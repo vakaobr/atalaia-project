@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+idf_component_register(
+    SRCS
+        "shell.c"
+        "game_timer.c"
+        "command_dispatch.c"
+        "preset_store.c"
+        "state_persist.c"
+        "node_runner.c"
+        "screen_renderer.c"
+        "preset_ui.c"
+        "wifi_setup.c"
+        "config_store.c"
+        "mem_monitor.c"
+        "button_tracker.c"
+        "hal/esp/hal_esp.c"
+        "hal/esp/hal_esp_buttons.c"
+        "hal/esp/hal_esp_keypad.c"
+        "hal/esp/hal_esp_leds.c"
+        "hal/esp/hal_esp_display.c"
+        "hal/esp/hal_esp_nfc.c"
+        "hal/esp/hal_esp_audio.c"
+        "hal/esp/hal_esp_battery.c"
+    INCLUDE_DIRS
+        "."
+        "hal"
+    PRIV_INCLUDE_DIRS
+        "hal/esp"
+    REQUIRES
+        atalaia_core
+        driver
+        esp_psram
+        esp_timer
+        nvs_flash
+        esp_wifi
+        esp_http_server
+        esp_event
+        esp_netif
+    EMBED_FILES
+        "wifi_setup.html"
+)

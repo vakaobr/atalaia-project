@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# ESP32-S3 target defaults for the Atalaia Field Box.
+# Default board: Heltec WiFi LoRa 32 V4 (ESP32-S3R2, 2 MB PSRAM,
+# 16 MB flash, SX1262 radio).  See ADR-P1-4 (partition layout),
+# ADR-P1-1 (pin assignments) and IMPLEMENTATION.md.
+
+# --- Target ---
+CONFIG_IDF_TARGET="esp32s3"
+
+# --- Flash (16 MB on Heltec V4) ---
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+
+# --- Partition table (custom, see partitions.csv) ---
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# --- PSRAM (2 MB quad on Heltec V4) ---
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_QUAD=y
+CONFIG_SPIRAM_SPEED_80M=y
+
+# --- FreeRTOS ---
+CONFIG_FREERTOS_HZ=1000
+
+# --- System ---
+CONFIG_ESP_SYSTEM_PANIC_PRINT_REBOOT=y
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+# --- Compiler ---
+CONFIG_COMPILER_OPTIMIZATION_PERF=y

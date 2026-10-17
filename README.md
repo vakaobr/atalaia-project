@@ -19,7 +19,7 @@ Atalaia is an open, local-first platform for airsoft, paintball and milsim game 
 
 *Atalaia* is Portuguese for "watchtower" ([why that name?](#name)).
 
-> **Status: pre-alpha, design phase.** Nothing here is ready for the field yet. Phase 0 is nearly complete: the shared core, its Lua sandbox, the Skirmesh-RF event codec and a browser-based simulator run Domination and Bomb, and phase 1 (the first Field Box) starts when prototype parts arrive. Ideas, reviews and early contributors are very welcome.
+> **Status: pre-alpha.** Nothing here is ready for the field yet. Phase 0 is complete: the shared core, its Lua sandbox, the Skirmesh-RF event codec and a browser-based simulator run Domination and Bomb. Phase 1 (the Field Box firmware shell) is built and cross-compiles for ESP32-S3; the final gate — a 2-hour club game on real hardware — awaits prototype parts. Ideas, reviews and early contributors are very welcome.
 
 ---
 
@@ -85,13 +85,25 @@ See [LICENSING.md](LICENSING.md) for the details.
 
 ## Getting started
 
-There is nothing to flash yet, but you can run the game modes on your computer. Build the core and run its tests and every mode's tests in the simulator:
+**Run the simulator** (no hardware needed). Build the core and run its tests and every mode's tests:
 
 ```sh
 sh tools/check.sh
 ```
 
 You need a C11 compiler, CMake 3.16 or newer, Python 3.10 or newer and PyYAML. No compiler? Use the [dev container](tools/README.md). To play a mode in your browser, holding team buttons and watching the props' screens and the event log, see the [simulator](simulator/README.md#play-a-mode-in-the-browser). To write a mode, start with [modes/README.md](modes/README.md).
+
+**Build the Field Box firmware** (cross-compiles in Docker, no toolchain needed locally):
+
+```sh
+# From Git Bash on Windows:
+MSYS_NO_PATHCONV=1 docker run --rm \
+  -v "$(pwd -W):/project" -w /project/firmware/esp32 \
+  espressif/idf:v5.3.2 \
+  bash -c "idf.py set-target esp32s3 && idf.py build"
+```
+
+See [firmware/esp32/README.md](firmware/esp32/README.md) for the full build guide, Kconfig options, pin table, and bring-up checklist.
 
 ## Contributing
 

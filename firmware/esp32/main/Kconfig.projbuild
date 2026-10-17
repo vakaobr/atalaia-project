@@ -1,0 +1,209 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Pin assignments and tuning knobs for the Atalaia Field Box.
+# Default board: Heltec WiFi LoRa 32 V4.3 (ESP32-S3R2, 16 MB flash,
+# 2 MB PSRAM, SX1262 LoRa radio, 0.96" OLED).
+#
+# Board-internal pins -- DO NOT reassign:
+#   1 (Vbat ADC), 2 (FEM_EN), 7 (VFEM_Ctrl), 8-14 (SX1262),
+#   17-18 (OLED I2C), 19-20 (USB), 21 (OLED RST), 35 (LED),
+#   36 (Vext), 37 (ADC_Ctrl), 43-44 (UART0 console).
+#
+# ESP32-S3 strapping pins:
+#   GPIO 0  -- boot mode (PRG button on V4.3). Do not use.
+#   GPIO 3  -- JTAG TMS.  Used here for DISP_DC; disables JTAG.
+#              Safe: JTAG is not needed in production; internal pull-up
+#              selects normal (non-JTAG) operation at reset.
+#   GPIO 45 -- VDD_SPI voltage.  NOT used.  An external pull-up here
+#              selects 1.8 V flash and prevents booting.
+#   GPIO 46 -- boot log verbosity.  NOT used in default config.
+#              An external pull-up suppresses boot log (harmless).
+#
+# GNSS header (38-42): used for external peripherals in Phase 1.
+# NFC/battery/keypad share the OLED I2C bus (17/18):
+#   0x20 (PCF8574 keypad), 0x24 (PN532 NFC), 0x36 (MAX17048), 0x3C (OLED).
+#
+# Convention: -1 means "unassigned / peripheral not wired".
+
+menu "Atalaia Field Box Configuration"
+
+    # ---- Buttons (active-low GPIOs) -----------------------------------------
+    menu "Buttons"
+        config ATALAIA_BTN1_PIN
+            int "Button 1 GPIO (-1 = unused)"
+            default 4
+
+        config ATALAIA_BTN2_PIN
+            int "Button 2 GPIO (-1 = unused)"
+            default 5
+
+        config ATALAIA_BTN3_PIN
+            int "Button 3 GPIO (-1 = unused)"
+            default 33
+            help
+                GPIO 33, freed from the keypad matrix by the PCF8574
+                I2C expander. Set to -1 for 2-team play.
+
+        config ATALAIA_BTN4_PIN
+            int "Button 4 GPIO (-1 = unused)"
+            default 34
+            help
+                GPIO 34, freed from the keypad matrix by the PCF8574
+                I2C expander. Set to -1 for 2- or 3-team play.
+    endmenu
+
+    # ---- PCF8574 I2C keypad expander ------------------------------------------
+    # The 4x3 matrix keypad is wired through a PCF8574 on the shared OLED
+    # I2C bus (GPIO 17/18). Rows on P0-P3, columns on P4-P6, P7 unused.
+    # This frees GPIOs 6, 15, 16, 33, 34, 38, 39 for audio, buttons, etc.
+    menu "Keypad"
+        config ATALAIA_KP_I2C_ADDR
+            hex "PCF8574 I2C address"
+            default 0x20
+            help
+                7-bit I2C address of the PCF8574 keypad expander.
+                Common values: 0x20-0x27 (A0-A2 address pins).
+
+        config ATALAIA_KP_INT_PIN
+            int "PCF8574 INT GPIO (-1 = poll)"
+            default -1
+            help
+                Optional interrupt pin from the PCF8574.  When set
+                the driver can skip I2C polls when no key change has
+                occurred.  Set to -1 to always poll (default).
+    endmenu
+
+    # ---- WS2812B LED strip --------------------------------------------------
+    menu "LEDs"
+        config ATALAIA_LED_PIN
+            int "LED data GPIO"
+            default 48
+
+        config ATALAIA_LED_COUNT
+            int "Number of LEDs"
+            default 24
+    endmenu
+
+    # ---- SPI display --------------------------------------------------------
+    menu "Display"
+        config ATALAIA_DISP_MOSI_PIN
+            int "Display SPI MOSI GPIO"
+            default 40
+            help
+                GPIO 40 is on the GNSS header.
+
+        config ATALAIA_DISP_CLK_PIN
+            int "Display SPI CLK GPIO"
+            default 41
+
+        config ATALAIA_DISP_CS_PIN
+            int "Display SPI CS GPIO"
+            default 42
+
+        config ATALAIA_DISP_DC_PIN
+            int "Display DC GPIO"
+            default 3
+            help
+                GPIO 3 is an ESP32-S3 JTAG strapping pin. Using it
+                for display DC disables the JTAG debug interface.
+                Safe: internal pull-up selects non-JTAG mode at reset.
+
+        config ATALAIA_DISP_RST_PIN
+            int "Display RST GPIO (-1 = tied to Vext)"
+            default 38
+            help
+                GPIO 38, freed from the keypad matrix by the PCF8574
+                I2C expander (on the GNSS header). Set to -1 when the
+                display RST is wired to Vext_Ctrl (GPIO 36) instead.
+
+        config ATALAIA_DISP_BL_PIN
+            int "Display backlight GPIO (-1 = always on via Vext)"
+            default 47
+            help
+                GPIO 47 is not a strapping pin. Safe for output.
+                Set to -1 to omit software backlight control (the
+                backlight stays on whenever Vext is high).
+
+        choice ATALAIA_DISP_CONTROLLER
+            prompt "Display controller IC"
+            default ATALAIA_DISP_ILI9341
+
+            config ATALAIA_DISP_ILI9341
+                bool "ILI9341"
+
+            config ATALAIA_DISP_ST7789
+                bool "ST7789"
+        endchoice
+    endmenu
+
+    # ---- NFC (PN532 over I2C, shared bus with OLED and battery gauge) -------
+    menu "NFC"
+        config ATALAIA_NFC_SDA_PIN
+            int "NFC I2C SDA GPIO"
+            default 17
+            help
+                Shares the on-board OLED I2C bus. The PN532 (0x24),
+                OLED (0x3C) and MAX17048 (0x36) coexist on this bus.
+
+        config ATALAIA_NFC_SCL_PIN
+            int "NFC I2C SCL GPIO"
+            default 18
+    endmenu
+
+    # ---- I2S audio (MAX98357A) ----------------------------------------------
+    # GPIOs 6, 15, 16 are freed from the keypad matrix by the PCF8574
+    # I2C expander and reassigned here.
+    menu "Audio"
+        config ATALAIA_AUDIO_BCLK_PIN
+            int "I2S bit-clock GPIO (-1 = audio disabled)"
+            default 6
+            help
+                GPIO 6, freed from keypad. Non-strapping, safe for I2S.
+
+        config ATALAIA_AUDIO_LRCLK_PIN
+            int "I2S LR-clock GPIO (-1 = audio disabled)"
+            default 15
+            help
+                GPIO 15, freed from keypad. Non-strapping.
+
+        config ATALAIA_AUDIO_DOUT_PIN
+            int "I2S data-out GPIO (-1 = audio disabled)"
+            default 16
+            help
+                GPIO 16, freed from keypad. Non-strapping.
+    endmenu
+
+    # ---- Battery gauge (MAX17048 over I2C, shared bus with NFC and OLED) ----
+    menu "Battery"
+        config ATALAIA_BATT_SDA_PIN
+            int "Battery gauge I2C SDA GPIO"
+            default 17
+            help
+                Shares the OLED I2C bus.
+
+        config ATALAIA_BATT_SCL_PIN
+            int "Battery gauge I2C SCL GPIO"
+            default 18
+    endmenu
+
+    # ---- Memory tier --------------------------------------------------------
+    choice ATALAIA_MEMORY_TIER
+        prompt "Lua heap memory tier"
+        default ATALAIA_MEMORY_TIER_FULL
+
+        config ATALAIA_MEMORY_TIER_FULL
+            bool "Full (256 KB)"
+            help
+                Allocates 256 KB for the Lua sandbox heap.
+                Requires PSRAM; falls back to reduced tier at runtime
+                if PSRAM is not detected.
+
+        config ATALAIA_MEMORY_TIER_REDUCED
+            bool "Reduced (64 KB)"
+            help
+                Allocates 64 KB for the Lua sandbox heap.
+                Suitable for boards without PSRAM (e.g. Heltec V3).
+    endchoice
+
+endmenu

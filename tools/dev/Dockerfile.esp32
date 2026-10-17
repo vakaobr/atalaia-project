@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# ESP-IDF development / CI image for the Atalaia firmware.
+#
+#   docker build -f tools/dev/Dockerfile.esp32 -t atalaia-idf .
+#   docker run --rm -v "$PWD:/project" -w /project/firmware/esp32 atalaia-idf \
+#       idf.py build
+#
+FROM espressif/idf:v5.3.2

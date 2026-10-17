@@ -1,0 +1,60 @@
+<!--
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atalaia Setup</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#1a1a2e;color:#e0e0e0;padding:16px;max-width:400px;margin:0 auto}
+h1{font-size:1.4rem;text-align:center;margin:16px 0;color:#00d4ff}
+form{display:flex;flex-direction:column;gap:12px}
+label{font-size:0.9rem;font-weight:600}
+input,select{width:100%;padding:10px;border:1px solid #444;border-radius:6px;background:#2a2a4a;color:#e0e0e0;font-size:1rem}
+input:focus,select:focus{outline:none;border-color:#00d4ff}
+button{padding:12px;background:#00d4ff;color:#1a1a2e;border:none;border-radius:6px;font-size:1rem;font-weight:700;cursor:pointer}
+button:active{background:#00a0cc}
+.note{font-size:0.75rem;color:#888;text-align:center;margin-top:12px}
+</style>
+</head>
+<body>
+<h1>Atalaia Node Setup</h1>
+<form method="POST" action="/config">
+
+<label for="name">Node Name</label>
+<input type="text" id="name" name="name" required maxlength="32" placeholder="field-box-01">
+
+<label for="region">Radio Region</label>
+<select id="region" name="region" required>
+<option value="">-- select --</option>
+<option value="EU868">EU868 (Europe)</option>
+<option value="US915">US915 (Americas)</option>
+<option value="AU915">AU915 (Australia)</option>
+<option value="AS923">AS923 (Asia)</option>
+</select>
+
+<label for="teams">Number of Teams</label>
+<select id="teams" name="teams">
+<option value="2" selected>2</option>
+<option value="3">3</option>
+<option value="4">4</option>
+</select>
+
+<label for="pin">Admin PIN (4-6 digits)</label>
+<input type="password" id="pin" name="pin" required pattern="[0-9]{4,6}" minlength="4" maxlength="6" inputmode="numeric" placeholder="1234">
+
+<label for="brightness">Display Brightness</label>
+<input type="range" id="brightness" name="brightness" min="10" max="100" value="80">
+
+<label for="volume">Audio Volume</label>
+<input type="range" id="volume" name="volume" min="0" max="100" value="70">
+
+<button type="submit">Save &amp; Reboot</button>
+</form>
+<p class="note">Connect to the node Wi-Fi and visit this page to configure.</p>
+</body>
+</html>

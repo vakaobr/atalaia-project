@@ -1,0 +1,26 @@
+{
+  "schema_version": "2.0.0",
+  "issue_name": "phase-1-single-box",
+  "current_phase": "complete",
+  "phase_status": "complete",
+  "review_iteration": 1,
+  "failing_experts": [],
+  "created_at": "2026-10-17T00:00:00Z",
+  "updated_at": "2026-10-18T00:00:00Z",
+  "artifacts": {
+    "RESEARCH.md": "complete",
+    "ADR.md": "complete",
+    "PLAN.md": "complete",
+    "IMPLEMENTATION.md": "complete",
+    "SECURITY.md": "complete",
+    "QA.md": "complete",
+    "SRE.md": "complete",
+    "REVIEW.md": "complete",
+    "PRODUCTION_READINESS.md": "complete",
+    "STATUS.md": "complete"
+  },
+  "metadata": {
+    "description": "Atalaia phase 1 (Single box). ESP-IDF shell on Heltec V4.3.",
+    "risk_level": "Medium"
+  }
+}
