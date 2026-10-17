@@ -20,10 +20,38 @@ jobs:
         run: cmake --build build
       - name: Test core
         run: ctest --test-dir build --output-on-failure
-      - name: Test game modes in the simulator
+      - name: Test the simulator and the game modes
+        env:
+          ATALAIA_CORE_LIB: ${{ github.workspace }}/build/libatalaia_core.so
         run: |
           pip install -r simulator/requirements.txt
-          cd simulator && python -m atalaia_sim --lib ../build/libatalaia_core.so test
+          cd simulator
+          python -m unittest discover -s tests -v
+          python -m atalaia_sim test
+
+  protocol:
+    name: Protocol schema and generated files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install tools
+        run: pip install -r simulator/requirements.txt check-jsonschema
+      - name: Generated files are up to date
+        run: python tools/protogen.py --check
+      - name: The JSON Schema accepts the examples and rejects the invalid ones
+        working-directory: protocol/json
+        run: |
+          check-jsonschema --check-metaschema event.schema.json
+          check-jsonschema --schemafile event.schema.json examples/*.json
+          for f in examples/invalid/*.json; do
+            if check-jsonschema --schemafile event.schema.json "$f" > /dev/null; then
+              echo "::error file=protocol/json/$f::the schema accepts this invalid example"
+              exit 1
+            fi
+          done
 
   sanitizers:
     name: Core under AddressSanitizer and UBSan

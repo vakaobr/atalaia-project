@@ -27,16 +27,21 @@ static uint8_t check_team(lua_State *L, atalaia_node_t *n, int idx,
     return team;
 }
 
-static atalaia_prio_t check_prio(lua_State *L, int opts_idx)
+/* opts.prio, or the event's default priority from the protocol schema
+ * (normal for custom events). */
+static atalaia_prio_t check_prio(lua_State *L, int opts_idx, const char *type)
 {
+    const atalaia_event_def_t *def = atalaia_event_def(type);
+    atalaia_prio_t result = def != NULL ? def->prio : ATALAIA_PRIO_NORMAL;
     if (lua_isnoneornil(L, opts_idx)) {
-        return ATALAIA_PRIO_NORMAL;
+        return result;
     }
     luaL_checktype(L, opts_idx, LUA_TTABLE);
     lua_getfield(L, opts_idx, "prio");
     const char *prio = lua_tostring(L, -1);
-    atalaia_prio_t result = ATALAIA_PRIO_NORMAL;
-    if (prio == NULL || strcmp(prio, "normal") == 0) {
+    if (prio == NULL) {
+        /* keep the default */
+    } else if (strcmp(prio, "normal") == 0) {
         result = ATALAIA_PRIO_NORMAL;
     } else if (strcmp(prio, "critical") == 0) {
         result = ATALAIA_PRIO_CRITICAL;
@@ -145,7 +150,7 @@ static int l_emit(lua_State *L)
         luaL_checktype(L, 2, LUA_TTABLE);
         data_idx = 2;
     }
-    atalaia_prio_t prio = check_prio(L, 3);
+    atalaia_prio_t prio = check_prio(L, 3, type);
     emit_event(L, n, type, data_idx, prio, "emit");
     return 0;
 }

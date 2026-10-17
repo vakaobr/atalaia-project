@@ -7,8 +7,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from . import codec
 from .core import Command, Core, Emitted, Node
 from .mode import Mode
+from .protocol import RF_PAYLOAD_MAX
 
 # While a team holds an input, shells emit team_input.hold at this interval
 # with the time held so far (see modes/README.md).
@@ -71,6 +73,10 @@ class Simulation:
         self.time_ms = 0
         self._log: list[LogEntry] = []
         self._controller_seq = 0
+        # Events that break protocol/schema/events.yaml or would not fit in a
+        # LoRa packet. They are collected here because the C core calls
+        # _record, and exceptions cannot cross that boundary.
+        self.problems: list[str] = []
         self.nodes: dict[str, VirtualNode] = {}
 
         for node_id, (name, role) in enumerate(nodes.items(), start=1):
@@ -107,11 +113,29 @@ class Simulation:
     def _record(self, vnode: VirtualNode, ev: Emitted) -> None:
         self._log.append(LogEntry(ev.t_ms, vnode.name, ev.node, ev.seq, ev.type,
                                   self._team_name(ev.team), ev.prio, ev.data))
+        self._check_wire(vnode.name, {"node": ev.node, "seq": ev.seq, "t": ev.t_ms, "type": ev.type,
+                                      "team": ev.team, "squad": ev.squad, "prio": ev.prio,
+                                      "data": ev.data})
 
     def _record_controller(self, type_: str, data: dict[str, Any]) -> None:
         self._controller_seq += 1
+        prio = codec.default_prio(type_)
         self._log.append(LogEntry(self.time_ms, CONTROLLER, 0, self._controller_seq, type_,
-                                  None, "critical", data))
+                                  None, prio, data))
+        self._check_wire(CONTROLLER, {"node": 0, "seq": self._controller_seq & 0xFFFF,
+                                      "t": self.time_ms, "type": type_, "prio": prio, "data": data})
+
+    def _check_wire(self, who: str, event: dict[str, Any]) -> None:
+        """Checks an event against the schema and the LoRa payload size."""
+        problems = codec.schema_problems(event["type"], event["data"])
+        try:
+            size = len(codec.encode_event(event))
+            if size > RF_PAYLOAD_MAX:
+                problems.append(f"'{event['type']}' takes {size} bytes on the wire, more than "
+                                f"the {RF_PAYLOAD_MAX} bytes of a LoRa payload")
+        except codec.CodecError as exc:
+            problems.append(f"'{event['type']}' cannot be sent: {exc}")
+        self.problems += [f"{who}: {p}" for p in problems]
 
     @property
     def events(self) -> list[LogEntry]:

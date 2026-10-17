@@ -35,7 +35,9 @@ endif()
 # ---- Core ------------------------------------------------------------------
 set(ATALAIA_CORE_SOURCES
     src/version.c
+    src/protocol.c
     src/event.c
+    src/codec.c
     src/score.c
     src/rand.c
     src/json.c
@@ -65,7 +67,7 @@ endif()
 # ---- Tests -----------------------------------------------------------------
 include(CTest)
 if(BUILD_TESTING)
-    add_executable(test_core tests/test_core.c tests/test_node.c)
+    add_executable(test_core tests/test_core.c tests/test_node.c tests/test_codec.c)
     target_include_directories(test_core PRIVATE src)
     target_link_libraries(test_core PRIVATE atalaia_core)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")

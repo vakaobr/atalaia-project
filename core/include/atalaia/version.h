@@ -9,8 +9,8 @@
 #define ATALAIA_VERSION_MINOR 1
 #define ATALAIA_VERSION_PATCH 0
 
-/* Skirmesh-RF protocol version spoken by this core. */
-#define ATALAIA_PROTOCOL_VERSION 1
+/* ATALAIA_PROTOCOL_VERSION, the Skirmesh-RF version this core speaks. */
+#include "atalaia/protocol.h"
 
 /* Returns the core version as "major.minor.patch". */
 const char *atalaia_version(void);

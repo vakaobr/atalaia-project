@@ -21,6 +21,8 @@ The GM console builds its settings form from `params` in `mode.yaml`, so GMs nev
 
 The script API is described in the "Game runtime and scripting" section of the [design specification](../docs/design-spec.md), and implemented in [`core/src/script_api.c`](../core/src/script_api.c).
 
+Standard events, their data fields and their default priorities are listed in [`protocol/schema/events.yaml`](../protocol/schema/events.yaml); `emit()` uses that priority unless you pass `{ prio = ... }`. `team` and `squad` may go in any event's data. A mode's own events are named `x.<club>.<name>` and can carry any data. Tests fail if a mode emits anything else, or an event too large for a LoRa packet (200 bytes, see [protocol/README.md](../protocol/README.md#events-on-lora)).
+
 ## Inputs from the hardware
 
 Modes react to semantic capabilities, so the same script works on a box with team buttons, a keypad or a touchscreen. The platform shell turns hardware into these events:

@@ -1,33 +1,92 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Standard events. DRAFT. Custom events use a namespace: x.<club>.<name>
+# Standard events. DRAFT: ids and keys may change until protocol v1 is frozen.
+# Custom events use a namespace: x.<club>.<name>. They travel with their
+# name as text and accept any data.
+#
+# After editing, run `python3 tools/protogen.py` and commit the generated
+# files with this one. Ids and keys are never reused once v1 is frozen.
 version: 1
 
-common_fields: [id, t, node, type, team, squad, data, prio]
+# Longest event name in bytes; custom names travel as text.
+type_max_length: 47
 
+priorities:
+  telemetry: { value: 0, doc: "best effort, coalesced" }
+  normal:    { value: 1, doc: "sent once with ACK, repaired by state sync" }
+  critical:  { value: 2, doc: "retried until acknowledged" }
+
+# The event envelope. On LoRa an event is a CBOR map with these integer keys
+# and short numeric ids for node, team and squad. Fields marked optional are
+# left out when they hold their default.
+envelope:
+  node:  { key: 1, doc: "source node short id within the game" }
+  seq:   { key: 2, doc: "per-node sequence number; (node, seq) is unique" }
+  t:     { key: 3, doc: "game time in milliseconds since game start" }
+  type:  { key: 4, doc: "standard event id, or the name as text" }
+  team:  { key: 5, optional: true, doc: "team id; 0 (none) when absent" }
+  squad: { key: 6, optional: true, doc: "squad id; 0 (none) when absent" }
+  prio:  { key: 7, optional: true, doc: "priority; the event's default when absent" }
+  data:  { key: 8, optional: true, doc: "event data; empty when absent" }
+
+# Event data fields. One table for every event, so a name always means the
+# same thing and has one CBOR key (keys 1-23 take one byte, so the most
+# common fields come first). Fields marked common may appear in any event.
+# Types: string, integer, number, boolean.
+data_fields:
+  team:          { key: 1,  type: string,  common: true, doc: "team name" }
+  squad:         { key: 2,  type: string,  common: true, doc: "squad name" }
+  reason:        { key: 3,  type: string,  doc: "why it happened" }
+  previous_team: { key: 4,  type: string,  doc: "team that owned the zone before" }
+  zone:          { key: 5,  type: string,  doc: "zone name" }
+  amount:        { key: 6,  type: integer, doc: "points; negative for penalties" }
+  fuse_s:        { key: 7,  type: number,  doc: "fuse length in seconds" }
+  winner:        { key: 8,  type: string,  doc: "winning team name" }
+  preset:        { key: 9,  type: string,  doc: "preset id" }
+  code:          { key: 10, type: string,  doc: "code id" }
+  kind:          { key: 11, type: string,  doc: "code kind: hint, points, unlock" }
+  tag:           { key: 12, type: string,  doc: "NFC tag id" }
+  owner:         { key: 13, type: string,  doc: "tag owner: team or player" }
+  player:        { key: 14, type: string,  doc: "player id" }
+  lives_left:    { key: 15, type: integer, doc: "lives remaining" }
+  window_open:   { key: 16, type: boolean, doc: "the target's scoring window was open" }
+  text:          { key: 17, type: string,  doc: "message text" }
+  audience:      { key: 18, type: string,  doc: "who sees the message" }
+  message:       { key: 19, type: string,  doc: "error message" }
+  percent:       { key: 20, type: integer, doc: "battery level in percent" }
+  fw:            { key: 21, type: string,  doc: "firmware version" }
+  tier:          { key: 22, type: string,  doc: "device tier" }
+  last_seen:     { key: 23, type: integer, doc: "game time of the last contact, in ms" }
+  replica:       { key: 24, type: string,  doc: "replica id" }
+  reading_mps:   { key: 25, type: number,  doc: "chrono reading in m/s" }
+  bb_g:          { key: 26, type: number,  doc: "BB weight in grams" }
+  limit_j:       { key: 27, type: number,  doc: "energy limit in joules" }
+
+# id: CBOR value of the type field (1-23 take one byte). prio: the default
+# priority. data: the fields this event may carry besides the common ones.
 events:
-  game.start:        { prio: critical, data: [preset] }
-  game.pause:        { prio: critical, data: [reason] }
-  game.resume:       { prio: critical, data: [] }
-  game.end:          { prio: critical, data: [reason, winner] }
-  zone.captured:     { prio: normal,   data: [zone, previous_team] }
-  zone.neutralized:  { prio: normal,   data: [zone, previous_team] }
-  bomb.armed:        { prio: critical, data: [fuse_s] }
-  bomb.defused:      { prio: critical, data: [] }
-  bomb.exploded:     { prio: critical, data: [] }
-  bomb.reset:        { prio: normal,   data: [] }
-  score.delta:       { prio: normal,   data: [amount, reason] }   # penalties; gains travel as counters in STATE
-  code.used:         { prio: normal,   data: [code, kind] }
-  tag.scanned:       { prio: normal,   data: [tag, owner] }
-  player.respawn:    { prio: normal,   data: [player, lives_left] }
-  player.checkin:    { prio: normal,   data: [player] }
-  target.hit:        { prio: normal,   data: [window_open] }
-  chrono.violation:  { prio: critical, data: [replica, reading_mps, bb_g, limit_j] }
-  gm.message:        { prio: normal,   data: [text, audience] }
-  node.online:       { prio: telemetry, data: [fw, tier] }
-  node.offline:      { prio: telemetry, data: [last_seen] }
-  node.rebooted:     { prio: critical, data: [reason] }
-  battery.low:       { prio: telemetry, data: [percent] }
-  script.error:      { prio: normal,   data: [message] }          # a handler failed; the node keeps running
-  script.halted:     { prio: critical, data: [reason] }           # the sandbox stopped the script
+  game.start:       { id: 1,  prio: critical,  data: [preset] }
+  game.pause:       { id: 2,  prio: critical,  data: [reason] }
+  game.resume:      { id: 3,  prio: critical,  data: [] }
+  game.end:         { id: 4,  prio: critical,  data: [reason, winner] }
+  zone.captured:    { id: 5,  prio: normal,    data: [zone, previous_team] }
+  zone.neutralized: { id: 6,  prio: normal,    data: [zone, previous_team] }
+  bomb.armed:       { id: 7,  prio: critical,  data: [fuse_s] }
+  bomb.defused:     { id: 8,  prio: critical,  data: [] }
+  bomb.exploded:    { id: 9,  prio: critical,  data: [] }
+  bomb.reset:       { id: 10, prio: normal,    data: [] }
+  score.delta:      { id: 11, prio: normal,    data: [amount, reason] }   # penalties; gains travel as counters in STATE
+  code.used:        { id: 12, prio: normal,    data: [code, kind] }
+  tag.scanned:      { id: 13, prio: normal,    data: [tag, owner] }
+  player.respawn:   { id: 14, prio: normal,    data: [player, lives_left] }
+  player.checkin:   { id: 15, prio: normal,    data: [player] }
+  target.hit:       { id: 16, prio: normal,    data: [window_open] }
+  chrono.violation: { id: 17, prio: critical,  data: [replica, reading_mps, bb_g, limit_j] }
+  gm.message:       { id: 18, prio: normal,    data: [text, audience] }
+  node.online:      { id: 19, prio: telemetry, data: [fw, tier] }
+  node.offline:     { id: 20, prio: telemetry, data: [last_seen] }
+  node.rebooted:    { id: 21, prio: critical,  data: [reason] }
+  battery.low:      { id: 22, prio: telemetry, data: [percent] }
+  script.error:     { id: 23, prio: normal,    data: [message] }          # a handler failed; the node keeps running
+  script.halted:    { id: 24, prio: critical,  data: [reason] }           # the sandbox stopped the script

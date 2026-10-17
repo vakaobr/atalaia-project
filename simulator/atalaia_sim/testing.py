@@ -170,6 +170,13 @@ class _Runner:
                               f"last screen is {template} {data}")
 
 
+def _check_problems(sim: Simulation, where: str) -> None:
+    """Any event that breaks the protocol schema fails the test."""
+    if sim.problems:
+        raise TestFailure(f"{where}: " + "; ".join(sim.problems) +
+                          " (see protocol/schema/events.yaml)")
+
+
 def run_test(core: Core, mode: Mode, path: Path) -> TestResult:
     try:
         spec = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -187,11 +194,13 @@ def run_test(core: Core, mode: Mode, path: Path) -> TestResult:
         runner = _Runner(sim)
         if spec.get("autostart", True):
             sim.start()
+            _check_problems(sim, "start")
         for i, step in enumerate(spec.get("steps") or [], start=1):
             try:
                 runner.step(step)
             except (TestFailure, SimError, KeyError) as exc:
                 raise TestFailure(f"step {i} {step!r}: {exc}") from exc
+            _check_problems(sim, f"step {i} {step!r}")
         return TestResult(mode.id, path, name, True)
     except (TestFailure, SimError, ModeError) as exc:
         log = [e.describe() for e in sim.events] if sim else []

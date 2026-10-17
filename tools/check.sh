@@ -2,13 +2,18 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Builds the core, runs its tests and runs every game mode's tests in the
-# simulator: the same checks as CI. Run from the repository root, natively
-# or in the dev container (see tools/dev/Dockerfile).
+# Checks the generated protocol files, builds the core, runs its tests, the
+# simulator's tests and every game mode's tests: the same checks as CI
+# (apart from the JSON Schema and licensing checks, which need extra tools).
+# Run from the repository root, natively or in the dev container (see
+# tools/dev/Dockerfile).
 set -eu
 BUILD="${BUILD:-build}"
+python3 tools/protogen.py --check
 cmake -S core -B "$BUILD" -DCMAKE_BUILD_TYPE=Debug -DATALAIA_SHARED=ON
 cmake --build "$BUILD"
 ctest --test-dir "$BUILD" --output-on-failure
-LIB="$(cd "$BUILD" && pwd)/libatalaia_core.so"
-cd simulator && python3 -m atalaia_sim --lib "$LIB" test
+export ATALAIA_CORE_LIB="$(cd "$BUILD" && pwd)/libatalaia_core.so"
+cd simulator
+python3 -m unittest discover -s tests
+python3 -m atalaia_sim test

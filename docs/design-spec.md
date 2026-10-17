@@ -479,7 +479,7 @@ The explosion is its own timer rather than a countdown in the display tick, so i
 
 | Area | Functions |
 | --- | --- |
-| Events | `on(type, fn)`, `emit(type, data, opts)` |
+| Events | `on(type, fn)`, `emit(type, data, opts)`; `opts.prio` defaults to the event's priority in the protocol schema |
 | Time | `every(s, fn)` and `after(s, fn)` return a timer id for `cancel(id)`; `game.time()` is seconds since the start |
 | State | `state.node{}` (this node only), `state.field{}` (replicated via controller) |
 | Game | `game.start()`, `game.finish(reason)`, `game.win(team)`, `score.add(team, n, reason, squad)`, `score.get(team or squad)` |
@@ -561,7 +561,7 @@ Indoor sites need a few specific choices:
 | Payload | ≤ 200 B | CBOR with integer keys |
 | MIC | 8 B | Message authentication with the per-game key |
 
-On Wi-Fi, BLE and the API the same messages are carried as JSON with readable keys. A shared schema file generates both encodings.
+On Wi-Fi, BLE and the API the same messages are carried as JSON with readable keys. A shared schema file generates both encodings. In an EVENT payload, standard events travel as a numeric id and custom events by name, and standard data fields use integer keys from one table; [`protocol/README.md`](../protocol/README.md) has the details.
 
 ### Message types
 
@@ -1022,6 +1022,9 @@ Twenty-eight decisions are settled and two questions remain open. Settled decisi
 
 | Date | Decision | Rationale |
 | --- | --- | --- |
+| 2026-10-17 | EVENT payloads: a CBOR map with integer keys; standard events by id, custom events by name; one table of data-field keys; defaults left out | Keeps a typical event under 40 bytes of the 200-byte LoRa payload while staying self-describing for custom events |
+| 2026-10-17 | Protocol tables, test vectors and the JSON Schema are generated from `protocol/schema`; the codecs are written by hand and share test vectors | One source of truth; hand-written codecs stay small and reviewable on every platform |
+| 2026-10-17 | `emit()` defaults to the schema's priority for standard events | Scripts cannot forget to mark `bomb.exploded` or `game.end` critical |
 | 2026-10-17 | Licences: GPL-3.0-or-later (with app-store exception) for core, firmware, apps and built-in modes; AGPL-3.0-or-later for field controller and site server | Field owners and makers may use it commercially; companies that ship or host changes must give them back to the community |
 | 2026-10-17 | Project name Atalaia; field radio protocol Skirmesh-RF; tagline "the open force-on-force platform" | A memorable name rooted in Portugal, a descriptive protocol name, and a tagline that explains the project |
 | 2026-10-17 | Code lives in the atalaia-project repository on GitHub, private at first under the founder's account; moved to an organisation once the project gains traction | Fast start with no setup overhead; GitHub keeps redirects when a repository moves |

@@ -1,0 +1,9 @@
+{
+  "id": "box-b210:77",
+  "t": 1500000,
+  "node": "box-b210",
+  "type": "x.myclub.power_plant.upgraded",
+  "team": "red",
+  "data": { "level": 3, "team": "red" },
+  "prio": "normal"
+}

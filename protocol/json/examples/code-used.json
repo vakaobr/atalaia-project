@@ -1,0 +1,10 @@
+{
+  "id": "box-a3f1:1842",
+  "t": 734210,
+  "node": "box-a3f1",
+  "type": "code.used",
+  "team": "blue",
+  "squad": "blue-2",
+  "data": { "code": "HINT-07", "kind": "hint" },
+  "prio": "normal"
+}

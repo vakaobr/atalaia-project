@@ -137,6 +137,7 @@ int main(void)
     test_score();
     test_rand();
     run_node_tests();
+    run_codec_tests();
 
     if (check_failures == 0) {
         printf("core: all tests passed\n");

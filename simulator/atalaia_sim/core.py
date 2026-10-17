@@ -12,8 +12,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-EVENT_TYPE_MAX = 48
-PRIO_NAMES = {0: "telemetry", 1: "normal", 2: "critical"}
+from .protocol import EVENT_TYPE_MAX, PRIORITIES
+
+PRIO_NAMES = {v: k for k, v in PRIORITIES.items()}
 STATUS_NAMES = {0: "empty", 1: "running", 2: "ended", 3: "halted"}
 
 
@@ -126,6 +127,7 @@ class Emitted:
     seq: int
     t_ms: int
     team: int
+    squad: int
     prio: str
     type: str
     data: dict[str, Any]
@@ -206,6 +208,7 @@ class Node:
             seq=ev.seq,
             t_ms=ev.t_ms,
             team=ev.team,
+            squad=ev.squad,
             prio=PRIO_NAMES.get(ev.prio, str(ev.prio)),
             type=ev.type.decode(),
             data=json.loads(data.decode()) if data else {},

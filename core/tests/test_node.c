@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "atalaia/codec.h"
 #include "atalaia/node.h"
 #include "check.h"
 
@@ -134,6 +135,41 @@ static void test_emit_and_handlers(void)
     CHECK(!atalaia_node_input(n, "team_input.press", "{\"team\":"));
     CHECK(!atalaia_node_input(n, "team_input.press", "[1,2]"));
     CHECK(atalaia_node_status(n) == ATALAIA_NODE_RUNNING);
+    atalaia_node_destroy(n);
+}
+
+/* emit() defaults to the schema's priority, and what a node emits survives
+ * the wire codec unchanged. */
+static void test_default_priority(void)
+{
+    recorder_t r;
+    atalaia_node_t *n = make_node(&r, 1, 0);
+    CHECK(load(n,
+        "on('team_input.press', function(e)\n"
+        "  emit('bomb.exploded', { team = e.team })\n"
+        "  emit('battery.low', { percent = 5 })\n"
+        "  emit('x.club.thing', { list = { 1, 2.5, 'x' }, nested = { ok = true } })\n"
+        "  emit('bomb.exploded', {}, { prio = 'normal' })\n"
+        "end)\n"));
+    CHECK(atalaia_node_input(n, "team_input.press", "{\"team\":\"red\"}"));
+    CHECK(r.events == 4);
+    CHECK(r.prio[0] == ATALAIA_PRIO_CRITICAL);
+    CHECK(r.prio[1] == ATALAIA_PRIO_TELEMETRY);
+    CHECK(r.prio[2] == ATALAIA_PRIO_NORMAL);
+    CHECK(r.prio[3] == ATALAIA_PRIO_NORMAL);
+
+    for (int i = 0; i < r.events && i < MAX_RECORDS; i++) {
+        atalaia_event_t ev, back;
+        atalaia_event_init(&ev, 3, r.seq[i], r.t_ms[i], r.type[i], r.team[i], 0, r.prio[i]);
+        uint8_t payload[ATALAIA_RF_PAYLOAD_MAX];
+        char json[RECORD_TEXT];
+        size_t len = atalaia_event_encode(&ev, r.data[i], payload, sizeof(payload), NULL);
+        CHECK(len > 0);
+        CHECK(atalaia_event_decode(payload, len, &back, json, sizeof(json), NULL));
+        CHECK(atalaia_event_compare(&ev, &back) == 0 && back.prio == ev.prio &&
+              strcmp(back.type, ev.type) == 0 && back.team == ev.team);
+        CHECK(strcmp(json, r.data[i]) == 0);
+    }
     atalaia_node_destroy(n);
 }
 
@@ -396,6 +432,7 @@ static void test_sequence_numbers(void)
 void run_node_tests(void)
 {
     test_emit_and_handlers();
+    test_default_priority();
     test_timers();
     test_scores_and_end();
     test_pause();

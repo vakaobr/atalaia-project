@@ -11,18 +11,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/* ATALAIA_EVENT_TYPE_MAX and atalaia_prio_t come from the protocol schema. */
+#include "atalaia/protocol.h"
+
 /* Team and squad ids are one byte on the wire. 0 means "none". */
 #define ATALAIA_TEAM_NONE  0u
 #define ATALAIA_SQUAD_NONE 0u
 #define ATALAIA_TEAM_MAX   250u
-
-#define ATALAIA_EVENT_TYPE_MAX 48 /* includes the terminating NUL */
-
-typedef enum {
-    ATALAIA_PRIO_TELEMETRY = 0, /* best effort, coalesced */
-    ATALAIA_PRIO_NORMAL    = 1, /* sent once with ACK, repaired by state sync */
-    ATALAIA_PRIO_CRITICAL  = 2  /* retried until acknowledged */
-} atalaia_prio_t;
 
 typedef struct {
     uint16_t node;     /* source node short id within the game */

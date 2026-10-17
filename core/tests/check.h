@@ -21,5 +21,6 @@ extern int check_failures;
     } while (0)
 
 void run_node_tests(void);
+void run_codec_tests(void);
 
 #endif /* ATALAIA_TEST_CHECK_H */

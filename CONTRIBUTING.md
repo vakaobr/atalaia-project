@@ -41,6 +41,8 @@ New capability types, standard events, protocol fields and API endpoints go thro
 2. Open a pull request. Discussion runs for at least two weeks.
 3. A maintainer records the decision; accepted RFCs get a number.
 
+Protocol changes are made in `protocol/schema/*.yaml`; then run `python3 tools/protogen.py` and commit the generated files too (see [protocol/README.md](protocol/README.md#changing-the-schema)).
+
 Bug fixes, refactors, new modes and documentation do not need an RFC.
 
 ## Pull requests
