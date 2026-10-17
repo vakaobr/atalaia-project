@@ -37,3 +37,6 @@ Thumbs.db
 *.pem
 *.key
 secrets.*
+
+# Local session handover notes
+HANDOVER.md
