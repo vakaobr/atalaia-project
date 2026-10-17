@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A capture by a squad records the squad
+steps:
+  - hold: { team: blue, s: 3, squad: blue-2 }
+  - expect: { type: zone.captured, team: blue, data: { squad: blue-2 } }

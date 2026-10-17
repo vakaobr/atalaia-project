@@ -2,23 +2,51 @@
 
 The shared C11 core runs on every full node: ESP32, Raspberry Pi/Linux and Android (through `dart:ffi`). Only platform shells and hardware drivers live elsewhere.
 
-Planned components:
+| Component | Purpose | Files | Status |
+| --- | --- | --- | --- |
+| Events | Event structure, identity and ordering | `event.h` | Done |
+| Event bus | Dispatches hardware, game and system events to script handlers, in order | `node.c` | Done |
+| Timers | `every`, `after` and `cancel` on game time, fired in a deterministic order | `node.c` | Done |
+| State store | `state.node{}` and grow-only, mergeable score counters | `score.h`, `script_api.c` | Done (`state.field{}` arrives with the controller in phase 2) |
+| Lua sandbox | Lua 5.4 with a memory cap, an instruction watchdog, no `io`/`os`/`load`, and a seeded `rand` | `sandbox.c`, `rand.c` | Done |
+| Script API | The functions modes call | `script_api.c` | Done, except squad ids, persistence and `field.*` |
+| Protocol codec | Skirmesh-RF CBOR and JSON encodings from `protocol/schema` | | Planned |
+| Event log | Append-only log with merge and replay | | Planned |
 
-| Component | Purpose | Status |
+## How a host uses it
+
+One `atalaia_node_t` runs one mode's `node.lua`. The host owns the clock and the hardware. It feeds the node input events and game time, and the node calls back with emitted events, hardware commands and log lines. The core never reads a real clock and never blocks, which is what makes a game replayable from its inputs. The full API is in [`include/atalaia/node.h`](include/atalaia/node.h).
+
+```c
+atalaia_node_config_t cfg = { .node_id = 1, .game_seed = seed, .callbacks = cb };
+atalaia_node_t *node = atalaia_node_create(&cfg);
+atalaia_node_set_teams(node, (const char *[]){"red", "blue"}, 2);
+atalaia_node_set_params(node, "{\"fuse_s\": 300}");
+atalaia_node_load(node, source, source_len, "@bomb/node.lua");
+atalaia_node_input(node, "game.start", NULL);
+atalaia_node_input(node, "team_input.hold", "{\"team\":\"red\",\"ms\":5000}");
+atalaia_node_advance(node, now_ms);
+```
+
+## Sandbox limits
+
+| Limit | Default | When it trips |
 | --- | --- | --- |
-| Events | Event structure, identity and ordering | Skeleton |
-| Event bus | Dispatch hardware, game and system events to scripts | Planned |
-| State store | Node-local and replicated state, grow-only score counters | Planned |
-| Lua sandbox | Lua 5.4 with memory and instruction limits, seeded `rand` | Planned |
-| Protocol codec | Skirmesh-RF CBOR and JSON encodings from `protocol/schema` | Planned |
-| Event log | Append-only log with merge and replay | Planned |
+| Script memory | 256 KB (set 64 KB for the Reduced tier) | The node halts with "memory limit exceeded" |
+| Instructions per callback | 1,000,000 | The node halts; catching the error with `pcall` does not help |
+| Events per input or timer step | 256 | The node halts (a handler that emits what it handles) |
+| Timers | 32 | `every`/`after` raise an error |
+
+A halted node emits `script.halted` and shows the `paused` screen. An ordinary error in a handler emits `script.error` and the node keeps running. Time spent inside Lua's C library functions (for example a very slow string pattern) is not counted by the instruction watchdog yet.
 
 ## Build and test
 
 ```sh
-cmake -S core -B build
+cmake -S core -B build -DATALAIA_SHARED=ON
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-Rules: C11, no dynamic allocation outside the Lua allocator on microcontrollers, public symbols prefixed `atalaia_`, warnings are errors.
+`ATALAIA_SHARED=ON` also builds the shared library the [simulator](../simulator/) loads. To run everything CI runs, including the game mode tests, use [`tools/check.sh`](../tools/check.sh). On a machine without a C compiler, run it in the [dev container](../tools/dev/Dockerfile).
+
+Rules: C11, no dynamic allocation outside the configured allocator (the host can point it at PSRAM on ESP32), public symbols prefixed `atalaia_`, warnings are errors.

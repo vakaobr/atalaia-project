@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: The other team takes the box over
+steps:
+  - hold: { team: red, s: 3 }
+  - wait: 7                       # red scores at 10 s
+  - hold: { team: blue, s: 3 }
+  - expect: { type: zone.captured, team: blue, at: 13, data: { previous_team: red } }
+  - wait: 7                       # blue scores at 20 s
+  - expect_score: { team: red, points: 1 }
+  - expect_score: { team: blue, points: 1 }

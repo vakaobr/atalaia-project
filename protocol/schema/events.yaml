@@ -17,7 +17,7 @@ events:
   bomb.defused:      { prio: critical, data: [] }
   bomb.exploded:     { prio: critical, data: [] }
   bomb.reset:        { prio: normal,   data: [] }
-  score.delta:       { prio: normal,   data: [amount, reason] }
+  score.delta:       { prio: normal,   data: [amount, reason] }   # penalties; gains travel as counters in STATE
   code.used:         { prio: normal,   data: [code, kind] }
   tag.scanned:       { prio: normal,   data: [tag, owner] }
   player.respawn:    { prio: normal,   data: [player, lives_left] }
@@ -29,3 +29,5 @@ events:
   node.offline:      { prio: telemetry, data: [last_seen] }
   node.rebooted:     { prio: critical, data: [reason] }
   battery.low:       { prio: telemetry, data: [percent] }
+  script.error:      { prio: normal,   data: [message] }          # a handler failed; the node keeps running
+  script.halted:     { prio: critical, data: [reason] }           # the sandbox stopped the script

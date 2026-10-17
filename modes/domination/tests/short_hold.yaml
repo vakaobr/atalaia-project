@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Letting go before the hold time does not capture
+params: { capture_hold_ms: 3000 }
+steps:
+  - hold: { team: red, s: 2.75 }
+  - wait: 60
+  - expect_no: zone.captured
+  - expect_score: { team: red, points: 0 }

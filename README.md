@@ -6,7 +6,7 @@ Atalaia is an open, local-first platform for airsoft, paintball and milsim game 
 
 *Atalaia* is Portuguese for "watchtower" ([why that name?](#name)).
 
-> **Status: pre-alpha, design phase.** Nothing here is ready for the field yet. We are in phase 0: setting up the repository, the shared core and the simulator. Ideas, reviews and early contributors are very welcome.
+> **Status: pre-alpha, design phase.** Nothing here is ready for the field yet. We are in phase 0: the shared core and its Lua sandbox run Domination and Bomb in the simulator. Ideas, reviews and early contributors are very welcome.
 
 ---
 
@@ -71,15 +71,13 @@ See [LICENSING.md](LICENSING.md) for the details.
 
 ## Getting started
 
-There is nothing to flash yet. If you want to build the core skeleton and run its tests:
+There is nothing to flash yet, but you can run the game modes on your computer. Build the core and run its tests and every mode's tests in the simulator:
 
 ```sh
-cmake -S core -B build
-cmake --build build
-ctest --test-dir build --output-on-failure
+sh tools/check.sh
 ```
 
-You need a C11 compiler and CMake 3.16 or newer.
+You need a C11 compiler, CMake 3.16 or newer, Python 3.10 or newer and PyYAML. No compiler? Use the [dev container](tools/README.md). To write a mode, start with [modes/README.md](modes/README.md).
 
 ## Contributing
 

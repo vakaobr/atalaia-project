@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: By default a defused bomb cannot be armed again
+params: { fuse_s: 60 }
+steps:
+  - hold: { team: red, s: 5 }
+  - hold: { team: blue, s: 10 }
+  - hold: { team: red, s: 5 }
+  - expect: bomb.armed
+  - expect: bomb.defused
+  - expect_no: bomb.armed

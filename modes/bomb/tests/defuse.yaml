@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Defenders defuse the armed bomb in time
+params: { fuse_s: 60 }
+steps:
+  - hold: { team: red, s: 5 }
+  - hold: { team: blue, s: 10 }
+  - expect: { type: bomb.armed, team: red }
+  - expect: { type: bomb.defused, team: blue, at: 15 }
+  - wait: 120
+  - expect_no: bomb.exploded

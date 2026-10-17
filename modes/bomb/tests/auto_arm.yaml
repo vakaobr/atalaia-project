@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: The bomb arms itself after auto_arm_after_s
+params: { fuse_s: 60, auto_arm_after_s: 30 }
+steps:
+  - wait: 30
+  - expect: { type: bomb.armed, team: red, at: 30 }
+  - wait: 60
+  - expect: { type: bomb.exploded, at: 90 }

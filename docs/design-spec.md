@@ -448,36 +448,39 @@ The GM console builds its settings form straight from `params`, including valida
 
 ```lua
 -- bomb/node.lua (simplified)
-local s = state.node { phase = "standby", fuse = 0 }
+local s = state.node { phase = "standby", explode_at = 0 }
+local fuse_timer
 
 on("team_input.hold", function(e)
   if s.phase == "standby" and e.team == params.attackers and e.ms >= params.arm_hold_ms then
-    s.phase, s.fuse = "armed", params.fuse_s
-    emit("bomb.armed", { team = e.team, fuse = s.fuse }, { prio = "critical" })
+    s.phase, s.explode_at = "armed", game.time() + params.fuse_s
+    fuse_timer = after(params.fuse_s, function()
+      s.phase = "exploded"
+      audio.play("explosion")
+      emit("bomb.exploded", { team = params.attackers }, { prio = "critical" })
+    end)
+    emit("bomb.armed", { team = e.team, fuse_s = params.fuse_s }, { prio = "critical" })
   elseif s.phase == "armed" and e.team == params.defenders and e.ms >= params.defuse_hold_ms then
+    cancel(fuse_timer)
     s.phase = params.reset_after_defuse and "standby" or "defused"
-    emit("bomb.defused", { team = e.team })
+    emit("bomb.defused", { team = e.team }, { prio = "critical" })
   end
 end)
 
 every(1, function()
   if s.phase ~= "armed" then return end
-  s.fuse = s.fuse - 1
-  ui.screen("countdown", { left = s.fuse })
-  if s.fuse <= 0 then
-    s.phase = "exploded"
-    audio.play("explosion")
-    emit("bomb.exploded", { team = params.attackers }, { prio = "critical" })
-  end
+  ui.screen("countdown", { left = math.ceil(s.explode_at - game.time()) })
 end)
 ```
+
+The explosion is its own timer rather than a countdown in the display tick, so it lands exactly `fuse_s` after arming. While a team holds a node's input, the platform shell emits `team_input.hold` every 250 ms with the time held so far in `ms`, then `team_input.release`.
 
 ### Script API surface (v1)
 
 | Area | Functions |
 | --- | --- |
 | Events | `on(type, fn)`, `emit(type, data, opts)` |
-| Time | `every(s, fn)`, `after(s, fn)`, `game.time()` |
+| Time | `every(s, fn)` and `after(s, fn)` return a timer id for `cancel(id)`; `game.time()` is seconds since the start |
 | State | `state.node{}` (this node only), `state.field{}` (replicated via controller) |
 | Game | `game.start()`, `game.finish(reason)`, `game.win(team)`, `score.add(team, n, reason, squad)`, `score.get(team or squad)` |
 | Hardware | `cap("ring"):fill(team)`, `ui.screen(template, data)`, `audio.play(clip)`, `audio.say(text)` |

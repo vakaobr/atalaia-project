@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: The game timer ends the game and freezes the score
+steps:
+  - hold: { team: red, s: 3 }
+  - wait: 17                      # red scores at 10 and 20 s
+  - end: time
+  - wait: 60
+  - expect_status: ended
+  - expect_score: { team: red, points: 2 }
+  - expect_screen: { template: final_score, data: { owner: red } }

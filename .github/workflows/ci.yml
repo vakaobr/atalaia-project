@@ -7,14 +7,34 @@ on:
 
 jobs:
   core:
-    name: Build and test core
+    name: Core and game modes
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
       - name: Configure
-        run: cmake -S core -B build -DCMAKE_BUILD_TYPE=Debug
+        run: cmake -S core -B build -DCMAKE_BUILD_TYPE=Debug -DATALAIA_SHARED=ON
       - name: Build
         run: cmake --build build
+      - name: Test core
+        run: ctest --test-dir build --output-on-failure
+      - name: Test game modes in the simulator
+        run: |
+          pip install -r simulator/requirements.txt
+          cd simulator && python -m atalaia_sim --lib ../build/libatalaia_core.so test
+
+  sanitizers:
+    name: Core under AddressSanitizer and UBSan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build
+        run: |
+          cmake -S core -B build -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
+          cmake --build build
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
@@ -22,11 +42,36 @@ jobs:
     name: Check licensing headers (REUSE)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Lint
         run: |
           pip install reuse
           reuse lint
+
+  dco:
+    name: Check DCO sign-off
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Every commit has a Signed-off-by line
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          missing=0
+          for sha in $(git rev-list --no-merges "$BASE..$HEAD"); do
+            if ! git log -1 --format=%B "$sha" | grep -q '^Signed-off-by: '; then
+              echo "::error::Commit $(git log -1 --format='%h %s' "$sha") has no Signed-off-by line"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Sign your commits with 'git commit -s'. See CONTRIBUTING.md."
+            exit 1
+          fi

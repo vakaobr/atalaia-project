@@ -1,0 +1,6 @@
+# Keep LF line endings in the repository and in working copies on every OS,
+# so scripts and generated files behave the same everywhere.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.stl binary

@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Defenders cannot arm, and a short hold does nothing
+steps:
+  - hold: { team: blue, s: 10 }
+  - hold: { team: red, s: 4.75 }
+  - wait: 400
+  - expect_no: bomb.armed

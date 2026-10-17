@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Holding the box captures it and scores every tick
+steps:
+  - hold: { team: red, s: 3 }
+  - expect: { type: zone.captured, team: red, at: 3 }
+  - wait: 57                      # ticks at 10, 20, ... 60 s
+  - expect_score: { team: red, points: 6 }
+  - expect_score: { team: blue, points: 0 }
