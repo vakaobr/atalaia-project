@@ -7,6 +7,10 @@
 # page shows, en.yaml has the same keys. Values are HTML; keys the template
 # marks |text are plain text. After editing, run python3 tools/build_site.py.
 # See site/README.md for the terms this translation uses.
+#
+# Links like href="#glossario-lora" point at the glossary entries at the end of
+# this file. Their ids (glossary.*.id) are stable: change them only together
+# with every link to them.
 
 meta:
   title: Atalaia · a plataforma aberta de combate simulado
@@ -29,6 +33,7 @@ header:
   try: Experimentar
   roadmap: Roteiro
   hub: Comunidade
+  glossary: Glossário
   language: Idioma
 
 hero:
@@ -36,11 +41,15 @@ hero:
   title: A plataforma aberta de <span class="nowrap">combate simulado</span>
   lead: >-
     A Atalaia é uma plataforma aberta para os dispositivos eletrónicos de jogo (os props) de
-    airsoft, paintball e milsim, que funciona no próprio campo, sem depender da internet. Monta
-    uma caixa de domínio com um microcontrolador de 20&nbsp;€, transforma um telemóvel Android
-    antigo num terminal de hacking, organiza um milsim de fim de semana com 20 caixas numa rede
-    mesh LoRa e escreve os teus próprios modos de jogo em pequenos scripts. Não precisa de nuvem
-    e não te prende a nenhum fabricante.
+    airsoft, paintball e milsim: as caixas que as equipas capturam, as bombas que armam e
+    desarmam. Monta uma caixa de domínio com um
+    <a href="#glossario-microcontrolador">microcontrolador</a> de 20&nbsp;€ (uma pequena placa de
+    computador, barata), transforma um telemóvel Android antigo num terminal de hacking, organiza
+    um milsim de fim de semana com 20 caixas numa <a href="#glossario-lora">rede mesh LoRa</a>
+    (rádio de longo alcance e baixo consumo, em que as caixas passam as mensagens umas às outras
+    de um lado ao outro do campo) e escreve os teus próprios modos de jogo em pequenos scripts.
+    Tudo corre no próprio campo: não precisa de nuvem nem de internet, e não te prende a nenhum
+    fabricante.
   discuss: Junta-te à conversa
   design: Lê a especificação
   source: Código no GitHub
@@ -54,48 +63,94 @@ hero:
     uma base quadrada, rodeada por oito malas cor de laranja e amarelas com antena e a inscrição
     «GAME PROP», todas ligadas por um círculo luminoso.
 
+game:
+  title: Como funciona um jogo
+  intro: >-
+    Para jogar não é preciso perceber nada de eletrónica. É assim que um jogo vai correr quando as
+    caixas estiverem construídas (fases 1 e 2); o <a href="#glossario-simulador">simulador</a> já
+    hoje joga os mesmos modos num computador.
+  setup:
+    title: Preparar
+    text: >-
+      A organização espalha as caixas pelo campo e escolhe um modo de jogo, como o Domínio, no
+      teclado de uma caixa ou num telemóvel, em menos de um minuto.
+  capture:
+    title: Capturar
+    text: >-
+      Para tomar uma caixa, a equipa mantém premido o botão da sua cor durante uns segundos. A
+      caixa acende-se com essa cor e pontua para a equipa até a outra a roubar.
+  relay:
+    title: Transmitir
+    text: >-
+      Cada caixa avisa por rádio o
+      <a href="#glossario-controlador-de-campo">controlador de campo</a>, um pequeno computador na
+      base; as caixas mais afastadas passam a mensagem pelas que estão no meio. Uma caixa que perca
+      a ligação continua a jogar e põe-se em dia mais tarde.
+  score:
+    title: Pontuar
+    text: >-
+      O controlador faz as contas. A organização acompanha o jogo ao vivo no telemóvel, e o campo
+      pode mostrar o marcador num ecrã grande ou numa transmissão em direto.
+
 why:
   title: Porquê a Atalaia
   intro: >-
     Os dispositivos eletrónicos dão outra vida a um jogo, mas os sistemas comerciais guardam as
-    regras num firmware fechado. Os modos novos ficam à espera do fabricante, não há API pública e
-    não dá para juntar hardware próprio. A Atalaia faz diferente.
+    regras num <a href="#glossario-firmware">firmware</a> fechado. Os modos novos ficam à espera do
+    fabricante, não há <a href="#glossario-api">API</a> pública e não dá para juntar hardware
+    próprio. A Atalaia faz diferente.
   local:
     title: Funciona sem internet
     text: >-
-      Todos os jogos correm totalmente offline, numa casa ou numa mata com vários quilómetros. A
-      internet é opcional.
+      Todos os jogos correm <a href="#glossario-sem-internet">no próprio campo</a>, totalmente
+      offline, numa casa ou numa mata com vários quilómetros. A internet é opcional.
   hardware:
     title: Qualquer hardware
     text: >-
-      Placas ESP32, Raspberry Pi, placas tipo Arduino e telemóveis Android, novos ou reaproveitados,
+      Placas <a href="#glossario-esp32">ESP32</a> baratas, computadores
+      <a href="#glossario-raspberry-pi">Raspberry Pi</a> do tamanho de um cartão de crédito, placas
+      simples <a href="#glossario-arduino">tipo Arduino</a> e
+      <a href="#glossario-dispositivo-android">telemóveis Android</a>, novos ou reaproveitados,
       entram todos no mesmo jogo.
   scripts:
     title: Modos em scripts
     text: >-
-      Os modos de jogo são pequenos scripts Lua com um ficheiro de definições. Muda-os ou
-      partilha-os sem gravar firmware de novo.
+      Os modos de jogo são pequenos <a href="#glossario-lua">scripts Lua</a>, ficheiros de texto com
+      as regras, mais um ficheiro de definições. Muda-os ou partilha-os sem voltar a gravar o
+      software que vem dentro das caixas.
   open:
     title: Protocolo e API abertos
     text: >-
-      Os dispositivos falam entre si pelo protocolo Skirmesh-RF, que está documentado; o
-      controlador de campo vai disponibilizar APIs MQTT, REST e WebSocket.
+      Os dispositivos falam entre si pelo <a href="#glossario-skirmesh-rf">Skirmesh-RF</a>, um
+      protocolo de rádio documentado, por isso qualquer pessoa pode construir um aparelho que entre
+      no jogo. O controlador de campo vai disponibilizar APIs MQTT, REST e WebSocket para
+      marcadores, transmissões em direto e outras ferramentas.
   fields:
     title: Feita para os campos
     text: >-
-      Funções de jogador, esquadras, cenários personalizados e um registo de cronografagem com
-      verificações aleatórias estão previstos de raiz.
+      Funções de jogador, esquadras, cenários personalizados e um registo de
+      <a href="#glossario-cronografagem">cronografagem</a> que guarda as medições de cada réplica
+      para verificações aleatórias estão previstos de raiz.
   copyleft:
     title: Copyleft
     text: >-
       Campos que cobram entrada e makers que vendem caixas são bem-vindos. Quem distribuir ou
-      alojar uma versão alterada tem de partilhar as alterações.
+      alojar uma versão alterada tem de <a href="#glossario-copyleft">partilhar as alterações</a>.
 
 how:
   title: Como tudo se liga
   intro: >-
-    Todos os nós completos correm o mesmo núcleo em C11 e os mesmos modos de jogo em Lua; só mudam
-    a camada de cada plataforma e os drivers do hardware.
+    Em poucas palavras: os dispositivos no campo falam por rádio com o controlador de campo, um
+    pequeno computador na base que corre o jogo e guarda a pontuação. Os telemóveis ligam-se a ele
+    por Wi-Fi, e os marcadores, as transmissões em direto e as apps de mapas, como o
+    <a href="#glossario-atak">ATAK</a>, pela sua API. Um
+    <a href="#glossario-servidor-do-clube">servidor do clube</a>, opcional e na internet, guarda as
+    contas e o histórico. O controlador, a API e o servidor do clube chegam em fases posteriores.
+  core: >-
+    Por dentro, todos os aparelhos que correm modos de jogo usam o mesmo
+    <a href="#glossario-nucleo">núcleo partilhado</a>, escrito em C11, e os mesmos modos em Lua; só
+    muda uma camada fina para cada tipo de hardware. Um modo escrito uma vez joga-se da mesma
+    maneira numa caixa, num telemóvel ou num Raspberry Pi.
   diagram:
     title: >-
       Um servidor do clube, opcional, liga-se pela internet ao controlador de campo. As apps da
@@ -123,8 +178,9 @@ how:
       <strong>Controlador de campo</strong> num Raspberry Pi ou Android: as apps da organização e
       dos jogadores ligam-se por Wi-Fi; os marcadores e o ATAK usam MQTT, REST e webhooks.
     props: >-
-      <strong>Dispositivos</strong> na rede mesh LoRa Skirmesh-RF: Field Boxes e satélites ESP32,
-      dispositivos Android com módulo ESP32 e nós simples tipo Arduino.
+      <strong>Dispositivos</strong> na rede mesh LoRa Skirmesh-RF:
+      <a href="#glossario-field-box">Field Boxes e satélites</a> ESP32, dispositivos Android com
+      módulo ESP32 e nós simples tipo Arduino.
 
 modes:
   title: Modos de jogo
@@ -155,9 +211,10 @@ modes:
 try:
   title: Experimenta já
   intro: >-
-    Ainda não há firmware para gravar, mas o núcleo partilhado já corre num computador. O simulador
-    joga um modo no browser: mantém premidos os botões das equipas, vê o ecrã de cada dispositivo e
-    acompanha o registo de eventos.
+    Ainda não há <a href="#glossario-firmware">firmware</a> para gravar, mas o núcleo partilhado já
+    corre num computador. O simulador joga um modo no browser: mantém premidos os botões das
+    equipas, vê o ecrã de cada dispositivo e acompanha o registo de eventos. Os comandos abaixo
+    escrevem-se num terminal.
   compiler: Com um compilador de C
   docker: Só com Docker
   then: >-
@@ -172,7 +229,9 @@ roadmap:
   next: A seguir
   p0:
     title: Alicerces
-    text: Núcleo partilhado, sandbox Lua, codec Skirmesh-RF, simulador no browser.
+    text: >-
+      Núcleo partilhado, <a href="#glossario-lua">sandbox Lua</a>,
+      <a href="#glossario-skirmesh-rf">codec Skirmesh-RF</a>, simulador no browser.
     gate: >-
       Prova: o simulador corre o Domínio e a Bomba a partir de scripts Lua. <strong>Superada.</strong>
   p1:
@@ -182,19 +241,26 @@ roadmap:
   p2:
     title: Rede de campo
     text: Skirmesh-RF sobre LoRa, controlador de campo, API, consola da organização.
-    gate: "Prova: 5 caixas num espaço de CQB e num campo exterior, sem uma única captura perdida."
+    gate: >-
+      Prova: 5 caixas num espaço de <a href="#glossario-cqb">CQB</a> e num campo exterior, sem uma
+      única captura perdida.
   p3:
     title: Android e jogadores
     text: >-
-      Dispositivos Android, módulo de E/S, app de jogador com funções, cronografagem à entrada.
+      Dispositivos Android, <a href="#glossario-dispositivo-android">módulo de E/S</a>, app de
+      jogador com funções, cronografagem à entrada.
     gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."
   p4:
     title: Servidor do clube e jogo avançado
     text: Servidor do clube, cenários personalizados, modos avançados, ATAK.
-    gate: "Prova: um milsim de fim de semana decorre do princípio ao fim com a Atalaia."
+    gate: >-
+      Prova: um <a href="#glossario-milsim">milsim</a> de fim de semana decorre do princípio ao fim
+      com a Atalaia.
   p5:
     title: Comunidade
-    text: Editor visual de modos, registo de modos, placa de suporte (PCB), traduções.
+    text: >-
+      Editor visual de modos, registo de modos, placa de suporte (PCB) que facilita a montagem,
+      traduções.
     gate: Continua depois da primeira versão.
 
 hub:
@@ -234,6 +300,236 @@ hub:
       Para clubes sem apoio informático, a preço de custo, com os dados de cada clube separados e
       exportáveis.
 
+# Each entry: id (the anchor, stable ASCII), term (as shown) and text (1-3 sentences).
+glossary:
+  id: glossario
+  title: Glossário
+  intro: >-
+    Os termos técnicos desta página, explicados em linguagem simples. As ligações no texto lá em
+    cima trazem-te até aqui.
+  groups:
+    game: O jogo
+    hardware: Hardware
+    radio: Rádio e ligações
+    software: Software
+    licences: Licenças
+  props:
+    id: glossario-dispositivos
+    term: Dispositivos de jogo (props)
+    text: >-
+      Os aparelhos eletrónicos de um jogo: caixas para capturar, bombas para armar e desarmar,
+      terminais de hacking, alvos onde acertar. Na Atalaia, qualquer aparelho pode servir: uma
+      caixa feita de propósito, um telemóvel ou uma pequena placa.
+  field_box:
+    id: glossario-field-box
+    term: Field Box e Satélite
+    text: >-
+      Os dispositivos de referência da Atalaia, montados à volta de um ESP32 com peças fáceis de
+      comprar. A Field Box é a principal, com botões arcade grandes, teclado, ecrã, luzes,
+      altifalante e leitor NFC numa caixa estanque, por cerca de
+      <span class="nowrap">70–110&nbsp;€</span> em peças; o Satélite é uma caixa mais pequena para
+      um ponto secundário, por cerca de <span class="nowrap">30–40&nbsp;€</span>. Os primeiros
+      protótipos da Field Box chegam na fase&nbsp;1.
+  milsim:
+    id: glossario-milsim
+    term: Milsim
+    text: >-
+      Abreviatura de <em>military simulation</em>, simulação militar: jogos longos, muitas vezes de
+      um fim de semana inteiro, com missões, cadeia de comando e regras realistas. É o maior teste
+      para a Atalaia: 10 a 20 caixas e satélites espalhados por uma área grande.
+  cqb:
+    id: glossario-cqb
+    term: CQB
+    text: >-
+      <em>Close quarters battle</em>, combate a curta distância: jogos dentro de casas, palacetes,
+      armazéns e outros espaços apertados, normalmente com menos de uns 150&nbsp;m de um lado ao
+      outro. Como tudo é perto e rápido, o perfil CQB da Atalaia usa tempos de captura e de bomba
+      mais curtos e põe as caixas numa planta do espaço em vez de usar GPS.
+  chrono:
+    id: glossario-cronografagem
+    term: Cronografagem e joules
+    text: >-
+      O cronógrafo mede a velocidade a que uma réplica dispara uma BB. Da velocidade e do peso da
+      BB sai a energia em joules, que os campos limitam por tipo de réplica: uma BB de 0,20&nbsp;g a
+      100&nbsp;m/s (cerca de 328&nbsp;fps) leva 1 joule. A Atalaia vai guardar as medições de cada
+      réplica, para os marshals poderem fazer verificações aleatórias durante o dia; qualquer
+      penalização é sempre decidida por uma pessoa.
+  microcontroller:
+    id: glossario-microcontrolador
+    term: Microcontrolador
+    text: >-
+      Um computador completo e minúsculo num só chip, feito para correr um único programa. Arranca
+      num instante, gasta muito pouca bateria e é barato, por isso é o cérebro habitual de um
+      dispositivo de jogo eletrónico. As placas ESP32 e Arduino são placas de microcontrolador.
+  esp32:
+    id: glossario-esp32
+    term: ESP32
+    text: >-
+      Um microcontrolador barato e muito popular, com Wi-Fi e Bluetooth incorporados; muitas placas
+      trazem também um rádio LoRa. É o cérebro da Field Box, do Satélite e do módulo de E/S, e
+      aguenta um dispositivo em jogo de um a três dias com uma bateria. As placas que já tens também
+      servem, mesmo sem memória extra (PSRAM), com algumas limitações.
+  arduino:
+    id: glossario-arduino
+    term: Placa tipo Arduino, nó simples
+    text: >-
+      Placas de microcontrolador simples e muito baratas, ao estilo do Arduino, como as de chips
+      AVR ou RP2040. São pequenas demais para correr modos de jogo, por isso na Atalaia funcionam
+      como nós simples: emprestam os botões, as luzes ou os sensores a uma caixa próxima ou ao
+      controlador de campo, que corre as regras por elas.
+  raspberry_pi:
+    id: glossario-raspberry-pi
+    term: Raspberry Pi
+    text: >-
+      Um computador pequeno e barato, mais ou menos do tamanho de um cartão de crédito, que corre
+      Linux. Com uma placa de rádio LoRa, vai ser o controlador de campo habitual (cerca de
+      <span class="nowrap">80–150&nbsp;€</span> a montagem completa), e também pode servir de dispositivo com ecrã grande ou
+      câmara.
+  android:
+    id: glossario-dispositivo-android
+    term: Dispositivo Android e módulo de E/S
+    text: >-
+      A app da Atalaia vai transformar um telemóvel ou tablet Android, novo ou um que esteja na
+      gaveta, de 2017 em diante, num dispositivo de jogo: um terminal de hacking, um mapa, um leitor
+      de códigos. Os telemóveis não têm rádio LoRa e os ecrãs táteis custam a usar com luvas, por
+      isso uma pequena caixa ESP32, o módulo de E/S (entrada e saída), vai ligar-se por cabo ou
+      Bluetooth para juntar o rádio, botões grandes, luzes e uma sirene. Ambos chegam na fase&nbsp;3.
+  firmware:
+    id: glossario-firmware
+    term: Firmware e gravar firmware
+    text: >-
+      O firmware é o programa que vem dentro de um aparelho e arranca quando o ligas. Gravar
+      firmware (<em>flashing</em>, em inglês) é escrever uma versão nova desse programa no
+      aparelho, normalmente por um cabo USB. As caixas da Atalaia só precisam de cabo da primeira
+      vez: depois, os modos novos chegam como scripts e as atualizações vêm do controlador de campo
+      por Wi-Fi ou Bluetooth, e desfazem-se sozinhas se a versão nova não arrancar.
+  lora:
+    id: glossario-lora
+    term: LoRa
+    text: >-
+      De <em>long range</em>, longo alcance: um rádio que envia mensagens pequenas para longe
+      gastando muito pouca energia, sem cartão SIM, rede móvel ou assinatura. Num campo típico
+      chega a cerca de <span class="nowrap">0,5–2&nbsp;km</span> e atravessa paredes grossas melhor
+      do que o Wi-Fi. O senão: as mensagens têm de ser curtas e cada aparelho só pode emitir
+      durante uma pequena parte do tempo (na Europa, 1% na maioria dos canais), por isso as caixas
+      só enviam o que muda, como «o vermelho capturou a&nbsp;B».
+  mesh:
+    id: glossario-mesh
+    term: Rede mesh
+    text: >-
+      Uma rede em que os aparelhos passam as mensagens uns aos outros, por isso uma caixa demasiado
+      longe da base é ouvida através das que estão no meio. A Atalaia só repete cada mensagem um
+      par de vezes, para o rádio não entupir, e a organização pode pôr caixas extra a servir de
+      repetidores em terrenos difíceis.
+  skirmesh:
+    id: glossario-skirmesh-rf
+    term: Skirmesh-RF
+    text: >-
+      O protocolo de rádio da própria Atalaia: o formato combinado em que as caixas, o controlador
+      e as apps trocam mensagens, seja por LoRa, Wi-Fi ou Bluetooth. Está documentado
+      publicamente, por isso qualquer pessoa pode construir um aparelho que entre no jogo, e cada
+      mensagem é assinada com uma chave própria daquele jogo, para que ninguém consiga
+      simplesmente forjar uma captura com um rádio. O código que empacota e verifica estas
+      mensagens, o codec, já existe.
+  links:
+    id: glossario-wifi-ble-nfc-qr
+    term: Wi-Fi, BLE, NFC e códigos QR
+    text: >-
+      As ligações de curto alcance do dia a dia, cada uma com a sua função. O Wi-Fi (cerca de
+      <span class="nowrap">50–150&nbsp;m</span>) leva o que é pesado: a consola da organização, a
+      app de jogador, modos novos e atualizações; o BLE, ou Bluetooth Low Energy
+      (<span class="nowrap">10–30&nbsp;m</span>), liga um telemóvel ao seu módulo e
+      emparelha aparelhos. O NFC é encostar e ler, como um cartão contactless, para etiquetas de
+      equipa, pulseiras e cartões de entrada no jogo, e os códigos QR leem-se com a câmara do
+      telemóvel para entrar num jogo ou introduzir um código.
+  api:
+    id: glossario-api
+    term: "API: MQTT, REST e WebSocket"
+    text: >-
+      Uma API é uma forma documentada de outros programas lerem um jogo e, com autorização, o
+      controlarem. Com ela, um clube vai poder ligar um marcador LED grande, mostrar a pontuação em
+      direto numa transmissão, receber alertas no Discord ou no Telegram, ou ter um relé que
+      dispara fumo e sirenes quando a bomba rebenta. MQTT, REST e WebSocket são três maneiras
+      padrão de lá chegar, por isso funcionam com ferramentas comuns; a API chega com o controlador
+      de campo na fase&nbsp;2.
+  atak:
+    id: glossario-atak
+    term: ATAK
+    text: >-
+      O <em>Android Team Awareness Kit</em>: uma app de mapas feita para os militares, com uma
+      versão civil gratuita que muitas equipas de milsim usam para ver os colegas num mapa
+      partilhado. O controlador de campo da Atalaia vai poder mostrar as caixas nesses mapas, e que
+      equipa tem cada uma (fase&nbsp;4).
+  local_first:
+    id: glossario-sem-internet
+    term: Funciona sem internet (local-first)
+    text: >-
+      Tudo o que um jogo precisa corre no próprio campo, nas caixas e no controlador de campo, por
+      isso funciona sem internet nem rede móvel. Quando há internet, só acrescenta extras, como
+      contas e o histórico dos jogos. Uma caixa que perca a ligação continua a jogar e a contar
+      pontos, e põe-se em dia quando a ligação volta.
+  core:
+    id: glossario-nucleo
+    term: Núcleo partilhado (C11)
+    text: >-
+      O coração da Atalaia: um único programa, escrito na linguagem de programação C (na versão de
+      2011, daí C11), que todos os aparelhos que correm modos de jogo usam. Trata dos eventos, das
+      pontuações e das mensagens de rádio e corre os modos de jogo em segurança; cada tipo de
+      hardware só lhe junta uma camada fina, com os drivers que fazem funcionar os botões, o ecrã e
+      o rádio. Já existe hoje.
+  lua:
+    id: glossario-lua
+    term: Lua e scripts de modos de jogo
+    text: >-
+      Um modo de jogo é um script: um pequeno ficheiro de texto com regras, como «manter premido
+      5 segundos para capturar», escrito em Lua, uma linguagem de programação pequena, muito
+      conhecida dos mods de videojogos. Os scripts correm numa sandbox, um espaço fechado sem
+      acesso a ficheiros nem à rede, por isso um modo partilhado não pode estragar um aparelho. A
+      organização nunca precisa de mexer em Lua: escolhe um modo e preenche as definições, e um
+      editor visual, por blocos, chega na fase&nbsp;5.
+  simulator:
+    id: glossario-simulador
+    term: Simulador
+    text: >-
+      Um programa que joga um modo de jogo com caixas virtuais no browser: carregas nos botões das
+      equipas no ecrã e vês o ecrã de cada caixa e o registo de eventos. Corre num computador
+      normal e já existe, por isso qualquer pessoa pode experimentar o Domínio e a Bomba antes de
+      haver hardware.
+  controller:
+    id: glossario-controlador-de-campo
+    term: Controlador de campo
+    text: >-
+      A base do jogo: um pequeno computador, normalmente um Raspberry Pi ou um aparelho Android,
+      que ouve todas as caixas pelo rádio, corre as regras que envolvem várias caixas, guarda a
+      pontuação oficial e serve a consola da organização aos telemóveis. Se falhar, as caixas
+      continuam a jogar e outro aparelho capaz toma o lugar, e uma caixa sozinha também consegue
+      correr um jogo sem ele. Chega na fase&nbsp;2.
+  server:
+    id: glossario-servidor-do-clube
+    term: Servidor do clube
+    text: >-
+      Um computador opcional, no campo ou alugado na internet, que guarda o que dura para lá de um
+      jogo: contas de jogadores, histórico, o registo de cronografagem e os serviços por trás da app
+      de jogador. Nenhum jogo fica à espera dele. Chega na fase 4, e o espaço da comunidade prevê
+      servidores alojados, a preço de custo, para clubes sem apoio informático.
+  open_source:
+    id: glossario-codigo-aberto
+    term: Código aberto e software livre
+    text: >-
+      O código-fonte, a receita legível de um programa, é público, e qualquer pessoa o pode usar,
+      estudar, alterar e partilhar, mesmo para fins comerciais. «Livre» quer dizer liberdade, não
+      preço: os campos podem cobrar entrada e os makers podem vender caixas.
+  copyleft:
+    id: glossario-copyleft
+    term: "Copyleft: GPL e AGPL"
+    text: >-
+      A regra que mantém a Atalaia aberta: usá-la tal como está não te obriga a nada, mas quem
+      passar a outros uma versão alterada tem de partilhar o código-fonte com a mesma licença. A
+      GPL, para o núcleo, o firmware, a app e os modos, aplica-se quando dás ou vendes cópias; a
+      AGPL, para o controlador de campo e o servidor do clube, aplica-se também quando pões uma
+      versão alterada a funcionar para outras pessoas através de uma rede. O hardware (CERN-OHL-S)
+      e a documentação (CC BY-SA) seguem a mesma ideia.
+
 involved:
   title: Participa
   intro: "A Atalaia é feita por jogadores, donos de campos e makers. Já hoje podes ajudar:"
@@ -252,8 +548,8 @@ involved:
     <a href="https://github.com/vakaobr/atalaia-project/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>.
   rules: >-
     Cada commit leva uma linha <code>Signed-off-by</code>, e o projeto é rigorosamente
-    <em>clean room</em>: nenhum código, firmware, manual, som ou imagem de qualquer produto
-    comercial.
+    <em>clean room</em>, feito de raiz: nenhum código, firmware, manual, som ou imagem de qualquer
+    produto comercial.
 
 name:
   title: O nome

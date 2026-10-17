@@ -22,7 +22,9 @@ joined with dots (why.local.title).
 
 Every key a page uses must be in that page's language file, and every key in a
 language file must be used by its page. Both pages must also link to the same
-external addresses, and their HTML must nest correctly. Needs only PyYAML.
+external addresses, every "#id" link on a page must have its target on that
+page (the glossary ids differ by language), and the HTML must nest correctly.
+Needs only PyYAML.
 """
 
 from __future__ import annotations
@@ -167,11 +169,18 @@ class Links(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.external: set[str] = set()
+        self.fragments: set[str] = set()  # targets of href="#..." links
+        self.ids: set[str] = set()
 
     def handle_starttag(self, tag: str, attrs: Any) -> None:
-        href = dict(attrs).get("href") or ""
+        attributes = dict(attrs)
+        if attributes.get("id"):
+            self.ids.add(attributes["id"])
+        href = attributes.get("href") or ""
         if tag == "a" and re.match(r"[a-z]+:", href):
             self.external.add(href)
+        elif tag == "a" and href.startswith("#"):
+            self.fragments.add(href[1:])
 
 
 def render(template: str, texts: dict[str, str], lang: Language, file_name: str) -> str:
@@ -243,6 +252,10 @@ def build() -> dict[Path, str]:
         check_nesting(page, f"{rel(out)} (from {file_name})")
         parser = Links()
         parser.feed(page)
+        missing = sorted(parser.fragments - parser.ids)
+        if missing:
+            raise SiteError(f"{rel(out)} (from {file_name}) links to ids it does not have: "
+                            + ", ".join(f"#{m}" for m in missing))
         links[lang] = parser.external
         pages[out] = page
 

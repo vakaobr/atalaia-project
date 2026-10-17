@@ -222,6 +222,15 @@ nav a:hover { color: var(--on-slate); }
 .features li { border-top: 3px solid var(--rule); padding-top: 14px; }
 .features p { margin: 8px 0 0; color: var(--muted); }
 
+/* "How a game works": the same ruled columns, numbered like beacons along a line. */
+.walk { counter-reset: step; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.walk li { counter-increment: step; }
+.walk h3::before {
+  content: counter(step);
+  margin-right: 10px;
+  color: var(--signal);
+}
+
 /* ---- game mode cards ---- */
 
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
@@ -252,6 +261,7 @@ nav a:hover { color: var(--on-slate); }
 .diagram text.label { fill: var(--muted); font-weight: 400; font-size: 12px; text-anchor: start; }
 .diagram text.label.accent { fill: var(--signal); font-weight: 600; }
 @media (prefers-color-scheme: dark) { .diagram .box.main rect { fill: var(--sand); stroke: var(--sand); } .diagram .box.main text, .diagram .box.main text.sub { fill: var(--slate); } }
+.note { color: var(--muted); max-width: 66ch; margin: 28px 0 0; }
 .diagram-list { display: none; margin: 0; padding-left: 20px; }
 .diagram-list li { margin-bottom: 8px; }
 @media (max-width: 640px) {
@@ -345,6 +355,41 @@ pre {
 }
 .chip.open { color: var(--open); border-color: currentColor; font-weight: 600; }
 @media (max-width: 520px) { .hub li { grid-template-columns: 1fr; gap: 8px; } }
+
+/* ---- glossary: groups under a sand rule, terms in two columns ---- */
+
+.glossary .group {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  gap: 12px 36px;
+  margin-top: 36px;
+  padding-top: 14px;
+  border-top: 3px solid var(--rule);
+}
+.glossary .group:first-child { margin-top: 0; }
+.glossary h3 { font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding-top: 4px; }
+.glossary dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 22px 36px;
+  margin: 0;
+}
+.glossary dt { font: 600 1.25rem/1.15 var(--display); }
+.glossary dd { margin: 4px 0 0; color: var(--muted); }
+/* A jump from a link lands below the sticky header and marks the entry. */
+.glossary [id] { scroll-margin-top: 84px; border-radius: var(--radius); }
+.glossary [id]:target {
+  margin: -8px -12px;
+  padding: 8px 12px 8px 9px;
+  border-left: 3px solid var(--signal);
+  background: var(--surface);
+}
+@media (max-width: 720px) {
+  .glossary .group { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .glossary [id] { scroll-margin-top: 12px; }
+}
 
 .ways { padding-left: 20px; }
 .ways li { margin-bottom: 6px; }

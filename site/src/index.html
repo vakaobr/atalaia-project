@@ -61,6 +61,7 @@ the pages. Code blocks and anything else that is the same in every language stay
         <a href="#try">{{ header.try }}</a>
         <a href="#roadmap">{{ header.roadmap }}</a>
         <a href="#hub">{{ header.hub }}</a>
+        <a href="#{{ glossary.id|text }}">{{ header.glossary }}</a>
         <a href="https://github.com/vakaobr/atalaia-project">GitHub</a>
       </nav>
       {# Each language is named in its own language, whichever page this is. #}
@@ -97,6 +98,20 @@ the pages. Code blocks and anything else that is the same in every language stay
           <img src="{{ page.root }}img/watchtower-night-960.jpg" srcset="{{ page.root }}img/watchtower-night-960.jpg 960w, {{ page.root }}img/watchtower-night-1600.jpg 1600w" sizes="(min-width: 1080px) 1048px, calc(100vw - 32px)" width="1600" height="893" decoding="async" fetchpriority="high" alt="{{ hero.image_alt|text }}">
 {% endif %}
         </picture>
+      </div>
+    </section>
+
+    {# A plain-words walkthrough for players who are not engineers. #}
+    <section aria-labelledby="game">
+      <div class="wrap">
+        <h2 id="game">{{ game.title }}</h2>
+        <p class="intro">{{ game.intro }}</p>
+        <ol class="features walk">
+          <li><h3>{{ game.setup.title }}</h3><p>{{ game.setup.text }}</p></li>
+          <li><h3>{{ game.capture.title }}</h3><p>{{ game.capture.text }}</p></li>
+          <li><h3>{{ game.relay.title }}</h3><p>{{ game.relay.text }}</p></li>
+          <li><h3>{{ game.score.title }}</h3><p>{{ game.score.text }}</p></li>
+        </ol>
       </div>
     </section>
 
@@ -151,6 +166,7 @@ the pages. Code blocks and anything else that is the same in every language stay
             <li>{{ how.list.props }}</li>
           </ol>
         </figure>
+        <p class="note">{{ how.core }}</p>
 {% if lang en %}
         {# The Portuguese page already shows this image in its hero. #}
         <figure class="art">
@@ -240,7 +256,72 @@ python ../tools/docker_sim.py serve ../modes/bomb</code></pre>
       </div>
     </section>
 
-    <section class="band" aria-labelledby="involved">
+    {#
+      The glossary. Each entry's id comes from the language file (glossario-lora,
+      glossary-lora...), and the text of either page links to those ids. Keep them
+      stable and ASCII: other sites may link to them. The build checks that every
+      #link on a page has a matching id.
+    #}
+    <section class="band" aria-labelledby="{{ glossary.id|text }}">
+      <div class="wrap">
+        <h2 id="{{ glossary.id|text }}">{{ glossary.title }}</h2>
+        <p class="intro">{{ glossary.intro }}</p>
+        <div class="glossary">
+          <div class="group">
+            <h3>{{ glossary.groups.game }}</h3>
+            <dl>
+              <div id="{{ glossary.props.id|text }}"><dt>{{ glossary.props.term }}</dt><dd>{{ glossary.props.text }}</dd></div>
+              <div id="{{ glossary.field_box.id|text }}"><dt>{{ glossary.field_box.term }}</dt><dd>{{ glossary.field_box.text }}</dd></div>
+              <div id="{{ glossary.milsim.id|text }}"><dt>{{ glossary.milsim.term }}</dt><dd>{{ glossary.milsim.text }}</dd></div>
+              <div id="{{ glossary.cqb.id|text }}"><dt>{{ glossary.cqb.term }}</dt><dd>{{ glossary.cqb.text }}</dd></div>
+              <div id="{{ glossary.chrono.id|text }}"><dt>{{ glossary.chrono.term }}</dt><dd>{{ glossary.chrono.text }}</dd></div>
+            </dl>
+          </div>
+          <div class="group">
+            <h3>{{ glossary.groups.hardware }}</h3>
+            <dl>
+              <div id="{{ glossary.microcontroller.id|text }}"><dt>{{ glossary.microcontroller.term }}</dt><dd>{{ glossary.microcontroller.text }}</dd></div>
+              <div id="{{ glossary.esp32.id|text }}"><dt>{{ glossary.esp32.term }}</dt><dd>{{ glossary.esp32.text }}</dd></div>
+              <div id="{{ glossary.arduino.id|text }}"><dt>{{ glossary.arduino.term }}</dt><dd>{{ glossary.arduino.text }}</dd></div>
+              <div id="{{ glossary.raspberry_pi.id|text }}"><dt>{{ glossary.raspberry_pi.term }}</dt><dd>{{ glossary.raspberry_pi.text }}</dd></div>
+              <div id="{{ glossary.android.id|text }}"><dt>{{ glossary.android.term }}</dt><dd>{{ glossary.android.text }}</dd></div>
+              <div id="{{ glossary.firmware.id|text }}"><dt>{{ glossary.firmware.term }}</dt><dd>{{ glossary.firmware.text }}</dd></div>
+            </dl>
+          </div>
+          <div class="group">
+            <h3>{{ glossary.groups.radio }}</h3>
+            <dl>
+              <div id="{{ glossary.lora.id|text }}"><dt>{{ glossary.lora.term }}</dt><dd>{{ glossary.lora.text }}</dd></div>
+              <div id="{{ glossary.mesh.id|text }}"><dt>{{ glossary.mesh.term }}</dt><dd>{{ glossary.mesh.text }}</dd></div>
+              <div id="{{ glossary.skirmesh.id|text }}"><dt>{{ glossary.skirmesh.term }}</dt><dd>{{ glossary.skirmesh.text }}</dd></div>
+              <div id="{{ glossary.links.id|text }}"><dt>{{ glossary.links.term }}</dt><dd>{{ glossary.links.text }}</dd></div>
+              <div id="{{ glossary.api.id|text }}"><dt>{{ glossary.api.term }}</dt><dd>{{ glossary.api.text }}</dd></div>
+              <div id="{{ glossary.atak.id|text }}"><dt>{{ glossary.atak.term }}</dt><dd>{{ glossary.atak.text }}</dd></div>
+            </dl>
+          </div>
+          <div class="group">
+            <h3>{{ glossary.groups.software }}</h3>
+            <dl>
+              <div id="{{ glossary.local_first.id|text }}"><dt>{{ glossary.local_first.term }}</dt><dd>{{ glossary.local_first.text }}</dd></div>
+              <div id="{{ glossary.core.id|text }}"><dt>{{ glossary.core.term }}</dt><dd>{{ glossary.core.text }}</dd></div>
+              <div id="{{ glossary.lua.id|text }}"><dt>{{ glossary.lua.term }}</dt><dd>{{ glossary.lua.text }}</dd></div>
+              <div id="{{ glossary.simulator.id|text }}"><dt>{{ glossary.simulator.term }}</dt><dd>{{ glossary.simulator.text }}</dd></div>
+              <div id="{{ glossary.controller.id|text }}"><dt>{{ glossary.controller.term }}</dt><dd>{{ glossary.controller.text }}</dd></div>
+              <div id="{{ glossary.server.id|text }}"><dt>{{ glossary.server.term }}</dt><dd>{{ glossary.server.text }}</dd></div>
+            </dl>
+          </div>
+          <div class="group">
+            <h3>{{ glossary.groups.licences }}</h3>
+            <dl>
+              <div id="{{ glossary.open_source.id|text }}"><dt>{{ glossary.open_source.term }}</dt><dd>{{ glossary.open_source.text }}</dd></div>
+              <div id="{{ glossary.copyleft.id|text }}"><dt>{{ glossary.copyleft.term }}</dt><dd>{{ glossary.copyleft.text }}</dd></div>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="involved">
       <div class="wrap">
         <h2 id="involved">{{ involved.title }}</h2>
         <p class="intro">{{ involved.intro }}</p>
@@ -254,7 +335,7 @@ python ../tools/docker_sim.py serve ../modes/bomb</code></pre>
       </div>
     </section>
 
-    <section aria-labelledby="name">
+    <section class="band" aria-labelledby="name">
       <div class="wrap two">
         <div>
           <img class="badge" src="{{ page.root }}img/logo-512.png" srcset="{{ page.root }}img/logo-192.png 192w, {{ page.root }}img/logo-512.png 512w" sizes="(max-width: 640px) 104px, 136px" width="512" height="512" loading="lazy" decoding="async" alt="{{ name.badge_alt|text }}">

@@ -6,6 +6,10 @@
 # every key here; apart from the parts only one page shows, pt.yaml has the
 # same keys. Values are HTML; keys the template marks |text are plain text.
 # After editing, run python3 tools/build_site.py. See site/README.md.
+#
+# Links like href="#glossary-lora" point at the glossary entries at the end of
+# this file. Their ids (glossary.*.id) are stable: change them only together
+# with every link to them.
 
 meta:
   title: Atalaia · the open force-on-force platform
@@ -27,16 +31,20 @@ header:
   try: Try it
   roadmap: Roadmap
   hub: Community
+  glossary: Glossary
   language: Language
 
 hero:
   status: Pre-alpha · phase 0 nearly complete · not field-ready yet
   title: The open <span class="nowrap">force-on-force</span> platform
   lead: >-
-    Atalaia is an open, local-first platform for airsoft, paintball and milsim game props.
-    Build a domination box from a €20 microcontroller, turn an old Android phone into a hacking
-    terminal, run a 20-box weekend milsim on a LoRa mesh, and write your own game modes as small
-    scripts. No cloud required, no vendor lock-in.
+    Atalaia is an open platform for the electronic props of airsoft, paintball and milsim: the
+    boxes teams capture, the bombs they arm and defuse. Build a domination box from a €20
+    <a href="#glossary-microcontroller">microcontroller</a> (a tiny, cheap computer board), turn an
+    old Android phone into a hacking terminal, run a 20-box weekend milsim on a
+    <a href="#glossary-lora">LoRa mesh</a> (long-range, low-power radio that the boxes relay to
+    one another across the field), and write your own game modes as small scripts. Every game runs
+    on the field itself: no cloud or internet needed, and no manufacturer can lock you in.
   discuss: Join the discussion
   design: Read the design
   source: Source on GitHub
@@ -50,48 +58,89 @@ hero:
     glowing orange GAME PROP boxes spread across a forested valley, while a group of players walks
     past them. Painted text reads "Open-source project ATALAIA".
 
+game:
+  title: How a game works
+  intro: >-
+    Playing needs no technical knowledge. This is how a game will run once the boxes are built (phases
+    1 and 2); the <a href="#glossary-simulator">simulator</a> already plays the same modes on a
+    computer today.
+  setup:
+    title: Set up
+    text: >-
+      The organisers place the boxes around the field and pick a game mode, such as Domination, on
+      a box's keypad or from a phone, in under a minute.
+  capture:
+    title: Capture
+    text: >-
+      To take a box, a team holds its colour's button for a few seconds. The box lights up in that
+      colour and scores for the team until the other side takes it back.
+  relay:
+    title: Relay
+    text: >-
+      Each box reports by radio to the <a href="#glossary-field-controller">field controller</a>, a
+      small computer at the base; boxes far away are relayed by the ones in between. A box that
+      loses contact keeps playing and catches up later.
+  score:
+    title: Score
+    text: >-
+      The controller adds it all up. The organisers follow the game live on their phones, and the
+      field can show the score on a big screen or on a stream.
+
 why:
   title: Why Atalaia
   intro: >-
     Electronic props add a lot to a game, but commercial systems keep the rules locked inside
-    closed firmware. New modes wait on the vendor, there is no public API, and you cannot add your
-    own hardware. Atalaia does it differently.
+    closed <a href="#glossary-firmware">firmware</a>. New modes wait on the vendor, there is no
+    public <a href="#glossary-api">API</a>, and you cannot add your own hardware. Atalaia does it
+    differently.
   local:
     title: Local-first
     text: >-
-      Every game runs fully offline, from a single house to a multi-kilometre forest. The internet
-      is optional.
+      Every game runs <a href="#glossary-local-first">on the field itself</a>, fully offline, from a
+      single house to a multi-kilometre forest. The internet is optional.
   hardware:
     title: Any hardware
     text: >-
-      ESP32 boards, Raspberry Pi, Arduino-class boards and new or repurposed Android phones all
-      play in the same game.
+      Cheap <a href="#glossary-esp32">ESP32</a> boards, credit-card-sized
+      <a href="#glossary-raspberry-pi">Raspberry Pi</a> computers, simple
+      <a href="#glossary-arduino">Arduino-class</a> boards and new or repurposed
+      <a href="#glossary-android-prop">Android phones</a> all play in the same game.
   scripts:
     title: Modes are scripts
     text: >-
-      Game modes are short Lua scripts with a settings file. Change or share one without
-      reflashing anything.
+      Game modes are short <a href="#glossary-lua">Lua scripts</a>, small text files of rules, with
+      a settings file. Change or share one without reflashing (reinstalling) the boxes' built-in
+      software.
   open:
     title: Open protocol and API
     text: >-
-      Props talk over the documented Skirmesh-RF protocol; the field controller will expose MQTT,
-      REST and WebSocket APIs.
+      Props talk over <a href="#glossary-skirmesh-rf">Skirmesh-RF</a>, a documented radio protocol,
+      so anyone can build a device that joins in. The field controller will offer MQTT, REST and
+      WebSocket APIs for scoreboards, stream overlays and other tools.
   fields:
     title: Built for fields
     text: >-
-      Player roles, squads, custom scenarios, and a chrono registry with spot checks are part of
-      the design.
+      Player roles, squads, custom scenarios, and a <a href="#glossary-chrono">chrono</a> registry
+      that keeps each replica's readings for spot checks are part of the design.
   copyleft:
     title: Copyleft
     text: >-
-      Fields that charge entry and makers who sell boxes are welcome. Anyone who ships or hosts
-      changes shares them back.
+      Fields that charge entry and makers who sell boxes are welcome. Anyone who ships or hosts a
+      changed version <a href="#glossary-copyleft">shares the changes</a> back.
 
 how:
   title: How it fits together
   intro: >-
-    Every full node runs the same C11 core and the same Lua game modes; only the platform shell and
-    hardware drivers differ.
+    In plain words: the props on the field talk by radio to the field controller, a small computer
+    at the base that runs the game and keeps the score. Phones connect to it over Wi-Fi, and
+    scoreboards, stream overlays and map apps such as <a href="#glossary-atak">ATAK</a> through its
+    API. An optional <a href="#glossary-site-server">site server</a> on the internet keeps accounts
+    and history. The controller, the API and the site server come in later phases.
+  core: >-
+    Under the hood, every device that runs game modes uses the same
+    <a href="#glossary-core">shared core</a>, written in C11, and the same Lua modes; only a thin
+    layer for each kind of hardware differs. A mode written once plays the same on a box, a phone
+    or a Raspberry Pi.
   diagram:
     title: >-
       An optional site server connects over the internet to the field controller. GM and player
@@ -119,8 +168,9 @@ how:
       <strong>Field controller</strong> on a Raspberry Pi or Android: GM and player apps join over
       Wi-Fi; scoreboards and ATAK use MQTT, REST and webhooks.
     props: >-
-      <strong>Props</strong> on the Skirmesh-RF LoRa mesh: ESP32 Field Boxes and satellites,
-      Android props with an ESP32 pod, and Arduino-class thin nodes.
+      <strong>Props</strong> on the Skirmesh-RF LoRa mesh: ESP32
+      <a href="#glossary-field-box">Field Boxes and satellites</a>, Android props with an ESP32 pod,
+      and Arduino-class thin nodes.
   # English page only: the Portuguese page shows this image in its hero.
   image_alt: >-
     Isometric illustration: a small stone tower with a radio box on top stands in the middle of a
@@ -158,8 +208,9 @@ modes:
 try:
   title: Try it today
   intro: >-
-    There is nothing to flash yet, but the shared core runs on a computer. The simulator plays a
-    mode in your browser: hold team buttons, watch each prop's screen and follow the event log.
+    There is nothing to <a href="#glossary-firmware">flash</a> yet, but the shared core runs on a
+    computer. The simulator plays a mode in your browser: hold team buttons, watch each prop's
+    screen and follow the event log. The commands below are typed in a terminal.
   compiler: With a C compiler
   docker: With Docker only
   then: >-
@@ -174,7 +225,9 @@ roadmap:
   next: Next
   p0:
     title: Foundations
-    text: Shared core, Lua sandbox, Skirmesh-RF codec, browser simulator.
+    text: >-
+      Shared core, <a href="#glossary-lua">Lua sandbox</a>,
+      <a href="#glossary-skirmesh-rf">Skirmesh-RF codec</a>, browser simulator.
     gate: >-
       Gate: the simulator runs Domination and Bomb from Lua scripts. <strong>Met.</strong>
   p1:
@@ -184,18 +237,25 @@ roadmap:
   p2:
     title: Field network
     text: Skirmesh-RF over LoRa, field controller, API, GM console.
-    gate: "Gate: 5 boxes on a CQB site and an outdoor field, zero lost captures."
+    gate: >-
+      Gate: 5 boxes on a <a href="#glossary-cqb">CQB</a> site and an outdoor field, zero lost
+      captures.
   p3:
     title: Android and players
-    text: Android props, I/O pod, player app with roles, chrono check-in.
+    text: >-
+      Android props, <a href="#glossary-android-prop">I/O pod</a>, player app with roles, chrono
+      check-in.
     gate: "Gate: one game mixes ESP32 and Android props without issues."
   p4:
     title: Site server and advanced play
     text: Site server, custom scenarios, advanced modes, ATAK.
-    gate: "Gate: a weekend milsim runs on Atalaia end to end."
+    gate: >-
+      Gate: a weekend <a href="#glossary-milsim">milsim</a> runs on Atalaia end to end.
   p5:
     title: Community
-    text: Visual mode editor, mode registry, carrier PCB, translations.
+    text: >-
+      Visual mode editor, mode registry, carrier PCB (a ready-made circuit board that makes builds
+      easier), translations.
     gate: Ongoing after the first release.
 
 hub:
@@ -230,6 +290,226 @@ hub:
     title: Hosted site servers
     text: For clubs without IT support, at cost, with every club's data separate and exportable.
 
+# Each entry: id (the anchor, stable ASCII), term (as shown) and text (1-3 sentences).
+glossary:
+  id: glossary
+  title: Glossary
+  intro: >-
+    The technical words on this page, in plain terms. The links in the text above lead here.
+  groups:
+    game: The game
+    hardware: Hardware
+    radio: Radio and connections
+    software: Software
+    licences: Licences
+  props:
+    id: glossary-props
+    term: Props
+    text: >-
+      The electronic devices of a game: boxes to capture, bombs to arm and defuse, terminals to
+      hack, targets to hit. In Atalaia any device can be one: a purpose-built box, a phone or a
+      small board.
+  field_box:
+    id: glossary-field-box
+    term: Field Box and Satellite
+    text: >-
+      Atalaia's own prop designs, built from off-the-shelf parts around an ESP32. The Field Box is
+      the main one, with big arcade buttons, a keypad, a screen, lights, a speaker and an NFC reader
+      in a weatherproof case, for roughly <span class="nowrap">€70–110</span> in parts; the
+      Satellite is a smaller box for a secondary point, for about
+      <span class="nowrap">€30–40</span>. The first Field Box prototypes come in phase&nbsp;1.
+  milsim:
+    id: glossary-milsim
+    term: Milsim
+    text: >-
+      Short for military simulation: long games, often over a whole weekend, with missions, a chain
+      of command and realistic rules. It is the biggest test for Atalaia: 10 to 20 boxes and
+      satellites spread over a large area.
+  cqb:
+    id: glossary-cqb
+    term: CQB
+    text: >-
+      Close-quarters battle: games inside houses, palacetes, warehouses and other tight spaces,
+      usually under about 150 m across. Everything is close and fast, so Atalaia's CQB profile uses
+      shorter capture and bomb times, and places the boxes on a floor plan instead of using GPS.
+  chrono:
+    id: glossary-chrono
+    term: Chrono and joules
+    text: >-
+      A chrono (chronograph) measures how fast a replica fires a BB. From the speed and the BB's
+      weight comes its energy in joules, which fields cap per type of replica: a 0.20&nbsp;g BB at
+      100&nbsp;m/s (about 328&nbsp;fps) carries 1 joule. Atalaia will keep each replica's readings,
+      so marshals can run spot checks during the day; a person always decides any penalty.
+  microcontroller:
+    id: glossary-microcontroller
+    term: Microcontroller
+    text: >-
+      A complete, tiny computer on a single chip, made to run one program. It starts in a moment,
+      uses very little battery and is cheap, which makes it the usual brain of an electronic prop.
+      ESP32 and Arduino boards are microcontroller boards.
+  esp32:
+    id: glossary-esp32
+    term: ESP32
+    text: >-
+      A popular, cheap microcontroller with Wi-Fi and Bluetooth built in; many boards also carry a
+      LoRa radio. It is the brain of the Field Box, the Satellite and the I/O pod, and keeps a prop
+      going for one to three days on a battery. Boards people already own can join too, even
+      without extra memory (PSRAM), with a few limits.
+  arduino:
+    id: glossary-arduino
+    term: Arduino-class board, thin node
+    text: >-
+      Simple, very cheap microcontroller boards in the Arduino style, such as those with AVR or
+      RP2040 chips. They are too small to run game modes, so in Atalaia they act as thin nodes: they
+      lend their buttons, lights or sensors to a nearby box or to the field controller, which runs
+      the rules for them.
+  raspberry_pi:
+    id: glossary-raspberry-pi
+    term: Raspberry Pi
+    text: >-
+      A small, cheap computer about the size of a credit card, running Linux. With a LoRa radio
+      board added, it will be the usual field controller (about <span class="nowrap">€80–150</span>
+      for the whole build), and it
+      can also run props that need a big screen or a camera.
+  android:
+    id: glossary-android-prop
+    term: Android prop and I/O pod
+    text: >-
+      The Atalaia app will turn an Android phone or tablet, new or a spare one from 2017 or later,
+      into a prop: a hacking terminal, a map, a code scanner. Phones have no LoRa radio and touch
+      screens are hard to use with gloves, so a small ESP32 box, the I/O (input/output) pod, will
+      connect by cable or Bluetooth to add the radio, big buttons, lights and a siren. Both arrive
+      in phase&nbsp;3.
+  firmware:
+    id: glossary-firmware
+    term: Firmware and flashing
+    text: >-
+      Firmware is the program built into a device, which starts when you switch it on. Flashing
+      means writing a new version of it onto the device, usually over a USB cable. Atalaia boxes
+      are flashed by cable once; after that, new game modes arrive as scripts, and firmware updates
+      come from the field controller over Wi-Fi or Bluetooth, undoing themselves if a new version
+      fails to start.
+  lora:
+    id: glossary-lora
+    term: LoRa
+    text: >-
+      Short for <em>long range</em>: a radio that sends small messages far on very little power,
+      with no SIM card, mobile coverage or subscription. On a typical field it reaches roughly
+      <span class="nowrap">0.5–2&nbsp;km</span>, and gets through thick walls better than Wi-Fi.
+      The catch: messages must be short, and each device may transmit only a small share of the
+      time (in Europe, 1% on most channels), so boxes send only what changes, such as “red
+      captured&nbsp;B”.
+  mesh:
+    id: glossary-mesh
+    term: Mesh
+    text: >-
+      A network in which devices pass messages on for each other, so a box too far from the base
+      is heard through the boxes in between. Atalaia repeats each message only a couple of times,
+      so the radio does not clog, and organisers can place extra boxes as repeaters on difficult
+      ground.
+  skirmesh:
+    id: glossary-skirmesh-rf
+    term: Skirmesh-RF
+    text: >-
+      Atalaia's own radio protocol: the agreed format in which boxes, the controller and apps
+      exchange messages, over LoRa, Wi-Fi or Bluetooth. It is documented in public, so anyone can
+      build a device that joins in, and every message is signed with a key for that game, so a
+      player with a radio cannot simply fake a capture. The code that packs and checks these
+      messages, the codec, exists today.
+  links:
+    id: glossary-wifi-ble-nfc-qr
+    term: Wi-Fi, BLE, NFC and QR codes
+    text: >-
+      Everyday short-range links, each with its own job. Wi-Fi (about
+      <span class="nowrap">50–150&nbsp;m</span>) carries the bulky things: the organisers' console,
+      the player app, new modes and updates; BLE, or Bluetooth Low Energy
+      (<span class="nowrap">10–30&nbsp;m</span>), links a phone to its pod and pairs devices. NFC is
+      tap-to-read, like a contactless card, for team tags, wristbands and join cards, and QR codes
+      are scanned with a phone camera to join a game or enter a code.
+  api:
+    id: glossary-api
+    term: "API: MQTT, REST and WebSocket"
+    text: >-
+      An API is a documented way for other programs to read a game and, with permission, control
+      it. With it a club will be able to drive a big LED scoreboard, a live score overlay on a
+      stream, Discord or Telegram alerts, or a relay that sets off smoke and sirens when the bomb
+      goes off. MQTT, REST and WebSocket are three standard ways in, so ordinary tools work with
+      it; it arrives with the field controller in phase&nbsp;2.
+  atak:
+    id: glossary-atak
+    term: ATAK
+    text: >-
+      The Android Team Awareness Kit: a map app made for the military, with a free civilian version
+      that many milsim teams use to see their team mates on a shared map. Atalaia's field
+      controller will be able to show the boxes on those maps, and which team holds each one
+      (phase&nbsp;4).
+  local_first:
+    id: glossary-local-first
+    term: Local-first
+    text: >-
+      Everything a game needs runs on the field itself, on the boxes and the field controller, so
+      it works with no internet or mobile coverage at all. When the internet is there, it only adds
+      extras, such as accounts and game history. A box that loses contact keeps playing and keeping
+      score, and catches up when the link returns.
+  core:
+    id: glossary-core
+    term: Shared core (C11)
+    text: >-
+      The heart of Atalaia: one program, written in the C programming language (its 2011 version,
+      hence C11), that every device running game modes uses. It handles events, scores and radio
+      messages and runs the game modes safely; each kind of hardware only adds a thin layer with
+      the drivers that work its buttons, screen and radio. It exists today.
+  lua:
+    id: glossary-lua
+    term: Lua and game-mode scripts
+    text: >-
+      A game mode is a script: a short text file of rules, such as “hold for 5 seconds to
+      capture”, written in Lua, a small programming language well known from video-game modding.
+      Scripts run in a sandbox, a sealed space with no access to files or the network, so a shared
+      mode cannot harm a device. Organisers never need to touch Lua: they pick a mode and fill in
+      its settings, and a visual, block-based editor will follow in phase&nbsp;5.
+  simulator:
+    id: glossary-simulator
+    term: Simulator
+    text: >-
+      A program that plays a game mode with virtual boxes in your web browser: you press the team
+      buttons on screen and watch each box's display and the event log. It runs on an ordinary
+      computer and exists today, so anyone can try Domination and Bomb before any hardware is
+      built.
+  controller:
+    id: glossary-field-controller
+    term: Field controller
+    text: >-
+      The base station of a game: a small computer, usually a Raspberry Pi or an Android device,
+      that hears every box over the radio, runs the rules that span several boxes, keeps the
+      official score and serves the organisers' console to their phones. If it fails, the boxes
+      keep playing and another capable device takes over, and a single box can run a game without
+      one. It arrives in phase&nbsp;2.
+  server:
+    id: glossary-site-server
+    term: Site server
+    text: >-
+      An optional computer, at the field or rented online, that keeps what lasts beyond one game:
+      player accounts, game history, the chrono registry and the services behind the player app.
+      Games never wait for it. It comes in phase 4, and the community hub plans hosted ones, at
+      cost, for clubs without IT support.
+  open_source:
+    id: glossary-open-source
+    term: Open source and free software
+    text: >-
+      The source code, the human-readable recipe of a program, is public, and anyone may use,
+      study, change and share it, even commercially. “Free” here means freedom, not price: fields
+      may charge entry and makers may sell boxes.
+  copyleft:
+    id: glossary-copyleft
+    term: "Copyleft: GPL and AGPL"
+    text: >-
+      The rule that keeps Atalaia open: using it as it is asks nothing of you, but passing on a
+      changed version means sharing its source code under the same licence. The GPL, for the core,
+      firmware, app and modes, applies when you give or sell copies; the AGPL, for the field
+      controller and site server, also applies when you run a changed version for other people over
+      a network. Hardware designs (CERN-OHL-S) and documentation (CC BY-SA) work the same way.
+
 involved:
   title: Get involved
   intro: "Atalaia is built by players, field owners and makers. You can help today by:"
@@ -248,7 +528,8 @@ involved:
     <a href="https://github.com/vakaobr/atalaia-project/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>.
   rules: >-
     Every commit carries a <code>Signed-off-by</code> line, and the project is strictly
-    clean-room: no code, firmware, manuals, sounds or images from any commercial product.
+    clean-room, written from scratch: no code, firmware, manuals, sounds or images from any
+    commercial product.
 
 name:
   title: The name

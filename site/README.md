@@ -63,8 +63,24 @@ It needs Python 3 and PyYAML (the dev container has both: see [tools/README.md](
   relative, so the pages work both on GitHub Pages and from a local server
   (`python3 -m http.server -d site`).
 
-CI runs `python3 tools/build_site.py --check`, which fails if a page is out of date or a
-translation is missing a key. `tools/check.sh` runs the same check.
+CI runs `python3 tools/build_site.py --check`, which fails if a page is out of date, a
+translation is missing a key, or a `#` link has no matching id on its page. `tools/check.sh`
+runs the same check.
+
+### Plain words and the glossary
+
+The page is written for players, field owners and GMs who are not engineers. When a technical
+term first appears, say what it is in a few plain words ("LoRa mesh (long-range, low-power
+radio...)"), and link the harder ones to the glossary near the end of the page.
+
+- Each glossary entry has `id`, `term` and `text` keys under `glossary` in both files. The ids
+  are ASCII and differ by language (`glossario-lora` on the Portuguese page, `glossary-lora` on
+  the English one); keep them stable, since other sites may link to them, and change a link
+  whenever you change an id.
+- A glossary text is one to three sentences: what the thing is, and why Atalaia uses it.
+- Check each claim against the [design specification](../docs/design-spec.md). Prices are the
+  spec's approximate figures, and anything not built yet (the field controller, the API, Android
+  props, the player app, the site server) is written as "will".
 
 ### Portuguese terms
 
@@ -73,8 +89,8 @@ players write. Keep these choices consistent when you edit it:
 
 | English | Portuguese |
 | --- | --- |
-| props | dispositivos (de jogo); caixas for the boxes. "Props" appears once, in the introduction |
-| GM | organização; GM console is "consola da organização" |
+| props | dispositivos (de jogo); caixas for the boxes. "Props" appears only in the introduction and in the glossary term |
+| GM, organisers | organização; GM console is "consola da organização" |
 | field | campo |
 | site server | servidor do clube |
 | field controller | controlador de campo |
@@ -84,6 +100,19 @@ players write. Keep these choices consistent when you edit it:
 | presets | predefinições |
 | Domination, Bomb | Domínio, Bomba |
 | gate (of a roadmap phase) | prova |
+| glossary | glossário |
+| How a game works | Como funciona um jogo |
+| local-first | funciona sem internet; "local-first" only in the glossary term |
+| microcontroller | microcontrolador |
+| firmware, flashing | firmware, gravar (o) firmware |
+| I/O pod, pod | módulo de E/S (entrada e saída), módulo |
+| thin node | nó simples |
+| shared core | núcleo partilhado |
+| mesh | rede mesh |
+| simulator | simulador |
+| scoreboard, stream (overlay) | marcador, transmissão em direto |
+| open source, free software | código aberto, software livre |
+| marshal | "marshal", as Portuguese players say it at games |
 
 Product and technical names stay as they are: Atalaia, Skirmesh-RF, Field Box, LoRa, ESP32,
 Raspberry Pi, Arduino, Android, Lua, MQTT, REST, WebSocket, ATAK, GitHub.
