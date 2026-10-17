@@ -8,7 +8,7 @@
 #define ATALAIA_SCREEN_TYPES_H
 
 #define SCREEN_TEMPLATE_MAX 32
-#define SCREEN_DATA_MAX     256
+#define SCREEN_DATA_MAX     512
 
 typedef struct {
     char template_name[SCREEN_TEMPLATE_MAX];

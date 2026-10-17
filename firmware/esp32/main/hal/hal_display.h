@@ -6,6 +6,11 @@
 
 #include <stdint.h>
 
+/* The 2.8" TFT in landscape, and the height of one LVGL draw buffer. */
+#define HAL_DISPLAY_WIDTH     320
+#define HAL_DISPLAY_HEIGHT    240
+#define HAL_DISPLAY_BUF_LINES 24 /* 1/10 of the screen per buffer (ADR-P1-2) */
+
 typedef void (*hal_display_flush_ready_cb_t)(void);
 
 typedef void (*hal_display_flush_cb_t)(int x1, int y1, int x2, int y2, const void *color_p,

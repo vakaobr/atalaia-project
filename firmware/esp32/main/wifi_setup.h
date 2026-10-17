@@ -18,6 +18,9 @@
  */
 int wifi_setup_start(void);
 
+/* The SoftAP name (atalaia-XXXX) after wifi_setup_start(); "" before it or in stub builds. */
+const char *wifi_setup_ssid(void);
+
 /* Stop the captive portal and free resources. */
 void wifi_setup_stop(void);
 

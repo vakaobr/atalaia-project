@@ -26,6 +26,7 @@ typedef struct {
 
 typedef struct {
     char mode_id[PRESET_MODE_ID_MAX];
+    char label[PRESET_LABEL_MAX]; /* shown in the picker; empty = mode_id */
     char params_json[PRESET_PARAMS_MAX];
     char source[PRESET_SOURCE_MAX];
     size_t source_len;

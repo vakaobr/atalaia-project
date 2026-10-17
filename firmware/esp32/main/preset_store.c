@@ -88,6 +88,10 @@ bool preset_store_save(int index, const preset_t *preset)
     if (!f) return false;
     fputc('{', f);
     write_json_string(f, "mode_id", preset->mode_id);
+    if (preset->label[0]) {
+        fputc(',', f);
+        write_json_string(f, "label", preset->label);
+    }
     fprintf(f, ",\"duration_s\":%u,", (unsigned)preset->duration_s);
     /* params_json is already a JSON object, embed it directly */
     fprintf(f, "\"params\":%s", preset->params_json[0] ? preset->params_json : "{}");
@@ -177,6 +181,7 @@ bool preset_store_load(int index, preset_t *out)
     buf[len] = '\0';
 
     if (!json_get_string(buf, "mode_id", out->mode_id, sizeof(out->mode_id))) return false;
+    json_get_string(buf, "label", out->label, sizeof(out->label));
     out->duration_s = json_get_uint(buf, "duration_s");
     json_get_params(buf, out->params_json, sizeof(out->params_json));
 
@@ -208,7 +213,10 @@ int preset_store_list(preset_summary_t *out, int max_out)
         out[count].index = i;
         json_get_string(buf, "mode_id", out[count].mode_id, sizeof(out[count].mode_id));
         /* Use mode_id as label if no label field. */
-        snprintf(out[count].label, sizeof(out[count].label), "%.47s", out[count].mode_id);
+        if (!json_get_string(buf, "label", out[count].label, sizeof(out[count].label)) ||
+            out[count].label[0] == '\0') {
+            snprintf(out[count].label, sizeof(out[count].label), "%.47s", out[count].mode_id);
+        }
         count++;
     }
     return count;

@@ -1,0 +1,79 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# A short Bomb game in the Wokwi emulator, about 30 s of simulated time:
+# boot, enter the admin PIN and pick Bomb (keys typed on the serial console,
+# because Wokwi's keypad cannot be pressed from a scenario), start, red holds
+# 5 s to arm, check the countdown, blue holds 10 s to defuse, check the
+# defused screen. Screenshots of the display land in build-wokwi/.
+#
+#   cd firmware/esp32
+#   wokwi-cli --timeout 60000 --scenario wokwi/bomb.scenario.yaml .
+name: Bomb game on the Field Box
+version: 1
+author: The Atalaia contributors
+
+steps:
+  - wait-serial: 'screen pin_entry {"digits":0,"error":false}'
+  # A new template takes LVGL up to a quarter of a second to draw in the
+  # emulator, after the log line; wait for it before each screenshot.
+  - delay: 1000ms
+  - take-screenshot:
+      part-id: lcd1
+      save-to: ../build-wokwi/scenario-1-pin.png
+
+  # Admin PIN 1234, then # to enter it.
+  - write-serial: '1234#'
+  - wait-serial: 'screen preset_select'
+  - delay: 1000ms
+  - take-screenshot:
+      part-id: lcd1
+      save-to: ../build-wokwi/scenario-2-presets.png
+
+  # Bomb is game 1; # moves on to the timer, # again to the confirmation.
+  - write-serial: '1#'
+  - wait-serial: 'screen timer_adjust'
+  - write-serial: '#'
+  - wait-serial: 'screen start_confirm'
+  - delay: 1000ms
+  - take-screenshot:
+      part-id: lcd1
+      save-to: ../build-wokwi/scenario-3-confirm.png
+  - write-serial: '#'
+  - wait-serial: 'screen standby {"arm":"red"}'
+  - delay: 1000ms
+  - take-screenshot:
+      part-id: lcd1
+      save-to: ../build-wokwi/scenario-4-standby.png
+
+  # Red holds its button for 5 s: the bomb is armed.
+  - set-control:
+      part-id: btn1
+      control: pressed
+      value: 1
+  - wait-serial: 'event bomb.armed'
+  - set-control:
+      part-id: btn1
+      control: pressed
+      value: 0
+  - wait-serial: 'screen countdown'
+  - delay: 1500ms
+  - take-screenshot:
+      part-id: lcd1
+      save-to: ../build-wokwi/scenario-5-countdown.png
+
+  # Blue holds its button for 10 s: defused.
+  - set-control:
+      part-id: btn2
+      control: pressed
+      value: 1
+  - wait-serial: 'event bomb.defused'
+  - set-control:
+      part-id: btn2
+      control: pressed
+      value: 0
+  - wait-serial: 'screen defused {"team":"blue"}'
+  - delay: 1000ms
+  - take-screenshot:
+      part-id: lcd1
+      save-to: ../build-wokwi/scenario-6-defused.png

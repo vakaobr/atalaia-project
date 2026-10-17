@@ -11,6 +11,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "screen_types.h"
+
 #define PRESET_UI_PIN_MAX 8
 
 typedef enum {
@@ -30,6 +32,7 @@ typedef struct {
     int preset_count;
     uint32_t timer_duration_s;
     bool pin_accepted;
+    bool pin_error; /* the last PIN was wrong; cleared by the next key */
 } preset_ui_t;
 
 /*
@@ -52,5 +55,14 @@ int preset_ui_selected_preset(const preset_ui_t *ui);
 
 /* Get the adjusted timer duration in seconds. */
 uint32_t preset_ui_timer_duration(const preset_ui_t *ui);
+
+/*
+ * Describe the screen for the current state (pin_entry, preset_select,
+ * timer_adjust or start_confirm; see screen_renderer.h). labels[i] is the
+ * label of list entry i + 1; labels may be NULL when label_count is 0.
+ * Returns false in PRESET_UI_STATE_GAME_STARTED, which has no picker screen.
+ */
+bool preset_ui_screen(const preset_ui_t *ui, const char *const *labels, int label_count,
+                      screen_update_t *out);
 
 #endif /* ATALAIA_PRESET_UI_H */

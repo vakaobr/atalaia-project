@@ -3,8 +3,22 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * Screen template renderer. Maps template names to C functions that
- * build LVGL widget trees. On ESP32 these render to LVGL; in tests
- * they record calls without any LVGL dependency.
+ * build LVGL widget trees (320x240). The device and the host tests build
+ * the same trees; every call is also recorded for test inspection.
+ *
+ * Templates and their data (all fields optional):
+ *   standby        {"arm": team}                 the bomb waits to be armed
+ *   countdown      {"left": s, "team": team}     time left, red under 10 s
+ *   defused        {"team": team}                in the winning team's colour
+ *   exploded       {"team": team}                in the winning team's colour
+ *   final_score    {"owner": team}               the game is over
+ *   paused         {}
+ *   status         {"title", "mode", "timer_s", "battery", "version"}
+ *   pin_entry      {"digits": n, "error": bool}  admin PIN prompt (shell)
+ *   preset_select  {"presets": [label...], "selected": n}   (shell)
+ *   timer_adjust   {"timer_s": s}                game length, 0 = no limit (shell)
+ *   start_confirm  {"label": text, "timer_s": s} (shell)
+ *   wifi_setup     {"ssid": text}                first-time setup (shell)
  */
 #ifndef ATALAIA_SCREEN_RENDERER_H
 #define ATALAIA_SCREEN_RENDERER_H
@@ -14,9 +28,10 @@
 #include "screen_types.h"
 
 /*
- * Render a screen template by name. On ESP32 this creates/updates
- * LVGL widgets on the active screen. In stub builds it records
- * the call for test inspection.
+ * Render a screen template by name: builds the template's widgets on
+ * the active LVGL screen when the template changes, then patches the
+ * data in. Without an LVGL display (or without ATALAIA_SCREEN_LVGL)
+ * it only records the call for test inspection.
  *
  * Returns true if the template was recognised.
  */

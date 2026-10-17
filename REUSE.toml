@@ -39,3 +39,11 @@ path = "site/fonts/**"
 precedence = "override"
 SPDX-FileCopyrightText = "2017 The Barlow Project Authors (https://github.com/jpt/barlow)"
 SPDX-License-Identifier = "OFL-1.1"
+
+# stb single-file headers, vendored for the firmware's screen tests only:
+# MIT or public domain (Unlicense), at the user's choice (see the end of each file).
+[[annotations]]
+path = ["firmware/esp32/test/third_party/stb/stb_image.h", "firmware/esp32/test/third_party/stb/stb_image_write.h"]
+precedence = "override"
+SPDX-FileCopyrightText = "2017 Sean Barrett"
+SPDX-License-Identifier = "MIT OR Unlicense"

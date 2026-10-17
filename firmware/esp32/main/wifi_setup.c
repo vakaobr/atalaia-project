@@ -85,6 +85,7 @@ bool parse_form_field(const char *body, const char *key, char *out, int out_sz)
 
 static const char *TAG = "wifi_setup";
 static httpd_handle_t server = NULL;
+static char ap_ssid[32];
 
 /* The HTML page is embedded via CMakeLists.txt EMBED_FILES. */
 extern const uint8_t setup_html_start[] asm("_binary_wifi_setup_html_start");
@@ -204,8 +205,17 @@ int wifi_setup_start(void)
     /* Get MAC for SSID suffix. */
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP);
-    char ssid[32];
-    snprintf(ssid, sizeof(ssid), "atalaia-%02X%02X", mac[4], mac[5]);
+    char *ssid = ap_ssid;
+    snprintf(ap_ssid, sizeof(ap_ssid), "atalaia-%02X%02X", mac[4], mac[5]);
+
+    /* The Wi-Fi driver and the AP network interface must exist first. */
+    esp_netif_create_default_wifi_ap();
+    wifi_init_config_t init_cfg = WIFI_INIT_CONFIG_DEFAULT();
+    esp_err_t err = esp_wifi_init(&init_cfg);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Wi-Fi init failed: %s", esp_err_to_name(err));
+        return -1;
+    }
 
     /* Start SoftAP. */
     wifi_config_t wifi_cfg = {0};
@@ -244,6 +254,11 @@ int wifi_setup_start(void)
     return 0;
 }
 
+const char *wifi_setup_ssid(void)
+{
+    return ap_ssid;
+}
+
 void wifi_setup_stop(void)
 {
     if (server) {
@@ -258,6 +273,11 @@ void wifi_setup_stop(void)
 int wifi_setup_start(void)
 {
     return 0;
+}
+
+const char *wifi_setup_ssid(void)
+{
+    return "";
 }
 
 void wifi_setup_stop(void)

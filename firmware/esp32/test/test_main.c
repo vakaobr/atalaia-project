@@ -3,15 +3,19 @@
 
 /*
  * Firmware test entry point. Runs on Linux (no ESP-IDF) with HAL stubs.
+ * LVGL runs on a headless display, so every screen the tests trigger goes
+ * through the real widget code (the reference images are in test_screens.c).
  */
 #include <stdio.h>
 
 #include "check.h"
+#include "test_display.h"
 
 int check_failures = 0;
 
 int main(void)
 {
+    test_display_init();
     run_game_timer_tests();
     run_command_dispatch_tests();
     run_preset_store_tests();
@@ -24,6 +28,8 @@ int main(void)
     run_wifi_setup_tests();
     run_reboot_resume_tests();
     run_screen_renderer_tests();
+    run_builtin_presets_tests();
+    run_key_filter_tests();
 
     if (check_failures == 0) {
         printf("firmware: all tests passed\n");

@@ -35,8 +35,9 @@ Reduced-tier option with smaller Lua heap and a monochrome OLED.
 | Main board | Heltec WiFi LoRa 32 V4.3 bare board, 863-928 MHz | Standard power for EU868 |
 | 2.4 GHz antenna | IPEX 1.0 (U.FL) FPC antenna, 2.4 GHz | **Required.** The bare board kit includes only the LoRa antenna; Wi-Fi and BLE (captive-portal setup) will barely work without this. |
 | LoRa antenna | Included with the board (863-928 MHz) | Match the region |
-| Team buttons | 2 x 60 mm arcade buttons with built-in LEDs | Active-low; common ground |
+| Team buttons | 2 (up to 4) x 60 mm arcade buttons with built-in LEDs | Active-low; common ground |
 | Keypad | 3x4 matrix membrane keypad | Codes, arming, admin PIN |
+| Keypad expander | PCF8574 I2C I/O expander module | Addr 0x20; reads the keypad over the board I2C bus, which frees 7 GPIOs |
 | Display | 2.8" ILI9341 or ST7789 SPI TFT (320x240) | Kconfig selects the controller |
 | LED ring | WS2812B ring (24 LEDs typical) | 5V data with 3.3V GPIO works at short distances; add a level shifter for reliability |
 | NFC reader | PN532 breakout (I2C mode) | Addr 0x24; shares the board I2C bus |
@@ -48,6 +49,9 @@ Reduced-tier option with smaller Lua heap and a monochrome OLED.
 
 ## Pin Assignments (Default Kconfig -- Heltec V4.3)
 
+These are the defaults in `firmware/esp32/main/Kconfig.projbuild`; that file
+is the reference if the two ever disagree.
+
 Board-internal pins (do not reassign): GPIO 1, 2, 7, 8-14, 17-18,
 19-20, 21, 35, 36, 37, 43-44.
 
@@ -55,44 +59,43 @@ Board-internal pins (do not reassign): GPIO 1, 2, 7, 8-14, 17-18,
 |----------------|------|-------|
 | Button 1       | 4    | Active low, internal pull-up |
 | Button 2       | 5    | |
-| Keypad Row 0   | 6    | Output, active low |
-| Keypad Row 1   | 15   | |
-| Keypad Row 2   | 16   | |
-| Keypad Row 3   | 33   | |
-| Keypad Col 0   | 34   | Input, internal pull-up |
-| Keypad Col 1   | 38   | GNSS header (free when no GNSS) |
-| Keypad Col 2   | 39   | GNSS header |
+| Button 3       | 33   | Optional; -1 in Kconfig for 2-team boxes |
+| Button 4       | 34   | Optional |
+| Keypad         | I2C  | PCF8574 at 0x20 on the board bus: rows on P0-P3, columns on P4-P6 |
 | LED Data       | 48   | WS2812B, single wire (RMT) |
 | Display MOSI   | 40   | GNSS header; SPI |
 | Display CLK    | 41   | GNSS header |
 | Display CS     | 42   | GNSS header |
-| Display DC     | 3    | Data/Command |
-| Display RST    | --   | Tied to Vext (GPIO 36) in hardware |
-| Display BL     | 45   | Backlight on/off |
-| NFC SDA        | 17   | Shared I2C bus (on-board OLED + NFC + gauge) |
-| NFC SCL        | 18   | |
-| I2S BCLK       | 0    | Strapping pin; safe as output after boot |
-| I2S LRCLK      | 46   | |
-| I2S DOUT       | 47   | |
-| Batt SDA       | 17   | Shared I2C bus |
-| Batt SCL       | 18   | |
-| Vext Ctrl      | 36   | Board-internal; drive high to power ext. peripherals |
-| ADC Ctrl       | 37   | Board-internal; drive high before reading Vbat ADC (GPIO 1) |
+| Display DC     | 3    | Data/Command (JTAG strapping pin; safe) |
+| Display RST    | 38   | GNSS header; -1 in Kconfig if RST is tied to Vext instead |
+| Display BL     | 47   | Backlight on/off |
+| I2C SDA        | 17   | Shared bus: on-board OLED, PCF8574, PN532, MAX17048 |
+| I2C SCL        | 18   | |
+| I2S BCLK       | 6    | MAX98357A |
+| I2S LRCLK      | 15   | |
+| I2S DOUT       | 16   | |
+| Vext Ctrl      | 36   | Board-internal; powers the external peripherals (see BRING_UP.md step 2) |
+| ADC Ctrl       | 37   | Board-internal; enable before reading Vbat ADC (GPIO 1) |
+
+The Wokwi emulator wires the same display, buttons and LED ring, and puts
+the keypad on GPIOs instead of the PCF8574
+(`firmware/esp32/docs/WOKWI.md`).
 
 ## Assembly Sequence
 
 1. Solder or socket the Heltec V4.3 bare board inside the enclosure.
 2. Connect the 2.4 GHz IPEX FPC antenna to the WiFi connector.
    Connect the LoRa antenna to the LoRa connector.
-3. Wire team buttons to GPIO 4-5 (common ground, active-low).
-4. Wire keypad matrix (rows to GPIO 6/15/16/33, cols to GPIO 34/38/39).
+3. Wire team buttons to GPIO 4-5 (and 33-34 for teams 3-4; common
+   ground, active-low).
+4. Wire the keypad to the PCF8574 (rows to P0-P3, columns to P4-P6) and
+   the PCF8574 to the I2C bus (SDA 17, SCL 18, address pins for 0x20).
 5. Connect WS2812B LED ring data to GPIO 48 (add a 3.3V-to-5V
    level shifter for runs longer than ~30 cm).
-6. Wire SPI display (MOSI 40, CLK 41, CS 42, DC 3, BL 45).
-   Tie display RST to the Vext rail (GPIO 36 powers it).
+6. Wire SPI display (MOSI 40, CLK 41, CS 42, DC 3, RST 38, BL 47).
 7. Connect PN532 NFC reader to I2C bus (SDA 17, SCL 18).
    Set the PN532 DIP switches to I2C mode.
-8. Wire MAX98357A I2S amplifier (BCLK 0, LRCLK 46, DOUT 47).
+8. Wire MAX98357A I2S amplifier (BCLK 6, LRCLK 15, DOUT 16).
 9. If using external MAX17048: connect to I2C bus (SDA 17, SCL 18).
 10. Wire battery pack to the board's JST connector (observe polarity).
 11. Route cables through cable glands; seal the enclosure.

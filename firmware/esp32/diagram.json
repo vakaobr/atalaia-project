@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "author": "The Atalaia contributors",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-s3-devkitc-1",
+      "id": "esp",
+      "top": 0,
+      "left": 0,
+      "attrs": { "flashSize": "16", "psramSize": "2", "psramType": "quad" }
+    },
+    {
+      "type": "wokwi-ili9341",
+      "id": "lcd1",
+      "top": -60,
+      "left": 230,
+      "rotate": 90,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn1",
+      "top": 300,
+      "left": 230,
+      "attrs": { "color": "red", "label": "RED team (key R)", "key": "r", "bounce": "0" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn2",
+      "top": 300,
+      "left": 380,
+      "attrs": { "color": "blue", "label": "BLUE team (key B)", "key": "b", "bounce": "0" }
+    },
+    {
+      "type": "wokwi-led-ring",
+      "id": "ring1",
+      "top": 260,
+      "left": 520,
+      "attrs": { "pixels": "24" }
+    },
+    {
+      "type": "wokwi-membrane-keypad",
+      "id": "keypad1",
+      "top": -40,
+      "left": -300,
+      "attrs": { "columns": "3" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+
+    [ "lcd1:VCC", "esp:3V3.2", "red", [] ],
+    [ "lcd1:GND", "esp:GND.2", "black", [] ],
+    [ "lcd1:CS", "esp:42", "orange", [] ],
+    [ "lcd1:D/C", "esp:3", "purple", [] ],
+    [ "lcd1:MOSI", "esp:40", "blue", [] ],
+    [ "lcd1:SCK", "esp:41", "yellow", [] ],
+    [ "lcd1:LED", "esp:47", "white", [] ],
+    [ "lcd1:RST", "esp:3V3.2", "red", [] ],
+
+    [ "btn1:2.r", "esp:4", "green", [] ],
+    [ "btn1:1.l", "esp:GND.1", "black", [] ],
+    [ "btn2:2.r", "esp:5", "green", [] ],
+    [ "btn2:1.l", "esp:GND.1", "black", [] ],
+
+    [ "ring1:DIN", "esp:48", "green", [] ],
+    [ "ring1:VCC", "esp:5V", "red", [] ],
+    [ "ring1:GND", "esp:GND.3", "black", [] ],
+
+    [ "keypad1:R1", "esp:6", "green", [] ],
+    [ "keypad1:R2", "esp:15", "green", [] ],
+    [ "keypad1:R3", "esp:16", "green", [] ],
+    [ "keypad1:R4", "esp:7", "green", [] ],
+    [ "keypad1:C1", "esp:1", "blue", [] ],
+    [ "keypad1:C2", "esp:2", "blue", [] ],
+    [ "keypad1:C3", "esp:39", "blue", [] ]
+  ],
+  "serialMonitor": { "display": "terminal", "newline": "lf" },
+  "dependencies": {}
+}

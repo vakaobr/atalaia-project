@@ -9,6 +9,8 @@ cmake-build-*/
 
 # ESP-IDF
 firmware/esp32/build/
+firmware/esp32/build-wokwi/
+firmware/esp32/build-test/
 sdkconfig
 sdkconfig.old
 managed_components/

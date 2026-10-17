@@ -19,7 +19,7 @@ Atalaia is an open, local-first platform for airsoft, paintball and milsim game 
 
 *Atalaia* is Portuguese for "watchtower" ([why that name?](#name)).
 
-> **Status: pre-alpha.** Nothing here is ready for the field yet. Phase 0 is complete: the shared core, its Lua sandbox, the Skirmesh-RF event codec and a browser-based simulator run Domination and Bomb. Phase 1 (the Field Box firmware shell) is built and cross-compiles for ESP32-S3; the final gate — a 2-hour club game on real hardware — awaits prototype parts. Ideas, reviews and early contributors are very welcome.
+> **Status: pre-alpha.** Nothing here is ready for the field yet. Phase 0 is complete: the shared core, its Lua sandbox, the Skirmesh-RF event codec and a browser-based simulator run Domination and Bomb. Phase 1 software is done: the Field Box firmware, its screens and an emulator setup that plays a game on a simulated box; the final gate — a 2-hour club game on real hardware — awaits prototype parts. Ideas, reviews and early contributors are very welcome.
 
 ---
 
@@ -93,17 +93,15 @@ sh tools/check.sh
 
 You need a C11 compiler, CMake 3.16 or newer, Python 3.10 or newer and PyYAML. No compiler? Use the [dev container](tools/README.md). To play a mode in your browser, holding team buttons and watching the props' screens and the event log, see the [simulator](simulator/README.md#play-a-mode-in-the-browser). To write a mode, start with [modes/README.md](modes/README.md).
 
-**Build the Field Box firmware** (cross-compiles in Docker, no toolchain needed locally):
+**Build the Field Box firmware** (cross-compiles in Docker, no toolchain needed locally; works from `cmd`, PowerShell or bash):
 
 ```sh
-# From Git Bash on Windows:
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/project" -w /project/firmware/esp32 \
-  espressif/idf:v5.3.2 \
-  bash -c "idf.py set-target esp32s3 && idf.py build"
+python tools/docker_fw.py build    # the firmware, in firmware/esp32/build/
+python tools/docker_fw.py test     # its host tests and screen reference images
+python tools/docker_fw.py wokwi    # the variant for the Wokwi emulator
 ```
 
-See [firmware/esp32/README.md](firmware/esp32/README.md) for the full build guide, Kconfig options, pin table, and bring-up checklist.
+To play a game on an emulated Field Box in VS Code before any hardware exists, see [firmware/esp32/docs/WOKWI.md](firmware/esp32/docs/WOKWI.md). See [firmware/esp32/README.md](firmware/esp32/README.md) for the full build guide, Kconfig options, pin table, and bring-up checklist.
 
 ## Contributing
 

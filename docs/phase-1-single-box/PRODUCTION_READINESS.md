@@ -23,32 +23,47 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 - [x] Formatting: clean (clang-format 18 + StyLua)
 - [x] Licensing: reuse lint compliant
 
-## ESP-IDF Build (clean copy, exit 0)
+## ESP-IDF Build (clean copy, exit 0, no warnings)
 
 ```
-Total image size: 716438 bytes (700 KB)
-atalaia_esp32.bin: 0xaef00 bytes. OTA partition 1.5 MB. 54% free.
-DRAM:  99,744 bytes (29.19%), 242,016 bytes free
-Flash code: 498,428 bytes
+Field Box (sdkconfig.defaults):
+atalaia_esp32.bin: 0x14d870 bytes (1,366,128). OTA partition 1.5 MB. 13% free.
+DIRAM: 205,456 bytes (60.12%), 136,304 free
+Flash code: 897,036 bytes   Flash data: 345,756 bytes
 IRAM:  16,383 bytes (99.99%)
+
+Wokwi variant (sdkconfig.defaults + sdkconfig.wokwi):
+atalaia_esp32.bin: 0xdd8b0 bytes (907,440). 42% free.
 ```
 
-Components: esp_lvgl_port 2.4.4, led_strip 2.5.5, lvgl 9.2.2, littlefs 1.14.8.
+Components: esp_lvgl_port 2.4.4 (unused), led_strip 2.5.5, lvgl 9.2.2,
+littlefs 1.14.8. The earlier 700 KB image did not link LVGL (the screen
+code was never compiled) or initialise Wi-Fi.
 
-## Stubbed (not done)
+## Screens
 
-- **LVGL host rendering and PNG artifacts:** LVGL widget trees compile
-  on ESP32 but are not built or rendered on the host. Template routing
-  is tested on the host (12 screen renderer tests). Building LVGL 9.2
-  from source in the host test build was not completed.
-- **preset_select screen:** TODO in the LVGL widget-building path.
+- [x] 12 templates render on the device and the host from the same code
+  and `lv_conf.h`
+- [x] 20 reference PNGs in `firmware/esp32/test/screens/`, compared pixel
+  by pixel in CI's `firmware-test` job; clipping and overlap checks
+- [x] Wokwi emulator plays a Bomb game; its display matches the references
+
+## Open items
+
+- **Image size:** 13% of the OTA slot is left. Grow the OTA slots
+  (ADR-P1-4) or trim fonts before phase 2 adds code.
+- **Game-timer bar (ADR-P1-3)** and the captive portal's DNS redirect are
+  not implemented.
+- **Vext (GPIO 36)** is not switched by the firmware; check the polarity
+  at bring-up.
 
 ## Documentation
 
 - [x] CHANGELOG updated
 - [x] README updated
 - [x] ADR written (P1-1 through P1-9)
-- [x] Runbook written (BRING_UP.md)
+- [x] Runbook written (BRING_UP.md, with a Wokwi step before hardware)
+- [x] Emulator guide written (firmware/esp32/docs/WOKWI.md)
 
 ## Breaking Changes
 
@@ -65,6 +80,8 @@ None.
 
 **Status:** SOFTWARE GATE PASSED, HARDWARE GATE OPEN
 
-The ESP-IDF build passes from a clean copy. All host tests pass. All
-expert reviews approved. The LVGL host rendering (PNG artifacts and
-hash checks) is not done. The Phase 1 gate is blocked on hardware.
+The ESP-IDF build passes from a clean copy for the Field Box and the
+Wokwi variant, with no warnings. All host tests pass, including the
+screen reference images. The firmware plays a Bomb game in the Wokwi
+emulator. The Phase 1 gate (a 2-hour club game on a real box) is blocked
+on hardware; BRING_UP.md lists what only the hardware can show.

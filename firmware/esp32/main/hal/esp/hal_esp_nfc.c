@@ -4,6 +4,7 @@
 #ifdef ESP_PLATFORM
 
 #include "../hal_nfc.h"
+#include "hal_esp_i2c.h"
 
 #include "driver/i2c.h"
 #include "esp_log.h"
@@ -16,15 +17,8 @@ static const char *TAG = "hal_nfc";
 
 /* ---- Kconfig pins ---- */
 
-#ifndef CONFIG_ATALAIA_NFC_SDA_PIN
-#define CONFIG_ATALAIA_NFC_SDA_PIN 17
-#endif
-#ifndef CONFIG_ATALAIA_NFC_SCL_PIN
-#define CONFIG_ATALAIA_NFC_SCL_PIN 18
-#endif
-#ifndef CONFIG_ATALAIA_NFC_I2C_PORT
-#define CONFIG_ATALAIA_NFC_I2C_PORT I2C_NUM_0
-#endif
+/* The PN532 sits on the shared board bus (hal_esp_i2c.c). */
+#define CONFIG_ATALAIA_NFC_I2C_PORT HAL_ESP_I2C_PORT
 
 #define PN532_I2C_ADDR                0x24
 #define PN532_READY_BIT               0x01
@@ -99,35 +93,24 @@ static esp_err_t pn532_read_response(uint8_t *buf, size_t buf_len, size_t *out_l
 
 /* ---- ops implementation ---- */
 
+static bool present;
+
 static int esp_nfc_init(void)
 {
-    i2c_config_t conf = {
-        .mode = I2C_MODE_MASTER,
-        .sda_io_num = CONFIG_ATALAIA_NFC_SDA_PIN,
-        .scl_io_num = CONFIG_ATALAIA_NFC_SCL_PIN,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = 100000, /* 100 kHz */
-    };
-
-    esp_err_t err = i2c_param_config(CONFIG_ATALAIA_NFC_I2C_PORT, &conf);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "I2C param config failed: %s", esp_err_to_name(err));
+    present = hal_esp_i2c_init() == 0 && hal_esp_i2c_probe(PN532_I2C_ADDR);
+    if (!present) {
+        /* Not fatal: the box runs without NFC (and Wokwi has no PN532). */
+        ESP_LOGW(TAG, "PN532 NFC reader not found at 0x%02X: NFC disabled", PN532_I2C_ADDR);
         return -1;
     }
-
-    err = i2c_driver_install(CONFIG_ATALAIA_NFC_I2C_PORT, conf.mode, 0, 0, 0);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "I2C driver install failed: %s", esp_err_to_name(err));
-        return -1;
-    }
-
-    ESP_LOGI(TAG, "PN532 NFC reader initialised on I2C%d", CONFIG_ATALAIA_NFC_I2C_PORT);
+    ESP_LOGI(TAG, "PN532 NFC reader at 0x%02X", PN532_I2C_ADDR);
     return 0;
 }
 
 static bool esp_nfc_poll(hal_nfc_tag_t *tag)
 {
+    if (!present) return false;
+
     /* InListPassiveTarget: 1 target, 106 kbps type A */
     uint8_t cmd[] = {PN532_CMD_INLISTPASSIVETARGET, 0x01, 0x00};
     esp_err_t err = pn532_write_command(cmd, sizeof(cmd));
@@ -167,7 +150,8 @@ static bool esp_nfc_poll(hal_nfc_tag_t *tag)
 
 static void esp_nfc_deinit(void)
 {
-    i2c_driver_delete(CONFIG_ATALAIA_NFC_I2C_PORT);
+    /* The bus is shared; it stays installed. */
+    present = false;
 }
 
 const hal_nfc_ops_t hal_esp_nfc_ops = {

@@ -3,7 +3,7 @@
 
 /*
  * Tests for screen_renderer template routing and data recording.
- * Verifies all 9 known templates, unknown template rejection,
+ * Verifies all 12 known templates, unknown template rejection,
  * NULL data handling, and sequential render call counting.
  */
 #include <stdio.h>
@@ -95,6 +95,39 @@ static void test_render_wifi_setup(void)
     CHECK(screen_renderer_call_count() == 1);
 }
 
+static void test_render_picker_templates(void)
+{
+    static const char *const names[] = {"pin_entry", "timer_adjust", "start_confirm"};
+    for (int i = 0; i < 3; i++) {
+        screen_renderer_reset();
+        CHECK(screen_render(names[i], "{}"));
+        CHECK(strcmp(screen_renderer_last_template(), names[i]) == 0);
+        CHECK(screen_renderer_call_count() == 1);
+    }
+}
+
+static void test_render_malformed_data(void)
+{
+    /* Bad JSON must never crash the renderer; the template still shows. */
+    static const char *const bad[] = {
+        "",
+        "{",
+        "{\"left\":",
+        "{\"left\":\"x",
+        "[1,2]",
+        "{\"presets\":[\"a\",",
+        "{\"arm\":{\"nested\":\"red\"}}",
+        "{\"left\":-5}",
+        "{\"left\":1e9}",
+    };
+    static const char *const tmpl[] = {"countdown", "standby", "preset_select", "status"};
+    for (int t = 0; t < 4; t++) {
+        for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
+            CHECK(screen_render(tmpl[t], bad[i]));
+        }
+    }
+}
+
 /* ---- edge cases ---- */
 
 static void test_render_unknown_template(void)
@@ -139,6 +172,8 @@ void run_screen_renderer_tests(void)
     test_render_status();
     test_render_preset_select();
     test_render_wifi_setup();
+    test_render_picker_templates();
+    test_render_malformed_data();
     test_render_unknown_template();
     test_render_null_data();
     test_render_sequential_calls();

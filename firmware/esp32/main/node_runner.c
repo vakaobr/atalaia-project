@@ -9,12 +9,22 @@
 
 #include "state_persist.h"
 
+#ifdef ESP_PLATFORM
+#include "esp_log.h"
+static const char *TAG = "game";
+#endif
+
 /* ---------- Core callbacks (static, wire to the runner context) ---------- */
 
 static void on_event(void *user, const atalaia_event_t *ev, const char *data_json)
 {
     node_runner_t *r = (node_runner_t *)user;
+#ifdef ESP_PLATFORM
+    /* The serial log is the bring-up checklist's (and Wokwi's) view of the game. */
+    ESP_LOGI(TAG, "event %s %s", ev->type, data_json ? data_json : "{}");
+#else
     (void)data_json;
+#endif
     r->event_count++;
     snprintf(r->last_event_type, sizeof(r->last_event_type), "%s", ev->type);
 }
@@ -28,7 +38,11 @@ static void on_command(void *user, const char *target, const char *method, const
 static void on_log(void *user, const char *message)
 {
     (void)user;
+#ifdef ESP_PLATFORM
+    ESP_LOGI(TAG, "mode: %s", message);
+#else
     (void)message;
+#endif
 }
 
 /* ------------------------------------------------------------------ */

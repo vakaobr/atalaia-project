@@ -13,9 +13,12 @@
  * share the same I2C port without conflicts.
  */
 
-#ifdef ESP_PLATFORM
+#include "sdkconfig.h"
+
+#if defined(ESP_PLATFORM) && !CONFIG_ATALAIA_KP_GPIO_MATRIX
 
 #include "../hal_keypad.h"
+#include "hal_esp_i2c.h"
 
 #include "driver/gpio.h"
 #include "driver/i2c.h"
@@ -32,9 +35,7 @@ static const char *TAG = "hal_kp";
 #ifndef CONFIG_ATALAIA_KP_INT_PIN
 #define CONFIG_ATALAIA_KP_INT_PIN -1
 #endif
-#ifndef CONFIG_ATALAIA_KP_I2C_PORT
-#define CONFIG_ATALAIA_KP_I2C_PORT I2C_NUM_0
-#endif
+#define CONFIG_ATALAIA_KP_I2C_PORT HAL_ESP_I2C_PORT
 
 #define NUM_ROWS 4
 #define NUM_COLS 3
@@ -57,15 +58,13 @@ static const char keymap[NUM_ROWS][NUM_COLS] = {
 
 /* ---- ops implementation ---- */
 
+static bool present;
+
 static int esp_keypad_init(void)
 {
-    /*
-     * The I2C bus is assumed to be already initialized by NFC or
-     * battery init (same port, same pins). If neither has run yet,
-     * we initialize it here.
-     */
+    if (hal_esp_i2c_init() != 0) return -1;
 
-    /* Optional interrupt pin (active-low from PCF8574 INT). */
+        /* Optional interrupt pin (active-low from PCF8574 INT). */
 #if CONFIG_ATALAIA_KP_INT_PIN >= 0
     gpio_config_t int_cfg = {
         .pin_bit_mask = 1ULL << (unsigned)CONFIG_ATALAIA_KP_INT_PIN,
@@ -81,19 +80,21 @@ static int esp_keypad_init(void)
     uint8_t all_high = 0xFF;
     esp_err_t err = i2c_master_write_to_device(
         CONFIG_ATALAIA_KP_I2C_PORT, CONFIG_ATALAIA_KP_I2C_ADDR, &all_high, 1, pdMS_TO_TICKS(100));
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "PCF8574 not detected at 0x%02X: %s", CONFIG_ATALAIA_KP_I2C_ADDR,
-                 esp_err_to_name(err));
-        /* Non-fatal: keypad scan will return KEY_NONE. */
-    } else {
-        ESP_LOGI(TAG, "PCF8574 keypad at 0x%02X", CONFIG_ATALAIA_KP_I2C_ADDR);
+    present = err == ESP_OK;
+    if (!present) {
+        /* Non-fatal: scan returns KEY_NONE and the box runs on its buttons. */
+        ESP_LOGW(TAG, "PCF8574 keypad not found at 0x%02X (%s): keypad disabled",
+                 CONFIG_ATALAIA_KP_I2C_ADDR, esp_err_to_name(err));
+        return -1;
     }
-
+    ESP_LOGI(TAG, "PCF8574 keypad at 0x%02X", CONFIG_ATALAIA_KP_I2C_ADDR);
     return 0;
 }
 
 static char esp_keypad_scan(void)
 {
+    if (!present) return HAL_KEY_NONE;
+
     for (int r = 0; r < NUM_ROWS; r++) {
         /*
          * Drive row r low (P0-P3), keep columns P4-P6 and P7 high.
@@ -142,4 +143,4 @@ const hal_keypad_ops_t hal_esp_keypad_ops = {
     .deinit = esp_keypad_deinit,
 };
 
-#endif /* ESP_PLATFORM */
+#endif /* ESP_PLATFORM && !CONFIG_ATALAIA_KP_GPIO_MATRIX */

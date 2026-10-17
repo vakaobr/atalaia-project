@@ -11,6 +11,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include <stdbool.h>
 #include <string.h>
 
 static const char *TAG = "hal_disp";
@@ -35,24 +36,35 @@ static const char *TAG = "hal_disp";
 #ifndef CONFIG_ATALAIA_DISP_BL_PIN
 #define CONFIG_ATALAIA_DISP_BL_PIN 47
 #endif
-#ifndef CONFIG_ATALAIA_DISP_WIDTH
-#define CONFIG_ATALAIA_DISP_WIDTH 320
-#endif
-#ifndef CONFIG_ATALAIA_DISP_HEIGHT
-#define CONFIG_ATALAIA_DISP_HEIGHT 240
+#define CONFIG_ATALAIA_DISP_WIDTH  HAL_DISPLAY_WIDTH
+#define CONFIG_ATALAIA_DISP_HEIGHT HAL_DISPLAY_HEIGHT
+
+/*
+ * MADCTL (0x36): landscape 320x240. ILI9341: MV | BGR. ST7789: MX | MV
+ * (RGB order). Check the orientation and colours at bring-up; flip MX/MY
+ * here if the picture is mirrored on a particular panel.
+ */
+#if CONFIG_ATALAIA_DISP_ST7789
+#define DISP_MADCTL 0x60
+#else
+#define DISP_MADCTL 0x28
 #endif
 
 static spi_device_handle_t spi_dev;
 static hal_display_flush_ready_cb_t pending_ready_cb;
+/* The queued pixel transfer must outlive esp_display_flush(), so it is static. */
+static spi_transaction_t pixel_trans;
+static bool pixel_trans_queued;
 
 /* ---- SPI DMA completion callback ---- */
 
 static void IRAM_ATTR spi_post_transfer_cb(spi_transaction_t *trans)
 {
-    (void)trans;
-    if (pending_ready_cb) {
-        pending_ready_cb();
+    /* Only the pixel transfer completes an LVGL flush, not the commands. */
+    if (trans == &pixel_trans && pending_ready_cb) {
+        hal_display_flush_ready_cb_t cb = pending_ready_cb;
         pending_ready_cb = NULL;
+        cb();
     }
 }
 
@@ -141,7 +153,7 @@ static int esp_display_init(void)
         .sclk_io_num = CONFIG_ATALAIA_DISP_CLK_PIN,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
-        .max_transfer_sz = CONFIG_ATALAIA_DISP_WIDTH * CONFIG_ATALAIA_DISP_HEIGHT * 2,
+        .max_transfer_sz = CONFIG_ATALAIA_DISP_WIDTH * HAL_DISPLAY_BUF_LINES * 2,
     };
     esp_err_t err = spi_bus_initialize(SPI2_HOST, &bus_cfg, SPI_DMA_CH_AUTO);
     if (err != ESP_OK) {
@@ -173,6 +185,16 @@ static int esp_display_init(void)
     uint8_t pix_fmt = 0x55;
     disp_send_data(&pix_fmt, 1);
 
+    /* Memory access control: landscape orientation. */
+    disp_send_cmd(0x36);
+    uint8_t madctl = DISP_MADCTL;
+    disp_send_data(&madctl, 1);
+
+#if CONFIG_ATALAIA_DISP_ST7789
+    /* Most ST7789 TFT modules need colour inversion on. */
+    disp_send_cmd(0x21);
+#endif
+
     /* Display on */
     disp_send_cmd(0x29);
 
@@ -190,20 +212,34 @@ static int esp_display_init(void)
 static void esp_display_flush(int x1, int y1, int x2, int y2, const void *color_p,
                               hal_display_flush_ready_cb_t ready_cb)
 {
+    /*
+     * Collect the previous pixel transfer first: polling transactions
+     * (the window commands) cannot start while a queued one is pending.
+     * LVGL only flushes again after ready_cb, so this does not block.
+     */
+    if (pixel_trans_queued) {
+        spi_transaction_t *done;
+        spi_device_get_trans_result(spi_dev, &done, portMAX_DELAY);
+        pixel_trans_queued = false;
+    }
+
     disp_set_window(x1, y1, x2, y2);
 
     int pixel_count = (x2 - x1 + 1) * (y2 - y1 + 1);
-    int byte_count = pixel_count * 2;
 
-    spi_transaction_t t;
-    memset(&t, 0, sizeof(t));
-    t.length = (size_t)byte_count * 8;
-    t.tx_buffer = color_p;
+    memset(&pixel_trans, 0, sizeof(pixel_trans));
+    pixel_trans.length = (size_t)pixel_count * 2 * 8;
+    pixel_trans.tx_buffer = color_p;
 
     pending_ready_cb = ready_cb;
 
     gpio_set_level(CONFIG_ATALAIA_DISP_DC_PIN, 1);
-    spi_device_queue_trans(spi_dev, &t, portMAX_DELAY);
+    if (spi_device_queue_trans(spi_dev, &pixel_trans, portMAX_DELAY) == ESP_OK) {
+        pixel_trans_queued = true;
+    } else {
+        pending_ready_cb = NULL;
+        ready_cb();
+    }
 }
 
 static void esp_display_set_brightness(uint8_t brightness)
@@ -221,6 +257,11 @@ static void esp_display_deinit(void)
     gpio_set_level(CONFIG_ATALAIA_DISP_BL_PIN, 0);
 #endif
     if (spi_dev) {
+        if (pixel_trans_queued) {
+            spi_transaction_t *done;
+            spi_device_get_trans_result(spi_dev, &done, portMAX_DELAY);
+            pixel_trans_queued = false;
+        }
         spi_bus_remove_device(spi_dev);
         spi_dev = NULL;
     }

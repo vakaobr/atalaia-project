@@ -58,8 +58,53 @@ menu "Atalaia Field Box Configuration"
     # I2C bus (GPIO 17/18). Rows on P0-P3, columns on P4-P6, P7 unused.
     # This frees GPIOs 6, 15, 16, 33, 34, 38, 39 for audio, buttons, etc.
     menu "Keypad"
+        choice ATALAIA_KP_INTERFACE
+            prompt "Keypad interface"
+            default ATALAIA_KP_PCF8574
+            help
+                How the 4x3 keypad is wired. The Field Box uses the PCF8574
+                expander. The GPIO matrix exists for the Wokwi emulator
+                (sdkconfig.wokwi), which has no PCF8574 part.
+
+            config ATALAIA_KP_PCF8574
+                bool "PCF8574 I2C expander (Field Box)"
+
+            config ATALAIA_KP_GPIO_MATRIX
+                bool "Direct GPIO matrix (Wokwi emulator)"
+        endchoice
+
+        config ATALAIA_KP_ROW0_PIN
+            int "Keypad row 1 GPIO (rows are outputs)"
+            depends on ATALAIA_KP_GPIO_MATRIX
+            default 6
+        config ATALAIA_KP_ROW1_PIN
+            int "Keypad row 2 GPIO"
+            depends on ATALAIA_KP_GPIO_MATRIX
+            default 15
+        config ATALAIA_KP_ROW2_PIN
+            int "Keypad row 3 GPIO"
+            depends on ATALAIA_KP_GPIO_MATRIX
+            default 16
+        config ATALAIA_KP_ROW3_PIN
+            int "Keypad row 4 GPIO"
+            depends on ATALAIA_KP_GPIO_MATRIX
+            default 7
+        config ATALAIA_KP_COL0_PIN
+            int "Keypad column 1 GPIO (columns are inputs with pull-ups)"
+            depends on ATALAIA_KP_GPIO_MATRIX
+            default 1
+        config ATALAIA_KP_COL1_PIN
+            int "Keypad column 2 GPIO"
+            depends on ATALAIA_KP_GPIO_MATRIX
+            default 2
+        config ATALAIA_KP_COL2_PIN
+            int "Keypad column 3 GPIO"
+            depends on ATALAIA_KP_GPIO_MATRIX
+            default 39
+
         config ATALAIA_KP_I2C_ADDR
             hex "PCF8574 I2C address"
+            depends on ATALAIA_KP_PCF8574
             default 0x20
             help
                 7-bit I2C address of the PCF8574 keypad expander.
@@ -67,6 +112,7 @@ menu "Atalaia Field Box Configuration"
 
         config ATALAIA_KP_INT_PIN
             int "PCF8574 INT GPIO (-1 = poll)"
+            depends on ATALAIA_KP_PCF8574
             default -1
             help
                 Optional interrupt pin from the PCF8574.  When set
@@ -185,6 +231,26 @@ menu "Atalaia Field Box Configuration"
         config ATALAIA_BATT_SCL_PIN
             int "Battery gauge I2C SCL GPIO"
             default 18
+    endmenu
+
+    # ---- Development and emulator options -----------------------------------
+    menu "Development"
+        config ATALAIA_SKIP_SETUP
+            bool "Skip the Wi-Fi setup portal (use default settings)"
+            default n
+            help
+                Boot straight into the preset picker with the default admin
+                PIN (1234) instead of opening the setup portal on first boot.
+                For the Wokwi emulator, which cannot host a SoftAP. Leave off
+                on real Field Boxes.
+
+        config ATALAIA_SERIAL_KEYS
+            bool "Accept keypad keys from the serial console"
+            default n
+            help
+                Characters 0-9, * and # typed on the USB serial console act
+                as keypad presses. Lets the Wokwi automation scenarios and a
+                bring-up session drive the picker without touching the keypad.
     endmenu
 
     # ---- Memory tier --------------------------------------------------------

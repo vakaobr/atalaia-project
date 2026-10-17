@@ -18,6 +18,20 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 > connector, or the captive-portal setup and any future BLE features
 > will barely work.
 
+## Before the hardware: Wokwi
+
+Run the firmware in the Wokwi emulator first ([WOKWI.md](WOKWI.md)). It
+catches crashes, stack overflows, wrong pin assignments and broken screens
+without a board: the first Wokwi run found a stack overflow in the memory
+monitor task that would have crash-looped every Field Box. Play one Bomb
+and one Domination game there before the first hardware session, so that
+any problem at bring-up is down to the hardware.
+
+What Wokwi cannot tell you, and this checklist must: the PCF8574 keypad
+expander (Wokwi uses a GPIO keypad instead), the PN532, the MAX17048, the
+I2S amplifier, the Heltec V4.3's Vext rail, the real panel's orientation and
+colours, power, range and the 2-hour stability gate.
+
 ## Prerequisites
 
 - Assembled Field Box (see `hardware/field-box/README.md` for BOM
@@ -29,10 +43,12 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 ## Step 1: First Boot Smoke Test
 
-1. Flash the firmware:
+1. Build it with `python tools/docker_fw.py build`, then flash it:
    ```
    idf.py flash -p /dev/ttyUSB0
    ```
+   (or the `esptool.py write_flash` command the build prints, with the
+   files in `firmware/esp32/build/`).
 2. Open serial monitor:
    ```
    idf.py monitor -p /dev/ttyUSB0
@@ -40,19 +56,32 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 3. Verify: boot log shows firmware version, PSRAM detection (2 MB on
    V4.3), tier selection (should be "full").
 4. Verify: no crash loops (watchdog resets).
-5. Verify: on-board LED (GPIO 35) blinks briefly during init.
+5. Verify: one line per part. A part that is not connected logs a warning
+   such as `PN532 NFC reader not found at 0x24: NFC disabled` and the box
+   keeps booting; every part that is connected must not log one.
+6. Verify: on the very first boot, LittleFS formats the storage partition
+   (`mount failed ... formatting`) and `stored 2 built-in preset(s)`.
 
 ## Step 2: Vext and External Peripherals
 
-1. The Vext rail (GPIO 36) must be driven high to power external
-   peripherals (NFC reader, display, etc.).
-2. Verify: `shell.c` drives GPIO 36 high early in `app_main`.
+1. The Vext rail (GPIO 36) powers the external peripherals (NFC reader,
+   display, etc.) when they are wired to it.
+2. The firmware does not switch Vext yet. Check the polarity in Heltec's
+   V4.3 schematic (on the V3, driving GPIO 36 LOW turns Vext on), then add
+   it early in `app_main` and record it here.
 3. If external peripherals do not respond, check Vext first.
 
 ## Step 3: Display
 
-1. Check display initialisation in the log (ILI9341 or ST7789).
-2. Verify: setup page or preset picker visible on the external TFT.
+1. Check display initialisation in the log: `Display initialised
+   (320x240)` and `LVGL 9.2.2 on 320x240`.
+2. Verify: the setup screen (first boot) or the admin PIN screen is
+   visible on the external TFT, in landscape, and looks like
+   `firmware/esp32/test/screens/wifi_setup.png` or `pin_entry.png`: the
+   same layout, the header bar at the top, amber and red where the
+   reference has them. Mirrored or upside-down text means the MADCTL value
+   in `hal_esp_display.c` needs a flip; red and blue swapped means its BGR
+   bit; inverted colours on an ST7789 means the inversion command.
 3. Note: the on-board 0.96" OLED (GPIO 17/18) shares the I2C bus
    with the NFC reader and battery gauge.  It can show status while
    the external TFT shows the game UI.
@@ -61,16 +90,19 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 ## Step 4: Buttons
 
-1. Press each team button (GPIO 4, 5).
-2. Serial log should show: `team_input.press` / `team_input.release`.
-3. Hold a button for > 250 ms: verify `team_input.hold` events at
-   250 ms intervals.
+1. Start a Bomb game (admin PIN, game 1, `#`, `#`). Press each team
+   button (GPIO 4, 5; 33, 34 for teams 3 and 4).
+2. Hold the red button for 5 s: the log shows `game: event bomb.armed`
+   and the screen the countdown. Hold blue for 10 s: `bomb.defused`.
+3. A short press (under 5 s) must not arm the bomb.
 
 ## Step 5: Keypad
 
-1. Press each key (0-9, *, #).
-2. Serial log should show: `keypad.key` events.
-3. Enter a multi-digit code + #: verify `keypad.code` event.
+1. Verify the log shows `PCF8574 keypad at 0x20` (not `not found`).
+2. On the PIN screen, press each key: every digit adds one dot, `*`
+   removes one, a wrong PIN plus `#` shows "Wrong PIN, try again".
+3. Hold a key down: it must count once, not repeat.
+4. During a game, key presses reach the mode as `keypad.key` events.
 
 ## Step 6: LEDs
 
@@ -89,7 +121,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 ## Step 8: Audio
 
 1. Start a game that plays sound clips (bomb armed/defused).
-2. Verify: audio plays through the speaker (I2S on GPIO 0/46/47).
+2. Verify: audio plays through the speaker (I2S on GPIO 6/15/16).
 3. Check volume control via serial command.
 
 ## Step 9: Battery
@@ -111,6 +143,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 3. Verify: captive portal page loads automatically.
 4. Fill in config and submit.
 5. Verify: node reboots into normal mode.
+6. The page sets the node up, but there is no DNS redirect yet: if the
+   phone does not open the page by itself, browse to
+   `http://192.168.4.1`.
 
 ## Step 11: Full Game Test (2 Hours) -- Phase 1 Gate
 

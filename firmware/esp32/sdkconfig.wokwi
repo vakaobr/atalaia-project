@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Wokwi emulator variant, applied on top of sdkconfig.defaults:
+#   python tools/docker_fw.py wokwi
+# builds it into build-wokwi/, which wokwi.toml and diagram.json use.
+# It never changes the real board's defaults.
+#
+# Wokwi's ESP32-S3-DevKitC-1 has no PCF8574, PN532, MAX17048, SX1262 or I2S
+# amplifier, and GPIO 33/34 are not on its headers. See docs/WOKWI.md.
+
+# The keypad sits on a GPIO matrix instead of the PCF8574 expander: rows on
+# 6, 15, 16, 7 and columns on 1, 2, 39. GPIO 6/15/16 are the audio pins,
+# free here because Wokwi does not simulate the I2S amplifier.
+CONFIG_ATALAIA_KP_GPIO_MATRIX=y
+CONFIG_ATALAIA_KP_ROW0_PIN=6
+CONFIG_ATALAIA_KP_ROW1_PIN=15
+CONFIG_ATALAIA_KP_ROW2_PIN=16
+CONFIG_ATALAIA_KP_ROW3_PIN=7
+CONFIG_ATALAIA_KP_COL0_PIN=1
+CONFIG_ATALAIA_KP_COL1_PIN=2
+CONFIG_ATALAIA_KP_COL2_PIN=39
+
+# Audio off: its pins carry the keypad.
+CONFIG_ATALAIA_AUDIO_BCLK_PIN=-1
+CONFIG_ATALAIA_AUDIO_LRCLK_PIN=-1
+CONFIG_ATALAIA_AUDIO_DOUT_PIN=-1
+
+# Two teams: GPIO 33/34 are not on the DevKitC-1 headers.
+CONFIG_ATALAIA_BTN3_PIN=-1
+CONFIG_ATALAIA_BTN4_PIN=-1
+
+# Wokwi does not simulate the ILI9341 RST pin, and GPIO 38 drives the
+# DevKitC-1's own RGB LED.
+CONFIG_ATALAIA_DISP_RST_PIN=-1
+
+# No SoftAP captive portal in the emulator: start with the default settings
+# (admin PIN 1234), and accept keypad keys from the serial console so the
+# automation scenarios can type them.
+CONFIG_ATALAIA_SKIP_SETUP=y
+CONFIG_ATALAIA_SERIAL_KEYS=y
+
+# Keep booting if the emulated board has no PSRAM (diagram.json asks for 2 MB).
+CONFIG_SPIRAM_IGNORE_NOTFOUND=y

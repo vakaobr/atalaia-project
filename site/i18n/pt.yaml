@@ -37,7 +37,7 @@ header:
   language: Idioma
 
 hero:
-  status: Pré-alfa · fase 0 quase concluída · ainda não está pronta para o campo
+  status: Pré-alfa · software da fase 1 concluído, à espera do hardware · ainda não está pronta para o campo
   title: A plataforma aberta de <span class="nowrap">combate simulado</span>
   lead: >-
     A Atalaia é uma plataforma aberta para os dispositivos eletrónicos de jogo (os props) de
@@ -225,8 +225,8 @@ try:
 roadmap:
   title: Roteiro
   intro: Seis fases. Cada uma acaba com um teste a sério no campo antes de a seguinte começar.
-  now: Agora
-  next: A seguir
+  now: Concluída
+  next: Software pronto
   p0:
     title: Alicerces
     text: >-
@@ -237,7 +237,10 @@ roadmap:
   p1:
     title: Uma caixa
     text: Montagem da Field Box, firmware ESP32, predefinições na própria caixa.
-    gate: "Prova: uma caixa aguenta um jogo de clube de 2 horas sem reiniciar."
+    gate: >-
+      Prova: uma caixa aguenta um jogo de clube de 2 horas sem reiniciar. O firmware e os ecrãs
+      estão prontos e correm num emulador; a prova fica em aberto até as primeiras caixas estarem
+      montadas.
   p2:
     title: Rede de campo
     text: Skirmesh-RF sobre LoRa, controlador de campo, API, consola da organização.

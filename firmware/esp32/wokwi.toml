@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Wokwi emulator (VS Code extension or wokwi-cli). Loads the Wokwi variant
+# of the firmware, built by `python tools/docker_fw.py wokwi` into
+# build-wokwi/ (sdkconfig.defaults + sdkconfig.wokwi). Not used by CI.
+# Paths are relative to this file. See docs/WOKWI.md.
+[wokwi]
+version = 1
+firmware = "build-wokwi/flasher_args.json"
+elf = "build-wokwi/atalaia_esp32.elf"

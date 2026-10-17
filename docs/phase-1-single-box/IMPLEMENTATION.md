@@ -106,8 +106,8 @@ second.
 The screen renderer in stub builds records template names and data for
 test inspection.  Nine templates are recognised (`standby`, `countdown`,
 `defused`, `exploded`, `final_score`, `paused`, `status`,
-`preset_select`, `wifi_setup`).  The LVGL rendering path is compiled
-only under `ESP_PLATFORM` and is deferred until hardware testing.
+`preset_select`, `wifi_setup`).  (Phase F below replaced the
+ESP-only LVGL path with one that the device and the host tests share.)
 
 The preset UI implements the full keypad-driven flow: PIN entry ->
 preset selection -> timer adjustment -> confirmation -> start.  Wrong
@@ -155,7 +155,10 @@ $ ctest --test-dir /tmp/fw-test --output-on-failure
 | game_loop | 3 | domination with real node.lua, bomb arm+explode, arm+defuse |
 | wifi_setup | 11 | form parser, URL decode, oversized, malformed, validation |
 | reboot_resume | 2 | bomb resume after reboot, node.rebooted event |
-| screen_renderer | 12 | all 9 templates, unknown reject, NULL data, multi-render |
+| screen_renderer | 14 | all templates, malformed data, unknown reject, NULL data, multi-render |
+| builtin_presets | 5 | seeding, labels, picker screens, Bomb played from the picker |
+| key_filter | 4 | one press per stroke, bounce, repeats |
+| screens (own executable) | 20 renders | pixel-exact reference images, clipping, overlaps, patch = build |
 
 ### ESP-IDF cross-compilation (clean copy, exit 0)
 
@@ -240,8 +243,92 @@ Testing approach:
   sequential calls).
 - **ESP32-only:** LVGL widget trees are compiled but not host-tested
   for rendering (LVGL is not linked in the host build).
-- **Follow-up:** Visual verification via the LVGL SDL simulator or
-  hardware is a Phase 2 task.
+- **Follow-up:** done in Phase F (host rendering with reference images,
+  and the Wokwi emulator).
+
+### Phase F: Screens rendered on the host, and the Wokwi emulator
+
+The `ATALAIA_SCREEN_LVGL` path was never defined in the ESP-IDF build, so
+before this phase the device drew nothing, and no LVGL code was compiled.
+Phase F wires LVGL on the device, renders the same code on the host, and
+runs the firmware in an emulator.
+
+**Screens.** `screen_renderer.c` now has a build/update function pair per
+template (ADR-P1-2: built once, then patched). Twelve templates: the nine
+from Phase C plus the picker's `pin_entry`, `timer_adjust` and
+`start_confirm`; `preset_select` lists the presets with the selection
+highlighted (the former TODO). Data is read with a small JSON reader that
+skips nested values and survives malformed input. Team screens use the
+team's colour (red, blue, green, yellow, orange, purple; dark text on
+yellow). Layout is for the 320x240 TFT with Montserrat 14/20/28/48.
+
+**One LVGL configuration.** `firmware/esp32/lvgl_conf/lv_conf.h` (LVGL's
+template, MIT) configures LVGL for both builds. `main/CMakeLists.txt` adds
+its folder and `LV_KCONFIG_IGNORE` to the `lvgl__lvgl` component, so the
+device ignores LVGL's Kconfig values; the host test adds the same folder
+and define. Unused widgets and colour formats are off (the image shrank
+from 1.49 MB to 1.33 MB with this).
+
+**Host rendering.** `firmware/esp32/test/CMakeLists.txt` fetches LVGL
+9.2.2 from its GitHub tag (`FetchContent`, URL plus SHA-256; the tag's
+`src/` is byte-identical to the registry package) and fails at configure
+time if `dependencies.lock` names another version. A headless display
+(`test_display.c`, no SDL) renders into a 320x240 RGB565 framebuffer.
+`test_screens.c` renders 20 cases, writes `<build>/screens/<name>.png`
+and compares each pixel with `test/screens/<name>.png` (stb_image_write
+and stb_image, vendored under `test/third_party/stb/`, MIT or Unlicense).
+It also fails on widgets outside the screen or their parent, overlapping
+labels, stale reference files, and when patching a screen gives different
+pixels from building it afresh. `ATALAIA_UPDATE_SCREENS=1` (or
+`python tools/docker_fw.py test --update-screens`) rewrites the
+references. The `firmware` test also runs on the headless display, so
+every screen any test triggers goes through the real widget code. CI's
+`firmware-test` commands are unchanged.
+
+**Device display.** `display_port.c` creates the LVGL display on the
+LVGL task: two DMA-capable 15 KB buffers (1/10 screen), flushed through
+`hal_display_ops_t` with an RGB565 byte swap; the SPI post-transfer
+interrupt calls `lv_display_flush_ready`. The flush's SPI transaction is
+now static (it was on the stack while queued) and collected before the
+next one, and the panel is set to landscape with MADCTL. If the panel
+fails, LVGL runs on a display that discards pixels and the game goes on.
+Redraws over 100 ms are logged.
+
+**Boot and shell.** The HAL `init` functions were never called; `shell.c`
+now brings up each part and logs a warning for any that is missing.
+LittleFS is mounted (formatted on first boot) and built-in Bomb and
+Domination presets are stored on an empty box (`builtin_presets.c`, sources
+embedded from `modes/`). The picker draws a screen for each step;
+`key_filter.c` turns keypad scans into one press per stroke. Mode events
+and screens are logged (`game: event ...`, `screen ...`).
+
+**Wokwi.** `diagram.json` (ESP32-S3-DevKitC-1 with 16 MB flash and 2 MB
+quad PSRAM, ILI9341 on the Kconfig display pins, red and blue buttons on
+GPIO 4 and 5, a 24-LED WS2812 ring on GPIO 48, a 4x3 membrane keypad),
+`wokwi.toml` (loads `build-wokwi/flasher_args.json`), and
+`sdkconfig.wokwi`, applied on top of `sdkconfig.defaults`. Wokwi has no
+PCF8574, so the variant selects a GPIO-matrix keypad driver
+(`CONFIG_ATALAIA_KP_GPIO_MATRIX`) on GPIOs 6/15/16 (the audio pins, free
+because I2S is not simulated), 7, 1, 2 and 39. It also turns audio and
+buttons 3-4 off, skips the setup portal (`CONFIG_ATALAIA_SKIP_SETUP`) and
+accepts keypad keys from the serial console (`CONFIG_ATALAIA_SERIAL_KEYS`).
+The real board's defaults are unchanged. `wokwi/bomb.scenario.yaml` plays
+a Bomb game automatically with wokwi-cli.
+
+**Bugs the emulator found.** The memory monitor task overflowed its 2 KB
+stack on its first log line, a crash loop on every box (now 4 KB). The
+first full redraw takes about 200 ms in the emulator, so the scenario waits
+before each screenshot.
+
+**Other fixes.** The battery gauge installed a second I2C driver on the
+NFC pins; all I2C parts now share port 0 (`hal_esp_i2c.c`) and are probed
+at boot. The Wi-Fi setup now calls `esp_wifi_init` and creates the AP
+interface (it did neither). The game and LVGL tasks have 8 KB stacks
+(ADR-P1-7 said 6 KB): the LVGL task now renders, and the game task parses
+Lua.
+
+**Launcher.** `tools/docker_fw.py build | wokwi | test [--update-screens]
+| clean`, usable from `cmd`.
 
 ## Deviations from PLAN.md
 
@@ -253,8 +340,11 @@ Testing approach:
 | 4 | Display RST on GPIO 38 (was tied to Vext) | Freed by keypad-to-I2C move |
 | 5 | 16 MB flash / 2 MB PSRAM (was 4 MB) | Board choice: Heltec V4.3 |
 | 6 | No LUA_32BITS | 64-bit Lua matches desktop; scripts behave identically |
-| 7 | LVGL host rendering not done | Building LVGL 9.2 in the host test build was not completed |
-| 8 | preset_select screen template has TODO | Presets array parsing not implemented |
+| 7 | LVGL configured by a shared `lv_conf.h`, not Kconfig | The host tests must render with exactly the device's settings |
+| 8 | `esp_lvgl_port` not used | `display_port.c` drives LVGL through the HAL display driver (ADR-P1-2's flush path) |
+| 9 | Game and LVGL task stacks 8 KB (ADR-P1-7: 6 KB) | LVGL rendering and Lua parsing; DRAM allows it |
+| 10 | Picker screens added as templates | The keypad picker needs a screen for each step |
+| 11 | Keypad on GPIOs in the Wokwi variant | Wokwi has no PCF8574 part |
 
 ## Files Modified Outside firmware/
 

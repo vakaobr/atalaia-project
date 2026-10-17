@@ -37,6 +37,7 @@ static int esp_leds_init(void)
 
     esp_err_t err = led_strip_new_rmt_device(&strip_cfg, &rmt_cfg, &strip);
     if (err != ESP_OK) {
+        strip = NULL;
         return -1;
     }
 
@@ -46,6 +47,7 @@ static int esp_leds_init(void)
 
 static void esp_leds_fill(uint8_t r, uint8_t g, uint8_t b)
 {
+    if (!strip) return;
     for (int i = 0; i < CONFIG_ATALAIA_LED_COUNT; i++) {
         led_strip_set_pixel(strip, i, r, g, b);
     }
@@ -53,14 +55,14 @@ static void esp_leds_fill(uint8_t r, uint8_t g, uint8_t b)
 
 static void esp_leds_set(int index, uint8_t r, uint8_t g, uint8_t b)
 {
-    if (index >= 0 && index < CONFIG_ATALAIA_LED_COUNT) {
+    if (strip && index >= 0 && index < CONFIG_ATALAIA_LED_COUNT) {
         led_strip_set_pixel(strip, index, r, g, b);
     }
 }
 
 static void esp_leds_show(void)
 {
-    led_strip_refresh(strip);
+    if (strip) led_strip_refresh(strip);
 }
 
 static void esp_leds_set_brightness(uint8_t brightness)

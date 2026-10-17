@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "atalaia/score.h"
 
@@ -17,6 +18,9 @@ int state_persist_init(const char *base_path)
     if (!base_path) return -1;
     snprintf(state_dir, sizeof(state_dir), "%s", base_path);
     snprintf(state_file, sizeof(state_file), "%s/current.bin", state_dir);
+#ifndef _WIN32
+    mkdir(state_dir, 0755); /* fails harmlessly when it already exists */
+#endif
     return 0;
 }
 

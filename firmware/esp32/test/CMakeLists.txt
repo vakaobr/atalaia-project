@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.18)
 project(atalaia_firmware_test LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
@@ -54,6 +54,54 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(atalaia_core_fw PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
 
+# ---- LVGL 9.2.2 (fetched; the version the device builds) ---------------------
+# The device gets LVGL from the ESP component registry (dependencies.lock);
+# the host fetches the same release from the official GitHub tag, checked by
+# hash. The GitHub tag's src/ is identical to the registry package's.
+set(ATALAIA_LVGL_VERSION 9.2.2)
+set(ATALAIA_LVGL_SHA256 129b4e00e06639fa79d7e8a6cab3c1ecce2445b1a246652ccd34f22e7b17ad6f)
+file(READ "${CMAKE_CURRENT_LIST_DIR}/../dependencies.lock" FW_LOCK)
+string(FIND "${FW_LOCK}" "\n  lvgl/lvgl:" LOCK_LVGL_POS)
+if(LOCK_LVGL_POS LESS 0)
+    message(FATAL_ERROR "lvgl/lvgl is missing from firmware/esp32/dependencies.lock")
+endif()
+string(SUBSTRING "${FW_LOCK}" ${LOCK_LVGL_POS} -1 FW_LOCK_LVGL)
+string(REGEX MATCH "\n    version: ([0-9.]+)" _ "${FW_LOCK_LVGL}")
+if(NOT CMAKE_MATCH_1 STREQUAL ATALAIA_LVGL_VERSION)
+    message(FATAL_ERROR "The device uses LVGL ${CMAKE_MATCH_1} (dependencies.lock) but the "
+        "host tests fetch ${ATALAIA_LVGL_VERSION}; update ATALAIA_LVGL_VERSION and its hash.")
+endif()
+
+if(POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+endif()
+include(FetchContent)
+FetchContent_Declare(lvgl
+    URL "https://github.com/lvgl/lvgl/archive/refs/tags/v${ATALAIA_LVGL_VERSION}.tar.gz"
+    URL_HASH SHA256=${ATALAIA_LVGL_SHA256}
+    # Only download: the sources are built below with the shared lv_conf.h.
+    SOURCE_SUBDIR do-not-add-subdirectory
+)
+FetchContent_MakeAvailable(lvgl)
+
+# One lv_conf.h for the device and the host, so both render alike.
+set(LVGL_CONF_DIR "${CMAKE_CURRENT_LIST_DIR}/../lvgl_conf")
+file(GLOB_RECURSE LVGL_SOURCES CONFIGURE_DEPENDS "${lvgl_SOURCE_DIR}/src/*.c")
+add_library(atalaia_lvgl_host STATIC ${LVGL_SOURCES})
+target_include_directories(atalaia_lvgl_host SYSTEM PUBLIC "${lvgl_SOURCE_DIR}" "${LVGL_CONF_DIR}")
+target_compile_definitions(atalaia_lvgl_host PUBLIC LV_CONF_INCLUDE_SIMPLE LV_KCONFIG_IGNORE)
+# Third-party code: built without the project's warning flags, like the vendored Lua.
+target_compile_options(atalaia_lvgl_host PRIVATE -w)
+
+# ---- Screen renderer (same source and LVGL widget trees as the device) -------
+add_library(atalaia_screens_fw STATIC ${CMAKE_CURRENT_SOURCE_DIR}/../main/screen_renderer.c)
+target_include_directories(atalaia_screens_fw PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../main)
+target_compile_definitions(atalaia_screens_fw PRIVATE ATALAIA_SCREEN_LVGL=1)
+target_link_libraries(atalaia_screens_fw PUBLIC atalaia_lvgl_host)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(atalaia_screens_fw PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
 # ---- Shell sources (testable subset) -----------------------------------------
 set(SHELL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../main)
 set(SHELL_SOURCES
@@ -62,11 +110,12 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/preset_store.c
     ${SHELL_DIR}/state_persist.c
     ${SHELL_DIR}/node_runner.c
-    ${SHELL_DIR}/screen_renderer.c
     ${SHELL_DIR}/preset_ui.c
     ${SHELL_DIR}/config_store.c
     ${SHELL_DIR}/wifi_setup.c
     ${SHELL_DIR}/button_tracker.c
+    ${SHELL_DIR}/builtin_presets.c
+    ${SHELL_DIR}/key_filter.c
 )
 
 # ---- HAL stub ----------------------------------------------------------------
@@ -89,6 +138,9 @@ set(TEST_SOURCES
     test_wifi_setup.c
     test_reboot_resume.c
     test_screen_renderer.c
+    test_builtin_presets.c
+    test_key_filter.c
+    test_display.c
 )
 
 # ---- Executable --------------------------------------------------------------
@@ -106,7 +158,7 @@ target_include_directories(firmware_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_link_libraries(firmware_test PRIVATE atalaia_core_fw atalaia_lua_fw)
+target_link_libraries(firmware_test PRIVATE atalaia_core_fw atalaia_lua_fw atalaia_screens_fw)
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(firmware_test PRIVATE -Wall -Wextra -Wpedantic -Werror)
@@ -117,6 +169,28 @@ if(MODES_DIR)
     target_compile_definitions(firmware_test PRIVATE "MODES_DIR=\"${MODES_DIR}\"")
 endif()
 
+# ---- Screen reference images -------------------------------------------------
+# Renders every template into <build>/screens/ and compares it with
+# test/screens/<name>.png. ATALAIA_UPDATE_SCREENS=1 rewrites the references.
+add_library(atalaia_png_test STATIC png_io.c)
+target_include_directories(atalaia_png_test PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_options(atalaia_png_test PRIVATE -w)
+find_library(MATH_LIBRARY_PNG m)
+if(MATH_LIBRARY_PNG)
+    target_link_libraries(atalaia_png_test PRIVATE ${MATH_LIBRARY_PNG})
+endif()
+
+add_executable(screen_test test_screens.c test_display.c)
+target_include_directories(screen_test PRIVATE ${SHELL_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(screen_test PRIVATE atalaia_screens_fw atalaia_png_test)
+target_compile_definitions(screen_test PRIVATE
+    "SCREENS_REF_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/screens\""
+    "SCREENS_OUT_DIR=\"${CMAKE_CURRENT_BINARY_DIR}/screens\"")
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(screen_test PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
 # ---- CTest -------------------------------------------------------------------
 include(CTest)
 add_test(NAME firmware COMMAND firmware_test)
+add_test(NAME screens COMMAND screen_test)

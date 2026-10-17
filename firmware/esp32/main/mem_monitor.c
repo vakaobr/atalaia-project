@@ -35,7 +35,8 @@ static void mem_monitor_task(void *arg)
 
 void mem_monitor_start(void)
 {
-    xTaskCreatePinnedToCore(mem_monitor_task, "mem_mon", 2048, NULL, 1, NULL, 0);
+    /* 2 KB overflowed in heap_caps_get_info + ESP_LOGI (found in the Wokwi emulator). */
+    xTaskCreatePinnedToCore(mem_monitor_task, "mem_mon", 4096, NULL, 1, NULL, 0);
 }
 
 #else
