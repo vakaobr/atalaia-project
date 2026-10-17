@@ -96,7 +96,17 @@ Atalaia props are game equipment. Make them look like game props: bright colours
 
 ## Name
 
-"Atalaia" is Portuguese for *watchtower*. Forks are welcome under the licence, but please give your fork its own name so players can tell it apart from the original project.
+An *atalaia* (say "ah-tah-LYE-ah") is a watchtower: a lookout post on a hill or a stretch of coast whose crew watched for trouble and passed the warning along. The word came into Portuguese from the Arabic *aṭ-ṭalāʾiʿ*, "the scouts" or "the vanguard", and *estar de atalaia* still means "to be on the lookout". Atalaias are scattered across Portugal's coast and countryside, and several towns carry the name.
+
+It turned out to be an accurate name for this project:
+
+- **A field controller is a watchtower.** It sits somewhere high, sees every prop on the field, and tells the GM the moment something changes.
+- **Watchtowers were local-first.** No tower ever waited for a cloud service. They worked with what was in sight.
+- **They also ran the original low-bandwidth mesh.** Smoke by day, fire by night, relayed from tower to tower: tiny messages, long range, very little airtime, a limited number of hops, and nobody streaming video. Skirmesh-RF follows the same rules with LoRa and fewer burnt eyebrows.
+- **The Arabic root means "the scouts".** That's a reasonable description of anyone who has ever played milsim.
+- **It's a real word, not a product name.** Portuguese speakers can say it without trying, and everyone else gets to learn one new word.
+
+Forks are welcome under the licence, but please give your fork its own name so players can tell it apart from the original project. Every watchtower needs its own hill.
 
 ## Licence
 
