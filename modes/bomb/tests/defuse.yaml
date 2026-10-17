@@ -7,5 +7,7 @@ steps:
   - hold: { team: blue, s: 10 }
   - expect: { type: bomb.armed, team: red }
   - expect: { type: bomb.defused, team: blue, at: 15 }
+  - expect_screen: { template: defused, data: { team: blue } }
   - wait: 120
   - expect_no: bomb.exploded
+  - expect_screen: { template: defused }

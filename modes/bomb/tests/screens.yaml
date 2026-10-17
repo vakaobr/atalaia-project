@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: The screen shows standby at the start and the countdown as soon as the bomb is armed
+params: { fuse_s: 60 }
+steps:
+  - expect_screen: { template: standby, data: { arm: red } }
+  - hold: { team: red, s: 5 }
+  - expect: { type: bomb.armed, at: 5 }
+  - expect_screen: { template: countdown, data: { left: 60 } }
+  - wait: 0.5
+  - expect_screen: { template: countdown, data: { left: 60 } }
+  - wait: 10
+  - expect_screen: { template: countdown, data: { left: 50 } }

@@ -5,7 +5,9 @@ params: { fuse_s: 60, reset_after_defuse: true }
 steps:
   - hold: { team: red, s: 5 }
   - hold: { team: blue, s: 10 }
+  - expect_screen: { template: standby, data: { arm: red } }
   - hold: { team: red, s: 5 }
+  - expect_screen: { template: countdown, data: { left: 60 } }
   - expect: bomb.armed
   - expect: bomb.defused
   - expect: { type: bomb.armed, team: red, at: 20 }

@@ -17,7 +17,7 @@ The GM console builds its settings form from `params` in `mode.yaml`, so GMs nev
 | Mode | Status |
 | --- | --- |
 | [Domination](domination/) | Runs in the simulator; 5 tests |
-| [Bomb / Rush](bomb/) | Runs in the simulator; 6 tests |
+| [Bomb / Rush](bomb/) | Runs in the simulator; 7 tests |
 
 The script API is described in the "Game runtime and scripting" section of the [design specification](../docs/design-spec.md), and implemented in [`core/src/script_api.c`](../core/src/script_api.c).
 

@@ -457,12 +457,14 @@ on("team_input.hold", function(e)
     fuse_timer = after(params.fuse_s, function()
       s.phase = "exploded"
       audio.play("explosion")
+      ui.screen("exploded", { team = params.attackers })
       emit("bomb.exploded", { team = params.attackers }, { prio = "critical" })
     end)
     emit("bomb.armed", { team = e.team, fuse_s = params.fuse_s }, { prio = "critical" })
   elseif s.phase == "armed" and e.team == params.defenders and e.ms >= params.defuse_hold_ms then
     cancel(fuse_timer)
     s.phase = params.reset_after_defuse and "standby" or "defused"
+    ui.screen(s.phase, { team = e.team })
     emit("bomb.defused", { team = e.team }, { prio = "critical" })
   end
 end)
@@ -473,7 +475,7 @@ every(1, function()
 end)
 ```
 
-The explosion is its own timer rather than a countdown in the display tick, so it lands exactly `fuse_s` after arming. While a team holds a node's input, the platform shell emits `team_input.hold` every 250 ms with the time held so far in `ms`, then `team_input.release`.
+The explosion is its own timer rather than a countdown in the display tick, so it lands exactly `fuse_s` after arming. The screen changes with the phase, so the prop never keeps showing a countdown after a defuse or an explosion. While a team holds a node's input, the platform shell emits `team_input.hold` every 250 ms with the time held so far in `ms`, then `team_input.release`.
 
 ### Script API surface (v1)
 

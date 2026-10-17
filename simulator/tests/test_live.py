@@ -69,7 +69,7 @@ class LiveGameTests(unittest.TestCase):
         game.act("step", {"seconds": 60})
         self.assertEqual([e.t_ms for e in events(game, "bomb.exploded")], [65000])
         screen = game.snapshot()["nodes"][0]["screen"]
-        self.assertEqual(screen["args"][0], "countdown")
+        self.assertEqual(screen["args"], ["exploded", {"team": "red"}])
         self.assertTrue(all(e.wire_bytes for e in game.sim.arrivals))
 
     def test_clock_follows_real_time_at_its_speed(self):
