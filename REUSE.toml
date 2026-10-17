@@ -25,3 +25,10 @@ path = "docs/**"
 precedence = "closest"
 SPDX-FileCopyrightText = "2026 The Atalaia contributors"
 SPDX-License-Identifier = "CC-BY-SA-4.0"
+
+# Vendored Lua 5.4 keeps its own MIT licence (see the notice in lua.h).
+[[annotations]]
+path = "core/third_party/lua/**"
+precedence = "override"
+SPDX-FileCopyrightText = "1994-2026 Lua.org, PUC-Rio"
+SPDX-License-Identifier = "MIT"
