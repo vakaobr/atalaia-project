@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Basic editor settings (https://editorconfig.org). Formatting itself is
+# checked by tools/format.sh.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{lua,yaml,yml,json,html,css,js,md}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[core/third_party/**]
+indent_style = unset
+indent_size = unset
+trim_trailing_whitespace = unset
+insert_final_newline = unset
+
+[{LICENSE,LICENSES/**}]
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset

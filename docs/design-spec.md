@@ -964,12 +964,12 @@ The hexagons are gates: a phase is done only when its field test passes. Android
 
 ### First tasks (phase 0)
 
-- [ ] Create the atalaia-project repository on GitHub (private at first, under the founder's account), with Discussions and a project page for the community hub.
-- [ ] Add the LICENSE files, CONTRIBUTING.md and the DCO check.
-- [ ] Write the protocol schema file (events, message types) and generate CBOR and JSON codecs.
-- [ ] Build the core skeleton: event bus, state store, Lua 5.4 sandbox with memory and instruction limits.
-- [ ] Build the desktop simulator with virtual nodes and a web view.
-- [ ] Port Domination and Bomb to Lua with event-sequence tests in CI.
+- [x] Create the atalaia-project repository on GitHub (private at first, under the founder's account), with Discussions. The project page for the community hub waits until the repository goes public.
+- [x] Add the LICENSE files, CONTRIBUTING.md and the DCO check.
+- [x] Write the protocol schema file (events, message types) and generate CBOR and JSON codecs.
+- [x] Build the core skeleton: event bus, state store, Lua 5.4 sandbox with memory and instruction limits.
+- [x] Build the desktop simulator with virtual nodes and a web view.
+- [x] Port Domination and Bomb to Lua with event-sequence tests in CI.
 - [ ] Order parts for three Field Box prototypes.
 
 ## 17. Legal, licensing and field safety

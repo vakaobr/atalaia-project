@@ -112,7 +112,10 @@ static int init_state(lua_State *L)
     remove_field(L, LUA_MATHLIBNAME, "randomseed");
 
     static const char *const registry_tables[] = {
-        REG_HANDLERS, REG_QUEUE, REG_CAPS, NULL,
+        REG_HANDLERS,
+        REG_QUEUE,
+        REG_CAPS,
+        NULL,
     };
     for (const char *const *key = registry_tables; *key != NULL; key++) {
         lua_newtable(L);

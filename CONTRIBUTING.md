@@ -69,7 +69,7 @@ docs: explain CQB field profile
 - **Lua**: 2-space indentation; no globals except the sandbox API.
 - **Dart**: the standard `dart format` style.
 
-Formatter configurations will be added during phase 0.
+Formatting is automatic: run `sh tools/format.sh` before committing (in the [dev container](tools/README.md) if you do not have clang-format 18 and StyLua), and CI fails if anything is left unformatted. The rules live in [`.clang-format`](.clang-format) and [`stylua.toml`](stylua.toml), and [`.editorconfig`](.editorconfig) sets up most editors to match. Vendored Lua and generated files are left alone.
 
 ## Safety
 

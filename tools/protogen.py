@@ -187,6 +187,7 @@ def c_spdx(summary: str) -> list[str]:
         f" * {summary}",
         f" * {GENERATED}",
         " */",
+        "/* clang-format off */",
     ]
 
 

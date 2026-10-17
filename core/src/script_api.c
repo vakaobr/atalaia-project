@@ -13,8 +13,7 @@
 
 /* ---- Helpers ------------------------------------------------------------- */
 
-static uint8_t check_team(lua_State *L, atalaia_node_t *n, int idx,
-                          const char *fn)
+static uint8_t check_team(lua_State *L, atalaia_node_t *n, int idx, const char *fn)
 {
     const char *name = lua_type(L, idx) == LUA_TSTRING ? lua_tostring(L, idx) : NULL;
     if (name == NULL) {
@@ -55,8 +54,7 @@ static atalaia_prio_t check_prio(lua_State *L, int opts_idx, const char *type)
 }
 
 /* Builds the table handlers receive: a copy of data plus type, t and node. */
-static void push_event_table(lua_State *L, atalaia_node_t *n, const char *type,
-                             int data_idx)
+static void push_event_table(lua_State *L, atalaia_node_t *n, const char *type, int data_idx)
 {
     lua_newtable(L);
     if (data_idx != 0) {
@@ -79,16 +77,15 @@ static void push_event_table(lua_State *L, atalaia_node_t *n, const char *type,
  * Sends an event to the host and queues it for this node's own handlers.
  * data_idx is 0 for an event without data.
  */
-static void emit_event(lua_State *L, atalaia_node_t *n, const char *type,
-                       int data_idx, atalaia_prio_t prio, const char *fn)
+static void emit_event(lua_State *L, atalaia_node_t *n, const char *type, int data_idx,
+                       atalaia_prio_t prio, const char *fn)
 {
     if (n->status != ATALAIA_NODE_RUNNING) {
         luaL_error(L, "%s: the game is not running", fn);
     }
     size_t len = strlen(type);
     if (len == 0 || len >= ATALAIA_EVENT_TYPE_MAX) {
-        luaL_error(L, "%s: event type must be 1 to %d characters", fn,
-                   ATALAIA_EVENT_TYPE_MAX - 1);
+        luaL_error(L, "%s: event type must be 1 to %d characters", fn, ATALAIA_EVENT_TYPE_MAX - 1);
     }
 
     uint8_t team = ATALAIA_TEAM_NONE;
@@ -103,8 +100,7 @@ static void emit_event(lua_State *L, atalaia_node_t *n, const char *type,
         lua_pushliteral(L, "{}");
     }
     /* Squad ids arrive with squad support; the squad name stays in data. */
-    atalaia_node_deliver(n, type, team, ATALAIA_SQUAD_NONE, prio,
-                         lua_tostring(L, -1));
+    atalaia_node_deliver(n, type, team, ATALAIA_SQUAD_NONE, prio, lua_tostring(L, -1));
     lua_pop(L, 1);
 
     push_event_table(L, n, type, data_idx);
@@ -202,8 +198,7 @@ static int l_game_time(lua_State *L)
 
 static int l_game_start(lua_State *L)
 {
-    emit_event(L, atalaia_node_from_lua(L), "game.start", 0,
-               ATALAIA_PRIO_CRITICAL, "game.start");
+    emit_event(L, atalaia_node_from_lua(L), "game.start", 0, ATALAIA_PRIO_CRITICAL, "game.start");
     return 0;
 }
 
@@ -213,8 +208,7 @@ static int l_game_finish(lua_State *L)
     lua_createtable(L, 0, 1);
     lua_pushstring(L, reason);
     lua_setfield(L, -2, "reason");
-    emit_event(L, atalaia_node_from_lua(L), "game.end", -1,
-               ATALAIA_PRIO_CRITICAL, "game.finish");
+    emit_event(L, atalaia_node_from_lua(L), "game.end", -1, ATALAIA_PRIO_CRITICAL, "game.finish");
     return 0;
 }
 
@@ -432,21 +426,26 @@ static void set_lib(lua_State *L, const char *name, const luaL_Reg *fns)
 int atalaia_script_api_open(lua_State *L)
 {
     static const luaL_Reg globals[] = {
-        {"on", l_on},       {"emit", l_emit},   {"every", l_every},
-        {"after", l_after}, {"cancel", l_cancel}, {"rand", l_rand},
-        {"log", l_log},     {"print", l_log},   {"cap", l_cap},
-        {NULL, NULL},
+        {"on", l_on},         {"emit", l_emit}, {"every", l_every}, {"after", l_after},
+        {"cancel", l_cancel}, {"rand", l_rand}, {"log", l_log},     {"print", l_log},
+        {"cap", l_cap},       {NULL, NULL},
     };
     static const luaL_Reg game[] = {
-        {"time", l_game_time},     {"start", l_game_start},
-        {"finish", l_game_finish}, {"win", l_game_win},
+        {"time", l_game_time},
+        {"start", l_game_start},
+        {"finish", l_game_finish},
+        {"win", l_game_win},
         {NULL, NULL},
     };
     static const luaL_Reg score[] = {
-        {"add", l_score_add}, {"get", l_score_get}, {NULL, NULL},
+        {"add", l_score_add},
+        {"get", l_score_get},
+        {NULL, NULL},
     };
     static const luaL_Reg state[] = {
-        {"node", l_state_node}, {"field", l_state_field}, {NULL, NULL},
+        {"node", l_state_node},
+        {"field", l_state_field},
+        {NULL, NULL},
     };
 
     lua_pushglobaltable(L);

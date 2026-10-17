@@ -66,6 +66,27 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
+  format:
+    name: Formatting (clang-format, StyLua)
+    # Pinned so a newer runner image cannot bring a clang-format that formats differently.
+    runs-on: ubuntu-24.04
+    env:
+      STYLUA_VERSION: "2.6.0"
+      STYLUA_SHA256: a485f72bbfa22e4642e77a84b5edc2611a5cab7477b34e2e709dd8f78e919895
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install the formatters (same versions as tools/dev/Dockerfile)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang-format-18
+          sudo ln -sf /usr/bin/clang-format-18 /usr/local/bin/clang-format
+          curl -sSfL -o /tmp/stylua.zip \
+            "https://github.com/JohnnyMorganz/StyLua/releases/download/v${STYLUA_VERSION}/stylua-linux-x86_64.zip"
+          echo "${STYLUA_SHA256}  /tmp/stylua.zip" | sha256sum -c -
+          sudo unzip -q /tmp/stylua.zip -d /usr/local/bin
+      - name: C and Lua are formatted
+        run: sh tools/format.sh --check
+
   licensing:
     name: Check licensing headers (REUSE)
     runs-on: ubuntu-latest

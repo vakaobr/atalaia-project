@@ -6,7 +6,9 @@
 local s = state.node { owner = nil }
 
 on("team_input.hold", function(e)
-  if e.team == s.owner or e.ms < params.capture_hold_ms then return end
+  if e.team == s.owner or e.ms < params.capture_hold_ms then
+    return
+  end
   local previous = s.owner
   s.owner = e.team
   cap("team_display"):show(e.team)

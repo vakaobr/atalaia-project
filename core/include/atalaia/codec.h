@@ -35,8 +35,8 @@
  * invalid or does not fit in cap bytes; *error (if error is not NULL) then
  * says why.
  */
-size_t atalaia_event_encode(const atalaia_event_t *ev, const char *data_json,
-                            uint8_t *buf, size_t cap, const char **error);
+size_t atalaia_event_encode(const atalaia_event_t *ev, const char *data_json, uint8_t *buf,
+                            size_t cap, const char **error);
 
 /*
  * Decodes a payload into ev, and its data into data_json as a compact JSON
@@ -44,7 +44,7 @@ size_t atalaia_event_encode(const atalaia_event_t *ev, const char *data_json,
  * has no data). Returns false if the payload is not a valid event or the
  * data does not fit; *error (if error is not NULL) then says why.
  */
-bool atalaia_event_decode(const uint8_t *buf, size_t len, atalaia_event_t *ev,
-                          char *data_json, size_t data_cap, const char **error);
+bool atalaia_event_decode(const uint8_t *buf, size_t len, atalaia_event_t *ev, char *data_json,
+                          size_t data_cap, const char **error);
 
 #endif /* ATALAIA_CODEC_H */

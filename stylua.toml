@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Lua style for game modes (StyLua). Run tools/format.sh to apply it.
+column_width = 100
+indent_type = "Spaces"
+indent_width = 2
+quote_style = "AutoPreferDouble"
+call_parentheses = "Input"  # keep the state.node { ... } idiom
+line_endings = "Unix"

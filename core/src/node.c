@@ -41,23 +41,21 @@ static void set_error(atalaia_node_t *n, const char *message)
 
 /* ---- Delivery to the host ------------------------------------------------ */
 
-void atalaia_node_deliver(atalaia_node_t *n, const char *type, uint8_t team,
-                          uint8_t squad, atalaia_prio_t prio, const char *data_json)
+void atalaia_node_deliver(atalaia_node_t *n, const char *type, uint8_t team, uint8_t squad,
+                          atalaia_prio_t prio, const char *data_json)
 {
     atalaia_event_t ev;
-    if (!atalaia_event_init(&ev, n->cfg.node_id, n->next_seq, n->now_ms, type,
-                            team, squad, prio)) {
+    if (!atalaia_event_init(&ev, n->cfg.node_id, n->next_seq, n->now_ms, type, team, squad, prio)) {
         return;
     }
     n->next_seq++;
     if (n->cfg.callbacks.event != NULL) {
-        n->cfg.callbacks.event(n->cfg.callbacks.user, &ev,
-                               data_json != NULL ? data_json : "{}");
+        n->cfg.callbacks.event(n->cfg.callbacks.user, &ev, data_json != NULL ? data_json : "{}");
     }
 }
 
-void atalaia_node_command(atalaia_node_t *n, const char *target,
-                          const char *method, const char *args_json)
+void atalaia_node_command(atalaia_node_t *n, const char *target, const char *method,
+                          const char *args_json)
 {
     if (n->cfg.callbacks.command != NULL) {
         n->cfg.callbacks.command(n->cfg.callbacks.user, target, method, args_json);
@@ -212,8 +210,8 @@ static void drain(lua_State *L, atalaia_node_t *n)
 
 /* ---- Timers -------------------------------------------------------------- */
 
-uint32_t atalaia_node_add_timer(atalaia_node_t *n, lua_State *L, int fn_idx,
-                                uint32_t delay_ms, uint32_t interval_ms)
+uint32_t atalaia_node_add_timer(atalaia_node_t *n, lua_State *L, int fn_idx, uint32_t delay_ms,
+                                uint32_t interval_ms)
 {
     for (int i = 0; i < ATALAIA_NODE_MAX_TIMERS; i++) {
         node_timer_t *t = &n->timers[i];
@@ -400,8 +398,7 @@ void atalaia_node_destroy(atalaia_node_t *n)
     }
     lua_close(n->L);
     if (n->team_names != NULL) {
-        n->cfg.alloc(n->cfg.alloc_ud, n->team_names,
-                     n->team_count * sizeof(*n->team_names), 0);
+        n->cfg.alloc(n->cfg.alloc_ud, n->team_names, n->team_count * sizeof(*n->team_names), 0);
     }
     n->cfg.alloc(n->cfg.alloc_ud, n, sizeof(*n), 0);
 }
@@ -426,7 +423,7 @@ bool atalaia_node_set_teams(atalaia_node_t *n, const char *const *names, size_t 
         }
     }
 
-    char (*copy)[ATALAIA_TEAM_NAME_MAX] = NULL;
+    char(*copy)[ATALAIA_TEAM_NAME_MAX] = NULL;
     if (count > 0) {
         copy = n->cfg.alloc(n->cfg.alloc_ud, NULL, 0, count * sizeof(*copy));
         if (copy == NULL) {
@@ -438,8 +435,7 @@ bool atalaia_node_set_teams(atalaia_node_t *n, const char *const *names, size_t 
         }
     }
     if (n->team_names != NULL) {
-        n->cfg.alloc(n->cfg.alloc_ud, n->team_names,
-                     n->team_count * sizeof(*n->team_names), 0);
+        n->cfg.alloc(n->cfg.alloc_ud, n->team_names, n->team_count * sizeof(*n->team_names), 0);
     }
     n->team_names = copy;
     n->team_count = count;
@@ -455,8 +451,7 @@ bool atalaia_node_set_params(atalaia_node_t *n, const char *params_json)
     return run_protected(n, p_set_params, &args);
 }
 
-bool atalaia_node_load(atalaia_node_t *n, const char *source, size_t len,
-                       const char *chunk_name)
+bool atalaia_node_load(atalaia_node_t *n, const char *source, size_t len, const char *chunk_name)
 {
     if (n == NULL || source == NULL || n->status != ATALAIA_NODE_EMPTY) {
         return false;
@@ -482,8 +477,7 @@ bool atalaia_node_input(atalaia_node_t *n, const char *type, const char *data_js
 
 void atalaia_node_advance(atalaia_node_t *n, uint32_t now_ms)
 {
-    if (n == NULL || n->status != ATALAIA_NODE_RUNNING || n->paused ||
-        now_ms <= n->now_ms) {
+    if (n == NULL || n->status != ATALAIA_NODE_RUNNING || n->paused || now_ms <= n->now_ms) {
         return;
     }
     step_args_t args = {n, NULL, NULL, 0, now_ms};
@@ -498,14 +492,10 @@ atalaia_node_status_t atalaia_node_status(const atalaia_node_t *n)
 const char *atalaia_node_status_name(atalaia_node_status_t status)
 {
     switch (status) {
-    case ATALAIA_NODE_EMPTY:
-        return "empty";
-    case ATALAIA_NODE_RUNNING:
-        return "running";
-    case ATALAIA_NODE_ENDED:
-        return "ended";
-    case ATALAIA_NODE_HALTED:
-        return "halted";
+    case ATALAIA_NODE_EMPTY: return "empty";
+    case ATALAIA_NODE_RUNNING: return "running";
+    case ATALAIA_NODE_ENDED: return "ended";
+    case ATALAIA_NODE_HALTED: return "halted";
     }
     return "unknown";
 }

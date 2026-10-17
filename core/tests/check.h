@@ -12,12 +12,12 @@
 
 extern int check_failures;
 
-#define CHECK(cond)                                                         \
-    do {                                                                    \
-        if (!(cond)) {                                                      \
-            fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond); \
-            check_failures++;                                               \
-        }                                                                   \
+#define CHECK(cond)                                                                                \
+    do {                                                                                           \
+        if (!(cond)) {                                                                             \
+            fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond);                        \
+            check_failures++;                                                                      \
+        }                                                                                          \
     } while (0)
 
 void run_node_tests(void);

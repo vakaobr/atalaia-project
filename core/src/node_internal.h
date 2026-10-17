@@ -62,15 +62,14 @@ atalaia_node_t *atalaia_node_from_lua(lua_State *L);
 int atalaia_script_api_open(lua_State *L);
 
 /* node.c */
-void atalaia_node_deliver(atalaia_node_t *node, const char *type, uint8_t team,
-                          uint8_t squad, atalaia_prio_t prio,
-                          const char *data_json);
-void atalaia_node_command(atalaia_node_t *node, const char *target,
-                          const char *method, const char *args_json);
+void atalaia_node_deliver(atalaia_node_t *node, const char *type, uint8_t team, uint8_t squad,
+                          atalaia_prio_t prio, const char *data_json);
+void atalaia_node_command(atalaia_node_t *node, const char *target, const char *method,
+                          const char *args_json);
 void atalaia_node_log(atalaia_node_t *node, const char *message);
 void atalaia_node_enqueue(lua_State *L, atalaia_node_t *node); /* pops event */
-uint32_t atalaia_node_add_timer(atalaia_node_t *node, lua_State *L, int fn_idx,
-                                uint32_t delay_ms, uint32_t interval_ms);
+uint32_t atalaia_node_add_timer(atalaia_node_t *node, lua_State *L, int fn_idx, uint32_t delay_ms,
+                                uint32_t interval_ms);
 void atalaia_node_cancel_timer(atalaia_node_t *node, lua_State *L, uint32_t id);
 
 #endif /* ATALAIA_NODE_INTERNAL_H */

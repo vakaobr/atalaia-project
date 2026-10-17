@@ -24,8 +24,7 @@ static void test_version(void)
 static void test_event_init(void)
 {
     atalaia_event_t ev;
-    CHECK(atalaia_event_init(&ev, 7, 42, 1500, "zone.captured", 2, 1,
-                             ATALAIA_PRIO_NORMAL));
+    CHECK(atalaia_event_init(&ev, 7, 42, 1500, "zone.captured", 2, 1, ATALAIA_PRIO_NORMAL));
     CHECK(ev.node == 7 && ev.seq == 42 && ev.t_ms == 1500);
     CHECK(ev.team == 2 && ev.squad == 1);
     CHECK(strcmp(ev.type, "zone.captured") == 0);
@@ -37,8 +36,7 @@ static void test_event_init(void)
     char long_type[ATALAIA_EVENT_TYPE_MAX + 1];
     memset(long_type, 'a', sizeof(long_type) - 1);
     long_type[sizeof(long_type) - 1] = '\0';
-    CHECK(!atalaia_event_init(&ev, 1, 1, 0, long_type, 1, 0,
-                              ATALAIA_PRIO_NORMAL));
+    CHECK(!atalaia_event_init(&ev, 1, 1, 0, long_type, 1, 0, ATALAIA_PRIO_NORMAL));
 }
 
 static void test_event_order(void)

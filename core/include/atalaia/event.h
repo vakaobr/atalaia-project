@@ -20,11 +20,11 @@
 #define ATALAIA_TEAM_MAX   250u
 
 typedef struct {
-    uint16_t node;     /* source node short id within the game */
-    uint16_t seq;      /* per-node sequence number; (node, seq) is unique */
-    uint32_t t_ms;     /* game time in milliseconds since game start */
-    uint8_t team;      /* ATALAIA_TEAM_NONE if not team-specific */
-    uint8_t squad;     /* ATALAIA_SQUAD_NONE if not squad-specific */
+    uint16_t node; /* source node short id within the game */
+    uint16_t seq;  /* per-node sequence number; (node, seq) is unique */
+    uint32_t t_ms; /* game time in milliseconds since game start */
+    uint8_t team;  /* ATALAIA_TEAM_NONE if not team-specific */
+    uint8_t squad; /* ATALAIA_SQUAD_NONE if not squad-specific */
     atalaia_prio_t prio;
     char type[ATALAIA_EVENT_TYPE_MAX]; /* e.g. "zone.captured" */
 } atalaia_event_t;
@@ -34,9 +34,8 @@ typedef struct {
  * Returns false (and leaves the event zeroed) if the type is empty,
  * too long, or the team id is out of range.
  */
-bool atalaia_event_init(atalaia_event_t *ev, uint16_t node, uint16_t seq,
-                        uint32_t t_ms, const char *type, uint8_t team,
-                        uint8_t squad, atalaia_prio_t prio);
+bool atalaia_event_init(atalaia_event_t *ev, uint16_t node, uint16_t seq, uint32_t t_ms,
+                        const char *type, uint8_t team, uint8_t squad, atalaia_prio_t prio);
 
 /* True if both events have the same (node, seq) identity. */
 bool atalaia_event_same_id(const atalaia_event_t *a, const atalaia_event_t *b);

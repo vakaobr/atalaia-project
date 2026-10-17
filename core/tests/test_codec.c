@@ -14,13 +14,12 @@
 #include "protocol_vectors.h"
 
 #define COUNT(a) (sizeof(a) / sizeof((a)[0]))
-#define BUF 1024
+#define BUF      1024
 
 static bool same_event(const atalaia_event_t *a, const atalaia_event_t *b)
 {
-    return a->node == b->node && a->seq == b->seq && a->t_ms == b->t_ms &&
-           a->team == b->team && a->squad == b->squad && a->prio == b->prio &&
-           strcmp(a->type, b->type) == 0;
+    return a->node == b->node && a->seq == b->seq && a->t_ms == b->t_ms && a->team == b->team &&
+           a->squad == b->squad && a->prio == b->prio && strcmp(a->type, b->type) == 0;
 }
 
 static void test_tables(void)
@@ -155,14 +154,41 @@ static void test_json_input(void)
     CHECK(encode_data("{}", buf, NULL) == encode_data(NULL, buf, NULL));
 
     static const char *const bad[] = {
-        "", "[]", "\"x\"", "1", "{", "{\"a\"}", "{\"a\":}", "{\"a\":1,}", "{\"a\":1 \"b\":2}",
-        "{a:1}", "{\"a\":1}x", "{\"a\":[1,]}", "{\"a\":tru}", "{\"a\":nul}",
-        "{\"a\":01}", "{\"a\":1.}", "{\"a\":-}", "{\"a\":.5}", "{\"a\":1e}", "{\"a\":+1}",
-        "{\"a\":1e999}", "{\"a\":9223372036854775808}", "{\"a\":-9223372036854775809}",
-        "{\"a\":\"\x01\"}", "{\"a\":\"unterminated}", "{\"a\":\"\\x\"}", "{\"a\":\"\\u12\"}",
-        "{\"a\":\"\\ud800\"}", "{\"a\":\"\\udc00\"}", "{\"a\":\"\\ud800\\u0041\"}",
-        "{\"a\":\"\xc3\x28\"}", "{\"a\":\"\xed\xa0\x80\"}", "{\"a\":\"\xc3\"}",
-        "{\"a\":1,\"a\":2}", "{\"team\":\"a\",\"team\":\"b\"}",
+        "",
+        "[]",
+        "\"x\"",
+        "1",
+        "{",
+        "{\"a\"}",
+        "{\"a\":}",
+        "{\"a\":1,}",
+        "{\"a\":1 \"b\":2}",
+        "{a:1}",
+        "{\"a\":1}x",
+        "{\"a\":[1,]}",
+        "{\"a\":tru}",
+        "{\"a\":nul}",
+        "{\"a\":01}",
+        "{\"a\":1.}",
+        "{\"a\":-}",
+        "{\"a\":.5}",
+        "{\"a\":1e}",
+        "{\"a\":+1}",
+        "{\"a\":1e999}",
+        "{\"a\":9223372036854775808}",
+        "{\"a\":-9223372036854775809}",
+        "{\"a\":\"\x01\"}",
+        "{\"a\":\"unterminated}",
+        "{\"a\":\"\\x\"}",
+        "{\"a\":\"\\u12\"}",
+        "{\"a\":\"\\ud800\"}",
+        "{\"a\":\"\\udc00\"}",
+        "{\"a\":\"\\ud800\\u0041\"}",
+        "{\"a\":\"\xc3\x28\"}",
+        "{\"a\":\"\xed\xa0\x80\"}",
+        "{\"a\":\"\xc3\"}",
+        "{\"a\":1,\"a\":2}",
+        "{\"team\":\"a\",\"team\":\"b\"}",
         "{\"a\":{\"b\":1,\"b\":2}}",
     };
     for (size_t i = 0; i < COUNT(bad); i++) {
@@ -238,8 +264,10 @@ static void test_mutations(void)
                 case 0: buf[at] = (uint8_t)next_rand(&state); break;
                 case 1: buf[at] ^= (uint8_t)(1u << (next_rand(&state) % 8)); break;
                 case 2: len = at + 1; break; /* truncate */
-                default: buf[at] = (uint8_t[]){0x00, 0x17, 0x18, 0x1b, 0x7f, 0x9f, 0xbf, 0xff}
-                             [next_rand(&state) % 8]; break;
+                default:
+                    buf[at] = (uint8_t[]){
+                        0x00, 0x17, 0x18, 0x1b, 0x7f, 0x9f, 0xbf, 0xff}[next_rand(&state) % 8];
+                    break;
                 }
             }
             atalaia_event_t ev, ev2;

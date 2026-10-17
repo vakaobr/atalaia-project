@@ -22,8 +22,16 @@
 #define MAX_NESTING (ATALAIA_CODEC_MAX_DEPTH + 1)
 #define NUMBER_MAX  64
 
-enum { MAJOR_UINT = 0, MAJOR_NINT = 1, MAJOR_BYTES = 2, MAJOR_TEXT = 3,
-       MAJOR_ARRAY = 4, MAJOR_MAP = 5, MAJOR_TAG = 6, MAJOR_SIMPLE = 7 };
+enum {
+    MAJOR_UINT = 0,
+    MAJOR_NINT = 1,
+    MAJOR_BYTES = 2,
+    MAJOR_TEXT = 3,
+    MAJOR_ARRAY = 4,
+    MAJOR_MAP = 5,
+    MAJOR_TAG = 6,
+    MAJOR_SIMPLE = 7
+};
 
 /* ---- shared helpers ------------------------------------------------------ */
 
@@ -597,8 +605,8 @@ static bool json_value(json_in_t *j, bool top)
 
 /* ---- encoding ------------------------------------------------------------- */
 
-size_t atalaia_event_encode(const atalaia_event_t *ev, const char *data_json,
-                            uint8_t *buf, size_t cap, const char **error)
+size_t atalaia_event_encode(const atalaia_event_t *ev, const char *data_json, uint8_t *buf,
+                            size_t cap, const char **error)
 {
     writer_t w = {buf, cap > ATALAIA_CODEC_MAX_BYTES ? ATALAIA_CODEC_MAX_BYTES : cap, 0, NULL};
     if (buf == NULL) {
@@ -619,11 +627,10 @@ size_t atalaia_event_encode(const atalaia_event_t *ev, const char *data_json,
         atalaia_prio_t prio = def != NULL ? def->prio : ATALAIA_PRIO_NORMAL;
         size_t start = w.pos;
         uint64_t entries = 4;
-        if (put(&w, "", 1) &&
-            put_head(&w, MAJOR_UINT, ATALAIA_KEY_NODE) && put_head(&w, MAJOR_UINT, ev->node) &&
-            put_head(&w, MAJOR_UINT, ATALAIA_KEY_SEQ) && put_head(&w, MAJOR_UINT, ev->seq) &&
-            put_head(&w, MAJOR_UINT, ATALAIA_KEY_T) && put_head(&w, MAJOR_UINT, ev->t_ms) &&
-            put_head(&w, MAJOR_UINT, ATALAIA_KEY_TYPE) &&
+        if (put(&w, "", 1) && put_head(&w, MAJOR_UINT, ATALAIA_KEY_NODE) &&
+            put_head(&w, MAJOR_UINT, ev->node) && put_head(&w, MAJOR_UINT, ATALAIA_KEY_SEQ) &&
+            put_head(&w, MAJOR_UINT, ev->seq) && put_head(&w, MAJOR_UINT, ATALAIA_KEY_T) &&
+            put_head(&w, MAJOR_UINT, ev->t_ms) && put_head(&w, MAJOR_UINT, ATALAIA_KEY_TYPE) &&
             (def != NULL ? put_head(&w, MAJOR_UINT, def->id) : put_text(&w, type, type_len))) {
             if (ev->team != ATALAIA_TEAM_NONE) {
                 put_head(&w, MAJOR_UINT, ATALAIA_KEY_TEAM);
@@ -672,7 +679,7 @@ typedef struct {
     const uint8_t *end;
     writer_t *w; /* the JSON output */
     keyset_t keys;
-    int depth;   /* containers open, counting the envelope */
+    int depth; /* containers open, counting the envelope */
 } cbor_in_t;
 
 static size_t remaining(const cbor_in_t *r)
@@ -903,8 +910,7 @@ static bool cbor_value(cbor_in_t *r, bool top)
         return read_text(r, v, &text) && put_json_string(w, text, (size_t)v);
     }
     case MAJOR_ARRAY:
-    case MAJOR_MAP:
-        return cbor_container(r, major, v, top);
+    case MAJOR_MAP: return cbor_container(r, major, v, top);
     case MAJOR_SIMPLE: {
         double d;
         if (ai == 20) return put_str(w, "false");
@@ -927,8 +933,7 @@ static bool cbor_value(cbor_in_t *r, bool top)
         }
         return put_json_double(w, d);
     }
-    default:
-        return fail(w, "byte strings and tags are not allowed");
+    default: return fail(w, "byte strings and tags are not allowed");
     }
 }
 
@@ -965,21 +970,13 @@ static bool decode_envelope(cbor_in_t *r, atalaia_event_t *ev)
         seen |= 1u << key;
         bool ok;
         switch (key) {
-        case ATALAIA_KEY_NODE:
-            ok = read_uint(r, 0xFFFF, "node out of range", &node);
-            break;
-        case ATALAIA_KEY_SEQ:
-            ok = read_uint(r, 0xFFFF, "seq out of range", &seq);
-            break;
-        case ATALAIA_KEY_T:
-            ok = read_uint(r, 0xFFFFFFFFu, "t out of range", &t);
-            break;
+        case ATALAIA_KEY_NODE: ok = read_uint(r, 0xFFFF, "node out of range", &node); break;
+        case ATALAIA_KEY_SEQ: ok = read_uint(r, 0xFFFF, "seq out of range", &seq); break;
+        case ATALAIA_KEY_T: ok = read_uint(r, 0xFFFFFFFFu, "t out of range", &t); break;
         case ATALAIA_KEY_TEAM:
             ok = read_uint(r, ATALAIA_TEAM_MAX, "team out of range", &team);
             break;
-        case ATALAIA_KEY_SQUAD:
-            ok = read_uint(r, 0xFF, "squad out of range", &squad);
-            break;
+        case ATALAIA_KEY_SQUAD: ok = read_uint(r, 0xFF, "squad out of range", &squad); break;
         case ATALAIA_KEY_PRIO:
             ok = read_uint(r, ATALAIA_PRIO_CRITICAL, "unknown priority", &prio);
             break;
@@ -1013,8 +1010,7 @@ static bool decode_envelope(cbor_in_t *r, atalaia_event_t *ev)
             has_data = true;
             ok = cbor_value(r, true);
             break;
-        default:
-            return fail(w, "unknown envelope key");
+        default: return fail(w, "unknown envelope key");
         }
         if (!ok) {
             return false;
@@ -1023,8 +1019,8 @@ static bool decode_envelope(cbor_in_t *r, atalaia_event_t *ev)
     if (remaining(r) != 0) {
         return fail(w, "trailing bytes");
     }
-    const unsigned required = 1u << ATALAIA_KEY_NODE | 1u << ATALAIA_KEY_SEQ |
-                              1u << ATALAIA_KEY_T | 1u << ATALAIA_KEY_TYPE;
+    const unsigned required = 1u << ATALAIA_KEY_NODE | 1u << ATALAIA_KEY_SEQ | 1u << ATALAIA_KEY_T |
+                              1u << ATALAIA_KEY_TYPE;
     if ((seen & required) != required) {
         return fail(w, "the event needs node, seq, t and type");
     }
@@ -1044,8 +1040,8 @@ static bool decode_envelope(cbor_in_t *r, atalaia_event_t *ev)
     return true;
 }
 
-bool atalaia_event_decode(const uint8_t *buf, size_t len, atalaia_event_t *ev,
-                          char *data_json, size_t data_cap, const char **error)
+bool atalaia_event_decode(const uint8_t *buf, size_t len, atalaia_event_t *ev, char *data_json,
+                          size_t data_cap, const char **error)
 {
     atalaia_event_t scratch;
     writer_t w = {(uint8_t *)data_json, 0, 0, NULL};

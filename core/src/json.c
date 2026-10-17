@@ -12,7 +12,7 @@
 
 #include "lauxlib.h"
 
-#define JSON_MAX_DEPTH 16
+#define JSON_MAX_DEPTH  16
 #define JSON_MAX_NUMBER 64
 
 /* ---- Encoding ------------------------------------------------------------
@@ -46,7 +46,7 @@ static void push_quoted(lua_State *L, const char *s, size_t len)
     for (size_t i = 0; i < len; i++) {
         unsigned char c = (unsigned char)s[i];
         switch (c) {
-        case '"':  luaL_addstring(&b, "\\\""); break;
+        case '"': luaL_addstring(&b, "\\\""); break;
         case '\\': luaL_addstring(&b, "\\\\"); break;
         case '\n': luaL_addstring(&b, "\\n"); break;
         case '\r': luaL_addstring(&b, "\\r"); break;
@@ -176,12 +176,8 @@ static void encode_value(encoder_t *e, int idx)
     lua_State *L = e->L;
     idx = lua_absindex(L, idx);
     switch (lua_type(L, idx)) {
-    case LUA_TNIL:
-        put(e, "null");
-        break;
-    case LUA_TBOOLEAN:
-        put(e, lua_toboolean(L, idx) ? "true" : "false");
-        break;
+    case LUA_TNIL: put(e, "null"); break;
+    case LUA_TBOOLEAN: put(e, lua_toboolean(L, idx) ? "true" : "false"); break;
     case LUA_TNUMBER:
         if (lua_isinteger(L, idx)) {
             lua_pushfstring(L, "%I", (LUAI_UACINT)lua_tointeger(L, idx));
@@ -201,11 +197,8 @@ static void encode_value(encoder_t *e, int idx)
         put_top(e);
         break;
     }
-    case LUA_TTABLE:
-        encode_table(e, idx);
-        break;
-    default:
-        luaL_error(L, "cannot encode a %s as JSON", luaL_typename(L, idx));
+    case LUA_TTABLE: encode_table(e, idx); break;
+    default: luaL_error(L, "cannot encode a %s as JSON", luaL_typename(L, idx));
     }
 }
 
@@ -313,14 +306,14 @@ static void decode_string(decoder_t *d)
         d->p++;
         char esc = *d->p++;
         switch (esc) {
-        case '"':  luaL_addchar(&b, '"'); break;
+        case '"': luaL_addchar(&b, '"'); break;
         case '\\': luaL_addchar(&b, '\\'); break;
-        case '/':  luaL_addchar(&b, '/'); break;
-        case 'b':  luaL_addchar(&b, '\b'); break;
-        case 'f':  luaL_addchar(&b, '\f'); break;
-        case 'n':  luaL_addchar(&b, '\n'); break;
-        case 'r':  luaL_addchar(&b, '\r'); break;
-        case 't':  luaL_addchar(&b, '\t'); break;
+        case '/': luaL_addchar(&b, '/'); break;
+        case 'b': luaL_addchar(&b, '\b'); break;
+        case 'f': luaL_addchar(&b, '\f'); break;
+        case 'n': luaL_addchar(&b, '\n'); break;
+        case 'r': luaL_addchar(&b, '\r'); break;
+        case 't': luaL_addchar(&b, '\t'); break;
         case 'u': {
             uint32_t cp = read_hex4(d);
             if (cp >= 0xD800 && cp <= 0xDBFF) {
@@ -339,9 +332,7 @@ static void decode_string(decoder_t *d)
             add_utf8(&b, cp);
             break;
         }
-        default:
-            d->p--;
-            fail(d, "bad escape");
+        default: d->p--; fail(d, "bad escape");
         }
     }
     luaL_pushresult(&b);
@@ -452,9 +443,18 @@ static void decode_value(decoder_t *d)
     case '{': decode_container(d, '}'); break;
     case '[': decode_container(d, ']'); break;
     case '"': decode_string(d); break;
-    case 't': decode_literal(d, "true"); lua_pushboolean(d->L, 1); break;
-    case 'f': decode_literal(d, "false"); lua_pushboolean(d->L, 0); break;
-    case 'n': decode_literal(d, "null"); lua_pushnil(d->L); break;
+    case 't':
+        decode_literal(d, "true");
+        lua_pushboolean(d->L, 1);
+        break;
+    case 'f':
+        decode_literal(d, "false");
+        lua_pushboolean(d->L, 0);
+        break;
+    case 'n':
+        decode_literal(d, "null");
+        lua_pushnil(d->L);
+        break;
     default:
         if (*d->p == '-' || is_digit(*d->p)) {
             decode_number(d);

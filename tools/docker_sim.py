@@ -9,14 +9,16 @@
 
 Takes the same arguments as `python -m atalaia_sim` and works from any folder
 and any shell (cmd, PowerShell, bash). Paths are relative to the current
-folder, as they would be natively. Docker must be running. The first run
-builds the atalaia-dev image; the core is rebuilt (incrementally, in the
-atalaia-core-build volume) before each command, so changes to it are picked up.
+folder, as they would be natively. Docker must be running. The atalaia-dev
+image is built on the first run and rebuilt whenever tools/dev/Dockerfile
+changes; the core is rebuilt (incrementally, in the atalaia-core-build volume)
+before each command, so changes to it are picked up.
 For `serve`, the page is published on localhost only.
 """
 
 from __future__ import annotations
 
+import hashlib
 import shlex
 import subprocess
 import sys
@@ -25,6 +27,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 IMAGE = "atalaia-dev"
 VOLUME = "atalaia-core-build"
+LABEL = "org.atalaia.dockerfile"
 
 
 def fail(message: str) -> int:
@@ -70,9 +73,14 @@ def main(argv: list[str]) -> int:
     except FileNotFoundError:
         return fail("the docker command was not found; install Docker Desktop")
 
-    if docker("image", "inspect", IMAGE, quiet=True) != 0:
-        print(f"Building the {IMAGE} image (first run only)...", flush=True)
-        if docker("build", "-t", IMAGE, str(REPO / "tools" / "dev")) != 0:
+    dockerfile = (REPO / "tools" / "dev" / "Dockerfile").read_bytes().replace(b"\r\n", b"\n")
+    wanted = hashlib.sha256(dockerfile).hexdigest()[:16]
+    label_format = "{{index .Config.Labels \"%s\"}}" % LABEL
+    built = subprocess.run(["docker", "image", "inspect", "-f", label_format, IMAGE],
+                           capture_output=True, text=True)
+    if built.returncode != 0 or built.stdout.strip() != wanted:
+        print(f"Building the {IMAGE} image (first run, or tools/dev/Dockerfile changed)...", flush=True)
+        if docker("build", "--label", f"{LABEL}={wanted}", "-t", IMAGE, str(REPO / "tools" / "dev")) != 0:
             return fail("building the image failed")
 
     args = container_args(argv)

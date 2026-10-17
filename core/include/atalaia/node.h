@@ -38,9 +38,9 @@
 #define ATALAIA_NODE_DEFAULT_MEM_LIMIT   (256u * 1024u)
 #define ATALAIA_NODE_DEFAULT_INSTR_LIMIT 1000000u
 
-#define ATALAIA_NODE_MAX_TIMERS     32
+#define ATALAIA_NODE_MAX_TIMERS      32
 #define ATALAIA_NODE_MIN_INTERVAL_MS 10u
-#define ATALAIA_TEAM_NAME_MAX       24 /* includes the terminating NUL */
+#define ATALAIA_TEAM_NAME_MAX        24 /* includes the terminating NUL */
 
 typedef struct atalaia_node atalaia_node_t;
 
@@ -57,16 +57,14 @@ typedef struct {
     void (*event)(void *user, const atalaia_event_t *ev, const char *data_json);
     /* A hardware command, e.g. target "ring", method "fill", args ["red"].
      * Targets are capability ids, or "ui" and "audio". */
-    void (*command)(void *user, const char *target, const char *method,
-                    const char *args_json);
+    void (*command)(void *user, const char *target, const char *method, const char *args_json);
     /* A line from the script's log() or print(). */
     void (*log)(void *user, const char *message);
     void *user;
 } atalaia_node_callbacks_t;
 
 /* Same contract as lua_Alloc: free when new_size is 0, otherwise resize. */
-typedef void *(*atalaia_alloc_fn)(void *ud, void *ptr, size_t old_size,
-                                  size_t new_size);
+typedef void *(*atalaia_alloc_fn)(void *ud, void *ptr, size_t old_size, size_t new_size);
 
 typedef struct {
     uint16_t node_id;     /* short id within the game */
@@ -86,8 +84,7 @@ void atalaia_node_destroy(atalaia_node_t *node);
  * Before loading: the game's teams (ids 1..count in this order) and the
  * preset's parameters as a JSON object, exposed to the script as `params`.
  */
-bool atalaia_node_set_teams(atalaia_node_t *node, const char *const *names,
-                            size_t count);
+bool atalaia_node_set_teams(atalaia_node_t *node, const char *const *names, size_t count);
 bool atalaia_node_set_params(atalaia_node_t *node, const char *params_json);
 
 /*
@@ -105,8 +102,7 @@ bool atalaia_node_load(atalaia_node_t *node, const char *source, size_t len,
  * Returns false if the node is not running, the game is paused and the
  * event is not a game.* event, or data_json is not a JSON object.
  */
-bool atalaia_node_input(atalaia_node_t *node, const char *type,
-                        const char *data_json);
+bool atalaia_node_input(atalaia_node_t *node, const char *type, const char *data_json);
 
 /*
  * Moves game time forward to now_ms, firing due timers in order. Game time

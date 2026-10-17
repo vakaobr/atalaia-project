@@ -6,9 +6,8 @@
 
 #include <string.h>
 
-bool atalaia_event_init(atalaia_event_t *ev, uint16_t node, uint16_t seq,
-                        uint32_t t_ms, const char *type, uint8_t team,
-                        uint8_t squad, atalaia_prio_t prio)
+bool atalaia_event_init(atalaia_event_t *ev, uint16_t node, uint16_t seq, uint32_t t_ms,
+                        const char *type, uint8_t team, uint8_t squad, atalaia_prio_t prio)
 {
     if (ev == NULL) {
         return false;
@@ -55,12 +54,9 @@ int atalaia_event_compare(const atalaia_event_t *a, const atalaia_event_t *b)
 const char *atalaia_prio_name(atalaia_prio_t prio)
 {
     switch (prio) {
-    case ATALAIA_PRIO_TELEMETRY:
-        return "telemetry";
-    case ATALAIA_PRIO_NORMAL:
-        return "normal";
-    case ATALAIA_PRIO_CRITICAL:
-        return "critical";
+    case ATALAIA_PRIO_TELEMETRY: return "telemetry";
+    case ATALAIA_PRIO_NORMAL: return "normal";
+    case ATALAIA_PRIO_CRITICAL: return "critical";
     }
     return "unknown";
 }

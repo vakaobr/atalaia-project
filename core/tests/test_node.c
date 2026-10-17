@@ -45,8 +45,7 @@ static void on_event(void *user, const atalaia_event_t *ev, const char *data)
     r->events++;
 }
 
-static void on_command(void *user, const char *target, const char *method,
-                       const char *args)
+static void on_command(void *user, const char *target, const char *method, const char *args)
 {
     recorder_t *r = user;
     if (r->commands < MAX_RECORDS) {
@@ -112,12 +111,11 @@ static void test_emit_and_handlers(void)
 {
     recorder_t r;
     atalaia_node_t *n = make_node(&r, 1, 0);
-    CHECK(load(n,
-        "on('team_input.press', function(e)\n"
-        "  emit('zone.captured', { team = e.team, zone = 'A', z = 1 },\n"
-        "       { prio = 'critical' })\n"
-        "end)\n"
-        "on('zone.captured', function(e) log('saw', e.type, e.zone, e.t) end)\n"));
+    CHECK(load(n, "on('team_input.press', function(e)\n"
+                  "  emit('zone.captured', { team = e.team, zone = 'A', z = 1 },\n"
+                  "       { prio = 'critical' })\n"
+                  "end)\n"
+                  "on('zone.captured', function(e) log('saw', e.type, e.zone, e.t) end)\n"));
     CHECK(atalaia_node_status(n) == ATALAIA_NODE_RUNNING);
 
     atalaia_node_advance(n, 1500);
@@ -144,13 +142,12 @@ static void test_default_priority(void)
 {
     recorder_t r;
     atalaia_node_t *n = make_node(&r, 1, 0);
-    CHECK(load(n,
-        "on('team_input.press', function(e)\n"
-        "  emit('bomb.exploded', { team = e.team })\n"
-        "  emit('battery.low', { percent = 5 })\n"
-        "  emit('x.club.thing', { list = { 1, 2.5, 'x' }, nested = { ok = true } })\n"
-        "  emit('bomb.exploded', {}, { prio = 'normal' })\n"
-        "end)\n"));
+    CHECK(load(n, "on('team_input.press', function(e)\n"
+                  "  emit('bomb.exploded', { team = e.team })\n"
+                  "  emit('battery.low', { percent = 5 })\n"
+                  "  emit('x.club.thing', { list = { 1, 2.5, 'x' }, nested = { ok = true } })\n"
+                  "  emit('bomb.exploded', {}, { prio = 'normal' })\n"
+                  "end)\n"));
     CHECK(atalaia_node_input(n, "team_input.press", "{\"team\":\"red\"}"));
     CHECK(r.events == 4);
     CHECK(r.prio[0] == ATALAIA_PRIO_CRITICAL);
@@ -178,10 +175,10 @@ static void test_timers(void)
     recorder_t r;
     atalaia_node_t *n = make_node(&r, 1, 0);
     CHECK(load(n,
-        "ticks = 0\n"
-        "local id = every(1, function() ticks = ticks + 1; log('tick', game.time()) end)\n"
-        "after(2.5, function() log('after', game.time()) end)\n"
-        "after(3.5, function() cancel(id) end)\n"));
+               "ticks = 0\n"
+               "local id = every(1, function() ticks = ticks + 1; log('tick', game.time()) end)\n"
+               "after(2.5, function() log('after', game.time()) end)\n"
+               "after(3.5, function() cancel(id) end)\n"));
     atalaia_node_advance(n, 10000);
     CHECK(r.logs == 4);
     CHECK(strcmp(r.log[0], "tick 1.0") == 0);
@@ -201,10 +198,10 @@ static void test_scores_and_end(void)
 {
     recorder_t r;
     atalaia_node_t *n = make_node(&r, 1, 0);
-    CHECK(load(n,
-        "every(1, function() score.add('red', 2, 'hold') end)\n"
-        "on('penalty', function() score.add('blue', -5, 'moved', 'blue-2') end)\n"
-        "on('game.end', function(e) log('final', score.get('red'), score.get('blue')) end)\n"));
+    CHECK(load(
+        n, "every(1, function() score.add('red', 2, 'hold') end)\n"
+           "on('penalty', function() score.add('blue', -5, 'moved', 'blue-2') end)\n"
+           "on('game.end', function(e) log('final', score.get('red'), score.get('blue')) end)\n"));
     atalaia_node_advance(n, 3000);
     CHECK(atalaia_node_input(n, "penalty", NULL));
     const atalaia_score_t *s = atalaia_node_score(n);
@@ -213,7 +210,8 @@ static void test_scores_and_end(void)
     /* Gains travel as counters; only the penalty is an event. */
     CHECK(r.events == 1 && strcmp(r.type[0], "score.delta") == 0);
     CHECK(strcmp(r.data[0],
-                 "{\"amount\":-5,\"reason\":\"moved\",\"squad\":\"blue-2\",\"team\":\"blue\"}") == 0);
+                 "{\"amount\":-5,\"reason\":\"moved\",\"squad\":\"blue-2\",\"team\":\"blue\"}") ==
+          0);
 
     CHECK(atalaia_node_input(n, "game.end", "{\"reason\":\"time\"}"));
     CHECK(atalaia_node_status(n) == ATALAIA_NODE_ENDED);
@@ -254,17 +252,17 @@ static void test_params_state_and_teams(void)
 {
     recorder_t r;
     atalaia_node_t *n = make_node(&r, 1, 0);
-    CHECK(atalaia_node_set_params(n,
-        "{\"fuse_s\": 300, \"reset\": true, \"label\": \"Caf\\u00e9 \\ud83d\\udca3\", "
-        "\"list\": [1, 2.5, null], \"skip\": null}"));
-    CHECK(load(n,
-        "local s = state.node { phase = 'standby', fuse = 0 }\n"
-        "s.phase = 'armed'\n"
-        "local again = state.node { phase = 'x', extra = 1 }\n"
-        "log(params.fuse_s, math.type(params.fuse_s), params.reset, params.label,\n"
-        "    params.list[2], params.skip, again.phase, again.extra, s == again)\n"));
+    CHECK(atalaia_node_set_params(
+        n, "{\"fuse_s\": 300, \"reset\": true, \"label\": \"Caf\\u00e9 \\ud83d\\udca3\", "
+           "\"list\": [1, 2.5, null], \"skip\": null}"));
+    CHECK(load(n, "local s = state.node { phase = 'standby', fuse = 0 }\n"
+                  "s.phase = 'armed'\n"
+                  "local again = state.node { phase = 'x', extra = 1 }\n"
+                  "log(params.fuse_s, math.type(params.fuse_s), params.reset, params.label,\n"
+                  "    params.list[2], params.skip, again.phase, again.extra, s == again)\n"));
     CHECK(r.logs == 1);
-    CHECK(strcmp(r.log[0], "300 integer true Caf\xc3\xa9 \xf0\x9f\x92\xa3 2.5 nil armed 1 true") == 0);
+    CHECK(strcmp(r.log[0], "300 integer true Caf\xc3\xa9 \xf0\x9f\x92\xa3 2.5 nil armed 1 true") ==
+          0);
     CHECK(atalaia_node_team_id(n, "blue") == 2);
     CHECK(atalaia_node_team_id(n, "green") == ATALAIA_TEAM_NONE);
     CHECK(strcmp(atalaia_node_team_name(n, 1), "red") == 0);
@@ -287,12 +285,11 @@ static void test_hardware_commands(void)
 {
     recorder_t r;
     atalaia_node_t *n = make_node(&r, 1, 0);
-    CHECK(load(n,
-        "cap('ring'):fill('red')\n"
-        "cap('ring'):progress(0.5)\n"
-        "ui.screen('countdown', { left = 30 })\n"
-        "audio.play('armed')\n"
-        "audio.stop()\n"));
+    CHECK(load(n, "cap('ring'):fill('red')\n"
+                  "cap('ring'):progress(0.5)\n"
+                  "ui.screen('countdown', { left = 30 })\n"
+                  "audio.play('armed')\n"
+                  "audio.stop()\n"));
     CHECK(r.commands == 5);
     CHECK(strcmp(r.command[0], "ring.fill [\"red\"]") == 0);
     CHECK(strcmp(r.command[1], "ring.progress [0.5]") == 0);
@@ -321,9 +318,8 @@ static void test_sandbox(void)
 {
     recorder_t r;
     atalaia_node_t *n = make_node(&r, 1, 0);
-    CHECK(load(n,
-        "log(io, os, require, load, loadfile, dofile, collectgarbage, debug,\n"
-        "    package, string.dump, math.random)\n"));
+    CHECK(load(n, "log(io, os, require, load, loadfile, dofile, collectgarbage, debug,\n"
+                  "    package, string.dump, math.random)\n"));
     CHECK(r.logs == 1 && strcmp(r.log[0], "nil nil nil nil nil nil nil nil nil nil nil") == 0);
     atalaia_node_destroy(n);
 
@@ -349,11 +345,10 @@ static void test_watchdog(void)
 
     /* Catching the watchdog error with pcall does not keep a script alive. */
     n = make_node(&r, 1, 0);
-    CHECK(load(n,
-        "on('go', function()\n"
-        "  while true do pcall(function() while true do end end) end\n"
-        "end)\n"
-        "every(1, function() log('still here') end)\n"));
+    CHECK(load(n, "on('go', function()\n"
+                  "  while true do pcall(function() while true do end end) end\n"
+                  "end)\n"
+                  "every(1, function() log('still here') end)\n"));
     CHECK(atalaia_node_input(n, "go", NULL));
     CHECK(atalaia_node_status(n) == ATALAIA_NODE_HALTED);
     atalaia_node_advance(n, 5000);
@@ -373,9 +368,8 @@ static void test_memory_limit(void)
 {
     recorder_t r;
     atalaia_node_t *n = make_node(&r, 1, 64u * 1024u);
-    CHECK(load(n,
-        "on('grow', function() local t = {} for i = 1, 1e7 do t[i] = i end end)\n"
-        "on('small', function() log('ok') end)\n"));
+    CHECK(load(n, "on('grow', function() local t = {} for i = 1, 1e7 do t[i] = i end end)\n"
+                  "on('small', function() log('ok') end)\n"));
     CHECK(atalaia_node_mem_used(n) < 64u * 1024u);
     CHECK(atalaia_node_input(n, "small", NULL));
     CHECK(atalaia_node_input(n, "grow", NULL));
