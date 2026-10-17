@@ -4,6 +4,8 @@
 
 Atalaia is an open, local-first platform for airsoft, paintball and milsim game props. Build a domination box from a €20 microcontroller, turn an old Android phone into a hacking terminal, run a 20-box weekend milsim on a LoRa mesh, and write your own game modes as small scripts. No cloud required, no vendor lock-in.
 
+*Atalaia* is Portuguese for "watchtower" ([why that name?](#name)).
+
 > **Status: pre-alpha, design phase.** Nothing here is ready for the field yet. We are in phase 0: setting up the repository, the shared core and the simulator. Ideas, reviews and early contributors are very welcome.
 
 ---
