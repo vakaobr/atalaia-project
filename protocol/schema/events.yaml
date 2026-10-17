@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Standard events. DRAFT. Custom events use a namespace: x.<club>.<name>
+version: 1
+
+common_fields: [id, t, node, type, team, squad, data, prio]
+
+events:
+  game.start:        { prio: critical, data: [preset] }
+  game.pause:        { prio: critical, data: [reason] }
+  game.resume:       { prio: critical, data: [] }
+  game.end:          { prio: critical, data: [reason, winner] }
+  zone.captured:     { prio: normal,   data: [zone, previous_team] }
+  zone.neutralized:  { prio: normal,   data: [zone, previous_team] }
+  bomb.armed:        { prio: critical, data: [fuse_s] }
+  bomb.defused:      { prio: critical, data: [] }
+  bomb.exploded:     { prio: critical, data: [] }
+  bomb.reset:        { prio: normal,   data: [] }
+  score.delta:       { prio: normal,   data: [amount, reason] }
+  code.used:         { prio: normal,   data: [code, kind] }
+  tag.scanned:       { prio: normal,   data: [tag, owner] }
+  player.respawn:    { prio: normal,   data: [player, lives_left] }
+  player.checkin:    { prio: normal,   data: [player] }
+  target.hit:        { prio: normal,   data: [window_open] }
+  chrono.violation:  { prio: critical, data: [replica, reading_mps, bb_g, limit_j] }
+  gm.message:        { prio: normal,   data: [text, audience] }
+  node.online:       { prio: telemetry, data: [fw, tier] }
+  node.offline:      { prio: telemetry, data: [last_seen] }
+  node.rebooted:     { prio: critical, data: [reason] }
+  battery.low:       { prio: telemetry, data: [percent] }

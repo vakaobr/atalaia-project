@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Skirmesh-RF messages. DRAFT: field ids and sizes may change until v1.
+protocol: skirmesh-rf
+version: 1
+
+header:                      # LoRa packet header, 9 bytes
+  - { name: version_flags, bytes: 1, doc: "protocol version, priority, ACK requested" }
+  - { name: game_id,       bytes: 2, doc: "ignore traffic from other games on the band" }
+  - { name: source,        bytes: 2, doc: "node short id within this game" }
+  - { name: seq,           bytes: 2, doc: "per-node sequence number, for dedupe and ACKs" }
+  - { name: hop_limit,     bytes: 1, doc: "flood control, default 2" }
+  - { name: type,          bytes: 1, doc: "message type, see below" }
+payload_max_bytes: 200       # CBOR with integer keys
+mic_bytes: 8                 # AES-CCM message integrity code with the game key
+
+messages:
+  - { id: 1, name: HELLO,  doc: "node announces itself and a capability summary" }
+  - { id: 2, name: EVENT,  doc: "one game or system event" }
+  - { id: 3, name: ACK,    doc: "confirms receipt of a sequence number" }
+  - { id: 4, name: STATE,  doc: "periodic snapshot of local state and per-team counters" }
+  - { id: 5, name: CMD,    doc: "controller or GM instruction: start, pause, reset, set owner, message" }
+  - { id: 6, name: TIME,   doc: "game-clock beacon; also the controller heartbeat" }
+  - { id: 7, name: CONFIG, doc: "assigns a preset and role; parameters only" }
+  - { id: 8, name: CLAIM,  doc: "controller election: candidate claims the role with a term number" }
+
+# Scripts, assets and firmware never travel over LoRa: they use Wi-Fi or BLE.

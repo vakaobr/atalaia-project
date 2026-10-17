@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+id: org.atalaia.domination
+version: 0.1.0
+license: GPL-3.0-or-later
+min_tier: reduced
+name: Domination
+description: The last team to claim the box scores while it holds it.
+roles:
+  zone: { requires: [team_input], optional: [team_display, audio, display] }
+params:
+  capture_hold_ms: { type: int, min: 0, max: 60000, default: 3000, label: "Hold time to capture (ms)" }
+  tick_s:          { type: int, min: 1, max: 600,   default: 10,   label: "Seconds per scoring tick" }
+  points_per_tick: { type: int, min: 1, max: 1000,  default: 1,    label: "Points per tick" }

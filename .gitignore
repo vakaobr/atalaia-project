@@ -1,0 +1,39 @@
+# Build output
+build/
+cmake-build-*/
+*.o
+*.a
+*.so
+*.elf
+*.bin
+
+# ESP-IDF
+firmware/esp32/build/
+sdkconfig
+sdkconfig.old
+managed_components/
+
+# Flutter / Dart
+app/.dart_tool/
+app/build/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/android/local.properties
+app/ios/Pods/
+
+# Python
+__pycache__/
+.venv/
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Secrets: never commit these
+.env
+*.pem
+*.key
+secrets.*
