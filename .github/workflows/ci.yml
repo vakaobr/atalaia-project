@@ -41,6 +41,8 @@ jobs:
         run: pip install -r simulator/requirements.txt check-jsonschema
       - name: Generated files are up to date
         run: python tools/protogen.py --check
+      - name: The project page is up to date in every language
+        run: python tools/build_site.py --check
       - name: The JSON Schema accepts the examples and rejects the invalid ones
         working-directory: protocol/json
         run: |

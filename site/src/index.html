@@ -1,0 +1,280 @@
+{#
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: CC-BY-SA-4.0
+
+Template of the project page. tools/build_site.py renders it once per language,
+with the text from site/i18n/<language>.yaml, into site/index.html (Portuguese)
+and site/en/index.html (English). See site/README.md.
+
+  {{ key }}        the text of key, inserted as HTML
+  {{ key|text }}   the text of key, escaped (for attributes and SVG text)
+  {{ page.* }}     values the script sets per page (language, paths, URLs)
+
+Lines between "{% if lang en %}" and "{% endif %}" (each tag on a line of its own)
+appear only on the pages of the languages listed; "{% if lang pt en %}" lists two.
+Each language file holds the keys of its own page.
+
+Comments like this one, between a brace-hash and a hash-brace, are not copied to
+the pages. Code blocks and anything else that is the same in every language stay here.
+#}
+<html lang="{{ page.lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ meta.title|text }}</title>
+  <meta name="description" content="{{ meta.description|text }}">
+  <meta name="color-scheme" content="light dark">
+  <link rel="canonical" href="{{ page.url.self }}">
+  <link rel="alternate" hreflang="pt-PT" href="{{ page.url.pt }}">
+  <link rel="alternate" hreflang="en" href="{{ page.url.en }}">
+  <link rel="alternate" hreflang="x-default" href="{{ page.url.pt }}">
+  <meta property="og:title" content="{{ meta.title|text }}">
+  <meta property="og:description" content="{{ meta.og_description|text }}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{ page.url.self }}">
+  <meta property="og:locale" content="{{ page.og_locale }}">
+  <meta property="og:locale:alternate" content="{{ page.og_locale_alternate }}">
+  <meta property="og:image" content="{{ page.og_image }}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="{{ meta.og_image_alt|text }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="{{ page.root }}favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{{ page.root }}img/logo-192.png">
+  <link rel="stylesheet" href="{{ page.root }}style.css">
+</head>
+<body>
+  <a class="skip" href="#main">{{ header.skip }}</a>
+
+  <header class="top">
+    <div class="wrap top-inner">
+      <a class="brand" href="./" aria-label="{{ header.home|text }}">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+          <path class="fire" d="M16 1c2 2.5 3.5 4 2.3 6.3-.6 1-1.6 1-2.3.4-.7.6-1.7.6-2.3-.4C12.5 5 14 3.5 16 1z" />
+          <path d="M9 15V9h3.5v3h2V9h3v3h2V9H23v6z" />
+          <path d="M10 15h12l2 15H8z" />
+        </svg>
+        Atalaia
+      </a>
+      <nav class="sections" aria-label="{{ header.sections|text }}">
+        <a href="#modes">{{ header.modes }}</a>
+        <a href="#try">{{ header.try }}</a>
+        <a href="#roadmap">{{ header.roadmap }}</a>
+        <a href="#hub">{{ header.hub }}</a>
+        <a href="https://github.com/vakaobr/atalaia-project">GitHub</a>
+      </nav>
+      {# Each language is named in its own language, whichever page this is. #}
+      <nav class="lang" aria-label="{{ header.language|text }}">
+        <a href="{{ page.href.pt }}" hreflang="pt-PT" lang="pt-PT"{{ page.current.pt }}>PT<span class="sr-only"> · Português</span></a>
+        <span class="sep" aria-hidden="true">·</span>
+        <a href="{{ page.href.en }}" hreflang="en" lang="en"{{ page.current.en }}>EN<span class="sr-only"> · English</span></a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div class="wrap">
+        <p class="status"><span class="dot" aria-hidden="true"></span> {{ hero.status }}</p>
+        <h1>{{ hero.title }}</h1>
+        <p class="lead">
+          {{ hero.lead }}
+        </p>
+        <div class="actions">
+          <a class="button primary" href="https://github.com/vakaobr/atalaia-project/discussions">{{ hero.discuss }}</a>
+          <a class="button" href="https://github.com/vakaobr/atalaia-project/blob/main/docs/design-spec.md">{{ hero.design }}</a>
+          <a class="button" href="https://github.com/vakaobr/atalaia-project">{{ hero.source }}</a>
+        </div>
+        <p class="name">{{ hero.name }} <a href="#name">{{ hero.why_name }}</a></p>
+        {# The night scene has English text painted in, so only the English page uses it. #}
+        <picture class="hero-art">
+{% if lang pt %}
+          <source type="image/webp" srcset="{{ page.root }}img/field-isometric-960.webp 960w, {{ page.root }}img/field-isometric-1600.webp 1600w" sizes="(min-width: 1080px) 1048px, calc(100vw - 32px)">
+          <img src="{{ page.root }}img/field-isometric-960.jpg" srcset="{{ page.root }}img/field-isometric-960.jpg 960w, {{ page.root }}img/field-isometric-1600.jpg 1600w" sizes="(min-width: 1080px) 1048px, calc(100vw - 32px)" width="1600" height="873" decoding="async" fetchpriority="high" alt="{{ hero.image_alt|text }}">
+{% endif %}
+{% if lang en %}
+          <source type="image/webp" srcset="{{ page.root }}img/watchtower-night-960.webp 960w, {{ page.root }}img/watchtower-night-1600.webp 1600w" sizes="(min-width: 1080px) 1048px, calc(100vw - 32px)">
+          <img src="{{ page.root }}img/watchtower-night-960.jpg" srcset="{{ page.root }}img/watchtower-night-960.jpg 960w, {{ page.root }}img/watchtower-night-1600.jpg 1600w" sizes="(min-width: 1080px) 1048px, calc(100vw - 32px)" width="1600" height="893" decoding="async" fetchpriority="high" alt="{{ hero.image_alt|text }}">
+{% endif %}
+        </picture>
+      </div>
+    </section>
+
+    <section class="band" aria-labelledby="why">
+      <div class="wrap">
+        <h2 id="why">{{ why.title }}</h2>
+        <p class="intro">{{ why.intro }}</p>
+        <ul class="features">
+          <li><h3>{{ why.local.title }}</h3><p>{{ why.local.text }}</p></li>
+          <li><h3>{{ why.hardware.title }}</h3><p>{{ why.hardware.text }}</p></li>
+          <li><h3>{{ why.scripts.title }}</h3><p>{{ why.scripts.text }}</p></li>
+          <li><h3>{{ why.open.title }}</h3><p>{{ why.open.text }}</p></li>
+          <li><h3>{{ why.fields.title }}</h3><p>{{ why.fields.text }}</p></li>
+          <li><h3>{{ why.copyleft.title }}</h3><p>{{ why.copyleft.text }}</p></li>
+        </ul>
+      </div>
+    </section>
+
+    <section aria-labelledby="how">
+      <div class="wrap">
+        <h2 id="how">{{ how.title }}</h2>
+        <p class="intro">{{ how.intro }}</p>
+        <figure class="diagram">
+          <svg viewBox="0 0 760 330" role="img" aria-labelledby="diagram-title">
+            <title id="diagram-title">{{ how.diagram.title|text }}</title>
+            <g class="links">
+              <line x1="380" y1="62" x2="380" y2="132" />
+              <line x1="200" y1="160" x2="290" y2="160" />
+              <line x1="470" y1="160" x2="560" y2="160" />
+              <line x1="380" y1="188" x2="380" y2="232" />
+              <line x1="95" y1="232" x2="665" y2="232" />
+              <line x1="95" y1="232" x2="95" y2="262" />
+              <line x1="285" y1="232" x2="285" y2="262" />
+              <line x1="475" y1="232" x2="475" y2="262" />
+              <line x1="665" y1="232" x2="665" y2="262" />
+            </g>
+            <g class="box optional"><rect x="270" y="14" width="220" height="48" rx="8" /><text x="380" y="35">{{ how.diagram.server|text }}</text><text class="sub" x="380" y="52">{{ how.diagram.server_sub|text }}</text></g>
+            <text class="label" x="388" y="102">internet</text>
+            <g class="box"><rect x="30" y="134" width="170" height="52" rx="8" /><text x="115" y="157">{{ how.diagram.apps|text }}</text><text class="sub" x="115" y="174">{{ how.diagram.apps_sub|text }}</text></g>
+            <g class="box main"><rect x="290" y="132" width="180" height="56" rx="8" /><text x="380" y="156">{{ how.diagram.controller|text }}</text><text class="sub" x="380" y="174">{{ how.diagram.controller_sub|text }}</text></g>
+            <g class="box"><rect x="560" y="134" width="170" height="52" rx="8" /><text x="645" y="157">{{ how.diagram.tools|text }}</text><text class="sub" x="645" y="174">{{ how.diagram.tools_sub|text }}</text></g>
+            <text class="label accent" x="392" y="216">{{ how.diagram.mesh|text }}</text>
+            <g class="box"><rect x="20" y="262" width="150" height="52" rx="8" /><text x="95" y="285">Field Box</text><text class="sub" x="95" y="302">ESP32</text></g>
+            <g class="box"><rect x="210" y="262" width="150" height="52" rx="8" /><text x="285" y="285">{{ how.diagram.satellite|text }}</text><text class="sub" x="285" y="302">ESP32</text></g>
+            <g class="box"><rect x="400" y="262" width="150" height="52" rx="8" /><text x="475" y="285">{{ how.diagram.android|text }}</text><text class="sub" x="475" y="302">{{ how.diagram.android_sub|text }}</text></g>
+            <g class="box"><rect x="590" y="262" width="150" height="52" rx="8" /><text x="665" y="285">{{ how.diagram.thin|text }}</text><text class="sub" x="665" y="302">{{ how.diagram.thin_sub|text }}</text></g>
+          </svg>
+          {# The phone layout shows this list instead of the diagram. #}
+          <ol class="diagram-list">
+            <li>{{ how.list.server }}</li>
+            <li>{{ how.list.controller }}</li>
+            <li>{{ how.list.props }}</li>
+          </ol>
+        </figure>
+{% if lang en %}
+        {# The Portuguese page already shows this image in its hero. #}
+        <figure class="art">
+          <picture>
+            <source type="image/webp" srcset="{{ page.root }}img/field-isometric-960.webp 960w, {{ page.root }}img/field-isometric-1600.webp 1600w" sizes="(min-width: 800px) 760px, calc(100vw - 32px)">
+            <img src="{{ page.root }}img/field-isometric-960.jpg" srcset="{{ page.root }}img/field-isometric-960.jpg 960w, {{ page.root }}img/field-isometric-1600.jpg 1600w" sizes="(min-width: 800px) 760px, calc(100vw - 32px)" width="1600" height="873" loading="lazy" decoding="async" alt="{{ how.image_alt|text }}">
+          </picture>
+          <figcaption>{{ how.image_caption }}</figcaption>
+        </figure>
+{% endif %}
+      </div>
+    </section>
+
+    <section class="band" aria-labelledby="modes">
+      <div class="wrap">
+        <h2 id="modes">{{ modes.title }}</h2>
+        <p class="intro">{{ modes.intro }}</p>
+        <div class="cards">
+          <article class="card">
+            <h3>{{ modes.domination.title }}</h3>
+            <p>{{ modes.domination.text }}</p>
+            <p class="meta">{{ modes.domination.meta }}</p>
+          </article>
+          <article class="card">
+            <h3>{{ modes.bomb.title }}</h3>
+            <p>{{ modes.bomb.text }}</p>
+            <p class="meta">{{ modes.bomb.meta }}</p>
+          </article>
+          <article class="card dashed">
+            <h3>{{ modes.yours.title }}</h3>
+            <p>{{ modes.yours.text }}</p>
+            <p class="meta"><a href="https://github.com/vakaobr/atalaia-project/issues/new/choose">{{ modes.yours.link }}</a></p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="try">
+      <div class="wrap">
+        <h2 id="try">{{ try.title }}</h2>
+        <p class="intro">{{ try.intro }}</p>
+        <div class="steps">
+          <div>
+            <h3>{{ try.compiler }}</h3>
+<pre><code>cmake -S core -B build -DATALAIA_SHARED=ON
+cmake --build build
+cd simulator
+python -m atalaia_sim serve ../modes/bomb</code></pre>
+          </div>
+          <div>
+            <h3>{{ try.docker }}</h3>
+<pre><code>cd simulator
+python ../tools/docker_sim.py serve ../modes/bomb</code></pre>
+          </div>
+        </div>
+        <p>{{ try.then }}</p>
+      </div>
+    </section>
+
+    <section class="band" aria-labelledby="roadmap">
+      <div class="wrap">
+        <h2 id="roadmap">{{ roadmap.title }}</h2>
+        <p class="intro">{{ roadmap.intro }}</p>
+        <ol class="phases">
+          <li class="now"><span class="tag">{{ roadmap.now }}</span><h3>0 · {{ roadmap.p0.title }}</h3><p>{{ roadmap.p0.text }}</p><p class="gate">{{ roadmap.p0.gate }}</p></li>
+          <li><span class="tag">{{ roadmap.next }}</span><h3>1 · {{ roadmap.p1.title }}</h3><p>{{ roadmap.p1.text }}</p><p class="gate">{{ roadmap.p1.gate }}</p></li>
+          <li><h3>2 · {{ roadmap.p2.title }}</h3><p>{{ roadmap.p2.text }}</p><p class="gate">{{ roadmap.p2.gate }}</p></li>
+          <li><h3>3 · {{ roadmap.p3.title }}</h3><p>{{ roadmap.p3.text }}</p><p class="gate">{{ roadmap.p3.gate }}</p></li>
+          <li><h3>4 · {{ roadmap.p4.title }}</h3><p>{{ roadmap.p4.text }}</p><p class="gate">{{ roadmap.p4.gate }}</p></li>
+          <li><h3>5 · {{ roadmap.p5.title }}</h3><p>{{ roadmap.p5.text }}</p><p class="gate">{{ roadmap.p5.gate }}</p></li>
+        </ol>
+      </div>
+    </section>
+
+    <section aria-labelledby="hub">
+      <div class="wrap">
+        <h2 id="hub">{{ hub.title }}</h2>
+        <p class="intro">{{ hub.intro }}</p>
+        <ul class="hub">
+          <li><span class="chip open">{{ hub.open }}</span><div><h3>{{ hub.discussion.title }}</h3><p>{{ hub.discussion.text }} <a href="https://github.com/vakaobr/atalaia-project/discussions">{{ hub.discussion.link }}</a></p></div></li>
+          <li><span class="chip">{{ hub.planned }}</span><div><h3>{{ hub.gallery.title }}</h3><p>{{ hub.gallery.text }}</p></div></li>
+          <li><span class="chip">{{ hub.planned }}</span><div><h3>{{ hub.directory.title }}</h3><p>{{ hub.directory.text }}</p></div></li>
+          <li><span class="chip">{{ hub.planned }}</span><div><h3>{{ hub.browser.title }}</h3><p>{{ hub.browser.text }}</p></div></li>
+          <li><span class="chip">{{ hub.later }}</span><div><h3>{{ hub.stats.title }}</h3><p>{{ hub.stats.text }}</p></div></li>
+          <li><span class="chip">{{ hub.later }}</span><div><h3>{{ hub.hosting.title }}</h3><p>{{ hub.hosting.text }}</p></div></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="band" aria-labelledby="involved">
+      <div class="wrap">
+        <h2 id="involved">{{ involved.title }}</h2>
+        <p class="intro">{{ involved.intro }}</p>
+        <ul class="ways">
+          <li>{{ involved.review }}</li>
+          <li>{{ involved.propose }}</li>
+          <li>{{ involved.share }}</li>
+          <li>{{ involved.code }}</li>
+        </ul>
+        <p>{{ involved.rules }}</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="name">
+      <div class="wrap two">
+        <div>
+          <img class="badge" src="{{ page.root }}img/logo-512.png" srcset="{{ page.root }}img/logo-192.png 192w, {{ page.root }}img/logo-512.png 512w" sizes="(max-width: 640px) 104px, 136px" width="512" height="512" loading="lazy" decoding="async" alt="{{ name.badge_alt|text }}">
+          <h2 id="name">{{ name.title }}</h2>
+          <p>{{ name.word }}</p>
+          <p>{{ name.fit }}</p>
+        </div>
+        <div>
+          <h2 id="safety">{{ safety.title }}</h2>
+          <p>{{ safety.text }}</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap foot-inner">
+      <p>{{ footer.licences }} <a href="https://github.com/vakaobr/atalaia-project/blob/main/LICENSING.md">{{ footer.licensing }}</a></p>
+      <p>{{ footer.independent }}</p>
+    </div>
+  </footer>
+</body>
+</html>

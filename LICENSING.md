@@ -15,7 +15,7 @@ Full licence texts are in [`LICENSES/`](LICENSES/). The root [`LICENSE`](LICENSE
 
 ## Third-party code
 
-Third-party components keep their own licences and must be compatible with GPL-3.0. Planned dependencies include Lua 5.4 (MIT), ESP-IDF (Apache-2.0), RadioLib (MIT), LVGL (MIT) and Flutter (BSD-3-Clause). Vendored code goes in a `third_party/` folder with its original licence file.
+Third-party components keep their own licences and must be compatible with GPL-3.0. The project page bundles the Barlow and Barlow Condensed fonts (OFL-1.1) in `site/fonts/`. Planned dependencies include Lua 5.4 (MIT), ESP-IDF (Apache-2.0), RadioLib (MIT), LVGL (MIT) and Flutter (BSD-3-Clause). Vendored code goes in a `third_party/` folder with its original licence file.
 
 ## Community game modes
 

@@ -1,0 +1,291 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+#
+# Portuguese (pt-PT) text of the project page (site/index.html, the default
+# page). Every key the Portuguese page uses in the template site/src/index.html
+# must be here, and it must use every key here; apart from the parts only one
+# page shows, en.yaml has the same keys. Values are HTML; keys the template
+# marks |text are plain text. After editing, run python3 tools/build_site.py.
+# See site/README.md for the terms this translation uses.
+
+meta:
+  title: Atalaia · a plataforma aberta de combate simulado
+  description: >-
+    A Atalaia é uma plataforma aberta para dispositivos de jogo de airsoft, paintball e milsim que
+    funciona sem internet: dispositivos ESP32, Raspberry Pi, Arduino e Android, modos de jogo em
+    scripts Lua e um protocolo LoRa aberto.
+  og_description: >-
+    Dispositivos de jogo abertos para airsoft, paintball e milsim, que funcionam sem internet. Os
+    modos de jogo são scripts; serve qualquer hardware.
+  og_image_alt: >-
+    Uma torre de pedra com uma caixa de rádio no topo, rodeada por malas cor de laranja e amarelas
+    com a inscrição «GAME PROP», ligadas por um círculo luminoso.
+
+header:
+  skip: Saltar para o conteúdo
+  home: Atalaia, página inicial
+  sections: Secções
+  modes: Modos
+  try: Experimentar
+  roadmap: Roteiro
+  hub: Comunidade
+  language: Idioma
+
+hero:
+  status: Pré-alfa · fase 0 quase concluída · ainda não está pronta para o campo
+  title: A plataforma aberta de <span class="nowrap">combate simulado</span>
+  lead: >-
+    A Atalaia é uma plataforma aberta para os dispositivos eletrónicos de jogo (os props) de
+    airsoft, paintball e milsim, que funciona no próprio campo, sem depender da internet. Monta
+    uma caixa de domínio com um microcontrolador de 20&nbsp;€, transforma um telemóvel Android
+    antigo num terminal de hacking, organiza um milsim de fim de semana com 20 caixas numa rede
+    mesh LoRa e escreve os teus próprios modos de jogo em pequenos scripts. Não precisa de nuvem
+    e não te prende a nenhum fabricante.
+  discuss: Junta-te à conversa
+  design: Lê a especificação
+  source: Código no GitHub
+  name: >-
+    <em>Atalaia</em>: torre de vigia no alto de um monte, de onde se via o perigo a chegar e se
+    passava o aviso.
+  why_name: Porquê este nome?
+  # The isometric image: the night scene has English text painted in, so it stays on the English page.
+  image_alt: >-
+    Ilustração isométrica: uma pequena torre de pedra com uma caixa de rádio no topo, ao centro de
+    uma base quadrada, rodeada por oito malas cor de laranja e amarelas com antena e a inscrição
+    «GAME PROP», todas ligadas por um círculo luminoso.
+
+why:
+  title: Porquê a Atalaia
+  intro: >-
+    Os dispositivos eletrónicos dão outra vida a um jogo, mas os sistemas comerciais guardam as
+    regras num firmware fechado. Os modos novos ficam à espera do fabricante, não há API pública e
+    não dá para juntar hardware próprio. A Atalaia faz diferente.
+  local:
+    title: Funciona sem internet
+    text: >-
+      Todos os jogos correm totalmente offline, numa casa ou numa mata com vários quilómetros. A
+      internet é opcional.
+  hardware:
+    title: Qualquer hardware
+    text: >-
+      Placas ESP32, Raspberry Pi, placas tipo Arduino e telemóveis Android, novos ou reaproveitados,
+      entram todos no mesmo jogo.
+  scripts:
+    title: Modos em scripts
+    text: >-
+      Os modos de jogo são pequenos scripts Lua com um ficheiro de definições. Muda-os ou
+      partilha-os sem gravar firmware de novo.
+  open:
+    title: Protocolo e API abertos
+    text: >-
+      Os dispositivos falam entre si pelo protocolo Skirmesh-RF, que está documentado; o
+      controlador de campo vai disponibilizar APIs MQTT, REST e WebSocket.
+  fields:
+    title: Feita para os campos
+    text: >-
+      Funções de jogador, esquadras, cenários personalizados e um registo de cronografagem com
+      verificações aleatórias estão previstos de raiz.
+  copyleft:
+    title: Copyleft
+    text: >-
+      Campos que cobram entrada e makers que vendem caixas são bem-vindos. Quem distribuir ou
+      alojar uma versão alterada tem de partilhar as alterações.
+
+how:
+  title: Como tudo se liga
+  intro: >-
+    Todos os nós completos correm o mesmo núcleo em C11 e os mesmos modos de jogo em Lua; só mudam
+    a camada de cada plataforma e os drivers do hardware.
+  diagram:
+    title: >-
+      Um servidor do clube, opcional, liga-se pela internet ao controlador de campo. As apps da
+      organização e dos jogadores chegam ao controlador por Wi-Fi, os marcadores e outras
+      ferramentas por MQTT e REST, e os dispositivos pela rede mesh LoRa Skirmesh-RF.
+    server: Servidor do clube (opcional)
+    server_sub: contas · histórico · app de jogador
+    apps: Apps da organização
+    apps_sub: e dos jogadores · Wi-Fi
+    controller: Controlador de campo
+    controller_sub: Raspberry Pi ou Android
+    tools: Marcadores, ATAK
+    tools_sub: MQTT, REST, webhooks
+    mesh: Skirmesh-RF · rede mesh LoRa
+    satellite: Satélite
+    android: Dispositivo Android
+    android_sub: com módulo ESP32
+    thin: Nó simples
+    thin_sub: tipo Arduino
+  list:
+    server: >-
+      <strong>Servidor do clube</strong> (opcional): contas, histórico e a app de jogador, pela
+      internet.
+    controller: >-
+      <strong>Controlador de campo</strong> num Raspberry Pi ou Android: as apps da organização e
+      dos jogadores ligam-se por Wi-Fi; os marcadores e o ATAK usam MQTT, REST e webhooks.
+    props: >-
+      <strong>Dispositivos</strong> na rede mesh LoRa Skirmesh-RF: Field Boxes e satélites ESP32,
+      dispositivos Android com módulo ESP32 e nós simples tipo Arduino.
+
+modes:
+  title: Modos de jogo
+  intro: >-
+    Os modos reagem à intenção («uma equipa está a capturar este dispositivo») e não ao hardware,
+    por isso o mesmo script corre numa caixa com dois botões arcade, numa caixa com teclado ou num
+    tablet. Há dois clássicos já escritos e testados.
+  domination:
+    title: Domínio
+    text: >-
+      Uma equipa mantém premido o botão do dispositivo durante uns segundos para o capturar e
+      pontua a cada intervalo enquanto o tiver. A outra equipa pode roubá-lo a qualquer momento.
+    meta: Manter premido para capturar · pontos a cada intervalo · as zonas que quiseres
+  bomb:
+    title: Bomba / Rush
+    text: >-
+      Os atacantes mantêm premido para armar a bomba e depois defendem-na. Os defensores têm de
+      aguentar o tempo suficiente para a desarmar antes que a contagem chegue ao fim. A duração da
+      contagem e os tempos de pressão são configuráveis.
+    meta: Armar · defender · desarmar ou rebentar
+  yours:
+    title: O teu modo
+    text: >-
+      Contadores de respawn, terminais de hacking, escolta de VIP, zonas mestre e satélites… Os
+      modos são pequenos scripts. Propõe o teu com o modelo de ideia de modo de jogo.
+    link: Partilha uma ideia de modo de jogo
+
+try:
+  title: Experimenta já
+  intro: >-
+    Ainda não há firmware para gravar, mas o núcleo partilhado já corre num computador. O simulador
+    joga um modo no browser: mantém premidos os botões das equipas, vê o ecrã de cada dispositivo e
+    acompanha o registo de eventos.
+  compiler: Com um compilador de C
+  docker: Só com Docker
+  then: >-
+    Depois abre <code>http://localhost:8000</code>. Precisas de Python 3.10 ou mais recente, com
+    PyYAML. O <a href="https://github.com/vakaobr/atalaia-project/blob/main/simulator/README.md">guia
+    do simulador</a> (em inglês) explica todas as opções.
+
+roadmap:
+  title: Roteiro
+  intro: Seis fases. Cada uma acaba com um teste a sério no campo antes de a seguinte começar.
+  now: Agora
+  next: A seguir
+  p0:
+    title: Alicerces
+    text: Núcleo partilhado, sandbox Lua, codec Skirmesh-RF, simulador no browser.
+    gate: >-
+      Prova: o simulador corre o Domínio e a Bomba a partir de scripts Lua. <strong>Superada.</strong>
+  p1:
+    title: Uma caixa
+    text: Montagem da Field Box, firmware ESP32, predefinições na própria caixa.
+    gate: "Prova: uma caixa aguenta um jogo de clube de 2 horas sem reiniciar."
+  p2:
+    title: Rede de campo
+    text: Skirmesh-RF sobre LoRa, controlador de campo, API, consola da organização.
+    gate: "Prova: 5 caixas num espaço de CQB e num campo exterior, sem uma única captura perdida."
+  p3:
+    title: Android e jogadores
+    text: >-
+      Dispositivos Android, módulo de E/S, app de jogador com funções, cronografagem à entrada.
+    gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."
+  p4:
+    title: Servidor do clube e jogo avançado
+    text: Servidor do clube, cenários personalizados, modos avançados, ATAK.
+    gate: "Prova: um milsim de fim de semana decorre do princípio ao fim com a Atalaia."
+  p5:
+    title: Comunidade
+    text: Editor visual de modos, registo de modos, placa de suporte (PCB), traduções.
+    gate: Continua depois da primeira versão.
+
+hub:
+  title: Espaço da comunidade
+  intro: >-
+    É aqui que se vão encontrar campos, equipas e quem constrói o seu próprio material. Tudo é
+    opcional: o espaço guarda só o que cada um decide publicar, e os dados de jogo ficam nos
+    servidores de cada campo.
+  open: Aberto
+  planned: Previsto
+  later: Mais tarde
+  discussion:
+    title: Discussão
+    text: Perguntas, ideias, comentários à especificação e relatos de eventos.
+    link: Ir para as Discussions
+  gallery:
+    title: Galeria de montagens
+    text: >-
+      Fotografias, listas de material, ficheiros dos invólucros e esquemas de ligações de cada
+      montagem, a começar pelos primeiros protótipos da Field Box.
+  directory:
+    title: Lista de campos e equipas
+    text: >-
+      Uma lista, só para quem se quiser inscrever, dos campos e equipas que usam a Atalaia, com a
+      região, o tipo de espaço e um contacto.
+  browser:
+    title: Catálogo de modos e cenários
+    text: O registo de modos, com descrições, modos para descarregar e avaliações da comunidade.
+  stats:
+    title: Estatísticas de utilização
+    text: >-
+      Totais anónimos de versões, plataformas e modos jogados, só para quem aderir. Desligadas por
+      omissão.
+  hosting:
+    title: Servidores de clube alojados
+    text: >-
+      Para clubes sem apoio informático, a preço de custo, com os dados de cada clube separados e
+      exportáveis.
+
+involved:
+  title: Participa
+  intro: "A Atalaia é feita por jogadores, donos de campos e makers. Já hoje podes ajudar:"
+  review: >-
+    a rever a
+    <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/design-spec.md">especificação
+    técnica</a> (em inglês) e a <a href="https://github.com/vakaobr/atalaia-project/issues">abrir
+    issues</a>;
+  propose: >-
+    a propor modos de jogo com o
+    <a href="https://github.com/vakaobr/atalaia-project/issues/new/choose">modelo de ideia de modo
+    de jogo</a>;
+  share: a contar como se joga no teu campo, para que as predefinições sirvam jogos reais;
+  code: >-
+    a escrever código: começa pelo
+    <a href="https://github.com/vakaobr/atalaia-project/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>.
+  rules: >-
+    Cada commit leva uma linha <code>Signed-off-by</code>, e o projeto é rigorosamente
+    <em>clean room</em>: nenhum código, firmware, manual, som ou imagem de qualquer produto
+    comercial.
+
+name:
+  title: O nome
+  badge_alt: >-
+    O emblema da Atalaia: três torres de vigia sobre dunas, com fogos de sinal no topo ligados por
+    um arco, por cima da palavra ATALAIA.
+  word: >-
+    Uma <em>atalaia</em> é uma torre de vigia: um posto de observação no alto de um monte ou à
+    beira-mar, de onde se vigiava o horizonte e se passava o aviso. A palavra chegou ao português
+    vinda do árabe <em>aṭ-ṭalāʾiʿ</em>, «os batedores», e ainda hoje se diz que alguém está
+    <em>de atalaia</em> quando está atento ao que aí vem. Há atalaias espalhadas pela costa e pelo
+    interior do país, e várias terras com o nome.
+  fit: >-
+    Um controlador de campo vê todos os dispositivos em jogo e avisa a organização mal alguma coisa
+    muda. As atalaias também não dependiam de ninguém: trabalhavam com o que tinham à vista. E
+    foram a primeira rede mesh de pouca largura de banda: fumo de dia, fogo à noite, passados de
+    torre em torre. O Skirmesh-RF segue as mesmas regras, com LoRa.
+
+safety:
+  title: Segurança no campo
+  text: >-
+    Os dispositivos da Atalaia são equipamento de jogo, e devem parecê-lo: cores vivas, etiquetas
+    bem visíveis a dizer «EQUIPAMENTO DE JOGO» ou «GAME PROP», e nada que se pareça com um engenho
+    explosivo verdadeiro. Transporta-os em malas identificadas, nunca os deixes sem vigilância fora
+    do campo e trata as baterias de lítio com cuidado.
+
+footer:
+  licences: >-
+    A Atalaia é software livre: GPL-3.0-or-later para o núcleo, o firmware, a app e os modos;
+    AGPL-3.0-or-later para o controlador de campo e o servidor do clube; CERN-OHL-S-2.0 para o
+    hardware; CC BY-SA 4.0 para a documentação e esta página.
+  licensing: Licenças
+  independent: >-
+    Projeto independente e feito pela comunidade, sem ligação a nenhum fabricante comercial de
+    dispositivos de jogo. Esta página não usa cookies nem carrega nada de outros sites.

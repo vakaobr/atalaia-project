@@ -1,6 +1,19 @@
+<p align="center">
+  <img src="site/img/logo-512.png" width="160" height="160" alt="The Atalaia badge: three watchtowers on sand dunes, with signal fires on their tops joined by an arc, above the word ATALAIA">
+</p>
+
 # Atalaia
 
-**The open force-on-force platform.**
+[![CI](https://github.com/vakaobr/atalaia-project/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/vakaobr/atalaia-project/actions/workflows/ci.yml)
+[![Project page](https://github.com/vakaobr/atalaia-project/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/vakaobr/atalaia-project/actions/workflows/pages.yml)
+[![Licence: GPL-3.0-or-later](https://img.shields.io/badge/licence-GPL--3.0--or--later-blue)](LICENSING.md)
+[![REUSE compliant](https://img.shields.io/badge/REUSE-compliant-green)](https://reuse.software/)
+[![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange)](#roadmap)
+[![Discussions](https://img.shields.io/github/discussions/vakaobr/atalaia-project?label=discussions)](https://github.com/vakaobr/atalaia-project/discussions)
+
+**The open force-on-force platform.** Project page: [Português](https://vakaobr.github.io/atalaia-project/) · [English](https://vakaobr.github.io/atalaia-project/en/)
+
+![Illustration: at dusk, a stone watchtower on a hilltop carries a radio box whose signals reach glowing orange GAME PROP boxes spread across a forested valley, while a group of players walks past them. Painted text reads "Open-source project ATALAIA".](site/img/watchtower-night-1600.jpg)
 
 Atalaia is an open, local-first platform for airsoft, paintball and milsim game props. Build a domination box from a €20 microcontroller, turn an old Android phone into a hacking terminal, run a 20-box weekend milsim on a LoRa mesh, and write your own game modes as small scripts. No cloud required, no vendor lock-in.
 
@@ -54,7 +67,7 @@ Every full node runs the same C11 core and the same Lua game modes; only the pla
 | [`simulator/`](simulator/) | Desktop simulator with virtual nodes and a web view | GPL-3.0-or-later |
 | [`hardware/`](hardware/) | Reference builds: wiring, bills of materials, enclosures | CERN-OHL-S-2.0 |
 | [`docs/`](docs/) | Design spec, RFCs, guides | CC-BY-SA-4.0 |
-| [`site/`](site/) | The project page, published to GitHub Pages | CC-BY-SA-4.0 |
+| [`site/`](site/) | The project page in Portuguese and English, published to [GitHub Pages](https://vakaobr.github.io/atalaia-project/) | CC-BY-SA-4.0 |
 | [`tools/`](tools/) | Developer scripts | GPL-3.0-or-later |
 
 See [LICENSING.md](LICENSING.md) for the details.

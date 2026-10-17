@@ -40,3 +40,6 @@ secrets.*
 
 # Local session handover notes
 HANDOVER.md
+
+# Claude Code worktrees (agents work on copies of the repository here)
+.claude/

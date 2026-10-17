@@ -30,6 +30,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/configure-pages@v6
+      # The template and translations the pages are built from (tools/build_site.py)
+      # are not part of the site. CI checks that the built pages are up to date.
+      - name: Leave out the page sources
+        run: rm -r site/src site/i18n site/README.md
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site
