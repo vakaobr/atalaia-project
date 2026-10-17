@@ -1,0 +1,94 @@
+<!doctype html>
+<!--
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atalaia simulator</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="bar">
+    <div class="title">
+      <span class="brand">Atalaia</span>
+      <span id="mode" class="mode">loading…</span>
+    </div>
+
+    <div class="group" aria-label="Game clock">
+      <output id="clock" class="clock">0:00.0</output>
+      <button id="run" type="button" title="Run or stop the clock">Run</button>
+      <label class="speed">Speed
+        <select id="speed"></select>
+      </label>
+      <button type="button" data-step="1" title="Let 1 second pass">+1 s</button>
+      <button type="button" data-step="10" title="Let 10 seconds pass">+10 s</button>
+      <button type="button" data-step="60" title="Let 1 minute pass">+1 min</button>
+    </div>
+
+    <div class="group" aria-label="Game controls">
+      <span id="game-state" class="chip">not started</span>
+      <button id="start" type="button" class="primary">Start game</button>
+      <button id="pause" type="button">Pause</button>
+      <button id="end" type="button">End</button>
+      <button id="reset" type="button" title="Start over with a new game">Reset</button>
+    </div>
+  </header>
+
+  <div id="notice" class="notice" role="status" hidden></div>
+  <div id="problems" class="problems" role="alert" hidden>
+    <strong>Protocol problems</strong> (a mode test would fail on these)
+    <ul id="problem-list"></ul>
+  </div>
+
+  <main>
+    <section id="nodes" class="nodes" aria-label="Nodes"></section>
+
+    <aside class="side">
+      <section class="panel">
+        <h2>Score</h2>
+        <ul id="scores" class="scores"></ul>
+        <p id="params" class="muted small"></p>
+      </section>
+      <section class="panel feed-panel">
+        <h2>Events <span id="event-count" class="muted small"></span></h2>
+        <div class="feed-wrap">
+          <table class="feed">
+            <thead><tr><th>Time</th><th>Node</th><th>Event</th><th>Data</th><th title="CBOR payload on LoRa">Bytes</th></tr></thead>
+            <tbody id="events"></tbody>
+          </table>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <template id="node-template">
+    <article class="node">
+      <header>
+        <h2 class="name"></h2>
+        <span class="role muted"></span>
+        <span class="status chip"></span>
+      </header>
+      <div class="screen" aria-label="Screen">
+        <div class="template"></div>
+        <dl class="screen-data"></dl>
+      </div>
+      <ul class="outputs" aria-label="Outputs"></ul>
+      <p class="audio muted small"></p>
+      <div class="teams" aria-label="Team inputs"></div>
+      <p class="input muted small"></p>
+      <footer class="small">
+        <span class="node-scores"></span>
+        <span class="mem muted"></span>
+      </footer>
+      <details class="logs">
+        <summary class="small">Script log</summary>
+        <pre></pre>
+      </details>
+    </article>
+  </template>
+</body>
+</html>

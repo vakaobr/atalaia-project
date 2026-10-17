@@ -65,6 +65,10 @@ def _library_names() -> list[str]:
     return ["libatalaia_core.so"]
 
 
+class LibraryNotFound(FileNotFoundError):
+    pass
+
+
 def find_library(explicit: Optional[str] = None) -> Path:
     """Finds the shared core: --lib, $ATALAIA_CORE_LIB, then build folders."""
     if explicit:
@@ -77,7 +81,7 @@ def find_library(explicit: Optional[str] = None) -> Path:
             candidate = repo / folder / name
             if candidate.exists():
                 return candidate
-    raise FileNotFoundError(
+    raise LibraryNotFound(
         "shared core library not found; build it with\n"
         "  cmake -S core -B build -DATALAIA_SHARED=ON && cmake --build build\n"
         "or pass --lib / set ATALAIA_CORE_LIB"

@@ -33,6 +33,7 @@ class LogEntry:
     team: Optional[str]
     prio: str
     data: dict[str, Any]
+    wire_bytes: Optional[int] = None  # size of the CBOR payload on LoRa
 
     def describe(self) -> str:
         team = f" [{self.team}]" if self.team else ""
@@ -47,6 +48,9 @@ class VirtualNode:
     runtime: Node
     commands: list[Command] = field(default_factory=list)
     logs: list[str] = field(default_factory=list)
+    # The last hardware input the shell sent: t_ms, type, data, and whether
+    # the node accepted it (it refuses inputs while paused or not running).
+    last_input: Optional[dict[str, Any]] = None
 
     def last_command(self, target: str, method: str) -> Optional[Command]:
         for cmd in reversed(self.commands):
@@ -111,23 +115,25 @@ class Simulation:
         return self.teams[team_id - 1] if 1 <= team_id <= len(self.teams) else None
 
     def _record(self, vnode: VirtualNode, ev: Emitted) -> None:
+        size = self._check_wire(vnode.name, {"node": ev.node, "seq": ev.seq, "t": ev.t_ms,
+                                             "type": ev.type, "team": ev.team, "squad": ev.squad,
+                                             "prio": ev.prio, "data": ev.data})
         self._log.append(LogEntry(ev.t_ms, vnode.name, ev.node, ev.seq, ev.type,
-                                  self._team_name(ev.team), ev.prio, ev.data))
-        self._check_wire(vnode.name, {"node": ev.node, "seq": ev.seq, "t": ev.t_ms, "type": ev.type,
-                                      "team": ev.team, "squad": ev.squad, "prio": ev.prio,
-                                      "data": ev.data})
+                                  self._team_name(ev.team), ev.prio, ev.data, size))
 
     def _record_controller(self, type_: str, data: dict[str, Any]) -> None:
         self._controller_seq += 1
         prio = codec.default_prio(type_)
+        size = self._check_wire(CONTROLLER, {"node": 0, "seq": self._controller_seq & 0xFFFF,
+                                             "t": self.time_ms, "type": type_, "prio": prio,
+                                             "data": data})
         self._log.append(LogEntry(self.time_ms, CONTROLLER, 0, self._controller_seq, type_,
-                                  None, prio, data))
-        self._check_wire(CONTROLLER, {"node": 0, "seq": self._controller_seq & 0xFFFF,
-                                      "t": self.time_ms, "type": type_, "prio": prio, "data": data})
+                                  None, prio, data, size))
 
-    def _check_wire(self, who: str, event: dict[str, Any]) -> None:
-        """Checks an event against the schema and the LoRa payload size."""
+    def _check_wire(self, who: str, event: dict[str, Any]) -> Optional[int]:
+        """Checks an event against the schema and the LoRa payload size; returns the size."""
         problems = codec.schema_problems(event["type"], event["data"])
+        size = None
         try:
             size = len(codec.encode_event(event))
             if size > RF_PAYLOAD_MAX:
@@ -136,6 +142,12 @@ class Simulation:
         except codec.CodecError as exc:
             problems.append(f"'{event['type']}' cannot be sent: {exc}")
         self.problems += [f"{who}: {p}" for p in problems]
+        return size
+
+    @property
+    def arrivals(self) -> list[LogEntry]:
+        """Every event in the order the simulator saw it (a live view appends to this)."""
+        return list(self._log)
 
     @property
     def events(self) -> list[LogEntry]:
@@ -172,7 +184,10 @@ class Simulation:
         self.time_ms = t_ms
 
     def input(self, node: str, type_: str, data: Optional[dict[str, Any]] = None) -> bool:
-        return self.node(node).runtime.input(type_, data or {})
+        vnode = self.node(node)
+        accepted = vnode.runtime.input(type_, data or {})
+        vnode.last_input = {"t": self.time_ms, "type": type_, "data": data or {}, "accepted": accepted}
+        return accepted
 
     def _check_team(self, team: str) -> None:
         if team not in self.teams:

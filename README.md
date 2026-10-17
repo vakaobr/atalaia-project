@@ -51,7 +51,7 @@ Every full node runs the same C11 core and the same Lua game modes; only the pla
 | [`app/`](app/) | Flutter app for Android and iOS: props, controller, player roles | GPL-3.0-or-later + app-store permission |
 | [`controller/`](controller/) | Field controller and GM console | AGPL-3.0-or-later |
 | [`server/`](server/) | Optional site server | AGPL-3.0-or-later |
-| [`simulator/`](simulator/) | Desktop simulator with virtual nodes | GPL-3.0-or-later |
+| [`simulator/`](simulator/) | Desktop simulator with virtual nodes and a web view | GPL-3.0-or-later |
 | [`hardware/`](hardware/) | Reference builds: wiring, bills of materials, enclosures | CERN-OHL-S-2.0 |
 | [`docs/`](docs/) | Design spec, RFCs, guides | CC-BY-SA-4.0 |
 | [`tools/`](tools/) | Developer scripts | GPL-3.0-or-later |
@@ -77,12 +77,13 @@ There is nothing to flash yet, but you can run the game modes on your computer. 
 sh tools/check.sh
 ```
 
-You need a C11 compiler, CMake 3.16 or newer, Python 3.10 or newer and PyYAML. No compiler? Use the [dev container](tools/README.md). To write a mode, start with [modes/README.md](modes/README.md).
+You need a C11 compiler, CMake 3.16 or newer, Python 3.10 or newer and PyYAML. No compiler? Use the [dev container](tools/README.md). To play a mode in your browser, holding team buttons and watching the props' screens and the event log, see the [simulator](simulator/README.md#play-a-mode-in-the-browser). To write a mode, start with [modes/README.md](modes/README.md).
 
 ## Contributing
 
 Atalaia is built by players, field owners and makers. You can help by:
 
+- asking questions and sharing ideas in [Discussions](https://github.com/vakaobr/atalaia-project/discussions),
 - reviewing the [design specification](docs/design-spec.md) and opening issues,
 - proposing game modes with the **Game mode idea** issue template,
 - writing code for any phase-0 task,

@@ -6,6 +6,7 @@ Developer scripts.
 | --- | --- |
 | [`check.sh`](check.sh) | Checks the generated protocol files, builds the core and runs its tests, the simulator's tests and every game mode's tests: the same checks as CI |
 | [`protogen.py`](protogen.py) | Generates the C and Python protocol tables, the C test vectors and the JSON Schema from `protocol/schema/`; `--check` fails if they are stale. See [protocol/README.md](../protocol/README.md#changing-the-schema) |
+| [`docker_sim.py`](docker_sim.py) | Runs any simulator command (`serve`, `test`) in the dev container, from any shell: `python tools/docker_sim.py serve modes/bomb` |
 | [`dev/Dockerfile`](dev/Dockerfile) | A Linux build environment matching CI, for machines without a C toolchain |
 
 Using the dev container (from the repository root):
