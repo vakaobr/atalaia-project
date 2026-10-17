@@ -964,7 +964,7 @@ The hexagons are gates: a phase is done only when its field test passes. Android
 
 ### First tasks (phase 0)
 
-- [x] Create the atalaia-project repository on GitHub (private at first, under the founder's account), with Discussions. The project page for the community hub waits until the repository goes public.
+- [x] Create the atalaia-project repository on GitHub (private at first, under the founder's account), with Discussions and a project page for the community hub (`site/`, published with GitHub Pages).
 - [x] Add the LICENSE files, CONTRIBUTING.md and the DCO check.
 - [x] Write the protocol schema file (events, message types) and generate CBOR and JSON codecs.
 - [x] Build the core skeleton: event bus, state store, Lua 5.4 sandbox with memory and instruction limits.

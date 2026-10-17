@@ -9,7 +9,7 @@ Atalaia uses copyleft licences: anyone may use, study, modify and even sell Atal
 | Field controller and GM console | `controller/` | `AGPL-3.0-or-later` |
 | Site server | `server/` | `AGPL-3.0-or-later` |
 | Hardware designs | `hardware/` | `CERN-OHL-S-2.0` |
-| Documentation | `docs/` | `CC-BY-SA-4.0` |
+| Documentation and the project page | `docs/`, `site/` | `CC-BY-SA-4.0` |
 
 Full licence texts are in [`LICENSES/`](LICENSES/). The root [`LICENSE`](LICENSE) file holds the GPL text because it covers most of the repository. Per-folder licences are declared in [`REUSE.toml`](REUSE.toml), following the [REUSE](https://reuse.software) conventions, and source files carry `SPDX-License-Identifier` headers.
 

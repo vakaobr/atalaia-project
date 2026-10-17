@@ -1,0 +1,228 @@
+<!doctype html>
+<!--
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atalaia · the open force-on-force platform</title>
+  <meta name="description" content="Atalaia is an open, local-first platform for airsoft, paintball and milsim game props: ESP32, Raspberry Pi, Arduino and Android props, game modes as Lua scripts, and an open LoRa protocol.">
+  <meta name="color-scheme" content="light dark">
+  <meta property="og:title" content="Atalaia · the open force-on-force platform">
+  <meta property="og:description" content="Open, local-first game props for airsoft, paintball and milsim. Game modes are scripts; any hardware works.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="top">
+    <div class="wrap top-inner">
+      <a class="brand" href="./" aria-label="Atalaia home">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 4 L22 13 H10 Z" />
+          <rect x="12" y="13" width="8" height="15" rx="1" />
+          <path class="ring" d="M6 10 A12 12 0 0 1 9 5" />
+          <path class="ring" d="M26 10 A12 12 0 0 0 23 5" />
+        </svg>
+        Atalaia
+      </a>
+      <nav aria-label="Sections">
+        <a href="#modes">Modes</a>
+        <a href="#try">Try it</a>
+        <a href="#roadmap">Roadmap</a>
+        <a href="#hub">Community</a>
+        <a href="https://github.com/vakaobr/atalaia-project">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div class="wrap">
+        <p class="status"><span class="dot" aria-hidden="true"></span> Pre-alpha · phase 0 nearly complete · not field-ready yet</p>
+        <h1>The open <span class="nowrap">force-on-force</span> platform</h1>
+        <p class="lead">
+          Atalaia is an open, local-first platform for airsoft, paintball and milsim game props.
+          Build a domination box from a €20 microcontroller, turn an old Android phone into a hacking
+          terminal, run a 20-box weekend milsim on a LoRa mesh, and write your own game modes as small
+          scripts. No cloud required, no vendor lock-in.
+        </p>
+        <div class="actions">
+          <a class="button primary" href="https://github.com/vakaobr/atalaia-project/discussions">Join the discussion</a>
+          <a class="button" href="https://github.com/vakaobr/atalaia-project/blob/main/docs/design-spec.md">Read the design</a>
+          <a class="button" href="https://github.com/vakaobr/atalaia-project">Source on GitHub</a>
+        </div>
+        <p class="name"><em>Atalaia</em> (ah-tah-LYE-ah) is Portuguese for <em>watchtower</em>: a lookout on a hill that watched for trouble and passed the warning along. <a href="#name">Why that name?</a></p>
+      </div>
+    </section>
+
+    <section class="band" aria-labelledby="why">
+      <div class="wrap">
+        <h2 id="why">Why Atalaia</h2>
+        <p class="intro">Electronic props add a lot to a game, but commercial systems keep the rules locked inside closed firmware. New modes wait on the vendor, there is no public API, and you cannot add your own hardware. Atalaia does it differently.</p>
+        <ul class="features">
+          <li><h3>Local-first</h3><p>Every game runs fully offline, from a single house to a multi-kilometre forest. The internet is optional.</p></li>
+          <li><h3>Any hardware</h3><p>ESP32 boards, Raspberry Pi, Arduino-class boards and new or repurposed Android phones all play in the same game.</p></li>
+          <li><h3>Modes are scripts</h3><p>Game modes are short Lua scripts with a settings file. Change or share one without reflashing anything.</p></li>
+          <li><h3>Open protocol and API</h3><p>Props talk over the documented Skirmesh-RF protocol; the field controller will expose MQTT, REST and WebSocket APIs.</p></li>
+          <li><h3>Built for fields</h3><p>Player roles, squads, custom scenarios, and a chrono registry with spot checks are part of the design.</p></li>
+          <li><h3>Copyleft</h3><p>Fields that charge entry and makers who sell boxes are welcome. Anyone who ships or hosts changes shares them back.</p></li>
+        </ul>
+      </div>
+    </section>
+
+    <section aria-labelledby="how">
+      <div class="wrap">
+        <h2 id="how">How it fits together</h2>
+        <p class="intro">Every full node runs the same C11 core and the same Lua game modes; only the platform shell and hardware drivers differ.</p>
+        <figure class="diagram">
+          <svg viewBox="0 0 760 330" role="img" aria-labelledby="diagram-title">
+            <title id="diagram-title">An optional site server connects over the internet to the field controller. GM and player apps reach the controller over Wi-Fi, scoreboards and other tools over MQTT and REST, and props over the Skirmesh-RF LoRa mesh.</title>
+            <g class="links">
+              <line x1="380" y1="62" x2="380" y2="132" />
+              <line x1="200" y1="160" x2="290" y2="160" />
+              <line x1="470" y1="160" x2="560" y2="160" />
+              <line x1="380" y1="188" x2="380" y2="232" />
+              <line x1="95" y1="232" x2="665" y2="232" />
+              <line x1="95" y1="232" x2="95" y2="262" />
+              <line x1="285" y1="232" x2="285" y2="262" />
+              <line x1="475" y1="232" x2="475" y2="262" />
+              <line x1="665" y1="232" x2="665" y2="262" />
+            </g>
+            <g class="box optional"><rect x="270" y="14" width="220" height="48" rx="8" /><text x="380" y="35">Site server (optional)</text><text class="sub" x="380" y="52">accounts · history · player app</text></g>
+            <text class="label" x="388" y="102">internet</text>
+            <g class="box"><rect x="30" y="134" width="170" height="52" rx="8" /><text x="115" y="157">GM and player apps</text><text class="sub" x="115" y="174">Wi-Fi</text></g>
+            <g class="box main"><rect x="290" y="132" width="180" height="56" rx="8" /><text x="380" y="156">Field controller</text><text class="sub" x="380" y="174">Raspberry Pi or Android</text></g>
+            <g class="box"><rect x="560" y="134" width="170" height="52" rx="8" /><text x="645" y="157">Scoreboards, ATAK</text><text class="sub" x="645" y="174">MQTT, REST, webhooks</text></g>
+            <text class="label accent" x="392" y="216">Skirmesh-RF · LoRa mesh</text>
+            <g class="box"><rect x="20" y="262" width="150" height="52" rx="8" /><text x="95" y="285">Field Box</text><text class="sub" x="95" y="302">ESP32</text></g>
+            <g class="box"><rect x="210" y="262" width="150" height="52" rx="8" /><text x="285" y="285">Satellite</text><text class="sub" x="285" y="302">ESP32</text></g>
+            <g class="box"><rect x="400" y="262" width="150" height="52" rx="8" /><text x="475" y="285">Android prop</text><text class="sub" x="475" y="302">with an ESP32 pod</text></g>
+            <g class="box"><rect x="590" y="262" width="150" height="52" rx="8" /><text x="665" y="285">Thin node</text><text class="sub" x="665" y="302">Arduino-class</text></g>
+          </svg>
+          <ol class="diagram-list">
+            <li><strong>Site server</strong> (optional): accounts, history and the player app, over the internet.</li>
+            <li><strong>Field controller</strong> on a Raspberry Pi or Android: GM and player apps join over Wi-Fi; scoreboards and ATAK use MQTT, REST and webhooks.</li>
+            <li><strong>Props</strong> on the Skirmesh-RF LoRa mesh: ESP32 Field Boxes and satellites, Android props with an ESP32 pod, and Arduino-class thin nodes.</li>
+          </ol>
+        </figure>
+      </div>
+    </section>
+
+    <section class="band" aria-labelledby="modes">
+      <div class="wrap">
+        <h2 id="modes">Game modes</h2>
+        <p class="intro">Modes react to intent ("a team is claiming this prop"), not to hardware, so the same script runs on a box with two arcade buttons, a keypad box or a tablet. Two classics are written and tested today.</p>
+        <div class="cards">
+          <article class="card">
+            <h3>Domination</h3>
+            <p>A team holds the prop's input for a few seconds to claim it, and scores every tick while it keeps it. The other team can take it over at any time.</p>
+            <p class="meta">Hold to capture · scores per tick · any number of zones</p>
+          </article>
+          <article class="card">
+            <h3>Bomb / Rush</h3>
+            <p>Attackers hold to arm the bomb, then defend it. Defenders must hold long enough to defuse it before the fuse runs out. Fuse and hold times are settings.</p>
+            <p class="meta">Arm · defend · defuse or explode</p>
+          </article>
+          <article class="card dashed">
+            <h3>Your mode</h3>
+            <p>Respawn counters, hacking terminals, VIP escort, master-and-satellite zones… Modes are short scripts. Propose one with the game mode idea template.</p>
+            <p class="meta"><a href="https://github.com/vakaobr/atalaia-project/issues/new/choose">Share a game mode idea</a></p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="try">
+      <div class="wrap">
+        <h2 id="try">Try it today</h2>
+        <p class="intro">There is nothing to flash yet, but the shared core runs on a computer. The simulator plays a mode in your browser: hold team buttons, watch each prop's screen and follow the event log.</p>
+        <div class="steps">
+          <div>
+            <h3>With a C compiler</h3>
+<pre><code>cmake -S core -B build -DATALAIA_SHARED=ON
+cmake --build build
+cd simulator
+python -m atalaia_sim serve ../modes/bomb</code></pre>
+          </div>
+          <div>
+            <h3>With Docker only</h3>
+<pre><code>cd simulator
+python ../tools/docker_sim.py serve ../modes/bomb</code></pre>
+          </div>
+        </div>
+        <p>Then open <code>http://localhost:8000</code>. You need Python 3.10+ with PyYAML. The <a href="https://github.com/vakaobr/atalaia-project/blob/main/simulator/README.md">simulator guide</a> has every option.</p>
+      </div>
+    </section>
+
+    <section class="band" aria-labelledby="roadmap">
+      <div class="wrap">
+        <h2 id="roadmap">Roadmap</h2>
+        <p class="intro">Six phases. Each one ends with a real field test before the next begins.</p>
+        <ol class="phases">
+          <li class="now"><span class="tag">Now</span><h3>0 · Foundations</h3><p>Shared core, Lua sandbox, Skirmesh-RF codec, browser simulator.</p><p class="gate">Gate: the simulator runs Domination and Bomb from Lua scripts. <strong>Met.</strong></p></li>
+          <li><span class="tag">Next</span><h3>1 · Single box</h3><p>Field Box build, ESP32 firmware, on-device presets.</p><p class="gate">Gate: one box runs a 2-hour club game with no restarts.</p></li>
+          <li><h3>2 · Field network</h3><p>Skirmesh-RF over LoRa, field controller, API, GM console.</p><p class="gate">Gate: 5 boxes on a CQB site and an outdoor field, zero lost captures.</p></li>
+          <li><h3>3 · Android and players</h3><p>Android props, I/O pod, player app with roles, chrono check-in.</p><p class="gate">Gate: one game mixes ESP32 and Android props without issues.</p></li>
+          <li><h3>4 · Site server and advanced play</h3><p>Site server, custom scenarios, advanced modes, ATAK.</p><p class="gate">Gate: a weekend milsim runs on Atalaia end to end.</p></li>
+          <li><h3>5 · Community</h3><p>Visual mode editor, mode registry, carrier PCB, translations.</p><p class="gate">Ongoing after the first release.</p></li>
+        </ol>
+      </div>
+    </section>
+
+    <section aria-labelledby="hub">
+      <div class="wrap">
+        <h2 id="hub">Community hub</h2>
+        <p class="intro">Fields, teams and builders will meet here. Everything is opt-in: the hub holds only what people choose to publish, and game data stays on each field's own servers.</p>
+        <ul class="hub">
+          <li><span class="chip open">Open</span><div><h3>Discussion</h3><p>Questions, ideas, reviews of the design and event reports. <a href="https://github.com/vakaobr/atalaia-project/discussions">Go to Discussions</a></p></div></li>
+          <li><span class="chip">Planned</span><div><h3>Build gallery</h3><p>Photos, bills of materials, enclosure files and wiring notes for each build, starting with the first Field Box prototypes.</p></div></li>
+          <li><span class="chip">Planned</span><div><h3>Field and team directory</h3><p>An opt-in list of fields and teams that use Atalaia, with region, site type and a contact link.</p></div></li>
+          <li><span class="chip">Planned</span><div><h3>Mode and scenario browser</h3><p>The mode registry, with descriptions, downloads and community ratings.</p></div></li>
+          <li><span class="chip">Later</span><div><h3>Usage statistics</h3><p>Opt-in, anonymous totals of versions, platforms and modes played. Off by default.</p></div></li>
+          <li><span class="chip">Later</span><div><h3>Hosted site servers</h3><p>For clubs without IT support, at cost, with every club's data separate and exportable.</p></div></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="band" aria-labelledby="involved">
+      <div class="wrap">
+        <h2 id="involved">Get involved</h2>
+        <p class="intro">Atalaia is built by players, field owners and makers. You can help today by:</p>
+        <ul class="ways">
+          <li>reviewing the <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/design-spec.md">design specification</a> and <a href="https://github.com/vakaobr/atalaia-project/issues">opening issues</a>;</li>
+          <li>proposing game modes with the <a href="https://github.com/vakaobr/atalaia-project/issues/new/choose">game mode idea template</a>;</li>
+          <li>sharing how your field plays, so the defaults fit real games;</li>
+          <li>writing code: start with <a href="https://github.com/vakaobr/atalaia-project/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>.</li>
+        </ul>
+        <p>Every commit carries a <code>Signed-off-by</code> line, and the project is strictly clean-room: no code, firmware, manuals, sounds or images from any commercial product.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="name">
+      <div class="wrap two">
+        <div>
+          <h2 id="name">The name</h2>
+          <p>An <em>atalaia</em> is a watchtower: a lookout post on a hill or a stretch of coast. The word came into Portuguese from the Arabic <em>aṭ-ṭalāʾiʿ</em>, "the scouts", and <em>estar de atalaia</em> still means "to be on the lookout".</p>
+          <p>A field controller sees every prop on the field and tells the GM the moment something changes. Watchtowers were local-first too, and ran the original low-bandwidth mesh: smoke by day, fire by night, relayed from tower to tower. Skirmesh-RF follows the same rules with LoRa.</p>
+        </div>
+        <div>
+          <h2 id="safety">Field safety</h2>
+          <p>Atalaia props are game equipment. Make them look like game props: bright colours, clear "GAME PROP" labels, and nothing resembling a real explosive device. Transport them in labelled cases, never leave them unattended outside the field, and treat lithium batteries with care.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap foot-inner">
+      <p>Atalaia is free software: GPL-3.0-or-later for the core, firmware, app and modes; AGPL-3.0-or-later for the field controller and site server; CERN-OHL-S-2.0 for hardware; CC BY-SA 4.0 for documentation and this page. <a href="https://github.com/vakaobr/atalaia-project/blob/main/LICENSING.md">Licensing</a></p>
+      <p>Independent and community-run; not affiliated with any commercial prop maker. This page sets no cookies and loads nothing from other sites.</p>
+    </div>
+  </footer>
+</body>
+</html>

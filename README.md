@@ -54,6 +54,7 @@ Every full node runs the same C11 core and the same Lua game modes; only the pla
 | [`simulator/`](simulator/) | Desktop simulator with virtual nodes and a web view | GPL-3.0-or-later |
 | [`hardware/`](hardware/) | Reference builds: wiring, bills of materials, enclosures | CERN-OHL-S-2.0 |
 | [`docs/`](docs/) | Design spec, RFCs, guides | CC-BY-SA-4.0 |
+| [`site/`](site/) | The project page, published to GitHub Pages | CC-BY-SA-4.0 |
 | [`tools/`](tools/) | Developer scripts | GPL-3.0-or-later |
 
 See [LICENSING.md](LICENSING.md) for the details.
