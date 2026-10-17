@@ -1,0 +1,95 @@
+{
+  "description": "AES-CCM packet vectors for cross-language validation. Key, nonce, AAD, ciphertext and tag are computed with the Python cryptography library.",
+  "vectors": [
+    {
+      "name": "basic_event",
+      "key": "0102030405060708090a0b0c0d0e0f10",
+      "epoch": 0,
+      "header": {
+        "version_flags": "0x2a",
+        "game_id": 1000,
+        "source": 7,
+        "seq": 42,
+        "hop_limit": 2,
+        "type": 2
+      },
+      "plaintext": "a10103",
+      "nonce": "03e800070000002a0000000000",
+      "aad": "2a03e80007002a02",
+      "ciphertext": "f6d793",
+      "tag": "97837a2df6f3729b"
+    },
+    {
+      "name": "seq_wrap",
+      "key": "0102030405060708090a0b0c0d0e0f10",
+      "epoch": 0,
+      "header": {
+        "version_flags": "0x22",
+        "game_id": 1,
+        "source": 1,
+        "seq": 65535,
+        "hop_limit": 3,
+        "type": 2
+      },
+      "plaintext": "a10102",
+      "nonce": "000100010000ffff0000000000",
+      "aad": "2200010001ffff02",
+      "ciphertext": "8491e4",
+      "tag": "3d14783388651080"
+    },
+    {
+      "name": "epoch_increment",
+      "key": "0102030405060708090a0b0c0d0e0f10",
+      "epoch": 1,
+      "header": {
+        "version_flags": "0x22",
+        "game_id": 1,
+        "source": 1,
+        "seq": 0,
+        "hop_limit": 3,
+        "type": 2
+      },
+      "plaintext": "a10102",
+      "nonce": "00010001000100000000000000",
+      "aad": "2200010001000002",
+      "ciphertext": "41d9a8",
+      "tag": "c649d9d74963309d"
+    },
+    {
+      "name": "hop_limit_one",
+      "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "epoch": 0,
+      "header": {
+        "version_flags": "0x36",
+        "game_id": 500,
+        "source": 10,
+        "seq": 100,
+        "hop_limit": 1,
+        "type": 1
+      },
+      "plaintext": "a80168626f782d3102010365312e302e300465302e312e3005000681000701",
+      "nonce": "01f4000a000000640000000000",
+      "aad": "3601f4000a006401",
+      "ciphertext": "acf690c2deae2dd6f59a2a127c1515bb4abff56c11a2cb65c58f291da54ac0",
+      "tag": "f828c05cf8063449"
+    },
+    {
+      "name": "empty_payload",
+      "key": "00000000000000000000000000000000",
+      "epoch": 0,
+      "header": {
+        "version_flags": "0x22",
+        "game_id": 99,
+        "source": 1,
+        "seq": 0,
+        "hop_limit": 1,
+        "type": 6
+      },
+      "plaintext": "",
+      "nonce": "00630001000000000000000000",
+      "aad": "2200630001000006",
+      "ciphertext": "",
+      "tag": "3c1cb9b65a34b128"
+    }
+  ]
+}

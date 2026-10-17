@@ -32,6 +32,17 @@ if(MATH_LIBRARY)
     target_link_libraries(atalaia_lua PUBLIC ${MATH_LIBRARY})
 endif()
 
+# ---- Optional: mbedtls for real AES-128-CCM --------------------------------
+find_library(MBEDCRYPTO_LIB mbedcrypto)
+find_path(MBEDTLS_INCLUDE_DIR mbedtls/ccm.h)
+if(MBEDCRYPTO_LIB AND MBEDTLS_INCLUDE_DIR)
+    set(ATALAIA_HAVE_MBEDTLS ON)
+    message(STATUS "mbedtls found: real AES-CCM backend enabled")
+else()
+    set(ATALAIA_HAVE_MBEDTLS OFF)
+    message(STATUS "mbedtls not found: building without real AES-CCM (test stub only)")
+endif()
+
 # ---- Core ------------------------------------------------------------------
 set(ATALAIA_CORE_SOURCES
     src/version.c
@@ -44,12 +55,25 @@ set(ATALAIA_CORE_SOURCES
     src/sandbox.c
     src/script_api.c
     src/node.c
+    src/packet.c
+    src/flood.c
+    src/ack.c
+    src/duty_cycle.c
+    src/msg_codec.c
 )
+if(ATALAIA_HAVE_MBEDTLS)
+    list(APPEND ATALAIA_CORE_SOURCES src/crypto_mbedtls.c)
+endif()
 
 function(atalaia_core_target name type)
     add_library(${name} ${type} ${ATALAIA_CORE_SOURCES})
     target_include_directories(${name} PUBLIC include PRIVATE src)
     target_link_libraries(${name} PRIVATE atalaia_lua)
+    if(ATALAIA_HAVE_MBEDTLS)
+        target_compile_definitions(${name} PUBLIC ATALAIA_HAVE_MBEDTLS)
+        target_include_directories(${name} PRIVATE ${MBEDTLS_INCLUDE_DIR})
+        target_link_libraries(${name} PRIVATE ${MBEDCRYPTO_LIB})
+    endif()
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(${name} PRIVATE -Wall -Wextra -Wpedantic -Werror)
     endif()
@@ -67,7 +91,11 @@ endif()
 # ---- Tests -----------------------------------------------------------------
 include(CTest)
 if(BUILD_TESTING)
-    add_executable(test_core tests/test_core.c tests/test_node.c tests/test_codec.c)
+    add_executable(test_core
+        tests/test_core.c tests/test_node.c tests/test_codec.c
+        tests/test_packet.c tests/test_flood.c tests/test_ack.c
+        tests/test_duty_cycle.c tests/test_msg_codec.c
+        tests/test_crypto_mbedtls.c)
     target_include_directories(test_core PRIVATE src)
     target_link_libraries(test_core PRIVATE atalaia_core)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")

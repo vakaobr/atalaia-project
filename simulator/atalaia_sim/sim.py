@@ -7,10 +7,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from typing import TYPE_CHECKING
+
 from . import codec
 from .core import Command, Core, Emitted, Node
 from .mode import Mode
-from .protocol import RF_PAYLOAD_MAX
+from .protocol import MESSAGE_TYPES, RF_PAYLOAD_MAX
+
+if TYPE_CHECKING:
+    from .radio_model import RadioModel
 
 # While a team holds an input, shells emit team_input.hold at this interval
 # with the time held so far (see modes/README.md).
@@ -70,6 +75,7 @@ class Simulation:
         seed: int = 1,
         mem_limit: int = 0,
         instr_limit: int = 0,
+        radio: Optional["RadioModel"] = None,
     ):
         self.mode = mode
         self.teams = list(teams)
@@ -82,6 +88,9 @@ class Simulation:
         # _record, and exceptions cannot cross that boundary.
         self.problems: list[str] = []
         self.nodes: dict[str, VirtualNode] = {}
+        # Optional radio model for field-network simulation.
+        self.radio: Optional["RadioModel"] = radio
+        self._pending: list[tuple[int, str, bytes]] = []  # (deliver_at_ms, dest_node, data)
 
         for node_id, (name, role) in enumerate(nodes.items(), start=1):
             if role not in mode.roles:
@@ -179,9 +188,82 @@ class Simulation:
     def advance_to(self, t_ms: int) -> None:
         if t_ms < self.time_ms:
             raise SimError("time cannot go backwards")
+        self._deliver_pending(t_ms)
         for vnode in self.nodes.values():
             vnode.runtime.advance(t_ms)
         self.time_ms = t_ms
+
+    def _deliver_pending(self, t_ms: int) -> None:
+        """Deliver radio packets that are due by *t_ms*."""
+        if self.radio is None:
+            return
+        deliveries = self.radio.tick(t_ms)
+        for dest_id, hdr, payload in deliveries:
+            # Find the VirtualNode with this node_id.
+            for vnode in self.nodes.values():
+                if vnode.runtime.node_id == dest_id:
+                    # Inject the payload as a radio-received event.
+                    try:
+                        from . import codec as _codec
+                        ev = _codec.decode_event(payload)
+                        vnode.runtime.input(ev["type"], ev.get("data", {}))
+                    except Exception:
+                        pass  # not an EVENT payload or decode failure
+                    break
+
+    def send_packet(
+        self,
+        from_node: str,
+        payload: bytes,
+        msg_type: int,
+        priority: int = 1,
+        ack_req: bool = False,
+        hop_limit: int = 2,
+    ) -> Optional[bytes]:
+        """Send a packet from *from_node* through the radio model.
+
+        Returns the raw packet bytes, or ``None`` if no radio model is
+        attached.
+        """
+        if self.radio is None:
+            return None
+        vnode = self.node(from_node)
+        seq = (vnode.runtime.node_id * 1000 + self.time_ms) & 0xFFFF
+        return self.radio.send(
+            from_node=vnode.runtime.node_id,
+            payload=payload,
+            msg_type=msg_type,
+            source=vnode.runtime.node_id,
+            seq=seq,
+            priority=priority,
+            ack_req=ack_req,
+            hop_limit=hop_limit,
+            now_ms=self.time_ms,
+        )
+
+    def partition(self, group_a: set[str], group_b: set[str]) -> None:
+        """Partition the radio network between two groups of named nodes."""
+        if self.radio is None:
+            raise SimError("no radio model attached")
+        ids_a = {self.node(n).runtime.node_id for n in group_a}
+        ids_b = {self.node(n).runtime.node_id for n in group_b}
+        self.radio.partition(ids_a, ids_b)
+
+    def heal(self) -> None:
+        """Restore full radio connectivity."""
+        if self.radio is None:
+            raise SimError("no radio model attached")
+        self.radio.heal()
+
+    def link(self, a: str, b: str, connected: bool) -> None:
+        """Set the radio link between two named nodes."""
+        if self.radio is None:
+            raise SimError("no radio model attached")
+        self.radio.set_link(
+            self.node(a).runtime.node_id,
+            self.node(b).runtime.node_id,
+            connected,
+        )
 
     def input(self, node: str, type_: str, data: Optional[dict[str, Any]] = None) -> bool:
         vnode = self.node(node)

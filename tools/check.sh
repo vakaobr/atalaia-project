@@ -8,6 +8,7 @@
 # Run from the repository root, natively or in the dev container (see
 # tools/dev/Dockerfile).
 set -eu
+export ATALAIA_REQUIRE_ALL=1
 BUILD="${BUILD:-build}"
 python3 tools/protogen.py --check
 python3 tools/build_site.py --check

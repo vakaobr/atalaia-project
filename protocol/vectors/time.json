@@ -1,0 +1,35 @@
+{
+  "description": "Test vectors for TIME payload encode/decode",
+  "valid": [
+    {
+      "name": "time_running",
+      "fields": {
+        "game_time_ms": 120000,
+        "game_state": 1,
+        "duration_ms": 600000,
+        "wall_s": 1729180800,
+        "term": 1
+      },
+      "cbor": "a5011a0001d4c00201031a000927c0041a671134800501"
+    },
+    {
+      "name": "time_waiting_with_tx",
+      "fields": {
+        "game_time_ms": 0,
+        "game_state": 0,
+        "duration_ms": 0,
+        "wall_s": 1729180800,
+        "term": 0,
+        "tx_time_us": 150
+      },
+      "cbor": "a6010002000300041a671134800500061896"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "time_missing_wall_s",
+      "cbor": "a40100020003000500",
+      "reason": "missing required field wall_s (key 4)"
+    }
+  ]
+}

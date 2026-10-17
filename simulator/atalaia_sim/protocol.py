@@ -19,6 +19,12 @@ class EventDef(NamedTuple):
     data: tuple[str, ...]  # data fields besides the common ones
 
 
+class PayloadField(NamedTuple):
+    key: int
+    type: str
+    required: bool
+
+
 PROTOCOL_VERSION = 1
 RF_HEADER_BYTES = 9
 RF_PAYLOAD_MAX = 200
@@ -122,4 +128,59 @@ EVENTS = {
     'battery.low': EventDef(22, 'telemetry', ('percent',)),
     'script.error': EventDef(23, 'normal', ('message',)),
     'script.halted': EventDef(24, 'critical', ('reason',)),
+}
+
+PAYLOAD_FIELDS = {
+    'HELLO': {
+        'node_name': PayloadField(1, 'text', True),
+        'platform': PayloadField(2, 'uint8', True),
+        'fw_version': PayloadField(3, 'text', True),
+        'core_version': PayloadField(4, 'text', True),
+        'tier': PayloadField(5, 'uint8', True),
+        'capabilities': PayloadField(6, 'array_uint8', True),
+        'transports': PayloadField(7, 'uint8', True),
+        'battery_pct': PayloadField(8, 'uint8', False),
+        'epoch': PayloadField(9, 'uint16', True),
+    },
+    'ACK': {
+        'ack_node': PayloadField(1, 'uint16', True),
+        'ack_seq': PayloadField(2, 'uint16', True),
+        'ack_bitmap': PayloadField(3, 'bytes', False),
+    },
+    'STATE': {
+        'owner_team': PayloadField(1, 'uint8', True),
+        'phase': PayloadField(2, 'uint8', True),
+        'game_time_ms': PayloadField(3, 'uint32', True),
+        'counters': PayloadField(4, 'map_u8_u32', True),
+        'rssi': PayloadField(5, 'int8', False),
+        'battery_pct': PayloadField(6, 'uint8', False),
+        'flags': PayloadField(7, 'uint8', False),
+        'epoch': PayloadField(8, 'uint16', True),
+    },
+    'CMD': {
+        'cmd': PayloadField(1, 'uint8', True),
+        'params': PayloadField(2, 'map', False),
+        'dest': PayloadField(3, 'uint16', False),
+    },
+    'TIME': {
+        'game_time_ms': PayloadField(1, 'uint32', True),
+        'game_state': PayloadField(2, 'uint8', True),
+        'duration_ms': PayloadField(3, 'uint32', True),
+        'wall_s': PayloadField(4, 'uint32', True),
+        'term': PayloadField(5, 'uint32', True),
+        'tx_time_us': PayloadField(6, 'uint16', False),
+    },
+    'CONFIG': {
+        'mode_id': PayloadField(1, 'text', True),
+        'role': PayloadField(2, 'text', True),
+        'params': PayloadField(3, 'text', True),
+        'teams': PayloadField(4, 'array_text', True),
+        'game_seed': PayloadField(5, 'uint32', True),
+    },
+    'CLAIM': {
+        'term': PayloadField(1, 'uint32', True),
+        'priority': PayloadField(2, 'uint16', True),
+        'node_id': PayloadField(3, 'uint16', True),
+        'last_ack_seq': PayloadField(4, 'map_u16_u16', False),
+    },
 }

@@ -14,7 +14,8 @@ ARG STYLUA_SHA256_AARCH64=8e67539e5fdf7a81cd03cf592b0df18d3bb96ee17a5ea5d9bf67b8
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      build-essential cmake ninja-build python3 python3-yaml clang-format-18 \
+      build-essential cmake ninja-build python3 python3-yaml python3-cryptography clang-format-18 \
+      libmbedtls-dev \
       ca-certificates curl unzip \
  && ln -s /usr/bin/clang-format-18 /usr/local/bin/clang-format \
  && arch="$(uname -m)" \

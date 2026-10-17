@@ -1,0 +1,23 @@
+{
+  "description": "Test vectors for CONFIG payload encode/decode",
+  "valid": [
+    {
+      "name": "config_domination",
+      "fields": {
+        "mode_id": "org.atalaia.domination",
+        "role": "zone",
+        "params": "{\"timeout\":300}",
+        "teams": ["red", "blue"],
+        "game_seed": 12345
+      },
+      "cbor": "a501766f72672e6174616c6169612e646f6d696e6174696f6e02647a6f6e65036f7b2274696d656f7574223a3330307d04826372656464626c756505193039"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "config_missing_teams",
+      "cbor": "a4016f6f72672e6174616c6169612e646f6d02647a6f6e6503627b7d0501",
+      "reason": "missing required field teams (key 4)"
+    }
+  ]
+}

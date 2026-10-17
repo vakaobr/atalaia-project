@@ -41,6 +41,10 @@ SPDX_LINES = ("SPDX-FileCopyrightText: 2026 The Atalaia contributors",
               "SPDX-License-Identifier: GPL-3.0-or-later")
 # REUSE-IgnoreEnd
 FIELD_TYPES = ("string", "integer", "number", "boolean")
+PAYLOAD_FIELD_TYPES = (
+    "uint8", "uint16", "uint32", "int8", "text", "bytes",
+    "array_uint8", "array_text", "map_u8_u32", "map_u16_u16", "map",
+)
 STANDARD_NAME = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$")
 FIELD_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 MESSAGE_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
@@ -123,6 +127,36 @@ def load_schema() -> dict[str, Any]:
             require(not fields[d].get("common"), f"event {name}: {d!r} is common to every event; do not list it")
     unique_ints({k: v["id"] for k, v in events.items()}, "event", 1, 255)
 
+    # ---- payload field definitions ----
+    msg_names = {m["name"] for m in messages}
+    payloads: dict[str, list[dict[str, Any]]] = {}
+    raw_payloads = msgs.get("payloads", {})
+    for msg_name, fields_list in raw_payloads.items():
+        require(msg_name in msg_names, f"payload {msg_name}: not a known message type")
+        seen_keys: dict[int, str] = {}
+        seen_names: set[str] = set()
+        validated: list[dict[str, Any]] = []
+        for f in fields_list:
+            fname = f["name"]
+            fkey = f["key"]
+            require(FIELD_NAME.match(fname) is not None,
+                    f"payload {msg_name}.{fname}: names are lower_snake_case")
+            require(fname not in seen_names,
+                    f"payload {msg_name}.{fname}: duplicate field name")
+            require(isinstance(fkey, int) and not isinstance(fkey, bool) and 1 <= fkey <= 23,
+                    f"payload {msg_name}.{fname}: key must be 1-23")
+            require(fkey not in seen_keys,
+                    f"payload {msg_name}.{fname}: key {fkey} already used by {seen_keys.get(fkey)}")
+            require(f.get("type") in PAYLOAD_FIELD_TYPES,
+                    f"payload {msg_name}.{fname}: type must be one of {', '.join(PAYLOAD_FIELD_TYPES)}")
+            require(isinstance(f.get("required"), bool),
+                    f"payload {msg_name}.{fname}: required must be true or false")
+            seen_keys[fkey] = fname
+            seen_names.add(fname)
+            validated.append({"key": fkey, "name": fname, "type": f["type"],
+                              "required": f["required"], "doc": f.get("doc", "")})
+        payloads[msg_name] = validated
+
     return {
         "version": msgs["version"],
         "protocol": msgs["protocol"],
@@ -131,6 +165,7 @@ def load_schema() -> dict[str, Any]:
         "payload_max": msgs["payload_max_bytes"],
         "mic_bytes": msgs["mic_bytes"],
         "messages": messages,
+        "payloads": payloads,
         "type_max": type_max,
         "prios": prios,
         "envelope": envelope,
@@ -225,7 +260,14 @@ def gen_c_header(s: dict[str, Any]) -> str:
     rows = [(f"ATALAIA_MSG_{c_ident(m['name'])} = {m['id']},", f"/* {c_comment(m['doc'])} */")
             for m in s["messages"]]
     L += aligned(rows)
-    L += ["} atalaia_msg_type_t;", "", "/* ---- Events ---- */", "",
+    L += ["} atalaia_msg_type_t;", ""]
+    for msg_name, pfields in s.get("payloads", {}).items():
+        L += [f"/* CBOR keys of {msg_name} payload fields. */", "enum {"]
+        rows = [(f"ATALAIA_PL_{c_ident(msg_name)}_{c_ident(f['name'])} = {f['key']},",
+                 f"/* {c_comment(f['doc'])} */") for f in pfields]
+        L += aligned(rows)
+        L += ["};", ""]
+    L += ["/* ---- Events ---- */", "",
           "/* Longest event type name plus the terminating NUL. */",
           f"#define ATALAIA_EVENT_TYPE_MAX {s['type_max'] + 1}", "",
           "typedef enum {"]
@@ -442,6 +484,12 @@ def gen_python(s: dict[str, Any]) -> str:
          "    data: tuple[str, ...]  # data fields besides the common ones",
          "",
          "",
+         "class PayloadField(NamedTuple):",
+         "    key: int",
+         "    type: str",
+         "    required: bool",
+         "",
+         "",
          f"PROTOCOL_VERSION = {s['version']}",
          f"RF_HEADER_BYTES = {s['header_bytes']}",
          f"RF_PAYLOAD_MAX = {s['payload_max']}",
@@ -468,6 +516,14 @@ def gen_python(s: dict[str, Any]) -> str:
     L += [f"    {lit(k)}: EventDef({v['id']}, {lit(v['prio'])}, {tuple(v.get('data', []))!r}),"
           for k, v in s["events"].items()]
     L += ["}", ""]
+    if s.get("payloads"):
+        L += ["PAYLOAD_FIELDS = {"]
+        for msg_name, pfields in s["payloads"].items():
+            L.append(f"    {lit(msg_name)}: {{")
+            for f in pfields:
+                L.append(f"        {lit(f['name'])}: PayloadField({f['key']}, {lit(f['type'])}, {f['required']}),")
+            L.append("    },")
+        L += ["}", ""]
     return "\n".join(L)
 
 
@@ -524,16 +580,203 @@ def gen_json_schema(s: dict[str, Any]) -> str:
     return json.dumps(doc, indent=2, ensure_ascii=False) + "\n"
 
 
+# ---- packet vectors (from protocol/vectors/*.json) -------------------------
+
+
+PACKET_VECTORS_DIR = REPO / "protocol" / "vectors"
+
+
+def load_json_vectors() -> dict[str, Any]:
+    """Load all JSON vector files from protocol/vectors/."""
+    result: dict[str, Any] = {}
+    for p in sorted(PACKET_VECTORS_DIR.glob("*.json")):
+        with p.open(encoding="utf-8") as f:
+            result[p.stem] = json.load(f)
+    return result
+
+
+def gen_packet_vectors(jv: dict[str, Any]) -> str:
+    """Generate core/tests/packet_vectors.h from the JSON vector files."""
+    L = c_spdx("Packet test vectors from protocol/vectors/ (JSON files).")
+    L[5] = " * Generated by tools/protogen.py from protocol/vectors/. Do not edit."
+    L += [
+        "#ifndef ATALAIA_PACKET_VECTORS_H",
+        "#define ATALAIA_PACKET_VECTORS_H",
+        "",
+        "#include <stdbool.h>",
+        "#include <stddef.h>",
+        "#include <stdint.h>",
+        "",
+    ]
+
+    def byte_array(name: str, hexstr: str) -> list[str]:
+        if not hexstr:
+            return [f"#define {name} NULL",
+                    f"#define {name}_len 0"]
+        data = bytes.fromhex(hexstr)
+        out = [f"static const uint8_t {name}[] = {{"]
+        for i in range(0, len(data), 12):
+            out.append("    " + ", ".join(f"0x{b:02x}" for b in data[i:i + 12]) + ",")
+        out.append("};")
+        out.append(f"#define {name}_len sizeof({name})")
+        return out
+
+    # ---- header vectors ----
+    if "header" in jv:
+        hv = jv["header"]
+        L += ["/* ---- header vectors ---- */", ""]
+        L += [
+            "typedef struct {",
+            "    const char *name;",
+            "    uint8_t version_flags;",
+            "    uint16_t game_id;",
+            "    uint16_t source;",
+            "    uint16_t seq;",
+            "    uint8_t hop_limit;",
+            "    uint8_t type;",
+            "    const uint8_t *bytes;",
+            "    size_t bytes_len;",
+            "} header_vector_t;",
+            "",
+            "typedef struct {",
+            "    const char *name;",
+            "    const uint8_t *bytes;",
+            "    size_t bytes_len;",
+            "    const char *reason;",
+            "} header_bad_vector_t;",
+            "",
+        ]
+        for i, v in enumerate(hv.get("valid", [])):
+            L += byte_array(f"hdr_vec_{i}", v["bytes"])
+        for i, v in enumerate(hv.get("invalid", [])):
+            L += byte_array(f"hdr_bad_{i}", v["bytes"])
+        L += ["", "static const header_vector_t header_vectors[] = {"]
+        for i, v in enumerate(hv.get("valid", [])):
+            h = v["header"]
+            vf = int(h["version_flags"], 16) if isinstance(h["version_flags"], str) else h["version_flags"]
+            L.append(f"    {{{c_string(v['name'])}, 0x{vf:02x}, {h['game_id']}, {h['source']}, "
+                     f"{h['seq']}, {h['hop_limit']}, {h['type']}, "
+                     f"hdr_vec_{i}, hdr_vec_{i}_len}},")
+        L += ["};", ""]
+        L += ["static const header_bad_vector_t header_bad_vectors[] = {"]
+        for i, v in enumerate(hv.get("invalid", [])):
+            L.append(f"    {{{c_string(v['name'])}, hdr_bad_{i}, hdr_bad_{i}_len, "
+                     f"{c_string(v.get('reason', ''))}}},")
+        L += ["};", ""]
+
+    # ---- payload vectors for each message type ----
+    payload_types = ["hello", "ack", "state", "cmd", "time", "config", "claim"]
+    L += ["/* ---- payload vectors ---- */", ""]
+    L += [
+        "typedef struct {",
+        "    const char *name;",
+        "    const char *fields_json;",
+        "    const uint8_t *cbor;",
+        "    size_t cbor_len;",
+        "} payload_vector_t;",
+        "",
+        "typedef struct {",
+        "    const char *name;",
+        "    const uint8_t *cbor;",
+        "    size_t cbor_len;",
+        "    const char *reason;",
+        "} payload_bad_vector_t;",
+        "",
+    ]
+    for msg_type in payload_types:
+        if msg_type not in jv:
+            continue
+        mv = jv[msg_type]
+        upper = msg_type.upper()
+        for i, v in enumerate(mv.get("valid", [])):
+            L += byte_array(f"pl_{msg_type}_{i}", v["cbor"])
+        for i, v in enumerate(mv.get("invalid", [])):
+            L += byte_array(f"pl_{msg_type}_bad_{i}", v["cbor"])
+        L += ["", f"static const payload_vector_t {msg_type}_vectors[] = {{"]
+        for i, v in enumerate(mv.get("valid", [])):
+            fields_json = json.dumps(v["fields"], separators=(",", ":"), ensure_ascii=False)
+            L.append(f"    {{{c_string(v['name'])}, {c_string(fields_json)}, "
+                     f"pl_{msg_type}_{i}, pl_{msg_type}_{i}_len}},")
+        L += ["};",
+              f"#define {upper}_VECTOR_COUNT (sizeof({msg_type}_vectors) / sizeof({msg_type}_vectors[0]))",
+              ""]
+        if mv.get("invalid"):
+            L += [f"static const payload_bad_vector_t {msg_type}_bad_vectors[] = {{"]
+            for i, v in enumerate(mv["invalid"]):
+                L.append(f"    {{{c_string(v['name'])}, pl_{msg_type}_bad_{i}, "
+                         f"pl_{msg_type}_bad_{i}_len, {c_string(v.get('reason', ''))}}},")
+            L += ["};",
+                  f"#define {upper}_BAD_VECTOR_COUNT (sizeof({msg_type}_bad_vectors) / sizeof({msg_type}_bad_vectors[0]))",
+                  ""]
+
+    # ---- AES-CCM vectors ----
+    if "aes_ccm" in jv:
+        av = jv["aes_ccm"]
+        L += ["/* ---- AES-CCM packet vectors ---- */", ""]
+        L += [
+            "typedef struct {",
+            "    const char *name;",
+            "    const uint8_t *key;",
+            "    uint16_t epoch;",
+            "    uint8_t version_flags;",
+            "    uint16_t game_id;",
+            "    uint16_t source;",
+            "    uint16_t seq;",
+            "    uint8_t hop_limit;",
+            "    uint8_t type;",
+            "    const uint8_t *plaintext;",
+            "    size_t plaintext_len;",
+            "    const uint8_t *nonce;",
+            "    const uint8_t *aad;",
+            "    size_t aad_len;",
+            "    const uint8_t *ciphertext;",
+            "    size_t ciphertext_len;",
+            "    const uint8_t *tag;",
+            "} aes_ccm_vector_t;",
+            "",
+        ]
+        for i, v in enumerate(av.get("vectors", [])):
+            L += byte_array(f"aes_key_{i}", v["key"])
+            L += byte_array(f"aes_nonce_{i}", v["nonce"])
+            L += byte_array(f"aes_aad_{i}", v["aad"])
+            L += byte_array(f"aes_pt_{i}", v["plaintext"])
+            L += byte_array(f"aes_ct_{i}", v["ciphertext"])
+            L += byte_array(f"aes_tag_{i}", v["tag"])
+        L += ["", "static const aes_ccm_vector_t aes_ccm_vectors[] = {"]
+        for i, v in enumerate(av.get("vectors", [])):
+            h = v["header"]
+            vf = int(h["version_flags"], 16) if isinstance(h["version_flags"], str) else h["version_flags"]
+            pt_ptr = f"aes_pt_{i}" if v["plaintext"] else "NULL"
+            ct_ptr = f"aes_ct_{i}" if v["ciphertext"] else "NULL"
+            pt_len = f"aes_pt_{i}_len" if v["plaintext"] else "0"
+            ct_len = f"aes_ct_{i}_len" if v["ciphertext"] else "0"
+            L.append(f"    {{{c_string(v['name'])}, aes_key_{i}, {v['epoch']}, "
+                     f"0x{vf:02x}, {h['game_id']}, {h['source']}, {h['seq']}, "
+                     f"{h['hop_limit']}, {h['type']}, "
+                     f"{pt_ptr}, {pt_len}, "
+                     f"aes_nonce_{i}, aes_aad_{i}, aes_aad_{i}_len, "
+                     f"{ct_ptr}, {ct_len}, "
+                     f"aes_tag_{i}}},")
+        L += ["};",
+              "#define AES_CCM_VECTOR_COUNT (sizeof(aes_ccm_vectors) / sizeof(aes_ccm_vectors[0]))",
+              ""]
+
+    L += ["#endif /* ATALAIA_PACKET_VECTORS_H */", ""]
+    return "\n".join(L)
+
+
 # ---- main ------------------------------------------------------------------
 
 
 def outputs() -> dict[Path, str]:
     schema = load_schema()
     vectors = load_vectors(schema)
+    json_vectors = load_json_vectors()
     return {
         REPO / "core/include/atalaia/protocol.h": gen_c_header(schema),
         REPO / "core/src/protocol.c": gen_c_source(schema),
         REPO / "core/tests/protocol_vectors.h": gen_c_vectors(schema, vectors),
+        REPO / "core/tests/packet_vectors.h": gen_packet_vectors(json_vectors),
         REPO / "simulator/atalaia_sim/protocol.py": gen_python(schema),
         REPO / "protocol/json/event.schema.json": gen_json_schema(schema),
     }

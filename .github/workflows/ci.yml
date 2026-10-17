@@ -9,11 +9,17 @@ jobs:
   core:
     name: Core and game modes
     runs-on: ubuntu-latest
+    env:
+      ATALAIA_REQUIRE_ALL: "1"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libmbedtls-dev
       - name: Configure
         run: cmake -S core -B build -DCMAKE_BUILD_TYPE=Debug -DATALAIA_SHARED=ON
       - name: Build
@@ -58,8 +64,14 @@ jobs:
   sanitizers:
     name: Core under AddressSanitizer and UBSan
     runs-on: ubuntu-latest
+    env:
+      ATALAIA_REQUIRE_ALL: "1"
     steps:
       - uses: actions/checkout@v7
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libmbedtls-dev
       - name: Build
         run: |
           cmake -S core -B build -DCMAKE_BUILD_TYPE=Debug \

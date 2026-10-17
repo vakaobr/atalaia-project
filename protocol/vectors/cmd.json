@@ -1,0 +1,28 @@
+{
+  "description": "Test vectors for CMD payload encode/decode",
+  "valid": [
+    {
+      "name": "cmd_broadcast",
+      "fields": {
+        "cmd": 0
+      },
+      "cbor": "a10100"
+    },
+    {
+      "name": "cmd_targeted",
+      "fields": {
+        "cmd": 3,
+        "params": {"timeout": 30},
+        "dest": 42
+      },
+      "cbor": "a3010302a16774696d656f7574181e03182a"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "cmd_missing_opcode",
+      "cbor": "a202a00305",
+      "reason": "missing required field cmd (key 1)"
+    }
+  ]
+}

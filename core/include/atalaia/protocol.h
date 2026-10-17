@@ -47,6 +47,72 @@ typedef enum {
     ATALAIA_MSG_CLAIM = 8,  /* controller election: candidate claims the role with a term number */
 } atalaia_msg_type_t;
 
+/* CBOR keys of HELLO payload fields. */
+enum {
+    ATALAIA_PL_HELLO_NODE_NAME = 1,    /* human-readable node name */
+    ATALAIA_PL_HELLO_PLATFORM = 2,     /* 0=esp32, 1=esp32s3, 2=linux, 3=android */
+    ATALAIA_PL_HELLO_FW_VERSION = 3,   /* firmware version string */
+    ATALAIA_PL_HELLO_CORE_VERSION = 4, /* core library version */
+    ATALAIA_PL_HELLO_TIER = 5,         /* 0=full, 1=reduced, 2=proxy */
+    ATALAIA_PL_HELLO_CAPABILITIES = 6, /* capability type ids */
+    ATALAIA_PL_HELLO_TRANSPORTS = 7,   /* bitmask: bit 0=lora, 1=wifi, 2=ble */
+    ATALAIA_PL_HELLO_BATTERY_PCT = 8,  /* 0-100 */
+    ATALAIA_PL_HELLO_EPOCH = 9,        /* current nonce epoch */
+};
+
+/* CBOR keys of ACK payload fields. */
+enum {
+    ATALAIA_PL_ACK_ACK_NODE = 1,   /* source node being acknowledged */
+    ATALAIA_PL_ACK_ACK_SEQ = 2,    /* highest contiguous seq received */
+    ATALAIA_PL_ACK_ACK_BITMAP = 3, /* selective ACK bitmap */
+};
+
+/* CBOR keys of STATE payload fields. */
+enum {
+    ATALAIA_PL_STATE_OWNER_TEAM = 1,   /* current owner (0=none) */
+    ATALAIA_PL_STATE_PHASE = 2,        /* mode-specific phase */
+    ATALAIA_PL_STATE_GAME_TIME_MS = 3, /* node local game time */
+    ATALAIA_PL_STATE_COUNTERS = 4,     /* per-team score counters */
+    ATALAIA_PL_STATE_RSSI = 5,         /* last received signal strength */
+    ATALAIA_PL_STATE_BATTERY_PCT = 6,  /* 0-100 */
+    ATALAIA_PL_STATE_FLAGS = 7,        /* bit 0: running, bit 1: paused */
+    ATALAIA_PL_STATE_EPOCH = 8,        /* current nonce epoch */
+};
+
+/* CBOR keys of CMD payload fields. */
+enum {
+    ATALAIA_PL_CMD_CMD = 1,    /* opcode: 0-7 */
+    ATALAIA_PL_CMD_PARAMS = 2, /* command-specific parameters */
+    ATALAIA_PL_CMD_DEST = 3,   /* destination node; absent = broadcast */
+};
+
+/* CBOR keys of TIME payload fields. */
+enum {
+    ATALAIA_PL_TIME_GAME_TIME_MS = 1, /* controller game time */
+    ATALAIA_PL_TIME_GAME_STATE = 2,   /* 0=waiting, 1=running, 2=paused, 3=ended */
+    ATALAIA_PL_TIME_DURATION_MS = 3,  /* total duration (0=unlimited) */
+    ATALAIA_PL_TIME_WALL_S = 4,       /* unix epoch seconds */
+    ATALAIA_PL_TIME_TERM = 5,         /* election term */
+    ATALAIA_PL_TIME_TX_TIME_US = 6,   /* processing time before TX */
+};
+
+/* CBOR keys of CONFIG payload fields. */
+enum {
+    ATALAIA_PL_CONFIG_MODE_ID = 1,   /* e.g. org.atalaia.domination */
+    ATALAIA_PL_CONFIG_ROLE = 2,      /* role within the mode */
+    ATALAIA_PL_CONFIG_PARAMS = 3,    /* preset parameters as JSON */
+    ATALAIA_PL_CONFIG_TEAMS = 4,     /* team names in order */
+    ATALAIA_PL_CONFIG_GAME_SEED = 5, /* seed for deterministic rand() */
+};
+
+/* CBOR keys of CLAIM payload fields. */
+enum {
+    ATALAIA_PL_CLAIM_TERM = 1,         /* monotonically increasing */
+    ATALAIA_PL_CLAIM_PRIORITY = 2,     /* higher = better */
+    ATALAIA_PL_CLAIM_NODE_ID = 3,      /* tiebreaker: lowest wins */
+    ATALAIA_PL_CLAIM_LAST_ACK_SEQ = 4, /* per-node last ACKd seq */
+};
+
 /* ---- Events ---- */
 
 /* Longest event type name plus the terminating NUL. */

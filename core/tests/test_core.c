@@ -136,6 +136,12 @@ int main(void)
     test_rand();
     run_node_tests();
     run_codec_tests();
+    run_packet_tests();
+    run_flood_tests();
+    run_ack_tests();
+    run_duty_cycle_tests();
+    run_msg_codec_tests();
+    run_crypto_mbedtls_tests();
 
     if (check_failures == 0) {
         printf("core: all tests passed\n");

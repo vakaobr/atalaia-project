@@ -1,0 +1,37 @@
+{
+  "description": "Test vectors for STATE payload encode/decode",
+  "valid": [
+    {
+      "name": "state_minimal",
+      "fields": {
+        "owner_team": 1,
+        "phase": 2,
+        "game_time_ms": 5000,
+        "counters": {"1": 100, "2": 200},
+        "epoch": 1
+      },
+      "cbor": "a5010102020319138804a20118640218c80801"
+    },
+    {
+      "name": "state_full",
+      "fields": {
+        "owner_team": 2,
+        "phase": 0,
+        "game_time_ms": 60000,
+        "counters": {"1": 500, "2": 300, "3": 0},
+        "rssi": -70,
+        "battery_pct": 45,
+        "flags": 1,
+        "epoch": 10
+      },
+      "cbor": "a8010202000319ea6004a3011901f40219012c030005384506182d0701080a"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "state_missing_counters",
+      "cbor": "a401010202031913880801",
+      "reason": "missing required field counters (key 4)"
+    }
+  ]
+}

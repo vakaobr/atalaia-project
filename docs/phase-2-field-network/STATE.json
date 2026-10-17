@@ -1,22 +1,29 @@
 {
   "schema_version": "2.0.0",
   "issue_name": "phase-2-field-network",
-  "current_phase": "planning_complete_design_only",
-  "phase_status": "complete",
+  "current_phase": "implementation",
+  "phase_status": "in_progress",
   "review_iteration": 0,
   "failing_experts": [],
   "created_at": "2026-10-17T12:00:00Z",
-  "updated_at": "2026-10-17T22:00:00Z",
+  "updated_at": "2026-10-17T23:45:00Z",
   "artifacts": {
     "RESEARCH.md": "complete",
     "ADR.md": "complete",
     "PLAN.md": "complete",
-    "STATUS.md": "complete"
+    "STATUS.md": "in_progress"
   },
   "metadata": {
-    "description": "Atalaia phase 2 (Field network), DESIGN ONLY. Scope from docs/design-spec.md section 16: the LoRa protocol (Skirmesh-RF), time sync, log merge, the Raspberry Pi field controller, the MQTT and REST API, the GM console web app, and an example scoreboard. Gate: 5 boxes on a CQB site and an outdoor field, with zero lost captures.",
+    "description": "Atalaia phase 2 (Field network). Design complete; implementation in progress.",
     "risk_level": "High",
-    "mode": "design_only_stop_after_planning",
-    "stopped_reason": "Design-only run per user request. Implementation starts after Phase 1 lands. Resume with --implement."
+    "implementation_progress": {
+      "phase_a": "complete",
+      "phase_b": "complete",
+      "phase_c": "pending",
+      "phase_d": "pending",
+      "phase_e": "pending",
+      "phase_f": "pending"
+    },
+    "resume_at": "phase_c"
   }
 }

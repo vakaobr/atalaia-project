@@ -1,0 +1,31 @@
+{
+  "description": "Test vectors for CLAIM payload encode/decode",
+  "valid": [
+    {
+      "name": "claim_simple",
+      "fields": {
+        "term": 1,
+        "priority": 100,
+        "node_id": 7
+      },
+      "cbor": "a301010218640307"
+    },
+    {
+      "name": "claim_with_acks",
+      "fields": {
+        "term": 5,
+        "priority": 200,
+        "node_id": 3,
+        "last_ack_seq": {"1": 42, "7": 10, "3": 99}
+      },
+      "cbor": "a401050218c8030304a301182a070a031863"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "claim_missing_node_id",
+      "cbor": "a20101021864",
+      "reason": "missing required field node_id (key 3)"
+    }
+  ]
+}

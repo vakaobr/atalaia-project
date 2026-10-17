@@ -1,3 +1,4 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 PyYAML>=6.0
+cryptography>=41.0  # optional: needed for AES-CCM packet encryption

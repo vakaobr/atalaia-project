@@ -1,0 +1,29 @@
+{
+  "description": "Test vectors for ACK payload encode/decode",
+  "valid": [
+    {
+      "name": "ack_simple",
+      "fields": {
+        "ack_node": 7,
+        "ack_seq": 42
+      },
+      "cbor": "a2010702182a"
+    },
+    {
+      "name": "ack_with_bitmap",
+      "fields": {
+        "ack_node": 3,
+        "ack_seq": 100,
+        "ack_bitmap": "ff00ff"
+      },
+      "cbor": "a301030218640343ff00ff"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "ack_missing_ack_node",
+      "cbor": "a102182a",
+      "reason": "missing required field ack_node (key 1)"
+    }
+  ]
+}

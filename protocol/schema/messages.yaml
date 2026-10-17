@@ -25,4 +25,51 @@ messages:
   - { id: 7, name: CONFIG, doc: "assigns a preset and role; parameters only" }
   - { id: 8, name: CLAIM,  doc: "controller election: candidate claims the role with a term number" }
 
+payloads:
+  HELLO:
+    - { key: 1, name: node_name, type: text, required: true, max: 24, doc: "human-readable node name" }
+    - { key: 2, name: platform, type: uint8, required: true, doc: "0=esp32, 1=esp32s3, 2=linux, 3=android" }
+    - { key: 3, name: fw_version, type: text, required: true, doc: "firmware version string" }
+    - { key: 4, name: core_version, type: text, required: true, doc: "core library version" }
+    - { key: 5, name: tier, type: uint8, required: true, doc: "0=full, 1=reduced, 2=proxy" }
+    - { key: 6, name: capabilities, type: array_uint8, required: true, doc: "capability type ids" }
+    - { key: 7, name: transports, type: uint8, required: true, doc: "bitmask: bit 0=lora, 1=wifi, 2=ble" }
+    - { key: 8, name: battery_pct, type: uint8, required: false, doc: "0-100" }
+    - { key: 9, name: epoch, type: uint16, required: true, doc: "current nonce epoch" }
+  ACK:
+    - { key: 1, name: ack_node, type: uint16, required: true, doc: "source node being acknowledged" }
+    - { key: 2, name: ack_seq, type: uint16, required: true, doc: "highest contiguous seq received" }
+    - { key: 3, name: ack_bitmap, type: bytes, required: false, max: 32, doc: "selective ACK bitmap" }
+  STATE:
+    - { key: 1, name: owner_team, type: uint8, required: true, doc: "current owner (0=none)" }
+    - { key: 2, name: phase, type: uint8, required: true, doc: "mode-specific phase" }
+    - { key: 3, name: game_time_ms, type: uint32, required: true, doc: "node local game time" }
+    - { key: 4, name: counters, type: map_u8_u32, required: true, doc: "per-team score counters" }
+    - { key: 5, name: rssi, type: int8, required: false, doc: "last received signal strength" }
+    - { key: 6, name: battery_pct, type: uint8, required: false, doc: "0-100" }
+    - { key: 7, name: flags, type: uint8, required: false, doc: "bit 0: running, bit 1: paused" }
+    - { key: 8, name: epoch, type: uint16, required: true, doc: "current nonce epoch" }
+  CMD:
+    - { key: 1, name: cmd, type: uint8, required: true, doc: "opcode: 0-7" }
+    - { key: 2, name: params, type: map, required: false, doc: "command-specific parameters" }
+    - { key: 3, name: dest, type: uint16, required: false, doc: "destination node; absent = broadcast" }
+  TIME:
+    - { key: 1, name: game_time_ms, type: uint32, required: true, doc: "controller game time" }
+    - { key: 2, name: game_state, type: uint8, required: true, doc: "0=waiting, 1=running, 2=paused, 3=ended" }
+    - { key: 3, name: duration_ms, type: uint32, required: true, doc: "total duration (0=unlimited)" }
+    - { key: 4, name: wall_s, type: uint32, required: true, doc: "unix epoch seconds" }
+    - { key: 5, name: term, type: uint32, required: true, doc: "election term" }
+    - { key: 6, name: tx_time_us, type: uint16, required: false, doc: "processing time before TX" }
+  CONFIG:
+    - { key: 1, name: mode_id, type: text, required: true, doc: "e.g. org.atalaia.domination" }
+    - { key: 2, name: role, type: text, required: true, doc: "role within the mode" }
+    - { key: 3, name: params, type: text, required: true, doc: "preset parameters as JSON" }
+    - { key: 4, name: teams, type: array_text, required: true, doc: "team names in order" }
+    - { key: 5, name: game_seed, type: uint32, required: true, doc: "seed for deterministic rand()" }
+  CLAIM:
+    - { key: 1, name: term, type: uint32, required: true, doc: "monotonically increasing" }
+    - { key: 2, name: priority, type: uint16, required: true, doc: "higher = better" }
+    - { key: 3, name: node_id, type: uint16, required: true, doc: "tiebreaker: lowest wins" }
+    - { key: 4, name: last_ack_seq, type: map_u16_u16, required: false, doc: "per-node last ACKd seq" }
+
 # Scripts, assets and firmware never travel over LoRa: they use Wi-Fi or BLE.
