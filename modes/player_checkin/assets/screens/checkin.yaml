@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The checkpoint. Data: total (check-ins), counts (per team, as text),
+# team (of the last check-in), message, error.
+template: checkin
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: "{team || 'panel'}" }
+    children:
+      - type: label
+        text: CHECK-IN
+        style: { font_size: 20, width: fill, align: center, color: contrast }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{total}"
+    style: { font_size: 48 }
+  - type: label
+    text: players checked in
+    style: { font_size: 20, color: muted }
+  - type: label
+    text: "{counts}"
+    style: { font_size: 20, visible: "{counts}" }
+  - type: label
+    text: "{message}"
+    style:
+      font_size: 20
+      width: 300
+      color: "{error && 'danger' || 'accent'}"
+      visible: "{message}"
+      padding: { top: 6 }
+  - type: spacer
+    height: fill
+  - type: label
+    text: Scan your tag to check in
+    style:
+      font_size: 14
+      color: muted
+      padding: { bottom: 10 }

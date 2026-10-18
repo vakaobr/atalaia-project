@@ -2,8 +2,8 @@
  * SPDX-FileCopyrightText: 2026 The Atalaia contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Button hold/release tracker. Translates raw GPIO button state into
- * the team_input.hold / team_input.release events that mode scripts
+ * Button press/hold/release tracker. Translates raw GPIO button state
+ * into the team_input.press / .hold / .release events that mode scripts
  * expect (see modes/README.md).
  */
 #ifndef ATALAIA_BUTTON_TRACKER_H
@@ -33,8 +33,9 @@ void button_tracker_init(button_tracker_t *t, const char *const *team_names, int
 
 /*
  * Update the tracker with the current button bitmask and elapsed time.
- * Generates team_input.hold events every BUTTON_HOLD_INTERVAL ms while
- * a button is held, and a team_input.release event when it is released.
+ * Generates a team_input.press event when a button goes down,
+ * team_input.hold events every BUTTON_HOLD_INTERVAL ms while it is held,
+ * and a team_input.release event when it is released.
  * Events are fed to the runner via node_runner_input.
  */
 void button_tracker_update(button_tracker_t *t, uint8_t pressed_bitmask, uint32_t delta_ms,

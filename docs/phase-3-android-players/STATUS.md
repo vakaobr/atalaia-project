@@ -5,9 +5,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 3 -- Android and Players: Status
 
-**Current phase:** Planning complete; Implementation pending
+**Current phase:** Implementation: plan phase A done in software; plan phases B-G pending
 **Risk level:** Medium
-**Last verified:** 2026-10-18 (phase 2 handoff applied)
+**Last verified:** 2026-10-18 (plan phase A)
 
 ## Completed
 
@@ -16,6 +16,26 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 - [x] Planning phase: `PLAN.md` (7 phases A-G, 12 AC, field test plan)
 - [x] Phase 2 handoff (2026-10-18): design updated to match phase 2
   A-E implementation (commit `771fd90`)
+- [x] Plan phase A (2026-10-18): event schema, three single-node modes,
+  player tags, capability proxy protocol v1, declarative screen templates
+  (see below)
+
+## Plan phase A (2026-10-18)
+
+| Deliverable | Where | State |
+| --- | --- | --- |
+| Events 25-27, 33-41 and data keys 29-30 | `protocol/schema/events.yaml` (C, Python and JSON Schema regenerated; three new event vectors) | Done |
+| Kill Confirmed, Respawn and Lives, Player Check-in | `modes/kill_confirmed/`, `modes/respawn/`, `modes/player_checkin/` (manifests with `i18n.pt`, scripts, 7 tests, YAML screens); built into the Field Box as presets 6-8 | Done |
+| Money Factory | events only (33, 34) | Mode deferred: decision A1 |
+| Player tags (ADR-P3-9) | `protocol/nfc-tag.md`, `core/src/tag.c`, `simulator/atalaia_sim/tag.py`, `protocol/vectors/tag.json`; the Field Box reads tags during games (`box_game_tag`, `@tag` on the console) | Done; tag writing from the console is a follow-up |
+| Capability proxy protocol v1 (ADR-P3-2) | `protocol/capability-proxy.md`, `protocol/vectors/capability_proxy.yaml`, `core/src/proxy.c`, `firmware/esp32/test/test_proxy_codec.c`, `simulator/atalaia_sim/capability_proxy.py` | Done (C and Python); the Dart codec is plan phase D, the pod firmware plan phase F |
+| Declarative screen templates (ADR-P3-4) | `core/src/screen_template.c` (parser, checks, expressions), `firmware/esp32/main/screen_template.c` (LVGL renderer, C fallback), templates for Bomb, Domination and the three new modes, 16 new reference images | Done on the Field Box; the Flutter renderer is plan phase D |
+| Chrono data model and energy | | Plan phase B, as the plan's file list says |
+
+Deviations and choices: decisions A1-A13 in `docs/review/decisions-to-review.md`
+(a draft RFC, `docs/rfcs/0000-phase-3-events-tags-and-pods.md`, records the
+protocol additions). A core bug found by Kill Confirmed was fixed: a penalty
+`score.add(team, -n, reason)` without a squad could not be encoded.
 
 ## Phase 2 handoff changes (2026-10-18)
 
@@ -51,12 +71,14 @@ Phase G needs hardware.
 1. ~~Research~~ -- Complete
 2. ~~Architecture~~ -- Complete
 3. ~~Planning~~ -- Complete
-4. Implementation -- ready to start
+4. Implementation -- plan phase A done; next: plan phase B (chrono, Dart)
+   and C (dart:ffi bridge), which can now use the tag, proxy and template
+   code in the core
 
 ## How to resume with implementation
 
 Run `/sdlc phase-3-android-players --resume`.  STATE.json records
-`current_phase: "planning"`, `phase_status: "complete"`.
+`current_phase: "implementation"`, `phase_status: "in_progress"` (plan phase A done).
 
 **What can start now (no hardware, no phase 2 blockers):**
 - Phases A and B (event schema, single-node modes, screen templates, chrono)
@@ -82,8 +104,8 @@ Phase 4's site server builds on these phase 3 interfaces:
 | Player token format | `app/lib/security/player_token.dart` | Token schema for account-based auth upgrade |
 | Position reports | `POST /api/v1/positions` | Position data model, visibility rules |
 | Replica registry | `app/lib/chrono/replica.dart` | Replica schema for the site-server database |
-| NFC tag format | HMAC-SHA256 with game key, truncated 16 bytes | Tag verification for site-server-managed games |
+| NFC tag format | `protocol/nfc-tag.md` (HMAC-SHA256 with game key, truncated 16 bytes; vectors `protocol/vectors/tag.json`) | Tag verification for site-server-managed games |
 | GM console extensions | `controller/console/src/` | Chrono view, position view, new mode UIs |
-| Mode events (IDs 25-26, 33-41) | `protocol/schema/events.yaml` | Event log storage, statistics, replays |
+| Mode events (IDs 25-27, 33-41) | `protocol/schema/events.yaml` | Event log storage, statistics, replays |
 | Field join key distribution | `protocol/join.md`, key 13 (CA fingerprint) | Site server join flow |
-| Capability proxy protocol | `protocol/vectors/capability_proxy.yaml` | Pod management in the site-server inventory |
+| Capability proxy protocol | `protocol/capability-proxy.md`, `protocol/vectors/capability_proxy.yaml` | Pod management in the site-server inventory |

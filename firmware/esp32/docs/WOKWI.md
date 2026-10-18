@@ -144,11 +144,24 @@ wokwi-cli --timeout 60000 --scenario wokwi/join.scenario.yaml .
 the Codes modifier on its own (a code terminal), types two digits and `#`
 on the serial console, and checks the `code_entry` screen: the digits, then
 "Wrong code" (screenshots `build-wokwi/codes-*.png`). The built-in presets
-are Bomb, Domination, Hold-All Domination, Last Stand and Codes, in that
-order.
+are Bomb, Domination, Hold-All Domination, Last Stand, Codes, Kill
+Confirmed, Respawn and Lives and Player Check-in, in that order.
 
 ```
 wokwi-cli --timeout 60000 --scenario wokwi/codes.scenario.yaml .
+```
+
+[`wokwi/killconfirmed.scenario.yaml`](../wokwi/killconfirmed.scenario.yaml)
+picks game `6`, Kill Confirmed (phase 3), and checks that the box announces
+the mode to the display and draws the mode's own YAML screen
+(`modes/kill_confirmed/assets/screens/tags.yaml`); red presses its button and
+the station opens for red; then a player tag is read through the serial
+console (`@tag <uid> <payload>`, as the NFC reader would) and, since a game
+picked on the box has no game key, it is refused with reason `no_game`
+(screenshots `build-wokwi/kill-*.png`).
+
+```
+wokwi-cli --timeout 60000 --scenario wokwi/killconfirmed.scenario.yaml .
 ```
 
 ## The same pixels as the host tests

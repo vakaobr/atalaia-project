@@ -144,6 +144,9 @@ int main(void)
     run_crypto_mbedtls_tests();
     run_field_api_tests();
     run_join_tests();
+    run_tag_tests();
+    run_screen_template_tests();
+    run_proxy_tests();
 
     if (check_failures == 0) {
         printf("core: all tests passed\n");

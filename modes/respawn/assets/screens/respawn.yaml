@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The respawn point. Data: lives (left, for the last team or player),
+# team, player (the last respawn), message, error.
+template: respawn
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: "{team || 'panel'}" }
+    children:
+      - type: label
+        text: RESPAWN
+        style: { font_size: 20, width: fill, align: center, color: contrast }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{lives}"
+    style: { font_size: 48, color: "{lives == 0 && 'danger' || 'white'}" }
+  - type: label
+    text: lives left
+    style: { font_size: 20, color: muted, visible: "{!team && !player}" }
+  - type: label
+    text: "lives left for {team|upper}"
+    style: { font_size: 20, color: team, visible: "{team && !params.per_player}" }
+  - type: label
+    text: "lives left for {player}"
+    style: { font_size: 20, color: muted, visible: "{player && params.per_player}" }
+  - type: label
+    text: "{message}"
+    style:
+      font_size: 20
+      width: 300
+      color: "{error && 'danger' || 'accent'}"
+      visible: "{message}"
+      padding: { top: 6 }
+  - type: spacer
+    height: fill
+  - type: label
+    text: Scan your tag to come back in
+    style:
+      font_size: 14
+      color: muted
+      padding: { bottom: 10 }

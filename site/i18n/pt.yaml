@@ -38,7 +38,7 @@ header:
   language: Idioma
 
 hero:
-  status: Pré-alfa · software da fase 2 pronto, à espera das placas de rádio · ainda não pronta para o campo
+  status: Pré-alfa · software da fase 2 pronto, fase 3 começou · ainda não pronta para o campo
   title: A plataforma aberta de <span class="nowrap">combate simulado</span>
   lead: >-
     A Atalaia é uma plataforma aberta para os dispositivos eletrónicos de jogo (os props) de
@@ -355,7 +355,10 @@ roadmap:
     text: >-
       Dispositivos Android, <a href="#glossario-dispositivo-android">módulo de E/S</a>, app de
       jogador com funções e os modos que precisam dos telemóveis dos jogadores: Respawn, Kill
-      Confirmed, Player Check-in, Money Factory e cronografagem à entrada.
+      Confirmed, Player Check-in, Money Factory e cronografagem à entrada. Já começou: a Baixa
+      Confirmada, as Reentradas e Vidas e o Registo de Presença leem as etiquetas NFC assinadas de
+      cada participante na Field Box, o protocolo do módulo de E/S está fixado e os modos descrevem
+      os seus ecrãs em YAML; tudo testado em software, ainda sem código Android.
     gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."
   p4:
     title: Servidor do clube e jogo avançado

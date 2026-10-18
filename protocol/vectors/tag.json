@@ -1,0 +1,130 @@
+{
+  "description": "Player tag vectors (protocol/nfc-tag.md): version byte, player id, team, game id, 16-byte HMAC-SHA256 with the game key. Every valid payload decodes for game_id with game_key and team_count teams to its fields, re-encodes byte for byte and round-trips through a Type 2 tag (ndef_tag). Every invalid one fails with its reason. events: the nfc.tag data a host gives the node for a read of uid, with the game's key (or no game) and teams.",
+  "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+  "game_id": 4242,
+  "teams": [
+    "red",
+    "blue"
+  ],
+  "uid": "04a1b2c3d4e5f6",
+  "valid": [
+    {
+      "name": "red_player",
+      "fields": {
+        "player": "p-17",
+        "team": 1,
+        "game_id": 4242
+      },
+      "payload": "01702d31370110928955556ca3d184f4a2d749c851a56e12",
+      "ndef_tag": "0336d21b186170706c69636174696f6e2f766e642e6174616c6169612e74616701702d31370110928955556ca3d184f4a2d749c851a56e12fe"
+    },
+    {
+      "name": "no_team",
+      "fields": {
+        "player": "marshal.ana",
+        "team": 0,
+        "game_id": 4242
+      },
+      "payload": "016d61727368616c2e616e610010928b7a868f56b7b4689a630689027744de",
+      "ndef_tag": "033dd21b1f6170706c69636174696f6e2f766e642e6174616c6169612e746167016d61727368616c2e616e610010928b7a868f56b7b4689a630689027744defe"
+    },
+    {
+      "name": "longest_player",
+      "fields": {
+        "player": "AAAAAAAAAAAAAAAAz_9-.bbbbbbbbbbb",
+        "team": 2,
+        "game_id": 4242
+      },
+      "payload": "01414141414141414141414141414141417a5f392d2e62626262626262626262620210929c55502a6a8a467f82f82514cb86b615",
+      "ndef_tag": "0352d21b346170706c69636174696f6e2f766e642e6174616c6169612e74616701414141414141414141414141414141417a5f392d2e62626262626262626262620210929c55502a6a8a467f82f82514cb86b615fe"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "too_short",
+      "payload": "01702d31370110928955556ca3d184f4a2d749c8",
+      "reason": "format",
+      "why": "shorter than version, one player byte, team, game id and mac"
+    },
+    {
+      "name": "too_long",
+      "payload": "01787878787878787878787878787878787878787878787878787878787878787878011092d2039bae194f64979c996aa86469ce03",
+      "reason": "format",
+      "why": "a 33-byte player id makes it longer than the maximum"
+    },
+    {
+      "name": "version_2",
+      "payload": "02702d313701109233ad18449e3c0c7d23af20082ad7ec46",
+      "reason": "version",
+      "why": "unknown format version"
+    },
+    {
+      "name": "other_game",
+      "payload": "01702d3137011093d1573811be733c9c09f633a7de501da1",
+      "reason": "game",
+      "why": "signed correctly, but for another game id"
+    },
+    {
+      "name": "mac_flipped",
+      "payload": "01702d31370110928955556ca3d184f4a2d749c851a56e13",
+      "reason": "mac",
+      "why": "one bit of the mac changed"
+    },
+    {
+      "name": "wrong_key",
+      "payload": "01702d31370110923ba0a9ddf628ddbdacc34df5bf47af53",
+      "reason": "mac",
+      "why": "signed with another game key"
+    },
+    {
+      "name": "player_space",
+      "payload": "01702031370110920a6ab322a266bc5d0dd7b2e8cf6f2c67",
+      "reason": "format",
+      "why": "authentic, but the player id has a space"
+    },
+    {
+      "name": "player_utf8",
+      "payload": "016a6fc3a36f0110921ef3df1fe26d32d37f4e88b74d1aa3f9",
+      "reason": "format",
+      "why": "authentic, but the player id is not ASCII letters and digits"
+    },
+    {
+      "name": "team_out_of_range",
+      "payload": "01702d31370310922162ca42ad97b7c9919fa7a12a57e0b4",
+      "reason": "team",
+      "why": "authentic, but team 3 in a game of 2 teams"
+    }
+  ],
+  "events": [
+    {
+      "name": "valid_with_team",
+      "payload": "01702d31370110928955556ca3d184f4a2d749c851a56e12",
+      "game_key": true,
+      "json": "{\"uid\":\"04a1b2c3d4e5f6\",\"valid\":true,\"player\":\"p-17\",\"team\":\"red\"}"
+    },
+    {
+      "name": "valid_without_team",
+      "payload": "016d61727368616c2e616e610010928b7a868f56b7b4689a630689027744de",
+      "game_key": true,
+      "json": "{\"uid\":\"04a1b2c3d4e5f6\",\"valid\":true,\"player\":\"marshal.ana\"}"
+    },
+    {
+      "name": "unsigned",
+      "payload": null,
+      "game_key": true,
+      "json": "{\"uid\":\"04a1b2c3d4e5f6\",\"valid\":false,\"reason\":\"unsigned\"}"
+    },
+    {
+      "name": "no_game",
+      "payload": "01702d31370110928955556ca3d184f4a2d749c851a56e12",
+      "game_key": false,
+      "json": "{\"uid\":\"04a1b2c3d4e5f6\",\"valid\":false,\"reason\":\"no_game\"}"
+    },
+    {
+      "name": "forged",
+      "payload": "01702d31370110928955556ca3d184f4a2d749c851a56e13",
+      "game_key": true,
+      "json": "{\"uid\":\"04a1b2c3d4e5f6\",\"valid\":false,\"reason\":\"mac\"}"
+    }
+  ]
+}

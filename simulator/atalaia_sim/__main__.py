@@ -14,6 +14,7 @@ import yaml
 
 from .core import Core, LibraryNotFound, find_library
 from .mode import ModeError, compose, find_modes, load_mode
+from .screens import check_screens, screen_files
 from .sim import SimError, Simulation
 from .testing import DEFAULT_TEAMS, run_test
 
@@ -38,6 +39,14 @@ def cmd_test(args: argparse.Namespace) -> int:
             failed += 1
             total += 1
             continue
+        screens = screen_files(mode_dir)
+        if screens:
+            total += 1
+            problems = check_screens(core, mode_dir)
+            print(f"{'FAIL' if problems else 'ok  '} {mode.id} / {len(screens)} screen template(s)")
+            for problem in problems:
+                print(f"     {problem}")
+            failed += 1 if problems else 0
         tests = mode.tests
         if not tests:
             print(f"  -- {mode.id}: no tests")

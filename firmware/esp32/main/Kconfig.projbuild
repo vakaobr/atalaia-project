@@ -420,14 +420,16 @@ menu "Atalaia Field Box Configuration"
                 on UART0. Off in the Wokwi build, whose console is UART0.
 
         config ATALAIA_SERIAL_JOIN
-            bool "Accept @join and @joinkey lines on the serial console"
+            bool "Accept @join, @joinkey and @tag lines on the serial console"
             default y
             help
                 "@join atalaia:join:..." joins a game from the text of a join
-                payload (the GM console shows it), and "@joinkey <64 hex>"
-                sets the field join key while no game is joined. For bring-up
-                and the Wokwi emulator; a join still needs a payload signed
-                with this box's field join key.
+                payload (the GM console shows it), "@joinkey <64 hex>"
+                sets the field join key while no game is joined, and
+                "@tag <uid hex> [<tag hex>]" reads a player tag (protocol/nfc-tag.md)
+                as if it had been tapped on the NFC reader. For bring-up and the
+                Wokwi emulator; a join still needs a payload signed with this
+                box's field join key, and a tag one signed with the game key.
 
         config ATALAIA_DEV_JOIN_KEY
             string "Development field join key (64 hex digits)"

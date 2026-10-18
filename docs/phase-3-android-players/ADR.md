@@ -298,6 +298,13 @@ Shared test vectors for IDENT, EVT, CMD and ACK frames are defined in
 `protocol/vectors/capability_proxy.yaml`.  Both the Dart client and the
 ESP32 pod firmware parse these vectors in their unit tests.
 
+**Implemented 2026-10-18 (plan phase A):** the full specification is
+`protocol/capability-proxy.md`; it settles what this ADR left open
+(decision A9): a RADIO_ERROR frame (`0x0A`), the proxy IDENT as the answer
+to RADIO_CMD IDENT, the GATT service UUID `4174616c-6169-6100-0000-000000000000`
+(above, the service had Pod TX's UUID), the Pod Status bytes, required
+fields and limits, and unknown keys 6-23 skipped.
+
 **Consequences:**
 - The frame format is frozen for v1; changes require a protocol version
   bump.
@@ -539,6 +546,13 @@ A new CI check validates all `assets/screens/*.yaml` files:
 - Only allowed widget types.
 - Interpolation expressions are parseable.
 - No unknown style properties.
+
+**Implemented 2026-10-18 (plan phase A):** the format as built is in
+`modes/README.md` ("Screens"): the widgets and styles above, plus
+comparisons, `!`, `&&`, `||`, the text filters `|clock`, `|upper`, `|int`,
+a screen background, and the colours `contrast` and `{expression}`
+(decision A10).  The Field Box reads the templates from its image, not
+LittleFS (decision A11).
 
 **Consequences:**
 - One template format renders on both ESP32 (LVGL) and Android/iOS
@@ -1077,7 +1091,8 @@ and 17 (`chrono.violation`) are already allocated and used as-is by
 the phase 3 modes.
 
 **Consequences:**
-- Event IDs 25-39 are reserved for phase 3.  Phase 4 starts at ID 40.
+- Event IDs 25-27 and 33-41 are phase 3's (28-32 the phase 2 mode
+  pack's).  Phase 4 starts at ID 42.
 - All new events follow the established conventions: CBOR integer keys,
   standard priorities, data fields from the shared table.
 - `protogen.py` must be run after updating `events.yaml` to regenerate
@@ -1173,6 +1188,11 @@ game are invalid.
 
 The tag UID is logged but not trusted (UIDs can be cloned on some NFC
 chips).
+
+**Implemented 2026-10-18 (plan phase A):** `protocol/nfc-tag.md`. A
+version byte goes first, the team is the 1-based team id (0 for none), and
+the record is an NDEF MIME record `application/vnd.atalaia.tag` (decision
+A3). The host checks the tag and the script gets `nfc.tag` (decision A4).
 
 #### Kiosk tamper detection
 

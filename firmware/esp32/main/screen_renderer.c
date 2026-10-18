@@ -16,11 +16,18 @@
  *
  * Layout: 320x240 landscape (2.8" ILI9341/ST7789), fonts Montserrat 14,
  * 20, 28 and 48 (lvgl_conf/lv_conf.h).
+ *
+ * Declarative templates (ADR-P3-4) come first: when the running mode ships
+ * a YAML template of the name (screen_template.h), it is drawn instead of
+ * the C function here. The C functions stay as the fallback for modes
+ * without one and for the shell's own screens.
  */
 #include "screen_renderer.h"
 
 #include <stdio.h>
 #include <string.h>
+
+#include "screen_template.h"
 
 static char last_template[SCREEN_TEMPLATE_MAX];
 static char last_data[SCREEN_DATA_MAX];
@@ -813,6 +820,17 @@ static const template_fns_t templates[] = {
     {"wifi_setup", build_wifi_setup, update_wifi_setup},
 };
 
+/* Clears the screen for a new template. */
+static void clean_screen(lv_obj_t *scr)
+{
+    lv_obj_clean(scr);
+    memset(slot, 0, sizeof(slot));
+    lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_pad_all(scr, 0, 0);
+    shown_template[0] = '\0';
+    screen_template_forget();
+}
+
 static void lvgl_render(const char *template_name, const char *data_json)
 {
     if (!lv_is_initialized() || !lv_display_get_default()) return;
@@ -820,13 +838,28 @@ static void lvgl_render(const char *template_name, const char *data_json)
     if (!scr) return;
     const char *data = data_json ? data_json : "{}";
 
+    /* The mode's own template first; "~" marks it in shown_template. */
+    const builtin_screen_t *yaml = screen_template_find(template_name);
+    if (yaml) {
+        char key[SCREEN_TEMPLATE_MAX];
+        snprintf(key, sizeof(key), "~%s", template_name);
+        if (strcmp(shown_template, key) == 0) {
+            screen_template_update(data);
+            return;
+        }
+        clean_screen(scr);
+        set_bg(scr, COLOR_BG);
+        if (screen_template_build(scr, yaml, data)) {
+            snprintf(shown_template, sizeof(shown_template), "%s", key);
+            return;
+        }
+        /* It did not parse (CI checks every template, so this is a bug): the C screen, if any. */
+    }
+
     for (size_t i = 0; i < sizeof(templates) / sizeof(templates[0]); i++) {
         if (strcmp(templates[i].name, template_name) != 0) continue;
         if (strcmp(shown_template, template_name) != 0) {
-            lv_obj_clean(scr);
-            memset(slot, 0, sizeof(slot));
-            lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
-            lv_obj_set_style_pad_all(scr, 0, 0);
+            clean_screen(scr);
             templates[i].build(scr);
             snprintf(shown_template, sizeof(shown_template), "%s", template_name);
         }
@@ -850,8 +883,17 @@ bool screen_render(const char *template_name, const char *data_json)
 {
     if (!template_name) return false;
 
-    /* Check if this is a known template. */
-    bool found = false;
+    /* The running mode, for its own templates (in order with the screens). */
+    if (strcmp(template_name, SCREEN_MODE_MESSAGE) == 0) {
+        screen_template_set_mode(data_json);
+#if ATALAIA_SCREEN_LVGL
+        lvgl_forget(); /* the same name may now be another mode's template */
+#endif
+        return true;
+    }
+
+    /* Check if this is a known template: the mode's own, or one of the C ones. */
+    bool found = screen_template_find(template_name) != NULL;
     for (int i = 0; known_templates[i]; i++) {
         if (strcmp(template_name, known_templates[i]) == 0) {
             found = true;
@@ -881,6 +923,7 @@ void screen_renderer_reset(void)
     last_template[0] = '\0';
     last_data[0] = '\0';
     call_count = 0;
+    screen_template_reset();
 #if ATALAIA_SCREEN_LVGL
     lvgl_forget();
 #endif

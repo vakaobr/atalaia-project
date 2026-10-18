@@ -12,9 +12,12 @@ Both encodings come from the schema files in [`schema/`](schema/), so they canno
 | [`schema/messages.yaml`](schema/messages.yaml) | Packet header and message types (draft) |
 | [`schema/events.yaml`](schema/events.yaml) | Standard events: ids, priorities, CBOR keys and data fields (draft) |
 | [`vectors/events.yaml`](vectors/events.yaml) | Test vectors every event codec must pass |
-| [`vectors/*.json`](vectors/) | Test vectors for header and message payload codecs, and for the join payload (`join.json`) |
+| [`vectors/*.json`](vectors/) | Test vectors for header and message payload codecs, the join payload (`join.json`) and player tags (`tag.json`) |
+| [`vectors/capability_proxy.yaml`](vectors/capability_proxy.yaml) | Test vectors for the capability proxy (I/O pod) frames and payloads |
 | [`join.md`](join.md) | The join payload that brings a box or a standby controller into a game (NFC card, QR code, serial console) |
+| [`nfc-tag.md`](nfc-tag.md) | Player tags: the signed NFC tag of a player (Kill Confirmed, Respawn, Player Check-in) |
 | [`usb-modem.md`](usb-modem.md) | The serial link between the field controller and its USB radio modem |
+| [`capability-proxy.md`](capability-proxy.md) | The link between an I/O pod and a phone (USB-OTG and BLE), version 1 |
 | [`json/event.schema.json`](json/event.schema.json) | JSON Schema of an event in the game log and the API (generated) |
 | [`json/examples/`](json/examples/) | Events that CI validates against that schema, plus invalid ones it must reject |
 
@@ -30,7 +33,8 @@ The generator writes these files; none of them should be edited by hand:
 | --- | --- |
 | `core/include/atalaia/protocol.h`, `core/src/protocol.c` | C: constants, ids, keys, payload field enums and lookup tables |
 | `core/tests/protocol_vectors.h` | C: event codec test vectors |
-| `core/tests/packet_vectors.h` | C: header, payload, AES-CCM and join test vectors (from `vectors/*.json`) |
+| `core/tests/packet_vectors.h` | C: header, payload, AES-CCM, join and player tag test vectors (from `vectors/*.json`) |
+| `core/tests/proxy_vectors.h` | C: capability proxy test vectors (from `vectors/capability_proxy.yaml`) |
 | `simulator/atalaia_sim/protocol.py` | Python: the same tables |
 | `protocol/json/event.schema.json` | Anyone consuming events as JSON |
 
@@ -121,6 +125,12 @@ A box or a standby controller joins with a join payload: a version byte, a CBOR 
 ## The USB radio modem
 
 The field controller reaches the radio through a modem board on USB. Its framing, commands and status codes are in [usb-modem.md](usb-modem.md).
+
+## Phase 3: player tags, I/O pods and new events
+
+- **Player tags** ([nfc-tag.md](nfc-tag.md)): a version byte, the player id, the team, the game id and a 16-byte HMAC-SHA256 under the game key, on an NFC tag as an `application/vnd.atalaia.tag` record. The node's host checks a tag and gives the mode `nfc.tag`.
+- **Capability proxy v1** ([capability-proxy.md](capability-proxy.md)): an I/O pod lends its buttons, LEDs, NFC reader and radio to a phone, with the USB modem's framing: IDENT, EVT, CMD and ACK (CBOR), and the modem's radio frames shifted by 3.
+- **Events** 25-27 and 33-41 (ADR-P3-8): `kill.confirmed`, `kill.denied`, `team.eliminated`, `money.collected`, `money.deposited`, `chrono.checkin`, `chrono.spotcheck`, `visibility.granted`, `visibility.expired`, `node.tamper`, `pod.connected`, `pod.disconnected`; data keys 29 (`see_team`) and 30 (`tolerance_pct`). The phase 2 mode pack holds 28-32; phase 4 starts at 42. Proposed in a draft RFC ([docs/rfcs/0000-phase-3-events-tags-and-pods.md](../docs/rfcs/0000-phase-3-events-tags-and-pods.md)).
 
 ### Header `version_flags` byte
 

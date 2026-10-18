@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+id: org.atalaia.player_checkin
+version: 0.1.0
+license: GPL-3.0-or-later
+min_tier: reduced
+kind: mode
+name: Player Check-in
+description: >-
+  Players check in at a checkpoint by scanning their signed NFC tag. The box counts the players of each
+  team and gives their team points for each check-in. A player counts once, or again after a set time.
+  Forged tags and tags from another game are refused.
+roles:
+  checkpoint: { requires: [nfc], optional: [display] }
+params:
+  points:         { type: int, min: 0, max: 1000, default: 1, label: "Points for the player's team per check-in" }
+  repeat_after_s: { type: int, min: 0, max: 86400, default: 0, label: "Seconds before the same player counts again (0: once per game)" }
+i18n:
+  pt:
+    name: Registo de Presença
+    description: >-
+      Cada participante faz o registo num ponto de controlo lendo a sua etiqueta NFC assinada. A caixa conta
+      as pessoas de cada equipa e dá pontos à equipa por cada registo. Cada pessoa conta uma vez, ou de
+      novo ao fim de um tempo definido. Etiquetas falsificadas ou de outro jogo são recusadas.
+    params:
+      points: Pontos para a equipa por cada registo
+      repeat_after_s: "Segundos até a mesma pessoa voltar a contar (0: uma vez por jogo)"

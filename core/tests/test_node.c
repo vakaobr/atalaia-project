@@ -222,6 +222,21 @@ static void test_scores_and_end(void)
     CHECK(!atalaia_node_input(n, "penalty", NULL));
     atalaia_node_destroy(n);
 
+    /* A penalty with a reason and no squad, and one with neither: the
+     * three-argument form once put the data table inside itself, so the
+     * event could not be encoded (found by Kill Confirmed). */
+    n = make_node(&r, 1, 0);
+    CHECK(load(n, "on('foul', function() score.add('red', -1, 'killed') end)\n"
+                  "on('foul2', function() score.add('red', -2) end)\n"));
+    CHECK(atalaia_node_input(n, "foul", NULL));
+    CHECK(atalaia_node_input(n, "foul2", NULL));
+    CHECK(atalaia_score_net(atalaia_node_score(n), 1) == -3);
+    CHECK(r.events == 2 && strcmp(r.type[0], "score.delta") == 0);
+    CHECK(strcmp(r.data[0], "{\"amount\":-1,\"reason\":\"killed\",\"team\":\"red\"}") == 0);
+    CHECK(strcmp(r.data[1], "{\"amount\":-2,\"reason\":\"\",\"team\":\"red\"}") == 0);
+    CHECK(find_event(&r, "script.error") < 0);
+    atalaia_node_destroy(n);
+
     /* A script can end the game itself. */
     n = make_node(&r, 1, 0);
     CHECK(load(n, "after(5, function() game.win('blue') end)"));

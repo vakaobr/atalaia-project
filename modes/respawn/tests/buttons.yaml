@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Without tags, a team's button press is a respawn for that team, with a 2 s guard against double presses
+params: { lives: 2 }
+steps:
+  - press: { team: blue }
+  - expect: { type: player.respawn, team: blue, at: 0, data: { lives_left: 1 } }
+  - press: { team: blue }
+  - expect_screen: { template: respawn, data: { message: Wait 2 s, error: true } }
+  - expect_no: player.respawn
+  - wait: 2
+  - press: { team: blue }
+  - expect: { type: player.respawn, team: blue, at: 2, data: { lives_left: 0 } }
+  - wait: 2
+  - press: { team: blue }
+  - expect: { type: team.eliminated, team: blue, at: 4 }
+  - press: { team: red }
+  - expect: { type: player.respawn, team: red, data: { lives_left: 1 } }
+  - expect_no: script.error

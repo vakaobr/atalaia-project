@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -82,8 +84,15 @@ class Simulation:
         mem_limit: int = 0,
         instr_limit: int = 0,
         radio: Optional["RadioModel"] = None,
+        game_id: int = 1,
+        game_key: Optional[bytes] = None,
     ):
+        self.core = core
         self.mode = mode
+        # The game's id and 16-byte key, as a join gives them to a box: player tags
+        # (protocol/nfc-tag.md) are signed with them. The default key is fixed per seed.
+        self.game_id = game_id
+        self.game_key = game_key or hashlib.sha256(b"atalaia-sim-game-key:%d" % seed).digest()[:16]
         self.teams = list(teams)
         self.params = params
         self.time_ms = 0
@@ -385,6 +394,13 @@ class Simulation:
         vnode.last_input = {"t": self.time_ms, "type": type_, "data": data or {}, "accepted": accepted}
         self._pump()
         return accepted
+
+    def scan(self, node: str, uid: bytes, payload: Optional[bytes]) -> bool:
+        """An NFC tag read on a node: the core checks the tag against this game (atalaia/tag.h)
+        and the node gets nfc.tag with the result, as a box's shell gives it."""
+        data = json.loads(self.core.tag_event_json(uid, payload, self.game_id, self.game_key,
+                                                   self.teams))
+        return self.input(node, "nfc.tag", data)
 
     def _check_team(self, team: str) -> None:
         if team not in self.teams:

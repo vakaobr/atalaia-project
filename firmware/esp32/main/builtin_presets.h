@@ -22,7 +22,8 @@ typedef struct {
 
 /*
  * Write each built-in preset (Bomb, Domination, Hold-All Domination, Last
- * Stand, Codes) whose mode no stored preset uses, into the lowest free
+ * Stand, Codes, Kill Confirmed, Respawn and Lives, Player Check-in) whose
+ * mode no stored preset uses, into the lowest free
  * slots, in that order. A built-in mode already stored gets the source from
  * this image when it differs (the firmware owns the built-in modes).
  * sources supplies node.lua for each mode; presets whose mode has no source

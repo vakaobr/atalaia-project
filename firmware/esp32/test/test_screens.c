@@ -23,6 +23,7 @@
 #include "lvgl.h"
 #include "png_io.h"
 #include "screen_renderer.h"
+#include "screen_template.h"
 #include "test_display.h"
 
 #define W TEST_DISPLAY_W
@@ -32,42 +33,81 @@ typedef struct {
     const char *name; /* PNG file name without .png */
     const char *template_name;
     const char *data;
+    /* For a mode's YAML template (modes/<mode>/assets/screens/): the "@mode"
+     * message, "<mode id> <params>"; NULL for the C screens. */
+    const char *mode;
 } screen_case_t;
+
+#define BOMB    "org.atalaia.bomb {\"attackers\":\"red\",\"defenders\":\"blue\",\"fuse_s\":300}"
+#define DOM     "org.atalaia.domination {\"capture_hold_ms\":3000,\"tick_s\":10}"
+#define KILL    "org.atalaia.kill_confirmed {\"turn_in_s\":20}"
+#define RESPAWN "org.atalaia.respawn {\"lives\":20,\"per_player\":false}"
+#define CHECKIN "org.atalaia.player_checkin {\"points\":1}"
 
 /* Data as the modes (modes/bomb, modes/domination, modes/codes) and the shell send it. */
 static const screen_case_t cases[] = {
-    {"standby", "standby", "{\"arm\":\"red\"}"},
-    {"countdown", "countdown", "{\"left\":299}"},
-    {"countdown_last_seconds", "countdown", "{\"left\":7}"},
-    {"countdown_long", "countdown", "{\"left\":5400,\"team\":\"red\"}"},
-    {"defused", "defused", "{\"team\":\"blue\"}"},
-    {"defused_yellow", "defused", "{\"team\":\"yellow\"}"},
-    {"exploded", "exploded", "{\"team\":\"red\"}"},
-    {"final_score", "final_score", "{\"owner\":\"red\"}"},
-    {"final_score_no_owner", "final_score", "{}"},
-    {"paused", "paused", "{}"},
+    {"standby", "standby", "{\"arm\":\"red\"}", NULL},
+    {"countdown", "countdown", "{\"left\":299}", NULL},
+    {"countdown_last_seconds", "countdown", "{\"left\":7}", NULL},
+    {"countdown_long", "countdown", "{\"left\":5400,\"team\":\"red\"}", NULL},
+    {"defused", "defused", "{\"team\":\"blue\"}", NULL},
+    {"defused_yellow", "defused", "{\"team\":\"yellow\"}", NULL},
+    {"exploded", "exploded", "{\"team\":\"red\"}", NULL},
+    {"final_score", "final_score", "{\"owner\":\"red\"}", NULL},
+    {"final_score_no_owner", "final_score", "{}", NULL},
+    {"paused", "paused", "{}", NULL},
     {"code_entry", "code_entry",
-     "{\"title\":\"ARM\",\"digits\":0,\"message\":\"Enter your team code\"}"},
-    {"code_entry_defuse", "code_entry", "{\"title\":\"DEFUSE\",\"digits\":3,\"left\":154}"},
+     "{\"title\":\"ARM\",\"digits\":0,\"message\":\"Enter your team code\"}", NULL},
+    {"code_entry_defuse", "code_entry", "{\"title\":\"DEFUSE\",\"digits\":3,\"left\":154}", NULL},
     {"code_entry_wrong", "code_entry",
-     "{\"title\":\"CODE\",\"digits\":0,\"message\":\"Wrong code\",\"error\":true}"},
+     "{\"title\":\"CODE\",\"digits\":0,\"message\":\"Wrong code\",\"error\":true}", NULL},
     {"code_entry_points", "code_entry",
-     "{\"title\":\"CODE\",\"digits\":4,\"message\":\"+50 points for RED\",\"error\":false}"},
+     "{\"title\":\"CODE\",\"digits\":4,\"message\":\"+50 points for RED\",\"error\":false}", NULL},
     {"status", "status",
      "{\"title\":\"Game on\",\"mode\":\"Domination\",\"timer_s\":600,\"battery\":85,"
-     "\"version\":\"0.1.0\"}"},
-    {"pin_entry", "pin_entry", "{\"digits\":2,\"error\":false}"},
-    {"pin_entry_wrong", "pin_entry", "{\"digits\":0,\"error\":true}"},
-    {"preset_select", "preset_select", "{\"presets\":[\"Bomb\",\"Domination\"],\"selected\":1}"},
+     "\"version\":\"0.1.0\"}",
+     NULL},
+    {"pin_entry", "pin_entry", "{\"digits\":2,\"error\":false}", NULL},
+    {"pin_entry_wrong", "pin_entry", "{\"digits\":0,\"error\":true}", NULL},
+    {"preset_select", "preset_select", "{\"presets\":[\"Bomb\",\"Domination\"],\"selected\":1}",
+     NULL},
     {"preset_select_long", "preset_select",
      "{\"presets\":[\"Bomb\",\"Domination\",\"Bomb (short fuse)\",\"Domination: 3 teams\","
      "\"Night game with a very long name that does not fit\",\"Training\",\"King of the hill\"],"
-     "\"selected\":5}"},
-    {"preset_select_empty", "preset_select", "{\"presets\":[],\"selected\":1}"},
-    {"timer_adjust", "timer_adjust", "{\"timer_s\":600}"},
-    {"timer_adjust_no_limit", "timer_adjust", "{\"timer_s\":0}"},
-    {"start_confirm", "start_confirm", "{\"label\":\"Bomb\",\"timer_s\":600}"},
-    {"wifi_setup", "wifi_setup", "{\"ssid\":\"atalaia-3F2A\"}"},
+     "\"selected\":5}",
+     NULL},
+    {"preset_select_empty", "preset_select", "{\"presets\":[],\"selected\":1}", NULL},
+    {"timer_adjust", "timer_adjust", "{\"timer_s\":600}", NULL},
+    {"timer_adjust_no_limit", "timer_adjust", "{\"timer_s\":0}", NULL},
+    {"start_confirm", "start_confirm", "{\"label\":\"Bomb\",\"timer_s\":600}", NULL},
+    {"wifi_setup", "wifi_setup", "{\"ssid\":\"atalaia-3F2A\"}", NULL},
+    /* Declarative templates (ADR-P3-4): Bomb and Domination migrated, the phase 3 modes. */
+    {"yaml_bomb_standby", "standby", "{\"arm\":\"red\"}", BOMB},
+    {"yaml_bomb_countdown", "countdown", "{\"left\":299}", BOMB},
+    {"yaml_bomb_countdown_last_seconds", "countdown", "{\"left\":7,\"team\":\"red\"}", BOMB},
+    {"yaml_bomb_defused", "defused", "{\"team\":\"blue\"}", BOMB},
+    {"yaml_bomb_defused_yellow", "defused", "{\"team\":\"yellow\"}", BOMB},
+    {"yaml_bomb_exploded", "exploded", "{\"team\":\"red\"}", BOMB},
+    {"yaml_domination_standby", "standby", "{}", DOM},
+    {"yaml_domination_captured", "captured", "{\"team\":\"red\",\"points\":12,\"since\":95}", DOM},
+    {"yaml_domination_final_score", "final_score", "{\"owner\":\"blue\",\"points\":40}", DOM},
+    {"yaml_domination_final_score_no_owner", "final_score", "{}", DOM},
+    {"yaml_kill_confirmed", "tags", "{\"error\":false}", KILL},
+    {"yaml_kill_confirmed_open", "tags",
+     "{\"team\":\"red\",\"left\":14,\"message\":\"Kill confirmed: b1\",\"error\":false}", KILL},
+    {"yaml_kill_confirmed_forged", "tags", "{\"message\":\"Forged tag\",\"error\":true}", KILL},
+    {"yaml_respawn", "respawn",
+     "{\"team\":\"blue\",\"player\":\"b3\",\"lives\":17,\"message\":\"Back in the game\","
+     "\"error\":false}",
+     RESPAWN},
+    {"yaml_respawn_out", "respawn",
+     "{\"team\":\"red\",\"player\":\"r1\",\"lives\":0,\"message\":\"No lives left: team out\","
+     "\"error\":true}",
+     RESPAWN},
+    {"yaml_checkin", "checkin",
+     "{\"total\":5,\"counts\":\"RED 3  BLUE 2\",\"team\":\"red\",\"message\":\"Checked in: r2\","
+     "\"error\":false}",
+     CHECKIN},
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))
 
@@ -138,7 +178,9 @@ static void check_overlaps(const char *name)
 
 static void render(const screen_case_t *c)
 {
+    if (c->mode) screen_render(SCREEN_MODE_MESSAGE, c->mode);
     if (!screen_render(c->template_name, c->data)) fail(c->name, "template not recognised");
+    if (c->mode && !screen_template_widget_count()) fail(c->name, "not drawn from its template");
     test_display_render();
     test_display_rgb888(rendered);
 }
@@ -239,6 +281,23 @@ static void check_patch_matches_build(void)
     test_display_rgb888(rendered);
     if (memcmp(patched, rendered, sizeof(rendered)) != 0) {
         fail("countdown", "patching 299 -> 7 differs from building the screen at 7");
+    }
+
+    /* The same for a declarative template, through the colour change at 10 s. */
+    screen_renderer_reset();
+    screen_render(SCREEN_MODE_MESSAGE, BOMB);
+    screen_render("countdown", "{\"left\":299}");
+    test_display_render();
+    screen_render("countdown", "{\"left\":7,\"team\":\"red\"}");
+    test_display_render();
+    test_display_rgb888(patched);
+    screen_renderer_reset();
+    screen_render(SCREEN_MODE_MESSAGE, BOMB);
+    screen_render("countdown", "{\"left\":7,\"team\":\"red\"}");
+    test_display_render();
+    test_display_rgb888(rendered);
+    if (memcmp(patched, rendered, sizeof(rendered)) != 0) {
+        fail("yaml_bomb_countdown", "patching 299 -> 7 differs from building the screen at 7");
     }
 }
 

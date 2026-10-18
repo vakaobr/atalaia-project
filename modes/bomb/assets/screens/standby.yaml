@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The bomb waits to be armed. Data: arm (the attacking team).
+template: standby
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: panel }
+    children:
+      - type: label
+        text: STANDBY
+        style: { font_size: 20, width: fill, align: center }
+  - type: spacer
+    height: fill
+  - type: label
+    text: Hold the button to arm
+    style: { font_size: 20, color: muted, visible: "{arm}" }
+  - type: label
+    text: Waiting
+    style: { font_size: 20, color: muted, visible: "{!arm}" }
+  - type: label
+    text: "{arm|upper}"
+    style: { font_size: 48, color: "{arm}", visible: "{arm}" }
+  - type: progress_bar
+    value: 1
+    style: { width: 180, height: 8, color: "{arm}", visible: "{arm}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: The bomb is not armed
+    style:
+      font_size: 14
+      color: muted
+      padding: { bottom: 10 }

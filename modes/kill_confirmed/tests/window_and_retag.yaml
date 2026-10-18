@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: The station closes after turn_in_s, a player's tag counts once per retag_after_s, and tags without a team are refused
+params: { turn_in_s: 10, retag_after_s: 30, confirm_points: 5, penalty_points: 0 }
+steps:
+  - press: { team: blue }
+  - scan: { player: r1, team: red }
+  - expect: { type: kill.confirmed, team: blue, at: 0, data: { player: r1, owner: red } }
+  - expect_no: score.delta
+  - expect_score: { team: blue, points: 5 }
+  - expect_score: { team: red, points: 0 }
+  # The same tag again, too soon.
+  - wait: 5
+  - scan: { player: r1, team: red }
+  - expect_screen: { template: tags, data: { team: blue, message: Tag already counted, error: true } }
+  - scan: { player: nobody }
+  - expect_screen: { template: tags, data: { message: This tag has no team, error: true } }
+  - expect_no: kill.confirmed
+  # The station closed 10 s after the last tag that counted.
+  - wait: 6
+  - scan: { player: r2, team: red }
+  - expect_screen: { template: tags, data: { message: "Press your team's button first" } }
+  # Once retag_after_s has passed, r1's tag counts again.
+  - wait: 20
+  - press: { team: blue }
+  - scan: { player: r1, team: red }
+  - expect: { type: kill.confirmed, team: blue, at: 31, data: { player: r1 } }
+  - expect_score: { team: blue, points: 10 }
+  - expect_no: script.error

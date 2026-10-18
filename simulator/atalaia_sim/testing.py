@@ -21,12 +21,14 @@ See modes/README.md for every step.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
 import yaml
 
+from . import tag as player_tag
 from .core import Core
 from .mode import Mode, ModeError, compose, load_mode
 from .sim import CONTROLLER, LogEntry, SimError, Simulation
@@ -125,6 +127,34 @@ class _Runner:
 
     def do_input(self, arg: dict[str, Any]) -> None:
         self.sim.input(self._default_node(arg), arg["type"], arg.get("data"))
+
+    def do_scan(self, arg: Any) -> None:
+        """An NFC tag read: a player's signed tag, a forged one, one from another game, or a
+        tag with no Atalaia record (uid only). See modes/README.md."""
+        if not isinstance(arg, dict):
+            raise TestFailure("scan takes a map: { player, team } or { uid }")
+        unknown = set(arg) - {"node", "player", "team", "uid", "forged", "game"}
+        if unknown:
+            raise TestFailure(f"scan: unknown key(s) {sorted(unknown)}")
+        payload = None
+        if "player" in arg:
+            team = arg.get("team")
+            if team is not None and team not in self.sim.teams:
+                raise TestFailure(f"scan: unknown team '{team}'")
+            team_id = self.sim.teams.index(team) + 1 if team else 0
+            key = self.sim.game_key
+            if arg.get("forged"):
+                key = bytes(b ^ 0x5A for b in key)
+            game_id = int(arg.get("game", self.sim.game_id))
+            payload = player_tag.encode({"player": str(arg["player"]), "team": team_id,
+                                         "game_id": game_id}, key)
+        if arg.get("uid"):
+            uid = bytes.fromhex(str(arg["uid"]))
+        elif "player" in arg:
+            uid = b"\x04" + hashlib.sha256(str(arg["player"]).encode()).digest()[:6]
+        else:
+            raise TestFailure("scan needs a player or a uid")
+        self.sim.scan(self._default_node(arg), uid, payload)
 
     def do_keys(self, arg: Any) -> None:
         if not isinstance(arg, dict):

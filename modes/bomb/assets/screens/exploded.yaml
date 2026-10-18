@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The bomb exploded: the whole screen in the winning team's colour.
+# Data: team (the arming team).
+template: exploded
+style: { background: "{team || 'panel'}" }
+layout:
+  - type: icon
+    icon: warning
+    style: { font_size: 48, color: contrast }
+  - type: label
+    text: EXPLODED
+    style: { font_size: 48, color: contrast }
+  - type: label
+    text: "{team|upper} team wins"
+    style: { font_size: 28, color: contrast, visible: "{team}" }

@@ -138,35 +138,37 @@ enum {
 
 /* CBOR keys of event data fields. */
 enum {
-    ATALAIA_DATA_TEAM = 1,          /* team name */
-    ATALAIA_DATA_SQUAD = 2,         /* squad name */
-    ATALAIA_DATA_REASON = 3,        /* why it happened */
-    ATALAIA_DATA_PREVIOUS_TEAM = 4, /* team that owned the zone before */
-    ATALAIA_DATA_ZONE = 5,          /* zone name */
-    ATALAIA_DATA_AMOUNT = 6,        /* points; negative for penalties */
-    ATALAIA_DATA_FUSE_S = 7,        /* fuse length in seconds */
-    ATALAIA_DATA_WINNER = 8,        /* winning team name */
-    ATALAIA_DATA_PRESET = 9,        /* preset id */
-    ATALAIA_DATA_CODE = 10,         /* code id */
-    ATALAIA_DATA_KIND = 11,         /* code kind: hint, points, unlock */
-    ATALAIA_DATA_TAG = 12,          /* NFC tag id */
-    ATALAIA_DATA_OWNER = 13,        /* tag owner: team or player */
-    ATALAIA_DATA_PLAYER = 14,       /* player id */
-    ATALAIA_DATA_LIVES_LEFT = 15,   /* lives remaining */
-    ATALAIA_DATA_WINDOW_OPEN = 16,  /* the target's scoring window was open */
-    ATALAIA_DATA_TEXT = 17,         /* message text */
-    ATALAIA_DATA_AUDIENCE = 18,     /* who sees the message */
-    ATALAIA_DATA_MESSAGE = 19,      /* error message */
-    ATALAIA_DATA_PERCENT = 20,      /* battery level in percent */
-    ATALAIA_DATA_FW = 21,           /* firmware version */
-    ATALAIA_DATA_TIER = 22,         /* device tier */
-    ATALAIA_DATA_LAST_SEEN = 23,    /* game time of the last contact, in ms */
-    ATALAIA_DATA_REPLICA = 24,      /* replica id */
-    ATALAIA_DATA_READING_MPS = 25,  /* chrono reading in m/s */
-    ATALAIA_DATA_BB_G = 26,         /* BB weight in grams */
-    ATALAIA_DATA_LIMIT_J = 27,      /* energy limit in joules */
-    ATALAIA_DATA_DURATION_S = 28,   /* countdown or visibility duration in seconds */
-    ATALAIA_DATA_HOLDER = 31,       /* team holding the node when it happened */
+    ATALAIA_DATA_TEAM = 1,           /* team name */
+    ATALAIA_DATA_SQUAD = 2,          /* squad name */
+    ATALAIA_DATA_REASON = 3,         /* why it happened */
+    ATALAIA_DATA_PREVIOUS_TEAM = 4,  /* team that owned the zone before */
+    ATALAIA_DATA_ZONE = 5,           /* zone name */
+    ATALAIA_DATA_AMOUNT = 6,         /* points; negative for penalties */
+    ATALAIA_DATA_FUSE_S = 7,         /* fuse length in seconds */
+    ATALAIA_DATA_WINNER = 8,         /* winning team name */
+    ATALAIA_DATA_PRESET = 9,         /* preset id */
+    ATALAIA_DATA_CODE = 10,          /* code id */
+    ATALAIA_DATA_KIND = 11,          /* code kind: hint, points, unlock */
+    ATALAIA_DATA_TAG = 12,           /* NFC tag id */
+    ATALAIA_DATA_OWNER = 13,         /* tag owner: team or player */
+    ATALAIA_DATA_PLAYER = 14,        /* player id */
+    ATALAIA_DATA_LIVES_LEFT = 15,    /* lives remaining */
+    ATALAIA_DATA_WINDOW_OPEN = 16,   /* the target's scoring window was open */
+    ATALAIA_DATA_TEXT = 17,          /* message text */
+    ATALAIA_DATA_AUDIENCE = 18,      /* who sees the message */
+    ATALAIA_DATA_MESSAGE = 19,       /* error message */
+    ATALAIA_DATA_PERCENT = 20,       /* battery level in percent */
+    ATALAIA_DATA_FW = 21,            /* firmware version */
+    ATALAIA_DATA_TIER = 22,          /* device tier */
+    ATALAIA_DATA_LAST_SEEN = 23,     /* game time of the last contact, in ms */
+    ATALAIA_DATA_REPLICA = 24,       /* replica id */
+    ATALAIA_DATA_READING_MPS = 25,   /* chrono reading in m/s */
+    ATALAIA_DATA_BB_G = 26,          /* BB weight in grams */
+    ATALAIA_DATA_LIMIT_J = 27,       /* energy limit in joules */
+    ATALAIA_DATA_DURATION_S = 28,    /* countdown or visibility duration in seconds */
+    ATALAIA_DATA_SEE_TEAM = 29,      /* team whose positions become visible */
+    ATALAIA_DATA_TOLERANCE_PCT = 30, /* chrono comparison tolerance in percent */
+    ATALAIA_DATA_HOLDER = 31,        /* team holding the node when it happened */
 };
 
 /* Standard event ids: the CBOR value of the type field. */
@@ -195,11 +197,23 @@ enum {
     ATALAIA_EV_BATTERY_LOW = 22,                /* battery.low */
     ATALAIA_EV_SCRIPT_ERROR = 23,               /* script.error */
     ATALAIA_EV_SCRIPT_HALTED = 24,              /* script.halted */
+    ATALAIA_EV_KILL_CONFIRMED = 25,             /* kill.confirmed */
+    ATALAIA_EV_KILL_DENIED = 26,                /* kill.denied */
+    ATALAIA_EV_TEAM_ELIMINATED = 27,            /* team.eliminated */
     ATALAIA_EV_HOLDALL_SCORING_START = 28,      /* holdall.scoring_start */
     ATALAIA_EV_HOLDALL_SCORING_STOP = 29,       /* holdall.scoring_stop */
     ATALAIA_EV_LASTSTAND_COUNTDOWN_START = 30,  /* laststand.countdown_start */
     ATALAIA_EV_LASTSTAND_COUNTDOWN_CANCEL = 31, /* laststand.countdown_cancel */
     ATALAIA_EV_LASTSTAND_DEFEATED = 32,         /* laststand.defeated */
+    ATALAIA_EV_MONEY_COLLECTED = 33,            /* money.collected */
+    ATALAIA_EV_MONEY_DEPOSITED = 34,            /* money.deposited */
+    ATALAIA_EV_CHRONO_CHECKIN = 35,             /* chrono.checkin */
+    ATALAIA_EV_CHRONO_SPOTCHECK = 36,           /* chrono.spotcheck */
+    ATALAIA_EV_VISIBILITY_GRANTED = 37,         /* visibility.granted */
+    ATALAIA_EV_VISIBILITY_EXPIRED = 38,         /* visibility.expired */
+    ATALAIA_EV_NODE_TAMPER = 39,                /* node.tamper */
+    ATALAIA_EV_POD_CONNECTED = 40,              /* pod.connected */
+    ATALAIA_EV_POD_DISCONNECTED = 41,           /* pod.disconnected */
 };
 
 typedef enum {

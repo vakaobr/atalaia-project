@@ -11,6 +11,8 @@ Outputs, each marked "do not edit":
     core/include/atalaia/protocol.h     C constants, ids, keys and table types
     core/src/protocol.c                 C tables and lookups
     core/tests/protocol_vectors.h       codec test vectors for the C tests
+    core/tests/packet_vectors.h         packet, payload, join and player tag vectors (C tests)
+    core/tests/proxy_vectors.h          capability proxy vectors (C tests, core and firmware)
     simulator/atalaia_sim/protocol.py   the same tables for Python
     protocol/json/event.schema.json     JSON Schema of an event in the game log
 
@@ -768,9 +770,82 @@ def gen_packet_vectors(jv: dict[str, Any]) -> str:
 
     if "join" in jv:
         L += gen_join_vectors(jv["join"], byte_array)
+    if "tag" in jv:
+        L += gen_tag_vectors(jv["tag"], byte_array)
 
     L += ["#endif /* ATALAIA_PACKET_VECTORS_H */", ""]
     return "\n".join(L)
+
+
+def gen_tag_vectors(tv: dict[str, Any], byte_array: Any) -> list[str]:
+    """Player tag vectors (protocol/vectors/tag.json), with expected structs."""
+    results = {"format": "ATALAIA_TAG_ERR_FORMAT", "version": "ATALAIA_TAG_ERR_VERSION",
+               "game": "ATALAIA_TAG_ERR_GAME", "mac": "ATALAIA_TAG_ERR_MAC",
+               "team": "ATALAIA_TAG_ERR_TEAM"}
+    L = ["/* ---- player tag vectors (protocol/nfc-tag.md) ---- */", "",
+         "#include \"atalaia/tag.h\"", "",
+         "typedef struct {",
+         "    const char *name;",
+         "    atalaia_tag_t fields;",
+         "    const uint8_t *payload;",
+         "    size_t payload_len;",
+         "    const uint8_t *ndef_tag;",
+         "    size_t ndef_tag_len;",
+         "} tag_vector_t;",
+         "",
+         "typedef struct {",
+         "    const char *name;",
+         "    const uint8_t *payload;",
+         "    size_t payload_len;",
+         "    atalaia_tag_result_t result;",
+         "    const char *why;",
+         "} tag_bad_vector_t;",
+         "",
+         "typedef struct {",
+         "    const char *name;",
+         "    const uint8_t *payload; /* NULL: the tag has no Atalaia record */",
+         "    size_t payload_len;",
+         "    bool game_key; /* false: the node is in no game */",
+         "    const char *json;",
+         "} tag_event_vector_t;",
+         ""]
+    L += byte_array("tag_game_key", tv["game_key"])
+    L += byte_array("tag_uid", tv["uid"])
+    for i, v in enumerate(tv["valid"]):
+        L += byte_array(f"tag_vec_{i}", v["payload"])
+        L += byte_array(f"tag_ndef_{i}", v["ndef_tag"])
+    for i, v in enumerate(tv["invalid"]):
+        L += byte_array(f"tag_bad_{i}", v["payload"])
+    for i, v in enumerate(tv["events"]):
+        if v["payload"]:
+            L += byte_array(f"tag_ev_{i}", v["payload"])
+    L += ["", f"#define TAG_VECTOR_GAME_ID {int(tv['game_id'])}",
+          "static const char *const tag_vector_teams[] = {"
+          + ", ".join(c_string(t) for t in tv["teams"]) + "};",
+          f"#define TAG_VECTOR_TEAM_COUNT {len(tv['teams'])}", "",
+          "static const tag_vector_t tag_vectors[] = {"]
+    for i, v in enumerate(tv["valid"]):
+        f = v["fields"]
+        L.append(f"    {{{c_string(v['name'])}, {{{c_string(f['player'])}, {int(f['team'])}, "
+                 f"{int(f['game_id'])}}}, tag_vec_{i}, tag_vec_{i}_len, tag_ndef_{i}, "
+                 f"tag_ndef_{i}_len}},")
+    L += ["};",
+          "#define TAG_VECTOR_COUNT (sizeof(tag_vectors) / sizeof(tag_vectors[0]))", "",
+          "static const tag_bad_vector_t tag_bad_vectors[] = {"]
+    for i, v in enumerate(tv["invalid"]):
+        L.append(f"    {{{c_string(v['name'])}, tag_bad_{i}, tag_bad_{i}_len, "
+                 f"{results[v['reason']]}, {c_string(v['why'])}}},")
+    L += ["};",
+          "#define TAG_BAD_VECTOR_COUNT (sizeof(tag_bad_vectors) / sizeof(tag_bad_vectors[0]))", "",
+          "static const tag_event_vector_t tag_event_vectors[] = {"]
+    for i, v in enumerate(tv["events"]):
+        ptr, n = (f"tag_ev_{i}", f"tag_ev_{i}_len") if v["payload"] else ("NULL", "0")
+        L.append(f"    {{{c_string(v['name'])}, {ptr}, {n}, {'true' if v['game_key'] else 'false'}, "
+                 f"{c_string(v['json'])}}},")
+    L += ["};",
+          "#define TAG_EVENT_VECTOR_COUNT (sizeof(tag_event_vectors) / sizeof(tag_event_vectors[0]))",
+          ""]
+    return L
 
 
 def gen_join_vectors(jv: dict[str, Any], byte_array: Any) -> list[str]:
@@ -852,6 +927,115 @@ def gen_join_vectors(jv: dict[str, Any], byte_array: Any) -> list[str]:
     return L
 
 
+# ---- capability proxy vectors (protocol/vectors/capability_proxy.yaml) ------
+
+PROXY_VECTORS = REPO / "protocol" / "vectors" / "capability_proxy.yaml"
+
+
+def gen_proxy_vectors(pv: dict[str, Any]) -> str:
+    """core/tests/proxy_vectors.h: the capability proxy vectors for the C tests (core and firmware)."""
+    L = c_spdx("Capability proxy test vectors (protocol/vectors/capability_proxy.yaml).")
+    L[5] = " * Generated by tools/protogen.py from protocol/vectors/capability_proxy.yaml. Do not edit."
+    L += ["#ifndef ATALAIA_PROXY_VECTORS_H", "#define ATALAIA_PROXY_VECTORS_H", "",
+          "#include <stdbool.h>", "#include <stddef.h>", "#include <stdint.h>", "",
+          "#include \"atalaia/proxy.h\"", ""]
+
+    def arr(name: str, hexstr: str) -> list[str]:
+        data = bytes.fromhex(hexstr)
+        if not data:
+            return [f"#define {name} ((const uint8_t *)\"\")", f"#define {name}_len 0"]
+        out = [f"static const uint8_t {name}[] = {{"]
+        for i in range(0, len(data), 12):
+            out.append("    " + ", ".join(f"0x{b:02x}" for b in data[i:i + 12]) + ",")
+        return out + ["};", f"#define {name}_len sizeof({name})"]
+
+    def compact(v: Any) -> str:
+        return json.dumps(v, separators=(",", ":"), ensure_ascii=False)
+
+    require(isinstance(pv.get("crc", {}).get("crc"), int), "capability_proxy.yaml: crc check missing")
+    L += arr("proxy_crc_data", pv["crc"]["data"])
+    L += [f"#define PROXY_CRC_CHECK 0x{pv['crc']['crc']:04x}", ""]
+
+    L += ["typedef struct {", "    const char *name;", "    atalaia_proxy_ident_t fields;",
+          "    const uint8_t *payload;", "    size_t payload_len;", "    const uint8_t *frame;",
+          "    size_t frame_len;", "} proxy_ident_vector_t;", "",
+          "typedef struct {", "    const char *name;", "    uint8_t type; /* EVT or CMD */",
+          "    atalaia_proxy_msg_t fields;", "    const uint8_t *payload;", "    size_t payload_len;",
+          "    const uint8_t *frame;", "    size_t frame_len;", "} proxy_msg_vector_t;", "",
+          "typedef struct {", "    const char *name;", "    uint8_t type; /* any frame type */",
+          "    const uint8_t *payload;", "    size_t payload_len;", "    const uint8_t *frame;",
+          "    size_t frame_len;", "} proxy_frame_vector_t;", "",
+          "typedef struct {", "    const char *name;", "    uint8_t type;", "    const uint8_t *payload;",
+          "    size_t payload_len;", "    const char *why;", "} proxy_bad_vector_t;", ""]
+
+    idents, msgs, frames, bads = [], [], [], []
+    for i, v in enumerate(pv["ident"]):
+        f = v["fields"]
+        L += arr(f"pi_{i}", v["payload"]) + arr(f"pi_{i}_frame", v["frame"])
+        battery = f.get("battery_pct")
+        idents.append(
+            f"    {{{c_string(v['name'])}, {{{c_string(f['fw_version'])}, "
+            f"{c_string(compact(f['capabilities']))}, {'true' if battery is not None else 'false'}, "
+            f"{battery or 0}, {'true' if f['has_radio'] else 'false'}, {f['protocol_version']}}}, "
+            f"pi_{i}, pi_{i}_len, pi_{i}_frame, pi_{i}_frame_len}},")
+        frames.append(f"    {{{c_string(v['name'])}, 0x01, pi_{i}, pi_{i}_len, pi_{i}_frame, pi_{i}_frame_len}},")
+    k = 0
+    for key, kind, name_field, data_field in (("evt", 2, "event", "data"), ("cmd", 3, "method", "args")):
+        for v in pv[key]:
+            f = v["fields"]
+            L += arr(f"pm_{k}", v["payload"]) + arr(f"pm_{k}_frame", v["frame"])
+            data = compact(f[data_field]) if f[data_field] else "{}"
+            msgs.append(
+                f"    {{{c_string(v['name'])}, {kind}, {{{c_string(f['cap_id'])}, "
+                f"{c_string(f[name_field])}, {c_string(data)}, {f['seq']}}}, "
+                f"pm_{k}, pm_{k}_len, pm_{k}_frame, pm_{k}_frame_len}},")
+            frames.append(f"    {{{c_string(v['name'])}, {kind}, pm_{k}, pm_{k}_len, pm_{k}_frame, "
+                          f"pm_{k}_frame_len}},")
+            k += 1
+    acks = []
+    for i, v in enumerate(pv["ack"]):
+        L += arr(f"pa_{i}", v["payload"]) + arr(f"pa_{i}_frame", v["frame"])
+        acks.append(f"    {{{c_string(v['name'])}, {int(v['seq'])}}},")
+        frames.append(f"    {{{c_string(v['name'])}, 0x04, pa_{i}, pa_{i}_len, pa_{i}_frame, pa_{i}_frame_len}},")
+    for i, v in enumerate(pv["radio"]):
+        L += arr(f"pr_{i}", v["payload"]) + arr(f"pr_{i}_frame", v["frame"])
+        frames.append(f"    {{{c_string(v['name'])}, {int(v['type'])}, pr_{i}, pr_{i}_len, pr_{i}_frame, "
+                      f"pr_{i}_frame_len}},")
+    for i, v in enumerate(pv["invalid"]):
+        L += arr(f"pb_{i}", v["payload"])
+        bads.append(f"    {{{c_string(v['name'])}, {int(v['type'])}, pb_{i}, pb_{i}_len, "
+                    f"{c_string(v['why'])}}},")
+    L += arr("proxy_skipped_ident", pv["skipped_keys"]["ident"]["payload"])
+    L += arr("proxy_skipped_evt", pv["skipped_keys"]["evt"]["payload"])
+    st = pv["stream"]
+    L += arr("proxy_stream", st["bytes"])
+    for i, f in enumerate(st["frames"]):
+        L += arr(f"ps_{i}", f["payload"])
+
+    L += ["", "static const proxy_ident_vector_t proxy_ident_vectors[] = {", *idents, "};",
+          "#define PROXY_IDENT_VECTOR_COUNT (sizeof(proxy_ident_vectors) / sizeof(proxy_ident_vectors[0]))",
+          "", "static const proxy_msg_vector_t proxy_msg_vectors[] = {", *msgs, "};",
+          "#define PROXY_MSG_VECTOR_COUNT (sizeof(proxy_msg_vectors) / sizeof(proxy_msg_vectors[0]))",
+          "", "static const struct {", "    const char *name;", "    uint16_t seq;",
+          "} proxy_ack_vectors[] = {", *acks, "};",
+          "#define PROXY_ACK_VECTOR_COUNT (sizeof(proxy_ack_vectors) / sizeof(proxy_ack_vectors[0]))",
+          "", "/* Every vector's payload and its frame, radio frames included. */",
+          "static const proxy_frame_vector_t proxy_frame_vectors[] = {", *frames, "};",
+          "#define PROXY_FRAME_VECTOR_COUNT (sizeof(proxy_frame_vectors) / sizeof(proxy_frame_vectors[0]))",
+          "", "static const proxy_bad_vector_t proxy_bad_vectors[] = {", *bads, "};",
+          "#define PROXY_BAD_VECTOR_COUNT (sizeof(proxy_bad_vectors) / sizeof(proxy_bad_vectors[0]))",
+          "", "/* The frames the stream holds, in order. */",
+          "static const proxy_frame_vector_t proxy_stream_frames[] = {"]
+    for i, f in enumerate(st["frames"]):
+        L.append(f"    {{\"stream {i}\", {int(f['type'])}, ps_{i}, ps_{i}_len, NULL, 0}},")
+    L += ["};",
+          "#define PROXY_STREAM_FRAME_COUNT (sizeof(proxy_stream_frames) / sizeof(proxy_stream_frames[0]))",
+          f"#define PROXY_STREAM_CRC_ERRORS {int(st['crc_errors'])}",
+          f"#define PROXY_STREAM_LENGTH_ERRORS {int(st['length_errors'])}",
+          "", "#endif /* ATALAIA_PROXY_VECTORS_H */", ""]
+    return "\n".join(L)
+
+
 # ---- main ------------------------------------------------------------------
 
 
@@ -864,6 +1048,7 @@ def outputs() -> dict[Path, str]:
         REPO / "core/src/protocol.c": gen_c_source(schema),
         REPO / "core/tests/protocol_vectors.h": gen_c_vectors(schema, vectors),
         REPO / "core/tests/packet_vectors.h": gen_packet_vectors(json_vectors),
+        REPO / "core/tests/proxy_vectors.h": gen_proxy_vectors(load_yaml(PROXY_VECTORS)),
         REPO / "simulator/atalaia_sim/protocol.py": gen_python(schema),
         REPO / "protocol/json/event.schema.json": gen_json_schema(schema),
     }

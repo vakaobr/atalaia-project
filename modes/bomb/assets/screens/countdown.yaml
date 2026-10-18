@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Seconds left until the bomb explodes, red for the last ten.
+# Data: left (seconds), team (with team codes: the arming team).
+template: countdown
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: danger }
+    children:
+      - type: label
+        text: ARMED
+        style: { font_size: 20, width: fill, align: center }
+  - type: spacer
+    height: fill
+  - type: label
+    id: time_left
+    text: "{left|clock}"
+    style: { font_size: 48, color: "{left <= 10 && 'danger' || 'white'}" }
+  - type: label
+    text: until detonation
+    style: { font_size: 20, color: muted }
+  - type: progress_bar
+    id: fuse_bar
+    value: "{left / params.fuse_s}"
+    style: { width: 240, height: 10, color: "{team || 'danger'}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "Armed by {team|upper}"
+    style:
+      font_size: 14
+      color: team
+      visible: "{team}"
+      padding: { bottom: 10 }

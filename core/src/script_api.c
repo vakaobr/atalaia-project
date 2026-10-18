@@ -235,6 +235,9 @@ static int l_score_add(lua_State *L)
     lua_Integer amount = luaL_checkinteger(L, 2);
     luaL_argcheck(L, amount >= INT32_MIN && amount <= INT32_MAX, 2, "out of range");
     const char *reason = luaL_optstring(L, 3, "");
+    /* Read before anything is pushed: with three arguments, slot 4 would
+     * otherwise be the data table itself (it then contained itself). */
+    bool has_squad = !lua_isnoneornil(L, 4);
     if (n->status != ATALAIA_NODE_RUNNING || amount == 0) {
         return 0; /* scores are frozen once the game has ended */
     }
@@ -250,7 +253,7 @@ static int l_score_add(lua_State *L)
         lua_setfield(L, -2, "amount");
         lua_pushstring(L, reason);
         lua_setfield(L, -2, "reason");
-        if (!lua_isnoneornil(L, 4)) {
+        if (has_squad) {
             lua_pushvalue(L, 4);
             lua_setfield(L, -2, "squad");
         }

@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Three players of two teams check in, the counts are right, and a duplicate scan is refused
+steps:
+  - expect_screen: { template: checkin, data: { total: 0, counts: "" } }
+  - scan: { player: r1, team: red }
+  - expect: { type: player.checkin, team: red, at: 0, data: { player: r1 } }
+  - scan: { player: b1, team: blue }
+  - expect: { type: player.checkin, team: blue, data: { player: b1 } }
+  - wait: 5
+  - scan: { player: r2, team: red }
+  - expect: { type: player.checkin, team: red, at: 5, data: { player: r2 } }
+  - expect_screen: { template: checkin, data: { total: 3, counts: RED 2  BLUE 1, team: red, message: "Checked in: r2" } }
+  - expect_score: { team: red, points: 2 }
+  - expect_score: { team: blue, points: 1 }
+  # The same player again, 5 s later: a duplicate.
+  - wait: 5
+  - scan: { player: r1, team: red }
+  - expect_screen: { template: checkin, data: { total: 3, message: Already checked in, error: true } }
+  - expect_no: player.checkin
+  # Forged, from another game, without a team, or not a game tag: refused.
+  - scan: { player: b2, team: blue, forged: true }
+  - expect_screen: { template: checkin, data: { message: Forged tag, error: true } }
+  - scan: { player: b2, team: blue, game: 99 }
+  - expect_screen: { template: checkin, data: { message: Tag from another game } }
+  - scan: { player: b2 }
+  - expect_screen: { template: checkin, data: { message: This tag has no team } }
+  - scan: { uid: "04c0ffee" }
+  - expect_screen: { template: checkin, data: { message: Not a game tag } }
+  - expect_no: player.checkin
+  - expect_score: { team: red, points: 2 }
+  - expect_score: { team: blue, points: 1 }
+  - expect_no: script.error

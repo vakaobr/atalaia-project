@@ -165,12 +165,18 @@ static void fixture(bool keep_flash)
     state_persist_init(st);
 
     static char dom[PRESET_SOURCE_MAX];
+    static char kc[PRESET_SOURCE_MAX];
     FILE *f = fopen(MODES_DIR "/domination/node.lua", "rb");
     CHECK(f != NULL);
     size_t dom_len = f ? fread(dom, 1, sizeof(dom) - 1, f) : 0;
     if (f) fclose(f);
-    const builtin_source_t sources[] = {{"org.atalaia.domination", dom, dom_len}};
-    int seeded = builtin_presets_seed(sources, 1);
+    f = fopen(MODES_DIR "/kill_confirmed/node.lua", "rb");
+    CHECK(f != NULL);
+    size_t kc_len = f ? fread(kc, 1, sizeof(kc) - 1, f) : 0;
+    if (f) fclose(f);
+    const builtin_source_t sources[] = {{"org.atalaia.domination", dom, dom_len},
+                                        {"org.atalaia.kill_confirmed", kc, kc_len}};
+    int seeded = builtin_presets_seed(sources, 2);
     CHECK(keep_flash ? seeded == 0 : seeded >= 1);
 
     hal_stub_init(&hal);
@@ -538,8 +544,92 @@ static void test_join_with_a_modifier(void)
     state_persist_clear();
 }
 
+/* "@tag <uid> <payload>" text for a player tag signed with key. */
+static void tag_text(const char *player, uint8_t team, uint16_t game_id, const uint8_t *key,
+                     char *out, size_t cap)
+{
+    atalaia_tag_t t;
+    memset(&t, 0, sizeof(t));
+    snprintf(t.player, sizeof(t.player), "%s", player);
+    t.team = team;
+    t.game_id = game_id;
+    uint8_t buf[ATALAIA_TAG_MAX];
+    size_t n = atalaia_tag_encode(&t, key, buf, sizeof(buf));
+    CHECK(n > 0);
+    size_t o = (size_t)snprintf(out, cap, "04a1b2c3d4e5f6 ");
+    for (size_t i = 0; i < n && o + 3 < cap; i++)
+        o += (size_t)snprintf(out + o, cap - o, "%02x", buf[i]);
+}
+
+/* Kill Confirmed in a joined game: player tags are checked with the join's game key. */
+static void test_player_tags(void)
+{
+    fixture(false);
+    CHECK(box_game_set_join_key_hex(&game, JOIN_KEY_HEX));
+    atalaia_join_t j;
+    make_join(&j);
+    snprintf(j.mode_id, sizeof(j.mode_id), "org.atalaia.kill_confirmed");
+    snprintf(j.role, sizeof(j.role), "station");
+    j.params_json[0] = '\0';
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    size_t n = encode(&j, JOIN_KEY, buf);
+    CHECK(box_game_join(&game, buf, n) == BOX_JOIN_OK);
+    char text[160];
+    tag_text("b7", 2, GAME_ID, GAME_KEY, text, sizeof(text));
+    CHECK(!box_game_tag_text(&game, text)); /* not started yet: nothing runs */
+
+    uint32_t now = 100;
+    cmd(FIELD_CMD_START);
+    CHECK(game.phase == BOX_PLAYING && runner.running);
+    CHECK(strcmp(runner.mode_id, "org.atalaia.kill_confirmed") == 0);
+    node_runner_input(&runner, "team_input.press", "{\"team\":\"red\"}");
+    CHECK(box_game_tag_text(&game, text));
+    CHECK(events_named("kill.confirmed") == 1);
+    CHECK(events_named("score.delta") == 1); /* blue's penalty */
+    CHECK(atalaia_score_net(atalaia_node_score(runner.node), 1) == 1);
+    CHECK(atalaia_score_net(atalaia_node_score(runner.node), 2) == -1);
+
+    /* Signed with another key, for another game, unsigned: the node hears them, nothing counts. */
+    static const uint8_t other[16] = {1};
+    tag_text("b8", 2, GAME_ID, other, text, sizeof(text));
+    CHECK(box_game_tag_text(&game, text));
+    tag_text("b9", 2, GAME_ID + 1, GAME_KEY, text, sizeof(text));
+    CHECK(box_game_tag_text(&game, text));
+    CHECK(box_game_tag_text(&game, "04a1b2c3"));
+    run_ms(&now, 100);
+    CHECK(events_named("kill.confirmed") == 1);
+    /* Malformed console text. */
+    CHECK(!box_game_tag_text(&game, "zz"));
+    CHECK(!box_game_tag_text(&game, "04a1 0"));
+    CHECK(!box_game_tag_text(&game, "04a1 00 extra"));
+    CHECK(!box_game_tag_text(&game, ""));
+
+    /* A stand-alone game has no game key: a tag is reported but never valid. */
+    fixture(false);
+    preset_t *p = &preset;
+    memset(p, 0, sizeof(*p));
+    snprintf(p->mode_id, sizeof(p->mode_id), "org.atalaia.kill_confirmed");
+    long len = preset_store_read_source(p->mode_id, p->source, sizeof(p->source));
+    CHECK(len > 0);
+    p->source_len = len > 0 ? (size_t)len : 0;
+    snprintf(p->params_json, sizeof(p->params_json),
+             "{\"confirm_points\":1,\"penalty_points\":1,\"turn_in_s\":20,\"retag_after_s\":60}");
+    static const char *const teams[] = {"red", "blue"};
+    CHECK(node_runner_start(&runner, p, teams, 2));
+    CHECK(runner.queues.screen_count >= 1);
+    CHECK(strcmp(runner.queues.screens[0].template_name, "@mode") == 0);
+    CHECK(strncmp(runner.queues.screens[0].data_json, "org.atalaia.kill_confirmed {", 28) == 0);
+    node_runner_input(&runner, "team_input.press", "{\"team\":\"red\"}");
+    int before = runner.event_count;
+    tag_text("b7", 2, GAME_ID, GAME_KEY, text, sizeof(text));
+    CHECK(box_game_tag_text(&game, text));
+    CHECK(runner.event_count == before); /* refused: no kill.confirmed */
+    node_runner_stop(&runner);
+}
+
 void run_box_game_tests(void)
 {
+    test_player_tags();
     test_join_refusals();
     test_join_with_a_modifier();
     test_join_play_end();

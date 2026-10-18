@@ -63,7 +63,8 @@ data_fields:
   bb_g:          { key: 26, type: number,  doc: "BB weight in grams" }
   limit_j:       { key: 27, type: number,  doc: "energy limit in joules" }
   duration_s:    { key: 28, type: number,  doc: "countdown or visibility duration in seconds" }
-  # Keys 29 (see_team) and 30 (tolerance_pct) are kept for phase 3 (ADR-P3-8).
+  see_team:      { key: 29, type: string,  doc: "team whose positions become visible" }
+  tolerance_pct: { key: 30, type: number,  doc: "chrono comparison tolerance in percent" }
   holder:        { key: 31, type: string,  doc: "team holding the node when it happened" }
 
 # id: CBOR value of the type field (1-23 take one byte). prio: the default
@@ -93,9 +94,21 @@ events:
   battery.low:      { id: 22, prio: telemetry, data: [percent] }
   script.error:     { id: 23, prio: normal,    data: [message] }          # a handler failed; the node keeps running
   script.halted:    { id: 24, prio: critical,  data: [reason] }           # the sandbox stopped the script
-  # Ids 25-27 and 33-39 are kept for phase 3 (ADR-P3-8); the phase 2 mode pack uses 28-32.
+  # Phase 3 (ADR-P3-8) uses 25-27 and 33-41; the phase 2 mode pack uses 28-32; phase 4 starts at 42.
+  kill.confirmed:   { id: 25, prio: normal,    data: [player, owner] }    # team: the team credited; player and owner: whose tag
+  kill.denied:      { id: 26, prio: normal,    data: [player, owner] }    # a team recovered its own player's tag: no points
+  team.eliminated:  { id: 27, prio: normal,    data: [] }                 # team: the team whose lives ran out
   holdall.scoring_start:      { id: 28, prio: normal,   data: [] }            # a team holds every zone and scores
   holdall.scoring_stop:       { id: 29, prio: normal,   data: [] }            # that team no longer holds every zone
   laststand.countdown_start:  { id: 30, prio: normal,   data: [duration_s] }  # defenders down to their last zones
   laststand.countdown_cancel: { id: 31, prio: normal,   data: [duration_s] }  # defenders retook a zone in time
   laststand.defeated:         { id: 32, prio: critical, data: [] }            # the countdown ran out
+  money.collected:            { id: 33, prio: normal,    data: [player, amount] }
+  money.deposited:            { id: 34, prio: normal,    data: [player, amount] }
+  chrono.checkin:             { id: 35, prio: normal,    data: [replica, player, reading_mps, bb_g] }
+  chrono.spotcheck:           { id: 36, prio: normal,    data: [replica, player, reading_mps, bb_g, tolerance_pct] }
+  visibility.granted:         { id: 37, prio: normal,    data: [see_team, duration_s, text] }  # team: who sees
+  visibility.expired:         { id: 38, prio: normal,    data: [see_team, text] }
+  node.tamper:                { id: 39, prio: critical,  data: [reason] }   # e.g. kiosk_broken
+  pod.connected:              { id: 40, prio: telemetry, data: [fw, tier] } # an I/O pod linked to this node
+  pod.disconnected:           { id: 41, prio: telemetry, data: [reason] }
