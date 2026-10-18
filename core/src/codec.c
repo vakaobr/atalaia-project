@@ -276,7 +276,8 @@ typedef struct {
     const char *p;
     writer_t *w;
     keyset_t keys;
-    int depth; /* containers open, counting the envelope */
+    int depth;  /* containers open, counting the envelope */
+    bool plain; /* keep every key as text (no standard data keys) */
 } json_in_t;
 
 static void skip_ws(json_in_t *j)
@@ -490,7 +491,7 @@ static bool json_object(json_in_t *j, bool top)
             if (!json_string(j)) {
                 return false;
             }
-            if (top) {
+            if (top && !j->plain) {
                 /* The text is the key's bytes after its (now final) head. */
                 unsigned ai = w->buf[key] & 0x1F;
                 size_t head = ai < 24 ? 1 : 1 + ((size_t)1 << (ai - 24));
@@ -649,7 +650,7 @@ size_t atalaia_event_encode(const atalaia_event_t *ev, const char *data_json, ui
             }
             if (data_json != NULL && w.error == NULL) {
                 size_t data_start = w.pos;
-                json_in_t j = {data_json, &w, {{0}, {0}, 0}, 1};
+                json_in_t j = {data_json, &w, {{0}, {0}, 0}, 1, false};
                 if (put_head(&w, MAJOR_UINT, ATALAIA_KEY_DATA) && json_value(&j, true)) {
                     skip_ws(&j);
                     if (*j.p != '\0') {
@@ -679,7 +680,8 @@ typedef struct {
     const uint8_t *end;
     writer_t *w; /* the JSON output */
     keyset_t keys;
-    int depth; /* containers open, counting the envelope */
+    int depth;  /* containers open, counting the envelope */
+    bool plain; /* every key is text (no standard data keys) */
 } cbor_in_t;
 
 static size_t remaining(const cbor_in_t *r)
@@ -850,7 +852,7 @@ static bool cbor_container(cbor_in_t *r, unsigned major, uint64_t count, bool to
                 return false;
             }
             size_t key = w->pos;
-            if (top && kmajor == MAJOR_UINT) {
+            if (top && kmajor == MAJOR_UINT && !r->plain) {
                 const atalaia_data_field_def_t *f =
                     k <= 0xFF ? atalaia_data_field_by_key((unsigned)k) : NULL;
                 if (f == NULL) {
@@ -1053,10 +1055,59 @@ bool atalaia_event_decode(const uint8_t *buf, size_t len, atalaia_event_t *ev, c
         if (buf == NULL || len > ATALAIA_CODEC_MAX_BYTES) {
             fail(&w, buf == NULL ? "no payload" : "payload too long");
         } else {
-            cbor_in_t r = {buf, buf + len, &w, {{0}, {0}, 0}, 1};
+            cbor_in_t r = {buf, buf + len, &w, {{0}, {0}, 0}, 1, false};
             decode_envelope(&r, ev != NULL ? ev : &scratch);
         }
         data_json[w.error == NULL ? w.pos : 0] = '\0';
+    }
+    if (error != NULL) {
+        *error = w.error;
+    }
+    return w.error == NULL;
+}
+
+/* ---- JSON objects as plain CBOR maps (CMD parameters) --------------------- */
+
+size_t atalaia_json_map_encode(const char *json, uint8_t *buf, size_t cap, const char **error)
+{
+    writer_t w = {buf, cap > ATALAIA_CODEC_MAX_BYTES ? ATALAIA_CODEC_MAX_BYTES : cap, 0, NULL};
+    if (buf == NULL) {
+        w.cap = 0;
+    }
+    if (json == NULL) {
+        fail(&w, "no JSON");
+    } else {
+        json_in_t j = {json, &w, {{0}, {0}, 0}, 0, true};
+        if (json_value(&j, true)) {
+            skip_ws(&j);
+            if (*j.p != '\0') {
+                fail(&w, "trailing characters after the JSON object");
+            }
+        }
+    }
+    if (error != NULL) {
+        *error = w.error;
+    }
+    return w.error == NULL ? w.pos : 0;
+}
+
+bool atalaia_json_map_decode(const uint8_t *buf, size_t len, size_t *used, char *json,
+                             size_t json_cap, const char **error)
+{
+    writer_t w = {(uint8_t *)json, 0, 0, NULL};
+    if (json == NULL || json_cap == 0) {
+        fail(&w, "no room for the JSON");
+    } else {
+        w.cap = json_cap - 1 > ATALAIA_CODEC_MAX_BYTES ? ATALAIA_CODEC_MAX_BYTES : json_cap - 1;
+        if (buf == NULL || len > ATALAIA_CODEC_MAX_BYTES) {
+            fail(&w, buf == NULL ? "no CBOR" : "CBOR too long");
+        } else {
+            cbor_in_t r = {buf, buf + len, &w, {{0}, {0}, 0}, 0, true};
+            if (cbor_value(&r, true) && used != NULL) {
+                *used = (size_t)(r.p - buf);
+            }
+        }
+        json[w.error == NULL ? w.pos : 0] = '\0';
     }
     if (error != NULL) {
         *error = w.error;

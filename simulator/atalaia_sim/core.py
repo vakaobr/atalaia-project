@@ -33,19 +33,38 @@ class _Event(ctypes.Structure):
 _EVENT_FN = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.POINTER(_Event), ctypes.c_char_p)
 _COMMAND_FN = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p)
 _LOG_FN = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_char_p)
+_FIELD_STATE_FN = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_char_p, ctypes.c_char_p)
 _ALLOC_FN = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_size_t)
+
+# atalaia_field_ops_t (core/include/atalaia/field_ops.h). nodes() returns a
+# malloc'd string the core frees, and owner() a string the core copies at
+# once, so both are declared as void pointers and filled in by hand.
+_FIELD_NODES_FN = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_char_p)
+_FIELD_OWNER_FN = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint16)
+_FIELD_SEND_FN = ctypes.CFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_uint16, ctypes.c_char_p, ctypes.c_char_p)
 
 
 class _Callbacks(ctypes.Structure):
+    # Must match atalaia_node_callbacks_t field for field.
     _fields_ = [
         ("event", _EVENT_FN),
         ("command", _COMMAND_FN),
         ("log", _LOG_FN),
+        ("field_state", _FIELD_STATE_FN),
         ("user", ctypes.c_void_p),
     ]
 
 
+class _FieldOps(ctypes.Structure):
+    _fields_ = [
+        ("nodes", _FIELD_NODES_FN),
+        ("owner", _FIELD_OWNER_FN),
+        ("send", _FIELD_SEND_FN),
+    ]
+
+
 class _Config(ctypes.Structure):
+    # Must match atalaia_node_config_t field for field.
     _fields_ = [
         ("node_id", ctypes.c_uint16),
         ("game_seed", ctypes.c_uint32),
@@ -54,7 +73,39 @@ class _Config(ctypes.Structure):
         ("callbacks", _Callbacks),
         ("alloc", _ALLOC_FN),
         ("alloc_ud", ctypes.c_void_p),
+        ("field_ops", ctypes.POINTER(_FieldOps)),
     ]
+
+
+def _libc_malloc():
+    """The C library's malloc, for strings the core will free()."""
+    try:
+        libc = ctypes.CDLL(None) if sys.platform != "win32" else ctypes.cdll.msvcrt
+        malloc = libc.malloc
+    except (OSError, AttributeError):
+        return None
+    malloc.restype = ctypes.c_void_p
+    malloc.argtypes = [ctypes.c_size_t]
+    return malloc
+
+
+_MALLOC = _libc_malloc()
+
+
+@dataclass
+class FieldOps:
+    """Controller callbacks behind field.* in a field script (ADR-P2-14).
+
+    nodes(role) returns a list of node descriptors (dicts), owner(node_id)
+    the owning team name or None, send(node_id, cmd, params) True when the
+    command was queued. on_state(key, value) is called when the script
+    writes state.field.
+    """
+
+    nodes: Callable[[Optional[str]], list[dict[str, Any]]]
+    owner: Callable[[int], Optional[str]]
+    send: Callable[[int, str, dict[str, Any]], bool]
+    on_state: Optional[Callable[[str, Any], None]] = None
 
 
 def _library_names() -> list[str]:
@@ -162,6 +213,7 @@ class Node:
         on_event: Optional[Callable[[Emitted], None]] = None,
         on_command: Optional[Callable[[Command], None]] = None,
         on_log: Optional[Callable[[str], None]] = None,
+        field_ops: Optional[FieldOps] = None,
     ):
         self._lib = core.lib
         self.node_id = node_id
@@ -174,6 +226,8 @@ class Node:
         self._cb_event = _EVENT_FN(self._event)
         self._cb_command = _COMMAND_FN(self._command)
         self._cb_log = _LOG_FN(self._log)
+        self._field = field_ops
+        self._owner_buf = ctypes.create_string_buffer(1)
 
         cfg = _Config()
         cfg.node_id = node_id
@@ -183,6 +237,15 @@ class Node:
         cfg.callbacks.event = self._cb_event
         cfg.callbacks.command = self._cb_command
         cfg.callbacks.log = self._cb_log
+        if field_ops is not None:
+            # A controller node: field.* is available and state.field is writable.
+            self._cb_field_state = _FIELD_STATE_FN(self._field_state)
+            self._cb_nodes = _FIELD_NODES_FN(self._field_nodes)
+            self._cb_owner = _FIELD_OWNER_FN(self._field_owner)
+            self._cb_send = _FIELD_SEND_FN(self._field_send)
+            self._ops = _FieldOps(self._cb_nodes, self._cb_owner, self._cb_send)
+            cfg.callbacks.field_state = self._cb_field_state
+            cfg.field_ops = ctypes.pointer(self._ops)
         self._handle = self._lib.atalaia_node_create(ctypes.byref(cfg))
         if not self._handle:
             raise MemoryError("atalaia_node_create failed")
@@ -227,6 +290,35 @@ class Node:
     def _log(self, _user, message) -> None:
         if self._on_log:
             self._on_log(message.decode(errors="replace"))
+
+    def _field_state(self, _user, key, value_json) -> None:
+        if self._field is not None and self._field.on_state is not None:
+            self._field.on_state(key.decode(), json.loads(value_json.decode()))
+
+    def _field_nodes(self, _user, role) -> Optional[int]:
+        if _MALLOC is None or self._field is None:
+            return None  # the core treats NULL as an empty list
+        nodes = self._field.nodes(role.decode() if role else None)
+        data = json.dumps(nodes).encode() + bytes(1)
+        ptr = _MALLOC(len(data))
+        if not ptr:
+            return None
+        ctypes.memmove(ptr, data, len(data))
+        return ptr
+
+    def _field_owner(self, _user, node_id) -> Optional[int]:
+        team = self._field.owner(int(node_id)) if self._field is not None else None
+        if team is None:
+            return None
+        # Kept alive until the next call; the core copies it at once.
+        self._owner_buf = ctypes.create_string_buffer(team.encode())
+        return ctypes.addressof(self._owner_buf)
+
+    def _field_send(self, _user, node_id, cmd, params) -> bool:
+        if self._field is None:
+            return False
+        args = json.loads(params.decode()) if params else {}
+        return bool(self._field.send(int(node_id), cmd.decode(), args))
 
     # -- driving the node --
 

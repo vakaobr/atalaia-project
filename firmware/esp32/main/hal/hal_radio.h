@@ -22,12 +22,15 @@ typedef enum {
 typedef struct {
     /*
      * Initialise the radio hardware (SPI, GPIOs, probe the chip).
-     * Returns 0 on success, -1 if the radio is not present.
+     * Returns 0 on success, -1 if the radio is not present or does not
+     * answer (BUSY stuck high, no SPI reply, configuration failed); the
+     * hardware is released again in that case.
      */
     int (*init)(void);
 
     /*
-     * Send a packet. Returns 0 on success, -1 on error.
+     * Send a packet. Returns 0 on success, -1 on a radio error (BUSY
+     * timeout, SPI failure), -2 if TX_DONE never came (TX timeout).
      * The caller must check duty-cycle before calling.
      */
     int (*send)(const uint8_t *data, size_t len);
@@ -45,7 +48,7 @@ typedef struct {
     /* Set the radio operating mode. */
     int (*set_mode)(hal_radio_mode_t mode);
 
-    /* Read the current RSSI (dBm). */
+    /* Read the current RSSI (dBm); INT8_MIN if the chip did not answer. */
     int8_t (*rssi)(void);
 
     /* Remaining duty-cycle budget in milliseconds for the current sub-band. */

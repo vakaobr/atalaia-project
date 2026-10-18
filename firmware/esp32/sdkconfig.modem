@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# USB radio modem variant (ADR-P2-4), applied on top of sdkconfig.defaults:
+#   python tools/docker_fw.py modem
+# builds it into build-modem/. Same board (Heltec V4.3), same radio code;
+# no Lua, screens or presets. The frames on the USB link are specified in
+# protocol/usb-modem.md.
+
+CONFIG_ATALAIA_MODEM_MODE=y
+CONFIG_ATALAIA_MODEM_LINK_USB_SERIAL_JTAG=y
+
+# The frames use the USB-Serial-JTAG port, so the log console stays on
+# UART0 (GPIO 43/44) only: no secondary console on USB, which would mix
+# log text into the frame stream.
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
+
+# ADR-P2-4: a hung modem loop reboots the modem; the controller notices
+# the missing replies, reconnects and sends the game key again.
+CONFIG_ESP_TASK_WDT_EN=y
+CONFIG_ESP_TASK_WDT_INIT=y
+CONFIG_ESP_TASK_WDT_PANIC=y
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=5
+
+# The modem has no Lua heap to place: PSRAM is optional.
+CONFIG_SPIRAM_IGNORE_NOTFOUND=y

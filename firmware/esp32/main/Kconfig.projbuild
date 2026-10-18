@@ -315,6 +315,52 @@ menu "Atalaia Field Box Configuration"
                 game via CONFIG message. Must be within an EU868 sub-band.
     endmenu
 
+    # ---- USB radio modem (ADR-P2-4) -----------------------------------------
+    menu "USB radio modem"
+        config ATALAIA_MODEM_MODE
+            bool "Build the USB radio modem instead of the Field Box firmware"
+            default n
+            help
+                The controller's radio: a Heltec V4.3 plugged into the field
+                controller (Raspberry Pi) over USB. Radio, AES-CCM, dedupe and
+                duty cycle run here; no Lua, screens or presets. Selected by
+                sdkconfig.modem (python tools/docker_fw.py modem). The frames
+                on the serial link are specified in protocol/usb-modem.md.
+
+        choice ATALAIA_MODEM_LINK
+            prompt "Serial link to the controller"
+            default ATALAIA_MODEM_LINK_USB_SERIAL_JTAG
+            depends on ATALAIA_MODEM_MODE
+            help
+                The ESP32-S3's built-in USB-Serial-JTAG port (GPIO 19/20), or
+                UART0 (GPIO 43/44) for boards with a USB-UART bridge chip.
+                With UART0 the console must move off UART0
+                (CONFIG_ESP_CONSOLE_NONE or USB_SERIAL_JTAG).
+
+            config ATALAIA_MODEM_LINK_USB_SERIAL_JTAG
+                bool "USB-Serial-JTAG (native USB)"
+
+            config ATALAIA_MODEM_LINK_UART0
+                bool "UART0 (USB-UART bridge on GPIO 43/44)"
+        endchoice
+
+        config ATALAIA_MODEM_UART_BAUD
+            int "UART0 baud rate"
+            default 921600
+            depends on ATALAIA_MODEM_LINK_UART0
+
+        config ATALAIA_MODEM_EPOCH_WINDOW
+            int "Receive epoch window"
+            default 16
+            range 1 64
+            depends on ATALAIA_MODEM_MODE
+            help
+                How many epochs above a box's last known epoch the modem
+                tries when a packet does not authenticate (ADR-P2-2 tries
+                only one). A box that rebooted several times out of range
+                would otherwise never be heard again. Never a lower epoch.
+    endmenu
+
     # ---- Development and emulator options -----------------------------------
     menu "Development"
         config ATALAIA_RADIO_DISABLE

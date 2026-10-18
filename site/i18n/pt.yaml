@@ -123,8 +123,8 @@ why:
     text: >-
       Os dispositivos falam entre si pelo <a href="#glossario-skirmesh-rf">Skirmesh-RF</a>, um
       protocolo de rádio documentado, por isso qualquer pessoa pode construir um aparelho que entre
-      no jogo. O controlador de campo vai disponibilizar APIs MQTT, REST e WebSocket para
-      marcadores, transmissões em direto e outras ferramentas.
+      no jogo. O controlador de campo disponibiliza APIs MQTT, REST e WebSocket para marcadores,
+      transmissões em direto e outras ferramentas.
   fields:
     title: Feita para os campos
     text: >-
@@ -145,7 +145,8 @@ how:
     por Wi-Fi, e os marcadores, as transmissões em direto e as apps de mapas, como o
     <a href="#glossario-atak">ATAK</a>, pela sua API. Um
     <a href="#glossario-servidor-do-clube">servidor do clube</a>, opcional e na internet, guarda as
-    contas e o histórico. O controlador, a API e o servidor do clube chegam em fases posteriores.
+    contas e o histórico. O controlador e a sua API já estão feitos e testados num computador,
+    ainda não no campo; o servidor do clube chega numa fase posterior.
   core: >-
     Por dentro, todos os aparelhos que correm modos de jogo usam o mesmo
     <a href="#glossario-nucleo">núcleo partilhado</a>, escrito em C11, e os mesmos modos em Lua; só
@@ -247,9 +248,10 @@ roadmap:
     text: Skirmesh-RF sobre LoRa, controlador de campo, API, consola da organização.
     gate: >-
       Prova: 5 caixas num espaço de <a href="#glossario-cqb">CQB</a> e num campo exterior, sem uma
-      única captura perdida. O protocolo de rádio cifrado e o firmware do rádio já estão feitos e
-      testados no simulador e no emulador; seguem-se o controlador de campo e a consola da
-      organização, e a prova precisa das placas de rádio.
+      única captura perdida. O protocolo de rádio cifrado, o firmware do rádio, o controlador de
+      campo com a sua API e o modem de rádio USB que o liga às caixas já estão feitos e testados
+      no simulador, no emulador e num computador; segue-se a consola da organização, e a prova
+      precisa das placas de rádio.
   p3:
     title: Android e jogadores
     text: >-
@@ -456,8 +458,8 @@ glossary:
       controlarem. Com ela, um clube vai poder ligar um marcador LED grande, mostrar a pontuação em
       direto numa transmissão, receber alertas no Discord ou no Telegram, ou ter um relé que
       dispara fumo e sirenes quando a bomba rebenta. MQTT, REST e WebSocket são três maneiras
-      padrão de lá chegar, por isso funcionam com ferramentas comuns; a API chega com o controlador
-      de campo na fase&nbsp;2.
+      padrão de lá chegar, por isso funcionam com ferramentas comuns. O controlador de campo já a
+      tem desde a fase&nbsp;2; foi testada num computador e ainda não num campo.
   atak:
     id: glossario-atak
     term: ATAK

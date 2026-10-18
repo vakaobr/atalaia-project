@@ -423,6 +423,55 @@ static void test_recv_unknown_source(void)
     CHECK(rp.source_epochs[found].epoch == 1);
 }
 
+/* ---- Epoch window (used by the USB modem) -------------------------------- */
+
+static bool recv_window(atalaia_radio_proto_t *rp, uint16_t source, uint16_t epoch, uint16_t window,
+                        uint16_t *got_epoch)
+{
+    uint8_t payload[] = {0x10, 0x20};
+    uint8_t pkt[ATALAIA_RF_HEADER_SIZE + sizeof(payload) + ATALAIA_RF_MIC_SIZE + 8];
+    size_t pkt_len = build_test_packet(1, source, 5, epoch, test_key, payload, sizeof(payload), pkt,
+                                       sizeof(pkt));
+    radio_rx_msg_t rx;
+    memcpy(rx.data, pkt, pkt_len);
+    rx.len = pkt_len;
+    rx.rssi = -50;
+    rx.timestamp_ms = 0;
+    atalaia_header_t out_hdr;
+    uint8_t out_payload[ATALAIA_RF_PAYLOAD_MAX];
+    size_t out_len = 0;
+    return atalaia_radio_proto_on_recv_window(rp, &rx, window, &out_hdr, out_payload, &out_len,
+                                              got_epoch);
+}
+
+static void test_recv_window(void)
+{
+    atalaia_radio_proto_t rp;
+    atalaia_radio_proto_init(&rp, 1, 2, &atalaia_crypto_test_stub, NULL);
+    atalaia_radio_proto_set_key(&rp, test_key);
+
+    /* Unknown source at epoch 6: one-epoch trial misses it, a window of 8 finds it. */
+    uint16_t got = 0;
+    CHECK(!recv_window(&rp, 4, 6, 1, &got));
+    CHECK(recv_window(&rp, 4, 6, 8, &got));
+    CHECK(got == 6);
+
+    /* Now known at 6: a jump of 3 (two reboots out of range) is found... */
+    CHECK(recv_window(&rp, 4, 9, 8, &got));
+    CHECK(got == 9);
+    /* ...a lower epoch never is, whatever the window... */
+    CHECK(!recv_window(&rp, 4, 8, 64, &got));
+    /* ...and a jump past the window is not. */
+    CHECK(!recv_window(&rp, 4, 9 + 9, 8, &got));
+    CHECK(recv_window(&rp, 4, 9 + 8, 8, &got));
+    CHECK(got == 17);
+
+    /* The window stops at the top of the epoch range. */
+    atalaia_radio_proto_set_source_epoch(&rp, 5, 65530);
+    CHECK(recv_window(&rp, 5, 65535, 64, &got));
+    CHECK(got == 65535);
+}
+
 /* ---- Runner --------------------------------------------------------------- */
 
 void run_radio_protocol_tests(void)
@@ -437,4 +486,5 @@ void run_radio_protocol_tests(void)
     test_recv_epoch_trial_reboot();
     test_recv_reject_lower_epoch();
     test_recv_unknown_source();
+    test_recv_window();
 }

@@ -115,7 +115,7 @@ why:
     title: Open protocol and API
     text: >-
       Props talk over <a href="#glossary-skirmesh-rf">Skirmesh-RF</a>, a documented radio protocol,
-      so anyone can build a device that joins in. The field controller will offer MQTT, REST and
+      so anyone can build a device that joins in. The field controller offers MQTT, REST and
       WebSocket APIs for scoreboards, stream overlays and other tools.
   fields:
     title: Built for fields
@@ -135,7 +135,8 @@ how:
     at the base that runs the game and keeps the score. Phones connect to it over Wi-Fi, and
     scoreboards, stream overlays and map apps such as <a href="#glossary-atak">ATAK</a> through its
     API. An optional <a href="#glossary-site-server">site server</a> on the internet keeps accounts
-    and history. The controller, the API and the site server come in later phases.
+    and history. The controller and its API are built and tested on a computer, not yet on the
+    field; the site server comes in a later phase.
   core: >-
     Under the hood, every device that runs game modes uses the same
     <a href="#glossary-core">shared core</a>, written in C11, and the same Lua modes; only a thin
@@ -242,9 +243,10 @@ roadmap:
     text: Skirmesh-RF over LoRa, field controller, API, GM console.
     gate: >-
       Gate: 5 boxes on a <a href="#glossary-cqb">CQB</a> site and an outdoor field, zero lost
-      captures. The encrypted radio protocol and the radio firmware are built and tested in the
-      simulator and the emulator; the field controller and GM console come next, and the gate
-      needs the radio boards.
+      captures. The encrypted radio protocol, the radio firmware, the field controller with its
+      API and the USB radio modem that links it to the boxes are built and tested in the
+      simulator, the emulator and on a computer; the GM console comes next, and the gate needs the
+      radio boards.
   p3:
     title: Android and players
     text: >-
@@ -439,7 +441,8 @@ glossary:
       it. With it a club will be able to drive a big LED scoreboard, a live score overlay on a
       stream, Discord or Telegram alerts, or a relay that sets off smoke and sirens when the bomb
       goes off. MQTT, REST and WebSocket are three standard ways in, so ordinary tools work with
-      it; it arrives with the field controller in phase&nbsp;2.
+      it. The field controller has it since phase&nbsp;2; it has been tested on a computer and not
+      yet on a field.
   atak:
     id: glossary-atak
     term: ATAK

@@ -1,42 +1,92 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Field controller: TIME beacons, score merge, event log, CLAIM election.
+"""Field controller logic: TIME beacons, ACKs, score merge, event log, CLAIM election.
 
-The :class:`FieldController` sits on node 0 and drives a simulated game
-through the :class:`RadioModel`.  It sends periodic TIME beacons,
-merges conflict-free score counters from STATE messages, records events,
-and handles CLAIM-based controller election (failover).
+The :class:`FieldController` holds everything the controller decides about
+the radio side of a game, independent of how packets travel:
+
+- in the simulator it sends through the :class:`RadioModel`
+  (:class:`RadioTransport`), and ``tick`` delivers the radio's packets;
+- in the real field controller (``controller/``) it sends through the USB
+  radio modem, and the modem's RX frames are fed to :meth:`on_packet`.
+
+Both use this same class, so what the simulator tests is what runs on the
+Raspberry Pi. Hooks (``on_event``, ``on_node``, ``on_scores``, ``on_role``)
+let the host store and publish what happens.
 """
 
 from __future__ import annotations
 
+import json
+import time
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Callable, Optional, Protocol
 
+from . import codec
+from .election import LEADER, Claim, Election
 from .packet import (
     Header,
+    ack_encode,
     claim_decode,
     claim_encode,
     cmd_encode,
     hello_decode,
     state_decode,
+    time_decode,
     time_encode,
+    vf_ack,
 )
 from .protocol import MESSAGE_TYPES
 from .radio_model import RadioModel
 
-# Game states
+# Game states (TIME key 2).
 GAME_WAITING = 0
 GAME_RUNNING = 1
 GAME_PAUSED = 2
 GAME_ENDED = 3
 
-_STATE_NAMES = {
+STATE_NAMES = {
     GAME_WAITING: "waiting",
     GAME_RUNNING: "running",
     GAME_PAUSED: "paused",
     GAME_ENDED: "ended",
 }
+_STATE_NAMES = STATE_NAMES  # kept for older imports
+
+# CMD opcodes (ADR-P2-3, RFC 0001).
+CMD_START = 0
+CMD_PAUSE = 1
+CMD_RESUME = 2
+CMD_END = 3
+CMD_SET_OWNER = 4
+CMD_MESSAGE = 5
+CMD_RESET = 6
+CMD_REBOOT = 7
+CMD_OPCODES = {
+    "start": CMD_START,
+    "pause": CMD_PAUSE,
+    "resume": CMD_RESUME,
+    "end": CMD_END,
+    "set_owner": CMD_SET_OWNER,
+    "message": CMD_MESSAGE,
+    "reset": CMD_RESET,
+    "reboot": CMD_REBOOT,
+}
+
+PRIO_TELEMETRY = 0
+PRIO_NORMAL = 1
+PRIO_CRITICAL = 2
+
+BROADCAST = 0xFFFF
+# CMD params travel as a CBOR map with text keys; a box's C decoder turns
+# them into JSON in a 128-byte buffer, so their JSON form must fit 127 bytes.
+CMD_PARAMS_MAX = 127
+# Flood copies of a packet are dropped for this long (ADR-P2-6: 60 s on the controller).
+PACKET_DEDUPE_MS = 60_000
+
+
+class NotController(RuntimeError):
+    """Raised when a command needs the controller role and this node is on standby."""
 
 
 @dataclass
@@ -50,127 +100,335 @@ class FieldNode:
     last_seq: int = 0
     epoch: int = 0
     score: dict[str, int] = field(default_factory=dict)
+    owner_team: int = 0
+    phase: int = 0
+    game_time_ms: int = 0
+    battery_pct: Optional[int] = None
+    rssi: Optional[int] = None
+    snr: Optional[int] = None
+    hello: dict[str, Any] = field(default_factory=dict)
+
+    def owner_name(self, teams: list[str]) -> Optional[str]:
+        if 1 <= self.owner_team <= len(teams):
+            return teams[self.owner_team - 1]
+        return None
+
+
+class Transport(Protocol):
+    """How the controller's own packets leave: returns the seq used, or None if refused."""
+
+    def send(self, msg_type: int, payload: bytes, *, priority: int, ack_req: bool,
+             hop_limit: int, now_ms: int) -> Optional[int]: ...
+
+
+class RadioTransport:
+    """Sends through the simulator's RadioModel from one node."""
+
+    def __init__(self, radio: RadioModel, node_id: int) -> None:
+        self.radio = radio
+        self.node_id = node_id
+        self.seq = 0
+        radio.add_node(node_id)
+
+    def send(self, msg_type: int, payload: bytes, *, priority: int, ack_req: bool,
+             hop_limit: int, now_ms: int) -> Optional[int]:
+        self.seq = (self.seq + 1) & 0xFFFF
+        self.radio.send(
+            from_node=self.node_id,
+            payload=payload,
+            msg_type=msg_type,
+            source=self.node_id,
+            seq=self.seq,
+            priority=priority,
+            ack_req=ack_req,
+            hop_limit=hop_limit,
+            now_ms=now_ms,
+        )
+        return self.seq
+
+
+class AckTracker:
+    """Which packet seqs arrived from each (node, epoch), as ACK payloads.
+
+    A box restarts its seq at 0 with every new epoch (reboot or seq wrap),
+    so seqs are tracked per epoch. ``ack_seq`` is the highest seq received
+    with every seq below it also received (0xFFFF when seq 0 is missing:
+    "nothing contiguous yet"); ``ack_bitmap`` bit n says whether
+    ``ack_seq + 1 + n`` arrived, for the next 256 seqs.
+    """
+
+    def __init__(self) -> None:
+        self._contig: dict[tuple[int, int], int] = {}
+        self._above: dict[tuple[int, int], set[int]] = {}
+
+    def record(self, node: int, epoch: int, seq: int) -> None:
+        key = (node, epoch)
+        contig = self._contig.get(key, -1)
+        if seq <= contig:
+            return
+        above = self._above.setdefault(key, set())
+        above.add(seq)
+        while contig + 1 in above:
+            contig += 1
+            above.discard(contig)
+        self._contig[key] = contig
+
+    def contiguous(self, node: int, epoch: int) -> int:
+        """Highest contiguous seq from 0, or -1."""
+        return self._contig.get((node, epoch), -1)
+
+    def ack_payload(self, node: int, epoch: int) -> dict[str, Any]:
+        contig = self.contiguous(node, epoch)
+        msg: dict[str, Any] = {"ack_node": node, "ack_seq": contig & 0xFFFF}
+        above = self._above.get((node, epoch), set())
+        bits = bytearray(32)
+        for seq in above:
+            n = seq - contig - 1
+            if 0 <= n < 256:
+                bits[n // 8] |= 1 << (n % 8)
+        used = len(bits.rstrip(b"\0"))
+        if used:
+            msg["ack_bitmap"] = bytes(bits[:used])
+        return msg
+
+    def latest_epoch(self, node: int) -> Optional[int]:
+        epochs = [e for (n, e) in self._contig if n == node]
+        return max(epochs) if epochs else None
 
 
 class FieldController:
-    """Manages a multi-node game through the radio model."""
+    """The controller's side of a multi-node game."""
 
     def __init__(
         self,
-        radio: RadioModel,
+        radio: Optional[RadioModel] = None,
         game_id: int = 1,
         teams: Optional[list[str]] = None,
-        beacon_interval_ms: int = 30_000,
+        beacon_interval_ms: Optional[int] = None,
+        *,
+        node_id: int = 0,
+        transport: Optional[Transport] = None,
+        election: Optional[Election] = None,
+        max_hops: Optional[int] = None,
+        wall_clock: Callable[[], float] = time.time,
     ) -> None:
+        if transport is None:
+            if radio is None:
+                raise ValueError("FieldController needs a radio model or a transport")
+            transport = RadioTransport(radio, node_id)
         self.radio = radio
+        self.transport = transport
+        self.node_id = node_id
         self.game_id = game_id
-        self.teams: list[str] = teams or []
-        self.beacon_interval_ms = beacon_interval_ms
+        self.teams: list[str] = list(teams or [])
+        if max_hops is None:
+            max_hops = radio.config.max_hops if radio is not None else 2
+        self.max_hops = max_hops
+        if election is None:
+            # A lone controller: in charge from the start, term 1.
+            election = Election(node_id, priority=0)
+            election.lead(1, 0)
+        self.election = election
+        self.beacon_interval_ms = (beacon_interval_ms if beacon_interval_ms is not None
+                                   else election.beacon_interval)
+        self._wall = wall_clock
 
-        # The controller is always node 0.
-        self.node_id = 0
-        self.radio.add_node(self.node_id)
-
-        self.term = 1
         self.game_state: int = GAME_WAITING
         self.game_time_ms: int = 0
         self.duration_ms: int = 0
         self.nodes: dict[int, FieldNode] = {}
         self.event_log: list[dict[str, Any]] = []
-        self.seq: int = 0
         self.last_beacon_ms: int = 0
+        self._now: int = 0
+        self._last_tick: Optional[int] = None
+        self._role_seen = election.role
+        self._event_seq = 0  # the controller's own events (score adjustments)
 
-        # Score aggregation: team_name -> counter_name -> max value
+        # Score aggregation: team name -> node key -> max value.
         self._scores: dict[str, dict[str, int]] = {t: {} for t in self.teams}
+        self._adjust: dict[str, int] = {}
+
+        self.acks = AckTracker()
+        self._packets_seen: dict[tuple[int, int, int], int] = {}
+        self._events_seen: set[tuple[int, int, int, str]] = set()
+        self._last_prune = 0
+
+        # Hooks for the host (all optional).
+        self.on_event: Optional[Callable[[dict[str, Any]], None]] = None
+        self.on_node: Optional[Callable[[FieldNode, str], None]] = None
+        self.on_scores: Optional[Callable[[dict[str, int]], None]] = None
+        self.on_role: Optional[Callable[[str, int], None]] = None
+
+    # --- properties -----------------------------------------------------------
+
+    @property
+    def term(self) -> int:
+        return self.election.term
+
+    @property
+    def seq(self) -> int:
+        return int(getattr(self.transport, "seq", 0))
+
+    @property
+    def is_controller(self) -> bool:
+        return self.election.is_leader
+
+    @property
+    def _now_ms(self) -> int:
+        return self._now
 
     # --- node management ------------------------------------------------------
 
-    def register_node(self, node_id: int, name: str, role: str) -> None:
+    def register_node(self, node_id: int, name: str, role: str) -> FieldNode:
         """Register a known field node."""
-        self.nodes[node_id] = FieldNode(node_id=node_id, name=name, role=role)
-        self.radio.add_node(node_id)
+        node = self.nodes.get(node_id)
+        if node is None:
+            node = FieldNode(node_id=node_id, name=name, role=role)
+            self.nodes[node_id] = node
+        else:
+            node.name, node.role = name, role
+        if self.radio is not None:
+            self.radio.add_node(node_id)
+        return node
+
+    def _node(self, node_id: int) -> FieldNode:
+        node = self.nodes.get(node_id)
+        if node is None:
+            node = self.register_node(node_id, f"node-{node_id}", "unknown")
+        return node
+
+    def team_name(self, team_id: int) -> Optional[str]:
+        if 1 <= team_id <= len(self.teams):
+            return self.teams[team_id - 1]
+        return None
 
     # --- game lifecycle -------------------------------------------------------
 
+    def _require_controller(self) -> None:
+        if not self.election.is_leader:
+            raise NotController(f"node {self.node_id} is not the controller (role {self.election.role})")
+
+    def _advance_time(self, now_ms: int) -> None:
+        if self.game_state == GAME_RUNNING and self._last_tick is not None and now_ms > self._last_tick:
+            self.game_time_ms += now_ms - self._last_tick
+        self._last_tick = now_ms
+        self._now = max(self._now, now_ms)
+
     def start_game(self, duration_ms: int = 0, now_ms: int = 0) -> None:
-        """Start the game.  Sends a CMD to all nodes."""
+        """Start the game: CMD start to every node, then a TIME beacon."""
+        self._require_controller()
         self.game_state = GAME_RUNNING
         self.duration_ms = duration_ms
         self.game_time_ms = 0
+        self._last_tick = now_ms
+        self._now = max(self._now, now_ms)
         self.last_beacon_ms = now_ms
-        self._send_cmd(1, {"duration_ms": duration_ms}, now_ms=now_ms)  # cmd=1 start
+        self._send_cmd(CMD_START, now_ms=now_ms)
         self.send_time_beacon(now_ms=now_ms)
 
-    def pause_game(self, now_ms: int = 0) -> None:
-        """Pause the game."""
+    def pause_game(self, now_ms: int = 0, reason: Optional[str] = None) -> None:
+        """Pause the game: the game clock stops."""
+        self._require_controller()
+        self._advance_time(now_ms)
         self.game_state = GAME_PAUSED
-        self._send_cmd(2, now_ms=now_ms)  # cmd=2 pause
+        self._send_cmd(CMD_PAUSE, {"reason": reason} if reason else None, now_ms=now_ms)
+        self.send_time_beacon(now_ms=now_ms)
 
-    def end_game(self, now_ms: int = 0) -> None:
+    def resume_game(self, now_ms: int = 0) -> None:
+        """Resume a paused game."""
+        self._require_controller()
+        self._advance_time(now_ms)
+        self.game_state = GAME_RUNNING
+        self._send_cmd(CMD_RESUME, now_ms=now_ms)
+        self.send_time_beacon(now_ms=now_ms)
+
+    def end_game(self, now_ms: int = 0, reason: Optional[str] = None) -> None:
         """End the game."""
+        self._require_controller()
+        self._advance_time(now_ms)
         self.game_state = GAME_ENDED
-        self._send_cmd(3, now_ms=now_ms)  # cmd=3 end
+        self._send_cmd(CMD_END, {"reason": reason} if reason else None, now_ms=now_ms)
+        self.send_time_beacon(now_ms=now_ms)
 
     # --- sending --------------------------------------------------------------
 
-    def _next_seq(self) -> int:
-        self.seq = (self.seq + 1) & 0xFFFF
-        return self.seq
+    def _send(self, msg_type: str, payload: bytes, priority: int, now_ms: int,
+              ack_req: bool = False) -> Optional[int]:
+        return self.transport.send(MESSAGE_TYPES[msg_type], payload, priority=priority,
+                                   ack_req=ack_req, hop_limit=self.max_hops, now_ms=now_ms)
 
-    def send_time_beacon(self, now_ms: int = 0) -> None:
-        """Broadcast a TIME beacon."""
+    def send_time_beacon(self, now_ms: int = 0) -> Optional[int]:
+        """Broadcast a TIME beacon (the controller heartbeat)."""
         payload = time_encode({
-            "epoch": self.term,
-            "game_time_ms": self.game_time_ms,
+            "game_time_ms": self.game_time_ms & 0xFFFFFFFF,
             "game_state": self.game_state,
-            "term": self.term,
-            "duration_ms": self.duration_ms,
+            "duration_ms": self.duration_ms & 0xFFFFFFFF,
+            "wall_s": int(self._wall()) & 0xFFFFFFFF,
+            "term": self.election.term & 0xFFFFFFFF,
         })
-        self.radio.send(
-            from_node=self.node_id,
-            payload=payload,
-            msg_type=MESSAGE_TYPES["TIME"],
-            source=self.node_id,
-            seq=self._next_seq(),
-            priority=2,  # critical
-            hop_limit=self.radio.config.max_hops,
-            now_ms=now_ms,
-        )
         self.last_beacon_ms = now_ms
+        return self._send("TIME", payload, PRIO_CRITICAL, now_ms)
 
     def send_cmd(
         self,
-        cmd: int,
+        cmd: int | str,
         params: Optional[dict[str, Any]] = None,
         dest: Optional[int] = None,
         now_ms: int = 0,
-    ) -> None:
-        """Send a CMD message (public API)."""
-        self._send_cmd(cmd, params, dest, now_ms=now_ms)
+    ) -> Optional[int]:
+        """Send a CMD (opcode or name; dest None = every node). Returns the packet seq.
+
+        params is a JSON-like object with text keys; its compact JSON form
+        must fit in 127 bytes (the boxes' buffer).
+        """
+        self._require_controller()
+        if isinstance(cmd, str) and cmd not in CMD_OPCODES:
+            raise ValueError(f"unknown command {cmd!r}")
+        opcode = CMD_OPCODES[cmd] if isinstance(cmd, str) else int(cmd)
+        if not 0 <= opcode <= 7:
+            raise ValueError(f"unknown command opcode {opcode}")
+        return self._send_cmd(opcode, params, dest, now_ms=now_ms)
 
     def _send_cmd(
         self,
         cmd: int,
-        params: Optional[dict[str, Any]] = None,
+        params: Optional[dict[Any, Any]] = None,
         dest: Optional[int] = None,
         now_ms: int = 0,
-    ) -> None:
+    ) -> Optional[int]:
         msg: dict[str, Any] = {"cmd": cmd}
         if params:
-            msg["params"] = params
-        if dest is not None:
+            text = json.dumps(params, separators=(",", ":"), ensure_ascii=False)
+            if len(text.encode()) > CMD_PARAMS_MAX:
+                raise ValueError(f"command parameters are {len(text.encode())} bytes; "
+                                 f"at most {CMD_PARAMS_MAX} fit in a CMD")
+            if not all(isinstance(k, str) for k in params):
+                raise ValueError("command parameter names must be text")
+            msg["params"] = dict(params)
+        if dest is not None and dest != BROADCAST:
             msg["dest"] = dest
-        payload = cmd_encode(msg)
-        self.radio.send(
-            from_node=self.node_id,
-            payload=payload,
-            msg_type=MESSAGE_TYPES["CMD"],
-            source=self.node_id,
-            seq=self._next_seq(),
-            priority=2,
-            hop_limit=self.radio.config.max_hops,
-            now_ms=now_ms,
-        )
+        return self._send("CMD", cmd_encode(msg), PRIO_CRITICAL, now_ms)
+
+    def _send_ack(self, node_id: int, epoch: int, now_ms: int) -> None:
+        self._send("ACK", ack_encode(self.acks.ack_payload(node_id, epoch)), PRIO_NORMAL, now_ms)
+
+    def _send_claim(self, claim: Claim, now_ms: int) -> None:
+        last_ack: dict[int, int] = {}
+        for node_id in self.nodes:
+            epoch = self.acks.latest_epoch(node_id)
+            if epoch is not None and self.acks.contiguous(node_id, epoch) >= 0:
+                last_ack[node_id] = self.acks.contiguous(node_id, epoch)
+        msg: dict[str, Any] = {"term": claim.term, "priority": claim.priority, "node_id": claim.node_id}
+        if last_ack:
+            msg["last_ack_seq"] = last_ack
+        self.event_log.append({"t_ms": now_ms, "type": "claim_sent", "term": claim.term,
+                               "priority": claim.priority})
+        self._send("CLAIM", claim_encode(msg), PRIO_CRITICAL, now_ms)
+
+    def promote(self, now_ms: int) -> None:
+        """Manual failover: stand for election now (the GM's "promote" button)."""
+        self._send_claim(self.election.promote(now_ms), now_ms)
+        self._check_role(now_ms)
 
     # --- receiving ------------------------------------------------------------
 
@@ -179,111 +437,203 @@ class FieldController:
         source_node: int,
         header: Header,
         payload: bytes,
+        meta: Optional[dict[str, Any]] = None,
     ) -> None:
-        """Process a received packet at the controller."""
+        """Process one decrypted packet. meta may carry epoch, rssi and snr (from the modem)."""
+        meta = meta or {}
+        epoch = int(meta.get("epoch", 0))
+        key = (header.source, epoch, header.seq)
+        if key in self._packets_seen:
+            return  # a flood copy of a packet already handled
+        self._packets_seen[key] = self._now
         msg_type = header.type
 
-        if msg_type == MESSAGE_TYPES["STATE"]:
-            self._on_state(source_node, header, payload)
-        elif msg_type == MESSAGE_TYPES["HELLO"]:
-            self._on_hello(source_node, header, payload)
-        elif msg_type == MESSAGE_TYPES["CLAIM"]:
-            self._on_claim(source_node, header, payload)
-        # EVENT messages: log them
-        elif msg_type == MESSAGE_TYPES["EVENT"]:
-            self._on_event(source_node, header, payload)
+        if msg_type == MESSAGE_TYPES["TIME"]:
+            self._on_time(source_node, payload)
+            return
+        if msg_type == MESSAGE_TYPES["CLAIM"]:
+            self._on_claim(source_node, payload)
+            return
 
-    def _on_state(self, source_node: int, header: Header, payload: bytes) -> None:
-        """Process a STATE message: update node info and merge scores."""
+        self.acks.record(source_node, epoch, header.seq)
+        node = self._node(source_node)
+        node.last_seen_ms = self._now
+        node.last_seq = header.seq
+        node.epoch = epoch
+        if "rssi" in meta:
+            node.rssi = meta["rssi"]
+        if "snr" in meta:
+            node.snr = meta["snr"]
+
+        if msg_type == MESSAGE_TYPES["STATE"]:
+            self._on_state(node, payload)
+        elif msg_type == MESSAGE_TYPES["HELLO"]:
+            self._on_hello(node, payload)
+        elif msg_type == MESSAGE_TYPES["EVENT"]:
+            self._on_event(node, header, payload, epoch)
+
+        if vf_ack(header.version_flags) and self.election.is_leader:
+            self._send_ack(source_node, epoch, self._now)
+
+    def _on_state(self, node: FieldNode, payload: bytes) -> None:
+        """STATE: node snapshot and score counters (merged by maximum)."""
         try:
             state = state_decode(payload)
         except Exception:
             return
-        node = self.nodes.get(source_node)
-        if node is None:
-            # Auto-register unknown nodes.
-            node = FieldNode(
-                node_id=source_node,
-                name=f"node-{source_node}",
-                role="unknown",
-            )
-            self.nodes[source_node] = node
-        node.last_seen_ms = self._now_ms
-        node.last_seq = header.seq
-        if "counters" in state and isinstance(state["counters"], dict):
-            self.merge_scores(source_node, state["counters"])
+        for name in ("owner_team", "phase", "game_time_ms"):
+            if isinstance(state.get(name), int):
+                setattr(node, name, state[name])
+        if isinstance(state.get("battery_pct"), int):
+            node.battery_pct = state["battery_pct"]
+        if isinstance(state.get("rssi"), int):
+            node.rssi = state["rssi"]
+        counters = state.get("counters")
+        if isinstance(counters, dict):
+            self.merge_scores(node.node_id, counters)
+        if self.on_node:
+            self.on_node(node, "state")
 
-    def _on_hello(self, source_node: int, header: Header, payload: bytes) -> None:
-        """Process a HELLO message: register or update the node."""
+    def _on_hello(self, node: FieldNode, payload: bytes) -> None:
+        """HELLO: register or update the node."""
         try:
             hello = hello_decode(payload)
         except Exception:
             return
-        name = hello.get("node_name", f"node-{source_node}")
-        role = hello.get("role", "unknown")
-        if source_node in self.nodes:
-            self.nodes[source_node].name = str(name)
-            self.nodes[source_node].role = str(role)
-            self.nodes[source_node].last_seen_ms = self._now_ms
-        else:
-            self.register_node(source_node, str(name), str(role))
-            self.nodes[source_node].last_seen_ms = self._now_ms
+        node.hello = hello
+        node.name = str(hello.get("node_name", node.name))
+        node.role = str(hello.get("role", node.role))
+        if isinstance(hello.get("battery_pct"), int):
+            node.battery_pct = hello["battery_pct"]
+        if self.on_node:
+            self.on_node(node, "hello")
 
-    def _on_claim(self, source_node: int, header: Header, payload: bytes) -> None:
-        """Process a CLAIM message for controller election."""
+    def _on_event(self, node: FieldNode, header: Header, payload: bytes, epoch: int) -> None:
+        """EVENT: decode, drop replays already logged, record."""
+        entry: dict[str, Any] = {
+            "t_ms": self._now,
+            "type": "event",
+            "source": node.node_id,
+            "seq": header.seq,
+            "payload_len": len(payload),
+            "epoch": epoch,
+        }
+        try:
+            ev = codec.decode_event(payload)
+        except Exception as exc:
+            entry["error"] = str(exc)
+            self.event_log.append(entry)
+            return
+        # A box's event seq restarts at 1 after a reboot, so the event's own
+        # identity is (node, seq, game time, type); replays match it exactly.
+        ident = (node.node_id, int(ev["seq"]), int(ev["t"]), str(ev["type"]))
+        if ident in self._events_seen:
+            return
+        self._events_seen.add(ident)
+        record = {
+            "node": node.node_id,
+            "seq": int(ev["seq"]),
+            "t": int(ev["t"]),
+            "type": str(ev["type"]),
+            "team": self.team_name(int(ev.get("team") or 0)),
+            "team_id": int(ev.get("team") or 0),
+            "squad": int(ev.get("squad") or 0),
+            "prio": ev.get("prio", "normal"),
+            "data": ev.get("data") or {},
+            "epoch": epoch,
+            "pkt_seq": header.seq,
+            "received_ms": self._now,
+        }
+        entry["event"] = record
+        self.event_log.append(entry)
+        if self.on_event:
+            self.on_event(record)
+
+    def _on_time(self, source: int, payload: bytes) -> None:
+        """TIME from another controller: follow it if its term is current."""
+        try:
+            beacon = time_decode(payload)
+        except Exception:
+            return
+        term = int(beacon.get("term", 0))
+        if not self.election.on_time(term, source, self._now):
+            return
+        # On standby, mirror the game clock so a takeover continues it.
+        if isinstance(beacon.get("game_state"), int):
+            self.game_state = beacon["game_state"]
+        if isinstance(beacon.get("game_time_ms"), int):
+            self.game_time_ms = beacon["game_time_ms"]
+            self._last_tick = self._now
+        if isinstance(beacon.get("duration_ms"), int):
+            self.duration_ms = beacon["duration_ms"]
+        self._check_role(self._now)
+
+    def _on_claim(self, source: int, payload: bytes) -> None:
+        """CLAIM from a candidate."""
         try:
             claim = claim_decode(payload)
         except Exception:
             return
+        term = int(claim.get("term", 0))
+        priority = int(claim.get("priority", 0))
+        candidate = int(claim.get("node_id", source))
         self.event_log.append({
-            "t_ms": self._now_ms,
+            "t_ms": self._now,
             "type": "claim",
-            "source": source_node,
-            "term": claim.get("term", 0),
-            "candidate": claim.get("candidate", source_node),
+            "source": source,
+            "term": term,
+            "priority": priority,
+            "node_id": candidate,
         })
+        self.election.on_claim(term, priority, candidate, self._now)
+        self._check_role(self._now)
 
-    def _on_event(self, source_node: int, header: Header, payload: bytes) -> None:
-        """Process an EVENT message: add to the event log."""
-        self.event_log.append({
-            "t_ms": self._now_ms,
-            "type": "event",
-            "source": source_node,
-            "seq": header.seq,
-            "payload_len": len(payload),
-        })
+    def _check_role(self, now_ms: int) -> None:
+        role = self.election.role
+        if role == self._role_seen:
+            return
+        self._role_seen = role
+        self.event_log.append({"t_ms": now_ms, "type": "role", "role": role, "term": self.election.term})
+        if role == LEADER:
+            # Took over: announce the new term at once (nodes follow the highest term).
+            self._last_tick = now_ms
+            self.send_time_beacon(now_ms)
+        if self.on_role:
+            self.on_role(role, self.election.term)
 
     # --- tick -----------------------------------------------------------------
 
-    @property
-    def _now_ms(self) -> int:
-        return self.radio._now_ms
+    def tick(
+        self,
+        now_ms: int,
+        deliveries: Optional[list[tuple[int, Header, bytes]]] = None,
+    ) -> list[tuple[int, Header, bytes]]:
+        """Advance to now_ms: deliver packets, run the election, send due beacons.
 
-    def tick(self, now_ms: int) -> list[tuple[int, Header, bytes]]:
-        """Advance time, deliver pending radio packets, auto-send beacons.
-
-        Returns the radio model's delivery list so callers can inspect
-        what was delivered this tick.
+        With a RadioModel and no ``deliveries``, the radio is ticked here.
+        When several controllers share one RadioModel, tick the radio once
+        and pass its deliveries to each controller.
         """
-        # Update game time if running.
-        if self.game_state == GAME_RUNNING:
-            elapsed = now_ms - (self.radio._now_ms if self.radio._now_ms > 0 else now_ms)
-            if elapsed > 0:
-                self.game_time_ms += elapsed
-
-        # Deliver pending radio packets.
-        deliveries = self.radio.tick(now_ms)
-
-        # Process packets addressed to us.
+        self._advance_time(now_ms)
+        if deliveries is None:
+            deliveries = self.radio.tick(now_ms) if self.radio is not None else []
         for dest_id, hdr, payload in deliveries:
             if dest_id == self.node_id:
                 self.on_packet(hdr.source, hdr, payload)
 
-        # Auto-send TIME beacon if interval has elapsed.
-        if self.game_state == GAME_RUNNING:
-            if now_ms - self.last_beacon_ms >= self.beacon_interval_ms:
-                self.send_time_beacon(now_ms=now_ms)
+        claim = self.election.tick(now_ms)
+        if claim is not None:
+            self._send_claim(claim, now_ms)
+        self._check_role(now_ms)
 
+        if (self.election.is_leader and self.game_state in (GAME_RUNNING, GAME_PAUSED)
+                and now_ms - self.last_beacon_ms >= self.beacon_interval_ms):
+            self.send_time_beacon(now_ms=now_ms)
+
+        if now_ms - self._last_prune >= 10_000:
+            self._last_prune = now_ms
+            cutoff = now_ms - PACKET_DEDUPE_MS
+            self._packets_seen = {k: t for k, t in self._packets_seen.items() if t >= cutoff}
         return deliveries
 
     # --- score merging --------------------------------------------------------
@@ -291,23 +641,69 @@ class FieldController:
     def merge_scores(self, node_id: int, counters: dict[Any, Any]) -> None:
         """Merge scores by taking the maximum per counter (conflict-free).
 
-        *counters* maps team names (or ids) to score values.
+        *counters* maps team ids (as STATE carries them) or team names to values.
         """
+        changed = False
         for key, value in counters.items():
-            if not isinstance(value, int):
+            if not isinstance(value, int) or isinstance(value, bool):
                 continue
-            team_name = str(key)
-            if team_name not in self._scores:
-                self._scores[team_name] = {}
+            team_name = self.team_name(key) if isinstance(key, int) else None
+            team_name = team_name or str(key)
             node_key = f"node-{node_id}"
-            current = self._scores[team_name].get(node_key, 0)
-            if value > current:
-                self._scores[team_name][node_key] = value
+            per_node = self._scores.setdefault(team_name, {})
+            if value > per_node.get(node_key, 0):
+                per_node[node_key] = value
+                changed = True
+        if changed and self.on_scores:
+            self.on_scores(self.total_scores)
+
+    def controller_event(self, type_: str, data: Optional[dict[str, Any]] = None,
+                         team: Optional[str] = None, prio: str = "normal") -> dict[str, Any]:
+        """Logs an event the controller itself originates (GM actions, field scripts)."""
+        self._event_seq = (self._event_seq % 0xFFFF) + 1
+        team_id = self.teams.index(team) + 1 if team in self.teams else 0
+        record = {
+            "node": self.node_id,
+            "seq": self._event_seq,
+            "t": self.game_time_ms,
+            "type": type_,
+            "team": team if team_id else None,
+            "team_id": team_id,
+            "squad": 0,
+            "prio": prio,
+            "data": dict(data or {}),
+            "epoch": None,
+            "pkt_seq": None,
+            "received_ms": self._now,
+        }
+        self.event_log.append({"t_ms": self._now, "type": "event", "source": self.node_id,
+                               "event": record})
+        if self.on_event:
+            self.on_event(record)
+        return record
+
+    def adjust_score(self, team: str, amount: int, reason: str = "", now_ms: Optional[int] = None
+                     ) -> dict[str, Any]:
+        """A GM's manual adjustment, logged as a score.delta event from the controller."""
+        if now_ms is not None:
+            self._advance_time(now_ms)
+        self._adjust[team] = self._adjust.get(team, 0) + int(amount)
+        record = self.controller_event("score.delta", {"team": team, "amount": int(amount),
+                                                       "reason": reason}, team=team)
+        if self.on_scores:
+            self.on_scores(self.total_scores)
+        return record
+
+    def restore_adjustments(self, adjustments: dict[str, int]) -> None:
+        """Puts back GM adjustments (after a controller restart)."""
+        self._adjust = dict(adjustments)
 
     @property
     def total_scores(self) -> dict[str, int]:
-        """Total score per team, summing the max from each node."""
+        """Total per team: the max reported by each node, summed, plus GM adjustments."""
         result: dict[str, int] = {}
         for team, node_scores in self._scores.items():
             result[team] = sum(node_scores.values())
+        for team, amount in self._adjust.items():
+            result[team] = result.get(team, 0) + amount
         return result

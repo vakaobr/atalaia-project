@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Atalaia field controller settings. Copy to controller.toml and run:
+#   python3 -m atalaia_controller run --config controller.toml
+# Every setting can also come from ATALAIA_<SECTION>_<KEY>, for example
+# ATALAIA_API_GM_TOKEN or ATALAIA_MODEM_PORT.
+
+[controller]
+node_id = 0                       # this controller's short id on the radio
+db_path = "/var/lib/atalaia/controller.db"
+failover_mode = "manual"          # "auto" only after field testing (ADR-P2-8)
+power_source = 3                  # 3 mains or USB, 2 large battery, 1 small battery
+battery_pct = 100
+storage_ok = true
+persist_game_key = false          # true: the game survives a controller restart, but
+                                  # the key is then on the Pi's disk (see README)
+
+[radio]
+channel_hz = 869525000            # the game channel, 869.4-869.65 MHz sub-band
+max_hops = 2
+
+[modem]
+port = "/dev/ttyACM0"             # the USB radio modem; empty = run without a radio
+baudrate = 921600
+ping_interval_s = 5.0
+
+[api]
+host = "0.0.0.0"
+port = 8080
+gm_token = ""                     # empty: generated on first start;
+read_token = ""                   # show them with `python3 -m atalaia_controller tokens`
+
+[mqtt]
+enabled = true
+host = "localhost"
+port = 1883
+username = "controller"
+password = ""

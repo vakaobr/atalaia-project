@@ -35,6 +35,34 @@ jobs:
           python -m unittest discover -s tests -v
           python -m atalaia_sim test
 
+  controller:
+    name: Field controller (REST, MQTT, host modem)
+    # Ubuntu's own Python packages, as in tools/dev/Dockerfile and on a Raspberry Pi.
+    runs-on: ubuntu-24.04
+    env:
+      ATALAIA_REQUIRE_ALL: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libmbedtls-dev mosquitto \
+            python3-yaml python3-cryptography python3-fastapi python3-uvicorn \
+            python3-websockets python3-httpx python3-paho-mqtt python3-serial
+          sudo systemctl stop mosquitto || true
+      - name: Build the core and the host modem
+        run: |
+          cmake -S core -B build -DCMAKE_BUILD_TYPE=Debug -DATALAIA_SHARED=ON -DBUILD_TESTING=OFF
+          cmake --build build
+          cmake -S firmware/esp32/test/modem_host -B build/modem_host -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build/modem_host
+      - name: Test the controller
+        env:
+          ATALAIA_CORE_LIB: ${{ github.workspace }}/build/libatalaia_core.so
+          ATALAIA_MODEM_HOST: ${{ github.workspace }}/build/modem_host/modem_host
+        working-directory: controller
+        run: /usr/bin/python3 -m unittest discover -s tests -v
+
   protocol:
     name: Protocol schema and generated files
     runs-on: ubuntu-latest
@@ -127,6 +155,21 @@ jobs:
           . $IDF_PATH/export.sh
           idf.py set-target esp32s3
           idf.py build
+
+  esp32-modem-build:
+    name: ESP32 USB radio modem cross-compilation
+    runs-on: ubuntu-latest
+    container:
+      image: espressif/idf:v5.3.2
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the modem variant (sdkconfig.modem)
+        working-directory: firmware/esp32
+        run: |
+          . $IDF_PATH/export.sh
+          idf.py -B build-modem -D SDKCONFIG=build-modem/sdkconfig \
+            -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.modem" build
+          grep -q '^CONFIG_ATALAIA_MODEM_MODE=y' build-modem/sdkconfig
 
   firmware-test:
     name: Firmware HAL stub tests

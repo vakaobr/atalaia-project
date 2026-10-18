@@ -14,6 +14,7 @@ import os
 import unittest
 from pathlib import Path
 
+from atalaia_sim.protocol import PAYLOAD_FIELDS
 from atalaia_sim.packet import (
     AAD_SIZE,
     HEADER_SIZE,
@@ -35,6 +36,7 @@ from atalaia_sim.packet import (
     hello_decode,
     hello_encode,
     nonce_build,
+    payload_problems,
     state_decode,
     state_encode,
     time_decode,
@@ -368,25 +370,28 @@ class PayloadVectorTests(unittest.TestCase):
     """Test payload encode/decode against protocol/vectors/*.json."""
 
     def _run_payload_vectors(self, filename, encode_fn, decode_fn):
+        """Every valid vector decodes to its fields and re-encodes to the same bytes;
+        every invalid one is flagged by payload_problems (the C tests do the same)."""
         path = VECTORS_DIR / filename
-        if not path.exists():
-            self.skipTest(f"{filename} not found")
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
+        msg_type = filename.split(".")[0].upper()
+        self.assertTrue(data["valid"])
         for v in data["valid"]:
             with self.subTest(v["name"]):
                 expected_cbor = bytes.fromhex(v["cbor"])
-                # Decode the vector CBOR.  Some vectors use CBOR types
-                # (e.g. byte strings) that the Python mini decoder does
-                # not support; skip those gracefully.
-                try:
-                    decoded = decode_fn(expected_cbor)
-                except Exception:
-                    continue
-                # Re-encode and compare
-                reencoded = encode_fn(decoded)
-                self.assertEqual(reencoded, expected_cbor,
+                decoded = decode_fn(expected_cbor)
+                self.assertEqual(decoded, _vector_fields(msg_type, v["fields"]))
+                self.assertEqual(payload_problems(msg_type, decoded), [])
+                self.assertEqual(encode_fn(decoded), expected_cbor,
                                  f"{v['name']}: re-encoded CBOR differs from vector")
+        for v in data.get("invalid", []):
+            with self.subTest(v["name"]):
+                try:
+                    decoded = decode_fn(bytes.fromhex(v["cbor"]))
+                except Exception:
+                    continue  # not even CBOR: rejected
+                self.assertNotEqual(payload_problems(msg_type, decoded), [], v["reason"])
 
     def test_hello_vectors(self):
         self._run_payload_vectors("hello.json", hello_encode, hello_decode)
@@ -408,6 +413,19 @@ class PayloadVectorTests(unittest.TestCase):
 
     def test_claim_vectors(self):
         self._run_payload_vectors("claim.json", claim_encode, claim_decode)
+
+
+def _vector_fields(msg_type, fields):
+    """The JSON vector fields as the decoder returns them (bytes as hex, map keys as text)."""
+    out = {}
+    for name, value in fields.items():
+        kind = PAYLOAD_FIELDS[msg_type][name].type
+        if kind == "bytes":
+            value = bytes.fromhex(value)
+        elif kind in ("map_u8_u32", "map_u16_u16"):
+            value = {int(k): v for k, v in value.items()}
+        out[name] = value
+    return out
 
 
 class RFC3610Tests(unittest.TestCase):

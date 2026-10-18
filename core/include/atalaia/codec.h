@@ -47,4 +47,19 @@ size_t atalaia_event_encode(const atalaia_event_t *ev, const char *data_json, ui
 bool atalaia_event_decode(const uint8_t *buf, size_t len, atalaia_event_t *ev, char *data_json,
                           size_t data_cap, const char **error);
 
+/*
+ * A JSON object as a CBOR map whose keys all stay text (no standard data
+ * keys), as CMD parameters travel (protocol/schema/messages.yaml). Same
+ * JSON subset as event data. Returns the bytes written, or 0.
+ */
+size_t atalaia_json_map_encode(const char *json, uint8_t *buf, size_t cap, const char **error);
+
+/*
+ * The CBOR map with text keys at buf (len bytes available) as a compact
+ * JSON object in json (json_cap bytes including the NUL). *used, if not
+ * NULL, receives the number of CBOR bytes the map took.
+ */
+bool atalaia_json_map_decode(const uint8_t *buf, size_t len, size_t *used, char *json,
+                             size_t json_cap, const char **error);
+
 #endif /* ATALAIA_CODEC_H */

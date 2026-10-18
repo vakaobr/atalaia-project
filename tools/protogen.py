@@ -151,10 +151,13 @@ def load_schema() -> dict[str, Any]:
                     f"payload {msg_name}.{fname}: type must be one of {', '.join(PAYLOAD_FIELD_TYPES)}")
             require(isinstance(f.get("required"), bool),
                     f"payload {msg_name}.{fname}: required must be true or false")
+            fmax = f.get("max")
+            require(fmax is None or (isinstance(fmax, int) and not isinstance(fmax, bool) and fmax > 0),
+                    f"payload {msg_name}.{fname}: max must be a positive integer")
             seen_keys[fkey] = fname
             seen_names.add(fname)
             validated.append({"key": fkey, "name": fname, "type": f["type"],
-                              "required": f["required"], "doc": f.get("doc", "")})
+                              "required": f["required"], "max": fmax, "doc": f.get("doc", "")})
         payloads[msg_name] = validated
 
     return {
@@ -469,7 +472,7 @@ def gen_python(s: dict[str, Any]) -> str:
          "",
          "from __future__ import annotations",
          "",
-         "from typing import NamedTuple",
+         "from typing import NamedTuple, Optional",
          "",
          "",
          "class DataField(NamedTuple):",
@@ -488,6 +491,7 @@ def gen_python(s: dict[str, Any]) -> str:
          "    key: int",
          "    type: str",
          "    required: bool",
+         "    max: Optional[int] = None  # longest text or bytes, in bytes",
          "",
          "",
          f"PROTOCOL_VERSION = {s['version']}",
@@ -521,7 +525,8 @@ def gen_python(s: dict[str, Any]) -> str:
         for msg_name, pfields in s["payloads"].items():
             L.append(f"    {lit(msg_name)}: {{")
             for f in pfields:
-                L.append(f"        {lit(f['name'])}: PayloadField({f['key']}, {lit(f['type'])}, {f['required']}),")
+                extra = f", {f['max']}" if f.get("max") is not None else ""
+                L.append(f"        {lit(f['name'])}: PayloadField({f['key']}, {lit(f['type'])}, {f['required']}{extra}),")
             L.append("    },")
         L += ["}", ""]
     return "\n".join(L)

@@ -10,9 +10,11 @@
 #include <stdio.h>
 
 extern int check_failures;
+extern int check_count;
 
 #define CHECK(cond)                                                                                \
     do {                                                                                           \
+        check_count++;                                                                             \
         if (!(cond)) {                                                                             \
             fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond);                        \
             check_failures++;                                                                      \
@@ -38,5 +40,7 @@ void run_time_sync_tests(void);
 void run_radio_stub_tests(void);
 void run_radio_protocol_tests(void);
 void run_radio_power_tests(void);
+void run_modem_framing_tests(void);
+void run_modem_tests(void);
 
 #endif /* ATALAIA_FW_TEST_CHECK_H */

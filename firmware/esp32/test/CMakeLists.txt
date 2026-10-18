@@ -125,6 +125,8 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/radio/event_log.c
     ${SHELL_DIR}/radio/time_sync.c
     ${SHELL_DIR}/radio/radio_protocol.c
+    ${SHELL_DIR}/modem/modem.c
+    ${SHELL_DIR}/modem/modem_framing.c
 )
 
 # ---- HAL stub ----------------------------------------------------------------
@@ -156,6 +158,8 @@ set(TEST_SOURCES
     test_radio_stub.c
     test_radio_protocol.c
     test_radio_power.c
+    test_modem_framing.c
+    test_modem.c
 )
 
 # ---- Executable --------------------------------------------------------------

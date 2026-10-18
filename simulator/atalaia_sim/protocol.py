@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 
 
 class DataField(NamedTuple):
@@ -23,6 +23,7 @@ class PayloadField(NamedTuple):
     key: int
     type: str
     required: bool
+    max: Optional[int] = None  # longest text or bytes, in bytes
 
 
 PROTOCOL_VERSION = 1
@@ -132,7 +133,7 @@ EVENTS = {
 
 PAYLOAD_FIELDS = {
     'HELLO': {
-        'node_name': PayloadField(1, 'text', True),
+        'node_name': PayloadField(1, 'text', True, 24),
         'platform': PayloadField(2, 'uint8', True),
         'fw_version': PayloadField(3, 'text', True),
         'core_version': PayloadField(4, 'text', True),
@@ -145,7 +146,7 @@ PAYLOAD_FIELDS = {
     'ACK': {
         'ack_node': PayloadField(1, 'uint16', True),
         'ack_seq': PayloadField(2, 'uint16', True),
-        'ack_bitmap': PayloadField(3, 'bytes', False),
+        'ack_bitmap': PayloadField(3, 'bytes', False, 32),
     },
     'STATE': {
         'owner_team': PayloadField(1, 'uint8', True),

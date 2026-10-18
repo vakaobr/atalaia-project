@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# systemd unit for the field controller on a Raspberry Pi:
+#   sudo cp controller/deploy/atalaia-controller.service /etc/systemd/system/
+#   sudo systemctl enable --now atalaia-controller
+# Assumes the repository at /opt/atalaia and the core library built into
+# /opt/atalaia/build (cmake -S core -B build -DATALAIA_SHARED=ON).
+
+[Unit]
+Description=Atalaia field controller
+After=network-online.target mosquitto.service
+Wants=mosquitto.service
+
+[Service]
+User=atalaia
+Group=dialout
+WorkingDirectory=/opt/atalaia/controller
+Environment=ATALAIA_CORE_LIB=/opt/atalaia/build/libatalaia_core.so
+ExecStart=/usr/bin/python3 -m atalaia_controller run --config /etc/atalaia/controller.toml
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

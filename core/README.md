@@ -11,7 +11,9 @@ The shared C11 core runs on every full node: ESP32, Raspberry Pi/Linux and Andro
 | State store | `state.node{}`, `state.field{}` and grow-only, mergeable score counters | `score.h`, `script_api.c` | Done |
 | Lua sandbox | Lua 5.4 with a memory cap, an instruction watchdog, no `io`/`os`/`load`, and a seeded `rand` | `sandbox.c`, `rand.c` | Done |
 | Script API | The functions modes call | `script_api.c` | Done (including `field.*` from Phase C) |
-| Event codec | An event and its JSON data to the CBOR payload of an EVENT message, and back | `codec.h`, `codec.c` | Done (packet header, MIC and other messages in phase 2) |
+| Event codec | An event and its JSON data to the CBOR payload of an EVENT message, and back; plain JSON objects to CBOR maps (CMD parameters) | `codec.h`, `codec.c` | Done |
+| Packet layer | Header, nonce, AAD, AES-128-CCM (mbedtls), flood dedupe, ACK tracker, duty cycle | `packet.h`, `flood.h`, `ack.h`, `duty_cycle.h` | Done (phase 2A) |
+| Message codec | The payloads of HELLO, ACK, STATE, CMD, TIME, CONFIG and CLAIM, exactly as `protocol/schema/messages.yaml` defines them: required fields always written and checked, schema types (arrays, maps), duplicate keys and oversize values rejected | `msg_codec.h`, `msg_codec.c` | Done (made schema-exact in phase 2D: it had disagreed with the shared vectors for HELLO, STATE, CMD, TIME and CLAIM) |
 | Event log | Append-only log with merge and replay | | Planned |
 
 ## How a host uses it

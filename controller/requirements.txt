@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The field controller's Python dependencies. On a Raspberry Pi or Ubuntu
+# the distribution packages are enough and are what CI tests:
+#   sudo apt install python3-fastapi python3-uvicorn python3-websockets \
+#        python3-paho-mqtt python3-serial python3-yaml python3-cryptography mosquitto
+# With pip, inside a virtual environment:
+#   pip install -r controller/requirements.txt
+fastapi>=0.92
+uvicorn>=0.17
+websockets>=10.4
+paho-mqtt>=1.6,<3
+pyserial>=3.5
+PyYAML>=6.0
+cryptography>=38.0
+# Tests only: FastAPI's TestClient
+httpx>=0.23

@@ -17,6 +17,7 @@
 #include "../hal_radio.h"
 #include "../../radio/radio_power.h"
 
+#include <stdint.h>
 #include <string.h>
 
 #include "driver/gpio.h"
@@ -113,45 +114,52 @@ static uint32_t dc_last_update_ms;
 
 /* ---- SPI helpers --------------------------------------------------------- */
 
-static void sx_wait_busy(void)
+/* BUSY must drop before every command; ~200 ms covers the longest SX1262
+ * operation (calibration). A chip that never releases BUSY, or a floating
+ * pin on a board without the chip, is reported as an error. */
+#define SX_BUSY_TIMEOUT_MS 200
+
+static int sx_wait_busy(void)
 {
-    for (int i = 0; i < 200; i++) { /* ~200 ms timeout */
-        if (!gpio_get_level(PIN_BUSY)) return;
-        vTaskDelay(1);
+    for (int i = 0; i < SX_BUSY_TIMEOUT_MS; i++) {
+        if (!gpio_get_level(PIN_BUSY)) return 0;
+        vTaskDelay(1); /* one tick = 1 ms (CONFIG_FREERTOS_HZ=1000) */
     }
+    return gpio_get_level(PIN_BUSY) ? -1 : 0;
 }
 
-static void sx_cmd(const uint8_t *cmd, size_t cmd_len, uint8_t *resp, size_t resp_len)
+/* One SX1262 command: waits for BUSY, then a single SPI transaction.
+ * Returns 0 on success, -1 on a BUSY timeout or an SPI error. */
+static int sx_cmd(const uint8_t *cmd, size_t cmd_len, uint8_t *resp, size_t resp_len)
 {
-    sx_wait_busy();
-    spi_transaction_t t = {0};
-    uint8_t tx_buf[256];
-    uint8_t rx_buf[256];
+    uint8_t tx_buf[260];
+    uint8_t rx_buf[260];
     size_t total = cmd_len + resp_len;
-    if (total > sizeof(tx_buf)) total = sizeof(tx_buf);
+    if (total > sizeof(tx_buf)) return -1;
+    if (sx_wait_busy() != 0) return -1;
+    spi_transaction_t t = {0};
     memset(tx_buf, 0, total);
     memcpy(tx_buf, cmd, cmd_len);
-    t.length = (int)(total * 8);
+    t.length = total * 8;
     t.tx_buffer = tx_buf;
     t.rx_buffer = rx_buf;
-    spi_device_transmit(spi_handle, &t);
+    if (spi_device_transmit(spi_handle, &t) != ESP_OK) return -1;
     if (resp && resp_len > 0) {
         memcpy(resp, rx_buf + cmd_len, resp_len);
     }
+    return 0;
 }
 
-static void sx_write_reg(uint16_t addr, uint8_t value)
+static int sx_write_reg(uint16_t addr, uint8_t value)
 {
     uint8_t cmd[] = {SX_CMD_WRITE_REGISTER, (uint8_t)(addr >> 8), (uint8_t)(addr & 0xFF), value};
-    sx_cmd(cmd, sizeof(cmd), NULL, 0);
+    return sx_cmd(cmd, sizeof(cmd), NULL, 0);
 }
 
-static uint8_t sx_read_reg(uint16_t addr)
+static int sx_read_reg(uint16_t addr, uint8_t *value)
 {
     uint8_t cmd[] = {SX_CMD_READ_REGISTER, (uint8_t)(addr >> 8), (uint8_t)(addr & 0xFF), 0x00};
-    uint8_t resp[1];
-    sx_cmd(cmd, sizeof(cmd), resp, 1);
-    return resp[0];
+    return sx_cmd(cmd, sizeof(cmd), value, 1);
 }
 
 /* ---- DIO1 ISR ------------------------------------------------------------ */
@@ -203,25 +211,43 @@ static bool eu868_channel_valid(uint32_t freq_hz)
 
 /* ---- Radio ops ----------------------------------------------------------- */
 
-static void sx_set_frequency(uint32_t freq_hz)
+static int sx_set_frequency(uint32_t freq_hz)
 {
     /* Freq register = freq * 2^25 / 32 MHz. */
     uint32_t frf = (uint32_t)((uint64_t)freq_hz * (1ULL << 25) / 32000000ULL);
     uint8_t cmd[] = {SX_CMD_SET_RF_FREQUENCY, (uint8_t)(frf >> 24), (uint8_t)(frf >> 16),
                      (uint8_t)(frf >> 8), (uint8_t)(frf & 0xFF)};
-    sx_cmd(cmd, sizeof(cmd), NULL, 0);
+    return sx_cmd(cmd, sizeof(cmd), NULL, 0);
+}
+
+/* Undoes the probe steps that ran, newest first. */
+static void probe_cleanup(int steps_done)
+{
+    if (steps_done >= 4 && dio1_sem != NULL) {
+        gpio_isr_handler_remove(PIN_DIO1);
+        vSemaphoreDelete(dio1_sem);
+        dio1_sem = NULL;
+    }
+    if (steps_done >= 2 && spi_handle != NULL) {
+        spi_bus_remove_device(spi_handle);
+        spi_handle = NULL;
+    }
+    if (steps_done >= 1) {
+        spi_bus_free(SPI3_HOST);
+    }
 }
 
 static int esp_radio_init(void)
 {
     /*
      * Probe the SX1262 over SPI before configuring FEM GPIOs.
-     * On boards without the radio (Wokwi emulator), this returns early
+     * On boards without the radio (Wokwi emulator), this returns -1
      * without touching GPIO2/GPIO7 (which Wokwi uses for the keypad).
      * The display already owns SPI2_HOST, so the radio uses SPI3_HOST.
      *
      * CONFIG_ATALAIA_RADIO_DEBUG_STEP (1-6) stops init after the given
-     * step for Wokwi bisection.  0 = normal full init.
+     * step, for bisecting the init on an emulator; 0 = normal full init.
+     * The per-step messages are debug-level logs.
      */
 #ifndef CONFIG_ATALAIA_RADIO_DEBUG_STEP
 #define CONFIG_ATALAIA_RADIO_DEBUG_STEP 0
@@ -235,16 +261,16 @@ static int esp_radio_init(void)
         .sclk_io_num = PIN_SCK,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
-        .max_transfer_sz = 256,
+        .max_transfer_sz = 260,
     };
     esp_err_t err = spi_bus_initialize(SPI3_HOST, &bus_cfg, SPI_DMA_CH_AUTO);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "radio SPI bus init failed: %s", esp_err_to_name(err));
         return -1;
     }
-    ESP_LOGI(TAG, "radio debug step 1 done (spi_bus_initialize)");
+    ESP_LOGD(TAG, "probe step 1 done (spi_bus_initialize)");
     if (dbg == 1) {
-        spi_bus_free(SPI3_HOST);
+        probe_cleanup(1);
         return -1;
     }
 
@@ -258,14 +284,12 @@ static int esp_radio_init(void)
     err = spi_bus_add_device(SPI3_HOST, &dev_cfg, &spi_handle);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "radio SPI device add failed: %s", esp_err_to_name(err));
-        spi_bus_free(SPI3_HOST);
+        probe_cleanup(1);
         return -1;
     }
-    ESP_LOGI(TAG, "radio debug step 2 done (spi_bus_add_device)");
+    ESP_LOGD(TAG, "probe step 2 done (spi_bus_add_device)");
     if (dbg == 2) {
-        spi_bus_remove_device(spi_handle);
-        spi_handle = NULL;
-        spi_bus_free(SPI3_HOST);
+        probe_cleanup(2);
         return -1;
     }
 
@@ -285,64 +309,60 @@ static int esp_radio_init(void)
         .mode = GPIO_MODE_INPUT,
     };
     gpio_config(&dio1_cfg);
-    ESP_LOGI(TAG, "radio debug step 3 done (GPIO config RST/BUSY/DIO1)");
+    ESP_LOGD(TAG, "probe step 3 done (GPIO config RST/BUSY/DIO1)");
     if (dbg == 3) {
-        spi_bus_remove_device(spi_handle);
-        spi_handle = NULL;
-        spi_bus_free(SPI3_HOST);
+        probe_cleanup(3);
         return -1;
     }
 
     /* Step 4: DIO1 ISR install. */
     dio1_sem = xSemaphoreCreateBinary();
+    if (dio1_sem == NULL) {
+        ESP_LOGW(TAG, "radio: no memory for the DIO1 semaphore");
+        probe_cleanup(3);
+        return -1;
+    }
     gpio_set_intr_type(PIN_DIO1, GPIO_INTR_POSEDGE);
     gpio_install_isr_service(0);
     gpio_isr_handler_add(PIN_DIO1, dio1_isr, NULL);
-    ESP_LOGI(TAG, "radio debug step 4 done (DIO1 ISR)");
+    ESP_LOGD(TAG, "probe step 4 done (DIO1 ISR)");
     if (dbg == 4) {
-        gpio_isr_handler_remove(PIN_DIO1);
-        vSemaphoreDelete(dio1_sem);
-        dio1_sem = NULL;
-        spi_bus_remove_device(spi_handle);
-        spi_handle = NULL;
-        spi_bus_free(SPI3_HOST);
+        probe_cleanup(4);
         return -1;
     }
 
-    /* Step 5: Reset pulse and BUSY wait. */
+    /* Step 5: Reset pulse, then BUSY must drop. A chip that never releases
+     * it, or a floating pin with no chip, means "no radio". */
     gpio_set_level(PIN_RST, 0);
     vTaskDelay(pdMS_TO_TICKS(10));
     gpio_set_level(PIN_RST, 1);
     vTaskDelay(pdMS_TO_TICKS(20));
-    /* Wait for BUSY to go low (with timeout to avoid hanging in Wokwi). */
-    for (int i = 0; i < 100; i++) {
-        if (!gpio_get_level(PIN_BUSY)) break;
-        vTaskDelay(1);
+    if (sx_wait_busy() != 0) {
+        ESP_LOGW(TAG, "SX1262 not detected (BUSY stuck high after reset)");
+        probe_cleanup(4);
+        return -1;
     }
-    ESP_LOGI(TAG, "radio debug step 5 done (reset + BUSY wait)");
+    ESP_LOGD(TAG, "probe step 5 done (reset + BUSY wait)");
     if (dbg == 5) {
-        gpio_isr_handler_remove(PIN_DIO1);
-        vSemaphoreDelete(dio1_sem);
-        dio1_sem = NULL;
-        spi_bus_remove_device(spi_handle);
-        spi_handle = NULL;
-        spi_bus_free(SPI3_HOST);
+        probe_cleanup(4);
         return -1;
     }
 
-    /* Step 6: Probe SyncWord register. */
-    uint8_t sync_hi = sx_read_reg(0x0740);
-    ESP_LOGI(TAG, "radio debug step 6 done (probe sync_hi=0x%02X)", sync_hi);
-    if (dbg == 6 || sync_hi == 0x00 || sync_hi == 0xFF) {
-        if (sync_hi == 0x00 || sync_hi == 0xFF) {
-            ESP_LOGW(TAG, "SX1262 not detected (sync_hi=0x%02X)", sync_hi);
-        }
-        gpio_isr_handler_remove(PIN_DIO1);
-        vSemaphoreDelete(dio1_sem);
-        dio1_sem = NULL;
-        spi_bus_remove_device(spi_handle);
-        spi_handle = NULL;
-        spi_bus_free(SPI3_HOST);
+    /* Step 6: Probe the SyncWord register. */
+    uint8_t sync_hi = 0;
+    if (sx_read_reg(0x0740, &sync_hi) != 0) {
+        ESP_LOGW(TAG, "SX1262 not detected (no answer on SPI)");
+        probe_cleanup(4);
+        return -1;
+    }
+    ESP_LOGD(TAG, "probe step 6 done (sync_hi=0x%02X)", sync_hi);
+    if (sync_hi == 0x00 || sync_hi == 0xFF) {
+        ESP_LOGW(TAG, "SX1262 not detected (sync_hi=0x%02X)", sync_hi);
+        probe_cleanup(4);
+        return -1;
+    }
+    if (dbg == 6) {
+        probe_cleanup(4);
         return -1;
     }
     ESP_LOGI(TAG, "SX1262 detected (sync_hi=0x%02X)", sync_hi);
@@ -360,52 +380,56 @@ static int esp_radio_init(void)
     gpio_set_level(PIN_FEM_EN, 1);
     gpio_set_level(PIN_VFEM_CTL, 0); /* RX path by default */
 
+    /* Configure the chip. Any command that fails (BUSY timeout or SPI
+     * error) leaves the radio unusable: report it and release it. */
+    int rc = 0;
+
     /* Set standby mode (STDBY_RC). */
     uint8_t standby_cmd[] = {SX_CMD_SET_STANDBY, 0x00};
-    sx_cmd(standby_cmd, sizeof(standby_cmd), NULL, 0);
+    rc |= sx_cmd(standby_cmd, sizeof(standby_cmd), NULL, 0);
 
     /* Set DIO2 as RF switch control. */
     uint8_t dio2_cmd[] = {SX_CMD_SET_DIO2_AS_RF_SW, 0x01};
-    sx_cmd(dio2_cmd, sizeof(dio2_cmd), NULL, 0);
+    rc |= sx_cmd(dio2_cmd, sizeof(dio2_cmd), NULL, 0);
 
     /* Set regulator to DC-DC. */
     uint8_t reg_cmd[] = {SX_CMD_SET_REGULATOR_MODE, 0x01};
-    sx_cmd(reg_cmd, sizeof(reg_cmd), NULL, 0);
+    rc |= sx_cmd(reg_cmd, sizeof(reg_cmd), NULL, 0);
 
     /* Calibrate. */
     uint8_t cal_cmd[] = {SX_CMD_CALIBRATE, 0x7F};
-    sx_cmd(cal_cmd, sizeof(cal_cmd), NULL, 0);
+    rc |= sx_cmd(cal_cmd, sizeof(cal_cmd), NULL, 0);
     vTaskDelay(pdMS_TO_TICKS(10));
 
     /* Set packet type to LoRa. */
     uint8_t pkt_cmd[] = {SX_CMD_SET_PACKET_TYPE, 0x01};
-    sx_cmd(pkt_cmd, sizeof(pkt_cmd), NULL, 0);
+    rc |= sx_cmd(pkt_cmd, sizeof(pkt_cmd), NULL, 0);
 
     /* Set frequency to the default game channel. */
-    sx_set_frequency(CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ);
+    rc |= sx_set_frequency(CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ);
 
     /* Set modulation parameters: SF7, BW125, CR4/5, low-data-rate off. */
     uint8_t mod_cmd[] = {SX_CMD_SET_MODULATION, LORA_SF, 0x04, LORA_CR, 0x00};
-    sx_cmd(mod_cmd, sizeof(mod_cmd), NULL, 0);
+    rc |= sx_cmd(mod_cmd, sizeof(mod_cmd), NULL, 0);
 
     /* Set PA config for SX1262 (+22 dBm capable PA). */
     uint8_t pa_cmd[] = {SX_CMD_SET_PA_CONFIG, 0x04, 0x07, 0x00, 0x01};
-    sx_cmd(pa_cmd, sizeof(pa_cmd), NULL, 0);
+    rc |= sx_cmd(pa_cmd, sizeof(pa_cmd), NULL, 0);
 
     /* Set TX params: power, ramp time 200us. */
     int8_t power = TX_POWER_DBM;
     if (power < -9) power = -9;
     if (power > 22) power = 22;
     uint8_t tx_cmd[] = {SX_CMD_SET_TX_PARAMS, (uint8_t)power, 0x04};
-    sx_cmd(tx_cmd, sizeof(tx_cmd), NULL, 0);
+    rc |= sx_cmd(tx_cmd, sizeof(tx_cmd), NULL, 0);
 
     /* Set sync word for private network. */
-    sx_write_reg(0x0740, (uint8_t)(LORA_SYNC_WORD >> 8));
-    sx_write_reg(0x0741, (uint8_t)(LORA_SYNC_WORD & 0xFF));
+    rc |= sx_write_reg(0x0740, (uint8_t)(LORA_SYNC_WORD >> 8));
+    rc |= sx_write_reg(0x0741, (uint8_t)(LORA_SYNC_WORD & 0xFF));
 
     /* Set buffer base addresses. */
     uint8_t buf_cmd[] = {SX_CMD_SET_BUFFER_BASE, 0x00, 0x80};
-    sx_cmd(buf_cmd, sizeof(buf_cmd), NULL, 0);
+    rc |= sx_cmd(buf_cmd, sizeof(buf_cmd), NULL, 0);
 
     /* Set DIO1 IRQ: TX_DONE | RX_DONE | TIMEOUT on DIO1. */
     uint8_t irq_cmd[] = {SX_CMD_SET_DIO_IRQ_PARAMS,
@@ -417,7 +441,14 @@ static int esp_radio_init(void)
                          0x00,
                          0x00,
                          0x00};
-    sx_cmd(irq_cmd, sizeof(irq_cmd), NULL, 0);
+    rc |= sx_cmd(irq_cmd, sizeof(irq_cmd), NULL, 0);
+
+    if (rc != 0) {
+        ESP_LOGE(TAG, "SX1262 configuration failed (BUSY timeout or SPI error)");
+        gpio_set_level(PIN_FEM_EN, 0);
+        probe_cleanup(4);
+        return -1;
+    }
 
     /* Init duty-cycle tracking. */
     memset(dc_buckets, 0, sizeof(dc_buckets));
@@ -431,6 +462,13 @@ static int esp_radio_init(void)
     return 0;
 }
 
+/* Back to continuous RX on the game channel (after TX or a TX failure). */
+static int sx_start_rx(void)
+{
+    uint8_t rx_cmd[] = {SX_CMD_SET_RX, 0xFF, 0xFF, 0xFF}; /* continuous */
+    return sx_cmd(rx_cmd, sizeof(rx_cmd), NULL, 0);
+}
+
 static int esp_radio_send(const uint8_t *data, size_t len)
 {
     if (len == 0 || len > 255) return -1;
@@ -441,26 +479,27 @@ static int esp_radio_send(const uint8_t *data, size_t len)
      * IQ standard. */
     uint8_t pkt_cmd[] = {
         SX_CMD_SET_PACKET_PARAMS, 0x00, LORA_PREAMBLE, 0x00, (uint8_t)len, 0x01, 0x00};
-    sx_cmd(pkt_cmd, sizeof(pkt_cmd), NULL, 0);
+    if (sx_cmd(pkt_cmd, sizeof(pkt_cmd), NULL, 0) != 0) return -1;
 
     /* Write payload to buffer at offset 0. */
     uint8_t wr_cmd[2 + 255];
     wr_cmd[0] = SX_CMD_WRITE_BUFFER;
     wr_cmd[1] = 0x00; /* offset */
     memcpy(wr_cmd + 2, data, len);
-    sx_cmd(wr_cmd, 2 + len, NULL, 0);
+    if (sx_cmd(wr_cmd, 2 + len, NULL, 0) != 0) return -1;
 
     /* Clear IRQ and transmit (no timeout). */
     uint8_t clr_cmd[] = {SX_CMD_CLR_IRQ_STATUS, 0xFF, 0xFF};
-    sx_cmd(clr_cmd, sizeof(clr_cmd), NULL, 0);
+    if (sx_cmd(clr_cmd, sizeof(clr_cmd), NULL, 0) != 0) return -1;
 
     uint8_t tx_cmd[] = {SX_CMD_SET_TX, 0x00, 0x00, 0x00};
-    sx_cmd(tx_cmd, sizeof(tx_cmd), NULL, 0);
+    if (sx_cmd(tx_cmd, sizeof(tx_cmd), NULL, 0) != 0) return -1;
 
     /* Wait for TX_DONE on DIO1 (max 2 seconds). */
     if (xSemaphoreTake(dio1_sem, pdMS_TO_TICKS(2000)) != pdTRUE) {
         ESP_LOGW(TAG, "TX timeout");
-        return -1;
+        sx_start_rx();
+        return -2;
     }
 
     /* Record airtime for duty-cycle tracking.
@@ -470,10 +509,7 @@ static int esp_radio_send(const uint8_t *data, size_t len)
     dc_record(airtime_us, now_ms);
 
     /* Return to RX on the game channel after TX. */
-    {
-        uint8_t rx_cmd[] = {SX_CMD_SET_RX, 0xFF, 0xFF, 0xFF}; /* continuous */
-        sx_cmd(rx_cmd, sizeof(rx_cmd), NULL, 0);
-    }
+    if (sx_start_rx() != 0) return -1;
 
     return 0;
 }
@@ -482,17 +518,17 @@ static size_t esp_radio_recv(uint8_t *buf, size_t max_len, int8_t *rssi)
 {
     /* Set packet params for max receive. */
     uint8_t pkt_cmd[] = {SX_CMD_SET_PACKET_PARAMS, 0x00, LORA_PREAMBLE, 0x00, 0xFF, 0x01, 0x00};
-    sx_cmd(pkt_cmd, sizeof(pkt_cmd), NULL, 0);
+    if (sx_cmd(pkt_cmd, sizeof(pkt_cmd), NULL, 0) != 0) return 0;
 
     /* Clear IRQ and set RX with 50ms timeout. */
     uint8_t clr_cmd[] = {SX_CMD_CLR_IRQ_STATUS, 0xFF, 0xFF};
-    sx_cmd(clr_cmd, sizeof(clr_cmd), NULL, 0);
+    if (sx_cmd(clr_cmd, sizeof(clr_cmd), NULL, 0) != 0) return 0;
 
     /* Timeout in units of 15.625 us: 50ms = 3200. */
     uint32_t timeout = 3200;
     uint8_t rx_cmd[] = {SX_CMD_SET_RX, (uint8_t)(timeout >> 16), (uint8_t)(timeout >> 8),
                         (uint8_t)(timeout & 0xFF)};
-    sx_cmd(rx_cmd, sizeof(rx_cmd), NULL, 0);
+    if (sx_cmd(rx_cmd, sizeof(rx_cmd), NULL, 0) != 0) return 0;
 
     /* Wait for RX_DONE or timeout on DIO1. */
     if (xSemaphoreTake(dio1_sem, pdMS_TO_TICKS(100)) != pdTRUE) {
@@ -502,7 +538,7 @@ static size_t esp_radio_recv(uint8_t *buf, size_t max_len, int8_t *rssi)
     /* Check IRQ status. */
     uint8_t irq_cmd[] = {SX_CMD_GET_IRQ_STATUS, 0x00};
     uint8_t irq_resp[2];
-    sx_cmd(irq_cmd, sizeof(irq_cmd), irq_resp, 2);
+    if (sx_cmd(irq_cmd, sizeof(irq_cmd), irq_resp, 2) != 0) return 0;
     uint16_t irq = ((uint16_t)irq_resp[0] << 8) | irq_resp[1];
 
     if (!(irq & SX_IRQ_RX_DONE)) {
@@ -512,7 +548,7 @@ static size_t esp_radio_recv(uint8_t *buf, size_t max_len, int8_t *rssi)
     /* Get RX buffer status: payload length and start offset. */
     uint8_t rxbuf_cmd[] = {SX_CMD_GET_RX_BUFFER_STATUS, 0x00};
     uint8_t rxbuf_resp[2];
-    sx_cmd(rxbuf_cmd, sizeof(rxbuf_cmd), rxbuf_resp, 2);
+    if (sx_cmd(rxbuf_cmd, sizeof(rxbuf_cmd), rxbuf_resp, 2) != 0) return 0;
     uint8_t payload_len = rxbuf_resp[0];
     uint8_t start_offset = rxbuf_resp[1];
 
@@ -525,12 +561,14 @@ static size_t esp_radio_recv(uint8_t *buf, size_t max_len, int8_t *rssi)
     rd_cmd[0] = SX_CMD_READ_BUFFER;
     rd_cmd[1] = start_offset;
     rd_cmd[2] = 0x00; /* NOP */
-    sx_cmd(rd_cmd, sizeof(rd_cmd), buf, payload_len);
+    if (sx_cmd(rd_cmd, sizeof(rd_cmd), buf, payload_len) != 0) return 0;
 
     /* Get packet status for RSSI. */
     uint8_t pkt_status_cmd[] = {SX_CMD_GET_PACKET_STATUS, 0x00};
     uint8_t pkt_status[3];
-    sx_cmd(pkt_status_cmd, sizeof(pkt_status_cmd), pkt_status, 3);
+    if (sx_cmd(pkt_status_cmd, sizeof(pkt_status_cmd), pkt_status, 3) != 0) {
+        pkt_status[0] = 0;
+    }
     if (rssi) {
         *rssi = (int8_t)(-(int)(pkt_status[0]) / 2);
     }
@@ -544,8 +582,7 @@ static int esp_radio_set_channel(uint32_t freq_hz)
         ESP_LOGW(TAG, "channel %lu Hz outside EU868 sub-bands", (unsigned long)freq_hz);
         return -1;
     }
-    sx_set_frequency(freq_hz);
-    return 0;
+    return sx_set_frequency(freq_hz);
 }
 
 static int esp_radio_set_mode(hal_radio_mode_t mode)
@@ -553,16 +590,13 @@ static int esp_radio_set_mode(hal_radio_mode_t mode)
     switch (mode) {
     case HAL_RADIO_MODE_SLEEP: {
         uint8_t cmd[] = {SX_CMD_SET_SLEEP, 0x00};
-        sx_cmd(cmd, sizeof(cmd), NULL, 0);
-    } break;
+        return sx_cmd(cmd, sizeof(cmd), NULL, 0);
+    }
     case HAL_RADIO_MODE_STANDBY: {
         uint8_t cmd[] = {SX_CMD_SET_STANDBY, 0x00};
-        sx_cmd(cmd, sizeof(cmd), NULL, 0);
-    } break;
-    case HAL_RADIO_MODE_RX: {
-        uint8_t cmd[] = {SX_CMD_SET_RX, 0xFF, 0xFF, 0xFF}; /* continuous */
-        sx_cmd(cmd, sizeof(cmd), NULL, 0);
-    } break;
+        return sx_cmd(cmd, sizeof(cmd), NULL, 0);
+    }
+    case HAL_RADIO_MODE_RX: return sx_start_rx();
     case HAL_RADIO_MODE_TX:
         /* TX is started by send(). */
         break;
@@ -574,7 +608,9 @@ static int8_t esp_radio_rssi(void)
 {
     uint8_t cmd[] = {SX_CMD_GET_RSSI_INST, 0x00};
     uint8_t resp[1];
-    sx_cmd(cmd, sizeof(cmd), resp, 1);
+    if (sx_cmd(cmd, sizeof(cmd), resp, 1) != 0) {
+        return INT8_MIN; /* no reading */
+    }
     return (int8_t)(-(int)resp[0] / 2);
 }
 
@@ -591,7 +627,7 @@ static void esp_radio_deinit(void)
     if (spi_handle) {
         /* Set sleep. */
         uint8_t cmd[] = {SX_CMD_SET_SLEEP, 0x00};
-        sx_cmd(cmd, sizeof(cmd), NULL, 0);
+        (void)sx_cmd(cmd, sizeof(cmd), NULL, 0); /* best effort: we are shutting down */
         spi_bus_remove_device(spi_handle);
         spi_handle = NULL;
         spi_bus_free(SPI3_HOST);

@@ -1,8 +1,20 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-idf_component_register(
-    SRCS
+if(CONFIG_ATALAIA_MODEM_MODE)
+    # USB radio modem (ADR-P2-4): radio, serial link and modem logic only.
+    set(ATALAIA_SRCS
+        "modem/modem_main.c"
+        "modem/modem_task.c"
+        "modem/modem.c"
+        "modem/modem_framing.c"
+        "hal/esp/hal_esp_radio.c"
+        "radio/radio_task.c"
+        "radio/radio_protocol.c"
+    )
+    set(ATALAIA_EMBED)
+else()
+    set(ATALAIA_SRCS
         "shell.c"
         "game_timer.c"
         "command_dispatch.c"
@@ -34,6 +46,13 @@ idf_component_register(
         "radio/time_sync.c"
         "radio/radio_protocol.c"
         "radio/radio_nvs_esp.c"
+    )
+    set(ATALAIA_EMBED EMBED_FILES "wifi_setup.html")
+endif()
+
+idf_component_register(
+    SRCS
+        ${ATALAIA_SRCS}
     INCLUDE_DIRS
         "."
         "hal"
@@ -42,6 +61,7 @@ idf_component_register(
     REQUIRES
         atalaia_core
         driver
+        esp_app_format
         esp_psram
         esp_timer
         nvs_flash
@@ -50,8 +70,7 @@ idf_component_register(
         esp_event
         esp_netif
         mbedtls
-    EMBED_FILES
-        "wifi_setup.html"
+    ${ATALAIA_EMBED}
 )
 
 # The screen templates build LVGL widgets on the device (ADR-P1-2), with the
@@ -67,9 +86,11 @@ target_compile_definitions(${lvgl_lib} PUBLIC LV_KCONFIG_IGNORE)
 # Built-in presets: the mode scripts from modes/ are compiled into the image
 # and written to the preset store when it is empty (builtin_presets.c). They
 # are copied first because both files are called node.lua.
-set(ATALAIA_MODES_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../modes")
-foreach(mode bomb domination)
-    configure_file("${ATALAIA_MODES_DIR}/${mode}/node.lua"
-                   "${CMAKE_CURRENT_BINARY_DIR}/${mode}_node.lua" COPYONLY)
-    target_add_binary_data(${COMPONENT_LIB} "${CMAKE_CURRENT_BINARY_DIR}/${mode}_node.lua" TEXT)
-endforeach()
+if(NOT CONFIG_ATALAIA_MODEM_MODE)
+    set(ATALAIA_MODES_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../modes")
+    foreach(mode bomb domination)
+        configure_file("${ATALAIA_MODES_DIR}/${mode}/node.lua"
+                       "${CMAKE_CURRENT_BINARY_DIR}/${mode}_node.lua" COPYONLY)
+        target_add_binary_data(${COMPONENT_LIB} "${CMAKE_CURRENT_BINARY_DIR}/${mode}_node.lua" TEXT)
+    endforeach()
+endif()

@@ -12,6 +12,7 @@
 #include "test_display.h"
 
 int check_failures = 0;
+int check_count = 0;
 
 int main(void)
 {
@@ -35,11 +36,13 @@ int main(void)
     run_radio_stub_tests();
     run_radio_protocol_tests();
     run_radio_power_tests();
+    run_modem_framing_tests();
+    run_modem_tests();
 
     if (check_failures == 0) {
-        printf("firmware: all tests passed\n");
+        printf("firmware: all %d checks passed\n", check_count);
         return 0;
     }
-    fprintf(stderr, "firmware: %d check(s) failed\n", check_failures);
+    fprintf(stderr, "firmware: %d of %d check(s) failed\n", check_failures, check_count);
     return 1;
 }

@@ -208,10 +208,20 @@ bool atalaia_radio_proto_on_recv(atalaia_radio_proto_t *rp, const radio_rx_msg_t
                                  atalaia_header_t *out_hdr, uint8_t *out_payload,
                                  size_t *out_payload_len)
 {
+    return atalaia_radio_proto_on_recv_window(rp, rx_msg, 1, out_hdr, out_payload, out_payload_len,
+                                              NULL);
+}
+
+bool atalaia_radio_proto_on_recv_window(atalaia_radio_proto_t *rp, const radio_rx_msg_t *rx_msg,
+                                        uint16_t window, atalaia_header_t *out_hdr,
+                                        uint8_t *out_payload, size_t *out_payload_len,
+                                        uint16_t *out_epoch)
+{
     if (!rp->has_key) return false;
     if (rx_msg->len < ATALAIA_RF_HEADER_SIZE + ATALAIA_RF_MIC_SIZE) {
         return false;
     }
+    if (window == 0) window = 1;
 
     /* Decode the cleartext header first to get the source. */
     atalaia_header_t hdr;
@@ -219,57 +229,29 @@ bool atalaia_radio_proto_on_recv(atalaia_radio_proto_t *rp, const radio_rx_msg_t
 
     uint16_t source = hdr.source;
 
-    /* Look up the source's last known epoch. */
+    /* Start at the source's last known epoch, or at 0 for a new source,
+     * and try at most `window` epochs above it: never a lower epoch
+     * (ADR-P2-2). */
     int idx = find_source(rp, source);
-    uint16_t try_epoch;
-    bool source_known;
+    uint16_t first = idx >= 0 ? rp->source_epochs[idx].epoch : 0;
+    uint32_t last = (uint32_t)first + window;
+    if (last > 65535u) last = 65535u;
 
-    if (idx >= 0) {
-        try_epoch = rp->source_epochs[idx].epoch;
-        source_known = true;
-    } else {
-        /* Unknown source: try epoch 0 first, then 1. */
-        try_epoch = 0;
-        source_known = false;
-    }
-
-    /* Try decryption with the source's current epoch. */
-    if (atalaia_packet_decrypt(rx_msg->data, rx_msg->len, try_epoch, rp->game_key, out_hdr,
-                               out_payload, out_payload_len, rp->crypto)) {
-        /* Success at the current epoch. */
-        if (!source_known) {
-            /* Add to the table. */
-            int slot = alloc_source_slot(rp);
-            rp->source_epochs[slot].source = source;
-            rp->source_epochs[slot].epoch = try_epoch;
-            rp->source_epochs[slot].valid = true;
+    for (uint32_t e = first; e <= last; e++) {
+        uint16_t epoch = (uint16_t)e;
+        if (!atalaia_packet_decrypt(rx_msg->data, rx_msg->len, epoch, rp->game_key, out_hdr,
+                                    out_payload, out_payload_len, rp->crypto)) {
+            continue;
         }
+        /* Authenticated: remember (or adopt) this epoch for the source. */
+        if (idx < 0) {
+            idx = alloc_source_slot(rp);
+        }
+        rp->source_epochs[idx].source = source;
+        rp->source_epochs[idx].epoch = epoch;
+        rp->source_epochs[idx].valid = true;
+        if (out_epoch != NULL) *out_epoch = epoch;
         return true;
     }
-
-    /* Try epoch+1 (sender rebooted or wrapped). */
-    if (try_epoch < 65535) {
-        uint16_t next_epoch = (uint16_t)(try_epoch + 1);
-        if (atalaia_packet_decrypt(rx_msg->data, rx_msg->len, next_epoch, rp->game_key, out_hdr,
-                                   out_payload, out_payload_len, rp->crypto)) {
-            /* Adopt the new epoch. */
-            if (idx >= 0) {
-                rp->source_epochs[idx].epoch = next_epoch;
-            } else {
-                int slot = alloc_source_slot(rp);
-                rp->source_epochs[slot].source = source;
-                rp->source_epochs[slot].epoch = next_epoch;
-                rp->source_epochs[slot].valid = true;
-            }
-            return true;
-        }
-    }
-
-    /* For unknown sources, also try epoch 1 if we started at 0. */
-    if (!source_known && try_epoch == 0) {
-        /* Already tried 0 and 1 (0+1=1), so nothing more to do. */
-    }
-
-    /* Both attempts failed. */
     return false;
 }

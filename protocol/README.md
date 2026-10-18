@@ -106,6 +106,12 @@ Every non-EVENT message carries a CBOR payload with integer keys, defined in `sc
 
 EVENT (type 2) payloads are defined separately in `schema/events.yaml`.
 
+Both codecs follow the schema field for field. Encoders always write every required field, even when it is 0 or empty; `array_uint8` is a CBOR array, `map_*` types and CMD `params` are CBOR maps (`params` with text keys). The C decoders (`core/src/msg_codec.c`) reject a payload that misses a required field, repeats a key, has trailing bytes or holds a value too large for its field; the Python side reports the same problems with `atalaia_sim.packet.payload_problems`. Every valid vector must decode and re-encode byte for byte in both languages, and every invalid one must be rejected: the tests no longer skip a vector they cannot read.
+
+## The USB radio modem
+
+The field controller reaches the radio through a modem board on USB. Its framing, commands and status codes are in [usb-modem.md](usb-modem.md).
+
 ### Header `version_flags` byte
 
 | Bits | Field | Values |

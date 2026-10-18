@@ -5,13 +5,14 @@
 
     python tools/docker_fw.py build            Field Box firmware -> firmware/esp32/build/
     python tools/docker_fw.py wokwi            Wokwi emulator variant -> firmware/esp32/build-wokwi/
+    python tools/docker_fw.py modem            USB radio modem variant -> firmware/esp32/build-modem/
     python tools/docker_fw.py test             host tests and screen reference images (as CI)
     python tools/docker_fw.py test --update-screens
                                                accept new screen renders as the references
     python tools/docker_fw.py clean            delete the firmware build folders
 
 Works from any folder and any shell (cmd, PowerShell, bash). Docker must be
-running. `build` and `wokwi` use the espressif/idf:v5.3.2 image, the same as
+running. `build`, `wokwi` and `modem` use the espressif/idf:v5.3.2 image, the same as
 CI's esp32-build job, and write into firmware/esp32/ so that flashing tools
 and the Wokwi extension find the files. `test` runs CI's firmware-test
 commands in the atalaia-dev image (built on first use, like docker_sim.py)
@@ -35,6 +36,8 @@ TEST_VOLUME = "atalaia-fw-test-build"
 
 WOKWI_BUILD = "build-wokwi"
 WOKWI_DEFAULTS = ("sdkconfig.defaults", "sdkconfig.wokwi")
+MODEM_BUILD = "build-modem"
+MODEM_DEFAULTS = ("sdkconfig.defaults", "sdkconfig.modem")
 
 
 def fail(message: str) -> int:
@@ -81,23 +84,36 @@ def build() -> int:
     return code
 
 
-def wokwi() -> int:
-    # The variant's sdkconfig lives in build-wokwi/. Regenerate it when the
-    # defaults change, so edits to sdkconfig.wokwi always take effect.
-    sdkconfig = FW / WOKWI_BUILD / "sdkconfig"
+def variant(build_dir: str, defaults: tuple[str, ...]) -> int:
+    """Builds a variant (defaults applied on top of sdkconfig.defaults) into build_dir."""
+    # The variant's sdkconfig lives in its build folder. Regenerate it when
+    # the defaults change, so edits to them always take effect.
+    sdkconfig = FW / build_dir / "sdkconfig"
     if sdkconfig.exists():
-        newest = max((FW / name).stat().st_mtime for name in WOKWI_DEFAULTS)
+        newest = max((FW / name).stat().st_mtime for name in defaults)
         if newest > sdkconfig.stat().st_mtime:
             sdkconfig.unlink()
     script = (
         "set -e; . $IDF_PATH/export.sh > /dev/null; "
-        f"idf.py -B {WOKWI_BUILD} -D SDKCONFIG={WOKWI_BUILD}/sdkconfig "
-        f"-D 'SDKCONFIG_DEFAULTS={';'.join(WOKWI_DEFAULTS)}' build"
+        f"idf.py -B {build_dir} -D SDKCONFIG={build_dir}/sdkconfig "
+        f"-D 'SDKCONFIG_DEFAULTS={';'.join(defaults)}' build"
     )
-    code = run_idf(script)
+    return run_idf(script)
+
+
+def wokwi() -> int:
+    code = variant(WOKWI_BUILD, WOKWI_DEFAULTS)
     if code == 0:
         print(f"\nWokwi firmware: firmware/esp32/{WOKWI_BUILD}/. Open firmware/esp32/diagram.json "
               "in VS Code and start the simulator (see firmware/esp32/docs/WOKWI.md).")
+    return code
+
+
+def modem() -> int:
+    code = variant(MODEM_BUILD, MODEM_DEFAULTS)
+    if code == 0:
+        print(f"\nModem firmware: firmware/esp32/{MODEM_BUILD}/atalaia_esp32.bin "
+              "(flash it to the board plugged into the controller; see controller/README.md)")
     return code
 
 
@@ -139,7 +155,7 @@ def test(update_screens: bool) -> int:
 
 
 def clean() -> int:
-    for name in ("build", WOKWI_BUILD, "build-test"):
+    for name in ("build", WOKWI_BUILD, MODEM_BUILD, "build-test"):
         path = FW / name
         if path.exists():
             shutil.rmtree(path)
@@ -152,7 +168,7 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 0 if argv else 1
     command, options = argv[0], argv[1:]
-    known = {"build": [], "wokwi": [], "test": ["--update-screens"], "clean": []}
+    known = {"build": [], "wokwi": [], "modem": [], "test": ["--update-screens"], "clean": []}
     if command not in known:
         return fail(f"unknown command {command!r}; run with --help")
     for option in options:
@@ -170,6 +186,8 @@ def main(argv: list[str]) -> int:
             return build()
         if command == "wokwi":
             return wokwi()
+        if command == "modem":
+            return modem()
         return test("--update-screens" in options)
     except KeyboardInterrupt:
         return 130

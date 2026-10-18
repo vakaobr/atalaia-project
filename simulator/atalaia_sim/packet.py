@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import struct
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 from . import cbor
 from .protocol import MESSAGE_TYPES
@@ -252,7 +252,7 @@ def _encode_payload(msg: dict[str, Any], key_table: dict[str, int]) -> bytes:
 
 def _decode_payload(data: bytes, key_table: dict[str, int]) -> dict[str, Any]:
     """Decode CBOR with integer keys to a dict with string keys."""
-    raw = cbor.decode(data)
+    raw = cbor.decode(data, allow_bytes=True)
     if not isinstance(raw, dict):
         raise ValueError("payload must be a CBOR map")
     reverse: dict[int, str] = {v: k for k, v in key_table.items()}
@@ -377,3 +377,67 @@ PAYLOAD_DECODERS: dict[str, Any] = {
     "CONFIG": config_decode,
     "CLAIM": claim_decode,
 }
+
+
+# --- schema checks ------------------------------------------------------------
+
+_UINT_MAX = {"uint8": 0xFF, "uint16": 0xFFFF, "uint32": 0xFFFFFFFF}
+
+
+def _is_uint(value: Any, hi: int) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= hi
+
+
+def _type_problem(kind: str, value: Any, max_len: Optional[int]) -> Optional[str]:
+    if kind in _UINT_MAX:
+        return None if _is_uint(value, _UINT_MAX[kind]) else f"must be a {kind}"
+    if kind == "int8":
+        ok = isinstance(value, int) and not isinstance(value, bool) and -128 <= value <= 127
+        return None if ok else "must be an int8"
+    if kind == "text":
+        if not isinstance(value, str):
+            return "must be text"
+        if max_len is not None and len(value.encode("utf-8")) > max_len:
+            return f"longer than {max_len} bytes"
+        return None
+    if kind == "bytes":
+        if not isinstance(value, (bytes, bytearray)):
+            return "must be a byte string"
+        if max_len is not None and len(value) > max_len:
+            return f"longer than {max_len} bytes"
+        return None
+    if kind == "array_uint8":
+        ok = isinstance(value, list) and all(_is_uint(v, 0xFF) for v in value)
+        return None if ok else "must be an array of uint8"
+    if kind == "array_text":
+        ok = isinstance(value, list) and all(isinstance(v, str) for v in value)
+        return None if ok else "must be an array of text"
+    if kind in ("map_u8_u32", "map_u16_u16"):
+        khi, vhi = (0xFF, 0xFFFFFFFF) if kind == "map_u8_u32" else (0xFFFF, 0xFFFF)
+        ok = isinstance(value, dict) and all(_is_uint(k, khi) and _is_uint(v, vhi)
+                                             for k, v in value.items())
+        return None if ok else f"must be a {kind} map"
+    if kind == "map":
+        ok = isinstance(value, dict) and all(isinstance(k, str) for k in value)
+        return None if ok else "must be a map with text keys"
+    return f"unknown field type {kind}"
+
+
+def payload_problems(msg_type: str, fields: dict[str, Any]) -> list[str]:
+    """What makes a decoded payload break protocol/schema/messages.yaml (empty if valid).
+
+    The same rules the C decoders in core/src/msg_codec.c enforce: every
+    required field present, every known field of its schema type and size.
+    Unknown fields are allowed (newer senders may add optional ones).
+    """
+    problems = []
+    schema = _PF[msg_type]
+    for name, pf in schema.items():
+        if name not in fields:
+            if pf.required:
+                problems.append(f"missing required field {name} (key {pf.key})")
+            continue
+        problem = _type_problem(pf.type, fields[name], pf.max)
+        if problem:
+            problems.append(f"{name} {problem}")
+    return problems

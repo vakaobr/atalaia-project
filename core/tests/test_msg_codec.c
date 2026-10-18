@@ -493,13 +493,13 @@ static void test_hello_vector_decode_reencode(void)
     for (size_t i = 0; i < HELLO_VECTOR_COUNT; i++) {
         const payload_vector_t *v = &hello_vectors[i];
         atalaia_hello_t msg;
-        if (!atalaia_hello_decode(v->cbor, v->cbor_len, &msg)) continue;
+        CHECK(
+            atalaia_hello_decode(v->cbor, v->cbor_len, &msg)); /* every valid vector must decode */
         uint8_t buf[BUF];
         size_t n = atalaia_hello_encode(&msg, buf, sizeof(buf));
         CHECK(n > 0);
-        if (n == v->cbor_len) {
-            CHECK(memcmp(buf, v->cbor, n) == 0);
-        }
+        CHECK(n == v->cbor_len);
+        CHECK(n == v->cbor_len && memcmp(buf, v->cbor, n) == 0);
     }
 }
 
@@ -508,13 +508,13 @@ static void test_ack_vector_decode_reencode(void)
     for (size_t i = 0; i < ACK_VECTOR_COUNT; i++) {
         const payload_vector_t *v = &ack_vectors[i];
         atalaia_ack_msg_t msg;
-        if (!atalaia_ack_msg_decode(v->cbor, v->cbor_len, &msg)) continue;
+        CHECK(atalaia_ack_msg_decode(v->cbor, v->cbor_len,
+                                     &msg)); /* every valid vector must decode */
         uint8_t buf[BUF];
         size_t n = atalaia_ack_msg_encode(&msg, buf, sizeof(buf));
         CHECK(n > 0);
-        if (n == v->cbor_len) {
-            CHECK(memcmp(buf, v->cbor, n) == 0);
-        }
+        CHECK(n == v->cbor_len);
+        CHECK(n == v->cbor_len && memcmp(buf, v->cbor, n) == 0);
     }
 }
 
@@ -523,13 +523,13 @@ static void test_state_vector_decode_reencode(void)
     for (size_t i = 0; i < STATE_VECTOR_COUNT; i++) {
         const payload_vector_t *v = &state_vectors[i];
         atalaia_state_msg_t msg;
-        if (!atalaia_state_decode(v->cbor, v->cbor_len, &msg)) continue;
+        CHECK(
+            atalaia_state_decode(v->cbor, v->cbor_len, &msg)); /* every valid vector must decode */
         uint8_t buf[BUF];
         size_t n = atalaia_state_encode(&msg, buf, sizeof(buf));
         CHECK(n > 0);
-        if (n == v->cbor_len) {
-            CHECK(memcmp(buf, v->cbor, n) == 0);
-        }
+        CHECK(n == v->cbor_len);
+        CHECK(n == v->cbor_len && memcmp(buf, v->cbor, n) == 0);
     }
 }
 
@@ -538,13 +538,12 @@ static void test_cmd_vector_decode_reencode(void)
     for (size_t i = 0; i < CMD_VECTOR_COUNT; i++) {
         const payload_vector_t *v = &cmd_vectors[i];
         atalaia_cmd_msg_t msg;
-        if (!atalaia_cmd_decode(v->cbor, v->cbor_len, &msg)) continue;
+        CHECK(atalaia_cmd_decode(v->cbor, v->cbor_len, &msg)); /* every valid vector must decode */
         uint8_t buf[BUF];
         size_t n = atalaia_cmd_encode(&msg, buf, sizeof(buf));
         CHECK(n > 0);
-        if (n == v->cbor_len) {
-            CHECK(memcmp(buf, v->cbor, n) == 0);
-        }
+        CHECK(n == v->cbor_len);
+        CHECK(n == v->cbor_len && memcmp(buf, v->cbor, n) == 0);
     }
 }
 
@@ -553,15 +552,14 @@ static void test_time_vector_decode_reencode(void)
     for (size_t i = 0; i < TIME_VECTOR_COUNT; i++) {
         const payload_vector_t *v = &time_vectors[i];
         atalaia_time_msg_t msg;
-        if (!atalaia_time_decode(v->cbor, v->cbor_len, &msg)) continue;
+        CHECK(atalaia_time_decode(v->cbor, v->cbor_len, &msg)); /* every valid vector must decode */
         uint8_t buf[BUF];
         size_t n = atalaia_time_encode(&msg, buf, sizeof(buf));
         CHECK(n > 0);
         /* Re-encoded bytes may differ from the vector when the C encoder
          * omits optional zero-valued fields that the vector includes. */
-        if (n == v->cbor_len) {
-            CHECK(memcmp(buf, v->cbor, n) == 0);
-        }
+        CHECK(n == v->cbor_len);
+        CHECK(n == v->cbor_len && memcmp(buf, v->cbor, n) == 0);
     }
 }
 
@@ -570,13 +568,13 @@ static void test_config_vector_decode_reencode(void)
     for (size_t i = 0; i < CONFIG_VECTOR_COUNT; i++) {
         const payload_vector_t *v = &config_vectors[i];
         atalaia_config_msg_t msg;
-        if (!atalaia_config_decode(v->cbor, v->cbor_len, &msg)) continue;
+        CHECK(
+            atalaia_config_decode(v->cbor, v->cbor_len, &msg)); /* every valid vector must decode */
         uint8_t buf[BUF];
         size_t n = atalaia_config_encode(&msg, buf, sizeof(buf));
         CHECK(n > 0);
-        if (n == v->cbor_len) {
-            CHECK(memcmp(buf, v->cbor, n) == 0);
-        }
+        CHECK(n == v->cbor_len);
+        CHECK(n == v->cbor_len && memcmp(buf, v->cbor, n) == 0);
     }
 }
 
@@ -585,14 +583,88 @@ static void test_claim_vector_decode_reencode(void)
     for (size_t i = 0; i < CLAIM_VECTOR_COUNT; i++) {
         const payload_vector_t *v = &claim_vectors[i];
         atalaia_claim_msg_t msg;
-        if (!atalaia_claim_decode(v->cbor, v->cbor_len, &msg)) continue;
+        CHECK(
+            atalaia_claim_decode(v->cbor, v->cbor_len, &msg)); /* every valid vector must decode */
         uint8_t buf[BUF];
         size_t n = atalaia_claim_encode(&msg, buf, sizeof(buf));
         CHECK(n > 0);
-        if (n == v->cbor_len) {
-            CHECK(memcmp(buf, v->cbor, n) == 0);
-        }
+        CHECK(n == v->cbor_len);
+        CHECK(n == v->cbor_len && memcmp(buf, v->cbor, n) == 0);
     }
+}
+
+/* Every invalid vector (missing required field, oversized text) is rejected. */
+static void test_invalid_vectors_rejected(void)
+{
+    union {
+        atalaia_hello_t hello;
+        atalaia_ack_msg_t ack;
+        atalaia_state_msg_t state;
+        atalaia_cmd_msg_t cmd;
+        atalaia_time_msg_t time;
+        atalaia_config_msg_t config;
+        atalaia_claim_msg_t claim;
+    } u;
+    for (size_t i = 0; i < HELLO_BAD_VECTOR_COUNT; i++) {
+        CHECK(!atalaia_hello_decode(hello_bad_vectors[i].cbor, hello_bad_vectors[i].cbor_len,
+                                    &u.hello));
+    }
+    for (size_t i = 0; i < ACK_BAD_VECTOR_COUNT; i++) {
+        CHECK(
+            !atalaia_ack_msg_decode(ack_bad_vectors[i].cbor, ack_bad_vectors[i].cbor_len, &u.ack));
+    }
+    for (size_t i = 0; i < STATE_BAD_VECTOR_COUNT; i++) {
+        CHECK(!atalaia_state_decode(state_bad_vectors[i].cbor, state_bad_vectors[i].cbor_len,
+                                    &u.state));
+    }
+    for (size_t i = 0; i < CMD_BAD_VECTOR_COUNT; i++) {
+        CHECK(!atalaia_cmd_decode(cmd_bad_vectors[i].cbor, cmd_bad_vectors[i].cbor_len, &u.cmd));
+    }
+    for (size_t i = 0; i < TIME_BAD_VECTOR_COUNT; i++) {
+        CHECK(
+            !atalaia_time_decode(time_bad_vectors[i].cbor, time_bad_vectors[i].cbor_len, &u.time));
+    }
+    for (size_t i = 0; i < CONFIG_BAD_VECTOR_COUNT; i++) {
+        CHECK(!atalaia_config_decode(config_bad_vectors[i].cbor, config_bad_vectors[i].cbor_len,
+                                     &u.config));
+    }
+    for (size_t i = 0; i < CLAIM_BAD_VECTOR_COUNT; i++) {
+        CHECK(!atalaia_claim_decode(claim_bad_vectors[i].cbor, claim_bad_vectors[i].cbor_len,
+                                    &u.claim));
+    }
+}
+
+/* A key twice, a value too big for its field, or bytes after the map: rejected. */
+static void test_malformed_payloads_rejected(void)
+{
+    atalaia_time_msg_t t;
+    /* TIME with key 1 twice. */
+    static const uint8_t dup[] = {0xa6, 0x01, 0x00, 0x01, 0x00, 0x02, 0x00,
+                                  0x03, 0x00, 0x04, 0x00, 0x05, 0x00};
+    CHECK(!atalaia_time_decode(dup, sizeof(dup), &t));
+    /* TIME followed by a stray byte. */
+    static const uint8_t trailing[] = {0xa5, 0x01, 0x00, 0x02, 0x00, 0x03,
+                                       0x00, 0x04, 0x00, 0x05, 0x00, 0x00};
+    CHECK(!atalaia_time_decode(trailing, sizeof(trailing), &t));
+    CHECK(atalaia_time_decode(trailing, sizeof(trailing) - 1, &t));
+    /* game_state 256 does not fit a uint8. */
+    static const uint8_t big[] = {0xa5, 0x01, 0x00, 0x02, 0x19, 0x01, 0x00,
+                                  0x03, 0x00, 0x04, 0x00, 0x05, 0x00};
+    CHECK(!atalaia_time_decode(big, sizeof(big), &t));
+    /* CMD params must be a map with text keys. */
+    atalaia_cmd_msg_t c;
+    static const uint8_t text_params[] = {0xa2, 0x01, 0x05, 0x02, 0x61, 0x78};
+    CHECK(!atalaia_cmd_decode(text_params, sizeof(text_params), &c));
+    static const uint8_t int_keys[] = {0xa2, 0x01, 0x05, 0x02, 0xa1, 0x01, 0x02};
+    CHECK(!atalaia_cmd_decode(int_keys, sizeof(int_keys), &c));
+    static const uint8_t nested[] = {0xa2, 0x01, 0x05, 0x02, 0xa1, 0x61, 0x61, 0x82, 0x01, 0xf5};
+    CHECK(atalaia_cmd_decode(nested, sizeof(nested), &c));
+    CHECK(strcmp(c.params_json, "{\"a\":[1,true]}") == 0);
+    /* A CMD whose JSON params are not an object cannot be encoded. */
+    memset(&c, 0, sizeof(c));
+    strcpy(c.params_json, "[1]");
+    uint8_t buf[BUF];
+    CHECK(atalaia_cmd_encode(&c, buf, sizeof(buf)) == 0);
 }
 
 void run_msg_codec_tests(void)
@@ -620,4 +692,6 @@ void run_msg_codec_tests(void)
     test_time_vector_decode_reencode();
     test_config_vector_decode_reencode();
     test_claim_vector_decode_reencode();
+    test_invalid_vectors_rejected();
+    test_malformed_payloads_rejected();
 }

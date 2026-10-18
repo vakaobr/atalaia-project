@@ -120,4 +120,20 @@ bool atalaia_radio_proto_on_recv(atalaia_radio_proto_t *rp, const radio_rx_msg_t
                                  atalaia_header_t *out_hdr, uint8_t *out_payload,
                                  size_t *out_payload_len);
 
+/*
+ * Like atalaia_radio_proto_on_recv, but searches up to `window` epochs
+ * above the source's last known epoch (or epochs 0..window for an unknown
+ * source) instead of only one. Never tries a lower epoch, so replays of
+ * older epochs are still rejected. window = 1 is exactly on_recv.
+ *
+ * The USB modem uses a wider window (CONFIG_ATALAIA_MODEM_EPOCH_WINDOW):
+ * a box that rebooted twice while out of range, or that joined with an
+ * epoch above 1, would otherwise never be decrypted again. If out_epoch
+ * is not NULL it receives the epoch that authenticated the packet.
+ */
+bool atalaia_radio_proto_on_recv_window(atalaia_radio_proto_t *rp, const radio_rx_msg_t *rx_msg,
+                                        uint16_t window, atalaia_header_t *out_hdr,
+                                        uint8_t *out_payload, size_t *out_payload_len,
+                                        uint16_t *out_epoch);
+
 #endif /* ATALAIA_RADIO_PROTOCOL_H */

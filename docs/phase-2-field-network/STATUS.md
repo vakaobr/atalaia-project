@@ -5,7 +5,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 2 -- Field Network: Status
 
-**Current phase:** Implementation (phases A + B + C complete, stopped before D)
+**Current phase:** Implementation (phases A + B + C + D complete; E next)
 **Risk level:** High
 **Last verified:** 2026-10-18
 
@@ -41,6 +41,12 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 - [x] Phase C: NVS encryption documented (eFuse HMAC scheme; BRING_UP.md step 0)
 - [x] Phase C: Documentation updated (firmware README, BRING_UP.md, hardware README, core README, CHANGELOG)
 - [x] Radio channel fix (2026-10-18): replaced three-channel round-robin hopping with a single shared game channel (default 869.525 MHz, g2 sub-band, 10% DC, 500 mW ERP). RFC 0001 Amendment 1; ADR-P2-13 superseded in part.
+- [x] Phase D: Python field controller `controller/atalaia_controller` (engine, SQLite store, REST API v1 with all 17 plan endpoints plus status/promote/healthz, WebSocket stream, MQTT bridge to Mosquitto, field.lua in the core, restart recovery)
+- [x] Phase D: USB modem framing (sync byte + CRC-16, protocol/usb-modem.md), serial client with ping watchdog, reconnect and radio.down/radio.up
+- [x] Phase D: USB radio modem firmware variant (`sdkconfig.modem`, `main/modem/`), 0 warnings; modem logic unit-tested on the host and built as a Linux host modem for the controller's integration tests
+- [x] Phase D: CLAIM election shared by the simulator and the controller (`atalaia_sim/election.py`), failover tested over the radio model (detection, priority, ties, manual promote, step-down, scores across the takeover)
+- [x] Phase D: core payload codec made schema-exact (it disagreed with the shared vectors for HELLO, STATE, CMD, TIME and CLAIM; the vector tests had skipped it); strict vector tests in C and Python, invalid vectors rejected
+- [x] Phase D: radio HAL `sx_wait_busy()` returns an error that every caller propagates; "SX1262 not detected" reported cleanly; debug-step logs at debug level
 
 ## Verification (2026-10-18, Phase C -- final)
 
@@ -83,9 +89,36 @@ Published known-answer: RFC 3610 section 8, Packet Vector 1 (AES-128-CCM,
 - **ESP32**: firmware provides mbedtls via IDF component.
 - **Python**: `cryptography` library (required in CI, optional locally).
 
-## Next: Phase D
+## Verification (2026-10-18, Phase D)
 
-Python field controller, USB modem framing, REST, MQTT, SQLite, failover.
+```
+sh tools/check.sh (ATALAIA_REQUIRE_ALL=1)    exit 0
+  protogen --check, build_site --check       OK
+  format --check (clang-format, StyLua)      OK
+  core ctest                                 1/1 passed (strict payload vectors)
+  simulator unittest                         153 tests, 0 skipped
+  mode tests                                 12/12 passed
+  controller unittest                        63 tests, 0 skipped (C host modem, mosquitto)
+Core ASan+UBSan                              exit 0
+firmware stub tests                          2/2 (firmware_test: 812 checks; screens)
+firmware tests + host modem under ASan/UBSan clean (extra, not a CI job)
+ESP-IDF build (Field Box, clean sdkconfig)   exit 0, 0 warnings, 0x14f660 bytes (34% of the 2 MB slot free)
+ESP-IDF build (Wokwi)                        exit 0, 0 warnings, 0xdf6c0 bytes
+ESP-IDF build (USB modem)                    exit 0, 0 warnings, 0x46560 bytes (86% of the slot free)
+Wokwi bomb scenario (radio enabled)          "Scenario completed successfully";
+                                             log: "SX1262 not detected (BUSY stuck high after reset)"
+reuse lint                                   exit 0
+```
+
+## What is real and what is not yet
+
+- Real and tested: the controller end to end in Docker (engine, store, API, WebSocket, MQTT with a real Mosquitto) talking to the modem's real C code (framing, AES-CCM with mbedtls, dedupe, epoch window, nonce guard) over pyserial's socket://; the election in the simulator; the modem firmware compiles for the ESP32-S3.
+- Not run yet: the modem firmware on a board (USB-Serial-JTAG link, radio timing, duty cycle on air), the controller on a Raspberry Pi, and any box talking to it: the Field Box shell starts the radio task but does not yet send events or STATE or act on TIME, CMD and ACK (decision D18).
+- Not built in this phase (plan phase E): the GM console, the NFC and QR join flow (so a second controller cannot get the key to stand by, D17), the example scoreboard.
+
+## Next: Phase E
+
+GM console (Preact + HTM PWA), join flow (NFC + QR), example scoreboard. Before phase F: wire the radio protocol into the Field Box shell (D18).
 
 ## Plan summary
 
@@ -94,7 +127,7 @@ Python field controller, USB modem framing, REST, MQTT, SQLite, failover.
 | A | Protocol codecs, RFC-0001, protogen, test vectors | Complete |
 | B | Simulator: RadioModel, FieldController, multi-node tests | Complete |
 | C | Core API (field_ops), radio HAL, ESP32 radio task, time sync, event log | Complete |
-| D | Python controller, USB modem framing, REST, MQTT, SQLite, failover | Pending |
+| D | Python controller, USB modem framing, REST, MQTT, SQLite, failover | Complete (software; hardware in F) |
 | E | GM console (Preact+HTM PWA), join flow (NFC+QR), scoreboard | Pending |
 | F | Hardware integration, calibration, field test, documentation | Pending |
 
@@ -106,7 +139,7 @@ Python field controller, USB modem framing, REST, MQTT, SQLite, failover.
 | AC-2 | AES-CCM encrypt/decrypt passes known vectors | Met (RFC 3610 + 5 packet vectors) |
 | AC-3 | Simulator multi-node game correct scores | Met |
 | AC-4 | Duty-cycle compliance in sim | Met |
-| AC-5 | Controller REST API serves all 17 endpoints | Phase D |
+| AC-5 | Controller REST API serves all 17 endpoints | Met (`controller/tests/test_api.py`, real app, real engine) |
 | AC-6 | GM console serves and renders | Phase E |
 | AC-7 | ESP32 firmware cross-compiles with radio | Met |
 | AC-8 | Partition recovery zero lost captures in sim | Met |

@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Development environment matching CI, for machines without a C toolchain.
+# The field controller's Python dependencies and Mosquitto come from the
+# Ubuntu 24.04 packages, the same ones the controller CI job installs.
 #   docker build -t atalaia-dev tools/dev
 #   docker run --rm -v "$PWD:/src" atalaia-dev sh tools/check.sh
 # tools/docker_sim.py rebuilds this image when this file changes.
@@ -16,6 +18,8 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       build-essential cmake ninja-build python3 python3-yaml python3-cryptography clang-format-18 \
       libmbedtls-dev \
+      python3-fastapi python3-uvicorn python3-websockets python3-httpx python3-paho-mqtt \
+      python3-serial mosquitto \
       ca-certificates curl unzip \
  && ln -s /usr/bin/clang-format-18 /usr/local/bin/clang-format \
  && arch="$(uname -m)" \

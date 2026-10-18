@@ -2,14 +2,17 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """The CBOR subset Skirmesh-RF uses (RFC 8949), with no dependencies.
 
-Encodes integers, text, arrays, maps, booleans, null and floats. Integers
-and lengths use the shortest form and floats the shortest of half, single
-or double precision that keeps the value. Map entries keep their order.
+Encodes integers, text, byte strings, arrays, maps, booleans, null and
+floats. Integers and lengths use the shortest form and floats the shortest
+of half, single or double precision that keeps the value. Map entries keep
+their order.
 
-The decoder rejects anything else: byte strings, tags, indefinite lengths,
-undefined and other simple values, duplicate map keys, NaN and infinity,
-containers nested more than MAX_DEPTH deep, and trailing bytes. It is the
-same subset as the C codec in core/src/codec.c.
+The decoder rejects anything else: tags, indefinite lengths, undefined and
+other simple values, duplicate map keys, NaN and infinity, containers
+nested more than MAX_DEPTH deep, and trailing bytes. Byte strings are
+accepted only with allow_bytes=True: message payloads use them (the ACK
+bitmap), event data never does. It is the same subset as the C codecs in
+core/src/codec.c and core/src/msg_codec.c.
 """
 
 from __future__ import annotations
@@ -86,6 +89,8 @@ def encode(value: Any, depth: int = 0) -> bytes:
         return _float(value)
     if isinstance(value, str):
         return encode_text(value)
+    if isinstance(value, (bytes, bytearray)):
+        return _head(2, len(value)) + bytes(value)
     if isinstance(value, (list, tuple)):
         return _head(4, len(value)) + b"".join(encode(v, depth + 1) for v in value)
     if isinstance(value, dict):
@@ -103,9 +108,10 @@ def encode(value: Any, depth: int = 0) -> bytes:
 
 
 class Decoder:
-    def __init__(self, data: bytes):
+    def __init__(self, data: bytes, allow_bytes: bool = False):
         self.data = bytes(data)
         self.pos = 0
+        self.allow_bytes = allow_bytes
 
     def _take(self, n: int) -> bytes:
         if n > len(self.data) - self.pos:
@@ -138,6 +144,8 @@ class Decoder:
             return n
         if major == 1:
             return -1 - n
+        if major == 2 and self.allow_bytes:
+            return self._take(n)
         if major == 3:
             try:
                 return self._take(n).decode("utf-8")
@@ -176,8 +184,8 @@ class Decoder:
             raise CBORError("trailing bytes")
 
 
-def decode(data: bytes) -> Any:
-    d = Decoder(data)
+def decode(data: bytes, allow_bytes: bool = False) -> Any:
+    d = Decoder(data, allow_bytes)
     value = d.value()
     d.done()
     return value

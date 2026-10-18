@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Topic permissions for /etc/mosquitto/atalaia.acl (see mosquitto.conf).
+
+user controller
+topic readwrite field/v1/#
+
+user gm
+topic read field/v1/#
+topic write field/v1/+/cmd/#
+
+user reader
+topic read field/v1/+/events/#
+topic read field/v1/+/score
+topic read field/v1/+/nodes/#
