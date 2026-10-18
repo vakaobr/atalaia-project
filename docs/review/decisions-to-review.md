@@ -43,6 +43,18 @@ The open questions from those design runs are added here as each run reports, wi
 | P5-6 | Maximum size of a mode package? | 1 MB per package. | Modes are scripts and small assets; a cap limits abuse of the registry. | open |
 | P5-7 | The carrier PCB: when? | Deferred until at least three perfboard prototypes work (ADR-P5-6); KiCad 8, CERN-OHL-S-2.0. | A PCB before the hand-wired boxes are proven would likely need a respin. | open |
 
+### Phase 3, Android and players (design: docs/phase-3-android-players/)
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| P3-1 | How are chrono readings signed? | **Changed from the design's choice.** Phase 3 chose HMAC-SHA256 (ADR-P3-7), phase 4 chose an Ed25519 key per marshal (ADR-P4-5). Chosen: Ed25519 in both, so phase 4 needs no migration. To be fixed in ADR-P3-7 before phase 3 is implemented. | Ed25519 survives password changes and lets other fields verify records without a shared secret. | open |
+| P3-2 | Screen templates: code or data? | Declarative YAML templates in each mode's `assets/screens/` (ADR-P3-4), as spec section 12 describes, with a minimal YAML parser on the ESP32. The firmware's current C-function templates (ADR-P1-2) get rewritten to read them. | Modes can ship their own screens and look the same on the box and the app. It costs a firmware parser and a renderer change. | open |
+| P3-3 | New standard events (ids 25-39: kill.confirmed, team.eliminated, holdall.*, laststand.*, chrono.checkin and spotcheck, visibility.*, node.tamper, pod.*)? | Added through protocol/schema/events.yaml as the design lists (ADR-P3-8). With no other contributors yet, recorded here instead of a two-week RFC review. | Events are protocol changes (CONTRIBUTING.md). | open |
+| P3-4 | MQTT on an Android controller? | A minimal embedded Dart MQTT 3.1.1 broker, QoS 0 and 1 only (ADR-P3-12); the Pi keeps Mosquitto. | No external broker on a phone. Worth checking whether a maintained Dart broker exists before writing one. | open |
+| P3-5 | Chrono limit templates (Portugal, UK, Germany, generic CQB)? | Ship inside the app; Portuguese values to be checked against the current national rules before release. | Props may be offline. The figures came from research, not an official source. | open |
+| P3-6 | Smaller choices: the yaml package in Flutter (custom parser only on the ESP32), no dormant FFI bridge on iOS, cirruslabs/flutter:stable for CI, pod firmware sharing the modem framing, a 247-byte minimum BLE MTU, and plan phase A first. | As the design chose (M-1 to M-8 in its report). | Standard tooling, code reuse, no BLE fragmentation. | open |
+| P3-7 | The design lists phase 2's USB modem framing and join format as "complete and stable". | They are designed (ADR-P2-5, ADR-P2-12) but built only in phase 2 plan phases D and E. Phase 3 re-checks its assumptions B4 and B10 when phase 2's report arrives. | Avoids building on interfaces that may still change. | open |
+
 ### Phase 4, site server and advanced play (design: docs/phase-4-site-server/)
 
 | # | Question | Answer chosen | Why | Status |
