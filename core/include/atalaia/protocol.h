@@ -165,34 +165,41 @@ enum {
     ATALAIA_DATA_READING_MPS = 25,  /* chrono reading in m/s */
     ATALAIA_DATA_BB_G = 26,         /* BB weight in grams */
     ATALAIA_DATA_LIMIT_J = 27,      /* energy limit in joules */
+    ATALAIA_DATA_DURATION_S = 28,   /* countdown or visibility duration in seconds */
+    ATALAIA_DATA_HOLDER = 31,       /* team holding the node when it happened */
 };
 
 /* Standard event ids: the CBOR value of the type field. */
 enum {
-    ATALAIA_EV_GAME_START = 1,        /* game.start */
-    ATALAIA_EV_GAME_PAUSE = 2,        /* game.pause */
-    ATALAIA_EV_GAME_RESUME = 3,       /* game.resume */
-    ATALAIA_EV_GAME_END = 4,          /* game.end */
-    ATALAIA_EV_ZONE_CAPTURED = 5,     /* zone.captured */
-    ATALAIA_EV_ZONE_NEUTRALIZED = 6,  /* zone.neutralized */
-    ATALAIA_EV_BOMB_ARMED = 7,        /* bomb.armed */
-    ATALAIA_EV_BOMB_DEFUSED = 8,      /* bomb.defused */
-    ATALAIA_EV_BOMB_EXPLODED = 9,     /* bomb.exploded */
-    ATALAIA_EV_BOMB_RESET = 10,       /* bomb.reset */
-    ATALAIA_EV_SCORE_DELTA = 11,      /* score.delta */
-    ATALAIA_EV_CODE_USED = 12,        /* code.used */
-    ATALAIA_EV_TAG_SCANNED = 13,      /* tag.scanned */
-    ATALAIA_EV_PLAYER_RESPAWN = 14,   /* player.respawn */
-    ATALAIA_EV_PLAYER_CHECKIN = 15,   /* player.checkin */
-    ATALAIA_EV_TARGET_HIT = 16,       /* target.hit */
-    ATALAIA_EV_CHRONO_VIOLATION = 17, /* chrono.violation */
-    ATALAIA_EV_GM_MESSAGE = 18,       /* gm.message */
-    ATALAIA_EV_NODE_ONLINE = 19,      /* node.online */
-    ATALAIA_EV_NODE_OFFLINE = 20,     /* node.offline */
-    ATALAIA_EV_NODE_REBOOTED = 21,    /* node.rebooted */
-    ATALAIA_EV_BATTERY_LOW = 22,      /* battery.low */
-    ATALAIA_EV_SCRIPT_ERROR = 23,     /* script.error */
-    ATALAIA_EV_SCRIPT_HALTED = 24,    /* script.halted */
+    ATALAIA_EV_GAME_START = 1,                  /* game.start */
+    ATALAIA_EV_GAME_PAUSE = 2,                  /* game.pause */
+    ATALAIA_EV_GAME_RESUME = 3,                 /* game.resume */
+    ATALAIA_EV_GAME_END = 4,                    /* game.end */
+    ATALAIA_EV_ZONE_CAPTURED = 5,               /* zone.captured */
+    ATALAIA_EV_ZONE_NEUTRALIZED = 6,            /* zone.neutralized */
+    ATALAIA_EV_BOMB_ARMED = 7,                  /* bomb.armed */
+    ATALAIA_EV_BOMB_DEFUSED = 8,                /* bomb.defused */
+    ATALAIA_EV_BOMB_EXPLODED = 9,               /* bomb.exploded */
+    ATALAIA_EV_BOMB_RESET = 10,                 /* bomb.reset */
+    ATALAIA_EV_SCORE_DELTA = 11,                /* score.delta */
+    ATALAIA_EV_CODE_USED = 12,                  /* code.used */
+    ATALAIA_EV_TAG_SCANNED = 13,                /* tag.scanned */
+    ATALAIA_EV_PLAYER_RESPAWN = 14,             /* player.respawn */
+    ATALAIA_EV_PLAYER_CHECKIN = 15,             /* player.checkin */
+    ATALAIA_EV_TARGET_HIT = 16,                 /* target.hit */
+    ATALAIA_EV_CHRONO_VIOLATION = 17,           /* chrono.violation */
+    ATALAIA_EV_GM_MESSAGE = 18,                 /* gm.message */
+    ATALAIA_EV_NODE_ONLINE = 19,                /* node.online */
+    ATALAIA_EV_NODE_OFFLINE = 20,               /* node.offline */
+    ATALAIA_EV_NODE_REBOOTED = 21,              /* node.rebooted */
+    ATALAIA_EV_BATTERY_LOW = 22,                /* battery.low */
+    ATALAIA_EV_SCRIPT_ERROR = 23,               /* script.error */
+    ATALAIA_EV_SCRIPT_HALTED = 24,              /* script.halted */
+    ATALAIA_EV_HOLDALL_SCORING_START = 28,      /* holdall.scoring_start */
+    ATALAIA_EV_HOLDALL_SCORING_STOP = 29,       /* holdall.scoring_stop */
+    ATALAIA_EV_LASTSTAND_COUNTDOWN_START = 30,  /* laststand.countdown_start */
+    ATALAIA_EV_LASTSTAND_COUNTDOWN_CANCEL = 31, /* laststand.countdown_cancel */
+    ATALAIA_EV_LASTSTAND_DEFEATED = 32,         /* laststand.defeated */
 };
 
 typedef enum {

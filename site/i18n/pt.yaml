@@ -38,7 +38,7 @@ header:
   language: Idioma
 
 hero:
-  status: Pré-alfa · software da fase 2 pronto, pacote de modos em curso · ainda não pronta para o campo
+  status: Pré-alfa · software da fase 2 pronto, à espera das placas de rádio · ainda não pronta para o campo
   title: A plataforma aberta de <span class="nowrap">combate simulado</span>
   lead: >-
     A Atalaia é uma plataforma aberta para os dispositivos eletrónicos de jogo (os props) de
@@ -212,7 +212,7 @@ modes:
 screens:
   title: O que se vê
   intro: >-
-    Sete capturas do firmware real da Field Box (ESP32, LVGL 9.2, ecrã de 320&nbsp;×&nbsp;240)
+    Oito capturas do firmware real da Field Box (ESP32, LVGL 9.2, ecrã de 320&nbsp;×&nbsp;240)
     a correr no emulador <a href="https://wokwi.com">Wokwi</a>. A interface da caixa está em inglês.
     Ainda não foi testado em hardware físico.
   note: >-
@@ -226,8 +226,9 @@ screens:
     caption: A organização introduz o PIN de administrador para desbloquear a configuração.
   choose_game:
     alt: >-
-      Ecrã da Field Box: cabeçalho «CHOOSE A GAME», linha 1 «Bomb» destacada a amarelo, linha 2
-      «Domination», indicação «1-9 choose # next * back».
+      Ecrã da Field Box: cabeçalho «CHOOSE A GAME» com a lista 1 «Bomb» (destacada a amarelo),
+      2 «Domination», 3 «Hold-All Domination», 4 «Last Stand» e 5 «Codes», e a indicação
+      «1-9 choose # next * back».
     caption: Escolha do modo de jogo no menu da própria caixa.
   confirm:
     alt: >-
@@ -253,6 +254,11 @@ screens:
       Ecrã da Field Box: cabeçalho «JOINED GAME 4242», etiqueta «Game» à esquerda, «zone, node 7»
       à direita.
     caption: Caixa entrou no jogo de campo via cartão NFC ou consola série.
+  code_entry:
+    alt: >-
+      Ecrã da Field Box: cabeçalho «CODE», dois de quatro círculos preenchidos a amarelo,
+      indicação «# enter * delete».
+    caption: A escrever um código do modificador Códigos (pontos, pistas ou desbloqueios).
 
 try:
   title: Experimenta já
@@ -293,11 +299,11 @@ roadmap:
   p2:
     title: Rede de campo
     text: >-
-      Skirmesh-RF sobre LoRa, controlador de campo, API, consola da organização. A fase vai
-      terminar com um pacote de modos: Hold-All Domination (só pontua quem segura todas as caixas),
-      Last Stand (uma contagem decrescente para a derrota enquanto se segura uma de três caixas),
-      códigos de armar por equipa na Bomba e o modificador de códigos (códigos no teclado ou em QR
-      que dão pontos, pistas ou desbloqueios).
+      Skirmesh-RF sobre LoRa, controlador de campo, API, consola da organização e um pacote de
+      modos, já escrito e testado em software: Domínio Total (só pontua quem tem todas as caixas),
+      Última Resistência (uma contagem para a derrota enquanto se tem uma de três zonas), códigos
+      de armar por equipa na Bomba e o modificador Códigos (códigos no teclado que dão pontos,
+      pistas ou desbloqueios, e a organização sabe quem os usou).
     gate: >-
       Prova: 5 caixas num espaço de <a href="#glossario-cqb">CQB</a> e num campo exterior, sem uma
       única captura perdida. O protocolo de rádio cifrado, o controlador de campo com a sua API, o

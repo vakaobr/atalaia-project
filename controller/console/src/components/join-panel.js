@@ -41,7 +41,8 @@ export class JoinPanel extends Component {
 
     roles() {
         const { game, modes } = this.props.app.state;
-        const mode = game && modes.find((m) => m.id === game.mode_id);
+        // A game with modifiers ("main+modifier") has the main mode's roles.
+        const mode = game && modes.find((m) => m.id === String(game.mode_id).split('+')[0]);
         return mode ? Object.keys(mode.roles || {}) : [];
     }
 

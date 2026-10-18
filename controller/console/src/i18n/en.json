@@ -57,6 +57,8 @@
     "duration_hint": "0 = no limit.",
     "length": "Length",
     "params": "Mode parameters",
+    "modifiers": "Modifiers",
+    "modifiers_hint": "They run alongside the mode on every box (for example keypad codes).",
     "create": "Create game",
     "message": "Message to every box",
     "message_hint": "Shown on the boxes' screens",

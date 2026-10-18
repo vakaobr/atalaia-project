@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Down to their last zone, the defenders fall when the countdown runs out and the attackers win
+params: { countdown_s: 60 }
+nodes: { alpha: zone, bravo: zone, charlie: zone }
+steps:
+  - expect: { type: zone.captured, node: alpha, team: blue, at: 0 }
+  - expect: { type: zone.captured, node: charlie, team: blue, at: 0 }
+  - hold: { node: alpha, team: red, s: 3 }
+  - expect_no: laststand.countdown_start           # two of three zones are still blue
+  - hold: { node: bravo, team: red, s: 3 }          # 3 -> 6 s: blue holds only charlie
+  - expect: { type: laststand.countdown_start, node: controller, team: blue, at: 6, data: { duration_s: 60 } }
+  - wait: 59
+  - expect_no: laststand.defeated
+  - expect_status: running
+  - wait: 1
+  - expect: { type: laststand.defeated, node: controller, team: blue, at: 66 }
+  - expect: { type: game.end, node: controller, at: 66, data: { reason: win, winner: red } }
+  - expect_status: ended
+  - expect_screen: { node: charlie, template: final_score, data: { owner: blue } }
+  - expect_no: script.error

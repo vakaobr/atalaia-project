@@ -14,6 +14,7 @@ the FieldController (TIME beacons, election) every ``tick_interval_s``.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import random
@@ -24,7 +25,7 @@ from typing import Any, Callable, Optional
 
 from atalaia_sim import join as joinfmt
 from atalaia_sim.core import Core, Emitted, FieldOps, Node
-from atalaia_sim.election import Election, priority_score
+from atalaia_sim.election import LEADER, Election, priority_score
 from atalaia_sim.field_controller import (
     CMD_OPCODES,
     GAME_ENDED,
@@ -35,7 +36,7 @@ from atalaia_sim.field_controller import (
     FieldNode,
     NotController,
 )
-from atalaia_sim.mode import ModeError
+from atalaia_sim.mode import SEPARATOR, ModeError
 from atalaia_sim.packet import Header, vf_make
 
 from . import radio_modem
@@ -118,12 +119,24 @@ class ModemTransport:
 
 
 class FieldScript:
-    """A mode's field.lua running in the core, with field.* answered by the engine."""
+    """A mode's field.lua running in the core, with field.* answered by the engine.
+
+    Its score.add() gains are the controller's own counters: they never
+    travel in a box's STATE, so they are merged into the totals under
+    ``score_key`` (one key per run of the script: a restart or a takeover
+    starts a new run, whose points add to the earlier runs'). A game.end it
+    emits (game.finish, game.win) ends the game once the script has
+    returned (``pending_end``), never from inside the core's callback.
+    """
 
     def __init__(self, core: Core, engine: "Controller", source: str, chunk: str,
-                 teams: list[str], params: dict[str, Any], seed: int) -> None:
+                 teams: list[str], params: dict[str, Any], seed: int,
+                 score_key: str = "field-1") -> None:
         self.engine = engine
+        self.teams = list(teams)
+        self.score_key = score_key
         self.state: dict[str, Any] = {}
+        self.pending_end: Optional[dict[str, Any]] = None
         ops = FieldOps(nodes=self._nodes, owner=self._owner, send=self._send, on_state=self._on_state)
         self.node = Node(core, engine.node_id, seed, teams, params, source, chunk,
                          on_event=self._on_event, on_log=self._on_log, field_ops=ops)
@@ -156,6 +169,9 @@ class FieldScript:
         self.engine._emit({"type": "field_state", "key": key, "value": value})
 
     def _on_event(self, ev: Emitted) -> None:
+        if ev.type == "game.end":
+            self.pending_end = dict(ev.data)
+            return
         fc = self._fc()
         team = fc.team_name(ev.team)
         fc.controller_event(ev.type, ev.data, team=team, prio=ev.prio)
@@ -165,9 +181,19 @@ class FieldScript:
 
     def input(self, type_: str, data: Optional[dict[str, Any]] = None) -> None:
         self.node.input(type_, data)
+        self._merge_gains()
 
     def advance(self, game_time_ms: int) -> None:
         self.node.advance(game_time_ms)
+        self._merge_gains()
+
+    def gains(self) -> dict[str, int]:
+        return {t: self.node.gained(t) for t in self.teams if self.node.gained(t)}
+
+    def _merge_gains(self) -> None:
+        gains = self.gains()
+        if gains:
+            self._fc().merge_counters(self.score_key, gains)
 
     def close(self) -> None:
         self.node.close()
@@ -196,6 +222,7 @@ class Controller:
         self.fc: Optional[FieldController] = None
         self.transport: Optional[ModemTransport] = None
         self.field: Optional[FieldScript] = None
+        self._field_scores: dict[str, dict[str, int]] = {}  # field.lua points per run
         self.key_lost = False
         self._key = b""
         self.tx_status: Counter[str] = Counter()
@@ -314,6 +341,16 @@ class Controller:
         fc.game_time_ms = int(saved) if saved else 0
         fc.game_state = {"running": GAME_RUNNING, "paused": GAME_PAUSED}.get(game["state"], 0)
         fc._last_tick = self.now_ms()
+        # The field script's points from earlier runs, and the script itself again.
+        saved_runs = self.store.get_setting(f"field_scores:{game['id']}")
+        self._field_scores = json.loads(saved_runs) if saved_runs else {}
+        for key, counters in self._field_scores.items():
+            fc.merge_counters(key, counters)
+        if fc.is_controller and fc.game_state in (GAME_RUNNING, GAME_PAUSED):
+            try:
+                self._start_field()
+            except (ModeError, ControllerError) as exc:
+                log.error("field.lua cannot run after the restart: %s", exc)
         log.info("resumed game %d (%s) at %d ms", game["id"], game["state"], fc.game_time_ms)
 
     def _adjustments(self, game_id: int) -> dict[str, int]:
@@ -327,6 +364,7 @@ class Controller:
         if self.field is not None:
             self.field.close()
             self.field = None
+        self._field_scores = {}
         if self.modem is not None:
             self.modem.clear()  # the modem forgets the key
         self.fc = None
@@ -370,6 +408,11 @@ class Controller:
                 if preset is None:
                     raise NotFound(f"no preset {spec['preset_id']}")
             mode_id = spec.get("mode_id") or (preset["mode_id"] if preset else None)
+            modifiers = spec.get("modifiers") or []
+            if not isinstance(modifiers, list) or not all(isinstance(m, str) for m in modifiers):
+                raise ControllerError("modifiers: a list of modifier ids")
+            if modifiers and isinstance(mode_id, str):
+                mode_id = SEPARATOR.join([mode_id, *modifiers])
             pkg = self.modes.get(mode_id) if isinstance(mode_id, str) else None
             if pkg is None:
                 raise ControllerError(f"unknown mode {mode_id!r}")
@@ -579,22 +622,16 @@ class Controller:
             assert self.game is not None
             if self.game["state"] != "ready":
                 raise Conflict(f"game {game_id} is {self.game['state']}; only a ready game starts")
-            pkg = self.modes.get(self.game["mode_id"])
-            if pkg is not None and pkg.field_script is not None:
-                assert self.core is not None
-                try:
-                    self.field = FieldScript(self.core, self, pkg.field_script, f"{pkg.id}/field.lua",
-                                             self.game["teams"], self.game["params"],
-                                             self.game["game_seed"])
-                except ModeError as exc:
-                    raise ControllerError(str(exc)) from None
             fc.start_game(duration_ms=self.game["duration_ms"], now_ms=self.now_ms())
             preset = self.store.preset(self.game["preset_id"]) if self.game.get("preset_id") else None
             fc.controller_event("game.start", {"preset": preset["name"] if preset else self.game["mode_id"]},
                                 prio="critical")
-            if self.field is not None:
-                self.field.input("game.start")
+            try:
+                self._start_field()
+            except ModeError as exc:
+                raise ControllerError(str(exc)) from None
             out = self._set_state(game_id, "running", started_at=time.time())
+            self._after_field()
             self._save_game_time(force=True)
             return out
 
@@ -621,7 +658,7 @@ class Controller:
                 self.field.input("game.resume")
             return self._set_state(game_id, "running")
 
-    def end_game(self, game_id: int, reason: str = "") -> dict[str, Any]:
+    def end_game(self, game_id: int, reason: str = "", winner: Optional[str] = None) -> dict[str, Any]:
         with self._lock:
             game = self.store.game(game_id)
             if game is None:
@@ -634,7 +671,8 @@ class Controller:
                 fc = self._live(game_id)
                 fc.end_game(now_ms=self.now_ms(), reason=reason or None)
                 data = {"reason": reason} if reason else {}
-                winner = _winner(fc.total_scores, fc.teams)
+                if winner not in fc.teams:
+                    winner = _winner(fc.total_scores, fc.teams)
                 if winner:
                     data["winner"] = winner
                 fc.controller_event("game.end", data, prio="critical")
@@ -782,6 +820,8 @@ class Controller:
             fc.tick(now)
             if self.field is not None and fc.game_state == GAME_RUNNING:
                 self.field.advance(fc.game_time_ms)
+                if self._after_field():
+                    return
             if (self.game is not None and fc.is_controller and fc.game_state == GAME_RUNNING
                     and fc.duration_ms and fc.game_time_ms >= fc.duration_ms):
                 self.end_game(self.game["id"], "time")
@@ -863,6 +903,8 @@ class Controller:
             if record.get("team"):
                 data.setdefault("team", record["team"])
             self.field.input(record["type"], data)
+            # Inside the radio receive path: an end the script asks for waits for the tick.
+            self._after_field(may_end=False)
 
     def _on_node(self, node: FieldNode, kind: str) -> None:
         if self.game is None:
@@ -883,6 +925,55 @@ class Controller:
         if self.game is not None:
             self.store.update_game(self.game["id"], term=term)
         self._emit({"type": "system", "kind": "role", "role": role, "term": term})
+        # A takeover: the game's field.lua runs here from now on (a new run; the
+        # points of the old controller's runs are not known here, decision K5).
+        if (role == LEADER and self.game is not None and self.fc is not None
+                and self.fc.game_state in (GAME_RUNNING, GAME_PAUSED)):
+            try:
+                self._start_field()
+            except (ModeError, ControllerError) as exc:
+                log.error("field.lua cannot run after the takeover: %s", exc)
+
+    # --- the field script ---------------------------------------------------------
+
+    def _start_field(self) -> None:
+        """Runs the game's field.lua (if its mode has one): at the start, after a
+        controller restart and after a takeover. Each run is numbered, and its
+        points are kept under its own key, so a new run adds to the earlier ones."""
+        if self.game is None or self.fc is None or self.field is not None:
+            return
+        pkg = self.modes.get(self.game["mode_id"])
+        if pkg is None or pkg.field_script is None:
+            return
+        if self.core is None:
+            raise Unavailable("this mode has a field.lua and the core library is not loaded")
+        gid = self.game["id"]
+        run = int(self.store.get_setting(f"field_run:{gid}") or 0) + 1
+        self.store.set_setting(f"field_run:{gid}", str(run))
+        self.field = FieldScript(self.core, self, pkg.field_script, f"{pkg.id}/field.lua",
+                                 self.game["teams"], self.game["params"], self.game["game_seed"],
+                                 score_key=f"field-{run}")
+        if self.fc.game_time_ms > 0:
+            self.field.advance(self.fc.game_time_ms)  # a restart or a takeover joins mid-game
+        self.field.input("game.start")
+        if self.fc.game_state == GAME_PAUSED:
+            self.field.input("game.pause")
+
+    def _after_field(self, may_end: bool = True) -> bool:
+        """After field.lua ran: keeps its points with the game, and ends the game if it
+        asked to. True when the game ended."""
+        field, game = self.field, self.game
+        if field is None or game is None:
+            return False
+        gains = field.gains()
+        if gains and self._field_scores.get(field.score_key) != gains:
+            self._field_scores[field.score_key] = gains
+            self.store.set_setting(f"field_scores:{game['id']}", json.dumps(self._field_scores))
+        if not may_end or field.pending_end is None or not self.fc or not self.fc.is_controller:
+            return False
+        data, field.pending_end = field.pending_end, None
+        self.end_game(game["id"], str(data.get("reason") or ""), winner=data.get("winner"))
+        return True
 
 
 def _int(value: Any, name: str) -> int:

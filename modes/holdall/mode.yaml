@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+id: org.atalaia.holdall
+version: 0.1.0
+license: GPL-3.0-or-later
+min_tier: reduced
+kind: mode
+name: Hold-All Domination
+description: Teams capture boxes as in Domination, but a team scores only while it holds every box at once.
+roles:
+  zone: { requires: [team_input], optional: [team_display, audio, display] }
+params:
+  capture_hold_ms: { type: int, min: 0, max: 60000, default: 3000, label: "Hold time to capture (ms)" }
+  tick_s:          { type: int, min: 1, max: 600,   default: 10,   label: "Seconds per scoring tick while one team holds every box" }
+  points_per_tick: { type: int, min: 1, max: 1000,  default: 1,    label: "Points per tick" }
+  min_zones:       { type: int, min: 1, max: 64,    default: 2,    label: "Boxes in play before anyone can score" }
+i18n:
+  pt:
+    name: Domínio Total
+    description: As equipas capturam caixas como no Domínio, mas uma equipa só pontua enquanto tiver todas as caixas ao mesmo tempo.
+    params:
+      capture_hold_ms: Tempo a premir para capturar (ms)
+      tick_s: Segundos por ponto enquanto uma equipa tem todas as caixas
+      points_per_tick: Pontos por intervalo
+      min_zones: Caixas em jogo antes de alguém poder pontuar

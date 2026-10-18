@@ -102,6 +102,8 @@ DATA_FIELDS = {
     'reading_mps': DataField(25, 'number', False),
     'bb_g': DataField(26, 'number', False),
     'limit_j': DataField(27, 'number', False),
+    'duration_s': DataField(28, 'number', False),
+    'holder': DataField(31, 'string', False),
 }
 
 EVENTS = {
@@ -111,12 +113,12 @@ EVENTS = {
     'game.end': EventDef(4, 'critical', ('reason', 'winner')),
     'zone.captured': EventDef(5, 'normal', ('zone', 'previous_team')),
     'zone.neutralized': EventDef(6, 'normal', ('zone', 'previous_team')),
-    'bomb.armed': EventDef(7, 'critical', ('fuse_s',)),
-    'bomb.defused': EventDef(8, 'critical', ()),
+    'bomb.armed': EventDef(7, 'critical', ('fuse_s', 'reason')),
+    'bomb.defused': EventDef(8, 'critical', ('reason',)),
     'bomb.exploded': EventDef(9, 'critical', ()),
     'bomb.reset': EventDef(10, 'normal', ()),
     'score.delta': EventDef(11, 'normal', ('amount', 'reason')),
-    'code.used': EventDef(12, 'normal', ('code', 'kind')),
+    'code.used': EventDef(12, 'normal', ('code', 'kind', 'amount', 'holder')),
     'tag.scanned': EventDef(13, 'normal', ('tag', 'owner')),
     'player.respawn': EventDef(14, 'normal', ('player', 'lives_left')),
     'player.checkin': EventDef(15, 'normal', ('player',)),
@@ -129,6 +131,11 @@ EVENTS = {
     'battery.low': EventDef(22, 'telemetry', ('percent',)),
     'script.error': EventDef(23, 'normal', ('message',)),
     'script.halted': EventDef(24, 'critical', ('reason',)),
+    'holdall.scoring_start': EventDef(28, 'normal', ()),
+    'holdall.scoring_stop': EventDef(29, 'normal', ()),
+    'laststand.countdown_start': EventDef(30, 'normal', ('duration_s',)),
+    'laststand.countdown_cancel': EventDef(31, 'normal', ('duration_s',)),
+    'laststand.defeated': EventDef(32, 'critical', ()),
 }
 
 PAYLOAD_FIELDS = {

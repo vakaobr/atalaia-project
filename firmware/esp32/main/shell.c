@@ -90,7 +90,7 @@ static const char *preset_labels[PRESET_MAX_SLOTS];
 static int preset_count;
 static screen_update_t picker_screen; /* last picker screen sent */
 
-/* preset_t holds an 8 KB source buffer: static, not on a task stack. */
+/* preset_t holds a 16 KB source buffer: static, not on a task stack. */
 static preset_t game_preset;
 
 static QueueHandle_t screen_queue;
@@ -121,6 +121,9 @@ static bool usb_input;
 /* Mode sources built into the firmware (main/CMakeLists.txt, from modes/). */
 extern const char bomb_node_lua_start[] asm("_binary_bomb_node_lua_start");
 extern const char domination_node_lua_start[] asm("_binary_domination_node_lua_start");
+extern const char holdall_node_lua_start[] asm("_binary_holdall_node_lua_start");
+extern const char laststand_node_lua_start[] asm("_binary_laststand_node_lua_start");
+extern const char codes_node_lua_start[] asm("_binary_codes_node_lua_start");
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -608,8 +611,11 @@ static void seed_presets(void)
     const builtin_source_t sources[] = {
         {"org.atalaia.bomb", bomb_node_lua_start, strlen(bomb_node_lua_start)},
         {"org.atalaia.domination", domination_node_lua_start, strlen(domination_node_lua_start)},
+        {"org.atalaia.holdall", holdall_node_lua_start, strlen(holdall_node_lua_start)},
+        {"org.atalaia.laststand", laststand_node_lua_start, strlen(laststand_node_lua_start)},
+        {"org.atalaia.codes", codes_node_lua_start, strlen(codes_node_lua_start)},
     };
-    int n = builtin_presets_seed(sources, 2);
+    int n = builtin_presets_seed(sources, (int)(sizeof(sources) / sizeof(sources[0])));
     if (n > 0) ESP_LOGI(TAG, "stored %d built-in preset(s)", n);
 }
 

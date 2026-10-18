@@ -13,7 +13,7 @@ from pathlib import Path
 import yaml
 
 from .core import Core, LibraryNotFound, find_library
-from .mode import ModeError, find_modes, load_mode
+from .mode import ModeError, compose, find_modes, load_mode
 from .sim import SimError, Simulation
 from .testing import DEFAULT_TEAMS, run_test
 
@@ -75,7 +75,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
     core = Core(find_library(args.lib))
     try:
-        mode = load_mode(Path(args.mode))
+        mode = compose(load_mode(Path(args.mode)), [load_mode(Path(m)) for m in args.modifier])
         teams = [t for t in args.teams.split(",") if t] if args.teams else DEFAULT_TEAMS
         overrides = {k: yaml.safe_load(v) for k, v in _key_values(args.param, "--param").items()}
         params = mode.resolve_params(overrides, teams)
@@ -113,6 +113,8 @@ def main(argv: list[str] | None = None) -> int:
     serve.add_argument("mode", help="mode folder, e.g. ../modes/bomb")
     serve.add_argument("--node", action="append", default=[], metavar="NAME=ROLE",
                        help="a node and its role; repeat for more (default: one node of the first role)")
+    serve.add_argument("--modifier", action="append", default=[], metavar="FOLDER",
+                       help="a modifier to run alongside the mode, e.g. ../modes/codes; repeat for more")
     serve.add_argument("--teams", help="comma-separated team names (default: red,blue)")
     serve.add_argument("--param", action="append", default=[], metavar="NAME=VALUE",
                        help="override a mode parameter; repeat for more")

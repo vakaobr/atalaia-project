@@ -34,7 +34,7 @@ typedef struct {
     const char *data;
 } screen_case_t;
 
-/* Data as the modes (modes/bomb, modes/domination) and the shell send it. */
+/* Data as the modes (modes/bomb, modes/domination, modes/codes) and the shell send it. */
 static const screen_case_t cases[] = {
     {"standby", "standby", "{\"arm\":\"red\"}"},
     {"countdown", "countdown", "{\"left\":299}"},
@@ -46,6 +46,13 @@ static const screen_case_t cases[] = {
     {"final_score", "final_score", "{\"owner\":\"red\"}"},
     {"final_score_no_owner", "final_score", "{}"},
     {"paused", "paused", "{}"},
+    {"code_entry", "code_entry",
+     "{\"title\":\"ARM\",\"digits\":0,\"message\":\"Enter your team code\"}"},
+    {"code_entry_defuse", "code_entry", "{\"title\":\"DEFUSE\",\"digits\":3,\"left\":154}"},
+    {"code_entry_wrong", "code_entry",
+     "{\"title\":\"CODE\",\"digits\":0,\"message\":\"Wrong code\",\"error\":true}"},
+    {"code_entry_points", "code_entry",
+     "{\"title\":\"CODE\",\"digits\":4,\"message\":\"+50 points for RED\",\"error\":false}"},
     {"status", "status",
      "{\"title\":\"Game on\",\"mode\":\"Domination\",\"timer_s\":600,\"battery\":85,"
      "\"version\":\"0.1.0\"}"},

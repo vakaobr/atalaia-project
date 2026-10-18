@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A box nobody has captured keeps everyone from scoring
+nodes: { alpha: zone, bravo: zone, charlie: zone }
+steps:
+  - hold: { node: alpha, team: blue, s: 3 }
+  - hold: { node: bravo, team: blue, s: 3 }
+  - wait: 120
+  - expect_no: holdall.scoring_start
+  - expect_score: { team: blue, points: 0 }

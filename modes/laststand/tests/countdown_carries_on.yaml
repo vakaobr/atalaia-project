@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Without reset the countdown carries on where it stopped
+params: { countdown_s: 60, reset: false }
+nodes: { alpha: zone, bravo: zone, charlie: zone }
+steps:
+  - hold: { node: alpha, team: red, s: 3 }
+  - hold: { node: bravo, team: red, s: 3 }          # countdown from 6 s
+  - wait: 20
+  - hold: { node: bravo, team: blue, s: 3 }         # stopped at 29 s with 37 s left
+  - hold: { node: bravo, team: red, s: 3 }          # running again from 32 s
+  - expect: { type: laststand.countdown_start, at: 32, data: { duration_s: 37 } }
+  - wait: 36
+  - expect_no: laststand.defeated
+  - wait: 1
+  - expect: { type: laststand.defeated, at: 69 }

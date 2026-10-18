@@ -111,7 +111,9 @@ cmake --build /tmp/fw-test && ctest --test-dir /tmp/fw-test --output-on-failure
 
 The screen templates (`main/screen_renderer.c`, ADR-P1-2) are C functions
 that build LVGL 9.2 widget trees for the 320x240 TFT: `standby`,
-`countdown`, `defused`, `exploded`, `final_score`, `paused`, `status`, the
+`countdown`, `defused`, `exploded`, `final_score`, `paused`, `code_entry`
+(a code typed on the keypad: title, dots, an optional clock and a message;
+Bomb's team codes and the Codes modifier use it), `status`, the
 preset picker (`pin_entry`, `preset_select`, `timer_adjust`,
 `start_confirm`) and `wifi_setup`. Each template is built once and then
 patched with new data, so a countdown only changes one label per second.
@@ -216,10 +218,23 @@ Listed in `main/idf_component.yml`:
 
 ## Built-in presets
 
-On a box with an empty preset store (a new or erased box, and every Wokwi
-run), the firmware stores two presets: Bomb and Domination, with the
-defaults from their `mode.yaml`. The mode scripts come from `modes/` at
-build time. The default admin PIN is 1234 until the setup portal sets one.
+Every mode in `modes/` is built into the image (`main/CMakeLists.txt`):
+Bomb, Domination, Hold-All Domination, Last Stand and the Codes modifier.
+At boot the firmware stores a preset, with the defaults from its
+`mode.yaml`, for each built-in mode that no stored preset uses yet (a new
+or erased box and every Wokwi run get all five, in that order; a box
+updated to a firmware with more modes gets the new ones in free slots), and
+replaces the stored script of a built-in mode when the image has a
+different one (`main/builtin_presets.c`). The default admin PIN is 1234
+until the setup portal sets one.
+
+A join may name a main mode with modifiers (`org.atalaia.domination+org.atalaia.codes`,
+see [modes/README.md](../../modes/README.md#main-modes-and-modifiers)): the box
+composes the stored scripts into one chunk, as the controller and the
+simulator do (`main/box_game.c`). A preset holds up to 16 KB of script
+(`PRESET_SOURCE_MAX`) for that; Hold-All and Last Stand boxes play their part
+with no field-specific firmware code, while their `field.lua` runs on the
+controller.
 
 ## Phase 2: the radio and field games
 

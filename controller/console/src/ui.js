@@ -58,6 +58,19 @@ export function lang() {
     return current;
 }
 
+/** A mode's name or description in the current language (mode.yaml "i18n"), else the manifest's. */
+export function modeText(mode, key) {
+    const tr = mode && mode.i18n && mode.i18n[current];
+    return (tr && typeof tr[key] === 'string' && tr[key]) || (mode && mode[key]) || '';
+}
+
+/** A mode parameter's label in the current language, else the manifest's, else its name. */
+export function paramLabel(mode, name) {
+    const tr = mode && mode.i18n && mode.i18n[current];
+    const spec = (mode && mode.params && mode.params[name]) || {};
+    return (tr && tr.params && tr.params[name]) || spec.label || name;
+}
+
 /** t('game.start') or t('feed.count', {n: 3}): the text in the current language. */
 export function t(key, vars) {
     let s = key.split('.').reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), dict);

@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: With team codes, a team's code arms the bomb and another team's code defuses it
+params: { fuse_s: 60, team_codes: "red=1234,blue=5678" }
+steps:
+  - expect_screen: { template: code_entry, data: { title: ARM, digits: 0 } }
+  - keys: "12"
+  - expect_screen: { template: code_entry, data: { title: ARM, digits: 2 } }
+  - keys: "34#"
+  - expect: { type: bomb.armed, team: red, at: 0, data: { fuse_s: 60, reason: code } }
+  - expect_screen: { template: countdown, data: { left: 60, team: red } }
+  - wait: 10
+  - keys: "5678#"
+  - expect: { type: bomb.defused, team: blue, at: 10, data: { reason: code } }
+  - expect_screen: { template: defused, data: { team: blue } }
+  - wait: 120
+  - expect_no: bomb.exploded
+  - expect_no: script.error

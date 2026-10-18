@@ -3,9 +3,75 @@
 //
 // Preset builder: forms drawn from each mode's parameter schema (mode.yaml
 // "params": int with min/max, bool, team, string; default, optional, label),
-// saved through POST /api/v1/presets. ParamFields is shared with the game form.
+// saved through POST /api/v1/presets. ParamFields, ModifierPicker and the
+// helpers for "main+modifier" mode ids are shared with the game form.
 
-import { html, Component, t, brief } from '../ui.js';
+import { html, Component, t, brief, modeText, paramLabel } from '../ui.js';
+
+/** Main modes (kind "mode") and modifiers (kind "modifier") of the catalogue. */
+export function mainModes(modes) {
+    return modes.filter((m) => m.kind !== 'modifier');
+}
+
+export function modifierModes(modes) {
+    return modes.filter((m) => m.kind === 'modifier');
+}
+
+/** The main mode and the modifiers a mode id names ("main+modifier+..."). */
+export function partsOf(modes, modeId) {
+    const ids = String(modeId || '').split('+');
+    return {
+        main: modes.find((m) => m.id === ids[0]),
+        mods: ids.slice(1).map((id) => modes.find((m) => m.id === id)).filter(Boolean),
+    };
+}
+
+/** The id a game or preset gets: the main mode, then the chosen modifiers in catalogue order. */
+export function composedId(modes, main, selected) {
+    const mods = modifierModes(modes).filter((m) => selected.includes(m.id)).map((m) => m.id);
+    return [main.id, ...mods].join('+');
+}
+
+/** Parameter schema and labels of a main mode with its modifiers. */
+export function schemaOf(main, mods) {
+    const schema = {};
+    const labels = {};
+    for (const m of [main, ...mods]) {
+        if (!m) continue;
+        for (const [name, spec] of Object.entries(m.params || {})) {
+            schema[name] = spec;
+            labels[name] = paramLabel(m, name);
+        }
+    }
+    return { schema, labels };
+}
+
+/** A mode id as people read it: the translated names, joined with "+". */
+export function modeName(modes, modeId) {
+    const { main, mods } = partsOf(modes, modeId);
+    return main ? [main, ...mods].map((m) => modeText(m, 'name')).join(' + ') : modeId;
+}
+
+/** Checkboxes for the modifiers that run alongside the main mode. */
+export class ModifierPicker extends Component {
+    toggle(id, on) {
+        const selected = this.props.selected.filter((x) => x !== id);
+        this.props.onChange(on ? [...selected, id] : selected);
+    }
+
+    render(props) {
+        const mods = modifierModes(props.modes);
+        if (!mods.length) return null;
+        return html`<fieldset class="field modifiers" data-testid=${`${props.prefix}-modifiers`}>
+            <legend>${t('game.modifiers')}</legend>
+            ${mods.map((m) => html`<label class="check" title=${modeText(m, 'description')}>
+                <input type="checkbox" value=${m.id} checked=${props.selected.includes(m.id)}
+                    onChange=${(e) => this.toggle(m.id, e.target.checked)} /> ${modeText(m, 'name')}
+            </label>`)}
+            <small class="muted">${t('game.modifiers_hint')}</small>
+        </fieldset>`;
+    }
+}
 
 /** The values a form starts with: the preset's, else the schema defaults. */
 export function initialValues(schema, values) {
@@ -29,7 +95,7 @@ export class ParamFields extends Component {
     field(name, spec) {
         const { values, teams, prefix } = this.props;
         const id = `${prefix || 'p'}-${name}`;
-        const label = spec.label || name;
+        const label = (this.props.labels && this.props.labels[name]) || spec.label || name;
         const value = values[name];
         let input;
         if (spec.type === 'int') {
@@ -45,7 +111,7 @@ export class ParamFields extends Component {
             </select>`;
         } else {
             input = html`<input id=${id} type="text" value=${value === undefined ? '' : value}
-                onInput=${(e) => this.set(name, e.target.value)} />`;
+                maxlength=${spec.max} onInput=${(e) => this.set(name, e.target.value)} />`;
         }
         const range = spec.type === 'int' && (spec.min !== undefined || spec.max !== undefined)
             ? `${spec.min !== undefined ? spec.min : '…'}–${spec.max !== undefined ? spec.max : '…'}` : '';
@@ -66,23 +132,35 @@ export class ParamFields extends Component {
 export class PresetBuilder extends Component {
     constructor(props) {
         super(props);
-        this.state = { name: '', modeId: '', values: {}, saved: '' };
+        this.state = { name: '', modeId: '', mods: [], values: {}, saved: '' };
     }
 
     mode() {
-        const { modes } = this.props.app.state;
+        const modes = mainModes(this.props.app.state.modes);
         return modes.find((m) => m.id === this.state.modeId) || modes[0];
+    }
+
+    schema(mode, mods) {
+        const all = this.props.app.state.modes;
+        return schemaOf(mode, (mods || this.state.mods).map((id) => all.find((m) => m.id === id)).filter(Boolean));
     }
 
     pickMode(modeId) {
         const mode = this.props.app.state.modes.find((m) => m.id === modeId);
-        this.setState({ modeId, values: initialValues(mode ? mode.params : {}) });
+        this.setState({ modeId, values: initialValues(this.schema(mode).schema) });
+    }
+
+    pickMods(mods) {
+        const mode = this.mode();
+        this.setState({ mods, modeId: mode.id,
+                        values: initialValues(this.schema(mode, mods).schema, this.state.values) });
     }
 
     copy(preset) {
-        const mode = this.props.app.state.modes.find((m) => m.id === preset.mode_id);
-        this.setState({ name: `${preset.name} (2)`, modeId: preset.mode_id,
-                        values: initialValues(mode ? mode.params : {}, preset.params), saved: '' });
+        const { main, mods } = partsOf(this.props.app.state.modes, preset.mode_id);
+        this.setState({ name: `${preset.name} (2)`, modeId: main ? main.id : preset.mode_id,
+                        mods: mods.map((m) => m.id),
+                        values: initialValues(schemaOf(main, mods).schema, preset.params), saved: '' });
     }
 
     async save(e) {
@@ -90,7 +168,8 @@ export class PresetBuilder extends Component {
         const mode = this.mode();
         if (!mode) return;
         const app = this.props.app;
-        const body = { name: this.state.name.trim(), mode_id: mode.id, params: this.state.values };
+        const body = { name: this.state.name.trim(), mode_id: composedId(app.state.modes, mode, this.state.mods),
+                       params: this.state.values };
         const out = await app.call('POST', '/presets', body);
         if (out) {
             this.setState({ saved: t('presets.saved', { name: out.name }) });
@@ -102,14 +181,15 @@ export class PresetBuilder extends Component {
         const app = props.app;
         const { modes, presets, role } = app.state;
         const mode = this.mode();
-        const values = state.modeId || !mode ? state.values : initialValues(mode.params);
+        const { schema, labels } = this.schema(mode);
+        const values = state.modeId || !mode ? state.values : initialValues(schema);
         return html`<section class="card" aria-labelledby="presets-h">
             <h2 id="presets-h">${t('presets.title')}</h2>
             ${presets.length === 0 ? html`<p class="muted">${t('presets.none')}</p>` : html`
             <div class="table-wrap"><table class="table" data-testid="preset-list">
                 <thead><tr><th>${t('presets.name')}</th><th>${t('presets.mode')}</th><th>${t('presets.params')}</th><th></th></tr></thead>
                 <tbody>${presets.map((p) => html`<tr>
-                    <td>${p.name}</td><td>${p.mode_id}</td><td class="small">${brief(p.params)}</td>
+                    <td>${p.name}</td><td>${modeName(modes, p.mode_id)}</td><td class="small">${brief(p.params)}</td>
                     <td>${role === 'gm' && html`<button type="button" class="link" onClick=${() => this.copy(p)}>${t('presets.copy')}</button>`}</td>
                 </tr>`)}</tbody>
             </table></div>`}
@@ -120,10 +200,12 @@ export class PresetBuilder extends Component {
                         onInput=${(e) => this.setState({ name: e.target.value })} /></div>
                 <div class="field"><label for="preset-mode">${t('presets.mode')}</label>
                     <select id="preset-mode" value=${mode.id} onChange=${(e) => this.pickMode(e.target.value)}>
-                        ${modes.map((m) => html`<option value=${m.id}>${m.name} (${m.id})</option>`)}
+                        ${mainModes(modes).map((m) => html`<option value=${m.id}>${modeText(m, 'name')} (${m.id})</option>`)}
                     </select></div>
-                <p class="muted small">${mode.description}</p>
-                <${ParamFields} schema=${mode.params} values=${values} prefix="preset"
+                <p class="muted small">${modeText(mode, 'description')}</p>
+                <${ModifierPicker} modes=${modes} selected=${state.mods} prefix="preset"
+                    onChange=${(mods) => this.pickMods(mods)} />
+                <${ParamFields} schema=${schema} labels=${labels} values=${values} prefix="preset"
                     onChange=${(v) => this.setState({ values: v, modeId: mode.id })} />
                 <button type="submit" data-testid="preset-save">${t('presets.save')}</button>
                 ${state.saved && html`<span class="ok" role="status">${state.saved}</span>`}

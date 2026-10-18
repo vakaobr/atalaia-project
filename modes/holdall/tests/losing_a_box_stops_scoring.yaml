@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Losing one box stops the scoring; retaking it starts a new tick
+nodes: { alpha: zone, bravo: zone, charlie: zone }
+steps:
+  - hold: { node: alpha, team: red, s: 3 }
+  - hold: { node: bravo, team: red, s: 3 }
+  - hold: { node: charlie, team: red, s: 3 }        # red holds all three at 9 s
+  - expect: { type: holdall.scoring_start, team: red, at: 9 }
+  - wait: 15                                        # a point at 19 s
+  - hold: { node: bravo, team: blue, s: 3 }         # 24 -> 27 s
+  - expect: { type: zone.captured, node: bravo, team: blue, data: { previous_team: red } }
+  - expect: { type: holdall.scoring_stop, node: controller, team: red, at: 27 }
+  - wait: 60
+  - expect_no: holdall.scoring_start
+  - expect_score: { team: red, points: 1 }
+  - expect_score: { team: blue, points: 0 }
+  - hold: { node: bravo, team: red, s: 3 }          # 87 -> 90 s
+  - expect: { type: holdall.scoring_start, team: red, at: 90 }
+  - wait: 9.9
+  - expect_score: { team: red, points: 1 }
+  - wait: 0.1                                       # the first new point, one full tick later
+  - expect_score: { team: red, points: 2 }

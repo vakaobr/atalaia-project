@@ -10,7 +10,7 @@ from typing import Any, Optional
 from typing import TYPE_CHECKING
 
 from . import codec
-from .core import Command, Core, Emitted, Node
+from .core import Command, Core, Emitted, FieldOps, Node
 from .mode import Mode
 from .protocol import MESSAGE_TYPES, RF_PAYLOAD_MAX
 
@@ -22,6 +22,12 @@ if TYPE_CHECKING:
 HOLD_STEP_MS = 250
 
 CONTROLLER = "controller"
+# With a field script, time moves in steps this long, so the controller's
+# script sees the nodes' events close to when they happened.
+FIELD_STEP_MS = 100
+# field.send() commands a node understands, as the input events a Field Box
+# turns them into (decision E7).
+FIELD_COMMANDS = {"set_owner": "cmd.set_owner", "message": "gm.message"}
 
 
 class SimError(Exception):
@@ -91,6 +97,16 @@ class Simulation:
         # Optional radio model for field-network simulation.
         self.radio: Optional["RadioModel"] = radio
         self._pending: list[tuple[int, str, bytes]] = []  # (deliver_at_ms, dest_node, data)
+        # The mode's field.lua (if any) runs as the controller would run it
+        # (ADR-P2-14): node events reach it, field.send reaches the nodes.
+        self.field: Optional[Node] = None
+        self.field_logs: list[str] = []
+        self.field_commands: list[tuple[int, str, str, dict[str, Any]]] = []  # (t, node, cmd, params)
+        self.owners: dict[int, Optional[str]] = {}  # node id -> team, as box STATE reports it
+        self._to_field: list[tuple[int, str, dict[str, Any]]] = []
+        self._to_nodes: list[tuple[str, str, dict[str, Any]]] = []
+        self._field_end: Optional[tuple[int, dict[str, Any]]] = None  # (t_ms, game.end data)
+        self._ended = False
 
         for node_id, (name, role) in enumerate(nodes.items(), start=1):
             if role not in mode.roles:
@@ -113,10 +129,20 @@ class Simulation:
             self.nodes[name] = vnode
             if not vnode.runtime.loaded:
                 raise SimError(f"node '{name}' failed to load {mode.id}: {vnode.runtime.last_error}")
+        if mode.field_script is not None:
+            ops = FieldOps(nodes=self._field_nodes, owner=self.owners.get, send=self._field_send)
+            self.field = Node(core, 0, seed, self.teams, params, mode.field_script,
+                              f"@{mode.path.name}/field.lua", mem_limit=mem_limit,
+                              instr_limit=instr_limit, on_event=self._record_field,
+                              on_log=self.field_logs.append, field_ops=ops)
+            if not self.field.loaded:
+                raise SimError(f"field.lua of {mode.id} failed to load: {self.field.last_error}")
 
     def close(self) -> None:
         for vnode in self.nodes.values():
             vnode.runtime.close()
+        if self.field is not None:
+            self.field.close()
 
     # -- the event log --
 
@@ -127,16 +153,79 @@ class Simulation:
         size = self._check_wire(vnode.name, {"node": ev.node, "seq": ev.seq, "t": ev.t_ms,
                                              "type": ev.type, "team": ev.team, "squad": ev.squad,
                                              "prio": ev.prio, "data": ev.data})
+        team = self._team_name(ev.team)
         self._log.append(LogEntry(ev.t_ms, vnode.name, ev.node, ev.seq, ev.type,
-                                  self._team_name(ev.team), ev.prio, ev.data, size))
+                                  team, ev.prio, ev.data, size))
+        # A box reports the team of its last capture as its owner (decision E6).
+        if ev.type == "zone.captured":
+            self.owners[ev.node] = team
+        elif ev.type == "zone.neutralized":
+            self.owners[ev.node] = None
+        if self.field is not None:
+            data = dict(ev.data)
+            data.setdefault("node", ev.node)
+            if team:
+                data.setdefault("team", team)
+            self._to_field.append((ev.t_ms, ev.type, data))
 
-    def _record_controller(self, type_: str, data: dict[str, Any]) -> None:
+    def _record_field(self, ev: Emitted) -> None:
+        """An event from field.lua: logged as the controller's; game.end ends the game."""
+        if ev.type == "game.end":
+            self._field_end = (ev.t_ms, dict(ev.data))
+            return
+        self._controller_seq += 1
+        team = self._team_name(ev.team)
+        size = self._check_wire(CONTROLLER, {"node": 0, "seq": self._controller_seq & 0xFFFF,
+                                             "t": ev.t_ms, "type": ev.type, "team": ev.team,
+                                             "prio": ev.prio, "data": ev.data})
+        self._log.append(LogEntry(ev.t_ms, CONTROLLER, 0, self._controller_seq, ev.type, team,
+                                  ev.prio, ev.data, size))
+
+    def _field_nodes(self, role: Optional[str]) -> list[dict[str, Any]]:
+        return [{"id": v.runtime.node_id, "name": v.name, "role": v.role,
+                 "owner": self.owners.get(v.runtime.node_id)}
+                for v in self.nodes.values() if role is None or v.role == role]
+
+    def _field_send(self, node_id: int, cmd: str, params: dict[str, Any]) -> bool:
+        target = next((v for v in self.nodes.values() if v.runtime.node_id == node_id), None)
+        if target is None or cmd not in FIELD_COMMANDS:
+            return False
+        self.field_commands.append((self.time_ms, target.name, cmd, dict(params)))
+        self._to_nodes.append((target.name, FIELD_COMMANDS[cmd], dict(params)))
+        return True
+
+    def _pump(self) -> None:
+        """Delivers what the nodes and the field script sent each other, until nothing is left.
+
+        Deliveries wait until the call that produced them has returned, so the
+        core is never re-entered from its own callbacks.
+        """
+        for _ in range(10_000):
+            if self._to_field:
+                t_ms, type_, data = self._to_field.pop(0)
+                assert self.field is not None
+                if t_ms > self.field.time_ms:
+                    self.field.advance(t_ms)
+                self.field.input(type_, data)
+            elif self._to_nodes:
+                name, type_, data = self._to_nodes.pop(0)
+                self.nodes[name].runtime.input(type_, data)
+            elif self._field_end is not None:
+                (t_ms, data), self._field_end = self._field_end, None
+                if not self._ended:
+                    self.end(data.get("reason", "finished"), data.get("winner"), t_ms=t_ms)
+            else:
+                return
+        raise SimError("the nodes and the field script keep sending each other events")
+
+    def _record_controller(self, type_: str, data: dict[str, Any], t_ms: Optional[int] = None) -> None:
+        t_ms = self.time_ms if t_ms is None else t_ms
         self._controller_seq += 1
         prio = codec.default_prio(type_)
         size = self._check_wire(CONTROLLER, {"node": 0, "seq": self._controller_seq & 0xFFFF,
-                                             "t": self.time_ms, "type": type_, "prio": prio,
+                                             "t": t_ms, "type": type_, "prio": prio,
                                              "data": data})
-        self._log.append(LogEntry(self.time_ms, CONTROLLER, 0, self._controller_seq, type_,
+        self._log.append(LogEntry(t_ms, CONTROLLER, 0, self._controller_seq, type_,
                                   None, prio, data, size))
 
     def _check_wire(self, who: str, event: dict[str, Any]) -> Optional[int]:
@@ -160,8 +249,10 @@ class Simulation:
 
     @property
     def events(self) -> list[LogEntry]:
-        """The merged game log, ordered by (time, node, sequence) as on the controller."""
-        return sorted(self._log, key=lambda e: (e.t_ms, e.node_id, e.seq))
+        """The merged game log, ordered by time. Events at the same time keep their arrival
+        order, so a field script's reaction comes after the event it reacts to."""
+        order = {id(e): i for i, e in enumerate(self._log)}
+        return sorted(self._log, key=lambda e: (e.t_ms, order[id(e)]))
 
     # -- driving the game --
 
@@ -170,17 +261,28 @@ class Simulation:
             raise SimError(f"no node named '{name}' (nodes: {', '.join(self.nodes)})")
         return self.nodes[name]
 
-    def broadcast(self, type_: str, data: Optional[dict[str, Any]] = None) -> None:
-        """A game event from the controller to every node."""
-        self._record_controller(type_, data or {})
+    def broadcast(self, type_: str, data: Optional[dict[str, Any]] = None,
+                  t_ms: Optional[int] = None) -> None:
+        """A game event from the controller to every node (and to the field script)."""
+        self._record_controller(type_, data or {}, t_ms)
+        if type_ == "game.end":
+            self._ended = True
         for vnode in self.nodes.values():
             vnode.runtime.input(type_, data or {})
+        if self.field is not None:
+            reason = (data or {}).get("reason")
+            self.field.input(type_, {"reason": reason} if reason else {})
+        self._pump()
 
     def start(self) -> None:
         self.broadcast("game.start", {"preset": self.mode.id})
 
-    def end(self, reason: str = "time") -> None:
-        self.broadcast("game.end", {"reason": reason})
+    def end(self, reason: str = "time", winner: Optional[str] = None,
+            t_ms: Optional[int] = None) -> None:
+        data = {"reason": reason}
+        if winner:
+            data["winner"] = winner
+        self.broadcast("game.end", data, t_ms)
 
     def wait(self, seconds: float) -> None:
         self.advance_to(self.time_ms + round(seconds * 1000))
@@ -189,8 +291,20 @@ class Simulation:
         if t_ms < self.time_ms:
             raise SimError("time cannot go backwards")
         self._deliver_pending(t_ms)
-        for vnode in self.nodes.values():
-            vnode.runtime.advance(t_ms)
+        if self.field is None:
+            for vnode in self.nodes.values():
+                vnode.runtime.advance(t_ms)
+            self.time_ms = t_ms
+            return
+        step = self.time_ms
+        while step < t_ms:
+            step = min(t_ms, step - step % FIELD_STEP_MS + FIELD_STEP_MS)
+            self.time_ms = step
+            for vnode in self.nodes.values():
+                vnode.runtime.advance(step)
+            self._pump()
+            self.field.advance(step)
+            self._pump()
         self.time_ms = t_ms
 
     def _deliver_pending(self, t_ms: int) -> None:
@@ -269,6 +383,7 @@ class Simulation:
         vnode = self.node(node)
         accepted = vnode.runtime.input(type_, data or {})
         vnode.last_input = {"t": self.time_ms, "type": type_, "data": data or {}, "accepted": accepted}
+        self._pump()
         return accepted
 
     def _check_team(self, team: str) -> None:
@@ -291,11 +406,20 @@ class Simulation:
             self.input(node, "team_input.hold", {**_team_data(team, squad), "ms": held})
         self.input(node, "team_input.release", {**_team_data(team, squad), "ms": total})
 
+    def keys(self, node: str, keys: str) -> None:
+        """Keypad presses: one keypad.key event per character (digits, * and #)."""
+        for key in keys:
+            self.input(node, "keypad.key", {"key": key})
+
     def score(self, team: str, node: Optional[str] = None) -> int:
+        """Field total (every node plus the field script), or one node's (CONTROLLER: the script's)."""
         self._check_team(team)
+        if node == CONTROLLER:
+            return self.field.score(team) if self.field is not None else 0
         if node is not None:
             return self.node(node).runtime.score(team)
-        return sum(v.runtime.score(team) for v in self.nodes.values())
+        total = sum(v.runtime.score(team) for v in self.nodes.values())
+        return total + (self.field.score(team) if self.field is not None else 0)
 
 
 def _team_data(team: str, squad: Optional[str]) -> dict[str, Any]:

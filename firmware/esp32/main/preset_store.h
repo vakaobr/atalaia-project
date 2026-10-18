@@ -16,7 +16,7 @@
 #define PRESET_LABEL_MAX   48
 #define PRESET_MODE_ID_MAX 64
 #define PRESET_PARAMS_MAX  512
-#define PRESET_SOURCE_MAX  (8 * 1024)
+#define PRESET_SOURCE_MAX  (16 * 1024) /* a main mode and its modifiers, composed */
 
 typedef struct {
     int index;
@@ -50,5 +50,15 @@ bool preset_store_save(int index, const preset_t *preset);
 
 /* Delete a preset by 1-based index. Returns true on success. */
 bool preset_store_delete(int index);
+
+/*
+ * Read a stored mode's source (node.lua) into buf, NUL-terminated. Returns
+ * its length, or -1 when it is not stored or needs more than cap - 1 bytes.
+ * mode_id must come from preset_store_list(), never from outside.
+ */
+long preset_store_read_source(const char *mode_id, char *buf, size_t cap);
+
+/* Replace a stored mode's source. Returns true on success. */
+bool preset_store_write_source(const char *mode_id, const char *source, size_t len);
 
 #endif /* ATALAIA_PRESET_STORE_H */

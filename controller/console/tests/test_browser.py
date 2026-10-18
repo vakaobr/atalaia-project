@@ -266,6 +266,59 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertEqual(cmds[0], {"cmd": 5, "params": {"text": "Cessar fogo"}})
         self.assertEqual(cmds[1], {"cmd": 4, "params": {"team": "blue"}, "dest": BOX})
 
+    def test_mode_pack_lists_and_starts(self):
+        """Hold-All and Last Stand (field.lua on the controller), and a mode with the Codes modifier."""
+        page = self.console()
+        source = page.get_by_test_id("game-source")
+        expect(source.locator('option[value="mode:org.atalaia.holdall"]')).to_have_text("Domínio Total")
+        expect(source.locator('option[value="mode:org.atalaia.laststand"]')).to_have_text("Última Resistência")
+        expect(source.locator('option[value="mode:org.atalaia.codes"]')).to_have_count(0)  # a modifier
+        page.get_by_test_id("game-name").fill("Tudo ou nada")
+        source.select_option("mode:org.atalaia.holdall")
+        expect(page.locator('label[for="game-min_zones"]')).to_contain_text("Caixas em jogo")
+        page.locator("#game-min_zones").fill("3")
+        page.get_by_test_id("game-create").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("pronto")
+        game = self.field.bundle.controller.game
+        self.assertEqual((game["mode_id"], game["params"]["min_zones"]), ("org.atalaia.holdall", 3))
+        page.get_by_test_id("game-start").click()
+        page.get_by_test_id("game-start-yes").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("a decorrer")
+        self.assertIsNotNone(self.field.bundle.controller.field)  # its field.lua runs
+        self.field.http.post(f"/api/v1/games/{game['id']}/end", json={})
+
+        # Domination with the Codes modifier, from the same form.
+        expect(page.get_by_test_id("game-ended")).to_be_visible()
+        page.get_by_test_id("game-name").fill("Com códigos")
+        page.get_by_test_id("game-source").select_option(f"mode:{DOMINATION}")
+        modifiers = page.get_by_test_id("game-modifiers")
+        expect(modifiers).to_contain_text("Códigos")
+        modifiers.locator('input[value="org.atalaia.codes"]').check()
+        page.locator("#game-codes").fill("4711:points:50,0815:hint")
+        page.get_by_test_id("game-create").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("pronto")
+        game = self.field.bundle.controller.game
+        self.assertEqual(game["mode_id"], f"{DOMINATION}+org.atalaia.codes")
+        self.assertEqual(game["params"]["codes"], "4711:points:50,0815:hint")
+        expect(page.get_by_text("Domínio + Códigos", exact=True)).to_be_visible()
+        page.get_by_test_id("tab-join").click()
+        page.get_by_test_id("join-generate").click()
+        j = join.decode(join.from_text(page.get_by_test_id("join-text").input_value()), JOIN_KEY)
+        self.assertEqual((j["mode_id"], j["role"]), (game["mode_id"], "zone"))
+
+        # A preset with the modifier.
+        page.get_by_test_id("tab-presets").click()
+        page.locator("#preset-name").fill("Bomba com pistas")
+        page.locator("#preset-mode").select_option("org.atalaia.bomb")
+        page.get_by_test_id("preset-modifiers").locator('input[value="org.atalaia.codes"]').check()
+        page.locator("#preset-team_codes").fill("red=1234,blue=5678")
+        page.locator("#preset-codes").fill("0815:hint")
+        page.get_by_test_id("preset-save").click()
+        expect(page.get_by_test_id("preset-list")).to_contain_text("Bomba / Rush + Códigos")
+        preset = next(p for p in self.field.http.get("/api/v1/presets").json() if p["name"] == "Bomba com pistas")
+        self.assertEqual(preset["mode_id"], "org.atalaia.bomb+org.atalaia.codes")
+        self.assertEqual((preset["params"]["team_codes"], preset["params"]["codes"]), ("red=1234,blue=5678", "0815:hint"))
+
     def test_join_qr_code_reads_back_as_the_join_text(self):
         if not ZBARIMG:
             self.skipTest("zbarimg is not installed")

@@ -483,9 +483,65 @@ static void test_resume_after_reboot(void)
     state_persist_clear();
 }
 
+/* A join naming a main mode and a modifier ("main+modifier"): the box runs both
+ * stored scripts in one chunk, as the controller and the simulator compose them. */
+static void test_join_with_a_modifier(void)
+{
+    fixture(false);
+    static char codes[PRESET_SOURCE_MAX];
+    FILE *f = fopen(MODES_DIR "/codes/node.lua", "rb");
+    CHECK(f != NULL);
+    size_t codes_len = f ? fread(codes, 1, sizeof(codes) - 1, f) : 0;
+    if (f) fclose(f);
+    const builtin_source_t sources[] = {{"org.atalaia.codes", codes, codes_len}};
+    CHECK(builtin_presets_seed(sources, 1) == 1);
+    CHECK(box_game_set_join_key_hex(&game, JOIN_KEY_HEX));
+
+    atalaia_join_t j;
+    make_join(&j);
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    snprintf(j.mode_id, sizeof(j.mode_id), "org.atalaia.domination+org.atalaia.nope");
+    size_t n = encode(&j, JOIN_KEY, buf);
+    CHECK(box_game_join(&game, buf, n) == BOX_JOIN_NO_MODE);
+    snprintf(j.mode_id, sizeof(j.mode_id), "org.atalaia.domination+org.atalaia.codes");
+    snprintf(j.params_json, sizeof(j.params_json),
+             "{\"capture_hold_ms\":1000,\"tick_s\":60,\"points_per_tick\":1,"
+             "\"codes\":\"4711:points:50\"}");
+    n = encode(&j, JOIN_KEY, buf);
+    CHECK(box_game_join(&game, buf, n) == BOX_JOIN_OK);
+    CHECK(strncmp(preset.source, "do\n", 3) == 0);
+    CHECK(strstr(preset.source, "\nend\ndo\n") != NULL);
+    CHECK(preset.source_len == strlen(preset.source));
+    CHECK(preset.source_len > codes_len + 16 && preset.source_len < sizeof(preset.source));
+
+    uint32_t now = 100;
+    cmd(FIELD_CMD_START);
+    CHECK(game.phase == BOX_PLAYING && runner.running);
+    for (int ms = 250; ms <= 1000; ms += 250) {
+        char json[64];
+        snprintf(json, sizeof(json), "{\"team\":\"red\",\"ms\":%d}", ms);
+        node_runner_input(&runner, "team_input.hold", json);
+    }
+    CHECK(events_named("zone.captured") == 1);
+    for (const char *k = "4711#"; *k; k++) {
+        char json[16];
+        snprintf(json, sizeof(json), "{\"key\":\"%c\"}", *k);
+        node_runner_input(&runner, "keypad.key", json);
+    }
+    CHECK(events_named("code.used") == 1);
+    CHECK(events_named("script.error") == 0);
+    run_ms(&now, 100);
+    CHECK(atalaia_node_score(runner.node)->gained[1] == 50);
+    cmd(FIELD_CMD_END);
+    ack_all();
+    run_ms(&now, 20);
+    state_persist_clear();
+}
+
 void run_box_game_tests(void)
 {
     test_join_refusals();
+    test_join_with_a_modifier();
     test_join_play_end();
     test_end_without_acks();
     test_resume_after_reboot();

@@ -5,8 +5,10 @@
 // resume and end it (each confirmed in place), send a message to every
 // box, adjust a team's score. ControllerPanel: role, term, radio, promote.
 
-import { html, Component, t, clock, ConfirmButton } from '../ui.js';
-import { ParamFields, initialValues } from './preset-builder.js';
+import { html, Component, t, clock, ConfirmButton, modeText } from '../ui.js';
+import {
+    ParamFields, ModifierPicker, initialValues, mainModes, partsOf, schemaOf, modeName,
+} from './preset-builder.js';
 
 const BROADCAST = 65535;
 
@@ -17,43 +19,54 @@ function parseTeams(text) {
 class CreateGame extends Component {
     constructor(props) {
         super(props);
-        this.state = { name: '', source: '', teams: 'red, blue', minutes: '20', values: null };
+        this.state = { name: '', source: '', teams: 'red, blue', minutes: '20', values: null, mods: [] };
     }
 
+    /** The mode or preset picked, its modifiers, and their parameter schema and labels. */
     choice() {
         const { modes, presets } = this.props.app.state;
-        const src = this.state.source || (modes[0] ? `mode:${modes[0].id}` : '');
+        const mains = mainModes(modes);
+        const src = this.state.source || (mains[0] ? `mode:${mains[0].id}` : '');
+        let preset = null;
+        let mode;
+        let mods;
         if (src.startsWith('preset:')) {
-            const preset = presets.find((p) => String(p.id) === src.slice(7));
-            const mode = preset && modes.find((m) => m.id === preset.mode_id);
-            return { src, preset, mode };
+            preset = presets.find((p) => String(p.id) === src.slice(7)) || null;
+            ({ main: mode, mods } = partsOf(modes, preset ? preset.mode_id : ''));
+        } else {
+            mode = mains.find((m) => `mode:${m.id}` === src);
+            mods = this.state.mods.map((id) => modes.find((m) => m.id === id)).filter(Boolean);
         }
-        return { src, preset: null, mode: modes.find((m) => `mode:${m.id}` === src) };
+        return { src, preset, mode, mods, ...schemaOf(mode, mods) };
     }
 
     pick(source) {
-        this.setState({ source, values: null });
+        this.setState({ source, values: null, mods: [] });
     }
 
     async submit(e) {
         e.preventDefault();
-        const { preset, mode } = this.choice();
+        const { preset, mode, mods, schema } = this.choice();
         if (!mode) return;
         const teams = parseTeams(this.state.teams);
-        const values = this.state.values || initialValues(mode.params, preset ? preset.params : null);
+        const values = this.state.values || initialValues(schema, preset ? preset.params : null);
         const body = { name: this.state.name.trim(), teams, params: values,
                        duration_ms: Math.max(0, Math.round(parseFloat(this.state.minutes || '0') * 60000)) };
-        if (preset) body.preset_id = preset.id;
-        else body.mode_id = mode.id;
+        if (preset) {
+            body.preset_id = preset.id;
+        } else {
+            body.mode_id = mode.id;
+            if (mods.length) body.modifiers = mods.map((m) => m.id);
+        }
         const game = await this.props.app.call('POST', '/games', body);
         if (game) this.props.app.setGame(game);
     }
 
     render(props, state) {
         const { modes, presets } = props.app.state;
-        const { src, preset, mode } = this.choice();
+        const { src, preset, mode, schema, labels } = this.choice();
         const teams = parseTeams(state.teams);
-        const values = state.values || (mode ? initialValues(mode.params, preset ? preset.params : null) : {});
+        const values = state.values || (mode ? initialValues(schema, preset ? preset.params : null) : {});
         return html`<form class="form" onSubmit=${(e) => this.submit(e)} data-testid="create-game">
             <h3>${t('game.new')}</h3>
             <div class="field"><label for="g-name">${t('game.name')}</label>
@@ -62,7 +75,7 @@ class CreateGame extends Component {
             <div class="field"><label for="g-source">${t('game.source')}</label>
                 <select id="g-source" data-testid="game-source" value=${src} onChange=${(e) => this.pick(e.target.value)}>
                     <optgroup label=${t('game.modes')}>
-                        ${modes.map((m) => html`<option value=${`mode:${m.id}`}>${m.name}</option>`)}
+                        ${mainModes(modes).map((m) => html`<option value=${`mode:${m.id}`}>${modeText(m, 'name')}</option>`)}
                     </optgroup>
                     ${presets.length > 0 && html`<optgroup label=${t('game.presets')}>
                         ${presets.map((p) => html`<option value=${`preset:${p.id}`}>${p.name}</option>`)}
@@ -76,9 +89,12 @@ class CreateGame extends Component {
                 <input id="g-minutes" type="number" min="0" step="1" value=${state.minutes}
                     onInput=${(e) => this.setState({ minutes: e.target.value })} />
                 <small class="muted">${t('game.duration_hint')}</small></div>
+            ${mode && !preset && html`<${ModifierPicker} modes=${modes} selected=${state.mods} prefix="game"
+                onChange=${(mods) => this.setState({ mods, values: null })} />`}
             ${mode && html`<details open=${!preset}>
                 <summary>${t('game.params')}</summary>
-                <${ParamFields} schema=${mode.params} values=${values} teams=${teams} prefix="game"
+                <p class="muted small">${modeText(mode, 'description')}</p>
+                <${ParamFields} schema=${schema} labels=${labels} values=${values} teams=${teams} prefix="game"
                     onChange=${(v) => this.setState({ values: v })} />
             </details>`}
             <button type="submit" data-testid="game-create">${t('game.create')}</button>
@@ -173,7 +189,7 @@ export class GameControl extends Component {
                 <dt>${t('game.state')}</dt><dd><span class=${`state state-${s}`} data-testid="game-state">${t(`game.states.${s}`)}</span></dd>
                 <dt>${t('game.clock')}</dt><dd class="big-clock" data-testid="game-clock">${clock(app.gameTime())}</dd>
                 <dt>${t('game.length')}</dt><dd>${game.duration_ms ? clock(game.duration_ms) : t('game.no_limit')}</dd>
-                <dt>${t('game.mode')}</dt><dd>${game.mode_id}</dd>
+                <dt>${t('game.mode')}</dt><dd>${modeName(props.app.state.modes, game.mode_id)}</dd>
                 <dt>${t('game.teams')}</dt><dd>${game.teams.join(', ')}</dd>
                 <dt>${t('game.id')}</dt><dd>${game.id}</dd>
             </dl>

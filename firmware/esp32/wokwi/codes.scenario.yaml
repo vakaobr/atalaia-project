@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The Codes modifier on its own (a code terminal) in the Wokwi emulator,
+# about 15 s of simulated time: boot, enter the admin PIN and pick Codes
+# (game 5 of the built-in presets), start, type two digits and #: the
+# keypad reaches the mode and the code_entry screen shows the digits, then
+# "Wrong code" (the built-in preset lists no codes). Keys are typed on the
+# serial console, as in bomb.scenario.yaml.
+#
+#   cd firmware/esp32
+#   wokwi-cli --timeout 60000 --scenario wokwi/codes.scenario.yaml .
+name: Codes terminal on the Field Box
+version: 1
+author: The Atalaia contributors
+
+steps:
+  - wait-serial: 'screen pin_entry {"digits":0,"error":false}'
+  - write-serial: '1234#'
+  - wait-serial: 'screen preset_select'
+  - delay: 1000ms
+  - take-screenshot:
+      part-id: lcd1
+      save-to: ../build-wokwi/codes-1-presets.png
+
+  # Codes is game 5; # moves on to the timer, # again to the confirmation, # starts.
+  - write-serial: '5#'
+  - wait-serial: 'screen timer_adjust'
+  - write-serial: '#'
+  - wait-serial: 'screen start_confirm'
+  - write-serial: '#'
+  - wait-serial: 'screen code_entry'
+  - delay: 1000ms
+  - take-screenshot:
+      part-id: lcd1
+      save-to: ../build-wokwi/codes-2-idle.png
+
+  - write-serial: '42'
+  - wait-serial: '"digits":2'
+  - delay: 1000ms
+  - take-screenshot:
+      part-id: lcd1
+      save-to: ../build-wokwi/codes-3-typed.png
+  - write-serial: '#'
+  - wait-serial: 'Wrong code'
+  - delay: 1000ms
+  - take-screenshot:
+      part-id: lcd1
+      save-to: ../build-wokwi/codes-4-wrong.png

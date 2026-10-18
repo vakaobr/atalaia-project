@@ -352,3 +352,20 @@ class Node:
     def score(self, team: str) -> int:
         team_id = self.teams.index(team) + 1
         return int(self._lib.atalaia_score_net(self._lib.atalaia_node_score(self._handle), team_id))
+
+    def gained(self, team: str) -> int:
+        """Points gained by a team on this node (never decreases; what STATE counters carry)."""
+        team_id = self.teams.index(team) + 1
+        score = _Score.from_address(self._lib.atalaia_node_score(self._handle))
+        return int(score.gained[team_id])
+
+
+TEAM_MAX = 250  # ATALAIA_TEAM_MAX in core/include/atalaia/event.h
+
+
+class _Score(ctypes.Structure):
+    # atalaia_score_t (core/include/atalaia/score.h); index 0 (no team) is unused.
+    _fields_ = [
+        ("gained", ctypes.c_uint32 * (TEAM_MAX + 1)),
+        ("lost", ctypes.c_uint32 * (TEAM_MAX + 1)),
+    ]

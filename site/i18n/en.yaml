@@ -35,7 +35,7 @@ header:
   language: Language
 
 hero:
-  status: Pre-alpha · phase 2 software done, mode pack in progress · not field-ready yet
+  status: Pre-alpha · phase 2 software done, waiting for the radio boards · not field-ready yet
   title: The open <span class="nowrap">force-on-force</span> platform
   lead: >-
     Atalaia is an open platform for the electronic props of airsoft, paintball and milsim: the
@@ -209,7 +209,7 @@ modes:
 screens:
   title: What it looks like
   intro: >-
-    Seven captures from the real Field Box firmware (ESP32, LVGL 9.2, 320&nbsp;×&nbsp;240&nbsp;TFT)
+    Eight captures from the real Field Box firmware (ESP32, LVGL 9.2, 320&nbsp;×&nbsp;240&nbsp;TFT)
     running in the <a href="https://wokwi.com">Wokwi</a> emulator. The box UI is in English.
     Not yet tested on physical hardware.
   note: >-
@@ -222,8 +222,9 @@ screens:
     caption: GM enters the admin PIN to unlock setup.
   choose_game:
     alt: >-
-      Field Box screen: "CHOOSE A GAME" header, row 1 "Bomb" highlighted in yellow, row 2
-      "Domination", "1-9 choose # next * back" hint.
+      Field Box screen: "CHOOSE A GAME" header listing 1 "Bomb" (highlighted in yellow),
+      2 "Domination", 3 "Hold-All Domination", 4 "Last Stand" and 5 "Codes", with the hint
+      "1-9 choose # next * back".
     caption: Pick a game mode from the on-box menu.
   confirm:
     alt: >-
@@ -250,6 +251,11 @@ screens:
       Field Box screen: "JOINED GAME 4242" header, "Game" label on the left, "zone, node 7" on
       the right.
     caption: Box joined the field game via NFC card or serial console.
+  code_entry:
+    alt: >-
+      Field Box screen: "CODE" header, two of four circles filled in yellow, "# enter * delete"
+      hint.
+    caption: Typing a code for the Codes modifier (points, hints or unlocks).
 
 try:
   title: Try it today
@@ -288,10 +294,11 @@ roadmap:
   p2:
     title: Field network
     text: >-
-      Skirmesh-RF over LoRa, field controller, API, GM console. The phase will end with a mode
-      pack: Hold-All Domination (score only while holding every box), Last Stand (a countdown to
-      defeat while holding one of three), per-team arming codes on Bomb, and the Codes modifier
-      (keypad or QR codes that grant points, hints or unlocks).
+      Skirmesh-RF over LoRa, field controller, API, GM console, and a mode pack, now written and
+      tested in software: Hold-All Domination (score only while holding every box), Last Stand (a
+      countdown to defeat while holding one of three), per-team arming codes on Bomb, and the Codes
+      modifier (keypad codes that grant points, hints or unlocks, with the GM told who used
+      them).
     gate: >-
       Gate: 5 boxes on a <a href="#glossary-cqb">CQB</a> site and an outdoor field, zero lost
       captures. The encrypted radio protocol, the field controller with its API, the USB radio

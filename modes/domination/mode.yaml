@@ -12,3 +12,11 @@ params:
   capture_hold_ms: { type: int, min: 0, max: 60000, default: 3000, label: "Hold time to capture (ms)" }
   tick_s:          { type: int, min: 1, max: 600,   default: 10,   label: "Seconds per scoring tick" }
   points_per_tick: { type: int, min: 1, max: 1000,  default: 1,    label: "Points per tick" }
+i18n:
+  pt:
+    name: Domínio
+    description: A última equipa a capturar a caixa pontua enquanto a tiver.
+    params:
+      capture_hold_ms: Tempo a premir para capturar (ms)
+      tick_s: Segundos por intervalo de pontuação
+      points_per_tick: Pontos por intervalo

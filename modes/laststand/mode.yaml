@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+id: org.atalaia.laststand
+version: 0.1.0
+license: GPL-3.0-or-later
+min_tier: reduced
+kind: mode
+name: Last Stand
+description: The defenders start with every zone. Once they are down to their last zone, a countdown to defeat runs until they retake another one.
+roles:
+  zone: { requires: [team_input], optional: [team_display, audio, display] }
+params:
+  capture_hold_ms: { type: int, min: 0, max: 60000, default: 3000, label: "Hold time to capture (ms)" }
+  attackers:       { type: team, default: red, label: "Attackers (win when the defenders fall)" }
+  defenders:       { type: team, default: blue, label: "Defenders (start with every zone)" }
+  countdown_s:     { type: int, min: 10, max: 3600, default: 120, label: "Countdown to defeat (s)" }
+  last_zones:      { type: int, min: 0, max: 63, default: 1, label: "The countdown runs while the defenders hold this many zones or fewer" }
+  min_zones:       { type: int, min: 1, max: 64, default: 2, label: "Zones in play before the countdown can run" }
+  reset:           { type: bool, default: true, label: "The countdown starts over after a retake (otherwise it carries on where it stopped)" }
+  end_game:        { type: bool, default: true, label: "End the game when the defenders fall" }
+i18n:
+  pt:
+    name: Última Resistência
+    description: Os defensores começam com todas as zonas. Quando ficam reduzidos à última zona, corre uma contagem para a derrota até reconquistarem outra.
+    params:
+      capture_hold_ms: Tempo a premir para capturar (ms)
+      attackers: Atacantes (ganham quando os defensores caem)
+      defenders: Defensores (começam com todas as zonas)
+      countdown_s: Contagem para a derrota (s)
+      last_zones: A contagem corre enquanto os defensores tiverem este número de zonas ou menos
+      min_zones: Zonas em jogo antes de a contagem poder correr
+      reset: A contagem recomeça do início após uma reconquista (senão continua de onde parou)
+      end_game: Terminar o jogo quando os defensores caem

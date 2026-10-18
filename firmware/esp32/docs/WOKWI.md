@@ -140,6 +140,17 @@ end-to-end tests).
 wokwi-cli --timeout 60000 --scenario wokwi/join.scenario.yaml .
 ```
 
+[`wokwi/codes.scenario.yaml`](../wokwi/codes.scenario.yaml) picks game `5`,
+the Codes modifier on its own (a code terminal), types two digits and `#`
+on the serial console, and checks the `code_entry` screen: the digits, then
+"Wrong code" (screenshots `build-wokwi/codes-*.png`). The built-in presets
+are Bomb, Domination, Hold-All Domination, Last Stand and Codes, in that
+order.
+
+```
+wokwi-cli --timeout 60000 --scenario wokwi/codes.scenario.yaml .
+```
+
 ## The same pixels as the host tests
 
 The screen code and LVGL configuration are shared with the host tests

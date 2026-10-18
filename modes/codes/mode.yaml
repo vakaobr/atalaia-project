@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+id: org.atalaia.codes
+version: 0.1.0
+license: GPL-3.0-or-later
+min_tier: reduced
+kind: modifier
+name: Codes
+description: >-
+  Keypad codes grant points, hints or unlocks, alongside any main mode on the same box. Each code works
+  once per game. The game master sees every code used, the team it counted for and the team holding the box.
+roles:
+  # On its own (no main mode) the box is a code terminal; added to a main mode, Codes runs on
+  # every box of that mode.
+  terminal: { requires: [keypad], optional: [display, audio] }
+params:
+  codes:
+    type: string
+    default: ""
+    max: 120
+    label: "Codes: digits:kind[:points][:team], comma-separated; kind is points, hint or unlock (e.g. 4711:points:50,0815:hint,2222:unlock:red)"
+i18n:
+  pt:
+    name: Códigos
+    description: >-
+      Códigos no teclado dão pontos, pistas ou desbloqueios, ao lado de qualquer modo principal na mesma caixa.
+      Cada código funciona uma vez por jogo. O mestre de jogo vê cada código usado, a equipa a que contou e a
+      equipa que tinha a caixa.
+    params:
+      codes: "Códigos: dígitos:tipo[:pontos][:equipa], separados por vírgulas; o tipo é points, hint ou unlock (ex.: 4711:points:50,0815:hint,2222:unlock:red)"

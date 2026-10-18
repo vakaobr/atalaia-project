@@ -222,6 +222,32 @@ int preset_store_list(preset_summary_t *out, int max_out)
     return count;
 }
 
+long preset_store_read_source(const char *mode_id, char *buf, size_t cap)
+{
+    if (!mode_id || !buf || cap == 0) return -1;
+    char path[256];
+    mode_source_path(mode_id, path, sizeof(path));
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+    size_t len = fread(buf, 1, cap - 1, f);
+    bool more = fgetc(f) != EOF;
+    fclose(f);
+    if (more) return -1;
+    buf[len] = '\0';
+    return (long)len;
+}
+
+bool preset_store_write_source(const char *mode_id, const char *source, size_t len)
+{
+    if (!mode_id || !source) return false;
+    char path[256];
+    mode_source_path(mode_id, path, sizeof(path));
+    FILE *f = fopen(path, "wb");
+    if (!f) return false;
+    bool ok = fwrite(source, 1, len, f) == len;
+    return fclose(f) == 0 && ok;
+}
+
 bool preset_store_delete(int index)
 {
     if (index < 1 || index > PRESET_MAX_SLOTS) return false;

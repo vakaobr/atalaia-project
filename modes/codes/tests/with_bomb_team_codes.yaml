@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Added to a Bomb with team codes, each code goes to the script that knows it, and the bomb's screen comes back
+main: bomb
+params: { fuse_s: 60, team_codes: "red=1234,blue=5678", codes: "4711:hint" }
+steps:
+  - keys: "1234#"
+  - expect: { type: bomb.armed, team: red, data: { reason: code } }
+  - expect_screen: { template: countdown, data: { left: 60, team: red } }
+  - wait: 5
+  - keys: "4711#"
+  - expect: { type: code.used, data: { kind: hint, code: "1" } }
+  - expect_screen: { template: code_entry, data: { title: CODE, message: "Hint: the game master is told" } }
+  - expect_no: bomb.defused
+  - wait: 3
+  - expect_screen: { template: countdown, data: { left: 52, team: red } }
+  - keys: "9999#"
+  - expect_screen: { template: code_entry, data: { title: CODE, message: Wrong code, error: true } }
+  - wait: 3
+  - expect_screen: { template: countdown, data: { left: 49 } }
+  - keys: "5678#"
+  - expect: { type: bomb.defused, team: blue, data: { reason: code } }
+  - expect_screen: { template: defused, data: { team: blue } }
+  - expect_no: script.error

@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: On its own, a box with codes grants points, hints and unlocks, each once
+params: { codes: "4711:points:50:red, 0815:hint, 2222:unlock:blue, 12x:points" }
+steps:
+  - expect_screen: { template: code_entry, data: { title: CODE, digits: 0 } }
+  - keys: "47"
+  - expect_screen: { template: code_entry, data: { title: CODE, digits: 2 } }
+  - keys: "11#"
+  - expect: { type: code.used, team: red, data: { code: "1", kind: points, amount: 50 } }
+  - expect_score: { team: red, points: 50 }
+  - expect_screen: { template: code_entry, data: { message: +50 points for RED, error: false } }
+  - keys: "4711#"
+  - expect_screen: { template: code_entry, data: { message: Code already used, error: true } }
+  - expect_no: code.used
+  - expect_score: { team: red, points: 50 }
+  - keys: "0815#"
+  - expect: { type: code.used, data: { code: "2", kind: hint } }
+  - keys: "2222#"
+  - expect: { type: code.used, team: blue, data: { code: "3", kind: unlock } }
+  - keys: "12#"
+  - expect_screen: { template: code_entry, data: { message: Wrong code, error: true } }
+  - expect_no: code.used
+  - wait: 3
+  - expect_screen: { template: code_entry, data: { title: CODE, digits: 0 } }
+  - expect_no: script.error

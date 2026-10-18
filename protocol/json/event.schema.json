@@ -55,7 +55,12 @@
             "node.rebooted",
             "battery.low",
             "script.error",
-            "script.halted"
+            "script.halted",
+            "holdall.scoring_start",
+            "holdall.scoring_stop",
+            "laststand.countdown_start",
+            "laststand.countdown_cancel",
+            "laststand.defeated"
           ]
         },
         {
@@ -283,6 +288,9 @@
               },
               "fuse_s": {
                 "$ref": "#/$defs/data/fuse_s"
+              },
+              "reason": {
+                "$ref": "#/$defs/data/reason"
               }
             },
             "additionalProperties": false
@@ -308,6 +316,9 @@
               },
               "squad": {
                 "$ref": "#/$defs/data/squad"
+              },
+              "reason": {
+                "$ref": "#/$defs/data/reason"
               }
             },
             "additionalProperties": false
@@ -420,6 +431,12 @@
               },
               "kind": {
                 "$ref": "#/$defs/data/kind"
+              },
+              "amount": {
+                "$ref": "#/$defs/data/amount"
+              },
+              "holder": {
+                "$ref": "#/$defs/data/holder"
               }
             },
             "additionalProperties": false
@@ -783,6 +800,137 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "holdall.scoring_start"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "holdall.scoring_stop"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "laststand.countdown_start"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "duration_s": {
+                "$ref": "#/$defs/data/duration_s"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "laststand.countdown_cancel"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "duration_s": {
+                "$ref": "#/$defs/data/duration_s"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "laststand.defeated"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
     }
   ],
   "$defs": {
@@ -894,6 +1042,14 @@
       "limit_j": {
         "type": "number",
         "description": "energy limit in joules"
+      },
+      "duration_s": {
+        "type": "number",
+        "description": "countdown or visibility duration in seconds"
+      },
+      "holder": {
+        "type": "string",
+        "description": "team holding the node when it happened"
       }
     }
   }

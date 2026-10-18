@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A team scores only from the moment it holds every box
+nodes: { alpha: zone, bravo: zone }
+steps:
+  - hold: { node: alpha, team: red, s: 3 }
+  - expect: { type: zone.captured, node: alpha, team: red, at: 3 }
+  - wait: 20
+  - expect_no: holdall.scoring_start
+  - expect_score: { team: red, points: 0 }
+  - hold: { node: bravo, team: red, s: 3 }          # 23 -> 26 s
+  - expect: { type: zone.captured, node: bravo, team: red, at: 26 }
+  - expect: { type: holdall.scoring_start, node: controller, team: red, at: 26 }
+  - wait: 30                                        # ticks at 36, 46 and 56 s
+  - expect_score: { team: red, points: 3 }
+  - expect_score: { team: red, node: controller, points: 3 }
+  - expect_score: { team: red, node: alpha, points: 0 }
+  - expect_no: script.error

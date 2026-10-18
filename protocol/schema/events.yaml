@@ -62,6 +62,9 @@ data_fields:
   reading_mps:   { key: 25, type: number,  doc: "chrono reading in m/s" }
   bb_g:          { key: 26, type: number,  doc: "BB weight in grams" }
   limit_j:       { key: 27, type: number,  doc: "energy limit in joules" }
+  duration_s:    { key: 28, type: number,  doc: "countdown or visibility duration in seconds" }
+  # Keys 29 (see_team) and 30 (tolerance_pct) are kept for phase 3 (ADR-P3-8).
+  holder:        { key: 31, type: string,  doc: "team holding the node when it happened" }
 
 # id: CBOR value of the type field (1-23 take one byte). prio: the default
 # priority. data: the fields this event may carry besides the common ones.
@@ -72,12 +75,12 @@ events:
   game.end:         { id: 4,  prio: critical,  data: [reason, winner] }
   zone.captured:    { id: 5,  prio: normal,    data: [zone, previous_team] }
   zone.neutralized: { id: 6,  prio: normal,    data: [zone, previous_team] }
-  bomb.armed:       { id: 7,  prio: critical,  data: [fuse_s] }
-  bomb.defused:     { id: 8,  prio: critical,  data: [] }
+  bomb.armed:       { id: 7,  prio: critical,  data: [fuse_s, reason] }   # reason "code": armed with a team code
+  bomb.defused:     { id: 8,  prio: critical,  data: [reason] }
   bomb.exploded:    { id: 9,  prio: critical,  data: [] }
   bomb.reset:       { id: 10, prio: normal,    data: [] }
   score.delta:      { id: 11, prio: normal,    data: [amount, reason] }   # penalties; gains travel as counters in STATE
-  code.used:        { id: 12, prio: normal,    data: [code, kind] }
+  code.used:        { id: 12, prio: normal,    data: [code, kind, amount, holder] }
   tag.scanned:      { id: 13, prio: normal,    data: [tag, owner] }
   player.respawn:   { id: 14, prio: normal,    data: [player, lives_left] }
   player.checkin:   { id: 15, prio: normal,    data: [player] }
@@ -90,3 +93,9 @@ events:
   battery.low:      { id: 22, prio: telemetry, data: [percent] }
   script.error:     { id: 23, prio: normal,    data: [message] }          # a handler failed; the node keeps running
   script.halted:    { id: 24, prio: critical,  data: [reason] }           # the sandbox stopped the script
+  # Ids 25-27 and 33-39 are kept for phase 3 (ADR-P3-8); the phase 2 mode pack uses 28-32.
+  holdall.scoring_start:      { id: 28, prio: normal,   data: [] }            # a team holds every zone and scores
+  holdall.scoring_stop:       { id: 29, prio: normal,   data: [] }            # that team no longer holds every zone
+  laststand.countdown_start:  { id: 30, prio: normal,   data: [duration_s] }  # defenders down to their last zones
+  laststand.countdown_cancel: { id: 31, prio: normal,   data: [duration_s] }  # defenders retook a zone in time
+  laststand.defeated:         { id: 32, prio: critical, data: [] }            # the countdown ran out

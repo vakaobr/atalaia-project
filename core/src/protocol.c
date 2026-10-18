@@ -15,9 +15,10 @@ static const uint8_t data_game_pause[] = {3};
 static const uint8_t data_game_end[] = {3, 8};
 static const uint8_t data_zone_captured[] = {5, 4};
 static const uint8_t data_zone_neutralized[] = {5, 4};
-static const uint8_t data_bomb_armed[] = {7};
+static const uint8_t data_bomb_armed[] = {7, 3};
+static const uint8_t data_bomb_defused[] = {3};
 static const uint8_t data_score_delta[] = {6, 3};
-static const uint8_t data_code_used[] = {10, 11};
+static const uint8_t data_code_used[] = {10, 11, 6, 31};
 static const uint8_t data_tag_scanned[] = {12, 13};
 static const uint8_t data_player_respawn[] = {14, 15};
 static const uint8_t data_player_checkin[] = {14};
@@ -30,6 +31,8 @@ static const uint8_t data_node_rebooted[] = {3};
 static const uint8_t data_battery_low[] = {20};
 static const uint8_t data_script_error[] = {19};
 static const uint8_t data_script_halted[] = {3};
+static const uint8_t data_laststand_countdown_start[] = {28};
+static const uint8_t data_laststand_countdown_cancel[] = {28};
 
 const atalaia_event_def_t atalaia_event_defs[] = {
     {"game.start", ATALAIA_EV_GAME_START, ATALAIA_PRIO_CRITICAL, data_game_start, 1},
@@ -38,12 +41,12 @@ const atalaia_event_def_t atalaia_event_defs[] = {
     {"game.end", ATALAIA_EV_GAME_END, ATALAIA_PRIO_CRITICAL, data_game_end, 2},
     {"zone.captured", ATALAIA_EV_ZONE_CAPTURED, ATALAIA_PRIO_NORMAL, data_zone_captured, 2},
     {"zone.neutralized", ATALAIA_EV_ZONE_NEUTRALIZED, ATALAIA_PRIO_NORMAL, data_zone_neutralized, 2},
-    {"bomb.armed", ATALAIA_EV_BOMB_ARMED, ATALAIA_PRIO_CRITICAL, data_bomb_armed, 1},
-    {"bomb.defused", ATALAIA_EV_BOMB_DEFUSED, ATALAIA_PRIO_CRITICAL, NULL, 0},
+    {"bomb.armed", ATALAIA_EV_BOMB_ARMED, ATALAIA_PRIO_CRITICAL, data_bomb_armed, 2},
+    {"bomb.defused", ATALAIA_EV_BOMB_DEFUSED, ATALAIA_PRIO_CRITICAL, data_bomb_defused, 1},
     {"bomb.exploded", ATALAIA_EV_BOMB_EXPLODED, ATALAIA_PRIO_CRITICAL, NULL, 0},
     {"bomb.reset", ATALAIA_EV_BOMB_RESET, ATALAIA_PRIO_NORMAL, NULL, 0},
     {"score.delta", ATALAIA_EV_SCORE_DELTA, ATALAIA_PRIO_NORMAL, data_score_delta, 2},
-    {"code.used", ATALAIA_EV_CODE_USED, ATALAIA_PRIO_NORMAL, data_code_used, 2},
+    {"code.used", ATALAIA_EV_CODE_USED, ATALAIA_PRIO_NORMAL, data_code_used, 4},
     {"tag.scanned", ATALAIA_EV_TAG_SCANNED, ATALAIA_PRIO_NORMAL, data_tag_scanned, 2},
     {"player.respawn", ATALAIA_EV_PLAYER_RESPAWN, ATALAIA_PRIO_NORMAL, data_player_respawn, 2},
     {"player.checkin", ATALAIA_EV_PLAYER_CHECKIN, ATALAIA_PRIO_NORMAL, data_player_checkin, 1},
@@ -56,6 +59,11 @@ const atalaia_event_def_t atalaia_event_defs[] = {
     {"battery.low", ATALAIA_EV_BATTERY_LOW, ATALAIA_PRIO_TELEMETRY, data_battery_low, 1},
     {"script.error", ATALAIA_EV_SCRIPT_ERROR, ATALAIA_PRIO_NORMAL, data_script_error, 1},
     {"script.halted", ATALAIA_EV_SCRIPT_HALTED, ATALAIA_PRIO_CRITICAL, data_script_halted, 1},
+    {"holdall.scoring_start", ATALAIA_EV_HOLDALL_SCORING_START, ATALAIA_PRIO_NORMAL, NULL, 0},
+    {"holdall.scoring_stop", ATALAIA_EV_HOLDALL_SCORING_STOP, ATALAIA_PRIO_NORMAL, NULL, 0},
+    {"laststand.countdown_start", ATALAIA_EV_LASTSTAND_COUNTDOWN_START, ATALAIA_PRIO_NORMAL, data_laststand_countdown_start, 1},
+    {"laststand.countdown_cancel", ATALAIA_EV_LASTSTAND_COUNTDOWN_CANCEL, ATALAIA_PRIO_NORMAL, data_laststand_countdown_cancel, 1},
+    {"laststand.defeated", ATALAIA_EV_LASTSTAND_DEFEATED, ATALAIA_PRIO_CRITICAL, NULL, 0},
 };
 const size_t atalaia_event_def_count =
     sizeof(atalaia_event_defs) / sizeof(atalaia_event_defs[0]);
@@ -88,6 +96,8 @@ const atalaia_data_field_def_t atalaia_data_field_defs[] = {
     {"reading_mps", ATALAIA_DATA_READING_MPS, ATALAIA_FIELD_NUMBER, false},
     {"bb_g", ATALAIA_DATA_BB_G, ATALAIA_FIELD_NUMBER, false},
     {"limit_j", ATALAIA_DATA_LIMIT_J, ATALAIA_FIELD_NUMBER, false},
+    {"duration_s", ATALAIA_DATA_DURATION_S, ATALAIA_FIELD_NUMBER, false},
+    {"holder", ATALAIA_DATA_HOLDER, ATALAIA_FIELD_STRING, false},
 };
 const size_t atalaia_data_field_def_count =
     sizeof(atalaia_data_field_defs) / sizeof(atalaia_data_field_defs[0]);

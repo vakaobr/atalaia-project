@@ -11,7 +11,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
-- Phase 3 (Android and players) design updated for the phase 2 handoff: I/O pod framing adopts USB modem sync+CRC-16; chrono readings signed by Ed25519 per marshal; Hold-All Domination and Last Stand moved to the phase 2 mode pack (event ids 27-32); join payload uses CA fingerprint + Wi-Fi fetch instead of the full certificate; single shared game channel (C5) propagated to pod CONFIGURE; Dart codecs must match schema-exact payloads (phase-3-android-players, commit 3f5ee7a)
+- Phase 2 mode pack: Hold-All Domination (`modes/holdall`, the controller's `field.lua` scores a team only while it holds every box), Last Stand (`modes/laststand`, a countdown to defeat while the defenders hold their last zone; the attackers win), per-team keypad codes on Bomb (`team_codes`), and the Codes modifier (`modes/codes`: keypad codes for points, hints and unlocks, reported to the GM with the holding team). New events 28–32 (`holdall.*`, `laststand.*`, ids from ADR-P3-8) and data fields `duration_s` (28) and `holder` (31) (phase-2-field-network, mode pack)
+- Modifiers (`kind: modifier`) run alongside a main mode on the same box; a game names them as `main+modifier`, and the simulator, the controller and the Field Box compose the scripts the same way (phase-2-field-network, mode pack)
+- Translated mode names and parameter labels (`i18n` in `mode.yaml`, European Portuguese for every built-in mode), shown by the GM console; modifier choice in the console's game and preset forms (phase-2-field-network, mode pack)
+- The simulator runs a mode's `field.lua` as the controller does (`keys` test step, `serve --modifier`); the controller keeps `field.lua` points across restarts, restarts the script after a restart or takeover, and ends the game on a script's `game.win()` (phase-2-field-network, mode pack)
+- Field Box: `code_entry` screen; all five modes built in as presets (a box adds missing built-in modes at boot and refreshes their scripts); joins with modifiers; Wokwi Codes scenario (phase-2-field-network, mode pack)
+- Project page and README gallery: the game picker now lists all five modes, and the Codes modifier's code-entry screen is shown (phase-2-field-network, mode pack)
+- Phase 3 (Android and players) design updated for the phase 2 handoff: I/O pod framing adopts USB modem sync+CRC-16; chrono readings signed by Ed25519 per marshal; Hold-All Domination and Last Stand moved to the phase 2 mode pack (event ids 28-32); join payload uses CA fingerprint + Wi-Fi fetch instead of the full certificate; single shared game channel (C5) propagated to pod CONFIGURE; Dart codecs must match schema-exact payloads (phase-3-android-players, commit 3f5ee7a)
 - Phase 4 (site server) design updated for the phase 2 and 3 handoffs: custom-scenario compiler becomes a shared library at `controller/atalaia_controller/scenarios/`; events table unique key adds game time and event type; sync auth is asymmetric (API key controller→server, bearer token server→controller); GPS positions come from phones and pods, not the Field Box (E21); join is by QR, not BLE (phase-4-site-server, commit 9ffda1f)
 - Screenshot gallery in README.md and the project page: seven captures of the real Field Box firmware (ESP32, LVGL 9.2, 320×240 TFT) running in the Wokwi emulator, walking through a Bomb game and a field join (bomb-1-pin through bomb-6-defused, join-joined)
 - Field Box build manual (`hardware/field-box/BUILD.md`): parts and sourcing, enclosure, board revision and antennas, 1S power path with fuse, reverse-polarity diode and 5 V boost, step-by-step wiring with checks, first flash from Windows, troubleshooting; untested until the first build. Wiring diagrams generated with WireViz from `hardware/field-box/wiring/*.yml`, with GPIO numbers taken from Kconfig (`python tools/docker_hw.py render`), checked by `tools/check_wiring.py` in `check.sh` and CI (phase-1-single-box)
@@ -54,6 +60,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 - Wokwi emulator setup for VS Code: `firmware/esp32/wokwi.toml`, `diagram.json` (ESP32-S3, ILI9341, team buttons, WS2812 ring, keypad), `sdkconfig.wokwi` (GPIO keypad instead of the PCF8574, no audio, setup skipped, keys from the serial console), a Bomb automation scenario and `firmware/esp32/docs/WOKWI.md` (phase-1-single-box)
 - `tools/docker_fw.py` builds the firmware, builds the Wokwi variant and runs the firmware tests in Docker from any shell, including `cmd` (phase-1-single-box)
 - Built-in Bomb and Domination presets, stored on a box with an empty preset store; keypad debouncing with one press per key stroke (phase-1-single-box)
+
+### Changed
+- Field Box preset scripts may be up to 16 KB (was 8 KB) (phase-2-field-network, mode pack)
+- `code.used` carries `amount` and `holder`; `bomb.armed` and `bomb.defused` carry `reason` (phase-2-field-network, mode pack)
+- In the simulator log, events at the same game time keep the order they happened in (phase-2-field-network, mode pack)
 
 ### Fixed
 - `hardware/field-box/README.md`: the BoM had a 2S pack on the board's single-cell battery socket (it would destroy the board); Vext and the board's ADC were described as used by the firmware; button 2 was on GPIO 5, the V4.3 front-end module's line (phase-1-single-box)

@@ -888,11 +888,11 @@ The project ships 12 modes and 3 modifiers, all written against the public scrip
 
 ### Modifiers
 
-Modifiers are small packages (`kind: modifier`) that run alongside any main mode on the same node.
+Modifiers are small packages (`kind: modifier`) that run alongside any main mode on the same node. A game names a main mode and its modifiers as `main+modifier`; their scripts run in one sandbox.
 
 | Modifier | What it does | Covers request |
 | --- | --- | --- |
-| Codes | Keypad or QR codes grant points, hints or unlocks; GM sees who used them and which team held the node | Hint-code notifications |
+| Codes | Keypad codes (QR text arrives with the phase 3 apps) grant points, hints or unlocks; GM sees who used them and which team held the node | Hint-code notifications |
 | Tags as codes | NFC tags act like codes in any mode (e.g. yellow = hint, red/blue = team points) | RFID tags in any mode |
 | Penalties | Moving, shaking or opening the prop costs points | — (anti-tamper) |
 

@@ -169,6 +169,49 @@ class FieldTests(unittest.TestCase):
         self.assertTrue(wait_for(lambda: self.score(gid, "blue") >= 5, 8))
         self.assertNotEqual(n_near, n_far)
 
+    def test_hold_all_scores_from_the_controller(self):
+        """Hold-All Domination: two boxes, the controller's field.lua scores while red holds both."""
+        r = self.client.post("/api/v1/games", headers=GM, json={
+            "name": "hold all", "mode_id": "org.atalaia.holdall", "teams": ["red", "blue"],
+            "params": {"capture_hold_ms": 1000, "tick_s": 1, "points_per_tick": 5}})
+        self.assertEqual(r.status_code, 201, r.text)
+        gid = r.json()["id"]
+        alpha, bravo = self.box("alpha"), self.box("bravo")
+        n_alpha, n_bravo = self.join(alpha), self.join(bravo)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+        self.assertTrue(wait_for(lambda: bravo.status()["phase"] == 2, 5))
+        alpha.hold(1, 1300)
+        self.assertTrue(wait_for(lambda: self.node(n_alpha).get("owner") == "red", 8))
+        self.assertEqual(self.score(gid, "red"), 0)  # one box is not enough
+        bravo.hold(1, 1300)
+        ctrl = self.ctrl.node_id
+        self.assertTrue(wait_for(lambda: "holdall.scoring_start" in self.log_types(gid, ctrl), 8))
+        self.assertTrue(wait_for(lambda: self.score(gid, "red") >= 10, 8))
+        self.assertEqual((alpha.status()["phase"], self.node(n_bravo)["owner"]), (2, "red"))
+        bravo.hold(2, 1300)  # blue takes one back: the scoring stops
+        self.assertTrue(wait_for(lambda: "holdall.scoring_stop" in self.log_types(gid, ctrl), 8))
+
+    def test_codes_modifier_on_a_box(self):
+        """Domination with the Codes modifier: the box composes both scripts; a code reaches the GM."""
+        r = self.client.post("/api/v1/games", headers=GM, json={
+            "name": "codes", "mode_id": "org.atalaia.domination", "modifiers": ["org.atalaia.codes"],
+            "teams": ["red", "blue"], "params": {"capture_hold_ms": 1000, "codes": "4711:points:50"}})
+        self.assertEqual(r.status_code, 201, r.text)
+        gid = r.json()["id"]
+        box = self.box("alpha")
+        nid = self.join(box)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
+        box.hold(1, 1300)
+        self.assertTrue(wait_for(lambda: "zone.captured" in self.log_types(gid, nid), 8))
+        box.send("keys 4711#")
+        self.assertTrue(wait_for(lambda: "code.used" in self.log_types(gid, nid), 8))
+        used = [e for e in self.client.get(f"/api/v1/games/{gid}/log", headers=READ).json()
+                if e["type"] == "code.used"][0]
+        self.assertEqual((used["team"], used["data"]["kind"], used["data"]["amount"], used["data"]["holder"]),
+                         ("red", "points", 50, "red"))
+        self.assertTrue(wait_for(lambda: self.score(gid, "red") >= 50, 8))
+
     def test_wrong_field_key_is_refused(self):
         self.game()
         stranger = BoxHost(self.hub, os.path.join(self.tmp.name, "stranger"), bytes(32), name="x")

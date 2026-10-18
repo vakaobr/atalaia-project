@@ -643,13 +643,17 @@ class FieldController:
 
         *counters* maps team ids (as STATE carries them) or team names to values.
         """
+        self.merge_counters(f"node-{node_id}", counters)
+
+    def merge_counters(self, node_key: str, counters: dict[Any, Any]) -> None:
+        """Like merge_scores, for any counter source: a node ("node-ID") or a run of the
+        controller's field script ("field-N"), whose points never travel in STATE."""
         changed = False
         for key, value in counters.items():
             if not isinstance(value, int) or isinstance(value, bool):
                 continue
             team_name = self.team_name(key) if isinstance(key, int) else None
             team_name = team_name or str(key)
-            node_key = f"node-{node_id}"
             per_node = self._scores.setdefault(team_name, {})
             if value > per_node.get(node_key, 0):
                 per_node[node_key] = value

@@ -23,6 +23,7 @@
  *   @join atalaia:join:...      join (as typed on the serial console)
  *   @joinkey <64 hex>           set the field join key
  *   hold <button 1-4> <ms>      hold a team button for ms, then release it
+ *   keys <0-9*#...>             keypad presses (keypad.key events to the mode)
  *   status                      print one STATUS line (JSON)
  *   quit
  * stdout: "READY air=<port>", then LOG, SCREEN and STATUS lines.
@@ -270,7 +271,7 @@ static int bind_udp(uint16_t port)
     return fd;
 }
 
-/* preset_t holds 8 KB of source: static, like on the ESP32. */
+/* preset_t holds 16 KB of source: static, like on the ESP32. */
 static preset_t preset;
 static node_runner_t runner;
 static box_game_t game;
@@ -361,21 +362,25 @@ int main(int argc, char **argv)
     mkdir(sub, 0700);
     event_log_init(&evlog, sub);
 
-    char p1[300], p2[300];
-    size_t bomb_len = 0, dom_len = 0;
-    snprintf(p1, sizeof(p1), "%s/bomb/node.lua", modes);
-    snprintf(p2, sizeof(p2), "%s/domination/node.lua", modes);
-    char *bomb = slurp(p1, &bomb_len);
-    char *dom = slurp(p2, &dom_len);
-    if (bomb == NULL || dom == NULL) {
-        fprintf(stderr, "box_host: cannot read the mode sources in %s\n", modes);
-        return 1;
-    }
-    const builtin_source_t sources[] = {
-        {"org.atalaia.bomb", bomb, bomb_len},
-        {"org.atalaia.domination", dom, dom_len},
+    /* The built-in modes, as main/CMakeLists.txt puts them in the image. */
+    static const char *const builtin_modes[][2] = {
+        {"bomb", "org.atalaia.bomb"},       {"domination", "org.atalaia.domination"},
+        {"holdall", "org.atalaia.holdall"}, {"laststand", "org.atalaia.laststand"},
+        {"codes", "org.atalaia.codes"},
     };
-    builtin_presets_seed(sources, 2);
+    enum { BUILTIN_COUNT = sizeof(builtin_modes) / sizeof(builtin_modes[0]) };
+    builtin_source_t sources[BUILTIN_COUNT];
+    for (int i = 0; i < BUILTIN_COUNT; i++) {
+        char p[300];
+        snprintf(p, sizeof(p), "%s/%s/node.lua", modes, builtin_modes[i][0]);
+        sources[i].mode_id = builtin_modes[i][1];
+        sources[i].source = slurp(p, &sources[i].source_len);
+        if (sources[i].source == NULL) {
+            fprintf(stderr, "box_host: cannot read %s\n", p);
+            return 1;
+        }
+    }
+    builtin_presets_seed(sources, BUILTIN_COUNT);
 
     hal_stub_init(&hal);
     node_runner_init(&runner, &hal, 0);
@@ -475,6 +480,13 @@ int main(int argc, char **argv)
                     if (sscanf(line, "hold %d %u", &b, &ms) == 2 && b >= 1 && b <= 4) {
                         pressed |= (uint8_t)(1u << (b - 1));
                         release_at[b - 1] = now + ms;
+                    } else if (strncmp(line, "keys ", 5) == 0) {
+                        /* Keypad presses, as the shell sends them to a running mode. */
+                        for (const char *k = line + 5; *k && runner.running; k++) {
+                            char json[16];
+                            snprintf(json, sizeof(json), "{\"key\":\"%c\"}", *k);
+                            node_runner_input(&runner, "keypad.key", json);
+                        }
                     } else if (strcmp(line, "status") == 0) {
                         print_status();
                     } else if (strcmp(line, "quit") == 0) {

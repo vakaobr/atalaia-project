@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: The GM's owner override counts, freeing a box stops scoring, and the game end freezes the score
+params: { tick_s: 5, points_per_tick: 2 }
+nodes: { alpha: zone, bravo: zone }
+steps:
+  - input: { node: alpha, type: cmd.set_owner, data: { team: blue } }
+  - input: { node: bravo, type: cmd.set_owner, data: { team: blue } }
+  - expect: { type: zone.captured, node: alpha, team: blue, at: 0 }
+  - expect: { type: holdall.scoring_start, team: blue, at: 0 }
+  - wait: 12                                        # points at 5 and 10 s
+  - input: { node: bravo, type: cmd.set_owner, data: { team: none } }
+  - expect: { type: zone.neutralized, node: bravo, data: { previous_team: blue } }
+  - expect: { type: holdall.scoring_stop, team: blue, at: 12 }
+  - wait: 10
+  - expect_score: { team: blue, points: 4 }
+  - input: { node: bravo, type: cmd.set_owner, data: { team: blue } }
+  - wait: 6                                         # a point at 27 s
+  - end: time
+  - wait: 60
+  - expect_status: ended
+  - expect_score: { team: blue, points: 6 }
+  - expect_screen: { node: alpha, template: final_score, data: { owner: blue } }

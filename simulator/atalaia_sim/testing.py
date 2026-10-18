@@ -28,7 +28,7 @@ from typing import Any, Optional
 import yaml
 
 from .core import Core
-from .mode import Mode, ModeError
+from .mode import Mode, ModeError, compose, load_mode
 from .sim import CONTROLLER, LogEntry, SimError, Simulation
 
 DEFAULT_TEAMS = ["red", "blue"]
@@ -126,6 +126,11 @@ class _Runner:
     def do_input(self, arg: dict[str, Any]) -> None:
         self.sim.input(self._default_node(arg), arg["type"], arg.get("data"))
 
+    def do_keys(self, arg: Any) -> None:
+        if not isinstance(arg, dict):
+            arg = {"keys": arg}
+        self.sim.keys(self._default_node(arg), str(arg["keys"]))
+
     # -- checks --
 
     def do_expect(self, arg: Any) -> None:
@@ -177,6 +182,21 @@ def _check_problems(sim: Simulation, where: str) -> None:
                           " (see protocol/schema/events.yaml)")
 
 
+def _composed(mode: Mode, spec: dict[str, Any]) -> Mode:
+    """The mode a test plays: a modifier's test may name a main mode (`main: domination`) and a
+    main mode's test its modifiers (`modifiers: [codes]`), as sibling folders of the mode."""
+    main = spec.get("main")
+    modifiers = spec.get("modifiers") or []
+    if main is None and not modifiers:
+        return mode
+    if not isinstance(modifiers, list) or (main is not None and not isinstance(main, str)):
+        raise ModeError("main is a mode folder name and modifiers a list of them")
+    others = [load_mode(mode.path.parent / name) for name in modifiers]
+    if main is not None:
+        return compose(load_mode(mode.path.parent / main), [mode, *others])
+    return compose(mode, others)
+
+
 def run_test(core: Core, mode: Mode, path: Path) -> TestResult:
     try:
         spec = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -184,11 +204,12 @@ def run_test(core: Core, mode: Mode, path: Path) -> TestResult:
         return TestResult(mode.id, path, path.stem, False, f"invalid YAML: {exc}")
     name = spec.get("name", path.stem)
     teams = spec.get("teams", DEFAULT_TEAMS)
-    default_node = next(iter(mode.roles))
-    nodes = spec.get("nodes", {default_node: default_node})
 
     sim: Optional[Simulation] = None
     try:
+        mode = _composed(mode, spec)
+        default_node = next(iter(mode.roles))
+        nodes = spec.get("nodes", {default_node: default_node})
         params = mode.resolve_params(spec.get("params") or {}, teams)
         sim = Simulation(core, mode, nodes, teams, params, seed=spec.get("seed", 1))
         runner = _Runner(sim)
@@ -207,6 +228,9 @@ def run_test(core: Core, mode: Mode, path: Path) -> TestResult:
         if sim:
             for vnode in sim.nodes.values():
                 log += [f"{'':10}  {vnode.name:<12} log: {line}" for line in vnode.logs]
+            log += [f"{'':10}  {CONTROLLER:<12} log: {line}" for line in sim.field_logs]
+            if sim.field is not None and sim.field.last_error:
+                log.append(f"{'':10}  {CONTROLLER:<12} error: {sim.field.last_error}")
         return TestResult(mode.id, path, name, False, str(exc), log)
     finally:
         if sim:

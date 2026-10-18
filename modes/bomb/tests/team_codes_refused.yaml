@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A wrong code, the arming team's own code and the team buttons do nothing
+params: { fuse_s: 60, team_codes: "red=1234,blue=5678" }
+steps:
+  - hold: { team: red, s: 6 }
+  - expect_no: bomb.armed
+  - keys: "9999#"
+  - expect_screen: { template: code_entry, data: { title: ARM, digits: 0, message: Wrong code, error: true } }
+  - expect_no: bomb.armed
+  - wait: 3
+  - expect_screen: { template: code_entry, data: { title: ARM, digits: 0, message: Enter your team code } }
+  - keys: "5678#"
+  - expect: { type: bomb.armed, team: blue, data: { reason: code } }
+  - keys: "5678#"
+  - expect_screen: { template: code_entry, data: { title: DEFUSE, message: Your team armed it, error: true } }
+  - hold: { team: red, s: 11 }
+  - expect_no: bomb.defused
+  - wait: 60
+  - expect: { type: bomb.exploded, team: blue }
+  - expect_screen: { template: exploded, data: { team: blue } }

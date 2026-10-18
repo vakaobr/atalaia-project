@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Retaking a zone stops the countdown, and the next one starts over
+params: { countdown_s: 60 }
+nodes: { alpha: zone, bravo: zone, charlie: zone }
+steps:
+  - hold: { node: alpha, team: red, s: 3 }
+  - hold: { node: bravo, team: red, s: 3 }          # countdown from 6 s
+  - wait: 20
+  - hold: { node: bravo, team: blue, s: 3 }         # 26 -> 29 s
+  - expect: { type: laststand.countdown_start, at: 6 }
+  - expect: { type: laststand.countdown_cancel, team: blue, at: 29, data: { duration_s: 37 } }
+  - hold: { node: bravo, team: red, s: 3 }          # 29 -> 32 s
+  - expect: { type: laststand.countdown_start, at: 32, data: { duration_s: 60 } }
+  - wait: 59
+  - expect_no: laststand.defeated
+  - wait: 1
+  - expect: { type: laststand.defeated, at: 92 }

@@ -1,11 +1,12 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 id: org.atalaia.bomb
-version: 0.1.0
+version: 0.2.0
 license: GPL-3.0-or-later
 min_tier: reduced
+kind: mode
 name: Bomb / Rush
-description: Attackers arm the bomb and defend it; defenders must defuse it before it explodes.
+description: Attackers arm the bomb and defend it; defenders must defuse it before it explodes. With team codes, each team arms and defuses with its own keypad code.
 roles:
   bomb: { requires: [team_input], optional: [keypad, audio, led, display] }
 params:
@@ -16,3 +17,17 @@ params:
   defuse_hold_ms:     { type: int, default: 10000, label: "Hold time to defuse (ms)" }
   reset_after_defuse: { type: bool, default: false, label: "Return to standby after defuse" }
   auto_arm_after_s:   { type: int, optional: true, label: "Arm automatically after (s)" }
+  team_codes:         { type: string, optional: true, max: 60, label: "Team codes, e.g. red=1234,blue=5678: the keypad arms (a team's code) and defuses (another team's code) instead of the buttons" }
+i18n:
+  pt:
+    name: Bomba / Rush
+    description: Os atacantes armam a bomba e defendem-na; os defensores têm de a desarmar antes de explodir. Com códigos de equipa, cada equipa arma e desarma com o seu próprio código no teclado.
+    params:
+      attackers: Atacantes
+      defenders: Defensores
+      fuse_s: Rastilho (s)
+      arm_hold_ms: Tempo a premir para armar (ms)
+      defuse_hold_ms: Tempo a premir para desarmar (ms)
+      reset_after_defuse: Voltar à espera depois de desarmada
+      auto_arm_after_s: Armar automaticamente ao fim de (s)
+      team_codes: "Códigos de equipa, ex.: red=1234,blue=5678: o teclado arma (o código de uma equipa) e desarma (o código de outra equipa) em vez dos botões"

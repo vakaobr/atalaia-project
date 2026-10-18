@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: With end_game off the defeat is only reported, and losing every zone keeps the countdown going
+params: { countdown_s: 30, end_game: false }
+nodes: { alpha: zone, bravo: zone }
+steps:
+  - hold: { node: alpha, team: red, s: 3 }          # countdown from 3 s
+  - expect: { type: laststand.countdown_start, at: 3, data: { duration_s: 30 } }
+  - hold: { node: bravo, team: red, s: 3 }          # blue holds nothing now
+  - expect_no: laststand.countdown_cancel
+  - wait: 27
+  - expect: { type: laststand.defeated, team: blue, at: 33 }
+  - wait: 60
+  - expect_no: game.end
+  - expect_status: running
+  - expect_no: laststand.countdown_start

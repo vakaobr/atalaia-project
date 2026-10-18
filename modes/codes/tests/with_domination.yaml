@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Added to Domination, a points code counts for the team holding the box, and the GM sees who held it
+main: domination
+params: { codes: "9000:points:20, 0815:hint" }
+steps:
+  - keys: "9000#"
+  - expect_screen: { template: code_entry, data: { message: No team holds this box, error: true } }
+  - expect_no: code.used
+  - hold: { team: red, s: 3 }
+  - keys: "9000#"
+  - expect: { type: code.used, team: red, at: 3, data: { code: "1", kind: points, amount: 20, holder: red } }
+  - expect_score: { team: red, points: 20 }
+  - wait: 7                                         # Domination's tick at 10 s
+  - expect_score: { team: red, points: 21 }
+  - hold: { team: blue, s: 3 }
+  - keys: "0815#"
+  - expect: { type: code.used, team: blue, data: { code: "2", kind: hint, holder: blue } }
+  - end: time
+  - expect_screen: { template: final_score, data: { owner: blue } }
+  - expect_no: script.error

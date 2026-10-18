@@ -7,6 +7,11 @@ field.lua (the script the controller itself runs, ADR-P2-14), plus assets
 under assets/. An upload is checked before it is stored: the manifest must
 parse and name its id, version and roles, and the scripts must load in the
 real core (ctypes), so a typo is caught at upload and not on the field.
+
+A package is a main mode or a modifier (``kind: modifier``). A game, a
+preset or a join names a main mode and its modifiers with one id joined by
+``+`` (``org.atalaia.domination+org.atalaia.codes``); ``get`` composes them
+(atalaia_sim.mode.compose), as the Field Box does from its stored presets.
 """
 
 from __future__ import annotations
@@ -18,7 +23,7 @@ from typing import Any, Optional
 
 import yaml
 from atalaia_sim.core import Core, FieldOps, Node
-from atalaia_sim.mode import Mode, ModeError
+from atalaia_sim.mode import SEPARATOR, Mode, ModeError, check_manifest, compose
 
 from .store import Store
 
@@ -39,18 +44,25 @@ class ModePackage:
 
     @property
     def field_script(self) -> Optional[str]:
-        return self.files.get("field.lua")
+        return self.mode.field_script
+
+    @property
+    def kind(self) -> str:
+        return self.mode.kind
 
     def to_api(self) -> dict[str, Any]:
         manifest = yaml.safe_load(self.files["mode.yaml"]) or {}
         return {
             "id": self.mode.id,
+            "kind": self.mode.kind,
             "name": self.mode.name,
             "version": self.mode.version,
-            "description": manifest.get("description", ""),
+            "description": self.mode.description,
             "min_tier": manifest.get("min_tier"),
             "roles": self.mode.roles,
             "params": self.mode.params,
+            "i18n": self.mode.i18n,
+            "parts": list(self.mode.parts),
             "field_script": self.field_script is not None,
             "builtin": self.builtin,
             "files": sorted(self.files),
@@ -88,9 +100,12 @@ def parse_package(files: dict[str, str], path: Path = Path("<upload>")) -> ModeP
     params = manifest.get("params") or {}
     if not isinstance(params, dict):
         raise ModeError("mode.yaml: params must be a map")
+    check_manifest(manifest, "mode.yaml")
     mode = Mode(path=path, id=manifest["id"], name=str(manifest.get("name", manifest["id"])),
                 version=str(manifest["version"]), roles=manifest["roles"], params=params,
-                node_script=files["node.lua"])
+                node_script=files["node.lua"], field_script=files.get("field.lua"),
+                kind=manifest.get("kind", "mode"), description=str(manifest.get("description", "")),
+                i18n=manifest.get("i18n") or {})
     return ModePackage(mode, dict(files), builtin=False)
 
 
@@ -155,7 +170,25 @@ class ModeRegistry:
         return [mods[k] for k in sorted(mods)]
 
     def get(self, mode_id: str) -> Optional[ModePackage]:
-        return next((m for m in self.all() if m.id == mode_id), None)
+        """A package, or a main mode with its modifiers ("main+modifier"), composed.
+
+        None when a part is not installed; ModeError when the parts do not go together.
+        """
+        if not isinstance(mode_id, str):
+            return None
+        names = mode_id.split(SEPARATOR)
+        found = {m.id: m for m in self.all() if m.id in names}
+        if len(names) == 1:
+            return found.get(mode_id)
+        if any(name not in found for name in names):
+            return None
+        parts = [found[name] for name in names]
+        mode = compose(parts[0].mode, [p.mode for p in parts[1:]])
+        # The main mode's manifest stands for the game (min_tier); the scripts are composed.
+        files = {"mode.yaml": parts[0].files["mode.yaml"], "node.lua": mode.node_script}
+        if mode.field_script is not None:
+            files["field.lua"] = mode.field_script
+        return ModePackage(mode, files, builtin=all(p.builtin for p in parts))
 
     def install(self, files: dict[str, str]) -> ModePackage:
         pkg = parse_package(files)

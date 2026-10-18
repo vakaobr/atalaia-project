@@ -28,9 +28,9 @@ static int call_count;
 
 /* Known templates. Mode templates first, then the shell's own screens. */
 static const char *known_templates[] = {
-    "standby",       "countdown",  "defused",   "exploded",      "final_score",
-    "paused",        "status",     "pin_entry", "preset_select", "timer_adjust",
-    "start_confirm", "wifi_setup", NULL,
+    "standby",      "countdown",     "defused",    "exploded",  "final_score",
+    "paused",       "code_entry",    "status",     "pin_entry", "preset_select",
+    "timer_adjust", "start_confirm", "wifi_setup", NULL,
 };
 
 /* ------------------------------------------------------------------ */
@@ -589,6 +589,73 @@ static void update_pin_entry(const char *data)
     show(slot[1 + PIN_DOTS], json_true(data, "error"));
 }
 
+/* ---- code_entry: a mode's code typed on the keypad -------------------- */
+/*
+ * Data: title (the header, e.g. ARM, DEFUSE, CODE), digits (dots shown),
+ * left (optional seconds: the fuse while a defuse code is typed), message
+ * (optional line under the dots), error (the message in red, else amber).
+ * Used by Bomb's team codes and the Codes modifier.
+ */
+
+#define CODE_DOTS     8
+#define CODE_TEXT_MAX 48
+
+static void build_code_entry(lv_obj_t *scr)
+{
+    set_bg(scr, COLOR_BG);
+    slot[0] = header(scr, COLOR_PANEL);
+    slot[1] = label(scr, &lv_font_montserrat_28, COLOR_DANGER, -42);
+    for (int i = 0; i < CODE_DOTS; i++) {
+        lv_obj_t *dot = box(scr, 22, 22, COLOR_BG);
+        lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_border_width(dot, 2, 0);
+        slot[2 + i] = dot;
+    }
+    slot[2 + CODE_DOTS] = label(scr, &lv_font_montserrat_20, COLOR_ACCENT, 50);
+    one_line(slot[2 + CODE_DOTS], 300);
+    footer(scr, "#  enter        *  delete");
+}
+
+static void update_code_entry(const char *data)
+{
+    char text[CODE_TEXT_MAX];
+    if (!json_str(data, "title", text, sizeof(text)) || !text[0]) {
+        snprintf(text, sizeof(text), "CODE");
+    }
+    upper(text);
+    lv_label_set_text(slot[0], text);
+
+    long left = 0;
+    bool has_left = json_int(data, "left", &left);
+    if (has_left) {
+        format_clock(left, text, sizeof(text));
+        lv_label_set_text(slot[1], text);
+    }
+    show(slot[1], has_left);
+
+    long digits = 0;
+    json_int(data, "digits", &digits);
+    if (digits < 0) digits = 0;
+    if (digits > CODE_DOTS) digits = CODE_DOTS;
+    int shown = digits > 4 ? (int)digits : 4;
+    const int pitch = 34;
+    int x0 = -(shown - 1) * pitch / 2;
+    for (int i = 0; i < CODE_DOTS; i++) {
+        lv_obj_t *dot = slot[2 + i];
+        show(dot, i < shown);
+        lv_obj_align(dot, LV_ALIGN_CENTER, x0 + i * pitch, has_left ? 4 : -14);
+        bool filled = i < digits;
+        set_bg(dot, filled ? COLOR_ACCENT : COLOR_BG);
+        lv_obj_set_style_border_color(dot, lv_color_hex(filled ? COLOR_ACCENT : COLOR_MUTED), 0);
+    }
+
+    lv_obj_t *msg = slot[2 + CODE_DOTS];
+    bool has_msg = json_str(data, "message", text, sizeof(text)) && text[0];
+    lv_label_set_text(msg, has_msg ? text : "");
+    set_colour(msg, json_true(data, "error") ? COLOR_DANGER : COLOR_ACCENT);
+    show(msg, has_msg);
+}
+
 /* ---- preset_select: the list of stored games -------------------------- */
 
 #define PRESET_ROWS  5
@@ -737,6 +804,7 @@ static const template_fns_t templates[] = {
     {"exploded", build_exploded, update_result},
     {"final_score", build_final_score, update_final_score},
     {"paused", build_paused, update_paused},
+    {"code_entry", build_code_entry, update_code_entry},
     {"status", build_status, update_status},
     {"pin_entry", build_pin_entry, update_pin_entry},
     {"preset_select", build_preset_select, update_preset_select},

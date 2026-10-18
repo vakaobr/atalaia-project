@@ -19,13 +19,13 @@ Atalaia is an open, local-first platform for airsoft, paintball and milsim game 
 
 *Atalaia* is Portuguese for "watchtower" ([why that name?](#name)).
 
-> **Status: pre-alpha.** Nothing here is ready for the field yet. Phase 0 is complete: the shared core, its Lua sandbox, the Skirmesh-RF event codec and a browser-based simulator run Domination and Bomb. Phase 1 software is done: the Field Box firmware, its screens and an emulator setup that plays a game on a simulated box; the final gate — a 2-hour club game on real hardware — awaits prototype parts. Phase 2 (the field network) has its network software built: the encrypted Skirmesh-RF radio protocol, the multi-box simulator, the field controller (REST, WebSocket and MQTT APIs, game log, controller failover), the USB radio modem firmware, the GM console with its scoreboard, the NFC and QR join flow, and the Field Box firmware talking the protocol (events, scores, commands, time sync, relaying). It is all tested in Docker, end to end: the controller with the modem's real code, the box's real game and radio code, a real MQTT broker and the console in a headless browser. None of it has run on radio hardware yet: the field test (plan phase F) waits for the boards, and the phase will end with a mode pack (Hold-All Domination, Last Stand, per-team arming codes on Bomb and the Codes modifier) that is still to be written. Ideas, reviews and early contributors are very welcome.
+> **Status: pre-alpha.** Nothing here is ready for the field yet. Phase 0 is complete: the shared core, its Lua sandbox, the Skirmesh-RF event codec and a browser-based simulator run Domination and Bomb. Phase 1 software is done: the Field Box firmware, its screens and an emulator setup that plays a game on a simulated box; the final gate — a 2-hour club game on real hardware — awaits prototype parts. Phase 2 (the field network) has its network software built: the encrypted Skirmesh-RF radio protocol, the multi-box simulator, the field controller (REST, WebSocket and MQTT APIs, game log, controller failover), the USB radio modem firmware, the GM console with its scoreboard, the NFC and QR join flow, and the Field Box firmware talking the protocol (events, scores, commands, time sync, relaying). It is all tested in Docker, end to end: the controller with the modem's real code, the box's real game and radio code, a real MQTT broker and the console in a headless browser. None of it has run on radio hardware yet: the field test (plan phase F) waits for the boards, and the phase's mode pack is written too: Hold-All Domination, Last Stand, per-team arming codes on Bomb and the Codes modifier, tested in the simulator, through the controller and on the host box. Ideas, reviews and early contributors are very welcome.
 
 ---
 
 ## What it looks like
 
-The seven captures below show the real Field Box firmware (ESP32, LVGL 9.2, 320×240 TFT) running in the Wokwi emulator. The box UI is in English. Not yet tested on physical hardware.
+The eight captures below show the real Field Box firmware (ESP32, LVGL 9.2, 320×240 TFT) running in the Wokwi emulator. The box UI is in English. Not yet tested on physical hardware.
 
 <table>
 <tr>
@@ -40,7 +40,7 @@ The seven captures below show the real Field Box firmware (ESP32, LVGL 9.2, 320�
 </tr>
 <tr>
 <td align="center"><img src="site/img/screens/join-joined.png" width="240" alt="Joined game 4242, zone, node 7"><br><em>Joined a field game</em></td>
-<td></td>
+<td align="center"><img src="site/img/screens/codes-entry.png" width="240" alt="Code entry: two of four digits typed"><br><em>Typing a code (Codes modifier)</em></td>
 <td align="center"><img src="hardware/field-box/wiring/field-box-wiring.png" width="240" alt="Field Box wiring diagram"><br><em><a href="hardware/field-box/BUILD.md">Build manual</a> wiring diagram</em></td>
 </tr>
 </table>
@@ -103,7 +103,7 @@ See [LICENSING.md](LICENSING.md) for the details.
 | --- | --- | --- |
 | 0 · Foundations | Repository, licences, shared core skeleton, Lua sandbox, simulator | The simulator runs Domination and Bomb from Lua scripts |
 | 1 · Single box | Field Box build, ESP32 firmware, on-device presets, a build manual with a wiring diagram | One box runs a 2-hour club game with no restarts |
-| 2 · Field network | Skirmesh-RF over LoRa, field controller, API, GM console; it will end with a mode pack: Hold-All Domination, Last Stand, per-team arming codes on Bomb and the Codes modifier | 5 boxes on a CQB site and an outdoor field, zero lost captures |
+| 2 · Field network | Skirmesh-RF over LoRa, field controller, API, GM console, and a mode pack (done in software): Hold-All Domination, Last Stand, per-team arming codes on Bomb and the Codes modifier | 5 boxes on a CQB site and an outdoor field, zero lost captures |
 | 3 · Android and players | Android props, I/O pod, player app with roles; Respawn, Kill Confirmed, Player Check-in, Money Factory and chrono check-in | One game mixes ESP32 and Android props without issues |
 | 4 · Site server and advanced play | Site server, custom scenarios, advanced modes, ATAK | A weekend milsim runs on Atalaia end to end |
 | 5 · Community | Visual mode editor, mode registry, carrier PCB, translations, build guides for other node types | Ongoing |

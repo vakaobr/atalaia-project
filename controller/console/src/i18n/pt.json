@@ -57,6 +57,8 @@
     "duration_hint": "0 = sem limite.",
     "length": "Duração",
     "params": "Parâmetros do modo",
+    "modifiers": "Modificadores",
+    "modifiers_hint": "Correm ao lado do modo em todas as caixas (por exemplo, códigos no teclado).",
     "create": "Criar jogo",
     "message": "Mensagem para todas as caixas",
     "message_hint": "Aparece no ecrã das caixas",

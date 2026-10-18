@@ -96,6 +96,39 @@ static void test_seed_skips_missing_source(void)
     CHECK(!preset_store_load(2, &p));
 }
 
+/* A box updated to a firmware with more built-in modes gets them, in free slots, and the
+ * stored script of a built-in mode follows the image. */
+static void test_seed_adds_missing_modes_and_refreshes_scripts(void)
+{
+    setup();
+    builtin_source_t only_dom[] = {{"org.atalaia.domination", dom_src, dom_len}};
+    CHECK(builtin_presets_seed(only_dom, 1) == 1);
+    static preset_t p;
+    CHECK(preset_store_load(1, &p));
+    snprintf(p.label, sizeof(p.label), "My domination");
+    CHECK(preset_store_save(3, &p)); /* a preset of the user's in slot 3 */
+
+    static const char newer[] = "-- a newer Domination\n";
+    builtin_source_t sources[] = {
+        {"org.atalaia.bomb", bomb_src, bomb_len},
+        {"org.atalaia.domination", newer, sizeof(newer) - 1},
+        {"org.atalaia.codes", "local x = 1\n", 12},
+    };
+    CHECK(builtin_presets_seed(sources, 3) == 2); /* Bomb and Codes; Domination is there */
+    preset_summary_t list[PRESET_MAX_SLOTS];
+    CHECK(preset_store_list(list, PRESET_MAX_SLOTS) == 4);
+    CHECK(list[1].index == 2 && strcmp(list[1].mode_id, "org.atalaia.bomb") == 0);
+    CHECK(list[3].index == 4 && strcmp(list[3].mode_id, "org.atalaia.codes") == 0);
+    CHECK(preset_store_load(3, &p) && strcmp(p.label, "My domination") == 0);
+    CHECK(p.source_len == sizeof(newer) - 1 && strcmp(p.source, newer) == 0);
+
+    char buf[16];
+    CHECK(preset_store_read_source("org.atalaia.codes", buf, sizeof(buf)) == 12);
+    CHECK(preset_store_read_source("org.atalaia.codes", buf, 12) == -1); /* does not fit */
+    CHECK(preset_store_read_source("org.atalaia.nope", buf, sizeof(buf)) == -1);
+    CHECK(builtin_presets_seed(sources, 3) == 0);
+}
+
 static void test_picker_screens(void)
 {
     preset_ui_t ui;
@@ -225,6 +258,7 @@ void run_builtin_presets_tests(void)
 {
     test_seed_empty_store();
     test_seed_skips_missing_source();
+    test_seed_adds_missing_modes_and_refreshes_scripts();
     test_picker_screens();
     test_picker_lists_at_most_nine();
     test_bomb_from_the_picker();

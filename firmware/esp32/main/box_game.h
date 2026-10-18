@@ -73,7 +73,7 @@ typedef enum {
 
 typedef struct {
     node_runner_t *runner;
-    preset_t *preset; /* buffer for the mode source (8 KB: static in the shell) */
+    preset_t *preset; /* buffer for the mode source (16 KB: static in the shell) */
     field_link_t link;
     box_store_ops_t store;
     box_shell_ops_t shell;

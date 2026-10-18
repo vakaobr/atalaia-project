@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A single zone never starts a countdown (fewer zones than min_zones, and no defence to fall back from)
+params: { countdown_s: 30 }
+nodes: { alpha: zone }
+steps:
+  - expect: { type: zone.captured, team: blue, at: 0 }
+  - wait: 120
+  - expect_no: laststand.countdown_start
+  - expect_status: running

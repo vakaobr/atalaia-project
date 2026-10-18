@@ -728,3 +728,13 @@ tr.offline td {
     word-break: break-all;
     font-size: 0.8rem;
 }
+
+.modifiers {
+    border: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.modifiers legend {
+    padding: 0;
+}

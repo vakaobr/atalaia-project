@@ -37,7 +37,7 @@ Game keys change with every game; the join key does not. A box with another fiel
 | 5 | `channel_hz` | uint | yes | the shared game channel, inside an EU868 sub-band (RFC 0001 Amendment 1) |
 | 6 | `max_hops` | uint | yes | 1-3: the relay clamp (ADR-P2-6) |
 | 7 | `teams` | array of text | yes | 1-8 different names, 1-23 bytes of UTF-8 each, no NUL; team ids are 1.. in this order |
-| 8 | `mode_id` | text | yes | 1-63 bytes, e.g. `org.atalaia.domination` |
+| 8 | `mode_id` | text | yes | 1-63 bytes, e.g. `org.atalaia.domination`; a main mode with modifiers is joined by `+`, main mode first (`org.atalaia.domination+org.atalaia.codes`, see modes/README.md) |
 | 9 | `role` | text | yes | 1-31 bytes: the mode role (`zone`), or `controller` for a standby controller |
 | 10 | `game_seed` | uint | yes | 32-bit seed for the scripts' `rand()` |
 | 11 | `params` | map | no | the preset parameters: text keys, JSON-like values (as CMD `params`); their compact JSON form is at most 200 bytes. Absent: the mode's defaults |
@@ -63,7 +63,7 @@ A box reads cards through its NFC reader and the text on its serial console as o
 
 ## What a reader does
 
-A **box** (kind 0) checks the tag with its join key, refuses a controller payload, a mode it does not have, or a game it cannot fit, then stores the payload in encrypted NVS (ADR-P2-12: the key survives a reboot and is erased when the game ends), tunes to `channel_hz`, clamps relays to `max_hops`, sends HELLO from `node_id`, and waits for the controller's CMD start with the mode loaded for `role`, `teams`, `params` and `game_seed`.
+A **box** (kind 0) checks the tag with its join key, refuses a controller payload, a mode it does not have (for `main+modifier`, any part it does not have, or parts whose scripts together exceed its 16 KB preset buffer), or a game it cannot fit, then stores the payload in encrypted NVS (ADR-P2-12: the key survives a reboot and is erased when the game ends), tunes to `channel_hz`, clamps relays to `max_hops`, sends HELLO from `node_id`, and waits for the controller's CMD start with the mode loaded for `role`, `teams`, `params` and `game_seed`.
 
 A **standby controller** (kind 1) checks the tag with its own copy of the join key, stores the game, configures its modem with the game key, `node_id` and `channel_hz`, and follows the TIME beacons of `controller_id` (and of whoever wins a later election) until it is promoted (ADR-P2-8).
 

@@ -148,9 +148,32 @@ reuse lint                                   compliant (522/522 files)
 - Not built: joining a box over Wi-Fi from the console (decision E3: boxes join by NFC card or serial console; QR codes are for phones in phase 3), Leaflet/OSM maps (E5), mode handling of `cmd.set_owner` (E7), penalties in the box counters (E6).
 - Added to phase 2 by the maintainer (2026-10-18): a mode pack (Hold-All Domination, Last Stand, per-team arming codes on Bomb, the Codes modifier), not started.
 
+## Mode pack (decision R6)
+
+- [x] Hold-All Domination (modes/holdall: node.lua captures; field.lua on the controller scores while one team holds every zone; min_zones)
+- [x] Last Stand (modes/laststand: defenders start with every zone; countdown while they hold last_zones or fewer; reset or carry on; end_game -> attackers win)
+- [x] Bomb per-team codes (team_codes; the keypad replaces the buttons; reason: code); the old Bomb behaviour is unchanged
+- [x] Codes modifier (modes/codes, kind: modifier; points, hint, unlock; code.used with holder); "main+modifier" composition in the simulator, the controller and the Field Box
+- [x] Events 28-32 and data fields duration_s (28) and holder (31); manifest i18n (pt); console modifier picker
+- [x] Field Box: code_entry template, five built-in presets added and refreshed at boot, 16 KB preset scripts, composed joins
+
+Not run: on radio boards; Last Stand end to end with host boxes (simulator and engine tests only); QR codes for Codes (they need the phase 3 apps). Decisions K1-K15 in docs/review/decisions-to-review.md.
+
+## Verification (2026-10-18, mode pack, clean copy)
+
+```
+sh tools/check.sh (ATALAIA_REQUIRE_ALL=1)   exit 0: simulator 180, modes 28/28, controller 97, 0 skipped; wiring check OK
+Core ASan+UBSan                              exit 0, 0 warnings
+firmware host tests                          2/2 passed
+GM console browser tests                     exit 0
+ESP-IDF Field Box                            exit 0, 0 warnings, 0x15da90 (V4.3 default, PCF8574 keypad, no skip flags)
+ESP-IDF Wokwi / modem                        exit 0, 0 warnings, 0xf08b0 / 0x469e0
+Wokwi bomb, join, codes (radio enabled)      "Scenario completed successfully" x3
+reuse lint                                   611/611 files compliant
+```
+
 ## Next
 
-- The mode pack (Hold-All Domination, Last Stand, Bomb team codes, Codes modifier).
 - Phase F, when the boards arrive: flash 5 boxes and a modem, bring-up (BRING_UP.md steps 7 and 10b for NFC and field games), calibration, the CQB and outdoor field tests.
 
 ## Plan summary

@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: With fewer boxes in play than min_zones, holding them all scores nothing
+params: { min_zones: 3 }
+nodes: { alpha: zone, bravo: zone }
+steps:
+  - hold: { node: alpha, team: red, s: 3 }
+  - hold: { node: bravo, team: red, s: 3 }
+  - wait: 60
+  - expect_no: holdall.scoring_start
+  - expect_score: { team: red, points: 0 }

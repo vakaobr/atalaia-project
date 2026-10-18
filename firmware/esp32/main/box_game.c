@@ -290,17 +290,66 @@ bool box_game_use_join_key_hex(box_game_t *g, const char *hex)
     return true;
 }
 
+/* The stored preset whose mode id is the first len bytes of id, or NULL. */
+static const preset_summary_t *stored_mode(const preset_summary_t *list, int n, const char *id,
+                                           size_t len)
+{
+    for (int i = 0; i < n; i++) {
+        if (strlen(list[i].mode_id) == len && strncmp(list[i].mode_id, id, len) == 0) {
+            return &list[i];
+        }
+    }
+    return NULL;
+}
+
+/* Appends "do\n" source "\nend\n" for each stored modifier named in mods
+ * ("a+b"), after the main script, which gets the same wrapper first: the
+ * chunk the controller and the simulator compose (atalaia_sim.mode). */
+static bool add_modifiers(box_game_t *g, const preset_summary_t *list, int n, const char *mods)
+{
+    preset_t *p = g->preset;
+    const size_t cap = sizeof(p->source);
+    size_t len = p->source_len;
+    if (len + 8 >= cap) return false;
+    memmove(p->source + 3, p->source, len);
+    memcpy(p->source, "do\n", 3);
+    memcpy(p->source + 3 + len, "\nend\n", 5);
+    len += 8;
+    while (*mods) {
+        const char *next = strchr(mods, '+');
+        size_t id_len = next != NULL ? (size_t)(next - mods) : strlen(mods);
+        const preset_summary_t *mod = stored_mode(list, n, mods, id_len);
+        if (mod == NULL || len + 3 + 5 + 1 >= cap) return false;
+        memcpy(p->source + len, "do\n", 3);
+        long part = preset_store_read_source(mod->mode_id, p->source + len + 3, cap - len - 3 - 5);
+        if (part < 0) return false;
+        len += 3 + (size_t)part;
+        memcpy(p->source + len, "\nend\n", 5);
+        len += 5;
+        mods = next != NULL ? next + 1 : mods + id_len;
+    }
+    p->source[len] = '\0';
+    p->source_len = len;
+    return true;
+}
+
+/* Loads the preset of a join's mode: a main mode, or a main mode with its
+ * modifiers ("org.atalaia.domination+org.atalaia.codes", modes/README.md). */
 static int find_preset(box_game_t *g, const char *mode_id)
 {
     /* 3.7 KB: not on the game task's stack (one box per process). */
     static preset_summary_t list[PRESET_MAX_SLOTS];
     int n = preset_store_list(list, PRESET_MAX_SLOTS);
-    for (int i = 0; i < n; i++) {
-        if (strcmp(list[i].mode_id, mode_id) == 0 && preset_store_load(list[i].index, g->preset)) {
-            return list[i].index;
-        }
+    const char *plus = strchr(mode_id, '+');
+    size_t main_len = plus != NULL ? (size_t)(plus - mode_id) : strlen(mode_id);
+    const preset_summary_t *first = stored_mode(list, n, mode_id, main_len);
+    if (first == NULL || !preset_store_load(first->index, g->preset)) return -1;
+    if (plus != NULL && !add_modifiers(g, list, n, plus + 1)) {
+        say(g, "mode %s: a modifier is not installed, or the scripts do not fit in %u bytes",
+            mode_id, (unsigned)sizeof(g->preset->source));
+        return -1;
     }
-    return -1;
+    return first->index;
 }
 
 static void show_waiting(box_game_t *g)
