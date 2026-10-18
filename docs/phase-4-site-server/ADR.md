@@ -176,7 +176,7 @@ CREATE TABLE game_events (
     priority     SMALLINT NOT NULL DEFAULT 1,
     data         JSONB,
     received_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE(game_id, node_id, seq)
+    UNIQUE(game_id, node_id, seq, game_time_ms, event_type)
 );
 CREATE INDEX idx_game_events_time ON game_events(game_id, game_time_ms);
 CREATE INDEX idx_game_events_type ON game_events(game_id, event_type);
@@ -410,9 +410,17 @@ Rules:
 - JSONB columns (`readings`, `data`, `teams`, `params`, `manifest`)
   provide flexibility for semi-structured data while keeping the
   relational structure for queryable fields.
-- The `UNIQUE(game_id, node_id, seq)` constraint on `game_events`
-  mirrors the controller's SQLite dedupe (ADR-P2-9) and enforces
-  idempotent event sync.
+- The `UNIQUE(game_id, node_id, seq, game_time_ms, event_type)`
+  constraint on `game_events` mirrors the controller's SQLite dedupe
+  (widened from ADR-P2-9's original `(game_id, node_id, seq)` to
+  handle seq restarts after a box reboot -- see decision D6) and
+  enforces idempotent event sync.
+- **Player tokens** (Phase 3): the controller issues HMAC-SHA256-
+  signed JSON player tokens (not JWT) with `player_id`, `team`,
+  `squad`, `role`, `game_id`, `exp`, signed with the game key. The
+  site server does not issue player tokens but must understand them
+  for position filtering. A `player_tokens` cache or validation
+  utility will be needed when the site server proxies position data.
 - Alembic's reversibility requirement means any deployment can be
   rolled back within one release window.
 
@@ -629,15 +637,29 @@ is conflict-free by design (RESEARCH.md section 6).
 
 **Decision:**
 
-**Transport:** HTTPS (TLS 1.3) with API-key authentication.
+**Transport:** HTTPS (TLS 1.3).
 
-**Controller API key:**
+**Authentication (asymmetric, updated 2026-10-18):**
 
-Each field has a long-lived API key generated during field registration
-on the site server. The key is a 256-bit random value, base64url-
-encoded (43 characters). The site server stores the Argon2id hash of
-the key in `fields.api_key_hash`. The controller stores the plaintext
-key in its local config file (protected by filesystem permissions).
+The controller and site server authenticate to each other with
+different mechanisms:
+
+- **Controller to site server (API key):** Each field has a long-lived
+  API key generated during field registration on the site server. The
+  key is a 256-bit random value, base64url-encoded (43 characters).
+  The site server stores the Argon2id hash of the key in
+  `fields.api_key_hash`. The controller stores the plaintext key in
+  its local config file (protected by filesystem permissions).
+
+- **Site server to controller (bearer tokens):** The site server
+  authenticates to the controller using the controller's existing
+  bearer token auth (decision D12): the GM token for write operations
+  (game state, score push, commands) and the read token for read
+  operations (event log, device health, roster). This reuses the
+  controller's auth model without adding a separate API-key path on
+  the controller side.
+
+**Controller API key (controller to site server):**
 
 ```python
 # Key generation (on the site server during field registration)
@@ -659,6 +681,26 @@ intentionally slow), the server caches a (hash_of_key -> field_id)
 mapping in memory after the first successful verification, keyed by
 SHA-256 of the presented key (fast lookup, no timing attack on the
 cache key).
+
+**Controller REST API endpoints (from Phase 2, for reference):**
+
+The controller serves these endpoints (bearer token auth: read token
+for GET, GM token for state changes):
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| GET | `/api/v1/games` | read | List games |
+| GET | `/api/v1/games/{id}` | read | Game detail with events and scores |
+| POST | `/api/v1/games` | GM | Create game |
+| POST | `/api/v1/games/{id}/start` | GM | Start game |
+| POST | `/api/v1/games/{id}/pause` | GM | Pause game |
+| POST | `/api/v1/games/{id}/end` | GM | End game |
+| GET | `/api/v1/controller` | read | Controller status |
+| GET | `/healthz` | none | Health check |
+
+The sync client on the controller side uses the site server's sync
+endpoints below with the API key. The site server uses the
+controller's endpoints above with the GM/read tokens.
 
 **Sync endpoints (site server):**
 
@@ -750,7 +792,8 @@ When the site server is unreachable:
 2. The controller tracks the last acknowledged `batch_seq` per game.
 3. On reconnect, the controller replays all unacknowledged batches in
    order.
-4. Batch replay is idempotent: the `UNIQUE(game_id, node_id, seq)`
+4. Batch replay is idempotent: the
+   `UNIQUE(game_id, node_id, seq, game_time_ms, event_type)`
    constraint on the site server silently drops duplicates.
 
 The controller attempts a sync every 30 seconds during a game and
@@ -777,8 +820,11 @@ real time.
 **Consequences:**
 - The sync is one-way during games (controller -> site server). The
   site server never pushes game state to the controller during a game.
-- API-key auth is simpler than mutual TLS and sufficient for the
-  threat model (the key authenticates the field, not individual users).
+- Auth is asymmetric: the controller authenticates to the site server
+  with an API key; the site server authenticates to the controller
+  with bearer tokens (GM/read). This avoids adding a second auth
+  mechanism to the controller and reuses the existing token model
+  (decision D12).
 - Offline buffering is transparent: the controller works identically
   whether the site server is reachable or not.
 - The grow-only score merge (`GREATEST`) is the same algorithm as the
@@ -1214,8 +1260,9 @@ objectives:
 
 **Compilation to field.lua:**
 
-The compiler is a Python module (`server/src/services/scenario_compiler.py`)
-that generates Lua code from templates.
+The compiler is a Python package at
+`controller/atalaia_controller/scenarios/` that generates Lua code
+from templates. The site server imports and reuses this package.
 
 ```python
 def compile_scenario(manifest: dict) -> str:
@@ -1305,14 +1352,36 @@ end)
 
 **Where the compiler runs:**
 
-On the site server. The GM console sends the scenario YAML via
-`POST /api/v1/scenarios`, the server validates and compiles it, stores
-both the manifest and the compiled `field.lua`, and returns the
-compiled script. The controller receives the compiled script via the
-normal preset sync (ADR-P4-3).
+On the field controller as a shared Python library at
+`controller/atalaia_controller/scenarios/` (maintainer decision P4-1).
+The GM console's scenario builder UI lives at
+`controller/console/src/components/scenario-builder.js` and calls the
+controller's compile endpoint. The controller validates and compiles
+the scenario locally, stores both the manifest and the compiled
+`field.lua`, and returns the result. A field without a site server
+can still build custom scenarios (local-first, per spec sections 3
+and 11).
 
-A CLI tool (`atalaia-scenario compile scenario.yaml`) is also
-provided for offline use without a site server.
+The site server imports the same Python package for its own
+`POST /api/v1/scenarios` endpoint, so compilation logic is never
+duplicated. Scenarios compiled on the site server are pushed to the
+controller via the normal preset sync (ADR-P4-3).
+
+A CLI tool (`python -m atalaia_controller.scenarios.cli compile
+scenario.yaml`) is also provided for offline use.
+
+**New events** (phase 4 IDs start at 42):
+
+| Event | ID | Priority | Data |
+|-------|----|----------|------|
+| `scenario.objective.completed` | 42 | normal | `{objective, team, squad?}` |
+| `scenario.objective.failed` | 43 | normal | `{objective, team, squad?}` |
+| `scenario.objective.revealed` | 44 | normal | `{objective, team, squad?}` |
+| `scenario.started` | 45 | critical | `{scenario_id, name}` |
+
+(IDs 46-49 are reserved for `satellite.captured`,
+`satellite.neutralized`, `vip.extracted`, `hacking.solved` -- see
+Phase B and Phase F of the plan.)
 
 **Consequences:**
 - The YAML manifest is human-readable and version-controllable. GMs
@@ -1326,6 +1395,10 @@ provided for offline use without a site server.
   the compiler is reused.
 - Generated Lua is human-readable for debugging. The GM can inspect
   it in the console.
+- The compiler lives on the controller
+  (`controller/atalaia_controller/scenarios/`), so a field without a
+  site server can still build custom scenarios. The site server
+  imports the same package, avoiding code duplication.
 
 ---
 
@@ -1342,8 +1415,8 @@ emission (RESEARCH.md section 10).
 **Decision:**
 
 **CoT emitter:** A Python module on the controller
-(`controller/src/atak.py`) that subscribes to game events and node
-STATE messages and emits CoT XML.
+(`controller/atalaia_controller/atak.py`) that subscribes to game
+events and node STATE messages and emits CoT XML.
 
 **CoT message template:**
 
@@ -2252,6 +2325,54 @@ The site server exposes `/api/v1/health` (public, no auth) and
 
 ---
 
+## Phase 2 and 3 handoff (2026-10-18)
+
+Phase 2 implementation (A-E) is complete and Phase 3 design is
+complete (not yet built). The following changes affect the ADRs above:
+
+### What changed
+
+1. **Controller package path** (ADR-P4-3, ADR-P4-6, ADR-P4-7):
+   `controller/atalaia_controller/`, not `controller/src/`.
+
+2. **Controller auth model** (ADR-P4-3): the controller uses bearer
+   tokens (read token for reads, GM token for writes), not the
+   API-key auth originally designed for both directions. Auth is now
+   asymmetric: controller-to-site-server uses a 256-bit API key;
+   site-server-to-controller uses bearer tokens.
+
+3. **Event unique constraint** (ADR-P4-1): widened from
+   `(game_id, node_id, seq)` to
+   `(game_id, node_id, seq, game_time_ms, event_type)` to handle
+   seq restarts after a box reboot (decision D6).
+
+4. **Scenario compiler location** (ADR-P4-6): moved from the site
+   server to the field controller as a shared Python library at
+   `controller/atalaia_controller/scenarios/`. The site server imports
+   it. Maintainer decision P4-1.
+
+5. **Event ID allocation**: Phase 3 uses IDs 25-26 and 33-41; Phase 2
+   mode pack uses 27-32. Phase 4 events start at ID 42.
+
+6. **Player tokens** (ADR-P4-1 note): HMAC-SHA256-signed JSON (not
+   JWT) with player_id, team, squad, role, game_id, exp; signed with
+   the game key. The controller issues them; the site server must
+   understand them for position filtering.
+
+### What was confirmed
+
+- **Chrono signing** (ADR-P4-5): Ed25519 per marshal, confirmed by
+  Phase 3 design (ADR-P3-7). No change needed.
+- **PostgreSQL + SQLAlchemy** (ADR-P4-1): unchanged.
+- **Multi-tenant schema isolation** (ADR-P4-4): unchanged.
+- **GDPR implementation** (ADR-P4-8): unchanged.
+- **Geo utilities** (ADR-P4-9): unchanged.
+- **ATAK / CoT** (ADR-P4-7): unchanged in protocol; module path
+  updated.
+- **Deployment** (ADR-P4-10): unchanged.
+
+---
+
 ## Constraints for Planning
 
 The planning phase must respect the following constraints derived from
@@ -2275,8 +2396,10 @@ the decisions above:
    The controller stores the plaintext key locally.
 
 5. **Events are append-only; scores merge by GREATEST.** The
-   `UNIQUE(game_id, node_id, seq)` constraint enforces idempotent
-   sync. The controller can replay conservatively.
+   `UNIQUE(game_id, node_id, seq, game_time_ms, event_type)` constraint
+   enforces idempotent sync (widened from the original `(game_id,
+   node_id, seq)` to handle seq restarts after a box reboot -- see
+   decision D6). The controller can replay conservatively.
 
 6. **Schema-per-field in hosted mode.** Self-hosted uses the public
    schema with no multi-tenant overhead. Migration must iterate over
@@ -2286,9 +2409,10 @@ the decisions above:
    independent of passwords. The private key is stored encrypted on
    the server for recovery and in the marshal's app for signing.
 
-8. **Scenario manifests are YAML.** The compiler runs on the site
-   server (Python) and produces `field.lua`. Validation includes DAG
-   check, parameter validation and zone geometry checks.
+8. **Scenario manifests are YAML.** The compiler is a shared Python
+   library at `controller/atalaia_controller/scenarios/` (maintainer
+   decision P4-1); the site server imports it. Validation includes
+   DAG check, parameter validation and zone geometry checks.
 
 9. **CoT emission via UDP multicast (primary) and TCP (secondary).**
    The `geo` table (`geo.distance`, `geo.in_zone`) is registered in

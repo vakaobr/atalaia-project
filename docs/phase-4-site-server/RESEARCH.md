@@ -65,8 +65,8 @@ weekend milsim running end to end on the platform.
 | Path | Relevance |
 |------|-----------|
 | `server/README.md` | Placeholder; confirms AGPL-3.0-or-later, PostgreSQL, container image |
-| `controller/src/` | Phase 2D (pending): Python controller with FastAPI, SQLite, MQTT, radio modem. Phase 4 site server shares the framework. No source files exist yet. |
-| `controller/console/` | Phase 2E (pending): GM console PWA. Phase 4 extends it with remote-setup and scenario-builder panels. |
+| `controller/atalaia_controller/` | Phase 2 (A-E complete): Python controller with FastAPI, SQLite (schema 2), MQTT (Mosquitto with per-user ACLs), radio modem. Bearer token auth (read token, GM token). Phase 4 site server shares the framework. |
+| `controller/console/` | Phase 2E (complete): GM console PWA (Preact 10.24.3 + HTM 3.1.1 + qrcode-generator), served at `/console/`. Phase 4 extends it with remote-setup and scenario-builder panels. |
 | `core/include/atalaia/` | 11 headers. `protocol.h` contains field_ops-related declarations. `node.h` defines `atalaia_node_config_t` with `field_ops` pointer. |
 | `core/src/script_api.c` | Lua API surface. `state.field{}` and `field.*` are registered when `field_ops` is non-NULL (Phase 2C, complete). |
 | `modes/domination/` | Reference mode: `node.lua` only, `mode.yaml` with params. |
@@ -824,7 +824,7 @@ defined by MIL-STD-2045 and the CoT specification from MITRE.
 
 ### Implementation
 
-A Python module on the controller (`controller/src/atak.py`) that:
+A Python module on the controller (`controller/atalaia_controller/atak.py`) that:
 
 1. Subscribes to game events and node STATE messages.
 2. Generates CoT XML for each node with a GPS fix.
@@ -1224,6 +1224,99 @@ def test_compile_capture_and_hold():
 
 ---
 
+## Phase 2 and 3 handoff (2026-10-18)
+
+Phase 2 implementation (A-E) is complete and Phase 3 design is
+complete (not yet built). This section checks the assumptions from
+section 15, lists the new interfaces from Phase 3, and records the
+event ID allocation.
+
+### Assumption check
+
+| # | Assumption | Verdict | Resolution |
+|---|-----------|---------|------------|
+| A1 | Phase 2D delivers a working Python controller with FastAPI REST API, SQLite store, MQTT publisher, and WebSocket stream | **HOLDS** (with differences) | Package is `controller/atalaia_controller/`, not `controller/src/`. Auth uses bearer tokens (read token, GM token), not JWT/sessions. SQLite schema 2 with events UNIQUE on `(game_id, node_id, seq, game_time, type)`. MQTT via Mosquitto with per-user ACLs (`deploy/mosquitto.conf`, `deploy/atalaia.acl`). One game per controller at a time (D14). |
+| A2 | Phase 2D delivers the GM console as a Preact+HTM PWA served by FastAPI | **HOLDS** | Preact 10.24.3 + HTM 3.1.1 + qrcode-generator, served at `/console/`. Class components only (no hooks, CSP forbids inline import map). |
+| A3 | Phase 2C delivers `field.*` API and `state.field{}` in the core | **HOLDS** | Confirmed complete. The controller's `field.lua` runs via ctypes to the same C core the simulator uses. |
+| A4 | Phase 3 delivers the Android shell (Flutter + dart:ffi) with kiosk mode | **HOLDS** | Phase 3 design complete, not yet built. Interface assumptions unchanged. |
+| A5 | Phase 3 delivers the player app with role-based views on Android and iOS | **HOLDS** | Phase 3 adds player tokens (HMAC-SHA256-signed JSON, not JWT) and position reporting (`POST /api/v1/positions`). |
+| A6 | Phase 3 delivers GPS reporting from the player app to the controller | **HOLDS** | Position reports via `POST /api/v1/positions`, authenticated with player token. GPS NOT on the Field Box (E21); positions come from phones/pods only. |
+| A7 | Phase 3 delivers NFC squad identification (team + squad from NFC tags) | **HOLDS** | NFC tags use HMAC-SHA256 with game key, truncated to 16 bytes. |
+| A8 | Phase 3 delivers the chrono check-in flow in the player app | **CHANGED** | Chrono records are JSON with Ed25519 signature per marshal (ADR-P3-7), not HMAC-SHA256 from the password. Aligns with ADR-P4-5. Record fields: reading_id, replica_id, player_id, type, velocity_mps, bb_weight_g, energy_j, chrono_id, marshal_id, marshal_name, game_id, field_id, timestamp, signature. |
+| A9 | Phase 3 delivers BLE join for Android devices | **HOLDS** | Unchanged. |
+| A10 | Phase 3 delivers Hold-All Domination, Last Stand, Kill Confirmed and other modes | **CHANGED** | Hold-All Domination and Last Stand moved to the Phase 2 mode pack (decision R6). Kill Confirmed remains Phase 3. |
+| A11 | Phase 1 delivers the target addon hardware | **HOLDS** | Unchanged. |
+| A12 | The controller's WiFi network supports UDP multicast for ATAK CoT | **HOLDS** | Unchanged. |
+| A13 | The site server can reach the controller via HTTPS through the 4G bridge | **HOLDS** (auth model changed) | The site server authenticates to the controller with bearer tokens (GM token for writes, read token for reads), not the API-key scheme the ADR designed. The controller authenticates to the site server with a 256-bit API key. Auth is asymmetric. |
+
+### Phase 3 interfaces the site server will consume
+
+These are concrete interfaces from the Phase 3 design that Phase 4
+must integrate with. Phase 3 is designed but not yet built; these are
+checked against the design documents.
+
+1. **Chrono reading record** (ADR-P3-7): JSON with Ed25519 signature.
+   Fields: `reading_id`, `replica_id`, `player_id`, `type`
+   (checkin/spotcheck/retest), `velocity_mps`, `bb_weight_g`,
+   `energy_j`, `chrono_id`, `marshal_id`, `marshal_name`, `game_id`,
+   `field_id`, `timestamp`, `signature`. The site server's chrono
+   registry (section 7, ADR-P4-5) consumes these records.
+
+2. **Replica registry**: `replica_id`, `owner_player_id`, `type`
+   (aeg/gbb/hpa/bolt_action/dmr/sniper/pistol/shotgun), `class`,
+   `make_model`, `registered_at`, `tag_type`, `tag_uid`. Maps to
+   the `replicas` table in ADR-P4-1 (note: Phase 3 adds `sniper`
+   to the replica type enum).
+
+3. **Limit templates**: YAML files with classes mapping to
+   `max_energy_j`, `max_fps_020`, `med_m`, `fire_mode`; per-field
+   overrides. The site server's `field_joule_limits` table (ADR-P4-1)
+   is compatible; `max_fps_020` and `fire_mode` are new fields to add.
+
+4. **Player tokens**: HMAC-SHA256-signed JSON (not JWT) with
+   `player_id`, `team`, `squad`, `role`, `game_id`, `exp`; signed
+   with the game key. The site server does not issue player tokens
+   (the controller does) but must understand them for position
+   filtering if it receives live position data.
+
+5. **Position reports**: `POST /api/v1/positions` (authenticated
+   with player token). The site server may proxy or relay these for
+   remote GM and ATAK.
+
+6. **Controller CA**: `GET /api/v1/controller/ca`; SHA-256 fingerprint
+   in join payload key 13. The site server does not need the CA
+   directly but must know about it for the sync TLS configuration.
+
+7. **NFC tags**: HMAC-SHA256 with game key, truncated to 16 bytes.
+   Relevant for the chrono check-in flow (tag UID → replica lookup).
+
+### Event ID allocation
+
+Phase 3 reserves event IDs 25-26 and 33-41 (kill.confirmed,
+kill.denied, money.collected, money.deposited, chrono.checkin,
+chrono.spotcheck, visibility.granted, visibility.expired,
+node.tamper, pod.connected, pod.disconnected). The Phase 2 mode
+pack (R6) owns IDs 27-32 (holdall.*, laststand.*, team.eliminated).
+
+**Phase 4 events start at ID 42.** The eight new events
+(`satellite.captured`, `satellite.neutralized`, `vip.extracted`,
+`hacking.solved`, `scenario.objective.completed`,
+`scenario.objective.failed`, `scenario.objective.revealed`,
+`scenario.started`) will be allocated IDs 42-49.
+
+### Codebase inventory corrections
+
+- The controller package is `controller/atalaia_controller/`, not
+  `controller/src/`. Updated in section 2.
+- The ATAK emitter path is `controller/atalaia_controller/atak.py`.
+  Updated in section 10.
+- The scenario compiler is a shared Python library at
+  `controller/atalaia_controller/scenarios/` (maintainer decision
+  P4-1), not `server/src/services/scenario_compiler.py`. Updated in
+  the file list below.
+
+---
+
 ## 18. Recommendations
 
 ### Architecture decisions needed (for ADR phase)
@@ -1323,9 +1416,10 @@ server/
     Dockerfile
     docker-compose.yml
 
-controller/src/
+controller/atalaia_controller/
     atak.py                     # CoT emitter (controller-side)
     sync_client.py              # Site server sync client
+    scenarios/                  # Custom scenario compiler (shared library; site server imports it)
 
 modes/
     master-and-satellites/
