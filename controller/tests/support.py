@@ -57,6 +57,13 @@ if not MODEM_HOST or not Path(MODEM_HOST).is_file():
     _missing("the host modem is not built (set ATALAIA_MODEM_HOST; see tools/check.sh)")
     MODEM_HOST = ""
 
+BOX_HOST = os.environ.get("ATALAIA_BOX_HOST", "")
+if not BOX_HOST or not Path(BOX_HOST).is_file():
+    _missing("the host box is not built (set ATALAIA_BOX_HOST; see tools/check.sh)")
+    BOX_HOST = ""
+
+REPO = HERE.parents[1]
+
 MOSQUITTO = shutil.which("mosquitto") or ("/usr/sbin/mosquitto" if Path("/usr/sbin/mosquitto").exists() else "")
 if not MOSQUITTO:
     _missing("mosquitto is not installed")
@@ -97,13 +104,14 @@ def node_packet(key: bytes, game_id: int, source: int, seq: int, epoch: int, msg
 class HostModem:
     """The C host modem (firmware/esp32/test/modem_host) with a UDP 'air'."""
 
-    def __init__(self, serial_port: int = 0, *args: str) -> None:
+    def __init__(self, serial_port: int = 0, *args: str, hub: Optional["AirHub"] = None) -> None:
         if not MODEM_HOST:
             raise unittest_skip("host modem not built")
         self.air = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.air.bind(("127.0.0.1", 0))
         self.air.settimeout(2.0)
-        self.peer_port = self.air.getsockname()[1]
+        # With a hub the modem transmits to the hub, which shares the air with others.
+        self.peer_port = hub.port if hub is not None else self.air.getsockname()[1]
         self.args = list(args)
         self.serial_port = serial_port
         self.proc: Optional[subprocess.Popen] = None
@@ -153,6 +161,167 @@ class HostModem:
                 out.append(self.transmitted(quiet))
             except socket.timeout:
                 return out
+
+
+class AirHub:
+    """A shared 'air' for several host programs (modems, host boxes): UDP broadcast.
+
+    Every program sends what it transmits to the hub's port; the hub hands
+    each datagram to every other registered program, as a radio channel
+    does. ``drop`` (a predicate on the datagram) simulates lost packets, and
+    ``heard`` keeps everything that went on air.
+    """
+
+    def __init__(self) -> None:
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind(("127.0.0.1", 0))
+        self.sock.settimeout(0.05)
+        self.port = self.sock.getsockname()[1]
+        self.members: list[int] = []
+        self.heard: list[tuple[int, bytes]] = []
+        self.drop = None
+        self.blocked: set[tuple[int, int]] = set()  # (from, to): out of radio range
+        self._lock = threading.Lock()
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def add(self, air_port: int) -> None:
+        with self._lock:
+            self.members.append(air_port)
+
+    def block(self, a: int, b: int) -> None:
+        """a and b cannot hear each other (both directions)."""
+        with self._lock:
+            self.blocked.update({(a, b), (b, a)})
+
+    def remove(self, air_port: int) -> None:
+        with self._lock:
+            if air_port in self.members:
+                self.members.remove(air_port)
+
+    def send(self, packet: bytes, from_port: int = 0) -> None:
+        """A packet put on air by something that is not a member (a test playing a box)."""
+        self._deliver(packet, from_port)
+
+    def _deliver(self, packet: bytes, from_port: int) -> None:
+        with self._lock:
+            self.heard.append((from_port, packet))
+            targets = [p for p in self.members if p != from_port and (from_port, p) not in self.blocked]
+            drop = self.drop
+        if drop is not None and drop(packet):
+            return
+        for port in targets:
+            self.sock.sendto(packet, ("127.0.0.1", port))
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            try:
+                data, addr = self.sock.recvfrom(512)
+            except socket.timeout:
+                continue
+            except OSError:
+                return
+            self._deliver(data, addr[1])
+
+    def close(self) -> None:
+        self._stop.set()
+        self._thread.join(timeout=2)
+        self.sock.close()
+
+
+class BoxHost:
+    """The C host box (firmware/esp32/test/box_host): a Field Box's game and radio logic.
+
+    It shares the hub's air with modems and other boxes. Its NVS and flash
+    are files in ``state_dir``, so ``kill()`` then ``start()`` is a battery
+    pull. Lines it prints are kept in ``lines``.
+    """
+
+    def __init__(self, hub: AirHub, state_dir: str, join_key: bytes, *, state_ms: int = 500,
+                 name: str = "box") -> None:
+        if not BOX_HOST:
+            raise unittest_skip("host box not built")
+        self.hub = hub
+        self.state_dir = state_dir
+        self.join_key = join_key
+        self.state_ms = state_ms
+        self.name = name
+        self.lines: list[str] = []
+        self.proc: Optional[subprocess.Popen] = None
+        self.air_port = 0
+        self._cond = threading.Condition()
+        self.start()
+
+    def start(self) -> None:
+        self.proc = subprocess.Popen(
+            [BOX_HOST, "--state-dir", self.state_dir, "--modes", str(REPO / "modes"),
+             "--air-peer", str(self.hub.port), "--join-key", self.join_key.hex(),
+             "--state-ms", str(self.state_ms), "--name", self.name],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        # A box that rejoins a stored game logs that before it is READY.
+        while True:
+            line = self.proc.stdout.readline()
+            if not line:
+                self.proc.wait(timeout=5)
+                raise RuntimeError(f"host box did not start: {self.proc.stderr.read()}")
+            if line.startswith("READY "):
+                break
+            self.lines.append(line.rstrip("\n"))
+        self.air_port = int(line.split()[1].split("=")[1])
+        self.hub.add(self.air_port)
+        threading.Thread(target=self._read, args=(self.proc,), daemon=True).start()
+
+    def _read(self, proc: subprocess.Popen) -> None:
+        for line in proc.stdout:
+            with self._cond:
+                self.lines.append(line.rstrip("\n"))
+                self._cond.notify_all()
+
+    def send(self, line: str) -> None:
+        assert self.proc is not None and self.proc.stdin is not None
+        self.proc.stdin.write(line + "\n")
+        self.proc.stdin.flush()
+
+    def join(self, text: str) -> None:
+        self.send("@join " + text)
+
+    def hold(self, button: int, ms: int) -> None:
+        self.send(f"hold {button} {ms}")
+
+    def logged(self, needle: str) -> bool:
+        with self._cond:
+            return any(needle in line for line in self.lines)
+
+    def status(self, timeout: float = 3.0) -> dict:
+        import json
+        with self._cond:
+            seen = len(self.lines)
+        self.send("status")
+        end = time.monotonic() + timeout
+        with self._cond:
+            while time.monotonic() < end:
+                for line in self.lines[seen:]:
+                    if line.startswith("STATUS "):
+                        return json.loads(line[7:])
+                self._cond.wait(0.05)
+        raise RuntimeError("the host box did not answer status")
+
+    def kill(self) -> None:
+        """A battery pull: no goodbye, no flush beyond what the box already wrote."""
+        if self.proc is not None:
+            self.hub.remove(self.air_port)
+            self.proc.kill()
+            self.proc.wait(timeout=5)
+            for f in (self.proc.stdin, self.proc.stdout, self.proc.stderr):
+                try:
+                    f.close()
+                except OSError:
+                    pass
+            self.proc = None
+
+    def close(self) -> None:
+        self.kill()
 
 
 def unittest_skip(reason: str) -> Exception:
@@ -296,5 +465,5 @@ class FakeModem:
         self.on_rx(mf.RxPacket(hdr, header_encode(hdr), payload, rssi, snr, epoch))
 
 
-__all__ = ["FakeModem","CORE", "Config", "HostModem", "Mosquitto", "FakeSerial", "config", "free_port",
+__all__ = ["AirHub", "BoxHost", "BOX_HOST", "FakeModem", "CORE", "Config", "HostModem", "Mosquitto", "FakeSerial", "config", "free_port",
            "node_packet", "packet_decrypt", "wait_for", "REQUIRE_ALL", "MESSAGE_TYPES"]

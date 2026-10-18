@@ -1,0 +1,267 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: CERN-OHL-S-2.0
+#
+# Field Box wiring, part 1 of 2: signals and 3.3 V logic power, for the
+# standard build in hardware/field-box/BUILD.md. Part 2 (battery, switch,
+# 5 V rail) is field-box-power.yml.
+#
+# WireViz source. The SVG and PNG next to it are generated from it:
+#   python tools/docker_hw.py render
+# and the pins are checked against the firmware's Kconfig defaults by:
+#   python tools/check_wiring.py
+#
+# Board pins are named by GPIO number only: find each one by the number
+# printed next to the header pin on your board. No physical header positions
+# are given here. Pin labels must stay unique within a connector, because the
+# connections and the check refer to pins by label.
+#
+# The GPIO numbers are not written here: GPIO<SYMBOL> stands for the default
+# of that Kconfig symbol in firmware/esp32/main/Kconfig.projbuild, filled in
+# when the diagram is rendered (tools/check_wiring.py --resolve). A change of
+# a pin default therefore only needs a re-render (and the pin table in
+# ../README.md), and the check fails until that is done.
+
+metadata:
+  title: Atalaia Field Box wiring 1/2 - signals and 3.3 V
+
+options:
+  fontname: DejaVu Sans
+  bgcolor: WH
+  bgcolor_node: WH
+  bgcolor_connector: WH
+  bgcolor_cable: WH
+  bgcolor_bundle: WH
+  color_mode: full
+  mini_bom_mode: false
+
+connectors:
+  BOARD:
+    type: Main board (Heltec WiFi LoRa 32 V4.2 or V4.3)
+    subtype: pins by GPIO number, not header position
+    show_pincount: false
+    pins:
+      - 3V3
+      - GND
+      - GPIO<ATALAIA_DISP_DC_PIN>
+      - GPIO<ATALAIA_BTN1_PIN>
+      - GPIO<ATALAIA_BTN2_PIN>
+      - GPIO<ATALAIA_AUDIO_BCLK_PIN>
+      - GPIO<ATALAIA_AUDIO_LRCLK_PIN>
+      - GPIO<ATALAIA_AUDIO_DOUT_PIN>
+      - GPIO<ATALAIA_NFC_SDA_PIN>
+      - GPIO<ATALAIA_NFC_SCL_PIN>
+      - GPIO<ATALAIA_BTN3_PIN>
+      - GPIO<ATALAIA_BTN4_PIN>
+      - GPIO<ATALAIA_DISP_RST_PIN>
+      - GPIO<ATALAIA_DISP_MOSI_PIN>
+      - GPIO<ATALAIA_DISP_CLK_PIN>
+      - GPIO<ATALAIA_DISP_CS_PIN>
+      - GPIO<ATALAIA_DISP_BL_PIN>
+      - GPIO<ATALAIA_LED_PIN>
+      - LoRa u.FL
+      - 2.4 GHz u.FL
+      - USB-C
+    notes: >-
+      Leave every other GPIO unconnected (BUILD.md 9.1). Never wire GPIO 5
+      (V4.3 FEM) or 46 (V4.2 FEM). Leave the GNSS connector empty.
+
+  HUB:
+    type: Interconnect board
+    subtype: perfboard, rails + 74AHCT125
+    pinlabels:
+      - 3V3 in
+      - GND in
+      - SDA in
+      - SCL in
+      - LED data in (3.3 V)
+      - LED data out (5 V)
+      - 3V3 to PCF8574
+      - GND to PCF8574
+      - SDA to PCF8574
+      - SCL to PCF8574
+      - 3V3 to PN532
+      - GND to PN532
+      - SDA to PN532
+      - SCL to PN532
+      - 3V3 to gauge
+      - GND to gauge
+      - SDA to gauge
+      - SCL to gauge
+      - 3V3 to TFT
+      - GND to TFT
+      - GND to BTN1
+      - 5V to BTN1 LED
+      - GND to BTN2
+      - 5V to BTN2 LED
+      - GND to BTN3
+      - 5V to BTN3 LED
+      - GND to BTN4
+      - 5V to BTN4 LED
+    notes: 5V rail fed from the power diagram (2/2).
+
+  BTN1:
+    type: Team 1 button (red)
+    subtype: 60 mm arcade, 5 V LED
+    pinlabels: [N/O, COM, LED+, LED-]
+    loops: [[2, 4]]  # COM to LED- at the button
+  BTN2:
+    type: Team 2 button (blue)
+    subtype: 60 mm arcade, 5 V LED
+    pinlabels: [N/O, COM, LED+, LED-]
+    loops: [[2, 4]]
+  BTN3:
+    type: Team 3 button (optional)
+    subtype: 60 mm arcade, 5 V LED
+    pinlabels: [N/O, COM, LED+, LED-]
+    loops: [[2, 4]]
+  BTN4:
+    type: Team 4 button (optional)
+    subtype: 60 mm arcade, 5 V LED
+    pinlabels: [N/O, COM, LED+, LED-]
+    loops: [[2, 4]]
+
+  PCF8574:
+    type: PCF8574 module (not PCF8574A)
+    subtype: I2C address 0x20, A0-A2 to GND
+    pinlabels: [VCC, GND, SDA, SCL, INT, P0, P1, P2, P3, P4, P5, P6, P7]
+  KEYPAD:
+    type: 3x4 membrane keypad
+    subtype: find rows/columns with a meter
+    pinlabels: [R1, R2, R3, R4, C1, C2, C3]
+
+  TFT:
+    type: 2.8 in SPI TFT, 320x240
+    subtype: ILI9341 (or ST7789)
+    pinlabels: [VCC, GND, CS, RESET, DC, SDI (MOSI), SCK, LED, SDO (MISO)]
+  PN532:
+    type: PN532 NFC module
+    subtype: switches set to I2C, 0x24
+    pinlabels: [VCC, GND, SDA, SCL]
+  GAUGE:
+    type: MAX17048 fuel gauge
+    subtype: 1 cell, 0x36
+    pinlabels: [VDD (logic), GND, SDA, SCL]
+  RING:
+    type: WS2812B ring, 24 LEDs
+    subtype: power in diagram 2/2
+    pinlabels: [DIN]
+  AMP:
+    type: MAX98357A I2S amp (optional)
+    subtype: power in diagram 2/2
+    pinlabels: [BCLK, LRC, DIN, SPK+, SPK-]
+  SPK:
+    type: Speaker 4-8 ohm, 3 W
+    pinlabels: [+, '-']
+
+  ANT_LORA:
+    type: 868 MHz antenna, 2 dBi
+    subtype: SMA bulkhead + whip
+    pinlabels: [SMA]
+    notes: Fit before ANY power, USB included.
+  ANT_WIFI:
+    type: 2.4 GHz FPC antenna
+    pinlabels: [u.FL]
+  USB_PANEL:
+    type: Panel USB-C socket, capped
+    pinlabels: [USB-C]
+
+cables:
+  W_BTN1: {category: bundle, gauge: 0.25 mm2, colors: [GN, BK, OG]}
+  W_BTN2: {category: bundle, gauge: 0.25 mm2, colors: [GN, BK, OG]}
+  W_BTN3: {category: bundle, gauge: 0.25 mm2, colors: [GN, BK, OG]}
+  W_BTN4: {category: bundle, gauge: 0.25 mm2, colors: [GN, BK, OG]}
+  W_BUS: {category: bundle, gauge: 0.25 mm2, length: 0.15, colors: [VT, BK, BU, YE]}
+  W_PCF: {category: bundle, gauge: 0.25 mm2, colors: [VT, BK, BU, YE]}
+  W_NFC: {category: bundle, gauge: 0.25 mm2, colors: [VT, BK, BU, YE]}
+  W_GAUGE: {category: bundle, gauge: 0.25 mm2, colors: [VT, BK, BU, YE]}
+  W_KEYPAD: {category: bundle, gauge: 0.14 mm2, colors: [BN, RD, OG, YE, GN, BU, VT]}
+  W_TFT: {category: bundle, gauge: 0.14 mm2, length: 0.15, colors: [VT, BK, WH, GY, PK, BN, TQ, LB]}
+  W_LED: {category: bundle, gauge: 0.25 mm2, colors: [WH, WH]}
+  W_AMP: {category: bundle, gauge: 0.25 mm2, colors: [GY, PK, BN]}
+  W_SPK: {category: bundle, gauge: 0.25 mm2, colors: [RD, BK]}
+  W_LORA: {type: u.FL to SMA pigtail, wirecount: 1, colors: [BK]}
+  W_WIFI: {type: antenna lead, wirecount: 1, colors: [GY]}
+  W_USB: {type: USB-C extension, wirecount: 1, colors: [BK]}
+
+connections:
+  # Team buttons: signal from the board; GND and LED 5 V from the hub.
+  - - BOARD: [GPIO<ATALAIA_BTN1_PIN>]
+    - W_BTN1: [1]
+    - BTN1: [N/O]
+  - - HUB: [GND to BTN1, 5V to BTN1 LED]
+    - W_BTN1: [2, 3]
+    - BTN1: [COM, LED+]
+  - - BOARD: [GPIO<ATALAIA_BTN2_PIN>]
+    - W_BTN2: [1]
+    - BTN2: [N/O]
+  - - HUB: [GND to BTN2, 5V to BTN2 LED]
+    - W_BTN2: [2, 3]
+    - BTN2: [COM, LED+]
+  - - BOARD: [GPIO<ATALAIA_BTN3_PIN>]
+    - W_BTN3: [1]
+    - BTN3: [N/O]
+  - - HUB: [GND to BTN3, 5V to BTN3 LED]
+    - W_BTN3: [2, 3]
+    - BTN3: [COM, LED+]
+  - - BOARD: [GPIO<ATALAIA_BTN4_PIN>]
+    - W_BTN4: [1]
+    - BTN4: [N/O]
+  - - HUB: [GND to BTN4, 5V to BTN4 LED]
+    - W_BTN4: [2, 3]
+    - BTN4: [COM, LED+]
+
+  # Board to hub: 3V3, GND and the board's I2C bus.
+  - - BOARD: [3V3, GND, GPIO<ATALAIA_NFC_SDA_PIN>, GPIO<ATALAIA_NFC_SCL_PIN>]
+    - W_BUS: [1, 2, 3, 4]
+    - HUB: [3V3 in, GND in, SDA in, SCL in]
+
+  # The three I2C devices.
+  - - HUB: [3V3 to PCF8574, GND to PCF8574, SDA to PCF8574, SCL to PCF8574]
+    - W_PCF: [1, 2, 3, 4]
+    - PCF8574: [VCC, GND, SDA, SCL]
+  - - HUB: [3V3 to PN532, GND to PN532, SDA to PN532, SCL to PN532]
+    - W_NFC: [1, 2, 3, 4]
+    - PN532: [VCC, GND, SDA, SCL]
+  - - HUB: [3V3 to gauge, GND to gauge, SDA to gauge, SCL to gauge]
+    - W_GAUGE: [1, 2, 3, 4]
+    - GAUGE: [VDD (logic), GND, SDA, SCL]
+
+  # Keypad on the expander: rows on P0-P3, columns on P4-P6.
+  - - PCF8574: [P0, P1, P2, P3, P4, P5, P6]
+    - W_KEYPAD: [1, 2, 3, 4, 5, 6, 7]
+    - KEYPAD: [R1, R2, R3, R4, C1, C2, C3]
+
+  # Display: 3.3 V from the hub, SPI and control from the board.
+  - - HUB: [3V3 to TFT, GND to TFT]
+    - W_TFT: [1, 2]
+    - TFT: [VCC, GND]
+  - - BOARD: [GPIO<ATALAIA_DISP_CS_PIN>, GPIO<ATALAIA_DISP_RST_PIN>, GPIO<ATALAIA_DISP_DC_PIN>, GPIO<ATALAIA_DISP_MOSI_PIN>, GPIO<ATALAIA_DISP_CLK_PIN>, GPIO<ATALAIA_DISP_BL_PIN>]
+    - W_TFT: [3, 4, 5, 6, 7, 8]
+    - TFT: [CS, RESET, DC, SDI (MOSI), SCK, LED]
+
+  # LED ring data through the hub's 3.3 V to 5 V buffer.
+  - - BOARD: [GPIO<ATALAIA_LED_PIN>]
+    - W_LED: [1]
+    - HUB: [LED data in (3.3 V)]
+  - - HUB: [LED data out (5 V)]
+    - W_LED: [2]
+    - RING: [DIN]
+
+  # Audio (optional).
+  - - BOARD: [GPIO<ATALAIA_AUDIO_BCLK_PIN>, GPIO<ATALAIA_AUDIO_LRCLK_PIN>, GPIO<ATALAIA_AUDIO_DOUT_PIN>]
+    - W_AMP: [1, 2, 3]
+    - AMP: [BCLK, LRC, DIN]
+  - - AMP: [SPK+, SPK-]
+    - W_SPK: [1, 2]
+    - SPK: [+, '-']
+
+  # Antennas and USB.
+  - - BOARD: [LoRa u.FL]
+    - W_LORA: [1]
+    - ANT_LORA: [SMA]
+  - - BOARD: [2.4 GHz u.FL]
+    - W_WIFI: [1]
+    - ANT_WIFI: [u.FL]
+  - - BOARD: [USB-C]
+    - W_USB: [1]
+    - USB_PANEL: [USB-C]

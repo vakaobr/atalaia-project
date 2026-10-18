@@ -29,6 +29,12 @@ typedef struct {
     uint32_t persist_accum_ms;
     size_t mem_limit;
     bool running;
+    /* Identity in a joined game (1 and 42 for a stand-alone game). */
+    uint16_t node_id;
+    uint32_t game_seed;
+    /* Every event the node emits also goes here (the radio link); may be NULL. */
+    void (*event_hook)(void *ctx, const atalaia_event_t *ev, const char *data_json);
+    void *event_ctx;
     /* Event recording for tests. */
     int event_count;
     char last_event_type[64];

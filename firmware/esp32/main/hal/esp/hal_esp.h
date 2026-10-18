@@ -16,6 +16,12 @@ extern "C" {
  */
 int hal_esp_init(hal_t *hal);
 
+/**
+ * Board power at boot: switches on Vext (GPIO 36, active low on the
+ * Heltec V4: the on-board OLED and the LoRa front end). Call first.
+ */
+void hal_esp_board_power_on(void);
+
 #ifdef __cplusplus
 }
 #endif

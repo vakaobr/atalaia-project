@@ -460,6 +460,35 @@ for the FEM gain (14 dB) and the antenna gain (2 dBi, Kconfig):
 against the EU868 sub-band table and refuses to transmit if the
 channel is outside all sub-bands.
 
+## Amendment 2 (2026-10-18): Join payload encoding
+
+**Supersedes:** the field table of section 9 ("Join flow"), which lists
+the fields but not how they are encoded or which key the HMAC uses.
+
+**Change:** The join payload is a version byte (1), a CBOR map with
+integer keys, and a 32-byte HMAC-SHA256 tag over the version byte and the
+map, at most 448 bytes in all. Beyond section 9's fields the map carries
+the controller's node id, the game channel, the relay clamp (`max_hops`,
+which section 9's companion ADR-P2-6 says the join carries), the scripts'
+seed, the preset parameters, and whether the payload is for a box or a
+standby controller. Keys 13-31 are reserved for optional fields and
+skipped by readers. The tag key is a 32-byte **field join key** shared by
+the controllers and boxes of one field, not a key only the controller
+holds: every reader must be able to check the tag. On NFC cards the
+payload is one NDEF MIME record of type `application/vnd.atalaia.join`;
+as text (QR codes, the serial console) it is `atalaia:join:` followed by
+base64url without padding.
+
+The full specification, with shared test vectors checked by the C and
+Python codecs, is [protocol/join.md](../../protocol/join.md). Decisions E1
+and E2 in `docs/review/decisions-to-review.md`.
+
+**Reason:** Section 9 could not be implemented as written: it gives no
+encoding, its "team_names NUL-separated" and variable-length text fields
+need lengths, a box cannot verify a tag made with a key only the controller
+has, and a box or a standby controller also needs the channel, the relay
+clamp and the controller's id before it hears its first TIME beacon.
+
 ## Open questions
 
 - Per-node session keys (HKDF-derived from the game key) would limit

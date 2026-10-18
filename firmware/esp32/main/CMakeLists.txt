@@ -9,6 +9,8 @@ if(CONFIG_ATALAIA_MODEM_MODE)
         "modem/modem.c"
         "modem/modem_framing.c"
         "hal/esp/hal_esp_radio.c"
+        "hal/esp/hal_esp_board.c"
+        "hal/board_fem.c"
         "radio/radio_task.c"
         "radio/radio_protocol.c"
     )
@@ -31,6 +33,7 @@ else()
         "mem_monitor.c"
         "button_tracker.c"
         "hal/esp/hal_esp.c"
+        "hal/esp/hal_esp_board.c"
         "hal/esp/hal_esp_i2c.c"
         "hal/esp/hal_esp_buttons.c"
         "hal/esp/hal_esp_keypad.c"
@@ -41,11 +44,15 @@ else()
         "hal/esp/hal_esp_audio.c"
         "hal/esp/hal_esp_battery.c"
         "hal/esp/hal_esp_radio.c"
+        "hal/board_fem.c"
         "radio/radio_task.c"
         "radio/event_log.c"
         "radio/time_sync.c"
         "radio/radio_protocol.c"
         "radio/radio_nvs_esp.c"
+        "radio/field_link.c"
+        "box_game.c"
+        "serial_console.c"
     )
     set(ATALAIA_EMBED EMBED_FILES "wifi_setup.html")
 endif()

@@ -86,6 +86,12 @@ bool parse_form_field(const char *body, const char *key, char *out, int out_sz)
 static const char *TAG = "wifi_setup";
 static httpd_handle_t server = NULL;
 static char ap_ssid[32];
+static bool (*join_key_handler)(const char *hex);
+
+void wifi_setup_set_join_key_handler(bool (*handler)(const char *hex))
+{
+    join_key_handler = handler;
+}
 
 /* The HTML page is embedded via CMakeLists.txt EMBED_FILES. */
 extern const uint8_t setup_html_start[] asm("_binary_wifi_setup_html_start");
@@ -173,6 +179,15 @@ static esp_err_t config_post_handler(httpd_req_t *req)
     uint32_t volume = 80;
     if (parse_form_field(buf, "volume", vol_s, sizeof(vol_s))) {
         volume = (uint32_t)parse_int_clamped(vol_s, 0, 100, 80);
+    }
+
+    /* The field join key is optional here (it can also be set on the console). */
+    char join_key[80];
+    if (parse_form_field(buf, "joinkey", join_key, sizeof(join_key)) && join_key[0] != '\0') {
+        if (join_key_handler == NULL || !join_key_handler(join_key)) {
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "The field join key is 64 hex digits");
+            return ESP_FAIL;
+        }
     }
 
     /* Write to config store. */
@@ -282,6 +297,11 @@ const char *wifi_setup_ssid(void)
 
 void wifi_setup_stop(void)
 {
+}
+
+void wifi_setup_set_join_key_handler(bool (*handler)(const char *hex))
+{
+    (void)handler;
 }
 
 #endif

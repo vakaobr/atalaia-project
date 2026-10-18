@@ -20,7 +20,7 @@ The emulator runs a variant of the firmware, built from
 | --- | --- | --- |
 | ESP32-S3, 16 MB flash, 2 MB PSRAM | Yes | `board-esp32-s3-devkitc-1`; the Heltec V4.3 has no Wokwi model, so the DevKitC-1 stands in |
 | 2.8" ILI9341 SPI display, 320x240 | Yes | `lcd1`, on the display pins from Kconfig (MOSI 40, SCK 41, CS 42, DC 3, backlight 47) |
-| Team buttons | Yes | `btn1` red on GPIO 4, `btn2` blue on GPIO 5; buttons 3 and 4 are off (GPIO 33/34 are not on the DevKitC-1) |
+| Team buttons | Yes | `btn1` red on GPIO 4, `btn2` blue on GPIO 5 (the Field Box uses GPIO 39, a keypad column here; the emulator has no radio front end on GPIO 5); buttons 3 and 4 are off (GPIO 33/34 are not on the DevKitC-1) |
 | WS2812 ring, 24 LEDs | Yes | `ring1` on GPIO 48 |
 | 4x3 keypad | Yes, wired differently | `keypad1`; see below |
 | PCF8574 keypad expander | No | Wokwi has no PCF8574 part |
@@ -123,6 +123,22 @@ wokwi-cli --timeout 60000 --scenario wokwi/bomb.scenario.yaml .
 
 It ends with "Scenario completed successfully". `wokwi-cli lint` checks
 `diagram.json` and needs no token.
+
+[`wokwi/join.scenario.yaml`](../wokwi/join.scenario.yaml) joins a field
+controller's game in about 10 seconds: it types a tampered join text on the
+serial console (refused: "bad tag"), then a real one, and checks that the box
+joined game 4242 as node 7 and shows the waiting screen
+(`build-wokwi/join-1-waiting.png`). The payload is the shared test vector
+`node_domination_zone` from `protocol/vectors/join.json`, signed with the
+public test join key that `sdkconfig.wokwi` sets as
+`CONFIG_ATALAIA_DEV_JOIN_KEY`. The emulator has no SX1262, so the box logs
+that it cannot tune the radio and the controller is never heard; the radio
+side is tested on the host instead (the host box and the controller's
+end-to-end tests).
+
+```
+wokwi-cli --timeout 60000 --scenario wokwi/join.scenario.yaml .
+```
 
 ## The same pixels as the host tests
 

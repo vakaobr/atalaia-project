@@ -7,6 +7,11 @@ idempotent, so flood copies and replays after a partition or a reboot are
 dropped by INSERT OR IGNORE. A box restarts its event seq at 1 after a
 reboot, so the key is (game, node, seq, game time, type), not
 (game, node, seq) as first sketched in ADR-P2-9.
+
+Schema 2 (plan phase E) adds each game's radio identity (this controller's
+node id, the channel and the relay clamp, and whether the game was joined
+as a standby controller), the field image and the node positions on it.
+A schema 1 file is upgraded in place.
 """
 
 from __future__ import annotations
@@ -18,7 +23,8 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings (
@@ -88,9 +94,45 @@ CREATE TABLE IF NOT EXISTS scores (
     score   INTEGER NOT NULL,
     PRIMARY KEY (game_id, team)
 );
+CREATE TABLE IF NOT EXISTS field_image (
+    id           INTEGER PRIMARY KEY CHECK (id = 1),   -- one image per field
+    content_type TEXT NOT NULL,
+    data         BLOB NOT NULL,
+    updated_at   REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS positions (
+    game_id INTEGER NOT NULL,
+    node_id INTEGER NOT NULL,
+    x       REAL NOT NULL,                             -- 0..1 across the field image
+    y       REAL NOT NULL,                             -- 0..1 down the field image
+    PRIMARY KEY (game_id, node_id)
+);
 """
 
+# Columns added to games in schema 2: (name, declaration).
+GAME_COLUMNS_V2 = (
+    ("node_id", "INTEGER"),                    # this controller's short id in the game
+    ("channel_hz", "INTEGER"),                 # the shared game channel
+    ("max_hops", "INTEGER"),                   # the relay clamp
+    ("joined", "INTEGER NOT NULL DEFAULT 0"),  # 1: joined as a standby controller
+    ("controller_id", "INTEGER"),              # joined game: the controller that made the join
+)
+
 LIVE_STATES = ("ready", "running", "paused")
+
+
+class _Result:
+    """A statement's rows and row count, read while the store's lock was held."""
+
+    def __init__(self, rows: list, rowcount: int) -> None:
+        self._rows = rows
+        self.rowcount = rowcount
+
+    def fetchone(self) -> Optional[sqlite3.Row]:
+        return self._rows[0] if self._rows else None
+
+    def fetchall(self) -> list:
+        return self._rows
 
 
 class Store:
@@ -107,6 +149,10 @@ class Store:
             self._db.execute("PRAGMA journal_mode=WAL" if path != ":memory:" else "PRAGMA journal_mode=MEMORY")
             self._db.execute("PRAGMA synchronous=FULL")  # events must survive a power cut
             self._db.executescript(SCHEMA)
+            have = {r["name"] for r in self._db.execute("PRAGMA table_info(games)").fetchall()}
+            for name, decl in GAME_COLUMNS_V2:
+                if name not in have:
+                    self._db.execute(f"ALTER TABLE games ADD COLUMN {name} {decl}")
             self.set_setting("schema_version", str(SCHEMA_VERSION))
         if path != ":memory:":
             try:
@@ -118,9 +164,14 @@ class Store:
         with self._lock:
             self._db.close()
 
-    def _exec(self, sql: str, args: tuple = ()) -> sqlite3.Cursor:
+    def _exec(self, sql: str, args: tuple = ()) -> "_Result":
+        # The rows are read while the lock is held: the API's worker threads and
+        # the engine's thread share one connection, and sqlite3 shares a cached
+        # statement between cursors running the same SQL, so a fetch outside the
+        # lock could read another thread's rows (seen as a NULL column).
         with self._lock:
-            return self._db.execute(sql, args)
+            cur = self._db.execute(sql, args)
+            return _Result(cur.fetchall(), cur.rowcount)
 
     # --- settings -----------------------------------------------------------
 
@@ -185,12 +236,15 @@ class Store:
     def create_game(self, game: dict[str, Any], key: Optional[bytes]) -> None:
         self._exec(
             "INSERT INTO games (id, name, mode_id, preset_id, teams_json, params_json, "
-            "assignments_json, duration_ms, game_seed, state, term, game_key, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "assignments_json, duration_ms, game_seed, state, term, game_key, created_at, "
+            "node_id, channel_hz, max_hops, joined, controller_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (game["id"], game["name"], game["mode_id"], game.get("preset_id"),
              json.dumps(game["teams"]), json.dumps(game["params"]),
              json.dumps(game["assignments"]), game["duration_ms"], game["game_seed"],
-             game["state"], game.get("term", 1), key, game["created_at"]))
+             game["state"], game.get("term", 1), key, game["created_at"],
+             game.get("node_id"), game.get("channel_hz"), game.get("max_hops"),
+             1 if game.get("joined") else 0, game.get("controller_id")))
 
     @staticmethod
     def _game(row: sqlite3.Row) -> dict[str, Any]:
@@ -200,7 +254,10 @@ class Store:
                 "assignments": json.loads(row["assignments_json"]),
                 "duration_ms": row["duration_ms"], "game_seed": row["game_seed"],
                 "state": row["state"], "term": row["term"], "created_at": row["created_at"],
-                "started_at": row["started_at"], "ended_at": row["ended_at"]}
+                "started_at": row["started_at"], "ended_at": row["ended_at"],
+                "node_id": row["node_id"], "channel_hz": row["channel_hz"],
+                "max_hops": row["max_hops"], "joined": bool(row["joined"]),
+                "controller_id": row["controller_id"]}
 
     def game(self, game_id: int) -> Optional[dict[str, Any]]:
         row = self._exec("SELECT * FROM games WHERE id = ?", (game_id,)).fetchone()
@@ -222,10 +279,12 @@ class Store:
         return {r["id"] for r in self._exec("SELECT id FROM games").fetchall()}
 
     def update_game(self, game_id: int, **fields: Any) -> None:
-        allowed = {"state", "term", "started_at", "ended_at", "game_key"}
+        allowed = {"state", "term", "started_at", "ended_at", "game_key", "assignments", "duration_ms"}
         unknown = set(fields) - allowed
         if unknown:
             raise ValueError(f"cannot update {unknown}")
+        if "assignments" in fields:
+            fields["assignments_json"] = json.dumps(fields.pop("assignments"))
         sets = ", ".join(f"{k} = ?" for k in fields)
         self._exec(f"UPDATE games SET {sets} WHERE id = ?", (*fields.values(), game_id))
 
@@ -293,3 +352,30 @@ class Store:
     def scores(self, game_id: int) -> dict[str, int]:
         rows = self._exec("SELECT team, score FROM scores WHERE game_id = ?", (game_id,)).fetchall()
         return {r["team"]: r["score"] for r in rows}
+
+    # --- field image and positions (GM console field view) ------------------
+
+    def set_field_image(self, content_type: str, data: bytes) -> None:
+        if len(data) > FIELD_IMAGE_MAX:
+            raise ValueError(f"the field image is over {FIELD_IMAGE_MAX} bytes")
+        self._exec("INSERT INTO field_image (id, content_type, data, updated_at) VALUES (1, ?, ?, ?) "
+                   "ON CONFLICT(id) DO UPDATE SET content_type = excluded.content_type, "
+                   "data = excluded.data, updated_at = excluded.updated_at",
+                   (content_type, data, time.time()))
+
+    def field_image(self) -> Optional[tuple[str, bytes, float]]:
+        row = self._exec("SELECT content_type, data, updated_at FROM field_image WHERE id = 1").fetchone()
+        return (row["content_type"], bytes(row["data"]), row["updated_at"]) if row else None
+
+    def delete_field_image(self) -> bool:
+        return self._exec("DELETE FROM field_image WHERE id = 1").rowcount == 1
+
+    def set_position(self, game_id: int, node_id: int, x: float, y: float) -> None:
+        self._exec("INSERT INTO positions (game_id, node_id, x, y) VALUES (?, ?, ?, ?) "
+                   "ON CONFLICT(game_id, node_id) DO UPDATE SET x = excluded.x, y = excluded.y",
+                   (game_id, node_id, x, y))
+
+    def positions(self, game_id: int) -> dict[int, dict[str, float]]:
+        rows = self._exec("SELECT node_id, x, y FROM positions WHERE game_id = ? ORDER BY node_id",
+                          (game_id,)).fetchall()
+        return {r["node_id"]: {"x": r["x"], "y": r["y"]} for r in rows}

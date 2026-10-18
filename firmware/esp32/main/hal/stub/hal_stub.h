@@ -38,6 +38,11 @@ extern uint32_t hal_stub_radio_dc_remaining_ms;
 
 void hal_stub_radio_reset(void);
 
+/* ---- NFC stub: the user memory a tag would return (0 bytes = no tag) ---- */
+
+extern uint8_t hal_stub_nfc_mem[888];
+extern size_t hal_stub_nfc_mem_len;
+
 /**
  * Reset every stub counter / recorder to zero / empty.
  */

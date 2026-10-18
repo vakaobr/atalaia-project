@@ -135,8 +135,8 @@ how:
     at the base that runs the game and keeps the score. Phones connect to it over Wi-Fi, and
     scoreboards, stream overlays and map apps such as <a href="#glossary-atak">ATAK</a> through its
     API. An optional <a href="#glossary-site-server">site server</a> on the internet keeps accounts
-    and history. The controller and its API are built and tested on a computer, not yet on the
-    field; the site server comes in a later phase.
+    and history. The controller, its API and the organisers' console are built and tested on a
+    computer, not yet on the field; the site server comes in a later phase.
   core: >-
     Under the hood, every device that runs game modes uses the same
     <a href="#glossary-core">shared core</a>, written in C11, and the same Lua modes; only a thin
@@ -234,24 +234,32 @@ roadmap:
       Gate: the simulator runs Domination and Bomb from Lua scripts. <strong>Met.</strong>
   p1:
     title: Single box
-    text: Field Box build, ESP32 firmware, on-device presets.
+    text: >-
+      Field Box build, ESP32 firmware, on-device presets, and a build manual with a wiring diagram.
     gate: >-
       Gate: one box runs a 2-hour club game with no restarts. The firmware and its screens are
-      done and run in an emulator; the gate stays open until the first boxes are built.
+      done and run in an emulator, and the build manual with its wiring diagrams is written; the
+      gate stays open until the first boxes are built.
   p2:
     title: Field network
-    text: Skirmesh-RF over LoRa, field controller, API, GM console.
+    text: >-
+      Skirmesh-RF over LoRa, field controller, API, GM console. The phase will end with a mode
+      pack: Hold-All Domination (score only while holding every box), Last Stand (a countdown to
+      defeat while holding one of three), per-team arming codes on Bomb, and the Codes modifier
+      (keypad or QR codes that grant points, hints or unlocks).
     gate: >-
       Gate: 5 boxes on a <a href="#glossary-cqb">CQB</a> site and an outdoor field, zero lost
-      captures. The encrypted radio protocol, the radio firmware, the field controller with its
-      API and the USB radio modem that links it to the boxes are built and tested in the
-      simulator, the emulator and on a computer; the GM console comes next, and the gate needs the
-      radio boards.
+      captures. The encrypted radio protocol, the field controller with its API, the USB radio
+      modem, the organisers' console with a scoreboard, joining a game with an NFC card or a QR
+      code, and the boxes' firmware talking to the controller are built and tested in the
+      simulator, the emulator and on a computer, whole games included. The gate needs the radio
+      boards.
   p3:
     title: Android and players
     text: >-
-      Android props, <a href="#glossary-android-prop">I/O pod</a>, player app with roles, chrono
-      check-in.
+      Android props, <a href="#glossary-android-prop">I/O pod</a>, player app with roles, and the
+      modes that need players' phones: Respawn, Kill Confirmed, Player Check-in, Money Factory and
+      chrono check-in.
     gate: "Gate: one game mixes ESP32 and Android props without issues."
   p4:
     title: Site server and advanced play
@@ -262,7 +270,7 @@ roadmap:
     title: Community
     text: >-
       Visual mode editor, mode registry, carrier PCB (a ready-made circuit board that makes builds
-      easier), translations.
+      easier), translations, build guides for other node types.
     gate: Ongoing after the first release.
 
 hub:
@@ -441,8 +449,8 @@ glossary:
       it. With it a club will be able to drive a big LED scoreboard, a live score overlay on a
       stream, Discord or Telegram alerts, or a relay that sets off smoke and sirens when the bomb
       goes off. MQTT, REST and WebSocket are three standard ways in, so ordinary tools work with
-      it. The field controller has it since phase&nbsp;2; it has been tested on a computer and not
-      yet on a field.
+      it. The field controller has it since phase&nbsp;2, with a ready-made scoreboard page; it has
+      been tested on a computer and not yet on a field.
   atak:
     id: glossary-atak
     term: ATAK
@@ -492,7 +500,7 @@ glossary:
       that hears every box over the radio, runs the rules that span several boxes, keeps the
       official score and serves the organisers' console to their phones. If it fails, the boxes
       keep playing and another capable device takes over, and a single box can run a game without
-      one. It arrives in phase&nbsp;2.
+      one. It is built (phase&nbsp;2) and tested on a computer, not yet on a field.
   server:
     id: glossary-site-server
     term: Site server

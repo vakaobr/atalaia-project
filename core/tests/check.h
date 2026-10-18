@@ -29,5 +29,6 @@ void run_duty_cycle_tests(void);
 void run_msg_codec_tests(void);
 void run_crypto_mbedtls_tests(void);
 void run_field_api_tests(void);
+void run_join_tests(void);
 
 #endif /* ATALAIA_TEST_CHECK_H */

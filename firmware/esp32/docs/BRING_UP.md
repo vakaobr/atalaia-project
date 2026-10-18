@@ -32,11 +32,34 @@ expander (Wokwi uses a GPIO keypad instead), the PN532, the MAX17048, the
 I2S amplifier, the Heltec V4.3's Vext rail, the real panel's orientation and
 colours, power, range and the 2-hour stability gate.
 
+## Before power-on: board revision, antenna, GNSS module
+
+1. **Identify the revision** by the radio front-end module (FEM) chip next
+   to the LoRa antenna connector (or the board's silkscreen):
+   **KCT8103L = Heltec V4.3** (the default), **GC1109 = Heltec V4.2**.
+   For a V4.2, set `idf.py menuconfig` > Atalaia Field Box Configuration >
+   Radio > Board revision > *Heltec V4.2 (GC1109)* before building, for the
+   Field Box and for the USB radio modem. The wrong choice leaves the
+   receiver deaf (V4.3 LNA bypassed) or the transmitter weak (V4.2 PA
+   bypassed).
+2. **Do not plug in the GNSS module** that ships with the V4. Its SH1.25
+   connector shares GPIO 34 and 38-42 with the Field Box's display and
+   button 4, and GPS is not supported in this pin map (decision E21).
+3. Fit the LoRa antenna before the first power-on (step 10 explains why).
+
+Pins that changed in phase E (for the wiring in `hardware/field-box/`):
+button 2 moved from GPIO 5 to **GPIO 39** (GPIO 5 is the V4.3 FEM's CTX
+control). The firmware now drives GPIO 36 (Vext) low at boot, and GPIO 7
+(FEM power) high, GPIO 2 (FEM enable) high and GPIO 5 low (V4.3) or
+GPIO 46 high (V4.2) once the SX1262 answers.
+
 ## Step 0: eFuse HMAC Key Provisioning (Production Only)
 
 **Skip this step for development boards.** Without the eFuse key, NVS
-encryption is not available and the game key is stored in plaintext
-NVS. The firmware logs a warning at boot.
+encryption is not available and the game key (inside the stored join
+payload) and the field join key are stored in plaintext NVS. The firmware
+logs a warning at boot: `NVS encryption is off: the game key and the field
+join key are stored in plain NVS`.
 
 On production Field Boxes, burn a 256-bit HMAC key into eFuse block 4
 before the first boot. This key protects the NVS partition contents
@@ -75,16 +98,23 @@ and unencrypted NVS -- no firmware changes are needed.
 
 ## Step 1: First Boot Smoke Test
 
-1. Build it with `python tools/docker_fw.py build`, then flash it:
+1. Build it with `python tools/docker_fw.py build`, then flash it over the
+   board's USB-C port. The Heltec V4 has no USB-UART bridge: the port is
+   the ESP32-S3's own USB (USB-Serial-JTAG), `/dev/ttyACM0` on Linux and a
+   `COMx` port on Windows:
    ```
-   idf.py flash -p /dev/ttyUSB0
+   idf.py -B build flash -p /dev/ttyACM0
    ```
    (or the `esptool.py write_flash` command the build prints, with the
-   files in `firmware/esp32/build/`).
-2. Open serial monitor:
+   files in `firmware/esp32/build/`). Flashing from Windows is described
+   step by step in `hardware/field-box/BUILD.md`, section 11.
+2. Open a serial monitor on the same port:
    ```
-   idf.py monitor -p /dev/ttyUSB0
+   idf.py -B build monitor -p /dev/ttyACM0
    ```
+   The log goes to UART0 and to this USB port; what you type on the USB
+   port (`@join`, `@joinkey`) reaches the box
+   (`CONFIG_ATALAIA_CONSOLE_USB_INPUT`).
 3. Verify: boot log shows firmware version, PSRAM detection (2 MB on
    V4.3), tier selection (should be "full").
 4. Verify: no crash loops (watchdog resets).
@@ -96,12 +126,19 @@ and unencrypted NVS -- no firmware changes are needed.
 
 ## Step 2: Vext and External Peripherals
 
-1. The Vext rail (GPIO 36) powers the external peripherals (NFC reader,
-   display, etc.) when they are wired to it.
-2. The firmware does not switch Vext yet. Check the polarity in Heltec's
-   V4.3 schematic (on the V3, driving GPIO 36 LOW turns Vext on), then add
-   it early in `app_main` and record it here.
-3. If external peripherals do not respond, check Vext first.
+1. Vext is a switched rail on the Heltec V4 for the on-board OLED and the
+   LoRa front end; in the standard Field Box wiring the external
+   peripherals (NFC reader, display, keypad expander) take 3V3 instead
+   (`hardware/field-box/BUILD.md`). It is active low: the firmware drives
+   GPIO 36 low first thing at boot
+   (`CONFIG_ATALAIA_VEXT_CTL_PIN`), before any peripheral is probed. The
+   log shows `Vext on (GPIO 36 low)`.
+2. Measure the Vext pin on the header: it should read about 3.3 V after
+   that line. Record the measurement here.
+3. If the on-board OLED stays dark or the radio is deaf, check Vext; if
+   the external peripherals do not respond, check their 3V3 supply.
+4. Button 4 sits on GPIO 34, which is also the GNSS power control: with no
+   GNSS module plugged in, check it reads high (not pressed) at rest.
 
 ## Step 3: Display
 
@@ -117,13 +154,14 @@ and unencrypted NVS -- no firmware changes are needed.
 3. Note: the on-board 0.96" OLED (GPIO 17/18) shares the I2C bus
    with the NFC reader and battery gauge.  It can show status while
    the external TFT shows the game UI.
-4. If the display does not init, toggle Vext (GPIO 36) -- the display
-   RST is tied to Vext in the default wiring.
+4. If the display does not init, check its reset line: GPIO 38 in the
+   default wiring (`ATALAIA_DISP_RST_PIN`), pulsed low by the driver at
+   start-up; and its 3V3 supply.
 
 ## Step 4: Buttons
 
 1. Start a Bomb game (admin PIN, game 1, `#`, `#`). Press each team
-   button (GPIO 4, 5; 33, 34 for teams 3 and 4).
+   button (GPIO 4, 39; 33, 34 for teams 3 and 4).
 2. Hold the red button for 5 s: the log shows `game: event bomb.armed`
    and the screen the countdown. Hold blue for 10 s: `bomb.defused`.
 3. A short press (under 5 s) must not arm the bomb.
@@ -144,11 +182,20 @@ and unencrypted NVS -- no firmware changes are needed.
 
 ## Step 7: NFC
 
-1. Verify the PN532 is in I2C mode (DIP switches).
-2. Hold an NFC tag near the PN532 reader.
-3. Serial log should show: `nfc.tag` event with UID.
+1. Verify the PN532 is in I2C mode (DIP switches); the log shows
+   `PN532 NFC reader at 0x24`, not `not found`.
+2. Write a join card: in the GM console's *Join* tab, make a payload for
+   this box and write its NFC bytes to an NTAG215 or NTAG216 card (any NFC
+   writer that can write raw NDEF memory; the console shows the bytes for
+   page 4 onwards). The box needs the field join key first (step 10b).
+3. With no game being played, hold the card on the reader: the log shows
+   `join card: joined` and the screen `JOINED GAME <id>`. A card made with
+   another field's key shows `join refused: bad tag`; holding the same card
+   longer does nothing more.
 4. Verify read distance (target: > 3 cm).
-5. If no response, check Vext power and I2C address (0x24).
+5. If no response, check the reader's 3V3 supply and I2C address (0x24). The PN532 code
+   (command, ACK, response; NTAG READ through InDataExchange) has not run
+   on a real reader before this step.
 
 ## Step 8: Audio
 
@@ -158,11 +205,12 @@ and unencrypted NVS -- no firmware changes are needed.
 
 ## Step 9: Battery
 
-1. The Heltec V4.3 has a built-in voltage divider on GPIO 1 (Vbat)
-   gated by ADC_Ctrl (GPIO 37).  Drive GPIO 37 high, then read
-   ADC on GPIO 1.
-2. If an external MAX17048 gauge is wired (I2C bus, addr 0x36):
-   verify serial log shows voltage and SoC%.
+1. The firmware reads the battery from the MAX17048 gauge (I2C, address
+   0x36): verify the log shows `MAX17048 detected` and that its voltage and charge
+   (%) look right against a multimeter. The board's own divider on GPIO 1
+   (Vbat, gated by ADC_Ctrl on GPIO 37) is not read by the firmware.
+2. Without the gauge the box runs, reports no battery level (HELLO and
+   STATE leave it out), and logs `MAX17048 battery gauge not found`.
 3. Disconnect USB-C; run on battery.  Verify readings update.
 4. Reconnect USB-C: verify charging behaviour.
 
@@ -172,27 +220,69 @@ and unencrypted NVS -- no firmware changes are needed.
 > BEFORE powering on. The 28 dBm FEM on the high-power V4.3.1 can be
 > damaged by transmitting into an open port.
 
-1. Verify the serial log shows `SX1262 detected (sync_hi=0x14)` and
+1. Verify the serial log shows `SX1262 detected (sync_hi=0x14)`,
+   `front-end module KCT8103L (Heltec V4.3) powered` (or GC1109 (Heltec
+   V4.2), matching the chip you read before power-on), and
    `SX1262 initialised: EU868, SF7, BW125k, TX N dBm, ch 869525000 Hz`
    (where N is the calculated conducted power and 869525000 is the
-   default game channel).
-2. If the log shows `SX1262 not detected` or `radio SPI bus init
+   default game channel). An `is both a team button and the ... front-end
+   control` error means a button is on a FEM pin: move the button.
+2. **Measure the conducted output power before any game transmission**
+   (decision C2): an attenuator and a power meter, or a calibrated SDR, on
+   the LoRa port, with a single test packet. The board's FEM can reach
+   27-28 dBm; the firmware sets the SX1262 to N dBm assuming 14 dB of FEM
+   gain, so the output should be about N + 14 dBm. If the measured gain is
+   higher, set `ATALAIA_RADIO_FEM_GAIN_DB` to the measured value: with more
+   than about 14 dB of real gain the default setting would exceed 500 mW
+   ERP on the g2 sub-band with a 2 dBi antenna (13 dBm + gain + 2 dBi -
+   2.15 must stay at or below 27 dBm ERP; decision E20).
+3. Check the receiver: with two boards 1-2 m apart, the RSSI of received
+   packets (log, or the controller's node list) should be roughly -30 to
+   -50 dBm. Much weaker (-80 dBm or below at that distance) means the FEM
+   is not powered or the board revision is set wrong.
+4. If the log shows `SX1262 not detected` or `radio SPI bus init
    failed`, check that GPIO 8-14 are not used by anything else and
    that the SX1262 is soldered (the Heltec V4.3 always has it).
-3. Verify the TX power value makes sense:
+5. Verify the TX power value makes sense:
    - With FEM (14 dB gain) and default 2 dBi antenna on the g2
      sub-band (default 869.525 MHz): N = 13 dBm conducted.
    - Adjust `ATALAIA_RADIO_ANTENNA_GAIN_DBI` in menuconfig if the
      actual antenna differs from the 2 dBi default.
-4. All nodes in a game use the same channel (default 869.525 MHz).
+6. All nodes in a game use the same channel (default 869.525 MHz).
    Neighbouring games should use different channels within the g2
    sub-band or in other EU868 sub-bands.  The channel is configurable
    via `ATALAIA_RADIO_DEFAULT_CHANNEL_HZ` in Kconfig.
-5. The radio task starts on core 0, priority 3. Verify it does not
+7. The radio task starts on core 0, priority 3. Verify it does not
    affect game_task timing (check game_timer_tick jitter in the log).
-6. Phase 2 radio protocol (event exchange, time sync) requires a
-   controller and at least two nodes. Single-box radio health can be
+8. Phase 2 radio protocol (event exchange, time sync) requires a
+   controller and at least two nodes (step 10b). Single-box radio health can be
    verified by monitoring `radio_task` log lines for TX/RX activity.
+
+## Step 10b: Joining a field controller's game
+
+Needs the field controller with its USB radio modem (controller/README.md)
+and two boards at least 1 m apart, both antennas fitted.
+
+1. Give the box the field join key: `python -m atalaia_controller join-key`
+   on the controller prints it; type `@joinkey <the 64 hex digits>` on the
+   box's serial console (the log shows `join key: stored`), or enter it in
+   the setup portal's "Field join key" field.
+2. Create a game in the GM console, open *Join*, choose the role, and type
+   the text it shows on the box's console as one line:
+   `@join atalaia:join:...`. The log shows `field: joined game <id> as node
+   <n> ...` and the console's node list shows the box (its HELLO).
+3. Start the game in the console: the box starts the mode. Capture with a
+   team button: the capture appears in the console's feed within a second
+   or two, and the scores follow the box's STATE (every 15 s, and right
+   after a capture).
+4. Pause, resume and end from the console: the box follows. After the end
+   the log shows `left game <id>; the game key is erased`.
+5. Battery pull during a game: the box comes back in the same game (`field:
+   ... resumed game`), with `node.rebooted` in the console's feed and no
+   capture lost.
+6. Range: walk the box away until the console marks it offline; with a
+   third box joined half-way, the far box's captures reach the console
+   again through the middle box's relay.
 
 ## Step 11: Wi-Fi Setup Portal
 

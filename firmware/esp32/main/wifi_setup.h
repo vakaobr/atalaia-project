@@ -25,6 +25,13 @@ const char *wifi_setup_ssid(void);
 void wifi_setup_stop(void);
 
 /*
+ * Where the form's optional field join key (64 hex digits, protocol/join.md)
+ * goes; the handler returns false if it is not a valid key. Set by the shell
+ * before wifi_setup_start(). Without a handler the field is ignored.
+ */
+void wifi_setup_set_join_key_handler(bool (*handler)(const char *hex));
+
+/*
  * Parse a single field from a URL-encoded form body (e.g. "name=val&k2=v2").
  * URL-decodes %XX sequences and '+' (space). Copies at most out_sz-1 bytes
  * into out and NUL-terminates.

@@ -1,0 +1,230 @@
+{
+  "app": {
+    "title": "Atalaia · Organização",
+    "language": "Língua",
+    "lang_pt": "Português",
+    "lang_en": "English",
+    "sections": "Secções",
+    "reconnecting": "Sem ligação ao controlador de campo. A voltar a ligar…"
+  },
+  "login": {
+    "intro": "Consola da organização do jogo, servida pelo controlador de campo.",
+    "token": "Código de acesso (da organização ou só de leitura)",
+    "enter": "Entrar",
+    "bad": "Código de acesso errado.",
+    "expired": "O código de acesso deixou de ser aceite. Volta a entrar.",
+    "hint": "O controlador mostra os códigos com: python3 -m atalaia_controller tokens",
+    "readonly": "Só leitura",
+    "leave": "Sair"
+  },
+  "tabs": {
+    "game": "Jogo",
+    "field": "Campo",
+    "nodes": "Caixas",
+    "join": "Juntar",
+    "presets": "Predefinições",
+    "feed": "Registo",
+    "controller": "Controlador"
+  },
+  "common": {
+    "yes": "Sim",
+    "no": "Não"
+  },
+  "time": {
+    "seconds": "há {n} s",
+    "minutes": "há {n} min",
+    "hours": "há {n} h"
+  },
+  "alerts": {
+    "radio_down": "Rádio em baixo: o modem USB não responde.",
+    "radio_up": "Rádio de volta.",
+    "tx_failed": "Envio falhado (seq {seq}): {status}",
+    "modem_error": "Erro do modem: {message}",
+    "role": "O controlador agora é {role} (mandato {term}).",
+    "node_offline": "A caixa {node} não dá notícias há mais de 90 s.",
+    "count": "{n} alertas"
+  },
+  "game": {
+    "title": "Jogo",
+    "new": "Novo jogo",
+    "name": "Nome do jogo",
+    "source": "Modo ou predefinição",
+    "modes": "Modos",
+    "presets": "Predefinições",
+    "teams": "Equipas",
+    "teams_hint": "Separadas por vírgulas, pela ordem dos botões (por exemplo: red, blue).",
+    "duration": "Duração (minutos)",
+    "duration_hint": "0 = sem limite.",
+    "length": "Duração",
+    "params": "Parâmetros do modo",
+    "create": "Criar jogo",
+    "message": "Mensagem para todas as caixas",
+    "message_hint": "Aparece no ecrã das caixas",
+    "send": "Enviar",
+    "message_sent": "Enviada.",
+    "adjust": "Ajustar pontuação",
+    "amount": "Pontos (negativo para penalizar)",
+    "reason": "Motivo",
+    "apply": "Aplicar",
+    "ended": "O jogo «{name}» terminou.",
+    "none": "Nenhum jogo a decorrer.",
+    "wait_gm": "A organização ainda não criou um jogo.",
+    "state": "Estado",
+    "clock": "Tempo de jogo",
+    "no_limit": "sem limite",
+    "mode": "Modo",
+    "id": "Identificador",
+    "standby_notice": "Este controlador está de reserva neste jogo: acompanha o controlador principal e só manda se for promovido.",
+    "start": "Começar",
+    "confirm_start": "Começar o jogo agora?",
+    "pause": "Pausa",
+    "confirm_pause": "Pôr o jogo em pausa?",
+    "resume": "Retomar",
+    "confirm_resume": "Retomar o jogo?",
+    "end": "Terminar",
+    "leave": "Deixar o jogo",
+    "confirm_end": "Tens a certeza?",
+    "not_leader": "Este controlador não está a mandar no jogo. Para o controlar daqui, promove-o no separador Controlador.",
+    "states": {
+      "ready": "pronto",
+      "running": "a decorrer",
+      "paused": "em pausa",
+      "ended": "terminado"
+    }
+  },
+  "controller": {
+    "title": "Controlador de campo",
+    "node_id": "Identificador no rádio",
+    "role": "Papel",
+    "term": "Mandato",
+    "leader": "Controlador ativo",
+    "failover": "Substituição",
+    "priority": "Prioridade",
+    "radio": "Rádio",
+    "modem": "Modem",
+    "reconnects": "Religações do modem",
+    "tx_epoch": "Época de envio",
+    "tx_status": "Resultados dos envios",
+    "joined": "De reserva neste jogo",
+    "promote": "Promover a controlador",
+    "confirm_promote": "Este controlador passa a mandar no jogo. Continuar?",
+    "promote_hint": "Promove um controlador de reserva quando o principal deixa de responder (substituição manual, ADR-P2-8).",
+    "roles": {
+      "leader": "controlador ativo",
+      "follower": "de reserva",
+      "candidate": "candidato"
+    },
+    "failover_modes": {
+      "manual": "manual",
+      "auto": "automática"
+    },
+    "radio_states": {
+      "up": "ligado",
+      "down": "em baixo",
+      "connecting": "a ligar",
+      "closed": "fechado",
+      "none": "sem modem"
+    }
+  },
+  "score": {
+    "title": "Pontuação",
+    "timeline": "Evolução da pontuação desde que a consola abriu",
+    "explain": "Pontos de cada caixa (o maior valor que cada uma comunicou) somados, mais os ajustes da organização."
+  },
+  "feed": {
+    "title": "Registo e alertas",
+    "dismiss": "Dispensar alerta",
+    "filter": "Filtrar acontecimentos",
+    "critical_only": "Só críticos",
+    "count": "{n} acontecimentos",
+    "empty": "Ainda não há acontecimentos."
+  },
+  "nodes": {
+    "title": "Caixas",
+    "node": "caixa",
+    "controller": "controlador",
+    "none": "Ainda não há caixas neste jogo.",
+    "id": "N.º",
+    "name": "Nome",
+    "role": "Papel",
+    "owner": "Dona",
+    "tier": "Nível",
+    "battery": "Bateria",
+    "signal": "Sinal",
+    "last_seen": "Última notícia",
+    "firmware": "Firmware",
+    "epoch": "Época",
+    "set_owner": "Equipa dona da caixa {node}",
+    "no_owner": "nenhuma",
+    "offline": "sem notícias",
+    "tiers": {
+      "full": "completo",
+      "reduced": "reduzido",
+      "proxy": "proxy"
+    }
+  },
+  "field": {
+    "title": "Campo",
+    "bad_type": "A imagem do campo tem de ser PNG, JPEG ou WebP.",
+    "marker": "Caixa {node}, dona: {owner}",
+    "upload": "Carregar imagem do campo",
+    "remove": "Remover imagem",
+    "image_alt": "Imagem do campo",
+    "no_image": "Sem imagem do campo: as caixas aparecem numa grelha.",
+    "drag_hint": "Arrasta as caixas para o sítio onde estão no campo."
+  },
+  "join": {
+    "title": "Juntar caixas e controladores",
+    "intro": "Gera os dados de entrada no jogo para uma caixa (cartão NFC ou consola série) ou para um controlador de reserva.",
+    "kind": "Para",
+    "kinds": {
+      "node": "uma caixa",
+      "controller": "um controlador de reserva"
+    },
+    "role": "Papel no modo",
+    "node_id": "Identificador",
+    "node_id_auto": "automático",
+    "generate": "Gerar",
+    "warning": "Atenção: este código e o cartão levam a chave do jogo. Mostra-os só a quem está a montar o campo.",
+    "for_node": "Caixa {node} ({role})",
+    "for_controller": "Controlador de reserva {node}",
+    "bytes": "{n} bytes",
+    "channel": "canal {mhz} MHz",
+    "qr_label": "Código QR com os dados de entrada",
+    "text": "Texto de entrada",
+    "copy": "Copiar texto",
+    "copied": "Copiado.",
+    "copy_failed": "Não foi possível copiar: seleciona o texto e copia-o à mão.",
+    "nfc": "Cartão NFC (NTAG215/216)",
+    "nfc_hint": "Bytes a escrever na memória do cartão a partir da página 4 (mensagem NDEF).",
+    "no_game": "Não há nenhum jogo a decorrer neste controlador.",
+    "standby_title": "Entrar como controlador de reserva",
+    "standby_intro": "Cola aqui o texto gerado pelo controlador principal para um controlador de reserva. Os dois controladores têm de partilhar a mesma chave de entrada do campo.",
+    "standby_join": "Entrar no jogo",
+    "standby_done": "Este controlador está agora de reserva no jogo {game}.",
+    "gm_only": "Só a organização pode gerar dados de entrada.",
+    "standby_cannot_issue": "Um controlador de reserva não gera dados de entrada; usa o controlador ativo."
+  },
+  "presets": {
+    "title": "Predefinições",
+    "optional": "opcional",
+    "no_params": "Este modo não tem parâmetros.",
+    "saved": "Predefinição «{name}» guardada.",
+    "none": "Ainda não há predefinições guardadas.",
+    "name": "Nome",
+    "mode": "Modo",
+    "params": "Parâmetros",
+    "copy": "Copiar",
+    "new": "Nova predefinição",
+    "save": "Guardar"
+  },
+  "scoreboard": {
+    "title": "Marcador",
+    "no_game": "À espera de um jogo…",
+    "token_needed": "Abre o marcador com o código de leitura no endereço: …/scoreboard.html#token=CÓDIGO",
+    "connecting": "A ligar ao controlador de campo…",
+    "offline": "Sem ligação. A voltar a ligar…",
+    "winner": "Vence {team}",
+    "tie": "Empate"
+  }
+}

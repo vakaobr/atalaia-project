@@ -53,6 +53,9 @@ button:active{background:#00a0cc}
 <label for="volume">Audio Volume</label>
 <input type="range" id="volume" name="volume" min="0" max="100" value="70">
 
+<label for="joinkey">Field join key (optional, 64 hex digits)</label>
+<input type="text" id="joinkey" name="joinkey" pattern="[0-9a-fA-F]{64}" maxlength="64" autocomplete="off" spellcheck="false" placeholder="python -m atalaia_controller join-key">
+
 <button type="submit">Save &amp; Reboot</button>
 </form>
 <p class="note">Connect to the node Wi-Fi and visit this page to configure.</p>

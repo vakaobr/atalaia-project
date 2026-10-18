@@ -47,3 +47,23 @@ path = ["firmware/esp32/test/third_party/stb/stb_image.h", "firmware/esp32/test/
 precedence = "override"
 SPDX-FileCopyrightText = "2017 Sean Barrett"
 SPDX-License-Identifier = "MIT OR Unlicense"
+
+# The GM console's vendored ES modules (controller/console/src/lib/README.md has
+# their versions and checksums), unmodified from their npm packages.
+[[annotations]]
+path = "controller/console/src/lib/preact.module.js"
+precedence = "override"
+SPDX-FileCopyrightText = "2015-present Jason Miller"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "controller/console/src/lib/htm.module.js"
+precedence = "override"
+SPDX-FileCopyrightText = "2018 Google Inc."
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = "controller/console/src/lib/qrcode.module.js"
+precedence = "override"
+SPDX-FileCopyrightText = "2009 Kazuhiko Arase"
+SPDX-License-Identifier = "MIT"

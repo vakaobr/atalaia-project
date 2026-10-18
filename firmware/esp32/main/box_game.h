@@ -1,0 +1,136 @@
+/*
+ * SPDX-FileCopyrightText: 2026 The Atalaia contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * A Field Box in a field controller's game: the join (ADR-P2-12,
+ * protocol/join.md), the radio link (radio/field_link.h) and the game the
+ * controller drives with CMD and TIME. Platform-free: the ESP32 shell and
+ * the host box (test/box_host) supply storage, screens and the clock.
+ *
+ * Life of a joined game:
+ *   join (NFC card, serial "@join ...") -> tag checked with the field join
+ *   key -> payload kept in encrypted NVS -> link up (new epoch, HELLO) ->
+ *   "waiting" screen -> CMD start (or a TIME showing the game running) ->
+ *   the mode runs with the join's role, teams, params, node id and seed ->
+ *   events, STATE, ACKs over the radio -> CMD end -> the key is erased once
+ *   the last events are acknowledged (or after a minute).
+ *   After a reboot the stored payload brings the box back into the game:
+ *   new epoch, HELLO, unacknowledged events resent, node.rebooted.
+ */
+#ifndef ATALAIA_BOX_GAME_H
+#define ATALAIA_BOX_GAME_H
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include "atalaia/join.h"
+#include "node_runner.h"
+#include "preset_store.h"
+#include "radio/field_link.h"
+
+/* Where the join lives across reboots: encrypted NVS on the ESP32 (ADR-P2-12). */
+typedef struct {
+    int (*load_join)(void *ctx, uint8_t *buf, size_t cap);               /* length, 0 = none */
+    int (*save_join)(void *ctx, const uint8_t *buf, size_t len);         /* 0 = ok */
+    int (*erase_join)(void *ctx);                                        /* 0 = ok */
+    int (*load_join_key)(void *ctx, uint8_t key[ATALAIA_JOIN_KEY_SIZE]); /* 0 = ok */
+    int (*save_join_key)(void *ctx, const uint8_t key[ATALAIA_JOIN_KEY_SIZE]); /* 0 = ok */
+    void *ctx;
+} box_store_ops_t;
+
+typedef struct {
+    void (*screen)(void *user, const char *template_name, const char *data_json);
+    void (*log)(void *user, const char *line);
+    void (*reboot)(void *user);                   /* CMD reboot; may be NULL */
+    bool (*set_channel)(void *user, uint32_t hz); /* tune the radio; may be NULL */
+    int (*battery_pct)(void *user);               /* -1 if unknown; may be NULL */
+    /* Puts a packet on air; NULL = the radio task's queue (radio_task_send). */
+    bool (*radio_send)(void *user, const uint8_t *pkt, size_t len);
+    void *user;
+} box_shell_ops_t;
+
+typedef enum {
+    BOX_IDLE = 0, /* no game joined: the stand-alone preset picker */
+    BOX_JOINED,   /* joined, waiting for the controller to start */
+    BOX_PLAYING,  /* running or paused */
+    BOX_ENDED,    /* ended; the key goes once the last events are acknowledged */
+} box_phase_t;
+
+typedef enum {
+    BOX_JOIN_OK = 0,
+    BOX_JOIN_NO_KEY,     /* this box has no field join key yet */
+    BOX_JOIN_NOT_A_JOIN, /* not a join text or card */
+    BOX_JOIN_REFUSED,    /* bad tag, unknown version or bad content (see the log) */
+    BOX_JOIN_CONTROLLER, /* a standby controller's payload */
+    BOX_JOIN_NO_MODE,    /* the mode is not installed on this box */
+    BOX_JOIN_BUSY,       /* a game is being played */
+    BOX_JOIN_STORAGE,    /* the payload could not be stored */
+    BOX_JOIN_RADIO,      /* the radio may not transmit (epoch NVS failure) */
+} box_join_result_t;
+
+#define BOX_END_LINGER_MS 60000
+
+typedef struct {
+    node_runner_t *runner;
+    preset_t *preset; /* buffer for the mode source (8 KB: static in the shell) */
+    field_link_t link;
+    box_store_ops_t store;
+    box_shell_ops_t shell;
+    const atalaia_crypto_ops_t *crypto;
+    const atalaia_radio_nvs_ops_t *nvs;
+    event_log_t *log;
+    atalaia_hello_t hello;
+
+    uint8_t join_key[ATALAIA_JOIN_KEY_SIZE];
+    bool have_join_key;
+    box_phase_t phase;
+    atalaia_join_t join;
+    const char *teams[ATALAIA_JOIN_TEAMS_MAX];
+    int preset_index;
+    bool paused;
+    uint8_t owner_team;
+    uint32_t now_ms;
+    uint32_t ended_ms;
+    uint32_t state_interval_ms; /* 0 = FIELD_LINK_STATE_MS */
+    char last_message[128];
+} box_game_t;
+
+void box_game_init(box_game_t *g, node_runner_t *runner, preset_t *preset_buf,
+                   const box_store_ops_t *store, const box_shell_ops_t *shell,
+                   const atalaia_crypto_ops_t *crypto, const atalaia_radio_nvs_ops_t *nvs,
+                   event_log_t *log, const atalaia_hello_t *hello);
+
+/* The field join key: from the store, or set by the field owner (and stored). */
+bool box_game_load_join_key(box_game_t *g);
+bool box_game_set_join_key(box_game_t *g, const uint8_t key[ATALAIA_JOIN_KEY_SIZE]);
+/* "@joinkey <64 hex digits>" on the console (stored). */
+bool box_game_set_join_key_hex(box_game_t *g, const char *hex);
+/* A key for this boot only, not stored (CONFIG_ATALAIA_DEV_JOIN_KEY). */
+bool box_game_use_join_key_hex(box_game_t *g, const char *hex);
+
+/* A join payload (NFC card, decoded text). */
+box_join_result_t box_game_join(box_game_t *g, const uint8_t *payload, size_t len);
+/* The text form: "atalaia:join:..." */
+box_join_result_t box_game_join_text(box_game_t *g, const char *text);
+/* The user memory of an NFC Type 2 tag (from page 4). */
+box_join_result_t box_game_join_tag(box_game_t *g, const uint8_t *mem, size_t len);
+const char *box_join_result_name(box_join_result_t r);
+
+/*
+ * At boot: if a join is stored, rejoin (new epoch, HELLO) and, if the game
+ * was being played, resume it from the saved state and send node.rebooted.
+ * Returns true if the box is in a joined game.
+ */
+bool box_game_resume(box_game_t *g, uint32_t now_ms);
+
+/* A packet heard on the radio. */
+void box_game_on_packet(box_game_t *g, const uint8_t *pkt, size_t len, int8_t rssi);
+
+/* Advance by raw_delta_ms of local time (now_ms: monotonic clock). */
+void box_game_tick(box_game_t *g, uint32_t raw_delta_ms, uint32_t now_ms);
+
+/* True while the box belongs to a field controller's game (buttons go to the node). */
+bool box_game_active(const box_game_t *g);
+
+#endif /* ATALAIA_BOX_GAME_H */

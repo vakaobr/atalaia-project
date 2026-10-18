@@ -2,10 +2,16 @@
  * SPDX-FileCopyrightText: 2026 The Atalaia contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * SX1262 LoRa radio driver for the Heltec WiFi LoRa 32 V4.3.
- * EU868 band, SF7/BW125, single shared game channel (default
+ * SX1262 LoRa radio driver for the Heltec WiFi LoRa 32 V4 (V4.3 with the
+ * KCT8103L front-end module, or V4.2 with the GC1109: Kconfig "Board
+ * revision"). EU868 band, SF7/BW125, single shared game channel (default
  * 869.525 MHz, g2 sub-band, 10% duty cycle, 500 mW ERP).
  * FEM gain (~14 dB) is accounted for in the TX power setting.
+ *
+ * The FEM is powered (its LDO on GPIO 7, its chip enable on GPIO 2, and
+ * the revision's mode pin) only after the SX1262 answers its probe;
+ * hal/board_fem.c plans the order. Before phase E the LDO pin was held
+ * low, which on real boards would have left the FEM unpowered.
  *
  * The init function probes the SX1262 by reading a register. If the
  * chip is not present (e.g. Wokwi emulator), init returns -1 and the
@@ -14,6 +20,7 @@
 
 #ifdef ESP_PLATFORM
 
+#include "../board_fem.h"
 #include "../hal_radio.h"
 #include "../../radio/radio_power.h"
 
@@ -22,6 +29,7 @@
 
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
+#include "esp_rom_sys.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -40,8 +48,40 @@ static const char *TAG = "radio";
 #define PIN_BUSY CONFIG_ATALAIA_RADIO_BUSY_PIN
 #define PIN_DIO1 CONFIG_ATALAIA_RADIO_DIO1_PIN
 
-#define PIN_FEM_EN       CONFIG_ATALAIA_RADIO_FEM_EN_PIN
-#define PIN_VFEM_CTL     CONFIG_ATALAIA_RADIO_VFEM_CTL_PIN
+#define PIN_FEM_EN   CONFIG_ATALAIA_RADIO_FEM_EN_PIN
+#define PIN_VFEM_CTL CONFIG_ATALAIA_RADIO_VFEM_CTL_PIN
+
+#if CONFIG_ATALAIA_BOARD_HELTEC_V4_2
+#define BOARD_FEM   BOARD_FEM_GC1109
+#define PIN_FEM_PA  CONFIG_ATALAIA_RADIO_FEM_PA_PIN
+#define PIN_FEM_CTX (-1)
+#else
+#define BOARD_FEM   BOARD_FEM_KCT8103L
+#define PIN_FEM_PA  (-1)
+#define PIN_FEM_CTX CONFIG_ATALAIA_RADIO_FEM_CTX_PIN
+#endif
+
+static const board_fem_pins_t fem_pins = {
+    .fem = BOARD_FEM,
+    .power_pin = PIN_VFEM_CTL,
+    .enable_pin = PIN_FEM_EN,
+    .pa_pin = PIN_FEM_PA,
+    .ctx_pin = PIN_FEM_CTX,
+};
+
+static void fem_apply(const board_pin_step_t *steps, size_t n)
+{
+    for (size_t i = 0; i < n; i++) {
+        gpio_set_level(steps[i].pin, steps[i].level);
+        if (steps[i].delay_us) esp_rom_delay_us(steps[i].delay_us);
+    }
+}
+
+static void fem_power_off(void)
+{
+    board_pin_step_t steps[BOARD_FEM_MAX_STEPS];
+    fem_apply(steps, board_fem_power_off(&fem_pins, steps, BOARD_FEM_MAX_STEPS));
+}
 #define FEM_GAIN_DB      CONFIG_ATALAIA_RADIO_FEM_GAIN_DB
 #define ANTENNA_GAIN_DBI CONFIG_ATALAIA_RADIO_ANTENNA_GAIN_DBI
 
@@ -367,18 +407,30 @@ static int esp_radio_init(void)
     }
     ESP_LOGI(TAG, "SX1262 detected (sync_hi=0x%02X)", sync_hi);
 
-    /* ---- Radio present: configure FEM ---- */
+    /* ---- Radio present: power the FEM ---- */
     /* FEM control pins are configured only after the probe succeeds,
-     * so GPIO2 and GPIO7 stay free on boards without the SX1262
-     * (Wokwi uses GPIO7 for the keypad).  DIO1 ISR was already set
-     * up in step 4 above. */
-    gpio_config_t fem_cfg = {
-        .pin_bit_mask = (1ULL << PIN_FEM_EN) | (1ULL << PIN_VFEM_CTL),
-        .mode = GPIO_MODE_OUTPUT,
-    };
-    gpio_config(&fem_cfg);
-    gpio_set_level(PIN_FEM_EN, 1);
-    gpio_set_level(PIN_VFEM_CTL, 0); /* RX path by default */
+     * so GPIO 2, 5, 7 and 46 stay free on boards without the SX1262
+     * (Wokwi uses GPIO 7 for the keypad and GPIO 5 for button 2).  DIO1
+     * ISR was already set up in step 4 above. */
+    {
+        static const int others[] = {CONFIG_ATALAIA_BTN1_PIN, CONFIG_ATALAIA_BTN2_PIN,
+                                     CONFIG_ATALAIA_BTN3_PIN, CONFIG_ATALAIA_BTN4_PIN};
+        int clash = board_fem_conflict(&fem_pins, others, sizeof(others) / sizeof(others[0]));
+        if (clash >= 0) {
+            ESP_LOGE(TAG,
+                     "GPIO %d is both a team button and the %s front-end control: move the "
+                     "button (menuconfig > Buttons)",
+                     clash, board_fem_name(BOARD_FEM));
+        }
+        board_pin_step_t steps[BOARD_FEM_MAX_STEPS];
+        size_t n = board_fem_power_on(&fem_pins, steps, BOARD_FEM_MAX_STEPS);
+        uint64_t mask = 0;
+        for (size_t i = 0; i < n; i++) mask |= 1ULL << steps[i].pin;
+        gpio_config_t fem_cfg = {.pin_bit_mask = mask, .mode = GPIO_MODE_OUTPUT};
+        gpio_config(&fem_cfg);
+        fem_apply(steps, n);
+        ESP_LOGI(TAG, "front-end module %s powered", board_fem_name(BOARD_FEM));
+    }
 
     /* Configure the chip. Any command that fails (BUSY timeout or SPI
      * error) leaves the radio unusable: report it and release it. */
@@ -445,7 +497,7 @@ static int esp_radio_init(void)
 
     if (rc != 0) {
         ESP_LOGE(TAG, "SX1262 configuration failed (BUSY timeout or SPI error)");
-        gpio_set_level(PIN_FEM_EN, 0);
+        fem_power_off();
         probe_cleanup(4);
         return -1;
     }
@@ -632,7 +684,7 @@ static void esp_radio_deinit(void)
         spi_handle = NULL;
         spi_bus_free(SPI3_HOST);
     }
-    gpio_set_level(PIN_FEM_EN, 0);
+    fem_power_off();
     if (dio1_sem) {
         gpio_isr_handler_remove(PIN_DIO1);
         vSemaphoreDelete(dio1_sem);

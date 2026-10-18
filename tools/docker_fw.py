@@ -73,12 +73,11 @@ def run_idf(script: str) -> int:
 
 
 def build() -> int:
-    script = (
-        "set -e; . $IDF_PATH/export.sh > /dev/null; "
-        "[ -f build/CMakeCache.txt ] || idf.py set-target esp32s3; "
-        "idf.py build"
-    )
-    code = run_idf(script)
+    # Like the variants, the Field Box keeps its sdkconfig in its build folder,
+    # made from sdkconfig.defaults alone: a firmware/esp32/sdkconfig left by an
+    # earlier Wokwi build (keypad matrix on GPIO 1/2/7/39) must never end up
+    # in a Field Box image, where GPIO 2 and 7 drive the radio front end.
+    code = variant("build", ("sdkconfig.defaults",))
     if code == 0:
         print("\nFirmware: firmware/esp32/build/atalaia_esp32.bin (to flash it, see firmware/esp32/docs/BRING_UP.md)")
     return code
@@ -160,6 +159,13 @@ def clean() -> int:
         if path.exists():
             shutil.rmtree(path)
             print(f"removed firmware/esp32/{name}/")
+    # A plain `idf.py build` (BRING_UP.md, CI) writes firmware/esp32/sdkconfig;
+    # remove it too, so the next build starts from sdkconfig.defaults.
+    for name in ("sdkconfig", "sdkconfig.old"):
+        path = FW / name
+        if path.exists():
+            path.unlink()
+            print(f"removed firmware/esp32/{name}")
     return 0
 
 

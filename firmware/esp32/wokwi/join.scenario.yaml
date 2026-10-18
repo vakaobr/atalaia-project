@@ -1,0 +1,38 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Joining a field controller's game in the Wokwi emulator, about 10 s of
+# simulated time: boot (the radio probe finds no SX1262 and the box carries
+# on), type a tampered join text on the serial console (refused: bad tag),
+# then the real one (the shared vector node_domination_zone from
+# protocol/vectors/join.json, signed with the public test join key that
+# sdkconfig.wokwi sets as CONFIG_ATALAIA_DEV_JOIN_KEY), check the box joined
+# game 4242 as node 7 and shows the waiting screen, and that the same text
+# again changes nothing. A screenshot of the display lands in build-wokwi/.
+#
+#   cd firmware/esp32
+#   wokwi-cli --timeout 60000 --scenario wokwi/join.scenario.yaml .
+name: Join a field game on the Field Box
+version: 1
+author: The Atalaia contributors
+
+steps:
+  - wait-serial: 'using the development field join key'
+  - wait-serial: 'screen pin_entry {"digits":0,"error":false}'
+
+  # One character of the tag changed: refused, nothing stored.
+  - write-serial: "@join atalaia:join:AasBGRCSAlArfhUWKK7Spqv3FYgJz088AwcEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JZHpvbmUKGTA5DABTPb_iVQNhRBI4c-CumM5lJXJdqhE3cFgVAFUzs9sh_Q\n"
+  - wait-serial: 'join refused: bad tag'
+
+  # The real payload: joined, waiting for the controller's start.
+  - write-serial: "@join atalaia:join:AasBGRCSAlArfhUWKK7Spqv3FYgJz088AwcEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JZHpvbmUKGTA5DABTPb_iVQNhRBI4c-CumM5lJXJdqhE3cFgVeFUzs9sh_Q\n"
+  - wait-serial: 'field: joined game 4242 as node 7 (org.atalaia.domination, zone), 2 teams, channel 869525000 Hz, epoch 1'
+  - wait-serial: 'screen status {"title":"Joined game 4242","mode":"zone, node 7"}'
+  - delay: 1000ms
+  - take-screenshot:
+      part-id: lcd1
+      save-to: ../build-wokwi/join-1-waiting.png
+
+  # The same card again: nothing changes (no new epoch).
+  - write-serial: "@join atalaia:join:AasBGRCSAlArfhUWKK7Spqv3FYgJz088AwcEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JZHpvbmUKGTA5DABTPb_iVQNhRBI4c-CumM5lJXJdqhE3cFgVeFUzs9sh_Q\n"
+  - wait-serial: 'join: joined'

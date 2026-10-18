@@ -766,8 +766,90 @@ def gen_packet_vectors(jv: dict[str, Any]) -> str:
               "#define AES_CCM_VECTOR_COUNT (sizeof(aes_ccm_vectors) / sizeof(aes_ccm_vectors[0]))",
               ""]
 
+    if "join" in jv:
+        L += gen_join_vectors(jv["join"], byte_array)
+
     L += ["#endif /* ATALAIA_PACKET_VECTORS_H */", ""]
     return "\n".join(L)
+
+
+def gen_join_vectors(jv: dict[str, Any], byte_array: Any) -> list[str]:
+    """Join payload vectors (protocol/vectors/join.json), with expected structs."""
+    L = ["/* ---- join payload vectors (protocol/join.md) ---- */", "",
+         "#include \"atalaia/join.h\"", "",
+         "typedef struct {",
+         "    const char *name;",
+         "    atalaia_join_t fields;",
+         "    const uint8_t *payload;",
+         "    size_t payload_len;",
+         "    const char *text;",
+         "    const uint8_t *ndef_tag;",
+         "    size_t ndef_tag_len;",
+         "} join_vector_t;",
+         "",
+         "typedef struct {",
+         "    const char *name;",
+         "    const uint8_t *payload;",
+         "    size_t payload_len;",
+         "    atalaia_join_result_t result;",
+         "    const char *why;",
+         "} join_bad_vector_t;",
+         "",
+         "typedef struct {",
+         "    const char *name;",
+         "    const uint8_t *key;",
+         "    size_t key_len;",
+         "    const uint8_t *data;",
+         "    size_t data_len;",
+         "    const uint8_t *mac;",
+         "} hmac_vector_t;",
+         ""]
+    L += byte_array("join_key", jv["join_key"])
+    L += byte_array("join_wrong_key", jv["wrong_key"])
+    L += byte_array("join_optional_key_skipped", jv["optional_key_skipped"])
+    for i, v in enumerate(jv["valid"]):
+        L += byte_array(f"join_vec_{i}", v["payload"])
+        L += byte_array(f"join_tag_{i}", v["ndef_tag"])
+    for i, v in enumerate(jv["invalid"]):
+        L += byte_array(f"join_bad_{i}", v["payload"])
+    for i, v in enumerate(jv["hmac_sha256"]):
+        L += byte_array(f"hmac_key_{i}", v["key"])
+        L += byte_array(f"hmac_data_{i}", v["data"])
+        L += byte_array(f"hmac_mac_{i}", v["mac"])
+
+    kinds = {"node": "ATALAIA_JOIN_KIND_NODE", "controller": "ATALAIA_JOIN_KIND_CONTROLLER"}
+    results = {"length": "ATALAIA_JOIN_ERR_LENGTH", "version": "ATALAIA_JOIN_ERR_VERSION",
+               "mac": "ATALAIA_JOIN_ERR_MAC", "body": "ATALAIA_JOIN_ERR_BODY"}
+    L += ["", "static const join_vector_t join_vectors[] = {"]
+    for i, v in enumerate(jv["valid"]):
+        f = v["fields"]
+        key = ", ".join(f"0x{b:02x}" for b in bytes.fromhex(f["game_key"]))
+        teams = ", ".join("{" + c_string(t) + "}" for t in f["teams"])
+        params = "" if f["params"] is None else json.dumps(f["params"], separators=(",", ":"),
+                                                           ensure_ascii=False)
+        L += [f"    {{{c_string(v['name'])},",
+              f"     {{{f['game_id']}, {{{key}}}, {f['node_id']}, {f['controller_id']}, "
+              f"{f['channel_hz']}u, {f['max_hops']},",
+              f"      {{{teams}}}, {len(f['teams'])},",
+              f"      {c_string(f['mode_id'])}, {c_string(f['role'])}, {f['game_seed']}u, "
+              f"{c_string(params)}, {kinds[f['kind']]}}},",
+              f"     join_vec_{i}, join_vec_{i}_len, {c_string(v['text'])}, "
+              f"join_tag_{i}, join_tag_{i}_len}},"]
+    L += ["};",
+          "#define JOIN_VECTOR_COUNT (sizeof(join_vectors) / sizeof(join_vectors[0]))", "",
+          "static const join_bad_vector_t join_bad_vectors[] = {"]
+    for i, v in enumerate(jv["invalid"]):
+        L.append(f"    {{{c_string(v['name'])}, join_bad_{i}, join_bad_{i}_len, "
+                 f"{results[v['reason']]}, {c_string(v['why'])}}},")
+    L += ["};",
+          "#define JOIN_BAD_VECTOR_COUNT (sizeof(join_bad_vectors) / sizeof(join_bad_vectors[0]))", "",
+          "static const hmac_vector_t hmac_vectors[] = {"]
+    for i, v in enumerate(jv["hmac_sha256"]):
+        L.append(f"    {{{c_string(v['name'])}, hmac_key_{i}, hmac_key_{i}_len, "
+                 f"hmac_data_{i}, hmac_data_{i}_len, hmac_mac_{i}}},")
+    L += ["};",
+          "#define HMAC_VECTOR_COUNT (sizeof(hmac_vectors) / sizeof(hmac_vectors[0]))", ""]
+    return L
 
 
 # ---- main ------------------------------------------------------------------

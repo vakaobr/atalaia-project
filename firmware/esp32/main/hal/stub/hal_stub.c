@@ -166,13 +166,25 @@ static bool stub_nfc_poll(hal_nfc_tag_t *tag)
     return false;
 }
 
+static int stub_nfc_read_user_memory(uint8_t *buf, size_t cap)
+{
+    if (hal_stub_nfc_mem_len == 0) return -1;
+    size_t n = hal_stub_nfc_mem_len < cap ? hal_stub_nfc_mem_len : cap;
+    memcpy(buf, hal_stub_nfc_mem, n);
+    return (int)n;
+}
+
 static void stub_nfc_deinit(void)
 {
 }
 
+uint8_t hal_stub_nfc_mem[888];
+size_t hal_stub_nfc_mem_len;
+
 static const hal_nfc_ops_t stub_nfc_ops = {
     .init = stub_nfc_init,
     .poll = stub_nfc_poll,
+    .read_user_memory = stub_nfc_read_user_memory,
     .deinit = stub_nfc_deinit,
 };
 

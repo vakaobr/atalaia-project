@@ -1,11 +1,25 @@
 /* SPDX-FileCopyrightText: 2026 The Atalaia contributors */
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 
+/*
+ * PN532 NFC reader over I2C (address 0x24), from the public PN532 user
+ * manual: every command is answered first by an ACK frame and then, when
+ * the chip is ready again, by the response frame; every I2C read starts
+ * with a status byte whose bit 0 says "ready".
+ *
+ * Two operations: poll for an ISO 14443A tag (InListPassiveTarget), and
+ * read a Type 2 tag's user memory (NTAG215/216, pages from 4) with the
+ * tag's READ command through InDataExchange, for join cards
+ * (protocol/join.md). Not yet run against a real PN532: the boards and
+ * readers have not arrived (plan phase F); BRING_UP.md step 7 checks it.
+ */
+
 #ifdef ESP_PLATFORM
 
 #include "../hal_nfc.h"
 #include "hal_esp_i2c.h"
 
+#include "atalaia/join.h"
 #include "driver/i2c.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -15,85 +29,97 @@
 
 static const char *TAG = "hal_nfc";
 
-/* ---- Kconfig pins ---- */
-
 /* The PN532 sits on the shared board bus (hal_esp_i2c.c). */
-#define CONFIG_ATALAIA_NFC_I2C_PORT HAL_ESP_I2C_PORT
+#define NFC_I2C_PORT HAL_ESP_I2C_PORT
 
 #define PN532_I2C_ADDR                0x24
 #define PN532_READY_BIT               0x01
 #define PN532_CMD_INLISTPASSIVETARGET 0x4A
+#define PN532_CMD_INDATAEXCHANGE      0x40
+#define NTAG_CMD_READ                 0x30
+#define NTAG_FIRST_USER_PAGE          4
+#define NTAG_LAST_PAGE                231 /* NTAG216; NTAG215 stops earlier and errors */
+#define PN532_TIMEOUT_MS              100
 
-/* ---- helpers ---- */
+static bool present;
+static bool have_target; /* the last poll found a tag (target 1) */
+
+/* ---- frames ---- */
 
 static esp_err_t pn532_write_command(const uint8_t *cmd, size_t len)
 {
-    /*
-     * PN532 I2C frame:
-     * [0x00] [0x00] [0xFF] [LEN] [LCS] [TFI=0xD4] [CMD] ... [DCS] [0x00]
-     */
+    /* [00] [00 FF] [LEN] [LCS] [D4 CMD ...] [DCS] [00] */
     uint8_t frame[64];
     if (len + 8 > sizeof(frame)) return ESP_ERR_INVALID_SIZE;
-
     size_t data_len = len + 1; /* TFI + command bytes */
-    uint8_t lcs = (uint8_t)(~data_len + 1);
-
-    frame[0] = 0x00; /* preamble */
-    frame[1] = 0x00; /* start code 1 */
-    frame[2] = 0xFF; /* start code 2 */
+    frame[0] = 0x00;
+    frame[1] = 0x00;
+    frame[2] = 0xFF;
     frame[3] = (uint8_t)data_len;
-    frame[4] = lcs;
-    frame[5] = 0xD4; /* TFI: host to PN532 */
-
+    frame[4] = (uint8_t)(~data_len + 1);
+    frame[5] = 0xD4;
     uint8_t dcs = 0xD4;
     for (size_t i = 0; i < len; i++) {
         frame[6 + i] = cmd[i];
         dcs += cmd[i];
     }
-    dcs = (uint8_t)(~dcs + 1);
-    frame[6 + len] = dcs;
-    frame[7 + len] = 0x00; /* postamble */
-
-    return i2c_master_write_to_device(CONFIG_ATALAIA_NFC_I2C_PORT, PN532_I2C_ADDR, frame, 8 + len,
-                                      pdMS_TO_TICKS(100));
+    frame[6 + len] = (uint8_t)(~dcs + 1);
+    frame[7 + len] = 0x00;
+    return i2c_master_write_to_device(NFC_I2C_PORT, PN532_I2C_ADDR, frame, 8 + len,
+                                      pdMS_TO_TICKS(PN532_TIMEOUT_MS));
 }
 
-static esp_err_t pn532_read_response(uint8_t *buf, size_t buf_len, size_t *out_len)
+static bool pn532_wait_ready(int timeout_ms)
 {
-    /* First byte is the ready status */
-    uint8_t status;
-    esp_err_t err = i2c_master_read_from_device(CONFIG_ATALAIA_NFC_I2C_PORT, PN532_I2C_ADDR,
-                                                &status, 1, pdMS_TO_TICKS(100));
-    if (err != ESP_OK) return err;
-    if (!(status & PN532_READY_BIT)) return ESP_ERR_NOT_FINISHED;
-
-    /* Read the response frame */
-    uint8_t frame[64];
-    size_t read_len = buf_len + 9;
-    if (read_len > sizeof(frame)) read_len = sizeof(frame);
-
-    err = i2c_master_read_from_device(CONFIG_ATALAIA_NFC_I2C_PORT, PN532_I2C_ADDR, frame, read_len,
-                                      pdMS_TO_TICKS(100));
-    if (err != ESP_OK) return err;
-
-    /*
-     * Frame: [RDY] [0x00] [0x00] [0xFF] [LEN] [LCS] [TFI=0xD5] [CMD+1] ... [DCS] [0x00]
-     * Data starts at offset 7 (after RDY + preamble + start + LEN + LCS + TFI)
-     */
-    size_t payload_len = frame[4];
-    if (payload_len < 2) return ESP_ERR_INVALID_RESPONSE;
-    payload_len -= 1; /* subtract TFI */
-
-    if (payload_len > buf_len) payload_len = buf_len;
-    memcpy(buf, &frame[7], payload_len);
-    *out_len = payload_len;
-
-    return ESP_OK;
+    for (int waited = 0; waited <= timeout_ms; waited += 5) {
+        uint8_t status = 0;
+        if (i2c_master_read_from_device(NFC_I2C_PORT, PN532_I2C_ADDR, &status, 1,
+                                        pdMS_TO_TICKS(20)) == ESP_OK &&
+            (status & PN532_READY_BIT)) {
+            return true;
+        }
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+    return false;
 }
 
-/* ---- ops implementation ---- */
+/*
+ * Sends a command, checks the ACK frame, waits for the response and copies
+ * its data (from the command code + 1 on) into resp. Returns the length, or -1.
+ */
+static int pn532_transceive(const uint8_t *cmd, size_t len, uint8_t *resp, size_t cap)
+{
+    if (pn532_write_command(cmd, len) != ESP_OK) return -1;
+    if (!pn532_wait_ready(PN532_TIMEOUT_MS)) return -1;
+    static const uint8_t ack[] = {0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00};
+    uint8_t frame[64];
+    if (i2c_master_read_from_device(NFC_I2C_PORT, PN532_I2C_ADDR, frame, 1 + sizeof(ack),
+                                    pdMS_TO_TICKS(PN532_TIMEOUT_MS)) != ESP_OK ||
+        memcmp(frame + 1, ack, sizeof(ack)) != 0) {
+        return -1;
+    }
+    if (!pn532_wait_ready(PN532_TIMEOUT_MS)) return -1;
+    /* [RDY] [00] [00 FF] [LEN] [LCS] [D5] [CMD+1 data...] [DCS] [00] */
+    size_t want = cap + 9;
+    if (want > sizeof(frame)) want = sizeof(frame);
+    if (i2c_master_read_from_device(NFC_I2C_PORT, PN532_I2C_ADDR, frame, want,
+                                    pdMS_TO_TICKS(PN532_TIMEOUT_MS)) != ESP_OK) {
+        return -1;
+    }
+    if (frame[2] != 0x00 || frame[3] != 0xFF || (uint8_t)(frame[4] + frame[5]) != 0 ||
+        frame[6] != 0xD5 || frame[4] < 2) {
+        return -1;
+    }
+    size_t n = (size_t)frame[4] - 1; /* without the TFI */
+    if (n > cap || 7 + n + 1 > want) return -1;
+    uint8_t dcs = 0xD5;
+    for (size_t i = 0; i < n; i++) dcs += frame[7 + i];
+    if ((uint8_t)(dcs + frame[7 + n]) != 0) return -1;
+    memcpy(resp, frame + 7, n);
+    return (int)n;
+}
 
-static bool present;
+/* ---- ops ---- */
 
 static int esp_nfc_init(void)
 {
@@ -109,43 +135,43 @@ static int esp_nfc_init(void)
 
 static bool esp_nfc_poll(hal_nfc_tag_t *tag)
 {
+    have_target = false;
     if (!present) return false;
-
-    /* InListPassiveTarget: 1 target, 106 kbps type A */
-    uint8_t cmd[] = {PN532_CMD_INLISTPASSIVETARGET, 0x01, 0x00};
-    esp_err_t err = pn532_write_command(cmd, sizeof(cmd));
-    if (err != ESP_OK) return false;
-
-    /* Wait for response */
-    vTaskDelay(pdMS_TO_TICKS(50));
-
+    /* InListPassiveTarget: 1 target, 106 kbps type A. */
+    static const uint8_t cmd[] = {PN532_CMD_INLISTPASSIVETARGET, 0x01, 0x00};
     uint8_t resp[32];
-    size_t resp_len = 0;
-    err = pn532_read_response(resp, sizeof(resp), &resp_len);
-    if (err != ESP_OK) return false;
-
-    /*
-     * Response: [CMD+1=0x4B] [NbTg] [Tg] [SENS_RES...] [SEL_RES] [NFCIDLength] [NFCID1...]
-     * resp[0] = 0x4B (InListPassiveTarget response)
-     * resp[1] = number of targets found
-     */
-    if (resp_len < 2 || resp[0] != 0x4B || resp[1] == 0) {
-        return false;
-    }
-
-    /* Parse UID from the response */
-    if (resp_len >= 7) {
-        uint8_t uid_len = resp[6];
-        if (uid_len > sizeof(tag->uid)) uid_len = sizeof(tag->uid);
-
-        memset(tag, 0, sizeof(*tag));
+    int n = pn532_transceive(cmd, sizeof(cmd), resp, sizeof(resp));
+    /* [4B] [NbTg] [Tg] [SENS_RES 2] [SEL_RES] [NFCIDLength] [NFCID1...] */
+    if (n < 7 || resp[0] != 0x4B || resp[1] == 0) return false;
+    memset(tag, 0, sizeof(*tag));
+    uint8_t uid_len = resp[6];
+    if (uid_len > sizeof(tag->uid)) uid_len = sizeof(tag->uid);
+    if (n >= 7 + uid_len) {
+        memcpy(tag->uid, &resp[7], uid_len);
         tag->uid_len = uid_len;
-        if (resp_len >= 7 + uid_len) {
-            memcpy(tag->uid, &resp[7], uid_len);
-        }
     }
-
+    have_target = true;
     return true;
+}
+
+static int esp_nfc_read_user_memory(uint8_t *buf, size_t cap)
+{
+    if (!present || !have_target) return -1;
+    size_t got = 0;
+    for (unsigned page = NTAG_FIRST_USER_PAGE; got < cap && page <= NTAG_LAST_PAGE; page += 4) {
+        /* InDataExchange to target 1: the tag's READ returns 16 bytes (4 pages). */
+        uint8_t cmd[] = {PN532_CMD_INDATAEXCHANGE, 0x01, NTAG_CMD_READ, (uint8_t)page};
+        uint8_t resp[24];
+        int n = pn532_transceive(cmd, sizeof(cmd), resp, sizeof(resp));
+        if (n < 18 || resp[0] != 0x41 || resp[1] != 0x00) break; /* past the end, or gone */
+        size_t take = cap - got < 16 ? cap - got : 16;
+        memcpy(buf + got, resp + 2, take);
+        got += take;
+        /* Stop as soon as the join record is complete. */
+        const uint8_t *payload = NULL;
+        if (atalaia_join_from_ndef_tag(buf, got, &payload) > 0) break;
+    }
+    return got > 0 ? (int)got : -1;
 }
 
 static void esp_nfc_deinit(void)
@@ -157,6 +183,7 @@ static void esp_nfc_deinit(void)
 const hal_nfc_ops_t hal_esp_nfc_ops = {
     .init = esp_nfc_init,
     .poll = esp_nfc_poll,
+    .read_user_memory = esp_nfc_read_user_memory,
     .deinit = esp_nfc_deinit,
 };
 

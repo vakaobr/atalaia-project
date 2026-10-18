@@ -22,6 +22,7 @@ import time
 from collections import Counter
 from typing import Any, Callable, Optional
 
+from atalaia_sim import join as joinfmt
 from atalaia_sim.core import Core, Emitted, FieldOps, Node
 from atalaia_sim.election import Election, priority_score
 from atalaia_sim.field_controller import (
@@ -29,6 +30,7 @@ from atalaia_sim.field_controller import (
     GAME_ENDED,
     GAME_PAUSED,
     GAME_RUNNING,
+    GAME_WAITING,
     FieldController,
     FieldNode,
     NotController,
@@ -123,7 +125,7 @@ class FieldScript:
         self.engine = engine
         self.state: dict[str, Any] = {}
         ops = FieldOps(nodes=self._nodes, owner=self._owner, send=self._send, on_state=self._on_state)
-        self.node = Node(core, engine.cfg.node_id, seed, teams, params, source, chunk,
+        self.node = Node(core, engine.node_id, seed, teams, params, source, chunk,
                          on_event=self._on_event, on_log=self._on_log, field_ops=ops)
         if not self.node.loaded:
             raise ModeError(f"field.lua does not load: {self.node.last_error}")
@@ -173,8 +175,11 @@ class FieldScript:
 
 class Controller:
     def __init__(self, cfg: Config, store: Store, *, modem: Optional[radio_modem.RadioModem] = None,
-                 core: Optional[Core] = None, clock: Callable[[], float] = time.monotonic) -> None:
+                 core: Optional[Core] = None, clock: Callable[[], float] = time.monotonic,
+                 join_key: bytes = b"") -> None:
         self.cfg = cfg
+        # The field join key authenticates join payloads (protocol/join.md); never on the API.
+        self.join_key = join_key
         self.store = store
         self.modem = modem
         self.core = core
@@ -219,6 +224,13 @@ class Controller:
                 log.exception("listener failed")
 
     @property
+    def node_id(self) -> int:
+        """This controller's short id in the live game (a joined standby has its own), else the configured one."""
+        if self.game is not None and self.game.get("node_id") is not None:
+            return int(self.game["node_id"])
+        return self.cfg.node_id
+
+    @property
     def radio_state(self) -> str:
         return self.modem.state if self.modem is not None else "none"
 
@@ -246,14 +258,25 @@ class Controller:
 
     # --- games: activation and restore ---------------------------------------
 
-    def _activate(self, game: dict[str, Any], key: bytes, term: int) -> None:
-        """Puts a game on the radio: transport, FieldController, election, hooks."""
-        election = Election(self.cfg.node_id, self.priority, mode=self.cfg.failover_mode)
-        election.lead(term, self.now_ms())
-        self.transport = ModemTransport(self.modem, self.store, game["id"], self.cfg.node_id,
-                                        self.cfg.max_hops, self.cfg.channel_hz, key)
+    def _activate(self, game: dict[str, Any], key: bytes, term: int, lead: bool = True) -> None:
+        """Puts a game on the radio: transport, FieldController, election, hooks.
+
+        lead=False for a game joined as a standby controller: it follows the
+        TIME beacons until it is promoted (ADR-P2-8).
+        """
+        node_id = game.get("node_id")
+        node_id = self.cfg.node_id if node_id is None else int(node_id)
+        channel = game.get("channel_hz") or self.cfg.channel_hz
+        max_hops = game.get("max_hops") or self.cfg.max_hops
+        election = Election(node_id, self.priority, mode=self.cfg.failover_mode)
+        if lead:
+            election.lead(term, self.now_ms())
+        else:
+            election.follow(self.now_ms())
+        self.transport = ModemTransport(self.modem, self.store, game["id"], node_id, max_hops,
+                                        channel, key)
         fc = FieldController(transport=self.transport, game_id=game["id"], teams=game["teams"],
-                             node_id=self.cfg.node_id, election=election, max_hops=self.cfg.max_hops)
+                             node_id=node_id, election=election, max_hops=max_hops)
         fc.duration_ms = game["duration_ms"]
         for node_id, role in game["assignments"].items():
             fc.register_node(int(node_id), f"node-{node_id}", role)
@@ -277,7 +300,8 @@ class Controller:
             self.game = game
             self.key_lost = True
             return
-        self._activate(game, key, game["term"])
+        # A joined standby restarts as a follower; the GM promotes it again if needed.
+        self._activate(game, key, game["term"], lead=not game.get("joined"))
         assert self.fc is not None
         fc = self.fc
         fc.restore_adjustments(self._adjustments(game["id"]))
@@ -295,7 +319,7 @@ class Controller:
     def _adjustments(self, game_id: int) -> dict[str, int]:
         out: dict[str, int] = {}
         for ev in self.store.events(game_id, event_type="score.delta"):
-            if ev["node"] == self.cfg.node_id and ev["team"]:
+            if ev["node"] == self.node_id and ev["team"]:
                 out[ev["team"]] = out.get(ev["team"], 0) + int(ev["data"].get("amount", 0))
         return out
 
@@ -389,6 +413,8 @@ class Controller:
                 "assignments": clean, "duration_ms": duration,
                 "game_seed": random.SystemRandom().randrange(1, 0xFFFFFFFF),
                 "state": "ready", "term": 1, "created_at": time.time(),
+                "node_id": self.cfg.node_id, "channel_hz": self.cfg.channel_hz,
+                "max_hops": self.cfg.max_hops, "joined": False,
             }
             self.store.create_game(game, key if self.cfg.persist_game_key else None)
             self._activate(self.store.game(game_id) or game, key, 1)
@@ -397,11 +423,135 @@ class Controller:
             return out
 
     def game_key(self, game_id: int) -> bytes:
-        """The live game's key, for the join flow (phase E). Never exposed over the API in phase D."""
+        """The live game's key. Only ever leaves the controller inside a join payload."""
         with self._lock:
             if self.game is None or self.game["id"] != game_id or self.key_lost:
                 raise Conflict("no key: the game is not live on this controller")
             return self._key
+
+    # --- join flow (ADR-P2-12, protocol/join.md) -------------------------------
+
+    def _used_ids(self) -> set[int]:
+        assert self.game is not None
+        used = {self.node_id, self.cfg.node_id, 0xFFFF}
+        used.update(int(n) for n in self.game["assignments"])
+        if self.fc is not None:
+            used.update(self.fc.nodes)
+        if self.game.get("controller_id") is not None:
+            used.add(int(self.game["controller_id"]))
+        return used
+
+    def issue_join(self, spec: dict[str, Any], node_id: Optional[int] = None) -> dict[str, Any]:
+        """A join payload for a box (kind "node") or a standby controller (kind "controller").
+
+        The node id is the given one or the lowest free id; a box's role is
+        recorded in the game's assignments. The answer holds the game key (in
+        the payload), so only the GM token may ask for it.
+        """
+        with self._lock:
+            if self.game is None:
+                raise Conflict("no live game: create a game first")
+            fc = self._live(self.game["id"])
+            if not self.join_key:
+                raise Unavailable("no join key configured")
+            kind = spec.get("kind", "node")
+            if kind not in joinfmt.KINDS:
+                raise ControllerError(f"kind: one of {', '.join(sorted(joinfmt.KINDS))}")
+            pkg = self.modes.get(self.game["mode_id"])
+            if kind == "node":
+                role = spec.get("role")
+                roles = sorted(pkg.mode.roles) if pkg is not None else []
+                if role is None and len(roles) == 1:
+                    role = roles[0]
+                if role not in roles:
+                    raise ControllerError(f"role: one of {roles}")
+            else:
+                role = "controller"
+            if node_id is None and spec.get("node_id") is not None:
+                node_id = _int(spec["node_id"], "node_id")
+            if node_id is None:
+                used = self._used_ids()
+                node_id = next(i for i in range(1, 0xFFFF) if i not in used)
+            node_id = _int(node_id, "node id")
+            if not 1 <= node_id <= 0xFFFE or node_id == self.node_id:
+                raise ControllerError(f"node id {node_id}: 1-65534, not the controller's")
+            assigned = self.game["assignments"].get(str(node_id))
+            if kind == "controller" and (assigned is not None or node_id in fc.nodes):
+                raise Conflict(f"node id {node_id} is a box in this game")
+            join = {
+                "game_id": self.game["id"], "game_key": self._key, "node_id": node_id,
+                "controller_id": self.node_id,
+                "channel_hz": self.game.get("channel_hz") or self.cfg.channel_hz,
+                "max_hops": self.game.get("max_hops") or self.cfg.max_hops,
+                "teams": list(self.game["teams"]), "mode_id": self.game["mode_id"], "role": role,
+                "game_seed": int(self.game["game_seed"]) & 0xFFFFFFFF,
+                "params": self.game["params"] or None, "kind": kind,
+            }
+            try:
+                payload = joinfmt.encode(join, self.join_key)
+            except joinfmt.JoinError as exc:
+                raise Conflict(f"this game does not fit in a join payload: {exc}") from None
+            if kind == "node" and assigned != role:
+                self.game["assignments"][str(node_id)] = role
+                self.store.update_game(self.game["id"], assignments=self.game["assignments"])
+                fc.register_node(node_id, f"node-{node_id}", role)
+            out = {
+                "game": self.game["id"], "node_id": node_id, "kind": kind, "role": role,
+                "controller_id": self.node_id, "channel_hz": join["channel_hz"],
+                "max_hops": join["max_hops"], "bytes": len(payload),
+                "text": joinfmt.to_text(payload), "payload_hex": payload.hex(),
+                "ndef_tag_hex": joinfmt.to_ndef_tag(payload).hex(),
+            }
+            self._emit({"type": "join", "game": self.game["id"], "node_id": node_id, "kind": kind,
+                        "role": role})
+            return out
+
+    def join_as_standby(self, text: Any) -> dict[str, Any]:
+        """Takes a game as a standby controller from a join text (kind "controller").
+
+        The game is stored and put on the radio with the payload's key, node
+        id and channel; this controller follows the TIME beacons until the
+        GM promotes it (ADR-P2-8). Answers with the game.
+        """
+        with self._lock:
+            if self.game is not None:
+                raise Conflict(f"game {self.game['id']} is still live here; end it first")
+            if not self.join_key:
+                raise Unavailable("no join key configured")
+            if not isinstance(text, str):
+                raise ControllerError("text: the join text (atalaia:join:...)")
+            try:
+                j = joinfmt.decode(joinfmt.from_text(text), self.join_key)
+            except joinfmt.JoinError as exc:
+                raise ControllerError(f"join payload refused ({exc.reason}): {exc}") from None
+            if j["kind"] != "controller":
+                raise ControllerError("this join payload is for a box, not a standby controller")
+            pkg = self.modes.get(j["mode_id"])
+            if pkg is None:
+                raise Conflict(f"mode {j['mode_id']} is not installed on this controller")
+            if pkg.field_script is not None and self.core is None:
+                raise Unavailable("this mode has a field.lua and the core library is not loaded")
+            existing = self.store.game(j["game_id"])
+            if existing is not None:
+                raise Conflict(f"this controller already has a game {j['game_id']} "
+                               f"({existing['state']})")
+            try:
+                params = resolve_params(pkg.mode, j["params"] or {}, j["teams"])
+            except ModeError as exc:
+                raise ControllerError(str(exc)) from None
+            game = {
+                "id": j["game_id"], "name": f"Game {j['game_id']} (standby)", "mode_id": pkg.id,
+                "preset_id": None, "teams": j["teams"], "params": params, "assignments": {},
+                "duration_ms": 0, "game_seed": j["game_seed"], "state": "ready", "term": 0,
+                "created_at": time.time(), "node_id": j["node_id"], "channel_hz": j["channel_hz"],
+                "max_hops": j["max_hops"], "joined": True, "controller_id": j["controller_id"],
+            }
+            key = j["game_key"]
+            self.store.create_game(game, key if self.cfg.persist_game_key else None)
+            self._activate(self.store.game(j["game_id"]) or game, key, 0, lead=False)
+            out = self.get_game(j["game_id"])
+            self._emit({"type": "game", "game": out})
+            return out
 
     def _live(self, game_id: int) -> FieldController:
         game = self.store.game(game_id)
@@ -478,6 +628,8 @@ class Controller:
                 raise NotFound(f"no game {game_id}")
             if self.game is None or self.game["id"] != game_id:
                 raise Conflict(f"game {game_id} is {game['state']}, not live")
+            if self.fc is not None and not self.fc.is_controller and self.game.get("joined"):
+                return self._leave_standby(game_id, reason or "left")
             if not self.key_lost:
                 fc = self._live(game_id)
                 fc.end_game(now_ms=self.now_ms(), reason=reason or None)
@@ -494,6 +646,17 @@ class Controller:
             out = self._set_state(game_id, "ended", ended_at=time.time())
             self._deactivate()
             return self.public_game(self.store.game(game_id) or out)
+
+    def _leave_standby(self, game_id: int, reason: str) -> dict[str, Any]:
+        """A standby controller stops following a game (the GM left it, or it ended)."""
+        if self.fc is not None:
+            self.store.save_scores(game_id, self.fc.total_scores)
+            self._save_game_time(force=True)
+        self.store.update_game(game_id, game_key=None)
+        log.info("standby: left game %d (%s)", game_id, reason)
+        out = self._set_state(game_id, "ended", ended_at=time.time())
+        self._deactivate()
+        return self.public_game(self.store.game(game_id) or out)
 
     def score(self, game_id: int) -> dict[str, Any]:
         with self._lock:
@@ -579,8 +742,10 @@ class Controller:
         with self._lock:
             fc = self.fc
             return {
-                "node_id": self.cfg.node_id,
+                "node_id": self.node_id,
                 "failover_mode": self.cfg.failover_mode,
+                "joined": bool(self.game.get("joined")) if self.game else False,
+                "leader": fc.election.leader if fc else None,
                 "priority": self.priority,
                 "role": fc.election.role if fc else None,
                 "term": fc.term if fc else None,
@@ -621,7 +786,30 @@ class Controller:
                     and fc.duration_ms and fc.game_time_ms >= fc.duration_ms):
                 self.end_game(self.game["id"], "time")
                 return
+            if self.game is not None and not fc.is_controller:
+                self._follow_state(fc)
+                if self.game is None:
+                    return
             self._save_game_time()
+
+    def _follow_state(self, fc: FieldController) -> None:
+        """On standby: the stored game follows the controller's TIME beacons."""
+        assert self.game is not None
+        state = {GAME_RUNNING: "running", GAME_PAUSED: "paused", GAME_ENDED: "ended",
+                 GAME_WAITING: "ready"}.get(fc.game_state, "ready")
+        if fc.duration_ms != self.game.get("duration_ms"):
+            self.game["duration_ms"] = fc.duration_ms
+            self.store.update_game(self.game["id"], duration_ms=fc.duration_ms)
+        if state == self.game["state"]:
+            return
+        if state == "ended":
+            self._leave_standby(self.game["id"], "the game ended")
+            return
+        times: dict[str, float] = {}
+        if state == "running" and not self.game.get("started_at"):
+            times["started_at"] = time.time()
+            self.game["started_at"] = times["started_at"]
+        self._set_state(self.game["id"], state, **times)
 
     def _save_game_time(self, force: bool = False) -> None:
         if self.fc is None or self.game is None:
@@ -669,7 +857,7 @@ class Controller:
             return
         ev = _public_event(record)
         self._emit({"type": "event", "game": self.game["id"], "event": ev})
-        if self.field is not None and record["node"] != self.cfg.node_id:
+        if self.field is not None and record["node"] != self.node_id:
             data = dict(record.get("data") or {})
             data.setdefault("node", record["node"])
             if record.get("team"):

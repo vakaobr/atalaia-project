@@ -27,6 +27,10 @@ CONFIG_ATALAIA_AUDIO_LRCLK_PIN=-1
 CONFIG_ATALAIA_AUDIO_DOUT_PIN=-1
 
 # Two teams: GPIO 33/34 are not on the DevKitC-1 headers.
+# diagram.json wires button 2 to GPIO 5. The Field Box default moved to GPIO 39
+# (GPIO 5 is the Heltec V4.3 FEM's CTX pin), but here 39 is a keypad column and
+# the emulator has no FEM: the FEM pins are driven only after an SX1262 answers.
+CONFIG_ATALAIA_BTN2_PIN=5
 CONFIG_ATALAIA_BTN3_PIN=-1
 CONFIG_ATALAIA_BTN4_PIN=-1
 
@@ -48,3 +52,12 @@ CONFIG_ATALAIA_SERIAL_KEYS=y
 
 # Keep booting if the emulated board has no PSRAM (diagram.json asks for 2 MB).
 CONFIG_SPIRAM_IGNORE_NOTFOUND=y
+
+# A field game can be joined from the serial console ("@join ..."): the join
+# scenario (wokwi/join.scenario.yaml) signs its payload with this public test
+# key (protocol/vectors/join.json). Never set it on a real Field Box.
+CONFIG_ATALAIA_DEV_JOIN_KEY="000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+
+# The emulated board's console is UART0; the USB-Serial-JTAG input of the
+# Field Box build (CONFIG_ATALAIA_CONSOLE_USB_INPUT) is not used here.
+# CONFIG_ATALAIA_CONSOLE_USB_INPUT is not set

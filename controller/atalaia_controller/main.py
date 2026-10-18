@@ -1,9 +1,11 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Entry point: python -m atalaia_controller [run|tokens] [--config controller.toml].
+"""Entry point: python -m atalaia_controller [run|tokens|join-key] [--config controller.toml].
 
-    run      start the controller: radio modem, MQTT bridge, REST/WebSocket API
-    tokens   print the GM and read tokens (generated on first start if not configured)
+    run       start the controller: radio modem, MQTT bridge, REST/WebSocket API, GM console
+    tokens    print the GM and read tokens (generated on first start if not configured)
+    join-key  print the field join key that authenticates join cards (protocol/join.md):
+              set it on every box of the field and on a standby controller
 """
 
 from __future__ import annotations
@@ -43,6 +45,18 @@ def ensure_tokens(cfg: Config, store: Store) -> tuple[str, str]:
     return out[0], out[1]
 
 
+def ensure_join_key(cfg: Config, store: Store) -> bytes:
+    """The configured field join key, or one generated once and kept in the store."""
+    if cfg.join_key:
+        return bytes.fromhex(cfg.join_key)
+    stored = store.get_setting("join_key")
+    if not stored:
+        stored = secrets.token_bytes(32).hex()
+        store.set_setting("join_key", stored)
+        log.warning("generated the field join key; show it with: python -m atalaia_controller join-key")
+    return bytes.fromhex(stored)
+
+
 def load_core() -> Optional[Core]:
     try:
         return Core(find_library())
@@ -67,6 +81,7 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
           serial_factory: Optional[Callable[[], Any]] = None) -> Bundle:
     store = Store(cfg.db_path)
     gm, read = ensure_tokens(cfg, store)
+    join_key = ensure_join_key(cfg, store)
     if core is None and load_core_lib:
         core = load_core()
     modem = None
@@ -75,7 +90,7 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
                            serial_factory=serial_factory)
     else:
         log.warning("no modem port configured: the controller runs without a radio")
-    controller = Controller(cfg, store, modem=modem, core=core)
+    controller = Controller(cfg, store, modem=modem, core=core, join_key=join_key)
     mqtt = maybe_bridge(cfg, controller)
     hub = Hub()
 
@@ -100,7 +115,7 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m atalaia_controller", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("command", nargs="?", default="run", choices=("run", "tokens"))
+    parser.add_argument("command", nargs="?", default="run", choices=("run", "tokens", "join-key"))
     parser.add_argument("--config", help="TOML settings file (see controller/controller.example.toml)")
     parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args(argv)
@@ -114,6 +129,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         store = Store(cfg.db_path)
         gm, read = ensure_tokens(cfg, store)
         print(f"GM token:   {gm}\nread token: {read}")
+        return 0
+    if args.command == "join-key":
+        print(ensure_join_key(cfg, Store(cfg.db_path)).hex())
         return 0
     bundle = build(cfg)
     import uvicorn

@@ -60,6 +60,7 @@ set(ATALAIA_CORE_SOURCES
     src/ack.c
     src/duty_cycle.c
     src/msg_codec.c
+    src/join.c
 )
 if(ATALAIA_HAVE_MBEDTLS)
     list(APPEND ATALAIA_CORE_SOURCES src/crypto_mbedtls.c)
@@ -95,7 +96,7 @@ if(BUILD_TESTING)
         tests/test_core.c tests/test_node.c tests/test_codec.c
         tests/test_packet.c tests/test_flood.c tests/test_ack.c
         tests/test_duty_cycle.c tests/test_msg_codec.c
-        tests/test_crypto_mbedtls.c tests/test_field_api.c)
+        tests/test_crypto_mbedtls.c tests/test_field_api.c tests/test_join.c)
     target_include_directories(test_core PRIVATE src)
     target_link_libraries(test_core PRIVATE atalaia_core)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")

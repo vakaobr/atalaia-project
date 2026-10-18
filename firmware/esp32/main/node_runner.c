@@ -27,6 +27,7 @@ static void on_event(void *user, const atalaia_event_t *ev, const char *data_jso
 #endif
     r->event_count++;
     snprintf(r->last_event_type, sizeof(r->last_event_type), "%s", ev->type);
+    if (r->event_hook != NULL) r->event_hook(r->event_ctx, ev, data_json);
 }
 
 static void on_command(void *user, const char *target, const char *method, const char *args_json)
@@ -52,6 +53,8 @@ void node_runner_init(node_runner_t *r, hal_t *hal, size_t mem_limit)
     memset(r, 0, sizeof(*r));
     r->hal = hal;
     r->mem_limit = mem_limit;
+    r->node_id = 1;
+    r->game_seed = 42;
     command_queues_init(&r->queues);
 }
 
@@ -76,8 +79,8 @@ bool node_runner_start(node_runner_t *r, const preset_t *preset, const char *con
 
     /* Create the node. */
     atalaia_node_config_t cfg = {0};
-    cfg.node_id = 1;
-    cfg.game_seed = 42;
+    cfg.node_id = r->node_id;
+    cfg.game_seed = r->game_seed;
     cfg.mem_limit = r->mem_limit;
     cfg.instr_limit = 1000000;
     cfg.callbacks.event = on_event;
@@ -140,8 +143,8 @@ bool node_runner_resume(node_runner_t *r, const state_persist_data_t *saved, con
 
     /* Create the node. */
     atalaia_node_config_t cfg = {0};
-    cfg.node_id = 1;
-    cfg.game_seed = 42;
+    cfg.node_id = r->node_id;
+    cfg.game_seed = r->game_seed;
     cfg.mem_limit = r->mem_limit;
     cfg.instr_limit = 1000000;
     cfg.callbacks.event = on_event;

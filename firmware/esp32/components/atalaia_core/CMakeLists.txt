@@ -25,6 +25,7 @@ set(CORE_SOURCES
     "${CORE_ROOT}/src/ack.c"
     "${CORE_ROOT}/src/duty_cycle.c"
     "${CORE_ROOT}/src/msg_codec.c"
+    "${CORE_ROOT}/src/join.c"
     "${CORE_ROOT}/src/crypto_mbedtls.c"
 )
 

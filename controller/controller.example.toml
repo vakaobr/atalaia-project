@@ -37,3 +37,9 @@ host = "localhost"
 port = 1883
 username = "controller"
 password = ""
+
+[join]
+key = ""                          # the field join key (64 hex digits) that authenticates join
+                                  # cards; empty: generated on first start. Give a standby
+                                  # controller the same key. Show it with
+                                  # `python3 -m atalaia_controller join-key`

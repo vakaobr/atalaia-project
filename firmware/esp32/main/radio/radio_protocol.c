@@ -85,6 +85,9 @@ void atalaia_radio_proto_init(atalaia_radio_proto_t *rp, uint16_t game_id, uint1
     rp->seq = 0;
     rp->has_key = false;
     rp->tx_blocked = false;
+    rp->max_hops = 2;
+    rp->tx = NULL;
+    rp->tx_ctx = NULL;
 }
 
 bool atalaia_radio_proto_boot_epoch(atalaia_radio_proto_t *rp)
@@ -146,35 +149,49 @@ void atalaia_radio_proto_set_source_epoch(atalaia_radio_proto_t *rp, uint16_t so
     rp->source_epochs[idx].valid = true;
 }
 
+bool atalaia_radio_proto_send_payload(atalaia_radio_proto_t *rp, uint8_t msg_type, uint8_t prio,
+                                      bool ack_req, const uint8_t *payload, size_t len,
+                                      uint16_t *seq_out)
+{
+    if (!rp->has_key) return false;
+    if (rp->tx_blocked) return false;
+    if (len > ATALAIA_RF_PAYLOAD_MAX) return false;
+
+    atalaia_header_t hdr;
+    hdr.version_flags = ATALAIA_VF_MAKE(1, prio, ack_req ? 1 : 0, 1);
+    hdr.game_id = rp->game_id;
+    hdr.source = rp->node_id;
+    hdr.seq = rp->seq;
+    hdr.hop_limit = rp->max_hops;
+    hdr.type = msg_type;
+
+    uint8_t pkt[ATALAIA_RF_HEADER_SIZE + ATALAIA_RF_PAYLOAD_MAX + ATALAIA_RF_MIC_SIZE];
+    size_t pkt_len = atalaia_packet_encrypt(&hdr, rp->epoch, rp->game_key, payload, len, pkt,
+                                            sizeof(pkt), rp->crypto);
+    if (pkt_len == 0) return false;
+
+    /* The nonce (epoch, seq) is used: advance before the packet can leave. */
+    if (!advance_seq(rp)) return false;
+    if (seq_out != NULL) *seq_out = hdr.seq;
+
+    if (rp->tx != NULL) return rp->tx(rp->tx_ctx, pkt, pkt_len);
+    return radio_task_send(pkt, pkt_len);
+}
+
 bool atalaia_radio_proto_send_event(atalaia_radio_proto_t *rp, const atalaia_event_t *ev,
                                     const char *data_json)
 {
     if (!rp->has_key) return false;
     if (rp->tx_blocked) return false;
 
-    /* Encode the event payload. */
     uint8_t payload[ATALAIA_RF_PAYLOAD_MAX];
     size_t payload_len = atalaia_event_encode(ev, data_json, payload, sizeof(payload), NULL);
     if (payload_len == 0) return false;
 
-    /* Build the header. */
-    atalaia_header_t hdr;
-    hdr.version_flags = ATALAIA_VF_MAKE(1, ev->prio, 1, 1);
-    hdr.game_id = rp->game_id;
-    hdr.source = rp->node_id;
-    hdr.seq = rp->seq;
-    hdr.hop_limit = 3;
-    hdr.type = ATALAIA_MSG_EVENT;
-
-    /* Encrypt and send. */
-    uint8_t pkt[ATALAIA_RF_HEADER_SIZE + ATALAIA_RF_PAYLOAD_MAX + ATALAIA_RF_MIC_SIZE];
-    size_t pkt_len = atalaia_packet_encrypt(&hdr, rp->epoch, rp->game_key, payload, payload_len,
-                                            pkt, sizeof(pkt), rp->crypto);
-    if (pkt_len == 0) return false;
-
-    if (!advance_seq(rp)) return false;
-
-    return radio_task_send(pkt, pkt_len);
+    /* Normal and critical events ask for an ACK; telemetry is best effort. */
+    return atalaia_radio_proto_send_payload(rp, ATALAIA_MSG_EVENT, (uint8_t)ev->prio,
+                                            ev->prio != ATALAIA_PRIO_TELEMETRY, payload,
+                                            payload_len, NULL);
 }
 
 bool atalaia_radio_proto_send_state(atalaia_radio_proto_t *rp, const atalaia_state_msg_t *state)
@@ -186,22 +203,8 @@ bool atalaia_radio_proto_send_state(atalaia_radio_proto_t *rp, const atalaia_sta
     size_t payload_len = atalaia_state_encode(state, payload, sizeof(payload));
     if (payload_len == 0) return false;
 
-    atalaia_header_t hdr;
-    hdr.version_flags = ATALAIA_VF_MAKE(1, 0, 0, 1);
-    hdr.game_id = rp->game_id;
-    hdr.source = rp->node_id;
-    hdr.seq = rp->seq;
-    hdr.hop_limit = 1;
-    hdr.type = ATALAIA_MSG_STATE;
-
-    uint8_t pkt[ATALAIA_RF_HEADER_SIZE + ATALAIA_RF_PAYLOAD_MAX + ATALAIA_RF_MIC_SIZE];
-    size_t pkt_len = atalaia_packet_encrypt(&hdr, rp->epoch, rp->game_key, payload, payload_len,
-                                            pkt, sizeof(pkt), rp->crypto);
-    if (pkt_len == 0) return false;
-
-    if (!advance_seq(rp)) return false;
-
-    return radio_task_send(pkt, pkt_len);
+    return atalaia_radio_proto_send_payload(rp, ATALAIA_MSG_STATE, 0, false, payload, payload_len,
+                                            NULL);
 }
 
 bool atalaia_radio_proto_on_recv(atalaia_radio_proto_t *rp, const radio_rx_msg_t *rx_msg,

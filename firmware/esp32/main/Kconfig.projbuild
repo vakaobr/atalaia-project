@@ -3,12 +3,16 @@
 #
 # Pin assignments and tuning knobs for the Atalaia Field Box.
 # Default board: Heltec WiFi LoRa 32 V4.3 (ESP32-S3R2, 16 MB flash,
-# 2 MB PSRAM, SX1262 LoRa radio, 0.96" OLED).
+# 2 MB PSRAM, SX1262 LoRa radio, KCT8103L front-end module, 0.96" OLED).
+# The V4.2 (GC1109 front-end module) is selected under Radio > Board revision.
 #
 # Board-internal pins -- DO NOT reassign:
-#   1 (Vbat ADC), 2 (FEM_EN), 7 (VFEM_Ctrl), 8-14 (SX1262),
+#   1 (Vbat ADC), 2 (FEM_EN), 7 (VFEM_Ctrl: the FEM's LDO), 8-14 (SX1262),
 #   17-18 (OLED I2C), 19-20 (USB), 21 (OLED RST), 35 (LED),
-#   36 (Vext), 37 (ADC_Ctrl), 43-44 (UART0 console).
+#   36 (Vext_Ctrl, active low), 37 (ADC_Ctrl), 43-44 (UART0 console),
+#   5 on the V4.3 (KCT8103L CTX: receive LNA or bypass),
+#   46 on the V4.2 (GC1109 CPS: PA or bypass).
+#   (Button 2 moved from GPIO 5 to GPIO 39 for the V4.3.)
 #
 # ESP32-S3 strapping pins:
 #   GPIO 0  -- boot mode (PRG button on V4.3). Do not use.
@@ -20,7 +24,13 @@
 #   GPIO 46 -- boot log verbosity.  NOT used in default config.
 #              An external pull-up suppresses boot log (harmless).
 #
-# GNSS header (38-42): used for external peripherals in Phase 1.
+# GNSS header (34, 38-42): the V4 ships with a GNSS module for its SH1.25
+# connector (34 = VGNSS_Ctrl, the module's power; 38-42 = its UART, wake,
+# PPS and reset). The Field Box uses these pins for the display and the
+# buttons instead: GPS is NOT supported in this pin map -- do not plug the
+# GNSS module in. Button 4 on GPIO 34 shares the GNSS power control: with
+# no module fitted, pressing it only switches the empty connector's
+# supply. The pin map is to be revisited when GPS-based modes arrive (phase 4).
 # NFC/battery/keypad share the OLED I2C bus (17/18):
 #   0x20 (PCF8574 keypad), 0x24 (PN532 NFC), 0x36 (MAX17048), 0x3C (OLED).
 #
@@ -36,7 +46,11 @@ menu "Atalaia Field Box Configuration"
 
         config ATALAIA_BTN2_PIN
             int "Button 2 GPIO (-1 = unused)"
-            default 5
+            default 39
+            help
+                GPIO 39 (on the GNSS header, freed from the keypad matrix by
+                the PCF8574). Not GPIO 5: on the Heltec V4.3, GPIO 5 is the
+                front-end module's receive-path control (CTX).
 
         config ATALAIA_BTN3_PIN
             int "Button 3 GPIO (-1 = unused)"
@@ -129,6 +143,16 @@ menu "Atalaia Field Box Configuration"
         config ATALAIA_LED_COUNT
             int "Number of LEDs"
             default 24
+
+        config ATALAIA_LED_BRIGHTNESS_PCT
+            int "LED ring brightness at boot (percent)"
+            default 40
+            range 1 100
+            help
+                WS2812 LEDs have no brightness control of their own: the
+                driver scales every colour. A 24-LED ring at full white
+                draws about 1.4 A from the battery; modes can change the
+                brightness with ring:set_brightness(percent).
     endmenu
 
     # ---- SPI display --------------------------------------------------------
@@ -265,19 +289,58 @@ menu "Atalaia Field Box Configuration"
             int "SX1262 DIO1 GPIO"
             default 14
 
+        choice ATALAIA_BOARD_REV
+            prompt "Board revision (radio front-end module)"
+            default ATALAIA_BOARD_HELTEC_V4_3
+            help
+                The Heltec WiFi LoRa 32 V4 has two front-end modules between
+                the SX1262 and the antenna. Read the chip next to the LoRa
+                antenna connector (BRING_UP.md step 0): KCT8103L = V4.3,
+                GC1109 = V4.2. The wrong choice leaves the receiver deaf or
+                the transmitter weak. Applies to the Field Box and the USB
+                radio modem.
+
+            config ATALAIA_BOARD_HELTEC_V4_3
+                bool "Heltec V4.3 (KCT8103L)"
+
+            config ATALAIA_BOARD_HELTEC_V4_2
+                bool "Heltec V4.2 (GC1109)"
+        endchoice
+
         config ATALAIA_RADIO_FEM_EN_PIN
-            int "FEM enable GPIO"
+            int "FEM chip enable GPIO (FEM_EN, high = on)"
             default 2
             help
-                Board-internal: do not reassign. Controls the front-end
-                module power on the Heltec V4.3.
+                Board-internal: do not reassign. The front-end module's chip
+                enable on both V4 revisions.
 
         config ATALAIA_RADIO_VFEM_CTL_PIN
-            int "VFEM control GPIO"
+            int "FEM power GPIO (VFEM_Ctrl, high = powered)"
             default 7
             help
-                Board-internal: do not reassign. Controls the FEM voltage
-                rail on the Heltec V4.3.
+                Board-internal: do not reassign. Switches the LDO that
+                powers the front-end module on both V4 revisions; it must be
+                high whenever the radio is used. Driven only after the
+                SX1262 answers its probe (the Wokwi emulator uses GPIO 7 for
+                its keypad).
+
+        config ATALAIA_RADIO_FEM_PA_PIN
+            int "GC1109 PA select GPIO (CPS, high = full PA)"
+            depends on ATALAIA_BOARD_HELTEC_V4_2
+            default 46
+            help
+                Board-internal on the V4.2: high selects the power amplifier
+                (low would bypass it). The SX1262's DIO2 drives the TX/RX
+                switch, so no TXEN/RXEN pins are used.
+
+        config ATALAIA_RADIO_FEM_CTX_PIN
+            int "KCT8103L receive path GPIO (CTX, low = LNA)"
+            depends on ATALAIA_BOARD_HELTEC_V4_3
+            default 5
+            help
+                Board-internal on the V4.3: low puts the receive LNA (about
+                21 dB) in the path, high bypasses it. The SX1262's DIO2
+                drives the TX/RX switch.
 
         config ATALAIA_RADIO_FEM_GAIN_DB
             int "FEM gain in dB (for TX power calculation)"
@@ -313,6 +376,62 @@ menu "Atalaia Field Box Configuration"
                 The frequency all nodes TX and RX on. Default 869.525 MHz
                 (g2 sub-band, 10% duty cycle, 500 mW ERP). Configurable per
                 game via CONFIG message. Must be within an EU868 sub-band.
+    endmenu
+
+    # ---- Board power ----------------------------------------------------------
+    menu "Board power"
+        config ATALAIA_VEXT_CTL_PIN
+            int "Vext control GPIO (active low, -1 = leave alone)"
+            default 36
+            help
+                Board-internal on the Heltec V4: driving GPIO 36 low switches
+                on Vext, the rail for the on-board OLED and the LoRa front
+                end (and for external parts wired to it; the standard Field
+                Box wiring powers them from 3V3). The firmware drives it low
+                early at boot, before anything is probed.
+    endmenu
+
+    # ---- Joined games (ADR-P2-12, protocol/join.md) -------------------------
+    menu "Field network games"
+        config ATALAIA_STATE_INTERVAL_S
+            int "Seconds between STATE packets in a joined game"
+            default 15
+            range 5 300
+            help
+                A box in a field controller's game sends its owner, phase,
+                game time and score counters this often (and at once after
+                a capture). 15 s keeps a 5-box game far below the 10% duty
+                cycle of the 869.4-869.65 MHz sub-band.
+
+        config ATALAIA_CONSOLE_USB_INPUT
+            bool "Read the serial console's input from the USB port (USB-Serial-JTAG)"
+            default y
+            depends on !ATALAIA_MODEM_MODE
+            help
+                The Heltec V4 has no USB-UART bridge: its USB-C port is the
+                ESP32-S3's own USB-Serial-JTAG. With this on, "@join",
+                "@joinkey" and (with ATALAIA_SERIAL_KEYS) keys typed in a
+                serial monitor on that port reach the box, as well as those
+                on UART0. Off in the Wokwi build, whose console is UART0.
+
+        config ATALAIA_SERIAL_JOIN
+            bool "Accept @join and @joinkey lines on the serial console"
+            default y
+            help
+                "@join atalaia:join:..." joins a game from the text of a join
+                payload (the GM console shows it), and "@joinkey <64 hex>"
+                sets the field join key while no game is joined. For bring-up
+                and the Wokwi emulator; a join still needs a payload signed
+                with this box's field join key.
+
+        config ATALAIA_DEV_JOIN_KEY
+            string "Development field join key (64 hex digits)"
+            default ""
+            help
+                Used only when no field join key is stored in NVS: for the
+                Wokwi emulator and the bench. Leave empty on Field Boxes, which
+                get the field's key once, with "@joinkey" or (later) the setup
+                portal; `python -m atalaia_controller join-key` prints it.
     endmenu
 
     # ---- USB radio modem (ADR-P2-4) -----------------------------------------

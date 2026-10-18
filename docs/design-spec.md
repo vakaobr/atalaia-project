@@ -230,7 +230,7 @@ Five reference builds cover v1, all from off-the-shelf parts with no custom PCB 
 
 | Build | Purpose | Core parts | Approx. cost |
 | --- | --- | --- | --- |
-| **Field Box** | Main prop: domination, bomb, codes, tags | ESP32-S3 LoRa board (e.g. Heltec LoRa 32 V3), 2–4 × 60 mm arcade buttons, 3×4 keypad, 2.8" TFT, WS2812 ring, PN532 NFC, MAX98357A amp + speaker + microSD, MAX17048 fuel gauge, 2S 18650 pack with BMS, IP65 box | €70–110 |
+| **Field Box** | Main prop: domination, bomb, codes, tags | ESP32-S3 LoRa board (e.g. Heltec LoRa 32 V3), 2–4 × 60 mm arcade buttons, 3×4 keypad, 2.8" TFT, WS2812 ring, PN532 NFC, MAX98357A amp + speaker, MAX17048 fuel gauge, 1S pack (two protected 18650 in parallel), IP65 box | €70–110 |
 | **Satellite** | Small secondary point, beacon, "power plant" | ESP32-S3 LoRa board, 2 buttons, LED ring, piezo buzzer, 1S 18650 | €30–40 |
 | **Android hybrid prop** | Rich-UI terminal, map, QR, 4G | Repurposed phone or tablet, rugged case, ESP32 I/O pod (LoRa + buttons + LEDs + siren) over USB-OTG or BLE | €0–120 device + €35 pod |
 | **Field controller** | Runs cross-device logic, API, GM web app | Raspberry Pi 4/5 (Zero 2 W for small fields), SX1262 LoRa HAT, optional GPS, optional 4G USB modem, 10–20 Ah power bank | €80–150 |
@@ -901,8 +901,8 @@ Modifiers are small packages (`kind: modifier`) that run alongside any main mode
 | --- | --- | --- | --- | --- |
 | Domination | Node | `team_input` | Classic; timer freeze | 1 |
 | Bomb / Rush | Node | `team_input` or `keypad` | Button arm/disarm, return to standby, auto-arm timer, per-team codes | 1 (per-team codes in 2) |
-| Hold-All Domination | Field + node | `team_input` | Score only while holding every box | 3 |
-| Last Stand | Field + node | `team_input` | Countdown to defeat while holding 1 of 3 | 3 |
+| Hold-All Domination | Field + node | `team_input` | Score only while holding every box | 2 (mode pack) |
+| Last Stand | Field + node | `team_input` | Countdown to defeat while holding 1 of 3 | 2 (mode pack) |
 | Kill Confirmed | Node | `nfc` | Scanning a team's tag removes their point | 3 |
 | Respawn and Lives | Node + player app | `nfc` or `qr` | Lives per team or player, respawn tracking | 3 |
 | Player Check-in | Node | `nfc` or `qr` | Count individual players | 3 |
@@ -948,15 +948,15 @@ Work runs in six phases, and each one closes with a real field test before the n
 flowchart TB
     p0["<b>Phase 0 · Foundations</b><br/>Repo, licences, CONTRIBUTING, RFC process<br/>Shared C core skeleton, Lua sandbox, desktop simulator"]
     g0{{"Simulator runs Domination and<br/>Bomb from Lua scripts"}}
-    p1["<b>Phase 1 · Single box</b><br/>Field Box build, ESP-IDF shell, on-device presets, Wi-Fi setup<br/>Domination and Bomb as Lua modes, game timer with freeze"]
+    p1["<b>Phase 1 · Single box</b><br/>Field Box build, ESP-IDF shell, on-device presets, Wi-Fi setup<br/>Domination and Bomb as Lua modes, game timer with freeze<br/>Field Box build manual with wiring diagram"]
     g1{{"One box runs a 2-hour club<br/>game with no restarts"}}
-    p2["<b>Phase 2 · Field network</b><br/>LoRa protocol, time sync, log merge, Raspberry Pi controller<br/>MQTT and REST API, GM console web app, scoreboard example"]
+    p2["<b>Phase 2 · Field network</b><br/>LoRa protocol, time sync, log merge, Raspberry Pi controller<br/>MQTT and REST API, GM console web app, scoreboard example<br/>Mode pack: Hold-All, Last Stand, Bomb team codes, Codes modifier"]
     g2{{"5 boxes on a CQB site and an<br/>outdoor field, zero lost captures"}}
-    p3["<b>Phase 3 · Android and players</b><br/>Android props, I/O pod, player app with roles (Android, iOS)<br/>Respawn, Kill Confirmed, Hold-All, Last Stand, chrono check-in"]
+    p3["<b>Phase 3 · Android and players</b><br/>Android props, I/O pod, player app with roles (Android, iOS)<br/>Respawn, Kill Confirmed, Player Check-in, Money Factory, chrono check-in"]
     g3{{"One game mixes ESP32 and<br/>Android props without issues"}}
     p4["<b>Phase 4 · Site server and advanced play</b><br/>Site server: accounts, history, chrono registry, remote setup<br/>Master and Satellites, Target, VIP, Hacking Terminal, ATAK"]
     g4{{"A weekend milsim runs on<br/>the platform end to end"}}
-    p5["<b>Phase 5 · Community</b><br/>Visual editor, mode registry with verified badge<br/>Carrier PCB, translations, build guides<br/><i>Ongoing after the first release</i>"]
+    p5["<b>Phase 5 · Community</b><br/>Visual editor, mode registry with verified badge<br/>Carrier PCB, translations, build guides for other node types<br/><i>Ongoing after the first release</i>"]
     p0 --> g0 --> p1 --> g1 --> p2 --> g2 --> p3 --> g3 --> p4 --> g4 --> p5
 ```
 

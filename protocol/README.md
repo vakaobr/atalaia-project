@@ -12,7 +12,9 @@ Both encodings come from the schema files in [`schema/`](schema/), so they canno
 | [`schema/messages.yaml`](schema/messages.yaml) | Packet header and message types (draft) |
 | [`schema/events.yaml`](schema/events.yaml) | Standard events: ids, priorities, CBOR keys and data fields (draft) |
 | [`vectors/events.yaml`](vectors/events.yaml) | Test vectors every event codec must pass |
-| [`vectors/*.json`](vectors/) | Test vectors for header and message payload codecs |
+| [`vectors/*.json`](vectors/) | Test vectors for header and message payload codecs, and for the join payload (`join.json`) |
+| [`join.md`](join.md) | The join payload that brings a box or a standby controller into a game (NFC card, QR code, serial console) |
+| [`usb-modem.md`](usb-modem.md) | The serial link between the field controller and its USB radio modem |
 | [`json/event.schema.json`](json/event.schema.json) | JSON Schema of an event in the game log and the API (generated) |
 | [`json/examples/`](json/examples/) | Events that CI validates against that schema, plus invalid ones it must reject |
 
@@ -28,7 +30,7 @@ The generator writes these files; none of them should be edited by hand:
 | --- | --- |
 | `core/include/atalaia/protocol.h`, `core/src/protocol.c` | C: constants, ids, keys, payload field enums and lookup tables |
 | `core/tests/protocol_vectors.h` | C: event codec test vectors |
-| `core/tests/packet_vectors.h` | C: header, payload and AES-CCM test vectors (from `vectors/*.json`) |
+| `core/tests/packet_vectors.h` | C: header, payload, AES-CCM and join test vectors (from `vectors/*.json`) |
 | `simulator/atalaia_sim/protocol.py` | Python: the same tables |
 | `protocol/json/event.schema.json` | Anyone consuming events as JSON |
 
@@ -108,6 +110,14 @@ EVENT (type 2) payloads are defined separately in `schema/events.yaml`.
 
 Both codecs follow the schema field for field. Encoders always write every required field, even when it is 0 or empty; `array_uint8` is a CBOR array, `map_*` types and CMD `params` are CBOR maps (`params` with text keys). The C decoders (`core/src/msg_codec.c`) reject a payload that misses a required field, repeats a key, has trailing bytes or holds a value too large for its field; the Python side reports the same problems with `atalaia_sim.packet.payload_problems`. Every valid vector must decode and re-encode byte for byte in both languages, and every invalid one must be rejected: the tests no longer skip a vector they cannot read.
 
+### What a Field Box sends and expects
+
+A box in a game (`firmware/esp32/main/radio/field_link.c`) sends HELLO after it joins or reboots, every game event as EVENT, and STATE every 15 seconds and after a capture. Normal and critical events and HELLO ask for an ACK and are sent again, in a new packet, every 3 seconds until one arrives (normal events give up after 10 tries). In STATE, `counters` holds the points each team **gained** on the box, `owner_team` the team of its last capture, and `phase` the box's game state (0 waiting, 1 running, 2 paused, 3 ended). It follows the TIME beacons of the controller with the highest term (and acts on a start, pause or end it missed), takes CMDs for its node id or for every node, and relays every authenticated packet once (hop_limit is the number of relays left, clamped to the join's `max_hops`). Decisions E6-E10 in `docs/review/decisions-to-review.md`.
+
+## Joining a game
+
+A box or a standby controller joins with a join payload: a version byte, a CBOR map with integer keys and an HMAC-SHA256 tag keyed with the field's join key, on an NFC card or as `atalaia:join:` text. See [join.md](join.md) and RFC 0001 Amendment 2.
+
 ## The USB radio modem
 
 The field controller reaches the radio through a modem board on USB. Its framing, commands and status codes are in [usb-modem.md](usb-modem.md).
@@ -138,4 +148,5 @@ Test vectors with real AES-CCM ciphertext are in `vectors/aes_ccm.json`, shared 
 
 ## Not yet defined
 
-- Sending a team's name in `data.team` as well as its id in the envelope is redundant on LoRa. Dropping the name needs the receiver to know the game's teams, so it waits for the join flow.
+- Sending a team's name in `data.team` as well as its id in the envelope is redundant on LoRa. Every node now learns the game's teams from its join payload, so the name could be dropped; that change to the event encoding needs an RFC.
+- Penalties: STATE carries only the points gained per team, so a box's penalties (`score.delta` events) are logged but not subtracted from the totals (decision E6).

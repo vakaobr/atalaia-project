@@ -51,6 +51,7 @@ set(CORE_SOURCES
     ${CORE_DIR}/src/ack.c
     ${CORE_DIR}/src/duty_cycle.c
     ${CORE_DIR}/src/msg_codec.c
+    ${CORE_DIR}/src/join.c
 )
 add_library(atalaia_core_fw STATIC ${CORE_SOURCES})
 target_include_directories(atalaia_core_fw PUBLIC ${CORE_DIR}/include PRIVATE ${CORE_DIR}/src)
@@ -125,6 +126,10 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/radio/event_log.c
     ${SHELL_DIR}/radio/time_sync.c
     ${SHELL_DIR}/radio/radio_protocol.c
+    ${SHELL_DIR}/radio/field_link.c
+    ${SHELL_DIR}/box_game.c
+    ${SHELL_DIR}/serial_console.c
+    ${SHELL_DIR}/hal/board_fem.c
     ${SHELL_DIR}/modem/modem.c
     ${SHELL_DIR}/modem/modem_framing.c
 )
@@ -160,6 +165,10 @@ set(TEST_SOURCES
     test_radio_power.c
     test_modem_framing.c
     test_modem.c
+    test_field_link.c
+    test_box_game.c
+    test_serial_console.c
+    test_board_fem.c
 )
 
 # ---- Executable --------------------------------------------------------------
@@ -174,6 +183,7 @@ target_include_directories(firmware_test PRIVATE
     ${CORE_DIR}/third_party/lua
     ${CORE_DIR}/src
     ${SHELL_DIR}
+    ${SHELL_DIR}/radio
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 

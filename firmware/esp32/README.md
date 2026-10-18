@@ -21,8 +21,9 @@ The firmware is structured as a shell around the shared C core (`core/`):
 
 ```
 app_main
-  +-- game_task (core 1, priority 5, 100 Hz)
-  |     +-- poll buttons/keypad/NFC
+  +-- game_task (core 1, priority 5, 100 Hz, 12 KB stack)
+  |     +-- radio RX -> box_game (field games: join, CMD, TIME, ACK)
+  |     +-- poll buttons/keypad/serial console; NFC join cards when idle
   |     +-- atalaia_node_advance()
   |     +-- game_timer_tick()
   |     +-- state_persist_save() (every 1 s)
@@ -167,11 +168,20 @@ the Field Box uses `sdkconfig.defaults` alone.
 
 Radio-specific Kconfig options (under "Atalaia Field Box Configuration > Radio"):
 - `ATALAIA_RADIO_NSS_PIN` .. `ATALAIA_RADIO_DIO1_PIN` -- SX1262 SPI and control pins
-- `ATALAIA_RADIO_FEM_EN_PIN`, `ATALAIA_RADIO_VFEM_CTL_PIN` -- FEM control
+- `ATALAIA_BOARD_REV` -- Heltec V4.3 (KCT8103L FEM, default) or V4.2 (GC1109 FEM); read the chip next to the LoRa connector (BRING_UP.md)
+- `ATALAIA_RADIO_FEM_EN_PIN` (2, chip enable), `ATALAIA_RADIO_VFEM_CTL_PIN` (7, the FEM's LDO, driven high), `ATALAIA_RADIO_FEM_CTX_PIN` (5, V4.3, low = LNA), `ATALAIA_RADIO_FEM_PA_PIN` (46, V4.2, high = PA) -- driven only after the SX1262 answers (`main/hal/board_fem.c`)
+- `ATALAIA_VEXT_CTL_PIN` -- Vext, active low, driven low at boot (under "Board power")
 - `ATALAIA_RADIO_FEM_GAIN_DB` -- FEM gain for TX power calculation (default 14)
 - `ATALAIA_RADIO_ANTENNA_GAIN_DBI` -- antenna gain in dBi (default 2)
 - `ATALAIA_RADIO_REGION` -- regulatory region (EU868)
 - `ATALAIA_RADIO_DISABLE` -- skip radio init (kept for debugging; the Wokwi build runs with the radio enabled)
+
+Field game options (under "Field network games"):
+- `ATALAIA_STATE_INTERVAL_S` -- seconds between STATE packets in a joined game (default 15)
+- `ATALAIA_SERIAL_JOIN` -- accept `@join` and `@joinkey` lines on the serial console (default on)
+- `ATALAIA_CONSOLE_USB_INPUT` -- read the console input from the USB-C port (USB-Serial-JTAG, the Heltec V4's only USB) as well as UART0 (default on; off in the Wokwi build)
+- `ATALAIA_LED_BRIGHTNESS_PCT` -- LED ring brightness at boot (default 40%; under "LEDs")
+- `ATALAIA_DEV_JOIN_KEY` -- a development field join key, used only when none is stored (set in `sdkconfig.wokwi` only)
 
 USB radio modem options (under "USB radio modem"): `ATALAIA_MODEM_MODE`,
 `ATALAIA_MODEM_LINK_USB_SERIAL_JTAG` / `ATALAIA_MODEM_LINK_UART0`,
@@ -211,9 +221,9 @@ run), the firmware stores two presets: Bomb and Domination, with the
 defaults from their `mode.yaml`. The mode scripts come from `modes/` at
 build time. The default admin PIN is 1234 until the setup portal sets one.
 
-## Phase 2 (implemented in Phase C)
+## Phase 2: the radio and field games
 
-The following Phase 2 components are now implemented:
+Implemented in plan phase C:
 
 - **SX1262 LoRa radio driver** -- `main/hal/esp/hal_esp_radio.c`, SPI3_HOST,
   EU868 SF7/BW125, single shared game channel (RFC 0001 Amendment 1), FEM gain
@@ -226,14 +236,49 @@ The following Phase 2 components are now implemented:
 - **Time sync** -- `main/radio/time_sync.c`, slew/step from TIME beacons.
 - **NVS key storage** -- `main/radio/radio_nvs_esp.c`, game key and epoch
   in the "radio" NVS namespace. On production boards with an eFuse HMAC key
-  burned, NVS encryption protects the key at rest.
+  burned, NVS encryption protects the key at rest; otherwise the box logs a
+  warning at boot that the key is in plain NVS.
+
+Implemented in plan phase E (decision D18): a box takes part in a field
+controller's game.
+
+- **Joining** -- `main/box_game.c`. A join payload
+  ([protocol/join.md](../../protocol/join.md)) arrives on an NFC card (the
+  PN532 reads the NTAG215/216 user memory: `hal_esp_nfc.c`) or as a line on
+  the serial console, `@join atalaia:join:...`. Its tag is checked with the
+  **field join key**, which the box gets once: on the setup portal's optional
+  "field join key" field, or with `@joinkey <64 hex digits>` on the serial
+  console while no game is joined. The verified payload (game key included)
+  is stored in NVS, the radio tunes to the game's channel, and the box sends
+  HELLO and shows "Joined game N" until the controller starts the game.
+- **The game** -- on the controller's CMD start (or a TIME beacon that shows
+  the game running), the box loads the mode for its role with the join's
+  teams, parameters, node id and seed; CMD pause, resume and end, TIME, and
+  the buttons drive it. `set_owner` and `message` reach the mode as the input
+  events `cmd.set_owner` and `gm.message`. At the end the stored join is
+  erased, and the key in RAM once the last events are acknowledged.
+- **The radio link** -- `main/radio/field_link.c` sends every event the mode
+  emits (normal and critical ones wait for an ACK, are resent every 3 s in a
+  new packet, and are written to the flash log first), STATE every
+  `CONFIG_ATALAIA_STATE_INTERVAL_S` seconds and after a capture (owner, game
+  state, game time, points gained per team, epoch), follows the controller
+  with the highest term, applies the time sync (slew, or a step ahead, or
+  holding the clock), and relays every authenticated packet once.
+- **After a reboot** -- the stored join brings the box back: a new epoch,
+  HELLO, the saved game state, `node.rebooted`, and the unacknowledged events
+  from the flash log.
+- **Tests** -- the host tests (`test/test_field_link.c`,
+  `test/test_box_game.c`, `test/test_serial_console.c`) run this code with
+  the stub HAL; `test/box_host/` builds it into a Linux program on a UDP
+  "air", which the controller's end-to-end tests
+  (`controller/tests/test_box_e2e.py`) play whole games with, through the
+  host modem. `wokwi/join.scenario.yaml` joins a game in the emulator.
 
 Still pending:
 
-- Wiring the radio protocol into the Field Box shell: the shell starts the
-  radio task, but the box does not yet encode its events and STATE for the
-  radio, nor act on received TIME, CMD and ACK packets (`radio_protocol.c`
-  and `time_sync.c` are tested on their own). Needed before plan phase F.
+- Running any of it on the radio boards (plan phase F): the SX1262 link,
+  the PN532 reading real join cards, NVS encryption on a provisioned box.
+- Joining over Wi-Fi from the GM console (decision E3).
 - A/B OTA updates with Ed25519 signatures
 - GNSS module support (GPIO 38-42 currently used for peripherals)
 

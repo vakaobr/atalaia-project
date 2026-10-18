@@ -1,0 +1,108 @@
+/*
+ * SPDX-FileCopyrightText: 2026 The Atalaia contributors
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Scoreboard: large type for a screen seen from a distance.
+ */
+
+:root {
+    --bg: #f4f6f2;
+    --fg: #1d231f;
+    --muted: #5d6a61;
+    --card: #ffffff;
+    color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #0e1210;
+        --fg: #eef3ee;
+        --muted: #9aa89e;
+        --card: #18201b;
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.3 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow-x: hidden;
+}
+
+.board {
+    min-height: 100vh;
+    padding: 2vh 3vw;
+    display: grid;
+    gap: 2vh;
+    align-content: start;
+}
+
+header {
+    text-align: center;
+}
+
+h1 {
+    margin: 0;
+    font-size: clamp(1.6rem, 5vw, 4rem);
+    overflow-wrap: anywhere;
+}
+
+.status {
+    margin: 0.5rem 0 0;
+    font-size: clamp(1.2rem, 3.5vw, 3rem);
+    color: var(--muted);
+}
+
+.clock {
+    font-variant-numeric: tabular-nums;
+    color: var(--fg);
+    font-weight: 700;
+}
+
+.teams {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 2vw;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+}
+
+.team {
+    background: var(--card);
+    border: 0.6rem solid var(--muted);
+    border-radius: 1rem;
+    padding: 2vh 1rem;
+    text-align: center;
+    display: grid;
+    gap: 1vh;
+}
+
+.name {
+    font-size: clamp(1.4rem, 4vw, 3.5rem);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.points {
+    font-size: clamp(3rem, 14vw, 12rem);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.note,
+.result {
+    text-align: center;
+    font-size: clamp(1.1rem, 3vw, 2.5rem);
+    overflow-wrap: anywhere;
+}
+
+.result {
+    font-weight: 700;
+}

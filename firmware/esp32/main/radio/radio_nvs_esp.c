@@ -14,6 +14,7 @@
 #include "esp_log.h"
 #include "nvs.h"
 #include "nvs_flash.h"
+#include "sdkconfig.h"
 
 static const char *TAG = "radio_nvs";
 
@@ -103,6 +104,88 @@ static const atalaia_radio_nvs_ops_t esp_nvs_ops = {
     .erase_key = esp_nvs_erase_key,
     .ctx = NULL,
 };
+
+/* ---- Join and field join key (box_game.h) ---------------------------------- */
+
+static int store_load_blob(const char *name, uint8_t *buf, size_t cap)
+{
+    size_t len = cap;
+    esp_err_t err = nvs_get_blob(nvs_h, name, buf, &len);
+    if (err == ESP_ERR_NVS_NOT_FOUND) return 0;
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "nvs read %s: %s", name, esp_err_to_name(err));
+        return -1;
+    }
+    return (int)len;
+}
+
+static int store_save_blob(const char *name, const uint8_t *buf, size_t len)
+{
+    esp_err_t err = nvs_set_blob(nvs_h, name, buf, len);
+    if (err == ESP_OK) err = nvs_commit(nvs_h);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "nvs write %s: %s", name, esp_err_to_name(err));
+        return -1;
+    }
+    return 0;
+}
+
+static int store_load_join(void *ctx, uint8_t *buf, size_t cap)
+{
+    (void)ctx;
+    int n = store_load_blob("join", buf, cap);
+    return n < 0 ? 0 : n;
+}
+
+static int store_save_join(void *ctx, const uint8_t *buf, size_t len)
+{
+    (void)ctx;
+    return store_save_blob("join", buf, len);
+}
+
+static int store_erase_join(void *ctx)
+{
+    (void)ctx;
+    esp_err_t err = nvs_erase_key(nvs_h, "join");
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return -1;
+    return nvs_commit(nvs_h) == ESP_OK ? 0 : -1;
+}
+
+static int store_load_join_key(void *ctx, uint8_t key[ATALAIA_JOIN_KEY_SIZE])
+{
+    (void)ctx;
+    return store_load_blob("join_key", key, ATALAIA_JOIN_KEY_SIZE) == ATALAIA_JOIN_KEY_SIZE ? 0
+                                                                                            : -1;
+}
+
+static int store_save_join_key(void *ctx, const uint8_t key[ATALAIA_JOIN_KEY_SIZE])
+{
+    (void)ctx;
+    return store_save_blob("join_key", key, ATALAIA_JOIN_KEY_SIZE);
+}
+
+static const box_store_ops_t esp_box_store = {
+    .load_join = store_load_join,
+    .save_join = store_save_join,
+    .erase_join = store_erase_join,
+    .load_join_key = store_load_join_key,
+    .save_join_key = store_save_join_key,
+    .ctx = NULL,
+};
+
+const box_store_ops_t *atalaia_box_store_esp(void)
+{
+    return &esp_box_store;
+}
+
+bool atalaia_nvs_encrypted(void)
+{
+#if CONFIG_NVS_ENCRYPTION
+    return true;
+#else
+    return false;
+#endif
+}
 
 /* ---- Public --------------------------------------------------------------- */
 

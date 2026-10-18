@@ -14,6 +14,7 @@ The shared C11 core runs on every full node: ESP32, Raspberry Pi/Linux and Andro
 | Event codec | An event and its JSON data to the CBOR payload of an EVENT message, and back; plain JSON objects to CBOR maps (CMD parameters) | `codec.h`, `codec.c` | Done |
 | Packet layer | Header, nonce, AAD, AES-128-CCM (mbedtls), flood dedupe, ACK tracker, duty cycle | `packet.h`, `flood.h`, `ack.h`, `duty_cycle.h` | Done (phase 2A) |
 | Message codec | The payloads of HELLO, ACK, STATE, CMD, TIME, CONFIG and CLAIM, exactly as `protocol/schema/messages.yaml` defines them: required fields always written and checked, schema types (arrays, maps), duplicate keys and oversize values rejected | `msg_codec.h`, `msg_codec.c` | Done (made schema-exact in phase 2D: it had disagreed with the shared vectors for HELLO, STATE, CMD, TIME and CLAIM) |
+| Join payload | The payload that brings a box or a standby controller into a game (`protocol/join.md`): CBOR body, HMAC-SHA256 tag with the field join key, NFC (NDEF on a Type 2 tag) and text (`atalaia:join:` base64url) forms, with its own SHA-256 and HMAC (no crypto library needed) | `join.h`, `join.c` | Done (phase 2E; RFC 4231 known answers and the shared vectors in `protocol/vectors/join.json`) |
 | Event log | Append-only log with merge and replay | | Planned |
 
 ## How a host uses it

@@ -5,7 +5,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 2 -- Field Network: Status
 
-**Current phase:** Implementation (phases A + B + C + D complete; E next)
+**Current phase:** Implementation (plan phases A to E complete in software; F needs the radio boards; a mode pack was added to phase 2 by the maintainer)
 **Risk level:** High
 **Last verified:** 2026-10-18
 
@@ -47,6 +47,15 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 - [x] Phase D: CLAIM election shared by the simulator and the controller (`atalaia_sim/election.py`), failover tested over the radio model (detection, priority, ties, manual promote, step-down, scores across the takeover)
 - [x] Phase D: core payload codec made schema-exact (it disagreed with the shared vectors for HELLO, STATE, CMD, TIME and CLAIM; the vector tests had skipped it); strict vector tests in C and Python, invalid vectors rejected
 - [x] Phase D: radio HAL `sx_wait_busy()` returns an error that every caller propagates; "SX1262 not detected" reported cleanly; debug-step logs at debug level
+- [x] Phase E: join payload format (`protocol/join.md`, RFC 0001 Amendment 2): version byte, CBOR body, HMAC-SHA256 with a field join key; NFC NDEF and `atalaia:join:` text forms; C codec with its own SHA-256/HMAC and Python codec, both strict against `protocol/vectors/join.json` (4 valid, 34 invalid, RFC 4231 HMAC known answers)
+- [x] Phase E: controller join flow: `POST /api/v1/join`, `POST /api/v1/nodes/{id}/join`, field join key (`join-key`, `[join] key`), store schema 2
+- [x] Phase E: standby controller (closes D17): `POST /api/v1/controller/join`, follows TIME, logs the game, leaves at the end, takes over when promoted; tested over the air with two C host modems
+- [x] Phase E: GM console (Preact + HTM PWA, no build step, pt-PT/en, strict CSP), served at `/console/`; read-only scoreboard page at `/scoreboard`; `examples/scoreboard/scoreboard.py` (MQTT)
+- [x] Phase E: Field Box on the radio (closes D18): `main/radio/field_link.c` (events with ACK and retry, HELLO, STATE, TIME with time sync and leader by term, CMD, ACK, relay) and `main/box_game.c` (join by NFC card or serial console, NVS storage, the mode run with the join's node id, seed, teams and params, end and key erase, rejoin after a reboot)
+- [x] Phase E: host box (`firmware/esp32/test/box_host`): the box's code on Linux; end-to-end tests with the controller and the host modem over a shared UDP air (join, play, scores, battery pull, end, relay through another box, wrong field key)
+- [x] Phase E: browser tests (Playwright, headless Chromium, Docker image `tools/dev/console/Dockerfile`, `python tools/docker_console.py`, CI job `console`)
+- [x] Phase E: Wokwi join scenario (`wokwi/join.scenario.yaml`), radio enabled
+- [x] Phase E: Heltec V4 front end fixed: the FEM's LDO (GPIO 7) was held low; now powered after the SX1262 probe, per board revision (Kconfig: V4.3 KCT8103L default, V4.2 GC1109), sequence tested on the host; button 2 moved from GPIO 5 to 39; Vext switched on at boot; GPS not supported in the pin map (decisions E17-E22)
 
 ## Verification (2026-10-18, Phase C -- final)
 
@@ -110,15 +119,39 @@ Wokwi bomb scenario (radio enabled)          "Scenario completed successfully";
 reuse lint                                   exit 0
 ```
 
+## Verification (2026-10-18, Phase E)
+
+```
+sh tools/check.sh (ATALAIA_REQUIRE_ALL=1)    exit 0
+  protogen --check, build_site --check       OK
+  format --check (clang-format, StyLua)      OK
+  core ctest                                 1/1 passed (incl. join vectors and HMAC)
+  simulator unittest                         167 tests, 0 skipped
+  mode tests                                 12/12 passed
+  controller unittest                        90 tests, 0 skipped (C host modem, C host box, mosquitto)
+Core ASan+UBSan                              exit 0
+firmware stub tests (docker_fw.py test)      2/2 (firmware_test: 1110 checks; screens)
+  under ASan/UBSan (extra)                   1110 checks; host box + host modem end-to-end 3/3, join 9/9
+browser tests (docker_console.py)            10 tests, headless Chromium, 0 skipped
+ESP-IDF clean builds, 0 warnings             Field Box 0x15a9a0 (32% of the 2 MB slot free),
+                                             Wokwi 0xed810, USB modem 0x469e0
+Wokwi bomb and join scenarios (radio on)     "Scenario completed successfully" (both)
+tools/check_wiring.py, docker_hw.py check    pin table, wiring diagrams and Kconfig agree
+reuse lint                                   compliant (522/522 files)
+```
+
 ## What is real and what is not yet
 
 - Real and tested: the controller end to end in Docker (engine, store, API, WebSocket, MQTT with a real Mosquitto) talking to the modem's real C code (framing, AES-CCM with mbedtls, dedupe, epoch window, nonce guard) over pyserial's socket://; the election in the simulator; the modem firmware compiles for the ESP32-S3.
-- Not run yet: the modem firmware on a board (USB-Serial-JTAG link, radio timing, duty cycle on air), the controller on a Raspberry Pi, and any box talking to it: the Field Box shell starts the radio task but does not yet send events or STATE or act on TIME, CMD and ACK (decision D18).
-- Not built in this phase (plan phase E): the GM console, the NFC and QR join flow (so a second controller cannot get the key to stand by, D17), the example scoreboard.
+- Real and tested since phase E: the box's game and radio code (`box_game.c`, `field_link.c`, the node runner, the core, mbedtls) as a Linux program playing whole games against the controller and the C modem over a shared UDP air, including a battery pull and a box heard only through another box's relay; the join payload in C and Python against shared vectors; the standby controller over the air; the GM console and scoreboard in headless Chromium against the real controller; the join from the serial console in the Wokwi emulator.
+- Not run yet: any of it on the radio boards: the modem firmware on a board (USB-Serial-JTAG link, radio timing, duty cycle on air), the controller on a Raspberry Pi, the SX1262 link between boxes, the PN532 reading real NTAG cards (the code is written from the public PN532 manual, never run on a reader), NVS encryption on a provisioned box.
+- Not built: joining a box over Wi-Fi from the console (decision E3: boxes join by NFC card or serial console; QR codes are for phones in phase 3), Leaflet/OSM maps (E5), mode handling of `cmd.set_owner` (E7), penalties in the box counters (E6).
+- Added to phase 2 by the maintainer (2026-10-18): a mode pack (Hold-All Domination, Last Stand, per-team arming codes on Bomb, the Codes modifier), not started.
 
-## Next: Phase E
+## Next
 
-GM console (Preact + HTM PWA), join flow (NFC + QR), example scoreboard. Before phase F: wire the radio protocol into the Field Box shell (D18).
+- The mode pack (Hold-All Domination, Last Stand, Bomb team codes, Codes modifier).
+- Phase F, when the boards arrive: flash 5 boxes and a modem, bring-up (BRING_UP.md steps 7 and 10b for NFC and field games), calibration, the CQB and outdoor field tests.
 
 ## Plan summary
 
@@ -128,7 +161,7 @@ GM console (Preact + HTM PWA), join flow (NFC + QR), example scoreboard. Before 
 | B | Simulator: RadioModel, FieldController, multi-node tests | Complete |
 | C | Core API (field_ops), radio HAL, ESP32 radio task, time sync, event log | Complete |
 | D | Python controller, USB modem framing, REST, MQTT, SQLite, failover | Complete (software; hardware in F) |
-| E | GM console (Preact+HTM PWA), join flow (NFC+QR), scoreboard | Pending |
+| E | GM console (Preact+HTM PWA), join flow (NFC+QR), scoreboard; boxes on the radio (D18) | Complete (software; NFC reader and radio in F) |
 | F | Hardware integration, calibration, field test, documentation | Pending |
 
 ## Acceptance criteria
@@ -140,7 +173,7 @@ GM console (Preact + HTM PWA), join flow (NFC + QR), example scoreboard. Before 
 | AC-3 | Simulator multi-node game correct scores | Met |
 | AC-4 | Duty-cycle compliance in sim | Met |
 | AC-5 | Controller REST API serves all 17 endpoints | Met (`controller/tests/test_api.py`, real app, real engine) |
-| AC-6 | GM console serves and renders | Phase E |
+| AC-6 | GM console serves and renders | Met (`test_console.py`; browser tests in headless Chromium) |
 | AC-7 | ESP32 firmware cross-compiles with radio | Met |
 | AC-8 | Partition recovery zero lost captures in sim | Met |
 | AC-9 | Failover election in simulator | Met |

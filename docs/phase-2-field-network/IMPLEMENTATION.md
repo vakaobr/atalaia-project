@@ -134,5 +134,69 @@ touch the SPI bus.
 - ACK `ack_seq` is "highest contiguous seq", but STATE and telemetry share
   the seq space and are never resent, so one lost STATE leaves a gap that
   only the bitmap covers (decision D7, an RFC question).
-- The Field Box shell does not yet use the radio protocol (decision D18).
+- The Field Box shell did not yet use the radio protocol (decision D18):
+  done in phase E, below.
 - The modem reports SNR as 0: the radio HAL does not read it yet.
+
+## Phase E: join flow, boxes on the radio, GM console (2026-10-18)
+
+### The join payload
+
+ADR-P2-12 listed the join's fields but not their encoding, and its HMAC
+key was "the controller's long-term key", which a box cannot check. The
+payload is now a version byte, a CBOR map with integer keys and an
+HMAC-SHA256 tag keyed with a **field join key** that every controller and
+box of a field holds (protocol/join.md, RFC 0001 Amendment 2, decisions E1
+and E2). It also carries what a box or a standby controller needs before
+its first TIME beacon: the controller's id, the channel, the relay clamp,
+the seed, the parameters and its kind. The C codec (`core/src/join.c`)
+has its own SHA-256 so the core still needs no crypto library for it; it
+is checked against RFC 4231 and, with the Python codec, against the same
+vectors, invalid ones included (each with a correct tag, so they test the
+body checks).
+
+### One box program, three places
+
+`main/box_game.c` (join, game lifecycle from CMD and TIME, rejoin after a
+reboot) and `main/radio/field_link.c` (the radio side) are plain C with
+injected storage, screens, clock and TX sink. They run on the ESP32-S3
+(`shell.c`), in the host unit tests with the stub HAL and test crypto,
+and in `test/box_host/`, a Linux program with mbedtls whose radio is UDP
+and whose NVS and flash are files. The controller's end-to-end tests start
+the host modem and host boxes on a Python UDP hub (`AirHub`, which can
+also put two programs out of each other's range) and play whole games:
+the controller's join text typed into the box's console, HELLO, CMD
+start, a capture logged once and acknowledged, STATE counters adding up,
+pause and resume, a battery pull (kill and restart with the same files:
+new epoch, `node.rebooted`, no lost capture, a new capture with the event
+seq restarted), the end (the box forgets the key), and a box out of the
+modem's range heard through another box's relay.
+
+### Findings fixed along the way
+
+- **Retries must be new packets.** The modem and the controller drop a
+  packet they have seen (same source, epoch and seq) as a flood copy, so
+  resending the identical packet after a lost ACK would never be
+  acknowledged. Each retry is a new packet with a new seq (decision E8).
+- **The relay rule.** `flood.c` treats hop_limit as the relays left (1 is
+  relayed once more, with 0); the box follows it (E9).
+- **Stack.** The Wokwi join scenario overflowed the 8 KB game task during a
+  join: the preset list (3.7 KB) moved off the stack and the task got
+  12 KB (E15).
+- **The test harness.** A host box that rejoins prints log lines before
+  READY; the helper first read the wrong line and then blocked reading the
+  stderr of a live process. Found by a hang, fixed in `support.py`.
+- **The store under load.** The browser tests hit an intermittent HTTP 500:
+  the API's threads and the engine share one SQLite connection, and rows
+  were fetched after the lock was released. `_exec` now reads the rows
+  while it holds the lock.
+
+### Known limits
+
+- Nothing of this has run on the boards: the SX1262 link, the PN532 with
+  real NTAG cards, NVS encryption on a provisioned box (phase F).
+- Boxes cannot join over Wi-Fi (E3); `set_owner` has no effect on the
+  built-in modes (E7); penalties are not in the box counters (E6).
+- An ACK names a seq but not the epoch: after the box's seq wraps
+  (65,536 packets) an ACK for the old epoch could clear a new packet with
+  the same seq. Not reachable in a game; worth an RFC with D7.

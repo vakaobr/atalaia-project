@@ -48,20 +48,20 @@ no SPIRAM) and Kconfig `ATALAIA_MEMORY_TIER_REDUCED`.
   board-internal pins (SX1262 SPI on GPIO 8-14, OLED I2C on GPIO 17-18,
   USB on GPIO 19-20, OLED RST on GPIO 21, on-board LED on GPIO 35, Vext
   on GPIO 36, ADC_Ctrl on GPIO 37, UART0 console on GPIO 43-44).  The
-  GNSS header pins (GPIO 38-42) are used for external peripherals; this
-  is documented and must be revisited when GNSS support is added.
+  GNSS header pins (GPIO 34, 38-42) are used for external peripherals, so
+  the V4's GNSS module is not supported (decision E21); revisit in phase 4.
 
 - **Shared I2C bus:** NFC (PN532, addr 0x24), battery gauge (MAX17048,
   addr 0x36) and the on-board OLED (SSD1306, addr 0x3C) share the
   board's I2C bus on GPIO 17/18.
 
-- **2 default team buttons:** GPIO pin constraints on the V4.3 allow 2
-  team buttons at the default pin map.  Kconfig supports up to 4 buttons
-  by reassigning pins (e.g. from the GNSS header or dropping audio).
+- **Team buttons:** 4 by default since the keypad moved to the PCF8574
+  (GPIO 4, 39, 33, 34; button 2 was on GPIO 5 until phase 2E, which found
+  GPIO 5 to be the Heltec V4.3 front end's CTX control: decision E18).
 
-- **Display RST tied to Vext:** Default RST pin is 0 (disabled).  The
-  display resets via the Vext power rail (GPIO 36).  Software handles
-  RST_PIN=0 with a compile-time `#if` guard.
+- **Display RST:** on GPIO 38 (`ATALAIA_DISP_RST_PIN`), pulsed by the
+  driver at start-up; -1 means the panel's reset is tied to its supply.
+  (The first draft tied it to Vext with RST pin 0; superseded.)
 
 - **Partition table:** 16 MB flash.  OTA slots: 2 x 1.5 MB.  LittleFS
   storage: 2 MB.  Leaves ~10 MB unpartitioned for future use.

@@ -145,8 +145,8 @@ how:
     por Wi-Fi, e os marcadores, as transmissões em direto e as apps de mapas, como o
     <a href="#glossario-atak">ATAK</a>, pela sua API. Um
     <a href="#glossario-servidor-do-clube">servidor do clube</a>, opcional e na internet, guarda as
-    contas e o histórico. O controlador e a sua API já estão feitos e testados num computador,
-    ainda não no campo; o servidor do clube chega numa fase posterior.
+    contas e o histórico. O controlador, a sua API e a consola da organização já estão feitos e
+    testados num computador, ainda não no campo; o servidor do clube chega numa fase posterior.
   core: >-
     Por dentro, todos os aparelhos que correm modos de jogo usam o mesmo
     <a href="#glossario-nucleo">núcleo partilhado</a>, escrito em C11, e os mesmos modos em Lua; só
@@ -238,25 +238,34 @@ roadmap:
       Prova: o simulador corre o Domínio e a Bomba a partir de scripts Lua. <strong>Superada.</strong>
   p1:
     title: Uma caixa
-    text: Montagem da Field Box, firmware ESP32, predefinições na própria caixa.
+    text: >-
+      Montagem da Field Box, firmware ESP32, predefinições na própria caixa e um manual de montagem
+      com o esquema de ligações.
     gate: >-
       Prova: uma caixa aguenta um jogo de clube de 2 horas sem reiniciar. O firmware e os ecrãs
-      estão prontos e correm num emulador; a prova fica em aberto até as primeiras caixas estarem
-      montadas.
+      estão prontos e correm num emulador, e o manual de montagem com os esquemas de ligações está
+      escrito; a prova fica em aberto até as primeiras caixas estarem montadas.
   p2:
     title: Rede de campo
-    text: Skirmesh-RF sobre LoRa, controlador de campo, API, consola da organização.
+    text: >-
+      Skirmesh-RF sobre LoRa, controlador de campo, API, consola da organização. A fase vai
+      terminar com um pacote de modos: Hold-All Domination (só pontua quem segura todas as caixas),
+      Last Stand (uma contagem decrescente para a derrota enquanto se segura uma de três caixas),
+      códigos de armar por equipa na Bomba e o modificador de códigos (códigos no teclado ou em QR
+      que dão pontos, pistas ou desbloqueios).
     gate: >-
       Prova: 5 caixas num espaço de <a href="#glossario-cqb">CQB</a> e num campo exterior, sem uma
-      única captura perdida. O protocolo de rádio cifrado, o firmware do rádio, o controlador de
-      campo com a sua API e o modem de rádio USB que o liga às caixas já estão feitos e testados
-      no simulador, no emulador e num computador; segue-se a consola da organização, e a prova
-      precisa das placas de rádio.
+      única captura perdida. O protocolo de rádio cifrado, o controlador de campo com a sua API, o
+      modem de rádio USB, a consola da organização com um marcador, a entrada num jogo com um
+      cartão NFC ou um código QR, e o firmware das caixas a falar com o controlador já estão
+      feitos e testados no simulador, no emulador e num computador, incluindo jogos completos. A
+      prova precisa das placas de rádio.
   p3:
     title: Android e jogadores
     text: >-
       Dispositivos Android, <a href="#glossario-dispositivo-android">módulo de E/S</a>, app de
-      jogador com funções, cronografagem à entrada.
+      jogador com funções e os modos que precisam dos telemóveis dos jogadores: Respawn, Kill
+      Confirmed, Player Check-in, Money Factory e cronografagem à entrada.
     gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."
   p4:
     title: Servidor do clube e jogo avançado
@@ -268,7 +277,7 @@ roadmap:
     title: Comunidade
     text: >-
       Editor visual de modos, registo de modos, placa de suporte (PCB) que facilita a montagem,
-      traduções.
+      traduções, guias de montagem para outros tipos de dispositivos.
     gate: Continua depois da primeira versão.
 
 hub:
@@ -459,7 +468,8 @@ glossary:
       direto numa transmissão, receber alertas no Discord ou no Telegram, ou ter um relé que
       dispara fumo e sirenes quando a bomba rebenta. MQTT, REST e WebSocket são três maneiras
       padrão de lá chegar, por isso funcionam com ferramentas comuns. O controlador de campo já a
-      tem desde a fase&nbsp;2; foi testada num computador e ainda não num campo.
+      tem desde a fase&nbsp;2, com uma página de marcador pronta a usar; foi testada num computador
+      e ainda não num campo.
   atak:
     id: glossario-atak
     term: ATAK
@@ -511,7 +521,8 @@ glossary:
       que ouve todas as caixas pelo rádio, corre as regras que envolvem várias caixas, guarda a
       pontuação oficial e serve a consola da organização aos telemóveis. Se falhar, as caixas
       continuam a jogar e outro aparelho capaz toma o lugar, e uma caixa sozinha também consegue
-      correr um jogo sem ele. Chega na fase&nbsp;2.
+      correr um jogo sem ele. Já está feito (fase&nbsp;2) e testado num computador, ainda não num
+      campo.
   server:
     id: glossario-servidor-do-clube
     term: Servidor do clube

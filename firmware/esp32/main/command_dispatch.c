@@ -145,7 +145,7 @@ void command_dispatch(const char *target, const char *method, const char *args_j
                     val = val * 10 + (*p - '0');
                     p++;
                 }
-                hal->leds->set_brightness((uint8_t)val);
+                hal->leds->set_brightness((uint8_t)(val > 100 ? 100 : val)); /* percent */
             }
         } else if (strcmp(method, "progress") == 0) {
             /* args: [0.5] -- fill fraction of LEDs. Simplified: fill all. */

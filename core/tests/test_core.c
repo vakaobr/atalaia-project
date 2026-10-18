@@ -143,6 +143,7 @@ int main(void)
     run_msg_codec_tests();
     run_crypto_mbedtls_tests();
     run_field_api_tests();
+    run_join_tests();
 
     if (check_failures == 0) {
         printf("core: all tests passed\n");

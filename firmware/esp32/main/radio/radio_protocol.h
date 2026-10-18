@@ -66,6 +66,11 @@ typedef struct {
     bool tx_blocked;
     const atalaia_crypto_ops_t *crypto;
     const atalaia_radio_nvs_ops_t *nvs;
+    uint8_t max_hops; /* hop_limit of our packets and relay clamp (ADR-P2-6); 2 by default */
+
+    /* Where packets go: NULL = radio_task_send(). The host box and the tests set their own. */
+    bool (*tx)(void *ctx, const uint8_t *pkt, size_t len);
+    void *tx_ctx;
 
     /* Per-source epoch table for receiver-side epoch trial. */
     atalaia_radio_source_epoch_t source_epochs[RADIO_PROTO_MAX_SOURCES];
@@ -98,6 +103,17 @@ void atalaia_radio_proto_set_epoch(atalaia_radio_proto_t *rp, uint16_t epoch);
  */
 void atalaia_radio_proto_set_source_epoch(atalaia_radio_proto_t *rp, uint16_t source,
                                           uint16_t epoch);
+
+/*
+ * Encrypt payload as one packet (header seq = the next seq, our epoch,
+ * hop_limit = max_hops) and hand it to the TX sink. *seq_out, if not NULL,
+ * receives the header seq used. Returns false if tx_blocked, there is no
+ * key, the payload is too long, the seq/epoch cannot advance safely, or the
+ * sink refused the packet (the seq is used up either way).
+ */
+bool atalaia_radio_proto_send_payload(atalaia_radio_proto_t *rp, uint8_t msg_type, uint8_t prio,
+                                      bool ack_req, const uint8_t *payload, size_t len,
+                                      uint16_t *seq_out);
 
 /*
  * Encode an event and queue it for TX. Returns true on success.

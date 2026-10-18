@@ -33,6 +33,10 @@
     port = 1883
     username = ""
     password = ""
+
+    [join]
+    key = ""                    # the field join key, 64 hex digits (protocol/join.md);
+                                # empty: generated on first start (see `join-key`)
 """
 
 from __future__ import annotations
@@ -52,6 +56,7 @@ SECTIONS = {
     "modem": ("port", "baudrate", "ping_interval_s"),
     "api": ("host", "port", "gm_token", "read_token"),
     "mqtt": ("enabled", "host", "port", "username", "password"),
+    "join": ("key",),
 }
 
 
@@ -89,6 +94,8 @@ class Config:
     mqtt_port: int = 1883
     mqtt_username: str = ""
     mqtt_password: str = ""
+    # [join]
+    join_key: str = ""
 
     def validate(self) -> None:
         if not 0 <= self.node_id <= 0xFFFE:
@@ -102,12 +109,20 @@ class Config:
             raise ConfigError("radio.channel_hz must be inside an EU868 sub-band")
         if self.tick_interval_s <= 0 or self.ping_interval_s <= 0:
             raise ConfigError("intervals must be positive")
+        if self.join_key:
+            try:
+                ok = len(bytes.fromhex(self.join_key)) == 32
+            except ValueError:
+                ok = False
+            if not ok:
+                raise ConfigError("join.key must be 64 hex digits (32 bytes)")
 
 
 # (section, key) -> Config attribute
 _ATTR = {("api", "port"): "api_port", ("mqtt", "enabled"): "mqtt_enabled",
          ("mqtt", "host"): "mqtt_host", ("mqtt", "port"): "mqtt_port",
-         ("mqtt", "username"): "mqtt_username", ("mqtt", "password"): "mqtt_password"}
+         ("mqtt", "username"): "mqtt_username", ("mqtt", "password"): "mqtt_password",
+         ("join", "key"): "join_key"}
 
 
 def _attr(section: str, key: str) -> str:

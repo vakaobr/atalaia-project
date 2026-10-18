@@ -38,6 +38,10 @@ int main(void)
     run_radio_power_tests();
     run_modem_framing_tests();
     run_modem_tests();
+    run_field_link_tests();
+    run_box_game_tests();
+    run_serial_console_tests();
+    run_board_fem_tests();
 
     if (check_failures == 0) {
         printf("firmware: all %d checks passed\n", check_count);

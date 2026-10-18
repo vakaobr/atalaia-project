@@ -12,6 +12,7 @@
 #ifndef ATALAIA_RADIO_NVS_ESP_H
 #define ATALAIA_RADIO_NVS_ESP_H
 
+#include "box_game.h"
 #include "radio_protocol.h"
 
 #ifdef ESP_PLATFORM
@@ -22,6 +23,15 @@
  * Returns NULL on failure (NVS not initialised).
  */
 const atalaia_radio_nvs_ops_t *atalaia_radio_nvs_esp_init(void);
+
+/*
+ * The join payload ("join" blob) and the field join key ("join_key") in the
+ * same namespace (box_game.h). Call after atalaia_radio_nvs_esp_init().
+ */
+const box_store_ops_t *atalaia_box_store_esp(void);
+
+/* True if the NVS partition is encrypted (CONFIG_NVS_ENCRYPTION, BRING_UP.md step 0). */
+bool atalaia_nvs_encrypted(void);
 
 #endif /* ESP_PLATFORM */
 

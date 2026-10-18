@@ -197,7 +197,7 @@ The Field Box is the main prop. Reference parts:
 | LEDs | WS2812 ring (24 LEDs typical) | single-wire (RMT peripheral) |
 | NFC reader | PN532 | I2C or SPI |
 | Audio | MAX98357A I2S amp + speaker + microSD for clips | I2S + SPI (SD) |
-| Battery | 2S 18650 + BMS + MAX17048 fuel gauge | I2C |
+| Battery | 1S: two protected 18650 in parallel (the board and the MAX17048 are single-cell parts; corrected 2026-10-18, see hardware/field-box/BUILD.md) + MAX17048 fuel gauge | I2C |
 | Enclosure | IP65 box, cable glands, recessed power switch | -- |
 
 ### 3.2 Device tiers (spec section 6)

@@ -18,6 +18,7 @@
 static const char *TAG = "atalaia-modem";
 
 extern const hal_radio_ops_t hal_esp_radio_ops;
+void hal_esp_board_power_on(void);
 
 void app_main(void)
 {
@@ -26,6 +27,7 @@ void app_main(void)
     hal.radio = &hal_esp_radio_ops;
 
     ESP_LOGI(TAG, "Atalaia USB radio modem, core %s", atalaia_version());
+    hal_esp_board_power_on();
     if (hal.radio->init() != 0) {
         ESP_LOGW(TAG, "radio: not available (no SX1262); TX frames get status no_radio");
         hal.radio = NULL;

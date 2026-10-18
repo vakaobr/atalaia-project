@@ -1,0 +1,153 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: CERN-OHL-S-2.0
+#
+# Field Box wiring, part 2 of 2: battery, fuse, switch and the 5 V rail, for
+# the standard build in hardware/field-box/BUILD.md. Part 1 (signals and
+# 3.3 V logic power) is field-box-wiring.yml; the HUB, RING, AMP, GAUGE and
+# BOARD here are the same parts, showing only their power pins.
+#
+# WireViz source; regenerate the images with:
+#   python tools/docker_hw.py render
+
+metadata:
+  title: Atalaia Field Box wiring 2/2 - power
+
+options:
+  fontname: DejaVu Sans
+  bgcolor: WH
+  bgcolor_node: WH
+  bgcolor_connector: WH
+  bgcolor_cable: WH
+  bgcolor_bundle: WH
+  color_mode: full
+  mini_bom_mode: false
+
+connectors:
+  BATT:
+    type: Li-ion 1S (3.0-4.2 V), protected
+    subtype: 2 x 18650 in parallel
+    pinlabels: [BAT+, BAT-]
+    notes: ONE cell in series only. Never a 2S (7.4 V) pack.
+  FUSE:
+    type: Inline fuse holder
+    subtype: 5 A fuse
+    pinlabels: [in, out]
+  DIODE:
+    type: Schottky diode, 3 A+
+    subtype: e.g. 1N5822, band to BAT+
+    pinlabels: [cathode (band), anode]
+    notes: Blows the fuse if the battery is reversed.
+  SWITCH:
+    type: Main switch, SPST
+    subtype: 5 A DC+, covered/recessed
+    pinlabels: [in, out]
+  SPL_BAT:
+    type: BAT+ splice (switched)
+    subtype: 4-way lever connector
+    pinlabels: [from switch, to board, to boost, to gauge]
+  SPL_GND:
+    type: Battery GND splice
+    subtype: 4-way lever connector
+    pinlabels: [from battery, to diode, to board, to boost]
+  BOARD:
+    type: Main board
+    subtype: battery socket
+    show_pincount: false
+    pins: [BAT+ (socket), BAT- (socket)]
+    notes: Check the lead's polarity with a meter first.
+  GAUGE:
+    type: MAX17048 fuel gauge
+    subtype: battery sense
+    pinlabels: [CELL+]
+  BOOST:
+    type: 5 V boost converter
+    subtype: 3-4.2 V in, 5 V 2.5 A+ out
+    pinlabels: [IN+, IN-, OUT+, OUT-]
+    notes: Set 5.0-5.2 V before connecting loads.
+  SPL_5V:
+    type: 5 V splice
+    subtype: 4-way lever connector
+    pinlabels: [from boost, to ring, to amp, to hub]
+  SPL_G5:
+    type: 5 V GND splice
+    subtype: 3-way lever connector
+    pinlabels: [from boost, to ring, to amp]
+  RING:
+    type: WS2812B ring, 24 LEDs
+    subtype: 1000 uF across 5V/GND
+    pinlabels: [5V, GND]
+  AMP:
+    type: MAX98357A amp (optional)
+    pinlabels: [VIN, GND]
+  HUB:
+    type: Interconnect board
+    subtype: 5V rail
+    pinlabels: [5V in]
+
+cables:
+  W_BAT: {category: bundle, gauge: 0.5 mm2, colors: [RD, BK]}
+  W_DIODE: {category: bundle, gauge: 0.5 mm2, colors: [RD, BK]}
+  W_JST: {type: battery-socket lead, category: bundle, gauge: 0.25 mm2, colors: [RD, BK]}
+  W_BOOST: {category: bundle, gauge: 0.5 mm2, colors: [RD, BK]}
+  W_SENSE: {category: bundle, gauge: 0.25 mm2, colors: [RD]}
+  W_5V: {category: bundle, gauge: 0.5 mm2, colors: [OG, BK]}
+  W_RING: {category: bundle, gauge: 0.5 mm2, colors: [OG, BK]}
+  W_AMP: {category: bundle, gauge: 0.5 mm2, colors: [OG, BK]}
+  W_HUB: {category: bundle, gauge: 0.25 mm2, colors: [OG]}
+
+connections:
+  - - BATT: [BAT+]
+    - W_BAT: [1]
+    - FUSE: [in]
+  - - BATT: [BAT-]
+    - W_BAT: [2]
+    - SPL_GND: [from battery]
+  # Arrows: short direct wires (0.5 mm2 red); WireViz needs pin numbers here.
+  - - FUSE: [2]  # out
+    - -->
+    - SWITCH: [1]  # in
+  - - FUSE: [out]
+    - W_DIODE: [1]
+    - DIODE: [cathode (band)]
+  - - SPL_GND: [to diode]
+    - W_DIODE: [2]
+    - DIODE: [anode]
+  - - SWITCH: [2]  # out
+    - -->
+    - SPL_BAT: [1]  # from switch
+  - - SPL_BAT: [to board]
+    - W_JST: [1]
+    - BOARD: [BAT+ (socket)]
+  - - SPL_GND: [to board]
+    - W_JST: [2]
+    - BOARD: [BAT- (socket)]
+  - - SPL_BAT: [to boost]
+    - W_BOOST: [1]
+    - BOOST: [IN+]
+  - - SPL_GND: [to boost]
+    - W_BOOST: [2]
+    - BOOST: [IN-]
+  - - SPL_BAT: [to gauge]
+    - W_SENSE: [1]
+    - GAUGE: [CELL+]
+  - - BOOST: [OUT+]
+    - W_5V: [1]
+    - SPL_5V: [from boost]
+  - - BOOST: [OUT-]
+    - W_5V: [2]
+    - SPL_G5: [from boost]
+  - - SPL_5V: [to ring]
+    - W_RING: [1]
+    - RING: [5V]
+  - - SPL_G5: [to ring]
+    - W_RING: [2]
+    - RING: [GND]
+  - - SPL_5V: [to amp]
+    - W_AMP: [1]
+    - AMP: [VIN]
+  - - SPL_G5: [to amp]
+    - W_AMP: [2]
+    - AMP: [GND]
+  - - SPL_5V: [to hub]
+    - W_HUB: [1]
+    - HUB: [5V in]

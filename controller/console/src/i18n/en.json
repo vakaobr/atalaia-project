@@ -1,0 +1,230 @@
+{
+  "app": {
+    "title": "Atalaia · Game control",
+    "language": "Language",
+    "lang_pt": "Português",
+    "lang_en": "English",
+    "sections": "Sections",
+    "reconnecting": "No connection to the field controller. Reconnecting…"
+  },
+  "login": {
+    "intro": "The organisers' console, served by the field controller.",
+    "token": "Access code (GM or read-only)",
+    "enter": "Enter",
+    "bad": "Wrong access code.",
+    "expired": "The access code is no longer accepted. Please enter it again.",
+    "hint": "The controller shows the codes with: python3 -m atalaia_controller tokens",
+    "readonly": "Read only",
+    "leave": "Sign out"
+  },
+  "tabs": {
+    "game": "Game",
+    "field": "Field",
+    "nodes": "Boxes",
+    "join": "Join",
+    "presets": "Presets",
+    "feed": "Log",
+    "controller": "Controller"
+  },
+  "common": {
+    "yes": "Yes",
+    "no": "No"
+  },
+  "time": {
+    "seconds": "{n} s ago",
+    "minutes": "{n} min ago",
+    "hours": "{n} h ago"
+  },
+  "alerts": {
+    "radio_down": "Radio down: the USB modem does not answer.",
+    "radio_up": "Radio back.",
+    "tx_failed": "Transmission failed (seq {seq}): {status}",
+    "modem_error": "Modem error: {message}",
+    "role": "This controller is now {role} (term {term}).",
+    "node_offline": "Box {node} has not been heard for more than 90 s.",
+    "count": "{n} alerts"
+  },
+  "game": {
+    "title": "Game",
+    "new": "New game",
+    "name": "Game name",
+    "source": "Mode or preset",
+    "modes": "Modes",
+    "presets": "Presets",
+    "teams": "Teams",
+    "teams_hint": "Separated by commas, in the order of the buttons (for example: red, blue).",
+    "duration": "Duration (minutes)",
+    "duration_hint": "0 = no limit.",
+    "length": "Length",
+    "params": "Mode parameters",
+    "create": "Create game",
+    "message": "Message to every box",
+    "message_hint": "Shown on the boxes' screens",
+    "send": "Send",
+    "message_sent": "Sent.",
+    "adjust": "Adjust score",
+    "amount": "Points (negative for a penalty)",
+    "reason": "Reason",
+    "apply": "Apply",
+    "ended": "The game “{name}” has ended.",
+    "none": "No game is running.",
+    "wait_gm": "The organisers have not created a game yet.",
+    "state": "State",
+    "clock": "Game time",
+    "no_limit": "no limit",
+    "mode": "Mode",
+    "id": "Id",
+    "standby_notice": "This controller is on standby in this game: it follows the main controller and only takes charge if promoted.",
+    "start": "Start",
+    "confirm_start": "Start the game now?",
+    "pause": "Pause",
+    "confirm_pause": "Pause the game?",
+    "resume": "Resume",
+    "confirm_resume": "Resume the game?",
+    "end": "End",
+    "leave": "Leave the game",
+    "confirm_end": "Are you sure?",
+    "not_leader": "This controller is not in charge of the game. To run it from here, promote it in the Controller tab.",
+    "states": {
+      "ready": "ready",
+      "running": "running",
+      "paused": "paused",
+      "ended": "ended"
+    }
+  },
+  "controller": {
+    "title": "Field controller",
+    "node_id": "Radio id",
+    "role": "Role",
+    "term": "Term",
+    "leader": "Controller in charge",
+    "failover": "Failover",
+    "priority": "Priority",
+    "radio": "Radio",
+    "modem": "Modem",
+    "reconnects": "Modem reconnects",
+    "tx_epoch": "Transmit epoch",
+    "tx_status": "Transmission results",
+    "joined": "On standby in this game",
+    "promote": "Promote to controller",
+    "confirm_promote": "This controller will take charge of the game. Continue?",
+    "promote_hint": "Promote a standby controller when the main one stops answering (manual failover, ADR-P2-8).",
+    "roles": {
+      "leader": "controller in charge",
+      "follower": "standby",
+      "candidate": "candidate"
+    },
+    "failover_modes": {
+      "manual": "manual",
+      "auto": "automatic"
+    },
+    "radio_states": {
+      "up": "up",
+      "down": "down",
+      "connecting": "connecting",
+      "closed": "closed",
+      "none": "no modem"
+    }
+  },
+  "score": {
+    "title": "Score",
+    "timeline": "Score over time since the console opened",
+    "explain": "Each box's points (the highest value it reported) added up, plus the organisers' adjustments."
+  },
+  "feed": {
+    "title": "Log and alerts",
+    "dismiss": "Dismiss alert",
+    "filter": "Filter events",
+    "critical_only": "Critical only",
+    "count": "{n} events",
+    "empty": "No events yet."
+  },
+  "nodes": {
+    "title": "Boxes",
+    "node": "box",
+    "controller": "controller",
+    "none": "No boxes in this game yet.",
+    "id": "No.",
+    "name": "Name",
+    "role": "Role",
+    "owner": "Owner",
+    "tier": "Tier",
+    "battery": "Battery",
+    "signal": "Signal",
+    "last_seen": "Last heard",
+    "firmware": "Firmware",
+    "epoch": "Epoch",
+    "set_owner": "Team owning box {node}",
+    "no_owner": "none",
+    "offline": "not heard",
+    "tiers": {
+      "full": "full",
+      "reduced": "reduced",
+      "proxy": "proxy"
+    }
+  },
+  "field": {
+    "title": "Field",
+    "bad_type": "The field image must be PNG, JPEG or WebP.",
+    "marker": "Box {node}, owner: {owner}",
+    "upload": "Upload field image",
+    "remove": "Remove image",
+    "image_alt": "Field image",
+    "no_image": "No field image: the boxes are shown on a grid.",
+    "drag_hint": "Drag the boxes to where they are on the field."
+  },
+  "join": {
+    "title": "Join boxes and controllers",
+    "intro": "Make the join data for a box (NFC card or serial console) or for a standby controller.",
+    "kind": "For",
+    "kinds": {
+      "node": "a box",
+      "controller": "a standby controller"
+    },
+    "role": "Role in the mode",
+    "node_id": "Id",
+    "node_id_auto": "automatic",
+    "generate": "Generate",
+    "warning": "Careful: this code and the card carry the game key. Show them only to the people setting up the field.",
+    "for_node": "Box {node} ({role})",
+    "for_controller": "Standby controller {node}",
+    "bytes": "{n} bytes",
+    "channel": "channel {mhz} MHz",
+    "qr_label": "QR code with the join data",
+    "text": "Join text",
+    "copy": "Copy text",
+    "copied": "Copied.",
+    "copy_failed": "Could not copy: select the text and copy it by hand.",
+    "nfc": "NFC card (NTAG215/216)",
+    "nfc_hint": "Bytes to write to the card's memory from page 4 (NDEF message).",
+    "no_game": "No game is running on this controller.",
+    "standby_title": "Join as a standby controller",
+    "standby_intro": "Paste the text the main controller made for a standby controller. Both controllers must share the same field join key.",
+    "standby_join": "Join the game",
+    "standby_done": "This controller is now on standby in game {game}.",
+    "gm_only": "Only the organisers can make join data.",
+    "standby_cannot_issue": "A standby controller does not make join data; use the controller in charge."
+  },
+  "presets": {
+    "title": "Presets",
+    "optional": "optional",
+    "no_params": "This mode has no parameters.",
+    "saved": "Preset “{name}” saved.",
+    "none": "No presets saved yet.",
+    "name": "Name",
+    "mode": "Mode",
+    "params": "Parameters",
+    "copy": "Copy",
+    "new": "New preset",
+    "save": "Save"
+  },
+  "scoreboard": {
+    "title": "Scoreboard",
+    "no_game": "Waiting for a game…",
+    "token_needed": "Open the scoreboard with the read code in its address: …/scoreboard.html#token=CODE",
+    "connecting": "Connecting to the field controller…",
+    "offline": "No connection. Reconnecting…",
+    "winner": "{team} wins",
+    "tie": "Tie"
+  }
+}
