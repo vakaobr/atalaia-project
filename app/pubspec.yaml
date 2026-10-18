@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The Atalaia app (README.md). Dependencies are pinned to exact versions and
+# pubspec.lock is committed; tools/docker_app.py and CI run
+# `flutter pub get --enforce-lockfile` in ghcr.io/cirruslabs/flutter:3.44.0.
+# To change a dependency: edit the pin here, then `python tools/docker_app.py lock`.
+name: atalaia_app
+description: >-
+  Atalaia's app for players, marshals, GMs and Android props. Plan phase B:
+  chrono check-in logic, player tags and player tokens (no UI yet).
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.12.0
+  flutter: ">=3.44.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # HMAC-SHA256 for player tags and player tokens (Dart team, pure Dart).
+  crypto: 3.0.7
+  # Ed25519 for chrono records; the pure-Dart implementation (DartEd25519) is used.
+  cryptography: 2.9.0
+  # Limit templates (and the screen templates in plan phase D).
+  yaml: 3.1.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: 6.0.0
+
+flutter:
+  assets:
+    - lib/chrono/limit_templates/

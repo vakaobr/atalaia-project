@@ -225,6 +225,20 @@ MSYS_NO_PATHCONV=1 docker run --rm ^
 
 ## Phase B: Chrono data model, energy calculation, limit templates
 
+**Status (2026-10-19): done in software.** What was built, and where it
+differs from this section, is in `STATUS.md` ("Plan phase B") and decisions
+B1-B13 of `docs/review/decisions-to-review.md`. In short: chrono records are
+signed with Ed25519 per marshal as ADR-P3-7 (P3-1) says, so
+`hmac_signer.dart` is `record_signer.dart` and the package is `cryptography`,
+not `pointycastle` (B1); the canonical form, the record fields and the player
+token format are specified in `protocol/chrono-record.md` and
+`protocol/player-token.md` with shared vectors that the controller's Python
+checks too (B3-B9); the player token key is the controller's own, not the
+game key (B8); the templates are `portugal.yaml`, `uk.yaml`, `germany.yaml`
+and `generic_cqb.yaml`, all marked unverified (B10); the image is
+`ghcr.io/cirruslabs/flutter:3.44.0` pinned by digest, run by
+`python tools/docker_app.py` (B2).
+
 ### Goal
 
 Implement the chrono check-in data model, energy calculation library,

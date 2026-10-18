@@ -1,0 +1,45 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# UNVERIFIED. These figures come from the project's research notes
+# (docs/phase-3-android-players/RESEARCH.md, section 5), not from an official
+# document. They are not the law and not any association's current rules.
+# Check them against the current national and association rules before use
+# (decision P3-5 in docs/review/decisions-to-review.md).
+format: 1
+id: portugal
+name: Portugal
+status: unverified
+warning: >-
+  Unverified: check against current national/association rules before use.
+  These figures come from the Atalaia project's research, not from an
+  official source.
+source: >-
+  Atalaia phase 3 research notes (RESEARCH.md section 5), summarising the
+  limits commonly attributed to the Portuguese airsoft associations; not
+  checked against their current rules.
+verified_date: null
+notes: >-
+  The figures in fps assume 0.20 g BBs. The minimum engagement distances are
+  the research's typical values.
+classes:
+  rifle:
+    max_energy_j: 1.14
+    max_fps_020: 350
+    med_m: 0
+    fire_mode: full_auto
+  dmr:
+    max_energy_j: 1.88
+    max_fps_020: 450
+    med_m: 20
+    fire_mode: semi_only
+  sniper:
+    max_energy_j: 2.81
+    max_fps_020: 550
+    med_m: 30
+    fire_mode: bolt_only
+  cqb:
+    max_energy_j: 0.84
+    max_fps_020: 300
+    med_m: 0
+    fire_mode: full_auto

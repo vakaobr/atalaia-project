@@ -12,10 +12,12 @@ Both encodings come from the schema files in [`schema/`](schema/), so they canno
 | [`schema/messages.yaml`](schema/messages.yaml) | Packet header and message types (draft) |
 | [`schema/events.yaml`](schema/events.yaml) | Standard events: ids, priorities, CBOR keys and data fields (draft) |
 | [`vectors/events.yaml`](vectors/events.yaml) | Test vectors every event codec must pass |
-| [`vectors/*.json`](vectors/) | Test vectors for header and message payload codecs, the join payload (`join.json`) and player tags (`tag.json`) |
+| [`vectors/*.json`](vectors/) | Test vectors for header and message payload codecs, the join payload (`join.json`), player tags (`tag.json`), chrono records (`chrono_record.json`) and player tokens (`player_token.json`) |
 | [`vectors/capability_proxy.yaml`](vectors/capability_proxy.yaml) | Test vectors for the capability proxy (I/O pod) frames and payloads |
 | [`join.md`](join.md) | The join payload that brings a box or a standby controller into a game (NFC card, QR code, serial console) |
 | [`nfc-tag.md`](nfc-tag.md) | Player tags: the signed NFC tag of a player (Kill Confirmed, Respawn, Player Check-in) |
+| [`chrono-record.md`](chrono-record.md) | Chrono records: one chronograph reading signed with the marshal's Ed25519 key, and the canonical JSON that is signed |
+| [`player-token.md`](player-token.md) | Player tokens: who a phone calling the controller's API is (player, team, squad, role, game), signed by the controller |
 | [`usb-modem.md`](usb-modem.md) | The serial link between the field controller and its USB radio modem |
 | [`capability-proxy.md`](capability-proxy.md) | The link between an I/O pod and a phone (USB-OTG and BLE), version 1 |
 | [`json/event.schema.json`](json/event.schema.json) | JSON Schema of an event in the game log and the API (generated) |

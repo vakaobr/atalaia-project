@@ -5,9 +5,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 3 -- Android and Players: Status
 
-**Current phase:** Implementation: plan phase A done in software; plan phases B-G pending
+**Current phase:** Implementation: plan phases A and B done in software; plan phases C-G pending
 **Risk level:** Medium
-**Last verified:** 2026-10-18 (plan phase A)
+**Last verified:** 2026-10-19 (plan phase B)
 
 ## Completed
 
@@ -19,6 +19,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 - [x] Plan phase A (2026-10-18): event schema, three single-node modes,
   player tags, capability proxy protocol v1, declarative screen templates
   (see below)
+- [x] Plan phase B (2026-10-19): chrono data model, energy, limit
+  templates, spot checks, Ed25519-signed records, player tags and player
+  tokens in Dart, with shared vectors checked by Dart and Python (see below)
 
 ## Plan phase A (2026-10-18)
 
@@ -30,12 +33,36 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | Player tags (ADR-P3-9) | `protocol/nfc-tag.md`, `core/src/tag.c`, `simulator/atalaia_sim/tag.py`, `protocol/vectors/tag.json`; the Field Box reads tags during games (`box_game_tag`, `@tag` on the console) | Done; tag writing from the console is a follow-up |
 | Capability proxy protocol v1 (ADR-P3-2) | `protocol/capability-proxy.md`, `protocol/vectors/capability_proxy.yaml`, `core/src/proxy.c`, `firmware/esp32/test/test_proxy_codec.c`, `simulator/atalaia_sim/capability_proxy.py` | Done (C and Python); the Dart codec is plan phase D, the pod firmware plan phase F |
 | Declarative screen templates (ADR-P3-4) | `core/src/screen_template.c` (parser, checks, expressions), `firmware/esp32/main/screen_template.c` (LVGL renderer, C fallback), templates for Bomb, Domination and the three new modes, 16 new reference images | Done on the Field Box; the Flutter renderer is plan phase D |
-| Chrono data model and energy | | Plan phase B, as the plan's file list says |
+| Chrono data model and energy | | Plan phase B, as the plan's file list says (done 2026-10-19, below) |
 
 Deviations and choices: decisions A1-A13 in `docs/review/decisions-to-review.md`
 (a draft RFC, `docs/rfcs/0000-phase-3-events-tags-and-pods.md`, records the
 protocol additions). A core bug found by Kill Confirmed was fixed: a penalty
 `score.add(team, -n, reason)` without a squad could not be encoded.
+
+## Plan phase B (2026-10-19)
+
+Pure Dart in `app/` (a Flutter project with no UI or platform folders yet),
+run with `python tools/docker_app.py` and CI's "Player app logic (Dart)" job
+in `ghcr.io/cirruslabs/flutter:3.44.0` (pinned by digest).
+
+| Deliverable | Where | State |
+| --- | --- | --- |
+| Energy, fps/m/s | `app/lib/chrono/energy.dart` | Done |
+| `ChronoReading`, `Replica` (ADR-P3-7) | `app/lib/chrono/reading.dart`, `replica.dart` | Done; `ref_reading_id` added, `game_id` optional (B5) |
+| Limit templates and loader | `app/lib/chrono/limit_template.dart`, `limit_templates/{portugal,uk,germany,generic_cqb}.yaml` | Done; every template marked unverified (P3-5, B10) |
+| Check-in and spot check (PASS/WARN/FAIL) | `app/lib/chrono/spot_check.dart` | Done |
+| Ed25519-signed records, canonical form | `protocol/chrono-record.md`, `app/lib/chrono/record_signer.dart`, `app/lib/security/canonical_json.dart`; Python verifier `controller/atalaia_controller/chrono.py` | Done; shared vectors `protocol/vectors/chrono_record.json` (4 valid, 28 invalid, RFC 8032) |
+| Retention and erasure rules | `app/lib/chrono/retention.dart` | Done (rules only; storage comes with phases D/E) |
+| Player tags in Dart | `app/lib/security/nfc_tag_signer.dart`, `ndef.dart` | Done; byte for byte against `protocol/vectors/tag.json`, `nfc.tag` event data included |
+| Player tokens (ADR-P3-9) | `protocol/player-token.md`, `app/lib/security/player_token.dart`; Python `controller/atalaia_controller/player_token.py` | Done; shared vectors `protocol/vectors/player_token.json` (3 valid, 22 invalid); not wired into the API (phase E) |
+| Tooling | `tools/docker_app.py`, `app/tool/check.sh`, `.github/workflows/ci.yml` (job `app`) | Done |
+
+Tests: 153 Dart tests (`flutter test`), 18 new Python tests in the
+controller. Deviations and choices: decisions B1-B13 in
+`docs/review/decisions-to-review.md`: Ed25519 instead of the file list's
+HMAC signer (B1), the canonical form made precise (B3), and a controller-only
+token key instead of the game key (B8) are the ones to look at first.
 
 ## Phase 2 handoff changes (2026-10-18)
 
@@ -71,18 +98,17 @@ Phase G needs hardware.
 1. ~~Research~~ -- Complete
 2. ~~Architecture~~ -- Complete
 3. ~~Planning~~ -- Complete
-4. Implementation -- plan phase A done; next: plan phase B (chrono, Dart)
-   and C (dart:ffi bridge), which can now use the tag, proxy and template
-   code in the core
+4. Implementation -- plan phases A and B done; next: plan phase C
+   (dart:ffi bridge, game loop isolate, FFI stub, NDK build), which can
+   use the tag, proxy and template code in the core and adds to `app/`
 
 ## How to resume with implementation
 
 Run `/sdlc phase-3-android-players --resume`.  STATE.json records
-`current_phase: "implementation"`, `phase_status: "in_progress"` (plan phase A done).
+`current_phase: "implementation"`, `phase_status: "in_progress"` (plan phases A and B done).
 
 **What can start now (no hardware, no phase 2 blockers):**
-- Phases A and B (event schema, single-node modes, screen templates, chrono)
-- Phase C (dart:ffi bridge) depends only on Phase A
+- Phase C (dart:ffi bridge) depends only on Phase A (done)
 - Phase D (Flutter UI, Kotlin plugins) depends on B and C
 
 **What needs hardware:**
@@ -99,9 +125,9 @@ Phase 4's site server builds on these phase 3 interfaces:
 
 | Interface | Where | What phase 4 consumes |
 |-----------|-------|----------------------|
-| Chrono reading record | `app/lib/chrono/reading.dart` | Schema, Ed25519 signature verification, replica registry |
+| Chrono reading record | `protocol/chrono-record.md`, `app/lib/chrono/reading.dart`, Python verifier `controller/atalaia_controller/chrono.py`, vectors `protocol/vectors/chrono_record.json` | Schema, canonical form, Ed25519 signature verification |
 | Limit templates | `app/lib/chrono/limit_templates/*.yaml` | Template format, per-field overrides |
-| Player token format | `app/lib/security/player_token.dart` | Token schema for account-based auth upgrade |
+| Player token format | `protocol/player-token.md`, `app/lib/security/player_token.dart`, `controller/atalaia_controller/player_token.py`, vectors `protocol/vectors/player_token.json` | Token schema for account-based auth upgrade; the token key is the controller's own (decision B8) |
 | Position reports | `POST /api/v1/positions` | Position data model, visibility rules |
 | Replica registry | `app/lib/chrono/replica.dart` | Replica schema for the site-server database |
 | NFC tag format | `protocol/nfc-tag.md` (HMAC-SHA256 with game key, truncated 16 bytes; vectors `protocol/vectors/tag.json`) | Tag verification for site-server-managed games |

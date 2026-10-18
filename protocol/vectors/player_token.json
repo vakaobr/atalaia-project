@@ -1,0 +1,188 @@
+{
+  "description": "Player tokens (protocol/player-token.md, ADR-P3-9): apt1.<base64url(payload)>.<base64url(HMAC-SHA256(key, 'apt1.' + base64url(payload)))>. Every valid token verifies with key for game_id, team_count teams at time now (Unix seconds) to its claims, and issuing the claims gives the token byte for byte (payload is the canonical JSON, mac the full HMAC in hex). Every invalid token fails with its reason (format, version, mac, game, team or expired).",
+  "key": "ac7ebb64e266798b17864640d3f1bbb68a73e54c2925d35c4538e4896fb84567",
+  "game_id": 4242,
+  "team_count": 2,
+  "now": 1792324800,
+  "valid": [
+    {
+      "name": "red_player",
+      "why": "a player of team 1, squad 2",
+      "claims": {
+        "player_id": "p-17",
+        "team": 1,
+        "squad": 2,
+        "role": "player",
+        "game_id": 4242,
+        "exp": 1792339200
+      },
+      "payload": "{\"exp\":1792339200,\"game_id\":4242,\"player_id\":\"p-17\",\"role\":\"player\",\"squad\":2,\"team\":1}",
+      "mac": "5dd4264969513a5c07fed35f470e2ea493117fb174c5cf98737400546b40ce70",
+      "token": "apt1.eyJleHAiOjE3OTIzMzkyMDAsImdhbWVfaWQiOjQyNDIsInBsYXllcl9pZCI6InAtMTciLCJyb2xlIjoicGxheWVyIiwic3F1YWQiOjIsInRlYW0iOjF9.XdQmSWlROlwH_tNfRw4upJMRf7F0xc-Yc3QAVGtAznA"
+    },
+    {
+      "name": "marshal_no_team",
+      "why": "no team, no squad",
+      "claims": {
+        "player_id": "marshal.ana",
+        "team": 0,
+        "squad": 0,
+        "role": "marshal",
+        "game_id": 4242,
+        "exp": 1792339200
+      },
+      "payload": "{\"exp\":1792339200,\"game_id\":4242,\"player_id\":\"marshal.ana\",\"role\":\"marshal\",\"squad\":0,\"team\":0}",
+      "mac": "4be80e17a6b10789350e4c5e7d563ff7894f1674cab4d7af8e8e902b43153fd6",
+      "token": "apt1.eyJleHAiOjE3OTIzMzkyMDAsImdhbWVfaWQiOjQyNDIsInBsYXllcl9pZCI6Im1hcnNoYWwuYW5hIiwicm9sZSI6Im1hcnNoYWwiLCJzcXVhZCI6MCwidGVhbSI6MH0.S-gOF6axB4k1DkxefVY_94lPFnTKtNevjo6QK0MVP9Y"
+    },
+    {
+      "name": "squad_leader_last_second",
+      "why": "longest player id; valid until one second after now",
+      "claims": {
+        "player_id": "AAAAAAAAAAAAAAAAz_9-.bbbbbbbbbbb",
+        "team": 2,
+        "squad": 255,
+        "role": "squad_leader",
+        "game_id": 4242,
+        "exp": 1792324801
+      },
+      "payload": "{\"exp\":1792324801,\"game_id\":4242,\"player_id\":\"AAAAAAAAAAAAAAAAz_9-.bbbbbbbbbbb\",\"role\":\"squad_leader\",\"squad\":255,\"team\":2}",
+      "mac": "5d00307c4c4d76b9909ca34893cce07554f9a25e04e185351f51ef3b55b16715",
+      "token": "apt1.eyJleHAiOjE3OTIzMjQ4MDEsImdhbWVfaWQiOjQyNDIsInBsYXllcl9pZCI6IkFBQUFBQUFBQUFBQUFBQUF6XzktLmJiYmJiYmJiYmJiIiwicm9sZSI6InNxdWFkX2xlYWRlciIsInNxdWFkIjoyNTUsInRlYW0iOjJ9.XQAwfExNdrmQnKNIk8zgdVT5ol4E4YU1H1HvO1WxZxU"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "version_2",
+      "why": "a later token version",
+      "reason": "version",
+      "token": "apt2.eyJleHAiOjE3OTIzMzkyMDAsImdhbWVfaWQiOjQyNDIsInBsYXllcl9pZCI6InAtMTciLCJyb2xlIjoicGxheWVyIiwic3F1YWQiOjIsInRlYW0iOjF9.glcJp-RbXgXMYwdBpkJP9G_dgWbD6RPFI4yYKXHxOZs"
+    },
+    {
+      "name": "not_a_token",
+      "why": "a GM or read token is not a player token",
+      "reason": "format",
+      "token": "gm-secret"
+    },
+    {
+      "name": "jwt_like",
+      "why": "another prefix",
+      "reason": "format",
+      "token": "eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3OTIzMzkyMDAsImdhbWVfaWQiOjQyNDIsInBsYXllcl9pZCI6InAtMTciLCJyb2xlIjoicGxheWVyIiwic3F1YWQiOjIsInRlYW0iOjF9.XdQmSWlROlwH_tNfRw4upJMRf7F0xc-Yc3QAVGtAznA"
+    },
+    {
+      "name": "two_parts",
+      "why": "no MAC",
+      "reason": "format",
+      "token": "apt1.eyJleHAiOjE3OTIzMzkyMDAsImdhbWVfaWQiOjQyNDIsInBsYXllcl9pZCI6InAtMTciLCJyb2xlIjoicGxheWVyIiwic3F1YWQiOjIsInRlYW0iOjF9"
+    },
+    {
+      "name": "four_parts",
+      "why": "a fourth part",
+      "reason": "format",
+      "token": "apt1.eyJleHAiOjE3OTIzMzkyMDAsImdhbWVfaWQiOjQyNDIsInBsYXllcl9pZCI6InAtMTciLCJyb2xlIjoicGxheWVyIiwic3F1YWQiOjIsInRlYW0iOjF9.XdQmSWlROlwH_tNfRw4upJMRf7F0xc-Yc3QAVGtAznA.x"
+    },
+    {
+      "name": "padded_payload",
+      "why": "base64url with padding",
+      "reason": "format",
+      "token": "apt1.eyJleHAiOjE3OTIzMzkyMDAsImdhbWVfaWQiOjQyNDIsInBsYXllcl9pZCI6InAtMTciLCJyb2xlIjoicGxheWVyIiwic3F1YWQiOjIsInRlYW0iOjF9=.XdQmSWlROlwH_tNfRw4upJMRf7F0xc-Yc3QAVGtAznA"
+    },
+    {
+      "name": "short_mac",
+      "why": "a 16-byte MAC",
+      "reason": "format",
+      "token": "apt1.eyJleHAiOjE3OTIzMzkyMDAsImdhbWVfaWQiOjQyNDIsInBsYXllcl9pZCI6InAtMTciLCJyb2xlIjoicGxheWVyIiwic3F1YWQiOjIsInRlYW0iOjF9.XdQmSWlROlwH_tNfRw4upJ"
+    },
+    {
+      "name": "mac_flipped",
+      "why": "one bit of the MAC changed",
+      "reason": "mac",
+      "token": "apt1.eyJleHAiOjE3OTIzMzkyMDAsImdhbWVfaWQiOjQyNDIsInBsYXllcl9pZCI6InAtMTciLCJyb2xlIjoicGxheWVyIiwic3F1YWQiOjIsInRlYW0iOjF9.3dQmSWlROlwH_tNfRw4upJMRf7F0xc-Yc3QAVGtAznA"
+    },
+    {
+      "name": "wrong_key",
+      "why": "issued with another key",
+      "reason": "mac",
+      "token": "apt1.eyJleHAiOjE3OTIzMzkyMDAsImdhbWVfaWQiOjQyNDIsInBsYXllcl9pZCI6InAtMTciLCJyb2xlIjoicGxheWVyIiwic3F1YWQiOjIsInRlYW0iOjF9.M9LM99WgCzZBQucYmvWPqeS1kDHn8VTeAqV9-8jqXkA"
+    },
+    {
+      "name": "payload_changed",
+      "why": "role changed after issuing",
+      "reason": "mac",
+      "token": "apt1.eyJleHAiOjE3OTIzMzkyMDAsImdhbWVfaWQiOjQyNDIsInBsYXllcl9pZCI6InAtMTciLCJyb2xlIjoiZ20iLCJzcXVhZCI6MiwidGVhbSI6MX0.XdQmSWlROlwH_tNfRw4upJMRf7F0xc-Yc3QAVGtAznA"
+    },
+    {
+      "name": "not_canonical",
+      "why": "authentic, but with spaces",
+      "reason": "format",
+      "token": "apt1.eyJleHAiOiAxNzkyMzM5MjAwLCAiZ2FtZV9pZCI6IDQyNDIsICJwbGF5ZXJfaWQiOiAicC0xNyIsICJyb2xlIjogInBsYXllciIsICJzcXVhZCI6IDIsICJ0ZWFtIjogMX0.dhfvTig2McVNYARemDBTHUzXknEreeRxvf1_mTYFog0"
+    },
+    {
+      "name": "unsorted",
+      "why": "authentic, but keys not sorted",
+      "reason": "format",
+      "token": "apt1.eyJwbGF5ZXJfaWQiOiJwLTE3IiwidGVhbSI6MSwic3F1YWQiOjIsInJvbGUiOiJwbGF5ZXIiLCJnYW1lX2lkIjo0MjQyLCJleHAiOjE3OTIzMzkyMDB9.-g5Wrq44orThOXJJTHRuzH3vdaKvMWN3QjDHFKT8PtY"
+    },
+    {
+      "name": "unknown_field",
+      "why": "authentic, but an extra field",
+      "reason": "format",
+      "token": "apt1.eyJhZG1pbiI6MSwiZXhwIjoxNzkyMzM5MjAwLCJnYW1lX2lkIjo0MjQyLCJwbGF5ZXJfaWQiOiJwLTE3Iiwicm9sZSI6InBsYXllciIsInNxdWFkIjoyLCJ0ZWFtIjoxfQ.rGA_m9Uw02lFQEm2gkl5wLQwOAS8E97Y0xgmcHTRt6M"
+    },
+    {
+      "name": "missing_field",
+      "why": "authentic, but no squad",
+      "reason": "format",
+      "token": "apt1.eyJleHAiOjE3OTIzMzkyMDAsImdhbWVfaWQiOjQyNDIsInBsYXllcl9pZCI6InAtMTciLCJyb2xlIjoicGxheWVyIiwidGVhbSI6MX0.-vP-UcYpp4Ny1wfNoV85fjtCRctg30g84-R61-ktX9g"
+    },
+    {
+      "name": "bad_role",
+      "why": "authentic, but an unknown role",
+      "reason": "format",
+      "token": "apt1.eyJleHAiOjE3OTIzMzkyMDAsImdhbWVfaWQiOjQyNDIsInBsYXllcl9pZCI6InAtMTciLCJyb2xlIjoiYWRtaW4iLCJzcXVhZCI6MiwidGVhbSI6MX0.B5tf7WxI1DCr628wpYWq0MIELJ2o_3HdAM_ktLftTtE"
+    },
+    {
+      "name": "team_bool",
+      "why": "authentic, but team is true",
+      "reason": "format",
+      "token": "apt1.eyJleHAiOjE3OTIzMzkyMDAsImdhbWVfaWQiOjQyNDIsInBsYXllcl9pZCI6InAtMTciLCJyb2xlIjoicGxheWVyIiwic3F1YWQiOjIsInRlYW0iOnRydWV9.UdQi7Twm2sILBhDp8NFPDPC1kCKBFNNjXrfiM_UfQ94"
+    },
+    {
+      "name": "player_space",
+      "why": "authentic, but a space in the player id",
+      "reason": "format",
+      "token": "apt1.eyJleHAiOjE3OTIzMzkyMDAsImdhbWVfaWQiOjQyNDIsInBsYXllcl9pZCI6InAgMTciLCJyb2xlIjoicGxheWVyIiwic3F1YWQiOjIsInRlYW0iOjF9.nVQkcUVqWArYqmuIx5v2xnbl47P6Xlqvk1kDDd7SGeQ"
+    },
+    {
+      "name": "not_json",
+      "why": "authentic, but not JSON",
+      "reason": "format",
+      "token": "apt1.bm90IGpzb24.fQUkm64t3neBUTDVQmXamsSe6_oOFtbrCJAUjgwp0XU"
+    },
+    {
+      "name": "other_game",
+      "why": "issued for another game",
+      "reason": "game",
+      "token": "apt1.eyJleHAiOjE3OTIzMzkyMDAsImdhbWVfaWQiOjQyNDMsInBsYXllcl9pZCI6InAtMTciLCJyb2xlIjoicGxheWVyIiwic3F1YWQiOjIsInRlYW0iOjF9.w4DWXfjbFF5V3PitqRr3O56ayJqBbYP5tsIUXg4GR5g"
+    },
+    {
+      "name": "team_out_of_range",
+      "why": "team 3 in a game of 2 teams",
+      "reason": "team",
+      "token": "apt1.eyJleHAiOjE3OTIzMzkyMDAsImdhbWVfaWQiOjQyNDIsInBsYXllcl9pZCI6InAtMTciLCJyb2xlIjoicGxheWVyIiwic3F1YWQiOjIsInRlYW0iOjN9.CZIwz5dXQRXhBF8tmdBKY9Z2U5gmQ4PBszP_EvJmVc4"
+    },
+    {
+      "name": "expired_now",
+      "why": "exp equals now",
+      "reason": "expired",
+      "token": "apt1.eyJleHAiOjE3OTIzMjQ4MDAsImdhbWVfaWQiOjQyNDIsInBsYXllcl9pZCI6InAtMTciLCJyb2xlIjoicGxheWVyIiwic3F1YWQiOjIsInRlYW0iOjF9.QP2WA898Xs4YTdaPDQEmZElDFRhSlyY-tXFUTxjsMKQ"
+    },
+    {
+      "name": "expired_long_ago",
+      "why": "a day old",
+      "reason": "expired",
+      "token": "apt1.eyJleHAiOjE3OTIyMzg0MDAsImdhbWVfaWQiOjQyNDIsInBsYXllcl9pZCI6InAtMTciLCJyb2xlIjoicGxheWVyIiwic3F1YWQiOjIsInRlYW0iOjF9.hklyiGmvC0BCgH-TtGoc-7NZB23ZiH-P6VMnvBHPKx0"
+    }
+  ]
+}

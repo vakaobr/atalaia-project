@@ -969,6 +969,12 @@ marshal's public key can verify the signature without a shared secret.
 Records are append-only: updates (retest after adjustment) create a new
 record referencing the original `reading_id`, never modify it.
 
+**Implemented 2026-10-19 (plan phase B):** `protocol/chrono-record.md`
+specifies the canonical form exactly (numbers, strings, ranges), adds
+`ref_reading_id` and makes `game_id` optional; one record per shot; shared
+vectors `protocol/vectors/chrono_record.json` checked by the app's Dart and
+the controller's Python (decisions B3-B6).
+
 **Consistency with S1:** Ed25519 is used for application-level signing
 throughout (modes, chrono, OTA checks); ESP32-S3 hardware secure boot
 (RSA-3072 or ECDSA) is a separate decision.
@@ -1148,6 +1154,12 @@ per-player tokens for position reporting and chrono access:
 
 The signature uses the controller's game key (already available).
 The token expires when the game ends.
+
+**Implemented 2026-10-19 (plan phase B):** `protocol/player-token.md`:
+`apt1.<base64url(canonical JSON)>.<base64url(HMAC-SHA256)>`, `game_id` the
+16-bit integer, squad and team 0 for none. The controller should key it with
+a per-game token key of its own rather than the game key, which every box,
+prop and join card holds (decision B8).
 
 The controller validates the token on every request and extracts the
 role for server-side filtering.

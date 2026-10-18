@@ -82,6 +82,23 @@ jobs:
           docker run --rm --ipc=host -e ATALAIA_REQUIRE_ALL=1 -e ATALAIA_REQUIRE_BROWSER=1 \
             -v "$PWD:/src" -w /src atalaia-console-test sh controller/console/tests/run.sh
 
+  app:
+    name: Player app logic (Dart)
+    # The pinned Flutter image that `python tools/docker_app.py` uses (Flutter
+    # 3.44.0, Dart 3.12.0, pinned by digest). app/tool/check.sh resolves the
+    # packages from the committed pubspec.lock, runs `flutter analyze
+    # --fatal-infos`, `dart format --set-exit-if-changed` and `flutter test`
+    # (chrono, player tags and player tokens against protocol/vectors/) on a
+    # copy of app/ and protocol/; the checkout is mounted read-only.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Analyze, check the formatting and test
+        run: |
+          docker run --rm -v "$PWD:/src:ro" -w /src \
+            ghcr.io/cirruslabs/flutter:3.44.0@sha256:46691e311715845de03a3ba4753a475476936805b29431b1f00f1816981033f8 \
+            sh /src/app/tool/check.sh check
+
   protocol:
     name: Protocol schema and generated files
     runs-on: ubuntu-latest

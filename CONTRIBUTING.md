@@ -49,7 +49,7 @@ Bug fixes, refactors, new modes and documentation do not need an RFC.
 
 - Keep each pull request focused on one change.
 - Describe what you changed, why, and how you tested it.
-- Add or update tests: C code in `core/tests/`, modes in `modes/<mode>/tests/`.
+- Add or update tests: C code in `core/tests/`, modes in `modes/<mode>/tests/`, the app's Dart in `app/test/` (`python tools/docker_app.py`).
 - Add an `SPDX-License-Identifier` header to new source files.
 - Write code, comments, commit messages and docs in English. Translations of user-facing text are welcome in `i18n/` folders.
 

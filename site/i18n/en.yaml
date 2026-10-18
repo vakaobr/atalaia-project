@@ -348,8 +348,10 @@ roadmap:
       Android props, <a href="#glossary-android-prop">I/O pod</a>, player app with roles, and the
       modes that need players' phones: Respawn, Kill Confirmed, Player Check-in, Money Factory and
       chrono check-in. Started: Kill Confirmed, Respawn and Lives and Player Check-in read players'
-      signed NFC tags on the Field Box, the I/O pod's link protocol is fixed, and modes describe
-      their screens in YAML; all tested in software, no Android code yet.
+      signed NFC tags on the Field Box, the I/O pod's link protocol is fixed, modes describe their
+      screens in YAML, and the app's first logic is written: chrono check-in (energy, limits per
+      class, spot checks, readings signed by the marshal) and players' signed tags and tokens. All
+      tested in software; nothing runs on a phone yet.
     gate: "Gate: one game mixes ESP32 and Android props without issues."
   p4:
     title: Site server and advanced play

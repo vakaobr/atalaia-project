@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# UNVERIFIED. These figures come from the project's research notes
+# (docs/phase-3-android-players/RESEARCH.md, section 5), not from an official
+# document. They are not the law and not any association's current rules.
+# Check them against the current national and association rules before use
+# (decision P3-5 in docs/review/decisions-to-review.md).
+format: 1
+id: germany
+name: Germany
+status: unverified
+warning: >-
+  Unverified: check against current national/association rules before use.
+  These figures come from the Atalaia project's research, not from an
+  official source.
+source: >-
+  Atalaia phase 3 research notes (RESEARCH.md section 5), which summarise
+  German airsoft law as 0.5 J for full-auto and 7.5 J for semi-only replicas
+  (above 18); not checked against the law itself.
+verified_date: null
+notes: >-
+  The research's figures are legal ceilings, not game-safety limits: a
+  field sets its own, much lower semi-only limit and the minimum engagement
+  distances (left empty here) before using this template.
+classes:
+  rifle:
+    max_energy_j: 0.5
+    max_fps_020: 232
+    med_m: null
+    fire_mode: full_auto
+  semi:
+    max_energy_j: 7.5
+    max_fps_020: 898
+    med_m: null
+    fire_mode: semi_only

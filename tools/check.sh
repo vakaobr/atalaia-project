@@ -6,8 +6,10 @@
 # simulator's tests, every game mode's tests, and the field controller's tests
 # (against the C host modem, the C host box and a private Mosquitto): the same
 # checks as CI (apart from the JSON Schema and licensing checks, which need
-# extra tools, the firmware jobs: tools/docker_fw.py, and the GM console's
-# browser tests: tools/docker_console.py).
+# extra tools, the firmware jobs: tools/docker_fw.py, the GM console's
+# browser tests: tools/docker_console.py, and the app's Dart checks:
+# tools/docker_app.py, since this image has no Dart; the controller's tests
+# below do check the Python side of the app's shared chrono and token vectors).
 # Run from the repository root, natively or in the dev container (see
 # tools/dev/Dockerfile).
 set -eu

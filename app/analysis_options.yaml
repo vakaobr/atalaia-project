@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# `flutter analyze --fatal-infos` (tools/docker_app.py, CI) fails on any finding.
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+
+linter:
+  rules:
+    - prefer_final_locals
+    - prefer_single_quotes
+    - unawaited_futures
+    - always_declare_return_types

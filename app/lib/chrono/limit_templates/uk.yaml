@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# UNVERIFIED. These figures come from the project's research notes
+# (docs/phase-3-android-players/RESEARCH.md, section 5), not from an official
+# document. They are not the law and not any association's current rules.
+# Check them against the current national and association rules before use
+# (decision P3-5 in docs/review/decisions-to-review.md).
+format: 1
+id: uk
+name: United Kingdom
+status: unverified
+warning: >-
+  Unverified: check against current national/association rules before use.
+  These figures come from the Atalaia project's research, not from an
+  official source.
+source: >-
+  Atalaia phase 3 research notes (RESEARCH.md section 5): site limits
+  commonly quoted in the UK. The research attributed them to UKARA, which is
+  a retailers' registration scheme rather than a body that sets field limits;
+  UK law sets its own ceilings, which these figures were not checked against.
+verified_date: null
+notes: >-
+  The figures in fps assume 0.20 g BBs (1.64 J is about 420 fps). The
+  minimum engagement distances are the research's typical values for any
+  field; it gave none for the UK.
+classes:
+  rifle:
+    max_energy_j: 1.14
+    max_fps_020: 350
+    med_m: 0
+    fire_mode: full_auto
+  dmr:
+    max_energy_j: 1.64
+    max_fps_020: 420
+    med_m: 20
+    fire_mode: semi_only
+  sniper:
+    max_energy_j: 2.32
+    max_fps_020: 500
+    med_m: 30
+    fire_mode: bolt_only

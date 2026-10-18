@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# UNVERIFIED. These figures come from the project's research notes
+# (docs/phase-3-android-players/RESEARCH.md, section 5), not from an official
+# document. They are not the law and not any association's current rules.
+# Check them against the current national and association rules before use
+# (decision P3-5 in docs/review/decisions-to-review.md).
+format: 1
+id: generic_cqb
+name: Generic CQB
+status: unverified
+warning: >-
+  Unverified: check against current national/association rules before use.
+  These figures come from the Atalaia project's research, not from an
+  official source.
+source: >-
+  Atalaia phase 3 research notes (RESEARCH.md section 5): a common indoor
+  (CQB) limit of 1.0 J for every class.
+verified_date: null
+notes: >-
+  A starting point for indoor fields: 1.0 J is about 328 fps with 0.20 g
+  BBs. National rules may be stricter.
+classes:
+  rifle:
+    max_energy_j: 1.0
+    max_fps_020: 328
+    med_m: 0
+    fire_mode: full_auto
+  dmr:
+    max_energy_j: 1.0
+    max_fps_020: 328
+    med_m: 0
+    fire_mode: semi_only
+  sniper:
+    max_energy_j: 1.0
+    max_fps_020: 328
+    med_m: 0
+    fire_mode: bolt_only
