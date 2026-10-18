@@ -22,8 +22,8 @@ phase 3 software can proceed immediately.
 - Four new game modes (all single-node): Kill Confirmed, Respawn/Lives,
   Player Check-in, Money Factory.  (Hold-All Domination and Last Stand
   moved to the phase 2 mode pack per decision R6.)
-- Event schema additions (`events.yaml`) for phase 3 events (IDs 25-26,
-  33-41; IDs 27-32 owned by the phase 2 mode pack) plus `protogen.py`
+- Event schema additions (`events.yaml`) for phase 3 events (IDs 25-27,
+  33-41; IDs 28-32 owned by the phase 2 mode pack) plus `protogen.py`
   regeneration.
 - Capability proxy protocol v1: frame format, CBOR payloads, test
   vectors shared by Dart and C.
@@ -84,7 +84,7 @@ phase 3 software can proceed immediately.
 | 9 | Server-side position filtering only | Phase E positions module sends only filtered positions per viewer role; the controller NEVER sends positions a client may not see |
 | 10 | Positions over Wi-Fi or 4G, never LoRa | Phase E position reports go to `POST /api/v1/positions`; no LoRa path for positions |
 | 11 | Ed25519 for chrono records; HMAC for NFC tags | Phase B chrono module signs readings with marshal's Ed25519 key (P3-1); NFC tags signed with game key (truncated 16-byte HMAC) |
-| 12 | Event IDs 25-26 and 33-41 for phase 3 | Phase A adds phase 3 IDs; IDs 27-32 owned by phase 2 mode pack; phase 4 starts at ID 42 |
+| 12 | Event IDs 25-27 and 33-41 for phase 3 | Phase A adds phase 3 IDs; IDs 28-32 owned by phase 2 mode pack; phase 4 starts at ID 42 |
 | 13 | iOS excludes prop and controller roles | Phase D uses conditional imports (`node_runner_stub.dart` on iOS); role selector hides prop/controller on iOS |
 | 14 | FFI stub library for Dart tests | Phase C creates `core/tests/stub.c` with `ATALAIA_STUB=ON`; CI sets `ATALAIA_CORE_LIB` to the stub path |
 | 15 | Four new CI jobs | Phase C adds `flutter-test` and `core-android-ndk`; Phase D adds `flutter-build-android` and `flutter-integration` |
@@ -148,7 +148,7 @@ phase 2C/D/E dependency. No hardware dependency.
 
 | File | Change |
 |------|--------|
-| `protocol/schema/events.yaml` | Add 15 events (IDs 25-39): `kill.confirmed`, `kill.denied`, `team.eliminated`, `holdall.scoring_start`, `holdall.scoring_stop`, `laststand.countdown_start`, `laststand.countdown_cancel`, `laststand.defeated`, `chrono.checkin`, `chrono.spotcheck`, `visibility.granted`, `visibility.expired`, `node.tamper`, `pod.connected`, `pod.disconnected`; add 3 data fields (keys 28-30): `duration_s`, `see_team`, `tolerance_pct` |
+| `protocol/schema/events.yaml` | Add 13 events (IDs 25-27, 33-41): `kill.confirmed`, `kill.denied`, `team.eliminated`, `money.collected`, `money.deposited`, `chrono.checkin`, `chrono.spotcheck`, `visibility.granted`, `visibility.expired`, `node.tamper`, `pod.connected`, `pod.disconnected` (IDs 28-32 already exist from the phase 2 mode pack); add 2 data fields (keys 29-30): `see_team`, `tolerance_pct` (`duration_s` 28 and `holder` 31 exist; Money Factory reuses `amount`, key 6) |
 | `core/CMakeLists.txt` | Add `screen_template.c` to the source list |
 | `core/tests/CMakeLists.txt` | Add `test_screen_template` executable |
 | `firmware/esp32/main/CMakeLists.txt` | Add `screen_template.c` |

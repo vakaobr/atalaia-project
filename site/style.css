@@ -403,3 +403,10 @@ pre {
 .foot { background: var(--slate); color: var(--on-slate-muted); padding: 32px 0 44px; font-size: 0.92rem; }
 .foot a { color: var(--on-slate); }
 .foot-inner p { margin: 0 0 8px; max-width: 80ch; }
+
+/* Firmware screenshots captured in the emulator */
+.screens { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-top: 8px; }
+.screens figure { margin: 0; }
+.screens img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 4px; }
+.screens figcaption { margin-top: 8px; font-size: 0.88rem; color: var(--muted); }
+.screens-note { margin-top: 20px; }

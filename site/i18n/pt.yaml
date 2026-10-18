@@ -22,8 +22,9 @@ meta:
     Dispositivos de jogo abertos para airsoft, paintball e milsim, que funcionam sem internet. Os
     modos de jogo são scripts; serve qualquer hardware.
   og_image_alt: >-
-    Uma torre de pedra com uma caixa de rádio no topo, rodeada por malas cor de laranja e amarelas
-    com a inscrição «GAME PROP», ligadas por um círculo luminoso.
+    Uma torre de vigia num monte ao anoitecer, com uma caixa de rádio no topo, ligada a caixas
+    luminosas «GAME PROP» espalhadas por um vale arborizado, sob as palavras «Projeto de código
+    aberto ATALAIA».
 
 header:
   skip: Saltar para o conteúdo
@@ -37,7 +38,7 @@ header:
   language: Idioma
 
 hero:
-  status: Pré-alfa · fase 2 (rede de campo) em curso · ainda não está pronta para o campo
+  status: Pré-alfa · software da fase 2 pronto, pacote de modos em curso · ainda não pronta para o campo
   title: A plataforma aberta de <span class="nowrap">combate simulado</span>
   lead: >-
     A Atalaia é uma plataforma aberta para os dispositivos eletrónicos de jogo (os props) de
@@ -57,11 +58,10 @@ hero:
     <em>Atalaia</em>: torre de vigia no alto de um monte, de onde se via o perigo a chegar e se
     passava o aviso.
   why_name: Porquê este nome?
-  # The isometric image: the night scene has English text painted in, so it stays on the English page.
   image_alt: >-
-    Ilustração isométrica: uma pequena torre de pedra com uma caixa de rádio no topo, ao centro de
-    uma base quadrada, rodeada por oito malas cor de laranja e amarelas com antena e a inscrição
-    «GAME PROP», todas ligadas por um círculo luminoso.
+    Ilustração: ao anoitecer, uma torre de vigia de pedra no alto de um monte tem uma caixa de rádio
+    no topo, cujos sinais chegam a caixas luminosas «GAME PROP» espalhadas pelo vale, onde um grupo
+    de jogadores caminha por um trilho. À esquerda, o título «Projeto de código aberto ATALAIA».
 
 game:
   title: Como funciona um jogo
@@ -208,6 +208,51 @@ modes:
       Contadores de respawn, terminais de hacking, escolta de VIP, zonas mestre e satélites… Os
       modos são pequenos scripts. Propõe o teu com o modelo de ideia de modo de jogo.
     link: Partilha uma ideia de modo de jogo
+
+screens:
+  title: O que se vê
+  intro: >-
+    Sete capturas do firmware real da Field Box (ESP32, LVGL 9.2, ecrã de 320&nbsp;×&nbsp;240)
+    a correr no emulador <a href="https://wokwi.com">Wokwi</a>. A interface da caixa está em inglês.
+    Ainda não foi testado em hardware físico.
+  note: >-
+    O <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">manual
+    de montagem</a> tem o esquema de ligações completo e o guia da primeira gravação do firmware,
+    para a Heltec WiFi LoRa 32&nbsp;V4.
+  pin_entry:
+    alt: >-
+      Ecrã da Field Box: cabeçalho «GAME MASTER», pedido «Enter the admin PIN», quatro círculos
+      vazios para os dígitos, indicação «# enter * delete».
+    caption: A organização introduz o PIN de administrador para desbloquear a configuração.
+  choose_game:
+    alt: >-
+      Ecrã da Field Box: cabeçalho «CHOOSE A GAME», linha 1 «Bomb» destacada a amarelo, linha 2
+      «Domination», indicação «1-9 choose # next * back».
+    caption: Escolha do modo de jogo no menu da própria caixa.
+  confirm:
+    alt: >-
+      Ecrã da Field Box: cabeçalho «START THE GAME?» sobre fundo laranja, nome do modo «Bomb»,
+      «Timer: 10 min», indicação «# start * back».
+    caption: Confirmação do modo e do temporizador antes de arrancar.
+  standby:
+    alt: >-
+      Ecrã da Field Box: cabeçalho «STANDBY», texto «Hold the button to arm», «RED» a vermelho,
+      «The bomb is not armed» em baixo.
+    caption: À espera que a equipa vermelha mantenha premido o botão de armar.
+  armed:
+    alt: >-
+      Ecrã da Field Box: cabeçalho «ARMED» sobre fundo vermelho, contagem «5:00» em grande,
+      legenda «until detonation».
+    caption: Bomba armada; a equipa azul tem 5 minutos para a desarmar.
+  defused:
+    alt: >-
+      Ecrã da Field Box: fundo azul, visto branco, «DEFUSED» em grande, «BLUE team wins» abaixo.
+    caption: A equipa azul desarmou a bomba a tempo.
+  joined:
+    alt: >-
+      Ecrã da Field Box: cabeçalho «JOINED GAME 4242», etiqueta «Game» à esquerda, «zone, node 7»
+      à direita.
+    caption: Caixa entrou no jogo de campo via cartão NFC ou consola série.
 
 try:
   title: Experimenta já
@@ -428,8 +473,10 @@ glossary:
       gastando muito pouca energia, sem cartão SIM, rede móvel ou assinatura. Num campo típico
       chega a cerca de <span class="nowrap">0,5–2&nbsp;km</span> e atravessa paredes grossas melhor
       do que o Wi-Fi. O senão: as mensagens têm de ser curtas e cada aparelho só pode emitir
-      durante uma pequena parte do tempo (na Europa, 1% na maioria dos canais), por isso as caixas
-      só enviam o que muda, como «o vermelho capturou a&nbsp;B».
+      durante uma pequena parte do tempo. A Atalaia usa a sub-banda EU868 g2 (869,525&nbsp;MHz por
+      omissão, 10% de ciclo de trabalho, 500&nbsp;mW), o que dá a cada caixa até 6 minutos de
+      emissão por hora — suficiente para eventos, pontuações e balizas de sincronização de tempo,
+      com margem de sobra. As caixas só enviam o que muda, como «o vermelho capturou a&nbsp;B».
   mesh:
     id: glossario-mesh
     term: Rede mesh

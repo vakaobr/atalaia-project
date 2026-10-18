@@ -39,7 +39,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | Phase 2D: Python controller, REST API, WebSocket | **Complete** | Player app, GM app (phase 3 extends the API) |
 | Phase 2E: GM console, join flow, scoreboard | **Complete** | GM role on Android |
 | Phase 2F: Field test, documentation | Pending | Gate: field-tested protocol before Android integration |
-| Phase 2 mode pack: Hold-All, Last Stand, Bomb codes, Codes modifier | **In progress** | Holds event IDs 27-32 |
+| Phase 2 mode pack: Hold-All, Last Stand, Bomb codes, Codes modifier | Done in software | Holds event IDs 28-32 and data keys 28 and 31 |
 
 **No critical phase 2 blockers remain.** Phase 3 implementation can
 start immediately for phases A-D.  Phase E needs the REST API

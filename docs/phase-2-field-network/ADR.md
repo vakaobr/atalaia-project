@@ -2201,9 +2201,12 @@ the decisions above:
     `-1` if the duty-cycle budget is exhausted. Upper layers must
     handle this (queue, retry, or drop).
 
-12. **TIME beacons on 869.525 MHz (g2 sub-band).** CMD packets from
+12. ~~**TIME beacons on 869.525 MHz (g2 sub-band).** CMD packets from
     the controller also use this sub-band. Node-to-controller traffic
-    uses the g sub-band (868.1/868.3/868.5 MHz, round-robin).
+    uses the g sub-band (868.1/868.3/868.5 MHz, round-robin).~~
+    **Superseded by RFC 0001 Amendment 1 (2026-10-18):** all game
+    traffic uses a single shared channel per game, default 869.525 MHz
+    (g2 sub-band, 10% duty cycle, 500 mW ERP).
 
 13. **Failover defaults to manual.** `failover_mode = manual` is the
     default field profile setting. The CLAIM protocol is fully
@@ -2248,9 +2251,11 @@ the decisions above:
 22. **Rebroadcast jitter: 10-50 ms.** Random, deterministic in the
     simulator (seeded by source + seq).
 
-23. **Three-channel hopping on the g sub-band.** 868.1, 868.3,
+23. ~~**Three-channel hopping on the g sub-band.** 868.1, 868.3,
     868.5 MHz, round-robin for node transmissions. Per-channel
-    independent duty-cycle tracking.
+    independent duty-cycle tracking.~~
+    **Superseded by RFC 0001 Amendment 1 (2026-10-18):** one shared
+    game channel per game (default 869.525 MHz, g2 sub-band).
 
 24. **Nonce = (epoch << 16) | seq.** The nonce_ctr is derived from the
     persisted epoch and the header seq. Epoch increments at boot and at

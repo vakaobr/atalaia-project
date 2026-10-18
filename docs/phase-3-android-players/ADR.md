@@ -1004,14 +1004,15 @@ sequential integers starting after the last assigned ID.
 **Updated 2026-10-18 (phase 2 handoff, decision R6):** Hold-All
 Domination and Last Stand moved from phase 3 into the phase 2 mode
 pack.  Their events (`holdall.scoring_start/stop`,
-`laststand.countdown_start/cancel/defeated`) and `team.eliminated`
-are allocated by the mode pack, reusing the IDs and names from this
-ADR.  Phase 3 modes are now: Kill Confirmed, Respawn, Player
+`laststand.countdown_start/cancel/defeated`, IDs 28-32) are allocated
+by the mode pack, reusing the IDs and names from this ADR.  The mode
+pack did not need `team.eliminated`, so ID 27 stays with phase 3 for
+Respawn and Lives (reconciled with the built mode pack, 2026-10-18).  Phase 3 modes are now: Kill Confirmed, Respawn, Player
 Check-in, **Money Factory**, and chrono check-in.
 
-**Decision:** Add the following events to `events.yaml`.  IDs 25-32
-are allocated by the phase 2 mode pack (holdall/laststand/eliminated);
-phase 3 new events start at the first free ID after the mode pack.
+**Decision:** Add the following events to `events.yaml`.  IDs 28-32
+are allocated by the phase 2 mode pack (holdall/laststand); phase 3
+takes 25-27 and 33-41.
 
 #### Game mode events (phase 3 -- IDs assigned after the mode pack)
 
@@ -1019,12 +1020,14 @@ phase 3 new events start at the first free ID after the mode pack.
 |-------|-----|----------|-------------|------|
 | `kill.confirmed` | 25 | normal | `[player, team]` | Kill Confirmed |
 | `kill.denied` | 26 | normal | `[player, team]` | Kill Confirmed (same-team scan, rejected) |
+| `team.eliminated` | 27 | normal | `[team]` | Respawn and Lives (a team's lives run out) |
 | `money.collected` | 33 | normal | `[player, team, amount]` | Money Factory |
 | `money.deposited` | 34 | normal | `[player, team, amount]` | Money Factory |
 
-Note: `team.eliminated` (27), `holdall.*` (28-29), `laststand.*`
-(30-32) are allocated by the phase 2 mode pack and reuse the names
-and IDs from the original version of this ADR.
+Note: `holdall.*` (28-29) and `laststand.*` (30-32) are allocated
+by the phase 2 mode pack and reuse the names and IDs from the original
+version of this ADR.  Money Factory reuses the existing `amount` field
+(key 6, integer points).
 
 #### Player and chrono events
 
@@ -1056,16 +1059,18 @@ The following data fields are added to the `data_fields` section:
 
 | Field | Key | Type | Doc |
 |-------|-----|------|-----|
-| `duration_s` | 28 | number | countdown or visibility duration in seconds |
 | `see_team` | 29 | string | team whose positions become visible |
 | `tolerance_pct` | 30 | number | chrono comparison tolerance percentage |
-| `amount` | 31 | number | resource amount (Money Factory) |
+
+`duration_s` (key 28) and `holder` (key 31, the team holding the node)
+were added by the phase 2 mode pack; phase 3's temporary visibility
+reuses `duration_s`.  `amount` already exists (key 6).
 
 #### Summary
 
-Total new events (phase 3 only): 12 (IDs 25-26, 33-41; 27-32 owned
+Total new events (phase 3 only): 13 (IDs 25-27, 33-41; 28-32 owned
 by the phase 2 mode pack).
-Total new data fields: 4 (keys 28-31).
+Total new data fields: 2 (keys 29-30).
 
 The existing event IDs 14 (`player.respawn`), 15 (`player.checkin`)
 and 17 (`chrono.violation`) are already allocated and used as-is by
@@ -1624,9 +1629,9 @@ the decisions above:
     with phase 4).  NFC tags are signed with the game key (truncated
     16-byte HMAC-SHA256).
 
-12. **Event IDs 25-26 and 33-41 for phase 3.** IDs 27-32 are owned by
-    the phase 2 mode pack (holdall/laststand/eliminated).  Phase 4
-    starts at ID 42.
+12. **Event IDs 25-27 and 33-41 for phase 3.** IDs 28-32 are owned by
+    the phase 2 mode pack (holdall/laststand).  Phase 4 starts at ID 42.
+    Data keys 29-30 are phase 3's; 28 and 31 are the mode pack's.
 
 13. **iOS excludes prop and controller roles.** Conditional imports
     and build flavors keep iOS clean.  No `dart:ffi` core bindings

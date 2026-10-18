@@ -87,11 +87,11 @@ the pages. Code blocks and anything else that is the same in every language stay
           <a class="button" href="https://github.com/vakaobr/atalaia-project">{{ hero.source }}</a>
         </div>
         <p class="name">{{ hero.name }} <a href="#name">{{ hero.why_name }}</a></p>
-        {# The night scene has English text painted in, so only the English page uses it. #}
+        {# The night scene has its title painted in: each language has its own copy. #}
         <picture class="hero-art">
 {% if lang pt %}
-          <source type="image/webp" srcset="{{ page.root }}img/field-isometric-960.webp 960w, {{ page.root }}img/field-isometric-1600.webp 1600w" sizes="(min-width: 1080px) 1048px, calc(100vw - 32px)">
-          <img src="{{ page.root }}img/field-isometric-960.jpg" srcset="{{ page.root }}img/field-isometric-960.jpg 960w, {{ page.root }}img/field-isometric-1600.jpg 1600w" sizes="(min-width: 1080px) 1048px, calc(100vw - 32px)" width="1600" height="873" decoding="async" fetchpriority="high" alt="{{ hero.image_alt|text }}">
+          <source type="image/webp" srcset="{{ page.root }}img/watchtower-night-pt-960.webp 960w, {{ page.root }}img/watchtower-night-pt-1600.webp 1600w" sizes="(min-width: 1080px) 1048px, calc(100vw - 32px)">
+          <img src="{{ page.root }}img/watchtower-night-pt-960.jpg" srcset="{{ page.root }}img/watchtower-night-pt-960.jpg 960w, {{ page.root }}img/watchtower-night-pt-1600.jpg 1600w" sizes="(min-width: 1080px) 1048px, calc(100vw - 32px)" width="1600" height="893" decoding="async" fetchpriority="high" alt="{{ hero.image_alt|text }}">
 {% endif %}
 {% if lang en %}
           <source type="image/webp" srcset="{{ page.root }}img/watchtower-night-960.webp 960w, {{ page.root }}img/watchtower-night-1600.webp 1600w" sizes="(min-width: 1080px) 1048px, calc(100vw - 32px)">
@@ -201,6 +201,45 @@ the pages. Code blocks and anything else that is the same in every language stay
             <p class="meta"><a href="https://github.com/vakaobr/atalaia-project/issues/new/choose">{{ modes.yours.link }}</a></p>
           </article>
         </div>
+      </div>
+    </section>
+
+    {# Screenshots: real firmware running in Wokwi, 7 captures #}
+    <section class="band" aria-labelledby="screens">
+      <div class="wrap">
+        <h2 id="screens">{{ screens.title }}</h2>
+        <p class="intro">{{ screens.intro }}</p>
+        <div class="screens">
+          <figure>
+            <img src="{{ page.root }}img/screens/bomb-1-pin.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.pin_entry.alt|text }}">
+            <figcaption>{{ screens.pin_entry.caption }}</figcaption>
+          </figure>
+          <figure>
+            <img src="{{ page.root }}img/screens/bomb-2-choose-game.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.choose_game.alt|text }}">
+            <figcaption>{{ screens.choose_game.caption }}</figcaption>
+          </figure>
+          <figure>
+            <img src="{{ page.root }}img/screens/bomb-3-confirm.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.confirm.alt|text }}">
+            <figcaption>{{ screens.confirm.caption }}</figcaption>
+          </figure>
+          <figure>
+            <img src="{{ page.root }}img/screens/bomb-4-standby.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.standby.alt|text }}">
+            <figcaption>{{ screens.standby.caption }}</figcaption>
+          </figure>
+          <figure>
+            <img src="{{ page.root }}img/screens/bomb-5-armed.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.armed.alt|text }}">
+            <figcaption>{{ screens.armed.caption }}</figcaption>
+          </figure>
+          <figure>
+            <img src="{{ page.root }}img/screens/bomb-6-defused.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.defused.alt|text }}">
+            <figcaption>{{ screens.defused.caption }}</figcaption>
+          </figure>
+          <figure>
+            <img src="{{ page.root }}img/screens/join-joined.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.joined.alt|text }}">
+            <figcaption>{{ screens.joined.caption }}</figcaption>
+          </figure>
+        </div>
+        <p class="note screens-note">{{ screens.note }}</p>
       </div>
     </section>
 

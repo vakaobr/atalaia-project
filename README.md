@@ -23,6 +23,30 @@ Atalaia is an open, local-first platform for airsoft, paintball and milsim game 
 
 ---
 
+## What it looks like
+
+The seven captures below show the real Field Box firmware (ESP32, LVGL 9.2, 320×240 TFT) running in the Wokwi emulator. The box UI is in English. Not yet tested on physical hardware.
+
+<table>
+<tr>
+<td align="center"><img src="site/img/screens/bomb-1-pin.png" width="240" alt="PIN entry screen"><br><em>Admin PIN entry</em></td>
+<td align="center"><img src="site/img/screens/bomb-2-choose-game.png" width="240" alt="Game selection: Bomb / Domination"><br><em>Pick a game mode</em></td>
+<td align="center"><img src="site/img/screens/bomb-3-confirm.png" width="240" alt="Start confirmation: Bomb, 10 min"><br><em>Confirm and start</em></td>
+</tr>
+<tr>
+<td align="center"><img src="site/img/screens/bomb-4-standby.png" width="240" alt="Standby: hold to arm, RED"><br><em>Waiting for red team to arm</em></td>
+<td align="center"><img src="site/img/screens/bomb-5-armed.png" width="240" alt="Armed: 5:00 countdown"><br><em>Bomb armed, 5-minute fuse</em></td>
+<td align="center"><img src="site/img/screens/bomb-6-defused.png" width="240" alt="Defused: BLUE team wins"><br><em>Blue defused in time</em></td>
+</tr>
+<tr>
+<td align="center"><img src="site/img/screens/join-joined.png" width="240" alt="Joined game 4242, zone, node 7"><br><em>Joined a field game</em></td>
+<td></td>
+<td align="center"><img src="hardware/field-box/wiring/field-box-wiring.png" width="240" alt="Field Box wiring diagram"><br><em><a href="hardware/field-box/BUILD.md">Build manual</a> wiring diagram</em></td>
+</tr>
+</table>
+
+---
+
 ## Why Atalaia
 
 Electronic game props add a lot to a game, but commercial systems keep the rules locked inside closed firmware. Every new game mode waits on the vendor, there is no public API, and you cannot add your own hardware.
@@ -58,17 +82,18 @@ Every full node runs the same C11 core and the same Lua game modes; only the pla
 | Folder | What lives there | Licence |
 | --- | --- | --- |
 | [`core/`](core/) | Shared C11 core: event bus, state store, Lua sandbox, protocol codec | GPL-3.0-or-later |
-| [`protocol/`](protocol/) | Skirmesh-RF message and event schemas | GPL-3.0-or-later |
+| [`protocol/`](protocol/) | Skirmesh-RF message and event schemas; [usb-modem.md](protocol/usb-modem.md) (modem framing); [join.md](protocol/join.md) (join payload) | GPL-3.0-or-later |
 | [`modes/`](modes/) | Built-in game modes (Lua + manifest) | GPL-3.0-or-later |
 | [`firmware/`](firmware/) | ESP32 firmware (ESP-IDF) and Arduino thin-node firmware | GPL-3.0-or-later |
 | [`app/`](app/) | Flutter app for Android and iOS: props, controller, player roles | GPL-3.0-or-later + app-store permission |
-| [`controller/`](controller/) | Field controller and GM console | AGPL-3.0-or-later |
+| [`controller/`](controller/) | Field controller (`atalaia_controller`) and GM console ([`controller/console/`](controller/console/), served at `/console/`) | AGPL-3.0-or-later |
 | [`server/`](server/) | Optional site server | AGPL-3.0-or-later |
 | [`simulator/`](simulator/) | Desktop simulator with virtual nodes and a web view | GPL-3.0-or-later |
+| [`examples/scoreboard/`](examples/scoreboard/) | MQTT subscriber scoreboard example | GPL-3.0-or-later |
 | [`hardware/`](hardware/) | Reference builds: wiring, bills of materials, enclosures; the Field Box build manual ([hardware/field-box/BUILD.md](hardware/field-box/BUILD.md)) | CERN-OHL-S-2.0 |
-| [`docs/`](docs/) | Design spec, RFCs, guides | CC-BY-SA-4.0 |
+| [`docs/`](docs/) | Design spec, RFCs, phase folders, guides | CC-BY-SA-4.0 |
 | [`site/`](site/) | The project page in Portuguese and English, published to [GitHub Pages](https://vakaobr.github.io/atalaia-project/) | CC-BY-SA-4.0 |
-| [`tools/`](tools/) | Developer scripts | GPL-3.0-or-later |
+| [`tools/`](tools/) | Developer scripts: `check.sh`, `docker_fw.py`, `docker_console.py`, `docker_sim.py`, `build_site.py`, `docker_hw.py` | GPL-3.0-or-later |
 
 See [LICENSING.md](LICENSING.md) for the details.
 

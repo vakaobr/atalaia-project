@@ -1292,11 +1292,11 @@ checked against the design documents.
 
 ### Event ID allocation
 
-Phase 3 reserves event IDs 25-26 and 33-41 (kill.confirmed,
-kill.denied, money.collected, money.deposited, chrono.checkin,
-chrono.spotcheck, visibility.granted, visibility.expired,
-node.tamper, pod.connected, pod.disconnected). The Phase 2 mode
-pack (R6) owns IDs 27-32 (holdall.*, laststand.*, team.eliminated).
+Phase 3 reserves event IDs 25-27 and 33-41 (kill.confirmed,
+kill.denied, team.eliminated, money.collected, money.deposited,
+chrono.checkin, chrono.spotcheck, visibility.granted,
+visibility.expired, node.tamper, pod.connected, pod.disconnected).
+The Phase 2 mode pack (R6) owns IDs 28-32 (holdall.*, laststand.*).
 
 **Phase 4 events start at ID 42.** The eight new events
 (`satellite.captured`, `satellite.neutralized`, `vip.extracted`,

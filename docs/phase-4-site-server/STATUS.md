@@ -78,8 +78,8 @@ complete (not yet built). Key changes affecting Phase 4:
   sections 3 and 11). ADR-P4-6 updated.
 - **Chrono signing**: Ed25519 per marshal in both Phase 3 and Phase 4,
   confirmed aligned with ADR-P4-5.
-- **Event ID allocation**: Phase 3 uses IDs 25-26 and 33-41; Phase 2
-  mode pack uses 27-32; Phase 4 starts at ID 42.
+- **Event ID allocation**: Phase 3 uses IDs 25-27 and 33-41; Phase 2
+  mode pack uses 28-32; Phase 4 starts at ID 42.
 - **Player tokens**: HMAC-SHA256-signed JSON (not JWT), with
   player_id, team, squad, role, game_id, exp, signed with game key.
 - **GPS**: NOT on the Field Box (E21); positions come from phones/pods

@@ -2351,8 +2351,8 @@ complete (not yet built). The following changes affect the ADRs above:
    `controller/atalaia_controller/scenarios/`. The site server imports
    it. Maintainer decision P4-1.
 
-5. **Event ID allocation**: Phase 3 uses IDs 25-26 and 33-41; Phase 2
-   mode pack uses 27-32. Phase 4 events start at ID 42.
+5. **Event ID allocation**: Phase 3 uses IDs 25-27 and 33-41; Phase 2
+   mode pack uses 28-32. Phase 4 events start at ID 42.
 
 6. **Player tokens** (ADR-P4-1 note): HMAC-SHA256-signed JSON (not
    JWT) with player_id, team, squad, role, game_id, exp; signed with

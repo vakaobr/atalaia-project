@@ -230,7 +230,7 @@ Five reference builds cover v1, all from off-the-shelf parts with no custom PCB 
 
 | Build | Purpose | Core parts | Approx. cost |
 | --- | --- | --- | --- |
-| **Field Box** | Main prop: domination, bomb, codes, tags | ESP32-S3 LoRa board (e.g. Heltec LoRa 32 V3), 2–4 × 60 mm arcade buttons, 3×4 keypad, 2.8" TFT, WS2812 ring, PN532 NFC, MAX98357A amp + speaker, MAX17048 fuel gauge, 1S pack (two protected 18650 in parallel), IP65 box | €70–110 |
+| **Field Box** | Main prop: domination, bomb, codes, tags | Heltec WiFi LoRa 32 V4 (V4.3 KCT8103L default, V4.2 GC1109 supported), 2–4 × 60 mm arcade buttons, 3×4 keypad, 2.8" TFT, WS2812 ring, PN532 NFC, MAX98357A amp + speaker, MAX17048 fuel gauge, 1S pack (two protected 18650 in parallel), IP65 box | €70–110 |
 | **Satellite** | Small secondary point, beacon, "power plant" | ESP32-S3 LoRa board, 2 buttons, LED ring, piezo buzzer, 1S 18650 | €30–40 |
 | **Android hybrid prop** | Rich-UI terminal, map, QR, 4G | Repurposed phone or tablet, rugged case, ESP32 I/O pod (LoRa + buttons + LEDs + siren) over USB-OTG or BLE | €0–120 device + €35 pod |
 | **Field controller** | Runs cross-device logic, API, GM web app | Raspberry Pi 4/5 (Zero 2 W for small fields), SX1262 LoRa HAT, optional GPS, optional 4G USB modem, 10–20 Ah power bank | €80–150 |
@@ -247,12 +247,12 @@ PSRAM is optional. Every ESP32 build works with or without it, so boards people 
 | Tier | Example boards | What runs | Limits |
 | --- | --- | --- | --- |
 | Full | ESP32-S3 with 2–8 MB PSRAM, classic ESP32 WROVER | Node scripts, a mode plus several modifiers, colour screens, cached audio clips | Script memory 256 KB by default |
-| Reduced | Classic ESP32 or ESP32-S3 without PSRAM (WROOM modules, most older dev boards) | Node scripts loaded as precompiled bytecode; one mode plus one modifier; small or monochrome screens | Script memory about 64 KB; audio streamed from microSD |
+| Reduced | Classic ESP32 or ESP32-S3 without PSRAM (WROOM modules, most older dev boards) | Node scripts loaded as precompiled bytecode; one mode plus one modifier; small or monochrome screens | Script memory about 64 KB; audio from a planned microSD add-on (not yet in firmware) |
 | Proxy | Boards that cannot run scripts (ESP8266, AVR, other low-RAM boards) | Thin node: hardware only, its script runs on the controller | Needs a link to the controller during the game |
 
 PSRAM sits inside the module, so it cannot practically be added to a board that lacks it. What helps a Reduced-tier board instead:
 
-- **microSD module** (about €2): holds sound clips, screen images and logs so they need no RAM.
+- **microSD module** (about €2, planned for Reduced-tier builds, not yet used in firmware): would hold sound clips and logs so they need no RAM.
 - **Monochrome OLED** instead of a colour TFT: a much smaller frame buffer.
 - **Proxy mode**: any board can hand its logic to the controller when a mode needs more than it has.
 - **For new builds**: pick an ESP32-S3 module with PSRAM; it usually costs only slightly more than one without.
@@ -519,15 +519,16 @@ One message protocol, Skirmesh-RF, runs over five pluggable transports, with LoR
 
 ### LoRa budget
 
-In EU868 most channels allow 1% duty cycle: 36 s of airtime per device per hour. At SF7/125 kHz a 30-byte packet takes roughly 60–70 ms, so a node can send about 500 packets an hour; at SF9 it is closer to 180. These are approximate planning figures to be measured in phase 2.
+All game traffic uses a single shared channel per game, by default 869.525 MHz in the g2 sub-band (869.4–869.65 MHz, 10% duty cycle, 500 mW ERP) per RFC 0001 Amendment 1. The channel is configurable per game; a neighbouring game on the same site picks a different channel. At SF7/125 kHz a 30-byte packet takes roughly 60–70 ms; at 10% duty cycle a single device has 360,000 ms of airtime per hour, enough for events, STATE, ACK, TIME and CMD with comfortable headroom.
 
 Rules that keep us inside the budget:
 
 - Send state **changes**, never clock ticks. A domination box counts hold time itself.
 - Hardware events stay local; only game events and periodic snapshots go on air.
 - Snapshots every 30–60 s by default, configurable per game.
-- The controller's time beacons and commands use the 869.4–869.65 MHz sub-band, which allows 10% duty cycle.
 - Scripts, assets and firmware never travel over LoRa.
+
+The g2 sub-band was chosen because its 10% duty cycle gives 10× the airtime of the standard EU868 g sub-band (1%), and 500 mW ERP gives longer range. Each device tracks its per-band airtime with a 60-bucket sliding 1-hour window; `airtime.low` is emitted when the remaining budget drops below 20%.
 
 ### Topology
 

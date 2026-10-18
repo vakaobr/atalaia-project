@@ -38,8 +38,8 @@ complete (not yet built). The following facts affect this plan:
   `controller/atalaia_controller/scenarios/`, not on the site server
   (maintainer decision P4-1). The site server imports the same
   package. Phase E updated.
-- **Event IDs**: Phase 4 starts at ID 42. Phase 3 uses 25-26 and
-  33-41; Phase 2 mode pack uses 27-32.
+- **Event IDs**: Phase 4 starts at ID 42. Phase 3 uses 25-27 and
+  33-41; Phase 2 mode pack uses 28-32.
 - **Player tokens**: HMAC-SHA256-signed JSON (not JWT), issued by the
   controller. The site server must understand them for position
   filtering.
@@ -91,8 +91,8 @@ The assumptions section (below) is updated with handoff results.
   (43), `scenario.objective.revealed` (44), `scenario.started` (45),
   `satellite.captured` (46), `satellite.neutralized` (47),
   `vip.extracted` (48), `hacking.solved` (49). Phase 4 events start
-  at ID 42 (Phase 3 uses 25-26 and 33-41; Phase 2 mode pack uses
-  27-32).
+  at ID 42 (Phase 3 uses 25-27 and 33-41; Phase 2 mode pack uses
+  28-32).
 - Site server Docker image and docker-compose with PostgreSQL.
 - Backup and restore scripts.
 - Setup script for first-time deployment.

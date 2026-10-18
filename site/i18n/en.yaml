@@ -35,7 +35,7 @@ header:
   language: Language
 
 hero:
-  status: Pre-alpha · phase 2 (field network) in progress · not field-ready yet
+  status: Pre-alpha · phase 2 software done, mode pack in progress · not field-ready yet
   title: The open <span class="nowrap">force-on-force</span> platform
   lead: >-
     Atalaia is an open platform for the electronic props of airsoft, paintball and milsim: the
@@ -52,7 +52,7 @@ hero:
     <em>Atalaia</em> (ah-tah-LYE-ah) is Portuguese for <em>watchtower</em>: a lookout on a hill
     that watched for trouble and passed the warning along.
   why_name: Why that name?
-  # The night scene: only the English page uses it, as it has English text painted in.
+  # The night scene: each language now has its own copy with the title painted in its language.
   image_alt: >-
     Illustration: at dusk, a stone watchtower on a hilltop carries a radio box whose signals reach
     glowing orange GAME PROP boxes spread across a forested valley, while a group of players walks
@@ -205,6 +205,51 @@ modes:
       Respawn counters, hacking terminals, VIP escort, master-and-satellite zones… Modes are short
       scripts. Propose one with the game mode idea template.
     link: Share a game mode idea
+
+screens:
+  title: What it looks like
+  intro: >-
+    Seven captures from the real Field Box firmware (ESP32, LVGL 9.2, 320&nbsp;×&nbsp;240&nbsp;TFT)
+    running in the <a href="https://wokwi.com">Wokwi</a> emulator. The box UI is in English.
+    Not yet tested on physical hardware.
+  note: >-
+    The <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">build
+    manual</a> has the full wiring diagram and first-flash guide for the Heltec WiFi LoRa 32&nbsp;V4.
+  pin_entry:
+    alt: >-
+      Field Box screen: "GAME MASTER" header, "Enter the admin PIN" prompt, four empty circles for
+      digits, "# enter * delete" hint.
+    caption: GM enters the admin PIN to unlock setup.
+  choose_game:
+    alt: >-
+      Field Box screen: "CHOOSE A GAME" header, row 1 "Bomb" highlighted in yellow, row 2
+      "Domination", "1-9 choose # next * back" hint.
+    caption: Pick a game mode from the on-box menu.
+  confirm:
+    alt: >-
+      Field Box screen: "START THE GAME?" header on an orange bar, "Bomb" mode name, "Timer:
+      10 min", "# start * back" hint.
+    caption: Confirm the mode and timer before starting.
+  standby:
+    alt: >-
+      Field Box screen: "STANDBY" header, "Hold the button to arm", "RED" in red, "The bomb is
+      not armed" at the bottom.
+    caption: Waiting for the red team to hold the arming button.
+  armed:
+    alt: >-
+      Field Box screen: "ARMED" header on a red bar, large "5:00" countdown, "until detonation"
+      label.
+    caption: Bomb armed; the blue team has 5 minutes to defuse it.
+  defused:
+    alt: >-
+      Field Box screen: blue background, white check mark, "DEFUSED" in large text, "BLUE team
+      wins" below.
+    caption: Blue team defused the bomb in time.
+  joined:
+    alt: >-
+      Field Box screen: "JOINED GAME 4242" header, "Game" label on the left, "zone, node 7" on
+      the right.
+    caption: Box joined the field game via NFC card or serial console.
 
 try:
   title: Try it today
@@ -410,10 +455,12 @@ glossary:
     text: >-
       Short for <em>long range</em>: a radio that sends small messages far on very little power,
       with no SIM card, mobile coverage or subscription. On a typical field it reaches roughly
-      <span class="nowrap">0.5–2&nbsp;km</span>, and gets through thick walls better than Wi-Fi.
+      <span class=”nowrap”>0.5–2&nbsp;km</span>, and gets through thick walls better than Wi-Fi.
       The catch: messages must be short, and each device may transmit only a small share of the
-      time (in Europe, 1% on most channels), so boxes send only what changes, such as “red
-      captured&nbsp;B”.
+      time. Atalaia uses the EU868 g2 sub-band (869.525&nbsp;MHz by default, 10% duty
+      cycle, 500&nbsp;mW), giving each box up to 6 minutes of airtime per hour — enough for
+      events, scores and time-sync beacons with headroom to spare. Boxes send only what changes,
+      such as “red captured B”.
   mesh:
     id: glossary-mesh
     term: Mesh
