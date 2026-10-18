@@ -1,0 +1,23 @@
+{
+  "schema_version": "2.0.0",
+  "issue_name": "phase-5-community",
+  "current_phase": "planning",
+  "phase_status": "complete",
+  "review_iteration": 0,
+  "failing_experts": [],
+  "created_at": "2026-10-17T12:00:00Z",
+  "updated_at": "2026-10-18T11:00:00Z",
+  "artifacts": {
+    "RESEARCH.md": "complete",
+    "ADR.md": "complete",
+    "PLAN.md": "complete",
+    "STATUS.md": "complete"
+  },
+  "metadata": {
+    "description": "Phase 5 (Community) design: visual mode editor, mode registry, carrier PCB, translations, build guides, community processes. Design only -- no production code.",
+    "risk_level": "Medium",
+    "scope": "design-only",
+    "stopped_after": "planning",
+    "resume_with": "--implement to continue to implementation"
+  }
+}
