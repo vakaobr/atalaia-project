@@ -1061,3 +1061,28 @@ depends on from phases 1 and 2.
 - **Cross-platform test vectors:** `protocol/vectors/` for capability
   proxy frames.
 - **Simulator ctypes:** `simulator/atalaia_sim/core.py` for FFI reference.
+- **USB modem framing:** `firmware/esp32/main/modem/modem_framing.c`
+  (sync+CRC framing, shared by pod).
+- **Join payload:** `protocol/join.md` and `core/src/join.c` for the
+  CBOR+HMAC format with shared vectors.
+
+---
+
+## Phase 2 handoff (2026-10-18)
+
+Phase 2 plan phases A-E are implemented (commit `771fd90`).  The
+following changes affect phase 3's assumptions:
+
+| Area | What changed | Impact on phase 3 |
+|------|-------------|-------------------|
+| **Radio channels (C5)** | One shared game channel (default 869.525 MHz, g2, 10% DC). No channel hopping. Channel carried in join payload key 5. | Drop any channel hopping assumptions. Pod CONFIGURE uses `channel_hz`. |
+| **USB modem framing (D1-D3)** | Frame = 0xA5 sync + type + len(2 BE) + payload + CRC-16/CCITT-FALSE(2). RX carries epoch (D2). TX_ACK has statuses 0-7. CMD has 7 opcodes. | Pod framing must adopt sync+CRC. ADR-P3-2 updated. |
+| **Join payload (E1-E3)** | Version byte + CBOR map + HMAC-SHA256 with field join key. Max 448 bytes. Keys 13-31 reserved. NFC MIME `application/vnd.atalaia.join`. QR pushes nothing to boxes. | CA cert does not fit; use fingerprint + Wi-Fi fetch. Android app must hold the field join key to verify cards. ADR-P3-9 updated. |
+| **REST/WS API (B6/B7)** | 17+ endpoints with bearer read/GM tokens. WS delivers snapshot + events + score + node + game + system. GM console at `/console/`. | Phase 3 adds: `POST /api/v1/positions`, `GET /api/v1/controller/ca`, player tokens, role-filtered WS position streams. |
+| **Codec corrections (D8)** | HELLO capabilities = array, STATE counters = maps, CMD params = text-keyed map (JSON <=127 bytes), required fields always encoded. | Dart codecs must match exactly. |
+| **Chrono signing (P3-1)** | Ed25519 per marshal in both phases 3 and 4, not HMAC-SHA256. | ADR-P3-7 updated. |
+| **Mode scope (R6)** | Hold-All Domination and Last Stand moved to phase 2 mode pack. | Phase 3 modes: Kill Confirmed, Respawn, Player Check-in, Money Factory, chrono check-in. |
+| **GPS on Field Box (E21)** | Not supported in the Field Box pin map. | I/O pod or phone GPS only for phase 3. |
+| **Ed25519 for signing (S1)** | Ed25519 for application-level signing. ESP32-S3 hardware secure boot is RSA-3072/ECDSA only. | Consistent with chrono signing and mode signing. |
+| **Epoch window (D4)** | Receivers try up to 16 epochs above (not just 1). | Pod and Android radio code use the same window. |
+| **Event retries (E8)** | Retries are new packets (new seq), not duplicates. | Dart radio code must do the same. |

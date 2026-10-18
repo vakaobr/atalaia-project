@@ -182,16 +182,21 @@ format is not frozen before pod development, rework is likely.
 
 #### Frame format (shared by BLE and USB)
 
-All frames use the same binary encoding:
+**Updated 2026-10-18 (phase 2 handoff):** the USB radio modem framing
+changed from bare type+length+payload to include a sync byte and CRC
+(decision D1 in `docs/review/decisions-to-review.md`).  The pod adopts
+the same framing so it can share `firmware/esp32/main/modem/modem_framing.c`.
+
+All frames use the modem's binary encoding (`protocol/usb-modem.md`):
 
 ```
-Byte 0:    frame_type (uint8)
-Byte 1-2:  payload_length (uint16 big-endian)
-Byte 3+:   payload (0 to 256 bytes)
+0xA5 | type (1) | length (2, big-endian) | payload (0-256 bytes) | CRC-16 (2, big-endian)
 ```
 
-This is identical to the USB radio modem framing (ADR-P2-4), which
-allows shared parsing code.
+CRC-16/CCITT-FALSE (polynomial 0x1021, init 0xFFFF, no reflection,
+no final XOR) over type, length and payload.  Over BLE GATT, the sync
+byte and CRC are still sent: they cost only 5 bytes and keep one
+parser for both transports.
 
 Frame types:
 
@@ -201,16 +206,18 @@ Frame types:
 | EVT | `0x02` | pod -> phone | CBOR: capability_id (text) + event_type (text) + data (map) |
 | CMD | `0x03` | phone -> pod | CBOR: capability_id (text) + method (text) + args (map) |
 | ACK | `0x04` | both | uint16 big-endian: seq of the frame being acknowledged |
-| RADIO_RX | `0x05` | pod -> phone | header (9) + plaintext payload + rssi (1) + snr (1) |
-| RADIO_TX | `0x06` | phone -> pod | header (9) + plaintext payload |
-| RADIO_TX_ACK | `0x07` | pod -> phone | seq (2) + status (1) |
-| RADIO_CMD | `0x08` | phone -> pod | opcode (1) + params (set channel, set key, query) |
-| RADIO_STATUS | `0x09` | pod -> phone | CBOR: duty_cycle, channel, rssi, uptime |
+| RADIO_RX | `0x05` | pod -> phone | header (9) + plaintext payload + rssi (int8) + snr (int8) + **epoch (uint16 BE)** |
+| RADIO_TX | `0x06` | phone -> pod | header (9) + plaintext payload (up to 200) |
+| RADIO_TX_ACK | `0x07` | pod -> phone | seq (uint16 BE) + status (1): statuses 0-7 per `protocol/usb-modem.md` |
+| RADIO_CMD | `0x08` | phone -> pod | opcode (1) + params: PING, CONFIGURE(27 bytes), SET_CHANNEL, STATUS, SET_PEER_EPOCH, CLEAR, IDENT |
+| RADIO_STATUS | `0x09` | pod -> phone | JSON: same fields as modem STATUS |
 
-Frame types `0x05`-`0x09` are identical to the radio modem frames
-`0x02`-`0x06` from ADR-P2-4, shifted by 3 to avoid collision with the
-capability proxy types.  This allows the pod to act as both a
-capability proxy and a radio modem simultaneously.
+Frame types `0x05`-`0x09` match the modem's `0x02`-`0x06` shifted by
+3.  The pod shares the modem's C framing code and acts as both a
+capability proxy and a radio modem.  RADIO_RX carries the nonce epoch
+(decision D2) so the phone can track rebooted boxes.  RADIO_CMD uses
+the modem's opcodes and parameters (CONFIGURE is 27 bytes: game_id 2,
+node_id 2, epoch 2, max_hops 1, channel_hz 4, key 16).
 
 #### IDENT payload (CBOR map)
 
@@ -842,7 +849,7 @@ defined the flow and GDPR requirements.  This ADR freezes the schema.
   "game_id": "g-001",
   "field_id": "field-cqb-porto",
   "timestamp": "2026-10-18T14:30:00Z",
-  "hmac": "base64-encoded-hmac-sha256"
+  "signature": "base64-encoded-ed25519-signature"
 }
 ```
 
@@ -924,26 +931,33 @@ When a marshal takes a spot-check reading:
 
 The tolerance percentage is configurable per field (default 5%).
 
-#### Signed records (marshal account + HMAC)
+#### Signed records (marshal account + Ed25519)
 
-Each reading is signed with HMAC-SHA256 using the marshal's account
-key (a per-marshal secret stored on the marshal's phone, derived from
-the marshal's credentials at login):
+**Updated 2026-10-18 (P3-1, maintainer decision):** chrono signing
+uses Ed25519, not HMAC-SHA256, in both phase 3 and phase 4, so phase 4
+needs no migration.  Ed25519 survives password changes and lets other
+fields verify records without a shared secret.
+
+Each marshal holds an Ed25519 key pair, generated when the marshal
+account is created (phase 4 site server) or when the marshal role is
+first assigned on a controller (phase 3, stored in the controller's
+SQLite and synced to the marshal's phone):
 
 ```
-hmac = HMAC-SHA256(marshal_key, canonical_json(reading_without_hmac))
+signature = Ed25519.sign(marshal_private_key, canonical_json(reading_without_signature))
 ```
 
-The canonical JSON is the reading record with the `hmac` field removed,
-keys sorted alphabetically, no whitespace.  This prevents editing
-readings after the fact.
-
-The marshal key is derived from the marshal's password hash using
-HKDF-SHA256 with salt `"atalaia-chrono-v1"`.  On the site server, the
-key is stored alongside the marshal account.
+The canonical JSON is the reading record with the `signature` field
+removed, keys sorted alphabetically, no whitespace.  The marshal's
+public key is stored alongside the account; any field that trusts the
+marshal's public key can verify the signature without a shared secret.
 
 Records are append-only: updates (retest after adjustment) create a new
 record referencing the original `reading_id`, never modify it.
+
+**Consistency with S1:** Ed25519 is used for application-level signing
+throughout (modes, chrono, OTA checks); ESP32-S3 hardware secure boot
+(RSA-3072 or ECDSA) is a separate decision.
 
 #### GDPR retention and erasure
 
@@ -967,8 +981,9 @@ record referencing the original `reading_id`, never modify it.
   Players are informed during registration.
 
 **Consequences:**
-- Readings are tamper-evident via HMAC.  A marshal cannot edit a
-  reading without the HMAC becoming invalid.
+- Readings are tamper-evident via Ed25519 signatures.  A marshal
+  cannot edit a reading without the signature becoming invalid.
+  Other fields can verify records using the marshal's public key.
 - The comparison algorithm is deterministic and auditable.
 - Limit templates are versioned and sourced; fields know when a
   template was last verified.
@@ -981,33 +996,42 @@ record referencing the original `reading_id`, never modify it.
 
 **Status:** Accepted
 
-**Context:** Phase 3 adds five game modes, chrono check-in, player
+**Context:** Phase 3 adds game modes, chrono check-in, player
 positioning, and tamper detection.  Each requires new events in
 `protocol/schema/events.yaml`.  Event IDs follow the existing scheme:
-sequential integers starting after the last assigned ID (24 =
-`script.halted`).
+sequential integers starting after the last assigned ID.
 
-**Decision:** Add the following events to `events.yaml`:
+**Updated 2026-10-18 (phase 2 handoff, decision R6):** Hold-All
+Domination and Last Stand moved from phase 3 into the phase 2 mode
+pack.  Their events (`holdall.scoring_start/stop`,
+`laststand.countdown_start/cancel/defeated`) and `team.eliminated`
+are allocated by the mode pack, reusing the IDs and names from this
+ADR.  Phase 3 modes are now: Kill Confirmed, Respawn, Player
+Check-in, **Money Factory**, and chrono check-in.
 
-#### Game mode events
+**Decision:** Add the following events to `events.yaml`.  IDs 25-32
+are allocated by the phase 2 mode pack (holdall/laststand/eliminated);
+phase 3 new events start at the first free ID after the mode pack.
+
+#### Game mode events (phase 3 -- IDs assigned after the mode pack)
 
 | Event | ID | Priority | Data fields | Mode |
 |-------|-----|----------|-------------|------|
 | `kill.confirmed` | 25 | normal | `[player, team]` | Kill Confirmed |
 | `kill.denied` | 26 | normal | `[player, team]` | Kill Confirmed (same-team scan, rejected) |
-| `team.eliminated` | 27 | critical | `[team, reason]` | Respawn / Last Stand |
-| `holdall.scoring_start` | 28 | normal | `[team]` | Hold-All Domination |
-| `holdall.scoring_stop` | 29 | normal | `[team]` | Hold-All Domination |
-| `laststand.countdown_start` | 30 | normal | `[team]` | Last Stand |
-| `laststand.countdown_cancel` | 31 | normal | `[team]` | Last Stand |
-| `laststand.defeated` | 32 | critical | `[team]` | Last Stand |
+| `money.collected` | 33 | normal | `[player, team, amount]` | Money Factory |
+| `money.deposited` | 34 | normal | `[player, team, amount]` | Money Factory |
+
+Note: `team.eliminated` (27), `holdall.*` (28-29), `laststand.*`
+(30-32) are allocated by the phase 2 mode pack and reuse the names
+and IDs from the original version of this ADR.
 
 #### Player and chrono events
 
 | Event | ID | Priority | Data fields | Feature |
 |-------|-----|----------|-------------|---------|
-| `chrono.checkin` | 33 | normal | `[replica, player, reading_mps, bb_g]` | Chrono check-in |
-| `chrono.spotcheck` | 34 | normal | `[replica, player, reading_mps, bb_g]` | Chrono spot check |
+| `chrono.checkin` | 35 | normal | `[replica, player, reading_mps, bb_g]` | Chrono check-in |
+| `chrono.spotcheck` | 36 | normal | `[replica, player, reading_mps, bb_g]` | Chrono spot check |
 
 Note: `chrono.violation` already exists at ID 17.
 
@@ -1015,16 +1039,16 @@ Note: `chrono.violation` already exists at ID 17.
 
 | Event | ID | Priority | Data fields | Feature |
 |-------|-----|----------|-------------|---------|
-| `visibility.granted` | 35 | normal | `[team, text]` | Temporary visibility |
-| `visibility.expired` | 36 | normal | `[team, text]` | Temporary visibility expiry |
+| `visibility.granted` | 37 | normal | `[team, text]` | Temporary visibility |
+| `visibility.expired` | 38 | normal | `[team, text]` | Temporary visibility expiry |
 
 #### Tamper and system events
 
 | Event | ID | Priority | Data fields | Feature |
 |-------|-----|----------|-------------|---------|
-| `node.tamper` | 37 | critical | `[reason]` | Kiosk mode broken, enclosure opened |
-| `pod.connected` | 38 | telemetry | `[fw, tier]` | I/O pod linked |
-| `pod.disconnected` | 39 | telemetry | `[reason]` | I/O pod link lost |
+| `node.tamper` | 39 | critical | `[reason]` | Kiosk mode broken, enclosure opened |
+| `pod.connected` | 40 | telemetry | `[fw, tier]` | I/O pod linked |
+| `pod.disconnected` | 41 | telemetry | `[reason]` | I/O pod link lost |
 
 #### New data fields
 
@@ -1035,11 +1059,13 @@ The following data fields are added to the `data_fields` section:
 | `duration_s` | 28 | number | countdown or visibility duration in seconds |
 | `see_team` | 29 | string | team whose positions become visible |
 | `tolerance_pct` | 30 | number | chrono comparison tolerance percentage |
+| `amount` | 31 | number | resource amount (Money Factory) |
 
 #### Summary
 
-Total new events: 15 (IDs 25-39).
-Total new data fields: 3 (keys 28-30).
+Total new events (phase 3 only): 12 (IDs 25-26, 33-41; 27-32 owned
+by the phase 2 mode pack).
+Total new data fields: 4 (keys 28-31).
 
 The existing event IDs 14 (`player.respawn`), 15 (`player.checkin`)
 and 17 (`chrono.violation`) are already allocated and used as-is by
@@ -1158,22 +1184,33 @@ the phone translates to a `node.tamper` event.
 
 #### Certificate handling for field-local HTTPS
 
+**Updated 2026-10-18 (phase 2 handoff):** the join payload is at most
+448 bytes (`protocol/join.md`); a DER-encoded CA certificate is
+~800-1200 bytes and does not fit.  Keys 13-31 are reserved for
+optional fields.
+
 **Field controller (local network):**
 
 The controller generates a self-signed CA at first setup:
 
-1. Generate an RSA 2048 root CA key and certificate (valid 10 years).
+1. Generate an Ed25519 root CA key and certificate (valid 10 years).
 2. Generate a server certificate signed by the CA (valid 1 year, with
    the controller's hostname and IP as SANs).
 3. Store both in the controller's config directory.
 
-The CA certificate is distributed to devices during join:
-- Included in the join payload (NFC/QR) as a DER-encoded blob.
-- The player app trusts this CA for the duration of the game.
+The CA certificate is distributed in two steps:
+- The join payload (NFC/QR) carries only the **SHA-256 fingerprint**
+  of the CA certificate in a reserved key (proposed key 13, needs an
+  RFC 0001 amendment).
+- On first connection over Wi-Fi, the phone fetches the full CA cert
+  from `GET /api/v1/controller/ca` (no token needed, served over
+  plain HTTP on port 8080).  The app checks the fingerprint against
+  the one in the join payload, and trusts the CA for the duration of
+  the game only.
 - After the game ends, the trust is removed.
 
-This approach avoids the "self-signed certificate warning" problem
-without requiring a public CA or internet access.
+This approach avoids the join payload size limit while still binding
+the CA trust to the join's HMAC-verified fingerprint.
 
 **Site server (internet-facing):**
 
@@ -1515,6 +1552,28 @@ The embedded Dart broker runs ONLY on Android.
 
 ---
 
+## Phase 2 handoff (2026-10-18)
+
+Phase 2 plan phases A-E are implemented and pushed (commit `771fd90`).
+The following assumptions from this ADR were re-checked against the
+implemented interfaces.
+
+| Assumption | Status | Resolution |
+|-----------|--------|-----------|
+| B2: `field_ops` pointer in `atalaia_node_config_t` | **Holds** | Exists; runs on the controller via ctypes. |
+| B4: USB modem framing = type+len+payload | **Changed** | Now 0xA5 sync + type + len + payload + CRC-16/CCITT-FALSE. Pod must adopt the same (ADR-P3-2 updated). RADIO_RX carries epoch. |
+| B6/B7: REST API + WebSocket stable | **Holds with additions needed** | 17+ endpoints exist with bearer tokens. Phase 3 must add: `POST /api/v1/positions`, player tokens, role-filtered WS streams. |
+| B10: Join payload format | **Changed** | Version byte + CBOR map + HMAC-SHA256, max 448 bytes. Keys 13-31 reserved. Field join key (not controller-only). NFC is NDEF MIME `application/vnd.atalaia.join`; text is `atalaia:join:` + base64url. QR pushes nothing to boxes (E3). CA cert does not fit; use fingerprint + Wi-Fi fetch (ADR-P3-9 updated). |
+| B13: Time sync | **Holds** | Slew <=5%, step at >=500 ms, hold when ahead, follow highest-term TIME. Android can reuse `field_link.c` logic. |
+| C5: Channel hopping | **Superseded** | One shared game channel per game (default 869.525 MHz, g2, 10% DC, 500 mW ERP), carried in join payload key 5 `channel_hz`. No channel hopping. |
+| P3-1: Chrono signing | **Changed** | Ed25519 per marshal, not HMAC-SHA256 (ADR-P3-7 updated). |
+| R6: Hold-All and Last Stand | **Moved** | Into the phase 2 mode pack. Phase 3 modes: Kill Confirmed, Respawn, Player Check-in, Money Factory, chrono check-in (ADR-P3-8 updated). |
+| S1: Ed25519 for app signing | **Holds** | ESP32-S3 hardware secure boot is RSA-3072/ECDSA only; Ed25519 for application-level signing. |
+| D8: Codec corrections | **Noted** | Dart codecs must match schema-exact C payloads: HELLO capabilities is an array, STATE counters/CLAIM acks are maps, CMD params is text-keyed map (JSON <=127 bytes), required fields always encoded. |
+| E21: GPS on Field Box | **Not supported** | GNSS header pins used by display/buttons. Revisit in phase 4. I/O pod or phone GPS only. |
+
+---
+
 ## Constraints for Planning
 
 The planning phase must respect the following constraints derived from
@@ -1532,8 +1591,9 @@ the decisions above:
    with `flutter build apk --debug`.
 
 4. **Capability proxy protocol v1 is frozen.** The frame format
-   (type + length + payload), GATT UUIDs, and characteristic layout
-   are fixed.  Changes require a protocol version bump.
+   (0xA5 sync + type + length + payload + CRC-16, matching the modem),
+   GATT UUIDs, and characteristic layout are fixed.  Changes require
+   a protocol version bump.
 
 5. **Pod firmware is a Kconfig variant.** `CONFIG_ATALAIA_POD_MODE`
    disables Lua, LVGL, preset store and game logic.  It enables BLE
@@ -1559,11 +1619,14 @@ the decisions above:
 10. **Positions over Wi-Fi or 4G, never LoRa.** Player positions are
     sent to the controller over the network, not over LoRa.
 
-11. **HMAC-SHA256 for chrono records and NFC tags.** Chrono readings
-    are signed with the marshal's key.  NFC tags are signed with the
-    game key (truncated to 16 bytes).
+11. **Ed25519 for chrono records; HMAC for NFC tags.** Chrono readings
+    are signed with the marshal's Ed25519 private key (P3-1, consistent
+    with phase 4).  NFC tags are signed with the game key (truncated
+    16-byte HMAC-SHA256).
 
-12. **Event IDs 25-39 for phase 3.** Phase 4 starts at ID 40.
+12. **Event IDs 25-26 and 33-41 for phase 3.** IDs 27-32 are owned by
+    the phase 2 mode pack (holdall/laststand/eliminated).  Phase 4
+    starts at ID 42.
 
 13. **iOS excludes prop and controller roles.** Conditional imports
     and build flavors keep iOS clean.  No `dart:ffi` core bindings
@@ -1591,17 +1654,18 @@ the decisions above:
     `app/lib/chrono/limit_templates/`, versioned, with source and
     date.
 
-20. **No `state.field{}` dependency for 3 of 5 modes.** Kill
-    Confirmed, Respawn and Player Check-in are single-node modes
-    that can ship before phase 2C completes.  Hold-All Domination
-    and Last Stand require `field.*` from phase 2C.
+20. **All phase 3 modes are single-node.** Kill Confirmed, Respawn,
+    Player Check-in and Money Factory are single-node modes with no
+    `field.*` dependency.  Hold-All Domination and Last Stand moved
+    to the phase 2 mode pack (decision R6).
 
 21. **BLE beacons are standard iBeacon hardware.** No custom firmware
     for beacons.  Room-level positioning, not metre-level.
 
-22. **Self-signed CA distributed at join.** The controller generates
-    a CA; the cert is included in the join payload.  The app trusts
-    it for the game duration only.
+22. **Self-signed CA fingerprint in join, cert over Wi-Fi.** The join
+    payload carries a SHA-256 fingerprint (proposed key 13); the app
+    fetches and verifies the full cert over Wi-Fi.  Needs an RFC
+    amendment for key 13.
 
 23. **SPDX headers on every file.** Files under `app/` use
     `GPL-3.0-or-later`.  Files under `controller/` use

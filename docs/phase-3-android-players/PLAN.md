@@ -7,11 +7,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 Gate: **one game mixes ESP32 and Android props without issues.**
 
-Constraint: Phase 2 is incomplete (2C/D/E/F pending). All builds run
-in Docker. What can be built and tested without phase 2 completion or
-hardware is separated from what depends on those. Roughly 70% of
-phase 3 software can proceed without waiting for phase 2C/D/E or
-real devices.
+Constraint: Phase 2 plan phases A-E are complete (commit `771fd90`,
+2026-10-18); phase F (hardware field test) is pending.  All builds run
+in Docker.  What can be built and tested without hardware is separated
+from what needs real devices.  With phase 2 A-E done, roughly 85% of
+phase 3 software can proceed immediately.
 
 ---
 
@@ -19,10 +19,12 @@ real devices.
 
 ### In scope (what phase 3 delivers)
 
-- Five new game modes: Kill Confirmed, Respawn/Lives, Player Check-in
-  (single-node), Hold-All Domination and Last Stand (field-script).
-- Event schema additions (`events.yaml`) for phase 3 events (IDs 25-39)
-  plus `protogen.py` regeneration.
+- Four new game modes (all single-node): Kill Confirmed, Respawn/Lives,
+  Player Check-in, Money Factory.  (Hold-All Domination and Last Stand
+  moved to the phase 2 mode pack per decision R6.)
+- Event schema additions (`events.yaml`) for phase 3 events (IDs 25-26,
+  33-41; IDs 27-32 owned by the phase 2 mode pack) plus `protogen.py`
+  regeneration.
 - Capability proxy protocol v1: frame format, CBOR payloads, test
   vectors shared by Dart and C.
 - Declarative screen template format (YAML): parser, interpolation
@@ -34,14 +36,14 @@ real devices.
   pod, NFC).
 - Chrono check-in: data model, energy calculation, limit templates
   (Portugal APDA, UK UKARA, Germany, Generic CQB), spot-check
-  comparison, marshal keypad UI, HMAC-signed records.
+  comparison, marshal keypad UI, Ed25519-signed records (P3-1).
 - Player positions and visibility: GPS and BLE beacon reporting,
   server-side role-based filtering, temporary visibility (UAV sweep).
 - I/O pod firmware: `CONFIG_ATALAIA_POD_MODE` Kconfig variant, BLE
   GATT server, USB CDC serial, capability proxy, radio passthrough.
 - Embedded MQTT broker (Dart) for the Android controller role.
 - Security: player tokens (HMAC-SHA256), NFC tag signing, self-signed
-  CA distribution at join, kiosk tamper detection.
+  CA fingerprint in join + cert fetch over Wi-Fi, kiosk tamper detection.
 - iOS build: player and GM roles only, conditional imports, App Store
   permission file.
 - CI: four new jobs (`flutter-test`, `flutter-build-android`,
@@ -63,7 +65,7 @@ real devices.
 - Cross-field chrono record sharing.
 - Metre-level indoor positioning (BLE triangulation).
 - iOS prop or controller roles.
-- Money Factory mode (needs site-server resource backend).
+- Hold-All Domination and Last Stand (moved to the phase 2 mode pack).
 
 ---
 
@@ -81,8 +83,8 @@ real devices.
 | 8 | Screen dimming, not sleeping | Phase D screen manager dims to 10% after 30 s, never calls `goToSleep` in kiosk mode; the game loop runs regardless |
 | 9 | Server-side position filtering only | Phase E positions module sends only filtered positions per viewer role; the controller NEVER sends positions a client may not see |
 | 10 | Positions over Wi-Fi or 4G, never LoRa | Phase E position reports go to `POST /api/v1/positions`; no LoRa path for positions |
-| 11 | HMAC-SHA256 for chrono records and NFC tags | Phase B chrono module signs readings with marshal key via HKDF-SHA256; NFC tags signed with game key (truncated 16-byte HMAC) |
-| 12 | Event IDs 25-39 for phase 3 | Phase A adds exactly IDs 25-39 to `events.yaml`; phase 4 starts at ID 40 |
+| 11 | Ed25519 for chrono records; HMAC for NFC tags | Phase B chrono module signs readings with marshal's Ed25519 key (P3-1); NFC tags signed with game key (truncated 16-byte HMAC) |
+| 12 | Event IDs 25-26 and 33-41 for phase 3 | Phase A adds phase 3 IDs; IDs 27-32 owned by phase 2 mode pack; phase 4 starts at ID 42 |
 | 13 | iOS excludes prop and controller roles | Phase D uses conditional imports (`node_runner_stub.dart` on iOS); role selector hides prop/controller on iOS |
 | 14 | FFI stub library for Dart tests | Phase C creates `core/tests/stub.c` with `ATALAIA_STUB=ON`; CI sets `ATALAIA_CORE_LIB` to the stub path |
 | 15 | Four new CI jobs | Phase C adds `flutter-test` and `core-android-ndk`; Phase D adds `flutter-build-android` and `flutter-integration` |
@@ -90,9 +92,9 @@ real devices.
 | 17 | Shared capability proxy test vectors | Phase A creates `protocol/vectors/capability_proxy.yaml` tested in both Dart and C |
 | 18 | GDPR retention for chrono records | Phase B implements configurable retention (default 12 months) with auto-delete and right of erasure via API |
 | 19 | Limit templates are YAML files | Phase B ships four templates in `app/lib/chrono/limit_templates/` with source and verification date |
-| 20 | No `state.field{}` dependency for 3 of 5 modes | Phase A implements Kill Confirmed, Respawn and Player Check-in as single-node modes; Hold-All and Last Stand deferred to Phase E (after phase 2C) |
+| 20 | All phase 3 modes are single-node | Phase A implements Kill Confirmed, Respawn, Player Check-in and Money Factory as single-node modes; Hold-All and Last Stand moved to phase 2 mode pack (R6) |
 | 21 | BLE beacons are standard iBeacon hardware | Phase E position scanner uses standard iBeacon format; no custom beacon firmware |
-| 22 | Self-signed CA distributed at join | Phase E security module includes the CA cert in the join payload; app trusts it for game duration only |
+| 22 | Self-signed CA fingerprint in join, cert over Wi-Fi | Phase E uses join payload key 13 for SHA-256 fingerprint; app fetches full cert from `GET /api/v1/controller/ca` and verifies fingerprint; needs RFC amendment |
 | 23 | SPDX headers on every file | `app/` uses `GPL-3.0-or-later`; `controller/` uses `AGPL-3.0-or-later`; docs use `CC-BY-SA-4.0` |
 | 24 | Minimum Android API 26 | Phase C sets `minSdkVersion 26` in `build.gradle.kts` |
 
@@ -458,33 +460,29 @@ runs `flutter test integration_test/`.
 
 ---
 
-## Phase E: Player positions, field-script modes, embedded MQTT, controller integration
+## Phase E: Player positions, embedded MQTT, controller integration
 
 ### Goal
 
-Implement the features that depend on phase 2C/D: player position
-reporting and server-side filtering, the two field-script modes
-(Hold-All Domination, Last Stand), the embedded MQTT broker for the
-Android controller role, the player app connection to the controller
-REST/WebSocket API, and the position module (GPS outdoors, BLE beacons
-indoors, temporary visibility). After this phase, the Flutter app
-connects to a real controller and all 5 game modes are testable.
+Implement the features that depend on the phase 2 controller: player
+position reporting and server-side filtering, the embedded MQTT broker
+for the Android controller role, the player app connection to the
+controller REST/WebSocket API, the position module (GPS outdoors, BLE
+beacons indoors, temporary visibility), player token issuance, and
+the CA fingerprint distribution (`GET /api/v1/controller/ca`).  After
+this phase, the Flutter app connects to a real controller and all 4
+phase 3 game modes are testable end-to-end.  (Hold-All Domination and
+Last Stand are delivered by the phase 2 mode pack, not this phase.)
 
-**Dependencies:** Phase 2C (`state.field{}` and `field.*` Lua API) for
-the two field-script modes. Phase 2D (Python controller REST/WS API)
-for app-to-controller integration. Phase D (Flutter UI).
+**Dependencies:** Phase 2D (Python controller REST/WS API) for
+app-to-controller integration. Phase D (Flutter UI).
 
 ### Files to create
 
 | File | Purpose |
 |------|---------|
-| `modes/hold_all_domination/mode.yaml` | Manifest: requires `team_input`, optional `display`; params: `points_per_second` |
-| `modes/hold_all_domination/node.lua` | Standard domination capture; emits `zone.captured`, `zone.neutralized` |
-| `modes/hold_all_domination/field.lua` | `field.common_owner(field.nodes("zone"))` scoring timer; emits `holdall.scoring_start`/`stop` |
-| `modes/hold_all_domination/tests/basic.yaml` | 2 zones: red captures both (scoring); blue captures one (stops); red recaptures (resumes) |
-| `modes/hold_all_domination/tests/edge_neutral.yaml` | One zone neutral: no scoring for any team |
-| `modes/last_stand/mode.yaml` | Manifest: requires `team_input`; params: `countdown_s` (120), `min_zones_safe` (2) |
-| `modes/last_stand/node.lua` | Standard domination capture |
+| ~~`modes/hold_all_domination/`~~ | **Moved to the phase 2 mode pack (R6)** |
+| ~~`modes/last_stand/`~~ | **Moved to the phase 2 mode pack (R6)** |
 | `modes/last_stand/field.lua` | Per-team zone count; countdown when holding exactly 1; cancel on recapture; `laststand.defeated` |
 | `modes/last_stand/tests/basic.yaml` | 3 zones: red holds 1 (countdown); captures 2nd (cancel); countdown expires (defeated) |
 | `app/lib/position/position_reporter.dart` | GPS reporter via `FusedLocationProviderClient`; configurable interval (5-60 s) |
@@ -510,23 +508,16 @@ for app-to-controller integration. Phase D (Flutter UI).
 
 | File | What it tests |
 |------|---------------|
-| `modes/hold_all_domination/tests/basic.yaml` | Red captures both zones: scoring starts; blue captures one: stops; edge: neutral zone blocks all scoring |
-| `modes/last_stand/tests/basic.yaml` | 3 zones; team holds 1: countdown starts; recapture: cancel; timeout: `laststand.defeated` |
+| ~~`modes/hold_all_domination/tests/`~~ | **Moved to the phase 2 mode pack (R6)** |
+| ~~`modes/last_stand/tests/`~~ | **Moved to the phase 2 mode pack (R6)** |
 | `app/test/position/visibility_engine_test.dart` | All role/visibility combinations from ADR-P3-6 table |
 | `app/test/controller/mqtt_broker_test.dart` | Connect/subscribe/publish round-trip; QoS 1; max connections |
 | `app/test/controller/api_client_test.dart` | Join, scores, log via mock HTTP |
 
 ### Validation (Phase E)
 
-**Field-script mode tests (requires phase 2C simulator support):**
-
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm ^
-  -v "%cd%:/src" atalaia-dev ^
-  sh -c "cd /src && python3 -m pytest modes/hold_all_domination/ modes/last_stand/ -v"
-```
-
-**All mode tests pass (including new single-node modes from Phase A):**
+**All mode tests pass (including new single-node modes from Phase A
+and Hold-All/Last Stand from the phase 2 mode pack):**
 
 ```sh
 MSYS_NO_PATHCONV=1 docker run --rm ^
@@ -695,52 +686,55 @@ Execute the Field Test Plan below.
 
 ## 4. Assumptions about phases 1 and 2
 
-| # | Assumption | Source | Exists yet? | Phases that depend on it | Impact if wrong |
-|---|-----------|--------|-------------|--------------------------|-----------------|
-| A1 | `atalaia_node_t` API is stable: `create`, `destroy`, `input`, `advance`, `load`, `set_teams`, `set_params` | `core/include/atalaia/node.h` | Yes | C, D | **High.** The Dart FFI bindings wrap every function. Any signature change requires updating the Dart layer. |
-| A2 | `atalaia_node_callbacks_t` has `event`, `command`, `log` callbacks with their current signatures | `core/include/atalaia/node.h` lines 54-64 | Yes | C | **High.** Dart `NativeCallable` wrappers depend on exact signatures. |
-| A3 | The core builds as a shared library with `-DATALAIA_SHARED=ON` | `core/CMakeLists.txt` | Yes | C | **Medium.** Android needs `.so` files; if the shared lib target changes, the NDK cross-compile step adapts. |
-| A4 | `atalaia_score_t` and `atalaia_score_merge` are available for score display | `core/include/atalaia/score.h` | Yes | D (prop role score display) | **Low.** The player app reads scores via the API, not directly from C. Only the prop role needs this. |
-| A5 | `atalaia_node_status_t` enum values (EMPTY, RUNNING, ENDED, HALTED) are stable | `core/include/atalaia/node.h` | Yes | C, D | **Low.** Used for status display. |
-| A6 | HAL ops struct pattern (function pointers in `hal_<name>_ops_t`) | ADR-P1-1; `firmware/esp32/main/hal/` | Yes | F | **Medium.** The I/O pod firmware reuses HAL modules. |
-| A7 | Screen templates are C functions with `screen_render(template, data)` | ADR-P1-2; `screen_renderer.c` | Yes | A | **Medium.** Phase A introduces declarative templates alongside these. The C functions remain as fallback. |
-| A8 | `ui.screen(template, data)` is the script API for display | `core/src/script_api.c` | Yes | A, D | **Low.** Both renderers are triggered by this call. |
-| A9 | LittleFS storage partition layout (`/presets/`, `/modes/`, `/state/`, `/audio/`) | ADR-P1-4 | Yes | F | **Low.** The pod uses LittleFS for template storage. |
-| A10 | FreeRTOS task architecture is extensible | ADR-P1-7 | Yes | F | **Low.** Pod adds BLE GATT and USB CDC tasks. |
-| B1 | `state.field{}` and `field.*` Lua API are implemented | Phase 2 PLAN Phase C; ADR-P2-5 | **Pending** (Phase 2C) | E | **Critical.** Hold-All Domination and Last Stand REQUIRE `field.nodes()`, `field.owner()`, `field.common_owner()`. Without this, two of five modes cannot be built. |
-| B2 | `atalaia_node_config_t` accepts a `field_ops` pointer | Phase 2 PLAN Phase C | **Pending** | E | **High.** The Android controller role needs `field_ops` to run `field.lua`. |
-| B3 | Skirmesh-RF packet codec (header, AES-CCM, CBOR payloads) is stable | Phase 2A; `core/include/atalaia/packet.h` | **Yes** | F | **High.** The I/O pod radio passthrough uses the same codec. |
-| B4 | USB radio modem framing is stable | ADR-P2-4 | **Yes** | F | **High.** The I/O pod reuses this framing for its radio passthrough. |
-| B5 | USB radio modem firmware is a Kconfig build variant | ADR-P2-4 | **Pending** (Phase 2D) | F | **Medium.** Pod firmware is modelled as another Kconfig variant. |
-| B6 | Python field controller REST API (`/api/v1/*`) is stable | Phase 2 PLAN Phase D; spec section 11 | **Pending** (Phase 2D) | E | **High.** The player app and GM app connect to this API. |
-| B7 | WebSocket `/api/v1/stream` delivers live events | Phase 2 PLAN Phase D | **Pending** (Phase 2D) | E | **High.** Player app uses WebSocket for live scores and events. |
-| B8 | `RadioModel` and `FieldController` in the simulator support multi-node testing | Phase 2B | **Yes** | E | **Medium.** Field-script modes tested in the simulator. |
-| B9 | Flood/dedupe/ACK in `core/` are stable | Phase 2A; `core/include/atalaia/flood.h` | **Yes** | F | **Low.** Pod firmware links the same flood code. |
-| B10 | Join flow (NFC card, QR, HMAC-SHA256 payload) is defined | ADR-P2-12 | **Yes** (defined) | D, E | **Medium.** Android app reads join NFC cards. |
-| B11 | Capability proxy protocol (IDENT, EVT, CMD, ACK frames) is defined | Spec section 7; ADR-P3-2 | **Defined and frozen in this phase** | D, F | **High.** Format is frozen by Phase A of this plan. |
-| B12 | GM console web app exists and is serveable | Phase 2 PLAN Phase E | **Pending** (Phase 2E) | D (GM WebView) | **Medium.** GM role wraps it in a WebView. If not ready, GM role deferred. |
-| B13 | TIME beacon and time sync algorithm are stable | Phase 2C; ADR-P2-7 | **Pending** | E (Android time sync) | **Medium.** Android prop time sync reuses the same algorithm. |
+**Updated 2026-10-18 (phase 2 handoff).** Phase 2 A-E are now
+complete.  All assumptions are re-checked against the implemented code.
 
-### Risk assessment
+| # | Assumption | Source | Status | Phases that depend on it | Impact if wrong |
+|---|-----------|--------|--------|--------------------------|-----------------|
+| A1 | `atalaia_node_t` API is stable | `core/include/atalaia/node.h` | **Holds** | C, D | **High.** Dart FFI wraps every function. |
+| A2 | `atalaia_node_callbacks_t` signatures stable | `core/include/atalaia/node.h` | **Holds** | C | **High.** Dart `NativeCallable` depends on exact signatures. |
+| A3 | Core builds as shared library | `core/CMakeLists.txt` | **Holds** | C | **Medium.** |
+| A4 | `atalaia_score_t` and merge available | `core/include/atalaia/score.h` | **Holds** | D | **Low.** |
+| A5 | `atalaia_node_status_t` enum stable | `core/include/atalaia/node.h` | **Holds** | C, D | **Low.** |
+| A6 | HAL ops struct pattern | `firmware/esp32/main/hal/` | **Holds** | F | **Medium.** |
+| A7 | Screen templates are C functions | `screen_renderer.c` | **Holds** | A | **Medium.** Declarative templates added alongside. |
+| A8 | `ui.screen(template, data)` script API | `core/src/script_api.c` | **Holds** | A, D | **Low.** |
+| A9 | LittleFS partition layout | ADR-P1-4 | **Holds** | F | **Low.** |
+| A10 | FreeRTOS extensible | ADR-P1-7 | **Holds** | F | **Low.** |
+| B1 | `state.field{}` and `field.*` Lua API | Phase 2C | **Done** | -- | Hold-All and Last Stand moved to phase 2 mode pack (R6). No phase 3 mode needs `field.*`. |
+| B2 | `field_ops` pointer in `atalaia_node_config_t` | Phase 2C | **Done** | E (Android controller) | Exists; runs on the controller via ctypes. |
+| B3 | Packet codec stable | Phase 2A; `core/include/atalaia/packet.h` | **Holds** | F | **High.** Codecs are schema-exact (D8). |
+| B4 | USB modem framing stable | `protocol/usb-modem.md` | **Changed** (D1) | F | **High.** Now 0xA5 sync + type + len + payload + CRC-16. RADIO_RX carries epoch (D2). Pod framing updated in ADR-P3-2 to match. |
+| B5 | Modem firmware is a Kconfig variant | `sdkconfig.modem` | **Done** | F | **Medium.** Pod modelled as a third variant. |
+| B6 | REST API stable | `controller/README.md` | **Done, additions needed** | E | **High.** 17+ endpoints exist. Phase 3 must add: `POST /api/v1/positions`, player tokens, role-filtered WS streams. |
+| B7 | WebSocket delivers live events | `controller/atalaia_controller/ws.py` | **Done, additions needed** | E | **High.** WS snapshot + events + score + node + game + system. Phase 3 adds position and role-filtered streams. |
+| B8 | Simulator RadioModel + FieldController | Phase 2B | **Done** | -- | Hold-All/Last Stand tested in phase 2. |
+| B9 | Flood/dedupe/ACK stable | Phase 2A | **Holds** | F | **Low.** |
+| B10 | Join payload format | `protocol/join.md` | **Changed** (E1, E2) | D, E | **Medium.** Version byte + CBOR + HMAC-SHA256 with field join key. Max 448 bytes. Keys 13-31 reserved. NFC MIME `application/vnd.atalaia.join`. Text `atalaia:join:` + base64url. QR pushes nothing to boxes (E3). CA cert cannot fit; use fingerprint. |
+| B11 | Capability proxy protocol frozen | ADR-P3-2 | **Updated** | D, F | **High.** Frame format now includes sync+CRC per modem. |
+| B12 | GM console exists | `controller/console/src/` | **Done** | D (GM WebView) | Served at `/console/`, pt-PT/en. |
+| B13 | Time sync stable | Phase 2C; `field_link.c` | **Done** | E | Slew <=5%, step >=500 ms, hold when ahead, follow highest-term TIME. Android can reuse logic. |
 
-**Critical dependencies (block phase 3 modes):**
-- B1: `state.field{}` and `field.*` -- blocks Hold-All and Last Stand.
-  **Mitigation:** these two modes are deferred to Phase E, which runs
-  after phase 2C delivers. The three single-node modes ship in Phase A.
+### Risk assessment (updated)
 
-**High dependencies (significant rework if changed):**
-- A1, A2: core API stability -- mitigated by the core being "done" for
-  phase 1.
-- B3, B4: packet codec and modem framing -- mitigated by phase 2A
-  being complete and tested with shared vectors.
-- B6, B7: REST API and WebSocket -- mitigated by the spec defining the
-  endpoints; app integration deferred to Phase E.
+**No critical phase 2 blockers remain.** All phase 3 modes are
+single-node (Hold-All and Last Stand moved to phase 2).  The REST API
+and WebSocket exist; phase 3 extends them.
+
+**Changes requiring attention:**
+- B4: pod framing must use sync+CRC and RADIO_RX must carry epoch.
+  ADR-P3-2 updated.
+- B10: join payload is CBOR with integer keys, max 448 bytes. CA cert
+  does not fit; ADR-P3-9 updated to use fingerprint + Wi-Fi fetch.
+- D8: Dart codecs must match schema-exact C payloads (HELLO caps as
+  array, STATE counters as map, CMD params as text-keyed map <=127
+  bytes JSON, required fields always encoded).
 
 ---
 
 ## 5. Acceptance criteria
 
-### AC-1: Event schema includes all 15 phase 3 events
+### AC-1: Event schema includes all phase 3 events
 
 ```sh
 MSYS_NO_PATHCONV=1 docker run --rm ^
@@ -748,31 +742,25 @@ MSYS_NO_PATHCONV=1 docker run --rm ^
   python3 tools/protogen.py --check
 ```
 
-**Expected:** exit 0. `events.yaml` contains event IDs 25-39. Codec
-tables regenerate cleanly.
+**Expected:** exit 0. `events.yaml` contains phase 3 event IDs
+(25-26, 33-41). Codec tables regenerate cleanly.
 
-### AC-2: Three single-node modes pass all tests
+### AC-2: Four single-node modes pass all tests
 
 ```sh
 MSYS_NO_PATHCONV=1 docker run --rm ^
   -v "%cd%:/src" atalaia-dev ^
-  sh -c "cd /src && python3 -m pytest modes/kill_confirmed/ modes/respawn/ modes/player_checkin/ -v"
+  sh -c "cd /src && python3 -m pytest modes/kill_confirmed/ modes/respawn/ modes/player_checkin/ modes/money_factory/ -v"
 ```
 
 **Expected:** exit 0. Kill Confirmed scores correctly, Respawn
 enforces life limits and cooldowns, Player Check-in counts and
-deduplicates.
+deduplicates, Money Factory collects and deposits.
 
-### AC-3: Two field-script modes pass all tests (requires phase 2C)
+### AC-3: Hold-All and Last Stand pass (phase 2 mode pack, not phase 3)
 
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm ^
-  -v "%cd%:/src" atalaia-dev ^
-  sh -c "cd /src && python3 -m pytest modes/hold_all_domination/ modes/last_stand/ -v"
-```
-
-**Expected:** exit 0. Hold-All scores only when one team holds all
-zones. Last Stand countdown starts, cancels and defeats correctly.
+**Removed.** Hold-All Domination and Last Stand moved to the phase 2
+mode pack (decision R6).  Their tests are owned by that pack.
 
 ### AC-4: Declarative templates parse and render on both platforms
 

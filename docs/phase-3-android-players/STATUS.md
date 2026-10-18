@@ -7,95 +7,83 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 **Current phase:** Planning complete; Implementation pending
 **Risk level:** Medium
-**Last verified:** 2026-10-18
+**Last verified:** 2026-10-18 (phase 2 handoff applied)
 
 ## Completed
 
-- [x] Architecture phase: `ADR.md`
-  - [x] ADR-P3-1: dart:ffi bridge architecture (isolate, NativeCallable.listener, Gradle NDK)
-  - [x] ADR-P3-2: Capability proxy protocol v1 (frame format, GATT UUIDs, test vectors)
-  - [x] ADR-P3-3: I/O pod firmware variant (CONFIG_ATALAIA_POD_MODE, task layout)
-  - [x] ADR-P3-4: Declarative screen template format (YAML, 7 widget types, interpolation)
-  - [x] ADR-P3-5: Android background survival (foreground service, wake lock, OEM exemption)
-  - [x] ADR-P3-6: Player position architecture (GPS/BLE, server-side filter, UAV sweep)
-  - [x] ADR-P3-7: Chrono data model (readings, limits, spot-check algorithm, HMAC, GDPR)
-  - [x] ADR-P3-8: New event types (15 events, IDs 25-39, 3 new data fields)
-  - [x] ADR-P3-9: Security model for the player app (tokens, NFC signing, self-signed CA)
-  - [x] ADR-P3-10: iOS exclusions (conditional imports, build flavors)
-  - [x] ADR-P3-11: CI strategy for Flutter (FFI stub, 4 CI jobs, emulator integration tests)
-  - [x] ADR-P3-12: Embedded MQTT broker for Android controller (minimal Dart broker)
 - [x] Research phase: `RESEARCH.md`
-  - [x] Flutter app architecture (dart:ffi, roles, Kotlin plugins)
-  - [x] Android prop shell (capabilities, background limits, kiosk)
-  - [x] I/O pod (hardware, BOM, capability proxy, firmware variant)
-  - [x] New game modes (Hold-All, Last Stand, Kill Confirmed, Respawn, Player Check-in)
-  - [x] Chrono check-in (registry, flow, limits, GDPR)
-  - [x] Player check-in mode
-  - [x] Player positions and visibility (GPS, BLE beacons, role filtering, GDPR)
-  - [x] Security (tokens, kiosk tamper resistance, NFC signing, HTTPS)
-  - [x] iOS constraints
-  - [x] CI for Flutter (emulators, FFI stubs, integration tests)
-  - [x] Screen template sharing (declarative format for LVGL + Flutter)
-  - [x] What needs real phones, pods or boards
-  - [x] Assumptions about phases 1 and 2 (10 from P1, 15 from P2)
-  - [x] Risk assessment
+- [x] Architecture phase: `ADR.md` (12 ADRs, 24 constraints)
+- [x] Planning phase: `PLAN.md` (7 phases A-G, 12 AC, field test plan)
+- [x] Phase 2 handoff (2026-10-18): design updated to match phase 2
+  A-E implementation (commit `771fd90`)
 
-## Phase 2 dependency check
+## Phase 2 handoff changes (2026-10-18)
+
+| Change | Impact | Files updated |
+|--------|--------|---------------|
+| P3-1: Chrono signing is Ed25519, not HMAC | ADR-P3-7 rewritten; reading schema uses `signature` field | ADR.md, PLAN.md |
+| R6: Hold-All and Last Stand moved to phase 2 mode pack | Phase 3 modes now: Kill Confirmed, Respawn, Player Check-in, Money Factory | ADR.md (P3-8), PLAN.md (scope, AC-2, AC-3), RESEARCH.md |
+| C5: Single shared game channel (no hopping) | Pod CONFIGURE uses `channel_hz` | RESEARCH.md handoff section |
+| B4: Modem framing now has sync+CRC | Pod framing updated to match | ADR.md (P3-2) |
+| B10: Join payload max 448 bytes, CBOR+HMAC, field join key | CA cert replaced by fingerprint + Wi-Fi fetch | ADR.md (P3-9), PLAN.md |
+| D8: Codec corrections | Dart codecs must match schema-exact C payloads | PLAN.md assumptions |
+| E21: GPS not on Field Box | I/O pod or phone GPS only | RESEARCH.md handoff |
+
+## Phase 2 dependency check (updated)
 
 | Dependency | Status | Blocks |
 |-----------|--------|--------|
-| Phase 2A: protocol codecs, AES-CCM, flood | Complete | Pod firmware, Android radio passthrough |
-| Phase 2B: simulator RadioModel, FieldController | Complete | Multi-node mode testing |
-| Phase 2C: `field.*` Lua API, radio HAL, time sync | Pending | Hold-All Domination, Last Stand modes |
-| Phase 2D: Python controller, REST API, WebSocket | Pending | Player app, GM app |
-| Phase 2E: GM console, join flow, scoreboard | Pending | GM role on Android |
+| Phase 2A: protocol codecs, AES-CCM, flood | **Complete** | Pod firmware, Android radio passthrough |
+| Phase 2B: simulator RadioModel, FieldController | **Complete** | Multi-node mode testing |
+| Phase 2C: `field.*` Lua API, radio HAL, time sync | **Complete** | No longer blocks phase 3 (Hold-All/Last Stand moved to phase 2) |
+| Phase 2D: Python controller, REST API, WebSocket | **Complete** | Player app, GM app (phase 3 extends the API) |
+| Phase 2E: GM console, join flow, scoreboard | **Complete** | GM role on Android |
 | Phase 2F: Field test, documentation | Pending | Gate: field-tested protocol before Android integration |
+| Phase 2 mode pack: Hold-All, Last Stand, Bomb codes, Codes modifier | **In progress** | Holds event IDs 27-32 |
 
-**Critical blocker:** Phase 2C (`state.field{}` and `field.*` API).
-Without this, Hold-All Domination and Last Stand cannot be implemented.
-Kill Confirmed, Respawn, and Player Check-in are single-node modes and
-do not depend on phase 2C.
+**No critical phase 2 blockers remain.** Phase 3 implementation can
+start immediately for phases A-D.  Phase E needs the REST API
+extensions (player tokens, position endpoint, role-filtered WS).
+Phase G needs hardware.
 
 ## Next steps
 
-1. ~~Architecture decisions (ADR.md)~~ -- Complete
-2. ~~Implementation plan (PLAN.md)~~ -- Complete
-3. Implementation (after phase 2 is complete)
-
-## Plan summary
-
-| Phase | Scope | Status |
-|-------|-------|--------|
-| Research | All 12 research areas, assumptions, risks | Complete |
-| Architecture | 12 ADRs: FFI bridge, capability proxy, pod firmware, templates, background survival, positions, chrono, events, security, iOS, CI, MQTT broker | Complete |
-| Planning | 7 implementation phases (A-G) with validation criteria, 12 AC, field test plan | Complete |
-| Implementation | Code (after phase 2 completes) | Pending |
+1. ~~Research~~ -- Complete
+2. ~~Architecture~~ -- Complete
+3. ~~Planning~~ -- Complete
+4. Implementation -- ready to start
 
 ## How to resume with implementation
 
-Run `/sdlc phase-3-android-players --resume` (or equivalent) once phase 2
-is far enough along. The STATE.json records `current_phase: "planning"`,
-`phase_status: "complete"`, which tells the orchestrator to proceed to
-implementation.
+Run `/sdlc phase-3-android-players --resume`.  STATE.json records
+`current_phase: "planning"`, `phase_status: "complete"`.
 
-**What can start before phase 2 finishes:**
+**What can start now (no hardware, no phase 2 blockers):**
 - Phases A and B (event schema, single-node modes, screen templates, chrono)
-  have no phase 2 dependency.
-- Phase C (dart:ffi bridge) depends only on Phase A.
-- Phase F (I/O pod firmware) depends on Phase A and needs hardware.
+- Phase C (dart:ffi bridge) depends only on Phase A
+- Phase D (Flutter UI, Kotlin plugins) depends on B and C
 
-**What must wait for phase 2:**
-- Phase E (field-script modes, positions, controller integration) needs
-  phase 2C (field_ops API) and phase 2D (controller REST/WebSocket).
-- Phase G (field test) needs all previous phases and hardware.
+**What needs hardware:**
+- Phase F (I/O pod firmware) depends on Phase A and needs a Heltec board
+- Phase G (field test) needs all previous phases and devices
 
 ## Gate
 
 **One game mixes ESP32 and Android props without issues.**
 
-This requires:
-- At least one ESP32 Field Box running a mode
-- At least one Android phone running the prop role (with or without I/O pod)
-- Both participating in the same game via the field controller
-- Captures, scores, and events propagating correctly between both device types
-- No crashes, no lost events, no timing issues
+## Phase 3 handoff for phase 4 (interfaces the site server will consume)
+
+Phase 4's site server builds on these phase 3 interfaces:
+
+| Interface | Where | What phase 4 consumes |
+|-----------|-------|----------------------|
+| Chrono reading record | `app/lib/chrono/reading.dart` | Schema, Ed25519 signature verification, replica registry |
+| Limit templates | `app/lib/chrono/limit_templates/*.yaml` | Template format, per-field overrides |
+| Player token format | `app/lib/security/player_token.dart` | Token schema for account-based auth upgrade |
+| Position reports | `POST /api/v1/positions` | Position data model, visibility rules |
+| Replica registry | `app/lib/chrono/replica.dart` | Replica schema for the site-server database |
+| NFC tag format | HMAC-SHA256 with game key, truncated 16 bytes | Tag verification for site-server-managed games |
+| GM console extensions | `controller/console/src/` | Chrono view, position view, new mode UIs |
+| Mode events (IDs 25-26, 33-41) | `protocol/schema/events.yaml` | Event log storage, statistics, replays |
+| Field join key distribution | `protocol/join.md`, key 13 (CA fingerprint) | Site server join flow |
+| Capability proxy protocol | `protocol/vectors/capability_proxy.yaml` | Pod management in the site-server inventory |

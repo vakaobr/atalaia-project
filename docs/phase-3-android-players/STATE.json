@@ -6,7 +6,7 @@
   "review_iteration": 0,
   "failing_experts": [],
   "created_at": "2026-10-17T18:00:00Z",
-  "updated_at": "2026-10-18T10:30:00Z",
+  "updated_at": "2026-10-18T14:00:00Z",
   "artifacts": {
     "RESEARCH.md": "complete",
     "ADR.md": "complete",
@@ -14,10 +14,11 @@
     "STATUS.md": "complete"
   },
   "metadata": {
-    "description": "Phase 3 design: Android props, I/O pod, Flutter player app with roles, new game modes (Respawn, Kill Confirmed, Hold-All, Last Stand), chrono check-in. Design only -- no production code.",
+    "description": "Phase 3 design: Android props, I/O pod, Flutter player app with roles, new game modes (Kill Confirmed, Respawn, Player Check-in, Money Factory), chrono check-in. Design only -- no production code.",
     "risk_level": "Medium",
     "mode": "design-only",
     "stop_after": "planning",
-    "resume_with": "--resume to continue to implementation phase"
+    "resume_with": "--resume to continue to implementation phase",
+    "phase_2_handoff": "2026-10-18, commit 771fd90"
   }
 }
