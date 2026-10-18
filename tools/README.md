@@ -24,3 +24,5 @@ docker run --rm -v "$PWD:/src" atalaia-dev sh tools/check.sh
 ```
 
 On Windows, use `${PWD}` in PowerShell or `$(pwd -W)` in Git Bash for the volume path.
+
+`docker_sim.py`, `docker_fw.py` and `docker_console.py` keep their build caches in named Docker volumes. To run them from two checkouts at once (for example a git worktree), give each its own volumes with `ATALAIA_VOLUME_SUFFIX`, e.g. `ATALAIA_VOLUME_SUFFIX=-p3 python tools/docker_fw.py test`.

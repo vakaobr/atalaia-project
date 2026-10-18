@@ -19,6 +19,7 @@ browser or tool is an error there, never a skip.
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import subprocess
 import sys
@@ -27,7 +28,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 IMAGE = "atalaia-console-test"
 LABEL = "org.atalaia.dockerfile"
-VOLUME = "atalaia-console-build"
+# ATALAIA_VOLUME_SUFFIX keeps the build cache of two checkouts (e.g. a git worktree) apart.
+VOLUME = "atalaia-console-build" + os.environ.get("ATALAIA_VOLUME_SUFFIX", "")
 DOCKERFILE = REPO / "tools" / "dev" / "console" / "Dockerfile"
 
 

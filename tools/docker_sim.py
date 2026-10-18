@@ -19,6 +19,7 @@ For `serve`, the page is published on localhost only.
 from __future__ import annotations
 
 import hashlib
+import os
 import shlex
 import subprocess
 import sys
@@ -26,7 +27,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 IMAGE = "atalaia-dev"
-VOLUME = "atalaia-core-build"
+# ATALAIA_VOLUME_SUFFIX keeps the build cache of two checkouts (e.g. a git worktree) apart.
+VOLUME = "atalaia-core-build" + os.environ.get("ATALAIA_VOLUME_SUFFIX", "")
 LABEL = "org.atalaia.dockerfile"
 
 

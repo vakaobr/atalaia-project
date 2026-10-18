@@ -22,6 +22,7 @@ and copies the rendered screens to firmware/esp32/build-test/screens/.
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
 import subprocess
 import sys
@@ -32,7 +33,8 @@ FW = REPO / "firmware" / "esp32"
 IDF_IMAGE = "espressif/idf:v5.3.2"
 DEV_IMAGE = "atalaia-dev"
 DEV_LABEL = "org.atalaia.dockerfile"
-TEST_VOLUME = "atalaia-fw-test-build"
+# ATALAIA_VOLUME_SUFFIX keeps the build cache of two checkouts (e.g. a git worktree) apart.
+TEST_VOLUME = "atalaia-fw-test-build" + os.environ.get("ATALAIA_VOLUME_SUFFIX", "")
 
 WOKWI_BUILD = "build-wokwi"
 WOKWI_DEFAULTS = ("sdkconfig.defaults", "sdkconfig.wokwi")
