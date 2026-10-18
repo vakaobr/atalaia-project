@@ -16,6 +16,44 @@ static const uint32_t band_budgets[ATALAIA_BAND_COUNT] = {
     36000000u   /* G3: 1%   of 3600s  */
 };
 
+/* ERC/REC 70-03 Annex 1 (edition of February 2025): h1.5, h1.6, h1.7, h1.9.
+ * In the same order as atalaia_band_t; band_budgets above follows duty_ppm. */
+static const atalaia_band_info_t band_table[ATALAIA_BAND_COUNT] = {
+    {868000000u, 868600000u, 10000, 14, 25},   /* g:  1%,   25 mW  */
+    {868700000u, 869200000u, 1000, 14, 25},    /* g1: 0.1%, 25 mW  */
+    {869400000u, 869650000u, 100000, 27, 500}, /* g2: 10%,  500 mW */
+    {869700000u, 870000000u, 10000, 14, 25},   /* g3: 1%,   25 mW  */
+};
+
+const atalaia_band_info_t *atalaia_band_info(atalaia_band_t band)
+{
+    if ((int)band < 0 || (int)band >= ATALAIA_BAND_COUNT) {
+        return NULL;
+    }
+    return &band_table[band];
+}
+
+atalaia_band_t atalaia_band_of_channel(uint32_t centre_hz, uint32_t bw_hz)
+{
+    uint64_t half = bw_hz / 2u;
+    if ((uint64_t)centre_hz < half) {
+        return ATALAIA_BAND_COUNT;
+    }
+    uint64_t lo = (uint64_t)centre_hz - half;
+    uint64_t hi = (uint64_t)centre_hz + half;
+    for (int b = 0; b < ATALAIA_BAND_COUNT; b++) {
+        if (lo >= band_table[b].lo_hz && hi <= band_table[b].hi_hz) {
+            return (atalaia_band_t)b;
+        }
+    }
+    return ATALAIA_BAND_COUNT;
+}
+
+bool atalaia_channel_ok(uint32_t centre_hz)
+{
+    return atalaia_band_of_channel(centre_hz, ATALAIA_LORA_BW_HZ) != ATALAIA_BAND_COUNT;
+}
+
 void atalaia_dc_init(atalaia_duty_cycle_t *dc)
 {
     memset(dc, 0, sizeof(*dc));

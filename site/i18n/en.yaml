@@ -204,6 +204,18 @@ radio:
       everything up to the game modes; a Raspberry Pi controller leaves the radio work to a USB
       radio modem; in phase&nbsp;3 an Android phone will do the same with an I/O pod. Phones on
       the field's Wi-Fi need no LoRa radio at all.
+  channel:
+    title: Which channel, and why 869.525&nbsp;MHz
+    lead: >-
+      All of a game's traffic shares one channel. The default, 869.525&nbsp;MHz, is the centre of
+      869.4–869.65&nbsp;MHz, the only part of the European 868&nbsp;MHz band where a device may
+      transmit up to 10% of the time at up to 500&nbsp;mW. Elsewhere in 868–870&nbsp;MHz the rules
+      allow 1% of the time (0.1% on 868.7–869.2&nbsp;MHz) at 25&nbsp;mW: about a tenth of the
+      airtime, and much less range. 868.1, 868.3 and 868.5&nbsp;MHz are LoRaWAN's default
+      channels and often busy. The default is shared too: LoRaWAN gateways send some replies on
+      869.525&nbsp;MHz and Meshtastic's European default uses it, so near such users the GM can let
+      the controller listen to every legal channel for a minute and pick the quietest, draw one at
+      random, or choose by hand. The boxes then follow the chosen channel's own limits.
 
 modes:
   title: Game modes
@@ -488,9 +500,10 @@ glossary:
       with no SIM card, mobile coverage or subscription. On a typical field it reaches roughly
       <span class="nowrap">0.5–2&nbsp;km</span>, and gets through thick walls better than Wi-Fi.
       The catch: messages must be short, and each device may transmit only a small share of the
-      time. Atalaia uses the EU868 g2 sub-band (869.525&nbsp;MHz by default, 10% duty
-      cycle, 500&nbsp;mW), giving each box up to 6 minutes of airtime per hour — enough for
-      events, scores and time-sync beacons with headroom to spare. Boxes send only what changes,
+      time. Atalaia uses 869.525&nbsp;MHz by default, in the only EU868 sub-band that allows
+      a 10% duty cycle and 500&nbsp;mW, giving each box up to 6 minutes of airtime per hour —
+      enough for events, scores and time-sync beacons with headroom to spare. A field can choose
+      another channel, which allows 1% of the time or less and 25&nbsp;mW. Boxes send only what changes,
       such as “red captured B”.
   mesh:
     id: glossary-mesh
@@ -673,8 +686,9 @@ diagrams:
       Wi-Fi or Bluetooth. The design estimate of about 0.5 to 2 km on a typical outdoor field is
       still to be measured in the phase 2 field test. Relays: a box out of the controller's reach
       is heard through the other boxes, and a message is passed on at most twice by default. Rules in Europe:
-      one shared game channel, 869.525 MHz by default, up to 500 mW, and each device may transmit
-      at most 10% of the time, 6 minutes per hour.
+      one shared game channel, 869.525 MHz by default, the only part of the band that allows
+      500 mW and 10% of the time, 6 minutes per hour for each device; other channels allow 25 mW
+      and 1% or less.
     chirp:
       title: "Chirps: heard below the noise"
       sweep: a chirp sweeps across the channel
@@ -716,8 +730,8 @@ diagrams:
       hour: 1 hour
       share: Each device may transmit at most 10% of the time, 6 minutes per hour.
       text: >-
-        One shared game channel, 869.525 MHz by default, up to 500 mW, with no licence or SIM card.
-        The firmware holds messages back rather than break the limit.
+        One shared channel, 869.525 MHz by default: the only part of the band allowing 500 mW and
+        10%. Other channels: 25 mW, 1% or less. No licence or SIM card.
   skirmesh:
     title: Skirmesh-RF on different devices
     desc: >-

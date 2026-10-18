@@ -48,6 +48,14 @@ def open_serial(url: str, baudrate: int, timeout: float):
     return port
 
 
+class MeasureError(Exception):
+    """A MEASURE the modem refused or could not finish (code: modem error name or "timeout")."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
 class RadioModem:
     def __init__(
         self,
@@ -93,6 +101,10 @@ class RadioModem:
         self._missed = 0
         self._next_ping = 0.0
         self._up_event = threading.Event()
+        # One MEASURE at a time: the result (Noise or MeasureError) and its event.
+        self._measure_lock = threading.Lock()
+        self._measure_done = threading.Event()
+        self._measure_result: Any = None
 
     # --- lifecycle ----------------------------------------------------------
 
@@ -136,6 +148,42 @@ class RadioModem:
         pairs = sorted(epochs.items())
         for i in range(0, len(pairs), 60):  # 60 pairs = 241 bytes, under the 256-byte limit
             self._write(mf.CMD, mf.peer_epoch_payload(pairs[i:i + 60]))
+
+    @property
+    def can_measure(self) -> bool:
+        """The modem has a radio and its firmware knows MEASURE (IDENT "measure": true)."""
+        ident = self.ident or {}
+        return ident.get("radio") == "sx1262" and ident.get("measure") is True
+
+    def set_channel(self, channel_hz: int) -> bool:
+        """Tunes the modem (SET_CHANNEL) outside a game; CONFIGURE carries the game's channel."""
+        return self._write(mf.CMD, mf.set_channel_payload(channel_hz))
+
+    def measure(self, channel_hz: int, dwell_ms: int, cad: bool = True,
+                timeout: Optional[float] = None) -> mf.Noise:
+        """Measures the noise on a channel (MEASURE) and waits for the NOISE frame.
+
+        Raises MeasureError when the modem answers with an ERROR (no radio,
+        busy, bad parameters, radio failure), when the link is not up, or
+        after ``timeout`` seconds (default: the dwell plus 3 s).
+        """
+        payload = mf.measure_payload(channel_hz, dwell_ms, cad)
+        with self._measure_lock:
+            if self.state != UP:
+                raise MeasureError("link", f"the radio modem is {self.state}")
+            self._measure_done.clear()
+            self._measure_result = None
+            if not self._write(mf.CMD, payload):
+                raise MeasureError("link", "could not write to the radio modem")
+            wait = timeout if timeout is not None else dwell_ms / 1000 + 3.0
+            if not self._measure_done.wait(wait):
+                raise MeasureError("timeout", f"no answer to MEASURE within {wait:.1f} s")
+            result = self._measure_result
+            if isinstance(result, MeasureError):
+                raise result
+            if not isinstance(result, mf.Noise) or result.channel_hz != channel_hz:
+                raise MeasureError("bad_frame", "the modem answered for another channel")
+            return result
 
     def send_packet(self, header: Header, payload: bytes) -> bool:
         """Queues a TX frame: the modem encrypts and transmits it. False if the link is not up."""
@@ -280,9 +328,17 @@ class RadioModem:
             elif frame_type == mf.IDENT:
                 self.ident = json.loads(payload.decode("utf-8"))
                 log.info("modem: %s", self.ident)
+            elif frame_type == mf.NOISE:
+                self._measure_result = mf.decode_noise(payload)
+                self._measure_done.set()
             elif frame_type == mf.ERROR:
                 code, message = mf.decode_error(payload)
                 log.warning("modem error %s: %s", code, message)
+                if message.startswith("MEASURE"):
+                    # The answer to a MEASURE (protocol/usb-modem.md): not an alert.
+                    self._measure_result = MeasureError(code, message)
+                    self._measure_done.set()
+                    return
                 if self.on_error:
                     self.on_error(code, message)
             else:

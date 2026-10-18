@@ -25,6 +25,7 @@
 
 #include "atalaia/packet.h"
 #include "modem_framing.h"
+#include "radio/noise_stats.h"
 #include "radio/radio_protocol.h"
 
 #define MODEM_DEDUPE_SIZE      64
@@ -43,6 +44,10 @@ typedef struct {
     uint32_t (*duty_cycle_remaining_ms)(void *ctx);
     /* Monotonic milliseconds. */
     uint32_t (*now_ms)(void *ctx);
+    /* Starts a noise measurement (MEASURE); the outcome comes back through
+     * modem_on_measure_result(). Returns 0, or -1 if the radio is busy.
+     * NULL: this build cannot measure. */
+    int (*measure_start)(void *ctx, uint32_t freq_hz, uint16_t dwell_ms, bool cad);
     void *ctx;
 } modem_io_t;
 
@@ -81,6 +86,7 @@ typedef struct {
     uint32_t channel_hz;
     bool tx_used;
     uint32_t last_tx_nonce; /* highest (epoch << 16) | seq sent */
+    bool measuring;         /* a MEASURE is running */
 
     modem_dedupe_entry_t dedupe[MODEM_DEDUPE_SIZE];
     modem_counters_t count;
@@ -106,6 +112,12 @@ void modem_on_air_rx(modem_t *m, const uint8_t *pkt, size_t len, int8_t rssi, in
 
 /* Outcome of a radio_send() call: tag is the packet's seq + 1. */
 void modem_on_tx_result(modem_t *m, uint32_t tag, modem_tx_status_t status);
+
+/*
+ * Outcome of a measurement started by MEASURE: rc 0 sends a NOISE frame
+ * with *r; -2 (channel refused) and any other failure send an ERROR.
+ */
+void modem_on_measure_result(modem_t *m, int rc, const noise_result_t *r);
 
 /* Handles one decoded frame (exposed for tests). */
 void modem_handle_frame(modem_t *m, uint8_t type, const uint8_t *payload, size_t len);

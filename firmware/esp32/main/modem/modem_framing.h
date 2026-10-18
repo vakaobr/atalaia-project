@@ -41,6 +41,7 @@ typedef enum {
     MODEM_FRAME_CMD = 0x05,    /* host -> modem: command */
     MODEM_FRAME_STATUS = 0x06, /* modem -> host: JSON status (reply to every CMD) */
     MODEM_FRAME_ERROR = 0x07,  /* modem -> host: error code + message */
+    MODEM_FRAME_NOISE = 0x08,  /* modem -> host: result of a MEASURE command */
 } modem_frame_type_t;
 
 /* CMD opcodes (first payload byte of a CMD frame). */
@@ -53,7 +54,13 @@ typedef enum {
     MODEM_CMD_SET_PEER_EPOCH = 0x05, /* n x (source u16, epoch u16) */
     MODEM_CMD_CLEAR = 0x06,          /* forget the key and the game */
     MODEM_CMD_IDENT = 0x07,          /* reply IDENT */
+    MODEM_CMD_MEASURE = 0x08,        /* channel_hz u32, dwell_ms u16, flags u8 (bit 0: CAD);
+                                        reply NOISE when done */
 } modem_cmd_t;
+
+/* Payload length of MODEM_CMD_MEASURE, opcode included. */
+#define MODEM_MEASURE_LEN 8
+#define MODEM_MEASURE_CAD 0x01
 
 /* Payload length of MODEM_CMD_CONFIGURE, opcode included. */
 #define MODEM_CONFIGURE_LEN 28
@@ -78,6 +85,8 @@ typedef enum {
     MODEM_ERR_NOT_CONFIGURED = 4, /* needs CONFIGURE first */
     MODEM_ERR_RADIO = 5,          /* radio missing or refused the setting */
     MODEM_ERR_BAD_PARAMS = 6,     /* parameters out of range */
+    MODEM_ERR_BUSY = 7,           /* MEASURE: a game is configured or a measurement runs */
+    MODEM_ERR_NO_RADIO = 8,       /* no radio chip, so nothing to measure with */
 } modem_error_t;
 
 /* CRC-16/CCITT-FALSE: poly 0x1021, init 0xFFFF, no reflection, no xorout.

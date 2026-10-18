@@ -206,7 +206,7 @@ static void make_join(atalaia_join_t *j)
     memcpy(j->game_key, GAME_KEY, 16);
     j->node_id = NODE;
     j->controller_id = 0;
-    j->channel_hz = 869450000u;
+    j->channel_hz = 869475000u;
     j->max_hops = 2;
     snprintf(j->teams[0], sizeof(j->teams[0]), "red");
     snprintf(j->teams[1], sizeof(j->teams[1]), "blue");
@@ -355,7 +355,7 @@ static void test_join_play_end(void)
     CHECK(box_game_join_text(&game, text) == BOX_JOIN_OK);
     CHECK(game.phase == BOX_JOINED && box_game_active(&game));
     CHECK(flash.join_len == (int)n && memcmp(flash.join, buf, n) == 0);
-    CHECK(shell.channel == 869450000u);
+    CHECK(shell.channel == 869475000u);
     CHECK(strcmp(shell.screen, "status") == 0 && strstr(shell.screen_data, "Joined game") != NULL);
     atalaia_header_t h;
     uint8_t pl[PKT_CAP];

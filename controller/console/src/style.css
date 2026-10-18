@@ -399,6 +399,20 @@ textarea {
     border-radius: 6px;
 }
 
+.table tr.suggested td {
+    background: var(--info-bg);
+}
+
+.why summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+
+progress {
+    max-width: 100%;
+    vertical-align: middle;
+}
+
 .facts {
     display: grid;
     grid-template-columns: max-content 1fr;

@@ -489,6 +489,46 @@ need lengths, a box cannot verify a tag made with a key only the controller
 has, and a box or a standby controller also needs the channel, the relay
 clamp and the controller's id before it hears its first TIME beacon.
 
+## Amendment 3 (2026-10-18): Choosing the field's channel; the whole channel inside one sub-band
+
+**Supersedes:** in Amendment 1, "The channel is configurable per game via the CONFIG message" (CONFIG has no channel field; the channel reaches boxes in the join payload, Amendment 2) and the "Channel validation" paragraph; the open question on adaptive channel selection, in part. Section 8's sub-band table stands, with the sources and the note on its labels below.
+
+**Change:**
+
+1. **Why 869.525 MHz is the default.** It is the centre of 869.4-869.65 MHz, the only part of the European 863-870 MHz short-range band where a device may transmit up to 10% of the time at up to 500 mW ERP. Everywhere else in 868-870 MHz the limit is 25 mW ERP with 1% of the time (0.1% on 868.7-869.2 MHz): about a tenth of the airtime, and roughly 13 dB less power, so much less range. 868.1, 868.3 and 868.5 MHz are LoRaWAN's three default channels, which every LoRaWAN device in Europe implements and joins on, so they are often busy. The default is shared too: LoRaWAN uses 869.525 MHz for its RX2 receive window and Class B beacons, and Meshtastic's EU_868 default sits on the same 869.525 MHz with a 250 kHz preset, the whole sub-band. Their packets are not mistaken for the game's (the game's are encrypted and authenticated, and use another sync word), but every transmission nearby shares the airtime, which is why the GM can scan for a quieter channel.
+
+2. **The channel is a field setting.** The field controller keeps it in its store (it survives a restart; `[radio] channel_hz` is the default until the GM first chooses). From the GM console (Settings), and only while no game is live, the GM can keep 869.525 MHz, run a noise scan of the candidate channels with the USB modem ("find a quiet channel"), draw a random candidate, or pick one from the list; scan and random choices are suggestions that change nothing until the GM accepts one. The controller sends the channel to the modem (SET_CHANNEL when no game is live, CONFIGURE for a game), stores it with each game, and puts the game's channel in every join payload (key 5, `channel_hz`). A game keeps its channel until it ends. Without a USB modem or without a radio chip the scan is unavailable and the channel stays as it is. The candidate list, the scan's dwell, the quiet threshold and the random rule are decisions CH1-CH8 in `docs/review/decisions-to-review.md`.
+
+3. **The whole channel must fit in one sub-band.** A centre frequency is legal only if centre - BW/2 and centre + BW/2 both lie inside one sub-band of section 8 (edges included), where BW is the game's LoRa bandwidth, 125 kHz. A centre inside a sub-band is not enough: 869.40 MHz at 125 kHz occupies 869.3375-869.4625 MHz and spills below the sub-band. The legal centres are:
+
+   | Sub-band | Edges | Legal centres (125 kHz) |
+   |----------|-------|-------------------------|
+   | g | 868.0-868.6 MHz | 868.0625-868.5375 MHz |
+   | g1 | 868.7-869.2 MHz | 868.7625-869.1375 MHz |
+   | g2 | 869.4-869.65 MHz | 869.4625-869.5875 MHz |
+   | g3 | 869.7-870.0 MHz | 869.7625-869.9375 MHz |
+
+   The rule is applied in one place per language (`atalaia_band_of_channel()` in `core/src/duty_cycle.c`, `simulator/atalaia_sim/eu868.py`) and used everywhere a channel enters: the controller's configuration and API, the modem's CONFIGURE, SET_CHANNEL and MEASURE, the join payload (both codecs; new invalid vectors in `protocol/vectors/join.json`, and two valid vectors moved from 869.65 and 870.0 MHz to the highest legal centres), the radio HAL's `set_channel()` on boxes and modems, and the simulator's radio model.
+
+4. **The limits follow the channel.** Boxes and the USB modem take the duty-cycle budget and the TX power from the sub-band of the channel in use, not from fixed g2 values: 10% and 500 mW ERP on g2, 1% (0.1% on g1) and 25 mW ERP elsewhere, with the conducted power reduced by the front-end module's gain and the antenna gain (decision C2). Airtime is the LoRa time on air for SF7/125 kHz, tracked per sub-band over a sliding hour, so moving to another channel does not reset what was spent in a sub-band. A packet whose time on air does not fit in what is left is not sent (TX_ACK `duty_cycle`). The simulator's radio model follows the same rules. The regulations also allow listen-before-talk with adaptive frequency agility instead of a duty-cycle limit; Skirmesh-RF does not use it.
+
+5. **Measuring does not transmit.** The noise scan uses a new USB modem command, MEASURE, which listens on a channel for a given dwell and reports instantaneous RSSI statistics and LoRa channel-activity detections (`protocol/usb-modem.md`). It never puts anything on air, and the modem refuses it while a game is configured.
+
+6. **Sync word.** The SX1262 is set to the private-network LoRa sync word, register value 0x1424 (0x12 in SX127x terms), as the phase 2 radio settings intended; the first firmware wrote 0x3444, LoRaWAN's public sync word, by mistake. All Skirmesh-RF devices must use the same value.
+
+**Note on the sub-band labels.** The labels g, g1, g2 and g3 in section 8 are this project's own. ERC Recommendation 70-03 now calls these bands h1.5, h1.6, h1.7 and h1.9 (Annex 1); its older editions lettered them g1 to g4, so 869.4-869.65 MHz was "g3" there, and LoRa documents that follow the older lettering call it g3. The code keeps the project's labels; user-facing text gives the frequencies.
+
+**Sources** (all checked on 2026-10-18):
+
+- ERC Recommendation 70-03, edition of February 2025, Annex 1 (non-specific short range devices): h1.4 865-868 MHz, 25 mW e.r.p., 1% duty cycle or LBT+AFA; h1.5 868-868.6 MHz, 25 mW e.r.p., 1% or LBT+AFA; h1.6 868.7-869.2 MHz, 25 mW e.r.p., 0.1% or LBT+AFA; h1.7 869.4-869.65 MHz, 500 mW e.r.p., 10% or LBT+AFA; h1.8 869.7-870 MHz, 5 mW e.r.p., no requirement; h1.9 869.7-870 MHz, 25 mW e.r.p., 1% or LBT+AFA. <https://docdb.cept.org/download/4635>
+- ERC Recommendation 70-03, edition of February 2009, Annex 1: the older lettering g1 868.000-868.600, g2 868.700-869.200, g3 869.400-869.650, g4 869.700-870.000 MHz.
+- ETSI EN 300 220-2 V3.2.1 (2018-06), Annex B, Table B.1: the same bands, powers and duty cycles ("or polite spectrum access"), channel bandwidth "the whole band". <https://www.etsi.org/deliver/etsi_en/300200_300299/30022002/03.02.01_60/en_30022002v030201p.pdf>
+- LoRa Alliance, LoRaWAN Regional Parameters RP002-1.0.4 (2022), section 2.4 (EU863-870): Table 6, the default channels 868.10, 868.30 and 868.50 MHz (duty cycle < 1%), which every EU863-870 end-device implements; section 2.4.7, RX2 default 869.525 MHz / DR0; section 2.4.8, Class B beacon and ping-slot default 869.525 MHz.
+- Meshtastic documentation, Radio Settings: EU_868 default frequency slot centred on 869.525 MHz, band 869.40-869.65 MHz, 10% duty cycle, +27 dBm ERP; LongFast preset 250 kHz. <https://meshtastic.org/docs/overview/radio-settings/>
+- SX1261/2 LoRa sync word values (public 0x3444, private 0x1424, register 0x0740): Semtech's SX126x driver headers; checked against a secondary copy, not the datasheet itself.
+
+**Reason:** the first firmware had one fixed channel and hard-coded the g2 duty cycle and power, so a field that chose another channel (Amendment 1 allowed it) would have kept g2's 10% budget and 500 mW power on a 1%, 25 mW channel, and the channel check accepted centres whose channel spilled out of the sub-band. A field next to a LoRaWAN gateway or a Meshtastic mesh had no way to see that, or to move.
+
 ## Open questions
 
 - Per-node session keys (HKDF-derived from the game key) would limit
@@ -501,3 +541,6 @@ clamp and the controller's id before it hears its first TIME beacon.
   improves the slew algorithm or just adds noise.
 - Channel hopping currently uses a fixed round-robin. Adaptive channel
   selection based on RSSI or error rates is a future improvement.
+  (Amendment 1 replaced hopping with one shared channel per game, and
+  Amendment 3 adds a noise scan when the field's channel is chosen; moving
+  a game to another channel while it runs is still open.)

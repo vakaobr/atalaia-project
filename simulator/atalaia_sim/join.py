@@ -24,7 +24,7 @@ import hmac
 import json
 from typing import Any, Optional
 
-from . import cbor
+from . import cbor, eu868
 from .codec import CodecError, _check_value
 
 VERSION = 1
@@ -49,9 +49,8 @@ KINDS = {"node": 0, "controller": 1}
 _KIND_NAMES = {v: k for k, v in KINDS.items()}
 _NAMES = {v: k for k, v in KEYS.items()}
 
-# EU868 sub-bands g, g1, g2, g3 (RFC 0001 Amendment 1).
-SUB_BANDS = ((868_000_000, 868_600_000), (868_700_000, 869_200_000),
-             (869_400_000, 869_650_000), (869_700_000, 870_000_000))
+# EU868 sub-bands g, g1, g2, g3 (RFC 0001 Amendment 1); a channel must fit inside one (Amendment 3).
+SUB_BANDS = tuple((b.lo_hz, b.hi_hz) for b in eu868.SUB_BANDS)
 
 
 class JoinError(ValueError):
@@ -63,7 +62,8 @@ class JoinError(ValueError):
 
 
 def channel_ok(hz: int) -> bool:
-    return any(lo <= hz <= hi for lo, hi in SUB_BANDS)
+    """The whole 125 kHz channel inside one EU868 sub-band (RFC 0001 Amendment 3)."""
+    return eu868.channel_ok(hz)
 
 
 def params_json(params: dict[str, Any]) -> str:
@@ -106,7 +106,7 @@ def validate(j: dict[str, Any]) -> dict[str, Any]:
         raise JoinError("body", "node_id and controller_id must differ")
     channel = _uint("channel_hz", j["channel_hz"], 0, 0xFFFFFFFF)
     if not channel_ok(channel):
-        raise JoinError("body", "channel_hz must be inside an EU868 sub-band")
+        raise JoinError("body", "channel_hz: the 125 kHz channel must fit inside an EU868 sub-band")
     out["channel_hz"] = channel
     out["max_hops"] = _uint("max_hops", j["max_hops"], 1, 3)
     teams = j["teams"]

@@ -9,7 +9,7 @@ panel has its own coordinates (400 units wide); only the panel positions and
 heights, and the last panel, differ between the layouts.
 
 Facts: RFC 0001 (Amendment 1: one shared channel in the g2 sub-band, 10% duty
-cycle, 500 mW ERP), design spec section 10 (field profiles, SF7 to SF10,
+cycle, 500 mW ERP; Amendment 3: other channels 25 mW, 1%), design spec section 10 (field profiles, SF7 to SF10,
 0.5-2 km estimate), the radio HAL (SF7, BW125). Colours: site/style.css.
 Text that a translation changes has a data-width (and data-lines): the build
 fails if it does not fit.

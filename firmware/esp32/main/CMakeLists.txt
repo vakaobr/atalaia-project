@@ -13,6 +13,8 @@ if(CONFIG_ATALAIA_MODEM_MODE)
         "hal/board_fem.c"
         "radio/radio_task.c"
         "radio/radio_protocol.c"
+        "radio/radio_limits.c"
+        "radio/noise_stats.c"
     )
     set(ATALAIA_EMBED)
 else()
@@ -50,6 +52,8 @@ else()
         "radio/time_sync.c"
         "radio/radio_protocol.c"
         "radio/radio_nvs_esp.c"
+        "radio/radio_limits.c"
+        "radio/noise_stats.c"
         "radio/field_link.c"
         "box_game.c"
         "serial_console.c"

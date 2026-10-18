@@ -17,8 +17,16 @@ persist_game_key = false          # true: the game survives a controller restart
                                   # the key is then on the Pi's disk (see README)
 
 [radio]
-channel_hz = 869525000            # the game channel, 869.4-869.65 MHz sub-band
+# The field's channel until the GM chooses one in the console (Settings), which
+# then wins. 869.525 MHz is the centre of 869.4-869.65 MHz, the only EU868
+# sub-band with 10% duty cycle and 500 mW ERP; elsewhere in 868-870 MHz the
+# limits are 1% (0.1% on 868.7-869.2) and 25 mW, and 868.1/868.3/868.5 MHz are
+# LoRaWAN's busy default channels. The whole 125 kHz channel (centre +-62.5 kHz)
+# must fit in one sub-band: 869.4625-869.5875 MHz there (RFC 0001 Amendment 3).
+channel_hz = 869525000
 max_hops = 2
+scan_dwell_s = 60.0               # "find a quiet channel": listening time, split across channels
+quiet_threshold_dbm = -105        # quiet: 90% of the noise readings at or below this
 
 [modem]
 port = "/dev/ttyACM0"             # the USB radio modem; empty = run without a radio

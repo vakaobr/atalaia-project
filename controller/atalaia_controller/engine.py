@@ -10,6 +10,12 @@ core, and tells its listeners (WebSocket hub, MQTT bridge) what happens.
 
 Everything that changes state holds one lock; a background thread ticks
 the FieldController (TIME beacons, election) every ``tick_interval_s``.
+
+The field's radio channel is a setting kept in the store (channels.py,
+RFC 0001 Amendment 3): new games use it, it goes to the modem with
+SET_CHANNEL and CONFIGURE and to the boxes in the join payload. It can
+only change while no game is live, and the noise scan that helps choose
+it runs only then too (measuring takes the modem off the channel).
 """
 
 from __future__ import annotations
@@ -23,6 +29,7 @@ import time
 from collections import Counter
 from typing import Any, Callable, Optional
 
+from atalaia_sim import eu868
 from atalaia_sim import join as joinfmt
 from atalaia_sim.core import Core, Emitted, FieldOps, Node
 from atalaia_sim.election import LEADER, Election, priority_score
@@ -39,7 +46,7 @@ from atalaia_sim.field_controller import (
 from atalaia_sim.mode import SEPARATOR, ModeError
 from atalaia_sim.packet import Header, vf_make
 
-from . import radio_modem
+from . import channels, radio_modem
 from .config import Config
 from .modem_framing import RxPacket
 from .modes import ModeRegistry, resolve_params
@@ -227,6 +234,23 @@ class Controller:
         self._key = b""
         self.tx_status: Counter[str] = Counter()
         self._last_time_save = 0
+        self.scan: Optional[channels.Scan] = None
+        self._last_scan: Optional[dict[str, Any]] = None
+        saved_scan = store.get_setting("radio.last_scan")
+        if saved_scan:
+            try:
+                self._last_scan = json.loads(saved_scan)
+            except ValueError:
+                self._last_scan = None
+        stored = self.store.get_setting("radio.channel_hz")
+        if stored is not None and (not stored.isdigit() or not eu868.channel_ok(int(stored))):
+            log.error("the stored field channel %r is not a legal EU868 game channel; using the "
+                      "configured %d Hz", stored, cfg.channel_hz)
+            self.store.set_setting("radio.channel_source", "default")
+            self.store.set_setting("radio.channel_hz", str(cfg.channel_hz))
+        elif stored is not None and int(stored) != cfg.channel_hz:
+            log.info("field channel %s Hz (chosen in the console; radio.channel_hz = %d is the "
+                     "default)", stored, cfg.channel_hz)
 
         if modem is not None:
             modem.on_rx = self._on_rx
@@ -261,6 +285,11 @@ class Controller:
     def radio_state(self) -> str:
         return self.modem.state if self.modem is not None else "none"
 
+    def stop_scan(self) -> None:
+        if self.scan is not None:
+            self.scan.cancel()
+            self.scan.join(15)
+
     def start(self) -> None:
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, name="controller-tick", daemon=True)
@@ -268,6 +297,7 @@ class Controller:
 
     def stop(self) -> None:
         self._stop.set()
+        self.stop_scan()
         if self._thread is not None:
             self._thread.join(timeout=5)
         with self._lock:
@@ -399,6 +429,8 @@ class Controller:
         with self._lock:
             if self.game is not None:
                 raise Conflict(f"game {self.game['id']} is still live; end it first")
+            if self.scan is not None and self.scan.running:
+                raise Conflict("a channel scan is running; wait for it or cancel it first")
             name = spec.get("name", "")
             if not isinstance(name, str) or not 1 <= len(name) <= 64:
                 raise ControllerError("name: 1 to 64 characters")
@@ -456,7 +488,7 @@ class Controller:
                 "assignments": clean, "duration_ms": duration,
                 "game_seed": random.SystemRandom().randrange(1, 0xFFFFFFFF),
                 "state": "ready", "term": 1, "created_at": time.time(),
-                "node_id": self.cfg.node_id, "channel_hz": self.cfg.channel_hz,
+                "node_id": self.cfg.node_id, "channel_hz": self.field_channel,
                 "max_hops": self.cfg.max_hops, "joined": False,
             }
             self.store.create_game(game, key if self.cfg.persist_game_key else None)
@@ -464,6 +496,133 @@ class Controller:
             out = self.get_game(game_id)
             self._emit({"type": "game", "game": out})
             return out
+
+    # --- the field's radio channel (channels.py, RFC 0001 Amendment 3) ---------
+
+    @property
+    def field_channel(self) -> int:
+        """The channel new games use: the GM's choice, else radio.channel_hz from the config."""
+        stored = self.store.get_setting("radio.channel_hz")
+        return int(stored) if stored is not None else self.cfg.channel_hz
+
+    def _channel_lock_reason(self) -> Optional[str]:
+        if self.game is not None:
+            return f"game {self.game['id']} is live ({self.game['state']}); end it first"
+        if self.scan is not None and self.scan.running:
+            return "a channel scan is running"
+        return None
+
+    SCAN_UNAVAILABLE = {
+        "no_modem": ("no USB radio modem is configured (modem.port is empty), so the noise cannot "
+                     "be measured; the field keeps its channel"),
+        "modem_down": "the USB radio modem is not connected; the scan needs it",
+        "no_radio": "the USB radio modem has no radio chip, so the noise cannot be measured",
+        "old_firmware": "the USB radio modem's firmware cannot measure noise (update it)",
+    }
+
+    def _scan_unavailable(self) -> Optional[str]:
+        """Why a scan cannot run now (a key of SCAN_UNAVAILABLE), or None."""
+        if self.modem is None:
+            return "no_modem"
+        if self.modem.state != radio_modem.UP:
+            return "modem_down"
+        ident = self.modem.ident or {}
+        if ident.get("radio") != "sx1262":
+            return "no_radio"
+        if not self.modem.can_measure:
+            return "old_firmware"
+        return None
+
+    def radio_settings(self) -> dict[str, Any]:
+        """The field channel, its limits, the candidates and the last scan (GET /api/v1/radio)."""
+        with self._lock:
+            hz = self.field_channel
+            scan = self.scan.public() if self.scan is not None else self._last_scan
+            return {
+                "channel": eu868.describe(hz),
+                "source": self.store.get_setting("radio.channel_source") or "default",
+                "confirmed": self.store.get_setting("radio.channel_confirmed") == "1",
+                "set_at": float(self.store.get_setting("radio.channel_set_at") or 0) or None,
+                "default": eu868.describe(self.cfg.channel_hz),
+                "recommended_hz": eu868.DEFAULT_CHANNEL_HZ,
+                "candidates": channels.candidates(),
+                "locked": self._channel_lock_reason(),
+                "scan_unavailable": self._scan_unavailable(),
+                "scan_dwell_s": self.cfg.scan_dwell_s,
+                "quiet_threshold_dbm": self.cfg.quiet_threshold_dbm,
+                "scan": scan,
+                "game_channel_hz": (self.game.get("channel_hz") if self.game is not None else None),
+            }
+
+    def set_field_channel(self, channel_hz: Any, source: Any = "manual") -> dict[str, Any]:
+        """The GM's choice for the field (accepting the default counts): stored, sent to the modem."""
+        with self._lock:
+            reason = self._channel_lock_reason()
+            if reason:
+                raise Conflict(f"the channel cannot change now: {reason}")
+            hz = _int(channel_hz, "channel_hz")
+            if not eu868.channel_ok(hz):
+                raise ControllerError(
+                    f"channel_hz {hz}: the 125 kHz channel (centre +-62.5 kHz) must fit inside "
+                    "one EU868 sub-band")
+            if source not in channels.SOURCES:
+                raise ControllerError(f"source: one of {', '.join(channels.SOURCES)}")
+            self.store.set_setting("radio.channel_hz", str(hz))
+            self.store.set_setting("radio.channel_source", source)
+            self.store.set_setting("radio.channel_confirmed", "1")
+            self.store.set_setting("radio.channel_set_at", str(time.time()))
+            if self.modem is not None and self.modem.is_up:
+                self.modem.set_channel(hz)
+            log.info("field channel set to %d Hz (%s)", hz, source)
+        out = self.radio_settings()
+        self._emit({"type": "radio", "radio": out})
+        return out
+
+    def random_channel(self) -> dict[str, Any]:
+        """A random legal channel as a suggestion; nothing changes until the GM accepts it."""
+        return channels.random_choice()
+
+    def start_scan(self, dwell_s: Any = None) -> dict[str, Any]:
+        """Starts the noise scan of the candidates ("find a quiet channel")."""
+        with self._lock:
+            reason = self._channel_lock_reason()
+            if reason:
+                raise Conflict(f"no scan now: {reason}")
+            unavailable = self._scan_unavailable()
+            if unavailable:
+                raise Unavailable(self.SCAN_UNAVAILABLE[unavailable])
+            total = self.cfg.scan_dwell_s
+            if dwell_s is not None:
+                if isinstance(dwell_s, bool) or not isinstance(dwell_s, (int, float)) \
+                        or not 1 <= dwell_s <= 600:
+                    raise ControllerError("dwell_s: 1 to 600 seconds")
+                total = float(dwell_s)
+            assert self.modem is not None
+            modem = self.modem
+            self.scan = channels.Scan(lambda hz, ms: modem.measure(hz, ms), total,
+                                      self.cfg.quiet_threshold_dbm, self._on_scan)
+            self.scan.start()
+            return self.scan.public()
+
+    def cancel_scan(self) -> dict[str, Any]:
+        with self._lock:
+            if self.scan is None or not self.scan.running:
+                raise Conflict("no channel scan is running")
+            scan = self.scan
+        scan.cancel()
+        return scan.public()
+
+    def scan_status(self) -> Optional[dict[str, Any]]:
+        with self._lock:
+            return self.scan.public() if self.scan is not None else self._last_scan
+
+    def _on_scan(self, state: dict[str, Any]) -> None:
+        if state["state"] != "running":
+            self._last_scan = state
+            self.store.set_setting("radio.last_scan", json.dumps(state))
+            if self.modem is not None and self.modem.is_up:
+                self.modem.set_channel(self.field_channel)  # back on the field's channel
+        self._emit({"type": "radio_scan", "scan": state})
 
     def game_key(self, game_id: int) -> bytes:
         """The live game's key. Only ever leaves the controller inside a join payload."""
@@ -797,6 +956,8 @@ class Controller:
                 },
                 "tx_epoch": self.transport.epoch if self.transport else None,
                 "tx_status": dict(self.tx_status),
+                "field_channel_hz": self.field_channel,
+                "channel_confirmed": self.store.get_setting("radio.channel_confirmed") == "1",
             }
 
     def promote(self) -> dict[str, Any]:
@@ -878,6 +1039,9 @@ class Controller:
         if state == radio_modem.UP:
             self._emit({"type": "system", "kind": "radio.up"})
             with self._lock:
+                if self.fc is None and self.modem is not None and not (
+                        self.scan is not None and self.scan.running):
+                    self.modem.set_channel(self.field_channel)  # no game: listen on the field's channel
                 if self.fc is not None:
                     known = {n.node_id: n.epoch for n in self.fc.nodes.values() if n.epoch}
                     if known and self.modem is not None:

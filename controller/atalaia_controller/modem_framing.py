@@ -28,6 +28,7 @@ TX_ACK = 0x04
 CMD = 0x05
 STATUS = 0x06
 ERROR = 0x07
+NOISE = 0x08
 
 # CMD opcodes
 CMD_PING = 0x01
@@ -37,6 +38,12 @@ CMD_STATUS = 0x04
 CMD_SET_PEER_EPOCH = 0x05
 CMD_CLEAR = 0x06
 CMD_IDENT = 0x07
+CMD_MEASURE = 0x08
+
+MEASURE_CAD = 0x01
+MEASURE_DWELL_MIN_MS = 10
+MEASURE_DWELL_MAX_MS = 10_000
+NOISE_LEN = 17
 
 # TX_ACK status codes
 TX_STATUS = {
@@ -58,6 +65,8 @@ ERRORS = {
     4: "not_configured",
     5: "radio",
     6: "bad_params",
+    7: "busy",
+    8: "no_radio",
 }
 
 
@@ -144,6 +153,43 @@ def ping_payload(token: int) -> bytes:
     return struct.pack(">BI", CMD_PING, token & 0xFFFFFFFF)
 
 
+def set_channel_payload(channel_hz: int) -> bytes:
+    return struct.pack(">BI", CMD_SET_CHANNEL, channel_hz)
+
+
+def measure_payload(channel_hz: int, dwell_ms: int, cad: bool = True) -> bytes:
+    if not MEASURE_DWELL_MIN_MS <= dwell_ms <= MEASURE_DWELL_MAX_MS:
+        raise FrameError(f"dwell of {dwell_ms} ms; {MEASURE_DWELL_MIN_MS}-{MEASURE_DWELL_MAX_MS}")
+    return struct.pack(">BIHB", CMD_MEASURE, channel_hz, dwell_ms, MEASURE_CAD if cad else 0)
+
+
+@dataclass
+class Noise:
+    """A NOISE frame: the noise the modem measured on one channel (MEASURE)."""
+
+    channel_hz: int
+    dwell_ms: int
+    samples: int
+    min_dbm: int
+    mean_dbm: int
+    p50_dbm: int
+    p90_dbm: int
+    max_dbm: int
+    cad_tries: int
+    cad_detected: int
+
+    @property
+    def activity(self) -> float:
+        """The share of channel-activity detections that found a LoRa preamble."""
+        return self.cad_detected / self.cad_tries if self.cad_tries else 0.0
+
+
+def decode_noise(payload: bytes) -> Noise:
+    if len(payload) != NOISE_LEN:
+        raise FrameError(f"NOISE is {NOISE_LEN} bytes")
+    return Noise(*struct.unpack(">IHHbbbbbHH", payload))
+
+
 def peer_epoch_payload(pairs: list[tuple[int, int]]) -> bytes:
     return bytes([CMD_SET_PEER_EPOCH]) + b"".join(struct.pack(">HH", s, e) for s, e in pairs)
 
@@ -189,4 +235,4 @@ def tx_payload(header_bytes: bytes, plaintext: bytes) -> bytes:
 
 def frame_name(frame_type: int) -> Optional[str]:
     return {IDENT: "IDENT", RX: "RX", TX: "TX", TX_ACK: "TX_ACK", CMD: "CMD", STATUS: "STATUS",
-            ERROR: "ERROR"}.get(frame_type)
+            ERROR: "ERROR", NOISE: "NOISE"}.get(frame_type)

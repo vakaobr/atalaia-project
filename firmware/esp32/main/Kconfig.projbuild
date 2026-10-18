@@ -373,9 +373,14 @@ menu "Atalaia Field Box Configuration"
             int "Default game channel frequency (Hz)"
             default 869525000
             help
-                The frequency all nodes TX and RX on. Default 869.525 MHz
-                (g2 sub-band, 10% duty cycle, 500 mW ERP). Configurable per
-                game via CONFIG message. Must be within an EU868 sub-band.
+                The channel the radio listens on until a game's join payload
+                (or the modem's CONFIGURE / SET_CHANNEL) sets the field's
+                channel. Default 869.525 MHz: the centre of 869.4-869.65 MHz,
+                the only EU868 sub-band with 10% duty cycle and 500 mW ERP
+                (RFC 0001 Amendment 3). The whole 125 kHz channel must fit in
+                one EU868 sub-band; the TX power and the duty-cycle budget
+                follow that sub-band (25 mW and 1% or 0.1% elsewhere). An
+                invalid value falls back to 869525000 with an error at boot.
     endmenu
 
     # ---- Board power ----------------------------------------------------------

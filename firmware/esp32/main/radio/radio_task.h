@@ -79,6 +79,21 @@ bool radio_task_set_channel(uint32_t freq_hz);
 uint32_t radio_task_duty_remaining_ms(void);
 
 /*
+ * Asks the radio task to measure the noise on freq_hz for dwell_ms (the
+ * HAL's measure op; nothing is transmitted). The task does it before its
+ * next TX or RX, then goes back to its own channel. Returns false if a
+ * measurement is already running, the HAL cannot measure, or the task is
+ * not running. The outcome comes back through radio_task_measure_result().
+ */
+bool radio_task_measure_start(uint32_t freq_hz, uint16_t dwell_ms, bool cad);
+
+/*
+ * The outcome of the last measurement, once: true if one was waiting. *rc
+ * is the HAL's return code (0 = *out is valid).
+ */
+bool radio_task_measure_result(noise_result_t *out, int *rc);
+
+/*
  * Dequeue a received packet. Returns true if a packet was available.
  * Thread-safe (called from game_task).
  */

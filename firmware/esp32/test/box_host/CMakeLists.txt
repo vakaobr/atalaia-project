@@ -43,6 +43,7 @@ add_executable(box_host
     ${MAIN_DIR}/radio/radio_task.c
     ${MAIN_DIR}/radio/event_log.c
     ${MAIN_DIR}/radio/time_sync.c
+    ${MAIN_DIR}/radio/noise_stats.c
     ${MAIN_DIR}/hal/stub/hal_stub.c
     ${MAIN_DIR}/hal/stub/hal_radio_stub.c
 )

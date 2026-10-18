@@ -14,6 +14,15 @@
  *
  *   modem_host [--serial-port N] [--air-port N] [--air-peer N]
  *              [--epoch-window N] [--duty-budget-ms N] [--no-radio]
+ *              [--noise-floor DBM] [--noise HZ:DBM[:CAD_PCT]]... [--measure-fail HZ]
+ *
+ * The duty-cycle budget and the TX power follow the channel's EU868
+ * sub-band (radio/radio_limits.c, as on the ESP32); --duty-budget-ms caps
+ * the budget lower for tests. MEASURE answers after the asked dwell, with
+ * samples drawn around the channel's simulated level (--noise, else
+ * --noise-floor, -120 dBm by default) and CAD detections in CAD_PCT percent
+ * of the tries; --measure-fail makes a measurement of HZ fail as a radio
+ * error would.
  *
  * Port 0 picks a free port. Once listening it prints one line on stdout:
  *   READY serial=<port> air=<port>
@@ -34,6 +43,8 @@
 #include <unistd.h>
 
 #include "modem/modem.h"
+#include "radio/noise_stats.h"
+#include "radio/radio_limits.h"
 
 #define PENDING_MAX 32
 
@@ -49,8 +60,23 @@ static uint32_t pending_tag[PENDING_MAX];
 static modem_tx_status_t pending_status[PENDING_MAX];
 static int pending = 0;
 
-static uint32_t duty_budget_ms = 360000; /* g2: 10% of an hour */
-static uint32_t duty_used_ms = 0;
+/* Duty cycle and power per sub-band, as the SX1262 HAL does. */
+static radio_limits_t limits;
+
+/* Simulated noise per channel. */
+#define NOISE_MAX 32
+static uint32_t noise_hz[NOISE_MAX];
+static int noise_dbm[NOISE_MAX];
+static int noise_cad_pct[NOISE_MAX];
+static int noise_count = 0;
+static int noise_floor = -120;
+static uint32_t measure_fail_hz = 0;
+
+/* A measurement in progress: answered when its dwell has passed. */
+static bool measure_pending = false;
+static uint32_t measure_hz, measure_done_at;
+static uint16_t measure_dwell;
+static bool measure_cad;
 
 static uint32_t mono_ms(void)
 {
@@ -79,13 +105,12 @@ static bool io_radio_send(void *ctx, const uint8_t *pkt, size_t len, uint32_t ta
 {
     (void)ctx;
     if (pending >= PENDING_MAX) return false;
-    /* Same rough airtime as the ESP HAL: (len + 20) ms at SF7/BW125. */
-    uint32_t airtime = (uint32_t)len + 20u;
+    /* The packet's LoRa time on air must fit in its sub-band's budget. */
     modem_tx_status_t status = MODEM_TX_OK;
-    if (duty_used_ms + airtime > duty_budget_ms) {
+    if (!radio_limits_can_send(&limits, len, mono_ms())) {
         status = MODEM_TX_DUTY_CYCLE;
     } else {
-        duty_used_ms += airtime;
+        radio_limits_record(&limits, len, mono_ms());
         if (have_peer) {
             sendto(air_sock, pkt, len, 0, (const struct sockaddr *)&air_peer, sizeof(air_peer));
         }
@@ -99,14 +124,62 @@ static bool io_radio_send(void *ctx, const uint8_t *pkt, size_t len, uint32_t ta
 static int io_set_channel(void *ctx, uint32_t freq_hz)
 {
     (void)ctx;
-    (void)freq_hz;
-    return 0;
+    return radio_limits_set_channel(&limits, freq_hz) ? 0 : -1;
 }
 
 static uint32_t io_duty_remaining(void *ctx)
 {
     (void)ctx;
-    return duty_used_ms >= duty_budget_ms ? 0 : duty_budget_ms - duty_used_ms;
+    return radio_limits_remaining_ms(&limits, mono_ms());
+}
+
+static int io_measure_start(void *ctx, uint32_t freq_hz, uint16_t dwell_ms, bool cad)
+{
+    (void)ctx;
+    if (measure_pending) return -1;
+    measure_pending = true;
+    measure_hz = freq_hz;
+    measure_dwell = dwell_ms;
+    measure_cad = cad;
+    measure_done_at = mono_ms() + dwell_ms;
+    return 0;
+}
+
+/* The simulated measurement: one reading per millisecond of dwell around
+ * the channel's level (a deterministic +-2 dB wobble and, every 50th
+ * reading, a 10 dB spike), through the same summary code as the ESP32. */
+static void finish_measure(modem_t *m)
+{
+    int level = noise_floor;
+    int cad_pct = 0;
+    for (int i = 0; i < noise_count; i++) {
+        if (noise_hz[i] == measure_hz) {
+            level = noise_dbm[i];
+            cad_pct = noise_cad_pct[i];
+        }
+    }
+    measure_pending = false;
+    if (measure_hz == measure_fail_hz) {
+        modem_on_measure_result(m, -1, NULL);
+        return;
+    }
+    static noise_acc_t acc;
+    noise_acc_init(&acc);
+    uint32_t x = measure_hz;
+    for (uint32_t i = 0; i < measure_dwell; i++) {
+        x = x * 1103515245u + 12345u;
+        int r = level + (int)((x >> 16) % 5u) - 2;
+        if (i % 50 == 49) r += 10;
+        noise_acc_add(&acc, r);
+    }
+    if (measure_cad) {
+        uint32_t tries = measure_dwell / 100u > 0 ? measure_dwell / 100u : 1u;
+        uint32_t hits = (tries * (uint32_t)cad_pct + 50u) / 100u;
+        for (uint32_t i = 0; i < tries; i++) noise_acc_cad(&acc, i < hits);
+    }
+    noise_result_t r;
+    noise_acc_finish(&acc, measure_hz, measure_dwell, &r);
+    modem_on_measure_result(m, 0, &r);
 }
 
 static uint32_t io_now(void *ctx)
@@ -155,6 +228,9 @@ int main(int argc, char **argv)
 {
     long serial_port = 0, air_port = 0, peer_port = 0, window = 16;
     bool radio = true;
+    /* The ESP32 HAL's defaults: 14 dB FEM, 2 dBi antenna, the default channel. */
+    radio_limits_init(&limits, 14, 2);
+    radio_limits_set_channel(&limits, 869525000u);
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--serial-port") == 0) {
             serial_port = arg_value(argc, argv, &i);
@@ -165,7 +241,27 @@ int main(int argc, char **argv)
         } else if (strcmp(argv[i], "--epoch-window") == 0) {
             window = arg_value(argc, argv, &i);
         } else if (strcmp(argv[i], "--duty-budget-ms") == 0) {
-            duty_budget_ms = (uint32_t)arg_value(argc, argv, &i);
+            limits.budget_cap_us = (uint32_t)arg_value(argc, argv, &i) * 1000u;
+        } else if (strcmp(argv[i], "--noise-floor") == 0) {
+            noise_floor = (int)arg_value(argc, argv, &i);
+        } else if (strcmp(argv[i], "--measure-fail") == 0) {
+            measure_fail_hz = (uint32_t)arg_value(argc, argv, &i);
+        } else if (strcmp(argv[i], "--noise") == 0) {
+            if (i + 1 >= argc || noise_count >= NOISE_MAX) {
+                fprintf(stderr, "modem_host: --noise HZ:DBM[:CAD_PCT]\n");
+                return 2;
+            }
+            i++;
+            unsigned long hz = 0;
+            int dbm = 0, pct = 0;
+            if (sscanf(argv[i], "%lu:%d:%d", &hz, &dbm, &pct) < 2) {
+                fprintf(stderr, "modem_host: bad --noise %s\n", argv[i]);
+                return 2;
+            }
+            noise_hz[noise_count] = (uint32_t)hz;
+            noise_dbm[noise_count] = dbm;
+            noise_cad_pct[noise_count] = pct;
+            noise_count++;
         } else if (strcmp(argv[i], "--no-radio") == 0) {
             radio = false;
         } else {
@@ -195,6 +291,7 @@ int main(int argc, char **argv)
         .set_channel = io_set_channel,
         .duty_cycle_remaining_ms = io_duty_remaining,
         .now_ms = io_now,
+        .measure_start = io_measure_start,
         .ctx = NULL,
     };
     static modem_t modem;
@@ -239,5 +336,8 @@ int main(int argc, char **argv)
             modem_on_tx_result(&modem, pending_tag[i], pending_status[i]);
         }
         pending = 0;
+        if (measure_pending && (int32_t)(mono_ms() - measure_done_at) >= 0) {
+            finish_measure(&modem);
+        }
     }
 }

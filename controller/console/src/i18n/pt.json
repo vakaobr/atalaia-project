@@ -24,7 +24,8 @@
     "join": "Juntar",
     "presets": "Predefinições",
     "feed": "Registo",
-    "controller": "Controlador"
+    "controller": "Controlador",
+    "settings": "Definições"
   },
   "common": {
     "yes": "Sim",
@@ -228,5 +229,74 @@
     "offline": "Sem ligação. A voltar a ligar…",
     "winner": "Vence {team}",
     "tie": "Empate"
+  },
+  "radio": {
+    "title": "Canal de rádio do campo",
+    "channel": "Canal",
+    "band": "Sub-banda",
+    "band_range": "{lo}–{hi} MHz ({erc})",
+    "allowed": "Limites",
+    "limits": "{duty}% do tempo · {mw} mW ERP",
+    "source": "Escolhido",
+    "sources": {
+      "default": "recomendado (por omissão)",
+      "scan": "pela pesquisa de ruído",
+      "random": "ao acaso",
+      "manual": "à mão"
+    },
+    "not_chosen": "ainda não escolhido: vale o recomendado",
+    "recommended": "recomendado",
+    "low_power_warning": "Este canal só permite 25 mW e cerca de um décimo do tempo de emissão do canal recomendado: menos alcance e, com muitas caixas, as emissões podem esgotar o tempo permitido.",
+    "first_setup": "Antes do primeiro jogo, escolhe o canal de rádio do campo. Até lá fica {channel} MHz, o recomendado.",
+    "choose": "Escolher o canal",
+    "why_title": "Porquê {channel} MHz?",
+    "why_1": "É o centro da faixa 869,4–869,65 MHz, a única parte da banda europeia de 868 MHz onde um aparelho pode emitir até 10% do tempo com até 500 mW (ERP). No resto de 868–870 MHz as regras permitem 1% do tempo (0,1% em 868,7–869,2 MHz) a 25 mW: cerca de um décimo do tempo de emissão e muito menos alcance.",
+    "why_2": "868,1, 868,3 e 868,5 MHz são os canais onde começam todos os aparelhos LoRaWAN na Europa, por isso estão muitas vezes ocupados.",
+    "why_3": "O canal recomendado é partilhado: as gateways LoRaWAN enviam parte das respostas em 869,525 MHz, e a predefinição europeia do Meshtastic usa a mesma frequência. Os pacotes delas não se confundem com os do jogo (os do jogo são cifrados e usam outra palavra de sincronização), mas cada emissão por perto gasta o mesmo tempo de antena. Se houver utilizações destas perto do campo, uma pesquisa mostra se outro canal está mais calmo.",
+    "locked_game": "Há um jogo em curso: termina-o para mudar de canal.",
+    "locked_scan": "Está a decorrer uma pesquisa de ruído.",
+    "default_title": "Manter o canal recomendado",
+    "default_hint": "{channel} MHz: o máximo de tempo de emissão e de potência que as regras europeias permitem (ver acima).",
+    "keep_default": "Usar {channel} MHz (recomendado)",
+    "scan_title": "Procurar um canal calmo",
+    "scan_hint": "O modem USB escuta cada canal possível, cerca de {seconds} s no total, sem emitir, e mostra-os do mais calmo para o mais ruidoso. Nada muda até aceitares.",
+    "scan": "Procurar",
+    "scan_cancel": "Parar a pesquisa",
+    "scan_progress": "A medir {channel} MHz ({n} de {total} feitos)",
+    "scan_failed": "A pesquisa parou: {error}",
+    "scan_cancelled": "Pesquisa interrompida.",
+    "unavailable": {
+      "no_modem": "Não há modem USB configurado, por isso não há rádio para medir o ruído. O canal fica como está.",
+      "modem_down": "O modem USB não está ligado; a pesquisa precisa dele.",
+      "no_radio": "O modem USB não tem chip de rádio, por isso não consegue medir o ruído.",
+      "old_firmware": "O firmware do modem USB não sabe medir o ruído: atualiza-o."
+    },
+    "suggest": {
+      "quiet_full_power": "Sugestão: {channel} MHz, o canal de potência máxima mais calmo ({limits}).",
+      "quietest": "Sugestão: {channel} MHz, o canal mais calmo ({limits}). Os canais de 500 mW tinham mais ruído.",
+      "quietest_but_noisy": "Todos os canais têm ruído. O que tem menos é {channel} MHz ({limits})."
+    },
+    "results_caption": "Do mais calmo para o mais ruidoso. Calmo: 90% das leituras a {threshold} dBm ou menos, e pouca atividade LoRa.",
+    "p90": "Ruído (90%)",
+    "mean": "Média",
+    "activity": "Atividade LoRa",
+    "quiet": "Calmo",
+    "suggested": "sugerido",
+    "use": "Usar {channel} MHz",
+    "use_short": "Usar",
+    "random_title": "Canal ao acaso",
+    "random_hint": "Tira à sorte um dos canais possíveis. Normalmente calha um canal de 1% e 25 mW; só 869,475, 869,525 e 869,575 MHz dão 10% e 500 mW.",
+    "random": "Tirar um canal",
+    "random_got": "Saiu {channel} MHz ({limits}).",
+    "random_odds": "{full} de {pool} canais possíveis dão 500 mW.",
+    "manual_title": "Escolher da lista",
+    "apply": "Usar este canal",
+    "low_airtime_warning": "0,1% do tempo: cerca de 3,6 s de emissão por hora em cada aparelho, pouco para um jogo.",
+    "read_only": "Só a organização pode mudar o canal.",
+    "notes": {
+      "default": "recomendado",
+      "lorawan_default": "canal por omissão do LoRaWAN, muitas vezes ocupado",
+      "low_airtime": "0,1%, não recomendado"
+    }
   }
 }

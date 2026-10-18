@@ -28,6 +28,8 @@ add_executable(modem_host
     ${MAIN_DIR}/modem/modem_framing.c
     ${MAIN_DIR}/radio/radio_protocol.c
     ${MAIN_DIR}/radio/radio_task.c
+    ${MAIN_DIR}/radio/radio_limits.c
+    ${MAIN_DIR}/radio/noise_stats.c
     ${CORE_DIR}/src/packet.c
     ${CORE_DIR}/src/crypto_mbedtls.c
     ${CORE_DIR}/src/codec.c
@@ -35,6 +37,7 @@ add_executable(modem_host
     ${CORE_DIR}/src/protocol.c
     ${CORE_DIR}/src/msg_codec.c
     ${CORE_DIR}/src/version.c
+    ${CORE_DIR}/src/duty_cycle.c
 )
 target_include_directories(modem_host PRIVATE
     ${CORE_DIR}/include ${CORE_DIR}/src ${MAIN_DIR} ${MBEDTLS_INCLUDE_DIR})

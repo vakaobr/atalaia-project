@@ -5,6 +5,12 @@
 Simulates the LoRa radio layer between field nodes: packet encoding,
 random loss, jitter, flood relay, deduplication, network partitions,
 and per-node duty-cycle tracking.
+
+The duty-cycle budget and the maximum power follow the game channel's
+EU868 sub-band (eu868.py, RFC 0001 Amendment 3), as on the boxes and the
+USB modem: 10% and 500 mW ERP on 869.4-869.65 MHz, 1% (0.1% on
+868.7-869.2 MHz) and 25 mW elsewhere. Time on air uses the LoRa formula
+for SF7/BW125. A node whose budget is spent does not transmit.
 """
 
 from __future__ import annotations
@@ -25,12 +31,9 @@ from .packet import (
     vf_make,
     vf_enc,
 )
+from . import eu868
 from .protocol import MESSAGE_TYPES
 
-# Estimated airtime per byte at SF7/125 kHz (rough LoRa model, in ms).
-_AIRTIME_PER_BYTE_MS = 0.5
-# Base transmission overhead in ms (preamble, header, etc.).
-_AIRTIME_BASE_MS = 30.0
 # Delivery jitter range in ms.
 _JITTER_MIN_MS = 5
 _JITTER_MAX_MS = 50
@@ -51,7 +54,9 @@ class RadioConfig:
     game_id: int = 1             # game identifier for packet headers
     game_key: bytes = b"\x00" * KEY_SIZE  # AES-128 key (test default)
     epoch: int = 0               # current encryption epoch
-    channel_hz: int = 869525000  # single shared game channel (g2 sub-band)
+    channel_hz: int = eu868.DEFAULT_CHANNEL_HZ  # single shared game channel (g2 sub-band)
+    fem_gain_db: int = 14        # Heltec V4.3 front-end module (decision C2)
+    antenna_gain_dbi: int = 2
 
 
 # --- pending packet -----------------------------------------------------------
@@ -74,8 +79,8 @@ class DutyCycleTracker:
     """Per-node duty-cycle tracking (simplified for simulation).
 
     The budget is expressed in milliseconds of airtime allowed per
-    rolling hour (3_600_000 ms).  At 10 % duty cycle (g2 sub-band)
-    the budget is 360_000 ms/hour.
+    rolling hour (3_600_000 ms): the channel's sub-band duty cycle times
+    an hour, 360_000 ms at 10 % (g2) and 36_000 ms at 1 %.
     """
 
     HOUR_MS = 3_600_000
@@ -117,6 +122,7 @@ class RadioNode:
 
     node_id: int
     duty: DutyCycleTracker = field(default_factory=DutyCycleTracker)
+    duty_refused: int = 0  # packets not sent: the budget was spent
 
 
 # --- radio model --------------------------------------------------------------
@@ -131,6 +137,10 @@ class RadioModel:
         rng: Optional[random.Random] = None,
     ) -> None:
         self.config = config or RadioConfig()
+        self.band = eu868.band_of(self.config.channel_hz)
+        if self.band is None:
+            raise ValueError(f"channel {self.config.channel_hz} Hz: the 125 kHz channel must fit "
+                             "inside an EU868 sub-band")
         self.rng = rng or random.Random(42)
         self.nodes: dict[int, RadioNode] = {}
         self.pending: list[PendingPacket] = []
@@ -149,7 +159,8 @@ class RadioModel:
         """Register a node with the radio model."""
         if node_id in self.nodes:
             return
-        self.nodes[node_id] = RadioNode(node_id=node_id)
+        self.nodes[node_id] = RadioNode(
+            node_id=node_id, duty=DutyCycleTracker(self.band.budget_ms_per_hour))
         self.dedupe[node_id] = {}
         # By default, every new node can reach every existing node.
         for other_id in self.nodes:
@@ -198,11 +209,39 @@ class RadioModel:
             for b in node_ids[i + 1:]:
                 self._set_link_internal(a, b, True)
 
-    # --- airtime estimation ---------------------------------------------------
+    # --- airtime and limits ---------------------------------------------------
 
     def _estimate_airtime(self, packet_len: int) -> float:
-        """Estimate on-air time for a packet of *packet_len* bytes."""
-        return _AIRTIME_BASE_MS + packet_len * _AIRTIME_PER_BYTE_MS
+        """On-air time in ms of a whole packet (LoRa formula, SF7/BW125)."""
+        return eu868.airtime_ms(packet_len)
+
+    @property
+    def duty_budget_ms_per_hour(self) -> float:
+        """The channel's sub-band duty cycle times an hour."""
+        return self.band.budget_ms_per_hour
+
+    @property
+    def max_erp_dbm(self) -> int:
+        """The sub-band's ERP limit: 27 dBm (500 mW) on g2, 14 dBm (25 mW) elsewhere."""
+        return self.band.erp_dbm
+
+    @property
+    def tx_power_dbm(self) -> int:
+        """The SX1262 conducted power the boxes use on this channel (radio_power.h)."""
+        return eu868.tx_power_dbm(self.band.erp_dbm, self.config.fem_gain_db,
+                                  self.config.antenna_gain_dbi)
+
+    def _spend(self, node_id: int, packet_len: int, now_ms: int) -> bool:
+        """Records a transmission in the node's budget; False (and nothing sent) if it does not fit."""
+        node_obj = self.nodes.get(node_id)
+        if node_obj is None:
+            return True
+        airtime = self._estimate_airtime(packet_len)
+        if not node_obj.duty.can_send(airtime, now_ms):
+            node_obj.duty_refused += 1
+            return False
+        node_obj.duty.record(airtime, now_ms)
+        return True
 
     # --- send -----------------------------------------------------------------
 
@@ -248,11 +287,9 @@ class RadioModel:
         else:
             raw = header_encode(hdr) + payload
 
-        # Duty-cycle check
-        airtime = self._estimate_airtime(len(raw))
-        node_obj = self.nodes.get(from_node)
-        if node_obj is not None:
-            node_obj.duty.record(airtime, now_ms)
+        # Duty-cycle check: a node whose budget is spent stays silent.
+        if not self._spend(from_node, len(raw), now_ms):
+            return raw
 
         # Mark the sender as having seen this (source, seq) so it won't
         # process its own packet or relay it back.
@@ -366,10 +403,8 @@ class RadioModel:
                     except ImportError:
                         relay_raw = header_encode(relay_hdr) + plaintext
 
-                    airtime = self._estimate_airtime(len(relay_raw))
-                    node_obj = self.nodes.get(dest_id)
-                    if node_obj is not None:
-                        node_obj.duty.record(airtime, now_ms)
+                    if not self._spend(dest_id, len(relay_raw), now_ms):
+                        continue
 
                     for next_id in self.nodes:
                         if next_id == dest_id or next_id == pkt.from_node:

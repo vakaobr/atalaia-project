@@ -21,9 +21,10 @@ import unittest
 from support import MODEM_HOST, HostModem, config, node_packet, packet_decrypt, wait_for
 from atalaia_controller import modem_framing as mf
 from atalaia_controller.engine import Controller
-from atalaia_controller.radio_modem import UP, RadioModem
+from atalaia_controller import channels
+from atalaia_controller.radio_modem import UP, MeasureError, RadioModem
 from atalaia_controller.store import Store
-from atalaia_sim import codec
+from atalaia_sim import codec, eu868
 from atalaia_sim.packet import (Header, ack_decode, cmd_decode, hello_encode, state_encode,
                                 time_decode, time_encode, vf_ack, vf_enc, vf_make)
 from atalaia_sim.protocol import MESSAGE_TYPES
@@ -148,12 +149,122 @@ class DutyCycleAndNoRadioTests(unittest.TestCase):
             host.close()
 
     def test_duty_cycle_budget(self):
-        # 9 + 30 + 8 bytes = 47 -> 67 ms of airtime each; a 150 ms budget fits two.
-        self.assertEqual(self.run_modem("--duty-budget-ms", "150"),
+        # 9 + 30 + 8 bytes = 47 -> 92.4 ms on air at SF7/BW125; a 200 ms budget fits two.
+        self.assertEqual(self.run_modem("--duty-budget-ms", "200"),
                          [(0, "ok"), (1, "ok"), (2, "duty_cycle")])
 
     def test_no_radio(self):
         self.assertEqual({s for _, s in self.run_modem("--no-radio")}, {"no_radio"})
+
+
+@unittest.skipUnless(MODEM_HOST, "host modem not built")
+class ChannelLimitsAndMeasureTests(unittest.TestCase):
+    """The C modem's channel rule, per-sub-band budget and MEASURE (RFC 0001 Amendment 3)."""
+
+    NOISE = ("--noise", "868100000:-96", "--noise", "868300000:-117:60", "--noise", "869475000:-109",
+             "--noise", "869525000:-104", "--noise", "869850000:-114", "--noise-floor", "-100",
+             "--measure-fail", "869925000")
+
+    def start(self, *args):
+        self.host = HostModem(0, *args)
+        self.errors = []
+        self.modem = RadioModem(self.host.url, ping_interval=0.1,
+                                on_error=lambda c, m: self.errors.append((c, m)))
+        self.modem.start()
+        self.assertTrue(self.modem.wait_up(5))
+        self.assertTrue(wait_for(lambda: self.modem.ident is not None))
+
+    def tearDown(self):
+        self.modem.stop()
+        self.host.close()
+
+    def status(self):
+        before = self.modem.status
+        self.modem._write(mf.CMD, bytes([mf.CMD_STATUS]))
+        self.assertTrue(wait_for(lambda: self.modem.status is not before
+                                 and self.modem.status.get("cmd") == mf.CMD_STATUS, 3))
+        return self.modem.status
+
+    def test_budget_follows_the_channel(self):
+        self.start()
+        self.assertEqual(self.status()["duty_ms"], 360_000)    # 869.525: 10% of an hour
+        for hz, budget in ((868_100_000, 36_000), (868_800_000, 3_600), (869_850_000, 36_000),
+                           (869_475_000, 360_000)):
+            self.assertTrue(self.modem.set_channel(hz))
+            self.assertTrue(wait_for(lambda: (self.modem.status or {}).get("channel_hz") == hz, 3))
+            self.assertEqual(self.status()["duty_ms"], budget, hz)
+        # The edges: a centre inside 869.4-869.65 MHz whose channel spills over is refused.
+        for hz in (869_400_000, 869_650_000, 870_000_000):
+            self.modem.set_channel(hz)
+        self.assertTrue(wait_for(lambda: len(self.errors) == 3, 3))
+        self.assertEqual({c for c, _ in self.errors}, {"bad_params"})
+        self.assertEqual(self.status()["channel_hz"], 869_475_000)
+
+    def test_measure(self):
+        self.start(*self.NOISE)
+        self.assertTrue(self.modem.can_measure)
+        n = self.modem.measure(868_100_000, 200)
+        self.assertEqual((n.channel_hz, n.dwell_ms, n.samples), (868_100_000, 200, 200))
+        self.assertTrue(-98 <= n.p50_dbm <= -94 and -98 <= n.mean_dbm <= -93, n)
+        self.assertTrue(-88 <= n.max_dbm <= -84, n)  # the simulated 10 dB spikes
+        self.assertEqual((n.cad_tries, n.cad_detected), (2, 0))
+        busy = self.modem.measure(868_300_000, 500)
+        self.assertEqual((busy.cad_tries, busy.cad_detected), (5, 3))
+        self.assertTrue(-102 <= self.modem.measure(869_775_000, 50).p90_dbm <= -98)  # the floor
+        with self.assertRaises(MeasureError) as cm:
+            self.modem.measure(869_925_000, 50)
+        self.assertEqual(cm.exception.code, "radio")
+        # Errors: an illegal centre, and a configured game (measuring would leave its channel).
+        with self.assertRaises(MeasureError) as cm:
+            self.modem.measure(869_400_000, 50)
+        self.assertEqual(cm.exception.code, "bad_params")
+        self.modem.configure(GAME, 0, 1, 2, 869_525_000, KEY)
+        self.assertTrue(wait_for(lambda: (self.modem.status or {}).get("configured") is True, 3))
+        with self.assertRaises(MeasureError) as cm:
+            self.modem.measure(868_100_000, 50)
+        self.assertEqual(cm.exception.code, "busy")
+        self.modem.clear()
+        self.assertTrue(wait_for(lambda: (self.modem.status or {}).get("configured") is False, 3))
+        self.assertEqual(self.modem.measure(868_100_000, 20).dwell_ms, 20)
+        self.assertEqual(self.errors, [])  # MEASURE answers are not alerts
+
+    def test_no_radio(self):
+        self.start("--no-radio")
+        self.assertFalse(self.modem.can_measure)
+        self.assertEqual(self.modem.ident["measure"], False)
+        with self.assertRaises(MeasureError) as cm:
+            self.modem.measure(869_525_000, 50)
+        self.assertEqual(cm.exception.code, "no_radio")
+
+    def test_engine_scan_over_the_c_modem(self):
+        self.start(*self.NOISE)
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = config(tmp, port=self.host.url, scan_dwell_s=1.1)
+            store = Store(cfg.db_path)
+            ctrl = Controller(cfg, store, modem=self.modem)
+            try:
+                ctrl.start_scan()
+                self.assertTrue(wait_for(lambda: ctrl.scan_status()["state"] != "running", 10))
+                scan = ctrl.scan_status()
+                self.assertEqual(scan["state"], "failed")  # --measure-fail on 869.925, the last one
+                self.assertEqual(scan["measured"], 10)
+                ranked = [r["channel_hz"] for r in scan["results"]]
+                self.assertEqual(ranked[-1], 868_300_000)  # LoRa activity: last
+                self.assertLess(ranked.index(869_850_000), ranked.index(869_475_000))
+                # Without the failing channel the scan completes and suggests 869.475 MHz:
+                # the quietest full-power channel, at or below -105 dBm.
+                ctrl.scan = channels.Scan(lambda hz, ms: self.modem.measure(hz, ms), 1.0, -105,
+                                          ctrl._on_scan,
+                                          channels=[h for h in eu868.scan_candidates() if h != 869_925_000])
+                ctrl.scan.start()
+                self.assertTrue(wait_for(lambda: ctrl.scan_status()["state"] == "done", 10))
+                self.assertEqual(ctrl.scan_status()["suggestion"],
+                                 {"channel_hz": 869_475_000, "reason": "quiet_full_power"})
+                ctrl.set_field_channel(869_475_000, "scan")
+                self.assertTrue(wait_for(lambda: self.status()["channel_hz"] == 869_475_000, 3))
+            finally:
+                ctrl.stop()
+                store.close()
 
 
 @unittest.skipUnless(MODEM_HOST, "host modem not built")

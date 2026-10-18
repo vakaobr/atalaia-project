@@ -35,6 +35,38 @@ typedef struct {
     atalaia_dc_band_t bands[ATALAIA_BAND_COUNT];
 } atalaia_duty_cycle_t;
 
+/*
+ * The EU868 sub-bands a game channel may use, as in ERC Recommendation
+ * 70-03 Annex 1 (h1.5, h1.6, h1.7, h1.9) and ETSI EN 300 220-2 V3.2.1
+ * Table B.1. The labels g, g1, g2, g3 are this project's own (RFC 0001
+ * section 8); the older ERC lettering called 869.4-869.65 MHz "g3".
+ * See RFC 0001 Amendment 3.
+ */
+#define ATALAIA_LORA_BW_HZ 125000u /* every game uses SF7 / 125 kHz (RFC 0001) */
+
+typedef struct {
+    uint32_t lo_hz;    /* lower edge */
+    uint32_t hi_hz;    /* upper edge */
+    uint32_t duty_ppm; /* duty-cycle limit in parts per million: 10000 = 1% */
+    int8_t erp_dbm;    /* ERP limit: 14 dBm = 25 mW, 27 dBm = 500 mW */
+    uint16_t erp_mw;   /* the same limit in mW */
+} atalaia_band_info_t;
+
+/* The table entry of a band (NULL for ATALAIA_BAND_COUNT or out of range). */
+const atalaia_band_info_t *atalaia_band_info(atalaia_band_t band);
+
+/*
+ * The sub-band that holds a channel of the given bandwidth, or
+ * ATALAIA_BAND_COUNT if none does. The whole channel must fit: centre -
+ * bw/2 and centre + bw/2 both inside one sub-band (its edges included). A
+ * centre inside a sub-band whose channel spills over the edge (869.40 MHz
+ * at 125 kHz) is refused.
+ */
+atalaia_band_t atalaia_band_of_channel(uint32_t centre_hz, uint32_t bw_hz);
+
+/* True if a game channel (125 kHz) fits inside one EU868 sub-band. */
+bool atalaia_channel_ok(uint32_t centre_hz);
+
 /* Initialises all bands with their EU868 budgets. */
 void atalaia_dc_init(atalaia_duty_cycle_t *dc);
 

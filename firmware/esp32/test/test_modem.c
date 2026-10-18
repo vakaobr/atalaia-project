@@ -35,6 +35,12 @@ typedef struct {
     uint32_t channel;
     int channel_calls;
     uint32_t now;
+    /* MEASURE requests the modem passed on. */
+    int measures;
+    uint32_t measure_hz;
+    uint16_t measure_dwell;
+    bool measure_cad;
+    int measure_rc; /* what measure_start answers */
 } fake_io_t;
 
 static fake_io_t io_state;
@@ -86,6 +92,17 @@ static uint32_t fake_now(void *ctx)
     return ((fake_io_t *)ctx)->now;
 }
 
+static int fake_measure(void *ctx, uint32_t hz, uint16_t dwell_ms, bool cad)
+{
+    fake_io_t *f = (fake_io_t *)ctx;
+    if (f->measure_rc != 0) return f->measure_rc;
+    f->measures++;
+    f->measure_hz = hz;
+    f->measure_dwell = dwell_ms;
+    f->measure_cad = cad;
+    return 0;
+}
+
 static modem_t modem;
 
 static void setup(bool radio, uint16_t window)
@@ -99,6 +116,7 @@ static void setup(bool radio, uint16_t window)
         .set_channel = fake_channel,
         .duty_cycle_remaining_ms = fake_duty,
         .now_ms = fake_now,
+        .measure_start = fake_measure,
         .ctx = &io_state,
     };
     modem_init(&modem, &io, &atalaia_crypto_test_stub, "test-1.0", radio, window);
@@ -277,6 +295,161 @@ static void test_configure_validation(void)
     put32(ch + 1, 868100000);
     host_send(MODEM_FRAME_CMD, ch, sizeof(ch));
     CHECK(status_has("\"channel_hz\":868100000"));
+
+    /* Centres inside a sub-band whose 125 kHz channel spills over its edge. */
+    static const uint32_t spill[] = {869400000u, 869650000u, 868000000u, 868600000u,
+                                     869700000u, 870000000u, 869587501u};
+    for (size_t i = 0; i < sizeof(spill) / sizeof(spill[0]); i++) {
+        clear_out();
+        put32(ch + 1, spill[i]);
+        host_send(MODEM_FRAME_CMD, ch, sizeof(ch));
+        e = last_of(MODEM_FRAME_ERROR);
+        CHECK(e >= 0 && io_state.payload[e][0] == MODEM_ERR_BAD_PARAMS);
+        CHECK(last_of(MODEM_FRAME_STATUS) < 0);
+        clear_out();
+        configure(0x1234, 0, 1, 2, spill[i], KEY);
+        e = last_of(MODEM_FRAME_ERROR);
+        CHECK(e >= 0 && io_state.payload[e][0] == MODEM_ERR_BAD_PARAMS);
+    }
+    CHECK(io_state.channel == 868100000);
+    /* The edges themselves: the lowest and highest centres of g2. */
+    clear_out();
+    put32(ch + 1, 869462500u);
+    host_send(MODEM_FRAME_CMD, ch, sizeof(ch));
+    CHECK(status_has("\"channel_hz\":869462500"));
+    put32(ch + 1, 869587500u);
+    host_send(MODEM_FRAME_CMD, ch, sizeof(ch));
+    CHECK(status_has("\"channel_hz\":869587500"));
+}
+
+static void measure_cmd(uint32_t hz, uint16_t dwell, uint8_t flags)
+{
+    uint8_t p[MODEM_MEASURE_LEN] = {MODEM_CMD_MEASURE};
+    put32(p + 1, hz);
+    put16(p + 5, dwell);
+    p[7] = flags;
+    host_send(MODEM_FRAME_CMD, p, sizeof(p));
+}
+
+static int last_error_code(void)
+{
+    int e = last_of(MODEM_FRAME_ERROR);
+    return e < 0 ? -1 : io_state.payload[e][0];
+}
+
+static void test_measure(void)
+{
+    setup(true, 16);
+    char json[MODEM_FRAME_PAYLOAD_MAX + 1];
+    modem_send_ident(&modem);
+    memcpy(json, io_state.payload[0], io_state.len[0]);
+    json[io_state.len[0]] = '\0';
+    CHECK(strstr(json, "\"measure\":true") != NULL);
+
+    /* Started: no reply until the result comes. */
+    clear_out();
+    measure_cmd(868300000u, 5000, MODEM_MEASURE_CAD);
+    CHECK(io_state.frames == 0);
+    CHECK(io_state.measures == 1 && io_state.measure_hz == 868300000u);
+    CHECK(io_state.measure_dwell == 5000 && io_state.measure_cad);
+    uint8_t status = MODEM_CMD_STATUS;
+    host_send(MODEM_FRAME_CMD, &status, 1);
+    CHECK(status_has("\"measuring\":true"));
+
+    /* While it runs: a second MEASURE, CONFIGURE and SET_CHANNEL are refused. */
+    clear_out();
+    measure_cmd(868100000u, 100, 0);
+    CHECK(last_error_code() == MODEM_ERR_BUSY && io_state.measures == 1);
+    clear_out();
+    configure(0x1234, 0, 1, 2, 869525000, KEY);
+    CHECK(last_error_code() == MODEM_ERR_BUSY && !modem.configured);
+    clear_out();
+    uint8_t ch[5] = {MODEM_CMD_SET_CHANNEL};
+    put32(ch + 1, 868100000u);
+    host_send(MODEM_FRAME_CMD, ch, sizeof(ch));
+    CHECK(last_error_code() == MODEM_ERR_BUSY);
+
+    /* The result: one NOISE frame with the summary, big-endian. */
+    clear_out();
+    noise_result_t r = {.channel_hz = 868300000u,
+                        .dwell_ms = 5000,
+                        .samples = 4990,
+                        .min_dbm = -121,
+                        .mean_dbm = -112,
+                        .p50_dbm = -114,
+                        .p90_dbm = -103,
+                        .max_dbm = -80,
+                        .cad_tries = 49,
+                        .cad_detected = 3};
+    modem_on_measure_result(&modem, 0, &r);
+    CHECK(io_state.frames == 1 && io_state.type[0] == MODEM_FRAME_NOISE);
+    CHECK(io_state.len[0] == NOISE_RESULT_LEN);
+    const uint8_t *n = io_state.payload[0];
+    CHECK(n[0] == 0x33 && n[1] == 0xC1 && n[2] == 0x34 && n[3] == 0xE0); /* 868300000 */
+    CHECK(n[4] == 0x13 && n[5] == 0x88);                                 /* 5000 ms */
+    CHECK(n[6] == 0x13 && n[7] == 0x7E);                                 /* 4990 samples */
+    CHECK((int8_t)n[8] == -121 && (int8_t)n[9] == -112 && (int8_t)n[10] == -114);
+    CHECK((int8_t)n[11] == -103 && (int8_t)n[12] == -80);
+    CHECK(n[13] == 0 && n[14] == 49 && n[15] == 0 && n[16] == 3);
+    CHECK(!modem.measuring);
+    /* A late duplicate result is ignored. */
+    modem_on_measure_result(&modem, 0, &r);
+    CHECK(io_state.frames == 1);
+
+    /* A radio failure and a refused channel come back as ERROR. */
+    measure_cmd(869850000u, 10, 0);
+    clear_out();
+    modem_on_measure_result(&modem, -1, NULL);
+    CHECK(last_error_code() == MODEM_ERR_RADIO);
+    measure_cmd(869850000u, 10, 0);
+    clear_out();
+    modem_on_measure_result(&modem, -2, NULL);
+    CHECK(last_error_code() == MODEM_ERR_BAD_PARAMS);
+
+    /* Bad parameters: an illegal channel or edge spill, a dwell out of range, a short frame. */
+    int before = io_state.measures;
+    clear_out();
+    measure_cmd(869400000u, 100, 0);
+    CHECK(last_error_code() == MODEM_ERR_BAD_PARAMS);
+    measure_cmd(915000000u, 100, 0);
+    CHECK(last_error_code() == MODEM_ERR_BAD_PARAMS);
+    measure_cmd(869525000u, 9, 0);
+    CHECK(last_error_code() == MODEM_ERR_BAD_PARAMS);
+    measure_cmd(869525000u, 10001, 0);
+    CHECK(last_error_code() == MODEM_ERR_BAD_PARAMS);
+    uint8_t shorty[3] = {MODEM_CMD_MEASURE, 1, 2};
+    host_send(MODEM_FRAME_CMD, shorty, sizeof(shorty));
+    CHECK(last_error_code() == MODEM_ERR_BAD_FRAME);
+    CHECK(io_state.measures == before);
+
+    /* The radio task could not take it. */
+    io_state.measure_rc = -1;
+    clear_out();
+    measure_cmd(869525000u, 100, 0);
+    CHECK(last_error_code() == MODEM_ERR_BUSY && !modem.measuring);
+    io_state.measure_rc = 0;
+
+    /* Not during a game: measuring would take the radio off the game channel. */
+    configure(0x1234, 0, 1, 2, 869525000, KEY);
+    clear_out();
+    measure_cmd(868100000u, 100, 0);
+    CHECK(last_error_code() == MODEM_ERR_BUSY && io_state.measures == before);
+    uint8_t clear_cmd = MODEM_CMD_CLEAR;
+    host_send(MODEM_FRAME_CMD, &clear_cmd, 1);
+    clear_out();
+    measure_cmd(868100000u, 100, 0);
+    CHECK(io_state.frames == 0 && io_state.measures == before + 1);
+
+    /* No radio chip (the Wokwi case): ERROR no_radio, nothing started. */
+    setup(false, 16);
+    modem_send_ident(&modem);
+    memcpy(json, io_state.payload[0], io_state.len[0]);
+    json[io_state.len[0]] = '\0';
+    CHECK(strstr(json, "\"measure\":false") != NULL);
+    measure_cmd(869525000u, 100, 0);
+    CHECK(last_error_code() == MODEM_ERR_NO_RADIO && io_state.measures == 0);
+    int e = last_of(MODEM_FRAME_ERROR);
+    CHECK(memcmp(io_state.payload[e] + 1, "MEASURE", 7) == 0);
 }
 
 static void test_tx_encrypts_and_acks(void)
@@ -541,4 +714,5 @@ void run_modem_tests(void)
     test_rx_drops_foreign_and_forged();
     test_rx_epoch_window();
     test_clear_forgets_the_game();
+    test_measure();
 }

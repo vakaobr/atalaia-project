@@ -21,6 +21,20 @@ static QueueHandle_t tx_queue;
 static QueueHandle_t rx_queue;
 static QueueHandle_t result_queue;
 static QueueHandle_t channel_queue; /* length 1: the latest requested channel */
+static QueueHandle_t measure_queue; /* length 1: a measurement request */
+static QueueHandle_t measure_done;  /* length 1: its outcome */
+static volatile bool measuring;
+
+typedef struct {
+    uint32_t freq_hz;
+    uint16_t dwell_ms;
+    bool cad;
+} measure_req_t;
+
+typedef struct {
+    int rc;
+    noise_result_t result;
+} measure_out_t;
 static volatile uint32_t duty_remaining_ms;
 static const hal_t *radio_hal;
 
@@ -39,13 +53,29 @@ static void radio_task_loop(void *arg)
         }
         duty_remaining_ms = radio_hal->radio->duty_cycle_remaining_ms();
 
+        /* A noise measurement (USB modem MEASURE): listens only, then back
+         * to the game channel inside the HAL. */
+        measure_req_t req;
+        if (xQueueReceive(measure_queue, &req, 0) == pdTRUE) {
+            measure_out_t out = {.rc = -1};
+            memset(&out.result, 0, sizeof(out.result));
+            out.rc = radio_hal->radio->measure(req.freq_hz, req.dwell_ms, req.cad, &out.result);
+            xQueueOverwrite(measure_done, &out);
+            measuring = false;
+        }
+
         /* Check for outbound packets. */
         radio_tx_msg_t tx_msg;
         if (xQueueReceive(tx_queue, &tx_msg, 0) == pdTRUE) {
             radio_tx_status_t status = RADIO_TX_RESULT_OK;
             if (radio_hal->radio->duty_cycle_remaining_ms() > 0) {
                 int rc = radio_hal->radio->send(tx_msg.data, tx_msg.len);
-                if (rc != 0) {
+                if (rc == -3) {
+                    /* This packet's time on air does not fit in what is left. */
+                    ESP_LOGW(TAG, "TX skipped: duty-cycle budget too small for %u bytes",
+                             (unsigned)tx_msg.len);
+                    status = RADIO_TX_RESULT_DUTY_CYCLE;
+                } else if (rc != 0) {
                     ESP_LOGW(TAG, "TX failed (%d)", rc);
                     status = RADIO_TX_RESULT_ERROR;
                 }
@@ -87,6 +117,8 @@ void radio_task_start(const hal_t *hal)
     rx_queue = xQueueCreate(RADIO_RX_QUEUE_LEN, sizeof(radio_rx_msg_t));
     result_queue = xQueueCreate(RADIO_TX_RESULT_QUEUE_LEN, sizeof(radio_tx_result_t));
     channel_queue = xQueueCreate(1, sizeof(uint32_t));
+    measure_queue = xQueueCreate(1, sizeof(measure_req_t));
+    measure_done = xQueueCreate(1, sizeof(measure_out_t));
     duty_remaining_ms = radio_hal->radio->duty_cycle_remaining_ms();
     xTaskCreatePinnedToCore(radio_task_loop, "radio", 4096, NULL, 3, NULL, 0);
 }
@@ -127,6 +159,31 @@ bool radio_task_set_channel(uint32_t freq_hz)
 uint32_t radio_task_duty_remaining_ms(void)
 {
     return duty_remaining_ms;
+}
+
+bool radio_task_measure_start(uint32_t freq_hz, uint16_t dwell_ms, bool cad)
+{
+    if (measure_queue == NULL || radio_hal == NULL || radio_hal->radio->measure == NULL ||
+        measuring) {
+        return false;
+    }
+    measure_req_t req = {.freq_hz = freq_hz, .dwell_ms = dwell_ms, .cad = cad};
+    measuring = true;
+    if (xQueueSend(measure_queue, &req, 0) != pdTRUE) {
+        measuring = false;
+        return false;
+    }
+    return true;
+}
+
+bool radio_task_measure_result(noise_result_t *out, int *rc)
+{
+    if (measure_done == NULL || out == NULL || rc == NULL) return false;
+    measure_out_t got;
+    if (xQueueReceive(measure_done, &got, 0) != pdTRUE) return false;
+    *out = got.result;
+    *rc = got.rc;
+    return true;
 }
 
 bool radio_task_recv(radio_rx_msg_t *msg)
@@ -173,6 +230,21 @@ bool radio_task_set_channel(uint32_t freq_hz)
 uint32_t radio_task_duty_remaining_ms(void)
 {
     return 0;
+}
+
+bool radio_task_measure_start(uint32_t freq_hz, uint16_t dwell_ms, bool cad)
+{
+    (void)freq_hz;
+    (void)dwell_ms;
+    (void)cad;
+    return false;
+}
+
+bool radio_task_measure_result(noise_result_t *out, int *rc)
+{
+    (void)out;
+    (void)rc;
+    return false;
 }
 
 bool radio_task_recv(radio_rx_msg_t *msg)

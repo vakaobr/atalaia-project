@@ -53,16 +53,32 @@ ESP-IDF drivers live in `main/hal/esp/`; stubs for Linux testing in
 
 The SX1262 LoRa radio driver (`main/hal/esp/hal_esp_radio.c`) uses
 SPI3_HOST (GPIO 8-14: NSS, SCK, MOSI, MISO, RST, BUSY, DIO1).
-EU868 band, SF7/BW125, single shared game channel (default 869.525 MHz
-in the g2 sub-band, 10% duty cycle, 500 mW ERP).  The channel is
-configurable per game via CONFIG message
-(`CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ` in Kconfig).  Neighbouring
-games use different channels within the sub-band or in other sub-bands.
+EU868 band, SF7/BW125, single shared game channel: the field's channel,
+which a box gets in its join payload and the modem with CONFIGURE or
+SET_CHANNEL (`CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ` in Kconfig until
+then). The default, 869.525 MHz, is the centre of 869.4-869.65 MHz, the
+only EU868 sub-band with 10% duty cycle and 500 mW ERP; the GM can choose
+another one in the controller's console (RFC 0001 Amendment 3). The whole
+125 kHz channel must fit in one sub-band, so `set_channel()` refuses a
+centre such as 869.40 MHz whose channel spills over an edge.
 
-The FEM (front-end module) on the Heltec V4.3 provides ~14 dB of gain.
-TX power is calculated by `radio_power.h` to comply with EU868 g2 ERP
-limits (27 dBm ERP), accounting for FEM and antenna gain (Kconfig
-`ATALAIA_RADIO_FEM_GAIN_DB` and `ATALAIA_RADIO_ANTENNA_GAIN_DBI`).
+The duty-cycle budget and the TX power follow the channel's sub-band
+(`main/radio/radio_limits.c`): 10% of a sliding hour and 500 mW ERP on
+869.4-869.65 MHz, 1% (0.1% on 868.7-869.2 MHz) and 25 mW ERP elsewhere,
+counted per sub-band with the LoRa time on air of each packet; a packet
+that does not fit in what is left is not sent. The FEM (front-end module)
+on the Heltec V4.3 provides ~14 dB of gain; `radio_power.h` turns the
+sub-band's ERP limit into the SX1262's conducted power, accounting for
+the FEM and antenna gain (Kconfig `ATALAIA_RADIO_FEM_GAIN_DB` and
+`ATALAIA_RADIO_ANTENNA_GAIN_DBI`): 13 dBm on 869.4-869.65 MHz and 0 dBm
+elsewhere with the defaults. The LoRa sync word is the private-network
+value 0x1424.
+
+`measure()` listens to a channel without transmitting, reading the
+instantaneous RSSI about once a millisecond and running a LoRa
+channel-activity detection every 100 ms, and returns the summary of
+`main/radio/noise_stats.c`: the USB modem's MEASURE command, which the
+controller's "find a quiet channel" uses. Not yet checked on a real board.
 
 DIO1 drives an ISR-based semaphore for TX_DONE/RX_DONE/TIMEOUT.
 The init function probes the SX1262 before configuring FEM GPIOs; if
@@ -146,7 +162,9 @@ the Field Box shell: the radio HAL and radio task, plus a serial task
 that moves the frames of [protocol/usb-modem.md](../../protocol/usb-modem.md)
 between the USB-Serial-JTAG port and the radio. The modem encrypts and
 decrypts with AES-CCM (mbedtls, hardware AES), dedupes flood copies,
-enforces the duty cycle, and keeps the game key in RAM only; it has no
+enforces the duty cycle of the channel's sub-band, measures the noise on
+a channel when asked (MEASURE, only while no game is configured), and
+keeps the game key in RAM only; it has no
 Lua, screens or presets (~280 KB image). The log console stays on UART0
 only, so it never mixes with the frames, and the task watchdog reboots a
 hung modem. `CONFIG_ATALAIA_MODEM_LINK_UART0` switches the link to UART0

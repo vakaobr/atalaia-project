@@ -5,8 +5,11 @@
  * SX1262 LoRa radio driver for the Heltec WiFi LoRa 32 V4 (V4.3 with the
  * KCT8103L front-end module, or V4.2 with the GC1109: Kconfig "Board
  * revision"). EU868 band, SF7/BW125, single shared game channel (default
- * 869.525 MHz, g2 sub-band, 10% duty cycle, 500 mW ERP).
- * FEM gain (~14 dB) is accounted for in the TX power setting.
+ * 869.525 MHz, g2 sub-band, 10% duty cycle, 500 mW ERP). The TX power and
+ * the duty-cycle budget follow the sub-band of the channel in use
+ * (radio/radio_limits.c, RFC 0001 Amendment 3): 25 mW ERP and 1% (or 0.1%)
+ * outside 869.4-869.65 MHz. FEM gain (~14 dB) and antenna gain are
+ * accounted for in the TX power setting (decision C2).
  *
  * The FEM is powered (its LDO on GPIO 7, its chip enable on GPIO 2, and
  * the revision's mode pin) only after the SX1262 answers its probe;
@@ -22,7 +25,8 @@
 
 #include "../board_fem.h"
 #include "../hal_radio.h"
-#include "../../radio/radio_power.h"
+#include "../../radio/noise_stats.h"
+#include "../../radio/radio_limits.h"
 
 #include <stdint.h>
 #include <string.h>
@@ -91,17 +95,19 @@ static void fem_power_off(void)
 #endif
 
 /* LoRa parameters: SF7, BW125, CR4/5. */
-#define LORA_SF        7
-#define LORA_BW_HZ     125000
-#define LORA_CR        1 /* 4/5 */
-#define LORA_PREAMBLE  8
-#define LORA_SYNC_WORD 0x3444 /* private network */
+#define LORA_SF       7
+#define LORA_BW_HZ    125000
+#define LORA_CR       1 /* 4/5 */
+#define LORA_PREAMBLE 8
+/* The SX126x private-network sync word (0x1424; LoRaWAN's public one is
+ * 0x3444), so LoRaWAN gateways and devices sharing a channel do not
+ * demodulate game packets, nor the boxes theirs. ADR-P2's radio settings
+ * chose "private"; earlier builds wrote 0x3444 by mistake. */
+#define LORA_SYNC_WORD 0x1424
 
-/* EU868 g2-band: 27 dBm ERP = 500 mW.  Conducted power accounts for
- * the FEM gain and the antenna gain (see radio_power.h).
- * With FEM=14 dB and antenna=2 dBi: (27*100+215 - 14*100 - 2*100)/100 = 13 dBm. */
-#define TX_POWER_DBM                                                                               \
-    atalaia_eu868_tx_power_dbm(ATALAIA_EU868_G2_ERP_LIMIT_DBM, FEM_GAIN_DB, ANTENNA_GAIN_DBI)
+/* The conducted TX power comes from the channel's sub-band (radio_limits):
+ * with FEM=14 dB and antenna=2 dBi, 13 dBm on 869.4-869.65 MHz (500 mW ERP)
+ * and 0 dBm elsewhere (25 mW ERP). */
 
 /* SX1262 commands. */
 #define SX_CMD_SET_SLEEP            0x84
@@ -129,28 +135,25 @@ static void fem_power_off(void)
 #define SX_CMD_CALIBRATE            0x89
 #define SX_CMD_SET_REGULATOR_MODE   0x96
 #define SX_CMD_SET_PA_CONFIG        0x95
+#define SX_CMD_SET_CAD              0xC5
+#define SX_CMD_SET_CAD_PARAMS       0x88
 
 /* IRQ masks. */
-#define SX_IRQ_TX_DONE (1 << 0)
-#define SX_IRQ_RX_DONE (1 << 1)
-#define SX_IRQ_TIMEOUT (1 << 9)
-#define SX_IRQ_ALL     0x03FF
+#define SX_IRQ_TX_DONE      (1 << 0)
+#define SX_IRQ_RX_DONE      (1 << 1)
+#define SX_IRQ_CAD_DONE     (1 << 7)
+#define SX_IRQ_CAD_DETECTED (1 << 8)
+#define SX_IRQ_TIMEOUT      (1 << 9)
+#define SX_IRQ_ALL          0x03FF
 
 /* ---- State --------------------------------------------------------------- */
 
 static spi_device_handle_t spi_handle;
 static SemaphoreHandle_t dio1_sem;
 
-/* Duty-cycle tracking: 60-bucket sliding window per sub-band.
- * g2 sub-band (869.4-869.65 MHz, 10% = 360 s/h). */
-#define DC_BUCKETS   60
-#define DC_WINDOW_MS (3600U * 1000U)
-#define DC_BUDGET_US (360000U * 1000U)
-
-static uint32_t dc_buckets[DC_BUCKETS];
-static uint32_t dc_used_us;
-static uint32_t dc_current_bucket;
-static uint32_t dc_last_update_ms;
+/* The channel in use, its sub-band's TX power and the per-sub-band airtime
+ * of the last hour (60-bucket sliding window, core duty_cycle.c). */
+static radio_limits_t limits;
 
 /* ---- SPI helpers --------------------------------------------------------- */
 
@@ -212,43 +215,6 @@ static void IRAM_ATTR dio1_isr(void *arg)
     if (higher) portYIELD_FROM_ISR();
 }
 
-/* ---- Duty-cycle tracking ------------------------------------------------- */
-
-static void dc_tick(uint32_t now_ms)
-{
-    if (dc_last_update_ms == 0) {
-        dc_last_update_ms = now_ms;
-        return;
-    }
-    uint32_t elapsed = now_ms - dc_last_update_ms;
-    uint32_t bucket_ms = DC_WINDOW_MS / DC_BUCKETS; /* 60 s */
-    while (elapsed >= bucket_ms) {
-        dc_current_bucket = (dc_current_bucket + 1) % DC_BUCKETS;
-        dc_used_us -= dc_buckets[dc_current_bucket];
-        dc_buckets[dc_current_bucket] = 0;
-        elapsed -= bucket_ms;
-        dc_last_update_ms += bucket_ms;
-    }
-}
-
-static void dc_record(uint32_t airtime_us, uint32_t now_ms)
-{
-    dc_tick(now_ms);
-    dc_buckets[dc_current_bucket] += airtime_us;
-    dc_used_us += airtime_us;
-}
-
-/* ---- EU868 channel validation -------------------------------------------- */
-
-/* Returns true if freq_hz is within an EU868 sub-band. */
-static bool eu868_channel_valid(uint32_t freq_hz)
-{
-    return (freq_hz >= 868000000 && freq_hz <= 868600000) || /* g */
-           (freq_hz >= 868700000 && freq_hz <= 869200000) || /* g1 */
-           (freq_hz >= 869400000 && freq_hz <= 869650000) || /* g2 */
-           (freq_hz >= 869700000 && freq_hz <= 870000000);   /* g3 */
-}
-
 /* ---- Radio ops ----------------------------------------------------------- */
 
 static int sx_set_frequency(uint32_t freq_hz)
@@ -257,6 +223,15 @@ static int sx_set_frequency(uint32_t freq_hz)
     uint32_t frf = (uint32_t)((uint64_t)freq_hz * (1ULL << 25) / 32000000ULL);
     uint8_t cmd[] = {SX_CMD_SET_RF_FREQUENCY, (uint8_t)(frf >> 24), (uint8_t)(frf >> 16),
                      (uint8_t)(frf >> 8), (uint8_t)(frf & 0xFF)};
+    return sx_cmd(cmd, sizeof(cmd), NULL, 0);
+}
+
+/* TX power in dBm (conducted), ramp time 200 us. */
+static int sx_set_tx_power(int8_t power)
+{
+    if (power < -9) power = -9;
+    if (power > 22) power = 22;
+    uint8_t cmd[] = {SX_CMD_SET_TX_PARAMS, (uint8_t)power, 0x04};
     return sx_cmd(cmd, sizeof(cmd), NULL, 0);
 }
 
@@ -457,8 +432,16 @@ static int esp_radio_init(void)
     uint8_t pkt_cmd[] = {SX_CMD_SET_PACKET_TYPE, 0x01};
     rc |= sx_cmd(pkt_cmd, sizeof(pkt_cmd), NULL, 0);
 
-    /* Set frequency to the default game channel. */
-    rc |= sx_set_frequency(CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ);
+    /* The default game channel; its sub-band sets the TX power and budget. */
+    radio_limits_init(&limits, FEM_GAIN_DB, ANTENNA_GAIN_DBI);
+    uint32_t channel = CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ;
+    if (!radio_limits_set_channel(&limits, channel)) {
+        ESP_LOGE(TAG, "default channel %lu Hz does not fit in an EU868 sub-band; using 869525000",
+                 (unsigned long)channel);
+        channel = 869525000u;
+        radio_limits_set_channel(&limits, channel);
+    }
+    rc |= sx_set_frequency(channel);
 
     /* Set modulation parameters: SF7, BW125, CR4/5, low-data-rate off. */
     uint8_t mod_cmd[] = {SX_CMD_SET_MODULATION, LORA_SF, 0x04, LORA_CR, 0x00};
@@ -468,12 +451,8 @@ static int esp_radio_init(void)
     uint8_t pa_cmd[] = {SX_CMD_SET_PA_CONFIG, 0x04, 0x07, 0x00, 0x01};
     rc |= sx_cmd(pa_cmd, sizeof(pa_cmd), NULL, 0);
 
-    /* Set TX params: power, ramp time 200us. */
-    int8_t power = TX_POWER_DBM;
-    if (power < -9) power = -9;
-    if (power > 22) power = 22;
-    uint8_t tx_cmd[] = {SX_CMD_SET_TX_PARAMS, (uint8_t)power, 0x04};
-    rc |= sx_cmd(tx_cmd, sizeof(tx_cmd), NULL, 0);
+    /* Set TX params: the sub-band's power, ramp time 200us. */
+    rc |= sx_set_tx_power(limits.tx_power_dbm);
 
     /* Set sync word for private network. */
     rc |= sx_write_reg(0x0740, (uint8_t)(LORA_SYNC_WORD >> 8));
@@ -483,12 +462,13 @@ static int esp_radio_init(void)
     uint8_t buf_cmd[] = {SX_CMD_SET_BUFFER_BASE, 0x00, 0x80};
     rc |= sx_cmd(buf_cmd, sizeof(buf_cmd), NULL, 0);
 
-    /* Set DIO1 IRQ: TX_DONE | RX_DONE | TIMEOUT on DIO1. */
+    /* Set DIO1 IRQ: TX_DONE | RX_DONE | TIMEOUT | CAD_DONE on DIO1. */
+    uint16_t dio1 = SX_IRQ_TX_DONE | SX_IRQ_RX_DONE | SX_IRQ_TIMEOUT | SX_IRQ_CAD_DONE;
     uint8_t irq_cmd[] = {SX_CMD_SET_DIO_IRQ_PARAMS,
                          (uint8_t)((SX_IRQ_ALL) >> 8),
                          (uint8_t)((SX_IRQ_ALL) & 0xFF),
-                         (uint8_t)((SX_IRQ_TX_DONE | SX_IRQ_RX_DONE | SX_IRQ_TIMEOUT) >> 8),
-                         (uint8_t)((SX_IRQ_TX_DONE | SX_IRQ_RX_DONE | SX_IRQ_TIMEOUT) & 0xFF),
+                         (uint8_t)(dio1 >> 8),
+                         (uint8_t)(dio1 & 0xFF),
                          0x00,
                          0x00,
                          0x00,
@@ -502,15 +482,8 @@ static int esp_radio_init(void)
         return -1;
     }
 
-    /* Init duty-cycle tracking. */
-    memset(dc_buckets, 0, sizeof(dc_buckets));
-    dc_used_us = 0;
-    dc_current_bucket = 0;
-    dc_last_update_ms = 0;
-
     ESP_LOGI(TAG, "SX1262 initialised: EU868, SF%d, BW%dk, TX %d dBm, ch %lu Hz", LORA_SF,
-             LORA_BW_HZ / 1000, TX_POWER_DBM,
-             (unsigned long)CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ);
+             LORA_BW_HZ / 1000, limits.tx_power_dbm, (unsigned long)limits.channel_hz);
     return 0;
 }
 
@@ -521,9 +494,16 @@ static int sx_start_rx(void)
     return sx_cmd(rx_cmd, sizeof(rx_cmd), NULL, 0);
 }
 
+static uint32_t now_ms(void)
+{
+    return (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
+}
+
 static int esp_radio_send(const uint8_t *data, size_t len)
 {
     if (len == 0 || len > 255) return -1;
+    /* The whole packet's time on air must fit in the sub-band's budget. */
+    if (!radio_limits_can_send(&limits, len, now_ms())) return -3;
 
     /* No channel hop -- all traffic uses the single game channel. */
 
@@ -554,11 +534,8 @@ static int esp_radio_send(const uint8_t *data, size_t len)
         return -2;
     }
 
-    /* Record airtime for duty-cycle tracking.
-     * Approximate LoRa SF7/BW125 airtime: ~40ms for a 200-byte packet. */
-    uint32_t airtime_us = 1000 * ((uint32_t)len + 20);
-    uint32_t now_ms = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
-    dc_record(airtime_us, now_ms);
+    /* Record the time on air (LoRa formula, SF7/BW125) in the sub-band's budget. */
+    radio_limits_record(&limits, len, now_ms());
 
     /* Return to RX on the game channel after TX. */
     if (sx_start_rx() != 0) return -1;
@@ -630,11 +607,24 @@ static size_t esp_radio_recv(uint8_t *buf, size_t max_len, int8_t *rssi)
 
 static int esp_radio_set_channel(uint32_t freq_hz)
 {
-    if (!eu868_channel_valid(freq_hz)) {
-        ESP_LOGW(TAG, "channel %lu Hz outside EU868 sub-bands", (unsigned long)freq_hz);
+    int8_t power;
+    if (!radio_limits_power_for(&limits, freq_hz, &power)) {
+        ESP_LOGW(TAG, "channel %lu Hz: the 125 kHz channel does not fit in an EU868 sub-band",
+                 (unsigned long)freq_hz);
         return -1;
     }
-    return sx_set_frequency(freq_hz);
+    /* Power first when it drops, so the radio never sends at the old (higher)
+     * power on the new channel; frequency first when it rises. */
+    if (power <= limits.tx_power_dbm) {
+        if (sx_set_tx_power(power) != 0 || sx_set_frequency(freq_hz) != 0) return -1;
+    } else {
+        if (sx_set_frequency(freq_hz) != 0 || sx_set_tx_power(power) != 0) return -1;
+    }
+    radio_limits_set_channel(&limits, freq_hz);
+    ESP_LOGI(TAG, "channel %lu Hz, TX %d dBm conducted, budget %lu ms left this hour",
+             (unsigned long)freq_hz, power,
+             (unsigned long)radio_limits_remaining_ms(&limits, now_ms()));
+    return 0;
 }
 
 static int esp_radio_set_mode(hal_radio_mode_t mode)
@@ -668,10 +658,74 @@ static int8_t esp_radio_rssi(void)
 
 static uint32_t esp_radio_duty_cycle_remaining_ms(void)
 {
-    uint32_t now_ms = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
-    dc_tick(now_ms);
-    if (dc_used_us >= DC_BUDGET_US) return 0;
-    return (DC_BUDGET_US - dc_used_us) / 1000;
+    return radio_limits_remaining_ms(&limits, now_ms());
+}
+
+/* ---- Noise measurement (USB modem MEASURE) -------------------------------- */
+
+/* One channel-activity detection on the current frequency: true if a LoRa
+ * preamble was seen. Two symbols, with the detection thresholds the SX126x
+ * documentation gives for SF7 / 125 kHz. *ok is false on a radio error. */
+static bool sx_cad_once(bool *ok)
+{
+    uint8_t stby[] = {SX_CMD_SET_STANDBY, 0x00};
+    uint8_t params[] = {
+        SX_CMD_SET_CAD_PARAMS, 0x01 /* 2 symbols */, 22, 10, 0x00 /* CAD only */, 0x00, 0x00, 0x00};
+    uint8_t clr[] = {SX_CMD_CLR_IRQ_STATUS, 0xFF, 0xFF};
+    uint8_t cad[] = {SX_CMD_SET_CAD};
+    *ok = false;
+    if (sx_cmd(stby, sizeof(stby), NULL, 0) != 0 || sx_cmd(params, sizeof(params), NULL, 0) != 0 ||
+        sx_cmd(clr, sizeof(clr), NULL, 0) != 0) {
+        return false;
+    }
+    xSemaphoreTake(dio1_sem, 0); /* drop a stale DIO1 edge */
+    if (sx_cmd(cad, sizeof(cad), NULL, 0) != 0) return false;
+    if (xSemaphoreTake(dio1_sem, pdMS_TO_TICKS(50)) != pdTRUE) return false;
+    uint8_t irq_cmd[] = {SX_CMD_GET_IRQ_STATUS, 0x00};
+    uint8_t irq_resp[2];
+    if (sx_cmd(irq_cmd, sizeof(irq_cmd), irq_resp, 2) != 0) return false;
+    uint16_t irq = ((uint16_t)irq_resp[0] << 8) | irq_resp[1];
+    *ok = (irq & SX_IRQ_CAD_DONE) != 0;
+    return *ok && (irq & SX_IRQ_CAD_DETECTED) != 0;
+}
+
+static int esp_radio_measure(uint32_t freq_hz, uint32_t dwell_ms, bool cad, noise_result_t *out)
+{
+    static noise_acc_t acc; /* 520 bytes: kept off the radio task's stack */
+    if (!atalaia_channel_ok(freq_hz)) return -2;
+    if (dwell_ms < NOISE_DWELL_MIN_MS) dwell_ms = NOISE_DWELL_MIN_MS;
+    if (dwell_ms > NOISE_DWELL_MAX_MS) dwell_ms = NOISE_DWELL_MAX_MS;
+    noise_acc_init(&acc);
+    uint8_t stby[] = {SX_CMD_SET_STANDBY, 0x00}; /* retune from standby, not mid-receive */
+    int rc = sx_cmd(stby, sizeof(stby), NULL, 0) == 0 && sx_set_frequency(freq_hz) == 0 &&
+                     sx_start_rx() == 0
+                 ? 0
+                 : -1;
+    uint32_t start = now_ms();
+    uint32_t next_cad = start + 50;
+    while (rc == 0 && now_ms() - start < dwell_ms) {
+        int8_t rssi = esp_radio_rssi();
+        if (rssi == INT8_MIN) {
+            rc = -1;
+            break;
+        }
+        noise_acc_add(&acc, rssi);
+        if (cad && (int32_t)(now_ms() - next_cad) >= 0) {
+            bool ok;
+            bool seen = sx_cad_once(&ok);
+            if (ok) noise_acc_cad(&acc, seen);
+            if (sx_start_rx() != 0) rc = -1;
+            next_cad = now_ms() + 100;
+        }
+        vTaskDelay(1); /* about one reading per millisecond */
+    }
+    /* Back to the game channel, listening. */
+    if (sx_cmd(stby, sizeof(stby), NULL, 0) != 0 || sx_set_frequency(limits.channel_hz) != 0 ||
+        sx_start_rx() != 0) {
+        rc = -1;
+    }
+    if (rc != 0) return rc;
+    return noise_acc_finish(&acc, freq_hz, (uint16_t)dwell_ms, out) ? 0 : -1;
 }
 
 static void esp_radio_deinit(void)
@@ -700,6 +754,7 @@ const hal_radio_ops_t hal_esp_radio_ops = {
     .set_mode = esp_radio_set_mode,
     .rssi = esp_radio_rssi,
     .duty_cycle_remaining_ms = esp_radio_duty_cycle_remaining_ms,
+    .measure = esp_radio_measure,
     .deinit = esp_radio_deinit,
 };
 

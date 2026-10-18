@@ -208,6 +208,19 @@ radio:
       corre tudo até aos modos de jogo; um controlador num Raspberry Pi deixa o trabalho do rádio a
       um modem de rádio USB; na fase&nbsp;3, um telemóvel Android vai fazer o mesmo com um módulo
       de E/S. Os telemóveis no Wi-Fi do campo não precisam de rádio LoRa.
+  channel:
+    title: Que canal, e porquê 869,525&nbsp;MHz
+    lead: >-
+      Todo o tráfego de um jogo partilha um canal. O canal por omissão, 869,525&nbsp;MHz, é o
+      centro de 869,4–869,65&nbsp;MHz, a única parte da banda europeia de 868&nbsp;MHz onde um
+      aparelho pode emitir até 10% do tempo com até 500&nbsp;mW. No resto de 868–870&nbsp;MHz as
+      regras permitem 1% do tempo (0,1% em 868,7–869,2&nbsp;MHz) a 25&nbsp;mW: cerca de um décimo
+      do tempo de emissão e muito menos alcance. 868,1, 868,3 e 868,5&nbsp;MHz são os canais por
+      omissão do LoRaWAN e estão muitas vezes ocupados. O canal por omissão também é partilhado:
+      as gateways LoRaWAN enviam parte das respostas em 869,525&nbsp;MHz e a predefinição europeia
+      do Meshtastic usa-o. Perto destas utilizações, a organização pode pôr o controlador a escutar
+      todos os canais permitidos durante um minuto e escolher o mais calmo, tirar um à sorte ou
+      escolher à mão. As caixas seguem depois os limites do canal escolhido.
 
 modes:
   title: Modos de jogo
@@ -505,10 +518,11 @@ glossary:
       gastando muito pouca energia, sem cartão SIM, rede móvel ou assinatura. Num campo típico
       chega a cerca de <span class="nowrap">0,5–2&nbsp;km</span> e atravessa paredes grossas melhor
       do que o Wi-Fi. O senão: as mensagens têm de ser curtas e cada aparelho só pode emitir
-      durante uma pequena parte do tempo. A Atalaia usa a sub-banda EU868 g2 (869,525&nbsp;MHz por
-      omissão, 10% de ciclo de trabalho, 500&nbsp;mW), o que dá a cada caixa até 6 minutos de
-      emissão por hora — suficiente para eventos, pontuações e balizas de sincronização de tempo,
-      com margem de sobra. As caixas só enviam o que muda, como «o vermelho capturou a&nbsp;B».
+      durante uma pequena parte do tempo. A Atalaia usa por omissão 869,525&nbsp;MHz, na única
+      sub-banda EU868 que permite 10% de ciclo de trabalho e 500&nbsp;mW, o que dá a cada caixa até
+      6 minutos de emissão por hora — suficiente para eventos, pontuações e balizas de
+      sincronização de tempo, com margem de sobra. Um campo pode escolher outro canal, que permite
+      1% do tempo ou menos e 25&nbsp;mW. As caixas só enviam o que muda, como «o vermelho capturou a&nbsp;B».
   mesh:
     id: glossario-mesh
     term: Rede mesh
@@ -701,8 +715,9 @@ diagrams:
       Bluetooth a 2,4 GHz. A estimativa do projeto, cerca de 0,5 a 2 km num campo típico ao ar
       livre, ainda vai ser medida no teste de campo da fase 2. Repetição: uma caixa fora do
       alcance do controlador é ouvida através das outras, e cada mensagem é repetida no máximo
-      duas vezes, por omissão. Regras na Europa: um canal de jogo partilhado, 869,525 MHz por omissão, até
-      500 mW, e cada aparelho só pode emitir 10% do tempo, 6 minutos por hora.
+      duas vezes, por omissão. Regras na Europa: um canal de jogo partilhado, 869,525 MHz por omissão, a
+      única parte da banda que permite 500 mW e 10% do tempo, 6 minutos por hora para cada
+      aparelho; os outros canais permitem 25 mW e 1% ou menos.
     chirp:
       title: "Chirps: ouvidos abaixo do ruído"
       sweep: um chirp varre o canal
@@ -744,8 +759,8 @@ diagrams:
       hour: 1 hora
       share: Cada aparelho só pode emitir 10% do tempo, 6 minutos por hora.
       text: >-
-        Um canal de jogo partilhado, 869,525 MHz por omissão, até 500 mW, sem licença nem cartão
-        SIM. O firmware retém as mensagens em vez de passar o limite.
+        Um canal partilhado, 869,525 MHz por omissão: a única parte da banda com 500 mW e 10%.
+        Outros canais: 25 mW, 1% ou menos. Sem licença nem cartão SIM.
   skirmesh:
     title: Skirmesh-RF em vários aparelhos
     desc: >-

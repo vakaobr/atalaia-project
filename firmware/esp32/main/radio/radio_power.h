@@ -4,10 +4,13 @@
 /*
  * EU868 TX power calculation accounting for FEM and antenna gain.
  *
- * EU868 sub-band limits are given in ERP (dBm):
+ * EU868 sub-band limits are given in ERP (dBm), ERC/REC 70-03 Annex 1:
  *   g-band  (868.0-868.6 MHz):  14 dBm ERP = 25 mW   (1% duty cycle)
  *   g1-band (868.7-869.2 MHz):  14 dBm ERP = 25 mW   (0.1%)
  *   g2-band (869.4-869.65 MHz): 27 dBm ERP = 500 mW   (10%)
+ *   g3-band (869.7-870.0 MHz):  14 dBm ERP = 25 mW   (1%)
+ * The table is atalaia_band_info() in the core; radio_limits.c picks the
+ * limit of the game channel's sub-band (RFC 0001 Amendment 3).
  *
  * EIRP = ERP + 2.15 dBi (dipole reference).
  * Conducted power = ERP + 2.15 - antenna_gain_dBi - fem_gain_dB.

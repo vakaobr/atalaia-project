@@ -63,12 +63,12 @@ BOX = 7
 class Field:
     """A running controller (uvicorn, real port) with the C host modem."""
 
-    def __init__(self) -> None:
-        self.host = HostModem()
+    def __init__(self, *modem_args: str) -> None:
+        self.host = HostModem(0, *modem_args)
         self.tmp = tempfile.TemporaryDirectory()
         self.port = free_port()
         cfg = config(self.tmp.name, port=self.host.url, api_port=self.port, host="127.0.0.1",
-                     join_key=JOIN_KEY.hex())
+                     join_key=JOIN_KEY.hex(), scan_dwell_s=1.1)
         self.bundle = build(cfg, core=CORE, load_core_lib=False)
         self.server = uvicorn.Server(uvicorn.Config(self.bundle.app, host="127.0.0.1", port=self.port,
                                                     log_level="error", lifespan="on"))
@@ -402,7 +402,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.field.box_hello()
         self.field.box_state(red=3)
         page = self.console(width=390, height=844)
-        for tab in ("game", "field", "nodes", "join", "presets", "feed", "controller"):
+        for tab in ("game", "field", "nodes", "join", "presets", "feed", "controller", "settings"):
             page.get_by_test_id(f"tab-{tab}").click()
             page.wait_for_timeout(150)
             self.no_horizontal_scroll(page)
@@ -413,6 +413,113 @@ class ConsoleBrowserTests(unittest.TestCase):
         board = self.page(f"/console/scoreboard.html#token={READ}", width=390, height=844)
         expect(board.get_by_test_id("board-score-red")).to_have_text("3")
         self.no_horizontal_scroll(board)
+
+    # --- the field's radio channel (Settings) ------------------------------------
+
+    def test_channel_first_setup_default_and_manual(self):
+        page = self.console()
+        notice = page.get_by_test_id("radio-first-setup")
+        expect(notice).to_contain_text("869,525 MHz")
+        page.get_by_test_id("radio-first-setup-go").click()
+        expect(page.get_by_test_id("tab-settings")).to_have_text("Definições")
+        expect(page.get_by_test_id("radio-channel")).to_have_text("869,525 MHz")
+        expect(page.get_by_test_id("radio-limits")).to_have_text("10% do tempo · 500 mW ERP")
+        expect(page.get_by_test_id("radio-source")).to_contain_text("ainda não escolhido")
+        why = page.get_by_test_id("radio-why")
+        why.locator("summary").click()
+        expect(why).to_contain_text("869,4–869,65 MHz")
+        expect(why).to_contain_text("Meshtastic")
+        # (a) Keep the recommended channel: it counts as the choice.
+        page.get_by_test_id("radio-keep-default").click()
+        expect(page.get_by_test_id("radio-source")).to_have_text("recomendado (por omissão)")
+        settings = self.field.http.get("/api/v1/radio").json()
+        self.assertEqual((settings["confirmed"], settings["source"]), (True, "default"))
+        page.get_by_test_id("tab-game").click()
+        expect(page.get_by_test_id("radio-first-setup")).to_have_count(0)
+        # (d) Pick one from the list: a 25 mW, 1% channel, with its warning.
+        page.get_by_test_id("tab-settings").click()
+        page.get_by_test_id("radio-manual").select_option("868300000")
+        page.get_by_test_id("radio-apply-manual").click()
+        expect(page.get_by_test_id("radio-channel")).to_have_text("868,300 MHz")
+        expect(page.get_by_test_id("radio-limits")).to_have_text("1% do tempo · 25 mW ERP")
+        expect(page.get_by_test_id("radio-low-power")).to_be_visible()
+        self.assertEqual(self.field.bundle.controller.field_channel, 868_300_000)
+        # The modem was retuned (SET_CHANNEL): its STATUS reports the channel.
+        self.assertTrue(wait_for(lambda: (self.field.bundle.modem.status or {}).get("channel_hz")
+                                 == 868_300_000, 8))
+        # A game takes the channel and locks it until it ends.
+        game = self.field.create_game()
+        self.assertEqual(game["channel_hz"], 868_300_000)
+        expect(page.get_by_test_id("radio-locked")).to_be_visible()
+        expect(page.get_by_test_id("radio-keep-default")).to_be_disabled()
+        expect(page.get_by_test_id("radio-apply-manual")).to_be_disabled()
+        page.get_by_test_id("tab-game").click()
+        expect(page.get_by_test_id("game-channel")).to_have_text("868,300 MHz")
+        page.get_by_test_id("tab-join").click()
+        page.get_by_test_id("join-generate").click()
+        j = join.decode(join.from_text(page.get_by_test_id("join-text").input_value()), JOIN_KEY)
+        self.assertEqual(j["channel_hz"], 868_300_000)
+        self.field.http.post(f"/api/v1/games/{game['id']}/end", json={})
+        page.get_by_test_id("tab-settings").click()
+        expect(page.get_by_test_id("radio-locked")).to_have_count(0)
+        expect(page.get_by_test_id("radio-keep-default")).to_be_enabled()
+
+    def test_channel_scan_and_random_in_english(self):
+        self.field.close()
+        self.field = Field("--noise", "868100000:-96", "--noise", "868300000:-117:60",
+                           "--noise", "869475000:-109", "--noise", "869525000:-104",
+                           "--noise", "869850000:-114", "--noise-floor", "-100")
+        page = self.console()
+        page.get_by_test_id("lang").first.select_option("en")
+        page.get_by_test_id("tab-settings").click()
+        expect(page.get_by_test_id("tab-settings")).to_have_text("Settings")
+        page.get_by_test_id("radio-scan").click()
+        expect(page.get_by_test_id("radio-suggestion")).to_contain_text(
+            "Suggested: 869.475 MHz, the quietest full-power channel", timeout=15000)
+        rows = page.locator("[data-testid=radio-results] tbody tr")
+        expect(rows).to_have_count(11)
+        expect(rows.first).to_have_attribute("data-channel", "869850000")
+        expect(rows.last).to_have_attribute("data-channel", "868300000")  # LoRa activity
+        expect(page.locator('[data-testid=radio-results] tr[data-channel="869475000"]')).to_contain_text("suggested")
+        self.assertEqual(self.field.bundle.controller.field_channel, 869_525_000)  # nothing changed yet
+        page.get_by_test_id("radio-accept-suggestion").click()
+        expect(page.get_by_test_id("radio-channel")).to_have_text("869.475 MHz")
+        expect(page.get_by_test_id("radio-source")).to_have_text("from the noise scan")
+        self.assertEqual(self.field.bundle.controller.field_channel, 869_475_000)
+        # (c) Random: a suggestion first, with the odds; accepted on request.
+        page.get_by_test_id("radio-random").click()
+        result = page.get_by_test_id("radio-random-result")
+        expect(result).to_contain_text("3 of 11 candidate channels give 500 mW.")
+        drawn = int(float(result.locator("p").first.text_content().split()[1]) * 1e6 + 0.5)
+        self.assertEqual(self.field.bundle.controller.field_channel, 869_475_000)
+        page.get_by_test_id("radio-accept-random").click()
+        expect(page.get_by_test_id("radio-source")).to_have_text("at random")
+        self.assertEqual(self.field.bundle.controller.field_channel, drawn)
+        # The choice survives a page reload (it is the controller's setting).
+        page.reload()
+        page.get_by_test_id("tab-settings").click()
+        expect(page.get_by_test_id("radio-source")).to_have_text("at random")
+
+    def test_channel_scan_without_a_radio(self):
+        self.field.close()
+        self.field = Field("--no-radio")
+        page = self.console()
+        page.get_by_test_id("tab-settings").click()
+        expect(page.get_by_test_id("radio-scan-unavailable")).to_have_text(
+            "O modem USB não tem chip de rádio, por isso não consegue medir o ruído.")
+        expect(page.get_by_test_id("radio-scan")).to_be_disabled()
+        expect(page.get_by_test_id("radio-channel")).to_have_text("869,525 MHz")  # the default stays
+        r = self.field.http.post("/api/v1/radio/scan")
+        self.assertEqual(r.status_code, 503)
+
+    def test_channel_settings_read_only(self):
+        page = self.console(READ)
+        page.get_by_test_id("tab-settings").click()
+        expect(page.get_by_test_id("radio-channel")).to_have_text("869,525 MHz")
+        expect(page.get_by_test_id("radio-keep-default")).to_have_count(0)
+        expect(page.get_by_test_id("radio-scan")).to_have_count(0)
+        page.get_by_test_id("tab-game").click()
+        expect(page.get_by_test_id("radio-first-setup")).to_have_count(0)
 
     def test_field_view_image_and_dragging(self):
         game = self.field.create_game(start=True)

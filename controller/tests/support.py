@@ -426,7 +426,7 @@ class FakeModem:
     def __init__(self, up: bool = True) -> None:
         from atalaia_sim.packet import header_decode  # noqa: F401
         self.state = "up" if up else "down"
-        self.ident = {"fw": "atalaia-modem", "fw_version": "fake"}
+        self.ident = {"fw": "atalaia-modem", "fw_version": "fake", "radio": "sx1262", "measure": True}
         self.status = {"configured": True}
         self.reconnects = 0
         self.sent: list[tuple[Header, bytes]] = []
@@ -434,10 +434,27 @@ class FakeModem:
         self.cleared = 0
         self.peers: dict[int, int] = {}
         self.on_rx = self.on_tx_ack = self.on_state = self.on_error = None
+        self.channels: list[int] = []             # SET_CHANNEL commands
+        self.measured: list[tuple[int, int]] = []  # MEASURE (channel, dwell_ms)
+        self.noise: dict[int, tuple[int, int]] = {}  # channel -> (p90 dBm, CAD detections of 10)
+        self.measure_gate = None                  # a threading.Event a measurement waits for
+        self.can_measure = True
 
     @property
     def is_up(self) -> bool:
         return self.state == "up"
+
+    def set_channel(self, channel_hz: int) -> bool:
+        self.channels.append(channel_hz)
+        return True
+
+    def measure(self, channel_hz: int, dwell_ms: int, cad: bool = True, timeout=None) -> "mf.Noise":
+        self.measured.append((channel_hz, dwell_ms))
+        if self.measure_gate is not None:
+            self.measure_gate.wait(5)
+        p90, hits = self.noise.get(channel_hz, (-118, 0))
+        return mf.Noise(channel_hz, dwell_ms, dwell_ms, p90 - 6, p90 - 3, p90 - 4, p90, p90 + 9,
+                        10, hits)
 
     def configure(self, *args) -> None:
         self.configured.append(args)

@@ -26,6 +26,7 @@ const SHELL = [
     'components/live-feed.js',
     'components/node-list.js',
     'components/preset-builder.js',
+    'components/radio-settings.js',
     'components/score-panel.js',
     'lib/preact.module.js',
     'lib/htm.module.js',

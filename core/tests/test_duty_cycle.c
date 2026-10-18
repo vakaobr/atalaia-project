@@ -128,8 +128,66 @@ static void test_airtime_bad_sf(void)
     CHECK(atalaia_airtime_us(13, 125000, 20) == 0);
 }
 
+/* The whole 125 kHz channel must fit in one sub-band (RFC 0001 Amendment 3). */
+static void test_channel_edges(void)
+{
+    CHECK(atalaia_band_of_channel(869525000u, ATALAIA_LORA_BW_HZ) == ATALAIA_BAND_G2);
+    CHECK(atalaia_band_of_channel(868100000u, ATALAIA_LORA_BW_HZ) == ATALAIA_BAND_G);
+    CHECK(atalaia_band_of_channel(868800000u, ATALAIA_LORA_BW_HZ) == ATALAIA_BAND_G1);
+    CHECK(atalaia_band_of_channel(869850000u, ATALAIA_LORA_BW_HZ) == ATALAIA_BAND_G3);
+    /* Lowest and highest centres of each sub-band: edges included. */
+    CHECK(atalaia_band_of_channel(869462500u, ATALAIA_LORA_BW_HZ) == ATALAIA_BAND_G2);
+    CHECK(atalaia_band_of_channel(869587500u, ATALAIA_LORA_BW_HZ) == ATALAIA_BAND_G2);
+    CHECK(atalaia_band_of_channel(868062500u, ATALAIA_LORA_BW_HZ) == ATALAIA_BAND_G);
+    CHECK(atalaia_band_of_channel(868537500u, ATALAIA_LORA_BW_HZ) == ATALAIA_BAND_G);
+    CHECK(atalaia_band_of_channel(868762500u, ATALAIA_LORA_BW_HZ) == ATALAIA_BAND_G1);
+    CHECK(atalaia_band_of_channel(869137500u, ATALAIA_LORA_BW_HZ) == ATALAIA_BAND_G1);
+    CHECK(atalaia_band_of_channel(869762500u, ATALAIA_LORA_BW_HZ) == ATALAIA_BAND_G3);
+    CHECK(atalaia_band_of_channel(869937500u, ATALAIA_LORA_BW_HZ) == ATALAIA_BAND_G3);
+    /* Centres inside a sub-band whose channel spills over an edge. */
+    CHECK(!atalaia_channel_ok(869400000u));
+    CHECK(!atalaia_channel_ok(869462499u));
+    CHECK(!atalaia_channel_ok(869587501u));
+    CHECK(!atalaia_channel_ok(869650000u));
+    CHECK(!atalaia_channel_ok(868000000u));
+    CHECK(!atalaia_channel_ok(868600000u));
+    CHECK(!atalaia_channel_ok(868700000u));
+    CHECK(!atalaia_channel_ok(869200000u));
+    CHECK(!atalaia_channel_ok(869700000u));
+    CHECK(!atalaia_channel_ok(870000000u));
+    /* Between and outside the sub-bands. */
+    CHECK(!atalaia_channel_ok(869300000u));
+    CHECK(!atalaia_channel_ok(868650000u));
+    CHECK(!atalaia_channel_ok(915000000u));
+    CHECK(!atalaia_channel_ok(0u));
+    CHECK(atalaia_band_of_channel(30000u, 125000u) == ATALAIA_BAND_COUNT);
+    /* A narrower channel fits closer to the edge. */
+    CHECK(atalaia_band_of_channel(869412500u, 25000u) == ATALAIA_BAND_G2);
+    CHECK(atalaia_band_of_channel(869412500u, ATALAIA_LORA_BW_HZ) == ATALAIA_BAND_COUNT);
+}
+
+static void test_band_info(void)
+{
+    const atalaia_band_info_t *g2 = atalaia_band_info(ATALAIA_BAND_G2);
+    CHECK(g2 != NULL);
+    CHECK(g2->lo_hz == 869400000u && g2->hi_hz == 869650000u);
+    CHECK(g2->duty_ppm == 100000 && g2->erp_dbm == 27 && g2->erp_mw == 500);
+    CHECK(atalaia_band_info(ATALAIA_BAND_G)->duty_ppm == 10000);
+    CHECK(atalaia_band_info(ATALAIA_BAND_G1)->duty_ppm == 1000);
+    CHECK(atalaia_band_info(ATALAIA_BAND_G3)->erp_mw == 25);
+    CHECK(atalaia_band_info(ATALAIA_BAND_COUNT) == NULL);
+    /* The hourly budgets follow the duty-cycle limits. */
+    atalaia_duty_cycle_t dc;
+    atalaia_dc_init(&dc);
+    for (int b = 0; b < ATALAIA_BAND_COUNT; b++) {
+        CHECK(dc.bands[b].budget_us == atalaia_band_info((atalaia_band_t)b)->duty_ppm * 3600u);
+    }
+}
+
 void run_duty_cycle_tests(void)
 {
+    test_channel_edges();
+    test_band_info();
     test_init_budgets();
     test_can_send_basic();
     test_record_and_check();

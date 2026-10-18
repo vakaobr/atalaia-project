@@ -2,7 +2,7 @@
 
 A box, or a second field controller standing by, joins a game with a **join payload**: everything it needs to take part, carried by an NFC card, a QR code (or its text) or the serial console, and never over LoRa (ADR-P2-12, RFC 0001 section 9). The field controller makes it; this file is its specification, version 1.
 
-Implementations: [`core/src/join.c`](../core/src/join.c) (C: boxes, the host test programs) and [`simulator/atalaia_sim/join.py`](../simulator/atalaia_sim/join.py) (Python: the field controller). Both check the shared vectors in [`vectors/join.json`](vectors/join.json): 4 valid payloads (decode, re-encode byte for byte, text form, NFC tag memory, refused under another key), 34 invalid ones that must fail with the stated reason, an optional-field case, and RFC 4231 HMAC-SHA256 known answers.
+Implementations: [`core/src/join.c`](../core/src/join.c) (C: boxes, the host test programs) and [`simulator/atalaia_sim/join.py`](../simulator/atalaia_sim/join.py) (Python: the field controller). Both check the shared vectors in [`vectors/join.json`](vectors/join.json): 4 valid payloads (decode, re-encode byte for byte, text form, NFC tag memory, refused under another key), 38 invalid ones that must fail with the stated reason, an optional-field case, and RFC 4231 HMAC-SHA256 known answers.
 
 ## Layout
 
@@ -34,7 +34,7 @@ Game keys change with every game; the join key does not. A box with another fiel
 | 2 | `game_key` | bytes | yes | exactly 16: the game's AES-128 key (ADR-P2-2) |
 | 3 | `node_id` | uint | yes | 0-65534: the short id this device takes in the game |
 | 4 | `controller_id` | uint | yes | 0-65534: the controller that made the payload; differs from `node_id` |
-| 5 | `channel_hz` | uint | yes | the shared game channel, inside an EU868 sub-band (RFC 0001 Amendment 1) |
+| 5 | `channel_hz` | uint | yes | the shared game channel (RFC 0001 Amendment 1): the whole 125 kHz channel, centre ± 62.5 kHz, inside one EU868 sub-band (Amendment 3), so 869462500-869587500 for 869.4-869.65 MHz |
 | 6 | `max_hops` | uint | yes | 1-3: the relay clamp (ADR-P2-6) |
 | 7 | `teams` | array of text | yes | 1-8 different names, 1-23 bytes of UTF-8 each, no NUL; team ids are 1.. in this order |
 | 8 | `mode_id` | text | yes | 1-63 bytes, e.g. `org.atalaia.domination`; a main mode with modifiers is joined by `+`, main mode first (`org.atalaia.domination+org.atalaia.codes`, see modes/README.md) |

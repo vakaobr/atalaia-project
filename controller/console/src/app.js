@@ -14,8 +14,9 @@ import { NodeList } from './components/node-list.js';
 import { FieldView } from './components/field-view.js';
 import { JoinPanel } from './components/join-panel.js';
 import { PresetBuilder } from './components/preset-builder.js';
+import { RadioSettings } from './components/radio-settings.js';
 
-const TABS = ['game', 'field', 'nodes', 'join', 'presets', 'feed', 'controller'];
+const TABS = ['game', 'field', 'nodes', 'join', 'presets', 'feed', 'controller', 'settings'];
 const FEED_MAX = 500;
 const ALERTS_MAX = 50;
 const HISTORY_MAX = 240;
@@ -28,6 +29,7 @@ class App extends Component {
             tab: 'game', connected: null, status: null, game: null, score: null,
             nodes: {}, seen: {}, feed: [], alerts: [], modes: [], presets: [],
             positions: {}, scoreHistory: [], clockBase: null, toast: '', now: Date.now(),
+            radio: null,
         };
         this.stream = null;
         this.token = '';
@@ -91,12 +93,17 @@ class App extends Component {
         this.token = '';
         saveToken('');
         this.setState({ token: '', role: null, connected: null, loginError: reason || '',
-                        game: null, status: null, nodes: {}, feed: [], alerts: [] });
+                        game: null, status: null, nodes: {}, feed: [], alerts: [], radio: null });
     }
 
     async loadCatalogue() {
         const [modes, presets] = await Promise.all([this.call('GET', '/modes'), this.call('GET', '/presets')]);
         this.setState({ modes: modes || [], presets: presets || [] });
+    }
+
+    async loadRadio() {
+        const radio = await this.call('GET', '/radio');
+        if (radio) this.setState({ radio });
     }
 
     startStream() {
@@ -154,6 +161,14 @@ class App extends Component {
                 }
             }
             this.refreshStatus();
+            if (this.state.radio) this.loadRadio(); // a live game locks the channel
+            break;
+        case 'radio':
+            this.setState({ radio: msg.radio });
+            break;
+        case 'radio_scan':
+            this.setState((s) => ({ radio: s.radio ? { ...s.radio, scan: msg.scan } : s.radio }));
+            if (msg.scan.state !== 'running') this.loadRadio();
             break;
         case 'system':
             this.onSystem(msg);
@@ -339,6 +354,8 @@ class App extends Component {
             return html`<${LiveFeed} app=${this} />`;
         case 'controller':
             return html`<${ControllerPanel} app=${this} />`;
+        case 'settings':
+            return html`<${RadioSettings} app=${this} />`;
         default:
             return null;
         }

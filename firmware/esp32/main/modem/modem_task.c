@@ -9,8 +9,9 @@
  * (CONFIG_ATALAIA_MODEM_LINK_UART0). Both paths are compiled in every
  * build so neither can rot; the unused one is dropped by the linker.
  *
- * The radio task owns the SPI bus, so channel changes and duty-cycle
- * readings go through it (radio_task_set_channel, radio_task_duty_*).
+ * The radio task owns the SPI bus, so channel changes, duty-cycle readings
+ * and noise measurements go through it (radio_task_set_channel,
+ * radio_task_duty_*, radio_task_measure_*).
  */
 #include "modem_task.h"
 
@@ -118,6 +119,12 @@ static uint32_t io_duty_remaining(void *ctx)
     return radio_task_duty_remaining_ms();
 }
 
+static int io_measure_start(void *ctx, uint32_t freq_hz, uint16_t dwell_ms, bool cad)
+{
+    (void)ctx;
+    return radio_task_measure_start(freq_hz, dwell_ms, cad) ? 0 : -1;
+}
+
 static uint32_t io_now_ms(void *ctx)
 {
     (void)ctx;
@@ -157,6 +164,11 @@ static void modem_loop(void *arg)
         while (radio_task_tx_result(&result)) {
             modem_on_tx_result(&modem, result.tag, map_status(result.status));
         }
+        noise_result_t noise;
+        int noise_rc;
+        if (radio_task_measure_result(&noise, &noise_rc)) {
+            modem_on_measure_result(&modem, noise_rc, &noise);
+        }
     }
 }
 
@@ -172,6 +184,7 @@ void modem_task_start(const hal_t *hal)
         .set_channel = io_set_channel,
         .duty_cycle_remaining_ms = io_duty_remaining,
         .now_ms = io_now_ms,
+        .measure_start = io_measure_start,
         .ctx = NULL,
     };
     const esp_app_desc_t *app = esp_app_get_description();

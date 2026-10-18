@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "atalaia/codec.h"
+#include "atalaia/duty_cycle.h"
 
 #include "cbor_int.h"
 
@@ -160,8 +161,8 @@ void atalaia_hmac_sha256(const uint8_t *key, size_t key_len, const uint8_t *msg,
 
 bool atalaia_join_channel_ok(uint32_t hz)
 {
-    return (hz >= 868000000u && hz <= 868600000u) || (hz >= 868700000u && hz <= 869200000u) ||
-           (hz >= 869400000u && hz <= 869650000u) || (hz >= 869700000u && hz <= 870000000u);
+    /* The whole 125 kHz channel inside one sub-band (RFC 0001 Amendment 3). */
+    return atalaia_channel_ok(hz);
 }
 
 /* Valid UTF-8 with no NUL, 1..max bytes. */

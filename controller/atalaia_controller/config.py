@@ -13,8 +13,14 @@
     persist_game_key = false    # keep the game key in SQLite to survive a restart
 
     [radio]
-    channel_hz = 869525000      # the shared game channel (RFC 0001 Amendment 1)
+    channel_hz = 869525000      # the field's channel until the GM chooses one in the console
+                                # (RFC 0001 Amendments 1 and 3); the 125 kHz channel must fit
+                                # inside one EU868 sub-band
     max_hops = 2
+    scan_dwell_s = 60.0         # "find a quiet channel": total listening time, split across
+                                # the candidates (at most 10 s each)
+    quiet_threshold_dbm = -105  # a channel whose 90th-percentile noise is at or below this
+                                # counts as quiet (decision CH4; to be calibrated at bring-up)
 
     [modem]
     port = "/dev/ttyACM0"       # or socket://host:port; empty = no radio
@@ -47,12 +53,14 @@ from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
+from atalaia_sim import eu868
+
 from . import REPO_ROOT
 
 SECTIONS = {
     "controller": ("node_id", "db_path", "modes_dirs", "failover_mode", "power_source",
                    "battery_pct", "storage_ok", "persist_game_key", "tick_interval_s"),
-    "radio": ("channel_hz", "max_hops"),
+    "radio": ("channel_hz", "max_hops", "scan_dwell_s", "quiet_threshold_dbm"),
     "modem": ("port", "baudrate", "ping_interval_s"),
     "api": ("host", "port", "gm_token", "read_token"),
     "mqtt": ("enabled", "host", "port", "username", "password"),
@@ -77,8 +85,10 @@ class Config:
     persist_game_key: bool = False
     tick_interval_s: float = 0.1
     # [radio]
-    channel_hz: int = 869_525_000
+    channel_hz: int = eu868.DEFAULT_CHANNEL_HZ
     max_hops: int = 2
+    scan_dwell_s: float = 60.0
+    quiet_threshold_dbm: int = -105
     # [modem]
     port: str = ""
     baudrate: int = 921_600
@@ -104,9 +114,17 @@ class Config:
             raise ConfigError("controller.failover_mode must be 'manual' or 'auto'")
         if not 1 <= self.max_hops <= 3:
             raise ConfigError("radio.max_hops must be 1-3 (ADR-P2-6)")
-        if not (869_400_000 <= self.channel_hz <= 869_650_000 or 868_000_000 <= self.channel_hz <= 868_600_000
-                or 868_700_000 <= self.channel_hz <= 869_200_000 or 869_700_000 <= self.channel_hz <= 870_000_000):
-            raise ConfigError("radio.channel_hz must be inside an EU868 sub-band")
+        if not eu868.channel_ok(self.channel_hz):
+            # The whole 125 kHz channel, not just its centre (RFC 0001 Amendment 3):
+            # 869.40 MHz is inside 869.4-869.65 MHz but its channel starts at 869.3375.
+            raise ConfigError(
+                f"radio.channel_hz = {self.channel_hz}: the 125 kHz channel (centre +-62.5 kHz) "
+                "must fit inside one EU868 sub-band (868.0-868.6, 868.7-869.2, 869.4-869.65 or "
+                "869.7-870.0 MHz); the default is 869525000")
+        if not 1.0 <= self.scan_dwell_s <= 600.0:
+            raise ConfigError("radio.scan_dwell_s must be 1-600 seconds")
+        if not -128 <= self.quiet_threshold_dbm <= 0:
+            raise ConfigError("radio.quiet_threshold_dbm must be -128 to 0")
         if self.tick_interval_s <= 0 or self.ping_interval_s <= 0:
             raise ConfigError("intervals must be positive")
         if self.join_key:

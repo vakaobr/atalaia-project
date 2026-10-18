@@ -24,7 +24,8 @@
     "join": "Join",
     "presets": "Presets",
     "feed": "Log",
-    "controller": "Controller"
+    "controller": "Controller",
+    "settings": "Settings"
   },
   "common": {
     "yes": "Yes",
@@ -228,5 +229,74 @@
     "offline": "No connection. Reconnecting…",
     "winner": "{team} wins",
     "tie": "Tie"
+  },
+  "radio": {
+    "title": "Field radio channel",
+    "channel": "Channel",
+    "band": "Sub-band",
+    "band_range": "{lo}–{hi} MHz ({erc})",
+    "allowed": "Limits",
+    "limits": "{duty}% of the time · {mw} mW ERP",
+    "source": "Chosen",
+    "sources": {
+      "default": "recommended (default)",
+      "scan": "from the noise scan",
+      "random": "at random",
+      "manual": "by hand"
+    },
+    "not_chosen": "not chosen yet: the recommended one applies",
+    "recommended": "recommended",
+    "low_power_warning": "This channel allows only 25 mW and about a tenth of the recommended channel's airtime: less range, and with many boxes their transmissions may run out of allowed time.",
+    "first_setup": "Before the first game, choose the field's radio channel. Until then it is {channel} MHz, the recommended one.",
+    "choose": "Choose the channel",
+    "why_title": "Why {channel} MHz?",
+    "why_1": "It is the centre of 869.4–869.65 MHz, the only part of the European 868 MHz band where a device may transmit up to 10% of the time at up to 500 mW (ERP). Everywhere else in 868–870 MHz the rules allow 1% of the time (0.1% on 868.7–869.2 MHz) at 25 mW: about a tenth of the airtime, and much less range.",
+    "why_2": "868.1, 868.3 and 868.5 MHz are the channels every LoRaWAN device in Europe starts on, so they are often busy.",
+    "why_3": "The recommended channel is shared: LoRaWAN gateways send some of their replies on 869.525 MHz, and Meshtastic's European default is the same frequency. Their packets are not mistaken for the game's (the game's are encrypted and use another sync word), but every transmission nearby uses the same airtime. If such users are near the field, a scan shows whether another channel is quieter.",
+    "locked_game": "A game is live: end it to change the channel.",
+    "locked_scan": "A noise scan is running.",
+    "default_title": "Keep the recommended channel",
+    "default_hint": "{channel} MHz: the most airtime and power European rules allow (see above).",
+    "keep_default": "Use {channel} MHz (recommended)",
+    "scan_title": "Find a quiet channel",
+    "scan_hint": "The USB modem listens to each candidate channel, about {seconds} s in all, without transmitting, and lists them quietest first. Nothing changes until you accept.",
+    "scan": "Scan",
+    "scan_cancel": "Stop the scan",
+    "scan_progress": "Measuring {channel} MHz ({n} of {total} done)",
+    "scan_failed": "The scan stopped: {error}",
+    "scan_cancelled": "Scan stopped.",
+    "unavailable": {
+      "no_modem": "No USB modem is configured, so there is no radio to measure the noise with. The channel stays as it is.",
+      "modem_down": "The USB modem is not connected; the scan needs it.",
+      "no_radio": "The USB modem has no radio chip, so it cannot measure the noise.",
+      "old_firmware": "The USB modem's firmware cannot measure noise: update it."
+    },
+    "suggest": {
+      "quiet_full_power": "Suggested: {channel} MHz, the quietest full-power channel ({limits}).",
+      "quietest": "Suggested: {channel} MHz, the quietest channel ({limits}). The 500 mW channels were noisier.",
+      "quietest_but_noisy": "Every channel is noisy. The least noisy is {channel} MHz ({limits})."
+    },
+    "results_caption": "Quietest first. Quiet: 90% of the readings at {threshold} dBm or lower, and little LoRa activity.",
+    "p90": "Noise (90%)",
+    "mean": "Mean",
+    "activity": "LoRa activity",
+    "quiet": "Quiet",
+    "suggested": "suggested",
+    "use": "Use {channel} MHz",
+    "use_short": "Use",
+    "random_title": "Random channel",
+    "random_hint": "Draws one of the candidate channels. It will usually be a 1%, 25 mW channel; only 869.475, 869.525 and 869.575 MHz give 10% and 500 mW.",
+    "random": "Draw a channel",
+    "random_got": "Drawn: {channel} MHz ({limits}).",
+    "random_odds": "{full} of {pool} candidate channels give 500 mW.",
+    "manual_title": "Pick from the list",
+    "apply": "Use this channel",
+    "low_airtime_warning": "0.1% of the time: about 3.6 s of transmission per hour for each device, too little for a game.",
+    "read_only": "Only the organisers can change the channel.",
+    "notes": {
+      "default": "recommended",
+      "lorawan_default": "LoRaWAN default, often busy",
+      "low_airtime": "0.1%, not recommended"
+    }
   }
 }

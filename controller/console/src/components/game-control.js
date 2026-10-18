@@ -6,6 +6,7 @@
 // box, adjust a team's score. ControllerPanel: role, term, radio, promote.
 
 import { html, Component, t, clock, ConfirmButton, modeText } from '../ui.js';
+import { FirstSetupNotice, mhz } from './radio-settings.js';
 import {
     ParamFields, ModifierPicker, initialValues, mainModes, partsOf, schemaOf, modeName,
 } from './preset-builder.js';
@@ -179,6 +180,7 @@ export class GameControl extends Component {
                 <h2 id="game-h">${t('game.title')}</h2>
                 ${game && game.state === 'ended' && html`<p data-testid="game-ended">${t('game.ended', { name: game.name })}</p>`}
                 ${!game && html`<p class="muted">${t('game.none')}</p>`}
+                <${FirstSetupNotice} app=${app} />
                 ${gm ? html`<${CreateGame} app=${app} />` : html`<p class="muted">${t('game.wait_gm')}</p>`}
             </section>`;
         }
@@ -192,6 +194,7 @@ export class GameControl extends Component {
                 <dt>${t('game.mode')}</dt><dd>${modeName(props.app.state.modes, game.mode_id)}</dd>
                 <dt>${t('game.teams')}</dt><dd>${game.teams.join(', ')}</dd>
                 <dt>${t('game.id')}</dt><dd>${game.id}</dd>
+                ${game.channel_hz && html`<dt>${t('radio.channel')}</dt><dd data-testid="game-channel">${mhz(game.channel_hz)} MHz</dd>`}
             </dl>
             ${game.joined && html`<p class="notice">${t('game.standby_notice')}</p>`}
             ${gm && html`<div class="actions" data-testid="game-actions">

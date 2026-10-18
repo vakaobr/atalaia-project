@@ -29,6 +29,12 @@ which browsers cannot give headers, also takes ``?token=``.
     POST /api/v1/controller/join           this controller takes a game as standby
     GET  /api/v1/field                     whether a field image is uploaded
     GET|PUT|DELETE /api/v1/field/image     the field image (map or floor plan) of the console
+    GET  /api/v1/radio                     the field's radio channel, its limits, candidates, last scan
+    PUT  /api/v1/radio/channel             set it {"channel_hz", "source"} (no live game)
+    POST /api/v1/radio/scan                find a quiet channel: noise scan with the modem {"dwell_s"?}
+    GET  /api/v1/radio/scan                the scan's progress and results
+    DELETE /api/v1/radio/scan              cancel the scan
+    POST /api/v1/radio/random              a random legal channel, as a suggestion
     GET  /api/v1/games/{id}/positions      where the nodes are on the field image
     PUT  /api/v1/games/{id}/positions/{n}  move a node on it
     GET  /healthz                          liveness, no token
@@ -239,6 +245,33 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     @app.post("/api/v1/controller/join", status_code=201, dependencies=[Depends(require_gm)])
     def join_standby(body: Any = Body(None)) -> dict[str, Any]:
         return controller.join_as_standby(body_map(body).get("text"))
+
+    # --- the field's radio channel (channels.py, RFC 0001 Amendment 3) -------
+
+    @app.get("/api/v1/radio", dependencies=[Depends(require_read)])
+    def radio() -> dict[str, Any]:
+        return controller.radio_settings()
+
+    @app.put("/api/v1/radio/channel", dependencies=[Depends(require_gm)])
+    def put_channel(body: Any = Body(None)) -> dict[str, Any]:
+        spec = body_map(body)
+        return controller.set_field_channel(spec.get("channel_hz"), spec.get("source", "manual"))
+
+    @app.post("/api/v1/radio/scan", status_code=202, dependencies=[Depends(require_gm)])
+    def start_scan(body: Any = Body(None)) -> dict[str, Any]:
+        return controller.start_scan(body_map(body).get("dwell_s"))
+
+    @app.get("/api/v1/radio/scan", dependencies=[Depends(require_read)])
+    def scan_status() -> dict[str, Any]:
+        return {"scan": controller.scan_status()}
+
+    @app.delete("/api/v1/radio/scan", dependencies=[Depends(require_gm)])
+    def cancel_scan() -> dict[str, Any]:
+        return controller.cancel_scan()
+
+    @app.post("/api/v1/radio/random", dependencies=[Depends(require_gm)])
+    def random_channel() -> dict[str, Any]:
+        return {"suggestion": controller.random_channel()}
 
     # --- field image and node positions (console field view) ------------------
 

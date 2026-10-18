@@ -35,6 +35,8 @@ extern int8_t hal_stub_radio_rx_rssi;
 extern bool hal_stub_radio_rx_pending;
 extern uint32_t hal_stub_radio_channel_hz;
 extern uint32_t hal_stub_radio_dc_remaining_ms;
+extern int hal_stub_radio_noise_dbm;
+extern int hal_stub_radio_measure_calls;
 
 void hal_stub_radio_reset(void);
 

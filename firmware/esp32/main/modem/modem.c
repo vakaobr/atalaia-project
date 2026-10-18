@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "atalaia/duty_cycle.h"
 #include "atalaia/version.h"
 
 /* ---- Output frames -------------------------------------------------------- */
@@ -57,12 +58,12 @@ static void send_status(modem_t *m, int cmd, bool has_token, uint32_t token)
     int n = snprintf(json, sizeof(json),
                      "{\"cmd\":%d,\"configured\":%s,\"radio\":%s,\"game_id\":%u,\"channel_hz\":%lu,"
                      "\"duty_ms\":%lu,\"uptime_s\":%lu,\"rx\":%lu,\"rx_auth_fail\":%lu,"
-                     "\"tx\":%lu,\"tx_fail\":%lu",
+                     "\"tx\":%lu,\"tx_fail\":%lu,\"measuring\":%s",
                      cmd, m->configured ? "true" : "false", m->radio_present ? "true" : "false",
                      (unsigned)m->game_id, (unsigned long)m->channel_hz, (unsigned long)duty,
                      (unsigned long)((now(m) - m->boot_ms) / 1000u), (unsigned long)m->count.rx_ok,
                      (unsigned long)m->count.rx_auth_fail, (unsigned long)m->count.tx_ok,
-                     (unsigned long)m->count.tx_fail);
+                     (unsigned long)m->count.tx_fail, m->measuring ? "true" : "false");
     if (n < 0 || (size_t)n >= sizeof(json) - 24) {
         return;
     }
@@ -78,10 +79,12 @@ void modem_send_ident(modem_t *m)
     char json[MODEM_FRAME_PAYLOAD_MAX];
     int n = snprintf(json, sizeof(json),
                      "{\"fw\":\"atalaia-modem\",\"fw_version\":\"%s\",\"core_version\":\"%s\","
-                     "\"framing\":%d,\"radio\":\"%s\",\"payload_max\":%d,\"epoch_window\":%u}",
+                     "\"framing\":%d,\"radio\":\"%s\",\"payload_max\":%d,\"epoch_window\":%u,"
+                     "\"measure\":%s}",
                      m->fw_version != NULL ? m->fw_version : "unknown", atalaia_version(),
                      MODEM_PROTOCOL_VERSION, m->radio_present ? "sx1262" : "none",
-                     ATALAIA_RF_PAYLOAD_MAX, (unsigned)m->epoch_window);
+                     ATALAIA_RF_PAYLOAD_MAX, (unsigned)m->epoch_window,
+                     m->radio_present && m->io.measure_start != NULL ? "true" : "false");
     if (n > 0 && (size_t)n < sizeof(json)) {
         send_frame(m, MODEM_FRAME_IDENT, (const uint8_t *)json, (size_t)n);
     }
@@ -99,17 +102,11 @@ static uint32_t be32(const uint8_t *p)
     return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | p[3];
 }
 
-/* EU868 sub-bands (g, g1, g2, g3): the only frequencies the modem accepts. */
-static bool channel_valid(uint32_t hz)
-{
-    return (hz >= 868000000u && hz <= 868600000u) || (hz >= 868700000u && hz <= 869200000u) ||
-           (hz >= 869400000u && hz <= 869650000u) || (hz >= 869700000u && hz <= 870000000u);
-}
-
 static bool apply_channel(modem_t *m, uint32_t hz)
 {
-    if (!channel_valid(hz)) {
-        send_error(m, MODEM_ERR_BAD_PARAMS, "channel outside the EU868 sub-bands");
+    /* The whole 125 kHz channel inside one EU868 sub-band (RFC 0001 Amendment 3). */
+    if (!atalaia_channel_ok(hz)) {
+        send_error(m, MODEM_ERR_BAD_PARAMS, "channel does not fit in an EU868 sub-band");
         return false;
     }
     if (m->radio_present && m->io.set_channel != NULL && m->io.set_channel(m->io.ctx, hz) != 0) {
@@ -216,6 +213,60 @@ static bool cmd_set_peer_epoch(modem_t *m, const uint8_t *p, size_t len)
     return true;
 }
 
+/* MEASURE: noise on a channel, only while no game is configured (measuring
+ * takes the radio off the game channel). Answered later by NOISE. Every
+ * error message starts with "MEASURE" so the host can match it. */
+static void cmd_measure(modem_t *m, const uint8_t *p, size_t len)
+{
+    if (len != MODEM_MEASURE_LEN) {
+        send_error(m, MODEM_ERR_BAD_FRAME, "MEASURE needs 7 bytes of parameters");
+        return;
+    }
+    uint32_t hz = be32(p + 1);
+    uint16_t dwell = be16(p + 5);
+    bool cad = (p[7] & MODEM_MEASURE_CAD) != 0;
+    if (!m->radio_present || m->io.measure_start == NULL) {
+        send_error(m, MODEM_ERR_NO_RADIO, "MEASURE: no radio to measure with");
+        return;
+    }
+    if (m->configured) {
+        send_error(m, MODEM_ERR_BUSY, "MEASURE: a game is configured; CLEAR it first");
+        return;
+    }
+    if (m->measuring) {
+        send_error(m, MODEM_ERR_BUSY, "MEASURE: a measurement is already running");
+        return;
+    }
+    if (!atalaia_channel_ok(hz)) {
+        send_error(m, MODEM_ERR_BAD_PARAMS, "MEASURE: channel does not fit in an EU868 sub-band");
+        return;
+    }
+    if (dwell < NOISE_DWELL_MIN_MS || dwell > NOISE_DWELL_MAX_MS) {
+        send_error(m, MODEM_ERR_BAD_PARAMS, "MEASURE: dwell must be 10-10000 ms");
+        return;
+    }
+    if (m->io.measure_start(m->io.ctx, hz, dwell, cad) != 0) {
+        send_error(m, MODEM_ERR_BUSY, "MEASURE: the radio is busy");
+        return;
+    }
+    m->measuring = true;
+}
+
+void modem_on_measure_result(modem_t *m, int rc, const noise_result_t *r)
+{
+    if (!m->measuring) return;
+    m->measuring = false;
+    if (rc == 0 && r != NULL) {
+        uint8_t buf[NOISE_RESULT_LEN];
+        size_t n = noise_result_encode(r, buf, sizeof(buf));
+        send_frame(m, MODEM_FRAME_NOISE, buf, n);
+    } else if (rc == -2) {
+        send_error(m, MODEM_ERR_BAD_PARAMS, "MEASURE: the radio refused the channel");
+    } else {
+        send_error(m, MODEM_ERR_RADIO, "MEASURE: the radio failed while measuring");
+    }
+}
+
 static void handle_cmd(modem_t *m, const uint8_t *p, size_t len)
 {
     if (len < 1) {
@@ -233,9 +284,17 @@ static void handle_cmd(modem_t *m, const uint8_t *p, size_t len)
         }
         return;
     case MODEM_CMD_CONFIGURE:
+        if (m->measuring) {
+            send_error(m, MODEM_ERR_BUSY, "CONFIGURE: a measurement is running");
+            return;
+        }
         if (!cmd_configure(m, p, len)) return;
         break;
     case MODEM_CMD_SET_CHANNEL:
+        if (m->measuring) {
+            send_error(m, MODEM_ERR_BUSY, "SET_CHANNEL: a measurement is running");
+            return;
+        }
         if (len != 5) {
             send_error(m, MODEM_ERR_BAD_FRAME, "SET_CHANNEL needs 4 bytes");
             return;
@@ -255,6 +314,7 @@ static void handle_cmd(modem_t *m, const uint8_t *p, size_t len)
         m->last_tx_nonce = 0;
         break;
     case MODEM_CMD_IDENT: modem_send_ident(m); return;
+    case MODEM_CMD_MEASURE: cmd_measure(m, p, len); return;
     default: send_error(m, MODEM_ERR_UNKNOWN_CMD, "unknown CMD opcode"); return;
     }
     send_status(m, op, false, 0);
