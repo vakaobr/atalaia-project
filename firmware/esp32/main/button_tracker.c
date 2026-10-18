@@ -26,10 +26,15 @@ void button_tracker_update(button_tracker_t *t, uint8_t pressed_bitmask, uint32_
         bool is_pressed = (pressed_bitmask >> i) & 1u;
 
         if (is_pressed && !t->pressed[i]) {
-            /* Newly pressed: start tracking. */
+            /* Newly pressed: start tracking. Modes that count presses (Kill
+             * Confirmed, Respawn) get team_input.press (modes/README.md);
+             * the others react to the holds only. */
             t->pressed[i] = true;
             t->held_ms[i] = 0;
             t->hold_accum[i] = 0;
+            char json[128];
+            snprintf(json, sizeof(json), "{\"team\":\"%s\"}", t->team_names[i]);
+            node_runner_input(runner, "team_input.press", json);
         }
 
         if (is_pressed && t->pressed[i]) {

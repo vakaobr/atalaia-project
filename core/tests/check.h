@@ -30,5 +30,8 @@ void run_msg_codec_tests(void);
 void run_crypto_mbedtls_tests(void);
 void run_field_api_tests(void);
 void run_join_tests(void);
+void run_tag_tests(void);
+void run_screen_template_tests(void);
+void run_proxy_tests(void);
 
 #endif /* ATALAIA_TEST_CHECK_H */

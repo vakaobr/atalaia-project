@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The game is over. Data: owner (the team holding the zone at the end),
+# points (its points on this box).
+template: final_score
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: panel }
+    children:
+      - type: label
+        text: GAME OVER
+        style: { font_size: 20, width: fill, align: center }
+  - type: spacer
+    height: fill
+  - type: label
+    text: The zone was held by
+    style: { font_size: 20, color: muted, visible: "{owner}" }
+  - type: label
+    text: "{owner|upper}"
+    style: { font_size: 48, color: "{owner}", visible: "{owner}" }
+  - type: label
+    text: "{points} points on this box"
+    style: { font_size: 20, visible: "{owner}" }
+  - type: label
+    text: No team held the zone
+    style: { font_size: 20, color: muted, visible: "{!owner}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: Scores are final
+    style:
+      font_size: 14
+      color: muted
+      padding: { bottom: 10 }

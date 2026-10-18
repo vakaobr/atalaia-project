@@ -29,6 +29,8 @@ typedef struct {
     uint32_t persist_accum_ms;
     size_t mem_limit;
     bool running;
+    /* The running mode's id: its screen templates (screen_template.h) apply. */
+    char mode_id[PRESET_MODE_ID_MAX];
     /* Identity in a joined game (1 and 42 for a stand-alone game). */
     uint16_t node_id;
     uint32_t game_seed;
@@ -48,6 +50,12 @@ typedef struct {
  * (256 KB for Full tier, 64 KB for Reduced; 0 = core default).
  */
 void node_runner_init(node_runner_t *r, hal_t *hal, size_t mem_limit);
+
+/*
+ * The mode whose screen templates the display uses. node_runner_start takes
+ * it from the preset; call this before node_runner_resume.
+ */
+void node_runner_set_mode(node_runner_t *r, const char *mode_id);
 
 /*
  * Load and start a game from a preset. Creates the node, loads the mode

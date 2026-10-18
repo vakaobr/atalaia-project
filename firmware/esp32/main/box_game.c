@@ -114,6 +114,7 @@ static void prepare_runner(box_game_t *g)
     g->runner->game_seed = g->join.game_seed;
     g->runner->event_hook = on_node_event;
     g->runner->event_ctx = g;
+    node_runner_set_mode(g->runner, g->preset->mode_id);
     if (g->join.params_json[0]) {
         snprintf(g->preset->params_json, sizeof(g->preset->params_json), "%s", g->join.params_json);
     }
@@ -500,4 +501,55 @@ void box_game_tick(box_game_t *g, uint32_t raw_delta_ms, uint32_t now_ms)
 bool box_game_active(const box_game_t *g)
 {
     return g->phase != BOX_IDLE;
+}
+
+/* ---- Player tags (atalaia/tag.h, protocol/nfc-tag.md) ------------------------ */
+
+bool box_game_tag(box_game_t *g, const uint8_t *uid, size_t uid_len, const uint8_t *payload,
+                  size_t len)
+{
+    if (g->runner == NULL || !g->runner->running) return false;
+    /* Only a joined game has a game key: a stand-alone game reports "no_game". */
+    bool joined = g->phase == BOX_PLAYING;
+    char json[ATALAIA_TAG_JSON_MAX];
+    size_t n = atalaia_tag_event_json(uid, uid_len, payload, len, joined ? g->join.game_id : 0,
+                                      joined ? g->join.game_key : NULL, joined ? g->teams : NULL,
+                                      joined ? g->join.team_count : 0, json, sizeof(json));
+    if (n == 0) return false;
+    say(g, "tag %s", json);
+    return node_runner_input(g->runner, "nfc.tag", json);
+}
+
+/* Hex digits up to a space or the end; returns the byte count, or 0. */
+static size_t parse_hex(const char **text, uint8_t *out, size_t cap)
+{
+    const char *p = *text;
+    while (*p == ' ') p++;
+    size_t n = 0;
+    while (*p && *p != ' ') {
+        int hi = hexval(p[0]);
+        int lo = hi < 0 || !p[1] ? -1 : hexval(p[1]);
+        if (lo < 0 || n >= cap) return 0;
+        out[n++] = (uint8_t)(hi << 4 | lo);
+        p += 2;
+    }
+    *text = p;
+    return n;
+}
+
+bool box_game_tag_text(box_game_t *g, const char *text)
+{
+    uint8_t uid[ATALAIA_TAG_UID_MAX];
+    uint8_t payload[ATALAIA_TAG_MAX];
+    const char *p = text;
+    size_t uid_len = parse_hex(&p, uid, sizeof(uid));
+    if (uid_len == 0) return false;
+    while (*p == ' ') p++;
+    size_t len = 0;
+    if (*p) {
+        len = parse_hex(&p, payload, sizeof(payload));
+        while (*p == ' ') p++;
+        if (len == 0 || *p) return false;
+    }
+    return box_game_tag(g, uid, uid_len, len ? payload : NULL, len);
 }

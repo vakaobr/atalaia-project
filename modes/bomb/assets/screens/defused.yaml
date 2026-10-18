@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The bomb was defused: the whole screen in the winning team's colour.
+# Data: team (the defusing team).
+template: defused
+style: { background: "{team || 'panel'}" }
+layout:
+  - type: icon
+    icon: ok
+    style: { font_size: 48, color: contrast }
+  - type: label
+    text: DEFUSED
+    style: { font_size: 48, color: contrast }
+  - type: label
+    text: "{team|upper} team wins"
+    style: { font_size: 28, color: contrast, visible: "{team}" }

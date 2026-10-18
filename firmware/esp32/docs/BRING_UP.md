@@ -193,9 +193,16 @@ and unencrypted NVS -- no firmware changes are needed.
    another field's key shows `join refused: bad tag`; holding the same card
    longer does nothing more.
 4. Verify read distance (target: > 3 cm).
-5. If no response, check the reader's 3V3 supply and I2C address (0x24). The PN532 code
-   (command, ACK, response; NTAG READ through InDataExchange) has not run
-   on a real reader before this step.
+5. Player tags (phase 3, [protocol/nfc-tag.md](../../../protocol/nfc-tag.md)):
+   during a game the box polls the reader every 300 ms. Check that a
+   game's buttons still respond at once while no card is near (the PN532
+   is set to one activation attempt per poll; if the log warned
+   `configuration not acknowledged`, polls block for 100 ms each), and that
+   any card held during a Kill Confirmed game logs `field: tag {"uid":...}`.
+6. If no response, check the reader's 3V3 supply and I2C address (0x24). The PN532 code
+   (command, ACK, response; SAMConfiguration and RFConfiguration at init;
+   NTAG READ through InDataExchange) has not run on a real reader before
+   this step.
 
 ## Step 8: Audio
 

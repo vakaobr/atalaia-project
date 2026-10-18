@@ -27,6 +27,11 @@ static const struct {
      "{\"capture_hold_ms\":3000,\"attackers\":\"red\",\"defenders\":\"blue\",\"countdown_s\":120,"
      "\"last_zones\":1,\"min_zones\":2,\"reset\":true,\"end_game\":true}"},
     {"Codes", "org.atalaia.codes", "{\"codes\":\"\"}"},
+    {"Kill Confirmed", "org.atalaia.kill_confirmed",
+     "{\"confirm_points\":1,\"penalty_points\":1,\"turn_in_s\":20,\"retag_after_s\":60}"},
+    {"Respawn and Lives", "org.atalaia.respawn",
+     "{\"lives\":20,\"per_player\":false,\"respawn_cooldown_s\":30}"},
+    {"Player Check-in", "org.atalaia.player_checkin", "{\"points\":1,\"repeat_after_s\":0}"},
 };
 
 /* preset_t holds a 16 KB source buffer, so it is not put on a task stack;

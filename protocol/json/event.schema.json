@@ -56,11 +56,23 @@
             "battery.low",
             "script.error",
             "script.halted",
+            "kill.confirmed",
+            "kill.denied",
+            "team.eliminated",
             "holdall.scoring_start",
             "holdall.scoring_stop",
             "laststand.countdown_start",
             "laststand.countdown_cancel",
-            "laststand.defeated"
+            "laststand.defeated",
+            "money.collected",
+            "money.deposited",
+            "chrono.checkin",
+            "chrono.spotcheck",
+            "visibility.granted",
+            "visibility.expired",
+            "node.tamper",
+            "pod.connected",
+            "pod.disconnected"
           ]
         },
         {
@@ -805,6 +817,93 @@
       "if": {
         "properties": {
           "type": {
+            "const": "kill.confirmed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "player": {
+                "$ref": "#/$defs/data/player"
+              },
+              "owner": {
+                "$ref": "#/$defs/data/owner"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "kill.denied"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "player": {
+                "$ref": "#/$defs/data/player"
+              },
+              "owner": {
+                "$ref": "#/$defs/data/owner"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "team.eliminated"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
             "const": "holdall.scoring_start"
           }
         }
@@ -931,6 +1030,297 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "money.collected"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "player": {
+                "$ref": "#/$defs/data/player"
+              },
+              "amount": {
+                "$ref": "#/$defs/data/amount"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "money.deposited"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "player": {
+                "$ref": "#/$defs/data/player"
+              },
+              "amount": {
+                "$ref": "#/$defs/data/amount"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "chrono.checkin"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "replica": {
+                "$ref": "#/$defs/data/replica"
+              },
+              "player": {
+                "$ref": "#/$defs/data/player"
+              },
+              "reading_mps": {
+                "$ref": "#/$defs/data/reading_mps"
+              },
+              "bb_g": {
+                "$ref": "#/$defs/data/bb_g"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "chrono.spotcheck"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "replica": {
+                "$ref": "#/$defs/data/replica"
+              },
+              "player": {
+                "$ref": "#/$defs/data/player"
+              },
+              "reading_mps": {
+                "$ref": "#/$defs/data/reading_mps"
+              },
+              "bb_g": {
+                "$ref": "#/$defs/data/bb_g"
+              },
+              "tolerance_pct": {
+                "$ref": "#/$defs/data/tolerance_pct"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "visibility.granted"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "see_team": {
+                "$ref": "#/$defs/data/see_team"
+              },
+              "duration_s": {
+                "$ref": "#/$defs/data/duration_s"
+              },
+              "text": {
+                "$ref": "#/$defs/data/text"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "visibility.expired"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "see_team": {
+                "$ref": "#/$defs/data/see_team"
+              },
+              "text": {
+                "$ref": "#/$defs/data/text"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "node.tamper"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "reason": {
+                "$ref": "#/$defs/data/reason"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "pod.connected"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "fw": {
+                "$ref": "#/$defs/data/fw"
+              },
+              "tier": {
+                "$ref": "#/$defs/data/tier"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "pod.disconnected"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "reason": {
+                "$ref": "#/$defs/data/reason"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
     }
   ],
   "$defs": {
@@ -1046,6 +1436,14 @@
       "duration_s": {
         "type": "number",
         "description": "countdown or visibility duration in seconds"
+      },
+      "see_team": {
+        "type": "string",
+        "description": "team whose positions become visible"
+      },
+      "tolerance_pct": {
+        "type": "number",
+        "description": "chrono comparison tolerance in percent"
       },
       "holder": {
         "type": "string",

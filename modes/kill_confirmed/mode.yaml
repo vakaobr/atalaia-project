@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+id: org.atalaia.kill_confirmed
+version: 0.1.0
+license: GPL-3.0-or-later
+min_tier: reduced
+kind: mode
+name: Kill Confirmed
+description: >-
+  Players carry signed NFC tags. A team presses its button at the station and scans the tags it
+  collected: an enemy's tag confirms the kill (points for the team, a penalty for the tag's team), a
+  teammate's tag denies it. Forged tags and tags from another game are refused.
+roles:
+  station: { requires: [nfc, team_input], optional: [display] }
+params:
+  confirm_points: { type: int, min: 0, max: 100, default: 1, label: "Points for a confirmed kill" }
+  penalty_points: { type: int, min: 0, max: 100, default: 1, label: "Points the killed player's team loses" }
+  turn_in_s:      { type: int, min: 3, max: 120, default: 20, label: "Seconds to scan tags after pressing the team button" }
+  retag_after_s:  { type: int, min: 1, max: 3600, default: 60, label: "Seconds before the same player's tag counts again" }
+i18n:
+  pt:
+    name: Baixa Confirmada
+    description: >-
+      Cada participante leva uma etiqueta NFC assinada. Uma equipa carrega no seu botão na estação e lê as
+      etiquetas que recolheu: a etiqueta de alguém da equipa adversária confirma a baixa (pontos para a
+      equipa e penalização para a equipa da etiqueta); a de alguém da própria equipa nega-a. Etiquetas
+      falsificadas ou de outro jogo são recusadas.
+    params:
+      confirm_points: Pontos por baixa confirmada
+      penalty_points: Pontos que perde a equipa de quem foi abatido
+      turn_in_s: Segundos para ler etiquetas depois de carregar no botão da equipa
+      retag_after_s: Segundos até a etiqueta da mesma pessoa voltar a contar

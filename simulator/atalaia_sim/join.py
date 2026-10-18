@@ -222,17 +222,17 @@ def from_text(text: str) -> bytes:
     return raw
 
 
-def ndef_record(payload: bytes) -> bytes:
-    """One NDEF MIME record (MB, ME, TNF 2) of type application/vnd.atalaia.join."""
+def ndef_record(payload: bytes, mime: bytes = NDEF_TYPE) -> bytes:
+    """One NDEF MIME record (MB, ME, TNF 2), by default of type application/vnd.atalaia.join."""
     short = len(payload) < 256
     flags = 0x80 | 0x40 | (0x10 if short else 0) | 0x02
     length = bytes([len(payload)]) if short else len(payload).to_bytes(4, "big")
-    return bytes([flags, len(NDEF_TYPE)]) + length + NDEF_TYPE + payload
+    return bytes([flags, len(mime)]) + length + mime + payload
 
 
-def to_ndef_tag(payload: bytes) -> bytes:
+def to_ndef_tag(payload: bytes, mime: bytes = NDEF_TYPE) -> bytes:
     """A Type 2 tag's user memory from page 4: NDEF message TLV, then the terminator TLV."""
-    message = ndef_record(payload)
+    message = ndef_record(payload, mime)
     if len(message) < 0xFF:
         head = bytes([0x03, len(message)])
     else:
@@ -240,8 +240,8 @@ def to_ndef_tag(payload: bytes) -> bytes:
     return head + message + b"\xfe"
 
 
-def from_ndef_tag(mem: bytes) -> Optional[bytes]:
-    """The join payload in a Type 2 tag's user memory, or None."""
+def from_ndef_tag(mem: bytes, mime: bytes = NDEF_TYPE) -> Optional[bytes]:
+    """The join payload (or the first record of type mime) in a Type 2 tag's user memory, or None."""
     i = 0
     while i < len(mem):
         t = mem[i]
@@ -260,12 +260,12 @@ def from_ndef_tag(mem: bytes) -> Optional[bytes]:
         if length > len(mem) - i:
             return None
         if t == 0x03:
-            return _find_record(mem[i:i + length])
+            return _find_record(mem[i:i + length], mime)
         i += length
     return None
 
 
-def _find_record(m: bytes) -> Optional[bytes]:
+def _find_record(m: bytes, mime: bytes) -> Optional[bytes]:
     i = 0
     while i < len(m):
         hdr = m[i]
@@ -299,7 +299,7 @@ def _find_record(m: bytes) -> Optional[bytes]:
         i += idlen
         if plen > len(m) - i:
             return None
-        if hdr & 0x07 == 0x02 and rtype == NDEF_TYPE:
+        if hdr & 0x07 == 0x02 and rtype == mime:
             return m[i:i + plen]
         i += plen
         if hdr & 0x40:

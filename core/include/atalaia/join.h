@@ -127,7 +127,16 @@ size_t atalaia_join_from_ndef_tag(const uint8_t *mem, size_t len, const uint8_t 
  */
 size_t atalaia_join_to_ndef_tag(const uint8_t *payload, size_t len, uint8_t *mem, size_t cap);
 
-/* HMAC-SHA256 (RFC 2104 / FIPS 180-4), used by the join tag. */
+/*
+ * The same two operations for any MIME record type (the join card's, or a
+ * player tag's ATALAIA_TAG_NDEF_TYPE in atalaia/tag.h).
+ */
+size_t atalaia_ndef_find_mime(const uint8_t *mem, size_t len, const char *mime,
+                              const uint8_t **payload);
+size_t atalaia_ndef_write_mime(const char *mime, const uint8_t *payload, size_t len, uint8_t *mem,
+                               size_t cap);
+
+/* HMAC-SHA256 (RFC 2104 / FIPS 180-4), used by the join tag and player tags. */
 void atalaia_hmac_sha256(const uint8_t *key, size_t key_len, const uint8_t *msg, size_t msg_len,
                          uint8_t out[32]);
 

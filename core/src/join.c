@@ -516,10 +516,10 @@ size_t atalaia_join_to_text(const uint8_t *payload, size_t len, char *text, size
 #define NDEF_IL        0x08
 #define NDEF_TNF_MIME  0x02
 
-/* Finds the join record in an NDEF message. */
-static size_t find_record(const uint8_t *m, size_t len, const uint8_t **payload)
+/* Finds the first MIME record of the given type in an NDEF message. */
+static size_t find_record(const uint8_t *m, size_t len, const char *mime, const uint8_t **payload)
 {
-    size_t type_len = strlen(ATALAIA_JOIN_NDEF_TYPE);
+    size_t type_len = strlen(mime);
     size_t i = 0;
     while (i < len) {
         uint8_t hdr = m[i++];
@@ -547,7 +547,7 @@ static size_t find_record(const uint8_t *m, size_t len, const uint8_t **payload)
         i += idlen;
         if (plen > len - i) return 0;
         if ((hdr & 0x07) == NDEF_TNF_MIME && tlen == type_len &&
-            memcmp(type, ATALAIA_JOIN_NDEF_TYPE, type_len) == 0) {
+            memcmp(type, mime, type_len) == 0) {
             *payload = m + i;
             return plen;
         }
@@ -558,6 +558,17 @@ static size_t find_record(const uint8_t *m, size_t len, const uint8_t **payload)
 }
 
 size_t atalaia_join_from_ndef_tag(const uint8_t *mem, size_t len, const uint8_t **payload)
+{
+    return atalaia_ndef_find_mime(mem, len, ATALAIA_JOIN_NDEF_TYPE, payload);
+}
+
+size_t atalaia_join_to_ndef_tag(const uint8_t *payload, size_t len, uint8_t *mem, size_t cap)
+{
+    return atalaia_ndef_write_mime(ATALAIA_JOIN_NDEF_TYPE, payload, len, mem, cap);
+}
+
+size_t atalaia_ndef_find_mime(const uint8_t *mem, size_t len, const char *mime,
+                              const uint8_t **payload)
 {
     size_t i = 0;
     while (i < len) {
@@ -572,15 +583,17 @@ size_t atalaia_join_from_ndef_tag(const uint8_t *mem, size_t len, const uint8_t 
             i += 2;
         }
         if (l > len - i) return 0;
-        if (t == TLV_NDEF) return find_record(mem + i, l, payload);
+        if (t == TLV_NDEF) return find_record(mem + i, l, mime, payload);
         i += l; /* lock or memory control TLV, or one we do not know */
     }
     return 0;
 }
 
-size_t atalaia_join_to_ndef_tag(const uint8_t *payload, size_t len, uint8_t *mem, size_t cap)
+size_t atalaia_ndef_write_mime(const char *mime, const uint8_t *payload, size_t len, uint8_t *mem,
+                               size_t cap)
 {
-    size_t type_len = strlen(ATALAIA_JOIN_NDEF_TYPE);
+    size_t type_len = strlen(mime);
+    if (type_len == 0 || type_len > 255) return 0;
     bool sr = len < 256;
     size_t rec_len = 2 + (sr ? 1 : 4) + type_len + len;
     size_t tlv_head = rec_len < 0xFF ? 2 : 4;
@@ -606,7 +619,7 @@ size_t atalaia_join_to_ndef_tag(const uint8_t *payload, size_t len, uint8_t *mem
         mem[o++] = (uint8_t)(len >> 8);
         mem[o++] = (uint8_t)len;
     }
-    memcpy(mem + o, ATALAIA_JOIN_NDEF_TYPE, type_len);
+    memcpy(mem + o, mime, type_len);
     o += type_len;
     memcpy(mem + o, payload, len);
     o += len;

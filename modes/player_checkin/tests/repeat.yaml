@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: With repeat_after_s a player counts again once the time has passed; a scan within it is a duplicate
+params: { repeat_after_s: 10, points: 3 }
+steps:
+  - scan: { player: b7, team: blue }
+  - expect: { type: player.checkin, team: blue, at: 0, data: { player: b7 } }
+  - wait: 9
+  - scan: { player: b7, team: blue }
+  - expect_screen: { template: checkin, data: { total: 1, message: Already checked in, error: true } }
+  - expect_no: player.checkin
+  - wait: 1
+  - scan: { player: b7, team: blue }
+  - expect: { type: player.checkin, team: blue, at: 10, data: { player: b7 } }
+  - expect_screen: { template: checkin, data: { total: 2, counts: BLUE 2 } }
+  - expect_score: { team: blue, points: 6 }
+  # The message clears after 4 s.
+  - wait: 4
+  - expect_screen: { template: checkin, data: { total: 2, error: false } }
+  - expect_no: script.error

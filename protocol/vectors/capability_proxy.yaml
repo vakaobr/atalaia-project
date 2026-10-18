@@ -1,0 +1,152 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Capability proxy protocol v1 vectors (protocol/capability-proxy.md). Every codec
+# (C: core/tests/test_proxy.c and firmware/esp32/test/test_proxy_codec.c; Python:
+# simulator/tests/test_capability_proxy.py; Dart: the player app) must turn each
+# vector's fields into exactly its payload and frame and back, and refuse every
+# invalid payload. Byte strings are hex. Written with the Python reference codec;
+# after editing, run python3 tools/protogen.py (core/tests/proxy_vectors.h).
+
+crc: { data: "313233343536373839", crc: 0x29b1 }   # CRC-16/CCITT-FALSE check value
+
+ident:
+  - name: full_pod
+    fields: {"fw_version": "0.3.0", "capabilities": [{"id": "btn.red", "type": "button", "team": "red"}, {"id": "btn.blue", "type": "button", "team": "blue"}, {"id": "ring", "type": "led", "count": 24, "rgb": true}, {"id": "spk", "type": "audio", "clips": true}, {"id": "nfc", "type": "nfc"}, {"id": "radio", "type": "lora"}], "battery_pct": 87, "has_radio": true, "protocol_version": 1}
+    payload: "a50165302e332e300286a36269646762746e2e726564647479706566627574746f6e647465616d63726564a36269646862746e2e626c7565647479706566627574746f6e647465616d64626c7565a46269646472696e676474797065636c656465636f756e74181863726762f5a36269646373706b647479706565617564696f65636c697073f5a2626964636e66636474797065636e6663a262696465726164696f6474797065646c6f726103185704f50501"
+    frame: "a50100b3a50165302e332e300286a36269646762746e2e726564647479706566627574746f6e647465616d63726564a36269646862746e2e626c7565647479706566627574746f6e647465616d64626c7565a46269646472696e676474797065636c656465636f756e74181863726762f5a36269646373706b647479706565617564696f65636c697073f5a2626964636e66636474797065636e6663a262696465726164696f6474797065646c6f726103185704f50501022a"
+  - name: no_battery_no_radio
+    fields: {"fw_version": "0.3.0-dev+g1a2b", "capabilities": [{"id": "btn.a", "type": "button"}], "has_radio": false, "protocol_version": 1}
+    payload: "a4016f302e332e302d6465762b67316132620281a26269646562746e2e61647479706566627574746f6e04f40501"
+    frame: "a501002ea4016f302e332e302d6465762b67316132620281a26269646562746e2e61647479706566627574746f6e04f40501711b"
+  - name: no_capabilities
+    fields: {"fw_version": "1", "capabilities": [], "battery_pct": 0, "has_radio": false, "protocol_version": 1}
+    payload: "a50161310280030004f40501"
+    frame: "a501000ca50161310280030004f40501375a"
+
+evt:
+  - name: button_hold
+    fields: {"cap_id": "btn.red", "event": "hold", "data": {"ms": 5000}, "seq": 7}
+    payload: "a4016762746e2e7265640264686f6c6403a1626d731913880407"
+    frame: "a502001aa4016762746e2e7265640264686f6c6403a1626d731913880407fde9"
+  - name: button_press_no_data
+    fields: {"cap_id": "btn.blue", "event": "press", "data": {}, "seq": 0}
+    payload: "a3016862746e2e626c7565026570726573730400"
+    frame: "a5020014a3016862746e2e626c75650265707265737304001523"
+  - name: nfc_tag
+    fields: {"cap_id": "nfc", "event": "tag", "data": {"uid": "04a1b2c3d4e5f6", "tag": "01702d3137011092d8e6a0e3d38a3e0a3e9b2d9c5d4bbf63e1"}, "seq": 65535}
+    payload: "a401636e6663026374616703a2637569646e303461316232633364346535663663746167783230313730326433313337303131303932643865366130653364333861336530613365396232643963356434626266363365310419ffff"
+    frame: "a502005ca401636e6663026374616703a2637569646e303461316232633364346535663663746167783230313730326433313337303131303932643865366130653364333861336530613365396232643963356434626266363365310419ffffda6c"
+  - name: nested_data
+    fields: {"cap_id": "imu", "event": "shock", "data": {"axes": [1, -2, 300], "g": 4, "ok": true, "where": {"side": "left"}}, "seq": 256}
+    payload: "a40163696d75026573686f636b03a4646178657383012119012c616704626f6bf5657768657265a16473696465646c65667404190100"
+    frame: "a5020036a40163696d75026573686f636b03a4646178657383012119012c616704626f6bf5657768657265a16473696465646c656674041901008f2f"
+
+cmd:
+  - name: ring_fill
+    fields: {"cap_id": "ring", "method": "fill", "args": {"team": "red"}, "seq": 1}
+    payload: "a4016472696e67026466696c6c03a1647465616d637265640401"
+    frame: "a503001aa4016472696e67026466696c6c03a1647465616d63726564040182e5"
+  - name: tone
+    fields: {"cap_id": "spk", "method": "tone", "args": {"freq": 2000, "ms": 150}, "seq": 300}
+    payload: "a4016373706b0264746f6e6503a264667265711907d0626d7318960419012c"
+    frame: "a503001fa4016373706b0264746f6e6503a264667265711907d0626d7318960419012c510f"
+  - name: clear_no_args
+    fields: {"cap_id": "keypad", "method": "clear", "args": {}, "seq": 65534}
+    payload: "a301666b65797061640265636c6561720419fffe"
+    frame: "a5030014a301666b65797061640265636c6561720419fffedd25"
+
+ack:
+  - name: seq_7
+    seq: 7
+    payload: "0007"
+    frame: "a50400020007868d"
+  - name: seq_0
+    seq: 0
+    payload: "0000"
+    frame: "a50400020000f66a"
+  - name: seq_max
+    seq: 65535
+    payload: "ffff"
+    frame: "a5040002ffffeb65"
+
+# The radio frames carry the USB modem's payloads (protocol/usb-modem.md) unchanged.
+radio:
+  - name: rx
+    type: 5
+    fields: {"header": "201234000700010203", "payload": "a50101020103190bb80405", "rssi": -87, "snr": 6, "epoch": 3}
+    payload: "201234000700010203a50101020103190bb80405a9060003"
+    frame: "a5050018201234000700010203a50101020103190bb80405a9060003a000"
+  - name: tx
+    type: 6
+    fields: {"header": "201234000700010203", "payload": "a10100"}
+    payload: "201234000700010203a10100"
+    frame: "a506000c201234000700010203a10100e9a5"
+  - name: tx_ack
+    type: 7
+    fields: {"seq": 513, "status": 1}
+    payload: "020101"
+    frame: "a507000302010110fd"
+  - name: cmd_configure
+    type: 8
+    fields: {"opcode": 2, "game_id": 4242, "node_id": 0, "epoch": 9, "max_hops": 2, "channel_hz": 869525000, "key": "2b7e151628aed2a6abf7158809cf4f3c"}
+    payload: "021092000000090233d3e6082b7e151628aed2a6abf7158809cf4f3c"
+    frame: "a508001c021092000000090233d3e6082b7e151628aed2a6abf7158809cf4f3ccd58"
+  - name: cmd_ident
+    type: 8
+    fields: {"opcode": 7}
+    payload: "07"
+    frame: "a50800010742d5"
+  - name: status
+    type: 9
+    fields: {"json": "{\"cmd\":4,\"configured\":true,\"radio\":\"sx1262\"}"}
+    payload: "7b22636d64223a342c22636f6e66696775726564223a747275652c22726164696f223a22737831323632227d"
+    frame: "a509002c7b22636d64223a342c22636f6e66696775726564223a747275652c22726164696f223a22737831323632227d71c4"
+  - name: error
+    type: 10
+    fields: {"code": 4, "message": "not configured"}
+    payload: "046e6f7420636f6e66696775726564"
+    frame: "a50a000f046e6f7420636f6e6669677572656407cf"
+
+# Keys 6-23 a later version may add are skipped; the decoded fields are those of
+# ident[0]'s layout below and evt button_hold.
+skipped_keys:
+  ident: { payload: "a60165302e332e30028004f5050109656c6174657217820102", fw_version: "0.3.0" }
+  evt: { payload: "a5016762746e2e7265640264686f6c6403a1626d73191388040706a1617801", same_as: button_hold }
+
+invalid:
+  - { name: missing_has_radio, type: 1, payload: "a30165302e332e3002800501", why: "has_radio is required" }
+  - { name: wrong_version, type: 1, payload: "a40165302e332e30028004f50502", why: "protocol_version must be 1" }
+  - { name: battery_101, type: 1, payload: "a50165302e332e30028003186504f50501", why: "battery_pct is 0-100" }
+  - { name: fw_version_too_long, type: 1, payload: "a4017818787878787878787878787878787878787878787878787878028004f50501", why: "fw_version is 1-23 bytes" }
+  - { name: fw_version_control, type: 1, payload: "a40164302e330a028004f50501", why: "fw_version is printable" }
+  - { name: descriptor_without_type, type: 1, payload: "a40165302e332e300281a1626964617804f50501", why: "a descriptor needs id and type" }
+  - { name: descriptor_empty_id, type: 1, payload: "a40165302e332e300281a2626964606474797065636e666304f50501", why: "a descriptor's id is not empty" }
+  - { name: too_many_capabilities, type: 1, payload: "a40165302e332e300291a26269646162647479706566627574746f6ea26269646162647479706566627574746f6ea26269646162647479706566627574746f6ea26269646162647479706566627574746f6ea26269646162647479706566627574746f6ea26269646162647479706566627574746f6ea26269646162647479706566627574746f6ea26269646162647479706566627574746f6ea26269646162647479706566627574746f6ea26269646162647479706566627574746f6ea26269646162647479706566627574746f6ea26269646162647479706566627574746f6ea26269646162647479706566627574746f6ea26269646162647479706566627574746f6ea26269646162647479706566627574746f6ea26269646162647479706566627574746f6ea26269646162647479706566627574746f6e04f50501", why: "at most 16 capabilities" }
+  - { name: has_radio_not_bool, type: 1, payload: "a40165302e332e30028004010501", why: "has_radio is a bool" }
+  - { name: keys_out_of_order, type: 1, payload: "a402800165302e332e3004f50501", why: "keys are in order" }
+  - { name: key_24, type: 1, payload: "a50165302e332e30028004f50501181800", why: "keys above 23 are refused" }
+  - { name: not_a_map, type: 1, payload: "8165302e332e30", why: "a payload is a map" }
+  - { name: trailing_byte, type: 2, payload: "a4016762746e2e7265640264686f6c6403a1626d73191388040700", why: "trailing bytes" }
+  - { name: missing_seq, type: 2, payload: "a2016762746e2e7265640264686f6c64", why: "seq is required" }
+  - { name: seq_too_big, type: 2, payload: "a3016762746e2e7265640264686f6c64041a00010000", why: "seq is 0-65535" }
+  - { name: cap_id_upper_case, type: 2, payload: "a3016342544e0264686f6c640401", why: "names are a-z 0-9 . _ -" }
+  - { name: event_too_long, type: 2, payload: "a3016762746e2e7265640278186868686868686868686868686868686868686868686868680401", why: "names are 1-23 bytes" }
+  - { name: empty_data_sent, type: 2, payload: "a4016762746e2e7265640264686f6c6403a00401", why: "an empty map is left out" }
+  - { name: data_not_a_map, type: 2, payload: "a4016762746e2e7265640264686f6c640381010401", why: "data is a map" }
+  - { name: data_integer_key, type: 2, payload: "a4016762746e2e7265640264686f6c6403a101020401", why: "data keys are text" }
+  - { name: duplicate_key, type: 2, payload: "a4016762746e2e726564016762746e2e7265640264686f6c640401", why: "a key twice" }
+  - { name: key_0, type: 3, payload: "a40001016472696e67026466696c6c0401", why: "key 0 is refused" }
+  - { name: method_empty, type: 3, payload: "a3016472696e6702600401", why: "names are not empty" }
+  - { name: ack_three_bytes, type: 4, payload: "000700", why: "an ACK is two bytes" }
+  - { name: ack_one_byte, type: 4, payload: "07", why: "an ACK is two bytes" }
+
+# Boot text, a frame, a frame with a bad CRC, an impossible length, a frame: the
+# decoder finds the two good frames, counting one CRC and one length error.
+stream:
+  bytes: "4553502d524f4d3a657370333273330d0aa502001aa4016762746e2e7265640264686f6c6403a1626d731913880407fde9a503001aa4016472696e67026466696c6c03a1647465616d637265640401821aa5017fffa50400020007868d"
+  frames:
+    - { type: 2, payload: "a4016762746e2e7265640264686f6c6403a1626d731913880407" }
+    - { type: 4, payload: "0007" }
+  crc_errors: 1
+  length_errors: 1

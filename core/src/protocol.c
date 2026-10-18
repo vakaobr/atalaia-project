@@ -31,8 +31,19 @@ static const uint8_t data_node_rebooted[] = {3};
 static const uint8_t data_battery_low[] = {20};
 static const uint8_t data_script_error[] = {19};
 static const uint8_t data_script_halted[] = {3};
+static const uint8_t data_kill_confirmed[] = {14, 13};
+static const uint8_t data_kill_denied[] = {14, 13};
 static const uint8_t data_laststand_countdown_start[] = {28};
 static const uint8_t data_laststand_countdown_cancel[] = {28};
+static const uint8_t data_money_collected[] = {14, 6};
+static const uint8_t data_money_deposited[] = {14, 6};
+static const uint8_t data_chrono_checkin[] = {24, 14, 25, 26};
+static const uint8_t data_chrono_spotcheck[] = {24, 14, 25, 26, 30};
+static const uint8_t data_visibility_granted[] = {29, 28, 17};
+static const uint8_t data_visibility_expired[] = {29, 17};
+static const uint8_t data_node_tamper[] = {3};
+static const uint8_t data_pod_connected[] = {21, 22};
+static const uint8_t data_pod_disconnected[] = {3};
 
 const atalaia_event_def_t atalaia_event_defs[] = {
     {"game.start", ATALAIA_EV_GAME_START, ATALAIA_PRIO_CRITICAL, data_game_start, 1},
@@ -59,11 +70,23 @@ const atalaia_event_def_t atalaia_event_defs[] = {
     {"battery.low", ATALAIA_EV_BATTERY_LOW, ATALAIA_PRIO_TELEMETRY, data_battery_low, 1},
     {"script.error", ATALAIA_EV_SCRIPT_ERROR, ATALAIA_PRIO_NORMAL, data_script_error, 1},
     {"script.halted", ATALAIA_EV_SCRIPT_HALTED, ATALAIA_PRIO_CRITICAL, data_script_halted, 1},
+    {"kill.confirmed", ATALAIA_EV_KILL_CONFIRMED, ATALAIA_PRIO_NORMAL, data_kill_confirmed, 2},
+    {"kill.denied", ATALAIA_EV_KILL_DENIED, ATALAIA_PRIO_NORMAL, data_kill_denied, 2},
+    {"team.eliminated", ATALAIA_EV_TEAM_ELIMINATED, ATALAIA_PRIO_NORMAL, NULL, 0},
     {"holdall.scoring_start", ATALAIA_EV_HOLDALL_SCORING_START, ATALAIA_PRIO_NORMAL, NULL, 0},
     {"holdall.scoring_stop", ATALAIA_EV_HOLDALL_SCORING_STOP, ATALAIA_PRIO_NORMAL, NULL, 0},
     {"laststand.countdown_start", ATALAIA_EV_LASTSTAND_COUNTDOWN_START, ATALAIA_PRIO_NORMAL, data_laststand_countdown_start, 1},
     {"laststand.countdown_cancel", ATALAIA_EV_LASTSTAND_COUNTDOWN_CANCEL, ATALAIA_PRIO_NORMAL, data_laststand_countdown_cancel, 1},
     {"laststand.defeated", ATALAIA_EV_LASTSTAND_DEFEATED, ATALAIA_PRIO_CRITICAL, NULL, 0},
+    {"money.collected", ATALAIA_EV_MONEY_COLLECTED, ATALAIA_PRIO_NORMAL, data_money_collected, 2},
+    {"money.deposited", ATALAIA_EV_MONEY_DEPOSITED, ATALAIA_PRIO_NORMAL, data_money_deposited, 2},
+    {"chrono.checkin", ATALAIA_EV_CHRONO_CHECKIN, ATALAIA_PRIO_NORMAL, data_chrono_checkin, 4},
+    {"chrono.spotcheck", ATALAIA_EV_CHRONO_SPOTCHECK, ATALAIA_PRIO_NORMAL, data_chrono_spotcheck, 5},
+    {"visibility.granted", ATALAIA_EV_VISIBILITY_GRANTED, ATALAIA_PRIO_NORMAL, data_visibility_granted, 3},
+    {"visibility.expired", ATALAIA_EV_VISIBILITY_EXPIRED, ATALAIA_PRIO_NORMAL, data_visibility_expired, 2},
+    {"node.tamper", ATALAIA_EV_NODE_TAMPER, ATALAIA_PRIO_CRITICAL, data_node_tamper, 1},
+    {"pod.connected", ATALAIA_EV_POD_CONNECTED, ATALAIA_PRIO_TELEMETRY, data_pod_connected, 2},
+    {"pod.disconnected", ATALAIA_EV_POD_DISCONNECTED, ATALAIA_PRIO_TELEMETRY, data_pod_disconnected, 1},
 };
 const size_t atalaia_event_def_count =
     sizeof(atalaia_event_defs) / sizeof(atalaia_event_defs[0]);
@@ -97,6 +120,8 @@ const atalaia_data_field_def_t atalaia_data_field_defs[] = {
     {"bb_g", ATALAIA_DATA_BB_G, ATALAIA_FIELD_NUMBER, false},
     {"limit_j", ATALAIA_DATA_LIMIT_J, ATALAIA_FIELD_NUMBER, false},
     {"duration_s", ATALAIA_DATA_DURATION_S, ATALAIA_FIELD_NUMBER, false},
+    {"see_team", ATALAIA_DATA_SEE_TEAM, ATALAIA_FIELD_STRING, false},
+    {"tolerance_pct", ATALAIA_DATA_TOLERANCE_PCT, ATALAIA_FIELD_NUMBER, false},
     {"holder", ATALAIA_DATA_HOLDER, ATALAIA_FIELD_STRING, false},
 };
 const size_t atalaia_data_field_def_count =

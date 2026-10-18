@@ -103,6 +103,8 @@ DATA_FIELDS = {
     'bb_g': DataField(26, 'number', False),
     'limit_j': DataField(27, 'number', False),
     'duration_s': DataField(28, 'number', False),
+    'see_team': DataField(29, 'string', False),
+    'tolerance_pct': DataField(30, 'number', False),
     'holder': DataField(31, 'string', False),
 }
 
@@ -131,11 +133,23 @@ EVENTS = {
     'battery.low': EventDef(22, 'telemetry', ('percent',)),
     'script.error': EventDef(23, 'normal', ('message',)),
     'script.halted': EventDef(24, 'critical', ('reason',)),
+    'kill.confirmed': EventDef(25, 'normal', ('player', 'owner')),
+    'kill.denied': EventDef(26, 'normal', ('player', 'owner')),
+    'team.eliminated': EventDef(27, 'normal', ()),
     'holdall.scoring_start': EventDef(28, 'normal', ()),
     'holdall.scoring_stop': EventDef(29, 'normal', ()),
     'laststand.countdown_start': EventDef(30, 'normal', ('duration_s',)),
     'laststand.countdown_cancel': EventDef(31, 'normal', ('duration_s',)),
     'laststand.defeated': EventDef(32, 'critical', ()),
+    'money.collected': EventDef(33, 'normal', ('player', 'amount')),
+    'money.deposited': EventDef(34, 'normal', ('player', 'amount')),
+    'chrono.checkin': EventDef(35, 'normal', ('replica', 'player', 'reading_mps', 'bb_g')),
+    'chrono.spotcheck': EventDef(36, 'normal', ('replica', 'player', 'reading_mps', 'bb_g', 'tolerance_pct')),
+    'visibility.granted': EventDef(37, 'normal', ('see_team', 'duration_s', 'text')),
+    'visibility.expired': EventDef(38, 'normal', ('see_team', 'text')),
+    'node.tamper': EventDef(39, 'critical', ('reason',)),
+    'pod.connected': EventDef(40, 'telemetry', ('fw', 'tier')),
+    'pod.disconnected': EventDef(41, 'telemetry', ('reason',)),
 }
 
 PAYLOAD_FIELDS = {

@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+id: org.atalaia.respawn
+version: 0.1.0
+license: GPL-3.0-or-later
+min_tier: reduced
+kind: mode
+name: Respawn and Lives
+description: >-
+  A respawn point counts lives. Players scan their signed NFC tag (or press their team's button) to come
+  back into the game; each respawn takes a life from their team, or from the player with per-player
+  lives, and a player must wait a cooldown between respawns. When a team has no lives left, the next
+  respawn is refused and the team is eliminated.
+roles:
+  respawn: { requires: [nfc], optional: [team_input, display] }
+params:
+  lives:              { type: int, min: 1, max: 1000, default: 20, label: "Lives: respawns per team, or per player with per-player lives" }
+  per_player:         { type: bool, default: false, label: "Count lives per player (needs NFC tags) instead of per team" }
+  respawn_cooldown_s: { type: int, min: 0, max: 600, default: 30, label: "Seconds a player waits between respawns" }
+i18n:
+  pt:
+    name: Reentradas e Vidas
+    description: >-
+      Um ponto de reentrada conta as vidas. Cada participante lê a sua etiqueta NFC assinada (ou carrega no
+      botão da sua equipa) para voltar ao jogo; cada reentrada gasta uma vida da equipa, ou da própria
+      pessoa com vidas individuais, e há um tempo de espera entre reentradas. Quando uma equipa fica sem
+      vidas, a reentrada seguinte é recusada e a equipa é eliminada.
+    params:
+      lives: "Vidas: reentradas por equipa, ou por pessoa com vidas individuais"
+      per_player: Contar as vidas por pessoa (precisa de etiquetas NFC) em vez de por equipa
+      respawn_cooldown_s: Segundos de espera entre reentradas de cada pessoa

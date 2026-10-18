@@ -124,6 +124,9 @@ extern const char domination_node_lua_start[] asm("_binary_domination_node_lua_s
 extern const char holdall_node_lua_start[] asm("_binary_holdall_node_lua_start");
 extern const char laststand_node_lua_start[] asm("_binary_laststand_node_lua_start");
 extern const char codes_node_lua_start[] asm("_binary_codes_node_lua_start");
+extern const char kill_confirmed_node_lua_start[] asm("_binary_kill_confirmed_node_lua_start");
+extern const char respawn_node_lua_start[] asm("_binary_respawn_node_lua_start");
+extern const char player_checkin_node_lua_start[] asm("_binary_player_checkin_node_lua_start");
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -193,8 +196,8 @@ static void serial_input_init(void)
     ESP_LOGI(TAG, "serial keys on: type 0-9, * and # on the console");
 #endif
 #if CONFIG_ATALAIA_SERIAL_JOIN
-    ESP_LOGI(TAG,
-             "serial join on: \"@join atalaia:join:...\" or \"@joinkey <hex>\" on the console");
+    ESP_LOGI(TAG, "serial join on: \"@join atalaia:join:...\", \"@joinkey <hex>\" or "
+                  "\"@tag <uid> [<tag>]\" on the console");
 #endif
 }
 
@@ -205,6 +208,13 @@ static void serial_command(const char *cmd)
         box_join_result_t r = box_game_join_text(&box, cmd + 5);
         ESP_LOGI(TAG, "join: %s", box_join_result_name(r));
         if (r == BOX_JOIN_OK) picker_active = false;
+        return;
+    }
+    if (strncmp(cmd, "tag ", 4) == 0) {
+        /* A player tag without a reader (bring-up, Wokwi): "@tag <uid hex> [<payload hex>]". */
+        if (!box_game_tag_text(&box, cmd + 4)) {
+            ESP_LOGW(TAG, "tag: refused (no game running, or not \"<uid hex> [<payload hex>]\")");
+        }
         return;
     }
     if (strncmp(cmd, "joinkey ", 8) == 0) {
@@ -316,10 +326,18 @@ static bool portal_join_key(const char *hex)
     return box_game_set_join_key_hex(&box, hex);
 }
 
-/* NFC join cards, while no game is being played: at most every 500 ms. */
-static void poll_join_card(uint32_t now)
+/*
+ * NFC, at most every 300 ms while a game runs (player tags, protocol/nfc-tag.md)
+ * and every 500 ms otherwise (join cards). A card is read once per tap.
+ * During a game a card with a player tag goes to the mode as nfc.tag, as
+ * does any card without an Atalaia record (reason "unsigned"); a join card
+ * is handled as a join, as before (refused while a joined game is played).
+ */
+static void poll_nfc(uint32_t now)
 {
-    if (box.phase == BOX_PLAYING || now - nfc_last_poll_ms < 500) return;
+    bool playing = runner.running;
+    if (now - nfc_last_poll_ms < (playing ? 300u : 500u)) return;
+    if (!playing && box.phase == BOX_PLAYING) return;
     nfc_last_poll_ms = now;
     hal_nfc_tag_t tag;
     if (!hal.nfc->poll(&tag)) {
@@ -332,6 +350,16 @@ static void poll_join_card(uint32_t now)
     memcpy(nfc_last_uid, tag.uid, sizeof(nfc_last_uid));
     nfc_last_uid_len = tag.uid_len;
     int n = hal.nfc->read_user_memory(nfc_mem, sizeof(nfc_mem));
+    if (playing) {
+        const uint8_t *payload = NULL;
+        size_t len = n > 0 ? atalaia_tag_from_ndef_tag(nfc_mem, (size_t)n, &payload) : 0;
+        const uint8_t *join = NULL;
+        bool join_card = n > 0 && atalaia_join_from_ndef_tag(nfc_mem, (size_t)n, &join) > 0;
+        if (len > 0 || !join_card) {
+            box_game_tag(&box, tag.uid, tag.uid_len, len > 0 ? payload : NULL, len);
+            return;
+        }
+    }
     if (n <= 0) return;
     box_join_result_t r = box_game_join_tag(&box, nfc_mem, (size_t)n);
     if (r == BOX_JOIN_NOT_A_JOIN) return; /* some other tag */
@@ -396,7 +424,7 @@ static void start_game(void)
     }
     game_preset.duration_s = preset_ui_timer_duration(&preset_ui);
 
-    /* Shown until the mode draws its own screen (Domination draws none while it runs). */
+    /* Shown until the mode draws its own screen. */
     char data[SCREEN_DATA_MAX];
     const char *label = game_preset.label[0] ? game_preset.label : game_preset.mode_id;
     snprintf(data, sizeof(data), "{\"title\":\"Game on\",\"mode\":\"%.40s\",\"timer_s\":%u}", label,
@@ -474,8 +502,8 @@ static void task_game(void *arg)
             }
         }
 
-        /* ---- NFC join cards ---- */
-        poll_join_card(now);
+        /* ---- NFC: join cards, and player tags while a game runs ---- */
+        poll_nfc(now);
 
         /* ---- Start the game the picker confirmed ---- */
         if (picker_active && preset_ui_get_state(&preset_ui) == PRESET_UI_STATE_GAME_STARTED &&
@@ -614,6 +642,11 @@ static void seed_presets(void)
         {"org.atalaia.holdall", holdall_node_lua_start, strlen(holdall_node_lua_start)},
         {"org.atalaia.laststand", laststand_node_lua_start, strlen(laststand_node_lua_start)},
         {"org.atalaia.codes", codes_node_lua_start, strlen(codes_node_lua_start)},
+        {"org.atalaia.kill_confirmed", kill_confirmed_node_lua_start,
+         strlen(kill_confirmed_node_lua_start)},
+        {"org.atalaia.respawn", respawn_node_lua_start, strlen(respawn_node_lua_start)},
+        {"org.atalaia.player_checkin", player_checkin_node_lua_start,
+         strlen(player_checkin_node_lua_start)},
     };
     int n = builtin_presets_seed(sources, (int)(sizeof(sources) / sizeof(sources[0])));
     if (n > 0) ESP_LOGI(TAG, "stored %d built-in preset(s)", n);
@@ -712,6 +745,7 @@ void app_main(void)
             uint8_t tc = saved.team_count;
             if (tc < 2) tc = 2;
             if (tc > 4) tc = 4;
+            node_runner_set_mode(&runner, game_preset.mode_id);
             if (node_runner_resume(&runner, &saved, game_preset.source, game_preset.source_len,
                                    game_preset.params_json, default_teams, tc)) {
                 button_tracker_init(&btn_tracker, default_teams, tc);

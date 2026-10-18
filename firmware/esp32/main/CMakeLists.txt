@@ -25,6 +25,7 @@ else()
         "state_persist.c"
         "node_runner.c"
         "screen_renderer.c"
+        "screen_template.c"
         "display_port.c"
         "preset_ui.c"
         "key_filter.c"
@@ -90,12 +91,21 @@ idf_component_get_property(lvgl_lib lvgl__lvgl COMPONENT_LIB)
 target_include_directories(${lvgl_lib} PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../lvgl_conf")
 target_compile_definitions(${lvgl_lib} PUBLIC LV_KCONFIG_IGNORE)
 
+# Screen templates (ADR-P3-4): every modes/<mode>/assets/screens/*.yaml is
+# compiled into the image (builtin_screens.c, generated here).
+if(NOT CONFIG_ATALAIA_MODEM_MODE)
+    include("${CMAKE_CURRENT_LIST_DIR}/builtin_screens.cmake")
+    atalaia_builtin_screens("${CMAKE_CURRENT_LIST_DIR}/../../../modes"
+                            "${CMAKE_CURRENT_BINARY_DIR}/builtin_screens.c")
+    target_sources(${COMPONENT_LIB} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/builtin_screens.c")
+endif()
+
 # Built-in presets: the mode scripts from modes/ are compiled into the image
 # and written to the preset store when it is empty (builtin_presets.c). They
 # are copied first because both files are called node.lua.
 if(NOT CONFIG_ATALAIA_MODEM_MODE)
     set(ATALAIA_MODES_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../modes")
-    foreach(mode bomb domination holdall laststand codes)
+    foreach(mode bomb domination holdall laststand codes kill_confirmed respawn player_checkin)
         configure_file("${ATALAIA_MODES_DIR}/${mode}/node.lua"
                        "${CMAKE_CURRENT_BINARY_DIR}/${mode}_node.lua" COPYONLY)
         target_add_binary_data(${COMPONENT_LIB} "${CMAKE_CURRENT_BINARY_DIR}/${mode}_node.lua" TEXT)

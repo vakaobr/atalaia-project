@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: With per-player lives each player has their own, buttons ask for a tag, and forged tags are refused
+params: { lives: 2, per_player: true, respawn_cooldown_s: 5 }
+steps:
+  - scan: { player: r1, team: red }
+  - expect: { type: player.respawn, team: red, data: { player: r1, lives_left: 1 } }
+  - scan: { player: r2, team: red }
+  - expect: { type: player.respawn, team: red, data: { player: r2, lives_left: 1 } }
+  - wait: 5
+  - scan: { player: r1, team: red }
+  - expect: { type: player.respawn, team: red, at: 5, data: { player: r1, lives_left: 0 } }
+  - wait: 5
+  - scan: { player: r1, team: red }
+  - expect_screen: { template: respawn, data: { player: r1, lives: 0, message: No lives left, error: true } }
+  - expect_no: player.respawn
+  - expect_no: team.eliminated
+  - press: { team: red }
+  - expect_screen: { template: respawn, data: { message: Scan your tag, error: true } }
+  - scan: { player: r9, team: red, forged: true }
+  - expect_screen: { template: respawn, data: { message: Forged tag, error: true } }
+  - expect_no: player.respawn
+  # A player tag without a team still has its own lives.
+  - scan: { player: marshal }
+  - expect: { type: player.respawn, data: { player: marshal, lives_left: 1 } }
+  - expect_no: script.error

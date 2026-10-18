@@ -10,8 +10,14 @@
  * Two operations: poll for an ISO 14443A tag (InListPassiveTarget), and
  * read a Type 2 tag's user memory (NTAG215/216, pages from 4) with the
  * tag's READ command through InDataExchange, for join cards
- * (protocol/join.md). Not yet run against a real PN532: the boards and
- * readers have not arrived (plan phase F); BRING_UP.md step 7 checks it.
+ * (protocol/join.md) and player tags (protocol/nfc-tag.md). Since the box
+ * also polls during games, init sets the chip to normal mode
+ * (SAMConfiguration) and to one passive activation attempt
+ * (RFConfiguration MaxRetries), so a poll with no tag in the field returns
+ * at once instead of waiting out the timeout, and a read stops as soon as
+ * the NDEF message is complete. Not yet run against a real PN532: the
+ * boards and readers have not arrived (plan phase F); BRING_UP.md step 7
+ * checks it.
  */
 
 #ifdef ESP_PLATFORM
@@ -19,7 +25,6 @@
 #include "../hal_nfc.h"
 #include "hal_esp_i2c.h"
 
-#include "atalaia/join.h"
 #include "driver/i2c.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -34,6 +39,8 @@ static const char *TAG = "hal_nfc";
 
 #define PN532_I2C_ADDR                0x24
 #define PN532_READY_BIT               0x01
+#define PN532_CMD_SAMCONFIGURATION    0x14
+#define PN532_CMD_RFCONFIGURATION     0x32
 #define PN532_CMD_INLISTPASSIVETARGET 0x4A
 #define PN532_CMD_INDATAEXCHANGE      0x40
 #define NTAG_CMD_READ                 0x30
@@ -130,6 +137,16 @@ static int esp_nfc_init(void)
         return -1;
     }
     ESP_LOGI(TAG, "PN532 NFC reader at 0x%02X", PN532_I2C_ADDR);
+    /* Normal mode (no SAM), and one passive activation attempt per poll
+     * (MxRtyATR 0xFF, MxRtyPSL 1, MxRtyPassiveActivation 1). */
+    static const uint8_t sam[] = {PN532_CMD_SAMCONFIGURATION, 0x01, 0x14, 0x01};
+    static const uint8_t retries[] = {PN532_CMD_RFCONFIGURATION, 0x05, 0xFF, 0x01, 0x01};
+    uint8_t resp[8];
+    if (pn532_transceive(sam, sizeof(sam), resp, sizeof(resp)) < 1 ||
+        pn532_transceive(retries, sizeof(retries), resp, sizeof(resp)) < 1) {
+        ESP_LOGW(TAG, "PN532: configuration not acknowledged; polls may block for %d ms",
+                 PN532_TIMEOUT_MS);
+    }
     return 0;
 }
 
@@ -154,6 +171,28 @@ static bool esp_nfc_poll(hal_nfc_tag_t *tag)
     return true;
 }
 
+/* True once the TLVs read so far hold a complete NDEF message, or the terminator. */
+static bool ndef_complete(const uint8_t *m, size_t len)
+{
+    size_t i = 0;
+    while (i < len) {
+        uint8_t t = m[i++];
+        if (t == 0x00) continue; /* NULL TLV */
+        if (t == 0xFE) return true;
+        if (i >= len) return false;
+        size_t l = m[i++];
+        if (l == 0xFF) {
+            if (len - i < 2) return false;
+            l = (size_t)m[i] << 8 | m[i + 1];
+            i += 2;
+        }
+        if (t == 0x03) return l <= len - i;
+        if (l > len - i) return false;
+        i += l;
+    }
+    return false;
+}
+
 static int esp_nfc_read_user_memory(uint8_t *buf, size_t cap)
 {
     if (!present || !have_target) return -1;
@@ -167,9 +206,8 @@ static int esp_nfc_read_user_memory(uint8_t *buf, size_t cap)
         size_t take = cap - got < 16 ? cap - got : 16;
         memcpy(buf + got, resp + 2, take);
         got += take;
-        /* Stop as soon as the join record is complete. */
-        const uint8_t *payload = NULL;
-        if (atalaia_join_from_ndef_tag(buf, got, &payload) > 0) break;
+        /* Stop as soon as the NDEF message is complete (a join card, a player tag). */
+        if (ndef_complete(buf, got)) break;
     }
     return got > 0 ? (int)got : -1;
 }

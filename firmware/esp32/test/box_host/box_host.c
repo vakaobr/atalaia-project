@@ -366,7 +366,8 @@ int main(int argc, char **argv)
     static const char *const builtin_modes[][2] = {
         {"bomb", "org.atalaia.bomb"},       {"domination", "org.atalaia.domination"},
         {"holdall", "org.atalaia.holdall"}, {"laststand", "org.atalaia.laststand"},
-        {"codes", "org.atalaia.codes"},
+        {"codes", "org.atalaia.codes"},     {"kill_confirmed", "org.atalaia.kill_confirmed"},
+        {"respawn", "org.atalaia.respawn"}, {"player_checkin", "org.atalaia.player_checkin"},
     };
     enum { BUILTIN_COUNT = sizeof(builtin_modes) / sizeof(builtin_modes[0]) };
     builtin_source_t sources[BUILTIN_COUNT];

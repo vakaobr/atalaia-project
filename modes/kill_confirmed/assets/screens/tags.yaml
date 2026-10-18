@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The Kill Confirmed station. Data: team (the team turning in tags, while the
+# station is open), left (seconds left to scan), message, error.
+template: tags
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: "{team || 'panel'}" }
+    children:
+      - type: label
+        text: KILL CONFIRMED
+        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{!team}" }
+      - type: label
+        text: "{team|upper}: SCAN TAGS"
+        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{team}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: Press your button
+    style: { font_size: 28, visible: "{!team}" }
+  - type: label
+    text: then scan the tags
+    style: { font_size: 20, color: muted, visible: "{!team}" }
+  - type: label
+    text: "{left}"
+    style: { font_size: 48, color: team, visible: "{team}" }
+  - type: progress_bar
+    value: "{left / params.turn_in_s}"
+    style: { width: 240, height: 8, color: team, visible: "{team}" }
+  - type: label
+    text: "{message}"
+    style:
+      font_size: 20
+      width: 300
+      color: "{error && 'danger' || 'accent'}"
+      visible: "{message}"
+      padding: { top: 6 }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "Enemy tag: confirmed. Team tag: denied."
+    style:
+      font_size: 14
+      color: muted
+      padding: { bottom: 10 }

@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Red has 3 lives; three respawns succeed, the fourth is refused and red is eliminated; a player waits out the cooldown
+params: { lives: 3, respawn_cooldown_s: 30 }
+steps:
+  - expect_screen: { template: respawn, data: { lives: 3 } }
+  - scan: { player: r1, team: red }
+  - expect: { type: player.respawn, team: red, at: 0, data: { player: r1, lives_left: 2 } }
+  - scan: { player: r2, team: red }
+  - expect: { type: player.respawn, team: red, data: { player: r2, lives_left: 1 } }
+  # r1 again, before the cooldown is over.
+  - wait: 10
+  - scan: { player: r1, team: red }
+  - expect_screen: { template: respawn, data: { message: Wait 20 s, error: true } }
+  - expect_no: player.respawn
+  - scan: { player: r3, team: red }
+  - expect: { type: player.respawn, team: red, at: 10, data: { player: r3, lives_left: 0 } }
+  - expect_screen: { template: respawn, data: { team: red, player: r3, lives: 0, message: Back in the game } }
+  # Blue's lives are blue's own.
+  - scan: { player: b1, team: blue }
+  - expect: { type: player.respawn, team: blue, data: { player: b1, lives_left: 2 } }
+  # Red has no lives left: the next respawn is refused and red is out, once.
+  - wait: 25
+  - scan: { player: r1, team: red }
+  - expect: { type: team.eliminated, team: red, at: 35 }
+  - expect_screen: { template: respawn, data: { team: red, lives: 0, message: "No lives left: team out", error: true } }
+  - expect_no: player.respawn
+  - scan: { player: r2, team: red }
+  - expect_no: team.eliminated
+  - expect_no: player.respawn
+  - expect_no: script.error

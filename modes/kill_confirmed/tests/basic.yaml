@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Red confirms a blue kill (+1/-1), a teammate's tag is denied, and forged or foreign tags are refused
+steps:
+  - expect_screen: { template: tags }
+  # Without a team at the station first, a tag does nothing.
+  - scan: { player: b1, team: blue }
+  - expect_screen: { template: tags, data: { message: "Press your team's button first", error: true } }
+  - expect_no: kill.confirmed
+  - press: { team: red }
+  - expect_screen: { template: tags, data: { team: red, left: 20, message: Scan your tags } }
+  - scan: { player: b1, team: blue }
+  - expect: { type: kill.confirmed, team: red, at: 0, data: { player: b1, owner: blue } }
+  - expect: { type: score.delta, team: blue, data: { amount: -1, reason: killed } }
+  - expect_score: { team: red, points: 1 }
+  - expect_score: { team: blue, points: -1 }
+  # A teammate's tag: the kill is denied, no points.
+  - scan: { player: r2, team: red }
+  - expect: { type: kill.denied, team: red, data: { player: r2, owner: red } }
+  - expect_screen: { template: tags, data: { message: "Kill denied: r2", error: false } }
+  - expect_score: { team: red, points: 1 }
+  # Signed with another key, written for another game, or not a game tag at all.
+  - scan: { player: b3, team: blue, forged: true }
+  - expect_screen: { template: tags, data: { message: Forged tag, error: true } }
+  - scan: { player: b3, team: blue, game: 7 }
+  - expect_screen: { template: tags, data: { message: Tag from another game, error: true } }
+  - scan: { uid: "04deadbeef" }
+  - expect_screen: { template: tags, data: { message: Not a game tag, error: true } }
+  - expect_no: kill.confirmed
+  - expect_no: kill.denied
+  - expect_score: { team: red, points: 1 }
+  - expect_score: { team: blue, points: -1 }
+  - expect_no: script.error

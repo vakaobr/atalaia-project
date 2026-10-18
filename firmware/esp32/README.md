@@ -23,14 +23,15 @@ The firmware is structured as a shell around the shared C core (`core/`):
 app_main
   +-- game_task (core 1, priority 5, 100 Hz, 12 KB stack)
   |     +-- radio RX -> box_game (field games: join, CMD, TIME, ACK)
-  |     +-- poll buttons/keypad/serial console; NFC join cards when idle
+  |     +-- poll buttons/keypad/serial console
+  |     +-- NFC: join cards when idle, player tags during a game (nfc.tag)
   |     +-- atalaia_node_advance()
   |     +-- game_timer_tick()
   |     +-- state_persist_save() (every 1 s)
   |     +-- command_dispatch()
   +-- lvgl_task (core 1, priority 4, 5 ms)
   |     +-- display_port_init() (LVGL 9.2, DMA flush)
-  |     +-- screen_render()
+  |     +-- screen_render() (the mode's YAML template, else the C screen)
   |     +-- lv_timer_handler()
   +-- radio_task (core 0, priority 3)
   |     +-- TX queue drain (radio_task_send)
@@ -109,7 +110,21 @@ cmake --build /tmp/fw-test && ctest --test-dir /tmp/fw-test --output-on-failure
 
 ## Screens
 
-The screen templates (`main/screen_renderer.c`, ADR-P1-2) are C functions
+Since phase 3 a mode can ship its screens as YAML templates
+(`modes/<mode>/assets/screens/`, ADR-P3-4; the format is in
+[modes/README.md](../../modes/README.md#screens)). They are compiled into the
+image at build time (`main/builtin_screens.cmake` writes `builtin_screens.c`,
+like the mode scripts), parsed by the core (`core/src/screen_template.c`)
+and drawn by `main/screen_template.c`: LVGL widgets are built once per
+template and then only the widgets whose text, colour, value or visibility
+changed are patched. The node runner tells the display which mode runs with
+a `@mode <mode id> <params>` message in the screen queue, so a name resolves
+to the running mode's template (main mode first, then its modifiers). Bomb
+and Domination use templates; when a mode has no template of a name, the C
+screens below are drawn. Templates come from the image only: there is no
+upload path yet, so LittleFS is not read for them (decision K10).
+
+The C screen templates (`main/screen_renderer.c`, ADR-P1-2) are C functions
 that build LVGL 9.2 widget trees for the 320x240 TFT: `standby`,
 `countdown`, `defused`, `exploded`, `final_score`, `paused`, `code_entry`
 (a code typed on the keypad: title, dots, an optional clock and a message;
@@ -123,7 +138,11 @@ fetched from its GitHub tag and checked against `dependencies.lock`) and the
 same `lvgl_conf/lv_conf.h`, render every template into memory, and compare
 the result pixel by pixel with the PNG files in
 [`test/screens/`](test/screens/). They also fail when a widget is clipped by
-the screen or two labels overlap. After changing a screen on purpose, run
+the screen or two labels overlap. The YAML templates of the modes have
+their own reference images (`test/screens/yaml_*.png`), and
+`test/test_screen_template.c` checks that every built-in template parses,
+that the running mode picks them, that a patch changes only the widgets it
+must, and the fallback to the C screens. After changing a screen on purpose, run
 `python tools/docker_fw.py test --update-screens` (or set
 `ATALAIA_UPDATE_SCREENS=1` for `ctest`), look at every changed PNG, and
 commit them with the change. Rendered images land in
@@ -219,10 +238,11 @@ Listed in `main/idf_component.yml`:
 ## Built-in presets
 
 Every mode in `modes/` is built into the image (`main/CMakeLists.txt`):
-Bomb, Domination, Hold-All Domination, Last Stand and the Codes modifier.
+Bomb, Domination, Hold-All Domination, Last Stand, the Codes modifier, and
+the phase 3 modes Kill Confirmed, Respawn and Lives and Player Check-in.
 At boot the firmware stores a preset, with the defaults from its
 `mode.yaml`, for each built-in mode that no stored preset uses yet (a new
-or erased box and every Wokwi run get all five, in that order; a box
+or erased box and every Wokwi run get all eight, in that order; a box
 updated to a firmware with more modes gets the new ones in free slots), and
 replaces the stored script of a built-in mode when the image has a
 different one (`main/builtin_presets.c`). The default admin PIN is 1234
@@ -235,6 +255,20 @@ simulator do (`main/box_game.c`). A preset holds up to 16 KB of script
 (`PRESET_SOURCE_MAX`) for that; Hold-All and Last Stand boxes play their part
 with no field-specific firmware code, while their `field.lua` runs on the
 controller.
+
+## Player tags (phase 3)
+
+While a game runs, the shell polls the PN532 every 300 ms and reads each card
+once per tap. A card with a player tag ([protocol/nfc-tag.md](../../protocol/nfc-tag.md))
+is checked with the joined game's id and key (`box_game_tag`, through
+`atalaia_tag_event_json` in the core) and reaches the mode as `nfc.tag`;
+a card without one arrives as `nfc.tag` with `valid: false, reason:
+"unsigned"`; a join card is still handled as a join. A game picked from the
+box's own list has no game key, so its tags are refused (`no_game`).
+`@tag <uid hex> [<tag payload hex>]` on the serial console does the same
+without a reader (bring-up, Wokwi; `CONFIG_ATALAIA_SERIAL_JOIN`). Team
+buttons now also send `team_input.press` when they go down (Kill Confirmed
+and Respawn count presses).
 
 ## Phase 2: the radio and field games
 

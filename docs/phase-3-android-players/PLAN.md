@@ -102,6 +102,15 @@ phase 3 software can proceed immediately.
 
 ## Phase A: Event schema, single-node game modes, capability proxy protocol, screen template format
 
+**Status (2026-10-18): done in software.** What was built, and where it
+differs from this section, is in `STATUS.md` ("Plan phase A") and decisions
+A1-A13 of `docs/review/decisions-to-review.md`. In short: Money Factory's
+mode and the chrono code wait (A1); the C proxy codec lives in the core
+(`core/src/proxy.c`) with the frames tested in `firmware/esp32/test` (A9);
+templates come from the firmware image, not LittleFS (A11); no
+`bomb/assets/screens/final_score.yaml` (A12); mode tests run with
+`python -m atalaia_sim test`, not pytest (A13).
+
 ### Goal
 
 Deliver everything that needs NO hardware, NO phase 2 completion, and

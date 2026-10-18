@@ -139,6 +139,11 @@ def find_library(explicit: Optional[str] = None) -> Path:
     )
 
 
+class _Scope(ctypes.Structure):
+    # atalaia_tpl_scope_t (core/include/atalaia/screen_template.h).
+    _fields_ = [("data", ctypes.c_char_p), ("params", ctypes.c_char_p)]
+
+
 class Core:
     """The loaded shared library, with argument types declared once."""
 
@@ -162,6 +167,15 @@ class Core:
             "atalaia_node_mem_used": ([p], ctypes.c_size_t),
             "atalaia_node_score": ([p], p),
             "atalaia_score_net": ([p, ctypes.c_uint8], ctypes.c_int64),
+            "atalaia_tag_event_json": ([ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p,
+                                        ctypes.c_size_t, ctypes.c_uint16, ctypes.c_char_p,
+                                        ctypes.POINTER(ctypes.c_char_p), ctypes.c_size_t,
+                                        ctypes.c_char_p, ctypes.c_size_t], ctypes.c_size_t),
+            "atalaia_tpl_sizeof": ([], ctypes.c_size_t),
+            "atalaia_tpl_parse": ([p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p,
+                                   ctypes.c_size_t], ctypes.c_bool),
+            "atalaia_tpl_text": ([ctypes.c_char_p, ctypes.POINTER(_Scope), ctypes.c_char_p,
+                                  ctypes.c_size_t], ctypes.c_size_t),
         }
         for name, (args, res) in sigs.items():
             fn = getattr(lib, name)
@@ -172,6 +186,34 @@ class Core:
     @property
     def version(self) -> str:
         return self.lib.atalaia_version().decode()
+
+    def check_screen(self, source: bytes) -> Optional[str]:
+        """Parses a screen template with the core's parser (the one the Field Box uses);
+        returns why it is refused, or None."""
+        tpl = ctypes.create_string_buffer(self.lib.atalaia_tpl_sizeof())
+        err = ctypes.create_string_buffer(160)
+        if self.lib.atalaia_tpl_parse(tpl, source, len(source), err, len(err)):
+            return None
+        return err.value.decode(errors="replace")
+
+    def screen_text(self, text: str, data: dict[str, Any], params: dict[str, Any]) -> str:
+        """A template text with its {expressions} filled in, as the renderers do it."""
+        scope = _Scope(json.dumps(data).encode(), json.dumps(params).encode())
+        out = ctypes.create_string_buffer(160)  # ATALAIA_TPL_TEXT_MAX
+        self.lib.atalaia_tpl_text(text.encode(), ctypes.byref(scope), out, len(out))
+        return out.value.decode()
+
+    def tag_event_json(self, uid: bytes, payload: Optional[bytes], game_id: int,
+                       game_key: Optional[bytes], teams: list[str]) -> str:
+        """The nfc.tag data for a tag read, as a host gets it from the core (atalaia/tag.h):
+        the tag is checked against the game's id and key in C, as on a box."""
+        names = (ctypes.c_char_p * max(len(teams), 1))(*[t.encode() for t in teams])
+        out = ctypes.create_string_buffer(256)  # ATALAIA_TAG_JSON_MAX
+        n = self.lib.atalaia_tag_event_json(uid, len(uid), payload, len(payload or b""), game_id,
+                                            game_key, names, len(teams), out, len(out))
+        if n == 0:
+            raise ValueError("atalaia_tag_event_json: the data does not fit")
+        return out.value.decode()
 
 
 @dataclass

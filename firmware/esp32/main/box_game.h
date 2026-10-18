@@ -25,6 +25,7 @@
 #include <stdint.h>
 
 #include "atalaia/join.h"
+#include "atalaia/tag.h"
 #include "node_runner.h"
 #include "preset_store.h"
 #include "radio/field_link.h"
@@ -132,5 +133,17 @@ void box_game_tick(box_game_t *g, uint32_t raw_delta_ms, uint32_t now_ms);
 
 /* True while the box belongs to a field controller's game (buttons go to the node). */
 bool box_game_active(const box_game_t *g);
+
+/*
+ * An NFC tag read while a game runs (joined or stand-alone): the node gets
+ * nfc.tag with the tag checked against the joined game's id and key
+ * (atalaia_tag_event_json; a stand-alone game has no key: reason no_game).
+ * payload is the tag's Atalaia record (atalaia_tag_from_ndef_tag), or NULL
+ * when it has none. Returns true if the node took the event.
+ */
+bool box_game_tag(box_game_t *g, const uint8_t *uid, size_t uid_len, const uint8_t *payload,
+                  size_t len);
+/* "@tag <uid hex> [<tag payload hex>]" on the console: the same, without a reader. */
+bool box_game_tag_text(box_game_t *g, const char *text);
 
 #endif /* ATALAIA_BOX_GAME_H */

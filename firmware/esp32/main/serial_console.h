@@ -8,8 +8,9 @@
  *     them, since the keypad cannot be pressed from a scenario);
  *   - a line that starts with '@' is a command, collected up to the line
  *     end: "@join atalaia:join:..." (a join text, protocol/join.md) and
- *     "@joinkey <64 hex digits>" (the field join key). Digits inside a
- *     command line are not keys.
+ *     "@joinkey <64 hex digits>" (the field join key) and
+ *     "@tag <uid hex> [<tag hex>]" (a player tag, protocol/nfc-tag.md).
+ *     Digits inside a command line are not keys.
  *
  * Platform-free so the host tests check it.
  */

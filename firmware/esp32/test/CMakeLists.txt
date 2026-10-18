@@ -52,6 +52,9 @@ set(CORE_SOURCES
     ${CORE_DIR}/src/duty_cycle.c
     ${CORE_DIR}/src/msg_codec.c
     ${CORE_DIR}/src/join.c
+    ${CORE_DIR}/src/tag.c
+    ${CORE_DIR}/src/screen_template.c
+    ${CORE_DIR}/src/proxy.c
 )
 add_library(atalaia_core_fw STATIC ${CORE_SOURCES})
 target_include_directories(atalaia_core_fw PUBLIC ${CORE_DIR}/include PRIVATE ${CORE_DIR}/src)
@@ -100,10 +103,17 @@ target_compile_definitions(atalaia_lvgl_host PUBLIC LV_CONF_INCLUDE_SIMPLE LV_KC
 target_compile_options(atalaia_lvgl_host PRIVATE -w)
 
 # ---- Screen renderer (same source and LVGL widget trees as the device) -------
-add_library(atalaia_screens_fw STATIC ${CMAKE_CURRENT_SOURCE_DIR}/../main/screen_renderer.c)
+# With the screen templates of modes/ built in, as main/CMakeLists.txt does.
+include(${CMAKE_CURRENT_LIST_DIR}/../main/builtin_screens.cmake)
+atalaia_builtin_screens("${MODES_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/builtin_screens.c")
+add_library(atalaia_screens_fw STATIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/../main/screen_renderer.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../main/screen_template.c
+    ${CMAKE_CURRENT_BINARY_DIR}/builtin_screens.c
+)
 target_include_directories(atalaia_screens_fw PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../main)
-target_compile_definitions(atalaia_screens_fw PRIVATE ATALAIA_SCREEN_LVGL=1)
-target_link_libraries(atalaia_screens_fw PUBLIC atalaia_lvgl_host)
+target_compile_definitions(atalaia_screens_fw PUBLIC ATALAIA_SCREEN_LVGL=1)
+target_link_libraries(atalaia_screens_fw PUBLIC atalaia_lvgl_host atalaia_core_fw)
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(atalaia_screens_fw PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
@@ -169,6 +179,7 @@ set(TEST_SOURCES
     test_box_game.c
     test_serial_console.c
     test_board_fem.c
+    test_screen_template.c
 )
 
 # ---- Executable --------------------------------------------------------------
@@ -219,7 +230,17 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(screen_test PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
 
+# ---- Capability proxy frames (protocol/capability-proxy.md) ------------------
+# The shared vectors through the modem framing the I/O pod reuses.
+add_executable(proxy_codec_test test_proxy_codec.c ${SHELL_DIR}/modem/modem_framing.c)
+target_include_directories(proxy_codec_test PRIVATE ${SHELL_DIR} ${CORE_DIR}/tests)
+target_link_libraries(proxy_codec_test PRIVATE atalaia_core_fw)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(proxy_codec_test PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
 # ---- CTest -------------------------------------------------------------------
 include(CTest)
 add_test(NAME firmware COMMAND firmware_test)
 add_test(NAME screens COMMAND screen_test)
+add_test(NAME proxy_codec COMMAND proxy_codec_test)

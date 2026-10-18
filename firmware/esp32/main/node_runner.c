@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "screen_template.h"
 #include "state_persist.h"
 
 #ifdef ESP_PLATFORM
@@ -46,7 +47,28 @@ static void on_log(void *user, const char *message)
 #endif
 }
 
+/* Tells the display which mode runs, first in the screen queue (screen_template.h). */
+static void announce_mode(node_runner_t *r, const char *params_json)
+{
+    if (r->queues.screen_count >= CMD_SCREEN_QUEUE_MAX) return;
+    screen_update_t *su = &r->queues.screens[r->queues.screen_count];
+    snprintf(su->template_name, sizeof(su->template_name), "%s", SCREEN_MODE_MESSAGE);
+    const char *params = params_json && params_json[0] ? params_json : "{}";
+    int n = snprintf(su->data_json, sizeof(su->data_json), "%s %s", r->mode_id, params);
+    if (n < 0 || (size_t)n >= sizeof(su->data_json)) {
+        /* Parameters too long for the message: the templates go without them. */
+        snprintf(su->data_json, sizeof(su->data_json), "%s {}", r->mode_id);
+    }
+    r->queues.screen_count++;
+}
+
 /* ------------------------------------------------------------------ */
+
+void node_runner_set_mode(node_runner_t *r, const char *mode_id)
+{
+    if (!r) return;
+    snprintf(r->mode_id, sizeof(r->mode_id), "%s", mode_id ? mode_id : "");
+}
 
 void node_runner_init(node_runner_t *r, hal_t *hal, size_t mem_limit)
 {
@@ -76,6 +98,8 @@ bool node_runner_start(node_runner_t *r, const preset_t *preset, const char *con
     r->game_time_ms = 0;
     r->persist_accum_ms = 0;
     r->team_count = team_count;
+    node_runner_set_mode(r, preset->mode_id);
+    announce_mode(r, preset->params_json);
 
     /* Create the node. */
     atalaia_node_config_t cfg = {0};
@@ -140,6 +164,7 @@ bool node_runner_resume(node_runner_t *r, const state_persist_data_t *saved, con
     r->persist_accum_ms = 0;
     r->team_count = team_count;
     r->preset_index = saved->preset_index;
+    announce_mode(r, params_json);
 
     /* Create the node. */
     atalaia_node_config_t cfg = {0};

@@ -1,0 +1,9 @@
+{
+  "id": "box-7c02:31",
+  "t": 61000,
+  "node": "box-7c02",
+  "type": "kill.confirmed",
+  "team": "red",
+  "data": { "player": "p-17", "owner": "blue" },
+  "prio": "normal"
+}
