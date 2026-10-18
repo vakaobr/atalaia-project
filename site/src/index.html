@@ -180,6 +180,34 @@ the pages. Code blocks and anything else that is the same in every language stay
       </div>
     </section>
 
+    {#
+      The two radio diagrams, built by tools/build_site.py from site/src/diagrams/ into
+      img/diagrams/<name>-<layout>-<language>.svg: the narrow layout (one column) on phones,
+      the wide one (two columns) elsewhere. Their alt text is the SVG's own description.
+    #}
+    <section aria-labelledby="radio">
+      <div class="wrap">
+        <h2 id="radio">{{ radio.title }}</h2>
+        <p class="intro">{{ radio.intro }}</p>
+        <figure class="radio-diagram">
+          <h3>{{ radio.lora.title }}</h3>
+          <p>{{ radio.lora.lead }}</p>
+          <picture>
+            <source media="(max-width: 760px)" srcset="{{ page.root }}img/diagrams/lora-narrow-{{ page.code }}.svg" width="420" height="1506">
+            <img src="{{ page.root }}img/diagrams/lora-wide-{{ page.code }}.svg" width="848" height="892" loading="lazy" decoding="async" alt="{{ diagrams.lora.desc|text }}">
+          </picture>
+        </figure>
+        <figure class="radio-diagram">
+          <h3>{{ radio.skirmesh.title }}</h3>
+          <p>{{ radio.skirmesh.lead }}</p>
+          <picture>
+            <source media="(max-width: 760px)" srcset="{{ page.root }}img/diagrams/skirmesh-narrow-{{ page.code }}.svg" width="420" height="1302">
+            <img src="{{ page.root }}img/diagrams/skirmesh-wide-{{ page.code }}.svg" width="848" height="711" loading="lazy" decoding="async" alt="{{ diagrams.skirmesh.desc|text }}">
+          </picture>
+        </figure>
+      </div>
+    </section>
+
     <section class="band" aria-labelledby="modes">
       <div class="wrap">
         <h2 id="modes">{{ modes.title }}</h2>

@@ -181,6 +181,30 @@ how:
     The field controller is the watchtower: from the middle of the field it keeps every prop in
     sight.
 
+radio:
+  title: How the radio works
+  intro: >-
+    The props talk over <a href="#glossary-lora">LoRa</a>, a long-range, low-power radio, in
+    Atalaia's own protocol, <a href="#glossary-skirmesh-rf">Skirmesh-RF</a>. These two diagrams
+    show what LoRa can and cannot do on a field, and how one protocol runs on very different
+    devices. None of it has been on a real field yet: range and timing will be measured in the
+    phase&nbsp;2 field test.
+  # Each diagram's alt text is its description, diagrams.*.desc, also used inside the SVG.
+  lora:
+    title: What LoRa can do
+    lead: >-
+      LoRa trades speed for reach: it gets short messages across a field on very little battery,
+      and its signal gets through walls and trees better than Wi-Fi does, although concrete, metal
+      and hills still block it. A box that cannot reach the controller is heard through the other
+      boxes, and European rules limit how much of the time each device may transmit.
+  skirmesh:
+    title: One protocol on every device
+    lead: >-
+      Skirmesh-RF is built in layers, from the radio up to the controller's API. A Field Box runs
+      everything up to the game modes; a Raspberry Pi controller leaves the radio work to a USB
+      radio modem; in phase&nbsp;3 an Android phone will do the same with an I/O pod. Phones on
+      the field's Wi-Fi need no LoRa radio at all.
+
 modes:
   title: Game modes
   intro: >-
@@ -462,7 +486,7 @@ glossary:
     text: >-
       Short for <em>long range</em>: a radio that sends small messages far on very little power,
       with no SIM card, mobile coverage or subscription. On a typical field it reaches roughly
-      <span class=”nowrap”>0.5–2&nbsp;km</span>, and gets through thick walls better than Wi-Fi.
+      <span class="nowrap">0.5–2&nbsp;km</span>, and gets through thick walls better than Wi-Fi.
       The catch: messages must be short, and each device may transmit only a small share of the
       time. Atalaia uses the EU868 g2 sub-band (869.525&nbsp;MHz by default, 10% duty
       cycle, 500&nbsp;mW), giving each box up to 6 minutes of airtime per hour — enough for
@@ -631,3 +655,126 @@ footer:
   independent: >-
     Independent and community-run; not affiliated with any commercial prop maker. This page sets no
     cookies and loads nothing from other sites.
+
+# The two radio diagrams: site/src/diagrams/*.svg, built into site/img/diagrams/.
+# Plain text, not HTML. Each text has a fixed room in the drawing; if a
+# translation does not fit, tools/build_site.py names the key and the line.
+diagrams:
+  lora:
+    title: How LoRa radio works
+    desc: >-
+      Five panels. Chirps: LoRa sends each symbol as a tone that sweeps across the channel, and a
+      receiver that knows the pattern can decode it even below the background noise, so it
+      reaches far on little power but carries only short messages. Spreading factor: each step up
+      from SF7 about doubles the time a message spends on air, for a little more range; the boxes
+      use SF7 today. Range: longest over open ground in line of sight, shorter through woods,
+      people and vehicles, much shorter inside buildings, and cut off by concrete, metal or a
+      hill, where a box in between can relay; 868 MHz gets through obstacles better than 2.4 GHz
+      Wi-Fi or Bluetooth. The design estimate of about 0.5 to 2 km on a typical outdoor field is
+      still to be measured in the phase 2 field test. Relays: a box out of the controller's reach
+      is heard through the other boxes, and a message is passed on at most twice by default. Rules in Europe:
+      one shared game channel, 869.525 MHz by default, up to 500 mW, and each device may transmit
+      at most 10% of the time, 6 minutes per hour.
+    chirp:
+      title: "Chirps: heard below the noise"
+      sweep: a chirp sweeps across the channel
+      noise: noise
+      below: decoded even below the noise
+      text: >-
+        The receiver knows the sweep pattern, so it hears it below the noise: long range on little
+        power, but slow, so messages are short.
+    sf:
+      title: Spreading factor (SF)
+      axis: Time on air for the same message
+      text: >-
+        Each step up about doubles the time on air, for a little more range. The boxes use SF7
+        today; the design plans SF9–10 for large outdoor fields.
+    range:
+      title: Open ground or indoors
+      axis: How far a message gets (a sketch, not to scale)
+      open: Open ground, in line of sight
+      woods: Woods, people, vehicles
+      walls: "Indoors: brick and stone walls"
+      blocked: Concrete, metal, behind a hill
+      relay: → a relay box helps
+      text: >-
+        868 MHz gets through walls, people and leaves better than 2.4 GHz Wi-Fi or Bluetooth, but
+        concrete, metal and hills cut it hard.
+      note: >-
+        Design estimate: about 0.5–2 km on a typical outdoor field. The phase 2 field test will
+        measure it.
+    relay:
+      title: Boxes relay for each other
+      controller: Controller
+      box_a: Box A repeats
+      box_b: Box B
+      text: >-
+        A box out of the controller's reach is heard through the others. A message is passed on at
+        most twice by default (the hop limit), so the channel stays clear.
+    rules:
+      title: Rules of the air in Europe (EU868)
+      hour: 1 hour
+      share: Each device may transmit at most 10% of the time, 6 minutes per hour.
+      text: >-
+        One shared game channel, 869.525 MHz by default, up to 500 mW, with no licence or SIM card.
+        The firmware holds messages back rather than break the limit.
+  skirmesh:
+    title: Skirmesh-RF on different devices
+    desc: >-
+      Left, the five layers of Skirmesh-RF from the bottom up: 1, the LoRa radio on one shared game
+      channel; 2, the Skirmesh-RF packet, with AES-128-CCM encryption under a key for each game,
+      epoch and sequence numbers against replays, a hop limit for relaying (two relays by default), ACKs, TIME beacons and
+      CLAIM for controller failover; 3, the messages HELLO, EVENT, ACK, STATE, CMD, TIME, CONFIG and
+      CLAIM in CBOR; 4, the shared C core and Lua game modes; 5, the field controller's REST,
+      WebSocket and MQTT APIs, GM console, scoreboard and join codes (NFC cards for boxes, QR codes
+      for a standby controller and, in phase 3, phones). Right,
+      which layers each device runs. Built and tested in software, not yet on a field: the Field
+      Box (layers 1 to 4), the USB radio modem (1 and 2) and the field controller on a Raspberry Pi
+      or PC (2 to 5), and the GM console on phones over Wi-Fi, which use layer 5 with no LoRa radio.
+      Planned: the satellite box (1 to 4) and, in phase 3, the I/O pod (1 and 2) that gives an
+      Android phone or tablet (2 to 4) a radio, and the player app.
+    stack: One protocol, in layers
+    l5:
+      title: Field controller services
+      text: >-
+        REST, WebSocket and MQTT APIs, GM console, scoreboard. Join codes: NFC cards for boxes,
+        QR codes for a standby controller and, in phase 3, phones.
+    l4:
+      title: "Game: shared core, Lua modes"
+      text: >-
+        The same C core and Lua modes run on every device that plays: zone rules on the boxes,
+        field-wide rules on the controller.
+    l3:
+      title: Messages
+      text: >-
+        HELLO, EVENT, ACK, STATE, CMD, TIME, CONFIG and CLAIM, packed as compact CBOR. Over Wi-Fi
+        the same events travel as JSON.
+    l2:
+      title: Skirmesh-RF packet
+      crypto: AES-128-CCM encryption, key per game
+      replay: "Epoch and sequence: replays refused"
+      hops: "Hop limit: 2 relays at most, by default"
+      acks: "ACKs: lost events are sent again"
+      time: TIME beacons keep clocks in step
+      claim: "CLAIM: a standby can take over"
+    l1:
+      title: LoRa radio
+      text: One shared game channel, 869.525 MHz by default, that every device listens on.
+    devices: Which device runs which layers
+    cells: "Coloured: the layers it runs"
+    box_sub: ESP32-S3 and an SX1262 LoRa radio
+    satellite: Satellite box
+    satellite_sub: "Planned: a smaller ESP32 box"
+    modem: USB radio modem
+    modem_sub: "Plugs into the controller: radio, encryption"
+    controller: Field controller
+    controller_sub: "Raspberry Pi or PC: the game, the API"
+    pod: I/O pod
+    pod_sub: "Phase 3: gives a phone a radio and buttons"
+    android: Android device
+    android_sub: "Phase 3: a phone or tablet runs the modes"
+    wifi: Phones on Wi-Fi
+    wifi_sub: GM console today, player app in phase 3
+    legend: >-
+      Solid: built and tested on a computer and in an emulator, not yet on a field. Dashed:
+      planned. Phones on Wi-Fi use layer 5 and need no LoRa radio.

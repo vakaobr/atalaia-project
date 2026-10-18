@@ -77,6 +77,20 @@ Atalaia takes a different approach:
 
 Every full node runs the same C11 core and the same Lua game modes; only the platform shell and hardware drivers differ. The complete design is in the [design specification](docs/design-spec.md).
 
+## How the radio works
+
+The props talk over LoRa, a long-range, low-power radio, in Atalaia's own protocol, Skirmesh-RF. None of it has been on a real field yet: range and timing will be measured in the phase 2 field test.
+
+**What LoRa can do.** LoRa trades speed for reach: it gets short messages across a field on very little battery, and its signal gets through walls and trees better than Wi-Fi does, although concrete, metal and hills still block it. A box that cannot reach the controller is heard through the other boxes, and European rules limit how much of the time each device may transmit.
+
+![How LoRa radio works, in five panels: chirps decoded below the noise; the spreading factor, where each step about doubles the time on air; range, longest over open ground and much shorter indoors or behind concrete, metal or a hill (design estimate 0.5–2 km outdoors, to be measured); boxes relaying for each other, at most twice by default; and the EU868 rules: one game channel at 869.525 MHz, up to 500 mW, at most 10% of the time.](site/img/diagrams/lora-wide-en.svg)
+
+**One protocol on every device.** Skirmesh-RF is built in layers, from the radio up to the controller's API. A Field Box runs everything up to the game modes; a Raspberry Pi controller leaves the radio work to a USB radio modem; in phase 3 an Android phone will do the same with an I/O pod. Phones on the field's Wi-Fi need no LoRa radio at all. The wire format is [RFC 0001](docs/rfcs/0001-skirmesh-rf-wire-format.md).
+
+![Skirmesh-RF on different devices: five layers from the bottom up (the LoRa radio on one shared channel; the encrypted Skirmesh-RF packet with anti-replay, hop limit, ACKs, TIME beacons and CLAIM failover; the eight message types in CBOR; the shared C core and Lua modes; the controller's APIs, GM console, scoreboard and join codes), and which layers each device runs. Built and tested in software: the Field Box (1 to 4), the USB radio modem (1 and 2), the field controller (2 to 5) and the GM console on phones over Wi-Fi (5). Planned: the satellite box (1 to 4) and, in phase 3, the I/O pod (1 and 2) and the Android device (2 to 4).](site/img/diagrams/skirmesh-wide-en.svg)
+
+The diagrams are built in English and Portuguese, for wide and narrow screens, from [`site/src/diagrams/`](site/src/diagrams/) by `tools/build_site.py`; the project page shows them in your language.
+
 ## Repository layout
 
 | Folder | What lives there | Licence |

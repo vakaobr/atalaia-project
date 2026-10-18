@@ -1,0 +1,192 @@
+{#
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: CC-BY-SA-4.0
+
+"Skirmesh-RF on different devices": the protocol's layers, and which device
+runs which, drawn for this project. tools/build_site.py writes it to
+site/img/diagrams/skirmesh-<layout>-<language>.svg: "wide" puts the two panels
+side by side, "narrow" one above the other. Each panel has its own coordinates
+(400 units wide).
+
+Facts: RFC 0001 with its amendments, protocol/usb-modem.md, protocol/join.md,
+docs/phase-2-field-network/STATUS.md (what is built), the phase 3 ADRs (the
+I/O pod and the Android app, not built). Built rows have a solid outline,
+planned ones a dashed one. Phones on Wi-Fi run no layer of their own: they use
+the controller's layer 5 (the GM console, built), so that cell is filled. Layer colours, bottom up: signal, sand-deep, sand,
+granite, slate (site/style.css).
+#}
+{% if layout wide %}
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 848 711" width="848" height="711" role="img" aria-labelledby="title desc" xml:lang="{{ page.lang }}" font-family="Barlow, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Liberation Sans', sans-serif" font-size="15" fill="#1f262c">
+{% endif %}
+{% if layout narrow %}
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 1302" width="420" height="1302" role="img" aria-labelledby="title desc" xml:lang="{{ page.lang }}" font-family="Barlow, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Liberation Sans', sans-serif" font-size="15" fill="#1f262c">
+{% endif %}
+  <title id="title">{{ diagrams.skirmesh.title|text }}</title>
+  <desc id="desc">{{ diagrams.skirmesh.desc|text }}</desc>
+{% if layout wide %}
+  <rect x="0.5" y="0.5" width="847" height="710" rx="10" fill="#f7f8f6" stroke="#d3d8db" />
+{% endif %}
+{% if layout narrow %}
+  <rect x="0.5" y="0.5" width="419" height="1301" rx="10" fill="#f7f8f6" stroke="#d3d8db" />
+{% endif %}
+  <text x="16" y="34" font-size="20" font-weight="600" data-width="388">{{ diagrams.skirmesh.title|text }}</text>
+
+  {# The layers, 5 at the top, 1 at the bottom. #}
+{% if layout wide %}
+  <g transform="translate(16 50)">
+{% endif %}
+{% if layout narrow %}
+  <g transform="translate(10 50)">
+{% endif %}
+    <rect x="0.5" y="0.5" width="399" height="644" rx="6" fill="#ffffff" stroke="#d3d8db" />
+    <text x="16" y="28" font-size="17" font-weight="600" data-width="368">{{ diagrams.skirmesh.stack|text }}</text>
+    <g fill="#f7f8f6" stroke="#d3d8db">
+      <rect x="12.5" y="44.5" width="375" height="112" rx="4" />
+      <rect x="12.5" y="163.5" width="375" height="112" rx="4" />
+      <rect x="12.5" y="282.5" width="375" height="112" rx="4" />
+      <rect x="12.5" y="401.5" width="375" height="151" rx="4" />
+      <rect x="12.5" y="559.5" width="375" height="73" rx="4" />
+    </g>
+    <path d="M42 44H16a4 4 0 0 0-4 4v105a4 4 0 0 0 4 4h26z" fill="#262d34" />
+    <path d="M42 163H16a4 4 0 0 0-4 4v105a4 4 0 0 0 4 4h26z" fill="#4a535c" />
+    <path d="M42 282H16a4 4 0 0 0-4 4v105a4 4 0 0 0 4 4h26z" fill="#e3c48d" />
+    <path d="M42 401H16a4 4 0 0 0-4 4v144a4 4 0 0 0 4 4h26z" fill="#c9a25c" />
+    <path d="M42 559H16a4 4 0 0 0-4 4v66a4 4 0 0 0 4 4h26z" fill="#f07a1a" />
+    <g font-size="17" font-weight="600" text-anchor="middle">
+      <text x="27" y="70" fill="#ffffff">5</text>
+      <text x="27" y="189" fill="#ffffff">4</text>
+      <text x="27" y="308" fill="#262d34">3</text>
+      <text x="27" y="427" fill="#262d34">2</text>
+      <text x="27" y="585" fill="#262d34">1</text>
+    </g>
+    <g font-size="16" font-weight="600">
+      <text x="52" y="67" data-width="328">{{ diagrams.skirmesh.l5.title|text }}</text>
+      <text x="52" y="186" data-width="328">{{ diagrams.skirmesh.l4.title|text }}</text>
+      <text x="52" y="305" data-width="328">{{ diagrams.skirmesh.l3.title|text }}</text>
+      <text x="52" y="424" data-width="328">{{ diagrams.skirmesh.l2.title|text }}</text>
+      <text x="52" y="582" data-width="328">{{ diagrams.skirmesh.l1.title|text }}</text>
+    </g>
+    <g fill="#56606a">
+      <text x="52" y="87" data-width="328" data-lines="4">{{ diagrams.skirmesh.l5.text|wrap }}</text>
+      <text x="52" y="206" data-width="328" data-lines="4">{{ diagrams.skirmesh.l4.text|wrap }}</text>
+      <text x="52" y="325" data-width="328" data-lines="4">{{ diagrams.skirmesh.l3.text|wrap }}</text>
+      <text x="52" y="602" data-width="328" data-lines="2">{{ diagrams.skirmesh.l1.text|wrap }}</text>
+    </g>
+    <g fill="#c9a25c">
+      <circle cx="57" cy="439" r="3" />
+      <circle cx="57" cy="458.5" r="3" />
+      <circle cx="57" cy="478" r="3" />
+      <circle cx="57" cy="497.5" r="3" />
+      <circle cx="57" cy="517" r="3" />
+      <circle cx="57" cy="536.5" r="3" />
+    </g>
+    <text x="66" y="444" data-width="314">{{ diagrams.skirmesh.l2.crypto|text }}</text>
+    <text x="66" y="463.5" data-width="314">{{ diagrams.skirmesh.l2.replay|text }}</text>
+    <text x="66" y="483" data-width="314">{{ diagrams.skirmesh.l2.hops|text }}</text>
+    <text x="66" y="502.5" data-width="314">{{ diagrams.skirmesh.l2.acks|text }}</text>
+    <text x="66" y="522" data-width="314">{{ diagrams.skirmesh.l2.time|text }}</text>
+    <text x="66" y="541.5" data-width="314">{{ diagrams.skirmesh.l2.claim|text }}</text>
+  </g>
+
+  {# The devices: a row each, with a cell per layer it runs. #}
+{% if layout wide %}
+  <g transform="translate(432 50)">
+    <rect x="0.5" y="0.5" width="399" height="644" rx="6" fill="#ffffff" stroke="#d3d8db" />
+{% endif %}
+{% if layout narrow %}
+  <g transform="translate(10 707)">
+    <rect x="0.5" y="0.5" width="399" height="584" rx="6" fill="#ffffff" stroke="#d3d8db" />
+{% endif %}
+    <text x="16" y="28" font-size="17" font-weight="600" data-width="368">{{ diagrams.skirmesh.devices|text }}</text>
+    <text x="16" y="52" fill="#56606a" data-width="236">{{ diagrams.skirmesh.cells|text }}</text>
+    <g font-weight="600" text-anchor="middle">
+      <text x="276" y="78">1</text>
+      <text x="300" y="78">2</text>
+      <text x="324" y="78">3</text>
+      <text x="348" y="78">4</text>
+      <text x="372" y="78">5</text>
+    </g>
+    <g fill="#f7f8f6" stroke="#4a535c">
+      <rect x="12.5" y="88.5" width="375" height="51" rx="4" />
+      <rect x="12.5" y="148.5" width="375" height="51" rx="4" stroke-dasharray="6 4" />
+      <rect x="12.5" y="208.5" width="375" height="103" rx="4" />
+      <rect x="12.5" y="320.5" width="375" height="103" rx="4" stroke-dasharray="6 4" />
+      <rect x="12.5" y="432.5" width="375" height="51" rx="4" />
+    </g>
+    <g stroke="#d3d8db">
+      <line x1="24" y1="260.5" x2="376" y2="260.5" />
+      <line x1="24" y1="372.5" x2="376" y2="372.5" />
+    </g>
+    {# The cells: x 266, 290, 314, 338, 362; y row top + 8. #}
+    <g stroke="#262d34" stroke-opacity="0.25">
+      <g>
+        <rect x="266" y="96" width="20" height="16" fill="#f07a1a" />
+        <rect x="290" y="96" width="20" height="16" fill="#c9a25c" />
+        <rect x="314" y="96" width="20" height="16" fill="#e3c48d" />
+        <rect x="338" y="96" width="20" height="16" fill="#4a535c" />
+        <rect x="362" y="96" width="20" height="16" fill="#ffffff" />
+      </g>
+      <g>
+        <rect x="266" y="156" width="20" height="16" fill="#f07a1a" />
+        <rect x="290" y="156" width="20" height="16" fill="#c9a25c" />
+        <rect x="314" y="156" width="20" height="16" fill="#e3c48d" />
+        <rect x="338" y="156" width="20" height="16" fill="#4a535c" />
+        <rect x="362" y="156" width="20" height="16" fill="#ffffff" />
+      </g>
+      <g>
+        <rect x="266" y="216" width="20" height="16" fill="#f07a1a" />
+        <rect x="290" y="216" width="20" height="16" fill="#c9a25c" />
+        <rect x="314" y="216" width="20" height="16" fill="#ffffff" />
+        <rect x="338" y="216" width="20" height="16" fill="#ffffff" />
+        <rect x="362" y="216" width="20" height="16" fill="#ffffff" />
+      </g>
+      <g>
+        <rect x="266" y="268" width="20" height="16" fill="#ffffff" />
+        <rect x="290" y="268" width="20" height="16" fill="#c9a25c" />
+        <rect x="314" y="268" width="20" height="16" fill="#e3c48d" />
+        <rect x="338" y="268" width="20" height="16" fill="#4a535c" />
+        <rect x="362" y="268" width="20" height="16" fill="#262d34" />
+      </g>
+      <g>
+        <rect x="266" y="328" width="20" height="16" fill="#f07a1a" />
+        <rect x="290" y="328" width="20" height="16" fill="#c9a25c" />
+        <rect x="314" y="328" width="20" height="16" fill="#ffffff" />
+        <rect x="338" y="328" width="20" height="16" fill="#ffffff" />
+        <rect x="362" y="328" width="20" height="16" fill="#ffffff" />
+      </g>
+      <g>
+        <rect x="266" y="380" width="20" height="16" fill="#ffffff" />
+        <rect x="290" y="380" width="20" height="16" fill="#c9a25c" />
+        <rect x="314" y="380" width="20" height="16" fill="#e3c48d" />
+        <rect x="338" y="380" width="20" height="16" fill="#4a535c" />
+        <rect x="362" y="380" width="20" height="16" fill="#ffffff" />
+      </g>
+      <g>
+        <rect x="266" y="440" width="20" height="16" fill="#ffffff" />
+        <rect x="290" y="440" width="20" height="16" fill="#ffffff" />
+        <rect x="314" y="440" width="20" height="16" fill="#ffffff" />
+        <rect x="338" y="440" width="20" height="16" fill="#ffffff" />
+        <rect x="362" y="440" width="20" height="16" fill="#262d34" />
+      </g>
+    </g>
+    <g font-size="16" font-weight="600">
+      <text x="24" y="109">Field Box</text>
+      <text x="24" y="169" data-width="236">{{ diagrams.skirmesh.satellite|text }}</text>
+      <text x="24" y="229" data-width="236">{{ diagrams.skirmesh.modem|text }}</text>
+      <text x="24" y="281" data-width="236">{{ diagrams.skirmesh.controller|text }}</text>
+      <text x="24" y="341" data-width="236">{{ diagrams.skirmesh.pod|text }}</text>
+      <text x="24" y="393" data-width="236">{{ diagrams.skirmesh.android|text }}</text>
+      <text x="24" y="453" data-width="236">{{ diagrams.skirmesh.wifi|text }}</text>
+    </g>
+    <g fill="#56606a">
+      <text x="24" y="130" data-width="352">{{ diagrams.skirmesh.box_sub|text }}</text>
+      <text x="24" y="190" data-width="352">{{ diagrams.skirmesh.satellite_sub|text }}</text>
+      <text x="24" y="250" data-width="352">{{ diagrams.skirmesh.modem_sub|text }}</text>
+      <text x="24" y="302" data-width="352">{{ diagrams.skirmesh.controller_sub|text }}</text>
+      <text x="24" y="362" data-width="352">{{ diagrams.skirmesh.pod_sub|text }}</text>
+      <text x="24" y="414" data-width="352">{{ diagrams.skirmesh.android_sub|text }}</text>
+      <text x="24" y="474" data-width="352">{{ diagrams.skirmesh.wifi_sub|text }}</text>
+    </g>
+    <text x="16" y="512" fill="#56606a" data-width="368" data-lines="4">{{ diagrams.skirmesh.legend|wrap }}</text>
+  </g>
+</svg>

@@ -269,6 +269,14 @@ nav a:hover { color: var(--on-slate); }
   .diagram-list { display: block; }
 }
 
+/* ---- radio diagrams: SVG images with their own light card, so they read in both themes ---- */
+
+.radio-diagram { margin: 0 0 48px; }
+.radio-diagram:last-child { margin-bottom: 0; }
+.radio-diagram p { color: var(--muted); max-width: 66ch; margin: 8px 0 20px; }
+/* Shown at their own size (848 or 420 units wide) or smaller, never stretched. */
+.radio-diagram img { display: block; max-width: 100%; height: auto; }
+
 /* ---- try it ---- */
 
 .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 20px; }

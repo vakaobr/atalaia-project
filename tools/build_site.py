@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Builds the project page in every language from one template.
+"""Builds the project page and its diagrams in every language from one set of templates.
 
-    python3 tools/build_site.py           write the pages
-    python3 tools/build_site.py --check   fail if a page is stale or a translation is incomplete
+    python3 tools/build_site.py           write the pages and the diagrams
+    python3 tools/build_site.py --check   fail if a file is stale or a translation is incomplete
 
-Reads the template site/src/index.html and one text file per language,
+Reads the template site/src/index.html, the diagram templates
+site/src/diagrams/<name>.svg and one text file per language,
 site/i18n/<code>.yaml, and writes, each marked "do not edit":
 
     site/index.html      Portuguese (pt-PT), the default page at the site root
     site/en/index.html   English
+    site/img/diagrams/<name>-<layout>-<code>.svg   each diagram, per layout and language
 
 In the template, {{ key }} inserts the text of a key as HTML, {{ key|text }}
 inserts it escaped (for attributes and SVG text), and {{ page.<name> }} inserts
@@ -20,11 +22,25 @@ tag on a line of its own, appear only on the pages of the languages listed
 (for a picture with English text in it, say). Nested keys in the YAML files are
 joined with dots (why.local.title).
 
-Every key a page uses must be in that page's language file, and every key in a
-language file must be used by its page. Both pages must also link to the same
+A diagram template is an SVG file with the same placeholders, apart from plain
+{{ key }}: its text is always escaped. Lines between {% if layout wide %} and
+{% endif %} make a layout: a diagram is written once per layout it names (a
+wide one for desktops and a narrow one for phones, say), or once if it names
+none. Translations differ in length, so a <text> whose only content is a
+placeholder gives the space it has: data-width (in SVG units) and, for
+{{ key|wrap }}, data-lines, the most lines the text may wrap to (data-leading
+sets the line height, 1.3 times the font size by default). The script wraps
+the text at spaces (and at line breaks in the YAML), and fails if a line does
+not fit, measuring it with the widest of the common fallback fonts
+(DejaVu Sans, Liberation Sans, Segoe UI, FreeSans), as a diagram shown as an
+image cannot use the page's fonts. The font size and weight come from the
+font-size and font-weight attributes of the text or its parents.
+
+Every key a page or a diagram uses must be in that language's file, and every
+key in a language file must be used. Both pages must also link to the same
 external addresses, every "#id" link on a page must have its target on that
-page (the glossary ids differ by language), and the HTML must nest correctly.
-Needs only PyYAML.
+page (the glossary ids differ by language), the HTML must nest correctly, and
+each diagram must be well-formed XML. Needs only PyYAML.
 """
 
 from __future__ import annotations
@@ -33,6 +49,8 @@ import argparse
 import html
 import re
 import sys
+import unicodedata
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from pathlib import Path
@@ -43,6 +61,8 @@ import yaml
 REPO = Path(__file__).resolve().parents[1]
 SITE = REPO / "site"
 TEMPLATE = SITE / "src" / "index.html"
+DIAGRAMS = SITE / "src" / "diagrams"
+DIAGRAM_OUT = SITE / "img" / "diagrams"
 I18N = SITE / "i18n"
 # Where GitHub Pages publishes site/. Used for the canonical, hreflang and
 # og:url addresses, which must be absolute; links between the pages stay relative.
@@ -75,7 +95,34 @@ COMMENT = re.compile(r"\{#(?:(?!#\}).)*#\}", re.S)
 # {% if lang pt en %} ... {% endif %}, each tag on a line of its own; blocks do not nest.
 IF_LANG = re.compile(r"^[ \t]*\{%\s*if\s+lang\s+([a-z ]+?)\s*%\}[ \t]*\n(.*?)^[ \t]*\{%\s*endif\s*%\}[ \t]*\n",
                      re.S | re.M)
-PLACEHOLDER = re.compile(r"\{\{\s*([A-Za-z0-9_.]+)\s*(?:\|\s*(text)\s*)?\}\}")
+# {% if layout wide %} ... {% endif %}, in diagram templates only; blocks do not nest.
+IF_LAYOUT = re.compile(r"^[ \t]*\{%\s*if\s+layout\s+([a-z ]+?)\s*%\}[ \t]*\n(.*?)^[ \t]*\{%\s*endif\s*%\}[ \t]*\n",
+                       re.S | re.M)
+PLACEHOLDER = re.compile(r"\{\{\s*([A-Za-z0-9_.]+)\s*(?:\|\s*(text|wrap)\s*)?\}\}")
+# A <text> element whose only content is a placeholder: its text is measured.
+TEXT_PLACEHOLDER = re.compile(
+    r"(<text\b[^>]*?)\s*>\s*\{\{\s*([A-Za-z0-9_.]+)\s*(?:\|\s*(text|wrap)\s*)?\}\}\s*</text>")
+SVG_NS = "http://www.w3.org/2000/svg"
+DATA_ATTRIBUTES = ("data-key", "data-filter", "data-width", "data-lines", "data-leading")
+
+# Advance widths in hundredths of an em, the widest of DejaVu Sans, Liberation
+# Sans (Arial's metrics), Segoe UI and FreeSans as Chromium measures them, for
+# the characters of WIDTH_CHARS; regular (400) and bold (600 and 700) weights.
+# A letter with an accent is as wide as the letter; anything else counts as 1 em.
+WIDTH_CHARS = "".join(chr(c) for c in range(32, 127)) + "·–—→×€«»“”’…≈±"
+WIDTH_REGULAR = (
+    "32 40 46 84 64 95 80 27 39 39 50 84 32 40 32 39 64 64 64 64 64 64 64 64 64 64 34 34 84 84 84 56 102 68 69 72"
+    " 77 67 61 78 75 29 53 67 56 90 75 79 67 79 72 67 63 73 68 99 69 68 69 39 38 39 84 56 50 61 63 55 63 62 35 63"
+    " 63 28 28 58 28 97 63 61 63 63 41 52 39 63 59 82 59 59 52 64 34 64 84 33 56 100 100 84 65 61 61 52 52 32 100"
+    " 84 84")
+WIDTH_BOLD = (
+    "35 46 52 84 70 100 87 31 46 46 52 84 38 42 38 44 70 70 70 70 70 70 70 70 70 70 40 40 84 84 84 61 100 77 76 73"
+    " 83 68 68 82 84 37 57 77 64 100 84 85 73 85 77 72 68 81 77 110 77 72 73 46 44 46 84 56 50 67 72 59 72 68 44 72"
+    " 71 34 34 67 34 104 71 69 72 72 49 60 48 71 65 92 65 65 58 71 37 71 84 38 56 100 100 84 70 65 65 66 66 38 100"
+    " 84 84")
+WIDTHS = {weight: dict(zip(WIDTH_CHARS, (int(w) / 100 for w in table.split())))
+          for weight, table in (("regular", WIDTH_REGULAR), ("bold", WIDTH_BOLD))}
+ET.register_namespace("", SVG_NS)  # write <svg xmlns=...>, not <ns0:svg>
 VOID_ELEMENTS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
                  "source", "track", "wbr"}
 
@@ -85,7 +132,7 @@ class SiteError(Exception):
 
 
 def rel(path: Path) -> str:
-    return path.relative_to(REPO).as_posix()
+    return path.relative_to(REPO).as_posix() if path.is_relative_to(REPO) else path.as_posix()
 
 
 def output_path(lang: Language) -> Path:
@@ -125,6 +172,7 @@ def page_values(lang: Language) -> dict[str, str]:
     root = "../" * lang.path.count("/")
     values = {
         "page.lang": lang.html_lang,
+        "page.code": lang.code,  # the language's short code, as in file names (lora-wide-en.svg)
         "page.og_locale": lang.og_locale,
         "page.og_locale_alternate": ",".join(o.og_locale for o in LANGUAGES if o != lang),
         "page.root": root,
@@ -192,6 +240,8 @@ def render(template: str, texts: dict[str, str], lang: Language, file_name: str)
             if key not in values:
                 raise SiteError(f"{rel(TEMPLATE)}: unknown page value {key}")
             return values[key]
+        if escape == "wrap":
+            raise SiteError(f"{rel(TEMPLATE)}: {{{{ {key}|wrap }}}} works only in a diagram")
         value = texts[key]  # every key is known to exist: see build()
         return html.escape(value, quote=True) if escape else value
 
@@ -210,36 +260,192 @@ def render(template: str, texts: dict[str, str], lang: Language, file_name: str)
     return header + "\n" + body
 
 
+def strip_comments(text: str, path: Path) -> str:
+    text = COMMENT.sub("", COMMENT_LINES.sub("", text.replace("\r\n", "\n")))
+    if "{#" in text or "#}" in text:
+        raise SiteError(f"{rel(path)}: a template comment is not closed, or is nested")
+    return text
+
+
+def only_for(template: str, blocks: re.Pattern[str], name: str) -> str:
+    """Keeps the {% if ... %} blocks of one kind that list name, and drops the others."""
+    return blocks.sub(lambda m: m.group(2) if name in m.group(1).split() else "", template)
+
+
+def layouts(template: str) -> list[str]:
+    """The layouts a diagram template names, in order; [""] when it names none."""
+    names = [name for m in IF_LAYOUT.finditer(template) for name in m.group(1).split()]
+    return list(dict.fromkeys(names)) or [""]
+
+
+def diagram_path(source: Path, layout: str, lang: Language) -> Path:
+    return DIAGRAM_OUT / ("-".join(part for part in (source.stem, layout, lang.code) if part) + ".svg")
+
+
+def text_width(text: str, size: float, bold: bool) -> float:
+    """The width of one line of text, in SVG units, in the widest fallback font."""
+    table = WIDTHS["bold" if bold else "regular"]
+    width = 0.0
+    for char in text.replace(" ", " "):
+        width += table.get(char, table.get(unicodedata.normalize("NFD", char)[0], 1.0))
+    return width * size
+
+
+def wrap(text: str, width: float, size: float, bold: bool) -> list[str]:
+    """Breaks text into lines at spaces, and at its own line breaks."""
+    lines = []
+    for paragraph in text.split("\n"):
+        line = ""
+        for word in paragraph.split(" "):
+            if not word:
+                continue
+            longer = f"{line} {word}" if line else word
+            if line and text_width(longer, size, bold) > width:
+                lines.append(line)
+                line = word
+            else:
+                line = longer
+        lines.append(line)
+    return lines
+
+
+def fit_text(element: ET.Element, size: float, weight: str, where: str) -> None:
+    """Checks that a measured <text> fits its data-width; for |wrap, breaks it into <tspan> lines."""
+    key = element.get("data-key")
+    if element.get("data-width") is None:
+        raise SiteError(f"{where}: the <text> of {key} needs data-width, the room its text has")
+    width = float(element.get("data-width", "0"))
+    bold = weight in ("bold", "bolder") or (weight.isdigit() and int(weight) >= 600)
+    text = element.text or ""
+    if element.get("data-filter") == "wrap":
+        lines = wrap(text, width, size, bold)
+        room = int(element.get("data-lines", "1"))
+    elif "\n" in text:
+        raise SiteError(f"{where}: {key} has line breaks; its <text> needs {{{{ {key}|wrap }}}}")
+    else:
+        lines, room = [text], 1
+    for number, line in enumerate(lines, 1):
+        needed = text_width(line, size, bold)
+        if needed > width:
+            which = f"line {number}, " if len(lines) > 1 else ""
+            raise SiteError(f"{where}: {key} does not fit: {which}\"{line}\" needs about {needed:.0f} units "
+                            f"and its <text> has {width:g}")
+    if len(lines) > room:
+        raise SiteError(f"{where}: {key} needs {len(lines)} lines and its <text> has room for {room}")
+    if len(lines) == 1:
+        element.text = lines[0]
+        return
+    leading = element.get("data-leading") or f"{size * 1.3:g}"
+    element.text = None
+    for number, line in enumerate(lines):
+        tspan = ET.SubElement(element, f"{{{SVG_NS}}}tspan", {"x": element.get("x", "0")})
+        if number:
+            tspan.set("dy", leading)
+        tspan.text = line
+
+
+def render_diagram(template: str, source: Path, texts: dict[str, str], lang: Language, out: Path,
+                   file_name: str) -> str:
+    where = f"{rel(out)} (from {rel(source)} and {file_name})"
+    values = page_values(lang)
+
+    def mark(match: re.Match[str]) -> str:
+        attributes, key, how = match.group(1), match.group(2), match.group(3)
+        if key.startswith("page.") or not how:
+            return match.group(0)  # filled in, or refused, below
+        value = html.escape(texts[key], quote=True)  # every key is known to exist: see build()
+        return f'{attributes} data-key="{key}" data-filter="{how}">{value}</text>'
+
+    def substitute(match: re.Match[str]) -> str:
+        key, how = match.group(1), match.group(2)
+        if key.startswith("page."):
+            if key not in values:
+                raise SiteError(f"{rel(source)}: unknown page value {key}")
+            return values[key]
+        if how == "wrap":
+            raise SiteError(f"{rel(source)}: {{{{ {key}|wrap }}}} must be the only content of a <text>")
+        if how != "text":
+            raise SiteError(f"{rel(source)}: a diagram's text is not HTML: write {{{{ {key}|text }}}}")
+        return html.escape(texts[key], quote=True)
+
+    body = PLACEHOLDER.sub(substitute, TEXT_PLACEHOLDER.sub(mark, template))
+    if "{{" in body or "}}" in body:
+        leftover = next(line for line in body.splitlines() if "{{" in line or "}}" in line)
+        raise SiteError(f"{where}: an unreadable placeholder is left: {leftover.strip()}")
+    try:
+        root = ET.fromstring(body, parser=ET.XMLParser(target=ET.TreeBuilder(insert_comments=True)))
+    except ET.ParseError as exc:
+        raise SiteError(f"{where}: not well-formed XML: {exc}") from None
+    if root.tag != f"{{{SVG_NS}}}svg":
+        raise SiteError(f'{where}: the root element must be <svg xmlns="{SVG_NS}">')
+
+    def walk(element: ET.Element, size: str, weight: str) -> None:
+        size = element.get("font-size", size)
+        weight = element.get("font-weight", weight)
+        if element.tag == f"{{{SVG_NS}}}text" and element.get("data-key"):
+            if len(element):
+                raise SiteError(f"{where}: the <text> of {element.get('data-key')} must hold only its placeholder")
+            try:
+                units = float(size.removesuffix("px"))
+            except ValueError:
+                raise SiteError(f"{where}: font-size {size!r} is not a number") from None
+            fit_text(element, units, weight, where)
+        for child in element:
+            walk(child, size, weight)
+        for name in DATA_ATTRIBUTES:
+            element.attrib.pop(name, None)
+
+    walk(root, "16", "400")
+    header = "\n".join((
+        "<!--",
+        *SPDX_LINES,
+        "",
+        f"Generated by tools/build_site.py from {rel(source)} and {file_name}. Do not edit.",
+        "-->",
+    ))
+    return header + "\n" + ET.tostring(root, encoding="unicode") + "\n"
+
+
 def build() -> dict[Path, str]:
-    template = TEMPLATE.read_text(encoding="utf-8").replace("\r\n", "\n")
-    template = COMMENT.sub("", COMMENT_LINES.sub("", template))
-    if "{#" in template or "#}" in template:
-        raise SiteError(f"{rel(TEMPLATE)}: a template comment is not closed, or is nested")
+    template = strip_comments(TEMPLATE.read_text(encoding="utf-8"), TEMPLATE)
+    sources = sorted(DIAGRAMS.glob("*.svg")) if DIAGRAMS.is_dir() else []
+    diagrams = {source: strip_comments(source.read_text(encoding="utf-8"), source) for source in sources}
     codes = {lang.code for lang in LANGUAGES}
-    for match in IF_LANG.finditer(template):
-        unknown = sorted(set(match.group(1).split()) - codes)
-        if unknown:
-            raise SiteError(f"{rel(TEMPLATE)}: {{% if lang %}} names an unknown language: {', '.join(unknown)}")
+    for path, text in ((TEMPLATE, template), *diagrams.items()):
+        for match in IF_LANG.finditer(text):
+            unknown = sorted(set(match.group(1).split()) - codes)
+            if unknown:
+                raise SiteError(f"{rel(path)}: {{% if lang %}} names an unknown language: {', '.join(unknown)}")
 
     problems = []
     all_texts = {}
     templates = {}
+    variants: dict[Language, list[tuple[Path, Path, str]]] = {}
+    users = rel(TEMPLATE) + (f" or a diagram in {rel(DIAGRAMS)}" if diagrams else "")
     for lang in LANGUAGES:
         file_name = rel(I18N / f"{lang.code}.yaml")
-        page_template = IF_LANG.sub(
-            lambda m, code=lang.code: m.group(2) if code in m.group(1).split() else "", template)
+        page_template = only_for(template, IF_LANG, lang.code)
         if "{%" in page_template or "%}" in page_template:
             raise SiteError(f"{rel(TEMPLATE)}: an {{% if lang %}} block is not closed, nested, "
                             f"or not on lines of its own")
         templates[lang] = page_template
         used = {m.group(1) for m in PLACEHOLDER.finditer(page_template)
                 if not m.group(1).startswith("page.")}
+        variants[lang] = []
+        for source, text in diagrams.items():
+            for layout in layouts(text):
+                variant = only_for(only_for(text, IF_LANG, lang.code), IF_LAYOUT, layout)
+                if "{%" in variant or "%}" in variant:
+                    raise SiteError(f"{rel(source)}: an {{% if %}} block is not closed, nested, "
+                                    f"or not on lines of its own")
+                variants[lang].append((diagram_path(source, layout, lang), source, variant))
+                used |= {m.group(1) for m in PLACEHOLDER.finditer(variant) if not m.group(1).startswith("page.")}
         texts = load_texts(lang)
         all_texts[lang] = texts
         for key in sorted(used - texts.keys()):
             problems.append(f"{file_name}: {key} is missing")
         for key in sorted(texts.keys() - used):
-            problems.append(f"{file_name}: {key} is not used by {rel(TEMPLATE)}")
+            problems.append(f"{file_name}: {key} is not used by {users}")
     if problems:
         raise SiteError("\n".join(problems))
 
@@ -268,13 +474,22 @@ def build() -> dict[Path, str]:
                 f"the {lang.code} and {first.code} pages link to different places"
                 + "".join(f"\n  only in {first.code}: {u}" for u in only)
                 + "".join(f"\n  only in {lang.code}: {u}" for u in extra))
+
+    for lang in LANGUAGES:
+        file_name = rel(I18N / f"{lang.code}.yaml")
+        for out, source, variant in variants[lang]:
+            pages[out] = render_diagram(variant, source, all_texts[lang], lang, out, file_name)
+    strays = sorted(path for path in DIAGRAM_OUT.glob("*.svg") if path not in pages) if DIAGRAM_OUT.is_dir() else []
+    if strays:
+        raise SiteError("no diagram template makes these files; delete them, or restore their template:"
+                        + "".join(f"\n  {rel(path)}" for path in strays))
     return pages
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--check", action="store_true",
-                        help="fail if a page is stale or a translation is incomplete")
+                        help="fail if a file is stale or a translation is incomplete")
     args = parser.parse_args(argv)
     try:
         pages = build()
@@ -293,7 +508,7 @@ def main(argv: list[str] | None = None) -> int:
             path.write_text(text, encoding="utf-8", newline="\n")
 
     if args.check and stale:
-        print("build_site: these pages are out of date; run python3 tools/build_site.py:", file=sys.stderr)
+        print("build_site: these files are out of date; run python3 tools/build_site.py:", file=sys.stderr)
         for p in stale:
             print(f"  {p}", file=sys.stderr)
         return 1

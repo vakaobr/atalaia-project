@@ -16,9 +16,11 @@ that changes it, leaving out `src/`, `i18n/` and this README.
 | `en/index.html` | The English page, at `/en/`. Generated |
 | `style.css`, `favicon.svg` | Shared by both pages |
 | `img/` | The badge and illustrations (see [Images](#images)) |
+| `img/diagrams/` | The two radio diagrams in each language and layout. Generated (see [Diagrams](#diagrams)) |
 | `fonts/` | Barlow and Barlow Condensed (latin subset, WOFF2), self-hosted so the page loads nothing from other sites; SIL OFL 1.1, see [LICENSES/OFL-1.1.txt](../LICENSES/OFL-1.1.txt) |
 | `style.css` | The look: slate, sand and signal orange taken from the badge, with the hero's hills and tower drawn in inline SVG |
 | `src/index.html` | The template both pages are built from |
+| `src/diagrams/` | The templates of the radio diagrams |
 | `i18n/pt.yaml`, `i18n/en.yaml` | The text of each page |
 
 ## Images
@@ -63,9 +65,26 @@ It needs Python 3 and PyYAML (the dev container has both: see [tools/README.md](
   relative, so the pages work both on GitHub Pages and from a local server
   (`python3 -m http.server -d site`).
 
-CI runs `python3 tools/build_site.py --check`, which fails if a page is out of date, a
-translation is missing a key, or a `#` link has no matching id on its page. `tools/check.sh`
-runs the same check.
+CI runs `python3 tools/build_site.py --check`, which fails if a page or a diagram is out of date,
+a translation is missing a key or does not fit its diagram, or a `#` link has no matching id on
+its page. `tools/check.sh` runs the same check.
+
+### Diagrams
+
+The radio diagrams ("How the radio works": `lora` and `skirmesh`) are drawn by hand in SVG in
+`src/diagrams/`, with placeholders for their text, which lives under `diagrams:` in the language
+files (plain text, not HTML). `build_site.py` writes each one per language and layout to
+`img/diagrams/<name>-<layout>-<language>.svg`: `wide` (two columns, for desktops and the README)
+and `narrow` (one column, which the page shows on screens up to 760 px wide). Lines between
+`{% if layout wide %}` and `{% endif %}` belong to one layout. The page uses each diagram's
+`desc` as its alt text.
+
+An SVG shown as an image cannot use the page's fonts, so most readers see their system's sans
+serif instead of Barlow. Each translated text therefore declares its room: `data-width` on its
+`<text>`, and for `{{ key|wrap }}` also `data-lines`. The build wraps the text at spaces and fails
+if a line would be too wide in the widest common fallback font (DejaVu Sans), naming the key and
+the line: shorten the translation, or give it more room in the template. Each diagram has an
+opaque light background, so it reads on dark pages too, and its colours are the page's.
 
 ### Plain words and the glossary
 
