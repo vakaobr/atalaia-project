@@ -43,6 +43,18 @@ The open questions from those design runs are added here as each run reports, wi
 | P5-6 | Maximum size of a mode package? | 1 MB per package. | Modes are scripts and small assets; a cap limits abuse of the registry. | open |
 | P5-7 | The carrier PCB: when? | Deferred until at least three perfboard prototypes work (ADR-P5-6); KiCad 8, CERN-OHL-S-2.0. | A PCB before the hand-wired boxes are proven would likely need a respin. | open |
 
+### Phase 4, site server and advanced play (design: docs/phase-4-site-server/)
+
+| # | Question | Answer chosen | Why | Status |
+| --- | --- | --- | --- | --- |
+| P4-1 | Where does the custom-scenario compiler (YAML objectives to field.lua) run? | **Changed from the design's choice.** The design puts it on the site server with a CLI fallback (ADR-P4-6). Chosen instead: a shared Python library that runs on the field controller (the GM console calls it there), and the site server reuses the same library. To be fixed in ADR-P4-6 before phase 4 is implemented. | The site server is optional and the platform is local-first (spec sections 3 and 11); a field without a site server must still build custom scenarios. | open |
+| P4-2 | How are chrono records signed? | Ed25519 key per marshal (ADR-P4-5), not HMAC. | Survives password changes and lets other fields verify a record without a shared secret. | open |
+| P4-3 | How are clubs isolated in hosted mode? | A PostgreSQL schema per field, with row-level security as defence in depth (ADR-P4-4). | Export and deletion are a single schema dump or drop; RLS catches query mistakes. | open |
+| P4-4 | Where do geo functions (distance, inside-zone) live? | In the C core (geo.c), exposed to node and field scripts (ADR-P4-9). | Trigonometry in Lua is slow on the ESP32, and one implementation keeps every platform identical. | open |
+| P4-5 | Is two-factor login mandatory? | TOTP is mandatory for admin, GM and marshal accounts, optional for players (ADR-P4-2). | These roles can change games and penalties. Field staff may find TOTP awkward on game day, so worth confirming. | open |
+| P4-6 | GDPR: is a legal review needed? | Yes, before hosted mode goes live. The design ships templates and defaults (anonymise on erasure, keep chrono signatures, retention 12 and 24 months, daily purge, PT/EN notices) that a Portuguese lawyer should review. | Hosting other clubs' player data makes the project a data processor. | open |
+| P4-7 | Which database for the site server? | PostgreSQL 16 in docker-compose with Caddy for TLS and daily pg_dump backups (ADR-P4-1, ADR-P4-10). | Multi-tenant hosting and JSONB event data; it runs on a mini PC or a small VPS. | open |
+
 ### Spec questions found along the way
 
 | # | Question | Answer chosen | Why | Status |
