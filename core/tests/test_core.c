@@ -17,7 +17,7 @@ int check_failures = 0;
 
 static void test_version(void)
 {
-    CHECK(strcmp(atalaia_version(), "0.1.0") == 0);
+    CHECK(strcmp(atalaia_version(), "0.2.0") == 0);
     CHECK(ATALAIA_PROTOCOL_VERSION == 1);
 }
 
@@ -142,6 +142,7 @@ int main(void)
     run_duty_cycle_tests();
     run_msg_codec_tests();
     run_crypto_mbedtls_tests();
+    run_field_api_tests();
 
     if (check_failures == 0) {
         printf("core: all tests passed\n");

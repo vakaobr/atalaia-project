@@ -19,7 +19,7 @@ Atalaia is an open, local-first platform for airsoft, paintball and milsim game 
 
 *Atalaia* is Portuguese for "watchtower" ([why that name?](#name)).
 
-> **Status: pre-alpha.** Nothing here is ready for the field yet. Phase 0 is complete: the shared core, its Lua sandbox, the Skirmesh-RF event codec and a browser-based simulator run Domination and Bomb. Phase 1 software is done: the Field Box firmware, its screens and an emulator setup that plays a game on a simulated box; the final gate — a 2-hour club game on real hardware — awaits prototype parts. Ideas, reviews and early contributors are very welcome.
+> **Status: pre-alpha.** Nothing here is ready for the field yet. Phase 0 is complete: the shared core, its Lua sandbox, the Skirmesh-RF event codec and a browser-based simulator run Domination and Bomb. Phase 1 software is done: the Field Box firmware, its screens and an emulator setup that plays a game on a simulated box; the final gate — a 2-hour club game on real hardware — awaits prototype parts. Phase 2 (the field network) is in progress: the encrypted Skirmesh-RF radio protocol, the multi-box simulator and the firmware radio driver are built and tested in the simulator and the emulator; the field controller and GM console come next. Ideas, reviews and early contributors are very welcome.
 
 ---
 

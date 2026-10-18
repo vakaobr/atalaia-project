@@ -31,6 +31,10 @@ app_main
   |     +-- display_port_init() (LVGL 9.2, DMA flush)
   |     +-- screen_render()
   |     +-- lv_timer_handler()
+  +-- radio_task (core 0, priority 3)
+  |     +-- TX queue drain (radio_task_send)
+  |     +-- RX poll (50 ms timeout via DIO1 ISR)
+  |     +-- single shared game channel (default 869.525 MHz, g2)
   +-- audio_task (core 0, priority 3)
   +-- wifi_task  (core 0, priority 2)
   +-- mem_monitor (core 0, priority 1, 10 s)
@@ -39,10 +43,30 @@ app_main
 ### HAL Abstraction
 
 Every hardware subsystem is behind a function-pointer ops struct
-(`hal_button_ops_t`, `hal_keypad_ops_t`, etc.).  ESP-IDF drivers
-live in `main/hal/esp/`; stubs for Linux testing in `main/hal/stub/`.
-The shell holds a `hal_t` aggregate initialised by `hal_esp_init()`
-or `hal_stub_init()`.
+(`hal_button_ops_t`, `hal_keypad_ops_t`, `hal_radio_ops_t`, etc.).
+ESP-IDF drivers live in `main/hal/esp/`; stubs for Linux testing in
+`main/hal/stub/`.  The shell holds a `hal_t` aggregate initialised by
+`hal_esp_init()` or `hal_stub_init()`.
+
+### Radio HAL
+
+The SX1262 LoRa radio driver (`main/hal/esp/hal_esp_radio.c`) uses
+SPI3_HOST (GPIO 8-14: NSS, SCK, MOSI, MISO, RST, BUSY, DIO1).
+EU868 band, SF7/BW125, single shared game channel (default 869.525 MHz
+in the g2 sub-band, 10% duty cycle, 500 mW ERP).  The channel is
+configurable per game via CONFIG message
+(`CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ` in Kconfig).  Neighbouring
+games use different channels within the sub-band or in other sub-bands.
+
+The FEM (front-end module) on the Heltec V4.3 provides ~14 dB of gain.
+TX power is calculated by `radio_power.h` to comply with EU868 g2 ERP
+limits (27 dBm ERP), accounting for FEM and antenna gain (Kconfig
+`ATALAIA_RADIO_FEM_GAIN_DB` and `ATALAIA_RADIO_ANTENNA_GAIN_DBI`).
+
+DIO1 drives an ISR-based semaphore for TX_DONE/RX_DONE/TIMEOUT.
+The init function probes the SX1262 before configuring FEM GPIOs; if
+the chip is absent (Wokwi emulator), init returns -1 and the firmware
+boots without radio.
 
 ## Device Tiers
 
@@ -105,10 +129,18 @@ hardware arrives.
 
 ## Kconfig
 
-All pin assignments, memory tier, keypad interface and display controller
-are in `main/Kconfig.projbuild`.  Change with `idf.py menuconfig`.
-`sdkconfig.wokwi` holds the emulator's overrides; the Field Box uses
-`sdkconfig.defaults` alone.
+All pin assignments, memory tier, keypad interface, display controller
+and radio settings are in `main/Kconfig.projbuild`.  Change with
+`idf.py menuconfig`.  `sdkconfig.wokwi` holds the emulator's overrides;
+the Field Box uses `sdkconfig.defaults` alone.
+
+Radio-specific Kconfig options (under "Atalaia Field Box Configuration > Radio"):
+- `ATALAIA_RADIO_NSS_PIN` .. `ATALAIA_RADIO_DIO1_PIN` -- SX1262 SPI and control pins
+- `ATALAIA_RADIO_FEM_EN_PIN`, `ATALAIA_RADIO_VFEM_CTL_PIN` -- FEM control
+- `ATALAIA_RADIO_FEM_GAIN_DB` -- FEM gain for TX power calculation (default 14)
+- `ATALAIA_RADIO_ANTENNA_GAIN_DBI` -- antenna gain in dBi (default 2)
+- `ATALAIA_RADIO_REGION` -- regulatory region (EU868)
+- `ATALAIA_RADIO_DISABLE` -- skip radio init (for Wokwi emulator)
 
 Default pin map avoids all Heltec V4.3 board-internal pins.
 See `Kconfig.projbuild` header and `hardware/field-box/README.md`.
@@ -121,8 +153,10 @@ Custom layout for 16 MB flash (`partitions.csv`):
 |-----------|------|---------|
 | nvs | 24 KB | Configuration key-value store |
 | otadata | 8 KB | A/B OTA bookkeeping |
-| ota_0 | 1.5 MB | Application slot A |
-| ota_1 | 1.5 MB | Application slot B |
+| phy_init | 4 KB | PHY calibration data |
+| nvs_keys | 4 KB | Encryption keys for NVS (Phase 2; see BRING_UP.md step 0) |
+| ota_0 | 2 MB | Application slot A |
+| ota_1 | 2 MB | Application slot B |
 | storage | 2 MB | LittleFS: presets, modes, state, audio |
 
 ## IDF Component Dependencies
@@ -142,9 +176,24 @@ run), the firmware stores two presets: Bomb and Domination, with the
 defaults from their `mode.yaml`. The mode scripts come from `modes/` at
 build time. The default admin PIN is 1234 until the setup portal sets one.
 
-## Phase 2 (not yet)
+## Phase 2 (implemented in Phase C)
 
-- SX1262 LoRa radio driver (Phase 2, field mesh)
+The following Phase 2 components are now implemented:
+
+- **SX1262 LoRa radio driver** -- `main/hal/esp/hal_esp_radio.c`, SPI3_HOST,
+  EU868 SF7/BW125, 3-channel hopping, FEM gain accounting, duty-cycle tracking.
+- **Radio task** -- FreeRTOS core 0 priority 3, TX/RX queues, DIO1 ISR.
+- **Radio protocol** -- `main/radio/radio_protocol.c`, packet encrypt/decrypt
+  with epoch persistence via NVS, per-source epoch trial on receive, nonce
+  safety invariant with `tx_blocked` on NVS failure or epoch exhaustion.
+- **Event log** -- `main/radio/event_log.c`, flash-backed append-only log.
+- **Time sync** -- `main/radio/time_sync.c`, slew/step from TIME beacons.
+- **NVS key storage** -- `main/radio/radio_nvs_esp.c`, game key and epoch
+  in the "radio" NVS namespace. On production boards with an eFuse HMAC key
+  burned, NVS encryption protects the key at rest.
+
+Still pending:
+
 - A/B OTA updates with Ed25519 signatures
 - GNSS module support (GPIO 38-42 currently used for peripherals)
 
@@ -152,4 +201,4 @@ build time. The default admin PIN is 1234 until the setup portal sets one.
 
 The firmware refuses to transmit until a region is set (EU868 for
 Europe, US915 for the Americas) and enforces power and duty-cycle
-limits.  The SX1262 radio is unused in Phase 1.
+limits.

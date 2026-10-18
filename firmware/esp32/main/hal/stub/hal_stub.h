@@ -24,6 +24,20 @@ extern char hal_stub_led_last_fill[4]; /* [0]=r, [1]=g, [2]=b, [3]=0 */
 extern int hal_stub_audio_play_count;
 extern char hal_stub_audio_last_clip[64];
 
+/* ---- radio stub counters ---- */
+
+extern int hal_stub_radio_tx_count;
+extern uint8_t hal_stub_radio_tx_buf[16][255];
+extern size_t hal_stub_radio_tx_len[16];
+extern uint8_t hal_stub_radio_rx_buf[255];
+extern size_t hal_stub_radio_rx_len;
+extern int8_t hal_stub_radio_rx_rssi;
+extern bool hal_stub_radio_rx_pending;
+extern uint32_t hal_stub_radio_channel_hz;
+extern uint32_t hal_stub_radio_dc_remaining_ms;
+
+void hal_stub_radio_reset(void);
+
 /**
  * Reset every stub counter / recorder to zero / empty.
  */

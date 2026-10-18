@@ -11,6 +11,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- Core 0.2.0: `state.field{}` read-write/read-only field-level state, `field.nodes`, `field.owner`, `field.send`, `field.score`, `field.common_owner` script API functions (phase-2-field-network, Phase C)
+- Radio HAL: SX1262 LoRa driver on SPI3_HOST (GPIO 8-14), EU868 SF7/BW125 with 3-channel hopping, FEM gain accounting via `radio_power.h`, duty-cycle tracking, DIO1 ISR, stub for Linux tests (phase-2-field-network, Phase C)
+- Radio task: FreeRTOS core 0 priority 3, TX/RX queues with 8-slot depth (phase-2-field-network, Phase C)
+- Flash event log: append-only on LittleFS, immediate flush for normal/critical events, telemetry cache with explicit flush, compaction after ACK (phase-2-field-network, Phase C)
+- Time sync: slew adjustment (max 5%/tick, step above 500 ms offset), EMA-smoothed offset from TIME beacons (phase-2-field-network, Phase C)
+- Radio protocol: Skirmesh-RF packet encode/decode with epoch persistence via NVS, per-source epoch trial on receive (tries stored epoch then epoch+1, never lower), `tx_blocked` on NVS failure or epoch exhaustion, nonce counter = (epoch << 16) | seq (phase-2-field-network, Phase C)
+- NVS key storage: game key and epoch in "radio" NVS namespace, function-pointer abstraction for testability (`atalaia_radio_nvs_ops_t`), ESP-IDF backend with optional eFuse HMAC encryption (phase-2-field-network, Phase C)
+- Partition table grown: OTA slots 1.5 MB to 2 MB, `nvs_keys` partition added for encrypted NVS (phase-2-field-network, Phase C)
+- EU868 TX power calculation: centi-dBm integer arithmetic accounting for FEM gain and antenna gain, clamped to SX1262 range [-9, +22] dBm (phase-2-field-network, Phase C)
+- Firmware test suite: 10 radio protocol tests (boot epoch, NVS failure, seq wrap, epoch exhaustion, receiver epoch trial with known/rebooted/lower/unknown sources), 6 TX power calculation tests (phase-2-field-network, Phase C)
 - ESP32-S3 firmware shell for the Atalaia Field Box (Heltec WiFi LoRa 32 V4.3): HAL abstraction layer with ESP-IDF and Linux stub implementations for buttons, keypad, LEDs, display, NFC, audio, and battery (phase-1-single-box)
 - Game timer with configurable countdown and score freeze: sends `game.end` at expiry, compatible with all existing modes (phase-1-single-box)
 - Preset storage on LittleFS: save, list, load, and delete up to 32 presets with associated mode source files (phase-1-single-box)

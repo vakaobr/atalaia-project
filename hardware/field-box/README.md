@@ -55,6 +55,28 @@ is the reference if the two ever disagree.
 Board-internal pins (do not reassign): GPIO 1, 2, 7, 8-14, 17-18,
 19-20, 21, 35, 36, 37, 43-44.
 
+### SX1262 Radio Pins (Board-Internal)
+
+| Function   | GPIO | Notes |
+|------------|------|-------|
+| SPI NSS    | 8    | SPI3_HOST chip select |
+| SPI SCK    | 9    | SPI3_HOST clock |
+| SPI MOSI   | 10   | SPI3_HOST data out |
+| SPI MISO   | 11   | SPI3_HOST data in |
+| RST        | 12   | Radio reset (active low pulse) |
+| BUSY       | 13   | SX1262 busy indicator (input) |
+| DIO1       | 14   | ISR: TX_DONE / RX_DONE / TIMEOUT |
+| FEM_EN     | 2    | Front-end module enable (board-internal) |
+| VFEM_Ctrl  | 7    | FEM voltage rail control (board-internal) |
+
+> **Antenna note:** The LoRa antenna MUST be connected to the LoRa
+> IPEX connector before power-on. The 28 dBm FEM on the high-power
+> V4.3.1 variant can be permanently damaged by transmitting into an
+> open antenna port. Standard-power boards tolerate it, but the
+> antenna should still be connected for correct radio operation.
+
+### Peripheral Pins
+
 | Function       | GPIO | Notes |
 |----------------|------|-------|
 | Button 1       | 4    | Active low, internal pull-up |

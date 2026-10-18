@@ -25,6 +25,7 @@
 #include "preset_ui.h"
 #include "screen_renderer.h"
 #include "state_persist.h"
+#include "radio/radio_task.h"
 #include "wifi_setup.h"
 
 #ifdef ESP_PLATFORM
@@ -326,6 +327,10 @@ static void hal_start(void)
     if (hal.nfc->init() != 0) ESP_LOGW(TAG, "NFC: not available");
     if (hal.audio->init() != 0) ESP_LOGW(TAG, "audio: not available");
     if (hal.battery->init() != 0) ESP_LOGW(TAG, "battery gauge: not available");
+    if (hal.radio->init() != 0) {
+        ESP_LOGW(TAG, "radio: not available (no SX1262)");
+        hal.radio = NULL; /* signal to the rest of the shell */
+    }
     hal.audio->set_volume((uint8_t)config_store_get_u32("volume", 80));
 }
 
@@ -435,6 +440,11 @@ void app_main(void)
             /* No valid saved state -- start the normal preset picker. */
             start_picker();
         }
+    }
+
+    /* Radio task (core 0, priority 3; only if the radio HAL init succeeded). */
+    if (hal.radio != NULL) {
+        radio_task_start(&hal);
     }
 
     /* FreeRTOS tasks per ADR-P1-7. */

@@ -1879,6 +1879,12 @@ using the persisted credentials and the new epoch.
 
 ### ADR-P2-13: Airtime budget and duty-cycle enforcement
 
+> **Superseded in part:** The three-channel round-robin hopping in the
+> original decision was found to be incompatible with single-radio
+> half-duplex operation (nodes listening on different channels after TX).
+> Amendment 1 of RFC 0001 (2026-10-18) replaces it with a single shared
+> game channel, by default 869.525 MHz (g2 sub-band).
+
 **Status:** Accepted
 
 **Context:** EU868 requires 1% duty cycle on most channels and 10% on

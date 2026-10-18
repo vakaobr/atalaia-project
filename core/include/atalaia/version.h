@@ -6,7 +6,7 @@
 #define ATALAIA_VERSION_H
 
 #define ATALAIA_VERSION_MAJOR 0
-#define ATALAIA_VERSION_MINOR 1
+#define ATALAIA_VERSION_MINOR 2
 #define ATALAIA_VERSION_PATCH 0
 
 /* ATALAIA_PROTOCOL_VERSION, the Skirmesh-RF version this core speaks. */

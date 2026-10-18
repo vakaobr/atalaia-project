@@ -34,6 +34,12 @@ CONFIG_ATALAIA_BTN4_PIN=-1
 # DevKitC-1's own RGB LED.
 CONFIG_ATALAIA_DISP_RST_PIN=-1
 
+# The radio probes the SX1262 at boot, logs "SX1262 not detected" and
+# carries on. No CONFIG_ATALAIA_RADIO_DISABLE needed: the init is safe
+# on the DevKitC-1 board (bisect confirmed steps 1-6 pass; root cause
+# of the earlier crash was an infinite BUSY-wait loop on a floating
+# GPIO, fixed by adding a 200-iteration timeout to sx_wait_busy).
+
 # No SoftAP captive portal in the emulator: start with the default settings
 # (admin PIN 1234), and accept keypad keys from the serial console so the
 # automation scenarios can type them.

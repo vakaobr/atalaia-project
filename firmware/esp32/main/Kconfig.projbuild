@@ -233,8 +233,109 @@ menu "Atalaia Field Box Configuration"
             default 18
     endmenu
 
+    # ---- SX1262 LoRa radio (Heltec V4.3 on-board) ---------------------------
+    # The SX1262 is on the board's own SPI bus (separate from the display).
+    # These are the V4.3 schematic pin assignments.
+    menu "Radio"
+        config ATALAIA_RADIO_NSS_PIN
+            int "SX1262 SPI NSS (CS) GPIO"
+            default 8
+
+        config ATALAIA_RADIO_SCK_PIN
+            int "SX1262 SPI SCK GPIO"
+            default 9
+
+        config ATALAIA_RADIO_MOSI_PIN
+            int "SX1262 SPI MOSI GPIO"
+            default 10
+
+        config ATALAIA_RADIO_MISO_PIN
+            int "SX1262 SPI MISO GPIO"
+            default 11
+
+        config ATALAIA_RADIO_RST_PIN
+            int "SX1262 RST GPIO"
+            default 12
+
+        config ATALAIA_RADIO_BUSY_PIN
+            int "SX1262 BUSY GPIO"
+            default 13
+
+        config ATALAIA_RADIO_DIO1_PIN
+            int "SX1262 DIO1 GPIO"
+            default 14
+
+        config ATALAIA_RADIO_FEM_EN_PIN
+            int "FEM enable GPIO"
+            default 2
+            help
+                Board-internal: do not reassign. Controls the front-end
+                module power on the Heltec V4.3.
+
+        config ATALAIA_RADIO_VFEM_CTL_PIN
+            int "VFEM control GPIO"
+            default 7
+            help
+                Board-internal: do not reassign. Controls the FEM voltage
+                rail on the Heltec V4.3.
+
+        config ATALAIA_RADIO_FEM_GAIN_DB
+            int "FEM gain in dB (for TX power calculation)"
+            default 14
+            help
+                The front-end module provides approximately this much gain.
+                Conducted TX power = ERP_limit + 2.15 - FEM_gain - antenna_gain,
+                clamped to the SX1262 range [-9, +22] dBm.
+
+        config ATALAIA_RADIO_ANTENNA_GAIN_DBI
+            int "Antenna gain in dBi"
+            default 2
+            help
+                Gain of the connected antenna in dBi. A typical stock
+                omnidirectional antenna is 2 dBi. This value is subtracted
+                from the EIRP limit together with the FEM gain to compute
+                the SX1262 conducted TX power. Measure with a calibrated
+                antenna analyser for production; the default is a
+                conservative estimate for a quarter-wave whip.
+
+        choice ATALAIA_RADIO_REGION
+            prompt "Radio regulatory region"
+            default ATALAIA_RADIO_REGION_EU868
+
+            config ATALAIA_RADIO_REGION_EU868
+                bool "EU868 (Europe)"
+        endchoice
+
+        config ATALAIA_RADIO_DEFAULT_CHANNEL_HZ
+            int "Default game channel frequency (Hz)"
+            default 869525000
+            help
+                The frequency all nodes TX and RX on. Default 869.525 MHz
+                (g2 sub-band, 10% duty cycle, 500 mW ERP). Configurable per
+                game via CONFIG message. Must be within an EU868 sub-band.
+    endmenu
+
     # ---- Development and emulator options -----------------------------------
     menu "Development"
+        config ATALAIA_RADIO_DISABLE
+            bool "Disable SX1262 radio HAL (Wokwi emulator)"
+            default n
+            help
+                Skip all radio SPI and GPIO initialisation at boot. Use this
+                on the Wokwi emulator, whose DevKitC-1 part has no SX1262
+                and whose flash emulation does not tolerate probing SPI3.
+
+        config ATALAIA_RADIO_DEBUG_STEP
+            int "Radio init debug bisect step (0 = normal, 1-6 = stop after step N)"
+            default 0
+            depends on !ATALAIA_RADIO_DISABLE
+            help
+                Bisect the radio init for Wokwi debugging. 0 = normal full
+                init. 1 = SPI bus init only. 2 = + SPI device add. 3 = + GPIO
+                config (RST, BUSY, DIO1 without ISR). 4 = + DIO1 ISR install.
+                5 = + reset pulse and BUSY wait. 6 = + first SPI transaction
+                (SyncWord probe). Remove or set to 0 for production.
+
         config ATALAIA_SKIP_SETUP
             bool "Skip the Wi-Fi setup portal (use default settings)"
             default n

@@ -20,6 +20,12 @@ set(CORE_SOURCES
     "${CORE_ROOT}/src/sandbox.c"
     "${CORE_ROOT}/src/script_api.c"
     "${CORE_ROOT}/src/node.c"
+    "${CORE_ROOT}/src/packet.c"
+    "${CORE_ROOT}/src/flood.c"
+    "${CORE_ROOT}/src/ack.c"
+    "${CORE_ROOT}/src/duty_cycle.c"
+    "${CORE_ROOT}/src/msg_codec.c"
+    "${CORE_ROOT}/src/crypto_mbedtls.c"
 )
 
 # Vendored Lua 5.4 -- only the libraries the sandbox opens.
@@ -63,7 +69,12 @@ idf_component_register(
         "${LUA_DIR}"
     PRIV_INCLUDE_DIRS
         "${CORE_ROOT}/src"
+    REQUIRES
+        mbedtls
 )
+
+# The IDF build always has mbedtls; enable the real AES-CCM backend.
+target_compile_definitions(${COMPONENT_LIB} PUBLIC ATALAIA_HAVE_MBEDTLS)
 
 # Lua runs with its default 64-bit integers and doubles, matching the
 # desktop core and the simulator.  This guarantees scripts behave

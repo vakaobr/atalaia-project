@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 cmake_minimum_required(VERSION 3.16)
-project(atalaia_core VERSION 0.1.0 LANGUAGES C)
+project(atalaia_core VERSION 0.2.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -95,7 +95,7 @@ if(BUILD_TESTING)
         tests/test_core.c tests/test_node.c tests/test_codec.c
         tests/test_packet.c tests/test_flood.c tests/test_ack.c
         tests/test_duty_cycle.c tests/test_msg_codec.c
-        tests/test_crypto_mbedtls.c)
+        tests/test_crypto_mbedtls.c tests/test_field_api.c)
     target_include_directories(test_core PRIVATE src)
     target_link_libraries(test_core PRIVATE atalaia_core)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")

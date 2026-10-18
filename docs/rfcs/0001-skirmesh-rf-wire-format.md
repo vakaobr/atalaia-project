@@ -425,6 +425,41 @@ two platforms.
 AES-CCM, dedupe, and duty-cycle code runs on the modem's ESP32, shared
 with the node firmware. The Pi needs only `pyserial`.
 
+## Amendment 1 (2026-10-18): Single shared game channel
+
+**Supersedes:** section 8 paragraph "Node TX hops across three g-band
+channels..." and section 6 sentence "TIME beacons use 869.525 MHz."
+
+**Change:** All game traffic (events, STATE, ACK, TIME, CMD) uses a
+single shared channel per game, by default 869.525 MHz in the g2
+sub-band (869.4-869.65 MHz, 10% duty cycle, 500 mW ERP).  The
+channel is configurable per game via the CONFIG message.
+
+**Reason:** With a single-radio half-duplex transceiver (SX1262), the
+round-robin hopping scheme in section 8 left nodes listening on
+different frequencies after their last TX, so they missed each other's
+packets.  A single shared channel is the standard single-radio mesh
+approach (Meshtastic's EU868 default uses the same frequency).
+
+The g2 sub-band was chosen because:
+- 10% duty cycle (360,000 ms/h) gives 10x the airtime of the g-band
+  (36,000 ms/h), which is important for a 5-node game with TIME
+  beacons, events, STATEs and ACKs.
+- 500 mW ERP gives better range than the g-band's 25 mW.
+- Neighbouring games are separated by choosing different channels
+  within the sub-band or in other sub-bands.
+
+**Duty-cycle tracking:** The firmware tracks the g2 10% budget per
+device with a 60-bucket sliding one-hour window.
+
+**Power:** The SX1262 conducted power for the g2 sub-band accounts
+for the FEM gain (14 dB) and the antenna gain (2 dBi, Kconfig):
+27 dBm ERP + 2.15 - 14 - 2 = 13.15 -> 13 dBm conducted.
+
+**Channel validation:** The firmware validates the configured channel
+against the EU868 sub-band table and refuses to transmit if the
+channel is outside all sub-bands.
+
 ## Open questions
 
 - Per-node session keys (HKDF-derived from the game key) would limit

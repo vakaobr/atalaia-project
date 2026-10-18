@@ -28,6 +28,12 @@ idf_component_register(
         "hal/esp/hal_esp_nfc.c"
         "hal/esp/hal_esp_audio.c"
         "hal/esp/hal_esp_battery.c"
+        "hal/esp/hal_esp_radio.c"
+        "radio/radio_task.c"
+        "radio/event_log.c"
+        "radio/time_sync.c"
+        "radio/radio_protocol.c"
+        "radio/radio_nvs_esp.c"
     INCLUDE_DIRS
         "."
         "hal"
@@ -43,6 +49,7 @@ idf_component_register(
         esp_http_server
         esp_event
         esp_netif
+        mbedtls
     EMBED_FILES
         "wifi_setup.html"
 )

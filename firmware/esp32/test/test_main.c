@@ -30,6 +30,11 @@ int main(void)
     run_screen_renderer_tests();
     run_builtin_presets_tests();
     run_key_filter_tests();
+    run_event_log_tests();
+    run_time_sync_tests();
+    run_radio_stub_tests();
+    run_radio_protocol_tests();
+    run_radio_power_tests();
 
     if (check_failures == 0) {
         printf("firmware: all tests passed\n");

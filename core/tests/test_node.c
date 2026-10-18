@@ -407,9 +407,13 @@ static void test_load_errors(void)
     CHECK(find_event(&r, "script.halted") >= 0);
     atalaia_node_destroy(n);
 
+    /* state.field{} on a regular node is now read-only (not an error to call,
+     * but writing to it errors). Verify the read-only table works. */
     n = make_node(&r, 1, 0);
-    CHECK(!load(n, "local x = state.field {}"));
-    CHECK(strstr(atalaia_node_last_error(n), "phase 2") != NULL);
+    CHECK(load(n, "local f = state.field { x = 1 }\n"
+                  "log(f.x)\n"));
+    CHECK(r.logs > 0);
+    CHECK(strcmp(r.log[r.logs - 1], "1") == 0);
     atalaia_node_destroy(n);
 }
 

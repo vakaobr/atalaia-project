@@ -46,6 +46,11 @@ set(CORE_SOURCES
     ${CORE_DIR}/src/sandbox.c
     ${CORE_DIR}/src/script_api.c
     ${CORE_DIR}/src/node.c
+    ${CORE_DIR}/src/packet.c
+    ${CORE_DIR}/src/flood.c
+    ${CORE_DIR}/src/ack.c
+    ${CORE_DIR}/src/duty_cycle.c
+    ${CORE_DIR}/src/msg_codec.c
 )
 add_library(atalaia_core_fw STATIC ${CORE_SOURCES})
 target_include_directories(atalaia_core_fw PUBLIC ${CORE_DIR}/include PRIVATE ${CORE_DIR}/src)
@@ -116,11 +121,16 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/button_tracker.c
     ${SHELL_DIR}/builtin_presets.c
     ${SHELL_DIR}/key_filter.c
+    ${SHELL_DIR}/radio/radio_task.c
+    ${SHELL_DIR}/radio/event_log.c
+    ${SHELL_DIR}/radio/time_sync.c
+    ${SHELL_DIR}/radio/radio_protocol.c
 )
 
 # ---- HAL stub ----------------------------------------------------------------
 set(HAL_SOURCES
     ${SHELL_DIR}/hal/stub/hal_stub.c
+    ${SHELL_DIR}/hal/stub/hal_radio_stub.c
 )
 
 # ---- Test sources ------------------------------------------------------------
@@ -141,6 +151,11 @@ set(TEST_SOURCES
     test_builtin_presets.c
     test_key_filter.c
     test_display.c
+    test_event_log.c
+    test_time_sync.c
+    test_radio_stub.c
+    test_radio_protocol.c
+    test_radio_power.c
 )
 
 # ---- Executable --------------------------------------------------------------

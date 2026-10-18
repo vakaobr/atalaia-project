@@ -32,6 +32,38 @@ expander (Wokwi uses a GPIO keypad instead), the PN532, the MAX17048, the
 I2S amplifier, the Heltec V4.3's Vext rail, the real panel's orientation and
 colours, power, range and the 2-hour stability gate.
 
+## Step 0: eFuse HMAC Key Provisioning (Production Only)
+
+**Skip this step for development boards.** Without the eFuse key, NVS
+encryption is not available and the game key is stored in plaintext
+NVS. The firmware logs a warning at boot.
+
+On production Field Boxes, burn a 256-bit HMAC key into eFuse block 4
+before the first boot. This key protects the NVS partition contents
+(game key, epoch counter) at rest:
+
+```
+espefuse.py --port /dev/ttyUSB0 burn_key \
+    BLOCK_KEY0 /path/to/hmac-key.bin HMAC_UP
+```
+
+Generate the key file with:
+
+```
+dd if=/dev/urandom of=hmac-key.bin bs=32 count=1
+```
+
+After burning, enable NVS encryption in `idf.py menuconfig`:
+- Component config > NVS > NVS Encryption > Enable
+- Select "HMAC-based scheme" and set the eFuse key ID to 0
+
+**This operation is irreversible.** Keep a secure backup of the key
+file; all boxes in the same fleet should use the same key to allow
+NVS partition interchange.
+
+The `radio_nvs_esp.c` code works transparently with both encrypted
+and unencrypted NVS -- no firmware changes are needed.
+
 ## Prerequisites
 
 - Assembled Field Box (see `hardware/field-box/README.md` for BOM
@@ -134,7 +166,35 @@ colours, power, range and the 2-hour stability gate.
 3. Disconnect USB-C; run on battery.  Verify readings update.
 4. Reconnect USB-C: verify charging behaviour.
 
-## Step 10: Wi-Fi Setup Portal
+## Step 10: Radio (SX1262 LoRa)
+
+> **Warning:** Connect the LoRa antenna to the LoRa IPEX connector
+> BEFORE powering on. The 28 dBm FEM on the high-power V4.3.1 can be
+> damaged by transmitting into an open port.
+
+1. Verify the serial log shows `SX1262 detected (sync_hi=0x14)` and
+   `SX1262 initialised: EU868, SF7, BW125k, TX N dBm, ch 869525000 Hz`
+   (where N is the calculated conducted power and 869525000 is the
+   default game channel).
+2. If the log shows `SX1262 not detected` or `radio SPI bus init
+   failed`, check that GPIO 8-14 are not used by anything else and
+   that the SX1262 is soldered (the Heltec V4.3 always has it).
+3. Verify the TX power value makes sense:
+   - With FEM (14 dB gain) and default 2 dBi antenna on the g2
+     sub-band (default 869.525 MHz): N = 13 dBm conducted.
+   - Adjust `ATALAIA_RADIO_ANTENNA_GAIN_DBI` in menuconfig if the
+     actual antenna differs from the 2 dBi default.
+4. All nodes in a game use the same channel (default 869.525 MHz).
+   Neighbouring games should use different channels within the g2
+   sub-band or in other EU868 sub-bands.  The channel is configurable
+   via `ATALAIA_RADIO_DEFAULT_CHANNEL_HZ` in Kconfig.
+5. The radio task starts on core 0, priority 3. Verify it does not
+   affect game_task timing (check game_timer_tick jitter in the log).
+6. Phase 2 radio protocol (event exchange, time sync) requires a
+   controller and at least two nodes. Single-box radio health can be
+   verified by monitoring `radio_task` log lines for TX/RX activity.
+
+## Step 11: Wi-Fi Setup Portal
 
 1. Reset configuration: hold reset during boot or enter admin PIN
    and select "Setup" from the admin menu.
@@ -147,7 +207,7 @@ colours, power, range and the 2-hour stability gate.
    phone does not open the page by itself, browse to
    `http://192.168.4.1`.
 
-## Step 11: Full Game Test (2 Hours) -- Phase 1 Gate
+## Step 12: Full Game Test (2 Hours) -- Phase 1 Gate
 
 1. Set up a Domination preset with 2 teams and 120-minute timer.
 2. Start the game from the keypad (enter admin PIN, select preset,
@@ -161,7 +221,7 @@ colours, power, range and the 2-hour stability gate.
 5. Let the timer expire.
 6. Verify: scores frozen, `final_score` screen displayed.
 
-## Step 12: Power Loss Recovery
+## Step 13: Power Loss Recovery
 
 1. Start a new game.
 2. After 5 minutes, disconnect the battery.
@@ -170,7 +230,7 @@ colours, power, range and the 2-hour stability gate.
 5. Verify: `node.rebooted` event emitted.
 6. Verify: timer continues from where it left off.
 
-## Step 13: Environmental
+## Step 14: Environmental
 
 1. Test in direct sunlight: display readability.
 2. Test at operating temperature extremes (0-45 C).
@@ -178,9 +238,15 @@ colours, power, range and the 2-hour stability gate.
 
 ## Notes for Phase 2
 
-- The SX1262 radio (GPIO 8-14) is unused in Phase 1.  Keep its pins
-  free and the LoRa antenna connected.
+- The SX1262 radio (GPIO 8-14) and its driver are implemented in
+  Phase C. The radio task, protocol layer, event log and time sync
+  are all wired. Multi-node field testing requires a controller
+  (Phase D).
+- NVS encryption for the game key is supported via the eFuse HMAC
+  scheme (see Step 0). On dev boards without the eFuse key, the key
+  is stored in plaintext NVS.
 - GNSS header pins (GPIO 38-42) are used for external peripherals in
-  the default pin map.  If GNSS support is added, these peripherals
+  the default pin map. If GNSS support is added, these peripherals
   must be moved to an I2C I/O expander or alternative pins.
-- TX power for the FEM variant must account for the FEM's gain.
+- TX power for the FEM variant accounts for FEM and antenna gain via
+  `radio_power.h` (Kconfig tuneable).

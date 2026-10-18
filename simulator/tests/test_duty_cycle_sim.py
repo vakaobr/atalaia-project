@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Duty-cycle simulation: verify no node exceeds the 1% budget.
+"""Duty-cycle simulation: verify no node exceeds the 10% budget.
 
     cd simulator && python -m unittest discover -s tests
 
@@ -36,7 +36,7 @@ class DutyCycleSimTests(unittest.TestCase):
     """Simulate a game and verify no node blows the duty-cycle budget."""
 
     def test_normal_traffic_within_budget(self):
-        """Normal game traffic stays within 1% duty cycle."""
+        """Normal game traffic stays within 10% duty cycle."""
         config = RadioConfig(loss_rate=0.0)
         radio = RadioModel(config=config, rng=random.Random(42))
         ctrl = FieldController(
@@ -69,7 +69,7 @@ class DutyCycleSimTests(unittest.TestCase):
                 )
             ctrl.tick(t + 100)
 
-        # Check duty cycle: no node should exceed 36_000 ms/hour.
+        # Check duty cycle: no node should exceed 360_000 ms/hour (g2 10%).
         budget = DutyCycleTracker().budget_ms_per_hour
         for nid, node_obj in radio.nodes.items():
             used = node_obj.duty.used(t + 100)

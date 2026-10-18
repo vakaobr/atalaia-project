@@ -51,6 +51,7 @@ class RadioConfig:
     game_id: int = 1             # game identifier for packet headers
     game_key: bytes = b"\x00" * KEY_SIZE  # AES-128 key (test default)
     epoch: int = 0               # current encryption epoch
+    channel_hz: int = 869525000  # single shared game channel (g2 sub-band)
 
 
 # --- pending packet -----------------------------------------------------------
@@ -73,13 +74,13 @@ class DutyCycleTracker:
     """Per-node duty-cycle tracking (simplified for simulation).
 
     The budget is expressed in milliseconds of airtime allowed per
-    rolling hour (3_600_000 ms).  At 1 % duty cycle the budget is
-    36_000 ms/hour.
+    rolling hour (3_600_000 ms).  At 10 % duty cycle (g2 sub-band)
+    the budget is 360_000 ms/hour.
     """
 
     HOUR_MS = 3_600_000
 
-    def __init__(self, budget_ms_per_hour: float = 36_000.0) -> None:
+    def __init__(self, budget_ms_per_hour: float = 360_000.0) -> None:
         self.budget_ms_per_hour = budget_ms_per_hour
         self._used: list[tuple[int, float]] = []  # (timestamp_ms, airtime_ms)
 

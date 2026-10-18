@@ -35,7 +35,7 @@ header:
   language: Language
 
 hero:
-  status: Pre-alpha · phase 1 software done, waiting for hardware · not field-ready yet
+  status: Pre-alpha · phase 2 (field network) in progress · not field-ready yet
   title: The open <span class="nowrap">force-on-force</span> platform
   lead: >-
     Atalaia is an open platform for the electronic props of airsoft, paintball and milsim: the
@@ -221,8 +221,9 @@ try:
 roadmap:
   title: Roadmap
   intro: Six phases. Each one ends with a real field test before the next begins.
-  now: Done
-  next: Software done
+  done: Done
+  software: Software done
+  current: In progress
   p0:
     title: Foundations
     text: >-
@@ -241,7 +242,9 @@ roadmap:
     text: Skirmesh-RF over LoRa, field controller, API, GM console.
     gate: >-
       Gate: 5 boxes on a <a href="#glossary-cqb">CQB</a> site and an outdoor field, zero lost
-      captures.
+      captures. The encrypted radio protocol and the radio firmware are built and tested in the
+      simulator and the emulator; the field controller and GM console come next, and the gate
+      needs the radio boards.
   p3:
     title: Android and players
     text: >-

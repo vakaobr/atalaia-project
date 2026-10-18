@@ -5,9 +5,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 2 -- Field Network: Status
 
-**Current phase:** Implementation (phases A + B complete, stopped before C)
+**Current phase:** Implementation (phases A + B + C complete, stopped before D)
 **Risk level:** High
-**Last verified:** 2026-10-17
+**Last verified:** 2026-10-18
 
 ## Completed
 
@@ -25,21 +25,40 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 - [x] Phase B: 9 simulator test files (all pass, 0 skipped in CI)
 - [x] No firmware regression (ESP-IDF build passes, 87% slot usage, 13% free)
 - [x] No silent skips (ATALAIA_REQUIRE_ALL=1 in check.sh and CI)
+- [x] Phase C: Core field_ops API (state.field{} read-write/read-only, field.nodes/owner/send/score/common_owner)
+- [x] Phase C: Core version bumped to 0.2.0
+- [x] Phase C: Radio HAL (hal_radio_ops_t, SX1262 driver on SPI3, stub for tests)
+- [x] Phase C: FEM gain accounting (14 dB), EU868 single shared game channel (default 869.525 MHz g2), duty-cycle tracking (g2 10%)
+- [x] Phase C: Radio task (FreeRTOS core 0 priority 3, TX/RX queues)
+- [x] Phase C: Flash event log (LittleFS, immediate flush for normal/critical, telemetry cache)
+- [x] Phase C: Time sync by slew (max 5%/s, step above 500 ms)
+- [x] Phase C: Radio protocol glue (packet encode/decode, epoch/nonce safety)
+- [x] Phase C: Partition table grown (OTA 1.5 -> 2 MB, nvs_keys added)
+- [x] Phase C: Wokwi passes with the radio enabled. The earlier "SPI3 probe corrupts Wokwi flash" disable was a real driver bug (an unbounded BUSY wait on a floating GPIO 13), now fixed with a ~200 ms timeout
+- [x] Phase C: Phase A core sources (packet, flood, ack, duty_cycle, msg_codec, crypto_mbedtls) wired into IDF component
+- [x] Phase C: Radio protocol tests (10 tests: boot epoch, NVS failure, seq wrap, epoch exhaustion, receiver epoch trial)
+- [x] Phase C: TX power calculation tests (6 tests: g-band, g2-band, no FEM, high-gain antenna, clamp low/high)
+- [x] Phase C: NVS encryption documented (eFuse HMAC scheme; BRING_UP.md step 0)
+- [x] Phase C: Documentation updated (firmware README, BRING_UP.md, hardware README, core README, CHANGELOG)
+- [x] Radio channel fix (2026-10-18): replaced three-channel round-robin hopping with a single shared game channel (default 869.525 MHz, g2 sub-band, 10% DC, 500 mW ERP). RFC 0001 Amendment 1; ADR-P2-13 superseded in part.
 
-## Verification (2026-10-17)
+## Verification (2026-10-18, Phase C -- final)
 
 ```
-docker build -t atalaia-dev tools/dev        exit 0
 sh tools/check.sh                            exit 0
-  protogen --check                           OK (all 6 generated files up to date)
+  protogen --check                           OK
   build_site.py --check                      OK
   format --check                             OK
-  cmake build (16 core + crypto_mbedtls)     OK (0 warnings, -Werror)
+  cmake build (core 0.2.0)                   OK (0 warnings, -Werror)
   ctest                                      1/1 passed
   simulator unittest                         108 tests, 0 skipped
   mode tests                                 12/12 passed
-ESP-IDF build (espressif/idf:v5.3.2)         exit 0 (binary 1,366,128 bytes)
-firmware stub tests                          2/2 passed
+Core ASan+UBSan                              exit 0, 0 sanitizer errors
+ESP-IDF build (Field Box)                    exit 0 (0x14f190 = 1,373 KB, 35% free in 2 MB OTA slot)
+ESP-IDF build (Wokwi)                        exit 0 (0x14f190 = 1,373 KB, 35% free in 2 MB OTA slot)
+firmware stub tests                          2/2 passed (incl. 10 radio protocol + 6 TX power tests)
+Wokwi bomb scenario                          "Scenario completed successfully"
+reuse lint                                   exit 0 (compliant)
 ```
 
 ## Shared test vectors
@@ -64,11 +83,9 @@ Published known-answer: RFC 3610 section 8, Packet Vector 1 (AES-128-CCM,
 - **ESP32**: firmware provides mbedtls via IDF component.
 - **Python**: `cryptography` library (required in CI, optional locally).
 
-## Next: Phase C
+## Next: Phase D
 
-Core Lua API (`state.field{}`, `field.*`), radio HAL (`hal_radio_ops_t` +
-SX1262 driver + stub), FreeRTOS radio task, flash event log, time sync.
-Core version bump to 0.2.0.
+Python field controller, USB modem framing, REST, MQTT, SQLite, failover.
 
 ## Plan summary
 
@@ -76,7 +93,7 @@ Core version bump to 0.2.0.
 |-------|-------|--------|
 | A | Protocol codecs, RFC-0001, protogen, test vectors | Complete |
 | B | Simulator: RadioModel, FieldController, multi-node tests | Complete |
-| C | Core API (field_ops), radio HAL, ESP32 radio task, time sync, event log | Pending |
+| C | Core API (field_ops), radio HAL, ESP32 radio task, time sync, event log | Complete |
 | D | Python controller, USB modem framing, REST, MQTT, SQLite, failover | Pending |
 | E | GM console (Preact+HTM PWA), join flow (NFC+QR), scoreboard | Pending |
 | F | Hardware integration, calibration, field test, documentation | Pending |
@@ -91,7 +108,7 @@ Core version bump to 0.2.0.
 | AC-4 | Duty-cycle compliance in sim | Met |
 | AC-5 | Controller REST API serves all 17 endpoints | Phase D |
 | AC-6 | GM console serves and renders | Phase E |
-| AC-7 | ESP32 firmware cross-compiles with radio | Phase C |
+| AC-7 | ESP32 firmware cross-compiles with radio | Met |
 | AC-8 | Partition recovery zero lost captures in sim | Met |
 | AC-9 | Failover election in simulator | Met |
 | AC-10 | Field test 5 boxes zero lost captures | Phase F |

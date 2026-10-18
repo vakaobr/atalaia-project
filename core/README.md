@@ -8,9 +8,9 @@ The shared C11 core runs on every full node: ESP32, Raspberry Pi/Linux and Andro
 | Protocol tables | Message types, event ids and priorities, CBOR keys; generated from `protocol/schema` | `protocol.h`, `protocol.c` | Done |
 | Event bus | Dispatches hardware, game and system events to script handlers, in order | `node.c` | Done |
 | Timers | `every`, `after` and `cancel` on game time, fired in a deterministic order | `node.c` | Done |
-| State store | `state.node{}` and grow-only, mergeable score counters | `score.h`, `script_api.c` | Done (`state.field{}` arrives with the controller in phase 2) |
+| State store | `state.node{}`, `state.field{}` and grow-only, mergeable score counters | `score.h`, `script_api.c` | Done |
 | Lua sandbox | Lua 5.4 with a memory cap, an instruction watchdog, no `io`/`os`/`load`, and a seeded `rand` | `sandbox.c`, `rand.c` | Done |
-| Script API | The functions modes call | `script_api.c` | Done, except squad ids, persistence and `field.*` |
+| Script API | The functions modes call | `script_api.c` | Done (including `field.*` from Phase C) |
 | Event codec | An event and its JSON data to the CBOR payload of an EVENT message, and back | `codec.h`, `codec.c` | Done (packet header, MIC and other messages in phase 2) |
 | Event log | Append-only log with merge and replay | | Planned |
 
@@ -19,7 +19,10 @@ The shared C11 core runs on every full node: ESP32, Raspberry Pi/Linux and Andro
 One `atalaia_node_t` runs one mode's `node.lua`. The host owns the clock and the hardware. It feeds the node input events and game time, and the node calls back with emitted events, hardware commands and log lines. The core never reads a real clock and never blocks, which is what makes a game replayable from its inputs. The full API is in [`include/atalaia/node.h`](include/atalaia/node.h).
 
 ```c
-atalaia_node_config_t cfg = { .node_id = 1, .game_seed = seed, .callbacks = cb };
+atalaia_node_config_t cfg = {
+    .node_id = 1, .game_seed = seed, .callbacks = cb,
+    .field_ops = &my_field_ops  /* Phase 2: field-level state and comms */
+};
 atalaia_node_t *node = atalaia_node_create(&cfg);
 atalaia_node_set_teams(node, (const char *[]){"red", "blue"}, 2);
 atalaia_node_set_params(node, "{\"fuse_s\": 300}");

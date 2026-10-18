@@ -33,5 +33,10 @@ void run_reboot_resume_tests(void);
 void run_screen_renderer_tests(void);
 void run_builtin_presets_tests(void);
 void run_key_filter_tests(void);
+void run_event_log_tests(void);
+void run_time_sync_tests(void);
+void run_radio_stub_tests(void);
+void run_radio_protocol_tests(void);
+void run_radio_power_tests(void);
 
 #endif /* ATALAIA_FW_TEST_CHECK_H */

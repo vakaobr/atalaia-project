@@ -15,10 +15,11 @@
 #define NODE_ERROR_MAX 200
 
 /* Registry keys for tables the runtime keeps inside the Lua state. */
-#define REG_HANDLERS "atalaia.handlers" /* event type -> list of functions */
-#define REG_QUEUE    "atalaia.queue"    /* events waiting for dispatch */
-#define REG_CAPS     "atalaia.caps"     /* capability id -> proxy */
-#define REG_STATE    "atalaia.state"    /* the state.node table */
+#define REG_HANDLERS    "atalaia.handlers"    /* event type -> list of functions */
+#define REG_QUEUE       "atalaia.queue"       /* events waiting for dispatch */
+#define REG_CAPS        "atalaia.caps"        /* capability id -> proxy */
+#define REG_STATE       "atalaia.state"       /* the state.node table */
+#define REG_FIELD_STATE "atalaia.field_state" /* the state.field table */
 
 typedef struct {
     bool active;

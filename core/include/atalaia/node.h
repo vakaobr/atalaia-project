@@ -32,6 +32,7 @@
 #include <stdint.h>
 
 #include "atalaia/event.h"
+#include "atalaia/field_ops.h"
 #include "atalaia/score.h"
 
 /* Defaults for the Full device tier (section 6 of the design spec). */
@@ -60,6 +61,8 @@ typedef struct {
     void (*command)(void *user, const char *target, const char *method, const char *args_json);
     /* A line from the script's log() or print(). */
     void (*log)(void *user, const char *message);
+    /* Field state changed on a controller node (key/value_json). */
+    void (*field_state)(void *user, const char *key, const char *value_json);
     void *user;
 } atalaia_node_callbacks_t;
 
@@ -74,6 +77,7 @@ typedef struct {
     atalaia_node_callbacks_t callbacks;
     atalaia_alloc_fn alloc; /* NULL for realloc/free */
     void *alloc_ud;
+    const atalaia_field_ops_t *field_ops; /* NULL for regular nodes */
 } atalaia_node_config_t;
 
 /* Returns NULL if memory runs out. */

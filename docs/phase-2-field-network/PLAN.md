@@ -36,7 +36,7 @@ without LoRa hardware.
 - Time sync algorithm: slew module with capped rate, airtime
   compensation, step threshold.
 - Duty-cycle tracker: per-sub-band sliding-window airtime accounting,
-  three-channel hopping on the g sub-band.
+  single shared game channel on the g2 sub-band (10% duty cycle).
 - `state.field{}` and `field.*` Lua API additions to `core/script_api.c`
   (guarded by `field_ops` pointer); core version bump to 0.2.0.
 - Event buffer: 128-entry DRAM ring buffer on ESP32; replay protocol
@@ -118,7 +118,7 @@ without LoRa hardware.
 | 20 | Mosquitto as system service | Phase D documents `apt install mosquitto`; the controller connects via `paho-mqtt` as a client |
 | 21 | SPDX headers on every file | `controller/` files use `AGPL-3.0-or-later`; `firmware/` and `core/` files use `GPL-3.0-or-later`; docs use `CC-BY-SA-4.0` |
 | 22 | Rebroadcast jitter 10-50 ms | Phase A `core/src/flood.c` draws jitter from `atalaia_rand` seeded with source + seq; Phase B simulator uses the same formula |
-| 23 | Three-channel hopping on g sub-band | Phase C radio task round-robins across 868.1, 868.3, 868.5 MHz for node TX; per-channel independent duty-cycle tracking |
+| 23 | ~~Three-channel hopping on g sub-band~~ **Superseded by Amendment 1 of RFC 0001 (2026-10-18):** single shared game channel, default 869.525 MHz (g2 sub-band, 10% duty cycle) | Phase C radio HAL uses one channel per game; no hopping |
 | 24 | Nonce = (epoch << 16) or seq | Phase A nonce construction uses the epoch and header seq; Phase C persists epoch in NVS at boot and seq wrap |
 | 25 | Epoch persisted at boot and seq wrap only | Phase C writes epoch to NVS before first TX after boot and when seq wraps 65535 to 0; if NVS write fails, radio halts |
 | 26 | eFuse HMAC key for production | Phase F bring-up checklist includes one-time eFuse key burn; `sdkconfig.defaults` enables `CONFIG_NVS_ENCRYPTION` |

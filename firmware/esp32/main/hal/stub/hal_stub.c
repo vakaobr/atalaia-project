@@ -254,6 +254,14 @@ static const hal_battery_ops_t stub_battery_ops = {
 /* Public initialiser                                                  */
 /* ------------------------------------------------------------------ */
 
+/* ---- Radio stub (defined in hal_radio_stub.c) ---------------------------- */
+
+extern const hal_radio_ops_t hal_stub_radio_ops;
+
+/* ------------------------------------------------------------------ */
+/* Public initialiser                                                  */
+/* ------------------------------------------------------------------ */
+
 void hal_stub_init(hal_t *hal)
 {
     hal->buttons = &stub_button_ops;
@@ -263,6 +271,7 @@ void hal_stub_init(hal_t *hal)
     hal->nfc = &stub_nfc_ops;
     hal->audio = &stub_audio_ops;
     hal->battery = &stub_battery_ops;
+    hal->radio = &hal_stub_radio_ops;
 
     hal_stub_reset_counters();
 }

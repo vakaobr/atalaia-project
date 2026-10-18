@@ -5,6 +5,7 @@
  * The functions game mode scripts call. The table "Script API surface" in
  * the design specification lists them; keep the two in step.
  */
+#include <stdlib.h>
 #include <string.h>
 
 #include "json.h"
@@ -298,10 +299,195 @@ static int l_state_node(lua_State *L)
     return 1;
 }
 
+/*
+ * __newindex metamethod for the controller's state.field table.
+ * Stores the value in REG_FIELD_STATE and notifies the host via the
+ * field_state callback.
+ */
+static int field_state_newindex(lua_State *L)
+{
+    atalaia_node_t *n = atalaia_node_from_lua(L);
+    const char *key = luaL_checkstring(L, 2);
+
+    /* Store the value in the backing registry table. */
+    lua_getfield(L, LUA_REGISTRYINDEX, REG_FIELD_STATE);
+    lua_pushvalue(L, 2); /* key */
+    lua_pushvalue(L, 3); /* value */
+    lua_rawset(L, -3);
+    lua_pop(L, 1);
+
+    /* Notify the host. */
+    if (n->cfg.callbacks.field_state != NULL) {
+        if (lua_isnil(L, 3)) {
+            n->cfg.callbacks.field_state(n->cfg.callbacks.user, key, "null");
+        } else {
+            atalaia_json_push_encoded(L, 3);
+            n->cfg.callbacks.field_state(n->cfg.callbacks.user, key, lua_tostring(L, -1));
+            lua_pop(L, 1);
+        }
+    }
+    return 0;
+}
+
+/*
+ * __index metamethod for the controller's state.field table.
+ * Reads from the backing REG_FIELD_STATE registry table.
+ */
+static int field_state_index(lua_State *L)
+{
+    lua_getfield(L, LUA_REGISTRYINDEX, REG_FIELD_STATE);
+    lua_pushvalue(L, 2);
+    lua_rawget(L, -2);
+    return 1;
+}
+
+/*
+ * __newindex that always errors (used for read-only state.field on
+ * regular nodes).
+ */
+static int field_state_readonly(lua_State *L)
+{
+    (void)L;
+    return luaL_error(L, "state.field is read-only on regular nodes");
+}
+
 static int l_state_field(lua_State *L)
 {
-    return luaL_error(L, "state.field is not available yet: it arrives with "
-                         "the field controller (phase 2)");
+    atalaia_node_t *n = atalaia_node_from_lua(L);
+    bool has_defaults = !lua_isnoneornil(L, 1);
+    if (has_defaults) {
+        luaL_checktype(L, 1, LUA_TTABLE);
+    }
+
+    /* Ensure the backing table exists. */
+    if (lua_getfield(L, LUA_REGISTRYINDEX, REG_FIELD_STATE) != LUA_TTABLE) {
+        lua_pop(L, 1);
+        lua_newtable(L);
+        lua_pushvalue(L, -1);
+        lua_setfield(L, LUA_REGISTRYINDEX, REG_FIELD_STATE);
+    }
+    int backing = lua_gettop(L);
+
+    /* Merge defaults (keys not already present). */
+    if (has_defaults) {
+        lua_pushnil(L);
+        while (lua_next(L, 1)) {
+            lua_pushvalue(L, -2);
+            int existing = lua_rawget(L, backing);
+            lua_pop(L, 1);
+            if (existing == LUA_TNIL) {
+                lua_pushvalue(L, -2);
+                lua_pushvalue(L, -2);
+                lua_rawset(L, backing);
+            }
+            lua_pop(L, 1);
+        }
+    }
+
+    /* Return a proxy table with metamethods that read/write the backing
+     * table.  On a controller (field_ops != NULL) the proxy is read-write;
+     * on a regular node it is read-only. */
+    lua_newtable(L);          /* the proxy */
+    lua_createtable(L, 0, 2); /* metatable */
+    lua_pushcfunction(L, field_state_index);
+    lua_setfield(L, -2, "__index");
+    if (n->cfg.field_ops != NULL) {
+        lua_pushcfunction(L, field_state_newindex);
+    } else {
+        lua_pushcfunction(L, field_state_readonly);
+    }
+    lua_setfield(L, -2, "__newindex");
+    lua_setmetatable(L, -2);
+
+    lua_remove(L, backing);
+    return 1;
+}
+
+/* ---- field.* (controller only) ------------------------------------------- */
+
+static int l_field_nodes(lua_State *L)
+{
+    atalaia_node_t *n = atalaia_node_from_lua(L);
+    const char *role = luaL_optstring(L, 1, NULL);
+    char *json = n->cfg.field_ops->nodes(n->cfg.callbacks.user, role);
+    if (json == NULL) {
+        lua_newtable(L);
+        return 1;
+    }
+    atalaia_json_push_decoded(L, json);
+    free(json);
+    return 1;
+}
+
+static int l_field_owner(lua_State *L)
+{
+    atalaia_node_t *n = atalaia_node_from_lua(L);
+    lua_Integer id = luaL_checkinteger(L, 1);
+    const char *owner = n->cfg.field_ops->owner(n->cfg.callbacks.user, (uint16_t)id);
+    if (owner == NULL) {
+        lua_pushnil(L);
+    } else {
+        lua_pushstring(L, owner);
+    }
+    return 1;
+}
+
+static int l_field_send(lua_State *L)
+{
+    atalaia_node_t *n = atalaia_node_from_lua(L);
+    lua_Integer id = luaL_checkinteger(L, 1);
+    const char *cmd = luaL_checkstring(L, 2);
+    const char *params = NULL;
+    if (!lua_isnoneornil(L, 3)) {
+        luaL_checktype(L, 3, LUA_TTABLE);
+        atalaia_json_push_encoded(L, 3);
+        params = lua_tostring(L, -1);
+    }
+    bool ok = n->cfg.field_ops->send(n->cfg.callbacks.user, (uint16_t)id, cmd, params);
+    lua_pushboolean(L, ok);
+    return 1;
+}
+
+static int l_field_score(lua_State *L)
+{
+    atalaia_node_t *n = atalaia_node_from_lua(L);
+    lua_newtable(L);
+    for (size_t i = 0; i < n->team_count; i++) {
+        int64_t net = atalaia_score_net(&n->score, (uint8_t)(i + 1));
+        lua_pushinteger(L, (lua_Integer)net);
+        lua_setfield(L, -2, n->team_names[i]);
+    }
+    return 1;
+}
+
+static int l_field_common_owner(lua_State *L)
+{
+    atalaia_node_t *n = atalaia_node_from_lua(L);
+    luaL_checktype(L, 1, LUA_TTABLE);
+    lua_Integer len = (lua_Integer)lua_rawlen(L, 1);
+    if (len == 0) {
+        lua_pushnil(L);
+        return 1;
+    }
+    const char *common = NULL;
+    for (lua_Integer i = 1; i <= len; i++) {
+        lua_rawgeti(L, 1, i);
+        lua_Integer id = luaL_checkinteger(L, -1);
+        lua_pop(L, 1);
+        const char *owner = n->cfg.field_ops->owner(n->cfg.callbacks.user, (uint16_t)id);
+        if (owner == NULL) {
+            lua_pushnil(L);
+            return 1;
+        }
+        if (common == NULL) {
+            common = owner;
+        } else if (strcmp(common, owner) != 0) {
+            lua_pushnil(L);
+            return 1;
+        }
+    }
+    lua_pushstring(L, common);
+    return 1;
 }
 
 /* ---- Utilities ----------------------------------------------------------- */
@@ -465,6 +651,21 @@ int atalaia_script_api_open(lua_State *L)
 
     lua_newtable(L);
     lua_setfield(L, -2, "params");
+
+    /* Register field.* functions only on controller nodes (field_ops set). */
+    atalaia_node_t *n = atalaia_node_from_lua(L);
+    if (n->cfg.field_ops != NULL) {
+        static const luaL_Reg field[] = {
+            {"nodes", l_field_nodes},
+            {"owner", l_field_owner},
+            {"send", l_field_send},
+            {"score", l_field_score},
+            {"common_owner", l_field_common_owner},
+            {NULL, NULL},
+        };
+        set_lib(L, "field", field);
+    }
+
     lua_pop(L, 1);
     return 0;
 }
