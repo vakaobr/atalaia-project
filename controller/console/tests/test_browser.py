@@ -271,7 +271,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         source = page.get_by_test_id("game-source")
         expect(source.locator('option[value="mode:org.atalaia.holdall"]')).to_have_text("Domínio Total")
-        expect(source.locator('option[value="mode:org.atalaia.laststand"]')).to_have_text("Última Resistência")
+        expect(source.locator('option[value="mode:org.atalaia.laststand"]')).to_have_text("Último Elemento")
         expect(source.locator('option[value="mode:org.atalaia.codes"]')).to_have_count(0)  # a modifier
         page.get_by_test_id("game-name").fill("Tudo ou nada")
         source.select_option("mode:org.atalaia.holdall")

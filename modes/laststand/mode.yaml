@@ -20,7 +20,7 @@ params:
   end_game:        { type: bool, default: true, label: "End the game when the defenders fall" }
 i18n:
   pt:
-    name: Última Resistência
+    name: Último Elemento
     description: Os defensores começam com todas as zonas. Quando ficam reduzidos à última zona, corre uma contagem para a derrota até reconquistarem outra.
     params:
       capture_hold_ms: Tempo a premir para capturar (ms)

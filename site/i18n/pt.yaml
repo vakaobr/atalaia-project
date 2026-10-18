@@ -301,7 +301,7 @@ roadmap:
     text: >-
       Skirmesh-RF sobre LoRa, controlador de campo, API, consola da organização e um pacote de
       modos, já escrito e testado em software: Domínio Total (só pontua quem tem todas as caixas),
-      Última Resistência (uma contagem para a derrota enquanto se tem uma de três zonas), códigos
+      Último Elemento (uma contagem para a derrota enquanto se tem uma de três zonas), códigos
       de armar por equipa na Bomba e o modificador Códigos (códigos no teclado que dão pontos,
       pistas ou desbloqueios, e a organização sabe quem os usou).
     gate: >-
