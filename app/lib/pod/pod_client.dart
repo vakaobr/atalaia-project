@@ -276,6 +276,12 @@ class PodInputs {
       if (key is! String) return null;
       return ('keypad.key', {'key': key});
     }
+    // A hit sensor's hit (a target addon lent through the proxy, decision
+    // P4R4): hit.hit with its strength, 0-255.
+    if (type == 'hit' && msg.name == 'hit') {
+      final strength = msg.data['strength'];
+      return ('hit.hit', {'strength': strength is int ? strength : 0});
+    }
     return null;
   }
 

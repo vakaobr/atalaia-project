@@ -95,6 +95,20 @@ class FieldOpsTests(unittest.TestCase):
                     "test/node.lua")
         self.assertTrue(node.loaded, node.last_error)
 
+    def test_game_teams_on_nodes_and_the_controller(self):
+        """game.teams(): the game's team names in order, for every script (decision P4R26)."""
+        logs = []
+        src = "log(table.concat(game.teams(), ','), #game.teams())\n"
+        node = Node(CORE, 3, 1, ["red", "blue", "yellow"], {}, src, "test/node.lua",
+                    on_log=logs.append)
+        self.assertTrue(node.loaded, node.last_error)
+        field = Node(CORE, 0, 1, ["green", "purple"], {}, src, "test/field.lua", on_log=logs.append,
+                     field_ops=FieldOps(nodes=lambda role: [], owner=lambda node_id: None,
+                                        send=lambda node_id, cmd, params: True,
+                                        on_state=lambda key, value: None))
+        self.assertTrue(field.loaded, field.last_error)
+        self.assertEqual(logs, ["red,blue,yellow 3", "green,purple 2"])
+
 
 if __name__ == "__main__":
     unittest.main()

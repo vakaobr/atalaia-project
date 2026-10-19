@@ -286,6 +286,16 @@ static void test_params_state_and_teams(void)
     CHECK(!atalaia_node_set_teams(n, NULL, 0));
     atalaia_node_destroy(n);
 
+    /* game.teams(): the names in order, a new table each time (decision P4R26). */
+    n = make_node(&r, 1, 0);
+    CHECK(load(n, "local t = game.teams()\n"
+                  "t[1] = 'green'\n"
+                  "local u = game.teams()\n"
+                  "log(#u, u[1], u[2], u[3], t ~= u)\n"));
+    CHECK(r.logs == 1);
+    CHECK(strcmp(r.log[0], "2 red blue nil true") == 0);
+    atalaia_node_destroy(n);
+
     /* An unknown team is a script error, reported and survived. */
     n = make_node(&r, 1, 0);
     CHECK(load(n, "on('x', function() score.add('green', 1) end)"));

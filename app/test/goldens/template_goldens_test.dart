@@ -125,6 +125,20 @@ const cases = [
     'master_status',
     '{"team":"yellow","since":3700,"held":1,"of":4,"points":0}',
   ),
+  // Target Windows: dark, dark after hits, a window open.
+  ('target_windows_standby', 'target_windows', 'standby', '{"hits":0}'),
+  (
+    'target_windows_standby_hit',
+    'target_windows',
+    'standby',
+    '{"team":"blue","hits":3}',
+  ),
+  (
+    'target_windows_window',
+    'target_windows',
+    'window',
+    '{"team":"red","left":4}',
+  ),
   (
     'code_entry',
     null,

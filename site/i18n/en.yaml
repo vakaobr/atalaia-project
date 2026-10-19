@@ -327,6 +327,13 @@ modes:
       holder also holds raises its points; when the master changes hands, every satellite goes back
       to neutral. Written and tested in software, not yet played on real boxes.
     meta: Several boxes · needs the field controller
+  target_windows:
+    title: Target Windows
+    text: >-
+      A target lights up in a random team's colour for a few seconds, and a hit while it is lit
+      scores for that team. The game is written and tested in software; the target addon it needs
+      (a plate with a hit sensor and a light ring) is not built yet.
+    meta: A box with the target addon · not available yet
   codes:
     title: Codes (modifier)
     text: >-
@@ -569,7 +576,7 @@ roadmap:
     title: Site server and advanced play
     short: >-
       Site server, game scheduling and registration, custom scenarios, advanced modes, ATAK.
-      Started: the first advanced mode, Master and Satellites, and the site server's skeleton and accounts are built in software.
+      Started: the first advanced modes, Master and Satellites and the logic of Target Windows, and the site server's skeleton and accounts are built in software.
     text: >-
       Site server (accounts, game history, the chrono registry, scheduling games, registration and
       publishing), custom scenarios, advanced modes (master and satellite zones, VIP escort, hacking
@@ -579,7 +586,9 @@ roadmap:
       Done in software, not yet on real boxes: Master and Satellites, where the satellites a team
       holds together with the master raise its points and the master changing hands frees them,
       tested in the simulator, through the field controller and on the box firmware run on a
-      computer; and the site server's skeleton (its database, migrations and a health check, in
+      computer; the rules of Target Windows, where a hit while the target shows a team's colour
+      scores for that team, tested in the simulator and the app (the target addon is not built
+      yet); and the site server's skeleton (its database, migrations and a health check, in
       its own container) and its accounts (passwords, two-factor codes required for organisers
       and marshals, sessions and roles per field; no game data yet), tested on a computer only.
     gate: >-

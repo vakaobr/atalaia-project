@@ -130,6 +130,66 @@ static void test_back_key(void)
     CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_PIN_ENTRY);
 }
 
+/* More than nine presets: '0' turns the page (decision M2-1). */
+static void test_pages(void)
+{
+    preset_ui_t ui;
+    preset_ui_init(&ui, "1234", 20);
+    enter_keys(&ui, "1234#");
+
+    /* Page 1: keys 1-9 pick presets 1-9. */
+    enter_keys(&ui, "9");
+    CHECK(ui.page == 0);
+    CHECK(preset_ui_selected_preset(&ui) == 9);
+
+    /* Page 2 selects its first entry; keys pick 10-18. */
+    preset_ui_handle_key(&ui, '0');
+    CHECK(ui.page == 1);
+    CHECK(preset_ui_selected_preset(&ui) == 10);
+    preset_ui_handle_key(&ui, '4');
+    CHECK(preset_ui_selected_preset(&ui) == 13);
+
+    /* Page 3 holds 19 and 20 only: 3-9 select nothing. */
+    preset_ui_handle_key(&ui, '0');
+    CHECK(ui.page == 2);
+    CHECK(preset_ui_selected_preset(&ui) == 19);
+    preset_ui_handle_key(&ui, '3');
+    CHECK(preset_ui_selected_preset(&ui) == 19);
+    preset_ui_handle_key(&ui, '2');
+    CHECK(preset_ui_selected_preset(&ui) == 20);
+
+    /* After the last page, the first again. */
+    preset_ui_handle_key(&ui, '0');
+    CHECK(ui.page == 0);
+    CHECK(preset_ui_selected_preset(&ui) == 1);
+
+    /* The pick survives the timer screen and back. */
+    enter_keys(&ui, "00");
+    enter_keys(&ui, "2#");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_TIMER_ADJUST);
+    preset_ui_handle_key(&ui, '*');
+    CHECK(ui.page == 2);
+    enter_keys(&ui, "###");
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_GAME_STARTED);
+    CHECK(preset_ui_selected_preset(&ui) == 20);
+}
+
+/* Nine presets or fewer: one page, and '0' changes nothing. */
+static void test_one_page_ignores_zero(void)
+{
+    preset_ui_t ui;
+    preset_ui_init(&ui, "1234", 9);
+    enter_keys(&ui, "1234#5");
+    CHECK(preset_ui_handle_key(&ui, '0'));
+    CHECK(ui.page == 0);
+    CHECK(preset_ui_selected_preset(&ui) == 5);
+
+    preset_ui_init(&ui, "1234", 0);
+    enter_keys(&ui, "1234#0");
+    CHECK(ui.page == 0);
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_PRESET_LIST);
+}
+
 void run_preset_ui_tests(void)
 {
     test_correct_pin_accepted();
@@ -138,4 +198,6 @@ void run_preset_ui_tests(void)
     test_timer_adjust();
     test_full_flow();
     test_back_key();
+    test_pages();
+    test_one_page_ignores_zero();
 }

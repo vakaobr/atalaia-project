@@ -74,6 +74,10 @@ These confirm the argument shapes the app chose before the pod existed (decision
 
 A button without `team` stands for the game's N-th team for `btn.N`, as a Field Box's button N; a builder may give a button a colour (`"team": "red"`), which the phone uses when the game has a team of that name. `tamper` is a new capability type, in the draft RFC with the phase 3 additions (`docs/rfcs/0000-phase-3-events-tags-and-pods.md`); the phone reports `opened` during a game as `node.tamper` with `reason: pod_opened`. The battery level is in IDENT (`battery_pct`) and in Pod Status, not in events.
 
+### A hit sensor (refinement of 2026-10-19, phase 4 plan phase 2)
+
+The design specification's `hit` type (a target addon's piezo plate, decision P4R4; draft RFC 0000 Amendment 1) on this protocol: a descriptor `{"id": "hit", "type": "hit"}`, the event `hit` `{"strength": 0-255}` (the phone gives the script `hit.hit` with the same `strength`) and the commands `arm` and `disarm` without arguments (the sensor reports hits only while armed). No pod built so far has one; the vectors `target_addon`, `target_hit` and `target_arm` fix the bytes for the addon or a pod that will.
+
 ### ACK (`0x04`) and retries
 
 Each side numbers its EVT (pod) or CMD (phone) frames with its own `seq` (uint16, wrapping) and the other side answers each with ACK carrying that `seq`. A frame not acknowledged within 500 ms is sent again, unchanged, up to 3 times; after that the link is considered broken and the phone reconnects (USB first, then BLE). A receiver acknowledges a repeated frame again but acts on it once (it remembers the last 16 `seq` values). Radio frames are not acknowledged at this layer: LoRa has its own ACKs.

@@ -311,7 +311,7 @@ On boot and on request, each node announces a descriptor:
 | `qr` | `scan(text)` | — | Android camera, Pi camera |
 | `gps` | `fix(lat, lon, acc)` | `rate(s)` | GNSS module, Android location |
 | `imu` | `moved`, `tilt(deg)`, `shock(g)` | `sensitivity` | IMU module, Android sensors |
-| `hit` | `hit(strength)` | `arm`, `disarm` | Target addon |
+| `hit` | `hit(strength)`: scripts get `hit.hit` with `strength` 0-255 | `arm`, `disarm` | Target addon (draft RFC 0000 Amendment 1, decision P4R4) |
 | `output` | — | `on`, `off`, `pulse(ms)` | Siren, smoke relay, strobe |
 | `battery` | `level(%)`, `low` | — | Fuel gauge, Android battery API |
 | `tamper` | `opened`, `closed` | — | Enclosure switch of an I/O pod (draft RFC 0000, decision PF8) |
@@ -485,7 +485,7 @@ The explosion is its own timer rather than a countdown in the display tick, so i
 | Events | `on(type, fn)`, `emit(type, data, opts)`; `opts.prio` defaults to the event's priority in the protocol schema |
 | Time | `every(s, fn)` and `after(s, fn)` return a timer id for `cancel(id)`; `game.time()` is seconds since the start |
 | State | `state.node{}` (this node only), `state.field{}` (replicated via controller) |
-| Game | `game.start()`, `game.finish(reason)`, `game.win(team)`, `score.add(team, n, reason, squad)`, `score.get(team or squad)` |
+| Game | `game.start()`, `game.finish(reason)`, `game.win(team)`, `game.teams()` (the game's team names in order), `score.add(team, n, reason, squad)`, `score.get(team or squad)` |
 | Hardware | `cap("ring"):fill(team)`, `ui.screen(template, data)`, `audio.play(clip)`, `audio.say(text)` |
 | Field (controller only) | `field.nodes(role)`, `field.owner(node)`, `field.common_owner(list)`, `field.send(node, cmd)` |
 | Utilities | `params`, `rand(a, b)` (seeded per game for replays), `log(msg)` |
@@ -924,7 +924,7 @@ Modifiers are small packages (`kind: modifier`) that run alongside any main mode
 | Medic Kit (Ligaduras) | Field + node of its own role, next to any main mode (a role package) | `nfc`, `team_input` | A hit player scans their signed tag and holds a button for a set time to be healed; the kit's heals (default 5, refilled by the GM) and each player's heals per game at every kit (default 2, counted by the controller) are limited, refusals say why, every heal reaches the console and the players | 3 (after plan phase E; built in software) |
 | Money Factory | Node | `nfc` | Resource-collection games | 3 |
 | Master and Satellites | Field + node | `team_input` | Satellites boost the master zone (each one held adds half the master's points per tick, rounded down: ×1.5 with one), and every satellite goes neutral when the master changes hands; upgradable and engineer-only satellites later (P4R3) | 4 (plan phase 1; built in software) |
-| Target Windows | Node + target addon | `hit`, `led` | Random team-colour scoring window | 4 |
+| Target Windows | Node + target addon | `hit`, `led` | Random team-colour scoring window: a hit while the target shows a team's colour scores for that team | 4 (plan phase 2; the logic built in software, the addon not yet: HW2) |
 | VIP / Payload | Node | `gps` or `imu` | Escort a moving prop, or a VIP player tracked by the player app | 4 |
 | Hacking Terminal | Node (Android) | `display` with touch | Solve a puzzle to unlock a code or capture | 4 |
 

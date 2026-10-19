@@ -226,6 +226,18 @@ static int l_game_win(lua_State *L)
     return 0;
 }
 
+/* The game's team names in order, a new table on each call (decision P4R26). */
+static int l_game_teams(lua_State *L)
+{
+    atalaia_node_t *n = atalaia_node_from_lua(L);
+    lua_createtable(L, (int)n->team_count, 0);
+    for (size_t i = 0; i < n->team_count; i++) {
+        lua_pushstring(L, n->team_names[i]);
+        lua_rawseti(L, -2, (lua_Integer)(i + 1));
+    }
+    return 1;
+}
+
 /* ---- score --------------------------------------------------------------- */
 
 static int l_score_add(lua_State *L)
@@ -623,11 +635,8 @@ int atalaia_script_api_open(lua_State *L)
         {"cap", l_cap},       {NULL, NULL},
     };
     static const luaL_Reg game[] = {
-        {"time", l_game_time},
-        {"start", l_game_start},
-        {"finish", l_game_finish},
-        {"win", l_game_win},
-        {NULL, NULL},
+        {"time", l_game_time}, {"start", l_game_start}, {"finish", l_game_finish},
+        {"win", l_game_win},   {"teams", l_game_teams}, {NULL, NULL},
     };
     static const luaL_Reg score[] = {
         {"add", l_score_add},

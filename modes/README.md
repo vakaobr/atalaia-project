@@ -25,6 +25,7 @@ The GM console builds its settings form from `params` in `mode.yaml`, so GMs nev
 | [Player Check-in](player_checkin/) | main mode | boxes and Android props with NFC | Phase 3; 2 tests |
 | [Medic Kit](medic/) (Ligaduras) | role package | its own boxes and Android props with NFC, next to any main mode; controller (`field.lua`) | After phase 3 plan phase E; 7 tests, plus simulator, controller, host-box, browser and on-device tests |
 | [Master and Satellites](master_satellites/) (Mestre e Satélites) | main mode | boxes + controller (`field.lua`) | Phase 4 plan phase 1, in software (not yet on radio hardware); 8 tests, plus controller, host-box and Field Box preset tests |
+| [Target Windows](target_windows/) (Janelas de Alvo) | main mode | boxes with the target addon (`hit`, `led`) | Phase 4 plan phase 2: the logic, in software; the addon does not exist yet (HW2), so it is not a Field Box preset and no Android prop offers it; 7 tests |
 
 The script API is described in the "Game runtime and scripting" section of the [design specification](../docs/design-spec.md), and implemented in [`core/src/script_api.c`](../core/src/script_api.c).
 
@@ -51,7 +52,18 @@ Design specification section 15; decisions P4R2, P4R3 and M1-1 to M1-5 in `docs/
 - **Screens:** `standby` (nobody holds the box), `captured` (a satellite: the team and since when) and `master_status` (the master: the team, its satellites of all of them, and its points per tick, red at 0), which the master shows when `field.lua` tells it (the mode command `status`, sent only when something on it changes). `final_score` is the Field Box's built-in screen, as for Hold-All.
 - **The GM** sees the master's holder and the satellites held in the console's field state (`master`, `held`), and every capture and freed satellite in the log.
 
-On a box without a controller (picked from the box's own preset list), Master and Satellites boxes only capture. The box's keypad picker lists the first nine presets, and this is the tenth built-in one: a box joined by the controller runs it, but it cannot be picked on the box itself yet (decision M1-4).
+On a box without a controller (picked from the box's own preset list), Master and Satellites boxes only capture. It is the tenth built-in preset, on the second page of the box's keypad picker (`0` turns the page, decision M2-1).
+
+## Target Windows (phase 4)
+
+Design specification section 15; decisions P4R4, P4R26 and M2-2 to M2-5 in `docs/review/decisions-to-review.md`.
+
+- **The target:** a box with the target addon (a plate with a hit sensor and an LED ring), the role `target`, which requires the capabilities `hit` and `led`. It is armed (`cap("hit"):arm()`) when the game starts and disarmed when it ends; a hit reaches the script as `hit.hit` with `strength` 0-255.
+- **Windows:** the target stays dark for `interval_s` seconds (default 20), then lights up (`cap("ring"):fill(team)`) in a random team's colour for `window_s` seconds (default 5). The team is one of `game.teams()`, picked with the game's seeded `rand()`, so a replay picks the same teams. The next window opens `interval_s` after the last one closed.
+- **Hits:** a hit of at least `min_strength` (default 40) while the window is open scores `hit_points` (default 5) for the window's team, on the target, and logs `target.hit` with that team and `window_open: true`; the first such hit closes the window unless `multi_hit`, which lets every hit in the window score. A hit while the target is dark scores nothing and logs `target.hit` with `window_open: false`, so the GM sees it. Weaker hits are ignored. The GM's owner override (`cmd.set_owner`) means nothing to a target and is ignored.
+- **Screens:** `standby` while the target is dark (the team of the last scoring hit, and how many there were), `window` while it is open (the team's colour and the seconds left); `final_score` is the Field Box's built-in screen.
+
+The addon and its driver are hardware work (phase 4 HW2): until they exist this mode runs in the simulator (the tests' `input` step gives `hit.hit`) and through the core in the app's tests, and is not a Field Box built-in preset (decision P4R23).
 
 ## Phase 3 modes (player tags)
 
@@ -147,6 +159,7 @@ Modes react to semantic capabilities, so the same script works on a box with tea
 | `team_input.hold` | `team`, `ms`, optional `squad` | Every 250 ms while a team holds its input; `ms` is the time held so far |
 | `team_input.release` | `team`, `ms`, optional `squad` | The team lets go |
 | `keypad.key` | `key` (`0`-`9`, `*`, `#`) | A keypad key is pressed |
+| `hit.hit` | `strength` (0-255) | A hit sensor (the target addon's plate) is hit while armed (`cap("hit"):arm()`; draft RFC 0000 Amendment 1) |
 | `nfc.tag` | `uid`, `valid`, then `player` and `team` (valid) or `reason` | A tag is read, checked against the game's key first ([nfc-tag.md](../protocol/nfc-tag.md)): `reason` is `unsigned`, `no_game`, `format`, `version`, `game`, `mac` or `team` |
 | `cmd.set_owner` | `team` (or `none`) | The GM's owner override from the console (decision E7); Hold-All and Last Stand handle it |
 | `cmd.mode` | `name`, then the command's own params | A mode command from the GM (a manifest's `commands`) or the field script (CMD opcode 8); the Medic Kit's `refill` and `heals` |

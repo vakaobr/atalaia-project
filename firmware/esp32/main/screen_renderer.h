@@ -15,7 +15,8 @@
  *   paused         {}
  *   status         {"title", "mode", "timer_s", "battery", "version"}
  *   pin_entry      {"digits": n, "error": bool}  admin PIN prompt (shell)
- *   preset_select  {"presets": [label...], "selected": n}   (shell)
+ *   preset_select  {"presets": [label...], "selected": n,  one page of at most nine (shell);
+ *                   "page": p, "pages": n}       "page"/"pages" only with more than nine games
  *   timer_adjust   {"timer_s": s}                game length, 0 = no limit (shell)
  *   start_confirm  {"label": text, "timer_s": s} (shell)
  *   wifi_setup     {"ssid": text}                first-time setup (shell)

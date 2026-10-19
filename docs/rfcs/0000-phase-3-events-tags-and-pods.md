@@ -58,3 +58,14 @@ Older nodes pass unknown event ids through as raw CBOR (ADR-P3-8); the JSON Sche
 1. Should tags use a key derived from the game key (decision A3 in `docs/review/decisions-to-review.md`)?
 2. Should the game master be able to write tags from the console (the controller holds the game key)?
 3. Should `tamper` be a capability type of its own, or an `imu`-like `moved` event of an `enclosure` type, once IMU-based tamper detection exists (decision PF8)?
+
+## Amendment 1 (2026-10-19): the `hit` capability (phase 4 plan phase 2)
+
+**Adds** the details of the design specification's `hit` capability type (section 7: events `hit(strength)`, commands `arm` and `disarm`, the target addon) that a script and the capability proxy need, so that the addon, or a pod or thin node that has a hit sensor, can lend it later. Decision P4R4; Target Windows (`modes/target_windows/`) is its first user.
+
+- **To a script,** a hit is the input event `hit.hit` with `strength`, an integer 0-255 (how hard the plate was hit, as the addon's piezo measures it; the addon decides the scale). `cap("hit"):arm()` makes the sensor report hits, `cap("hit"):disarm()` stops it; a sensor reports nothing until it is armed.
+- **On the capability proxy** (`protocol/capability-proxy.md`, version 1 unchanged): a descriptor `{"id": "hit", "type": "hit"}` in IDENT; EVT `{cap_id: "hit", event: "hit", data: {"strength": n}}`; CMD `arm` and `disarm`, without arguments. The phone turns the EVT into `hit.hit`, as it turns a button's `hold` into `team_input.hold`. Shared vectors: `ident` `target_addon`, `evt` `target_hit`, `cmd` `target_arm` in `protocol/vectors/capability_proxy.yaml`, checked by the C, Python and Dart codecs.
+- **Events:** none new. A scoring hit uses `target.hit` (16), already in the schema, with `window_open` and the team in the envelope.
+- **Not yet:** the addon's own firmware and the Field Box's addon port driver (phase 4 HW2). Until they exist, Target Windows is not a Field Box built-in preset, and Android props do not offer `hit` (a phone has no hit sensor; a pod that one day lists one would lend it as above).
+
+Compatibility: no new frame, key or event; a receiver that does not know the type `hit` ignores the descriptor, as for any capability type it does not use.

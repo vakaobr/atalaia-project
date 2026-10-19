@@ -14,6 +14,8 @@
 #include "screen_types.h"
 
 #define PRESET_UI_PIN_MAX 8
+/* The keypad picks entries 1-9 of a page; '0' turns to the next page (decision M2-1). */
+#define PRESET_UI_PAGE_SIZE 9
 
 typedef enum {
     PRESET_UI_STATE_PIN_ENTRY,
@@ -28,8 +30,9 @@ typedef struct {
     char pin_buffer[PRESET_UI_PIN_MAX + 1];
     int pin_pos;
     char admin_pin[PRESET_UI_PIN_MAX + 1];
-    int selected_preset;
+    int selected_preset; /* 1-based, across every page */
     int preset_count;
+    int page; /* 0-based page of PRESET_UI_PAGE_SIZE entries on the list screen */
     uint32_t timer_duration_s;
     bool pin_accepted;
     bool pin_error; /* the last PIN was wrong; cleared by the next key */
@@ -43,7 +46,9 @@ void preset_ui_init(preset_ui_t *ui, const char *admin_pin, int preset_count);
 
 /*
  * Handle a keypad key press. Returns true if the UI consumed the key.
- * Keys: '0'-'9' for digits, '#' for confirm/enter, '*' for back/cancel.
+ * Keys: '0'-'9' for digits, '#' for confirm/enter, '*' for back/cancel. On the preset
+ * list, '1'-'9' pick an entry of the current page and '0' shows the next page (the
+ * first again after the last), selecting its first entry.
  */
 bool preset_ui_handle_key(preset_ui_t *ui, char key);
 
@@ -59,7 +64,9 @@ uint32_t preset_ui_timer_duration(const preset_ui_t *ui);
 /*
  * Describe the screen for the current state (pin_entry, preset_select,
  * timer_adjust or start_confirm; see screen_renderer.h). labels[i] is the
- * label of list entry i + 1; labels may be NULL when label_count is 0.
+ * label of list entry i + 1; labels may be NULL when label_count is 0. The
+ * list screen holds the current page only, with "page" and "pages" when there
+ * is more than one.
  * Returns false in PRESET_UI_STATE_GAME_STARTED, which has no picker screen.
  */
 bool preset_ui_screen(const preset_ui_t *ui, const char *const *labels, int label_count,

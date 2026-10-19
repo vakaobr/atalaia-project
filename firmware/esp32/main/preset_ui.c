@@ -7,6 +7,13 @@
 #include <stdio.h>
 #include <string.h>
 
+/* Pages of the preset list (at least one, which may be empty). */
+static int page_count(const preset_ui_t *ui)
+{
+    if (ui->preset_count <= PRESET_UI_PAGE_SIZE) return 1;
+    return (ui->preset_count + PRESET_UI_PAGE_SIZE - 1) / PRESET_UI_PAGE_SIZE;
+}
+
 void preset_ui_init(preset_ui_t *ui, const char *admin_pin, int preset_count)
 {
     memset(ui, 0, sizeof(*ui));
@@ -59,9 +66,18 @@ bool preset_ui_handle_key(preset_ui_t *ui, char key)
 
     case PRESET_UI_STATE_PRESET_LIST:
         if (key >= '1' && key <= '9') {
-            int idx = key - '0';
+            int idx = ui->page * PRESET_UI_PAGE_SIZE + (key - '0');
             if (idx <= ui->preset_count) {
                 ui->selected_preset = idx;
+            }
+            return true;
+        }
+        if (key == '0') {
+            /* The next page, then the first again; one page: nothing to turn. */
+            int pages = page_count(ui);
+            if (pages > 1) {
+                ui->page = (ui->page + 1) % pages;
+                ui->selected_preset = ui->page * PRESET_UI_PAGE_SIZE + 1;
             }
             return true;
         }
@@ -168,16 +184,26 @@ bool preset_ui_screen(const preset_ui_t *ui, const char *const *labels, int labe
     case PRESET_UI_STATE_PRESET_LIST: {
         tmpl = "preset_select";
         size_t pos = (size_t)snprintf(data, sz, "{\"presets\":[");
-        /* The keypad picks entries 1-9, so the list holds at most nine. */
-        int n = label_count < 9 ? label_count : 9;
-        for (int i = 0; i < n && pos + 40 < sz; i++) {
+        /* The keypad picks entries 1-9, so the list holds one page of at most nine. */
+        int first = ui->page * PRESET_UI_PAGE_SIZE;
+        int n = label_count - first;
+        if (n > PRESET_UI_PAGE_SIZE) n = PRESET_UI_PAGE_SIZE;
+        for (int i = 0; i < n && pos + 48 < sz; i++) {
+            const char *label = labels && labels[first + i] ? labels[first + i] : "";
             if (i > 0) data[pos++] = ',';
             data[pos++] = '"';
-            pos = json_append_escaped(data, pos, sz - 32, labels && labels[i] ? labels[i] : "");
+            pos = json_append_escaped(data, pos, sz - 40, label);
             data[pos++] = '"';
             data[pos] = '\0';
         }
-        snprintf(data + pos, sz - pos, "],\"selected\":%d}", ui->selected_preset);
+        int pages = page_count(ui);
+        int selected = ui->selected_preset - first;
+        if (pages > 1) {
+            snprintf(data + pos, sz - pos, "],\"selected\":%d,\"page\":%d,\"pages\":%d}", selected,
+                     ui->page + 1, pages);
+        } else {
+            snprintf(data + pos, sz - pos, "],\"selected\":%d}", selected);
+        }
         break;
     }
 

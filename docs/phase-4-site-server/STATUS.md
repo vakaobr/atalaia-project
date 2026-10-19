@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Implementation (plan phases 1, 10 and 11 built in software, 2026-10-19)
+**Current phase:** Implementation (plan phases 1, 2, 10 and 11 built in software, 2026-10-19)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-19 (plan phase 11, full clean-copy check)
-**Next step:** plan phase 2 (Target Windows, logic) on the modes chain; plan phase 12 (personal data) on the site server chain
+**Last verified:** 2026-10-19 (plan phase 2, full clean-copy check)
+**Next step:** plan phase 3 (geo utilities in the core) on the modes chain; plan phase 12 (personal data) on the site server chain
 
 ## Completed
 
@@ -40,8 +40,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | # | Plan phase | Software now / hardware | Depends on | Status |
 |---|------------|-------------------------|------------|--------|
 | 1 | Master and Satellites | Software, now | -- | Done in software (2026-10-19; not on radio hardware) |
-| 2 | Target Windows (logic), `game.teams()`, `hit` input | Software, now | -- | **Next** |
-| 3 | Geo utilities in the core | Software, now | -- | Pending |
+| 2 | Target Windows (logic), `game.teams()`, `hit` input | Software, now | -- | Done in software (2026-10-19; the addon: HW2) |
+| 3 | Geo utilities in the core | Software, now | -- | **Next** |
 | 4 | Hacking Terminal | Software, now | -- | Pending |
 | 5 | VIP / Payload | Software, now | 3 | Pending |
 | 6 | Scenario packages and the objectives role package | Software, now | -- | Pending |
@@ -80,8 +80,8 @@ satellite held (whole points, rounded down), nothing below
 `field.send(id, "set_owner", { team = "none" })` when the master
 leaves a team's hands. Screens `standby`, `captured`, `master_status`
 (told by `field.lua` with the mode command `status`). No new events.
-A built-in Field Box preset (the tenth; the box's own picker shows
-nine, M1-4) and the app's generated catalogue.
+A built-in Field Box preset (the tenth, on the picker's second page
+since plan phase 2: M1-4, M2-1) and the app's generated catalogue.
 
 Tested: 8 YAML tests in the simulator and in Dart through the core,
 the controller with two host boxes on the host modem
@@ -89,6 +89,33 @@ the controller with two host boxes on the host modem
 host tests (the preset seeded and run, the templates found) and 4
 reference images, 4 app goldens. Not run: Wokwi (R7), radio boards.
 Decisions M1-1 to M1-6 (open).
+
+## Plan phase 2: Target Windows, logic (built 2026-10-19, in software)
+
+`modes/target_windows` (`org.atalaia.target_windows`, "Janelas de
+Alvo"): a `target` (requires `hit` and `led`) is dark for `interval_s`,
+then shows a random team's colour (`game.teams()` and the seeded
+`rand()`) for `window_s`; a hit of at least `min_strength` in the window
+scores `hit_points` for that team and logs `target.hit`
+(`window_open: true`), the first one closing the window unless
+`multi_hit`; a hit while dark logs `window_open: false`. Screens
+`standby` and `window`. The core gained `game.teams()` (P4R26); the `hit`
+capability is draft RFC 0000 Amendment 1 and a refinement of
+`protocol/capability-proxy.md`, with three shared vectors; the app's pod
+client maps a lent hit sensor. Not a Field Box preset and not offered by
+Android props until the addon exists (P4R4, P4R23; HW2).
+
+Done first in the same plan phase: the Field Box keypad picker's pages
+(`0` turns to the next nine), so all ten built-in presets can be picked
+on the box (M2-1, closing M1-4).
+
+Tested: 7 YAML tests in the simulator and in Dart through the core,
+`game.teams()` in C (a node and the controller) and through the
+simulator's bindings, the three new vectors through the C, Python and
+Dart codecs, the picker's pages in the firmware host tests with two
+reference images, three reference images and three app goldens of the
+mode's screens. Not run: Wokwi (R7), any hardware (there is no addon
+yet). Decisions M2-1 to M2-5 (open).
 
 ## Plan phase 10: site server skeleton (built 2026-10-19, in software)
 

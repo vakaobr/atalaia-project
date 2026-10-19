@@ -186,7 +186,43 @@ static void test_picker_lists_at_most_nine(void)
     CHECK(preset_ui_screen(&ui, labels, 12, &su));
     CHECK(strlen(su.data_json) < sizeof(su.data_json));
     CHECK(su.data_json[strlen(su.data_json) - 1] == '}');
-    CHECK(strstr(su.data_json, "\"selected\":1}") != NULL);
+    CHECK(strstr(su.data_json, "\"selected\":1,\"page\":1,\"pages\":2}") != NULL);
+    CHECK(screen_render(su.template_name, su.data_json));
+
+    /* Labels full of characters to escape still leave a whole JSON object. */
+    for (int i = 0; i < 12; i++)
+        labels[i] = "\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"";
+    CHECK(preset_ui_screen(&ui, labels, 12, &su));
+    CHECK(su.data_json[strlen(su.data_json) - 1] == '}');
+    CHECK(strstr(su.data_json, "\"pages\":2}") != NULL);
+}
+
+/* Decision M2-1: '0' shows the next nine; the second page is numbered 1-9 again. */
+static void test_picker_second_page(void)
+{
+    preset_ui_t ui;
+    preset_ui_init(&ui, "1", 12);
+    const char *labels[12] = {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"};
+    for (const char *k = "1#0"; *k; k++) preset_ui_handle_key(&ui, *k);
+    screen_update_t su;
+    CHECK(preset_ui_screen(&ui, labels, 12, &su));
+    CHECK(strcmp(su.template_name, "preset_select") == 0);
+    CHECK(strcmp(su.data_json,
+                 "{\"presets\":[\"J\",\"K\",\"L\"],\"selected\":1,\"page\":2,\"pages\":2}") == 0);
+    CHECK(screen_render(su.template_name, su.data_json));
+
+    preset_ui_handle_key(&ui, '3');
+    preset_ui_handle_key(&ui, '#');
+    preset_ui_handle_key(&ui, '#');
+    CHECK(preset_ui_screen(&ui, labels, 12, &su));
+    CHECK(strcmp(su.template_name, "start_confirm") == 0);
+    CHECK(strstr(su.data_json, "\"label\":\"L\"") != NULL);
+
+    /* Back on the list after the timer: still the second page. */
+    preset_ui_handle_key(&ui, '*');
+    preset_ui_handle_key(&ui, '*');
+    CHECK(preset_ui_screen(&ui, labels, 12, &su));
+    CHECK(strstr(su.data_json, "\"selected\":3,\"page\":2") != NULL);
 }
 
 /* The last screen the mode queued, or NULL. */
@@ -255,7 +291,8 @@ static void test_bomb_from_the_picker(void)
 }
 
 /* Every built-in mode, as main/CMakeLists.txt puts them in the image: Master and Satellites,
- * the newest, takes the tenth slot, and on its own (no controller) a box of it only captures. */
+ * the newest, takes the tenth slot, the picker's second page, and on its own (no controller) a
+ * box of it only captures. */
 static void test_every_builtin_and_master_satellites(void)
 {
     setup();
@@ -284,8 +321,16 @@ static void test_every_builtin_and_master_satellites(void)
     CHECK(strcmp(list[N - 1].mode_id, "org.atalaia.master_satellites") == 0);
     CHECK(strcmp(list[N - 1].label, "Master and Satellites") == 0);
 
+    /* Picked on the box itself: PIN, '0' for the second page, its first entry (M2-1). */
+    preset_ui_t ui;
+    preset_ui_init(&ui, "1234", N);
+    for (const char *k = "1234#0###"; *k; k++) preset_ui_handle_key(&ui, *k);
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_GAME_STARTED);
+    CHECK(preset_ui_selected_preset(&ui) == N);
+
     static preset_t p;
-    CHECK(preset_store_load(N, &p));
+    CHECK(preset_store_load(list[preset_ui_selected_preset(&ui) - 1].index, &p));
+    CHECK(strcmp(p.mode_id, "org.atalaia.master_satellites") == 0);
     CHECK(strstr(p.params_json, "\"points_per_tick\":2") != NULL);
     CHECK(strstr(p.params_json, "\"satellite_bonus_pct\":50") != NULL);
 
@@ -315,6 +360,7 @@ void run_builtin_presets_tests(void)
     test_seed_adds_missing_modes_and_refreshes_scripts();
     test_picker_screens();
     test_picker_lists_at_most_nine();
+    test_picker_second_page();
     test_bomb_from_the_picker();
     test_every_builtin_and_master_satellites();
 }

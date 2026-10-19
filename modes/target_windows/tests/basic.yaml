@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A hit while the target shows a team's colour scores for that team, and the first hit closes the window
+params: { interval_s: 10, window_s: 5, hit_points: 5 }
+teams: [red]
+steps:
+  - expect_screen: { template: standby, data: { hits: 0 } }
+  - wait: 10
+  - expect_screen: { template: window, data: { team: red, left: 5 } }
+  - wait: 2
+  - expect_screen: { template: window, data: { team: red, left: 3 } }
+  - input: { type: hit.hit, data: { strength: 200 } }
+  - expect: { type: target.hit, team: red, at: 12, data: { window_open: true } }
+  - expect_score: { team: red, points: 5 }
+  - expect_screen: { template: standby, data: { team: red, hits: 1 } }
+  - input: { type: hit.hit, data: { strength: 200 } }   # the window closed with the first hit
+  - expect: { type: target.hit, at: 12, data: { window_open: false } }
+  - expect_score: { team: red, points: 5 }
+  - wait: 10                                            # the next window, 10 s after the last closed
+  - expect_screen: { template: window, data: { team: red } }
+  - input: { type: hit.hit, data: { strength: 90 } }
+  - expect: { type: target.hit, team: red, at: 22, data: { window_open: true } }
+  - expect_score: { team: red, points: 10 }

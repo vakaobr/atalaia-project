@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+id: org.atalaia.target_windows
+version: 0.1.0
+license: GPL-3.0-or-later
+min_tier: reduced
+name: Target Windows
+description: >-
+  A target lights up in a random team's colour for a few seconds; a hit while it is lit scores for that
+  team. Needs the target addon (a hit sensor and an LED ring).
+roles:
+  target: { requires: [hit, led], optional: [display, audio] }
+params:
+  interval_s:   { type: int, min: 1, max: 3600, default: 20, label: "Seconds the target stays dark between windows" }
+  window_s:     { type: int, min: 1, max: 600,  default: 5,  label: "Seconds a window stays open" }
+  hit_points:   { type: int, min: 1, max: 1000, default: 5,  label: "Points for a hit in the window" }
+  min_strength: { type: int, min: 0, max: 255,  default: 40, label: "Weakest hit that counts (0-255)" }
+  multi_hit:    { type: bool, default: false, label: "Every hit in a window scores (otherwise the first hit closes it)" }
+i18n:
+  pt:
+    name: Janelas de Alvo
+    description: >-
+      Um alvo acende-se na cor de uma equipa ao acaso durante alguns segundos; um tiro enquanto está aceso
+      pontua para essa equipa. Precisa do módulo de alvo (um sensor de impacto e um anel de LED).
+    params:
+      interval_s: Segundos em que o alvo fica apagado entre janelas
+      window_s: Segundos que uma janela fica aberta
+      hit_points: Pontos por um tiro na janela
+      min_strength: Impacto mais fraco que conta (0-255)
+      multi_hit: Todos os tiros numa janela pontuam (senão, o primeiro fecha-a)

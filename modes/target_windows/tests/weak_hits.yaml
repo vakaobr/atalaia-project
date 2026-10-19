@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Hits weaker than min_strength are ignored; a hit of exactly min_strength counts
+params: { interval_s: 10, window_s: 5, min_strength: 100, hit_points: 3 }
+teams: [blue]
+steps:
+  - input: { type: hit.hit, data: { strength: 99 } }
+  - expect_no: target.hit
+  - wait: 10
+  - input: { type: hit.hit, data: { strength: 20 } }
+  - input: { type: hit.hit, data: {} }                  # no strength: as weak as can be
+  - expect_no: target.hit
+  - expect_score: { team: blue, points: 0 }
+  - expect_screen: { template: window, data: { team: blue } }
+  - input: { type: hit.hit, data: { strength: 100 } }
+  - expect: { type: target.hit, team: blue, at: 10, data: { window_open: true } }
+  - expect_score: { team: blue, points: 3 }

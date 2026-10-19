@@ -672,7 +672,8 @@ static void update_code_entry(const char *data)
 static void build_preset_select(lv_obj_t *scr)
 {
     set_bg(scr, COLOR_BG);
-    lv_label_set_text(header(scr, COLOR_PANEL), "CHOOSE A GAME");
+    slot[3 * PRESET_ROWS + 1] = header(scr, COLOR_PANEL);
+    lv_label_set_text(slot[3 * PRESET_ROWS + 1], "CHOOSE A GAME");
     for (int i = 0; i < PRESET_ROWS; i++) {
         lv_obj_t *row = box(scr, SCREEN_W - 24, PRESET_ROW_H, COLOR_BG);
         lv_obj_set_style_radius(row, 6, 0);
@@ -690,7 +691,7 @@ static void build_preset_select(lv_obj_t *scr)
     }
     slot[3 * PRESET_ROWS] = label(scr, &lv_font_montserrat_20, COLOR_MUTED, 0);
     lv_label_set_text(slot[3 * PRESET_ROWS], "No games stored");
-    footer(scr, "1-9  choose      #  next      *  back");
+    slot[3 * PRESET_ROWS + 2] = footer(scr, "1-9  choose      #  next      *  back");
 }
 
 static void update_preset_select(const char *data)
@@ -699,6 +700,23 @@ static void update_preset_select(const char *data)
     int count = json_str_list(data, "presets", names, LIST_MAX);
     long selected = 1;
     json_int(data, "selected", &selected);
+
+    /* More than nine games: the list is one page of them, numbered 1-9, and 0 turns the page
+     * (decision M2-1). Without "pages" the list is the only page. */
+    long page = 1;
+    long pages = 1;
+    json_int(data, "page", &page);
+    json_int(data, "pages", &pages);
+    if (pages > 1) {
+        char title[40];
+        snprintf(title, sizeof(title), "CHOOSE A GAME  %ld/%ld", page, pages);
+        lv_label_set_text(slot[3 * PRESET_ROWS + 1], title);
+        lv_label_set_text(slot[3 * PRESET_ROWS + 2],
+                          "1-9  choose    0  more    #  next    *  back");
+    } else {
+        lv_label_set_text(slot[3 * PRESET_ROWS + 1], "CHOOSE A GAME");
+        lv_label_set_text(slot[3 * PRESET_ROWS + 2], "1-9  choose      #  next      *  back");
+    }
 
     /* Scroll so the selected row stays visible. */
     int first = 0;

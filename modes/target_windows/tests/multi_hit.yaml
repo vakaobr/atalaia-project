@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: With multi_hit every hit in the window scores until the window closes on time
+params: { interval_s: 10, window_s: 5, hit_points: 2, multi_hit: true }
+teams: [yellow]
+steps:
+  - wait: 11
+  - input: { type: hit.hit, data: { strength: 200 } }
+  - input: { type: hit.hit, data: { strength: 200 } }
+  - wait: 2
+  - input: { type: hit.hit, data: { strength: 200 } }
+  - expect: { type: target.hit, team: yellow, at: 11, data: { window_open: true } }
+  - expect: { type: target.hit, team: yellow, at: 11, data: { window_open: true } }
+  - expect: { type: target.hit, team: yellow, at: 13, data: { window_open: true } }
+  - expect_score: { team: yellow, points: 6 }
+  - expect_screen: { template: window, data: { team: yellow, left: 2 } }
+  - wait: 2                                             # closed at 15
+  - expect_screen: { template: standby, data: { team: yellow, hits: 3 } }
+  - input: { type: hit.hit, data: { strength: 200 } }
+  - expect: { type: target.hit, at: 15, data: { window_open: false } }
+  - expect_score: { team: yellow, points: 6 }

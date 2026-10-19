@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The target is dark between windows. Data: team (the team of the last
+# scoring hit, if any) and hits (scoring hits on this target so far).
+template: standby
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: panel }
+    children:
+      - type: label
+        text: TARGET
+        style: { font_size: 20, width: fill, align: center }
+  - type: spacer
+    height: fill
+  - type: label
+    text: STAND BY
+    style: { font_size: 28, color: accent }
+  - type: label
+    text: Wait for your colour
+    style: { font_size: 20, color: muted }
+  - type: label
+    text: "Last hit: {team|upper}"
+    style: { font_size: 20, color: team, visible: "{team}" }
+  - type: label
+    text: "{hits} scoring hits"
+    style: { font_size: 14, color: muted, visible: "{hits > 0}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: Hit the target while it shows your colour
+    style:
+      font_size: 14
+      color: muted
+      padding: { bottom: 10 }

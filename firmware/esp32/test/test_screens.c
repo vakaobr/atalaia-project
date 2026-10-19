@@ -46,6 +46,7 @@ typedef struct {
 #define MEDIC    "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"pt\"}"
 #define MEDIC_EN "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"en\"}"
 #define MASTER   "org.atalaia.master_satellites {\"capture_hold_ms\":3000,\"tick_s\":10}"
+#define TARGET   "org.atalaia.target_windows {\"interval_s\":20,\"window_s\":5}"
 
 /* Data as the modes (modes/bomb, modes/domination, modes/codes) and the shell send it. */
 static const screen_case_t cases[] = {
@@ -80,6 +81,14 @@ static const screen_case_t cases[] = {
      "\"selected\":5}",
      NULL},
     {"preset_select_empty", "preset_select", "{\"presets\":[],\"selected\":1}", NULL},
+    /* The ten built-in presets, two pages (decision M2-1). */
+    {"preset_select_page1", "preset_select",
+     "{\"presets\":[\"Bomb\",\"Domination\",\"Hold-All Domination\",\"Last Stand\",\"Codes\","
+     "\"Kill Confirmed\",\"Respawn and Lives\",\"Player Check-in\",\"Medic Kit\"],"
+     "\"selected\":1,\"page\":1,\"pages\":2}",
+     NULL},
+    {"preset_select_page2", "preset_select",
+     "{\"presets\":[\"Master and Satellites\"],\"selected\":1,\"page\":2,\"pages\":2}", NULL},
     {"timer_adjust", "timer_adjust", "{\"timer_s\":600}", NULL},
     {"timer_adjust_no_limit", "timer_adjust", "{\"timer_s\":0}", NULL},
     {"start_confirm", "start_confirm", "{\"label\":\"Bomb\",\"timer_s\":600}", NULL},
@@ -134,6 +143,11 @@ static const screen_case_t cases[] = {
      "{\"team\":\"red\",\"since\":95,\"held\":2,\"of\":3,\"points\":4}", MASTER},
     {"yaml_master_satellites_status_no_points", "master_status",
      "{\"team\":\"yellow\",\"since\":3700,\"held\":1,\"of\":4,\"points\":0}", MASTER},
+    /* Target Windows (not a preset until the addon exists): dark, after a hit, and a window open.
+     */
+    {"yaml_target_windows_standby", "standby", "{\"hits\":0}", TARGET},
+    {"yaml_target_windows_standby_hit", "standby", "{\"team\":\"blue\",\"hits\":3}", TARGET},
+    {"yaml_target_windows_window", "window", "{\"team\":\"red\",\"left\":4}", TARGET},
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))
 

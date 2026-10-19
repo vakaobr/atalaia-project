@@ -23,6 +23,12 @@ ident:
     fields: {"fw_version": "1", "capabilities": [], "battery_pct": 0, "has_radio": false, "protocol_version": 1}
     payload: "a50161310280030004f40501"
     frame: "a501000ca50161310280030004f40501375a"
+  # The target addon's hit sensor and ring (type hit: decision P4R4; bytes assembled by hand from
+  # the tables in capability-proxy.md and checked with the codecs).
+  - name: target_addon
+    fields: {"fw_version": "0.4.0", "capabilities": [{"id": "hit", "type": "hit"}, {"id": "ring", "type": "led", "count": 24, "rgb": true}], "has_radio": false, "protocol_version": 1}
+    payload: "a40165302e342e300282a262696463686974647479706563686974a46269646472696e676474797065636c656465636f756e74181863726762f504f40501"
+    frame: "a501003ea40165302e342e300282a262696463686974647479706563686974a46269646472696e676474797065636c656465636f756e74181863726762f504f40501ef6c"
 
 evt:
   - name: button_hold
@@ -41,6 +47,10 @@ evt:
     fields: {"cap_id": "imu", "event": "shock", "data": {"axes": [1, -2, 300], "g": 4, "ok": true, "where": {"side": "left"}}, "seq": 256}
     payload: "a40163696d75026573686f636b03a4646178657383012119012c616704626f6bf5657768657265a16473696465646c65667404190100"
     frame: "a5020036a40163696d75026573686f636b03a4646178657383012119012c616704626f6bf5657768657265a16473696465646c656674041901008f2f"
+  - name: target_hit
+    fields: {"cap_id": "hit", "event": "hit", "data": {"strength": 200}, "seq": 12}
+    payload: "a40163686974026368697403a168737472656e67746818c8040c"
+    frame: "a502001aa40163686974026368697403a168737472656e67746818c8040c046c"
 
 cmd:
   - name: ring_fill
@@ -55,6 +65,10 @@ cmd:
     fields: {"cap_id": "keypad", "method": "clear", "args": {}, "seq": 65534}
     payload: "a301666b65797061640265636c6561720419fffe"
     frame: "a5030014a301666b65797061640265636c6561720419fffedd25"
+  - name: target_arm
+    fields: {"cap_id": "hit", "method": "arm", "args": {}, "seq": 2}
+    payload: "a30163686974026361726d0402"
+    frame: "a503000da30163686974026361726d04027156"
 
 ack:
   - name: seq_7

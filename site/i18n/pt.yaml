@@ -338,6 +338,14 @@ modes:
       satélites voltam a ficar neutros. Escrito e testado em software, ainda não jogado em caixas
       reais.
     meta: Várias caixas · precisa do controlador de campo
+  target_windows:
+    title: Janelas de Alvo
+    text: >-
+      Um alvo acende-se na cor de uma equipa ao acaso durante alguns segundos, e um tiro que lhe
+      acerte enquanto está aceso pontua para essa equipa. O jogo está escrito e testado em software;
+      o módulo de alvo de que precisa (uma placa com um sensor de impacto e um anel de luz) ainda
+      não está feito.
+    meta: Uma caixa com o módulo de alvo · ainda não disponível
   codes:
     title: Códigos (modificador)
     text: >-
@@ -589,7 +597,7 @@ roadmap:
     title: Servidor do clube e jogo avançado
     short: >-
       Servidor do clube, marcação de jogos e inscrições, cenários personalizados, modos avançados,
-      ATAK. Começada: o primeiro modo avançado, Mestre e Satélites, e o esqueleto e as contas do servidor do clube estão feitos em software.
+      ATAK. Começada: os primeiros modos avançados, Mestre e Satélites e as regras das Janelas de Alvo, e o esqueleto e as contas do servidor do clube estão feitos em software.
     text: >-
       Servidor do clube (contas, histórico dos jogos, registo de cronografagem, marcação de jogos,
       inscrições e publicação), cenários personalizados, modos avançados (zonas mestre e satélites,
@@ -600,7 +608,9 @@ roadmap:
       Pronto em software, ainda não em caixas reais: Mestre e Satélites, em que os satélites que uma
       equipa tem junto com a mestre aumentam os seus pontos e a mestre a mudar de mãos liberta-os,
       testado no simulador, através do controlador de campo e no firmware da caixa a correr num
-      computador; e o esqueleto do servidor do clube (a base de dados, as migrações e uma
+      computador; as regras das Janelas de Alvo, em que um tiro enquanto o alvo mostra a cor de uma
+      equipa pontua para essa equipa, testadas no simulador e na aplicação (o módulo de alvo ainda
+      não está feito); e o esqueleto do servidor do clube (a base de dados, as migrações e uma
       verificação de estado, no seu próprio contentor) e as contas (palavras-passe, códigos de
       dois fatores obrigatórios para quem organiza e para marshals, sessões e funções por campo;
       ainda sem dados de jogos), testado só num computador.

@@ -365,7 +365,8 @@ differs from the design above (decisions M1-1 to M1-6):
 - The Field Box's keypad picker lists nine presets and this is the
   tenth built-in one: joinable by the controller, not pickable on the
   box (M1-4; a second picker page is recommended before plan phases 4
-  and 6 add more presets).
+  and 6 add more presets). Done in plan phase 2: `0` turns the page
+  (M2-1).
 - One master counts (the lowest node id); owners from `field.owner()`
   checked on each capture and every second, as Hold-All (M1-5).
 - Tests: the six named above (`three_satellites.yaml` for 0-3
@@ -429,6 +430,32 @@ YAML: hit in the window scores for the window's team; a hit outside
 scores nothing and reports `window_open: false`; weak hits ignored; three
 cycles with a fixed `seed` give the expected teams; `cmd.set_owner` is
 ignored. The capability vector through the C, Python and Dart codecs.
+
+**Built 2026-10-19 (in software; the addon is HW2).** What differs from
+the design above, or fills what it left open (decisions M2-1 to M2-5):
+
+- Windows: the target is dark for `interval_s` after the start and after
+  each window closes (the dark time, so no rule ties it to `window_s`);
+  the first scoring hit closes the window unless `multi_hit`; a hit while
+  dark logs `target.hit` with `window_open: false` and no team; the sensor
+  is armed from `game.start` to `game.end` (M2-2). Screens `standby` and
+  `window`.
+- `game.teams()` returns a new table each call; the core stays 0.2.0
+  (M2-3).
+- The `hit` capability is draft RFC 0000 Amendment 1 and a dated
+  refinement in `protocol/capability-proxy.md`; vectors `target_addon`
+  (IDENT), `target_hit` (EVT) and `target_arm` (CMD), assembled by hand
+  from the tables and passed by the C, Python and Dart codecs, none of which
+  checks capability types. The app's pod client maps a lent `hit` to
+  `hit.hit` (M2-5).
+- Not a Field Box preset (P4R23): the simulator's firmware checks name it
+  as the one mode not in the image; its templates are in the image anyway,
+  with three reference images and three app goldens (M2-4).
+- Done first in this plan phase: the Field Box picker's pages (`0` turns
+  to the next nine, M2-1, closing M1-4), with host tests and two
+  reference screens.
+- Tests: the five named above plus `basic.yaml` (screens, the next
+  window) and `multi_hit.yaml`; seed 3 gives red, blue, yellow.
 
 ### Validation
 

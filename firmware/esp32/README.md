@@ -356,7 +356,7 @@ it builds nothing.
 
 ## Built-in presets
 
-Every mode in `modes/` is built into the image (`main/CMakeLists.txt`):
+Every mode in `modes/` but Target Windows is built into the image (`main/CMakeLists.txt`):
 Bomb, Domination, Hold-All Domination, Last Stand, the Codes modifier,
 the phase 3 modes Kill Confirmed, Respawn and Lives and Player Check-in, and
 the Medic Kit (a role package: the controller joins a kit with the kit's id
@@ -368,10 +368,13 @@ or erased box and every Wokwi run get all ten, in that order; a box
 updated to a firmware with more modes gets the new ones in free slots), and
 replaces the stored script of a built-in mode when the image has a
 different one (`main/builtin_presets.c`). The default admin PIN is 1234
-until the setup portal sets one. The keypad picker lists the first nine
-presets (keys 1-9), so the tenth, Master and Satellites, runs only when the
-controller joins the box to such a game (decision M1-4); its scoring is on
-the controller anyway.
+until the setup portal sets one. The keypad picker shows nine presets a
+page (keys 1-9 on every page); with more than nine, `0` turns to the next
+page, and the header shows the page (`CHOOSE A GAME 1/2`), so the tenth,
+Master and Satellites, is the first entry of the second page (decision
+M2-1). Target Windows is the one mode in `modes/` that is not built in: it
+needs the target addon and its driver (decision P4R23, phase 4 HW2); its
+screen templates are in the image, as every mode's are.
 
 A join may name a main mode with modifiers (`org.atalaia.domination+org.atalaia.codes`,
 see [modes/README.md](../../modes/README.md#main-modes-modifiers-and-role-packages)): the box

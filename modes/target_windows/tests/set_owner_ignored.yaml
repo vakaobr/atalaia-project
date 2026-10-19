@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: The GM's owner override means nothing to a target and is ignored
+params: { interval_s: 10, window_s: 5 }
+teams: [red, blue]
+steps:
+  - input: { type: cmd.set_owner, data: { team: red } }
+  - input: { type: cmd.set_owner, data: { team: none } }
+  - expect_no: zone.captured
+  - expect_no: zone.neutralized
+  - expect_screen: { template: standby, data: { hits: 0 } }
+  - wait: 30
+  - expect_score: { team: red, points: 0 }
+  - expect_score: { team: blue, points: 0 }
+  - end: time
+  - expect_status: ended
+  - expect_screen: { template: final_score, data: {} }

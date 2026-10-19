@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A hit while the target is dark, or after its window has closed, scores nothing and says the window was shut
+params: { interval_s: 10, window_s: 5 }
+teams: [red, blue]
+steps:
+  - wait: 4
+  - input: { type: hit.hit, data: { strength: 255 } }
+  - expect: { type: target.hit, at: 4, data: { window_open: false } }
+  - wait: 11                                            # the window opened at 10 and closed at 15
+  - expect_screen: { template: standby, data: { hits: 0 } }
+  - input: { type: hit.hit, data: { strength: 255 } }
+  - expect: { type: target.hit, at: 15, data: { window_open: false } }
+  - expect_score: { team: red, points: 0 }
+  - expect_score: { team: blue, points: 0 }

@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: The window's team comes from game.teams() and the game's seed, so three cycles with seed 3 always give red, blue, yellow (a replay picks the same)
+params: { interval_s: 10, window_s: 5, hit_points: 1 }
+teams: [red, blue, yellow]
+seed: 3
+steps:
+  - wait: 10
+  - input: { type: hit.hit, data: { strength: 200 } }
+  - expect: { type: target.hit, team: red, at: 10, data: { window_open: true } }
+  - wait: 10
+  - input: { type: hit.hit, data: { strength: 200 } }
+  - expect: { type: target.hit, team: blue, at: 20, data: { window_open: true } }
+  - wait: 10
+  - input: { type: hit.hit, data: { strength: 200 } }
+  - expect: { type: target.hit, team: yellow, at: 30, data: { window_open: true } }
+  - expect_score: { team: red, points: 1 }
+  - expect_score: { team: blue, points: 1 }
+  - expect_score: { team: yellow, points: 1 }

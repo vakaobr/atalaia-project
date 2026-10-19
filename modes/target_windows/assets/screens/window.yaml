@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# A scoring window is open. Data: team (whose window it is) and left (seconds
+# until it closes).
+template: window
+style: { background: team }
+layout:
+  - type: spacer
+    height: fill
+  - type: label
+    text: HIT IT
+    style: { font_size: 28, color: contrast }
+  - type: label
+    text: "{team|upper}"
+    style: { font_size: 48, color: contrast }
+  - type: label
+    text: "{left} s"
+    style: { font_size: 28, color: contrast }
+  - type: spacer
+    height: fill

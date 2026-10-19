@@ -273,6 +273,40 @@ void main() {
       );
     });
 
+    test('a hit sensor lent by a target addon: hit.hit, and arm', () {
+      final target = PodInputs(
+        const PodIdent(
+          fwVersion: '0.4.0',
+          capabilities: [
+            {'id': 'hit', 'type': 'hit'},
+            {'id': 'ring', 'type': 'led', 'count': 24, 'rgb': true},
+          ],
+          hasRadio: false,
+        ),
+      );
+      expectInput(
+        target.input(
+          const ProxyMessage(
+            capId: 'hit',
+            name: 'hit',
+            data: {'strength': 200},
+            seq: 12,
+          ),
+          tagData: tagData,
+        ),
+        ('hit.hit', {'strength': 200}),
+      );
+      expectInput(
+        target.input(
+          const ProxyMessage(capId: 'hit', name: 'hit', seq: 13),
+          tagData: tagData,
+        ),
+        ('hit.hit', {'strength': 0}),
+      );
+      final arm = target.command('hit', 'arm', const [])!;
+      expect([arm.$1, arm.$2, arm.$3], ['hit', 'arm', <String, Object?>{}]);
+    });
+
     test("a script's commands for the pod's hardware", () {
       final fill = inputs.command('ring', 'fill', ['red'])!;
       expect(

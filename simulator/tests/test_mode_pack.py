@@ -175,16 +175,26 @@ class FieldScriptSimTests(unittest.TestCase):
 
 
 class FirmwareBuiltinTests(unittest.TestCase):
-    """The Field Box carries every built-in mode, with the manifests' default parameters."""
+    """The Field Box carries every built-in mode a box can run, with the manifests' default
+    parameters; the others are named here, with the reason."""
 
     FIRMWARE = MODES.parent / "firmware" / "esp32"
+    # Folders that are not Field Box presets (decision P4R23).
+    NOT_ON_THE_BOX = {
+        "target_windows": "needs the target addon's hit sensor and its driver (P4R4, HW2)",
+    }
+
+    def box_folders(self):
+        folders = {p.parent.name for p in MODES.glob("*/mode.yaml")}
+        self.assertLessEqual(set(self.NOT_ON_THE_BOX), folders)
+        return folders - set(self.NOT_ON_THE_BOX)
 
     def test_presets_match_the_manifests(self):
         src = (self.FIRMWARE / "main" / "builtin_presets.c").read_text(encoding="utf-8")
         start = src.index("builtin[] = {")
         body = src[start:src.index("\n};", start)]
         entries = re.findall(r'\{"([^"]+)", "([^"]+)",((?:\s*"(?:[^"\\]|\\.)*")+)\}', body)
-        modes = {m.id: m for m in (load_mode(p.parent) for p in sorted(MODES.glob("*/mode.yaml")))}
+        modes = {m.id: m for m in (load_mode(MODES / f) for f in sorted(self.box_folders()))}
         self.assertEqual({e[1] for e in entries}, set(modes))
         for label, mode_id, literals in entries:
             text = "".join(s.encode().decode("unicode_escape")
@@ -194,7 +204,7 @@ class FirmwareBuiltinTests(unittest.TestCase):
                 self.assertEqual(label, modes[mode_id].name.split(" / ")[0])
 
     def test_every_mode_is_in_the_image(self):
-        folders = {p.parent.name for p in MODES.glob("*/mode.yaml")}
+        folders = self.box_folders()
         cmake = (self.FIRMWARE / "main" / "CMakeLists.txt").read_text(encoding="utf-8")
         listed = re.search(r"foreach\(mode ([a-z_\s]+)\)", cmake).group(1).split()
         self.assertEqual(set(listed), folders)
@@ -204,6 +214,8 @@ class FirmwareBuiltinTests(unittest.TestCase):
             mode_id = load_mode(MODES / folder).id
             self.assertIn(f"_binary_{folder}_node_lua_start", shell)
             self.assertIn(f'{{"{folder}", "{mode_id}"}}', host)
+        for folder in self.NOT_ON_THE_BOX:
+            self.assertNotIn(f"_binary_{folder}_node_lua_start", shell)
 
     def test_scripts_fit_a_preset_and_a_reduced_box(self):
         """A preset holds 16 KB of script (PRESET_SOURCE_MAX): every main mode with every

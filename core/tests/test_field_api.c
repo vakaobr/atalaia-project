@@ -254,6 +254,17 @@ static void test_field_score(void)
     atalaia_node_destroy(n);
 }
 
+/* game.teams() on the controller too (P4R26). */
+static void test_field_game_teams(void)
+{
+    field_recorder_t r;
+    atalaia_node_t *n = make_field_node(&r, true);
+    CHECK(load_src(n, "log(table.concat(game.teams(), ','))\n"));
+    CHECK(r.logs == 1);
+    CHECK(strcmp(r.log[0], "red,blue") == 0);
+    atalaia_node_destroy(n);
+}
+
 static void test_field_common_owner(void)
 {
     field_recorder_t r;
@@ -334,6 +345,7 @@ void run_field_api_tests(void)
     test_field_owner();
     test_field_send();
     test_field_score();
+    test_field_game_teams();
     test_field_common_owner();
     test_field_common_owner_reused_buffer();
     test_field_not_available_regular();
