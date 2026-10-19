@@ -1509,6 +1509,11 @@ possible.  The Android controller role needs an embedded MQTT broker
 for local clients (scoreboards, custom integrations) to subscribe to
 game events.
 
+**Updated 2026-10-19 (plan phase E, decision PE10):** the broker
+(`app/lib/controller/mqtt_broker.dart`) uses the Pi controller's topics
+(`field/v1/{game}/...`) and supports retained messages, which the Pi's
+bridge relies on; the controller shell around it is not built yet (PE24).
+
 **Decision:** Use **HiveMQ MQTT Client for Dart** as an MQTT client
 library, combined with a **minimal embedded broker implemented in
 Dart** for the Android controller role.
@@ -1605,7 +1610,12 @@ The embedded Dart broker runs ONLY on Android.
 ### ADR-P3-13: Field check-in and per-game replica declaration
 
 **Status:** Proposed (2026-10-19, maintainer request; decisions F1-F12
-in `docs/review/decisions-to-review.md`, all open)
+in `docs/review/decisions-to-review.md`, all open).  **Implemented
+2026-10-19 (plan phase E)**: `protocol/checkin.md`,
+`controller/atalaia_controller/checkin.py`, the console's Check-in tab and
+poster, `app/lib/checkin/`; choices made on the way are decisions PE1-PE25
+(ECDSA P-256 CA, PE2; the series and its judging, PE9; teams and squads,
+PE25)
 
 **Context:** The maintainer asked for players to check in at the field
 by scanning a QR code printed for the check-in area, then pick which

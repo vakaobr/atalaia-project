@@ -37,11 +37,35 @@ which browsers cannot give headers, also takes ``?token=``.
     POST /api/v1/radio/random              a random legal channel, as a suggestion
     GET  /api/v1/games/{id}/positions      where the nodes are on the field image
     PUT  /api/v1/games/{id}/positions/{n}  move a node on it
+    GET  /api/v1/controller/ca             the field CA's certificate (PEM), no token (ADR-P3-9)
+    GET  /api/v1/checkin                   field check-in: field, notice, settings, open games (no token)
+    POST /api/v1/checkin                   check in with a field identity: a player token
+    POST /api/v1/checkin/token             a new player token (player token)
+    GET|DELETE /api/v1/checkin/me          the player's own check-in / leave the game
+    PUT  /api/v1/checkin/me/replicas       the player's declaration (replicas for this game)
+    PUT  /api/v1/checkin/me/marshal-key    a marshal registers the Ed25519 key that signs readings
+    GET|POST /api/v1/games/{id}/checkins   staff: the list with names / a manual check-in
+    GET  /api/v1/games/{id}/checkins.csv   GM: the list as CSV
+    PATCH|DELETE /api/v1/games/{id}/checkins/{player}  staff changes / GM removal
+    GET  /api/v1/games/{id}/chrono-list    staff: the "replicas to chrono" list
+    POST /api/v1/games/{id}/checkin/open|close  GM
+    POST /api/v1/chrono/readings           a marshal's signed series of readings
+    GET|POST /api/v1/marshals              GM: marshals' public keys
+    GET|PUT /api/v1/checkin/settings       GM: confirm, federation, limits
+    GET|PUT /api/v1/checkin/poster         GM: the check-in poster's text and fields
+    GET|DELETE /api/v1/players/{player}    GM (or the player): their data / erase it (?chrono=1: readings too)
+    GET|POST /api/v1/positions             player positions: the ones the caller may see / report (player token)
+    WS   /api/v1/prop                      an Android prop's Wi-Fi link (prop_link.py)
     GET  /healthz                          liveness, no token
     GET  /console/                         the GM console (static files, no token)
     GET  /scoreboard                       the read-only scoreboard page (/console/scoreboard.html)
 
 Join answers carry the game key inside the payload: GM token only, never cached.
+
+Player tokens (protocol/player-token.md, issued at check-in) read what the
+read token reads about games, and their own check-in; their role, team and
+squad are checked against the check-in on every request (checkin.py). They
+cannot read modes, presets, the controller's or the radio's state.
 """
 
 from __future__ import annotations
@@ -59,10 +83,12 @@ from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
+from . import checkin as checkinmod
+from .checkin import Viewer
 from .engine import Controller, ControllerError
 from .modes import resolve_params
 from .store import FIELD_IMAGE_MAX
-from .ws import Hub
+from .ws import PLAYER_TYPES, Hub, default_route, public
 
 CONSOLE_DIR = Path(__file__).resolve().parent.parent / "console" / "src"
 IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp"}
@@ -75,6 +101,7 @@ class Auth:
             raise ValueError("both tokens must be set")
         self.gm_token = gm_token
         self.read_token = read_token
+        self.checkin: Optional[checkinmod.Checkin] = None  # set by create_app
 
     def role(self, token: Optional[str]) -> Optional[str]:
         if not token:
@@ -83,6 +110,18 @@ class Auth:
             return "gm"
         if hmac.compare_digest(token.encode(), self.read_token.encode()):
             return "read"
+        return None
+
+    def viewer(self, token: Optional[str]) -> Optional[Viewer]:
+        """Who a token is: the GM or read token, or a valid player token (None: refused)."""
+        role = self.role(token)
+        if role is not None:
+            return Viewer(role)
+        if token and token.startswith("apt") and self.checkin is not None:
+            try:
+                return self.checkin.resolve(token)
+            except checkinmod.Unauthorized:
+                return None
         return None
 
 
@@ -95,7 +134,8 @@ def _token(request: Request) -> Optional[str]:
 
 def create_app(controller: Controller, hub: Hub, auth: Auth,
                on_start: Optional[Callable[[], None]] = None,
-               on_stop: Optional[Callable[[], None]] = None) -> FastAPI:
+               on_stop: Optional[Callable[[], None]] = None,
+               ca_pem: Optional[bytes] = None) -> FastAPI:
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
         if on_start:
@@ -107,13 +147,40 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
                 on_stop()
 
     app = FastAPI(title="Atalaia field controller", version=__version__, lifespan=lifespan)
+    checkin = controller.checkin
+    players = controller.positions  # player positions (positions.py)
+    auth.checkin = checkin
+    if hub.route is default_route and checkin is not None:
+        hub.route = make_route(controller)
     controller.add_listener(hub.publish)
 
-    def require_read(request: Request) -> str:
+    def viewer(request: Request) -> Viewer:
+        v = auth.viewer(_token(request))
+        if v is None:
+            raise HTTPException(401, "a GM, read or player token is needed", {"WWW-Authenticate": "Bearer"})
+        return v
+
+    def require_read(request: Request) -> Viewer:
+        """The GM, read or a player token: the game's public data."""
+        return viewer(request)
+
+    def require_console(request: Request) -> str:
+        """The GM or read token (the console's views of the controller itself)."""
         role = auth.role(_token(request))
         if role is None:
             raise HTTPException(401, "a read or GM token is needed", {"WWW-Authenticate": "Bearer"})
         return role
+
+    def require_player(request: Request) -> Viewer:
+        v = viewer(request)
+        if v.kind != "player":
+            raise HTTPException(403, "this needs a player token (check in first)")
+        return v
+
+    def need_checkin() -> checkinmod.Checkin:
+        if checkin is None:
+            raise HTTPException(503, "field check-in is not set up on this controller")
+        return checkin
 
     def require_gm(request: Request) -> str:
         role = auth.role(_token(request))
@@ -126,6 +193,10 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     @app.exception_handler(ControllerError)
     async def controller_error(request: Request, exc: ControllerError):
         return JSONResponse({"detail": str(exc)}, status_code=exc.status)
+
+    @app.exception_handler(checkinmod.Refused)
+    async def refused(request: Request, exc: checkinmod.Refused):
+        return JSONResponse({"detail": str(exc), "reasons": exc.reasons}, status_code=exc.status)
 
     @app.exception_handler(ModeError)
     async def mode_error(request: Request, exc: ModeError):
@@ -143,15 +214,19 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         return {"ok": True, "version": __version__, "radio": controller.radio_state}
 
     @app.get("/api/v1/whoami")
-    def whoami(role: str = Depends(require_read)) -> dict[str, Any]:
-        """Which token this is ("gm" or "read"): the console hides GM controls for "read"."""
-        return {"role": role, "version": __version__}
+    def whoami(v: Viewer = Depends(require_read)) -> dict[str, Any]:
+        """Which token this is ("gm", "read" or "player"): the console hides GM controls for "read"."""
+        out: dict[str, Any] = {"role": v.kind, "version": __version__}
+        if v.kind == "player":
+            out.update({"player_role": v.role, "player_id": v.player_id, "game_id": v.game_id,
+                        "team": v.team, "squad": v.squad, "stale": v.stale})
+        return out
 
     @app.get("/api/v1/nodes", dependencies=[Depends(require_read)])
     def nodes(game: Optional[int] = None) -> list[dict[str, Any]]:
         return controller.nodes(game)
 
-    @app.get("/api/v1/modes", dependencies=[Depends(require_read)])
+    @app.get("/api/v1/modes", dependencies=[Depends(require_console)])
     def modes() -> list[dict[str, Any]]:
         return [m.to_api() for m in controller.modes.all()]
 
@@ -160,7 +235,7 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         files = body_map(body).get("files")
         return controller.modes.install(files).to_api()
 
-    @app.get("/api/v1/presets", dependencies=[Depends(require_read)])
+    @app.get("/api/v1/presets", dependencies=[Depends(require_console)])
     def presets() -> list[dict[str, Any]]:
         return controller.store.presets()
 
@@ -191,7 +266,11 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
 
     @app.post("/api/v1/games/{game_id}/start", dependencies=[Depends(require_gm)])
     def start(game_id: int) -> dict[str, Any]:
-        return controller.start_game(game_id)
+        out = controller.start_game(game_id)
+        if checkin is not None:
+            # ADR-P3-13: a warning, not a block; the console asks before it starts.
+            out = {**out, "pending_declarations": checkin.pending_count(game_id)}
+        return out
 
     @app.post("/api/v1/games/{game_id}/pause", dependencies=[Depends(require_gm)])
     def pause(game_id: int, body: Any = Body(None)) -> dict[str, Any]:
@@ -224,7 +303,7 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     def game_log(game_id: int, since_ms: Optional[int] = None) -> list[dict[str, Any]]:
         return controller.log(game_id, since_ms)
 
-    @app.get("/api/v1/controller", dependencies=[Depends(require_read)])
+    @app.get("/api/v1/controller", dependencies=[Depends(require_console)])
     def status() -> dict[str, Any]:
         return controller.status()
 
@@ -248,7 +327,7 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
 
     # --- the field's radio channel (channels.py, RFC 0001 Amendment 3) -------
 
-    @app.get("/api/v1/radio", dependencies=[Depends(require_read)])
+    @app.get("/api/v1/radio", dependencies=[Depends(require_console)])
     def radio() -> dict[str, Any]:
         return controller.radio_settings()
 
@@ -261,7 +340,7 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     def start_scan(body: Any = Body(None)) -> dict[str, Any]:
         return controller.start_scan(body_map(body).get("dwell_s"))
 
-    @app.get("/api/v1/radio/scan", dependencies=[Depends(require_read)])
+    @app.get("/api/v1/radio/scan", dependencies=[Depends(require_console)])
     def scan_status() -> dict[str, Any]:
         return {"scan": controller.scan_status()}
 
@@ -339,6 +418,171 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         controller._emit(msg)
         return msg
 
+    # --- the field CA (ADR-P3-9, P3-8) -------------------------------------------
+
+    @app.get("/api/v1/controller/ca")
+    def field_ca() -> Response:
+        """The field CA's certificate, no token: phones check it against the poster's or the join
+        payload's fingerprint and pin it (protocol/checkin.md)."""
+        if ca_pem is None:
+            raise HTTPException(404, "HTTPS is off on this controller ([api] tls_port = 0)")
+        import hashlib  # noqa: PLC0415
+
+        from cryptography import x509  # noqa: PLC0415
+        from cryptography.hazmat.primitives import serialization  # noqa: PLC0415
+
+        der = x509.load_pem_x509_certificate(ca_pem).public_bytes(serialization.Encoding.DER)
+        return Response(ca_pem, media_type="application/x-pem-file",
+                        headers={"X-Atalaia-CA-SHA256": hashlib.sha256(der).hexdigest(),
+                                 "Cache-Control": "no-cache"})
+
+    # --- field check-in (ADR-P3-13, protocol/checkin.md) ------------------------------
+
+    def client_of(request: Request) -> str:
+        return request.client.host if request.client else "?"
+
+    @app.get("/api/v1/checkin")
+    def checkin_info(request: Request) -> JSONResponse:
+        svc = need_checkin()
+        if not svc.info_rate.allow(client_of(request)):
+            raise HTTPException(429, "too many requests from this address; wait a minute")
+        return JSONResponse(svc.info(), headers=NO_STORE)
+
+    @app.post("/api/v1/checkin")
+    def checkin_post(request: Request, body: Any = Body(None)) -> JSONResponse:
+        out, created = need_checkin().check_in(body_map(body), client_of(request))
+        return JSONResponse(out, status_code=201 if created else 200, headers=NO_STORE)
+
+    @app.post("/api/v1/checkin/token")
+    def checkin_token(v: Viewer = Depends(require_player)) -> JSONResponse:
+        return JSONResponse(need_checkin().refresh_token(v), headers=NO_STORE)
+
+    @app.get("/api/v1/checkin/me")
+    def checkin_me(v: Viewer = Depends(require_player)) -> JSONResponse:
+        return JSONResponse(need_checkin().me(v), headers=NO_STORE)
+
+    @app.delete("/api/v1/checkin/me")
+    def checkin_leave(v: Viewer = Depends(require_player)) -> dict[str, Any]:
+        return need_checkin().leave(v)
+
+    @app.put("/api/v1/checkin/me/replicas")
+    def checkin_replicas(v: Viewer = Depends(require_player), body: Any = Body(None)) -> dict[str, Any]:
+        return need_checkin().put_my_replicas(v, body_map(body))
+
+    @app.put("/api/v1/checkin/me/marshal-key")
+    def checkin_marshal_key(v: Viewer = Depends(require_player), body: Any = Body(None)) -> dict[str, Any]:
+        if v.role != "marshal":
+            raise HTTPException(403, "only a marshal registers a signing key (the GM gives the role)")
+        return need_checkin().register_marshal(body_map(body), player_id=v.player_id)
+
+    @app.get("/api/v1/games/{game_id}/checkins")
+    def checkins_list(game_id: int, v: Viewer = Depends(require_read)) -> JSONResponse:
+        return JSONResponse(need_checkin().list_checkins(v, game_id), headers=NO_STORE)
+
+    @app.get("/api/v1/games/{game_id}/checkins.csv", dependencies=[Depends(require_gm)])
+    def checkins_csv(game_id: int) -> Response:
+        text = need_checkin().csv_export(game_id)
+        return Response(text.encode("utf-8-sig"), media_type="text/csv; charset=utf-8",
+                        headers={**NO_STORE,
+                                 "Content-Disposition": f'attachment; filename="checkins-{game_id}.csv"'})
+
+    @app.post("/api/v1/games/{game_id}/checkins", status_code=201)
+    def checkins_manual(game_id: int, v: Viewer = Depends(require_read), body: Any = Body(None)) -> dict[str, Any]:
+        return need_checkin().manual_checkin(v, game_id, body_map(body))
+
+    @app.patch("/api/v1/games/{game_id}/checkins/{player_id}")
+    def checkins_patch(game_id: int, player_id: str, v: Viewer = Depends(require_read),
+                       body: Any = Body(None)) -> dict[str, Any]:
+        return need_checkin().patch_checkin(v, game_id, player_id, body_map(body))
+
+    @app.delete("/api/v1/games/{game_id}/checkins/{player_id}")
+    def checkins_remove(game_id: int, player_id: str, v: Viewer = Depends(require_read)) -> dict[str, Any]:
+        return need_checkin().remove_checkin(v, game_id, player_id)
+
+    @app.get("/api/v1/games/{game_id}/chrono-list")
+    def chrono_list(game_id: int, v: Viewer = Depends(require_read)) -> JSONResponse:
+        return JSONResponse(need_checkin().chrono_list(v, game_id), headers=NO_STORE)
+
+    @app.post("/api/v1/games/{game_id}/checkin/open", dependencies=[Depends(require_gm)])
+    def checkin_open(game_id: int) -> dict[str, Any]:
+        return need_checkin().set_open(game_id, True)
+
+    @app.post("/api/v1/games/{game_id}/checkin/close", dependencies=[Depends(require_gm)])
+    def checkin_close(game_id: int) -> dict[str, Any]:
+        return need_checkin().set_open(game_id, False)
+
+    @app.post("/api/v1/chrono/readings")
+    def chrono_readings(v: Viewer = Depends(require_read), body: Any = Body(None)) -> dict[str, Any]:
+        return need_checkin().upload_readings(v, body_map(body))
+
+    @app.get("/api/v1/marshals", dependencies=[Depends(require_gm)])
+    def marshals() -> list[dict[str, Any]]:
+        return need_checkin().marshals()
+
+    @app.post("/api/v1/marshals", status_code=201, dependencies=[Depends(require_gm)])
+    def marshal_add(body: Any = Body(None)) -> dict[str, Any]:
+        return need_checkin().register_marshal(body_map(body))
+
+    @app.get("/api/v1/checkin/settings", dependencies=[Depends(require_gm)])
+    def checkin_settings() -> dict[str, Any]:
+        return need_checkin().settings()
+
+    @app.put("/api/v1/checkin/settings", dependencies=[Depends(require_gm)])
+    def checkin_settings_put(body: Any = Body(None)) -> dict[str, Any]:
+        return need_checkin().set_settings(body_map(body))
+
+    @app.get("/api/v1/checkin/poster", dependencies=[Depends(require_gm)])
+    def checkin_poster() -> dict[str, Any]:
+        return need_checkin().poster()
+
+    @app.put("/api/v1/checkin/poster", dependencies=[Depends(require_gm)])
+    def checkin_poster_put(body: Any = Body(None)) -> dict[str, Any]:
+        return need_checkin().set_poster(body_map(body))
+
+    def own_or_gm(v: Viewer, player_id: str) -> None:
+        if not (v.is_gm_token or (v.kind == "player" and v.player_id == player_id)):
+            raise HTTPException(403, "the GM token, or the player's own token")
+
+    @app.get("/api/v1/players/{player_id}/chrono")
+    def player_chrono(player_id: str, v: Viewer = Depends(require_read)) -> JSONResponse:
+        own_or_gm(v, player_id)
+        return JSONResponse({"player_id": player_id, "readings": need_checkin().player_readings(player_id)},
+                            headers=NO_STORE)
+
+    @app.delete("/api/v1/players/{player_id}/chrono")
+    def player_chrono_erase(player_id: str, v: Viewer = Depends(require_read)) -> dict[str, Any]:
+        own_or_gm(v, player_id)
+        svc = need_checkin()
+        return {"player_id": player_id, "readings_deleted": svc.store.delete_readings(player_id=player_id)}
+
+    @app.delete("/api/v1/players/{player_id}", dependencies=[Depends(require_gm)])
+    def player_erase(player_id: str, chrono: bool = False) -> dict[str, Any]:
+        return need_checkin().erase_player(player_id, chrono_too=chrono)
+
+    # --- player positions (ADR-P3-6) -------------------------------------------------
+
+    @app.post("/api/v1/positions")
+    def positions_post(v: Viewer = Depends(require_player), body: Any = Body(None)) -> dict[str, Any]:
+        if players is None:
+            raise HTTPException(503, "positions are not set up on this controller")
+        return players.report(v, body)
+
+    @app.get("/api/v1/positions")
+    def positions_get(v: Viewer = Depends(require_read)) -> JSONResponse:
+        if players is None:
+            raise HTTPException(503, "positions are not set up on this controller")
+        return JSONResponse({"positions": players.visible(v)}, headers=NO_STORE)
+
+    # --- Android props on Wi-Fi (prop_link.py) ----------------------------------------
+
+    @app.websocket("/api/v1/prop")
+    async def prop_link(ws: WebSocket) -> None:
+        links = controller.prop_links
+        if links is None:
+            await ws.close(code=4404)
+            return
+        await links.serve(ws)
+
     # --- the GM console and the scoreboard: static files, no build step -------
 
     if CONSOLE_DIR.is_dir():
@@ -370,19 +614,23 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         header = ws.headers.get("authorization", "")
         if not token and header.lower().startswith("bearer "):
             token = header[7:].strip()
-        if auth.role(token) is None:
+        v = auth.viewer(token)
+        if v is None:
             await ws.close(code=4401)
             return
         await ws.accept()
-        queue = hub.subscribe()
+        queue = hub.subscribe(v)
         try:
-            await ws.send_json(_snapshot(controller))
+            await ws.send_json(_snapshot(controller, v))
 
             async def sender() -> None:
                 while True:
                     msg = await queue.get()
                     if msg is None:
                         await ws.close(code=4408)  # too slow: reconnect for a fresh snapshot
+                        return
+                    if isinstance(msg, tuple):  # ("close", code): e.g. 4409, fetch a new token
+                        await ws.close(code=msg[1])
                         return
                     await ws.send_json(msg)
 
@@ -427,13 +675,69 @@ def _reason(spec: dict[str, Any]) -> str:
     return reason
 
 
-def _snapshot(controller: Controller) -> dict[str, Any]:
+HELLO_EVENTS = 100
+
+
+def _snapshot(controller: Controller, viewer: Optional[Viewer] = None) -> dict[str, Any]:
+    """The first message on the stream: the live game, its score, nodes and its latest events,
+    so a client that connects mid-game shows what already happened (item 4 of plan phase E).
+    A player's connection also gets its own check-in and the positions it may see."""
     status = controller.status()
     game_id = status["live_game"]
-    return {
+    events = []
+    if game_id:
+        events = [{k: e.get(k) for k in ("node", "seq", "t", "type", "team", "squad", "prio", "data")}
+                  for e in controller.store.events(game_id)[-HELLO_EVENTS:]]
+    out: dict[str, Any] = {
         "type": "hello",
-        "status": status,
         "game": controller.get_game(game_id) if game_id else None,
         "score": controller.score(game_id) if game_id else None,
         "nodes": controller.nodes(game_id) if game_id else [],
+        "events": events,
     }
+    if viewer is None or viewer.kind != "player":
+        out["status"] = status
+        return out
+    out["status"] = {"live_game": game_id}
+    svc = controller.checkin
+    if svc is not None and viewer.game_id is not None:
+        game = controller.store.game(viewer.game_id)
+        row = controller.store.checkin(viewer.game_id, viewer.player_id)
+        if game is not None and row is not None:
+            out["me"] = {**svc.row_view(game, row), "stale_token": viewer.stale}
+    if controller.positions is not None:
+        out["positions"] = controller.positions.visible(viewer)
+    return out
+
+
+def make_route(controller: Controller) -> Callable[[Any, dict[str, Any]], Any]:
+    """Who gets which stream message (decision PE6; ws.py)."""
+
+    def route(v: Optional[Viewer], msg: dict[str, Any]) -> Any:
+        if v is None:
+            return None
+        if msg.get("_staff") or "_player" in msg:
+            game = msg.get("game")
+            staff = v.is_staff and (v.kind != "player" or v.game_id == game)
+            own = v.kind == "player" and v.player_id is not None and v.player_id == msg.get("_player") \
+                and v.game_id == game
+            if not staff and not own:
+                return None
+            out = public(msg)
+            if own and msg.get("_assignment"):
+                # The GM changed this player's team, squad or role: fetch a new token and reconnect.
+                return [out, ("close", 4409)]
+            return out
+        if msg.get("_position"):
+            pos = controller.positions
+            return public(msg) if pos is not None and pos.can_see(v, msg["position"]) else None
+        if msg.get("_positions_refresh"):
+            pos = controller.positions
+            if pos is None or v.kind == "read":
+                return None
+            return {"type": "positions", "game": msg.get("game"), "positions": pos.visible(v, msg.get("game"))}
+        if v.kind == "player" and msg.get("type") not in PLAYER_TYPES:
+            return None
+        return public(msg)
+
+    return route

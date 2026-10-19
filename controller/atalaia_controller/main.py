@@ -3,26 +3,35 @@
 """Entry point: python -m atalaia_controller [run|tokens|join-key] [--config controller.toml].
 
     run       start the controller: radio modem, MQTT bridge, REST/WebSocket API, GM console
+              (HTTP on [api] port, HTTPS with the field CA on [api] tls_port)
     tokens    print the GM and read tokens (generated on first start if not configured)
     join-key  print the field join key that authenticates join cards (protocol/join.md):
               set it on every box of the field and on a standby controller
+    ca        print the field CA's fingerprint (it is on the check-in poster) and its folder
 """
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 import logging
+import os
 import secrets
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable, Optional
 
 from atalaia_sim.core import Core, LibraryNotFound, find_library
 
+from . import tls as tlsmod
 from .api import Auth, create_app
+from .checkin import Checkin
 from .config import Config, ConfigError, load_config
 from .engine import Controller
 from .mqtt import MqttBridge, maybe_bridge
+from .positions import Positions
+from .prop_link import PropLinks
 from .radio_modem import RadioModem
 from .store import Store
 from .ws import Hub
@@ -66,6 +75,34 @@ def load_core() -> Optional[Core]:
         return None
 
 
+def tls_dir(cfg: Config) -> Path:
+    if cfg.tls_dir:
+        return Path(cfg.tls_dir)
+    return Path(os.path.dirname(os.path.abspath(cfg.db_path))) / "tls"
+
+
+def ensure_tls(cfg: Config) -> Optional[tlsmod.FieldTls]:
+    """The field CA and the server certificate, made on first start (None with tls_port = 0)."""
+    if not cfg.tls_port:
+        return None
+    return tlsmod.ensure(tls_dir(cfg), tlsmod.local_names(cfg.tls_names), cfg.field_name)
+
+
+def poster_urls(cfg: Config, tls: Optional[tlsmod.FieldTls]) -> list[str]:
+    """The poster's default https addresses: the configured names first, then this host's addresses."""
+    if tls is None:
+        return []
+    out = []
+    for name in tls.names:
+        if name in ("localhost", "127.0.0.1"):
+            continue
+        host = f"[{name}]" if ":" in name else name
+        url = f"https://{host}:{cfg.tls_port}" if cfg.tls_port != 443 else f"https://{host}"
+        if url not in out and len(url) <= 64:
+            out.append(url)
+    return out[:3]
+
+
 @dataclass
 class Bundle:
     cfg: Config
@@ -75,6 +112,7 @@ class Bundle:
     mqtt: Optional[MqttBridge]
     hub: Hub
     app: Any
+    tls: Optional[tlsmod.FieldTls] = None
 
 
 def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = True,
@@ -91,6 +129,12 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
     else:
         log.warning("no modem port configured: the controller runs without a radio")
     controller = Controller(cfg, store, modem=modem, core=core, join_key=join_key)
+    tls = ensure_tls(cfg)
+    controller.ca_sha256 = tls.ca_sha256 if tls else None
+    controller.link_urls = poster_urls(cfg, tls)
+    Checkin(controller, ca_sha256=tls.ca_sha256 if tls else None, default_urls=controller.link_urls)
+    Positions(controller)
+    PropLinks(controller)
     mqtt = maybe_bridge(cfg, controller)
     hub = Hub()
 
@@ -108,14 +152,34 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
         if modem is not None:
             modem.stop()
 
-    app = create_app(controller, hub, Auth(gm, read), on_start=on_start, on_stop=on_stop)
-    return Bundle(cfg, store, controller, modem, mqtt, hub, app)
+    app = create_app(controller, hub, Auth(gm, read), on_start=on_start, on_stop=on_stop,
+                     ca_pem=tls.ca_pem if tls else None)
+    return Bundle(cfg, store, controller, modem, mqtt, hub, app, tls)
+
+
+def serve(bundle: Bundle, log_level: str = "info") -> None:
+    """HTTP on [api] port and, with the field CA, HTTPS on [api] tls_port: one app, one lifespan."""
+    import uvicorn  # noqa: PLC0415
+
+    cfg = bundle.cfg
+    servers = [uvicorn.Server(uvicorn.Config(bundle.app, host=cfg.host, port=cfg.api_port,
+                                             log_level=log_level, lifespan="on"))]
+    if bundle.tls is not None:
+        servers.append(uvicorn.Server(uvicorn.Config(
+            bundle.app, host=cfg.host, port=cfg.tls_port, log_level=log_level, lifespan="off",
+            ssl_certfile=str(bundle.tls.server_cert), ssl_keyfile=str(bundle.tls.server_key))))
+        log.info("HTTPS on port %d with the field CA %s", cfg.tls_port, bundle.tls.ca_sha256.hex())
+
+    async def run_all() -> None:
+        await asyncio.gather(*(srv.serve() for srv in servers))
+
+    asyncio.run(run_all())
 
 
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m atalaia_controller", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("command", nargs="?", default="run", choices=("run", "tokens", "join-key"))
+    parser.add_argument("command", nargs="?", default="run", choices=("run", "tokens", "join-key", "ca"))
     parser.add_argument("--config", help="TOML settings file (see controller/controller.example.toml)")
     parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args(argv)
@@ -133,10 +197,17 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.command == "join-key":
         print(ensure_join_key(cfg, Store(cfg.db_path)).hex())
         return 0
-    bundle = build(cfg)
-    import uvicorn
+    if args.command == "ca":
+        tls = ensure_tls(cfg)
+        if tls is None:
+            print("HTTPS is off ([api] tls_port = 0)")
+            return 1
+        from .checkin_poster import fingerprint_text, short_fingerprint  # noqa: PLC0415
 
-    uvicorn.run(bundle.app, host=cfg.host, port=cfg.api_port, log_level=args.log_level.lower())
+        print(f"field CA:    {fingerprint_text(tls.ca_sha256)}\nshort form:  {short_fingerprint(tls.ca_sha256)}"
+              f"\nfolder:      {tls.dir}\nnames:       {', '.join(tls.names)}")
+        return 0
+    serve(build(cfg), args.log_level.lower())
     return 0
 
 

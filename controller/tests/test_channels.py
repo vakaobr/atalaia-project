@@ -226,7 +226,8 @@ class ScanTests(EngineChannelCase):
                          (-104, False, 10.0, 500))
         # The scan changed nothing: the GM accepts or overrides.
         self.assertEqual(self.ctrl.field_channel, 868_500_000)
-        self.assertEqual(self.modem.channels, [868_500_000])  # back on the field's channel
+        # Back on the field's channel: the scan thread retunes after it reports "done".
+        self.assertTrue(wait_for(lambda: self.modem.channels == [868_500_000], 5), self.modem.channels)
         self.assertTrue(any(m["type"] == "radio_scan" and m["scan"]["state"] == "done"
                             for m in self.messages))
         self.ctrl.set_field_channel(scan["suggestion"]["channel_hz"], "scan")

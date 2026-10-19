@@ -9,10 +9,15 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'checkin/checkin_client.dart';
+import 'checkin/field_trust.dart';
+import 'checkin/my_replicas.dart';
+import 'controller/prop_link.dart';
 import 'core/node_runner.dart';
 import 'l10n/strings.dart';
 import 'modes/mode_catalog.dart';
 import 'platform/channels.dart';
+import 'platform/location.dart';
 import 'platform/services.dart';
 import 'player/field_feed.dart';
 import 'pod/pod_transports.dart';
@@ -37,7 +42,14 @@ class AppServices {
     this.consoleView,
     this.usbPods,
     this.blePods,
-  }) : modes = modes ?? ModeCatalog.builtin();
+    FieldHttp Function(PinnedField field)? fieldHttp,
+    CaFetcher? caFetch,
+    this.location,
+    this.linkConnect,
+  }) : modes = modes ?? ModeCatalog.builtin(),
+       fieldHttp = fieldHttp ?? IoFieldHttp.new,
+       trust = FieldTrust(store, fetch: caFetch),
+       checkins = CheckinStore(store);
 
   /// The phone's own plugins, the core from the APK.
   factory AppServices.platform(AppStore store, DeviceServices device) =>
@@ -51,6 +63,7 @@ class AppServices {
         store: store,
         usbPods: ChannelPodTransport.usb,
         blePods: ChannelPodTransport.ble,
+        location: ChannelLocationService(),
       );
 
   final NodeRunner runner;
@@ -65,6 +78,20 @@ class AppServices {
   final ConsoleViewBuilder? consoleView;
   final ChannelPodTransport? usbPods;
   final ChannelPodTransport? blePods;
+
+  /// Field check-in (ADR-P3-13): the field controller's API over its pinned
+  /// CA (tests give a fake controller), the pinned fields, the player's
+  /// replicas and check-ins.
+  final FieldHttp Function(PinnedField field) fieldHttp;
+  final FieldTrust trust;
+  final CheckinStore checkins;
+
+  /// The phone's location, for position reports (null: not available).
+  final LocationService? location;
+
+  /// How a prop links to the controller over Wi-Fi (tests give a fake; null:
+  /// wss:// with the CA the join payload names, prop_link.dart).
+  final LinkConnect? linkConnect;
 }
 
 /// The settings, saved whenever they change.

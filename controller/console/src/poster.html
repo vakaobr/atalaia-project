@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<!--
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: AGPL-3.0-or-later
+
+The field's check-in poster (ADR-P3-13): an A4 page for the check-in area,
+printed from the browser. It needs the GM token (kept from the console).
+Its QR code carries no secret (protocol/checkin.md).
+-->
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atalaia · Check-in</title>
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="poster.css">
+  <script type="module" src="poster.js"></script>
+</head>
+<body>
+  <div id="tools" class="tools"><noscript>O cartaz precisa de JavaScript. · The poster needs JavaScript.</noscript></div>
+  <main id="poster" class="poster" hidden>
+    <h1 id="field-name" data-testid="poster-field"></h1>
+    <p class="kicker">Check-in no campo · Field check-in</p>
+    <div class="codes">
+      <figure class="code">
+        <div id="qr" class="qr" data-testid="poster-qr-wrap"></div>
+        <figcaption>Atalaia</figcaption>
+      </figure>
+      <figure class="code" id="wifi-figure" hidden>
+        <div id="wifi-qr" class="qr small-qr" data-testid="poster-wifi-qr"></div>
+        <figcaption id="wifi-caption"></figcaption>
+      </figure>
+    </div>
+    <ol class="steps">
+      <li><span class="pt" id="step1-pt"></span><span class="en" id="step1-en"></span></li>
+      <li><span class="pt">Abre a app Atalaia.</span><span class="en">Open the Atalaia app.</span></li>
+      <li><span class="pt">Em «Jogador», toca em «Check-in no campo» e lê este código.</span><span class="en">Under “Player”, tap “Check in at the field” and scan this code.</span></li>
+    </ol>
+    <p class="notice-line"><span class="pt">Sem app? Faz o check-in na mesa da organização.</span><span class="en">No app? Check in at the organisers’ desk.</span></p>
+    <p class="fingerprint"><span>Certificado do campo · Field certificate</span> <code id="ca-short" data-testid="poster-ca-short"></code></p>
+  </main>
+</body>
+</html>

@@ -13,6 +13,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app.dart';
+import '../checkin/field_trust.dart';
+import '../controller/prop_link.dart';
 import '../l10n/strings.dart';
 import '../platform/services.dart';
 import '../pod/pod_client.dart';
@@ -76,8 +78,36 @@ class _PropGameScreenState extends State<PropGameScreen> {
           kiosk: services.kiosk,
           kioskEnabled: app.settings.kiosk,
           modeName: widget.modeName,
+          link: _linkFor(services),
         );
     unawaited(_open(services));
+  }
+
+  /// The Wi-Fi link to the controller when the join payload names it
+  /// (keys 13 and 14; protocol/prop-link.md).
+  PropLink? _linkFor(AppServices services) {
+    final j = widget.setup.join;
+    final urls = j?.urls;
+    final ca = j?.caSha256;
+    if (j == null || urls == null || ca == null) return null;
+    PinnedField? field;
+    return PropLink(
+      join: j,
+      urls: urls,
+      hello: {
+        'node_name': 'phone-${j.nodeId}',
+        'fw_version': 'app-0.3.0',
+        'core_version': services.runner.coreVersion ?? '',
+        'tier': 0,
+        'capabilities': const <int>[],
+      },
+      connect:
+          services.linkConnect ??
+          (uri) async {
+            field ??= await services.trust.forGame(urls, ca);
+            return ioLinkConnect(field)(uri);
+          },
+    );
   }
 
   Future<void> _open(AppServices services) async {
@@ -263,6 +293,28 @@ class _PropGameScreenState extends State<PropGameScreen> {
           nfc: _nfcOn,
           onAdmin: _admin,
         ),
+        if (session.link != null)
+          ListenableBuilder(
+            listenable: session.link!,
+            builder: (context, _) => Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              child: Text(
+                s.t('prop.link.${session.link!.state.name}'),
+                key: const Key('prop-link-state'),
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+          ),
+        if (session.gmMessage != null && session.gmMessage!.isNotEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(8),
+            child: Text(
+              s.t('prop.gm_message', {'text': session.gmMessage}),
+              key: const Key('prop-gm-message'),
+            ),
+          ),
         if (session.tamper)
           Container(
             width: double.infinity,

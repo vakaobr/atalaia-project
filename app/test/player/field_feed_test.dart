@@ -252,4 +252,127 @@ void main() {
       expect(attempts, 2);
     });
   });
+
+  group('with a player token (plan phase E)', () {
+    Future<void> settle() => Future<void>.delayed(Duration.zero);
+
+    test(
+      "the snapshot's history, the player's own row and positions",
+      () async {
+        final socket = FakeSocket();
+        final feed = FieldFeed(
+          FieldLink(Uri.parse('https://10.0.2.2:8443'), 'apt1.a'),
+          connect: (uri) async {
+            expect(
+              uri.toString(),
+              'wss://10.0.2.2:8443/api/v1/stream?token=apt1.a',
+            );
+            return socket;
+          },
+        );
+        addTearDown(feed.dispose);
+        unawaited(feed.start());
+        await settle();
+        socket.send({
+          ...hello,
+          'events': [
+            {
+              'node': 0,
+              't': 0,
+              'type': 'game.start',
+              'data': {'preset': 'x'},
+            },
+            {
+              'node': 2,
+              't': 4000,
+              'type': 'zone.captured',
+              'team': 'red',
+              'data': <String, Object?>{},
+            },
+            {
+              'node': 5,
+              't': 9000,
+              'type': 'player.respawn',
+              'team': 'blue',
+              'data': {'lives_left': 2},
+            },
+          ],
+          'me': {
+            'player_id': 'p-abcdefgh2345',
+            'role': 'player',
+            'team': 'red',
+          },
+          'positions': [
+            {'player_id': 'p-abcdefgh2345', 'lat': 38.7, 'lon': -9.1},
+          ],
+        });
+        await settle();
+        // Events from before the phone connected, newest first.
+        expect(feed.events.map((e) => e.type), [
+          'player.respawn',
+          'zone.captured',
+          'game.start',
+        ]);
+        expect(feed.lives, {'blue': 2});
+        expect(feed.me!['team'], 'red');
+        expect(feed.positions.keys, ['p-abcdefgh2345']);
+        socket
+          ..send({
+            'type': 'player_position',
+            'game': 7,
+            'position': {'player_id': 'p-bbbbbbbbbbbb', 'lat': 1, 'lon': 2},
+          })
+          ..send({
+            'type': 'checkin',
+            'game': 7,
+            'checkin': {
+              'player_id': 'p-abcdefgh2345',
+              'role': 'player',
+              'team': 'blue',
+            },
+          })
+          ..send({
+            'type': 'checkin',
+            'game': 7,
+            'checkin': {'player_id': 'p-zzzzzzzzzzzz', 'team': 'red'},
+          });
+        await settle();
+        expect(feed.positions, hasLength(2));
+        expect(feed.me!['team'], 'blue'); // only the player's own row
+        // A reconnect's snapshot starts the history over, without duplicates.
+        socket.send({
+          ...hello,
+          'events': [
+            {
+              'node': 0,
+              't': 0,
+              'type': 'game.start',
+              'data': <String, Object?>{},
+            },
+          ],
+        });
+        await settle();
+        expect(feed.events, hasLength(1));
+      },
+    );
+
+    test('closed with 4409: a new token, then the stream again', () async {
+      final sockets = <FakeSocket>[];
+      final tokens = <String>[];
+      final feed = FieldFeed(
+        FieldLink.parse('https://10.0.2.2:8443', 'apt1.old')!,
+        connect: (uri) async {
+          tokens.add(uri.queryParameters['token']!);
+          return (sockets..add(FakeSocket())).last;
+        },
+        onAssignment: () async => 'apt1.new',
+      );
+      addTearDown(feed.dispose);
+      unawaited(feed.start());
+      await settle();
+      await sockets.single.drop(4409);
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(tokens, ['apt1.old', 'apt1.new']);
+    });
+  });
 }

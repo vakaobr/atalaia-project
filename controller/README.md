@@ -11,7 +11,7 @@ Runs on a Raspberry Pi (or any Linux machine) next to the field. It:
 
 Licence: AGPL-3.0-or-later. Running a modified controller for other people means sharing your changes.
 
-Status: phase 2, plan phases D and E. Built and tested in Docker against the modem's real C code, the Field Box's real game and radio code (the host box), a real Mosquitto broker and, for the GM console, headless Chromium; not yet run on a Raspberry Pi with a real modem board and real boxes (that is plan phase F, when the boards arrive).
+Status: phase 2, plan phases D and E; phase 3, plan phase E (field check-in, player tokens, chrono readings, player positions, Android props on Wi-Fi, HTTPS with the field's own CA). Built and tested in Docker against the modem's real C code, the Field Box's real game and radio code (the host box), a real Mosquitto broker and, for the GM console, headless Chromium; not yet run on a Raspberry Pi with a real modem board and real boxes (that is plan phase F, when the boards arrive).
 
 ## How it is built
 
@@ -30,6 +30,10 @@ Status: phase 2, plan phases D and E. Built and tested in Docker against the mod
 | `atalaia_controller/store.py` | SQLite: the events table's UNIQUE key makes replays and flood copies harmless |
 | `atalaia_controller/api.py`, `ws.py` | REST and WebSocket API v1 |
 | `atalaia_controller/mqtt.py` | MQTT topics of spec section 11 |
+| `atalaia_controller/tls.py` | The field's own CA and the controller's HTTPS certificate (ADR-P3-9) |
+| `atalaia_controller/checkin.py`, `checkin_poster.py` | Field check-in, player tokens, declarations, the "replicas to chrono" list, signed readings ([protocol/checkin.md](../protocol/checkin.md)) |
+| `atalaia_controller/positions.py` | Player positions and who may see them (ADR-P3-6) |
+| `atalaia_controller/prop_link.py` | Android props on the field's Wi-Fi ([protocol/prop-link.md](../protocol/prop-link.md)) |
 | `atalaia_controller/modes.py` | Built-in and uploaded mode packages, checked in the core before they are stored |
 | `console/src/` | The GM console and the scoreboard page (static files) |
 
@@ -85,22 +89,44 @@ A mode's `field.lua` (Hold-All Domination, Last Stand) runs in the core on the c
 
 The game key never touches the Pi's disk by default (ADR-P2-4): if the controller restarts during a game, that game can only be ended. With `persist_game_key = true` the key is kept in the SQLite file (mode 0600) and the game continues after a restart, from its last saved game time, scores and adjustments.
 
+## HTTPS and the field CA
+
+On first start the controller makes the field's own certificate authority and a server certificate for its names and addresses in `tls/` next to the database (`[api] tls_dir`), keys with mode 0600, and serves the same API with HTTPS on `[api] tls_port` (8443) next to plain HTTP on `[api] port` (8080). `python3 -m atalaia_controller ca` prints the CA's fingerprint, which the check-in poster and the join payloads for Android props carry; phones fetch the certificate from `GET /api/v1/controller/ca` (no token, both ports), check it and trust only it for this field. Put the names and addresses phones use in `[api] tls_names` (the controller adds `localhost`, its host name, `name.local` and the addresses it finds; the server certificate is made again when the list changes or it has under 30 days left). The CA itself is never replaced on its own: deleting the folder makes a new one, and every player then has to remove the field in the app. The CA is ECDSA P-256 so that browsers accept it too (decision PE2). The GM console and the scoreboard still work on plain HTTP.
+
+## Field check-in
+
+Players check in at the field with the app ([protocol/checkin.md](../protocol/checkin.md), ADR-P3-13). In the GM console's *Check-in* tab, *Print the poster* opens an A4 page with the field's QR code: print it once and put it up in the check-in area. The poster carries no secret: the field's id and name, the controller's https addresses (`[checkin] urls`, else from `tls_names` and the host), the CA's fingerprint and optionally the Wi-Fi network's name (`[checkin] wifi_ssid`; the poster page can draw a Wi-Fi code from a password typed there, which is never stored).
+
+A player who scans it checks in with a display name (and the federation number if `[checkin] federation` asks for it; never verified automatically: staff tick "card seen"), and gets a **player token** keyed with the game's own token key, made by this controller and kept only in its SQLite file. The token's role, team and squad are checked against the player's check-in on every request, so the GM's changes and removals take effect at once. Check-in is open from a game's creation until it ends (*Close check-in* stops it); with `[checkin] confirm = "staff"` check-ins wait for a marshal or the GM to confirm them. The controller logs `player.checkin` with the player's id, never the name. A team always exists; squads, sub-groups inside a team, only in a game created with `squads` (decision PE25): there the GM gives a squad (team › squad) and the squad-leader role, elsewhere both are refused.
+
+Players declare the replicas they will use; marshals see the **replicas to chrono** list in their app and in the console, and their phones send each signed series of readings (`POST /api/v1/chrono/readings`): the controller verifies them with the marshal's registered Ed25519 key, judges the series against the class limit of `[checkin] limit_template` (one of `app/lib/chrono/limit_templates/`, unverified research figures: decision P3-5) and marks the replica passed or refused. A pass counts for the rest of the field's day (`chrono_valid_for`). A marshal is a checked-in person to whom the GM gave the marshal role; the marshal's app then registers its key itself, or the GM registers one with `POST /api/v1/marshals`.
+
+Personal data stays on the controller: names and federation numbers are shown to staff (the GM token, marshals) only, never in events, MQTT, logs or the read token's views, and are erased `[checkin] retention_days` (30) days after the game; a field identity unused for a year is deleted. The default privacy notice is `templates/checkin-notice-pt.md` and `-en.md` (`[checkin] notice_pt`, `notice_en`; raise `notice_version` when it changes). Everything works without internet.
+
+## Player positions
+
+A checked-in player may share their position during a running game (`POST /api/v1/positions`, up to 5 reports). The controller keeps the latest per player for that game only and deletes them when it ends; it sends a position only to those who may see it (ADR-P3-6): a player sees their own (and their squad's with the game parameter `squad_visible`), a squad leader their squad, a VIP their team, marshals and the GM everyone, the read token nobody. A mode's `visibility.granted` event (team, `see_team`, `duration_s`) lets a team see another for a while; the controller logs `visibility.expired` when the time is up. Positions never go on the radio or MQTT.
+
+## Android props on Wi-Fi
+
+An Android phone running a prop that joined with a join payload links to the controller over the field's Wi-Fi ([protocol/prop-link.md](../protocol/prop-link.md)): `WS /api/v1/prop`, an HMAC proof of the game key, then its HELLO, STATE and events as JSON, which the controller encodes with the radio's codecs and hands to the same FieldController as a box's packets. TIME beacons and commands reach the linked props too; without a modem, commands reach the Wi-Fi props and are reported as sent. The join payload for a box carries the CA's fingerprint and the https addresses (keys 13 and 14) when HTTPS is on; boxes skip them.
+
 ## REST API v1
 
-Reading needs the read or GM token, changing anything the GM token: `Authorization: Bearer <token>` (the WebSocket also takes `?token=`).
+Reading needs the read or GM token, changing anything the GM token: `Authorization: Bearer <token>` (the WebSocket also takes `?token=`). A player token (field check-in) reads what the read token reads about games, its own check-in and what its role allows; it cannot read modes, presets, the controller's or the radio's state.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/api/v1/nodes` | Nodes of the live game (or `?game=`): owner, battery, RSSI, epoch, firmware, capabilities |
 | GET / POST | `/api/v1/modes` | Installed modes and modifiers (`kind`), their parameters and translations (`i18n`) / upload `{"files": {"mode.yaml": ..., "node.lua": ..., "field.lua": ...}}` |
 | GET / POST | `/api/v1/presets` | List / save `{"name", "mode_id", "params"}` |
-| GET / POST | `/api/v1/games` | List / create `{"name", "mode_id" or "preset_id", "modifiers": [...], "teams", "params", "duration_ms", "assignments": {"7": "zone"}}`; a game with modifiers gets the mode id `main+modifier` |
+| GET / POST | `/api/v1/games` | List / create `{"name", "mode_id" or "preset_id", "modifiers": [...], "teams", "squads", "params", "duration_ms", "assignments": {"7": "zone"}}`; a game with modifiers gets the mode id `main+modifier`; `squads` (0-16 per team, 0 by default) only for games whose teams split into squads (milsims, big games) |
 | GET | `/api/v1/games/{id}` | One game |
 | POST | `/api/v1/games/{id}/start` · `/pause` · `/resume` · `/end` | Lifecycle (`{"reason"}` for pause and end) |
 | GET / POST | `/api/v1/games/{id}/score` | Totals / GM adjustment `{"team", "amount", "reason"}`, logged as `score.delta` |
 | POST | `/api/v1/nodes/{id}/cmd` | `{"cmd": "message" \| "set_owner" \| "reset" \| "reboot", "params": {...}}`; node 65535 = every node |
 | GET | `/api/v1/games/{id}/log` | The merged event log, in game-time order (`?since_ms=`) |
-| WS | `/api/v1/stream` | A snapshot, then every event, score, node update, game change and alert (`radio.down`, `tx.failed`, role changes), the field channel (`radio`) and scan progress (`radio_scan`) |
+| WS | `/api/v1/stream` | A snapshot (with the live game's latest 100 events), then every event, score, node update, game change and alert (`radio.down`, `tx.failed`, role changes), the field channel (`radio`) and scan progress (`radio_scan`); for staff also `checkin` and `chrono_list`; for a player token only the game's public messages, its own check-in and the positions it may see (code 4409: fetch a new token) |
 | GET | `/api/v1/controller` | Role, term, radio state, modem identity and counters, the field channel and whether it was chosen |
 | GET | `/api/v1/radio` | The field's channel with its sub-band limits, where it came from, the candidates, whether it is locked (a live game or a scan), why a scan is unavailable, the last scan |
 | PUT | `/api/v1/radio/channel` | Set it `{"channel_hz", "source": "default" \| "scan" \| "random" \| "manual"}`; 409 while a game exists or a scan runs, 400 for a channel that does not fit in a sub-band |
@@ -113,6 +139,25 @@ Reading needs the read or GM token, changing anything the GM token: `Authorizati
 | GET | `/api/v1/field` | Whether a field image is uploaded: `{"image": {"content_type", "bytes", "updated_at"} \| null}` |
 | GET / PUT / DELETE | `/api/v1/field/image` | The field image of the console's field view: raw PNG, JPEG or WebP body, up to 4 MB |
 | GET / PUT | `/api/v1/games/{id}/positions` · `/positions/{node}` | Where each node sits on the field image: `{"x", "y"}` as fractions 0-1 |
+| GET | `/api/v1/controller/ca` | The field CA's certificate (PEM; header `X-Atalaia-CA-SHA256`), no token |
+| GET / POST | `/api/v1/checkin` | No token, rate-limited: the field, the privacy notice, the settings, the limit classes, the open games / check in `{"game_id", "player_id", "player_secret", "display_name", "notice_version", "federation_number"?, "team_preference"?, "replicas"?}` → a player token |
+| POST | `/api/v1/checkin/token` | A new player token (player token) |
+| GET / DELETE | `/api/v1/checkin/me` | The player's own check-in and declaration / leave the game (personal fields erased) |
+| PUT | `/api/v1/checkin/me/replicas` | `{"replicas": [...]}`: the declaration |
+| PUT | `/api/v1/checkin/me/marshal-key` | A marshal registers `{"marshal_id", "name", "public_key"}` |
+| GET / POST | `/api/v1/games/{id}/checkins` | Staff (GM token, marshal or gm player token): the list with names / a hand check-in |
+| PATCH / DELETE | `/api/v1/games/{id}/checkins/{player}` | GM token: `team`, `squad`, `role`, removal; staff: confirm (`status: "checked_in"`), `federation_seen`, `replicas` |
+| GET | `/api/v1/games/{id}/checkins.csv` | GM token: the list as CSV |
+| GET | `/api/v1/games/{id}/chrono-list` | Staff: the "replicas to chrono" list, pending first, with counts |
+| POST | `/api/v1/games/{id}/checkin/open` · `/close` | GM token |
+| POST | `/api/v1/chrono/readings` | A marshal's (or the GM's) series of signed readings `{"readings": [...], "declaration_id"?, "replica"?}`; 422 with each record's reason, 409 for a partly stored series |
+| GET / POST | `/api/v1/marshals` | GM token: marshals' public keys / register one |
+| GET / PUT | `/api/v1/checkin/settings` | GM token: `confirm`, `federation`, `federation_label`, `max_replicas`, `max_players`, `chrono_valid_for` |
+| GET / PUT | `/api/v1/checkin/poster` | GM token: the poster's text, fields and fingerprint / `urls`, `wifi_ssid`, `game_id`, `field_name` |
+| GET / DELETE | `/api/v1/players/{player}/chrono` | GM token or the player's own token: their readings / erase them |
+| DELETE | `/api/v1/players/{player}` | GM token: erase a field identity with its check-ins and declarations (`?chrono=true`: readings too) |
+| GET / POST | `/api/v1/positions` | The positions the caller may see / a player's reports (player token) |
+| WS | `/api/v1/prop` | An Android prop's Wi-Fi link |
 | GET | `/healthz` | Liveness, no token |
 
 FastAPI also serves the generated OpenAPI description at `/openapi.json` and `/docs`.
@@ -137,5 +182,7 @@ Who may publish commands is Mosquitto's job: [`deploy/mosquitto.conf`](deploy/mo
 ## Tests
 
 `sh tools/check.sh` in the dev container runs everything, the controller included. From `cmd`, in the repository: `docker run --rm -v "%cd%:/src" atalaia-dev sh tools/check.sh` (the first `python tools/docker_sim.py test` builds the `atalaia-dev` image). The controller's tests (`controller/tests/`, unittest) need the core library (`ATALAIA_CORE_LIB`), the host modem (`ATALAIA_MODEM_HOST`, built from `firmware/esp32/test/modem_host/`) and `mosquitto`; with `ATALAIA_REQUIRE_ALL=1`, as in `check.sh` and CI, a missing one is an error, not a skip. They cover the framing against the C modem, AES-CCM in both directions, the watchdog and reconnect, the engine and restart recovery, every API endpoint, MQTT against a real broker, a `field.lua`, and the app served by uvicorn on a real port. They also check the GM console's files as served (`test_console.py`), run the example MQTT scoreboard against a private broker (`test_scoreboard_example.py`), choose the field's channel, scan for a quiet one over a recording modem and over the C host modem (simulated noise levels per channel, `test_channels.py`, `test_modem_host.py`), issue and refuse join payloads, make a second controller stand by, follow and take over a game over the air with two host modems (`test_join.py`), and play whole games with the host box (`ATALAIA_BOX_HOST`, built from `firmware/esp32/test/box_host/`): a join from the controller's payload, captures and scores over the radio, a battery pull, the end of the game, and a box heard only through another box's relay (`test_box_e2e.py`), Hold-All Domination scored by the controller from two boxes' captures, and the Codes modifier composed with Domination on a box, with a keypad code reaching the log. `test_mode_pack.py` runs the built-in `field.lua` scripts through the real engine: Hold-All scoring and its points across a restart, Last Stand ending the game with the attackers as winners, the script starting again after a takeover, and modifiers composed with a main mode.
+
+The phase 3 tests (`test_checkin.py`, `test_chrono_list.py`, `test_checkin_poster.py`, `test_positions.py`, `test_prop_link.py`, `test_tls.py`) run the whole controller from `main.build()` without a radio: the poster codec against `protocol/vectors/checkin.json`, check-in and its rules, player tokens and the role re-check, the role-filtered stream, the "replicas to chrono" list with readings signed in the test and the shared chrono vectors, the retention purge, the privacy rules (no names in events, MQTT, logs or read views), the visibility table, an Android prop's Wi-Fi link, and a real TLS connection that trusts only the field CA.
 
 The console's browser tests (headless Chromium, `controller/console/tests/`) need a browser, so they run separately: `python tools/docker_console.py`, and CI's `console` job.

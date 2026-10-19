@@ -12,6 +12,7 @@ import 'package:atalaia_app/l10n/strings_pt.dart';
 import 'package:atalaia_app/prop/prop_session.dart';
 import 'package:atalaia_app/ui/theme.dart';
 import 'package:atalaia_app/chrono/replica.dart';
+import 'package:atalaia_app/controller/prop_link.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Set<String> placeholders(String s) =>
@@ -86,6 +87,23 @@ void main() {
         'unavailable',
       ])
         'tags.write_$r',
+      // Plan phase E: check-in states and roles, chrono states, the prop link.
+      for (final st in ['pending', 'checked_in', 'left', 'removed'])
+        'checkin.status.$st',
+      for (final r in [
+        'player',
+        'squad_leader',
+        'vip',
+        'marshal',
+        'gm',
+        'spectator',
+      ])
+        'checkin.role.$r',
+      for (final st in ['pending', 'passed', 'refused', 'withdrawn'])
+        'chrono_state.$st',
+      for (final o in ['pass', 'fail', 'warn', 'unjudged', 'null'])
+        'chrono.sent_$o',
+      for (final st in LinkState.values) 'prop.link.${st.name}',
     ];
     for (final k in keys) {
       expect(ptStrings.containsKey(k), isTrue, reason: k);

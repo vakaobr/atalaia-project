@@ -96,8 +96,15 @@ class ChannelForegroundService implements ForegroundService {
   static const _ch = MethodChannel('$_prefix/foreground');
 
   @override
-  Future<bool> start({required String title, required String text}) =>
-      _call<bool>(_ch, 'start', false, {'title': title, 'text': text});
+  Future<bool> start({
+    required String title,
+    required String text,
+    bool location = false,
+  }) => _call<bool>(_ch, 'start', false, {
+    'title': title,
+    'text': text,
+    'location': location,
+  });
 
   @override
   Future<void> update({required String title, required String text}) =>

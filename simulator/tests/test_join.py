@@ -25,6 +25,8 @@ WRONG = bytes.fromhex(VECTORS["wrong_key"])
 def fields(v: dict) -> dict:
     out = dict(v["fields"])
     out["game_key"] = bytes.fromhex(out["game_key"])
+    out["ca_sha256"] = bytes.fromhex(out["ca_sha256"]) if out.get("ca_sha256") else None
+    out.setdefault("urls", None)
     return out
 
 
@@ -76,6 +78,26 @@ class ValidVectorTests(unittest.TestCase):
     def test_optional_key_is_skipped(self) -> None:
         got = join.decode(bytes.fromhex(VECTORS["optional_key_skipped"]), KEY)
         self.assertEqual(got, fields(VECTORS["valid"][0]))
+
+
+class ControllerLinkTests(unittest.TestCase):
+    """Optional keys 13 and 14 (RFC 0001 Amendment 4, proposed): the field CA and the controller's addresses."""
+
+    def test_valid_round_trip(self) -> None:
+        link = VECTORS["controller_link"]
+        self.assertGreaterEqual(len(link["valid"]), 3)
+        for v in link["valid"]:
+            with self.subTest(v["name"]):
+                payload = bytes.fromhex(v["payload"])
+                self.assertEqual(join.decode(payload, KEY), fields(v))
+                self.assertEqual(join.encode(fields(v), KEY), payload)
+                self.assertEqual(join.to_text(payload), v["text"])
+
+    def test_invalid_fail_as_body(self) -> None:
+        for v in VECTORS["controller_link"]["invalid"]:
+            with self.subTest(v["name"]), self.assertRaises(join.JoinError) as cm:
+                join.decode(bytes.fromhex(v["payload"]), KEY)
+            self.assertEqual(cm.exception.reason, "body", f"{v['name']}: {cm.exception}")
 
 
 class InvalidVectorTests(unittest.TestCase):

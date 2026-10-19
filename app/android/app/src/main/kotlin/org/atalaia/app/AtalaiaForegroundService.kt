@@ -37,11 +37,16 @@ class AtalaiaForegroundService : Service() {
         val notification = notification(title, text)
         if (!running) {
             if (Build.VERSION.SDK_INT >= 29) {
-                startForeground(
-                    NOTIFICATION_ID,
-                    notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
-                )
+                // A player sharing their position also keeps location running with the
+                // screen off (ADR-P3-6); only with the permission granted, or Android 14 refuses.
+                var types = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                if (intent?.getBooleanExtra(EXTRA_LOCATION, false) == true &&
+                    checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) ==
+                    android.content.pm.PackageManager.PERMISSION_GRANTED
+                ) {
+                    types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                }
+                startForeground(NOTIFICATION_ID, notification, types)
             } else {
                 startForeground(NOTIFICATION_ID, notification)
             }
@@ -107,6 +112,7 @@ class AtalaiaForegroundService : Service() {
     companion object {
         const val EXTRA_TITLE = "title"
         const val EXTRA_TEXT = "text"
+        const val EXTRA_LOCATION = "location"
         private const val CHANNEL = "atalaia_game"
         private const val NOTIFICATION_ID = 1
 

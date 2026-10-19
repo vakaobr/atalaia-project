@@ -10,6 +10,12 @@
 /// (decision PC6), and holds the foreground service, the screen manager and
 /// kiosk mode while the game runs (ADR-P3-5).
 ///
+/// With a [PropLink] (plan phase E, decision PD12) the prop takes part in the
+/// controller's game over Wi-Fi as a box does over the radio: its events and
+/// STATE go to the controller, the controller's commands and TIME beacons
+/// start, pause, resume and end it, and a kiosk-mode loss is reported as
+/// node.tamper.
+///
 /// A [ChangeNotifier]: the game screen rebuilds when it changes. It has no
 /// widgets and no platform code of its own (the services are injected), so
 /// the tests drive it on the real core with a manual clock.
@@ -19,6 +25,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../controller/prop_link.dart';
 import '../core/node_types.dart';
 import '../modes/mode_catalog.dart';
 import '../platform/services.dart';
@@ -96,6 +103,7 @@ class PropSession extends ChangeNotifier {
     this.clock = GameClock.realTime,
     this.tick = const Duration(milliseconds: 50),
     this.modeName = '',
+    this.link,
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now,
        timer = GameTimer(setup.durationMs) {
@@ -113,7 +121,17 @@ class PropSession extends ChangeNotifier {
   final GameClock clock;
   final Duration tick;
   final String modeName;
+
+  /// The Wi-Fi link to the field controller, when the join payload names it.
+  final PropLink? link;
   final DateTime Function() _now;
+  StreamSubscription<LinkMessage>? _linkSub;
+  var _ownerTeam = 0;
+  var _shellSeq = 0;
+  var _sinceState = 0;
+
+  /// The organisers' last message (CMD message).
+  String? gmMessage;
 
   final GameTimer timer;
   late final ButtonTracker tracker;
@@ -188,6 +206,11 @@ class PropSession extends ChangeNotifier {
         phase = PropPhase.failed;
       } else {
         phase = PropPhase.ready;
+        final l = link;
+        if (l != null) {
+          _linkSub = l.messages.listen(_onLink);
+          l.start();
+        }
       }
     } on Object catch (e) {
       error = '$e';
@@ -293,12 +316,18 @@ class PropSession extends ChangeNotifier {
   /// Moves game time on by [ms] (GameClock.manual: tests and replays).
   Future<void> advance(int ms) async {
     final node = _node;
-    if (node == null) return;
-    final s = await node.snapshot();
-    if (s.status == NodeStatus.running &&
-        !s.paused &&
-        phase != PropPhase.ready) {
-      await node.advanceTo(s.timeMs + ms);
+    if (node == null || _closed) return;
+    try {
+      final s = await node.snapshot();
+      if (s.status == NodeStatus.running &&
+          !s.paused &&
+          phase != PropPhase.ready) {
+        await node.advanceTo(s.timeMs + ms);
+      }
+    } on Object {
+      // The screen closed the session while the core was answering.
+      if (_closed) return;
+      rethrow;
     }
     await _onTick(ms, snapshotNow: true);
   }
@@ -308,6 +337,11 @@ class PropSession extends ChangeNotifier {
     tracker.tick(ms);
     _sinceSnapshot += ms;
     _sinceSlow += ms;
+    _sinceState += ms;
+    if (link != null && _sinceState >= 5000) {
+      _sinceState = 0;
+      _sendState();
+    }
     if (snapshotNow || _sinceSnapshot >= 250) {
       _sinceSnapshot = 0;
       await _refresh();
@@ -334,6 +368,13 @@ class PropSession extends ChangeNotifier {
       if (!active && !tamper) {
         tamper = true;
         _log('node.tamper kiosk_broken');
+        link?.sendEvent(
+          seq: ++_shellSeq,
+          tMs: gameTimeMs,
+          type: 'node.tamper',
+          prio: 'critical',
+          data: const {'reason': 'kiosk_broken'},
+        );
         await device.vibrate(const [0, 400, 200, 400]);
         notifyListeners();
       }
@@ -358,7 +399,70 @@ class PropSession extends ChangeNotifier {
       _log('time is up: game.end');
       await node.input('game.end');
     }
-    if (before != (gameTimeMs ~/ 1000, scores, phase)) notifyListeners();
+    if (before != (gameTimeMs ~/ 1000, scores, phase)) {
+      if (link != null && before.$2 != scores) _sendState();
+      notifyListeners();
+    }
+  }
+
+  /// STATE for the controller: the owner, the game time, the counters by
+  /// team id (1-based), merged by maximum there.
+  void _sendState() {
+    final l = link;
+    if (l == null) return;
+    l.sendState({
+      'owner_team': _ownerTeam,
+      'phase': phase == PropPhase.running ? 1 : 0,
+      'game_time_ms': gameTimeMs,
+      'counters': {
+        for (var i = 0; i < setup.teams.length; i++)
+          if ((scores[setup.teams[i]] ?? 0) > 0)
+            '${i + 1}': scores[setup.teams[i]],
+      },
+      'flags':
+          (phase == PropPhase.running ? 1 : 0) |
+          (phase == PropPhase.paused ? 2 : 0),
+    });
+  }
+
+  /// The controller's word, as a box takes it (firmware box_game.c).
+  void _onLink(LinkMessage m) {
+    switch (m) {
+      case LinkCommand(:final cmd, :final params):
+        switch (cmd) {
+          case 'start':
+            unawaited(start());
+          case 'pause':
+            if (phase == PropPhase.running) {
+              unawaited(_input('game.pause', params));
+            }
+          case 'resume':
+            if (phase == PropPhase.paused) unawaited(_input('game.resume'));
+          case 'end':
+            if (running) unawaited(_input('game.end', params));
+          case 'set_owner':
+            if (running) unawaited(_input('cmd.set_owner', params));
+          case 'message':
+            gmMessage = params['text'] is String
+                ? params['text']! as String
+                : '';
+            _log('message from the organisers: $gmMessage');
+            if (running) unawaited(_input('gm.message', params));
+            notifyListeners();
+          default:
+            _log('command $cmd from the controller');
+        }
+      case LinkTime(:final state):
+        // A TIME beacon after a missed command: follow the controller.
+        if (state == 'running' && phase == PropPhase.ready) unawaited(start());
+        if (state == 'paused' && phase == PropPhase.running) {
+          unawaited(_input('game.pause', {'reason': 'controller'}));
+        }
+        if (state == 'running' && phase == PropPhase.paused) {
+          unawaited(_input('game.resume'));
+        }
+        if (state == 'ended' && running) unawaited(_input('game.end'));
+    }
   }
 
   void _phaseFrom(NodeSnapshot s) {
@@ -394,6 +498,17 @@ class PropSession extends ChangeNotifier {
         _onCommand(command);
       case NodeEventOutput(:final event):
         _log('${event.type} ${event.dataJson}');
+        if (event.type == 'zone.captured') _ownerTeam = event.team;
+        if (event.type == 'zone.neutralized') _ownerTeam = 0;
+        link?.sendEvent(
+          seq: event.seq,
+          tMs: event.tMs,
+          type: event.type,
+          team: event.team,
+          squad: event.squad,
+          prio: event.prioName,
+          data: event.data,
+        );
         if (event.prio == 2) unawaited(device.vibrate(const [0, 250]));
       case NodeLogOutput(:final line):
         _log(line);
@@ -503,6 +618,8 @@ class PropSession extends ChangeNotifier {
     // Not awaited: a cancelled subscription has nothing left to say.
     unawaited(_sub?.cancel());
     unawaited(_podSub?.cancel());
+    unawaited(_linkSub?.cancel());
+    await link?.close();
     await _pod?.close();
     await _node?.close();
     await foreground?.stop();
@@ -510,8 +627,19 @@ class PropSession extends ChangeNotifier {
     if (kioskEnabled) await kiosk?.stop();
   }
 
+  var _disposed = false;
+
+  /// A tick or a hardware event can still be awaiting the core when the
+  /// screen closes and disposes the session: what it would announce then
+  /// has no one left to hear it.
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
   @override
   void dispose() {
+    _disposed = true;
     unawaited(close());
     super.dispose();
   }

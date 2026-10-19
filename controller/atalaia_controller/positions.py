@@ -1,0 +1,201 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+"""Player positions and who may see them (ADR-P3-6, constraint 9: server-side filtering only).
+
+Phones report with POST /api/v1/positions (a player token; GPS outdoors, the
+strongest BLE beacon indoors). The controller keeps each player's latest
+report for the live game only and sends a position to a connection only if
+that connection's role may see it:
+
+    player        their own; their squad's too when the game's parameters say squad_visible
+    squad_leader  their squad
+    vip           their team (the escort)
+    marshal, gm   everyone (the GM token too)
+    spectator     nobody (the read token is a spectator)
+
+A mode can grant a team a temporary view of another team (a UAV sweep): the
+event ``visibility.granted`` (its envelope team sees ``see_team`` for
+``duration_s``), ended by ``visibility.expired``, which the controller emits
+when the time is up. Positions are deleted when the game ends, and are never
+sent on the radio or MQTT.
+"""
+
+from __future__ import annotations
+
+import math
+import re
+import threading
+import time
+from typing import TYPE_CHECKING, Any, Callable, Optional
+
+from .engine import Conflict, ControllerError
+
+if TYPE_CHECKING:
+    from .checkin import Viewer
+    from .engine import Controller
+
+REPORTS_MAX = 5
+BEACON_RE = re.compile(r"[0-9]{1,5}:[0-9]{1,5}")
+SOURCES = ("gps", "ble")
+GRANT_MAX_S = 3600
+
+
+def _num(name: str, v: Any, lo: float, hi: float, optional: bool = True) -> Optional[float]:
+    if v is None and optional:
+        return None
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or not lo <= v <= hi:
+        raise ControllerError(f"{name}: a number from {lo} to {hi}")
+    return float(v)
+
+
+def check_report(r: Any) -> dict[str, Any]:
+    """One position report's own fields (the player, team and squad come from the token)."""
+    if not isinstance(r, dict):
+        raise ControllerError("a position report is an object")
+    allowed = {"lat", "lon", "accuracy_m", "altitude_m", "heading_deg", "speed_mps", "source", "beacon_id",
+               "t", "player_id", "team", "squad"}
+    unknown = set(r) - allowed
+    if unknown:
+        raise ControllerError(f"position report: unknown fields {sorted(unknown)}")
+    source = r.get("source", "gps")
+    if source not in SOURCES:
+        raise ControllerError("source: gps or ble")
+    out: dict[str, Any] = {"source": source}
+    if source == "gps":
+        out["lat"] = _num("lat", r.get("lat"), -90, 90, optional=False)
+        out["lon"] = _num("lon", r.get("lon"), -180, 180, optional=False)
+        out["accuracy_m"] = _num("accuracy_m", r.get("accuracy_m"), 0, 10_000)
+        for name, lo, hi in (("altitude_m", -1000, 10_000), ("heading_deg", 0, 360), ("speed_mps", 0, 200)):
+            v = _num(name, r.get(name), lo, hi)
+            if v is not None:
+                out[name] = v
+    else:
+        bid = r.get("beacon_id")
+        if not isinstance(bid, str) or not BEACON_RE.fullmatch(bid) \
+                or not all(0 <= int(x) <= 65535 for x in bid.split(":")):
+            raise ControllerError("beacon_id: major:minor of the strongest iBeacon")
+        out["beacon_id"] = bid
+    t = r.get("t", 0)
+    if isinstance(t, bool) or not isinstance(t, int) or not 0 <= t <= 2**53:
+        raise ControllerError("t: milliseconds, an integer")
+    out["t"] = t
+    return out
+
+
+class Positions:
+    def __init__(self, controller: "Controller", wall: Callable[[], float] = time.time) -> None:
+        self.ctrl = controller
+        self._wall = wall
+        self._lock = threading.Lock()
+        # (game, team that sees, team seen) -> expiry (wall seconds)
+        self.grants: dict[tuple[int, str, str], float] = {}
+        controller.positions = self
+
+    # --- who sees whom -----------------------------------------------------------
+
+    def _squad_visible(self, game_id: int) -> bool:
+        game = self.ctrl.store.game(game_id)
+        return bool(game and (game.get("params") or {}).get("squad_visible"))
+
+    def _team_name(self, game_id: int, team_id: int) -> Optional[str]:
+        game = self.ctrl.store.game(game_id)
+        if game and 1 <= team_id <= len(game["teams"]):
+            return game["teams"][team_id - 1]
+        return None
+
+    def can_see(self, viewer: "Viewer", pos: dict[str, Any]) -> bool:
+        if viewer.kind == "gm":
+            return True
+        if viewer.kind != "player" or viewer.game_id != pos["game_id"]:
+            return False
+        role = viewer.role
+        if role in ("marshal", "gm"):
+            return True
+        if pos["player_id"] == viewer.player_id:
+            return role != "spectator"
+        same_team = viewer.team != 0 and pos["team"] == viewer.team
+        same_squad = same_team and viewer.squad != 0 and pos["squad"] == viewer.squad
+        if role == "squad_leader" and same_squad:
+            return True
+        if role == "vip" and same_team:
+            return True
+        if role == "player" and same_squad and self._squad_visible(pos["game_id"]):
+            return True
+        if role in ("player", "squad_leader", "vip") and viewer.team and pos["team"]:
+            mine = self._team_name(pos["game_id"], viewer.team)
+            theirs = self._team_name(pos["game_id"], pos["team"])
+            exp = self.grants.get((pos["game_id"], mine or "", theirs or ""))
+            if exp is not None and exp > self._wall():
+                return True
+        return False
+
+    def visible(self, viewer: "Viewer", game_id: Optional[int] = None) -> list[dict[str, Any]]:
+        if game_id is None:
+            game_id = viewer.game_id if viewer.kind == "player" else (
+                self.ctrl.game["id"] if self.ctrl.game else None)
+        if game_id is None:
+            return []
+        return [p for p in self.ctrl.store.player_positions(game_id).values() if self.can_see(viewer, p)]
+
+    # --- reports -------------------------------------------------------------------
+
+    def report(self, viewer: "Viewer", body: Any) -> dict[str, Any]:
+        if viewer.kind != "player":
+            raise ControllerError("positions come from a player's token")
+        items = body.get("reports") if isinstance(body, dict) and "reports" in body else [body]
+        if not isinstance(items, list) or not 1 <= len(items) <= REPORTS_MAX:
+            raise ControllerError(f"reports: 1 to {REPORTS_MAX} position reports")
+        checked = [check_report(r) for r in items]
+        for r, raw in zip(checked, items):
+            if raw.get("player_id") not in (None, viewer.player_id):
+                raise ControllerError("player_id: only your own position")
+        game = self.ctrl.store.game(viewer.game_id)
+        if game is None or game["state"] not in ("running", "paused") or self.ctrl.game is None \
+                or self.ctrl.game["id"] != game["id"]:
+            raise Conflict("positions are kept only while the game runs")
+        latest = max(checked, key=lambda r: r["t"])
+        pos = {"game_id": game["id"], "player_id": viewer.player_id, "team": viewer.team,
+               "squad": viewer.squad, **latest, "received_at": self._wall()}
+        self.ctrl.store.set_player_position(game["id"], viewer.player_id, pos, self._wall())
+        self.ctrl._emit({"type": "player_position", "game": game["id"], "position": pos, "_position": True})
+        return {"stored": len(checked), "interval_s": self.interval(game)}
+
+    @staticmethod
+    def interval(game: dict[str, Any]) -> int:
+        v = (game.get("params") or {}).get("position_interval_s", 10)
+        return int(v) if isinstance(v, int) and 5 <= v <= 60 else 10
+
+    # --- temporary visibility --------------------------------------------------------
+
+    def on_event(self, game_id: int, record: dict[str, Any]) -> None:
+        """visibility.granted from a node or field.lua: its team sees see_team for duration_s."""
+        if record.get("type") != "visibility.granted":
+            return
+        data = record.get("data") or {}
+        team, see, dur = record.get("team"), data.get("see_team"), data.get("duration_s")
+        if not isinstance(team, str) or not isinstance(see, str) or isinstance(dur, bool) \
+                or not isinstance(dur, (int, float)) or not 0 < dur <= GRANT_MAX_S:
+            return
+        with self._lock:
+            self.grants[(game_id, team, see)] = self._wall() + float(dur)
+        self.ctrl._emit({"type": "positions", "game": game_id, "_positions_refresh": True})
+
+    def tick(self) -> None:
+        """Ends grants whose time is up, with visibility.expired from the controller."""
+        now = self._wall()
+        with self._lock:
+            done = [k for k, exp in self.grants.items() if exp <= now]
+            for k in done:
+                del self.grants[k]
+        for game_id, team, see in done:
+            fc = self.ctrl.fc
+            if fc is not None and self.ctrl.game is not None and self.ctrl.game["id"] == game_id:
+                fc.controller_event("visibility.expired", {"see_team": see, "text": "time"}, team=team)
+            self.ctrl._emit({"type": "positions", "game": game_id, "_positions_refresh": True})
+
+    def end_game(self, game_id: int) -> None:
+        """ADR-P3-6: positions last only as long as the game."""
+        with self._lock:
+            for k in [k for k in self.grants if k[0] == game_id]:
+                del self.grants[k]
+        self.ctrl.store.delete_player_positions(game_id)

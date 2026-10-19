@@ -25,11 +25,14 @@
     "presets": "Presets",
     "feed": "Log",
     "controller": "Controller",
-    "settings": "Settings"
+    "settings": "Settings",
+    "checkin": "Check-in"
   },
   "common": {
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "save": "Save",
+    "cancel": "Cancel"
   },
   "time": {
     "seconds": "{n} s ago",
@@ -93,7 +96,11 @@
       "running": "running",
       "paused": "paused",
       "ended": "ended"
-    }
+    },
+    "confirm_start_pending": "{n} declared replica(s) not chronographed yet. Start anyway?",
+    "squads": "Squads per team",
+    "squads_hint": "0 = no squads (small games: teams only). In a milsim or a big game each team splits into squads.",
+    "squads_each": "{n} squads per team"
   },
   "controller": {
     "title": "Field controller",
@@ -298,5 +305,114 @@
       "lorawan_default": "LoRaWAN default, often busy",
       "low_airtime": "0.1%, not recommended"
     }
+  },
+  "checkin": {
+    "title": "Field check-in",
+    "intro": "Players scan the field's poster with the app, check in and declare the replicas they will use in this game. Names are shown only here and in the marshals' view.",
+    "open": "Check-in for “{game}” is open.",
+    "closed": "Check-in for “{game}” is closed.",
+    "close": "Close check-in",
+    "reopen": "Open check-in",
+    "print_poster": "Print the poster",
+    "csv": "Export CSV",
+    "statuses": {
+      "pending": "waiting for confirmation",
+      "checked_in": "checked in",
+      "left": "left",
+      "removed": "removed"
+    },
+    "states": {
+      "pending": "not chronographed",
+      "passed": "passed",
+      "refused": "refused",
+      "withdrawn": "withdrawn"
+    },
+    "refused_today": "refused today",
+    "list": "Check-ins",
+    "empty": "Nobody has checked in to this game yet.",
+    "name": "Name",
+    "status": "Status",
+    "team": "Team",
+    "squad": "Squad",
+    "role": "Role",
+    "replicas": "Replicas",
+    "erased": "(erased)",
+    "by_hand": "by hand",
+    "prefers": "prefers {team}",
+    "confirm": "Confirm",
+    "roles": {
+      "player": "player",
+      "squad_leader": "squad leader",
+      "vip": "VIP",
+      "marshal": "marshal",
+      "gm": "GM",
+      "spectator": "spectator"
+    },
+    "card_seen": "card seen",
+    "not_checked": "not checked",
+    "remove": "Remove",
+    "manual": "Check in by hand",
+    "manual_hint": "For players without the app: the controller makes their id, which can be written to a player tag.",
+    "team_preference": "Preferred team",
+    "type": "Type",
+    "class": "Class",
+    "make_model": "Make and model",
+    "types": {
+      "aeg": "AEG (electric)",
+      "gbb": "GBB (gas)",
+      "hpa": "HPA (compressed air)",
+      "bolt_action": "Bolt action",
+      "dmr": "DMR",
+      "sniper": "Sniper",
+      "pistol": "Pistol",
+      "shotgun": "Shotgun"
+    },
+    "add_replica": "Add a replica",
+    "manual_save": "Check in",
+    "manual_done": "Checked in: {id}",
+    "chrono_title": "Replicas to chrono",
+    "valid_day": "A pass counts for the rest of the day at this field.",
+    "valid_game": "Every game asks for a new chronograph.",
+    "chrono_empty": "No replicas declared yet.",
+    "unregistered": "not registered at the field yet",
+    "settings": "Check-in rules",
+    "confirm_mode": "Confirmation",
+    "confirm_auto": "automatic",
+    "confirm_staff": "by the GM or a marshal",
+    "federation": "Federation number",
+    "federation_off": "do not ask",
+    "federation_optional": "optional",
+    "federation_required": "required",
+    "federation_label": "Federation (for example, FPA)",
+    "max_replicas": "Replicas per player and game",
+    "max_players": "Most players per game",
+    "valid_for": "A chronograph counts for",
+    "valid_for_day": "the whole day",
+    "valid_for_game": "this game only",
+    "federation_note": "The federation number is never verified automatically: “required” only stops the form being sent without it. Tick “card seen” once you have seen the card.",
+    "saved": "Saved.",
+    "poster": "Check-in poster",
+    "poster_intro": "Print it once and put it up in the check-in area: it serves every game at the field. It holds no key and no password.",
+    "ca": "Field certificate",
+    "poster_urls": "The controller's https addresses (one per line)",
+    "poster_ssid": "The field's Wi-Fi network name",
+    "poster_pinned": "This game only",
+    "gm_only": "Only the GM manages check-in.",
+    "no_game": "No game is live: create one to open check-in. The poster can be printed now.",
+    "team_squad": "Team › squad",
+    "squad_n": "squad {n}",
+    "no_squad": "no squad"
+  },
+  "poster": {
+    "title": "Check-in poster",
+    "login": "Open the console with the GM token first.",
+    "no_text": "The poster cannot be made yet.",
+    "qr_label": "QR code for checking in at the field",
+    "intro": "Print this page on A4. The code holds no secrets: it can stay in plain view.",
+    "print": "Print",
+    "wifi_password": "Wi-Fi password",
+    "wifi_draw": "Draw the Wi-Fi code",
+    "wifi_label": "QR code for the Wi-Fi network",
+    "wifi_note": "The password is used only to draw the Wi-Fi code: it is neither kept nor sent."
   }
 }

@@ -114,8 +114,7 @@ players write. Keep these choices consistent when you edit it:
 | site server | servidor do clube |
 | field controller | controlador de campo |
 | chrono, chrono check-in | cronografagem, cronografagem à entrada |
-| milsim, CQB, respawn, makers, copyleft | unchanged |
-| squads | esquadras |
+| milsim, CQB, respawn, makers, copyleft, squad | unchanged ("esquadra" is a police station) |
 | presets | predefinições |
 | Domination, Bomb | Domínio, Bomba |
 | gate (of a roadmap phase) | prova |

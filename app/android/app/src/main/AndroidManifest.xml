@@ -9,13 +9,17 @@ wake and Wi-Fi locks and its notification (ADR-P3-5); the battery
 exemption, asked once; NFC (players' tags, join cards); the camera (QR
 codes); vibration; Bluetooth LE and USB host for the I/O pod. Every
 hardware feature is optional: a phone without NFC or a camera still
-installs the app. Location for player positions comes with plan phase E
-(below Android 12 a Bluetooth scan already needs it).
+installs the app. Location (plan phase E): a player who chooses to share
+their position during a game (ADR-P3-6), with the foreground service's
+location type so it goes on with the screen off; below Android 12 a
+Bluetooth scan needs it too.
 
-Cleartext HTTP is allowed: the field controller serves its API and console
-over plain HTTP on the field's own network until its certificate handling
-(ADR-P3-9, plan phase E) is built (decision PD11). Backups are off: the
-settings hold the field join key and the marshal's private key.
+Cleartext HTTP is still allowed for the GM console and the read-only
+player view, which the field controller serves over plain HTTP on the
+field's own network (decision PD11). Field check-in, the player token and
+the prop's Wi-Fi link use HTTPS with the field's own CA, pinned by the app
+(ADR-P3-9, ADR-P3-13; decision PE3). Backups are off: the settings hold the
+field join key, the marshal's private key and the field identities.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
@@ -32,7 +36,9 @@ settings hold the field join key and the marshal's private key.
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission
         android:name="android.permission.BLUETOOTH_SCAN"
         android:usesPermissionFlags="neverForLocation" />
@@ -75,11 +81,12 @@ settings hold the field join key and the marshal's private key.
             android:exported="false"
             android:screenOrientation="unspecified"
             android:theme="@style/ScanTheme" />
-        <!-- A prop's game: wake lock, Wi-Fi lock, persistent notification. -->
+        <!-- A prop's game, or a player sharing their position: wake lock, Wi-Fi lock,
+             persistent notification. -->
         <service
             android:name=".AtalaiaForegroundService"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
+            android:foregroundServiceType="connectedDevice|location" />
         <!-- Lets a prop phone make the app its device owner (kiosk without prompts). -->
         <receiver
             android:name=".AtalaiaAdminReceiver"

@@ -68,6 +68,21 @@ Future<void> run(PropSession s, int ms, {int step = 50}) async {
 }
 
 void main() {
+  test(
+    'a tick still waiting on the core when the screen closes is harmless',
+    () async {
+      // Seen on CI's emulator: the screen disposed the session while a tick
+      // was awaiting a snapshot, and the tick then notified a disposed
+      // ChangeNotifier.
+      final s = session('org.atalaia.domination', 'zone');
+      await s.open();
+      await s.start();
+      final tick = s.advance(250);
+      s.dispose();
+      await tick;
+    },
+  );
+
   test('Bomb: standby, armed by holding the button, the countdown, the '
       'explosion', () async {
     final device = FakeDevice();

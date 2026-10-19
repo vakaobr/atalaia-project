@@ -57,6 +57,15 @@ final class AppSettings {
   /// The team the player view highlights.
   String? myTeam;
 
+  /// Field check-in (ADR-P3-13): the name last used, and the version of each
+  /// field's privacy notice the player has read (field id -> version).
+  String? displayName;
+  Map<String, int> noticeSeen = {};
+
+  /// Sharing the phone's position in a game (ADR-P3-6): asked each game,
+  /// remembered only as the last answer.
+  bool sharePosition = false;
+
   List<int>? get joinKey {
     final h = joinKeyHex;
     if (h == null || !isJoinKeyHex(h)) return null;
@@ -103,6 +112,9 @@ final class AppSettings {
     'chrono_id': chronoId,
     'limit_template': limitTemplate,
     'my_team': myTeam,
+    'display_name': displayName,
+    'notice_seen': noticeSeen,
+    'share_position': sharePosition,
   };
 
   static AppSettings fromJson(Map<String, Object?> j) {
@@ -124,7 +136,13 @@ final class AppSettings {
       ..fieldId = str('field_id') ?? 'field'
       ..chronoId = str('chrono_id') ?? 'chrono-1'
       ..limitTemplate = str('limit_template') ?? 'portugal'
-      ..myTeam = str('my_team');
+      ..myTeam = str('my_team')
+      ..displayName = str('display_name')
+      ..noticeSeen = {
+        for (final e in ((j['notice_seen'] as Map?) ?? const {}).entries)
+          if (e.value is int) '${e.key}': e.value as int,
+      }
+      ..sharePosition = j['share_position'] == true;
   }
 }
 

@@ -3,7 +3,9 @@
 
 /// The marshal's tools: who the marshal is (name, id, the Ed25519 key that
 /// signs their chrono records), the chrono check-in, the replica registry,
-/// writing players' tags, and erasing a player's readings on request.
+/// writing players' tags, and erasing a player's readings on request; and
+/// (plan phase E) the field's "replicas to chrono" list, once the marshal has
+/// checked in at the field and the GM has given them the marshal role.
 library;
 
 import 'dart:async';
@@ -11,11 +13,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app.dart';
+import '../checkin/checkin_screen.dart';
 import '../chrono/chrono_ui.dart';
 import '../chrono/replica_registry_ui.dart';
 import '../l10n/strings.dart';
 import '../security/bytes.dart';
 import '../ui/widgets.dart';
+import 'chrono_queue.dart';
 import 'marshal_records.dart';
 import 'tag_writer.dart';
 
@@ -50,6 +54,38 @@ class _MarshalHomeScreenState extends State<MarshalHomeScreen> {
   void _go(Widget screen) =>
       Navigator.push(context, MaterialPageRoute<void>(builder: (_) => screen));
 
+  /// The field's list needs a marshal's check-in; without one, check in first.
+  Future<void> _queue() async {
+    final services = context.services;
+    await services.checkins.load();
+    final c = services.checkins.checkins.reversed
+        .where((x) => x.staff)
+        .firstOrNull;
+    final field = c == null ? null : await services.trust.known(c.fieldId);
+    if (!mounted) return;
+    if (c == null || field == null) {
+      final s = context.s;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          content: Text(s.t('queue.check_in_first')),
+          actions: [
+            FilledButton(
+              key: const Key('queue-go-checkin'),
+              onPressed: () {
+                Navigator.pop(context);
+                _go(const CheckinScreen());
+              },
+              child: Text(s.t('player.checkin')),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    _go(ChronoQueueScreen(checkin: c, field: field, records: records));
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = context.s;
@@ -65,6 +101,15 @@ class _MarshalHomeScreenState extends State<MarshalHomeScreen> {
             children: [
               if (!records.hasIdentity)
                 Notice(s.t('marshal.no_identity'), kind: NoticeKind.warning),
+              Card(
+                child: ListTile(
+                  key: const Key('marshal-queue'),
+                  leading: const Icon(Icons.fact_check, size: 32),
+                  title: Text(s.t('queue.title')),
+                  subtitle: Text(s.t('queue.hint')),
+                  onTap: _queue,
+                ),
+              ),
               Card(
                 child: ListTile(
                   key: const Key('marshal-chrono'),

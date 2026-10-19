@@ -101,7 +101,11 @@ class FakeForeground implements ForegroundService {
   final calls = <String>[];
 
   @override
-  Future<bool> start({required String title, required String text}) async {
+  Future<bool> start({
+    required String title,
+    required String text,
+    bool location = false,
+  }) async {
     calls.add('start $title | $text');
     return true;
   }

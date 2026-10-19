@@ -529,6 +529,21 @@ clamp and the controller's id before it hears its first TIME beacon.
 
 **Reason:** the first firmware had one fixed channel and hard-coded the g2 duty cycle and power, so a field that chose another channel (Amendment 1 allowed it) would have kept g2's 10% budget and 500 mW power on a 1%, 25 mW channel, and the channel check accepted centres whose channel spilled out of the sub-band. A field next to a LoRaWAN gateway or a Meshtastic mesh had no way to see that, or to move.
 
+## Amendment 4 (2026-10-19, proposed): The field CA and the controller's addresses in the join payload
+
+**Status:** proposed with phase 3 plan phase E (decision PE4); for review.
+
+Two optional keys of the join payload's body ([protocol/join.md](../../protocol/join.md)), from the range kept for optional fields:
+
+| Key | Field | Type | Values |
+| --- | --- | --- | --- |
+| 13 | `ca_sha256` | bytes | 32: SHA-256 of the field CA's DER certificate (decision P3-8) |
+| 14 | `urls` | array of text | 1-3 different `https://host[:port]` base addresses of the controller, at most 64 bytes each |
+
+An Android prop, which has no LoRa radio of its own, uses them to link to the controller over the field's Wi-Fi ([protocol/prop-link.md](../../protocol/prop-link.md)): it fetches the CA from one of the addresses, checks it against key 13 and trusts it for that game only. The controller adds them to payloads for boxes (kind 0) when it serves HTTPS, and leaves them out when the payload would not fit. Boxes skip keys 13-31 as before, so their firmware is unchanged; the Python and Dart codecs read 13 and 14 and skip 15-31. The vector that tested a skipped optional key used key 13 and now uses key 20.
+
+Nothing on the radio changes: the keys are inside the join payload's tag, which still authenticates the whole payload with the field join key.
+
 ## Open questions
 
 - Per-node session keys (HKDF-derived from the game key) would limit

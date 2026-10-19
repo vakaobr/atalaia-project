@@ -409,9 +409,14 @@ roadmap:
       (it runs any mode and draws the mode's own screens, with big team buttons, a keypad and NFC
       tags), players follow the field controller's game, marshals do chrono check-in (energy,
       limits per class, spot checks, signed readings), the replica registry and players' tags, and
-      the GM opens the console. The app is tested on an Android emulator; nothing has run on a real
-      phone yet. Still to come: the link to the controller, player roles and positions, the I/O
-      pod's firmware and the iOS version.
+      the GM opens the console. Players check in at the field by scanning a printed poster (no
+      account, no internet), say which replicas they will use and see whether they have been
+      through the chronograph; marshals work from that list and their signed readings mark each
+      replica passed or refused; players can share their position during a game, and the
+      controller decides who sees it; an Android prop takes part in the controller's game over the
+      field's Wi-Fi. The app is tested on Android emulators; nothing has run on a real phone yet.
+      Still to come: the phone as the field controller, the I/O pod's firmware and the iOS
+      version.
     gate: "Gate: one game mixes ESP32 and Android props without issues."
   p4:
     title: Site server and advanced play

@@ -5,9 +5,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 3 -- Android and Players: Status
 
-**Current phase:** Implementation: plan phases A, B, C and D done in software; plan phases E-G pending
+**Current phase:** Implementation: plan phases A, B, C and D done in software; plan phase E done in software except the Android controller role's shell (PE24); plan phases F-G pending
 **Risk level:** Medium
-**Last verified:** 2026-10-19 (plan phase D)
+**Last verified:** 2026-10-19 (plan phase E)
 
 ## Completed
 
@@ -29,6 +29,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
   GM), the Flutter screen-template renderer, join by QR/NFC/text, European
   Portuguese and English, the Kotlin plugins, the emulator CI job; iOS not
   built (see below)
+- [x] Plan phase E (2026-10-19): field check-in with the printed poster,
+  player tokens and the role-filtered stream, signed chrono readings and the
+  "replicas to chrono" list, HTTPS with the field CA, Android props on Wi-Fi,
+  player positions, the stream's history; the Android controller role only in
+  part (see below)
 
 ## Plan phase A (2026-10-18)
 
@@ -147,6 +152,44 @@ pods, kiosk mode as device owner, hours on battery), iOS (not built), the
 emulator tests outside CI, Wokwi (its CI quota is used up, decision R7).
 Deviations and choices: decisions PD1-PD24 in `docs/review/decisions-to-review.md`.
 
+## Plan phase E (2026-10-19)
+
+Field check-in and everything the phone needs from the field controller.
+Run with `sh tools/check.sh` (the controller's tests), `python
+tools/docker_console.py` (the console in Chromium), `python
+tools/docker_app.py` (Dart, NDK, APK) and `app\tool\emulator_tests.ps1`
+(on-device).
+
+| Deliverable | Where | State |
+| --- | --- | --- |
+| Check-in poster (ADR-P3-13) | `protocol/checkin.md`, `protocol/vectors/checkin.json` (3 valid, 47 invalid, 8 invalid texts, declarations, identities); `controller/atalaia_controller/checkin_poster.py`, `app/lib/protocol/checkin_poster.dart` | Done; both codecs check the vectors |
+| HTTPS with the field CA (P3-8, ADR-P3-9) | `controller/atalaia_controller/tls.py` (ECDSA P-256, decision PE2), HTTPS on 8443 next to HTTP, `GET /api/v1/controller/ca`, `python -m atalaia_controller ca`; `app/lib/checkin/field_trust.dart` (pinned per field on first use, a changed one refused) | Done; a real TLS connection trusting only the CA is tested |
+| Check-in at the controller | `controller/atalaia_controller/checkin.py`, `store.py` (schema 3), `api.py`; `[checkin]` settings | Done: identities, check-in, staff confirmation, federation number (never verified), hand check-in, removal, leaving, CSV, settings, open and close, retention purge, `player.checkin` with the id only |
+| Player tokens (ADR-P3-9, B8) | issued at check-in with the controller's own per-game key (SQLite 0600, WAL and shm too), verified on REST and the stream, role, team and squad re-checked against the row (decision PE7) | Done |
+| Role-filtered stream | `ws.py`, `api.py` `make_route` (decision PE6) | Done: names to staff only, players their own rows, positions by visibility, a player's `hello` with its row; the GM's change closes the player's stream with 4409 |
+| Replicas to chrono | declarations, `POST /api/v1/chrono/readings` (Ed25519 with `chrono.py`, judged with the limit template), `GET .../chrono-list`; `chrono.checkin`, `chrono.spotcheck`, `chrono.violation` | Done; the shared chrono vectors go through the API |
+| GM console | `controller/console/src/components/checkin-panel.js`, `poster.html`/`poster.js`/`poster.css`, i18n pt and en | Done: the Check-in tab (live), the A4 poster with its QR code and an optional Wi-Fi code, the start warning |
+| App: check-in, declaration, marshal list | `app/lib/checkin/`, `app/lib/marshal/chrono_queue.dart`, `chrono_ui.dart` (send a series), `marshal_records.dart` (unsent series, pending links) | Done |
+| Player view history (the empty feed seen on the emulator) | the stream's `hello` carries the latest 100 events (PE13); `field_feed.dart` | Done |
+| Prop on Wi-Fi (PD12) | `protocol/prop-link.md`, `controller/atalaia_controller/prop_link.py`, `app/lib/controller/prop_link.dart`, `prop_session.dart`; join keys 13 and 14 (RFC 0001 Amendment 4, proposed) | Done: HELLO, STATE, events with ACK and resend, commands and TIME, `node.tamper` |
+| Positions (ADR-P3-6) | `controller/atalaia_controller/positions.py`, `POST`/`GET /api/v1/positions`; `app/lib/position/position_reporter.dart`, `app/lib/platform/location.dart`, `LocationPlugin.kt`, the foreground service's location type | Done for GPS; BLE beacons not built |
+| Teams and squads (maintainer) | games' `squads` (0 = none), squad pickers and the squad-leader role only where a game has squads (PE25) | Done in the controller, the console and the app |
+| Android controller role (ADR-P3-12) | `app/lib/controller/mqtt_broker.dart`, `visibility_engine.dart` | **Partly**: the broker and the visibility engine are built and tested; the controller shell (`field.lua` and the API on the phone) is not (PE24) |
+
+Tests: controller 201 (60 new: check-in, chrono list with the shared
+vectors, poster vectors, positions, prop link, TLS); console browser tests
+(3 new: the Check-in tab live, with squads, the poster's QR code read back
+with `zbarimg`); 626 Dart tests (106 new); 7 on-device tests (2 new, check-in
+over real HTTPS), run on a local Android 16 emulator at the Pixel 7's size and
+at CI's 320x640. A fix found on the way: `PropSession.advance` threw when the
+session closed while the core was answering (decision PE23, with the
+coordinator's notify fix and a test that fails without it).
+
+Not run: real phones (GPS, background positions, the Wi-Fi link to a real
+controller on a field network), a controller on a Raspberry Pi serving HTTPS
+to phones, Wokwi (decision R7). Deviations and choices: decisions PE1-PE25 in
+`docs/review/decisions-to-review.md`.
+
 ## Maintainer request: field check-in (2026-10-19, design only)
 
 The maintainer asked for players to check in at the field by scanning a
@@ -161,7 +204,7 @@ registration and publishing go to phase 4 (ADR-P4-11, ADR-P4-12).
 | Plan | `PLAN.md` plan phase E, subsection "Field check-in and per-game replica declaration": files, tests, AC-13; field test 5 |
 | Open questions | F1-F12 in `docs/review/decisions-to-review.md` ("Field check-in, registration and scheduling") |
 
-Nothing is built yet.  No new event ids: the controller emits the
+Built in plan phase E (above).  No new event ids: the controller emits the
 existing `player.checkin` (15).
 
 ## Phase 2 handoff changes (2026-10-18)
@@ -198,11 +241,10 @@ Phase G needs hardware.
 1. ~~Research~~ -- Complete
 2. ~~Architecture~~ -- Complete
 3. ~~Planning~~ -- Complete
-4. Implementation -- plan phases A, B, C and D done; next: plan phase E
-   (the prop's link to the controller, player tokens with roles and the
-   role-filtered feed, positions, the CA fingerprint, chrono readings to the
-   controller, the Android controller role with its MQTT broker, and
-   field check-in with per-game replica declaration, ADR-P3-13)
+4. Implementation -- plan phases A-E done in software (E without the
+   Android controller role's shell, PE24); next: plan phase F (the I/O pod's
+   firmware, needs a Heltec board), the controller shell, then plan phase G
+   (the field test)
 
 ## How to resume with implementation
 
@@ -229,11 +271,11 @@ Phase 4's site server builds on these phase 3 interfaces:
 | Chrono reading record | `protocol/chrono-record.md`, `app/lib/chrono/reading.dart`, Python verifier `controller/atalaia_controller/chrono.py`, vectors `protocol/vectors/chrono_record.json` | Schema, canonical form, Ed25519 signature verification |
 | Limit templates | `app/lib/chrono/limit_templates/*.yaml` | Template format, per-field overrides |
 | Player token format | `protocol/player-token.md`, `app/lib/security/player_token.dart`, `controller/atalaia_controller/player_token.py`, vectors `protocol/vectors/player_token.json` | Token schema for account-based auth upgrade; the token key is the controller's own (decision B8) |
-| Position reports | `POST /api/v1/positions` | Position data model, visibility rules |
+| Position reports | `POST /api/v1/positions`, `controller/atalaia_controller/positions.py` | Position data model, visibility rules |
 | Replica registry | `app/lib/chrono/replica.dart` | Replica schema for the site-server database |
 | NFC tag format | `protocol/nfc-tag.md` (HMAC-SHA256 with game key, truncated 16 bytes; vectors `protocol/vectors/tag.json`) | Tag verification for site-server-managed games |
 | GM console extensions | `controller/console/src/` | Chrono view, position view, new mode UIs |
 | Mode events (IDs 25-27, 33-41) | `protocol/schema/events.yaml` | Event log storage, statistics, replays |
 | Field join key distribution | `protocol/join.md`, key 13 (CA fingerprint) | Site server join flow |
 | Capability proxy protocol | `protocol/capability-proxy.md`, `protocol/vectors/capability_proxy.yaml` | Pod management in the site-server inventory |
-| Field check-in and declarations (planned, ADR-P3-13) | `protocol/checkin.md`, the controller's check-in tables and endpoints | Roster sync fills the check-in list with registrations and pre-declared replicas; check-ins and chrono outcomes pushed back after the game (ADR-P4-11) |
+| Field check-in and declarations (ADR-P3-13, built in plan phase E) | `protocol/checkin.md`, `controller/atalaia_controller/checkin.py`, store schema 3 | Roster sync fills the check-in list with registrations and pre-declared replicas; check-ins and chrono outcomes pushed back after the game (ADR-P4-11) |

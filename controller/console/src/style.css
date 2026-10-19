@@ -752,3 +752,50 @@ tr.offline td {
 .modifiers legend {
     padding: 0;
 }
+
+/* ---- field check-in (components/checkin-panel.js) ---- */
+
+.badge {
+    display: inline-block;
+    padding: 0 0.45em;
+    border-radius: 0.6em;
+    border: 1px solid var(--line);
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.chrono-pending,
+.status-pending {
+    background: var(--warn-bg);
+    border-color: var(--warn);
+}
+
+.chrono-passed,
+.status-checked_in {
+    background: var(--info-bg);
+    border-color: var(--ok);
+}
+
+.chrono-refused,
+.status-removed {
+    background: var(--crit-bg);
+    border-color: var(--danger);
+}
+
+.chrono-list,
+.chrono-list ul {
+    margin: 0.3rem 0;
+    padding-left: 1.2rem;
+}
+
+.chrono-list > li {
+    margin-bottom: 0.5rem;
+}
+
+input.narrow {
+    width: 4.5em;
+}
+
+button.link.danger {
+    color: var(--danger);
+}

@@ -38,6 +38,9 @@ host = "0.0.0.0"
 port = 8080
 gm_token = ""                     # empty: generated on first start;
 read_token = ""                   # show them with `python3 -m atalaia_controller tokens`
+tls_port = 8443                   # HTTPS with the field's own CA (made on first start); 0 = off
+tls_dir = ""                      # empty: the tls/ folder next to db_path
+tls_names = []                    # the names and addresses phones use, e.g. ["10.42.0.1", "campo.local"]
 
 [mqtt]
 enabled = true
@@ -51,3 +54,24 @@ key = ""                          # the field join key (64 hex digits) that auth
                                   # cards; empty: generated on first start. Give a standby
                                   # controller the same key. Show it with
                                   # `python3 -m atalaia_controller join-key`
+
+[checkin]
+# Field check-in (protocol/checkin.md). Players scan the poster printed from the
+# GM console's Check-in tab; nothing needs the internet.
+field_id = "field"                # the field's id (as in chrono records): 1-64 of A-Za-z0-9._:-
+field_name = "Atalaia"            # shown to players
+operator = ""                     # who runs the field: the data controller in the privacy notice
+confirm = "auto"                  # or "staff": a marshal or the GM confirms each check-in
+federation = "off"                # or "optional", "required": the federation number, never verified
+federation_label = "FPA"
+max_replicas = 5                  # per player and game
+max_players = 300                 # per game
+chrono_valid_for = "day"          # or "game"
+rate_per_minute = 10              # check-ins per client address
+urls = []                         # the poster's https addresses; empty: from tls_names and this host
+wifi_ssid = ""                    # the field network's name on the poster
+limit_template = "portugal"       # the class limits (app/lib/chrono/limit_templates/, unverified)
+notice_version = 1                # raise it when the privacy notice changes
+notice_pt = ""                    # your own notice files (Markdown); empty: controller/templates/
+notice_en = ""
+retention_days = 30               # names and federation numbers are erased this long after a game

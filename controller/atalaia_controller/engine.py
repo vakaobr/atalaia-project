@@ -55,6 +55,7 @@ from .store import Store
 log = logging.getLogger("atalaia.controller")
 
 TEAM_NAME_MAX = 23  # ATALAIA_TEAM_NAME_MAX - 1 in the core
+SQUADS_MAX = 16     # squads per team a game may define
 GAME_TIME_SAVE_MS = 5_000
 # Commands for one node; the lifecycle (start, pause, resume, end) goes through the game.
 NODE_COMMANDS = ("set_owner", "message", "reset", "reboot")
@@ -86,8 +87,11 @@ class ModemTransport:
     """
 
     def __init__(self, modem: Optional[radio_modem.RadioModem], store: Store, game_id: int,
-                 node_id: int, max_hops: int, channel_hz: int, key: bytes) -> None:
+                 node_id: int, max_hops: int, channel_hz: int, key: bytes,
+                 wifi: Optional[Callable[[int, bytes], bool]] = None) -> None:
         self.modem = modem
+        # Android props linked over Wi-Fi get the TIME beacons and commands too (prop_link.py).
+        self.wifi = wifi
         self.store = store
         self.game_id = game_id
         self.node_id = node_id
@@ -107,9 +111,10 @@ class ModemTransport:
 
     def send(self, msg_type: int, payload: bytes, *, priority: int, ack_req: bool,
              hop_limit: int, now_ms: int) -> Optional[int]:
+        on_wifi = self.wifi(msg_type, payload) if self.wifi is not None else False
         if self.modem is None or not self.modem.is_up:
             self.refused += 1
-            return None
+            return self.seq if on_wifi else None
         if self._next > 0xFFFF:
             self.epoch = self.store.next_tx_epoch()  # persisted before the first packet with it
             self._next = 0
@@ -235,6 +240,13 @@ class Controller:
         self.tx_status: Counter[str] = Counter()
         self._last_time_save = 0
         self.scan: Optional[channels.Scan] = None
+        # Phase 3 (plan phase E): field check-in, player positions, Android props on Wi-Fi.
+        # Set by checkin.Checkin, positions.Positions and prop_link.PropLinks.
+        self.checkin: Any = None
+        self.positions: Any = None
+        self.prop_links: Any = None
+        self.ca_sha256: Optional[bytes] = None  # the field CA (tls.py): join payload key 13
+        self.link_urls: list[str] = []          # its https addresses: join payload key 14
         self._last_scan: Optional[dict[str, Any]] = None
         saved_scan = store.get_setting("radio.last_scan")
         if saved_scan:
@@ -331,7 +343,7 @@ class Controller:
         else:
             election.follow(self.now_ms())
         self.transport = ModemTransport(self.modem, self.store, game["id"], node_id, max_hops,
-                                        channel, key)
+                                        channel, key, wifi=self._to_wifi)
         fc = FieldController(transport=self.transport, game_id=game["id"], teams=game["teams"],
                              node_id=node_id, election=election, max_hops=max_hops)
         fc.duration_ms = game["duration_ms"]
@@ -389,6 +401,10 @@ class Controller:
             if ev["node"] == self.node_id and ev["team"]:
                 out[ev["team"]] = out.get(ev["team"], 0) + int(ev["data"].get("amount", 0))
         return out
+
+    def _to_wifi(self, msg_type: int, payload: bytes) -> bool:
+        links = self.prop_links
+        return links.forward(msg_type, payload) if links is not None else False
 
     def _deactivate(self) -> None:
         if self.field is not None:
@@ -478,6 +494,11 @@ class Controller:
                 clean[str(nid)] = role
             if pkg.field_script is not None and self.core is None:
                 raise Unavailable("this mode has a field.lua and the core library is not loaded")
+            # Squads are sub-groups inside each team, only in games that have them (milsims,
+            # big games): 0, the default, is a game with teams only (decision PE25).
+            squads = _int(spec.get("squads", 0), "squads")
+            if not 0 <= squads <= SQUADS_MAX:
+                raise ControllerError(f"squads: 0 (none) to {SQUADS_MAX} per team")
 
             used = self.store.game_ids()
             game_id = random.SystemRandom().choice([g for g in range(1, 0xFFFF) if g not in used][:4096])
@@ -489,7 +510,7 @@ class Controller:
                 "game_seed": random.SystemRandom().randrange(1, 0xFFFFFFFF),
                 "state": "ready", "term": 1, "created_at": time.time(),
                 "node_id": self.cfg.node_id, "channel_hz": self.field_channel,
-                "max_hops": self.cfg.max_hops, "joined": False,
+                "max_hops": self.cfg.max_hops, "joined": False, "squads": squads,
             }
             self.store.create_game(game, key if self.cfg.persist_game_key else None)
             self._activate(self.store.game(game_id) or game, key, 1)
@@ -689,8 +710,20 @@ class Controller:
                 "game_seed": int(self.game["game_seed"]) & 0xFFFFFFFF,
                 "params": self.game["params"] or None, "kind": kind,
             }
+            # Android props link over Wi-Fi with the field CA and the controller's addresses
+            # (keys 13 and 14, RFC 0001 Amendment 4, proposed); boxes skip them. A payload too
+            # long with them is made without them (the prop then asks for the address).
+            link = {}
+            if kind == "node" and self.ca_sha256 is not None:
+                link = {"ca_sha256": self.ca_sha256, "urls": list(self.link_urls[:3]) or None}
             try:
-                payload = joinfmt.encode(join, self.join_key)
+                try:
+                    payload = joinfmt.encode({**join, **link}, self.join_key)
+                except joinfmt.JoinError as exc:
+                    if not link or exc.reason != "length":
+                        raise
+                    link = {}
+                    payload = joinfmt.encode(join, self.join_key)
             except joinfmt.JoinError as exc:
                 raise Conflict(f"this game does not fit in a join payload: {exc}") from None
             if kind == "node" and assigned != role:
@@ -703,6 +736,7 @@ class Controller:
                 "max_hops": join["max_hops"], "bytes": len(payload),
                 "text": joinfmt.to_text(payload), "payload_hex": payload.hex(),
                 "ndef_tag_hex": joinfmt.to_ndef_tag(payload).hex(),
+                "wifi_link": bool(link),
             }
             self._emit({"type": "join", "game": self.game["id"], "node_id": node_id, "kind": kind,
                         "role": role})
@@ -840,6 +874,8 @@ class Controller:
                 self.store.save_scores(game_id, fc.total_scores)
                 self._save_game_time(force=True)
             self.store.update_game(game_id, game_key=None)  # the key does not outlive the game
+            if self.positions is not None:
+                self.positions.end_game(game_id)  # ADR-P3-6: positions last as long as the game
             out = self._set_state(game_id, "ended", ended_at=time.time())
             self._deactivate()
             return self.public_game(self.store.game(game_id) or out)
@@ -973,12 +1009,16 @@ class Controller:
     # --- the tick -------------------------------------------------------------
 
     def tick(self) -> None:
+        if self.checkin is not None:
+            self.checkin.purge()  # retention (ADR-P3-13), at most every 10 minutes
         with self._lock:
             fc = self.fc
             if fc is None:
                 return
             now = self.now_ms()
             fc.tick(now)
+            if self.positions is not None:
+                self.positions.tick()
             if self.field is not None and fc.game_state == GAME_RUNNING:
                 self.field.advance(fc.game_time_ms)
                 if self._after_field():
@@ -1061,6 +1101,8 @@ class Controller:
             return
         ev = _public_event(record)
         self._emit({"type": "event", "game": self.game["id"], "event": ev})
+        if self.positions is not None:
+            self.positions.on_event(self.game["id"], record)
         if self.field is not None and record["node"] != self.node_id:
             data = dict(record.get("data") or {})
             data.setdefault("node", record["node"])

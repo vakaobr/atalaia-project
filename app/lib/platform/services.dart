@@ -106,7 +106,13 @@ abstract interface class KioskService {
 /// running (partial wake lock, Wi-Fi lock) with a persistent notification
 /// while a game runs.
 abstract interface class ForegroundService {
-  Future<bool> start({required String title, required String text});
+  /// [location]: a player sharing their position (the service's location
+  /// type, so fixes go on with the screen off; ADR-P3-6).
+  Future<bool> start({
+    required String title,
+    required String text,
+    bool location = false,
+  });
   Future<void> update({required String title, required String text});
   Future<void> stop();
 }

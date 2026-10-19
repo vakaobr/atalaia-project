@@ -5,8 +5,13 @@
 /// field controller with its address and access code (scan the scoreboard's
 /// QR code, or type them), then follow the game: the clock, the teams'
 /// points, who holds each objective, lives, eliminated teams, the GM's
-/// messages and the game's events, in the app's language. Player tokens
-/// with roles (squad leader, VIP...) and positions are plan phase E.
+/// messages and the game's events, in the app's language.
+///
+/// Plan phase E: checking in at the field with its poster (lib/checkin/)
+/// gives a player token; the view then follows the game over the field's
+/// pinned HTTPS, shows the game's events from before the phone connected,
+/// and lets the player share their position while the game runs (ADR-P3-6:
+/// the controller decides who sees it).
 library;
 
 import 'dart:async';
@@ -14,7 +19,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app.dart';
+import '../checkin/checkin_client.dart';
+import '../checkin/checkin_screen.dart';
 import '../l10n/strings.dart';
+import '../position/position_reporter.dart';
 import '../prop/game_timer.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -90,6 +98,17 @@ class _PlayerStartScreenState extends State<PlayerStartScreen> {
           const SizedBox(height: 12),
           if (_error != null) Notice(s.t(_error!), kind: NoticeKind.error),
           FilledButton.icon(
+            key: const Key('player-checkin'),
+            icon: const Icon(Icons.how_to_reg),
+            label: Text(s.t('player.checkin')),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(builder: (_) => const CheckinScreen()),
+            ),
+          ),
+          const _ContinueCheckin(),
+          SectionTitle(s.t('player.watch')),
+          FilledButton.icon(
             key: const Key('player-scan'),
             icon: const Icon(Icons.qr_code_scanner),
             label: Text(s.t('player.scan')),
@@ -123,10 +142,64 @@ class _PlayerStartScreenState extends State<PlayerStartScreen> {
   }
 }
 
+/// The latest check-in, to go back to it.
+class _ContinueCheckin extends StatefulWidget {
+  const _ContinueCheckin();
+
+  @override
+  State<_ContinueCheckin> createState() => _ContinueCheckinState();
+}
+
+class _ContinueCheckinState extends State<_ContinueCheckin> {
+  @override
+  void initState() {
+    super.initState();
+    unawaited(context.services.checkins.load());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final services = context.services;
+    return ListenableBuilder(
+      listenable: services.checkins,
+      builder: (context, _) {
+        final c = services.checkins.latest();
+        if (c == null) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: OutlinedButton.icon(
+            key: const Key('player-continue'),
+            icon: const Icon(Icons.arrow_forward),
+            label: Text(context.s.t('player.continue', {'game': c.gameName})),
+            onPressed: () async {
+              final field = await services.trust.known(c.fieldId);
+              if (field == null || !context.mounted) return;
+              await Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => CheckinStatusScreen(checkin: c, field: field),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
 class PlayerScreen extends StatefulWidget {
-  const PlayerScreen({required this.link, this.feed, super.key});
+  const PlayerScreen({
+    required this.link,
+    this.feed,
+    this.onAssignment,
+    super.key,
+  });
 
   final FieldLink link;
+
+  /// A new player token after the GM changed this player's team or role.
+  final Future<String?> Function()? onAssignment;
 
   /// A feed to show instead of connecting (tests).
   final FieldFeed? feed;
@@ -142,18 +215,71 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void initState() {
     super.initState();
+    final services = context.services;
     feed =
         widget.feed ??
-        FieldFeed(widget.link, connect: context.services.feedConnect);
+        FieldFeed(
+          widget.link,
+          // A check-in's link trusts the field's pinned CA (tests give a fake).
+          connect:
+              widget.link.field != null && services.feedConnect == ioConnect
+              ? null
+              : services.feedConnect,
+          onAssignment: widget.onAssignment,
+        );
     if (widget.feed == null) unawaited(feed.start());
     _clock = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (mounted && feed.gameState == 'running') setState(() {});
     });
   }
 
+  PositionReporter? _reporter;
+  String? _shareError;
+
+  Future<void> _share(bool on) async {
+    final services = context.services;
+    final s = context.s;
+    final app = AppScope.read(context);
+    final location = services.location;
+    final field = widget.link.field;
+    if (!on) {
+      _reporter?.stop();
+      await services.foreground.stop();
+      await app.update((x) => x.sharePosition = false);
+      if (mounted) setState(() {});
+      return;
+    }
+    if (location == null || field == null || !await location.available()) {
+      setState(() => _shareError = s.t('player.no_location'));
+      return;
+    }
+    if (!await services.device.requestPermission('ACCESS_FINE_LOCATION') ||
+        !await location.granted()) {
+      if (mounted) setState(() => _shareError = s.t('player.location_denied'));
+      return;
+    }
+    final client = CheckinClient(services.fieldHttp(field));
+    final r = _reporter ??= PositionReporter(
+      location: location,
+      send: (reports) => client.reportPositions(feed.link.token, reports),
+    );
+    r.start();
+    await services.foreground.start(
+      title: s.t('player.sharing_title'),
+      text: s.t('player.sharing_text'),
+      location: true,
+    );
+    await app.update((x) => x.sharePosition = true);
+    if (mounted) setState(() => _shareError = null);
+  }
+
   @override
   void dispose() {
     _clock?.cancel();
+    if (_reporter?.running ?? false) {
+      unawaited(context.services.foreground.stop());
+    }
+    _reporter?.dispose();
     if (widget.feed == null) feed.dispose();
     super.dispose();
   }
@@ -164,8 +290,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(s.t('role.player'))),
       body: ListenableBuilder(
-        listenable: feed,
-        builder: (context, _) => PlayerView(feed: feed),
+        listenable: Listenable.merge([feed, ?_reporter]),
+        builder: (context, _) => PlayerView(
+          feed: feed,
+          sharing: widget.link.field == null
+              ? null
+              : _SharePosition(
+                  running: _reporter?.running ?? false,
+                  sent: _reporter?.sent ?? 0,
+                  stopped: _reporter?.stopReason,
+                  error: _shareError,
+                  onChanged: _share,
+                  squads: ((feed.game?['squads'] as int?) ?? 0) > 0,
+                ),
+        ),
       ),
     );
   }
@@ -173,8 +311,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
 /// What a player sees of the game.
 class PlayerView extends StatelessWidget {
-  const PlayerView({required this.feed, super.key});
+  const PlayerView({required this.feed, this.sharing, super.key});
   final FieldFeed feed;
+
+  /// The position-sharing switch (a check-in's link only).
+  final Widget? sharing;
 
   @override
   Widget build(BuildContext context) {
@@ -229,6 +370,26 @@ class PlayerView extends StatelessWidget {
             ],
           ),
           if (feed.gameState == 'ended') _Result(feed: feed),
+          if (feed.me != null)
+            Text(
+              s.t('player.me', {
+                'role': s.t('checkin.role.${feed.me!['role']}'),
+                'team': feed.me!['team'] == null
+                    ? s.t('player.no_team')
+                    : teamAndSquad(
+                        s,
+                        '${feed.me!['team']}',
+                        (feed.me!['squad'] as int?) ?? 0,
+                      ),
+              }),
+              key: const Key('player-me'),
+            ),
+          if (sharing != null && feed.gameState == 'running') sharing!,
+          if (feed.positions.length > 1)
+            Text(
+              s.t('player.positions', {'n': feed.positions.length}),
+              key: const Key('player-positions'),
+            ),
           for (final m in messages.take(3))
             Notice(
               s.t('player.message', {'text': m.data['text']}),
@@ -290,6 +451,52 @@ class PlayerView extends StatelessWidget {
               trailing: Text(clockText(e.tMs)),
             ),
         ],
+      ],
+    );
+  }
+}
+
+class _SharePosition extends StatelessWidget {
+  const _SharePosition({
+    required this.running,
+    required this.sent,
+    required this.stopped,
+    required this.error,
+    required this.onChanged,
+    this.squads = false,
+  });
+
+  final bool running;
+  final int sent;
+  final String? stopped;
+  final String? error;
+  final ValueChanged<bool> onChanged;
+
+  /// Whether the game has squads (the hint names them only then).
+  final bool squads;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SwitchListTile(
+          key: const Key('player-share-position'),
+          value: running,
+          onChanged: onChanged,
+          title: Text(s.t('player.share')),
+          subtitle: Text(
+            running
+                ? s.t('player.share_on', {'n': sent})
+                : s.t(
+                    squads ? 'player.share_hint_squads' : 'player.share_hint',
+                  ),
+          ),
+        ),
+        if (error != null) Notice(error!, kind: NoticeKind.warning),
+        if (!running && stopped != null)
+          Notice(s.t('player.share_stopped'), kind: NoticeKind.info),
       ],
     );
   }

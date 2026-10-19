@@ -18,6 +18,8 @@ Both encodings come from the schema files in [`schema/`](schema/), so they canno
 | [`nfc-tag.md`](nfc-tag.md) | Player tags: the signed NFC tag of a player (Kill Confirmed, Respawn, Player Check-in) |
 | [`chrono-record.md`](chrono-record.md) | Chrono records: one chronograph reading signed with the marshal's Ed25519 key, and the canonical JSON that is signed |
 | [`player-token.md`](player-token.md) | Player tokens: who a phone calling the controller's API is (player, team, squad, role, game), signed by the controller |
+| [`checkin.md`](checkin.md) | Field check-in: the printed poster's `atalaia:checkin:` text, trusting the field's CA, the check-in endpoints, per-game replica declarations and the "replicas to chrono" list; vectors in `vectors/checkin.json` |
+| [`prop-link.md`](prop-link.md) | An Android prop's link to the controller over Wi-Fi: the HMAC proof of the game key, HELLO, STATE and events up, TIME and commands down |
 | [`usb-modem.md`](usb-modem.md) | The serial link between the field controller and its USB radio modem |
 | [`capability-proxy.md`](capability-proxy.md) | The link between an I/O pod and a phone (USB-OTG and BLE), version 1 |
 | [`json/event.schema.json`](json/event.schema.json) | JSON Schema of an event in the game log and the API (generated) |

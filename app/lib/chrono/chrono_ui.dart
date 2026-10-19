@@ -16,6 +16,7 @@ import 'package:flutter/services.dart';
 
 import '../app.dart';
 import '../l10n/strings.dart';
+import '../marshal/chrono_queue.dart' show ChronoUpload;
 import '../marshal/marshal_records.dart';
 import '../platform/services.dart';
 import '../ui/theme.dart';
@@ -67,9 +68,21 @@ class VelocityEntry {
 const bbWeights = [0.20, 0.23, 0.25, 0.28, 0.30, 0.32, 0.36, 0.40, 0.43, 0.45];
 
 class ChronoScreen extends StatefulWidget {
-  const ChronoScreen({required this.records, this.templates, super.key});
+  const ChronoScreen({
+    required this.records,
+    this.templates,
+    this.replica,
+    this.upload,
+    super.key,
+  });
 
   final MarshalRecords records;
+
+  /// The replica to start with (from the "replicas to chrono" list).
+  final Replica? replica;
+
+  /// Where a judged series goes: the field controller (plan phase E).
+  final ChronoUpload? upload;
 
   /// The limit templates (tests give them; the app loads its assets).
   final List<LimitTemplate>? templates;
@@ -81,8 +94,10 @@ class ChronoScreen extends StatefulWidget {
 class _ChronoScreenState extends State<ChronoScreen> {
   List<LimitTemplate> _templates = const [];
   LimitTemplate? _template;
-  Replica? _replica;
+  late Replica? _replica = widget.replica;
   ReadingType _type = ReadingType.checkin;
+  String? _sent;
+  bool _sending = false;
   bool _fps = false;
   double _weight = 0.20;
   final _entry = VelocityEntry();
@@ -149,14 +164,34 @@ class _ChronoScreenState extends State<ChronoScreen> {
         type: _type,
         velocityMps: mps,
         bbWeightG: _weight,
+        gameId: widget.upload == null ? null : '${widget.upload!.gameId}',
       );
       setState(() {
+        _sent = null;
         _series.add(r);
         _entry.clear();
         _error = null;
       });
     } on ChronoFormatException catch (e) {
       setState(() => _error = e.message);
+    }
+  }
+
+  Future<void> _send() async {
+    final up = widget.upload;
+    if (up == null || _series.isEmpty) return;
+    setState(() => _sending = true);
+    final s = context.s;
+    try {
+      final out = await up.send(records, List.of(_series));
+      if (!mounted) return;
+      setState(() => _sent = s.t('chrono.sent_${out['outcome']}'));
+    } on Object catch (e) {
+      if (mounted) {
+        setState(() => _sent = s.t('chrono.send_failed', {'error': '$e'}));
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
     }
   }
 
@@ -339,8 +374,25 @@ class _ChronoScreenState extends State<ChronoScreen> {
                 ),
                 trailing: Text('${s.number(r.energyJ, 3)} J'),
               ),
+            if (widget.upload != null)
+              FilledButton.icon(
+                key: const Key('chrono-send'),
+                icon: const Icon(Icons.send),
+                label: Text(s.t('chrono.send')),
+                onPressed:
+                    _sending ||
+                        _series.every(
+                          (r) => records.uploaded.contains(r.readingId),
+                        )
+                    ? null
+                    : _send,
+              ),
+            if (_sent != null) Notice(_sent!, key: const Key('chrono-sent')),
             TextButton(
-              onPressed: () => setState(_series.clear),
+              onPressed: () => setState(() {
+                _series.clear();
+                _sent = null;
+              }),
               child: Text(s.t('chrono.new_series')),
             ),
           ],

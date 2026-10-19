@@ -29,6 +29,8 @@ JoinPayload _fields(Map<String, dynamic> f) => JoinPayload(
   gameSeed: f['game_seed'] as int,
   params: (f['params'] as Map?)?.cast<String, Object?>(),
   kind: JoinKind.values.byName(f['kind'] as String),
+  caSha256: f['ca_sha256'] == null ? null : hexDecode(f['ca_sha256'] as String),
+  urls: (f['urls'] as List?)?.cast<String>(),
 );
 
 /// [text] with the last base64url character's lowest bit set: a padding bit
@@ -105,7 +107,7 @@ void main() {
     }
   });
 
-  test('an optional key 13-31 is skipped', () {
+  test('an unknown optional key is skipped', () {
     final j = decodeJoin(hexDecode(v['optional_key_skipped'] as String), key);
     final first = cases(v, 'valid').first;
     expect(hexEncode(encodeJoin(j, key)), first['payload']);
@@ -126,6 +128,45 @@ void main() {
         );
       });
     }
+  });
+
+  group('controller link (keys 13 and 14)', () {
+    final link = v['controller_link'] as Map<String, dynamic>;
+    for (final c in cases(link, 'valid')) {
+      test('${c['name']}', () {
+        final payload = hexDecode(c['payload'] as String);
+        final f = c['fields'] as Map<String, dynamic>;
+        final j = decodeJoin(payload, key);
+        expect(
+          j.caSha256 == null ? null : hexEncode(j.caSha256!),
+          f['ca_sha256'],
+        );
+        expect(j.urls, f['urls']);
+        expect(hexEncode(encodeJoin(j, key)), c['payload']);
+        expect(hexEncode(encodeJoin(_fields(f), key)), c['payload']);
+        expect(joinToText(payload), c['text']);
+      });
+    }
+    for (final c in cases(link, 'invalid')) {
+      test('${c['name']}: body', () {
+        expect(
+          () => decodeJoin(hexDecode(c['payload'] as String), key),
+          throwsA(
+            isA<JoinException>().having(
+              (e) => e.reason,
+              'reason',
+              JoinFailure.body,
+            ),
+          ),
+        );
+      });
+    }
+    test('the old vectors have neither', () {
+      for (final c in cases(v, 'valid')) {
+        final j = decodeJoin(hexDecode(c['payload'] as String), key);
+        expect((j.caSha256, j.urls), (null, null));
+      }
+    });
   });
 
   test('HMAC-SHA256 known answers (RFC 4231)', () {

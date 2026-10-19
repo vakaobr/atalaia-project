@@ -15,8 +15,9 @@ import { FieldView } from './components/field-view.js';
 import { JoinPanel } from './components/join-panel.js';
 import { PresetBuilder } from './components/preset-builder.js';
 import { RadioSettings } from './components/radio-settings.js';
+import { CheckinPanel } from './components/checkin-panel.js';
 
-const TABS = ['game', 'field', 'nodes', 'join', 'presets', 'feed', 'controller', 'settings'];
+const TABS = ['game', 'checkin', 'field', 'nodes', 'join', 'presets', 'feed', 'controller', 'settings'];
 const FEED_MAX = 500;
 const ALERTS_MAX = 50;
 const HISTORY_MAX = 240;
@@ -29,8 +30,9 @@ class App extends Component {
             tab: 'game', connected: null, status: null, game: null, score: null,
             nodes: {}, seen: {}, feed: [], alerts: [], modes: [], presets: [],
             positions: {}, scoreHistory: [], clockBase: null, toast: '', now: Date.now(),
-            radio: null,
+            radio: null, chronoCounts: null,
         };
+        this.checkinPanel = null;
         this.stream = null;
         this.token = '';
         this.offline = new Set();
@@ -131,9 +133,19 @@ class App extends Component {
             if (msg.game) {
                 this.loadLog(msg.game.id);
                 this.loadPositions(msg.game.id);
+                this.loadChronoCounts(msg.game);
             }
             break;
         }
+        case 'checkin':
+        case 'checkin_open':
+        case 'checkin_settings':
+            if (this.checkinPanel) this.checkinPanel.onStream(msg);
+            break;
+        case 'chrono_list':
+            if (this.state.game && msg.game === this.state.game.id) this.setState({ chronoCounts: msg.counts });
+            if (this.checkinPanel) this.checkinPanel.onStream(msg);
+            break;
         case 'event': {
             const ev = { ...msg.event, game: msg.game, at: now };
             this.setState((s) => ({ feed: [ev, ...s.feed].slice(0, FEED_MAX) }));
@@ -154,6 +166,8 @@ class App extends Component {
             if (!this.state.game || msg.game.live || msg.game.id === this.state.game.id) {
                 const isNew = !this.state.game || this.state.game.id !== msg.game.id;
                 this.setGame(msg.game);
+                if (isNew) this.setState({ chronoCounts: null });
+                if (isNew && msg.game.live) this.loadChronoCounts(msg.game);
                 if (isNew) this.setState({ feed: [], scoreHistory: [], positions: {}, nodes: {}, seen: {} });
                 if (isNew && msg.game.live) {
                     this.loadPositions(msg.game.id);
@@ -226,6 +240,13 @@ class App extends Component {
         const feed = log.slice(-FEED_MAX).reverse().map((e) => ({ ...e, game: gameId, at: now }));
         this.setState((s) => ({ feed: [...s.feed.filter((e) => e.game === gameId && e.at > now), ...feed]
             .slice(0, FEED_MAX) }));
+    }
+
+    async loadChronoCounts(game) {
+        // The start warning (ADR-P3-13): replicas declared and not chronographed yet.
+        if (this.state.role !== 'gm' || !game.live || game.state === 'ended') return;
+        const list = await this.call('GET', `/games/${game.id}/chrono-list`);
+        if (list) this.setState({ chronoCounts: list.counts });
     }
 
     async loadPositions(gameId) {
@@ -342,6 +363,8 @@ class App extends Component {
         switch (tab) {
         case 'game':
             return html`<${GameControl} app=${this} /><${ScorePanel} app=${this} />`;
+        case 'checkin':
+            return html`<${CheckinPanel} app=${this} ref=${(c) => { this.checkinPanel = c; }} />`;
         case 'field':
             return html`<${FieldView} app=${this} />`;
         case 'nodes':

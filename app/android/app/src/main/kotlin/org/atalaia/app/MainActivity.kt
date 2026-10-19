@@ -31,6 +31,7 @@ class MainActivity : FlutterActivity() {
         qr = QrScanPlugin(this, messenger)
         usb = UsbPodPlugin(this, messenger)
         ble = BlePodPlugin(this, messenger)
+        LocationPlugin(this, messenger)
     }
 
     override fun onResume() {

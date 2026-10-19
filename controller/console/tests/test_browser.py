@@ -37,6 +37,7 @@ from support import (CORE, MESSAGE_TYPES, MODEM_HOST, HostModem, config, free_po
 import httpx  # noqa: E402
 import uvicorn  # noqa: E402
 
+from atalaia_controller import checkin_poster  # noqa: E402
 from atalaia_controller.main import build  # noqa: E402
 from atalaia_sim import codec, join  # noqa: E402
 from atalaia_sim.packet import cmd_decode, hello_encode, state_encode  # noqa: E402
@@ -402,7 +403,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.field.box_hello()
         self.field.box_state(red=3)
         page = self.console(width=390, height=844)
-        for tab in ("game", "field", "nodes", "join", "presets", "feed", "controller", "settings"):
+        for tab in ("game", "checkin", "field", "nodes", "join", "presets", "feed", "controller", "settings"):
             page.get_by_test_id(f"tab-{tab}").click()
             page.wait_for_timeout(150)
             self.no_horizontal_scroll(page)
@@ -572,7 +573,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v1').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v2').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json"):
             self.assertIn(path, cached)
@@ -584,6 +585,136 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.locator("#app")).not_to_be_empty()
         self.assertIn("Atalaia", page.title())
         page.context.set_offline(False)
+
+
+    # --- field check-in (ADR-P3-13) ------------------------------------------------
+
+    def check_in(self, game_id: int, name: str, **extra) -> dict:
+        import base64 as b64
+        import secrets as sec
+        pid = "p-" + "".join(sec.choice("abcdefghijklmnopqrstuvwxyz234567") for _ in range(12))
+        secret = b64.urlsafe_b64encode(os.urandom(32)).rstrip(b"=").decode("ascii")
+        r = httpx.post(self.field.base + "/api/v1/checkin", json={
+            "game_id": game_id, "player_id": pid, "player_secret": secret, "display_name": name,
+            "notice_version": 1, **extra}, timeout=10)
+        self.assertIn(r.status_code, (200, 201), r.text)
+        return r.json()
+
+    def test_checkin_tab_follows_check_ins_live(self):
+        game = self.field.create_game()
+        self.field.http.put("/api/v1/checkin/settings", json={"confirm": "staff", "federation": "optional"})
+        page = self.console()
+        page.get_by_test_id("tab-checkin").click()
+        expect(page.get_by_test_id("checkin-empty")).to_be_visible()
+        expect(page.get_by_test_id("checkin-open")).to_contain_text("aberto")
+        me = self.check_in(game["id"], "Coruja", federation_number="FPA-77", replicas=[
+            {"declaration_id": "6f1d2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b", "type": "aeg", "class": "rifle"},
+            {"declaration_id": "0a1b2c3d-4e5f-4a6b-9c7d-8e9f0a1b2c3d", "type": "bolt_action", "class": "sniper",
+             "make_model": "Well MB4402"}])
+        row = page.get_by_test_id(f"checkin-row-{me['player_id']}")
+        expect(row.get_by_test_id("checkin-name")).to_have_text("Coruja")  # live, no reload
+        expect(row).to_contain_text("à espera de confirmação")
+        expect(row.get_by_test_id("checkin-replicas")).to_contain_text("2")
+        expect(page.get_by_test_id("chrono-counts")).to_contain_text("por cronografar: 2")
+        expect(page.get_by_test_id(f"chrono-player-{me['player_id']}")).to_contain_text("Well MB4402")
+        row.get_by_test_id("checkin-confirm").click()
+        expect(row).to_contain_text("com check-in")
+        row.get_by_test_id("checkin-card-seen").check()
+        expect(row).to_contain_text("cartão visto")
+        # A game without squads: teams only, no squad picker or squad-leader role.
+        expect(row.get_by_test_id("checkin-squad")).to_have_count(0)
+        expect(row.locator("[data-testid=checkin-role] option[value=squad_leader]")).to_have_count(0)
+        expect(page.get_by_test_id("checkin-table")).not_to_contain_text("squad")
+        row.get_by_test_id("checkin-role").select_option("marshal")
+        self.assertTrue(wait_for(lambda: self.field.bundle.store.checkin(game["id"], me["player_id"])["role"]
+                                 == "marshal", 5))
+        stored = self.field.bundle.store.checkin(game["id"], me["player_id"])
+        self.assertEqual((stored["status"], stored["federation_seen"]), ("checked_in", True))
+        # A player without the app, checked in by hand.
+        page.get_by_test_id("checkin-manual").click()
+        page.get_by_test_id("checkin-manual-name").fill("Sem Telemóvel")
+        page.get_by_test_id("checkin-manual-add").click()
+        page.get_by_test_id("checkin-manual-save").click()
+        expect(page.get_by_test_id("checkin-table")).to_contain_text("Sem Telemóvel")
+        expect(page.get_by_test_id("chrono-counts")).to_contain_text("por cronografar: 3")
+        # The start warning counts the replicas still to chronograph.
+        page.get_by_test_id("tab-game").click()
+        page.get_by_test_id("game-start").click()
+        expect(page.locator(".confirm-q")).to_contain_text("3 réplica")
+        page.get_by_test_id("game-start-yes").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("a decorrer")
+        # The read token sees no check-in tab content and no names.
+        read = self.console(READ)
+        read.get_by_test_id("tab-checkin").click()
+        expect(read.locator("main.content")).not_to_contain_text("Coruja")
+
+    def test_checkin_tab_with_squads(self):
+        page = self.console()
+        page.get_by_test_id("game-name").fill("Milsim")
+        page.get_by_test_id("game-source").select_option(f"mode:{DOMINATION}")
+        page.get_by_test_id("game-squads").fill("2")
+        page.get_by_test_id("game-create").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("pronto")
+        game = self.field.bundle.controller.game
+        self.assertEqual(game["squads"], 2)
+        expect(page.locator("dl.facts")).to_contain_text("2 squads por equipa")
+        me = self.check_in(game["id"], "Lince")
+        page.get_by_test_id("tab-checkin").click()
+        row = page.get_by_test_id(f"checkin-row-{me['player_id']}")
+        expect(page.get_by_test_id("checkin-table")).to_contain_text("Equipa › squad")
+        expect(row.get_by_test_id("checkin-squad")).to_have_count(0)  # a squad is inside a team
+        row.get_by_test_id("checkin-team").select_option("blue")
+        expect(row.get_by_test_id("checkin-squad")).to_be_visible()
+        row.get_by_test_id("checkin-squad").select_option("2")
+        row.get_by_test_id("checkin-role").select_option("squad_leader")
+        self.assertTrue(wait_for(lambda: self.field.bundle.store.checkin(game["id"], me["player_id"])["role"]
+                                 == "squad_leader", 5))
+        stored = self.field.bundle.store.checkin(game["id"], me["player_id"])
+        self.assertEqual((stored["team"], stored["squad"]), (2, 2))
+
+    def test_poster_renders_a_qr_code_with_the_poster_text(self):
+        if not ZBARIMG:
+            self.skipTest("zbarimg is not installed")
+        self.field.create_game()
+        self.field.http.put("/api/v1/checkin/poster", json={"wifi_ssid": "Atalaia Campo"})
+        expected = self.field.http.get("/api/v1/checkin/poster").json()
+        page = self.console()
+        page.get_by_test_id("tab-checkin").click()
+        expect(page.get_by_test_id("poster-ca")).to_have_text(expected["ca_short"])
+        with page.expect_popup() as popup:
+            page.get_by_test_id("checkin-poster-link").click()
+        poster = popup.value
+        poster.on("pageerror", lambda e: self.errors.append(f"pageerror: {e}"))
+        expect(poster.get_by_test_id("poster-qr")).to_be_visible()
+        expect(poster.get_by_test_id("poster-field")).to_have_text(expected["field_name"])
+        expect(poster.get_by_test_id("poster-ca-short")).to_have_text(expected["ca_short"])
+        expect(poster.locator("#step1-pt")).to_contain_text("Atalaia Campo")
+        with tempfile.TemporaryDirectory() as tmp:
+            shot = os.path.join(tmp, "poster.png")
+            poster.get_by_test_id("poster-qr").screenshot(path=shot)
+            out = subprocess.run([ZBARIMG, "--raw", "-q", shot], capture_output=True, text=True, timeout=30)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        text = out.stdout.strip()
+        self.assertEqual(text, expected["text"])
+        decoded = checkin_poster.parse(text)
+        self.assertEqual(decoded["ca_sha256"], self.field.bundle.tls.ca_sha256)
+        self.assertEqual(decoded["wifi_ssid"], "Atalaia Campo")
+        # The Wi-Fi code, drawn from a password that is not kept.
+        poster.get_by_test_id("poster-wifi-pass").fill("segredo;1")
+        poster.get_by_test_id("poster-wifi-draw").click()
+        expect(poster.get_by_test_id("poster-wifi-svg")).to_be_visible()
+        self.assertEqual(poster.get_by_test_id("poster-wifi-pass").input_value(), "")
+        with tempfile.TemporaryDirectory() as tmp:
+            shot = os.path.join(tmp, "wifi.png")
+            poster.get_by_test_id("poster-wifi-svg").screenshot(path=shot)
+            out = subprocess.run([ZBARIMG, "--raw", "-q", shot], capture_output=True, text=True, timeout=30)
+        self.assertEqual(out.stdout.strip(), "WIFI:T:WPA;S:Atalaia Campo;P:segredo\\;1;;")
+        self.assertNotIn("segredo", self.field.http.get("/api/v1/checkin/poster").text)
+        # A phone-sized window has no sideways scroll; printing hides the tools.
+        poster.set_viewport_size({"width": 390, "height": 844})
+        self.no_horizontal_scroll(poster)
+        poster.emulate_media(media="print")
+        expect(poster.get_by_test_id("poster-print")).to_be_hidden()
 
 
 if __name__ == "__main__":

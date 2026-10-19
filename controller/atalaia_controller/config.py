@@ -32,6 +32,28 @@
     port = 8080
     gm_token = ""               # empty: generated on first start (see `tokens`)
     read_token = ""
+    tls_port = 8443             # HTTPS with the field's own CA (ADR-P3-9); 0 = off
+    tls_dir = ""                # where the CA and server certificate live; empty: next to db_path
+    tls_names = []              # extra host names or IP addresses for the server certificate
+
+    [checkin]                   # field check-in (ADR-P3-13, protocol/checkin.md)
+    field_id = "field"          # the field's id, as in chrono records
+    field_name = "Atalaia"      # shown to players (1-48 characters)
+    operator = ""               # the field operator, the data controller in the privacy notice
+    confirm = "auto"            # or "staff": a check-in waits until a marshal or the GM confirms it
+    federation = "off"          # or "optional", "required": the federation number (never verified)
+    federation_label = "FPA"
+    max_replicas = 5            # per player and game, 1-20
+    max_players = 300           # per game
+    chrono_valid_for = "day"    # or "game": how long a chrono pass counts
+    rate_per_minute = 10        # check-ins per client address and minute
+    urls = []                   # the poster's https addresses; empty: from tls_names and this host
+    wifi_ssid = ""              # the field network's name on the poster
+    limit_template = "portugal" # the chrono limits the classes come from (app/lib/chrono/limit_templates)
+    notice_version = 1          # raise it when the privacy notice changes
+    notice_pt = ""              # privacy notice files (Markdown); empty: the default ones
+    notice_en = ""
+    retention_days = 30         # a check-in's personal data after its game (ADR-P4-8's guest rule)
 
     [mqtt]
     enabled = true
@@ -62,9 +84,13 @@ SECTIONS = {
                    "battery_pct", "storage_ok", "persist_game_key", "tick_interval_s"),
     "radio": ("channel_hz", "max_hops", "scan_dwell_s", "quiet_threshold_dbm"),
     "modem": ("port", "baudrate", "ping_interval_s"),
-    "api": ("host", "port", "gm_token", "read_token"),
+    "api": ("host", "port", "gm_token", "read_token", "tls_port", "tls_dir", "tls_names"),
     "mqtt": ("enabled", "host", "port", "username", "password"),
     "join": ("key",),
+    "checkin": ("field_id", "field_name", "operator", "confirm", "federation", "federation_label",
+                "max_replicas", "max_players", "chrono_valid_for", "rate_per_minute", "urls",
+                "wifi_ssid", "limit_template", "notice_version", "notice_pt", "notice_en",
+                "retention_days"),
 }
 
 
@@ -98,6 +124,9 @@ class Config:
     api_port: int = 8080
     gm_token: str = ""
     read_token: str = ""
+    tls_port: int = 8443
+    tls_dir: str = ""
+    tls_names: list[str] = field(default_factory=list)
     # [mqtt]
     mqtt_enabled: bool = True
     mqtt_host: str = "localhost"
@@ -106,6 +135,24 @@ class Config:
     mqtt_password: str = ""
     # [join]
     join_key: str = ""
+    # [checkin]
+    field_id: str = "field"
+    field_name: str = "Atalaia"
+    operator: str = ""
+    checkin_confirm: str = "auto"
+    federation: str = "off"
+    federation_label: str = "FPA"
+    max_replicas: int = 5
+    max_players: int = 300
+    chrono_valid_for: str = "day"
+    rate_per_minute: int = 10
+    checkin_urls: list[str] = field(default_factory=list)
+    wifi_ssid: str = ""
+    limit_template: str = "portugal"
+    notice_version: int = 1
+    notice_pt: str = ""
+    notice_en: str = ""
+    retention_days: int = 30
 
     def validate(self) -> None:
         if not 0 <= self.node_id <= 0xFFFE:
@@ -127,6 +174,9 @@ class Config:
             raise ConfigError("radio.quiet_threshold_dbm must be -128 to 0")
         if self.tick_interval_s <= 0 or self.ping_interval_s <= 0:
             raise ConfigError("intervals must be positive")
+        if not 0 <= self.tls_port <= 65535 or (self.tls_port and self.tls_port == self.api_port):
+            raise ConfigError("api.tls_port must be 0 (off) or a port other than api.port")
+        _check_checkin(self)
         if self.join_key:
             try:
                 ok = len(bytes.fromhex(self.join_key)) == 32
@@ -136,11 +186,45 @@ class Config:
                 raise ConfigError("join.key must be 64 hex digits (32 bytes)")
 
 
+CHECKIN_CHOICES = {"checkin_confirm": ("auto", "staff"), "federation": ("off", "optional", "required"),
+                   "chrono_valid_for": ("day", "game")}
+
+
+def _check_checkin(cfg: "Config") -> None:
+    from .checkin_poster import FIELD_ID_RE, FIELD_NAME_MAX, url_ok  # noqa: PLC0415
+
+    for attr, choices in CHECKIN_CHOICES.items():
+        if getattr(cfg, attr) not in choices:
+            name = "confirm" if attr == "checkin_confirm" else attr
+            raise ConfigError(f"checkin.{name} must be one of {', '.join(choices)}")
+    if not FIELD_ID_RE.fullmatch(cfg.field_id):
+        raise ConfigError("checkin.field_id: 1-64 of A-Z a-z 0-9 . _ : -")
+    if not 1 <= len(cfg.field_name) <= FIELD_NAME_MAX or cfg.field_name != cfg.field_name.strip():
+        raise ConfigError(f"checkin.field_name: 1-{FIELD_NAME_MAX} characters")
+    if not 1 <= len(cfg.federation_label) <= 16:
+        raise ConfigError("checkin.federation_label: 1-16 characters")
+    if not 1 <= cfg.max_replicas <= 20:
+        raise ConfigError("checkin.max_replicas must be 1-20")
+    if not 1 <= cfg.max_players <= 5000:
+        raise ConfigError("checkin.max_players must be 1-5000")
+    if not 1 <= cfg.rate_per_minute <= 1000:
+        raise ConfigError("checkin.rate_per_minute must be 1-1000")
+    if len(cfg.checkin_urls) > 3 or not all(url_ok(u) for u in cfg.checkin_urls):
+        raise ConfigError("checkin.urls: at most 3 addresses like https://10.42.0.1:8443")
+    if len(cfg.wifi_ssid.encode("utf-8")) > 32:
+        raise ConfigError("checkin.wifi_ssid: at most 32 bytes")
+    if not 1 <= cfg.notice_version <= 1_000_000:
+        raise ConfigError("checkin.notice_version must be a positive integer")
+    if not 1 <= cfg.retention_days <= 3653:
+        raise ConfigError("checkin.retention_days must be 1-3653")
+
+
 # (section, key) -> Config attribute
 _ATTR = {("api", "port"): "api_port", ("mqtt", "enabled"): "mqtt_enabled",
          ("mqtt", "host"): "mqtt_host", ("mqtt", "port"): "mqtt_port",
          ("mqtt", "username"): "mqtt_username", ("mqtt", "password"): "mqtt_password",
-         ("join", "key"): "join_key"}
+         ("join", "key"): "join_key", ("checkin", "confirm"): "checkin_confirm",
+         ("checkin", "urls"): "checkin_urls"}
 
 
 def _attr(section: str, key: str) -> str:

@@ -22,6 +22,7 @@ class ForegroundServicePlugin(private val activity: Activity, messenger: BinaryM
         val intent = Intent(activity, AtalaiaForegroundService::class.java)
             .putExtra(AtalaiaForegroundService.EXTRA_TITLE, call.argument<String>("title") ?: "")
             .putExtra(AtalaiaForegroundService.EXTRA_TEXT, call.argument<String>("text") ?: "")
+            .putExtra(AtalaiaForegroundService.EXTRA_LOCATION, call.argument<Boolean>("location") ?: false)
         when (call.method) {
             "start" -> try {
                 activity.startForegroundService(intent)

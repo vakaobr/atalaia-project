@@ -11,9 +11,15 @@ field's 32-byte join key. A join is a dict:
      "controller_id": 0, "channel_hz": 869525000, "max_hops": 2,
      "teams": ["red", "blue"], "mode_id": "org.atalaia.domination",
      "role": "zone", "game_seed": 12345, "params": {...} or None,
-     "kind": "node" or "controller"}
+     "kind": "node" or "controller",
+     "ca_sha256": b"...32..." or None, "urls": ["https://10.42.0.1:8443"] or None}
 
-Both codecs check protocol/vectors/join.json.
+ca_sha256 (key 13) and urls (key 14) are optional (RFC 0001 Amendment 4,
+proposed): the field CA's fingerprint and the controller's https addresses,
+for an Android prop that links to the controller over Wi-Fi
+(protocol/prop-link.md). Boxes skip them, as they skip every key from 13.
+
+The codecs check protocol/vectors/join.json.
 """
 
 from __future__ import annotations
@@ -22,6 +28,7 @@ import base64
 import hashlib
 import hmac
 import json
+import re
 from typing import Any, Optional
 
 from . import cbor, eu868
@@ -43,8 +50,15 @@ NDEF_TYPE = b"application/vnd.atalaia.join"
 KEYS = {
     "game_id": 1, "game_key": 2, "node_id": 3, "controller_id": 4, "channel_hz": 5,
     "max_hops": 6, "teams": 7, "mode_id": 8, "role": 9, "game_seed": 10, "params": 11, "kind": 12,
+    "ca_sha256": 13, "urls": 14,
 }
-REQUIRED = set(KEYS) - {"params"}
+OPTIONAL = ("params", "ca_sha256", "urls")
+REQUIRED = set(KEYS) - set(OPTIONAL)
+URLS_MAX = 3
+URL_MAX = 64
+# The same rule as the check-in poster's urls (protocol/checkin.md): https://host[:port], no path.
+URL_RE = re.compile(r"https://(?:[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63})*|\[[0-9A-Fa-f:.]{2,45}\])"
+                    r"(?::([1-9][0-9]{0,4}))?")
 KINDS = {"node": 0, "controller": 1}
 _KIND_NAMES = {v: k for k, v in KINDS.items()}
 _NAMES = {v: k for k, v in KEYS.items()}
@@ -129,6 +143,20 @@ def validate(j: dict[str, Any]) -> dict[str, Any]:
         if len(params_json(params).encode("utf-8")) > PARAMS_MAX:
             raise JoinError("body", f"params: the JSON form is over {PARAMS_MAX} bytes")
     out["params"] = params
+    ca = j.get("ca_sha256")
+    if ca is not None and (not isinstance(ca, (bytes, bytearray)) or len(ca) != 32):
+        raise JoinError("body", "ca_sha256 must be 32 bytes")
+    out["ca_sha256"] = bytes(ca) if ca is not None else None
+    urls = j.get("urls")
+    if urls is not None:
+        if not isinstance(urls, list) or not 1 <= len(urls) <= URLS_MAX or len(set(urls)) != len(urls):
+            raise JoinError("body", f"urls: 1 to {URLS_MAX} different addresses")
+        for u in urls:
+            m = URL_RE.fullmatch(u) if isinstance(u, str) and u.isascii() and len(u) <= URL_MAX else None
+            if m is None or (m.group(1) is not None and int(m.group(1)) > 65535):
+                raise JoinError("body", f"urls: {u!r} is not https://host[:port] of at most {URL_MAX} bytes")
+        urls = list(urls)
+    out["urls"] = urls
     kind = j["kind"]
     if kind not in KINDS:
         raise JoinError("body", f"kind must be one of {sorted(KINDS)}")
@@ -143,7 +171,7 @@ def encode(j: dict[str, Any], join_key: bytes) -> bytes:
     v = validate(j)
     body: dict[int, Any] = {}
     for name in KEYS:
-        if name == "params" and v["params"] is None:
+        if name in OPTIONAL and v[name] is None:
             continue
         body[KEYS[name]] = KINDS[v["kind"]] if name == "kind" else v[name]
     signed = bytes([VERSION]) + cbor.encode(body)
@@ -180,9 +208,14 @@ def decode(data: bytes, join_key: bytes) -> dict[str, Any]:
             if not isinstance(v, int) or isinstance(v, bool) or v not in _KIND_NAMES:
                 raise JoinError("body", f"unknown join kind {v!r}")
             v = _KIND_NAMES[v]
+        if name in ("ca_sha256", "urls") and v is None:
+            raise JoinError("body", f"{name} is null: leave an optional field out instead")
         j[name] = v
-    if "game_key" in j and not isinstance(j["game_key"], bytes):
-        raise JoinError("body", "game_key must be a byte string")
+    for name in ("game_key", "ca_sha256"):
+        if name in j and not isinstance(j[name], bytes):
+            raise JoinError("body", f"{name} must be a byte string")
+    if "urls" in j and _has_bytes(j["urls"]):
+        raise JoinError("body", "urls must be text")
     for name in ("teams", "mode_id", "role"):
         if name in j and _has_bytes(j[name]):
             raise JoinError("body", f"{name} must be text")

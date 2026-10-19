@@ -20,7 +20,7 @@ function parseTeams(text) {
 class CreateGame extends Component {
     constructor(props) {
         super(props);
-        this.state = { name: '', source: '', teams: 'red, blue', minutes: '20', values: null, mods: [] };
+        this.state = { name: '', source: '', teams: 'red, blue', minutes: '20', squads: '0', values: null, mods: [] };
     }
 
     /** The mode or preset picked, its modifiers, and their parameter schema and labels. */
@@ -52,7 +52,8 @@ class CreateGame extends Component {
         const teams = parseTeams(this.state.teams);
         const values = this.state.values || initialValues(schema, preset ? preset.params : null);
         const body = { name: this.state.name.trim(), teams, params: values,
-                       duration_ms: Math.max(0, Math.round(parseFloat(this.state.minutes || '0') * 60000)) };
+                       duration_ms: Math.max(0, Math.round(parseFloat(this.state.minutes || '0') * 60000)),
+                       squads: Math.max(0, Math.min(16, parseInt(this.state.squads || '0', 10) || 0)) };
         if (preset) {
             body.preset_id = preset.id;
         } else {
@@ -90,6 +91,10 @@ class CreateGame extends Component {
                 <input id="g-minutes" type="number" min="0" step="1" value=${state.minutes}
                     onInput=${(e) => this.setState({ minutes: e.target.value })} />
                 <small class="muted">${t('game.duration_hint')}</small></div>
+            <div class="field"><label for="g-squads">${t('game.squads')}</label>
+                <input id="g-squads" data-testid="game-squads" type="number" min="0" max="16" step="1" value=${state.squads}
+                    onInput=${(e) => this.setState({ squads: e.target.value })} />
+                <small class="muted">${t('game.squads_hint')}</small></div>
             ${mode && !preset && html`<${ModifierPicker} modes=${modes} selected=${state.mods} prefix="game"
                 onChange=${(mods) => this.setState({ mods, values: null })} />`}
             ${mode && html`<details open=${!preset}>
@@ -185,6 +190,7 @@ export class GameControl extends Component {
             </section>`;
         }
         const s = game.state;
+        const pending = (app.state.chronoCounts && app.state.chronoCounts.pending) || 0;
         return html`<section class="card" aria-labelledby="game-h">
             <h2 id="game-h">${game.name}</h2>
             <dl class="facts">
@@ -192,14 +198,16 @@ export class GameControl extends Component {
                 <dt>${t('game.clock')}</dt><dd class="big-clock" data-testid="game-clock">${clock(app.gameTime())}</dd>
                 <dt>${t('game.length')}</dt><dd>${game.duration_ms ? clock(game.duration_ms) : t('game.no_limit')}</dd>
                 <dt>${t('game.mode')}</dt><dd>${modeName(props.app.state.modes, game.mode_id)}</dd>
-                <dt>${t('game.teams')}</dt><dd>${game.teams.join(', ')}</dd>
+                <dt>${t('game.teams')}</dt><dd>${game.teams.join(', ')}${game.squads
+                    ? ` · ${t('game.squads_each', { n: game.squads })}` : ''}</dd>
                 <dt>${t('game.id')}</dt><dd>${game.id}</dd>
                 ${game.channel_hz && html`<dt>${t('radio.channel')}</dt><dd data-testid="game-channel">${mhz(game.channel_hz)} MHz</dd>`}
             </dl>
             ${game.joined && html`<p class="notice">${t('game.standby_notice')}</p>`}
             ${gm && html`<div class="actions" data-testid="game-actions">
                 ${s === 'ready' && html`<${ConfirmButton} testid="game-start" class="primary" label=${t('game.start')}
-                    question=${t('game.confirm_start')} disabled=${!leading} onConfirm=${() => this.lifecycle('start')} />`}
+                    question=${pending ? t('game.confirm_start_pending', { n: pending }) : t('game.confirm_start')}
+                    disabled=${!leading} onConfirm=${() => this.lifecycle('start')} />`}
                 ${s === 'running' && html`<${ConfirmButton} testid="game-pause" label=${t('game.pause')}
                     question=${t('game.confirm_pause')} disabled=${!leading} onConfirm=${() => this.lifecycle('pause', {})} />`}
                 ${s === 'paused' && html`<${ConfirmButton} testid="game-resume" class="primary" label=${t('game.resume')}

@@ -7,8 +7,13 @@
 /// it: a snapshot first, then games, scores, events and nodes. Reconnects
 /// after 1 s, doubling up to 15 s; a refused code (close 4401) stops.
 ///
-/// Player tokens with roles, and positions, are plan phase E: the feed here
-/// is what every holder of the read code sees.
+/// The snapshot holds the game's latest events (plan phase E), so a phone
+/// that connects mid-game shows what already happened. With a player token
+/// (a field check-in, ADR-P3-13) the link is HTTPS with the field's pinned
+/// CA; the feed then also has the player's own check-in ([me]), the
+/// positions the controller lets this player see, and when the GM changes
+/// the player's team or role (close 4409) it asks [onAssignment] for a new
+/// token before it reconnects.
 library;
 
 import 'dart:async';
@@ -17,13 +22,20 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../checkin/field_trust.dart';
+
 /// A field controller's address and access code.
 final class FieldLink {
-  const FieldLink(this.base, this.token);
+  const FieldLink(this.base, this.token, {this.field});
 
-  /// http://host:port
+  /// http://host:port, or https://host:port with [field].
   final Uri base;
   final String token;
+
+  /// The pinned field of a check-in: its CA is the only one trusted.
+  final PinnedField? field;
+
+  FieldLink withToken(String t) => FieldLink(base, t, field: field);
 
   Uri get stream => base.replace(
     scheme: base.scheme == 'https' ? 'wss' : 'ws',
@@ -98,6 +110,11 @@ class _IoSocket implements FeedSocket {
 Future<FeedSocket> ioConnect(Uri uri) async =>
     _IoSocket(await WebSocket.connect(uri.toString()));
 
+/// [ioConnect] trusting only [field]'s CA.
+Future<FeedSocket> pinnedConnect(Uri uri, PinnedField field) async => _IoSocket(
+  await WebSocket.connect(uri.toString(), customClient: field.client()),
+);
+
 enum FeedState { connecting, open, closed, denied }
 
 /// One event of the game, as the controller logged it.
@@ -111,12 +128,30 @@ final class FeedEvent {
 }
 
 class FieldFeed extends ChangeNotifier {
-  FieldFeed(this.link, {FeedConnect? connect, DateTime Function()? now})
-    : _connect = connect ?? ioConnect,
-      _now = now ?? DateTime.now;
+  FieldFeed(
+    this.link, {
+    FeedConnect? connect,
+    DateTime Function()? now,
+    this.onAssignment,
+  }) : _connect =
+           connect ??
+           (link.field == null
+               ? ioConnect
+               : (uri) => pinnedConnect(uri, link.field!)),
+       _now = now ?? DateTime.now;
 
-  final FieldLink link;
+  FieldLink link;
   final FeedConnect _connect;
+
+  /// Asked for a new token when the controller closes the stream with 4409
+  /// (the GM changed this player's team, squad or role); null keeps the old.
+  final Future<String?> Function()? onAssignment;
+
+  /// The player's own check-in (a player token's stream only).
+  Map<String, Object?>? me;
+
+  /// The positions this connection may see, by player id (ADR-P3-6).
+  final positions = <String, Map<String, Object?>>{};
   final DateTime Function() _now;
 
   FeedState state = FeedState.connecting;
@@ -177,6 +212,11 @@ class FieldFeed extends ChangeNotifier {
         notifyListeners();
         return;
       }
+      if (s.closeCode == 4409 && onAssignment != null) {
+        final t = await onAssignment!();
+        if (t != null) link = link.withToken(t);
+        _delay = const Duration(milliseconds: 200);
+      }
     } on Object {
       // connection refused or dropped
     }
@@ -204,6 +244,21 @@ class FieldFeed extends ChangeNotifier {
             nodes[n['node_id']! as int] = n;
           }
         }
+        // The game's latest events, oldest first: what happened before this
+        // connection (a reconnect starts the list over, without duplicates).
+        events.clear();
+        eliminated.clear();
+        lives.clear();
+        for (final e in (m['events'] as List?) ?? const []) {
+          if (e is Map<String, Object?>) _onEvent(e);
+        }
+        if (m['me'] is Map) me = (m['me']! as Map).cast<String, Object?>();
+        positions.clear();
+        for (final p in (m['positions'] as List?) ?? const []) {
+          if (p is Map && p['player_id'] is String) {
+            positions[p['player_id']! as String] = p.cast<String, Object?>();
+          }
+        }
       case 'game':
         final g = m['game'] as Map<String, Object?>?;
         if (g != null &&
@@ -228,6 +283,28 @@ class FieldFeed extends ChangeNotifier {
       case 'event':
         final e = m['event'];
         if (e is Map<String, Object?>) _onEvent(e);
+      case 'checkin':
+        final c = m['checkin'];
+        if (c is Map && (me == null || c['player_id'] == me!['player_id'])) {
+          me = c.cast<String, Object?>();
+        }
+      case 'chrono_list':
+        final mine = me;
+        if (mine != null && m['player_id'] == mine['player_id']) {
+          me = {...mine, 'declarations': m['declarations']};
+        }
+      case 'player_position':
+        final p = m['position'];
+        if (p is Map && p['player_id'] is String) {
+          positions[p['player_id']! as String] = p.cast<String, Object?>();
+        }
+      case 'positions':
+        positions.clear();
+        for (final p in (m['positions'] as List?) ?? const []) {
+          if (p is Map && p['player_id'] is String) {
+            positions[p['player_id']! as String] = p.cast<String, Object?>();
+          }
+        }
     }
     notifyListeners();
   }

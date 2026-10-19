@@ -13,7 +13,10 @@
 /// scanned, or a join card over NFC (MIME record application/vnd.atalaia.join).
 /// The app checks the tag with the field join key entered once in its
 /// settings, then uses the game's id and key, its node id, mode, role, teams,
-/// parameters and seed.
+/// parameters and seed. Optional keys 13 (the field CA's fingerprint) and 14
+/// (the controller's https addresses) let it link to the controller over
+/// Wi-Fi (protocol/prop-link.md, RFC 0001 Amendment 4, proposed); boxes skip
+/// them.
 library;
 
 import 'dart:convert';
@@ -74,6 +77,8 @@ final class JoinPayload {
     required this.gameSeed,
     required this.params,
     required this.kind,
+    this.caSha256,
+    this.urls,
   });
 
   final int gameId;
@@ -92,6 +97,12 @@ final class JoinPayload {
   /// Null: the mode's defaults.
   final Map<String, Object?>? params;
   final JoinKind kind;
+
+  /// Key 13: SHA-256 of the field CA's DER certificate (32 bytes), or null.
+  final Uint8List? caSha256;
+
+  /// Key 14: the controller's https base addresses (1-3), or null.
+  final List<String>? urls;
 
   /// The parts of [modeId]: the main mode, then its modifiers.
   List<String> get modeParts => modeId.split('+');
@@ -201,6 +212,29 @@ JoinPayload _validate(Map<String, Object?> j) {
   }
   final kind = j['kind'];
   if (kind is! JoinKind) throw _body('kind must be node or controller');
+  final ca = j['ca_sha256'];
+  if (ca != null && (ca is! Uint8List || ca.length != 32)) {
+    throw _body('ca_sha256 must be 32 bytes');
+  }
+  final urls = j['urls'];
+  List<String>? u;
+  if (urls != null) {
+    if (urls is! List ||
+        urls.isEmpty ||
+        urls.length > 3 ||
+        urls.toSet().length != urls.length) {
+      throw _body('urls: 1 to 3 different addresses');
+    }
+    u = [
+      for (final x in urls)
+        if (x is String && httpsBaseUrlOk(x))
+          x
+        else
+          throw _body(
+            'urls: $x is not https://host[:port] of at most 64 bytes',
+          ),
+    ];
+  }
   return JoinPayload(
     gameId: gameId,
     gameKey: key,
@@ -214,13 +248,31 @@ JoinPayload _validate(Map<String, Object?> j) {
     gameSeed: seed,
     params: p,
     kind: kind,
+    caSha256: ca as Uint8List?,
+    urls: u,
   );
 }
+
+/// An https base address: https://host[:port] (a DNS name or IPv4 address,
+/// or an IPv6 address in brackets), nothing after it, at most 64 bytes. The
+/// rule of the check-in poster's and the join payload's urls.
+bool httpsBaseUrlOk(String url) {
+  if (url.length > 64 || url.codeUnits.any((c) => c > 0x7e)) return false;
+  final m = _httpsBase.firstMatch(url);
+  if (m == null) return false;
+  final port = m.group(1);
+  return port == null || int.parse(port) <= 65535;
+}
+
+final _httpsBase = RegExp(
+  r'^https://(?:[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63})*'
+  r'|\[[0-9A-Fa-f:.]{2,45}\])(?::([1-9][0-9]{0,4}))?$',
+);
 
 const _keys = {
   1: 'game_id', 2: 'game_key', 3: 'node_id', 4: 'controller_id', //
   5: 'channel_hz', 6: 'max_hops', 7: 'teams', 8: 'mode_id', 9: 'role',
-  10: 'game_seed', 11: 'params', 12: 'kind',
+  10: 'game_seed', 11: 'params', 12: 'kind', 13: 'ca_sha256', 14: 'urls',
 };
 
 bool _hasBytes(Object? v) => switch (v) {
@@ -274,12 +326,17 @@ JoinPayload decodeJoin(List<int> data, List<int> joinKey) {
       if (v is! int || v < 0 || v > 1) throw _body('unknown join kind $v');
       v = JoinKind.values[v];
     }
+    if ((name == 'ca_sha256' || name == 'urls') && v == null) {
+      throw _body('$name is null: leave an optional field out instead');
+    }
     j[name] = v;
   }
-  if (j.containsKey('game_key') && j['game_key'] is! Uint8List) {
-    throw _body('game_key must be a byte string');
+  for (final name in ['game_key', 'ca_sha256']) {
+    if (j.containsKey(name) && j[name] is! Uint8List) {
+      throw _body('$name must be a byte string');
+    }
   }
-  for (final name in ['teams', 'mode_id', 'role', 'params']) {
+  for (final name in ['teams', 'mode_id', 'role', 'params', 'urls']) {
     if (_hasBytes(j[name])) throw _body('$name must be text');
   }
   return _validate(j);
@@ -304,6 +361,8 @@ Uint8List encodeJoin(JoinPayload j, List<int> joinKey) {
     'game_seed': j.gameSeed,
     'params': j.params,
     'kind': j.kind,
+    'ca_sha256': j.caSha256,
+    'urls': j.urls,
   });
   final body = <int, Object?>{
     1: v.gameId,
@@ -318,6 +377,8 @@ Uint8List encodeJoin(JoinPayload j, List<int> joinKey) {
     10: v.gameSeed,
     if (v.params != null) 11: v.params,
     12: v.kind.index,
+    if (v.caSha256 != null) 13: v.caSha256,
+    if (v.urls != null) 14: v.urls,
   };
   final signed = Uint8List.fromList([joinVersion, ...cborEncode(body)]);
   final out = Uint8List.fromList([

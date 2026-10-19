@@ -111,7 +111,7 @@
       "ndef_tag": "03ff0124c21c000001026170706c69636174696f6e2f766e642e6174616c6169612e6a6f696e01ac0119020102502b7e151628aed2a6abf7158809cf4f3c0319fffd0402051a33da315c06020788777465616d2d6f6e652d776974682d32332d6368617273216374776f65746872656564666f757264666976656373697865736576656e65656967687408783f782e636c75622e636170747572652d7468652d666c61672d78787878787878787878787878787878787878787878787878787878787878787878787878787809781f666c61672d73746174696f6e2d776974682d33312d62797465732d726f6c650a184d0ba16f636170747572655f686f6c645f6d73190bb80c0028076c8127f63df367d71dfec78e6aa8032df0b18b1cb7c5405779e6fefc56d2fe"
     }
   ],
-  "optional_key_skipped": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000d66667574757265c1aa19eb7c994f1ad8d3c5e51b384842d93528c9724b709894de9d8033e48b35",
+  "optional_key_skipped": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c001466667574757265668f3369c4524a4636ea72c89e2a13dc2581e1648a1495e82497d0e9d82beb93",
   "invalid": [
     {
       "name": "tag_mismatch_body_changed",
@@ -361,5 +361,149 @@
       "data": "54657374205573696e67204c6172676572205468616e20426c6f636b2d53697a65204b6579202d2048617368204b6579204669727374",
       "mac": "60e431591ee0b67f0d8a26aacbf5b77f8e0bc6213728c5140546040f0ee37f54"
     }
-  ]
+  ],
+  "controller_link": {
+    "description": "Optional keys 13 (ca_sha256, 32 bytes: the field CA's fingerprint) and 14 (urls: 1-3 https base addresses of the controller), RFC 0001 Amendment 4 (proposed), for Android props that link over Wi-Fi (protocol/prop-link.md). The app's and the simulator's codecs decode and re-encode these byte for byte; boxes (core/src/join.c) skip keys 13-31, so the C tests do not read this section.",
+    "valid": [
+      {
+        "name": "prop_with_ca_and_urls",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 7,
+          "controller_id": 0,
+          "channel_hz": 869525000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "zone",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "node",
+          "ca_sha256": "adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+          "urls": [
+            "https://10.42.0.1:8443",
+            "https://atalaia.local:8443"
+          ]
+        },
+        "payload": "01ad0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000d5820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a0e827668747470733a2f2f31302e34322e302e313a38343433781a68747470733a2f2f6174616c6169612e6c6f63616c3a38343433f4160c53498d5ed1b8f63e174d049e2f296bd069f2409321c59760779ef5f31b",
+        "text": "atalaia:join:Aa0BGRCSAlArfhUWKK7Spqv3FYgJz088AwcEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JZHpvbmUKGTA5DAANWCCtt5S9FDFtK4YhcaM8aLnKj7wk45gDBBO6lPLKpNZGOg6Cdmh0dHBzOi8vMTAuNDIuMC4xOjg0NDN4Gmh0dHBzOi8vYXRhbGFpYS5sb2NhbDo4NDQz9BYMU0mNXtG49j4XTQSeLylr0GnyQJMhxZdgd5718xs"
+      },
+      {
+        "name": "prop_with_ca_only",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 7,
+          "controller_id": 0,
+          "channel_hz": 869525000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "zone",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "node",
+          "ca_sha256": "adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+          "urls": null
+        },
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000d5820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a29ef9f68990b701e34141b214f090ad79c9916c5634e1ae2caf739cc93a0862c",
+        "text": "atalaia:join:AawBGRCSAlArfhUWKK7Spqv3FYgJz088AwcEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JZHpvbmUKGTA5DAANWCCtt5S9FDFtK4YhcaM8aLnKj7wk45gDBBO6lPLKpNZGOinvn2iZC3AeNBQbIU8JCtecmRbFY04a4sr3OcyToIYs"
+      },
+      {
+        "name": "prop_with_urls_only",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 7,
+          "controller_id": 0,
+          "channel_hz": 869525000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "zone",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "node",
+          "urls": [
+            "https://[fd00::1]:8443"
+          ],
+          "ca_sha256": null
+        },
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000e817668747470733a2f2f5b666430303a3a315d3a38343433116699007bb504290eba1ff48d964d987c984e5cb8b67b66b437ed6b3b9fc002",
+        "text": "atalaia:join:AawBGRCSAlArfhUWKK7Spqv3FYgJz088AwcEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JZHpvbmUKGTA5DAAOgXZodHRwczovL1tmZDAwOjoxXTo4NDQzEWaZAHu1BCkOuh_0jZZNmHyYTly4tntmtDftazufwAI"
+      }
+    ],
+    "invalid": [
+      {
+        "name": "ca_31_bytes",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000d581fadb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6468a78920837d481fcb844bd01432891d681bad03c0424939f70d8562e828024b7",
+        "reason": "body",
+        "why": "the fingerprint is 32 bytes"
+      },
+      {
+        "name": "ca_as_text",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000d784061646237393462643134333136643262383632313731613333633638623963613866626332346533393830333034313362613934663263616134643634363361b8fc9476127c0d5b440e733c0785b16d42f2c19ab9bde41bff96a400e29a2d25",
+        "reason": "body",
+        "why": "the fingerprint is a byte string"
+      },
+      {
+        "name": "ca_null",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000df6e99e90316995cde14be2deeaee3f7512f45b5b54bbae8be59f270625cb185776",
+        "reason": "body",
+        "why": "an optional field is left out, never null"
+      },
+      {
+        "name": "urls_empty",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000e80828f0f7ef5acef79b9ebc38594e3a892de09049bdbb19c44e5eafc6c5278484d",
+        "reason": "body",
+        "why": "1 to 3 addresses"
+      },
+      {
+        "name": "urls_4",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000e847568747470733a2f2f31302e302e302e313a383434337568747470733a2f2f31302e302e302e323a383434337568747470733a2f2f31302e302e302e333a383434337568747470733a2f2f31302e302e302e343a38343433bf45de6a2215080c3d942a223ba95435696e998bacdf80395cbb5e2d268b4faf",
+        "reason": "body",
+        "why": "1 to 3 addresses"
+      },
+      {
+        "name": "url_http",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000e8175687474703a2f2f31302e34322e302e313a38303830bc995e3c040779e19cba6e87fea52a15bb6f05db5b98bcf7814aca50f6e96bf0",
+        "reason": "body",
+        "why": "https only"
+      },
+      {
+        "name": "url_path",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000e81781a68747470733a2f2f31302e34322e302e313a383434332f617069a87eaffdd3ec0c93563b8871de2e356372e01d937373bf4522aa569aa5cf6e48",
+        "reason": "body",
+        "why": "a base address"
+      },
+      {
+        "name": "url_repeated",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000e826b68747470733a2f2f613a316b68747470733a2f2f613a3165bab46bfe9b7a44073e3631e63b3d92520f82ff892740221d8993b2b879d4d1",
+        "reason": "body",
+        "why": "each address once"
+      },
+      {
+        "name": "urls_text",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000e7668747470733a2f2f31302e34322e302e313a383434332f70201b25684495e56305149c9721867dd8bfa56104da7abe25cd4f2986721f",
+        "reason": "body",
+        "why": "an array of text"
+      },
+      {
+        "name": "url_bytes",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000e814968747470733a2f2f6125f8f50e99d69489d70acb570543891cf842c2d118c586b362e9b02cc42432a7",
+        "reason": "body",
+        "why": "addresses are text"
+      }
+    ]
+  }
 }

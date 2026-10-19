@@ -6,6 +6,9 @@
 library;
 
 import 'package:atalaia_app/app.dart';
+import 'package:atalaia_app/checkin/checkin_client.dart';
+import 'package:atalaia_app/checkin/field_trust.dart';
+import 'package:atalaia_app/controller/prop_link.dart';
 import 'package:atalaia_app/core/node_runner.dart';
 import 'package:atalaia_app/l10n/strings.dart';
 import 'package:atalaia_app/player/field_feed.dart';
@@ -20,7 +23,15 @@ class Harness {
     required this.runner,
     this.feedConnect,
     FakeQr? qr,
+    this.fieldHttp,
+    this.caFetch,
+    this.linkConnect,
   }) : qr = qr ?? FakeQr();
+
+  /// A fake field controller for check-in (test/support/fake_field.dart).
+  final FieldHttp Function(PinnedField field)? fieldHttp;
+  final CaFetcher? caFetch;
+  final LinkConnect? linkConnect;
 
   final AppSettings settings;
   final NodeRunner runner;
@@ -43,6 +54,9 @@ class Harness {
     feedConnect: feedConnect ?? _noFeed,
     consoleView: (context, url) =>
         Center(child: Text('console $url', key: const Key('console-view'))),
+    fieldHttp: fieldHttp,
+    caFetch: caFetch ?? _noCa,
+    linkConnect: linkConnect,
   );
 
   /// The app; a new harness is a new app (its own state), even when pumped
@@ -56,6 +70,7 @@ class Harness {
 }
 
 Future<FeedSocket> _noFeed(Uri uri) => Future.error(StateError('no network'));
+Future<String> _noCa(Uri uri) => Future.error(StateError('no network'));
 
 Harness harness({
   AppLanguage language = AppLanguage.pt,
@@ -63,9 +78,15 @@ Harness harness({
   FeedConnect? feedConnect,
   AppSettings? settings,
   FakeQr? qr,
+  FieldHttp Function(PinnedField field)? fieldHttp,
+  CaFetcher? caFetch,
+  LinkConnect? linkConnect,
 }) => Harness(
   settings: (settings ?? AppSettings())..language = language,
   runner: runner ?? FakeNodeRunner(),
   feedConnect: feedConnect,
   qr: qr,
+  fieldHttp: fieldHttp,
+  caFetch: caFetch,
+  linkConnect: linkConnect,
 );

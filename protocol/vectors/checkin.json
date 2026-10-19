@@ -1,0 +1,554 @@
+{
+  "description": "Check-in poster vectors (protocol/checkin.md): version byte and CBOR body, text form atalaia:checkin: + base64url. Every valid payload decodes to its fields (bytes in hex, absent optionals null) and re-encodes byte for byte to the same payload and text. Every invalid one fails with its reason (length, version or body); every invalid text with reason text. optional_keys_skipped and spaces_around decode like the vector they name. declarations and identities are checked by the controller and the app alike.",
+  "valid": [
+    {
+      "name": "minimal",
+      "fields": {
+        "field_id": "campo-norte",
+        "field_name": "Campo Norte",
+        "urls": [
+          "https://10.42.0.1:8443"
+        ],
+        "ca_sha256": "adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+        "wifi_ssid": null,
+        "game_id": null
+      },
+      "payload": "01a4016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "text": "atalaia:checkin:AaQBa2NhbXBvLW5vcnRlAmtDYW1wbyBOb3J0ZQOBdmh0dHBzOi8vMTAuNDIuMC4xOjg0NDMEWCCtt5S9FDFtK4YhcaM8aLnKj7wk45gDBBO6lPLKpNZGOg"
+    },
+    {
+      "name": "full",
+      "fields": {
+        "field_id": "clube.aguia:sintra",
+        "field_name": "Clube Águia · Sintra",
+        "urls": [
+          "https://10.42.0.1:8443",
+          "https://atalaia.local:8443",
+          "https://[fd00::1]:8443"
+        ],
+        "ca_sha256": "3a9075374e38d12bfde9e9ee49cff2b730a1c1c28def34384dfbac783b0740a5",
+        "wifi_ssid": "Atalaia Campo",
+        "game_id": 4242
+      },
+      "payload": "01a60172636c7562652e61677569613a73696e7472610276436c75626520c3816775696120c2b72053696e74726103837668747470733a2f2f31302e34322e302e313a38343433781a68747470733a2f2f6174616c6169612e6c6f63616c3a383434337668747470733a2f2f5b666430303a3a315d3a383434330458203a9075374e38d12bfde9e9ee49cff2b730a1c1c28def34384dfbac783b0740a5056d4174616c6169612043616d706f06191092",
+      "text": "atalaia:checkin:AaYBcmNsdWJlLmFndWlhOnNpbnRyYQJ2Q2x1YmUgw4FndWlhIMK3IFNpbnRyYQODdmh0dHBzOi8vMTAuNDIuMC4xOjg0NDN4Gmh0dHBzOi8vYXRhbGFpYS5sb2NhbDo4NDQzdmh0dHBzOi8vW2ZkMDA6OjFdOjg0NDMEWCA6kHU3TjjRK_3p6e5Jz_K3MKHBwo3vNDhN-6x4OwdApQVtQXRhbGFpYSBDYW1wbwYZEJI"
+    },
+    {
+      "name": "game_only_default_port",
+      "fields": {
+        "field_id": "F",
+        "field_name": "Arena 7",
+        "urls": [
+          "https://arena7.example"
+        ],
+        "ca_sha256": "adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+        "wifi_ssid": null,
+        "game_id": 65534
+      },
+      "payload": "01a501614602674172656e61203703817668747470733a2f2f6172656e61372e6578616d706c65045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a0619fffe",
+      "text": "atalaia:checkin:AaUBYUYCZ0FyZW5hIDcDgXZodHRwczovL2FyZW5hNy5leGFtcGxlBFggrbeUvRQxbSuGIXGjPGi5yo-8JOOYAwQTupTyyqTWRjoGGf_-"
+    }
+  ],
+  "optional_keys_skipped": {
+    "name": "optional_keys_skipped",
+    "payload": "01a6016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a077661206c61746572206f7074696f6e616c206669656c64181f820102",
+    "same_as": "minimal",
+    "why": "keys 7 and 31 are kept for optional fields: skipped"
+  },
+  "invalid": [
+    {
+      "name": "empty",
+      "payload": "",
+      "reason": "length",
+      "why": "no bytes"
+    },
+    {
+      "name": "version_only",
+      "payload": "01",
+      "reason": "length",
+      "why": "a version byte and no body"
+    },
+    {
+      "name": "over_192_bytes",
+      "payload": "01a4016b63616d706f2d6e6f7274650278307878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878780383783f68747470733a2f2f61616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613a38343433783f68747470733a2f2f62626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262623a38343433783f68747470733a2f2f63636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363633a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "length",
+      "why": "298 bytes"
+    },
+    {
+      "name": "version_0",
+      "payload": "00a4016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "version",
+      "why": "version 0 is unknown"
+    },
+    {
+      "name": "version_2",
+      "payload": "02a4016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "version",
+      "why": "version 2 is unknown"
+    },
+    {
+      "name": "missing_field_id",
+      "payload": "01a3026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "field_id is required"
+    },
+    {
+      "name": "missing_field_name",
+      "payload": "01a3016b63616d706f2d6e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "field_name is required"
+    },
+    {
+      "name": "missing_urls",
+      "payload": "01a3016b63616d706f2d6e6f727465026b43616d706f204e6f727465045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "urls is required"
+    },
+    {
+      "name": "missing_ca",
+      "payload": "01a3016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433",
+      "reason": "body",
+      "why": "ca_sha256 is required"
+    },
+    {
+      "name": "repeated_key",
+      "payload": "01a5016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a016963616d706f2d73756c",
+      "reason": "body",
+      "why": "key 1 twice"
+    },
+    {
+      "name": "key_32",
+      "payload": "01a5016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a182001",
+      "reason": "body",
+      "why": "keys are below 32"
+    },
+    {
+      "name": "negative_key",
+      "payload": "01a5016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a2001",
+      "reason": "body",
+      "why": "keys are 0-31"
+    },
+    {
+      "name": "text_key",
+      "payload": "01a5016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a686669656c645f69646178",
+      "reason": "body",
+      "why": "keys are integers"
+    },
+    {
+      "name": "trailing_bytes",
+      "payload": "01a4016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a00",
+      "reason": "body",
+      "why": "a byte after the map"
+    },
+    {
+      "name": "not_a_map",
+      "payload": "01820102",
+      "reason": "body",
+      "why": "the body is an array"
+    },
+    {
+      "name": "truncated",
+      "payload": "01a4016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4",
+      "reason": "body",
+      "why": "the map ends early"
+    },
+    {
+      "name": "ca_31_bytes",
+      "payload": "01a4016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a3834343304581fadb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d646",
+      "reason": "body",
+      "why": "the fingerprint is 32 bytes"
+    },
+    {
+      "name": "ca_33_bytes",
+      "payload": "01a4016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045821adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a00",
+      "reason": "body",
+      "why": "the fingerprint is 32 bytes"
+    },
+    {
+      "name": "ca_as_text",
+      "payload": "01a4016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a3834343304784061646237393462643134333136643262383632313731613333633638623963613866626332346533393830333034313362613934663263616134643634363361",
+      "reason": "body",
+      "why": "the fingerprint is a byte string"
+    },
+    {
+      "name": "field_id_bytes",
+      "payload": "01a4014563616d706f026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "field_id is text"
+    },
+    {
+      "name": "field_id_space",
+      "payload": "01a4016b63616d706f206e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "a space is not allowed in an id"
+    },
+    {
+      "name": "field_id_65",
+      "payload": "01a40178416161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "1-64 characters"
+    },
+    {
+      "name": "field_id_empty",
+      "payload": "01a40160026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "1-64 characters"
+    },
+    {
+      "name": "field_name_empty",
+      "payload": "01a4016b63616d706f2d6e6f727465026003817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "1-48 characters"
+    },
+    {
+      "name": "field_name_49",
+      "payload": "01a4016b63616d706f2d6e6f727465027862c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a903817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "1-48 characters (not bytes)"
+    },
+    {
+      "name": "field_name_control",
+      "payload": "01a4016b63616d706f2d6e6f727465026b43616d706f0a4e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "no control characters"
+    },
+    {
+      "name": "field_name_padded",
+      "payload": "01a4016b63616d706f2d6e6f72746502662043616d706f03817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "no spaces at the ends"
+    },
+    {
+      "name": "urls_empty",
+      "payload": "01a4016b63616d706f2d6e6f727465026b43616d706f204e6f7274650380045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "1 to 3 addresses"
+    },
+    {
+      "name": "urls_4",
+      "payload": "01a4016b63616d706f2d6e6f727465026b43616d706f204e6f72746503847568747470733a2f2f31302e302e302e313a383434337568747470733a2f2f31302e302e302e323a383434337568747470733a2f2f31302e302e302e333a383434337568747470733a2f2f31302e302e302e343a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "1 to 3 addresses"
+    },
+    {
+      "name": "urls_text",
+      "payload": "01a4016b63616d706f2d6e6f727465026b43616d706f204e6f727465037668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "urls is an array"
+    },
+    {
+      "name": "url_http",
+      "payload": "01a4016b63616d706f2d6e6f727465026b43616d706f204e6f727465038175687474703a2f2f31302e34322e302e313a38303830045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "only https: the app pins the CA"
+    },
+    {
+      "name": "url_path",
+      "payload": "01a4016b63616d706f2d6e6f727465026b43616d706f204e6f7274650381781a68747470733a2f2f31302e34322e302e313a383434332f617069045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "a base address, no path"
+    },
+    {
+      "name": "url_slash",
+      "payload": "01a4016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817768747470733a2f2f31302e34322e302e313a383434332f045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "a base address, no path"
+    },
+    {
+      "name": "url_userinfo",
+      "payload": "01a4016b63616d706f2d6e6f727465026b43616d706f204e6f7274650381781b68747470733a2f2f757365724031302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "no user name"
+    },
+    {
+      "name": "url_port_0",
+      "payload": "01a4016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817368747470733a2f2f31302e34322e302e313a30045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "port 1-65535"
+    },
+    {
+      "name": "url_port_65536",
+      "payload": "01a4016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817768747470733a2f2f31302e34322e302e313a3635353336045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "port 1-65535"
+    },
+    {
+      "name": "url_65_bytes",
+      "payload": "01a4016b63616d706f2d6e6f727465026b43616d706f204e6f7274650381784168747470733a2f2f616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "at most 64 bytes"
+    },
+    {
+      "name": "url_repeated",
+      "payload": "01a4016b63616d706f2d6e6f727465026b43616d706f204e6f72746503827668747470733a2f2f31302e34322e302e313a383434337668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "each address once"
+    },
+    {
+      "name": "url_not_text",
+      "payload": "01a4016b63616d706f2d6e6f727465026b43616d706f204e6f7274650381182a045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+      "reason": "body",
+      "why": "an address is text"
+    },
+    {
+      "name": "ssid_33_bytes",
+      "payload": "01a5016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a057821737373737373737373737373737373737373737373737373737373737373737373",
+      "reason": "body",
+      "why": "1-32 bytes"
+    },
+    {
+      "name": "ssid_empty",
+      "payload": "01a5016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a0560",
+      "reason": "body",
+      "why": "1-32 bytes"
+    },
+    {
+      "name": "ssid_nul",
+      "payload": "01a5016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a0563610062",
+      "reason": "body",
+      "why": "no NUL"
+    },
+    {
+      "name": "game_0",
+      "payload": "01a5016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a0600",
+      "reason": "body",
+      "why": "game ids are 1-65534"
+    },
+    {
+      "name": "game_65535",
+      "payload": "01a5016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a0619ffff",
+      "reason": "body",
+      "why": "game ids are 1-65534"
+    },
+    {
+      "name": "game_text",
+      "payload": "01a5016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a066434323432",
+      "reason": "body",
+      "why": "game_id is an integer"
+    },
+    {
+      "name": "game_float",
+      "payload": "01a5016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a06f93c00",
+      "reason": "body",
+      "why": "game_id is an integer, not a float"
+    },
+    {
+      "name": "game_null",
+      "payload": "01a5016b63616d706f2d6e6f727465026b43616d706f204e6f72746503817668747470733a2f2f31302e34322e302e313a38343433045820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a06f6",
+      "reason": "body",
+      "why": "null is not a game id"
+    }
+  ],
+  "texts": {
+    "same": {
+      "name": "spaces_around",
+      "text": "  atalaia:checkin:AaQBa2NhbXBvLW5vcnRlAmtDYW1wbyBOb3J0ZQOBdmh0dHBzOi8vMTAuNDIuMC4xOjg0NDMEWCCtt5S9FDFtK4YhcaM8aLnKj7wk45gDBBO6lPLKpNZGOg\n",
+      "same_as": "minimal",
+      "why": "spaces and line ends around the text are ignored"
+    },
+    "invalid": [
+      {
+        "name": "join_prefix",
+        "text": "atalaia:join:AaQBa2NhbXBvLW5vcnRlAmtDYW1wbyBOb3J0ZQOBdmh0dHBzOi8vMTAuNDIuMC4xOjg0NDMEWCCtt5S9FDFtK4YhcaM8aLnKj7wk45gDBBO6lPLKpNZGOg",
+        "why": "another kind of code",
+        "reason": "text"
+      },
+      {
+        "name": "no_prefix",
+        "text": "AaQBa2NhbXBvLW5vcnRlAmtDYW1wbyBOb3J0ZQOBdmh0dHBzOi8vMTAuNDIuMC4xOjg0NDMEWCCtt5S9FDFtK4YhcaM8aLnKj7wk45gDBBO6lPLKpNZGOg",
+        "why": "the prefix is required",
+        "reason": "text"
+      },
+      {
+        "name": "padding",
+        "text": "atalaia:checkin:AaQBa2NhbXBvLW5vcnRlAmtDYW1wbyBOb3J0ZQOBdmh0dHBzOi8vMTAuNDIuMC4xOjg0NDMEWCCtt5S9FDFtK4YhcaM8aLnKj7wk45gDBBO6lPLKpNZGOg==",
+        "why": "no padding",
+        "reason": "text"
+      },
+      {
+        "name": "standard_base64",
+        "text": "atalaia:checkin:AQ+/",
+        "why": "+ and / are not base64url",
+        "reason": "text"
+      },
+      {
+        "name": "empty",
+        "text": "atalaia:checkin:",
+        "why": "no payload",
+        "reason": "text"
+      },
+      {
+        "name": "one_char_left",
+        "text": "atalaia:checkin:AQEBA",
+        "why": "a length of 4n+1 is not base64",
+        "reason": "text"
+      },
+      {
+        "name": "not_canonical",
+        "text": "atalaia:checkin:AR",
+        "why": "the unused bits are not zero",
+        "reason": "text"
+      },
+      {
+        "name": "inner_space",
+        "text": "atalaia:checkin:AQ EB",
+        "why": "spaces only around the text",
+        "reason": "text"
+      }
+    ]
+  },
+  "declarations": {
+    "valid": [
+      {
+        "name": "registered",
+        "declaration": {
+          "declaration_id": "6f1d2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b",
+          "replica_id": "0a1b2c3d-4e5f-4a6b-9c7d-8e9f0a1b2c3d",
+          "type": "aeg",
+          "class": "rifle"
+        }
+      },
+      {
+        "name": "not_registered_yet",
+        "declaration": {
+          "declaration_id": "0a1b2c3d-4e5f-4a6b-9c7d-8e9f0a1b2c3d",
+          "type": "bolt_action",
+          "class": "sniper",
+          "make_model": "Well MB4402 · azul"
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "name": "state_from_client",
+        "declaration": {
+          "declaration_id": "6f1d2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b",
+          "type": "aeg",
+          "class": "rifle",
+          "state": "passed"
+        },
+        "why": "only the controller keeps the state"
+      },
+      {
+        "name": "uppercase_uuid",
+        "declaration": {
+          "declaration_id": "6F1D2A3B-4C5D-4E6F-8A9B-0C1D2E3F4A5B",
+          "type": "aeg",
+          "class": "rifle"
+        },
+        "why": "lowercase UUIDs"
+      },
+      {
+        "name": "bad_replica_id",
+        "declaration": {
+          "declaration_id": "6f1d2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b",
+          "replica_id": "r-1",
+          "type": "aeg",
+          "class": "rifle"
+        },
+        "why": "replica ids are UUIDs"
+      },
+      {
+        "name": "unknown_type",
+        "declaration": {
+          "declaration_id": "6f1d2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b",
+          "type": "laser",
+          "class": "rifle"
+        },
+        "why": "ADR-P3-7's replica types"
+      },
+      {
+        "name": "class_uppercase",
+        "declaration": {
+          "declaration_id": "6f1d2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b",
+          "type": "aeg",
+          "class": "Rifle"
+        },
+        "why": "class: 1-32 of a-z 0-9 _"
+      },
+      {
+        "name": "make_model_empty",
+        "declaration": {
+          "declaration_id": "6f1d2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b",
+          "type": "aeg",
+          "class": "rifle",
+          "make_model": ""
+        },
+        "why": "1-64 characters when present"
+      },
+      {
+        "name": "make_model_65",
+        "declaration": {
+          "declaration_id": "6f1d2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b",
+          "type": "aeg",
+          "class": "rifle",
+          "make_model": "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+        },
+        "why": "1-64 characters"
+      },
+      {
+        "name": "make_model_control",
+        "declaration": {
+          "declaration_id": "6f1d2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b",
+          "type": "aeg",
+          "class": "rifle",
+          "make_model": "a\tb"
+        },
+        "why": "no control characters"
+      },
+      {
+        "name": "missing_class",
+        "declaration": {
+          "declaration_id": "6f1d2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b",
+          "type": "aeg"
+        },
+        "why": "class is required"
+      },
+      {
+        "name": "missing_id",
+        "declaration": {
+          "type": "aeg",
+          "class": "rifle"
+        },
+        "why": "declaration_id is required"
+      },
+      {
+        "name": "type_number",
+        "declaration": {
+          "declaration_id": "6f1d2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b",
+          "type": 1,
+          "class": "rifle"
+        },
+        "why": "type is text"
+      }
+    ]
+  },
+  "identities": {
+    "player_ids": {
+      "valid": [
+        "p-abcdefgh2345",
+        "p-zzzzzzzzzzzz"
+      ],
+      "invalid": [
+        "p-ABCDEFGH2345",
+        "p-abcdefgh234",
+        "p-abcdefgh23456",
+        "p-abcdefgh2341",
+        "q-abcdefgh2345",
+        "abcdefgh2345",
+        "p_abcdefgh2345"
+      ]
+    },
+    "secrets": {
+      "valid": [
+        "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+      ],
+      "invalid": [
+        "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+        "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHg",
+        "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh+",
+        "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh9"
+      ]
+    }
+  }
+}

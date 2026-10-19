@@ -12,18 +12,29 @@ Schema 2 (plan phase E) adds each game's radio identity (this controller's
 node id, the channel and the relay clamp, and whether the game was joined
 as a standby controller), the field image and the node positions on it.
 A schema 1 file is upgraded in place.
+
+Schema 3 (phase 3, plan phase E; ADR-P3-13) adds field check-in: the
+per-game player-token keys (the controller's own, decision B8: they never
+leave this file), the field's player identities (an id and the SHA-256 of
+its secret), check-ins with their few personal fields, the per-game replica
+declarations, the field's replica registry, the signed chrono readings,
+the marshals' public keys, and the players' latest positions (deleted when
+the game ends, ADR-P3-6). The file is created with mode 0600, and so are
+SQLite's WAL and shared-memory files next to it, because it holds tokens,
+token keys and (with persist_game_key) game keys.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import threading
 import time
 from pathlib import Path
 from typing import Any, Optional
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes
 
 SCHEMA = """
@@ -107,6 +118,86 @@ CREATE TABLE IF NOT EXISTS positions (
     y       REAL NOT NULL,                             -- 0..1 down the field image
     PRIMARY KEY (game_id, node_id)
 );
+CREATE TABLE IF NOT EXISTS token_keys (
+    game_id    INTEGER PRIMARY KEY,
+    key        BLOB NOT NULL,                          -- 32 random bytes, never sent anywhere
+    created_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS field_players (
+    player_id      TEXT PRIMARY KEY,                   -- p- and 12 base32 characters
+    secret_sha256  BLOB,                               -- NULL: checked in by hand (no app)
+    created_at     REAL NOT NULL,
+    last_seen_at   REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS checkins (
+    game_id           INTEGER NOT NULL,
+    player_id         TEXT NOT NULL,
+    status            TEXT NOT NULL,                   -- pending, checked_in, left, removed
+    display_name      TEXT,                            -- personal data: erased after retention
+    federation_number TEXT,
+    federation_seen   INTEGER NOT NULL DEFAULT 0,
+    team_preference   TEXT,
+    team              INTEGER NOT NULL DEFAULT 0,      -- 1-based team id, 0 none
+    squad             INTEGER NOT NULL DEFAULT 0,
+    role              TEXT NOT NULL DEFAULT 'player',
+    manual            INTEGER NOT NULL DEFAULT 0,
+    notice_version    INTEGER,
+    seq               INTEGER NOT NULL,                -- check-in order
+    created_at        REAL NOT NULL,
+    updated_at        REAL NOT NULL,
+    checked_in_at     REAL,
+    erased_at         REAL,
+    PRIMARY KEY (game_id, player_id)
+);
+CREATE TABLE IF NOT EXISTS declarations (
+    declaration_id TEXT PRIMARY KEY,
+    game_id        INTEGER NOT NULL,
+    player_id      TEXT NOT NULL,
+    replica_id     TEXT,
+    type           TEXT NOT NULL,
+    class          TEXT NOT NULL,
+    make_model     TEXT,
+    state          TEXT NOT NULL,                      -- pending, passed, refused, withdrawn
+    reading_id     TEXT,
+    position       INTEGER NOT NULL,
+    created_at     REAL NOT NULL,
+    updated_at     REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_declarations_game ON declarations (game_id, player_id);
+CREATE TABLE IF NOT EXISTS replicas (
+    replica_id      TEXT PRIMARY KEY,
+    owner_player_id TEXT NOT NULL,
+    data_json       TEXT NOT NULL,
+    registered_at   REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS chrono_readings (
+    reading_id  TEXT PRIMARY KEY,
+    replica_id  TEXT NOT NULL,
+    player_id   TEXT NOT NULL,
+    marshal_id  TEXT NOT NULL,
+    type        TEXT NOT NULL,
+    game_id     TEXT,
+    timestamp   TEXT NOT NULL,
+    record_json TEXT NOT NULL,                         -- the signed record, as received
+    series_id   TEXT NOT NULL,
+    outcome     TEXT,                                  -- the series' result when it was judged
+    received_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_readings_replica ON chrono_readings (replica_id, player_id);
+CREATE TABLE IF NOT EXISTS marshal_keys (
+    marshal_id    TEXT PRIMARY KEY,
+    name          TEXT NOT NULL,
+    public_key    BLOB NOT NULL,
+    player_id     TEXT,
+    registered_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS player_positions (
+    game_id     INTEGER NOT NULL,
+    player_id   TEXT NOT NULL,
+    report_json TEXT NOT NULL,
+    received_at REAL NOT NULL,
+    PRIMARY KEY (game_id, player_id)
+);
 """
 
 # Columns added to games in schema 2: (name, declaration).
@@ -116,9 +207,18 @@ GAME_COLUMNS_V2 = (
     ("max_hops", "INTEGER"),                   # the relay clamp
     ("joined", "INTEGER NOT NULL DEFAULT 0"),  # 1: joined as a standby controller
     ("controller_id", "INTEGER"),              # joined game: the controller that made the join
+    ("squads", "INTEGER NOT NULL DEFAULT 0"),  # schema 3: squads per team (0: the game has none)
 )
 
 LIVE_STATES = ("ready", "running", "paused")
+
+
+def _private(path: str) -> None:
+    try:
+        if os.path.exists(path):
+            os.chmod(path, 0o600)
+    except OSError:
+        pass
 
 
 class _Result:
@@ -142,6 +242,9 @@ class Store:
         self.path = path
         if path != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
+            # Created private before SQLite opens it: its WAL and shm files take its mode.
+            os.close(os.open(path, os.O_RDWR | os.O_CREAT, 0o600))
+            _private(path)
         self._db = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
         self._db.row_factory = sqlite3.Row
         self._lock = threading.RLock()
@@ -155,10 +258,8 @@ class Store:
                     self._db.execute(f"ALTER TABLE games ADD COLUMN {name} {decl}")
             self.set_setting("schema_version", str(SCHEMA_VERSION))
         if path != ":memory:":
-            try:
-                Path(path).chmod(0o600)  # may hold tokens and, if enabled, a game key
-            except OSError:
-                pass
+            for name in (path, path + "-wal", path + "-shm"):
+                _private(name)  # tokens, token keys and, if enabled, game keys
 
     def close(self) -> None:
         with self._lock:
@@ -237,14 +338,14 @@ class Store:
         self._exec(
             "INSERT INTO games (id, name, mode_id, preset_id, teams_json, params_json, "
             "assignments_json, duration_ms, game_seed, state, term, game_key, created_at, "
-            "node_id, channel_hz, max_hops, joined, controller_id) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "node_id, channel_hz, max_hops, joined, controller_id, squads) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (game["id"], game["name"], game["mode_id"], game.get("preset_id"),
              json.dumps(game["teams"]), json.dumps(game["params"]),
              json.dumps(game["assignments"]), game["duration_ms"], game["game_seed"],
              game["state"], game.get("term", 1), key, game["created_at"],
              game.get("node_id"), game.get("channel_hz"), game.get("max_hops"),
-             1 if game.get("joined") else 0, game.get("controller_id")))
+             1 if game.get("joined") else 0, game.get("controller_id"), int(game.get("squads") or 0)))
 
     @staticmethod
     def _game(row: sqlite3.Row) -> dict[str, Any]:
@@ -257,7 +358,7 @@ class Store:
                 "started_at": row["started_at"], "ended_at": row["ended_at"],
                 "node_id": row["node_id"], "channel_hz": row["channel_hz"],
                 "max_hops": row["max_hops"], "joined": bool(row["joined"]),
-                "controller_id": row["controller_id"]}
+                "controller_id": row["controller_id"], "squads": row["squads"]}
 
     def game(self, game_id: int) -> Optional[dict[str, Any]]:
         row = self._exec("SELECT * FROM games WHERE id = ?", (game_id,)).fetchone()
@@ -379,3 +480,227 @@ class Store:
         rows = self._exec("SELECT node_id, x, y FROM positions WHERE game_id = ? ORDER BY node_id",
                           (game_id,)).fetchall()
         return {r["node_id"]: {"x": r["x"], "y": r["y"]} for r in rows}
+
+    # --- field check-in (schema 3, ADR-P3-13) --------------------------------
+
+    def token_key(self, game_id: int, create: bool = False) -> Optional[bytes]:
+        """The game's player-token key (decision B8): made once, kept in this file only."""
+        with self._lock:
+            row = self._exec("SELECT key FROM token_keys WHERE game_id = ?", (game_id,)).fetchone()
+            if row is not None:
+                return bytes(row["key"])
+            if not create:
+                return None
+            key = os.urandom(32)
+            self._exec("INSERT INTO token_keys (game_id, key, created_at) VALUES (?, ?, ?)",
+                       (game_id, key, time.time()))
+            return key
+
+    def field_player(self, player_id: str) -> Optional[dict[str, Any]]:
+        row = self._exec("SELECT * FROM field_players WHERE player_id = ?", (player_id,)).fetchone()
+        if row is None:
+            return None
+        secret = row["secret_sha256"]
+        return {"player_id": row["player_id"],
+                "secret_sha256": bytes(secret) if secret is not None else None,
+                "created_at": row["created_at"], "last_seen_at": row["last_seen_at"]}
+
+    def add_field_player(self, player_id: str, secret_sha256: Optional[bytes], now: float) -> None:
+        self._exec("INSERT INTO field_players (player_id, secret_sha256, created_at, last_seen_at) "
+                   "VALUES (?, ?, ?, ?)", (player_id, secret_sha256, now, now))
+
+    def touch_field_player(self, player_id: str, now: float) -> None:
+        self._exec("UPDATE field_players SET last_seen_at = ? WHERE player_id = ?", (now, player_id))
+
+    CHECKIN_FIELDS = ("status", "display_name", "federation_number", "federation_seen", "team_preference",
+                      "team", "squad", "role", "manual", "notice_version", "updated_at", "checked_in_at",
+                      "erased_at")
+
+    @staticmethod
+    def _checkin(row: sqlite3.Row) -> dict[str, Any]:
+        out = {k: row[k] for k in row.keys()}
+        out["federation_seen"] = bool(out["federation_seen"])
+        out["manual"] = bool(out["manual"])
+        return out
+
+    def checkin(self, game_id: int, player_id: str) -> Optional[dict[str, Any]]:
+        row = self._exec("SELECT * FROM checkins WHERE game_id = ? AND player_id = ?",
+                         (game_id, player_id)).fetchone()
+        return self._checkin(row) if row else None
+
+    def checkins(self, game_id: int) -> list[dict[str, Any]]:
+        rows = self._exec("SELECT * FROM checkins WHERE game_id = ? ORDER BY seq", (game_id,)).fetchall()
+        return [self._checkin(r) for r in rows]
+
+    def count_checkins(self, game_id: int, statuses: tuple[str, ...] = ("pending", "checked_in")) -> int:
+        marks = ", ".join("?" for _ in statuses)
+        row = self._exec(f"SELECT COUNT(*) AS n FROM checkins WHERE game_id = ? AND status IN ({marks})",
+                         (game_id, *statuses)).fetchone()
+        return int(row["n"])
+
+    def add_checkin(self, game_id: int, player_id: str, fields: dict[str, Any], now: float) -> None:
+        with self._lock:
+            row = self._exec("SELECT COALESCE(MAX(seq), 0) + 1 AS n FROM checkins WHERE game_id = ?",
+                             (game_id,)).fetchone()
+            cols = {"status": "pending", "team": 0, "squad": 0, "role": "player", "federation_seen": 0,
+                    "manual": 0, **fields}
+            names = ", ".join(cols)
+            marks = ", ".join("?" for _ in cols)
+            self._exec(f"INSERT INTO checkins (game_id, player_id, seq, created_at, updated_at, {names}) "
+                       f"VALUES (?, ?, ?, ?, ?, {marks})",
+                       (game_id, player_id, int(row["n"]), now, now, *cols.values()))
+
+    def update_checkin(self, game_id: int, player_id: str, **fields: Any) -> None:
+        unknown = set(fields) - set(self.CHECKIN_FIELDS)
+        if unknown:
+            raise ValueError(f"cannot update {unknown}")
+        if not fields:
+            return
+        sets = ", ".join(f"{k} = ?" for k in fields)
+        self._exec(f"UPDATE checkins SET {sets} WHERE game_id = ? AND player_id = ?",
+                   (*fields.values(), game_id, player_id))
+
+    @staticmethod
+    def _declaration(row: sqlite3.Row) -> dict[str, Any]:
+        return {k: row[k] for k in row.keys()}
+
+    def declarations(self, game_id: int, player_id: Optional[str] = None) -> list[dict[str, Any]]:
+        if player_id is None:
+            rows = self._exec("SELECT * FROM declarations WHERE game_id = ? ORDER BY position",
+                              (game_id,)).fetchall()
+        else:
+            rows = self._exec("SELECT * FROM declarations WHERE game_id = ? AND player_id = ? "
+                              "ORDER BY position", (game_id, player_id)).fetchall()
+        return [self._declaration(r) for r in rows]
+
+    def declaration(self, declaration_id: str) -> Optional[dict[str, Any]]:
+        row = self._exec("SELECT * FROM declarations WHERE declaration_id = ?", (declaration_id,)).fetchone()
+        return self._declaration(row) if row else None
+
+    def declarations_for_replica(self, replica_id: str, player_id: str) -> list[dict[str, Any]]:
+        rows = self._exec("SELECT * FROM declarations WHERE replica_id = ? AND player_id = ? "
+                          "ORDER BY created_at", (replica_id, player_id)).fetchall()
+        return [self._declaration(r) for r in rows]
+
+    DECLARATION_COLUMNS = ("declaration_id", "game_id", "player_id", "replica_id", "type", "class",
+                           "make_model", "state", "reading_id", "position")
+
+    def put_declaration(self, d: dict[str, Any], now: float) -> None:
+        cols = self.DECLARATION_COLUMNS
+        self._exec(f"INSERT INTO declarations ({', '.join(cols)}, created_at, updated_at) "
+                   f"VALUES ({', '.join('?' for _ in cols)}, ?, ?) ON CONFLICT(declaration_id) DO UPDATE SET "
+                   "replica_id = excluded.replica_id, type = excluded.type, class = excluded.class, "
+                   "make_model = excluded.make_model, state = excluded.state, "
+                   "reading_id = excluded.reading_id, position = excluded.position, "
+                   "updated_at = excluded.updated_at",
+                   (*(d.get(c) for c in cols), now, now))
+
+    def delete_declarations(self, game_id: int, player_id: str) -> None:
+        self._exec("DELETE FROM declarations WHERE game_id = ? AND player_id = ?", (game_id, player_id))
+
+    def put_replica(self, replica: dict[str, Any], now: float) -> None:
+        self._exec("INSERT INTO replicas (replica_id, owner_player_id, data_json, registered_at) "
+                   "VALUES (?, ?, ?, ?) ON CONFLICT(replica_id) DO UPDATE SET "
+                   "owner_player_id = excluded.owner_player_id, data_json = excluded.data_json",
+                   (replica["replica_id"], replica["owner_player_id"], json.dumps(replica), now))
+
+    def replica(self, replica_id: str) -> Optional[dict[str, Any]]:
+        row = self._exec("SELECT data_json FROM replicas WHERE replica_id = ?", (replica_id,)).fetchone()
+        return json.loads(row["data_json"]) if row else None
+
+    def add_reading(self, record: dict[str, Any], series_id: str, outcome: Optional[str], now: float) -> bool:
+        """Stores a signed reading once (False: its reading_id was already stored)."""
+        cur = self._exec(
+            "INSERT OR IGNORE INTO chrono_readings (reading_id, replica_id, player_id, marshal_id, type, "
+            "game_id, timestamp, record_json, series_id, outcome, received_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (record["reading_id"], record["replica_id"], record["player_id"], record["marshal_id"],
+             record["type"], record.get("game_id"), record["timestamp"],
+             json.dumps(record, sort_keys=True, ensure_ascii=False), series_id, outcome, now))
+        return cur.rowcount == 1
+
+    def readings(self, *, replica_id: Optional[str] = None, player_id: Optional[str] = None,
+                 reading_ids: Optional[list[str]] = None) -> list[dict[str, Any]]:
+        sql = "SELECT * FROM chrono_readings WHERE 1 = 1"
+        args: list[Any] = []
+        if replica_id is not None:
+            sql += " AND replica_id = ?"
+            args.append(replica_id)
+        if player_id is not None:
+            sql += " AND player_id = ?"
+            args.append(player_id)
+        if reading_ids is not None:
+            sql += f" AND reading_id IN ({', '.join('?' for _ in reading_ids) or 'NULL'})"
+            args.extend(reading_ids)
+        sql += " ORDER BY timestamp, reading_id"
+        return [{"reading_id": r["reading_id"], "series_id": r["series_id"], "outcome": r["outcome"],
+                 "type": r["type"], "timestamp": r["timestamp"], "received_at": r["received_at"],
+                 "record": json.loads(r["record_json"])}
+                for r in self._exec(sql, tuple(args)).fetchall()]
+
+    def delete_readings(self, *, player_id: Optional[str] = None, before: Optional[str] = None) -> int:
+        if player_id is not None:
+            return self._exec("DELETE FROM chrono_readings WHERE player_id = ?", (player_id,)).rowcount
+        if before is not None:
+            return self._exec("DELETE FROM chrono_readings WHERE timestamp < ?", (before,)).rowcount
+        return 0
+
+    def put_marshal(self, marshal_id: str, name: str, public_key: bytes, player_id: Optional[str],
+                    now: float) -> None:
+        self._exec("INSERT INTO marshal_keys (marshal_id, name, public_key, player_id, registered_at) "
+                   "VALUES (?, ?, ?, ?, ?) ON CONFLICT(marshal_id) DO UPDATE SET name = excluded.name, "
+                   "public_key = excluded.public_key, player_id = excluded.player_id, "
+                   "registered_at = excluded.registered_at", (marshal_id, name, public_key, player_id, now))
+
+    def marshal(self, marshal_id: str) -> Optional[dict[str, Any]]:
+        row = self._exec("SELECT * FROM marshal_keys WHERE marshal_id = ?", (marshal_id,)).fetchone()
+        if row is None:
+            return None
+        return {"marshal_id": row["marshal_id"], "name": row["name"], "public_key": bytes(row["public_key"]),
+                "player_id": row["player_id"], "registered_at": row["registered_at"]}
+
+    def marshals(self) -> list[dict[str, Any]]:
+        rows = self._exec("SELECT marshal_id FROM marshal_keys ORDER BY marshal_id").fetchall()
+        return [m for m in (self.marshal(r["marshal_id"]) for r in rows) if m]
+
+    def erase_player(self, player_id: str) -> None:
+        """A player's field identity, check-ins and declarations (not the readings: chrono erasure)."""
+        with self._lock:
+            self._exec("DELETE FROM declarations WHERE player_id = ?", (player_id,))
+            self._exec("DELETE FROM checkins WHERE player_id = ?", (player_id,))
+            self._exec("DELETE FROM player_positions WHERE player_id = ?", (player_id,))
+            self._exec("DELETE FROM field_players WHERE player_id = ?", (player_id,))
+
+    def purge_checkins(self, ended_before: float, idle_before: float, now: float) -> dict[str, int]:
+        """Retention (ADR-P3-13): personal fields and declarations of games that ended before
+        ended_before; field identities not seen since idle_before."""
+        with self._lock:
+            games = [r["id"] for r in self._exec(
+                "SELECT id FROM games WHERE state = 'ended' AND ended_at IS NOT NULL AND ended_at < ?",
+                (ended_before,)).fetchall()]
+            erased = declarations = 0
+            for gid in games:
+                erased += self._exec(
+                    "UPDATE checkins SET display_name = NULL, federation_number = NULL, "
+                    "team_preference = NULL, erased_at = ? WHERE game_id = ? AND erased_at IS NULL",
+                    (now, gid)).rowcount
+                declarations += self._exec("DELETE FROM declarations WHERE game_id = ?", (gid,)).rowcount
+            idle = [r["player_id"] for r in self._exec(
+                "SELECT player_id FROM field_players WHERE last_seen_at < ?", (idle_before,)).fetchall()]
+            for pid in idle:
+                self.erase_player(pid)
+            return {"checkins": erased, "declarations": declarations, "identities": len(idle)}
+
+    def set_player_position(self, game_id: int, player_id: str, report: dict[str, Any], now: float) -> None:
+        self._exec("INSERT INTO player_positions (game_id, player_id, report_json, received_at) "
+                   "VALUES (?, ?, ?, ?) ON CONFLICT(game_id, player_id) DO UPDATE SET "
+                   "report_json = excluded.report_json, received_at = excluded.received_at",
+                   (game_id, player_id, json.dumps(report), now))
+
+    def player_positions(self, game_id: int) -> dict[str, dict[str, Any]]:
+        rows = self._exec("SELECT player_id, report_json FROM player_positions WHERE game_id = ?",
+                          (game_id,)).fetchall()
+        return {r["player_id"]: json.loads(r["report_json"]) for r in rows}
+
+    def delete_player_positions(self, game_id: int) -> int:
+        return self._exec("DELETE FROM player_positions WHERE game_id = ?", (game_id,)).rowcount

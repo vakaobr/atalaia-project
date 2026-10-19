@@ -25,11 +25,14 @@
     "presets": "Predefinições",
     "feed": "Registo",
     "controller": "Controlador",
-    "settings": "Definições"
+    "settings": "Definições",
+    "checkin": "Check-in"
   },
   "common": {
     "yes": "Sim",
-    "no": "Não"
+    "no": "Não",
+    "save": "Guardar",
+    "cancel": "Cancelar"
   },
   "time": {
     "seconds": "há {n} s",
@@ -93,7 +96,11 @@
       "running": "a decorrer",
       "paused": "em pausa",
       "ended": "terminado"
-    }
+    },
+    "confirm_start_pending": "Há {n} réplica(s) declarada(s) por cronografar. Começar mesmo assim?",
+    "squads": "Squads por equipa",
+    "squads_hint": "0 = sem squads (jogos pequenos: só equipas). Num milsim ou num jogo grande, cada equipa divide-se em squads.",
+    "squads_each": "{n} squads por equipa"
   },
   "controller": {
     "title": "Controlador de campo",
@@ -298,5 +305,114 @@
       "lorawan_default": "canal por omissão do LoRaWAN, muitas vezes ocupado",
       "low_airtime": "0,1%, não recomendado"
     }
+  },
+  "checkin": {
+    "title": "Check-in no campo",
+    "intro": "Quem joga lê o cartaz do campo com a app, faz o check-in e declara as réplicas que vai usar neste jogo. Os nomes só aparecem aqui e na vista dos marshals.",
+    "open": "O check-in de «{game}» está aberto.",
+    "closed": "O check-in de «{game}» está fechado.",
+    "close": "Fechar o check-in",
+    "reopen": "Abrir o check-in",
+    "print_poster": "Imprimir o cartaz",
+    "csv": "Exportar CSV",
+    "statuses": {
+      "pending": "à espera de confirmação",
+      "checked_in": "com check-in",
+      "left": "saiu",
+      "removed": "retirado"
+    },
+    "states": {
+      "pending": "por cronografar",
+      "passed": "aprovada",
+      "refused": "recusada",
+      "withdrawn": "retirada"
+    },
+    "refused_today": "recusada hoje",
+    "list": "Check-ins",
+    "empty": "Ainda ninguém fez o check-in neste jogo.",
+    "name": "Nome",
+    "status": "Estado",
+    "team": "Equipa",
+    "squad": "Squad",
+    "role": "Papel",
+    "replicas": "Réplicas",
+    "erased": "(apagado)",
+    "by_hand": "à mão",
+    "prefers": "prefere {team}",
+    "confirm": "Confirmar",
+    "roles": {
+      "player": "jogador/a",
+      "squad_leader": "líder de squad",
+      "vip": "VIP",
+      "marshal": "marshal",
+      "gm": "organização",
+      "spectator": "espectador/a"
+    },
+    "card_seen": "cartão visto",
+    "not_checked": "não verificado",
+    "remove": "Retirar",
+    "manual": "Check-in à mão",
+    "manual_hint": "Para quem não tem a app: o controlador cria o identificador, que se pode gravar numa etiqueta de jogador.",
+    "team_preference": "Equipa preferida",
+    "type": "Tipo",
+    "class": "Classe",
+    "make_model": "Marca e modelo",
+    "types": {
+      "aeg": "AEG (elétrica)",
+      "gbb": "GBB (gás)",
+      "hpa": "HPA (ar comprimido)",
+      "bolt_action": "Ferrolho",
+      "dmr": "DMR",
+      "sniper": "Sniper",
+      "pistol": "Pistola",
+      "shotgun": "Caçadeira"
+    },
+    "add_replica": "Juntar réplica",
+    "manual_save": "Fazer o check-in",
+    "manual_done": "Check-in feito: {id}",
+    "chrono_title": "Réplicas por cronografar",
+    "valid_day": "Uma aprovação vale para o resto do dia neste campo.",
+    "valid_game": "Cada jogo pede uma nova cronografagem.",
+    "chrono_empty": "Nenhuma réplica declarada ainda.",
+    "unregistered": "ainda sem registo no campo",
+    "settings": "Regras do check-in",
+    "confirm_mode": "Confirmação",
+    "confirm_auto": "automática",
+    "confirm_staff": "pela organização ou um marshal",
+    "federation": "Número de federado",
+    "federation_off": "não pedir",
+    "federation_optional": "opcional",
+    "federation_required": "obrigatório",
+    "federation_label": "Federação (por exemplo, FPA)",
+    "max_replicas": "Réplicas por pessoa e jogo",
+    "max_players": "Máximo de participantes por jogo",
+    "valid_for": "Uma cronografagem vale",
+    "valid_for_day": "o dia todo",
+    "valid_for_game": "só este jogo",
+    "federation_note": "O número de federado nunca é verificado automaticamente: «obrigatório» só impede o envio sem ele. Marca «cartão visto» depois de ver o cartão.",
+    "saved": "Guardado.",
+    "poster": "Cartaz de check-in",
+    "poster_intro": "Imprime-o uma vez e afixa-o na zona de check-in: serve para todos os jogos do campo. Não leva nenhuma chave nem palavra-passe.",
+    "ca": "Certificado do campo",
+    "poster_urls": "Endereços https do controlador (um por linha)",
+    "poster_ssid": "Nome da rede Wi-Fi do campo",
+    "poster_pinned": "Só para este jogo",
+    "gm_only": "Só a organização gere o check-in.",
+    "no_game": "Não há nenhum jogo a decorrer: cria um jogo para abrir o check-in. O cartaz pode ser impresso já.",
+    "team_squad": "Equipa › squad",
+    "squad_n": "squad {n}",
+    "no_squad": "sem squad"
+  },
+  "poster": {
+    "title": "Cartaz de check-in",
+    "login": "Abre primeiro a consola com a chave da organização.",
+    "no_text": "O cartaz ainda não pode ser feito.",
+    "qr_label": "Código QR do check-in no campo",
+    "intro": "Imprime esta página em A4. O código não leva segredos: pode ficar à vista.",
+    "print": "Imprimir",
+    "wifi_password": "Palavra-passe do Wi-Fi",
+    "wifi_draw": "Desenhar o código do Wi-Fi",
+    "wifi_label": "Código QR da rede Wi-Fi",
+    "wifi_note": "A palavra-passe só serve para desenhar o código do Wi-Fi: não é guardada nem enviada."
   }
 }
