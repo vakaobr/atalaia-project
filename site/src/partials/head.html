@@ -1,0 +1,32 @@
+{#
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: CC-BY-SA-4.0
+
+The inside of every page's <head>. page.title, page.description and
+page.og_description are the page's meta.<page>.* texts, escaped; the social
+preview image is the language's own (img/og-<language>.jpg) on every page.
+#}
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page.title }}</title>
+  <meta name="description" content="{{ page.description }}">
+  <meta name="color-scheme" content="light dark">
+  <link rel="canonical" href="{{ page.url.self }}">
+  <link rel="alternate" hreflang="pt-PT" href="{{ page.url.pt }}">
+  <link rel="alternate" hreflang="en" href="{{ page.url.en }}">
+  <link rel="alternate" hreflang="x-default" href="{{ page.url.pt }}">
+  <meta property="og:title" content="{{ page.title }}">
+  <meta property="og:description" content="{{ page.og_description }}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Atalaia">
+  <meta property="og:url" content="{{ page.url.self }}">
+  <meta property="og:locale" content="{{ page.og_locale }}">
+  <meta property="og:locale:alternate" content="{{ page.og_locale_alternate }}">
+  <meta property="og:image" content="{{ page.og_image }}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="{{ meta.og_image_alt|text }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="{{ page.root }}favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{{ page.root }}img/logo-192.png">
+  <link rel="stylesheet" href="{{ page.root }}style.css">

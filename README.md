@@ -101,7 +101,7 @@ The props talk over LoRa, a long-range, low-power radio, in Atalaia's own protoc
 
 ![Skirmesh-RF on different devices: five layers from the bottom up (the LoRa radio on one shared channel; the encrypted Skirmesh-RF packet with anti-replay, hop limit, ACKs, TIME beacons and CLAIM failover; the eight message types in CBOR; the shared C core and Lua modes; the controller's APIs, GM console, scoreboard and join codes), and which layers each device runs. Built and tested in software: the Field Box (1 to 4), the USB radio modem (1 and 2), the field controller (2 to 5) and the GM console on phones over Wi-Fi (5). Planned: the satellite box (1 to 4) and, in phase 3, the I/O pod (1 and 2) and the Android device (2 to 4).](site/img/diagrams/skirmesh-wide-en.svg)
 
-The diagrams are built in English and Portuguese, for wide and narrow screens, from [`site/src/diagrams/`](site/src/diagrams/) by `tools/build_site.py`; the project page shows them in your language.
+The diagrams are built in English and Portuguese, for wide and narrow screens, from [`site/src/diagrams/`](site/src/diagrams/) by `tools/build_site.py`; the project page's radio page shows them in your language ([Português](https://vakaobr.github.io/atalaia-project/radio/) · [English](https://vakaobr.github.io/atalaia-project/en/radio/)).
 
 ## Repository layout
 

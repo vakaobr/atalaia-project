@@ -2,76 +2,34 @@
 SPDX-FileCopyrightText: 2026 The Atalaia contributors
 SPDX-License-Identifier: CC-BY-SA-4.0
 
-Template of the project page. tools/build_site.py renders it once per language,
+Template of the main page. tools/build_site.py renders it once per language,
 with the text from site/i18n/<language>.yaml, into site/index.html (Portuguese)
-and site/en/index.html (English). See site/README.md.
+and site/en/index.html (English). The other pages (modes, radio, roadmap,
+glossary) have templates of their own beside this one; see site/README.md.
 
-  {{ key }}        the text of key, inserted as HTML
-  {{ key|text }}   the text of key, escaped (for attributes and SVG text)
-  {{ page.* }}     values the script sets per page (language, paths, URLs)
+  {{ key }}            the text of key, inserted as HTML
+  {{ key|text }}       the text of key, escaped (for attributes and SVG text)
+  {{ page.* }}         values the script sets per page (language, paths, URLs)
+  {{ page.to.<page> }} the relative link to another page in the same language
+  {% include name %}   the partial site/src/partials/name.html, on a line of its own
 
 Lines between "{% if lang en %}" and "{% endif %}" (each tag on a line of its own)
 appear only on the pages of the languages listed; "{% if lang pt en %}" lists two.
-Each language file holds the keys of its own page.
+Each language file holds the keys of its own pages.
+
+The main page shows a short version of the radio, modes and roadmap sections,
+each with a link to its page. Keep the ids radio, modes and roadmap on them:
+older links to /#roadmap and the like land there.
 
 Comments like this one, between a brace-hash and a hash-brace, are not copied to
 the pages. Code blocks and anything else that is the same in every language stay here.
 #}
 <html lang="{{ page.lang }}">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ meta.title|text }}</title>
-  <meta name="description" content="{{ meta.description|text }}">
-  <meta name="color-scheme" content="light dark">
-  <link rel="canonical" href="{{ page.url.self }}">
-  <link rel="alternate" hreflang="pt-PT" href="{{ page.url.pt }}">
-  <link rel="alternate" hreflang="en" href="{{ page.url.en }}">
-  <link rel="alternate" hreflang="x-default" href="{{ page.url.pt }}">
-  <meta property="og:title" content="{{ meta.title|text }}">
-  <meta property="og:description" content="{{ meta.og_description|text }}">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="{{ page.url.self }}">
-  <meta property="og:locale" content="{{ page.og_locale }}">
-  <meta property="og:locale:alternate" content="{{ page.og_locale_alternate }}">
-  <meta property="og:image" content="{{ page.og_image }}">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="{{ meta.og_image_alt|text }}">
-  <meta name="twitter:card" content="summary_large_image">
-  <link rel="icon" href="{{ page.root }}favicon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="{{ page.root }}img/logo-192.png">
-  <link rel="stylesheet" href="{{ page.root }}style.css">
+{% include head %}
 </head>
 <body>
-  <a class="skip" href="#main">{{ header.skip }}</a>
-
-  <header class="top">
-    <div class="wrap top-inner">
-      <a class="brand" href="./" aria-label="{{ header.home|text }}">
-        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
-          <path class="fire" d="M16 1c2 2.5 3.5 4 2.3 6.3-.6 1-1.6 1-2.3.4-.7.6-1.7.6-2.3-.4C12.5 5 14 3.5 16 1z" />
-          <path d="M9 15V9h3.5v3h2V9h3v3h2V9H23v6z" />
-          <path d="M10 15h12l2 15H8z" />
-        </svg>
-        Atalaia
-      </a>
-      <nav class="sections" aria-label="{{ header.sections|text }}">
-        <a href="#modes">{{ header.modes }}</a>
-        <a href="#try">{{ header.try }}</a>
-        <a href="#roadmap">{{ header.roadmap }}</a>
-        <a href="#hub">{{ header.hub }}</a>
-        <a href="#{{ glossary.id|text }}">{{ header.glossary }}</a>
-        <a href="https://github.com/vakaobr/atalaia-project">GitHub</a>
-      </nav>
-      {# Each language is named in its own language, whichever page this is. #}
-      <nav class="lang" aria-label="{{ header.language|text }}">
-        <a href="{{ page.href.pt }}" hreflang="pt-PT" lang="pt-PT"{{ page.current.pt }}>PT<span class="sr-only"> · Português</span></a>
-        <span class="sep" aria-hidden="true">·</span>
-        <a href="{{ page.href.en }}" hreflang="en" lang="en"{{ page.current.en }}>EN<span class="sr-only"> · English</span></a>
-      </nav>
-    </div>
-  </header>
+{% include header %}
 
   <main id="main">
     <section class="hero">
@@ -168,7 +126,7 @@ the pages. Code blocks and anything else that is the same in every language stay
         </figure>
         <p class="note">{{ how.core }}</p>
 {% if lang en %}
-        {# The Portuguese page already shows this image in its hero. #}
+        {# English page only: its keys, how.image_*, are only in en.yaml. #}
         <figure class="art">
           <picture>
             <source type="image/webp" srcset="{{ page.root }}img/field-isometric-960.webp 960w, {{ page.root }}img/field-isometric-1600.webp 1600w" sizes="(min-width: 800px) 760px, calc(100vw - 32px)">
@@ -180,39 +138,16 @@ the pages. Code blocks and anything else that is the same in every language stay
       </div>
     </section>
 
-    {#
-      The two radio diagrams, built by tools/build_site.py from site/src/diagrams/ into
-      img/diagrams/<name>-<layout>-<language>.svg: the narrow layout (one column) on phones,
-      the wide one (two columns) elsewhere. Their alt text is the SVG's own description.
-    #}
-    <section aria-labelledby="radio">
+    {# Short versions of the radio and modes pages, each linking to its page. #}
+    <section class="band" aria-labelledby="radio">
       <div class="wrap">
         <h2 id="radio">{{ radio.title }}</h2>
-        <p class="intro">{{ radio.intro }}</p>
-        <figure class="radio-diagram">
-          <h3>{{ radio.lora.title }}</h3>
-          <p>{{ radio.lora.lead }}</p>
-          <picture>
-            <source media="(max-width: 760px)" srcset="{{ page.root }}img/diagrams/lora-narrow-{{ page.code }}.svg" width="420" height="1506">
-            <img src="{{ page.root }}img/diagrams/lora-wide-{{ page.code }}.svg" width="848" height="892" loading="lazy" decoding="async" alt="{{ diagrams.lora.desc|text }}">
-          </picture>
-        </figure>
-        <div class="radio-diagram">
-          <h3>{{ radio.channel.title }}</h3>
-          <p>{{ radio.channel.lead }}</p>
-        </div>
-        <figure class="radio-diagram">
-          <h3>{{ radio.skirmesh.title }}</h3>
-          <p>{{ radio.skirmesh.lead }}</p>
-          <picture>
-            <source media="(max-width: 760px)" srcset="{{ page.root }}img/diagrams/skirmesh-narrow-{{ page.code }}.svg" width="420" height="1302">
-            <img src="{{ page.root }}img/diagrams/skirmesh-wide-{{ page.code }}.svg" width="848" height="711" loading="lazy" decoding="async" alt="{{ diagrams.skirmesh.desc|text }}">
-          </picture>
-        </figure>
+        <p class="intro">{{ radio.teaser }}</p>
+        <p class="more"><a href="{{ page.to.radio }}">{{ radio.more }}</a></p>
       </div>
     </section>
 
-    <section class="band" aria-labelledby="modes">
+    <section aria-labelledby="modes">
       <div class="wrap">
         <h2 id="modes">{{ modes.title }}</h2>
         <p class="intro">{{ modes.intro }}</p>
@@ -228,46 +163,12 @@ the pages. Code blocks and anything else that is the same in every language stay
             <p class="meta">{{ modes.bomb.meta }}</p>
           </article>
           <article class="card">
-            <h3>{{ modes.holdall.title }}</h3>
-            <p>{{ modes.holdall.text }}</p>
-            <p class="meta">{{ modes.holdall.meta }}</p>
-          </article>
-          <article class="card">
-            <h3>{{ modes.laststand.title }}</h3>
-            <p>{{ modes.laststand.text }}</p>
-            <p class="meta">{{ modes.laststand.meta }}</p>
-          </article>
-          <article class="card">
             <h3>{{ modes.kill_confirmed.title }}</h3>
             <p>{{ modes.kill_confirmed.text }}</p>
             <p class="meta">{{ modes.kill_confirmed.meta }}</p>
           </article>
-          <article class="card">
-            <h3>{{ modes.respawn.title }}</h3>
-            <p>{{ modes.respawn.text }}</p>
-            <p class="meta">{{ modes.respawn.meta }}</p>
-          </article>
-          <article class="card">
-            <h3>{{ modes.player_checkin.title }}</h3>
-            <p>{{ modes.player_checkin.text }}</p>
-            <p class="meta">{{ modes.player_checkin.meta }}</p>
-          </article>
-          <article class="card">
-            <h3>{{ modes.medic.title }}</h3>
-            <p>{{ modes.medic.text }}</p>
-            <p class="meta">{{ modes.medic.meta }}</p>
-          </article>
-          <article class="card">
-            <h3>{{ modes.codes.title }}</h3>
-            <p>{{ modes.codes.text }}</p>
-            <p class="meta">{{ modes.codes.meta }}</p>
-          </article>
-          <article class="card dashed">
-            <h3>{{ modes.yours.title }}</h3>
-            <p>{{ modes.yours.text }}</p>
-            <p class="meta"><a href="https://github.com/vakaobr/atalaia-project/issues/new/choose">{{ modes.yours.link }}</a></p>
-          </article>
         </div>
+        <p class="more"><a href="{{ page.to.modes }}">{{ modes.more }}</a></p>
       </div>
     </section>
 
@@ -352,18 +253,20 @@ python ../tools/docker_sim.py serve ../modes/bomb</code></pre>
       </div>
     </section>
 
+    {# The short roadmap: one line per phase. The full one is the roadmap page. #}
     <section class="band" aria-labelledby="roadmap">
       <div class="wrap">
         <h2 id="roadmap">{{ roadmap.title }}</h2>
         <p class="intro">{{ roadmap.intro }}</p>
-        <ol class="phases">
-          <li><span class="tag">{{ roadmap.done }}</span><h3>0 · {{ roadmap.p0.title }}</h3><p>{{ roadmap.p0.text }}</p><p class="gate">{{ roadmap.p0.gate }}</p></li>
-          <li><span class="tag">{{ roadmap.software }}</span><h3>1 · {{ roadmap.p1.title }}</h3><p>{{ roadmap.p1.text }}</p><p class="gate">{{ roadmap.p1.gate }}</p></li>
-          <li class="now"><span class="tag">{{ roadmap.current }}</span><h3>2 · {{ roadmap.p2.title }}</h3><p>{{ roadmap.p2.text }}</p><p class="gate">{{ roadmap.p2.gate }}</p></li>
-          <li><h3>3 · {{ roadmap.p3.title }}</h3><p>{{ roadmap.p3.text }}</p><p class="gate">{{ roadmap.p3.gate }}</p></li>
-          <li><h3>4 · {{ roadmap.p4.title }}</h3><p>{{ roadmap.p4.text }}</p><p class="gate">{{ roadmap.p4.gate }}</p></li>
-          <li><h3>5 · {{ roadmap.p5.title }}</h3><p>{{ roadmap.p5.text }}</p><p class="gate">{{ roadmap.p5.gate }}</p></li>
+        <ol class="strip">
+          <li><span class="tag">{{ roadmap.done }}</span><h3>0 · {{ roadmap.p0.title }}</h3><p>{{ roadmap.p0.short }}</p></li>
+          <li><span class="tag">{{ roadmap.software }}</span><h3>1 · {{ roadmap.p1.title }}</h3><p>{{ roadmap.p1.short }}</p></li>
+          <li class="now"><span class="tag">{{ roadmap.current }}</span><h3>2 · {{ roadmap.p2.title }}</h3><p>{{ roadmap.p2.short }}</p></li>
+          <li><h3>3 · {{ roadmap.p3.title }}</h3><p>{{ roadmap.p3.short }}</p></li>
+          <li><h3>4 · {{ roadmap.p4.title }}</h3><p>{{ roadmap.p4.short }}</p></li>
+          <li><h3>5 · {{ roadmap.p5.title }}</h3><p>{{ roadmap.p5.short }}</p></li>
         </ol>
+        <p class="more"><a href="{{ page.to.roadmap }}">{{ roadmap.more }}</a></p>
       </div>
     </section>
 
@@ -382,72 +285,7 @@ python ../tools/docker_sim.py serve ../modes/bomb</code></pre>
       </div>
     </section>
 
-    {#
-      The glossary. Each entry's id comes from the language file (glossario-lora,
-      glossary-lora...), and the text of either page links to those ids. Keep them
-      stable and ASCII: other sites may link to them. The build checks that every
-      #link on a page has a matching id.
-    #}
-    <section class="band" aria-labelledby="{{ glossary.id|text }}">
-      <div class="wrap">
-        <h2 id="{{ glossary.id|text }}">{{ glossary.title }}</h2>
-        <p class="intro">{{ glossary.intro }}</p>
-        <div class="glossary">
-          <div class="group">
-            <h3>{{ glossary.groups.game }}</h3>
-            <dl>
-              <div id="{{ glossary.props.id|text }}"><dt>{{ glossary.props.term }}</dt><dd>{{ glossary.props.text }}</dd></div>
-              <div id="{{ glossary.field_box.id|text }}"><dt>{{ glossary.field_box.term }}</dt><dd>{{ glossary.field_box.text }}</dd></div>
-              <div id="{{ glossary.milsim.id|text }}"><dt>{{ glossary.milsim.term }}</dt><dd>{{ glossary.milsim.text }}</dd></div>
-              <div id="{{ glossary.cqb.id|text }}"><dt>{{ glossary.cqb.term }}</dt><dd>{{ glossary.cqb.text }}</dd></div>
-              <div id="{{ glossary.chrono.id|text }}"><dt>{{ glossary.chrono.term }}</dt><dd>{{ glossary.chrono.text }}</dd></div>
-            </dl>
-          </div>
-          <div class="group">
-            <h3>{{ glossary.groups.hardware }}</h3>
-            <dl>
-              <div id="{{ glossary.microcontroller.id|text }}"><dt>{{ glossary.microcontroller.term }}</dt><dd>{{ glossary.microcontroller.text }}</dd></div>
-              <div id="{{ glossary.esp32.id|text }}"><dt>{{ glossary.esp32.term }}</dt><dd>{{ glossary.esp32.text }}</dd></div>
-              <div id="{{ glossary.arduino.id|text }}"><dt>{{ glossary.arduino.term }}</dt><dd>{{ glossary.arduino.text }}</dd></div>
-              <div id="{{ glossary.raspberry_pi.id|text }}"><dt>{{ glossary.raspberry_pi.term }}</dt><dd>{{ glossary.raspberry_pi.text }}</dd></div>
-              <div id="{{ glossary.android.id|text }}"><dt>{{ glossary.android.term }}</dt><dd>{{ glossary.android.text }}</dd></div>
-              <div id="{{ glossary.firmware.id|text }}"><dt>{{ glossary.firmware.term }}</dt><dd>{{ glossary.firmware.text }}</dd></div>
-            </dl>
-          </div>
-          <div class="group">
-            <h3>{{ glossary.groups.radio }}</h3>
-            <dl>
-              <div id="{{ glossary.lora.id|text }}"><dt>{{ glossary.lora.term }}</dt><dd>{{ glossary.lora.text }}</dd></div>
-              <div id="{{ glossary.mesh.id|text }}"><dt>{{ glossary.mesh.term }}</dt><dd>{{ glossary.mesh.text }}</dd></div>
-              <div id="{{ glossary.skirmesh.id|text }}"><dt>{{ glossary.skirmesh.term }}</dt><dd>{{ glossary.skirmesh.text }}</dd></div>
-              <div id="{{ glossary.links.id|text }}"><dt>{{ glossary.links.term }}</dt><dd>{{ glossary.links.text }}</dd></div>
-              <div id="{{ glossary.api.id|text }}"><dt>{{ glossary.api.term }}</dt><dd>{{ glossary.api.text }}</dd></div>
-              <div id="{{ glossary.atak.id|text }}"><dt>{{ glossary.atak.term }}</dt><dd>{{ glossary.atak.text }}</dd></div>
-            </dl>
-          </div>
-          <div class="group">
-            <h3>{{ glossary.groups.software }}</h3>
-            <dl>
-              <div id="{{ glossary.local_first.id|text }}"><dt>{{ glossary.local_first.term }}</dt><dd>{{ glossary.local_first.text }}</dd></div>
-              <div id="{{ glossary.core.id|text }}"><dt>{{ glossary.core.term }}</dt><dd>{{ glossary.core.text }}</dd></div>
-              <div id="{{ glossary.lua.id|text }}"><dt>{{ glossary.lua.term }}</dt><dd>{{ glossary.lua.text }}</dd></div>
-              <div id="{{ glossary.simulator.id|text }}"><dt>{{ glossary.simulator.term }}</dt><dd>{{ glossary.simulator.text }}</dd></div>
-              <div id="{{ glossary.controller.id|text }}"><dt>{{ glossary.controller.term }}</dt><dd>{{ glossary.controller.text }}</dd></div>
-              <div id="{{ glossary.server.id|text }}"><dt>{{ glossary.server.term }}</dt><dd>{{ glossary.server.text }}</dd></div>
-            </dl>
-          </div>
-          <div class="group">
-            <h3>{{ glossary.groups.licences }}</h3>
-            <dl>
-              <div id="{{ glossary.open_source.id|text }}"><dt>{{ glossary.open_source.term }}</dt><dd>{{ glossary.open_source.text }}</dd></div>
-              <div id="{{ glossary.copyleft.id|text }}"><dt>{{ glossary.copyleft.term }}</dt><dd>{{ glossary.copyleft.text }}</dd></div>
-            </dl>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section aria-labelledby="involved">
+    <section class="band" aria-labelledby="involved">
       <div class="wrap">
         <h2 id="involved">{{ involved.title }}</h2>
         <p class="intro">{{ involved.intro }}</p>
@@ -461,7 +299,7 @@ python ../tools/docker_sim.py serve ../modes/bomb</code></pre>
       </div>
     </section>
 
-    <section class="band" aria-labelledby="name">
+    <section aria-labelledby="name">
       <div class="wrap two">
         <div>
           <img class="badge" src="{{ page.root }}img/logo-512.png" srcset="{{ page.root }}img/logo-192.png 192w, {{ page.root }}img/logo-512.png 512w" sizes="(max-width: 640px) 104px, 136px" width="512" height="512" loading="lazy" decoding="async" alt="{{ name.badge_alt|text }}">
@@ -477,11 +315,6 @@ python ../tools/docker_sim.py serve ../modes/bomb</code></pre>
     </section>
   </main>
 
-  <footer class="foot">
-    <div class="wrap foot-inner">
-      <p>{{ footer.licences }} <a href="https://github.com/vakaobr/atalaia-project/blob/main/LICENSING.md">{{ footer.licensing }}</a></p>
-      <p>{{ footer.independent }}</p>
-    </div>
-  </footer>
+{% include footer %}
 </body>
 </html>

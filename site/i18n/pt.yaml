@@ -1,26 +1,55 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: CC-BY-SA-4.0
 #
-# Portuguese (pt-PT) text of the project page (site/index.html, the default
-# page). Every key the Portuguese page uses in the template site/src/index.html
-# must be here, and it must use every key here; apart from the parts only one
-# page shows, en.yaml has the same keys. Values are HTML; keys the template
-# marks |text are plain text. After editing, run python3 tools/build_site.py.
+# Portuguese (pt-PT) text of the project pages, the default language (site/:
+# the main page, modos/, radio/, roadmap/ and glossario/). Every key the
+# Portuguese pages use in the templates site/src/*.html and
+# site/src/partials/*.html must be here, and they must use every key here;
+# apart from the parts only one language shows, en.yaml has the same keys. A
+# key can be used on several pages. Values are HTML; keys the templates mark
+# |text are plain text. After editing, run python3 tools/build_site.py.
 # See site/README.md for the terms this translation uses.
 #
-# Links like href="#glossario-lora" point at the glossary entries at the end of
-# this file. Their ids (glossary.*.id) are stable: change them only together
-# with every link to them.
+# Links like href="{{ page.to.glossary }}#glossario-lora" point at the glossary
+# entries at the end of this file, on the glossary page; {{ page.to.<page> }}
+# becomes the relative link to that page from whichever page shows the text.
+# The ids (glossary.*.id) are stable: change them only together with every
+# link to them.
 
+# Each page's title, description and (optionally) social preview description,
+# under its name in the page table of tools/build_site.py. og_image_alt is the
+# same on every page, as they all share the language's preview image.
 meta:
-  title: Atalaia · a plataforma aberta de combate simulado
-  description: >-
-    A Atalaia é uma plataforma aberta para dispositivos de jogo de airsoft, paintball e milsim que
-    funciona sem internet: dispositivos ESP32, Raspberry Pi, Arduino e Android, modos de jogo em
-    scripts Lua e um protocolo LoRa aberto.
-  og_description: >-
-    Dispositivos de jogo abertos para airsoft, paintball e milsim, que funcionam sem internet. Os
-    modos de jogo são scripts; serve qualquer hardware.
+  index:
+    title: Atalaia · a plataforma aberta de combate simulado
+    description: >-
+      A Atalaia é uma plataforma aberta para dispositivos de jogo de airsoft, paintball e milsim que
+      funciona sem internet: dispositivos ESP32, Raspberry Pi, Arduino e Android, modos de jogo em
+      scripts Lua e um protocolo LoRa aberto.
+    og_description: >-
+      Dispositivos de jogo abertos para airsoft, paintball e milsim, que funcionam sem internet. Os
+      modos de jogo são scripts; serve qualquer hardware.
+  modes:
+    title: Modos de jogo · Atalaia
+    description: >-
+      Os modos de jogo da Atalaia para airsoft, paintball e milsim: Domínio, Bomba / Rush, Domínio
+      Total, Último Elemento, Baixa Confirmada, Reentradas e Vidas, Registo de Presença, o
+      modificador Códigos e as Ligaduras, cada um num pequeno script Lua.
+  radio:
+    title: Como funciona o rádio · Atalaia
+    description: >-
+      O que o rádio LoRa consegue e não consegue fazer num campo de airsoft ou paintball, que canal
+      a Atalaia usa e porquê, e como o seu protocolo Skirmesh-RF corre em todos os aparelhos.
+  roadmap:
+    title: Roadmap · Atalaia
+    description: >-
+      As seis fases da Atalaia, do núcleo partilhado à comunidade, cada uma a acabar com um teste a
+      sério no campo antes de a seguinte começar.
+  glossary:
+    title: Glossário · Atalaia
+    description: >-
+      Os termos técnicos do projeto Atalaia, do LoRa e do ESP32 ao copyleft, explicados em
+      linguagem simples para quem joga, quem tem um campo e a organização.
   og_image_alt: >-
     Uma torre de vigia num monte ao anoitecer, com uma caixa de rádio no topo, ligada a caixas
     luminosas «GAME PROP» espalhadas por um vale arborizado, sob as palavras «Projeto de código
@@ -31,8 +60,9 @@ header:
   home: Atalaia, página inicial
   sections: Secções
   modes: Modos
+  radio: Rádio
   try: Experimentar
-  roadmap: Roteiro
+  roadmap: Roadmap
   hub: Comunidade
   glossary: Glossário
   language: Idioma
@@ -44,9 +74,9 @@ hero:
     A Atalaia é uma plataforma aberta para os dispositivos eletrónicos de jogo (os props) de
     airsoft, paintball e milsim: as caixas que as equipas capturam, as bombas que armam e
     desarmam. Monta uma caixa de domínio com um
-    <a href="#glossario-microcontrolador">microcontrolador</a> de 20&nbsp;€ (uma pequena placa de
+    <a href="{{ page.to.glossary }}#glossario-microcontrolador">microcontrolador</a> de 20&nbsp;€ (uma pequena placa de
     computador, barata), transforma um telemóvel Android antigo num terminal de hacking, organiza
-    um milsim de fim de semana com 20 caixas numa <a href="#glossario-lora">rede mesh LoRa</a>
+    um milsim de fim de semana com 20 caixas numa <a href="{{ page.to.glossary }}#glossario-lora">rede mesh LoRa</a>
     (rádio de longo alcance e baixo consumo, em que as caixas passam as mensagens umas às outras
     de um lado ao outro do campo) e escreve os teus próprios modos de jogo em pequenos scripts.
     Tudo corre no próprio campo: não precisa de nuvem nem de internet, e não te prende a nenhum
@@ -67,7 +97,7 @@ game:
   title: Como funciona um jogo
   intro: >-
     Para jogar não é preciso perceber nada de eletrónica. É assim que um jogo vai correr quando as
-    caixas estiverem construídas (fases 1 e 2); o <a href="#glossario-simulador">simulador</a> já
+    caixas estiverem construídas (fases 1 e 2); o <a href="{{ page.to.glossary }}#glossario-simulador">simulador</a> já
     hoje joga os mesmos modos num computador.
   setup:
     title: Preparar
@@ -83,7 +113,7 @@ game:
     title: Transmitir
     text: >-
       Cada caixa avisa por rádio o
-      <a href="#glossario-controlador-de-campo">controlador de campo</a>, um pequeno computador na
+      <a href="{{ page.to.glossary }}#glossario-controlador-de-campo">controlador de campo</a>, um pequeno computador na
       base; as caixas mais afastadas passam a mensagem pelas que estão no meio. Uma caixa que perca
       a ligação continua a jogar e põe-se em dia mais tarde.
   score:
@@ -96,32 +126,32 @@ why:
   title: Porquê a Atalaia
   intro: >-
     Os dispositivos eletrónicos dão outra vida a um jogo, mas os sistemas comerciais guardam as
-    regras num <a href="#glossario-firmware">firmware</a> fechado. Os modos novos ficam à espera do
-    fabricante, não há <a href="#glossario-api">API</a> pública e não dá para juntar hardware
+    regras num <a href="{{ page.to.glossary }}#glossario-firmware">firmware</a> fechado. Os modos novos ficam à espera do
+    fabricante, não há <a href="{{ page.to.glossary }}#glossario-api">API</a> pública e não dá para juntar hardware
     próprio. A Atalaia faz diferente.
   local:
     title: Funciona sem internet
     text: >-
-      Todos os jogos correm <a href="#glossario-sem-internet">no próprio campo</a>, totalmente
+      Todos os jogos correm <a href="{{ page.to.glossary }}#glossario-sem-internet">no próprio campo</a>, totalmente
       offline, numa casa ou numa mata com vários quilómetros. A internet é opcional.
   hardware:
     title: Qualquer hardware
     text: >-
-      Placas <a href="#glossario-esp32">ESP32</a> baratas, computadores
-      <a href="#glossario-raspberry-pi">Raspberry Pi</a> do tamanho de um cartão de crédito, placas
-      simples <a href="#glossario-arduino">tipo Arduino</a> e
-      <a href="#glossario-dispositivo-android">telemóveis Android</a>, novos ou reaproveitados,
+      Placas <a href="{{ page.to.glossary }}#glossario-esp32">ESP32</a> baratas, computadores
+      <a href="{{ page.to.glossary }}#glossario-raspberry-pi">Raspberry Pi</a> do tamanho de um cartão de crédito, placas
+      simples <a href="{{ page.to.glossary }}#glossario-arduino">tipo Arduino</a> e
+      <a href="{{ page.to.glossary }}#glossario-dispositivo-android">telemóveis Android</a>, novos ou reaproveitados,
       entram todos no mesmo jogo.
   scripts:
     title: Modos em scripts
     text: >-
-      Os modos de jogo são pequenos <a href="#glossario-lua">scripts Lua</a>, ficheiros de texto com
+      Os modos de jogo são pequenos <a href="{{ page.to.glossary }}#glossario-lua">scripts Lua</a>, ficheiros de texto com
       as regras, mais um ficheiro de definições. Muda-os ou partilha-os sem voltar a gravar o
       software que vem dentro das caixas.
   open:
     title: Protocolo e API abertos
     text: >-
-      Os dispositivos falam entre si pelo <a href="#glossario-skirmesh-rf">Skirmesh-RF</a>, um
+      Os dispositivos falam entre si pelo <a href="{{ page.to.glossary }}#glossario-skirmesh-rf">Skirmesh-RF</a>, um
       protocolo de rádio documentado, por isso qualquer pessoa pode construir um aparelho que entre
       no jogo. O controlador de campo disponibiliza APIs MQTT, REST e WebSocket para marcadores,
       transmissões em direto e outras ferramentas.
@@ -129,13 +159,13 @@ why:
     title: Feita para os campos
     text: >-
       Funções de jogador, squads, cenários personalizados e um registo de
-      <a href="#glossario-cronografagem">cronografagem</a> que guarda as medições de cada réplica
+      <a href="{{ page.to.glossary }}#glossario-cronografagem">cronografagem</a> que guarda as medições de cada réplica
       para verificações aleatórias estão previstos de raiz.
   copyleft:
     title: Copyleft
     text: >-
       Campos que cobram entrada e makers que vendem caixas são bem-vindos. Quem distribuir ou
-      alojar uma versão alterada tem de <a href="#glossario-copyleft">partilhar as alterações</a>.
+      alojar uma versão alterada tem de <a href="{{ page.to.glossary }}#glossario-copyleft">partilhar as alterações</a>.
 
 how:
   title: Como tudo se liga
@@ -143,13 +173,13 @@ how:
     Em poucas palavras: os dispositivos no campo falam por rádio com o controlador de campo, um
     pequeno computador na base que corre o jogo e guarda a pontuação. Os telemóveis ligam-se a ele
     por Wi-Fi, e os marcadores, as transmissões em direto e as apps de mapas, como o
-    <a href="#glossario-atak">ATAK</a>, pela sua API. Um
-    <a href="#glossario-servidor-do-clube">servidor do clube</a>, opcional e na internet, guarda as
+    <a href="{{ page.to.glossary }}#glossario-atak">ATAK</a>, pela sua API. Um
+    <a href="{{ page.to.glossary }}#glossario-servidor-do-clube">servidor do clube</a>, opcional e na internet, guarda as
     contas e o histórico. O controlador, a sua API e a consola da organização já estão feitos e
     testados num computador, ainda não no campo; o servidor do clube chega numa fase posterior.
   core: >-
     Por dentro, todos os aparelhos que correm modos de jogo usam o mesmo
-    <a href="#glossario-nucleo">núcleo partilhado</a>, escrito em C11, e os mesmos modos em Lua; só
+    <a href="{{ page.to.glossary }}#glossario-nucleo">núcleo partilhado</a>, escrito em C11, e os mesmos modos em Lua; só
     muda uma camada fina para cada tipo de hardware. Um modo escrito uma vez joga-se da mesma
     maneira numa caixa, num telemóvel ou num Raspberry Pi.
   diagram:
@@ -180,18 +210,26 @@ how:
       dos jogadores ligam-se por Wi-Fi; os marcadores e o ATAK usam MQTT, REST e webhooks.
     props: >-
       <strong>Dispositivos</strong> na rede mesh LoRa Skirmesh-RF:
-      <a href="#glossario-field-box">Field Boxes e satélites</a> ESP32, dispositivos Android com
+      <a href="{{ page.to.glossary }}#glossario-field-box">Field Boxes e satélites</a> ESP32, dispositivos Android com
       módulo ESP32 e nós simples tipo Arduino.
 
 radio:
   title: Como funciona o rádio
   intro: >-
-    Os dispositivos falam por <a href="#glossario-lora">LoRa</a>, um rádio de longo alcance e
+    Os dispositivos falam por <a href="{{ page.to.glossary }}#glossario-lora">LoRa</a>, um rádio de longo alcance e
     baixo consumo, no protocolo próprio da Atalaia, o
-    <a href="#glossario-skirmesh-rf">Skirmesh-RF</a>. Estes dois diagramas mostram o que o LoRa
+    <a href="{{ page.to.glossary }}#glossario-skirmesh-rf">Skirmesh-RF</a>. Estes dois diagramas mostram o que o LoRa
     consegue e não consegue fazer num campo, e como um só protocolo corre em aparelhos muito
     diferentes. Nada disto passou ainda por um campo a sério: o alcance e os tempos vão ser
     medidos no teste de campo da fase&nbsp;2.
+  # The main page's short version of this section, with a link to the radio page.
+  teaser: >-
+    Os dispositivos falam por <a href="{{ page.to.glossary }}#glossario-lora">LoRa</a>, um rádio
+    de longo alcance e baixo consumo, no protocolo próprio da Atalaia, o
+    <a href="{{ page.to.glossary }}#glossario-skirmesh-rf">Skirmesh-RF</a>. Dois diagramas mostram
+    o que o LoRa consegue e não consegue fazer num campo, e como um só protocolo corre em
+    aparelhos muito diferentes. Nada disto passou ainda por um campo a sério.
+  more: Como funciona o rádio, em dois diagramas →
   # O texto alternativo de cada diagrama é a sua descrição, diagrams.*.desc, também usada no SVG.
   lora:
     title: O que o LoRa consegue fazer
@@ -229,6 +267,10 @@ modes:
     por isso o mesmo script corre numa Field Box, numa caixa com teclado ou num telemóvel Android.
     Há sete modos, um modificador e as Ligaduras já escritos e testados em software; ainda nenhum
     correu num campo a sério.
+  # The main page shows three modes, then this link to the modes page.
+  more: Ver os 7 modos →
+  # At the end of the modes page.
+  try: Experimenta já um modo no browser →
   domination:
     title: Domínio
     text: >-
@@ -369,7 +411,7 @@ screens:
 try:
   title: Experimenta já
   intro: >-
-    Ainda não há <a href="#glossario-firmware">firmware</a> para gravar, mas o núcleo partilhado já
+    Ainda não há <a href="{{ page.to.glossary }}#glossario-firmware">firmware</a> para gravar, mas o núcleo partilhado já
     corre num computador. O simulador joga um modo no browser: mantém premidos os botões das
     equipas, vê o ecrã de cada dispositivo e acompanha o registo de eventos. Os comandos abaixo
     escrevem-se num terminal.
@@ -381,20 +423,28 @@ try:
     do simulador</a> (em inglês) explica todas as opções.
 
 roadmap:
-  title: Roteiro
+  # "Roadmap" stays in English in Portuguese too, as it is known in Portugal (never "Roteiro").
+  title: Roadmap
   intro: Seis fases. Cada uma acaba com um teste a sério no campo antes de a seguinte começar.
+  # The main page shows each phase's title and short line, then this link to the roadmap page.
+  more: O roadmap completo, com o que cada fase inclui e a sua prova →
   done: Concluída
   software: Software pronto
   current: Em curso
   p0:
     title: Alicerces
+    short: >-
+      Núcleo partilhado, sandbox Lua, codec Skirmesh-RF e simulador no browser. Prova superada.
     text: >-
-      Núcleo partilhado, <a href="#glossario-lua">sandbox Lua</a>,
-      <a href="#glossario-skirmesh-rf">codec Skirmesh-RF</a>, simulador no browser.
+      Núcleo partilhado, <a href="{{ page.to.glossary }}#glossario-lua">sandbox Lua</a>,
+      <a href="{{ page.to.glossary }}#glossario-skirmesh-rf">codec Skirmesh-RF</a>, simulador no browser.
     gate: >-
       Prova: o simulador corre o Domínio e a Bomba a partir de scripts Lua. <strong>Superada.</strong>
   p1:
     title: Uma caixa
+    short: >-
+      Firmware da Field Box a correr num emulador e manual de montagem; à espera das primeiras
+      caixas.
     text: >-
       Montagem da Field Box, firmware ESP32, predefinições na própria caixa e um manual de montagem
       com o esquema de ligações.
@@ -404,6 +454,9 @@ roadmap:
       escrito; a prova fica em aberto até as primeiras caixas estarem montadas.
   p2:
     title: Rede de campo
+    short: >-
+      Skirmesh-RF sobre LoRa, controlador de campo, API, consola da organização e um pacote de
+      modos, testados em software; à espera das placas de rádio.
     text: >-
       Skirmesh-RF sobre LoRa, controlador de campo, API, consola da organização e um pacote de
       modos, já escrito e testado em software: Domínio Total (só pontua quem tem todas as caixas),
@@ -411,7 +464,7 @@ roadmap:
       de armar por equipa na Bomba e o modificador Códigos (códigos no teclado que dão pontos,
       pistas ou desbloqueios, e a organização sabe quem os usou).
     gate: >-
-      Prova: 5 caixas num espaço de <a href="#glossario-cqb">CQB</a> e num campo exterior, sem uma
+      Prova: 5 caixas num espaço de <a href="{{ page.to.glossary }}#glossario-cqb">CQB</a> e num campo exterior, sem uma
       única captura perdida. O protocolo de rádio cifrado, o controlador de campo com a sua API, o
       modem de rádio USB, a consola da organização com um marcador, a entrada num jogo com um
       cartão NFC ou um código QR, e o firmware das caixas a falar com o controlador já estão
@@ -419,8 +472,11 @@ roadmap:
       prova precisa das placas de rádio.
   p3:
     title: Android e jogadores
+    short: >-
+      Dispositivos Android, módulo de E/S, app para quem joga e os modos que precisam dos
+      telemóveis; muito já feito em software.
     text: >-
-      Dispositivos Android, <a href="#glossario-dispositivo-android">módulo de E/S</a>, app para
+      Dispositivos Android, <a href="{{ page.to.glossary }}#glossario-dispositivo-android">módulo de E/S</a>, app para
       quem joga, com funções, e os modos que precisam dos telemóveis de quem joga: Respawn, Kill
       Confirmed, Player Check-in, Money Factory, as Ligaduras (a pessoa atingida lê a sua etiqueta
       e mantém um botão premido para receber o tratamento, com um número limitado de tratamentos)
@@ -443,12 +499,17 @@ roadmap:
     gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."
   p4:
     title: Servidor do clube e jogo avançado
+    short: >-
+      Servidor do clube, cenários personalizados, modos avançados, ATAK.
     text: Servidor do clube, cenários personalizados, modos avançados, ATAK.
     gate: >-
-      Prova: um <a href="#glossario-milsim">milsim</a> de fim de semana decorre do princípio ao fim
+      Prova: um <a href="{{ page.to.glossary }}#glossario-milsim">milsim</a> de fim de semana decorre do princípio ao fim
       com a Atalaia.
   p5:
     title: Comunidade
+    short: >-
+      Editor visual de modos, registo de modos, placa de suporte (PCB), traduções, guias de
+      montagem.
     text: >-
       Editor visual de modos, registo de modos, placa de suporte (PCB) que facilita a montagem,
       traduções, guias de montagem para outros tipos de dispositivos.
@@ -496,8 +557,8 @@ glossary:
   id: glossario
   title: Glossário
   intro: >-
-    Os termos técnicos desta página, explicados em linguagem simples. As ligações no texto lá em
-    cima trazem-te até aqui.
+    Os termos técnicos destas páginas, explicados em linguagem simples. As ligações no texto de
+    cada página trazem-te até aqui.
   groups:
     game: O jogo
     hardware: Hardware

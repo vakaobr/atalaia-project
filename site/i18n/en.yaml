@@ -1,24 +1,53 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: CC-BY-SA-4.0
 #
-# English text of the project page (site/en/index.html). Every key the English
-# page uses in the template site/src/index.html must be here, and it must use
-# every key here; apart from the parts only one page shows, pt.yaml has the
-# same keys. Values are HTML; keys the template marks |text are plain text.
-# After editing, run python3 tools/build_site.py. See site/README.md.
+# English text of the project pages (site/en/: the main page, modes/, radio/,
+# roadmap/ and glossary/). Every key the English pages use in the templates
+# site/src/*.html and site/src/partials/*.html must be here, and they must use
+# every key here; apart from the parts only one language shows, pt.yaml has the
+# same keys. A key can be used on several pages. Values are HTML; keys the
+# templates mark |text are plain text. After editing, run
+# python3 tools/build_site.py. See site/README.md.
 #
-# Links like href="#glossary-lora" point at the glossary entries at the end of
-# this file. Their ids (glossary.*.id) are stable: change them only together
-# with every link to them.
+# Links like href="{{ page.to.glossary }}#glossary-lora" point at the glossary
+# entries at the end of this file, on the glossary page; {{ page.to.<page> }}
+# becomes the relative link to that page from whichever page shows the text.
+# The ids (glossary.*.id) are stable: change them only together with every
+# link to them.
 
+# Each page's title, description and (optionally) social preview description,
+# under its name in the page table of tools/build_site.py. og_image_alt is the
+# same on every page, as they all share the language's preview image.
 meta:
-  title: Atalaia · the open force-on-force platform
-  description: >-
-    Atalaia is an open, local-first platform for airsoft, paintball and milsim game props: ESP32,
-    Raspberry Pi, Arduino and Android props, game modes as Lua scripts, and an open LoRa protocol.
-  og_description: >-
-    Open, local-first game props for airsoft, paintball and milsim. Game modes are scripts; any
-    hardware works.
+  index:
+    title: Atalaia · the open force-on-force platform
+    description: >-
+      Atalaia is an open, local-first platform for airsoft, paintball and milsim game props: ESP32,
+      Raspberry Pi, Arduino and Android props, game modes as Lua scripts, and an open LoRa protocol.
+    og_description: >-
+      Open, local-first game props for airsoft, paintball and milsim. Game modes are scripts; any
+      hardware works.
+  modes:
+    title: Game modes · Atalaia
+    description: >-
+      Atalaia's game modes for airsoft, paintball and milsim: Domination, Bomb / Rush, Hold-All
+      Domination, Last Stand, Kill Confirmed, Respawn and Lives, Player Check-in, the Codes modifier
+      and the Medic Kit, each a short Lua script.
+  radio:
+    title: How the radio works · Atalaia
+    description: >-
+      What LoRa radio can and cannot do on an airsoft or paintball field, which channel Atalaia
+      uses and why, and how its Skirmesh-RF protocol runs on every device.
+  roadmap:
+    title: Roadmap · Atalaia
+    description: >-
+      Atalaia's six phases, from the shared core to the community, each ending with a real field
+      test before the next begins.
+  glossary:
+    title: Glossary · Atalaia
+    description: >-
+      The technical words of the Atalaia project, from LoRa and ESP32 to copyleft, in plain terms
+      for players, field owners and GMs.
   og_image_alt: >-
     A hilltop watchtower at dusk with a radio box on top, linked to glowing GAME PROP boxes across
     a forested valley, under the words "Open-source project ATALAIA".
@@ -28,6 +57,7 @@ header:
   home: Atalaia home
   sections: Sections
   modes: Modes
+  radio: Radio
   try: Try it
   roadmap: Roadmap
   hub: Community
@@ -40,9 +70,9 @@ hero:
   lead: >-
     Atalaia is an open platform for the electronic props of airsoft, paintball and milsim: the
     boxes teams capture, the bombs they arm and defuse. Build a domination box from a €20
-    <a href="#glossary-microcontroller">microcontroller</a> (a tiny, cheap computer board), turn an
+    <a href="{{ page.to.glossary }}#glossary-microcontroller">microcontroller</a> (a tiny, cheap computer board), turn an
     old Android phone into a hacking terminal, run a 20-box weekend milsim on a
-    <a href="#glossary-lora">LoRa mesh</a> (long-range, low-power radio that the boxes relay to
+    <a href="{{ page.to.glossary }}#glossary-lora">LoRa mesh</a> (long-range, low-power radio that the boxes relay to
     one another across the field), and write your own game modes as small scripts. Every game runs
     on the field itself: no cloud or internet needed, and no manufacturer can lock you in.
   discuss: Join the discussion
@@ -62,7 +92,7 @@ game:
   title: How a game works
   intro: >-
     Playing needs no technical knowledge. This is how a game will run once the boxes are built (phases
-    1 and 2); the <a href="#glossary-simulator">simulator</a> already plays the same modes on a
+    1 and 2); the <a href="{{ page.to.glossary }}#glossary-simulator">simulator</a> already plays the same modes on a
     computer today.
   setup:
     title: Set up
@@ -77,7 +107,7 @@ game:
   relay:
     title: Relay
     text: >-
-      Each box reports by radio to the <a href="#glossary-field-controller">field controller</a>, a
+      Each box reports by radio to the <a href="{{ page.to.glossary }}#glossary-field-controller">field controller</a>, a
       small computer at the base; boxes far away are relayed by the ones in between. A box that
       loses contact keeps playing and catches up later.
   score:
@@ -90,56 +120,56 @@ why:
   title: Why Atalaia
   intro: >-
     Electronic props add a lot to a game, but commercial systems keep the rules locked inside
-    closed <a href="#glossary-firmware">firmware</a>. New modes wait on the vendor, there is no
-    public <a href="#glossary-api">API</a>, and you cannot add your own hardware. Atalaia does it
+    closed <a href="{{ page.to.glossary }}#glossary-firmware">firmware</a>. New modes wait on the vendor, there is no
+    public <a href="{{ page.to.glossary }}#glossary-api">API</a>, and you cannot add your own hardware. Atalaia does it
     differently.
   local:
     title: Local-first
     text: >-
-      Every game runs <a href="#glossary-local-first">on the field itself</a>, fully offline, from a
+      Every game runs <a href="{{ page.to.glossary }}#glossary-local-first">on the field itself</a>, fully offline, from a
       single house to a multi-kilometre forest. The internet is optional.
   hardware:
     title: Any hardware
     text: >-
-      Cheap <a href="#glossary-esp32">ESP32</a> boards, credit-card-sized
-      <a href="#glossary-raspberry-pi">Raspberry Pi</a> computers, simple
-      <a href="#glossary-arduino">Arduino-class</a> boards and new or repurposed
-      <a href="#glossary-android-prop">Android phones</a> all play in the same game.
+      Cheap <a href="{{ page.to.glossary }}#glossary-esp32">ESP32</a> boards, credit-card-sized
+      <a href="{{ page.to.glossary }}#glossary-raspberry-pi">Raspberry Pi</a> computers, simple
+      <a href="{{ page.to.glossary }}#glossary-arduino">Arduino-class</a> boards and new or repurposed
+      <a href="{{ page.to.glossary }}#glossary-android-prop">Android phones</a> all play in the same game.
   scripts:
     title: Modes are scripts
     text: >-
-      Game modes are short <a href="#glossary-lua">Lua scripts</a>, small text files of rules, with
+      Game modes are short <a href="{{ page.to.glossary }}#glossary-lua">Lua scripts</a>, small text files of rules, with
       a settings file. Change or share one without reflashing (reinstalling) the boxes' built-in
       software.
   open:
     title: Open protocol and API
     text: >-
-      Props talk over <a href="#glossary-skirmesh-rf">Skirmesh-RF</a>, a documented radio protocol,
+      Props talk over <a href="{{ page.to.glossary }}#glossary-skirmesh-rf">Skirmesh-RF</a>, a documented radio protocol,
       so anyone can build a device that joins in. The field controller offers MQTT, REST and
       WebSocket APIs for scoreboards, stream overlays and other tools.
   fields:
     title: Built for fields
     text: >-
-      Player roles, squads, custom scenarios, and a <a href="#glossary-chrono">chrono</a> registry
+      Player roles, squads, custom scenarios, and a <a href="{{ page.to.glossary }}#glossary-chrono">chrono</a> registry
       that keeps each replica's readings for spot checks are part of the design.
   copyleft:
     title: Copyleft
     text: >-
       Fields that charge entry and makers who sell boxes are welcome. Anyone who ships or hosts a
-      changed version <a href="#glossary-copyleft">shares the changes</a> back.
+      changed version <a href="{{ page.to.glossary }}#glossary-copyleft">shares the changes</a> back.
 
 how:
   title: How it fits together
   intro: >-
     In plain words: the props on the field talk by radio to the field controller, a small computer
     at the base that runs the game and keeps the score. Phones connect to it over Wi-Fi, and
-    scoreboards, stream overlays and map apps such as <a href="#glossary-atak">ATAK</a> through its
-    API. An optional <a href="#glossary-site-server">site server</a> on the internet keeps accounts
+    scoreboards, stream overlays and map apps such as <a href="{{ page.to.glossary }}#glossary-atak">ATAK</a> through its
+    API. An optional <a href="{{ page.to.glossary }}#glossary-site-server">site server</a> on the internet keeps accounts
     and history. The controller, its API and the organisers' console are built and tested on a
     computer, not yet on the field; the site server comes in a later phase.
   core: >-
     Under the hood, every device that runs game modes uses the same
-    <a href="#glossary-core">shared core</a>, written in C11, and the same Lua modes; only a thin
+    <a href="{{ page.to.glossary }}#glossary-core">shared core</a>, written in C11, and the same Lua modes; only a thin
     layer for each kind of hardware differs. A mode written once plays the same on a box, a phone
     or a Raspberry Pi.
   diagram:
@@ -170,7 +200,7 @@ how:
       Wi-Fi; scoreboards and ATAK use MQTT, REST and webhooks.
     props: >-
       <strong>Props</strong> on the Skirmesh-RF LoRa mesh: ESP32
-      <a href="#glossary-field-box">Field Boxes and satellites</a>, Android props with an ESP32 pod,
+      <a href="{{ page.to.glossary }}#glossary-field-box">Field Boxes and satellites</a>, Android props with an ESP32 pod,
       and Arduino-class thin nodes.
   # English page only: the Portuguese page shows this image in its hero.
   image_alt: >-
@@ -184,11 +214,19 @@ how:
 radio:
   title: How the radio works
   intro: >-
-    The props talk over <a href="#glossary-lora">LoRa</a>, a long-range, low-power radio, in
-    Atalaia's own protocol, <a href="#glossary-skirmesh-rf">Skirmesh-RF</a>. These two diagrams
+    The props talk over <a href="{{ page.to.glossary }}#glossary-lora">LoRa</a>, a long-range, low-power radio, in
+    Atalaia's own protocol, <a href="{{ page.to.glossary }}#glossary-skirmesh-rf">Skirmesh-RF</a>. These two diagrams
     show what LoRa can and cannot do on a field, and how one protocol runs on very different
     devices. None of it has been on a real field yet: range and timing will be measured in the
     phase&nbsp;2 field test.
+  # The main page's short version of this section, with a link to the radio page.
+  teaser: >-
+    The props talk over <a href="{{ page.to.glossary }}#glossary-lora">LoRa</a>, a long-range,
+    low-power radio, in Atalaia's own protocol,
+    <a href="{{ page.to.glossary }}#glossary-skirmesh-rf">Skirmesh-RF</a>. Two diagrams show what
+    LoRa can and cannot do on a field, and how one protocol runs on very different devices. None
+    of it has been on a real field yet.
+  more: How the radio works, in two diagrams →
   # Each diagram's alt text is its description, diagrams.*.desc, also used inside the SVG.
   lora:
     title: What LoRa can do
@@ -223,6 +261,10 @@ modes:
     Modes react to intent ("a team is claiming this prop"), not to hardware, so the same script
     runs on a Field Box, a keypad box or an Android phone. Seven modes, one modifier and the Medic
     Kit are written and tested in software today; none has run on a real field yet.
+  # The main page shows three modes, then this link to the modes page.
+  more: See all 7 modes →
+  # At the end of the modes page.
+  try: Try a mode in your browser today →
   domination:
     title: Domination
     text: >-
@@ -359,7 +401,7 @@ screens:
 try:
   title: Try it today
   intro: >-
-    There is nothing to <a href="#glossary-firmware">flash</a> yet, but the shared core runs on a
+    There is nothing to <a href="{{ page.to.glossary }}#glossary-firmware">flash</a> yet, but the shared core runs on a
     computer. The simulator plays a mode in your browser: hold team buttons, watch each prop's
     screen and follow the event log. The commands below are typed in a terminal.
   compiler: With a C compiler
@@ -372,18 +414,24 @@ try:
 roadmap:
   title: Roadmap
   intro: Six phases. Each one ends with a real field test before the next begins.
+  # The main page shows each phase's title and short line, then this link to the roadmap page.
+  more: The full roadmap, with what each phase holds and its gate →
   done: Done
   software: Software done
   current: In progress
   p0:
     title: Foundations
+    short: >-
+      Shared core, Lua sandbox, Skirmesh-RF codec and browser simulator. Gate met.
     text: >-
-      Shared core, <a href="#glossary-lua">Lua sandbox</a>,
-      <a href="#glossary-skirmesh-rf">Skirmesh-RF codec</a>, browser simulator.
+      Shared core, <a href="{{ page.to.glossary }}#glossary-lua">Lua sandbox</a>,
+      <a href="{{ page.to.glossary }}#glossary-skirmesh-rf">Skirmesh-RF codec</a>, browser simulator.
     gate: >-
       Gate: the simulator runs Domination and Bomb from Lua scripts. <strong>Met.</strong>
   p1:
     title: Single box
+    short: >-
+      Field Box firmware running in an emulator and a build manual; waiting for the first boxes.
     text: >-
       Field Box build, ESP32 firmware, on-device presets, and a build manual with a wiring diagram.
     gate: >-
@@ -392,6 +440,9 @@ roadmap:
       gate stays open until the first boxes are built.
   p2:
     title: Field network
+    short: >-
+      Skirmesh-RF over LoRa, field controller, API, GM console and a mode pack, tested in
+      software; waiting for the radio boards.
     text: >-
       Skirmesh-RF over LoRa, field controller, API, GM console, and a mode pack, now written and
       tested in software: Hold-All Domination (score only while holding every box), Last Stand (a
@@ -399,7 +450,7 @@ roadmap:
       modifier (keypad codes that grant points, hints or unlocks, with the GM told who used
       them).
     gate: >-
-      Gate: 5 boxes on a <a href="#glossary-cqb">CQB</a> site and an outdoor field, zero lost
+      Gate: 5 boxes on a <a href="{{ page.to.glossary }}#glossary-cqb">CQB</a> site and an outdoor field, zero lost
       captures. The encrypted radio protocol, the field controller with its API, the USB radio
       modem, the organisers' console with a scoreboard, joining a game with an NFC card or a QR
       code, and the boxes' firmware talking to the controller are built and tested in the
@@ -407,8 +458,11 @@ roadmap:
       boards.
   p3:
     title: Android and players
+    short: >-
+      Android props, the I/O pod, the player app and the modes that need phones; much of it done in
+      software.
     text: >-
-      Android props, <a href="#glossary-android-prop">I/O pod</a>, player app with roles, and the
+      Android props, <a href="{{ page.to.glossary }}#glossary-android-prop">I/O pod</a>, player app with roles, and the
       modes that need players' phones: Respawn, Kill Confirmed, Player Check-in, Money Factory,
       the Medic Kit (a hit player scans their tag and holds a button to be healed, with a limited
       number of heals) and chrono check-in. Done in software: Kill Confirmed, Respawn and Lives,
@@ -429,11 +483,15 @@ roadmap:
     gate: "Gate: one game mixes ESP32 and Android props without issues."
   p4:
     title: Site server and advanced play
+    short: >-
+      Site server, custom scenarios, advanced modes, ATAK.
     text: Site server, custom scenarios, advanced modes, ATAK.
     gate: >-
-      Gate: a weekend <a href="#glossary-milsim">milsim</a> runs on Atalaia end to end.
+      Gate: a weekend <a href="{{ page.to.glossary }}#glossary-milsim">milsim</a> runs on Atalaia end to end.
   p5:
     title: Community
+    short: >-
+      Visual mode editor, mode registry, carrier PCB, translations, build guides.
     text: >-
       Visual mode editor, mode registry, carrier PCB (a ready-made circuit board that makes builds
       easier), translations, build guides for other node types.
@@ -476,7 +534,8 @@ glossary:
   id: glossary
   title: Glossary
   intro: >-
-    The technical words on this page, in plain terms. The links in the text above lead here.
+    The technical words of these pages, in plain terms. The links in the text of every page lead
+    here.
   groups:
     game: The game
     hardware: Hardware

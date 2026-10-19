@@ -1,0 +1,57 @@
+{#
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: CC-BY-SA-4.0
+
+The radio page: the two radio diagrams with their lead-ins, and the channel.
+Built into site/radio/ (Portuguese) and site/en/radio/ (English); the main
+page has a short version that links here. See site/README.md.
+
+The diagrams are built by tools/build_site.py from site/src/diagrams/ into
+img/diagrams/<name>-<layout>-<language>.svg: the narrow layout (one column) on
+phones, the wide one (two columns) elsewhere. Their alt text is the SVG's own
+description.
+#}
+<html lang="{{ page.lang }}">
+<head>
+{% include head %}
+</head>
+<body>
+{% include header %}
+
+  <main id="main">
+    <section class="page-head" aria-labelledby="radio">
+      <div class="wrap">
+        <h1 id="radio">{{ radio.title }}</h1>
+        <p class="lead">{{ radio.intro }}</p>
+      </div>
+    </section>
+
+    <div class="content">
+      <div class="wrap">
+        <figure class="radio-diagram" id="lora">
+          <h2>{{ radio.lora.title }}</h2>
+          <p>{{ radio.lora.lead }}</p>
+          <picture>
+            <source media="(max-width: 760px)" srcset="{{ page.root }}img/diagrams/lora-narrow-{{ page.code }}.svg" width="420" height="1506">
+            <img src="{{ page.root }}img/diagrams/lora-wide-{{ page.code }}.svg" width="848" height="892" loading="lazy" decoding="async" alt="{{ diagrams.lora.desc|text }}">
+          </picture>
+        </figure>
+        <div class="radio-diagram" id="channel">
+          <h2>{{ radio.channel.title }}</h2>
+          <p>{{ radio.channel.lead }}</p>
+        </div>
+        <figure class="radio-diagram" id="skirmesh">
+          <h2>{{ radio.skirmesh.title }}</h2>
+          <p>{{ radio.skirmesh.lead }}</p>
+          <picture>
+            <source media="(max-width: 760px)" srcset="{{ page.root }}img/diagrams/skirmesh-narrow-{{ page.code }}.svg" width="420" height="1302">
+            <img src="{{ page.root }}img/diagrams/skirmesh-wide-{{ page.code }}.svg" width="848" height="711" loading="lazy" decoding="async" alt="{{ diagrams.skirmesh.desc|text }}">
+          </picture>
+        </figure>
+      </div>
+    </div>
+  </main>
+
+{% include footer %}
+</body>
+</html>

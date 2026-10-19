@@ -129,6 +129,14 @@ nav { display: flex; flex-wrap: wrap; gap: 4px 22px; font-size: 0.98rem; }
 nav a { color: var(--on-slate-muted); text-decoration: none; }
 nav a:hover { color: var(--on-slate); }
 .sections { margin-left: auto; }
+/* The link of the page being read. */
+.sections a[aria-current="page"] {
+  color: var(--on-slate);
+  text-decoration: underline;
+  text-decoration-color: var(--signal);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
+}
 
 /* Language switcher: PT · EN, the current language lit like a beacon. */
 .lang { align-items: center; gap: 2px; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.05em; }
@@ -192,6 +200,32 @@ nav a:hover { color: var(--on-slate); }
 .hero .button.primary { background: var(--signal); border-color: var(--signal); color: var(--slate); }
 .hero .button.primary:hover { filter: brightness(1.08); color: var(--slate); }
 .name { color: var(--on-slate-muted); font-size: 0.98rem; margin: 30px 0 0; max-width: 62ch; }
+
+/* ---- the head of a subpage: the hero's slate and hills, shorter ---- */
+
+.page-head {
+  padding: 56px 0 104px;
+  color: var(--on-slate);
+  background-color: var(--slate);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 140' preserveAspectRatio='none'%3E%3Cpath fill='%23c9a25c' d='M0 140V80C180 42 360 42 520 70c120 22 200-20 340-32 160-12 320 22 580 34v68z'/%3E%3Cpath fill='%23e3c48d' d='M0 140v-32c220-28 420-22 620-4s380-16 580-20c120-2 200 8 240 12v44z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: 100% 72px;
+  background-position: center bottom;
+}
+.page-head h1 { font-size: clamp(2.4rem, 6vw, 3.8rem); max-width: none; }
+.page-head .lead { margin-bottom: 0; }
+.page-head a { color: var(--on-slate); }
+.page-head a:hover { color: var(--sand); }
+
+/* The body of a subpage. Its headings are second-level, drawn like the main page's third-level ones. */
+.content { padding: 56px 0 72px; }
+.content h2 { font-size: 1.4rem; font-weight: 600; line-height: 1.15; }
+/* A jump from a link lands below the sticky header. */
+.content [id] { scroll-margin-top: 84px; }
+@media (max-width: 640px) { .content [id] { scroll-margin-top: 12px; } }
+
+/* A link onward from a short section of the main page to its page. */
+.more { margin: 28px 0 0; font-weight: 600; }
 
 /* ---- illustrations ---- */
 
@@ -338,6 +372,21 @@ pre {
 .phases li.now .tag { background: var(--signal); color: var(--slate); }
 @media (prefers-color-scheme: dark) { .tag { background: var(--line); } }
 
+/* The main page's short roadmap: one line per phase, under a sand rule; the current one lit. */
+.strip {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 28px 36px;
+}
+.strip li { border-top: 3px solid var(--rule); padding-top: 12px; }
+.strip li.now { border-top-color: var(--signal); }
+.strip h3 { font-size: 1.25rem; }
+.strip p { margin: 6px 0 0; color: var(--muted); }
+.strip li.now .tag { background: var(--signal); color: var(--slate); }
+
 /* ---- community hub: a ruled list ---- */
 
 .hub { list-style: none; padding: 0; margin: 0; border-bottom: 1px solid var(--line); }
@@ -375,7 +424,7 @@ pre {
   border-top: 3px solid var(--rule);
 }
 .glossary .group:first-child { margin-top: 0; }
-.glossary h3 { font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding-top: 4px; }
+.glossary .group h2 { font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding-top: 4px; }
 .glossary dl {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

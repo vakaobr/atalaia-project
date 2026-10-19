@@ -1,0 +1,86 @@
+{#
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: CC-BY-SA-4.0
+
+The game modes page: every mode, the Codes modifier, the Medic Kit role
+package and "your mode". Built into site/modos/ (Portuguese) and
+site/en/modes/ (English); the main page shows three of these cards and links
+here. See site/README.md and the comment at the top of index.html.
+#}
+<html lang="{{ page.lang }}">
+<head>
+{% include head %}
+</head>
+<body>
+{% include header %}
+
+  <main id="main">
+    <section class="page-head" aria-labelledby="modes">
+      <div class="wrap">
+        <h1 id="modes">{{ modes.title }}</h1>
+        <p class="lead">{{ modes.intro }}</p>
+      </div>
+    </section>
+
+    <div class="content band">
+      <div class="wrap">
+        <div class="cards">
+          <article class="card" id="domination">
+            <h2>{{ modes.domination.title }}</h2>
+            <p>{{ modes.domination.text }}</p>
+            <p class="meta">{{ modes.domination.meta }}</p>
+          </article>
+          <article class="card" id="bomb">
+            <h2>{{ modes.bomb.title }}</h2>
+            <p>{{ modes.bomb.text }}</p>
+            <p class="meta">{{ modes.bomb.meta }}</p>
+          </article>
+          <article class="card" id="holdall">
+            <h2>{{ modes.holdall.title }}</h2>
+            <p>{{ modes.holdall.text }}</p>
+            <p class="meta">{{ modes.holdall.meta }}</p>
+          </article>
+          <article class="card" id="laststand">
+            <h2>{{ modes.laststand.title }}</h2>
+            <p>{{ modes.laststand.text }}</p>
+            <p class="meta">{{ modes.laststand.meta }}</p>
+          </article>
+          <article class="card" id="kill-confirmed">
+            <h2>{{ modes.kill_confirmed.title }}</h2>
+            <p>{{ modes.kill_confirmed.text }}</p>
+            <p class="meta">{{ modes.kill_confirmed.meta }}</p>
+          </article>
+          <article class="card" id="respawn">
+            <h2>{{ modes.respawn.title }}</h2>
+            <p>{{ modes.respawn.text }}</p>
+            <p class="meta">{{ modes.respawn.meta }}</p>
+          </article>
+          <article class="card" id="player-checkin">
+            <h2>{{ modes.player_checkin.title }}</h2>
+            <p>{{ modes.player_checkin.text }}</p>
+            <p class="meta">{{ modes.player_checkin.meta }}</p>
+          </article>
+          <article class="card" id="medic">
+            <h2>{{ modes.medic.title }}</h2>
+            <p>{{ modes.medic.text }}</p>
+            <p class="meta">{{ modes.medic.meta }}</p>
+          </article>
+          <article class="card" id="codes">
+            <h2>{{ modes.codes.title }}</h2>
+            <p>{{ modes.codes.text }}</p>
+            <p class="meta">{{ modes.codes.meta }}</p>
+          </article>
+          <article class="card dashed" id="yours">
+            <h2>{{ modes.yours.title }}</h2>
+            <p>{{ modes.yours.text }}</p>
+            <p class="meta"><a href="https://github.com/vakaobr/atalaia-project/issues/new/choose">{{ modes.yours.link }}</a></p>
+          </article>
+        </div>
+        <p class="more"><a href="{{ page.to.index }}#try">{{ modes.try }}</a></p>
+      </div>
+    </div>
+  </main>
+
+{% include footer %}
+</body>
+</html>

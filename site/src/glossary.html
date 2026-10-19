@@ -1,0 +1,87 @@
+{#
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: CC-BY-SA-4.0
+
+The glossary page. Built into site/glossario/ (Portuguese) and
+site/en/glossary/ (English). Each entry's id comes from the language file
+(glossario-lora, glossary-lora...), and the text of every page links to those
+ids with href="{{ page.to.glossary }}#<id>". Keep them stable and ASCII: other
+sites may link to them. The build checks that every link to this page has a
+matching id.
+#}
+<html lang="{{ page.lang }}">
+<head>
+{% include head %}
+</head>
+<body>
+{% include header %}
+
+  <main id="main">
+    <section class="page-head" aria-labelledby="{{ glossary.id|text }}">
+      <div class="wrap">
+        <h1 id="{{ glossary.id|text }}">{{ glossary.title }}</h1>
+        <p class="lead">{{ glossary.intro }}</p>
+      </div>
+    </section>
+
+    <div class="content band">
+      <div class="wrap">
+        <div class="glossary">
+          <div class="group">
+            <h2>{{ glossary.groups.game }}</h2>
+            <dl>
+              <div id="{{ glossary.props.id|text }}"><dt>{{ glossary.props.term }}</dt><dd>{{ glossary.props.text }}</dd></div>
+              <div id="{{ glossary.field_box.id|text }}"><dt>{{ glossary.field_box.term }}</dt><dd>{{ glossary.field_box.text }}</dd></div>
+              <div id="{{ glossary.milsim.id|text }}"><dt>{{ glossary.milsim.term }}</dt><dd>{{ glossary.milsim.text }}</dd></div>
+              <div id="{{ glossary.cqb.id|text }}"><dt>{{ glossary.cqb.term }}</dt><dd>{{ glossary.cqb.text }}</dd></div>
+              <div id="{{ glossary.chrono.id|text }}"><dt>{{ glossary.chrono.term }}</dt><dd>{{ glossary.chrono.text }}</dd></div>
+            </dl>
+          </div>
+          <div class="group">
+            <h2>{{ glossary.groups.hardware }}</h2>
+            <dl>
+              <div id="{{ glossary.microcontroller.id|text }}"><dt>{{ glossary.microcontroller.term }}</dt><dd>{{ glossary.microcontroller.text }}</dd></div>
+              <div id="{{ glossary.esp32.id|text }}"><dt>{{ glossary.esp32.term }}</dt><dd>{{ glossary.esp32.text }}</dd></div>
+              <div id="{{ glossary.arduino.id|text }}"><dt>{{ glossary.arduino.term }}</dt><dd>{{ glossary.arduino.text }}</dd></div>
+              <div id="{{ glossary.raspberry_pi.id|text }}"><dt>{{ glossary.raspberry_pi.term }}</dt><dd>{{ glossary.raspberry_pi.text }}</dd></div>
+              <div id="{{ glossary.android.id|text }}"><dt>{{ glossary.android.term }}</dt><dd>{{ glossary.android.text }}</dd></div>
+              <div id="{{ glossary.firmware.id|text }}"><dt>{{ glossary.firmware.term }}</dt><dd>{{ glossary.firmware.text }}</dd></div>
+            </dl>
+          </div>
+          <div class="group">
+            <h2>{{ glossary.groups.radio }}</h2>
+            <dl>
+              <div id="{{ glossary.lora.id|text }}"><dt>{{ glossary.lora.term }}</dt><dd>{{ glossary.lora.text }}</dd></div>
+              <div id="{{ glossary.mesh.id|text }}"><dt>{{ glossary.mesh.term }}</dt><dd>{{ glossary.mesh.text }}</dd></div>
+              <div id="{{ glossary.skirmesh.id|text }}"><dt>{{ glossary.skirmesh.term }}</dt><dd>{{ glossary.skirmesh.text }}</dd></div>
+              <div id="{{ glossary.links.id|text }}"><dt>{{ glossary.links.term }}</dt><dd>{{ glossary.links.text }}</dd></div>
+              <div id="{{ glossary.api.id|text }}"><dt>{{ glossary.api.term }}</dt><dd>{{ glossary.api.text }}</dd></div>
+              <div id="{{ glossary.atak.id|text }}"><dt>{{ glossary.atak.term }}</dt><dd>{{ glossary.atak.text }}</dd></div>
+            </dl>
+          </div>
+          <div class="group">
+            <h2>{{ glossary.groups.software }}</h2>
+            <dl>
+              <div id="{{ glossary.local_first.id|text }}"><dt>{{ glossary.local_first.term }}</dt><dd>{{ glossary.local_first.text }}</dd></div>
+              <div id="{{ glossary.core.id|text }}"><dt>{{ glossary.core.term }}</dt><dd>{{ glossary.core.text }}</dd></div>
+              <div id="{{ glossary.lua.id|text }}"><dt>{{ glossary.lua.term }}</dt><dd>{{ glossary.lua.text }}</dd></div>
+              <div id="{{ glossary.simulator.id|text }}"><dt>{{ glossary.simulator.term }}</dt><dd>{{ glossary.simulator.text }}</dd></div>
+              <div id="{{ glossary.controller.id|text }}"><dt>{{ glossary.controller.term }}</dt><dd>{{ glossary.controller.text }}</dd></div>
+              <div id="{{ glossary.server.id|text }}"><dt>{{ glossary.server.term }}</dt><dd>{{ glossary.server.text }}</dd></div>
+            </dl>
+          </div>
+          <div class="group">
+            <h2>{{ glossary.groups.licences }}</h2>
+            <dl>
+              <div id="{{ glossary.open_source.id|text }}"><dt>{{ glossary.open_source.term }}</dt><dd>{{ glossary.open_source.text }}</dd></div>
+              <div id="{{ glossary.copyleft.id|text }}"><dt>{{ glossary.copyleft.term }}</dt><dd>{{ glossary.copyleft.text }}</dd></div>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+{% include footer %}
+</body>
+</html>

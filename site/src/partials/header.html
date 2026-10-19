@@ -1,0 +1,38 @@
+{#
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: CC-BY-SA-4.0
+
+The skip link and the header of every page. The section links lead to the
+subpages and to sections of the main page, in this page's language;
+page.nav.<page> marks the link of the page being read. The language switcher
+leads to this same page in the other language.
+#}
+  <a class="skip" href="#main">{{ header.skip }}</a>
+
+  <header class="top">
+    <div class="wrap top-inner">
+      <a class="brand" href="{{ page.to.index }}" aria-label="{{ header.home|text }}">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+          <path class="fire" d="M16 1c2 2.5 3.5 4 2.3 6.3-.6 1-1.6 1-2.3.4-.7.6-1.7.6-2.3-.4C12.5 5 14 3.5 16 1z" />
+          <path d="M9 15V9h3.5v3h2V9h3v3h2V9H23v6z" />
+          <path d="M10 15h12l2 15H8z" />
+        </svg>
+        Atalaia
+      </a>
+      <nav class="sections" aria-label="{{ header.sections|text }}">
+        <a href="{{ page.to.modes }}"{{ page.nav.modes }}>{{ header.modes }}</a>
+        <a href="{{ page.to.radio }}"{{ page.nav.radio }}>{{ header.radio }}</a>
+        <a href="{{ page.to.index }}#try">{{ header.try }}</a>
+        <a href="{{ page.to.roadmap }}"{{ page.nav.roadmap }}>{{ header.roadmap }}</a>
+        <a href="{{ page.to.index }}#hub">{{ header.hub }}</a>
+        <a href="{{ page.to.glossary }}"{{ page.nav.glossary }}>{{ header.glossary }}</a>
+        <a href="https://github.com/vakaobr/atalaia-project">GitHub</a>
+      </nav>
+      {# Each language is named in its own language, whichever page this is. #}
+      <nav class="lang" aria-label="{{ header.language|text }}">
+        <a href="{{ page.href.pt }}" hreflang="pt-PT" lang="pt-PT"{{ page.current.pt }}>PT<span class="sr-only"> · Português</span></a>
+        <span class="sep" aria-hidden="true">·</span>
+        <a href="{{ page.href.en }}" hreflang="en" lang="en"{{ page.current.en }}>EN<span class="sr-only"> · English</span></a>
+      </nav>
+    </div>
+  </header>
