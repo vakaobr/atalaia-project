@@ -5,7 +5,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Project page
 
-The project page at <https://vakaobr.github.io/atalaia-project/>. It is static HTML and CSS: no
+The project page at <https://atalaia-project.link/>. It is static HTML and CSS: no
 JavaScript, no cookies, nothing loaded from other sites. The
 [Pages workflow](../.github/workflows/pages.yml) publishes this folder on every push to `main`
 that changes it, leaving out `src/`, `i18n/` and this README.

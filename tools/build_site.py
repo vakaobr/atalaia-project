@@ -87,7 +87,7 @@ SITEMAP = SITE / "sitemap.xml"
 UNPUBLISHED = ("src", "i18n", "README.md")
 # Where GitHub Pages publishes site/. Used for the canonical, hreflang, og:url and
 # sitemap addresses, which must be absolute; links between the pages stay relative.
-SITE_URL = "https://vakaobr.github.io/atalaia-project/"
+SITE_URL = "https://atalaia-project.link/"
 
 
 @dataclass(frozen=True)

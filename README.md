@@ -11,7 +11,7 @@
 [![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange)](#roadmap)
 [![Discussions](https://img.shields.io/github/discussions/vakaobr/atalaia-project?label=discussions)](https://github.com/vakaobr/atalaia-project/discussions)
 
-**The open force-on-force platform.** Project page: [Português](https://vakaobr.github.io/atalaia-project/) · [English](https://vakaobr.github.io/atalaia-project/en/)
+**The open force-on-force platform.** Project page: [Português](https://atalaia-project.link/) · [English](https://atalaia-project.link/en/)
 
 ![Illustration: at dusk, a stone watchtower on a hilltop carries a radio box whose signals reach glowing orange GAME PROP boxes spread across a forested valley, while a group of players walks past them. Painted text reads "Open-source project ATALAIA".](site/img/watchtower-night-1600.jpg)
 
@@ -101,7 +101,7 @@ The props talk over LoRa, a long-range, low-power radio, in Atalaia's own protoc
 
 ![Skirmesh-RF on different devices: five layers from the bottom up (the LoRa radio on one shared channel; the encrypted Skirmesh-RF packet with anti-replay, hop limit, ACKs, TIME beacons and CLAIM failover; the eight message types in CBOR; the shared C core and Lua modes; the controller's APIs, GM console, scoreboard and join codes), and which layers each device runs. Built and tested in software: the Field Box (1 to 4), the USB radio modem (1 and 2), the field controller (2 to 5) and the GM console on phones over Wi-Fi (5). Planned: the satellite box (1 to 4) and, in phase 3, the I/O pod (1 and 2) and the Android device (2 to 4).](site/img/diagrams/skirmesh-wide-en.svg)
 
-The diagrams are built in English and Portuguese, for wide and narrow screens, from [`site/src/diagrams/`](site/src/diagrams/) by `tools/build_site.py`; the project page's radio page shows them in your language ([Português](https://vakaobr.github.io/atalaia-project/radio/) · [English](https://vakaobr.github.io/atalaia-project/en/radio/)).
+The diagrams are built in English and Portuguese, for wide and narrow screens, from [`site/src/diagrams/`](site/src/diagrams/) by `tools/build_site.py`; the project page's radio page shows them in your language ([Português](https://atalaia-project.link/radio/) · [English](https://atalaia-project.link/en/radio/)).
 
 ## Repository layout
 
@@ -118,7 +118,7 @@ The diagrams are built in English and Portuguese, for wide and narrow screens, f
 | [`examples/scoreboard/`](examples/scoreboard/) | MQTT subscriber scoreboard example | GPL-3.0-or-later |
 | [`hardware/`](hardware/) | Reference builds: wiring, bills of materials, enclosures; the Field Box build manual ([hardware/field-box/BUILD.md](hardware/field-box/BUILD.md)) | CERN-OHL-S-2.0 |
 | [`docs/`](docs/) | Design spec, RFCs, phase folders, guides | CC-BY-SA-4.0 |
-| [`site/`](site/) | The project page in Portuguese and English, published to [GitHub Pages](https://vakaobr.github.io/atalaia-project/) | CC-BY-SA-4.0 |
+| [`site/`](site/) | The project page in Portuguese and English, published to [GitHub Pages](https://atalaia-project.link/) | CC-BY-SA-4.0 |
 | [`tools/`](tools/) | Developer scripts: `check.sh`, `docker_fw.py`, `docker_console.py`, `docker_sim.py`, `build_site.py`, `docker_hw.py` | GPL-3.0-or-later |
 
 See [LICENSING.md](LICENSING.md) for the details.
