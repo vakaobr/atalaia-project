@@ -8,7 +8,7 @@ library;
 import 'package:atalaia_app/app.dart';
 import 'package:atalaia_app/platform/channels.dart';
 import 'package:atalaia_app/storage/app_store.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The app as on a phone, but with fresh settings that ask nothing of the
@@ -36,6 +36,14 @@ Future<void> waitFor(
     await tester.pump(const Duration(milliseconds: 100));
     await Future<void>.delayed(const Duration(milliseconds: 100));
   }
+}
+
+/// Taps the app bar's back button. WidgetTester.pageBack() finds it by its
+/// English tooltip ("Back"), so it never finds it in the Portuguese app.
+Future<void> goBack(WidgetTester tester) async {
+  final back = find.byType(BackButton);
+  expect(back, findsOneWidget, reason: 'one back button expected on screen');
+  await tester.tap(back);
 }
 
 /// Lets [d] of real time pass, pumping frames.

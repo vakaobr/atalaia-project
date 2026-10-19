@@ -30,19 +30,22 @@ void main() {
 
     await tester.tap(find.byKey(const Key('role-player')));
     await waitFor(tester, find.byKey(const Key('player-connect')));
-    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await goBack(tester);
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('role-marshal')));
     await waitFor(tester, find.byKey(const Key('marshal-chrono')));
-    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await goBack(tester);
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('role-prop')));
     await waitFor(tester, find.byKey(const Key('prop-new')));
+    await tester.pumpAndSettle();
     // The phone's features came from the Kotlin plugin.
     expect(find.text('botões das equipas'), findsOneWidget);
-    await tester.pageBack();
+    await goBack(tester);
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('open-settings')));
@@ -50,7 +53,7 @@ void main() {
     await tester.tap(find.text('English'));
     await tester.pumpAndSettle();
     expect(find.text('Settings'), findsOneWidget);
-    await tester.pageBack();
+    await goBack(tester);
     await tester.pumpAndSettle();
     expect(find.text('Game prop'), findsOneWidget);
     expect(find.text('Player'), findsOneWidget);
