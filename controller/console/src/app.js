@@ -6,7 +6,7 @@
 // the panels in components/. Every change goes through the REST API v1.
 
 import { html, render, Component, t, loadLanguage, LANGS, api, ApiError, Stream,
-         savedToken, saveToken, clock, OFFLINE_MS } from './ui.js';
+         savedToken, saveToken, clock, OFFLINE_MS, fetchBranding, brandingUrl } from './ui.js';
 import { GameControl, ControllerPanel } from './components/game-control.js';
 import { ScorePanel } from './components/score-panel.js';
 import { LiveFeed } from './components/live-feed.js';
@@ -16,6 +16,7 @@ import { JoinPanel } from './components/join-panel.js';
 import { PresetBuilder } from './components/preset-builder.js';
 import { RadioSettings } from './components/radio-settings.js';
 import { CheckinPanel } from './components/checkin-panel.js';
+import { BrandingSettings, TeamPresets, FieldBrand, accentRef } from './components/branding-settings.js';
 
 const TABS = ['game', 'checkin', 'field', 'nodes', 'join', 'presets', 'feed', 'controller', 'settings'];
 const FEED_MAX = 500;
@@ -30,7 +31,7 @@ class App extends Component {
             tab: 'game', connected: null, status: null, game: null, score: null,
             nodes: {}, seen: {}, feed: [], alerts: [], modes: [], presets: [],
             positions: {}, scoreHistory: [], clockBase: null, toast: '', now: Date.now(),
-            radio: null, chronoCounts: null,
+            radio: null, chronoCounts: null, branding: null, teamPresets: [],
         };
         this.checkinPanel = null;
         this.stream = null;
@@ -42,6 +43,8 @@ class App extends Component {
     async componentDidMount() {
         const l = await loadLanguage();
         this.setState({ ready: true, lang: l });
+        // The field's branding is public: the login page shows it before any token (decision BR3).
+        fetchBranding().then((b) => { if (b && !this.state.branding) this.setState({ branding: b }); });
         if (this.state.token) this.login(this.state.token);
         this.ticker = setInterval(() => this.tick(), 1000);
         this.refresher = setInterval(() => this.refresh(), 10000);
@@ -103,6 +106,11 @@ class App extends Component {
         this.setState({ modes: modes || [], presets: presets || [] });
     }
 
+    async loadTeamPresets() {
+        const list = await this.call('GET', '/team-presets');
+        if (list) this.setState({ teamPresets: list });
+    }
+
     async loadRadio() {
         const radio = await this.call('GET', '/radio');
         if (radio) this.setState({ radio });
@@ -129,6 +137,7 @@ class App extends Component {
                 seen[n.node_id] = n.seen_ms_ago !== null && n.seen_ms_ago !== undefined ? now - n.seen_ms_ago : now;
             }
             this.setState({ status: msg.status, score: msg.score, nodes, seen });
+            if (msg.branding) this.setState({ branding: msg.branding });
             this.setGame(msg.game);
             if (msg.game) {
                 this.loadLog(msg.game.id);
@@ -193,6 +202,9 @@ class App extends Component {
             break;
         case 'position':
             this.setState((s) => ({ positions: { ...s.positions, [msg.node_id]: { x: msg.x, y: msg.y } } }));
+            break;
+        case 'branding':
+            this.setState({ branding: msg.branding });
             break;
         case 'field_image':
             this.setState((s) => ({ imageVersion: (s.imageVersion || 0) + 1 }));
@@ -313,7 +325,11 @@ class App extends Component {
             const token = e.target.elements.token.value.trim();
             if (token) this.login(token);
         };
+        const b = this.state.branding;
         return html`<main class="login">
+            ${b && b.logo && html`<img class="login-logo" src=${brandingUrl(b.logo)} data-testid="login-logo"
+                alt=${t('branding.logo_alt', { name: b.field_name })} />`}
+            ${b && b.field_name && b.field_name !== 'Atalaia' && html`<p class="login-field" data-testid="login-field">${b.field_name}</p>`}
             <h1>${t('app.title')}</h1>
             <p>${t('login.intro')}</p>
             <form onSubmit=${submit}>
@@ -338,11 +354,11 @@ class App extends Component {
     }
 
     renderHeader() {
-        const { status, connected, game, role, alerts } = this.state;
+        const { status, connected, game, role, alerts, branding } = this.state;
         const radio = status ? status.radio : 'none';
-        return html`<header class="top">
+        return html`<header class="top" ref=${accentRef(branding)} data-testid="header">
             <div class="brand">
-                <strong>${t('app.title')}</strong>
+                <${FieldBrand} branding=${branding} fallback=${t('app.title')} />
                 ${game && html`<span class="game-name" data-testid="header-game">${game.name}${' · '}<span
                     class=${`state state-${game.state}`}>${t(`game.states.${game.state}`)}</span>${' · '}<span
                     data-testid="header-clock">${clock(this.gameTime())}</span></span>`}
@@ -378,7 +394,7 @@ class App extends Component {
         case 'controller':
             return html`<${ControllerPanel} app=${this} />`;
         case 'settings':
-            return html`<${RadioSettings} app=${this} />`;
+            return html`<${RadioSettings} app=${this} /><${BrandingSettings} app=${this} /><${TeamPresets} app=${this} />`;
         default:
             return null;
         }

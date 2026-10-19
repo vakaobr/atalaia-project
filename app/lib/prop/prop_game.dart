@@ -6,13 +6,22 @@
 /// act), an optional keypad, tag reading, the light (the ring's or team
 /// display's colour) and the game clock. The admin controls (start, pause,
 /// end, leave) sit behind the admin PIN; the back button asks for it too.
+///
+/// A prop that joined a field's game shows the field's branding (decisions
+/// BR1-BR24), fetched over the join payload's pinned HTTPS: the logo in the
+/// top bar, the wallpaper (dimmed) on the idle screens before and after the
+/// game, never behind the mode's own screen, the accent on the start
+/// button, and each team's crest and display name on its button.
 library;
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
 import '../app.dart';
+import '../branding/branded.dart';
+import '../branding/field_branding.dart';
 import '../checkin/field_trust.dart';
 import '../controller/prop_link.dart';
 import '../l10n/strings.dart';
@@ -60,6 +69,8 @@ class _PropGameScreenState extends State<PropGameScreen> {
   bool _teamButtons = true;
   bool _keypadOffered = false;
   bool _left = false;
+  FieldBranding? _brand;
+  TeamBranding _teams = TeamBranding.none;
 
   @override
   void initState() {
@@ -81,7 +92,32 @@ class _PropGameScreenState extends State<PropGameScreen> {
           link: _linkFor(services),
         );
     unawaited(_open(services));
+    unawaited(_loadBranding(services));
   }
+
+  /// The field's branding and the game's team crests, when the join payload
+  /// names the controller (keys 13 and 14); its CA is checked first.
+  Future<void> _loadBranding(AppServices services) async {
+    final j = widget.setup.join;
+    final urls = j?.urls;
+    final ca = j?.caSha256;
+    if (j == null || urls == null || urls.isEmpty || ca == null) return;
+    try {
+      final field = await services.trust.forGame(urls, ca);
+      final source = services.brandingSource(urls, field);
+      final brand = await services.branding.refresh(source);
+      if (mounted && brand != null) setState(() => _brand = brand);
+      final teams = await services.branding.gameTeams(source, j.gameId);
+      if (mounted) setState(() => _teams = teams);
+    } on Object {
+      // Out of reach or another CA: the default look.
+    }
+  }
+
+  bool get _idle =>
+      session.phase == PropPhase.loading ||
+      session.phase == PropPhase.ready ||
+      session.phase == PropPhase.ended;
 
   /// The Wi-Fi link to the controller when the join payload names it
   /// (keys 13 and 14; protocol/prop-link.md).
@@ -262,19 +298,29 @@ class _PropGameScreenState extends State<PropGameScreen> {
   @override
   Widget build(BuildContext context) => Theme(
     data: atalaiaTheme(Brightness.dark),
-    child: PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) unawaited(_leave());
-      },
-      child: Scaffold(
-        backgroundColor: AtalaiaColors.background,
-        body: SafeArea(
-          child: Listener(
-            onPointerDown: (_) => session.touched(),
-            child: ListenableBuilder(
-              listenable: session,
-              builder: (context, _) => _body(context),
+    child: BrandedTheme(
+      branding: _brand,
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) unawaited(_leave());
+        },
+        child: Scaffold(
+          backgroundColor: AtalaiaColors.background,
+          body: SafeArea(
+            child: Listener(
+              onPointerDown: (_) => session.touched(),
+              child: ListenableBuilder(
+                listenable: session,
+                // The wallpaper only on the idle screens (decision BR19).
+                builder: (context, _) => _idle
+                    ? BrandBackdrop(
+                        branding: _brand,
+                        dark: true,
+                        child: _body(context),
+                      )
+                    : _body(context),
+              ),
             ),
           ),
         ),
@@ -292,6 +338,7 @@ class _PropGameScreenState extends State<PropGameScreen> {
           modeName: widget.modeName,
           nfc: _nfcOn,
           onAdmin: _admin,
+          branding: _brand,
         ),
         if (session.link != null)
           ListenableBuilder(
@@ -329,7 +376,9 @@ class _PropGameScreenState extends State<PropGameScreen> {
           flex: 5,
           child: Stack(
             children: [
-              Positioned.fill(child: _Screen(session: session)),
+              Positioned.fill(
+                child: _Screen(session: session, branding: _brand),
+              ),
               if (session.phase == PropPhase.paused)
                 _Overlay(
                   icon: Icons.pause,
@@ -395,8 +444,9 @@ class _PropGameScreenState extends State<PropGameScreen> {
                         padding: const EdgeInsets.all(6),
                         child: TeamButton(
                           team: t,
+                          crest: _teams.crest(t),
                           label: s.t('prop.hold', {
-                            'team': s.team(t).toUpperCase(),
+                            'team': teamLabel(s, _teams, t).toUpperCase(),
                           }),
                           down: session.tracker.isDown(t),
                           onDown: () => session.pressTeam(t),
@@ -454,12 +504,14 @@ class _TopBar extends StatelessWidget {
     required this.modeName,
     required this.nfc,
     required this.onAdmin,
+    this.branding,
   });
 
   final PropSession session;
   final String modeName;
   final bool nfc;
   final VoidCallback onAdmin;
+  final FieldBranding? branding;
 
   @override
   Widget build(BuildContext context) {
@@ -485,6 +537,11 @@ class _TopBar extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
           child: Row(
             children: [
+              if (branding?.logo != null)
+                Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: BrandLogo(branding: branding, height: 30),
+                ),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -535,8 +592,9 @@ class _TopBar extends StatelessWidget {
 
 /// The mode's screen, at the Field Box's 4:3.
 class _Screen extends StatelessWidget {
-  const _Screen({required this.session});
+  const _Screen({required this.session, this.branding});
   final PropSession session;
+  final FieldBranding? branding;
 
   @override
   Widget build(BuildContext context) {
@@ -562,14 +620,37 @@ class _Screen extends StatelessWidget {
         ),
       );
     } else {
+      // The idle screen: the field's logo and name over its wallpaper, if any.
+      final b = branding;
       child = ColoredBox(
-        color: AtalaiaColors.background,
+        color: b?.wallpaper != null
+            ? Colors.transparent
+            : AtalaiaColors.background,
         child: Center(
-          child: Text(
-            session.phase == PropPhase.loading
-                ? s.t('prop.loading')
-                : s.t('prop.waiting'),
-            style: const TextStyle(color: AtalaiaColors.muted, fontSize: 22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (b?.logo != null) ...[
+                BrandLogo(branding: b, height: 96),
+                const SizedBox(height: 8),
+              ],
+              if (b != null && b.fieldName.isNotEmpty && !b.isEmpty)
+                Text(
+                  b.fieldName,
+                  key: const Key('prop-field-name'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white, fontSize: 24),
+                ),
+              Text(
+                session.phase == PropPhase.loading
+                    ? s.t('prop.loading')
+                    : s.t('prop.waiting'),
+                style: const TextStyle(
+                  color: AtalaiaColors.muted,
+                  fontSize: 22,
+                ),
+              ),
+            ],
           ),
         ),
       );
@@ -626,11 +707,15 @@ class TeamButton extends StatelessWidget {
     required this.down,
     required this.onDown,
     required this.onUp,
+    this.crest,
     super.key,
   });
 
   final String team;
   final String label;
+
+  /// The team's crest in this game (decision BR15); the colour stays the button's.
+  final Uint8List? crest;
   final bool down;
   final VoidCallback onDown;
   final VoidCallback onUp;
@@ -638,6 +723,15 @@ class TeamButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = AtalaiaColors.team(team);
+    final text = Text(
+      label,
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        color: AtalaiaColors.on(color),
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+      ),
+    );
     return Semantics(
       button: true,
       label: label,
@@ -659,15 +753,28 @@ class TeamButton extends StatelessWidget {
           alignment: Alignment.center,
           child: Padding(
             padding: const EdgeInsets.all(8),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AtalaiaColors.on(color),
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            child: crest == null
+                ? text
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: LayoutBuilder(
+                            builder: (context, box) => TeamCrest(
+                              team: team,
+                              crest: crest,
+                              size: box.maxHeight.isFinite
+                                  ? box.maxHeight.clamp(24.0, 72.0)
+                                  : 56,
+                            ),
+                          ),
+                        ),
+                      ),
+                      text,
+                    ],
+                  ),
           ),
         ),
       ),

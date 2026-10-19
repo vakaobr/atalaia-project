@@ -38,6 +38,10 @@ SPDX-License-Identifier: CC-BY-SA-4.0
   `modes/medic` role package, mode commands (CMD opcode 8), events 50-51, in
   the simulator, the controller, the GM console, the Field Box and the app
   (see below)
+- [x] Branding (2026-10-19, maintainer request): field branding (name, logo,
+  wallpaper, accent) on the controller, team names and crests per game and
+  saved teams, in the app, the GM console, the scoreboard and the check-in
+  poster (see below)
 
 ## Plan phase A (2026-10-18)
 
@@ -229,6 +233,38 @@ command, the event texts, 6 golden images), and on an Android 16 emulator
 
 Not run: real NFC tags on a phone or on the Field Box's PN532, real radios,
 Wokwi (decision R7). A kit's own charges do not survive its reboot (MK15).
+
+## Branding (2026-10-19)
+
+Maintainer request: "each field (or team) running it at their own server be
+able to set a logo and/or a wallpaper to identify them". Decisions BR1-BR24
+in `docs/review/decisions-to-review.md`.
+
+| Deliverable | Where | State |
+| --- | --- | --- |
+| Field branding on the controller | `controller/atalaia_controller/branding.py`: the field's name (the poster's), logo, wallpaper and accent colour, kept in SQLite (schema 4), public without a token (`GET /api/v1/field/branding` with an ETag, the images with their SHA-256 as ETag and 304s), changed with the GM token, announced on the stream (`branding`, also in the snapshot) | Done |
+| Image checks | `controller/atalaia_controller/images.py`: PNG, JPEG or WebP only (from the file's signature; SVG and GIF refused), logo 1 MiB and 16-2048 px, wallpaper 4 MiB and 320-4096 px, crest 512 KiB and 16-1024 px, animated images refused; structure checked and metadata stripped with the standard library (no Pillow, BR7) | Done |
+| Team branding | per game `team_info` (display name and crest next to the colour, which stays the team's name for the boxes and the radio), changed until the game ends; crests stored once by their hash (`POST /api/v1/crests`, `GET /api/v1/crests/{id}`, immutable); saved teams (`/api/v1/team-presets`); `GET /api/v1/games/{id}/teams` for Android props | Done |
+| GM console | `components/branding-settings.js`: the field's branding and the saved teams in *Settings*, team names and crests in the game form and on the game card; the logo and name on the accent colour in the header and on the login page; crests and names in the scores; the rights reminder at every upload | Done; 3 browser tests |
+| Scoreboard and poster | `scoreboard.js`: the logo and name above the game, the wallpaper behind a veil, crests and names; `poster.js`: the logo above the field's name, outside the QR code | Done; the QR code reads back with `zbarimg` with the logo on the poster |
+| The app | `app/lib/branding/`: fetched after a check-in or a join and kept per field id; the logo in the header, the wallpaper dimmed behind the check-in's page and the player's view, the accent on the primary colour (made readable at 4.5:1); team crests and names in the player's view; an Android prop's top-bar logo, its idle screens with the wallpaper (never behind the mode's screen, BR19) and crests on its team buttons; the default look without branding | Done; unit, widget and golden tests, the on-device check-in test |
+| Docs | `controller/README.md`, `controller/console/README.md`, `app/README.md`, `protocol/checkin.md` (where the app finds the branding; no protocol change), phase 4 `PLAN.md` (club profiles), `CHANGELOG.md` | Done |
+
+Tests: the controller (`controller/tests/test_branding.py`, 19: the image
+rules against real PNG, JPEG and WebP files and broken ones, the metadata
+stripping, every endpoint, ETags and 304s, persistence across a restart,
+crests per game, team presets, the clean-up, the rate limit), the GM console
+in Chromium (3: the settings to the header, scoreboard and poster with the QR
+code read back; saved teams and a game with crests on the scores and the
+scoreboard; the read token), Dart (`test/branding/`, 13, and 4 golden images
+in `test/goldens/images/branding/`; every earlier golden image unchanged), and
+`integration_test/check_in_test.dart` on the Android emulator (the logo,
+wallpaper and a crest over the pinned HTTPS).
+
+Not done: the field's logo on the Field Box's TFT (BR24), club profiles with
+accounts (phase 4), team names in MQTT and on the boxes' screens, branding on
+a standby controller (each controller has its own). Not run: real phones,
+real field images from a club.
 
 ## Maintainer request: field check-in (2026-10-19, design only)
 

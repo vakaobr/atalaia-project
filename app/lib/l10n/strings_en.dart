@@ -542,4 +542,5 @@ const Map<String, String> enStrings = {
   'player.share_hint_squads':
       'Only during the game; the controller decides who sees it (your squad if the game allows it, the organisers and the marshals).',
   'checkin.team_squad': '{team} › squad {squad}',
+  'branding.logo': 'Logo of {name}',
 };

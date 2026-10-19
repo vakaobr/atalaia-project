@@ -35,6 +35,7 @@ Status: phase 2, plan phases D and E; phase 3, plan phase E (field check-in, pla
 | `atalaia_controller/positions.py` | Player positions and who may see them (ADR-P3-6) |
 | `atalaia_controller/prop_link.py` | Android props on the field's Wi-Fi ([protocol/prop-link.md](../protocol/prop-link.md)) |
 | `atalaia_controller/modes.py` | Built-in and uploaded mode packages, checked in the core before they are stored |
+| `atalaia_controller/branding.py`, `images.py` | The field's branding (name, logo, wallpaper, accent), team crests and team presets; uploaded images checked and stripped of metadata without an image library |
 | `console/src/` | The GM console and the scoreboard page (static files) |
 
 The join payloads come from the simulator's `atalaia_sim/join.py`, the Python side of [protocol/join.md](../protocol/join.md).
@@ -103,6 +104,22 @@ Players declare the replicas they will use; marshals see the **replicas to chron
 
 Personal data stays on the controller: names and federation numbers are shown to staff (the GM token, marshals) only, never in events, MQTT, logs or the read token's views, and are erased `[checkin] retention_days` (30) days after the game; a field identity unused for a year is deleted. The default privacy notice is `templates/checkin-notice-pt.md` and `-en.md` (`[checkin] notice_pt`, `notice_en`; raise `notice_version` when it changes). Everything works without internet.
 
+## Field and team branding
+
+A field or club running its own controller can show who it is (decisions BR1-BR24 in `docs/review/decisions-to-review.md`). In the GM console's *Definições / Settings* (GM token): the field's name (the same name the check-in poster prints), a logo, an optional wallpaper and an accent colour. The controller keeps them in its SQLite file, so they survive restarts. Anyone who can reach the field's API reads them without a token, since players need them before or right after checking in and none of it is personal data: the app shows the logo in its header, the wallpaper (dimmed) behind the player's view and an Android prop's idle screen, and the accent on its primary buttons; the GM console shows the logo and name in its header, the scoreboard above the game, and the check-in poster above the field's name, outside the QR code. Without branding everything keeps the default Atalaia look.
+
+Teams get a display name and a crest per game next to their colour: `team_info` when the game is created, or `PUT /api/v1/games/{id}/teams/{team}` until it ends. The colour stays the team's name (red, blue...), which is what the boxes, their LEDs and buttons, the radio, events and MQTT use. *Saved teams* (team presets) keep a club's name, crest and usual colour for the next game.
+
+Uploads are PNG, JPEG or WebP only (SVG is refused: it can carry scripts), with the type read from the file itself:
+
+| Image | Bytes | Pixels a side | Shape |
+| --- | --- | --- | --- |
+| Logo | up to 1 MiB (1,048,576) | 16 to 2048 | at most 8:1 |
+| Wallpaper | up to 4 MiB (4,194,304) | 320 to 4096 | at most 8:1 |
+| Crest | up to 512 KiB (524,288) | 16 to 1024 | at most 4:1 |
+
+The controller has no image library: `images.py` checks each file's structure with the standard library (PNG chunks and checksums with the pixel data inflated to exactly the size its header says, JPEG segments with one frame, WebP's RIFF and image headers), refuses animated images, and rewrites the file without its metadata (text and EXIF chunks, JPEG APP1/APP13 and comments, WebP EXIF and XMP), keeping colour profiles. Images are stored once by the SHA-256 of the result, which is also their ETag; a replaced logo or wallpaper is deleted at once, a crest no game or team preset uses a day after its upload (at most 500 are kept). Whoever uploads an image is responsible for having the rights to it; the console says so next to every upload.
+
 ## Player positions
 
 A checked-in player may share their position during a running game (`POST /api/v1/positions`, up to 5 reports). The controller keeps the latest per player for that game only and deletes them when it ends; it sends a position only to those who may see it (ADR-P3-6): a player sees their own (and their squad's with the game parameter `squad_visible`), a squad leader their squad, a VIP their team, marshals and the GM everyone, the read token nobody. A mode's `visibility.granted` event (team, `see_team`, `duration_s`) lets a team see another for a while; the controller logs `visibility.expired` when the time is up. Positions never go on the radio or MQTT.
@@ -120,13 +137,13 @@ Reading needs the read or GM token, changing anything the GM token: `Authorizati
 | GET | `/api/v1/nodes` | Nodes of the live game (or `?game=`): owner, battery, RSSI, epoch, firmware, capabilities |
 | GET / POST | `/api/v1/modes` | Installed modes and modifiers (`kind`), their parameters and translations (`i18n`) / upload `{"files": {"mode.yaml": ..., "node.lua": ..., "field.lua": ...}}` |
 | GET / POST | `/api/v1/presets` | List / save `{"name", "mode_id", "params"}` |
-| GET / POST | `/api/v1/games` | List / create `{"name", "mode_id" or "preset_id", "modifiers": [...], "teams", "squads", "params", "duration_ms", "assignments": {"7": "zone"}}`; a game with modifiers gets the mode id `main+modifier`; `squads` (0-16 per team, 0 by default) only for games whose teams split into squads (milsims, big games) |
+| GET / POST | `/api/v1/games` | List / create `{"name", "mode_id" or "preset_id", "modifiers": [...], "teams", "squads", "params", "duration_ms", "assignments": {"7": "zone"}, "team_info": {"red": {"display_name", "crest_id" or "team_preset_id"}}}`; a game with modifiers gets the mode id `main+modifier`; `squads` (0-16 per team, 0 by default) only for games whose teams split into squads (milsims, big games) |
 | GET | `/api/v1/games/{id}` | One game |
 | POST | `/api/v1/games/{id}/start` · `/pause` · `/resume` · `/end` | Lifecycle (`{"reason"}` for pause and end) |
 | GET / POST | `/api/v1/games/{id}/score` | Totals / GM adjustment `{"team", "amount", "reason"}`, logged as `score.delta` |
 | POST | `/api/v1/nodes/{id}/cmd` | `{"cmd": "message" \| "set_owner" \| "reset" \| "reboot" \| "mode", "params": {...}}`; node 65535 = every node. `mode` is a mode command (CMD opcode 8): `params.name` must be one of the game's manifests' `commands` for the node's role, such as a medic kit's `{"name": "refill"}` |
 | GET | `/api/v1/games/{id}/log` | The merged event log, in game-time order (`?since_ms=`) |
-| WS | `/api/v1/stream` | A snapshot (with the live game's latest 100 events), then every event, score, node update, game change and alert (`radio.down`, `tx.failed`, role changes), the field channel (`radio`) and scan progress (`radio_scan`); for staff also `checkin` and `chrono_list`; for a player token only the game's public messages, its own check-in and the positions it may see (code 4409: fetch a new token) |
+| WS | `/api/v1/stream` | A snapshot (with the live game's latest 100 events), then every event, score, node update, game change and alert (`radio.down`, `tx.failed`, role changes), the field channel (`radio`), scan progress (`radio_scan`) and the field's branding (`branding`, also in the snapshot); for staff also `checkin` and `chrono_list`; for a player token only the game's public messages, its own check-in and the positions it may see (code 4409: fetch a new token) |
 | GET | `/api/v1/controller` | Role, term, radio state, modem identity and counters, the field channel and whether it was chosen |
 | GET | `/api/v1/radio` | The field's channel with its sub-band limits, where it came from, the candidates, whether it is locked (a live game or a scan), why a scan is unavailable, the last scan |
 | PUT | `/api/v1/radio/channel` | Set it `{"channel_hz", "source": "default" \| "scan" \| "random" \| "manual"}`; 409 while a game exists or a scan runs, 400 for a channel that does not fit in a sub-band |
@@ -137,6 +154,15 @@ Reading needs the read or GM token, changing anything the GM token: `Authorizati
 | POST | `/api/v1/join` · `/api/v1/nodes/{id}/join` | A join payload ([protocol/join.md](../protocol/join.md)) for a box `{"role"}` or a standby controller `{"kind": "controller"}`, optional `node_id`: QR/serial text, NFC tag bytes. GM only, `Cache-Control: no-store` (it carries the game key) |
 | POST | `/api/v1/controller/join` | This controller takes a game as standby: `{"text": "atalaia:join:..."}` |
 | GET | `/api/v1/field` | Whether a field image is uploaded: `{"image": {"content_type", "bytes", "updated_at"} \| null}` |
+| GET | `/api/v1/field/branding` | No token, rate-limited: `{"field_id", "field_name", "accent", "logo", "wallpaper", "etag"}`, each image as `{"url", "id", "etag", "content_type", "width", "height", "bytes"}` or null; `ETag`, 304 for `If-None-Match` |
+| PUT | `/api/v1/field/branding` | GM token: `{"field_name"?, "accent"?: "#rrggbb" \| null}` (the name is the poster's) |
+| GET / PUT / DELETE | `/api/v1/field/branding/logo` · `/wallpaper` | GET with no token (`ETag` = the image's SHA-256, `Cache-Control: no-cache`, 304); PUT a raw PNG, JPEG or WebP body (413 too large, 415 not an allowed type, 422 damaged, animated or outside the pixel limits) |
+| POST | `/api/v1/crests` | GM token: a raw crest image; `{"crest_id", "url", ...}` (201 new, 200 already stored) |
+| GET | `/api/v1/crests/{id}` | No token: a crest by its SHA-256, cached for a year (`immutable`) |
+| GET / POST | `/api/v1/team-presets` | Saved teams `{"name", "colour"?, "crest_id"?}`: read or GM token / GM token |
+| PUT / DELETE | `/api/v1/team-presets/{id}` | GM token |
+| GET | `/api/v1/games/{id}/teams` | No token: each team's colour, display name and crest (what an Android prop draws on its buttons) |
+| PUT | `/api/v1/games/{id}/teams/{team}` | GM token, until the game ends: `{"display_name"?, "crest_id"?, "team_preset_id"?}` (`null` clears) |
 | GET / PUT / DELETE | `/api/v1/field/image` | The field image of the console's field view: raw PNG, JPEG or WebP body, up to 4 MB |
 | GET / PUT | `/api/v1/games/{id}/positions` · `/positions/{node}` | Where each node sits on the field image: `{"x", "y"}` as fractions 0-1 |
 | GET | `/api/v1/controller/ca` | The field CA's certificate (PEM; header `X-Atalaia-CA-SHA256`), no token |
@@ -182,6 +208,8 @@ Who may publish commands is Mosquitto's job: [`deploy/mosquitto.conf`](deploy/mo
 ## Tests
 
 `sh tools/check.sh` in the dev container runs everything, the controller included. From `cmd`, in the repository: `docker run --rm -v "%cd%:/src" atalaia-dev sh tools/check.sh` (the first `python tools/docker_sim.py test` builds the `atalaia-dev` image). The controller's tests (`controller/tests/`, unittest) need the core library (`ATALAIA_CORE_LIB`), the host modem (`ATALAIA_MODEM_HOST`, built from `firmware/esp32/test/modem_host/`) and `mosquitto`; with `ATALAIA_REQUIRE_ALL=1`, as in `check.sh` and CI, a missing one is an error, not a skip. They cover the framing against the C modem, AES-CCM in both directions, the watchdog and reconnect, the engine and restart recovery, every API endpoint, MQTT against a real broker, a `field.lua`, and the app served by uvicorn on a real port. They also check the GM console's files as served (`test_console.py`), run the example MQTT scoreboard against a private broker (`test_scoreboard_example.py`), choose the field's channel, scan for a quiet one over a recording modem and over the C host modem (simulated noise levels per channel, `test_channels.py`, `test_modem_host.py`), issue and refuse join payloads, make a second controller stand by, follow and take over a game over the air with two host modems (`test_join.py`), and play whole games with the host box (`ATALAIA_BOX_HOST`, built from `firmware/esp32/test/box_host/`): a join from the controller's payload, captures and scores over the radio, a battery pull, the end of the game, and a box heard only through another box's relay (`test_box_e2e.py`), Hold-All Domination scored by the controller from two boxes' captures, and the Codes modifier composed with Domination on a box, with a keypad code reaching the log. `test_mode_pack.py` runs the built-in `field.lua` scripts through the real engine: Hold-All scoring and its points across a restart, Last Stand ending the game with the attackers as winners, the script starting again after a takeover, and modifiers composed with a main mode.
+
+`test_branding.py` checks the image rules against real PNG, JPEG and WebP files (`tests/fixtures/branding/`, made once with Pillow by `make.py` there) and hand-made broken ones (wrong type, SVG, GIF, oversize, too small or too large, too long, animated, bad checksums, truncated, a decompression bomb, trailing data), the metadata stripping, and the endpoints through the whole controller: reading without a token, changing only with the GM token, ETags and 304s, the name shared with the poster, persistence across a restart, the stream, crests per game, team presets, the clean-up and the rate limit.
 
 The phase 3 tests (`test_checkin.py`, `test_chrono_list.py`, `test_checkin_poster.py`, `test_positions.py`, `test_prop_link.py`, `test_tls.py`) run the whole controller from `main.build()` without a radio: the poster codec against `protocol/vectors/checkin.json`, check-in and its rules, player tokens and the role re-check, the role-filtered stream, the "replicas to chrono" list with readings signed in the test and the shared chrono vectors, the retention purge, the privacy rules (no names in events, MQTT, logs or read views), the visibility table, an Android prop's Wi-Fi link, and a real TLS connection that trusts only the field CA.
 

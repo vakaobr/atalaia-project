@@ -27,7 +27,7 @@ CLOSE = "close"  # a queued ("close", code): the sender closes the socket with t
 
 # What a player-token connection is sent (besides its own check-in messages).
 PLAYER_TYPES = {"hello", "game", "score", "node", "event", "field_state", "positions", "player_position",
-                "checkin", "chrono_list", "checkin_open", "pong"}
+                "checkin", "chrono_list", "checkin_open", "pong", "branding"}
 
 Route = Callable[[Any, dict[str, Any]], Any]
 

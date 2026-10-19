@@ -538,7 +538,7 @@ tr.offline td {
 
 .score {
     display: grid;
-    grid-template-columns: 1rem 1fr auto;
+    grid-template-columns: 1fr auto;
     gap: 0.2rem 0.6rem;
     align-items: center;
 }
@@ -804,4 +804,117 @@ input.narrow {
 
 button.link.danger {
     color: var(--danger);
+}
+
+/* Field and team branding (decisions BR1-BR24) */
+
+.field-brand {
+    display: inline-flex;
+    gap: 0.5rem;
+    align-items: center;
+    min-width: 0;
+}
+
+.field-logo {
+    height: 2rem;
+    width: auto;
+    max-width: 8rem;
+    object-fit: contain;
+}
+
+.login-logo {
+    display: block;
+    max-height: 6rem;
+    max-width: 100%;
+    margin: 0 auto 0.5rem;
+    object-fit: contain;
+}
+
+.login-field {
+    text-align: center;
+    font-weight: 600;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.brand-slot {
+    margin: 1rem 0;
+}
+
+.brand-preview {
+    display: block;
+    max-width: 100%;
+    max-height: 8rem;
+    object-fit: contain;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--bg);
+}
+
+.brand-wallpaper {
+    max-height: 10rem;
+    object-fit: cover;
+}
+
+.crest {
+    width: 2rem;
+    height: 2rem;
+    object-fit: contain;
+    flex: none;
+}
+
+.crest-empty {
+    display: inline-block;
+    border: 1px dashed var(--line);
+    border-radius: 4px;
+}
+
+.team-presets {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0;
+    display: grid;
+    gap: 0.4rem;
+}
+
+.team-preset,
+.team-row,
+.team-label {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    min-width: 0;
+}
+
+.team-row {
+    margin: 0.4rem 0;
+}
+
+.team-row input {
+    flex: 1 1 8rem;
+    min-width: 0;
+}
+
+.team-row select {
+    flex: 1 1 8rem;
+    width: auto;
+    min-width: 0;
+}
+
+.team-colour {
+    min-width: 3.5rem;
+}
+
+.small-button {
+    font-size: 0.85rem;
+}
+
+.top .brand .field-brand {
+    align-self: center;
+}
+
+.teams-editor,
+.team-branding {
+    margin-top: 0.8rem;
 }

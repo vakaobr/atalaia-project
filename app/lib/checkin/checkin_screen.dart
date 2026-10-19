@@ -8,6 +8,8 @@
 /// one, a team preference), check in and get a player token. Then the
 /// check-in's page: the status the controller gave, the replicas declared
 /// for this game and their chrono state, following the game, leaving.
+/// The check-in's page shows the field's branding (decisions BR1-BR24),
+/// fetched from the controller right after the check-in and kept per field.
 library;
 
 import 'dart:async';
@@ -15,6 +17,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app.dart';
+import '../branding/branded.dart';
+import '../branding/field_branding.dart';
 import '../l10n/strings.dart';
 import '../marshal/chrono_queue.dart';
 import '../player/field_feed.dart';
@@ -163,7 +167,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
   Future<void> _forgetField() async {
     final poster = _poster;
     if (poster == null) return;
-    await context.services.trust.forget(poster.fieldId);
+    final services = context.services;
+    await services.trust.forget(poster.fieldId);
+    await services.branding.forget(poster.fieldId);
     if (mounted) await _usePoster(posterToText(encodePoster(poster)));
   }
 
@@ -513,6 +519,7 @@ class _CheckinStatusScreenState extends State<CheckinStatusScreen> {
   Map<String, Object?>? _me;
   String? _error;
   bool _left = false;
+  FieldBranding? _brand;
 
   FieldCheckin get c => widget.checkin;
 
@@ -520,6 +527,20 @@ class _CheckinStatusScreenState extends State<CheckinStatusScreen> {
   void initState() {
     super.initState();
     unawaited(_refresh());
+    unawaited(_loadBranding());
+  }
+
+  /// The field's branding: as kept, then fresh from the controller.
+  Future<void> _loadBranding() async {
+    final services = context.services;
+    final f = widget.field;
+    final kept = await services.branding.cached(f.fieldId);
+    if (mounted && kept != null) setState(() => _brand = kept);
+    final fresh = await services.branding.refresh(
+      services.brandingSource(f.urls, f),
+      fieldId: f.fieldId,
+    );
+    if (mounted && fresh != null) setState(() => _brand = fresh);
   }
 
   Future<void> _refresh() async {
@@ -622,124 +643,145 @@ class _CheckinStatusScreenState extends State<CheckinStatusScreen> {
         if (d is Map && d['state'] != 'withdrawn')
           Declaration.fromJson(d.cast<String, Object?>()),
     ];
-    return Scaffold(
-      appBar: AppBar(title: Text(s.t('checkin.status_title'))),
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Text(
-              widget.field.fieldName,
-              style: Theme.of(context).textTheme.headlineSmall,
+    return BrandedTheme(
+      branding: _brand,
+      child: Scaffold(
+        appBar: AppBar(
+          title: BrandTitle(
+            branding: _brand,
+            fallback: s.t('checkin.status_title'),
+          ),
+        ),
+        body: BrandBackdrop(
+          branding: _brand,
+          child: _body(context, s, me, decls),
+        ),
+      ),
+    );
+  }
+
+  Widget _body(
+    BuildContext context,
+    Strings s,
+    Map<String, Object?>? me,
+    List<Declaration> decls,
+  ) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _refresh();
+        await _loadBranding();
+      },
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text(
+            widget.field.fieldName,
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          Text(c.gameName, key: const Key('checkin-status-game')),
+          const SizedBox(height: 8),
+          if (_left)
+            Notice(
+              s.t('checkin.left'),
+              kind: NoticeKind.ok,
+              key: const Key('checkin-left'),
             ),
-            Text(c.gameName, key: const Key('checkin-status-game')),
-            const SizedBox(height: 8),
-            if (_left)
-              Notice(
-                s.t('checkin.left'),
-                kind: NoticeKind.ok,
-                key: const Key('checkin-left'),
-              ),
-            if (_error != null) Notice(_error!, kind: NoticeKind.warning),
-            if (!_left) ...[
-              Notice(
-                s.t('checkin.status.${c.status}'),
-                kind: c.status == 'checked_in'
-                    ? NoticeKind.ok
-                    : NoticeKind.info,
-                key: const Key('checkin-status'),
-              ),
-              Wrap(
-                spacing: 8,
-                children: [
+          if (_error != null) Notice(_error!, kind: NoticeKind.warning),
+          if (!_left) ...[
+            Notice(
+              s.t('checkin.status.${c.status}'),
+              kind: c.status == 'checked_in' ? NoticeKind.ok : NoticeKind.info,
+              key: const Key('checkin-status'),
+            ),
+            Wrap(
+              spacing: 8,
+              children: [
+                Chip(
+                  key: const Key('checkin-role'),
+                  label: Text(s.t('checkin.role.${c.role}')),
+                ),
+                if (c.team != null)
                   Chip(
-                    key: const Key('checkin-role'),
-                    label: Text(s.t('checkin.role.${c.role}')),
+                    key: const Key('checkin-team'),
+                    label: Text(teamAndSquad(s, c.team!, c.squad)),
                   ),
-                  if (c.team != null)
-                    Chip(
-                      key: const Key('checkin-team'),
-                      label: Text(teamAndSquad(s, c.team!, c.squad)),
-                    ),
-                  Chip(label: Text(c.playerId)),
-                ],
+                Chip(label: Text(c.playerId)),
+              ],
+            ),
+            SectionTitle(s.t('checkin.my_declaration')),
+            if (me != null && decls.isEmpty) Text(s.t('checkin.no_replicas')),
+            for (final d in decls)
+              ListTile(
+                key: Key('checkin-decl-${d.declarationId}'),
+                title: Text(replicaLabel(s, d.type, d.makeModel)),
+                subtitle: Text(d.replicaClass),
+                trailing: ChronoStateChip(
+                  d.state,
+                  refusedToday: d.refusedToday,
+                ),
               ),
-              SectionTitle(s.t('checkin.my_declaration')),
-              if (me != null && decls.isEmpty) Text(s.t('checkin.no_replicas')),
-              for (final d in decls)
-                ListTile(
-                  key: Key('checkin-decl-${d.declarationId}'),
-                  title: Text(replicaLabel(s, d.type, d.makeModel)),
-                  subtitle: Text(d.replicaClass),
-                  trailing: ChronoStateChip(
-                    d.state,
-                    refusedToday: d.refusedToday,
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              key: const Key('checkin-declare'),
+              icon: const Icon(Icons.inventory_2),
+              label: Text(s.t('checkin.declare')),
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => DeclareReplicasScreen(
+                      checkin: c,
+                      client: _client,
+                      declared: decls,
+                    ),
+                  ),
+                );
+                await _refresh();
+              },
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              key: const Key('checkin-follow'),
+              icon: const Icon(Icons.sports_score),
+              label: Text(s.t('checkin.follow')),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => PlayerScreen(
+                    link: FieldLink(
+                      Uri.parse(widget.field.urls.first),
+                      c.token,
+                      field: widget.field,
+                    ),
+                    onAssignment: _newToken,
                   ),
                 ),
-              const SizedBox(height: 8),
-              FilledButton.icon(
-                key: const Key('checkin-declare'),
-                icon: const Icon(Icons.inventory_2),
-                label: Text(s.t('checkin.declare')),
-                onPressed: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute<void>(
-                      builder: (_) => DeclareReplicasScreen(
-                        checkin: c,
-                        client: _client,
-                        declared: decls,
-                      ),
-                    ),
-                  );
-                  await _refresh();
-                },
               ),
+            ),
+            if (c.staff) ...[
               const SizedBox(height: 8),
               OutlinedButton.icon(
-                key: const Key('checkin-follow'),
-                icon: const Icon(Icons.sports_score),
-                label: Text(s.t('checkin.follow')),
+                key: const Key('checkin-queue'),
+                icon: const Icon(Icons.speed),
+                label: Text(s.t('queue.title')),
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute<void>(
-                    builder: (_) => PlayerScreen(
-                      link: FieldLink(
-                        Uri.parse(widget.field.urls.first),
-                        c.token,
-                        field: widget.field,
-                      ),
-                      onAssignment: _newToken,
-                    ),
+                    builder: (_) =>
+                        ChronoQueueScreen(checkin: c, field: widget.field),
                   ),
                 ),
-              ),
-              if (c.staff) ...[
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  key: const Key('checkin-queue'),
-                  icon: const Icon(Icons.speed),
-                  label: Text(s.t('queue.title')),
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute<void>(
-                      builder: (_) =>
-                          ChronoQueueScreen(checkin: c, field: widget.field),
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 24),
-              TextButton.icon(
-                key: const Key('checkin-leave'),
-                icon: const Icon(Icons.logout),
-                label: Text(s.t('checkin.leave')),
-                onPressed: _leave,
               ),
             ],
+            const SizedBox(height: 24),
+            TextButton.icon(
+              key: const Key('checkin-leave'),
+              icon: const Icon(Icons.logout),
+              label: Text(s.t('checkin.leave')),
+              onPressed: _leave,
+            ),
           ],
-        ),
+        ],
       ),
     );
   }

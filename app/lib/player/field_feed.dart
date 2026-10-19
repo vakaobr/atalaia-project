@@ -170,6 +170,10 @@ class FieldFeed extends ChangeNotifier {
   /// Lives left by player or team, from player.respawn.
   final lives = <String, int>{};
 
+  /// The ETag of the field's branding as the stream last told it (the
+  /// snapshot, then `branding` messages): the view fetches it when it changes.
+  String? brandingEtag;
+
   FeedSocket? _socket;
   Timer? _retry;
   var _delay = const Duration(seconds: 1);
@@ -229,6 +233,10 @@ class FieldFeed extends ChangeNotifier {
         : _delay * 2;
   }
 
+  void _setBranding(Object? b) {
+    if (b is Map && b['etag'] is String) brandingEtag = b['etag']! as String;
+  }
+
   /// One message of the stream (public for the tests).
   void onMessage(Map<String, Object?> m) {
     switch (m['type']) {
@@ -253,6 +261,7 @@ class FieldFeed extends ChangeNotifier {
           if (e is Map<String, Object?>) _onEvent(e);
         }
         if (m['me'] is Map) me = (m['me']! as Map).cast<String, Object?>();
+        _setBranding(m['branding']);
         positions.clear();
         for (final p in (m['positions'] as List?) ?? const []) {
           if (p is Map && p['player_id'] is String) {
@@ -271,6 +280,8 @@ class FieldFeed extends ChangeNotifier {
           }
           _setGame(g);
         }
+      case 'branding':
+        _setBranding(m['branding']);
       case 'score':
         if (game != null && m['game'] == game!['id'] && m['teams'] is Map) {
           totals = _ints(m['teams']! as Map);

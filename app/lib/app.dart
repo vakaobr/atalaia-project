@@ -6,9 +6,12 @@
 /// settings, the language and the theme.
 library;
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'branding/field_branding.dart';
 import 'checkin/checkin_client.dart';
 import 'checkin/field_trust.dart';
 import 'checkin/my_replicas.dart';
@@ -28,6 +31,18 @@ import 'ui/theme.dart';
 /// Builds the GM console's web view (a test replaces it: no WebView there).
 typedef ConsoleViewBuilder = Widget Function(BuildContext context, Uri url);
 
+/// Where a field's branding comes from: its addresses, over its pinned CA
+/// when there is one (a check-in or a join payload), else plain HTTP(S).
+typedef BrandingSourceFor =
+    BrandingSource Function(List<String> urls, PinnedField? field);
+
+BrandingSource ioBrandingSource(List<String> urls, PinnedField? field) =>
+    IoBrandingSource(
+      urls,
+      field?.client() ??
+          (HttpClient()..connectionTimeout = const Duration(seconds: 8)),
+    );
+
 class AppServices {
   AppServices({
     required this.runner,
@@ -46,7 +61,10 @@ class AppServices {
     CaFetcher? caFetch,
     this.location,
     this.linkConnect,
+    BrandingSourceFor? brandingSource,
   }) : modes = modes ?? ModeCatalog.builtin(),
+       brandingSource = brandingSource ?? ioBrandingSource,
+       branding = BrandingCache(store),
        fieldHttp = fieldHttp ?? IoFieldHttp.new,
        trust = FieldTrust(store, fetch: caFetch),
        checkins = CheckinStore(store);
@@ -92,6 +110,11 @@ class AppServices {
   /// How a prop links to the controller over Wi-Fi (tests give a fake; null:
   /// wss:// with the CA the join payload names, prop_link.dart).
   final LinkConnect? linkConnect;
+
+  /// Field and team branding (decisions BR1-BR24): what the app keeps per
+  /// field, and how it asks a controller for it (tests give a fake).
+  final BrandingCache branding;
+  final BrandingSourceFor brandingSource;
 }
 
 /// The settings, saved whenever they change.

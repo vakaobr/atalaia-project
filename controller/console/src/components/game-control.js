@@ -5,8 +5,9 @@
 // resume and end it (each confirmed in place), send a message to every
 // box, adjust a team's score. ControllerPanel: role, term, radio, promote.
 
-import { html, Component, t, clock, ConfirmButton, modeText } from '../ui.js';
+import { html, Component, t, clock, ConfirmButton, modeText, teamName } from '../ui.js';
 import { FirstSetupNotice, mhz } from './radio-settings.js';
+import { TeamFields, TeamsEditor, teamInfoBody } from './branding-settings.js';
 import {
     ParamFields, ModifierPicker, initialValues, mainModes, partsOf, schemaOf, modeName,
 } from './preset-builder.js';
@@ -20,7 +21,12 @@ function parseTeams(text) {
 class CreateGame extends Component {
     constructor(props) {
         super(props);
-        this.state = { name: '', source: '', teams: 'red, blue', minutes: '20', squads: '0', values: null, mods: [] };
+        this.state = { name: '', source: '', teams: 'red, blue', minutes: '20', squads: '0', values: null, mods: [],
+                       teamInfo: {} };
+    }
+
+    componentDidMount() {
+        this.props.app.loadTeamPresets();
     }
 
     /** The mode or preset picked, its modifiers, and their parameter schema and labels. */
@@ -54,6 +60,8 @@ class CreateGame extends Component {
         const body = { name: this.state.name.trim(), teams, params: values,
                        duration_ms: Math.max(0, Math.round(parseFloat(this.state.minutes || '0') * 60000)),
                        squads: Math.max(0, Math.min(16, parseInt(this.state.squads || '0', 10) || 0)) };
+        const info = teamInfoBody(this.state.teamInfo, teams);
+        if (info) body.team_info = info;
         if (preset) {
             body.preset_id = preset.id;
         } else {
@@ -87,6 +95,13 @@ class CreateGame extends Component {
                 <input id="g-teams" data-testid="game-teams" required value=${state.teams}
                     onInput=${(e) => this.setState({ teams: e.target.value })} />
                 <small class="muted">${t('game.teams_hint')}</small></div>
+            <details class="team-branding" data-testid="game-team-branding">
+                <summary>${t('teams.for_game')}</summary>
+                <p class="muted small">${t('teams.for_game_hint')}</p>
+                <${TeamFields} app=${props.app} teams=${teams} prefix="game" value=${state.teamInfo}
+                    onChange=${(teamInfo) => this.setState({ teamInfo })} />
+                <p class="muted small">${t('branding.rights')}</p>
+            </details>
             <div class="field"><label for="g-minutes">${t('game.duration')}</label>
                 <input id="g-minutes" type="number" min="0" step="1" value=${state.minutes}
                     onInput=${(e) => this.setState({ minutes: e.target.value })} />
@@ -155,7 +170,7 @@ class Adjust extends Component {
         return html`<form class="form inline" onSubmit=${(e) => this.submit(e)} data-testid="adjust">
             <label for="adj-team">${t('game.adjust')}</label>
             <select id="adj-team" value=${state.team || game.teams[0]} onChange=${(e) => this.setState({ team: e.target.value })}>
-                ${game.teams.map((tm) => html`<option value=${tm}>${tm}</option>`)}
+                ${game.teams.map((tm) => html`<option value=${tm}>${teamName(game, tm)}</option>`)}
             </select>
             <input type="number" step="1" aria-label=${t('game.amount')} placeholder=${t('game.amount')}
                 value=${state.amount} onInput=${(e) => this.setState({ amount: e.target.value })} />
@@ -198,7 +213,8 @@ export class GameControl extends Component {
                 <dt>${t('game.clock')}</dt><dd class="big-clock" data-testid="game-clock">${clock(app.gameTime())}</dd>
                 <dt>${t('game.length')}</dt><dd>${game.duration_ms ? clock(game.duration_ms) : t('game.no_limit')}</dd>
                 <dt>${t('game.mode')}</dt><dd>${modeName(props.app.state.modes, game.mode_id)}</dd>
-                <dt>${t('game.teams')}</dt><dd>${game.teams.join(', ')}${game.squads
+                <dt>${t('game.teams')}</dt><dd data-testid="game-teams-list">${game.teams.map((tm) => teamName(game, tm) === tm ? tm
+                    : `${teamName(game, tm)} (${tm})`).join(', ')}${game.squads
                     ? ` · ${t('game.squads_each', { n: game.squads })}` : ''}</dd>
                 <dt>${t('game.id')}</dt><dd>${game.id}</dd>
                 ${game.channel_hz && html`<dt>${t('radio.channel')}</dt><dd data-testid="game-channel">${mhz(game.channel_hz)} MHz</dd>`}
@@ -218,6 +234,7 @@ export class GameControl extends Component {
             ${gm && !leading && html`<p class="notice">${t('game.not_leader')}</p>`}
             ${gm && leading && html`<${Broadcast} app=${app} />`}
             ${gm && leading && html`<${Adjust} app=${app} />`}
+            ${gm && s !== 'ended' && html`<${TeamsEditor} app=${app} />`}
         </section>`;
     }
 }

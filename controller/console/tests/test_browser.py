@@ -641,7 +641,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v2').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v3').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json"):
             self.assertIn(path, cached)
@@ -783,6 +783,164 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.no_horizontal_scroll(poster)
         poster.emulate_media(media="print")
         expect(poster.get_by_test_id("poster-print")).to_be_hidden()
+
+    # --- field and team branding (decisions BR1-BR24) -------------------------------
+
+    def loaded(self, locator) -> None:
+        """The image is shown and the browser decoded it."""
+        expect(locator).to_be_visible()
+        self.assertTrue(wait_for(lambda: locator.evaluate("img => img.complete && img.naturalWidth > 0"), 5),
+                        "the image did not decode")
+
+    def forget_refusal(self, path: str) -> None:
+        """A refusal the test asked for is not a page error."""
+        self.errors = [e for e in self.errors if path not in e and "status of 4" not in e]
+
+    def test_field_branding_from_settings_to_header_scoreboard_and_poster(self):
+        if not ZBARIMG:
+            self.skipTest("zbarimg is not installed")
+        page = self.console()
+        expect(page.get_by_test_id("header-logo")).to_have_count(0)  # the default look
+        page.get_by_test_id("tab-settings").click()
+        expect(page.get_by_test_id("branding-rights")).to_contain_text("responsabilidade")
+        page.get_by_test_id("branding-name").fill("Campo Norte")
+        page.get_by_test_id("branding-accent").fill("#c0ffee")
+        page.get_by_test_id("branding-save").click()
+        expect(page.get_by_test_id("header-field-name")).to_have_text("Campo Norte")
+        accent = page.get_by_test_id("header").evaluate("h => getComputedStyle(h).getPropertyValue('--accent')")
+        self.assertEqual(accent.strip(), "#c0ffee")
+        self.assertEqual(self.field.http.get("/api/v1/checkin/poster").json()["field_name"], "Campo Norte")
+        # Uploads: a logo with metadata (stripped by the controller) and a WebP wallpaper.
+        page.get_by_test_id("branding-logo-upload").set_input_files(str(BRANDING / "logo.png"))
+        self.loaded(page.get_by_test_id("branding-logo-img"))
+        self.loaded(page.get_by_test_id("header-logo"))
+        page.get_by_test_id("branding-wallpaper-upload").set_input_files(str(BRANDING / "wallpaper.webp"))
+        self.loaded(page.get_by_test_id("branding-wallpaper-img"))
+        served = httpx.get(self.field.base + "/api/v1/field/branding/logo")  # no token
+        self.assertEqual(served.status_code, 200)
+        self.assertNotIn(b"Someone Private", served.content)
+        # Refused in the page (SVG, GIF: never sent) and by the controller (8x8 pixels).
+        with tempfile.TemporaryDirectory() as tmp:
+            svg = Path(tmp) / "logo.svg"
+            svg.write_text('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>')
+            page.get_by_test_id("branding-logo-upload").set_input_files(str(svg))
+            expect(page.get_by_test_id("toast")).to_contain_text("PNG, JPEG ou WebP")
+            page.get_by_test_id("branding-logo-upload").set_input_files(str(BRANDING / "not-allowed.gif"))
+            expect(page.get_by_test_id("toast")).to_contain_text("PNG, JPEG ou WebP")
+            page.get_by_test_id("branding-logo-upload").set_input_files(str(BRANDING / "animated.png"))
+            expect(page.get_by_test_id("toast")).to_contain_text("animated PNG")
+            self.forget_refusal("/field/branding/logo")
+        self.loaded(page.get_by_test_id("header-logo"))  # the earlier logo stays
+        # Another page (the login screen, before any token) shows it at once.
+        login = self.page()
+        self.loaded(login.get_by_test_id("login-logo"))
+        expect(login.get_by_test_id("login-field")).to_have_text("Campo Norte")
+        # The scoreboard: the logo and name above the game, the wallpaper behind it.
+        self.field.create_game(name="Final", start=True)
+        board = self.page(f"/console/scoreboard.html#token={READ}")
+        self.loaded(board.get_by_test_id("board-logo"))
+        expect(board.get_by_test_id("board-field-name")).to_have_text("Campo Norte")
+        self.assertTrue(board.evaluate("document.body.classList.contains('with-wallpaper')"))
+        self.assertIn("/api/v1/field/branding/wallpaper",
+                      board.evaluate("getComputedStyle(document.body).backgroundImage"))
+        # The poster: the logo above the field's name, and the QR code still reads back.
+        expected = self.field.http.get("/api/v1/checkin/poster").json()
+        poster = page.context.new_page()  # the console's context: the poster uses its GM token
+        poster.on("pageerror", lambda e: self.errors.append(f"pageerror: {e}"))
+        poster.goto(self.field.base + "/console/poster.html")
+        self.loaded(poster.get_by_test_id("poster-logo"))
+        expect(poster.get_by_test_id("poster-field")).to_have_text("Campo Norte")
+        with tempfile.TemporaryDirectory() as tmp:
+            for target in ("poster-qr", None):
+                shot = os.path.join(tmp, "poster.png")
+                (poster.get_by_test_id(target) if target else poster.locator("#poster")).screenshot(path=shot)
+                out = subprocess.run([ZBARIMG, "--raw", "-q", shot], capture_output=True, text=True, timeout=30)
+                self.assertEqual(out.returncode, 0, out.stderr)
+                self.assertEqual(out.stdout.strip(), expected["text"], target or "the whole poster")
+        poster.set_viewport_size({"width": 390, "height": 844})
+        self.no_horizontal_scroll(poster)
+        # Removing the logo brings the default look back, live.
+        page.get_by_test_id("branding-logo-remove").click()
+        expect(page.get_by_test_id("header-logo")).to_have_count(0)
+        expect(board.get_by_test_id("board-logo")).to_have_count(0)
+
+    def test_team_presets_and_a_game_with_crests(self):
+        page = self.console()
+        page.get_by_test_id("tab-settings").click()
+        page.get_by_test_id("team-preset-name").fill("Lobos")
+        page.get_by_test_id("team-preset-colour").select_option("red")
+        page.get_by_test_id("team-preset-crest").set_input_files(str(BRANDING / "crest-red.png"))
+        self.loaded(page.get_by_test_id("team-preset-crest-img"))
+        page.get_by_test_id("team-preset-add").click()
+        self.assertTrue(wait_for(lambda: self.field.http.get("/api/v1/team-presets").json(), 5))
+        preset = self.field.http.get("/api/v1/team-presets").json()[0]
+        self.assertEqual((preset["name"], preset["colour"]), ("Lobos", "red"))
+        self.loaded(page.get_by_test_id(f"team-preset-{preset['id']}").locator("img"))
+        # A game: red from the saved team, blue with its own name and crest.
+        page.get_by_test_id("tab-game").click()
+        page.get_by_test_id("game-name").fill("Sábado")
+        page.get_by_test_id("game-team-branding").locator("summary").click()
+        page.get_by_test_id("game-team-preset-red").select_option(label="Lobos")
+        self.loaded(page.get_by_test_id("game-team-crest-img-red"))
+        page.get_by_test_id("game-team-name-blue").fill("Águias")
+        page.get_by_test_id("game-team-crest-blue").set_input_files(str(BRANDING / "crest-blue.webp"))
+        self.loaded(page.get_by_test_id("game-team-crest-img-blue"))
+        page.get_by_test_id("game-create").click()
+        expect(page.get_by_test_id("game-state")).to_be_visible()
+        game = self.field.http.get("/api/v1/games").json()[-1]
+        self.assertEqual(game["teams"], ["red", "blue"])
+        self.assertEqual(game["team_info"]["red"]["team_preset_id"], preset["id"])
+        self.assertEqual(game["team_info"]["red"]["display_name"], "Lobos")
+        self.assertEqual(game["team_info"]["blue"]["display_name"], "Águias")
+        self.assertIn("crest_id", game["team_info"]["blue"])
+        expect(page.get_by_test_id("game-teams-list")).to_have_text("Lobos (red), Águias (blue)")
+        scores = page.get_by_test_id("scores")
+        expect(scores).to_contain_text("Lobos")
+        self.loaded(scores.locator('[data-team="blue"] img'))
+        # A name changed while the game is ready, from the game card.
+        page.get_by_test_id("teams-editor").locator("summary").click()
+        page.get_by_test_id("live-team-name-blue").fill("Águias Negras")
+        page.get_by_test_id("teams-save").click()
+        expect(scores).to_contain_text("Águias Negras")
+        self.assertEqual(self.field.http.get(f"/api/v1/games/{game['id']}/teams").json()["teams"][1]["display_name"],
+                         "Águias Negras")
+        # The scoreboard: crests and names, live; the colours stay.
+        self.field.http.post(f"/api/v1/games/{game['id']}/start")
+        board = self.page(f"/console/scoreboard.html#token={READ}&lang=en")
+        expect(board.get_by_test_id("board-name-red")).to_have_text("Lobos")
+        self.loaded(board.get_by_test_id("board-crest-red"))
+        self.loaded(board.get_by_test_id("board-crest-blue"))
+        self.field.box_hello()
+        self.field.box_state(red=20, blue=35)
+        expect(board.get_by_test_id("board-score-blue")).to_have_text("35")
+        self.field.http.post(f"/api/v1/games/{game['id']}/end", json={})
+        expect(board.get_by_test_id("board-result")).to_have_text("Águias Negras wins")
+        # Phone width: the settings and the game form with team rows do not scroll sideways.
+        phone = self.console(width=390, height=844)
+        phone.get_by_test_id("tab-settings").click()
+        phone.wait_for_timeout(150)
+        self.no_horizontal_scroll(phone)
+        phone.get_by_test_id("tab-game").click()
+        phone.get_by_test_id("game-team-branding").locator("summary").click()
+        phone.wait_for_timeout(150)
+        self.no_horizontal_scroll(phone)
+        board.set_viewport_size({"width": 390, "height": 844})
+        self.no_horizontal_scroll(board)
+
+    def test_read_token_sees_branding_without_controls(self):
+        self.field.http.put("/api/v1/field/branding/logo", content=(BRANDING / "logo.jpg").read_bytes(),
+                            headers={"Content-Type": "image/jpeg"})
+        page = self.console(READ)
+        self.loaded(page.get_by_test_id("header-logo"))
+        page.get_by_test_id("tab-settings").click()
+        expect(page.get_by_test_id("branding-settings")).to_contain_text("Só a organização")
+        expect(page.get_by_test_id("branding-form")).to_have_count(0)
+        expect(page.get_by_test_id("branding-logo-upload")).to_have_count(0)
+        expect(page.get_by_test_id("team-preset-form")).to_have_count(0)
+        self.loaded(page.get_by_test_id("branding-logo-img"))
+
+
+BRANDING = CONTROLLER / "tests" / "fixtures" / "branding"
 
 
 if __name__ == "__main__":

@@ -29,6 +29,15 @@ which browsers cannot give headers, also takes ``?token=``.
     POST /api/v1/controller/join           this controller takes a game as standby
     GET  /api/v1/field                     whether a field image is uploaded
     GET|PUT|DELETE /api/v1/field/image     the field image (map or floor plan) of the console
+    GET  /api/v1/field/branding            the field's name, logo, wallpaper and accent (no token, ETag)
+    PUT  /api/v1/field/branding            GM: {"field_name"?, "accent"?}
+    GET|PUT|DELETE /api/v1/field/branding/{logo|wallpaper}  the images (GET: no token, ETag)
+    POST /api/v1/crests                    GM: upload a team crest (raw PNG, JPEG or WebP)
+    GET  /api/v1/crests/{id}               a crest (no token, immutable)
+    GET|POST /api/v1/team-presets          saved teams: display name, colour, crest
+    PUT|DELETE /api/v1/team-presets/{id}   GM
+    GET  /api/v1/games/{id}/teams          a game's team colours, display names and crests (no token)
+    PUT  /api/v1/games/{id}/teams/{team}   GM: {"display_name"?, "crest_id"?, "team_preset_id"?}
     GET  /api/v1/radio                     the field's radio channel, its limits, candidates, last scan
     PUT  /api/v1/radio/channel             set it {"channel_hz", "source"} (no live game)
     POST /api/v1/radio/scan                find a quiet channel: noise scan with the modem {"dwell_s"?}
@@ -84,6 +93,8 @@ from fastapi.staticfiles import StaticFiles
 
 from . import __version__
 from . import checkin as checkinmod
+from . import images
+from .branding import SLOTS, Branding, etag
 from .checkin import Viewer
 from .engine import Controller, ControllerError
 from .modes import resolve_params
@@ -93,6 +104,9 @@ from .ws import PLAYER_TYPES, Hub, default_route, public
 CONSOLE_DIR = Path(__file__).resolve().parent.parent / "console" / "src"
 IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp"}
 NO_STORE = {"Cache-Control": "no-store"}
+# Served images: never sniffed as anything else, and inert if opened as a page (decision BR9).
+IMAGE_HEADERS = {"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox",
+                 "Content-Disposition": "inline"}
 
 
 class Auth:
@@ -153,6 +167,7 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     if hub.route is default_route and checkin is not None:
         hub.route = make_route(controller)
     controller.add_listener(hub.publish)
+    branding = controller.branding if controller.branding is not None else Branding(controller)
 
     def viewer(request: Request) -> Viewer:
         v = auth.viewer(_token(request))
@@ -182,6 +197,9 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
             raise HTTPException(503, "field check-in is not set up on this controller")
         return checkin
 
+    def client_of(request: Request) -> str:
+        return request.client.host if request.client else "?"
+
     def require_gm(request: Request) -> str:
         role = auth.role(_token(request))
         if role is None:
@@ -201,6 +219,10 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     @app.exception_handler(ModeError)
     async def mode_error(request: Request, exc: ModeError):
         return JSONResponse({"detail": str(exc)}, status_code=400)
+
+    @app.exception_handler(images.ImageError)
+    async def image_error(request: Request, exc: images.ImageError):
+        return JSONResponse({"detail": str(exc)}, status_code=exc.status)
 
     def body_map(body: Any) -> dict[str, Any]:
         if body is None:
@@ -418,6 +440,116 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         controller._emit(msg)
         return msg
 
+    # --- field and team branding (branding.py, decisions BR1-BR24) ----------------
+
+    def public_read(request: Request) -> None:
+        if not branding.rate.allow(client_of(request)):
+            raise HTTPException(429, "too many requests from this address; wait a minute")
+
+    def not_modified(request: Request, tag: str) -> bool:
+        wanted = request.headers.get("if-none-match")
+        if not wanted:
+            return False
+        return wanted.strip() == "*" or any(t.strip().removeprefix("W/") == tag for t in wanted.split(","))
+
+    def image_response(request: Request, img: dict[str, Any], cache: str) -> Response:
+        tag = etag(img["id"])
+        headers = {"ETag": tag, "Cache-Control": cache, **IMAGE_HEADERS}
+        if not_modified(request, tag):
+            return Response(status_code=304, headers=headers)
+        return Response(img["data"], media_type=img["content_type"], headers=headers)
+
+    async def read_upload(request: Request, limit: int, what: str) -> tuple[bytes, str]:
+        ctype = request.headers.get("content-type", "").split(";")[0].strip().lower()
+        declared = request.headers.get("content-length")
+        if declared is not None and declared.isdigit() and int(declared) > limit:
+            raise HTTPException(413, f"the {what} is over {limit} bytes")
+        data = bytearray()
+        async for chunk in request.stream():
+            data.extend(chunk)
+            if len(data) > limit:
+                raise HTTPException(413, f"the {what} is over {limit} bytes")
+        return bytes(data), ctype
+
+    def slot_of(slot: str) -> images.Limits:
+        if slot not in SLOTS:
+            raise HTTPException(404, "the field's branding images are 'logo' and 'wallpaper'")
+        return SLOTS[slot]
+
+    @app.get("/api/v1/field/branding")
+    def field_branding(request: Request) -> Response:
+        """No token: anyone who can reach the field's API (players before or right after check-in)."""
+        public_read(request)
+        view = branding.view()
+        headers = {"ETag": view["etag"], "Cache-Control": "no-cache"}
+        if not_modified(request, view["etag"]):
+            return Response(status_code=304, headers=headers)
+        return JSONResponse(view, headers=headers)
+
+    @app.put("/api/v1/field/branding", dependencies=[Depends(require_gm)])
+    def put_field_branding(body: Any = Body(None)) -> dict[str, Any]:
+        return branding.set_field(body_map(body))
+
+    @app.get("/api/v1/field/branding/{slot}")
+    def field_branding_image(slot: str, request: Request) -> Response:
+        slot_of(slot)
+        public_read(request)
+        img = branding.image(slot)
+        if img is None:
+            raise HTTPException(404, f"no {slot} uploaded")
+        return image_response(request, img, "no-cache")
+
+    @app.put("/api/v1/field/branding/{slot}", dependencies=[Depends(require_gm)])
+    async def put_field_branding_image(slot: str, request: Request) -> dict[str, Any]:
+        limits = slot_of(slot)
+        data, ctype = await read_upload(request, limits.max_bytes, slot)
+        return branding.put_image(slot, data, ctype)
+
+    @app.delete("/api/v1/field/branding/{slot}", dependencies=[Depends(require_gm)])
+    def delete_field_branding_image(slot: str) -> dict[str, Any]:
+        slot_of(slot)
+        return branding.delete_image(slot)
+
+    @app.post("/api/v1/crests", dependencies=[Depends(require_gm)])
+    async def post_crest(request: Request) -> JSONResponse:
+        data, ctype = await read_upload(request, images.CREST.max_bytes, "crest")
+        out, created = branding.add_crest(data, ctype)
+        return JSONResponse(out, status_code=201 if created else 200)
+
+    @app.get("/api/v1/crests/{crest_id}")
+    def get_crest(crest_id: str, request: Request) -> Response:
+        public_read(request)
+        img = branding.crest(crest_id)
+        if img is None:
+            raise HTTPException(404, "no such crest")
+        # A crest's id is its content's hash: the same URL never shows another image.
+        return image_response(request, img, "public, max-age=31536000, immutable")
+
+    @app.get("/api/v1/team-presets", dependencies=[Depends(require_console)])
+    def team_presets() -> list[dict[str, Any]]:
+        return branding.team_presets()
+
+    @app.post("/api/v1/team-presets", status_code=201, dependencies=[Depends(require_gm)])
+    def team_preset_add(body: Any = Body(None)) -> dict[str, Any]:
+        return branding.save_team_preset(body_map(body))
+
+    @app.put("/api/v1/team-presets/{preset_id}", dependencies=[Depends(require_gm)])
+    def team_preset_put(preset_id: int, body: Any = Body(None)) -> dict[str, Any]:
+        return branding.save_team_preset(body_map(body), preset_id)
+
+    @app.delete("/api/v1/team-presets/{preset_id}", dependencies=[Depends(require_gm)])
+    def team_preset_delete(preset_id: int) -> dict[str, Any]:
+        return branding.delete_team_preset(preset_id)
+
+    @app.get("/api/v1/games/{game_id}/teams")
+    def game_teams(game_id: int, request: Request) -> dict[str, Any]:
+        public_read(request)
+        return branding.game_teams(game_id)
+
+    @app.put("/api/v1/games/{game_id}/teams/{team}", dependencies=[Depends(require_gm)])
+    def game_team_put(game_id: int, team: str, body: Any = Body(None)) -> dict[str, Any]:
+        return controller.set_team_info(game_id, team, body_map(body))
+
     # --- the field CA (ADR-P3-9, P3-8) -------------------------------------------
 
     @app.get("/api/v1/controller/ca")
@@ -437,9 +569,6 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
                                  "Cache-Control": "no-cache"})
 
     # --- field check-in (ADR-P3-13, protocol/checkin.md) ------------------------------
-
-    def client_of(request: Request) -> str:
-        return request.client.host if request.client else "?"
 
     @app.get("/api/v1/checkin")
     def checkin_info(request: Request) -> JSONResponse:
@@ -695,6 +824,8 @@ def _snapshot(controller: Controller, viewer: Optional[Viewer] = None) -> dict[s
         "nodes": controller.nodes(game_id) if game_id else [],
         "events": events,
     }
+    if controller.branding is not None:
+        out["branding"] = controller.branding.view()  # public: the field's name, images, accent
     if viewer is None or viewer.kind != "player":
         out["status"] = status
         return out

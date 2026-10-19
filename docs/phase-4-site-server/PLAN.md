@@ -130,6 +130,22 @@ The assumptions section (below) is updated with handoff results.
 - iOS player app (Phase 3; the site server API serves it, but the
   app is not a Phase 4 deliverable).
 
+### Club profiles (added 2026-10-19, with phase 3's branding)
+
+Phase 3 gave each controller a **field branding** (the field's name, logo,
+wallpaper and accent colour) and per-game **team branding** with saved
+team presets (display name, usual colour, crest), all kept on that one
+controller (`controller/atalaia_controller/branding.py`, decisions
+BR1-BR24). **Club profiles with accounts** belong to the site server: a
+club's page with its name, logo and crest, edited by the club's own
+accounts, from which a field's controllers take their branding and team
+presets in the sync (instead of a GM uploading them on each controller), and
+a team's crest that follows it from field to field. To design with plan
+phase I (field pages, registration): the same image rules as the
+controller's (PNG, JPEG or WebP, the size and pixel caps, metadata
+stripped), the rights reminder, and moderation for public club pages. Not in
+the current plan phases.
+
 ---
 
 ## Constraints from ADR.md (all 18 respected)

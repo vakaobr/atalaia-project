@@ -6,6 +6,7 @@
 library;
 
 import 'package:atalaia_app/app.dart';
+import 'package:atalaia_app/branding/field_branding.dart';
 import 'package:atalaia_app/checkin/checkin_client.dart';
 import 'package:atalaia_app/checkin/field_trust.dart';
 import 'package:atalaia_app/controller/prop_link.dart';
@@ -26,12 +27,16 @@ class Harness {
     this.fieldHttp,
     this.caFetch,
     this.linkConnect,
+    this.brandingSource,
   }) : qr = qr ?? FakeQr();
 
   /// A fake field controller for check-in (test/support/fake_field.dart).
   final FieldHttp Function(PinnedField field)? fieldHttp;
   final CaFetcher? caFetch;
   final LinkConnect? linkConnect;
+
+  /// A fake controller's branding endpoints (none: every request fails).
+  final BrandingSourceFor? brandingSource;
 
   final AppSettings settings;
   final NodeRunner runner;
@@ -57,6 +62,7 @@ class Harness {
     fieldHttp: fieldHttp,
     caFetch: caFetch ?? _noCa,
     linkConnect: linkConnect,
+    brandingSource: brandingSource ?? (_, _) => const _NoBranding(),
   );
 
   /// The app; a new harness is a new app (its own state), even when pumped
@@ -72,6 +78,14 @@ class Harness {
 Future<FeedSocket> _noFeed(Uri uri) => Future.error(StateError('no network'));
 Future<String> _noCa(Uri uri) => Future.error(StateError('no network'));
 
+class _NoBranding implements BrandingSource {
+  const _NoBranding();
+
+  @override
+  Future<BrandingResponse> get(String path, {String? ifNoneMatch}) =>
+      Future.error(StateError('no network'));
+}
+
 Harness harness({
   AppLanguage language = AppLanguage.pt,
   NodeRunner? runner,
@@ -81,6 +95,7 @@ Harness harness({
   FieldHttp Function(PinnedField field)? fieldHttp,
   CaFetcher? caFetch,
   LinkConnect? linkConnect,
+  BrandingSourceFor? brandingSource,
 }) => Harness(
   settings: (settings ?? AppSettings())..language = language,
   runner: runner ?? FakeNodeRunner(),
@@ -89,4 +104,5 @@ Harness harness({
   fieldHttp: fieldHttp,
   caFetch: caFetch,
   linkConnect: linkConnect,
+  brandingSource: brandingSource,
 );

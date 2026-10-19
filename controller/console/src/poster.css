@@ -81,6 +81,20 @@ button.primary {
     text-align: center;
 }
 
+.field-logo {
+    display: block;
+    max-width: 120mm;
+    max-height: 32mm;
+    width: auto;
+    height: auto;
+    margin: 0 auto 4mm;
+    object-fit: contain;
+}
+
+.field-logo[hidden] {
+    display: none;
+}
+
 .poster h1 {
     font-size: 2.4rem;
     margin: 0 0 4px;

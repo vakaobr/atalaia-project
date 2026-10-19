@@ -477,7 +477,9 @@ roadmap:
       through the chronograph; marshals work from that list and their signed readings mark each
       replica passed or refused; players can share their position during a game, and the
       controller decides who sees it; an Android prop takes part in the controller's game over the
-      field's Wi-Fi. The app is tested on Android emulators; nothing has run on a real phone yet.
+      field's Wi-Fi. A field or club that runs its own controller can show its logo, wallpaper
+      and colour in the app, on the scoreboard and on the poster, and give its teams names and
+      crests. The app is tested on Android emulators; nothing has run on a real phone yet.
       Still to come: the phone as the field controller, the I/O pod's firmware and the iOS
       version.
     gate: "Gate: one game mixes ESP32 and Android props without issues."

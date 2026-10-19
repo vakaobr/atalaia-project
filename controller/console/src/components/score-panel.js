@@ -6,6 +6,7 @@
 // totals since the console opened.
 
 import { html, Component, t, teamColour } from '../ui.js';
+import { TeamLabel } from './branding-settings.js';
 
 export function Timeline({ history, teams }) {
     if (!history || history.length < 2) return null;
@@ -34,8 +35,7 @@ export class ScorePanel extends Component {
             <h2 id="score-h">${t('score.title')}</h2>
             <ul class="scores" data-testid="scores">
                 ${teams.map((tm) => html`<li class="score" data-team=${tm}>
-                    <span class="swatch" aria-hidden="true" ref=${(el) => { if (el) el.style.background = teamColour(tm, teams); }}></span>
-                    <span class="team-name">${tm}</span>
+                    <${TeamLabel} game=${game} team=${tm} teams=${teams} />
                     <strong class="team-score" data-testid=${`score-${tm}`}>${totals[tm] || 0}</strong>
                     <span class="bar" aria-hidden="true"><span ref=${(el) => {
                         if (el) {

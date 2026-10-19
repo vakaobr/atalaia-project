@@ -7,10 +7,12 @@
 // and English and the short form of the field CA's fingerprint, which
 // staff compare with the console's. A field whose Wi-Fi has a password can
 // draw a standard Wi-Fi QR code beside it: the password is typed here, used
-// only to draw that code, and never stored or sent anywhere.
+// only to draw that code, and never stored or sent anywhere. The field's
+// logo (its branding, decisions BR1-BR24) goes above its name, apart from
+// the QR code, so the code reads as before.
 
 import qrcode from './lib/qrcode.module.js';
-import { t, loadLanguage, api, savedToken } from './ui.js';
+import { t, loadLanguage, api, savedToken, fetchBranding, brandingUrl } from './ui.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -81,6 +83,13 @@ async function main() {
         return;
     }
     document.getElementById('field-name').textContent = poster.field_name;
+    const branding = await fetchBranding();
+    if (branding && branding.logo) {
+        const logo = document.getElementById('field-logo');
+        logo.alt = t('branding.logo_alt', { name: poster.field_name });
+        logo.src = brandingUrl(branding.logo);
+        logo.hidden = false;
+    }
     document.getElementById('ca-short').textContent = poster.ca_short;
     const ssid = poster.wifi_ssid;
     document.getElementById('step1-pt').textContent = ssid

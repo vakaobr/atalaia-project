@@ -550,4 +550,5 @@ const Map<String, String> ptStrings = {
   'player.share_hint_squads':
       'Só durante o jogo; o controlador decide quem a vê (a tua squad, se o jogo o permitir, a organização e os marshals).',
   'checkin.team_squad': '{team} › squad {squad}',
+  'branding.logo': 'Logótipo de {name}',
 };

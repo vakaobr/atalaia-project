@@ -494,7 +494,9 @@ roadmap:
       usar e vê se já passaram no cronógrafo; os marshals trabalham a partir dessa lista e as suas
       medições assinadas aprovam ou recusam cada réplica; quem joga pode partilhar a posição
       durante o jogo, e o controlador decide quem a vê; um telemóvel Android faz de caixa no jogo do
-      controlador pela rede Wi-Fi do campo. Falta o telemóvel como controlador de campo, o firmware
+      controlador pela rede Wi-Fi do campo. Um campo ou clube com o seu próprio controlador pode
+      mostrar o logótipo, a imagem de fundo e a cor na app, no marcador e no cartaz, e dar nomes e
+      emblemas às equipas. Falta o telemóvel como controlador de campo, o firmware
       do módulo de E/S e a versão iOS.
     gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."
   p4:

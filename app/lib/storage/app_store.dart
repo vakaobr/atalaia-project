@@ -6,12 +6,15 @@
 /// android:allowBackup is off so it is not copied to the cloud). The field
 /// join key and the marshal's private key live here too: protected by
 /// Android's app sandbox, not by a hardware-backed keystore (decision PD6).
-/// Writes go to a temporary file first, then replace the old one.
+/// Writes go to a temporary file first, then replace the old one. Binary
+/// files (a field's logo and wallpaper, team crests: lib/branding/) are
+/// kept the same way under `blobs/`.
 library;
 
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart' show ThemeMode;
@@ -155,6 +158,18 @@ abstract interface class AppStore {
   /// A list of JSON records by name (readings, replicas).
   Future<List<Map<String, Object?>>> loadList(String name);
   Future<void> saveList(String name, List<Map<String, Object?>> items);
+
+  /// A binary file by name (letters, digits and dashes), or null.
+  Future<Uint8List?> loadBlob(String name);
+  Future<void> saveBlob(String name, Uint8List bytes);
+  Future<void> deleteBlob(String name);
+}
+
+final _blobName = RegExp(r'^[a-z0-9-]{1,100}$');
+
+String _checkBlobName(String name) {
+  if (!_blobName.hasMatch(name)) throw ArgumentError.value(name, 'name');
+  return name;
 }
 
 class FileAppStore implements AppStore {
@@ -200,6 +215,29 @@ class FileAppStore implements AppStore {
   @override
   Future<void> saveList(String name, List<Map<String, Object?>> items) =>
       _write(name, items);
+
+  File _blob(String name) => File('$dir/blobs/${_checkBlobName(name)}');
+
+  @override
+  Future<Uint8List?> loadBlob(String name) async {
+    final f = _blob(name);
+    return await f.exists() ? f.readAsBytes() : null;
+  }
+
+  @override
+  Future<void> saveBlob(String name, Uint8List bytes) async {
+    final f = _blob(name);
+    await f.parent.create(recursive: true);
+    final tmp = File('${f.path}.tmp');
+    await tmp.writeAsBytes(bytes, flush: true);
+    await tmp.rename(f.path);
+  }
+
+  @override
+  Future<void> deleteBlob(String name) async {
+    final f = _blob(name);
+    if (await f.exists()) await f.delete();
+  }
 }
 
 /// Keeps everything in memory (tests, and platforms without a files folder).
@@ -225,4 +263,18 @@ class MemoryAppStore implements AppStore {
   @override
   Future<void> saveList(String name, List<Map<String, Object?>> items) async =>
       _lists[name] = [...items];
+
+  final _blobs = <String, Uint8List>{};
+
+  @override
+  Future<Uint8List?> loadBlob(String name) async =>
+      _blobs[_checkBlobName(name)];
+
+  @override
+  Future<void> saveBlob(String name, Uint8List bytes) async =>
+      _blobs[_checkBlobName(name)] = Uint8List.fromList(bytes);
+
+  @override
+  Future<void> deleteBlob(String name) async =>
+      _blobs.remove(_checkBlobName(name));
 }

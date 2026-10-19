@@ -231,6 +231,47 @@ export function teamColour(name, teams) {
     return PALETTE[(i >= 0 ? i : name.length) % PALETTE.length];
 }
 
+// ---- branding (decisions BR1-BR24) ---------------------------------------------
+
+/** A team's name as players see it: the game's display name for it, else its colour name. */
+export function teamName(game, team) {
+    const info = game && game.team_info && game.team_info[team];
+    return (info && info.display_name) || team;
+}
+
+/** The address of a team's crest in a game, or null. Crests never change at one address. */
+export function crestUrl(game, team) {
+    const info = game && game.team_info && game.team_info[team];
+    return info && info.crest_id ? `/api/v1/crests/${info.crest_id}` : null;
+}
+
+/** The address of the field's logo or wallpaper (GET /api/v1/field/branding's refs), versioned by
+ * the image's id so a new upload shows at once. */
+export function brandingUrl(ref) {
+    return ref ? `${ref.url}?v=${ref.id.slice(0, 16)}` : null;
+}
+
+/** Black or white text, whichever reads better on a #rrggbb background. */
+export function textOn(hex) {
+    const n = parseInt(String(hex).slice(1), 16);
+    const lin = (c) => {
+        const s = c / 255;
+        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    };
+    const lum = 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+    return lum > 0.4 ? '#101418' : '#ffffff';
+}
+
+/** GET /api/v1/field/branding: public, no token (null when the controller cannot be reached). */
+export async function fetchBranding() {
+    try {
+        const r = await fetch('/api/v1/field/branding', { cache: 'no-cache' });
+        return r.ok ? r.json() : null;
+    } catch (e) {
+        return null;
+    }
+}
+
 /** Game time as m:ss (or h:mm:ss). */
 export function clock(ms) {
     if (ms === null || ms === undefined || ms < 0) return '–';

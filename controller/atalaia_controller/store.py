@@ -22,6 +22,11 @@ the marshals' public keys, and the players' latest positions (deleted when
 the game ends, ADR-P3-6). The file is created with mode 0600, and so are
 SQLite's WAL and shared-memory files next to it, because it holds tokens,
 token keys and (with persist_game_key) game keys.
+
+Schema 4 adds field and team branding (decisions BR1-BR24): the uploaded
+images (the field's logo and wallpaper and the teams' crests, stored once
+by the SHA-256 of their checked bytes), the saved team presets, and each
+game's team display names and crests (games.team_info_json).
 """
 
 from __future__ import annotations
@@ -34,7 +39,7 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes
 
 SCHEMA = """
@@ -191,6 +196,23 @@ CREATE TABLE IF NOT EXISTS marshal_keys (
     player_id     TEXT,
     registered_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS images (
+    id           TEXT PRIMARY KEY,                     -- SHA-256 of data, hex
+    kind         TEXT NOT NULL,                        -- logo, wallpaper, crest (as first uploaded)
+    content_type TEXT NOT NULL,
+    width        INTEGER NOT NULL,
+    height       INTEGER NOT NULL,
+    data         BLOB NOT NULL,                        -- checked, metadata stripped (images.py)
+    created_at   REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS team_presets (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL UNIQUE,                  -- the team's display name
+    colour      TEXT,                                  -- the colour it usually plays (red, blue...)
+    crest_id    TEXT,                                  -- images.id
+    created_at  REAL NOT NULL,
+    updated_at  REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS player_positions (
     game_id     INTEGER NOT NULL,
     player_id   TEXT NOT NULL,
@@ -208,6 +230,7 @@ GAME_COLUMNS_V2 = (
     ("joined", "INTEGER NOT NULL DEFAULT 0"),  # 1: joined as a standby controller
     ("controller_id", "INTEGER"),              # joined game: the controller that made the join
     ("squads", "INTEGER NOT NULL DEFAULT 0"),  # schema 3: squads per team (0: the game has none)
+    ("team_info_json", "TEXT"),                # schema 4: {team: {display_name, crest_id}}
 )
 
 LIVE_STATES = ("ready", "running", "paused")
@@ -338,14 +361,15 @@ class Store:
         self._exec(
             "INSERT INTO games (id, name, mode_id, preset_id, teams_json, params_json, "
             "assignments_json, duration_ms, game_seed, state, term, game_key, created_at, "
-            "node_id, channel_hz, max_hops, joined, controller_id, squads) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "node_id, channel_hz, max_hops, joined, controller_id, squads, team_info_json) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (game["id"], game["name"], game["mode_id"], game.get("preset_id"),
              json.dumps(game["teams"]), json.dumps(game["params"]),
              json.dumps(game["assignments"]), game["duration_ms"], game["game_seed"],
              game["state"], game.get("term", 1), key, game["created_at"],
              game.get("node_id"), game.get("channel_hz"), game.get("max_hops"),
-             1 if game.get("joined") else 0, game.get("controller_id"), int(game.get("squads") or 0)))
+             1 if game.get("joined") else 0, game.get("controller_id"), int(game.get("squads") or 0),
+             json.dumps(game.get("team_info") or {})))
 
     @staticmethod
     def _game(row: sqlite3.Row) -> dict[str, Any]:
@@ -358,7 +382,8 @@ class Store:
                 "started_at": row["started_at"], "ended_at": row["ended_at"],
                 "node_id": row["node_id"], "channel_hz": row["channel_hz"],
                 "max_hops": row["max_hops"], "joined": bool(row["joined"]),
-                "controller_id": row["controller_id"], "squads": row["squads"]}
+                "controller_id": row["controller_id"], "squads": row["squads"],
+                "team_info": json.loads(row["team_info_json"] or "{}")}
 
     def game(self, game_id: int) -> Optional[dict[str, Any]]:
         row = self._exec("SELECT * FROM games WHERE id = ?", (game_id,)).fetchone()
@@ -380,12 +405,15 @@ class Store:
         return {r["id"] for r in self._exec("SELECT id FROM games").fetchall()}
 
     def update_game(self, game_id: int, **fields: Any) -> None:
-        allowed = {"state", "term", "started_at", "ended_at", "game_key", "assignments", "duration_ms"}
+        allowed = {"state", "term", "started_at", "ended_at", "game_key", "assignments", "duration_ms",
+                   "team_info"}
         unknown = set(fields) - allowed
         if unknown:
             raise ValueError(f"cannot update {unknown}")
         if "assignments" in fields:
             fields["assignments_json"] = json.dumps(fields.pop("assignments"))
+        if "team_info" in fields:
+            fields["team_info_json"] = json.dumps(fields.pop("team_info"))
         sets = ", ".join(f"{k} = ?" for k in fields)
         self._exec(f"UPDATE games SET {sets} WHERE id = ?", (*fields.values(), game_id))
 
@@ -480,6 +508,86 @@ class Store:
         rows = self._exec("SELECT node_id, x, y FROM positions WHERE game_id = ? ORDER BY node_id",
                           (game_id,)).fetchall()
         return {r["node_id"]: {"x": r["x"], "y": r["y"]} for r in rows}
+
+    # --- branding images and team presets (schema 4, decisions BR1-BR24) ------
+
+    def put_image(self, image_id: str, kind: str, content_type: str, width: int, height: int,
+                  data: bytes) -> bool:
+        """Stores a checked image once; False if the same bytes were already stored."""
+        cur = self._exec("INSERT OR IGNORE INTO images (id, kind, content_type, width, height, data, created_at) "
+                         "VALUES (?, ?, ?, ?, ?, ?, ?)", (image_id, kind, content_type, width, height, data,
+                                                         time.time()))
+        return cur.rowcount == 1
+
+    def image(self, image_id: str, with_data: bool = True) -> Optional[dict[str, Any]]:
+        cols = "id, kind, content_type, width, height, created_at, length(data) AS bytes"
+        if with_data:
+            cols += ", data"
+        row = self._exec(f"SELECT {cols} FROM images WHERE id = ?", (image_id,)).fetchone()
+        if row is None:
+            return None
+        out = {k: row[k] for k in ("id", "kind", "content_type", "width", "height", "created_at", "bytes")}
+        if with_data:
+            out["data"] = bytes(row["data"])
+        return out
+
+    def image_ids(self, kind: Optional[str] = None) -> list[dict[str, Any]]:
+        sql = "SELECT id, kind, created_at FROM images"
+        args: tuple = ()
+        if kind is not None:
+            sql += " WHERE kind = ?"
+            args = (kind,)
+        return [{"id": r["id"], "kind": r["kind"], "created_at": r["created_at"]}
+                for r in self._exec(sql + " ORDER BY created_at", args).fetchall()]
+
+    def delete_image(self, image_id: str) -> bool:
+        return self._exec("DELETE FROM images WHERE id = ?", (image_id,)).rowcount == 1
+
+    def team_info_crests(self) -> set[str]:
+        """Every crest a game refers to (ended games included: their results show them)."""
+        out: set[str] = set()
+        for r in self._exec("SELECT team_info_json FROM games WHERE team_info_json IS NOT NULL").fetchall():
+            try:
+                info = json.loads(r["team_info_json"])
+            except ValueError:
+                continue
+            for v in info.values() if isinstance(info, dict) else ():
+                if isinstance(v, dict) and isinstance(v.get("crest_id"), str):
+                    out.add(v["crest_id"])
+        return out
+
+    @staticmethod
+    def _team_preset(row: sqlite3.Row) -> dict[str, Any]:
+        return {"id": row["id"], "name": row["name"], "colour": row["colour"], "crest_id": row["crest_id"],
+                "created_at": row["created_at"], "updated_at": row["updated_at"]}
+
+    def team_presets(self) -> list[dict[str, Any]]:
+        return [self._team_preset(r) for r in self._exec("SELECT * FROM team_presets ORDER BY name").fetchall()]
+
+    def team_preset(self, preset_id: int) -> Optional[dict[str, Any]]:
+        row = self._exec("SELECT * FROM team_presets WHERE id = ?", (preset_id,)).fetchone()
+        return self._team_preset(row) if row else None
+
+    def save_team_preset(self, name: str, colour: Optional[str], crest_id: Optional[str],
+                         preset_id: Optional[int] = None) -> dict[str, Any]:
+        """A new team preset, or (with preset_id) a change to one; a name is unique (ValueError)."""
+        now = time.time()
+        with self._lock:
+            try:
+                if preset_id is None:
+                    cur = self._db.execute("INSERT INTO team_presets (name, colour, crest_id, created_at, "
+                                           "updated_at) VALUES (?, ?, ?, ?, ?)", (name, colour, crest_id, now, now))
+                    preset_id = int(cur.lastrowid)
+                else:
+                    self._db.execute("UPDATE team_presets SET name = ?, colour = ?, crest_id = ?, updated_at = ? "
+                                     "WHERE id = ?", (name, colour, crest_id, now, preset_id))
+            except sqlite3.IntegrityError:
+                raise ValueError(f"a team preset named {name!r} already exists") from None
+            row = self._exec("SELECT * FROM team_presets WHERE id = ?", (preset_id,)).fetchone()
+        return self._team_preset(row)
+
+    def delete_team_preset(self, preset_id: int) -> bool:
+        return self._exec("DELETE FROM team_presets WHERE id = ?", (preset_id,)).rowcount == 1
 
     # --- field check-in (schema 3, ADR-P3-13) --------------------------------
 

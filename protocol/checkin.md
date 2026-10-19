@@ -40,6 +40,10 @@ On the first scan of a `field_id`, the app fetches `GET /api/v1/controller/ca` (
 
 The controller makes the CA on first start (`controller/atalaia_controller/tls.py`): ECDSA P-256 (decision PE2), valid 10 years, and a server certificate for its names and addresses (`[api] tls_names` and the ones it finds), valid one year and made again when it has under 30 days left or the names change. `python -m atalaia_controller ca` prints the fingerprint. HTTPS is served on `[api] tls_port` (8443 by default) next to plain HTTP on `[api] port` (8080).
 
+### The field's branding
+
+The poster carries no branding, and nothing in this protocol changes for it. Once the CA is pinned, the app asks the poster's addresses for `GET /api/v1/field/branding` (no token; the field's id and name, a logo, a wallpaper and an accent colour, with an ETag) and keeps it per `field_id`; a game's teams carry their display names and crests in the game (`team_info`). The endpoints and limits are in [controller/README.md](../controller/README.md#field-and-team-branding) (decisions BR1-BR24).
+
 ## Who the player is
 
 Playing never needs an account. For each field the app makes a **field identity** on its first check-in there: a `player_id` of `p-` and 12 characters of `a-z2-7` (lowercase base32), and a 32-byte random `player_secret`, sent as 43 characters of base64url without padding. The controller keeps the id and the SHA-256 of the secret. The same id comes back on every game day at that field; a known id with another secret is refused (409), so nobody can take over a known id. Two fields cannot link a player's ids. A player checked in by hand has an id made by the controller and no secret, so no app can claim it.

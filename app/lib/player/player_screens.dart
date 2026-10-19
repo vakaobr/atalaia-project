@@ -12,13 +12,21 @@
 /// pinned HTTPS, shows the game's events from before the phone connected,
 /// and lets the player share their position while the game runs (ADR-P3-6:
 /// the controller decides who sees it).
+///
+/// The field's branding (decisions BR1-BR24): its logo and name in the
+/// header, its wallpaper behind the view (dimmed), its accent on the
+/// primary buttons, and each team's crest and display name, downloaded
+/// from the controller and kept per field; the default look without it.
 library;
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
 import '../app.dart';
+import '../branding/branded.dart';
+import '../branding/field_branding.dart';
 import '../checkin/checkin_client.dart';
 import '../checkin/checkin_screen.dart';
 import '../l10n/strings.dart';
@@ -211,6 +219,61 @@ class PlayerScreen extends StatefulWidget {
 class _PlayerScreenState extends State<PlayerScreen> {
   late final FieldFeed feed;
   Timer? _clock;
+  FieldBranding? _brand;
+  TeamBranding _teams = TeamBranding.none;
+  BrandingSource? _source;
+  String? _teamInfoSeen;
+  String? _brandEtagSeen;
+
+  Future<void>? _brandLoading;
+
+  /// The field's branding: as kept (at once), then fresh from the controller
+  /// (one request at a time).
+  Future<void> _loadBranding() => _brandLoading ??= _fetchBranding()
+      .whenComplete(() => _brandLoading = null);
+
+  Future<void> _fetchBranding() async {
+    final services = context.services;
+    final field = widget.link.field;
+    final source = _source ??= services.brandingSource(
+      field?.urls ?? [widget.link.base.toString()],
+      field,
+    );
+    if (field != null && _brand == null) {
+      final kept = await services.branding.cached(field.fieldId);
+      if (mounted && kept != null) setState(() => _brand = kept);
+    }
+    final fresh = await services.branding.refresh(
+      source,
+      fieldId: field?.fieldId,
+    );
+    if (mounted && fresh != null) setState(() => _brand = fresh);
+  }
+
+  /// The game's team names at once, their crests when they arrive; again
+  /// when the game's teams change, and the field's branding when the
+  /// stream says it changed.
+  void _onFeed() {
+    final info = feed.game?['team_info'];
+    final key = jsonEncode(info);
+    if (key != _teamInfoSeen) {
+      _teamInfoSeen = key;
+      setState(() => _teams = TeamBranding.namesOf(info));
+      final services = context.services;
+      unawaited(
+        services.branding.teams(_source, info).then((t) {
+          if (mounted && jsonEncode(feed.game?['team_info']) == key) {
+            setState(() => _teams = t);
+          }
+        }),
+      );
+    }
+    final etag = feed.brandingEtag;
+    if (etag != null && etag != _brandEtagSeen) {
+      _brandEtagSeen = etag;
+      if (_brand?.etag != etag) unawaited(_loadBranding());
+    }
+  }
 
   @override
   void initState() {
@@ -228,6 +291,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
           onAssignment: widget.onAssignment,
         );
     if (widget.feed == null) unawaited(feed.start());
+    unawaited(_loadBranding());
+    feed.addListener(_onFeed);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _onFeed();
+    });
     _clock = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (mounted && feed.gameState == 'running') setState(() {});
     });
@@ -276,6 +344,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void dispose() {
     _clock?.cancel();
+    feed.removeListener(_onFeed);
     if (_reporter?.running ?? false) {
       unawaited(context.services.foreground.stop());
     }
@@ -287,22 +356,31 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   Widget build(BuildContext context) {
     final s = context.s;
-    return Scaffold(
-      appBar: AppBar(title: Text(s.t('role.player'))),
-      body: ListenableBuilder(
-        listenable: Listenable.merge([feed, ?_reporter]),
-        builder: (context, _) => PlayerView(
-          feed: feed,
-          sharing: widget.link.field == null
-              ? null
-              : _SharePosition(
-                  running: _reporter?.running ?? false,
-                  sent: _reporter?.sent ?? 0,
-                  stopped: _reporter?.stopReason,
-                  error: _shareError,
-                  onChanged: _share,
-                  squads: ((feed.game?['squads'] as int?) ?? 0) > 0,
-                ),
+    return BrandedTheme(
+      branding: _brand,
+      child: Scaffold(
+        appBar: AppBar(
+          title: BrandTitle(branding: _brand, fallback: s.t('role.player')),
+        ),
+        body: BrandBackdrop(
+          branding: _brand,
+          child: ListenableBuilder(
+            listenable: Listenable.merge([feed, ?_reporter]),
+            builder: (context, _) => PlayerView(
+              feed: feed,
+              teams: _teams,
+              sharing: widget.link.field == null
+                  ? null
+                  : _SharePosition(
+                      running: _reporter?.running ?? false,
+                      sent: _reporter?.sent ?? 0,
+                      stopped: _reporter?.stopReason,
+                      error: _shareError,
+                      onChanged: _share,
+                      squads: ((feed.game?['squads'] as int?) ?? 0) > 0,
+                    ),
+            ),
+          ),
         ),
       ),
     );
@@ -311,8 +389,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
 /// What a player sees of the game.
 class PlayerView extends StatelessWidget {
-  const PlayerView({required this.feed, this.sharing, super.key});
+  const PlayerView({
+    required this.feed,
+    this.sharing,
+    this.teams = TeamBranding.none,
+    super.key,
+  });
   final FieldFeed feed;
+
+  /// The game's team display names and crests (decision BR14).
+  final TeamBranding teams;
 
   /// The position-sharing switch (a check-in's link only).
   final Widget? sharing;
@@ -323,7 +409,7 @@ class PlayerView extends StatelessWidget {
     final app = context.app;
     final mine = app.settings.myTeam;
     final g = feed.game;
-    final teams = feed.teams;
+    final teamNames = feed.teams;
     final left = feed.remainingMs;
     final t = feed.gameTimeMs;
     final messages = [
@@ -369,17 +455,18 @@ class PlayerView extends StatelessWidget {
               if (left != null) Text(s.t('player.left')),
             ],
           ),
-          if (feed.gameState == 'ended') _Result(feed: feed),
+          if (feed.gameState == 'ended') _Result(feed: feed, teams: teams),
           if (feed.me != null)
             Text(
               s.t('player.me', {
                 'role': s.t('checkin.role.${feed.me!['role']}'),
                 'team': feed.me!['team'] == null
                     ? s.t('player.no_team')
-                    : teamAndSquad(
+                    : _meTeam(
                         s,
+                        teams,
                         '${feed.me!['team']}',
-                        (feed.me!['squad'] as int?) ?? 0,
+                        feed.me!['squad'],
                       ),
               }),
               key: const Key('player-me'),
@@ -399,13 +486,14 @@ class PlayerView extends StatelessWidget {
           for (final (team, points) in feed.ranking)
             _TeamRow(
               team: team,
+              teams: teams,
               points: points,
               mine: team == mine,
               out: feed.eliminated.contains(team),
               lives: feed.lives[team],
               onTap: () => app.update((x) => x.myTeam = team),
             ),
-          if (teams.isNotEmpty && mine == null)
+          if (teamNames.isNotEmpty && mine == null)
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
@@ -418,13 +506,21 @@ class PlayerView extends StatelessWidget {
             for (final n in feed.nodes.values)
               ListTile(
                 dense: true,
-                leading: TeamDot(n['owner'] as String?),
+                leading: teams.crest('${n['owner']}') == null
+                    ? TeamDot(n['owner'] as String?)
+                    : TeamCrest(
+                        team: '${n['owner']}',
+                        crest: teams.crest('${n['owner']}'),
+                        size: 24,
+                      ),
                 title: Text(
                   '${n['name'] ?? s.t('player.node', {'n': n['node_id']})}',
                 ),
                 subtitle: Text(
                   n['owner'] is String
-                      ? s.t('player.held_by', {'team': s.team('${n['owner']}')})
+                      ? s.t('player.held_by', {
+                          'team': teamLabel(s, teams, '${n['owner']}'),
+                        })
                       : s.t('player.held_by_none'),
                 ),
               ),
@@ -434,7 +530,7 @@ class PlayerView extends StatelessWidget {
             for (final e in feed.lives.entries)
               ListTile(
                 dense: true,
-                title: Text(e.key),
+                title: Text(teamLabel(s, teams, e.key)),
                 trailing: Text(
                   '${e.value}',
                   style: const TextStyle(fontSize: 22),
@@ -447,7 +543,7 @@ class PlayerView extends StatelessWidget {
             ListTile(
               dense: true,
               leading: TeamDot(e.team, size: 12),
-              title: Text(eventText(s, e)),
+              title: Text(eventText(s, e, teams)),
               trailing: Text(clockText(e.tMs)),
             ),
         ],
@@ -502,9 +598,17 @@ class _SharePosition extends StatelessWidget {
   }
 }
 
+/// The player's team (and squad) as the game names it.
+String _meTeam(Strings s, TeamBranding teams, String team, Object? squad) {
+  final n = squad is int ? squad : 0;
+  final name = teamLabel(s, teams, team);
+  return n > 0 ? s.t('checkin.team_squad', {'team': name, 'squad': n}) : name;
+}
+
 class _Result extends StatelessWidget {
-  const _Result({required this.feed});
+  const _Result({required this.feed, required this.teams});
   final FieldFeed feed;
+  final TeamBranding teams;
 
   @override
   Widget build(BuildContext context) {
@@ -516,7 +620,7 @@ class _Result extends StatelessWidget {
     } else if (r.length > 1 && r[0].$2 == r[1].$2) {
       text = s.t('player.tie');
     } else {
-      text = s.t('player.winner', {'team': s.team(r.first.$1)});
+      text = s.t('player.winner', {'team': teamLabel(s, teams, r.first.$1)});
     }
     return Notice(text, kind: NoticeKind.ok, key: const Key('player-result'));
   }
@@ -525,6 +629,7 @@ class _Result extends StatelessWidget {
 class _TeamRow extends StatelessWidget {
   const _TeamRow({
     required this.team,
+    required this.teams,
     required this.points,
     required this.mine,
     required this.out,
@@ -533,6 +638,7 @@ class _TeamRow extends StatelessWidget {
   });
 
   final String team;
+  final TeamBranding teams;
   final int points;
   final bool mine;
   final bool out;
@@ -551,9 +657,11 @@ class _TeamRow extends StatelessWidget {
       child: ListTile(
         key: Key('player-team-$team'),
         onTap: onTap,
-        leading: TeamDot(team, size: 28),
+        leading: teams.crest(team) == null
+            ? TeamDot(team, size: 28)
+            : TeamCrest(team: team, crest: teams.crest(team), size: 36),
         title: Text(
-          s.team(team).toUpperCase(),
+          teamLabel(s, teams, team).toUpperCase(),
           style: TextStyle(
             fontWeight: FontWeight.w700,
             decoration: out ? TextDecoration.lineThrough : null,
@@ -578,20 +686,21 @@ class _TeamRow extends StatelessWidget {
 
 /// An event of the game in words (the types of protocol/schema/events.yaml
 /// that players care about; others show their type).
-String eventText(Strings s, FeedEvent e) {
-  final team = e.team == null ? '' : s.team(e.team!);
+String eventText(Strings s, FeedEvent e, [TeamBranding? teams]) {
+  String name(String t) => teamLabel(s, teams, t);
+  final team = e.team == null ? '' : name(e.team!);
   final d = e.data;
   String? str(String k) => d[k] is String ? d[k]! as String : null;
   final key = 'event.${e.type}';
   final args = <String, Object?>{
     'team': team,
     'zone': str('zone') ?? s.t('player.node', {'n': e.node}),
-    'previous': s.team(str('previous_team') ?? ''),
+    'previous': name(str('previous_team') ?? ''),
     'player': str('player') ?? '',
     'owner': str('owner') ?? '',
     'lives': d['lives_left'] ?? '',
     'amount': d['amount'] ?? '',
-    'winner': s.team(str('winner') ?? ''),
+    'winner': name(str('winner') ?? ''),
     'text': str('text') ?? '',
     'fuse': d['fuse_s'] ?? '',
     'reason': str('reason') ?? '',

@@ -10,6 +10,7 @@
     --fg: #1d231f;
     --muted: #5d6a61;
     --card: #ffffff;
+    --veil: rgba(244, 246, 242, 0.84);
     color-scheme: light dark;
 }
 
@@ -19,6 +20,7 @@
         --fg: #eef3ee;
         --muted: #9aa89e;
         --card: #18201b;
+        --veil: rgba(14, 18, 16, 0.82);
     }
 }
 
@@ -105,4 +107,41 @@ h1 {
 
 .result {
     font-weight: 700;
+}
+
+/* The field's branding: its logo and name above the game, its wallpaper behind a veil. */
+
+body.with-wallpaper {
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+}
+
+.field-brand {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1vh;
+    min-width: 0;
+}
+
+.field-logo {
+    height: clamp(2.5rem, 8vh, 6rem);
+    width: auto;
+    max-width: 40vw;
+    object-fit: contain;
+}
+
+.field-name {
+    font-size: clamp(1.1rem, 3vw, 2.5rem);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.crest {
+    width: clamp(3rem, 10vw, 8rem);
+    height: clamp(3rem, 10vw, 8rem);
+    object-fit: contain;
+    justify-self: center;
 }

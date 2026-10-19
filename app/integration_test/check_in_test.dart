@@ -7,7 +7,9 @@
 // from test/support/fake_field.dart, the shapes controller/atalaia_controller
 // sends). The app pins that CA from the poster's fingerprint, checks in,
 // declares a replica, and follows the game over WSS, where the snapshot's
-// history shows what happened before it connected.
+// history shows what happened before it connected. The field's branding
+// (decisions BR1-BR24) comes over the same pinned HTTPS: its logo on the
+// check-in's page and the player's view, a team's crest and name.
 
 import 'dart:convert';
 import 'dart:io';
@@ -19,6 +21,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
+import '../test/support/branding.dart';
 import '../test/support/fake_field.dart';
 import 'support.dart';
 import 'test_certs.dart';
@@ -30,6 +33,12 @@ class DeviceField {
 
   final HttpServer server;
   final FakeField field;
+  final branding = FakeBrandingField(
+    accent: '#ffd400',
+    logo: testLogo(),
+    wallpaper: testWallpaper(),
+  );
+  late final blueCrest = branding.addCrest(testCrest(0xFF1B6EE0));
   final streams = <WebSocket>[];
   final streamTokens = <String>[];
 
@@ -77,6 +86,9 @@ class DeviceField {
             'state': 'running',
             'game_time_ms': 60000,
             'live': true,
+            'team_info': {
+              'blue': {'display_name': 'Águias', 'crest_id': blueCrest},
+            },
           },
           'score': {
             'game': 42,
@@ -104,6 +116,18 @@ class DeviceField {
           'me': {'player_id': 'x', 'role': 'player', 'team': 'red'},
         }),
       );
+      return;
+    }
+    if (path.startsWith('/api/v1/field/branding') ||
+        path.startsWith('/api/v1/crests/')) {
+      final r = await branding.get(
+        path,
+        ifNoneMatch: req.headers.value('if-none-match'),
+      );
+      req.response.statusCode = r.status;
+      if (r.etag != null) req.response.headers.set('ETag', r.etag!);
+      req.response.add(r.bytes);
+      await req.response.close();
       return;
     }
     final auth = req.headers.value('authorization');
@@ -152,6 +176,11 @@ void main() {
     await tapVisible(tester, find.byKey(const Key('checkin-submit')));
     await waitFor(tester, find.text('Check-in feito.'));
     expect(f.field.rows.values.single['display_name'], 'Falcão');
+    // The field's logo and name in the check-in's header, fetched over the
+    // pinned HTTPS right after the check-in.
+    await waitFor(tester, find.byKey(const Key('brand-logo')));
+    expect(find.byKey(const Key('brand-wallpaper')), findsOneWidget);
+    expect(f.branding.requests, contains('/api/v1/field/branding/logo'));
 
     // A replica for this game.
     await tapVisible(tester, find.byKey(const Key('checkin-declare')));
@@ -174,6 +203,11 @@ void main() {
     await reveal(tester, find.text('A equipa vermelha capturou Moinho'));
     expect(find.text('A equipa vermelha capturou Moinho'), findsOneWidget);
     expect(f.streamTokens.single, startsWith('apt1.'));
+    // The player's view: the field's logo, and the blue team's crest and name.
+    expect(find.byKey(const Key('brand-logo')), findsOneWidget);
+    await reveal(tester, find.text('ÁGUIAS'));
+    await waitFor(tester, find.byKey(const Key('crest-blue')));
+    expect(f.branding.requests, contains('/api/v1/crests/${f.blueCrest}'));
   });
 
   testWidgets("a poster whose fingerprint is not the controller's is refused", (

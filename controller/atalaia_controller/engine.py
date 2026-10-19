@@ -24,6 +24,7 @@ import json
 import logging
 import os
 import random
+import re
 import threading
 import time
 from collections import Counter
@@ -56,6 +57,8 @@ log = logging.getLogger("atalaia.controller")
 
 TEAM_NAME_MAX = 23  # ATALAIA_TEAM_NAME_MAX - 1 in the core
 SQUADS_MAX = 16     # squads per team a game may define
+TEAM_DISPLAY_MAX = 32  # characters of a team's display name (decision BR13)
+CREST_ID_RE = re.compile(r"[0-9a-f]{64}")
 GAME_TIME_SAVE_MS = 5_000
 # Commands for one node; the lifecycle (start, pause, resume, end) goes through the game.
 # "mode" is a mode command (RFC 0001 Amendment 5): params name one of the commands the
@@ -249,6 +252,7 @@ class Controller:
         self.checkin: Any = None
         self.positions: Any = None
         self.prop_links: Any = None
+        self.branding: Any = None  # branding.Branding: the field's logo, wallpaper, crests (BR1-BR24)
         self.ca_sha256: Optional[bytes] = None  # the field CA (tls.py): join payload key 13
         self.link_urls: list[str] = []          # its https addresses: join payload key 14
         self._last_scan: Optional[dict[str, Any]] = None
@@ -503,6 +507,17 @@ class Controller:
             squads = _int(spec.get("squads", 0), "squads")
             if not 0 <= squads <= SQUADS_MAX:
                 raise ControllerError(f"squads: 0 (none) to {SQUADS_MAX} per team")
+            # Team branding (decisions BR12-BR15): display names and crests next to the colours,
+            # which stay the team names the boxes and the radio know.
+            raw_info = spec.get("team_info") or {}
+            if not isinstance(raw_info, dict):
+                raise ControllerError("team_info: an object {team: {display_name, crest_id, team_preset_id}}")
+            team_info = {}
+            for team, entry in raw_info.items():
+                if team not in teams:
+                    raise ControllerError(f"team_info: {team!r} is not one of the game's teams {teams}")
+                team_info[team] = self._team_entry(team, entry, {})
+            team_info = {k: v for k, v in team_info.items() if v}
 
             used = self.store.game_ids()
             game_id = random.SystemRandom().choice([g for g in range(1, 0xFFFF) if g not in used][:4096])
@@ -515,12 +530,66 @@ class Controller:
                 "state": "ready", "term": 1, "created_at": time.time(),
                 "node_id": self.cfg.node_id, "channel_hz": self.field_channel,
                 "max_hops": self.cfg.max_hops, "joined": False, "squads": squads,
+                "team_info": team_info,
             }
             self.store.create_game(game, key if self.cfg.persist_game_key else None)
             self._activate(self.store.game(game_id) or game, key, 1)
             out = self.get_game(game_id)
             self._emit({"type": "game", "game": out})
             return out
+
+    # --- team branding (decisions BR12-BR15) --------------------------------------
+
+    def _team_entry(self, team: str, spec: Any, current: dict[str, Any]) -> dict[str, Any]:
+        """A team's display name and crest from a request: a team preset's, then the request's own
+        fields on top (null removes one); the colour is the team's name and never changes here."""
+        if not isinstance(spec, dict):
+            raise ControllerError(f"team_info.{team}: an object with display_name, crest_id or team_preset_id")
+        unknown = set(spec) - {"display_name", "crest_id", "team_preset_id"}
+        if unknown:
+            raise ControllerError(f"team_info.{team}: unknown fields {sorted(unknown)}")
+        out = dict(current)
+        if spec.get("team_preset_id") is not None:
+            preset = self.store.team_preset(_int(spec["team_preset_id"], "team_preset_id"))
+            if preset is None:
+                raise NotFound(f"no team preset {spec['team_preset_id']}")
+            out["display_name"] = preset["name"]
+            out["crest_id"] = preset["crest_id"]
+            out["team_preset_id"] = preset["id"]
+        if "display_name" in spec:
+            out["display_name"] = display_name(spec["display_name"], f"team_info.{team}.display_name")
+        if "crest_id" in spec:
+            crest = spec["crest_id"]
+            if crest is not None and (not isinstance(crest, str) or not CREST_ID_RE.fullmatch(crest)
+                                      or self.store.image(crest, with_data=False) is None):
+                raise ControllerError(f"team_info.{team}.crest_id: an uploaded crest's id (POST /api/v1/crests)")
+            out["crest_id"] = crest
+        if "display_name" in spec or "crest_id" in spec:
+            out.pop("team_preset_id", None)  # changed by hand: no longer the preset's
+        return {k: v for k, v in out.items() if v is not None}
+
+    def set_team_info(self, game_id: int, team: str, spec: Any) -> dict[str, Any]:
+        """PUT /api/v1/games/{id}/teams/{team}: change a team's display name or crest until the game ends."""
+        with self._lock:
+            game = self.store.game(game_id)
+            if game is None:
+                raise NotFound(f"no game {game_id}")
+            if game["state"] == "ended":
+                raise Conflict(f"game {game_id} has ended")
+            if team not in game["teams"]:
+                raise NotFound(f"game {game_id} has no team {team!r}")
+            info = dict(game.get("team_info") or {})
+            entry = self._team_entry(team, spec, info.get(team, {}))
+            if entry:
+                info[team] = entry
+            else:
+                info.pop(team, None)
+            self.store.update_game(game_id, team_info=info)
+            if self.game is not None and self.game["id"] == game_id:
+                self.game["team_info"] = info
+            out = self.get_game(game_id)
+        self._emit({"type": "game", "game": out})
+        return out
 
     # --- the field's radio channel (channels.py, RFC 0001 Amendment 3) ---------
 
@@ -1039,6 +1108,8 @@ class Controller:
     def tick(self) -> None:
         if self.checkin is not None:
             self.checkin.purge()  # retention (ADR-P3-13), at most every 10 minutes
+        if self.branding is not None:
+            self.branding.purge()  # crests nothing refers to any more, at most every 10 minutes
         with self._lock:
             fc = self.fc
             if fc is None:
@@ -1208,6 +1279,21 @@ class Controller:
         data, field.pending_end = field.pending_end, None
         self.end_game(game["id"], str(data.get("reason") or ""), winner=data.get("winner"))
         return True
+
+
+def display_name(value: Any, name: str) -> Optional[str]:
+    """A team's display name: 1-32 characters without control characters, or None to clear it."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ControllerError(f"{name}: text")
+    value = value.strip()
+    if value == "":
+        return None
+    if len(value) > TEAM_DISPLAY_MAX or any(ord(c) < 0x20 or 0x7F <= ord(c) <= 0x9F
+                                             or 0xD800 <= ord(c) <= 0xDFFF for c in value):
+        raise ControllerError(f"{name}: 1-{TEAM_DISPLAY_MAX} characters without control characters")
+    return value
 
 
 def _int(value: Any, name: str) -> int:
