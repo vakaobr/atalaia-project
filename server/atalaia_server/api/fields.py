@@ -7,19 +7,29 @@
     GET    /api/v1/fields/{field_id}/roles                  the field's admin or gm
     PUT    /api/v1/fields/{field_id}/roles                  {username, role}: grant
     DELETE /api/v1/fields/{field_id}/roles/{user_id}/{role} revoke
+    POST   /api/v1/fields/{field_id}/sync-keys              the field's admin: a controller API key, shown once
+    GET    /api/v1/fields/{field_id}/sync-keys              its keys: fingerprint, label, times (never the key)
+    DELETE /api/v1/fields/{field_id}/sync-keys/{key_id}     revoke one
 
 Who may grant or revoke what, on one field: its ``admin`` (and a server
 administrator) any role; its ``gm`` ``player``, ``squad_leader``, ``vip``
 and ``spectator``; nobody else. ``admin``, ``gm`` and ``marshal`` go only to
 accounts with TOTP on (409 ``totp_required``). Every change is in the audit
 log.
+
+A field's controllers authenticate with an API key (ADR-P4-3 as amended,
+P4R13): 32 random bytes, kept only as its SHA-256, shown once when made, at
+most two live at a time so a new one can be installed before the old one is
+revoked (409 ``too_many_keys``). Only the field's ``admin`` (in a TOTP
+session) manages them; making and revoking one is in the audit log.
 """
 
 from __future__ import annotations
 
 import re
 import uuid
-from typing import Any
+from datetime import datetime, timezone
+from typing import Any, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -30,10 +40,11 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import sync
 from ..audit import record
 from ..auth import Principal, current_principal, require_field_role, server_admin
 from ..db import get_session
-from ..models import PRIVILEGED_ROLES, ROLE_BY_ID, ROLE_NAMES, Field, User, UserFieldRole
+from ..models import PRIVILEGED_ROLES, ROLE_BY_ID, ROLE_NAMES, Field, FieldApiKey, User, UserFieldRole
 
 router = APIRouter(prefix="/api/v1", tags=["fields"])
 
@@ -49,6 +60,11 @@ class FieldIn(BaseModel):
     slug: str = PydanticField(max_length=128)
     field_type: str = "outdoor"
     timezone: str = PydanticField(default="Europe/Lisbon", max_length=64)
+
+
+class SyncKeyIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    label: Optional[str] = PydanticField(default=None, max_length=64)
 
 
 class GrantIn(BaseModel):
@@ -167,5 +183,59 @@ async def revoke_role(field_id: uuid.UUID, user_id: uuid.UUID, role: str, reques
         raise HTTPException(404, "role_not_found")
     record(db, "role_revoke", request, user_id=principal.user.id, resource="user", resource_id=user_id,
            details={"field_id": str(field_id), "role": role})
+    await db.commit()
+    return Response(status_code=204)
+
+
+def _key_json(k: FieldApiKey) -> dict[str, Any]:
+    return {"id": str(k.id), "fingerprint": sync.fingerprint(k.key_sha256), "label": k.label,
+            "created_at": k.created_at.isoformat() if k.created_at else None,
+            "last_used_at": k.last_used_at.isoformat() if k.last_used_at else None,
+            "revoked_at": k.revoked_at.isoformat() if k.revoked_at else None}
+
+
+@router.post("/fields/{field_id}/sync-keys", status_code=201)
+async def create_sync_key(field_id: uuid.UUID, request: Request, body: Optional[SyncKeyIn] = None,
+                          principal: Principal = Depends(current_principal),
+                          db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    require_field_role(principal, field_id, "admin")
+    await _field(db, field_id)
+    # Lock the field's row: two requests at once cannot both see one live key and make a third.
+    await db.execute(select(Field.id).where(Field.id == field_id).with_for_update())
+    if await sync.live_keys(db, field_id) >= sync.MAX_LIVE_KEYS:
+        raise HTTPException(409, "too_many_keys")
+    label = body.label.strip() if body and body.label and body.label.strip() else None
+    key = sync.new_key()
+    row = FieldApiKey(field_id=field_id, key_sha256=sync.key_hash(key), label=label, created_by=principal.user.id)
+    db.add(row)
+    await db.flush()
+    record(db, "sync_key_create", request, user_id=principal.user.id, resource="field", resource_id=field_id,
+           details={"key_id": str(row.id), "fingerprint": sync.fingerprint(row.key_sha256)})
+    await db.commit()
+    await db.refresh(row)
+    return JSONResponse({**_key_json(row), "key": key}, status_code=201, headers=NO_STORE)
+
+
+@router.get("/fields/{field_id}/sync-keys")
+async def list_sync_keys(field_id: uuid.UUID, principal: Principal = Depends(current_principal),
+                         db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    require_field_role(principal, field_id, "admin")
+    await _field(db, field_id)
+    rows = await db.scalars(select(FieldApiKey).where(FieldApiKey.field_id == field_id)
+                            .order_by(FieldApiKey.created_at))
+    return JSONResponse([_key_json(k) for k in rows], headers=NO_STORE)
+
+
+@router.delete("/fields/{field_id}/sync-keys/{key_id}", status_code=204)
+async def revoke_sync_key(field_id: uuid.UUID, key_id: uuid.UUID, request: Request,
+                          principal: Principal = Depends(current_principal),
+                          db: AsyncSession = Depends(get_session)) -> Response:
+    require_field_role(principal, field_id, "admin")
+    row = await db.get(FieldApiKey, key_id)
+    if row is None or row.field_id != field_id or row.revoked_at is not None:
+        raise HTTPException(404, "key_not_found")
+    row.revoked_at = datetime.now(timezone.utc)
+    record(db, "sync_key_revoke", request, user_id=principal.user.id, resource="field", resource_id=field_id,
+           details={"key_id": str(row.id), "fingerprint": sync.fingerprint(row.key_sha256)})
     await db.commit()
     return Response(status_code=204)

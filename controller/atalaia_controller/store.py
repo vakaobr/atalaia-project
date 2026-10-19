@@ -27,6 +27,11 @@ Schema 4 adds field and team branding (decisions BR1-BR24): the uploaded
 images (the field's logo and wallpaper and the teams' crests, stored once
 by the SHA-256 of their checked bytes), the saved team presets, and each
 game's team display names and crests (games.team_info_json).
+
+Schema 5 (phase 4, plan phase 13; ADR-P4-3's amendment, decision P4R11) adds
+``sync_state``: per game, the last ``events.id`` the site server acknowledged
+(the sync client's push cursor) and the hashes of the game's metadata, score
+counters and nodes as last sent, so a cycle sends only what changed.
 """
 
 from __future__ import annotations
@@ -39,7 +44,7 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes
 
 SCHEMA = """
@@ -212,6 +217,19 @@ CREATE TABLE IF NOT EXISTS team_presets (
     crest_id    TEXT,                                  -- images.id
     created_at  REAL NOT NULL,
     updated_at  REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sync_state (
+    game_id    INTEGER NOT NULL,
+    game_seed  INTEGER NOT NULL,
+    acked_id   INTEGER NOT NULL DEFAULT 0,             -- the last events.id the site server acknowledged
+    meta_sha   TEXT,                                   -- SHA-256 of what was last sent, per kind
+    scores_sha TEXT,
+    nodes_sha  TEXT,
+    skipped    INTEGER NOT NULL DEFAULT 0,             -- events not sent: not in protocol/sync.md's form
+    final      INTEGER NOT NULL DEFAULT 0,             -- 1: an ended game, everything acknowledged
+    last_ok_at REAL,
+    last_error TEXT,
+    PRIMARY KEY (game_id, game_seed)
 );
 CREATE TABLE IF NOT EXISTS player_positions (
     game_id     INTEGER NOT NULL,
@@ -461,6 +479,20 @@ class Store:
                  "received_at": r["received_at"]}
                 for r in self._exec(sql, tuple(args)).fetchall()]
 
+    def events_after(self, game_id: int, after_id: int, limit: int) -> list[dict[str, Any]]:
+        """The game's events with an ``events.id`` above ``after_id``, in id order (the sync cursor)."""
+        rows = self._exec("SELECT * FROM events WHERE game_id = ? AND id > ? ORDER BY id LIMIT ?",
+                          (game_id, after_id, limit)).fetchall()
+        return [{"id": r["id"], "node": r["node_id"], "seq": r["seq"], "t": r["game_time"], "type": r["type"],
+                 "team": r["team"], "squad": r["squad"], "prio": r["priority"],
+                 "data": json.loads(r["data_json"]), "epoch": r["epoch"], "pkt_seq": r["pkt_seq"]}
+                for r in rows]
+
+    def count_events_after(self, game_id: int, after_id: int) -> int:
+        row = self._exec("SELECT COUNT(*) AS n FROM events WHERE game_id = ? AND id > ?",
+                         (game_id, after_id)).fetchone()
+        return int(row["n"])
+
     def count_events(self, game_id: int, event_type: Optional[str] = None) -> int:
         if event_type is None:
             row = self._exec("SELECT COUNT(*) AS n FROM events WHERE game_id = ?", (game_id,)).fetchone()
@@ -481,6 +513,40 @@ class Store:
     def scores(self, game_id: int) -> dict[str, int]:
         rows = self._exec("SELECT team, score FROM scores WHERE game_id = ?", (game_id,)).fetchall()
         return {r["team"]: r["score"] for r in rows}
+
+    # --- sync state (schema 5, plan phase 13) -------------------------------
+
+    SYNC_FIELDS = ("acked_id", "meta_sha", "scores_sha", "nodes_sha", "skipped", "final", "last_ok_at",
+                   "last_error")
+
+    def sync_state(self, game_id: int, game_seed: int) -> dict[str, Any]:
+        """What the site server has of a game, as far as this controller knows (all empty at first)."""
+        row = self._exec("SELECT * FROM sync_state WHERE game_id = ? AND game_seed = ?",
+                         (game_id, game_seed)).fetchone()
+        if row is None:
+            return {"acked_id": 0, "meta_sha": None, "scores_sha": None, "nodes_sha": None, "skipped": 0,
+                    "final": False, "last_ok_at": None, "last_error": None}
+        out = {k: row[k] for k in self.SYNC_FIELDS}
+        out["final"] = bool(out["final"])
+        return out
+
+    def save_sync_state(self, game_id: int, game_seed: int, **fields: Any) -> None:
+        unknown = set(fields) - set(self.SYNC_FIELDS)
+        if unknown:
+            raise ValueError(f"cannot update {unknown}")
+        if "final" in fields:
+            fields["final"] = 1 if fields["final"] else 0
+        with self._lock:
+            self._exec("INSERT OR IGNORE INTO sync_state (game_id, game_seed) VALUES (?, ?)", (game_id, game_seed))
+            if fields:
+                sets = ", ".join(f"{k} = ?" for k in fields)
+                self._exec(f"UPDATE sync_state SET {sets} WHERE game_id = ? AND game_seed = ?",
+                           (*fields.values(), game_id, game_seed))
+
+    def reset_sync_state(self) -> int:
+        """Forgets what was sent (a new site server): everything is sent again, and dropped there as
+        duplicates where it is already stored. Returns the number of games forgotten."""
+        return self._exec("DELETE FROM sync_state").rowcount
 
     # --- field image and positions (GM console field view) ------------------
 

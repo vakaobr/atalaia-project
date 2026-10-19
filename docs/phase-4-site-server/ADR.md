@@ -1035,6 +1035,16 @@ P4R25, proposed):**
    `protocol/sync.md` with shared vectors (`protocol/vectors/sync.json`)
    read by the controller's client and the site server.
 
+*Built 2026-10-20 (plan phase 13; decisions S13-1 to S13-12, proposed):*
+`POST /api/v1/sync/games`, `events`, `scores` and `nodes` and
+`WS /api/v1/sync/stream` (the key on the upgrade, not in a first message) on
+the site server; the controller's `sync_client.py` over HTTPS with the
+standard library, offline first, its cursor in `sync_state` (store schema 5);
+both check bodies with `controller/atalaia_controller/sync_format.py` against
+`protocol/vectors/sync.json`. A joined controller's "ended" does not end a
+game; a `game.end` event does. The other endpoints of item 6 come with
+their plan phases.
+
 ---
 
 ### ADR-P4-4: Multi-tenant isolation

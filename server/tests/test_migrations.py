@@ -26,7 +26,8 @@ from atalaia_server.models import ROLES, Base
 
 from .base import SERVER, TempDatabase, alembic_config
 
-TABLES = {"fields", "users", "roles", "user_field_roles", "sessions", "audit_log", "refresh_tokens", "consents"}
+TABLES = {"fields", "users", "roles", "user_field_roles", "sessions", "audit_log", "refresh_tokens", "consents",
+          "field_api_keys", "controllers", "games", "game_events", "game_node_scores", "game_nodes", "user_game_roles"}
 
 SCHEMA_SQL = (
     ("columns", "SELECT table_name, column_name, data_type, is_nullable, column_default, character_maximum_length "
@@ -149,6 +150,31 @@ class MigrationTests(unittest.TestCase):
         command.downgrade(self.cfg, "0002_accounts")
         self.assertEqual(self.db.fetch("SELECT count(*) FROM users WHERE gdpr_consent_at IS NOT NULL")[0][0], 1)
         self.db.fetch("DELETE FROM users")
+
+    def test_0004_with_data(self) -> None:
+        """0004_sync: the unique keys of games and events, and back down with the data."""
+        command.upgrade(self.cfg, "0004_sync")
+        field = self.db.fetch("INSERT INTO fields (name, slug) VALUES ('Campo', 'campo') RETURNING id")[0][0]
+        game = self.db.fetch("INSERT INTO games (field_id, game_id, game_seed, name, mode_id, teams, state, "
+                             "controller_created_at) VALUES ($1, 7, 4294967295, 'g', 'm', '[\"red\"]', 'ready', now()) "
+                             "RETURNING id", field)[0][0]
+        with self.assertRaisesRegex(Exception, "uq_games_field_id_game_id_game_seed"):
+            self.db.fetch("INSERT INTO games (field_id, game_id, game_seed, name, mode_id, teams, state, "
+                          "controller_created_at) VALUES ($1, 7, 4294967295, 'g', 'm', '[]', 'ready', now())", field)
+        with self.assertRaisesRegex(Exception, "ck_games_state"):
+            self.db.fetch("INSERT INTO games (field_id, game_id, game_seed, name, mode_id, teams, state, "
+                          "controller_created_at) VALUES ($1, 8, 1, 'g', 'm', '[]', 'archived', now())", field)
+        insert = ("INSERT INTO game_events (game, node_id, seq, game_time_ms, event_type, priority) "
+                  "VALUES ($1, 3, 1, 100, 'zone.captured', 'normal')")
+        self.db.fetch(insert, game)
+        with self.assertRaisesRegex(Exception, "uq_game_events_game_node_id_seq_game_time_ms_event_type"):
+            self.db.fetch(insert, game)
+        with self.assertRaisesRegex(Exception, "ck_game_node_scores_value"):
+            self.db.fetch("INSERT INTO game_node_scores (game, source, team, value) VALUES ($1, 'node-3', 'red', -1)",
+                          game)
+        command.downgrade(self.cfg, "0003_personal_data")
+        self.assertNotIn("games", self.tables())
+        self.db.fetch("DELETE FROM fields")
 
     def test_one_linear_history(self) -> None:
         self.assertEqual(len(self.script.get_heads()), 1)

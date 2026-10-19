@@ -75,3 +75,14 @@ notice_version = 1                # raise it when the privacy notice changes
 notice_pt = ""                    # your own notice files (Markdown); empty: controller/templates/
 notice_en = ""
 retention_days = 30               # names and federation numbers are erased this long after a game
+
+[sync]
+# The site server (phase 4; protocol/sync.md). The controller opens every
+# connection and the game never waits for it: everything is in SQLite first.
+enabled = false
+url = ""                          # https://site.example.org (http:// only to this machine)
+api_key = ""                      # or ATALAIA_SYNC_API_KEY, or: python3 -m atalaia_controller sync-key
+ca_file = ""                      # a CA (PEM) to trust instead of the system's
+interval_game_s = 30.0            # while a game runs
+interval_idle_s = 300.0           # between games; failures double the wait up to this
+timeout_s = 15.0                  # per request

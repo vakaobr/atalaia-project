@@ -7,11 +7,12 @@ Runs on a Raspberry Pi (or any Linux machine) next to the field. It:
 - sends the TIME beacons that keep every box's clock in step and double as its heartbeat,
 - takes part in **controller failover** (the CLAIM election, ADR-P2-8),
 - runs a mode's `field.lua`, the script for logic that spans several boxes,
-- serves the REST and WebSocket API, the GM console and a scoreboard page, and publishes to MQTT.
+- serves the REST and WebSocket API, the GM console and a scoreboard page, and publishes to MQTT,
+- optionally pushes its games to a **site server** (phase 4), offline first: games never wait for the network.
 
 Licence: AGPL-3.0-or-later. Running a modified controller for other people means sharing your changes.
 
-Status: phase 2, plan phases D and E; phase 3, plan phase E (field check-in, player tokens, chrono readings, player positions, Android props on Wi-Fi, HTTPS with the field's own CA). Built and tested in Docker against the modem's real C code, the Field Box's real game and radio code (the host box), a real Mosquitto broker and, for the GM console, headless Chromium; not yet run on a Raspberry Pi with a real modem board and real boxes (that is plan phase F, when the boards arrive).
+Status: phase 2, plan phases D and E; phase 3, plan phase E (field check-in, player tokens, chrono readings, player positions, Android props on Wi-Fi, HTTPS with the field's own CA); phase 4, plan phase 13 (the site server sync, in software: tested against the real site server and PostgreSQL in Docker, not yet over a real 4G link). Built and tested in Docker against the modem's real C code, the Field Box's real game and radio code (the host box), a real Mosquitto broker and, for the GM console, headless Chromium; not yet run on a Raspberry Pi with a real modem board and real boxes (that is plan phase F, when the boards arrive).
 
 ## How it is built
 
@@ -36,6 +37,7 @@ Status: phase 2, plan phases D and E; phase 3, plan phase E (field check-in, pla
 | `atalaia_controller/prop_link.py` | Android props on the field's Wi-Fi ([protocol/prop-link.md](../protocol/prop-link.md)) |
 | `atalaia_controller/modes.py` | Built-in and uploaded mode packages, checked in the core before they are stored |
 | `atalaia_controller/branding.py`, `images.py` | The field's branding (name, logo, wallpaper, accent), team crests and team presets; uploaded images checked and stripped of metadata without an image library |
+| `atalaia_controller/sync_client.py`, `sync_format.py` | The site server sync ([protocol/sync.md](../protocol/sync.md)): the client thread, its cursor in `sync_state`, and the body checks the site server shares |
 | `console/src/` | The GM console and the scoreboard page (static files) |
 
 The join payloads come from the simulator's `atalaia_sim/join.py`, the Python side of [protocol/join.md](../protocol/join.md).
@@ -62,6 +64,18 @@ Flash the modem board with the modem firmware first (`python tools/docker_fw.py 
 Without a modem (`[modem] port = ""`) the controller still runs: games can be created and the API works, but nothing reaches the boxes.
 
 Settings come from a TOML file and `ATALAIA_<SECTION>_<KEY>` environment variables; see [controller.example.toml](controller.example.toml).
+
+## Site server sync
+
+Off by default. With `[sync] enabled = true`, a `url` and the field's API key (made by the field's admin on the site server, `POST /api/v1/fields/{field}/sync-keys`, shown once), the controller pushes every game to the site server: its metadata, its event log in id order, its score counters per source and its nodes ([protocol/sync.md](../protocol/sync.md), ADR-P4-3 as amended). It opens every connection (a field behind a phone's 4G link cannot be reached); the site server holds none of its tokens.
+
+```sh
+python3 -m atalaia_controller sync-key --config ../controller.toml           # paste the key (stored in the store, mode 0600)
+python3 -m atalaia_controller sync-key --status --config ../controller.toml  # where the key comes from, its fingerprint
+python3 -m atalaia_controller sync-key --resend --config ../controller.toml  # a new site server: send everything again
+```
+
+`[sync] api_key` or `ATALAIA_SYNC_API_KEY` win over the stored key. The site server's certificate is checked against the system's CAs, or `[sync] ca_file`; `http://` only to this machine. **Offline first:** the client is a thread that reads the store; the game runs the same with or without the network. It syncs every 30 s while a game runs and every 5 min between games, doubling the wait after a failure (up to 5 min) and following `Retry-After`; a game's start, pause or end wakes it. Each game's cursor (the last event id the site server acknowledged) is kept in `sync_state` (store schema 5), so a restart resumes where it was, and a batch sent twice is harmless (the site server drops duplicates by the events' own key). Never sent: positions, check-in names and federation numbers, tokens and keys. `GET /api/v1/controller` shows `sync`: the last success, the last error, failures and the events still to send.
 
 ## The field's radio channel
 
@@ -212,5 +226,7 @@ Who may publish commands is Mosquitto's job: [`deploy/mosquitto.conf`](deploy/mo
 `test_branding.py` checks the image rules against real PNG, JPEG and WebP files (`tests/fixtures/branding/`, made once with Pillow by `make.py` there) and hand-made broken ones (wrong type, SVG, GIF, oversize, too small or too large, too long, animated, bad checksums, truncated, a decompression bomb, trailing data), the metadata stripping, and the endpoints through the whole controller: reading without a token, changing only with the GM token, ETags and 304s, the name shared with the poster, persistence across a restart, the stream, crests per game, team presets, the clean-up and the rate limit.
 
 The phase 3 tests (`test_checkin.py`, `test_chrono_list.py`, `test_checkin_poster.py`, `test_positions.py`, `test_prop_link.py`, `test_tls.py`) run the whole controller from `main.build()` without a radio: the poster codec against `protocol/vectors/checkin.json`, check-in and its rules, player tokens and the role re-check, the role-filtered stream, the "replicas to chrono" list with readings signed in the test and the shared chrono vectors, the retention purge, the privacy rules (no names in events, MQTT, logs or read views), the visibility table, an Android prop's Wi-Fi link, and a real TLS connection that trusts only the field CA.
+
+`test_sync_client.py` runs the sync client against a small site server in the test process: the cursor and batches, a replay after a restart and after a lost answer, a game the site server lost, an event out of form skipped instead of blocking, a refused body that does not hold up the rest, the backoff and `Retry-After`, the game going on with nothing listening, the thread woken by a game's start and end, redirects refused (the key never goes elsewhere), TLS trusting only the configured CA, the settings and `sync-key`, and a whole game with check-ins, positions and tokens with nothing private in any body, checked field by field. `test_sync_format.py` checks the shared body checker against `protocol/vectors/sync.json` and the score merge against the simulator's `FieldController`. The end-to-end test against the real site server and PostgreSQL is the site server's `tests/test_sync_e2e.py` (`python3 tools/docker_server.py test tests.test_sync_e2e`).
 
 The console's browser tests (headless Chromium, `controller/console/tests/`) need a browser, so they run separately: `python tools/docker_console.py`, and CI's `console` job.

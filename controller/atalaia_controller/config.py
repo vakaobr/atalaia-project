@@ -65,6 +65,17 @@
     [join]
     key = ""                    # the field join key, 64 hex digits (protocol/join.md);
                                 # empty: generated on first start (see `join-key`)
+
+    [sync]                      # the site server (ADR-P4-3, protocol/sync.md); the controller
+                                # opens every connection and the game never waits for it
+    enabled = false
+    url = ""                    # https://site.example.org (http:// only to this machine)
+    api_key = ""                # the field's API key (43 characters); or ATALAIA_SYNC_API_KEY,
+                                # or stored with `python3 -m atalaia_controller sync-key`
+    ca_file = ""                # a CA certificate (PEM) to trust instead of the system's
+    interval_game_s = 30.0      # between syncs while a game runs
+    interval_idle_s = 300.0     # between games; failures double the wait, up to interval_idle_s
+    timeout_s = 15.0            # per request
 """
 
 from __future__ import annotations
@@ -87,6 +98,7 @@ SECTIONS = {
     "api": ("host", "port", "gm_token", "read_token", "tls_port", "tls_dir", "tls_names"),
     "mqtt": ("enabled", "host", "port", "username", "password"),
     "join": ("key",),
+    "sync": ("enabled", "url", "api_key", "ca_file", "interval_game_s", "interval_idle_s", "timeout_s"),
     "checkin": ("field_id", "field_name", "operator", "confirm", "federation", "federation_label",
                 "max_replicas", "max_players", "chrono_valid_for", "rate_per_minute", "urls",
                 "wifi_ssid", "limit_template", "notice_version", "notice_pt", "notice_en",
@@ -153,6 +165,14 @@ class Config:
     notice_pt: str = ""
     notice_en: str = ""
     retention_days: int = 30
+    # [sync]
+    sync_enabled: bool = False
+    sync_url: str = ""
+    sync_api_key: str = ""
+    sync_ca_file: str = ""
+    sync_interval_game_s: float = 30.0
+    sync_interval_idle_s: float = 300.0
+    sync_timeout_s: float = 15.0
 
     def validate(self) -> None:
         if not 0 <= self.node_id <= 0xFFFE:
@@ -177,6 +197,7 @@ class Config:
         if not 0 <= self.tls_port <= 65535 or (self.tls_port and self.tls_port == self.api_port):
             raise ConfigError("api.tls_port must be 0 (off) or a port other than api.port")
         _check_checkin(self)
+        _check_sync(self)
         if self.join_key:
             try:
                 ok = len(bytes.fromhex(self.join_key)) == 32
@@ -219,12 +240,31 @@ def _check_checkin(cfg: "Config") -> None:
         raise ConfigError("checkin.retention_days must be 1-3653")
 
 
+def _check_sync(cfg: "Config") -> None:
+    from .sync_client import api_key_ok, url_problem  # noqa: PLC0415
+
+    if cfg.sync_url:
+        problem = url_problem(cfg.sync_url)
+        if problem:
+            raise ConfigError(f"sync.url: {problem}")
+    elif cfg.sync_enabled:
+        raise ConfigError("sync.enabled needs sync.url (the site server's https:// address)")
+    if cfg.sync_api_key and not api_key_ok(cfg.sync_api_key):
+        raise ConfigError("sync.api_key: the field's API key from the site server (43 characters of A-Z a-z 0-9 - _)")
+    if not 1.0 <= cfg.sync_interval_game_s <= cfg.sync_interval_idle_s <= 86400.0:
+        raise ConfigError("sync.interval_game_s and sync.interval_idle_s: 1 to 86400 seconds, the first not above "
+                          "the second")
+    if not 1.0 <= cfg.sync_timeout_s <= 300.0:
+        raise ConfigError("sync.timeout_s must be 1-300 seconds")
+
+
 # (section, key) -> Config attribute
 _ATTR = {("api", "port"): "api_port", ("mqtt", "enabled"): "mqtt_enabled",
          ("mqtt", "host"): "mqtt_host", ("mqtt", "port"): "mqtt_port",
          ("mqtt", "username"): "mqtt_username", ("mqtt", "password"): "mqtt_password",
          ("join", "key"): "join_key", ("checkin", "confirm"): "checkin_confirm",
          ("checkin", "urls"): "checkin_urls"}
+_ATTR.update({("sync", k): f"sync_{k}" for k in SECTIONS["sync"]})
 
 
 def _attr(section: str, key: str) -> str:

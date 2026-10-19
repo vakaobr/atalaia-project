@@ -60,8 +60,10 @@ RUN pip install --no-cache-dir --require-hashes --no-deps --only-binary=:all: --
       -r /tmp/requirements-test.txt \
  && pip check \
  && rm /tmp/requirements-test.txt
-# The built-in modes, for the core load check in tests/test_shared_imports.py.
+# The built-in modes, for the core load check in tests/test_shared_imports.py and the
+# controller's engine in tests/test_sync_e2e.py; the shared sync vectors for tests/test_sync.py.
 COPY modes /app/modes
+COPY protocol/vectors/sync.json /app/protocol/vectors/sync.json
 COPY server/tests /app/server/tests
 ENV ATALAIA_REQUIRE_ALL=1
 USER atalaia

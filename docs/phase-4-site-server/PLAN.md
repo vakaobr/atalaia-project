@@ -1037,6 +1037,27 @@ python3 tools/docker_server.py test && python3 tools/docker_server.py migrations
 docker run --rm -v "$PWD:/src" atalaia-dev sh -c "BUILD=/tmp/c sh tools/check.sh"
 ```
 
+**Built 2026-10-20** (in software; decisions S13-1 to S13-12). Differences
+from the text above, as built: the shared batch check is
+`controller/atalaia_controller/sync_format.py` (plain Python; its vector tests
+run in tools/check.sh) and the site server's side is `atalaia_server/sync.py`
+with `api/sync.py`; `nodes` is `game_nodes`, child tables point at a game with
+a `game` column, and the score counters' key is `(game, source, team)` with
+sources `node-<id>` and `field-<run>@<controller node id>` (a controller's
+field-script runs, S13-3); `user_game_roles` came here (S11-6) with
+`/api/v1/games/{game}/roles` and a small games API (`api/games.py`); API keys
+are managed by the field's admin at `/api/v1/fields/{field}/sync-keys`
+(S13-7); a standby's "ended" does not end a game, a `game.end` event does
+(S13-5); the WebSocket is built on the site server, authenticated on the
+upgrade, but the controller's client uses HTTP only until plan phase 19
+(S13-8); the client is standard-library urllib (no new controller
+dependency); `sync_state` also keeps hashes of what was last sent, so a
+cycle sends only what changed; `python3 -m atalaia_controller sync-key`
+also has `--status`, `--clear` and `--resend`; game history is purged 24
+months after a game ended (S13-10). The end-to-end test runs the real
+controller engine and client against the site server under uvicorn in the
+test image on the test PostgreSQL.
+
 ---
 
 ## Plan phase 14: Chrono registry

@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Implementation (plan phases 1, 2, 3, 10, 11 and 12 built in software, 2026-10-20)
+**Current phase:** Implementation (plan phases 1, 2, 3, 10, 11, 12 and 13 built in software, 2026-10-20; sync over 4G: HW1)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-20 (plan phase 3, full clean-copy check)
-**Next step:** plan phase 4 (Hacking Terminal) on the modes chain; plan phase 13 (controller sync) on the site server chain
+**Last verified:** 2026-10-20 (plan phase 13, full clean-copy check)
+**Next step:** plan phase 4 (Hacking Terminal) on the modes chain; plan phase 14 (chrono registry) on the site server chain
 
 ## Completed
 
@@ -219,6 +219,45 @@ run in tools/check.sh. Not yet: the tables of later plan phases (games,
 chrono, registrations), each added to `personal_data.py` with its plan
 phase; a flow asking existing accounts to consent to a changed notice; the
 legal review of the templates. Decisions S12-1 to S12-8, all open.
+
+## Plan phase 13: controller sync (built 2026-10-20, in software)
+
+What exists: the site server's `POST /api/v1/sync/games`, `events`, `scores`
+and `nodes` and `WS /api/v1/sync/stream`, with a field API key (SHA-256 only,
+two live during a rotation, made and revoked by the field's admin at
+`/api/v1/fields/{field}/sync-keys`); games identified by `(field, game_id,
+game_seed)`, events unique on the controller's own key (replays, duplicates,
+out-of-order batches and a standby's copy change nothing), score counters per
+source merged by `GREATEST` with totals derived from them and every
+`score.delta` (a negative GM adjustment lowers them); per-game roles
+(`user_game_roles`) and a small games API; migration `0004_sync`; per-game
+roles in access, export and erasure, games purged after 24 months. On the
+controller: `sync_client.py` (offline first: a thread that only reads the
+store; 30 s in a game, 5 min between, doubling on failure up to 5 min,
+`Retry-After`; the cursor per game in `sync_state`, store schema 5), `[sync]`
+settings (off by default), `sync-key` (store, `--status`, `--clear`,
+`--resend`), `sync` in `GET /api/v1/controller`. One format, one checker:
+`protocol/sync.md`, `controller/atalaia_controller/sync_format.py` and the
+shared vectors `protocol/vectors/sync.json`. No new dependency on either
+side (the client is the standard library's urllib).
+
+Tests: 187 in the site server's image against PostgreSQL 16 (36 new: API
+keys and rotation, batches replayed, duplicated, out of order and from a
+standby, the merge vectors and a negative adjustment, game identity, the
+shared vectors through the endpoints, the stream, per-game roles, the games
+API, 0004 with data, and `test_sync_e2e.py`: the real controller engine and
+client against the site server under uvicorn in the same container, on the
+test PostgreSQL, including a replay of everything and an offline
+controller catching up); 258 controller tests in tools/check.sh (30 new:
+the client against a small in-process site server, privacy checked field by
+field over a game with check-ins, positions and tokens, TLS with a pinned
+CA, redirects refused, backoff; the shared checker against the vectors).
+Not yet: over a real 4G link with a VPS (HW1); the controller's stream
+client and the remote GM (plan phase 19); the other sync endpoints with
+their plan phases (chrono 14, check-ins and roster 16, field and branding
+18, presets 20); the history views (20). Decisions S13-1 to S13-12, all
+open; S13-8 (no controller stream client yet) and S13-12 (the request limit
+shared with sync) want the maintainer's eye.
 
 ## Dependencies
 

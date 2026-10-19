@@ -12,7 +12,7 @@ Both encodings come from the schema files in [`schema/`](schema/), so they canno
 | [`schema/messages.yaml`](schema/messages.yaml) | Packet header and message types (draft) |
 | [`schema/events.yaml`](schema/events.yaml) | Standard events: ids, priorities, CBOR keys and data fields (draft) |
 | [`vectors/events.yaml`](vectors/events.yaml) | Test vectors every event codec must pass |
-| [`vectors/*.json`](vectors/) | Test vectors for header and message payload codecs, the join payload (`join.json`), player tags (`tag.json`), chrono records (`chrono_record.json`) and player tokens (`player_token.json`) |
+| [`vectors/*.json`](vectors/) | Test vectors for header and message payload codecs, the join payload (`join.json`), player tags (`tag.json`), chrono records (`chrono_record.json`), player tokens (`player_token.json`) and the controller sync's bodies (`sync.json`) |
 | [`vectors/capability_proxy.yaml`](vectors/capability_proxy.yaml) | Test vectors for the capability proxy (I/O pod) frames and payloads |
 | [`vectors/geo.json`](vectors/geo.json) | Known answers (each with its source and tolerance), edge cases, argument errors and exact result bits for `geo.distance` and `geo.in_zone` (ADR-P4-9) |
 | [`join.md`](join.md) | The join payload that brings a box or a standby controller into a game (NFC card, QR code, serial console) |
@@ -21,6 +21,7 @@ Both encodings come from the schema files in [`schema/`](schema/), so they canno
 | [`player-token.md`](player-token.md) | Player tokens: who a phone calling the controller's API is (player, team, squad, role, game), signed by the controller |
 | [`checkin.md`](checkin.md) | Field check-in: the printed poster's `atalaia:checkin:` text, trusting the field's CA, the check-in endpoints, per-game replica declarations and the "replicas to chrono" list; vectors in `vectors/checkin.json` |
 | [`prop-link.md`](prop-link.md) | An Android prop's link to the controller over Wi-Fi: the HMAC proof of the game key, HELLO, STATE and events up, TIME and commands down; with an I/O pod, the field's radio as well, and which one is used when |
+| [`sync.md`](sync.md) | The controller sync: how a field controller pushes its games, event logs, score counters and nodes to a site server, the merge rules, the API key; vectors in `vectors/sync.json` |
 | [`usb-modem.md`](usb-modem.md) | The serial link between the field controller and its USB radio modem |
 | [`capability-proxy.md`](capability-proxy.md) | The link between an I/O pod and a phone (USB-OTG and BLE), version 1 |
 | [`json/event.schema.json`](json/event.schema.json) | JSON Schema of an event in the game log and the API (generated) |

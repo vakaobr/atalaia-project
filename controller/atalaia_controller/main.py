@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Entry point: python -m atalaia_controller [run|tokens|join-key] [--config controller.toml].
+"""Entry point: python -m atalaia_controller [run|tokens|join-key|ca|sync-key] [--config controller.toml].
 
     run       start the controller: radio modem, MQTT bridge, REST/WebSocket API, GM console
               (HTTP on [api] port, HTTPS with the field CA on [api] tls_port)
@@ -8,6 +8,9 @@
     join-key  print the field join key that authenticates join cards (protocol/join.md):
               set it on every box of the field and on a standby controller
     ca        print the field CA's fingerprint (it is on the check-in poster) and its folder
+    sync-key  store the field's site server API key, read from standard input (ADR-P4-3);
+              --status shows where the key comes from and its fingerprint, --clear forgets
+              the stored one, --resend sends every game to the site server again
 """
 
 from __future__ import annotations
@@ -34,6 +37,7 @@ from .positions import Positions
 from .prop_link import PropLinks
 from .radio_modem import RadioModem
 from .store import Store
+from .sync_client import KEY_SETTING, SyncClient, api_key_ok, key_fingerprint, resolve_api_key
 from .ws import Hub
 
 log = logging.getLogger("atalaia")
@@ -113,6 +117,7 @@ class Bundle:
     hub: Hub
     app: Any
     tls: Optional[tlsmod.FieldTls] = None
+    sync: Optional[SyncClient] = None
 
 
 def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = True,
@@ -137,6 +142,11 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
     PropLinks(controller)
     mqtt = maybe_bridge(cfg, controller)
     hub = Hub()
+    sync = None
+    if cfg.sync_enabled:
+        sync = SyncClient(cfg, store)
+        controller.sync = sync
+        controller.add_listener(sync.on_controller_message)
 
     def on_start() -> None:
         if modem is not None:
@@ -144,8 +154,12 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
         if mqtt is not None:
             mqtt.start()
         controller.start()
+        if sync is not None:
+            sync.start()
 
     def on_stop() -> None:
+        if sync is not None:
+            sync.stop()
         controller.stop()
         if mqtt is not None:
             mqtt.stop()
@@ -154,7 +168,7 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
 
     app = create_app(controller, hub, Auth(gm, read), on_start=on_start, on_stop=on_stop,
                      ca_pem=tls.ca_pem if tls else None)
-    return Bundle(cfg, store, controller, modem, mqtt, hub, app, tls)
+    return Bundle(cfg, store, controller, modem, mqtt, hub, app, tls, sync)
 
 
 def serve(bundle: Bundle, log_level: str = "info") -> None:
@@ -176,10 +190,52 @@ def serve(bundle: Bundle, log_level: str = "info") -> None:
     asyncio.run(run_all())
 
 
+def sync_key(cfg: Config, store: Store, action: str, stdin: Any = sys.stdin) -> int:
+    """The sync-key command: store, show, clear the API key, or send everything again."""
+    if action == "status":
+        key, source = resolve_api_key(cfg, store)
+        state = "on" if cfg.sync_enabled else "off ([sync] enabled = false)"
+        if key is None:
+            print(f"sync: {state}\nAPI key: none")
+        else:
+            where = "settings ([sync] api_key or ATALAIA_SYNC_API_KEY)" if source == "config" else "the store"
+            print(f"sync: {state}\nsite server: {cfg.sync_url or '(no [sync] url)'}\n"
+                  f"API key: from {where}, fingerprint {key_fingerprint(key)}")
+        return 0
+    if action == "clear":
+        store.set_setting(KEY_SETTING, "")
+        print("the stored API key is gone" + (" ([sync] api_key is still set)" if cfg.sync_api_key else ""))
+        return 0
+    if action == "resend":
+        n = store.reset_sync_state()
+        print(f"every game is sent again at the next sync ({n} were sent before); the site server "
+              "drops what it already has")
+        return 0
+    if stdin.isatty():
+        import getpass  # noqa: PLC0415
+
+        key = getpass.getpass("the field's API key from the site server: ").strip()
+    else:
+        key = stdin.readline().strip()
+    if not api_key_ok(key):
+        print("atalaia_controller: that is not a site server API key (43 characters of A-Z a-z 0-9 - _)",
+              file=sys.stderr)
+        return 2
+    store.set_setting(KEY_SETTING, key)
+    print(f"stored the API key {key_fingerprint(key)}" +
+          (" ([sync] api_key is set and wins over it)" if cfg.sync_api_key else ""))
+    return 0
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m atalaia_controller", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("command", nargs="?", default="run", choices=("run", "tokens", "join-key", "ca"))
+    parser.add_argument("command", nargs="?", default="run",
+                        choices=("run", "tokens", "join-key", "ca", "sync-key"))
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--status", action="store_true", help="sync-key: where the API key comes from")
+    group.add_argument("--clear", action="store_true", help="sync-key: forget the stored API key")
+    group.add_argument("--resend", action="store_true", help="sync-key: send every game again")
     parser.add_argument("--config", help="TOML settings file (see controller/controller.example.toml)")
     parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args(argv)
@@ -194,6 +250,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         gm, read = ensure_tokens(cfg, store)
         print(f"GM token:   {gm}\nread token: {read}")
         return 0
+    if args.command == "sync-key":
+        action = "status" if args.status else "clear" if args.clear else "resend" if args.resend else "set"
+        return sync_key(cfg, Store(cfg.db_path), action)
     if args.command == "join-key":
         print(ensure_join_key(cfg, Store(cfg.db_path)).hex())
         return 0

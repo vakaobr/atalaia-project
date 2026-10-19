@@ -8,6 +8,7 @@
 !simulator/atalaia_sim/
 !controller/atalaia_controller/
 !modes/
+!protocol/vectors/sync.json
 !server/requirements.txt
 !server/requirements-test.txt
 !server/atalaia_server/

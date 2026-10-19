@@ -17,6 +17,17 @@ What holds personal data now (plan phases 10-12):
 | ``sessions`` (+ ``refresh_tokens``) | address, user agent, times | deleted | 30 days after expiry or revocation |
 | ``consents`` | every record | deleted | (with the account) |
 | ``audit_log`` | the person's own entries, and entries about them (without who made them) | kept for the log's integrity, without addresses; the account it names is anonymised | after 36 months |
+| ``user_game_roles`` (plan phase 13) | the person's roles per game, with the game (``games.json`` in the export) | deleted | with the game |
+| ``games`` with ``game_events``, ``game_node_scores``, ``game_nodes`` (plan phase 13) | (not linked to an account: see below) | (nothing to unlink) | 24 months after the game ended (or was made, if it never ended) |
+
+The synced games (plan phase 13) come from field controllers and hold no
+account: their events carry only the field's pseudonymous player ids
+(``player``: ``p-`` and 12 base32 characters, ADR-P4-8's amendment), never a
+name, a federation number or a position (P4R25). Nothing links them to an
+account until accounts adopt their player ids (plan phase 16), which then
+adds them to access, export and erasure; until then the person's games are
+the ones they hold a per-game role on (decision S13-10). The whole game goes
+when its history retention ends.
 
 Erasure is anonymisation, not deletion (ADR-P4-8): the ``users`` row stays
 under a random ``deleted-`` name with no email, no password and no consent,
@@ -37,11 +48,11 @@ import zipfile
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Optional
 
-from sqlalchemy import delete, or_, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .audit import record
-from .models import ROLE_BY_ID, AuditLog, Consent, Field, User, UserFieldRole, UserSession
+from .models import ROLE_BY_ID, AuditLog, Consent, Field, Game, User, UserFieldRole, UserGameRole, UserSession
 
 log = logging.getLogger("atalaia.server.purge")
 
@@ -51,10 +62,11 @@ PURPOSES = (ACCOUNT,)  # chrono_sharing joins with the chrono registry (plan pha
 ERASED_PREFIX = "deleted-"
 ERASED_PASSWORD = "DELETED"  # not an Argon2 hash: passwords.verify_password never accepts it
 
-# Retention (ADR-P4-8's table; decision S12-6). Chrono records, game history and guest data
-# come with their tables (plan phases 13-16), with fields.default_retention_days.
+# Retention (ADR-P4-8's table; decisions S12-6, S13-10). Chrono records and guest data come with
+# their tables (plan phases 14-16); game history is 24 months, fixed until fields get a setting.
 SESSION_RETENTION = timedelta(days=30)   # after a session expired or was revoked
 AUDIT_RETENTION = timedelta(days=1095)   # 36 months
+GAME_RETENTION = timedelta(days=730)     # 24 months: game history, after the game ended
 
 
 def _iso(value: Optional[datetime]) -> Optional[str]:
@@ -88,6 +100,10 @@ async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.U
         AuditLog.resource == "user", AuditLog.resource_id == user.id,
         or_(AuditLog.user_id.is_(None), AuditLog.user_id != user.id)).order_by(AuditLog.id))
     consents = await db.scalars(select(Consent).where(Consent.user_id == user.id).order_by(Consent.given_at))
+    game_roles = await db.execute(
+        select(UserGameRole.role_id, UserGameRole.granted_at, Game, Field.name)
+        .join(Game, Game.id == UserGameRole.game).join(Field, Field.id == Game.field_id)
+        .where(UserGameRole.user_id == user.id).order_by(Game.controller_created_at, UserGameRole.role_id))
     return {
         "format": FORMAT,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -111,6 +127,10 @@ async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.U
                                  "created_at": _iso(a.created_at)} for a in about],
         "consents": [{"purpose": c.purpose, "notice_version": c.notice_version, "given_at": _iso(c.given_at),
                       "withdrawn_at": _iso(c.withdrawn_at)} for c in consents],
+        "games": [{"game": str(g.id), "field": field_name, "name": g.name, "mode_id": g.mode_id,
+                   "state": g.state, "started_at": _iso(g.started_at), "ended_at": _iso(g.ended_at),
+                   "role": ROLE_BY_ID[role_id], "granted_at": _iso(granted_at)}
+                  for role_id, granted_at, g, field_name in game_roles],
     }
 
 
@@ -141,9 +161,14 @@ audit_log_about_you.json
 consents.json       Your consents: purpose, the privacy notice's version, when given
                     and when withdrawn.
                     Os seus consentimentos.
+games.json          The games you hold a role on (gm, marshal, player...): the game,
+                    its field, when it ran, your role.
+                    Os jogos em que tem um papel.
 
-Game history and chrono records are not on this server yet; when they are,
-they will be in this export too. Positions never reach the site server.
+Chrono records are not on this server yet; when they are, they will be in
+this export too. Game events name players only by the field's pseudonymous
+player ids, which are not linked to accounts yet. Positions never reach the
+site server.
 """
 
 
@@ -152,7 +177,7 @@ def export_zip(data: dict[str, Any]) -> bytes:
     files = {
         "profile.json": data["user"], "field_roles.json": data["field_roles"], "sessions.json": data["sessions"],
         "audit_log.json": data["audit_log"], "audit_log_about_you.json": data["audit_log_about_you"],
-        "consents.json": data["consents"],
+        "consents.json": data["consents"], "games.json": data["games"],
     }
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as zf:
@@ -174,6 +199,7 @@ async def erase(db: AsyncSession, user_id: uuid.UUID, reason: str = "user_reques
     await db.execute(delete(UserFieldRole).where(UserFieldRole.user_id == user_id))
     await db.execute(delete(UserSession).where(UserSession.user_id == user_id))  # refresh tokens cascade
     await db.execute(delete(Consent).where(Consent.user_id == user_id))
+    await db.execute(delete(UserGameRole).where(UserGameRole.user_id == user_id))
     # The log keeps what happened, not where from: the person's addresses go.
     await db.execute(update(AuditLog).where(AuditLog.user_id == user_id, AuditLog.ip_address.is_not(None))
                      .values(ip_address=None))
@@ -189,7 +215,10 @@ async def purge(db: AsyncSession, now: Optional[datetime] = None, dry_run: bool 
     sessions = await db.execute(delete(UserSession).where(
         or_(UserSession.expires_at < cutoff, UserSession.revoked_at < cutoff)))
     audit = await db.execute(delete(AuditLog).where(AuditLog.created_at < now - AUDIT_RETENTION))
-    counts = {"sessions": sessions.rowcount or 0, "audit_log": audit.rowcount or 0}
+    # A game with its events, counters, nodes and per-game roles (they cascade).
+    games = await db.execute(delete(Game).where(
+        func.coalesce(Game.ended_at, Game.controller_created_at) < now - GAME_RETENTION))
+    counts = {"sessions": sessions.rowcount or 0, "audit_log": audit.rowcount or 0, "games": games.rowcount or 0}
     if dry_run:
         await db.rollback()
         return counts

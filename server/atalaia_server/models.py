@@ -1,12 +1,15 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""ORM models (ADR-P4-1; migrations 0001_base, 0002_accounts and 0003_personal_data).
+"""ORM models (ADR-P4-1; migrations 0001_base, 0002_accounts, 0003_personal_data and 0004_sync).
 
 Fields, users, roles, per-field roles, sessions and the audit log, as
 ADR-P4-1 defines them, with plan phase 11's additions for accounts: the
 server administrator flag and the last TOTP step on ``users``, the second
 factor on ``sessions``, and ``refresh_tokens`` (only hashes); plan phase 12's
-``consents`` (ADR-P4-8). A table that holds personal data must also be added to
+``consents`` (ADR-P4-8); plan phase 13's controller sync (ADR-P4-3 as amended):
+``field_api_keys``, ``controllers``, ``games``, ``game_events``,
+``game_node_scores``, ``game_nodes`` and the per-game roles,
+``user_game_roles``. A table that holds personal data must also be added to
 ``personal_data.py`` (access, export, erasure, the purge) in the same plan
 phase. Every later plan phase adds its own tables here and in
 its own Alembic migration; ``tests.test_migrations`` checks that the
@@ -22,7 +25,7 @@ from datetime import datetime
 from typing import Any, Optional
 
 from sqlalchemy import (BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, LargeBinary, MetaData,
-                        SmallInteger, String, UniqueConstraint, func, text)
+                        PrimaryKeyConstraint, SmallInteger, String, UniqueConstraint, func, text)
 from sqlalchemy.dialects.postgresql import INET, JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -202,3 +205,144 @@ class Consent(Base):
     notice_version: Mapped[str] = mapped_column(String(64), nullable=False)
     given_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     withdrawn_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+# --- the controller sync (plan phase 13, migration 0004_sync) -----------------------------
+
+GAME_STATES = ("ready", "running", "paused", "ended")
+
+
+class FieldApiKey(Base):
+    """A field's API key for its controllers (P4R13): only its SHA-256 (hex) is kept; the key is
+    shown once when it is made. At most two live keys per field (a rotation), checked when one is
+    made; a revoked key stays listed."""
+
+    __tablename__ = "field_api_keys"
+    __table_args__ = (Index("idx_field_api_keys_field", "field_id"),)
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    field_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), nullable=False)
+    key_sha256: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    label: Mapped[Optional[str]] = mapped_column(String(64))
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = _created()
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class Controller(Base):
+    """A field controller that synced (its own random id, protocol/sync.md): version, first and
+    last seen, the key it used last. A standby controller is a row of its own."""
+
+    __tablename__ = "controllers"
+    __table_args__ = (UniqueConstraint("field_id", "controller_id"),)
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    field_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), nullable=False)
+    controller_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    version: Mapped[str] = mapped_column(String(32), nullable=False)
+    api_key_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("field_api_keys.id", ondelete="SET NULL"))
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class Game(Base):
+    """A controller's game: ``(field_id, game_id, game_seed)`` (P4R11), ``game_id`` being the 16-bit
+    id on the radio. The controller's own times are ``controller_created_at``, ``started_at`` and
+    ``ended_at``; ``created_at`` and ``updated_at`` are the site server's."""
+
+    __tablename__ = "games"
+    __table_args__ = (
+        UniqueConstraint("field_id", "game_id", "game_seed"),
+        CheckConstraint("state IN ('ready', 'running', 'paused', 'ended')", name="state"),
+        CheckConstraint("game_id BETWEEN 0 AND 65535 AND game_seed BETWEEN 0 AND 4294967295", name="radio_id"),
+        Index("idx_games_field_created", "field_id", "controller_created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    field_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), nullable=False)
+    game_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    game_seed: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    mode_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    teams: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    team_info: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    params: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    squads: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="0")
+    duration_ms: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
+    state: Mapped[str] = mapped_column(String(16), nullable=False)
+    controller_created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = _created()
+    updated_at: Mapped[datetime] = _updated()
+
+
+class GameEvent(Base):
+    """One event of a game's log, append-only; unique on the controller's own key (P4R11)."""
+
+    __tablename__ = "game_events"
+    __table_args__ = (
+        UniqueConstraint("game", "node_id", "seq", "game_time_ms", "event_type"),
+        Index("idx_game_events_game_time", "game", "game_time_ms"),
+        Index("idx_game_events_type", "game", "event_type"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    game: Mapped[uuid.UUID] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"), nullable=False)
+    node_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    seq: Mapped[int] = mapped_column(Integer, nullable=False)
+    game_time_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    event_type: Mapped[str] = mapped_column(String(48), nullable=False)
+    team: Mapped[Optional[str]] = mapped_column(String(32))
+    squad: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    priority: Mapped[str] = mapped_column(String(16), nullable=False)
+    data: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    epoch: Mapped[Optional[int]] = mapped_column(Integer)
+    pkt_seq: Mapped[Optional[int]] = mapped_column(Integer)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class GameNodeScore(Base):
+    """A score counter per (game, source, team), merged by ``GREATEST`` (P4R10). A source is a node
+    (``node-3``) or one run of a controller's field script (``field-1@0``, decision S13-3)."""
+
+    __tablename__ = "game_node_scores"
+    __table_args__ = (PrimaryKeyConstraint("game", "source", "team"),
+                      CheckConstraint("value >= 0", name="value"))
+
+    game: Mapped[uuid.UUID] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"), nullable=False)
+    source: Mapped[str] = mapped_column(String(32), nullable=False)
+    team: Mapped[str] = mapped_column(String(32), nullable=False)
+    value: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class GameNode(Base):
+    """A game's node: name, role, health (the allowed ``info`` keys of protocol/sync.md)."""
+
+    __tablename__ = "game_nodes"
+    __table_args__ = (PrimaryKeyConstraint("game", "node_id"),)
+
+    game: Mapped[uuid.UUID] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"), nullable=False)
+    node_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    name: Mapped[str] = mapped_column(String(32), nullable=False)
+    role: Mapped[str] = mapped_column(String(32), nullable=False)
+    info: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class UserGameRole(Base):
+    """A role on one game (ADR-P4-1's ``user_game_roles``; decision S11-6): the same roles and the
+    same TOTP rule as per field."""
+
+    __tablename__ = "user_game_roles"
+    __table_args__ = (UniqueConstraint("user_id", "game", "role_id"),
+                      Index("idx_user_game_roles_game", "game"))
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    game: Mapped[uuid.UUID] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"), nullable=False)
+    role_id: Mapped[int] = mapped_column(SmallInteger, ForeignKey("roles.id"), nullable=False)
+    granted_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
+    granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

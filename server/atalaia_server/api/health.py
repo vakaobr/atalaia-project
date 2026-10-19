@@ -27,7 +27,7 @@ from sqlalchemy import func, select
 from .. import __version__
 from ..auth import UNAUTHORISED, bearer, principal_from_token
 from ..db import ping
-from ..models import Field, User, UserSession
+from ..models import Controller, Field, Game, GameEvent, User, UserSession
 
 router = APIRouter(prefix="/api/v1", tags=["health"])
 
@@ -82,6 +82,9 @@ async def metrics(request: Request) -> JSONResponse:
             body["sessions_active"] = await session.scalar(
                 select(func.count()).select_from(UserSession).where(
                     UserSession.revoked_at.is_(None), UserSession.expires_at > datetime.now(timezone.utc)))
+            body["games_total"] = await session.scalar(select(func.count()).select_from(Game))
+            body["game_events_total"] = await session.scalar(select(func.count()).select_from(GameEvent))
+            body["controllers_total"] = await session.scalar(select(func.count()).select_from(Controller))
     except Exception:  # noqa: BLE001  (the database is down: say so, as health does)
         return JSONResponse({**body, "database": "unreachable"}, status_code=503,
                             headers={"Cache-Control": "no-store"})

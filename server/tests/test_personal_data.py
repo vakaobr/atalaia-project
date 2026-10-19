@@ -74,7 +74,7 @@ class AccessTests(PersonalDataTestCase):
         self.assertEqual(r.headers["cache-control"], "no-store")
         data = r.json()
         self.assertEqual(set(data), {"format", "generated_at", "user", "field_roles", "sessions", "audit_log",
-                                     "audit_log_about_you", "consents"})
+                                     "audit_log_about_you", "consents", "games"})
         self.assertEqual(data["format"], "atalaia-personal-data/1")
         self.assertEqual((data["user"]["id"], data["user"]["username"], data["user"]["email"]),
                          (user["id"], "rita", "rita@example.pt"))
@@ -121,7 +121,7 @@ class AccessTests(PersonalDataTestCase):
             names = sorted(zf.namelist())
             self.assertEqual(names, sorted(f"export/{n}" for n in (
                 "profile.json", "field_roles.json", "sessions.json", "audit_log.json", "audit_log_about_you.json",
-                "consents.json", "README.txt")))
+                "consents.json", "games.json", "README.txt")))
             files = {n: zf.read(n).decode("utf-8") for n in names}
         self.assertEqual(json.loads(files["export/profile.json"]), data["user"])
         self.assertEqual(json.loads(files["export/consents.json"]), data["consents"])
@@ -336,18 +336,18 @@ class PurgeTests(PersonalDataTestCase):
             await self.fetch("INSERT INTO audit_log (action, created_at) VALUES ('login', $1)", now - timedelta(days=days))
 
         async with self.app.state.sessionmaker() as db:
-            self.assertEqual(await personal_data.purge(db, now, dry_run=True), {"sessions": 2, "audit_log": 1})
+            self.assertEqual(await personal_data.purge(db, now, dry_run=True), {"sessions": 2, "audit_log": 1, "games": 0})
         self.assertEqual((await self.fetch("SELECT count(*) FROM sessions"))[0][0], 5)
         async with self.app.state.sessionmaker() as db:
-            self.assertEqual(await personal_data.purge(db, now), {"sessions": 2, "audit_log": 1})
+            self.assertEqual(await personal_data.purge(db, now), {"sessions": 2, "audit_log": 1, "games": 0})
         left = {r[0] for r in await self.fetch("SELECT id FROM sessions")}
         self.assertEqual(left, {sessions[n] for n in ("expired_recently", "revoked_recently", "live")})
         self.assertEqual((await self.fetch("SELECT count(*) FROM refresh_tokens"))[0][0], 3)
         self.assertEqual((await self.fetch("SELECT count(*) FROM audit_log WHERE action = 'login'"))[0][0], 1)
         purges = await self.audit("retention_purge")
-        self.assertEqual(json.loads(purges[0]["details"]), {"sessions": 2, "audit_log": 1})
+        self.assertEqual(json.loads(purges[0]["details"]), {"sessions": 2, "audit_log": 1, "games": 0})
         async with self.app.state.sessionmaker() as db:  # again: nothing left to do
-            self.assertEqual(await personal_data.purge(db, now), {"sessions": 0, "audit_log": 0})
+            self.assertEqual(await personal_data.purge(db, now), {"sessions": 0, "audit_log": 0, "games": 0})
 
     async def test_the_command(self) -> None:
         user_id, _, _ = await self.make_user()
@@ -367,8 +367,8 @@ class PurgeTests(PersonalDataTestCase):
                     os.environ.pop(k, None)
                 else:
                     os.environ[k] = v
-        self.assertEqual(outputs, ["Retention purge would delete: 1 sessions rows, 0 audit log rows\n",
-                                   "Retention purge deleted: 1 sessions rows, 0 audit log rows\n"])
+        self.assertEqual(outputs, ["Retention purge would delete: 1 sessions rows, 0 audit log rows, 0 games rows\n",
+                                   "Retention purge deleted: 1 sessions rows, 0 audit log rows, 0 games rows\n"])
         self.assertEqual((await self.fetch("SELECT count(*) FROM sessions"))[0][0], 0)
 
     async def test_the_daily_task(self) -> None:
@@ -397,6 +397,58 @@ class PurgeTests(PersonalDataTestCase):
             self.assertFalse(task.done())
         self.assertTrue(task.cancelled())
         self.assertIsNone(self.app.state.purge_task)  # the tests' own app runs none
+
+
+class GameDataTests(PersonalDataTestCase):
+    """Plan phase 13's tables: per-game roles in access, export and erasure; games in the purge."""
+
+    async def game(self, field_id: uuid.UUID, ended: datetime | None, created: datetime) -> uuid.UUID:
+        game = (await self.fetch(
+            "INSERT INTO games (field_id, game_id, game_seed, name, mode_id, teams, state, controller_created_at, "
+            "ended_at) VALUES ($1, (random() * 60000)::int, (random() * 4e9)::bigint, 'Domingo', 'org.atalaia.domination', "
+            "'[\"red\", \"blue\"]', $2, $3, $4) RETURNING id", field_id, "ended" if ended else "running", created,
+            ended))[0][0]
+        await self.fetch("INSERT INTO game_events (game, node_id, seq, game_time_ms, event_type, priority, data) "
+                         "VALUES ($1, 0, 1, 10, 'player.checkin', 'normal', '{\"player\": \"p-abcdefghijkl\"}')", game)
+        await self.fetch("INSERT INTO game_node_scores (game, source, team, value) VALUES ($1, 'node-3', 'red', 5)", game)
+        return game
+
+    async def test_game_roles_in_access_export_and_erasure(self) -> None:
+        user = await self.register("rita")
+        user_id = uuid.UUID(user["id"])
+        field_id = await self.field()
+        now = datetime.now(timezone.utc)
+        game = await self.game(field_id, None, now)
+        await self.fetch("INSERT INTO user_game_roles (user_id, game, role_id) VALUES ($1, $2, 1)", user_id, game)
+        session = await self.login("rita")
+        data = (await self.client.get("/api/v1/me/data", headers=bearer(session))).json()
+        self.assertEqual([(g["game"], g["field"], g["name"], g["role"]) for g in data["games"]],
+                         [(str(game), "Campo Tejo", "Domingo", "player")])
+        r = await self.client.get("/api/v1/me/export", headers=bearer(session))
+        with zipfile.ZipFile(io.BytesIO(r.content)) as zf:
+            self.assertEqual(json.loads(zf.read("export/games.json")), data["games"])
+        r = await self.client.request("DELETE", "/api/v1/me", json={"password": PASSWORD}, headers=bearer(session))
+        self.assertEqual(r.status_code, 204, r.text)
+        self.assertEqual((await self.fetch("SELECT count(*) FROM user_game_roles"))[0][0], 0)
+        self.assertEqual((await self.fetch("SELECT count(*) FROM games"))[0][0], 1)  # the game is the field's
+
+    async def test_games_go_after_24_months(self) -> None:
+        field_id = await self.field()
+        now = datetime.now(timezone.utc)
+        old = await self.game(field_id, now - timedelta(days=731), now - timedelta(days=740))
+        recent = await self.game(field_id, now - timedelta(days=729), now - timedelta(days=740))
+        never_ended = await self.game(field_id, None, now - timedelta(days=731))
+        user_id, _, _ = await self.make_user()
+        await self.fetch("INSERT INTO user_game_roles (user_id, game, role_id) VALUES ($1, $2, 1)", user_id, old)
+        async with self.app.state.sessionmaker() as db:
+            counts = await personal_data.purge(db, now)
+        self.assertEqual(counts["games"], 2)
+        self.assertEqual({r[0] for r in await self.fetch("SELECT id FROM games")}, {recent})
+        for table in ("game_events", "game_node_scores", "user_game_roles"):
+            with self.subTest(table=table):
+                left = {r[0] for r in await self.fetch(f"SELECT DISTINCT game FROM {table}")}
+                self.assertTrue(left <= {recent})
+        self.assertNotIn(never_ended, {r[0] for r in await self.fetch("SELECT id FROM games")})
 
 
 class ScheduleTests(unittest.TestCase):
