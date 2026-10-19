@@ -182,8 +182,10 @@ jobs:
           # Android 13+ asks before an app posts notifications (a prop asks when
           # its game starts); grant it once installed, as app/tool/emulator_tests.ps1
           # does locally. On API 30 there is no such permission and pm grant fails
-          # quietly.
-          script: sh -c '(while true; do adb shell pm grant org.atalaia.app android.permission.POST_NOTIFICATIONS >/dev/null 2>&1; sleep 0.3; done) & flutter test integration_test --reporter expanded -d emulator-5554'
+          # quietly. The loop's output goes to /dev/null and it is stopped when the
+          # tests end: a background job holding the step's output open makes the
+          # step wait until the job's time limit.
+          script: sh -c '(while true; do adb shell pm grant org.atalaia.app android.permission.POST_NOTIFICATIONS; sleep 0.3; done) >/dev/null 2>&1 & g=$!; flutter test integration_test --reporter expanded -d emulator-5554; r=$?; kill $g; exit $r'
 
   protocol:
     name: Protocol schema and generated files
