@@ -39,6 +39,12 @@ phase 3 software can proceed immediately.
   comparison, marshal keypad UI, Ed25519-signed records (P3-1).
 - Player positions and visibility: GPS and BLE beacon reporting,
   server-side role-based filtering, temporary visibility (UAV sweep).
+- Field check-in and per-game replica declaration (added 2026-10-19,
+  maintainer request; ADR-P3-13, plan phase E): a printed check-in
+  poster from the GM console, check-in from the app with a player token,
+  replicas declared per game, a "replicas to chrono" list for marshals
+  and the GM console, manual check-in for players without the app, an
+  optional federation number that is never verified automatically.
 - I/O pod firmware: `CONFIG_ATALAIA_POD_MODE` Kconfig variant, BLE
   GATT server, USB CDC serial, capability proxy, radio passthrough.
 - Embedded MQTT broker (Dart) for the Android controller role.
@@ -66,10 +72,13 @@ phase 3 software can proceed immediately.
 - Metre-level indoor positioning (BLE triangulation).
 - iOS prop or controller roles.
 - Hold-All Domination and Last Stand (moved to the phase 2 mode pack).
+- Game scheduling, publication, online registration and third-party
+  platforms (phase 4, ADR-P4-11 and ADR-P4-12); linking a hand
+  check-in to an app later.
 
 ---
 
-## 2. Constraints from ADR.md (all 24 respected)
+## 2. Constraints from ADR.md (all 27 respected)
 
 | # | Constraint | How the plan respects it |
 |---|------------|--------------------------|
@@ -97,6 +106,9 @@ phase 3 software can proceed immediately.
 | 22 | Self-signed CA fingerprint in join, cert over Wi-Fi | Phase E uses join payload key 13 for SHA-256 fingerprint; app fetches full cert from `GET /api/v1/controller/ca` and verifies fingerprint; needs RFC amendment |
 | 23 | SPDX headers on every file | `app/` uses `GPL-3.0-or-later`; `controller/` uses `AGPL-3.0-or-later`; docs use `CC-BY-SA-4.0` |
 | 24 | Minimum Android API 26 | Phase C sets `minSdkVersion 26` in `build.gradle.kts` |
+| 25 | The check-in poster carries no secret (ADR-P3-13) | Phase E's poster holds field id and name, controller URLs, CA fingerprint, optional SSID and game id; vectors refuse anything else in keys 1-6; the app pins the CA per field |
+| 26 | Check-in personal data minimal and off the event path (ADR-P3-13) | Phase E's tests check that events, MQTT, logs and read-token views carry no names or federation numbers, and the 30-day purge |
+| 27 | Controller is the authority for check-ins and the chrono list (ADR-P3-13) | Phase E's list changes only on readings verified with the marshal's key; per-game token key kept across restarts; no internet in any test |
 
 ---
 
@@ -510,7 +522,7 @@ runs `flutter test integration_test/`.
 
 ---
 
-## Phase E: Player positions, embedded MQTT, controller integration
+## Phase E: Player positions, embedded MQTT, controller integration, field check-in
 
 ### Goal
 
@@ -523,6 +535,11 @@ the CA fingerprint distribution (`GET /api/v1/controller/ca`).  After
 this phase, the Flutter app connects to a real controller and all 4
 phase 3 game modes are testable end-to-end.  (Hold-All Domination and
 Last Stand are delivered by the phase 2 mode pack, not this phase.)
+
+**Added 2026-10-19 (maintainer request):** field check-in by a printed
+poster, per-game replica declaration and the marshals' "replicas to
+chrono" list (ADR-P3-13); its files, tests and acceptance are in the
+subsection at the end of this plan phase.
 
 **Dependencies:** Phase 2D (Python controller REST/WS API) for
 app-to-controller integration. Phase D (Flutter UI).
@@ -583,6 +600,90 @@ MSYS_NO_PATHCONV=1 docker run --rm ^
   cirruslabs/flutter:stable ^
   flutter test test/position/ test/controller/ -v
 ```
+
+### Field check-in and per-game replica declaration (added 2026-10-19, maintainer request)
+
+**Goal:** a player arrives at the field, scans the check-in poster with
+the app, is checked in at the controller and gets a player token,
+then picks the replicas they will use in that game.  The controller
+keeps a per-game "replicas to chrono" list; the marshal's view and the
+GM console show which declared replicas are not chronographed yet,
+and a signed chrono check-in reading marks each one passed or refused.
+The GM console shows the check-ins and the chrono state, and prints
+the poster.  Design: ADR-P3-13; open questions F1-F12 in
+`docs/review/decisions-to-review.md`.  Everything here works with no
+internet and no site server; phase 4 fills the same list from
+registrations (ADR-P4-11).
+
+**Dependencies:** this plan phase's player token issuance with the
+controller's own per-game token key (decision B8), the CA certificate
+endpoint `GET /api/v1/controller/ca` with the fingerprint (P3-8), and
+chrono readings sent to the controller.  Plan phase D's marshal
+screens, replica registry and tag writer (done).
+
+**Files to create:**
+
+| File | Licence | Purpose |
+|------|---------|---------|
+| `protocol/checkin.md` | GPL-3.0-or-later | The check-in poster text `atalaia:checkin:` (version, CBOR keys 1-6), the TOFU rule, the check-in endpoints' request and response bodies, the declaration's fields and states |
+| `protocol/vectors/checkin.json` | GPL-3.0-or-later | Valid posters (decode, re-encode byte for byte, text form), invalid ones with the reason they must fail, declarations valid and invalid |
+| `controller/atalaia_controller/checkin.py` | AGPL-3.0-or-later | Check-in rules: field identities (id, SHA-256 of the secret), check-ins and their states, settings, declarations, the "replicas to chrono" list and its matching rules (by `replica_id` and `player_id`, valid for the day or the game), retention purge |
+| `controller/atalaia_controller/checkin_poster.py` | AGPL-3.0-or-later | Poster text codec (Python side of `protocol/checkin.md`) |
+| `controller/console/src/components/checkin-panel.js` | AGPL-3.0-or-later | GM console *Check-in* tab: open or close per game, settings, live check-in list (status, team and squad, federation number with "card seen", declared replicas and chrono state), "replicas to chrono" list, manual check-in, removal, CSV export |
+| `controller/console/src/poster.html`, `poster.js` | AGPL-3.0-or-later | The printable A4 poster (QR code with the existing `qrcode.module.js`, field name, steps in pt and en, CA fingerprint short form, optional Wi-Fi QR code from a password typed in and never stored) |
+| `controller/templates/checkin-notice-pt.md`, `checkin-notice-en.md` | CC-BY-SA-4.0 | Short default privacy notice for check-in (field operator as data controller, what is kept, 30-day retention, rights); for the P4-6 legal review |
+| `app/lib/protocol/checkin_poster.dart` | GPL-3.0-or-later | Poster text codec (Dart side), against `checkin.json` |
+| `app/lib/checkin/field_trust.dart` | GPL-3.0-or-later | Per-field CA pinning: fetch `GET /api/v1/controller/ca`, compare SHA-256, keep it per `field_id`, refuse a changed fingerprint; an HTTP client that trusts that CA only for the poster's URLs |
+| `app/lib/checkin/field_identity.dart` | GPL-3.0-or-later | Per-field `player_id` (`p-` + 12 base32) and 32-byte secret in the app's private storage |
+| `app/lib/checkin/checkin_client.dart` | GPL-3.0-or-later | The check-in endpoints: info, check in, token refresh, own check-in, declaration, leave |
+| `app/lib/checkin/checkin_screen.dart` | GPL-3.0-or-later | Scan, connect (or "join Wi-Fi X"), notice, form (display name, federation number when asked, team preference), result |
+| `app/lib/checkin/my_replicas.dart`, `declare_replicas_screen.dart` | GPL-3.0-or-later | The player's own replica list on the phone, and the per-game declaration with each replica's chrono state |
+| `app/lib/marshal/chrono_queue.dart` | GPL-3.0-or-later | The marshal's "replicas to chrono" view: by player, pending first, counts, scan a sticker to jump to its declaration, link an unregistered replica, manual check-in |
+| `controller/tests/test_checkin.py` | AGPL-3.0-or-later | Check-in endpoints and rules (below) |
+| `controller/tests/test_checkin_poster.py` | AGPL-3.0-or-later | Poster codec against `checkin.json` |
+| `controller/tests/test_chrono_list.py` | AGPL-3.0-or-later | Readings to list states |
+| `app/test/protocol/checkin_poster_test.dart`, `app/test/checkin/*_test.dart`, `app/test/marshal/chrono_queue_test.dart` | GPL-3.0-or-later | Dart codec, trust, identity, client (mock HTTP), screens (widget tests, both languages), marshal queue |
+
+**Files to modify:**
+
+| File | Change |
+|------|--------|
+| `controller/atalaia_controller/store.py` | Next schema version: `field_players`, `checkins`, `replica_declarations`, `replicas`, `chrono_readings`, `marshal_keys`, per-game token keys (mode 0600 file, as `persist_game_key`) |
+| `controller/atalaia_controller/api.py`, `ws.py` | The ADR-P3-13 endpoints; `checkin` and `chrono_list` stream messages for GM and marshal connections only; rate limit and per-game cap on the unauthenticated endpoints; the start warning when declarations are pending |
+| `controller/atalaia_controller/engine.py` | Emit `player.checkin` (15) as the controller's node when a check-in becomes checked in |
+| `controller/atalaia_controller/config.py`, `controller/controller.example.toml` | `[checkin]`: `confirm`, `federation`, `federation_label`, `max_replicas`, `max_players`, `chrono_valid_for`, `rate_per_minute`, `urls`, `wifi_ssid`, `field_id`, `field_name`, notice files |
+| `controller/console/src/app.js`, `i18n/pt.json`, `i18n/en.json` | The *Check-in* tab and its texts |
+| `app/lib/marshal/marshal_home.dart`, `marshal_records.dart` | Entry to the queue; readings sent to the controller with the game's `game_id`; marshal key registration when the role is given |
+| `app/lib/player/player_screens.dart` | "Check in at the field" entry; the player's feed uses the token once checked in |
+| `app/lib/l10n/strings_pt.dart`, `strings_en.dart` | New strings (European Portuguese, "tu", inclusive, PD20) |
+| `app/lib/controller/controller_shell.dart` (this plan phase) | The Android controller role serves the same check-in endpoints, tested with the same contract cases |
+| `controller/README.md`, `app/README.md`, `controller/console/README.md` | Check-in, the poster, the marshal queue (R4) |
+
+**Tests to create:**
+
+| File | What it tests |
+|------|---------------|
+| `controller/tests/test_checkin_poster.py`, `app/test/protocol/checkin_poster_test.dart` | Both codecs against `protocol/vectors/checkin.json`: every valid poster decodes and re-encodes byte for byte; every invalid one fails with its reason (missing key, repeated key, key 32, trailing bytes, 33-byte fingerprint, non-canonical base64url, over 192 bytes); keys 7-31 skipped |
+| `controller/tests/test_checkin.py` | Info without a token lists only open games and no names; check-in issues a token that `player_token.py` accepts with role `player`; a known id with the wrong secret is 409; the same id and secret check in again; closed check-in is 403; the rate limit and the per-game cap; `staff` mode leaves it pending until confirmed; `player.checkin` emitted once, with the player id and no name; a GM role change issues a new token and the old token is refused for the new role; a removed player's token is refused; leaving erases the personal fields; the read token sees no names on REST or the stream; tokens survive a controller restart; retention purge after 30 days; federation `required` refuses an empty number, and nothing ever checks its content |
+| `controller/tests/test_chrono_list.py` | A declared replica is pending; a signed check-in series that passes makes it passed, one that fails makes it refused, a retest pass after a fail makes it passed with both records kept; an unsigned record, one signed by an unregistered key and one with a changed field are refused and change nothing; a replay of the same `reading_id` changes nothing; `day` validity passes a second game's declaration at once, `game` does not; a declaration without `replica_id` is linked when the marshal registers the replica; a player cannot withdraw a replica once chronographed |
+| `app/test/checkin/*_test.dart` | Trust: a matching fingerprint is kept, a changed one is refused with both short forms; the client against a mock controller; the identity is made once per field and reused; the declaration screen limits and states; screens in both languages (widget tests) |
+| `app/test/marshal/chrono_queue_test.dart` | Pending first, counts, sticker scan jumps to the declaration, linking a new replica, manual check-in |
+| Console browser test (`controller/console/tests/test_browser.py`) | The *Check-in* tab with a live check-in arriving on the stream; the poster page renders a QR code that decodes to the controller's poster text |
+
+**Validation:**
+
+```sh
+MSYS_NO_PATHCONV=1 docker run --rm -v "%cd%:/src" atalaia-dev sh tools/check.sh
+python tools/docker_app.py check
+python tools/docker_console.py
+```
+
+**Acceptance (AC-13 in section 5):** a player's app with no internet
+scans a printed poster, checks in, declares two replicas; the GM
+console and the marshal's view show both as not chronographed; a
+signed passing series for one and a failing series for the other mark
+them passed and refused; the read token never sees the player's name;
+the controller restarts and nothing is lost.
 
 ---
 
@@ -938,6 +1039,25 @@ Execute the Field Test Plan below. A mixed-device Domination game with
 at least one ESP32 box and one Android phone (with or without I/O pod)
 completes with zero lost events, correct scores, and no crashes.
 
+### AC-13: Field check-in and the "replicas to chrono" list (added 2026-10-19)
+
+```sh
+MSYS_NO_PATHCONV=1 docker run --rm -v "%cd%:/src" atalaia-dev sh tools/check.sh
+python tools/docker_app.py check
+python tools/docker_console.py
+```
+
+**Expected:** exit 0, with `test_checkin_poster.py`, `test_checkin.py`,
+`test_chrono_list.py`, the Dart check-in and queue tests and the
+console's *Check-in* browser test passing.  Together they show: a poster
+decoded by both codecs from the shared vectors; a check-in with no
+internet that returns a valid player token with role `player`; two
+declared replicas listed as not chronographed for the GM and the
+marshal; a signed passing series and a signed failing series marking
+them passed and refused, and an unsigned one changing nothing; no name
+or federation number in events, MQTT or the read token's views; nothing
+lost across a controller restart.
+
 ---
 
 ## 6. Field Test Plan
@@ -1025,6 +1145,19 @@ without issues."
 3. Enter 3 velocity readings on the large keypad.
 4. Verify energy calculation and pass/fail badge.
 5. Re-scan the replica: verify green pass badge appears.
+
+#### Test 5: Field check-in and replica declaration (added 2026-10-19)
+
+1. Print the check-in poster from the GM console and tape it up.
+2. Three players scan it with their phones on the field Wi-Fi (no
+   internet), check in and declare one or two replicas each; a fourth
+   player without the app is checked in by a marshal.
+3. Verify the GM console and the marshal's view list every declared
+   replica as not chronographed, and the poster's fingerprint matches
+   the console's.
+4. Chronograph the replicas; fail one on purpose, then retest it.
+5. Verify the list shows passed, refused, then passed after the retest,
+   and that a spectator scoreboard shows no names.
 
 ### Metrics to collect
 
@@ -1235,6 +1368,12 @@ docs/
     templates/
         privacy-notice.md
 ```
+
+Field check-in (2026-10-19, plan phase E) adds `protocol/checkin.md`
+and its vectors, `controller/atalaia_controller/checkin.py` and
+`checkin_poster.py`, the console's *Check-in* tab and poster page, and
+`app/lib/checkin/` with the marshal's `chrono_queue.dart`, plus their
+tests (listed in plan phase E).
 
 Total: ~100 new files across modes, protocol, core, firmware, app,
 and docs. Modified files: ~15 (events.yaml, CMakeLists files, ci.yml,

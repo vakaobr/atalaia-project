@@ -12,6 +12,12 @@ utilities and deployment before implementation begins. Each one answers
 a question the research phase identified and creates a constraint that
 the planning phase must respect.
 
+Two more, ADR-P4-11 (game scheduling, publication and registration)
+and ADR-P4-12 (open feeds, registration import and platform adapters),
+were added on 2026-10-19 at the maintainer's request; both are
+proposed, with their open questions in `docs/review/decisions-to-review.md`
+(F13-F23).
+
 ---
 
 ### ADR-P4-1: Site server database schema
@@ -328,6 +334,12 @@ CREATE TABLE game_registrations (
     UNIQUE(scheduled_game_id, user_id)
 );
 ```
+
+**Updated 2026-10-19 (ADR-P4-11, maintainer request):** both tables gain
+columns for the registration window, publication, the federation
+requirement, imported registrations without an account, pre-declared
+replicas (`registration_replicas`) and per-field player ids
+(`field_player_ids`).
 
 #### Scenarios
 
@@ -706,7 +718,9 @@ controller's endpoints above with the GM/read tokens.
 
 | Method | Path | Direction | Purpose |
 |--------|------|-----------|---------|
-| GET | `/api/v1/sync/roster?game_id=` | Controller pulls | Players registered for upcoming game |
+| GET | `/api/v1/sync/roster?game_id=` | Controller pulls | Players registered for upcoming game (payload defined in ADR-P4-11: registrations with pre-declared replicas and check-in ticket hashes) |
+| GET | `/api/v1/sync/schedule?days=` | Controller pulls | Published scheduled games (added by ADR-P4-11) |
+| POST | `/api/v1/sync/checkins` | Controller pushes | Check-in outcomes and declaration states after the game (added by ADR-P4-11) |
 | GET | `/api/v1/sync/presets` | Controller pulls | Shared presets (version > controller's version) |
 | GET | `/api/v1/sync/chrono?player_ids=` | Controller pulls | Chrono records for registered players |
 | GET | `/api/v1/sync/field` | Controller pulls | Field config, joule limits, house rules |
@@ -2325,6 +2339,332 @@ The site server exposes `/api/v1/health` (public, no auth) and
 
 ---
 
+### ADR-P4-11: Game scheduling, publication and registration
+
+**Status:** Proposed (2026-10-19, maintainer request; decisions
+F13-F17 in `docs/review/decisions-to-review.md`, all open)
+
+**Context:** The maintainer asked that a "field admin can schedule
+games (and it may be published to the field server page - if they have
+one) or shared/third-party platforms ... which would allow players to
+register to the games".  ADR-P4-1 already has `scheduled_games` and
+`game_registrations` tables, and ADR-P4-3 a roster pull
+(`GET /api/v1/sync/roster`), but nothing says how a game is published,
+who may register, what a registration holds, or how it reaches the
+field controller.  Phase 3's ADR-P3-13 designs the game-day part: the
+check-in poster, check-in at the controller, the per-game replica
+declaration and the "replicas to chrono" list.  This ADR feeds that list
+from the site server.  The field controller stays the authority during
+the game, and a field without a site server loses nothing it had.
+
+**Decision:**
+
+#### Scheduling
+
+A user with the `admin` or `gm` role on a field creates a scheduled
+game: title, description, start and estimated end (stored in UTC,
+shown in the field's time zone, `fields.timezone`), mode or preset or
+scenario (optional: many games are announced before the GM picks one),
+teams, `max_players`, registration window (`registration_opens_at`,
+`registration_closes_at`), the federation requirement (`off`,
+`optional`, `required`, with the field's label, as ADR-P3-13), and
+whether replicas are pre-declared at registration (default on).
+
+Statuses stay ADR-P4-1's: `draft` (only staff see it), `published`
+(on the field page and the feeds), `registering` (published with the
+window open; computed from the window rather than set by hand),
+`in_progress` (when the controller reports the start through
+`POST /api/v1/sync/game`), `completed`, `cancelled` (stays visible as
+cancelled, with a reason).  Only `admin` may publish or cancel.
+
+#### Publication on the field page
+
+The site server serves a public page per field,
+`https://<site>/f/<slug>/`, rendered on the server (it works without
+JavaScript): the field's name, an optional description and address,
+and its upcoming published games; each game has its own page,
+`/f/<slug>/games/<id>`, with the details, the places left, the
+requirements and a *Register* button.  The pages show no registered
+player's name or count beyond "places left".  A field turns its page
+on or off (`fields.public_page`, default off).  In hosted mode each
+field's page reads only its own schema (ADR-P4-4).  The open feeds
+(ADR-P4-12) list the same games.
+
+#### Registration
+
+Online registration needs an account (ADR-P4-2): a player logs in on
+the site server's web pages or in the app, opens a published game in
+its window, and registers with:
+
+- a display name for that game (from the profile's callsign by default);
+- a team preference, if the game allows it;
+- the federation number, if the game asks for one (never verified
+  automatically, as ADR-P3-13);
+- **pre-declared replicas**: picked from the player's replicas on the
+  site server (`replicas`, ADR-P4-1) or described anew (type, class
+  from the field's limit template, make and model), at most the field's
+  `max_replicas`.  They become the game's declaration on the controller.
+
+`max_players` is enforced; when the game is full, registration closes
+(no waiting list in this version).  A player can change the
+declaration or cancel until the window closes; staff can at any time.
+
+**The player's id at the field.**  Each account has one pseudonymous
+`player_id` per field (`field_player_ids`: user, field, `player_id`
+of the ADR-P3-13 form), made on first registration there.  When a
+player who already checked in at that field without an account (a
+phase 3 field identity on the phone) links the account, the app sends
+that id and its secret once and the site server adopts the id, so the
+replica and chrono history continue.
+
+**The check-in ticket.**  A registration gets a random 32-byte ticket
+secret.  The site server stores its SHA-256, shows the secret once to
+the player's app (and as a printable ticket: a QR code of
+`atalaia:ticket:` with the base64url CBOR of
+`{1: registration_id, 2: player_id, 3: secret}`), and sends the hash
+in the roster.  It is not a game credential: it only lets the
+controller match an arrival to a registration.
+
+**Data:** ADR-P4-1's tables gain columns (one reversible Alembic
+migration):
+
+- `scheduled_games`: `ends_at`, `registration_opens_at`,
+  `registration_closes_at`, `federation` (`off`/`optional`/`required`),
+  `predeclare_replicas`, `location_text`, `published_at`,
+  `cancelled_reason`, `ical_sequence` (ADR-P4-12), `controller_game_id`
+  (filled when the controller links its game);
+- `game_registrations`: `user_id` becomes nullable (imported
+  registrations, ADR-P4-12); `player_id`, `display_name`, `status`
+  (`registered`, `cancelled`, `checked_in`, `no_show`),
+  `federation_number`, `ticket_hash`, `source` (`site`, `import`,
+  `adapter:<id>`), `external_ref`, `updated_at`;
+  `UNIQUE(scheduled_game_id, source, external_ref)`;
+- new `registration_replicas` (`registration_id`, `declaration_id`,
+  `replica_id` nullable, `type`, `class`, `make_model`);
+- new `field_player_ids` (`user_id`, `field_id`, `player_id`,
+  `UNIQUE(field_id, player_id)`);
+- `fields`: `public_page`, `description`, `address_text`,
+  `federation_label`.
+
+#### Sync with the controller on game day
+
+The controller pulls, as ADR-P4-3 says (the site server never pushes
+game state):
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/v1/sync/schedule?days=14` | New: the field's published games for the next days, so the GM can create the controller game "from the schedule" (the controller game then records `scheduled_game_id`, and the site server's `controller_game_id`) |
+| GET | `/api/v1/sync/roster?game_id=` | ADR-P4-3's pull, now defined: per registration `registration_id`, `player_id`, `display_name`, `team_preference`, `federation_number` (when the game asks), `ticket_hash`, `status`, and the pre-declared replicas with their `declaration_id` |
+| POST | `/api/v1/sync/checkins` | New: after the game (or in batches during it, when a link exists), each registration's outcome (`checked_in` or `no_show`), its declaration's final states and the deciding `reading_id`s; the readings themselves go through ADR-P4-3's `POST /api/v1/sync/chrono` |
+
+On the controller the roster becomes **expected** check-ins, with
+their declarations already in the "replicas to chrono" list as
+`pending`, so marshals can prepare before anyone arrives.  At the
+field a registered player scans the poster; the app sends the
+registration id and ticket secret with the check-in (ADR-P3-13's
+`POST /api/v1/checkin`), and the controller marks the expected
+check-in as arrived.  A registered player without the app is ticked
+by a marshal by name, or shows the printed ticket to the marshal's
+scanner.
+
+**Authority.**  The controller pulls the roster again until the game
+starts: new registrations are added, cancelled ones that have not
+checked in are removed, everything already checked in stays as the
+controller has it.  Once the game starts the controller stops applying
+roster changes for it; staff changes on the day (a walk-in, a team
+change, a refusal) are the controller's and win.  Without internet on
+the day the controller uses its last pull; with no pull at all, every
+player is a walk-in (ADR-P3-13), and the app adds its registration id
+to the check-in so the site server can match it when the controller
+pushes later.
+
+**Walk-ins** (checked in at the field, not registered) are pushed as a
+count only, unless the field turns on `[sync] push_walkins`; then they
+are stored as guest registrations under ADR-P4-8's 30-day guest rule.
+
+#### Personal data
+
+Registration data is part of the account's data: it appears in
+`GET /api/v1/me/data` and the export, and erasure anonymises it
+(ADR-P4-8).  The federation number on a registration is erased 30 days
+after the game (it is kept on the profile only if the player saves it
+there).  Registrations themselves follow the game history retention
+(24 months, ADR-P4-8).  The roster sent to a controller holds only
+what ADR-P3-13's check-in holds; the controller's 30-day rule then
+applies to it.  The registration form states which data the field
+gets and for how long; the notice is in the P4-6 legal review.
+
+**Consequences:**
+- A field can announce games on its own page and take registrations
+  with pre-declared replicas, and marshals see the expected replicas
+  before the gate opens.
+- The controller remains the authority on the day and works from its
+  last pull when the internet is gone; the site server never pushes
+  into a running game.
+- The roster carries only what the check-in list needs; walk-ins stay
+  on the controller unless the field opts in.
+- ADR-P4-1 gains one reversible migration and two small tables; ADR-
+  P4-3 gains two endpoints and a defined roster payload.
+
+---
+
+### ADR-P4-12: Open feeds, registration import and platform adapters
+
+**Status:** Proposed (2026-10-19, maintainer request; decisions
+F18-F23 in `docs/review/decisions-to-review.md`, all open)
+
+**Context:** The maintainer also asked for publication on "shared/
+third-party platforms like the jogarairsoft.pt we have here in
+portugal".  A web search (2026-10-19) found no public information or
+API documentation for jogarairsoft.pt, so no integration with it can be
+designed from facts.  The project is clean-room (spec section 17) and
+will not scrape a third party's pages.  What can be built without any
+platform's cooperation is open, standard output that any calendar or
+platform can read, and an import of a registration list that a field
+exports from wherever it takes registrations.
+
+**Decision:**
+
+#### iCalendar feed (RFC 5545)
+
+`GET /f/<slug>/games.ics` (public when the field page is on; also a
+per-game `/f/<slug>/games/<id>.ics`), media type `text/calendar`:
+
+- one `VCALENDAR` with `VERSION:2.0` and
+  `PRODID:-//Atalaia//Site server//EN`, one `VEVENT` per published game,
+  including cancelled ones for 30 days after their date;
+- per event: `UID` (the scheduled game's UUID `@` the site's host name,
+  never reused), `DTSTAMP`, `DTSTART` and `DTEND` in UTC (the `Z` form,
+  so no `VTIMEZONE` is needed), `SUMMARY`, `DESCRIPTION` (plain text,
+  with the game page's address), `LOCATION` (the field's address text,
+  if set), `URL`, `STATUS` (`CONFIRMED`, or `CANCELLED`), `SEQUENCE`
+  (raised on every change to time, place or status, so subscribed
+  calendars update), `LAST-MODIFIED`;
+- CRLF line ends, lines folded at 75 octets, text values escaped as RFC
+  5545 requires (backslash, semicolon, comma, newline);
+- `ETag` and `Last-Modified` headers so calendar apps can poll cheaply.
+
+Drafts never appear.  No personal data: no registrant names or counts.
+
+#### JSON feed
+
+`GET /f/<slug>/games.json`, the same games as data, for a club's own
+website or a platform willing to read it:
+
+```json
+{
+  "format": "atalaia.games",
+  "version": 1,
+  "field": {"slug": "campo-exemplo", "name": "Campo Exemplo", "timezone": "Europe/Lisbon", "url": "https://..."},
+  "games": [
+    {
+      "id": "0192...", "title": "...", "description": "...",
+      "starts_at": "2026-11-08T09:00:00Z", "ends_at": "2026-11-08T13:00:00Z",
+      "status": "published", "mode": "org.atalaia.domination",
+      "registration": {"opens_at": "...", "closes_at": "...", "open": true, "max_players": 60, "places_left": 12},
+      "requirements": {"federation": "required", "federation_label": "FPA"},
+      "url": "https://.../f/campo-exemplo/games/0192...", "ics": "https://.../games/0192....ics",
+      "updated_at": "..."
+    }
+  ]
+}
+```
+
+Times are RFC 3339 in UTC.  The schema is a JSON Schema file in the
+repository (`server/schemas/games-feed-v1.schema.json`) and the format
+is documented in `server/docs/feeds.md`; a new major version gets a new
+`version` and a new path.  Both feeds send
+`Access-Control-Allow-Origin: *` (read-only, no cookies), so other
+sites can show them.  The game page also embeds the game as
+schema.org `Event` JSON-LD, a common vocabulary that search engines
+read.
+
+#### Registration import
+
+`POST /api/v1/fields/{field_id}/scheduled-games/{id}/registrations/import`
+(`admin` or `gm`), with `?dry_run=true` to preview:
+
+- **CSV** (RFC 4180, UTF-8, a header row) or a **JSON** array of
+  objects with the same names;
+- columns: `display_name` (required), `external_ref` (the other
+  platform's registration id; recommended), `team_preference`,
+  `federation_number`, `replicas` (JSON: an array of `{type, class,
+  make_model}`; CSV: entries separated by `|`, each
+  `type:class[:make_model]`);
+- **only those columns are read**: any other column (an email, a phone
+  number, a birth date) is ignored and named in the preview as "not
+  imported", so the import never takes more than the check-in needs;
+- rows upsert by `(source, external_ref)`, so importing an updated
+  export again changes the same registrations; rows without
+  `external_ref` are added each time (the preview warns);
+- the preview lists, per row, created, updated or refused with the
+  reason; nothing is written in a dry run;
+- imported registrations have no account (`user_id` null, `source`
+  `import` with the label the admin gives, e.g. the platform's name),
+  get a `player_id` but no ticket (the marshal ticks them by name), and
+  follow ADR-P4-8's 30-day guest rule.  The field is the data
+  controller for what it imports and must have its own basis for having
+  that list; the import screen says so.
+
+#### Platform adapters
+
+An adapter connects one field's site server to one external platform
+through that platform's own interface.  The interface
+(`server/src/integrations/base.py`):
+
+```python
+class PlatformAdapter(Protocol):
+    id: str                        # stable, e.g. "csv", "example"
+    name: str
+    capabilities: frozenset[str]   # subset of {"publish", "update", "cancel", "registrations"}
+
+    async def publish(self, game: PublishedGame, cfg: AdapterConfig) -> ExternalRef: ...
+    async def update(self, ref: ExternalRef, game: PublishedGame, cfg: AdapterConfig) -> None: ...
+    async def cancel(self, ref: ExternalRef, cfg: AdapterConfig) -> None: ...
+    async def fetch_registrations(self, ref: ExternalRef, cfg: AdapterConfig) -> list[ImportedRegistration]: ...
+```
+
+Rules:
+
+- **Only a documented API or a written agreement.**  An adapter uses
+  the platform's published API, or an interface the platform has agreed
+  to in writing.  No scraping of web pages, no automated form posting,
+  no use of a person's login on their behalf beyond what the platform's
+  API offers.  An adapter that does any of these is not accepted.
+- Registrations from an adapter go through the import path above (same
+  columns, same minimisation, same preview rules when run by hand).
+- Off by default, enabled per field by an `admin`; credentials are
+  stored encrypted (Fernet, as TOTP secrets, ADR-P4-2); every call is in
+  the audit log; calls go out from the site server only, never from the
+  field controller; a failing platform never blocks scheduling,
+  publication or check-in.
+- New table `platform_links` (`field_id`, `adapter_id`, `config_enc`,
+  `enabled`) and `external_game_links` (`scheduled_game_id`,
+  `adapter_id`, `external_ref`, `last_synced_at`, `last_error`).
+- Shipped: the interface, a test adapter, and the CSV and JSON import as
+  the reference "registrations" source.  No adapter for a named
+  platform ships without that platform's API documentation or
+  agreement.
+
+**jogarairsoft.pt.**  No adapter is designed.  No public information or
+API about it was found (web search, 2026-10-19).  An adapter needs the
+platform's API documentation or an agreement with its operators, which
+the maintainer would have to request by contacting them (F22).  Until
+then, a field that uses it can link its feeds where the platform
+allows, and import a registration list if the platform lets the field
+export one (unknown).  Nothing will be scraped.
+
+**Consequences:**
+- Any calendar app can subscribe to a field's games, and any site or
+  platform can read them, with no agreement needed.
+- Fields that take registrations elsewhere can still bring them to the
+  controller's check-in list, with only the data the check-in needs.
+- Specific platforms are an extension point with clear rules, not a
+  promise; nothing is said about a third party that is not known.
+- The feeds are public and hold no personal data.
+
+---
+
 ## Phase 2 and 3 handoff (2026-10-18)
 
 Phase 2 implementation (A-E) is complete and Phase 3 design is
@@ -2445,3 +2785,18 @@ the decisions above:
     assumes GPS reporting. ADR-P4-1 (game roles) assumes the player
     app role model. These interfaces must be re-verified when Phase 3
     design completes.
+
+16. **Scheduling and registration feed the controller; they never drive
+    it** (ADR-P4-11, 2026-10-19).  The controller pulls the schedule and
+    the roster; roster changes stop applying once the game starts; the
+    roster carries only what ADR-P3-13's check-in holds; walk-ins are
+    pushed as counts unless the field opts in.
+
+17. **Open feeds hold no personal data** (ADR-P4-12).  iCalendar (RFC
+    5545, UTC times) and the versioned JSON feed list published games
+    only; drafts never, registrant names never.
+
+18. **Third-party platforms only through a documented API or a written
+    agreement** (ADR-P4-12).  No scraping or automated form posting;
+    adapters are off by default, per field, audited, outbound from the
+    site server only; imports read only the listed columns.

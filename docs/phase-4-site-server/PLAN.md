@@ -71,7 +71,15 @@ The assumptions section (below) is updated with handoff results.
 - Controller-to-site-server sync protocol: event batch push, score
   merge (GREATEST), chrono sync, roster pull, offline buffering,
   WebSocket live stream.
-- Game scheduling, player registration, scheduled game lifecycle.
+- Game scheduling, player registration, scheduled game lifecycle;
+  added 2026-10-19 (maintainer request, ADR-P4-11, ADR-P4-12, Phase I):
+  publication on the field's site-server page, registration with
+  pre-declared replicas synced to the controller's check-in list on
+  game day, an iCalendar (RFC 5545) feed, a JSON feed, import of a
+  registration list (CSV or JSON), and an adapter interface for
+  specific platforms (documented API or written agreement only; no
+  scraping; no adapter for jogarairsoft.pt until the maintainer has
+  contacted it).
 - Device health dashboard, firmware catalog, remote GM console relay.
 - Master and Satellites mode (`field.lua` + `node.lua`; depends on
   Phase 2C only).
@@ -124,7 +132,7 @@ The assumptions section (below) is updated with handoff results.
 
 ---
 
-## Constraints from ADR.md (all 15 respected)
+## Constraints from ADR.md (all 18 respected)
 
 | # | Constraint | How the plan respects it |
 |---|------------|--------------------------|
@@ -143,6 +151,9 @@ The assumptions section (below) is updated with handoff results.
 | 13 | SPDX headers on every file; AGPL-3.0-or-later for server; GPL-3.0-or-later for controller additions and modes; CC-BY-SA-4.0 for docs | Every phase's file lists specify the licence; a CI grep check validates headers |
 | 14 | No C compiler on host; site server is pure Python; `libatalaia_core.so` cross-compiled in Docker; `cryptography` ships pre-built wheels | All validation commands use Docker; the site server Dockerfile uses `python:3.11-slim`; the core builds inside `atalaia-dev` |
 | 15 | Phase 3 interfaces are assumptions; `gps.fix` events, player app role model, Android shell are assumed but must be re-verified when Phase 3 design completes | Phase F (Phase-3-dependent modes) is explicitly gated; every Phase 3 assumption is marked in the Assumptions table |
+| 16 | Scheduling and registration feed the controller, never drive it (ADR-P4-11) | Phase I's controller tests: roster changes stop at the game's start; the roster holds only check-in fields; walk-ins as counts by default |
+| 17 | Open feeds hold no personal data (ADR-P4-12) | Phase I's feed tests check for names, drafts and counts beyond places left |
+| 18 | Third-party platforms only through a documented API or written agreement (ADR-P4-12) | Phase I ships the interface, a test adapter and the import only; adapters off by default and audited |
 
 ---
 
@@ -648,8 +659,9 @@ MSYS_NO_PATHCONV=1 docker run --rm \
 ### Goal
 
 Implement the site server's remote management features: device health
-dashboard (battery, firmware, RSSI, last seen), game scheduling with
-player registration, and the remote GM console relay. The health
+dashboard (battery, firmware, RSSI, last seen) and the remote GM
+console relay.  (Game scheduling with player registration moved to
+Phase I on 2026-10-19, with publication and the open feeds.) The health
 dashboard consumes device data pushed via the sync protocol (Phase C).
 The remote GM console proxies commands to the controller via the sync
 WebSocket. Game scheduling provides a calendar with registration and
@@ -660,12 +672,12 @@ roster management.
 | File | Licence | Purpose |
 |------|---------|---------|
 | `server/src/api/devices.py` | AGPL-3.0-or-later | Device health endpoints: list devices, device detail (battery, fw_version, rssi, last_seen), firmware catalog |
-| `server/src/api/scheduling.py` | AGPL-3.0-or-later | Game scheduling: CRUD for scheduled games, player registration/unregistration, team assignment, roster query |
+| ~~`server/src/api/scheduling.py`~~ | | **Moved to Phase I (2026-10-19)** with registration, publication and feeds |
 | `server/src/api/remote_gm.py` | AGPL-3.0-or-later | Remote GM: proxy WS connection to controller, forward commands (start, pause, override) with GM token validation, relay live events/scores |
 | `server/src/services/device_service.py` | AGPL-3.0-or-later | Device health tracking: update from sync data, firmware version comparison, battery trend |
-| `server/src/services/scheduling_service.py` | AGPL-3.0-or-later | Scheduling logic: registration limits, team balancing, status transitions (draft -> published -> registering -> in_progress -> completed) |
+| ~~`server/src/services/scheduling_service.py`~~ | | **Moved to Phase I (2026-10-19)** |
 | `server/tests/test_devices.py` | AGPL-3.0-or-later | Device health tests |
-| `server/tests/test_scheduling.py` | AGPL-3.0-or-later | Scheduling tests |
+| ~~`server/tests/test_scheduling.py`~~ | | **Moved to Phase I (2026-10-19)** |
 | `server/tests/test_remote_gm.py` | AGPL-3.0-or-later | Remote GM tests |
 
 ### Files to modify
@@ -680,7 +692,7 @@ roster management.
 | File | What it tests |
 |------|---------------|
 | `server/tests/test_devices.py` | Device list (filter by field), device detail (battery, fw_version, rssi), device update via sync (push STATE, verify device record updated), firmware catalog (list available versions) |
-| `server/tests/test_scheduling.py` | Create scheduled game, publish (status transition), register player (verify roster count), register beyond max_players (rejected), unregister player, team assignment, pull roster (verify format matches sync protocol) |
+| ~~`server/tests/test_scheduling.py`~~ | Moved to Phase I (2026-10-19), extended there |
 | `server/tests/test_remote_gm.py` | WebSocket connection with GM token (accepted), WebSocket without token (rejected), forward start command to mock controller, receive live event from mock controller, command forwarded only if user has GM role |
 
 ### Validation commands
@@ -700,6 +712,87 @@ MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml \
   run --rm test \
   sh -c "alembic upgrade head && python -m pytest tests/ -v"
 ```
+
+## Phase I: Scheduling, publication, registration and open feeds (added 2026-10-19, maintainer request)
+
+### Goal
+
+The field admin schedules games and publishes them on the field's
+site-server page; players with an account register, with their
+replicas pre-declared; the controller pulls the schedule and the
+roster on game day and fills ADR-P3-13's check-in list and "replicas
+to chrono" list, staying the authority during the game; outcomes are
+pushed back after the game.  Open output for other platforms: an
+iCalendar feed, a JSON feed, and an import of a registration list
+(CSV or JSON), plus an adapter interface for specific platforms with
+the rule "documented API or written agreement, no scraping".  Design:
+ADR-P4-11 and ADR-P4-12; open questions F13-F23 in
+`docs/review/decisions-to-review.md`.  The scheduling files of Phase G
+move here.
+
+**Dependencies:** Phase A (accounts, fields, roles, audit log), Phase C
+(sync client and API-key auth), phase 3 plan phase E's field check-in
+on the controller (ADR-P3-13).  The feeds and the import need only
+Phase A.
+
+### Files to create
+
+| File | Licence | Purpose |
+|------|---------|---------|
+| `server/migrations/versions/NNNN_scheduling_registration.py` (next number) | AGPL-3.0-or-later | ADR-P4-11's columns and tables, ADR-P4-12's `platform_links` and `external_game_links`; reversible |
+| `server/src/api/scheduling.py` | AGPL-3.0-or-later | (from Phase G) scheduled games: create, edit, publish, cancel (with reason); `admin` publishes and cancels, `gm` edits |
+| `server/src/services/scheduling_service.py` | AGPL-3.0-or-later | (from Phase G) status rules (`registering` computed from the window), `ical_sequence` raised on time, place or status changes |
+| `server/src/api/registrations.py` | AGPL-3.0-or-later | Register, change the declaration, cancel (player, until the window closes); staff list and changes; ticket shown once |
+| `server/src/services/registration_service.py` | AGPL-3.0-or-later | `max_players`, per-field `player_id` (made once, or adopted from a phone's field identity with its secret), ticket secret and hash, pre-declared replicas against the field's limit-template classes and `max_replicas` |
+| `server/src/web/field_pages.py`, `server/src/web/templates/field.html`, `game.html` | AGPL-3.0-or-later | Public field page and game pages, server-rendered, no JavaScript needed, schema.org `Event` JSON-LD, pt and en |
+| `server/src/feeds/ical.py` | AGPL-3.0-or-later | RFC 5545 writer: UTC times, folding at 75 octets, CRLF, text escaping, `UID`/`SEQUENCE`/`STATUS`, cancelled games for 30 days; ETag |
+| `server/src/feeds/json_feed.py` | AGPL-3.0-or-later | `atalaia.games` version 1 |
+| `server/schemas/games-feed-v1.schema.json` | AGPL-3.0-or-later | JSON Schema of the JSON feed |
+| `server/src/imports/registration_import.py` | AGPL-3.0-or-later | CSV (RFC 4180) and JSON import: only the listed columns, upsert by `(source, external_ref)`, dry-run preview per row |
+| `server/src/integrations/base.py`, `registry.py`, `testing.py` | AGPL-3.0-or-later | `PlatformAdapter` protocol, per-field enablement, encrypted config, audit of every call; a test adapter |
+| `server/docs/feeds.md`, `server/docs/integrations.md` | CC-BY-SA-4.0 | The two feeds and the import format; the adapter rules (documented API or written agreement, no scraping) and how to propose one |
+| `server/tests/test_scheduling.py` | AGPL-3.0-or-later | (from Phase G, extended) |
+| `server/tests/test_registrations.py`, `test_field_pages.py`, `test_feeds.py`, `test_registration_import.py`, `test_integrations.py` | AGPL-3.0-or-later | Below |
+| `controller/tests/test_sync_schedule.py` | AGPL-3.0-or-later | Controller side of the schedule and roster pulls and the check-in push |
+
+### Files to modify
+
+| File | Change |
+|------|--------|
+| `server/src/models.py`, `schemas.py` | The new columns and tables |
+| `server/src/api/sync.py` | `GET /sync/schedule`, the defined `GET /sync/roster` payload, `POST /sync/checkins` |
+| `server/src/services/gdpr_service.py` (Phase A) | Registrations and pre-declared replicas in access, export and erasure; federation numbers erased 30 days after the game; imported and walk-in guest registrations after 30 days |
+| `controller/atalaia_controller/sync_client.py` | Pull schedule and roster until the game starts (then stop for that game); push check-in outcomes; `[sync] push_walkins` (default off) |
+| `controller/atalaia_controller/checkin.py` (phase 3) | Expected check-ins from the roster with their declarations; check-in by registration id and ticket secret; a printed ticket scanned by a marshal |
+| `controller/console/src/components/checkin-panel.js` (phase 3) | "Create from the schedule"; expected, arrived and walk-in columns |
+| `app/lib/checkin/` (phase 3) | Account login on the site server, the field's games, register with pre-declared replicas, keep the ticket, send it at check-in; hand over the phone's field identity when linking an account |
+| `server/README.md`, `docs/design-spec.md` | Scheduling, the field page, the feeds, the import and the adapter rules (R4) |
+
+### Tests to create
+
+| File | What it tests |
+|------|---------------|
+| `server/tests/test_scheduling.py` | Create a draft (not public), publish (`admin` only; `gm` refused), `registering` follows the window, cancel with reason, `ical_sequence` raised on a change of time, place or status and not on a description edit |
+| `server/tests/test_registrations.py` | Register needs an account and an open window; `max_players` closes it; federation `required` refuses an empty number and never checks its content; pre-declared replicas limited to the field's classes and `max_replicas`; cancel until the window closes; one `player_id` per user and field, and adoption of a phone's id only with its secret; the ticket hash stored, the secret never |
+| `server/tests/test_field_pages.py` | Page off by default (404); published games only; no names; another field's games never shown in hosted mode |
+| `server/tests/test_feeds.py` | The `.ics` parses with a strict RFC 5545 parser test (CRLF, folding, escaping, required properties, UTC), cancelled games carry `STATUS:CANCELLED` and a higher `SEQUENCE`, drafts absent; the JSON feed validates against its schema; CORS header; ETag gives 304; no personal data in either |
+| `server/tests/test_registration_import.py` | CSV and JSON give the same result; unknown columns (an email) ignored and listed; dry run writes nothing; re-import updates by `external_ref`; bad rows refused with their reason; imported rows have no account and expire after 30 days |
+| `server/tests/test_integrations.py` | Adapters off by default; the test adapter's registrations go through the import rules; credentials stored encrypted; every call audited; a failing adapter does not block publishing |
+| `controller/tests/test_sync_schedule.py` | The roster becomes expected check-ins with pending declarations; a later pull adds and removes before the start and changes nothing after it; ticket check-in arrives the expected player; walk-ins pushed as counts unless enabled; outcomes pushed once (idempotent) |
+
+### Validation commands
+
+```sh
+MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml \
+  run --rm test \
+  sh -c "alembic upgrade head && alembic downgrade -1 && alembic upgrade head && python -m pytest tests/test_scheduling.py tests/test_registrations.py tests/test_field_pages.py tests/test_feeds.py tests/test_registration_import.py tests/test_integrations.py -v"
+```
+
+```sh
+MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/src" atalaia-dev sh tools/check.sh
+```
+
+Acceptance: AC-17 to AC-19.
 
 ---
 
@@ -968,6 +1061,39 @@ forward to mock controller, events relay back.
 Execute the Weekend Milsim Gate Test Plan below. All functional
 requirements pass, all quantitative criteria met. Gate decision made.
 
+### AC-17: Scheduling, publication and registration (added 2026-10-19)
+
+```sh
+MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml   run --rm test   sh -c "alembic upgrade head && python -m pytest tests/test_scheduling.py tests/test_registrations.py tests/test_field_pages.py -v"
+```
+
+**Expected:** exit 0. A published game appears on the field page and a
+draft does not; registration needs an account and an open window and
+stops at `max_players`; pre-declared replicas are stored; no player name
+appears on a public page.
+
+### AC-18: Game-day sync into the controller's check-in list (added 2026-10-19)
+
+```sh
+MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/src" atalaia-dev   sh -c "cd /src/controller && python3 -m pytest tests/test_sync_schedule.py -v"
+```
+
+**Expected:** exit 0. The roster becomes expected check-ins whose
+declarations are pending in the "replicas to chrono" list; a ticket
+check-in arrives the player; roster changes after the start change
+nothing; outcomes are pushed back once.
+
+### AC-19: Open feeds and registration import (added 2026-10-19)
+
+```sh
+MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml   run --rm test   sh -c "alembic upgrade head && python -m pytest tests/test_feeds.py tests/test_registration_import.py tests/test_integrations.py -v"
+```
+
+**Expected:** exit 0. The iCalendar feed passes the RFC 5545 checks and
+the JSON feed its schema, neither with personal data; a CSV and a JSON
+import give the same registrations, ignore unlisted columns and update
+by `external_ref`; adapters are off by default.
+
 ---
 
 ## Weekend milsim gate test plan
@@ -1206,6 +1332,9 @@ Phase A ────────────────────────
 - Phases C and D can run in parallel once Phase 2D lands.
 - Phase F is blocked until Phase 3 lands.
 - Phase G is blocked until Phase C lands (sync data feeds devices).
+- Phase I (added 2026-10-19) needs Phase A for the feeds and the
+  import, Phase C and phase 3 plan phase E (field check-in) for the
+  game-day sync.
 - Phase H is the final integration and depends on all other phases.
 
 ---

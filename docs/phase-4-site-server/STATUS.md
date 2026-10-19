@@ -8,13 +8,13 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 **Current phase:** Planning
 **Phase status:** Complete
 **Risk level:** High
-**Last verified:** 2026-10-18
+**Last verified:** 2026-10-19 (design additions)
 
 ## Completed
 
 - [x] Research phase: `RESEARCH.md`
-- [x] Architecture decisions: `ADR.md` (10 ADRs: ADR-P4-1 through ADR-P4-10)
-- [x] Implementation plan: `PLAN.md` (8 phases: A through H, 16 acceptance criteria, weekend milsim gate test plan)
+- [x] Architecture decisions: `ADR.md` (10 ADRs: ADR-P4-1 through ADR-P4-10; ADR-P4-11 and ADR-P4-12 added 2026-10-19, proposed)
+- [x] Implementation plan: `PLAN.md` (8 phases: A through H, 16 acceptance criteria, weekend milsim gate test plan; Phase I and AC-17 to AC-19 added 2026-10-19)
 
 ## Pending
 
@@ -30,10 +30,35 @@ implementation.
 
 Phase G (remote setup) requires Phase C.
 
+Phase I (scheduling, publication, registration, feeds; added
+2026-10-19) requires Phase A; its game-day sync also requires Phase C
+and phase 3's field check-in (ADR-P3-13).
+
 Phase H (integration and weekend milsim gate) requires all other
 phases plus Phase 2F (hardware) and Phase 3 implementation.
 
 To resume: `--implement` with Phase A as the first target.
+
+## Maintainer request: scheduling, registration, publishing (2026-10-19, design only)
+
+The maintainer asked that a field admin can schedule games, publish
+them on the field's site-server page or on shared or third-party
+platforms (naming jogarairsoft.pt in Portugal), and let players
+register; on game day players check in at the field with a printed QR
+code and declare their replicas for the chronograph (phase 3,
+ADR-P3-13).
+
+| What | Where |
+| --- | --- |
+| Scheduling, field page, registration with pre-declared replicas, game-day sync (schedule and roster pulls, check-in push; the controller stays the authority) | `ADR.md` ADR-P4-11 (proposed) |
+| iCalendar (RFC 5545) and JSON feeds, registration import (CSV, JSON), platform adapter interface and its rules | `ADR.md` ADR-P4-12 (proposed) |
+| Plan | `PLAN.md` Phase I (Phase G's scheduling files moved there), constraints 16-18, AC-17 to AC-19 |
+| Open questions | F13-F23 in `docs/review/decisions-to-review.md` |
+
+**jogarairsoft.pt:** no public information or API about it was found
+(web search, 2026-10-19).  No adapter is designed: it needs the
+platform's API documentation or an agreement, which needs the
+maintainer to contact its operators (F22).  No scraping.
 
 ## Plan summary
 
@@ -42,7 +67,7 @@ To resume: `--implement` with Phase A as the first target.
 | Research | Codebase inventory, spec requirements, architecture analysis, threat model, assumptions | Complete |
 | Architecture | ADR-P4-1 through ADR-P4-10 (database schema, auth, sync, multi-tenant, chrono signing, scenario DSL, ATAK, GDPR, geo utilities, deployment) | Complete |
 | Planning | Implementation plan with 8 phases (A-H), 16 acceptance criteria, weekend milsim gate test plan, dependency graph | Complete |
-| Implementation | Phases A-E ready (Phase 2D done); F waits for Phase 3; H waits for all | Pending |
+| Implementation | Phases A-E ready (Phase 2D done); F waits for Phase 3; I's feeds and import need only A, its game-day sync waits for C and phase 3's field check-in; H waits for all | Pending |
 
 ## Dependencies
 

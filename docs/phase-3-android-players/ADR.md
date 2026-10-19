@@ -9,7 +9,9 @@ Twelve decisions settle the structure of the Flutter app, the I/O pod
 firmware, the capability proxy protocol, the player-facing features and
 the CI pipeline before implementation begins.  Each one answers a
 question the research phase identified and creates a constraint that
-the planning phase must respect.
+the planning phase must respect.  A thirteenth, ADR-P3-13 (field
+check-in and per-game replica declaration), was added on 2026-10-19 at
+the maintainer's request.
 
 ---
 
@@ -891,6 +893,11 @@ play), `retest` (after a failed check-in, adjusted and re-tested).
 `class` is a field-defined category that maps to an energy limit in the
 limit template.
 
+**Updated 2026-10-19 (ADR-P3-13, maintainer request):** players declare,
+per game, which replicas they will use; the controller keeps the field's
+registry and a per-game "replicas to chrono" list that signed check-in
+readings mark passed or refused.
+
 #### Limit template format
 
 ```yaml
@@ -1163,6 +1170,12 @@ prop and join card holds (decision B8).
 
 The controller validates the token on every request and extracts the
 role for server-side filtering.
+
+**Updated 2026-10-19 (ADR-P3-13, maintainer request):** players get their
+token by checking in at the field: the app scans the printed check-in
+poster, reaches the controller over the field network and calls
+`POST /api/v1/checkin`.  A self check-in gives only the role `player`;
+other roles come from the GM.
 
 #### Role-based position filtering (server-side enforcement)
 
@@ -1589,6 +1602,363 @@ The embedded Dart broker runs ONLY on Android.
 
 ---
 
+### ADR-P3-13: Field check-in and per-game replica declaration
+
+**Status:** Proposed (2026-10-19, maintainer request; decisions F1-F12
+in `docs/review/decisions-to-review.md`, all open)
+
+**Context:** The maintainer asked for players to check in at the field
+by scanning a QR code printed for the check-in area, then pick which
+of their replicas they will use in that game, so that marshals know
+in advance which replicas still need the chronograph.  The maintainer's
+words: "administration [can] prepare QR code which can be printed and
+added to the field checkin area, so players can arrive, open the app
+and scan it to do their checkin at the field.  after checked in, the
+players can select the replica(s) they expect to use at the field in
+that specific game, which would mark which ones they need to take to
+the marshalls to run the chrono, and marshalls can see in advance
+which replicas are not chronnoed yet".  Scheduling and registration
+before the game day belong to the site server (ADR-P4-11, ADR-P4-12);
+this ADR is the local part, which must work with no internet and no
+site server.
+
+What exists: the join payload (`protocol/join.md`) is for props and
+standby controllers and carries the game key, so it can never be shown
+to players.  Player tokens (`protocol/player-token.md`, decisions B8,
+B9) say who is calling the controller's API, but nothing issues them
+yet.  The CA fingerprint plan (P3-8, ADR-P3-9) covers HTTPS on the
+field network.  The chrono record (`protocol/chrono-record.md`) and
+the replica registry (ADR-P3-7, `app/lib/chrono/replica.dart`) live on
+the marshal's phone; sending them to the controller is plan phase E.
+`player.checkin` (event 15) exists; today the Player Check-in mode's
+boxes emit it at a checkpoint.
+
+**Decision:**
+
+#### The check-in poster
+
+The GM console prints a **check-in poster**: an A4 page for the
+check-in area with a QR code, the field's name, three steps in
+European Portuguese and English ("join the Wi-Fi network ...", "open
+the Atalaia app", "scan this code") and the short form of the CA
+fingerprint, so staff can compare it with the console.  The page is
+rendered by the console in the browser with the QR library it already
+ships (`controller/console/src/lib/qrcode.module.js`) and printed from
+the browser, so the controller needs no PDF or image library.
+
+The poster is **per field**, not per game: it is printed once and
+stays on the wall while the field's controller address and CA stay
+the same (the CA is valid for 10 years, ADR-P3-9).  The GM may pin a
+poster to one game (an event with its own sign), but the default
+poster leads to whichever games are open for check-in.
+
+The QR code holds a text, like the join text:
+
+```
+atalaia:checkin:<base64url without padding of: version (1 byte) | body (CBOR map)>
+```
+
+| Key | Field | Type | Required | Values |
+| --- | --- | --- | --- | --- |
+| 1 | `field_id` | text | yes | the field's id, as in chrono records: 1-64 of `A-Za-z0-9._:-` |
+| 2 | `field_name` | text | yes | 1-48 characters, shown to the player |
+| 3 | `urls` | array of text | yes | 1-3 base URLs of the controller's API, tried in order, e.g. `https://10.42.0.1:8443` and `https://atalaia.local:8443` |
+| 4 | `ca_sha256` | bytes | yes | 32 bytes: SHA-256 of the field CA's DER certificate, the same value as the join payload's proposed key 13 (P3-8) |
+| 5 | `wifi_ssid` | text | no | 1-32 bytes: the field network's name, shown as "join this Wi-Fi" |
+| 6 | `game_id` | uint | no | 1-65534: only this game (a pinned poster) |
+
+Version 1, at most 192 bytes before base64.  Encoders write the keys
+in this order in their shortest form; decoders refuse a missing
+required field, a repeated key, a wrong type, trailing bytes and keys
+of 32 or more, and skip keys 7-31 (kept for later optional fields), as
+the join payload's codecs do.  The specification goes in
+`protocol/checkin.md`, with shared vectors in
+`protocol/vectors/checkin.json` checked by Dart and Python.
+
+**The poster carries no secret.**  There is no join key, game key,
+token key or Wi-Fi password in it, and it is not authenticated with a
+MAC: a player's app holds no key that could check one, and anyone may
+photograph the poster.  A field whose Wi-Fi has a password can print
+a standard Wi-Fi QR code beside it (the common `WIFI:` text format
+that phone cameras read); the console asks for the password only to
+draw that code and never stores it.
+
+**Trust (TOFU per field).**  On the first scan of a `field_id`, the
+app fetches the CA certificate from `GET /api/v1/controller/ca`
+(ADR-P3-9), checks its SHA-256 against `ca_sha256`, and keeps the
+certificate for that field.  Unlike a prop, which trusts the CA for
+one game, a player's app keeps it until the player removes the field,
+so the next game day needs no new check.  The app uses that CA only
+in its own HTTP client and only for the poster's URLs, never in the
+system's trust store.  A later poster for the same `field_id` with a
+different fingerprint is refused with a warning that names both
+short forms; the player can accept it only by removing the field
+first.  A forged poster can therefore only fool a phone that never
+saw the real one, and what it could collect is the little a check-in
+asks for (below): no passwords, no payment.
+
+#### Who the player is (no account)
+
+Playing never requires an account (spec section 12).  For each field,
+the app makes a **field identity** on its first check-in there: a
+`player_id` of `p-` and 12 random base32 characters (it fits the
+player token's and the player tag's id rules) and a 32-byte random
+`player_secret`, both kept in the app's private storage (PD6).  The
+controller keeps the `player_id` and SHA-256 of the secret.  The next
+check-in at that field sends both, so the same player keeps the same
+id (and the same replica history) across game days, while two fields
+cannot link their ids.  A check-in with a known `player_id` and the
+wrong secret is refused (409), so a known id cannot be taken over.
+With a site-server account (phase 4) the account's per-field id takes
+over; the app hands its existing id to the site server when the
+player links the account, so the history continues (ADR-P4-11).
+
+#### Checking in
+
+The GM opens check-in for a game (by default from its creation until
+it ends) and may close it.  The app, after the scan:
+
+1. connects to the first `urls` entry that answers (if none does, it
+   says to join `wifi_ssid` and keeps trying);
+2. reads `GET /api/v1/checkin`: the field's name and operator, the
+   privacy notice, the games open for check-in (with `game_id`, only
+   that one), and the field's check-in settings;
+3. shows the notice once per field and version, then the form: a
+   display name (a callsign or a first name, as the player wants), the
+   federation number if the field asks for one (below), a team
+   preference if the game allows it;
+4. sends `POST /api/v1/checkin` and receives a **player token**
+   (`protocol/player-token.md`, unchanged): role `player`, the team and
+   squad the GM has given (0 until then), the game's `game_id`.
+
+A self check-in only ever gives the role `player`.  Marshal, GM and
+other roles come only from the GM (in the console, or `PATCH` below);
+the GM's change makes the controller issue a new token, which the
+app fetches when the stream tells it its assignment changed.  Player
+tokens cannot be revoked one by one (player-token.md), so the
+controller also checks every token's `role` and `team` against the
+player's current check-in row: a demotion, a team change or a removal
+takes effect at once, and the old token keeps only what the row still
+allows.
+
+The field chooses, in `[checkin] confirm`, between `auto` (checked in
+at once, the default) and `staff` (the check-in waits as `pending`
+until a marshal or the GM confirms it, for fields that check a
+payment, a waiver or a wristband at the desk).  A pending player
+already has a token and can declare replicas; the console shows them
+apart.
+
+The controller emits **`player.checkin` (15)** as its own node when a
+check-in becomes checked in (at once, or when staff confirm it), with
+`player` = the `player_id` and the envelope's team when one is
+assigned.  It is not emitted again for a token refresh.  The Player
+Check-in mode's boxes keep emitting the same event at a checkpoint;
+reports tell the two apart by the node.  No new event ids: everything
+else in this ADR is controller data and WebSocket messages, not radio
+events.
+
+**The token key** is the controller's own, per game (decision B8):
+this ADR depends on it, since anyone holding the game key could
+otherwise mint a marshal token.  The controller keeps the per-game
+token key in its store (mode 0600) so tokens survive a controller
+restart; it authorises only the field API, never the radio (the game
+key's own rule, ADR-P2-4, is unchanged).  `exp` is the game's planned
+end plus 2 hours, or the end of the field's local day, whichever comes
+first; the app refreshes the token with `POST /api/v1/checkin/token`.
+
+#### Declaring replicas
+
+After checking in, the player picks from **"my replicas"**, a list the
+app keeps per player on the phone (type, class, make and model as the
+player describes them, and the registry's `replica_id` once a marshal
+has registered the replica at that field), or adds a new one.  The
+picked replicas are the game's **declaration**:
+
+| Field | Value |
+| --- | --- |
+| `declaration_id` | a lowercase UUID, made by the app (or the controller for a manual check-in) |
+| `replica_id` | the registry's id (ADR-P3-7) when known; absent for a replica the field has not registered yet |
+| `type` | ADR-P3-7's replica types (`aeg`, `gbb`, `hpa`, `bolt_action`, `dmr`, `sniper`, `pistol`, `shotgun`) |
+| `class` | a class of the field's active limit template (`GET /api/v1/checkin` lists them) |
+| `make_model` | optional, 1-64 characters |
+| `state` | `pending`, `passed`, `refused` or `withdrawn` (kept by the controller) |
+| `reading_id` | the chrono reading that decided the state |
+
+At most `[checkin] max_replicas` (default 5, 1-20) per player and game.
+`PUT /api/v1/checkin/me/replicas` replaces the declaration; the player
+may withdraw a replica while it is `pending`, and not after a marshal
+has chronographed it (only staff can change it then).
+
+#### The "replicas to chrono" list
+
+Per game, the controller keeps every declaration with its state.  This
+is the list the marshals work from:
+
+- **pending** until a check-in or retest series for that replica is
+  received; **passed** when the series passes; **refused** when it
+  fails (B11: a check-in or retest is PASS or FAIL only).  A later
+  retest that passes makes a refused replica passed; the failed record
+  stays (records are append-only).
+- A reading is matched to a declaration by `replica_id` and
+  `player_id`.  A declaration without a `replica_id` is linked at the
+  chronograph: the marshal scans the replica's sticker or label; if it
+  is not in the registry, the marshal picks the player's pending
+  declaration and registers the replica, which gives it its
+  `replica_id`.
+- **Valid for the day** (`[checkin] chrono_valid_for = "day"`, the
+  default): a passing check-in series for that replica at this field
+  earlier on the same field-local day marks a new declaration passed
+  at once, so a player who plays two games in a day goes through the
+  chronograph once.  `"game"` asks for a chronograph per game.  A
+  replica refused earlier that day is shown to marshals as such when
+  it is declared again.
+- Readings reach the controller signed (`protocol/chrono-record.md`):
+  the marshal's app sends them with `POST /api/v1/chrono/readings`,
+  with `game_id` set to the game being checked in.  The controller
+  verifies each one with the marshal's registered Ed25519 public key
+  before it changes the list, and refuses an unsigned or unverifiable
+  record.  A marshal's key is registered when the GM gives a
+  checked-in person the marshal role (the app sends the public key)
+  or from the console (ADR-P3-7: "when the marshal role is first
+  assigned on a controller").  Upload is idempotent by `reading_id`.
+- The controller emits `chrono.checkin` (35) once per judged series,
+  with its highest reading; spot checks keep `chrono.spotcheck` (36)
+  and `chrono.violation` (17) as ADR-P3-7 says.  A refusal adds no
+  event: it is in the list, which only staff see.
+
+**The marshal's view** (app, marshal role) shows the list grouped by
+player, with "not chronographed yet" first in check-in order, counts
+of pending, passed and refused, and a scan of a replica's sticker or
+label that jumps to its declaration.  **The GM console** gets a
+*Check-in* tab: open or close check-in per game, the settings, the
+poster, the live list of check-ins (status, team and squad, federation
+number with a "card seen" tick, number of declared replicas and their
+chrono state), the same "replicas to chrono" list, manual check-in,
+removal, and a CSV export of the list for the field's own records (GM
+token only: it holds names).  Asking to start a game with pending
+declarations shows a warning with the count; it does not block (the
+GM decides).
+
+#### A player without the app
+
+A marshal (app) or the GM (console) checks the player in by hand:
+display name, federation number if asked, and the replicas the player
+names.  The controller makes the `player_id`; the marshal can write it
+to a player tag with the existing tag writer (PD14) for the modes that
+need one.  The player has no token and needs none: the list, the
+chronograph and the game work the same.  Linking a hand check-in to an
+app later is not in this ADR.
+
+#### Federation number
+
+Many games in Portugal require players federated with the FPA (the
+maintainer's note).  The field sets `[checkin] federation` to `off`
+(default), `optional` or `required`, and a label (`federation_label`,
+e.g. "FPA").  The number is free text (1-32 printable characters).
+**It is never verified automatically**: no lookup, no checksum, no
+call to any federation.  `required` only means the form will not send
+without it; the console marks it "not checked" until a marshal or the
+GM ticks "card seen".  The app can remember it for that field if the
+player asks.  Whether a federation offers any verification service,
+and whether one should be used, is an open question (F10).
+
+#### API (controller, REST v1 additions)
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/v1/checkin` | none | Field name and operator, privacy notice (version, pt and en), games open for check-in, settings (`confirm`, `federation`, `federation_label`, `max_replicas`, `chrono_valid_for`), the limit template's classes |
+| POST | `/api/v1/checkin` | none | `{game_id, player_id, player_secret, display_name, federation_number?, team_preference?, notice_version}` -> `{player_id, token, exp, status, team, squad, role}`; 409 for a known id with the wrong secret, 403 when check-in is closed |
+| POST | `/api/v1/checkin/token` | player token | A new token (after a change, or near `exp`) |
+| GET | `/api/v1/checkin/me` | player token | The player's own check-in and declaration, with states |
+| PUT | `/api/v1/checkin/me/replicas` | player token | Replace the declaration |
+| DELETE | `/api/v1/checkin/me` | player token | Leave the game; the check-in's personal fields are erased |
+| GET / POST | `/api/v1/games/{id}/checkins` | GM token, or a marshal or gm player token | The list with names / a manual check-in |
+| PATCH / DELETE | `/api/v1/games/{id}/checkins/{player_id}` | GM token (team, squad, role, remove); marshal (confirm, card seen, declarations) | Staff changes |
+| GET | `/api/v1/games/{id}/chrono-list` | GM token, or a marshal or gm player token | The "replicas to chrono" list |
+| POST | `/api/v1/chrono/readings` | marshal player token | Signed readings; verified, stored, matched |
+| POST | `/api/v1/marshals` | GM token | Register a marshal's id, name and Ed25519 public key |
+| GET / PUT | `/api/v1/checkin/settings` · `/api/v1/checkin/poster` | GM token | Settings / the poster's text and fields |
+| POST | `/api/v1/games/{id}/checkin/open` · `/close` | GM token | Open or close check-in |
+| DELETE | `/api/v1/players/{player_id}` | GM token | Erase a player's field identity, check-ins and declarations (chrono readings: ADR-P3-7's erasure) |
+
+The two unauthenticated endpoints answer only on the field network
+(the controller listens on the local network, spec section 14), are
+rate-limited per client address (10 check-ins a minute by default) and
+capped per game (`[checkin] max_players`, default 300).  On
+`WS /api/v1/stream`, GM and marshal connections also get `checkin` and
+`chrono_list` messages; a player's connection gets only its own; a
+read-token connection (scoreboards, spectators) gets neither.
+
+#### Personal data (GDPR)
+
+- **What is kept:** the per-field `player_id` and a hash of its
+  secret; per check-in the display name, the federation number if
+  given, the team preference, the time, the state; the declaration.
+  Nothing else: no email, phone number, birth date, identity document
+  or photo.  Positions are separate (ADR-P3-6, their own consent).
+- **Where it does not go:** events carry only the `player_id`; names
+  and federation numbers never reach the radio, MQTT, the event log,
+  the read token's views or the controller's log lines.
+- **Retention**, following ADR-P4-8's guest rule: a check-in's display
+  name, federation number and team preference, and the declaration,
+  are erased 30 days after the game; a field identity with no check-in
+  for 365 days is deleted (the chrono retention, B12, so replica
+  history lasts as long as the readings).  Chrono readings keep their
+  own retention (ADR-P3-7).
+- **Rights:** the player sees their data in the app (`GET
+  /api/v1/checkin/me`), can leave a game and erase it (`DELETE
+  /api/v1/checkin/me`), and can ask the field to erase everything
+  (`DELETE /api/v1/players/{player_id}`, plus the chrono erasure).
+- **Notice:** the app shows the field's notice before the first
+  check-in at a field and again when its version changes.  The
+  controller ships a short default in Portuguese and English naming
+  the field operator as data controller, to be replaced by ADR-P4-8's
+  templates; both go to the legal review of decision P4-6.
+- **Lawful basis (proposed, for that review):** legitimate interest for
+  the check-in list and the declaration (running the game, replica
+  safety); for the federation number, the field's rules for that game
+  where it requires one, otherwise the player's choice to give it
+  (F11).
+
+#### Offline behaviour
+
+- Nothing needs the internet: the phone talks to the controller over
+  the field network only.  The Pi controller is the reference; the
+  Android controller role (ADR-P3-12) serves the same endpoints and
+  passes the same contract tests.
+- A phone that is not on the field network is told to join
+  `wifi_ssid`.  "My replicas" lives on the phone, so the player can
+  prepare it before arriving; it is sent with the check-in.
+- When the controller is out of reach after check-in, the app keeps
+  its token and its declaration and retries.  The marshal's app keeps
+  signing readings offline, as now, and uploads them when it can; the
+  list catches up.  The marshals' list view needs the controller.
+- A controller restart keeps everything (SQLite, the per-game token
+  key).  A standby controller that takes over does not have the
+  check-ins (they are not on the radio) and has another token key: the
+  app checks in again by itself with its field identity and resends
+  its declaration, and the marshals' apps resend their readings, which
+  rebuilds the list (F9).
+
+**Consequences:**
+- Players check in with their own phones from a printed code, with no
+  account and no internet, and marshals see before anyone queues which
+  replicas still need the chronograph.
+- The poster is public and long-lived; it holds nothing that helps
+  anyone take part in the game's radio or mint tokens.
+- Player tokens finally have an issuer, with the controller-only token
+  key of decision B8, which this ADR makes a requirement.
+- Check-in personal data is a short list, stays on the controller,
+  never travels with events, and expires on ADR-P4-8's guest schedule.
+- The controller gains tables (field identities, check-ins,
+  declarations, replicas, readings, marshal keys) and about fifteen
+  endpoints; the protocol gains one text format (`atalaia:checkin:`)
+  and no event ids.
+- Phase 4 (ADR-P4-11) fills the same list from site-server
+  registrations; the controller stays the authority on the day.
+
+---
+
 ## Phase 2 handoff (2026-10-18)
 
 Phase 2 plan phases A-E are implemented and pushed (commit `771fd90`).
@@ -1710,3 +2080,19 @@ the decisions above:
 
 24. **Minimum Android API 26.** All Android features require API 26
     (Android 8.0) or higher.
+
+25. **The check-in poster carries no secret** (ADR-P3-13).  No join key,
+    game key, token key or Wi-Fi password; it is not authenticated; the
+    app pins the field's CA per `field_id` on first use.
+
+26. **Check-in personal data stays minimal and off the event path**
+    (ADR-P3-13).  A display name, an optional federation number (never
+    verified automatically), a team preference and the declared
+    replicas; never in events, MQTT, logs or read-token views; erased 30
+    days after the game.
+
+27. **The controller is the authority for check-ins and the "replicas to
+    chrono" list** (ADR-P3-13).  It works with no internet; a list entry
+    changes only on a reading verified with the marshal's Ed25519 key;
+    player tokens are keyed with the controller's own per-game token key
+    (decision B8), kept across restarts.

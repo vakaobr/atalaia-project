@@ -645,6 +645,8 @@ Reading needs a read token, which can be printed as a QR code for spectators and
 | POST | `/api/v1/nodes/{id}/cmd` | Send a command to one node |
 | GET | `/api/v1/games/{id}/log` | Export the merged event log |
 | WS | `/api/v1/stream` | Live event stream |
+| GET / POST | `/api/v1/checkin` | Field check-in from the printed poster; a player token in return (phase 3) |
+| GET | `/api/v1/games/{id}/chrono-list` | Declared replicas and their chrono state, for marshals and the GM (phase 3) |
 
 The REST API is described in an OpenAPI file and MQTT in an AsyncAPI file, both versioned in the repo.
 
@@ -665,6 +667,7 @@ A field with internet can self-host a site server. It never runs game logic: it 
 | Accounts and profiles | Players, clubs and squads. Optional: playing never requires an account |
 | Field setup | Maps and floor plans, prop inventory, presets, field profiles, house rules such as joule limits per replica class |
 | Remote management | Prop health, battery and firmware status when props are online; game scheduling |
+| Game calendar | Games scheduled by the field admin and published on the field's page; registration with the replicas each player expects to use; an iCalendar feed and a JSON feed for calendars and other platforms; import of a registration list taken elsewhere (other platforms only through their documented API or an agreement, never by scraping) |
 | Player app backend | Login, role assignment, positions, messages, pre-game briefings |
 | History | Archived event logs, scores and statistics per player, squad and team |
 | Chrono registry | Replicas, check-in readings and spot checks (section 12) |
@@ -672,7 +675,7 @@ A field with internet can self-host a site server. It never runs game logic: it 
 
 Sync with the field controller:
 
-- **Before a game** the controller pulls rosters, roles, presets and chrono records, so check-in and spot checks work even if the internet drops.
+- **Before a game** the controller pulls rosters (with each registration's declared replicas), roles, presets and chrono records, so check-in and spot checks work even if the internet drops. Roster changes stop applying once the game starts.
 - **During a game** the controller stays authoritative. It streams events to the site server when a link exists, and uploads the full log afterwards when it does not.
 - **Conflicts** do not arise: events and chrono records are append-only, and presets are versioned.
 
@@ -723,6 +726,14 @@ Players install the app once and join a game by scanning a QR code at the safe z
 | Spectator | Scores and public events only, with a delay | Nothing that affects play |
 
 Modes can declare extra roles in their manifest, such as an "engineer" who may activate satellite boxes or a medic who can revive players. A role is a view plus a set of permissions, so like modes it is data.
+
+### Field check-in and replica declaration
+
+The GM console prints a check-in poster for the field's check-in area. Its QR code tells the app how to reach this field's controller and which certificate to trust; it holds no game key or other secret, so it can stay on the wall for years. A player arrives, joins the field Wi-Fi, scans the poster and is checked in at the controller, which gives the app a player token (role `player`; other roles only from the GM). No account and no internet are needed.
+
+The player then picks which of their replicas they will use in that game. The controller keeps, per game, a list of the declared replicas not yet chronographed: marshals see it in advance in the app and the GM in the console, and a signed chrono check-in reading marks each one passed or refused. A pass counts for the rest of the day at that field by default. A marshal checks in a player who has no app by hand. Fields that require federated players can ask for a federation number, which the app never verifies: staff check the card. A check-in keeps only a display name, that optional number, a team preference and the declared replicas; none of it travels in events, and it is erased 30 days after the game.
+
+With a site server, players can register for a scheduled game beforehand and declare their replicas then; the controller pulls the list on game day and stays in charge during the game.
 
 ### Positions and visibility
 
@@ -872,6 +883,8 @@ Accounts, positions and chrono records are personal data, and fields in the EU f
 - Chrono records are kept for a period the field sets (default 12 months).
 - Players can export or delete their own account and records.
 - Sharing chrono history with other fields is off by default. Each field opts in, and players are told at registration which fields can see their records.
+- Field check-in keeps a display name, an optional federation number (never verified automatically), a team preference and the declared replicas, erased 30 days after the game; names never appear in events, MQTT or spectator views.
+- Public game pages and calendar feeds list games only, never who registered.
 
 The docs include a template privacy notice organisers can show players at registration.
 
@@ -953,9 +966,9 @@ flowchart TB
     g1{{"One box runs a 2-hour club<br/>game with no restarts"}}
     p2["<b>Phase 2 · Field network</b><br/>LoRa protocol, time sync, log merge, Raspberry Pi controller<br/>MQTT and REST API, GM console web app, scoreboard example<br/>Mode pack: Hold-All, Last Stand, Bomb team codes, Codes modifier"]
     g2{{"5 boxes on a CQB site and an<br/>outdoor field, zero lost captures"}}
-    p3["<b>Phase 3 · Android and players</b><br/>Android props, I/O pod, player app with roles (Android, iOS)<br/>Respawn, Kill Confirmed, Player Check-in, Money Factory, chrono check-in"]
+    p3["<b>Phase 3 · Android and players</b><br/>Android props, I/O pod, player app with roles (Android, iOS)<br/>Respawn, Kill Confirmed, Player Check-in, Money Factory, chrono check-in<br/>Field check-in by printed QR, per-game replica declaration for the chrono"]
     g3{{"One game mixes ESP32 and<br/>Android props without issues"}}
-    p4["<b>Phase 4 · Site server and advanced play</b><br/>Site server: accounts, history, chrono registry, remote setup<br/>Master and Satellites, Target, VIP, Hacking Terminal, ATAK"]
+    p4["<b>Phase 4 · Site server and advanced play</b><br/>Site server: accounts, history, chrono registry, remote setup<br/>Game scheduling, registration, publishing (field page, iCal and JSON feeds)<br/>Master and Satellites, Target, VIP, Hacking Terminal, ATAK"]
     g4{{"A weekend milsim runs on<br/>the platform end to end"}}
     p5["<b>Phase 5 · Community</b><br/>Visual editor, mode registry with verified badge<br/>Carrier PCB, translations, build guides for other node types<br/><i>Ongoing after the first release</i>"]
     p0 --> g0 --> p1 --> g1 --> p2 --> g2 --> p3 --> g3 --> p4 --> g4 --> p5

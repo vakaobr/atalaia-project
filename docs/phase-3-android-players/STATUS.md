@@ -12,7 +12,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 ## Completed
 
 - [x] Research phase: `RESEARCH.md`
-- [x] Architecture phase: `ADR.md` (12 ADRs, 24 constraints)
+- [x] Architecture phase: `ADR.md` (12 ADRs, 24 constraints; ADR-P3-13 and constraints 25-27 added 2026-10-19, proposed)
 - [x] Planning phase: `PLAN.md` (7 phases A-G, 12 AC, field test plan)
 - [x] Phase 2 handoff (2026-10-18): design updated to match phase 2
   A-E implementation (commit `771fd90`)
@@ -147,6 +147,23 @@ pods, kiosk mode as device owner, hours on battery), iOS (not built), the
 emulator tests outside CI, Wokwi (its CI quota is used up, decision R7).
 Deviations and choices: decisions PD1-PD24 in `docs/review/decisions-to-review.md`.
 
+## Maintainer request: field check-in (2026-10-19, design only)
+
+The maintainer asked for players to check in at the field by scanning a
+printed QR code, pick the replicas they will use in that game, and for
+marshals to see in advance which replicas are not chronographed yet.
+The local part is designed and added to plan phase E; scheduling,
+registration and publishing go to phase 4 (ADR-P4-11, ADR-P4-12).
+
+| What | Where |
+| --- | --- |
+| Design | `ADR.md` ADR-P3-13 (proposed): the check-in poster (`atalaia:checkin:`, per field, no secret, CA pinned per field on first use), check-in at the controller with a player token (role `player` only; the controller's own per-game token key, B8, kept across restarts), the per-game declaration, the "replicas to chrono" list driven by signed readings, manual check-in, the optional federation number (never verified automatically), personal data and retention (30 days, ADR-P4-8's guest rule), offline behaviour; constraints 25-27 |
+| Plan | `PLAN.md` plan phase E, subsection "Field check-in and per-game replica declaration": files, tests, AC-13; field test 5 |
+| Open questions | F1-F12 in `docs/review/decisions-to-review.md` ("Field check-in, registration and scheduling") |
+
+Nothing is built yet.  No new event ids: the controller emits the
+existing `player.checkin` (15).
+
 ## Phase 2 handoff changes (2026-10-18)
 
 | Change | Impact | Files updated |
@@ -184,7 +201,8 @@ Phase G needs hardware.
 4. Implementation -- plan phases A, B, C and D done; next: plan phase E
    (the prop's link to the controller, player tokens with roles and the
    role-filtered feed, positions, the CA fingerprint, chrono readings to the
-   controller, the Android controller role with its MQTT broker)
+   controller, the Android controller role with its MQTT broker, and
+   field check-in with per-game replica declaration, ADR-P3-13)
 
 ## How to resume with implementation
 
@@ -218,3 +236,4 @@ Phase 4's site server builds on these phase 3 interfaces:
 | Mode events (IDs 25-27, 33-41) | `protocol/schema/events.yaml` | Event log storage, statistics, replays |
 | Field join key distribution | `protocol/join.md`, key 13 (CA fingerprint) | Site server join flow |
 | Capability proxy protocol | `protocol/capability-proxy.md`, `protocol/vectors/capability_proxy.yaml` | Pod management in the site-server inventory |
+| Field check-in and declarations (planned, ADR-P3-13) | `protocol/checkin.md`, the controller's check-in tables and endpoints | Roster sync fills the check-in list with registrations and pre-declared replicas; check-ins and chrono outcomes pushed back after the game (ADR-P4-11) |
