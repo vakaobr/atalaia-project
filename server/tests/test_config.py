@@ -24,6 +24,18 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual((s.db_pool_size, s.db_max_overflow, s.db_timeout_s), (5, 5, 5.0))
         self.assertIsNone(s.metrics_token)
         self.assertEqual(s.log_level, "info")
+        self.assertEqual((s.purge_hour, s.privacy_notice_version), (3, "template-2026-10-19"))
+
+    def test_purge_hour_and_notice_version(self) -> None:
+        s = Settings.from_env({**BASE, "ATALAIA_PURGE_HOUR": "0", "ATALAIA_PRIVACY_NOTICE_VERSION": "campo-tejo-v2"})
+        self.assertEqual((s.purge_hour, s.privacy_notice_version), (0, "campo-tejo-v2"))
+        self.assertIsNone(Settings.from_env({**BASE, "ATALAIA_PURGE_HOUR": " OFF "}).purge_hour)
+        for raw in ("24", "-1", "3am"):
+            with self.subTest(raw=raw), self.assertRaisesRegex(ConfigError, "ATALAIA_PURGE_HOUR"):
+                Settings.from_env({**BASE, "ATALAIA_PURGE_HOUR": raw})
+        for raw in ("v 2", "-v2", "x" * 65, "versão"):
+            with self.subTest(raw=raw), self.assertRaisesRegex(ConfigError, "ATALAIA_PRIVACY_NOTICE_VERSION"):
+                Settings.from_env({**BASE, "ATALAIA_PRIVACY_NOTICE_VERSION": raw})
 
     def test_every_setting(self) -> None:
         s = Settings.from_env({

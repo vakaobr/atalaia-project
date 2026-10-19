@@ -3,6 +3,7 @@
 """The site server's commands: ``python -m atalaia_server <command>``.
 
     python -m atalaia_server create-admin --username NAME [--email EMAIL] [--password-stdin]
+    python -m atalaia_server purge [--dry-run]
 
 ``create-admin`` makes a server administrator (ADR-P4-2): it asks for the
 password twice (or reads one line from standard input with
@@ -12,6 +13,11 @@ the account only after a code from that app is typed back, since an
 administrator cannot log in without TOTP. In the deployed Compose project:
 ``docker compose exec server python -m atalaia_server create-admin --username ...``.
 It needs ATALAIA_DATABASE_URL and ATALAIA_SECRET_KEY, as the server does.
+
+``purge`` runs the retention purge (ADR-P4-8) once and prints what it
+deleted (``--dry-run``: what it would delete). The server runs it by itself
+every day at ATALAIA_PURGE_HOUR (03:00 UTC by default); the command is for a
+deployment that turns that off and schedules it elsewhere, or for a check.
 """
 
 from __future__ import annotations
@@ -28,8 +34,8 @@ from typing import Callable, Optional, TextIO
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from . import passwords, totp
-from .api.auth import EMAIL, USERNAME
+from . import passwords, personal_data, totp
+from .api.auth import EMAIL, username_problem
 from .audit import record
 from .config import ConfigError, Settings
 from .db import make_engine, make_sessionmaker
@@ -50,7 +56,9 @@ async def create_admin(settings: Settings, username: str, email: Optional[str], 
     """Creates the administrator once a code for its new TOTP secret is confirmed; returns its id."""
     username = username.strip().lower()
     email = email.strip().lower() if email and email.strip() else None
-    if not USERNAME.fullmatch(username):
+    if username_problem(username) == "username_reserved":
+        raise CommandError(f"usernames starting with {personal_data.ERASED_PREFIX!r} are reserved for erased accounts")
+    if username_problem(username):
         raise CommandError("the username must be 3-64 characters: letters, digits, '.', '_' or '-', "
                            "starting with a letter or digit")
     if email is not None and not EMAIL.fullmatch(email):
@@ -91,6 +99,8 @@ async def create_admin(settings: Settings, username: str, email: Optional[str], 
                 await db.flush()
             except IntegrityError:
                 raise CommandError("that username or email address is already taken") from None
+            personal_data.give_consent(db, user.id, personal_data.ACCOUNT, settings.privacy_notice_version,
+                                       user.gdpr_consent_at)
             record(db, "admin_create", None, user_id=user.id, resource="user", resource_id=user.id,
                    details={"via": "cli"})
             await db.commit()
@@ -98,6 +108,19 @@ async def create_admin(settings: Settings, username: str, email: Optional[str], 
             return user.id
     finally:
         await engine.dispose()
+
+
+async def run_purge(settings: Settings, dry_run: bool, out: TextIO) -> dict[str, int]:
+    engine = make_engine(settings)
+    try:
+        async with make_sessionmaker(engine)() as db:
+            counts = await personal_data.purge(db, dry_run=dry_run)
+    finally:
+        await engine.dispose()
+    verb = "would delete" if dry_run else "deleted"
+    print(f"Retention purge {verb}: " + ", ".join(f"{n} {what.replace('_', ' ')} rows" for what, n in counts.items()),
+          file=out)
+    return counts
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -108,6 +131,8 @@ def _parser() -> argparse.ArgumentParser:
     admin.add_argument("--email")
     admin.add_argument("--password-stdin", action="store_true",
                        help="read the password from the first line of standard input, the TOTP code from the next")
+    purge = sub.add_parser("purge", help="delete what is past its retention period (ADR-P4-8), once")
+    purge.add_argument("--dry-run", action="store_true", help="count, delete nothing")
     return parser
 
 
@@ -119,6 +144,9 @@ def main(argv: Optional[list[str]] = None, stdin: TextIO = sys.stdin, out: TextI
     except ConfigError as e:
         print(f"atalaia_server: {e}", file=err)
         return 2
+    if args.command == "purge":
+        asyncio.run(run_purge(settings, args.dry_run, out))
+        return 0
     if args.password_stdin:
         password = stdin.readline().rstrip("\r\n")
 

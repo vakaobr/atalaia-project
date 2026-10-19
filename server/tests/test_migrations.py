@@ -26,7 +26,7 @@ from atalaia_server.models import ROLES, Base
 
 from .base import SERVER, TempDatabase, alembic_config
 
-TABLES = {"fields", "users", "roles", "user_field_roles", "sessions", "audit_log", "refresh_tokens"}
+TABLES = {"fields", "users", "roles", "user_field_roles", "sessions", "audit_log", "refresh_tokens", "consents"}
 
 SCHEMA_SQL = (
     ("columns", "SELECT table_name, column_name, data_type, is_nullable, column_default, character_maximum_length "
@@ -129,6 +129,25 @@ class MigrationTests(unittest.TestCase):
         command.downgrade(self.cfg, "0001_base")
         self.assertEqual(self.db.fetch("SELECT count(*) FROM sessions")[0][0], 0)
         self.assertEqual(self.db.fetch("SELECT username FROM users")[0][0], "rita")
+        self.db.fetch("DELETE FROM users")
+
+    def test_0003_with_data(self) -> None:
+        """0003_personal_data gives earlier accounts their account consent, and goes back."""
+        command.upgrade(self.cfg, "0002_accounts")
+        self.db.fetch("INSERT INTO users (username, password_hash, gdpr_consent_at) "
+                      "VALUES ('rita', 'x', '2026-10-01T10:00:00Z'), ('joana', 'x', NULL)")
+        command.upgrade(self.cfg, "0003_personal_data")
+        rows = self.db.fetch("SELECT u.username, c.purpose, c.notice_version, c.given_at = u.gdpr_consent_at AS same, "
+                             "c.withdrawn_at FROM consents c JOIN users u ON u.id = c.user_id")
+        self.assertEqual([tuple(r) for r in rows], [("rita", "account", "before-0003", True, None)])
+        # One live consent per account and purpose; a withdrawn one may sit beside it.
+        with self.assertRaisesRegex(Exception, "uq_consents_live"):
+            self.db.fetch("INSERT INTO consents (user_id, purpose, notice_version) "
+                          "SELECT id, 'account', 'v2' FROM users WHERE username = 'rita'")
+        self.db.fetch("INSERT INTO consents (user_id, purpose, notice_version, withdrawn_at) "
+                      "SELECT id, 'account', 'v0', now() FROM users WHERE username = 'rita'")
+        command.downgrade(self.cfg, "0002_accounts")
+        self.assertEqual(self.db.fetch("SELECT count(*) FROM users WHERE gdpr_consent_at IS NOT NULL")[0][0], 1)
         self.db.fetch("DELETE FROM users")
 
     def test_one_linear_history(self) -> None:

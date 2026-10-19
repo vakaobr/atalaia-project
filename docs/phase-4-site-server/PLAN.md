@@ -914,6 +914,26 @@ later plan phase:** a table with personal data is added to access,
 export, erasure and the purge in the same plan phase. Tests:
 `test_personal_data.py`. Portuguese templates in pt-PT, inclusive.
 
+**Built 2026-10-19** (in software; decisions S12-1 to S12-8). Differences
+from the text above, as built: the module that knows every personal data
+table is `atalaia_server/personal_data.py` (access, export, erasure, the
+purge; later plan phases add their tables there) with the routes in
+`api/me.py`; `PATCH /api/v1/me` changes the username and email and
+`POST /api/v1/me/password` the password (ending the other sessions), both,
+and `DELETE /api/v1/me`, only with the current password (erasure with a TOTP
+code too, S12-3); erasure keeps an anonymised `deleted-...` tombstone, keeps
+the person's audit rows without their addresses and logs itself with no
+account (S12-4); consents get their own table, `consents`, with the privacy
+notice's version (`ATALAIA_PRIVACY_NOTICE_VERSION`, S12-5) in migration
+`0003_personal_data` (so sync is `0004_sync`, S12-7); the purge (sessions 30
+days after they end, the audit log after 36 months) runs inside the server
+every day at `ATALAIA_PURGE_HOUR` and as `python -m atalaia_server purge
+[--dry-run]` (S12-6); the export's game, chrono and event files come with
+their tables (S12-2); the DPA template is in English only until the legal
+review (S12-8). Also in this plan phase: the login lockout is now per
+(address, username), with a per-address ceiling of 50 failures (S11-12,
+S12-1).
+
 ---
 
 ## Plan phase 13: Controller sync
@@ -927,7 +947,7 @@ games; the site server stores them. Decisions P4R10-P4R13.
 
 ### Site server
 
-- Migration `0003_sync`: `field_api_keys` (SHA-256, two active during a
+- Migration `0004_sync` (*renamed 2026-10-19: plan phase 12 took `0003_personal_data`, decision S12-7*): `field_api_keys` (SHA-256, two active during a
   rotation), `controllers` (controller_id, last seen, version),
   `games` (UUID, `field_id`, `game_id`, `game_seed`, mode id, teams,
   team info, params, times, state; unique `(field_id, game_id,
@@ -985,7 +1005,7 @@ docker run --rm -v "$PWD:/src" atalaia-dev sh -c "BUILD=/tmp/c sh tools/check.sh
 
 *Software, can be done now; with a real chronograph: HW4. Depends on plan phase 13. Size M.*
 
-ADR-P4-5 as amended (P4R14, P4R15). Migration `0004_chrono`:
+ADR-P4-5 as amended (P4R14, P4R15). Migration `0005_chrono` (*renamed 2026-10-19, S12-7*):
 `marshal_keys` (marshal_id, public key, from/until, the account it is
 linked to), `replicas` (the app's `replica_id` UUID, the per-field
 owner, type including `sniper`, class, make and model), `chrono_readings`

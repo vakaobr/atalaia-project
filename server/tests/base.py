@@ -49,7 +49,7 @@ METRICS_TOKEN = "t" * 40
 SECRET_KEY = "s" * 43
 PASSWORD = "correct horse battery staple 42"
 # The tables tests write to (not roles, which the migrations seed).
-DATA_TABLES = ("audit_log", "refresh_tokens", "sessions", "user_field_roles", "users", "fields")
+DATA_TABLES = ("audit_log", "consents", "refresh_tokens", "sessions", "user_field_roles", "users", "fields")
 _clock = [time.time()]
 
 
@@ -143,10 +143,11 @@ class DatabaseTestCase(unittest.IsolatedAsyncioTestCase):
 
 class AppTestCase(DatabaseTestCase):
     metrics_token: Optional[str] = METRICS_TOKEN
+    purge_hour: Optional[int] = None  # no daily purge task unless a test asks for one
 
     def settings(self) -> Settings:
         return Settings(database_url=self.database_url, secret_key=SECRET_KEY, metrics_token=self.metrics_token,
-                        db_timeout_s=2.0)
+                        db_timeout_s=2.0, purge_hour=self.purge_hour)
 
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()

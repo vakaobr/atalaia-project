@@ -27,6 +27,16 @@ Protocol changes go through the RFC process in [`rfcs/`](rfcs/).
 | --- | --- | --- |
 | [RFC 0001](rfcs/0001-skirmesh-rf-wire-format.md) | Accepted | Skirmesh-RF wire format, encryption, duty cycle, join, failover. Amendment 1: single shared game channel (869.525 MHz g2). Amendment 2: join payload encoding. |
 
+## Templates
+
+Drafts for field operators, to be reviewed by a lawyer before use (decision
+P4-6):
+
+| Template | What it is |
+| --- | --- |
+| [`templates/privacy-notice-pt.md`](templates/privacy-notice-pt.md), [`templates/privacy-notice-en.md`](templates/privacy-notice-en.md) | The site server's privacy notice, in Portuguese and English (the field controller's own check-in notice is in `controller/templates/`) |
+| [`templates/dpa-template.md`](templates/dpa-template.md) | A data processing agreement for a hosted site server (GDPR Art. 28) |
+
 ## Decisions to review
 
 Open design questions that need a maintainer decision are tracked in

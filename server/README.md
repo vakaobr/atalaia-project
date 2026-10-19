@@ -8,7 +8,7 @@ Licence: AGPL-3.0-or-later.
 
 ## Status
 
-Phase 4 plan phases 10 and 11 are built, and tested on a computer only. Plan phase 10 is the skeleton every later plan phase builds on: the application factory, its settings, the async database layer on PostgreSQL 16, the first migration (the base tables), `GET /api/v1/health` and `GET /api/v1/metrics`, security headers on every response, the server's own image, and the tests with their tooling. Plan phase 11 adds accounts, sessions and roles: registration, login with a TOTP step, rotating refresh tokens, lockouts and rate limits, per-field roles, the audit log and `python -m atalaia_server create-admin`. There is no game data yet: personal data rights come in plan phase 12, the controller sync (and per-game roles) in plan phase 13, deployment with HTTPS (Caddy, setup and backups) in plan phase 22. See [docs/phase-4-site-server/PLAN.md](../docs/phase-4-site-server/PLAN.md).
+Phase 4 plan phases 10, 11 and 12 are built, and tested on a computer only. Plan phase 10 is the skeleton every later plan phase builds on: the application factory, its settings, the async database layer on PostgreSQL 16, the first migration (the base tables), `GET /api/v1/health` and `GET /api/v1/metrics`, security headers on every response, the server's own image, and the tests with their tooling. Plan phase 11 adds accounts, sessions and roles: registration, login with a TOTP step, rotating refresh tokens, lockouts and rate limits, per-field roles, the audit log and `python -m atalaia_server create-admin`. Plan phase 12 adds the personal data rights: access, export, rectification and erasure of one's own account, consent records, the daily retention purge, and privacy notice and DPA templates. There is no game data yet: the controller sync (and per-game roles) in plan phase 13, deployment with HTTPS (Caddy, setup and backups) in plan phase 22. See [docs/phase-4-site-server/PLAN.md](../docs/phase-4-site-server/PLAN.md).
 
 ## Layout
 
@@ -29,8 +29,10 @@ Phase 4 plan phases 10 and 11 are built, and tested on a computer only. Plan pha
 | [`atalaia_server/auth.py`](atalaia_server/auth.py) | Who is calling and which roles count (re-read from the database on every request) |
 | [`atalaia_server/ratelimit.py`](atalaia_server/ratelimit.py) | Lockouts and the per-address request limit |
 | [`atalaia_server/audit.py`](atalaia_server/audit.py) | Audit log rows |
-| [`atalaia_server/cli.py`](atalaia_server/cli.py) | `python -m atalaia_server create-admin` |
-| [`migrations/`](migrations/), [`alembic.ini`](alembic.ini) | Alembic, async; one reversible migration per plan phase (`0001_base`, `0002_accounts`) |
+| [`atalaia_server/api/me.py`](atalaia_server/api/me.py) | A person's rights on their own account: access, export, rectification, a new password, erasure |
+| [`atalaia_server/personal_data.py`](atalaia_server/personal_data.py) | Every table with personal data, for access, export, erasure and the retention purge; consent records |
+| [`atalaia_server/cli.py`](atalaia_server/cli.py) | `python -m atalaia_server create-admin` and `purge` |
+| [`migrations/`](migrations/), [`alembic.ini`](alembic.ini) | Alembic, async; one reversible migration per plan phase (`0001_base`, `0002_accounts`, `0003_personal_data`) |
 | [`requirements.in`](requirements.in), [`requirements.txt`](requirements.txt) | Dependencies; the `.txt` pins every package with its PyPI hashes (`requirements-test.*`: the tests' extras) |
 | [`Dockerfile`](Dockerfile) | The image: the core built in its own stage, then `python:3.12-slim` (pinned by digest) with the requirements and the Python shared with the controller; target `test` adds the tests |
 | [`docker-compose.yml`](docker-compose.yml) | The server and `postgres:16-alpine`, for a local trial (Caddy comes in plan phase 22) |
@@ -50,6 +52,8 @@ The site server imports the Python it shares with the field controller (the chro
 | `ATALAIA_DB_TIMEOUT_S` | 5 | Connect and health-check timeout, seconds |
 | `ATALAIA_METRICS_TOKEN` | (empty) | Optional bearer token for `/api/v1/metrics`, at least 32 characters, for a monitoring system; server administrators can always read the metrics |
 | `ATALAIA_LOG_LEVEL` | `info` | `debug`, `info`, `warning` or `error` |
+| `ATALAIA_PURGE_HOUR` | 3 | The hour (UTC, 0-23) at which the server runs the retention purge every day; `off` when something else runs `python -m atalaia_server purge` |
+| `ATALAIA_PRIVACY_NOTICE_VERSION` | `template-2026-10-19` | The version of the privacy notice the field shows, stored with every consent; raise it when the notice changes (1-64 of letters, digits and `. _ : + -`) |
 
 A setting that is present but not valid stops the server at start-up with a message; it is never replaced by its default. The database password never appears in logs.
 
@@ -68,6 +72,11 @@ A setting that is present but not valid stops the server at start-up with a mess
 | POST | `/api/v1/auth/totp/enrol` | Bearer | `{password}`: a new secret and its `otpauth://` URI, shown once |
 | POST | `/api/v1/auth/totp/confirm` | Bearer | `{code}`: TOTP is on |
 | POST | `/api/v1/auth/totp/disable` | Bearer | `{password, code}`: TOTP is off (refused while the account holds `admin`, `gm` or `marshal`) |
+| GET | `/api/v1/me/data` | Bearer | Everything the server holds about the account, as JSON (below) |
+| GET | `/api/v1/me/export` | Bearer | The same as a ZIP of JSON files with a README (`atalaia-export-<username>-<date>.zip`) |
+| PATCH | `/api/v1/me` | Bearer | `{password, username?, email?}` (`email: null` removes it): the account |
+| POST | `/api/v1/me/password` | Bearer | `{password, new_password}`: 204; every other session of the account ends |
+| DELETE | `/api/v1/me` | Bearer | `{password, code?}` (the code when the account has TOTP): 204; the account is anonymised and logged out everywhere |
 | POST | `/api/v1/fields` | a server administrator | `{name, slug, field_type?, timezone?}`: 201 with the field |
 | GET | `/api/v1/fields` | Bearer | The fields the caller has a role on (every field for a server administrator) |
 | GET | `/api/v1/fields/{field_id}/roles` | the field's `admin` or `gm` | Who holds which role |
@@ -84,9 +93,24 @@ ADR-P4-2, with decisions S11-1 to S11-15:
 - **Passwords:** Argon2id with 3 passes over 64 MiB, 4 lanes, a 16-byte salt and a 32-byte tag; an older hash is replaced at the next login. The policy is NIST SP 800-63B's: 10 to 1024 characters (after Unicode NFKC normalisation), no character-class rules, not the username, and not one of the 100,000 passwords seen most often in breaches (the UK NCSC's list, [`data/breached-passwords.txt`](atalaia_server/data/breached-passwords.txt): SecLists' `Passwords/Common-Credentials/100k-most-used-passwords-NCSC.txt` at commit `1a7bb9127eca9e6ff2fc0301c597fe6e16a0cb56`, unmodified, SHA-256 `c2e5696882c603b76bb67a47ee970897e5a76fc4c3f5547abe3d0ca340c576e0`, MIT as part of SecLists), compared whatever the case. An unknown username takes as long to refuse as a wrong password.
 - **TOTP** (RFC 6238): 6 digits every 30 seconds, as authenticator apps do by default; one step of clock drift either side; each code is accepted once. Seeds are stored encrypted (Fernet). Accounts with `admin`, `gm` or `marshal` on any field, and server administrators, must have it, and those roles count only in a session that passed it.
 - **Sessions:** a 15-minute access token (`Authorization: Bearer`; the server re-reads the session and the roles on every request, so a logout or a removed role counts at once) and a refresh token in the cookie `__Secure-atalaia_refresh` (HttpOnly, Secure, SameSite=Strict, sent only to `/api/v1/auth/refresh`). Each refresh spends the token and issues a new one; a spent token presented again ends the whole session. A session ends after 7 days without a refresh, and after 30 days in any case. The database keeps only SHA-256 hashes of refresh tokens.
-- **Limits:** 5 failed logins from one address lock that address out of logging in for 15 minutes; 5 wrong codes lock an account's TOTP for 15 minutes; 10 registrations an hour and 100 API requests a minute per address. The state is in memory, for the one worker process the image runs.
+- **Limits:** 5 failed logins for one username from one address lock that username at that address for 15 minutes, and 50 failed logins from one address, whatever the usernames, lock the address for 15 minutes (so one player's typos do not lock out a whole field behind one 4G address; decision S12-1); 5 wrong codes lock an account's TOTP for 15 minutes; 10 registrations an hour and 100 API requests a minute per address. The state is in memory, for the one worker process the image runs.
 - **Roles** are per field: `player`, `squad_leader`, `vip`, `marshal`, `gm`, `spectator`, `admin`. A field's `admin` grants and revokes any of them; its `gm` the four player roles. Per-game roles come with the games themselves (plan phase 13).
 - **The audit log** records registrations, logins, failures and lockouts, refresh replays, logouts, TOTP changes, new fields and every role change, with the address; never a password, a code, a token or a username typed for an account that does not exist.
+
+## Personal data
+
+ADR-P4-8, with decisions S12-1 to S12-8. The field operator is the data controller; `personal_data.py` lists every table that holds personal data, and each later plan phase adds its tables there (access, export, erasure, purge) in the same change.
+
+- **Access and export:** `GET /api/v1/me/data` answers `{format, generated_at, user, field_roles, sessions, audit_log, audit_log_about_you, consents}`: the account (never the password hash or the TOTP secret), roles per field, sessions with their addresses and user agents, the person's own audit entries with addresses, entries others made about the account (a role granted: what and when, not who) and the consent records. `GET /api/v1/me/export` puts the same data in a ZIP: `export/profile.json`, `field_roles.json`, `sessions.json`, `audit_log.json`, `audit_log_about_you.json`, `consents.json` and a `README.txt` in English and Portuguese.
+- **Rectification:** the username and email (`PATCH /api/v1/me`) and the password (`POST /api/v1/me/password`), each with the current password, under the same lockouts as a login. The audit log names the fields changed, never their values.
+- **Erasure** (`DELETE /api/v1/me`, with the password and, for an account with TOTP, a code) anonymises: the account becomes `deleted-` and 16 random hex characters with no email, no password, no TOTP and no consent; its roles, sessions and consents are deleted; its audit entries stay without their addresses; the erasure is logged with no account and no address. Names starting with `deleted-` are reserved. The last server administrator cannot be erased.
+- **Consents:** each one recorded in `consents` with its purpose (`account` for now) and `ATALAIA_PRIVACY_NOTICE_VERSION`; registration and `create-admin` record the account consent.
+- **Retention:** every day at `ATALAIA_PURGE_HOUR` (03:00 UTC) the server deletes sessions 30 days after they expired or ended (with their refresh tokens) and audit entries older than 36 months, and logs what it deleted. `python -m atalaia_server purge [--dry-run]` runs it once (`docker compose exec server python -m atalaia_server purge`).
+- **Templates** for the operator to fill in, to be reviewed by a lawyer before use: [`docs/templates/privacy-notice-pt.md`](../docs/templates/privacy-notice-pt.md), [`privacy-notice-en.md`](../docs/templates/privacy-notice-en.md) and the hosted service's data processing agreement [`dpa-template.md`](../docs/templates/dpa-template.md).
+
+Positions never reach the site server (decision P4R25).
+
+## The first administrator
 
 The first administrator is made from the command line, in the server's container: `docker compose exec server python -m atalaia_server create-admin --username NAME [--email ADDRESS]` asks for the password twice, shows a TOTP secret and its `otpauth://` URI for an authenticator app, and creates the account once a code from the app is typed back (`--password-stdin` reads the password, then the code, from standard input).
 
@@ -100,7 +124,7 @@ python3 tools/docker_server.py test tests.test_health    # some (unittest names)
 python3 tools/docker_server.py migrations                # upgrade head, downgrade base, upgrade head, alembic check
 ```
 
-Each test class gets a fresh database, migrated to head, on the test PostgreSQL; there is no SQLite stand-in (decision P4R17). `tests.test_migrations` also steps through every revision, checks that each downgrade restores the schema exactly, and that the migrations build exactly the ORM models. The tests that need no database and nothing beyond the controller's Ubuntu packages (`test_config`, `test_ids`, `test_shared_imports`) also run in `tools/check.sh` and in CI's `controller` job; `test_passwords`, `test_totp` (with RFC 6238's and RFC 4226's own test vectors), `test_tokens` and `test_ratelimit` need no database but need argon2-cffi, PyJWT and pyotp, so they run in the server's image only. CI's `server` job builds the same test image and runs the same `sh tests/run.sh test` and `sh tests/run.sh migrations` against a `postgres:16-alpine` service container.
+Each test class gets a fresh database, migrated to head, on the test PostgreSQL; there is no SQLite stand-in (decision P4R17). `tests.test_migrations` also steps through every revision, checks that each downgrade restores the schema exactly, and that the migrations build exactly the ORM models. The tests that need no database and nothing beyond the controller's Ubuntu packages (`test_config`, `test_ids`, `test_shared_imports`) also run in `tools/check.sh` and in CI's `controller` job; `test_passwords`, `test_totp` (with RFC 6238's and RFC 4226's own test vectors), `test_tokens` and `test_ratelimit` need no database but need argon2-cffi, PyJWT and pyotp, so they run in the server's image only. `test_personal_data` covers access, the export's ZIP, rectification, password changes, erasure (with TOTP, and the last administrator) and the retention purge, its command and its daily task. CI's `server` job builds the same test image and runs the same `sh tests/run.sh test` and `sh tests/run.sh migrations` against a `postgres:16-alpine` service container.
 
 ## Trying it locally
 
@@ -115,4 +139,4 @@ python3 tools/docker_server.py down    # stops it and deletes its database
 
 ## Dependencies
 
-Plan phase 11 added argon2-cffi 25.1.0 (with argon2-cffi-bindings 26.1.0), PyJWT 2.15.1 and pyotp 2.10.0, pinned the same way (`--exclude-newer 2026-10-05`, every hash checked against PyPI). Only `requirements.txt` goes into the image, installed with `pip --require-hashes --no-deps --only-binary=:all:` and checked with `pip check`. Every version is a release at least two weeks old when it was pinned; `requirements.in` has the command that refreshes the pins (uv's `pip compile --generate-hashes --exclude-newer`). The base images are pinned by digest: `python:3.12.14-slim` and `postgres:16.15-alpine`.
+Plan phase 12 added none (the export's ZIP is the standard library's `zipfile`). Plan phase 11 added argon2-cffi 25.1.0 (with argon2-cffi-bindings 26.1.0), PyJWT 2.15.1 and pyotp 2.10.0, pinned the same way (`--exclude-newer 2026-10-05`, every hash checked against PyPI). Only `requirements.txt` goes into the image, installed with `pip --require-hashes --no-deps --only-binary=:all:` and checked with `pip check`. Every version is a release at least two weeks old when it was pinned; `requirements.in` has the command that refreshes the pins (uv's `pip compile --generate-hashes --exclude-newer`). The base images are pinned by digest: `python:3.12.14-slim` and `postgres:16.15-alpine`.

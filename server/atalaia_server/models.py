@@ -1,11 +1,14 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""ORM models (ADR-P4-1; migrations 0001_base and 0002_accounts).
+"""ORM models (ADR-P4-1; migrations 0001_base, 0002_accounts and 0003_personal_data).
 
 Fields, users, roles, per-field roles, sessions and the audit log, as
 ADR-P4-1 defines them, with plan phase 11's additions for accounts: the
 server administrator flag and the last TOTP step on ``users``, the second
-factor on ``sessions``, and ``refresh_tokens`` (only hashes). Every later plan phase adds its own tables here and in
+factor on ``sessions``, and ``refresh_tokens`` (only hashes); plan phase 12's
+``consents`` (ADR-P4-8). A table that holds personal data must also be added to
+``personal_data.py`` (access, export, erasure, the purge) in the same plan
+phase. Every later plan phase adds its own tables here and in
 its own Alembic migration; ``tests.test_migrations`` checks that the
 migrations build exactly these models. User-facing keys are UUIDv7
 (``ids.uuid7``) with ``gen_random_uuid()`` as the database's fallback;
@@ -167,6 +170,7 @@ class AuditLog(Base):
         Index("idx_audit_log_user", "user_id"),
         Index("idx_audit_log_action", "action"),
         Index("idx_audit_log_created", "created_at"),
+        Index("idx_audit_log_resource", "resource_id"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
@@ -177,3 +181,24 @@ class AuditLog(Base):
     details: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB)
     ip_address: Mapped[Optional[str]] = mapped_column(INET)
     created_at: Mapped[datetime] = _created()
+
+
+class Consent(Base):
+    """A consent given (ADR-P4-8, plan phase 12): its purpose, the version of the privacy notice
+    the person was shown, when, and when it was withdrawn. At most one live consent per purpose.
+    ``users.gdpr_consent_at`` keeps the account consent's time, as ADR-P4-1 has it; this table is
+    the record that shows what was consented to (GDPR Art. 7(1)). Purposes: ``account`` now;
+    ``chrono_sharing`` comes with the chrono registry (plan phase 14)."""
+
+    __tablename__ = "consents"
+    __table_args__ = (
+        Index("idx_consents_user", "user_id"),
+        Index("uq_consents_live", "user_id", "purpose", unique=True, postgresql_where=text("withdrawn_at IS NULL")),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    purpose: Mapped[str] = mapped_column(String(32), nullable=False)
+    notice_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    given_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    withdrawn_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

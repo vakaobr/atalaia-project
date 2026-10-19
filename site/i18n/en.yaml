@@ -576,7 +576,7 @@ roadmap:
     title: Site server and advanced play
     short: >-
       Site server, game scheduling and registration, custom scenarios, advanced modes, ATAK.
-      Started: the first advanced modes, Master and Satellites and the logic of Target Windows, and the site server's skeleton and accounts are built in software.
+      Started: the first advanced modes, Master and Satellites and the logic of Target Windows, and the site server's skeleton, accounts and personal data rights are built in software.
     text: >-
       Site server (accounts, game history, the chrono registry, scheduling games, registration and
       publishing), custom scenarios, advanced modes (master and satellite zones, VIP escort, hacking
@@ -590,7 +590,9 @@ roadmap:
       scores for that team, tested in the simulator and the app (the target addon is not built
       yet); and the site server's skeleton (its database, migrations and a health check, in
       its own container) and its accounts (passwords, two-factor codes required for organisers
-      and marshals, sessions and roles per field; no game data yet), tested on a computer only.
+      and marshals, sessions and roles per field) and personal data rights (access, export,
+      correction, erasure, consent records, a daily retention purge); no game data yet; tested on
+      a computer only.
     gate: >-
       Gate: a weekend <a href="{{ page.to.glossary }}#glossary-milsim">milsim</a> runs on Atalaia end to end.
   p5:

@@ -597,7 +597,7 @@ roadmap:
     title: Servidor do clube e jogo avançado
     short: >-
       Servidor do clube, marcação de jogos e inscrições, cenários personalizados, modos avançados,
-      ATAK. Começada: os primeiros modos avançados, Mestre e Satélites e as regras das Janelas de Alvo, e o esqueleto e as contas do servidor do clube estão feitos em software.
+      ATAK. Começada: os primeiros modos avançados, Mestre e Satélites e as regras das Janelas de Alvo, e o esqueleto, as contas e os direitos sobre os dados pessoais do servidor do clube estão feitos em software.
     text: >-
       Servidor do clube (contas, histórico dos jogos, registo de cronografagem, marcação de jogos,
       inscrições e publicação), cenários personalizados, modos avançados (zonas mestre e satélites,
@@ -612,8 +612,10 @@ roadmap:
       equipa pontua para essa equipa, testadas no simulador e na aplicação (o módulo de alvo ainda
       não está feito); e o esqueleto do servidor do clube (a base de dados, as migrações e uma
       verificação de estado, no seu próprio contentor) e as contas (palavras-passe, códigos de
-      dois fatores obrigatórios para quem organiza e para marshals, sessões e funções por campo;
-      ainda sem dados de jogos), testado só num computador.
+      dois fatores obrigatórios para quem organiza e para marshals, sessões e funções por campo) e
+      os direitos sobre os dados pessoais (acesso, exportação, correção, apagamento, registo de
+      consentimentos, limpeza diária por prazo de conservação); ainda sem dados de jogos; testado
+      só num computador.
     gate: >-
       Prova: um <a href="{{ page.to.glossary }}#glossario-milsim">milsim</a> de fim de semana decorre do princípio ao fim
       com a Atalaia.

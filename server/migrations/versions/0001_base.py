@@ -7,7 +7,7 @@ Revises: (none)
 Created: 2026-10-19
 
 The roles are seeded here (ADR-P4-1's seven). ``fields`` has no
-``api_key_hash``: controller API keys get their own table in 0003_sync (two
+``api_key_hash``: controller API keys get their own table in 0004_sync (two
 active during a rotation, P4R13). ``gen_random_uuid()`` is built into
 PostgreSQL 13+, so no extension is needed.
 """

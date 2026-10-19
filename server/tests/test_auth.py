@@ -16,7 +16,7 @@ from argon2 import PasswordHasher, Type
 
 from atalaia_server import tokens, totp
 from atalaia_server.api.auth import COOKIE, COOKIE_PATH
-from atalaia_server.ratelimit import Limits, RequestLimit
+from atalaia_server.ratelimit import Limits, Lockout, RequestLimit
 from atalaia_server.security_headers import HEADERS
 
 from .base import PASSWORD, AppTestCase
@@ -152,22 +152,55 @@ class LoginTests(AuthTestCase):
         for typed in ("nope", "nobody-here", PASSWORD):
             self.assertNotIn(typed, text)
 
-    async def test_five_failures_lock_the_address_for_fifteen_minutes(self) -> None:
+    async def test_five_failures_lock_that_username_at_that_address(self) -> None:
+        """Decisions S11-12 and S12-1: 5 failures lock one (address, username) for 15 minutes."""
         clock = Clock()
         self.app.state.limits = Limits(clock=clock)
         _, name, _ = await self.make_user()
+        _, friend, _ = await self.make_user()
         for _ in range(5):
             r = await self.client.post("/api/v1/auth/login", json={"username": name, "password": "wrong password"})
             self.assertEqual(r.status_code, 401)
-        r = await self.client.post("/api/v1/auth/login", json={"username": name, "password": PASSWORD})
+        r = await self.client.post("/api/v1/auth/login", json={"username": name.upper(), "password": PASSWORD})
         self.assertEqual((r.status_code, r.json()["detail"]), (429, "too_many_attempts"))
         self.assertEqual(r.headers["retry-after"], "900")
-        self.assertEqual(len(await self.audit("login_locked")), 1)
-        # Another address is not locked out.
+        locked = await self.audit("login_locked")
+        self.assertEqual(len(locked), 1)
+        self.assertEqual(json.loads(locked[0]["details"]), {"where": "login", "scope": "username_address"})
+        # Another player behind the same address (a field's 4G link) still logs in.
+        self.assertIn("access_token", await self.login(friend))
+        # The same username from another address is not locked out either.
         other = httpx.AsyncClient(transport=httpx.ASGITransport(app=self.app, client=("198.51.100.4", 4000)),
                                   base_url="https://server.test")
         self.stack.push_async_callback(other.aclose)
         self.assertIn("access_token", await self.login(name, client=other))
+        clock.t += 900
+        self.assertIn("access_token", await self.login(name))
+
+    async def test_a_success_clears_the_count(self) -> None:
+        self.app.state.limits = Limits(clock=Clock())
+        _, name, _ = await self.make_user()
+        for _ in range(4):
+            await self.client.post("/api/v1/auth/login", json={"username": name, "password": "wrong password"})
+        await self.login(name)
+        for _ in range(4):
+            r = await self.client.post("/api/v1/auth/login", json={"username": name, "password": "wrong password"})
+            self.assertEqual(r.status_code, 401)
+
+    async def test_spraying_locks_the_address(self) -> None:
+        """Many usernames from one address: the per-address ceiling (50 by default) locks it."""
+        clock = Clock()
+        self.app.state.limits = Limits(clock=clock)
+        self.app.state.limits.login_address = Lockout(3, 900, 900, clock)
+        _, name, _ = await self.make_user()
+        for i in range(3):
+            r = await self.client.post("/api/v1/auth/login", json={"username": f"guess{i}", "password": PASSWORD})
+            self.assertEqual(r.status_code, 401)
+        r = await self.client.post("/api/v1/auth/login", json={"username": name, "password": PASSWORD})
+        self.assertEqual((r.status_code, r.json()["detail"]), (429, "too_many_attempts"))
+        locked = await self.audit("login_locked")
+        self.assertIsNone(locked[0]["user_id"])
+        self.assertEqual(json.loads(locked[0]["details"]), {"where": "login", "scope": "address"})
         clock.t += 900
         self.assertIn("access_token", await self.login(name))
 

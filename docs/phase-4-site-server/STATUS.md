@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Implementation (plan phases 1, 2, 10 and 11 built in software, 2026-10-19)
+**Current phase:** Implementation (plan phases 1, 2, 10, 11 and 12 built in software, 2026-10-20)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-19 (plan phase 2, full clean-copy check)
-**Next step:** plan phase 3 (geo utilities in the core) on the modes chain; plan phase 12 (personal data) on the site server chain
+**Last verified:** 2026-10-20 (plan phase 12, full clean-copy check)
+**Next step:** plan phase 3 (geo utilities in the core) on the modes chain; plan phase 13 (controller sync) on the site server chain
 
 ## Completed
 
@@ -50,8 +50,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | 9 | ATAK / CoT emitter | Software, now | 3 | Pending |
 | 10 | Site server skeleton and test tooling | Software, now | -- | **Done in software** (2026-10-19) |
 | 11 | Accounts, sessions and roles | Software, now | 10 | **Done in software** (2026-10-19) |
-| 12 | Personal data | Software, now | 11 | **Next** (site server chain) |
-| 13 | Controller sync | Software, now | 10, 11 | Pending |
+| 12 | Personal data | Software, now | 11 | **Done in software** (2026-10-19) |
+| 13 | Controller sync | Software, now | 10, 11 | **Next** (site server chain) |
 | 14 | Chrono registry | Software, now | 13 | Pending |
 | 15 | Scheduling, field pages and feeds | Software, now | 11 | Pending |
 | 16 | Registration and game-day sync | Software, now | 13, 15 | Pending |
@@ -164,6 +164,36 @@ deployment behind Caddy with the client address from the proxy (22).
 Decisions S11-1 to S11-15, all open; S11-4 (the breached list's licence)
 and S11-12 (lockouts per address behind a field's shared 4G address) want
 the maintainer's eye.
+
+## Plan phase 12: personal data (built 2026-10-19, in software)
+
+What exists: `GET /api/v1/me/data` (everything held about the account:
+profile, roles per field, sessions, the person's audit entries and those
+about them, consents) and `GET /api/v1/me/export` (the same as a ZIP of JSON
+files with a bilingual README); rectification with `PATCH /api/v1/me`
+(username, email) and `POST /api/v1/me/password` (ends the other sessions),
+both behind the current password; erasure with `DELETE /api/v1/me`
+(password, and a TOTP code where the account has it): the account
+anonymised as a `deleted-...` tombstone, its roles, sessions and consents
+deleted, its audit rows kept without addresses, the erasure logged with no
+account, the last server administrator refused; consent records with the
+privacy notice's version (`consents`, migration `0003_personal_data`); the
+daily retention purge inside the server (`ATALAIA_PURGE_HOUR`, 03:00 UTC)
+and `python -m atalaia_server purge [--dry-run]`: sessions 30 days after
+they end, the audit log after 36 months; `docs/templates/` with the privacy
+notice in pt-PT and English and a DPA template, marked for legal review
+(P4-6). Also: the login lockout is per (address, username), 5 failures, with
+a ceiling of 50 failures per address (S11-12 changed, S12-1). No new
+dependency.
+
+Tests: 151 in the test image against PostgreSQL 16 (27 new: access, export,
+rectification, password change, erasure with and without TOTP, the last
+administrator, the purge's periods, its command and its daily task, 0003
+with data, the new lockouts); 22 (no database, no server dependencies) also
+run in tools/check.sh. Not yet: the tables of later plan phases (games,
+chrono, registrations), each added to `personal_data.py` with its plan
+phase; a flow asking existing accounts to consent to a changed notice; the
+legal review of the templates. Decisions S12-1 to S12-8, all open.
 
 ## Dependencies
 

@@ -760,6 +760,10 @@ once (RFC 6238 section 5.2); the refresh endpoint also needs the header
 `X-Atalaia-Refresh: 1`; a site-wide `users.server_admin`, made by
 `python -m atalaia_server create-admin`, administers fields; per-game roles
 come with `games` in plan phase 13.
+*Changed 2026-10-19 (plan phase 12; decision S12-1):* the login lockout is
+per (address, username), 5 failures in 15 minutes, with a ceiling of 50
+failures in 15 minutes per address, so one player's typos no longer lock out
+everyone behind a field's shared 4G address.
 
 ---
 
@@ -2157,6 +2161,20 @@ proposed):**
 - **Rule for the implementation:** each plan phase that adds a table
   with personal data adds it to access, export, erasure and the purge
   in the same commit.
+
+*Built 2026-10-19 (plan phase 12; decisions S12-1 to S12-8, proposed):*
+the four endpoints as above, plus `POST /api/v1/me/password`; changes and
+erasure need the current password (and a TOTP code to erase an account that
+has TOTP). Erasure is the anonymisation above for the tables that exist
+(the `users` row as a `deleted-...` tombstone; field roles, sessions and
+consent records deleted; the person's audit rows kept without their
+addresses; the erasure logged with no account and no address).
+Consents are records in a `consents` table with the privacy notice's
+version, not only `users.gdpr_consent_at`. The purge (sessions 30 days after
+they end, the audit log after 36 months, server-wide) runs inside the
+server daily at `ATALAIA_PURGE_HOUR` (03:00 UTC) and as `python -m
+atalaia_server purge`. The templates are in `docs/templates/`. The list of
+personal data tables lives in `server/atalaia_server/personal_data.py`.
 
 ---
 

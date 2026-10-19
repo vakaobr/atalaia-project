@@ -37,11 +37,12 @@ from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import passwords, totp
+from .. import passwords, personal_data, totp
 from ..audit import record, request_ip
 from ..auth import Principal, current_principal, load_roles
 from ..db import get_session
 from ..models import PRIVILEGED_ROLES, ROLE_NAMES, RefreshToken, User, UserFieldRole, UserSession
+from ..ratelimit import login_key
 from ..tokens import (ACCESS_TTL_S, REFRESH_TTL_S, SESSION_MAX_S, TokenError, make_access_token,
                       make_totp_step_token, new_refresh_token, read_totp_step_token, refresh_token_hash)
 
@@ -87,6 +88,25 @@ class CodeIn(Strict):
 class DisableIn(Strict):
     password: str = Field(max_length=4096)
     code: str = Field(max_length=16)
+
+
+def username_problem(username: str) -> Optional[str]:
+    """None when a (lower-cased) username may be used, else the error code."""
+    if not USERNAME.fullmatch(username):
+        return "username_invalid"
+    if username.startswith(personal_data.ERASED_PREFIX):
+        return "username_reserved"  # the names erased accounts get (ADR-P4-8)
+    return None
+
+
+def normalise_email(email: Optional[str]) -> Optional[str]:
+    return email.strip().lower() if email and email.strip() else None
+
+
+def email_problem(email: Optional[str]) -> Optional[str]:
+    if email is not None and (len(email) > 320 or not EMAIL.fullmatch(email)):
+        return "email_invalid"
+    return None
 
 
 def _now() -> datetime:
@@ -145,19 +165,29 @@ async def _start_session(db: AsyncSession, request: Request, user: User, mfa: bo
 
 
 async def _check_password(db: AsyncSession, request: Request, user: Optional[User], password: str,
-                          where: str) -> None:
-    """Verifies the password under the per-address lockout; 429 when locked, raises on a mismatch."""
-    wait = request.app.state.limits.login.retry_after(_ip_key(request))
+                          where: str, username: Optional[str] = None) -> None:
+    """Verifies the password under the lockouts; 429 when locked, raises on a mismatch.
+
+    Two lockouts count each failure (decisions S11-12, S12-1): one per (address, username),
+    ``username`` being what was typed at login (the account's own name elsewhere), and a much
+    higher one per address against spraying many usernames from one place."""
+    limits = request.app.state.limits
+    address = _ip_key(request)
+    key = login_key(address, username if username is not None else (user.username if user else ""))
+    wait = max(limits.login.retry_after(key), limits.login_address.retry_after(address))
     if wait:
         raise _too_many(wait)
     if await passwords.verify_password(user.password_hash if user else None, password):
         if user is not None and passwords.needs_rehash(user.password_hash):
             user.password_hash = await passwords.hash_password(password)
+        limits.login.clear(key)
         return
-    locked = request.app.state.limits.login.fail(_ip_key(request))
+    locked = limits.login.fail(key)
+    address_locked = limits.login_address.fail(address)
     record(db, "login_failed", request, user_id=user.id if user else None, details={"where": where})
-    if locked:
-        record(db, "login_locked", request, details={"where": where})
+    if locked or address_locked:
+        record(db, "login_locked", request, user_id=user.id if user and locked else None,
+               details={"where": where, "scope": "address" if address_locked else "username_address"})
     await db.commit()
     if where == "login":
         raise HTTPException(401, "invalid_credentials")
@@ -199,11 +229,10 @@ def _secret(request: Request, user: User) -> Optional[str]:
 @router.post("/auth/register", status_code=201)
 async def register(body: RegisterIn, request: Request, db: AsyncSession = Depends(get_session)) -> JSONResponse:
     username = body.username.strip().lower()
-    email = body.email.strip().lower() if body.email and body.email.strip() else None
-    if not USERNAME.fullmatch(username):
-        raise HTTPException(400, "username_invalid")
-    if email is not None and (len(email) > 320 or not EMAIL.fullmatch(email)):
-        raise HTTPException(400, "email_invalid")
+    email = normalise_email(body.email)
+    problem = username_problem(username) or email_problem(email)
+    if problem:
+        raise HTTPException(400, problem)
     if not body.consent:
         raise HTTPException(400, "consent_required")
     problem = passwords.policy_problem(body.password, username)
@@ -222,6 +251,8 @@ async def register(body: RegisterIn, request: Request, db: AsyncSession = Depend
     except IntegrityError:
         await db.rollback()
         raise HTTPException(409, "username_or_email_taken") from None
+    personal_data.give_consent(db, user.id, personal_data.ACCOUNT, request.app.state.settings.privacy_notice_version,
+                               user.gdpr_consent_at)
     record(db, "register", request, user_id=user.id, resource="user", resource_id=user.id)
     await db.commit()
     return JSONResponse(user_json(user, {}), status_code=201, headers=NO_STORE)
@@ -231,7 +262,7 @@ async def register(body: RegisterIn, request: Request, db: AsyncSession = Depend
 async def login(body: LoginIn, request: Request, db: AsyncSession = Depends(get_session)) -> JSONResponse:
     username = body.username.strip().lower()
     user = await db.scalar(select(User).where(User.username == username)) if username else None
-    await _check_password(db, request, user, body.password, "login")
+    await _check_password(db, request, user, body.password, "login", username)
     assert user is not None
     if user.totp_enabled:
         await db.commit()  # a rehash, if any

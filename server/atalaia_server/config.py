@@ -11,6 +11,11 @@
     ATALAIA_METRICS_TOKEN   optional bearer token for GET /api/v1/metrics (a monitoring
                             system); server administrators can always read it
     ATALAIA_LOG_LEVEL       debug, info (default), warning or error
+    ATALAIA_PURGE_HOUR      the hour (UTC, 0-23, default 3) of the daily retention purge, or
+                            "off" when something else runs `python -m atalaia_server purge`
+    ATALAIA_PRIVACY_NOTICE_VERSION
+                            the version of the privacy notice the field shows (default
+                            "template-2026-10-19"), stored with every consent
 
 Plain Python with no third-party imports, so its tests also run in the
 atalaia-dev image (tools/check.sh). A setting that is present but wrong is
@@ -20,6 +25,7 @@ an error at start-up, never silently replaced by its default.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Mapping, Optional
 from urllib.parse import urlsplit, urlunsplit
@@ -28,6 +34,8 @@ LOG_LEVELS = ("debug", "info", "warning", "error")
 URL_SCHEME = "postgresql+asyncpg"
 MIN_METRICS_TOKEN = 32
 MIN_SECRET_KEY = 32
+DEFAULT_NOTICE_VERSION = "template-2026-10-19"
+NOTICE_VERSION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:+-]{0,63}")
 _KEY_HINT = "(python3 -c \"import secrets; print(secrets.token_urlsafe(32))\")"
 
 
@@ -88,6 +96,12 @@ def _number(env: Mapping[str, str], name: str, default: float, low: float, high:
     return value
 
 
+def _purge_hour(env: Mapping[str, str]) -> Optional[int]:
+    if env.get("ATALAIA_PURGE_HOUR", "").strip().lower() == "off":
+        return None
+    return int(_number(env, "ATALAIA_PURGE_HOUR", 3, 0, 23, int))
+
+
 @dataclass(frozen=True)
 class Settings:
     database_url: str = field(repr=False)
@@ -97,6 +111,8 @@ class Settings:
     db_timeout_s: float = 5.0
     metrics_token: Optional[str] = field(default=None, repr=False)
     log_level: str = "info"
+    purge_hour: Optional[int] = 3
+    privacy_notice_version: str = DEFAULT_NOTICE_VERSION
 
     def __post_init__(self) -> None:
         _check_url(self.database_url)
@@ -106,12 +122,18 @@ class Settings:
             raise ConfigError(f"ATALAIA_LOG_LEVEL must be one of {', '.join(LOG_LEVELS)}")
         if self.metrics_token is not None and len(self.metrics_token) < MIN_METRICS_TOKEN:
             raise ConfigError(f"ATALAIA_METRICS_TOKEN must be at least {MIN_METRICS_TOKEN} characters {_KEY_HINT}")
+        if self.purge_hour is not None and not 0 <= self.purge_hour <= 23:
+            raise ConfigError("ATALAIA_PURGE_HOUR must be an hour from 0 to 23, or off")
+        if not NOTICE_VERSION.fullmatch(self.privacy_notice_version):
+            raise ConfigError("ATALAIA_PRIVACY_NOTICE_VERSION must be 1-64 characters: letters, digits and . _ : + -, "
+                              "starting with a letter or digit")
 
     def __repr__(self) -> str:
         return (f"Settings(database_url={redact_url(self.database_url)!r}, secret_key=set, "
                 f"db_pool_size={self.db_pool_size}, "
                 f"db_max_overflow={self.db_max_overflow}, db_timeout_s={self.db_timeout_s}, "
-                f"metrics_token={'set' if self.metrics_token else 'unset'}, log_level={self.log_level!r})")
+                f"metrics_token={'set' if self.metrics_token else 'unset'}, log_level={self.log_level!r}, "
+                f"purge_hour={self.purge_hour!r}, privacy_notice_version={self.privacy_notice_version!r})")
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Settings":
@@ -128,4 +150,6 @@ class Settings:
             db_timeout_s=float(_number(env, "ATALAIA_DB_TIMEOUT_S", 5.0, 0.1, 60.0, float)),
             metrics_token=env.get("ATALAIA_METRICS_TOKEN", "").strip() or None,
             log_level=env.get("ATALAIA_LOG_LEVEL", "info").strip().lower() or "info",
+            purge_hour=_purge_hour(env),
+            privacy_notice_version=env.get("ATALAIA_PRIVACY_NOTICE_VERSION", "").strip() or DEFAULT_NOTICE_VERSION,
         )

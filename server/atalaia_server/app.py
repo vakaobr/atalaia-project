@@ -12,13 +12,16 @@ is at /api/v1/openapi.json.
 
 The app's own state: ``keys`` (derived from ATALAIA_SECRET_KEY), ``seed_box``
 (TOTP seeds), ``limits`` (rate limits and lockouts), ``used_totp_steps``
-(spent TOTP login steps) and ``clock`` (the time TOTP codes are checked at;
+(spent TOTP login steps), ``purge_task`` (the daily retention purge, unless
+ATALAIA_PURGE_HOUR is off) and ``clock`` (the time TOTP codes are checked at;
 the tests move it). All of it is in memory, for the one worker process the
 image runs (ADR-P4-2).
 """
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -28,8 +31,8 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from . import __version__
-from .api import auth, fields, health
+from . import __version__, personal_data
+from .api import auth, fields, health, me
 from .config import Settings, redact_url
 from .db import make_engine, make_sessionmaker
 from .ratelimit import Limits, RequestLimitMiddleware
@@ -49,9 +52,18 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         app.state.engine = make_engine(settings)
         app.state.sessionmaker = make_sessionmaker(app.state.engine)
         log.info("site server %s starting, database %s", __version__, redact_url(settings.database_url))
+        purge = None
+        if settings.purge_hour is not None:  # the daily retention purge (ADR-P4-8)
+            purge = asyncio.create_task(personal_data.purge_daily(app.state.sessionmaker, settings.purge_hour),
+                                        name="retention-purge")
+        app.state.purge_task = purge
         try:
             yield
         finally:
+            if purge is not None:
+                purge.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await purge
             await app.state.engine.dispose()
 
     app = FastAPI(title="Atalaia site server", version=__version__, lifespan=lifespan,
@@ -70,6 +82,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(fields.router)
+    app.include_router(me.router)
     return app
 
 

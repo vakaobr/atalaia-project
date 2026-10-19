@@ -8,7 +8,7 @@ import asyncio
 import unittest
 from typing import Any
 
-from atalaia_server.ratelimit import Limits, Lockout, RequestLimit, RequestLimitMiddleware
+from atalaia_server.ratelimit import Limits, Lockout, RequestLimit, RequestLimitMiddleware, login_key
 
 
 class Clock:
@@ -62,6 +62,32 @@ class LockoutTests(unittest.TestCase):
         self.assertLessEqual(len(lock._locked), 100)
 
 
+class LoginKeyTests(unittest.TestCase):
+    def test_per_address_and_username(self) -> None:
+        self.assertEqual(login_key("192.0.2.1", "Rita "), login_key("192.0.2.1", "rita"))
+        self.assertNotEqual(login_key("192.0.2.1", "rita"), login_key("192.0.2.2", "rita"))
+        self.assertNotEqual(login_key("192.0.2.1", "rita"), login_key("192.0.2.1", "joana"))
+
+    def test_the_typed_username_is_not_kept_as_text(self) -> None:
+        typed = "my password typed in the wrong box"
+        key = login_key("192.0.2.1", typed)
+        self.assertNotIn("password", key)
+        self.assertEqual(len(key), len("192.0.2.1#") + 32)
+
+    def test_a_shared_address_is_not_locked_by_one_player(self) -> None:
+        """One player's five typos lock that player at that address, not the field's 4G address."""
+        limits = Limits(clock=Clock())
+        for _ in range(5):
+            limits.login.fail(login_key("198.51.100.9", "rita"))
+            limits.login_address.fail("198.51.100.9")
+        self.assertGreater(limits.login.retry_after(login_key("198.51.100.9", "rita")), 0)
+        self.assertEqual(limits.login.retry_after(login_key("198.51.100.9", "joana")), 0)
+        self.assertEqual(limits.login_address.retry_after("198.51.100.9"), 0)
+        for i in range(45):  # spraying: 50 failures from the address, whatever the usernames
+            limits.login_address.fail("198.51.100.9")
+        self.assertEqual(limits.login_address.retry_after("198.51.100.9"), 900)
+
+
 class RequestLimitTests(unittest.TestCase):
     def test_sliding_minute(self) -> None:
         clock = Clock()
@@ -82,9 +108,13 @@ class RequestLimitTests(unittest.TestCase):
             limit.hit(f"ip{i}")
         self.assertLessEqual(len(limit._hits), 50)
 
-    def test_adr_p4_2_numbers(self) -> None:
+    def test_the_numbers(self) -> None:
+        """ADR-P4-2's, with the login lockout per (address, username) and a per-address ceiling (S12-1)."""
         limits = Limits()
         self.assertEqual((limits.login.limit, limits.login.window_s, limits.login.lock_s), (5, 900, 900))
+        self.assertEqual((limits.login_address.limit, limits.login_address.window_s, limits.login_address.lock_s),
+                         (50, 900, 900))
+        self.assertEqual((limits.register.limit, limits.register.window_s), (10, 3600))
         self.assertEqual((limits.totp.limit, limits.totp.window_s, limits.totp.lock_s), (5, 900, 900))
         self.assertEqual((limits.requests.limit, limits.requests.window_s), (100, 60))
 

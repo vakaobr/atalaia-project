@@ -2,8 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Rate limits and lockouts, in memory (ADR-P4-2).
 
-- 5 failed logins from one IP address in 15 minutes lock that address out of
-  logging in for 15 minutes (``Lockout``).
+- 5 failed logins for one username from one IP address in 15 minutes lock
+  that username out of logging in from that address for 15 minutes
+  (``Lockout``, key ``login_key(address, username)``), and 50 failed logins
+  from one address in 15 minutes, whatever the usernames, lock the whole
+  address for 15 minutes (against password spraying). Players at a field
+  share one 4G/NAT address, so one player's typos must not lock everyone out
+  (decisions S11-12, S12-1). The typed username is kept only as a truncated
+  SHA-256 inside the key, never as text.
 - 5 failed TOTP codes for one account in 15 minutes lock that account's TOTP
   checks for 15 minutes.
 - 10 registrations from one IP address an hour.
@@ -21,6 +27,7 @@ client would share the proxy's address.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import threading
@@ -113,11 +120,19 @@ class RequestLimit:
             return 0
 
 
+def login_key(address: str, username: str) -> str:
+    """The per (address, username) lockout key; the username only as a truncated hash, so a
+    password typed into the username box never sits in memory as text."""
+    digest = hashlib.sha256(username.strip().lower().encode("utf-8", "surrogatepass")).hexdigest()[:32]
+    return f"{address}#{digest}"
+
+
 class Limits:
     """The limits of one application (``app.state.limits``)."""
 
     def __init__(self, clock: Clock = time.monotonic) -> None:
-        self.login = Lockout(5, 15 * 60, 15 * 60, clock)          # per IP address
+        self.login = Lockout(5, 15 * 60, 15 * 60, clock)          # per (IP address, username): login_key()
+        self.login_address = Lockout(50, 15 * 60, 15 * 60, clock)  # per IP address, any username
         self.totp = Lockout(5, 15 * 60, 15 * 60, clock)           # per account
         self.register = Lockout(10, 3600, 3600, clock)            # per IP address (each one counts)
         self.requests = RequestLimit(100, 60, clock)              # per IP address

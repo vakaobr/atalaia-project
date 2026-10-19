@@ -10,7 +10,11 @@ end up in the log); a failed login names the account only when it exists.
 Actions written by plan phase 11: ``register``, ``login``, ``login_failed``,
 ``login_locked``, ``totp_failed``, ``totp_locked``, ``refresh_replay``,
 ``logout``, ``totp_enabled``, ``totp_disabled``, ``field_create``,
-``role_grant``, ``role_revoke``, ``admin_create``.
+``role_grant``, ``role_revoke``, ``admin_create``. Plan phase 12 adds
+``profile_update`` (the names of the fields changed, never their values),
+``password_change``, ``gdpr_erasure`` (no account, no address) and
+``retention_purge`` (the counts deleted); a ``login_locked`` row says which
+lockout tripped (``scope``).
 """
 
 from __future__ import annotations

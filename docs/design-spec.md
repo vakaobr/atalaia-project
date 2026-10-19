@@ -880,14 +880,14 @@ The controller generates the game key when a game is created. Nodes receive it d
 
 Accounts, positions and chrono records are personal data, and fields in the EU fall under GDPR. Each field is the data controller for its own data. On hosted site servers the project acts only as a data processor, under a written agreement with each field. Defaults favour minimal data:
 
-- Positions are deleted when a game is archived, unless the GM exports them.
+- Positions stay on the field controller for the live game only and are deleted when it ends; they never reach the site server (phase 4 decision P4R25).
 - Chrono records are kept for a period the field sets (default 12 months).
-- Players can export or delete their own account and records.
+- Players can see, export, correct or delete their own account and records (on the site server: built in software, phase 4 plan phase 12; erasure anonymises, so signed chrono records keep their signatures without the person).
 - Sharing chrono history with other fields is off by default. Each field opts in, and players are told at registration which fields can see their records.
 - Field check-in keeps a display name, an optional federation number (never verified automatically), a team preference and the declared replicas, erased 30 days after the game; names never appear in events, MQTT or spectator views.
 - Public game pages and calendar feeds list games only, never who registered.
 
-The docs include a template privacy notice organisers can show players at registration.
+The docs include template privacy notices in Portuguese and English and a data processing agreement for hosted servers ([`templates/`](templates/)), to be reviewed by a lawyer before use.
 
 ## 15. Built-in game modes
 
