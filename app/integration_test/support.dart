@@ -38,6 +38,28 @@ Future<void> waitFor(
   }
 }
 
+/// Scrolls until [finder] is on screen. On a small screen (CI's emulator)
+/// part of a page starts below the fold, and a list does not build what is
+/// scrolled away, so look downwards first, then upwards.
+Future<void> reveal(WidgetTester tester, Finder finder) async {
+  if (finder.evaluate().isEmpty) {
+    final scrollable = find.byType(Scrollable).first;
+    try {
+      await tester.scrollUntilVisible(finder, 200, scrollable: scrollable);
+    } on StateError {
+      await tester.scrollUntilVisible(finder, -200, scrollable: scrollable);
+    }
+  }
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+}
+
+/// Taps [finder] once it is on screen (a tap below the fold misses).
+Future<void> tapVisible(WidgetTester tester, Finder finder) async {
+  await reveal(tester, finder);
+  await tester.tap(finder);
+}
+
 /// Taps the app bar's back button. WidgetTester.pageBack() finds it by its
 /// English tooltip ("Back"), so it never finds it in the Portuguese app.
 Future<void> goBack(WidgetTester tester) async {

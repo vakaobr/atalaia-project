@@ -28,22 +28,23 @@ void main() {
     await waitFor(tester, find.text('Dispositivo de jogo'));
     expect(find.text('Participante'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('role-player')));
+    await tapVisible(tester, find.byKey(const Key('role-player')));
     await waitFor(tester, find.byKey(const Key('player-connect')));
     await tester.pumpAndSettle();
     await goBack(tester);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('role-marshal')));
+    await tapVisible(tester, find.byKey(const Key('role-marshal')));
     await waitFor(tester, find.byKey(const Key('marshal-chrono')));
     await tester.pumpAndSettle();
     await goBack(tester);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('role-prop')));
+    await tapVisible(tester, find.byKey(const Key('role-prop')));
     await waitFor(tester, find.byKey(const Key('prop-new')));
     await tester.pumpAndSettle();
     // The phone's features came from the Kotlin plugin.
+    await reveal(tester, find.text('botões das equipas'));
     expect(find.text('botões das equipas'), findsOneWidget);
     await goBack(tester);
     await tester.pumpAndSettle();

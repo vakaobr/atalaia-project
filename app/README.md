@@ -34,6 +34,31 @@ Phase 3, plan phases B, C and D: the app has its screens. An Android phone can b
    - **Without adb**: copy the file to the phone (USB file transfer, a memory card or a shared folder), open it in the phone's file manager and allow *Install unknown apps* for that file manager when Android asks.
 3. A debug build is signed with Flutter's debug key: to install a build signed with another key, uninstall the old one first (`adb uninstall org.atalaia.app`).
 
+## Try it on the Android emulator (Windows)
+
+What runs there: the prop shell with on-screen buttons and keypad, the player view, the GM console, join by pasted text, the marshal screens. What doesn't: NFC (no reader), the I/O pod links, real battery and background behaviour; use a phone for those.
+
+**One-time setup** (about 4 GB here on `Y:`; any fast local disk works):
+
+1. Turn on *Windows Hypervisor Platform* (an admin `cmd`: `dism /online /enable-feature /featurename:HypervisorPlatform /all`) and reboot.
+2. Install a JDK 17 (`winget install EclipseAdoptium.Temurin.17.JDK`) and unpack Google's [command-line tools](https://developer.android.com/studio#command-line-tools-only) to `<sdk>\cmdline-tools\latest`. Set `ANDROID_HOME` to `<sdk>` and `ANDROID_AVD_HOME` to a folder for the virtual phones, and add `<sdk>\platform-tools` and `<sdk>\emulator` to `PATH`.
+3. Install the packages. The new `android` tool replaces `sdkmanager`: using it accepts the [Android SDK terms](https://developer.android.com/studio/terms), and it ignores `ANDROID_HOME`, so pass `--sdk`:
+   `android --no-metrics --sdk=<sdk> sdk install platform-tools emulator platforms/android-36 system-images/android-36/default/x86_64`
+4. Create the virtual phone (the stock image, no Google services, like the app):
+   `avdmanager create avd --name atalaia-phone --package "system-images;android-36;default;x86_64" --device pixel_7`
+
+**Each time:**
+
+```bat
+emulator -avd atalaia-phone -no-snapshot-save
+python tools\docker_app.py apk
+adb install -r app\build\atalaia-debug.apk
+```
+
+The emulator reaches your PC at `10.0.2.2`. Start a controller without a radio in Docker (`[modem] port = ""`, `[mqtt] enabled = false`, `-p 8080:8080`; see [controller/README.md](../controller/README.md#running-it)) and connect *Participante* to `http://10.0.2.2:8080` with the read token, or open *Organização* with the GM token.
+
+**Hot reload and on-device tests** need Flutter on Windows (the same 3.44.0 as `tools/docker_app.py`; `flutter config --android-sdk <sdk> --jdk-dir <jdk>`): `flutter run -d emulator-5554` in `app\`; `powershell -ExecutionPolicy Bypass -File app\tool\emulator_tests.ps1` runs the tests CI's emulator job runs (it grants the notification permission Android 13+ asks for when a prop's game starts, which Flutter cannot tap). To check a small screen like CI's emulator: `adb shell wm size 320x640` and `adb shell wm density 160` (`reset` undoes them). The first build downloads the NDK and CMake into the SDK. A real phone works the same way over Wi-Fi: *Developer options › Wireless debugging*, `adb pair`, then `flutter run`.
+
 On the phone, *Definições* (the gear) sets the language, the **field join key** (`python3 -m atalaia_controller join-key` on the controller prints it) and the **admin PIN** that guards a prop's start, pause, end and leave. For a phone kept as a prop, kiosk mode can run without prompts once the app is the device owner: on a phone with no accounts, `adb shell dpm set-device-owner org.atalaia.app/.AtalaiaAdminReceiver`. Otherwise Android asks to confirm screen pinning.
 
 ### The screens (plan phase D)
