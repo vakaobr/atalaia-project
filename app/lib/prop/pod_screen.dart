@@ -3,8 +3,10 @@
 
 /// Linking an I/O pod (protocol/capability-proxy.md): over USB-OTG first,
 /// else Bluetooth LE. The screen finds pods, opens the chosen link, waits
-/// for the pod's IDENT and hands the linked [PodClient] back. No pod exists
-/// yet (its firmware is plan phase F): this has not met real hardware.
+/// for the pod's IDENT and hands the linked [PodClient] back. Over
+/// Bluetooth the pod asks to pair first (an encrypted link, decision PF4),
+/// so the wait is longer: Android shows its pairing question. Not run with
+/// a real pod yet (plan phase G).
 library;
 
 import 'dart:async';
@@ -71,7 +73,11 @@ class _PodScreenState extends State<PodScreen> {
     });
     await client.start();
     try {
-      await identified.future.timeout(const Duration(seconds: 3));
+      await identified.future.timeout(
+        d.kind == 'usb'
+            ? const Duration(seconds: 3)
+            : const Duration(seconds: 30),
+      );
     } on TimeoutException {
       await sub.cancel();
       await client.close();

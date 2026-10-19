@@ -14,7 +14,10 @@
 /// controller's game over Wi-Fi as a box does over the radio: its events and
 /// STATE go to the controller, the controller's commands and TIME beacons
 /// start, pause, resume and end it, and a kiosk-mode loss is reported as
-/// node.tamper.
+/// node.tamper. A linked I/O pod with a radio adds the field's radio
+/// ([PodRadioLink], decision PF9): both go through a [DualLink], which keeps
+/// the radio for when the Wi-Fi link is down; an opened pod is node.tamper
+/// too (reason pod_opened).
 ///
 /// A [ChangeNotifier]: the game screen rebuilds when it changes. It has no
 /// widgets and no platform code of its own (the services are injected), so
@@ -25,6 +28,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../controller/dual_link.dart';
 import '../controller/prop_link.dart';
 import '../core/node_types.dart';
 import '../modes/mode_catalog.dart';
@@ -32,6 +36,7 @@ import '../platform/services.dart';
 import '../pod/pod_client.dart';
 import '../pod/pod_codec.dart';
 import '../protocol/join_payload.dart';
+import '../radio/pod_radio_link.dart';
 import '../security/ndef.dart';
 import '../security/nfc_tag_signer.dart';
 import '../ui/template/screen_template.dart';
@@ -104,9 +109,13 @@ class PropSession extends ChangeNotifier {
     this.tick = const Duration(milliseconds: 50),
     this.modeName = '',
     this.link,
+    this.radioLinkFor,
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now,
-       timer = GameTimer(setup.durationMs) {
+       timer = GameTimer(setup.durationMs),
+       _link = link != null || setup.join != null
+           ? DualLink(wifi: link)
+           : null {
     tracker = ButtonTracker(_input);
     screenManager = ScreenManager(device, kiosk: kioskEnabled, now: _now);
   }
@@ -124,6 +133,17 @@ class PropSession extends ChangeNotifier {
 
   /// The Wi-Fi link to the field controller, when the join payload names it.
   final PropLink? link;
+
+  /// The radio link through a pod with a radio, for a joined game (null:
+  /// none; the app gives the core's event codec and the stored epochs).
+  final PodRadioLink? Function(PodClient pod)? radioLinkFor;
+
+  /// The links to the controller: Wi-Fi and/or the pod's radio.
+  final DualLink? _link;
+
+  /// The radio link through the pod, once one with a radio is linked.
+  PodRadioLink? get radio => _link?.radio;
+  DualLink? get controllerLink => _link;
   final DateTime Function() _now;
   StreamSubscription<LinkMessage>? _linkSub;
   var _ownerTeam = 0;
@@ -171,6 +191,9 @@ class PropSession extends ChangeNotifier {
   /// Kiosk mode was left while the game ran (ADR-P3-9 tamper detection).
   bool tamper = false;
 
+  /// The pod's enclosure is open (its tamper switch, during the game).
+  bool podOpened = false;
+
   /// The pod linked to this prop, if any.
   PodIdent? get pod => _pod?.ident;
 
@@ -206,7 +229,7 @@ class PropSession extends ChangeNotifier {
         phase = PropPhase.failed;
       } else {
         phase = PropPhase.ready;
-        final l = link;
+        final l = _link;
         if (l != null) {
           _linkSub = l.messages.listen(_onLink);
           l.start();
@@ -284,13 +307,24 @@ class PropSession extends ChangeNotifier {
     _podSub = client.events.listen((e) {
       switch (e) {
         case PodIdentified(:final ident):
-          _podInputs = PodInputs(ident);
+          _podInputs = PodInputs(ident, teams: setup.teams);
           _log(
             'pod ${ident.fwVersion}: ${ident.capabilities.length} capabilities',
           );
+          _attachRadio(client, ident);
           notifyListeners();
         case PodCapabilityEvent(:final message):
           unawaited(screenManager.activity());
+          final inputs = _podInputs;
+          if (inputs != null && inputs.caseOpened(message)) {
+            unawaited(_podCaseOpened());
+            return;
+          }
+          if (inputs != null && inputs.caseClosed(message)) {
+            podOpened = false;
+            notifyListeners();
+            return;
+          }
           final mapped = _podInputs?.input(
             message,
             tagData: (uid, tag) => podTagData(
@@ -307,10 +341,37 @@ class PropSession extends ChangeNotifier {
           _podInputs = null;
           notifyListeners();
         case PodRadioFrame():
-          break; // the radio is the controller link (plan phase E)
+          break; // the radio link (PodRadioLink) reads them
       }
     });
     await client.start();
+  }
+
+  /// A pod with a radio in a joined game: the field's radio joins the links.
+  void _attachRadio(PodClient client, PodIdent ident) {
+    final l = _link;
+    final make = radioLinkFor;
+    if (!ident.hasRadio || l == null || make == null || l.radio != null) return;
+    final r = make(client);
+    if (r == null) return;
+    _log('radio link through the pod');
+    unawaited(l.attachRadio(r, hello: link?.hello ?? const {}));
+  }
+
+  /// The pod's enclosure was opened during the game (node.tamper, critical).
+  Future<void> _podCaseOpened() async {
+    if (!running || podOpened) return;
+    podOpened = true;
+    _log('node.tamper pod_opened');
+    _link?.sendEvent(
+      seq: ++_shellSeq,
+      tMs: gameTimeMs,
+      type: 'node.tamper',
+      prio: 'critical',
+      data: const {'reason': 'pod_opened'},
+    );
+    notifyListeners();
+    await device.vibrate(const [0, 400, 200, 400]);
   }
 
   /// Moves game time on by [ms] (GameClock.manual: tests and replays).
@@ -338,7 +399,7 @@ class PropSession extends ChangeNotifier {
     _sinceSnapshot += ms;
     _sinceSlow += ms;
     _sinceState += ms;
-    if (link != null && _sinceState >= 5000) {
+    if (_link != null && _sinceState >= 5000) {
       _sinceState = 0;
       _sendState();
     }
@@ -368,7 +429,7 @@ class PropSession extends ChangeNotifier {
       if (!active && !tamper) {
         tamper = true;
         _log('node.tamper kiosk_broken');
-        link?.sendEvent(
+        _link?.sendEvent(
           seq: ++_shellSeq,
           tMs: gameTimeMs,
           type: 'node.tamper',
@@ -400,7 +461,7 @@ class PropSession extends ChangeNotifier {
       await node.input('game.end');
     }
     if (before != (gameTimeMs ~/ 1000, scores, phase)) {
-      if (link != null && before.$2 != scores) _sendState();
+      if (_link != null && before.$2 != scores) _sendState();
       notifyListeners();
     }
   }
@@ -408,7 +469,7 @@ class PropSession extends ChangeNotifier {
   /// STATE for the controller: the owner, the game time, the counters by
   /// team id (1-based), merged by maximum there.
   void _sendState() {
-    final l = link;
+    final l = _link;
     if (l == null) return;
     l.sendState({
       'owner_team': _ownerTeam,
@@ -504,7 +565,7 @@ class PropSession extends ChangeNotifier {
         _log('${event.type} ${event.dataJson}');
         if (event.type == 'zone.captured') _ownerTeam = event.team;
         if (event.type == 'zone.neutralized') _ownerTeam = 0;
-        link?.sendEvent(
+        _link?.sendEvent(
           seq: event.seq,
           tMs: event.tMs,
           type: event.type,
@@ -512,6 +573,7 @@ class PropSession extends ChangeNotifier {
           squad: event.squad,
           prio: event.prioName,
           data: event.data,
+          dataJson: event.dataJson,
         );
         if (event.prio == 2) unawaited(device.vibrate(const [0, 250]));
       case NodeLogOutput(:final line):
@@ -623,7 +685,7 @@ class PropSession extends ChangeNotifier {
     unawaited(_sub?.cancel());
     unawaited(_podSub?.cancel());
     unawaited(_linkSub?.cancel());
-    await link?.close();
+    await _link?.close();
     await _pod?.close();
     await _node?.close();
     await foreground?.stop();

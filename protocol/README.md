@@ -19,7 +19,7 @@ Both encodings come from the schema files in [`schema/`](schema/), so they canno
 | [`chrono-record.md`](chrono-record.md) | Chrono records: one chronograph reading signed with the marshal's Ed25519 key, and the canonical JSON that is signed |
 | [`player-token.md`](player-token.md) | Player tokens: who a phone calling the controller's API is (player, team, squad, role, game), signed by the controller |
 | [`checkin.md`](checkin.md) | Field check-in: the printed poster's `atalaia:checkin:` text, trusting the field's CA, the check-in endpoints, per-game replica declarations and the "replicas to chrono" list; vectors in `vectors/checkin.json` |
-| [`prop-link.md`](prop-link.md) | An Android prop's link to the controller over Wi-Fi: the HMAC proof of the game key, HELLO, STATE and events up, TIME and commands down |
+| [`prop-link.md`](prop-link.md) | An Android prop's link to the controller over Wi-Fi: the HMAC proof of the game key, HELLO, STATE and events up, TIME and commands down; with an I/O pod, the field's radio as well, and which one is used when |
 | [`usb-modem.md`](usb-modem.md) | The serial link between the field controller and its USB radio modem |
 | [`capability-proxy.md`](capability-proxy.md) | The link between an I/O pod and a phone (USB-OTG and BLE), version 1 |
 | [`json/event.schema.json`](json/event.schema.json) | JSON Schema of an event in the game log and the API (generated) |
@@ -133,7 +133,7 @@ The field controller reaches the radio through a modem board on USB. Its framing
 ## Phase 3: player tags, I/O pods and new events
 
 - **Player tags** ([nfc-tag.md](nfc-tag.md)): a version byte, the player id, the team, the game id and a 16-byte HMAC-SHA256 under the game key, on an NFC tag as an `application/vnd.atalaia.tag` record. The node's host checks a tag and gives the mode `nfc.tag`.
-- **Capability proxy v1** ([capability-proxy.md](capability-proxy.md)): an I/O pod lends its buttons, LEDs, NFC reader and radio to a phone, with the USB modem's framing: IDENT, EVT, CMD and ACK (CBOR), and the modem's radio frames shifted by 3.
+- **Capability proxy v1** ([capability-proxy.md](capability-proxy.md)): an I/O pod lends its buttons, LEDs, NFC reader and radio to a phone, with the USB modem's framing: IDENT, EVT, CMD and ACK (CBOR), and the modem's radio frames shifted by 3 (NOISE included since plan phase F). The pod's side is `firmware/esp32/main/pod/`; the refinements made while building it are dated in the file.
 - **Events** 25-27 and 33-41 (ADR-P3-8): `kill.confirmed`, `kill.denied`, `team.eliminated`, `money.collected`, `money.deposited`, `chrono.checkin`, `chrono.spotcheck`, `visibility.granted`, `visibility.expired`, `node.tamper`, `pod.connected`, `pod.disconnected`; data keys 29 (`see_team`) and 30 (`tolerance_pct`). The phase 2 mode pack holds 28-32; phase 4 starts at 42. Proposed in a draft RFC ([docs/rfcs/0000-phase-3-events-tags-and-pods.md](../docs/rfcs/0000-phase-3-events-tags-and-pods.md)).
 
 ### Header `version_flags` byte

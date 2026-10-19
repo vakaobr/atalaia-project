@@ -49,6 +49,11 @@ typedef struct {
      * NULL: this build cannot measure. */
     int (*measure_start)(void *ctx, uint32_t freq_hz, uint16_t dwell_ms, bool cad);
     void *ctx;
+    /* When set, every frame the modem sends goes here (type and payload)
+     * instead of being encoded for serial_write: the I/O pod puts them on
+     * its own links as RADIO_* frames (main/pod/pod.c). NULL for the modem. */
+    void (*frame_out)(void *frame_ctx, uint8_t type, const uint8_t *payload, size_t len);
+    void *frame_ctx;
 } modem_io_t;
 
 typedef struct {

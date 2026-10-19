@@ -5,7 +5,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Android props on Wi-Fi (the prop link)
 
-An Android phone running a prop joins a game with a join payload ([join.md](join.md)), like a box, but it has no LoRa radio of its own (an I/O pod brings one in plan phase F). On the field's Wi-Fi it links to the controller instead and takes part as a box does over the radio: it reports its HELLO, STATE and EVENT messages and receives the controller's TIME beacons and commands (decision PD12, plan phase E). This file is the link, version 1.
+An Android phone running a prop joins a game with a join payload ([join.md](join.md)), like a box, but it has no LoRa radio of its own (an I/O pod brings one, below). On the field's Wi-Fi it links to the controller instead and takes part as a box does over the radio: it reports its HELLO, STATE and EVENT messages and receives the controller's TIME beacons and commands (decision PD12, plan phase E). This file is the link, version 1.
 
 Implementations: `controller/atalaia_controller/prop_link.py` (Python: the controller) and `app/lib/controller/prop_link.dart` (Dart: the phone). Tests: `controller/tests/test_prop_link.py` and `app/test/controller/prop_link_test.dart`.
 
@@ -51,3 +51,15 @@ Whatever the controller sends on the radio as TIME or CMD reaches the linked pro
 - The link proves the game key without sending it; every game has a new key, so a link ends with its game. Anyone who holds the game key (every box and join card has it) can link as an assigned node: as on the radio, the join payload is the credential (ADR-P2-12).
 - Over `wss://` with the pinned field CA the messages are private and cannot be changed on the way. Over plain `ws://` (the controller's HTTP port) they are not; the app uses `wss://` whenever the payload has keys 13 and 14.
 - Positions never travel on this link (ADR-P3-6: `POST /api/v1/positions`).
+
+## With an I/O pod: the field's radio as well (plan phase F)
+
+A phone with an I/O pod that has a radio ([capability-proxy.md](capability-proxy.md)) can also take part on the field's radio, as a box does: it builds the plaintext Skirmesh-RF packets (HELLO, EVENT, STATE; the EVENT payload with the core's own codec) and the pod encrypts and sends them with the USB modem's code, which keeps the channel's duty cycle and power; the phone hears the controller's TIME, CMD and ACK through the pod (`app/lib/radio/pod_radio_link.dart`; refinement of 2026-10-19, decision PF9). It configures the pod's radio with the join payload's game, node id, hops and channel and a new epoch, stored before it is used, so a nonce never repeats under one game key; HELLO goes until acknowledged; normal and critical events ask for an ACK and are sent again every 3 s in new packets; STATE goes at most every 15 s. The phone does not relay other nodes' packets.
+
+When both links exist (`app/lib/controller/dual_link.dart`):
+
+- while this Wi-Fi link is up, everything goes on it, the radio stays quiet (the field's airtime is shared and duty-cycled), and the controller's word is taken from Wi-Fi only;
+- while it is down, events and STATE go on the radio too, and TIME and commands come from the radio;
+- every event still goes to the Wi-Fi link, which keeps it until acknowledged and sends it again after a reconnect; an event heard on both arrives twice and is logged once (the log's duplicate key is node, seq, game time, type), and scores merge by maximum.
+
+Both HELLOs then say so in `transports`: bit 0 (LoRa) is set when a pod with a radio is linked, next to bit 1 (Wi-Fi) when there is a Wi-Fi link (`hello` here carries `transports` 3; the radio's HELLO 3, or 1 at a field without Wi-Fi). A game joined without the controller's addresses (no keys 13 and 14) uses the radio alone.

@@ -8,9 +8,10 @@
 /// [PodInputs] turns a pod's events into the inputs the core expects, as a
 /// box's shell does.
 ///
-/// No pod exists yet (its firmware is plan phase F): this is checked with a
-/// pod simulated in the tests (test/pod/pod_client_test.dart), not with
-/// hardware.
+/// Checked with a pod simulated in the tests (test/pod/pod_client_test.dart)
+/// and with the pod firmware's own C code running on the host
+/// (firmware/esp32/test/pod_host, test/pod/pod_host_test.dart), over both
+/// links; not with a real pod yet (plan phase G).
 library;
 
 import 'dart:async';
@@ -43,8 +44,8 @@ final class PodCapabilityEvent extends PodEvent {
   final ProxyMessage message;
 }
 
-/// RADIO_RX, RADIO_TX_ACK, RADIO_STATUS or RADIO_ERROR, untouched (the
-/// phone's radio code reads them: plan phase E).
+/// RADIO_RX, RADIO_TX_ACK, RADIO_STATUS, RADIO_ERROR or RADIO_NOISE,
+/// untouched (the phone's radio link reads them: lib/radio/pod_radio_link.dart).
 final class PodRadioFrame extends PodEvent {
   const PodRadioFrame(this.type, this.payload);
   final int type;
@@ -160,7 +161,8 @@ class PodClient {
       case FrameType.radioRx ||
           FrameType.radioTxAck ||
           FrameType.radioStatus ||
-          FrameType.radioError:
+          FrameType.radioError ||
+          FrameType.radioNoise:
         _events.add(PodRadioFrame(f.type, f.payload));
       default:
         break; // other types are ignored: a later version may add frames
@@ -179,6 +181,9 @@ class PodClient {
   }
 
   Future<void> close() async {
+    // Events are delivered synchronously: a listener that closes the client
+    // while it hears one must not have the next event fired inside it.
+    await Future<void>.value();
     _break('closed');
     await _sub?.cancel();
     await transport.close();
@@ -195,11 +200,39 @@ class _Pending {
 }
 
 /// A pod's events as the inputs a mode expects (modes/README.md "Inputs
-/// from the hardware"), given the pod's capability descriptors.
+/// from the hardware"), given the pod's capability descriptors and the
+/// game's [teams].
 class PodInputs {
-  PodInputs(this.ident);
+  PodInputs(this.ident, {this.teams = const []});
 
   final PodIdent ident;
+
+  /// The game's team names, in order (team id i + 1 is teams[i]).
+  final List<String> teams;
+
+  static final _buttonNumber = RegExp(r'^btn\.(\d+)$');
+
+  /// A button's team (decision PF6): its colour when the game has a team of
+  /// that name, else the game's N-th team for button N ("btn.N"), as on a
+  /// Field Box; null when the game has no such team.
+  String? buttonTeam(Map<String, Object?> cap) {
+    final colour = cap['team'];
+    if (colour is String && (teams.isEmpty || teams.contains(colour))) {
+      return colour;
+    }
+    final m = _buttonNumber.firstMatch('${cap['id']}');
+    final n = m == null ? null : int.parse(m.group(1)!);
+    if (n != null && n >= 1 && n <= teams.length) return teams[n - 1];
+    return null;
+  }
+
+  /// Whether [msg] says the pod's enclosure was opened (a tamper switch).
+  bool caseOpened(ProxyMessage msg) =>
+      _descriptor(msg.capId)?['type'] == 'tamper' && msg.name == 'opened';
+
+  /// Whether [msg] says the pod's enclosure was closed again.
+  bool caseClosed(ProxyMessage msg) =>
+      _descriptor(msg.capId)?['type'] == 'tamper' && msg.name == 'closed';
 
   Map<String, Object?>? _descriptor(String capId) {
     for (final c in ident.capabilities) {
@@ -219,8 +252,8 @@ class PodInputs {
     final cap = _descriptor(msg.capId);
     final type = cap?['type'];
     if (type == 'button') {
-      final team = cap!['team'];
-      if (team is! String) return null;
+      final team = buttonTeam(cap!);
+      if (team == null) return null;
       final ms = msg.data['ms'];
       return switch (msg.name) {
         'press' => ('team_input.press', {'team': team}),
@@ -246,15 +279,37 @@ class PodInputs {
     return null;
   }
 
-  /// The pod command for a script's hardware command, or null: a ring's
-  /// fill and a team display's show take {"team": name}, a speaker's tone
-  /// {"freq", "ms"}; other commands pass their arguments as {"args": [...]}.
+  /// The pod command for a script's hardware command, or null (decision
+  /// PD16, confirmed by the pod firmware in PF7): a ring's fill and a team
+  /// display's show take {"team": name}, a speaker's tone {"freq", "ms"};
+  /// other commands pass their arguments as {"args": [...]}. The semantic
+  /// targets reach the pod's parts by type: team_display:show is the LED
+  /// ring's fill, audio goes to the pod's speaker.
   (String, String, Map<String, Object?>)? command(
     String target,
     String method,
     List<Object?> args,
   ) {
-    if (_descriptor(target) == null) return null;
+    if (_descriptor(target) == null) {
+      final type = switch (target) {
+        'team_display' => 'led',
+        'audio' => 'audio',
+        _ => null,
+      };
+      Map<String, Object?>? part;
+      for (final c in ident.capabilities) {
+        if (type != null && c['type'] == type) {
+          part = c;
+          break;
+        }
+      }
+      if (part == null) return null;
+      return command(
+        '${part['id']}',
+        target == 'team_display' && method == 'show' ? 'fill' : method,
+        args,
+      );
+    }
     if ((method == 'fill' || method == 'show') &&
         args.length == 1 &&
         args.single is String) {

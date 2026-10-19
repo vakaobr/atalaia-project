@@ -38,6 +38,37 @@
 
 menu "Atalaia Field Box Configuration"
 
+    # ---- Firmware variant (ADR-P2-4, ADR-P3-3) ---------------------------------
+    choice ATALAIA_DEVICE_MODE
+        prompt "Firmware variant"
+        default ATALAIA_NODE_MODE
+        help
+            One ESP-IDF project, three images: the Field Box, the field
+            controller's USB radio modem (sdkconfig.modem, python
+            tools/docker_fw.py modem) and the I/O pod that lends its hardware
+            to a phone (sdkconfig.pod, python tools/docker_fw.py pod).
+
+        config ATALAIA_NODE_MODE
+            bool "Field Box"
+
+        config ATALAIA_MODEM_MODE
+            bool "USB radio modem"
+            help
+                The controller's radio: a Heltec V4.3 plugged into the field
+                controller (Raspberry Pi) over USB. Radio, AES-CCM, dedupe and
+                duty cycle run here; no Lua, screens or presets. The frames on
+                the serial link are specified in protocol/usb-modem.md.
+
+        config ATALAIA_POD_MODE
+            bool "I/O pod (capability proxy for a phone)"
+            help
+                A Heltec V4 that lends its team buttons, keypad, LED ring,
+                sound, NFC reader, enclosure switch and LoRa radio to an
+                Android phone over USB or Bluetooth LE (ADR-P3-3,
+                protocol/capability-proxy.md). No Lua, screens, presets or
+                Wi-Fi; the radio is the USB modem's code.
+    endchoice
+
     # ---- Buttons (active-low GPIOs) -----------------------------------------
     menu "Buttons"
         config ATALAIA_BTN1_PIN
@@ -297,8 +328,8 @@ menu "Atalaia Field Box Configuration"
                 the SX1262 and the antenna. Read the chip next to the LoRa
                 antenna connector (BRING_UP.md step 0): KCT8103L = V4.3,
                 GC1109 = V4.2. The wrong choice leaves the receiver deaf or
-                the transmitter weak. Applies to the Field Box and the USB
-                radio modem.
+                the transmitter weak. Applies to the Field Box, the USB
+                radio modem and the I/O pod.
 
             config ATALAIA_BOARD_HELTEC_V4_3
                 bool "Heltec V4.3 (KCT8103L)"
@@ -411,7 +442,7 @@ menu "Atalaia Field Box Configuration"
         config ATALAIA_CONSOLE_USB_INPUT
             bool "Read the serial console's input from the USB port (USB-Serial-JTAG)"
             default y
-            depends on !ATALAIA_MODEM_MODE
+            depends on ATALAIA_NODE_MODE
             help
                 The Heltec V4 has no USB-UART bridge: its USB-C port is the
                 ESP32-S3's own USB-Serial-JTAG. With this on, "@join",
@@ -443,15 +474,7 @@ menu "Atalaia Field Box Configuration"
 
     # ---- USB radio modem (ADR-P2-4) -----------------------------------------
     menu "USB radio modem"
-        config ATALAIA_MODEM_MODE
-            bool "Build the USB radio modem instead of the Field Box firmware"
-            default n
-            help
-                The controller's radio: a Heltec V4.3 plugged into the field
-                controller (Raspberry Pi) over USB. Radio, AES-CCM, dedupe and
-                duty cycle run here; no Lua, screens or presets. Selected by
-                sdkconfig.modem (python tools/docker_fw.py modem). The frames
-                on the serial link are specified in protocol/usb-modem.md.
+        depends on ATALAIA_MODEM_MODE
 
         choice ATALAIA_MODEM_LINK
             prompt "Serial link to the controller"
@@ -475,16 +498,86 @@ menu "Atalaia Field Box Configuration"
             default 921600
             depends on ATALAIA_MODEM_LINK_UART0
 
-        config ATALAIA_MODEM_EPOCH_WINDOW
-            int "Receive epoch window"
-            default 16
-            range 1 64
-            depends on ATALAIA_MODEM_MODE
+    endmenu
+
+    config ATALAIA_MODEM_EPOCH_WINDOW
+        int "Receive epoch window (USB radio modem and I/O pod)"
+        default 16
+        range 1 64
+        depends on ATALAIA_MODEM_MODE || ATALAIA_POD_MODE
+        help
+            How many epochs above a box's last known epoch the modem (or an
+            I/O pod's radio) tries when a packet does not authenticate
+            (ADR-P2-2 tries only one). A box that rebooted several times out
+            of range would otherwise never be heard again. Never a lower epoch.
+
+    # ---- I/O pod (ADR-P3-3, protocol/capability-proxy.md) -------------------
+    # The pod uses the Field Box's pins for its buttons, keypad expander, LED
+    # ring, NFC reader, battery gauge, amplifier and radio. It has no display,
+    # so the display's GPIOs (3, 38, 40-42, 47) are free on a pod.
+    menu "I/O pod"
+        depends on ATALAIA_POD_MODE
+
+        config ATALAIA_POD_BTN1_TEAM
+            string "Colour of button 1 (empty: the game's 1st team)"
+            default ""
             help
-                How many epochs above a box's last known epoch the modem
-                tries when a packet does not authenticate (ADR-P2-2 tries
-                only one). A box that rebooted several times out of range
-                would otherwise never be heard again. Never a lower epoch.
+                Empty (the default): button N stands for the game's N-th
+                team, as on a Field Box. A colour (red, blue, green, yellow,
+                orange, purple, white, pink, cyan) goes into the button's
+                descriptor in IDENT, and the phone uses it when the game has
+                a team of that name. Which buttons are fitted follows their
+                pins (Buttons menu, -1 = not fitted).
+
+        config ATALAIA_POD_BTN2_TEAM
+            string "Colour of button 2 (empty: the game's 2nd team)"
+            default ""
+
+        config ATALAIA_POD_BTN3_TEAM
+            string "Colour of button 3 (empty: the game's 3rd team)"
+            default ""
+
+        config ATALAIA_POD_BTN4_TEAM
+            string "Colour of button 4 (empty: the game's 4th team)"
+            default ""
+
+        config ATALAIA_POD_TAMPER_PIN
+            int "Enclosure switch GPIO (-1 = none)"
+            default 47
+            help
+                A switch between this GPIO and GND that the closed lid holds
+                closed (the pin has its pull-up on). Opening the enclosure
+                sends the "case" capability's "opened" event, which the phone
+                reports as node.tamper. The switch is armed only once it has
+                read closed, so a pod built without one never reports a
+                tamper. GPIO 47 is the Field Box's display backlight; a pod
+                has no display.
+
+        config ATALAIA_POD_TAMPER_OPEN_HIGH
+            bool "The switch's pin reads high when the enclosure is open"
+            default y
+            help
+                With the switch to GND and the pull-up, an open switch reads
+                high. Turn this off for a switch wired the other way.
+
+        config ATALAIA_POD_BLE
+            bool "Bluetooth LE link"
+            default y
+            help
+                The pod's GATT service (protocol/capability-proxy.md), next to
+                the USB link. Off: USB only (turn CONFIG_BT_ENABLED off too to
+                leave the Bluetooth stack out of the image).
+
+        config ATALAIA_POD_BLE_ENCRYPTED
+            bool "Frames only on an encrypted Bluetooth link"
+            default y
+            depends on ATALAIA_POD_BLE
+            help
+                The pod asks the phone to pair (LE Secure Connections, Just
+                Works: the pod has no display; bonded) and takes Pod RX writes
+                and sends frames only once the link is encrypted, so the game
+                key in RADIO_CMD CONFIGURE never crosses the air in the clear.
+                Off only for bench tests with tools that cannot pair.
     endmenu
 
     # ---- Development and emulator options -----------------------------------

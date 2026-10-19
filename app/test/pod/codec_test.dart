@@ -132,12 +132,30 @@ void main() {
               channelHz: f['channel_hz']! as int,
               key: hexDecode(f['key']! as String),
             ),
+          FrameType.radioCmd when f['opcode'] == RadioOp.measure =>
+            radioMeasure(
+              f['channel_hz']! as int,
+              f['dwell_ms']! as int,
+              cad: f['flags'] == 1,
+            ),
           FrameType.radioCmd => [f['opcode']! as int],
           FrameType.radioStatus => utf8.encode(f['json']! as String),
           FrameType.radioError => radioError(
             f['code']! as int,
             f['message']! as String,
           ),
+          FrameType.radioNoise => RadioNoise(
+            channelHz: f['channel_hz']! as int,
+            dwellMs: f['dwell_ms']! as int,
+            samples: f['samples']! as int,
+            minDbm: f['min_dbm']! as int,
+            meanDbm: f['mean_dbm']! as int,
+            p50Dbm: f['p50_dbm']! as int,
+            p90Dbm: f['p90_dbm']! as int,
+            maxDbm: f['max_dbm']! as int,
+            cadTries: f['cad_tries']! as int,
+            cadDetected: f['cad_detected']! as int,
+          ).encode(),
           _ => throw StateError('type $type'),
         };
         expect(hexEncode(payload), c['payload']);

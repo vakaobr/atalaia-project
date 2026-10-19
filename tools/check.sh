@@ -4,7 +4,7 @@
 #
 # Checks the generated protocol files, the project page and the formatting, builds the core, runs its tests, the
 # simulator's tests, every game mode's tests, and the field controller's tests
-# (against the C host modem, the C host box and a private Mosquitto): the same
+# (against the C host modem, the C host box, the C host pod and a private Mosquitto): the same
 # checks as CI (apart from the JSON Schema and licensing checks, which need
 # extra tools, the firmware jobs: tools/docker_fw.py, the GM console's
 # browser tests: tools/docker_console.py, and the app's Dart checks and
@@ -36,6 +36,9 @@ export ATALAIA_MODEM_HOST="$(cd "$BUILD/modem_host" && pwd)/modem_host"
 cmake -S firmware/esp32/test/box_host -B "$BUILD/box_host" -DCMAKE_BUILD_TYPE=Debug
 cmake --build "$BUILD/box_host"
 export ATALAIA_BOX_HOST="$(cd "$BUILD/box_host" && pwd)/box_host"
+cmake -S firmware/esp32/test/pod_host -B "$BUILD/pod_host" -DCMAKE_BUILD_TYPE=Debug
+cmake --build "$BUILD/pod_host"
+export ATALAIA_POD_HOST="$(cd "$BUILD/pod_host" && pwd)/pod_host"
 cd simulator
 python3 -m unittest discover -s tests
 python3 -m atalaia_sim test

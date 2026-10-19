@@ -28,8 +28,10 @@ import java.util.concurrent.Executors
  * The I/O pod over USB-OTG (protocol/capability-proxy.md): the pod is a USB
  * CDC ACM device; this opens it with Android's UsbManager, sets 921600 baud
  * 8N1 and DTR, reads its bulk-in endpoint on a thread and hands the bytes
- * to Dart (lib/pod/pod_client.dart finds the frames). No pod firmware
- * exists yet (plan phase F): this has not been run against hardware.
+ * to Dart (lib/pod/pod_client.dart finds the frames). The pod firmware
+ * (firmware/esp32/main/pod/) is the ESP32-S3's USB-Serial-JTAG port, where
+ * RTS with DTR clear would reset the chip: both are set together. Not run
+ * against a real pod yet (plan phase G).
  */
 class UsbPodPlugin(private val activity: Activity, messenger: BinaryMessenger) :
     MethodChannel.MethodCallHandler, EventChannel.StreamHandler {

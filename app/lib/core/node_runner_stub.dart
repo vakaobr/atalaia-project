@@ -5,11 +5,15 @@
 /// nothing. The player, GM and spectator roles do not need it.
 library;
 
+import '../radio/rf_codec.dart';
 import 'node_types.dart';
 
 /// [libraryPath] is ignored: there is no core to load.
 NodeRunner createNodeRunner({String? libraryPath}) =>
     const UnsupportedNodeRunner();
+
+/// No core, no EVENT codec: a prop's radio link needs one.
+EventEncoder? createEventEncoder({String? libraryPath}) => null;
 
 final class UnsupportedNodeRunner implements NodeRunner {
   const UnsupportedNodeRunner();

@@ -33,9 +33,10 @@ import java.util.UUID
  * the pod service, then a GATT link with a 247-byte MTU, notifications on
  * Pod TX (the pod's frames, handed to Dart as bytes) and writes without
  * response to Pod RX (the phone's frames, cut to the MTU and sent one after
- * the other). The run-time permissions are asked from Dart first. No pod
- * firmware exists yet (plan phase F): this has not been run against
- * hardware.
+ * the other). The run-time permissions are asked from Dart first. The pod
+ * firmware (firmware/esp32/main/pod/) asks to pair on connection (Android
+ * shows its question) and sends its frames once the link is encrypted. Not
+ * run against a real pod yet (plan phase G).
  */
 @SuppressLint("MissingPermission")
 class BlePodPlugin(private val activity: Activity, messenger: BinaryMessenger) :

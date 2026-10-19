@@ -16,6 +16,10 @@
 
 static void send_frame(modem_t *m, uint8_t type, const uint8_t *payload, size_t len)
 {
+    if (m->io.frame_out != NULL) {
+        m->io.frame_out(m->io.frame_ctx, type, payload, len);
+        return;
+    }
     uint8_t buf[MODEM_FRAME_MAX];
     size_t n = modem_frame_encode(type, payload, len, buf, sizeof(buf));
     if (n > 0 && m->io.serial_write != NULL) {

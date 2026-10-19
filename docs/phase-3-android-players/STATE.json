@@ -14,7 +14,7 @@
     "STATUS.md": "complete"
   },
   "metadata": {
-    "description": "Phase 3: Android props, I/O pod, Flutter player app with roles, new game modes (Kill Confirmed, Respawn, Player Check-in, Money Factory), chrono check-in. Plan phases A, B, C, D and E (all but the Android controller shell) implemented.",
+    "description": "Phase 3: Android props, I/O pod, Flutter player app with roles, new game modes (Kill Confirmed, Respawn, Player Check-in, Money Factory), chrono check-in. Plan phases A, B, C, D, E (all but the Android controller shell) and F (in software) implemented.",
     "risk_level": "Medium",
     "mode": "implementation",
     "resume_with": "--resume to continue to implementation phase",
@@ -25,8 +25,8 @@
       "C": "done in software (2026-10-19): dart:ffi bindings, isolate-local callbacks, game loop isolate, FFI stub with layout report, every mode test through the Dart bridge, Android NDK build (three ABIs) via CMake presets and Gradle, CI jobs flutter-test, core-android-ndk, flutter-build-android; core fix in field.common_owner; decisions PC1-PC11",
       "D": "done in software (2026-10-19): Flutter screen-template renderer checked against the core, Android prop shell (modes on the core, team buttons, keypad, NFC tags, game timer sending game.end, admin PIN, screen manager, kiosk and tamper), join by QR/NFC/text, player view on the controller feed, GM web view, marshal chrono/replicas/tag writer, pt-PT and English, Kotlin plugins (device, kiosk, foreground service, NFC, QR with CameraX+ZXing, USB and BLE pod), pod codec and client, CI job flutter-integration (emulator, not run locally); iOS not built; core fix in |clock; decisions PD1-PD24",
       "E": "done in software (2026-10-19) except the Android controller role's shell (PE24): field check-in (poster, identities, tokens with the controller's own per-game key, declarations, replicas-to-chrono list fed by signed readings, retention), HTTPS with the field CA, role-filtered stream with the event history in hello, Android props on Wi-Fi (join keys 13 and 14), player positions with server-side visibility, teams and squads (PE25), GM console Check-in tab and poster, the app's screens; Dart MQTT broker and visibility engine; decisions PE1-PE25",
-      "F": "pending (needs hardware)",
-      "G": "pending (needs hardware)"
+      "F": "done in software (2026-10-19): I/O pod firmware variant (CONFIG_ATALAIA_POD_MODE, sdkconfig.pod), proxy, USB-Serial-JTAG and NimBLE GATT links, the Field Box HAL as capabilities, radio passthrough with the modem's code (RADIO_NOISE 0x0B), node.tamper from an enclosure switch, the host pod; the phone's radio link through a pod and DualLink with Wi-Fi; not run on a board or a phone; decisions PF1-PF15",
+      "G": "pending (needs hardware: boards, pods, phones, the Pi)"
     }
   }
 }

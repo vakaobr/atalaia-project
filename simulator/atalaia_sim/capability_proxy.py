@@ -17,6 +17,7 @@ the modem framing) and this one check protocol/vectors/capability_proxy.yaml.
 from __future__ import annotations
 
 import re
+import struct
 from typing import Any, Optional
 
 from . import cbor
@@ -27,12 +28,14 @@ VERSION = 1
 
 IDENT, EVT, CMD, ACK = 0x01, 0x02, 0x03, 0x04
 RADIO_RX, RADIO_TX, RADIO_TX_ACK, RADIO_CMD, RADIO_STATUS, RADIO_ERROR = 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A
+# The modem's NOISE (the answer to MEASURE), 0x08 + 3: decision PF2.
+RADIO_NOISE = 0x0B
 TYPE_NAMES = {IDENT: "IDENT", EVT: "EVT", CMD: "CMD", ACK: "ACK", RADIO_RX: "RADIO_RX",
               RADIO_TX: "RADIO_TX", RADIO_TX_ACK: "RADIO_TX_ACK", RADIO_CMD: "RADIO_CMD",
-              RADIO_STATUS: "RADIO_STATUS", RADIO_ERROR: "RADIO_ERROR"}
+              RADIO_STATUS: "RADIO_STATUS", RADIO_ERROR: "RADIO_ERROR", RADIO_NOISE: "RADIO_NOISE"}
 
 # The modem's CMD opcodes (protocol/usb-modem.md), carried by RADIO_CMD.
-OP_PING, OP_CONFIGURE, OP_SET_CHANNEL, OP_STATUS, OP_SET_PEER_EPOCH, OP_CLEAR, OP_IDENT = range(1, 8)
+OP_PING, OP_CONFIGURE, OP_SET_CHANNEL, OP_STATUS, OP_SET_PEER_EPOCH, OP_CLEAR, OP_IDENT, OP_MEASURE = range(1, 9)
 
 CAPS_MAX = 16
 TEXT_MAX = 23
@@ -275,6 +278,19 @@ def radio_configure(game_id: int, node_id: int, epoch: int, max_hops: int, chann
 
 def radio_error(code: int, message: str) -> bytes:
     return bytes([_uint("code", code, 255)]) + message.encode()
+
+
+def radio_measure(channel_hz: int, dwell_ms: int, cad: bool) -> bytes:
+    """RADIO_CMD MEASURE: the modem's opcode 8 (protocol/usb-modem.md)."""
+    return (bytes([OP_MEASURE]) + _uint("channel_hz", channel_hz, 0xFFFFFFFF).to_bytes(4, "big") +
+            _uint("dwell_ms", dwell_ms, 0xFFFF).to_bytes(2, "big") + bytes([1 if cad else 0]))
+
+
+def radio_noise(r: dict[str, int]) -> bytes:
+    """RADIO_NOISE: the modem's NOISE payload, 17 bytes."""
+    return struct.pack(">IHHbbbbbHH", r["channel_hz"], r["dwell_ms"], r["samples"], r["min_dbm"],
+                       r["mean_dbm"], r["p50_dbm"], r["p90_dbm"], r["max_dbm"], r["cad_tries"],
+                       r["cad_detected"])
 
 
 def describe(frame_type: int) -> Optional[str]:

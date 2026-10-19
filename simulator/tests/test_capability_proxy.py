@@ -94,9 +94,14 @@ class PayloadTests(unittest.TestCase):
                          by_name["status"]["fields"]["json"])
         f = by_name["error"]["fields"]
         self.assertEqual(cp.radio_error(f["code"], f["message"]).hex(), by_name["error"]["payload"])
-        # The radio frames are the modem's frame types plus 3.
+        f = by_name["cmd_measure"]["fields"]
+        self.assertEqual(cp.radio_measure(f["channel_hz"], f["dwell_ms"], f["flags"] == 1).hex(),
+                         by_name["cmd_measure"]["payload"])
+        self.assertEqual(cp.radio_noise(by_name["noise"]["fields"]).hex(), by_name["noise"]["payload"])
+        # The radio frames are the modem's frame types plus 3, NOISE (0x0B) included.
         for v in VECTORS["radio"]:
-            self.assertIn(v["type"], range(cp.RADIO_RX, cp.RADIO_ERROR + 1))
+            self.assertIn(v["type"], range(cp.RADIO_RX, cp.RADIO_NOISE + 1))
+        self.assertEqual(cp.describe(cp.RADIO_NOISE), "RADIO_NOISE")
 
     def test_invalid(self) -> None:
         self.assertGreaterEqual(len(VECTORS["invalid"]), 20)

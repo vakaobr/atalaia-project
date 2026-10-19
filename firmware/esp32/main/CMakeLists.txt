@@ -17,6 +17,40 @@ if(CONFIG_ATALAIA_MODEM_MODE)
         "radio/noise_stats.c"
     )
     set(ATALAIA_EMBED)
+elseif(CONFIG_ATALAIA_POD_MODE)
+    # I/O pod (ADR-P3-3): the capability proxy for a phone over USB and
+    # Bluetooth LE, the Field Box's input and output parts, and the modem's
+    # radio logic. No Lua, screens, presets or Wi-Fi.
+    set(ATALAIA_SRCS
+        "pod/pod_main.c"
+        "pod/pod_task.c"
+        "pod/pod.c"
+        "pod/pod_caps.c"
+        "pod/pod_json.c"
+        "pod/pod_ble.c"
+        "modem/modem.c"
+        "modem/modem_framing.c"
+        "key_filter.c"
+        "hal/esp/hal_esp_board.c"
+        "hal/esp/hal_esp_i2c.c"
+        "hal/esp/hal_esp_buttons.c"
+        "hal/esp/hal_esp_keypad.c"
+        "hal/esp/hal_esp_keypad_gpio.c"
+        "hal/esp/hal_esp_leds.c"
+        "hal/esp/hal_esp_nfc.c"
+        "hal/esp/hal_esp_audio.c"
+        "hal/esp/hal_esp_battery.c"
+        "hal/esp/hal_esp_radio.c"
+        "hal/board_fem.c"
+        "radio/radio_task.c"
+        "radio/radio_protocol.c"
+        "radio/radio_limits.c"
+        "radio/noise_stats.c"
+    )
+    if(CONFIG_ATALAIA_POD_BLE)
+        list(APPEND ATALAIA_SRCS "pod/pod_ble_nimble.c")
+    endif()
+    set(ATALAIA_EMBED)
 else()
     set(ATALAIA_SRCS
         "shell.c"
@@ -62,6 +96,24 @@ else()
     set(ATALAIA_EMBED EMBED_FILES "wifi_setup.html")
 endif()
 
+set(ATALAIA_REQUIRES
+    atalaia_core
+    driver
+    esp_app_format
+    esp_psram
+    esp_timer
+    nvs_flash
+    esp_wifi
+    esp_http_server
+    esp_event
+    esp_netif
+    mbedtls
+    # NimBLE (part of ESP-IDF) for the I/O pod's Bluetooth link. Always listed:
+    # requirements are expanded before the sdkconfig is read. Without
+    # CONFIG_BT_ENABLED (the Field Box, the modem) it builds and links nothing.
+    bt
+)
+
 idf_component_register(
     SRCS
         ${ATALAIA_SRCS}
@@ -71,17 +123,7 @@ idf_component_register(
     PRIV_INCLUDE_DIRS
         "hal/esp"
     REQUIRES
-        atalaia_core
-        driver
-        esp_app_format
-        esp_psram
-        esp_timer
-        nvs_flash
-        esp_wifi
-        esp_http_server
-        esp_event
-        esp_netif
-        mbedtls
+        ${ATALAIA_REQUIRES}
     ${ATALAIA_EMBED}
 )
 
@@ -96,8 +138,8 @@ target_include_directories(${lvgl_lib} PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../lvgl
 target_compile_definitions(${lvgl_lib} PUBLIC LV_KCONFIG_IGNORE)
 
 # Screen templates (ADR-P3-4): every modes/<mode>/assets/screens/*.yaml is
-# compiled into the image (builtin_screens.c, generated here).
-if(NOT CONFIG_ATALAIA_MODEM_MODE)
+# compiled into the image (builtin_screens.c, generated here). The Field Box only.
+if(NOT CONFIG_ATALAIA_MODEM_MODE AND NOT CONFIG_ATALAIA_POD_MODE)
     include("${CMAKE_CURRENT_LIST_DIR}/builtin_screens.cmake")
     atalaia_builtin_screens("${CMAKE_CURRENT_LIST_DIR}/../../../modes"
                             "${CMAKE_CURRENT_BINARY_DIR}/builtin_screens.c")
@@ -107,7 +149,7 @@ endif()
 # Built-in presets: the mode scripts from modes/ are compiled into the image
 # and written to the preset store when it is empty (builtin_presets.c). They
 # are copied first because both files are called node.lua.
-if(NOT CONFIG_ATALAIA_MODEM_MODE)
+if(NOT CONFIG_ATALAIA_MODEM_MODE AND NOT CONFIG_ATALAIA_POD_MODE)
     set(ATALAIA_MODES_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../modes")
     foreach(mode bomb domination holdall laststand codes kill_confirmed respawn player_checkin medic)
         configure_file("${ATALAIA_MODES_DIR}/${mode}/node.lua"

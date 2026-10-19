@@ -19,6 +19,9 @@ import 'package:flutter/foundation.dart';
 
 import '../checkin/field_trust.dart';
 import '../protocol/join_payload.dart';
+import 'controller_link.dart';
+
+export 'controller_link.dart';
 
 const _domain = 'atalaia-prop-link-v1';
 
@@ -74,31 +77,9 @@ LinkConnect ioLinkConnect(PinnedField? field) =>
       await WebSocket.connect(uri.toString(), customClient: field?.client()),
     );
 
-/// What the controller sends: a TIME beacon or a command.
-sealed class LinkMessage {
-  const LinkMessage();
-}
-
-final class LinkTime extends LinkMessage {
-  const LinkTime(this.state, this.gameTimeMs, this.durationMs);
-
-  /// waiting, running, paused, ended
-  final String state;
-  final int gameTimeMs;
-  final int durationMs;
-}
-
-final class LinkCommand extends LinkMessage {
-  const LinkCommand(this.cmd, this.params);
-
-  /// start, pause, resume, end, set_owner, message, reset, reboot, mode
-  final String cmd;
-  final Map<String, Object?> params;
-}
-
 enum LinkState { connecting, linked, refused, offline, closed }
 
-class PropLink extends ChangeNotifier {
+class PropLink extends ChangeNotifier implements ControllerLink {
   PropLink({
     required this.join,
     required this.connect,
@@ -136,7 +117,18 @@ class PropLink extends ChangeNotifier {
 
   LinkState state = LinkState.connecting;
   final _messages = StreamController<LinkMessage>.broadcast();
+  @override
   Stream<LinkMessage> get messages => _messages.stream;
+
+  @override
+  bool get linked => state == LinkState.linked;
+
+  /// HELLO's fields changed (an I/O pod brought a radio: transports): the
+  /// controller hears the new HELLO at once when linked.
+  void updateHello(Map<String, Object?> fields) {
+    hello = fields;
+    if (linked) _send({'type': 'hello', ...hello});
+  }
 
   /// Events sent and not acknowledged yet, by "type/seq".
   final _unacked = <String, Map<String, Object?>>{};
@@ -149,6 +141,7 @@ class PropLink extends ChangeNotifier {
 
   int get unacked => _unacked.length;
 
+  @override
   void start() => unawaited(_open());
 
   Future<void> _open() async {
@@ -253,6 +246,7 @@ class PropLink extends ChangeNotifier {
   );
 
   /// An event of the prop's mode (or the shell's own, such as node.tamper).
+  @override
   void sendEvent({
     required int seq,
     required int tMs,
@@ -261,6 +255,7 @@ class PropLink extends ChangeNotifier {
     int squad = 0,
     String? prio,
     Map<String, Object?> data = const {},
+    String? dataJson,
   }) {
     final e = <String, Object?>{
       'seq': seq,
@@ -279,11 +274,13 @@ class PropLink extends ChangeNotifier {
   }
 
   /// The prop's STATE: owner, phase, game time, counters by team id.
+  @override
   void sendState(Map<String, Object?> fields) {
     _lastState = fields;
     if (state == LinkState.linked) _send({'type': 'state', ...fields});
   }
 
+  @override
   Future<void> close() async {
     _stopped = true;
     _retry?.cancel();

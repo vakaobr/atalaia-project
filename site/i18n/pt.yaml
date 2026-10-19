@@ -244,8 +244,8 @@ radio:
     lead: >-
       O Skirmesh-RF está organizado em camadas, do rádio até à API do controlador. Uma Field Box
       corre tudo até aos modos de jogo; um controlador num Raspberry Pi deixa o trabalho do rádio a
-      um modem de rádio USB; na fase&nbsp;3, um telemóvel Android vai fazer o mesmo com um módulo
-      de E/S. Os telemóveis no Wi-Fi do campo não precisam de rádio LoRa.
+      um modem de rádio USB; na fase&nbsp;3, um telemóvel Android faz o mesmo com um módulo de
+      E/S. Os telemóveis no Wi-Fi do campo não precisam de rádio LoRa.
   channel:
     title: Que canal, e porquê 869,525&nbsp;MHz
     lead: >-
@@ -482,22 +482,26 @@ roadmap:
       e mantém um botão premido para receber o tratamento, com um número limitado de tratamentos)
       e cronografagem à entrada. Já feito em software: a Baixa Confirmada, as Reentradas e Vidas, o
       Registo de Presença e as Ligaduras leem na Field Box as etiquetas NFC assinadas de cada
-      participante, o protocolo do módulo de E/S está fixado e os modos
-      descrevem os seus ecrãs em YAML. A app corre o mesmo núcleo de jogo das caixas, em segundo
+      participante, o módulo de E/S tem o seu protocolo e o seu firmware (uma placa Heltec que
+      empresta a um telemóvel os botões das equipas, o teclado, as luzes, a sirene, o leitor NFC,
+      o sensor de abertura e o rádio LoRa, por USB ou Bluetooth) e os modos descrevem os seus
+      ecrãs em YAML. A app corre o mesmo núcleo de jogo das caixas, em segundo
       plano, e já tem os seus ecrãs, em português e em inglês: um telemóvel Android faz de caixa
       (corre qualquer modo e desenha os ecrãs do próprio modo, com botões grandes das equipas,
       teclado e etiquetas NFC), quem joga segue o jogo do controlador de campo, os marshals fazem a
       cronografagem (energia, limites por classe, verificações durante o jogo, medições assinadas),
       o registo de réplicas e as etiquetas de quem joga, e a organização abre a sua consola. A app
-      é testada em emuladores Android; ainda nada correu num telemóvel a sério. Quem joga faz o
+      é testada em emuladores Android e com o próprio código do firmware do módulo a correr num
+      computador; ainda nada correu num telemóvel ou num módulo a sério. Quem joga faz o
       check-in no campo lendo um cartaz impresso (sem conta e sem internet), diz que réplicas vai
       usar e vê se já passaram no cronógrafo; os marshals trabalham a partir dessa lista e as suas
       medições assinadas aprovam ou recusam cada réplica; quem joga pode partilhar a posição
       durante o jogo, e o controlador decide quem a vê; um telemóvel Android faz de caixa no jogo do
-      controlador pela rede Wi-Fi do campo. Um campo ou clube com o seu próprio controlador pode
+      controlador pela rede Wi-Fi do campo ou, onde não há Wi-Fi, pelo rádio do campo através de um
+      módulo de E/S. Um campo ou clube com o seu próprio controlador pode
       mostrar o logótipo, a imagem de fundo e a cor na app, no marcador e no cartaz, e dar nomes e
-      emblemas às equipas. Falta o telemóvel como controlador de campo, o firmware
-      do módulo de E/S e a versão iOS.
+      emblemas às equipas. Falta o telemóvel como controlador de campo, a versão iOS e o teste
+      no campo com telemóveis e módulos a sério.
     gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."
   p4:
     title: Servidor do clube e jogo avançado
@@ -921,9 +925,9 @@ diagrams:
       telemóveis). À direita, que camadas corre cada aparelho.
       Feitos e testados em software, ainda não no campo: a Field Box (camadas 1 a 4), o modem de
       rádio USB (1 e 2) e o controlador de campo num Raspberry Pi ou PC (2 a 5), e a consola da
-      organização nos telemóveis por Wi-Fi, que usam a camada 5 sem rádio LoRa. Previstos: a caixa
-      satélite (1 a 4) e, na fase 3, o módulo de E/S (1 e 2) que dá rádio a um telemóvel ou tablet
-      Android (2 a 4), e a app de jogador.
+      organização nos telemóveis por Wi-Fi, que usam a camada 5 sem rádio LoRa. Também feitos em
+      software, para a fase 3: o módulo de E/S (1 e 2) que dá rádio a um telemóvel ou tablet
+      Android (2 a 4), e a app de jogador. Prevista: a caixa satélite (1 a 4).
     stack: Um protocolo, por camadas
     l5:
       title: Serviços do controlador de campo

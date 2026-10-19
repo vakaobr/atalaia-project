@@ -240,7 +240,7 @@ radio:
     lead: >-
       Skirmesh-RF is built in layers, from the radio up to the controller's API. A Field Box runs
       everything up to the game modes; a Raspberry Pi controller leaves the radio work to a USB
-      radio modem; in phase&nbsp;3 an Android phone will do the same with an I/O pod. Phones on
+      radio modem; in phase&nbsp;3 an Android phone does the same with an I/O pod. Phones on
       the field's Wi-Fi need no LoRa radio at all.
   channel:
     title: Which channel, and why 869.525&nbsp;MHz
@@ -466,8 +466,10 @@ roadmap:
       modes that need players' phones: Respawn, Kill Confirmed, Player Check-in, Money Factory,
       the Medic Kit (a hit player scans their tag and holds a button to be healed, with a limited
       number of heals) and chrono check-in. Done in software: Kill Confirmed, Respawn and Lives,
-      Player Check-in and the Medic Kit read players' signed NFC tags on the Field Box, the I/O pod's link protocol is fixed, and modes
-      describe their screens in YAML. The app runs the same game core as the boxes, in the
+      Player Check-in and the Medic Kit read players' signed NFC tags on the Field Box, the I/O
+      pod has its link protocol and its firmware (a Heltec board that lends a phone its team
+      buttons, keypad, lights, siren, NFC reader, enclosure switch and LoRa radio, over USB or
+      Bluetooth), and modes describe their screens in YAML. The app runs the same game core as the boxes, in the
       background, and has its screens, in Portuguese and English: an Android phone acts as a box
       (it runs any mode and draws the mode's own screens, with big team buttons, a keypad and NFC
       tags), players follow the field controller's game, marshals do chrono check-in (energy,
@@ -477,11 +479,11 @@ roadmap:
       through the chronograph; marshals work from that list and their signed readings mark each
       replica passed or refused; players can share their position during a game, and the
       controller decides who sees it; an Android prop takes part in the controller's game over the
-      field's Wi-Fi. A field or club that runs its own controller can show its logo, wallpaper
+      field's Wi-Fi, or over the field's radio through an I/O pod where there is no Wi-Fi. A field or club that runs its own controller can show its logo, wallpaper
       and colour in the app, on the scoreboard and on the poster, and give its teams names and
-      crests. The app is tested on Android emulators; nothing has run on a real phone yet.
-      Still to come: the phone as the field controller, the I/O pod's firmware and the iOS
-      version.
+      crests. The app is tested on Android emulators, and against the pod firmware's own code run
+      on a computer; nothing has run on a real phone or pod yet. Still to come: the phone as the
+      field controller, the iOS version and the field test with real phones and pods.
     gate: "Gate: one game mixes ESP32 and Android props without issues."
   p4:
     title: Site server and advanced play
@@ -884,8 +886,8 @@ diagrams:
       which layers each device runs. Built and tested in software, not yet on a field: the Field
       Box (layers 1 to 4), the USB radio modem (1 and 2) and the field controller on a Raspberry Pi
       or PC (2 to 5), and the GM console on phones over Wi-Fi, which use layer 5 with no LoRa radio.
-      Planned: the satellite box (1 to 4) and, in phase 3, the I/O pod (1 and 2) that gives an
-      Android phone or tablet (2 to 4) a radio, and the player app.
+      Built in software for phase 3 too: the I/O pod (1 and 2) that gives an Android phone or
+      tablet (2 to 4) a radio, and the player app. Planned: the satellite box (1 to 4).
     stack: One protocol, in layers
     l5:
       title: Field controller services

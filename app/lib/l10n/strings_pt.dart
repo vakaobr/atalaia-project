@@ -138,6 +138,8 @@ const Map<String, String> ptStrings = {
   'prop.script_error': 'O modo parou',
   'prop.tamper':
       'Alguém saiu do modo quiosque durante o jogo. Avisa a organização.',
+  'prop.pod_opened':
+      'Alguém abriu o módulo de E/S durante o jogo. Avisa a organização.',
   'prop.hold': 'Manter premido\n{team}',
   'prop.nfc_hint': 'Encosta a etiqueta às costas do telemóvel.',
   'prop.keypad': 'Teclado',
@@ -546,6 +548,11 @@ const Map<String, String> ptStrings = {
   'prop.link.refused': 'O controlador recusou este dispositivo (outro jogo?)',
   'prop.link.offline': 'Sem ligação ao controlador: a tentar outra vez…',
   'prop.link.closed': 'Outro dispositivo tomou o lugar deste',
+  'prop.radio.configuring': 'A preparar o rádio do módulo…',
+  'prop.radio.linked': 'O rádio do módulo está no canal do campo',
+  'prop.radio.heard': 'Ligado ao controlador pelo rádio do módulo',
+  'prop.radio.offline': 'O rádio do módulo não responde: a tentar outra vez…',
+  'prop.radio.closed': 'O rádio do módulo está desligado',
   'prop.gm_message': 'Organização: {text}',
   'player.share_hint_squads':
       'Só durante o jogo; o controlador decide quem a vê (a tua squad, se o jogo o permitir, a organização e os marshals).',

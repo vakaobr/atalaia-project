@@ -42,6 +42,8 @@ New data fields: `see_team` (key 29, string) and `tolerance_pct` (key 30, number
 
 **Capability proxy v1** ([protocol/capability-proxy.md](../../protocol/capability-proxy.md)): the USB modem's framing (sync, type, length, payload, CRC-16) on USB-OTG and BLE; IDENT, EVT, CMD (CBOR maps with integer keys) and ACK; the modem's RX, TX, TX_ACK, CMD, STATUS and ERROR shifted by 3; GATT service `4174616c-6169-6100-0000-000000000000` with three characteristics.
 
+Added with the pod firmware (plan phase F, 2026-10-19): the modem's NOISE as RADIO_NOISE (`0x0B`, the answer to MEASURE, which the modem gained with RFC 0001 Amendment 3; decision PF2), and a capability type `tamper` (events `opened`, `closed`) for a pod's enclosure switch, which the phone reports as `node.tamper` with `reason: pod_opened` (decision PF8). The standard capability types of the design specification (section 7) gain `tamper`.
+
 ## Compatibility
 
 Older nodes pass unknown event ids through as raw CBOR (ADR-P3-8); the JSON Schema of the game log gains the new events. The tag and the proxy are new formats with version bytes or fields of their own. The capability proxy skips unknown keys 6-23, so a later pod can add optional fields.
@@ -55,3 +57,4 @@ Older nodes pass unknown event ids through as raw CBOR (ADR-P3-8); the JSON Sche
 
 1. Should tags use a key derived from the game key (decision A3 in `docs/review/decisions-to-review.md`)?
 2. Should the game master be able to write tags from the console (the controller holds the game key)?
+3. Should `tamper` be a capability type of its own, or an `imu`-like `moved` event of an `enclosure` type, once IMU-based tamper detection exists (decision PF8)?

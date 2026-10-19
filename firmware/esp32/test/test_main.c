@@ -44,6 +44,7 @@ int main(void)
     run_serial_console_tests();
     run_board_fem_tests();
     run_screen_template_tests();
+    run_pod_tests();
 
     if (check_failures == 0) {
         printf("firmware: all %d checks passed\n", check_count);

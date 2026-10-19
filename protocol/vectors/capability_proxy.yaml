@@ -107,6 +107,17 @@ radio:
     fields: {"code": 4, "message": "not configured"}
     payload: "046e6f7420636f6e66696775726564"
     frame: "a50a000f046e6f7420636f6e6669677572656407cf"
+  # The modem's MEASURE (opcode 8) and its NOISE answer, 0x08 + 3 (decision PF2).
+  - name: cmd_measure
+    type: 8
+    fields: {"opcode": 8, "channel_hz": 868100000, "dwell_ms": 5000, "flags": 1}
+    payload: "0833be27a0138801"
+    frame: "a50800080833be27a0138801a691"
+  - name: noise
+    type: 11
+    fields: {"channel_hz": 869525000, "dwell_ms": 5000, "samples": 4980, "min_dbm": -121, "mean_dbm": -115, "p50_dbm": -116, "p90_dbm": -110, "max_dbm": -95, "cad_tries": 50, "cad_detected": 2}
+    payload: "33d3e60813881374878d8c92a100320002"
+    frame: "a50b001133d3e60813881374878d8c92a100320002b07d"
 
 # Keys 6-23 a later version may add are skipped; the decoded fields are those of
 # ident[0]'s layout below and evt button_hold.

@@ -19,7 +19,7 @@
 
 uint8_t atalaia_proxy_modem_type(uint8_t proxy_type)
 {
-    return proxy_type >= ATALAIA_PROXY_RADIO_RX && proxy_type <= ATALAIA_PROXY_RADIO_ERROR
+    return proxy_type >= ATALAIA_PROXY_RADIO_RX && proxy_type <= ATALAIA_PROXY_RADIO_NOISE
                ? (uint8_t)(proxy_type - 3)
                : 0;
 }

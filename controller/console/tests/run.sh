@@ -18,9 +18,13 @@ cmake -S firmware/esp32/test/modem_host -B "$BUILD/modem_host" -DCMAKE_BUILD_TYP
 cmake --build "$BUILD/modem_host" > /dev/null
 export ATALAIA_CORE_LIB="$(cd "$BUILD/core" && pwd)/libatalaia_core.so"
 export ATALAIA_MODEM_HOST="$(cd "$BUILD/modem_host" && pwd)/modem_host"
-# The tests share controller/tests/support.py, which needs the host box too.
+# The tests share controller/tests/support.py, which needs the host box and
+# the host pod too.
 cmake -S firmware/esp32/test/box_host -B "$BUILD/box_host" -DCMAKE_BUILD_TYPE=Debug > /dev/null
 cmake --build "$BUILD/box_host" > /dev/null
 export ATALAIA_BOX_HOST="$(cd "$BUILD/box_host" && pwd)/box_host"
+cmake -S firmware/esp32/test/pod_host -B "$BUILD/pod_host" -DCMAKE_BUILD_TYPE=Debug > /dev/null
+cmake --build "$BUILD/pod_host" > /dev/null
+export ATALAIA_POD_HOST="$(cd "$BUILD/pod_host" && pwd)/pod_host"
 cd controller
 python3 -m unittest discover -s console/tests -v "$@"

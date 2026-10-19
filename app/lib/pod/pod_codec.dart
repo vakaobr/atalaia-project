@@ -35,6 +35,9 @@ abstract final class FrameType {
   static const radioCmd = 0x08;
   static const radioStatus = 0x09;
   static const radioError = 0x0a;
+
+  /// The modem's NOISE, the answer to MEASURE (decision PF2).
+  static const radioNoise = 0x0b;
 }
 
 /// The modem's CMD opcodes (protocol/usb-modem.md), carried by RADIO_CMD.
@@ -46,6 +49,7 @@ abstract final class RadioOp {
   static const setPeerEpoch = 5;
   static const clear = 6;
   static const ident = 7;
+  static const measure = 8;
 }
 
 const int capabilitiesMax = 16;
@@ -396,3 +400,74 @@ Uint8List radioConfigure({
 
 Uint8List radioError(int code, String message) =>
     Uint8List.fromList([_uint('code', code, 255), ...utf8.encode(message)]);
+
+/// RADIO_CMD MEASURE: noise on a channel for dwell ms (with CAD: LoRa activity too).
+Uint8List radioMeasure(int channelHz, int dwellMs, {bool cad = false}) =>
+    Uint8List.fromList([
+      RadioOp.measure,
+      (_uint('channel_hz', channelHz, 0xffffffff) >> 24) & 0xff,
+      (channelHz >> 16) & 0xff,
+      (channelHz >> 8) & 0xff,
+      channelHz & 0xff,
+      _uint('dwell_ms', dwellMs, 0xffff) >> 8,
+      dwellMs & 0xff,
+      cad ? 1 : 0,
+    ]);
+
+/// A RADIO_NOISE payload (17 bytes), as the modem's NOISE frame lays it out.
+final class RadioNoise {
+  const RadioNoise({
+    required this.channelHz,
+    required this.dwellMs,
+    required this.samples,
+    required this.minDbm,
+    required this.meanDbm,
+    required this.p50Dbm,
+    required this.p90Dbm,
+    required this.maxDbm,
+    required this.cadTries,
+    required this.cadDetected,
+  });
+
+  factory RadioNoise.decode(List<int> p) {
+    if (p.length != 17) throw ProxyException('a NOISE payload is 17 bytes');
+    int u16(int i) => p[i] << 8 | p[i + 1];
+    int i8(int i) => p[i] >= 128 ? p[i] - 256 : p[i];
+    return RadioNoise(
+      channelHz: p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3],
+      dwellMs: u16(4),
+      samples: u16(6),
+      minDbm: i8(8),
+      meanDbm: i8(9),
+      p50Dbm: i8(10),
+      p90Dbm: i8(11),
+      maxDbm: i8(12),
+      cadTries: u16(13),
+      cadDetected: u16(15),
+    );
+  }
+
+  final int channelHz, dwellMs, samples;
+  final int minDbm, meanDbm, p50Dbm, p90Dbm, maxDbm;
+  final int cadTries, cadDetected;
+
+  Uint8List encode() => Uint8List.fromList([
+    channelHz >> 24 & 0xff,
+    channelHz >> 16 & 0xff,
+    channelHz >> 8 & 0xff,
+    channelHz & 0xff,
+    dwellMs >> 8 & 0xff,
+    dwellMs & 0xff,
+    samples >> 8 & 0xff,
+    samples & 0xff,
+    minDbm & 0xff,
+    meanDbm & 0xff,
+    p50Dbm & 0xff,
+    p90Dbm & 0xff,
+    maxDbm & 0xff,
+    cadTries >> 8 & 0xff,
+    cadTries & 0xff,
+    cadDetected >> 8 & 0xff,
+    cadDetected & 0xff,
+  ]);
+}

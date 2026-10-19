@@ -11,11 +11,45 @@ library;
 import 'dart:io';
 
 import '../ffi/bindings.dart';
+import '../radio/rf_codec.dart';
 import 'game_loop_isolate.dart';
 import 'node_types.dart';
 
 NodeRunner createNodeRunner({String? libraryPath}) =>
     FfiNodeRunner(libraryPath: libraryPath);
+
+/// The core's EVENT codec for a prop's radio link (lib/radio/pod_radio_link.dart),
+/// as a box encodes its events; null where there is no core (iOS).
+EventEncoder? createEventEncoder({String? libraryPath}) {
+  if (Platform.isIOS) return null;
+  final AtalaiaCore core;
+  try {
+    core = AtalaiaCore.open(libraryPath);
+  } on Object {
+    return null;
+  }
+  return ({
+    required int node,
+    required int seq,
+    required int tMs,
+    required String type,
+    required int team,
+    required int squad,
+    required int prio,
+    required String? dataJson,
+  }) => core
+      .encodeEvent(
+        node: node,
+        seq: seq,
+        tMs: tMs,
+        type: type,
+        team: team,
+        squad: squad,
+        prio: prio,
+        dataJson: dataJson,
+      )
+      .bytes;
+}
 
 final class FfiNodeRunner implements NodeRunner {
   const FfiNodeRunner({this.libraryPath});

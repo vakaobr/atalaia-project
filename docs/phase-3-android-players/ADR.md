@@ -307,6 +307,16 @@ to RADIO_CMD IDENT, the GATT service UUID `4174616c-6169-6100-0000-000000000000`
 (above, the service had Pod TX's UUID), the Pod Status bytes, required
 fields and limits, and unknown keys 6-23 skipped.
 
+**Implemented 2026-10-19 (plan phase F):** the pod's side in
+`firmware/esp32/main/pod/`. Refinements, dated in `protocol/capability-proxy.md`:
+RADIO_NOISE `0x0B` and MEASURE (PF2); a link is active once the phone
+speaks on it, CMD seqs are remembered per link and forgotten on a new link,
+the links go inactive after an EVT is sent 4 times unacknowledged, the game
+key is forgotten when its link goes (PF5); the Bluetooth link must be
+encrypted (LE Secure Connections, Just Works, bonded) and the pod then sends
+IDENT unasked (PF4); the capabilities a pod lends and PD16's argument shapes
+(PF6-PF8).
+
 **Consequences:**
 - The frame format is frozen for v1; changes require a protocol version
   bump.
@@ -418,6 +428,16 @@ the node firmware (~300 KB vs ~550 KB), fitting comfortably in the
 - The pod never runs scripts; it is a pure proxy.
 - The same OTA mechanism (A/B partitions, Ed25519) updates the pod
   firmware.
+
+**Implemented 2026-10-19 (plan phase F):** `CONFIG_ATALAIA_POD_MODE` in the
+variant choice above, `sdkconfig.pod`, `firmware/esp32/main/pod/`. Differences:
+the proxy, the USB-Serial-JTAG link, the capabilities and the radio results
+run on one task (core 1, priority 5), the NimBLE host on its own task (core
+0), tones on an audio task; there is no separate `usb_cdc_task` or
+`radio_task` of the pod's own (the Field Box's radio task is reused). The
+configuration is Kconfig, not NVS over CMD `config` (PF15). The image is
+about 650 KB with NimBLE (this ADR guessed ~300 KB without it). Not run on
+a board yet (plan phase G).
 
 ---
 

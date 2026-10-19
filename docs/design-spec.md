@@ -314,6 +314,7 @@ On boot and on request, each node announces a descriptor:
 | `hit` | `hit(strength)` | `arm`, `disarm` | Target addon |
 | `output` | — | `on`, `off`, `pulse(ms)` | Siren, smoke relay, strobe |
 | `battery` | `level(%)`, `low` | — | Fuel gauge, Android battery API |
+| `tamper` | `opened`, `closed` | — | Enclosure switch of an I/O pod (draft RFC 0000, decision PF8) |
 
 New types are added by RFC (section 13), never ad hoc, so scripts stay portable.
 

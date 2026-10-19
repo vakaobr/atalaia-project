@@ -132,6 +132,8 @@ const Map<String, String> enStrings = {
   'prop.script_error': 'The mode stopped',
   'prop.tamper':
       'Someone left kiosk mode during the game. Tell the game master.',
+  'prop.pod_opened':
+      'Someone opened the I/O pod during the game. Tell the game master.',
   'prop.hold': 'Hold\n{team}',
   'prop.nfc_hint': 'Hold the tag to the back of the phone.',
   'prop.keypad': 'Keypad',
@@ -538,6 +540,11 @@ const Map<String, String> enStrings = {
   'prop.link.refused': 'The controller refused this device (another game?)',
   'prop.link.offline': 'No connection to the controller: trying again…',
   'prop.link.closed': 'Another device took this one\'s place',
+  'prop.radio.configuring': 'Setting up the pod\'s radio…',
+  'prop.radio.linked': 'The pod\'s radio is on the field\'s channel',
+  'prop.radio.heard': 'Linked to the controller over the pod\'s radio',
+  'prop.radio.offline': 'The pod\'s radio is not answering: trying again…',
+  'prop.radio.closed': 'The pod\'s radio is off',
   'prop.gm_message': 'Organisers: {text}',
   'player.share_hint_squads':
       'Only during the game; the controller decides who sees it (your squad if the game allows it, the organisers and the marshals).',

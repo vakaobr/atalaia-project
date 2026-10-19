@@ -5,9 +5,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 3 -- Android and Players: Status
 
-**Current phase:** Implementation: plan phases A, B, C and D done in software; plan phase E done in software except the Android controller role's shell (PE24); plan phases F-G pending
+**Current phase:** Implementation: plan phases A-D and F done in software; plan phase E done in software except the Android controller role's shell (PE24); plan phase G (integration and field test) pending, it needs the hardware
 **Risk level:** Medium
-**Last verified:** 2026-10-19 (plan phase E)
+**Last verified:** 2026-10-19 (plan phase F)
 
 ## Completed
 
@@ -42,6 +42,10 @@ SPDX-License-Identifier: CC-BY-SA-4.0
   wallpaper, accent) on the controller, team names and crests per game and
   saved teams, in the app, the GM console, the scoreboard and the check-in
   poster (see below)
+- [x] Plan phase F (2026-10-19): the I/O pod's firmware (USB, Bluetooth LE,
+  the Field Box's HAL as capabilities, the radio passthrough, node.tamper),
+  the host pod, and the phone's radio link through a pod next to its Wi-Fi
+  link; nothing run on a board or a phone (see below)
 
 ## Plan phase A (2026-10-18)
 
@@ -266,6 +270,50 @@ accounts (phase 4), team names in MQTT and on the boxes' screens, branding on
 a standby controller (each controller has its own). Not run: real phones,
 real field images from a club.
 
+## Plan phase F (2026-10-19)
+
+The I/O pod's firmware, and the phone's side of it. Run with `python
+tools/docker_fw.py pod` (the image), `python tools/docker_fw.py test` (the
+firmware's host tests), `sh tools/check.sh` (the controller's end-to-end test
+with the host pod) and `python tools/docker_app.py` (the Dart tests against
+the host pod and the host modem). Decisions PF1-PF15 in
+`docs/review/decisions-to-review.md`.
+
+| Deliverable | Where | State |
+| --- | --- | --- |
+| Pod variant (ADR-P3-3) | `CONFIG_ATALAIA_POD_MODE` in a three-way firmware-variant choice (`Kconfig.projbuild`), `sdkconfig.pod`, `main/CMakeLists.txt`, `main/pod/pod_main.c`; `python tools/docker_fw.py pod`; CI `esp32-pod-build` | Done: no Lua, screens, presets or Wi-Fi; about 650 KB in a 2 MB OTA slot; V4.3 (KCT8103L) by default, V4.2 (GC1109) in menuconfig, Vext on, no GPS (E21) |
+| Proxy (ADR-P3-2) | `main/pod/pod.c` (plain C), `pod_task.c` (the FreeRTOS task, core 1, priority 5) | Done: IDENT (asked, and unasked on a ready Bluetooth link), EVT with ACKs and 3 resends then broken links, CMD acknowledged and acted on once per link, unknown types ignored (PF5) |
+| USB link | `pod_task.c`: the ESP32-S3's USB-Serial-JTAG (CDC ACM to the phone), the console on UART0 | Done (PF3); not run with a phone |
+| Bluetooth LE GATT server | `main/pod/pod_ble.c` (UUIDs, advertising data, the link's states, notifications cut to the MTU), `pod_ble_nimble.c` (NimBLE, ESP-IDF's own) | Done: one phone, MTU 247, Pod TX / Pod RX / Pod Status, LE Secure Connections Just Works with bonds, frames only on an encrypted link (PF4); not run with a phone |
+| Capabilities on the HAL | `main/pod/pod_caps.c`, `pod_json.c`, `pod_config.h` | Done: buttons (by number, optional colour), PCF8574 keypad, LED ring, amplifier (clips as tones), PN532 player tags, enclosure switch; only what is fitted in IDENT (PF6, PF7) |
+| Radio passthrough | `main/pod/pod.c` with `main/modem/modem.c` (a `frame_out` hook) | Done: RADIO_TX/RX/TX_ACK/CMD/STATUS/ERROR and RADIO_NOISE `0x0B` (PF2), the channel's sub-band limits and the edge rule of the modem, the key forgotten when its link goes (PF5) |
+| `node.tamper` | the `case` capability (type `tamper`, draft RFC 0000); `PropSession` reports `opened` as `node.tamper` (`pod_opened`) | Done (PF8); no IMU in the HAL |
+| PD16's command shapes | `app/lib/pod/pod_client.dart` (`PodInputs.command`, semantic targets by type) | Confirmed (PF7) |
+| The phone on the radio, and Wi-Fi or LoRa | `app/lib/radio/rf_codec.dart`, `pod_radio_link.dart`, `app/lib/controller/dual_link.dart`, `controller_link.dart`; `PropSession` (`radioLinkFor`), the prop screen's radio state | Done (PF9): HELLO `transports` bit 0 with a pod; Wi-Fi first, the radio while it is down |
+| Host pod | `firmware/esp32/test/pod_host` (USB and Bluetooth as TCP, the radio as UDP, the hardware on stdin); built by `tools/check.sh`, `tools/docker_app.py`, CI | Done (PF10) |
+| Docs | `firmware/esp32/README.md`, `docs/BRING_UP.md` (the pod's hardware checks), `protocol/capability-proxy.md` and `prop-link.md` (dated refinements), the draft RFC, the design specification's capability types, `CHANGELOG.md`, `README.md`, the project page | Done |
+
+Tests: the firmware's host tests (`test/test_pod.c` in `firmware_test`: IDENT
+and its 256-byte budget, CMD and its ACK from the shared vectors, the once-only
+action and the per-link seqs, EVT resends and broken links, the radio
+passthrough with the modem's logic, the key cleared with its link, every
+capability; `test_ble_gatt_stub.c`, its own `ctest` entry: UUIDs, advertising,
+the ready link, MTU pieces, a CMD written in two pieces reaching the hardware
+stub, a press reaching the phone, a busy stack, Pod Status), the Python and
+Dart codecs with the two new vectors, the controller end to end with the host
+modem and the host pod (`controller/tests/test_pod_e2e.py`, 2), Dart against
+the host pod and the host modem (`app/test/pod/pod_host_test.dart` 4,
+`app/test/radio/pod_radio_link_test.dart` 4, `app/test/prop/prop_pod_session_test.dart` 2)
+and the Dart RF codecs against the shared vectors (`app/test/radio/rf_codec_test.dart`).
+Found and fixed on the way: a pod client closed from one of its own event
+listeners threw (PF13); the radio link took only the last copy's ACK (PF12).
+
+Not run: anything on a pod board or with a phone (USB, pairing and
+Bluetooth, the radio on air and its conducted power, NFC with real cards,
+the keypad, the ring, the amplifier, the enclosure switch, hours on battery:
+BRING_UP.md, "The I/O pod", and plan phase G), the APK's Kotlin plugins
+against a pod, Wokwi (it has no pod; its CI quota is used up, decision R7).
+
 ## Maintainer request: field check-in (2026-10-19, design only)
 
 The maintainer asked for players to check in at the field by scanning a
@@ -317,10 +365,10 @@ Phase G needs hardware.
 1. ~~Research~~ -- Complete
 2. ~~Architecture~~ -- Complete
 3. ~~Planning~~ -- Complete
-4. Implementation -- plan phases A-E done in software (E without the
-   Android controller role's shell, PE24), and the Medic Kit; next: plan
-   phase F (the I/O pod's firmware, needs a Heltec board), the controller
-   shell, then plan phase G (the field test)
+4. Implementation -- plan phases A-F done in software (E without the
+   Android controller role's shell, PE24), the Medic Kit and branding; next:
+   the controller shell, then plan phase G (the field test: the boards, the
+   pods and real phones)
 
 ## How to resume with implementation
 
@@ -331,7 +379,7 @@ Run `/sdlc phase-3-android-players --resume`.  STATE.json records
 - Phase E (positions, controller integration, player tokens) depends on D (done) and phase 2D (done)
 
 **What needs hardware:**
-- Phase F (I/O pod firmware) depends on Phase A and needs a Heltec board
+- Phase F's checks on a board (firmware/esp32/docs/BRING_UP.md, "The I/O pod")
 - Phase G (field test) needs all previous phases and devices
 
 ## Gate

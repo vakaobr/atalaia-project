@@ -15,7 +15,9 @@ set(CMAKE_C_EXTENSIONS OFF)
 get_filename_component(CORE_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../../core" ABSOLUTE)
 get_filename_component(MAIN_DIR "${CMAKE_CURRENT_LIST_DIR}/../../main" ABSOLUTE)
 
-find_library(MBEDCRYPTO_LIB mbedcrypto)
+# Static when there is a static library, so the binary also runs where mbedtls is
+# not installed (the Flutter image: the app's radio-link tests use it too).
+find_library(MBEDCRYPTO_LIB NAMES libmbedcrypto.a mbedcrypto)
 find_path(MBEDTLS_INCLUDE_DIR mbedtls/ccm.h)
 if(NOT MBEDCRYPTO_LIB OR NOT MBEDTLS_INCLUDE_DIR)
     message(FATAL_ERROR "The host modem needs mbedtls for real AES-CCM "

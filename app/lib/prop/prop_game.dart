@@ -24,9 +24,11 @@ import '../branding/branded.dart';
 import '../branding/field_branding.dart';
 import '../checkin/field_trust.dart';
 import '../controller/prop_link.dart';
+import '../core/node_runner.dart';
 import '../l10n/strings.dart';
 import '../platform/services.dart';
 import '../pod/pod_client.dart';
+import '../radio/pod_radio_link.dart';
 import '../ui/template/template_view.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -90,6 +92,7 @@ class _PropGameScreenState extends State<PropGameScreen> {
           kioskEnabled: app.settings.kiosk,
           modeName: widget.modeName,
           link: _linkFor(services),
+          radioLinkFor: (pod) => _radioFor(services, pod),
         );
     unawaited(_open(services));
     unawaited(_loadBranding(services));
@@ -143,6 +146,27 @@ class _PropGameScreenState extends State<PropGameScreen> {
             field ??= await services.trust.forGame(urls, ca);
             return ioLinkConnect(field)(uri);
           },
+    );
+  }
+
+  /// The field's radio through a linked pod, for a joined game (decision
+  /// PF9): the core's event codec, the epochs kept in the app's store.
+  PodRadioLink? _radioFor(AppServices services, PodClient pod) {
+    final j = widget.setup.join;
+    final encode = createEventEncoder();
+    if (j == null || encode == null) return null;
+    return PodRadioLink(
+      pod: pod,
+      join: j,
+      epochs: AppEpochStore(services.store),
+      encodeEvent: encode,
+      hello: {
+        'node_name': 'phone-${j.nodeId}',
+        'fw_version': 'app-0.3.0',
+        'core_version': services.runner.coreVersion ?? '',
+        'tier': 0,
+        'capabilities': const <int>[],
+      },
     );
   }
 
@@ -353,6 +377,23 @@ class _PropGameScreenState extends State<PropGameScreen> {
               ),
             ),
           ),
+        if (session.radio case final radio?)
+          ListenableBuilder(
+            listenable: radio,
+            builder: (context, _) => Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              child: Text(
+                s.t(
+                  radio.linked && radio.heard
+                      ? 'prop.radio.heard'
+                      : 'prop.radio.${radio.state.name}',
+                ),
+                key: const Key('prop-radio-state'),
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+          ),
         if (session.gmMessage != null && session.gmMessage!.isNotEmpty)
           Container(
             width: double.infinity,
@@ -369,6 +410,17 @@ class _PropGameScreenState extends State<PropGameScreen> {
             padding: const EdgeInsets.all(8),
             child: Text(
               s.t('prop.tamper'),
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
+        if (session.podOpened)
+          Container(
+            width: double.infinity,
+            color: AtalaiaColors.danger,
+            padding: const EdgeInsets.all(8),
+            child: Text(
+              s.t('prop.pod_opened'),
+              key: const Key('prop-pod-opened'),
               style: const TextStyle(color: Colors.white),
             ),
           ),

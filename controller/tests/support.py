@@ -62,6 +62,11 @@ if not BOX_HOST or not Path(BOX_HOST).is_file():
     _missing("the host box is not built (set ATALAIA_BOX_HOST; see tools/check.sh)")
     BOX_HOST = ""
 
+POD_HOST = os.environ.get("ATALAIA_POD_HOST", "")
+if not POD_HOST or not Path(POD_HOST).is_file():
+    _missing("the host pod is not built (set ATALAIA_POD_HOST; see tools/check.sh)")
+    POD_HOST = ""
+
 REPO = HERE.parents[1]
 
 MOSQUITTO = shutil.which("mosquitto") or ("/usr/sbin/mosquitto" if Path("/usr/sbin/mosquitto").exists() else "")
@@ -322,6 +327,135 @@ class BoxHost:
 
     def close(self) -> None:
         self.kill()
+
+
+class PodHost:
+    """The C host pod (firmware/esp32/test/pod_host): an I/O pod's proxy and radio.
+
+    It shares the hub's air with modems and boxes. ``phone()`` opens its USB
+    link (a TCP socket carrying the frames of protocol/capability-proxy.md);
+    its hardware is driven with ``send()`` (press, tag, case open...) and what
+    it does with its outputs is in ``lines``.
+    """
+
+    def __init__(self, hub: Optional[AirHub] = None, *args: str) -> None:
+        if not POD_HOST:
+            raise unittest_skip("host pod not built")
+        self.hub = hub
+        self.lines: list[str] = []
+        self._cond = threading.Condition()
+        cmd = [POD_HOST, *args]
+        if hub is not None:
+            cmd += ["--air-peer", str(hub.port)]
+        self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE, text=True)
+        line = self.proc.stdout.readline().split()
+        if not line or line[0] != "READY":
+            raise RuntimeError(f"host pod did not start: {self.proc.stderr.read()}")
+        fields = dict(part.split("=") for part in line[1:])
+        self.usb_port, self.ble_port = int(fields["usb"]), int(fields["ble"])
+        self.air_port = int(fields["air"])
+        if hub is not None:
+            hub.add(self.air_port)
+        threading.Thread(target=self._read, daemon=True).start()
+
+    def _read(self) -> None:
+        for line in self.proc.stdout:
+            with self._cond:
+                self.lines.append(line.rstrip("\n"))
+                self._cond.notify_all()
+
+    def send(self, line: str) -> None:
+        self.proc.stdin.write(line + "\n")
+        self.proc.stdin.flush()
+
+    def logged(self, needle: str) -> bool:
+        with self._cond:
+            return any(needle in line for line in self.lines)
+
+    def status(self, timeout: float = 3.0) -> dict:
+        import json
+        with self._cond:
+            seen = len(self.lines)
+        self.send("status")
+        end = time.monotonic() + timeout
+        with self._cond:
+            while time.monotonic() < end:
+                for line in self.lines[seen:]:
+                    if line.startswith("STATUS "):
+                        return json.loads(line[7:])
+                self._cond.wait(0.05)
+        raise RuntimeError("the host pod did not answer status")
+
+    def phone(self) -> "PodPhone":
+        return PodPhone(self.usb_port)
+
+    def close(self) -> None:
+        if self.hub is not None:
+            self.hub.remove(self.air_port)
+        try:
+            self.send("quit")
+            self.proc.wait(timeout=5)
+        except (OSError, subprocess.TimeoutExpired):
+            self.proc.kill()
+            self.proc.wait(timeout=5)
+        for f in (self.proc.stdin, self.proc.stdout, self.proc.stderr):
+            try:
+                f.close()
+            except OSError:
+                pass
+
+
+class PodPhone:
+    """A phone's end of a pod's USB link: frames out, frames in (decoded, kept in order)."""
+
+    def __init__(self, port: int) -> None:
+        from atalaia_sim import capability_proxy as cp
+        self.cp = cp
+        self.sock = socket.create_connection(("127.0.0.1", port), timeout=5)
+        self.frames: list[tuple[int, bytes]] = []
+        self._dec = cp.FrameDecoder()
+        self._cond = threading.Condition()
+        self._closed = False
+        threading.Thread(target=self._read, daemon=True).start()
+
+    def _read(self) -> None:
+        while True:
+            try:
+                data = self.sock.recv(4096)
+            except OSError:
+                return
+            if not data:
+                return
+            with self._cond:
+                self.frames += self._dec.feed(data)
+                self._cond.notify_all()
+
+    def send(self, frame_type: int, payload: bytes = b"") -> None:
+        self.sock.sendall(self.cp.encode_frame(frame_type, payload))
+
+    def wait(self, frame_type: int, match=None, timeout: float = 5.0, start: int = 0):
+        """The first frame of frame_type at index >= start whose payload match() accepts."""
+        end = time.monotonic() + timeout
+        with self._cond:
+            while True:
+                for i in range(start, len(self.frames)):
+                    t, p = self.frames[i]
+                    if t == frame_type and (match is None or match(p)):
+                        return p
+                left = end - time.monotonic()
+                if left <= 0:
+                    return None
+                self._cond.wait(min(left, 0.05))
+
+    def close(self) -> None:
+        # shutdown first: it sends the FIN at once and wakes the reader
+        # thread's recv (a bare close() can wait for that recv to return).
+        try:
+            self.sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        self.sock.close()
 
 
 def unittest_skip(reason: str) -> Exception:

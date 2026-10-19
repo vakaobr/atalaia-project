@@ -5,7 +5,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # ESP32 Firmware
 
-ESP-IDF firmware for Atalaia Field Boxes running on ESP32-S3.
+ESP-IDF firmware for Atalaia Field Boxes running on ESP32-S3, and two more
+images from the same project: the field controller's USB radio modem and
+the I/O pod that lends its hardware to an Android phone.
 
 ## Default Board
 
@@ -110,12 +112,13 @@ bash, from the repository folder:
 python tools/docker_fw.py build                   firmware for the Field Box -> firmware/esp32/build/
 python tools/docker_fw.py wokwi                   Wokwi emulator variant -> firmware/esp32/build-wokwi/
 python tools/docker_fw.py modem                   USB radio modem variant -> firmware/esp32/build-modem/
+python tools/docker_fw.py pod                     I/O pod variant -> firmware/esp32/build-pod/
 python tools/docker_fw.py test                    host tests and screen reference images
 python tools/docker_fw.py test --update-screens   accept changed screens as the new references
 ```
 
-`build`, `wokwi` and `modem` use the `espressif/idf:v5.3.2` image, like CI's
-`esp32-build` and `esp32-modem-build` jobs. `test` runs CI's `firmware-test` commands in the
+`build`, `wokwi`, `modem` and `pod` use the `espressif/idf:v5.3.2` image, like CI's
+`esp32-build`, `esp32-modem-build` and `esp32-pod-build` jobs. `test` runs CI's `firmware-test` commands in the
 `atalaia-dev` image. With a toolchain of your own, the same commands are:
 
 ```sh
@@ -198,6 +201,87 @@ UDP standing in for the radio.
 Not yet tested on a board: the USB-Serial-JTAG link, the TX power and
 the radio timing need the parts (plan phase F).
 
+## The I/O pod (phase 3, plan phase F)
+
+The third image of the same project: a Heltec WiFi LoRa 32 V4 that lends
+its hardware to an Android phone running a prop (ADR-P3-3). The phone runs
+the mode; the pod has no Lua, screens, presets or Wi-Fi. It speaks the
+capability proxy protocol v1 ([protocol/capability-proxy.md](../../protocol/capability-proxy.md))
+on two links at once:
+
+- **USB** -- the board's USB-C port, which is the ESP32-S3's own
+  USB-Serial-JTAG controller: a phone sees a CDC ACM serial device, as the
+  controller sees the USB modem. TinyUSB would need an extra component and
+  would take the port away from flashing; the modem already proves this
+  path (decision PF3). The log console stays on UART0.
+- **Bluetooth LE** -- a NimBLE GATT server (part of ESP-IDF): the service
+  `4174616c-6169-6100-0000-000000000000` with Pod TX (notify), Pod RX
+  (write without response) and Pod Status (read, notify), advertised as
+  `atalaia-pod-XXXX`, one phone at a time, a 247-byte MTU. The pod asks the
+  phone to pair (LE Secure Connections, Just Works, bonded): frames go out
+  and Pod RX writes are taken only on an encrypted link, so the game key
+  in RADIO_CMD CONFIGURE never crosses the air in the clear (decision PF4).
+
+What it lends (only what is fitted is in IDENT; decision PF6):
+
+| Capability | Events | Commands |
+| --- | --- | --- |
+| `btn.1`-`btn.4` (button) | `press`, `hold` {"ms"} every 250 ms, `release` {"ms"} | |
+| `keypad` (PCF8574) | `key` {"key"} | `clear` |
+| `ring` (led, WS2812) | | `fill` {"team"} or {"r","g","b"}, `color`, `off`, `set_brightness`, `progress` |
+| `audio` (MAX98357A) | | `tone` {"freq","ms"}, `play` (the mode's clips as tones), `stop`, `set_volume` |
+| `nfc` (PN532) | `tag` {"uid", "tag"}: a player tag's record; join cards are not forwarded | |
+| `case` (tamper) | `opened`, `closed` | |
+
+Button N stands for the game's N-th team, as on a Field Box; a colour set
+in Kconfig goes into its descriptor. The enclosure switch (GPIO 47 by
+default, to GND, closed while the lid is shut) is armed once it has read
+closed, so a pod without one never alarms; the phone reports an opening as
+`node.tamper` (reason `pod_opened`). The battery gauge's level is in IDENT
+and in Pod Status.
+
+The radio is the USB modem's own code (`main/modem/modem.c`, frames
+shifted by 3): the phone sends plaintext packets with RADIO_TX, the pod
+encrypts them with the game key, keeps the duty cycle and the TX power of
+the channel's EU868 sub-band (`radio/radio_limits.c`), refuses a channel
+that does not fit in one sub-band, dedupes and decrypts what it hears
+(RADIO_RX), and measures noise when asked (MEASURE, answered by RADIO_NOISE
+`0x0B`, decision PF2). The game key lives in RAM only and is forgotten
+when the link that configured the radio goes (decision PF5). The board
+revision (V4.3 KCT8103L by default, V4.2 GC1109) and Vext are the Field
+Box's settings; the GNSS connector is not used (E21).
+
+```
+python tools/docker_fw.py pod      -> firmware/esp32/build-pod/atalaia_esp32.bin (~650 KB)
+```
+
+`sdkconfig.pod` selects `CONFIG_ATALAIA_POD_MODE` and NimBLE; CI's
+`esp32-pod-build` job builds it and fails on any warning. Flash it like
+the Field Box (docs/BRING_UP.md, "The I/O pod"); the pod section there
+lists the checks that need the board and a phone. Code:
+
+- `main/pod/pod.c` -- the proxy: IDENT, EVT with ACKs and resends, CMD
+  acted on once, the radio passthrough, Pod Status (plain C);
+- `main/pod/pod_caps.c` -- the capabilities on the HAL ops (plain C);
+- `main/pod/pod_ble.c` -- the GATT service's logic, UUIDs and advertising
+  data (plain C); `pod_ble_nimble.c` puts it on NimBLE;
+- `main/pod/pod_task.c`, `pod_main.c` -- the ESP-IDF task, USB, audio queue,
+  enclosure switch, and the boot.
+
+Tests: `test/test_pod.c` (the proxy and the capabilities, against the
+shared vectors), `test/test_ble_gatt_stub.c` (`ctest -R ble_gatt_stub`: the
+GATT service with the Bluetooth stack stubbed), `test/test_proxy_codec.c`
+(the frames). `test/pod_host/` builds the pod's code with real AES-CCM into
+a Linux program (USB and Bluetooth links as TCP sockets, the radio as UDP,
+the hardware on stdin) that the app's Dart tests
+(`app/test/pod/pod_host_test.dart`, `app/test/radio/pod_radio_link_test.dart`)
+and the controller's end-to-end test (`controller/tests/test_pod_e2e.py`)
+drive.
+
+Not tested on a board yet (plan phase G): the USB and Bluetooth links to a
+real phone, pairing, the radio on air, NFC with real cards, the keypad,
+the ring, the amplifier and the enclosure switch.
+
 ## Kconfig
 
 All pin assignments, memory tier, keypad interface, display controller
@@ -222,9 +306,21 @@ Field game options (under "Field network games"):
 - `ATALAIA_LED_BRIGHTNESS_PCT` -- LED ring brightness at boot (default 40%; under "LEDs")
 - `ATALAIA_DEV_JOIN_KEY` -- a development field join key, used only when none is stored (set in `sdkconfig.wokwi` only)
 
-USB radio modem options (under "USB radio modem"): `ATALAIA_MODEM_MODE`,
+The firmware variant is a choice at the top of the menu: `ATALAIA_NODE_MODE`
+(the Field Box, default), `ATALAIA_MODEM_MODE` (`sdkconfig.modem`) or
+`ATALAIA_POD_MODE` (`sdkconfig.pod`).
+
+USB radio modem options (under "USB radio modem"):
 `ATALAIA_MODEM_LINK_USB_SERIAL_JTAG` / `ATALAIA_MODEM_LINK_UART0`,
-`ATALAIA_MODEM_UART_BAUD`, `ATALAIA_MODEM_EPOCH_WINDOW` (default 16).
+`ATALAIA_MODEM_UART_BAUD`; `ATALAIA_MODEM_EPOCH_WINDOW` (default 16) for
+the modem and the pod.
+
+I/O pod options (under "I/O pod"): `ATALAIA_POD_BTN1_TEAM` ..
+`ATALAIA_POD_BTN4_TEAM` (a button's colour; empty, the default: button N is
+the game's N-th team), `ATALAIA_POD_TAMPER_PIN` (the enclosure switch,
+default 47, -1 = none) and `ATALAIA_POD_TAMPER_OPEN_HIGH`,
+`ATALAIA_POD_BLE` (the Bluetooth link, default on) and
+`ATALAIA_POD_BLE_ENCRYPTED` (frames only on an encrypted link, default on).
 
 Default pin map avoids all Heltec V4.3 board-internal pins.
 See `Kconfig.projbuild` header and `hardware/field-box/README.md`.
@@ -252,6 +348,11 @@ Listed in `main/idf_component.yml`:
 - `lvgl/lvgl` -- v9.2 display toolkit, configured by `lvgl_conf/lv_conf.h`
 - `espressif/led_strip` -- WS2812B RMT driver
 - `joltwallet/littlefs` -- LittleFS VFS
+
+The I/O pod's Bluetooth stack, NimBLE, is ESP-IDF's own `bt` component
+(v5.3.2, the image's version): no managed component, nothing new in
+`dependencies.lock`. Without `CONFIG_BT_ENABLED` (the Field Box, the modem)
+it builds nothing.
 
 ## Built-in presets
 

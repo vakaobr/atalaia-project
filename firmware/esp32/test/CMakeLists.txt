@@ -144,6 +144,10 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/hal/board_fem.c
     ${SHELL_DIR}/modem/modem.c
     ${SHELL_DIR}/modem/modem_framing.c
+    ${SHELL_DIR}/pod/pod.c
+    ${SHELL_DIR}/pod/pod_caps.c
+    ${SHELL_DIR}/pod/pod_json.c
+    ${SHELL_DIR}/pod/pod_ble.c
 )
 
 # ---- HAL stub ----------------------------------------------------------------
@@ -183,6 +187,7 @@ set(TEST_SOURCES
     test_serial_console.c
     test_board_fem.c
     test_screen_template.c
+    test_pod.c
 )
 
 # ---- Executable --------------------------------------------------------------
@@ -199,6 +204,7 @@ target_include_directories(firmware_test PRIVATE
     ${SHELL_DIR}
     ${SHELL_DIR}/radio
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CORE_DIR}/tests # proxy_vectors.h
 )
 
 target_link_libraries(firmware_test PRIVATE atalaia_core_fw atalaia_lua_fw atalaia_screens_fw)
@@ -242,8 +248,21 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(proxy_codec_test PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
 
+# ---- The I/O pod's GATT service with the Bluetooth stack stubbed --------------
+add_executable(ble_gatt_stub_test test_ble_gatt_stub.c
+    ${SHELL_DIR}/pod/pod.c ${SHELL_DIR}/pod/pod_ble.c ${SHELL_DIR}/pod/pod_caps.c
+    ${SHELL_DIR}/pod/pod_json.c ${SHELL_DIR}/key_filter.c ${SHELL_DIR}/modem/modem.c
+    ${SHELL_DIR}/modem/modem_framing.c ${SHELL_DIR}/radio/radio_protocol.c
+    ${SHELL_DIR}/radio/radio_task.c ${SHELL_DIR}/radio/noise_stats.c)
+target_include_directories(ble_gatt_stub_test PRIVATE ${SHELL_DIR} ${CORE_DIR}/tests)
+target_link_libraries(ble_gatt_stub_test PRIVATE atalaia_core_fw)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(ble_gatt_stub_test PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
 # ---- CTest -------------------------------------------------------------------
 include(CTest)
 add_test(NAME firmware COMMAND firmware_test)
 add_test(NAME screens COMMAND screen_test)
 add_test(NAME proxy_codec COMMAND proxy_codec_test)
+add_test(NAME ble_gatt_stub COMMAND ble_gatt_stub_test)

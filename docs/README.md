@@ -41,7 +41,7 @@ Each implementation phase has its own folder with `RESEARCH.md`, `ADR.md`,
 | --- | --- | --- |
 | [`phase-1-single-box/`](phase-1-single-box/) | 1 · Single box | Software complete; hardware gate pending |
 | [`phase-2-field-network/`](phase-2-field-network/) | 2 · Field network | Software complete (A–E); mode pack in progress; hardware gate (F) pending |
-| [`phase-3-android-players/`](phase-3-android-players/) | 3 · Android and players | Planning complete; implementation pending |
+| [`phase-3-android-players/`](phase-3-android-players/) | 3 · Android and players | Software of plan phases A-F done (E without the Android controller shell); field test (G) pending |
 | [`phase-4-site-server/`](phase-4-site-server/) | 4 · Site server and advanced play | Planning complete; implementation pending |
 | [`phase-5-community/`](phase-5-community/) | 5 · Community | Planning; ongoing after release |
 

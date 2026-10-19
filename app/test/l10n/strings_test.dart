@@ -13,6 +13,7 @@ import 'package:atalaia_app/prop/prop_session.dart';
 import 'package:atalaia_app/ui/theme.dart';
 import 'package:atalaia_app/chrono/replica.dart';
 import 'package:atalaia_app/controller/prop_link.dart';
+import 'package:atalaia_app/radio/pod_radio_link.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Set<String> placeholders(String s) =>
@@ -104,6 +105,10 @@ void main() {
       for (final o in ['pass', 'fail', 'warn', 'unjudged', 'null'])
         'chrono.sent_$o',
       for (final st in LinkState.values) 'prop.link.${st.name}',
+      // Plan phase F: the radio link through an I/O pod.
+      for (final st in RadioLinkState.values) 'prop.radio.${st.name}',
+      'prop.radio.heard',
+      'prop.pod_opened',
     ];
     for (final k in keys) {
       expect(ptStrings.containsKey(k), isTrue, reason: k);

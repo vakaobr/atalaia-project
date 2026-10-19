@@ -164,6 +164,8 @@ static void test_encode_refuses(void)
 
     CHECK(atalaia_proxy_modem_type(ATALAIA_PROXY_RADIO_RX) == 0x02);
     CHECK(atalaia_proxy_modem_type(ATALAIA_PROXY_RADIO_ERROR) == 0x07);
+    CHECK(atalaia_proxy_modem_type(ATALAIA_PROXY_RADIO_NOISE) == 0x08);
+    CHECK(atalaia_proxy_modem_type(0x0C) == 0);
     CHECK(atalaia_proxy_modem_type(ATALAIA_PROXY_ACK) == 0);
     CHECK(atalaia_proxy_ack_encode(1, buf, 1) == 0);
 }

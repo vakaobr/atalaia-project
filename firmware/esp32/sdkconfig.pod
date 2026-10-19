@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# I/O pod variant (ADR-P3-3), applied on top of sdkconfig.defaults:
+#   python tools/docker_fw.py pod
+# builds it into build-pod/. Same board (Heltec V4.3 by default, V4.2 in
+# menuconfig), same pins and radio code; no Lua, screens, presets or Wi-Fi.
+# The frames on its USB and Bluetooth links: protocol/capability-proxy.md.
+
+CONFIG_ATALAIA_POD_MODE=y
+
+# The phone's USB link is the USB-Serial-JTAG port, so the log console stays
+# on UART0 (GPIO 43/44) only: no secondary console on USB, which would mix
+# log text into the frame stream (as on the modem, sdkconfig.modem).
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
+
+# A hung pod loop reboots the pod; the phone notices the missing ACKs, links
+# again and configures the radio again.
+CONFIG_ESP_TASK_WDT_EN=y
+CONFIG_ESP_TASK_WDT_INIT=y
+CONFIG_ESP_TASK_WDT_PANIC=y
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=5
+
+# The pod has no Lua heap to place: PSRAM is optional.
+CONFIG_SPIRAM_IGNORE_NOTFOUND=y
+
+# Bluetooth LE with NimBLE (part of ESP-IDF): a peripheral, one phone at a
+# time, a 247-byte MTU (P3-6), LE Secure Connections with bonds kept in NVS.
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
+CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
+CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=247
+CONFIG_BT_NIMBLE_SECURITY_ENABLE=y
+CONFIG_BT_NIMBLE_SM_LEGACY=n
+CONFIG_BT_NIMBLE_SM_SC=y
+CONFIG_BT_NIMBLE_NVS_PERSIST=y
+CONFIG_BT_NIMBLE_MAX_BONDS=4
+CONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=5120

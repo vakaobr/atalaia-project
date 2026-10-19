@@ -765,6 +765,36 @@ MSYS_NO_PATHCONV=1 docker run --rm ^
          ctest --test-dir /tmp/fw-test --output-on-failure"
 ```
 
+### As built (2026-10-19)
+
+Done in software; decisions PF1-PF15 in `docs/review/decisions-to-review.md`,
+status in `STATUS.md`. What differs from the lists above:
+
+- **Files.** The proxy, capabilities and GATT logic are plain C apart from
+  ESP-IDF, as the modem's (`main/pod/pod.c`, `pod_caps.c`, `pod_ble.c`,
+  `pod_json.c`), with thin ESP-IDF files (`pod_task.c` for the task, the
+  USB-Serial-JTAG link, the audio queue and the enclosure switch;
+  `pod_ble_nimble.c`; `pod_main.c` with its own `app_main`, so `shell.c` is
+  unchanged). `pod_config.h` holds Kconfig settings, not NVS ones: the
+  pod's configuration over CMD (ADR-P3-3) is not built (PF15).
+- **Kconfig.** The modem's bool became the three-way variant choice of
+  ADR-P3-3; `sdkconfig.pod` selects the pod and NimBLE.
+- **Build.** `python tools/docker_fw.py pod` (the plan's
+  `-DCONFIG_ATALAIA_POD_MODE=y` is not how ESP-IDF takes Kconfig values);
+  CI `esp32-pod-build`. Image about 650 KB (the plan guessed ~300 KB before
+  NimBLE).
+- **Protocol.** RADIO_NOISE `0x0B` and MEASURE through the pod (PF2); the
+  pod's links, seqs and key rules (PF5), its Bluetooth security (PF4) and
+  its capabilities (PF6-PF8) are dated refinements in
+  `protocol/capability-proxy.md`.
+- **The phone's side.** Beyond the plan's list: the phone's radio link
+  through the pod and its choice between Wi-Fi and LoRa (PF9), which plan
+  phase D left to this phase (PD12) and plan phase E's handoff named.
+- **Tests.** `test_proxy_codec.c` existed (plan phase A) and checks the new
+  vectors; new: `test_pod.c` (in `firmware_test`), `test_ble_gatt_stub.c`
+  (`ctest -R ble_gatt_stub`), the host pod (`test/pod_host`) with Dart and
+  controller tests against it (PF10).
+
 ---
 
 ## Phase G: Integration, field test, documentation
@@ -782,6 +812,35 @@ completed without hardware.
 Phase 2F (field-tested LoRa protocol). **Hardware required:**
 ESP32 LoRa boards, Android phone(s), Raspberry Pi, I/O pod
 components.
+
+**The I/O pod on hardware (added after plan phase F, 2026-10-19).** Plan
+phase F built and tested the pod's firmware and the phone's side against
+the pod's own code on a computer only. Before the field test, on a pod
+board with a phone (the steps are `firmware/esp32/docs/BRING_UP.md`, "The
+I/O pod"):
+
+1. Read the board revision (KCT8103L = V4.3, GC1109 = V4.2) and build the
+   pod for it; fit the LoRa antenna; boot it and check the UART0 log.
+2. USB-OTG: the phone finds and opens the pod; opening the port does not
+   reset it (DTR and RTS set together, PF3).
+3. Bluetooth LE: the pod is found as `atalaia-pod-XXXX`, Android asks to
+   pair once, IDENT arrives within 30 s, the bond is kept, one phone at a
+   time (PF4); the MTU is 247.
+4. Inputs and outputs on a prop game: buttons by number, keypad keys, a
+   player tag on the pod's reader, the ring's team colour, the clips as
+   tones; press-to-reaction under 100 ms on USB and 200 ms on Bluetooth.
+5. The enclosure switch: `node.tamper` (`pod_opened`) in the GM console
+   when the lid opens during a game; nothing without a switch (PF8).
+6. The pod's conducted TX power (BRING_UP step 10) before anything is sent
+   in a game.
+7. The phone on the field's radio through the pod with the Wi-Fi off: the
+   controller lists the node (HELLO, transports LoRa), the game's start
+   reaches it, its captures are logged and acknowledged; Wi-Fi on and off
+   again: it moves between the links with no capture lost or doubled
+   (PF9).
+8. The phone unplugged or out of Bluetooth range: the pod forgets the game
+   key (`radio cleared`); linking again works with the next epoch (PF5).
+9. Two hours on battery and Bluetooth: no watchdog reset, no lost link.
 
 ### Files to create
 
@@ -1128,6 +1187,14 @@ without issues."
 4. If the pod loses LoRa contact, verify the Android prop continues
    scoring locally.
 5. Return to Wi-Fi range. Verify buffered events replay.
+6. (Added after plan phase F.) The GM console shows each capture once
+   (the controller drops the copy that arrives over both links), the
+   phone's screen shows which link it is on ("over the pod's radio" while
+   out of Wi-Fi), and the pod's radio stays quiet once the Wi-Fi link is
+   back (decision PF9).
+7. Join a second phone with a pod at a spot with no Wi-Fi at all, from a
+   join payload without the controller's addresses: it plays on the radio
+   alone.
 
 #### Test 3: Kill Confirmed mode with NFC (requires NFC on phone)
 

@@ -38,6 +38,7 @@ typedef enum {
     ATALAIA_PROXY_RADIO_CMD = 0x08,    /* the modem's CMD; IDENT (7) is answered with IDENT */
     ATALAIA_PROXY_RADIO_STATUS = 0x09, /* the modem's STATUS */
     ATALAIA_PROXY_RADIO_ERROR = 0x0A,  /* the modem's ERROR */
+    ATALAIA_PROXY_RADIO_NOISE = 0x0B,  /* the modem's NOISE, the answer to MEASURE (decision PF2) */
 } atalaia_proxy_type_t;
 
 /* The modem frame type a radio frame carries (proxy type - 3), or 0. */

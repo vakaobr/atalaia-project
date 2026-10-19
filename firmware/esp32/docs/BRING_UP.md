@@ -347,3 +347,66 @@ and two boards at least 1 m apart, both antennas fitted.
   must be moved to an I2C I/O expander or alternative pins.
 - TX power for the FEM variant accounts for FEM and antenna gain via
   `radio_power.h` (Kconfig tuneable).
+
+## The I/O pod (phase 3, plan phase F)
+
+The pod image (`python tools/docker_fw.py pod`, `firmware/esp32/build-pod/`)
+runs on the same board with the same pins for its buttons, keypad
+expander, LED ring, NFC reader, battery gauge and amplifier; the display is
+not fitted (its GPIOs are free). Do the board steps above that apply
+(revision and FEM, antenna before power-on, conducted power, NFC, keypad,
+LEDs, audio), then these, which need the board and an Android phone with
+the app (`python tools/docker_app.py apk`). None of them has been run yet.
+
+1. **Boot.** Flash `build-pod/` as in step 1 and watch UART0 (GPIO 43/44,
+   a 3.3 V USB-UART adapter: the USB-C port carries the pod's frames, not
+   the log). Expect `Atalaia I/O pod`, `Vext on`, one line per part that is
+   missing, the SX1262 and FEM lines of step 10, `advertising as
+   atalaia-pod-XXXX` and `I/O pod ... capabilities [...]` listing what is
+   fitted.
+2. **USB link.** Plug the pod into the phone with a USB-C OTG cable (the
+   phone powers it). In the app: Prop > I/O pod > Find pods: the pod is
+   listed (CDC ACM, Espressif 303a:1001); open it and allow USB access: the
+   app shows "Pod linked over USB" with the capability count. Check that
+   opening the port does **not** reset the pod (the app sets DTR and RTS
+   together; on the USB-Serial-JTAG only RTS with DTR low resets: the
+   UART0 log must not show a new boot).
+3. **Bluetooth link.** Unplug USB. Find pods again: `atalaia-pod-XXXX`
+   (the last 4 hex digits of its Bluetooth address) is listed. Open it:
+   Android asks to pair (Just Works: confirm); within 30 s the app shows
+   "Pod linked over BLE". The UART0 log shows the connection, the MTU (247)
+   and the encryption. Open it again later: no second pairing question (the
+   bond is kept). With a second phone, the pod is not listed while the
+   first is connected (one phone at a time) and is again once it leaves.
+4. **Inputs.** Start a prop game on the phone (any mode with team buttons),
+   with the pod linked: each button is the game's team by number (button 1
+   = first team), holding one captures as on a Field Box; keypad keys reach
+   the mode (Codes); a player tag on the pod's reader is checked by the
+   phone (Kill Confirmed, Medic Kit). Time from press to the phone's
+   reaction: under 100 ms over USB, under 200 ms over Bluetooth.
+5. **Outputs.** The mode's team light fills the ring in the team's colour;
+   its sounds play on the pod's amplifier as tones.
+6. **Enclosure switch.** Fit a microswitch from GPIO 47 to GND that the
+   closed lid holds closed. Open the lid during the game: the phone shows
+   "Someone opened the I/O pod" and the GM console's feed shows
+   `node.tamper` (`pod_opened`). Without a switch fitted, nothing is ever
+   reported.
+7. **Radio through the pod.** Join the phone's prop to a controller's game
+   with the pod linked (a join payload; the field's Wi-Fi off, so the radio
+   is the only link): the console lists the phone's node (HELLO, transports
+   LoRa), the game's start reaches the phone, its captures reach the
+   console within 1-2 s and are acknowledged (the phone shows "Linked to
+   the controller over the pod's radio"). Turn the field's Wi-Fi on: the
+   phone moves to the Wi-Fi link and the pod's radio goes quiet; turn it
+   off again: the radio takes over. Measure the pod's conducted power as in
+   step 10 before any of this.
+8. **Losing the phone.** Unplug the USB (or walk the phone out of Bluetooth
+   range): the UART0 log shows `radio cleared` (the game key is
+   forgotten). Link again: the phone configures the radio again with the
+   next epoch and the console keeps hearing it.
+9. **Battery.** With the MAX17048 fitted, IDENT and the Pod Status
+   characteristic carry its level (nRF Connect or a similar app can read
+   Pod Status: battery %, the last packet's RSSI, flags).
+10. **Hours.** A 2-hour game with the pod on battery and Bluetooth: no
+    watchdog reset in the UART0 log, no lost link, the battery estimate on
+    a 3000 mAh cell.
