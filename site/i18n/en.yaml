@@ -221,24 +221,60 @@ modes:
   title: Game modes
   intro: >-
     Modes react to intent ("a team is claiming this prop"), not to hardware, so the same script
-    runs on a box with two arcade buttons, a keypad box or a tablet. Two classics are written and
-    tested today.
+    runs on a Field Box, a keypad box or an Android phone. Seven modes and one modifier are written
+    and tested in software today; none has run on a real field yet.
   domination:
     title: Domination
     text: >-
       A team holds the prop's input for a few seconds to claim it, and scores every tick while it
       keeps it. The other team can take it over at any time.
-    meta: Hold to capture · scores per tick · any number of zones
+    meta: Team buttons · one box or many
   bomb:
     title: Bomb / Rush
     text: >-
-      Attackers hold to arm the bomb, then defend it. Defenders must hold long enough to defuse it
-      before the fuse runs out. Fuse and hold times are settings.
-    meta: Arm · defend · defuse or explode
+      Attackers arm the bomb, then defend it; defenders must defuse it before the fuse runs out.
+      Arm and defuse by holding a button, or give each team its own keypad code.
+    meta: Team buttons or keypad · fuse and hold times are settings
+  holdall:
+    title: Hold-All Domination
+    text: >-
+      Teams capture boxes as in Domination, but a team scores only while it holds every box at
+      once. Lose one and the scoring stops.
+    meta: Several boxes · needs the field controller
+  laststand:
+    title: Last Stand
+    text: >-
+      The defenders start with every zone. Once they are down to their last one, a countdown to
+      defeat runs until they retake another; when it runs out, the attackers win.
+    meta: Several boxes · needs the field controller
+  kill_confirmed:
+    title: Kill Confirmed
+    text: >-
+      Players carry signed NFC tags. A team scans the tags it collected at a station: an enemy's
+      tag confirms the kill, a teammate's denies it. Forged tags are refused.
+    meta: NFC reader · player tags
+  respawn:
+    title: Respawn and Lives
+    text: >-
+      A respawn point counts lives per team or per player, with a cooldown between respawns. When
+      a team runs out of lives, it is eliminated.
+    meta: NFC reader or team buttons
+  player_checkin:
+    title: Player Check-in
+    text: >-
+      Players check in at a checkpoint with their tag. The box counts each team's players and can
+      give points for every check-in.
+    meta: NFC reader · player tags
+  codes:
+    title: Codes (modifier)
+    text: >-
+      Runs alongside any mode on the same box: keypad codes grant points, hints or unlocks, and the
+      GM sees who used each code and which team held the box.
+    meta: Keypad · works with any mode
   yours:
     title: Your mode
     text: >-
-      Respawn counters, hacking terminals, VIP escort, master-and-satellite zones… Modes are short
+      Hacking terminals, VIP escort, master-and-satellite zones, Money Factory… Modes are short
       scripts. Propose one with the game mode idea template.
     link: Share a game mode idea
 
