@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Implementation (plan phase 10 built in software, 2026-10-19)
+**Current phase:** Implementation (plan phases 1 and 10 built in software, 2026-10-19)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-19 (plan phase 10: `tools/docker_server.py test` and `migrations`, tools/check.sh)
-**Next step:** plan phase 1 (Master and Satellites) on the modes chain; plan phase 11 (accounts, sessions and roles) on the site server chain
+**Last verified:** 2026-10-19 (plan phases 1 and 10, full clean-copy check)
+**Next step:** plan phase 2 (Target Windows, logic) on the modes chain; plan phase 11 (accounts, sessions and roles) on the site server chain
 
 ## Completed
 
@@ -39,8 +39,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 | # | Plan phase | Software now / hardware | Depends on | Status |
 |---|------------|-------------------------|------------|--------|
-| 1 | Master and Satellites | Software, now | -- | **Next** |
-| 2 | Target Windows (logic), `game.teams()`, `hit` input | Software, now | -- | Pending |
+| 1 | Master and Satellites | Software, now | -- | Done in software (2026-10-19; not on radio hardware) |
+| 2 | Target Windows (logic), `game.teams()`, `hit` input | Software, now | -- | **Next** |
 | 3 | Geo utilities in the core | Software, now | -- | Pending |
 | 4 | Hacking Terminal | Software, now | -- | Pending |
 | 5 | VIP / Payload | Software, now | 3 | Pending |
@@ -68,6 +68,27 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 Plan phases 1-9 and 10-22 are two independent chains; they can run in
 parallel worktrees.
+
+## Plan phase 1: Master and Satellites (built 2026-10-19)
+
+`modes/master_satellites` (`org.atalaia.master_satellites`, "Mestre e
+Satélites"): `master` and `satellite` boxes capture as in Domination
+and do not score; `field.lua` scores the master's holder every
+`tick_s` with `points_per_tick` plus `satellite_bonus_pct` % of it per
+satellite held (whole points, rounded down), nothing below
+`min_satellites`, and frees every satellite with
+`field.send(id, "set_owner", { team = "none" })` when the master
+leaves a team's hands. Screens `standby`, `captured`, `master_status`
+(told by `field.lua` with the mode command `status`). No new events.
+A built-in Field Box preset (the tenth; the box's own picker shows
+nine, M1-4) and the app's generated catalogue.
+
+Tested: 8 YAML tests in the simulator and in Dart through the core,
+the controller with two host boxes on the host modem
+(`test_box_e2e.py`, the satellite freed over the radio), the Field Box
+host tests (the preset seeded and run, the templates found) and 4
+reference images, 4 app goldens. Not run: Wokwi (R7), radio boards.
+Decisions M1-1 to M1-6 (open).
 
 ## Plan phase 10: site server skeleton (built 2026-10-19, in software)
 
@@ -147,7 +168,7 @@ maintainer to contact its operators (F22). No scraping.
 ## How to resume
 
 Run `/sdlc phase-4-site-server --implement`. STATE.json records
-`current_phase: "planning"`, `phase_status: "complete"`,
-`resume_with: "--implement"` and the first plan phase. Each plan phase
+`current_phase: "implementation"`, `phase_status: "in_progress"`,
+`resume_with: "--implement"`, the plan phases done and the next one. Each plan phase
 is verified from a clean copy (PLAN.md, "How each plan phase is
 verified") and committed by the coordinator; agents do not commit.

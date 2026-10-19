@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Each satellite the master's holder takes adds half the master's points, rounded down
+nodes: { master: master, alpha: satellite, bravo: satellite, charlie: satellite }
+steps:
+  - hold: { node: master, team: blue, s: 3 }         # ticks at 13, 23, 33, 43 s
+  - wait: 10.5
+  - expect_score: { team: blue, points: 2 }          # no satellite: 2
+  - hold: { node: alpha, team: blue, s: 3 }          # 13.5 -> 16.5 s
+  - wait: 7
+  - expect_score: { team: blue, points: 5 }          # one: 2 + 1
+  - hold: { node: bravo, team: blue, s: 3 }
+  - wait: 7
+  - expect_score: { team: blue, points: 9 }          # two: 2 + 2
+  - hold: { node: charlie, team: blue, s: 3 }
+  - expect_screen: { node: master, template: master_status, data: { team: blue, held: 3, of: 3, points: 5 } }
+  - wait: 7
+  - expect_score: { team: blue, points: 14 }         # three: 2 + 3
+  - expect_score: { team: red, points: 0 }

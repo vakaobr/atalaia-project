@@ -923,14 +923,14 @@ Modifiers are small packages (`kind: modifier`) that run alongside any main mode
 | Player Check-in | Node | `nfc` or `qr` | Count individual players | 3 |
 | Medic Kit (Ligaduras) | Field + node of its own role, next to any main mode (a role package) | `nfc`, `team_input` | A hit player scans their signed tag and holds a button for a set time to be healed; the kit's heals (default 5, refilled by the GM) and each player's heals per game at every kit (default 2, counted by the controller) are limited, refusals say why, every heal reaches the console and the players | 3 (after plan phase E; built in software) |
 | Money Factory | Node | `nfc` | Resource-collection games | 3 |
-| Master and Satellites | Field + node | `team_input` | Satellites boost the master zone (×1.5, faster ticks), upgradable, engineer-only tags | 4 |
+| Master and Satellites | Field + node | `team_input` | Satellites boost the master zone (each one held adds half the master's points per tick, rounded down: ×1.5 with one), and every satellite goes neutral when the master changes hands; upgradable and engineer-only satellites later (P4R3) | 4 (plan phase 1; built in software) |
 | Target Windows | Node + target addon | `hit`, `led` | Random team-colour scoring window | 4 |
 | VIP / Payload | Node | `gps` or `imu` | Escort a moving prop, or a VIP player tracked by the player app | 4 |
 | Hacking Terminal | Node (Android) | `display` with touch | Solve a puzzle to unlock a code or capture | 4 |
 
 ### Example: Master and Satellites without the cloud
 
-The master box runs Domination. Each satellite runs a small node script that emits `zone.captured` for its own small zone. The controller's `field.lua` multiplies the master's score while the same team holds its satellites, and resets satellites to neutral when the master changes hands. Everything runs over the local LoRa mesh, so no internet connection is needed.
+The master box and the satellites run the same small node script (`modes/master_satellites/node.lua`), which emits `zone.captured` for its own small zone and does not score. The controller's `field.lua` scores the master's holder, raises its points for every satellite the same team holds, and resets satellites to neutral when the master changes hands (`field.send(id, "set_owner", { team = "none" })`). Everything runs over the local LoRa mesh, so no internet connection is needed.
 
 ### Custom scenarios
 

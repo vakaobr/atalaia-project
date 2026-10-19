@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A satellite taken by the other team drops the bonus, without freeing the others
+params: { tick_s: 5 }
+nodes: { master: master, alpha: satellite, bravo: satellite }
+steps:
+  - hold: { node: alpha, team: red, s: 3 }
+  - hold: { node: bravo, team: red, s: 3 }
+  - hold: { node: master, team: red, s: 3 }          # captured at 9 s; ticks at 14, 19, 24 s
+  - wait: 5.5
+  - expect_score: { team: red, points: 4 }
+  - hold: { node: bravo, team: blue, s: 3 }          # 14.5 -> 17.5 s
+  - expect: { type: zone.captured, node: bravo, team: blue, data: { previous_team: red } }
+  - expect_screen: { node: master, template: master_status, data: { team: red, held: 1, of: 2, points: 3 } }
+  - wait: 2
+  - expect_score: { team: red, points: 7 }           # 4 + 3
+  - expect_score: { team: blue, points: 0 }          # a satellite without the master scores nothing
+  - hold: { node: bravo, team: red, s: 3 }           # 19.5 -> 22.5 s
+  - wait: 2
+  - expect_score: { team: red, points: 11 }          # 7 + 4
+  - expect_no: zone.neutralized

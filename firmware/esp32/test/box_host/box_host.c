@@ -369,7 +369,7 @@ int main(int argc, char **argv)
         {"holdall", "org.atalaia.holdall"}, {"laststand", "org.atalaia.laststand"},
         {"codes", "org.atalaia.codes"},     {"kill_confirmed", "org.atalaia.kill_confirmed"},
         {"respawn", "org.atalaia.respawn"}, {"player_checkin", "org.atalaia.player_checkin"},
-        {"medic", "org.atalaia.medic"},
+        {"medic", "org.atalaia.medic"},     {"master_satellites", "org.atalaia.master_satellites"},
     };
     enum { BUILTIN_COUNT = sizeof(builtin_modes) / sizeof(builtin_modes[0]) };
     builtin_source_t sources[BUILTIN_COUNT];

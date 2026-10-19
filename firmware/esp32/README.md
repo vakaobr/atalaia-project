@@ -360,14 +360,18 @@ Every mode in `modes/` is built into the image (`main/CMakeLists.txt`):
 Bomb, Domination, Hold-All Domination, Last Stand, the Codes modifier,
 the phase 3 modes Kill Confirmed, Respawn and Lives and Player Check-in, and
 the Medic Kit (a role package: the controller joins a kit with the kit's id
-alone, so the box loads it like any preset).
+alone, so the box loads it like any preset), and phase 4's Master and
+Satellites.
 At boot the firmware stores a preset, with the defaults from its
 `mode.yaml`, for each built-in mode that no stored preset uses yet (a new
-or erased box and every Wokwi run get all eight, in that order; a box
+or erased box and every Wokwi run get all ten, in that order; a box
 updated to a firmware with more modes gets the new ones in free slots), and
 replaces the stored script of a built-in mode when the image has a
 different one (`main/builtin_presets.c`). The default admin PIN is 1234
-until the setup portal sets one.
+until the setup portal sets one. The keypad picker lists the first nine
+presets (keys 1-9), so the tenth, Master and Satellites, runs only when the
+controller joins the box to such a game (decision M1-4); its scoring is on
+the controller anyway.
 
 A join may name a main mode with modifiers (`org.atalaia.domination+org.atalaia.codes`,
 see [modes/README.md](../../modes/README.md#main-modes-modifiers-and-role-packages)): the box

@@ -60,6 +60,15 @@ void main() {
     expect(fuse.label('pt'), 'Rastilho (s)');
     expect(fuse.label('en'), 'Fuse (s)');
     expect(catalog.byId('org.atalaia.holdall')!.needsController, isTrue);
+    final ms = catalog.byId('org.atalaia.master_satellites')!;
+    expect(ms.needsController, isTrue);
+    expect(ms.name('pt'), 'Mestre e Satélites');
+    expect(ms.name('en'), 'Master and Satellites');
+    expect(ms.roles.map((r) => r.name), ['master', 'satellite']);
+    expect(
+      ms.screens.keys,
+      containsAll(['standby', 'captured', 'master_status']),
+    );
     expect(catalog.byId('org.atalaia.respawn')!.needsController, isFalse);
   });
 

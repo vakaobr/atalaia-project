@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Nobody scores while nobody holds the master, whatever the satellites
+nodes: { master: master, alpha: satellite, bravo: satellite }
+steps:
+  - hold: { node: alpha, team: red, s: 3 }
+  - hold: { node: bravo, team: blue, s: 3 }
+  - wait: 120
+  - expect_score: { team: red, points: 0 }
+  - expect_score: { team: blue, points: 0 }
+  - expect_screen: { node: master, template: standby }
+  - expect_no: zone.neutralized
+  - hold: { node: alpha, team: blue, s: 3 }          # satellites change hands freely
+  - expect: { type: zone.captured, node: alpha, team: blue, data: { previous_team: red } }
+  - wait: 60
+  - expect_score: { team: blue, points: 0 }
+  - expect_no: zone.neutralized

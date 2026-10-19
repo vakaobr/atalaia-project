@@ -254,6 +254,60 @@ static void test_bomb_from_the_picker(void)
     node_runner_stop(&runner);
 }
 
+/* Every built-in mode, as main/CMakeLists.txt puts them in the image: Master and Satellites,
+ * the newest, takes the tenth slot, and on its own (no controller) a box of it only captures. */
+static void test_every_builtin_and_master_satellites(void)
+{
+    setup();
+    static const char *const folders[][2] = {
+        {"bomb", "org.atalaia.bomb"},       {"domination", "org.atalaia.domination"},
+        {"holdall", "org.atalaia.holdall"}, {"laststand", "org.atalaia.laststand"},
+        {"codes", "org.atalaia.codes"},     {"kill_confirmed", "org.atalaia.kill_confirmed"},
+        {"respawn", "org.atalaia.respawn"}, {"player_checkin", "org.atalaia.player_checkin"},
+        {"medic", "org.atalaia.medic"},     {"master_satellites", "org.atalaia.master_satellites"},
+    };
+    enum { N = sizeof(folders) / sizeof(folders[0]) };
+    static char src[N][PRESET_SOURCE_MAX];
+    builtin_source_t sources[N];
+    for (int i = 0; i < N; i++) {
+        char path[200];
+        snprintf(path, sizeof(path), MODES_DIR "/%s/node.lua", folders[i][0]);
+        sources[i].mode_id = folders[i][1];
+        sources[i].source = src[i];
+        sources[i].source_len = read_file(path, src[i], sizeof(src[i]));
+        CHECK(sources[i].source_len > 0);
+    }
+    CHECK(builtin_presets_seed(sources, N) == N);
+    preset_summary_t list[PRESET_MAX_SLOTS];
+    CHECK(preset_store_list(list, PRESET_MAX_SLOTS) == N);
+    CHECK(list[N - 1].index == N);
+    CHECK(strcmp(list[N - 1].mode_id, "org.atalaia.master_satellites") == 0);
+    CHECK(strcmp(list[N - 1].label, "Master and Satellites") == 0);
+
+    static preset_t p;
+    CHECK(preset_store_load(N, &p));
+    CHECK(strstr(p.params_json, "\"points_per_tick\":2") != NULL);
+    CHECK(strstr(p.params_json, "\"satellite_bonus_pct\":50") != NULL);
+
+    hal_t hal;
+    hal_stub_init(&hal);
+    static node_runner_t runner;
+    node_runner_init(&runner, &hal, 0);
+    const char *teams[] = {"red", "blue"};
+    CHECK(node_runner_start(&runner, &p, teams, 2));
+    button_tracker_t buttons;
+    button_tracker_init(&buttons, teams, 2);
+    const screen_update_t *su = last_screen(&runner);
+    CHECK(su && strcmp(su->template_name, "standby") == 0);
+
+    runner.queues.screen_count = 0;
+    hold(&runner, &buttons, 0x2, 3100); /* blue holds 3 s: captured, no score on the box */
+    su = last_screen(&runner);
+    CHECK(su && strcmp(su->template_name, "captured") == 0);
+    CHECK(su && strstr(su->data_json, "\"team\":\"blue\"") != NULL);
+    node_runner_stop(&runner);
+}
+
 void run_builtin_presets_tests(void)
 {
     test_seed_empty_store();
@@ -262,4 +316,5 @@ void run_builtin_presets_tests(void)
     test_picker_screens();
     test_picker_lists_at_most_nine();
     test_bomb_from_the_picker();
+    test_every_builtin_and_master_satellites();
 }

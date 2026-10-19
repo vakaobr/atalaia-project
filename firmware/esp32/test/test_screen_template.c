@@ -24,7 +24,7 @@ static const char *BOMB = "org.atalaia.bomb {\"attackers\":\"red\",\"fuse_s\":30
 
 static void test_every_builtin_template_parses(void)
 {
-    CHECK(builtin_screen_count == 15);
+    CHECK(builtin_screen_count == 18);
     for (int i = 0; i < builtin_screen_count; i++) {
         const builtin_screen_t *s = &builtin_screens[i];
         char err[160];
@@ -61,6 +61,12 @@ static void test_mode_picks_templates(void)
     /* A mode without templates, or none at all. */
     screen_render(SCREEN_MODE_MESSAGE, "org.atalaia.holdall {}");
     CHECK(screen_template_find("final_score") == NULL);
+    /* Master and Satellites has its own standby and captured, next to Domination's. */
+    screen_render(SCREEN_MODE_MESSAGE, "org.atalaia.master_satellites {}");
+    s = screen_template_find("standby");
+    CHECK(s != NULL && strcmp(s->mode_id, "org.atalaia.master_satellites") == 0);
+    CHECK(screen_template_find("master_status") != NULL);
+    CHECK(screen_template_find("final_score") == NULL); /* the Field Box's C screen */
     screen_render(SCREEN_MODE_MESSAGE, "");
     CHECK(screen_template_find("standby") == NULL);
     /* Parameters too long for the message arrive as "{}". */

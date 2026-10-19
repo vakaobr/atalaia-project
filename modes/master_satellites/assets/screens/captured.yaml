@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# A team holds a satellite (or a box with no controller). Data: team, since
+# (game time of the capture, in seconds). Boxes do not score: the master does.
+template: captured
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: team }
+    children:
+      - type: label
+        text: ZONE HELD
+        style: { font_size: 20, width: fill, align: center, color: contrast }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{team|upper}"
+    style: { font_size: 48, color: team }
+  - type: label
+    text: "held since {since|clock}"
+    style: { font_size: 20, color: muted }
+  - type: spacer
+    height: fill
+  - type: label
+    text: Hold your button to take it over
+    style:
+      font_size: 14
+      color: muted
+      padding: { bottom: 10 }

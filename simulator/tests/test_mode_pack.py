@@ -196,7 +196,7 @@ class FirmwareBuiltinTests(unittest.TestCase):
     def test_every_mode_is_in_the_image(self):
         folders = {p.parent.name for p in MODES.glob("*/mode.yaml")}
         cmake = (self.FIRMWARE / "main" / "CMakeLists.txt").read_text(encoding="utf-8")
-        listed = re.search(r"foreach\(mode ([a-z_ ]+)\)", cmake).group(1).split()
+        listed = re.search(r"foreach\(mode ([a-z_\s]+)\)", cmake).group(1).split()
         self.assertEqual(set(listed), folders)
         shell = (self.FIRMWARE / "main" / "shell.c").read_text(encoding="utf-8")
         host = (self.FIRMWARE / "test" / "box_host" / "box_host.c").read_text(encoding="utf-8")

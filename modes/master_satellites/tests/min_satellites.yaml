@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: With min_satellites, the master scores only while its holder has that many satellites
+params: { tick_s: 5, min_satellites: 2 }
+nodes: { master: master, alpha: satellite, bravo: satellite }
+steps:
+  - hold: { node: master, team: red, s: 3 }          # ticks at 8, 13, 18 ... s
+  - hold: { node: alpha, team: red, s: 3 }           # 3 -> 6 s
+  - wait: 10
+  - expect_score: { team: red, points: 0 }           # one satellite is not enough
+  - expect_screen: { node: master, template: master_status, data: { team: red, held: 1, points: 0 } }
+  - hold: { node: bravo, team: red, s: 3 }           # 16 -> 19 s
+  - wait: 4                                          # a tick at 23 s
+  - expect_score: { team: red, points: 4 }

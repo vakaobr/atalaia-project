@@ -24,6 +24,7 @@ The GM console builds its settings form from `params` in `mode.yaml`, so GMs nev
 | [Respawn and Lives](respawn/) | main mode | boxes and Android props with NFC (or team buttons) | Phase 3; 3 tests |
 | [Player Check-in](player_checkin/) | main mode | boxes and Android props with NFC | Phase 3; 2 tests |
 | [Medic Kit](medic/) (Ligaduras) | role package | its own boxes and Android props with NFC, next to any main mode; controller (`field.lua`) | After phase 3 plan phase E; 7 tests, plus simulator, controller, host-box, browser and on-device tests |
+| [Master and Satellites](master_satellites/) (Mestre e Satélites) | main mode | boxes + controller (`field.lua`) | Phase 4 plan phase 1, in software (not yet on radio hardware); 8 tests, plus controller, host-box and Field Box preset tests |
 
 The script API is described in the "Game runtime and scripting" section of the [design specification](../docs/design-spec.md), and implemented in [`core/src/script_api.c`](../core/src/script_api.c).
 
@@ -39,6 +40,18 @@ Ideas from public community requests (design specification sections 2 and 15); t
 - **Codes** (`org.atalaia.codes`, a modifier): `codes` lists keypad codes as `digits:kind[:points][:team]`, comma-separated, where kind is `points`, `hint` or `unlock` (`4711:points:50,0815:hint,2222:unlock:red`). Type the digits, then `#`; `*` clears. Each code works once per game on each box. `code.used` tells the GM which code (its place in the list), what it gave, the team it counted for (the code's team, else the team holding the box) and the team holding the box (`holder`). A points code with no team and no holder is refused.
 
 On a box without a controller (picked from the box's own preset list), Hold-All and Last Stand boxes only capture: their scoring and countdown live in `field.lua`.
+
+## Master and Satellites (phase 4)
+
+Design specification section 15; decisions P4R2, P4R3 and M1-1 to M1-5 in `docs/review/decisions-to-review.md`.
+
+- **The boxes:** one box joined with the role `master`, any number with the role `satellite`. Both run the same `node.lua`: a team captures a box by holding its input for `capture_hold_ms`, as in Domination, and boxes do not score. Satellites report their captures with the standard `zone.captured` and `zone.neutralized` (no events of their own).
+- **Scoring:** the controller's `field.lua` scores the master's holder every `tick_s` seconds (the first points one full tick after the capture): `points_per_tick` (default 2), plus `satellite_bonus_pct` % of it (default 50) for every satellite the same team holds, rounded down, because points are whole numbers (`score.add` takes integers). With the defaults that is 2, 3, 4 and 5 points a tick with 0 to 3 satellites. While the holder has fewer than `min_satellites` satellites (default 0) the master scores nothing. Nobody scores while nobody holds the master; a satellite alone never scores.
+- **The master changes hands:** when the master leaves a team's hands (another team captures it, or the GM sets it to another team or to none), `field.lua` frees every satellite (`field.send(id, "set_owner", { team = "none" })`), each of them logs `zone.neutralized`, and the new holder starts without a bonus. The first capture of a free master frees nothing. A satellite that rebooted is freed at the next change of the master, as on the field. With more than one master box, only the first (the lowest node id) counts.
+- **Screens:** `standby` (nobody holds the box), `captured` (a satellite: the team and since when) and `master_status` (the master: the team, its satellites of all of them, and its points per tick, red at 0), which the master shows when `field.lua` tells it (the mode command `status`, sent only when something on it changes). `final_score` is the Field Box's built-in screen, as for Hold-All.
+- **The GM** sees the master's holder and the satellites held in the console's field state (`master`, `held`), and every capture and freed satellite in the log.
+
+On a box without a controller (picked from the box's own preset list), Master and Satellites boxes only capture. The box's keypad picker lists the first nine presets, and this is the tenth built-in one: a box joined by the controller runs it, but it cannot be picked on the box itself yet (decision M1-4).
 
 ## Phase 3 modes (player tags)
 

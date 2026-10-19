@@ -36,6 +36,10 @@ static const struct {
     {"Medic Kit", "org.atalaia.medic",
      "{\"heal_hold_s\":10,\"charges\":5,\"max_heals_per_player\":2,\"cooldown_s\":0,"
      "\"lang\":\"pt\"}"},
+    /* Scores from the controller's field.lua; on its own a box only captures. */
+    {"Master and Satellites", "org.atalaia.master_satellites",
+     "{\"capture_hold_ms\":3000,\"tick_s\":10,\"points_per_tick\":2,\"satellite_bonus_pct\":50,"
+     "\"min_satellites\":0}"},
 };
 
 /* preset_t holds a 16 KB source buffer, so it is not put on a task stack;

@@ -348,6 +348,31 @@ P4R22, P4R23.
 - Field Box host tests: the preset loads; three ESP-IDF builds, 0
   warnings.
 
+**Built 2026-10-19 (in software, not yet on radio hardware).** What
+differs from the design above (decisions M1-1 to M1-6):
+
+- The master box learns its satellites and bonus from `field.lua`
+  through a mode command of the mode's own, `status` (`{ name, team,
+  held, of, points }`), sent only when one of them changes; no box
+  knows its role otherwise (M1-1).
+- Satellites are freed whenever the master leaves a team's hands,
+  including the GM setting it to none; the first capture of a free
+  master frees nothing; a free satellite ignores `set_owner none`
+  (M1-2).
+- `min_satellites`: the master scores nothing while its holder has
+  fewer satellites (M1-3). The bonus counts the satellites held at each
+  tick.
+- The Field Box's keypad picker lists nine presets and this is the
+  tenth built-in one: joinable by the controller, not pickable on the
+  box (M1-4; a second picker page is recommended before plan phases 4
+  and 6 add more presets).
+- One master counts (the lowest node id); owners from `field.owner()`
+  checked on each capture and every second, as Hold-All (M1-5).
+- Tests: the six named above (`three_satellites.yaml` for 0-3
+  satellites) plus `odd_points.yaml` (rounding) and
+  `min_satellites.yaml`; `basic.yaml` covers a satellite alone. No console event words were
+  needed (no new events).
+
 ### Validation
 
 ```sh

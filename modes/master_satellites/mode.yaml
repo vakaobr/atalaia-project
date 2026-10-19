@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+id: org.atalaia.master_satellites
+version: 0.1.0
+license: GPL-3.0-or-later
+min_tier: reduced
+name: Master and Satellites
+description: >-
+  Teams capture a master box and its satellites as in Domination. Only the master scores, and the
+  satellites its holder also holds raise its points; when the master changes hands, every satellite goes
+  back to neutral.
+roles:
+  master:    { requires: [team_input], optional: [team_display, audio, display] }
+  satellite: { requires: [team_input], optional: [team_display, audio, display] }
+params:
+  capture_hold_ms:     { type: int, min: 0, max: 60000, default: 3000, label: "Hold time to capture (ms)" }
+  tick_s:              { type: int, min: 1, max: 600,   default: 10,   label: "Seconds per scoring tick while a team holds the master" }
+  points_per_tick:     { type: int, min: 1, max: 1000,  default: 2,    label: "Points per tick for the master alone" }
+  satellite_bonus_pct: { type: int, min: 0, max: 1000,  default: 50,   label: "Bonus per satellite held, in % of the master's points (rounded down)" }
+  min_satellites:      { type: int, min: 0, max: 63,    default: 0,    label: "Satellites the master's holder needs before the master scores" }
+i18n:
+  pt:
+    name: Mestre e Satélites
+    description: >-
+      As equipas capturam uma caixa mestre e os seus satélites como no Domínio. Só a mestre pontua, e os
+      satélites que a mesma equipa tiver aumentam os seus pontos; quando a mestre muda de mãos, todos os
+      satélites voltam a ficar neutros.
+    params:
+      capture_hold_ms: Tempo a premir para capturar (ms)
+      tick_s: Segundos por intervalo enquanto uma equipa tem a mestre
+      points_per_tick: Pontos por intervalo só pela mestre
+      satellite_bonus_pct: Bónus por satélite, em % dos pontos da mestre (arredondado para baixo)
+      min_satellites: Satélites de que a equipa da mestre precisa antes de a mestre pontuar

@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: The GM's owner override on the master counts as a change of hands; freeing the master stops the scoring
+params: { tick_s: 5 }
+nodes: { master: master, alpha: satellite, bravo: satellite }
+steps:
+  - input: { node: alpha, type: cmd.set_owner, data: { team: red } }
+  - input: { node: master, type: cmd.set_owner, data: { team: red } }
+  - expect: { type: zone.captured, node: master, team: red, at: 0 }
+  - wait: 5
+  - expect_score: { team: red, points: 3 }
+  - input: { node: master, type: cmd.set_owner, data: { team: blue } }
+  - expect: { type: zone.captured, node: master, team: blue, data: { previous_team: red } }
+  - expect: { type: zone.neutralized, node: alpha, data: { previous_team: red } }
+  - expect_no: { type: zone.neutralized, node: bravo }   # it was free already
+  - wait: 5
+  - expect_score: { team: blue, points: 2 }
+  - input: { node: bravo, type: cmd.set_owner, data: { team: blue } }
+  - input: { node: master, type: cmd.set_owner, data: { team: none } }
+  - expect: { type: zone.neutralized, node: master, data: { previous_team: blue } }
+  - expect: { type: zone.neutralized, node: bravo, data: { previous_team: blue } }
+  - expect_screen: { node: master, template: standby }
+  - wait: 30
+  - expect_score: { team: blue, points: 2 }
+  - expect_score: { team: red, points: 3 }
+  - end: time
+  - expect_status: ended
+  - expect_screen: { node: master, template: final_score, data: {} }

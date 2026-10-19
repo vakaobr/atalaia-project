@@ -105,6 +105,26 @@ const cases = [
     '{"reason":"limit","message":"Chegaste ao limite de tratamentos","player":"r2","team":"red","remaining":3}',
   ),
   ('medic_empty', 'medic', 'medic_empty', '{}'),
+  // Master and Satellites: a free box, a satellite, the master with its status.
+  ('master_satellites_standby', 'master_satellites', 'standby', '{}'),
+  (
+    'master_satellites_captured',
+    'master_satellites',
+    'captured',
+    '{"team":"blue","since":95}',
+  ),
+  (
+    'master_satellites_status',
+    'master_satellites',
+    'master_status',
+    '{"team":"red","since":95,"held":2,"of":3,"points":4}',
+  ),
+  (
+    'master_satellites_status_no_points',
+    'master_satellites',
+    'master_status',
+    '{"team":"yellow","since":3700,"held":1,"of":4,"points":0}',
+  ),
   (
     'code_entry',
     null,

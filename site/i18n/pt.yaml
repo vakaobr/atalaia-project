@@ -68,7 +68,7 @@ header:
   language: Idioma
 
 hero:
-  status: Pré-alfa · software das fases 1 e 2 pronto, fase 3 quase completa em software · ainda não pronta para o campo
+  status: Pré-alfa · software das fases 1 e 2 pronto, fase 3 quase completa em software, fase 4 começada · ainda não pronta para o campo
   title: A plataforma aberta de <span class="nowrap">combate simulado</span>
   lead: >-
     A Atalaia é uma plataforma aberta para os dispositivos eletrónicos de jogo (os props) de
@@ -329,6 +329,14 @@ modes:
       repõe um kit a partir da consola, e cada tratamento aparece no registo da organização e no
       ecrã de quem joga.
     meta: Leitor NFC e um botão · etiquetas dos participantes · precisa do controlador de campo
+  master_satellites:
+    title: Mestre e Satélites
+    text: >-
+      As equipas capturam uma caixa mestre e os seus satélites. Só a mestre pontua, e cada satélite
+      que a mesma equipa tiver aumenta os seus pontos; quando a mestre muda de mãos, todos os
+      satélites voltam a ficar neutros. Escrito e testado em software, ainda não jogado em caixas
+      reais.
+    meta: Várias caixas · precisa do controlador de campo
   codes:
     title: Códigos (modificador)
     text: >-
@@ -338,7 +346,7 @@ modes:
   yours:
     title: O teu modo
     text: >-
-      Terminais de hacking, escolta de VIP, zonas mestre e satélites, Money Factory… Os
+      Terminais de hacking, escolta de VIP, Money Factory… Os
       modos são pequenos scripts. Propõe o teu com o modelo de ideia de modo de jogo.
     link: Partilha uma ideia de modo de jogo
 
@@ -488,7 +496,7 @@ roadmap:
   intro: >-
     Seis fases, cada uma fechada por um teste a sério no campo, a sua prova. O software foi à frente
     do hardware: as fases 1 e 2 estão prontas em software e as suas provas esperam pelas placas,
-    enquanto a fase 3 está a ser feita.
+    a fase 3 está quase completa em software e a fase 4 já começou.
   # The main page shows each phase's title and short line, then this link to the roadmap page.
   more: O roadmap completo, com o que cada fase inclui e a sua prova →
   # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
@@ -580,15 +588,20 @@ roadmap:
     title: Servidor do clube e jogo avançado
     short: >-
       Servidor do clube, marcação de jogos e inscrições, cenários personalizados, modos avançados,
-      ATAK. Investigação, arquitetura e plano escritos; o esqueleto do servidor do clube está feito.
+      ATAK. Começada: o primeiro modo avançado, Mestre e Satélites, e o esqueleto do servidor do clube estão feitos em software.
     text: >-
       Servidor do clube (contas, histórico dos jogos, registo de cronografagem, marcação de jogos,
       inscrições e publicação), cenários personalizados, modos avançados (zonas mestre e satélites,
       escolta de VIP, terminais de hacking e outros) e o
       <a href="{{ page.to.glossary }}#glossario-atak">ATAK</a>. A investigação, a arquitetura e o plano de implementação
-      estão escritos. Já feito, e testado só num computador: o esqueleto do servidor do clube (a
-      base de dados, as migrações e uma verificação de estado, no seu próprio contentor; ainda sem
-      contas nem dados de jogos).
+      estão escritos, e o plano está a ser feito em pequenos passos.
+    done: >-
+      Pronto em software, ainda não em caixas reais: Mestre e Satélites, em que os satélites que uma
+      equipa tem junto com a mestre aumentam os seus pontos e a mestre a mudar de mãos liberta-os,
+      testado no simulador, através do controlador de campo e no firmware da caixa a correr num
+      computador; e o esqueleto do servidor do clube (a base de dados, as migrações e uma
+      verificação de estado, no seu próprio contentor; ainda sem contas nem dados de jogos),
+      testado só num computador.
     gate: >-
       Prova: um <a href="{{ page.to.glossary }}#glossario-milsim">milsim</a> de fim de semana decorre do princípio ao fim
       com a Atalaia.

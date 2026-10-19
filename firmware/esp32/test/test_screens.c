@@ -45,6 +45,7 @@ typedef struct {
 #define CHECKIN  "org.atalaia.player_checkin {\"points\":1}"
 #define MEDIC    "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"pt\"}"
 #define MEDIC_EN "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"en\"}"
+#define MASTER   "org.atalaia.master_satellites {\"capture_hold_ms\":3000,\"tick_s\":10}"
 
 /* Data as the modes (modes/bomb, modes/domination, modes/codes) and the shell send it. */
 static const screen_case_t cases[] = {
@@ -125,6 +126,14 @@ static const screen_case_t cases[] = {
     {"yaml_medic_hold_en", "medic_hold",
      "{\"player\":\"b1\",\"team\":\"blue\",\"progress\":0.25,\"left\":8,\"remaining\":4}",
      MEDIC_EN},
+    /* Master and Satellites: a free box, a satellite, and the master with the controller's status.
+     */
+    {"yaml_master_satellites_standby", "standby", "{}", MASTER},
+    {"yaml_master_satellites_captured", "captured", "{\"team\":\"blue\",\"since\":95}", MASTER},
+    {"yaml_master_satellites_status", "master_status",
+     "{\"team\":\"red\",\"since\":95,\"held\":2,\"of\":3,\"points\":4}", MASTER},
+    {"yaml_master_satellites_status_no_points", "master_status",
+     "{\"team\":\"yellow\",\"since\":3700,\"held\":1,\"of\":4,\"points\":0}", MASTER},
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))
 

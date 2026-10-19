@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: The master's holder scores every tick, the master shows its holder, and satellites alone score nothing
+nodes: { master: master, alpha: satellite, bravo: satellite }
+steps:
+  - expect_screen: { node: master, template: standby }
+  - hold: { node: alpha, team: red, s: 3 }           # a satellite alone: no points
+  - expect: { type: zone.captured, node: alpha, team: red, at: 3 }
+  - expect_screen: { node: alpha, template: captured, data: { team: red, since: 3 } }
+  - wait: 20
+  - expect_score: { team: red, points: 0 }
+  - hold: { node: master, team: red, s: 3 }          # 23 -> 26 s
+  - expect: { type: zone.captured, node: master, team: red, at: 26 }
+  - expect_screen: { node: master, template: master_status, data: { team: red, since: 26, held: 1, of: 2, points: 3 } }
+  - wait: 9.9
+  - expect_score: { team: red, points: 0 }
+  - wait: 0.1                                        # one full tick after the capture
+  - expect_score: { team: red, points: 3 }           # 2, and 1 for the satellite
+  - expect_score: { team: red, node: controller, points: 3 }
+  - expect_score: { team: red, node: master, points: 0 }
+  - wait: 20
+  - expect_score: { team: red, points: 9 }
+  - expect_no: zone.neutralized
+  - expect_no: script.error

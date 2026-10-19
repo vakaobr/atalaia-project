@@ -193,6 +193,34 @@ class FieldTests(unittest.TestCase):
         bravo.hold(2, 1300)  # blue takes one back: the scoring stops
         self.assertTrue(wait_for(lambda: "holdall.scoring_stop" in self.log_types(gid, ctrl), 8))
 
+    def test_master_and_satellites_frees_the_satellites_over_the_radio(self):
+        """Master and Satellites: the controller's field.lua scores the master's holder with the
+        satellite bonus, and when the master changes hands its field.send(set_owner none) reaches
+        the satellite box over the radio, which frees itself."""
+        r = self.client.post("/api/v1/games", headers=GM, json={
+            "name": "master", "mode_id": "org.atalaia.master_satellites", "teams": ["red", "blue"],
+            "params": {"capture_hold_ms": 1000, "tick_s": 1, "points_per_tick": 2}})
+        self.assertEqual(r.status_code, 201, r.text)
+        gid = r.json()["id"]
+        master, sat = self.box("master"), self.box("sat")
+        n_master, n_sat = self.join(master, role="master"), self.join(sat, role="satellite")
+        self.assertTrue(master.logged("org.atalaia.master_satellites, master"), master.lines[-5:])
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+        self.assertTrue(wait_for(lambda: sat.status()["phase"] == 2, 5))
+        sat.hold(1, 1300)
+        self.assertTrue(wait_for(lambda: self.node(n_sat).get("owner") == "red", 8))
+        self.assertEqual(self.score(gid, "red"), 0)  # a satellite alone scores nothing
+        master.hold(1, 1300)
+        self.assertTrue(wait_for(lambda: self.node(n_master).get("owner") == "red", 8))
+        self.assertTrue(wait_for(lambda: self.score(gid, "red") >= 9, 10))  # 3 a tick: 2 + 1
+        master.hold(2, 1300)  # blue takes the master: the satellite is freed
+        self.assertTrue(wait_for(lambda: "zone.neutralized" in self.log_types(gid, n_sat), 8))
+        self.assertTrue(wait_for(lambda: self.node(n_sat).get("owner") is None, 8))
+        self.assertTrue(wait_for(lambda: self.score(gid, "blue") >= 4, 8))  # 2 a tick, no bonus
+        freed = [e for e in self.client.get(f"/api/v1/games/{gid}/log", headers=READ).json()
+                 if e["type"] == "zone.neutralized"][0]
+        self.assertEqual((freed["node"], freed["data"]["previous_team"]), (n_sat, "red"))
+
     def test_codes_modifier_on_a_box(self):
         """Domination with the Codes modifier: the box composes both scripts; a code reaches the GM."""
         r = self.client.post("/api/v1/games", headers=GM, json={

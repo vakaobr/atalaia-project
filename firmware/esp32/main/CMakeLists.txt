@@ -151,7 +151,8 @@ endif()
 # are copied first because both files are called node.lua.
 if(NOT CONFIG_ATALAIA_MODEM_MODE AND NOT CONFIG_ATALAIA_POD_MODE)
     set(ATALAIA_MODES_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../modes")
-    foreach(mode bomb domination holdall laststand codes kill_confirmed respawn player_checkin medic)
+    foreach(mode bomb domination holdall laststand codes kill_confirmed respawn player_checkin medic
+                 master_satellites)
         configure_file("${ATALAIA_MODES_DIR}/${mode}/node.lua"
                        "${CMAKE_CURRENT_BINARY_DIR}/${mode}_node.lua" COPYONLY)
         target_add_binary_data(${COMPONENT_LIB} "${CMAKE_CURRENT_BINARY_DIR}/${mode}_node.lua" TEXT)
