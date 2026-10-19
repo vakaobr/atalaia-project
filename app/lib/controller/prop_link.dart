@@ -91,7 +91,7 @@ final class LinkTime extends LinkMessage {
 final class LinkCommand extends LinkMessage {
   const LinkCommand(this.cmd, this.params);
 
-  /// start, pause, resume, end, set_owner, message, reset, reboot
+  /// start, pause, resume, end, set_owner, message, reset, reboot, mode
   final String cmd;
   final Map<String, Object?> params;
 }

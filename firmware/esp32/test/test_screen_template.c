@@ -24,7 +24,7 @@ static const char *BOMB = "org.atalaia.bomb {\"attackers\":\"red\",\"fuse_s\":30
 
 static void test_every_builtin_template_parses(void)
 {
-    CHECK(builtin_screen_count == 10);
+    CHECK(builtin_screen_count == 15);
     for (int i = 0; i < builtin_screen_count; i++) {
         const builtin_screen_t *s = &builtin_screens[i];
         char err[160];
@@ -129,8 +129,49 @@ static void test_fallback_to_c_screens(void)
     screen_renderer_reset();
 }
 
+static void fold_is(const char *in, const char *want)
+{
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%s", in);
+    screen_template_fold_text(buf);
+    if (strcmp(buf, want) != 0) fprintf(stderr, "FAIL fold \"%s\": \"%s\"\n", in, buf);
+    CHECK(strcmp(buf, want) == 0);
+}
+
+/* The Montserrat fonts are ASCII only: Portuguese texts lose their accents, not letters. */
+static void test_text_fold(void)
+{
+    fold_is("L\xc3\xaa a tua etiqueta", "Le a tua etiqueta");
+    fold_is("Mant\xc3\xa9m premido para tratar", "Mantem premido para tratar");
+    fold_is("A\xc3\x87\xc3\x83O \xc3\xa7\xc3\xa3 \xc3\xbf", "ACAO ca y");
+    fold_is("1.\xc2\xba \xc2\xab x \xc2\xbb 20\xc2\xb0", "1.o \" x \" 20o");
+    fold_is("a \xe2\x80\x94 b\xe2\x80\xa6 \xe2\x80\x9cq\xe2\x80\x9d \xe2\x80\x99",
+            "a - b... \"q\" '");
+    fold_is("ok \xef\x80\x8c", "ok \xef\x80\x8c");              /* LV_SYMBOL_OK stays */
+    fold_is("\xe2\x82\xac 5 \xf0\x9f\x98\x80 \xc3", "? 5 ? ?"); /* euro, emoji, a cut sequence */
+    fold_is("\x80x\xc2", "?x?");
+    fold_is("", "");
+}
+
+/* The Medic Kit's Portuguese screens on the box: folded, and the language follows params.lang. */
+static void test_medic_screens(void)
+{
+    test_display_init();
+    screen_renderer_reset();
+    screen_render(SCREEN_MODE_MESSAGE, "org.atalaia.medic {\"heal_hold_s\":10,\"lang\":\"pt\"}");
+    CHECK(screen_render("medic_hold", "{\"player\":\"b1\",\"progress\":0.5,\"left\":5}"));
+    CHECK(screen_template_widget_count() > 0);
+    test_display_render();
+    screen_render(SCREEN_MODE_MESSAGE, "org.atalaia.medic {\"lang\":\"en\"}");
+    CHECK(screen_render("medic_idle", "{\"remaining\":1}"));
+    test_display_render();
+    screen_renderer_reset();
+}
+
 void run_screen_template_tests(void)
 {
+    test_text_fold();
+    test_medic_screens();
     test_every_builtin_template_parses();
     test_mode_picks_templates();
     test_build_and_patch();

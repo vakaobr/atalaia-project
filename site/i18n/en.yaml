@@ -221,8 +221,8 @@ modes:
   title: Game modes
   intro: >-
     Modes react to intent ("a team is claiming this prop"), not to hardware, so the same script
-    runs on a Field Box, a keypad box or an Android phone. Seven modes and one modifier are written
-    and tested in software today; none has run on a real field yet.
+    runs on a Field Box, a keypad box or an Android phone. Seven modes, one modifier and the Medic
+    Kit are written and tested in software today; none has run on a real field yet.
   domination:
     title: Domination
     text: >-
@@ -265,6 +265,14 @@ modes:
       Players check in at a checkpoint with their tag. The box counts each team's players and can
       give points for every check-in.
     meta: NFC reader · player tags
+  medic:
+    title: Medic Kit
+    text: >-
+      Next to any mode: a hit player scans their tag and holds a button for a set time to be healed.
+      The kit shows how many heals it has left; each player gets a limited number per game at every
+      kit, the GM refills a kit from the console, and every heal shows in the GM's log and the
+      players' view.
+    meta: NFC reader and a button · player tags · needs the field controller
   codes:
     title: Codes (modifier)
     text: >-
@@ -403,8 +411,8 @@ roadmap:
       Android props, <a href="#glossary-android-prop">I/O pod</a>, player app with roles, and the
       modes that need players' phones: Respawn, Kill Confirmed, Player Check-in, Money Factory,
       the Medic Kit (a hit player scans their tag and holds a button to be healed, with a limited
-      number of heals) and chrono check-in. Done in software: Kill Confirmed, Respawn and Lives and Player Check-in read
-      players' signed NFC tags on the Field Box, the I/O pod's link protocol is fixed, and modes
+      number of heals) and chrono check-in. Done in software: Kill Confirmed, Respawn and Lives,
+      Player Check-in and the Medic Kit read players' signed NFC tags on the Field Box, the I/O pod's link protocol is fixed, and modes
       describe their screens in YAML. The app runs the same game core as the boxes, in the
       background, and has its screens, in Portuguese and English: an Android phone acts as a box
       (it runs any mode and draws the mode's own screens, with big team buttons, a keypad and NFC

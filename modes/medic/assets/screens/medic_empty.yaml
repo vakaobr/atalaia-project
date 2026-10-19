@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The kit has no heals left until the organisers refill it. Data: team (the
+# team the kit serves, if one). Texts in params.lang (pt or en).
+template: medic_empty
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: "{team || 'panel'}" }
+    children:
+      - type: label
+        text: LIGADURAS
+        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang != 'en'}" }
+      - type: label
+        text: MEDIC KIT
+        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang == 'en'}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "0"
+    style: { font_size: 48, color: danger }
+  - type: label
+    text: Sem ligaduras
+    style: { font_size: 28, color: danger, visible: "{params.lang != 'en'}" }
+  - type: label
+    text: The kit is empty
+    style: { font_size: 28, color: danger, visible: "{params.lang == 'en'}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: A organização pode repor o kit
+    style:
+      font_size: 14
+      color: muted
+      visible: "{params.lang != 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: The organisers can refill it
+    style:
+      font_size: 14
+      color: muted
+      visible: "{params.lang == 'en'}"
+      padding: { bottom: 10 }

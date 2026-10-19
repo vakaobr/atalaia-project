@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Two kits share a player's limit and cooldown through the controller's count
+params: { max_heals_per_player: 2, cooldown_s: 30, heal_hold_s: 2 }
+nodes: { north: medic, south: medic }
+steps:
+  - scan: { node: north, player: b1, team: blue }
+  - hold: { node: north, team: blue, s: 2 }
+  - expect: { type: medic.heal, node: north, data: { player: b1, player_heals_used: 1, remaining: 4 } }
+  # The south kit was told: b1 is still in the cooldown there.
+  - wait: 5
+  - scan: { node: south, player: b1, team: blue }
+  - expect_screen: { node: south, template: medic_refused, data: { reason: cooldown, player: b1 } }
+  - wait: 30
+  - scan: { node: south, player: b1, team: blue }
+  - hold: { node: south, team: blue, s: 2 }
+  - expect: { type: medic.heal, node: south, data: { player: b1, player_heals_used: 2, remaining: 4 } }
+  # Two heals in the game, one at each kit: b1 is at the limit at both.
+  - wait: 60
+  - scan: { node: north, player: b1, team: blue }
+  - expect_screen: { node: north, template: medic_refused, data: { reason: limit, used: 2 } }
+  - scan: { node: south, player: b1, team: blue }
+  - expect_screen: { node: south, template: medic_refused, data: { reason: limit, used: 2 } }
+  # Each kit keeps its own charges.
+  - scan: { node: north, player: b2, team: blue }
+  - hold: { node: north, team: blue, s: 2 }
+  - expect: { type: medic.heal, node: north, data: { player: b2, player_heals_used: 1, remaining: 3 } }
+  - expect_no: script.error

@@ -62,7 +62,7 @@
     "length": "Length",
     "params": "Mode parameters",
     "modifiers": "Modifiers",
-    "modifiers_hint": "They run alongside the mode on every box (for example keypad codes).",
+    "modifiers_hint": "They run alongside the mode on its boxes (for example keypad codes).",
     "create": "Create game",
     "message": "Message to every box",
     "message_hint": "Shown on the boxes' screens",
@@ -100,7 +100,9 @@
     "confirm_start_pending": "{n} declared replica(s) not chronographed yet. Start anyway?",
     "squads": "Squads per team",
     "squads_hint": "0 = no squads (small games: teams only). In a milsim or a big game each team splits into squads.",
-    "squads_each": "{n} squads per team"
+    "squads_each": "{n} squads per team",
+    "role_packages": "Props with a role of their own",
+    "role_packages_hint": "Boxes and phones given their role run only them, next to the mode's boxes (for example medic kits)."
   },
   "controller": {
     "title": "Field controller",
@@ -147,7 +149,11 @@
     "filter": "Filter events",
     "critical_only": "Critical only",
     "count": "{n} events",
-    "empty": "No events yet."
+    "empty": "No events yet.",
+    "events": {
+      "medic_heal": "{player} was healed (heals left in the kit: {remaining}; heals in this game: {used})",
+      "medic_empty": "A medic kit is empty"
+    }
   },
   "nodes": {
     "title": "Boxes",
@@ -171,7 +177,9 @@
       "full": "full",
       "reduced": "reduced",
       "proxy": "proxy"
-    }
+    },
+    "commands": "Commands",
+    "command_sent": "sent"
   },
   "field": {
     "title": "Field",
@@ -226,7 +234,8 @@
     "params": "Parameters",
     "copy": "Copy",
     "new": "New preset",
-    "save": "Save"
+    "save": "Save",
+    "any_team": "every team"
   },
   "scoreboard": {
     "title": "Scoreboard",

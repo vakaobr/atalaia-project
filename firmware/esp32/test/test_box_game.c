@@ -174,9 +174,15 @@ static void fixture(bool keep_flash)
     CHECK(f != NULL);
     size_t kc_len = f ? fread(kc, 1, sizeof(kc) - 1, f) : 0;
     if (f) fclose(f);
+    static char medic[PRESET_SOURCE_MAX];
+    f = fopen(MODES_DIR "/medic/node.lua", "rb");
+    CHECK(f != NULL);
+    size_t medic_len = f ? fread(medic, 1, sizeof(medic) - 1, f) : 0;
+    if (f) fclose(f);
     const builtin_source_t sources[] = {{"org.atalaia.domination", dom, dom_len},
-                                        {"org.atalaia.kill_confirmed", kc, kc_len}};
-    int seeded = builtin_presets_seed(sources, 2);
+                                        {"org.atalaia.kill_confirmed", kc, kc_len},
+                                        {"org.atalaia.medic", medic, medic_len}};
+    int seeded = builtin_presets_seed(sources, 3);
     CHECK(keep_flash ? seeded == 0 : seeded >= 1);
 
     hal_stub_init(&hal);
@@ -627,8 +633,110 @@ static void test_player_tags(void)
     node_runner_stop(&runner);
 }
 
+/* A CMD for this box with its params (compact JSON, as the controller's codec writes them). */
+static void cmd_params(uint8_t opcode, const char *params_json)
+{
+    atalaia_cmd_msg_t m;
+    memset(&m, 0, sizeof(m));
+    m.cmd = opcode;
+    m.dest = NODE;
+    snprintf(m.params_json, sizeof(m.params_json), "%s", params_json);
+    uint8_t buf[192];
+    size_t n = atalaia_cmd_encode(&m, buf, sizeof(buf));
+    CHECK(n > 0);
+    from_controller(ATALAIA_MSG_CMD, buf, n);
+}
+
+/* The last screen the mode drew since the queue was emptied, or NULL. */
+static const char *last_screen(const char **data)
+{
+    if (runner.queues.screen_count == 0) return NULL;
+    const screen_update_t *s = &runner.queues.screens[runner.queues.screen_count - 1];
+    if (data != NULL) *data = s->data_json;
+    return s->template_name;
+}
+
+/* Held for ms: team_input.hold every 250 ms, then the release (as the button tracker). */
+static void hold_ms(int ms)
+{
+    char json[64];
+    for (int t = 250; t <= ms; t += 250) {
+        snprintf(json, sizeof(json), "{\"team\":\"blue\",\"ms\":%d}", t);
+        node_runner_input(&runner, "team_input.hold", json);
+    }
+    snprintf(json, sizeof(json), "{\"team\":\"blue\",\"ms\":%d}", ms);
+    node_runner_input(&runner, "team_input.release", json);
+}
+
+/* The Medic Kit, a role package: the controller joins a kit with the kit's id alone, so
+ * the box composes nothing; a player's tag and a held button heal; the controller's count
+ * of a player's heals and the GM's refill reach the script as mode commands (opcode 8). */
+static void test_medic_kit(void)
+{
+    fixture(false);
+    CHECK(box_game_set_join_key_hex(&game, JOIN_KEY_HEX));
+    atalaia_join_t j;
+    make_join(&j);
+    snprintf(j.mode_id, sizeof(j.mode_id), "org.atalaia.medic");
+    snprintf(j.role, sizeof(j.role), "medic");
+    snprintf(j.params_json, sizeof(j.params_json),
+             "{\"heal_hold_s\":1,\"charges\":1,\"max_heals_per_player\":1,\"cooldown_s\":0,"
+             "\"lang\":\"en\"}");
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    size_t n = encode(&j, JOIN_KEY, buf);
+    CHECK(box_game_join(&game, buf, n) == BOX_JOIN_OK);
+    uint32_t now = 100;
+    cmd(FIELD_CMD_START);
+    CHECK(game.phase == BOX_PLAYING && runner.running);
+    CHECK(strcmp(runner.mode_id, "org.atalaia.medic") == 0);
+
+    char text[160];
+    tag_text("b7", 2, GAME_ID, GAME_KEY, text, sizeof(text));
+    CHECK(box_game_tag_text(&game, text));
+    hold_ms(1000);
+    CHECK(events_named("medic.heal") == 1);
+    CHECK(events_named("medic.empty") == 1); /* one charge: empty after one heal */
+
+    /* The GM refills the kit; the controller says b8 had a heal at another kit. */
+    cmd_params(FIELD_CMD_MODE, "{\"name\":\"refill\"}");
+    cmd_params(FIELD_CMD_MODE, "{\"at\":3,\"name\":\"heals\",\"player\":\"b8\",\"used\":1}");
+    runner.queues.screen_count = 0;
+    tag_text("b8", 2, GAME_ID, GAME_KEY, text, sizeof(text));
+    CHECK(box_game_tag_text(&game, text));
+    const char *data = NULL;
+    const char *name = last_screen(&data);
+    CHECK(name != NULL && strcmp(name, "medic_refused") == 0);
+    CHECK(data != NULL && strstr(data, "\"reason\":\"limit\"") != NULL);
+    hold_ms(1000);
+    CHECK(events_named("medic.heal") == 1);
+
+    /* A forged tag is refused; b9 is healed with the refilled charge. */
+    static const uint8_t other[16] = {1};
+    runner.queues.screen_count = 0;
+    tag_text("b9", 2, GAME_ID, other, text, sizeof(text));
+    CHECK(box_game_tag_text(&game, text));
+    name = last_screen(&data);
+    CHECK(name != NULL && strcmp(name, "medic_refused") == 0);
+    CHECK(data != NULL && strstr(data, "\"message\":\"Forged tag\"") != NULL);
+    tag_text("b9", 2, GAME_ID, GAME_KEY, text, sizeof(text));
+    CHECK(box_game_tag_text(&game, text));
+    hold_ms(1000);
+    CHECK(events_named("medic.heal") == 2);
+    CHECK(events_named("medic.empty") == 2);
+    CHECK(events_named("script.error") == 0);
+
+    /* A mode command before the start of a game, or after its end, reaches no script. */
+    cmd(FIELD_CMD_END);
+    ack_all();
+    run_ms(&now, 20);
+    cmd_params(FIELD_CMD_MODE, "{\"name\":\"refill\"}");
+    CHECK(!runner.running);
+    state_persist_clear();
+}
+
 void run_box_game_tests(void)
 {
+    test_medic_kit();
     test_player_tags();
     test_join_refusals();
     test_join_with_a_modifier();

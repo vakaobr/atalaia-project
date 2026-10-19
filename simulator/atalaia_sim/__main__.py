@@ -123,7 +123,8 @@ def main(argv: list[str] | None = None) -> int:
     serve.add_argument("--node", action="append", default=[], metavar="NAME=ROLE",
                        help="a node and its role; repeat for more (default: one node of the first role)")
     serve.add_argument("--modifier", action="append", default=[], metavar="FOLDER",
-                       help="a modifier to run alongside the mode, e.g. ../modes/codes; repeat for more")
+                       help="a modifier to run alongside the mode (e.g. ../modes/codes) or a role "
+                            "package for nodes of its role (e.g. ../modes/medic); repeat for more")
     serve.add_argument("--teams", help="comma-separated team names (default: red,blue)")
     serve.add_argument("--param", action="append", default=[], metavar="NAME=VALUE",
                        help="override a mode parameter; repeat for more")

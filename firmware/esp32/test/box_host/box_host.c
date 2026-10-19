@@ -22,6 +22,7 @@
  * stdin, one command per line:
  *   @join atalaia:join:...      join (as typed on the serial console)
  *   @joinkey <64 hex>           set the field join key
+ *   @tag <uid hex> [<tag hex>]  a player tag read (as the NFC reader would, in a game)
  *   hold <button 1-4> <ms>      hold a team button for ms, then release it
  *   keys <0-9*#...>             keypad presses (keypad.key events to the mode)
  *   status                      print one STATUS line (JSON)
@@ -368,6 +369,7 @@ int main(int argc, char **argv)
         {"holdall", "org.atalaia.holdall"}, {"laststand", "org.atalaia.laststand"},
         {"codes", "org.atalaia.codes"},     {"kill_confirmed", "org.atalaia.kill_confirmed"},
         {"respawn", "org.atalaia.respawn"}, {"player_checkin", "org.atalaia.player_checkin"},
+        {"medic", "org.atalaia.medic"},
     };
     enum { BUILTIN_COUNT = sizeof(builtin_modes) / sizeof(builtin_modes[0]) };
     builtin_source_t sources[BUILTIN_COUNT];
@@ -468,6 +470,9 @@ int main(int argc, char **argv)
                         out("LOG join key %s", box_game_set_join_key_hex(&game, command + 8)
                                                    ? "stored"
                                                    : "refused (64 hex digits)");
+                    } else if (strncmp(command, "tag ", 4) == 0) {
+                        out("LOG tag %s",
+                            box_game_tag_text(&game, command + 4) ? "read" : "not read");
                     }
                     line_len = 0;
                     continue;

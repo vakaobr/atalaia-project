@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# A heal is done. Data: player, team (the player's), remaining (heals left
+# in the kit), used (the player's heals in this game), max (heals a player
+# may have; 0: no limit). Texts in params.lang (pt or en).
+template: medic_healed
+style: { background: "{team || 'panel'}" }
+layout:
+  - type: icon
+    icon: plus
+    style: { font_size: 48, color: contrast }
+  - type: label
+    text: DE VOLTA AO JOGO
+    style: { font_size: 28, color: contrast, visible: "{params.lang != 'en'}" }
+  - type: label
+    text: BACK IN THE GAME
+    style: { font_size: 28, color: contrast, visible: "{params.lang == 'en'}" }
+  - type: label
+    text: "{player}"
+    style: { font_size: 20, color: contrast }
+  - type: label
+    text: "Tratamento {used} de {max}"
+    style: { font_size: 20, color: contrast, visible: "{params.lang != 'en' && max > 0}" }
+  - type: label
+    text: "Heal {used} of {max}"
+    style: { font_size: 20, color: contrast, visible: "{params.lang == 'en' && max > 0}" }
+  - type: label
+    text: "Restam {remaining} ligaduras"
+    style: { font_size: 14, color: contrast, visible: "{params.lang != 'en' && remaining != 1}", padding: 6 }
+  - type: label
+    text: Resta 1 ligadura
+    style: { font_size: 14, color: contrast, visible: "{params.lang != 'en' && remaining == 1}", padding: 6 }
+  - type: label
+    text: "{remaining} heals left in the kit"
+    style: { font_size: 14, color: contrast, visible: "{params.lang == 'en' && remaining != 1}", padding: 6 }
+  - type: label
+    text: 1 heal left in the kit
+    style: { font_size: 14, color: contrast, visible: "{params.lang == 'en' && remaining == 1}", padding: 6 }

@@ -72,7 +72,9 @@
             "visibility.expired",
             "node.tamper",
             "pod.connected",
-            "pod.disconnected"
+            "pod.disconnected",
+            "medic.heal",
+            "medic.empty"
           ]
         },
         {
@@ -1321,6 +1323,65 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "medic.heal"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "player": {
+                "$ref": "#/$defs/data/player"
+              },
+              "remaining": {
+                "$ref": "#/$defs/data/remaining"
+              },
+              "player_heals_used": {
+                "$ref": "#/$defs/data/player_heals_used"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "medic.empty"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
     }
   ],
   "$defs": {
@@ -1448,6 +1509,14 @@
       "holder": {
         "type": "string",
         "description": "team holding the node when it happened"
+      },
+      "remaining": {
+        "type": "integer",
+        "description": "uses left, such as a medic kit's heals"
+      },
+      "player_heals_used": {
+        "type": "integer",
+        "description": "heals a player has had in this game"
       }
     }
   }

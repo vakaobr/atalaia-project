@@ -66,6 +66,8 @@ data_fields:
   see_team:      { key: 29, type: string,  doc: "team whose positions become visible" }
   tolerance_pct: { key: 30, type: number,  doc: "chrono comparison tolerance in percent" }
   holder:        { key: 31, type: string,  doc: "team holding the node when it happened" }
+  remaining:     { key: 32, type: integer, doc: "uses left, such as a medic kit's heals" }
+  player_heals_used: { key: 33, type: integer, doc: "heals a player has had in this game" }
 
 # id: CBOR value of the type field (1-23 take one byte). prio: the default
 # priority. data: the fields this event may carry besides the common ones.
@@ -94,7 +96,8 @@ events:
   battery.low:      { id: 22, prio: telemetry, data: [percent] }
   script.error:     { id: 23, prio: normal,    data: [message] }          # a handler failed; the node keeps running
   script.halted:    { id: 24, prio: critical,  data: [reason] }           # the sandbox stopped the script
-  # Phase 3 (ADR-P3-8) uses 25-27 and 33-41; the phase 2 mode pack uses 28-32; phase 4 starts at 42.
+  # Phase 3 (ADR-P3-8) uses 25-27 and 33-41; the phase 2 mode pack uses 28-32; phase 4 plans 42-49;
+  # the Medic Kit (after phase 3 plan phase E) uses 50-51.
   kill.confirmed:   { id: 25, prio: normal,    data: [player, owner] }    # team: the team credited; player and owner: whose tag
   kill.denied:      { id: 26, prio: normal,    data: [player, owner] }    # a team recovered its own player's tag: no points
   team.eliminated:  { id: 27, prio: normal,    data: [] }                 # team: the team whose lives ran out
@@ -112,3 +115,5 @@ events:
   node.tamper:                { id: 39, prio: critical,  data: [reason] }   # e.g. kiosk_broken
   pod.connected:              { id: 40, prio: telemetry, data: [fw, tier] } # an I/O pod linked to this node
   pod.disconnected:           { id: 41, prio: telemetry, data: [reason] }
+  medic.heal:                 { id: 50, prio: normal,    data: [player, remaining, player_heals_used] }  # team: the player's
+  medic.empty:                { id: 51, prio: normal,    data: [] }         # team: the team the kit serves, if one

@@ -78,6 +78,33 @@ const cases = [
     'checkin',
     '{"total":5,"counts":"RED 3  BLUE 2","team":"red","message":"Checked in: r2","error":false}',
   ),
+  // The Medic Kit's screens, in Portuguese (the default lang).
+  ('medic_idle', 'medic', 'medic_idle', '{"remaining":4}'),
+  (
+    'medic_idle_team_one_left',
+    'medic',
+    'medic_idle',
+    '{"remaining":1,"team":"blue"}',
+  ),
+  (
+    'medic_hold',
+    'medic',
+    'medic_hold',
+    '{"player":"b1","team":"blue","progress":0.6,"left":4,"remaining":4}',
+  ),
+  (
+    'medic_healed',
+    'medic',
+    'medic_healed',
+    '{"player":"b1","team":"blue","remaining":3,"used":1,"max":2}',
+  ),
+  (
+    'medic_refused',
+    'medic',
+    'medic_refused',
+    '{"reason":"limit","message":"Chegaste ao limite de tratamentos","player":"r2","team":"red","remaining":3}',
+  ),
+  ('medic_empty', 'medic', 'medic_empty', '{}'),
   (
     'code_entry',
     null,

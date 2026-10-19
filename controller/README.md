@@ -124,7 +124,7 @@ Reading needs the read or GM token, changing anything the GM token: `Authorizati
 | GET | `/api/v1/games/{id}` | One game |
 | POST | `/api/v1/games/{id}/start` · `/pause` · `/resume` · `/end` | Lifecycle (`{"reason"}` for pause and end) |
 | GET / POST | `/api/v1/games/{id}/score` | Totals / GM adjustment `{"team", "amount", "reason"}`, logged as `score.delta` |
-| POST | `/api/v1/nodes/{id}/cmd` | `{"cmd": "message" \| "set_owner" \| "reset" \| "reboot", "params": {...}}`; node 65535 = every node |
+| POST | `/api/v1/nodes/{id}/cmd` | `{"cmd": "message" \| "set_owner" \| "reset" \| "reboot" \| "mode", "params": {...}}`; node 65535 = every node. `mode` is a mode command (CMD opcode 8): `params.name` must be one of the game's manifests' `commands` for the node's role, such as a medic kit's `{"name": "refill"}` |
 | GET | `/api/v1/games/{id}/log` | The merged event log, in game-time order (`?since_ms=`) |
 | WS | `/api/v1/stream` | A snapshot (with the live game's latest 100 events), then every event, score, node update, game change and alert (`radio.down`, `tx.failed`, role changes), the field channel (`radio`) and scan progress (`radio_scan`); for staff also `checkin` and `chrono_list`; for a player token only the game's public messages, its own check-in and the positions it may see (code 4409: fetch a new token) |
 | GET | `/api/v1/controller` | Role, term, radio state, modem identity and counters, the field channel and whether it was chosen |

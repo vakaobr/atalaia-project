@@ -196,6 +196,13 @@ void main() {
         'cmd': 'message',
         'params': {'text': 'Última volta'},
       });
+      // A mode command (CMD opcode 8): the script gets cmd.mode with its name.
+      end.push({
+        'type': 'cmd',
+        'cmd': 'mode',
+        'opcode': 8,
+        'params': {'name': 'refill'},
+      });
       end.push({
         'type': 'cmd',
         'cmd': 'end',
@@ -206,8 +213,11 @@ void main() {
       expect(s.gmMessage, 'Última volta');
       expect(
         node.inputs.map((i) => i.$1),
-        containsAll(['gm.message', 'game.end']),
+        containsAll(['gm.message', 'cmd.mode', 'game.end']),
       );
+      expect(node.inputs.firstWhere((i) => i.$1 == 'cmd.mode').$2, {
+        'name': 'refill',
+      });
     },
   );
 }

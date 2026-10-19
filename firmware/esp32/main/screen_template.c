@@ -9,8 +9,10 @@
  * (6 px and 4 px gaps) with their children centred. "fill" takes the room
  * left along the parent's direction (flex grow) and the whole parent across
  * it. Fonts: Montserrat 14, 20, 28 and 48 (font_size picks the nearest,
- * 20 by default). A progress bar is a track with a filled part, 200x12 by
- * default. Colours not set: white text on the dark background, accent bars.
+ * 20 by default), ASCII only, so texts are folded first (accents dropped,
+ * screen_template_fold_text). A progress bar is a track with a filled part,
+ * 200x12 by default. Colours not set: white text on the dark background,
+ * accent bars.
  */
 #include "screen_template.h"
 
@@ -68,6 +70,65 @@ const builtin_screen_t *screen_template_find(const char *name)
         part = end + 1;
     }
     return NULL;
+}
+
+/* U+00C0-U+00FF without their accents (two-byte UTF-8 C3 80-C3 BF). */
+static const char latin1_base[] =
+    "AAAAAAACEEEEIIIIDNOOOOOxOUUUUYTsaaaaaaaceeeeiiiidnooooo/ouuuuyty";
+
+void screen_template_fold_text(char *s)
+{
+    const unsigned char *in = (const unsigned char *)s;
+    char *out = s;
+    while (*in) {
+        unsigned char c = in[0];
+        if (c < 0x80) {
+            *out++ = (char)c;
+            in++;
+        } else if (c == 0xC3 && in[1] >= 0x80 && in[1] <= 0xBF) {
+            *out++ = latin1_base[in[1] - 0x80];
+            in += 2;
+        } else if (c == 0xC2 && in[1] >= 0x80 && in[1] <= 0xBF) {
+            /* ª and º (1.º), the quotes « », the degree sign; the rest has no ASCII look-alike. */
+            unsigned char d = in[1];
+            *out++ = d == 0xAA                  ? 'a'
+                     : (d == 0xBA || d == 0xB0) ? 'o'
+                     : (d == 0xAB || d == 0xBB) ? '"'
+                                                : '?';
+            in += 2;
+        } else if (c == 0xEF && in[1] >= 0x80 && in[1] <= 0xA3 && in[2] >= 0x80 && in[2] <= 0xBF) {
+            /* LVGL's symbols (U+F000-U+F8FF) are in the fonts: kept as they are. */
+            *out++ = (char)in[0];
+            *out++ = (char)in[1];
+            *out++ = (char)in[2];
+            in += 3;
+        } else if (c == 0xE2 && in[1] == 0x80 && in[2] >= 0x80 && in[2] <= 0xBF) {
+            /* Dashes, quotes and the ellipsis of U+2010-U+203F. */
+            unsigned char d = in[2];
+            if (d >= 0x90 && d <= 0x95) {
+                *out++ = '-';
+            } else if (d >= 0x98 && d <= 0x9B) {
+                *out++ = '\'';
+            } else if (d >= 0x9C && d <= 0x9F) {
+                *out++ = '"';
+            } else if (d == 0xA6) {
+                *out++ = '.';
+                *out++ = '.';
+                *out++ = '.';
+            } else {
+                *out++ = '?';
+            }
+            in += 3;
+        } else {
+            /* Anything else beyond ASCII: one '?' for the whole sequence (or a stray byte). */
+            int len = c >= 0xF0 ? 4 : c >= 0xE0 ? 3 : c >= 0xC0 ? 2 : 1;
+            int i = 1;
+            while (i < len && (in[i] & 0xC0) == 0x80) i++;
+            *out++ = '?';
+            in += i;
+        }
+    }
+    *out = '\0';
 }
 
 #if ATALAIA_SCREEN_LVGL
@@ -370,6 +431,7 @@ void screen_template_update(const char *data_json)
             }
             if (w->type == ATALAIA_TPL_LABEL) {
                 atalaia_tpl_text(atalaia_tpl_str(&tpl, w->content), &sc, text, sizeof(text));
+                screen_template_fold_text(text);
                 if (strcmp(lv_label_get_text(o), text) != 0) {
                     lv_label_set_text(o, text);
                     dirty = true;
@@ -401,6 +463,7 @@ void screen_template_update(const char *data_json)
                 lv_qrcode_update(o, text, (uint32_t)strlen(text));
 #else
                 lv_obj_set_style_text_color(o, lv_color_hex(fg == NOT_SET ? COLOR_TEXT : fg), 0);
+                screen_template_fold_text(text);
                 lv_label_set_text(o, text);
 #endif
                 qr_hash[i] = h;

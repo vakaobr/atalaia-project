@@ -113,7 +113,8 @@ final class ModeManifest {
   final String id;
   final String version;
 
-  /// mode or modifier.
+  /// mode, modifier or role (a role package such as the Medic Kit: a node
+  /// with its role runs it alone, modes/README.md).
   final String kind;
   final Map<String, String> names;
   final Map<String, String> descriptions;
@@ -128,6 +129,8 @@ final class ModeManifest {
   final Map<String, String> screens;
 
   bool get isModifier => kind == 'modifier';
+
+  bool get isRolePackage => kind == 'role';
 
   /// Modes with a field.lua need the field controller (Hold-All, Last
   /// Stand): a prop on its own cannot score them.
@@ -334,6 +337,11 @@ class ModeCatalog {
     for (final p in parts.skip(1)) {
       final m = byId(p);
       if (m == null) throw ModeException('unknown modifier $p');
+      // A controller's join names what a node runs, so a role package
+      // never comes after a main mode here (it runs alone on its node).
+      if (m.isRolePackage) {
+        throw ModeException('$p is a role package: its nodes run it alone');
+      }
       if (!m.isModifier) throw ModeException('$p is a main mode');
       if (mods.contains(m)) throw ModeException('$p is named twice');
       for (final param in m.params) {

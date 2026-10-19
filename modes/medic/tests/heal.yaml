@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A player scans their tag and holds a button for 10 s to be healed; the kit counts down
+steps:
+  - expect_screen: { template: medic_idle, data: { remaining: 5 } }
+  - scan: { player: b1, team: blue }
+  - expect_screen: { template: medic_hold, data: { player: b1, team: blue, progress: 0, left: 10 } }
+  - hold: { team: blue, s: 10 }
+  - expect: { type: medic.heal, team: blue, at: 10, data: { player: b1, remaining: 4, player_heals_used: 1 } }
+  - expect_screen: { template: medic_healed, data: { player: b1, team: blue, remaining: 4, used: 1, max: 2 } }
+  - wait: 4
+  - expect_screen: { template: medic_idle, data: { remaining: 4 } }
+  # Any button heals: the tag already says who the player is. A second player, a second heal.
+  - scan: { player: r1, team: red }
+  - hold: { team: blue, s: 10 }
+  - expect: { type: medic.heal, team: red, data: { player: r1, remaining: 3, player_heals_used: 1 } }
+  # The heal comes once per hold: holding on does nothing more.
+  - scan: { player: r2, team: red }
+  - hold: { team: red, s: 15 }
+  - expect: { type: medic.heal, team: red, data: { player: r2, remaining: 2 } }
+  - expect_no: medic.heal
+  - expect_no: medic.empty
+  - expect_no: script.error

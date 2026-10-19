@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+id: org.atalaia.medic
+version: 0.1.0
+license: GPL-3.0-or-later
+min_tier: reduced
+# A role package: added to any game (org.atalaia.domination+org.atalaia.medic), its role
+# brings medic kits to the field, and a node given that role runs this script alone.
+kind: role
+name: Medic Kit
+description: >-
+  A medic kit next to any game. A hit player scans their signed NFC tag and holds a button for a time
+  the organisers set, to be healed; letting go early cancels. The kit has a number of heals and shows
+  how many are left; each player can be healed a limited number of times per game, at every kit, and the
+  GM and the players see every heal. Forged tags, tags from another game and players of a team the kit
+  does not serve are refused, and the screen says why.
+roles:
+  medic: { requires: [nfc, team_input], optional: [display, audio] }
+params:
+  heal_hold_s:          { type: int, min: 1, max: 120, default: 10, label: "Seconds a player holds the button to be healed" }
+  charges:              { type: int, min: 1, max: 999, default: 5, label: "Heals in the kit" }
+  max_heals_per_player: { type: int, min: 0, max: 100, default: 2, label: "Heals per player in the game, at every kit (0: no limit)" }
+  cooldown_s:           { type: int, min: 0, max: 3600, default: 0, label: "Seconds a player waits between two heals (0: no wait)" }
+  team:                 { type: team, optional: true, label: "Team the kit serves (empty: every team)" }
+  lang:                 { type: string, default: pt, max: 2, label: "Language of the kit's screen: pt or en" }
+commands:
+  refill: { roles: [medic], label: "Refill the kit" }
+i18n:
+  pt:
+    name: Ligaduras
+    description: >-
+      Um kit de primeiros socorros ao lado de qualquer jogo. A pessoa atingida lê a sua etiqueta NFC
+      assinada e mantém premido um botão durante o tempo que a organização definir, para receber o
+      tratamento; largar antes do tempo cancela. O kit tem um número de ligaduras e mostra quantas restam;
+      cada pessoa pode receber um número limitado de tratamentos por jogo, em todos os kits, e a
+      organização e quem joga veem cada tratamento. Etiquetas falsificadas ou de outro jogo, e pessoas de
+      uma equipa que o kit não serve, são recusadas, e o ecrã diz porquê.
+    params:
+      heal_hold_s: Segundos a premir o botão para receber o tratamento
+      charges: Ligaduras no kit
+      max_heals_per_player: "Tratamentos por pessoa no jogo, em todos os kits (0: sem limite)"
+      cooldown_s: "Segundos de espera entre dois tratamentos da mesma pessoa (0: sem espera)"
+      team: "Equipa que o kit serve (vazio: todas)"
+      lang: "Língua do ecrã do kit: pt ou en"
+    commands:
+      refill: Repor as ligaduras

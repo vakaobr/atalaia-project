@@ -211,6 +211,11 @@ static void link_on_cmd(void *user, uint8_t cmd, const char *params_json)
         say(g, "reboot requested by the controller");
         if (g->shell.reboot != NULL) g->shell.reboot(g->shell.user);
         break;
+    case FIELD_CMD_MODE:
+        /* A mode command (the GM's refill of a medic kit, a field script's count):
+         * the script gets its params, name included, as on("cmd.mode", ...). */
+        if (g->phase == BOX_PLAYING) node_runner_input(g->runner, "cmd.mode", params);
+        break;
     default: say(g, "unknown command %u ignored", cmd); break;
     }
 }

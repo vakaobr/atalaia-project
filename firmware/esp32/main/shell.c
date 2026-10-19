@@ -127,6 +127,7 @@ extern const char codes_node_lua_start[] asm("_binary_codes_node_lua_start");
 extern const char kill_confirmed_node_lua_start[] asm("_binary_kill_confirmed_node_lua_start");
 extern const char respawn_node_lua_start[] asm("_binary_respawn_node_lua_start");
 extern const char player_checkin_node_lua_start[] asm("_binary_player_checkin_node_lua_start");
+extern const char medic_node_lua_start[] asm("_binary_medic_node_lua_start");
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -647,6 +648,7 @@ static void seed_presets(void)
         {"org.atalaia.respawn", respawn_node_lua_start, strlen(respawn_node_lua_start)},
         {"org.atalaia.player_checkin", player_checkin_node_lua_start,
          strlen(player_checkin_node_lua_start)},
+        {"org.atalaia.medic", medic_node_lua_start, strlen(medic_node_lua_start)},
     };
     int n = builtin_presets_seed(sources, (int)(sizeof(sources) / sizeof(sources[0])));
     if (n > 0) ESP_LOGI(TAG, "stored %d built-in preset(s)", n);

@@ -11,6 +11,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:atalaia_app/chrono/limit_template.dart';
+import 'package:atalaia_app/l10n/strings.dart';
 import 'package:atalaia_app/chrono/reading.dart';
 import 'package:atalaia_app/chrono/replica.dart';
 import 'package:atalaia_app/chrono/chrono_ui.dart';
@@ -161,6 +162,23 @@ void main() {
     await tester.tap(find.byKey(const Key('player-team-red')));
     await tester.pumpAndSettle();
     expect(h.settings.myTeam, 'red');
+  });
+
+  test("the Medic Kit's events in words, in both languages", () {
+    const heal = FeedEvent(
+      'medic.heal',
+      'blue',
+      {'player': 'b1', 'remaining': 4, 'player_heals_used': 1},
+      597000,
+      5,
+    );
+    const empty = FeedEvent('medic.empty', null, {}, 598000, 6);
+    const pt = Strings(AppLanguage.pt);
+    const en = Strings(AppLanguage.en);
+    expect(eventText(pt, heal), 'b1 recebeu tratamento (ligaduras no kit: 4)');
+    expect(eventText(en, heal), 'b1 was healed (heals left in the kit: 4)');
+    expect(eventText(pt, empty), 'Um kit de ligaduras ficou vazio');
+    expect(eventText(en, empty), 'A medic kit is empty');
   });
 
   testWidgets('the player connects with the scoreboard QR code', (

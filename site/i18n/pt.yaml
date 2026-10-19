@@ -227,8 +227,8 @@ modes:
   intro: >-
     Os modos reagem à intenção («uma equipa está a capturar este dispositivo») e não ao hardware,
     por isso o mesmo script corre numa Field Box, numa caixa com teclado ou num telemóvel Android.
-    Há sete modos e um modificador já escritos e testados em software; ainda nenhum correu num
-    campo a sério.
+    Há sete modos, um modificador e as Ligaduras já escritos e testados em software; ainda nenhum
+    correu num campo a sério.
   domination:
     title: Domínio
     text: >-
@@ -273,6 +273,15 @@ modes:
       Cada participante regista-se num ponto de controlo com a sua etiqueta. A caixa conta as
       pessoas de cada equipa e pode dar pontos por cada registo.
     meta: Leitor NFC · etiquetas dos participantes
+  medic:
+    title: Ligaduras
+    text: >-
+      Ao lado de qualquer modo: a pessoa atingida lê a sua etiqueta e mantém premido um botão
+      durante o tempo definido para receber o tratamento. O kit mostra quantas ligaduras restam;
+      cada pessoa tem um número limitado de tratamentos por jogo, em todos os kits, a organização
+      repõe um kit a partir da consola, e cada tratamento aparece no registo da organização e no
+      ecrã de quem joga.
+    meta: Leitor NFC e um botão · etiquetas dos participantes · precisa do controlador de campo
   codes:
     title: Códigos (modificador)
     text: >-
@@ -413,11 +422,11 @@ roadmap:
     text: >-
       Dispositivos Android, <a href="#glossario-dispositivo-android">módulo de E/S</a>, app para
       quem joga, com funções, e os modos que precisam dos telemóveis de quem joga: Respawn, Kill
-      Confirmed, Player Check-in, Money Factory, as Ligaduras (quem é atingido lê a sua etiqueta e
-      mantém um botão premido para ser tratado, com um número limitado de tratamentos) e
-      cronografagem à entrada. Já feito em software: a
-      Baixa Confirmada, as Reentradas e Vidas e o Registo de Presença leem na Field Box as etiquetas
-      NFC assinadas de cada participante, o protocolo do módulo de E/S está fixado e os modos
+      Confirmed, Player Check-in, Money Factory, as Ligaduras (a pessoa atingida lê a sua etiqueta
+      e mantém um botão premido para receber o tratamento, com um número limitado de tratamentos)
+      e cronografagem à entrada. Já feito em software: a Baixa Confirmada, as Reentradas e Vidas, o
+      Registo de Presença e as Ligaduras leem na Field Box as etiquetas NFC assinadas de cada
+      participante, o protocolo do módulo de E/S está fixado e os modos
       descrevem os seus ecrãs em YAML. A app corre o mesmo núcleo de jogo das caixas, em segundo
       plano, e já tem os seus ecrãs, em português e em inglês: um telemóvel Android faz de caixa
       (corre qualquer modo e desenha os ecrãs do próprio modo, com botões grandes das equipas,

@@ -62,7 +62,7 @@
     "length": "Duração",
     "params": "Parâmetros do modo",
     "modifiers": "Modificadores",
-    "modifiers_hint": "Correm ao lado do modo em todas as caixas (por exemplo, códigos no teclado).",
+    "modifiers_hint": "Correm ao lado do modo nas suas caixas (por exemplo, códigos no teclado).",
     "create": "Criar jogo",
     "message": "Mensagem para todas as caixas",
     "message_hint": "Aparece no ecrã das caixas",
@@ -100,7 +100,9 @@
     "confirm_start_pending": "Há {n} réplica(s) declarada(s) por cronografar. Começar mesmo assim?",
     "squads": "Squads por equipa",
     "squads_hint": "0 = sem squads (jogos pequenos: só equipas). Num milsim ou num jogo grande, cada equipa divide-se em squads.",
-    "squads_each": "{n} squads por equipa"
+    "squads_each": "{n} squads por equipa",
+    "role_packages": "Props com uma função própria",
+    "role_packages_hint": "As caixas e os telemóveis com essa função correm só isto, ao lado das caixas do modo (por exemplo, kits de ligaduras)."
   },
   "controller": {
     "title": "Controlador de campo",
@@ -147,7 +149,11 @@
     "filter": "Filtrar acontecimentos",
     "critical_only": "Só críticos",
     "count": "{n} acontecimentos",
-    "empty": "Ainda não há acontecimentos."
+    "empty": "Ainda não há acontecimentos.",
+    "events": {
+      "medic_heal": "{player} recebeu tratamento (ligaduras no kit: {remaining}; tratamentos neste jogo: {used})",
+      "medic_empty": "Um kit de ligaduras ficou vazio"
+    }
   },
   "nodes": {
     "title": "Caixas",
@@ -171,7 +177,9 @@
       "full": "completo",
       "reduced": "reduzido",
       "proxy": "proxy"
-    }
+    },
+    "commands": "Comandos",
+    "command_sent": "enviado"
   },
   "field": {
     "title": "Campo",
@@ -226,7 +234,8 @@
     "params": "Parâmetros",
     "copy": "Copiar",
     "new": "Nova predefinição",
-    "save": "Guardar"
+    "save": "Guardar",
+    "any_team": "todas as equipas"
   },
   "scoreboard": {
     "title": "Marcador",

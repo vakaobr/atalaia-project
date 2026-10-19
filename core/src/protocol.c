@@ -44,6 +44,7 @@ static const uint8_t data_visibility_expired[] = {29, 17};
 static const uint8_t data_node_tamper[] = {3};
 static const uint8_t data_pod_connected[] = {21, 22};
 static const uint8_t data_pod_disconnected[] = {3};
+static const uint8_t data_medic_heal[] = {14, 32, 33};
 
 const atalaia_event_def_t atalaia_event_defs[] = {
     {"game.start", ATALAIA_EV_GAME_START, ATALAIA_PRIO_CRITICAL, data_game_start, 1},
@@ -87,6 +88,8 @@ const atalaia_event_def_t atalaia_event_defs[] = {
     {"node.tamper", ATALAIA_EV_NODE_TAMPER, ATALAIA_PRIO_CRITICAL, data_node_tamper, 1},
     {"pod.connected", ATALAIA_EV_POD_CONNECTED, ATALAIA_PRIO_TELEMETRY, data_pod_connected, 2},
     {"pod.disconnected", ATALAIA_EV_POD_DISCONNECTED, ATALAIA_PRIO_TELEMETRY, data_pod_disconnected, 1},
+    {"medic.heal", ATALAIA_EV_MEDIC_HEAL, ATALAIA_PRIO_NORMAL, data_medic_heal, 3},
+    {"medic.empty", ATALAIA_EV_MEDIC_EMPTY, ATALAIA_PRIO_NORMAL, NULL, 0},
 };
 const size_t atalaia_event_def_count =
     sizeof(atalaia_event_defs) / sizeof(atalaia_event_defs[0]);
@@ -123,6 +126,8 @@ const atalaia_data_field_def_t atalaia_data_field_defs[] = {
     {"see_team", ATALAIA_DATA_SEE_TEAM, ATALAIA_FIELD_STRING, false},
     {"tolerance_pct", ATALAIA_DATA_TOLERANCE_PCT, ATALAIA_FIELD_NUMBER, false},
     {"holder", ATALAIA_DATA_HOLDER, ATALAIA_FIELD_STRING, false},
+    {"remaining", ATALAIA_DATA_REMAINING, ATALAIA_FIELD_INTEGER, false},
+    {"player_heals_used", ATALAIA_DATA_PLAYER_HEALS_USED, ATALAIA_FIELD_INTEGER, false},
 };
 const size_t atalaia_data_field_def_count =
     sizeof(atalaia_data_field_defs) / sizeof(atalaia_data_field_defs[0]);

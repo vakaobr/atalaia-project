@@ -9,6 +9,7 @@
 
 import { html, Component, createRef, t } from '../ui.js';
 import qrcode from '../lib/qrcode.module.js';
+import { gameRoles } from './preset-builder.js';
 
 /** The QR code of text as SVG modules (error correction L, byte mode, 4-module quiet zone). */
 export function QrCode({ text, label }) {
@@ -41,9 +42,9 @@ export class JoinPanel extends Component {
 
     roles() {
         const { game, modes } = this.props.app.state;
-        // A game with modifiers ("main+modifier") has the main mode's roles.
-        const mode = game && modes.find((m) => m.id === String(game.mode_id).split('+')[0]);
-        return mode ? Object.keys(mode.roles || {}) : [];
+        // A game's roles: its main mode's, and its role packages' (a medic kit's "medic");
+        // modifiers run on the main mode's boxes and add none.
+        return game ? gameRoles(modes, game.mode_id) : [];
     }
 
     async generate(e) {

@@ -1,0 +1,9 @@
+{
+  "id": "kit-north:7",
+  "t": 61000,
+  "node": "kit-north",
+  "type": "medic.heal",
+  "team": "blue",
+  "data": { "player": "b1", "remaining": 4, "player_heals_used": 1 },
+  "prio": "normal"
+}

@@ -48,8 +48,16 @@ const controller = 'controller';
 const fieldStepMs = 100;
 
 /// field.send() commands a node understands, as the input events a Field Box
-/// turns them into (decision E7).
-const fieldCommands = {'set_owner': 'cmd.set_owner', 'message': 'gm.message'};
+/// turns them into (decision E7). "mode" is a mode command (CMD opcode 8, RFC
+/// 0001 Amendment 5): its params name it, and the script gets cmd.mode.
+const fieldCommands = {
+  'set_owner': 'cmd.set_owner',
+  'message': 'gm.message',
+  'mode': 'cmd.mode',
+};
+
+/// The name of a mode command (mode.py COMMAND_NAME).
+final commandName = RegExp(r'^[a-z][a-z0-9_]{0,23}$');
 
 /// A mode's manifest or a test file that cannot be used.
 class ModeError implements Exception {
@@ -75,6 +83,15 @@ Object? plain(Object? v) => switch (v) {
 
 // ---- Modes (mode.py) -----------------------------------------------------------
 
+/// A role package inside a composed game: its roles run it alone.
+class RolePart {
+  RolePart(this.id, this.nodeScript, this.chunkName, this.paramNames);
+  final String id;
+  final String nodeScript;
+  final String chunkName;
+  final Set<String> paramNames;
+}
+
 class Mode {
   Mode({
     required this.dir,
@@ -85,18 +102,55 @@ class Mode {
     required this.params,
     required this.nodeScript,
     required this.fieldScript,
-  });
+    this.roleParts = const {},
+    String? mainId,
+  }) : mainId = mainId ?? id;
 
   final Directory dir;
   final String id;
   final String name;
+
+  /// mode, modifier or role (a role package, modes/README.md).
   final String kind;
   final Map<String, Object?> roles;
   final Map<String, Map<String, Object?>> params;
   final String nodeScript;
   final String? fieldScript;
 
+  /// For a composed mode: role -> the role package its nodes run instead.
+  final Map<String, RolePart> roleParts;
+
+  /// For a composed mode: what the main mode's roles run (main + modifiers).
+  final String mainId;
+
   String get folder => dir.uri.pathSegments.lastWhere((s) => s.isNotEmpty);
+
+  /// The script a node with [role] runs.
+  String nodeScriptFor(String role) =>
+      roleParts[role]?.nodeScript ?? nodeScript;
+
+  String chunkNameFor(String role) =>
+      roleParts[role]?.chunkName ?? '@$folder/node.lua';
+
+  /// The mode id a node with [role] is given in its join.
+  String nodeModeId(String role) => roleParts[role]?.id ?? mainId;
+
+  /// The game's parameters a node with [role] runs with (its join's).
+  Map<String, Object?> paramsFor(String role, Map<String, Object?> values) {
+    if (roleParts.isEmpty) return Map.of(values);
+    final part = roleParts[role];
+    if (part != null) {
+      return {
+        for (final e in values.entries)
+          if (part.paramNames.contains(e.key)) e.key: e.value,
+      };
+    }
+    final others = {for (final p in roleParts.values) ...p.paramNames};
+    return {
+      for (final e in values.entries)
+        if (!others.contains(e.key)) e.key: e.value,
+    };
+  }
 
   List<File> get tests => _yamlFiles(Directory('${dir.path}/tests'));
 
@@ -216,16 +270,23 @@ String composeScripts(List<String> scripts) => scripts.length == 1
     ? scripts.single
     : scripts.map((s) => 'do\n$s\nend\n').join();
 
-/// A main mode with modifiers: one id, one parameter schema, one script per place.
+/// A main mode with modifiers and role packages: one id, one parameter
+/// schema; the main mode's roles run it with the modifiers, and each role
+/// package's roles run that package alone (mode.py compose).
 Mode compose(Mode main, List<Mode> modifiers) {
   if (modifiers.isEmpty) return main;
   if (main.kind != 'mode') {
-    throw ModeError('${main.id} is a modifier; a game needs a main mode first');
+    throw ModeError(
+      '${main.id} is a ${main.kind}; a game needs a main mode first',
+    );
   }
   final seen = {main.id};
   final params = Map.of(main.params);
+  final roles = Map.of(main.roles);
+  final mods = <Mode>[];
+  final roleParts = <String, RolePart>{};
   for (final mod in modifiers) {
-    if (mod.kind != 'modifier') {
+    if (mod.kind == 'mode') {
       throw ModeError('${mod.id} is a main mode, not a modifier');
     }
     if (!seen.add(mod.id)) throw ModeError('${mod.id} is named twice');
@@ -236,18 +297,41 @@ Mode compose(Mode main, List<Mode> modifiers) {
       );
     }
     params.addAll(mod.params);
+    if (mod.kind == 'modifier') {
+      mods.add(mod);
+      continue;
+    }
+    final roleClash = roles.keys.toSet().intersection(mod.roles.keys.toSet());
+    if (roleClash.isNotEmpty) {
+      throw ModeError(
+        '${mod.id} and ${main.id} both have the role(s) $roleClash',
+      );
+    }
+    roles.addAll(mod.roles);
+    final part = RolePart(
+      mod.id,
+      mod.nodeScript,
+      '@${mod.folder}/node.lua',
+      mod.params.keys.toSet(),
+    );
+    for (final r in mod.roles.keys) {
+      roleParts[r] = part;
+    }
   }
   final parts = [main, ...modifiers];
+  final runs = [main, ...mods];
   final fields = [for (final m in parts) ?m.fieldScript];
   return Mode(
     dir: main.dir,
     id: parts.map((m) => m.id).join('+'),
     name: parts.map((m) => m.name).join(' + '),
     kind: 'mode',
-    roles: main.roles,
+    roles: roles,
     params: params,
-    nodeScript: composeScripts([for (final m in parts) m.nodeScript]),
+    nodeScript: composeScripts([for (final m in runs) m.nodeScript]),
     fieldScript: fields.isEmpty ? null : composeScripts(fields),
+    roleParts: roleParts,
+    mainId: runs.map((m) => m.id).join('+'),
   );
 }
 
@@ -489,13 +573,15 @@ class Simulation {
         }
         final vnode = VirtualNode(e.key, e.value);
         sim.nodes[e.key] = vnode;
+        // A node runs what its role runs, with that part's parameters, as
+        // its join gives them (a role package's roles run it alone).
         final spec = NodeSpec(
-          source: mode.nodeScript,
-          chunkName: '@${mode.folder}/node.lua',
+          source: mode.nodeScriptFor(e.value),
+          chunkName: mode.chunkNameFor(e.value),
           nodeId: nodeId,
           gameSeed: seed,
           teams: sim.teams,
-          params: params,
+          params: mode.paramsFor(e.value, params),
         );
         switch (via) {
           case Via.direct:
@@ -746,6 +832,9 @@ class Simulation {
         .where((v) => v.runtime.nodeId == nodeId)
         .firstOrNull;
     if (target == null || !fieldCommands.containsKey(cmd)) return false;
+    if (cmd == 'mode' && !commandName.hasMatch('${params['name'] ?? ''}')) {
+      return false; // a mode command names itself
+    }
     _toNodes.add((target.name, fieldCommands[cmd]!, Map.of(params)));
     return true;
   }

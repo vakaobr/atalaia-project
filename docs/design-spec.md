@@ -901,7 +901,7 @@ The project ships 12 modes and 3 modifiers, all written against the public scrip
 
 ### Modifiers
 
-Modifiers are small packages (`kind: modifier`) that run alongside any main mode on the same node. A game names a main mode and its modifiers as `main+modifier`; their scripts run in one sandbox.
+Modifiers are small packages (`kind: modifier`) that run alongside any main mode on the same node. A game names a main mode and its modifiers as `main+modifier`; their scripts run in one sandbox. Role packages (`kind: role`, the Medic Kit) bring a role of their own to any game: a node given that role runs the package alone, and its join names only the package (modes/README.md).
 
 | Modifier | What it does | Covers request |
 | --- | --- | --- |
@@ -920,7 +920,7 @@ Modifiers are small packages (`kind: modifier`) that run alongside any main mode
 | Kill Confirmed | Node | `nfc` | Scanning a team's tag removes their point | 3 |
 | Respawn and Lives | Node + player app | `nfc` or `qr` | Lives per team or player, respawn tracking | 3 |
 | Player Check-in | Node | `nfc` or `qr` | Count individual players | 3 |
-| Medic Kit (Ligaduras) | Node (alongside any mode) | `nfc`, `team_input` | A hit player scans their tag and holds the button to be healed; heals per kit and per player are limited and reported | 3 (after plan phase E) |
+| Medic Kit (Ligaduras) | Field + node of its own role, next to any main mode (a role package) | `nfc`, `team_input` | A hit player scans their signed tag and holds a button for a set time to be healed; the kit's heals (default 5, refilled by the GM) and each player's heals per game at every kit (default 2, counted by the controller) are limited, refusals say why, every heal reaches the console and the players | 3 (after plan phase E; built in software) |
 | Money Factory | Node | `nfc` | Resource-collection games | 3 |
 | Master and Satellites | Field + node | `team_input` | Satellites boost the master zone (×1.5, faster ticks), upgradable, engineer-only tags | 4 |
 | Target Windows | Node + target addon | `hit`, `led` | Random team-colour scoring window | 4 |

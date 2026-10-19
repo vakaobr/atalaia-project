@@ -62,6 +62,8 @@ CMD_SET_OWNER = 4
 CMD_MESSAGE = 5
 CMD_RESET = 6
 CMD_REBOOT = 7
+# A command for the node's mode script (RFC 0001 Amendment 5): params name it.
+CMD_MODE = 8
 CMD_OPCODES = {
     "start": CMD_START,
     "pause": CMD_PAUSE,
@@ -71,6 +73,7 @@ CMD_OPCODES = {
     "message": CMD_MESSAGE,
     "reset": CMD_RESET,
     "reboot": CMD_REBOOT,
+    "mode": CMD_MODE,
 }
 
 PRIO_TELEMETRY = 0
@@ -385,7 +388,7 @@ class FieldController:
         if isinstance(cmd, str) and cmd not in CMD_OPCODES:
             raise ValueError(f"unknown command {cmd!r}")
         opcode = CMD_OPCODES[cmd] if isinstance(cmd, str) else int(cmd)
-        if not 0 <= opcode <= 7:
+        if not 0 <= opcode <= CMD_MODE:
             raise ValueError(f"unknown command opcode {opcode}")
         return self._send_cmd(opcode, params, dest, now_ms=now_ms)
 

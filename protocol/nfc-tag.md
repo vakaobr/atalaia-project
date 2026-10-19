@@ -1,6 +1,6 @@
 # Player tags
 
-A player tag is the NFC tag (a sticker, card, key fob or wristband) a player carries in the modes that need to know who is at a prop: Kill Confirmed, Respawn and Lives, Player Check-in (ADR-P3-9). It says who the player is and which team they play for, and it is signed with the game key, so a box can tell a real tag from a forged one without asking anyone. The tag's UID is reported but never trusted: some chips let anyone set it.
+A player tag is the NFC tag (a sticker, card, key fob or wristband) a player carries in the modes that need to know who is at a prop: Kill Confirmed, Respawn and Lives, Player Check-in (ADR-P3-9), and the Medic Kit, where the tag is required to start a heal (decision MK1). It says who the player is and which team they play for, and it is signed with the game key, so a box can tell a real tag from a forged one without asking anyone. The tag's UID is reported but never trusted: some chips let anyone set it.
 
 Implementations: `core/src/tag.c` (`atalaia/tag.h`, used by the Field Box and, through `dart:ffi`, by Android props) and `simulator/atalaia_sim/tag.py`. Both check the shared vectors in [`vectors/tag.json`](vectors/tag.json).
 

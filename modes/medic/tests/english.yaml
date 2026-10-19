@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: In English, the refusals are in English; a button already held when the tag is read counts from the scan
+params: { lang: en, heal_hold_s: 4 }
+steps:
+  - scan: { player: b1, team: blue, forged: true }
+  - expect_screen: { template: medic_refused, data: { reason: mac, message: Forged tag } }
+  - scan: { uid: "04c0ffee" }
+  - expect_screen: { template: medic_refused, data: { message: Not a game tag } }
+  - hold: { team: blue, s: 1 }
+  - wait: 4
+  - expect_screen: { template: medic_idle, data: { remaining: 5 } }
+  # The button goes down first (a press, then holds), the tag comes 2 s into the hold.
+  - press: { team: blue }
+  - input: { type: team_input.hold, data: { team: blue, ms: 2000 } }
+  - scan: { player: b1, team: blue }
+  - input: { type: team_input.hold, data: { team: blue, ms: 2250 } }
+  - expect_screen: { template: medic_hold, data: { player: b1 } }
+  - input: { type: team_input.hold, data: { team: blue, ms: 5750 } }
+  - expect_no: medic.heal
+  - input: { type: team_input.hold, data: { team: blue, ms: 6000 } }
+  - expect: { type: medic.heal, data: { player: b1, remaining: 4 } }
+  - input: { type: team_input.release, data: { team: blue, ms: 6100 } }
+  - wait: 5
+  # Cooldown and limit wording.
+  - input: { type: cmd.mode, data: { name: heals, player: b9, used: 2, at: 0 } }
+  - scan: { player: b9, team: blue }
+  - expect_screen: { template: medic_refused, data: { reason: limit, message: You have had all your heals } }
+  - expect_no: script.error

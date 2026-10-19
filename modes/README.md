@@ -4,7 +4,7 @@ Each mode is a folder with a manifest and one or two Lua scripts:
 
 ```
 <mode>/
-  mode.yaml     id, version, licence, kind, minimum device tier, roles, parameters, translations
+  mode.yaml     id, version, licence, kind, minimum device tier, roles, parameters, GM commands, translations
   node.lua      runs on each prop with the mode's role
   field.lua     optional: runs on the field controller for logic across props
   assets/       optional: sound clips, screen templates (assets/screens/<name>.yaml)
@@ -23,6 +23,7 @@ The GM console builds its settings form from `params` in `mode.yaml`, so GMs nev
 | [Kill Confirmed](kill_confirmed/) | main mode | boxes and Android props with NFC | Phase 3; 2 tests, plus host-box tests with signed tags |
 | [Respawn and Lives](respawn/) | main mode | boxes and Android props with NFC (or team buttons) | Phase 3; 3 tests |
 | [Player Check-in](player_checkin/) | main mode | boxes and Android props with NFC | Phase 3; 2 tests |
+| [Medic Kit](medic/) (Ligaduras) | role package | its own boxes and Android props with NFC, next to any main mode; controller (`field.lua`) | After phase 3 plan phase E; 7 tests, plus simulator, controller, host-box, browser and on-device tests |
 
 The script API is described in the "Game runtime and scripting" section of the [design specification](../docs/design-spec.md), and implemented in [`core/src/script_api.c`](../core/src/script_api.c).
 
@@ -49,12 +50,23 @@ These modes identify players by their **player tag**: an NFC tag signed with the
 
 Money Factory (also phase 3, ADR-P3-8) comes in a later plan phase: its events (`money.collected`, `money.deposited`) are in the schema already.
 
-## Main modes and modifiers
+## The Medic Kit (Ligaduras)
 
-`kind: modifier` marks a package that runs alongside a main mode on the same node. A game, a preset and a join payload name a main mode and its modifiers with one id joined by `+`, main mode first:
+Requested by the maintainer (decisions MK1-MK8 and MK9 on in `docs/review/decisions-to-review.md`). A **role package** (`org.atalaia.medic`, below): its `medic` boxes or phones stand next to any main mode, and a node given that role runs only the kit.
+
+- **A heal:** a hit player scans their player tag (required: decision MK1), then holds a button for `heal_hold_s` seconds (default 10), as when arming the Bomb. Any team button counts: the tag says who the player is. Letting go early cancels: the player scans again. The screen fills up while the button is held, then shows the player back in the game and the heals left.
+- **Limits:** the kit holds `charges` heals (default 5) and shows how many are left; at 0 it is empty (`medic.empty`) and refuses everyone until the GM refills it from the console (the *Boxes* tab's command, `refill`). A player gets at most `max_heals_per_player` heals in the game (default 2; 0 for no limit), at every kit, and waits `cooldown_s` between two (default 0). With `team` the kit serves that team only; empty, every team.
+- **Refusals say why on the screen:** a forged tag, a tag from another game, a card that is not a player tag, a team the game lacks, a player of a team the kit does not serve, a player at the limit, still in the cooldown (with the seconds left), a hold without a scan, letting go early. Nothing is sent to the controller for a refusal.
+- **Across kits:** each heal is `medic.heal` (`team`, `player`, `remaining`, `player_heals_used`). The kit's `field.lua` on the controller counts every player's heals for the whole game and tells the other kits (the mode command `heals`, below), so a limit of 2 holds across kits. A kit out of the controller's reach goes on with what it knows (its own heals, and what it was told): a player may get one heal too many there, and when the kit's events arrive the controller's count is the larger of the two. A kit that rebooted is told every count again. The kit's own charges do not survive a reboot (no mode's script state does yet).
+- **Language:** `lang` (`pt`, the default, or `en`) picks the kit's screens; the texts are in the templates and the refusals in the script. The Field Box's fonts have no accented letters, so it draws "Le a tua etiqueta" for "Lê a tua etiqueta" (the app draws every character).
+- **Screens:** `medic_idle` ("Lê a tua etiqueta", "Restam N ligaduras"), `medic_hold` ("Mantém premido para tratar", a filling bar, the seconds left), `medic_healed`, `medic_refused` (the reason), `medic_empty`.
+
+## Main modes, modifiers and role packages
+
+`kind: modifier` marks a package that runs alongside a main mode on the same node. `kind: role` marks a **role package**: it brings roles of its own to any game, and a node given one of them runs that package alone (a medic kit next to Domination's zone boxes runs no capture rules). A game and a preset name a main mode and its other parts with one id joined by `+`, main mode first:
 
 ```
-org.atalaia.domination+org.atalaia.codes
+org.atalaia.domination+org.atalaia.codes+org.atalaia.medic
 ```
 
 The scripts are composed into one Lua chunk, the main mode's first, each in its own block, so their locals stay apart and their handlers for the same event run in that order:
@@ -68,11 +80,34 @@ do
 end
 ```
 
-The simulator (`atalaia_sim.mode.compose`), the field controller and the Field Box (`firmware/esp32/main/box_game.c`, from its stored presets) build the same chunk; `field.lua` scripts compose the same way. The parameters of the parts are merged into one schema, so their names must differ; the whole id is at most 63 bytes (it travels in the join payload). A modifier on its own is a valid game too: Codes alone makes the box a code terminal.
+The simulator (`atalaia_sim.mode.compose`), the field controller and the Field Box (`firmware/esp32/main/box_game.c`, from its stored presets) build the same chunk; `field.lua` scripts compose the same way. The parameters of the parts are merged into one schema, so their names must differ; the whole id is at most 63 bytes. A modifier on its own is a valid game too: Codes alone makes the box a code terminal.
+
+Role packages are composed by role, not into the chunk:
+
+- The game's roles are the main mode's and the role packages' (names must differ; a modifier adds none). The game form of the GM console lists role packages apart from the modifiers.
+- A node with a main mode's role runs the main mode and the modifiers, as above. A node with a role package's role runs that package's `node.lua` alone, with that package's parameters only.
+- The controller makes each box's join with **what that box runs**: a kit's join payload names `org.atalaia.medic` and carries the kit's parameters, a zone box's names `org.atalaia.domination+org.atalaia.codes` and the zone's parameters ([protocol/join.md](../protocol/join.md)). So the Field Box and the Android prop compose exactly as before and need not know the kinds; a standby controller's join names the whole game.
+- `field.lua` scripts of every part run together on the controller, in the id's order, and see every node's events.
+- A role package on its own is a valid game (a field of medic kits only); it cannot lead other parts.
 
 Scripts on one box that read keypad codes share them through the global table `keypad_codes`: each adds a function that says whether a code is its own, so a code meant for one script is not reported as wrong by the other (Bomb's team codes and Codes do this).
 
 While its prompt is up, Codes keeps the screen: it wraps `ui.screen`, holds the main mode's screens and shows the newest one when the prompt closes.
+
+### Mode commands
+
+A manifest may declare commands that the GM console offers for nodes of some roles:
+
+```yaml
+commands:
+  refill: { roles: [medic], label: "Refill the kit" }
+i18n:
+  pt:
+    commands:
+      refill: Repor as ligaduras
+```
+
+The console shows a button per command on each box of those roles (the *Boxes* tab); the controller sends it as a **mode command**, CMD opcode 8 with the command's name in its params (`{"name": "refill"}`, RFC 0001 Amendment 5), and refuses names the game does not declare, or a box of another role. A `field.lua` sends mode commands of its own with `field.send(node, "mode", { name = "heals", ... })` (names: 1-24 of `a-z`, `0-9` and `_`, starting with a letter; they need no declaration). Either way the node's script gets `cmd.mode` with the params, the name included, and checks `e.name`.
 
 ## Translations
 
@@ -101,6 +136,7 @@ Modes react to semantic capabilities, so the same script works on a box with tea
 | `keypad.key` | `key` (`0`-`9`, `*`, `#`) | A keypad key is pressed |
 | `nfc.tag` | `uid`, `valid`, then `player` and `team` (valid) or `reason` | A tag is read, checked against the game's key first ([nfc-tag.md](../protocol/nfc-tag.md)): `reason` is `unsigned`, `no_game`, `format`, `version`, `game`, `mac` or `team` |
 | `cmd.set_owner` | `team` (or `none`) | The GM's owner override from the console (decision E7); Hold-All and Last Stand handle it |
+| `cmd.mode` | `name`, then the command's own params | A mode command from the GM (a manifest's `commands`) or the field script (CMD opcode 8); the Medic Kit's `refill` and `heals` |
 | `gm.message` | `text` | A message from the GM |
 
 ## Tests
@@ -124,7 +160,7 @@ steps:
 
 The game starts automatically at time 0 (`autostart: false` turns that off). Only `wait` and `hold` move time forward. A modifier's test may name a main mode to run with (`main: domination`, a sibling folder), and a main mode's test its modifiers (`modifiers: [codes]`).
 
-When the mode has a `field.lua`, it runs as the controller runs it: it receives every node's events (with `node` and `team` in the data), `field.owner()` is the team of each node's last `zone.captured` (as box STATE reports it), `field.send(node, "set_owner" or "message", params)` reaches the node as `cmd.set_owner` or `gm.message`, its own events are logged from node `controller`, its points count in the field total, and a `game.win()` or `game.finish()` ends the game on every node. Time then moves in steps of 100 ms.
+When the mode has a `field.lua`, it runs as the controller runs it: it receives every node's events (with `node` and `team` in the data), `field.owner()` is the team of each node's last `zone.captured` (as box STATE reports it), `field.send(node, "set_owner", "message" or "mode", params)` reaches the node as `cmd.set_owner`, `gm.message` or `cmd.mode`, its own events are logged from node `controller`, its points count in the field total, and a `game.win()` or `game.finish()` ends the game on every node. Time then moves in steps of 100 ms.
 
 | Step | Example | What it does |
 | --- | --- | --- |
@@ -180,8 +216,8 @@ A colour is a team name, `red`, `blue`, `green`, `yellow`, `orange`, `purple`, `
 
 Expressions read the screen's data (`left`, `team`; dots reach into objects) and the game's parameters (`params.fuse_s`), with numbers, `'text'`, `+ - * /`, comparisons, `!`, `&&`, `||` and parentheses; `&&` and `||` give the deciding value, as in Lua, so `{a && 'x' || 'y'}` chooses. A missing name is empty (0 in arithmetic), and division by zero gives 0. In text, `{expression|clock}` shows seconds as `M:SS` (`H:MM:SS` from an hour), `|upper` in capitals and `|int` without decimals; `{{` and `}}` are braces. No functions, loops or conditionals beyond these.
 
-The simulator's mode tests check every template with the core's own parser (the one the Field Box uses), and that its name matches its file; the parser and the expressions are in [`core/src/screen_template.c`](../core/src/screen_template.c). Text on the box is English for now, as the scripts write it.
+The simulator's mode tests check every template with the core's own parser (the one the Field Box uses), and that its name matches its file; the parser and the expressions are in [`core/src/screen_template.c`](../core/src/screen_template.c). Text on the box is English for most modes, as the scripts write it. A mode can offer its screens in more languages through a parameter, as the Medic Kit does with `lang` (`visible: "{params.lang == 'en'}"` on each language's labels). The Field Box's fonts are ASCII only: it draws accented letters without the accent and other characters as `?` (`firmware/esp32/main/screen_template.c`); the app draws every character.
 
 ## On the Field Box
 
-Every mode in this folder is built into the Field Box firmware (`firmware/esp32/main/CMakeLists.txt`) as a preset, and a box adds the presets of built-in modes it does not have yet at boot; the scripts are data, so a mode needs no firmware code of its own. Its screen templates are built in the same way. A preset holds up to 16 KB of script (a main mode with its modifiers, composed). The largest combination, Bomb with Codes, takes about 50 KB of a Reduced-tier box's 64 KB Lua heap when loaded; Full-tier boxes have 256 KB.
+Every mode in this folder is built into the Field Box firmware (`firmware/esp32/main/CMakeLists.txt`) as a preset (the Medic Kit too, so a box can be joined as a kit), and a box adds the presets of built-in modes it does not have yet at boot; the scripts are data, so a mode needs no firmware code of its own. Its screen templates are built in the same way. A preset holds up to 16 KB of script (a main mode with its modifiers, composed). The largest combination, Bomb with Codes, takes about 50 KB of a Reduced-tier box's 64 KB Lua heap when loaded; Full-tier boxes have 256 KB.

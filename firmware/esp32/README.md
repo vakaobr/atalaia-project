@@ -256,8 +256,10 @@ Listed in `main/idf_component.yml`:
 ## Built-in presets
 
 Every mode in `modes/` is built into the image (`main/CMakeLists.txt`):
-Bomb, Domination, Hold-All Domination, Last Stand, the Codes modifier, and
-the phase 3 modes Kill Confirmed, Respawn and Lives and Player Check-in.
+Bomb, Domination, Hold-All Domination, Last Stand, the Codes modifier,
+the phase 3 modes Kill Confirmed, Respawn and Lives and Player Check-in, and
+the Medic Kit (a role package: the controller joins a kit with the kit's id
+alone, so the box loads it like any preset).
 At boot the firmware stores a preset, with the defaults from its
 `mode.yaml`, for each built-in mode that no stored preset uses yet (a new
 or erased box and every Wokwi run get all eight, in that order; a box
@@ -267,7 +269,7 @@ different one (`main/builtin_presets.c`). The default admin PIN is 1234
 until the setup portal sets one.
 
 A join may name a main mode with modifiers (`org.atalaia.domination+org.atalaia.codes`,
-see [modes/README.md](../../modes/README.md#main-modes-and-modifiers)): the box
+see [modes/README.md](../../modes/README.md#main-modes-modifiers-and-role-packages)): the box
 composes the stored scripts into one chunk, as the controller and the
 simulator do (`main/box_game.c`). A preset holds up to 16 KB of script
 (`PRESET_SOURCE_MAX`) for that; Hold-All and Last Stand boxes play their part
@@ -322,7 +324,9 @@ controller's game.
   the game running), the box loads the mode for its role with the join's
   teams, parameters, node id and seed; CMD pause, resume and end, TIME, and
   the buttons drive it. `set_owner` and `message` reach the mode as the input
-  events `cmd.set_owner` and `gm.message`. At the end the stored join is
+  events `cmd.set_owner` and `gm.message`, and a mode command (opcode 8: a
+  medic kit's refill, the controller's count of a player's heals) as
+  `cmd.mode`. At the end the stored join is
   erased, and the key in RAM once the last events are acknowledged.
 - **The radio link** -- `main/radio/field_link.c` sends every event the mode
   emits (normal and critical ones wait for an ACK, are resent every 3 s in a
@@ -337,7 +341,7 @@ controller's game.
 - **Tests** -- the host tests (`test/test_field_link.c`,
   `test/test_box_game.c`, `test/test_serial_console.c`) run this code with
   the stub HAL; `test/box_host/` builds it into a Linux program on a UDP
-  "air", which the controller's end-to-end tests
+  "air" (team buttons, keypad presses and `@tag` player tags on its stdin), which the controller's end-to-end tests
   (`controller/tests/test_box_e2e.py`) play whole games with, through the
   host modem. `wokwi/join.scenario.yaml` joins a game in the emulator.
 

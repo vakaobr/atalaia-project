@@ -163,6 +163,7 @@ const Map<String, String> ptStrings = {
   'setup.role': 'Papel no modo',
   'setup.teams': 'Equipas',
   'setup.params': 'Parâmetros do modo',
+  'setup.any_team': 'Todas as equipas',
   'setup.length': 'Duração',
   'setup.minutes': 'Minutos',
   'setup.minutes_hint': '0 = sem limite. No fim, o jogo termina sozinho.',
@@ -298,6 +299,9 @@ const Map<String, String> ptStrings = {
   'event.laststand.defeated': 'Último elemento: a defesa caiu',
   'event.gm.message': 'Organização: {text}',
   'event.visibility.granted': 'A equipa {team} vê o campo',
+  'event.medic.heal':
+      '{player} recebeu tratamento (ligaduras no kit: {remaining})',
+  'event.medic.empty': 'Um kit de ligaduras ficou vazio',
   'event.chrono.violation': 'Réplica acima do limite',
   'event.node.tamper': 'Alguém mexeu numa caixa ({reason})',
 

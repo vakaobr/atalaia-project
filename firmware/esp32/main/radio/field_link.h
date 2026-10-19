@@ -44,7 +44,7 @@
 #define FIELD_LINK_AIRTIME_MS  40    /* rough TIME airtime at SF7/BW125 */
 #define FIELD_LINK_MAX_RETRIES 10    /* normal priority; critical retries until ACK */
 
-/* CMD opcodes (ADR-P2-3). */
+/* CMD opcodes (ADR-P2-3; FIELD_CMD_MODE: RFC 0001 Amendment 5). */
 enum {
     FIELD_CMD_START = 0,
     FIELD_CMD_PAUSE = 1,
@@ -54,6 +54,7 @@ enum {
     FIELD_CMD_MESSAGE = 5,
     FIELD_CMD_RESET = 6,
     FIELD_CMD_REBOOT = 7,
+    FIELD_CMD_MODE = 8, /* a command for the mode script: cmd.mode, its params name it */
 };
 
 /* Game states as TIME carries them. */

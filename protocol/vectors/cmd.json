@@ -16,6 +16,15 @@
         "dest": 42
       },
       "cbor": "a3010302a16774696d656f7574181e03182a"
+    },
+    {
+      "name": "cmd_mode_refill",
+      "fields": {
+        "cmd": 8,
+        "params": {"name": "refill"},
+        "dest": 7
+      },
+      "cbor": "a3010802a1646e616d6566726566696c6c0307"
     }
   ],
   "invalid": [

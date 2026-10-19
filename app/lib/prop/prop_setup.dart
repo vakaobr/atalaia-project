@@ -103,6 +103,8 @@ class _PropSetupScreenState extends State<PropSetupScreen> {
     var i = 0;
     for (final p in mode.params.where((p) => p.type == 'team')) {
       final v = _values[p.name] ?? p.defaultValue;
+      // An optional team left empty means every team (a medic kit's team).
+      if (v == null && p.optional) continue;
       if (!_teams.contains(v)) _values[p.name] = _teams[i % _teams.length];
       i++;
     }
@@ -322,6 +324,10 @@ class _PropSetupScreenState extends State<PropSetupScreen> {
             initialValue: _teams.contains(value) ? value as String : null,
             decoration: InputDecoration(labelText: label),
             items: [
+              if (p.optional)
+                DropdownMenuItem<String>(
+                  child: Text(context.s.t('setup.any_team')),
+                ),
               for (final t in _teams)
                 DropdownMenuItem(value: t, child: Text(context.s.team(t))),
             ],

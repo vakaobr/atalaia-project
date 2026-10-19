@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: The last heal empties the kit, which refuses everyone until the GM refills it
+params: { charges: 2, heal_hold_s: 3, team: red }
+steps:
+  - expect_screen: { template: medic_idle, data: { remaining: 2, team: red } }
+  - scan: { player: r1, team: red }
+  - hold: { team: red, s: 3 }
+  - expect: { type: medic.heal, data: { player: r1, remaining: 1 } }
+  - wait: 4
+  - expect_screen: { template: medic_idle, data: { remaining: 1 } }
+  - scan: { player: r2, team: red }
+  - hold: { team: red, s: 3 }
+  - expect: { type: medic.heal, at: 10, data: { player: r2, remaining: 0 } }
+  - expect: { type: medic.empty, team: red, at: 10 }
+  - wait: 4
+  - expect_screen: { template: medic_empty, data: { team: red } }
+  # Empty: a scan or a hold changes nothing.
+  - scan: { player: r3, team: red }
+  - expect_screen: { template: medic_empty }
+  - hold: { team: red, s: 3 }
+  - expect_no: medic.heal
+  # The GM's refill from the console (CMD opcode 8, "refill"): full again.
+  - input: { type: cmd.mode, data: { name: refill } }
+  - expect_screen: { template: medic_idle, data: { remaining: 2 } }
+  - scan: { player: r3, team: red }
+  - hold: { team: red, s: 3 }
+  - expect: { type: medic.heal, data: { player: r3, remaining: 1 } }
+  - expect_no: medic.empty
+  - expect_no: script.error

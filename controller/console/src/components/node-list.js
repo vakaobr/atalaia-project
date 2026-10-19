@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Node health: every box the controller knows in the live game, with what
-// its HELLO and STATE reports say, and (for the GM) a zone owner override.
+// its HELLO and STATE reports say, and (for the GM) a zone owner override and
+// the mode commands of the box's role (mode.yaml "commands", such as a medic
+// kit's refill: CMD opcode 8, RFC 0001 Amendment 5).
 
 import { html, Component, t, age, teamColour, OFFLINE_MS } from '../ui.js';
+import { commandsFor } from './preset-builder.js';
 
 const TIERS = { 0: 'full', 1: 'reduced', 2: 'proxy' };
 
@@ -19,14 +22,25 @@ export function linkBars(rssi) {
 }
 
 export class NodeList extends Component {
+    constructor() {
+        super();
+        this.state = { sent: {} };
+    }
+
     setOwner(node, team) {
         const params = team ? { team } : {};
         this.props.app.call('POST', `/nodes/${node.node_id}/cmd`, { cmd: 'set_owner', params });
     }
 
-    render(props) {
+    async modeCommand(node, name) {
+        const out = await this.props.app.call('POST', `/nodes/${node.node_id}/cmd`,
+                                              { cmd: 'mode', params: { name } });
+        if (out) this.setState({ sent: { ...this.state.sent, [`${node.node_id}:${name}`]: true } });
+    }
+
+    render(props, state) {
         const app = props.app;
-        const { nodes, seen, game, role, now, status } = app.state;
+        const { nodes, seen, game, role, now, status, modes } = app.state;
         const list = Object.values(nodes).sort((a, b) => a.node_id - b.node_id);
         const teams = (game && game.teams) || [];
         const gm = role === 'gm' && status && status.role === 'leader' && game && game.live;
@@ -39,6 +53,7 @@ export class NodeList extends Component {
                     <th>${t('nodes.owner')}</th><th>${t('nodes.tier')}</th><th>${t('nodes.battery')}</th>
                     <th>${t('nodes.signal')}</th><th>${t('nodes.last_seen')}</th><th>${t('nodes.firmware')}</th>
                     <th>${t('nodes.epoch')}</th>
+                    ${gm && html`<th>${t('nodes.commands')}</th>`}
                 </tr></thead>
                 <tbody>${list.map((n) => {
                     const ago = seen[n.node_id] !== undefined ? now - seen[n.node_id] : null;
@@ -60,6 +75,11 @@ export class NodeList extends Component {
                         <td>${offline ? html`<strong class="warn">${t('nodes.offline')} </strong>` : ''}${age(ago)}</td>
                         <td>${n.fw_version || '–'}</td>
                         <td>${n.epoch === null || n.epoch === undefined ? '–' : n.epoch}</td>
+                        ${gm && html`<td>${commandsFor(modes || [], game.mode_id, n.role).map((c) => html`
+                            <button type="button" class="small" data-testid=${`node-cmd-${n.node_id}-${c.name}`}
+                                onClick=${() => this.modeCommand(n, c.name)}>${c.label}</button>
+                            ${state.sent[`${n.node_id}:${c.name}`] && html`<span class="ok small" role="status">
+                                ${t('nodes.command_sent')}</span>`}`)}</td>`}
                     </tr>`;
                 })}</tbody>
             </table></div>`}

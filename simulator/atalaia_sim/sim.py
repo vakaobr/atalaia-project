@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 
 from . import codec
 from .core import Command, Core, Emitted, FieldOps, Node
-from .mode import Mode
+from .mode import COMMAND_NAME, Mode
 from .protocol import MESSAGE_TYPES, RF_PAYLOAD_MAX
 
 if TYPE_CHECKING:
@@ -28,8 +28,10 @@ CONTROLLER = "controller"
 # script sees the nodes' events close to when they happened.
 FIELD_STEP_MS = 100
 # field.send() commands a node understands, as the input events a Field Box
-# turns them into (decision E7).
-FIELD_COMMANDS = {"set_owner": "cmd.set_owner", "message": "gm.message"}
+# turns them into (decision E7). "mode" is a mode command (CMD opcode 8, RFC 0001
+# Amendment 5): its params carry the command's name, and the node's script gets
+# them as cmd.mode.
+FIELD_COMMANDS = {"set_owner": "cmd.set_owner", "message": "gm.message", "mode": "cmd.mode"}
 
 
 class SimError(Exception):
@@ -64,6 +66,8 @@ class VirtualNode:
     # The last hardware input the shell sent: t_ms, type, data, and whether
     # the node accepted it (it refuses inputs while paused or not running).
     last_input: Optional[dict[str, Any]] = None
+    # The parameters this node runs with: its role's part of the game's (its join's).
+    params: dict[str, Any] = field(default_factory=dict)
 
     def last_command(self, target: str, method: str) -> Optional[Command]:
         for cmd in reversed(self.commands):
@@ -116,19 +120,26 @@ class Simulation:
         self._to_nodes: list[tuple[str, str, dict[str, Any]]] = []
         self._field_end: Optional[tuple[int, dict[str, Any]]] = None  # (t_ms, game.end data)
         self._ended = False
+        # Nodes out of the controller's reach (set_reachable): their events wait for the
+        # link to come back, as a box's retries would, and commands to them are lost.
+        self._unreachable: set[str] = set()
+        self._held: list[tuple[str, int, str, dict[str, Any]]] = []
 
         for node_id, (name, role) in enumerate(nodes.items(), start=1):
             if role not in mode.roles:
                 raise SimError(f"node '{name}': mode {mode.id} has no role '{role}'")
-            vnode = VirtualNode(name=name, role=role, runtime=None)  # type: ignore[arg-type]
+            # A node runs what its role runs, with that part's parameters, as its join
+            # gives them (a role package's roles run the package alone, modes/README.md).
+            vnode = VirtualNode(name=name, role=role, runtime=None,  # type: ignore[arg-type]
+                                params=mode.params_for(role, params))
             vnode.runtime = Node(
                 core,
                 node_id=node_id,
                 game_seed=seed,
                 teams=self.teams,
-                params=params,
-                source=mode.node_script,
-                chunk_name=f"@{mode.path.name}/node.lua",
+                params=vnode.params,
+                source=mode.node_script_for(role),
+                chunk_name=mode.chunk_name_for(role),
                 mem_limit=mem_limit,
                 instr_limit=instr_limit,
                 on_event=lambda ev, n=vnode: self._record(n, ev),
@@ -175,7 +186,10 @@ class Simulation:
             data.setdefault("node", ev.node)
             if team:
                 data.setdefault("team", team)
-            self._to_field.append((ev.t_ms, ev.type, data))
+            if vnode.name in self._unreachable:
+                self._held.append((vnode.name, ev.t_ms, ev.type, data))
+            else:
+                self._to_field.append((ev.t_ms, ev.type, data))
 
     def _record_field(self, ev: Emitted) -> None:
         """An event from field.lua: logged as the controller's; game.end ends the game."""
@@ -199,9 +213,29 @@ class Simulation:
         target = next((v for v in self.nodes.values() if v.runtime.node_id == node_id), None)
         if target is None or cmd not in FIELD_COMMANDS:
             return False
+        if cmd == "mode" and not COMMAND_NAME.match(str((params or {}).get("name", ""))):
+            return False  # a mode command names itself: 1-24 of a-z, 0-9 and _
         self.field_commands.append((self.time_ms, target.name, cmd, dict(params)))
-        self._to_nodes.append((target.name, FIELD_COMMANDS[cmd], dict(params)))
+        if target.name not in self._unreachable:
+            self._to_nodes.append((target.name, FIELD_COMMANDS[cmd], dict(params)))
         return True
+
+    def set_reachable(self, node: str, reachable: bool) -> None:
+        """Takes a node out of the controller's reach, or brings it back.
+
+        Out of reach, the node keeps playing on its own: its events reach the
+        field script only when it is back (a box resends what was not
+        acknowledged), and the field script's commands to it are lost.
+        """
+        self.node(node)
+        if reachable:
+            self._unreachable.discard(node)
+            back = [h for h in self._held if h[0] == node]
+            self._held = [h for h in self._held if h[0] != node]
+            self._to_field += [(self.time_ms, type_, data) for _, _, type_, data in back]
+            self._pump()
+        else:
+            self._unreachable.add(node)
 
     def _pump(self) -> None:
         """Delivers what the nodes and the field script sent each other, until nothing is left.

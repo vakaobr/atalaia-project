@@ -41,7 +41,7 @@ typedef enum {
     ATALAIA_MSG_EVENT = 2,  /* one game or system event */
     ATALAIA_MSG_ACK = 3,    /* confirms receipt of a sequence number */
     ATALAIA_MSG_STATE = 4,  /* periodic snapshot of local state and per-team counters */
-    ATALAIA_MSG_CMD = 5,    /* controller or GM instruction: start, pause, reset, set owner, message */
+    ATALAIA_MSG_CMD = 5,    /* controller or GM instruction: start, pause, reset, set owner, message, a mode command */
     ATALAIA_MSG_TIME = 6,   /* game-clock beacon; also the controller heartbeat */
     ATALAIA_MSG_CONFIG = 7, /* assigns a preset and role; parameters only */
     ATALAIA_MSG_CLAIM = 8,  /* controller election: candidate claims the role with a term number */
@@ -81,7 +81,7 @@ enum {
 
 /* CBOR keys of CMD payload fields. */
 enum {
-    ATALAIA_PL_CMD_CMD = 1,    /* opcode: 0-7 */
+    ATALAIA_PL_CMD_CMD = 1,    /* opcode: 0-8 */
     ATALAIA_PL_CMD_PARAMS = 2, /* command-specific parameters */
     ATALAIA_PL_CMD_DEST = 3,   /* destination node; absent = broadcast */
 };
@@ -138,37 +138,39 @@ enum {
 
 /* CBOR keys of event data fields. */
 enum {
-    ATALAIA_DATA_TEAM = 1,           /* team name */
-    ATALAIA_DATA_SQUAD = 2,          /* squad name */
-    ATALAIA_DATA_REASON = 3,         /* why it happened */
-    ATALAIA_DATA_PREVIOUS_TEAM = 4,  /* team that owned the zone before */
-    ATALAIA_DATA_ZONE = 5,           /* zone name */
-    ATALAIA_DATA_AMOUNT = 6,         /* points; negative for penalties */
-    ATALAIA_DATA_FUSE_S = 7,         /* fuse length in seconds */
-    ATALAIA_DATA_WINNER = 8,         /* winning team name */
-    ATALAIA_DATA_PRESET = 9,         /* preset id */
-    ATALAIA_DATA_CODE = 10,          /* code id */
-    ATALAIA_DATA_KIND = 11,          /* code kind: hint, points, unlock */
-    ATALAIA_DATA_TAG = 12,           /* NFC tag id */
-    ATALAIA_DATA_OWNER = 13,         /* tag owner: team or player */
-    ATALAIA_DATA_PLAYER = 14,        /* player id */
-    ATALAIA_DATA_LIVES_LEFT = 15,    /* lives remaining */
-    ATALAIA_DATA_WINDOW_OPEN = 16,   /* the target's scoring window was open */
-    ATALAIA_DATA_TEXT = 17,          /* message text */
-    ATALAIA_DATA_AUDIENCE = 18,      /* who sees the message */
-    ATALAIA_DATA_MESSAGE = 19,       /* error message */
-    ATALAIA_DATA_PERCENT = 20,       /* battery level in percent */
-    ATALAIA_DATA_FW = 21,            /* firmware version */
-    ATALAIA_DATA_TIER = 22,          /* device tier */
-    ATALAIA_DATA_LAST_SEEN = 23,     /* game time of the last contact, in ms */
-    ATALAIA_DATA_REPLICA = 24,       /* replica id */
-    ATALAIA_DATA_READING_MPS = 25,   /* chrono reading in m/s */
-    ATALAIA_DATA_BB_G = 26,          /* BB weight in grams */
-    ATALAIA_DATA_LIMIT_J = 27,       /* energy limit in joules */
-    ATALAIA_DATA_DURATION_S = 28,    /* countdown or visibility duration in seconds */
-    ATALAIA_DATA_SEE_TEAM = 29,      /* team whose positions become visible */
-    ATALAIA_DATA_TOLERANCE_PCT = 30, /* chrono comparison tolerance in percent */
-    ATALAIA_DATA_HOLDER = 31,        /* team holding the node when it happened */
+    ATALAIA_DATA_TEAM = 1,               /* team name */
+    ATALAIA_DATA_SQUAD = 2,              /* squad name */
+    ATALAIA_DATA_REASON = 3,             /* why it happened */
+    ATALAIA_DATA_PREVIOUS_TEAM = 4,      /* team that owned the zone before */
+    ATALAIA_DATA_ZONE = 5,               /* zone name */
+    ATALAIA_DATA_AMOUNT = 6,             /* points; negative for penalties */
+    ATALAIA_DATA_FUSE_S = 7,             /* fuse length in seconds */
+    ATALAIA_DATA_WINNER = 8,             /* winning team name */
+    ATALAIA_DATA_PRESET = 9,             /* preset id */
+    ATALAIA_DATA_CODE = 10,              /* code id */
+    ATALAIA_DATA_KIND = 11,              /* code kind: hint, points, unlock */
+    ATALAIA_DATA_TAG = 12,               /* NFC tag id */
+    ATALAIA_DATA_OWNER = 13,             /* tag owner: team or player */
+    ATALAIA_DATA_PLAYER = 14,            /* player id */
+    ATALAIA_DATA_LIVES_LEFT = 15,        /* lives remaining */
+    ATALAIA_DATA_WINDOW_OPEN = 16,       /* the target's scoring window was open */
+    ATALAIA_DATA_TEXT = 17,              /* message text */
+    ATALAIA_DATA_AUDIENCE = 18,          /* who sees the message */
+    ATALAIA_DATA_MESSAGE = 19,           /* error message */
+    ATALAIA_DATA_PERCENT = 20,           /* battery level in percent */
+    ATALAIA_DATA_FW = 21,                /* firmware version */
+    ATALAIA_DATA_TIER = 22,              /* device tier */
+    ATALAIA_DATA_LAST_SEEN = 23,         /* game time of the last contact, in ms */
+    ATALAIA_DATA_REPLICA = 24,           /* replica id */
+    ATALAIA_DATA_READING_MPS = 25,       /* chrono reading in m/s */
+    ATALAIA_DATA_BB_G = 26,              /* BB weight in grams */
+    ATALAIA_DATA_LIMIT_J = 27,           /* energy limit in joules */
+    ATALAIA_DATA_DURATION_S = 28,        /* countdown or visibility duration in seconds */
+    ATALAIA_DATA_SEE_TEAM = 29,          /* team whose positions become visible */
+    ATALAIA_DATA_TOLERANCE_PCT = 30,     /* chrono comparison tolerance in percent */
+    ATALAIA_DATA_HOLDER = 31,            /* team holding the node when it happened */
+    ATALAIA_DATA_REMAINING = 32,         /* uses left, such as a medic kit's heals */
+    ATALAIA_DATA_PLAYER_HEALS_USED = 33, /* heals a player has had in this game */
 };
 
 /* Standard event ids: the CBOR value of the type field. */
@@ -214,6 +216,8 @@ enum {
     ATALAIA_EV_NODE_TAMPER = 39,                /* node.tamper */
     ATALAIA_EV_POD_CONNECTED = 40,              /* pod.connected */
     ATALAIA_EV_POD_DISCONNECTED = 41,           /* pod.disconnected */
+    ATALAIA_EV_MEDIC_HEAL = 50,                 /* medic.heal */
+    ATALAIA_EV_MEDIC_EMPTY = 51,                /* medic.empty */
 };
 
 typedef enum {

@@ -320,6 +320,74 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertEqual(preset["mode_id"], "org.atalaia.bomb+org.atalaia.codes")
         self.assertEqual((preset["params"]["team_codes"], preset["params"]["codes"]), ("red=1234,blue=5678", "0815:hint"))
 
+    def test_medic_kits_next_to_a_mode(self):
+        """The Medic Kit (a role package) from the game form; a kit's join names the kit alone;
+        a heal reads as words in the feed; the GM refills a kit from the Boxes tab."""
+        page = self.console()
+        page.get_by_test_id("game-name").fill("Com ligaduras")
+        page.get_by_test_id("game-source").select_option(f"mode:{DOMINATION}")
+        roles = page.get_by_test_id("game-roles")
+        expect(roles).to_contain_text("Props com uma função própria")
+        expect(roles).to_contain_text("Ligaduras")
+        expect(page.get_by_test_id("game-modifiers")).not_to_contain_text("Ligaduras")
+        roles.locator('input[value="org.atalaia.medic"]').check()
+        expect(page.locator('label[for="game-heal_hold_s"]')).to_contain_text("Segundos a premir")
+        expect(page.locator("#game-team option").first).to_have_text("todas as equipas")
+        page.locator("#game-heal_hold_s").fill("5")
+        page.get_by_test_id("game-create").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("pronto")
+        game = self.field.bundle.controller.game
+        self.assertEqual(game["mode_id"], f"{DOMINATION}+org.atalaia.medic")
+        self.assertEqual(game["params"]["heal_hold_s"], 5)
+        self.assertNotIn("team", game["params"])  # every team
+
+        # The kit's join: the role list has "medic", and the payload names the kit alone.
+        page.get_by_test_id("tab-join").click()
+        page.locator("#j-role").select_option("medic")
+        page.locator("#j-node").fill(str(BOX))
+        page.get_by_test_id("join-generate").click()
+        j = join.decode(join.from_text(page.get_by_test_id("join-text").input_value()), JOIN_KEY)
+        self.assertEqual((j["mode_id"], j["role"], j["node_id"]), ("org.atalaia.medic", "medic", BOX))
+        self.assertEqual(j["params"]["heal_hold_s"], 5)
+        self.assertNotIn("tick_s", j["params"])
+
+        # A heal from the kit, in words in the log.
+        self.field.http.post(f"/api/v1/games/{game['id']}/start")
+        self.field.host.transmitted_all(0.3)  # CMD start and TIME
+        self.field.box_hello()
+        ev = codec.encode_event({"node": BOX, "seq": 1, "t": 9000, "type": "medic.heal", "team": 2,
+                                 "data": {"team": "blue", "player": "b1", "remaining": 4,
+                                          "player_heals_used": 1}})
+        self.field.box("EVENT", ev, ack=True)
+        page.get_by_test_id("tab-feed").click()
+        heal = page.locator('[data-testid=feed] [data-type="medic.heal"]')
+        expect(heal).to_contain_text("b1 recebeu tratamento (ligaduras no kit: 4; tratamentos neste jogo: 1)")
+
+        # The GM refills the kit: a mode command (CMD opcode 8) for that box only.
+        page.get_by_test_id("tab-nodes").click()
+        refill = page.get_by_test_id(f"node-cmd-{BOX}-refill")
+        expect(refill).to_have_text("Repor as ligaduras")
+        key = self.field.bundle.controller.game_key(game["id"])
+        epoch = self.field.bundle.controller.transport.epoch
+        self.field.host.transmitted_all(0.3)
+        refill.click()
+        expect(page.locator(f'[data-testid=node-list] tr[data-node="{BOX}"]')).to_contain_text("enviado")
+        cmds = []
+
+        def heard_refill() -> bool:
+            for pkt in self.field.host.transmitted_all(0.2):
+                hdr, plain = packet_decrypt(pkt, epoch, key)
+                if hdr.type == MESSAGE_TYPES["CMD"]:
+                    cmds.append(cmd_decode(plain))
+            return {"cmd": 8, "params": {"name": "refill"}, "dest": BOX} in cmds
+        self.assertTrue(wait_for(heard_refill, 5), cmds)
+
+        # In English, the command's label and the heal follow the language.
+        page.get_by_test_id("lang").first.select_option("en")
+        expect(refill).to_have_text("Refill the kit")
+        page.get_by_test_id("tab-feed").click()
+        expect(heal).to_contain_text("b1 was healed (heals left in the kit: 4; heals in this game: 1)")
+
     def test_join_qr_code_reads_back_as_the_join_text(self):
         if not ZBARIMG:
             self.skipTest("zbarimg is not installed")

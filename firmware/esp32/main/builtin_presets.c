@@ -32,6 +32,10 @@ static const struct {
     {"Respawn and Lives", "org.atalaia.respawn",
      "{\"lives\":20,\"per_player\":false,\"respawn_cooldown_s\":30}"},
     {"Player Check-in", "org.atalaia.player_checkin", "{\"points\":1,\"repeat_after_s\":0}"},
+    /* A role package: on its own, a kit for games without a controller (tags need one). */
+    {"Medic Kit", "org.atalaia.medic",
+     "{\"heal_hold_s\":10,\"charges\":5,\"max_heals_per_player\":2,\"cooldown_s\":0,"
+     "\"lang\":\"pt\"}"},
 };
 
 /* preset_t holds a 16 KB source buffer, so it is not put on a task stack;

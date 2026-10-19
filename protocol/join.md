@@ -37,15 +37,17 @@ Game keys change with every game; the join key does not. A box with another fiel
 | 5 | `channel_hz` | uint | yes | the shared game channel (RFC 0001 Amendment 1): the whole 125 kHz channel, centre ± 62.5 kHz, inside one EU868 sub-band (Amendment 3), so 869462500-869587500 for 869.4-869.65 MHz |
 | 6 | `max_hops` | uint | yes | 1-3: the relay clamp (ADR-P2-6) |
 | 7 | `teams` | array of text | yes | 1-8 different names, 1-23 bytes of UTF-8 each, no NUL; team ids are 1.. in this order |
-| 8 | `mode_id` | text | yes | 1-63 bytes, e.g. `org.atalaia.domination`; a main mode with modifiers is joined by `+`, main mode first (`org.atalaia.domination+org.atalaia.codes`, see modes/README.md) |
+| 8 | `mode_id` | text | yes | 1-63 bytes, e.g. `org.atalaia.domination`; a main mode with modifiers is joined by `+`, main mode first (`org.atalaia.domination+org.atalaia.codes`, see modes/README.md). For a node, what that node runs: in a game with a role package (`org.atalaia.domination+org.atalaia.medic`), a node with the package's role gets the package's id alone (`org.atalaia.medic`) and the other nodes the main mode with its modifiers; a standby controller gets the whole game's id |
 | 9 | `role` | text | yes | 1-31 bytes: the mode role (`zone`), or `controller` for a standby controller |
 | 10 | `game_seed` | uint | yes | 32-bit seed for the scripts' `rand()` |
-| 11 | `params` | map | no | the preset parameters: text keys, JSON-like values (as CMD `params`); their compact JSON form is at most 200 bytes. Absent: the mode's defaults |
+| 11 | `params` | map | no | the preset parameters: text keys, JSON-like values (as CMD `params`); their compact JSON form is at most 200 bytes. For a node, the parameters of the parts it runs (as `mode_id`); for a standby controller, all of them. Absent: the mode's defaults |
 | 12 | `kind` | uint | yes | 0 = a node (box, prop), 1 = a standby controller |
 | 13 | `ca_sha256` | bytes | no | 32: SHA-256 of the field CA's DER certificate, for an Android prop's Wi-Fi link (P3-8; RFC 0001 Amendment 4, proposed) |
 | 14 | `urls` | array of text | no | 1-3 different `https://host[:port]` base addresses of the controller, at most 64 bytes each, for the same link ([prop-link.md](prop-link.md)) |
 
 Encoders write the keys in this order, integers and lengths in their shortest form, and leave `params`, `ca_sha256` and `urls` out when there are none. Decoders accept the keys in any order, refuse a missing required field, a repeated key, a value of the wrong type or out of range, trailing bytes and any key of 32 or more, and skip the keys they do not know up to 31, which are kept for optional fields a newer controller may add (the tag still covers them). Boxes (`core/src/join.c`) skip 13 to 31; the Python and Dart codecs read 13 and 14 and skip 15 to 31. The `controller_link` section of the vectors has payloads with keys 13 and 14, checked by Python and Dart (decision PE4).
+
+Role packages (the Medic Kit, modes/README.md) change no field and no encoding: the controller only chooses `mode_id` and `params` per node by its role, so a box composes what it is given exactly as before (decision MK9).
 
 The fields beyond ADR-P2-12's first list (`controller_id`, `channel_hz`, `max_hops`, `game_seed`, `kind`) are what a box and a standby controller turned out to need: the channel to listen on, the relay clamp ADR-P2-6 says the join carries, who to follow before the first TIME beacon, and the scripts' seed. Decision E1.
 

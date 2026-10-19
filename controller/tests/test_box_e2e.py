@@ -19,11 +19,13 @@ from __future__ import annotations
 
 import os
 import tempfile
+import time
 import unittest
 
 from fastapi.testclient import TestClient
 
 from support import (BOX_HOST, CORE, MODEM_HOST, AirHub, BoxHost, HostModem, config, wait_for)
+from atalaia_sim import tag as player_tag
 from atalaia_controller.api import Auth, create_app
 from atalaia_controller.engine import Controller
 from atalaia_controller.radio_modem import RadioModem
@@ -211,6 +213,57 @@ class FieldTests(unittest.TestCase):
         self.assertEqual((used["team"], used["data"]["kind"], used["data"]["amount"], used["data"]["holder"]),
                          ("red", "points", 50, "red"))
         self.assertTrue(wait_for(lambda: self.score(gid, "red") >= 50, 8))
+
+    def test_medic_kits_share_a_players_limit(self):
+        """Domination with the Medic Kit (a role package): two boxes join as kits and run the
+        kit alone; a player healed at one kit is at the limit at the other, because the
+        controller's field.lua tells it over the radio (CMD opcode 8); the GM refills a kit."""
+        r = self.client.post("/api/v1/games", headers=GM, json={
+            "name": "medics", "mode_id": "org.atalaia.domination", "modifiers": ["org.atalaia.medic"],
+            "teams": ["red", "blue"],
+            "params": {"heal_hold_s": 1, "charges": 1, "max_heals_per_player": 1, "lang": "en"}})
+        self.assertEqual(r.status_code, 201, r.text)
+        gid = r.json()["id"]
+        north, south = self.box("north"), self.box("south")
+        n_north, n_south = self.join(north, role="medic"), self.join(south, role="medic")
+        self.assertTrue(north.logged("org.atalaia.medic, medic"), north.lines[-5:])
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+        self.assertTrue(wait_for(lambda: south.status()["phase"] == 2, 5))
+        key = self.ctrl.game_key(gid)
+
+        def scan(box: BoxHost, player: str) -> None:
+            payload = player_tag.encode({"player": player, "team": 2, "game_id": gid}, key)
+            before = box.lines.count("LOG tag read")
+            box.send(f"@tag 04a1b2c3d4e5f6 {payload.hex()}")
+            self.assertTrue(wait_for(lambda: box.lines.count("LOG tag read") > before, 3))
+
+        def heals(node_id: int) -> list[dict]:
+            return [e for e in self.client.get(f"/api/v1/games/{gid}/log", headers=READ).json()
+                    if e["type"] == "medic.heal" and e["node"] == node_id]
+
+        scan(north, "b1")
+        north.hold(2, 1300)
+        self.assertTrue(wait_for(lambda: heals(n_north), 8))
+        self.assertEqual((heals(n_north)[0]["team"], heals(n_north)[0]["data"]),
+                         ("blue", {"team": "blue", "player": "b1", "remaining": 0, "player_heals_used": 1}))
+        self.assertTrue(wait_for(lambda: "medic.empty" in self.log_types(gid, n_north), 8))
+        # The controller's word reaches the south kit: b1 is at the limit there.
+        time.sleep(1.0)
+        scan(south, "b1")
+        south.hold(2, 1300)
+        time.sleep(2.5)
+        self.assertEqual(heals(n_south), [])
+        # Another player is healed there; the GM refills the north kit, which heals again.
+        scan(south, "b2")
+        south.hold(2, 1300)
+        self.assertTrue(wait_for(lambda: heals(n_south), 8))
+        r = self.client.post(f"/api/v1/nodes/{n_north}/cmd", headers=GM,
+                             json={"cmd": "mode", "params": {"name": "refill"}})
+        self.assertEqual(r.status_code, 202, r.text)
+        time.sleep(1.0)
+        scan(north, "b3")
+        north.hold(1, 1300)
+        self.assertTrue(wait_for(lambda: len(heals(n_north)) == 2, 8))
 
     def test_wrong_field_key_is_refused(self):
         self.game()

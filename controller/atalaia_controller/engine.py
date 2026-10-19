@@ -43,7 +43,7 @@ from atalaia_sim.field_controller import (
     FieldNode,
     NotController,
 )
-from atalaia_sim.mode import SEPARATOR, ModeError
+from atalaia_sim.mode import COMMAND_NAME, SEPARATOR, ModeError
 from atalaia_sim.packet import Header, vf_make
 
 from . import channels, radio_modem
@@ -58,7 +58,9 @@ TEAM_NAME_MAX = 23  # ATALAIA_TEAM_NAME_MAX - 1 in the core
 SQUADS_MAX = 16     # squads per team a game may define
 GAME_TIME_SAVE_MS = 5_000
 # Commands for one node; the lifecycle (start, pause, resume, end) goes through the game.
-NODE_COMMANDS = ("set_owner", "message", "reset", "reboot")
+# "mode" is a mode command (RFC 0001 Amendment 5): params name one of the commands the
+# game's manifests declare (`commands`, such as the Medic Kit's refill).
+NODE_COMMANDS = ("set_owner", "message", "reset", "reboot", "mode")
 
 
 class ControllerError(Exception):
@@ -170,6 +172,8 @@ class FieldScript:
         return node.owner_name(self._fc().teams) if node else None
 
     def _send(self, node_id: int, cmd: str, params: dict[str, Any]) -> bool:
+        if cmd == "mode" and not COMMAND_NAME.match(str((params or {}).get("name", ""))):
+            return False  # a mode command names itself (atalaia_sim.mode.COMMAND_NAME)
         try:
             return self._fc().send_cmd(cmd, params or None, dest=node_id,
                                        now_ms=self.engine.now_ms()) is not None
@@ -701,14 +705,21 @@ class Controller:
             assigned = self.game["assignments"].get(str(node_id))
             if kind == "controller" and (assigned is not None or node_id in fc.nodes):
                 raise Conflict(f"node id {node_id} is a box in this game")
+            # A box's join names what it runs, with that part's parameters: for a role of a
+            # role package (the Medic Kit's medic), the package alone; else the main mode and
+            # its modifiers (modes/README.md, protocol/join.md). A standby controller gets
+            # the whole game, as it runs every part's field.lua.
+            mode_id, params = self.game["mode_id"], self.game["params"]
+            if kind == "node" and pkg is not None:
+                mode_id, params = pkg.mode.node_mode_id(role), pkg.mode.params_for(role, params or {})
             join = {
                 "game_id": self.game["id"], "game_key": self._key, "node_id": node_id,
                 "controller_id": self.node_id,
                 "channel_hz": self.game.get("channel_hz") or self.cfg.channel_hz,
                 "max_hops": self.game.get("max_hops") or self.cfg.max_hops,
-                "teams": list(self.game["teams"]), "mode_id": self.game["mode_id"], "role": role,
+                "teams": list(self.game["teams"]), "mode_id": mode_id, "role": role,
                 "game_seed": int(self.game["game_seed"]) & 0xFFFFFFFF,
-                "params": self.game["params"] or None, "kind": kind,
+                "params": params or None, "kind": kind,
             }
             # Android props link over Wi-Fi with the field CA and the controller's addresses
             # (keys 13 and 14, RFC 0001 Amendment 4, proposed); boxes skip them. A payload too
@@ -963,6 +974,8 @@ class Controller:
                                       "(start, pause, resume and end go through the game)")
             if params is not None and not isinstance(params, dict):
                 raise ControllerError("params must be a map")
+            if cmd == "mode":
+                self._check_mode_command(fc, node_id, params or {})
             try:
                 seq = fc.send_cmd(cmd, params or None, dest=node_id, now_ms=self.now_ms())
             except ValueError as exc:
@@ -970,6 +983,21 @@ class Controller:
             if seq is None:
                 raise Unavailable(f"the radio modem is {self.radio_state}; command not sent")
             return {"node": node_id, "cmd": cmd, "opcode": CMD_OPCODES[cmd], "seq": seq}
+
+    def _check_mode_command(self, fc: FieldController, node_id: int, params: dict[str, Any]) -> None:
+        """A GM's mode command must be one the game's manifests declare, for the node's role."""
+        assert self.game is not None
+        name = params.get("name")
+        pkg = self.modes.get(self.game["mode_id"])
+        commands = pkg.mode.commands if pkg is not None else {}
+        if not isinstance(name, str) or name not in commands:
+            known = ", ".join(sorted(commands)) or "none in this game"
+            raise ControllerError(f"params.name: one of the game's mode commands ({known})")
+        node = fc.nodes.get(node_id)
+        roles = commands[name].get("roles") or []
+        if node_id != 0xFFFF and node is not None and node.role and node.role not in roles:
+            raise ControllerError(f"{name} is a command for {', '.join(roles)} nodes; "
+                                  f"node {node_id} is a {node.role}")
 
     def status(self) -> dict[str, Any]:
         with self._lock:

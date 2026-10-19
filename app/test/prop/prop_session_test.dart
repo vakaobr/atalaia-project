@@ -217,6 +217,76 @@ void main() {
     expect(s.screenData['error'], isTrue);
   });
 
+  test('Medic Kit: a signed tag, then holding a button heals; letting go '
+      'early cancels; a forged tag is refused', () async {
+    final key = Uint8List.fromList(List.generate(16, (i) => 200 - i));
+    final join = JoinPayload(
+      gameId: 77,
+      gameKey: key,
+      nodeId: 5,
+      controllerId: 0,
+      channelHz: 869525000,
+      maxHops: 2,
+      teams: const ['red', 'blue'],
+      modeId: 'org.atalaia.medic',
+      role: 'medic',
+      gameSeed: 3,
+      params: null,
+      kind: JoinKind.node,
+    );
+    final s = session(
+      'org.atalaia.medic',
+      'medic',
+      params: {'heal_hold_s': 2, 'charges': 2},
+      join: join,
+    );
+    addTearDown(s.close);
+    await s.open();
+    await s.start();
+    await s.advance(0);
+    expect(s.screenName, 'medic_idle');
+    expect(s.screenData['remaining'], 2);
+    expect(s.template?.name, 'medic_idle');
+
+    Future<void> scan(String player, List<int> withKey) => s.tagRead(
+      NfcRead(
+        uid: Uint8List.fromList([4, player.length, 7]),
+        ndef: ndefMimeRecord(
+          encodeTag(PlayerTag(player: player, team: 2, gameId: 77), withKey),
+          tagNdefType,
+        ),
+      ),
+    );
+
+    await scan('b1', key);
+    await s.advance(0);
+    expect(s.screenName, 'medic_hold');
+    expect(s.screenData['player'], 'b1');
+    s.pressTeam('blue');
+    await run(s, 1000);
+    s.releaseTeam('blue');
+    await s.advance(0);
+    expect(s.screenName, 'medic_refused');
+    expect(s.screenData['reason'], 'cancelled');
+    expect(s.log.any((l) => l.startsWith('medic.heal')), isFalse);
+
+    await run(s, 5000, step: 500); // the refusal leaves the screen
+    await scan('b1', key);
+    s.pressTeam('blue');
+    await run(s, 2500);
+    s.releaseTeam('blue');
+    await s.advance(0);
+    expect(s.screenName, 'medic_healed');
+    expect(s.screenData['remaining'], 1);
+    expect(s.log.any((l) => l.startsWith('medic.heal')), isTrue);
+
+    await scan('b2', Uint8List(16)); // signed with another key
+    await s.advance(0);
+    expect(s.screenName, 'medic_refused');
+    expect(s.screenData['reason'], 'mac');
+    expect(s.screenData['message'], 'Etiqueta falsificada');
+  });
+
   test(
     'a stand-alone prop has no game key: tags are refused (no_game)',
     () async {

@@ -595,6 +595,7 @@ String eventText(Strings s, FeedEvent e) {
     'text': str('text') ?? '',
     'fuse': d['fuse_s'] ?? '',
     'reason': str('reason') ?? '',
+    'remaining': d['remaining'] ?? '',
   };
   return s.tOr(key, e.type, args);
 }

@@ -442,6 +442,10 @@ class PropSession extends ChangeNotifier {
             if (running) unawaited(_input('game.end', params));
           case 'set_owner':
             if (running) unawaited(_input('cmd.set_owner', params));
+          case 'mode':
+            // A mode command (RFC 0001 Amendment 5): a medic kit's refill
+            // from the GM, the controller's count of a player's heals.
+            if (running) unawaited(_input('cmd.mode', params));
           case 'message':
             gmMessage = params['text'] is String
                 ? params['text']! as String

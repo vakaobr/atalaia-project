@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Next to Domination, the kit's node runs only the kit, and the zone box only Domination
+main: domination
+params: { capture_hold_ms: 3000, heal_hold_s: 5 }
+nodes: { zone: zone, kit: medic }
+steps:
+  - expect_screen: { node: kit, template: medic_idle, data: { remaining: 5 } }
+  - expect_screen: { node: zone, template: standby }
+  # Holding the kit's button captures nothing: Domination does not run there.
+  - hold: { node: kit, team: red, s: 5 }
+  - expect_no: zone.captured
+  - expect_screen: { node: kit, template: medic_refused, data: { reason: scan_first } }
+  - hold: { node: zone, team: red, s: 3 }
+  - expect: { type: zone.captured, node: zone, team: red }
+  - scan: { node: kit, player: b1, team: blue }
+  - hold: { node: kit, team: blue, s: 5 }
+  - expect: { type: medic.heal, node: kit, team: blue, data: { player: b1, remaining: 4 } }
+  # A tag at the zone box means nothing to Domination; the heal scored nothing.
+  - scan: { node: zone, player: b2, team: blue }
+  - expect_no: medic.heal
+  - wait: 5                                         # Domination's tick at 10 s
+  - expect_score: { team: red, points: 1 }
+  - expect_score: { team: blue, points: 0 }
+  - end: time
+  - expect_screen: { node: zone, template: final_score, data: { owner: red } }
+  - expect_no: script.error

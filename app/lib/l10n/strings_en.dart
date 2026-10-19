@@ -157,6 +157,7 @@ const Map<String, String> enStrings = {
   'setup.role': 'Role in the mode',
   'setup.teams': 'Teams',
   'setup.params': "The mode's parameters",
+  'setup.any_team': 'Every team',
   'setup.length': 'Length',
   'setup.minutes': 'Minutes',
   'setup.minutes_hint': '0 = no limit. At the end, the game ends by itself.',
@@ -292,6 +293,9 @@ const Map<String, String> enStrings = {
   'event.visibility.granted': '{team} sees the field',
   'event.chrono.violation': 'A replica above the limit',
   'event.node.tamper': 'Someone tampered with a box ({reason})',
+  'event.medic.heal':
+      '{player} was healed (heals left in the kit: {remaining})',
+  'event.medic.empty': 'A medic kit is empty',
 
   // GM
   'gm.intro':

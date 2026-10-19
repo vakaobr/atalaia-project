@@ -106,4 +106,49 @@ void main() {
       expect(() => catalog.compose(bad), throwsA(isA<ModeException>()));
     }
   });
+
+  test('the Medic Kit is a role package a prop runs alone', () {
+    final medic = catalog.byId('org.atalaia.medic')!;
+    expect(medic.kind, 'role');
+    expect(medic.isRolePackage, isTrue);
+    expect(medic.isModifier, isFalse);
+    expect(catalog.mainModes, contains(medic)); // a kit on its own
+    expect(medic.name('pt'), 'Ligaduras');
+    expect(medic.name('en'), 'Medic Kit');
+    expect(medic.role('medic')!.requires, ['nfc', 'team_input']);
+    expect(
+      medic.screens.keys,
+      containsAll([
+        'medic_idle',
+        'medic_hold',
+        'medic_healed',
+        'medic_refused',
+        'medic_empty',
+      ]),
+    );
+    final kit = catalog.compose('org.atalaia.medic');
+    final p = kit.resolveParams(const {}, const ['red', 'blue']);
+    expect(p, {
+      'heal_hold_s': 10,
+      'charges': 5,
+      'max_heals_per_player': 2,
+      'cooldown_s': 0,
+      'lang': 'pt',
+    });
+    expect(
+      kit.resolveParams({'team': 'blue'}, const ['red', 'blue'])['team'],
+      'blue',
+    );
+    // A controller joins a kit with the kit's id alone (modes/README.md).
+    expect(
+      () => catalog.compose('org.atalaia.domination+org.atalaia.medic'),
+      throwsA(
+        isA<ModeException>().having(
+          (e) => e.message,
+          'message',
+          contains('role package'),
+        ),
+      ),
+    );
+  });
 }

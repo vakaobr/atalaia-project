@@ -208,7 +208,7 @@ Typical size: 20-40 bytes (2-team game).
 | 3 | `dest` | uint16 | no | Destination node; absent = broadcast |
 
 Opcodes: 0=start, 1=pause, 2=resume, 3=end, 4=set_owner,
-5=message, 6=reset, 7=reboot.
+5=message, 6=reset, 7=reboot; 8=mode (Amendment 5).
 
 #### TIME (type 6)
 
@@ -543,6 +543,19 @@ Two optional keys of the join payload's body ([protocol/join.md](../../protocol/
 An Android prop, which has no LoRa radio of its own, uses them to link to the controller over the field's Wi-Fi ([protocol/prop-link.md](../../protocol/prop-link.md)): it fetches the CA from one of the addresses, checks it against key 13 and trusts it for that game only. The controller adds them to payloads for boxes (kind 0) when it serves HTTPS, and leaves them out when the payload would not fit. Boxes skip keys 13-31 as before, so their firmware is unchanged; the Python and Dart codecs read 13 and 14 and skip 15-31. The vector that tested a skipped optional key used key 13 and now uses key 20.
 
 Nothing on the radio changes: the keys are inside the join payload's tag, which still authenticates the whole payload with the field join key.
+
+## Amendment 5 (2026-10-19, proposed): Mode commands (CMD opcode 8)
+
+**Status:** proposed with the Medic Kit (decision MK11); for review.
+
+CMD opcode **8, `mode`**: a command for the node's mode script. Its `params` (key 2) must hold `name`, 1-24 bytes of `a-z`, `0-9` and `_` starting with a letter, and may hold the command's own parameters; the whole compact JSON form stays within the 127 bytes a box takes, as for every CMD. A node gives its script the input event `cmd.mode` with the params as its data (the name included) and nothing else: the opcode changes no game state on the node. It comes from:
+
+- the GM, through `POST /api/v1/nodes/{id}/cmd` with `{"cmd": "mode", "params": {"name": ...}}`: the controller sends only names that the game's manifests declare under `commands` for the node's role (the Medic Kit's `refill`);
+- a mode's `field.lua`, through `field.send(node, "mode", {name = ..., ...})` (the Medic Kit's `heals`, a player's count of heals at every kit).
+
+Over Wi-Fi ([protocol/prop-link.md](../../protocol/prop-link.md)) the command is a `cmd` message with `cmd: "mode"` and `opcode: 8`. A box or prop from before this amendment logs the opcode as unknown and ignores it, so a game whose modes do not use mode commands is unaffected. The CMD payload's encoding is unchanged; `protocol/vectors/cmd.json` gains a vector with opcode 8.
+
+**Reason:** opcodes 0-7 are taken by the lifecycle and the GM's built-in commands, and a mode had no way to hear from the GM or from its controller script beyond `set_owner` and `message`, which mean something else to every box (`message` is also shown as the organisers' word). One generic opcode with a named command keeps new modes from needing new opcodes.
 
 ## Open questions
 

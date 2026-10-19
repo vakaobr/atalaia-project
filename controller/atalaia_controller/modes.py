@@ -8,10 +8,13 @@ under assets/. An upload is checked before it is stored: the manifest must
 parse and name its id, version and roles, and the scripts must load in the
 real core (ctypes), so a typo is caught at upload and not on the field.
 
-A package is a main mode or a modifier (``kind: modifier``). A game, a
-preset or a join names a main mode and its modifiers with one id joined by
-``+`` (``org.atalaia.domination+org.atalaia.codes``); ``get`` composes them
-(atalaia_sim.mode.compose), as the Field Box does from its stored presets.
+A package is a main mode, a modifier (``kind: modifier``) or a role
+package (``kind: role``, the Medic Kit). A game or a preset names a main
+mode and its other parts with one id joined by ``+``
+(``org.atalaia.domination+org.atalaia.codes+org.atalaia.medic``); ``get``
+composes them (atalaia_sim.mode.compose). A box's join names only what that
+box runs (Mode.node_mode_id), which the Field Box composes from its stored
+presets.
 """
 
 from __future__ import annotations
@@ -61,6 +64,7 @@ class ModePackage:
             "min_tier": manifest.get("min_tier"),
             "roles": self.mode.roles,
             "params": self.mode.params,
+            "commands": self.mode.commands,
             "i18n": self.mode.i18n,
             "parts": list(self.mode.parts),
             "field_script": self.field_script is not None,
@@ -105,7 +109,7 @@ def parse_package(files: dict[str, str], path: Path = Path("<upload>")) -> ModeP
                 version=str(manifest["version"]), roles=manifest["roles"], params=params,
                 node_script=files["node.lua"], field_script=files.get("field.lua"),
                 kind=manifest.get("kind", "mode"), description=str(manifest.get("description", "")),
-                i18n=manifest.get("i18n") or {})
+                i18n=manifest.get("i18n") or {}, commands=manifest.get("commands") or {})
     return ModePackage(mode, dict(files), builtin=False)
 
 

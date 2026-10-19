@@ -95,7 +95,7 @@ class CreateGame extends Component {
                 <input id="g-squads" data-testid="game-squads" type="number" min="0" max="16" step="1" value=${state.squads}
                     onInput=${(e) => this.setState({ squads: e.target.value })} />
                 <small class="muted">${t('game.squads_hint')}</small></div>
-            ${mode && !preset && html`<${ModifierPicker} modes=${modes} selected=${state.mods} prefix="game"
+            ${mode && !preset && html`<${ModifierPicker} modes=${modes} main=${mode} selected=${state.mods} prefix="game"
                 onChange=${(mods) => this.setState({ mods, values: null })} />`}
             ${mode && html`<details open=${!preset}>
                 <summary>${t('game.params')}</summary>

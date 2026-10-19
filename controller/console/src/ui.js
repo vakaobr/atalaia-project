@@ -71,6 +71,23 @@ export function paramLabel(mode, name) {
     return (tr && tr.params && tr.params[name]) || spec.label || name;
 }
 
+/** A mode command's label (mode.yaml "commands", such as the Medic Kit's refill). */
+export function commandLabel(mode, name) {
+    const tr = mode && mode.i18n && mode.i18n[current];
+    const spec = (mode && mode.commands && mode.commands[name]) || {};
+    return (tr && tr.commands && tr.commands[name]) || spec.label || name;
+}
+
+/** An event in words for the feed, when the language has words for its type (feed.events,
+ * keyed by type with the dots as underscores), else ''. */
+export function eventWords(e) {
+    const key = `feed.events.${String(e.type || '').replace(/\./g, '_')}`;
+    const d = e.data || {};
+    const s = t(key, { team: e.team || '', player: d.player || '', remaining: d.remaining,
+                       used: d.player_heals_used });
+    return s === key ? '' : s;
+}
+
 /** t('game.start') or t('feed.count', {n: 3}): the text in the current language. */
 export function t(key, vars) {
     let s = key.split('.').reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), dict);

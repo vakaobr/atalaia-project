@@ -6,7 +6,7 @@
 // radio down, failed transmissions, modem errors, boxes gone quiet,
 // controller role changes and critical events.
 
-import { html, Component, t, clock, brief } from '../ui.js';
+import { html, Component, t, clock, brief, eventWords } from '../ui.js';
 
 export class LiveFeed extends Component {
     constructor() {
@@ -20,7 +20,8 @@ export class LiveFeed extends Component {
         const self = status ? status.node_id : null;
         const f = state.filter.trim().toLowerCase();
         const shown = feed.filter((e) => (!state.criticalOnly || e.prio === 'critical')
-            && (!f || `${e.type} ${e.team || ''} ${e.node} ${brief(e.data)}`.toLowerCase().includes(f)));
+            && (!f || `${e.type} ${e.team || ''} ${e.node} ${brief(e.data)} ${eventWords(e)}`
+                .toLowerCase().includes(f)));
         return html`<section class="card" aria-labelledby="feed-h">
             <h2 id="feed-h">${t('feed.title')}</h2>
             ${alerts.length > 0 && html`<ul class="alerts" data-testid="alerts" aria-live="polite">
@@ -45,7 +46,8 @@ export class LiveFeed extends Component {
                     <span class="ev-type">${e.type}</span>
                     ${e.team && html`<span class="ev-team">${e.team}</span>`}
                     <span class="ev-node">${e.node === self ? t('nodes.controller') : `${t('nodes.node')} ${e.node}`}</span>
-                    <span class="ev-data">${brief(e.data)}</span>
+                    ${eventWords(e) ? html`<span class="ev-words">${eventWords(e)}</span>`
+                        : html`<span class="ev-data">${brief(e.data)}</span>`}
                 </li>`)}
             </ol>`}
         </section>`;

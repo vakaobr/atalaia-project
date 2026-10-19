@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A player at the per-game limit, or still in the cooldown, is refused; others are not
+params: { max_heals_per_player: 2, cooldown_s: 60, heal_hold_s: 5 }
+steps:
+  - scan: { player: b1, team: blue }
+  - hold: { team: blue, s: 5 }
+  - expect: { type: medic.heal, at: 5, data: { player: b1, player_heals_used: 1, remaining: 4 } }
+  # 10 s later b1 is back: the cooldown has 50 s to go.
+  - wait: 10
+  - scan: { player: b1, team: blue }
+  - expect_screen: { template: medic_refused, data: { reason: cooldown, wait_s: 50, message: Espera 50 s } }
+  # Another player is not held up by b1's cooldown.
+  - scan: { player: b2, team: blue }
+  - hold: { team: blue, s: 5 }
+  - expect: { type: medic.heal, data: { player: b2, player_heals_used: 1, remaining: 3 } }
+  - wait: 50
+  - scan: { player: b1, team: blue }
+  - hold: { team: blue, s: 5 }
+  - expect: { type: medic.heal, data: { player: b1, player_heals_used: 2, remaining: 2 } }
+  - expect_screen: { template: medic_healed, data: { used: 2, max: 2 } }
+  # Two heals is b1's limit for the game, whatever the cooldown.
+  - wait: 120
+  - scan: { player: b1, team: blue }
+  - expect_screen: { template: medic_refused, data: { reason: limit, player: b1, used: 2, max: 2,
+                                                      message: Chegaste ao limite de tratamentos } }
+  - hold: { team: blue, s: 5 }
+  - expect_no: medic.heal
+  - expect_no: script.error

@@ -38,11 +38,13 @@ typedef struct {
     const char *mode;
 } screen_case_t;
 
-#define BOMB    "org.atalaia.bomb {\"attackers\":\"red\",\"defenders\":\"blue\",\"fuse_s\":300}"
-#define DOM     "org.atalaia.domination {\"capture_hold_ms\":3000,\"tick_s\":10}"
-#define KILL    "org.atalaia.kill_confirmed {\"turn_in_s\":20}"
-#define RESPAWN "org.atalaia.respawn {\"lives\":20,\"per_player\":false}"
-#define CHECKIN "org.atalaia.player_checkin {\"points\":1}"
+#define BOMB     "org.atalaia.bomb {\"attackers\":\"red\",\"defenders\":\"blue\",\"fuse_s\":300}"
+#define DOM      "org.atalaia.domination {\"capture_hold_ms\":3000,\"tick_s\":10}"
+#define KILL     "org.atalaia.kill_confirmed {\"turn_in_s\":20}"
+#define RESPAWN  "org.atalaia.respawn {\"lives\":20,\"per_player\":false}"
+#define CHECKIN  "org.atalaia.player_checkin {\"points\":1}"
+#define MEDIC    "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"pt\"}"
+#define MEDIC_EN "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"en\"}"
 
 /* Data as the modes (modes/bomb, modes/domination, modes/codes) and the shell send it. */
 static const screen_case_t cases[] = {
@@ -108,6 +110,21 @@ static const screen_case_t cases[] = {
      "{\"total\":5,\"counts\":\"RED 3  BLUE 2\",\"team\":\"red\",\"message\":\"Checked in: r2\","
      "\"error\":false}",
      CHECKIN},
+    /* The Medic Kit: Portuguese by default (accents folded for the ASCII fonts), and English. */
+    {"yaml_medic_idle", "medic_idle", "{\"remaining\":4}", MEDIC},
+    {"yaml_medic_idle_team_one_left", "medic_idle", "{\"remaining\":1,\"team\":\"blue\"}", MEDIC},
+    {"yaml_medic_hold", "medic_hold",
+     "{\"player\":\"b1\",\"team\":\"blue\",\"progress\":0.6,\"left\":4,\"remaining\":4}", MEDIC},
+    {"yaml_medic_healed", "medic_healed",
+     "{\"player\":\"b1\",\"team\":\"blue\",\"remaining\":3,\"used\":1,\"max\":2}", MEDIC},
+    {"yaml_medic_refused", "medic_refused",
+     "{\"reason\":\"limit\",\"message\":\"Chegaste ao limite de tratamentos\",\"player\":\"r2\","
+     "\"team\":\"red\",\"remaining\":3}",
+     MEDIC},
+    {"yaml_medic_empty", "medic_empty", "{}", MEDIC},
+    {"yaml_medic_hold_en", "medic_hold",
+     "{\"player\":\"b1\",\"team\":\"blue\",\"progress\":0.25,\"left\":8,\"remaining\":4}",
+     MEDIC_EN},
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))
 

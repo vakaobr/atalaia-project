@@ -44,6 +44,16 @@ const builtin_screen_t *screen_template_find(const char *name);
 /* Forgets the mode and the widgets (tests). */
 void screen_template_reset(void);
 
+/*
+ * The Field Box's fonts are Montserrat with the ASCII range only (lv_conf.h),
+ * so a label's text is folded in place before it is drawn: accented Latin
+ * letters lose the accent ("Lê a tua etiqueta" -> "Le a tua etiqueta"),
+ * dashes, quotes and the ellipsis become their ASCII forms, LVGL's own
+ * symbols stay, and anything else becomes '?'. The text only gets shorter.
+ * Phones draw the same templates with every character (app/lib/ui/template/).
+ */
+void screen_template_fold_text(char *s);
+
 #if ATALAIA_SCREEN_LVGL
 #include "lvgl.h"
 

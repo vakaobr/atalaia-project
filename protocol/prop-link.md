@@ -41,7 +41,7 @@ The controller encodes each with the radio's own codecs (`atalaia_sim.packet`, `
 | Message | Fields |
 | --- | --- |
 | `time` | TIME's `game_time_ms`, `game_state` (and its name `state`: waiting, running, paused, ended), `duration_ms`, `wall_s`, `term` |
-| `cmd` | `cmd` (`start`, `pause`, `resume`, `end`, `set_owner`, `message`, `reset`, `reboot`), `opcode`, `params`, `dest` (absent: every node) |
+| `cmd` | `cmd` (`start`, `pause`, `resume`, `end`, `set_owner`, `message`, `reset`, `reboot`, `mode`), `opcode`, `params`, `dest` (absent: every node); a `mode` command (opcode 8, RFC 0001 Amendment 5) reaches the mode script as `cmd.mode` with its params, `name` included |
 | `ack`, `error`, `pong`, `replaced` | as above |
 
 Whatever the controller sends on the radio as TIME or CMD reaches the linked props too; a command for one node reaches only that node's link. Without a radio modem a command reaches the Wi-Fi props and is reported as sent.

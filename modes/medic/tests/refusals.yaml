@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Every refusal says why on the screen, and nothing is healed
+params: { team: blue }
+steps:
+  # Forged (signed with another key), from another game, not a player tag, a team the game lacks.
+  - scan: { player: b1, team: blue, forged: true }
+  - expect_screen: { template: medic_refused, data: { reason: mac, message: Etiqueta falsificada, remaining: 5 } }
+  - scan: { player: b1, team: blue, game: 99 }
+  - expect_screen: { template: medic_refused, data: { reason: game, message: Etiqueta de outro jogo } }
+  - scan: { uid: "04c0ffee" }
+  - expect_screen: { template: medic_refused, data: { reason: not_tag, message: Não é uma etiqueta do jogo } }
+  - input: { type: nfc.tag, data: { uid: "04a1", valid: false, reason: team } }
+  - expect_screen: { template: medic_refused, data: { reason: team, message: Equipa desconhecida } }
+  - input: { type: nfc.tag, data: { uid: "04a1", valid: false, reason: no_game } }
+  - expect_screen: { template: medic_refused, data: { reason: no_game, message: Este kit não está num jogo } }
+  # The kit serves blue: a red player, or a player tag with no team, is refused.
+  - scan: { player: r1, team: red }
+  - expect_screen: { template: medic_refused, data: { reason: wrong_team, player: r1, team: red,
+                                                      message: Este kit é de outra equipa } }
+  - scan: { player: marshal }
+  - expect_screen: { template: medic_refused, data: { reason: wrong_team, player: marshal } }
+  # A hold without a scan (once the last refusal has left the screen).
+  - hold: { team: blue, s: 1 }
+  - expect_screen: { template: medic_refused, data: { reason: wrong_team } }
+  - wait: 4
+  - hold: { team: blue, s: 1 }
+  - expect_screen: { template: medic_refused, data: { reason: scan_first, message: Lê primeiro a tua etiqueta } }
+  # Letting go early cancels: the player has to scan again.
+  - wait: 4
+  - scan: { player: b1, team: blue }
+  - hold: { team: blue, s: 6 }
+  - expect_screen: { template: medic_refused, data: { reason: cancelled, player: b1,
+                                                      message: "Largaste antes do tempo: lê a etiqueta outra vez" } }
+  - expect_no: medic.heal
+  - wait: 4
+  - hold: { team: blue, s: 10 }
+  - expect_no: medic.heal
+  - expect_status: running
+  - expect_no: script.error

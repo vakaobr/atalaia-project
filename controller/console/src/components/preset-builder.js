@@ -4,17 +4,45 @@
 // Preset builder: forms drawn from each mode's parameter schema (mode.yaml
 // "params": int with min/max, bool, team, string; default, optional, label),
 // saved through POST /api/v1/presets. ParamFields, ModifierPicker and the
-// helpers for "main+modifier" mode ids are shared with the game form.
+// helpers for "main+modifier" mode ids are shared with the game form. A
+// game's parts after its main mode are modifiers (kind "modifier": they run
+// on the main mode's boxes) and role packages (kind "role", the Medic Kit:
+// boxes given their role run them alone, modes/README.md).
 
-import { html, Component, t, brief, modeText, paramLabel } from '../ui.js';
+import { html, Component, t, brief, modeText, paramLabel, commandLabel } from '../ui.js';
 
-/** Main modes (kind "mode") and modifiers (kind "modifier") of the catalogue. */
+/** Main modes (kind "mode", and role packages, which may run alone), modifiers (kind
+ * "modifier") and role packages (kind "role") of the catalogue. */
 export function mainModes(modes) {
     return modes.filter((m) => m.kind !== 'modifier');
 }
 
 export function modifierModes(modes) {
     return modes.filter((m) => m.kind === 'modifier');
+}
+
+export function roleModes(modes) {
+    return modes.filter((m) => m.kind === 'role');
+}
+
+/** The roles of a game: its main mode's and its role packages' (modifiers add none). */
+export function gameRoles(modes, modeId) {
+    const { main, mods } = partsOf(modes, modeId);
+    const parts = [main, ...mods.filter((m) => m.kind === 'role')].filter(Boolean);
+    return parts.flatMap((m) => Object.keys(m.roles || {}));
+}
+
+/** The GM commands of a game for a node of this role (mode.yaml "commands"), with labels. */
+export function commandsFor(modes, modeId, role) {
+    const { main, mods } = partsOf(modes, modeId);
+    const out = [];
+    for (const m of [main, ...mods]) {
+        if (!m) continue;
+        for (const [name, spec] of Object.entries(m.commands || {})) {
+            if ((spec.roles || []).includes(role)) out.push({ name, label: commandLabel(m, name) });
+        }
+    }
+    return out;
 }
 
 /** The main mode and the modifiers a mode id names ("main+modifier+..."). */
@@ -26,9 +54,12 @@ export function partsOf(modes, modeId) {
     };
 }
 
-/** The id a game or preset gets: the main mode, then the chosen modifiers in catalogue order. */
+/** The id a game or preset gets: the main mode, then the chosen modifiers and role packages
+ * in catalogue order. */
 export function composedId(modes, main, selected) {
-    const mods = modifierModes(modes).filter((m) => selected.includes(m.id)).map((m) => m.id);
+    if (main.kind === 'role') return main.id; // a role package on its own takes no other parts
+    const mods = modes.filter((m) => m.kind !== 'mode' && m.id !== main.id && selected.includes(m.id))
+        .map((m) => m.id);
     return [main.id, ...mods].join('+');
 }
 
@@ -52,24 +83,32 @@ export function modeName(modes, modeId) {
     return main ? [main, ...mods].map((m) => modeText(m, 'name')).join(' + ') : modeId;
 }
 
-/** Checkboxes for the modifiers that run alongside the main mode. */
+/** Checkboxes for the modifiers that run alongside the main mode, and for the role
+ * packages (boxes of their own role, such as medic kits). None for a role package that
+ * is the game on its own (props.main). */
 export class ModifierPicker extends Component {
     toggle(id, on) {
         const selected = this.props.selected.filter((x) => x !== id);
         this.props.onChange(on ? [...selected, id] : selected);
     }
 
-    render(props) {
-        const mods = modifierModes(props.modes);
-        if (!mods.length) return null;
-        return html`<fieldset class="field modifiers" data-testid=${`${props.prefix}-modifiers`}>
-            <legend>${t('game.modifiers')}</legend>
-            ${mods.map((m) => html`<label class="check" title=${modeText(m, 'description')}>
+    group(list, key, testid) {
+        if (!list.length) return null;
+        const props = this.props;
+        return html`<fieldset class="field modifiers" data-testid=${testid}>
+            <legend>${t(`game.${key}`)}</legend>
+            ${list.map((m) => html`<label class="check" title=${modeText(m, 'description')}>
                 <input type="checkbox" value=${m.id} checked=${props.selected.includes(m.id)}
                     onChange=${(e) => this.toggle(m.id, e.target.checked)} /> ${modeText(m, 'name')}
             </label>`)}
-            <small class="muted">${t('game.modifiers_hint')}</small>
+            <small class="muted">${t(`game.${key}_hint`)}</small>
         </fieldset>`;
+    }
+
+    render(props) {
+        if (props.main && props.main.kind === 'role') return null;
+        return html`${this.group(modifierModes(props.modes), 'modifiers', `${props.prefix}-modifiers`)}
+            ${this.group(roleModes(props.modes), 'role_packages', `${props.prefix}-roles`)}`;
     }
 }
 
@@ -106,7 +145,10 @@ export class ParamFields extends Component {
             input = html`<input id=${id} type="checkbox" checked=${!!value}
                 onChange=${(e) => this.set(name, e.target.checked)} />`;
         } else if (spec.type === 'team' && teams && teams.length) {
-            input = html`<select id=${id} value=${value} onChange=${(e) => this.set(name, e.target.value)}>
+            // An optional team left empty means every team (a medic kit's team).
+            input = html`<select id=${id} value=${value === undefined ? '' : value}
+                onChange=${(e) => this.set(name, e.target.value)}>
+                ${spec.optional && html`<option value="">${t('presets.any_team')}</option>`}
                 ${teams.map((tm) => html`<option value=${tm}>${tm}</option>`)}
             </select>`;
         } else {
@@ -203,7 +245,7 @@ export class PresetBuilder extends Component {
                         ${mainModes(modes).map((m) => html`<option value=${m.id}>${modeText(m, 'name')} (${m.id})</option>`)}
                     </select></div>
                 <p class="muted small">${modeText(mode, 'description')}</p>
-                <${ModifierPicker} modes=${modes} selected=${state.mods} prefix="preset"
+                <${ModifierPicker} modes=${modes} main=${mode} selected=${state.mods} prefix="preset"
                     onChange=${(mods) => this.pickMods(mods)} />
                 <${ParamFields} schema=${schema} labels=${labels} values=${values} prefix="preset"
                     onChange=${(v) => this.setState({ values: v, modeId: mode.id })} />

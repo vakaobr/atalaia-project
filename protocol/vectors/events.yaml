@@ -59,6 +59,12 @@ valid:
   - name: "Phase 3: a chrono spot check with its tolerance (tolerance_pct, key 30)"
     event: {"node": 9, "seq": 2, "t": 120500, "type": "chrono.spotcheck", "data": {"bb_g": 0.25, "player": "p-3", "reading_mps": 96.5, "replica": "r-0042", "tolerance_pct": 5}}
     cbor: "a5 01 09 02 02 03 1a 00 01 d6 b4 04 18 24 08 a5 18 1a f9 34 00 0e 63 70 2d 33 18 19 f9 56 08 18 18 66 72 2d 30 30 34 32 18 1e 05"
+  - name: "The Medic Kit heals a blue player (id 50; remaining and player_heals_used, keys 32 and 33)"
+    event: {"node": 5, "seq": 3, "t": 61000, "type": "medic.heal", "team": 2, "data": {"player": "b1", "player_heals_used": 1, "remaining": 4, "team": "blue"}}
+    cbor: "a6 01 05 02 03 03 19 ee 48 04 18 32 05 02 08 a4 0e 62 62 31 18 21 01 18 20 04 01 64 62 6c 75 65"
+  - name: "A medic kit serving blue is empty (id 51)"
+    event: {"node": 6, "seq": 1, "t": 120000, "type": "medic.empty", "team": 2, "data": {"team": "blue"}}
+    cbor: "a6 01 06 02 01 03 1a 00 01 d4 c0 04 18 33 05 02 08 a1 01 64 62 6c 75 65"
 
 invalid:
   - name: "Truncated"  # truncated

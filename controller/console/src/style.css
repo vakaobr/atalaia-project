@@ -651,6 +651,12 @@ tr.offline td {
     min-width: 0;
 }
 
+/* An event in words (feed.events in the language files), such as a medic kit's heal. */
+.ev-words {
+    overflow-wrap: anywhere;
+    min-width: 0;
+}
+
 .prio-critical {
     background: var(--crit-bg);
 }

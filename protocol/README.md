@@ -15,7 +15,7 @@ Both encodings come from the schema files in [`schema/`](schema/), so they canno
 | [`vectors/*.json`](vectors/) | Test vectors for header and message payload codecs, the join payload (`join.json`), player tags (`tag.json`), chrono records (`chrono_record.json`) and player tokens (`player_token.json`) |
 | [`vectors/capability_proxy.yaml`](vectors/capability_proxy.yaml) | Test vectors for the capability proxy (I/O pod) frames and payloads |
 | [`join.md`](join.md) | The join payload that brings a box or a standby controller into a game (NFC card, QR code, serial console) |
-| [`nfc-tag.md`](nfc-tag.md) | Player tags: the signed NFC tag of a player (Kill Confirmed, Respawn, Player Check-in) |
+| [`nfc-tag.md`](nfc-tag.md) | Player tags: the signed NFC tag of a player (Kill Confirmed, Respawn, Player Check-in, the Medic Kit) |
 | [`chrono-record.md`](chrono-record.md) | Chrono records: one chronograph reading signed with the marshal's Ed25519 key, and the canonical JSON that is signed |
 | [`player-token.md`](player-token.md) | Player tokens: who a phone calling the controller's API is (player, team, squad, role, game), signed by the controller |
 | [`checkin.md`](checkin.md) | Field check-in: the printed poster's `atalaia:checkin:` text, trusting the field's CA, the check-in endpoints, per-game replica declarations and the "replicas to chrono" list; vectors in `vectors/checkin.json` |
@@ -120,7 +120,7 @@ Both codecs follow the schema field for field. Encoders always write every requi
 
 ### What a Field Box sends and expects
 
-A box in a game (`firmware/esp32/main/radio/field_link.c`) sends HELLO after it joins or reboots, every game event as EVENT, and STATE every 15 seconds and after a capture. Normal and critical events and HELLO ask for an ACK and are sent again, in a new packet, every 3 seconds until one arrives (normal events give up after 10 tries). In STATE, `counters` holds the points each team **gained** on the box, `owner_team` the team of its last capture, and `phase` the box's game state (0 waiting, 1 running, 2 paused, 3 ended). It follows the TIME beacons of the controller with the highest term (and acts on a start, pause or end it missed), takes CMDs for its node id or for every node, and relays every authenticated packet once (hop_limit is the number of relays left, clamped to the join's `max_hops`). Decisions E6-E10 in `docs/review/decisions-to-review.md`.
+A box in a game (`firmware/esp32/main/radio/field_link.c`) sends HELLO after it joins or reboots, every game event as EVENT, and STATE every 15 seconds and after a capture. Normal and critical events and HELLO ask for an ACK and are sent again, in a new packet, every 3 seconds until one arrives (normal events give up after 10 tries). In STATE, `counters` holds the points each team **gained** on the box, `owner_team` the team of its last capture, and `phase` the box's game state (0 waiting, 1 running, 2 paused, 3 ended). It follows the TIME beacons of the controller with the highest term (and acts on a start, pause or end it missed), takes CMDs for its node id or for every node (opcode 8, a mode command, reaches the mode as `cmd.mode`: RFC 0001 Amendment 5), and relays every authenticated packet once (hop_limit is the number of relays left, clamped to the join's `max_hops`). Decisions E6-E10 in `docs/review/decisions-to-review.md`.
 
 ## Joining a game
 

@@ -188,6 +188,11 @@ static const uint8_t pl_cmd_1[] = {
     0x74, 0x18, 0x1e, 0x03, 0x18, 0x2a,
 };
 #define pl_cmd_1_len sizeof(pl_cmd_1)
+static const uint8_t pl_cmd_2[] = {
+    0xa3, 0x01, 0x08, 0x02, 0xa1, 0x64, 0x6e, 0x61, 0x6d, 0x65, 0x66, 0x72,
+    0x65, 0x66, 0x69, 0x6c, 0x6c, 0x03, 0x07,
+};
+#define pl_cmd_2_len sizeof(pl_cmd_2)
 static const uint8_t pl_cmd_bad_0[] = {
     0xa2, 0x02, 0xa0, 0x03, 0x05,
 };
@@ -196,6 +201,7 @@ static const uint8_t pl_cmd_bad_0[] = {
 static const payload_vector_t cmd_vectors[] = {
     {"cmd_broadcast", "{\"cmd\":0}", pl_cmd_0, pl_cmd_0_len},
     {"cmd_targeted", "{\"cmd\":3,\"params\":{\"timeout\":30},\"dest\":42}", pl_cmd_1, pl_cmd_1_len},
+    {"cmd_mode_refill", "{\"cmd\":8,\"params\":{\"name\":\"refill\"},\"dest\":7}", pl_cmd_2, pl_cmd_2_len},
 };
 #define CMD_VECTOR_COUNT (sizeof(cmd_vectors) / sizeof(cmd_vectors[0]))
 
