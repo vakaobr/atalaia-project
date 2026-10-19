@@ -6,7 +6,115 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 # Phase 4 -- Site Server and Advanced Play: Research
 
 **Risk level:** High
-**Last updated:** 2026-10-17
+**Last updated:** 2026-10-19 (refreshed after phase 3 software; first written 2026-10-17)
+
+---
+
+## Refresh 2026-10-19 (after phase 3 software)
+
+This research was written before phase 3 was built and got only partial
+handoff updates on 2026-10-18 (the section at the end). Phase 2 plan
+phases A-E and the mode pack, and phase 3 plan phases A-F, the Medic
+Kit and branding are now built in software; what is left of them needs
+hardware (phase 2 F, phase 3 G, the Android controller shell PE24, iOS).
+This section records what was built that phase 4 consumes, what that
+changes, and the lessons learned; the body below is corrected in place
+(marked "2026-10-19") where it was wrong. Decisions: P4R1-P4R26 in
+`docs/review/decisions-to-review.md`, all open.
+
+### What exists now (code beats docs)
+
+| Area | As built | Where |
+|------|----------|-------|
+| Controller API | One FastAPI app; routes listed in its docstring; tokens as `Authorization: Bearer`, `?token=` only on `WS /api/v1/stream` | `controller/atalaia_controller/api.py` |
+| Controller auth | GM token (writes; 403 with the read token), read token (reads, scoreboard), player tokens (`require_player`; `require_read` accepts them, `require_console` does not); no token for `/healthz`, the CA, branding, the poster's `GET` and the check-in itself | `api.py` (`Auth`), `main.py` (`ensure_tokens`) |
+| Player tokens | `apt1.<b64url payload>.<b64url HMAC-SHA256>` over canonical JSON `{exp, game_id, player_id, role, squad, team}`, keyed with the controller's own per-game token key (B8), re-checked against the check-in on every request; roles `player, squad_leader, vip, marshal, gm, spectator` | `player_token.py`, `protocol/player-token.md`, `protocol/vectors/player_token.json` |
+| Check-in | Poster `atalaia:checkin:` (no secret), per-field player ids `p-` + 12 base32 with a secret (SHA-256 kept), per-game check-ins (`pending`, `checked_in`, `left`, `removed`), staff confirmation, federation number never verified, 30-day retention | `checkin.py`, `checkin_poster.py`, `protocol/checkin.md`, `protocol/vectors/checkin.json` |
+| Replica declarations | per game: `declaration_id` (UUID), `replica_id`, type (`aeg, gbb, hpa, bolt_action, dmr, sniper, pistol, shotgun`), class from the limit template, make and model; states `pending, passed, refused, withdrawn`; at most `max_replicas` (5) | `checkin.py`, `store.py` (`declarations`, `replicas`) |
+| Chrono records | One signed record per shot (Ed25519 on the marshal's phone, canonical JSON, `signature` field); uploaded in series of 1-50 to `POST /api/v1/chrono/readings`, verified, judged against the class limit; kept verbatim (`record_json`); marshal public keys registered from the phone; events `chrono.checkin`, `chrono.spotcheck`, `chrono.violation` | `chrono.py`, `protocol/chrono-record.md`, `protocol/vectors/chrono_record.json`, `app/lib/chrono/` |
+| Store | SQLite schema 4, `CREATE TABLE IF NOT EXISTS` plus columns; events unique on `(game_id, node_id, seq, game_time, type)`; `games.id` = the 16-bit radio game id; `game_seed` per game | `store.py` |
+| Scores | Per team and node (the max each node reported), plus the controller's own counters and GM adjustments as `score.delta` events (can be negative) | `simulator/atalaia_sim/field_controller.py` (`total_scores`), `engine.py` |
+| MQTT | `field/v1/{game}/events/{type}`, `.../score`, `.../nodes/{node}/state`, `.../health` (retained), commands on `.../cmd/{node}` and `.../cmd/all` | `mqtt.py`, `deploy/atalaia.acl` |
+| CMD opcodes | 0 start ... 7 reboot, 8 `mode` (named mode commands, RFC 0001 Amendment 5, proposed) | `field_controller.py`, `engine.py` |
+| Branding | Field name, logo, wallpaper, accent; per-game team names and crests; saved teams; images checked and stripped with the standard library | `branding.py`, `images.py` |
+| Radio channel | Chosen per field (default 869.525 MHz, scan, random, manual), locked during a game, the whole channel inside one sub-band | `channels.py`, `simulator/atalaia_sim/eu868.py` |
+| Positions | `POST /api/v1/positions` (player token), kept for the live game only, filtered by role, never on the radio or MQTT; UAV-style `visibility.granted` | `positions.py` |
+| Android props | On the field Wi-Fi (`WS /api/v1/prop`, an HMAC proof of the game key) or on the radio through an I/O pod | `prop_link.py`, `protocol/prop-link.md`, `app/lib/controller/`, `app/lib/radio/` |
+| I/O pod | Firmware built (USB, BLE, the HAL's capabilities, radio passthrough, `node.tamper`); not run on a board | `firmware/esp32/main/pod/`, `protocol/capability-proxy.md` |
+| Modes | `domination`, `bomb`, `holdall`, `laststand`, `codes` (modifier), `kill_confirmed`, `respawn`, `player_checkin`, `medic` (`kind: role`); translations in `mode.yaml` `i18n.pt`; screens as YAML templates; mode commands; Field Box built-in presets only (a new mode needs a flash) | `modes/`, `modes/README.md`, `firmware/esp32/main/builtin_presets.c` |
+| Event ids | 1-41 and 50-51 taken, 42-49 free and planned for phase 4; data keys 1-33 taken | `protocol/schema/events.yaml` |
+| Scenario compiler | **Not built**: `controller/atalaia_controller/scenarios/` does not exist yet (P4-1 says where it goes) | -- |
+| Site server | **Not built**: `server/` holds only its README | -- |
+| Tests and tooling | `tools/check.sh` (everything CI runs, `ATALAIA_REQUIRE_ALL=1`); `unittest` everywhere (no pytest); mode tests via `python3 -m atalaia_sim test`; `tools/docker_{sim,fw,app,console,hw}.py`; the `atalaia-dev` image (Ubuntu 24.04 packages: FastAPI 0.101, pydantic 1.10); no PostgreSQL anywhere yet | `tools/`, `.github/workflows/ci.yml` |
+
+### What that changes for phase 4
+
+1. **Event ids and data keys** (P4R1): 42-45 scenario events, 46
+   `vip.extracted`, 47 `hacking.solved`, 48-49 free; no
+   `satellite.*` (satellites send `zone.captured`, as spec section 15's
+   own example); `target.hit` already exists (16, `window_open`); data
+   keys 34 `objective`, 35 `scenario`, 36 `puzzle`.
+2. **Sync** (P4R10-P4R13): the controller opens every connection (4G
+   NAT); the site server keeps none of its tokens; a game is
+   `(field, game_id, game_seed)`; the push cursor is the controller's
+   event id; scores merge per node, not per total; the API key is stored
+   as SHA-256.
+3. **Chrono registry** (P4R14, P4R15): stores the signed readings
+   verbatim, verifies them with `chrono.py`, keeps public keys only (no
+   server-held private key), keys records to per-field player ids that
+   an account can adopt.
+4. **Scenario DSL** (P4R7-P4R9): boxes cannot receive per-game scripts,
+   so a scenario is a `kind: scenario` package (`field.lua` only) over a
+   new built-in role package `org.atalaia.objectives`; teams by name,
+   squads by number; the Lua load check in the core on both the
+   controller and the site server.
+5. **Modes**: Master and Satellites needs no phase 3 piece except
+   integer scoring (P4R2); engineer-only satellites are deferred
+   because player tags carry no squad (P4R3); Target Windows needs the
+   `hit` input (P4R4) and `game.teams()` (P4R26); the Hacking Terminal
+   uses the keypad, not touch (P4R5); VIP / Payload gets positions as a
+   controller-only `position.fix` and `gps.fix` on Android props, never
+   as radio events (P4R6). **Dependencies of the old plan phase F are
+   met in software**: the Android prop shell (keypad, NFC, screens),
+   the player app and position reports exist; only real-phone tests
+   wait.
+6. **ATAK** (P4R18): props have no coordinates (positions are 0-1 on
+   the field image), so the image is georeferenced; player positions
+   are never multicast.
+7. **Branding and club profiles** (P4R19): phase 3's per-controller
+   branding is the model; the site server adds clubs and syncs branding
+   and saved teams to controllers.
+8. **I/O pod and Android props on Wi-Fi**: Android props reach the
+   controller over Wi-Fi without a pod, so Hacking Terminals and
+   payload props can be phones on the field Wi-Fi; a pod adds buttons,
+   a keypad and the radio. A pod's or an addon's `hit` capability can be
+   lent the same way once the addon exists.
+9. **Tooling** (P4R16, P4R17): the site server has its own image and
+   pinned dependencies; its tests use `unittest` against PostgreSQL 16
+   in a CI service container and an ephemeral local container.
+
+### Lessons learned that apply
+
+- **Clean-copy builds catch what incremental builds hide** (an
+  undefined Kconfig symbol, a build-downloaded dependency, a gitignored
+  lock file): every plan phase is verified from a fresh clone and a
+  fresh `atalaia-dev` image.
+- **Check known-answer vectors against their source documents**: a
+  self-made AES-CCM vector was once labelled RFC 3610's. Phase 4's
+  iCalendar, CoT and geo vectors cite their sources.
+- **Shared vectors across C, Python and Dart** caught real bugs (the
+  core's payload codec disagreed with the schema, D8; the core's
+  `{x|clock}` was undefined behaviour, PD3); every phase 4 format with
+  two implementations gets vectors in `protocol/vectors/`.
+- **Exceptions in ctypes callbacks are swallowed**: the simulator
+  collects problems in `Simulation.problems`, and tests must check it.
+  New field-script inputs follow the same rule.
+- **Wokwi's CI quota is used up** (decision R7): firmware is verified
+  with the host tests, the screen images and three ESP-IDF builds with
+  no warnings until the quota resets or the maintainer decides.
+- **Strict decoders and tests that fail on skips**
+  (`ATALAIA_REQUIRE_ALL=1`): a vector test that skipped what it could
+  not decode hid the D8 codec bugs.
 
 ---
 
@@ -65,12 +173,13 @@ weekend milsim running end to end on the platform.
 | Path | Relevance |
 |------|-----------|
 | `server/README.md` | Placeholder; confirms AGPL-3.0-or-later, PostgreSQL, container image |
-| `controller/atalaia_controller/` | Phase 2 (A-E complete): Python controller with FastAPI, SQLite (schema 2), MQTT (Mosquitto with per-user ACLs), radio modem. Bearer token auth (read token, GM token). Phase 4 site server shares the framework. |
+| `controller/atalaia_controller/` | Phase 2 (A-E complete) and phase 3 (E, the Medic Kit, branding, 2026-10-19): Python controller with FastAPI, SQLite (schema 4), MQTT (Mosquitto with per-user ACLs), radio modem, HTTPS with the field CA, check-in, player tokens, chrono readings, positions, Android props on Wi-Fi, branding. Bearer token auth (read token, GM token, player tokens). Phase 4 site server shares the language, not the dependency versions (P4R16). |
 | `controller/console/` | Phase 2E (complete): GM console PWA (Preact 10.24.3 + HTM 3.1.1 + qrcode-generator), served at `/console/`. Phase 4 extends it with remote-setup and scenario-builder panels. |
 | `core/include/atalaia/` | 11 headers. `protocol.h` contains field_ops-related declarations. `node.h` defines `atalaia_node_config_t` with `field_ops` pointer. |
 | `core/src/script_api.c` | Lua API surface. `state.field{}` and `field.*` are registered when `field_ops` is non-NULL (Phase 2C, complete). |
 | `modes/domination/` | Reference mode: `node.lua` only, `mode.yaml` with params. |
 | `modes/bomb/` | Reference mode: `node.lua` only, `mode.yaml` with params. |
+| `modes/holdall/`, `laststand/`, `medic/` | (2026-10-19) Modes with a `field.lua`; `medic` is a role package (`kind: role`) with mode commands: the patterns phase 4's multi-node modes and scenarios follow. All nine modes are in the refresh table above. |
 | `simulator/` | RadioModel, FieldController, packet codec. Tests cover multi-node, partition, failover, duty-cycle. |
 | `protocol/schema/events.yaml` | Standard event vocabulary; Phase 4 adds new events (target.hit already listed; add satellite.*, vip.*, hacking.*, scenario.*). |
 | `protocol/schema/messages.yaml` | 8 message types. No changes expected for Phase 4. |
@@ -79,8 +188,8 @@ weekend milsim running end to end on the platform.
 
 ### Patterns to follow
 
-- **Mode package format**: `mode.yaml` + `node.lua` + optional `field.lua` + `tests/` + `assets/` + `i18n/`.
-- **Test format**: YAML event sequences with `expect`, `hold`, `wait` steps; CI runs them in the simulator.
+- **Mode package format**: `mode.yaml` + `node.lua` + optional `field.lua` + `tests/` + `assets/` + `i18n/`. *(2026-10-19: translations live in `mode.yaml` under `i18n.pt`, screens in `assets/screens/`; there is no `i18n/` folder; folder names use underscores.)*
+- **Test format**: YAML event sequences with `expect`, `hold`, `wait` steps; CI runs them in the simulator (`python3 -m atalaia_sim test`, also through the core in Dart; the `input` step injects any event).
 - **Protocol extension**: new events go through `events.yaml` with an RFC if they add packet fields.
 - **ADR pairing**: every significant decision gets an ADR in the phase directory.
 - **SPDX headers**: AGPL-3.0-or-later for controller and site server code; CC-BY-SA-4.0 for docs.
@@ -325,13 +434,16 @@ Offline fallback:
 with an API key (long-lived, rotatable) generated during field
 registration. The site server authenticates to the controller with the
 same mechanism (for push notifications and pre-game data delivery).
+*(2026-10-19: superseded. The controller opens every connection, since
+it sits behind 4G NAT, and the site server holds none of its tokens;
+see ADR-P4-3's amendment, P4R12.)*
 
 **Conflict resolution:** Not needed by design:
 
 | Data type | Why conflict-free |
 |-----------|-------------------|
-| Events | Append-only; deduplicated by `(game_id, node_id, seq)` |
-| Scores | Grow-only counters; merge by maximum |
+| Events | Append-only; deduplicated by `(game_id, node_id, seq)` *(2026-10-19: `(game, node_id, seq, game_time, type)`, as the controller, D6)* |
+| Scores | Grow-only counters; merge by maximum *(2026-10-19: per node counters only; totals can fall with a GM's adjustment, P4R10)* |
 | Chrono records | Append-only; signed by marshal; never edited |
 | Presets | Versioned; site server version wins for shared presets; local presets are controller-only |
 | Player profiles | Site server is authoritative; controller caches a read-only snapshot |
@@ -405,6 +517,11 @@ ChronoRecord
   notes: str (optional)
 ```
 
+*(2026-10-19: superseded by what phase 3 built: one Ed25519-signed
+record per shot, signed on the marshal's phone, in the format of
+`protocol/chrono-record.md`; the site server stores it verbatim, P4R15.
+Replica ids are the app's UUIDs and types include `sniper`.)*
+
 ### Cross-field sharing
 
 Sharing chrono history between fields is opt-in at two levels:
@@ -446,6 +563,9 @@ The marshal's signing key is derived from their password at login
   app holds the private key. This is more robust but adds key
   management complexity. **Decision deferred to ADR phase.**
 
+*(2026-10-19: decided and built. Ed25519 per marshal (ADR-P4-5, P3-1);
+the phone makes the key and only the public key leaves it (P4R14).)*
+
 ---
 
 ## 8. Remote setup
@@ -468,7 +588,9 @@ online (connected to the controller, which relays to the site server):
 The site server holds firmware images (signed). The controller pulls
 them and pushes to nodes over Wi-Fi during maintenance windows. The
 site server does not push firmware directly to nodes (it has no LoRa
-link). OTA is Phase 3 (A/B partitions, Ed25519 signatures).
+link). OTA is Phase 3 (A/B partitions, Ed25519 signatures). *(2026-10-19:
+OTA is not built yet, `firmware/esp32/README.md`; the firmware catalogue
+in plan phase 19 lists versions only.)*
 
 ### Game scheduling
 
@@ -506,7 +628,10 @@ Browser --HTTPS--> Site server --WS/HTTPS--> Controller (via 4G bridge)
 The remote GM console is read-only for live scores and events. Write
 commands (start, pause, override) are forwarded to the controller,
 which validates the GM token before executing them. The controller
-remains authoritative.
+remains authoritative. *(2026-10-19: the WebSocket is opened by the
+controller; remote commands travel back on it only when the field sets
+`[sync] remote_gm = true`, from a list, logged on both sides; the site
+server holds no GM token, P4R12.)*
 
 Latency: the 4G bridge adds 50-200 ms. This is acceptable for GM
 commands (which are human-paced) but not for time-critical game logic
@@ -590,6 +715,16 @@ No hardware dependency beyond what Phase 2 provides. Create test
 scenarios: master capture, satellite capture, multiplier calculation,
 master hand change resets satellites, engineer-only filter.
 
+*(2026-10-19 corrections, P4R2 and P4R3: satellites emit the standard
+`zone.captured` (the spec's own example), so `field.owner()` works for
+them and the pseudocode's `on("satellite.captured")` becomes
+`on("zone.captured")` with a check of the node's role through
+`field.nodes("satellite")`, whose entries are tables with `id`;
+`score.add` takes integers only, so `points_per_tick * fs.multiplier`
+raises an error and the bonus is computed in whole points; the reset
+sends `{ team = "none" }`; boxes are capture-only like Hold-All's. The
+engineer-only filter is deferred: player tags carry no squad.)*
+
 **Phase dependency:** Phase 2 only. No Phase 3 dependency for basic
 functionality. Engineer-only tags need Phase 3 (NFC squad identification).
 
@@ -633,6 +768,11 @@ end)
 ```
 
 No `field.lua` needed -- this is a single-node mode.
+
+*(2026-10-19: `game.teams()` does not exist in the core; plan phase 2
+adds it (P4R26). The `hit` input is written into the draft RFC as
+`hit.hit` with `strength` (P4R4); the logic is testable now with the
+mode tests' `input` step.)*
 
 **`field.lua` needs:** None.
 
@@ -701,6 +841,15 @@ controller.
 coordinates. Test extraction zone entry, exit, re-entry. Test with
 both prop-based VIP (ESP32 + GPS module) and player-app VIP.
 
+*(2026-10-19, P4R6: no `gps.fix` event exists, and one on the radio
+would broadcast a player's position. Phase 3 built `POST
+/api/v1/positions`, kept on the controller and filtered by role. The
+VIP's reports reach `field.lua` as a controller-only input,
+`position.fix`, never logged or sent; a payload prop is an Android prop
+whose `node.lua` gets `gps.fix` from the phone and checks the zone
+itself. Field Boxes have no GPS (E21), so an "ESP32 + GPS module" payload
+is not planned.)*
+
 **Phase dependency:** Phase 3 (player app with GPS reporting, VIP
 role). Cannot be fully tested without Android hardware and GPS.
 
@@ -760,6 +909,13 @@ disabling defences).
 functions testable in unit tests. The actual touch interaction needs
 an Android device.
 
+*(2026-10-19, P4R5: no `display.touch` input exists in the core, the
+app or the firmware, and touch is weak outdoors (spec section 7). The
+Hacking Terminal is built on `keypad.key`, team input and screen
+templates, so it runs on a Field Box with a keypad and on an Android
+prop's on-screen keypad, and is tested with the mode tests' `keys`
+step; a touch puzzle waits for an RFC.)*
+
 **Phase dependency:** Phase 3 (Android shell, Flutter touch UI, kiosk
 mode).
 
@@ -771,6 +927,13 @@ mode).
 | Target Windows | Yes | No | -- | -- | Target addon |
 | VIP / Payload | Optional | Yes | field.* API | Player app, GPS, VIP role | GPS module or phone |
 | Hacking Terminal | Yes | Optional | -- | Android shell, Flutter UI | Android device |
+
+*(2026-10-19: every phase 3 dependency in this table is built in
+software: the player app with roles (including `vip`), position
+reports, the Android prop shell with keypad, NFC and screens. Engineer-only
+is deferred (P4R3); the Hacking Terminal also runs on a Field Box with a
+keypad (P4R5); only the target addon and real-phone tests need
+hardware.)*
 
 ---
 
@@ -827,7 +990,9 @@ defined by MIL-STD-2045 and the CoT specification from MITRE.
 A Python module on the controller (`controller/atalaia_controller/atak.py`) that:
 
 1. Subscribes to game events and node STATE messages.
-2. Generates CoT XML for each node with a GPS fix.
+2. Generates CoT XML for each node with a GPS fix. *(2026-10-19: Field
+   Boxes have no GPS; node positions are 0-1 on the field image, which
+   the GM georeferences; player positions are never multicast, P4R18.)*
 3. Sends CoT messages via UDP multicast on the field Wi-Fi network.
 4. Optionally forwards to the site server, which relays to remote ATAK
    clients via TCP.
@@ -945,6 +1110,13 @@ The GM console (or a CLI tool) compiles the scenario manifest into a
 
 The generated `field.lua` is saved as a preset and can be shared in
 the mode registry.
+
+*(2026-10-19, P4R7 and P4R8: boxes run built-in scripts only, so the
+compiled scenario is a `kind: scenario` package with a `field.lua` over
+a built-in `org.atalaia.objectives` role package; teams are the game's
+team names, squads are numbers (the manifest above uses free squad
+names the controller does not have); objective texts live in the
+package, events carry only the objective id.)*
 
 ### Test approach
 
@@ -1096,6 +1268,8 @@ injection). The player app never receives data its role may not see.
 
 ```yaml
 # .github/workflows/server.yml (conceptual)
+# (2026-10-19: a `server` job inside the existing ci.yml, with this
+#  service container; tests are unittest, not pytest, P4R17)
 services:
   postgres:
     image: postgres:16-alpine
@@ -1123,6 +1297,8 @@ Tests:
 
 ```yaml
 # In the existing simulator test suite
+# (2026-10-19: as built, `python3 -m atalaia_sim test` runs every mode's
+#  YAML tests inside tools/check.sh; folders use underscores)
 steps:
   - run: pytest modes/master-and-satellites/tests/ -v
   - run: pytest modes/target-windows/tests/ -v
@@ -1171,6 +1347,10 @@ def test_compile_capture_and_hold():
 ---
 
 ## 15. Assumptions about earlier phases
+
+*(2026-10-19: re-checked against the built code in PLAN.md's
+assumptions table; A13 is dropped, A7 and A9 changed, the rest are
+built in software.)*
 
 | # | Assumption | Phase dependency | Impact if wrong |
 |---|-----------|------------------|-----------------|
@@ -1243,7 +1423,7 @@ event ID allocation.
 | A6 | Phase 3 delivers GPS reporting from the player app to the controller | **HOLDS** | Position reports via `POST /api/v1/positions`, authenticated with player token. GPS NOT on the Field Box (E21); positions come from phones/pods only. |
 | A7 | Phase 3 delivers NFC squad identification (team + squad from NFC tags) | **HOLDS** | NFC tags use HMAC-SHA256 with game key, truncated to 16 bytes. |
 | A8 | Phase 3 delivers the chrono check-in flow in the player app | **CHANGED** | Chrono records are JSON with Ed25519 signature per marshal (ADR-P3-7), not HMAC-SHA256 from the password. Aligns with ADR-P4-5. Record fields: reading_id, replica_id, player_id, type, velocity_mps, bb_weight_g, energy_j, chrono_id, marshal_id, marshal_name, game_id, field_id, timestamp, signature. |
-| A9 | Phase 3 delivers BLE join for Android devices | **HOLDS** | Unchanged. |
+| A9 | Phase 3 delivers BLE join for Android devices | **HOLDS** | Unchanged. *(2026-10-19: changed; joins are by QR, NFC or text, P3-10; BLE is only the pod link.)* |
 | A10 | Phase 3 delivers Hold-All Domination, Last Stand, Kill Confirmed and other modes | **CHANGED** | Hold-All Domination and Last Stand moved to the Phase 2 mode pack (decision R6). Kill Confirmed remains Phase 3. |
 | A11 | Phase 1 delivers the target addon hardware | **HOLDS** | Unchanged. |
 | A12 | The controller's WiFi network supports UDP multicast for ATAK CoT | **HOLDS** | Unchanged. |
@@ -1275,7 +1455,8 @@ checked against the design documents.
 
 4. **Player tokens**: HMAC-SHA256-signed JSON (not JWT) with
    `player_id`, `team`, `squad`, `role`, `game_id`, `exp`; signed
-   with the game key. The site server does not issue player tokens
+   with the game key *(corrected 2026-10-19: with the controller's own
+   per-game token key, B8)*. The site server does not issue player tokens
    (the controller does) but must understand them for position
    filtering if it receives live position data.
 
@@ -1303,6 +1484,9 @@ The Phase 2 mode pack (R6) owns IDs 28-32 (holdall.*, laststand.*).
 `hacking.solved`, `scenario.objective.completed`,
 `scenario.objective.failed`, `scenario.objective.revealed`,
 `scenario.started`) will be allocated IDs 42-49.
+
+*(2026-10-19, P4R1: six events, 42-47; no `satellite.*`; the Medic Kit
+took 50-51 and data keys 32-33; phase 4's data keys start at 34.)*
 
 ### Codebase inventory corrections
 
@@ -1345,6 +1529,9 @@ The Phase 2 mode pack (R6) owns IDs 28-32 (holdall.*, laststand.*).
 
 ### Implementation order
 
+*(2026-10-19: superseded by PLAN.md's "Implementation order", 22
+software plan phases and 4 hardware ones.)*
+
 1. **Site server skeleton** (FastAPI + PostgreSQL + Alembic + auth).
    No Phase 3 dependency.
 2. **Sync protocol** (controller pushes events/scores/chrono to site
@@ -1369,6 +1556,11 @@ The Phase 2 mode pack (R6) owns IDs 28-32 (holdall.*, laststand.*).
 12. **Weekend milsim gate**. Last; depends on everything above.
 
 ### Files to create (Phase 4)
+
+*(2026-10-19: superseded by PLAN.md's "Summary of new files": the site
+server package is `server/atalaia_server/`, mode folders use
+underscores, the scenario compiler is in the controller, the CoT emitter
+is `controller/atalaia_controller/atak.py`.)*
 
 ```
 server/
@@ -1461,7 +1653,7 @@ docs/
 - **Mode package format**: follow the existing `modes/domination/` and
   `modes/bomb/` structure.
 - **Test format**: YAML event sequences for modes; pytest for the site
-  server.
+  server. *(2026-10-19: unittest, as the rest of the repository, P4R17.)*
 - **ADR pairing**: one ADR per significant design decision.
 - **SPDX headers**: AGPL-3.0-or-later for server and controller code;
   GPL-3.0-or-later for modes; CC-BY-SA-4.0 for docs.
@@ -1486,7 +1678,8 @@ docs/
    controller (Python). Recommendation: site server, with the GM
    console sending the scenario YAML and receiving the compiled
    field.lua. The controller receives the compiled script via the
-   normal preset push.
+   normal preset push. *(Changed 2026-10-18, decision P4-1: a shared
+   library on the controller, imported by the site server.)*
 
 4. **Chrono record integrity.** Marshal signatures must survive
    password changes. An Ed25519 keypair per marshal (generated at role

@@ -7,1108 +7,1148 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 Gate: **A weekend milsim runs on the platform end to end.**
 
-Constraint: Phase 2D (Python controller) and Phase 3 (Android shell,
-player app, GPS, chrono) are not yet complete. All builds run in
-Docker. What can be built and tested without those phases (site server
-skeleton, auth, GDPR, scenario DSL, modes that depend only on Phase 2C,
-ATAK/CoT) is separated from what depends on Phase 2D (sync protocol)
-or Phase 3 (VIP, Hacking Terminal, chrono end-to-end). Phase 3's
-design is not available -- its interfaces are derived from the spec
-and marked for re-checking when Phase 3 design completes.
+This plan was refreshed on 2026-10-19, after phase 3's software was
+built (section "Refresh 2026-10-19" below). The plan phases are now
+listed **in the order to implement them**, each marked *software, can
+be done now* or *needs hardware or a real deployment*, small enough to
+be implemented, verified from a clean copy and committed on its own.
+All builds and tests run in Docker; the commands below are the
+repository's real ones.
 
 ---
 
-## Phase 2 and 3 handoff (2026-10-18)
+## Refresh 2026-10-19 (after phase 3 software)
 
-Phase 2 implementation (A-E) is now complete and Phase 3 design is
-complete (not yet built). The following facts affect this plan:
+Phase 2 plan phases A-E and the mode pack, and phase 3 plan phases A-F,
+the Medic Kit and branding are built in software (phase 3 STATUS.md).
+What is left of them needs hardware: phase 2 plan phase F (the field
+test), phase 3 plan phase G (the field test), the Android controller
+role's shell (PE24) and iOS. The 2026-10-18 handoff had updated this
+plan from phase 3's *design*; the code differs from that design in
+ways that change phase 4. What changed, and why:
 
-- **Controller package**: `controller/atalaia_controller/`, not
-  `controller/src/` (decision D15). All file paths in this plan
-  updated.
-- **Controller auth**: bearer tokens (read token, GM token), not
-  JWT/sessions (decision D12). The sync client on the controller
-  authenticates to the site server with a 256-bit API key; the site
-  server authenticates to the controller with the GM token (writes)
-  and read token (reads).
-- **Event unique constraint**: `(game_id, node_id, seq, game_time,
-  type)`, not `(game_id, node_id, seq)` (decision D6). ADR-P4-1 and
-  constraint 5 updated.
-- **Scenario compiler**: runs on the field controller at
-  `controller/atalaia_controller/scenarios/`, not on the site server
-  (maintainer decision P4-1). The site server imports the same
-  package. Phase E updated.
-- **Event IDs**: Phase 4 starts at ID 42. Phase 3 uses 25-27 and
-  33-41; Phase 2 mode pack uses 28-32.
-- **Player tokens**: HMAC-SHA256-signed JSON (not JWT), issued by the
-  controller. The site server must understand them for position
-  filtering.
-- **Chrono signing**: Ed25519 per marshal, confirmed by Phase 3
-  design (ADR-P3-7). Aligns with ADR-P4-5.
-- **Hold-All Domination and Last Stand**: in the Phase 2 mode pack
-  now (decision R6), not Phase 3.
-- **GPS not on Field Box** (E21): positions come from phones/pods
-  only.
+1. **Order.** The old phases A-I were ordered by dependency on phases
+   2D and 3, which are now done. The maintainer wants as much code as
+   possible before the Heltec V4 boards arrive, so the phases are
+   re-cut into 22 small software plan phases and 4 hardware ones,
+   modes and core first (they reuse tooling phase 3 proved), then the
+   site server chain (decision P4R20). The mapping from the old letters
+   is in the table below.
+2. **Tests and tooling.** Mode tests are YAML run by
+   `python3 -m atalaia_sim test` (and through the core in Dart), the
+   controller's tests are `unittest`, not pytest (decision D15), and
+   everything runs in the `atalaia-dev` image through `tools/check.sh`
+   and the `tools/docker_*.py` wrappers. Commands are written for the
+   WSL/Linux working copy (`$PWD`, no `MSYS_NO_PATHCONV` or `pwd -W`).
+   The site server gets its own image and PostgreSQL in a service
+   container in CI and an ephemeral container locally (P4R16, P4R17).
+3. **Event ids.** 42-45 scenario events, 46 `vip.extracted`, 47
+   `hacking.solved`; no `satellite.*` events (satellites send
+   `zone.captured`, as spec section 15 says); `target.hit` already
+   exists as 16; 50-51 are the Medic Kit's; data keys from 34
+   (decision P4R1). Each id is added with the code that first uses it.
+4. **Modes.** Folders with underscores and translations in
+   `mode.yaml` (P4R22); `score.add` takes integers (P4R2); inputs that
+   exist (`keypad.key`, `team_input.*`, `nfc.tag`, `cmd.mode`) instead
+   of an invented `display.touch` (P4R5); positions never travel as a
+   `gps.fix` event on the radio (P4R6); a `hit.hit` input for the target
+   addon (P4R4); engineer-only satellites deferred (P4R3).
+5. **Custom scenarios.** Boxes run only built-in scripts (a new mode
+   needs a flash, K10; a join for a missing mode is refused), so a
+   scenario compiles to a `kind: scenario` package with a `field.lua`
+   only, and the boxes run a new built-in role package,
+   `org.atalaia.objectives` (P4R7).
+6. **Sync.** The controller opens every connection (it sits behind 4G
+   NAT) and the site server never holds the controller's GM or read
+   token (P4R12); the API key is stored as SHA-256 (P4R13); a game is
+   `(field, game_id, game_seed)` (P4R11); scores merge per node, not per
+   total, because a GM's adjustment can be negative (P4R10).
+7. **Chrono registry.** Records are the signed per-reading JSON that
+   the marshal's phone makes; the site server stores them verbatim,
+   verifies them with the controller's `chrono.py` and keeps public
+   keys only (P4R14, P4R15).
+8. **Player identity and tokens.** Players are per-field
+   pseudonymous ids (`p-` + 12 base32 characters with a secret whose
+   SHA-256 the controller keeps); player tokens (`apt1.`) are signed
+   with the controller's own per-game token key (B8), not the game key;
+   the site server never verifies or issues them.
+9. **Branding and club profiles.** Phase 3 built field and team
+   branding per controller; club profiles sync it (P4R19, plan phase
+   18).
+10. **ATAK.** Field Boxes have no GPS and their positions are 0-1 on
+    the field image, so the image is georeferenced; player positions
+    are never multicast (P4R18).
+11. **Licences.** Controller additions are AGPL-3.0-or-later
+    (REUSE.toml), not GPL (P4R21).
 
-The assumptions section (below) is updated with handoff results.
+### Old phases to new plan phases
+
+| Old | Content | New plan phases |
+|-----|---------|-----------------|
+| A | Site server skeleton, auth, GDPR, deploy | 10, 11, 12, 21, 22 |
+| B | Master and Satellites, Target Windows | 1, 2 (+ HW2) |
+| C | Sync and chrono registry | 13, 14, 20 |
+| D | Geo utilities, ATAK/CoT | 3, 9 (+ HW3) |
+| E | Scenario DSL and compiler | 6, 7, 8 (+ the site server's library in 20) |
+| F | VIP / Payload, Hacking Terminal | 4, 5 (+ HW3) |
+| G | Device health, remote GM | 19 |
+| I | Scheduling, registration, feeds, import | 15, 16, 17 |
+| H | Integration and the weekend gate | HW1-HW4 |
+| (new) | Club profiles and branding sync | 18 |
+
+### Lessons from phases 2 and 3 that this plan applies
+
+- **Verify from a clean copy.** Incremental builds have hidden real
+  errors twice (an undefined Kconfig symbol in an ESP-IDF build, a
+  build-downloaded dependency). Every plan phase is verified from a
+  fresh clone with a freshly built `atalaia-dev` image and an empty
+  build folder (section "How each plan phase is verified").
+- **Check known-answer vectors against their source documents**, not
+  against the implementation (a self-made AES-CCM vector was once
+  labelled RFC 3610's). New vectors in this phase (iCalendar folding,
+  CoT XML, the sync batch) cite their source; RFC test vectors are
+  copied from the RFC.
+- **Shared vectors for every format with two implementations.** C,
+  Python and Dart all read `protocol/vectors/`; phase 4 adds vectors for
+  the scenario package, the sync batch and the `hit` capability, and the
+  site server reads the existing chrono and player-token vectors too.
+- **Exceptions raised in ctypes callbacks are swallowed.** The
+  simulator collects problems in `Simulation.problems`; new field-script
+  inputs (`position.fix`, scenario mode commands) must report errors the
+  same way, and tests assert that `problems` is empty.
+- **Wokwi's CI quota is used up (decision R7).** Firmware changes (new
+  built-in presets) are verified with the firmware host tests, the
+  screen reference images and the three ESP-IDF builds with no
+  warnings; each commit says that Wokwi did not run.
+
+---
+
+## How each plan phase is verified
+
+Every plan phase ends with the same independent check, from a clean
+copy, before its commit:
+
+```sh
+# a clean copy and a fresh image (no build/, no managed_components, no sdkconfig)
+rm -rf /tmp/verify && git clone --quiet . /tmp/verify && cd /tmp/verify
+docker build -t atalaia-dev:verify tools/dev
+docker run --rm -v "$PWD:/src" atalaia-dev:verify sh -c "BUILD=/tmp/c sh tools/check.sh"
+```
+
+`tools/check.sh` runs protogen's check, the project page check, the
+wiring check, the formatters, the core's `ctest`, the host modem, box
+and pod builds, the simulator's unit tests, **every mode's YAML tests**
+(`python3 -m atalaia_sim test`) and the controller's unit tests, with
+`ATALAIA_REQUIRE_ALL=1` so a missing core or host binary is an error,
+not a skip. Depending on what a plan phase touches, also:
+
+| Touches | Command | CI job |
+|---------|---------|--------|
+| Modes run in Dart through the core, the app, the catalogue | `python3 tools/docker_app.py` (check, ndk, apk); `python3 tools/docker_app.py gen` after a new built-in mode; `goldens` for new screens | `flutter-test`, `core-android-ndk`, `flutter-build-android` |
+| On-device app tests | `sh app/tool/emulator_tests.sh` (needs KVM) | `flutter-integration` |
+| Field Box presets, firmware C | `python3 tools/docker_fw.py test`, then `build`, `modem` and `pod` (0 warnings); not `wokwi` (R7) | `firmware-test`, `esp32-build`, `esp32-modem-build`, `esp32-pod-build` |
+| The core's C | ASan/UBSan, as CI's `sanitizers` job: `docker run --rm -v "$PWD:/src" atalaia-dev sh -c 'cmake -S core -B /tmp/s -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all" && cmake --build /tmp/s && ctest --test-dir /tmp/s --output-on-failure'` | `sanitizers` |
+| GM console | `python3 tools/docker_console.py` (Playwright in Chromium) | `console` |
+| Licences | `reuse lint`, as CI's `licensing` job (locally: `python3 -m venv /tmp/r && /tmp/r/bin/pip install reuse && /tmp/r/bin/reuse lint`, in a copy without build output) | `licensing` |
+| Site server (from plan phase 10) | `python3 tools/docker_server.py test` (new: Docker Compose with an ephemeral `postgres:16-alpine` and the server's test image); `python3 tools/docker_server.py migrations` (upgrade, downgrade, upgrade) | `server` (new, with a `postgres:16-alpine` service) |
+
+Mode tests alone, during development:
+`python3 tools/docker_sim.py test modes/master_satellites` (the core is
+rebuilt incrementally in a Docker volume: fine while working, never the
+final check).
+
+The **database in tests** (decision P4R17): the site server's database
+layer is tested only against PostgreSQL 16, never SQLite. Layers with no
+database (feeds, the iCalendar writer, the import parser, sync batch
+validation, chrono verification, the scenario compiler) are plain
+Python with unit tests that also run inside `tools/check.sh`.
 
 ---
 
 ## Scope
 
-### In scope (software -- buildable and testable without extra hardware)
+### In scope (software, buildable and testable now)
 
-- Site server application (FastAPI + PostgreSQL + Alembic).
-- Account model with Argon2id passwords, JWT sessions, TOTP 2FA.
-- Role-based access control (player, squad_leader, vip, marshal, gm,
-  spectator, admin) with per-field and per-game granularity.
-- GDPR compliance endpoints (access, export, erasure, rectification),
-  retention purge job, privacy notice and DPA templates.
-- Multi-tenant hosted mode (schema-per-field, RLS defence-in-depth).
-- Chrono registry: replica registration, marshal Ed25519 signing keys,
-  check-in records, spot checks, cross-field sharing with double
-  opt-in, violation tracking.
-- Controller-to-site-server sync protocol: event batch push, score
-  merge (GREATEST), chrono sync, roster pull, offline buffering,
-  WebSocket live stream.
-- Game scheduling, player registration, scheduled game lifecycle;
-  added 2026-10-19 (maintainer request, ADR-P4-11, ADR-P4-12, Phase I):
-  publication on the field's site-server page, registration with
-  pre-declared replicas synced to the controller's check-in list on
-  game day, an iCalendar (RFC 5545) feed, a JSON feed, import of a
-  registration list (CSV or JSON), and an adapter interface for
-  specific platforms (documented API or written agreement only; no
-  scraping; no adapter for jogarairsoft.pt until the maintainer has
-  contacted it).
-- Device health dashboard, firmware catalog, remote GM console relay.
-- Master and Satellites mode (`field.lua` + `node.lua`; depends on
-  Phase 2C only).
-- Target Windows mode (`node.lua`; depends on Phase 2C only).
-- VIP / Payload mode (`field.lua` + `node.lua`; depends on Phase 3
-  GPS and player app).
-- Hacking Terminal mode (`node.lua`; depends on Phase 3 Android shell).
-- ATAK / CoT emitter on the controller (UDP multicast + TCP;
-  `controller/atalaia_controller/atak.py`).
-- `geo.distance()` and `geo.in_zone()` in the core Lua API
-  (`core/src/script_api.c`).
-- Custom scenario DSL: YAML manifest schema, Python compiler to
-  `field.lua`, validation (DAG check, parameter check, zone geometry),
-  CLI tool.
-- New events in `protocol/schema/events.yaml` (IDs 42-49):
-  `scenario.objective.completed` (42), `scenario.objective.failed`
-  (43), `scenario.objective.revealed` (44), `scenario.started` (45),
-  `satellite.captured` (46), `satellite.neutralized` (47),
-  `vip.extracted` (48), `hacking.solved` (49). Phase 4 events start
-  at ID 42 (Phase 3 uses 25-27 and 33-41; Phase 2 mode pack uses
-  28-32).
-- Site server Docker image and docker-compose with PostgreSQL.
-- Backup and restore scripts.
-- Setup script for first-time deployment.
+- Four advanced modes: Master and Satellites, Target Windows (logic;
+  the addon is hardware), Hacking Terminal (keypad puzzles), VIP /
+  Payload (player and payload prop).
+- `geo.distance()` and `geo.in_zone()` in the core for every script.
+- Custom scenarios: the `kind: scenario` package, the built-in
+  `org.atalaia.objectives` role package, the compiler and validator
+  (`controller/atalaia_controller/scenarios/`, decision P4-1), a CLI,
+  the controller's scenario endpoints, the GM console's scenario
+  builder, objectives in the player view.
+- The ATAK / CoT emitter on the controller, with a georeferenced field
+  image.
+- The site server (`server/`): FastAPI with PostgreSQL 16, Alembic,
+  accounts (Argon2id, JWT, TOTP), roles, personal data rights and
+  retention, the controller sync (a controller-initiated link), the
+  chrono registry, scheduling, publication, registration with
+  pre-declared replicas and the game-day sync into the controller's
+  check-in list, iCalendar and JSON feeds, the registration import and
+  the adapter interface, club profiles and branding sync, device
+  health, the remote GM relay over the controller's link, game history,
+  hosted multi-tenant mode, deployment (Caddy, setup, backup, restore).
+- New events and data keys in `protocol/schema/events.yaml` (P4R1).
 
-### In scope (needs hardware or real deployment)
+### Needs hardware or a real deployment
 
-- End-to-end sync testing with a real Pi controller and 4G bridge.
-- Target Windows mode hardware testing (piezo sensor calibration and
-  debounce tuning on the target addon).
-- ATAK field testing (real ATAK app on an Android phone on the field
-  Wi-Fi network).
-- Master and Satellites hardware testing with ESP32 Satellite builds.
-- Chrono end-to-end testing with a real chronograph and NFC tags.
-- Weekend milsim gate (10-20 ESP32 boxes, Pi controller, repeaters,
-  4G bridge, site server, 20+ player phones, ATAK devices).
+- Sync over a real 4G link between a Raspberry Pi controller and a
+  site server on a VPS (HW1).
+- The target addon and its `hit` driver on the Field Box (HW2).
+- Real phones: the VIP's GPS outdoors, a Hacking Terminal and a payload
+  prop on a phone, ATAK on a phone on the field Wi-Fi (HW3).
+- Chrono end to end with a real chronograph and NFC tags (HW4).
+- The weekend milsim gate (HW4), after phase 2 plan phase F and phase 3
+  plan phase G.
 
 ### Out of scope (later phases)
 
-- Visual scenario editor / Blockly (Phase 5).
-- TAK Server integration (Phase 5+).
-- Carrier PCB (Phase 5).
-- BLE room beacons for indoor positioning (Phase 3/5).
-- Meshtastic as alternate transport (Phase 3+).
-- DIY chronograph addon firmware (Phase 5).
-- Community hub public directory and mode registry browser (Phase 5).
-- Additional mode translations beyond en and pt (Phase 5).
-- iOS player app (Phase 3; the site server API serves it, but the
-  app is not a Phase 4 deliverable).
-
-### Club profiles (added 2026-10-19, with phase 3's branding)
-
-Phase 3 gave each controller a **field branding** (the field's name, logo,
-wallpaper and accent colour) and per-game **team branding** with saved
-team presets (display name, usual colour, crest), all kept on that one
-controller (`controller/atalaia_controller/branding.py`, decisions
-BR1-BR24). **Club profiles with accounts** belong to the site server: a
-club's page with its name, logo and crest, edited by the club's own
-accounts, from which a field's controllers take their branding and team
-presets in the sync (instead of a GM uploading them on each controller), and
-a team's crest that follows it from field to field. To design with plan
-phase I (field pages, registration): the same image rules as the
-controller's (PNG, JPEG or WebP, the size and pixel caps, metadata
-stripped), the rights reminder, and moderation for public club pages. Not in
-the current plan phases.
+- Visual scenario editor (phase 5; it will write the same manifest).
+- TAK Server integration (phase 5+).
+- A touch-only Hacking Terminal puzzle (needs a `display.touch` input
+  and an RFC, P4R5).
+- Engineer-only satellites (P4R3).
+- Carrier PCB, community hub directory, mode registry browser, more
+  languages (phase 5).
+- The Android controller role's shell (phase 3 PE24) and iOS (phase 3).
+- Money Factory (phase 3 decision A1).
 
 ---
 
-## Constraints from ADR.md (all 18 respected)
+## Constraints (from ADR.md, with the 2026-10-19 amendments)
 
 | # | Constraint | How the plan respects it |
 |---|------------|--------------------------|
-| 1 | PostgreSQL 16+ with SQLAlchemy 2.0 async + asyncpg; UUID PKs, `created_at` and `updated_at` timestamps | Phase A creates the schema from ADR-P4-1 via Alembic; the CI docker-compose starts PostgreSQL 16-alpine; every model carries UUID PK and timestamp columns |
-| 2 | Alembic for all schema changes; every migration reversible; CI runs upgrade-downgrade-upgrade | Phase A creates the Alembic scaffold; AC-2 validates reversibility with the three-step migration test in CI |
-| 3 | Argon2id for passwords, PyJWT for tokens, pyotp for TOTP; TOTP mandatory for admin/GM/marshal | Phase A implements auth; tests assert TOTP enforcement for privileged roles; the breached-password list ships as a static file |
-| 4 | Asymmetric sync auth: controller authenticates to site server with a 256-bit API key (Argon2id-hashed, SHA-256 cache); site server authenticates to controller with bearer tokens (GM token for writes, read token for reads) | Phase C implements the sync service with asymmetric auth; tests use a test API key for controller-to-server and test bearer tokens for server-to-controller |
-| 5 | Events are append-only; scores merge by GREATEST; `UNIQUE(game_id, node_id, seq, game_time_ms, event_type)` enforces idempotent sync (widened per decision D6) | Phase C sync endpoints enforce the unique constraint; score merge uses the `GREATEST` SQL function; tests replay duplicate batches |
-| 6 | Schema-per-field in hosted mode; single schema in self-hosted; Alembic iterates over tenant schemas | Phase A creates the tenant routing middleware; self-hosted tests use the public schema; hosted-mode tests create and tear down a test schema |
-| 7 | Ed25519 for chrono record signing; per-marshal keypairs independent of passwords; encrypted private key recovery | Phase A creates the `marshal_signing_keys` table; Phase C implements the signing/verification flow; tests verify signature stability across password changes |
-| 8 | Scenario manifests are YAML; compiler is a shared Python library at `controller/atalaia_controller/scenarios/` (maintainer decision P4-1); the site server imports it; validation includes DAG check, parameter validation and zone geometry checks | Phase E implements the compiler at `controller/atalaia_controller/scenarios/`; tests compile each of the 7 objective types and run the generated Lua in the simulator |
-| 9 | CoT emission via UDP multicast (primary) and TCP (secondary); `geo.distance` and `geo.in_zone` registered in the core for all scripts; zone types: circle and polygon | Phase D adds `geo.*` to the core (C); Phase D adds `atak.py` to the controller; CoT XML tests verify against known-good samples |
-| 10 | GDPR: anonymise on erasure, retain for integrity; retention purge daily; privacy notice and DPA templates shipped but require legal review | Phase A implements GDPR endpoints; tests verify anonymisation preserves marshal signatures; templates ship in `docs/templates/` |
-| 11 | docker-compose with Caddy or nginx for TLS; setup script generates secrets; backups use `pg_dump -Fc` with 30-day retention | Phase A creates the docker-compose and setup script; Phase H documentation includes deployment and backup runbooks |
-| 12 | New events in `events.yaml`: 8 new event types for scenarios, satellites, VIP and hacking | Phase B and Phase F add events; tests validate the new events round-trip through the simulator event bus |
-| 13 | SPDX headers on every file; AGPL-3.0-or-later for server; GPL-3.0-or-later for controller additions and modes; CC-BY-SA-4.0 for docs | Every phase's file lists specify the licence; a CI grep check validates headers |
-| 14 | No C compiler on host; site server is pure Python; `libatalaia_core.so` cross-compiled in Docker; `cryptography` ships pre-built wheels | All validation commands use Docker; the site server Dockerfile uses `python:3.11-slim`; the core builds inside `atalaia-dev` |
-| 15 | Phase 3 interfaces are assumptions; `gps.fix` events, player app role model, Android shell are assumed but must be re-verified when Phase 3 design completes | Phase F (Phase-3-dependent modes) is explicitly gated; every Phase 3 assumption is marked in the Assumptions table |
-| 16 | Scheduling and registration feed the controller, never drive it (ADR-P4-11) | Phase I's controller tests: roster changes stop at the game's start; the roster holds only check-in fields; walk-ins as counts by default |
-| 17 | Open feeds hold no personal data (ADR-P4-12) | Phase I's feed tests check for names, drafts and counts beyond places left |
-| 18 | Third-party platforms only through a documented API or written agreement (ADR-P4-12) | Phase I ships the interface, a test adapter and the import only; adapters off by default and audited |
+| 1 | PostgreSQL 16+ with SQLAlchemy 2 async + asyncpg; UUID keys on user-facing tables; `created_at`/`updated_at` | Plan phase 10 creates the schema with Alembic; tests run on PostgreSQL 16 only (P4R17) |
+| 2 | Alembic for every change; every migration reversible; CI runs upgrade-downgrade-upgrade | `tools/docker_server.py migrations` and the `server` CI job in every site-server plan phase |
+| 3 | Argon2id passwords, PyJWT, pyotp; TOTP mandatory for admin, GM and marshal accounts | Plan phase 11 |
+| 4 | **Amended 2026-10-19:** the controller opens every connection; the site server never stores the controller's tokens; the controller's API key is a 256-bit value stored as SHA-256 (P4R12, P4R13) | Plan phase 13; remote GM in plan phase 19 rides the controller's WebSocket |
+| 5 | **Amended 2026-10-19:** events append-only, unique on `(game, node_id, seq, game_time_ms, type)`; a game is `(field, game_id, game_seed)`; scores merge per node counter by `GREATEST`, GM adjustments come as `score.delta` events (P4R10, P4R11) | Plan phase 13's tests replay batches and negative adjustments |
+| 6 | Schema per field in hosted mode; one schema self-hosted | Plan phase 21 (hosted mode last) |
+| 7 | **Amended 2026-10-19:** Ed25519 per marshal, keys made on the marshal's phone; the site server keeps public keys only, with history; records stored verbatim and verified with `chrono.py` (P4R14, P4R15) | Plan phase 14 |
+| 8 | **Amended 2026-10-19:** scenarios are YAML; the compiler is `controller/atalaia_controller/scenarios/` (P4-1), the site server imports it; it emits a `kind: scenario` package (`field.lua` only) over the built-in `org.atalaia.objectives` role package (P4R7, P4R8) | Plan phases 6-8, 20 |
+| 9 | `geo.distance`, `geo.in_zone` in the core for every script; CoT over UDP multicast (props and zones only) and TCP (staff endpoints) (P4R18) | Plan phases 3, 9 |
+| 10 | Personal data: anonymise on erasure, keep signatures; daily retention purge; templates need legal review (P4-6); **positions never reach the site server** (P4R25) | Plan phase 12, extended by every later plan phase that adds personal data |
+| 11 | Docker Compose with Caddy (or nginx) for TLS; setup script makes secrets; `pg_dump -Fc` backups, 30 days | Plan phase 22 |
+| 12 | **Amended 2026-10-19:** new events 42-47 and data keys 34-36 (P4R1), each added with the code that first emits it | Plan phases 4, 5, 6 |
+| 13 | **Amended 2026-10-19:** SPDX headers on every file; AGPL-3.0-or-later for `server/` and `controller/` (incl. `sync_client.py`, `atak.py`, `scenarios/`); GPL-3.0-or-later for modes, core and tools; CC-BY-SA-4.0 for docs (P4R21) | `reuse lint` in CI |
+| 14 | **Amended 2026-10-19:** no C compiler on the host; the site server image is `python:3.12-slim` with hash-pinned pip dependencies and a build stage for `libatalaia_core.so` (P4R9, P4R16) | Plan phase 10 |
+| 15 | **Amended 2026-10-19:** phase 3 interfaces are now built and are the source of truth (STATUS.md handoff), not assumptions | The assumptions table below marks each as built |
+| 16 | Scheduling and registration feed the controller, never drive it (ADR-P4-11) | Plan phase 16 |
+| 17 | Open feeds hold no personal data (ADR-P4-12) | Plan phase 15 |
+| 18 | Third-party platforms only by documented API or written agreement (ADR-P4-12) | Plan phase 17 |
+| 19 | **New 2026-10-19:** boxes run built-in scripts only; anything per game (a scenario) lives in `field.lua` and reaches nodes as mode commands (P4R7) | Plan phases 6-8 |
+| 20 | **New 2026-10-19:** positions never travel as events, on the radio, MQTT or to the site server; scripts get them as controller-only inputs (P4R6, P4R25) | Plan phases 5, 9 |
+| 21 | **New 2026-10-19:** shared Python (scenarios, chrono verifier, player-token codec, image checks, `atalaia_sim.mode`) stays free of FastAPI and pydantic (P4R16) | Plan phases 7, 13, 14, 18 import them from the site server |
+| 22 | **New 2026-10-19:** `score.add` takes integers; events carry ids, never texts or coordinates; every event fits 200 bytes (the simulator's checks) | Mode tests |
+| 23 | **New 2026-10-19:** each plan phase is verified from a clean copy and committed on its own; firmware without Wokwi until R7 ends | "How each plan phase is verified" |
 
 ---
 
-## Phase A: Site server skeleton (auth, DB, GDPR, deploy)
+## Implementation order
 
-### Goal
+| # | Plan phase | Scope | Software now / hardware | Depends on | Size |
+|---|------------|-------|-------------------------|------------|------|
+| 1 | Master and Satellites | `modes/master_satellites/`, Field Box preset, app catalogue | Software, now | -- | S |
+| 2 | Target Windows (logic) | `modes/target_windows/`, `game.teams()` in the core, `hit` capability in the draft RFC and the capability proxy | Software, now (the addon: HW2) | -- | S |
+| 3 | Geo utilities | `core/src/geo.c`, `geo.*` in `script_api.c` | Software, now | -- | S |
+| 4 | Hacking Terminal | `modes/hacking_terminal/`, event 47, Field Box preset, app | Software, now (on a phone: HW3) | -- | M |
+| 5 | VIP / Payload | `modes/vip_payload/`, event 46, `position.fix` for `field.lua`, `gps.fix` on Android props | Software, now (real GPS: HW3) | 3 | M |
+| 6 | Scenario packages and objectives | `kind: scenario`, `modes/objectives/` role package, events 42-45, data keys 34-35 | Software, now | -- | M |
+| 7 | Scenario compiler and validator | `controller/atalaia_controller/scenarios/` and its CLI | Software, now | 3, 6 | L |
+| 8 | Scenarios in the controller, console and app | `/api/v1/scenarios`, the scenario builder, objective routing, the player view | Software, now | 7 | M |
+| 9 | ATAK / CoT emitter | `atak.py`, field image georeference | Software, now (a real ATAK: HW3) | 3 | M |
+| 10 | Site server skeleton and test tooling | `server/` app, config, database, Alembic base, health, image, `tools/docker_server.py`, CI job | Software, now | -- | M |
+| 11 | Accounts, sessions and roles | Argon2id, JWT, TOTP, refresh rotation, rate limits, per-field roles, audit log | Software, now | 10 | M |
+| 12 | Personal data | access, export, erasure, rectification, retention purge, notices and DPA templates | Software, now | 11 | M |
+| 13 | Controller sync | API keys, the controller-initiated link, events, per-node scores, game metadata, nodes; `sync_client.py`, store schema 5 | Software, now (over 4G: HW1) | 10, 11 | L |
+| 14 | Chrono registry | marshal keys, replicas, readings with verification, violations, cross-field sharing | Software, now | 13 | M |
+| 15 | Scheduling, field pages and feeds | scheduled games, publication, `.ics`, JSON feed | Software, now | 11 | M |
+| 16 | Registration and game-day sync | registrations, tickets, roster pull, expected check-ins, outcomes push | Software, now | 13, 15 | L |
+| 17 | Registration import and adapters | CSV/JSON import, `PlatformAdapter`, test adapter | Software, now | 16 | S |
+| 18 | Club profiles and branding sync | clubs, branding and saved teams through `GET /sync/field` | Software, now | 13 | M |
+| 19 | Device health, firmware catalogue, remote GM | health from sync, remote GM over the controller's WebSocket | Software, now | 13 | M |
+| 20 | Game history and the scenario library | history views, scenario CRUD on the site server pushed with presets | Software, now | 13, 7 | M |
+| 21 | Hosted multi-tenant mode | schema per field, RLS, export and deletion of a field | Software, now | 10-20 | M |
+| 22 | Deployment | Caddy, `setup.sh`, `backup.sh`, restore test, `server/docs/DEPLOY.md` | Software, now | 10 | S |
+| HW1 | Sync over a real link | a Pi controller with the modem, a phone's 4G, a VPS | Needs hardware and a deployment | 13, phase 2 F | -- |
+| HW2 | Target addon | the addon's MCU firmware, the addon port driver, piezo tuning | Needs hardware | 2 | -- |
+| HW3 | Phones in the field | VIP GPS, payload prop, Hacking Terminal and ATAK on real phones | Needs hardware | 4, 5, 9, phase 3 G | -- |
+| HW4 | Chrono end to end and the weekend milsim gate | staged gate test plan below | Needs hardware and players | all, phase 2 F, phase 3 G | -- |
 
-Stand up the site server application: FastAPI with PostgreSQL,
-Alembic migrations for the full ADR-P4-1 schema, Argon2id
-authentication with JWT sessions and TOTP, role-based access control,
-GDPR endpoints (access, export, erasure, rectification), the
-retention purge job, privacy notice and DPA templates, the
-docker-compose deployment, and the setup script. This phase has no
-dependency on Phase 2D, Phase 3 or any hardware. Everything runs in
-Docker.
+Sizes: S about a day of agent work and under 1,000 changed lines, M two
+to three days, L up to a week. Plan phases 1-9 and 10-22 are two
+independent chains and can run in parallel worktrees; within each
+chain, follow the order.
 
-### Files to create
-
-| File | Licence | Purpose |
-|------|---------|---------|
-| `server/src/__init__.py` | AGPL-3.0-or-later | Package init |
-| `server/src/main.py` | AGPL-3.0-or-later | FastAPI application factory, middleware, lifespan |
-| `server/src/config.py` | AGPL-3.0-or-later | Configuration from env vars (DATABASE_URL, SECRET_KEY, REFRESH_SECRET, HOSTED_MODE, etc.) |
-| `server/src/models.py` | AGPL-3.0-or-later | SQLAlchemy 2.0 async models for all ADR-P4-1 tables (users, fields, games, events, chrono, etc.) |
-| `server/src/schemas.py` | AGPL-3.0-or-later | Pydantic v2 request/response schemas |
-| `server/src/database.py` | AGPL-3.0-or-later | Async engine, session factory, tenant routing middleware |
-| `server/src/auth.py` | AGPL-3.0-or-later | Argon2id hashing, JWT encode/decode, TOTP enrollment/verification, refresh token rotation, replay detection, breached-password check |
-| `server/src/api/__init__.py` | AGPL-3.0-or-later | API router aggregation |
-| `server/src/api/accounts.py` | AGPL-3.0-or-later | Registration, login, login/totp, refresh, logout, TOTP enrollment |
-| `server/src/api/fields.py` | AGPL-3.0-or-later | Field CRUD, joule limits, field settings |
-| `server/src/api/roles.py` | AGPL-3.0-or-later | Role assignment (per-field, per-game), marshal key generation |
-| `server/src/api/gdpr.py` | AGPL-3.0-or-later | `GET /me/data`, `GET /me/export`, `DELETE /me`, `PATCH /me` |
-| `server/src/api/health.py` | AGPL-3.0-or-later | `GET /health`, `GET /metrics` |
-| `server/src/middleware/__init__.py` | AGPL-3.0-or-later | Package init |
-| `server/src/middleware/auth_middleware.py` | AGPL-3.0-or-later | JWT verification dependency, role injection, `get_current_user` |
-| `server/src/middleware/rate_limit.py` | AGPL-3.0-or-later | Sliding-window rate limiter (in-memory; Redis optional) |
-| `server/src/middleware/security_headers.py` | AGPL-3.0-or-later | HSTS, CSP, X-Frame-Options, X-Content-Type-Options |
-| `server/src/services/__init__.py` | AGPL-3.0-or-later | Package init |
-| `server/src/services/gdpr_service.py` | AGPL-3.0-or-later | Anonymisation, export ZIP generation, retention purge job |
-| `server/src/services/tenant_service.py` | AGPL-3.0-or-later | Create/delete tenant schema, Alembic per-tenant migration runner |
-| `server/src/cli.py` | AGPL-3.0-or-later | CLI: `create-admin`, `rotate-secrets`, `purge-retention` |
-| `server/src/data/breached_passwords.txt` | AGPL-3.0-or-later | Top 100k breached passwords (static, no API call) |
-| `server/migrations/alembic.ini` | AGPL-3.0-or-later | Alembic config |
-| `server/migrations/env.py` | AGPL-3.0-or-later | Async Alembic runner with multi-tenant schema iteration |
-| `server/migrations/versions/0001_initial_schema.py` | AGPL-3.0-or-later | Full ADR-P4-1 schema: accounts, fields, devices, games, chrono, players, scheduling, scenarios, audit log, marshal signing keys |
-| `server/requirements.txt` | AGPL-3.0-or-later | fastapi, uvicorn, sqlalchemy[asyncio], asyncpg, alembic, argon2-cffi, pyjwt, pyotp, cryptography, pydantic, httpx |
-| `server/pyproject.toml` | AGPL-3.0-or-later | Project metadata, pytest config, ruff config |
-| `server/Dockerfile` | AGPL-3.0-or-later | python:3.11-slim, pip install, alembic upgrade head + uvicorn |
-| `server/docker-compose.yml` | AGPL-3.0-or-later | atalaia-server + postgres:16-alpine + optional caddy |
-| `server/docker-compose.test.yml` | AGPL-3.0-or-later | Test variant: ephemeral PostgreSQL, pytest runner |
-| `server/setup.sh` | AGPL-3.0-or-later | First-time setup: generate secrets, create .env, `docker compose up` |
-| `server/backup.sh` | AGPL-3.0-or-later | Daily backup: pg_dump -Fc + app-data tar.gz, 30-day retention |
-| `server/tests/__init__.py` | AGPL-3.0-or-later | Package init |
-| `server/tests/conftest.py` | AGPL-3.0-or-later | Fixtures: async test client, test database, test user, test field |
-| `server/tests/test_auth.py` | AGPL-3.0-or-later | Registration, login, TOTP, refresh rotation, replay detection, rate limiting, breached password rejection |
-| `server/tests/test_roles.py` | AGPL-3.0-or-later | Role assignment, TOTP enforcement for privileged roles, role-based endpoint access |
-| `server/tests/test_gdpr.py` | AGPL-3.0-or-later | Data access, export ZIP contents, erasure anonymisation (verify marshal signatures survive), retention purge |
-| `server/tests/test_models.py` | AGPL-3.0-or-later | Model creation, constraints, indexes |
-| `server/tests/test_health.py` | AGPL-3.0-or-later | Health and metrics endpoints |
-| `server/tests/test_tenant.py` | AGPL-3.0-or-later | Schema creation, tenant routing, RLS isolation, tenant deletion |
-| `server/tests/test_migration.py` | AGPL-3.0-or-later | Alembic upgrade-downgrade-upgrade round-trip |
-| `docs/templates/privacy-notice-pt.md` | CC-BY-SA-4.0 | GDPR privacy notice template (Portuguese) |
-| `docs/templates/privacy-notice-en.md` | CC-BY-SA-4.0 | GDPR privacy notice template (English) |
-| `docs/templates/dpa-template.md` | CC-BY-SA-4.0 | Data Processing Agreement template (hosted mode) |
-
-### Files to modify
-
-| File | Change |
-|------|--------|
-| `server/README.md` | Replace placeholder with real documentation: architecture, setup, API summary |
-
-### Tests to create
-
-| File | What it tests |
-|------|---------------|
-| `server/tests/test_auth.py` | Password hashing (Argon2id params match OWASP), login flow (username+password), TOTP flow (enrollment, verify, reject bad code), JWT access token (encode, decode, expiry), refresh token (rotation, replay detection, session revocation), rate limiting (5 attempts -> lockout), breached password rejection |
-| `server/tests/test_roles.py` | Per-field role assignment, per-game role assignment, TOTP required for admin/GM/marshal, role-gated endpoints (marshal-only, admin-only, GM-only), role inheritance (admin has GM permissions) |
-| `server/tests/test_gdpr.py` | `GET /me/data` returns all personal data, `GET /me/export` returns ZIP with correct files, `DELETE /me` anonymises user (username randomised, email NULL, password_hash DELETED), anonymised user's chrono records retain marshal signature and readings, retention purge deletes records past field default, guest cleanup after 30 days |
-| `server/tests/test_models.py` | All ADR-P4-1 tables create successfully, UUID PKs are unique, `created_at`/`updated_at` default to now(), foreign key cascades work, UNIQUE constraints reject duplicates |
-| `server/tests/test_health.py` | `/health` returns 200 with database status, `/metrics` requires admin auth |
-| `server/tests/test_tenant.py` | Create tenant schema, verify tables exist, route request to tenant, verify RLS prevents cross-tenant access, delete tenant drops schema |
-| `server/tests/test_migration.py` | `alembic upgrade head` succeeds, `alembic downgrade base` succeeds, second `alembic upgrade head` succeeds (idempotent) |
-
-### Validation commands
-
-**Site server tests (PostgreSQL in docker-compose):**
-
-```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml \
-  run --rm test \
-  sh -c "alembic upgrade head && python -m pytest tests/ -v --tb=short"
-```
-
-**Migration reversibility test:**
-
-```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml \
-  run --rm test \
-  sh -c "alembic upgrade head && alembic downgrade base && alembic upgrade head && echo 'Migration round-trip OK'"
-```
-
-**Docker image builds:**
-
-```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.yml build
-```
+**First: plan phase 1 (Master and Satellites).**
 
 ---
 
-## Phase B: Advanced modes -- no Phase 3 dependencies (Master and Satellites, Target Windows)
+## Plan phase 1: Master and Satellites
+
+*Software, can be done now. Depends on nothing. Size S.*
 
 ### Goal
 
-Implement the two advanced game modes that depend only on Phase 2C
-(`field.*` API, which is complete): Master and Satellites
-(`field.lua` + `node.lua`) and Target Windows (`node.lua`). Add the
-new events to `protocol/schema/events.yaml`. Write YAML event-sequence
-tests that run in the simulator. No Phase 3 dependency for basic
-functionality. Engineer-only satellite capture is deferred to Phase F
-(requires Phase 3 NFC squad identification). Target Windows hardware
-testing (piezo sensor) is deferred to Phase H.
+The mode of spec section 15: a master zone and satellites; holding
+satellites while holding the master boosts the master's scoring, and
+when the master changes hands every satellite goes back to neutral.
+Decisions P4R2 (events, integer points), P4R3 (no engineer-only yet),
+P4R22, P4R23.
 
-### Files to create
+### Design
+
+- `mode.yaml`: id `org.atalaia.master_satellites`, `kind` omitted
+  (main mode), `min_tier: reduced`, roles `master` and `satellite`,
+  both `{ requires: [team_input], optional: [team_display, audio,
+  display] }`; params `capture_hold_ms` (3000), `tick_s` (10),
+  `points_per_tick` (2, even by default so a half bonus is whole),
+  `satellite_bonus_pct` (50), `min_satellites` (0); `i18n.pt` ("Mestre
+  e Satélites").
+- `node.lua`: capture-only, the same as Hold-All's (`zone.captured`,
+  `zone.neutralized`, `cmd.set_owner`); boxes do not score.
+- `field.lua`: on `zone.captured`/`zone.neutralized` and every second,
+  count the satellites whose owner is the master's owner; every
+  `tick_s`, `score.add(owner, points_per_tick + points_per_tick *
+  held * satellite_bonus_pct // 100, "master")`; when the master's owner
+  changes, `field.send(id, "set_owner", { team = "none" })` to each
+  satellite. A satellite that rebooted is reset by the next master
+  change, as in the field (no special case).
+- Screens: the mode's own templates in `assets/screens/` (templates
+  belong to their mode: Domination's `standby` and `captured` adapted,
+  plus `master_status` with the satellites held and the bonus), checked
+  by the simulator's template check and drawn by the Field Box and the
+  app.
+
+### Files
 
 | File | Licence | Purpose |
 |------|---------|---------|
-| `modes/master-and-satellites/mode.yaml` | GPL-3.0-or-later | Mode manifest: roles (master, satellite), capabilities, parameters (tick_s, points_per_tick, satellite_multiplier) |
-| `modes/master-and-satellites/node.lua` | GPL-3.0-or-later | Satellite node script: team_input capture, emit `satellite.captured` / `satellite.neutralized` |
-| `modes/master-and-satellites/field.lua` | GPL-3.0-or-later | Controller field script: multiplier tracking, master hand-change resets satellites, periodic scoring with multiplier |
-| `modes/master-and-satellites/tests/test_basic.yaml` | GPL-3.0-or-later | Basic scenario: master capture, satellite capture, multiplier applied |
-| `modes/master-and-satellites/tests/test_master_change.yaml` | GPL-3.0-or-later | Master changes hands: all satellites reset to neutral, multiplier resets to 1 |
-| `modes/master-and-satellites/tests/test_multi_satellite.yaml` | GPL-3.0-or-later | 3 satellites: multiplier increases with each capture (x1.5, x2.0, x2.5) |
-| `modes/master-and-satellites/tests/test_satellite_recapture.yaml` | GPL-3.0-or-later | Satellite recaptured by opposing team: multiplier adjusts |
-| `modes/master-and-satellites/i18n/en.yaml` | GPL-3.0-or-later | English strings |
-| `modes/master-and-satellites/i18n/pt.yaml` | GPL-3.0-or-later | Portuguese strings |
-| `modes/target-windows/mode.yaml` | GPL-3.0-or-later | Mode manifest: roles (target), capabilities (hit, led), parameters (interval_s, window_s, hit_points) |
-| `modes/target-windows/node.lua` | GPL-3.0-or-later | Target node script: random team-colour window, hit scoring, arm/disarm |
-| `modes/target-windows/tests/test_hit_in_window.yaml` | GPL-3.0-or-later | Hit during open window: score awarded |
-| `modes/target-windows/tests/test_hit_outside_window.yaml` | GPL-3.0-or-later | Hit outside window: no score |
-| `modes/target-windows/tests/test_window_cycle.yaml` | GPL-3.0-or-later | Multiple window cycles: correct team colours, timing |
-| `modes/target-windows/i18n/en.yaml` | GPL-3.0-or-later | English strings |
-| `modes/target-windows/i18n/pt.yaml` | GPL-3.0-or-later | Portuguese strings |
+| `modes/master_satellites/mode.yaml` | GPL-3.0-or-later | Manifest |
+| `modes/master_satellites/node.lua` | GPL-3.0-or-later | Capture-only box |
+| `modes/master_satellites/field.lua` | GPL-3.0-or-later | Bonus, ticks, reset on master change |
+| `modes/master_satellites/assets/screens/*.yaml` | GPL-3.0-or-later | Screens (if new) |
+| `modes/master_satellites/tests/basic.yaml`, `master_change.yaml`, `three_satellites.yaml`, `satellite_recapture.yaml`, `gm_override.yaml`, `no_master_owner.yaml` | GPL-3.0-or-later | Event sequences |
+| `firmware/esp32/main/CMakeLists.txt`, `builtin_presets.c`, `shell.c` | (existing) | The mode as a built-in preset |
+| `app/lib/modes/builtin_modes.g.dart` | (generated) | `python3 tools/docker_app.py gen` |
+| `controller/console/src/i18n/{en,pt}.json` | (existing) | Event words (`feed.events`), if new texts are needed |
+| `modes/README.md`, `docs/design-spec.md` (section 15 table: "built in software"), `CHANGELOG.md`, `README.md`, `site/i18n/{en,pt}.yaml` | (existing) | Docs (R4) |
 
-### Files to modify
+### Tests
 
-| File | Change |
-|------|--------|
-| `protocol/schema/events.yaml` | Add `satellite.captured`, `satellite.neutralized`, `target.hit` with data schemas |
+- YAML (simulator, and in Dart through the core): the bonus with 0-3
+  satellites (`expect_score` at each tick), the master changing hands
+  resets satellites (`zone.neutralized` from each satellite), a
+  satellite recaptured by the other team drops the bonus, the GM's
+  `set_owner` on the master, no score while nobody holds the master.
+- The controller with the real engine: `field.send` reaches the host
+  boxes (`controller/tests/test_box_e2e.py` gets one case).
+- Field Box host tests: the preset loads; three ESP-IDF builds, 0
+  warnings.
 
-### Tests to create
-
-| File | What it tests |
-|------|---------------|
-| `modes/master-and-satellites/tests/test_basic.yaml` | Master capture by red, satellite capture by red, verify multiplier x1.5 applied to scoring tick |
-| `modes/master-and-satellites/tests/test_master_change.yaml` | Red captures master, red captures 2 satellites, blue captures master: verify all satellites reset to neutral, multiplier resets to 1 |
-| `modes/master-and-satellites/tests/test_multi_satellite.yaml` | Red captures master and 3 satellites sequentially: verify multiplier increases to x2.5 |
-| `modes/master-and-satellites/tests/test_satellite_recapture.yaml` | Red captures master and satellite, blue recaptures satellite: verify multiplier drops back to x1.0 |
-| `modes/target-windows/tests/test_hit_in_window.yaml` | Window opens for red, hit arrives: verify `target.hit` event with window=true, score added for red |
-| `modes/target-windows/tests/test_hit_outside_window.yaml` | No window open, hit arrives: verify `target.hit` event with window=false, no score |
-| `modes/target-windows/tests/test_window_cycle.yaml` | Run 3 complete window cycles: verify random team selection, correct timing, window opens and closes |
-
-### Validation commands
-
-**Master and Satellites tests:**
+### Validation
 
 ```sh
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/src" atalaia-dev \
-  sh -c "cd /src && python3 -m pytest modes/master-and-satellites/tests/ -v"
-```
-
-**Target Windows tests:**
-
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/src" atalaia-dev \
-  sh -c "cd /src && python3 -m pytest modes/target-windows/tests/ -v"
-```
-
-**All mode tests still pass (no regressions):**
-
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/src" atalaia-dev \
-  sh -c "cd /src && python3 -m pytest modes/ -v"
+python3 tools/docker_sim.py test modes/master_satellites
+python3 tools/docker_app.py gen && python3 tools/docker_app.py check
+python3 tools/docker_fw.py test && python3 tools/docker_fw.py build
+# then the clean-copy check (tools/check.sh)
 ```
 
 ---
 
-## Phase C: Sync protocol + chrono registry (depends on Phase 2D)
+## Plan phase 2: Target Windows (logic)
+
+*Software, can be done now; the addon is HW2. Depends on nothing. Size S.*
 
 ### Goal
 
-Implement the controller-to-site-server sync protocol (ADR-P4-3):
-event batch push with idempotent deduplication, score snapshot merge
-by GREATEST, chrono record sync, roster/preset/field pull, offline
-buffering with batch replay, and the optional WebSocket live stream.
-Implement the chrono registry: replica registration, marshal Ed25519
-keypair management, check-in records, spot checks, cross-field sharing
-with double opt-in, violation tracking and marshal signature
-verification. This phase depends on Phase 2D (the controller REST API
-and SQLite store must be available for the sync client). The site
-server side can be built and tested independently using a mock
-controller.
+A target lights a random team's colour for a short window; a hit in the
+window scores for that team (spec section 15). Decision P4R4.
 
-### Files to create
+### Design
 
-| File | Licence | Purpose |
-|------|---------|---------|
-| `server/src/api/sync.py` | AGPL-3.0-or-later | Sync endpoints: `GET /sync/roster`, `GET /sync/presets`, `GET /sync/chrono`, `GET /sync/field`, `POST /sync/events`, `POST /sync/scores`, `POST /sync/chrono`, `POST /sync/game`, `WS /sync/stream` |
-| `server/src/api/chrono.py` | AGPL-3.0-or-later | Chrono endpoints: replica CRUD, check-in records, spot checks, violation tracking, cross-field history query |
-| `server/src/api/games.py` | AGPL-3.0-or-later | Game history endpoints: list, detail, event log query, score timeline |
-| `server/src/services/sync_service.py` | AGPL-3.0-or-later | Event dedup, score merge (GREATEST), batch acknowledgement, offline buffer tracking |
-| `server/src/services/chrono_service.py` | AGPL-3.0-or-later | Marshal key generation (Ed25519), signing, verification, cross-field sharing consent, violation detection |
-| `controller/atalaia_controller/sync_client.py` | GPL-3.0-or-later | Site server sync client: pull roster/presets/chrono before game, push events/scores/chrono during/after, offline buffer, batch replay, backoff (30s during game, 5min between, double on failure, cap 5min) |
-| `server/tests/test_sync.py` | AGPL-3.0-or-later | Sync endpoint tests |
-| `server/tests/test_chrono.py` | AGPL-3.0-or-later | Chrono registry tests |
-| `server/tests/test_games.py` | AGPL-3.0-or-later | Game history tests |
-| `controller/tests/test_sync_client.py` | GPL-3.0-or-later | Sync client tests |
+- The `hit` capability (spec section 7) reaches scripts as `hit.hit`
+  with `strength` (0-255); commands `cap("hit"):arm()` and `:disarm()`.
+  Written into `docs/rfcs/0000-phase-3-events-tags-and-pods.md` (draft)
+  and `protocol/capability-proxy.md` (type `hit`, a dated refinement),
+  with a shared vector in `protocol/vectors/capability_proxy.yaml`, so a
+  pod or the addon can lend it later.
+- `modes/target_windows/`: role `target` `{ requires: [hit, led],
+  optional: [display, audio] }`; params `interval_s`, `window_s`,
+  `hit_points`, `min_strength`; `node.lua` opens windows with
+  `rand()`, fills the ring with the team, arms the target, scores with
+  `score.add`, emits `target.hit` (16) with `window_open` and the team
+  in the envelope; hits below `min_strength` ignored; at most one score
+  per window per target unless `multi_hit`.
+- `game.teams()` in the core (decision P4R26): the game's team names
+  in order, for node and field scripts (`core/src/script_api.c`, a C
+  test, a simulator test; Dart gets it through the core). The window's
+  team is `teams[rand(1, #teams)]`.
+- Not a Field Box preset yet (P4R23), not offered by Android props.
 
-**Note (2026-10-18 handoff):** the controller package is
-`controller/atalaia_controller/`, not `controller/src/` (decision
-D15). The sync client authenticates to the site server with a 256-bit
-API key. The site server authenticates to the controller with the GM
-token (writes) and read token (reads).
+### Files
 
-### Files to modify
+`modes/target_windows/{mode.yaml,node.lua,tests/*.yaml,assets/screens/*.yaml}`
+(GPL-3.0-or-later); `core/src/script_api.c` and `core/tests/` (`game.teams()`),
+`docs/design-spec.md` (script API); the draft RFC and `protocol/capability-proxy.md`
+(dated refinement); `protocol/vectors/capability_proxy.yaml` (a `hit`
+IDENT entry and an EVT); the C, Python and Dart proxy codecs if they
+check capability types; docs.
 
-| File | Change |
-|------|--------|
-| `server/src/api/__init__.py` | Register sync, chrono, and games routers |
-| `server/src/models.py` | Verify all sync-related models are present (game_events unique constraint, game_scores upsert) |
+### Tests
 
-### Tests to create
+YAML: hit in the window scores for the window's team; a hit outside
+scores nothing and reports `window_open: false`; weak hits ignored; three
+cycles with a fixed `seed` give the expected teams; `cmd.set_owner` is
+ignored. The capability vector through the C, Python and Dart codecs.
 
-| File | What it tests |
-|------|---------------|
-| `server/tests/test_sync.py` | API-key auth (valid key accepted, invalid rejected, missing rejected), event batch push (insert 10 events, verify all persisted), duplicate batch replay (same batch_seq, verify events_duplicate count), score merge (push {red: 100}, push {red: 150}, verify stored value is 150), game lifecycle (create, start, end, verify timestamps), roster pull (register 3 players, pull roster, verify 3 returned), chrono sync (push 2 records, pull for registered players, verify 2 returned), WebSocket auth and event streaming |
-| `server/tests/test_chrono.py` | Replica registration (create, read, update), marshal key generation (Ed25519 keypair, public key stored, encrypted private key stored), record creation (marshal signs, server stores, verify signature), spot check vs check-in comparison, violation detection (reading > limit, reading > check-in + tolerance%), cross-field sharing (field A shares, field B queries, consent required at both levels), signature verification across password change (re-encrypt private key, new signature verifiable, old signatures still valid) |
-| `server/tests/test_games.py` | Game list (filter by field, status), game detail (scores, events count), event log query (filter by type, time range), score timeline (verify snapshots ordered by time) |
-| `controller/tests/test_sync_client.py` | Pull roster (mock server, verify deserialization), push events (mock server, verify batch_seq tracking), offline buffer (mock server unreachable, verify events buffered in SQLite, mock server restored, verify replay), backoff (verify interval doubles on failure, caps at 5 min) |
-
-### Validation commands
-
-**Sync and chrono tests (site server):**
+### Validation
 
 ```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml \
-  run --rm test \
-  sh -c "alembic upgrade head && python -m pytest tests/test_sync.py tests/test_chrono.py tests/test_games.py -v"
-```
-
-**Sync client tests (controller, mock server):**
-
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/src" atalaia-dev \
-  sh -c "cd /src/controller && pip install -r requirements.txt && \
-         python3 -m pytest tests/test_sync_client.py -v"
+python3 tools/docker_sim.py test modes/target_windows
+python3 tools/docker_app.py test test/modes
+python3 tools/docker_fw.py test && python3 tools/docker_fw.py build   # the core changed (game.teams)
+# clean-copy check (tools/check.sh; the vectors run in C and Python there), ASan/UBSan
 ```
 
 ---
 
-## Phase D: ATAK/CoT + geo utilities (depends on Phase 2D)
+## Plan phase 3: Geo utilities in the core
+
+*Software, can be done now. Depends on nothing. Size S.*
 
 ### Goal
 
-Add `geo.distance()` and `geo.in_zone()` to the core Lua API
-(ADR-P4-9) -- Haversine distance and circle/polygon zone checks
-implemented in C, registered unconditionally so both `node.lua` and
-`field.lua` can use them. Build the ATAK / CoT emitter as a Python
-module on the controller (ADR-P4-7): subscribe to game events and
-node STATE messages, generate CoT XML, send via UDP multicast on
-the field Wi-Fi and optionally via TCP to the site server for remote
-ATAK relay. This phase depends on Phase 2D (the controller must be
-running to emit CoT). The core geo functions can be built and tested
-independently.
+ADR-P4-9: `geo.distance(lat1, lon1, lat2, lon2)` (metres, Haversine)
+and `geo.in_zone(lat, lon, zone)` (circle or polygon) for every script,
+in C.
 
-### Files to create
+### Files
 
 | File | Licence | Purpose |
 |------|---------|---------|
-| `core/include/atalaia/geo.h` | GPL-3.0-or-later | `haversine_m()`, `in_zone_circle()`, `in_zone_polygon()` function declarations |
-| `core/src/geo.c` | GPL-3.0-or-later | C implementations of Haversine and ray-casting point-in-polygon |
-| `core/tests/test_geo.c` | GPL-3.0-or-later | Geo function tests |
-| `controller/atalaia_controller/atak.py` | GPL-3.0-or-later | CoT emitter: `CotEmitter` class, `generate_cot()`, UDP multicast sender, optional TCP sender, CoT type mapping, staleness, UID format |
-| `controller/atalaia_controller/atak_config.py` | GPL-3.0-or-later | ATAK configuration: env vars for multicast group, port, intervals, enable/disable |
-| `controller/tests/test_atak.py` | GPL-3.0-or-later | CoT emitter tests |
-| `controller/tests/test_geo_lua.py` | GPL-3.0-or-later | Lua-level geo API tests via simulator |
+| `core/include/atalaia/geo.h`, `core/src/geo.c` | GPL-3.0-or-later | `atalaia_geo_distance_m()`, `atalaia_geo_in_circle()`, `atalaia_geo_in_polygon()` (at most 32 vertices) |
+| `core/src/script_api.c` | (existing) | The `geo` table, registered for node and field scripts |
+| `core/CMakeLists.txt` | (existing) | `geo.c`, `-lm` |
+| `core/tests/test_geo.c` | GPL-3.0-or-later | C tests |
+| `protocol/vectors/geo.json` | GPL-3.0-or-later | Known distances and zone cases, read by C and Python (and Dart through the core) |
+| `simulator/tests/test_geo.py` | GPL-3.0-or-later | `geo.*` from Lua through ctypes against the vectors |
+| `docs/design-spec.md` (script API), `modes/README.md` | (existing) | Docs |
 
-### Files to modify
+### Tests
 
-| File | Change |
-|------|--------|
-| `core/src/script_api.c` | Register `geo` table with `distance` and `in_zone` functions |
-| `core/CMakeLists.txt` | Add `geo.c` to source list |
-| `core/tests/CMakeLists.txt` | Add `test_geo` executable, link math library |
+Distances checked against an independent source (Lisbon-Porto by the
+haversine formula on a 6,371 km sphere, about 274 km; a 1 m and a
+100 m case; the same point; antipodes), not against the code itself;
+circle edge, polygon inside, outside, concave, on a vertex; argument
+errors (`luaL_error`, reported as `script.error`). The firmware's host
+tests and ESP-IDF builds rerun (the core is in the Field Box image).
 
-### Tests to create
-
-| File | What it tests |
-|------|---------------|
-| `core/tests/test_geo.c` | Haversine: Lisbon-to-Porto ~274 km, same point = 0, antipodal = ~20015 km; in_zone_circle: point at centre (inside), point at edge (inside), point outside; in_zone_polygon: point inside square, point outside, point on edge, concave polygon |
-| `controller/tests/test_atak.py` | CoT XML generation (parse XML, verify `event` root, `point` lat/lon, `__group` name, `status` battery), CoT type mapping (uncaptured prop -> `a-n-G-E-X`, team-owned -> `a-f-G-E-X`), UID format (`atalaia-{node_name}-{node_id}`), staleness (`stale = start + 2 * interval`), UDP emission (mock socket, verify `sendto` called with correct multicast address) |
-| `controller/tests/test_geo_lua.py` | Lua `geo.distance()` round-trip via simulator (inject two coordinates, verify result matches C implementation), Lua `geo.in_zone()` with circle zone, Lua `geo.in_zone()` with polygon zone |
-
-### Validation commands
-
-**Core geo tests:**
+### Validation
 
 ```sh
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/src" atalaia-dev \
-  sh -c "BUILD=/tmp/c sh tools/check.sh"
-```
-
-**ATAK emitter tests:**
-
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/src" atalaia-dev \
-  sh -c "cd /src/controller && pip install -r requirements.txt && \
-         python3 -m pytest tests/test_atak.py -v"
-```
-
-**Lua geo API tests:**
-
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/src" atalaia-dev \
-  sh -c "cd /src && python3 -m pytest controller/tests/test_geo_lua.py -v"
+# clean-copy check (ctest runs test_geo; the simulator runs test_geo.py)
+docker run --rm -v "$PWD:/src" atalaia-dev sh -c "BUILD=/tmp/c sh tools/check.sh"
+python3 tools/docker_fw.py test && python3 tools/docker_fw.py build
+# ASan/UBSan as CI's sanitizers job
 ```
 
 ---
 
-## Phase E: Custom scenario DSL and compiler
+## Plan phase 4: Hacking Terminal
+
+*Software, can be done now; on a phone in the field: HW3. Depends on nothing. Size M.*
 
 ### Goal
 
-Implement the YAML-based custom scenario DSL (ADR-P4-6): the
-manifest schema with all 7 objective block types (capture_and_hold,
-enter_code, scan_tags, escort, destroy, defend, survive), the Python
-compiler that transforms manifests into `field.lua` scripts, manifest
-validation (DAG check, parameter validation, zone geometry), and a
-CLI tool for offline compilation. Add the scenario events to
-`events.yaml` (IDs 42-45). The compiler is a shared Python library
-at `controller/atalaia_controller/scenarios/` (maintainer decision
-P4-1); the site server imports and reuses it. The GM console's
-scenario builder UI lives at
-`controller/console/src/components/scenario-builder.js`. Escort
-objectives (which require GPS) are compiled but cannot be fully
-tested until Phase 3; their generated Lua is validated syntactically.
+A terminal with a puzzle; solving it emits `hacking.solved` (47) and
+can reveal a code or capture the terminal for the solving team.
+Decision P4R5.
 
-### Files to create
+### Design
 
-| File | Licence | Purpose |
-|------|---------|---------|
-| `controller/atalaia_controller/scenarios/__init__.py` | GPL-3.0-or-later | Package init; `compile_scenario()` entry point |
-| `controller/atalaia_controller/scenarios/compiler.py` | GPL-3.0-or-later | Manifest parser, DAG validator, per-objective-type Lua templates, dependency wiring, visibility management, zone geometry check |
-| `controller/atalaia_controller/scenarios/validator.py` | GPL-3.0-or-later | YAML schema validation (unique IDs, valid depends_on refs, DAG cycle check via topological sort, required params per type, time_window logic, radius_m >= 10 warning, non-self-intersecting polygons) |
-| `controller/atalaia_controller/scenarios/templates.py` | GPL-3.0-or-later | Lua code templates for each of the 7 objective types, preamble, state init, dependency wiring, visibility handlers |
-| `controller/atalaia_controller/scenarios/cli.py` | GPL-3.0-or-later | CLI: `python -m atalaia_controller.scenarios.cli compile scenario.yaml [-o output.lua]` |
-| `controller/console/src/components/scenario-builder.js` | GPL-3.0-or-later | GM console scenario builder UI (Preact component); calls the controller's compile endpoint |
-| `server/src/api/scenarios.py` | AGPL-3.0-or-later | Scenario CRUD on site server: `POST /scenarios` (validate + compile + store), `GET /scenarios`, `GET /scenarios/{id}`, `PUT /scenarios/{id}`, `DELETE /scenarios/{id}`, `GET /scenarios/{id}/lua`. Imports `atalaia_controller.scenarios` for compilation. |
-| `server/tests/test_scenario_compiler.py` | AGPL-3.0-or-later | Compiler tests |
-| `server/tests/test_scenario_validator.py` | AGPL-3.0-or-later | Validator tests |
-| `server/tests/test_scenario_api.py` | AGPL-3.0-or-later | Scenario API tests |
-| `server/tests/test_scenarios/simple_capture.yaml` | AGPL-3.0-or-later | Test scenario: single capture_and_hold objective |
-| `server/tests/test_scenarios/multi_objective.yaml` | AGPL-3.0-or-later | Test scenario: 4 objectives with dependencies (intel -> rescue + sabotage, defend_hq) |
-| `server/tests/test_scenarios/all_types.yaml` | AGPL-3.0-or-later | Test scenario: one of each objective type |
-| `server/tests/test_scenarios/cyclic_deps.yaml` | AGPL-3.0-or-later | Invalid scenario: cyclic dependency (A -> B -> A) |
-| `server/tests/test_scenarios/bad_params.yaml` | AGPL-3.0-or-later | Invalid scenario: missing required params |
+- `modes/hacking_terminal/`: role `terminal` `{ requires: [keypad],
+  optional: [team_input, display, audio] }`; params `puzzle`
+  (`code`, `wires`, `sequence`), `digits` (3-6), `lockout_s`,
+  `reveal_code` (a string shown and sent on success, optional),
+  `capture` (bool: the terminal becomes the solving team's zone),
+  `lang`.
+- The solving team: the team that pressed its input before typing
+  (`team_input.press`), or the terminal's `team` param; with neither,
+  `hacking.solved` has no team.
+- Events: `hacking.solved` (47, critical) with data `puzzle` (key 36),
+  `code` (10) and the team; the event is added to `events.yaml` here
+  (protogen, a vector, the draft RFC). Wrong answers are not events
+  (the screen shows them).
+- Screens in Portuguese and English (`lang`), checked by the simulator
+  and drawn by the Field Box and the app.
+- A built-in preset on the Field Box (it has a keypad) and in the
+  app's catalogue (the on-screen keypad).
 
-### Files to modify
+### Files
 
-| File | Change |
-|------|--------|
-| `protocol/schema/events.yaml` | Add `scenario.objective.completed`, `scenario.objective.failed`, `scenario.objective.revealed`, `scenario.started` |
-| `server/src/api/__init__.py` | Register scenarios router |
+`modes/hacking_terminal/{mode.yaml,node.lua,assets/screens/*.yaml,tests/*.yaml}`;
+`protocol/schema/events.yaml` (+ generated files), `protocol/vectors/events.yaml`,
+the draft RFC; Field Box presets; `app/lib/modes/builtin_modes.g.dart`;
+the app's event texts (`app/lib/l10n/`); the console's `feed.events`
+words; golden images; docs.
 
-### Tests to create
+### Tests
 
-| File | What it tests |
-|------|---------------|
-| `server/tests/test_scenario_compiler.py` | Compile `simple_capture.yaml`: output is valid Lua (syntax check), contains the objective handler, contains scoring; compile `multi_objective.yaml`: dependency wiring (intel completion activates rescue and sabotage), visibility handlers (hidden objectives become visible on dependency completion); compile `all_types.yaml`: each type generates the correct Lua pattern; compile each type individually and run generated Lua in the simulator: verify objective completion emits `scenario.objective.completed` |
-| `server/tests/test_scenario_validator.py` | Valid scenario passes; `cyclic_deps.yaml` rejected with cycle error; `bad_params.yaml` rejected with missing param error; duplicate objective IDs rejected; non-existent depends_on reference rejected; invalid time_window (start > end) rejected; escort with radius_m < 10 produces warning; self-intersecting polygon rejected |
-| `server/tests/test_scenario_api.py` | `POST /scenarios` with valid YAML: 201, compiled Lua stored; `POST /scenarios` with invalid YAML: 422 with validation errors; `GET /scenarios/{id}/lua` returns compiled Lua; `PUT /scenarios/{id}` recompiles; `DELETE /scenarios/{id}` removes |
+YAML for each puzzle with a fixed `seed` (solved, a wrong answer and the
+lockout, the code revealed, `capture`), `expect_screen` on each screen;
+Dart through the core and golden images of the screens; Field Box host
+tests with `keys`; three ESP-IDF builds.
 
-### Validation commands
-
-**Scenario compiler and validator tests:**
+### Validation
 
 ```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml \
-  run --rm test \
-  sh -c "alembic upgrade head && python -m pytest tests/test_scenario_compiler.py tests/test_scenario_validator.py tests/test_scenario_api.py -v"
-```
-
-**CLI compile test:**
-
-```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml \
-  run --rm test \
-  sh -c "python -m atalaia_controller.scenarios.cli compile tests/test_scenarios/multi_objective.yaml && echo 'CLI compile OK'"
-```
-
-**Generated Lua runs in the simulator (multi-objective scenario):**
-
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/src" atalaia-dev \
-  sh -c "cd /src && python3 -m pytest server/tests/test_scenario_compiler.py::test_multi_objective_simulation -v"
+python3 tools/docker_sim.py test modes/hacking_terminal
+python3 tools/docker_app.py gen && python3 tools/docker_app.py && python3 tools/docker_app.py goldens
+python3 tools/docker_fw.py test && python3 tools/docker_fw.py build
+python3 tools/docker_console.py
+# clean-copy check
 ```
 
 ---
 
-## Phase F: Advanced modes -- Phase 3 dependencies (VIP/Payload, Hacking Terminal)
+## Plan phase 5: VIP / Payload
+
+*Software, can be done now; real GPS: HW3. Depends on plan phase 3. Size M.*
 
 ### Goal
 
-Implement the two advanced game modes that depend on Phase 3
-deliverables: VIP / Payload (`field.lua` + `node.lua`; requires GPS
-reporting from the player app) and Hacking Terminal (`node.lua`;
-requires the Phase 3 Android shell with Flutter touch UI). Add the
-engineer-only satellite capture variant to Master and Satellites
-(requires Phase 3 NFC squad identification). Add `vip.extracted` and
-`hacking.solved` events to `events.yaml`. Write simulator tests with
-injected `gps.fix` and `display.touch` events. Full hardware testing
-is deferred to Phase H.
+Escort a VIP player (tracked by the player app's position reports) or a
+payload prop (an Android prop with GPS) to an extraction zone; checkpoint
+boxes along the way. Decision P4R6.
 
-**This phase is blocked until Phase 3 design completes.** The
-interfaces below are derived from the spec and marked for re-checking.
+### Design
 
-### Files to create
+- **VIP player.** The controller's `positions.py` hands each new report
+  of a player whose check-in role is `vip` to the game's field script as
+  the input `position.fix` (`player`, `team`, `role`, `lat`, `lon`,
+  `acc`, `src`) through a new field operation; never logged as an event,
+  never on the radio, MQTT or the stream, never in `state.field`. In the
+  simulator, a test step `position: { player, team, role, lat, lon }`
+  injects it.
+- **Payload prop.** The Android prop shell delivers `gps.fix` (`lat`,
+  `lon`, `acc`) from the location plugin to `node.lua` when the role
+  requires `gps` (`app/lib/prop/`); the script checks the zone with
+  `geo.in_zone()` and emits only `vip.extracted`.
+- `modes/vip_payload/`: main mode with roles `checkpoint`
+  (`team_input`: Domination-like capture, no local scoring) and
+  `payload` (`requires: [gps]`, Android only); params `vip_team`,
+  `extract_lat`, `extract_lon`, `extract_radius_m` (min 10),
+  `checkpoint_points`, `end_on_extract`.
+- `field.lua`: `position.fix` for the VIP inside the zone, or a
+  `vip.extracted` from the payload, ends the game for `vip_team` with
+  `game.win()` when `end_on_extract`; checkpoints score while held.
+- Event `vip.extracted` (46, critical) with `player` (14) or the
+  payload's node, and the team; added to `events.yaml` here.
 
-| File | Licence | Purpose |
-|------|---------|---------|
-| `modes/vip-payload/mode.yaml` | GPL-3.0-or-later | Mode manifest: roles (escort_prop, checkpoint), capabilities (gps or player-app GPS), parameters (vip_team, extract_lat, extract_lon, extract_radius_m, checkpoint_points) |
-| `modes/vip-payload/node.lua` | GPL-3.0-or-later | Checkpoint node script: Domination-like capture for escort route checkpoints |
-| `modes/vip-payload/field.lua` | GPL-3.0-or-later | Controller field script: listen for `gps.fix` from VIP, check extraction zone via `geo.in_zone()`, emit `vip.extracted` on arrival, call `game.win()` |
-| `modes/vip-payload/tests/test_extraction.yaml` | GPL-3.0-or-later | VIP enters extraction zone: verify `vip.extracted` emitted, team wins |
-| `modes/vip-payload/tests/test_outside_zone.yaml` | GPL-3.0-or-later | VIP moves but stays outside zone: no extraction event |
-| `modes/vip-payload/tests/test_checkpoint_scoring.yaml` | GPL-3.0-or-later | VIP team captures checkpoints along route: verify scoring |
-| `modes/vip-payload/i18n/en.yaml` | GPL-3.0-or-later | English strings |
-| `modes/vip-payload/i18n/pt.yaml` | GPL-3.0-or-later | Portuguese strings |
-| `modes/hacking-terminal/mode.yaml` | GPL-3.0-or-later | Mode manifest: roles (terminal), capabilities (display with touch), parameters (puzzle_type, difficulty, lockout_s), min_tier: full, platform: android |
-| `modes/hacking-terminal/node.lua` | GPL-3.0-or-later | Terminal node script: puzzle generation, touch input handling, solve/fail/lockout logic, emit `hacking.solved` |
-| `modes/hacking-terminal/tests/test_solve.yaml` | GPL-3.0-or-later | Correct input sequence: verify `hacking.solved` emitted |
-| `modes/hacking-terminal/tests/test_fail_lockout.yaml` | GPL-3.0-or-later | Incorrect input: verify lockout timer, puzzle regeneration |
-| `modes/hacking-terminal/tests/test_puzzle_types.yaml` | GPL-3.0-or-later | Each puzzle type (wires, code, pattern) generates solvable state |
-| `modes/hacking-terminal/i18n/en.yaml` | GPL-3.0-or-later | English strings |
-| `modes/hacking-terminal/i18n/pt.yaml` | GPL-3.0-or-later | Portuguese strings |
+### Files
 
-### Files to modify
+`modes/vip_payload/*`; `core/src/script_api.c` and `node.h` only if a new
+field operation is needed for inputs to the field script (otherwise the
+controller delivers it as any input event to the field node);
+`simulator/atalaia_sim/` (the `position` test step, checks that no event
+carries coordinates); `controller/atalaia_controller/positions.py`,
+`engine.py` (the hand-over); `app/lib/prop/` (`gps.fix` into the core);
+`protocol/schema/events.yaml` (+ generated); docs.
 
-| File | Change |
-|------|--------|
-| `protocol/schema/events.yaml` | Add `vip.extracted`, `hacking.solved` with data schemas |
-| `modes/master-and-satellites/node.lua` | Add engineer-only capture check: if `params.engineer_only` and `e.squad ~= "engineer"`, ignore input. **Maintainer review recommended: depends on Phase 3 NFC squad identification format.** |
-| `modes/master-and-satellites/mode.yaml` | Add `engineer_only` parameter (bool, default false) |
+### Tests
 
-### Tests to create
+YAML: the VIP enters, leaves and re-enters the zone; a non-VIP player in
+the zone does nothing; the payload's `gps.fix` inside and outside;
+checkpoint scoring. Controller: a `POST /api/v1/positions` by a VIP
+token ends the game; the stream and MQTT never carry the coordinates
+(as the phase 3 privacy tests). Dart: a prop session with fake fixes.
 
-| File | What it tests |
-|------|---------------|
-| `modes/vip-payload/tests/test_extraction.yaml` | Inject `gps.fix` at extraction zone coordinates: verify `vip.extracted` event with correct team, verify `game.win()` called |
-| `modes/vip-payload/tests/test_outside_zone.yaml` | Inject `gps.fix` outside extraction zone: verify no extraction event |
-| `modes/vip-payload/tests/test_checkpoint_scoring.yaml` | VIP team captures 3 checkpoints: verify score increments |
-| `modes/hacking-terminal/tests/test_solve.yaml` | Inject `display.touch` sequence matching solution: verify `hacking.solved` event |
-| `modes/hacking-terminal/tests/test_fail_lockout.yaml` | Inject wrong `display.touch`: verify phase changes to `locked_out`, verify after `lockout_s` puzzle regenerates |
-| `modes/hacking-terminal/tests/test_puzzle_types.yaml` | Generate puzzle for each type, verify solution exists, verify check function works |
-
-### Validation commands
-
-**VIP / Payload tests:**
+### Validation
 
 ```sh
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/src" atalaia-dev \
-  sh -c "cd /src && python3 -m pytest modes/vip-payload/tests/ -v"
-```
-
-**Hacking Terminal tests:**
-
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/src" atalaia-dev \
-  sh -c "cd /src && python3 -m pytest modes/hacking-terminal/tests/ -v"
-```
-
-**All mode tests (regression):**
-
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/src" atalaia-dev \
-  sh -c "cd /src && python3 -m pytest modes/ -v"
+python3 tools/docker_sim.py test modes/vip_payload
+python3 tools/docker_app.py
+# clean-copy check (the controller's tests run in tools/check.sh)
 ```
 
 ---
 
-## Phase G: Remote setup (health dashboard, scheduling, remote GM)
+## Plan phase 6: Scenario packages and the objectives role package
+
+*Software, can be done now. Depends on nothing (plan phase 3 for escort later). Size M.*
 
 ### Goal
 
-Implement the site server's remote management features: device health
-dashboard (battery, firmware, RSSI, last seen) and the remote GM
-console relay.  (Game scheduling with player registration moved to
-Phase I on 2026-10-19, with publication and the open feeds.) The health
-dashboard consumes device data pushed via the sync protocol (Phase C).
-The remote GM console proxies commands to the controller via the sync
-WebSocket. Game scheduling provides a calendar with registration and
-roster management.
+The runtime that compiled scenarios need (decision P4R7): the
+`kind: scenario` package and the built-in `org.atalaia.objectives`
+role package, with the scenario events.
 
-### Files to create
+### Design
 
-| File | Licence | Purpose |
-|------|---------|---------|
-| `server/src/api/devices.py` | AGPL-3.0-or-later | Device health endpoints: list devices, device detail (battery, fw_version, rssi, last_seen), firmware catalog |
-| ~~`server/src/api/scheduling.py`~~ | | **Moved to Phase I (2026-10-19)** with registration, publication and feeds |
-| `server/src/api/remote_gm.py` | AGPL-3.0-or-later | Remote GM: proxy WS connection to controller, forward commands (start, pause, override) with GM token validation, relay live events/scores |
-| `server/src/services/device_service.py` | AGPL-3.0-or-later | Device health tracking: update from sync data, firmware version comparison, battery trend |
-| ~~`server/src/services/scheduling_service.py`~~ | | **Moved to Phase I (2026-10-19)** |
-| `server/tests/test_devices.py` | AGPL-3.0-or-later | Device health tests |
-| ~~`server/tests/test_scheduling.py`~~ | | **Moved to Phase I (2026-10-19)** |
-| `server/tests/test_remote_gm.py` | AGPL-3.0-or-later | Remote GM tests |
+- `kind: scenario` in `simulator/atalaia_sim/mode.py`,
+  `controller/atalaia_controller/modes.py` and the app's catalogue: a
+  package with `mode.yaml` and `field.lua`, no `node.lua`, no roles; it
+  must lead the composed id and be followed by at least one role
+  package; it is never named in a box's join (the controller's joins
+  already name "what that box runs"); uploads only (never built in).
+- `modes/objectives/` (`org.atalaia.objectives`, `kind: role`): roles
+  `objective` `{ requires: [team_input], optional: [keypad, nfc,
+  display, audio, team_display] }` and `bomb_site` `{ requires:
+  [team_input], optional: [keypad, display, audio, led] }`; each node
+  waits for a `cmd.mode` `setup` from the field script (what it is
+  for: capture with a hold time, a code, a tag count, a bomb's fuse),
+  reports `zone.captured`, `code.used`, `tag.scanned`, `bomb.*` with
+  no local scoring, and asks again after a reboot (`node.rebooted`
+  makes the field script send `setup` again, as the Medic Kit's
+  `heals`).
+- Events 42-45 and data keys `objective` (34) and `scenario` (35)
+  added to `events.yaml` (protogen, vectors, the draft RFC).
+- A hand-written example scenario package
+  (`modes/objectives/tests/fixtures/`) proves the runtime before the
+  compiler exists.
 
-### Files to modify
+### Files
 
-| File | Change |
-|------|--------|
-| `server/src/api/__init__.py` | Register devices, scheduling, and remote_gm routers |
-| `server/src/services/sync_service.py` | Update device health data when sync pushes node STATE messages |
+`modes/objectives/*`; `simulator/atalaia_sim/mode.py`;
+`controller/atalaia_controller/modes.py`, `engine.py` (joins);
+`app/lib/modes/mode_catalog.dart`, `app/tool/gen_modes.dart`;
+`protocol/schema/events.yaml` (+ generated), `protocol/vectors/events.yaml`;
+Field Box presets (objectives); `modes/README.md`; docs.
 
-### Tests to create
+### Tests
 
-| File | What it tests |
-|------|---------------|
-| `server/tests/test_devices.py` | Device list (filter by field), device detail (battery, fw_version, rssi), device update via sync (push STATE, verify device record updated), firmware catalog (list available versions) |
-| ~~`server/tests/test_scheduling.py`~~ | Moved to Phase I (2026-10-19), extended there |
-| `server/tests/test_remote_gm.py` | WebSocket connection with GM token (accepted), WebSocket without token (rejected), forward start command to mock controller, receive live event from mock controller, command forwarded only if user has GM role |
+Simulator: composing `scenario + objectives` (and refusing a scenario
+alone, a scenario after another part, a scenario with a `node.lua`);
+the example scenario's YAML tests (capture, code, tags, bomb site, a
+reboot and the `setup` sent again). Controller: install, the joins name
+only `org.atalaia.objectives`. Dart: the catalogue and the role
+package through the core. Field Box host tests and builds.
 
-### Validation commands
-
-**Remote setup tests:**
-
-```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml \
-  run --rm test \
-  sh -c "alembic upgrade head && python -m pytest tests/test_devices.py tests/test_scheduling.py tests/test_remote_gm.py -v"
-```
-
-**All site server tests (regression):**
+### Validation
 
 ```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml \
-  run --rm test \
-  sh -c "alembic upgrade head && python -m pytest tests/ -v"
-```
-
-## Phase I: Scheduling, publication, registration and open feeds (added 2026-10-19, maintainer request)
-
-### Goal
-
-The field admin schedules games and publishes them on the field's
-site-server page; players with an account register, with their
-replicas pre-declared; the controller pulls the schedule and the
-roster on game day and fills ADR-P3-13's check-in list and "replicas
-to chrono" list, staying the authority during the game; outcomes are
-pushed back after the game.  Open output for other platforms: an
-iCalendar feed, a JSON feed, and an import of a registration list
-(CSV or JSON), plus an adapter interface for specific platforms with
-the rule "documented API or written agreement, no scraping".  Design:
-ADR-P4-11 and ADR-P4-12; open questions F13-F23 in
-`docs/review/decisions-to-review.md`.  The scheduling files of Phase G
-move here.
-
-**Dependencies:** Phase A (accounts, fields, roles, audit log), Phase C
-(sync client and API-key auth), phase 3 plan phase E's field check-in
-on the controller (ADR-P3-13).  The feeds and the import need only
-Phase A.
-
-### Files to create
-
-| File | Licence | Purpose |
-|------|---------|---------|
-| `server/migrations/versions/NNNN_scheduling_registration.py` (next number) | AGPL-3.0-or-later | ADR-P4-11's columns and tables, ADR-P4-12's `platform_links` and `external_game_links`; reversible |
-| `server/src/api/scheduling.py` | AGPL-3.0-or-later | (from Phase G) scheduled games: create, edit, publish, cancel (with reason); `admin` publishes and cancels, `gm` edits |
-| `server/src/services/scheduling_service.py` | AGPL-3.0-or-later | (from Phase G) status rules (`registering` computed from the window), `ical_sequence` raised on time, place or status changes |
-| `server/src/api/registrations.py` | AGPL-3.0-or-later | Register, change the declaration, cancel (player, until the window closes); staff list and changes; ticket shown once |
-| `server/src/services/registration_service.py` | AGPL-3.0-or-later | `max_players`, per-field `player_id` (made once, or adopted from a phone's field identity with its secret), ticket secret and hash, pre-declared replicas against the field's limit-template classes and `max_replicas` |
-| `server/src/web/field_pages.py`, `server/src/web/templates/field.html`, `game.html` | AGPL-3.0-or-later | Public field page and game pages, server-rendered, no JavaScript needed, schema.org `Event` JSON-LD, pt and en |
-| `server/src/feeds/ical.py` | AGPL-3.0-or-later | RFC 5545 writer: UTC times, folding at 75 octets, CRLF, text escaping, `UID`/`SEQUENCE`/`STATUS`, cancelled games for 30 days; ETag |
-| `server/src/feeds/json_feed.py` | AGPL-3.0-or-later | `atalaia.games` version 1 |
-| `server/schemas/games-feed-v1.schema.json` | AGPL-3.0-or-later | JSON Schema of the JSON feed |
-| `server/src/imports/registration_import.py` | AGPL-3.0-or-later | CSV (RFC 4180) and JSON import: only the listed columns, upsert by `(source, external_ref)`, dry-run preview per row |
-| `server/src/integrations/base.py`, `registry.py`, `testing.py` | AGPL-3.0-or-later | `PlatformAdapter` protocol, per-field enablement, encrypted config, audit of every call; a test adapter |
-| `server/docs/feeds.md`, `server/docs/integrations.md` | CC-BY-SA-4.0 | The two feeds and the import format; the adapter rules (documented API or written agreement, no scraping) and how to propose one |
-| `server/tests/test_scheduling.py` | AGPL-3.0-or-later | (from Phase G, extended) |
-| `server/tests/test_registrations.py`, `test_field_pages.py`, `test_feeds.py`, `test_registration_import.py`, `test_integrations.py` | AGPL-3.0-or-later | Below |
-| `controller/tests/test_sync_schedule.py` | AGPL-3.0-or-later | Controller side of the schedule and roster pulls and the check-in push |
-
-### Files to modify
-
-| File | Change |
-|------|--------|
-| `server/src/models.py`, `schemas.py` | The new columns and tables |
-| `server/src/api/sync.py` | `GET /sync/schedule`, the defined `GET /sync/roster` payload, `POST /sync/checkins` |
-| `server/src/services/gdpr_service.py` (Phase A) | Registrations and pre-declared replicas in access, export and erasure; federation numbers erased 30 days after the game; imported and walk-in guest registrations after 30 days |
-| `controller/atalaia_controller/sync_client.py` | Pull schedule and roster until the game starts (then stop for that game); push check-in outcomes; `[sync] push_walkins` (default off) |
-| `controller/atalaia_controller/checkin.py` (phase 3) | Expected check-ins from the roster with their declarations; check-in by registration id and ticket secret; a printed ticket scanned by a marshal |
-| `controller/console/src/components/checkin-panel.js` (phase 3) | "Create from the schedule"; expected, arrived and walk-in columns |
-| `app/lib/checkin/` (phase 3) | Account login on the site server, the field's games, register with pre-declared replicas, keep the ticket, send it at check-in; hand over the phone's field identity when linking an account |
-| `server/README.md`, `docs/design-spec.md` | Scheduling, the field page, the feeds, the import and the adapter rules (R4) |
-
-### Tests to create
-
-| File | What it tests |
-|------|---------------|
-| `server/tests/test_scheduling.py` | Create a draft (not public), publish (`admin` only; `gm` refused), `registering` follows the window, cancel with reason, `ical_sequence` raised on a change of time, place or status and not on a description edit |
-| `server/tests/test_registrations.py` | Register needs an account and an open window; `max_players` closes it; federation `required` refuses an empty number and never checks its content; pre-declared replicas limited to the field's classes and `max_replicas`; cancel until the window closes; one `player_id` per user and field, and adoption of a phone's id only with its secret; the ticket hash stored, the secret never |
-| `server/tests/test_field_pages.py` | Page off by default (404); published games only; no names; another field's games never shown in hosted mode |
-| `server/tests/test_feeds.py` | The `.ics` parses with a strict RFC 5545 parser test (CRLF, folding, escaping, required properties, UTC), cancelled games carry `STATUS:CANCELLED` and a higher `SEQUENCE`, drafts absent; the JSON feed validates against its schema; CORS header; ETag gives 304; no personal data in either |
-| `server/tests/test_registration_import.py` | CSV and JSON give the same result; unknown columns (an email) ignored and listed; dry run writes nothing; re-import updates by `external_ref`; bad rows refused with their reason; imported rows have no account and expire after 30 days |
-| `server/tests/test_integrations.py` | Adapters off by default; the test adapter's registrations go through the import rules; credentials stored encrypted; every call audited; a failing adapter does not block publishing |
-| `controller/tests/test_sync_schedule.py` | The roster becomes expected check-ins with pending declarations; a later pull adds and removes before the start and changes nothing after it; ticket check-in arrives the expected player; walk-ins pushed as counts unless enabled; outcomes pushed once (idempotent) |
-
-### Validation commands
-
-```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml \
-  run --rm test \
-  sh -c "alembic upgrade head && alembic downgrade -1 && alembic upgrade head && python -m pytest tests/test_scheduling.py tests/test_registrations.py tests/test_field_pages.py tests/test_feeds.py tests/test_registration_import.py tests/test_integrations.py -v"
-```
-
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/src" atalaia-dev sh tools/check.sh
-```
-
-Acceptance: AC-17 to AC-19.
-
----
-
-## Phase H: Integration, weekend milsim gate, documentation
-
-### Goal
-
-Bring all pieces together end-to-end. Update documentation (README,
-ARCHITECTURE, deployment guides). Run the staged gate test plan (desk
-test, small game, scale test, weekend gate). This phase depends on
-all preceding phases and on Phase 2F (hardware integration) and
-Phase 3 (player app, Android shell, GPS). The gate cannot be
-completed without real hardware and real players.
-
-### Files to create
-
-| File | Licence | Purpose |
-|------|---------|---------|
-| `docs/phase-4-site-server/FIELD_TEST.md` | CC-BY-SA-4.0 | Weekend milsim gate test runbook: equipment checklist, staging procedures, per-stage pass criteria, post-test analysis |
-| `server/docs/DEPLOY.md` | CC-BY-SA-4.0 | Site server deployment guide: docker-compose setup, Caddy/nginx TLS, DNS, first admin user, backup cron, restore |
-| `server/docs/API.md` | CC-BY-SA-4.0 | Site server REST API reference (generated from OpenAPI) |
-| `docs/phase-4-site-server/ARCHITECTURE.md` | CC-BY-SA-4.0 | Phase 4 architecture overview: component diagram, data flow, sync model, security model |
-
-### Files to modify
-
-| File | Change |
-|------|--------|
-| `server/README.md` | Final documentation: architecture summary, setup quickstart, API reference link, deployment link |
-| `README.md` (project root) | Update project status: Phase 4 deliverables, site server, advanced modes, ATAK, custom scenarios |
-| `docs/phase-4-site-server/STATUS.md` | Mark Planning complete; mark implementation paused |
-
-### Validation commands
-
-**Full site server test suite:**
-
-```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml \
-  run --rm test \
-  sh -c "alembic upgrade head && python -m pytest tests/ -v --tb=short"
-```
-
-**Full mode test suite:**
-
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/src" atalaia-dev \
-  sh -c "cd /src && python3 -m pytest modes/ -v"
-```
-
-**Full core test suite (including geo):**
-
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/src" atalaia-dev \
-  sh -c "BUILD=/tmp/c sh tools/check.sh"
-```
-
-**SPDX header check (all new files):**
-
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/src" atalaia-dev \
-  sh -c "cd /src && grep -rL 'SPDX-License-Identifier' server/src/ server/tests/ modes/master-and-satellites/ modes/target-windows/ modes/vip-payload/ modes/hacking-terminal/ controller/atalaia_controller/atak.py controller/atalaia_controller/sync_client.py core/src/geo.c core/include/atalaia/geo.h && echo 'FAIL: missing SPDX headers' || echo 'All SPDX headers present'"
+python3 tools/docker_sim.py test modes/objectives
+python3 tools/docker_app.py gen && python3 tools/docker_app.py
+python3 tools/docker_fw.py test && python3 tools/docker_fw.py build
+# clean-copy check
 ```
 
 ---
 
-## Assumptions about earlier phases
+## Plan phase 7: Scenario compiler and validator
 
-| # | Assumption | Source | Plan phases that depend on it | What to do if wrong |
-|---|-----------|--------|-------------------------------|---------------------|
-| A1 | Phase 2D delivers a working Python controller with FastAPI REST API, SQLite store, MQTT publisher, and WebSocket stream | RESEARCH.md section 15; ADR-P2-5 | C (sync client), D (ATAK emitter), G (remote GM relay), H (integration) | **HOLDS** (2026-10-18). Package is `controller/atalaia_controller/`. Auth uses bearer tokens (read/GM). SQLite schema 2 with wider unique constraint. MQTT via Mosquitto with per-user ACLs. |
-| A2 | Phase 2D delivers the GM console as a Preact+HTM PWA served by FastAPI | RESEARCH.md section 15 | G (remote GM console), H (integration) | **HOLDS** (2026-10-18). Preact 10.24.3 + HTM 3.1.1 + qrcode-generator, served at `/console/`. |
-| A3 | Phase 2C delivers `field.*` API and `state.field{}` in the core (confirmed complete per STATUS.md) | Phase 2 STATUS.md | B (Master and Satellites), E (scenario compiler generates field.lua), F (VIP, Hacking Terminal) | **HOLDS** (2026-10-18). Confirmed complete; field.lua runs via ctypes to the same C core. |
-| A4 | Phase 3 delivers the Android shell (Flutter + dart:ffi) with kiosk mode | Phase 3 design (ADR-P3-4). | F (Hacking Terminal mode) | **HOLDS** (2026-10-18). Phase 3 design complete, not yet built. Interface assumptions unchanged. |
-| A5 | Phase 3 delivers the player app with role-based views on Android and iOS | Phase 3 design (ADR-P3-3). | C (chrono check-in flow consumes player app records), G (scheduling shows in player app), H (weekend gate needs 20+ players on the app) | **HOLDS** (2026-10-18). Phase 3 adds player tokens (HMAC-SHA256-signed JSON, not JWT) and position reporting (`POST /api/v1/positions`). |
-| A6 | Phase 3 delivers GPS reporting from the player app to the controller as `gps.fix` events | Phase 3 design (P3-9). | D (ATAK CoT for player positions), F (VIP / Payload mode) | **HOLDS** (2026-10-18). Position reports via `POST /api/v1/positions`, authenticated with player token. GPS not on Field Box (E21); comes from phones/pods only. |
-| A7 | Phase 3 delivers NFC squad identification (team + squad from NFC tags) | Phase 3 design. | F (engineer-only satellite capture in Master and Satellites) | **HOLDS** (2026-10-18). NFC tags use HMAC-SHA256 with game key, truncated to 16 bytes. |
-| A8 | Phase 3 delivers the chrono check-in flow in the player app (marshal scans tag, enters readings, app signs and uploads) | Phase 3 design (ADR-P3-7). | C (chrono registry receives records from the check-in flow), H (weekend gate chrono check-in) | **CHANGED** (2026-10-18). Chrono records are JSON with Ed25519 signature per marshal (ADR-P3-7), aligning with ADR-P4-5. Record format is concrete: reading_id, replica_id, player_id, type, velocity_mps, bb_weight_g, energy_j, chrono_id, marshal_id, marshal_name, game_id, field_id, timestamp, signature. |
-| A9 | Phase 3 delivers BLE join for Android devices | Phase 3 design (ADR-P3-2). | H (weekend gate, players joining via phone) | **HOLDS** (2026-10-18). Unchanged. |
-| A10 | Phase 3 delivers Hold-All Domination, Last Stand, Kill Confirmed and other multi-node modes that validate the `field.lua` API under real game conditions | Decision R6; Phase 3 design. | B (Master and Satellites uses the same field.lua API), E (scenario compiler generates field.lua) | **CHANGED** (2026-10-18). Hold-All Domination and Last Stand are in the Phase 2 mode pack now (decision R6). Kill Confirmed remains Phase 3. The field.lua API is validated by the Phase 2 mode pack. |
-| A11 | Phase 1 delivers the target addon hardware (piezo sensor + MCU + LED ring on the addon bus) | Spec section 6 | B (Target Windows mode logic), H (Target Windows hardware testing) | **HOLDS** (2026-10-18). Unchanged. |
-| A12 | The controller's WiFi network supports UDP multicast for ATAK CoT | Spec section 10 | D (ATAK CoT multicast) | **HOLDS** (2026-10-18). Unchanged. |
-| A13 | The site server can reach the controller via HTTPS through the 4G bridge | Spec section 11 | G (remote GM console), H (live sync during weekend gate) | **HOLDS** (2026-10-18, auth model changed). The site server authenticates to the controller with bearer tokens (GM token for writes, read token for reads), not API keys. The controller authenticates to the site server with a 256-bit API key. |
+*Software, can be done now. Depends on plan phases 3 and 6. Size L.*
+
+### Goal
+
+ADR-P4-6 as amended: a YAML scenario manifest compiles to a `kind:
+scenario` package. The library is shared (`controller/atalaia_controller/scenarios/`,
+decision P4-1), pure Python (stdlib, PyYAML), imported by the controller
+and the site server.
+
+### Files
+
+| File | Licence | Purpose |
+|------|---------|---------|
+| `controller/atalaia_controller/scenarios/__init__.py` | AGPL-3.0-or-later | `compile_scenario(manifest) -> Package`, `validate(manifest) -> list[Problem]` |
+| `.../scenarios/manifest.py` | AGPL-3.0-or-later | Parsing, defaults, the names of P4R8 |
+| `.../scenarios/validator.py` | AGPL-3.0-or-later | Unique ids, references, DAG (topological sort), required params per type, time windows, zone geometry (radius >= 10 m warning, simple polygons), teams and squads that exist, sizes (every event under 200 bytes) |
+| `.../scenarios/lua.py` | AGPL-3.0-or-later | Lua generation: string escaping, one block per objective type, dependency wiring, visibility, the `setup` commands |
+| `.../scenarios/package.py` | AGPL-3.0-or-later | `mode.yaml` (kind `scenario`, `i18n.pt`) and `field.lua` of the package |
+| `.../scenarios/__main__.py` | AGPL-3.0-or-later | `python3 -m atalaia_controller.scenarios compile|check scenario.yaml [-o dir]` |
+| `controller/tests/test_scenarios.py` | AGPL-3.0-or-later | Unit tests |
+| `controller/tests/scenarios/*.yaml` | AGPL-3.0-or-later | Valid and invalid manifests |
+| `protocol/vectors/scenario.json` | GPL-3.0-or-later | Manifests with their expected problems, for any later implementation (the console's live checks, phase 5's editor) |
+
+### Tests
+
+Every objective type compiled and run in the simulator with the
+objectives package (completion and failure emit 42/43; reveals 44;
+`scenario.started` 45 at the start); the dependency chain of the
+multi-objective example; time windows; `survive` against Respawn's
+lives; `escort` with `position.fix`; Lua escaping of hostile texts (a
+name with `]]`, quotes, newlines); every invalid manifest refused with
+its reason; `Simulation.problems` empty in every run.
+
+### Validation
+
+```sh
+docker run --rm -v "$PWD:/src" atalaia-dev sh -c "BUILD=/tmp/c sh tools/check.sh"
+docker run --rm -v "$PWD:/src" atalaia-dev sh -c "cd controller && python3 -m atalaia_controller.scenarios check tests/scenarios/multi_objective.yaml"
+```
+
+---
+
+## Plan phase 8: Scenarios in the controller, console and app
+
+*Software, can be done now. Depends on plan phase 7. Size M.*
+
+### Goal
+
+A GM builds, checks and runs a scenario from the console, on a field
+with no site server; players see their revealed objectives.
+
+### Files and changes
+
+- `controller/atalaia_controller/api.py`: `POST /api/v1/scenarios/check`
+  (console token: problems for the editor), `POST /api/v1/scenarios`
+  (GM: compile and install as a mode package), `GET /api/v1/scenarios`
+  (console), `GET /api/v1/scenarios/{id}` (manifest and generated Lua,
+  for the GM to read).
+- `ws.py`, `api.py` `make_route`, `PLAYER_TYPES`: objective events to
+  the assigned team and squad, all to staff, hidden ones never before
+  their reveal (P4R24).
+- `controller/console/src/components/scenario-builder.js`: a YAML editor
+  with the problems listed, the node names to assign in the Join tab,
+  pt and en.
+- The app's player view: objectives with the scenario's translated
+  names (from the game's setup) and their state.
+
+### Tests
+
+Controller unit tests for each endpoint and the routing; console browser
+tests (build, check, install, run a two-objective scenario on host
+boxes); Dart widget and golden tests of the objectives in the player
+view; the on-device test gets one case.
+
+### Validation
+
+```sh
+python3 tools/docker_console.py
+python3 tools/docker_app.py && python3 tools/docker_app.py goldens
+# clean-copy check
+```
+
+---
+
+## Plan phase 9: ATAK / CoT emitter
+
+*Software, can be done now; a real ATAK device: HW3. Depends on plan phase 3. Size M.*
+
+### Goal
+
+ADR-P4-7 as amended (P4R18): props and zones on ATAK maps over the field
+Wi-Fi.
+
+### Files and changes
+
+| File | Licence | Purpose |
+|------|---------|---------|
+| `controller/atalaia_controller/atak.py` | AGPL-3.0-or-later | CoT XML (escaped), type mapping, UIDs, staleness, UDP multicast sender, optional TCP senders to staff endpoints |
+| `controller/atalaia_controller/config.py`, `controller.example.toml` | (existing) | `[atak] enabled = false`, `multicast`, `port`, `interval_s`, `staff_endpoints = []`, `players = false` |
+| `controller/atalaia_controller/api.py`, `store.py` | (existing) | `PUT /api/v1/field/georef` (GM): two image corners with lat and lon; schema 5 |
+| `controller/console/src/components/` | (existing) | Placing the two corners on the field image |
+| `controller/tests/test_atak.py` | AGPL-3.0-or-later | Tests |
+| `protocol/vectors/cot.xml` (or `cot.json`) | GPL-3.0-or-later | Known-good CoT samples, cited from the CoT specification's examples |
+
+### Tests
+
+XML parses, `uid`, `type`, `time`/`stale`, `point` from the georeference
+(an image position of 0.5, 0.5 lands in the middle of the two corners),
+`__group` from the owner's colour; a captured zone is sent at once;
+nothing is sent while `enabled` is false; **no player position is ever
+multicast**, staff endpoints only with `players = true`; a receiver on
+the loopback in the test gets the datagram.
+
+### Validation
+
+```sh
+docker run --rm -v "$PWD:/src" atalaia-dev sh -c "BUILD=/tmp/c sh tools/check.sh"
+python3 tools/docker_console.py
+```
+
+---
+
+## Plan phase 10: Site server skeleton and its test tooling
+
+*Software, can be done now. Depends on nothing. Size M.*
+
+### Goal
+
+The `server/` application and the tooling every later plan phase uses:
+FastAPI app factory, configuration, the async database layer, the first
+Alembic migration (fields, users, roles, user_field_roles, sessions,
+audit_log), `/api/v1/health` and `/api/v1/metrics`, security headers,
+the image, the test Compose file, `tools/docker_server.py` and the CI
+job. Decisions P4R9, P4R16, P4R17.
+
+### Files
+
+| File | Licence | Purpose |
+|------|---------|---------|
+| `server/atalaia_server/__init__.py`, `app.py`, `config.py`, `db.py`, `models.py`, `security_headers.py` | AGPL-3.0-or-later | The package (named like the controller's, not `src`, decision D15) |
+| `server/atalaia_server/api/health.py` | AGPL-3.0-or-later | Health and metrics |
+| `server/migrations/env.py`, `server/alembic.ini`, `server/migrations/versions/0001_base.py` | AGPL-3.0-or-later | Async Alembic; the base tables only (each later plan phase adds its own migration) |
+| `server/requirements.in`, `server/requirements.txt` (hash-pinned) | AGPL-3.0-or-later | Dependencies (P4R16) |
+| `server/Dockerfile` | AGPL-3.0-or-later | Stage 1 builds `libatalaia_core.so` (the core) with cmake; stage 2 `python:3.12-slim` with the requirements, `server/`, `controller/atalaia_controller/` and `simulator/atalaia_sim/` (the shared Python), the core library; a `test` target adds the tests |
+| `server/docker-compose.yml` | AGPL-3.0-or-later | The server and `postgres:16-alpine` (Caddy in plan phase 22) |
+| `server/docker-compose.test.yml` | AGPL-3.0-or-later | An ephemeral `postgres:16-alpine` (tmpfs, health check) and the test image |
+| `server/tests/__init__.py`, `base.py`, `test_health.py`, `test_migrations.py`, `test_shared_imports.py` | AGPL-3.0-or-later | `unittest` base classes: a fresh database per test class, an httpx ASGI client; the shared modules import without FastAPI on the controller's side |
+| `tools/docker_server.py` | GPL-3.0-or-later | `test`, `migrations`, `build`, `up`, `down` |
+| `.github/workflows/ci.yml` | (existing) | New job `server`: build the test image, `services: postgres: image: postgres:16-alpine`, run the tests and the migration round trip |
+| `server/README.md`, `tools/README.md`, `README.md`, `CHANGELOG.md`, site | (existing) | Docs |
+
+### Validation
+
+```sh
+python3 tools/docker_server.py test
+python3 tools/docker_server.py migrations     # upgrade head, downgrade base, upgrade head
+docker run --rm -v "$PWD:/src" atalaia-dev sh -c "BUILD=/tmp/c sh tools/check.sh"   # unchanged parts still pass
+```
+
+---
+
+## Plan phase 11: Accounts, sessions and roles
+
+*Software, can be done now. Depends on plan phase 10. Size M.*
+
+ADR-P4-2 as written: registration, login, `login/totp`, refresh with
+rotation and replay detection, logout, TOTP enrolment (Fernet-encrypted
+seeds), the breached-password list, rate limits, per-field and per-game
+roles (player, squad_leader, vip, marshal, gm, spectator, admin) with
+TOTP required for admin, gm and marshal, the audit log, `python -m
+atalaia_server create-admin`. Migration `0002_accounts`. Tests:
+`server/tests/test_auth.py`, `test_roles.py` (as the old phase A
+listed). Validation: `python3 tools/docker_server.py test` and
+`migrations`.
+
+---
+
+## Plan phase 12: Personal data
+
+*Software, can be done now. Depends on plan phase 11. Size M.*
+
+ADR-P4-8 as amended: `GET /api/v1/me/data`, `GET /api/v1/me/export`
+(ZIP of JSON), `DELETE /api/v1/me` (anonymise, keep signatures),
+`PATCH /api/v1/me`; the daily retention purge (`python -m atalaia_server
+purge`); `docs/templates/privacy-notice-{pt,en}.md` and
+`dpa-template.md` (marked for legal review, P4-6). **Rule for every
+later plan phase:** a table with personal data is added to access,
+export, erasure and the purge in the same plan phase. Tests:
+`test_personal_data.py`. Portuguese templates in pt-PT, inclusive.
+
+---
+
+## Plan phase 13: Controller sync
+
+*Software, can be done now; over a real 4G link: HW1. Depends on plan phases 10 and 11. Size L.*
+
+### Goal
+
+ADR-P4-3 as amended: the controller opens the link and pushes its
+games; the site server stores them. Decisions P4R10-P4R13.
+
+### Site server
+
+- Migration `0003_sync`: `field_api_keys` (SHA-256, two active during a
+  rotation), `controllers` (controller_id, last seen, version),
+  `games` (UUID, `field_id`, `game_id`, `game_seed`, mode id, teams,
+  team info, params, times, state; unique `(field_id, game_id,
+  game_seed)`), `game_events` (unique `(game, node_id, seq,
+  game_time_ms, event_type)`, `data` JSONB, `epoch`, `pkt_seq`,
+  `received_at`), `game_node_scores` (`(game, node_id, team)`,
+  `value`, merged by `GREATEST`), `nodes` (per game: name, role, info).
+- `POST /api/v1/sync/games` (create or update a game's metadata),
+  `POST /api/v1/sync/events` (a batch: `{game, after_id, events: [...]}`,
+  the controller's own event ids; answers `acked_id`, inserted and
+  duplicate counts), `POST /api/v1/sync/scores` (per node counters),
+  `POST /api/v1/sync/nodes`, `WS /api/v1/sync/stream` (the controller
+  connects; live events and scores one way, remote commands the other
+  way from plan phase 19).
+- The batch format is shared: `protocol/sync.md` and
+  `protocol/vectors/sync.json` (valid and invalid batches), read by the
+  controller's client and the site server.
+
+### Controller
+
+- `controller/atalaia_controller/sync_client.py` (AGPL): a thread with
+  backoff (30 s during a game, 5 min between, doubling on failure,
+  capped at 5 min), the cursor per game in a new `sync_state` table
+  (store schema 5), the API key from `[sync] api_key`,
+  `ATALAIA_SYNC_API_KEY` or `python3 -m atalaia_controller sync-key`,
+  `[sync] url`, `enabled = false` by default; the site server's TLS
+  checked against the system CAs (or a pinned CA in the config).
+- Never sent: positions, check-in names (until plan phase 16 defines
+  what goes back), tokens, keys.
+
+### Tests
+
+Site server: API key accepted, wrong or missing refused; a batch, the
+same batch again (duplicates counted, nothing doubled), an out-of-order
+batch; a GM's negative adjustment lowers the derived total; a standby
+controller's events for the same `(game_id, game_seed)` land in the same
+game; the 16-bit `game_id` reused months later is a new game; the sync
+vectors. Controller: against a small in-process HTTP server (no
+PostgreSQL): cursor, replay after a restart, backoff, nothing private in
+any request body (checked field by field). End to end: the controller's
+client against the real site server in `docker-compose.test.yml`
+(`server/tests/test_sync_e2e.py`, the controller package run in the test
+image).
+
+### Validation
+
+```sh
+python3 tools/docker_server.py test && python3 tools/docker_server.py migrations
+docker run --rm -v "$PWD:/src" atalaia-dev sh -c "BUILD=/tmp/c sh tools/check.sh"
+```
+
+---
+
+## Plan phase 14: Chrono registry
+
+*Software, can be done now; with a real chronograph: HW4. Depends on plan phase 13. Size M.*
+
+ADR-P4-5 as amended (P4R14, P4R15). Migration `0004_chrono`:
+`marshal_keys` (marshal_id, public key, from/until, the account it is
+linked to), `replicas` (the app's `replica_id` UUID, the per-field
+owner, type including `sniper`, class, make and model), `chrono_readings`
+(`reading_id` unique, `record_json` verbatim, the fields of
+`protocol/chrono-record.md` as columns for queries, series and outcome,
+`verified_at`), `chrono_violations`, consents for sharing. Sync:
+`POST /api/v1/sync/marshals`, `POST /api/v1/sync/chrono` (readings, the
+controller's series and outcomes), `POST /api/v1/sync/replicas`; each
+reading verified with `atalaia_controller.chrono.verify` against the
+marshal's key valid at its time; a record that fails is kept apart and
+reported, never silently dropped. Queries for staff and the player's
+own history; cross-field history only with both fields' and the
+account's consent. Tests: the shared `protocol/vectors/chrono_record.json`
+through the sync endpoint (every valid one accepted, every invalid one
+refused with its reason), a rotated key, a reading uploaded twice,
+erasure keeps the record and drops the link to the person.
+
+---
+
+## Plan phase 15: Scheduling, field pages and feeds
+
+*Software, can be done now. Depends on plan phase 11. Size M.*
+
+ADR-P4-11 (scheduling and publication) and ADR-P4-12 (feeds), as
+written; files as the old phase I listed, under
+`server/atalaia_server/`: `api/scheduling.py`, `services/scheduling.py`,
+`web/field_pages.py` and templates (pt and en, no JavaScript),
+`feeds/ical.py`, `feeds/json_feed.py`, `server/schemas/games-feed-v1.schema.json`,
+`server/docs/feeds.md`. Migration `0005_scheduling`. Tests:
+`test_scheduling.py`, `test_field_pages.py`, `test_feeds.py`; the
+iCalendar writer is checked against RFC 5545's own examples (folding,
+escaping, `DTSTART` in UTC), not only against itself.
+
+---
+
+## Plan phase 16: Registration and game-day sync
+
+*Software, can be done now. Depends on plan phases 13 and 15. Size L.*
+
+ADR-P4-11's registration and game-day sync, against the check-in that
+phase 3 built (`protocol/checkin.md`, `controller/atalaia_controller/checkin.py`):
+
+- Site server: registrations with pre-declared replicas (classes from
+  the field's limit template: the controller's template names, as
+  `app/lib/chrono/limit_templates/`), per-field `player_id` of the
+  phase 3 form (`p-` + 12 base32) made once or adopted from the phone's
+  field identity with its secret (the SHA-256 compared, as the
+  controller does), ticket secrets (SHA-256 kept), `GET
+  /api/v1/sync/schedule`, `GET /api/v1/sync/roster`, `POST
+  /api/v1/sync/checkins`; migration `0006_registration`.
+- Controller: `sync_client.py` pulls the schedule and roster until the
+  game starts; `checkin.py` gets **expected** check-ins (a new
+  `status = 'expected'`, store schema 6) with their declarations
+  `pending` in the "replicas to chrono" list, check-in by registration
+  id and ticket secret (`POST /api/v1/checkin` gains `registration_id`
+  and `ticket`), a printed `atalaia:ticket:` code scanned by a marshal
+  (the poster codec's sibling, with vectors in `protocol/checkin.md`
+  and `protocol/vectors/checkin.json`); outcomes pushed once.
+- Console: *Create from the schedule*; expected, arrived and walk-in
+  columns. App: account login on the site server, the field's games,
+  registering with replicas, the ticket kept and sent at check-in.
+- Tests as the old phase I listed (`test_registrations.py`,
+  `controller/tests/test_sync_schedule.py`), plus the ticket vectors in
+  Python and Dart.
+
+---
+
+## Plan phase 17: Registration import and platform adapters
+
+*Software, can be done now. Depends on plan phase 16. Size S.*
+
+ADR-P4-12's import (CSV per RFC 4180 and JSON, only the listed columns,
+dry run, upsert by `(source, external_ref)`) and the `PlatformAdapter`
+interface with a test adapter, off by default, encrypted configuration,
+every call audited; `server/docs/integrations.md`. No adapter for a
+named platform (F22). Tests: `test_registration_import.py`,
+`test_integrations.py`.
+
+---
+
+## Plan phase 18: Club profiles and branding sync
+
+*Software, can be done now. Depends on plan phase 13. Size M.*
+
+Decision P4R19. Site server: clubs (name, slug, logo, crest, colour,
+members with a club role), the field's branding and saved teams edited
+there, images checked with the controller's `images.py` (imported, the
+same limits: logo 1 MiB and 16-2048 px, wallpaper 4 MiB and 320-4096 px,
+crest 512 KiB and 16-1024 px, PNG/JPEG/WebP, metadata stripped), the
+rights reminder at every upload, public club pages off by default with
+a report button and an admin who can hide them. `GET
+/api/v1/sync/field` carries the branding (with image SHA-256s) and the
+saved teams; the controller fetches changed images and applies them
+when `[sync] branding = "site"` (default `"local"`). Tests on both sides,
+including a crest that follows a team to a second field's controller.
+
+---
+
+## Plan phase 19: Device health, firmware catalogue and remote GM
+
+*Software, can be done now. Depends on plan phase 13. Size M.*
+
+ADR-P4-3 and RESEARCH section 8 as amended (P4R12): device health from
+synced `node.online`, `battery.low`, `node.offline` events and node
+STATE (battery, firmware, RSSI, last seen); a firmware catalogue (list
+only: OTA is not built yet); the remote GM: a site-server user with the
+`gm` role on the field sees the live game through the controller's
+WebSocket and sends commands back on it, only when the controller sets
+`[sync] remote_gm = true`, limited to start, pause, resume, end, GM
+messages and declared mode commands, each logged on both sides (the
+controller's `audit` entries, the site server's audit log). Tests:
+`test_devices.py`, `test_remote_gm.py` (a command refused while
+`remote_gm` is off, refused for a command outside the list, refused for
+a user without `gm` on that field), and the controller's side.
+
+---
+
+## Plan phase 20: Game history and the scenario library
+
+*Software, can be done now. Depends on plan phases 13 and 7. Size M.*
+
+Game history (list, detail, event log by type and time, score timeline
+derived from per-node counters), spectator views with a delay, a public
+scoreboard per field when the field turns it on; the scenario library
+on the site server (`/api/v1/scenarios`: validate and compile with the
+shared library and the core's load check, P4R9; store, version) pushed
+to the controller with presets in `GET /api/v1/sync/presets`, where the
+controller installs and checks it again. Tests: `test_games.py`,
+`test_scenarios_api.py`.
+
+---
+
+## Plan phase 21: Hosted multi-tenant mode
+
+*Software, can be done now. Depends on plan phases 10-20. Size M.*
+
+ADR-P4-4 as written: `tenants`, schema per field, routing by API key and
+by host name, RLS as defence in depth, Alembic over every tenant, export
+(`pg_dump --schema`) and deletion of one field. Built last because every
+earlier table must exist first; hosted mode does not go live before the
+legal review (P4-6). Tests: `test_tenants.py` (no row of one field
+visible from another, even with a routing bug simulated).
+
+---
+
+## Plan phase 22: Deployment
+
+*Software, can be done now. Depends on plan phase 10. Size S.*
+
+ADR-P4-10: Caddy in `server/docker-compose.yml`, `server/setup.sh`
+(secrets, `.env` with mode 0600), `server/backup.sh` and a restore
+procedure, tested in CI by backing up a database with data, restoring it
+into a new one and running the tests' checks against it;
+`server/docs/DEPLOY.md`. Validation: `python3 tools/docker_server.py
+test`, plus the backup and restore test.
+
+---
+
+## HW1: Sync over a real link
+
+*Needs hardware and a deployment. Depends on plan phase 13 and phase 2 plan phase F.*
+
+A Raspberry Pi controller with the modem board, a phone as the 4G
+bridge, a site server on a VPS: a game's events reach the site server
+within 5 s (95th percentile) while the link is up; the link cut for 10
+minutes during a game, then every event arrives once; the controller
+behind carrier-grade NAT needs no inbound port.
+
+## HW2: Target addon
+
+*Needs hardware. Depends on plan phase 2.*
+
+The target addon's MCU firmware (RP2040 or ATtiny) and its link to the
+Field Box's addon port, the `hit` capability in the Field Box's HAL,
+piezo threshold and debounce tuned on steel and polycarbonate plates;
+then Target Windows becomes a built-in preset.
+
+## HW3: Phones in the field
+
+*Needs hardware. Depends on plan phases 4, 5 and 9, and phase 3 plan phase G.*
+
+The VIP's GPS outdoors against the extraction radius (10-25 m, risk R8),
+a payload prop on a phone, the Hacking Terminal on a phone and a Field
+Box with a keypad in sunlight and gloves, ATAK on a phone on the field
+Wi-Fi with the georeferenced image.
+
+## HW4: Chrono end to end and the weekend milsim gate
+
+*Needs hardware and players. Depends on everything above, phase 2 plan
+phase F and phase 3 plan phase G.*
+
+The staged gate test plan below.
+
+---
+
+## Assumptions about earlier phases (re-checked 2026-10-19)
+
+| # | Assumption | Status 2026-10-19 | Plan phases |
+|---|-----------|-------------------|-------------|
+| A1 | The Python controller (FastAPI, SQLite, MQTT, WebSocket) | **Built.** `controller/atalaia_controller/`, store schema 4, routes in `api.py`, MQTT `field/v1/...` | 8, 9, 13-20 |
+| A2 | The GM console (Preact + HTM, CSP, class components) | **Built.** `controller/console/src/`, Playwright tests | 8, 9, 16 |
+| A3 | `field.*` and `state.field{}` in the core | **Built.** `field.nodes/owner/send/score/common_owner` | 1, 5, 6, 7 |
+| A4 | The Android prop shell (Flutter, `dart:ffi`, kiosk) | **Built in software** (phase 3 D-F); not run on a phone | 4, 5 |
+| A5 | The player app with role views | **Built in software** (Android; iOS not built) | 8, 16 |
+| A6 | GPS reports from the app | **Built:** `POST /api/v1/positions`, kept on the controller, filtered by role; **no `gps.fix` events** | 5, 9 |
+| A7 | NFC squad identification | **Changed:** player tags carry player and team, not squad (P4R3) | -- |
+| A8 | Chrono check-in in the app | **Built:** signed per-reading records, `POST /api/v1/chrono/readings`, marshal keys from the phone | 14 |
+| A9 | BLE join for Android | **Changed:** join by QR, NFC or text (P3-10); a pod over BLE or USB (plan phase F) | -- |
+| A10 | Multi-node modes prove `field.lua` | **Built:** Hold-All, Last Stand, the Medic Kit | 1, 6 |
+| A11 | The target addon | **Not built** (hardware/target-addon: design phase) | HW2 |
+| A12 | Multicast on the field Wi-Fi | Unchanged; checked in HW3 | 9 |
+| A13 | The site server reaches the controller over 4G | **Dropped:** the controller connects out (P4R12) | 13, 19 |
+| A14 | (new) Boxes can run per-game scripts | **False:** built-in presets only; new modes need a flash (K10) | 6-8 |
+| A15 | (new) Check-in, player ids, tokens, branding as phase 3 built them | **Built:** `checkin.py`, `player_token.py`, `branding.py` | 16, 18 |
 
 ---
 
 ## Acceptance criteria
 
-### AC-1: Site server starts and passes health check
+Commands are run from the repository root in WSL/Linux. "Clean-copy
+check" means the commands in "How each plan phase is verified".
 
-```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.yml up -d
-sleep 10
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.yml exec atalaia-server \
-  python -c "import httpx; r = httpx.get('http://localhost:8000/api/v1/health'); print(r.json()); assert r.status_code == 200"
-docker compose -f server/docker-compose.yml down
-```
-
-**Expected:** `{"status": "healthy", "database": "connected", ...}` with exit 0.
-
-### AC-2: Alembic migration round-trip succeeds
-
-```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml \
-  run --rm test \
-  sh -c "alembic upgrade head && alembic downgrade base && alembic upgrade head && echo OK"
-```
-
-**Expected:** exit 0, "OK" printed.
-
-### AC-3: Auth flow (registration, login, TOTP, refresh)
-
-```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml \
-  run --rm test \
-  sh -c "alembic upgrade head && python -m pytest tests/test_auth.py -v"
-```
-
-**Expected:** exit 0. Tests cover registration, login, TOTP enrollment
-and verification, refresh token rotation, replay detection, rate
-limiting, and breached password rejection.
-
-### AC-4: GDPR endpoints work correctly
-
-```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml \
-  run --rm test \
-  sh -c "alembic upgrade head && python -m pytest tests/test_gdpr.py -v"
-```
-
-**Expected:** exit 0. Export ZIP contains profile.json, games.json,
-chrono_records.json, events.json, consents.json, README.txt. Erasure
-anonymises the user but preserves marshal signatures on chrono records.
-
-### AC-5: Sync protocol is idempotent and conflict-free
-
-```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml \
-  run --rm test \
-  sh -c "alembic upgrade head && python -m pytest tests/test_sync.py -v"
-```
-
-**Expected:** exit 0. Duplicate event batches report `events_duplicate`
-count. Score merge uses GREATEST. Event unique constraint
-`(game_id, node_id, seq)` prevents duplicates.
-
-### AC-6: Chrono records are signed and verifiable
-
-```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml \
-  run --rm test \
-  sh -c "alembic upgrade head && python -m pytest tests/test_chrono.py -v"
-```
-
-**Expected:** exit 0. Marshal Ed25519 signature is created during
-record creation, verifiable with the stored public key, and survives
-password changes (key is independent of password).
-
-### AC-7: Master and Satellites mode passes simulator tests
-
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/src" atalaia-dev \
-  sh -c "cd /src && python3 -m pytest modes/master-and-satellites/tests/ -v"
-```
-
-**Expected:** exit 0. Multiplier tracks correctly, master hand-change
-resets satellites, scoring ticks apply multiplier.
-
-### AC-8: Target Windows mode passes simulator tests
-
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/src" atalaia-dev \
-  sh -c "cd /src && python3 -m pytest modes/target-windows/tests/ -v"
-```
-
-**Expected:** exit 0. Hit in window scores, hit outside window does
-not, window cycles correctly.
-
-### AC-9: Geo functions are correct
-
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/src" atalaia-dev \
-  sh -c "BUILD=/tmp/c sh tools/check.sh"
-```
-
-**Expected:** exit 0. `test_geo.c` tests pass: Haversine Lisbon-Porto
-within 1 km of 274 km, circle and polygon zone checks are correct.
-
-### AC-10: ATAK CoT XML is valid and correctly typed
-
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/src" atalaia-dev \
-  sh -c "cd /src/controller && pip install -r requirements.txt && \
-         python3 -m pytest tests/test_atak.py -v"
-```
-
-**Expected:** exit 0. CoT XML parses as valid XML, `event` root
-element has correct `type` and `uid`, `point` has lat/lon, `__group`
-has team name, staleness is set correctly.
-
-### AC-11: Scenario compiler produces valid, runnable Lua
-
-```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml \
-  run --rm test \
-  sh -c "alembic upgrade head && python -m pytest tests/test_scenario_compiler.py -v"
-```
-
-**Expected:** exit 0. Each of the 7 objective types compiles to valid
-Lua. The multi-objective scenario runs in the simulator: dependency
-chains activate correctly, objectives complete and fail correctly,
-visibility events fire.
-
-### AC-12: Scenario validator rejects invalid manifests
-
-```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml \
-  run --rm test \
-  sh -c "alembic upgrade head && python -m pytest tests/test_scenario_validator.py -v"
-```
-
-**Expected:** exit 0. Cyclic dependencies, missing parameters,
-duplicate IDs, non-existent references, invalid time windows and
-self-intersecting polygons are all rejected with descriptive errors.
-
-### AC-13: VIP / Payload mode passes simulator tests
-
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/src" atalaia-dev \
-  sh -c "cd /src && python3 -m pytest modes/vip-payload/tests/ -v"
-```
-
-**Expected:** exit 0. VIP extraction zone entry triggers
-`vip.extracted`. Outside-zone GPS fixes do not trigger extraction.
-
-### AC-14: Hacking Terminal mode passes simulator tests
-
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -v "$(pwd -W):/src" atalaia-dev \
-  sh -c "cd /src && python3 -m pytest modes/hacking-terminal/tests/ -v"
-```
-
-**Expected:** exit 0. Correct input triggers `hacking.solved`. Wrong
-input triggers lockout and puzzle regeneration.
-
-### AC-15: Remote GM console relays commands and events
-
-```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml \
-  run --rm test \
-  sh -c "alembic upgrade head && python -m pytest tests/test_remote_gm.py -v"
-```
-
-**Expected:** exit 0. GM-authenticated WebSocket connects, commands
-forward to mock controller, events relay back.
-
-### AC-16: Weekend milsim gate (hardware required)
-
-Execute the Weekend Milsim Gate Test Plan below. All functional
-requirements pass, all quantitative criteria met. Gate decision made.
-
-### AC-17: Scheduling, publication and registration (added 2026-10-19)
-
-```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml   run --rm test   sh -c "alembic upgrade head && python -m pytest tests/test_scheduling.py tests/test_registrations.py tests/test_field_pages.py -v"
-```
-
-**Expected:** exit 0. A published game appears on the field page and a
-draft does not; registration needs an account and an open window and
-stops at `max_players`; pre-declared replicas are stored; no player name
-appears on a public page.
-
-### AC-18: Game-day sync into the controller's check-in list (added 2026-10-19)
-
-```sh
-MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/src" atalaia-dev   sh -c "cd /src/controller && python3 -m pytest tests/test_sync_schedule.py -v"
-```
-
-**Expected:** exit 0. The roster becomes expected check-ins whose
-declarations are pending in the "replicas to chrono" list; a ticket
-check-in arrives the player; roster changes after the start change
-nothing; outcomes are pushed back once.
-
-### AC-19: Open feeds and registration import (added 2026-10-19)
-
-```sh
-MSYS_NO_PATHCONV=1 docker compose -f server/docker-compose.test.yml   run --rm test   sh -c "alembic upgrade head && python -m pytest tests/test_feeds.py tests/test_registration_import.py tests/test_integrations.py -v"
-```
-
-**Expected:** exit 0. The iCalendar feed passes the RFC 5545 checks and
-the JSON feed its schema, neither with personal data; a CSV and a JSON
-import give the same registrations, ignore unlisted columns and update
-by `external_ref`; adapters are off by default.
+| AC | What | Command | Expected |
+|----|------|---------|----------|
+| AC-1 | Site server starts and is healthy | `python3 tools/docker_server.py up` then `curl -fsS http://localhost:8000/api/v1/health` then `python3 tools/docker_server.py down` | `{"status": "healthy", "database": "connected", ...}` |
+| AC-2 | Migrations round trip | `python3 tools/docker_server.py migrations` | exit 0 |
+| AC-3 | Auth (registration, login, TOTP, refresh) | `python3 tools/docker_server.py test tests.test_auth tests.test_roles` | exit 0 |
+| AC-4 | Personal data rights | `python3 tools/docker_server.py test tests.test_personal_data` | exit 0; erasure keeps chrono signatures valid |
+| AC-5 | Sync idempotent, scores right with negative adjustments | `python3 tools/docker_server.py test tests.test_sync tests.test_sync_e2e` | exit 0 |
+| AC-6 | Chrono records verified with the shared vectors | `python3 tools/docker_server.py test tests.test_chrono` | exit 0; every invalid vector refused with its reason |
+| AC-7 | Master and Satellites | `python3 tools/docker_sim.py test modes/master_satellites` | all tests pass |
+| AC-8 | Target Windows | `python3 tools/docker_sim.py test modes/target_windows` | all tests pass |
+| AC-9 | Geo functions | clean-copy check (`ctest`: `test_geo`; simulator: `test_geo.py`) | exit 0 |
+| AC-10 | CoT is valid, no player position multicast | clean-copy check (`controller/tests/test_atak.py`) | exit 0 |
+| AC-11 | Scenarios compile and run | clean-copy check (`controller/tests/test_scenarios.py`) | each objective type completes and fails as specified in the simulator |
+| AC-12 | Scenario validator refuses bad manifests | same | every invalid manifest refused with its reason |
+| AC-13 | VIP / Payload | `python3 tools/docker_sim.py test modes/vip_payload` and the controller's positions tests | exit 0; no coordinates in events, MQTT or the stream |
+| AC-14 | Hacking Terminal | `python3 tools/docker_sim.py test modes/hacking_terminal` | exit 0 |
+| AC-15 | Remote GM over the controller's link | `python3 tools/docker_server.py test tests.test_remote_gm` | exit 0; refused when `remote_gm` is off |
+| AC-16 | Weekend milsim gate | HW4 | all pass criteria below |
+| AC-17 | Scheduling, publication, registration | `python3 tools/docker_server.py test tests.test_scheduling tests.test_registrations tests.test_field_pages` | exit 0 |
+| AC-18 | Game-day sync into the check-in list | clean-copy check (`controller/tests/test_sync_schedule.py`) | exit 0 |
+| AC-19 | Feeds and import | `python3 tools/docker_server.py test tests.test_feeds tests.test_registration_import tests.test_integrations` | exit 0 |
+| AC-20 | (new) New built-in modes on every platform | `python3 tools/docker_app.py`, `python3 tools/docker_fw.py test`, the three ESP-IDF builds | exit 0, 0 warnings |
+| AC-21 | (new) Club branding reaches a controller | `python3 tools/docker_server.py test tests.test_clubs` and the controller's sync tests | exit 0 |
+| AC-22 | (new) Backup and restore | the plan phase 22 test | the restored database passes the checks |
 
 ---
 
@@ -1124,234 +1164,111 @@ criteria below are demonstrated in a single weekend event (two days,
 
 | Item | Quantity | Purpose |
 |------|----------|---------|
-| Heltec WiFi LoRa 32 V4.3 (ESP32-S3 + SX1262) | 10-20 | Field Boxes and Satellites |
-| Heltec WiFi LoRa 32 V4.3 (modem variant) | 1 | USB radio modem for the controller |
-| Raspberry Pi 4 or 5 | 1 | Field controller |
-| Dedicated repeater nodes (Heltec V4.3) | 1-3 | Range extension for large outdoor areas |
-| Android phone with 4G SIM | 1 | Internet bridge (controller to site server) |
-| VPS or mini PC | 1 | Site server (PostgreSQL + FastAPI) |
-| Player phones (Android and iOS) | 20+ | Player app |
-| Android phones with ATAK installed | 1-2 | Marshal/GM ATAK devices |
-| Target addon (piezo + MCU + LED ring) | 1-2 | Target Windows mode hardware |
-| NFC tags (NTAG215/216) | 50+ | Player/replica/squad identification |
-| Commercial chronograph | 1 | Chrono check-in |
-| Arcade buttons per box | 2-4 | Team input |
-| 18650 battery packs per box | 1 | Full-day power |
-| Power banks for controller and bridge | 2 | Full-day power |
-| USB-A to USB-C cable | 1 | Pi to modem board |
-| Laptop | 1 | Serial monitoring and data collection |
+| Heltec WiFi LoRa 32 V4 (ESP32-S3 + SX1262; V4.3 by default, V4.2 in menuconfig) | 10-20 | Field Boxes, satellites, objectives, Hacking Terminals with keypads |
+| Heltec V4 (modem image) | 1 | USB radio modem for the controller |
+| Heltec V4 (pod image) | 2-4 | I/O pods for Android props |
+| Raspberry Pi 4 or 5 | 1 (+1 standby) | Field controller |
+| Repeater nodes (Heltec V4) | 1-3 | Range |
+| Android phone with 4G | 1 | Internet for the controller (controller connects out) |
+| VPS or mini PC | 1 | Site server |
+| Player phones (Android) | 20+ | Player app, check-in, VIP |
+| Android phones with ATAK | 1-2 | Marshal and GM maps |
+| Target addon | 1-2 | Target Windows (if HW2 is done) |
+| NFC tags (NTAG215/216) | 50+ | Player tags, replica stickers |
+| Chronograph | 1 | Chrono check-in |
+| Printed check-in poster | 1 | Field check-in (phase 3) |
+| Batteries, power banks, cables, a laptop | as needed | Power and logs |
 
 ### Staging approach
 
 #### Stage 1: Desk test
 
-**Setup:** 5 boxes + controller + site server on a desk. No players.
+5 boxes, the controller, the site server on a desk, no players: a game
+scheduled and published on the site server, the roster pulled, 20+
+captures in Domination, events on the site server within 30 s, Master
+and Satellites' bonus and reset, the remote GM's view (with
+`remote_gm` on), a chrono series signed on a marshal's phone and
+verified on the site server, a 3-objective custom scenario run to its
+end. Pass: everything syncs once, no errors in the logs.
 
-**Procedure:**
-1. Start the site server (docker-compose).
-2. Start the controller with the USB modem.
-3. Join 5 boxes via NFC.
-4. Create a scheduled game on the site server. Pull roster.
-5. Start a Domination game. Press buttons to generate 20+ captures.
-6. Verify sync: events appear on the site server within 30 seconds.
-7. Start a Master and Satellites game. Verify multiplier logic.
-8. Open the remote GM console via the site server. Verify live scores.
-9. Verify chrono: create a replica, create a check-in record with
-   marshal signature, verify signature on the site server.
-10. Compile a custom scenario (3 objectives) and run it.
+#### Stage 2: Small game
 
-**Pass criteria:**
-- All events sync to site server.
-- Remote GM console shows live scores and events.
-- Chrono record is signed and verifiable.
-- Custom scenario objectives complete correctly.
-- Zero errors in controller and site server logs.
-
-#### Stage 2: Small game test
-
-**Setup:** 5 boxes, 5 players with the player app, chrono check-in.
-Half-day (4 hours).
-
-**Procedure:**
-1. Register 5 players on the site server.
-2. Schedule a game. Players register via the app.
-3. Chrono check-in: each player registers their replica, marshal
-   records readings, verify pass/fail.
-4. Run one Domination game (30 min).
-5. Run one Master and Satellites game (30 min).
-6. Verify player app shows role-appropriate views.
-7. Run a spot check during game 2: compare with check-in reading.
-8. End games. Verify site server has full history.
-
-**Pass criteria:**
-- All 5 players join via the app.
-- Chrono check-in records are signed and stored.
-- Spot check comparison works.
-- Event sync latency < 5 s (95th percentile).
-- Zero lost captures.
+5 boxes, 5 players with the app, a half day: players register on the
+site server with their replicas, check in with the poster, marshals
+chrono the pre-declared replicas; one Domination and one Master and
+Satellites game; a spot check; the full history on the site server.
+Pass: all 5 check in through the app, every chrono record signed and
+stored, sync latency under 5 s (95th percentile), no lost captures.
 
 #### Stage 3: Scale test
 
-**Setup:** 10-15 boxes, 10+ players, multiple modes, ATAK, custom
-scenario. Full day (8 hours).
-
-**Procedure:**
-1. Run at least 4 different modes: Domination, Bomb, Master and
-   Satellites, and a custom scenario with 3+ objectives.
-2. Enable ATAK CoT. Verify props appear on ATAK maps on marshal
-   phones within 30 seconds of game start.
-3. Test controller failover: kill the Pi mid-game, verify backup
-   election completes within 40 seconds, verify zero lost events.
-4. Test offline sync: disconnect the 4G bridge for 10 minutes,
-   reconnect, verify all events sync.
-5. Monitor battery levels on all boxes. Record start and end
-   percentages.
-6. Test the remote GM console throughout the day.
-
-**Pass criteria:**
-- All modes run without errors.
-- ATAK shows > 80% of GPS-equipped props within 30 s.
-- Controller failover: zero lost captures.
-- Offline sync: all events sync after reconnect.
-- Battery: zero props die before end of the scheduled game.
-- Zero lost captures across all games.
+10-15 boxes, 10+ players, a full day: Domination, Bomb, Master and
+Satellites and a custom scenario with 3+ objectives; ATAK on; a
+controller failover (the Pi killed mid-game, the standby takes over
+within 40 s, check-ins rebuilt as F9 says); the 4G link cut for 10
+minutes; batteries logged. Pass: no errors, ATAK shows over 80% of the
+props within 30 s, no lost captures, every event synced after the
+reconnect, no prop runs flat before its game ends.
 
 #### Stage 4: Weekend gate
 
-**Setup:** Full setup as specified in the equipment list. Two days,
-20+ players.
+The full equipment, two days, 20+ players: day 1 chrono for everyone, 4+
+games (Domination, Bomb, Master and Satellites, a custom scenario),
+ATAK, a remote GM, a planned failover, Target Windows if the addon
+exists; day 2 a pass valid for the day (F8) or a new chrono, 3+ more
+games including a scenario with 4+ objectives and dependencies, VIP /
+Payload, a Hacking Terminal, then the data collection.
 
-**Procedure:**
-1. Day 1 (8-16 hours):
-   - Chrono check-in for all players.
-   - Run at least 4 games: Domination, Bomb, Master and Satellites,
-     custom scenario.
-   - Use ATAK throughout.
-   - Remote GM observes from off-site.
-   - Planned controller failover test.
-   - At least one Target Windows game (if addon hardware available).
-2. Day 2 (8-16 hours):
-   - Repeat chrono check-in (or verify Day 1 records persist).
-   - Run at least 3 more games, including a custom scenario with
-     4+ objectives and dependency chains.
-   - VIP / Payload game (if Phase 3 GPS is available).
-   - Hacking Terminal game (if Phase 3 Android shell is available).
-   - Final data collection: full event logs, chrono records, player
-     stats.
+**Pass criteria (quantitative):** no lost captures; sync latency under
+5 s at the 95th percentile; 100% of chrono records signed and stored;
+over 90% of registered players check in and join at least one game with
+the app; over 80% of the props on ATAK within 30 s; no prop runs flat
+before its game ends; the site server holds the whole weekend's history,
+scores and chrono records; at least one custom scenario with 3+
+objectives, each reaching completed or failed as it should.
 
-**Pass criteria (quantitative):**
-- Zero lost captures across all games.
-- Event sync latency: 95th percentile < 5 s from event generation
-  to site server persistence.
-- Chrono registry: 100% of check-in records are signed and stored.
-- Player app: > 90% of registered players successfully join at
-  least one game via the app.
-- ATAK: > 80% of GPS-equipped props visible on ATAK within 30 s
-  of game start.
-- Battery: zero props die before end of the scheduled game.
-- Site server: complete game history, scores, and chrono records
-  for the entire weekend.
-- Custom scenario: at least one game uses a custom scenario with
-  3+ objectives and all objectives complete or fail correctly.
+### Post-test analysis
 
-### Post-test analysis procedure
-
-After each test stage:
-
-1. **Export data:**
-   - Controller event log: `GET /api/v1/games/{id}/log > game_log.json`
-   - Site server event log: `GET /api/v1/games/{id}/events`
-   - Each box's serial log (captured during the test).
-   - Site server chrono records: `GET /api/v1/chrono/records?field_id=...`
-
-2. **Cross-reference events:**
-   For each `zone.captured` in the serial logs, verify it exists in
-   the controller's log and the site server's log with matching
-   `(node_id, seq)`.
-
-3. **Compute metrics:**
-   - Delivery latency distribution (median, P95, P99) from the
-     controller log.
-   - Sync latency distribution (median, P95, P99) from the site
-     server `received_at` vs `game_time_ms`.
-   - Time sync accuracy: max |node_game_time - controller_game_time|.
-   - Duty-cycle usage per node from radio HAL logs.
-   - Battery drain per box (start vs end percentage).
-
-4. **Verify chrono integrity:**
-   For each chrono record on the site server, verify the marshal
-   signature using the stored public key.
-
-5. **Check scenario completion:**
-   For each custom scenario game, verify all objectives reached
-   their expected terminal state (completed or failed).
-
-6. **Root-cause any failures:**
-   If any captures are lost or any metric misses its target, identify
-   root cause from serial logs, controller logs, site server logs and
-   radio HAL counters.
+1. Export: the controller's log (`GET /api/v1/games/{id}/log`), the
+   site server's events (`GET /api/v1/games/{uuid}/events`), each box's
+   serial log, the site server's chrono readings for the field.
+2. Cross-reference every `zone.captured` of the serial logs with the
+   controller's and the site server's logs by `(node, seq, game time)`.
+3. Compute delivery and sync latency (median, P95, P99), time-sync
+   accuracy, duty cycle per node, battery drain per box.
+4. Verify every chrono record on the site server with the marshal's
+   public key valid at its time.
+5. Check every scenario objective's final state.
+6. Root-cause any failure from the logs and the radio counters.
 
 ### Gate decision
 
-The Phase 4 gate is met when the Stage 4 weekend test passes all
-quantitative criteria. If VIP / Payload or Hacking Terminal cannot
-be tested because Phase 3 is incomplete, the gate can pass with
-those modes excluded, provided they have passed simulator tests
-(AC-13, AC-14) and the remaining criteria are all met. The missing
-modes must be field-tested as a follow-up within 30 days of Phase 3
-completion.
+The gate is met when Stage 4 passes every quantitative criterion. If
+Target Windows, VIP / Payload or the Hacking Terminal cannot be played
+for lack of hardware or phones, the gate can pass without them provided
+they pass their software acceptance criteria (AC-8, AC-13, AC-14) and
+are played in the field within 30 days of the missing hardware
+arriving.
 
 ---
 
-## Phase dependency graph
+## Dependency graph
 
 ```
-Phase A ─────────────────────────────────────> Phase H
-  │                                              ^
-  ├──> Phase B ──────────────────────────────────┤
-  │      (no Phase 2D/3 deps)                    │
-  │                                              │
-  ├──> Phase E ──────────────────────────────────┤
-  │      (no Phase 2D/3 deps for compiler;       │
-  │       escort objectives need Phase 3 GPS     │
-  │       for full testing)                      │
-  │                                              │
-  │   [Phase 2D lands]                           │
-  │      │                                       │
-  ├──> Phase C ──────────────────────────────────┤
-  │      (sync + chrono; depends on Phase 2D)    │
-  │      │                                       │
-  ├──> Phase D ──────────────────────────────────┤
-  │      (ATAK/CoT; depends on Phase 2D          │
-  │       for controller integration;            │
-  │       geo functions independent)             │
-  │                                              │
-  │   [Phase 3 lands]                            │
-  │      │                                       │
-  ├──> Phase F ──────────────────────────────────┤
-  │      (VIP, Hacking Terminal;                 │
-  │       depends on Phase 3)                    │
-  │                                              │
-  │   [Phase C lands]                            │
-  │      │                                       │
-  └──> Phase G ──────────────────────────────────┘
-         (remote setup; depends on Phase C
-          for device health data)
+Modes and core chain                      Site server chain
+  1 Master and Satellites                   10 skeleton + test tooling
+  2 Target Windows (logic) ----> HW2          ├─ 11 accounts ── 12 personal data
+  3 Geo ─┬─ 5 VIP / Payload ───> HW3          │      ├─ 15 scheduling ── 16 registration ── 17 import
+         ├─ 7 compiler                         │      └─ 13 sync ─┬─ 14 chrono
+         └─ 9 ATAK ────────────> HW3          │                  ├─ 16 (also needs 15)
+  4 Hacking Terminal ──────────> HW3          │                  ├─ 18 club profiles
+  6 scenario runtime ── 7 ── 8 console/app    │                  ├─ 19 devices, remote GM
+                         └──────────────────────────────────────> 20 history, scenario library
+                                               └─ 22 deployment
+                                              21 hosted mode (after 10-20)
+  13 ── HW1 (with phase 2 F)
+  everything ── HW4 (with phase 2 F and phase 3 G)
 ```
-
-**Parallelism:**
-
-- Phases A, B, and E can run in parallel from the start (no
-  inter-dependencies, no Phase 2D/3 dependency).
-- Phase D's geo functions (core C code) can start immediately;
-  the ATAK emitter (controller Python) waits for Phase 2D.
-- Phases C and D can run in parallel once Phase 2D lands.
-- Phase F is blocked until Phase 3 lands.
-- Phase G is blocked until Phase C lands (sync data feeds devices).
-- Phase I (added 2026-10-19) needs Phase A for the feeds and the
-  import, Phase C and phase 3 plan phase E (field check-in) for the
-  game-day sync.
-- Phase H is the final integration and depends on all other phases.
 
 ---
 
@@ -1359,171 +1276,36 @@ Phase A ────────────────────────
 
 ```
 server/
-    src/
-        __init__.py
-        main.py
-        config.py
-        models.py
-        schemas.py
-        database.py
-        auth.py
-        cli.py
-        # cli_scenario.py -- moved to controller/atalaia_controller/scenarios/cli.py
-        data/
-            breached_passwords.txt
-        api/
-            __init__.py
-            accounts.py
-            fields.py
-            roles.py
-            gdpr.py
-            health.py
-            sync.py
-            chrono.py
-            games.py
-            scenarios.py
-            devices.py
-            scheduling.py
-            remote_gm.py
-        services/
-            __init__.py
-            sync_service.py
-            chrono_service.py
-            gdpr_service.py
-            tenant_service.py
-            device_service.py
-            scheduling_service.py
-            # scenario_compiler.py -- moved to controller/atalaia_controller/scenarios/
-        middleware/
-            __init__.py
-            auth_middleware.py
-            rate_limit.py
-            security_headers.py
-    migrations/
-        alembic.ini
-        env.py
-        versions/
-            0001_initial_schema.py
-    tests/
-        __init__.py
-        conftest.py
-        test_auth.py
-        test_roles.py
-        test_gdpr.py
-        test_models.py
-        test_health.py
-        test_tenant.py
-        test_migration.py
-        test_sync.py
-        test_chrono.py
-        test_games.py
-        test_scenario_compiler.py
-        test_scenario_validator.py
-        test_scenario_api.py
-        test_devices.py
-        test_scheduling.py
-        test_remote_gm.py
-        test_scenarios/
-            simple_capture.yaml
-            multi_objective.yaml
-            all_types.yaml
-            cyclic_deps.yaml
-            bad_params.yaml
-    requirements.txt
-    pyproject.toml
-    Dockerfile
-    docker-compose.yml
-    docker-compose.test.yml
-    setup.sh
-    backup.sh
-    docs/
-        DEPLOY.md
-        API.md
+    atalaia_server/            app.py, config.py, db.py, models.py, security_headers.py,
+                               api/ (health, accounts, roles, me, sync, chrono, games,
+                               scheduling, registrations, clubs, devices, remote_gm, scenarios),
+                               services/, web/ (field pages, templates), feeds/, imports/,
+                               integrations/, cli
+    migrations/                env.py, versions/0001_base.py ... (one per plan phase)
+    schemas/games-feed-v1.schema.json
+    tests/                     base.py and test_*.py (unittest, PostgreSQL 16)
+    docs/                      feeds.md, integrations.md, DEPLOY.md, API.md
+    Dockerfile, docker-compose.yml, docker-compose.test.yml,
+    requirements.in, requirements.txt, setup.sh, backup.sh, alembic.ini
 
 controller/atalaia_controller/
-    atak.py
-    atak_config.py
-    sync_client.py
-    scenarios/
-        __init__.py
-        compiler.py
-        validator.py
-        templates.py
-        cli.py
+    sync_client.py, atak.py
+    scenarios/                 __init__.py, manifest.py, validator.py, lua.py, package.py, __main__.py
+controller/console/src/components/scenario-builder.js (+ georeference, schedule columns)
+controller/tests/              test_scenarios.py, scenarios/*.yaml, test_atak.py,
+                               test_sync_client.py, test_sync_schedule.py
 
-controller/console/src/components/
-    scenario-builder.js
+core/include/atalaia/geo.h, core/src/geo.c, core/tests/test_geo.c
 
-controller/tests/
-    test_atak.py
-    test_geo_lua.py
-    test_sync_client.py
+modes/master_satellites/, target_windows/, hacking_terminal/, vip_payload/, objectives/
+    (mode.yaml with i18n.pt, node.lua, field.lua where needed, assets/screens/, tests/)
 
-core/
-    include/atalaia/
-        geo.h
-    src/
-        geo.c
-    tests/
-        test_geo.c
+protocol/
+    sync.md, vectors/{sync.json, geo.json, scenario.json, cot.xml}
+    schema/events.yaml (events 42-47, data keys 34-36), capability-proxy.md (hit)
 
-modes/
-    master-and-satellites/
-        mode.yaml
-        node.lua
-        field.lua
-        i18n/
-            en.yaml
-            pt.yaml
-        tests/
-            test_basic.yaml
-            test_master_change.yaml
-            test_multi_satellite.yaml
-            test_satellite_recapture.yaml
-    target-windows/
-        mode.yaml
-        node.lua
-        i18n/
-            en.yaml
-            pt.yaml
-        tests/
-            test_hit_in_window.yaml
-            test_hit_outside_window.yaml
-            test_window_cycle.yaml
-    vip-payload/
-        mode.yaml
-        node.lua
-        field.lua
-        i18n/
-            en.yaml
-            pt.yaml
-        tests/
-            test_extraction.yaml
-            test_outside_zone.yaml
-            test_checkpoint_scoring.yaml
-    hacking-terminal/
-        mode.yaml
-        node.lua
-        i18n/
-            en.yaml
-            pt.yaml
-        tests/
-            test_solve.yaml
-            test_fail_lockout.yaml
-            test_puzzle_types.yaml
+tools/docker_server.py
 
-docs/
-    phase-4-site-server/
-        PLAN.md             (this file)
-        FIELD_TEST.md
-        ARCHITECTURE.md
-    templates/
-        privacy-notice-pt.md
-        privacy-notice-en.md
-        dpa-template.md
+docs/templates/privacy-notice-pt.md, privacy-notice-en.md, dpa-template.md
+docs/phase-4-site-server/FIELD_TEST.md (with HW4)
 ```
-
-Total: ~100 new files across server, controller, core, modes and
-docs. Modified files: ~10 (events.yaml, server README, project
-README, STATUS.md, core CMakeLists, script_api.c, master-and-
-satellites node.lua and mode.yaml, server api __init__.py).

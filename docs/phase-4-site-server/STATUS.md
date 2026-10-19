@@ -5,39 +5,81 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Planning
-**Phase status:** Complete
+**Current phase:** Planning (refreshed 2026-10-19)
+**Phase status:** Complete; ready for implementation
 **Risk level:** High
-**Last verified:** 2026-10-19 (design additions)
+**Last verified:** 2026-10-19 (design refreshed against phase 3's software)
+**Next step:** `--implement`, starting with plan phase 1 (Master and Satellites)
 
 ## Completed
 
 - [x] Research phase: `RESEARCH.md`
-- [x] Architecture decisions: `ADR.md` (10 ADRs: ADR-P4-1 through ADR-P4-10; ADR-P4-11 and ADR-P4-12 added 2026-10-19, proposed)
-- [x] Implementation plan: `PLAN.md` (8 phases: A through H, 16 acceptance criteria, weekend milsim gate test plan; Phase I and AC-17 to AC-19 added 2026-10-19)
+- [x] Architecture decisions: `ADR.md` (ADR-P4-1 to ADR-P4-10; ADR-P4-11 and ADR-P4-12 added 2026-10-19, proposed)
+- [x] Implementation plan: `PLAN.md`
+- [x] Phase 2 and 3 design handoff (2026-10-18)
+- [x] **Refresh after phase 3 software (2026-10-19):** every ADR re-checked against the built code, with dated amendments; RESEARCH and PLAN corrected in place, each with a "Refresh 2026-10-19" section; the plan re-sequenced into 22 software plan phases and 4 hardware ones; decisions P4R1-P4R26 in `docs/review/decisions-to-review.md` (all open)
 
-## Pending
+## Refresh 2026-10-19: what changed
 
-Phase 2 A-E is complete (2026-10-18).  Phase 3 design is complete
-but not yet implemented.
+| Change | Why | Decisions | Files |
+|--------|-----|-----------|-------|
+| Plan re-cut and re-ordered: modes and core first (1-9), then the site server (10-22); hardware last (HW1-HW4) | The maintainer wants code while waiting for the Heltec V4 boards; every plan phase is small enough to be verified from a clean copy and committed alone | P4R20 | PLAN.md |
+| Event ids 42-47, data keys 34-36; no `satellite.*`; `target.hit` already 16 | Satellites send `zone.captured` (spec section 15); the Medic Kit took 50-51 | P4R1, P4R2 | ADR.md (P4-6), PLAN.md |
+| Custom scenarios as a `kind: scenario` package over a built-in `org.atalaia.objectives` role package | Boxes run built-in scripts only; a new mode needs a flash (K10) | P4R7-P4R9, P4R24 | ADR.md (P4-6), PLAN.md 6-8 |
+| The controller opens every connection; no controller tokens on the site server; SHA-256 API keys; games as `(field, game_id, game_seed)`; per-node score merge | 4G NAT; a GM's adjustment can be negative; the 16-bit game id repeats | P4R10-P4R13 | ADR.md (P4-1, P4-3), PLAN.md 13 |
+| Chrono registry stores the signed readings verbatim and public keys only | Phase 3 built per-reading Ed25519 records signed on the phone | P4R14, P4R15 | ADR.md (P4-1, P4-5), PLAN.md 14 |
+| Positions never as events or on the site server; `position.fix` for `field.lua`, `gps.fix` on Android props | Phase 3 keeps positions on the controller, filtered by role | P4R6, P4R25 | ADR.md (P4-8, P4-9), PLAN.md 5 |
+| Hacking Terminal on the keypad; Target Windows' `hit` input and `game.teams()`; engineer-only deferred | No touch input or team list exists; player tags carry no squad | P4R3-P4R5, P4R26 | PLAN.md 2, 4 |
+| ATAK: props and zones only on multicast, a georeferenced field image | Field Boxes have no GPS; multicast cannot filter by role | P4R18 | ADR.md (P4-7), PLAN.md 9 |
+| Club profiles and branding sync | Phase 3 built branding per controller | P4R19 | PLAN.md 18 |
+| Site server image `python:3.12-slim` with pinned deps, package `atalaia_server`, `unittest` on PostgreSQL 16 (CI service container, local ephemeral container) | The dev image's packages are FastAPI 0.101 with pydantic 1.10; one test runner in the repository | P4R16, P4R17, P4R9 | ADR.md (P4-10), PLAN.md 10 |
+| Controller additions AGPL-3.0-or-later; mode folders with underscores, translations in `mode.yaml` | REUSE.toml and the repository's conventions | P4R21, P4R22, P4R23 | PLAN.md |
 
-Phases A (site server skeleton), B (Master and Satellites, Target
-Windows modes), C (sync protocol), D (ATAK/CoT), and E (custom
-scenario DSL) can proceed immediately -- Phase 2D is done.
+## Plan summary (order to implement)
 
-Phase F (VIP/Payload, Hacking Terminal) requires Phase 3
-implementation.
+| # | Plan phase | Software now / hardware | Depends on | Status |
+|---|------------|-------------------------|------------|--------|
+| 1 | Master and Satellites | Software, now | -- | **Next** |
+| 2 | Target Windows (logic), `game.teams()`, `hit` input | Software, now | -- | Pending |
+| 3 | Geo utilities in the core | Software, now | -- | Pending |
+| 4 | Hacking Terminal | Software, now | -- | Pending |
+| 5 | VIP / Payload | Software, now | 3 | Pending |
+| 6 | Scenario packages and the objectives role package | Software, now | -- | Pending |
+| 7 | Scenario compiler and validator | Software, now | 3, 6 | Pending |
+| 8 | Scenarios in the controller, console and app | Software, now | 7 | Pending |
+| 9 | ATAK / CoT emitter | Software, now | 3 | Pending |
+| 10 | Site server skeleton and test tooling | Software, now | -- | Pending |
+| 11 | Accounts, sessions and roles | Software, now | 10 | Pending |
+| 12 | Personal data | Software, now | 11 | Pending |
+| 13 | Controller sync | Software, now | 10, 11 | Pending |
+| 14 | Chrono registry | Software, now | 13 | Pending |
+| 15 | Scheduling, field pages and feeds | Software, now | 11 | Pending |
+| 16 | Registration and game-day sync | Software, now | 13, 15 | Pending |
+| 17 | Registration import and adapters | Software, now | 16 | Pending |
+| 18 | Club profiles and branding sync | Software, now | 13 | Pending |
+| 19 | Device health, firmware catalogue, remote GM | Software, now | 13 | Pending |
+| 20 | Game history and the scenario library | Software, now | 13, 7 | Pending |
+| 21 | Hosted multi-tenant mode | Software, now | 10-20 | Pending |
+| 22 | Deployment (Caddy, setup, backup, restore) | Software, now | 10 | Pending |
+| HW1 | Sync over a real 4G link | Hardware and a deployment | 13, phase 2 F | Waiting for boards |
+| HW2 | Target addon | Hardware | 2 | Waiting for the addon |
+| HW3 | Phones in the field (VIP, payload, terminal, ATAK) | Hardware | 4, 5, 9, phase 3 G | Waiting for boards and phones |
+| HW4 | Chrono end to end, weekend milsim gate | Hardware and players | all, phase 2 F, phase 3 G | Waiting |
 
-Phase G (remote setup) requires Phase C.
+Plan phases 1-9 and 10-22 are two independent chains; they can run in
+parallel worktrees.
 
-Phase I (scheduling, publication, registration, feeds; added
-2026-10-19) requires Phase A; its game-day sync also requires Phase C
-and phase 3's field check-in (ADR-P3-13).
+## Dependencies
 
-Phase H (integration and weekend milsim gate) requires all other
-phases plus Phase 2F (hardware) and Phase 3 implementation.
-
-To resume: `--implement` with Phase A as the first target.
+| Dependency | Status (2026-10-19) | Impact on Phase 4 |
+|------------|---------------------|-------------------|
+| Phase 2 A-E and mode pack | Done in software | None |
+| Phase 2 F (hardware, field test) | Pending, needs the boards | HW1, HW4 |
+| Phase 3 A-F, the Medic Kit, branding | Done in software | Old plan phase F's dependencies are met; plan phases 4, 5, 8, 16, 18 build on them |
+| Phase 3 PE24 (Android controller shell), iOS | Not built | None for phase 4's software |
+| Phase 3 G (field test with phones and pods) | Pending, needs the hardware | HW3, HW4 |
+| Target addon (hardware/target-addon) | Design phase | HW2 |
+| Wokwi CI quota (decision R7) | Used up | Firmware changes verified with host tests and ESP-IDF builds only |
 
 ## Maintainer request: scheduling, registration, publishing (2026-10-19, design only)
 
@@ -46,83 +88,42 @@ them on the field's site-server page or on shared or third-party
 platforms (naming jogarairsoft.pt in Portugal), and let players
 register; on game day players check in at the field with a printed QR
 code and declare their replicas for the chronograph (phase 3,
-ADR-P3-13).
+ADR-P3-13, now built).
 
 | What | Where |
 | --- | --- |
-| Scheduling, field page, registration with pre-declared replicas, game-day sync (schedule and roster pulls, check-in push; the controller stays the authority) | `ADR.md` ADR-P4-11 (proposed) |
+| Scheduling, field page, registration with pre-declared replicas, game-day sync (schedule and roster pulls, check-in push; the controller stays the authority) | `ADR.md` ADR-P4-11 (proposed; amended 2026-10-19 against the built check-in) |
 | iCalendar (RFC 5545) and JSON feeds, registration import (CSV, JSON), platform adapter interface and its rules | `ADR.md` ADR-P4-12 (proposed) |
-| Plan | `PLAN.md` Phase I (Phase G's scheduling files moved there), constraints 16-18, AC-17 to AC-19 |
+| Plan | `PLAN.md` plan phases 15, 16 and 17; constraints 16-18; AC-17 to AC-19 |
 | Open questions | F13-F23 in `docs/review/decisions-to-review.md` |
 
 **jogarairsoft.pt:** no public information or API about it was found
-(web search, 2026-10-19).  No adapter is designed: it needs the
+(web search, 2026-10-19). No adapter is designed: it needs the
 platform's API documentation or an agreement, which needs the
-maintainer to contact its operators (F22).  No scraping.
-
-## Plan summary
-
-| Phase | Scope | Status |
-|-------|-------|--------|
-| Research | Codebase inventory, spec requirements, architecture analysis, threat model, assumptions | Complete |
-| Architecture | ADR-P4-1 through ADR-P4-10 (database schema, auth, sync, multi-tenant, chrono signing, scenario DSL, ATAK, GDPR, geo utilities, deployment) | Complete |
-| Planning | Implementation plan with 8 phases (A-H), 16 acceptance criteria, weekend milsim gate test plan, dependency graph | Complete |
-| Implementation | Phases A-E ready (Phase 2D done); F waits for Phase 3; I's feeds and import need only A, its game-day sync waits for C and phase 3's field check-in; H waits for all | Pending |
-
-## Dependencies
-
-| Dependency | Status | Impact on Phase 4 |
-|------------|--------|-------------------|
-| Phase 2A: Protocol codecs | Complete | None |
-| Phase 2B: Simulator (RadioModel, FieldController) | Complete | None |
-| Phase 2C: Core field_ops API (state.field{}, field.*) | Complete | None -- field.lua API is available |
-| Phase 2D: Python controller (FastAPI, SQLite, MQTT) | **Complete** | Site server shares framework and sync protocol |
-| Phase 2E: GM console (Preact+HTM PWA) | **Complete** | Site server serves the same console |
-| Phase 2F: Hardware integration and field test | Pending | **High** -- weekend milsim gate requires working hardware |
-| Phase 3: Android shell, player app, GPS, chrono | Design complete | **High** -- VIP, Hacking Terminal, chrono registry depend on Phase 3 |
-| Phase 1: Target addon hardware | Not started | **High** -- Target Windows mode requires addon |
-
-## Phase 2 and 3 handoff (2026-10-18)
-
-Phase 2 implementation (A-E) is complete and Phase 3 design is
-complete (not yet built). Key changes affecting Phase 4:
-
-- **Controller package path**: `controller/atalaia_controller/`, not
-  `controller/src/`.
-- **Controller auth**: bearer tokens (read token, GM token), not
-  JWT/sessions or API-key auth. The site server authenticates to the
-  controller with the GM token (writes) and read token (reads). The
-  controller authenticates to the site server with a 256-bit API key.
-- **Event unique constraint**: `(game_id, node_id, seq, game_time,
-  type)`, not just `(game_id, node_id, seq)`. Site server schema
-  (ADR-P4-1) updated to match.
-- **Scenario compiler location**: runs on the field controller as a
-  shared Python library at `controller/atalaia_controller/scenarios/`.
-  The site server imports and reuses it. A field without a site
-  server can still build custom scenarios (local-first per spec
-  sections 3 and 11). ADR-P4-6 updated.
-- **Chrono signing**: Ed25519 per marshal in both Phase 3 and Phase 4,
-  confirmed aligned with ADR-P4-5.
-- **Event ID allocation**: Phase 3 uses IDs 25-27 and 33-41; Phase 2
-  mode pack uses 28-32; Phase 4 starts at ID 42.
-- **Player tokens**: HMAC-SHA256-signed JSON (not JWT), with
-  player_id, team, squad, role, game_id, exp, signed with game key.
-- **GPS**: NOT on the Field Box (E21); positions come from phones/pods
-  only. VIP/Payload mode unaffected (uses player app GPS).
-- **Hold-All Domination and Last Stand**: moved to Phase 2 mode pack
-  (decision R6), no longer Phase 3.
-
-RESEARCH.md, ADR.md and PLAN.md updated with a full handoff section.
+maintainer to contact its operators (F22). No scraping.
 
 ## Key findings from research
 
-1. Python / FastAPI + PostgreSQL is the clear choice for the site server.
-2. Sync is conflict-free by design (append-only events, grow-only scores).
-3. GDPR compliance is scoped but requires legal review for hosted mode.
-4. All four advanced modes need field.lua (Phase 2C, complete).
-5. Three of four modes depend on Phase 3 deliverables.
-6. ATAK / CoT is a well-defined open standard; no SDK licence needed.
-7. The weekend milsim gate should be staged (desk, small, scale, weekend).
-8. 10 architecture decisions identified for the ADR phase.
-9. 13 assumptions about earlier phases documented with impact levels.
-10. 12 risks identified with mitigations.
+1. Python / FastAPI + PostgreSQL for the site server, in its own image
+   with its own pinned versions (P4R16).
+2. Sync is conflict-free by design (append-only events, per-node
+   grow-only counters); the controller opens every connection (P4R12).
+3. GDPR compliance is scoped but needs a legal review for hosted mode
+   (P4-6).
+4. All four advanced modes and custom scenarios work through
+   `field.lua` and built-in node scripts; none needs a per-game script
+   on a box.
+5. Phase 3's dependencies of the advanced modes are built in software;
+   what waits is hardware (the target addon, real phones).
+6. ATAK / CoT is an open format; no SDK licence is needed; player
+   positions stay off multicast.
+7. The weekend milsim gate is staged (desk, small, scale, weekend) and
+   needs phase 2 F and phase 3 G.
+
+## How to resume
+
+Run `/sdlc phase-4-site-server --implement`. STATE.json records
+`current_phase: "planning"`, `phase_status: "complete"`,
+`resume_with: "--implement"` and the first plan phase. Each plan phase
+is verified from a clean copy (PLAN.md, "How each plan phase is
+verified") and committed by the coordinator; agents do not commit.

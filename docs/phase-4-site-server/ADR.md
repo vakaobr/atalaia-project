@@ -20,6 +20,71 @@ proposed, with their open questions in `docs/review/decisions-to-review.md`
 
 ---
 
+## Refresh 2026-10-19 (after phase 3 software)
+
+Every ADR below was re-checked against the code phase 2 and phase 3
+built (the controller in `controller/atalaia_controller/`, the app, the
+modes, `protocol/`). Where the code and an ADR disagree, the code is the
+fact and the ADR gets a dated **Amendment 2026-10-19** at its end; the
+original text stays, with a short "superseded" note where it is now
+wrong, so the history can be read. The amendments are proposals:
+decisions P4R1-P4R26 in `docs/review/decisions-to-review.md`, all open.
+
+| ADR | Re-check 2026-10-19 | Amendment |
+|-----|---------------------|-----------|
+| P4-1 Database schema | Partly wrong: chrono tables, game identity, scores, player tokens | Yes: chrono as signed readings, `(field, game_id, game_seed)`, per-node scores, `sniper`, per-field player ids (P4R10, P4R11, P4R15) |
+| P4-2 Authentication | Holds; site-server accounts are independent of the controller's tokens | Note only |
+| P4-3 Sync | Wrong on direction and auth, scores and batches | Yes: the controller opens every connection, no controller tokens on the site server, SHA-256 API keys, the controller's event ids as the cursor, per-node score counters (P4R10-P4R13) |
+| P4-4 Multi-tenant | Holds | Note: built last (plan phase 21) |
+| P4-5 Chrono signing | Ed25519 holds; key handling and record shape differ | Yes: keys made on the marshal's phone, public keys only on the site server, records verbatim (P4R14, P4R15) |
+| P4-6 Scenario DSL | The runtime cannot work on boxes that run built-in scripts only | Yes: `kind: scenario` and `org.atalaia.objectives`, names, ids, Lua as the core takes it (P4R7, P4R8, P4R9, P4R24) |
+| P4-7 ATAK / CoT | `gps.fix` does not exist; props have no coordinates; multicast cannot filter | Yes: props and zones only on multicast, a georeferenced field image, staff endpoints for players (P4R18) |
+| P4-8 Personal data | Holds; positions and check-in data as phase 3 built them | Yes: positions never on the site server, retention aligned (P4R25) |
+| P4-9 Geo utilities | Holds; its `gps.fix` example does not | Yes: `position.fix` (controller-only) and `gps.fix` on Android props (P4R6) |
+| P4-10 Deployment | Image and package names | Yes: `python:3.12-slim`, hash-pinned dependencies, a build stage for the core, package `atalaia_server` (P4R9, P4R16) |
+| P4-11 Scheduling and registration | Holds against phase 3's check-in | Small: expected check-ins and the ticket on the built `POST /api/v1/checkin` |
+| P4-12 Feeds and adapters | Holds | None |
+
+Facts the amendments rely on (all built, 2026-10-19):
+
+- **Controller API and auth:** routes in `controller/atalaia_controller/api.py`;
+  `Authorization: Bearer` with the GM token (writes), the read token
+  (reads, the scoreboard) or a player token (`require_player`, some
+  read routes); `?token=` only on `WS /api/v1/stream`; tokens are
+  `secrets.token_urlsafe(24)` kept in the `settings` table or set in
+  `[api]`; branding and the check-in poster's endpoints need none.
+- **Player tokens:** `apt1.<payload>.<mac>`, HMAC-SHA256 with the
+  controller's own per-game token key (`token_keys`, decision B8), not
+  the game key; fields `exp, game_id, player_id, role, squad, team`;
+  role, team and squad re-checked against the check-in on every request.
+- **Players:** per-field ids `p-` + 12 base32 characters with a
+  32-byte secret on the phone (the controller keeps its SHA-256); check-ins
+  per game; declarations per game (`aeg, gbb, hpa, bolt_action, dmr,
+  sniper, pistol, shotgun`; classes from the limit template).
+- **Chrono:** one record per reading, signed on the marshal's phone
+  with Ed25519 over canonical JSON (`protocol/chrono-record.md`,
+  `protocol/vectors/chrono_record.json`), uploaded in series to
+  `POST /api/v1/chrono/readings`, verified with `chrono.verify`, the
+  record kept as received (`chrono_readings.record_json`); marshal
+  public keys registered from the phone (`marshal_keys`).
+- **Store:** SQLite schema 4; events unique on
+  `(game_id, node_id, seq, game_time, type)`, INSERT OR IGNORE;
+  `games.id` is the 16-bit radio game id; `game_seed` is random per game
+  and travels in the join; scores per team and node, GM adjustments as
+  `score.delta` events from the controller.
+- **Modes:** `kind` `mode`, `modifier` or `role`, composed with `+`;
+  translations in `mode.yaml` `i18n.pt`; mode commands (CMD opcode 8);
+  boxes run built-in presets only and refuse a join for a mode they do
+  not have.
+- **Event ids:** 1-41 and 50-51 taken; 42-49 free and planned for
+  phase 4; data keys 1-33 taken (P4R1).
+- **Positions:** `POST /api/v1/positions`, kept on the controller for
+  the live game, filtered by role, never on the radio or MQTT.
+- **Branding:** per controller (`branding.py`, `images.py`), public
+  reads with ETags.
+
+---
+
 ### ADR-P4-1: Site server database schema
 
 **Status:** Accepted
@@ -429,12 +494,54 @@ Rules:
   enforces idempotent event sync.
 - **Player tokens** (Phase 3): the controller issues HMAC-SHA256-
   signed JSON player tokens (not JWT) with `player_id`, `team`,
-  `squad`, `role`, `game_id`, `exp`, signed with the game key. The
-  site server does not issue player tokens but must understand them
-  for position filtering. A `player_tokens` cache or validation
-  utility will be needed when the site server proxies position data.
+  `squad`, `role`, `game_id`, `exp`, signed with the controller's own
+  per-game token key (decision B8; corrected 2026-10-19: not the game
+  key). The site server does not issue player tokens and, since it
+  never receives positions (P4R25), does not verify them either.
+  *(The earlier "`player_tokens` cache" is superseded 2026-10-19.)*
 - Alembic's reversibility requirement means any deployment can be
   rolled back within one release window.
+
+**Amendment 2026-10-19 (after phase 3 software; decisions P4R10,
+P4R11, P4R15, proposed):**
+
+- **Built in steps.** The schema above is the target; each plan phase
+  adds its own reversible migration (`0001_base`: fields, users, roles,
+  sessions, audit log; then accounts, sync, chrono, scheduling,
+  registration, clubs), instead of one `0001_initial_schema`.
+- **Games from controllers.** A synced game is identified by
+  `(field_id, game_id, game_seed)`: `game_id` is the controller's 16-bit
+  radio id, which repeats over months, and `game_seed` (32-bit, random
+  per game, in the join) is shared with a standby controller. `games`
+  gains `game_id INTEGER`, `game_seed BIGINT`, `team_info JSONB`
+  (display names and crests), `params JSONB`, `squads SMALLINT`, with
+  `UNIQUE(field_id, game_id, game_seed)`; teams are the controller's
+  team names (colours).
+- **Events** also keep `epoch`, `pkt_seq` and the controller's own
+  event id (`source_id`) for the push cursor; the unique key above
+  stays.
+- **Scores.** `game_scores` (per team and counter) is replaced by
+  `game_node_scores (game_id, node_id, team, value)`, merged by
+  `GREATEST`; totals are derived as the controller derives them (the
+  sum of node counters plus the controller's `score.delta` events),
+  because a GM's adjustment can be negative.
+- **Chrono.** `replicas` uses the app's `replica_id` (UUID) as its key,
+  `owner_player_id` (the per-field id) next to `owner_id` (an account,
+  when one adopted the id), `replica_type` including `sniper`, `class`
+  (from the field's limit template), `make_model`. `chrono_records` is
+  replaced by `chrono_readings`: one row per signed reading, keyed by
+  the record's `reading_id`, with `record_json` exactly as received,
+  the record's fields as columns for queries (`replica_id`, `player_id`,
+  `type`, `velocity_mps`, `bb_weight_g`, `energy_j`, `chrono_id`,
+  `marshal_id`, `field_id` as the controller's `[checkin] field_id`
+  string, `game_id` optional, `timestamp`, `ref_reading_id`), the
+  controller's `series_id` and `outcome`, and `verified_at`.
+  `marshal_signing_keys` keeps public keys only (ADR-P4-5's amendment).
+  `field_joule_limits` follows the limit templates (`max_energy_j`,
+  `max_fps_020`, `med_m`, `fire_mode`).
+- **Players.** `field_player_ids` (ADR-P4-11) holds the phase 3 form of
+  id (`p-` + 12 base32); an account adopts a phone's id only with its
+  secret (SHA-256 compared).
 
 ---
 
@@ -635,6 +742,13 @@ async def create_chrono_record(
   deployments. A reverse proxy (Caddy/nginx) adds a second layer
   (ADR-P4-10).
 
+**Re-check 2026-10-19:** holds. Site-server accounts and sessions are
+independent of the controller's GM, read and player tokens; the role
+names match the controller's player-token roles (`player`,
+`squad_leader`, `vip`, `marshal`, `gm`, `spectator`) plus `admin`. The
+code goes in `server/atalaia_server/` (not `server/src/`, as decision
+D15 did for the controller).
+
 ---
 
 ### ADR-P4-3: Sync protocol between controller and site server
@@ -669,7 +783,9 @@ different mechanisms:
   (game state, score push, commands) and the read token for read
   operations (event log, device health, roster). This reuses the
   controller's auth model without adding a separate API-key path on
-  the controller side.
+  the controller side. *(Superseded 2026-10-19: the site server never
+  connects to the controller and holds none of its tokens; see the
+  amendment at the end of this ADR, decision P4R12.)*
 
 **Controller API key (controller to site server):**
 
@@ -692,9 +808,17 @@ with the stored hash. To avoid hashing on every request (Argon2id is
 intentionally slow), the server caches a (hash_of_key -> field_id)
 mapping in memory after the first successful verification, keyed by
 SHA-256 of the presented key (fast lookup, no timing attack on the
-cache key).
+cache key). *(Superseded 2026-10-19: the key is stored as its SHA-256
+only, decision P4R13; see the amendment.)*
 
 **Controller REST API endpoints (from Phase 2, for reference):**
+
+*(2026-10-19: a small subset of what the controller now serves; the
+full list as built is in `controller/atalaia_controller/api.py`'s
+docstring and `controller/README.md`. Phase 3 added a third kind of
+token, the player token, and routes that need no token at all:
+`/healthz`, the CA, branding, the check-in poster's `GET` and the
+check-in itself. The site server uses none of these routes, P4R12.)*
 
 The controller serves these endpoints (bearer token auth: read token
 for GET, GM token for state changes):
@@ -846,6 +970,54 @@ real time.
 - Batch replay with deduplication means the controller never needs to
   track exactly which events the site server has -- it can replay
   conservatively.
+
+**Amendment 2026-10-19 (after phase 3 software; decisions P4R10-P4R13,
+P4R25, proposed):**
+
+1. **The controller opens every connection.** A field controller sits
+   behind a phone's 4G link, usually behind carrier-grade NAT, so the
+   site server cannot reach it. The controller makes HTTPS requests to
+   the site server and keeps one WebSocket open to it
+   (`WS /api/v1/sync/stream`); anything the site server sends to the
+   controller (remote GM commands, plan phase 19) travels back on that
+   WebSocket. The site server never stores the controller's GM, read or
+   player-token keys; this changes the answer to decision P4-8.
+2. **API key.** A 256-bit random key per field (more than one during a
+   rotation), stored on the site server as its SHA-256 and compared in
+   constant time; Argon2id and the cache above are dropped (a random
+   key cannot be guessed, so a slow hash adds nothing). On the
+   controller: `[sync] api_key`, `ATALAIA_SYNC_API_KEY`, or stored in
+   its settings with `python3 -m atalaia_controller sync-key`.
+3. **Game identity.** `(field, game_id, game_seed)` (ADR-P4-1's
+   amendment); the batch carries `game_id` and `game_seed`, never a
+   site-server UUID the controller would have to learn first.
+4. **Cursor.** The controller pushes its own `events` rows in id order
+   and keeps, per game, the last id the site server acknowledged
+   (`sync_state`, controller store schema 5); the site server answers
+   `acked_id`. The unique key still drops replays. `batch_seq` is
+   dropped.
+5. **Scores.** The snapshot carries per node counters
+   (`{node_id: {team: value}}`) merged by `GREATEST`; GM adjustments
+   arrive as the controller's `score.delta` events; per-reason counters
+   are dropped (the controller has none).
+6. **Endpoints** (site server; all with the API key):
+   `POST /api/v1/sync/games` (game metadata, replacing
+   `POST /api/v1/sync/game`), `POST /api/v1/sync/events`,
+   `POST /api/v1/sync/scores`, `POST /api/v1/sync/nodes` (names, roles,
+   health), `POST /api/v1/sync/marshals`, `POST /api/v1/sync/replicas`,
+   `POST /api/v1/sync/chrono` (signed readings with the controller's
+   series outcomes), `POST /api/v1/sync/checkins` (ADR-P4-11),
+   `GET /api/v1/sync/field` (field settings, limit template, branding
+   and saved teams, P4R19), `GET /api/v1/sync/presets` (presets and
+   scenarios), `GET /api/v1/sync/schedule` and `GET /api/v1/sync/roster`
+   (ADR-P4-11), `WS /api/v1/sync/stream`. `GET /api/v1/sync/chrono`
+   (pulling other fields' records for registered players) waits for
+   the sharing consent rules (ADR-P4-5) and is not in the first version.
+7. **Never sent:** positions (P4R25), tokens and keys, check-in names
+   and federation numbers beyond what ADR-P4-11 sends back.
+8. **One format, two implementations.** The batch formats go into
+   `protocol/sync.md` with shared vectors (`protocol/vectors/sync.json`)
+   read by the controller's client and the site server.
 
 ---
 
@@ -1009,6 +1181,11 @@ mechanism.
   hundreds of fields). Beyond that, a second PostgreSQL instance is
   the scaling path.
 
+**Re-check 2026-10-19:** holds. Hosted mode is built last (plan phase
+21), once every table exists, and does not go live before the legal
+review (decision P4-6). With the controller-initiated link (ADR-P4-3's
+amendment) the API key also selects the tenant on the sync WebSocket.
+
 ---
 
 ### ADR-P4-5: Chrono record signing
@@ -1026,6 +1203,11 @@ past ones if the key derivation uses the password.
 **Decision:** **Ed25519 per-marshal keypairs.**
 
 **Key lifecycle:**
+
+*(Steps 1, 3 and 4 and the `encrypted_private_key` column are
+superseded 2026-10-19: phase 3 makes the key on the marshal's phone and
+the site server keeps public keys only; see the amendment at the end of
+this ADR, decision P4R14.)*
 
 1. When a user is assigned the marshal role (`user_field_roles`),
    the server generates an Ed25519 keypair.
@@ -1146,6 +1328,41 @@ module.
   keys, which are recoverable by anyone who knows the password. For the
   threat model (game integrity, not national security), this is
   acceptable.
+
+**Amendment 2026-10-19 (after phase 3 software; decisions P4R14, P4R15,
+proposed):**
+
+- **Ed25519 per marshal holds** (decision P3-1), with the record
+  format of `protocol/chrono-record.md` version 1: one record per shot,
+  canonical JSON (sorted keys, no spaces, UTF-8, the three numbers as
+  floats), the signature in `signature` (standard base64, 88
+  characters), RFC 8032's pure Ed25519 with non-canonical signatures
+  refused. The signing and verifying snippets above use
+  `marshal_signature`; the built format names the field `signature`,
+  and the shared vectors (`protocol/vectors/chrono_record.json`) are the
+  reference.
+- **Keys are made on the marshal's phone** (`app/lib/chrono/record_signer.dart`)
+  and only the public key leaves it: to the controller with
+  `PUT /api/v1/checkin/me/marshal-key` or `POST /api/v1/marshals`
+  (`{marshal_id, name, public_key}`), and from the controller to the
+  site server (`POST /api/v1/sync/marshals`). A marshal with an account
+  can also register the key on the site server, which links it to the
+  account.
+- **No private key on the site server**, encrypted or not: a server
+  that can sign as a marshal undoes the non-repudiation this ADR chose
+  Ed25519 for. A lost phone means a new key; old keys stay with their
+  validity period, so old records still verify. `protocol/chrono-record.md`
+  still mentions the recovery copy; it is to be corrected when P4R14 is
+  confirmed.
+- **Storage and verification:** the site server keeps each reading
+  verbatim (`chrono_readings.record_json`, ADR-P4-1's amendment) and
+  verifies it on arrival with the controller's own verifier
+  (`atalaia_controller.chrono.verify`, imported, not rewritten); a
+  record that fails is kept apart and reported, never dropped
+  silently.
+- **Cross-field sharing** uses accounts: per-field player ids are
+  pseudonymous on purpose (decision F3), so records of two fields are
+  linked only through an account that adopted both ids and consented.
 
 ---
 
@@ -1395,7 +1612,10 @@ scenario.yaml`) is also provided for offline use.
 
 (IDs 46-49 are reserved for `satellite.captured`,
 `satellite.neutralized`, `vip.extracted`, `hacking.solved` -- see
-Phase B and Phase F of the plan.)
+Phase B and Phase F of the plan. *Changed 2026-10-19, decision P4R1:
+46 `vip.extracted`, 47 `hacking.solved`; satellites send
+`zone.captured`, so no `satellite.*` events; 48-49 stay free; the
+`objective` and `scenario` data keys are 34 and 35.*)
 
 **Consequences:**
 - The YAML manifest is human-readable and version-controllable. GMs
@@ -1413,6 +1633,61 @@ Phase B and Phase F of the plan.)
   (`controller/atalaia_controller/scenarios/`), so a field without a
   site server can still build custom scenarios. The site server
   imports the same package, avoiding code duplication.
+
+**Amendment 2026-10-19 (after phase 3 software; decisions P4R1, P4R7,
+P4R8, P4R9, P4R24, proposed):**
+
+1. **What the nodes run.** A Field Box runs built-in presets only: a
+   join for a mode it lacks is refused (`BOX_JOIN_NO_MODE`), and a new
+   mode needs a firmware flash (decision K10). A scenario therefore
+   cannot ship node scripts. The compiler emits a package of a new
+   kind, **`kind: scenario`**: `mode.yaml` and `field.lua`, no
+   `node.lua`, no roles of its own. It leads the composed id and is
+   followed by a new **built-in role package, `org.atalaia.objectives`**
+   (`objective`: capture and hold without local scoring, a keypad code,
+   tags to scan; `bomb_site`: arm, defuse and explode without local
+   scoring), e.g. `org.club.foxhound+org.atalaia.objectives`. The
+   controller's joins already name "what that box runs", so a box's
+   join names only `org.atalaia.objectives`. The scenario's `field.lua`
+   tells each node what it is for at the start with a mode command
+   (`field.send(id, "mode", { name = "setup", ... })`), and again when
+   the node reboots, as the Medic Kit's `heals` does. The example
+   generated Lua above (`on(...)` with `nodes["box-b"]`,
+   `teams["bravo"]`, `e.data.objective`) is replaced by code against the
+   real field API (`field.nodes(role)` returns `{id, ...}` tables,
+   `field.owner(id)` a team name, events carry `node` and `team`).
+2. **Names** (P4R8). Teams are the game's team names (the colours the
+   boxes and the radio use); squads are numbers, 1 to the game's
+   `squads`; nodes are names the GM assigns in the console's Join tab,
+   mapped to node ids at join time; objective ids are
+   `[a-z][a-z0-9_]{0,23}`; texts (objective names and descriptions) are
+   in the package in English with `i18n.pt`, never in events.
+3. **Events and data.** Scenario events carry `objective` (key 34)
+   and the team and squad in the envelope; `scenario.started` carries
+   `scenario` (key 35, the package id). Points are whole numbers
+   (`score.add` refuses fractions), and generated Lua escapes every
+   string it embeds.
+4. **Visibility** (P4R24). The controller routes objective events on
+   the stream to the assigned team and squad, all of them to staff; a
+   hidden objective is never sent before its reveal. The app shows the
+   translated names from the package.
+5. **Validation** (P4R9). Structural checks (unique ids, references, a
+   DAG, required parameters, time windows, zone geometry, teams and
+   squads that exist, every event under 200 bytes) in the shared
+   library; the generated `field.lua` loaded in the C core, as the
+   controller's `modes.install()` does, on the controller and on the
+   site server (whose image builds the core in a build stage). The
+   controller checks again when it installs a scenario and stays the
+   authority.
+6. **Escort and survive** use what phase 3 built: `escort` takes the
+   VIP's `position.fix` (ADR-P4-9's amendment) or a payload prop's
+   `vip.extracted`; `survive` reads Respawn and Lives' `player.respawn`
+   (`lives_left`) and `team.eliminated`.
+7. **Library layout:** `controller/atalaia_controller/scenarios/`
+   (`manifest.py`, `validator.py`, `lua.py`, `package.py`,
+   `__main__.py` for `python3 -m atalaia_controller.scenarios`), pure
+   Python (standard library and PyYAML), AGPL-3.0-or-later like the rest
+   of `controller/`.
 
 ---
 
@@ -1573,6 +1848,34 @@ documented but not tested in Phase 4.
   is acceptable for situational awareness (not real-time game control).
 - TAK Server compatibility is a future extension, not a Phase 4
   requirement.
+
+**Amendment 2026-10-19 (after phase 3 software; decision P4R18,
+proposed):**
+
+- **No `gps.fix` events exist** (the table's "VIP player ... `gps.fix`
+  event" row is superseded). Player positions arrive at the controller
+  with `POST /api/v1/positions` and are kept there, filtered by role
+  (ADR-P3-6, phase 3 constraint 9).
+- **Multicast carries props and zones only.** Anyone on the field
+  Wi-Fi can read a multicast group, so player positions are never
+  multicast. They go only to staff ATAK endpoints the GM lists
+  (`[atak] staff_endpoints`, TCP, off by default with `players =
+  false`), and only positions the staff roles may see.
+- **Where props are.** Field Boxes have no GPS (E21); the GM places
+  nodes on the field image (positions 0-1, `PUT /api/v1/games/{id}/positions/{node}`).
+  The GM georeferences the image by giving two of its corners a
+  latitude and longitude (`PUT /api/v1/field/georef`, store schema 5);
+  the emitter converts image positions to coordinates. An Android
+  prop with GPS may give its own.
+- **Remote ATAK through the site server** forwards props and zones
+  only, over the controller's sync WebSocket (ADR-P4-3's amendment).
+- **Configuration** is the controller's TOML (`[atak] enabled = false`,
+  `multicast = "239.2.3.1:6969"`, `interval_s = 30`,
+  `staff_endpoints = []`, `players = false`), overridable as
+  `ATALAIA_ATAK_*`, not module constants.
+- CoT XML text is escaped (team display names and node names come from
+  users), and the samples in the tests are taken from the CoT
+  documentation, not from the emitter's own output.
 
 ---
 
@@ -1819,6 +2122,30 @@ functional drafts based on standard GDPR processor agreements.
   though legal review is recommended.
 - Guest players are automatically cleaned up after 30 days.
 
+**Amendment 2026-10-19 (after phase 3 software; decision P4R25,
+proposed):**
+
+- **Positions never reach the site server.** The controller keeps
+  them for the live game only and deletes them when it ends; the sync
+  carries none. The "Positions (GPS)" rows above (consent, "deleted on
+  game archive", in the access response) are superseded: there is
+  nothing to export or delete on the site server. A remote GM sees
+  positions live through the controller's link only when the field
+  turns `remote_gm` on.
+- **Data that arrives from controllers** is per-field and
+  pseudonymous: `player_id` (`p-` + 12 base32), replicas, signed chrono
+  readings, check-in outcomes. Names and federation numbers stay on the
+  controller (30 days, decision F11) except what ADR-P4-11 sends back
+  for registered players. Chrono records keep their signature on
+  erasure; the link to the person (the account and the adopted
+  `player_id`) is what erasure removes.
+- **Retention aligned with the controller:** chrono and field
+  identities 365 days (the controller's `CHRONO_RETENTION_DAYS` and
+  `IDENTITY_DAYS`, decision B12), check-in data 30 days after the game.
+- **Rule for the implementation:** each plan phase that adds a table
+  with personal data adds it to access, export, erasure and the purge
+  in the same commit.
+
 ---
 
 ### ADR-P4-9: Geo utilities in the script API
@@ -2016,6 +2343,28 @@ minor version; otherwise it is included in the next minor bump.
   Polygon zones are O(n) in vertices.
 - The `geo` table is stateless and has no sandbox implications (no
   I/O, no memory allocation beyond the stack).
+
+**Amendment 2026-10-19 (after phase 3 software; decision P4R6,
+proposed):**
+
+- **Where coordinates come from.** The usage example's
+  `on("gps.fix", ...)` in `field.lua` is superseded: no such event
+  exists, and an event would put a player's position on the radio. The
+  controller hands its field script a controller-only input,
+  `position.fix` (`player`, `team`, `role`, `lat`, `lon`, `acc`, `src`),
+  for the reports of players whose role the mode asks for (the VIP).
+  It is never logged, emitted, sent on the radio, MQTT or the stream,
+  or kept in `state.field` (which a standby controller receives). On an
+  Android prop with a `gps` capability, the app's location service gives
+  `node.lua` the input `gps.fix` (`lat`, `lon`, `acc`), so a payload
+  prop checks its own zone and emits only the outcome.
+- **No coordinates in events:** no event has `lat` or `lon` data keys,
+  so the simulator's schema checks refuse a script that tries.
+- **Polygons** take at most 32 vertices; the functions raise a Lua
+  error (reported as `script.error`) on bad arguments.
+- **Vectors:** `protocol/vectors/geo.json` (distances computed with an
+  independent tool, zone cases) are checked by the C tests and the
+  simulator; the Dart side uses the core, so it gets the same results.
 
 ---
 
@@ -2337,6 +2686,32 @@ The site server exposes `/api/v1/health` (public, no auth) and
 - The health endpoint enables uptime monitoring with any standard
   tool (UptimeRobot, cron+curl, Prometheus blackbox exporter).
 
+**Amendment 2026-10-19 (after phase 3 software; decisions P4R9, P4R16,
+P4R17, proposed):**
+
+- **Image:** `python:3.12-slim` (CI and Ubuntu 24.04 use 3.12), with
+  `server/requirements.txt` pinned with hashes (made from
+  `server/requirements.in`); a first build stage compiles the core
+  (`libatalaia_core.so`) so the site server can load a scenario's
+  `field.lua` as the controller does; the final image has no compiler.
+  The image also copies the shared pure-Python code it imports
+  (`controller/atalaia_controller/` and `simulator/atalaia_sim/`), so
+  the build context is the repository root.
+- **Package:** `server/atalaia_server/` (not `server/src/`), started as
+  `uvicorn atalaia_server.app:app`; the CLI is `python -m
+  atalaia_server` (`create-admin`, `purge`, `rotate-secrets`).
+- **Not the atalaia-dev stack.** The dev image's Ubuntu packages are
+  FastAPI 0.101 with pydantic 1.10 and no SQLAlchemy 2; the site server
+  pins its own versions. The controller keeps the Raspberry Pi OS
+  generation (decision D15).
+- **Tests** use `unittest` against PostgreSQL 16: a `postgres:16-alpine`
+  service container in a new CI job `server`, and locally an ephemeral
+  container from `server/docker-compose.test.yml`, driven by a new
+  `tools/docker_server.py` (P4R17).
+- The Compose file's obsolete `version:` key is dropped, and the health
+  check uses the standard library (`python -c "import urllib.request
+  ..."`) so the image does not need httpx.
+
 ---
 
 ### ADR-P4-11: Game scheduling, publication and registration
@@ -2505,6 +2880,25 @@ gets and for how long; the notice is in the P4-6 legal review.
   on the controller unless the field opts in.
 - ADR-P4-1 gains one reversible migration and two small tables; ADR-
   P4-3 gains two endpoints and a defined roster payload.
+
+**Amendment 2026-10-19 (re-checked against phase 3's check-in as built,
+proposed):**
+
+- The check-in this ADR feeds is built (`protocol/checkin.md`,
+  `controller/atalaia_controller/checkin.py`, store schema 3-4). Its
+  `player_id` form, the per-field secret (SHA-256 on the controller),
+  the declarations (types including `sniper`, classes from the limit
+  template, `max_replicas`, a lowercase-UUID `declaration_id`), the
+  federation setting, the 30-day retention and `player.checkin` with
+  the id only all match what this ADR assumed.
+- What the controller gains: a check-in `status` of `expected` (next to
+  `pending`, `checked_in`, `left`, `removed`), `registration_id` and
+  `ticket` fields on `POST /api/v1/checkin`, and the `atalaia:ticket:`
+  code, specified next to the poster in `protocol/checkin.md` with
+  shared vectors for Python and Dart (plan phase 16).
+- The roster and the check-in push follow ADR-P4-3's amendment: the
+  controller pulls and pushes over its own connection; the site server
+  never sends anything into a running game.
 
 ---
 
@@ -2697,12 +3091,16 @@ complete (not yet built). The following changes affect the ADRs above:
 6. **Player tokens** (ADR-P4-1 note): HMAC-SHA256-signed JSON (not
    JWT) with player_id, team, squad, role, game_id, exp; signed with
    the game key. The controller issues them; the site server must
-   understand them for position filtering.
+   understand them for position filtering. *(Corrected 2026-10-19: as
+   built they are signed with the controller's own per-game token key,
+   decision B8, and the site server neither issues nor verifies them,
+   P4R25.)*
 
 ### What was confirmed
 
 - **Chrono signing** (ADR-P4-5): Ed25519 per marshal, confirmed by
-  Phase 3 design (ADR-P3-7). No change needed.
+  Phase 3 design (ADR-P3-7). No change needed. *(2026-10-19: the
+  algorithm holds; key handling changed, see ADR-P4-5's amendment.)*
 - **PostgreSQL + SQLAlchemy** (ADR-P4-1): unchanged.
 - **Multi-tenant schema isolation** (ADR-P4-4): unchanged.
 - **GDPR implementation** (ADR-P4-8): unchanged.
@@ -2710,6 +3108,10 @@ complete (not yet built). The following changes affect the ADRs above:
 - **ATAK / CoT** (ADR-P4-7): unchanged in protocol; module path
   updated.
 - **Deployment** (ADR-P4-10): unchanged.
+
+*(2026-10-19: this handoff was written from phase 3's design; the
+"Refresh 2026-10-19" section at the top of this file and the dated
+amendments re-check every ADR against what phase 3 built.)*
 
 ---
 
@@ -2733,13 +3135,18 @@ the decisions above:
 
 4. **API-key authentication for controller sync.** The key is a
    256-bit random value, stored as an Argon2id hash on the server.
-   The controller stores the plaintext key locally.
+   The controller stores the plaintext key locally. *Amended
+   2026-10-19:* stored as its SHA-256; the controller opens every
+   connection and the site server holds none of the controller's
+   tokens (ADR-P4-3's amendment).
 
 5. **Events are append-only; scores merge by GREATEST.** The
    `UNIQUE(game_id, node_id, seq, game_time_ms, event_type)` constraint
    enforces idempotent sync (widened from the original `(game_id,
    node_id, seq)` to handle seq restarts after a box reboot -- see
-   decision D6). The controller can replay conservatively.
+   decision D6). The controller can replay conservatively. *Amended
+   2026-10-19:* a game is `(field, game_id, game_seed)`; scores merge
+   per node counter, GM adjustments come as `score.delta` events.
 
 6. **Schema-per-field in hosted mode.** Self-hosted uses the public
    schema with no multi-tenant overhead. Migration must iterate over
@@ -2748,11 +3155,17 @@ the decisions above:
 7. **Ed25519 for chrono record signing.** Keypairs are per-marshal,
    independent of passwords. The private key is stored encrypted on
    the server for recovery and in the marshal's app for signing.
+   *Amended 2026-10-19:* the key is made on the marshal's phone and
+   never leaves it; the site server keeps public keys with their
+   history and the records verbatim.
 
 8. **Scenario manifests are YAML.** The compiler is a shared Python
    library at `controller/atalaia_controller/scenarios/` (maintainer
    decision P4-1); the site server imports it. Validation includes
    DAG check, parameter validation and zone geometry checks.
+   *Amended 2026-10-19:* it emits a `kind: scenario` package
+   (`field.lua` only) over the built-in `org.atalaia.objectives` role
+   package; the Lua is load-checked in the core on both sides.
 
 9. **CoT emission via UDP multicast (primary) and TCP (secondary).**
    The `geo` table (`geo.distance`, `geo.in_zone`) is registered in
@@ -2770,21 +3183,33 @@ the decisions above:
     objective.completed`, `scenario.objective.failed`, `scenario.
     objective.revealed`, `scenario.started`, `satellite.captured`,
     `satellite.neutralized`, `vip.extracted`, `hacking.solved`.
+    *Amended 2026-10-19 (P4R1):* 42-45 the scenario events, 46
+    `vip.extracted`, 47 `hacking.solved`, no `satellite.*`; data keys
+    34 `objective`, 35 `scenario`, 36 `puzzle`; each added with the
+    code that first emits it.
 
 13. **SPDX headers on every file.** `AGPL-3.0-or-later` for server
     code. `GPL-3.0-or-later` for controller additions (atak.py,
     sync_client.py). `CC-BY-SA-4.0` for docs and templates.
+    *Corrected 2026-10-19 (P4R21):* controller additions are
+    AGPL-3.0-or-later like all of `controller/` (REUSE.toml); modes,
+    core and tools GPL-3.0-or-later.
 
 14. **No C compiler on host.** The site server is pure Python. The
     controller's `libatalaia_core.so` (for geo functions) is cross-
     compiled in Docker. The `cryptography` library ships pre-built
-    wheels.
+    wheels. *Amended 2026-10-19:* the site server image builds the core
+    in a build stage (scenario load checks) and runs `python:3.12-slim`
+    with hash-pinned dependencies.
 
 15. **Phase 3 interfaces are assumptions.** ADR-P4-7 (ATAK) assumes
     `gps.fix` events from the player app. ADR-P4-6 (`escort` objective)
     assumes GPS reporting. ADR-P4-1 (game roles) assumes the player
     app role model. These interfaces must be re-verified when Phase 3
-    design completes.
+    design completes. *Superseded 2026-10-19:* phase 3's interfaces are
+    built and are the source of truth; there are no `gps.fix` events
+    (positions stay on the controller), the role model is the player
+    token's.
 
 16. **Scheduling and registration feed the controller; they never drive
     it** (ADR-P4-11, 2026-10-19).  The controller pulls the schedule and
@@ -2800,3 +3225,25 @@ the decisions above:
     agreement** (ADR-P4-12).  No scraping or automated form posting;
     adapters are off by default, per field, audited, outbound from the
     site server only; imports read only the listed columns.
+
+19. **Boxes run built-in scripts only** (added 2026-10-19, ADR-P4-6's
+    amendment). Anything particular to one game lives in `field.lua`
+    and reaches the nodes as mode commands.
+
+20. **Positions never travel as events**, on the radio, MQTT, the
+    stream's public messages or to the site server (added 2026-10-19,
+    ADR-P4-8 and ADR-P4-9 amendments). Scripts get them as
+    controller-only inputs.
+
+21. **Shared Python stays framework-free** (added 2026-10-19): the
+    scenario library, the chrono verifier, the player-token codec, the
+    image checks and `atalaia_sim.mode` import without FastAPI or
+    pydantic, so the controller and the site server both use them.
+
+22. **Scripts' limits as built** (added 2026-10-19): `score.add` takes
+    integers; events carry ids, never texts or coordinates; every event
+    fits 200 bytes (the simulator's checks).
+
+23. **Verification** (added 2026-10-19): each plan phase is verified
+    from a clean copy and committed on its own; firmware changes are
+    verified without Wokwi while decision R7 stands.
