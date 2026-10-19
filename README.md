@@ -119,7 +119,7 @@ The diagrams are built in English and Portuguese, for wide and narrow screens, f
 | [`hardware/`](hardware/) | Reference builds: wiring, bills of materials, enclosures; the Field Box build manual ([hardware/field-box/BUILD.md](hardware/field-box/BUILD.md)) | CERN-OHL-S-2.0 |
 | [`docs/`](docs/) | Design spec, RFCs, phase folders, guides | CC-BY-SA-4.0 |
 | [`site/`](site/) | The project page in Portuguese and English, published to [GitHub Pages](https://atalaia-project.link/) | CC-BY-SA-4.0 |
-| [`tools/`](tools/) | Developer scripts: `check.sh`, `docker_fw.py`, `docker_console.py`, `docker_sim.py`, `build_site.py`, `docker_hw.py` | GPL-3.0-or-later |
+| [`tools/`](tools/) | Developer scripts: `check.sh`, `docker_fw.py`, `docker_console.py`, `docker_server.py`, `docker_sim.py`, `build_site.py`, `docker_hw.py` | GPL-3.0-or-later |
 
 See [LICENSING.md](LICENSING.md) for the details.
 
@@ -131,7 +131,7 @@ See [LICENSING.md](LICENSING.md) for the details.
 | 1 · Single box | Field Box build, ESP32 firmware, on-device presets, a build manual with a wiring diagram | One box runs a 2-hour club game with no restarts |
 | 2 · Field network | Skirmesh-RF over LoRa, field controller, API, GM console, and a mode pack (done in software): Hold-All Domination, Last Stand, per-team arming codes on Bomb and the Codes modifier | 5 boxes on a CQB site and an outdoor field, zero lost captures |
 | 3 · Android and players | Android props, I/O pod, player app with roles; Respawn, Kill Confirmed, Player Check-in, Money Factory, the Medic Kit (a hit player scans their tag and holds to be healed, with limited heals) and chrono check-in. Done in software: the three tag modes, the Medic Kit (a role package next to any mode, its heals counted across kits by the controller, refilled from the GM console), signed player tags, the I/O pod protocol, YAML mode screens, and the app: its engine (the core through `dart:ffi` in a game loop isolate, built for Android with the NDK) and its screens (Android props, the player's view, the marshal's chrono check-in, replicas and tags, the GM console; Portuguese and English), tested on an emulator in CI; field check-in with a printed poster, player tokens and roles, the "replicas to chrono" list fed by signed readings, player positions, Android props on the field's Wi-Fi, HTTPS with the field's own CA, field and team branding (logo, wallpaper, colour, team crests), the I/O pod's firmware (USB and Bluetooth LE, the Field Box's buttons, keypad, ring, sound, NFC and an enclosure switch, the radio passthrough) and the phone's radio link through it, tested against the pod's own code on a PC. Next: the phone as the field controller, then the field test with real phones and pods | One game mixes ESP32 and Android props without issues |
-| 4 · Site server and advanced play | Site server, custom scenarios, advanced modes, ATAK | A weekend milsim runs on Atalaia end to end |
+| 4 · Site server and advanced play | Site server, custom scenarios, advanced modes, ATAK. Done in software: the site server's skeleton (FastAPI on PostgreSQL 16, its migrations and health check, in its own image; no accounts yet) | A weekend milsim runs on Atalaia end to end |
 | 5 · Community | Visual mode editor, mode registry, carrier PCB, translations, build guides for other node types | Ongoing |
 
 ## Getting started
@@ -153,6 +153,8 @@ python tools/docker_fw.py wokwi    # the variant for the Wokwi emulator
 ```
 
 **Run the field controller and its GM console** on a laptop, without a radio, in the dev container (see [controller/README.md](controller/README.md#running-it)): the console is at `http://localhost:8080/console/` and the scoreboard at `/scoreboard`. The console's browser tests run with `python tools/docker_console.py`.
+
+**Run the site server's tests** (only its skeleton exists so far) against a throwaway PostgreSQL 16 in Docker: `python3 tools/docker_server.py test` and `python3 tools/docker_server.py migrations`; `up` and `down` start and stop a local trial. See [server/README.md](server/README.md).
 
 To play a game on an emulated Field Box in VS Code before any hardware exists, see [firmware/esp32/docs/WOKWI.md](firmware/esp32/docs/WOKWI.md). See [firmware/esp32/README.md](firmware/esp32/README.md) for the full build guide, Kconfig options, pin table, and bring-up checklist.
 

@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The site server's direct dependencies (decision P4R16). requirements.txt is
+# made from this file with every package pinned to a version and its PyPI
+# hashes; the image installs it with pip --require-hashes. Only releases at
+# least two weeks old are taken (--exclude-newer). To refresh both files, from
+# the repository root:
+#   docker run --rm -v "$PWD/server:/w" -w /w python:3.12.14-slim sh -c '
+#     pip install -q uv==0.9.30 &&
+#     for f in requirements requirements-test; do
+#       uv pip compile --python-version 3.12 --exclude-newer YYYY-MM-DD --generate-hashes \
+#         --no-header $f.in -o $f.txt; done'
+# then put the SPDX header back at the top of both .txt files and run the
+# tests (python3 tools/docker_server.py test). Plan phase 11 adds argon2-cffi,
+# PyJWT and pyotp.
+fastapi
+uvicorn
+sqlalchemy[asyncio]
+asyncpg
+alembic
+# Imported by the code shared with the controller: the mode loader, the chrono verifier.
+PyYAML
+cryptography

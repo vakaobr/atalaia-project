@@ -2711,6 +2711,11 @@ P4R17, proposed):**
 - The Compose file's obsolete `version:` key is dropped, and the health
   check uses the standard library (`python -c "import urllib.request
   ..."`) so the image does not need httpx.
+- *Built 2026-10-19 (plan phase 10):* the server starts with
+  `uvicorn --factory atalaia_server.app:create_app` rather than
+  `atalaia_server.app:app`, and the settings are `ATALAIA_*` variables
+  (`ATALAIA_DATABASE_URL`, ...) rather than this ADR's `DATABASE_URL`;
+  decisions S10-1 and S10-7, proposed.
 
 ---
 

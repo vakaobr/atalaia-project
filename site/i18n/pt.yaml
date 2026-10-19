@@ -180,7 +180,8 @@ how:
     <a href="{{ page.to.glossary }}#glossario-atak">ATAK</a>, pela sua API. Um
     <a href="{{ page.to.glossary }}#glossario-servidor-do-clube">servidor do clube</a>, opcional e na internet, guarda as
     contas e o histórico. O controlador, a sua API e a consola da organização já estão feitos e
-    testados num computador, ainda não no campo; o servidor do clube chega numa fase posterior.
+    testados num computador, ainda não no campo; do servidor do clube só existe, por agora, o
+    esqueleto (a base de dados e uma verificação de estado, ainda sem contas).
   core: >-
     Por dentro, todos os aparelhos que correm modos de jogo usam o mesmo
     <a href="{{ page.to.glossary }}#glossario-nucleo">núcleo partilhado</a>, escrito em C11, e os mesmos modos em Lua; só
@@ -579,13 +580,15 @@ roadmap:
     title: Servidor do clube e jogo avançado
     short: >-
       Servidor do clube, marcação de jogos e inscrições, cenários personalizados, modos avançados,
-      ATAK. Investigação, arquitetura e plano escritos; ainda sem código.
+      ATAK. Investigação, arquitetura e plano escritos; o esqueleto do servidor do clube está feito.
     text: >-
       Servidor do clube (contas, histórico dos jogos, registo de cronografagem, marcação de jogos,
       inscrições e publicação), cenários personalizados, modos avançados (zonas mestre e satélites,
       escolta de VIP, terminais de hacking e outros) e o
       <a href="{{ page.to.glossary }}#glossario-atak">ATAK</a>. A investigação, a arquitetura e o plano de implementação
-      estão escritos; ainda não há código.
+      estão escritos. Já feito, e testado só num computador: o esqueleto do servidor do clube (a
+      base de dados, as migrações e uma verificação de estado, no seu próprio contentor; ainda sem
+      contas nem dados de jogos).
     gate: >-
       Prova: um <a href="{{ page.to.glossary }}#glossario-milsim">milsim</a> de fim de semana decorre do princípio ao fim
       com a Atalaia.

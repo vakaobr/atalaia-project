@@ -69,6 +69,12 @@ jobs:
           ATALAIA_POD_HOST: ${{ github.workspace }}/build/pod_host/pod_host
         working-directory: controller
         run: /usr/bin/python3 -m unittest discover -s tests -v
+      - name: The site server's plain-Python tests (no database), on the controller's packages
+        # As tools/check.sh runs them: the shared modules import without the site server's stack.
+        env:
+          ATALAIA_CORE_LIB: ${{ github.workspace }}/build/libatalaia_core.so
+        working-directory: server
+        run: /usr/bin/python3 -m unittest tests.test_config tests.test_ids tests.test_shared_imports -v
 
   console:
     name: GM console and scoreboard in a browser (Chromium)
@@ -85,6 +91,42 @@ jobs:
         run: |
           docker run --rm --ipc=host -e ATALAIA_REQUIRE_ALL=1 -e ATALAIA_REQUIRE_BROWSER=1 \
             -v "$PWD:/src" -w /src atalaia-console-test sh controller/console/tests/run.sh
+
+  server:
+    name: Site server (FastAPI on PostgreSQL 16, migrations)
+    # The image of server/Dockerfile (target test: python:3.12-slim, the
+    # hash-pinned requirements, the core built in its own stage) and the same
+    # commands `python3 tools/docker_server.py test` and `... migrations` run
+    # in it locally (decision P4R17); here PostgreSQL is a service container
+    # instead of Compose's ephemeral one, with the same image, user and password.
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16.15-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+        env:
+          POSTGRES_USER: atalaia
+          POSTGRES_PASSWORD: atalaia-test
+          POSTGRES_DB: atalaia
+        ports:
+          - 5432:5432
+        options: >-
+          --tmpfs /var/lib/postgresql/data
+          --health-cmd "pg_isready -U atalaia -d atalaia"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    env:
+      ATALAIA_DATABASE_URL: postgresql+asyncpg://atalaia:atalaia-test@localhost:5432/atalaia
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the test image
+        run: docker build -f server/Dockerfile --target test -t atalaia-server-test .
+      - name: Tests
+        run: |
+          docker run --rm --network host -e ATALAIA_DATABASE_URL atalaia-server-test \
+            sh tests/run.sh test
+      - name: Migrations (upgrade head, downgrade base, upgrade head, check)
+        run: |
+          docker run --rm --network host -e ATALAIA_DATABASE_URL atalaia-server-test \
+            sh tests/run.sh migrations
 
   flutter-test:
     name: Player app (Dart, with the core through dart:ffi)

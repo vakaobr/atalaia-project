@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Planning (refreshed 2026-10-19)
-**Phase status:** Complete; ready for implementation
+**Current phase:** Implementation (plan phase 10 built in software, 2026-10-19)
+**Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-19 (design refreshed against phase 3's software)
-**Next step:** `--implement`, starting with plan phase 1 (Master and Satellites)
+**Last verified:** 2026-10-19 (plan phase 10: `tools/docker_server.py test` and `migrations`, tools/check.sh)
+**Next step:** plan phase 1 (Master and Satellites) on the modes chain; plan phase 11 (accounts, sessions and roles) on the site server chain
 
 ## Completed
 
@@ -48,8 +48,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | 7 | Scenario compiler and validator | Software, now | 3, 6 | Pending |
 | 8 | Scenarios in the controller, console and app | Software, now | 7 | Pending |
 | 9 | ATAK / CoT emitter | Software, now | 3 | Pending |
-| 10 | Site server skeleton and test tooling | Software, now | -- | Pending |
-| 11 | Accounts, sessions and roles | Software, now | 10 | Pending |
+| 10 | Site server skeleton and test tooling | Software, now | -- | **Done in software** (2026-10-19) |
+| 11 | Accounts, sessions and roles | Software, now | 10 | **Next** (site server chain) |
 | 12 | Personal data | Software, now | 11 | Pending |
 | 13 | Controller sync | Software, now | 10, 11 | Pending |
 | 14 | Chrono registry | Software, now | 13 | Pending |
@@ -68,6 +68,30 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 Plan phases 1-9 and 10-22 are two independent chains; they can run in
 parallel worktrees.
+
+## Plan phase 10: site server skeleton (built 2026-10-19, in software)
+
+What exists: `server/atalaia_server/` (app factory, `ATALAIA_*` settings,
+the async database layer on PostgreSQL 16, the base models and UUIDv7 keys,
+security headers, `GET /api/v1/health` and the token-guarded
+`GET /api/v1/metrics`), Alembic with `0001_base` (fields, users, roles
+seeded, user_field_roles, sessions, audit_log), the server's image
+(`server/Dockerfile`: the core built in its own stage, `python:3.12.14-slim`
+by digest, hash-pinned requirements, an unprivileged user, a `test` target),
+`server/docker-compose.yml` (local trial) and `docker-compose.test.yml`,
+`tools/docker_server.py` (`test`, `migrations`, `build`, `up`, `down`) and
+CI's `server` job with a `postgres:16-alpine` service container.
+
+Tests: 34 in the test image against PostgreSQL 16 (health and its 503,
+metrics and their token, security headers, the served app over real HTTP,
+model defaults, the migration round trip per revision, migrations equal to
+the models, the roles seed; settings, UUIDv7 with RFC 9562's example, the
+shared modules importing without the web stack, every built-in mode loading
+in the image's core). 19 of them (no database) also run in tools/check.sh.
+Not yet: accounts and anything with personal data (plan phases 11, 12), the
+controller sync (13), deployment with HTTPS and backups (22). Not run here:
+the CI job itself (its commands were run by hand against a container started
+the same way). Decisions S10-1 to S10-12, all open.
 
 ## Dependencies
 

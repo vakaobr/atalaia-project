@@ -3,10 +3,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Checks the generated protocol files, the project page and the formatting, builds the core, runs its tests, the
-# simulator's tests, every game mode's tests, and the field controller's tests
-# (against the C host modem, the C host box, the C host pod and a private Mosquitto): the same
+# simulator's tests, every game mode's tests, the field controller's tests
+# (against the C host modem, the C host box, the C host pod and a private Mosquitto) and
+# the site server's tests that need no database (settings, ids, the shared Python): the same
 # checks as CI (apart from the JSON Schema and licensing checks, which need
-# extra tools, the firmware jobs: tools/docker_fw.py, the GM console's
+# extra tools, the firmware jobs: tools/docker_fw.py, the site server on
+# PostgreSQL: tools/docker_server.py, the GM console's
 # browser tests: tools/docker_console.py, and the app's Dart checks and
 # Android builds: tools/docker_app.py, since this image has no Dart; the
 # controller's tests below do check the Python side of the app's shared chrono
@@ -44,3 +46,7 @@ python3 -m unittest discover -s tests
 python3 -m atalaia_sim test
 cd ../controller
 python3 -m unittest discover -s tests
+# The site server's plain-Python tests (decision P4R17); the rest need PostgreSQL 16
+# and the server's own image: python3 tools/docker_server.py test.
+cd ../server
+python3 -m unittest tests.test_config tests.test_ids tests.test_shared_imports

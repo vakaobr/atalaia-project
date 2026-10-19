@@ -170,7 +170,8 @@ how:
     scoreboards, stream overlays and map apps such as <a href="{{ page.to.glossary }}#glossary-atak">ATAK</a> through its
     API. An optional <a href="{{ page.to.glossary }}#glossary-site-server">site server</a> on the internet keeps accounts
     and history. The controller, its API and the organisers' console are built and tested on a
-    computer, not yet on the field; the site server comes in a later phase.
+    computer, not yet on the field; of the site server only the skeleton exists so far (its database
+    and a health check, no accounts yet).
   core: >-
     Under the hood, every device that runs game modes uses the same
     <a href="{{ page.to.glossary }}#glossary-core">shared core</a>, written in C11, and the same Lua modes; only a thin
@@ -561,12 +562,14 @@ roadmap:
     title: Site server and advanced play
     short: >-
       Site server, game scheduling and registration, custom scenarios, advanced modes, ATAK.
-      Research, architecture and plan written; no code yet.
+      Research, architecture and plan written; the site server's skeleton is built.
     text: >-
       Site server (accounts, game history, the chrono registry, scheduling games, registration and
       publishing), custom scenarios, advanced modes (master and satellite zones, VIP escort, hacking
       terminals and more) and <a href="{{ page.to.glossary }}#glossary-atak">ATAK</a>. The research, the architecture and
-      the implementation plan are written; there is no code yet.
+      the implementation plan are written. Built so far, and tested on a computer only: the site
+      server's skeleton (its database, migrations and a health check, in its own container; no
+      accounts or game data yet).
     gate: >-
       Gate: a weekend <a href="{{ page.to.glossary }}#glossary-milsim">milsim</a> runs on Atalaia end to end.
   p5:

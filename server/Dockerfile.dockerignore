@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Build context of server/Dockerfile (the repository root): only what the
+# image copies, never build output, caches or secrets.
+*
+!core/
+!simulator/atalaia_sim/
+!controller/atalaia_controller/
+!modes/
+!server/requirements.txt
+!server/requirements-test.txt
+!server/atalaia_server/
+!server/migrations/
+!server/alembic.ini
+!server/tests/
+**/__pycache__
+**/*.pyc
+core/build*
+core/third_party/lua/*.o

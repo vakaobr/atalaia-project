@@ -800,6 +800,18 @@ python3 tools/docker_server.py migrations     # upgrade head, downgrade base, up
 docker run --rm -v "$PWD:/src" atalaia-dev sh -c "BUILD=/tmp/c sh tools/check.sh"   # unchanged parts still pass
 ```
 
+**Built 2026-10-19** (in software; decisions S10-1 to S10-12). Differences
+from the table above, as built: the tests' own dependencies are in
+`server/requirements-test.in`/`.txt` (the server image has no httpx);
+`atalaia_server/ids.py` makes the UUIDv7 keys; `server/tests/run.sh` is the
+one entry point the tool and CI share; `test_config.py` and `test_ids.py`
+join `test_shared_imports.py` as the plain-Python tests that tools/check.sh
+and CI's `controller` job also run; `server/Dockerfile.dockerignore` narrows
+the build context; `fields` has no `api_key_hash` (plan phase 13's
+`field_api_keys`); `/api/v1/metrics` uses a token until plan phase 11; the
+app starts with `uvicorn --factory atalaia_server.app:create_app`; the
+migration round trip ends with `alembic check`.
+
 ---
 
 ## Plan phase 11: Accounts, sessions and roles

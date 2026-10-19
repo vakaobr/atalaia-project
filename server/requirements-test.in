@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The tests' extra dependencies, installed only in the image's test target;
+# pinned and hashed into requirements-test.txt as requirements.in explains.
+-c requirements.txt
+httpx

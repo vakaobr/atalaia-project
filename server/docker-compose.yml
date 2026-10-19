@@ -1,0 +1,50 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The site server and its PostgreSQL 16 (ADR-P4-10). Plan phase 22 adds Caddy
+# for HTTPS, server/setup.sh for the secrets and the backups; until then this
+# is for trying the server locally: `python3 tools/docker_server.py up`
+# (which sets POSTGRES_PASSWORD) and `... down`. The server listens on
+# 127.0.0.1 only.
+
+services:
+  server:
+    image: ${ATALAIA_SERVER_IMAGE:-atalaia-server}
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+      target: server
+    environment:
+      ATALAIA_DATABASE_URL: "postgresql+asyncpg://atalaia:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/atalaia"
+      ATALAIA_METRICS_TOKEN: "${ATALAIA_METRICS_TOKEN:-}"
+      ATALAIA_LOG_LEVEL: "${ATALAIA_LOG_LEVEL:-info}"
+    ports:
+      - "127.0.0.1:${ATALAIA_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=4)"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  postgres:
+    image: postgres:16.15-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+    environment:
+      POSTGRES_USER: atalaia
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}"
+      POSTGRES_DB: atalaia
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atalaia -d atalaia"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  pgdata:
