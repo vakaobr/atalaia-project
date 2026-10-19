@@ -4,7 +4,8 @@
 
 A caller may hand over the URL in ``Config.attributes["database_url"]``
 instead (the tests do, for their per-class databases); otherwise the site
-server's settings are read from the environment. Each migration runs in one transaction (PostgreSQL has
+server's ATALAIA_DATABASE_URL is read from the environment (nothing else:
+migrating needs no secret key). Each migration runs in one transaction (PostgreSQL has
 transactional DDL), so a failed upgrade leaves the schema as it was.
 """
 
@@ -18,7 +19,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import NullPool
 
-from atalaia_server.config import Settings
+from atalaia_server.config import database_url_from_env
 from atalaia_server.models import Base
 
 config = context.config
@@ -29,7 +30,7 @@ target_metadata = Base.metadata
 
 
 def _url() -> str:
-    return config.attributes.get("database_url") or Settings.from_env().database_url
+    return config.attributes.get("database_url") or database_url_from_env()
 
 
 def _configure(**kwargs: object) -> None:

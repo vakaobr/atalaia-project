@@ -16,8 +16,10 @@ run `sh tests/run.sh test|migrations` in it with Docker Compose
 (server/docker-compose.test.yml) next to an ephemeral postgres:16-alpine in a
 tmpfs, then remove the containers whatever the result: CI's server job runs
 the same image and the same commands against a service container. `up` is a
-local trial with a random database password (server/docker-compose.yml):
-`down` deletes its data. ATALAIA_VOLUME_SUFFIX keeps the Compose projects and
+local trial with a random database password and secret key
+(server/docker-compose.yml): `down` deletes its data. In a running trial,
+`docker compose -p atalaia-server-trial exec server python -m atalaia_server
+create-admin --username NAME` makes a server administrator. ATALAIA_VOLUME_SUFFIX keeps the Compose projects and
 images of two checkouts (e.g. a git worktree) apart.
 """
 
@@ -93,18 +95,21 @@ def in_tests_image(what: str, args: list[str]) -> int:
 def trial(what: str) -> int:
     env = {**os.environ, "ATALAIA_SERVER_IMAGE": SERVER_IMAGE}
     file = "docker-compose.yml"
+    unused = {"POSTGRES_PASSWORD": "unused", "ATALAIA_SECRET_KEY": "unused"}
     if what == "build":
-        return run(compose(file, TRIAL_PROJECT, "build", "server"), {**env, "POSTGRES_PASSWORD": "unused"})
+        return run(compose(file, TRIAL_PROJECT, "build", "server"), {**env, **unused})
     if what == "down":
-        return run(compose(file, TRIAL_PROJECT, "down", "--volumes", "--remove-orphans"),
-                   {**env, "POSTGRES_PASSWORD": "unused"})
-    # up: a new password each time is fine, since down deletes the database with it.
+        return run(compose(file, TRIAL_PROJECT, "down", "--volumes", "--remove-orphans"), {**env, **unused})
+    # up: a new password and key each time is fine, since down deletes the database with them.
     env.setdefault("POSTGRES_PASSWORD", secrets.token_urlsafe(24))
+    env.setdefault("ATALAIA_SECRET_KEY", secrets.token_urlsafe(32))
     code = run(compose(file, TRIAL_PROJECT, "up", "--detach", "--build", "--wait"), env)
     if code == 0:
         port = env.get("ATALAIA_PORT", "8000")
         print(f"\ndocker_server: the site server is up: http://127.0.0.1:{port}/api/v1/health "
-              f"(python3 tools/docker_server.py down stops it and deletes its data)")
+              f"(python3 tools/docker_server.py down stops it and deletes its data; an administrator: "
+              f"docker compose -p {TRIAL_PROJECT} exec server python -m atalaia_server create-admin "
+              f"--username NAME)")
     return code
 
 

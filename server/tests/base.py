@@ -6,8 +6,14 @@
 server ATALAIA_DATABASE_URL points at), migrates it to head unless the class
 sets ``migrate = False``, and drops it afterwards; each test gets its own
 engine (``self.engine``, no pool, so nothing outlives the test's event loop).
-``AppTestCase`` adds the application, started through its lifespan, and an
-httpx client on its ASGI transport (``self.client``).
+``AppTestCase`` adds the application, started through its lifespan, an
+httpx client on its ASGI transport (``self.client``, over https:// so the
+Secure refresh cookie is kept), and helpers that make accounts and log in.
+
+TOTP codes in the tests are made for the app's clock (``app.state.clock``),
+which every ``code`` call moves 30 seconds further on: a code is accepted only
+once per account (RFC 6238 section 5.2), so two logins of one account in the
+same real half-minute would otherwise refuse the second.
 
 Without ATALAIA_DATABASE_URL these tests fail; they never fall back to
 another database (decision P4R17).
@@ -18,7 +24,9 @@ from __future__ import annotations
 import asyncio
 import os
 import secrets
+import time
 import unittest
+import uuid
 from contextlib import AsyncExitStack
 from pathlib import Path
 from typing import Any, Optional
@@ -31,11 +39,24 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from atalaia_server import passwords, totp
 from atalaia_server.app import create_app
 from atalaia_server.config import Settings
+from atalaia_server.models import User
 
 SERVER = Path(__file__).resolve().parents[1]
 METRICS_TOKEN = "t" * 40
+SECRET_KEY = "s" * 43
+PASSWORD = "correct horse battery staple 42"
+# The tables tests write to (not roles, which the migrations seed).
+DATA_TABLES = ("audit_log", "refresh_tokens", "sessions", "user_field_roles", "users", "fields")
+_clock = [time.time()]
+
+
+def next_time() -> float:
+    """A moment 30 seconds after the last one any test used (one TOTP step later)."""
+    _clock[0] += totp.PERIOD_S
+    return _clock[0]
 
 
 def server_url() -> str:
@@ -124,16 +145,66 @@ class AppTestCase(DatabaseTestCase):
     metrics_token: Optional[str] = METRICS_TOKEN
 
     def settings(self) -> Settings:
-        return Settings(database_url=self.database_url, metrics_token=self.metrics_token, db_timeout_s=2.0)
+        return Settings(database_url=self.database_url, secret_key=SECRET_KEY, metrics_token=self.metrics_token,
+                        db_timeout_s=2.0)
 
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
+        if self.migrate:  # every test starts with no data (the class shares one database)
+            await self.fetch("TRUNCATE " + ", ".join(DATA_TABLES) + " RESTART IDENTITY CASCADE")
         self.stack = AsyncExitStack()
         self.app = create_app(self.settings())
         await self.stack.enter_async_context(self.app.router.lifespan_context(self.app))
         self.client = await self.stack.enter_async_context(
-            httpx.AsyncClient(transport=httpx.ASGITransport(app=self.app), base_url="http://server.test"))
+            httpx.AsyncClient(transport=httpx.ASGITransport(app=self.app), base_url="https://server.test"))
 
     async def asyncTearDown(self) -> None:
         await self.stack.aclose()
         await super().asyncTearDown()
+
+    # Accounts -------------------------------------------------------------------------
+
+    async def make_user(self, username: Optional[str] = None, password: str = PASSWORD, with_totp: bool = False,
+                        server_admin: bool = False) -> tuple[uuid.UUID, str, Optional[str]]:
+        """A new account written straight to the database: (id, username, TOTP secret or None)."""
+        username = username or f"user-{secrets.token_hex(4)}"
+        secret = totp.new_secret() if with_totp or server_admin else None
+        async with self.app.state.sessionmaker() as db:
+            user = User(username=username, password_hash=await passwords.hash_password(password),
+                        totp_enabled=secret is not None, server_admin=server_admin,
+                        totp_secret_enc=self.app.state.seed_box.seal(secret) if secret else None)
+            db.add(user)
+            await db.commit()
+            return user.id, username, secret
+
+    def code(self, secret: str) -> str:
+        """A TOTP code the app accepts now: the app's clock moves one step on and the code is for it."""
+        t = next_time()
+        self.app.state.clock = lambda: t
+        return totp.code_at(secret, t)
+
+    async def login(self, username: str, password: str = PASSWORD, secret: Optional[str] = None,
+                    client: Optional[httpx.AsyncClient] = None) -> dict[str, Any]:
+        """Logs in (with the TOTP step when the account has it); returns the session's JSON."""
+        client = client or self.client
+        r = await client.post("/api/v1/auth/login", json={"username": username, "password": password})
+        assert r.status_code == 200, (r.status_code, r.text)
+        body = r.json()
+        if body.get("totp_required"):
+            assert secret is not None, "the account has TOTP: pass its secret"
+            r = await client.post("/api/v1/auth/login/totp",
+                                  json={"totp_session": body["totp_session"], "code": self.code(secret)})
+            assert r.status_code == 200, (r.status_code, r.text)
+            body = r.json()
+        return body
+
+    async def auth(self, username: str, password: str = PASSWORD, secret: Optional[str] = None) -> dict[str, str]:
+        """The Authorization header of a fresh login."""
+        body = await self.login(username, password, secret)
+        return {"Authorization": f"Bearer {body['access_token']}"}
+
+    def other_client(self) -> httpx.AsyncClient:
+        """A second client (its own cookies) on the same app; closed with the test."""
+        client = httpx.AsyncClient(transport=httpx.ASGITransport(app=self.app), base_url="https://server.test")
+        self.stack.push_async_callback(client.aclose)
+        return client

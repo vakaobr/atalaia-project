@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Implementation (plan phases 1 and 10 built in software, 2026-10-19)
+**Current phase:** Implementation (plan phases 1, 10 and 11 built in software, 2026-10-19)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-19 (plan phases 1 and 10, full clean-copy check)
-**Next step:** plan phase 2 (Target Windows, logic) on the modes chain; plan phase 11 (accounts, sessions and roles) on the site server chain
+**Last verified:** 2026-10-19 (plan phase 11, full clean-copy check)
+**Next step:** plan phase 2 (Target Windows, logic) on the modes chain; plan phase 12 (personal data) on the site server chain
 
 ## Completed
 
@@ -49,8 +49,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | 8 | Scenarios in the controller, console and app | Software, now | 7 | Pending |
 | 9 | ATAK / CoT emitter | Software, now | 3 | Pending |
 | 10 | Site server skeleton and test tooling | Software, now | -- | **Done in software** (2026-10-19) |
-| 11 | Accounts, sessions and roles | Software, now | 10 | **Next** (site server chain) |
-| 12 | Personal data | Software, now | 11 | Pending |
+| 11 | Accounts, sessions and roles | Software, now | 10 | **Done in software** (2026-10-19) |
+| 12 | Personal data | Software, now | 11 | **Next** (site server chain) |
 | 13 | Controller sync | Software, now | 10, 11 | Pending |
 | 14 | Chrono registry | Software, now | 13 | Pending |
 | 15 | Scheduling, field pages and feeds | Software, now | 11 | Pending |
@@ -113,6 +113,30 @@ Not yet: accounts and anything with personal data (plan phases 11, 12), the
 controller sync (13), deployment with HTTPS and backups (22). Not run here:
 the CI job itself (its commands were run by hand against a container started
 the same way). Decisions S10-1 to S10-12, all open.
+
+## Plan phase 11: accounts, sessions and roles (built 2026-10-19, in software)
+
+What exists: registration with consent and the password policy (NIST SP
+800-63B, the NCSC's 100,000 breached passwords), Argon2id hashes with
+ADR-P4-2's parameters; login, the TOTP step (RFC 6238, each code once,
+seeds encrypted), 15-minute access tokens checked against the session and
+the roles in the database on every request, refresh tokens in a
+SameSite=Strict cookie stored as SHA-256 and rotated, a replay ending the
+session; logout; TOTP enrolment, confirmation and removal; lockouts and
+rate limits (in memory); fields and per-field roles with TOTP required for
+admin, gm and marshal; the audit log; `python -m atalaia_server
+create-admin`; metrics for server administrators; migration
+`0002_accounts`; argon2-cffi, PyJWT and pyotp pinned by hash.
+
+Tests: 124 in the test image against PostgreSQL 16 (90 new: passwords,
+TOTP with the RFC 6238 and RFC 4226 vectors, tokens, rate limits, accounts
+and sessions, roles, `create-admin` run as a command, 0002 with data); 21
+(no database, no server dependencies) also run in tools/check.sh. Not yet:
+per-game roles (with `games`, plan phase 13), personal data rights (12),
+deployment behind Caddy with the client address from the proxy (22).
+Decisions S11-1 to S11-15, all open; S11-4 (the breached list's licence)
+and S11-12 (lockouts per address behind a field's shared 4G address) want
+the maintainer's eye.
 
 ## Dependencies
 

@@ -24,7 +24,7 @@ from atalaia_server.config import Settings
 from atalaia_server.models import Field
 from atalaia_server.security_headers import HEADERS
 
-from .base import METRICS_TOKEN, SERVER, AppTestCase
+from .base import METRICS_TOKEN, SECRET_KEY, SERVER, AppTestCase
 
 
 def assert_security_headers(case: unittest.TestCase, headers) -> None:
@@ -59,7 +59,7 @@ class HealthTests(AppTestCase):
         spec = (await self.client.get("/api/v1/openapi.json")).json()
         self.assertIn("/api/v1/health", spec["paths"])
 
-    async def test_metrics_need_the_token(self) -> None:
+    async def test_metrics_need_the_token_or_an_administrator(self) -> None:
         for headers in ({}, {"Authorization": "Bearer wrong"}, {"Authorization": f"Basic {METRICS_TOKEN}"},
                         {"Authorization": f"Bearer {METRICS_TOKEN}x"}):
             with self.subTest(headers=headers):
@@ -73,7 +73,7 @@ class HealthTests(AppTestCase):
         self.assertEqual(r.status_code, 200)
         body = r.json()
         self.assertEqual(body["database"], "connected")
-        self.assertEqual((body["fields_total"], body["users_total"]), (0, 0))
+        self.assertEqual((body["fields_total"], body["users_total"], body["sessions_active"]), (0, 0, 0))
         self.assertEqual(body["db_pool_size"], self.settings().db_pool_size)
         self.assertIsInstance(body["db_pool_checked_out"], int)
         self.assertEqual(body["version"], __version__)
@@ -84,12 +84,22 @@ class HealthTests(AppTestCase):
         await self.fetch("DELETE FROM fields WHERE slug = 'campo-metrics'")
 
 
-class MetricsOffTests(AppTestCase):
+class MetricsAccountTests(AppTestCase):
+    """Without ATALAIA_METRICS_TOKEN only server administrators read the metrics (S10-2, S11-9)."""
+
     metrics_token = None
 
-    async def test_no_token_configured_no_endpoint(self) -> None:
-        r = await self.client.get("/api/v1/metrics", headers={"Authorization": "Bearer anything"})
-        self.assertEqual(r.status_code, 404)
+    async def test_server_administrators_only(self) -> None:
+        r = await self.client.get("/api/v1/metrics", headers={"Authorization": f"Bearer {METRICS_TOKEN}"})
+        self.assertEqual(r.status_code, 401)
+        _, admin, secret = await self.make_user(server_admin=True)
+        r = await self.client.get("/api/v1/metrics", headers=await self.auth(admin, secret=secret))
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual((r.json()["users_total"], r.json()["sessions_active"]), (1, 1))
+        _, player, _ = await self.make_user()
+        r = await self.client.get("/api/v1/metrics", headers=await self.auth(player))
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.json()["detail"], "server_admin_required")
 
 
 class DatabaseDownTests(AppTestCase):
@@ -98,7 +108,7 @@ class DatabaseDownTests(AppTestCase):
     def settings(self) -> Settings:
         closed = _free_port()  # nothing listens there: the connection is refused at once
         url = make_url(self.database_url).set(host="127.0.0.1", port=closed).render_as_string(hide_password=False)
-        return Settings(database_url=url, metrics_token=METRICS_TOKEN, db_timeout_s=2.0)
+        return Settings(database_url=url, secret_key=SECRET_KEY, metrics_token=METRICS_TOKEN, db_timeout_s=2.0)
 
     async def test_unhealthy(self) -> None:
         r = await self.client.get("/api/v1/health")
@@ -136,7 +146,7 @@ class ServeTests(AppTestCase):
 
     async def test_uvicorn_serves_health_and_stops_cleanly(self) -> None:
         port = _free_port()
-        env = {**os.environ, "ATALAIA_DATABASE_URL": self.database_url}
+        env = {**os.environ, "ATALAIA_DATABASE_URL": self.database_url, "ATALAIA_SECRET_KEY": SECRET_KEY}
         proc = subprocess.Popen([sys.executable, "-m", "uvicorn", "--factory", "atalaia_server.app:create_app",
                                  "--host", "127.0.0.1", "--port", str(port), "--log-level", "info"],
                                 cwd=SERVER, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)

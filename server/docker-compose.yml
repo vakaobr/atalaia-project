@@ -4,8 +4,8 @@
 # The site server and its PostgreSQL 16 (ADR-P4-10). Plan phase 22 adds Caddy
 # for HTTPS, server/setup.sh for the secrets and the backups; until then this
 # is for trying the server locally: `python3 tools/docker_server.py up`
-# (which sets POSTGRES_PASSWORD) and `... down`. The server listens on
-# 127.0.0.1 only.
+# (which sets POSTGRES_PASSWORD and ATALAIA_SECRET_KEY) and `... down`. The
+# server listens on 127.0.0.1 only.
 
 services:
   server:
@@ -16,6 +16,7 @@ services:
       target: server
     environment:
       ATALAIA_DATABASE_URL: "postgresql+asyncpg://atalaia:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/atalaia"
+      ATALAIA_SECRET_KEY: "${ATALAIA_SECRET_KEY:?set ATALAIA_SECRET_KEY}"
       ATALAIA_METRICS_TOKEN: "${ATALAIA_METRICS_TOKEN:-}"
       ATALAIA_LOG_LEVEL: "${ATALAIA_LOG_LEVEL:-info}"
     ports:

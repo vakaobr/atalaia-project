@@ -1,0 +1,272 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+"""Server administrators, fields and per-field roles on PostgreSQL 16 (ADR-P4-2)."""
+
+from __future__ import annotations
+
+import asyncio
+import io
+import os
+import subprocess
+import sys
+import time
+import uuid
+from typing import Any
+
+import jwt
+
+from atalaia_server import cli, totp
+from atalaia_server.models import ROLES
+
+from .base import PASSWORD, SECRET_KEY, SERVER, AppTestCase, next_time
+
+
+class CreateAdminTests(AppTestCase):
+    async def create(self, username: str, password: str = PASSWORD, codes: Any = None) -> uuid.UUID:
+        t = next_time()
+        out = io.StringIO()
+
+        def read_code(uri: str, secret: str) -> str:
+            self.assertIn(secret, uri)
+            return next(codes) if codes is not None else totp.code_at(secret, t)
+
+        return await cli.create_admin(self.settings(), username, None, password, read_code, out, clock=lambda: t)
+
+    async def test_create_admin_then_log_in_with_totp(self) -> None:
+        user_id = await self.create("Chefe")
+        row = (await self.fetch("SELECT * FROM users WHERE id = $1", user_id))[0]
+        self.assertEqual((row["username"], row["server_admin"], row["totp_enabled"]), ("chefe", True, True))
+        secret = self.app.state.seed_box.open(row["totp_secret_enc"])
+        r = await self.client.post("/api/v1/auth/login", json={"username": "chefe", "password": PASSWORD})
+        self.assertTrue(r.json()["totp_required"])
+        me = await self.client.get("/api/v1/me", headers=await self.auth("chefe", secret=secret))
+        self.assertEqual((me.json()["server_admin"], me.json()["mfa"]), (True, True))
+        audit = await self.fetch("SELECT user_id, details FROM audit_log WHERE action = 'admin_create'")
+        self.assertEqual(audit[0]["user_id"], user_id)
+
+    async def test_refusals_create_nothing(self) -> None:
+        await self.create("chefe")
+        for username, password, codes, message in (
+                ("chefe", PASSWORD, None, "already exists"),
+                ("x", PASSWORD, None, "username"),
+                ("outro", "basketball", None, "breached"),
+                ("outro", "short", None, "at least 10"),
+                ("outro", PASSWORD, iter(["000000", "111111", "222222"]), "no valid TOTP code")):
+            with self.subTest(username=username, message=message):
+                with self.assertRaisesRegex(cli.CommandError, message):
+                    await self.create(username, password, codes)
+        self.assertEqual((await self.fetch("SELECT count(*) FROM users"))[0][0], 1)
+
+    async def test_the_command(self) -> None:
+        """``python -m atalaia_server create-admin --password-stdin``, typing the code it asks for."""
+        env = {**os.environ, "ATALAIA_DATABASE_URL": self.database_url, "ATALAIA_SECRET_KEY": SECRET_KEY,
+               "PYTHONUNBUFFERED": "1"}
+        out = await asyncio.to_thread(_run_create_admin, env)
+        self.assertEqual(out["code"], 0, out["text"])
+        self.assertIn("otpauth://totp/Atalaia:operadora?secret=", out["text"])
+        self.assertIn("TOTP code: Server administrator 'operadora' created", out["text"])
+        self.assertTrue((await self.fetch("SELECT server_admin FROM users WHERE username = 'operadora'"))[0][0])
+
+    async def test_the_command_needs_the_settings(self) -> None:
+        err = io.StringIO()
+        saved = {k: os.environ.pop(k) for k in ("ATALAIA_DATABASE_URL", "ATALAIA_SECRET_KEY") if k in os.environ}
+        try:
+            code = await asyncio.to_thread(cli.main, ["create-admin", "--username", "x1x"], io.StringIO(),
+                                           io.StringIO(), err)
+        finally:
+            os.environ.update(saved)
+        self.assertEqual(code, 2)
+        self.assertIn("ATALAIA_DATABASE_URL", err.getvalue())
+
+
+def _run_create_admin(env: dict[str, str]) -> dict[str, Any]:
+    proc = subprocess.Popen([sys.executable, "-m", "atalaia_server", "create-admin", "--username", "operadora",
+                             "--password-stdin"], cwd=SERVER, env=env, stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    assert proc.stdin and proc.stdout
+    proc.stdin.write(PASSWORD + "\n")
+    proc.stdin.flush()
+    text = ""
+    secret = None
+    for line in proc.stdout:
+        text += line
+        if line.strip().startswith("secret: "):
+            secret = line.split(":", 1)[1].strip()
+            break
+    if secret is not None:
+        proc.stdin.write(totp.code_at(secret, time.time()) + "\n")
+    proc.stdin.close()
+    # Through the same text wrapper (communicate() would read the pipe itself and miss what it buffered).
+    rest = proc.stdout.read()
+    proc.stdout.close()
+    proc.wait(timeout=60)
+    return {"code": proc.returncode, "text": text + rest}
+
+
+class RoleTestCase(AppTestCase):
+    async def asyncSetUp(self) -> None:
+        await super().asyncSetUp()
+        _, self.admin, self.admin_secret = await self.make_user("chefe", server_admin=True)
+        self.as_admin = await self.auth(self.admin, secret=self.admin_secret)
+
+    async def new_field(self, slug: str) -> str:
+        r = await self.client.post("/api/v1/fields", headers=self.as_admin, json={"name": slug.title(), "slug": slug})
+        self.assertEqual(r.status_code, 201, r.text)
+        return r.json()["id"]
+
+    async def grant(self, headers: dict[str, str], field: str, username: str, role: str) -> Any:
+        return await self.client.put(f"/api/v1/fields/{field}/roles", headers=headers,
+                                     json={"username": username, "role": role})
+
+    async def member(self, field: str, role: str, with_totp: bool = False) -> tuple[uuid.UUID, str, dict[str, str]]:
+        """A new account holding that role on the field, logged in."""
+        user_id, name, secret = await self.make_user(with_totp=with_totp or role in ("admin", "gm", "marshal"))
+        r = await self.grant(self.as_admin, field, name, role)
+        self.assertEqual(r.status_code, 201, r.text)
+        return user_id, name, await self.auth(name, secret=secret)
+
+
+class FieldTests(RoleTestCase):
+    async def test_server_administrators_create_fields(self) -> None:
+        r = await self.client.post("/api/v1/fields", headers=self.as_admin,
+                                   json={"name": "Campo Tejo", "slug": "campo-tejo", "field_type": "cqb",
+                                         "timezone": "Atlantic/Azores"})
+        self.assertEqual(r.status_code, 201, r.text)
+        body = r.json()
+        self.assertEqual((body["slug"], body["field_type"], body["timezone"]), ("campo-tejo", "cqb", "Atlantic/Azores"))
+        audit = await self.fetch("SELECT resource_id FROM audit_log WHERE action = 'field_create'")
+        self.assertEqual(str(audit[0][0]), body["id"])
+        for change, code in (({"slug": "campo-tejo"}, "slug_taken"), ({"slug": "Campo Tejo"}, "slug_invalid"),
+                             ({"slug": "x-", "name": "X"}, "slug_invalid"), ({"field_type": "beach"}, "field_type_invalid"),
+                             ({"timezone": "Mars/Olympus"}, "timezone_invalid"), ({"name": "  "}, "name_invalid")):
+            with self.subTest(change=change):
+                r = await self.client.post("/api/v1/fields", headers=self.as_admin,
+                                           json={"name": "Outro", "slug": "outro", **change})
+                self.assertEqual(r.json()["detail"], code)
+
+    async def test_nobody_else_creates_fields(self) -> None:
+        _, name, secret = await self.make_user(with_totp=True)
+        for headers in ({}, await self.auth(name, secret=secret)):
+            r = await self.client.post("/api/v1/fields", headers=headers, json={"name": "X", "slug": "x"})
+            self.assertEqual(r.status_code, 401 if not headers else 403)
+
+    async def test_an_administrator_session_without_totp_counts_for_nothing(self) -> None:
+        await self.fetch("UPDATE sessions SET mfa = false")
+        r = await self.client.post("/api/v1/fields", headers=self.as_admin, json={"name": "X", "slug": "x"})
+        self.assertEqual((r.status_code, r.json()["detail"]), (403, "server_admin_required"))
+        self.assertEqual((await self.client.get("/api/v1/metrics", headers=self.as_admin)).status_code, 403)
+
+    async def test_listing(self) -> None:
+        tejo, norte = await self.new_field("tejo"), await self.new_field("norte")
+        _, _, player = await self.member(tejo, "player")
+        everything = (await self.client.get("/api/v1/fields", headers=self.as_admin)).json()
+        self.assertEqual([f["slug"] for f in everything], ["norte", "tejo"])
+        mine = (await self.client.get("/api/v1/fields", headers=player)).json()
+        self.assertEqual([(f["id"], f["my_roles"]) for f in mine], [(tejo, ["player"])])
+        self.assertNotIn(norte, str(mine))
+
+
+class RoleTests(RoleTestCase):
+    async def asyncSetUp(self) -> None:
+        await super().asyncSetUp()
+        self.field = await self.new_field("campo")
+        self.other_field = await self.new_field("outro")
+
+    async def test_privileged_roles_need_totp(self) -> None:
+        _, plain, _ = await self.make_user()
+        for role in ("admin", "gm", "marshal"):
+            with self.subTest(role=role):
+                r = await self.grant(self.as_admin, self.field, plain, role)
+                self.assertEqual((r.status_code, r.json()["detail"]), (409, "totp_required"))
+        for role in ("player", "squad_leader", "vip", "spectator"):
+            with self.subTest(role=role):
+                self.assertEqual((await self.grant(self.as_admin, self.field, plain, role)).status_code, 201)
+        _, secure, _ = await self.make_user(with_totp=True)
+        self.assertEqual((await self.grant(self.as_admin, self.field, secure, "marshal")).status_code, 201)
+        self.assertEqual((await self.grant(self.as_admin, self.field, secure, "marshal")).status_code, 200)
+        grants = await self.fetch("SELECT details FROM audit_log WHERE action = 'role_grant'")
+        self.assertEqual(len(grants), 5)  # the repeated grant changed nothing, so it is not logged
+
+    async def test_who_grants_what(self) -> None:
+        _, _, field_admin = await self.member(self.field, "admin")
+        _, _, gm = await self.member(self.field, "gm")
+        _, _, marshal = await self.member(self.field, "marshal")
+        _, _, player = await self.member(self.field, "player")
+        _, _, other_gm = await self.member(self.other_field, "gm")
+        _, target, _ = await self.make_user(with_totp=True)
+        expected = {
+            "admin": {"field_admin": 201, "gm": 403, "marshal": 403, "player": 403, "other_gm": 403},
+            "gm": {"field_admin": 201, "gm": 403, "marshal": 403, "player": 403, "other_gm": 403},
+            "marshal": {"field_admin": 201, "gm": 403, "marshal": 403, "player": 403, "other_gm": 403},
+            "player": {"field_admin": 200, "gm": 200, "marshal": 403, "player": 403, "other_gm": 403},
+            "squad_leader": {"field_admin": 200, "gm": 201, "marshal": 403, "player": 403, "other_gm": 403},
+            "vip": {"field_admin": 200, "gm": 201, "marshal": 403, "player": 403, "other_gm": 403},
+            "spectator": {"field_admin": 200, "gm": 201, "marshal": 403, "player": 403, "other_gm": 403},
+        }
+        callers = {"field_admin": field_admin, "gm": gm, "marshal": marshal, "player": player, "other_gm": other_gm}
+        order = ["gm", "player", "other_gm", "marshal", "field_admin"]  # field_admin last: it may re-grant
+        for role, by in expected.items():
+            for caller in sorted(by, key=order.index):
+                with self.subTest(role=role, caller=caller):
+                    r = await self.grant(callers[caller], self.field, target, role)
+                    want = by[caller]
+                    if want in (200, 201):
+                        self.assertIn(r.status_code, (200, 201), r.text)
+                    else:
+                        self.assertEqual((r.status_code, r.json()["detail"]), (want, "role_required"))
+
+    async def test_revoking_counts_at_once(self) -> None:
+        gm_id, _, gm = await self.member(self.field, "gm")
+        self.assertEqual((await self.client.get(f"/api/v1/fields/{self.field}/roles", headers=gm)).status_code, 200)
+        r = await self.client.delete(f"/api/v1/fields/{self.field}/roles/{gm_id}/gm", headers=self.as_admin)
+        self.assertEqual(r.status_code, 204)
+        # The same access token, still unexpired, no longer carries the role.
+        r = await self.client.get(f"/api/v1/fields/{self.field}/roles", headers=gm)
+        self.assertEqual((r.status_code, r.json()["detail"]), (403, "role_required"))
+        audit = await self.fetch("SELECT resource_id, details FROM audit_log WHERE action = 'role_revoke'")
+        self.assertEqual(audit[0]["resource_id"], gm_id)
+        r = await self.client.delete(f"/api/v1/fields/{self.field}/roles/{gm_id}/gm", headers=self.as_admin)
+        self.assertEqual((r.status_code, r.json()["detail"]), (404, "role_not_found"))
+        r = await self.client.delete(f"/api/v1/fields/{self.field}/roles/{gm_id}/boss", headers=self.as_admin)
+        self.assertEqual((r.status_code, r.json()["detail"]), (400, "role_invalid"))
+
+    async def test_privileged_roles_count_only_after_the_totp_step(self) -> None:
+        gm_id, _, gm = await self.member(self.field, "gm")
+        await self.fetch("UPDATE sessions SET mfa = false WHERE user_id = $1", gm_id)
+        r = await self.client.get(f"/api/v1/fields/{self.field}/roles", headers=gm)
+        self.assertEqual(r.status_code, 403)
+        # The field is still listed, with the role the account holds.
+        self.assertEqual((await self.client.get("/api/v1/fields", headers=gm)).json()[0]["my_roles"], ["gm"])
+
+    async def test_list_roles(self) -> None:
+        gm_id, gm_name, gm = await self.member(self.field, "gm")
+        _, player_name, player = await self.member(self.field, "player")
+        r = await self.client.get(f"/api/v1/fields/{self.field}/roles", headers=gm)
+        self.assertEqual(sorted((x["username"], x["role"]) for x in r.json()),
+                         sorted([(gm_name, "gm"), (player_name, "player")]))
+        self.assertTrue(all(x["granted_by"] for x in r.json()))
+        self.assertEqual((await self.client.get(f"/api/v1/fields/{self.field}/roles", headers=player)).status_code,
+                         403)
+        self.assertEqual((await self.client.get(f"/api/v1/fields/{self.other_field}/roles",
+                                                headers=gm)).status_code, 403)
+
+    async def test_unknown_things(self) -> None:
+        r = await self.grant(self.as_admin, self.field, "nobody-at-all", "player")
+        self.assertEqual((r.status_code, r.json()["detail"]), (404, "user_not_found"))
+        r = await self.grant(self.as_admin, str(uuid.uuid4()), "chefe", "player")
+        self.assertEqual((r.status_code, r.json()["detail"]), (404, "field_not_found"))
+        r = await self.grant(self.as_admin, self.field, "chefe", "general")
+        self.assertEqual((r.status_code, r.json()["detail"]), (400, "role_invalid"))
+
+    async def test_roles_in_the_token_and_in_me(self) -> None:
+        _, name, secret = await self.make_user(with_totp=True)
+        await self.grant(self.as_admin, self.field, name, "marshal")
+        await self.grant(self.as_admin, self.field, name, "player")
+        session = await self.login(name, secret=secret)
+        self.assertEqual(session["user"]["roles"], {self.field: ["marshal", "player"]})
+        claims = jwt.decode(session["access_token"], options={"verify_signature": False})
+        self.assertEqual(claims["roles"], {self.field: ["marshal", "player"]})
+
+    def test_the_seven_roles(self) -> None:
+        self.assertEqual([name for _, name in ROLES],
+                         ["player", "squad_leader", "vip", "marshal", "gm", "spectator", "admin"])

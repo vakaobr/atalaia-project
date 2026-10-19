@@ -3,11 +3,13 @@
 """Site server settings, from ATALAIA_* environment variables.
 
     ATALAIA_DATABASE_URL    required: postgresql+asyncpg://user:password@host:5432/database
+    ATALAIA_SECRET_KEY      required (at least 32 characters): the keys of the access tokens,
+                            the TOTP login step and the TOTP seeds are derived from it
     ATALAIA_DB_POOL_SIZE    connections kept open (default 5, 1-100)
     ATALAIA_DB_MAX_OVERFLOW extra connections under load (default 5, 0-100)
     ATALAIA_DB_TIMEOUT_S    connect and health-check timeout in seconds (default 5, 0.1-60)
-    ATALAIA_METRICS_TOKEN   bearer token for GET /api/v1/metrics; empty: the endpoint
-                            answers 404 (admin accounts replace it in plan phase 11)
+    ATALAIA_METRICS_TOKEN   optional bearer token for GET /api/v1/metrics (a monitoring
+                            system); server administrators can always read it
     ATALAIA_LOG_LEVEL       debug, info (default), warning or error
 
 Plain Python with no third-party imports, so its tests also run in the
@@ -25,6 +27,8 @@ from urllib.parse import urlsplit, urlunsplit
 LOG_LEVELS = ("debug", "info", "warning", "error")
 URL_SCHEME = "postgresql+asyncpg"
 MIN_METRICS_TOKEN = 32
+MIN_SECRET_KEY = 32
+_KEY_HINT = "(python3 -c \"import secrets; print(secrets.token_urlsafe(32))\")"
 
 
 class ConfigError(ValueError):
@@ -61,6 +65,16 @@ def _check_url(url: str) -> str:
     return url
 
 
+def database_url_from_env(env: Optional[Mapping[str, str]] = None) -> str:
+    """ATALAIA_DATABASE_URL alone, checked (Alembic needs nothing else)."""
+    env = os.environ if env is None else env
+    url = env.get("ATALAIA_DATABASE_URL", "").strip()
+    if not url:
+        raise ConfigError("ATALAIA_DATABASE_URL is not set "
+                          "(postgresql+asyncpg://user:password@host:5432/database)")
+    return _check_url(url)
+
+
 def _number(env: Mapping[str, str], name: str, default: float, low: float, high: float, kind: type) -> float:
     raw = env.get(name, "").strip()
     if not raw:
@@ -77,6 +91,7 @@ def _number(env: Mapping[str, str], name: str, default: float, low: float, high:
 @dataclass(frozen=True)
 class Settings:
     database_url: str = field(repr=False)
+    secret_key: str = field(repr=False)
     db_pool_size: int = 5
     db_max_overflow: int = 5
     db_timeout_s: float = 5.0
@@ -85,26 +100,29 @@ class Settings:
 
     def __post_init__(self) -> None:
         _check_url(self.database_url)
+        if len(self.secret_key) < MIN_SECRET_KEY:
+            raise ConfigError(f"ATALAIA_SECRET_KEY must be at least {MIN_SECRET_KEY} characters {_KEY_HINT}")
         if self.log_level not in LOG_LEVELS:
             raise ConfigError(f"ATALAIA_LOG_LEVEL must be one of {', '.join(LOG_LEVELS)}")
         if self.metrics_token is not None and len(self.metrics_token) < MIN_METRICS_TOKEN:
-            raise ConfigError(f"ATALAIA_METRICS_TOKEN must be at least {MIN_METRICS_TOKEN} characters "
-                              "(python3 -c \"import secrets; print(secrets.token_urlsafe(32))\")")
+            raise ConfigError(f"ATALAIA_METRICS_TOKEN must be at least {MIN_METRICS_TOKEN} characters {_KEY_HINT}")
 
     def __repr__(self) -> str:
-        return (f"Settings(database_url={redact_url(self.database_url)!r}, db_pool_size={self.db_pool_size}, "
+        return (f"Settings(database_url={redact_url(self.database_url)!r}, secret_key=set, "
+                f"db_pool_size={self.db_pool_size}, "
                 f"db_max_overflow={self.db_max_overflow}, db_timeout_s={self.db_timeout_s}, "
                 f"metrics_token={'set' if self.metrics_token else 'unset'}, log_level={self.log_level!r})")
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Settings":
         env = os.environ if env is None else env
-        url = env.get("ATALAIA_DATABASE_URL", "").strip()
-        if not url:
-            raise ConfigError("ATALAIA_DATABASE_URL is not set "
-                              "(postgresql+asyncpg://user:password@host:5432/database)")
+        url = database_url_from_env(env)
+        secret = env.get("ATALAIA_SECRET_KEY", "").strip()
+        if not secret:
+            raise ConfigError(f"ATALAIA_SECRET_KEY is not set {_KEY_HINT}")
         return cls(
             database_url=url,
+            secret_key=secret,
             db_pool_size=int(_number(env, "ATALAIA_DB_POOL_SIZE", 5, 1, 100, int)),
             db_max_overflow=int(_number(env, "ATALAIA_DB_MAX_OVERFLOW", 5, 0, 100, int)),
             db_timeout_s=float(_number(env, "ATALAIA_DB_TIMEOUT_S", 5.0, 0.1, 60.0, float)),

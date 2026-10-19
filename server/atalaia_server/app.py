@@ -9,6 +9,12 @@ them (the tests do). The database engine is made when the app starts and
 disposed when it stops. The interactive API pages are off: they load scripts
 from a CDN, which the content security policy forbids; the OpenAPI document
 is at /api/v1/openapi.json.
+
+The app's own state: ``keys`` (derived from ATALAIA_SECRET_KEY), ``seed_box``
+(TOTP seeds), ``limits`` (rate limits and lockouts), ``used_totp_steps``
+(spent TOTP login steps) and ``clock`` (the time TOTP codes are checked at;
+the tests move it). All of it is in memory, for the one worker process the
+image runs (ADR-P4-2).
 """
 
 from __future__ import annotations
@@ -18,13 +24,18 @@ import time
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from . import __version__
-from .api import health
+from .api import auth, fields, health
 from .config import Settings, redact_url
 from .db import make_engine, make_sessionmaker
+from .ratelimit import Limits, RequestLimitMiddleware
 from .security_headers import SecurityHeadersMiddleware
+from .tokens import Keys, UsedTokens
+from .totp import SeedBox
 
 log = logging.getLogger("atalaia.server")
 
@@ -47,6 +58,24 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
                   docs_url=None, redoc_url=None, openapi_url="/api/v1/openapi.json")
     app.state.settings = settings
     app.state.started = time.monotonic()
+    app.state.keys = Keys(settings.secret_key)
+    app.state.seed_box = SeedBox(app.state.keys.totp_seed)
+    app.state.limits = Limits()
+    app.state.used_totp_steps = UsedTokens()
+    app.state.clock = time.time
+    app.add_exception_handler(RequestValidationError, _invalid_request)
+    # The last one added runs first: security headers wrap everything, the 429s included.
+    app.add_middleware(RequestLimitMiddleware, get_limits=lambda: app.state.limits)
     app.add_middleware(SecurityHeadersMiddleware)
     app.include_router(health.router)
+    app.include_router(auth.router)
+    app.include_router(fields.router)
     return app
+
+
+async def _invalid_request(request: Request, exc: Exception) -> JSONResponse:
+    """FastAPI's 422, without the ``input`` and ``ctx`` it would echo back (a password, say)."""
+    assert isinstance(exc, RequestValidationError)
+    errors = [{"loc": list(e.get("loc", ())), "msg": e.get("msg", ""), "type": e.get("type", "")}
+              for e in exc.errors()]
+    return JSONResponse({"detail": errors}, status_code=422)

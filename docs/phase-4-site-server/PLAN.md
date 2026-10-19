@@ -853,6 +853,25 @@ atalaia_server create-admin`. Migration `0002_accounts`. Tests:
 listed). Validation: `python3 tools/docker_server.py test` and
 `migrations`.
 
+**Built 2026-10-19** (in software; decisions S11-1 to S11-15). Differences
+from the text above, as built: **per-game roles wait for plan phase 13**
+(`user_game_roles` needs its `games` table, S11-6, as S10-5 had it), so
+plan phase 13 adds them; refresh tokens are opaque random values kept as
+SHA-256 in a new `refresh_tokens` table, not JWTs (S11-1); every request
+re-reads the session and the roles from the database (S11-2); a
+`users.server_admin` flag for the site server's own administrator, made by
+`create-admin`, and the smallest fields API (`POST`/`GET /api/v1/fields`)
+so roles can be granted (S11-7); `GET /api/v1/metrics` is for server
+administrators, with `ATALAIA_METRICS_TOKEN` kept as an optional monitoring
+credential (S11-9); the new modules are `passwords.py`, `totp.py`,
+`tokens.py`, `ratelimit.py`, `auth.py`, `audit.py`, `cli.py`,
+`api/auth.py` and `api/fields.py`, with the breached list in
+`atalaia_server/data/`; `test_passwords.py`, `test_totp.py` (the RFC 6238
+and RFC 4226 vectors), `test_tokens.py` and `test_ratelimit.py` need no
+database but need the server's dependencies, so they run in the server's
+image only (`docker_server.py test`, CI's `server` job), not in
+tools/check.sh.
+
 ---
 
 ## Plan phase 12: Personal data

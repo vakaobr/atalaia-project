@@ -749,6 +749,18 @@ names match the controller's player-token roles (`player`,
 code goes in `server/atalaia_server/` (not `server/src/`, as decision
 D15 did for the controller).
 
+*Built 2026-10-19 (plan phase 11; decisions S11-1 to S11-15, proposed):*
+as above, except: refresh tokens are 256-bit random values stored only as
+SHA-256 in `refresh_tokens` (every token a session was given, so a replay
+is recognised), not JWTs with a `REFRESH_SECRET`; access tokens are still
+JWTs, but each request re-reads the session and the roles from the
+database, so a logout or a removed role counts at once; the keys are
+derived from one `ATALAIA_SECRET_KEY` with HKDF; a TOTP code is accepted
+once (RFC 6238 section 5.2); the refresh endpoint also needs the header
+`X-Atalaia-Refresh: 1`; a site-wide `users.server_admin`, made by
+`python -m atalaia_server create-admin`, administers fields; per-game roles
+come with `games` in plan phase 13.
+
 ---
 
 ### ADR-P4-3: Sync protocol between controller and site server

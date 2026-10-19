@@ -180,8 +180,9 @@ how:
     <a href="{{ page.to.glossary }}#glossario-atak">ATAK</a>, pela sua API. Um
     <a href="{{ page.to.glossary }}#glossario-servidor-do-clube">servidor do clube</a>, opcional e na internet, guarda as
     contas e o histórico. O controlador, a sua API e a consola da organização já estão feitos e
-    testados num computador, ainda não no campo; do servidor do clube só existe, por agora, o
-    esqueleto (a base de dados e uma verificação de estado, ainda sem contas).
+    testados num computador, ainda não no campo; do servidor do clube só existem, por agora, o
+    esqueleto e as contas (entrada com códigos de dois fatores e funções por campo; ainda sem dados
+    de jogos).
   core: >-
     Por dentro, todos os aparelhos que correm modos de jogo usam o mesmo
     <a href="{{ page.to.glossary }}#glossario-nucleo">núcleo partilhado</a>, escrito em C11, e os mesmos modos em Lua; só
@@ -588,7 +589,7 @@ roadmap:
     title: Servidor do clube e jogo avançado
     short: >-
       Servidor do clube, marcação de jogos e inscrições, cenários personalizados, modos avançados,
-      ATAK. Começada: o primeiro modo avançado, Mestre e Satélites, e o esqueleto do servidor do clube estão feitos em software.
+      ATAK. Começada: o primeiro modo avançado, Mestre e Satélites, e o esqueleto e as contas do servidor do clube estão feitos em software.
     text: >-
       Servidor do clube (contas, histórico dos jogos, registo de cronografagem, marcação de jogos,
       inscrições e publicação), cenários personalizados, modos avançados (zonas mestre e satélites,
@@ -600,8 +601,9 @@ roadmap:
       equipa tem junto com a mestre aumentam os seus pontos e a mestre a mudar de mãos liberta-os,
       testado no simulador, através do controlador de campo e no firmware da caixa a correr num
       computador; e o esqueleto do servidor do clube (a base de dados, as migrações e uma
-      verificação de estado, no seu próprio contentor; ainda sem contas nem dados de jogos),
-      testado só num computador.
+      verificação de estado, no seu próprio contentor) e as contas (palavras-passe, códigos de
+      dois fatores obrigatórios para quem organiza e para marshals, sessões e funções por campo;
+      ainda sem dados de jogos), testado só num computador.
     gate: >-
       Prova: um <a href="{{ page.to.glossary }}#glossario-milsim">milsim</a> de fim de semana decorre do princípio ao fim
       com a Atalaia.

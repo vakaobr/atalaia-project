@@ -1,9 +1,11 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""ORM models of the base tables (ADR-P4-1; migration 0001_base).
+"""ORM models (ADR-P4-1; migrations 0001_base and 0002_accounts).
 
 Fields, users, roles, per-field roles, sessions and the audit log, as
-ADR-P4-1 defines them. Every later plan phase adds its own tables here and in
+ADR-P4-1 defines them, with plan phase 11's additions for accounts: the
+server administrator flag and the last TOTP step on ``users``, the second
+factor on ``sessions``, and ``refresh_tokens`` (only hashes). Every later plan phase adds its own tables here and in
 its own Alembic migration; ``tests.test_migrations`` checks that the
 migrations build exactly these models. User-facing keys are UUIDv7
 (``ids.uuid7``) with ``gen_random_uuid()`` as the database's fallback;
@@ -16,7 +18,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Optional
 
-from sqlalchemy import (BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, LargeBinary, MetaData,
+from sqlalchemy import (BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, LargeBinary, MetaData,
                         SmallInteger, String, UniqueConstraint, func, text)
 from sqlalchemy.dialects.postgresql import INET, JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -70,8 +72,21 @@ class Field(Base):
     updated_at: Mapped[datetime] = _updated()
 
 
+# Roles that need TOTP (ADR-P4-2): granting one to an account without TOTP fails, and they
+# count only in a session that passed the TOTP step.
+PRIVILEGED_ROLES = frozenset({"admin", "gm", "marshal"})
+ROLE_NAMES = {name: role_id for role_id, name in ROLES}
+ROLE_BY_ID = {role_id: name for role_id, name in ROLES}
+
+
 class User(Base):
+    """An account. Usernames are stored lower-case (a check constraint), so they are unique
+    whatever the case typed. ``server_admin`` (plan phase 11) is the site server's own
+    administrator, made by ``python -m atalaia_server create-admin``: it manages fields and
+    roles everywhere and reads the metrics, and always has TOTP."""
+
     __tablename__ = "users"
+    __table_args__ = (CheckConstraint("username = lower(username)", name="username_lower"),)
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     username: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
@@ -79,6 +94,9 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(256), nullable=False)
     totp_secret_enc: Mapped[Optional[bytes]] = mapped_column(LargeBinary)
     totp_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # The time step of the last TOTP code accepted: a code is used once (RFC 6238 section 5.2).
+    totp_last_step: Mapped[Optional[int]] = mapped_column(BigInteger)
+    server_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     gdpr_consent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     data_retention_days: Mapped[Optional[int]] = mapped_column(Integer)
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
@@ -106,7 +124,9 @@ class UserFieldRole(Base):
 
 
 class UserSession(Base):
-    """A login's refresh token (ADR-P4-2); plan phase 11 fills it."""
+    """One login (ADR-P4-2). ``mfa`` says the login passed the TOTP step; ``expires_at`` moves
+    on at each refresh (7 days) but never past 30 days from ``created_at``. Its refresh tokens
+    are in ``refresh_tokens``."""
 
     __tablename__ = "sessions"
     __table_args__ = (
@@ -116,12 +136,29 @@ class UserSession(Base):
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    refresh_token: Mapped[str] = mapped_column(String(512), nullable=False, unique=True)
     user_agent: Mapped[Optional[str]] = mapped_column(String(512))
     ip_address: Mapped[Optional[str]] = mapped_column(INET)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = _created()
     revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    mfa: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class RefreshToken(Base):
+    """Every refresh token a session was given, as its SHA-256 (the token itself is never stored).
+
+    Rotation marks the presented token ``used_at`` and issues a new one; a token presented
+    again after that is a replay, and the whole session is revoked (ADR-P4-2)."""
+
+    __tablename__ = "refresh_tokens"
+    __table_args__ = (Index("idx_refresh_tokens_session", "session_id"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    created_at: Mapped[datetime] = _created()
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
 class AuditLog(Base):

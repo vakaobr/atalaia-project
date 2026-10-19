@@ -12,13 +12,16 @@
 #       uv pip compile --python-version 3.12 --exclude-newer YYYY-MM-DD --generate-hashes \
 #         --no-header $f.in -o $f.txt; done'
 # then put the SPDX header back at the top of both .txt files and run the
-# tests (python3 tools/docker_server.py test). Plan phase 11 adds argon2-cffi,
-# PyJWT and pyotp.
+# tests (python3 tools/docker_server.py test).
 fastapi
 uvicorn
 sqlalchemy[asyncio]
 asyncpg
 alembic
+# Accounts (ADR-P4-2, plan phase 11): Argon2id passwords, access tokens, TOTP.
+argon2-cffi
+PyJWT
+pyotp
 # Imported by the code shared with the controller: the mode loader, the chrono verifier.
 PyYAML
 cryptography

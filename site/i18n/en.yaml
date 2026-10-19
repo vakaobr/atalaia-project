@@ -170,8 +170,8 @@ how:
     scoreboards, stream overlays and map apps such as <a href="{{ page.to.glossary }}#glossary-atak">ATAK</a> through its
     API. An optional <a href="{{ page.to.glossary }}#glossary-site-server">site server</a> on the internet keeps accounts
     and history. The controller, its API and the organisers' console are built and tested on a
-    computer, not yet on the field; of the site server only the skeleton exists so far (its database
-    and a health check, no accounts yet).
+    computer, not yet on the field; of the site server only the skeleton and the accounts exist so
+    far (logins with two-factor codes and per-field roles; no game data yet).
   core: >-
     Under the hood, every device that runs game modes uses the same
     <a href="{{ page.to.glossary }}#glossary-core">shared core</a>, written in C11, and the same Lua modes; only a thin
@@ -569,7 +569,7 @@ roadmap:
     title: Site server and advanced play
     short: >-
       Site server, game scheduling and registration, custom scenarios, advanced modes, ATAK.
-      Started: the first advanced mode, Master and Satellites, and the site server's skeleton are built in software.
+      Started: the first advanced mode, Master and Satellites, and the site server's skeleton and accounts are built in software.
     text: >-
       Site server (accounts, game history, the chrono registry, scheduling games, registration and
       publishing), custom scenarios, advanced modes (master and satellite zones, VIP escort, hacking
@@ -580,7 +580,8 @@ roadmap:
       holds together with the master raise its points and the master changing hands frees them,
       tested in the simulator, through the field controller and on the box firmware run on a
       computer; and the site server's skeleton (its database, migrations and a health check, in
-      its own container; no accounts or game data yet), tested on a computer only.
+      its own container) and its accounts (passwords, two-factor codes required for organisers
+      and marshals, sessions and roles per field; no game data yet), tested on a computer only.
     gate: >-
       Gate: a weekend <a href="{{ page.to.glossary }}#glossary-milsim">milsim</a> runs on Atalaia end to end.
   p5:

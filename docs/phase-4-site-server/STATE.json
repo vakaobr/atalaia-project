@@ -6,7 +6,7 @@
   "review_iteration": 0,
   "failing_experts": [],
   "created_at": "2026-10-17T00:00:00Z",
-  "updated_at": "2026-10-19T23:00:00Z",
+  "updated_at": "2026-10-19T23:59:00Z",
   "artifacts": {
     "RESEARCH.md": "complete",
     "ADR.md": "complete",
@@ -19,12 +19,12 @@
     "design_only": false,
     "stop_after": null,
     "resume_with": "--implement",
-    "next_plan_phase": "2 (Target Windows, logic) on the modes chain; 11 (accounts, sessions and roles) on the site server chain",
-    "completed_plan_phases": ["1", "10"],
+    "next_plan_phase": "2 (Target Windows, logic) on the modes chain; 12 (personal data) on the site server chain",
+    "completed_plan_phases": ["1", "10", "11"],
     "plan_phase_order": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "HW1", "HW2", "HW3", "HW4"],
     "software_now": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22"],
     "needs_hardware": ["HW1", "HW2", "HW3", "HW4"],
-    "resume_note": "Plan phase 1 (Master and Satellites) built in software 2026-10-19 (decisions M1-1 to M1-6, open). Refreshed 2026-10-19 against phase 3's software. Plan phases 1-9 (modes, core, scenarios, ATAK) and 10-22 (site server) are independent chains; HW1-HW4 wait for the Heltec V4 boards, the target addon, phones and phase 2 F / phase 3 G. Decisions P4R1-P4R26 are open. Plan phase 10 (site server skeleton and its test tooling) built in software on 2026-10-19; decisions S10-1 to S10-12 open.",
+    "resume_note": "Plan phase 1 (Master and Satellites) built in software 2026-10-19 (decisions M1-1 to M1-6, open). Refreshed 2026-10-19 against phase 3's software. Plan phases 1-9 (modes, core, scenarios, ATAK) and 10-22 (site server) are independent chains; HW1-HW4 wait for the Heltec V4 boards, the target addon, phones and phase 2 F / phase 3 G. Decisions P4R1-P4R26 are open. Plan phase 10 (site server skeleton and its test tooling) built in software on 2026-10-19; decisions S10-1 to S10-12 open. Plan phase 11 (accounts, sessions and roles) built in software on 2026-10-19; decisions S11-1 to S11-15 open.",
     "handoff_applied": "2026-10-18 (phase 2 A-E complete, phase 3 design complete); refreshed 2026-10-19 (phase 3 software built)"
   }
 }

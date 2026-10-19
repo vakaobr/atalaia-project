@@ -26,7 +26,7 @@ from atalaia_server.models import ROLES, Base
 
 from .base import SERVER, TempDatabase, alembic_config
 
-BASE_TABLES = {"fields", "users", "roles", "user_field_roles", "sessions", "audit_log"}
+TABLES = {"fields", "users", "roles", "user_field_roles", "sessions", "audit_log", "refresh_tokens"}
 
 SCHEMA_SQL = (
     ("columns", "SELECT table_name, column_name, data_type, is_nullable, column_default, character_maximum_length "
@@ -67,7 +67,7 @@ class MigrationTests(unittest.TestCase):
     def test_round_trip(self) -> None:
         empty = self.schema()
         command.upgrade(self.cfg, "head")
-        self.assertEqual(self.tables(), BASE_TABLES | {"alembic_version"})
+        self.assertEqual(self.tables(), TABLES | {"alembic_version"})
         first = self.schema()
         command.downgrade(self.cfg, "base")
         self.assertEqual(self.tables(), {"alembic_version"})
@@ -112,6 +112,24 @@ class MigrationTests(unittest.TestCase):
         command.upgrade(self.cfg, "head")
         rows = self.db.fetch("SELECT id, name FROM roles ORDER BY id")
         self.assertEqual([(r["id"], r["name"]) for r in rows], list(ROLES))
+
+    def test_0002_with_data(self) -> None:
+        """0002_accounts on a database with a user and an old-style session, and back."""
+        command.upgrade(self.cfg, "0001_base")
+        user = self.db.fetch("INSERT INTO users (username, password_hash) VALUES ('rita', 'x') RETURNING id")[0][0]
+        self.db.fetch("INSERT INTO sessions (user_id, refresh_token, expires_at) VALUES ($1, 'old', now())", user)
+        command.upgrade(self.cfg, "0002_accounts")
+        row = self.db.fetch("SELECT server_admin, totp_last_step FROM users")[0]
+        self.assertEqual(tuple(row), (False, None))
+        self.assertEqual(self.db.fetch("SELECT mfa FROM sessions")[0][0], False)  # kept, with the new default
+        with self.assertRaisesRegex(Exception, "ck_users_username_lower"):
+            self.db.fetch("INSERT INTO users (username, password_hash) VALUES ('Rita2', 'x')")
+        self.db.fetch("INSERT INTO refresh_tokens (session_id, token_hash) SELECT id, repeat('a', 64) FROM sessions")
+        # Down again: sessions cannot keep their tokens in the 0001 schema, so they go; users stay.
+        command.downgrade(self.cfg, "0001_base")
+        self.assertEqual(self.db.fetch("SELECT count(*) FROM sessions")[0][0], 0)
+        self.assertEqual(self.db.fetch("SELECT username FROM users")[0][0], "rita")
+        self.db.fetch("DELETE FROM users")
 
     def test_one_linear_history(self) -> None:
         self.assertEqual(len(self.script.get_heads()), 1)

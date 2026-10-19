@@ -1,0 +1,384 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+"""Accounts and sessions: register, login, the TOTP step, refresh, logout, TOTP enrolment (ADR-P4-2).
+
+    POST /api/v1/auth/register        {username, password, email?, consent}
+    POST /api/v1/auth/login           {username, password}
+    POST /api/v1/auth/login/totp      {totp_session, code}
+    POST /api/v1/auth/refresh         the refresh cookie + header X-Atalaia-Refresh: 1
+    POST /api/v1/auth/logout          Bearer
+    GET  /api/v1/me                   Bearer
+    POST /api/v1/auth/totp/enrol      Bearer, {password}
+    POST /api/v1/auth/totp/confirm    Bearer, {code}
+    POST /api/v1/auth/totp/disable    Bearer, {password, code}
+
+A login answers ``{access_token, token_type, expires_in, user}`` and sets the
+refresh token as a cookie: ``__Secure-atalaia_refresh``, HttpOnly, Secure,
+SameSite=Strict, Path=/api/v1/auth/refresh, so the browser sends it to the
+refresh endpoint only and scripts never see it. The access token travels in
+``Authorization: Bearer``, never in a cookie, so the API needs no CSRF token;
+the refresh endpoint, the one place a cookie is read, also wants the header
+``X-Atalaia-Refresh: 1``, which a cross-site form cannot send and a
+cross-site script cannot send without a CORS preflight the server never
+grants. Errors are ``{"detail": "<code>"}`` with a code a client translates.
+"""
+
+from __future__ import annotations
+
+import re
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import func, select, update
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from .. import passwords, totp
+from ..audit import record, request_ip
+from ..auth import Principal, current_principal, load_roles
+from ..db import get_session
+from ..models import PRIVILEGED_ROLES, ROLE_NAMES, RefreshToken, User, UserFieldRole, UserSession
+from ..tokens import (ACCESS_TTL_S, REFRESH_TTL_S, SESSION_MAX_S, TokenError, make_access_token,
+                      make_totp_step_token, new_refresh_token, read_totp_step_token, refresh_token_hash)
+
+router = APIRouter(prefix="/api/v1", tags=["auth"])
+
+COOKIE = "__Secure-atalaia_refresh"
+COOKIE_PATH = "/api/v1/auth/refresh"
+REFRESH_HEADER = "x-atalaia-refresh"
+USERNAME = re.compile(r"[a-z0-9][a-z0-9_.-]{2,63}")
+EMAIL = re.compile(r"[^@\s]{1,64}@[^@\s.]+(\.[^@\s.]+)+")
+NO_STORE = {"Cache-Control": "no-store"}
+
+
+class Strict(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class RegisterIn(Strict):
+    username: str = Field(max_length=64)
+    password: str = Field(max_length=4096)
+    email: Optional[str] = Field(default=None, max_length=320)
+    consent: bool = False
+
+
+class LoginIn(Strict):
+    username: str = Field(max_length=320)
+    password: str = Field(max_length=4096)
+
+
+class TotpLoginIn(Strict):
+    totp_session: str = Field(max_length=2048)
+    code: str = Field(max_length=16)
+
+
+class PasswordIn(Strict):
+    password: str = Field(max_length=4096)
+
+
+class CodeIn(Strict):
+    code: str = Field(max_length=16)
+
+
+class DisableIn(Strict):
+    password: str = Field(max_length=4096)
+    code: str = Field(max_length=16)
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _ip_key(request: Request) -> str:
+    return request_ip(request) or "unknown"
+
+
+def _too_many(retry_after: int) -> HTTPException:
+    return HTTPException(429, "too_many_attempts", headers={"Retry-After": str(retry_after)})
+
+
+def user_json(user: User, roles: dict[uuid.UUID, set[str]]) -> dict[str, Any]:
+    return {"id": str(user.id), "username": user.username, "email": user.email,
+            "totp_enabled": user.totp_enabled, "server_admin": user.server_admin,
+            "roles": {str(f): sorted(r) for f, r in roles.items()},
+            "created_at": user.created_at.isoformat() if user.created_at else None}
+
+
+def _set_cookie(response: Response, token: str) -> None:
+    response.set_cookie(COOKIE, token, max_age=REFRESH_TTL_S, path=COOKIE_PATH, secure=True, httponly=True,
+                        samesite="strict")
+
+
+def _clear_cookie(response: Response) -> None:
+    response.delete_cookie(COOKIE, path=COOKIE_PATH, secure=True, httponly=True, samesite="strict")
+
+
+def _session_body(request: Request, user: User, session: UserSession,
+                  roles: dict[uuid.UUID, set[str]]) -> dict[str, Any]:
+    token, _ = make_access_token(request.app.state.keys, user.id, session.id, user.username,
+                                 {str(f): sorted(r) for f, r in roles.items()})
+    return {"access_token": token, "token_type": "bearer", "expires_in": ACCESS_TTL_S, "mfa": session.mfa,
+            "user": user_json(user, roles)}
+
+
+async def _start_session(db: AsyncSession, request: Request, user: User, mfa: bool) -> JSONResponse:
+    now = _now()
+    session = UserSession(user_id=user.id, user_agent=(request.headers.get("user-agent") or "")[:512] or None,
+                          ip_address=request_ip(request), expires_at=now + timedelta(seconds=REFRESH_TTL_S),
+                          mfa=mfa, last_used_at=now)
+    db.add(session)
+    await db.flush()
+    refresh = new_refresh_token()
+    db.add(RefreshToken(session_id=session.id, token_hash=refresh_token_hash(refresh)))
+    user.last_login_at = now
+    record(db, "login", request, user_id=user.id, resource="session", resource_id=session.id,
+           details={"mfa": mfa})
+    await db.commit()
+    roles = await load_roles(db, user.id)
+    response = JSONResponse(_session_body(request, user, session, roles), headers=NO_STORE)
+    _set_cookie(response, refresh)
+    return response
+
+
+async def _check_password(db: AsyncSession, request: Request, user: Optional[User], password: str,
+                          where: str) -> None:
+    """Verifies the password under the per-address lockout; 429 when locked, raises on a mismatch."""
+    wait = request.app.state.limits.login.retry_after(_ip_key(request))
+    if wait:
+        raise _too_many(wait)
+    if await passwords.verify_password(user.password_hash if user else None, password):
+        if user is not None and passwords.needs_rehash(user.password_hash):
+            user.password_hash = await passwords.hash_password(password)
+        return
+    locked = request.app.state.limits.login.fail(_ip_key(request))
+    record(db, "login_failed", request, user_id=user.id if user else None, details={"where": where})
+    if locked:
+        record(db, "login_locked", request, details={"where": where})
+    await db.commit()
+    if where == "login":
+        raise HTTPException(401, "invalid_credentials")
+    raise HTTPException(403, "invalid_password")
+
+
+async def _check_code(db: AsyncSession, request: Request, user: User, secret: Optional[str], code: str,
+                      where: str) -> int:
+    """Verifies a TOTP code under the per-account lockout and spends its step; returns the step."""
+    key = str(user.id)
+    wait = request.app.state.limits.totp.retry_after(key)
+    if wait:
+        raise _too_many(wait)
+    step = totp.verify(secret, code, request.app.state.clock(), user.totp_last_step) if secret else None
+    if step is not None:
+        # Spend the step atomically: two requests with the same code cannot both pass.
+        spent = await db.scalar(
+            update(User).where(User.id == user.id,
+                               (User.totp_last_step.is_(None)) | (User.totp_last_step < step))
+            .values(totp_last_step=step).returning(User.id).execution_options(synchronize_session=False))
+        if spent is not None:
+            user.totp_last_step = step
+            request.app.state.limits.totp.clear(key)
+            return step
+    locked = request.app.state.limits.totp.fail(key)
+    record(db, "totp_failed", request, user_id=user.id, details={"where": where})
+    if locked:
+        record(db, "totp_locked", request, user_id=user.id, details={"where": where})
+    await db.commit()
+    raise HTTPException(401 if where == "login" else 403, "invalid_code")
+
+
+def _secret(request: Request, user: User) -> Optional[str]:
+    if user.totp_secret_enc is None:
+        return None
+    return request.app.state.seed_box.open(user.totp_secret_enc)
+
+
+@router.post("/auth/register", status_code=201)
+async def register(body: RegisterIn, request: Request, db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    username = body.username.strip().lower()
+    email = body.email.strip().lower() if body.email and body.email.strip() else None
+    if not USERNAME.fullmatch(username):
+        raise HTTPException(400, "username_invalid")
+    if email is not None and (len(email) > 320 or not EMAIL.fullmatch(email)):
+        raise HTTPException(400, "email_invalid")
+    if not body.consent:
+        raise HTTPException(400, "consent_required")
+    problem = passwords.policy_problem(body.password, username)
+    if problem:
+        raise HTTPException(400, problem)
+    limits = request.app.state.limits
+    wait = limits.register.retry_after(_ip_key(request))
+    if wait:
+        raise _too_many(wait)
+    limits.register.fail(_ip_key(request))  # every registration counts towards the hourly limit
+    user = User(username=username, email=email, password_hash=await passwords.hash_password(body.password),
+                gdpr_consent_at=_now())
+    db.add(user)
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(409, "username_or_email_taken") from None
+    record(db, "register", request, user_id=user.id, resource="user", resource_id=user.id)
+    await db.commit()
+    return JSONResponse(user_json(user, {}), status_code=201, headers=NO_STORE)
+
+
+@router.post("/auth/login")
+async def login(body: LoginIn, request: Request, db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    username = body.username.strip().lower()
+    user = await db.scalar(select(User).where(User.username == username)) if username else None
+    await _check_password(db, request, user, body.password, "login")
+    assert user is not None
+    if user.totp_enabled:
+        await db.commit()  # a rehash, if any
+        token, _ = make_totp_step_token(request.app.state.keys, user.id)
+        return JSONResponse({"totp_required": True, "totp_session": token}, headers=NO_STORE)
+    return await _start_session(db, request, user, mfa=False)
+
+
+@router.post("/auth/login/totp")
+async def login_totp(body: TotpLoginIn, request: Request, db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    used = request.app.state.used_totp_steps
+    try:
+        user_id, jti, expires_at = read_totp_step_token(request.app.state.keys, body.totp_session)
+    except TokenError:
+        raise HTTPException(401, "invalid_totp_session") from None
+    if used.spent(jti):
+        raise HTTPException(401, "invalid_totp_session")
+    user = await db.get(User, user_id)
+    if user is None or not user.totp_enabled:
+        raise HTTPException(401, "invalid_totp_session")
+    await _check_code(db, request, user, _secret(request, user), body.code, "login")
+    if not used.spend(jti, expires_at):
+        await db.rollback()
+        raise HTTPException(401, "invalid_totp_session")
+    return await _start_session(db, request, user, mfa=True)
+
+
+@router.post("/auth/refresh")
+async def refresh(request: Request, db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    if request.headers.get(REFRESH_HEADER) != "1":
+        raise HTTPException(403, "refresh_header_required")
+
+    def refused(code: str = "invalid_refresh_token") -> JSONResponse:
+        response = JSONResponse({"detail": code}, status_code=401, headers=NO_STORE)
+        _clear_cookie(response)
+        return response
+
+    presented = request.cookies.get(COOKIE)
+    if not presented or len(presented) > 256:
+        return refused()
+    row = (await db.execute(
+        select(RefreshToken, UserSession, User)
+        .join(UserSession, UserSession.id == RefreshToken.session_id)
+        .join(User, User.id == UserSession.user_id)
+        .where(RefreshToken.token_hash == refresh_token_hash(presented))
+        .with_for_update(of=[RefreshToken, UserSession]))).first()
+    if row is None:
+        return refused()
+    token, session, user = row
+    now = _now()
+    if token.used_at is not None:
+        # A rotated token came back: someone else has a copy. End the session for both (ADR-P4-2).
+        if session.revoked_at is None:
+            session.revoked_at = now
+        record(db, "refresh_replay", request, user_id=user.id, resource="session", resource_id=session.id)
+        await db.commit()
+        return refused()
+    deadline = session.created_at + timedelta(seconds=SESSION_MAX_S)
+    if session.revoked_at is not None or session.expires_at <= now or deadline <= now:
+        await db.rollback()
+        return refused()
+    token.used_at = now
+    fresh = new_refresh_token()
+    db.add(RefreshToken(session_id=session.id, token_hash=refresh_token_hash(fresh)))
+    session.expires_at = min(now + timedelta(seconds=REFRESH_TTL_S), deadline)
+    session.last_used_at = now
+    await db.commit()
+    roles = await load_roles(db, user.id)
+    response = JSONResponse(_session_body(request, user, session, roles), headers=NO_STORE)
+    _set_cookie(response, fresh)
+    return response
+
+
+@router.post("/auth/logout", status_code=204)
+async def logout(request: Request, principal: Principal = Depends(current_principal),
+                 db: AsyncSession = Depends(get_session)) -> Response:
+    await db.execute(update(UserSession).where(UserSession.id == principal.session.id,
+                                               UserSession.revoked_at.is_(None)).values(revoked_at=func.now()))
+    record(db, "logout", request, user_id=principal.user.id, resource="session", resource_id=principal.session.id)
+    await db.commit()
+    response = Response(status_code=204)
+    _clear_cookie(response)
+    return response
+
+
+@router.get("/me")
+async def me(principal: Principal = Depends(current_principal)) -> JSONResponse:
+    return JSONResponse({**user_json(principal.user, principal.roles), "mfa": principal.mfa}, headers=NO_STORE)
+
+
+async def _user_for_update(db: AsyncSession, principal: Principal) -> User:
+    """The caller's row, locked, in the request's own database session."""
+    user = await db.scalar(select(User).where(User.id == principal.user.id).with_for_update())
+    if user is None:
+        raise HTTPException(401, "not_authenticated")
+    return user
+
+
+@router.post("/auth/totp/enrol")
+async def totp_enrol(body: PasswordIn, request: Request, principal: Principal = Depends(current_principal),
+                     db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    """Starts enrolment: a new secret, shown once; TOTP is on after ``confirm``."""
+    user = await _user_for_update(db, principal)
+    if user.totp_enabled:
+        raise HTTPException(409, "totp_already_enabled")
+    await _check_password(db, request, user, body.password, "totp_enrol")
+    secret = totp.new_secret()
+    user.totp_secret_enc = request.app.state.seed_box.seal(secret)
+    user.totp_last_step = None
+    await db.commit()
+    return JSONResponse({"secret": secret, "otpauth_uri": totp.provisioning_uri(secret, user.username),
+                         "digits": totp.DIGITS, "period_s": totp.PERIOD_S}, headers=NO_STORE)
+
+
+@router.post("/auth/totp/confirm", status_code=204)
+async def totp_confirm(body: CodeIn, request: Request, principal: Principal = Depends(current_principal),
+                       db: AsyncSession = Depends(get_session)) -> Response:
+    """A code from the new secret turns TOTP on; this session counts as having passed it."""
+    user = await _user_for_update(db, principal)
+    if user.totp_enabled or user.totp_secret_enc is None:
+        raise HTTPException(409, "totp_not_pending")
+    await _check_code(db, request, user, _secret(request, user), body.code, "totp_confirm")
+    user.totp_enabled = True
+    await db.execute(update(UserSession).where(UserSession.id == principal.session.id).values(mfa=True))
+    record(db, "totp_enabled", request, user_id=user.id, resource="user", resource_id=user.id)
+    await db.commit()
+    return Response(status_code=204)
+
+
+@router.post("/auth/totp/disable", status_code=204)
+async def totp_disable(body: DisableIn, request: Request, principal: Principal = Depends(current_principal),
+                       db: AsyncSession = Depends(get_session)) -> Response:
+    """Turns TOTP off, with the password and a current code; refused while a role needs it."""
+    user = await _user_for_update(db, principal)
+    if not user.totp_enabled:
+        raise HTTPException(409, "totp_not_enabled")
+    privileged = await db.scalar(select(func.count()).select_from(UserFieldRole).where(
+        UserFieldRole.user_id == user.id,
+        UserFieldRole.role_id.in_([ROLE_NAMES[r] for r in PRIVILEGED_ROLES])))
+    if user.server_admin or privileged:
+        raise HTTPException(409, "totp_required_by_role")
+    await _check_password(db, request, user, body.password, "totp_disable")
+    await _check_code(db, request, user, _secret(request, user), body.code, "totp_disable")
+    user.totp_enabled = False
+    user.totp_secret_enc = None
+    user.totp_last_step = None
+    await db.execute(update(UserSession).where(UserSession.user_id == user.id).values(mfa=False))
+    record(db, "totp_disabled", request, user_id=user.id, resource="user", resource_id=user.id)
+    await db.commit()
+    return Response(status_code=204)
