@@ -306,6 +306,20 @@ MSYS_NO_PATHCONV=1 docker run --rm ^
 
 ## Phase C: dart:ffi bridge, game loop isolate, FFI stub, NDK cross-compile, CI
 
+**Status (2026-10-19): done in software.** What was built, and where it
+differs from this section, is in `STATUS.md` ("Plan phase C") and decisions
+PC1-PC11 of `docs/review/decisions-to-review.md`. In short: callbacks are
+`NativeCallable.isolateLocal`, not `.listener`, because the core's pointers
+only live during its call (PC1); the Dart tests load the real core as well as
+the stub, built in `atalaia-dev` or on the CI runner and passed in with
+`ATALAIA_CORE_LIB` and `ATALAIA_CORE_STUB_LIB` (PC2); every mode's YAML tests
+run through the bridge, directly and in game loop isolates (PC3); struct
+layouts are checked against the stub's report from the real headers (PC4);
+there is no `core/tests/CMakeLists.txt` (the stub is a target in
+`core/CMakeLists.txt`) and the NDK presets are `core/CMakePresets.json`;
+`flutter-build-android` moved up from plan phase D (PC11). A core bug found
+by these tests was fixed (`field.common_owner`).
+
 ### Goal
 
 Build the core Dart FFI bridge to `libatalaia_core.so`, the game loop

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: GPL-3.0-or-later
+
+A placeholder mark until the app has its icon: a watchtower (atalaia) in the
+108 dp adaptive-icon canvas, inside the 66 dp safe zone.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- The lookout: a roof over a platform. -->
+    <path
+        android:fillColor="@color/atalaia_mark"
+        android:pathData="M54,26 L72,40 L36,40 Z M38,42 L70,42 L70,48 L38,48 Z" />
+    <!-- The tower, narrowing upwards. -->
+    <path
+        android:fillColor="@color/atalaia_mark"
+        android:pathData="M44,50 L64,50 L68,82 L40,82 Z" />
+</vector>

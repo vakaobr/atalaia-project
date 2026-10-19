@@ -6,7 +6,7 @@
   "review_iteration": 0,
   "failing_experts": [],
   "created_at": "2026-10-17T18:00:00Z",
-  "updated_at": "2026-10-19T01:00:00Z",
+  "updated_at": "2026-10-19T12:00:00Z",
   "artifacts": {
     "RESEARCH.md": "complete",
     "ADR.md": "complete",
@@ -14,7 +14,7 @@
     "STATUS.md": "complete"
   },
   "metadata": {
-    "description": "Phase 3: Android props, I/O pod, Flutter player app with roles, new game modes (Kill Confirmed, Respawn, Player Check-in, Money Factory), chrono check-in. Plan phases A and B implemented.",
+    "description": "Phase 3: Android props, I/O pod, Flutter player app with roles, new game modes (Kill Confirmed, Respawn, Player Check-in, Money Factory), chrono check-in. Plan phases A, B and C implemented.",
     "risk_level": "Medium",
     "mode": "implementation",
     "resume_with": "--resume to continue to implementation phase",
@@ -22,7 +22,7 @@
     "plan_phases": {
       "A": "done in software (2026-10-18): events, Kill Confirmed, Respawn, Player Check-in, player tags, capability proxy v1, screen templates; decisions A1-A13",
       "B": "done in software (2026-10-19): chrono data model, energy, limit templates (unverified), spot checks, Ed25519-signed records, player tags and player tokens in Dart; shared vectors chrono_record.json and player_token.json checked in Dart and Python; decisions B1-B13",
-      "C": "pending",
+      "C": "done in software (2026-10-19): dart:ffi bindings, isolate-local callbacks, game loop isolate, FFI stub with layout report, every mode test through the Dart bridge, Android NDK build (three ABIs) via CMake presets and Gradle, CI jobs flutter-test, core-android-ndk, flutter-build-android; core fix in field.common_owner; decisions PC1-PC11",
       "D": "pending",
       "E": "pending",
       "F": "pending (needs hardware)",

@@ -17,7 +17,9 @@ typedef struct {
     /* Returns a JSON array of node descriptors matching the optional role
      * filter (NULL = all nodes). The caller frees the returned string. */
     char *(*nodes)(void *user, const char *role);
-    /* Returns the team name that owns the given node, or NULL. */
+    /* Returns the team name that owns the given node, or NULL. The string
+     * belongs to the host and must stay valid until the next owner() call;
+     * the core copies it before calling again. */
     const char *(*owner)(void *user, uint16_t node_id);
     /* Sends a command to a specific node. Returns true on success. */
     bool (*send)(void *user, uint16_t node_id, const char *cmd, const char *params_json);

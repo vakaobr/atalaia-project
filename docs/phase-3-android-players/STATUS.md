@@ -5,9 +5,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 3 -- Android and Players: Status
 
-**Current phase:** Implementation: plan phases A and B done in software; plan phases C-G pending
+**Current phase:** Implementation: plan phases A, B and C done in software; plan phases D-G pending
 **Risk level:** Medium
-**Last verified:** 2026-10-19 (plan phase B)
+**Last verified:** 2026-10-19 (plan phase C)
 
 ## Completed
 
@@ -22,6 +22,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 - [x] Plan phase B (2026-10-19): chrono data model, energy, limit
   templates, spot checks, Ed25519-signed records, player tags and player
   tokens in Dart, with shared vectors checked by Dart and Python (see below)
+- [x] Plan phase C (2026-10-19): the `dart:ffi` bridge to the core, the game
+  loop isolate, the FFI stub, every mode's tests through the Dart bridge, the
+  core built for Android by the NDK and Gradle (see below)
 
 ## Plan phase A (2026-10-18)
 
@@ -44,7 +47,8 @@ protocol additions). A core bug found by Kill Confirmed was fixed: a penalty
 
 Pure Dart in `app/` (a Flutter project with no UI or platform folders yet),
 run with `python tools/docker_app.py` and CI's "Player app logic (Dart)" job
-in `ghcr.io/cirruslabs/flutter:3.44.0` (pinned by digest).
+(since plan phase C: `flutter-test`) in `ghcr.io/cirruslabs/flutter:3.44.0`
+(pinned by digest).
 
 | Deliverable | Where | State |
 | --- | --- | --- |
@@ -63,6 +67,40 @@ controller. Deviations and choices: decisions B1-B13 in
 `docs/review/decisions-to-review.md`: Ed25519 instead of the file list's
 HMAC signer (B1), the canonical form made precise (B3), and a controller-only
 token key instead of the game key (B8) are the ones to look at first.
+
+## Plan phase C (2026-10-19)
+
+The engine layer of the app, still without a user interface. Run with
+`python tools/docker_app.py` (from any shell; Docker only) and CI's jobs
+`flutter-test`, `core-android-ndk` and `flutter-build-android`.
+
+| Deliverable | Where | State |
+| --- | --- | --- |
+| Dart FFI bindings | `app/lib/ffi/native_types.dart`, `bindings.dart`, `core_node.dart` | Done: all of `node.h`, plus version, templates, tag checks and the event codec |
+| Callbacks | `app/lib/ffi/callbacks.dart` | Done, as `NativeCallable.isolateLocal` (decision PC1), with field operations for a controller node |
+| Game loop isolate | `app/lib/core/game_loop_isolate.dart` | Done: 100 Hz real-time clock or manual clock; ordered outputs; pause, status and errors reported |
+| Node runners (conditional import) | `app/lib/core/node_runner.dart`, `node_runner_android.dart`, `node_runner_stub.dart`, `node_types.dart` | Done; iOS reports unsupported at run time, leaving it out of the build is plan phase D (PC7) |
+| FFI stub | `core/tests/stub.c`, `-DATALAIA_STUB=ON` in `core/CMakeLists.txt` | Done, with a struct layout report checked by Dart and by the simulator's ctypes (PC4, PC5) |
+| Mode tests through the bridge | `app/test/modes/mode_tests_test.dart`, `app/test/support/mode_runner.dart` | Done: all 36 YAML test files of the 8 mode folders, each directly and in game loop isolates, and the 5 modes' screen templates (PC3) |
+| NDK cross-compile | `core/CMakePresets.json`, `app/tool/check.sh ndk` | Done: arm64-v8a, armeabi-v7a, x86_64, NDK 28.2.13676358, CMake 3.22.1, no warnings, 16 KB pages, 64-bit Lua numbers (PC10) |
+| Gradle build | `app/android/` (`org.atalaia.app`, min SDK 26) | Done: `flutter build apk --debug` builds the core for the three ABIs into the APK (PC8); not run on an emulator or phone |
+| Tooling and CI | `tools/docker_app.py` (`check`, `test`, `ndk`, `apk`, all by default), `app/tool/check.sh`, `.github/workflows/ci.yml` | Done; `flutter-build-android` moved up from plan phase D (PC11) |
+
+Tests: 298 Dart tests (`flutter test`), 145 of them new: 78 mode tests on
+the real core (36 YAML files, each directly and through game loop isolates,
+5 screen-template checks, 1 that every file is found), 28 for the real core
+through the bindings (the 17 shared event vectors through the C codec, the
+5 tag event vectors, templates, a Domination node), 20 for the bindings and
+struct layouts against the stub, 15 for the game loop isolate, 4 for the
+node runners and the placeholder screen. Python: 2 new simulator tests
+(ctypes layouts against the stub); C: 1 new core test. A core bug found by
+the Dart mode tests was fixed:
+`field.common_owner()` compared against a string the host may already have
+freed (core `script_api.c`, with a regression test in `test_field_api.c`).
+
+Not run: the APK on an Android emulator or a phone (plan phase D's
+`flutter-integration` job and plan phase G's devices), and Wokwi (its CI
+quota is used up, decision R7).
 
 ## Phase 2 handoff changes (2026-10-18)
 
@@ -98,18 +136,18 @@ Phase G needs hardware.
 1. ~~Research~~ -- Complete
 2. ~~Architecture~~ -- Complete
 3. ~~Planning~~ -- Complete
-4. Implementation -- plan phases A and B done; next: plan phase C
-   (dart:ffi bridge, game loop isolate, FFI stub, NDK build), which can
-   use the tag, proxy and template code in the core and adds to `app/`
+4. Implementation -- plan phases A, B and C done; next: plan phase D
+   (Flutter UI, Kotlin plugins, Android prop shell, template renderer,
+   iOS build, emulator job), on top of `lib/core/node_runner.dart` and
+   `GameLoopIsolate`
 
 ## How to resume with implementation
 
 Run `/sdlc phase-3-android-players --resume`.  STATE.json records
-`current_phase: "implementation"`, `phase_status: "in_progress"` (plan phases A and B done).
+`current_phase: "implementation"`, `phase_status: "in_progress"` (plan phases A, B and C done).
 
 **What can start now (no hardware, no phase 2 blockers):**
-- Phase C (dart:ffi bridge) depends only on Phase A (done)
-- Phase D (Flutter UI, Kotlin plugins) depends on B and C
+- Phase D (Flutter UI, Kotlin plugins) depends on B and C (both done)
 
 **What needs hardware:**
 - Phase F (I/O pod firmware) depends on Phase A and needs a Heltec board

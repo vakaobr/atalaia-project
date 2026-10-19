@@ -21,7 +21,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libmbedtls-dev
       - name: Configure
-        run: cmake -S core -B build -DCMAKE_BUILD_TYPE=Debug -DATALAIA_SHARED=ON
+        run: cmake -S core -B build -DCMAKE_BUILD_TYPE=Debug -DATALAIA_SHARED=ON -DATALAIA_STUB=ON
       - name: Build
         run: cmake --build build
       - name: Test core
@@ -29,6 +29,7 @@ jobs:
       - name: Test the simulator and the game modes
         env:
           ATALAIA_CORE_LIB: ${{ github.workspace }}/build/libatalaia_core.so
+          ATALAIA_CORE_STUB_LIB: ${{ github.workspace }}/build/libatalaia_core_stub.so
         run: |
           pip install -r simulator/requirements.txt
           cd simulator
@@ -82,22 +83,59 @@ jobs:
           docker run --rm --ipc=host -e ATALAIA_REQUIRE_ALL=1 -e ATALAIA_REQUIRE_BROWSER=1 \
             -v "$PWD:/src" -w /src atalaia-console-test sh controller/console/tests/run.sh
 
-  app:
-    name: Player app logic (Dart)
+  flutter-test:
+    name: Player app (Dart, with the core through dart:ffi)
     # The pinned Flutter image that `python tools/docker_app.py` uses (Flutter
-    # 3.44.0, Dart 3.12.0, pinned by digest). app/tool/check.sh resolves the
-    # packages from the committed pubspec.lock, runs `flutter analyze
-    # --fatal-infos`, `dart format --set-exit-if-changed` and `flutter test`
-    # (chrono, player tags and player tokens against protocol/vectors/) on a
-    # copy of app/ and protocol/; the checkout is mounted read-only.
+    # 3.44.0, Dart 3.12.0, pinned by digest). That image has no CMake, so the
+    # core and the FFI stub are built here first, as shared libraries for this
+    # runner (Ubuntu 24.04, like the image), without mbedtls, which the image
+    # lacks. app/tool/check.sh resolves the packages from the committed
+    # pubspec.lock, runs `flutter analyze --fatal-infos`, `dart format
+    # --set-exit-if-changed` and `flutter test` on a copy of the read-only
+    # checkout: the bridge against the stub, and every mode's tests in
+    # modes/*/tests/ on the real core, directly and in game loop isolates.
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+      - name: Build the core and the FFI stub as shared libraries
+        run: |
+          cmake -S core -B build -DCMAKE_BUILD_TYPE=Debug -DATALAIA_SHARED=ON -DATALAIA_STUB=ON             -DATALAIA_MBEDTLS=OFF -DBUILD_TESTING=OFF
+          cmake --build build
       - name: Analyze, check the formatting and test
+        run: |
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/build:/core-build:ro" -w /src             -e ATALAIA_CORE_LIB=/core-build/libatalaia_core.so             -e ATALAIA_CORE_STUB_LIB=/core-build/libatalaia_core_stub.so             ghcr.io/cirruslabs/flutter:3.44.0@sha256:46691e311715845de03a3ba4753a475476936805b29431b1f00f1816981033f8             sh /src/app/tool/check.sh check
+
+  core-android-ndk:
+    name: Core cross-compiled for Android (NDK, three ABIs)
+    # In the same Flutter image: the Android SDK manager installs NDK
+    # 28.2.13676358 and CMake 3.22.1 (pinned in app/tool/check.sh), then
+    # core/CMakePresets.json builds libatalaia_core.so for arm64-v8a,
+    # armeabi-v7a and x86_64 with -Werror. Each library is checked: the right
+    # machine, the node.h entry points exported, nothing needed beyond libc,
+    # libm and libdl, and 16 KB pages on the 64-bit ABIs.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Cross-compile and check
+        run: |
+          docker run --rm -v "$PWD:/src:ro" -w /src             ghcr.io/cirruslabs/flutter:3.44.0@sha256:46691e311715845de03a3ba4753a475476936805b29431b1f00f1816981033f8             sh /src/app/tool/check.sh ndk
+
+  flutter-build-android:
+    name: Android APK (Gradle builds the core with the NDK)
+    # `flutter build apk --debug` in the same Flutter image: Gradle 9.1.0
+    # (checksum-pinned), the Android Gradle plugin 9.0.1 and Kotlin 2.3.20, with
+    # externalNativeBuild compiling core/ for arm64-v8a, armeabi-v7a and
+    # x86_64 (app/android/app/build.gradle.kts). The APK must contain
+    # lib/<abi>/libatalaia_core.so for each, checked as in core-android-ndk.
+    # The APK is not run here: the emulator job is plan phase D.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build and check the APK
         run: |
           docker run --rm -v "$PWD:/src:ro" -w /src \
             ghcr.io/cirruslabs/flutter:3.44.0@sha256:46691e311715845de03a3ba4753a475476936805b29431b1f00f1816981033f8 \
-            sh /src/app/tool/check.sh check
+            sh /src/app/tool/check.sh apk
 
   protocol:
     name: Protocol schema and generated files

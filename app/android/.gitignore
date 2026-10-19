@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Written by Flutter and Gradle on each machine.
+gradle-wrapper.jar
+/.gradle
+/.kotlin
+/captures/
+/gradlew
+/gradlew.bat
+/local.properties
+GeneratedPluginRegistrant.java
+.cxx/
+
+# Signing keys never go into the repository.
+key.properties
+**/*.keystore
+**/*.jks

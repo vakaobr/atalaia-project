@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+<resources>
+    <color name="atalaia_background">#FF1B2A1E</color>
+    <color name="atalaia_mark">#FFE8B341</color>
+</resources>

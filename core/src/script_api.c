@@ -472,7 +472,9 @@ static int l_field_common_owner(lua_State *L)
         lua_pushnil(L);
         return 1;
     }
-    const char *common = NULL;
+    /* owner()'s answer is only valid until the next call (field_ops.h), so the
+     * first one is copied onto the Lua stack before asking again. */
+    int common = 0;
     for (lua_Integer i = 1; i <= len; i++) {
         lua_rawgeti(L, 1, i);
         lua_Integer id = luaL_checkinteger(L, -1);
@@ -482,14 +484,15 @@ static int l_field_common_owner(lua_State *L)
             lua_pushnil(L);
             return 1;
         }
-        if (common == NULL) {
-            common = owner;
-        } else if (strcmp(common, owner) != 0) {
+        if (common == 0) {
+            lua_pushstring(L, owner);
+            common = lua_gettop(L);
+        } else if (strcmp(lua_tostring(L, common), owner) != 0) {
             lua_pushnil(L);
             return 1;
         }
     }
-    lua_pushstring(L, common);
+    lua_pushvalue(L, common);
     return 1;
 }
 

@@ -7,9 +7,10 @@
 # (against the C host modem, the C host box and a private Mosquitto): the same
 # checks as CI (apart from the JSON Schema and licensing checks, which need
 # extra tools, the firmware jobs: tools/docker_fw.py, the GM console's
-# browser tests: tools/docker_console.py, and the app's Dart checks:
-# tools/docker_app.py, since this image has no Dart; the controller's tests
-# below do check the Python side of the app's shared chrono and token vectors).
+# browser tests: tools/docker_console.py, and the app's Dart checks and
+# Android builds: tools/docker_app.py, since this image has no Dart; the
+# controller's tests below do check the Python side of the app's shared chrono
+# and token vectors, and the simulator's tests its ctypes structs against the FFI stub).
 # Run from the repository root, natively or in the dev container (see
 # tools/dev/Dockerfile).
 set -eu
@@ -23,10 +24,12 @@ if command -v clang-format > /dev/null 2>&1 && command -v stylua > /dev/null 2>&
 else
     echo "check.sh: skipping the formatting check (clang-format or stylua missing; the dev container has both)"
 fi
-cmake -S core -B "$BUILD" -DCMAKE_BUILD_TYPE=Debug -DATALAIA_SHARED=ON
+cmake -S core -B "$BUILD" -DCMAKE_BUILD_TYPE=Debug -DATALAIA_SHARED=ON -DATALAIA_STUB=ON
 cmake --build "$BUILD"
 ctest --test-dir "$BUILD" --output-on-failure
 export ATALAIA_CORE_LIB="$(cd "$BUILD" && pwd)/libatalaia_core.so"
+# The FFI stub: the simulator's ctypes structs are checked against its layout report.
+export ATALAIA_CORE_STUB_LIB="$(cd "$BUILD" && pwd)/libatalaia_core_stub.so"
 cmake -S firmware/esp32/test/modem_host -B "$BUILD/modem_host" -DCMAKE_BUILD_TYPE=Debug
 cmake --build "$BUILD/modem_host"
 export ATALAIA_MODEM_HOST="$(cd "$BUILD/modem_host" && pwd)/modem_host"

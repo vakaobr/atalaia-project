@@ -350,8 +350,10 @@ roadmap:
       chrono check-in. Started: Kill Confirmed, Respawn and Lives and Player Check-in read players'
       signed NFC tags on the Field Box, the I/O pod's link protocol is fixed, modes describe their
       screens in YAML, and the app's first logic is written: chrono check-in (energy, limits per
-      class, spot checks, readings signed by the marshal) and players' signed tags and tokens. All
-      tested in software; nothing runs on a phone yet.
+      class, spot checks, readings signed by the marshal) and players' signed tags and tokens. The
+      app's engine runs the same game core as the boxes, in the background, and every game mode
+      passes its tests through it; the core is built into an Android app. All tested in software;
+      nothing runs on a phone yet.
     gate: "Gate: one game mixes ESP32 and Android props without issues."
   p4:
     title: Site server and advanced play

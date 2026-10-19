@@ -9,7 +9,9 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-option(ATALAIA_SHARED "Also build the core as a shared library (used by the simulator)" OFF)
+option(ATALAIA_SHARED "Also build the core as a shared library (used by the simulator and the app)" OFF)
+option(ATALAIA_STUB "Also build libatalaia_core_stub, the FFI stub the app's Dart tests load" OFF)
+option(ATALAIA_MBEDTLS "Use mbedtls for real AES-128-CCM when it is installed" ON)
 
 # ---- Lua 5.4 (vendored, MIT) -----------------------------------------------
 # Only the libraries the sandbox opens are compiled: no io, os, package,
@@ -33,9 +35,14 @@ if(MATH_LIBRARY)
 endif()
 
 # ---- Optional: mbedtls for real AES-128-CCM --------------------------------
-find_library(MBEDCRYPTO_LIB mbedcrypto)
-find_path(MBEDTLS_INCLUDE_DIR mbedtls/ccm.h)
-if(MBEDCRYPTO_LIB AND MBEDTLS_INCLUDE_DIR)
+# -DATALAIA_MBEDTLS=OFF leaves it out even when it is installed: the shared
+# library the app's tests load then runs where libmbedcrypto is missing, and
+# the Android build (which has no mbedtls) is the same on every machine.
+if(ATALAIA_MBEDTLS)
+    find_library(MBEDCRYPTO_LIB mbedcrypto)
+    find_path(MBEDTLS_INCLUDE_DIR mbedtls/ccm.h)
+endif()
+if(ATALAIA_MBEDTLS AND MBEDCRYPTO_LIB AND MBEDTLS_INCLUDE_DIR)
     set(ATALAIA_HAVE_MBEDTLS ON)
     message(STATUS "mbedtls found: real AES-CCM backend enabled")
 else()
@@ -90,6 +97,17 @@ if(ATALAIA_SHARED)
     set_target_properties(atalaia_core_shared PROPERTIES
         OUTPUT_NAME atalaia_core
         WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endif()
+
+# ---- FFI stub (ADR-P3-11) ---------------------------------------------------
+# Every function of node.h with predictable behaviour and no Lua (tests/stub.c),
+# for the app's Dart tests of the bridge itself.
+if(ATALAIA_STUB)
+    add_library(atalaia_core_stub SHARED tests/stub.c)
+    target_include_directories(atalaia_core_stub PRIVATE include)
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(atalaia_core_stub PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    endif()
 endif()
 
 # ---- Tests -----------------------------------------------------------------

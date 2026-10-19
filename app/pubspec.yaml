@@ -7,8 +7,9 @@
 # To change a dependency: edit the pin here, then `python tools/docker_app.py lock`.
 name: atalaia_app
 description: >-
-  Atalaia's app for players, marshals, GMs and Android props. Plan phase B:
-  chrono check-in logic, player tags and player tokens (no UI yet).
+  Atalaia's app for players, marshals, GMs and Android props. Plan phases B
+  and C: chrono check-in logic, player tags and tokens, and the dart:ffi
+  bridge to the shared C core with its game loop isolate (no UI yet).
 publish_to: none
 version: 0.1.0
 
@@ -23,6 +24,8 @@ dependencies:
   crypto: 3.0.7
   # Ed25519 for chrono records; the pure-Dart implementation (DartEd25519) is used.
   cryptography: 2.9.0
+  # calloc, malloc and UTF-8 strings for the dart:ffi bridge to the core (Dart team).
+  ffi: 2.2.0
   # Limit templates (and the screen templates in plan phase D).
   yaml: 3.1.4
 

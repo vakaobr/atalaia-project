@@ -42,6 +42,21 @@ def docker(*args: str, quiet: bool = False) -> int:
     return subprocess.call(["docker", *args], stdout=out, stderr=out)
 
 
+def ensure_image() -> bool:
+    """Builds the atalaia-dev image if it is missing or tools/dev/Dockerfile changed
+    (tools/docker_app.py uses it too). False if the build failed."""
+    dockerfile = (REPO / "tools" / "dev" / "Dockerfile").read_bytes().replace(b"\r\n", b"\n")
+    wanted = hashlib.sha256(dockerfile).hexdigest()[:16]
+    label_format = "{{index .Config.Labels \"%s\"}}" % LABEL
+    built = subprocess.run(["docker", "image", "inspect", "-f", label_format, IMAGE],
+                           capture_output=True, text=True)
+    if built.returncode != 0 or built.stdout.strip() != wanted:
+        print(f"Building the {IMAGE} image (first run, or tools/dev/Dockerfile changed)...", flush=True)
+        if docker("build", "--label", f"{LABEL}={wanted}", "-t", IMAGE, str(REPO / "tools" / "dev")) != 0:
+            return False
+    return True
+
+
 def container_args(args: list[str]) -> list[str]:
     """Turns host paths into paths inside the container, where the repository is /src."""
     out = []
@@ -75,15 +90,8 @@ def main(argv: list[str]) -> int:
     except FileNotFoundError:
         return fail("the docker command was not found; install Docker Desktop")
 
-    dockerfile = (REPO / "tools" / "dev" / "Dockerfile").read_bytes().replace(b"\r\n", b"\n")
-    wanted = hashlib.sha256(dockerfile).hexdigest()[:16]
-    label_format = "{{index .Config.Labels \"%s\"}}" % LABEL
-    built = subprocess.run(["docker", "image", "inspect", "-f", label_format, IMAGE],
-                           capture_output=True, text=True)
-    if built.returncode != 0 or built.stdout.strip() != wanted:
-        print(f"Building the {IMAGE} image (first run, or tools/dev/Dockerfile changed)...", flush=True)
-        if docker("build", "--label", f"{LABEL}={wanted}", "-t", IMAGE, str(REPO / "tools" / "dev")) != 0:
-            return fail("building the image failed")
+    if not ensure_image():
+        return fail("building the image failed")
 
     args = container_args(argv)
     run = ["run", "--rm", "--init", "-v", f"{REPO}:/src", "-v", f"{VOLUME}:/build"]

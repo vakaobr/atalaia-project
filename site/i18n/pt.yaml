@@ -360,7 +360,9 @@ roadmap:
       cada participante na Field Box, o protocolo do módulo de E/S está fixado, os modos descrevem
       os seus ecrãs em YAML e a app já tem a sua primeira lógica: a cronografagem (energia, limites
       por classe, verificações durante o jogo, medições assinadas por cada marshal) e as etiquetas e
-      credenciais assinadas de quem joga. Tudo testado em software; ainda nada corre num telemóvel.
+      credenciais assinadas de quem joga. O motor da app corre o mesmo núcleo de jogo das caixas, em
+      segundo plano, e todos os modos de jogo passam nos seus testes através dele; o núcleo já está
+      compilado numa app Android. Tudo testado em software; ainda nada corre num telemóvel.
     gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."
   p4:
     title: Servidor do clube e jogo avançado

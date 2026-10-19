@@ -1,0 +1,29 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "android",
+      "hidden": true,
+      "description": "The core for Android with the NDK in $ANDROID_NDK_HOME (app/tool/check.sh ndk). The app's APK builds the same through Gradle (app/android/app/build.gradle.kts).",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/../build/${presetName}",
+      "toolchainFile": "$env{ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "ANDROID_PLATFORM": "android-26",
+        "ATALAIA_SHARED": "ON",
+        "ATALAIA_MBEDTLS": "OFF",
+        "BUILD_TESTING": "OFF"
+      }
+    },
+    { "name": "android-arm64-v8a", "inherits": "android", "cacheVariables": { "ANDROID_ABI": "arm64-v8a" } },
+    { "name": "android-armeabi-v7a", "inherits": "android", "cacheVariables": { "ANDROID_ABI": "armeabi-v7a" } },
+    { "name": "android-x86_64", "inherits": "android", "cacheVariables": { "ANDROID_ABI": "x86_64" } }
+  ],
+  "buildPresets": [
+    { "name": "android-arm64-v8a", "configurePreset": "android-arm64-v8a", "targets": ["atalaia_core_shared"] },
+    { "name": "android-armeabi-v7a", "configurePreset": "android-armeabi-v7a", "targets": ["atalaia_core_shared"] },
+    { "name": "android-x86_64", "configurePreset": "android-x86_64", "targets": ["atalaia_core_shared"] }
+  ]
+}

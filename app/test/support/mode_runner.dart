@@ -1,0 +1,1253 @@
+// SPDX-FileCopyrightText: 2026 The Atalaia contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+/// Runs a mode's event-sequence tests (`modes/<mode>/tests/*.yaml`) on the
+/// real core through the Dart bridge: the Dart port of
+/// simulator/atalaia_sim/testing.py, sim.py and mode.py, without the radio
+/// model. The same YAML files run in the simulator (`python -m atalaia_sim
+/// test`), so Python and Dart check the same expectations; modes/README.md
+/// describes every step.
+///
+/// Each node can run in two ways ([Via]): a `CoreNode` called directly, or a
+/// game loop isolate with a manual clock (the app's own path, ADR-P3-1). A
+/// mode's field script (field.lua) always runs directly with field
+/// operations, as the controller runs it.
+library;
+
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:atalaia_app/core/game_loop_isolate.dart';
+import 'package:atalaia_app/core/node_types.dart';
+import 'package:atalaia_app/ffi/bindings.dart';
+import 'package:atalaia_app/ffi/callbacks.dart';
+import 'package:atalaia_app/ffi/core_node.dart';
+import 'package:atalaia_app/ffi/native_types.dart';
+import 'package:atalaia_app/security/nfc_tag_signer.dart';
+import 'package:crypto/crypto.dart';
+import 'package:yaml/yaml.dart';
+
+import 'event_schema.dart';
+
+/// How the test's nodes run.
+enum Via {
+  /// CoreNode, synchronously, on the test's isolate.
+  direct,
+
+  /// One game loop isolate per node, GameClock.manual.
+  isolate,
+}
+
+const defaultTeams = ['red', 'blue'];
+
+/// While a team holds an input, shells emit team_input.hold this often.
+const holdStepMs = 250;
+const controller = 'controller';
+
+/// With a field script, time moves in steps this long (sim.py FIELD_STEP_MS).
+const fieldStepMs = 100;
+
+/// field.send() commands a node understands, as the input events a Field Box
+/// turns them into (decision E7).
+const fieldCommands = {'set_owner': 'cmd.set_owner', 'message': 'gm.message'};
+
+/// A mode's manifest or a test file that cannot be used.
+class ModeError implements Exception {
+  ModeError(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
+
+class TestFailure implements Exception {
+  TestFailure(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
+
+/// YAML maps and lists as plain Dart ones.
+Object? plain(Object? v) => switch (v) {
+  YamlMap() => {for (final e in v.entries) '${e.key}': plain(e.value)},
+  YamlList() => [for (final e in v) plain(e)],
+  _ => v,
+};
+
+// ---- Modes (mode.py) -----------------------------------------------------------
+
+class Mode {
+  Mode({
+    required this.dir,
+    required this.id,
+    required this.name,
+    required this.kind,
+    required this.roles,
+    required this.params,
+    required this.nodeScript,
+    required this.fieldScript,
+  });
+
+  final Directory dir;
+  final String id;
+  final String name;
+  final String kind;
+  final Map<String, Object?> roles;
+  final Map<String, Map<String, Object?>> params;
+  final String nodeScript;
+  final String? fieldScript;
+
+  String get folder => dir.uri.pathSegments.lastWhere((s) => s.isNotEmpty);
+
+  List<File> get tests => _yamlFiles(Directory('${dir.path}/tests'));
+
+  List<File> get screens => _yamlFiles(Directory('${dir.path}/assets/screens'));
+
+  /// Defaults from the manifest plus overrides, checked against the schema.
+  Map<String, Object?> resolveParams(
+    Map<String, Object?> overrides,
+    List<String> teams,
+  ) {
+    final unknown = overrides.keys.where((k) => !params.containsKey(k));
+    if (unknown.isNotEmpty) {
+      throw ModeError('$id: unknown parameter(s) ${unknown.toList()..sort()}');
+    }
+    final values = <String, Object?>{};
+    params.forEach((name, spec) {
+      final Object? value;
+      if (overrides.containsKey(name)) {
+        value = overrides[name];
+      } else if (spec.containsKey('default')) {
+        value = spec['default'];
+      } else if (spec['optional'] == true) {
+        return;
+      } else {
+        throw ModeError("$id: parameter '$name' has no value");
+      }
+      _checkParam(id, name, spec, value, teams);
+      values[name] = value;
+    });
+    return values;
+  }
+}
+
+List<File> _yamlFiles(Directory d) {
+  if (!d.existsSync()) return [];
+  return d
+      .listSync()
+      .whereType<File>()
+      .where((f) => f.path.endsWith('.yaml'))
+      .toList()
+    ..sort((a, b) => a.path.compareTo(b.path));
+}
+
+void _checkParam(
+  String modeId,
+  String name,
+  Map<String, Object?> spec,
+  Object? value,
+  List<String> teams,
+) {
+  final where = "$modeId: parameter '$name'";
+  switch (spec['type']) {
+    case 'int':
+      if (value is! int) {
+        throw ModeError('$where must be an integer, got $value');
+      }
+      final min = spec['min'] as num?;
+      final max = spec['max'] as num?;
+      if (min != null && value < min) {
+        throw ModeError('$where must be at least $min');
+      }
+      if (max != null && value > max) {
+        throw ModeError('$where must be at most $max');
+      }
+    case 'bool':
+      if (value is! bool) {
+        throw ModeError('$where must be true or false, got $value');
+      }
+    case 'team':
+      if (!teams.contains(value)) {
+        throw ModeError(
+          "$where must be one of the game's teams $teams, got $value",
+        );
+      }
+    case 'string':
+      if (value is! String) throw ModeError('$where must be text, got $value');
+      final max = spec['max'] as num?;
+      if (max != null && utf8.encode(value).length > max) {
+        throw ModeError('$where must be at most $max bytes');
+      }
+    default:
+      throw ModeError('$where has unknown type ${spec['type']}');
+  }
+}
+
+Mode loadMode(Directory dir) {
+  final manifest = File('${dir.path}/mode.yaml');
+  if (!manifest.existsSync()) throw ModeError('${dir.path}: no mode.yaml');
+  final m =
+      (plain(loadYaml(manifest.readAsStringSync())) as Map<String, Object?>?) ??
+      {};
+  for (final key in ['id', 'version', 'roles']) {
+    if (!m.containsKey(key)) {
+      throw ModeError("${manifest.path}: missing '$key'");
+    }
+  }
+  final node = File('${dir.path}/node.lua');
+  if (!node.existsSync()) throw ModeError('${dir.path}: no node.lua');
+  final field = File('${dir.path}/field.lua');
+  return Mode(
+    dir: dir,
+    id: m['id']! as String,
+    name: (m['name'] ?? m['id']) as String,
+    kind: (m['kind'] ?? 'mode') as String,
+    roles: (m['roles']! as Map<String, Object?>),
+    params: {
+      for (final e in ((m['params'] as Map<String, Object?>?) ?? {}).entries)
+        e.key: e.value! as Map<String, Object?>,
+    },
+    nodeScript: node.readAsStringSync(),
+    fieldScript: field.existsSync() ? field.readAsStringSync() : null,
+  );
+}
+
+/// One Lua chunk from a main mode's script and its modifiers' scripts.
+String composeScripts(List<String> scripts) => scripts.length == 1
+    ? scripts.single
+    : scripts.map((s) => 'do\n$s\nend\n').join();
+
+/// A main mode with modifiers: one id, one parameter schema, one script per place.
+Mode compose(Mode main, List<Mode> modifiers) {
+  if (modifiers.isEmpty) return main;
+  if (main.kind != 'mode') {
+    throw ModeError('${main.id} is a modifier; a game needs a main mode first');
+  }
+  final seen = {main.id};
+  final params = Map.of(main.params);
+  for (final mod in modifiers) {
+    if (mod.kind != 'modifier') {
+      throw ModeError('${mod.id} is a main mode, not a modifier');
+    }
+    if (!seen.add(mod.id)) throw ModeError('${mod.id} is named twice');
+    final clash = params.keys.toSet().intersection(mod.params.keys.toSet());
+    if (clash.isNotEmpty) {
+      throw ModeError(
+        '${mod.id} and ${main.id} both have the parameter(s) $clash',
+      );
+    }
+    params.addAll(mod.params);
+  }
+  final parts = [main, ...modifiers];
+  final fields = [for (final m in parts) ?m.fieldScript];
+  return Mode(
+    dir: main.dir,
+    id: parts.map((m) => m.id).join('+'),
+    name: parts.map((m) => m.name).join(' + '),
+    kind: 'mode',
+    roles: main.roles,
+    params: params,
+    nodeScript: composeScripts([for (final m in parts) m.nodeScript]),
+    fieldScript: fields.isEmpty ? null : composeScripts(fields),
+  );
+}
+
+/// Mode folders in [root]: the folders with a mode.yaml, sorted.
+List<Directory> findModes(Directory root) =>
+    root
+        .listSync()
+        .whereType<Directory>()
+        .where((d) => File('${d.path}/mode.yaml').existsSync())
+        .toList()
+      ..sort((a, b) => a.path.compareTo(b.path));
+
+// ---- Screen templates (screens.py) ----------------------------------------------
+
+const _templateSourceMax = 4096; // ATALAIA_TPL_SOURCE_MAX
+
+/// Problems with a mode's screen templates, checked by the core's own parser.
+List<String> checkScreens(AtalaiaCore core, Mode mode) {
+  final problems = <String>[];
+  for (final file in mode.screens) {
+    final name = file.uri.pathSegments.last;
+    final stem = name.substring(0, name.length - '.yaml'.length);
+    final bytes = file.readAsBytesSync();
+    if (bytes.length > _templateSourceMax) {
+      problems.add('$name: larger than $_templateSourceMax bytes');
+      continue;
+    }
+    final String source;
+    try {
+      source = utf8.decode(bytes);
+    } on FormatException {
+      problems.add('$name: not UTF-8');
+      continue;
+    }
+    final why = core.checkScreen(source);
+    if (why != null) {
+      problems.add('$name: $why');
+      continue;
+    }
+    final doc = plain(loadYaml(source)) as Map<String, Object?>?;
+    if (doc?['template'] != stem) {
+      problems.add(
+        "$name: its template: name is ${doc?['template']}; it must be '$stem'",
+      );
+    }
+  }
+  return problems;
+}
+
+// ---- The simulated game (sim.py) ------------------------------------------------
+
+class LogEntry {
+  LogEntry(
+    this.tMs,
+    this.node,
+    this.nodeId,
+    this.seq,
+    this.type,
+    this.team,
+    this.prio,
+    this.data,
+  );
+
+  final int tMs;
+  final String node;
+  final int nodeId;
+  final int seq;
+  final String type;
+  final String? team;
+  final int prio;
+  final Map<String, Object?> data;
+
+  String describe() {
+    final t = (tMs / 1000).toStringAsFixed(3).padLeft(9);
+    final tm = team != null ? ' [$team]' : '';
+    final d = data.isNotEmpty ? ' $data' : '';
+    return '${t}s  ${node.padRight(12)} $type$tm$d';
+  }
+}
+
+/// One node of the game, behind either way of running it.
+abstract class SimNode {
+  int get nodeId;
+  bool get loaded;
+  Future<bool> input(String type, Map<String, Object?> data);
+  Future<void> advance(int ms);
+  Future<String> status();
+  Future<String> lastError();
+  Future<int> score(String team);
+  Future<void> close();
+}
+
+class _DirectNode implements SimNode {
+  _DirectNode(this.node, this.nodeId);
+  final CoreNode node;
+  @override
+  final int nodeId;
+  @override
+  bool get loaded => node.loaded;
+  void _raise() {
+    if (node.callbackErrors.isNotEmpty) {
+      final e = node.callbackErrors.first;
+      node.callbackErrors.clear();
+      throw TestFailure('a callback handler failed: $e');
+    }
+  }
+
+  @override
+  Future<bool> input(String type, Map<String, Object?> data) async {
+    final ok = node.input(type, data);
+    _raise();
+    return ok;
+  }
+
+  @override
+  Future<void> advance(int ms) async {
+    node.advance(ms);
+    _raise();
+  }
+
+  @override
+  Future<String> status() async => node.status.name;
+  @override
+  Future<String> lastError() async => node.lastError;
+  @override
+  Future<int> score(String team) async => node.score(team);
+  @override
+  Future<void> close() async => node.close();
+}
+
+class _IsolateNode implements SimNode {
+  _IsolateNode(this.loop, this.nodeId);
+  final GameLoopIsolate loop;
+  @override
+  final int nodeId;
+  @override
+  bool get loaded => loop.loaded;
+  @override
+  Future<bool> input(String type, Map<String, Object?> data) =>
+      loop.input(type, data);
+  @override
+  Future<void> advance(int ms) => loop.advanceTo(ms);
+  @override
+  Future<String> status() async => (await loop.snapshot()).status.name;
+  @override
+  Future<String> lastError() async => (await loop.snapshot()).lastError;
+  @override
+  Future<int> score(String team) async => (await loop.snapshot()).scores[team]!;
+  @override
+  Future<void> close() => loop.close();
+}
+
+class VirtualNode {
+  VirtualNode(this.name, this.role);
+  final String name;
+  final String role;
+  late final SimNode runtime;
+  final commands = <NodeCommand>[];
+  final logs = <String>[];
+
+  NodeCommand? lastCommand(String target, String method) {
+    for (final c in commands.reversed) {
+      if (c.target == target && c.method == method) return c;
+    }
+    return null;
+  }
+}
+
+class Simulation {
+  Simulation._(
+    this.core,
+    this.schema,
+    this.mode,
+    this.teams,
+    this.params,
+    this.seed,
+    this.via,
+  ) : gameKey = sha256
+          .convert(utf8.encode('atalaia-sim-game-key:$seed'))
+          .bytes
+          .sublist(0, 16);
+
+  final AtalaiaCore core;
+  final EventSchema schema;
+  final Mode mode;
+  final List<String> teams;
+  final Map<String, Object?> params;
+  final int seed;
+  final Via via;
+
+  /// The game's id and 16-byte key, as a join gives them; player tags are signed with them.
+  final int gameId = 1;
+  final List<int> gameKey;
+
+  int timeMs = 0;
+  final _log = <LogEntry>[];
+  var _controllerSeq = 0;
+
+  /// Events that break protocol/schema/events.yaml or would not fit in a
+  /// LoRa packet (they are found inside the core's callbacks, where nothing
+  /// may be thrown).
+  final problems = <String>[];
+  final nodes = <String, VirtualNode>{};
+  CoreNode? field;
+  final fieldLogs = <String>[];
+  final owners = <int, String?>{};
+  final _toField = <(int, String, Map<String, Object?>)>[];
+  final _toNodes = <(String, String, Map<String, Object?>)>[];
+  (int, Map<String, Object?>)? _fieldEnd;
+  var _ended = false;
+
+  static Future<Simulation> create(
+    AtalaiaCore core,
+    EventSchema schema,
+    Mode mode,
+    Map<String, String> nodeRoles,
+    List<String> teams,
+    Map<String, Object?> params, {
+    int seed = 1,
+    Via via = Via.direct,
+  }) async {
+    final sim = Simulation._(
+      core,
+      schema,
+      mode,
+      List.of(teams),
+      params,
+      seed,
+      via,
+    );
+    try {
+      var nodeId = 0;
+      for (final e in nodeRoles.entries) {
+        nodeId++;
+        if (!mode.roles.containsKey(e.value)) {
+          throw TestFailure(
+            "node '${e.key}': mode ${mode.id} has no role '${e.value}'",
+          );
+        }
+        final vnode = VirtualNode(e.key, e.value);
+        sim.nodes[e.key] = vnode;
+        final spec = NodeSpec(
+          source: mode.nodeScript,
+          chunkName: '@${mode.folder}/node.lua',
+          nodeId: nodeId,
+          gameSeed: seed,
+          teams: sim.teams,
+          params: params,
+        );
+        switch (via) {
+          case Via.direct:
+            vnode.runtime = _DirectNode(
+              CoreNode.create(
+                core,
+                spec,
+                handlers: NodeHandlers(
+                  onEvent: (ev) => sim._record(vnode, ev),
+                  onCommand: vnode.commands.add,
+                  onLog: vnode.logs.add,
+                ),
+              ),
+              nodeId,
+            );
+          case Via.isolate:
+            vnode.runtime = _IsolateNode(
+              await GameLoopIsolate.spawn(
+                spec,
+                libraryPath: core.path,
+                clock: GameClock.manual,
+                onOutput: (out) {
+                  switch (out) {
+                    case NodeEventOutput(:final event):
+                      sim._record(vnode, event);
+                    case NodeCommandOutput(:final command):
+                      vnode.commands.add(command);
+                    case NodeLogOutput(:final line):
+                      vnode.logs.add(line);
+                    case NodeErrorOutput(:final message):
+                      sim.problems.add('${vnode.name}: $message');
+                    case NodeStatusOutput():
+                      break;
+                  }
+                },
+              ),
+              nodeId,
+            );
+        }
+        if (!vnode.runtime.loaded) {
+          throw TestFailure(
+            "node '${e.key}' failed to load ${mode.id}: ${await vnode.runtime.lastError()}",
+          );
+        }
+      }
+      if (mode.fieldScript != null) {
+        sim.field = CoreNode.create(
+          core,
+          NodeSpec(
+            source: mode.fieldScript!,
+            chunkName: '@${mode.folder}/field.lua',
+            nodeId: 0,
+            gameSeed: seed,
+            teams: sim.teams,
+            params: params,
+          ),
+          handlers: NodeHandlers(
+            onEvent: sim._recordField,
+            onLog: sim.fieldLogs.add,
+          ),
+          fieldOps: _SimFieldOps(sim),
+        );
+        if (!sim.field!.loaded) {
+          throw TestFailure(
+            'field.lua of ${mode.id} failed to load: ${sim.field!.lastError}',
+          );
+        }
+      }
+    } catch (_) {
+      await sim.close();
+      rethrow;
+    }
+    return sim;
+  }
+
+  Future<void> close() async {
+    for (final v in nodes.values) {
+      try {
+        await v.runtime.close();
+      } on Error {
+        // never created (late field unset)
+      }
+    }
+    field?.close();
+  }
+
+  // -- the event log --
+
+  String? _teamName(int id) =>
+      id >= 1 && id <= teams.length ? teams[id - 1] : null;
+
+  void _record(VirtualNode vnode, EmittedEvent ev) {
+    final data = ev.data;
+    _checkWire(
+      vnode.name,
+      ev.node,
+      ev.seq,
+      ev.tMs,
+      ev.type,
+      ev.team,
+      ev.squad,
+      ev.prio,
+      data,
+      ev.dataJson,
+    );
+    final team = _teamName(ev.team);
+    _log.add(
+      LogEntry(
+        ev.tMs,
+        vnode.name,
+        ev.node,
+        ev.seq,
+        ev.type,
+        team,
+        ev.prio,
+        data,
+      ),
+    );
+    // A box reports the team of its last capture as its owner (decision E6).
+    if (ev.type == 'zone.captured') {
+      owners[ev.node] = team;
+    } else if (ev.type == 'zone.neutralized') {
+      owners[ev.node] = null;
+    }
+    if (field != null) {
+      final d = Map.of(data);
+      d.putIfAbsent('node', () => ev.node);
+      if (team != null) d.putIfAbsent('team', () => team);
+      _toField.add((ev.tMs, ev.type, d));
+    }
+  }
+
+  void _recordField(EmittedEvent ev) {
+    if (ev.type == 'game.end') {
+      _fieldEnd = (ev.tMs, ev.data);
+      return;
+    }
+    _controllerSeq++;
+    final data = ev.data;
+    _checkWire(
+      controller,
+      0,
+      _controllerSeq & 0xffff,
+      ev.tMs,
+      ev.type,
+      ev.team,
+      0,
+      ev.prio,
+      data,
+      ev.dataJson,
+    );
+    _log.add(
+      LogEntry(
+        ev.tMs,
+        controller,
+        0,
+        _controllerSeq,
+        ev.type,
+        _teamName(ev.team),
+        ev.prio,
+        data,
+      ),
+    );
+  }
+
+  void _recordController(String type, Map<String, Object?> data, [int? t]) {
+    final tMs = t ?? timeMs;
+    _controllerSeq++;
+    final prio = schema.defaultPrio(type);
+    _checkWire(
+      controller,
+      0,
+      _controllerSeq & 0xffff,
+      tMs,
+      type,
+      0,
+      0,
+      prio,
+      data,
+      jsonEncode(data),
+    );
+    _log.add(
+      LogEntry(tMs, controller, 0, _controllerSeq, type, null, prio, data),
+    );
+  }
+
+  /// Checks an event against the schema, and that the core's codec puts it
+  /// in one LoRa payload.
+  void _checkWire(
+    String who,
+    int node,
+    int seq,
+    int tMs,
+    String type,
+    int team,
+    int squad,
+    int prio,
+    Map<String, Object?> data,
+    String dataJson,
+  ) {
+    final found = schema.problems(type, data);
+    final encoded = core.encodeEvent(
+      node: node,
+      seq: seq,
+      tMs: tMs,
+      type: type,
+      team: team,
+      squad: squad,
+      prio: prio,
+      dataJson: dataJson,
+    );
+    if (encoded.bytes == null) {
+      found.add("'$type' cannot be sent: ${encoded.error}");
+    } else if (encoded.size > rfPayloadMax) {
+      found.add(
+        "'$type' takes ${encoded.size} bytes on the wire, more than the "
+        '$rfPayloadMax bytes of a LoRa payload',
+      );
+    }
+    problems.addAll(found.map((p) => '$who: $p'));
+  }
+
+  /// The merged game log, by time; events at the same time keep their arrival order.
+  List<LogEntry> get events {
+    final indexed = [for (var i = 0; i < _log.length; i++) (i, _log[i])];
+    indexed.sort((a, b) {
+      final c = a.$2.tMs.compareTo(b.$2.tMs);
+      return c != 0 ? c : a.$1.compareTo(b.$1);
+    });
+    return [for (final e in indexed) e.$2];
+  }
+
+  // -- field operations, for field.lua --
+
+  List<Map<String, Object?>> _fieldNodes(String? role) => [
+    for (final v in nodes.values)
+      if (role == null || v.role == role)
+        {
+          'id': v.runtime.nodeId,
+          'name': v.name,
+          'role': v.role,
+          'owner': owners[v.runtime.nodeId],
+        },
+  ];
+
+  bool _fieldSend(int nodeId, String cmd, Map<String, Object?> params) {
+    final target = nodes.values
+        .where((v) => v.runtime.nodeId == nodeId)
+        .firstOrNull;
+    if (target == null || !fieldCommands.containsKey(cmd)) return false;
+    _toNodes.add((target.name, fieldCommands[cmd]!, Map.of(params)));
+    return true;
+  }
+
+  /// Delivers what the nodes and the field script sent each other, after the
+  /// call that produced it has returned (the core is never re-entered).
+  Future<void> _pump() async {
+    for (var i = 0; i < 10000; i++) {
+      if (_toField.isNotEmpty) {
+        final (t, type, data) = _toField.removeAt(0);
+        if (t > field!.timeMs) field!.advance(t);
+        field!.input(type, data);
+      } else if (_toNodes.isNotEmpty) {
+        final (name, type, data) = _toNodes.removeAt(0);
+        await nodes[name]!.runtime.input(type, data);
+      } else if (_fieldEnd != null) {
+        final (t, data) = _fieldEnd!;
+        _fieldEnd = null;
+        if (!_ended) {
+          await end(
+            (data['reason'] as String?) ?? 'finished',
+            data['winner'] as String?,
+            t,
+          );
+        }
+      } else {
+        return;
+      }
+    }
+    throw TestFailure(
+      'the nodes and the field script keep sending each other events',
+    );
+  }
+
+  // -- driving the game --
+
+  VirtualNode node(String name) =>
+      nodes[name] ??
+      (throw TestFailure(
+        "no node named '$name' (nodes: ${nodes.keys.join(', ')})",
+      ));
+
+  Future<void> broadcast(
+    String type, [
+    Map<String, Object?>? data,
+    int? t,
+  ]) async {
+    final d = data ?? {};
+    _recordController(type, d, t);
+    if (type == 'game.end') _ended = true;
+    for (final v in nodes.values) {
+      await v.runtime.input(type, d);
+    }
+    if (field != null) {
+      final reason = d['reason'];
+      field!.input(type, reason != null ? {'reason': reason} : {});
+    }
+    await _pump();
+  }
+
+  Future<void> start() => broadcast('game.start', {'preset': mode.id});
+
+  Future<void> end([String reason = 'time', String? winner, int? t]) =>
+      broadcast('game.end', {'reason': reason, 'winner': ?winner}, t);
+
+  Future<void> wait(num seconds) =>
+      advanceTo(timeMs + (seconds * 1000).round());
+
+  Future<void> advanceTo(int t) async {
+    if (t < timeMs) throw TestFailure('time cannot go backwards');
+    if (field == null) {
+      for (final v in nodes.values) {
+        await v.runtime.advance(t);
+      }
+      timeMs = t;
+      return;
+    }
+    var step = timeMs;
+    while (step < t) {
+      final next = step - step % fieldStepMs + fieldStepMs;
+      step = next < t ? next : t;
+      timeMs = step;
+      for (final v in nodes.values) {
+        await v.runtime.advance(step);
+      }
+      await _pump();
+      field!.advance(step);
+      await _pump();
+    }
+    timeMs = t;
+  }
+
+  Future<bool> input(
+    String nodeName,
+    String type, [
+    Map<String, Object?>? data,
+  ]) async {
+    final ok = await node(nodeName).runtime.input(type, data ?? {});
+    await _pump();
+    return ok;
+  }
+
+  void _checkTeam(String team) {
+    if (!teams.contains(team)) {
+      throw TestFailure("unknown team '$team' (teams: ${teams.join(', ')})");
+    }
+  }
+
+  Future<void> press(String nodeName, String team, [String? squad]) async {
+    _checkTeam(team);
+    await input(nodeName, 'team_input.press', _teamData(team, squad));
+  }
+
+  Future<void> hold(
+    String nodeName,
+    String team,
+    num seconds, [
+    String? squad,
+  ]) async {
+    _checkTeam(team);
+    final total = (seconds * 1000).round();
+    final start = timeMs;
+    var held = 0;
+    while (held < total) {
+      held = held + holdStepMs < total ? held + holdStepMs : total;
+      await advanceTo(start + held);
+      await input(nodeName, 'team_input.hold', {
+        ..._teamData(team, squad),
+        'ms': held,
+      });
+    }
+    await input(nodeName, 'team_input.release', {
+      ..._teamData(team, squad),
+      'ms': total,
+    });
+  }
+
+  Future<void> keys(String nodeName, String keys) async {
+    for (final k in keys.split('')) {
+      await input(nodeName, 'keypad.key', {'key': k});
+    }
+  }
+
+  /// An NFC tag read: the core checks the tag against this game (atalaia/tag.h).
+  Future<void> scan(String nodeName, List<int> uid, List<int>? payload) async {
+    final json = core.tagEventJson(
+      uid: uid,
+      payload: payload,
+      gameId: gameId,
+      gameKey: gameKey,
+      teams: teams,
+    );
+    await input(nodeName, 'nfc.tag', jsonDecode(json) as Map<String, Object?>);
+  }
+
+  /// Field total (every node plus the field script), or one node's.
+  Future<int> score(String team, [String? nodeName]) async {
+    _checkTeam(team);
+    if (nodeName == controller) return field?.score(team) ?? 0;
+    if (nodeName != null) return node(nodeName).runtime.score(team);
+    var total = 0;
+    for (final v in nodes.values) {
+      total += await v.runtime.score(team);
+    }
+    return total + (field?.score(team) ?? 0);
+  }
+}
+
+/// The controller's answers to field.lua (ADR-P2-14), from the simulated game.
+class _SimFieldOps implements FieldOperations {
+  _SimFieldOps(this.sim);
+  final Simulation sim;
+  @override
+  List<Map<String, Object?>> nodes(String? role) => sim._fieldNodes(role);
+  @override
+  String? owner(int nodeId) => sim.owners[nodeId];
+  @override
+  bool send(int nodeId, String cmd, Map<String, Object?> params) =>
+      sim._fieldSend(nodeId, cmd, params);
+}
+
+Map<String, Object?> _teamData(String team, String? squad) => {
+  'team': team,
+  'squad': ?squad,
+};
+
+// ---- Tests (testing.py) ----------------------------------------------------------
+
+bool _subset(Object? expected, Object? actual) {
+  if (expected is Map) {
+    return actual is Map &&
+        expected.entries.every(
+          (e) => actual.containsKey(e.key) && _subset(e.value, actual[e.key]),
+        );
+  }
+  return expected == actual;
+}
+
+Map<String, Object?> _eventFilter(Object? spec) {
+  if (spec is String) return {'type': spec};
+  if (spec is! Map<String, Object?> || !spec.containsKey('type')) {
+    throw TestFailure('an event match needs a type: $spec');
+  }
+  return spec;
+}
+
+bool _matches(LogEntry e, Map<String, Object?> spec) {
+  if (e.type != spec['type']) return false;
+  if (spec.containsKey('node') && e.node != spec['node']) return false;
+  if (spec.containsKey('team') && e.team != spec['team']) return false;
+  if (spec.containsKey('at') &&
+      e.tMs != ((spec['at']! as num) * 1000).round()) {
+    return false;
+  }
+  if (spec.containsKey('data') && !_subset(spec['data'], e.data)) return false;
+  return true;
+}
+
+class _Runner {
+  _Runner(this.sim);
+  final Simulation sim;
+  var cursor = 0; // events before this index were consumed by `expect`
+
+  Future<void> step(Object? step) async {
+    if (step is! Map<String, Object?> || step.length != 1) {
+      throw TestFailure('each step needs exactly one action: $step');
+    }
+    final MapEntry(key: action, value: arg) = step.entries.single;
+    switch (action) {
+      case 'start':
+        await sim.start();
+      case 'end':
+        await sim.end(arg is String ? arg : 'time');
+      case 'pause':
+        await sim.broadcast('game.pause', {'reason': 'gm'});
+      case 'resume':
+        await sim.broadcast('game.resume', {});
+      case 'wait':
+        await sim.wait(arg! as num);
+      case 'hold':
+        final a = arg! as Map<String, Object?>;
+        await sim.hold(
+          _node(a),
+          a['team']! as String,
+          a['s']! as num,
+          a['squad'] as String?,
+        );
+      case 'press':
+        final a = arg! as Map<String, Object?>;
+        await sim.press(_node(a), a['team']! as String, a['squad'] as String?);
+      case 'input':
+        final a = arg! as Map<String, Object?>;
+        await sim.input(
+          _node(a),
+          a['type']! as String,
+          a['data'] as Map<String, Object?>?,
+        );
+      case 'scan':
+        await _scan(arg);
+      case 'keys':
+        final a = arg is Map<String, Object?> ? arg : {'keys': arg};
+        await sim.keys(_node(a), '${a['keys']}');
+      case 'expect':
+        _expect(arg);
+      case 'expect_no':
+        _expectNo(arg);
+      case 'expect_score':
+        final a = arg! as Map<String, Object?>;
+        final actual = await sim.score(
+          a['team']! as String,
+          a['node'] as String?,
+        );
+        if (actual != a['points']) {
+          throw TestFailure(
+            'expected ${a['team']} to have ${a['points']} points, has $actual',
+          );
+        }
+      case 'expect_status':
+        final a = arg is String
+            ? {'status': arg}
+            : arg! as Map<String, Object?>;
+        final names = a.containsKey('node')
+            ? [a['node']! as String]
+            : sim.nodes.keys.toList();
+        for (final name in names) {
+          final runtime = sim.node(name).runtime;
+          final status = await runtime.status();
+          if (status != a['status']) {
+            final err = await runtime.lastError();
+            throw TestFailure(
+              "expected node '$name' to be ${a['status']}, it is $status"
+              '${err.isNotEmpty ? ' ($err)' : ''}',
+            );
+          }
+        }
+      case 'expect_screen':
+        final a = arg! as Map<String, Object?>;
+        final name = _node(a);
+        final cmd = sim.node(name).lastCommand('ui', 'screen');
+        if (cmd == null) {
+          throw TestFailure("node '$name' has not shown any screen");
+        }
+        final args = cmd.args;
+        final template = args.isNotEmpty ? args[0] : null;
+        final data = args.length > 1 ? args[1] : <String, Object?>{};
+        if (template != a['template'] || !_subset(a['data'] ?? {}, data)) {
+          throw TestFailure(
+            "expected screen ${a['template']} ${a['data'] ?? {}} on '$name', "
+            'last screen is $template $data',
+          );
+        }
+      default:
+        throw TestFailure("unknown step '$action'");
+    }
+  }
+
+  String _node(Map<String, Object?> arg) {
+    if (arg.containsKey('node')) return arg['node']! as String;
+    if (sim.nodes.length == 1) return sim.nodes.keys.single;
+    throw TestFailure('this game has several nodes: say which one with node:');
+  }
+
+  Future<void> _scan(Object? arg) async {
+    if (arg is! Map<String, Object?>) {
+      throw TestFailure('scan takes a map: { player, team } or { uid }');
+    }
+    final unknown = arg.keys.toSet().difference({
+      'node',
+      'player',
+      'team',
+      'uid',
+      'forged',
+      'game',
+    });
+    if (unknown.isNotEmpty) {
+      throw TestFailure('scan: unknown key(s) ${unknown.toList()..sort()}');
+    }
+    List<int>? payload;
+    if (arg.containsKey('player')) {
+      final team = arg['team'] as String?;
+      if (team != null && !sim.teams.contains(team)) {
+        throw TestFailure("scan: unknown team '$team'");
+      }
+      final teamId = team != null ? sim.teams.indexOf(team) + 1 : 0;
+      var key = sim.gameKey;
+      if (arg['forged'] == true) key = [for (final b in key) b ^ 0x5a];
+      final gameId = (arg['game'] as int?) ?? sim.gameId;
+      payload = encodeTag(
+        PlayerTag(player: '${arg['player']}', team: teamId, gameId: gameId),
+        key,
+      );
+    }
+    final List<int> uid;
+    if (arg['uid'] != null && '${arg['uid']}'.isNotEmpty) {
+      final hex = '${arg['uid']}';
+      uid = [
+        for (var i = 0; i < hex.length; i += 2)
+          int.parse(hex.substring(i, i + 2), radix: 16),
+      ];
+    } else if (arg.containsKey('player')) {
+      uid = [
+        0x04,
+        ...sha256.convert(utf8.encode('${arg['player']}')).bytes.sublist(0, 6),
+      ];
+    } else {
+      throw TestFailure('scan needs a player or a uid');
+    }
+    await sim.scan(_node(arg), uid, payload);
+  }
+
+  void _expect(Object? arg) {
+    final spec = _eventFilter(arg);
+    final events = sim.events;
+    for (var i = cursor; i < events.length; i++) {
+      if (_matches(events[i], spec)) {
+        cursor = i + 1;
+        return;
+      }
+    }
+    throw TestFailure(
+      'expected event $spec at or before ${sim.timeMs / 1000}s, not found',
+    );
+  }
+
+  void _expectNo(Object? arg) {
+    final spec = _eventFilter(arg);
+    for (final e in sim.events.skip(cursor)) {
+      if (_matches(e, spec)) {
+        throw TestFailure('unexpected event: ${e.describe().trim()}');
+      }
+    }
+  }
+}
+
+class TestResult {
+  TestResult(this.name, this.passed, [this.message = '', this.log = const []]);
+  final String name;
+  final bool passed;
+  final String message;
+  final List<String> log;
+
+  @override
+  String toString() =>
+      passed ? 'ok $name' : 'FAIL $name: $message\n  ${log.join('\n  ')}';
+}
+
+void _checkProblems(Simulation sim, String where) {
+  if (sim.problems.isNotEmpty) {
+    throw TestFailure(
+      '$where: ${sim.problems.join('; ')} (see protocol/schema/events.yaml)',
+    );
+  }
+}
+
+/// The mode a test plays: `main:` and `modifiers:` name sibling mode folders.
+Mode _composed(Mode mode, Map<String, Object?> spec) {
+  final main = spec['main'];
+  final modifiers = spec['modifiers'] ?? [];
+  if (main == null && (modifiers as List).isEmpty) return mode;
+  if (modifiers is! List || (main != null && main is! String)) {
+    throw ModeError('main is a mode folder name and modifiers a list of them');
+  }
+  final parent = mode.dir.parent.path;
+  final others = [for (final m in modifiers) loadMode(Directory('$parent/$m'))];
+  if (main != null) {
+    return compose(loadMode(Directory('$parent/$main')), [mode, ...others]);
+  }
+  return compose(mode, others);
+}
+
+/// Runs one test file of [mode] with its nodes running [via].
+Future<TestResult> runTest(
+  AtalaiaCore core,
+  EventSchema schema,
+  Mode mode,
+  File file,
+  Via via,
+) async {
+  final Map<String, Object?> spec;
+  try {
+    spec =
+        (plain(loadYaml(file.readAsStringSync())) as Map<String, Object?>?) ??
+        {};
+  } on YamlException catch (e) {
+    return TestResult(file.path, false, 'invalid YAML: $e');
+  }
+  final name = (spec['name'] ?? file.path) as String;
+  final teams = ((spec['teams'] as List?) ?? defaultTeams).cast<String>();
+  Simulation? sim;
+  try {
+    final m = _composed(mode, spec);
+    final defaultNode = m.roles.keys.first;
+    final nodeRoles = ((spec['nodes'] as Map?) ?? {defaultNode: defaultNode})
+        .cast<String, String>();
+    final params = m.resolveParams(
+      (spec['params'] as Map<String, Object?>?) ?? {},
+      teams,
+    );
+    sim = await Simulation.create(
+      core,
+      schema,
+      m,
+      nodeRoles,
+      teams,
+      params,
+      seed: (spec['seed'] as int?) ?? 1,
+      via: via,
+    );
+    final runner = _Runner(sim);
+    if (spec['autostart'] != false) {
+      await sim.start();
+      _checkProblems(sim, 'start');
+    }
+    final steps = (spec['steps'] as List?) ?? [];
+    for (var i = 0; i < steps.length; i++) {
+      try {
+        await runner.step(steps[i]);
+      } on TestFailure catch (e) {
+        throw TestFailure('step ${i + 1} ${steps[i]}: $e');
+      }
+      _checkProblems(sim, 'step ${i + 1} ${steps[i]}');
+    }
+    return TestResult(name, true);
+  } on Exception catch (e) {
+    final log = <String>[];
+    if (sim != null) {
+      log.addAll(sim.events.map((e) => e.describe()));
+      for (final v in sim.nodes.values) {
+        log.addAll(
+          v.logs.map(
+            (l) => '${''.padRight(10)}  ${v.name.padRight(12)} log: $l',
+          ),
+        );
+      }
+      log.addAll(
+        sim.fieldLogs.map(
+          (l) => '${''.padRight(10)}  ${controller.padRight(12)} log: $l',
+        ),
+      );
+    }
+    return TestResult(name, false, '$e', log);
+  } finally {
+    await sim?.close();
+  }
+}

@@ -37,8 +37,8 @@ _FIELD_STATE_FN = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_char_p, ctype
 _ALLOC_FN = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_size_t)
 
 # atalaia_field_ops_t (core/include/atalaia/field_ops.h). nodes() returns a
-# malloc'd string the core frees, and owner() a string the core copies at
-# once, so both are declared as void pointers and filled in by hand.
+# malloc'd string the core frees, and owner() a string that must live until the
+# next owner() call, so both are declared as void pointers and filled in by hand.
 _FIELD_NODES_FN = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_char_p)
 _FIELD_OWNER_FN = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint16)
 _FIELD_SEND_FN = ctypes.CFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_uint16, ctypes.c_char_p, ctypes.c_char_p)
@@ -352,7 +352,7 @@ class Node:
         team = self._field.owner(int(node_id)) if self._field is not None else None
         if team is None:
             return None
-        # Kept alive until the next call; the core copies it at once.
+        # Kept alive until the next call, as field_ops.h asks; the core copies it before then.
         self._owner_buf = ctypes.create_string_buffer(team.encode())
         return ctypes.addressof(self._owner_buf)
 

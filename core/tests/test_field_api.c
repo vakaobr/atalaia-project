@@ -273,6 +273,48 @@ static void test_field_common_owner(void)
     atalaia_node_destroy(n);
 }
 
+/* A host that answers owner() in one buffer it rewrites on every call (as
+ * the Dart and Python bindings do): node 1 is red, the others blue. */
+static char reused_owner_buf[8];
+
+static const char *reused_owner(void *user, uint16_t node_id)
+{
+    (void)user;
+    snprintf(reused_owner_buf, sizeof(reused_owner_buf), "%s", node_id == 1 ? "red" : "blue");
+    return reused_owner_buf;
+}
+
+static const atalaia_field_ops_t reused_owner_ops = {
+    .nodes = mock_nodes,
+    .owner = reused_owner,
+    .send = mock_send,
+};
+
+static void test_field_common_owner_reused_buffer(void)
+{
+    field_recorder_t r;
+    memset(&r, 0, sizeof(r));
+    atalaia_node_config_t cfg = {0};
+    cfg.node_id = 1;
+    cfg.instr_limit = 200000;
+    cfg.callbacks.log = on_log;
+    cfg.callbacks.user = &r;
+    cfg.field_ops = &reused_owner_ops;
+    atalaia_node_t *n = atalaia_node_create(&cfg);
+    static const char *const teams[] = {"red", "blue"};
+    CHECK(n != NULL);
+    CHECK(atalaia_node_set_teams(n, teams, 2));
+    /* The first answer must be copied before owner() is asked again. */
+    CHECK(load_src(n, "log(tostring(field.common_owner({1, 2})))\n"
+                      "log(tostring(field.common_owner({2, 3})))\n"
+                      "log(tostring(field.common_owner({1, 1})))\n"));
+    CHECK(r.logs == 3);
+    CHECK(strcmp(r.log[0], "nil") == 0);
+    CHECK(strcmp(r.log[1], "blue") == 0);
+    CHECK(strcmp(r.log[2], "red") == 0);
+    atalaia_node_destroy(n);
+}
+
 static void test_field_not_available_regular(void)
 {
     field_recorder_t r;
@@ -293,5 +335,6 @@ void run_field_api_tests(void)
     test_field_send();
     test_field_score();
     test_field_common_owner();
+    test_field_common_owner_reused_buffer();
     test_field_not_available_regular();
 }
