@@ -413,7 +413,9 @@ roadmap:
     text: >-
       Dispositivos Android, <a href="#glossario-dispositivo-android">módulo de E/S</a>, app para
       quem joga, com funções, e os modos que precisam dos telemóveis de quem joga: Respawn, Kill
-      Confirmed, Player Check-in, Money Factory e cronografagem à entrada. Já feito em software: a
+      Confirmed, Player Check-in, Money Factory, as Ligaduras (quem é atingido lê a sua etiqueta e
+      mantém um botão premido para ser tratado, com um número limitado de tratamentos) e
+      cronografagem à entrada. Já feito em software: a
       Baixa Confirmada, as Reentradas e Vidas e o Registo de Presença leem na Field Box as etiquetas
       NFC assinadas de cada participante, o protocolo do módulo de E/S está fixado e os modos
       descrevem os seus ecrãs em YAML. A app corre o mesmo núcleo de jogo das caixas, em segundo

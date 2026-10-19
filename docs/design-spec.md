@@ -920,6 +920,7 @@ Modifiers are small packages (`kind: modifier`) that run alongside any main mode
 | Kill Confirmed | Node | `nfc` | Scanning a team's tag removes their point | 3 |
 | Respawn and Lives | Node + player app | `nfc` or `qr` | Lives per team or player, respawn tracking | 3 |
 | Player Check-in | Node | `nfc` or `qr` | Count individual players | 3 |
+| Medic Kit (Ligaduras) | Node (alongside any mode) | `nfc`, `team_input` | A hit player scans their tag and holds the button to be healed; heals per kit and per player are limited and reported | 3 (after plan phase E) |
 | Money Factory | Node | `nfc` | Resource-collection games | 3 |
 | Master and Satellites | Field + node | `team_input` | Satellites boost the master zone (×1.5, faster ticks), upgradable, engineer-only tags | 4 |
 | Target Windows | Node + target addon | `hit`, `led` | Random team-colour scoring window | 4 |
@@ -966,7 +967,7 @@ flowchart TB
     g1{{"One box runs a 2-hour club<br/>game with no restarts"}}
     p2["<b>Phase 2 · Field network</b><br/>LoRa protocol, time sync, log merge, Raspberry Pi controller<br/>MQTT and REST API, GM console web app, scoreboard example<br/>Mode pack: Hold-All, Last Stand, Bomb team codes, Codes modifier"]
     g2{{"5 boxes on a CQB site and an<br/>outdoor field, zero lost captures"}}
-    p3["<b>Phase 3 · Android and players</b><br/>Android props, I/O pod, player app with roles (Android, iOS)<br/>Respawn, Kill Confirmed, Player Check-in, Money Factory, chrono check-in<br/>Field check-in by printed QR, per-game replica declaration for the chrono"]
+    p3["<b>Phase 3 · Android and players</b><br/>Android props, I/O pod, player app with roles (Android, iOS)<br/>Respawn, Kill Confirmed, Player Check-in, Money Factory, chrono check-in<br/>Field check-in by printed QR, per-game replica declaration for the chrono<br/>Medic Kit: tag, hold to heal, limited heals"]
     g3{{"One game mixes ESP32 and<br/>Android props without issues"}}
     p4["<b>Phase 4 · Site server and advanced play</b><br/>Site server: accounts, history, chrono registry, remote setup<br/>Game scheduling, registration, publishing (field page, iCal and JSON feeds)<br/>Master and Satellites, Target, VIP, Hacking Terminal, ATAK"]
     g4{{"A weekend milsim runs on<br/>the platform end to end"}}

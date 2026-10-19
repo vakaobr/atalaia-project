@@ -401,8 +401,9 @@ roadmap:
     title: Android and players
     text: >-
       Android props, <a href="#glossary-android-prop">I/O pod</a>, player app with roles, and the
-      modes that need players' phones: Respawn, Kill Confirmed, Player Check-in, Money Factory and
-      chrono check-in. Done in software: Kill Confirmed, Respawn and Lives and Player Check-in read
+      modes that need players' phones: Respawn, Kill Confirmed, Player Check-in, Money Factory,
+      the Medic Kit (a hit player scans their tag and holds a button to be healed, with a limited
+      number of heals) and chrono check-in. Done in software: Kill Confirmed, Respawn and Lives and Player Check-in read
       players' signed NFC tags on the Field Box, the I/O pod's link protocol is fixed, and modes
       describe their screens in YAML. The app runs the same game core as the boxes, in the
       background, and has its screens, in Portuguese and English: an Android phone acts as a box
