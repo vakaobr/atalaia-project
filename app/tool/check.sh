@@ -13,9 +13,12 @@
 #                                     for arm64-v8a, armeabi-v7a and x86_64
 #                                     (core/CMakePresets.json) and check the libraries
 #   sh app/tool/check.sh apk          flutter build apk --debug (Gradle builds the
-#                                     core with the NDK) and check the APK's libraries
-#   sh app/tool/check.sh format       format lib/ and test/ in place
+#                                     core with the NDK) and check the APK's libraries,
+#                                     and that it carries no Google Play services
+#   sh app/tool/check.sh format       format lib/, test/, integration_test/ and tool/ in place
 #   sh app/tool/check.sh lock         resolve pubspec.yaml again and write pubspec.lock
+#   sh app/tool/check.sh gen          write lib/modes/builtin_modes.g.dart from modes/
+#   sh app/tool/check.sh goldens      draw the golden images of test/goldens/ again
 #
 # check and test need the core and the FFI stub built for this machine as
 # shared libraries, named by ATALAIA_CORE_LIB and ATALAIA_CORE_STUB_LIB (this
@@ -24,9 +27,9 @@
 # modes/*/tests/ run on the real core through the Dart bridge.
 #
 # The repository is at $ATALAIA_SRC (default /src), mounted read-only except
-# for format and lock: the work happens on a copy of app/, core/, modes/ and
-# protocol/, so nothing is written into the checkout. format and lock copy
-# their results back and need it writable.
+# for format, lock, gen and goldens: the work happens on a copy of app/,
+# core/, modes/ and protocol/, so nothing is written into the checkout.
+# Those four copy their results back and need it writable.
 set -eu
 SRC="${ATALAIA_SRC:-/src}"
 MODE="${1:-check}"
@@ -38,6 +41,9 @@ export FLUTTER_SUPPRESS_ANALYTICS=true
 NDK_VERSION=28.2.13676358
 CMAKE_VERSION=3.22.1
 ABIS="arm64-v8a armeabi-v7a x86_64"
+
+# The Dart folders the formatter checks and formats.
+DART_DIRS="lib test integration_test tool"
 
 rm -rf "$W"
 mkdir -p "$W"
@@ -113,7 +119,7 @@ case "$MODE" in
         need_core_libs
         flutter pub get --enforce-lockfile
         flutter analyze --fatal-infos
-        dart format --output=none --set-exit-if-changed lib test
+        dart format --output=none --set-exit-if-changed $DART_DIRS
         flutter test "$@"
         ;;
     test)
@@ -152,19 +158,46 @@ case "$MODE" in
             unzip -o -q "$apk" "lib/$abi/libatalaia_core.so" -d "/tmp/apk-lib/$abi"
             check_android_lib "/tmp/apk-lib/$abi/lib/$abi/libatalaia_core.so" "$abi"
         done
+        # No proprietary SDKs (decision PD5): no Google Play services or ML Kit classes.
+        mkdir -p /tmp/apk-dex
+        unzip -o -q "$apk" 'classes*.dex' -d /tmp/apk-dex
+        # (ZXing's classes must be found: proof that the search reads the classes.)
+        cat /tmp/apk-dex/classes*.dex | grep -a -q 'Lcom/google/zxing/qrcode/QRCodeReader;'             || { echo "check.sh: cannot read the classes of $apk" >&2; exit 1; }
+        if cat /tmp/apk-dex/classes*.dex | grep -a -q -E 'Lcom/google/android/gms/|Lcom/google/mlkit/'; then
+            echo "check.sh: $apk contains Google Play services or ML Kit classes" >&2
+            exit 1
+        fi
+        echo "ok   no Google Play services or ML Kit classes in the APK"
         echo "ok   $apk ($(wc -c < "$apk") bytes)"
+        # A writable folder to put the APK in (tools/docker_app.py mounts app/build/).
+        if [ -n "${ATALAIA_APK_OUT:-}" ]; then
+            cp "$apk" "$ATALAIA_APK_OUT/atalaia-debug.apk"
+            echo "ok   copied to app/build/atalaia-debug.apk"
+        fi
         ;;
     format)
         flutter pub get --enforce-lockfile
-        dart format lib test
-        cp -r lib test "$SRC/app/"
+        dart format $DART_DIRS
+        cp -r $DART_DIRS "$SRC/app/"
+        ;;
+    gen)
+        flutter pub get --enforce-lockfile
+        dart run tool/gen_modes.dart ../modes
+        dart format lib/modes/builtin_modes.g.dart
+        cp lib/modes/builtin_modes.g.dart "$SRC/app/lib/modes/"
+        ;;
+    goldens)
+        flutter pub get --enforce-lockfile
+        flutter test --update-goldens test/goldens "$@"
+        rm -rf "$SRC/app/test/goldens/images"
+        cp -r test/goldens/images "$SRC/app/test/goldens/"
         ;;
     lock)
         flutter pub get
         cp pubspec.lock "$SRC/app/pubspec.lock"
         ;;
     *)
-        echo "check.sh: unknown mode '$MODE' (check, test, ndk, apk, format or lock)" >&2
+        echo "check.sh: unknown mode '$MODE' (check, test, ndk, apk, format, lock, gen or goldens)" >&2
         exit 2
         ;;
 esac

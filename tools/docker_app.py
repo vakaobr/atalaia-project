@@ -11,9 +11,12 @@
     python tools/docker_app.py ndk                the core cross-compiled with the Android NDK for
                                                   arm64-v8a, armeabi-v7a, x86_64 (CI: core-android-ndk)
     python tools/docker_app.py apk                flutter build apk --debug, with the core built by
-                                                  Gradle and the NDK (CI: flutter-build-android)
-    python tools/docker_app.py format             format app/lib and app/test in place
+                                                  Gradle and the NDK (CI: flutter-build-android);
+                                                  the APK lands in app/build/atalaia-debug.apk
+    python tools/docker_app.py format             format app/lib, test, integration_test and tool in place
     python tools/docker_app.py lock               resolve app/pubspec.yaml again, write pubspec.lock
+    python tools/docker_app.py gen                write app/lib/modes/builtin_modes.g.dart from modes/
+    python tools/docker_app.py goldens            draw app/test/goldens/images/ again (then look at them)
 
 Works from any folder and any shell (cmd, PowerShell, bash). Docker must be
 running. Two images are used:
@@ -28,11 +31,15 @@ running. Two images are used:
   1 GB) and Gradle 9.1.0 with its dependencies on the first `apk`.
 
 The checkout is mounted read-only (check.sh works on a copy) except for
-format and lock. Named volumes keep the downloads and the core's build
-between runs: atalaia-app-pub-cache, atalaia-app-core, atalaia-app-ndk,
-atalaia-app-cmake and atalaia-app-gradle, each with $ATALAIA_VOLUME_SUFFIX
-appended (to keep two checkouts apart). `docker volume rm` any of them to
-start fresh.
+format, lock, gen and goldens. Named volumes keep the downloads and the
+core's build between runs: atalaia-app-pub-cache, atalaia-app-core,
+atalaia-app-ndk, atalaia-app-cmake and atalaia-app-gradle, each with
+$ATALAIA_VOLUME_SUFFIX appended (to keep two checkouts apart). `docker
+volume rm` any of them to start fresh.
+
+The emulator tests (app/integration_test/, CI's flutter-integration job)
+need an Android emulator with hardware acceleration (KVM), which Docker on
+Windows and macOS does not offer; they run in CI only.
 
 tools/check.sh (the atalaia-dev image, no Dart) does not run these; it does
 build the FFI stub and check the simulator's ctypes structs against it.
@@ -59,7 +66,7 @@ NDK_VOLUME = "atalaia-app-ndk" + SUFFIX
 CMAKE_VOLUME = "atalaia-app-cmake" + SUFFIX
 GRADLE_VOLUME = "atalaia-app-gradle" + SUFFIX
 SDK = "/opt/android-sdk-linux"
-MODES = ("all", "check", "test", "ndk", "apk", "format", "lock")
+MODES = ("all", "check", "test", "ndk", "apk", "format", "lock", "gen", "goldens")
 
 
 def fail(message: str) -> int:
@@ -82,7 +89,7 @@ def build_core() -> int:
 
 def flutter(mode: str, args: list[str]) -> int:
     """app/tool/check.sh <mode> in the Flutter image; returns its exit code."""
-    writable = mode in ("format", "lock")
+    writable = mode in ("format", "lock", "gen", "goldens")
     cmd = ["docker", "run", "--rm", "-v", f"{REPO}:/src" + ("" if writable else ":ro"),
            "-v", f"{PUB_VOLUME}:/root/.pub-cache", "-w", "/src"]
     if mode in ("check", "test"):
@@ -92,7 +99,10 @@ def flutter(mode: str, args: list[str]) -> int:
     if mode in ("ndk", "apk"):
         cmd += ["-v", f"{NDK_VOLUME}:{SDK}/ndk", "-v", f"{CMAKE_VOLUME}:{SDK}/cmake"]
     if mode == "apk":
-        cmd += ["-v", f"{GRADLE_VOLUME}:/root/.gradle"]
+        out = REPO / "app" / "build"
+        out.mkdir(parents=True, exist_ok=True)
+        cmd += ["-v", f"{GRADLE_VOLUME}:/root/.gradle", "-v", f"{out}:/apk-out",
+                "-e", "ATALAIA_APK_OUT=/apk-out"]
     cmd += [IMAGE, "sh", "/src/app/tool/check.sh", mode, *args]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                             encoding="utf-8", errors="replace")
@@ -133,7 +143,7 @@ def main(argv: list[str]) -> int:
     except FileNotFoundError:
         return fail("the docker command was not found; install Docker Desktop")
     try:
-        if mode in ("format", "lock", "ndk", "apk"):
+        if mode in ("format", "lock", "gen", "goldens", "ndk", "apk"):
             return flutter(mode, argv)
         code = build_core()
         if code != 0:

@@ -71,6 +71,11 @@ Uint8List? payloadFromType2Memory(List<int> mem, String mimeType) {
   return null;
 }
 
+/// The payload of the first MIME record of [mimeType] in an NDEF message
+/// (the records, as Android's Ndef API reads a tag), or null.
+Uint8List? payloadFromNdefMessage(List<int> message, String mimeType) =>
+    _findRecord(message, ascii.encode(mimeType));
+
 Uint8List? _findRecord(List<int> m, List<int> type) {
   var i = 0;
   while (i < m.length) {

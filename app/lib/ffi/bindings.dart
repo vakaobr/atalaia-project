@@ -208,6 +208,30 @@ class AtalaiaBindings {
         int Function(Pointer<Utf8>, Pointer<TemplateScope>, Pointer<Utf8>, int)
       >('atalaia_tpl_text', isLeaf: true);
 
+  late final tplTruthy = library
+      .lookupFunction<
+        Bool Function(Pointer<Utf8>, Pointer<TemplateScope>),
+        bool Function(Pointer<Utf8>, Pointer<TemplateScope>)
+      >('atalaia_tpl_truthy', isLeaf: true);
+
+  late final tplFraction = library
+      .lookupFunction<
+        Double Function(Pointer<Utf8>, Pointer<TemplateScope>),
+        double Function(Pointer<Utf8>, Pointer<TemplateScope>)
+      >('atalaia_tpl_fraction', isLeaf: true);
+
+  late final tplColor = library
+      .lookupFunction<
+        Bool Function(Pointer<Utf8>, Pointer<Uint32>),
+        bool Function(Pointer<Utf8>, Pointer<Uint32>)
+      >('atalaia_tpl_color', isLeaf: true);
+
+  late final tplExprOk = library
+      .lookupFunction<
+        Bool Function(Pointer<Utf8>, Size, Pointer<Utf8>, Size),
+        bool Function(Pointer<Utf8>, int, Pointer<Utf8>, int)
+      >('atalaia_tpl_expr_ok', isLeaf: true);
+
   late final eventEncode = library
       .lookupFunction<
         Size Function(
@@ -280,7 +304,12 @@ class AtalaiaCore {
         err.cast(),
         160,
       );
-      return ok ? null : err.cast<Utf8>().toDartString();
+      if (ok) return null;
+      final n = err.asTypedList(160).indexOf(0);
+      return utf8.decode(
+        err.asTypedList(n < 0 ? 159 : n),
+        allowMalformed: true,
+      );
     } finally {
       calloc
         ..free(tpl)
@@ -296,22 +325,94 @@ class AtalaiaCore {
     Map<String, Object?> params,
   ) {
     const cap = 160; // ATALAIA_TPL_TEXT_MAX
-    final scope = calloc<TemplateScope>();
-    final t = text.toNativeUtf8(allocator: calloc);
     final out = calloc<Uint8>(cap);
+    try {
+      _withScope(text, data, params, (t, scope) {
+        bindings.tplText(t, scope, out.cast(), cap);
+      });
+      final n = out.asTypedList(cap).indexOf(0);
+      return utf8.decode(out.asTypedList(n), allowMalformed: true);
+    } finally {
+      calloc.free(out);
+    }
+  }
+
+  /// A visible: property's truth (atalaia_tpl_truthy).
+  bool screenTruthy(
+    String? value,
+    Map<String, Object?> data,
+    Map<String, Object?> params,
+  ) {
+    var r = false;
+    _withScope(value, data, params, (v, scope) {
+      r = bindings.tplTruthy(v, scope);
+    });
+    return r;
+  }
+
+  /// A progress_bar value, 0-1 (atalaia_tpl_fraction).
+  double screenFraction(
+    String? value,
+    Map<String, Object?> data,
+    Map<String, Object?> params,
+  ) {
+    var r = 0.0;
+    _withScope(value, data, params, (v, scope) {
+      r = bindings.tplFraction(v, scope);
+    });
+    return r;
+  }
+
+  /// A colour name's 0xRRGGBB, or null (atalaia_tpl_color).
+  int? screenColor(String name) {
+    final n = name.toNativeUtf8(allocator: calloc);
+    final rgb = calloc<Uint32>();
+    try {
+      return bindings.tplColor(n, rgb) ? rgb.value : null;
+    } finally {
+      calloc
+        ..free(n)
+        ..free(rgb);
+    }
+  }
+
+  /// Why an expression (without braces) is refused, or null (atalaia_tpl_expr_ok).
+  String? screenExpressionError(String expr) {
+    final bytes = utf8.encode(expr);
+    final e = _nativeBytes(bytes);
+    final err = calloc<Uint8>(64);
+    try {
+      return bindings.tplExprOk(e.cast(), bytes.length, err.cast(), 64)
+          ? null
+          : err.cast<Utf8>().toDartString();
+    } finally {
+      calloc
+        ..free(e)
+        ..free(err);
+    }
+  }
+
+  /// Runs [body] with [text] (null for NULL) and a scope of [data] and [params]
+  /// in native memory.
+  void _withScope(
+    String? text,
+    Map<String, Object?> data,
+    Map<String, Object?> params,
+    void Function(Pointer<Utf8> text, Pointer<TemplateScope> scope) body,
+  ) {
+    final scope = calloc<TemplateScope>();
+    final t = text == null ? nullptr : text.toNativeUtf8(allocator: calloc);
     scope.ref
       ..data = jsonEncode(data).toNativeUtf8(allocator: calloc)
       ..params = jsonEncode(params).toNativeUtf8(allocator: calloc);
     try {
-      bindings.tplText(t, scope, out.cast(), cap);
-      return out.cast<Utf8>().toDartString();
+      body(t.cast(), scope);
     } finally {
       calloc
         ..free(scope.ref.data)
         ..free(scope.ref.params)
-        ..free(scope)
-        ..free(t)
-        ..free(out);
+        ..free(scope);
+      if (t != nullptr) calloc.free(t);
     }
   }
 

@@ -418,3 +418,4 @@ pre {
 .screens img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 4px; }
 .screens figcaption { margin-top: 8px; font-size: 0.88rem; color: var(--muted); }
 .screens-note { margin-top: 20px; }
+.app-screens { grid-template-columns: repeat(auto-fill, minmax(150px, 220px)); }

@@ -189,6 +189,10 @@ abstract interface class RunningNode {
   /// message arrives (so it is all there when a call's future completes).
   Stream<NodeOutput> get outputs;
 
+  /// What the script's top level emitted while the node was loading, before
+  /// anyone could listen to [outputs] (a first ui.screen, say).
+  List<NodeOutput> get startupOutputs;
+
   /// An input event. With [GameClock.realTime] it waits for the next tick,
   /// as hardware events on a box do; the result is whether the node took it.
   Future<bool> input(String type, [Map<String, Object?>? data]);

@@ -236,7 +236,7 @@ the pages. Code blocks and anything else that is the same in every language stay
       </div>
     </section>
 
-    {# Screenshots: real firmware running in Wokwi, 7 captures #}
+    {# Screenshots: real firmware running in Wokwi, then the app's test images #}
     <section class="band" aria-labelledby="screens">
       <div class="wrap">
         <h2 id="screens">{{ screens.title }}</h2>
@@ -276,6 +276,22 @@ the pages. Code blocks and anything else that is the same in every language stay
           </figure>
         </div>
         <p class="note screens-note">{{ screens.note }}</p>
+        <h3 id="app-screens">{{ screens.app_title }}</h3>
+        <p>{{ screens.app_intro }}</p>
+        <div class="screens app-screens">
+          <figure>
+            <img src="{{ page.root }}img/screens/app-prop-game-{{ page.code }}.png" width="360" height="780" loading="lazy" decoding="async" alt="{{ screens.app_prop.alt|text }}">
+            <figcaption>{{ screens.app_prop.caption }}</figcaption>
+          </figure>
+          <figure>
+            <img src="{{ page.root }}img/screens/app-player-{{ page.code }}.png" width="360" height="780" loading="lazy" decoding="async" alt="{{ screens.app_player.alt|text }}">
+            <figcaption>{{ screens.app_player.caption }}</figcaption>
+          </figure>
+          <figure>
+            <img src="{{ page.root }}img/screens/app-chrono-{{ page.code }}.png" width="360" height="780" loading="lazy" decoding="async" alt="{{ screens.app_chrono.alt|text }}">
+            <figcaption>{{ screens.app_chrono.caption }}</figcaption>
+          </figure>
+        </div>
       </div>
     </section>
 

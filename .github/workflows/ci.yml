@@ -127,7 +127,7 @@ jobs:
     # externalNativeBuild compiling core/ for arm64-v8a, armeabi-v7a and
     # x86_64 (app/android/app/build.gradle.kts). The APK must contain
     # lib/<abi>/libatalaia_core.so for each, checked as in core-android-ndk.
-    # The APK is not run here: the emulator job is plan phase D.
+    # The APK is run on an emulator by flutter-integration below.
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -136,6 +136,50 @@ jobs:
           docker run --rm -v "$PWD:/src:ro" -w /src \
             ghcr.io/cirruslabs/flutter:3.44.0@sha256:46691e311715845de03a3ba4753a475476936805b29431b1f00f1816981033f8 \
             sh /src/app/tool/check.sh apk
+
+  flutter-integration:
+    name: The app on an Android emulator (integration tests)
+    # The emulator needs hardware acceleration (KVM), which GitHub's Ubuntu
+    # runners have and Docker on Windows or macOS does not: these tests run
+    # here only. An Android 11 (API 30) x86_64 emulator with the plain AOSP
+    # image (no Google APIs: the app must not need Google Play services) runs
+    # `flutter test integration_test`, which builds the debug APK (Gradle
+    # builds the core with the NDK) and drives the real app: the roles, a
+    # Bomb prop on the real core, a join text, the player view over a
+    # WebSocket (app/integration_test/). Flutter 3.44.0 comes from
+    # subosito/flutter-action because the emulator and the Flutter tool must
+    # run on the same machine; both actions are pinned by commit.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - name: Let the emulator use KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: 3.44.0
+          channel: stable
+      - name: Pinned NDK and CMake (as app/tool/check.sh)
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            --install "ndk;28.2.13676358" "cmake;3.22.1" > /dev/null
+      - name: Packages from the lockfile
+        working-directory: app
+        run: flutter pub get --enforce-lockfile
+      - name: Integration tests on the emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 30
+          target: default
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          working-directory: app
+          script: flutter test integration_test --reporter expanded -d emulator-5554
 
   protocol:
     name: Protocol schema and generated files

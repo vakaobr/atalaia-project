@@ -1045,6 +1045,10 @@ static void put_value(sbuf_t *b, val_t v, int filter)
     char buf[40];
     if (filter == F_CLOCK) {
         double d = as_num(v);
+        /* Clamped first: a double beyond long long's range cannot be converted
+         * (undefined behaviour; x86 and ARM give different answers). 1e15 s is
+         * over 31 million years. */
+        if (isfinite(d) && d > 1e15) d = 1e15;
         long long s = d > 0 && isfinite(d) ? (long long)ceil(d - 1e-9) : 0;
         if (s >= 3600) {
             snprintf(buf, sizeof(buf), "%lld:%02lld:%02lld", s / 3600, (s / 60) % 60, s % 60);

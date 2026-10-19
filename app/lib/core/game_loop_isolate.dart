@@ -122,7 +122,7 @@ final class GameLoopIsolate implements RunningNode {
   var _closed = false;
   NodeSnapshot? _lastSnapshot;
 
-  /// What the script's top level emitted while the node was loading.
+  @override
   final List<NodeOutput> startupOutputs = [];
 
   @override

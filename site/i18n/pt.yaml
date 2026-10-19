@@ -299,6 +299,26 @@ screens:
       indicação «# enter * delete».
     caption: A escrever um código do modificador Códigos (pontos, pistas ou desbloqueios).
 
+  app_title: A app Android
+  app_intro: >-
+    A app desenha os mesmos ecrãs dos modos, a partir dos mesmos ficheiros YAML. Estas são as
+    imagens dos testes da app, não fotografias de um telemóvel: ainda nada correu num telemóvel a
+    sério.
+  app_prop:
+    alt: >-
+      Um telemóvel Android como bomba: o ecrã de contagem do modo («ARMED», «4:47», «until
+      detonation») por cima de dois botões grandes, vermelho e azul, para manter premidos.
+    caption: Um telemóvel como bomba, com os botões das equipas.
+  app_player:
+    alt: >-
+      A vista de quem joga: o nome do jogo, 20:00 para o fim, os 20 pontos da equipa azul por cima
+      dos 12 da vermelha, de quem é cada objetivo e o que aconteceu.
+    caption: Quem joga segue o jogo no telemóvel.
+  app_chrono:
+    alt: >-
+      O cronógrafo do marshal: o teclado da velocidade, o peso da BB e um «PASSA» verde, com a
+      energia mais alta e o limite.
+    caption: Cronografagem à entrada, com a medição assinada pelo marshal.
 try:
   title: Experimenta já
   intro: >-
@@ -353,16 +373,19 @@ roadmap:
   p3:
     title: Android e jogadores
     text: >-
-      Dispositivos Android, <a href="#glossario-dispositivo-android">módulo de E/S</a>, app de
-      jogador com funções e os modos que precisam dos telemóveis dos jogadores: Respawn, Kill
-      Confirmed, Player Check-in, Money Factory e cronografagem à entrada. Já começou: a Baixa
-      Confirmada, as Reentradas e Vidas e o Registo de Presença leem as etiquetas NFC assinadas de
-      cada participante na Field Box, o protocolo do módulo de E/S está fixado, os modos descrevem
-      os seus ecrãs em YAML e a app já tem a sua primeira lógica: a cronografagem (energia, limites
-      por classe, verificações durante o jogo, medições assinadas por cada marshal) e as etiquetas e
-      credenciais assinadas de quem joga. O motor da app corre o mesmo núcleo de jogo das caixas, em
-      segundo plano, e todos os modos de jogo passam nos seus testes através dele; o núcleo já está
-      compilado numa app Android. Tudo testado em software; ainda nada corre num telemóvel.
+      Dispositivos Android, <a href="#glossario-dispositivo-android">módulo de E/S</a>, app para
+      quem joga, com funções, e os modos que precisam dos telemóveis de quem joga: Respawn, Kill
+      Confirmed, Player Check-in, Money Factory e cronografagem à entrada. Já feito em software: a
+      Baixa Confirmada, as Reentradas e Vidas e o Registo de Presença leem na Field Box as etiquetas
+      NFC assinadas de cada participante, o protocolo do módulo de E/S está fixado e os modos
+      descrevem os seus ecrãs em YAML. A app corre o mesmo núcleo de jogo das caixas, em segundo
+      plano, e já tem os seus ecrãs, em português e em inglês: um telemóvel Android faz de caixa
+      (corre qualquer modo e desenha os ecrãs do próprio modo, com botões grandes das equipas,
+      teclado e etiquetas NFC), quem joga segue o jogo do controlador de campo, os marshals fazem a
+      cronografagem (energia, limites por classe, verificações durante o jogo, medições assinadas),
+      o registo de réplicas e as etiquetas de quem joga, e a organização abre a sua consola. A app
+      é testada num emulador Android; ainda nada correu num telemóvel a sério. Falta a ligação ao
+      controlador, as funções e posições de quem joga, o firmware do módulo de E/S e a versão iOS.
     gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."
   p4:
     title: Servidor do clube e jogo avançado

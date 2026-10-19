@@ -5,9 +5,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 3 -- Android and Players: Status
 
-**Current phase:** Implementation: plan phases A, B and C done in software; plan phases D-G pending
+**Current phase:** Implementation: plan phases A, B, C and D done in software; plan phases E-G pending
 **Risk level:** Medium
-**Last verified:** 2026-10-19 (plan phase C)
+**Last verified:** 2026-10-19 (plan phase D)
 
 ## Completed
 
@@ -25,6 +25,10 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 - [x] Plan phase C (2026-10-19): the `dart:ffi` bridge to the core, the game
   loop isolate, the FFI stub, every mode's tests through the Dart bridge, the
   core built for Android by the NDK and Gradle (see below)
+- [x] Plan phase D (2026-10-19): the app's screens (prop shell, player, marshal,
+  GM), the Flutter screen-template renderer, join by QR/NFC/text, European
+  Portuguese and English, the Kotlin plugins, the emulator CI job; iOS not
+  built (see below)
 
 ## Plan phase A (2026-10-18)
 
@@ -102,6 +106,47 @@ Not run: the APK on an Android emulator or a phone (plan phase D's
 `flutter-integration` job and plan phase G's devices), and Wokwi (its CI
 quota is used up, decision R7).
 
+## Plan phase D (2026-10-19)
+
+The app's screens, the Android prop shell and the Kotlin plugins. Run with
+`python tools/docker_app.py` (check, ndk, apk, plus `gen` and `goldens`)
+and CI's `flutter-test`, `core-android-ndk`, `flutter-build-android` and the
+new `flutter-integration` (an Android emulator).
+
+| Deliverable | Where | State |
+| --- | --- | --- |
+| Screen-template renderer (ADR-P3-4) | `app/lib/ui/template/` | Done: a Dart port of the core's YAML-subset parser and evaluator, compared with the core through `dart:ffi` (every shipped template, 2,500 mutated templates with the same messages, 4,000 expressions, 4,000 texts, 3,000 visibilities and progress values); a Flutter renderer with the LVGL renderer's layout rules on a 320x240 canvas; golden images with the firmware references' data (decision PD2) |
+| Android prop shell | `app/lib/prop/` | Done: any built-in mode (and Codes as a modifier) on the real core in a game loop isolate; team buttons (press, hold every 250 ms, release), keypad, NFC tags checked with the game key, a pod's events; the mode's screens (and the Field Box's C-only `code_entry` and `final_score` as templates); sounds as tones and vibration; the game's length sending `game.end` (PC6); admin PIN for start, pause, end, leave; screen manager (ADR-P3-5); kiosk mode and its loss (ADR-P3-9); capability mapper; battery guide by maker |
+| Join (P3-10) | `app/lib/protocol/`, `app/lib/prop/join_screen.dart` | Done: the join payload's Dart codec against `join.json`; QR code (camera), join card (NFC) or pasted text, checked with the field join key from the settings; the joined game's setup. The prop starts locally: the link to the controller is plan phase E (PD12) |
+| Player and GM roles | `app/lib/player/` | Done: the player's view on the controller's `WS /api/v1/stream` with the read code (from the scoreboard's address): time, points, objectives, lives, eliminations, GM messages, events in words; the GM console in a web view. Player tokens with roles and positions: plan phase E (PD13) |
+| Marshal | `app/lib/marshal/`, `app/lib/chrono/chrono_ui.dart`, `replica_registry_ui.dart` | Done: identity and Ed25519 key, chrono check-in and spot check (keypad, m/s or fps, BB weight, PASS/WARN/FAIL against the unverified limit templates), replica registry by NFC sticker or QR label, players' tags written for a game (PD14), retention and erasure |
+| Kotlin plugins | `app/android/app/src/main/kotlin/org/atalaia/app/` | Done and compiled into the APK: device (vibration, tones, screen, battery exemption, permissions, features), kiosk (lock task, device-owner receiver), foreground service (wake lock, Wi-Fi lock, notification), NFC (reader mode, writing), QR scanner (CameraX, ZXing: no Google Play services, PD5), USB pod (CDC ACM) and BLE pod (GATT). Run on the CI emulator (device, foreground service, the core); NFC, camera, USB and BLE not run on hardware |
+| Capability proxy codec and pod client | `app/lib/pod/` | Done: the Dart codec against `capability_proxy.yaml`; the client (IDENT, ACK, 3 retries, dedupe) against a simulated pod; pod events as inputs. No pod firmware yet (plan phase F) |
+| Languages | `app/lib/l10n/` | Done: European Portuguese by default (as players say it, "tu", inclusive), English; Material's own texts through `flutter_localizations`; decimal comma in Portuguese; team colours named in the language (PD20) |
+| iOS build | | **Not built**: no macOS in the toolchain. Code kept iOS-tolerant (PC7): no prop role on iOS (tested), no core, channels answer "not available". Steps for a Mac in `app/README.md` (PD10) |
+| CI | `.github/workflows/ci.yml` `flutter-integration` | Added: Android 11 x86_64 AOSP emulator (`reactivecircus/android-emulator-runner` v2.38.0 and `subosito/flutter-action` v2.23.0, pinned by commit), `flutter test integration_test`: 5 tests on the real APK (PD17). **Not run locally** (no KVM in Docker on Windows) |
+| Install guide | `app/README.md` | Done: `python tools/docker_app.py apk` puts `app/build/atalaia-debug.apk` on the host; adb or file copy |
+
+Tests: 520 Dart tests (`flutter test`), 222 of them new: the template engine
+against the core (18), golden images (20 of mode and shell templates; 12 of
+six screens in both languages), the prop on the real core and its screens,
+joining, the player's feed, the marshal's records, storage, translations,
+CBOR and the join vectors, the capability proxy vectors and the pod client;
+plus 5 integration tests for the emulator. C: one new core test (`{x|clock}` on
+values beyond a 64-bit integer, PD3). The APK check now also proves the APK
+holds no Google Play services or ML Kit classes.
+
+A core bug found by the differential tests was fixed: `{x|clock}` converted
+a double beyond `long long`'s range (undefined behaviour in C: x86 and ARM
+gave different texts); the core now clamps at 1e15 s (`core/src/screen_template.c`,
+test in `core/tests/test_screen_template.c`; firmware host tests and both
+ESP-IDF builds rerun, no warnings).
+
+Not run: the app on a real phone (NFC tags, the camera, USB and Bluetooth
+pods, kiosk mode as device owner, hours on battery), iOS (not built), the
+emulator tests outside CI, Wokwi (its CI quota is used up, decision R7).
+Deviations and choices: decisions PD1-PD24 in `docs/review/decisions-to-review.md`.
+
 ## Phase 2 handoff changes (2026-10-18)
 
 | Change | Impact | Files updated |
@@ -136,18 +181,18 @@ Phase G needs hardware.
 1. ~~Research~~ -- Complete
 2. ~~Architecture~~ -- Complete
 3. ~~Planning~~ -- Complete
-4. Implementation -- plan phases A, B and C done; next: plan phase D
-   (Flutter UI, Kotlin plugins, Android prop shell, template renderer,
-   iOS build, emulator job), on top of `lib/core/node_runner.dart` and
-   `GameLoopIsolate`
+4. Implementation -- plan phases A, B, C and D done; next: plan phase E
+   (the prop's link to the controller, player tokens with roles and the
+   role-filtered feed, positions, the CA fingerprint, chrono readings to the
+   controller, the Android controller role with its MQTT broker)
 
 ## How to resume with implementation
 
 Run `/sdlc phase-3-android-players --resume`.  STATE.json records
-`current_phase: "implementation"`, `phase_status: "in_progress"` (plan phases A, B and C done).
+`current_phase: "implementation"`, `phase_status: "in_progress"` (plan phases A, B, C and D done).
 
 **What can start now (no hardware, no phase 2 blockers):**
-- Phase D (Flutter UI, Kotlin plugins) depends on B and C (both done)
+- Phase E (positions, controller integration, player tokens) depends on D (done) and phase 2D (done)
 
 **What needs hardware:**
 - Phase F (I/O pod firmware) depends on Phase A and needs a Heltec board

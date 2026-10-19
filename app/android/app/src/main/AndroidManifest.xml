@@ -3,14 +3,54 @@
 SPDX-FileCopyrightText: 2026 The Atalaia contributors
 SPDX-License-Identifier: GPL-3.0-or-later
 
-Plan phase C: no permissions yet. Plan phase D adds the prop's (foreground
-service, wake lock, NFC, Bluetooth, USB host, camera, location).
+Plan phase D. Permissions: the network (the field controller's API and the
+GM console, over the field's Wi-Fi); a prop's foreground service with its
+wake and Wi-Fi locks and its notification (ADR-P3-5); the battery
+exemption, asked once; NFC (players' tags, join cards); the camera (QR
+codes); vibration; Bluetooth LE and USB host for the I/O pod. Every
+hardware feature is optional: a phone without NFC or a camera still
+installs the app. Location for player positions comes with plan phase E
+(below Android 12 a Bluetooth scan already needs it).
+
+Cleartext HTTP is allowed: the field controller serves its API and console
+over plain HTTP on the field's own network until its certificate handling
+(ADR-P3-9, plan phase E) is built (decision PD11). Backups are off: the
+settings hold the field join key and the marshal's private key.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+
     <application
         android:label="Atalaia"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -29,6 +69,29 @@ service, wake lock, NFC, Bluetooth, USB host, camera, location).
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- The QR scanner (CameraX and ZXing). -->
+        <activity
+            android:name=".QrScanActivity"
+            android:exported="false"
+            android:screenOrientation="unspecified"
+            android:theme="@style/ScanTheme" />
+        <!-- A prop's game: wake lock, Wi-Fi lock, persistent notification. -->
+        <service
+            android:name=".AtalaiaForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+        <!-- Lets a prop phone make the app its device owner (kiosk without prompts). -->
+        <receiver
+            android:name=".AtalaiaAdminReceiver"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
         <!-- Flutter's plugin registration reads this. -->
         <meta-data
             android:name="flutterEmbedding"

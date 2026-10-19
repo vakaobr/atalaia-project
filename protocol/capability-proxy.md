@@ -2,7 +2,7 @@
 
 An **I/O pod** is an ESP32 board (a Heltec WiFi LoRa 32 V4.3 or smaller) that lends its hardware to an Android phone: big buttons, an LED ring, a siren, an NFC reader and a LoRa radio (ADR-P3-2, ADR-P3-3). The pod runs no scripts; the phone runs the mode and talks to the pod over USB-OTG or Bluetooth Low Energy with the frames below. To a script on the phone, a pod's button is the same as a box's. Thin nodes (design specification section 7) use the same frames.
 
-This file is the protocol's specification, version 1 (`protocol_version: 1` in IDENT). Frozen: a change needs a new version. Shared vectors: [`vectors/capability_proxy.yaml`](vectors/capability_proxy.yaml), checked by the C codec (`core/src/proxy.c` with `firmware/esp32/main/modem/modem_framing.c`: `core/tests/test_proxy.c`, `firmware/esp32/test/test_proxy_codec.c`) and the Python one (`simulator/atalaia_sim/capability_proxy.py`: `simulator/tests/test_capability_proxy.py`). The Dart codec of the player app (phase 3 plan phase D) must pass them too.
+This file is the protocol's specification, version 1 (`protocol_version: 1` in IDENT). Frozen: a change needs a new version. Shared vectors: [`vectors/capability_proxy.yaml`](vectors/capability_proxy.yaml), checked by the C codec (`core/src/proxy.c` with `firmware/esp32/main/modem/modem_framing.c`: `core/tests/test_proxy.c`, `firmware/esp32/test/test_proxy_codec.c`) and the Python one (`simulator/atalaia_sim/capability_proxy.py`: `simulator/tests/test_capability_proxy.py`). The app's Dart codec passes them too (`app/lib/pod/pod_codec.dart`: `app/test/pod/codec_test.dart`), and its pod client (`app/lib/pod/pod_client.dart`) does the ACKs and retries below.
 
 ## Frames
 

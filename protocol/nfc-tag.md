@@ -41,4 +41,4 @@ On a Field Box the NFC reader is polled every 300 ms while a game runs; each car
 
 ## Writing tags
 
-Whoever holds the game key can write tags: the field controller, or the GM's phone. Writing them from the GM console is not built yet (a follow-up for the controller); `atalaia_tag_encode()` and `atalaia_tag_to_ndef_tag()` (C), and `tag.encode()` and `tag.to_ndef_tag()` (Python), make the bytes.
+Whoever holds the game key can write tags: the field controller, or the GM's phone. The app's marshal role writes them for a game picked with its join card or code (`app/lib/marshal/tag_writer.dart`, `lib/security/nfc_tag_signer.dart`); writing them from the GM console is not built yet (a follow-up for the controller); `atalaia_tag_encode()` and `atalaia_tag_to_ndef_tag()` (C), and `tag.encode()` and `tag.to_ndef_tag()` (Python), make the bytes.

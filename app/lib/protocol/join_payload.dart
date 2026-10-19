@@ -1,0 +1,370 @@
+// SPDX-FileCopyrightText: 2026 The Atalaia contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+/// Join payloads (protocol/join.md, ADR-P2-12): the Dart side of
+/// core/src/join.c and simulator/atalaia_sim/join.py, checked against the
+/// same vectors (protocol/vectors/join.json).
+///
+///     version (1 byte, 1) | body (CBOR map, integer keys) | HMAC-SHA256 (32)
+///
+/// The tag is HMAC-SHA256 over the version byte and the body, keyed with the
+/// field's 32-byte join key. An Android prop joins a game by reading one
+/// (decision P3-10): the QR code's text form `atalaia:join:...`, typed or
+/// scanned, or a join card over NFC (MIME record application/vnd.atalaia.join).
+/// The app checks the tag with the field join key entered once in its
+/// settings, then uses the game's id and key, its node id, mode, role, teams,
+/// parameters and seed.
+library;
+
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:crypto/crypto.dart';
+
+import '../security/bytes.dart';
+import 'cbor.dart';
+
+const int joinVersion = 1;
+const int joinMaxLength = 448;
+const int joinMacSize = 32;
+const int joinKeySize = 32;
+const int gameKeySize = 16;
+const String joinTextPrefix = 'atalaia:join:';
+const String joinNdefType = 'application/vnd.atalaia.join';
+
+/// Why a payload is refused: the tag check comes before the body, so a
+/// forged card says `mac`, never what is inside it.
+enum JoinFailure { length, version, mac, body }
+
+class JoinException implements Exception {
+  JoinException(this.reason, this.message);
+  final JoinFailure reason;
+  final String message;
+  @override
+  String toString() => 'JoinException(${reason.name}): $message';
+}
+
+enum JoinKind { node, controller }
+
+/// EU868 sub-bands (RFC 0001 Amendment 1 and 3): a channel's whole 125 kHz
+/// must fit inside one.
+const _subBands = [
+  (868000000, 868600000),
+  (868700000, 869200000),
+  (869400000, 869650000),
+  (869700000, 870000000),
+];
+
+bool channelOk(int hz) {
+  const half = 125000 ~/ 2;
+  return _subBands.any((b) => b.$1 <= hz - half && hz + half <= b.$2);
+}
+
+final class JoinPayload {
+  JoinPayload({
+    required this.gameId,
+    required this.gameKey,
+    required this.nodeId,
+    required this.controllerId,
+    required this.channelHz,
+    required this.maxHops,
+    required this.teams,
+    required this.modeId,
+    required this.role,
+    required this.gameSeed,
+    required this.params,
+    required this.kind,
+  });
+
+  final int gameId;
+  final Uint8List gameKey;
+  final int nodeId;
+  final int controllerId;
+  final int channelHz;
+  final int maxHops;
+  final List<String> teams;
+
+  /// A main mode with its modifiers joined by '+', main mode first.
+  final String modeId;
+  final String role;
+  final int gameSeed;
+
+  /// Null: the mode's defaults.
+  final Map<String, Object?>? params;
+  final JoinKind kind;
+
+  /// The parts of [modeId]: the main mode, then its modifiers.
+  List<String> get modeParts => modeId.split('+');
+
+  @override
+  String toString() =>
+      'JoinPayload(game $gameId, node $nodeId, $modeId/$role, $teams)';
+}
+
+JoinException _body(String why) => JoinException(JoinFailure.body, why);
+
+String _text(String name, Object? v, int maxBytes) {
+  if (v is! String) throw _body('$name must be text');
+  final n = utf8.encode(v).length;
+  if (n < 1 || n > maxBytes || v.contains('\u0000')) {
+    throw _body('$name: 1 to $maxBytes bytes of UTF-8 without NUL');
+  }
+  return v;
+}
+
+int _uint(String name, Object? v, int lo, int hi) {
+  if (v is! int || v < lo || v > hi) {
+    throw _body('$name must be an integer from $lo to $hi');
+  }
+  return v;
+}
+
+const _maxKeys = 128;
+
+/// Parameter values are JSON values, with the core codec's limits.
+void _checkValue(Object? v, int depth, List<int> openKeys) {
+  if ((v is List || v is Map) && depth >= cborMaxDepth) {
+    throw _body('params: data nested more than ${cborMaxDepth - 1} deep');
+  }
+  if (v == null || v is bool || v is String || v is double || v is int) {
+    return;
+  }
+  if (v is List) {
+    for (final x in v) {
+      _checkValue(x, depth + 1, openKeys);
+    }
+    return;
+  }
+  if (v is Map) {
+    for (final e in v.entries) {
+      if (e.key is! String) throw _body('params: data keys must be text');
+      openKeys[0]++;
+      if (openKeys[0] > _maxKeys) {
+        throw _body('params: too many keys in nested data');
+      }
+      _checkValue(e.value, depth + 1, openKeys);
+    }
+    return;
+  }
+  throw _body('params cannot hold byte strings');
+}
+
+/// Checks a join's fields as both codecs do.
+JoinPayload _validate(Map<String, Object?> j) {
+  const required = [
+    'game_id', 'game_key', 'node_id', 'controller_id', 'channel_hz', //
+    'max_hops', 'teams', 'mode_id', 'role', 'game_seed', 'kind',
+  ];
+  final missing = required.where((k) => !j.containsKey(k)).toList()..sort();
+  if (missing.isNotEmpty) {
+    throw _body('missing join fields: ${missing.join(', ')}');
+  }
+  final gameId = _uint('game_id', j['game_id'], 1, 0xfffe);
+  final key = j['game_key'];
+  if (key is! Uint8List || key.length != gameKeySize) {
+    throw _body('game_key must be 16 bytes');
+  }
+  final nodeId = _uint('node_id', j['node_id'], 0, 0xfffe);
+  final controllerId = _uint('controller_id', j['controller_id'], 0, 0xfffe);
+  if (nodeId == controllerId) {
+    throw _body('node_id and controller_id must differ');
+  }
+  final channel = _uint('channel_hz', j['channel_hz'], 0, 0xffffffff);
+  if (!channelOk(channel)) {
+    throw _body(
+      'channel_hz: the 125 kHz channel must fit inside an EU868 sub-band',
+    );
+  }
+  final maxHops = _uint('max_hops', j['max_hops'], 1, 3);
+  final teams = j['teams'];
+  if (teams is! List || teams.isEmpty || teams.length > 8) {
+    throw _body('teams: 1 to 8 names');
+  }
+  final names = [for (final t in teams) _text('team name', t, 23)];
+  if (names.toSet().length != names.length) {
+    throw _body('team names must differ');
+  }
+  final modeId = _text('mode_id', j['mode_id'], 63);
+  final role = _text('role', j['role'], 31);
+  final seed = _uint('game_seed', j['game_seed'], 0, 0xffffffff);
+  final params = j['params'];
+  Map<String, Object?>? p;
+  if (params != null) {
+    if (params is! Map || params.keys.any((k) => k is! String)) {
+      throw _body('params must be a map with text keys');
+    }
+    p = params.cast<String, Object?>();
+    _checkValue(p, 1, [0]);
+    if (utf8.encode(jsonEncode(p)).length > 200) {
+      throw _body('params: the JSON form is over 200 bytes');
+    }
+  }
+  final kind = j['kind'];
+  if (kind is! JoinKind) throw _body('kind must be node or controller');
+  return JoinPayload(
+    gameId: gameId,
+    gameKey: key,
+    nodeId: nodeId,
+    controllerId: controllerId,
+    channelHz: channel,
+    maxHops: maxHops,
+    teams: names,
+    modeId: modeId,
+    role: role,
+    gameSeed: seed,
+    params: p,
+    kind: kind,
+  );
+}
+
+const _keys = {
+  1: 'game_id', 2: 'game_key', 3: 'node_id', 4: 'controller_id', //
+  5: 'channel_hz', 6: 'max_hops', 7: 'teams', 8: 'mode_id', 9: 'role',
+  10: 'game_seed', 11: 'params', 12: 'kind',
+};
+
+bool _hasBytes(Object? v) => switch (v) {
+  Uint8List() => true,
+  final List<Object?> l => l.any(_hasBytes),
+  final Map<Object?, Object?> m => m.values.any(_hasBytes),
+  _ => false,
+};
+
+/// Checks the tag (in constant time) with [joinKey], then the body.
+/// Throws [JoinException].
+JoinPayload decodeJoin(List<int> data, List<int> joinKey) {
+  if (data.length < 1 + 1 + joinMacSize || data.length > joinMaxLength) {
+    throw JoinException(
+      JoinFailure.length,
+      'a join payload is 34 to $joinMaxLength bytes, not ${data.length}',
+    );
+  }
+  if (data[0] != joinVersion) {
+    throw JoinException(
+      JoinFailure.version,
+      'unknown join format version ${data[0]}',
+    );
+  }
+  final signed = data.sublist(0, data.length - joinMacSize);
+  final tag = data.sublist(data.length - joinMacSize);
+  final mac = Hmac(sha256, joinKey).convert(signed).bytes;
+  if (!constantTimeEquals(mac, tag)) {
+    throw JoinException(
+      JoinFailure.mac,
+      "the join payload's tag does not match this field's join key",
+    );
+  }
+  final Object? raw;
+  try {
+    raw = cborDecode(signed.sublist(1), allowBytes: true);
+  } on CborException catch (e) {
+    throw _body('join body: ${e.message}');
+  }
+  if (raw is! Map) throw _body('the join body must be a map');
+  final j = <String, Object?>{};
+  for (final e in raw.entries) {
+    final k = e.key;
+    if (k is! int || k < 0 || k >= 32) {
+      throw _body('join body key $k: keys are integers below 32');
+    }
+    final name = _keys[k];
+    if (name == null) continue; // an optional field a newer controller adds
+    var v = e.value;
+    if (name == 'kind') {
+      if (v is! int || v < 0 || v > 1) throw _body('unknown join kind $v');
+      v = JoinKind.values[v];
+    }
+    j[name] = v;
+  }
+  if (j.containsKey('game_key') && j['game_key'] is! Uint8List) {
+    throw _body('game_key must be a byte string');
+  }
+  for (final name in ['teams', 'mode_id', 'role', 'params']) {
+    if (_hasBytes(j[name])) throw _body('$name must be text');
+  }
+  return _validate(j);
+}
+
+/// The payload for [j], tagged with [joinKey] (the controller's side; the app
+/// uses it in tests and to make test cards).
+Uint8List encodeJoin(JoinPayload j, List<int> joinKey) {
+  if (joinKey.length != joinKeySize) {
+    throw ArgumentError('the join key is $joinKeySize bytes');
+  }
+  final v = _validate({
+    'game_id': j.gameId,
+    'game_key': j.gameKey,
+    'node_id': j.nodeId,
+    'controller_id': j.controllerId,
+    'channel_hz': j.channelHz,
+    'max_hops': j.maxHops,
+    'teams': j.teams,
+    'mode_id': j.modeId,
+    'role': j.role,
+    'game_seed': j.gameSeed,
+    'params': j.params,
+    'kind': j.kind,
+  });
+  final body = <int, Object?>{
+    1: v.gameId,
+    2: v.gameKey,
+    3: v.nodeId,
+    4: v.controllerId,
+    5: v.channelHz,
+    6: v.maxHops,
+    7: v.teams,
+    8: v.modeId,
+    9: v.role,
+    10: v.gameSeed,
+    if (v.params != null) 11: v.params,
+    12: v.kind.index,
+  };
+  final signed = Uint8List.fromList([joinVersion, ...cborEncode(body)]);
+  final out = Uint8List.fromList([
+    ...signed,
+    ...Hmac(sha256, joinKey).convert(signed).bytes,
+  ]);
+  if (out.length > joinMaxLength) {
+    throw JoinException(
+      JoinFailure.length,
+      'the join payload is ${out.length} bytes; at most $joinMaxLength fit',
+    );
+  }
+  return out;
+}
+
+/// The QR code and console form: "atalaia:join:" + base64url, no padding.
+String joinToText(List<int> payload) =>
+    joinTextPrefix + base64Url.encode(payload).replaceAll('=', '');
+
+/// The payload in a join text. Spaces and line ends around it are ignored;
+/// anything not canonical base64url is refused (reason `length`).
+Uint8List joinFromText(String text) {
+  final t = text.trim();
+  if (!t.startsWith(joinTextPrefix)) {
+    throw JoinException(
+      JoinFailure.length,
+      'a join text starts with $joinTextPrefix',
+    );
+  }
+  final b64 = t.substring(joinTextPrefix.length);
+  if (b64.length % 4 == 1 || !RegExp(r'^[A-Za-z0-9_-]*$').hasMatch(b64)) {
+    throw JoinException(JoinFailure.length, 'the join text is not base64url');
+  }
+  final Uint8List raw;
+  try {
+    raw = base64Url.decode(b64.padRight((b64.length + 3) ~/ 4 * 4, '='));
+  } on FormatException {
+    throw JoinException(JoinFailure.length, 'the join text is not base64url');
+  }
+  if (joinToText(raw) != joinTextPrefix + b64) {
+    throw JoinException(
+      JoinFailure.length,
+      'the join text is not in canonical base64url',
+    );
+  }
+  return raw;
+}
+
+/// Whether [text] looks like a join text (before any check).
+bool isJoinText(String text) => text.trim().startsWith(joinTextPrefix);

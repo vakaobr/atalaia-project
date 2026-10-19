@@ -7,11 +7,12 @@
 # To change a dependency: edit the pin here, then `python tools/docker_app.py lock`.
 name: atalaia_app
 description: >-
-  Atalaia's app for players, marshals, GMs and Android props. Plan phases B
-  and C: chrono check-in logic, player tags and tokens, and the dart:ffi
-  bridge to the shared C core with its game loop isolate (no UI yet).
+  Atalaia's app for players, marshals, GMs and Android props: the prop shell
+  that runs a game mode on the shared C core (dart:ffi, game loop isolate)
+  and draws its YAML screens, the player and GM views, the marshal's chrono
+  check-in, player tags and join cards.
 publish_to: none
-version: 0.1.0
+version: 0.2.0
 
 environment:
   sdk: ^3.12.0
@@ -20,20 +21,33 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # HMAC-SHA256 for player tags and player tokens (Dart team, pure Dart).
+  # Material widgets' own strings in European Portuguese (part of the SDK).
+  flutter_localizations:
+    sdk: flutter
+  # HMAC-SHA256 for player tags, player tokens and join payloads (Dart team, pure Dart).
   crypto: 3.0.7
   # Ed25519 for chrono records; the pure-Dart implementation (DartEd25519) is used.
   cryptography: 2.9.0
   # calloc, malloc and UTF-8 strings for the dart:ffi bridge to the core (Dart team).
   ffi: 2.2.0
-  # Limit templates (and the screen templates in plan phase D).
+  # QR code matrices for the qr_code template widget (kevmoo.com, pure Dart);
+  # the app draws the modules itself (lib/ui/qr_painter.dart).
+  qr: 4.0.0
+  # The GM role shows the field controller's GM console (flutter.dev; the
+  # system WebView on Android, WKWebView on iOS).
+  webview_flutter: 4.14.1
+  # Limit templates, mode manifests and screen templates.
   yaml: 3.1.4
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # On-device tests (integration_test/, CI's flutter-integration job).
+  integration_test:
+    sdk: flutter
   flutter_lints: 6.0.0
 
 flutter:
+  uses-material-design: true
   assets:
     - lib/chrono/limit_templates/

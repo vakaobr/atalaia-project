@@ -2,7 +2,7 @@
 
 A box, or a second field controller standing by, joins a game with a **join payload**: everything it needs to take part, carried by an NFC card, a QR code (or its text) or the serial console, and never over LoRa (ADR-P2-12, RFC 0001 section 9). The field controller makes it; this file is its specification, version 1.
 
-Implementations: [`core/src/join.c`](../core/src/join.c) (C: boxes, the host test programs) and [`simulator/atalaia_sim/join.py`](../simulator/atalaia_sim/join.py) (Python: the field controller). Both check the shared vectors in [`vectors/join.json`](vectors/join.json): 4 valid payloads (decode, re-encode byte for byte, text form, NFC tag memory, refused under another key), 38 invalid ones that must fail with the stated reason, an optional-field case, and RFC 4231 HMAC-SHA256 known answers.
+Implementations: [`core/src/join.c`](../core/src/join.c) (C: boxes, the host test programs), [`simulator/atalaia_sim/join.py`](../simulator/atalaia_sim/join.py) (Python: the field controller) and [`app/lib/protocol/join_payload.dart`](../app/lib/protocol/join_payload.dart) (Dart: Android props joining by QR code, card or text, and the marshal's tag writer). All check the shared vectors in [`vectors/join.json`](vectors/join.json): 4 valid payloads (decode, re-encode byte for byte, text form, NFC tag memory, refused under another key), 38 invalid ones that must fail with the stated reason, an optional-field case, and RFC 4231 HMAC-SHA256 known answers.
 
 ## Layout
 

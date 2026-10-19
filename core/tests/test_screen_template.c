@@ -152,7 +152,8 @@ static void test_layout_and_styles(void)
 
 static void test_expressions(void)
 {
-    const char *d = "{\"left\":7,\"big\":5400,\"team\":\"red\",\"zero\":0,\"f\":2.5,\"neg\":-3,"
+    const char *d = "{\"left\":7,\"big\":5400,\"huge\":1e22,\"team\":\"red\",\"zero\":0,\"f\":2.5,"
+                    "\"neg\":-3,"
                     "\"ok\":true,\"no\":false,\"none\":null,\"name\":\"a\\\"b\\u00e7\","
                     "\"obj\":{\"inner\":{\"x\":4},\"s\":\"deep\"},\"list\":[1,2]}";
     const char *p = "{\"fuse_s\":300,\"attackers\":\"blue\"}";
@@ -160,6 +161,9 @@ static void test_expressions(void)
     SAME(text("{left|clock}", d, p), "0:07");
     SAME(text("{big|clock}", d, p), "1:30:00");
     SAME(text("{neg|clock}", d, p), "0:00");
+    /* Beyond long long's range: clamped to 1e15 s, not converted (undefined). */
+    SAME(text("{huge|clock}", d, p), "277777777777:46:40");
+    SAME(text("{-huge|clock}", d, p), "0:00");
     SAME(text("{f}", d, p), "2.5");
     SAME(text("{f|int}", d, p), "2");
     SAME(text("{1/3}", d, p), "0.33");

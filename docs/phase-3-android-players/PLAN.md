@@ -398,6 +398,19 @@ MSYS_NO_PATHCONV=1 docker run --rm ^
 
 ## Phase D: Flutter UI, Kotlin plugins, Android prop shell, iOS build
 
+**Status (2026-10-19): done in software, iOS not built.** What was built, and
+where it differs from this section, is in `STATUS.md` ("Plan phase D") and
+decisions PD1-PD24 of `docs/review/decisions-to-review.md`. In short: the
+template renderer ports the core's YAML-subset parser instead of using the
+`yaml` package, checked against the core (PD2); the QR scanner is CameraX and
+ZXing, not `mobile_scanner` (ML Kit needs Google Play services, PD5); no
+`geolocator`, `flutter_blue_plus`, `usb_serial`, `nfc_manager` or
+`qr_flutter`: the app's own Kotlin plugins and the `qr` package (PD19);
+positions and the controller role stay in plan phase E (PD1); iOS cannot be
+built without a Mac, so there is no `ios/` folder (PD10); the emulator runs
+the AOSP image, without Google APIs (PD17). A core bug found by the
+renderer's tests was fixed (`{x|clock}` beyond 64-bit integers, PD3).
+
 ### Goal
 
 Build the Flutter UI for all four roles (prop, controller, GM, player),

@@ -145,7 +145,7 @@ Steps that target a node take `node:`, which can be left out when the game has o
 
 ## Screens
 
-`ui.screen(name, data)` shows one of the mode's screens. A mode ships its screens as YAML templates in `assets/screens/<name>.yaml` (ADR-P3-4); the Field Box draws them with LVGL and the Android app will draw the same files with Flutter. A name without a template falls back to the Field Box's built-in screens (`code_entry`, used by Codes and Bomb's team codes, and the older C versions of the screens below), so Hold-All, Last Stand and Codes keep their C screens for now.
+`ui.screen(name, data)` shows one of the mode's screens. A mode ships its screens as YAML templates in `assets/screens/<name>.yaml` (ADR-P3-4); the Field Box draws them with LVGL and the Android app draws the same files with Flutter (`app/lib/ui/template/`, the same parser and expressions ported to Dart and checked against the core's). A name without a template falls back to the Field Box's built-in screens (`code_entry`, used by Codes and Bomb's team codes, and the older C versions of the screens below), so Hold-All, Last Stand and Codes keep their C screens for now; the app has `code_entry` and `final_score` as templates of its own (`app/lib/prop/shell_screens.dart`).
 
 ```yaml
 template: countdown              # the file's name

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: GPL-3.0-or-later
+
+The device-admin component asks for no policies: it only lets a phone kept
+as a prop make Atalaia its device owner, for kiosk mode without prompts.
+-->
+<device-admin>
+    <uses-policies />
+</device-admin>
