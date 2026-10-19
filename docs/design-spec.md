@@ -489,6 +489,7 @@ The explosion is its own timer rather than a countdown in the display tick, so i
 | Hardware | `cap("ring"):fill(team)`, `ui.screen(template, data)`, `audio.play(clip)`, `audio.say(text)` |
 | Field (controller only) | `field.nodes(role)`, `field.owner(node)`, `field.common_owner(list)`, `field.send(node, cmd)` |
 | Utilities | `params`, `rand(a, b)` (seeded per game for replays), `log(msg)` |
+| Geo | `geo.distance(lat1, lon1, lat2, lon2)` (metres, haversine on a 6,371 km sphere), `geo.in_zone(lat, lon, zone)` with `{ type = "circle", lat, lon, radius_m }` or `{ type = "polygon", points = { {lat, lon}, ... } }` (3-32 points; the edge is inside); WGS 84 degrees; the same result to the bit on every platform, so replays agree (ADR-P4-9, decisions M3-1 to M3-3) |
 
 ### Sandbox rules
 

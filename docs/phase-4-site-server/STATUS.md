@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Implementation (plan phases 1, 2, 10, 11 and 12 built in software, 2026-10-20)
+**Current phase:** Implementation (plan phases 1, 2, 3, 10, 11 and 12 built in software, 2026-10-20)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-20 (plan phase 12, full clean-copy check)
-**Next step:** plan phase 3 (geo utilities in the core) on the modes chain; plan phase 13 (controller sync) on the site server chain
+**Last verified:** 2026-10-20 (plan phase 3, full clean-copy check)
+**Next step:** plan phase 4 (Hacking Terminal) on the modes chain; plan phase 13 (controller sync) on the site server chain
 
 ## Completed
 
@@ -41,8 +41,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 |---|------------|-------------------------|------------|--------|
 | 1 | Master and Satellites | Software, now | -- | Done in software (2026-10-19; not on radio hardware) |
 | 2 | Target Windows (logic), `game.teams()`, `hit` input | Software, now | -- | Done in software (2026-10-19; the addon: HW2) |
-| 3 | Geo utilities in the core | Software, now | -- | **Next** |
-| 4 | Hacking Terminal | Software, now | -- | Pending |
+| 3 | Geo utilities in the core | Software, now | -- | Done in software (2026-10-20) |
+| 4 | Hacking Terminal | Software, now | -- | **Next** |
 | 5 | VIP / Payload | Software, now | 3 | Pending |
 | 6 | Scenario packages and the objectives role package | Software, now | -- | Pending |
 | 7 | Scenario compiler and validator | Software, now | 3, 6 | Pending |
@@ -116,6 +116,31 @@ Dart codecs, the picker's pages in the firmware host tests with two
 reference images, three reference images and three app goldens of the
 mode's screens. Not run: Wokwi (R7), any hardware (there is no addon
 yet). Decisions M2-1 to M2-5 (open).
+
+## Plan phase 3: geo utilities in the core (built 2026-10-20, in software)
+
+`geo.distance(lat1, lon1, lat2, lon2)` (metres, haversine on 6,371 km)
+and `geo.in_zone(lat, lon, zone)` (a circle, or a polygon of 3 to 32
+points; the edge is inside) for node and field scripts, in
+`core/src/geo.c` (ADR-P4-9). Argument errors are `script.error`.
+Results are the same to the bit on every platform (M3-1): only
+`+ - * /` and `sqrt`, its own sine, cosine and arc tangent, and
+`-ffp-contract=off` in the core's, the Field Box's and the firmware host
+tests' builds. The Field Box image grew by 5.4 KB (`0x1710c0`, 28 % of
+the 2 MB OTA slot free).
+
+Tested: `protocol/vectors/geo.json` (27 distances, of which 11 known
+answers from Rosetta Code, GeographicLib and arc identities and 16
+determinism pins; 24 zone cases; 18 argument errors) in C
+(`core/tests/test_geo.c`, through the C functions and from Lua; a
+`field.lua` check in `test_field_api.c`) and from Lua through the shared
+library (`simulator/tests/test_geo.py`); ASan/UBSan; firmware host tests
+and the Field Box, modem and pod builds. Checked once by hand: the
+core's `ctest` on arm64 and armv7 with gcc and clang (Alpine in QEMU)
+and the vectors' exact bits in an ESP-IDF app on the ESP32 and ESP32-S3
+in Espressif's QEMU. Not run: Wokwi (R7), real boards, Dart (no mode
+uses `geo` yet; VIP / Payload, plan phase 5, will). Decisions M3-1 to
+M3-3 (open).
 
 ## Plan phase 10: site server skeleton (built 2026-10-19, in software)
 

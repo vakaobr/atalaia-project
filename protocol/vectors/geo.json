@@ -1,0 +1,1198 @@
+{
+  "description": "Known answers for geo.distance and geo.in_zone (ADR-P4-9), read by core/tests/test_geo.c (through core/tests/geo_vectors.h, made by tools/protogen.py) and simulator/tests/test_geo.py. 'metres' and 'inside' come from the cited source, never from the implementation; a distance passes within tolerance_m. 'bits' is the IEEE 754 double the implementation returns, the same on every platform (decision M3-1): a determinism pin, checked exactly, not a known answer.",
+  "radius_m": 6371000.0,
+  "distances": [
+    {
+      "name": "bna_lax",
+      "a": [
+        36.12,
+        -86.67
+      ],
+      "b": [
+        33.94,
+        -118.4
+      ],
+      "metres": 2886444.4428379834,
+      "tolerance_m": 1e-06,
+      "source": "Rosetta Code, 'Haversine formula' task (https://rosettacode.org/wiki/Haversine_formula): BNA (36.12, -86.67) to LAX (33.94, -118.40), '6371.0 km -> 2886.44444283798329974715782394574671655 km'",
+      "bits": "0x4146059638aeea40"
+    },
+    {
+      "name": "lisbon_porto",
+      "a": [
+        38.7223,
+        -9.1393
+      ],
+      "b": [
+        41.1579,
+        -8.6291
+      ],
+      "metres": 274000.0,
+      "tolerance_m": 1000.0,
+      "source": "ADR-P4-9's test: Lisbon (38.7223, -9.1393) to Porto (41.1579, -8.6291), about 274 km, +/- 1 km",
+      "bits": "0x4110bdde05deec86"
+    },
+    {
+      "name": "jfk_sin_wgs84",
+      "a": [
+        40.63972222222222,
+        -73.77888888888889
+      ],
+      "b": [
+        1.3591666666666669,
+        103.98944444444444
+      ],
+      "metres": 15347628.0,
+      "tolerance_m": 76738.14,
+      "source": "GeographicLib GeodSolve(1) manual, EXAMPLES (https://geographiclib.sourceforge.io/C++/doc/GeodSolve.1.html): JFK 40:38:23N 073:46:44W to SIN 01:21:33N 103:59:22E is 15347628 m on the WGS84 ellipsoid; the sphere is within ADR-P4-9's 0.5 %",
+      "bits": "0x416d4203758ad6ef"
+    },
+    {
+      "name": "meridian_1m",
+      "a": [
+        38.7223,
+        -9.1393
+      ],
+      "b": [
+        38.72230899321605,
+        -9.1393
+      ],
+      "metres": 1.0,
+      "tolerance_m": 1e-06,
+      "source": "Along a meridian the haversine distance is R * dlat (dlat in radians), so lat + 1 m * 180 / (pi * 6371000 m) is 1 m away",
+      "bits": "0x3fefffffffd3d2dd"
+    },
+    {
+      "name": "meridian_100m",
+      "a": [
+        38.7223,
+        -9.1393
+      ],
+      "b": [
+        38.72319932160592,
+        -9.1393
+      ],
+      "metres": 100.0,
+      "tolerance_m": 1e-06,
+      "source": "As meridian_1m, 100 m",
+      "bits": "0x4059000000004504"
+    },
+    {
+      "name": "equator_100m",
+      "a": [
+        0.0,
+        0.0
+      ],
+      "b": [
+        0.0,
+        0.0008993216059187306
+      ],
+      "metres": 100.0,
+      "tolerance_m": 1e-06,
+      "source": "Along the equator the haversine distance is R * dlon, so 100 m * 180 / (pi * 6371000 m) of longitude is 100 m",
+      "bits": "0x4059000000000000"
+    },
+    {
+      "name": "same_point",
+      "a": [
+        38.7223,
+        -9.1393
+      ],
+      "b": [
+        38.7223,
+        -9.1393
+      ],
+      "metres": 0.0,
+      "tolerance_m": 0.0,
+      "source": "A point is 0 m from itself",
+      "bits": "0x0000000000000000"
+    },
+    {
+      "name": "antipodes_equator",
+      "a": [
+        0.0,
+        0.0
+      ],
+      "b": [
+        0.0,
+        180.0
+      ],
+      "metres": 20015086.79602057,
+      "tolerance_m": 1e-06,
+      "source": "Antipodes are half a great circle apart: pi * 6371000 m = 20015086.796... m",
+      "bits": "0x4173167eecbc8011"
+    },
+    {
+      "name": "antipodes_poles",
+      "a": [
+        90.0,
+        0.0
+      ],
+      "b": [
+        -90.0,
+        0.0
+      ],
+      "metres": 20015086.79602057,
+      "tolerance_m": 1e-06,
+      "source": "As antipodes_equator, pole to pole",
+      "bits": "0x4173167eecbc8011"
+    },
+    {
+      "name": "antipodes_lisbon",
+      "a": [
+        38.7223,
+        -9.1393
+      ],
+      "b": [
+        -38.7223,
+        170.8607
+      ],
+      "metres": 20015086.79602057,
+      "tolerance_m": 1.0,
+      "source": "As antipodes_equator; haversine is ill-conditioned next to antipodes, hence 1 m",
+      "bits": "0x4173167ee9b2ca51"
+    },
+    {
+      "name": "across_180",
+      "a": [
+        10.0,
+        179.9
+      ],
+      "b": [
+        10.0,
+        -179.9
+      ],
+      "metres": 21901.125171037038,
+      "tolerance_m": 1.0,
+      "source": "0.2 degrees of longitude across the 180th meridian at 10 N: about R * cos(10 deg) * 0.2 deg (a parallel's arc, longer than the great circle by under 1 mm)",
+      "bits": "0x40d56347fd4f1972"
+    },
+    {
+      "name": "pin_0",
+      "a": [
+        -31.71010233003077,
+        -125.6942973871793
+      ],
+      "b": [
+        27.16820514717368,
+        -153.9229367996846
+      ],
+      "source": "determinism pin: inputs at random, no expected value",
+      "bits": "0x415b753e6a78ed2c"
+    },
+    {
+      "name": "pin_1",
+      "a": [
+        6.4587607752040554,
+        -48.35198991146922
+      ],
+      "b": [
+        6.4499207536995495,
+        -48.35184119680543
+      ],
+      "source": "determinism pin: inputs at random, no expected value",
+      "bits": "0x408eb8d2ad6283ce"
+    },
+    {
+      "name": "pin_2",
+      "a": [
+        -83.25078148044273,
+        -23.887553881541095
+      ],
+      "b": [
+        -77.4260237565686,
+        -147.34331519620858
+      ],
+      "source": "determinism pin: inputs at random, no expected value",
+      "bits": "0x413d39f043a6a253"
+    },
+    {
+      "name": "pin_3",
+      "a": [
+        -13.586545954347486,
+        117.66676488193372
+      ],
+      "b": [
+        -13.594069915124493,
+        117.66122966122586
+      ],
+      "source": "determinism pin: inputs at random, no expected value",
+      "bits": "0x4090121436f8cfd4"
+    },
+    {
+      "name": "pin_4",
+      "a": [
+        22.93798003300607,
+        161.17521928452203
+      ],
+      "b": [
+        13.878530751149754,
+        -37.195029125719145
+      ],
+      "source": "determinism pin: inputs at random, no expected value",
+      "bits": "0x416d7c4a384899f9"
+    },
+    {
+      "name": "pin_5",
+      "a": [
+        85.7259190067256,
+        -163.23023497760775
+      ],
+      "b": [
+        85.73308837590658,
+        -163.23444279188112
+      ],
+      "source": "determinism pin: inputs at random, no expected value",
+      "bits": "0x4088efaaf9825131"
+    },
+    {
+      "name": "pin_6",
+      "a": [
+        -64.03408499566125,
+        -137.5947942917874
+      ],
+      "b": [
+        -34.473271661651815,
+        113.80548928321133
+      ],
+      "source": "determinism pin: inputs at random, no expected value",
+      "bits": "0x415c56f93ad97eaa"
+    },
+    {
+      "name": "pin_7",
+      "a": [
+        -57.469251613691256,
+        29.376058918487843
+      ],
+      "b": [
+        -57.46647334431273,
+        29.373506869342357
+      ],
+      "source": "determinism pin: inputs at random, no expected value",
+      "bits": "0x40758910a356fed4"
+    },
+    {
+      "name": "pin_8",
+      "a": [
+        8.5940038277204,
+        -157.39596900960368
+      ],
+      "b": [
+        -79.27178940607811,
+        -105.85486338504245
+      ],
+      "source": "determinism pin: inputs at random, no expected value",
+      "bits": "0x41637b20ac1bcbea"
+    },
+    {
+      "name": "pin_9",
+      "a": [
+        32.47199517272146,
+        -26.066769959014977
+      ],
+      "b": [
+        32.468278116129,
+        -26.065058721744823
+      ],
+      "source": "determinism pin: inputs at random, no expected value",
+      "bits": "0x407bb663b2c9af13"
+    },
+    {
+      "name": "pin_10",
+      "a": [
+        -8.426812253260437,
+        -72.08388112907436
+      ],
+      "b": [
+        52.9883066740484,
+        71.63799614264565
+      ],
+      "source": "determinism pin: inputs at random, no expected value",
+      "bits": "0x416adcef1f4cdaa5"
+    },
+    {
+      "name": "pin_11",
+      "a": [
+        -46.06262807001248,
+        26.79253569312155
+      ],
+      "b": [
+        -46.06212413993625,
+        26.800038443033017
+      ],
+      "source": "determinism pin: inputs at random, no expected value",
+      "bits": "0x40822caa286df2d9"
+    },
+    {
+      "name": "pin_12",
+      "a": [
+        41.300152099059176,
+        -76.34240463953286
+      ],
+      "b": [
+        86.43147254866477,
+        -137.49631982821364
+      ],
+      "source": "determinism pin: inputs at random, no expected value",
+      "bits": "0x4153f5bfbc75187c"
+    },
+    {
+      "name": "pin_13",
+      "a": [
+        -14.737892078659101,
+        92.5707346434898
+      ],
+      "b": [
+        -14.74485238796589,
+        92.57051390549931
+      ],
+      "source": "determinism pin: inputs at random, no expected value",
+      "bits": "0x4088328520b8c963"
+    },
+    {
+      "name": "pin_14",
+      "a": [
+        -82.94269373146122,
+        60.557708352382264
+      ],
+      "b": [
+        47.62275591830635,
+        26.289338499858218
+      ],
+      "source": "determinism pin: inputs at random, no expected value",
+      "bits": "0x416bec53b6ed5f8a"
+    },
+    {
+      "name": "pin_15",
+      "a": [
+        67.58600612955988,
+        -67.05089537468517
+      ],
+      "b": [
+        67.58991203688535,
+        -67.04900797714306
+      ],
+      "source": "determinism pin: inputs at random, no expected value",
+      "bits": "0x407b9a0581e81afc"
+    }
+  ],
+  "zones": [
+    {
+      "name": "rosetta_square_5_5",
+      "point": [
+        5.0,
+        5.0
+      ],
+      "zone": {
+        "type": "polygon",
+        "points": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            10
+          ],
+          [
+            10,
+            10
+          ],
+          [
+            10,
+            0
+          ]
+        ]
+      },
+      "inside": true,
+      "source": "Rosetta Code, 'Ray-casting algorithm' task (https://rosettacode.org/wiki/Ray-casting_algorithm), the Ada solution's output for the point (5.0,5.0) in the polygon 'Square': TRUE"
+    },
+    {
+      "name": "rosetta_square_5_8",
+      "point": [
+        8.0,
+        5.0
+      ],
+      "zone": {
+        "type": "polygon",
+        "points": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            10
+          ],
+          [
+            10,
+            10
+          ],
+          [
+            10,
+            0
+          ]
+        ]
+      },
+      "inside": true,
+      "source": "Rosetta Code, 'Ray-casting algorithm' task (https://rosettacode.org/wiki/Ray-casting_algorithm), the Ada solution's output for the point (5.0,8.0) in the polygon 'Square': TRUE"
+    },
+    {
+      "name": "rosetta_square_m10_5",
+      "point": [
+        5.0,
+        -10.0
+      ],
+      "zone": {
+        "type": "polygon",
+        "points": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            10
+          ],
+          [
+            10,
+            10
+          ],
+          [
+            10,
+            0
+          ]
+        ]
+      },
+      "inside": false,
+      "source": "Rosetta Code, 'Ray-casting algorithm' task (https://rosettacode.org/wiki/Ray-casting_algorithm), the Ada solution's output for the point (-10.0,5.0) in the polygon 'Square': FALSE"
+    },
+    {
+      "name": "rosetta_square_8_5",
+      "point": [
+        5.0,
+        8.0
+      ],
+      "zone": {
+        "type": "polygon",
+        "points": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            10
+          ],
+          [
+            10,
+            10
+          ],
+          [
+            10,
+            0
+          ]
+        ]
+      },
+      "inside": true,
+      "source": "Rosetta Code, 'Ray-casting algorithm' task (https://rosettacode.org/wiki/Ray-casting_algorithm), the Ada solution's output for the point (8.0,5.0) in the polygon 'Square': TRUE"
+    },
+    {
+      "name": "rosetta_exagon_5_5",
+      "point": [
+        5.0,
+        5.0
+      ],
+      "zone": {
+        "type": "polygon",
+        "points": [
+          [
+            0,
+            3
+          ],
+          [
+            0,
+            7
+          ],
+          [
+            5,
+            10
+          ],
+          [
+            10,
+            7
+          ],
+          [
+            10,
+            3
+          ],
+          [
+            5,
+            0
+          ]
+        ]
+      },
+      "inside": true,
+      "source": "Rosetta Code, 'Ray-casting algorithm' task (https://rosettacode.org/wiki/Ray-casting_algorithm), the Ada solution's output for the point (5.0,5.0) in the polygon 'Exagon': TRUE"
+    },
+    {
+      "name": "rosetta_exagon_5_8",
+      "point": [
+        8.0,
+        5.0
+      ],
+      "zone": {
+        "type": "polygon",
+        "points": [
+          [
+            0,
+            3
+          ],
+          [
+            0,
+            7
+          ],
+          [
+            5,
+            10
+          ],
+          [
+            10,
+            7
+          ],
+          [
+            10,
+            3
+          ],
+          [
+            5,
+            0
+          ]
+        ]
+      },
+      "inside": true,
+      "source": "Rosetta Code, 'Ray-casting algorithm' task (https://rosettacode.org/wiki/Ray-casting_algorithm), the Ada solution's output for the point (5.0,8.0) in the polygon 'Exagon': TRUE"
+    },
+    {
+      "name": "rosetta_exagon_m10_5",
+      "point": [
+        5.0,
+        -10.0
+      ],
+      "zone": {
+        "type": "polygon",
+        "points": [
+          [
+            0,
+            3
+          ],
+          [
+            0,
+            7
+          ],
+          [
+            5,
+            10
+          ],
+          [
+            10,
+            7
+          ],
+          [
+            10,
+            3
+          ],
+          [
+            5,
+            0
+          ]
+        ]
+      },
+      "inside": false,
+      "source": "Rosetta Code, 'Ray-casting algorithm' task (https://rosettacode.org/wiki/Ray-casting_algorithm), the Ada solution's output for the point (-10.0,5.0) in the polygon 'Exagon': FALSE"
+    },
+    {
+      "name": "rosetta_exagon_8_5",
+      "point": [
+        5.0,
+        8.0
+      ],
+      "zone": {
+        "type": "polygon",
+        "points": [
+          [
+            0,
+            3
+          ],
+          [
+            0,
+            7
+          ],
+          [
+            5,
+            10
+          ],
+          [
+            10,
+            7
+          ],
+          [
+            10,
+            3
+          ],
+          [
+            5,
+            0
+          ]
+        ]
+      },
+      "inside": true,
+      "source": "Rosetta Code, 'Ray-casting algorithm' task (https://rosettacode.org/wiki/Ray-casting_algorithm), the Ada solution's output for the point (8.0,5.0) in the polygon 'Exagon': TRUE"
+    },
+    {
+      "name": "rosetta_strange_5_5",
+      "point": [
+        5.0,
+        5.0
+      ],
+      "zone": {
+        "type": "polygon",
+        "points": [
+          [
+            2.5,
+            2.5
+          ],
+          [
+            10,
+            0
+          ],
+          [
+            7.5,
+            2.5
+          ],
+          [
+            7.5,
+            7.5
+          ],
+          [
+            10,
+            10
+          ],
+          [
+            0,
+            10
+          ]
+        ]
+      },
+      "inside": true,
+      "source": "Rosetta Code, 'Ray-casting algorithm' task (https://rosettacode.org/wiki/Ray-casting_algorithm), the Ada solution's output for the point (5.0,5.0) in the polygon 'Strange': TRUE; its first edge (0,0)-(2.5,2.5), below every test point's ray, is left out to make a ring"
+    },
+    {
+      "name": "rosetta_strange_5_8",
+      "point": [
+        8.0,
+        5.0
+      ],
+      "zone": {
+        "type": "polygon",
+        "points": [
+          [
+            2.5,
+            2.5
+          ],
+          [
+            10,
+            0
+          ],
+          [
+            7.5,
+            2.5
+          ],
+          [
+            7.5,
+            7.5
+          ],
+          [
+            10,
+            10
+          ],
+          [
+            0,
+            10
+          ]
+        ]
+      },
+      "inside": false,
+      "source": "Rosetta Code, 'Ray-casting algorithm' task (https://rosettacode.org/wiki/Ray-casting_algorithm), the Ada solution's output for the point (5.0,8.0) in the polygon 'Strange': FALSE; its first edge (0,0)-(2.5,2.5), below every test point's ray, is left out to make a ring"
+    },
+    {
+      "name": "rosetta_strange_m10_5",
+      "point": [
+        5.0,
+        -10.0
+      ],
+      "zone": {
+        "type": "polygon",
+        "points": [
+          [
+            2.5,
+            2.5
+          ],
+          [
+            10,
+            0
+          ],
+          [
+            7.5,
+            2.5
+          ],
+          [
+            7.5,
+            7.5
+          ],
+          [
+            10,
+            10
+          ],
+          [
+            0,
+            10
+          ]
+        ]
+      },
+      "inside": false,
+      "source": "Rosetta Code, 'Ray-casting algorithm' task (https://rosettacode.org/wiki/Ray-casting_algorithm), the Ada solution's output for the point (-10.0,5.0) in the polygon 'Strange': FALSE; its first edge (0,0)-(2.5,2.5), below every test point's ray, is left out to make a ring"
+    },
+    {
+      "name": "rosetta_strange_8_5",
+      "point": [
+        5.0,
+        8.0
+      ],
+      "zone": {
+        "type": "polygon",
+        "points": [
+          [
+            2.5,
+            2.5
+          ],
+          [
+            10,
+            0
+          ],
+          [
+            7.5,
+            2.5
+          ],
+          [
+            7.5,
+            7.5
+          ],
+          [
+            10,
+            10
+          ],
+          [
+            0,
+            10
+          ]
+        ]
+      },
+      "inside": true,
+      "source": "Rosetta Code, 'Ray-casting algorithm' task (https://rosettacode.org/wiki/Ray-casting_algorithm), the Ada solution's output for the point (8.0,5.0) in the polygon 'Strange': TRUE; its first edge (0,0)-(2.5,2.5), below every test point's ray, is left out to make a ring"
+    },
+    {
+      "name": "square_vertex",
+      "point": [
+        10.0,
+        10.0
+      ],
+      "zone": {
+        "type": "polygon",
+        "points": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            10
+          ],
+          [
+            10,
+            10
+          ],
+          [
+            10,
+            0
+          ]
+        ]
+      },
+      "inside": true,
+      "source": "Decision M3-2 (a point on an edge or a vertex is inside), not a reference value; Rosetta Code's Ada output says FALSE for (10,10)"
+    },
+    {
+      "name": "square_left_edge",
+      "point": [
+        5.0,
+        0.0
+      ],
+      "zone": {
+        "type": "polygon",
+        "points": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            10
+          ],
+          [
+            10,
+            10
+          ],
+          [
+            10,
+            0
+          ]
+        ]
+      },
+      "inside": true,
+      "source": "Decision M3-2 (a point on an edge or a vertex is inside), not a reference value; Rosetta Code's Ada output says FALSE for (0,5)"
+    },
+    {
+      "name": "square_right_edge",
+      "point": [
+        5.0,
+        10.0
+      ],
+      "zone": {
+        "type": "polygon",
+        "points": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            10
+          ],
+          [
+            10,
+            10
+          ],
+          [
+            10,
+            0
+          ]
+        ]
+      },
+      "inside": true,
+      "source": "Decision M3-2 (a point on an edge or a vertex is inside), not a reference value"
+    },
+    {
+      "name": "exagon_vertex",
+      "point": [
+        5.0,
+        0.0
+      ],
+      "zone": {
+        "type": "polygon",
+        "points": [
+          [
+            0,
+            3
+          ],
+          [
+            0,
+            7
+          ],
+          [
+            5,
+            10
+          ],
+          [
+            10,
+            7
+          ],
+          [
+            10,
+            3
+          ],
+          [
+            5,
+            0
+          ]
+        ]
+      },
+      "inside": true,
+      "source": "Decision M3-2 (a point on an edge or a vertex is inside), not a reference value"
+    },
+    {
+      "name": "exagon_slanted_edge",
+      "point": [
+        2.5,
+        8.5
+      ],
+      "zone": {
+        "type": "polygon",
+        "points": [
+          [
+            0,
+            3
+          ],
+          [
+            0,
+            7
+          ],
+          [
+            5,
+            10
+          ],
+          [
+            10,
+            7
+          ],
+          [
+            10,
+            3
+          ],
+          [
+            5,
+            0
+          ]
+        ]
+      },
+      "inside": true,
+      "source": "Decision M3-2 (a point on an edge or a vertex is inside), not a reference value; (8.5, 2.5) is the midpoint of the edge (7,0)-(10,5)"
+    },
+    {
+      "name": "field_rectangle_inside",
+      "point": [
+        38.7223,
+        -9.1395
+      ],
+      "zone": {
+        "type": "polygon",
+        "points": [
+          [
+            38.722,
+            -9.14
+          ],
+          [
+            38.722,
+            -9.139
+          ],
+          [
+            38.7226,
+            -9.139
+          ],
+          [
+            38.7226,
+            -9.14
+          ]
+        ]
+      },
+      "inside": true,
+      "source": "By construction: the point lies strictly between the rectangle's latitudes and longitudes"
+    },
+    {
+      "name": "field_rectangle_outside",
+      "point": [
+        38.7227,
+        -9.1395
+      ],
+      "zone": {
+        "type": "polygon",
+        "points": [
+          [
+            38.722,
+            -9.14
+          ],
+          [
+            38.722,
+            -9.139
+          ],
+          [
+            38.7226,
+            -9.139
+          ],
+          [
+            38.7226,
+            -9.14
+          ]
+        ]
+      },
+      "inside": false,
+      "source": "By construction: the point's latitude is above the rectangle's"
+    },
+    {
+      "name": "circle_centre",
+      "point": [
+        38.7223,
+        -9.1393
+      ],
+      "zone": {
+        "type": "circle",
+        "lat": 38.7223,
+        "lon": -9.1393,
+        "radius_m": 15
+      },
+      "inside": true,
+      "source": "The centre is 0 m from itself"
+    },
+    {
+      "name": "circle_inside_edge",
+      "point": [
+        38.722434889247666,
+        -9.1393
+      ],
+      "zone": {
+        "type": "circle",
+        "lat": 38.7223,
+        "lon": -9.1393,
+        "radius_m": 15
+      },
+      "inside": true,
+      "source": "14.999 m north along the meridian (R * dlat), inside a 15 m circle"
+    },
+    {
+      "name": "circle_outside_edge",
+      "point": [
+        38.7224349072341,
+        -9.1393
+      ],
+      "zone": {
+        "type": "circle",
+        "lat": 38.7223,
+        "lon": -9.1393,
+        "radius_m": 15
+      },
+      "inside": false,
+      "source": "15.001 m north along the meridian (R * dlat), outside a 15 m circle"
+    },
+    {
+      "name": "circle_radius_0",
+      "point": [
+        38.7223,
+        -9.1393
+      ],
+      "zone": {
+        "type": "circle",
+        "lat": 38.7223,
+        "lon": -9.1393,
+        "radius_m": 0
+      },
+      "inside": true,
+      "source": "Decision M3-2: the edge is inside, so the centre is inside a circle of radius 0"
+    },
+    {
+      "name": "circle_across_180",
+      "point": [
+        10.0,
+        -179.99
+      ],
+      "zone": {
+        "type": "circle",
+        "lat": 10.0,
+        "lon": 179.99,
+        "radius_m": 3000
+      },
+      "inside": true,
+      "source": "0.02 degrees of longitude at 10 N is about 2.19 km (R * cos(10 deg) * 0.02 deg), inside 3 km"
+    }
+  ],
+  "errors": [
+    {
+      "name": "distance_string",
+      "script": "geo.distance('38', 0, 0, 0)",
+      "message": "geo.distance: lat1 must be a number from -90 to 90"
+    },
+    {
+      "name": "distance_missing",
+      "script": "geo.distance(0, 0, 0)",
+      "message": "geo.distance: lon2 must be a number from -180 to 180"
+    },
+    {
+      "name": "distance_lat_range",
+      "script": "geo.distance(0, 0, 90.5, 0)",
+      "message": "geo.distance: lat2 must be a number from -90 to 90"
+    },
+    {
+      "name": "distance_lon_range",
+      "script": "geo.distance(0, -180.5, 0, 0)",
+      "message": "geo.distance: lon1 must be a number from -180 to 180"
+    },
+    {
+      "name": "distance_nan",
+      "script": "geo.distance(0/0, 0, 0, 0)",
+      "message": "geo.distance: lat1 must be a number from -90 to 90"
+    },
+    {
+      "name": "distance_huge",
+      "script": "geo.distance(0, 0, 0, math.huge)",
+      "message": "geo.distance: lon2 must be a number from -180 to 180"
+    },
+    {
+      "name": "zone_missing",
+      "script": "geo.in_zone(0, 0)",
+      "message": "geo.in_zone: zone must be a table"
+    },
+    {
+      "name": "zone_point",
+      "script": "geo.in_zone(95, 0, { type = 'circle', lat = 0, lon = 0, radius_m = 1 })",
+      "message": "geo.in_zone: lat must be a number from -90 to 90"
+    },
+    {
+      "name": "zone_type",
+      "script": "geo.in_zone(0, 0, { type = 'square' })",
+      "message": "geo.in_zone: zone.type must be 'circle' or 'polygon'"
+    },
+    {
+      "name": "zone_no_type",
+      "script": "geo.in_zone(0, 0, { lat = 0, lon = 0, radius_m = 1 })",
+      "message": "geo.in_zone: zone.type must be 'circle' or 'polygon'"
+    },
+    {
+      "name": "circle_no_radius",
+      "script": "geo.in_zone(0, 0, { type = 'circle', lat = 0, lon = 0 })",
+      "message": "geo.in_zone: zone.radius_m must be a number of metres, 0 or more"
+    },
+    {
+      "name": "circle_negative_radius",
+      "script": "geo.in_zone(0, 0, { type = 'circle', lat = 0, lon = 0, radius_m = -1 })",
+      "message": "geo.in_zone: zone.radius_m must be a number of metres, 0 or more"
+    },
+    {
+      "name": "circle_centre",
+      "script": "geo.in_zone(0, 0, { type = 'circle', lat = 0, lon = 200, radius_m = 1 })",
+      "message": "geo.in_zone: zone.lon must be a number from -180 to 180"
+    },
+    {
+      "name": "polygon_two_points",
+      "script": "geo.in_zone(0, 0, { type = 'polygon', points = { {0, 0}, {1, 1} } })",
+      "message": "geo.in_zone: zone.points must be a list of 3 to 32 {lat, lon} points"
+    },
+    {
+      "name": "polygon_33_points",
+      "script": "local p = {} for i = 1, 33 do p[i] = {i, 0} end geo.in_zone(0, 0, { type = 'polygon', points = p })",
+      "message": "geo.in_zone: zone.points must be a list of 3 to 32 {lat, lon} points"
+    },
+    {
+      "name": "polygon_no_points",
+      "script": "geo.in_zone(0, 0, { type = 'polygon' })",
+      "message": "geo.in_zone: zone.points must be a list of 3 to 32 {lat, lon} points"
+    },
+    {
+      "name": "polygon_bad_point",
+      "script": "geo.in_zone(0, 0, { type = 'polygon', points = { {0, 0}, {1, 1}, 'x' } })",
+      "message": "geo.in_zone: zone.points[3] must be {lat, lon}"
+    },
+    {
+      "name": "polygon_bad_lon",
+      "script": "geo.in_zone(0, 0, { type = 'polygon', points = { {0, 0}, {1, 1}, {1, 200} } })",
+      "message": "geo.in_zone: zone.points[3][2] must be a number from -180 to 180"
+    }
+  ]
+}

@@ -5,9 +5,12 @@
  * The functions game mode scripts call. The table "Script API surface" in
  * the design specification lists them; keep the two in step.
  */
+#include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "atalaia/geo.h"
 #include "json.h"
 #include "lauxlib.h"
 #include "node_internal.h"
@@ -618,6 +621,96 @@ static int l_cap(lua_State *L)
     return 1;
 }
 
+/* ---- geo (ADR-P4-9) ------------------------------------------------------ */
+
+/* A coordinate: a Lua number from -limit to limit, else a script error. */
+static double geo_coord(lua_State *L, int idx, const char *fn, const char *name, int limit)
+{
+    double v = lua_type(L, idx) == LUA_TNUMBER ? (double)lua_tonumber(L, idx) : NAN;
+    if (!(v >= -limit && v <= limit)) {
+        luaL_error(L, "%s: %s must be a number from -%d to %d", fn, name, limit, limit);
+    }
+    return v;
+}
+
+static int l_geo_distance(lua_State *L)
+{
+    const char *fn = "geo.distance";
+    double lat1 = geo_coord(L, 1, fn, "lat1", 90);
+    double lon1 = geo_coord(L, 2, fn, "lon1", 180);
+    double lat2 = geo_coord(L, 3, fn, "lat2", 90);
+    double lon2 = geo_coord(L, 4, fn, "lon2", 180);
+    lua_pushnumber(L, (lua_Number)atalaia_geo_distance_m(lat1, lon1, lat2, lon2));
+    return 1;
+}
+
+static bool geo_in_circle(lua_State *L, double lat, double lon)
+{
+    const char *fn = "geo.in_zone";
+    lua_getfield(L, 3, "lat");
+    double clat = geo_coord(L, -1, fn, "zone.lat", 90);
+    lua_getfield(L, 3, "lon");
+    double clon = geo_coord(L, -1, fn, "zone.lon", 180);
+    lua_getfield(L, 3, "radius_m");
+    double radius = lua_type(L, -1) == LUA_TNUMBER ? (double)lua_tonumber(L, -1) : NAN;
+    if (!(radius >= 0.0 && radius < HUGE_VAL)) {
+        luaL_error(L, "%s: zone.radius_m must be a number of metres, 0 or more", fn);
+    }
+    lua_pop(L, 3);
+    return atalaia_geo_in_circle(lat, lon, clat, clon, radius);
+}
+
+static bool geo_in_polygon(lua_State *L, double lat, double lon)
+{
+    const char *fn = "geo.in_zone";
+    double points[ATALAIA_GEO_POLYGON_MAX][2];
+    lua_getfield(L, 3, "points");
+    size_t count = lua_type(L, -1) == LUA_TTABLE ? (size_t)lua_rawlen(L, -1) : 0;
+    if (count < 3 || count > ATALAIA_GEO_POLYGON_MAX) {
+        luaL_error(L, "%s: zone.points must be a list of 3 to %d {lat, lon} points", fn,
+                   ATALAIA_GEO_POLYGON_MAX);
+    }
+    for (size_t i = 0; i < count; i++) {
+        char name[32];
+        if (lua_rawgeti(L, -1, (lua_Integer)(i + 1)) != LUA_TTABLE) {
+            luaL_error(L, "%s: zone.points[%d] must be {lat, lon}", fn, (int)(i + 1));
+        }
+        lua_rawgeti(L, -1, 1);
+        snprintf(name, sizeof(name), "zone.points[%d][1]", (int)(i + 1));
+        points[i][0] = geo_coord(L, -1, fn, name, 90);
+        lua_rawgeti(L, -2, 2);
+        snprintf(name, sizeof(name), "zone.points[%d][2]", (int)(i + 1));
+        points[i][1] = geo_coord(L, -1, fn, name, 180);
+        lua_pop(L, 3);
+    }
+    lua_pop(L, 1);
+    return atalaia_geo_in_polygon(lat, lon, (const double(*)[2])points, count);
+}
+
+/* geo.in_zone(lat, lon, zone): zone is { type = "circle", lat, lon, radius_m }
+ * or { type = "polygon", points = { {lat, lon}, ... } }. */
+static int l_geo_in_zone(lua_State *L)
+{
+    const char *fn = "geo.in_zone";
+    double lat = geo_coord(L, 1, fn, "lat", 90);
+    double lon = geo_coord(L, 2, fn, "lon", 180);
+    if (lua_type(L, 3) != LUA_TTABLE) {
+        return luaL_error(L, "%s: zone must be a table", fn);
+    }
+    lua_getfield(L, 3, "type");
+    const char *type = lua_type(L, -1) == LUA_TSTRING ? lua_tostring(L, -1) : "";
+    bool inside;
+    if (strcmp(type, "circle") == 0) {
+        inside = geo_in_circle(L, lat, lon);
+    } else if (strcmp(type, "polygon") == 0) {
+        inside = geo_in_polygon(L, lat, lon);
+    } else {
+        return luaL_error(L, "%s: zone.type must be 'circle' or 'polygon'", fn);
+    }
+    lua_pushboolean(L, inside);
+    return 1;
+}
+
 /* ---- Registration -------------------------------------------------------- */
 
 static void set_lib(lua_State *L, const char *name, const luaL_Reg *fns)
@@ -648,12 +741,18 @@ int atalaia_script_api_open(lua_State *L)
         {"field", l_state_field},
         {NULL, NULL},
     };
+    static const luaL_Reg geo[] = {
+        {"distance", l_geo_distance},
+        {"in_zone", l_geo_in_zone},
+        {NULL, NULL},
+    };
 
     lua_pushglobaltable(L);
     luaL_setfuncs(L, globals, 0);
     set_lib(L, "game", game);
     set_lib(L, "score", score);
     set_lib(L, "state", state);
+    set_lib(L, "geo", geo); /* node and field scripts alike (ADR-P4-9) */
 
     lua_pushliteral(L, "ui");
     push_proxy(L, -1);

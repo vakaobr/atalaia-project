@@ -265,6 +265,20 @@ static void test_field_game_teams(void)
     atalaia_node_destroy(n);
 }
 
+/* geo.* on the controller too (ADR-P4-9). */
+static void test_field_geo(void)
+{
+    field_recorder_t r;
+    atalaia_node_t *n = make_field_node(&r, true);
+    CHECK(load_src(
+        n,
+        "log(string.format('%.3f', geo.distance(36.12, -86.67, 33.94, -118.40)),\n"
+        "    geo.in_zone(0, 0, { type = 'polygon', points = { {-1, -1}, {-1, 1}, {1, 0} } }))\n"));
+    CHECK(r.logs == 1);
+    CHECK(strcmp(r.log[0], "2886444.443 true") == 0);
+    atalaia_node_destroy(n);
+}
+
 static void test_field_common_owner(void)
 {
     field_recorder_t r;
@@ -346,6 +360,7 @@ void run_field_api_tests(void)
     test_field_send();
     test_field_score();
     test_field_game_teams();
+    test_field_geo();
     test_field_common_owner();
     test_field_common_owner_reused_buffer();
     test_field_not_available_regular();

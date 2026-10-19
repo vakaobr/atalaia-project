@@ -55,7 +55,10 @@ set(CORE_SOURCES
     ${CORE_DIR}/src/tag.c
     ${CORE_DIR}/src/screen_template.c
     ${CORE_DIR}/src/proxy.c
+    ${CORE_DIR}/src/geo.c
 )
+# As in core/CMakeLists.txt (decision M3-1).
+set_source_files_properties(${CORE_DIR}/src/geo.c PROPERTIES COMPILE_OPTIONS -ffp-contract=off)
 add_library(atalaia_core_fw STATIC ${CORE_SOURCES})
 target_include_directories(atalaia_core_fw PUBLIC ${CORE_DIR}/include PRIVATE ${CORE_DIR}/src)
 target_link_libraries(atalaia_core_fw PRIVATE atalaia_lua_fw)

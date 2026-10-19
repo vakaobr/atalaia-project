@@ -576,23 +576,22 @@ roadmap:
     title: Site server and advanced play
     short: >-
       Site server, game scheduling and registration, custom scenarios, advanced modes, ATAK.
-      Started: the first advanced modes, Master and Satellites and the logic of Target Windows, and the site server's skeleton, accounts and personal data rights are built in software.
+      Started: the first advanced modes, Master and Satellites and the logic of Target Windows, and geo utilities in the core, and the site server's skeleton, accounts and personal data rights are built in software.
     text: >-
       Site server (accounts, game history, the chrono registry, scheduling games, registration and
       publishing), custom scenarios, advanced modes (master and satellite zones, VIP escort, hacking
       terminals and more) and <a href="{{ page.to.glossary }}#glossary-atak">ATAK</a>. The research, the architecture and
       the implementation plan are written, and the plan is being built in small steps.
     done: >-
-      Done in software, not yet on real boxes: Master and Satellites, where the satellites a team
-      holds together with the master raise its points and the master changing hands frees them,
-      tested in the simulator, through the field controller and on the box firmware run on a
-      computer; the rules of Target Windows, where a hit while the target shows a team's colour
-      scores for that team, tested in the simulator and the app (the target addon is not built
-      yet); and the site server's skeleton (its database, migrations and a health check, in
-      its own container) and its accounts (passwords, two-factor codes required for organisers
-      and marshals, sessions and roles per field) and personal data rights (access, export,
-      correction, erasure, consent records, a daily retention purge); no game data yet; tested on
-      a computer only.
+      Done in software and tested on a computer, not yet on real boxes or a real server. Modes:
+      Master and Satellites (satellites held with the master raise its points; the master
+      changing hands frees them), the rules of Target Windows (a hit while the target shows a
+      team's colour scores for that team; the target addon is not built yet), and geo utilities
+      in the core (distances and zones for every script, identical on every platform). Site
+      server: its skeleton (database, migrations, health check, in its own container), accounts
+      (passwords, two-factor codes required for organisers and marshals, sessions and roles per
+      field) and personal data rights (access, export, correction, erasure, consent records, a
+      daily retention purge); no game data yet.
     gate: >-
       Gate: a weekend <a href="{{ page.to.glossary }}#glossary-milsim">milsim</a> runs on Atalaia end to end.
   p5:

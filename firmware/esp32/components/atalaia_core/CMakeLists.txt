@@ -29,6 +29,7 @@ set(CORE_SOURCES
     "${CORE_ROOT}/src/tag.c"
     "${CORE_ROOT}/src/screen_template.c"
     "${CORE_ROOT}/src/proxy.c"
+    "${CORE_ROOT}/src/geo.c"
     "${CORE_ROOT}/src/crypto_mbedtls.c"
 )
 
@@ -76,6 +77,10 @@ idf_component_register(
     REQUIRES
         mbedtls
 )
+
+# geo.c gives the same bits on every platform (decision M3-1): no fused
+# multiply-add, as in core/CMakeLists.txt.
+set_source_files_properties("${CORE_ROOT}/src/geo.c" PROPERTIES COMPILE_OPTIONS -ffp-contract=off)
 
 # The IDF build always has mbedtls; enable the real AES-CCM backend.
 target_compile_definitions(${COMPONENT_LIB} PUBLIC ATALAIA_HAVE_MBEDTLS)

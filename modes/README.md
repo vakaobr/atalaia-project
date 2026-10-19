@@ -165,6 +165,22 @@ Modes react to semantic capabilities, so the same script works on a box with tea
 | `cmd.mode` | `name`, then the command's own params | A mode command from the GM (a manifest's `commands`) or the field script (CMD opcode 8); the Medic Kit's `refill` and `heals` |
 | `gm.message` | `text` | A message from the GM |
 
+## Positions and zones
+
+`geo.distance(lat1, lon1, lat2, lon2)` gives the distance in metres between two points (haversine on a sphere of 6,371 km: within 0.5 % of the ellipsoid, far closer than a phone's GPS at game distances), and `geo.in_zone(lat, lon, zone)` says whether a point is in a zone, for node and field scripts alike (ADR-P4-9):
+
+```lua
+local extraction = { type = "circle", lat = 38.7223, lon = -9.1393, radius_m = 15 }
+local compound = { type = "polygon", points = { {38.7220, -9.1400}, {38.7220, -9.1390},
+                                                {38.7226, -9.1390}, {38.7226, -9.1400} } }
+if geo.in_zone(lat, lon, extraction) then ... end
+```
+
+- Coordinates are WGS 84 degrees, latitude from -90 to 90 and longitude from -180 to 180; anything else (a string, NaN, a missing value) is a script error (`script.error`), as is a zone without a known `type`, a negative `radius_m` or a polygon with fewer than 3 or more than 32 points.
+- A point on a circle's edge, on a polygon's edge or on a vertex is inside (decision M3-2). Polygons are tested in plain latitude and longitude, so keep them simple (not self-intersecting) and off the 180th meridian; circles work anywhere.
+- The results are the same to the last bit on the Field Box, the controller and a phone, so a game replays the same everywhere (decision M3-1). Lua's own `math.sin` and friends come from each platform's C library and may differ in the last bit: use `geo` for positions.
+- Where positions come from: a VIP's phone through the controller (`position.fix`, for `field.lua` only) and a payload prop's own GPS (`gps.fix`), both in plan phase 5; positions are never events (P4R6).
+
 ## Tests
 
 Every mode ships tests in `tests/*.yaml`, and CI runs them in the [simulator](../simulator/) on every change. A test sets up a game and runs its steps in order:

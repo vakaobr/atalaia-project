@@ -19,10 +19,11 @@
     "design_only": false,
     "stop_after": null,
     "resume_with": "--implement",
-    "next_plan_phase": "3 (geo utilities in the core) on the modes chain; 13 (controller sync) on the site server chain",
+    "next_plan_phase": "4 (Hacking Terminal) on the modes chain; 13 (controller sync) on the site server chain",
     "completed_plan_phases": [
       "1",
       "2",
+      "3",
       "10",
       "11",
       "12"
@@ -85,7 +86,7 @@
       "HW3",
       "HW4"
     ],
-    "resume_note": "Plan phase 1 (Master and Satellites) built in software 2026-10-19 (decisions M1-1 to M1-6, open). Plan phase 2 (Target Windows logic, game.teams(), the hit capability) and the Field Box picker's pages built in software 2026-10-19 (decisions M2-1 to M2-5, open); the target addon is HW2. Refreshed 2026-10-19 against phase 3's software. Plan phases 1-9 (modes, core, scenarios, ATAK) and 10-22 (site server) are independent chains; HW1-HW4 wait for the Heltec V4 boards, the target addon, phones and phase 2 F / phase 3 G. Decisions P4R1-P4R26 are open. Plan phase 10 (site server skeleton and its test tooling) built in software on 2026-10-19; decisions S10-1 to S10-12 open. Plan phase 11 (accounts, sessions and roles) built in software on 2026-10-19; decisions S11-1 to S11-15 open. Plan phase 12 (personal data rights, consent records, retention purge; lockout per address and username) built in software on 2026-10-20; decisions S12-1 to S12-8 open.",
+    "resume_note": "Plan phase 1 (Master and Satellites) built in software 2026-10-19 (decisions M1-1 to M1-6, open). Plan phase 2 (Target Windows logic, game.teams(), the hit capability) and the Field Box picker's pages built in software 2026-10-19 (decisions M2-1 to M2-5, open); the target addon is HW2. Refreshed 2026-10-19 against phase 3's software. Plan phases 1-9 (modes, core, scenarios, ATAK) and 10-22 (site server) are independent chains; HW1-HW4 wait for the Heltec V4 boards, the target addon, phones and phase 2 F / phase 3 G. Decisions P4R1-P4R26 are open. Plan phase 10 (site server skeleton and its test tooling) built in software on 2026-10-19; decisions S10-1 to S10-12 open. Plan phase 11 (accounts, sessions and roles) built in software on 2026-10-19; decisions S11-1 to S11-15 open. Plan phase 12 (personal data rights, consent records, retention purge; lockout per address and username) built in software on 2026-10-20; decisions S12-1 to S12-8 open. Plan phase 3 (geo utilities: geo.distance, geo.in_zone, bit-identical on every platform) built in software 2026-10-20; decisions M3-1 to M3-3 open.",
     "handoff_applied": "2026-10-18 (phase 2 A-E complete, phase 3 design complete); refreshed 2026-10-19 (phase 3 software built)"
   }
 }

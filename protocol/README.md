@@ -14,6 +14,7 @@ Both encodings come from the schema files in [`schema/`](schema/), so they canno
 | [`vectors/events.yaml`](vectors/events.yaml) | Test vectors every event codec must pass |
 | [`vectors/*.json`](vectors/) | Test vectors for header and message payload codecs, the join payload (`join.json`), player tags (`tag.json`), chrono records (`chrono_record.json`) and player tokens (`player_token.json`) |
 | [`vectors/capability_proxy.yaml`](vectors/capability_proxy.yaml) | Test vectors for the capability proxy (I/O pod) frames and payloads |
+| [`vectors/geo.json`](vectors/geo.json) | Known answers (each with its source and tolerance), edge cases, argument errors and exact result bits for `geo.distance` and `geo.in_zone` (ADR-P4-9) |
 | [`join.md`](join.md) | The join payload that brings a box or a standby controller into a game (NFC card, QR code, serial console) |
 | [`nfc-tag.md`](nfc-tag.md) | Player tags: the signed NFC tag of a player (Kill Confirmed, Respawn, Player Check-in, the Medic Kit) |
 | [`chrono-record.md`](chrono-record.md) | Chrono records: one chronograph reading signed with the marshal's Ed25519 key, and the canonical JSON that is signed |
@@ -39,6 +40,7 @@ The generator writes these files; none of them should be edited by hand:
 | `core/tests/protocol_vectors.h` | C: event codec test vectors |
 | `core/tests/packet_vectors.h` | C: header, payload, AES-CCM, join and player tag test vectors (from `vectors/*.json`) |
 | `core/tests/proxy_vectors.h` | C: capability proxy test vectors (from `vectors/capability_proxy.yaml`) |
+| `core/tests/geo_vectors.h` | C: geo test vectors, as exact hexadecimal doubles (from `vectors/geo.json`) |
 | `simulator/atalaia_sim/protocol.py` | Python: the same tables |
 | `protocol/json/event.schema.json` | Anyone consuming events as JSON |
 

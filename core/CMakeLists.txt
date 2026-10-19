@@ -71,15 +71,24 @@ set(ATALAIA_CORE_SOURCES
     src/tag.c
     src/screen_template.c
     src/proxy.c
+    src/geo.c
 )
 if(ATALAIA_HAVE_MBEDTLS)
     list(APPEND ATALAIA_CORE_SOURCES src/crypto_mbedtls.c)
+endif()
+# geo.c must give the same bits everywhere (decision M3-1): no fused
+# multiply-add (clang contracts a * b + c by default, and arm64 has FMA).
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    set_source_files_properties(src/geo.c PROPERTIES COMPILE_OPTIONS -ffp-contract=off)
 endif()
 
 function(atalaia_core_target name type)
     add_library(${name} ${type} ${ATALAIA_CORE_SOURCES})
     target_include_directories(${name} PUBLIC include PRIVATE src)
     target_link_libraries(${name} PRIVATE atalaia_lua)
+    if(MATH_LIBRARY)
+        target_link_libraries(${name} PRIVATE ${MATH_LIBRARY}) # sqrt in geo.c
+    endif()
     if(ATALAIA_HAVE_MBEDTLS)
         target_compile_definitions(${name} PUBLIC ATALAIA_HAVE_MBEDTLS)
         target_include_directories(${name} PRIVATE ${MBEDTLS_INCLUDE_DIR})
@@ -119,7 +128,7 @@ if(BUILD_TESTING)
         tests/test_duty_cycle.c tests/test_msg_codec.c
         tests/test_crypto_mbedtls.c tests/test_field_api.c tests/test_join.c
         tests/test_tag.c tests/test_screen_template.c
-        tests/test_proxy.c)
+        tests/test_proxy.c tests/test_geo.c)
     target_include_directories(test_core PRIVATE src)
     target_link_libraries(test_core PRIVATE atalaia_core)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
