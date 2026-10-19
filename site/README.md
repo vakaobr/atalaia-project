@@ -5,8 +5,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Project page
 
-The project page at <https://atalaia-project.link/>. It is static HTML and CSS: no
-JavaScript, no cookies, nothing loaded from other sites. The
+The project page at <https://atalaia-project.link/>. It is static HTML and CSS: no cookies,
+nothing loaded from other sites, and one small inline script, the main page's screenshot viewer
+(see [Screenshots](#screenshots)), without which every page still works. The
 [Pages workflow](../.github/workflows/pages.yml) publishes this folder on every push to `main`
 that changes it, leaving out `src/`, `i18n/` and this README.
 
@@ -42,7 +43,7 @@ folder is named in its language:
 ### Old links and anchors
 
 The main page used to hold the whole site, so other sites may link to its anchors. GitHub Pages
-has no server-side redirects, and the pages use no JavaScript, so old anchors are kept where a
+has no server-side redirects, and the pages do not redirect with JavaScript, so old anchors are kept where a
 short version of their section stays: `/#roadmap`, `/#modes` and `/#radio` (and their `/en/`
 twins) still land on the main page's short sections, each with a link to its page. The old
 glossary anchors (`/#glossario-lora`, `/en/#glossary-lora`) now only open the main page; the
@@ -62,9 +63,30 @@ the rest of this folder (see [REUSE.toml](../REUSE.toml)); the top-level README 
 | `watchtower-night-pt-960/1600` (`.jpg`, `.webp`) | The same night scene with its text in Portuguese, "Projeto de código aberto ATALAIA" | Hero of the Portuguese main page |
 | `field-isometric-960/1600` (`.jpg`, `.webp`) | Isometric stone tower ringed by GAME PROP cases | "How it fits together" on the English main page |
 | `og-pt.jpg`, `og-en.jpg` | 1200 × 630 social previews (`og:image`) | Link previews of every page in that language |
+| `screens/` | Screenshots (see [Screenshots](#screenshots)) | "What it looks like" on the main page; some in the top-level README |
 
 Each main page loads only its own hero image (WebP, with JPEG for older browsers, at 960 or 1600
 pixels wide as the screen needs) and lazy-loads everything below it.
+
+### Screenshots
+
+`img/screens/` holds the screenshots of "What it looks like", shown at their own size:
+
+| Files | What they are |
+| --- | --- |
+| `bomb-*.png`, `join-joined.png`, `codes-entry.png` | The Field Box firmware (320 × 240) in the Wokwi emulator |
+| `app-<screen>-pt.png`, `app-<screen>-en.png` | The app's golden test images (360 × 780), copied from `app/test/goldens/images/screens/` (`home` as `app-roles`, `prop_game` as `app-prop-game`, `player`, `chrono`) and `branding/` (`player` as `app-player-branded`); each language's page shows its own |
+| `app-medic-*.png` | The Medic Kit's screens (320 × 240) as the app draws them, from `app/test/goldens/images/templates/medic_*.png`; the kit's screens are Portuguese by default, so both languages show the same copies |
+
+When the app's golden images change (`python tools/docker_app.py goldens`), copy them again.
+Each screenshot is a link to its own image. A small inline script at the end of
+`src/index.html` opens the link in a `<dialog>` on the page instead: the image as large as the
+screen allows (up to three times its size, in whole steps when small, so its pixels stay sharp),
+its alt text as the caption, previous and next (buttons or the arrow keys), closed with Esc, the
+close button or a click outside the image, with the focus back on the screenshot. Without
+JavaScript, or in a browser without `<dialog>`, the link opens the image itself. The viewer
+needs each `<img>` to keep its `width` and `height`, and the link the class `zoom`. In the
+script, never write two braces together: the build reads them as a placeholder.
 
 ## Translating the pages
 
@@ -154,8 +176,10 @@ radio...)"), and link the harder ones to the glossary page:
   change a link whenever you change an id.
 - A glossary text is one to three sentences: what the thing is, and why Atalaia uses it.
 - Check each claim against the [design specification](../docs/design-spec.md). Prices are the
-  spec's approximate figures, and anything not built yet (the field controller, the API, Android
-  props, the player app, the site server) is written as "will".
+  spec's approximate figures, and anything not built yet (the site server, the phone as field
+  controller, the iOS app, the thin nodes) is written as "will" or "still to come". What is built
+  but has not run on real hardware (the firmware, the controller, the app, the I/O pod) says so.
+  The roadmap's status tags and the hero's status line follow `docs/phase-*/STATUS.md`.
 
 ### Portuguese terms
 
@@ -176,6 +200,7 @@ players write. Keep these choices consistent when you edit it:
 | Domination, Bomb | Domínio, Bomba |
 | roadmap | Roadmap, unchanged, as it is known in Portugal (never "Roteiro"); its page is `/roadmap/` |
 | gate (of a roadmap phase) | prova |
+| roadmap status tags: done, software done, in progress, designed | concluída, software pronto, em curso, planeada ("desenhada" reads as drawn) |
 | glossary | glossário |
 | How a game works | Como funciona um jogo |
 | local-first | funciona sem internet; "local-first" only in the glossary term |

@@ -10,9 +10,10 @@ side by side, "narrow" one above the other. Each panel has its own coordinates
 
 Facts: RFC 0001 with its amendments, protocol/usb-modem.md, protocol/join.md,
 docs/phase-2-field-network/STATUS.md (what is built), the phase 3 ADRs (the
-I/O pod and the Android app, not built). Built rows have a solid outline,
+I/O pod and the Android app, built in software in plan phases D to F) and
+docs/phase-3-android-players/STATUS.md. Built rows have a solid outline,
 planned ones a dashed one. Phones on Wi-Fi run no layer of their own: they use
-the controller's layer 5 (the GM console, built), so that cell is filled. Layer colours, bottom up: signal, sand-deep, sand,
+the controller's layer 5 (the GM console and the player app, built), so that cell is filled. Layer colours, bottom up: signal, sand-deep, sand,
 granite, slate (site/style.css).
 #}
 {% if layout wide %}
@@ -110,7 +111,7 @@ granite, slate (site/style.css).
       <rect x="12.5" y="88.5" width="375" height="51" rx="4" />
       <rect x="12.5" y="148.5" width="375" height="51" rx="4" stroke-dasharray="6 4" />
       <rect x="12.5" y="208.5" width="375" height="103" rx="4" />
-      <rect x="12.5" y="320.5" width="375" height="103" rx="4" stroke-dasharray="6 4" />
+      <rect x="12.5" y="320.5" width="375" height="103" rx="4" />
       <rect x="12.5" y="432.5" width="375" height="51" rx="4" />
     </g>
     <g stroke="#d3d8db">

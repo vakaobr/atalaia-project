@@ -5,7 +5,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 The roadmap page: the six phases in full, with their gates. Built into
 site/roadmap/ in both languages ("Roadmap" stays in English in Portuguese too);
 the main page has a one-line-per-phase version that links here. Keep the
-phases' status tags the same on both. See site/README.md.
+phases' status tags (done, software, current with class "now", designed)
+the same on both. The status of each phase comes from
+docs/phase-*/STATUS.md. See site/README.md.
 #}
 <html lang="{{ page.lang }}">
 <head>
@@ -27,10 +29,10 @@ phases' status tags the same on both. See site/README.md.
         <ol class="phases">
           <li id="phase-0"><span class="tag">{{ roadmap.done }}</span><h2>0 · {{ roadmap.p0.title }}</h2><p>{{ roadmap.p0.text }}</p><p class="gate">{{ roadmap.p0.gate }}</p></li>
           <li id="phase-1"><span class="tag">{{ roadmap.software }}</span><h2>1 · {{ roadmap.p1.title }}</h2><p>{{ roadmap.p1.text }}</p><p class="gate">{{ roadmap.p1.gate }}</p></li>
-          <li id="phase-2" class="now"><span class="tag">{{ roadmap.current }}</span><h2>2 · {{ roadmap.p2.title }}</h2><p>{{ roadmap.p2.text }}</p><p class="gate">{{ roadmap.p2.gate }}</p></li>
-          <li id="phase-3"><h2>3 · {{ roadmap.p3.title }}</h2><p>{{ roadmap.p3.text }}</p><p class="gate">{{ roadmap.p3.gate }}</p></li>
-          <li id="phase-4"><h2>4 · {{ roadmap.p4.title }}</h2><p>{{ roadmap.p4.text }}</p><p class="gate">{{ roadmap.p4.gate }}</p></li>
-          <li id="phase-5"><h2>5 · {{ roadmap.p5.title }}</h2><p>{{ roadmap.p5.text }}</p><p class="gate">{{ roadmap.p5.gate }}</p></li>
+          <li id="phase-2"><span class="tag">{{ roadmap.software }}</span><h2>2 · {{ roadmap.p2.title }}</h2><p>{{ roadmap.p2.text }}</p><p class="gate">{{ roadmap.p2.gate }}</p></li>
+          <li id="phase-3" class="now"><span class="tag">{{ roadmap.current }}</span><h2>3 · {{ roadmap.p3.title }}</h2><p>{{ roadmap.p3.text }}</p><p>{{ roadmap.p3.done }}</p><p>{{ roadmap.p3.todo }}</p><p class="gate">{{ roadmap.p3.gate }}</p></li>
+          <li id="phase-4"><span class="tag designed">{{ roadmap.designed }}</span><h2>4 · {{ roadmap.p4.title }}</h2><p>{{ roadmap.p4.text }}</p><p class="gate">{{ roadmap.p4.gate }}</p></li>
+          <li id="phase-5"><span class="tag designed">{{ roadmap.designed }}</span><h2>5 · {{ roadmap.p5.title }}</h2><p>{{ roadmap.p5.text }}</p><p class="gate">{{ roadmap.p5.gate }}</p></li>
         </ol>
       </div>
     </div>

@@ -43,8 +43,8 @@ meta:
   roadmap:
     title: Roadmap · Atalaia
     description: >-
-      As seis fases da Atalaia, do núcleo partilhado à comunidade, cada uma a acabar com um teste a
-      sério no campo antes de a seguinte começar.
+      As seis fases da Atalaia, do núcleo partilhado à comunidade, cada uma fechada por um teste a
+      sério no campo, e em que ponto está cada uma.
   glossary:
     title: Glossário · Atalaia
     description: >-
@@ -68,7 +68,7 @@ header:
   language: Idioma
 
 hero:
-  status: Pré-alfa · software da fase 2 pronto, fase 3 começou · ainda não pronta para o campo
+  status: Pré-alfa · software das fases 1 e 2 pronto, fase 3 quase completa em software · ainda não pronta para o campo
   title: A plataforma aberta de <span class="nowrap">combate simulado</span>
   lead: >-
     A Atalaia é uma plataforma aberta para os dispositivos eletrónicos de jogo (os props) de
@@ -141,13 +141,16 @@ why:
       <a href="{{ page.to.glossary }}#glossario-raspberry-pi">Raspberry Pi</a> do tamanho de um cartão de crédito, placas
       simples <a href="{{ page.to.glossary }}#glossario-arduino">tipo Arduino</a> e
       <a href="{{ page.to.glossary }}#glossario-dispositivo-android">telemóveis Android</a>, novos ou reaproveitados,
-      entram todos no mesmo jogo.
+      têm todos lugar no mesmo jogo. O software das caixas ESP32, do controlador de campo e dos
+      telemóveis Android já está escrito; as placas tipo Arduino chegam mais tarde.
   scripts:
     title: Modos em scripts
     text: >-
       Os modos de jogo são pequenos <a href="{{ page.to.glossary }}#glossario-lua">scripts Lua</a>, ficheiros de texto com
-      as regras, mais um ficheiro de definições. Muda-os ou partilha-os sem voltar a gravar o
-      software que vem dentro das caixas.
+      as regras, mais um ficheiro de definições: fáceis de ler, mudar e partilhar, e nenhum modo
+      precisa de código próprio no software que vem dentro das caixas. Por agora as caixas trazem
+      os modos já incluídos; enviar um modo novo sem voltar a gravar esse software ainda está por
+      fazer.
   open:
     title: Protocolo e API abertos
     text: >-
@@ -158,9 +161,10 @@ why:
   fields:
     title: Feita para os campos
     text: >-
-      Funções de jogador, squads, cenários personalizados e um registo de
-      <a href="{{ page.to.glossary }}#glossario-cronografagem">cronografagem</a> que guarda as medições de cada réplica
-      para verificações aleatórias estão previstos de raiz.
+      Funções de jogador, squads, check-in no campo com um cartaz impresso e um registo de
+      <a href="{{ page.to.glossary }}#glossario-cronografagem">cronografagem</a> que guarda as medições assinadas de cada
+      réplica para verificações aleatórias já estão feitos em software; os cenários personalizados
+      chegam na fase&nbsp;4.
   copyleft:
     title: Copyleft
     text: >-
@@ -342,7 +346,7 @@ screens:
   intro: >-
     Oito capturas do firmware real da Field Box (ESP32, LVGL 9.2, ecrã de 320&nbsp;×&nbsp;240)
     a correr no emulador <a href="https://wokwi.com">Wokwi</a>. A interface da caixa está em inglês.
-    Ainda não foi testado em hardware físico.
+    Ainda não foi testado em hardware físico. Toca ou clica numa captura para a ver em grande.
   note: >-
     O <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">manual
     de montagem</a> tem o esquema de ligações completo e o guia da primeira gravação do firmware,
@@ -390,9 +394,15 @@ screens:
 
   app_title: A app Android
   app_intro: >-
-    A app desenha os mesmos ecrãs dos modos, a partir dos mesmos ficheiros YAML. Estas são as
-    imagens dos testes da app, não fotografias de um telemóvel: ainda nada correu num telemóvel a
-    sério.
+    Os ecrãs da própria app estão em português ou em inglês, e ela desenha os ecrãs de cada modo a
+    partir dos mesmos ficheiros YAML da Field Box. Estas são as imagens dos testes da app, não
+    fotografias de um telemóvel: a app já correu em emuladores Android, mas ainda não num telemóvel
+    a sério.
+  app_roles:
+    alt: >-
+      O primeiro ecrã da app, «O que vais fazer neste telemóvel?»: quatro escolhas, cada uma com uma
+      linha a dizer o que faz: Dispositivo de jogo, Participante, Marshal e Organização.
+    caption: Escolhe o que este telemóvel faz no jogo.
   app_prop:
     alt: >-
       Um telemóvel Android como bomba: o ecrã de contagem do modo («ARMED», «4:47», «until
@@ -403,34 +413,90 @@ screens:
       A vista de quem joga: o nome do jogo, 20:00 para o fim, os 20 pontos da equipa azul por cima
       dos 12 da vermelha, de quem é cada objetivo e o que aconteceu.
     caption: Quem joga segue o jogo no telemóvel.
+  app_branded:
+    alt: >-
+      A vista de quem joga num campo com a sua própria imagem: o logótipo e o nome do campo, Campo
+      Norte, no cabeçalho, a imagem de fundo esbatida por trás, e as equipas Águias e Lobos com os
+      seus emblemas e pontos, 20 a 12.
+    caption: O logótipo, a imagem de fundo e os emblemas das equipas de um campo.
   app_chrono:
     alt: >-
       O cronógrafo do marshal: o teclado da velocidade, o peso da BB e um «PASSA» verde, com a
       energia mais alta e o limite.
     caption: Cronografagem à entrada, com a medição assinada pelo marshal.
+  medic_intro: >-
+    As Ligaduras desenham os seus ecrãs a partir dos mesmos ficheiros YAML numa Field Box e num
+    dispositivo Android, em português, a não ser que a organização escolha o inglês. Aqui, tal como
+    a app os desenha:
+  medic_idle:
+    alt: >-
+      Ecrã das Ligaduras: cabeçalho «LIGADURAS», um 4 em grande, «Restam 4 ligaduras» e, a amarelo,
+      «Lê a tua etiqueta e mantém premido o botão».
+    caption: À espera, com 4 ligaduras disponíveis.
+  medic_hold:
+    alt: >-
+      Ecrã das Ligaduras: o identificador de quem joga, b1, num cabeçalho azul, «Mantém premido para
+      tratar», faltam 4 segundos, a amarelo, por cima de uma barra de progresso, e «Largar antes do
+      tempo cancela».
+    caption: b1 mantém o botão premido para receber o tratamento.
+  medic_healed:
+    alt: >-
+      Ecrã das Ligaduras em fundo azul: uma cruz branca, «DE VOLTA AO JOGO», b1, «Tratamento 1 de 2»
+      e «Restam 3 ligaduras».
+    caption: De volta ao jogo, com o primeiro de dois tratamentos.
+  # O visualizador de capturas (o diálogo no fim da página principal).
+  viewer:
+    label: Captura de ecrã
+    prev: Captura anterior
+    next: Captura seguinte
+    close: Fechar
 try:
   title: Experimenta já
   intro: >-
-    Ainda não há <a href="{{ page.to.glossary }}#glossario-firmware">firmware</a> para gravar, mas o núcleo partilhado já
-    corre num computador. O simulador joga um modo no browser: mantém premidos os botões das
-    equipas, vê o ecrã de cada dispositivo e acompanha o registo de eventos. Os comandos abaixo
-    escrevem-se num terminal.
+    Não precisas de hardware: o núcleo partilhado já corre num computador. O simulador joga um modo
+    no browser: mantém premidos os botões das equipas, vê o ecrã de cada dispositivo e acompanha o
+    registo de eventos. Os comandos abaixo escrevem-se num terminal.
   compiler: Com um compilador de C
   docker: Só com Docker
   then: >-
     Depois abre <code>http://localhost:8000</code>. Precisas de Python 3.10 ou mais recente, com
     PyYAML. O <a href="https://github.com/vakaobr/atalaia-project/blob/main/simulator/README.md">guia
     do simulador</a> (em inglês) explica todas as opções.
+  board:
+    title: Numa placa
+    text: >-
+      O <a href="{{ page.to.glossary }}#glossario-firmware">firmware</a> da Field Box, do modem de
+      rádio USB e do módulo de E/S já está escrito. O da Field Box corre no emulador Wokwi e os três
+      correm em testes num computador, mas nenhum correu ainda numa placa a sério. Para montar uma
+      caixa e gravar o firmware, segue o
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">manual
+      de montagem</a> (em inglês); o
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/firmware/esp32/README.md">guia do
+      firmware</a> (em inglês) explica também como compilar o do modem e o do módulo.
+  app:
+    title: Num telemóvel Android
+    text: >-
+      Compila o APK de testes (debug) da app com o Docker e instala-o num telemóvel com Android 8.0
+      ou mais recente, ou no emulador Android, como explica o
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/app/README.md#install-it-on-an-android-phone-from-windows">guia
+      da app</a> (em inglês). Já correu em emuladores, mas ainda não num telemóvel a sério.
 
 roadmap:
   # "Roadmap" stays in English in Portuguese too, as it is known in Portugal (never "Roteiro").
   title: Roadmap
-  intro: Seis fases. Cada uma acaba com um teste a sério no campo antes de a seguinte começar.
+  intro: >-
+    Seis fases, cada uma fechada por um teste a sério no campo, a sua prova. O software foi à frente
+    do hardware: as fases 1 e 2 estão prontas em software e as suas provas esperam pelas placas,
+    enquanto a fase 3 está a ser feita.
   # The main page shows each phase's title and short line, then this link to the roadmap page.
   more: O roadmap completo, com o que cada fase inclui e a sua prova →
+  # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
+  # hardware), in progress, designed (research, architecture and plan written; no code):
+  # "Planeada", as "Desenhada" reads as a drawing in Portugal.
   done: Concluída
   software: Software pronto
   current: Em curso
+  designed: Planeada
   p0:
     title: Alicerces
     short: >-
@@ -474,40 +540,52 @@ roadmap:
     title: Android e jogadores
     short: >-
       Dispositivos Android, módulo de E/S, app para quem joga e os modos que precisam dos
-      telemóveis; muito já feito em software.
+      telemóveis: feito em software, menos o telemóvel como controlador de campo e o iOS; o teste no
+      campo espera por telemóveis e módulos a sério.
     text: >-
-      Dispositivos Android, <a href="{{ page.to.glossary }}#glossario-dispositivo-android">módulo de E/S</a>, app para
-      quem joga, com funções, e os modos que precisam dos telemóveis de quem joga: Respawn, Kill
-      Confirmed, Player Check-in, Money Factory, as Ligaduras (a pessoa atingida lê a sua etiqueta
-      e mantém um botão premido para receber o tratamento, com um número limitado de tratamentos)
-      e cronografagem à entrada. Já feito em software: a Baixa Confirmada, as Reentradas e Vidas, o
-      Registo de Presença e as Ligaduras leem na Field Box as etiquetas NFC assinadas de cada
-      participante, o módulo de E/S tem o seu protocolo e o seu firmware (uma placa Heltec que
-      empresta a um telemóvel os botões das equipas, o teclado, as luzes, a sirene, o leitor NFC,
-      o sensor de abertura e o rádio LoRa, por USB ou Bluetooth) e os modos descrevem os seus
-      ecrãs em YAML. A app corre o mesmo núcleo de jogo das caixas, em segundo
-      plano, e já tem os seus ecrãs, em português e em inglês: um telemóvel Android faz de caixa
-      (corre qualquer modo e desenha os ecrãs do próprio modo, com botões grandes das equipas,
-      teclado e etiquetas NFC), quem joga segue o jogo do controlador de campo, os marshals fazem a
-      cronografagem (energia, limites por classe, verificações durante o jogo, medições assinadas),
-      o registo de réplicas e as etiquetas de quem joga, e a organização abre a sua consola. A app
-      é testada em emuladores Android e com o próprio código do firmware do módulo a correr num
-      computador; ainda nada correu num telemóvel ou num módulo a sério. Quem joga faz o
-      check-in no campo lendo um cartaz impresso (sem conta e sem internet), diz que réplicas vai
-      usar e vê se já passaram no cronógrafo; os marshals trabalham a partir dessa lista e as suas
-      medições assinadas aprovam ou recusam cada réplica; quem joga pode partilhar a posição
-      durante o jogo, e o controlador decide quem a vê; um telemóvel Android faz de caixa no jogo do
-      controlador pela rede Wi-Fi do campo ou, onde não há Wi-Fi, pelo rádio do campo através de um
-      módulo de E/S. Um campo ou clube com o seu próprio controlador pode
-      mostrar o logótipo, a imagem de fundo e a cor na app, no marcador e no cartaz, e dar nomes e
-      emblemas às equipas. Falta o telemóvel como controlador de campo, a versão iOS e o teste
-      no campo com telemóveis e módulos a sério.
+      Dispositivos Android, o <a href="{{ page.to.glossary }}#glossario-dispositivo-android">módulo de E/S</a>, a app
+      para quem joga, para os marshals e para a organização, e os modos que precisam dos telemóveis
+      e das etiquetas de quem joga.
+    done: >-
+      <strong>Feito em software</strong> (fases A a F do plano): a Baixa Confirmada, as Reentradas
+      e Vidas e o Registo de Presença, que leem as etiquetas NFC assinadas de quem joga, e as
+      Ligaduras (a pessoa atingida lê a sua etiqueta e mantém um botão premido para receber o
+      tratamento, com um número limitado de tratamentos); ecrãs dos modos descritos em YAML,
+      desenhados da mesma maneira pela Field Box e pela app; a
+      <a href="{{ page.to.glossary }}#glossario-cronografagem">cronografagem</a> à entrada (energia, limites por
+      classe, verificações durante o jogo, medições assinadas pelo marshal). A app corre o mesmo
+      núcleo de jogo das caixas, em português e em inglês: um telemóvel Android faz de caixa
+      (qualquer modo, com os ecrãs do próprio modo, botões grandes das equipas, teclado e etiquetas
+      NFC) e entra num jogo por código QR, cartão NFC ou texto; quem joga segue o jogo; os marshals
+      têm a cronografagem, o registo de réplicas e as etiquetas de quem joga; a organização abre a
+      sua consola. Quem joga faz o check-in no campo lendo um cartaz impresso (sem conta e sem
+      internet), diz que réplicas vai usar e vê se já passaram no cronógrafo; os marshals
+      trabalham a partir dessa lista de «réplicas por cronografar», e as suas medições assinadas
+      aprovam ou recusam cada réplica. Quem joga pode partilhar a posição durante o jogo, e o
+      controlador decide quem a vê. Um telemóvel Android faz de caixa no jogo do controlador pela
+      rede Wi-Fi do campo ou pelo rádio, através de um módulo de E/S, cujo firmware empresta ao
+      telemóvel os botões das equipas, o teclado, as luzes, a sirene, o leitor NFC, o sensor de
+      abertura e o rádio LoRa de uma placa Heltec, por USB ou Bluetooth. Um campo ou clube com o
+      seu próprio controlador pode mostrar o logótipo, a imagem de fundo e a cor na app, no
+      marcador e no cartaz, e dar nomes e emblemas às equipas.
+    todo: >-
+      <strong>Ainda falta.</strong> Em software: o telemóvel como controlador de campo (o broker
+      MQTT e o filtro de posições já estão feitos, o controlador em si não) e a versão iOS (por
+      fazer: precisa de um Mac); o modo Money Factory ficou para depois. A fase G do plano, o teste
+      no campo com telemóveis e módulos a sério, espera pelo hardware: até agora a app só correu em
+      emuladores Android, e o firmware do módulo só como o seu próprio código num computador.
     gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."
   p4:
     title: Servidor do clube e jogo avançado
     short: >-
-      Servidor do clube, cenários personalizados, modos avançados, ATAK.
-    text: Servidor do clube, cenários personalizados, modos avançados, ATAK.
+      Servidor do clube, marcação de jogos e inscrições, cenários personalizados, modos avançados,
+      ATAK. Investigação, arquitetura e plano escritos; ainda sem código.
+    text: >-
+      Servidor do clube (contas, histórico dos jogos, registo de cronografagem, marcação de jogos,
+      inscrições e publicação), cenários personalizados, modos avançados (zonas mestre e satélites,
+      escolta de VIP, terminais de hacking e outros) e o
+      <a href="{{ page.to.glossary }}#glossario-atak">ATAK</a>. A investigação, a arquitetura e o plano de implementação
+      estão escritos; ainda não há código.
     gate: >-
       Prova: um <a href="{{ page.to.glossary }}#glossario-milsim">milsim</a> de fim de semana decorre do princípio ao fim
       com a Atalaia.
@@ -515,10 +593,11 @@ roadmap:
     title: Comunidade
     short: >-
       Editor visual de modos, registo de modos, placa de suporte (PCB), traduções, guias de
-      montagem.
+      montagem. Investigação, arquitetura e plano escritos; ainda sem código.
     text: >-
       Editor visual de modos, registo de modos, placa de suporte (PCB) que facilita a montagem,
-      traduções, guias de montagem para outros tipos de dispositivos.
+      traduções, guias de montagem para outros tipos de dispositivos. A investigação, a arquitetura
+      e o plano de implementação estão escritos; ainda não há código.
     gate: Continua depois da primeira versão.
 
 hub:
@@ -586,8 +665,9 @@ glossary:
       comprar. A Field Box é a principal, com botões arcade grandes, teclado, ecrã, luzes,
       altifalante e leitor NFC numa caixa estanque, por cerca de
       <span class="nowrap">70–110&nbsp;€</span> em peças; o Satélite é uma caixa mais pequena para
-      um ponto secundário, por cerca de <span class="nowrap">30–40&nbsp;€</span>. Os primeiros
-      protótipos da Field Box chegam na fase&nbsp;1.
+      um ponto secundário, por cerca de <span class="nowrap">30–40&nbsp;€</span>. O firmware e o
+      manual de montagem da Field Box já estão prontos; os primeiros protótipos esperam pelas peças
+      (fase&nbsp;1).
   milsim:
     id: glossario-milsim
     term: Milsim
@@ -609,9 +689,10 @@ glossary:
     text: >-
       O cronógrafo mede a velocidade a que uma réplica dispara uma BB. Da velocidade e do peso da
       BB sai a energia em joules, que os campos limitam por tipo de réplica: uma BB de 0,20&nbsp;g a
-      100&nbsp;m/s (cerca de 328&nbsp;fps) leva 1 joule. A Atalaia vai guardar as medições de cada
-      réplica, para os marshals poderem fazer verificações aleatórias durante o dia; qualquer
-      penalização é sempre decidida por uma pessoa.
+      100&nbsp;m/s (cerca de 328&nbsp;fps) leva 1 joule. A Atalaia guarda as medições de cada
+      réplica, assinadas pelo marshal, para os marshals poderem fazer verificações aleatórias
+      durante o dia (já feito em software, ainda não usado num campo); qualquer penalização é sempre
+      decidida por uma pessoa.
   microcontroller:
     id: glossario-microcontrolador
     term: Microcontrolador
@@ -625,7 +706,8 @@ glossary:
     text: >-
       Um microcontrolador barato e muito popular, com Wi-Fi e Bluetooth incorporados; muitas placas
       trazem também um rádio LoRa. É o cérebro da Field Box, do Satélite e do módulo de E/S, e
-      aguenta um dispositivo em jogo de um a três dias com uma bateria. As placas que já tens também
+      deverá aguentar um dispositivo em jogo de um a três dias com uma bateria (uma estimativa,
+      ainda por medir). As placas que já tens também
       servem, mesmo sem memória extra (PSRAM), com algumas limitações.
   arduino:
     id: glossario-arduino
@@ -647,28 +729,30 @@ glossary:
     id: glossario-dispositivo-android
     term: Dispositivo Android e módulo de E/S
     text: >-
-      A app da Atalaia vai transformar um telemóvel ou tablet Android, novo ou um que esteja na
-      gaveta, de 2017 em diante, num dispositivo de jogo: um terminal de hacking, um mapa, um leitor
-      de códigos. Os telemóveis não têm rádio LoRa e os ecrãs táteis custam a usar com luvas, por
-      isso uma pequena caixa ESP32, o módulo de E/S (entrada e saída), vai ligar-se por cabo ou
-      Bluetooth para juntar o rádio, botões grandes, luzes e uma sirene. Ambos chegam na fase&nbsp;3.
+      A app da Atalaia transforma um telemóvel ou tablet Android, novo ou um que esteja na gaveta,
+      de 2017 em diante, num dispositivo de jogo que corre qualquer modo no ecrã. Os telemóveis não
+      têm rádio LoRa e os ecrãs táteis custam a usar com luvas, por isso uma pequena caixa ESP32, o
+      módulo de E/S (entrada e saída), liga-se por cabo ou Bluetooth para juntar o rádio, botões
+      grandes, luzes e uma sirene. Ambos estão feitos em software (fase&nbsp;3) e testados em
+      emuladores e num computador, ainda não num telemóvel ou num módulo a sério.
   firmware:
     id: glossario-firmware
     term: Firmware e gravar firmware
     text: >-
       O firmware é o programa que vem dentro de um aparelho e arranca quando o ligas. Gravar
       firmware (<em>flashing</em>, em inglês) é escrever uma versão nova desse programa no
-      aparelho, normalmente por um cabo USB. As caixas da Atalaia só precisam de cabo da primeira
-      vez: depois, os modos novos chegam como scripts e as atualizações vêm do controlador de campo
-      por Wi-Fi ou Bluetooth, e desfazem-se sozinhas se a versão nova não arrancar.
+      aparelho, normalmente por um cabo USB. As caixas da Atalaia gravam-se por cabo, e por agora
+      um modo de jogo novo chega com uma nova gravação; mais tarde, os modos vão chegar como scripts
+      e as atualizações do firmware vão vir do controlador de campo por Wi-Fi ou Bluetooth, e
+      desfazem-se sozinhas se a versão nova não arrancar.
   lora:
     id: glossario-lora
     term: LoRa
     text: >-
       De <em>long range</em>, longo alcance: um rádio que envia mensagens pequenas para longe
       gastando muito pouca energia, sem cartão SIM, rede móvel ou assinatura. Num campo típico
-      chega a cerca de <span class="nowrap">0,5–2&nbsp;km</span> e atravessa paredes grossas melhor
-      do que o Wi-Fi. O senão: as mensagens têm de ser curtas e cada aparelho só pode emitir
+      deverá chegar a cerca de <span class="nowrap">0,5–2&nbsp;km</span> (uma estimativa do projeto,
+      ainda por medir) e atravessa paredes grossas melhor do que o Wi-Fi. O senão: as mensagens têm de ser curtas e cada aparelho só pode emitir
       durante uma pequena parte do tempo. A Atalaia usa por omissão 869,525&nbsp;MHz, na única
       sub-banda EU868 que permite 10% de ciclo de trabalho e 500&nbsp;mW, o que dá a cada caixa até
       6 minutos de emissão por hora — suficiente para eventos, pontuações e balizas de
@@ -689,9 +773,9 @@ glossary:
       O protocolo de rádio da própria Atalaia: o formato combinado em que as caixas, o controlador
       e as apps trocam mensagens, seja por LoRa, Wi-Fi ou Bluetooth. Está documentado
       publicamente, por isso qualquer pessoa pode construir um aparelho que entre no jogo, e cada
-      mensagem é assinada com uma chave própria daquele jogo, para que ninguém consiga
-      simplesmente forjar uma captura com um rádio. O código que empacota e verifica estas
-      mensagens, o codec, já existe.
+      mensagem é cifrada e assinada com uma chave própria daquele jogo, para que ninguém consiga
+      simplesmente forjar uma captura com um rádio. Já está feito e testado em software, ainda não
+      num campo.
   links:
     id: glossario-wifi-ble-nfc-qr
     term: Wi-Fi, BLE, NFC e códigos QR
@@ -766,7 +850,7 @@ glossary:
       pontuação oficial e serve a consola da organização aos telemóveis. Se falhar, as caixas
       continuam a jogar e outro aparelho capaz toma o lugar, e uma caixa sozinha também consegue
       correr um jogo sem ele. Já está feito (fase&nbsp;2) e testado num computador, ainda não num
-      campo.
+      campo; pô-lo a correr num aparelho Android ainda está por fazer.
   server:
     id: glossario-servidor-do-clube
     term: Servidor do clube
@@ -969,7 +1053,7 @@ diagrams:
     android: Aparelho Android
     android_sub: "Fase 3: telemóvel ou tablet corre os modos"
     wifi: Telemóveis por Wi-Fi
-    wifi_sub: Consola da organização já, app na fase 3
+    wifi_sub: Consola da organização e app de jogador
     legend: >-
       Contínuo: feito e testado num computador e num emulador, ainda não no campo. Tracejado:
       previsto. Os telemóveis por Wi-Fi usam a camada 5 e não precisam de rádio LoRa.

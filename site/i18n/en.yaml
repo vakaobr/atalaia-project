@@ -41,8 +41,8 @@ meta:
   roadmap:
     title: Roadmap · Atalaia
     description: >-
-      Atalaia's six phases, from the shared core to the community, each ending with a real field
-      test before the next begins.
+      Atalaia's six phases, from the shared core to the community, each closed by a real field test,
+      and where each one stands today.
   glossary:
     title: Glossary · Atalaia
     description: >-
@@ -65,7 +65,7 @@ header:
   language: Language
 
 hero:
-  status: Pre-alpha · phase 2 software done, phase 3 started · not field-ready yet
+  status: Pre-alpha · phase 1 and 2 software done, phase 3 nearly complete in software · not field-ready yet
   title: The open <span class="nowrap">force-on-force</span> platform
   lead: >-
     Atalaia is an open platform for the electronic props of airsoft, paintball and milsim: the
@@ -134,13 +134,16 @@ why:
       Cheap <a href="{{ page.to.glossary }}#glossary-esp32">ESP32</a> boards, credit-card-sized
       <a href="{{ page.to.glossary }}#glossary-raspberry-pi">Raspberry Pi</a> computers, simple
       <a href="{{ page.to.glossary }}#glossary-arduino">Arduino-class</a> boards and new or repurposed
-      <a href="{{ page.to.glossary }}#glossary-android-prop">Android phones</a> all play in the same game.
+      <a href="{{ page.to.glossary }}#glossary-android-prop">Android phones</a> all have a place in the same
+      game. The software for the ESP32 boxes, the field controller and Android phones is written; the
+      Arduino-class boards come later.
   scripts:
     title: Modes are scripts
     text: >-
       Game modes are short <a href="{{ page.to.glossary }}#glossary-lua">Lua scripts</a>, small text files of rules, with
-      a settings file. Change or share one without reflashing (reinstalling) the boxes' built-in
-      software.
+      a settings file: easy to read, change and share, and no mode needs code of its own in the boxes'
+      built-in software. For now the boxes carry their modes built in; sending a new one without
+      reflashing (reinstalling) that software is still to come.
   open:
     title: Open protocol and API
     text: >-
@@ -150,8 +153,9 @@ why:
   fields:
     title: Built for fields
     text: >-
-      Player roles, squads, custom scenarios, and a <a href="{{ page.to.glossary }}#glossary-chrono">chrono</a> registry
-      that keeps each replica's readings for spot checks are part of the design.
+      Player roles, squads, check-in at the field with a printed poster, and a
+      <a href="{{ page.to.glossary }}#glossary-chrono">chrono</a> registry that keeps each replica's signed readings for
+      spot checks are built in software; custom scenarios come in phase&nbsp;4.
   copyleft:
     title: Copyleft
     text: >-
@@ -333,7 +337,7 @@ screens:
   intro: >-
     Eight captures from the real Field Box firmware (ESP32, LVGL 9.2, 320&nbsp;×&nbsp;240&nbsp;TFT)
     running in the <a href="https://wokwi.com">Wokwi</a> emulator. The box UI is in English.
-    Not yet tested on physical hardware.
+    Not yet tested on physical hardware. Tap or click a screenshot to see it larger.
   note: >-
     The <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">build
     manual</a> has the full wiring diagram and first-flash guide for the Heltec WiFi LoRa 32&nbsp;V4.
@@ -381,8 +385,14 @@ screens:
 
   app_title: The Android app
   app_intro: >-
-    The app draws the same mode screens from the same YAML files. These are the app's test images,
-    not photos of a phone: nothing has run on a real phone yet.
+    The app's own screens are in Portuguese or English, and it draws each mode's screens from the
+    same YAML files as the Field Box. These are the app's test images, not photos of a phone: the
+    app has run on Android emulators, not yet on a real phone.
+  app_roles:
+    alt: >-
+      The app's first screen, "What will this phone do?": four choices, each with a line on what it
+      does: Game prop, Player, Marshal and Game master.
+    caption: Pick what this phone does in the game.
   app_prop:
     alt: >-
       An Android phone as the bomb: the mode's countdown screen ("ARMED", "4:47", "until
@@ -393,32 +403,88 @@ screens:
       The player's view: the game's name, 20:00 to go, the blue team's 20 points above the red
       team's 12, who holds each objective, and what happened.
     caption: Players follow the game on their phones.
+  app_branded:
+    alt: >-
+      The player's view of a field with its own branding: the field's logo and name, Campo Norte, in
+      the header, its wallpaper faint behind the view, and the teams Águias and Lobos with their
+      crests and scores, 20 to 12.
+    caption: A field's own logo, wallpaper and team crests.
   app_chrono:
     alt: >-
       The marshal's chronograph: the velocity keypad, the BB weight and a green "PASS", with the
       highest energy and the limit.
     caption: Chrono check-in, the reading signed by the marshal.
+  medic_intro: >-
+    The Medic Kit draws its screens from the same YAML files on a Field Box and on an Android prop,
+    in Portuguese unless the GM sets it to English. Here they are as the app draws them:
+  medic_idle:
+    alt: >-
+      Medic Kit screen: "LIGADURAS" (Medic Kit) header, a large 4, "Restam 4 ligaduras" (4 heals
+      left) and, in yellow, "Lê a tua etiqueta e mantém premido o botão" (scan your tag, then hold
+      the button).
+    caption: Waiting for a player, with 4 heals left.
+  medic_hold:
+    alt: >-
+      Medic Kit screen: the player's id, b1, in a blue header, "Mantém premido para tratar" (keep
+      holding to heal), 4 seconds to go in yellow above a progress bar, and "Largar antes do tempo
+      cancela" (letting go early cancels).
+    caption: Player b1 holds the button to be healed.
+  medic_healed:
+    alt: >-
+      Medic Kit screen on blue: a white cross, "DE VOLTA AO JOGO" (back in the game), b1,
+      "Tratamento 1 de 2" (heal 1 of 2) and "Restam 3 ligaduras" (3 heals left in the kit).
+    caption: Back in the game, with the first of two heals.
+  # The screenshot viewer (the dialog at the end of the main page).
+  viewer:
+    label: Screenshot
+    prev: Previous screenshot
+    next: Next screenshot
+    close: Close
 try:
   title: Try it today
   intro: >-
-    There is nothing to <a href="{{ page.to.glossary }}#glossary-firmware">flash</a> yet, but the shared core runs on a
-    computer. The simulator plays a mode in your browser: hold team buttons, watch each prop's
-    screen and follow the event log. The commands below are typed in a terminal.
+    No hardware is needed: the shared core runs on a computer. The simulator plays a mode in your
+    browser: hold team buttons, watch each prop's screen and follow the event log. The commands
+    below are typed in a terminal.
   compiler: With a C compiler
   docker: With Docker only
   then: >-
     Then open <code>http://localhost:8000</code>. You need Python 3.10+ with PyYAML. The
     <a href="https://github.com/vakaobr/atalaia-project/blob/main/simulator/README.md">simulator
     guide</a> has every option.
+  board:
+    title: On a board
+    text: >-
+      The <a href="{{ page.to.glossary }}#glossary-firmware">firmware</a> of the Field Box, the USB
+      radio modem and the I/O pod is written. The Field Box's runs in the Wokwi emulator and all
+      three run in tests on a computer, but none has run on a real board yet. To build a box and
+      flash it, follow the
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">build
+      manual</a>; the
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/firmware/esp32/README.md">firmware
+      guide</a> builds the modem and the pod too.
+  app:
+    title: On an Android phone
+    text: >-
+      Build the app's debug APK with Docker and install it on a phone with Android 8.0 or later, or
+      on the Android emulator, as the
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/app/README.md#install-it-on-an-android-phone-from-windows">app
+      guide</a> explains. It has run on emulators, not yet on a real phone.
 
 roadmap:
   title: Roadmap
-  intro: Six phases. Each one ends with a real field test before the next begins.
+  intro: >-
+    Six phases, each closed by a real field test, its gate. The software has gone ahead of the
+    hardware: phases 1 and 2 are done in software and their gates wait for the boards, while phase
+    3 is being built.
   # The main page shows each phase's title and short line, then this link to the roadmap page.
   more: The full roadmap, with what each phase holds and its gate →
+  # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
+  # hardware), in progress, designed (research, architecture and plan written; no code).
   done: Done
   software: Software done
   current: In progress
+  designed: Designed
   p0:
     title: Foundations
     short: >-
@@ -459,46 +525,59 @@ roadmap:
   p3:
     title: Android and players
     short: >-
-      Android props, the I/O pod, the player app and the modes that need phones; much of it done in
-      software.
+      Android props, the I/O pod, the player app and the modes that need phones: done in software,
+      except the phone as field controller and iOS; the field test waits for real phones and pods.
     text: >-
-      Android props, <a href="{{ page.to.glossary }}#glossary-android-prop">I/O pod</a>, player app with roles, and the
-      modes that need players' phones: Respawn, Kill Confirmed, Player Check-in, Money Factory,
-      the Medic Kit (a hit player scans their tag and holds a button to be healed, with a limited
-      number of heals) and chrono check-in. Done in software: Kill Confirmed, Respawn and Lives,
-      Player Check-in and the Medic Kit read players' signed NFC tags on the Field Box, the I/O
-      pod has its link protocol and its firmware (a Heltec board that lends a phone its team
-      buttons, keypad, lights, siren, NFC reader, enclosure switch and LoRa radio, over USB or
-      Bluetooth), and modes describe their screens in YAML. The app runs the same game core as the boxes, in the
-      background, and has its screens, in Portuguese and English: an Android phone acts as a box
-      (it runs any mode and draws the mode's own screens, with big team buttons, a keypad and NFC
-      tags), players follow the field controller's game, marshals do chrono check-in (energy,
-      limits per class, spot checks, signed readings), the replica registry and players' tags, and
-      the GM opens the console. Players check in at the field by scanning a printed poster (no
-      account, no internet), say which replicas they will use and see whether they have been
-      through the chronograph; marshals work from that list and their signed readings mark each
-      replica passed or refused; players can share their position during a game, and the
-      controller decides who sees it; an Android prop takes part in the controller's game over the
-      field's Wi-Fi, or over the field's radio through an I/O pod where there is no Wi-Fi. A field or club that runs its own controller can show its logo, wallpaper
+      Android props, the <a href="{{ page.to.glossary }}#glossary-android-prop">I/O pod</a>, the app for players,
+      marshals and the GM, and the modes that need players' phones and tags.
+    done: >-
+      <strong>Done in software</strong> (plan phases A to F): Kill Confirmed, Respawn and Lives and
+      Player Check-in, which read players' signed NFC tags, and the Medic Kit (a hit player scans
+      their tag and holds a button to be healed, with a limited number of heals); mode screens
+      described in YAML, drawn alike by the Field Box and the app;
+      <a href="{{ page.to.glossary }}#glossary-chrono">chrono check-in</a> (energy, limits per class, spot checks,
+      readings signed by the marshal). The app runs the same game core as the boxes, in Portuguese
+      and English: an Android phone acts as a box (any mode, with the mode's own screens, big team
+      buttons, a keypad and NFC tags) and joins a game by QR code, NFC card or text; players follow
+      the game; marshals have the chrono, the replica registry and players' tags; the GM opens the
+      console. Players check in at the field by scanning a printed poster (no account, no
+      internet), say which replicas they will use and see whether they have passed the chrono;
+      marshals work from that "replicas to chrono" list, and their signed readings mark each
+      replica passed or refused. Players can share their position during a game, and the
+      controller decides who sees it. An Android prop takes part in the controller's game over the
+      field's Wi-Fi, or over its radio through an I/O pod, whose firmware lends the phone a Heltec
+      board's team buttons, keypad, lights, siren, NFC reader, enclosure switch and LoRa radio over
+      USB or Bluetooth. A field or club that runs its own controller can show its logo, wallpaper
       and colour in the app, on the scoreboard and on the poster, and give its teams names and
-      crests. The app is tested on Android emulators, and against the pod firmware's own code run
-      on a computer; nothing has run on a real phone or pod yet. Still to come: the phone as the
-      field controller, the iOS version and the field test with real phones and pods.
+      crests.
+    todo: >-
+      <strong>Still to come.</strong> In software: the phone as the field controller (its MQTT
+      broker and position filter are built, the controller itself is not) and the iOS version (not
+      built: it needs a Mac); the Money Factory mode is deferred. Plan phase G, the field test with
+      real phones and pods, waits for the hardware: so far the app has run only on Android
+      emulators, and the pod firmware only as its own code on a computer.
     gate: "Gate: one game mixes ESP32 and Android props without issues."
   p4:
     title: Site server and advanced play
     short: >-
-      Site server, custom scenarios, advanced modes, ATAK.
-    text: Site server, custom scenarios, advanced modes, ATAK.
+      Site server, game scheduling and registration, custom scenarios, advanced modes, ATAK.
+      Research, architecture and plan written; no code yet.
+    text: >-
+      Site server (accounts, game history, the chrono registry, scheduling games, registration and
+      publishing), custom scenarios, advanced modes (master and satellite zones, VIP escort, hacking
+      terminals and more) and <a href="{{ page.to.glossary }}#glossary-atak">ATAK</a>. The research, the architecture and
+      the implementation plan are written; there is no code yet.
     gate: >-
       Gate: a weekend <a href="{{ page.to.glossary }}#glossary-milsim">milsim</a> runs on Atalaia end to end.
   p5:
     title: Community
     short: >-
-      Visual mode editor, mode registry, carrier PCB, translations, build guides.
+      Visual mode editor, mode registry, carrier PCB, translations, build guides. Research,
+      architecture and plan written; no code yet.
     text: >-
       Visual mode editor, mode registry, carrier PCB (a ready-made circuit board that makes builds
-      easier), translations, build guides for other node types.
+      easier), translations, build guides for other node types. The research, the architecture and
+      the implementation plan are written; there is no code yet.
     gate: Ongoing after the first release.
 
 hub:
@@ -561,7 +640,8 @@ glossary:
       the main one, with big arcade buttons, a keypad, a screen, lights, a speaker and an NFC reader
       in a weatherproof case, for roughly <span class="nowrap">€70–110</span> in parts; the
       Satellite is a smaller box for a secondary point, for about
-      <span class="nowrap">€30–40</span>. The first Field Box prototypes come in phase&nbsp;1.
+      <span class="nowrap">€30–40</span>. The Field Box's firmware and build manual are ready; its first
+      prototypes wait for their parts (phase&nbsp;1).
   milsim:
     id: glossary-milsim
     term: Milsim
@@ -582,8 +662,9 @@ glossary:
     text: >-
       A chrono (chronograph) measures how fast a replica fires a BB. From the speed and the BB's
       weight comes its energy in joules, which fields cap per type of replica: a 0.20&nbsp;g BB at
-      100&nbsp;m/s (about 328&nbsp;fps) carries 1 joule. Atalaia will keep each replica's readings,
-      so marshals can run spot checks during the day; a person always decides any penalty.
+      100&nbsp;m/s (about 328&nbsp;fps) carries 1 joule. Atalaia keeps each replica's readings, signed
+      by the marshal, so marshals can run spot checks during the day (built in software, not yet
+      used on a field); a person always decides any penalty.
   microcontroller:
     id: glossary-microcontroller
     term: Microcontroller
@@ -596,8 +677,9 @@ glossary:
     term: ESP32
     text: >-
       A popular, cheap microcontroller with Wi-Fi and Bluetooth built in; many boards also carry a
-      LoRa radio. It is the brain of the Field Box, the Satellite and the I/O pod, and keeps a prop
-      going for one to three days on a battery. Boards people already own can join too, even
+      LoRa radio. It is the brain of the Field Box, the Satellite and the I/O pod, and should keep a
+      prop going for one to three days on a battery (an estimate, not yet measured). Boards people
+      already own can join too, even
       without extra memory (PSRAM), with a few limits.
   arduino:
     id: glossary-arduino
@@ -619,27 +701,28 @@ glossary:
     id: glossary-android-prop
     term: Android prop and I/O pod
     text: >-
-      The Atalaia app will turn an Android phone or tablet, new or a spare one from 2017 or later,
-      into a prop: a hacking terminal, a map, a code scanner. Phones have no LoRa radio and touch
-      screens are hard to use with gloves, so a small ESP32 box, the I/O (input/output) pod, will
-      connect by cable or Bluetooth to add the radio, big buttons, lights and a siren. Both arrive
-      in phase&nbsp;3.
+      The Atalaia app turns an Android phone or tablet, new or a spare one from 2017 or later, into a
+      prop that runs any game mode on its screen. Phones have no LoRa radio and touch screens are
+      hard to use with gloves, so a small ESP32 box, the I/O (input/output) pod, connects by cable or
+      Bluetooth to add the radio, big buttons, lights and a siren. Both are built in software
+      (phase&nbsp;3) and tested on emulators and a computer, not yet on a real phone or pod.
   firmware:
     id: glossary-firmware
     term: Firmware and flashing
     text: >-
       Firmware is the program built into a device, which starts when you switch it on. Flashing
       means writing a new version of it onto the device, usually over a USB cable. Atalaia boxes
-      are flashed by cable once; after that, new game modes arrive as scripts, and firmware updates
-      come from the field controller over Wi-Fi or Bluetooth, undoing themselves if a new version
-      fails to start.
+      are flashed by cable, and for now a new game mode comes with a new flash; later, modes will
+      arrive as scripts and firmware updates from the field controller over Wi-Fi or Bluetooth,
+      undoing themselves if a new version fails to start.
   lora:
     id: glossary-lora
     term: LoRa
     text: >-
       Short for <em>long range</em>: a radio that sends small messages far on very little power,
-      with no SIM card, mobile coverage or subscription. On a typical field it reaches roughly
-      <span class="nowrap">0.5–2&nbsp;km</span>, and gets through thick walls better than Wi-Fi.
+      with no SIM card, mobile coverage or subscription. On a typical field it should reach roughly
+      <span class="nowrap">0.5–2&nbsp;km</span> (a design estimate, still to be measured), and gets
+      through thick walls better than Wi-Fi.
       The catch: messages must be short, and each device may transmit only a small share of the
       time. Atalaia uses 869.525&nbsp;MHz by default, in the only EU868 sub-band that allows
       a 10% duty cycle and 500&nbsp;mW, giving each box up to 6 minutes of airtime per hour —
@@ -660,9 +743,9 @@ glossary:
     text: >-
       Atalaia's own radio protocol: the agreed format in which boxes, the controller and apps
       exchange messages, over LoRa, Wi-Fi or Bluetooth. It is documented in public, so anyone can
-      build a device that joins in, and every message is signed with a key for that game, so a
-      player with a radio cannot simply fake a capture. The code that packs and checks these
-      messages, the codec, exists today.
+      build a device that joins in, and every message is encrypted and signed with a key for that
+      game, so a player with a radio cannot simply fake a capture. It is built and tested in
+      software, not yet on a field.
   links:
     id: glossary-wifi-ble-nfc-qr
     term: Wi-Fi, BLE, NFC and QR codes
@@ -732,7 +815,8 @@ glossary:
       that hears every box over the radio, runs the rules that span several boxes, keeps the
       official score and serves the organisers' console to their phones. If it fails, the boxes
       keep playing and another capable device takes over, and a single box can run a game without
-      one. It is built (phase&nbsp;2) and tested on a computer, not yet on a field.
+      one. It is built (phase&nbsp;2) and tested on a computer, not yet on a field; running it on an
+      Android device is still to come.
   server:
     id: glossary-site-server
     term: Site server
@@ -929,7 +1013,7 @@ diagrams:
     android: Android device
     android_sub: "Phase 3: a phone or tablet runs the modes"
     wifi: Phones on Wi-Fi
-    wifi_sub: GM console today, player app in phase 3
+    wifi_sub: GM console and player app
     legend: >-
       Solid: built and tested on a computer and in an emulator, not yet on a field. Dashed:
       planned. Phones on Wi-Fi use layer 5 and need no LoRa radio.

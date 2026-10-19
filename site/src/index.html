@@ -172,60 +172,88 @@ the pages. Code blocks and anything else that is the same in every language stay
       </div>
     </section>
 
-    {# Screenshots: real firmware running in Wokwi, then the app's test images #}
+    {# Screenshots: real firmware running in Wokwi, then the app's test images
+       (copies of app/test/goldens/images/). Each one is a link to its image,
+       which the viewer at the end of the page opens in a dialog; without
+       JavaScript the link opens the image itself. The viewer takes the
+       image's size from its width and height. #}
     <section class="band" aria-labelledby="screens">
       <div class="wrap">
         <h2 id="screens">{{ screens.title }}</h2>
         <p class="intro">{{ screens.intro }}</p>
         <div class="screens">
           <figure>
-            <img src="{{ page.root }}img/screens/bomb-1-pin.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.pin_entry.alt|text }}">
+            <a class="zoom" href="{{ page.root }}img/screens/bomb-1-pin.png"><img src="{{ page.root }}img/screens/bomb-1-pin.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.pin_entry.alt|text }}"></a>
             <figcaption>{{ screens.pin_entry.caption }}</figcaption>
           </figure>
           <figure>
-            <img src="{{ page.root }}img/screens/bomb-2-choose-game.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.choose_game.alt|text }}">
+            <a class="zoom" href="{{ page.root }}img/screens/bomb-2-choose-game.png"><img src="{{ page.root }}img/screens/bomb-2-choose-game.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.choose_game.alt|text }}"></a>
             <figcaption>{{ screens.choose_game.caption }}</figcaption>
           </figure>
           <figure>
-            <img src="{{ page.root }}img/screens/bomb-3-confirm.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.confirm.alt|text }}">
+            <a class="zoom" href="{{ page.root }}img/screens/bomb-3-confirm.png"><img src="{{ page.root }}img/screens/bomb-3-confirm.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.confirm.alt|text }}"></a>
             <figcaption>{{ screens.confirm.caption }}</figcaption>
           </figure>
           <figure>
-            <img src="{{ page.root }}img/screens/bomb-4-standby.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.standby.alt|text }}">
+            <a class="zoom" href="{{ page.root }}img/screens/bomb-4-standby.png"><img src="{{ page.root }}img/screens/bomb-4-standby.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.standby.alt|text }}"></a>
             <figcaption>{{ screens.standby.caption }}</figcaption>
           </figure>
           <figure>
-            <img src="{{ page.root }}img/screens/bomb-5-armed.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.armed.alt|text }}">
+            <a class="zoom" href="{{ page.root }}img/screens/bomb-5-armed.png"><img src="{{ page.root }}img/screens/bomb-5-armed.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.armed.alt|text }}"></a>
             <figcaption>{{ screens.armed.caption }}</figcaption>
           </figure>
           <figure>
-            <img src="{{ page.root }}img/screens/bomb-6-defused.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.defused.alt|text }}">
+            <a class="zoom" href="{{ page.root }}img/screens/bomb-6-defused.png"><img src="{{ page.root }}img/screens/bomb-6-defused.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.defused.alt|text }}"></a>
             <figcaption>{{ screens.defused.caption }}</figcaption>
           </figure>
           <figure>
-            <img src="{{ page.root }}img/screens/join-joined.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.joined.alt|text }}">
+            <a class="zoom" href="{{ page.root }}img/screens/join-joined.png"><img src="{{ page.root }}img/screens/join-joined.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.joined.alt|text }}"></a>
             <figcaption>{{ screens.joined.caption }}</figcaption>
           </figure>
           <figure>
-            <img src="{{ page.root }}img/screens/codes-entry.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.code_entry.alt|text }}">
+            <a class="zoom" href="{{ page.root }}img/screens/codes-entry.png"><img src="{{ page.root }}img/screens/codes-entry.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.code_entry.alt|text }}"></a>
             <figcaption>{{ screens.code_entry.caption }}</figcaption>
           </figure>
         </div>
         <p class="note screens-note">{{ screens.note }}</p>
-        <h3 id="app-screens">{{ screens.app_title }}</h3>
-        <p>{{ screens.app_intro }}</p>
+        <h3 id="app-screens" class="subhead">{{ screens.app_title }}</h3>
+        <p class="intro">{{ screens.app_intro }}</p>
         <div class="screens app-screens">
           <figure>
-            <img src="{{ page.root }}img/screens/app-prop-game-{{ page.code }}.png" width="360" height="780" loading="lazy" decoding="async" alt="{{ screens.app_prop.alt|text }}">
+            <a class="zoom" href="{{ page.root }}img/screens/app-roles-{{ page.code }}.png"><img src="{{ page.root }}img/screens/app-roles-{{ page.code }}.png" width="360" height="780" loading="lazy" decoding="async" alt="{{ screens.app_roles.alt|text }}"></a>
+            <figcaption>{{ screens.app_roles.caption }}</figcaption>
+          </figure>
+          <figure>
+            <a class="zoom" href="{{ page.root }}img/screens/app-prop-game-{{ page.code }}.png"><img src="{{ page.root }}img/screens/app-prop-game-{{ page.code }}.png" width="360" height="780" loading="lazy" decoding="async" alt="{{ screens.app_prop.alt|text }}"></a>
             <figcaption>{{ screens.app_prop.caption }}</figcaption>
           </figure>
           <figure>
-            <img src="{{ page.root }}img/screens/app-player-{{ page.code }}.png" width="360" height="780" loading="lazy" decoding="async" alt="{{ screens.app_player.alt|text }}">
+            <a class="zoom" href="{{ page.root }}img/screens/app-player-{{ page.code }}.png"><img src="{{ page.root }}img/screens/app-player-{{ page.code }}.png" width="360" height="780" loading="lazy" decoding="async" alt="{{ screens.app_player.alt|text }}"></a>
             <figcaption>{{ screens.app_player.caption }}</figcaption>
           </figure>
           <figure>
-            <img src="{{ page.root }}img/screens/app-chrono-{{ page.code }}.png" width="360" height="780" loading="lazy" decoding="async" alt="{{ screens.app_chrono.alt|text }}">
+            <a class="zoom" href="{{ page.root }}img/screens/app-player-branded-{{ page.code }}.png"><img src="{{ page.root }}img/screens/app-player-branded-{{ page.code }}.png" width="360" height="780" loading="lazy" decoding="async" alt="{{ screens.app_branded.alt|text }}"></a>
+            <figcaption>{{ screens.app_branded.caption }}</figcaption>
+          </figure>
+          <figure>
+            <a class="zoom" href="{{ page.root }}img/screens/app-chrono-{{ page.code }}.png"><img src="{{ page.root }}img/screens/app-chrono-{{ page.code }}.png" width="360" height="780" loading="lazy" decoding="async" alt="{{ screens.app_chrono.alt|text }}"></a>
             <figcaption>{{ screens.app_chrono.caption }}</figcaption>
+          </figure>
+        </div>
+        {# The Medic Kit's screens are the mode's own, in Portuguese by default: one copy for both languages. #}
+        <p class="screens-lead">{{ screens.medic_intro }}</p>
+        <div class="screens">
+          <figure>
+            <a class="zoom" href="{{ page.root }}img/screens/app-medic-idle.png"><img src="{{ page.root }}img/screens/app-medic-idle.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.medic_idle.alt|text }}"></a>
+            <figcaption>{{ screens.medic_idle.caption }}</figcaption>
+          </figure>
+          <figure>
+            <a class="zoom" href="{{ page.root }}img/screens/app-medic-hold.png"><img src="{{ page.root }}img/screens/app-medic-hold.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.medic_hold.alt|text }}"></a>
+            <figcaption>{{ screens.medic_hold.caption }}</figcaption>
+          </figure>
+          <figure>
+            <a class="zoom" href="{{ page.root }}img/screens/app-medic-healed.png"><img src="{{ page.root }}img/screens/app-medic-healed.png" width="320" height="240" loading="lazy" decoding="async" alt="{{ screens.medic_healed.alt|text }}"></a>
+            <figcaption>{{ screens.medic_healed.caption }}</figcaption>
           </figure>
         </div>
       </div>
@@ -250,10 +278,21 @@ python ../tools/docker_sim.py serve ../modes/bomb</code></pre>
           </div>
         </div>
         <p>{{ try.then }}</p>
+        <div class="steps try-more">
+          <div>
+            <h3>{{ try.board.title }}</h3>
+            <p>{{ try.board.text }}</p>
+          </div>
+          <div>
+            <h3>{{ try.app.title }}</h3>
+            <p>{{ try.app.text }}</p>
+          </div>
+        </div>
       </div>
     </section>
 
-    {# The short roadmap: one line per phase. The full one is the roadmap page. #}
+    {# The short roadmap: one line per phase. The full one is the roadmap page;
+       keep the status tags and the lit phase (class now) the same on both. #}
     <section class="band" aria-labelledby="roadmap">
       <div class="wrap">
         <h2 id="roadmap">{{ roadmap.title }}</h2>
@@ -261,10 +300,10 @@ python ../tools/docker_sim.py serve ../modes/bomb</code></pre>
         <ol class="strip">
           <li><span class="tag">{{ roadmap.done }}</span><h3>0 · {{ roadmap.p0.title }}</h3><p>{{ roadmap.p0.short }}</p></li>
           <li><span class="tag">{{ roadmap.software }}</span><h3>1 · {{ roadmap.p1.title }}</h3><p>{{ roadmap.p1.short }}</p></li>
-          <li class="now"><span class="tag">{{ roadmap.current }}</span><h3>2 · {{ roadmap.p2.title }}</h3><p>{{ roadmap.p2.short }}</p></li>
-          <li><h3>3 · {{ roadmap.p3.title }}</h3><p>{{ roadmap.p3.short }}</p></li>
-          <li><h3>4 · {{ roadmap.p4.title }}</h3><p>{{ roadmap.p4.short }}</p></li>
-          <li><h3>5 · {{ roadmap.p5.title }}</h3><p>{{ roadmap.p5.short }}</p></li>
+          <li><span class="tag">{{ roadmap.software }}</span><h3>2 · {{ roadmap.p2.title }}</h3><p>{{ roadmap.p2.short }}</p></li>
+          <li class="now"><span class="tag">{{ roadmap.current }}</span><h3>3 · {{ roadmap.p3.title }}</h3><p>{{ roadmap.p3.short }}</p></li>
+          <li><span class="tag designed">{{ roadmap.designed }}</span><h3>4 · {{ roadmap.p4.title }}</h3><p>{{ roadmap.p4.short }}</p></li>
+          <li><span class="tag designed">{{ roadmap.designed }}</span><h3>5 · {{ roadmap.p5.title }}</h3><p>{{ roadmap.p5.short }}</p></li>
         </ol>
         <p class="more"><a href="{{ page.to.roadmap }}">{{ roadmap.more }}</a></p>
       </div>
@@ -314,6 +353,101 @@ python ../tools/docker_sim.py serve ../modes/bomb</code></pre>
       </div>
     </section>
   </main>
+
+  {# The screenshot viewer. The script below opens a screenshot's link in this
+     dialog: the image as large as the screen allows (at most three times its
+     size, in whole steps when it is small, so its pixels stay sharp), its alt
+     text as the caption, previous and next (also the arrow keys), closed with
+     Esc, the close button or a click outside the image; focus goes back to
+     the screenshot. It is the page's only script: inline, loading nothing.
+     Without it, or in a browser without <dialog>, the links open the images.
+     Keep "{" and "}" in the script apart: two together are a placeholder. #}
+  <dialog class="viewer" id="viewer" aria-label="{{ screens.viewer.label|text }}">
+    <div class="viewer-frame">
+      <div class="viewer-bar">
+        <button type="button" class="viewer-button" data-go="-1" aria-label="{{ screens.viewer.prev|text }}"><span aria-hidden="true">←</span></button>
+        <span class="viewer-count" aria-live="polite"></span>
+        <button type="button" class="viewer-button" data-go="1" aria-label="{{ screens.viewer.next|text }}"><span aria-hidden="true">→</span></button>
+        <button type="button" class="viewer-button viewer-close" aria-label="{{ screens.viewer.close|text }}"><span aria-hidden="true">×</span></button>
+      </div>
+      <img class="viewer-image" alt="">
+      <p class="viewer-caption" aria-hidden="true"></p>
+    </div>
+  </dialog>
+  <script>
+    (function () {
+      "use strict";
+      var dialog = document.getElementById("viewer");
+      if (!dialog || typeof dialog.showModal !== "function") return;
+      var links = Array.prototype.slice.call(document.querySelectorAll("a.zoom"));
+      var frame = dialog.querySelector(".viewer-frame");
+      var bar = dialog.querySelector(".viewer-bar");
+      var image = dialog.querySelector(".viewer-image");
+      var caption = dialog.querySelector(".viewer-caption");
+      var count = dialog.querySelector(".viewer-count");
+      var closeButton = dialog.querySelector(".viewer-close");
+      var current = 0;
+      var opener = null;
+
+      function fit() {
+        var thumb = links[current].querySelector("img");
+        var width = Number(thumb.getAttribute("width"));
+        var height = Number(thumb.getAttribute("height"));
+        var style = getComputedStyle(frame);
+        var roomX = frame.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+        var roomY = frame.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
+          - bar.offsetHeight - caption.offsetHeight - 2 * parseFloat(style.rowGap || "0");
+        var scale = Math.max(0.1, Math.min(roomX / width, roomY / height, 3));
+        var sharp = scale >= 2;
+        if (sharp) scale = Math.floor(scale);
+        image.classList.toggle("sharp", sharp);
+        image.style.width = Math.round(width * scale) + "px";
+        image.style.height = Math.round(height * scale) + "px";
+      }
+
+      function show(index) {
+        current = (index + links.length) % links.length;
+        var link = links[current];
+        var thumb = link.querySelector("img");
+        var figure = link.closest("figure");
+        var title = figure && figure.querySelector("figcaption");
+        image.src = link.href;
+        image.alt = thumb.alt;
+        caption.textContent = thumb.alt;
+        count.textContent = (current + 1) + " / " + links.length;
+        dialog.setAttribute("aria-label", title ? title.textContent.trim() : thumb.alt);
+        fit();
+      }
+
+      links.forEach(function (link, index) {
+        link.addEventListener("click", function (event) {
+          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+          opener = link;
+          dialog.showModal();
+          show(index);
+          closeButton.focus();
+        });
+      });
+      dialog.querySelectorAll("[data-go]").forEach(function (button) {
+        button.addEventListener("click", function () { show(current + Number(button.getAttribute("data-go"))); });
+      });
+      closeButton.addEventListener("click", function () { dialog.close(); });
+      dialog.addEventListener("click", function (event) {
+        if (event.target === dialog || event.target === frame) dialog.close();
+      });
+      dialog.addEventListener("keydown", function (event) {
+        if (event.key === "ArrowLeft") { show(current - 1); event.preventDefault(); }
+        if (event.key === "ArrowRight") { show(current + 1); event.preventDefault(); }
+      });
+      dialog.addEventListener("close", function () {
+        image.removeAttribute("src");
+        if (opener) opener.focus();
+        opener = null;
+      });
+      window.addEventListener("resize", function () { if (dialog.open) fit(); });
+    })();
+  </script>
 
 {% include footer %}
 </body>
