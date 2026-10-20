@@ -68,7 +68,7 @@ header:
   language: Idioma
 
 hero:
-  status: Pré-alfa · software das fases 1 e 2 pronto, fase 3 quase completa em software, fase 4 começada · ainda não pronta para o campo
+  status: Pré-alfa · software das fases 1 e 2 pronto, primeira placa testada na bancada, fase 3 quase completa em software, fase 4 começada · ainda não pronta para o campo
   title: A plataforma aberta de <span class="nowrap">combate simulado</span>
   lead: >-
     A Atalaia é uma plataforma aberta para os dispositivos eletrónicos de jogo (os props) de
@@ -381,7 +381,8 @@ screens:
   intro: >-
     Oito capturas do firmware real da Field Box (ESP32, LVGL 9.2, ecrã de 320&nbsp;×&nbsp;240)
     a correr no emulador <a href="https://wokwi.com">Wokwi</a>. A interface da caixa está em inglês.
-    Ainda não foi testado em hardware físico. Toca ou clica numa captura para a ver em grande.
+    O firmware já corre numa Heltec V4.3 a sério; as capturas são do emulador. Toca ou clica numa
+    captura para a ver em grande.
   note: >-
     O <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">manual
     de montagem</a> tem o esquema de ligações completo e o guia da primeira gravação do firmware,
@@ -501,8 +502,11 @@ try:
     title: Numa placa
     text: >-
       O <a href="{{ page.to.glossary }}#glossario-firmware">firmware</a> da Field Box, do modem de
-      rádio USB e do módulo de E/S já está escrito. O da Field Box corre no emulador Wokwi e os três
-      correm em testes num computador, mas nenhum correu ainda numa placa a sério. Para montar uma
+      rádio USB e do módulo de E/S já está escrito, e os três correm em testes num computador. O da
+      Field Box já correu numa Heltec V4.3 a sério, na bancada: arranca, liga o rádio, lê dois botões
+      e joga a Bomba, com o pequeno ecrã da placa a mostrar o jogo; o do modem e o do módulo ainda
+      não correram numa placa. Para experimentar numa placa sem caixa, há uma versão de bancada do
+      firmware (teclas pelo cabo USB). Para montar uma
       caixa e gravar o firmware, segue o
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">manual
       de montagem</a> (em inglês); o
@@ -521,8 +525,9 @@ roadmap:
   title: Roadmap
   intro: >-
     Seis fases, cada uma fechada por um teste a sério no campo, a sua prova. O software foi à frente
-    do hardware: as fases 1 e 2 estão prontas em software e as suas provas esperam pelas placas,
-    a fase 3 está quase completa em software e a fase 4 já começou.
+    do hardware: as fases 1 e 2 estão prontas em software, a primeira placa já joga a Bomba na
+    bancada e as provas esperam pelas caixas montadas; a fase 3 está quase completa em software e a
+    fase 4 já começou.
   # The main page shows each phase's title and short line, then this link to the roadmap page.
   more: O roadmap completo, com o que cada fase inclui e a sua prova →
   # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
@@ -544,15 +549,17 @@ roadmap:
   p1:
     title: Uma caixa
     short: >-
-      Firmware da Field Box a correr num emulador e manual de montagem; à espera das primeiras
-      caixas.
+      Firmware da Field Box pronto e manual de montagem; a primeira placa já joga a Bomba na
+      bancada, à espera da primeira caixa montada.
     text: >-
       Montagem da Field Box, firmware ESP32, predefinições na própria caixa e um manual de montagem
       com o esquema de ligações.
     gate: >-
       Prova: uma caixa aguenta um jogo de clube de 2 horas sem reiniciar. O firmware e os ecrãs
       estão prontos e correm num emulador, e o manual de montagem com os esquemas de ligações está
-      escrito; a prova fica em aberto até as primeiras caixas estarem montadas.
+      escrito. A primeira placa (Heltec V4.3, 20 de outubro de 2026) já arranca, liga o rádio, lê
+      os botões e joga a Bomba (armar, desarmar, fim do tempo) com o ecrã da própria placa; a prova
+      fica em aberto até haver uma caixa montada que aguente as 2 horas.
   p2:
     title: Rede de campo
     short: >-

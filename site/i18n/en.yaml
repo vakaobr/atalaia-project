@@ -65,7 +65,7 @@ header:
   language: Language
 
 hero:
-  status: Pre-alpha · phase 1 and 2 software done, phase 3 nearly complete in software, phase 4 started · not field-ready yet
+  status: Pre-alpha · phase 1 and 2 software done, first board tested on the bench, phase 3 nearly complete in software, phase 4 started · not field-ready yet
   title: The open <span class="nowrap">force-on-force</span> platform
   lead: >-
     Atalaia is an open platform for the electronic props of airsoft, paintball and milsim: the
@@ -369,7 +369,8 @@ screens:
   intro: >-
     Eight captures from the real Field Box firmware (ESP32, LVGL 9.2, 320&nbsp;×&nbsp;240&nbsp;TFT)
     running in the <a href="https://wokwi.com">Wokwi</a> emulator. The box UI is in English.
-    Not yet tested on physical hardware. Tap or click a screenshot to see it larger.
+    The firmware now runs on a real Heltec V4.3; these screenshots are from the emulator. Tap or
+    click a screenshot to see it larger.
   note: >-
     The <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">build
     manual</a> has the full wiring diagram and first-flash guide for the Heltec WiFi LoRa 32&nbsp;V4.
@@ -488,8 +489,11 @@ try:
     title: On a board
     text: >-
       The <a href="{{ page.to.glossary }}#glossary-firmware">firmware</a> of the Field Box, the USB
-      radio modem and the I/O pod is written. The Field Box's runs in the Wokwi emulator and all
-      three run in tests on a computer, but none has run on a real board yet. To build a box and
+      radio modem and the I/O pod is written, and all three run in tests on a computer. The Field
+      Box's has run on a real Heltec V4.3 on the bench: it boots, powers the radio, reads two buttons
+      and plays Bomb, with the board's own small screen showing the game; the modem's and the pod's
+      have not run on a board yet. To try a bare board without a box, there is a bench build of the
+      firmware (keys over the USB cable). To build a box and
       flash it, follow the
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">build
       manual</a>; the
@@ -507,8 +511,9 @@ roadmap:
   title: Roadmap
   intro: >-
     Six phases, each closed by a real field test, its gate. The software has gone ahead of the
-    hardware: phases 1 and 2 are done in software and their gates wait for the boards, phase 3 is
-    nearly complete in software, and phase 4 has started.
+    hardware: phases 1 and 2 are done in software, the first board already plays Bomb on the bench
+    and the gates wait for built boxes; phase 3 is nearly complete in software, and phase 4 has
+    started.
   # The main page shows each phase's title and short line, then this link to the roadmap page.
   more: The full roadmap, with what each phase holds and its gate →
   # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
@@ -529,13 +534,16 @@ roadmap:
   p1:
     title: Single box
     short: >-
-      Field Box firmware running in an emulator and a build manual; waiting for the first boxes.
+      Field Box firmware and a build manual; the first board plays Bomb on the bench, waiting for
+      the first built box.
     text: >-
       Field Box build, ESP32 firmware, on-device presets, and a build manual with a wiring diagram.
     gate: >-
       Gate: one box runs a 2-hour club game with no restarts. The firmware and its screens are
-      done and run in an emulator, and the build manual with its wiring diagrams is written; the
-      gate stays open until the first boxes are built.
+      done and run in an emulator, and the build manual with its wiring diagrams is written. The
+      first board (Heltec V4.3, 20 October 2026) boots, powers the radio, reads its buttons and plays
+      Bomb (arming, defusing, the timer running out) on its own small screen; the gate stays open
+      until a built box runs the 2 hours.
   p2:
     title: Field network
     short: >-

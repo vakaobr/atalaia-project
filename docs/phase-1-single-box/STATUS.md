@@ -12,6 +12,31 @@ The phase 1 software is done, screens included. The firmware runs a Bomb
 game end to end in the Wokwi emulator. The phase gate (one box runs a
 2-hour club game with no restarts) needs the hardware and stays open.
 
+## First board on the bench (2026-10-20)
+
+The first board, a Heltec WiFi LoRa 32 V4.3 (HTIT-WB32LAF V4.3, ESP32-S3
+rev 0.2, 2 MB PSRAM, 16 MB flash), with two buttons on GPIO 4 and 39 and no
+TFT, keypad, NFC, LED ring or battery gauge, flashed from Windows over its
+own USB port (BUILD.md section 11) with the bench variant. Seen on it:
+
+- Boot: PSRAM found, full tier, no reboot loop; each missing part logs a
+  warning and the box goes on (BRING_UP.md step 1).
+- Radio: SX1262 found, the KCT8103L front end powered (the V4.3 pin fixes
+  of 2026-10-18 hold). Nothing transmitted: the radio step (10) needs a
+  second board and the power check.
+- The on-board OLED (new, decisions HB-1 to HB-3): splash, the picker and
+  the game, upright.
+- Picker over serial keys, a Bomb game: arming by a 5 s hold, defusing by a
+  10 s hold, the hold bars filling, the game ending when its timer runs out
+  and the picker coming back (the stand-alone game-end bug found and fixed
+  here, HB-5); power-loss resume of the game time (the mode's own state is
+  not kept yet, HB-7).
+- The buttons' unsoldered Dupont pins lost contact during holds: solder
+  them (BUILD.md troubleshooting).
+
+Still open for the gate: a built box (TFT, keypad, NFC, ring, battery),
+BRING_UP.md steps 2-14, and the 2-hour game.
+
 ## Verified (exit 0 from a clean copy of the committed files)
 
 - **ESP-IDF cross-compile**, Field Box (`idf.py set-target esp32s3 &&
