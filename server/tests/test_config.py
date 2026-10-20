@@ -51,6 +51,16 @@ class SettingsTests(unittest.TestCase):
             with self.subTest(raw=raw), self.assertRaisesRegex(ConfigError, "ATALAIA_PUBLIC_URL"):
                 Settings.from_env({**BASE, "ATALAIA_PUBLIC_URL": raw})
 
+    def test_firmware_keys(self) -> None:
+        self.assertEqual(Settings.from_env(BASE).firmware_keys, ())  # none: the catalogue takes no entry (S19-8)
+        key = "A" * 43 + "="  # 32 zero bytes
+        other = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="  # 32 bytes of 1
+        self.assertEqual(Settings.from_env({**BASE, "ATALAIA_FIRMWARE_KEYS": f" {key} ,{other},"}).firmware_keys,
+                         (key, other))
+        for raw in ("AAAA", "A" * 44, "not base64!", ",".join([key] * 9)):
+            with self.subTest(raw=raw[:20]), self.assertRaisesRegex(ConfigError, "ATALAIA_FIRMWARE_KEYS"):
+                Settings.from_env({**BASE, "ATALAIA_FIRMWARE_KEYS": raw})
+
     def test_test_adapter(self) -> None:
         self.assertFalse(Settings.from_env(BASE).test_adapter)  # off unless asked for (plan phase 17)
         self.assertFalse(Settings.from_env({**BASE, "ATALAIA_TEST_ADAPTER": "Off"}).test_adapter)

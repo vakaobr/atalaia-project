@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Implementation (plan phases 1 to 18 built in software, 2026-10-20; sync over 4G: HW1; a real ATAK device: HW3)
+**Current phase:** Implementation (plan phases 1 to 19 built in software, 2026-10-20; sync over 4G: HW1; a real ATAK device: HW3)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-20 (plan phase 8, full clean-copy check)
-**Next step:** the modes chain (plan phases 1 to 9) is built in software; plan phase 19 (device health, firmware catalogue, remote GM) on the site server chain, then 20 (the site server's scenario library, which should also carry a scenario to a standby controller, M8-3)
+**Last verified:** 2026-10-20 (plan phase 19, full clean-copy check)
+**Next step:** the modes chain (plan phases 1 to 9) is built in software; plan phase 20 (the site server's scenario library, which should also carry a scenario to a standby controller, M8-3)
 
 ## Completed
 
@@ -57,7 +57,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | 16 | Registration and game-day sync | Software, now | 13, 15 | **Done in software** (2026-10-20; the app's screens with 17, a real game day: HW1) |
 | 17 | Registration import and adapters | Software, now | 16 | **Done in software** (2026-10-20, with the app's registration screens; no real platform) |
 | 18 | Club profiles and branding sync | Software, now | 13 | **Done in software** (2026-10-20; not yet on a real deployment) |
-| 19 | Device health, firmware catalogue, remote GM | Software, now | 13 | Pending |
+| 19 | Device health, firmware catalogue, remote GM | Software, now | 13 | **Done in software** (2026-10-20; not yet on a real deployment or over 4G) |
 | 20 | Game history and the scenario library | Software, now | 13, 7 | Pending |
 | 21 | Hosted multi-tenant mode | Software, now | 10-20 | Pending |
 | 22 | Deployment (Caddy, setup, backup, restore) | Software, now | 10 | Pending |
@@ -678,6 +678,47 @@ migration's data test, and the controller's `test_sync_branding.py` against an
 in-memory site server; the shared vectors gain 2 valid and 9 invalid field
 answers. Not yet: a real deployment, the console's "from the site server"
 label. Decisions S18-1 to S18-12, all open.
+
+## Plan phase 19: device health, firmware catalogue and remote GM (built 2026-10-20, in software)
+
+What exists: on the site server, **device health** read from what the
+controllers already sync (each game's nodes: battery, RSSI, SNR, platform,
+firmware and core versions, tier, last seen; and the `node.online`,
+`node.offline`, `battery.low` and `node.tamper` events): `GET
+/api/v1/fields/{field}/devices` lists each device by its name with its latest
+game, `GET /api/v1/games/{game}/devices` one game's nodes, for the field's admin
+and gm, with battery-low, offline, silent, tampered and outdated-firmware flags.
+A **firmware catalogue** (`/api/v1/firmware`, migration `0010_firmware`): a list
+only, no image stored or sent (OTA is not built); a server administrator adds a
+release only when a key in `ATALAIA_FIRMWARE_KEYS` signed it with Ed25519 (no key:
+no entries), every listing checks the signatures again, a withdrawn release stays
+marked, a pre-release is never the latest. The **remote GM**: a controller with
+`[sync] remote_gm = true` (off by default) opens `WS /api/v1/sync/stream` itself
+and keeps it open (`remote_gm.py`, `ws_client.py`, a small RFC 6455 client on the
+standard library); it sends its live game (state, totals, the nodes' health, the
+latest events; never positions) and takes commands. A user with the `gm` role on
+the field, in a TOTP session, sees it (`GET /api/v1/fields/{field}/remote-gm`) and
+sends `start`, `pause`, `resume`, `end`, a GM message or a declared mode command
+(`POST .../remote-gm/commands`), nothing else. The controller checks every command
+again with the shared `sync_format.check_command`, refuses all of them while its
+setting is off, refuses another game, a stale or a repeated command, and logs each
+one in `remote_commands` (store schema 8, `GET /api/v1/remote-gm`); the site server
+logs every attempt in its audit log (`remote_gm_command`, `remote_gm_denied`, `GET
+.../remote-gm/log`). The site server gained `wsproto`, so uvicorn serves the stream
+in the image (it could not before, S19-1). `protocol/sync.md` describes the
+messages; 13 valid and 24 invalid shared vectors.
+
+Tests: `test_devices.py`, `test_firmware.py` (RFC 8032's own vectors; also in
+tools/check.sh), `test_remote_gm.py` (a command refused while `remote_gm` is off,
+refused outside the list, refused for a user without `gm` on that field; the
+controller's refusals and timeouts; a revoked key; the live view; the audit log),
+`test_remote_gm_e2e.py` (a GM runs the real controller's game over a real socket
+under uvicorn), the migration's data test, and the controller's
+`test_remote_gm.py` (its checks, its log, the live view, the stream against a
+raw-socket server, RFC 6455's own examples). Not built: the remote ATAK relay that
+M9-10 had deferred here (it needs an authenticated endpoint, S19-10), positions in
+the remote view, a GM page on the site server and the console's screen for the log.
+Not yet: a real deployment, over 4G (HW1). Decisions S19-1 to S19-11, all open.
 
 ## Dependencies
 

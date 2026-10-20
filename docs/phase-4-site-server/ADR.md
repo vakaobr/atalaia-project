@@ -1049,7 +1049,13 @@ their plan phases. *(2026-10-20, plan phase 14: `POST /api/v1/sync/marshals`,
 /api/v1/sync/field` carries the field's branding and saved teams, with
 `GET /api/v1/sync/images/{sha256}` for their images, pulled only with
 `[sync] branding = "site"`; the field settings and limit template are not
-in it yet, decision S18-1.)*
+in it yet, decision S18-1.)* *(2026-10-20, plan phase 19: with `[sync]
+remote_gm = true` the controller opens `WS /api/v1/sync/stream` itself and
+sends `hello`, `live` and `command.result` on it; the site server sends
+`command` back, for a user with the `gm` role on the field in a TOTP
+session, from a list of six (start, pause, resume, end, a GM message, a
+declared mode command); both sides check every message with
+`sync_format.STREAM` and log every command; decisions S19-1 to S19-11.)*
 
 ---
 
@@ -1920,6 +1926,11 @@ proposed):**
   prop with GPS may give its own.
 - **Remote ATAK through the site server** forwards props and zones
   only, over the controller's sync WebSocket (ADR-P4-3's amendment).
+  *(2026-10-20, plan phase 19: not built. The stream exists, but the
+  relay needs an internet-facing endpoint for ATAK clients, and raw
+  CoT on TCP 4242 has no authentication; it waits for a design with
+  client certificates, as TAK's TLS streaming has, decision S19-10,
+  which answers M9-10.)*
 - **Configuration** is the controller's TOML (`[atak] enabled = false`,
   `multicast = "239.2.3.1:6969"`, `interval_s = 30`,
   `staff_endpoints = []`, `players = false`), overridable as

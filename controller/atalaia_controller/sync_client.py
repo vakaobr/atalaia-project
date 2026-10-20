@@ -288,6 +288,7 @@ class SyncClient:
         self.branding_pulled_at: Optional[float] = None
         self.branding_error: Optional[str] = None
         self.images_fetched = 0
+        self.remote: Optional[Any] = None  # remote_gm.RemoteGm, with [sync] remote_gm = true (plan phase 19)
 
     # --- identity ---------------------------------------------------------------------
 
@@ -886,4 +887,5 @@ class SyncClient:
                              "claims_answered": self.claims_answered},
                 "branding": {"source": getattr(self.cfg, "sync_branding", "local"),
                              "supported": self.branding_supported, "pulled_at": self.branding_pulled_at,
-                             "error": self.branding_error, "images_fetched": self.images_fetched}}
+                             "error": self.branding_error, "images_fetched": self.images_fetched},
+                "remote_gm": self.remote.status() if self.remote is not None else {"enabled": False}}

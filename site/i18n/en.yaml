@@ -601,7 +601,7 @@ roadmap:
     title: Site server and advanced play
     short: >-
       Site server, game scheduling and registration, custom scenarios, advanced modes, ATAK.
-      Started: advanced modes (Master and Satellites, the Hacking Terminal, VIP / Payload and the logic of Target Windows), custom scenarios (their runtime, compiler, console editor and objectives in the app), geo utilities in the core, the ATAK feed, and the site server's accounts, personal data rights, controller sync, chrono registry, game scheduling with public field pages, feeds and registration, and club profiles with branding sync are built in software.
+      Started: advanced modes (Master and Satellites, the Hacking Terminal, VIP / Payload and the logic of Target Windows), custom scenarios (their runtime, compiler, console editor and objectives in the app), geo utilities in the core, the ATAK feed, and the site server's accounts, personal data rights, controller sync, chrono registry, game scheduling with public field pages, feeds and registration, club profiles with branding sync, device health, a firmware catalogue and the remote GM are built in software.
     text: >-
       Site server (accounts, game history, the chrono registry, scheduling games, registration and
       publishing), custom scenarios, advanced modes (master and satellite zones, VIP escort, hacking
@@ -642,7 +642,13 @@ roadmap:
       JSON) exported from another platform; and club profiles (name, colour, logo and crest,
       members, a public page off by default with a report button and moderation) with the field's
       branding and saved teams synced to its controllers, so a club's crest reaches every field that
-      saved its team.
+      saved its team; and device health (each box's battery, link and firmware from what the
+      controllers send), a firmware catalogue that only lists releases signed with a trusted key
+      (nothing is installed: over-the-air updates are not built yet), and the remote GM: an organiser
+      with the GM role, logged in with a two-factor code, sees the live game and starts, pauses,
+      resumes or ends it, or sends a message or a mode command, over a connection the field
+      controller opens itself, only when the field turns it on, with every command logged on both
+      sides.
     gate: >-
       Gate: a weekend <a href="{{ page.to.glossary }}#glossary-milsim">milsim</a> runs on Atalaia end to end.
   p5:

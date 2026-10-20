@@ -12,7 +12,7 @@ is at /api/v1/openapi.json.
 
 The app's own state: ``keys`` (derived from ATALAIA_SECRET_KEY), ``seed_box``
 (TOTP seeds), ``limits`` (rate limits and lockouts), ``used_totp_steps``
-(spent TOTP login steps), ``purge_task`` (the daily retention purge, unless
+(spent TOTP login steps), ``remote_hub`` (the remote GM's controller links, plan phase 19), ``purge_task`` (the daily retention purge, unless
 ATALAIA_PURGE_HOUR is off) and ``clock`` (the time TOTP codes are checked at;
 the tests move it). All of it is in memory, for the one worker process the
 image runs (ADR-P4-2).
@@ -32,11 +32,13 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from . import __version__, integrations, personal_data
-from .api import (auth, branding, chrono, clubs, fields, games, health, integrations as integrations_api, me,
-                  registration_import, registrations, scheduling, sync)
+from .api import (auth, branding, chrono, clubs, devices, fields, firmware, games, health,
+                  integrations as integrations_api, me, registration_import, registrations, remote_gm, scheduling,
+                  sync)
 from .config import Settings, redact_url
 from .db import make_engine, make_sessionmaker
 from .ratelimit import Limits, RequestLimitMiddleware
+from .remote_gm import RemoteHub
 from .security_headers import SecurityHeadersMiddleware
 from .tokens import Keys, UsedTokens
 from .totp import SeedBox
@@ -79,6 +81,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.state.limits = Limits()
     app.state.used_totp_steps = UsedTokens()
     app.state.clock = time.time
+    app.state.remote_hub = RemoteHub()  # the remote GM's open controller links (plan phase 19)
     app.add_exception_handler(RequestValidationError, _invalid_request)
     # The last one added runs first: security headers wrap everything, the 429s included.
     app.add_middleware(RequestLimitMiddleware, get_limits=lambda: app.state.limits)
@@ -96,6 +99,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.include_router(integrations_api.router)
     app.include_router(branding.router)
     app.include_router(clubs.router)
+    app.include_router(devices.router)
+    app.include_router(firmware.router)
+    app.include_router(remote_gm.router)
     app.include_router(field_pages.router)
     app.include_router(club_pages.router)
     return app

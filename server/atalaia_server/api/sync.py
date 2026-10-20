@@ -18,7 +18,9 @@
     GET  /api/v1/sync/claims                   accounts' claims of player ids, waiting for this field's verdict
     GET  /api/v1/sync/field                    the field's branding and saved teams, images by SHA-256 (plan phase 18)
     GET  /api/v1/sync/images/{sha256}          one of those images, as stored (checked, metadata stripped)
-    WS   /api/v1/sync/stream   the POST bodies on one socket the controller keeps open
+    WS   /api/v1/sync/stream   the POST bodies on one socket the controller keeps open; with the
+                               controller's [sync] remote_gm on, also its hello, live view and
+                               command results, and the remote GM's commands the other way (plan phase 19)
 
 The controller opens every connection (P4R12); nothing here connects to it.
 Bodies are checked by ``atalaia_controller.sync_format``, the code the
@@ -29,16 +31,17 @@ the controller seen.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Optional
 
 from atalaia_controller import sync_format
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, Response
 
-from .. import sync
+from .. import remote_gm, sync
 from ..auth import UNAUTHORISED, bearer
 from ..models import FieldApiKey
 from ..services import branding, registration
@@ -187,9 +190,30 @@ async def field_image(sha256: str, request: Request) -> Response:
             "Content-Disposition": "inline"})
 
 
+# The remote GM's messages from the controller (plan phase 19); ``command`` goes the other way only.
+STREAM_IN = ("hello", "live", "command.result")
+
+
+class _Session:
+    """One socket's state: its sends serialised (a remote command is sent from another request's task)
+    and, after ``hello``, its remote GM link."""
+
+    def __init__(self, ws: WebSocket, caller: sync.Caller) -> None:
+        self.ws = ws
+        self.caller = caller
+        self.lock = asyncio.Lock()
+        self.link: Optional[remote_gm.Link] = None
+
+    async def send(self, msg: dict[str, Any]) -> None:
+        async with self.lock:
+            await self.ws.send_json(msg)
+
+
 @router.websocket("/stream")
 async def stream(ws: WebSocket) -> None:
-    """One socket per controller: ``{"type": kind, ...body}`` in, ``{"type": kind + ".ack", ...}`` out."""
+    """One socket per controller: ``{"type": kind, ...body}`` in, ``{"type": kind + ".ack", ...}`` out;
+    the remote GM's ``hello``, ``live`` and ``command.result`` in (only ``hello`` is answered), its
+    ``command`` out."""
     scheme, _, value = ws.headers.get("authorization", "").partition(" ")
     key = value.strip() if scheme.lower() == "bearer" else None
     async with ws.app.state.sessionmaker() as db:
@@ -199,22 +223,32 @@ async def stream(ws: WebSocket) -> None:
         await ws.close(code=WS_UNAUTHORISED)
         return
     await ws.accept()
+    session = _Session(ws, caller)
+    hub: remote_gm.RemoteHub = ws.app.state.remote_hub
     try:
         while True:
             raw = await ws.receive_text()
-            await ws.send_json(await _message(ws, caller, raw))
+            answer = await _message(ws, caller, raw, session)
+            if answer is not None:
+                await session.send(answer)
     except WebSocketDisconnect:
         return
+    finally:
+        if session.link is not None:
+            hub.detach(session.link)
 
 
-async def _message(ws: WebSocket, caller: sync.Caller, raw: str) -> dict[str, Any]:
+async def _message(ws: WebSocket, caller: sync.Caller, raw: str,
+                   session: Optional[_Session] = None) -> Optional[dict[str, Any]]:
+    """One message's answer, or None (a ``live`` or ``command.result`` gets none). Without a ``session`` (no
+    socket of its own) only the sync bodies and ``ping`` are taken."""
     if len(raw.encode("utf-8")) > sync_format.MAX_BODY:
         return {"type": "error", "detail": "body_too_large"}
     try:
         msg = json.loads(raw)
     except ValueError:
         return {"type": "error", **sync.SyncProblem(400, "invalid_body", "not_json", "").body()}
-    if not isinstance(msg, dict) or msg.get("type") not in (*sync_format.CHECKS, "ping"):
+    if not isinstance(msg, dict) or msg.get("type") not in (*sync_format.CHECKS, *STREAM_IN, "ping"):
         return {"type": "error", **sync.SyncProblem(400, "invalid_body", "bad_type", "type").body()}
     kind = msg.pop("type")
     if kind == "ping":
@@ -223,13 +257,51 @@ async def _message(ws: WebSocket, caller: sync.Caller, raw: str) -> dict[str, An
         try:
             # The key may have been revoked since the socket opened.
             if not await _still_live(db, caller):
+                if session is not None and session.link is not None:
+                    ws.app.state.remote_hub.detach(session.link)
+                    session.link = None
                 await ws.close(code=WS_UNAUTHORISED)
                 raise WebSocketDisconnect(WS_UNAUTHORISED)
+            if kind in STREAM_IN:
+                if session is None:
+                    raise sync.SyncProblem(400, "invalid_body", "bad_type", "type")
+                return await _remote(session, db, kind, msg)
             answer = await sync.apply(db, caller, kind, sync.check(kind, msg))
         except sync.SyncProblem as exc:
             await db.rollback()
             return {"type": "error", **exc.body()}
     return {"type": f"{kind}.ack", **answer}
+
+
+async def _remote(session: _Session, db: Any, kind: str, msg: dict[str, Any]) -> Optional[dict[str, Any]]:
+    """The remote GM's messages (plan phase 19): ``hello`` registers the link (and is answered), ``live``
+    replaces its live view, ``command.result`` answers a waiting command; the last two get no answer."""
+    try:
+        body = sync_format.STREAM[kind](msg)
+    except sync_format.SyncFormatError as exc:
+        raise sync.SyncProblem(400, "invalid_body", exc.code, exc.path) from None
+    hub: remote_gm.RemoteHub = session.ws.app.state.remote_hub
+    if kind == "hello":
+        await sync.seen(db, session.caller, body)
+        await db.commit()
+        if session.link is not None:
+            hub.detach(session.link)
+        session.link = remote_gm.Link(
+            field_id=session.caller.field_id, key_id=session.caller.key_id, controller_id=body["controller"]["id"],
+            controller_row=session.caller.controller, version=body["controller"]["version"],
+            remote_gm=body["remote_gm"], send=session.send)
+        hub.attach(session.link)
+        return {"type": "hello.ack", "remote_gm": body["remote_gm"]}
+    link = session.link
+    if link is None:
+        raise sync.SyncProblem(409, "hello_first")
+    if body["controller"]["id"] != link.controller_id:
+        raise sync.SyncProblem(400, "invalid_body", "not_this_controller", "controller.id")
+    if kind == "live":
+        link.live, link.live_at = body["live"], datetime.now(timezone.utc)
+    else:
+        hub.result(link, body)
+    return None
 
 
 async def _still_live(db: Any, caller: sync.Caller) -> bool:

@@ -1,5 +1,5 @@
 {
- "description": "Controller sync bodies (protocol/sync.md). Every valid body passes its kind's check (games, events, scores, nodes, marshals, replicas, chrono, checkins, claims); nodes_unknown_info_dropped keeps only the info keys listed under info. Every invalid body fails with the error code and path given (the first problem found, in the order of protocol/sync.md's tables). merge: the snapshots merged in order by maximum per (source, team) give counters, and the totals are the counters' sum per team plus the deltas (GM adjustments, score.delta), worked out by hand from protocol/sync.md's rule (decision P4R10). The chrono bodies use the marshal test key and records of chrono_record.json: chrono_readings verifies on the site server once marshals_with_a_rotated_key is stored (its second key is that test key, valid from 1792000000). answers (plan phases 16 and 18): the answers of the GET endpoints the controller pulls (schedule, roster, claims, and field: the branding and saved teams, images by SHA-256), each valid one passing sync_format.ANSWERS[kind] and each invalid one failing with its error and path; the site server's own answers are checked with the same functions in its tests.",
+ "description": "Controller sync bodies (protocol/sync.md). Every valid body passes its kind's check (games, events, scores, nodes, marshals, replicas, chrono, checkins, claims); nodes_unknown_info_dropped keeps only the info keys listed under info. Every invalid body fails with the error code and path given (the first problem found, in the order of protocol/sync.md's tables). merge: the snapshots merged in order by maximum per (source, team) give counters, and the totals are the counters' sum per team plus the deltas (GM adjustments, score.delta), worked out by hand from protocol/sync.md's rule (decision P4R10). The chrono bodies use the marshal test key and records of chrono_record.json: chrono_readings verifies on the site server once marshals_with_a_rotated_key is stored (its second key is that test key, valid from 1792000000). answers (plan phases 16 and 18): the answers of the GET endpoints the controller pulls (schedule, roster, claims, and field: the branding and saved teams, images by SHA-256), each valid one passing sync_format.ANSWERS[kind] and each invalid one failing with its error and path; the site server's own answers are checked with the same functions in its tests. stream (plan phase 19): the remote GM's messages on WS /api/v1/sync/stream (hello, live and command.result from the controller, command from the site server), each valid one passing sync_format.STREAM[kind] and each invalid one failing with its error and path; format vectors made for this repository from protocol/sync.md (there is no external source to copy them from).",
  "valid": [
   {
    "name": "game_minimal",
@@ -11218,6 +11218,1685 @@
     },
     "error": "unknown_field",
     "path": "teams[0].members"
+   }
+  ]
+ },
+ "stream": {
+  "valid": [
+   {
+    "name": "hello_remote_gm_on",
+    "kind": "hello",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "remote_gm": true
+    }
+   },
+   {
+    "name": "hello_remote_gm_off",
+    "kind": "hello",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "remote_gm": false
+    }
+   },
+   {
+    "name": "live_no_game",
+    "kind": "live",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "live": null
+    }
+   },
+   {
+    "name": "live_running",
+    "kind": "live",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "live": {
+      "game": {
+       "game_id": 4242,
+       "game_seed": 3735928559
+      },
+      "name": "Domingo",
+      "mode_id": "org.atalaia.domination",
+      "teams": [
+       "red",
+       "blue"
+      ],
+      "state": "running",
+      "in_charge": true,
+      "totals": {
+       "red": -20,
+       "blue": 15
+      },
+      "game_time_ms": 734210,
+      "duration_ms": 3600000,
+      "nodes": [
+       {
+        "node_id": 3,
+        "name": "alpha",
+        "role": "zone",
+        "last_seen": 1792000400.0,
+        "info": {
+         "owner": "red",
+         "battery_pct": 81,
+         "rssi": -71,
+         "snr": 7.5,
+         "platform": "1",
+         "fw_version": "0.4.0",
+         "tier": "0"
+        }
+       }
+      ],
+      "events": [
+       {
+        "id": 7,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 8,
+        "node": 0,
+        "seq": 9,
+        "t": 734100,
+        "type": "score.delta",
+        "prio": "critical",
+        "team": "red",
+        "data": {
+         "amount": -20,
+         "team": "red",
+         "reason": "penalty"
+        }
+       }
+      ],
+      "mode_commands": [
+       {
+        "name": "refill",
+        "roles": [
+         "medic"
+        ]
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "command_start",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "start",
+     "params": {},
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    }
+   },
+   {
+    "name": "command_pause_with_reason",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "pause",
+     "params": {
+      "reason": "medic on field"
+     },
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    }
+   },
+   {
+    "name": "command_resume",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "resume",
+     "params": {},
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    }
+   },
+   {
+    "name": "command_end",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "end",
+     "params": {},
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    }
+   },
+   {
+    "name": "command_message",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "message",
+     "params": {
+      "text": "5 minutos para o fim"
+     },
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    }
+   },
+   {
+    "name": "command_mode_every_node",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "mode",
+     "params": {
+      "name": "refill"
+     },
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    }
+   },
+   {
+    "name": "command_mode_one_node",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "mode",
+     "params": {
+      "name": "refill",
+      "node": 7
+     },
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    }
+   },
+   {
+    "name": "result_done",
+    "kind": "command.result",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "code": "done",
+     "detail": "game 4242 is paused"
+    }
+   },
+   {
+    "name": "result_refused_no_detail",
+    "kind": "command.result",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "code": "remote_gm_off"
+    }
+   }
+  ],
+  "invalid": [
+   {
+    "name": "hello_without_remote_gm",
+    "kind": "hello",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     }
+    },
+    "error": "missing",
+    "path": "remote_gm"
+   },
+   {
+    "name": "hello_remote_gm_text",
+    "kind": "hello",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "remote_gm": "yes"
+    },
+    "error": "not_a_boolean",
+    "path": "remote_gm"
+   },
+   {
+    "name": "hello_with_a_game",
+    "kind": "hello",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "remote_gm": true
+    },
+    "error": "unknown_field",
+    "path": "game"
+   },
+   {
+    "name": "live_with_positions",
+    "kind": "live",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "live": {
+      "game": {
+       "game_id": 4242,
+       "game_seed": 3735928559
+      },
+      "name": "Domingo",
+      "mode_id": "org.atalaia.domination",
+      "teams": [
+       "red",
+       "blue"
+      ],
+      "state": "running",
+      "in_charge": true,
+      "totals": {
+       "red": -20,
+       "blue": 15
+      },
+      "game_time_ms": 734210,
+      "duration_ms": 3600000,
+      "nodes": [
+       {
+        "node_id": 3,
+        "name": "alpha",
+        "role": "zone",
+        "last_seen": 1792000400.0,
+        "info": {
+         "owner": "red",
+         "battery_pct": 81,
+         "rssi": -71,
+         "snr": 7.5,
+         "platform": "1",
+         "fw_version": "0.4.0",
+         "tier": "0"
+        }
+       }
+      ],
+      "events": [
+       {
+        "id": 7,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 8,
+        "node": 0,
+        "seq": 9,
+        "t": 734100,
+        "type": "score.delta",
+        "prio": "critical",
+        "team": "red",
+        "data": {
+         "amount": -20,
+         "team": "red",
+         "reason": "penalty"
+        }
+       }
+      ],
+      "mode_commands": [
+       {
+        "name": "refill",
+        "roles": [
+         "medic"
+        ]
+       }
+      ],
+      "positions": []
+     }
+    },
+    "error": "unknown_field",
+    "path": "live.positions"
+   },
+   {
+    "name": "live_event_with_a_position",
+    "kind": "live",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "live": {
+      "game": {
+       "game_id": 4242,
+       "game_seed": 3735928559
+      },
+      "name": "Domingo",
+      "mode_id": "org.atalaia.domination",
+      "teams": [
+       "red",
+       "blue"
+      ],
+      "state": "running",
+      "in_charge": true,
+      "totals": {
+       "red": -20,
+       "blue": 15
+      },
+      "game_time_ms": 734210,
+      "duration_ms": 3600000,
+      "nodes": [
+       {
+        "node_id": 3,
+        "name": "alpha",
+        "role": "zone",
+        "last_seen": 1792000400.0,
+        "info": {
+         "owner": "red",
+         "battery_pct": 81,
+         "rssi": -71,
+         "snr": 7.5,
+         "platform": "1",
+         "fw_version": "0.4.0",
+         "tier": "0"
+        }
+       }
+      ],
+      "events": [
+       {
+        "id": 7,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha",
+         "lat": 38.8
+        }
+       },
+       {
+        "id": 8,
+        "node": 0,
+        "seq": 9,
+        "t": 734100,
+        "type": "score.delta",
+        "prio": "critical",
+        "team": "red",
+        "data": {
+         "amount": -20,
+         "team": "red",
+         "reason": "penalty"
+        }
+       }
+      ],
+      "mode_commands": [
+       {
+        "name": "refill",
+        "roles": [
+         "medic"
+        ]
+       }
+      ]
+     }
+    },
+    "error": "position_not_allowed",
+    "path": "live.events[0].data.lat"
+   },
+   {
+    "name": "live_total_of_another_team",
+    "kind": "live",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "live": {
+      "game": {
+       "game_id": 4242,
+       "game_seed": 3735928559
+      },
+      "name": "Domingo",
+      "mode_id": "org.atalaia.domination",
+      "teams": [
+       "red",
+       "blue"
+      ],
+      "state": "running",
+      "in_charge": true,
+      "totals": {
+       "red": 1,
+       "green": 2
+      },
+      "game_time_ms": 734210,
+      "duration_ms": 3600000,
+      "nodes": [
+       {
+        "node_id": 3,
+        "name": "alpha",
+        "role": "zone",
+        "last_seen": 1792000400.0,
+        "info": {
+         "owner": "red",
+         "battery_pct": 81,
+         "rssi": -71,
+         "snr": 7.5,
+         "platform": "1",
+         "fw_version": "0.4.0",
+         "tier": "0"
+        }
+       }
+      ],
+      "events": [
+       {
+        "id": 7,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 8,
+        "node": 0,
+        "seq": 9,
+        "t": 734100,
+        "type": "score.delta",
+        "prio": "critical",
+        "team": "red",
+        "data": {
+         "amount": -20,
+         "team": "red",
+         "reason": "penalty"
+        }
+       }
+      ],
+      "mode_commands": [
+       {
+        "name": "refill",
+        "roles": [
+         "medic"
+        ]
+       }
+      ]
+     }
+    },
+    "error": "unknown_team",
+    "path": "live.totals.green"
+   },
+   {
+    "name": "live_too_many_events",
+    "kind": "live",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "live": {
+      "game": {
+       "game_id": 4242,
+       "game_seed": 3735928559
+      },
+      "name": "Domingo",
+      "mode_id": "org.atalaia.domination",
+      "teams": [
+       "red",
+       "blue"
+      ],
+      "state": "running",
+      "in_charge": true,
+      "totals": {
+       "red": -20,
+       "blue": 15
+      },
+      "game_time_ms": 734210,
+      "duration_ms": 3600000,
+      "nodes": [
+       {
+        "node_id": 3,
+        "name": "alpha",
+        "role": "zone",
+        "last_seen": 1792000400.0,
+        "info": {
+         "owner": "red",
+         "battery_pct": 81,
+         "rssi": -71,
+         "snr": 7.5,
+         "platform": "1",
+         "fw_version": "0.4.0",
+         "tier": "0"
+        }
+       }
+      ],
+      "events": [
+       {
+        "id": 1,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 2,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 3,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 4,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 5,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 6,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 7,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 8,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 9,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 10,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 11,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 12,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 13,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 14,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 15,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 16,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 17,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 18,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 19,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 20,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 21,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 22,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 23,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 24,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 25,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 26,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 27,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 28,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 29,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 30,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 31,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 32,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 33,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 34,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 35,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 36,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 37,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 38,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 39,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 40,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 41,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 42,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 43,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 44,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 45,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 46,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 47,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 48,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 49,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 50,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 51,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       }
+      ],
+      "mode_commands": [
+       {
+        "name": "refill",
+        "roles": [
+         "medic"
+        ]
+       }
+      ]
+     }
+    },
+    "error": "bad_batch_size",
+    "path": "live.events"
+   },
+   {
+    "name": "live_in_charge_missing",
+    "kind": "live",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "live": {
+      "game": {
+       "game_id": 4242,
+       "game_seed": 3735928559
+      },
+      "name": "Domingo",
+      "mode_id": "org.atalaia.domination",
+      "teams": [
+       "red",
+       "blue"
+      ],
+      "state": "running",
+      "totals": {
+       "red": -20,
+       "blue": 15
+      },
+      "game_time_ms": 734210,
+      "duration_ms": 3600000,
+      "nodes": [
+       {
+        "node_id": 3,
+        "name": "alpha",
+        "role": "zone",
+        "last_seen": 1792000400.0,
+        "info": {
+         "owner": "red",
+         "battery_pct": 81,
+         "rssi": -71,
+         "snr": 7.5,
+         "platform": "1",
+         "fw_version": "0.4.0",
+         "tier": "0"
+        }
+       }
+      ],
+      "events": [
+       {
+        "id": 7,
+        "node": 3,
+        "seq": 4,
+        "t": 734000,
+        "type": "zone.captured",
+        "prio": "normal",
+        "team": "red",
+        "data": {
+         "zone": "alpha"
+        }
+       },
+       {
+        "id": 8,
+        "node": 0,
+        "seq": 9,
+        "t": 734100,
+        "type": "score.delta",
+        "prio": "critical",
+        "team": "red",
+        "data": {
+         "amount": -20,
+         "team": "red",
+         "reason": "penalty"
+        }
+       }
+      ],
+      "mode_commands": [
+       {
+        "name": "refill",
+        "roles": [
+         "medic"
+        ]
+       }
+      ]
+     }
+    },
+    "error": "missing",
+    "path": "live.in_charge"
+   },
+   {
+    "name": "command_not_in_the_list",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "set_owner",
+     "params": {
+      "team": "red"
+     },
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    },
+    "error": "not_allowed",
+    "path": "command"
+   },
+   {
+    "name": "command_score_adjustment",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "score",
+     "params": {
+      "team": "red",
+      "amount": 50
+     },
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    },
+    "error": "not_allowed",
+    "path": "command"
+   },
+   {
+    "name": "command_start_with_params",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "start",
+     "params": {
+      "preset": "x"
+     },
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    },
+    "error": "unknown_field",
+    "path": "params.preset"
+   },
+   {
+    "name": "command_with_a_token",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "start",
+     "params": {},
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25,
+     "token": "gm-secret"
+    },
+    "error": "unknown_field",
+    "path": "token"
+   },
+   {
+    "name": "command_message_empty",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "message",
+     "params": {
+      "text": ""
+     },
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    },
+    "error": "not_a_text",
+    "path": "params.text"
+   },
+   {
+    "name": "command_message_blank",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "message",
+     "params": {
+      "text": "   "
+     },
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    },
+    "error": "bad_text",
+    "path": "params.text"
+   },
+   {
+    "name": "command_message_too_long",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "message",
+     "params": {
+      "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+     },
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    },
+    "error": "bad_text",
+    "path": "params.text"
+   },
+   {
+    "name": "command_message_control_character",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "message",
+     "params": {
+      "text": "a\nb"
+     },
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    },
+    "error": "bad_text",
+    "path": "params.text"
+   },
+   {
+    "name": "command_mode_bad_name",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "mode",
+     "params": {
+      "name": "Refill"
+     },
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    },
+    "error": "bad_text",
+    "path": "params.name"
+   },
+   {
+    "name": "command_mode_node_zero",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "mode",
+     "params": {
+      "name": "refill",
+      "node": 0
+     },
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    },
+    "error": "out_of_range",
+    "path": "params.node"
+   },
+   {
+    "name": "command_pause_long_reason",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "pause",
+     "params": {
+      "reason": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+     },
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    },
+    "error": "bad_text",
+    "path": "params.reason"
+   },
+   {
+    "name": "command_id_not_a_uuid",
+    "kind": "command",
+    "body": {
+     "id": "42",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "start",
+     "params": {},
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    },
+    "error": "bad_text",
+    "path": "id"
+   },
+   {
+    "name": "command_without_a_user",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "start",
+     "params": {},
+     "sent_at": 1792000500.25
+    },
+    "error": "missing",
+    "path": "user"
+   },
+   {
+    "name": "command_user_without_username",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "start",
+     "params": {},
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa"
+     },
+     "sent_at": 1792000500.25
+    },
+    "error": "missing",
+    "path": "user.username"
+   },
+   {
+    "name": "result_unknown_code",
+    "kind": "command.result",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "code": "maybe"
+    },
+    "error": "bad_value",
+    "path": "code"
+   },
+   {
+    "name": "result_extra_field",
+    "kind": "command.result",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "code": "done",
+     "state": "x"
+    },
+    "error": "unknown_field",
+    "path": "state"
    }
   ]
  }

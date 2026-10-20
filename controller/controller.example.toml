@@ -86,6 +86,11 @@ ca_file = ""                      # a CA (PEM) to trust instead of the system's
 interval_game_s = 30.0            # while a game runs
 interval_idle_s = 300.0           # between games; failures double the wait up to this
 timeout_s = 15.0                  # per request
+# true: the site server's users with the gm role on this field see the live game and
+# may start, pause, resume and end it, send GM messages and the game's declared mode
+# commands, over a WebSocket this controller opens; every command is logged on both
+# sides (plan phase 19). Off by default.
+remote_gm = false
 
 [atak]
 # Cursor on Target for ATAK (ADR-P4-7 as amended, P4R18; atak.py). Props and the

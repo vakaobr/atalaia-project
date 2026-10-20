@@ -41,6 +41,10 @@ server's tests check its own answers with.
 
 Branding (plan phase 18; P4R19): the answer of ``GET /api/v1/sync/field``, the field's branding and
 saved teams with their images by SHA-256 (``check_field``, in ``ANSWERS`` too).
+
+The remote GM (plan phase 19; P4R12): the stream's own messages, in ``STREAM``: the controller's ``hello``,
+``live`` (its live game: never a position) and ``command.result``, and the site server's ``command``, one
+of ``REMOTE_COMMANDS`` (start, pause, resume, end, a GM message, a declared mode command) and nothing else.
 """
 
 from __future__ import annotations
@@ -361,12 +365,16 @@ def _info_value(kind: str, value: Any, path: str) -> Any:
 
 def check_nodes(body: Any) -> dict[str, Any]:
     body = _envelope(body, ("nodes",))
-    nodes = body["nodes"]
+    _node_list(body["nodes"], "nodes")
+    return body
+
+
+def _node_list(nodes: Any, where: str) -> None:
     if not isinstance(nodes, list) or len(nodes) > MAX_NODES:
-        _fail("bad_batch_size", "nodes")
+        _fail("bad_batch_size", where)
     seen = set()
     for i, node in enumerate(nodes):
-        path = f"nodes[{i}]"
+        path = f"{where}[{i}]"
         node = _obj(node, path)
         _keys(node, path, ("node_id", "name", "role", "last_seen"), ("info",))
         _int(node["node_id"], f"{path}.node_id", 0, U16)
@@ -379,7 +387,6 @@ def check_nodes(body: Any) -> dict[str, Any]:
         info = _obj(node.get("info", {}), f"{path}.info")
         node["info"] = {k: _info_value(NODE_INFO[k], v, f"{path}.info.{k}")
                         for k, v in info.items() if k in NODE_INFO}
-    return body
 
 
 # --- the chrono registry (plan phase 14) -------------------------------------------------
@@ -788,6 +795,144 @@ def check_field(body: Any) -> dict[str, Any]:
             _text(club["slug"], f"{path}.club.slug", 128, pattern=CLUB_SLUG)
             _text(club["name"], f"{path}.club.name", 128)
     return body
+
+
+# --- the remote GM on the stream (plan phase 19; P4R12) -------------------------------------
+#
+# Only with ``[sync] remote_gm = true`` does the controller open ``WS /api/v1/sync/stream`` for the
+# remote GM. It sends ``hello`` (whether it takes remote commands), ``live`` (its live game, as the
+# console sees it, for a site-server user with the ``gm`` role on the field) and ``command.result``;
+# the site server sends ``command``, from the short list below and nothing else. Both sides check
+# every message with these functions (``STREAM``), the controller before it acts on a command.
+
+REMOTE_COMMANDS = ("start", "pause", "resume", "end", "message", "mode")
+MESSAGE_MAX = 100           # characters of a GM message (the console's limit; the radio's CMD is 127 bytes)
+REASON_MAX = 64             # characters of a pause or end reason (the controller's API)
+USERNAME_MAX = 64           # the site server's usernames
+DETAIL_MAX = 200            # characters of a command result's detail
+MAX_LIVE_EVENTS = 50        # the live view's latest events
+MAX_MODE_COMMANDS = 32
+COMMAND_NAME = re.compile(r"[a-z][a-z0-9_]{0,23}")  # a mode command's name (atalaia_sim.mode)
+RESULT_CODES = ("done", "remote_gm_off", "invalid", "stale", "not_live", "not_found", "conflict", "unavailable",
+                "failed")
+TOTAL_MIN, TOTAL_MAX = -(2**40), 2**40  # a live total: counters plus GM adjustments, which may be negative
+STALE_S = 60.0              # a command sent longer ago than this (or this far in the future) is refused
+
+
+def check_hello(body: Any) -> dict[str, Any]:
+    """The controller's first message on the stream: whether it takes remote GM commands."""
+    body = _envelope(body, ("remote_gm",), game=False)
+    _bool(body["remote_gm"], "remote_gm")
+    return body
+
+
+def check_live(body: Any) -> dict[str, Any]:
+    """The controller's live game as its console sees it (null: no live game): never a position, a token,
+    a key or a check-in; the nodes and events as the HTTP bodies carry them."""
+    body = _envelope(body, ("live",), game=False)
+    live = body["live"]
+    if live is None:
+        return body
+    live = _obj(live, "live")
+    _keys(live, "live", ("game", "name", "mode_id", "teams", "state", "in_charge", "totals", "nodes", "events"),
+          ("game_time_ms", "duration_ms", "mode_commands"))
+    ident = _obj(live["game"], "live.game")
+    _keys(ident, "live.game", ("game_id", "game_seed"))
+    _int(ident["game_id"], "live.game.game_id", 0, U16)
+    _int(ident["game_seed"], "live.game.game_seed", 0, U32)
+    _text(live["name"], "live.name", 64)
+    _text(live["mode_id"], "live.mode_id", 128, pattern=MODE_ID)
+    teams = live["teams"]
+    if not isinstance(teams, list) or not 1 <= len(teams) <= TEAMS_MAX:
+        _fail("bad_teams", "live.teams")
+    for i, team in enumerate(teams):
+        _team(team, f"live.teams[{i}]")
+    if live["state"] not in STATES:
+        _fail("bad_state", "live.state")
+    _bool(live["in_charge"], "live.in_charge")
+    totals = _obj(live["totals"], "live.totals")
+    for team, value in totals.items():
+        if team not in teams:
+            _fail("unknown_team", f"live.totals.{team}")
+        _int(value, f"live.totals.{team}", TOTAL_MIN, TOTAL_MAX)
+    _int(live.setdefault("game_time_ms", None), "live.game_time_ms", 0, U32, null=True)
+    _int(live.setdefault("duration_ms", 0), "live.duration_ms", 0, U32)
+    _node_list(live["nodes"], "live.nodes")
+    events = _list(live["events"], "live.events", MAX_LIVE_EVENTS)
+    for i, ev in enumerate(events):
+        check_event(ev, f"live.events[{i}]")
+    for i, cmd in enumerate(_list(live.setdefault("mode_commands", []), "live.mode_commands", MAX_MODE_COMMANDS)):
+        path = f"live.mode_commands[{i}]"
+        cmd = _obj(cmd, path)
+        _keys(cmd, path, ("name", "roles"))
+        _text(cmd["name"], f"{path}.name", 24, pattern=COMMAND_NAME)
+        for j, role in enumerate(_list(cmd["roles"], f"{path}.roles", 16, lo=1)):
+            _text(role, f"{path}.roles[{j}]", 32)
+    return body
+
+
+def check_command_params(command: Any, params: Any, path: str = "params") -> dict[str, Any]:
+    """A remote command's parameters: none for start and resume, an optional reason for pause and end, the
+    text of a GM message, the name (and optionally the node: 65535 = every node) of a mode command the
+    game's manifests declare (the controller checks that last part against its game)."""
+    if command not in REMOTE_COMMANDS:
+        _fail("not_allowed", "command")
+    params = _obj(params, path)
+    if command in ("start", "resume"):
+        _keys(params, path, ())
+    elif command in ("pause", "end"):
+        _keys(params, path, (), ("reason",))
+        reason = params.setdefault("reason", "")
+        if reason != "":
+            _text(reason, f"{path}.reason", REASON_MAX)
+    elif command == "message":
+        _keys(params, path, ("text",))
+        text = _text(params["text"], f"{path}.text", MESSAGE_MAX)
+        if not text.strip():
+            _fail("bad_text", f"{path}.text")
+    else:  # mode
+        _keys(params, path, ("name",), ("node",))
+        _text(params["name"], f"{path}.name", 24, pattern=COMMAND_NAME)
+        _int(params.setdefault("node", U16), f"{path}.node", 1, U16)
+    return params
+
+
+def check_command(body: Any) -> dict[str, Any]:
+    """A remote GM command the site server sends on the stream (without its ``type``): its id, the game it is
+    for, the command and its parameters, who asked (the site server's account) and when (the site server's
+    clock, seconds since 1970)."""
+    body = _obj(body, "")
+    _keys(body, "", ("id", "game", "command", "params", "user", "sent_at"))
+    _uuid(body["id"], "id")
+    ident = _obj(body["game"], "game")
+    _keys(ident, "game", ("game_id", "game_seed"))
+    _int(ident["game_id"], "game.game_id", 0, U16)
+    _int(ident["game_seed"], "game.game_seed", 0, U32)
+    if body["command"] not in REMOTE_COMMANDS:
+        _fail("not_allowed", "command")
+    check_command_params(body["command"], body["params"])
+    user = _obj(body["user"], "user")
+    _keys(user, "user", ("id", "username"))
+    _uuid(user["id"], "user.id")
+    _text(user["username"], "user.username", USERNAME_MAX)
+    _num(body["sent_at"], "sent_at", 0, TIME_MAX)
+    return body
+
+
+def check_result(body: Any) -> dict[str, Any]:
+    """The controller's answer to a command: ``done`` or why not (``RESULT_CODES``), with a short detail."""
+    body = _obj(body, "")
+    _envelope({k: v for k, v in body.items() if k != "detail"}, ("id", "code"), game=False)
+    body.setdefault("detail", None)
+    _uuid(body["id"], "id")
+    if body["code"] not in RESULT_CODES:
+        _fail("bad_value", "code")
+    _text(body["detail"], "detail", DETAIL_MAX, null=True)
+    return body
+
+
+# The stream's own messages (``type`` taken out): what the controller sends, and the command it gets.
+STREAM = {"hello": check_hello, "live": check_live, "command.result": check_result, "command": check_command}
 
 
 CHECKS = {"games": check_game, "events": check_events, "scores": check_scores, "nodes": check_nodes,

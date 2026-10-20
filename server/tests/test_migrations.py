@@ -33,7 +33,7 @@ TABLES = {"fields", "users", "roles", "user_field_roles", "sessions", "audit_log
           "field_player_ids", "marshal_keys", "replicas", "chrono_readings", "chrono_rejects", "chrono_violations",
           "scheduled_games", "game_registrations", "registration_replicas", "player_id_claims",
           "platform_links", "external_game_links", "branding_images", "clubs", "club_members", "club_reports",
-          "field_teams"}
+          "field_teams", "firmware_releases"}
 
 SCHEMA_SQL = (
     ("columns", "SELECT table_name, column_name, data_type, is_nullable, column_default, character_maximum_length "
@@ -336,6 +336,25 @@ class MigrationTests(unittest.TestCase):
             self.assertNotIn(table, self.tables())
         self.assertEqual(self.db.fetch("SELECT name FROM fields")[0][0], "Campo")
         self.db.fetch("DELETE FROM fields")
+
+    def test_0010_with_data(self) -> None:
+        """0010_firmware: a release, its checks, an account's deletion, and back."""
+        command.upgrade(self.cfg, "0009_clubs")
+        user = self.db.fetch("INSERT INTO users (username, password_hash) VALUES ('rita', 'x') RETURNING id")[0][0]
+        command.upgrade(self.cfg, "0010_firmware")
+        insert = ("INSERT INTO firmware_releases (platform, version, size, sha256, signature, key_id, added_by) "
+                  "VALUES ('esp32s3', $1, $2, $3, $4, 'abcdef0123456789', $5)")
+        self.db.fetch(insert, "0.4.0", 1024, "ab" * 32, "A" * 88, user)
+        with self.assertRaisesRegex(Exception, "uq_firmware_releases_platform_version"):
+            self.db.fetch(insert, "0.4.0", 1024, "cd" * 32, "A" * 88, user)
+        with self.assertRaisesRegex(Exception, "ck_firmware_releases_sha256"):
+            self.db.fetch(insert, "0.4.1", 1024, "AB" * 32, "A" * 88, user)
+        with self.assertRaisesRegex(Exception, "ck_firmware_releases_size"):
+            self.db.fetch(insert, "0.4.2", 0, "ab" * 32, "A" * 88, user)
+        self.db.fetch("DELETE FROM users")  # the release stays, unlinked from who added it
+        self.assertIsNone(self.db.fetch("SELECT added_by FROM firmware_releases")[0][0])
+        command.downgrade(self.cfg, "0009_clubs")
+        self.assertNotIn("firmware_releases", self.tables())
 
     def test_one_linear_history(self) -> None:
         self.assertEqual(len(self.script.get_heads()), 1)

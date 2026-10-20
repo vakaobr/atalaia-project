@@ -21,6 +21,9 @@
                             unset, they follow the request (a local trial only)
     ATALAIA_TEST_ADAPTER    "on" offers the platform adapters' test adapter (an in-memory stand-in
                             for a platform, for trials and tests); "off" by default (plan phase 17)
+    ATALAIA_FIRMWARE_KEYS   the Ed25519 public keys (32 bytes in standard base64, separated by
+                            commas, at most 8) whose signatures the firmware catalogue accepts
+                            (plan phase 19); unset, the catalogue takes no entry at all
 
 Plain Python with no third-party imports, so its tests also run in the
 atalaia-dev image (tools/check.sh). A setting that is present but wrong is
@@ -29,6 +32,8 @@ an error at start-up, never silently replaced by its default.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import os
 import re
 from dataclasses import dataclass, field
@@ -44,8 +49,23 @@ NOTICE_VERSION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:+-]{0,63}")
 _KEY_HINT = "(python3 -c \"import secrets; print(secrets.token_urlsafe(32))\")"
 
 
+MAX_FIRMWARE_KEYS = 8
+
+
 class ConfigError(ValueError):
     """A setting is missing or not valid."""
+
+
+def check_firmware_key(text: str) -> str:
+    """One release key of ATALAIA_FIRMWARE_KEYS: an Ed25519 public key, 32 bytes in standard base64."""
+    try:
+        raw = base64.b64decode(text.strip(), validate=True)
+    except (binascii.Error, ValueError):
+        raw = b""
+    if len(raw) != 32:
+        raise ConfigError("ATALAIA_FIRMWARE_KEYS: each key is an Ed25519 public key, 32 bytes in standard base64 "
+                          "(44 characters)")
+    return base64.b64encode(raw).decode("ascii")
 
 
 def redact_url(url: str) -> str:
@@ -146,6 +166,7 @@ class Settings:
     privacy_notice_version: str = DEFAULT_NOTICE_VERSION
     public_url: Optional[str] = None
     test_adapter: bool = False
+    firmware_keys: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         _check_url(self.database_url)
@@ -162,6 +183,9 @@ class Settings:
                               "starting with a letter or digit")
         if self.public_url is not None:
             object.__setattr__(self, "public_url", check_public_url(self.public_url))
+        if len(self.firmware_keys) > MAX_FIRMWARE_KEYS:
+            raise ConfigError(f"ATALAIA_FIRMWARE_KEYS: at most {MAX_FIRMWARE_KEYS} keys")
+        object.__setattr__(self, "firmware_keys", tuple(check_firmware_key(k) for k in self.firmware_keys))
 
     def __repr__(self) -> str:
         return (f"Settings(database_url={redact_url(self.database_url)!r}, secret_key=set, "
@@ -169,7 +193,8 @@ class Settings:
                 f"db_max_overflow={self.db_max_overflow}, db_timeout_s={self.db_timeout_s}, "
                 f"metrics_token={'set' if self.metrics_token else 'unset'}, log_level={self.log_level!r}, "
                 f"purge_hour={self.purge_hour!r}, privacy_notice_version={self.privacy_notice_version!r}, "
-                f"public_url={self.public_url!r}, test_adapter={self.test_adapter!r})")
+                f"public_url={self.public_url!r}, test_adapter={self.test_adapter!r}, "
+                f"firmware_keys={len(self.firmware_keys)})")
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Settings":
@@ -190,4 +215,5 @@ class Settings:
             privacy_notice_version=env.get("ATALAIA_PRIVACY_NOTICE_VERSION", "").strip() or DEFAULT_NOTICE_VERSION,
             public_url=env.get("ATALAIA_PUBLIC_URL", "").strip() or None,
             test_adapter=_on_off(env, "ATALAIA_TEST_ADAPTER"),
+            firmware_keys=tuple(k for k in env.get("ATALAIA_FIRMWARE_KEYS", "").split(",") if k.strip()),
         )

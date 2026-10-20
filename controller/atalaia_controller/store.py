@@ -47,6 +47,11 @@ controller game was made from which scheduled game, and its roster's last pull),
 ``checkins`` the registration a check-in belongs to (``registration_id``, the SHA-256 of its
 ticket, ``from_roster``) next to a new status, ``expected``: a registered player who has not
 arrived yet. A schema 6 file is upgraded in place.
+
+Schema 8 (phase 4, plan phase 19; P4R12) adds ``remote_commands``: every command a remote GM sent
+through the site server (``[sync] remote_gm = true``), who sent it (the site server's account id and
+username), what it asked for and what came of it, whether it was carried out or refused. Rows older
+than ``REMOTE_LOG_DAYS`` are deleted when a new one is added.
 """
 
 from __future__ import annotations
@@ -59,7 +64,8 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
+REMOTE_LOG_DAYS = 365  # the remote GM's log on the controller (decision S19-9)
 FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes
 
 SCHEMA = """
@@ -275,6 +281,19 @@ CREATE TABLE IF NOT EXISTS schedule_links (
     roster_count      INTEGER,
     roster_error      TEXT,
     PRIMARY KEY (game_id, game_seed)
+);
+CREATE TABLE IF NOT EXISTS remote_commands (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    command_id  TEXT UNIQUE,                           -- schema 8: the site server's id of a remote GM command
+    received_at REAL NOT NULL,
+    user_id     TEXT,                                  -- the site server's account that sent it
+    username    TEXT,
+    command     TEXT,                                  -- start, pause, resume, end, message, mode
+    params_json TEXT NOT NULL,
+    game_id     INTEGER,
+    game_seed   INTEGER,
+    result      TEXT NOT NULL,                         -- done, or why not (sync_format.RESULT_CODES)
+    detail      TEXT
 );
 CREATE TABLE IF NOT EXISTS player_positions (
     game_id     INTEGER NOT NULL,
@@ -609,6 +628,50 @@ class Store:
         with self._lock:
             self._exec("DELETE FROM sync_items")
             return self._exec("DELETE FROM sync_state").rowcount
+
+    # --- the remote GM's log (schema 8, plan phase 19) ----------------------------------
+
+    def remote_command(self, command_id: str) -> Optional[dict[str, Any]]:
+        row = self._exec("SELECT * FROM remote_commands WHERE command_id = ?", (command_id,)).fetchone()
+        return self._remote_row(row) if row is not None else None
+
+    def add_remote_command(self, entry: dict[str, Any]) -> dict[str, Any]:
+        """Logs one remote command and what came of it; drops entries older than REMOTE_LOG_DAYS."""
+        now = time.time()
+        with self._lock:
+            self._exec("DELETE FROM remote_commands WHERE received_at < ?", (now - REMOTE_LOG_DAYS * 86400,))
+            cur = self._exec(
+                "INSERT OR IGNORE INTO remote_commands (command_id, received_at, user_id, username, command, "
+                "params_json, game_id, game_seed, result, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (entry.get("command_id"), entry.get("received_at", now), entry.get("user_id"), entry.get("username"),
+                 entry.get("command"), json.dumps(entry.get("params") or {}), entry.get("game_id"),
+                 entry.get("game_seed"), entry["result"], entry.get("detail")))
+            if cur.rowcount != 1 and entry.get("command_id"):
+                found = self.remote_command(entry["command_id"])
+                assert found is not None
+                return found
+            row = self._exec("SELECT * FROM remote_commands ORDER BY id DESC LIMIT 1").fetchone()
+            return self._remote_row(row)
+
+    def remote_commands(self, limit: int = 200) -> list[dict[str, Any]]:
+        rows = self._exec("SELECT * FROM remote_commands ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        return [self._remote_row(r) for r in rows]
+
+    @staticmethod
+    def _remote_row(r: sqlite3.Row) -> dict[str, Any]:
+        return {"id": r["id"], "command_id": r["command_id"], "received_at": r["received_at"],
+                "user_id": r["user_id"], "username": r["username"], "command": r["command"],
+                "params": json.loads(r["params_json"]), "game_id": r["game_id"], "game_seed": r["game_seed"],
+                "result": r["result"], "detail": r["detail"]}
+
+    def last_events(self, game_id: int, limit: int) -> list[dict[str, Any]]:
+        """The game's latest ``limit`` events, oldest first, as ``events_after`` gives them."""
+        rows = self._exec("SELECT * FROM events WHERE game_id = ? ORDER BY id DESC LIMIT ?",
+                          (game_id, limit)).fetchall()
+        return [{"id": r["id"], "node": r["node_id"], "seq": r["seq"], "t": r["game_time"], "type": r["type"],
+                 "team": r["team"], "squad": r["squad"], "prio": r["priority"],
+                 "data": json.loads(r["data_json"]), "epoch": r["epoch"], "pkt_seq": r["pkt_seq"]}
+                for r in reversed(rows)]
 
     # --- the chrono registry's sync (schema 6, plan phase 14) -----------------
 

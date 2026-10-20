@@ -62,6 +62,27 @@ class VectorTests(unittest.TestCase):
                     fmt.ANSWERS[vector["kind"]](copy.deepcopy(vector["body"]))
                 self.assertEqual((caught.exception.code, caught.exception.path), (vector["error"], vector["path"]))
 
+    def test_stream(self) -> None:
+        """The remote GM's messages on the stream (plan phase 19): the controller's and the site server's."""
+        stream = VECTORS["stream"]
+        self.assertEqual((len(stream["valid"]), len(stream["invalid"])), (13, 24))
+        self.assertEqual({v["kind"] for v in stream["valid"]}, set(fmt.STREAM))
+        for vector in stream["valid"]:
+            with self.subTest(vector=vector["name"]):
+                fmt.STREAM[vector["kind"]](copy.deepcopy(vector["body"]))
+        for vector in stream["invalid"]:
+            with self.subTest(vector=vector["name"]):
+                with self.assertRaises(fmt.SyncFormatError) as caught:
+                    fmt.STREAM[vector["kind"]](copy.deepcopy(vector["body"]))
+                self.assertEqual((caught.exception.code, caught.exception.path), (vector["error"], vector["path"]))
+
+    def test_command_defaults(self) -> None:
+        body = copy.deepcopy(next(v["body"] for v in VECTORS["stream"]["valid"] if v["name"] == "command_mode_every_node"))
+        self.assertEqual(fmt.check_command(body)["params"], {"name": "refill", "node": 0xFFFF})
+        body = copy.deepcopy(next(v["body"] for v in VECTORS["stream"]["valid"] if v["name"] == "command_end"))
+        self.assertEqual(fmt.check_command(body)["params"], {"reason": ""})
+        self.assertEqual(set(fmt.REMOTE_COMMANDS), {"start", "pause", "resume", "end", "message", "mode"})
+
     def test_merge(self) -> None:
         for case in VECTORS["merge"]:
             with self.subTest(case=case["name"]):

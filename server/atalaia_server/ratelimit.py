@@ -14,6 +14,7 @@
   checks for 15 minutes.
 - 10 registrations from one IP address an hour.
 - 5 reports of club pages from one IP address an hour (plan phase 18).
+- 30 remote GM commands a minute from one account (plan phase 19).
 - 100 API requests a minute from one IP address (``RequestLimitMiddleware``);
   the health check is not counted, so an uptime monitor never trips it.
 
@@ -138,6 +139,7 @@ class Limits:
         self.register = Lockout(10, 3600, 3600, clock)            # per IP address (each one counts)
         self.requests = RequestLimit(100, 60, clock)              # per IP address
         self.reports = RequestLimit(5, 3600, clock)               # club page reports per IP address (plan phase 18)
+        self.remote_commands = RequestLimit(30, 60, clock)        # remote GM commands per account (plan phase 19)
 
 
 UNLIMITED_PATHS = ("/api/v1/health",)

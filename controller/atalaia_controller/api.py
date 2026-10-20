@@ -27,6 +27,7 @@ which browsers cannot give headers, also takes ``?token=``.
     WS   /api/v1/stream                    live events, scores, nodes and alerts
     GET  /api/v1/controller                controller and radio status
     POST /api/v1/controller/promote        manual failover: stand for election
+    GET  /api/v1/remote-gm                 GM: the remote GM's state and log of commands (plan phase 19)
     POST /api/v1/join                      a join payload for a box or a standby controller
     POST /api/v1/nodes/{id}/join           the same, for node id {id} ({"name"}: a scenario's box)
     POST /api/v1/controller/join           this controller takes a game as standby
@@ -373,6 +374,13 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     @app.get("/api/v1/controller", dependencies=[Depends(require_console)])
     def status() -> dict[str, Any]:
         return controller.status()
+
+    @app.get("/api/v1/remote-gm", dependencies=[Depends(require_gm)])
+    def remote_gm_log(limit: int = 200) -> dict[str, Any]:
+        """The remote GM (plan phase 19): whether it is on, its stream, and every command it got."""
+        remote = getattr(controller.sync, "remote", None) if controller.sync is not None else None
+        return {"enabled": bool(controller.cfg.sync_remote_gm), "stream": remote.status() if remote else None,
+                "log": controller.store.remote_commands(max(1, min(int(limit), 1000)))}
 
     @app.post("/api/v1/controller/promote", dependencies=[Depends(require_gm)])
     def promote() -> dict[str, Any]:

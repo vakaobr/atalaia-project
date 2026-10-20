@@ -31,6 +31,8 @@ What holds personal data now (plan phases 10-12):
 | ``club_members`` (plan phase 18) | the person's clubs, club role and invitations (``clubs.json``) | deleted (a club whose last admin goes keeps its profile; a server administrator can still manage it) | an invitation not accepted, 30 days after it was made; a membership with the account |
 | ``club_reports`` (plan phase 18) | the reports the person made while logged in (``club_reports.json``; never an address) | kept for the moderation record, without the link to the account (reporter and deciding administrator) | 12 months after the decision (an open report stays until decided) |
 | ``clubs``, ``field_teams``, ``branding_images``, the field's branding columns (plan phase 18) | (a club's or a field's public profile: no person in them; who made a club is ``created_by``, unlinked at erasure) | ``created_by`` and ``hidden_by`` cleared | an image nothing uses, a day after its upload |
+| ``firmware_releases`` (plan phase 19) | (the server's catalogue: no person in it; who added a release is ``added_by``, unlinked at erasure) | ``added_by`` cleared | (kept: withdrawn releases stay, marked) |
+| the remote GM's audit rows (plan phase 19: ``remote_gm_command``, ``remote_gm_denied``) | in the audit log as every other action | as every other audit row: kept without the person's addresses | 36 months, as the audit log |
 
 The synced games (plan phase 13) come from field controllers and hold no
 account: their events carry only the field's pseudonymous player ids
@@ -92,7 +94,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from . import chrono_registry
 from .audit import record
 from .models import (ROLE_BY_ID, AuditLog, ChronoReading, ChronoReject, Club, ClubMember, ClubReport, Consent, Field,
-                     FieldPlayerId, Game, GameRegistration, MarshalKey, PlayerIdClaim, RegistrationReplica, Replica,
+                     FieldPlayerId, FirmwareRelease, Game, GameRegistration, MarshalKey, PlayerIdClaim, RegistrationReplica, Replica,
                      ScheduledGame, User, UserFieldRole, UserGameRole, UserSession)
 from .services import branding
 
@@ -370,6 +372,9 @@ async def erase(db: AsyncSession, user_id: uuid.UUID, reason: str = "user_reques
     await db.execute(update(ClubReport).where(ClubReport.reporter_id == user_id).values(reporter_id=None)
                      .execution_options(synchronize_session=False))
     await db.execute(update(ClubReport).where(ClubReport.decided_by == user_id).values(decided_by=None)
+                     .execution_options(synchronize_session=False))
+    # The firmware catalogue (plan phase 19) stays; who added a release does not.
+    await db.execute(update(FirmwareRelease).where(FirmwareRelease.added_by == user_id).values(added_by=None)
                      .execution_options(synchronize_session=False))
     # The log keeps what happened, not where from: the person's addresses go.
     await db.execute(update(AuditLog).where(AuditLog.user_id == user_id, AuditLog.ip_address.is_not(None))

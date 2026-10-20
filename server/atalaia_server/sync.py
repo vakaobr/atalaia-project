@@ -118,6 +118,11 @@ def _time(value: Optional[float]) -> Optional[datetime]:
     return datetime.fromtimestamp(value, tz=timezone.utc) if value is not None else None
 
 
+async def seen(db: AsyncSession, caller: Caller, body: dict[str, Any]) -> None:
+    """Marks the body's controller seen (version, the key it used, now) and sets ``caller.controller``."""
+    await _seen(db, caller, body)
+
+
 async def _seen(db: AsyncSession, caller: Caller, body: dict[str, Any]) -> None:
     ctrl = body["controller"]
     stmt = insert(Controller).values(field_id=caller.field_id, controller_id=uuid.UUID(ctrl["id"]),

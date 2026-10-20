@@ -39,6 +39,7 @@ from .positions import Positions
 from .prop_link import PropLinks
 from .radio_modem import RadioModem
 from .store import Store
+from .remote_gm import RemoteGm
 from .sync_client import KEY_SETTING, SyncClient, api_key_ok, key_fingerprint, resolve_api_key
 from .ws import Hub
 
@@ -121,6 +122,7 @@ class Bundle:
     tls: Optional[tlsmod.FieldTls] = None
     sync: Optional[SyncClient] = None
     atak: Optional[AtakEmitter] = None
+    remote: Optional[RemoteGm] = None
 
 
 def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = True,
@@ -150,6 +152,15 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
         sync = SyncClient(cfg, store, checkin=controller.checkin)
         controller.sync = sync
         controller.add_listener(sync.on_controller_message)
+    remote = None
+    key, _ = resolve_api_key(cfg, store)
+    if sync is not None and cfg.sync_remote_gm and key:
+        # The remote GM (plan phase 19, P4R12): only with [sync] remote_gm = true, on a socket this
+        # controller opens; the site server never holds the GM token.
+        client = sync
+        remote = RemoteGm(cfg, store, controller, api_key=key, controller_id=lambda: client.controller_id)
+        sync.remote = remote
+        controller.add_listener(remote.on_controller_message)
     atak = AtakEmitter(cfg, controller) if cfg.atak_enabled else None
 
     def on_start() -> None:
@@ -160,12 +171,16 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
         controller.start()
         if sync is not None:
             sync.start()
+        if remote is not None:
+            remote.start()
         if atak is not None:
             atak.start()
 
     def on_stop() -> None:
         if atak is not None:
             atak.stop()
+        if remote is not None:
+            remote.stop()
         if sync is not None:
             sync.stop()
         controller.stop()
@@ -176,7 +191,7 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
 
     app = create_app(controller, hub, Auth(gm, read), on_start=on_start, on_stop=on_stop,
                      ca_pem=tls.ca_pem if tls else None)
-    return Bundle(cfg, store, controller, modem, mqtt, hub, app, tls, sync, atak)
+    return Bundle(cfg, store, controller, modem, mqtt, hub, app, tls, sync, atak, remote)
 
 
 def serve(bundle: Bundle, log_level: str = "info") -> None:

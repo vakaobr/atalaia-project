@@ -70,7 +70,7 @@ class SiteServer:
 
     def __init__(self, database_url: str) -> None:
         self.port = free_port()
-        app = create_app(Settings(database_url=database_url, secret_key=SECRET_KEY, purge_hour=None))
+        self.app = app = create_app(Settings(database_url=database_url, secret_key=SECRET_KEY, purge_hour=None))
         self.server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=self.port, log_level="warning",
                                                     lifespan="on"))
         self.thread = threading.Thread(target=self.server.run, daemon=True)

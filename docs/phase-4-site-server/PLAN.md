@@ -268,7 +268,7 @@ Python with unit tests that also run inside `tools/check.sh`.
 | 16 | Registration and game-day sync | registrations, tickets, roster pull, expected check-ins, outcomes push | Software, now | 13, 15 | L |
 | 17 | Registration import and adapters | CSV/JSON import, `PlatformAdapter`, test adapter | Software, now | 16 | S |
 | 18 | Club profiles and branding sync | clubs, branding and saved teams through `GET /sync/field` | Software, now | 13 | M |
-| 19 | Device health, firmware catalogue, remote GM | health from sync, remote GM over the controller's WebSocket | Software, now | 13 | M |
+| 19 | Device health, firmware catalogue, remote GM | health from sync, remote GM over the controller's WebSocket (built 2026-10-20) | Software, now | 13 | M |
 | 20 | Game history and the scenario library | history views, scenario CRUD on the site server pushed with presets | Software, now | 13, 7 | M |
 | 21 | Hosted multi-tenant mode | schema per field, RLS, export and deletion of a field | Software, now | 10-20 | M |
 | 22 | Deployment | Caddy, `setup.sh`, `backup.sh`, restore test, `server/docs/DEPLOY.md` | Software, now | 10 | S |
@@ -1539,6 +1539,28 @@ controller's `audit` entries, the site server's audit log). Tests:
 `test_devices.py`, `test_remote_gm.py` (a command refused while
 `remote_gm` is off, refused for a command outside the list, refused for
 a user without `gm` on that field), and the controller's side.
+
+*Built 2026-10-20 (decisions S19-1 to S19-11, open; in software, tested
+against PostgreSQL in Docker and the real controller, not yet on a real
+deployment or over 4G):* migration `0010_firmware` (`firmware_releases`; device
+health needs no table); `services/devices.py` with `api/devices.py`
+(`/api/v1/fields/{field}/devices`, `/api/v1/games/{game}/devices`: a device is
+its node name across games, S19-9); `firmware.py` with `api/firmware.py` (a list
+only, entries signed with Ed25519 by a key in `ATALAIA_FIRMWARE_KEYS`, checked
+again at every listing, S19-8); `remote_gm.py` with `api/remote_gm.py`
+(`/api/v1/fields/{field}/remote-gm`, `.../commands`, `.../log`) over the
+stream's new `hello`, `live`, `command` and `command.result` messages, checked by
+`sync_format.STREAM` with 13 valid and 24 invalid shared vectors (S19-3). Only the
+field's `gm` in a TOTP session may act (S19-4); the controller checks every
+command again (S19-5). The controller's "`audit` entries" are a new table,
+`remote_commands` (store schema 8), with `remote_gm.py`, `ws_client.py` (its own
+RFC 6455 client, S19-2), `[sync] remote_gm` and `GET /api/v1/remote-gm` (S19-6).
+The site server gained `wsproto` so uvicorn serves the stream at all (S19-1).
+Not built: the remote ATAK relay that decision M9-10 had deferred here (S19-10),
+positions in the remote view (S19-7), a GM web page on the site server and the
+console's screen for the log (S19-11). Tests: `test_devices.py`,
+`test_firmware.py`, `test_remote_gm.py`, `test_remote_gm_e2e.py` (the real
+controller under uvicorn) and the controller's `test_remote_gm.py`.
 
 ---
 

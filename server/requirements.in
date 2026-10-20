@@ -15,6 +15,9 @@
 # tests (python3 tools/docker_server.py test).
 fastapi
 uvicorn
+# uvicorn's WebSocket protocol, for WS /api/v1/sync/stream (the remote GM, plan phase 19, decision S19-1):
+# pure Python on h11, which uvicorn already uses.
+wsproto
 sqlalchemy[asyncio]
 asyncpg
 alembic

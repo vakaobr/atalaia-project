@@ -309,4 +309,5 @@ async def revoke_sync_key(field_id: uuid.UUID, key_id: uuid.UUID, request: Reque
     record(db, "sync_key_revoke", request, user_id=principal.user.id, resource="field", resource_id=field_id,
            details={"key_id": str(row.id), "fingerprint": sync.fingerprint(row.key_sha256)})
     await db.commit()
+    request.app.state.remote_hub.detach_key(row.id)  # its controllers' links take no more remote commands
     return Response(status_code=204)

@@ -78,6 +78,10 @@
     timeout_s = 15.0            # per request
     branding = "local"          # "site": the field's branding and saved teams come from the site
                                 # server (plan phase 18) and the console cannot change them
+    remote_gm = false           # true: keep a WebSocket open to the site server so that a user with
+                                # the gm role on the field there sees the live game and can start,
+                                # pause, resume and end it, send GM messages and declared mode
+                                # commands (plan phase 19, P4R12); every command is logged here
 
     [atak]                      # Cursor on Target for ATAK (ADR-P4-7 as amended, P4R18; atak.py)
     enabled = false
@@ -110,7 +114,7 @@ SECTIONS = {
     "mqtt": ("enabled", "host", "port", "username", "password"),
     "join": ("key",),
     "sync": ("enabled", "url", "api_key", "ca_file", "interval_game_s", "interval_idle_s", "timeout_s",
-             "branding"),
+             "branding", "remote_gm"),
     "checkin": ("field_id", "field_name", "operator", "confirm", "federation", "federation_label",
                 "max_replicas", "max_players", "chrono_valid_for", "rate_per_minute", "urls",
                 "wifi_ssid", "limit_template", "notice_version", "notice_pt", "notice_en",
@@ -187,6 +191,7 @@ class Config:
     sync_interval_idle_s: float = 300.0
     sync_timeout_s: float = 15.0
     sync_branding: str = "local"  # "local" (the console's) or "site" (pulled from the site server)
+    sync_remote_gm: bool = False  # the remote GM through the site server's stream (plan phase 19)
     # [atak]
     atak_enabled: bool = False
     atak_multicast: str = "239.2.3.1:6969"
@@ -279,6 +284,8 @@ def _check_sync(cfg: "Config") -> None:
         raise ConfigError("sync.timeout_s must be 1-300 seconds")
     if cfg.sync_branding not in ("local", "site"):
         raise ConfigError("sync.branding must be 'local' (the console's) or 'site' (the site server's)")
+    if cfg.sync_remote_gm and not cfg.sync_enabled:
+        raise ConfigError("sync.remote_gm needs sync.enabled (the remote GM rides the sync's link)")
 
 
 def _check_atak(cfg: "Config") -> None:
