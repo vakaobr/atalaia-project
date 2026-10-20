@@ -23,6 +23,7 @@ What holds personal data now (plan phases 10-12):
 | ``chrono_readings``, ``chrono_violations``, ``chrono_rejects`` (plan phase 14) | the readings, violations and refused readings of the person's player ids, each record as signed (``chrono_records.json``) | kept, signatures intact; erasure removes the link (``field_player_ids``) | the field's ``default_retention_days`` (365) after the reading (a reject: after it first arrived) |
 | ``replicas`` (plan phase 14) | the replicas of the person's player ids (in ``chrono_records.json``) | kept for the readings, without make, model and tag | the field's retention after the last change, once no reading names them |
 | ``marshal_keys`` (plan phase 14) | the keys the person registered as a marshal (``marshal_keys.json``) | kept, so what they signed still verifies, without the link to the account | the field's retention after the key's period ended, once no reading needs it |
+| ``scheduled_games`` (plan phase 15) | the games the person scheduled as the field's staff (``scheduled_games.json``) | kept (they are the field's), without the link to the account (``created_by``) | 24 months after the game's end, as game history |
 
 The synced games (plan phase 13) come from field controllers and hold no
 account: their events carry only the field's pseudonymous player ids
@@ -39,6 +40,10 @@ the person's through ``field_player_ids``, the player ids their account holds
 (adopted in plan phase 16, decision S14-3). Erasure deletes those links and
 keeps the signed records as they are (ADR-P4-8: signatures stay valid), so
 nothing leads from them to the person any more.
+
+The schedule (plan phase 15) is the field's: a scheduled game names only the staff
+account that made it (``created_by``), and the public pages and feeds show no person at all.
+Registrations, with their player ids, names and replicas, are plan phase 16's.
 
 Erasure is anonymisation, not deletion (ADR-P4-8): the ``users`` row stays
 under a random ``deleted-`` name with no email, no password and no consent,
@@ -65,7 +70,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from . import chrono_registry
 from .audit import record
 from .models import (ROLE_BY_ID, AuditLog, ChronoReading, ChronoReject, Consent, Field, FieldPlayerId, Game,
-                     MarshalKey, Replica, User, UserFieldRole, UserGameRole, UserSession)
+                     MarshalKey, Replica, ScheduledGame, User, UserFieldRole, UserGameRole, UserSession)
 
 log = logging.getLogger("atalaia.server.purge")
 
@@ -81,7 +86,7 @@ ERASED_PASSWORD = "DELETED"  # not an Argon2 hash: passwords.verify_password nev
 # field's fields.default_retention_days (365 by default, the controller's CHRONO_RETENTION_DAYS).
 SESSION_RETENTION = timedelta(days=30)   # after a session expired or was revoked
 AUDIT_RETENTION = timedelta(days=1095)   # 36 months
-GAME_RETENTION = timedelta(days=730)     # 24 months: game history, after the game ended
+GAME_RETENTION = timedelta(days=730)     # 24 months: game history, after the game ended (scheduled games too)
 
 
 def _iso(value: Optional[datetime]) -> Optional[str]:
@@ -126,6 +131,9 @@ async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.U
         select(UserGameRole.role_id, UserGameRole.granted_at, Game, Field.name)
         .join(Game, Game.id == UserGameRole.game).join(Field, Field.id == Game.field_id)
         .where(UserGameRole.user_id == user.id).order_by(Game.controller_created_at, UserGameRole.role_id))
+    scheduled = await db.execute(
+        select(ScheduledGame, Field.name).join(Field, Field.id == ScheduledGame.field_id)
+        .where(ScheduledGame.created_by == user.id).order_by(ScheduledGame.starts_at))
     return {
         "format": FORMAT,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -157,6 +165,9 @@ async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.U
                        for field_id, name, pid, at in player_ids],
         "chrono_records": await chrono_registry.my_history(db, user.id),
         "marshal_keys": [{"field": name, **chrono_registry.key_json(k)} for k, name in keys],
+        "scheduled_games": [{"id": str(g.id), "field_id": str(g.field_id), "field": name, "title": g.title,
+                             "starts_at": _iso(g.starts_at), "ends_at": _iso(g.ends_at), "status": g.status,
+                             "created_at": _iso(g.created_at)} for g, name in scheduled],
     }
 
 
@@ -201,6 +212,11 @@ chrono_records.json Per field: your chrono readings, each with the record exactl
 marshal_keys.json   The public keys you registered as a marshal (never a private key:
                     it stays on your phone).
                     As chaves públicas que registou como marshal.
+scheduled_games.json
+                    The games you scheduled for a field as its staff (title, times,
+                    status). They are the field's and stay when you erase your account,
+                    without your name.
+                    Os jogos que marcou para um campo, como staff.
 
 Game events name players only by the field's pseudonymous player ids, which
 are not linked to accounts yet. Positions never reach the site server.
@@ -214,6 +230,7 @@ def export_zip(data: dict[str, Any]) -> bytes:
         "audit_log.json": data["audit_log"], "audit_log_about_you.json": data["audit_log_about_you"],
         "consents.json": data["consents"], "games.json": data["games"], "player_ids.json": data["player_ids"],
         "chrono_records.json": data["chrono_records"], "marshal_keys.json": data["marshal_keys"],
+        "scheduled_games.json": data["scheduled_games"],
     }
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as zf:
@@ -245,6 +262,9 @@ async def erase(db: AsyncSession, user_id: uuid.UUID, reason: str = "user_reques
     await db.execute(update(MarshalKey).where(MarshalKey.user_id == user_id).values(user_id=None)
                      .execution_options(synchronize_session=False))
     await db.execute(delete(FieldPlayerId).where(FieldPlayerId.user_id == user_id))
+    # The field's schedule stays; who scheduled a game does not.
+    await db.execute(update(ScheduledGame).where(ScheduledGame.created_by == user_id).values(created_by=None)
+                     .execution_options(synchronize_session=False))
     # The log keeps what happened, not where from: the person's addresses go.
     await db.execute(update(AuditLog).where(AuditLog.user_id == user_id, AuditLog.ip_address.is_not(None))
                      .values(ip_address=None))
@@ -265,6 +285,9 @@ async def purge(db: AsyncSession, now: Optional[datetime] = None, dry_run: bool 
         func.coalesce(Game.ended_at, Game.controller_created_at) < now - GAME_RETENTION))
     counts = {"sessions": sessions.rowcount or 0, "audit_log": audit.rowcount or 0, "games": games.rowcount or 0}
     counts.update(await _purge_chrono(db, now))
+    # The schedule (plan phase 15): a scheduled game is game history once it has ended.
+    scheduled = await db.execute(delete(ScheduledGame).where(ScheduledGame.ends_at < now - GAME_RETENTION))
+    counts["scheduled_games"] = scheduled.rowcount or 0
     if dry_run:
         await db.rollback()
         return counts

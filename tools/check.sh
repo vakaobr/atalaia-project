@@ -49,4 +49,4 @@ python3 -m unittest discover -s tests
 # The site server's plain-Python tests (decision P4R17); the rest need PostgreSQL 16
 # and the server's own image: python3 tools/docker_server.py test.
 cd ../server
-python3 -m unittest tests.test_config tests.test_ids tests.test_shared_imports tests.test_chrono_verify
+python3 -m unittest tests.test_config tests.test_ids tests.test_shared_imports tests.test_chrono_verify tests.test_feeds

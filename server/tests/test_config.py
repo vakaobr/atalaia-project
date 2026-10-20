@@ -37,6 +37,20 @@ class SettingsTests(unittest.TestCase):
             with self.subTest(raw=raw), self.assertRaisesRegex(ConfigError, "ATALAIA_PRIVACY_NOTICE_VERSION"):
                 Settings.from_env({**BASE, "ATALAIA_PRIVACY_NOTICE_VERSION": raw})
 
+    def test_public_url(self) -> None:
+        self.assertIsNone(Settings.from_env(BASE).public_url)
+        for raw, expected in (("https://Campo.Example.pt", "https://campo.example.pt"),
+                              ("https://campo.example.pt/", "https://campo.example.pt"),
+                              ("https://campo.example.pt:8443", "https://campo.example.pt:8443"),
+                              ("http://localhost:8000", "http://localhost:8000")):
+            with self.subTest(raw=raw):
+                self.assertEqual(Settings.from_env({**BASE, "ATALAIA_PUBLIC_URL": raw}).public_url, expected)
+        for raw in ("campo.example.pt", "ftp://campo.example.pt", "http://campo.example.pt",
+                    "https://campo.example.pt/site", "https://campo.example.pt/?x=1", "https://u:p@campo.example.pt",
+                    "https://campo.example.pt:99999"):
+            with self.subTest(raw=raw), self.assertRaisesRegex(ConfigError, "ATALAIA_PUBLIC_URL"):
+                Settings.from_env({**BASE, "ATALAIA_PUBLIC_URL": raw})
+
     def test_every_setting(self) -> None:
         s = Settings.from_env({
             **BASE, "ATALAIA_DB_POOL_SIZE": "10", "ATALAIA_DB_MAX_OVERFLOW": "0",

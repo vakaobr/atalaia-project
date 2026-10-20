@@ -32,13 +32,14 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from . import __version__, personal_data
-from .api import auth, chrono, fields, games, health, me, sync
+from .api import auth, chrono, fields, games, health, me, scheduling, sync
 from .config import Settings, redact_url
 from .db import make_engine, make_sessionmaker
 from .ratelimit import Limits, RequestLimitMiddleware
 from .security_headers import SecurityHeadersMiddleware
 from .tokens import Keys, UsedTokens
 from .totp import SeedBox
+from .web import field_pages
 
 log = logging.getLogger("atalaia.server")
 
@@ -86,6 +87,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.include_router(games.router)
     app.include_router(chrono.router)
     app.include_router(sync.router)
+    app.include_router(scheduling.router)
+    app.include_router(field_pages.router)
     return app
 
 

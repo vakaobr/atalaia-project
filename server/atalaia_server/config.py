@@ -16,6 +16,9 @@
     ATALAIA_PRIVACY_NOTICE_VERSION
                             the version of the privacy notice the field shows (default
                             "template-2026-10-19"), stored with every consent
+    ATALAIA_PUBLIC_URL      the site's public origin (https://campo.example.pt): the links in
+                            the field pages and feeds and the host name in iCalendar UIDs;
+                            unset, they follow the request (a local trial only)
 
 Plain Python with no third-party imports, so its tests also run in the
 atalaia-dev image (tools/check.sh). A setting that is present but wrong is
@@ -73,6 +76,23 @@ def _check_url(url: str) -> str:
     return url
 
 
+def check_public_url(url: str) -> str:
+    """ATALAIA_PUBLIC_URL: an http(s) origin with a host and no path, query or fragment; returned
+    without a trailing slash. ``http`` only for a trial on this computer."""
+    try:
+        parts = urlsplit(url.strip())
+        parts.port  # noqa: B018  (raises ValueError for a bad port)
+    except ValueError:
+        raise ConfigError("ATALAIA_PUBLIC_URL is not a valid URL") from None
+    if parts.scheme not in ("https", "http") or not parts.hostname:
+        raise ConfigError("ATALAIA_PUBLIC_URL must be https://<host>[:port] (the site's public address)")
+    if parts.scheme == "http" and parts.hostname not in ("localhost", "127.0.0.1", "::1"):
+        raise ConfigError("ATALAIA_PUBLIC_URL must use https:// (http:// only for localhost)")
+    if parts.path not in ("", "/") or parts.query or parts.fragment or parts.username or parts.password:
+        raise ConfigError("ATALAIA_PUBLIC_URL must be an origin only, with no path, query or user")
+    return f"{parts.scheme}://{parts.netloc.lower()}"
+
+
 def database_url_from_env(env: Optional[Mapping[str, str]] = None) -> str:
     """ATALAIA_DATABASE_URL alone, checked (Alembic needs nothing else)."""
     env = os.environ if env is None else env
@@ -113,6 +133,7 @@ class Settings:
     log_level: str = "info"
     purge_hour: Optional[int] = 3
     privacy_notice_version: str = DEFAULT_NOTICE_VERSION
+    public_url: Optional[str] = None
 
     def __post_init__(self) -> None:
         _check_url(self.database_url)
@@ -127,13 +148,16 @@ class Settings:
         if not NOTICE_VERSION.fullmatch(self.privacy_notice_version):
             raise ConfigError("ATALAIA_PRIVACY_NOTICE_VERSION must be 1-64 characters: letters, digits and . _ : + -, "
                               "starting with a letter or digit")
+        if self.public_url is not None:
+            object.__setattr__(self, "public_url", check_public_url(self.public_url))
 
     def __repr__(self) -> str:
         return (f"Settings(database_url={redact_url(self.database_url)!r}, secret_key=set, "
                 f"db_pool_size={self.db_pool_size}, "
                 f"db_max_overflow={self.db_max_overflow}, db_timeout_s={self.db_timeout_s}, "
                 f"metrics_token={'set' if self.metrics_token else 'unset'}, log_level={self.log_level!r}, "
-                f"purge_hour={self.purge_hour!r}, privacy_notice_version={self.privacy_notice_version!r})")
+                f"purge_hour={self.purge_hour!r}, privacy_notice_version={self.privacy_notice_version!r}, "
+                f"public_url={self.public_url!r})")
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Settings":
@@ -152,4 +176,5 @@ class Settings:
             log_level=env.get("ATALAIA_LOG_LEVEL", "info").strip().lower() or "info",
             purge_hour=_purge_hour(env),
             privacy_notice_version=env.get("ATALAIA_PRIVACY_NOTICE_VERSION", "").strip() or DEFAULT_NOTICE_VERSION,
+            public_url=env.get("ATALAIA_PUBLIC_URL", "").strip() or None,
         )

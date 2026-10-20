@@ -139,6 +139,8 @@ class Limits:
 
 
 UNLIMITED_PATHS = ("/api/v1/health",)
+# The API and the public field pages and feeds (plan phase 15) share the per-address limit.
+LIMITED_PREFIXES = ("/api/", "/f/")
 
 
 def client_ip(scope: dict[str, Any]) -> str:
@@ -161,7 +163,8 @@ class RequestLimitMiddleware:
         self._get = get_limits  # read per request, so a test can swap the app's limits
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
-        if scope["type"] != "http" or not scope["path"].startswith("/api/") or scope["path"] in UNLIMITED_PATHS:
+        path = scope.get("path", "")
+        if scope["type"] != "http" or not path.startswith(LIMITED_PREFIXES) or path in UNLIMITED_PATHS:
             await self.app(scope, receive, send)
             return
         wait = self._get().requests.hit(client_ip(scope))

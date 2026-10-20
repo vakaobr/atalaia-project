@@ -1197,6 +1197,22 @@ written; files as the old phase I listed, under
 iCalendar writer is checked against RFC 5545's own examples (folding,
 escaping, `DTSTART` in UTC), not only against itself.
 
+**Built 2026-10-20** (in software; decisions S15-1 to S15-15). Differences
+from the text above, as built: the migration is `0006_scheduling` (0005 is
+the chrono registry's) and holds only this plan phase's half of ADR-P4-11's
+columns, `scheduled_games` and the field page's columns on `fields`;
+registrations and `controller_game_id` are plan phase 16's (S15-1). Times are
+`starts_at` and `ends_at` (S15-2); `registering` is computed, not stored
+(S15-3). The pages use `string.Template` files and `html.escape`, no
+template engine (S15-8), with one style sheet, `/static/field.css`; the feeds'
+writers are `atalaia_server/feeds/` (plain Python, also run by tools/check.sh
+in `tests.test_feeds`), the rules `services/scheduling.py`, the staff API
+`api/scheduling.py`, the field page's settings on `PATCH
+/api/v1/fields/{field}`. New setting `ATALAIA_PUBLIC_URL` for links and UIDs
+(S15-10). Until plan phase 16 nothing can be registered for: the feed's
+`registration.open` is false and the pages have no registration button
+(S15-7).
+
 ---
 
 ## Plan phase 16: Registration and game-day sync

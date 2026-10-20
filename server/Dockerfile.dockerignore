@@ -15,6 +15,7 @@
 !server/atalaia_server/
 !server/migrations/
 !server/alembic.ini
+!server/schemas/
 !server/tests/
 **/__pycache__
 **/*.pyc

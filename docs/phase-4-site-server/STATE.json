@@ -19,7 +19,7 @@
     "design_only": false,
     "stop_after": null,
     "resume_with": "--implement",
-    "next_plan_phase": "6 (scenario packages and objectives) on the modes chain; 15 (scheduling, field pages and feeds) on the site server chain",
+    "next_plan_phase": "6 (scenario packages and objectives) on the modes chain; 16 (registration and game-day sync) on the site server chain",
     "completed_plan_phases": [
       "1",
       "2",
@@ -30,7 +30,8 @@
       "11",
       "12",
       "13",
-      "14"
+      "14",
+      "15"
     ],
     "plan_phase_order": [
       "1",
@@ -90,7 +91,7 @@
       "HW3",
       "HW4"
     ],
-    "resume_note": "Plan phase 1 (Master and Satellites) built in software 2026-10-19 (decisions M1-1 to M1-6, open). Plan phase 2 (Target Windows logic, game.teams(), the hit capability) and the Field Box picker's pages built in software 2026-10-19 (decisions M2-1 to M2-5, open); the target addon is HW2. Refreshed 2026-10-19 against phase 3's software. Plan phases 1-9 (modes, core, scenarios, ATAK) and 10-22 (site server) are independent chains; HW1-HW4 wait for the Heltec V4 boards, the target addon, phones and phase 2 F / phase 3 G. Decisions P4R1-P4R26 are open. Plan phase 10 (site server skeleton and its test tooling) built in software on 2026-10-19; decisions S10-1 to S10-12 open. Plan phase 11 (accounts, sessions and roles) built in software on 2026-10-19; decisions S11-1 to S11-15 open. Plan phase 12 (personal data rights, consent records, retention purge; lockout per address and username) built in software on 2026-10-20; decisions S12-1 to S12-8 open. Plan phase 3 (geo utilities: geo.distance, geo.in_zone, bit-identical on every platform) built in software 2026-10-20; decisions M3-1 to M3-3 open. Plan phase 13 (controller sync: migration 0004_sync, controller store schema 5, protocol/sync.md) built in software on 2026-10-20; over a real 4G link is HW1; decisions S13-1 to S13-12 open. Plan phase 4 (Hacking Terminal: code, wires and sequence puzzles on the keypad, hacking.solved 47, puzzle key 36, the 11th Field Box preset) built in software 2026-10-20; decisions M4-1 to M4-9 open. Plan phase 14 (chrono registry: migration 0005_chrono, controller store schema 6) built in software on 2026-10-20; decisions S14-1 to S14-12 open. Plan phase 5 (VIP / Payload, vip.extracted 46, the 12th Field Box preset; gm_only data and params stripped from player views, M4-7/M5-1) built in software 2026-10-20; decisions M5-1 to M5-7 open.",
+    "resume_note": "Plan phase 1 (Master and Satellites) built in software 2026-10-19 (decisions M1-1 to M1-6, open). Plan phase 2 (Target Windows logic, game.teams(), the hit capability) and the Field Box picker's pages built in software 2026-10-19 (decisions M2-1 to M2-5, open); the target addon is HW2. Refreshed 2026-10-19 against phase 3's software. Plan phases 1-9 (modes, core, scenarios, ATAK) and 10-22 (site server) are independent chains; HW1-HW4 wait for the Heltec V4 boards, the target addon, phones and phase 2 F / phase 3 G. Decisions P4R1-P4R26 are open. Plan phase 10 (site server skeleton and its test tooling) built in software on 2026-10-19; decisions S10-1 to S10-12 open. Plan phase 11 (accounts, sessions and roles) built in software on 2026-10-19; decisions S11-1 to S11-15 open. Plan phase 12 (personal data rights, consent records, retention purge; lockout per address and username) built in software on 2026-10-20; decisions S12-1 to S12-8 open. Plan phase 3 (geo utilities: geo.distance, geo.in_zone, bit-identical on every platform) built in software 2026-10-20; decisions M3-1 to M3-3 open. Plan phase 13 (controller sync: migration 0004_sync, controller store schema 5, protocol/sync.md) built in software on 2026-10-20; over a real 4G link is HW1; decisions S13-1 to S13-12 open. Plan phase 4 (Hacking Terminal: code, wires and sequence puzzles on the keypad, hacking.solved 47, puzzle key 36, the 11th Field Box preset) built in software 2026-10-20; decisions M4-1 to M4-9 open. Plan phase 14 (chrono registry: migration 0005_chrono, controller store schema 6) built in software on 2026-10-20; decisions S14-1 to S14-12 open. Plan phase 5 (VIP / Payload, vip.extracted 46, the 12th Field Box preset; gm_only data and params stripped from player views, M4-7/M5-1) built in software 2026-10-20; decisions M5-1 to M5-7 open. Plan phase 15 (scheduling, public field pages, iCalendar and JSON feeds; migration 0006_scheduling) built in software on 2026-10-20; decisions S15-1 to S15-15 open.",
     "handoff_applied": "2026-10-18 (phase 2 A-E complete, phase 3 design complete); refreshed 2026-10-19 (phase 3 software built)"
   }
 }

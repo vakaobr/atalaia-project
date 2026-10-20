@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Atalaia games feed, version 1",
+  "description": "A field's published games, as served at /f/<slug>/games.json (server/docs/feeds.md, ADR-P4-12). No personal data. Version 1 may gain optional members; readers ignore members they do not know.",
+  "type": "object",
+  "required": ["format", "version", "field", "games"],
+  "properties": {
+    "format": {"const": "atalaia.games"},
+    "version": {"const": 1},
+    "field": {
+      "type": "object",
+      "required": ["slug", "name", "timezone", "url"],
+      "properties": {
+        "slug": {"type": "string", "pattern": "^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 128},
+        "timezone": {"type": "string", "description": "An IANA time zone name: the field's local time, for showing the UTC times"},
+        "url": {"type": "string", "format": "uri"},
+        "description": {"type": ["string", "null"]},
+        "address": {"type": ["string", "null"]}
+      }
+    },
+    "games": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/game"}
+    }
+  },
+  "$defs": {
+    "time": {"type": "string", "format": "date-time", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+    "optional_time": {"anyOf": [{"$ref": "#/$defs/time"}, {"type": "null"}]},
+    "game": {
+      "type": "object",
+      "required": ["id", "title", "description", "starts_at", "ends_at", "status", "mode", "registration",
+                   "requirements", "url", "ics", "updated_at"],
+      "properties": {
+        "id": {"type": "string", "format": "uuid"},
+        "title": {"type": "string", "minLength": 1, "maxLength": 256},
+        "description": {"type": ["string", "null"]},
+        "starts_at": {"$ref": "#/$defs/time"},
+        "ends_at": {"$ref": "#/$defs/time"},
+        "status": {"enum": ["published", "in_progress", "completed", "cancelled"]},
+        "cancelled_reason": {"type": ["string", "null"]},
+        "mode": {"type": ["string", "null"], "description": "The Atalaia mode id (org.atalaia.domination), or null while not chosen"},
+        "teams": {"type": "array", "items": {"type": "string"}},
+        "location": {"type": ["string", "null"]},
+        "registration": {
+          "type": "object",
+          "required": ["opens_at", "closes_at", "open", "max_players", "places_left"],
+          "properties": {
+            "opens_at": {"$ref": "#/$defs/optional_time"},
+            "closes_at": {"$ref": "#/$defs/optional_time"},
+            "open": {"type": "boolean"},
+            "max_players": {"type": ["integer", "null"], "minimum": 1},
+            "places_left": {"type": ["integer", "null"], "minimum": 0}
+          }
+        },
+        "requirements": {
+          "type": "object",
+          "required": ["federation", "federation_label"],
+          "properties": {
+            "federation": {"enum": ["off", "optional", "required"]},
+            "federation_label": {"type": ["string", "null"]}
+          }
+        },
+        "url": {"type": "string", "format": "uri"},
+        "ics": {"type": "string", "format": "uri"},
+        "updated_at": {"$ref": "#/$defs/time"}
+      }
+    }
+  }
+}

@@ -1,0 +1,63 @@
+/* SPDX-FileCopyrightText: 2026 The Atalaia contributors */
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* The public field pages (plan phase 15): served from the site server itself, no fonts or
+   images from elsewhere; light and dark follow the reader's setting. */
+:root {
+  color-scheme: light dark;
+  --ground: #f7f6f2;
+  --ink: #1d1f1c;
+  --muted: #5a5f57;
+  --line: #d6d4cc;
+  --accent: #3b5d2a;
+  --warn: #8a2a1a;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #171916;
+    --ink: #e8e7e1;
+    --muted: #a3a89f;
+    --line: #3a3d37;
+    --accent: #9cc483;
+    --warn: #f0937e;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font: 1rem/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+header.top, main, footer { max-width: 44rem; margin: 0 auto; padding: 0 1rem; }
+header.top { padding-block: 0.75rem; text-align: right; font-size: 0.9rem; }
+header.top a, header.top span { margin-left: 0.75rem; }
+header.top span { font-weight: 600; }
+h1 { font-size: 1.8rem; line-height: 1.2; margin: 0.5rem 0 1rem; }
+h2 { font-size: 1.2rem; margin: 2rem 0 0.75rem; }
+a { color: var(--accent); }
+.address { color: var(--muted); }
+ul.list { list-style: none; padding: 0; margin: 0; }
+ul.list li { border-top: 1px solid var(--line); padding: 0.75rem 0; }
+ul.list li:last-child { border-bottom: 1px solid var(--line); }
+.when { display: block; color: var(--muted); font-size: 0.95rem; }
+.title { font-weight: 600; }
+.badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0 0.4rem;
+  border: 1px solid var(--warn);
+  border-radius: 0.25rem;
+  color: var(--warn);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+.notice { border-left: 4px solid var(--warn); padding: 0.25rem 0.75rem; }
+dl.details { display: grid; grid-template-columns: minmax(8rem, max-content) 1fr; gap: 0.4rem 1rem; }
+dl.details dt { color: var(--muted); }
+dl.details dd { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 30rem) {
+  dl.details { grid-template-columns: 1fr; }
+  dl.details dd { margin-bottom: 0.5rem; }
+}
+footer { margin-top: 3rem; padding-block: 1rem 2rem; color: var(--muted); font-size: 0.85rem;
+         border-top: 1px solid var(--line); }

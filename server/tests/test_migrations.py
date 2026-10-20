@@ -11,6 +11,7 @@ before and after each downgrade.
 from __future__ import annotations
 
 import asyncio
+import datetime
 import re
 import unittest
 import uuid
@@ -29,7 +30,8 @@ from .base import SERVER, TempDatabase, alembic_config
 
 TABLES = {"fields", "users", "roles", "user_field_roles", "sessions", "audit_log", "refresh_tokens", "consents",
           "field_api_keys", "controllers", "games", "game_events", "game_node_scores", "game_nodes", "user_game_roles",
-          "field_player_ids", "marshal_keys", "replicas", "chrono_readings", "chrono_rejects", "chrono_violations"}
+          "field_player_ids", "marshal_keys", "replicas", "chrono_readings", "chrono_rejects", "chrono_violations",
+          "scheduled_games"}
 
 SCHEMA_SQL = (
     ("columns", "SELECT table_name, column_name, data_type, is_nullable, column_default, character_maximum_length "
@@ -218,6 +220,28 @@ class MigrationTests(unittest.TestCase):
         self.db.fetch("DELETE FROM consents")
         self.db.fetch("DELETE FROM fields")
         self.db.fetch("DELETE FROM users")
+
+    def test_0006_with_data(self) -> None:
+        """0006_scheduling: fields keep their rows with the page off, the schedule's checks, and back down."""
+        command.upgrade(self.cfg, "0005_chrono")
+        field = self.db.fetch("INSERT INTO fields (name, slug) VALUES ('Campo', 'campo') RETURNING id")[0][0]
+        command.upgrade(self.cfg, "0006_scheduling")
+        self.assertEqual(tuple(self.db.fetch("SELECT public_page, description, address_text FROM fields")[0]),
+                         (False, None, None))
+        insert = ("INSERT INTO scheduled_games (field_id, title, starts_at, ends_at, status) "
+                  "VALUES ($1, 'Domingo', '2030-11-09T09:00:00Z', $2, $3)")
+        self.db.fetch(insert, field, datetime.datetime(2030, 11, 9, 13, tzinfo=datetime.timezone.utc), "draft")
+        row = self.db.fetch("SELECT status, federation, predeclare_replicas, ical_sequence, teams FROM scheduled_games")
+        self.assertEqual(tuple(row[0]), ("draft", "off", True, 0, "[]"))
+        with self.assertRaisesRegex(Exception, "ck_scheduled_games_times"):
+            self.db.fetch(insert, field, datetime.datetime(2030, 11, 9, 8, tzinfo=datetime.timezone.utc), "draft")
+        with self.assertRaisesRegex(Exception, "ck_scheduled_games_status"):
+            self.db.fetch(insert, field, datetime.datetime(2030, 11, 9, 13, tzinfo=datetime.timezone.utc),
+                          "registering")  # computed from the window, never stored
+        command.downgrade(self.cfg, "0005_chrono")
+        self.assertNotIn("scheduled_games", self.tables())
+        self.assertEqual(self.db.fetch("SELECT name FROM fields")[0][0], "Campo")
+        self.db.fetch("DELETE FROM fields")
 
     def test_one_linear_history(self) -> None:
         self.assertEqual(len(self.script.get_heads()), 1)

@@ -4,7 +4,9 @@
 
     POST   /api/v1/fields                                   server administrator: a new field
     GET    /api/v1/fields                                   the fields the caller has a role on (all, for a server administrator)
-    PATCH  /api/v1/fields/{field_id}                        the field's admin: {chrono_sharing_enabled} (plan phase 14)
+    PATCH  /api/v1/fields/{field_id}                        the field's admin: {chrono_sharing_enabled} (plan phase 14),
+                                                            {public_page, description, address_text,
+                                                            federation_label} (plan phase 15)
     GET    /api/v1/fields/{field_id}/roles                  the field's admin or gm
     PUT    /api/v1/fields/{field_id}/roles                  {username, role}: grant
     DELETE /api/v1/fields/{field_id}/roles/{user_id}/{role} revoke
@@ -42,6 +44,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import sync
+from ..services import scheduling
 from ..audit import record
 from ..auth import Principal, current_principal, require_field_role, server_admin
 from ..db import get_session
@@ -64,8 +67,14 @@ class FieldIn(BaseModel):
 
 
 class FieldPatch(BaseModel):
+    """Only the members sent change; ``null`` or ``""`` clears a text."""
+
     model_config = ConfigDict(extra="forbid")
     chrono_sharing_enabled: Optional[bool] = None
+    public_page: Optional[bool] = None
+    description: Optional[str] = None
+    address_text: Optional[str] = None
+    federation_label: Optional[str] = None
 
 
 class SyncKeyIn(BaseModel):
@@ -81,7 +90,8 @@ class GrantIn(BaseModel):
 
 def field_json(f: Field, roles: Any = None) -> dict[str, Any]:
     body = {"id": str(f.id), "name": f.name, "slug": f.slug, "field_type": f.field_type, "timezone": f.timezone,
-            "chrono_sharing_enabled": f.chrono_sharing_enabled}
+            "chrono_sharing_enabled": f.chrono_sharing_enabled, "public_page": f.public_page,
+            "description": f.description, "address_text": f.address_text, "federation_label": f.federation_label}
     if roles is not None:
         body["my_roles"] = sorted(roles)
     return body
@@ -136,13 +146,34 @@ async def update_field(field_id: uuid.UUID, body: FieldPatch, request: Request,
                        principal: Principal = Depends(current_principal),
                        db: AsyncSession = Depends(get_session)) -> JSONResponse:
     """The field's settings: whether it shares chrono records with other sharing fields (ADR-P4-5), for
-    the players who consented to it (``PUT /api/v1/me/consents/chrono-sharing/{field_id}``)."""
+    the players who consented to it (``PUT /api/v1/me/consents/chrono-sharing/{field_id}``); its public
+    page and feeds (``public_page``, off by default) and what they show about the field (ADR-P4-11).
+    The audit log names a text that changed, not its value. A new address changes the published games
+    that show it, for calendars (``SEQUENCE``)."""
     require_field_role(principal, field_id, "admin")
     field = await _field(db, field_id)
-    changed = {}
-    if body.chrono_sharing_enabled is not None and body.chrono_sharing_enabled != field.chrono_sharing_enabled:
-        field.chrono_sharing_enabled = body.chrono_sharing_enabled
-        changed["chrono_sharing_enabled"] = body.chrono_sharing_enabled
+    changed: dict[str, Any] = {}
+    for name in ("chrono_sharing_enabled", "public_page"):
+        value = getattr(body, name)
+        if value is not None and value != getattr(field, name):
+            setattr(field, name, value)
+            changed[name] = value
+    texts = (("description", scheduling.FIELD_DESCRIPTION_MAX, False),
+             ("address_text", scheduling.LOCATION_MAX, True),
+             ("federation_label", scheduling.FEDERATION_LABEL_MAX, True))
+    for name, limit, one_line in texts:
+        if name not in body.model_fields_set:
+            continue
+        try:
+            clean = scheduling.clean_line if one_line else scheduling.clean_text
+            value = clean(getattr(body, name), name, limit)
+        except scheduling.ScheduleError as exc:
+            raise HTTPException(400, exc.code) from None
+        if value != getattr(field, name):
+            setattr(field, name, value)
+            changed[name] = "set" if value is not None else "cleared"
+    if "address_text" in changed:
+        await scheduling.bump_for_field_address(db, field.id, datetime.now(timezone.utc))
     if changed:
         record(db, "field_update", request, user_id=principal.user.id, resource="field", resource_id=field.id,
                details=changed)

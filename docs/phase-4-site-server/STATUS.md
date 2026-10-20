@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Implementation (plan phases 1, 2, 3, 4, 5, 10, 11, 12, 13 and 14 built in software, 2026-10-20; sync over 4G: HW1)
+**Current phase:** Implementation (plan phases 1, 2, 3, 4, 5, 10, 11, 12, 13, 14 and 15 built in software, 2026-10-20; sync over 4G: HW1)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-20 (plan phase 5, full clean-copy check)
-**Next step:** plan phase 6 (scenario packages and the objectives role package) on the modes chain; plan phase 15 (scheduling, field pages and feeds) on the site server chain
+**Last verified:** 2026-10-20 (plan phase 15, full clean-copy check)
+**Next step:** plan phase 6 (scenario packages and the objectives role package) on the modes chain; plan phase 16 (registration and game-day sync) on the site server chain
 
 ## Completed
 
@@ -370,6 +370,42 @@ fields' records (`GET /api/v1/sync/chrono`, with plan phase 16's roster); a
 controller's erasure reaching the site server by itself (S14-10). Decisions
 S14-1 to S14-12, all open; S14-5 (sharing consent per field) and S14-10
 (erasure propagation) want the maintainer's eye.
+
+## Plan phase 15: scheduling, field pages and feeds (built 2026-10-20, in software)
+
+What exists: scheduled games on the site server (`api/scheduling.py`,
+`services/scheduling.py`, migration `0006_scheduling`): the field's admin and
+gm, in a TOTP session, make drafts and edit them; the admin publishes and
+cancels (with a reason, still shown); drafts can be deleted, published games
+only cancelled. Times are kept in UTC and shown in the field's time zone; the
+registration window is checked against the start. A field's admin turns on
+its public page and sets its description, address and federation label
+(`PATCH /api/v1/fields/{field}`). The public side (`web/field_pages.py`):
+`/f/<slug>/` and `/f/<slug>/games/<id>`, server-rendered HTML in pt-PT and
+English with no JavaScript and nothing from other sites (the security headers
+unchanged), schema.org `Event` JSON-LD on game pages; `/f/<slug>/games.ics`
+and `/f/<slug>/games/<id>.ics` (RFC 5545: CRLF, folding at 75 octets without
+splitting UTF-8, TEXT escaping, UTC times, stable UIDs, `SEQUENCE` raised on
+changes of time, place or status) and `/f/<slug>/games.json` (`atalaia.games`
+version 1, `server/schemas/games-feed-v1.schema.json`, documented in
+`server/docs/feeds.md`), with ETags, `304`s and `Access-Control-Allow-Origin:
+*`. No personal data on any of them; drafts never. The schedule joins
+access, export, erasure and the purge (`created_by`). New setting
+`ATALAIA_PUBLIC_URL`. No new dependency.
+
+Tests: 282 in the site server's image against PostgreSQL 16 (56 new:
+`test_scheduling.py`, 15, roles, rules, the lifecycle and `SEQUENCE`, the
+field page's settings, the schedule's personal data; `test_field_pages.py`,
+20, what the public sees and never sees, languages, escaping, the security
+headers, the feeds' content and caching, the per-address limit; `test_feeds.py`,
+19, the iCalendar writer against RFC 5545's own examples copied from the RFC
+and the JSON feed against its schema; 0006 with data; a setting); 57 of the
+server's tests (20 new) run in tools/check.sh with no database. Not yet:
+online registration, the roster and the check-in sync (plan phase 16), so the
+feed's `registration.open` stays false; the registration import (17); a
+deployment with its public address (22). Decisions S15-1 to S15-15, all
+open; S15-10 (the public address) and S15-11 (the limit for calendar
+services) want the maintainer's eye.
 
 ## Dependencies
 

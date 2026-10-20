@@ -65,6 +65,7 @@ RUN pip install --no-cache-dir --require-hashes --no-deps --only-binary=:all: --
 # tests/test_sync.py, test_chrono.py and test_chrono_verify.py.
 COPY modes /app/modes
 COPY protocol/vectors/sync.json protocol/vectors/chrono_record.json /app/protocol/vectors/
+COPY server/schemas /app/server/schemas
 COPY server/tests /app/server/tests
 ENV ATALAIA_REQUIRE_ALL=1
 USER atalaia

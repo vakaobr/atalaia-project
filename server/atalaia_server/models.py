@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""ORM models (ADR-P4-1; migrations 0001_base, 0002_accounts, 0003_personal_data, 0004_sync, 0005_chrono).
+"""ORM models (ADR-P4-1; migrations 0001_base, 0002_accounts, 0003_personal_data, 0004_sync, 0005_chrono,
+0006_scheduling).
 
 Fields, users, roles, per-field roles, sessions and the audit log, as
 ADR-P4-1 defines them, with plan phase 11's additions for accounts: the
@@ -12,7 +13,9 @@ factor on ``sessions``, and ``refresh_tokens`` (only hashes); plan phase 12's
 ``user_game_roles``; plan phase 14's chrono registry (ADR-P4-5 as amended):
 ``marshal_keys``, ``replicas``, ``chrono_readings``, ``chrono_rejects``,
 ``chrono_violations`` and ``field_player_ids``, with ``consents.field_id``
-for the per-field ``chrono_sharing`` consent. A table that holds personal data must also be added to
+for the per-field ``chrono_sharing`` consent; plan phase 15's ``scheduled_games`` (ADR-P4-11) and
+the field page's columns on ``fields`` (``public_page``, ``description``, ``address_text``,
+``federation_label``). A table that holds personal data must also be added to
 ``personal_data.py`` (access, export, erasure, the purge) in the same plan
 phase. Every later plan phase adds its own tables here and in
 its own Alembic migration; ``tests.test_migrations`` checks that the
@@ -77,6 +80,11 @@ class Field(Base):
     default_retention_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default="365")
     chrono_sharing_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     public_scoreboard: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # The public field page and its feeds (ADR-P4-11, ADR-P4-12; plan phase 15): off by default.
+    public_page: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    address_text: Mapped[Optional[str]] = mapped_column(String(512))
+    federation_label: Mapped[Optional[str]] = mapped_column(String(16))
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _updated()
 
@@ -532,3 +540,55 @@ class ChronoViolation(Base):
     resolved_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _created()
+
+
+# --- scheduling (plan phase 15, migration 0006_scheduling) -------------------------------
+
+# Stored statuses (ADR-P4-11): ``registering`` is not one, it is computed from the window.
+SCHEDULED_STATUSES = ("draft", "published", "in_progress", "completed", "cancelled")
+FEDERATION_RULES = ("off", "optional", "required")
+
+
+class ScheduledGame(Base):
+    """A game a field announces (ADR-P4-1's ``scheduled_games`` with ADR-P4-11's columns): times in UTC
+    (shown in ``fields.timezone``), the mode if already chosen, the registration window and its rules.
+    ``draft`` is seen by staff only; ``published`` and later are on the field page and the feeds;
+    ``cancelled`` stays visible with its reason. ``ical_sequence`` is the iCalendar ``SEQUENCE``, raised
+    when the time, the place or the status of a published game changes (ADR-P4-12). Registrations and
+    ``controller_game_id`` come with plan phase 16; presets and scenarios with plan phase 20."""
+
+    __tablename__ = "scheduled_games"
+    __table_args__ = (
+        CheckConstraint("status IN ('draft', 'published', 'in_progress', 'completed', 'cancelled')", name="status"),
+        CheckConstraint("federation IN ('off', 'optional', 'required')", name="federation"),
+        CheckConstraint("ends_at > starts_at", name="times"),
+        CheckConstraint("registration_closes_at IS NULL OR registration_opens_at IS NULL "
+                        "OR registration_closes_at > registration_opens_at", name="window"),
+        CheckConstraint("max_players IS NULL OR max_players BETWEEN 1 AND 10000", name="max_players"),
+        CheckConstraint("ical_sequence >= 0", name="ical_sequence"),
+        Index("idx_scheduled_games_field_starts", "field_id", "starts_at"),
+        Index("idx_scheduled_games_created_by", "created_by"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    field_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[str] = mapped_column(String(256), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    location_text: Mapped[Optional[str]] = mapped_column(String(512))
+    mode_id: Mapped[Optional[str]] = mapped_column(String(128))
+    teams: Mapped[list[str]] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    max_players: Mapped[Optional[int]] = mapped_column(Integer)
+    registration_opens_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    registration_closes_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    federation: Mapped[str] = mapped_column(String(16), nullable=False, server_default="off")
+    predeclare_replicas: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="draft")
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    cancelled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    cancelled_reason: Mapped[Optional[str]] = mapped_column(String(512))
+    ical_sequence: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = _created()
+    updated_at: Mapped[datetime] = _updated()
