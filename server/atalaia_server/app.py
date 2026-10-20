@@ -32,9 +32,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from . import __version__, integrations, personal_data
-from .api import (auth, branding, chrono, clubs, devices, fields, firmware, games, health,
-                  integrations as integrations_api, me, registration_import, registrations, remote_gm, scheduling,
-                  sync)
+from .api import (auth, branding, chrono, clubs, devices, fields, firmware, games, health, history,
+                  integrations as integrations_api, me, registration_import, registrations, remote_gm, scenarios,
+                  scheduling, sync)
 from .config import Settings, redact_url
 from .db import make_engine, make_sessionmaker
 from .ratelimit import Limits, RequestLimitMiddleware
@@ -42,7 +42,7 @@ from .remote_gm import RemoteHub
 from .security_headers import SecurityHeadersMiddleware
 from .tokens import Keys, UsedTokens
 from .totp import SeedBox
-from .web import club_pages, field_pages
+from .web import club_pages, field_pages, scoreboard
 
 log = logging.getLogger("atalaia.server")
 
@@ -104,6 +104,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.include_router(remote_gm.router)
     app.include_router(field_pages.router)
     app.include_router(club_pages.router)
+    app.include_router(history.router)  # plan phase 20: game history, the scenario library, the scoreboard
+    app.include_router(scenarios.router)
+    app.include_router(scoreboard.router)
     return app
 
 

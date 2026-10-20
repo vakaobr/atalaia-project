@@ -7,7 +7,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 How a field controller pushes its games to a site server: the games' metadata, their event logs, their score counters and their nodes; the field's chrono registry: the marshals' public keys, the replica registry and the signed chrono readings (plan phase 14); game day (plan phase 16): the schedule and rosters it pulls, the registrations' outcomes and the claims' verdicts it pushes; branding (plan phase 18): the field's branding and saved teams it pulls with `[sync] branding = "site"`; and the remote GM (plan phase 19): with `[sync] remote_gm = true`, its live game on the stream and the commands of the field's GMs back. Design: ADR-P4-3 and ADR-P4-5 with their 2026-10-19 amendments in `docs/phase-4-site-server/ADR.md`; decisions P4R10-P4R15, S13-1 onwards, S14-1 onwards, S16-1 onwards and S18-1 onwards in `docs/review/decisions-to-review.md`.
 
-Implementations: `controller/atalaia_controller/sync_client.py` (the controller's client) and `server/atalaia_server/sync.py` with `api/sync.py` (the site server). Both check bodies with the same plain-Python module, `controller/atalaia_controller/sync_format.py`, and both are tested against the shared vectors in [`vectors/sync.json`](vectors/sync.json): 14 valid bodies, 65 invalid ones with the error code and path they must fail with, 3 score merges worked out by hand, under `answers` 6 valid and 23 invalid answers of the endpoints the controller pulls (`sync_format.ANSWERS`), and under `stream` 13 valid and 24 invalid messages of the remote GM (`sync_format.STREAM`, plan phase 19). The site server verifies each chrono reading with the controller's own `controller/atalaia_controller/chrono.py` (`server/atalaia_server/chrono_verify.py`), against [`vectors/chrono_record.json`](vectors/chrono_record.json) too.
+Implementations: `controller/atalaia_controller/sync_client.py` (the controller's client) and `server/atalaia_server/sync.py` with `api/sync.py` (the site server). Both check bodies with the same plain-Python module, `controller/atalaia_controller/sync_format.py`, and both are tested against the shared vectors in [`vectors/sync.json`](vectors/sync.json): 14 valid bodies, 65 invalid ones with the error code and path they must fail with, 3 score merges worked out by hand, under `answers` 9 valid and 32 invalid answers of the endpoints the controller pulls (`sync_format.ANSWERS`), and under `stream` 13 valid and 24 invalid messages of the remote GM (`sync_format.STREAM`, plan phase 19). The site server verifies each chrono reading with the controller's own `controller/atalaia_controller/chrono.py` (`server/atalaia_server/chrono_verify.py`), against [`vectors/chrono_record.json`](vectors/chrono_record.json) too.
 
 ## The link
 
@@ -241,6 +241,31 @@ An image is `{sha256, content_type, width, height, bytes}`: the SHA-256 (64 lowe
 ### GET /api/v1/sync/images/{sha256}
 
 The image's bytes with its `Content-Type`, for an image the field's branding or one of its saved teams uses (any other: `404 {"detail": "image_not_found"}`, whatever another field uses). The controller fetches only images it does not have, at most 50 a cycle, and stores one only if its bytes hash to the SHA-256 asked for and `images.check` accepts them with the limits of their kind without changing them; otherwise it keeps what it had and tries again in the next cycle. It then makes its field branding and its site-made team presets match the answer: a preset made on the controller with a site team's name becomes that team's; a team gone from the answer loses its preset. With `"site"` the console cannot change the field's branding nor those presets (`409`); the GM's own presets stay the GM's.
+
+## The scenario library and game presets (plan phase 20)
+
+ADR-P4-6 as amended (P4R7, P4R9). The field's staff keep scenarios (manifests, each save a revision) and game presets on the site server; every controller with the field's key pulls them with `[sync] library = true` (the default), after branding in each cycle, so a standby has the same scenarios as the primary (decision M8-3). A site server without these endpoints (`404`, `405`) is skipped. Both answers are checked on both sides with `sync_format.ANSWERS`.
+
+### GET /api/v1/sync/presets
+
+`200 {"sync_version": 1, "scenarios": [...], "presets": [...]}`:
+
+| Field | Type | Values |
+| --- | --- | --- |
+| `scenarios` | array | at most 200 `{scenario_id, revision, version, name, sha256}`, each `scenario_id` once: the field's scenarios that are not archived |
+| `scenarios[].scenario_id` | text | the package id (`org.club.foxhound`: dotted, lower case, at most 40 characters, no `+`) |
+| `scenarios[].revision` | integer | 1 and up: the site server's count of saves |
+| `scenarios[].version`, `name` | text | the manifest's (1-32 and 1-128 characters) |
+| `scenarios[].sha256` | text | 64 lower-case hex: the SHA-256 of the manifest's UTF-8 text |
+| `presets` | array | at most 200 `{preset_id, name, mode_id, params}`, each `preset_id` (UUID) and `name` (1-64 characters, no space at either end) once |
+| `presets[].mode_id` | text | a game's mode id, a scenario's with its parts (`org.club.foxhound+org.atalaia.objectives`) |
+| `presets[].params` | object | the mode's parameters, at most 8 KiB as JSON; they may hold the game's codes, like a game's `params` |
+
+### GET /api/v1/sync/scenarios/{scenario_id}
+
+One scenario's current revision: `200 {"sync_version": 1, "scenario_id", "revision", "sha256", "manifest"}`, `manifest` being the text as it was saved (YAML or JSON, at most 256 KiB) whose UTF-8 bytes must hash to `sha256` (`sha256_mismatch` otherwise). An archived scenario or another field's is `404 {"detail": "scenario_not_found"}`.
+
+The controller fetches a scenario only when the SHA-256 differs from the one it last installed from the site (kept in its setting `sync.site_library`), compiles the manifest and loads its `field.lua` in its core again (`scenario_service.install`, the GM console's install), and stays the authority: a manifest it refuses is not fetched again until the site changes it, and one the live game runs waits until the game ends. A preset is saved by its name once its mode is installed on the controller and its parameters fit that mode (a site preset replaces a GM preset with the same name). Scenarios and presets the site no longer lists stay on the controller. `sync` in the controller's `GET /api/v1/controller` has `library`: whether it is on and supported, the last pull, what came from the site and the last problems.
 
 ## WS /api/v1/sync/stream
 

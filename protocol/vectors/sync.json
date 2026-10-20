@@ -1,5 +1,5 @@
 {
- "description": "Controller sync bodies (protocol/sync.md). Every valid body passes its kind's check (games, events, scores, nodes, marshals, replicas, chrono, checkins, claims); nodes_unknown_info_dropped keeps only the info keys listed under info. Every invalid body fails with the error code and path given (the first problem found, in the order of protocol/sync.md's tables). merge: the snapshots merged in order by maximum per (source, team) give counters, and the totals are the counters' sum per team plus the deltas (GM adjustments, score.delta), worked out by hand from protocol/sync.md's rule (decision P4R10). The chrono bodies use the marshal test key and records of chrono_record.json: chrono_readings verifies on the site server once marshals_with_a_rotated_key is stored (its second key is that test key, valid from 1792000000). answers (plan phases 16 and 18): the answers of the GET endpoints the controller pulls (schedule, roster, claims, and field: the branding and saved teams, images by SHA-256), each valid one passing sync_format.ANSWERS[kind] and each invalid one failing with its error and path; the site server's own answers are checked with the same functions in its tests. stream (plan phase 19): the remote GM's messages on WS /api/v1/sync/stream (hello, live and command.result from the controller, command from the site server), each valid one passing sync_format.STREAM[kind] and each invalid one failing with its error and path; format vectors made for this repository from protocol/sync.md (there is no external source to copy them from).",
+ "description": "Controller sync bodies (protocol/sync.md). Every valid body passes its kind's check (games, events, scores, nodes, marshals, replicas, chrono, checkins, claims); nodes_unknown_info_dropped keeps only the info keys listed under info. Every invalid body fails with the error code and path given (the first problem found, in the order of protocol/sync.md's tables). merge: the snapshots merged in order by maximum per (source, team) give counters, and the totals are the counters' sum per team plus the deltas (GM adjustments, score.delta), worked out by hand from protocol/sync.md's rule (decision P4R10). The chrono bodies use the marshal test key and records of chrono_record.json: chrono_readings verifies on the site server once marshals_with_a_rotated_key is stored (its second key is that test key, valid from 1792000000). answers (plan phases 16, 18 and 20): the answers of the GET endpoints the controller pulls (schedule, roster, claims, field: the branding and saved teams, images by SHA-256, presets: the scenario library by id, revision and SHA-256 and the game presets, and scenario: one manifest whose UTF-8 bytes hash to its sha256), each valid one passing sync_format.ANSWERS[kind] and each invalid one failing with its error and path; the site server's own answers are checked with the same functions in its tests. stream (plan phase 19): the remote GM's messages on WS /api/v1/sync/stream (hello, live and command.result from the controller, command from the site server), each valid one passing sync_format.STREAM[kind] and each invalid one failing with its error and path; format vectors made for this repository from protocol/sync.md (there is no external source to copy them from).",
  "valid": [
   {
    "name": "game_minimal",
@@ -10215,6 +10215,68 @@
      },
      "teams": []
     }
+   },
+   {
+    "name": "presets",
+    "kind": "presets",
+    "body": {
+     "sync_version": 1,
+     "scenarios": [
+      {
+       "scenario_id": "org.club.foxhound",
+       "revision": 4,
+       "version": "3",
+       "name": "Raposa",
+       "sha256": "a55ef5a11a38f46a99f85af2fbb9a4f0c12b56e924f1de69fd1c1c0793f045f3"
+      },
+      {
+       "scenario_id": "pt.campo-norte.night_raid",
+       "revision": 1,
+       "version": "1.0.0",
+       "name": "Night raid",
+       "sha256": "abababababababababababababababababababababababababababababababab"
+      }
+     ],
+     "presets": [
+      {
+       "preset_id": "0192f3a4-0000-7000-8000-0000000000a1",
+       "name": "Domingo: Raposa",
+       "mode_id": "org.club.foxhound+org.atalaia.objectives",
+       "params": {}
+      },
+      {
+       "preset_id": "0192f3a4-0000-7000-8000-0000000000a2",
+       "name": "Bomba curta",
+       "mode_id": "org.atalaia.bomb",
+       "params": {
+        "fuse_s": 45,
+        "team_codes": {
+         "red": "1234"
+        }
+       }
+      }
+     ]
+    }
+   },
+   {
+    "name": "presets_empty",
+    "kind": "presets",
+    "body": {
+     "sync_version": 1,
+     "scenarios": [],
+     "presets": []
+    }
+   },
+   {
+    "name": "scenario",
+    "kind": "scenario",
+    "body": {
+     "sync_version": 1,
+     "scenario_id": "org.club.foxhound",
+     "revision": 4,
+     "sha256": "a55ef5a11a38f46a99f85af2fbb9a4f0c12b56e924f1de69fd1c1c0793f045f3",
+     "manifest": "id: org.club.foxhound\nversion: 3\nname: Raposa\nteams: [red, blue]\nnodes:\n  ponte: { role: objective }\nobjectives:\n  - id: ponte\n    name: Tomar a ponte\n    type: capture_and_hold\n    target: ponte\n    hold_s: 60\n    effect: { points: 100 }\n"
+    }
    }
   ],
   "invalid": [
@@ -11218,6 +11280,338 @@
     },
     "error": "unknown_field",
     "path": "teams[0].members"
+   },
+   {
+    "name": "presets_duplicate_scenario",
+    "kind": "presets",
+    "body": {
+     "sync_version": 1,
+     "scenarios": [
+      {
+       "scenario_id": "org.club.foxhound",
+       "revision": 4,
+       "version": "3",
+       "name": "Raposa",
+       "sha256": "a55ef5a11a38f46a99f85af2fbb9a4f0c12b56e924f1de69fd1c1c0793f045f3"
+      },
+      {
+       "scenario_id": "org.club.foxhound",
+       "revision": 1,
+       "version": "1.0.0",
+       "name": "Night raid",
+       "sha256": "abababababababababababababababababababababababababababababababab"
+      }
+     ],
+     "presets": [
+      {
+       "preset_id": "0192f3a4-0000-7000-8000-0000000000a1",
+       "name": "Domingo: Raposa",
+       "mode_id": "org.club.foxhound+org.atalaia.objectives",
+       "params": {}
+      },
+      {
+       "preset_id": "0192f3a4-0000-7000-8000-0000000000a2",
+       "name": "Bomba curta",
+       "mode_id": "org.atalaia.bomb",
+       "params": {
+        "fuse_s": 45,
+        "team_codes": {
+         "red": "1234"
+        }
+       }
+      }
+     ]
+    },
+    "error": "duplicate_scenario",
+    "path": "scenarios[1].scenario_id"
+   },
+   {
+    "name": "presets_scenario_id_with_plus",
+    "kind": "presets",
+    "body": {
+     "sync_version": 1,
+     "scenarios": [
+      {
+       "scenario_id": "org.club.foxhound+org.atalaia.objectives",
+       "revision": 4,
+       "version": "3",
+       "name": "Raposa",
+       "sha256": "a55ef5a11a38f46a99f85af2fbb9a4f0c12b56e924f1de69fd1c1c0793f045f3"
+      },
+      {
+       "scenario_id": "pt.campo-norte.night_raid",
+       "revision": 1,
+       "version": "1.0.0",
+       "name": "Night raid",
+       "sha256": "abababababababababababababababababababababababababababababababab"
+      }
+     ],
+     "presets": [
+      {
+       "preset_id": "0192f3a4-0000-7000-8000-0000000000a1",
+       "name": "Domingo: Raposa",
+       "mode_id": "org.club.foxhound+org.atalaia.objectives",
+       "params": {}
+      },
+      {
+       "preset_id": "0192f3a4-0000-7000-8000-0000000000a2",
+       "name": "Bomba curta",
+       "mode_id": "org.atalaia.bomb",
+       "params": {
+        "fuse_s": 45,
+        "team_codes": {
+         "red": "1234"
+        }
+       }
+      }
+     ]
+    },
+    "error": "bad_text",
+    "path": "scenarios[0].scenario_id"
+   },
+   {
+    "name": "presets_revision_zero",
+    "kind": "presets",
+    "body": {
+     "sync_version": 1,
+     "scenarios": [
+      {
+       "scenario_id": "org.club.foxhound",
+       "revision": 0,
+       "version": "3",
+       "name": "Raposa",
+       "sha256": "a55ef5a11a38f46a99f85af2fbb9a4f0c12b56e924f1de69fd1c1c0793f045f3"
+      },
+      {
+       "scenario_id": "pt.campo-norte.night_raid",
+       "revision": 1,
+       "version": "1.0.0",
+       "name": "Night raid",
+       "sha256": "abababababababababababababababababababababababababababababababab"
+      }
+     ],
+     "presets": [
+      {
+       "preset_id": "0192f3a4-0000-7000-8000-0000000000a1",
+       "name": "Domingo: Raposa",
+       "mode_id": "org.club.foxhound+org.atalaia.objectives",
+       "params": {}
+      },
+      {
+       "preset_id": "0192f3a4-0000-7000-8000-0000000000a2",
+       "name": "Bomba curta",
+       "mode_id": "org.atalaia.bomb",
+       "params": {
+        "fuse_s": 45,
+        "team_codes": {
+         "red": "1234"
+        }
+       }
+      }
+     ]
+    },
+    "error": "out_of_range",
+    "path": "scenarios[0].revision"
+   },
+   {
+    "name": "presets_scenario_unknown_key",
+    "kind": "presets",
+    "body": {
+     "sync_version": 1,
+     "scenarios": [
+      {
+       "scenario_id": "org.club.foxhound",
+       "revision": 4,
+       "version": "3",
+       "name": "Raposa",
+       "sha256": "a55ef5a11a38f46a99f85af2fbb9a4f0c12b56e924f1de69fd1c1c0793f045f3",
+       "manifest": "id: org.club.foxhound\nversion: 3\nname: Raposa\nteams: [red, blue]\nnodes:\n  ponte: { role: objective }\nobjectives:\n  - id: ponte\n    name: Tomar a ponte\n    type: capture_and_hold\n    target: ponte\n    hold_s: 60\n    effect: { points: 100 }\n"
+      },
+      {
+       "scenario_id": "pt.campo-norte.night_raid",
+       "revision": 1,
+       "version": "1.0.0",
+       "name": "Night raid",
+       "sha256": "abababababababababababababababababababababababababababababababab"
+      }
+     ],
+     "presets": [
+      {
+       "preset_id": "0192f3a4-0000-7000-8000-0000000000a1",
+       "name": "Domingo: Raposa",
+       "mode_id": "org.club.foxhound+org.atalaia.objectives",
+       "params": {}
+      },
+      {
+       "preset_id": "0192f3a4-0000-7000-8000-0000000000a2",
+       "name": "Bomba curta",
+       "mode_id": "org.atalaia.bomb",
+       "params": {
+        "fuse_s": 45,
+        "team_codes": {
+         "red": "1234"
+        }
+       }
+      }
+     ]
+    },
+    "error": "unknown_field",
+    "path": "scenarios[0].manifest"
+   },
+   {
+    "name": "presets_duplicate_preset_name",
+    "kind": "presets",
+    "body": {
+     "sync_version": 1,
+     "scenarios": [
+      {
+       "scenario_id": "org.club.foxhound",
+       "revision": 4,
+       "version": "3",
+       "name": "Raposa",
+       "sha256": "a55ef5a11a38f46a99f85af2fbb9a4f0c12b56e924f1de69fd1c1c0793f045f3"
+      },
+      {
+       "scenario_id": "pt.campo-norte.night_raid",
+       "revision": 1,
+       "version": "1.0.0",
+       "name": "Night raid",
+       "sha256": "abababababababababababababababababababababababababababababababab"
+      }
+     ],
+     "presets": [
+      {
+       "preset_id": "0192f3a4-0000-7000-8000-0000000000a1",
+       "name": "Domingo: Raposa",
+       "mode_id": "org.club.foxhound+org.atalaia.objectives",
+       "params": {}
+      },
+      {
+       "preset_id": "0192f3a4-0000-7000-8000-0000000000a2",
+       "name": "Domingo: Raposa",
+       "mode_id": "org.atalaia.bomb",
+       "params": {
+        "fuse_s": 45,
+        "team_codes": {
+         "red": "1234"
+        }
+       }
+      }
+     ]
+    },
+    "error": "duplicate_preset",
+    "path": "presets[1].name"
+   },
+   {
+    "name": "presets_bad_mode_id",
+    "kind": "presets",
+    "body": {
+     "sync_version": 1,
+     "scenarios": [
+      {
+       "scenario_id": "org.club.foxhound",
+       "revision": 4,
+       "version": "3",
+       "name": "Raposa",
+       "sha256": "a55ef5a11a38f46a99f85af2fbb9a4f0c12b56e924f1de69fd1c1c0793f045f3"
+      },
+      {
+       "scenario_id": "pt.campo-norte.night_raid",
+       "revision": 1,
+       "version": "1.0.0",
+       "name": "Night raid",
+       "sha256": "abababababababababababababababababababababababababababababababab"
+      }
+     ],
+     "presets": [
+      {
+       "preset_id": "0192f3a4-0000-7000-8000-0000000000a1",
+       "name": "Domingo: Raposa",
+       "mode_id": "Org.Club",
+       "params": {}
+      },
+      {
+       "preset_id": "0192f3a4-0000-7000-8000-0000000000a2",
+       "name": "Bomba curta",
+       "mode_id": "org.atalaia.bomb",
+       "params": {
+        "fuse_s": 45,
+        "team_codes": {
+         "red": "1234"
+        }
+       }
+      }
+     ]
+    },
+    "error": "bad_text",
+    "path": "presets[0].mode_id"
+   },
+   {
+    "name": "presets_params_not_an_object",
+    "kind": "presets",
+    "body": {
+     "sync_version": 1,
+     "scenarios": [
+      {
+       "scenario_id": "org.club.foxhound",
+       "revision": 4,
+       "version": "3",
+       "name": "Raposa",
+       "sha256": "a55ef5a11a38f46a99f85af2fbb9a4f0c12b56e924f1de69fd1c1c0793f045f3"
+      },
+      {
+       "scenario_id": "pt.campo-norte.night_raid",
+       "revision": 1,
+       "version": "1.0.0",
+       "name": "Night raid",
+       "sha256": "abababababababababababababababababababababababababababababababab"
+      }
+     ],
+     "presets": [
+      {
+       "preset_id": "0192f3a4-0000-7000-8000-0000000000a1",
+       "name": "Domingo: Raposa",
+       "mode_id": "org.club.foxhound+org.atalaia.objectives",
+       "params": {}
+      },
+      {
+       "preset_id": "0192f3a4-0000-7000-8000-0000000000a2",
+       "name": "Bomba curta",
+       "mode_id": "org.atalaia.bomb",
+       "params": [
+        45
+       ]
+      }
+     ]
+    },
+    "error": "not_an_object",
+    "path": "presets[1].params"
+   },
+   {
+    "name": "scenario_sha256_mismatch",
+    "kind": "scenario",
+    "body": {
+     "sync_version": 1,
+     "scenario_id": "org.club.foxhound",
+     "revision": 4,
+     "sha256": "a55ef5a11a38f46a99f85af2fbb9a4f0c12b56e924f1de69fd1c1c0793f045f3",
+     "manifest": "id: org.club.foxhound\nversion: 3\nname: Raposa\nteams: [red, blue]\nnodes:\n  ponte: { role: objective }\nobjectives:\n  - id: ponte\n    name: Tomar a ponte\n    type: capture_and_hold\n    target: ponte\n    hold_s: 60\n    effect: { points: 1000 }\n"
+    },
+    "error": "sha256_mismatch",
+    "path": "sha256"
+   },
+   {
+    "name": "scenario_empty_manifest",
+    "kind": "scenario",
+    "body": {
+     "sync_version": 1,
+     "scenario_id": "org.club.foxhound",
+     "revision": 4,
+     "sha256": "a55ef5a11a38f46a99f85af2fbb9a4f0c12b56e924f1de69fd1c1c0793f045f3",
+     "manifest": ""
+    },
+    "error": "not_a_text",
+    "path": "manifest"
    }
   ]
  },

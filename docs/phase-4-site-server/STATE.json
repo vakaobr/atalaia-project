@@ -6,7 +6,7 @@
   "review_iteration": 0,
   "failing_experts": [],
   "created_at": "2026-10-17T00:00:00Z",
-  "updated_at": "2026-10-21T00:30:00Z",
+  "updated_at": "2026-10-21T01:30:00Z",
   "artifacts": {
     "RESEARCH.md": "complete",
     "ADR.md": "complete",
@@ -19,7 +19,7 @@
     "design_only": false,
     "stop_after": null,
     "resume_with": "--implement",
-    "next_plan_phase": "20 (scenario library and game history on the site server), then 21 and 22",
+    "next_plan_phase": "21 (hosted multi-tenant mode); 22 (deployment) under way",
     "completed_plan_phases": [
       "1",
       "2",
@@ -39,7 +39,8 @@
       "16",
       "17",
       "18",
-      "19"
+      "19",
+      "20"
     ],
     "plan_phase_order": [
       "1",

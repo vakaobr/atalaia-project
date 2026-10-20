@@ -33,7 +33,8 @@ TABLES = {"fields", "users", "roles", "user_field_roles", "sessions", "audit_log
           "field_player_ids", "marshal_keys", "replicas", "chrono_readings", "chrono_rejects", "chrono_violations",
           "scheduled_games", "game_registrations", "registration_replicas", "player_id_claims",
           "platform_links", "external_game_links", "branding_images", "clubs", "club_members", "club_reports",
-          "field_teams", "firmware_releases"}
+          "field_teams", "firmware_releases", "field_history_settings", "game_score_samples", "field_scenarios",
+          "field_scenario_revisions", "field_presets"}
 
 SCHEMA_SQL = (
     ("columns", "SELECT table_name, column_name, data_type, is_nullable, column_default, character_maximum_length "
@@ -355,6 +356,42 @@ class MigrationTests(unittest.TestCase):
         self.assertIsNone(self.db.fetch("SELECT added_by FROM firmware_releases")[0][0])
         command.downgrade(self.cfg, "0009_clubs")
         self.assertNotIn("firmware_releases", self.tables())
+
+    def test_0011_with_data(self) -> None:
+        """0011_history: the per-field settings' ranges, one scenario per id and field, revisions and samples
+        going with their scenario and game, and back down (the field and its game stay)."""
+        command.upgrade(self.cfg, "0011_history")
+        field = self.db.fetch("INSERT INTO fields (name, slug) VALUES ('Campo', 'campo') RETURNING id")[0][0]
+        self.db.fetch("INSERT INTO field_history_settings (field_id) VALUES ($1)", field)
+        row = self.db.fetch("SELECT spectator_delay_s, retention_days FROM field_history_settings")[0]
+        self.assertEqual(tuple(row), (60, 730))
+        for column, value, check in (("spectator_delay_s", 3601, "ck_field_history_settings_delay"),
+                                     ("retention_days", 731, "ck_field_history_settings_retention"),
+                                     ("retention_days", 29, "ck_field_history_settings_retention")):
+            with self.subTest(column=column, value=value), self.assertRaisesRegex(Exception, check):
+                self.db.fetch(f"UPDATE field_history_settings SET {column} = $1", value)
+        scenario = self.db.fetch("INSERT INTO field_scenarios (field_id, scenario_id, revision) "
+                                 "VALUES ($1, 'org.club.fox', 1) RETURNING id", field)[0][0]
+        with self.assertRaisesRegex(Exception, "uq_field_scenarios_field_id_scenario_id"):
+            self.db.fetch("INSERT INTO field_scenarios (field_id, scenario_id, revision) "
+                          "VALUES ($1, 'org.club.fox', 1)", field)
+        self.db.fetch("INSERT INTO field_scenario_revisions (scenario, revision, version, name, manifest, "
+                      "manifest_sha256) VALUES ($1, 1, '1', 'Fox', 'id: org.club.fox', repeat('a', 64))", scenario)
+        game = self.db.fetch("INSERT INTO games (field_id, game_id, game_seed, name, mode_id, teams, state, "
+                             "controller_created_at) VALUES ($1, 7, 1, 'g', 'm', '[\"red\"]', 'ended', now()) "
+                             "RETURNING id", field)[0][0]
+        self.db.fetch("INSERT INTO game_score_samples (game, source, team, value) "
+                      "VALUES ($1, 'node-3', 'red', 5)", game)
+        self.db.fetch("DELETE FROM field_scenarios")
+        self.assertEqual(self.db.fetch("SELECT count(*) FROM field_scenario_revisions")[0][0], 0)
+        self.db.fetch("DELETE FROM games")
+        self.assertEqual(self.db.fetch("SELECT count(*) FROM game_score_samples")[0][0], 0)
+        command.downgrade(self.cfg, "0010_firmware")
+        for table in ("field_history_settings", "game_score_samples", "field_scenarios", "field_scenario_revisions",
+                      "field_presets"):
+            self.assertNotIn(table, self.tables())
+        self.assertEqual(self.db.fetch("SELECT name FROM fields")[0][0], "Campo")
+        self.db.fetch("DELETE FROM fields")
 
     def test_one_linear_history(self) -> None:
         self.assertEqual(len(self.script.get_heads()), 1)

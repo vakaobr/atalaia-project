@@ -22,7 +22,8 @@ controller's own ``sync_format`` (shared, plain Python) and hand it here:
   the answers of the GET endpoints the controller pulls.
 - ``totals``: a game's totals, derived as the controller derives them (P4R10):
   the counters' sum per team plus every ``score.delta`` amount, negative ones
-  included. Totals are never stored, so they can never be merged wrongly.
+  included. Totals are never stored, so they can never be merged wrongly. Each counter's rise is
+  also kept with its arrival time (``services.history``, plan phase 20): the score timeline.
 """
 
 from __future__ import annotations
@@ -42,7 +43,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import chrono_registry
 from .models import Controller, FieldApiKey, Game, GameEvent, GameNode, GameNodeScore
-from .services import registration
+from .services import history, registration
 
 MAX_LIVE_KEYS = 2  # a field's live API keys: the old one and the new one during a rotation
 
@@ -212,8 +213,11 @@ async def _scores(db: AsyncSession, caller: Caller, body: dict[str, Any]) -> dic
         stmt = stmt.on_conflict_do_update(
             index_elements=["game", "source", "team"],
             set_={"value": func.greatest(GameNodeScore.value, stmt.excluded.value), "updated_at": func.now()},
-            where=stmt.excluded.value > GameNodeScore.value).returning(GameNodeScore.source)
-        updated = len((await db.execute(stmt)).all())
+            where=stmt.excluded.value > GameNodeScore.value).returning(GameNodeScore.source, GameNodeScore.team,
+                                                                       GameNodeScore.value)
+        raised = [tuple(r) for r in (await db.execute(stmt)).all()]
+        updated = len(raised)
+        await history.record_samples(db, game.id, raised)  # the score timeline (plan phase 20)
     return {"totals": await totals(db, game), "updated": updated}
 
 

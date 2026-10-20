@@ -64,6 +64,20 @@ With ``"local"`` (the default) nothing is pulled and the console's branding
 stays the controller's own. A site server without these endpoints is
 skipped quietly, as for game day.
 
+**The scenario library** (plan phase 20; ADR-P4-6 as amended, P4R9): with
+``[sync] library = true`` (the default) the client then pulls the field's
+library (``GET /api/v1/sync/presets``): each scenario by id, revision and the
+SHA-256 of its manifest, and the field's game presets. A scenario whose
+manifest this controller has not installed from the site yet is fetched
+(``GET /api/v1/sync/scenarios/{id}``, its SHA-256 checked) and installed with
+``scenario_service.install``, which compiles it and loads its ``field.lua`` in
+the core again: the controller stays the authority. Every controller with the
+field's key does this, a standby too, so a standby has the scenario a join
+names (decision M8-3). A refused manifest is not fetched again until the site
+changes it; one the live game runs waits for the game to end. Presets are
+saved by name once their mode is installed here and their parameters fit it.
+Scenarios and presets the site no longer lists stay on the controller.
+
 **Never sent:** positions (P4R25), check-in names and federation numbers,
 tokens, the game, join and token keys, private keys. The bodies carry the fields listed in
 protocol/sync.md only; a node's info goes through a list of allowed keys, and
@@ -95,7 +109,10 @@ import uuid
 from typing import Any, Callable, Optional
 from urllib.parse import urlsplit
 
+from atalaia_sim.mode import ModeError
+
 from . import __version__, images
+from .modes import resolve_params
 from .sync_format import (ANSWERS, MAX_EVENTS, MAX_MARSHALS, MAX_READINGS, MAX_REPLICAS, MAX_ROSTER, SYNC_VERSION,
                           SyncFormatError, check_checkins, check_claims, check_event, check_marshal, check_nodes,
                           check_reading, check_replica)
@@ -113,6 +130,7 @@ SCHEDULE_DAYS = 14
 UNSUPPORTED = (404, 405, 501)  # an older site server without the game-day endpoints
 UNSUPPORTED_CODES = ("Not Found", "Method Not Allowed", "http_404", "http_405", "http_501")
 IMAGES_PER_CYCLE = 50  # branding images fetched in one cycle; the rest in the next ones
+LIBRARY_SETTING = "sync.site_library"  # what was installed from the site's library: {scenarios, refused, presets}
 
 
 def api_key_ok(key: str) -> bool:
@@ -255,12 +273,14 @@ class SyncClient:
 
     def __init__(self, cfg: Any, store: Any, *, api_key: Optional[str] = None,
                  transport: Optional[Any] = None, wall: Callable[[], float] = time.time,
-                 checkin: Optional[Any] = None, branding: Optional[Any] = None) -> None:
+                 checkin: Optional[Any] = None, branding: Optional[Any] = None,
+                 controller: Optional[Any] = None) -> None:
         self.cfg = cfg
         self.store = store
         self.checkin = checkin  # checkin.Checkin: applies rosters and makes outcomes (plan phase 16)
         # branding.Branding: applies the site's branding (plan phase 18); a Branding made later sets it itself.
         self.branding = branding
+        self.controller = controller  # engine.Controller: installs the site's scenarios and presets (plan phase 20)
         key, source = (api_key, "given") if api_key else resolve_api_key(cfg, store)
         self.key_source = source
         self.key_fingerprint = key_fingerprint(key) if key else None
@@ -289,6 +309,10 @@ class SyncClient:
         self.branding_error: Optional[str] = None
         self.images_fetched = 0
         self.remote: Optional[Any] = None  # remote_gm.RemoteGm, with [sync] remote_gm = true (plan phase 19)
+        self.library_supported = True
+        self.library_pulled_at: Optional[float] = None
+        self.library_error: Optional[str] = None
+        self.scenarios_installed = 0
 
     # --- identity ---------------------------------------------------------------------
 
@@ -372,6 +396,7 @@ class SyncClient:
                 self._sync_registry()
                 self._game_day()
                 self._site_branding()
+                self._site_library()
             except SyncError as exc:
                 self.failures += 1
                 self.retry_after = exc.retry_after
@@ -801,6 +826,108 @@ class SyncClient:
         self.images_fetched += 1
         return True
 
+    # --- the scenario library and presets (plan phase 20) ------------------------------------
+
+    def _library_state(self) -> dict[str, dict[str, str]]:
+        try:
+            state = json.loads(self.store.get_setting(LIBRARY_SETTING) or "{}")
+        except ValueError:
+            state = {}
+        return {k: dict(state.get(k) or {}) for k in ("scenarios", "refused", "presets")}
+
+    def _site_library(self) -> None:
+        """With ``[sync] library = true``: the field's scenarios not installed from the site yet, then its presets."""
+        if not getattr(self.cfg, "sync_library", True) or self.controller is None \
+                or not hasattr(self.transport, "get"):
+            return
+        self.pulls += 1
+        try:
+            answer = self.transport.get("/api/v1/sync/presets")
+        except SyncError as exc:
+            if exc.status in UNSUPPORTED and exc.code in UNSUPPORTED_CODES:
+                if self.library_supported:
+                    log.info("the site server has no scenario library: skipped")
+                self.library_supported = False
+                return
+            raise
+        self.library_supported = True
+        try:
+            answer = ANSWERS["presets"](answer)
+        except SyncFormatError as exc:
+            raise SyncError("bad_answer", detail=str(exc)) from None
+        state = self._library_state()
+        problems: list[str] = []
+        try:
+            for ref in answer["scenarios"]:
+                sid, sha = ref["scenario_id"], ref["sha256"]
+                if sha not in (state["scenarios"].get(sid), state["refused"].get(sid)):
+                    problem = self._install_scenario(sid, sha, state)
+                    if problem:
+                        problems.append(f"{sid}: {problem}")
+            for preset in answer["presets"]:
+                sha = digest({k: preset[k] for k in ("name", "mode_id", "params")})
+                if state["presets"].get(preset["name"]) != sha:
+                    problem = self._save_preset(preset)
+                    if problem:
+                        problems.append(f"preset {preset['name']}: {problem}")
+                    else:
+                        state["presets"][preset["name"]] = sha
+        finally:
+            self.store.set_setting(LIBRARY_SETTING, json.dumps(state, sort_keys=True))
+        self.library_error = "; ".join(problems)[:500] or None
+        self.library_pulled_at = self._wall()
+
+    def _install_scenario(self, sid: str, sha: str, state: dict[str, dict[str, str]]) -> Optional[str]:
+        """Fetches one manifest and installs it (compiled and loaded in the core here); a problem, or None."""
+        from . import scenario_service  # noqa: PLC0415 (it imports the engine's modules)
+        from .engine import Conflict  # noqa: PLC0415
+
+        self.pulls += 1
+        try:
+            body = self.transport.get(f"/api/v1/sync/scenarios/{sid}")
+        except SyncError as exc:
+            if exc.status == 404:
+                return "gone from the site server"
+            raise
+        try:
+            body = ANSWERS["scenario"](body)
+        except SyncFormatError as exc:
+            raise SyncError("bad_answer", detail=str(exc)) from None
+        if body["scenario_id"] != sid or body["sha256"] != sha:
+            return "changed on the site server while fetched; next cycle"
+        ctrl = self.controller
+        try:
+            with ctrl._lock:  # not while a game starts with it (the console's install runs the same checks)
+                scenario_service.install(ctrl, body["manifest"])
+        except (scenario_service.Refused, ModeError) as exc:
+            state["refused"][sid] = sha
+            log.error("scenario %s from the site server refused: %s", sid, exc)
+            return f"refused: {exc}"
+        except Conflict as exc:
+            if not scenario_service._uses(ctrl.game, sid):
+                state["refused"][sid] = sha  # another kind of package has this id here
+            log.warning("scenario %s from the site server not installed: %s", sid, exc)
+            return str(exc)
+        state["scenarios"][sid] = sha
+        state["refused"].pop(sid, None)
+        self.scenarios_installed += 1
+        ctrl._emit({"type": "modes"})
+        log.info("scenario %s installed from the site server (revision %d)", sid, body["revision"])
+        return None
+
+    def _save_preset(self, preset: dict[str, Any]) -> Optional[str]:
+        """A site preset saved by its name once its mode is installed here and its parameters fit it."""
+        ctrl = self.controller
+        try:
+            pkg = ctrl.modes.get(preset["mode_id"])
+            if pkg is None:
+                return f"mode {preset['mode_id']} is not installed here"
+            resolve_params(pkg.mode, preset["params"], None)
+        except ModeError as exc:
+            return str(exc)
+        self.store.save_preset(preset["name"], pkg.id, preset["params"])
+        return None
+
     # --- what is sent -------------------------------------------------------------------
 
     def meta(self, game: dict[str, Any]) -> dict[str, Any]:
@@ -888,4 +1015,8 @@ class SyncClient:
                 "branding": {"source": getattr(self.cfg, "sync_branding", "local"),
                              "supported": self.branding_supported, "pulled_at": self.branding_pulled_at,
                              "error": self.branding_error, "images_fetched": self.images_fetched},
-                "remote_gm": self.remote.status() if self.remote is not None else {"enabled": False}}
+                "remote_gm": self.remote.status() if self.remote is not None else {"enabled": False},
+                "library": {"enabled": bool(getattr(self.cfg, "sync_library", True)),
+                            "supported": self.library_supported, "pulled_at": self.library_pulled_at,
+                            "error": self.library_error, "scenarios_installed": self.scenarios_installed,
+                            "from_site": {k: sorted(v) for k, v in self._library_state().items()}}}

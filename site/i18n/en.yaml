@@ -601,7 +601,7 @@ roadmap:
     title: Site server and advanced play
     short: >-
       Site server, game scheduling and registration, custom scenarios, advanced modes, ATAK.
-      Started: advanced modes (Master and Satellites, the Hacking Terminal, VIP / Payload and the logic of Target Windows), custom scenarios (their runtime, compiler, console editor and objectives in the app), geo utilities in the core, the ATAK feed, and the site server's accounts, personal data rights, controller sync, chrono registry, game scheduling with public field pages, feeds and registration, club profiles with branding sync, device health, a firmware catalogue and the remote GM are built in software.
+      Started: advanced modes (Master and Satellites, the Hacking Terminal, VIP / Payload and the logic of Target Windows), custom scenarios (their runtime, compiler, console editor and objectives in the app), geo utilities in the core, the ATAK feed, and the site server's accounts, personal data rights, controller sync, chrono registry, game scheduling with public field pages, feeds and registration, club profiles with branding sync, game history and the scenario library, device health, a firmware catalogue and the remote GM are built in software.
     text: >-
       Site server (accounts, game history, the chrono registry, scheduling games, registration and
       publishing), custom scenarios, advanced modes (master and satellite zones, VIP escort, hacking
@@ -648,7 +648,10 @@ roadmap:
       with the GM role, logged in with a two-factor code, sees the live game and starts, pauses,
       resumes or ends it, or sends a message or a mode command, over a connection the field
       controller opens itself, only when the field turns it on, with every command logged on both
-      sides.
+      sides; and game history (each game's score timeline and event log; players and spectators
+      see a live game a minute behind, without secrets or player ids), a public scoreboard per field
+      (off by default) and the field's scenario library with its game presets, checked as the field
+      controller checks them and installed by every controller of the field, a standby included.
     gate: >-
       Gate: a weekend <a href="{{ page.to.glossary }}#glossary-milsim">milsim</a> runs on Atalaia end to end.
   p5:

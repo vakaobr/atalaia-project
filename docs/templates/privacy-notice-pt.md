@@ -59,7 +59,7 @@ perfis, e não tomamos decisões automatizadas sobre ti.
 | Sessões | 30 dias depois de terminarem ou expirarem |
 | Registo de segurança | 36 meses |
 | Leituras do cronógrafo | [365 dias] |
-| Histórico dos jogos | [24 meses] |
+| Histórico dos jogos (resultados, os eventos com o teu identificador de jogador) | [24 meses; no máximo 24 meses, menos se o campo o definir] |
 | Dados de inscrição de quem não tem conta | 30 dias depois do jogo |
 | Pertença a clubes | Até saíres do clube ou apagares a conta |
 | Convites de clubes não aceites | 30 dias |

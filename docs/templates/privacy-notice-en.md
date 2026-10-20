@@ -59,7 +59,7 @@ automated decisions about you.
 | Logins | 30 days after they end or expire |
 | Security log | 36 months |
 | Chronograph readings | [365 days] |
-| Game history | [24 months] |
+| Game history (results, the events that name your player id) | [24 months; at most 24 months, less if the field sets it] |
 | Registration data of people without an account | 30 days after the game |
 | Club memberships | Until you leave the club or erase your account |
 | Club invitations not accepted | 30 days |

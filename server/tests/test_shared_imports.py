@@ -37,7 +37,8 @@ BLOCKED = ("fastapi", "pydantic", "pydantic_core", "starlette", "sqlalchemy", "a
            "httpx", "anyio")
 SHARED = ("atalaia_controller.chrono", "atalaia_controller.player_token", "atalaia_controller.images",
           "atalaia_controller.sync_format", "atalaia_controller.sync_client",
-          "atalaia_controller.modes", "atalaia_sim.mode", "atalaia_sim.core",
+          "atalaia_controller.modes", "atalaia_controller.scenarios", "atalaia_controller.visibility",
+          "atalaia_sim.mode", "atalaia_sim.core",
           "atalaia_server.config", "atalaia_server.ids", "atalaia_server.chrono_verify")
 MODES = Path(os.environ.get("ATALAIA_MODES_DIR", REPO / "modes"))
 

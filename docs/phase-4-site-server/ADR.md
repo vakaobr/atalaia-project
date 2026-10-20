@@ -1746,6 +1746,15 @@ P4R8, P4R9, P4R24, proposed):**
    Python (standard library and PyYAML), AGPL-3.0-or-later like the rest
    of `controller/`.
 
+*Built 2026-10-20 (plan phase 20; decisions S20-1 to S20-8, proposed):* the
+site server's scenario library (`/api/v1/fields/{field}/scenarios`) checks a
+manifest with this library and the core's load check (P4R9) and keeps every
+save as a revision; `GET /api/v1/sync/presets` gives every controller of the
+field the library (and the field's game presets), and `GET
+/api/v1/sync/scenarios/{id}` one manifest. The controller installs what
+changed with its own install, checking it again (it stays the authority), so a
+standby has the scenario too (M8-3).
+
 ---
 
 ### ADR-P4-7: ATAK / CoT integration

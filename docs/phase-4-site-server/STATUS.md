@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Implementation (plan phases 1 to 19 built in software, 2026-10-20; sync over 4G: HW1; a real ATAK device: HW3)
+**Current phase:** Implementation (plan phases 1 to 20 built in software, 2026-10-20; sync over 4G: HW1; a real ATAK device: HW3)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-20 (plan phase 19, full clean-copy check)
-**Next step:** the modes chain (plan phases 1 to 9) is built in software; plan phase 20 (the site server's scenario library, which should also carry a scenario to a standby controller, M8-3)
+**Last verified:** 2026-10-20 (plan phase 20, full clean-copy check)
+**Next step:** plan phase 21 (hosted multi-tenant mode); plan phase 22 (deployment) under way
 
 ## Completed
 
@@ -58,7 +58,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | 17 | Registration import and adapters | Software, now | 16 | **Done in software** (2026-10-20, with the app's registration screens; no real platform) |
 | 18 | Club profiles and branding sync | Software, now | 13 | **Done in software** (2026-10-20; not yet on a real deployment) |
 | 19 | Device health, firmware catalogue, remote GM | Software, now | 13 | **Done in software** (2026-10-20; not yet on a real deployment or over 4G) |
-| 20 | Game history and the scenario library | Software, now | 13, 7 | Pending |
+| 20 | Game history and the scenario library | Software, now | 13, 7 | **Done in software** (2026-10-20; not yet on a real deployment) |
 | 21 | Hosted multi-tenant mode | Software, now | 10-20 | Pending |
 | 22 | Deployment (Caddy, setup, backup, restore) | Software, now | 10 | Pending |
 | HW1 | Sync over a real 4G link | Hardware and a deployment | 13, phase 2 F | Waiting for boards |
@@ -719,6 +719,47 @@ raw-socket server, RFC 6455's own examples). Not built: the remote ATAK relay th
 M9-10 had deferred here (it needs an authenticated endpoint, S19-10), positions in
 the remote view, a GM page on the site server and the console's screen for the log.
 Not yet: a real deployment, over 4G (HW1). Decisions S19-1 to S19-11, all open.
+
+## Plan phase 20: game history and the scenario library (built 2026-10-20, in software)
+
+What exists: on the site server, the history of a field's synced games
+(`GET /api/v1/fields/{id}/history`: newest first, by state, mode and time,
+with teams, totals and the winner), each game's score timeline derived from
+the per-node counters (every rise of a counter is kept with its arrival
+time, `game_score_samples`; the totals at each arrival follow the
+controller's rule, GM adjustments included) and its event log by type, team
+and game time with the count of each type. Staff see everything; anyone else
+with a role on the field or the game sees a live game 60 s behind (the
+field's `spectator_delay_s`, 0-3,600) and a log without secrets, telemetry
+or player ids. A public scoreboard per field (`/f/<slug>/scoreboard` and
+`.json`, off by default, refreshed every 30 s, no JavaScript) shows the live
+game's teams and delayed scores, nothing else. The field's scenario library
+(`/api/v1/fields/{id}/scenarios`): a manifest is checked with the
+controller's own compiler and validator and its `field.lua` loaded in the
+image's core (P4R9), each save a revision, archived ones no longer pushed;
+the field's game presets beside it. Every controller of the field pulls them
+(`GET /api/v1/sync/presets`, then `GET /api/v1/sync/scenarios/{id}` for a
+manifest that changed) with `[sync] library = true` (the default) and
+installs them through the console's own install, checking again; so a
+standby has the scenario a join names (M8-3). The person's game history (the
+games their player ids appear in, with those events) is in access and export;
+erasure removes the link as before. ADR-P4-8's per-field history retention:
+`retention_days` (30-730, 730 by default). Migration `0011_history` (after
+plan phase 19's `0010_firmware`); `protocol/sync.md`.
+
+Tests: `test_games.py` (list and filters, timeline, spectator delay and
+redaction, a game role, the log's filters, settings, the public scoreboard,
+per-field retention, the person's game history in access, export and
+erasure), `test_scenarios_api.py` (check, the core missing, revisions,
+archive and restore, who may use it, the sync answers, presets, and the
+real controller: a primary and a standby install the same library and its
+next revision), the migration's data test, and the controller's
+`test_sync_library.py` (both controllers, a standby's join for a scenario
+game after one sync, fetch only on change, a refused manifest, a live game
+keeping its scenario, presets waiting for their mode, off, an older site
+server, a corrupt answer); the shared vectors gain 3 valid and 9 invalid
+answers. Not yet: a real deployment, a console or web page for the history
+and the library. Decisions S20-1 to S20-8, all open.
 
 ## Dependencies
 

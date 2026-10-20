@@ -30,6 +30,8 @@ What holds personal data now (plan phases 10-12):
 | ``platform_links``, ``external_game_links`` (plan phase 17) | (the field's: no person in them) | | |
 | ``club_members`` (plan phase 18) | the person's clubs, club role and invitations (``clubs.json``) | deleted (a club whose last admin goes keeps its profile; a server administrator can still manage it) | an invitation not accepted, 30 days after it was made; a membership with the account |
 | ``club_reports`` (plan phase 18) | the reports the person made while logged in (``club_reports.json``; never an address) | kept for the moderation record, without the link to the account (reporter and deciding administrator) | 12 months after the decision (an open report stays until decided) |
+| ``games`` and ``game_events`` as the person's game history (plan phase 20) | the games whose events name one of the person's player ids (``player``, ``owner``, ``holder``), with those events and the game's totals, and the games their registrations were checked in to (``game_history.json``) | nothing to change: the events keep the field's pseudonymous ids; erasure deletes ``field_player_ids``, the only link to the person | the field's ``retention_days`` (``field_history_settings``, 30-730, 730 by default: ADR-P4-8's 24 months) after the game ended |
+| ``game_score_samples``, ``field_history_settings``, ``field_scenarios``, ``field_scenario_revisions``, ``field_presets`` (plan phase 20) | (the field's: no person in them; who saved a scenario or a preset is only in the audit log) | | the samples with their game |
 | ``clubs``, ``field_teams``, ``branding_images``, the field's branding columns (plan phase 18) | (a club's or a field's public profile: no person in them; who made a club is ``created_by``, unlinked at erasure) | ``created_by`` and ``hidden_by`` cleared | an image nothing uses, a day after its upload |
 | ``firmware_releases`` (plan phase 19) | (the server's catalogue: no person in it; who added a release is ``added_by``, unlinked at erasure) | ``added_by`` cleared | (kept: withdrawn releases stay, marked) |
 | the remote GM's audit rows (plan phase 19: ``remote_gm_command``, ``remote_gm_denied``) | in the audit log as every other action | as every other audit row: kept without the person's addresses | 36 months, as the audit log |
@@ -96,7 +98,7 @@ from .audit import record
 from .models import (ROLE_BY_ID, AuditLog, ChronoReading, ChronoReject, Club, ClubMember, ClubReport, Consent, Field,
                      FieldPlayerId, FirmwareRelease, Game, GameRegistration, MarshalKey, PlayerIdClaim, RegistrationReplica, Replica,
                      ScheduledGame, User, UserFieldRole, UserGameRole, UserSession)
-from .services import branding
+from .services import branding, history
 
 log = logging.getLogger("atalaia.server.purge")
 
@@ -108,7 +110,7 @@ ERASED_PREFIX = "deleted-"
 ERASED_PASSWORD = "DELETED"  # not an Argon2 hash: passwords.verify_password never accepts it
 
 # Retention (ADR-P4-8's table; decisions S12-6, S13-10, S14-8, S16-7, S17-5). Guest data is plan phase 17's
-# imports (GUEST_RETENTION); game history is 24 months, fixed until fields get a setting; the chrono registry
+# imports (GUEST_RETENTION); game history is 24 months, or less per field (plan phase 20); the chrono registry
 # keeps each field's fields.default_retention_days (365 by default, the controller's CHRONO_RETENTION_DAYS).
 SESSION_RETENTION = timedelta(days=30)   # after a session expired or was revoked
 AUDIT_RETENTION = timedelta(days=1095)   # 36 months
@@ -232,6 +234,7 @@ async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.U
                    "created_by_you": c.created_by == user.id} for m, c in clubs],
         "club_reports": [{"id": str(r.id), "club": slug, "reason": r.reason, "text": r.text, "status": r.status,
                           "created_at": _iso(r.created_at), "decided_at": _iso(r.decided_at)} for r, slug in reports],
+        "game_history": await history.player_history(db, user.id),
     }
 
 
@@ -293,6 +296,12 @@ clubs.json          The clubs you belong to or were invited to, with your club r
                     Os clubes a que pertence e os convites recebidos, com o papel no clube.
 club_reports.json   The reports of club pages you made while logged in.
                     As denúncias de páginas de clubes que fez com sessão iniciada.
+game_history.json   The games you played, by your player ids at each field: the game, its
+                    teams and final totals, and the events that name your player id (a
+                    respawn, a tag scanned...); and the games you were checked in to from
+                    a registration. Kept as the field's game history (24 months at most).
+                    Os jogos em que participou: o jogo, as equipas, a pontuação final e os
+                    eventos com o seu identificador de jogador.
 
 Game events name players only by the field's pseudonymous player ids; yours
 are listed in player_ids.json. Positions never reach the site server.
@@ -309,7 +318,7 @@ def export_zip(data: dict[str, Any]) -> bytes:
         "registrations.json": data["registrations"],
         "chrono_records.json": data["chrono_records"], "marshal_keys.json": data["marshal_keys"],
         "scheduled_games.json": data["scheduled_games"], "clubs.json": data["clubs"],
-        "club_reports.json": data["club_reports"],
+        "club_reports.json": data["club_reports"], "game_history.json": data["game_history"],
     }
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as zf:
@@ -392,8 +401,8 @@ async def purge(db: AsyncSession, now: Optional[datetime] = None, dry_run: bool 
         or_(UserSession.expires_at < cutoff, UserSession.revoked_at < cutoff)))
     audit = await db.execute(delete(AuditLog).where(AuditLog.created_at < now - AUDIT_RETENTION))
     # A game with its events, counters, nodes and per-game roles (they cascade).
-    games = await db.execute(delete(Game).where(
-        func.coalesce(Game.ended_at, Game.controller_created_at) < now - GAME_RETENTION))
+    # Each field's game history retention (plan phase 20: field_history_settings, 24 months by default).
+    games = await db.execute(delete(Game).where(history.past_retention(now)))
     counts = {"sessions": sessions.rowcount or 0, "audit_log": audit.rowcount or 0, "games": games.rowcount or 0}
     counts.update(await _purge_chrono(db, now))
     # The schedule (plan phase 15): a scheduled game is game history once it has ended.

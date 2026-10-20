@@ -81,7 +81,7 @@ class AccessTests(PersonalDataTestCase):
         self.assertEqual(set(data), {"format", "generated_at", "user", "field_roles", "sessions", "audit_log",
                                      "audit_log_about_you", "consents", "games", "player_ids", "chrono_records",
                                      "marshal_keys", "scheduled_games", "registrations", "player_id_claims",
-                                     "clubs", "club_reports"})
+                                     "clubs", "club_reports", "game_history"})
         self.assertEqual(data["format"], "atalaia-personal-data/1")
         self.assertEqual((data["user"]["id"], data["user"]["username"], data["user"]["email"]),
                          (user["id"], "rita", "rita@example.pt"))
@@ -130,7 +130,7 @@ class AccessTests(PersonalDataTestCase):
                 "profile.json", "field_roles.json", "sessions.json", "audit_log.json", "audit_log_about_you.json",
                 "consents.json", "games.json", "player_ids.json", "chrono_records.json", "marshal_keys.json",
                 "scheduled_games.json", "registrations.json", "player_id_claims.json", "clubs.json",
-                "club_reports.json", "README.txt")))
+                "club_reports.json", "game_history.json", "README.txt")))
             files = {n: zf.read(n).decode("utf-8") for n in names}
         self.assertEqual(json.loads(files["export/profile.json"]), data["user"])
         self.assertEqual(json.loads(files["export/consents.json"]), data["consents"])

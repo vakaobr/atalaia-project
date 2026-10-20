@@ -18,6 +18,9 @@
     GET  /api/v1/sync/claims                   accounts' claims of player ids, waiting for this field's verdict
     GET  /api/v1/sync/field                    the field's branding and saved teams, images by SHA-256 (plan phase 18)
     GET  /api/v1/sync/images/{sha256}          one of those images, as stored (checked, metadata stripped)
+    GET  /api/v1/sync/presets                  the field's scenario library (id, revision, SHA-256) and game
+                                               presets (plan phase 20), the same for every controller of the field
+    GET  /api/v1/sync/scenarios/{scenario_id}  one scenario's current manifest
     WS   /api/v1/sync/stream   the POST bodies on one socket the controller keeps open; with the
                                controller's [sync] remote_gm on, also its hello, live view and
                                command results, and the remote GM's commands the other way (plan phase 19)
@@ -44,7 +47,7 @@ from fastapi.responses import JSONResponse, Response
 from .. import remote_gm, sync
 from ..auth import UNAUTHORISED, bearer
 from ..models import FieldApiKey
-from ..services import branding, registration
+from ..services import branding, library, registration
 
 router = APIRouter(prefix="/api/v1/sync", tags=["sync"])
 NO_STORE = {"Cache-Control": "no-store"}
@@ -188,6 +191,23 @@ async def field_image(sha256: str, request: Request) -> Response:
         return Response(image.data, media_type=image.content_type, headers={
             "ETag": f'"{image.sha256}"', "Cache-Control": "private, max-age=31536000, immutable",
             "Content-Disposition": "inline"})
+
+
+@router.get("/presets")
+async def library_presets(request: Request) -> JSONResponse:
+    async def build(db: Any, caller: sync.Caller) -> Any:
+        return await library.sync_answer(db, caller.field_id)
+    return await _pull(request, build)
+
+
+@router.get("/scenarios/{scenario_id}")
+async def library_scenario(scenario_id: str, request: Request) -> JSONResponse:
+    async def build(db: Any, caller: sync.Caller) -> Any:
+        answer = await library.sync_scenario(db, caller.field_id, scenario_id)
+        if answer is None:
+            raise sync.SyncProblem(404, "scenario_not_found")
+        return answer
+    return await _pull(request, build)
 
 
 # The remote GM's messages from the controller (plan phase 19); ``command`` goes the other way only.

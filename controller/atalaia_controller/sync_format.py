@@ -45,10 +45,15 @@ saved teams with their images by SHA-256 (``check_field``, in ``ANSWERS`` too).
 The remote GM (plan phase 19; P4R12): the stream's own messages, in ``STREAM``: the controller's ``hello``,
 ``live`` (its live game: never a position) and ``command.result``, and the site server's ``command``, one
 of ``REMOTE_COMMANDS`` (start, pause, resume, end, a GM message, a declared mode command) and nothing else.
+
+The scenario library (plan phase 20): the answers of ``GET /api/v1/sync/presets`` (the field's scenarios by
+id, revision and SHA-256, and its game presets: ``check_presets``) and ``GET /api/v1/sync/scenarios/{id}``
+(one manifest, its SHA-256 checked: ``check_scenario``), in ``ANSWERS``.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import re
@@ -935,12 +940,89 @@ def check_result(body: Any) -> dict[str, Any]:
 STREAM = {"hello": check_hello, "live": check_live, "command.result": check_result, "command": check_command}
 
 
+# --- the scenario library and presets (plan phase 20) -------------------------------------
+# The controller pulls the field's library (``GET /api/v1/sync/presets``): each scenario's id, revision and
+# the SHA-256 of its manifest, and the field's game presets whole; then each scenario whose manifest it has
+# not installed yet (``GET /api/v1/sync/scenarios/{id}``), which it compiles and checks again in its core.
+
+MAX_LIBRARY = 200            # scenarios, and presets, in one presets answer
+MANIFEST_MAX = 256 * 1024    # bytes of a manifest (scenarios.manifest.MANIFEST_MAX_BYTES)
+PRESET_NAME_MAX = 64         # a controller preset's name (api.py's save_preset)
+SCENARIO_ID = re.compile(r"[a-z0-9][a-z0-9_-]*(\.[a-z0-9][a-z0-9_-]*)+")
+SCENARIO_ID_MAX = 40         # a scenario's id leads a game's mode id: 63 - len("+org.atalaia.objectives")
+REVISION_MAX = 2**31 - 1
+
+
+def _scenario_ref(s: dict[str, Any], path: str) -> dict[str, Any]:
+    def at(key: str) -> str:
+        return f"{path}.{key}" if path else key
+    _text(s["scenario_id"], at("scenario_id"), SCENARIO_ID_MAX, pattern=SCENARIO_ID)
+    _int(s["revision"], at("revision"), 1, REVISION_MAX)
+    _text(s["sha256"], at("sha256"), 64, pattern=SHA256_HEX)
+    return s
+
+
+def check_presets(body: Any) -> dict[str, Any]:
+    """GET /api/v1/sync/presets' answer: the field's scenarios (id, revision, version, name, the SHA-256 of the
+    manifest's UTF-8 text) and its game presets (id, name, mode id, parameters)."""
+    body = _answer_envelope(body, ("scenarios", "presets"))
+    ids: set[str] = set()
+    for i, s in enumerate(_list(body["scenarios"], "scenarios", MAX_LIBRARY)):
+        path = f"scenarios[{i}]"
+        s = _obj(s, path)
+        _keys(s, path, ("scenario_id", "revision", "version", "name", "sha256"))
+        _scenario_ref(s, path)
+        if s["scenario_id"] in ids:
+            _fail("duplicate_scenario", f"{path}.scenario_id")
+        ids.add(s["scenario_id"])
+        _text(s["version"], f"{path}.version", 32)
+        _text(s["name"], f"{path}.name", 128)
+    names: set[str] = set()
+    presets: set[str] = set()
+    for i, p in enumerate(_list(body["presets"], "presets", MAX_LIBRARY)):
+        path = f"presets[{i}]"
+        p = _obj(p, path)
+        _keys(p, path, ("preset_id", "name", "mode_id", "params"))
+        _uuid(p["preset_id"], f"{path}.preset_id")
+        if p["preset_id"] in presets:
+            _fail("duplicate_preset", f"{path}.preset_id")
+        presets.add(p["preset_id"])
+        _text(p["name"], f"{path}.name", PRESET_NAME_MAX)
+        if p["name"] != p["name"].strip():
+            _fail("bad_text", f"{path}.name")
+        if p["name"] in names:
+            _fail("duplicate_preset", f"{path}.name")
+        names.add(p["name"])
+        _text(p["mode_id"], f"{path}.mode_id", 128, pattern=MODE_ID)
+        _obj(p["params"], f"{path}.params")
+        if _json_size(p["params"]) > MAX_PARAMS:
+            _fail("too_large", f"{path}.params")
+    return body
+
+
+def check_scenario(body: Any) -> dict[str, Any]:
+    """GET /api/v1/sync/scenarios/{id}'s answer: the scenario's current manifest, as it was saved (YAML or JSON
+    text, at most 256 KiB), whose UTF-8 bytes must hash to ``sha256``."""
+    body = _answer_envelope(body, ("scenario_id", "revision", "sha256", "manifest"))
+    _scenario_ref(body, "")
+    manifest = body["manifest"]
+    if not isinstance(manifest, str) or not manifest.strip():
+        _fail("not_a_text", "manifest")
+    raw = manifest.encode("utf-8", "surrogatepass")
+    if len(raw) > MANIFEST_MAX:
+        _fail("too_large", "manifest")
+    if hashlib.sha256(raw).hexdigest() != body["sha256"]:
+        _fail("sha256_mismatch", "sha256")
+    return body
+
+
 CHECKS = {"games": check_game, "events": check_events, "scores": check_scores, "nodes": check_nodes,
           "marshals": check_marshals, "replicas": check_replicas, "chrono": check_chrono,
           "checkins": check_checkins, "claims": check_claims}
 GAME_KINDS = ("games", "events", "scores", "nodes", "checkins")  # the bodies about one game; the rest are the field's
-# The answers of the GET endpoints the controller pulls (plan phases 16 and 18).
-ANSWERS = {"schedule": check_schedule, "roster": check_roster, "claims": check_claims_list, "field": check_field}
+# The answers of the GET endpoints the controller pulls (plan phases 16, 18 and 20).
+ANSWERS = {"schedule": check_schedule, "roster": check_roster, "claims": check_claims_list, "field": check_field,
+           "presets": check_presets, "scenario": check_scenario}
 
 
 def parse(kind: str, raw: bytes) -> dict[str, Any]:

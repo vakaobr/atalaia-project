@@ -84,3 +84,8 @@ form.report textarea { width: 100%; min-height: 6rem; font: inherit; color: inhe
 form.report button { margin-top: 1rem; padding: 0.5rem 1.25rem; border: 0; border-radius: 0.3rem;
                      background: var(--accent); color: var(--ground); font: inherit; font-weight: 600; }
 section.report-link { margin-top: 3rem; font-size: 0.9rem; color: var(--muted); }
+/* The public scoreboard (plan phase 20): one row per team, the score large. */
+table.scores { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+table.scores th, table.scores td { border-top: 1px solid var(--line); padding: 0.6rem 0; text-align: left; }
+table.scores td.score { text-align: right; font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+table.scores tr.winner th { color: var(--accent); }

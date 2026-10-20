@@ -1577,6 +1577,27 @@ to the controller with presets in `GET /api/v1/sync/presets`, where the
 controller installs and checks it again. Tests: `test_games.py`,
 `test_scenarios_api.py`.
 
+*Built 2026-10-20 (decisions S20-1 to S20-8, open; in software, tested
+against PostgreSQL in Docker and the real controller, not yet on a real
+deployment):* migration `0011_history` (written beside plan phase 19's
+`0010_firmware` and chained after it: `field_history_settings`,
+`game_score_samples`, `field_scenarios`, `field_scenario_revisions`,
+`field_presets`), models in `atalaia_server/history_models.py`;
+`api/history.py` and `services/history.py` (the field's history with
+filters, a game's score timeline from the per-node counters as they
+arrived, its event log by type, team and game time with counts per type;
+staff see everything, other roles a live game `spectator_delay_s` behind,
+60 s by default, without secrets, telemetry or player ids; the field's
+settings), `web/scoreboard.py` (`/f/<slug>/scoreboard` and `.json`, off
+by default), `api/scenarios.py` and `services/library.py` (check, save as
+revisions, read, archive; the field's game presets); `GET
+/api/v1/sync/presets` and `GET /api/v1/sync/scenarios/{id}`, checked by
+`sync_format.check_presets` and `check_scenario`. On the controller,
+`[sync] library = true` (the default) installs what changed with
+`scenario_service.install`, on every controller of the field, standby
+included (M8-3, S20-1). The person's game history is in access and export;
+ADR-P4-8's per-field history retention is `retention_days` (30-730).
+
 ---
 
 ## Plan phase 21: Hosted multi-tenant mode

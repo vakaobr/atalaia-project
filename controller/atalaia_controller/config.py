@@ -82,6 +82,8 @@
                                 # the gm role on the field there sees the live game and can start,
                                 # pause, resume and end it, send GM messages and declared mode
                                 # commands (plan phase 19, P4R12); every command is logged here
+    library = true              # install the field's scenario library and game presets from the
+                                # site server (plan phase 20), on every controller of the field
 
     [atak]                      # Cursor on Target for ATAK (ADR-P4-7 as amended, P4R18; atak.py)
     enabled = false
@@ -114,7 +116,7 @@ SECTIONS = {
     "mqtt": ("enabled", "host", "port", "username", "password"),
     "join": ("key",),
     "sync": ("enabled", "url", "api_key", "ca_file", "interval_game_s", "interval_idle_s", "timeout_s",
-             "branding", "remote_gm"),
+             "branding", "remote_gm", "library"),
     "checkin": ("field_id", "field_name", "operator", "confirm", "federation", "federation_label",
                 "max_replicas", "max_players", "chrono_valid_for", "rate_per_minute", "urls",
                 "wifi_ssid", "limit_template", "notice_version", "notice_pt", "notice_en",
@@ -192,6 +194,7 @@ class Config:
     sync_timeout_s: float = 15.0
     sync_branding: str = "local"  # "local" (the console's) or "site" (pulled from the site server)
     sync_remote_gm: bool = False  # the remote GM through the site server's stream (plan phase 19)
+    sync_library: bool = True  # pull the field's scenarios and presets from the site server (plan phase 20)
     # [atak]
     atak_enabled: bool = False
     atak_multicast: str = "239.2.3.1:6969"
