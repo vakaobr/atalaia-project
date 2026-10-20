@@ -65,7 +65,7 @@ to check, alternatives and what to avoid.
 | LoRa antenna | 868 MHz antenna, 2 dBi or less | The kit antenna (IPEX lead) is fine behind the plastic wall of the box. For more range: an SMA bulkhead with an IPEX-to-SMA pigtail and an outside antenna. A higher-gain antenna needs `ATALAIA_RADIO_ANTENNA_GAIN_DBI` changed to stay legal |
 | Team buttons | 2 (up to 4) x 60 mm arcade buttons, 5 V LED versions | Active-low, common ground. The firmware does not drive the button LEDs: they light from the 5 V rail whenever the box is on |
 | Keypad | 3x4 matrix membrane keypad | Codes, arming, admin PIN |
-| Keypad expander | PCF8574 I2C I/O expander module (not PCF8574A) | Addr 0x20; reads the keypad over the board I2C bus, which frees 7 GPIOs. A PCF8574A answers at 0x38 instead |
+| Keypad expander | PCF8574 (or PCF8574A) I2C I/O expander module | Addr 0x20-0x27 (a PCF8574A: 0x38-0x3F), found by the firmware; reads the keypad over the board I2C bus, which frees 7 GPIOs. Powered from 3V3, never 5V (its pull-ups would put 5 V on the bus) |
 | Display | 2.8" ILI9341 or ST7789 SPI TFT (320x240) | Kconfig selects the controller |
 | LED ring | WS2812B ring, 24 LEDs, 5 V | Data through the level shifter below; 1000 uF capacitor at the ring |
 | Level shifter | 74AHCT125 (or 74HCT125), DIP-14, with socket | 3.3 V data to 5 V for the LED ring. Not 74HC125 (needs a higher input voltage) |

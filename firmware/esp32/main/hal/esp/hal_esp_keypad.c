@@ -7,7 +7,9 @@
  * Wiring: rows on P0-P3 (active-low output), columns on P4-P6 (input
  * with internal pull-up), P7 unused (kept high). The PCF8574 sits on
  * the shared OLED I2C bus (GPIO 17/18) at CONFIG_ATALAIA_KP_I2C_ADDR
- * (default 0x20).
+ * (default 0x20), or wherever it answers: a PCF8574 at 0x20-0x27, a
+ * PCF8574A (sold under the same name) at 0x38-0x3F. The other parts on the
+ * bus are never probed: the NFC reader (0x24) and the board's OLED (0x3C).
  *
  * Uses the legacy driver/i2c.h API so NFC, battery and keypad can
  * share the same I2C port without conflicts.
@@ -59,6 +61,34 @@ static const char keymap[NUM_ROWS][NUM_COLS] = {
 /* ---- ops implementation ---- */
 
 static bool present;
+static uint8_t kp_addr = CONFIG_ATALAIA_KP_I2C_ADDR;
+
+/* Addresses of the bus's other parts, never taken for the keypad. */
+static bool reserved(uint8_t addr)
+{
+    return addr == 0x24 /* PN532 NFC */ || addr == 0x36 /* MAX17048 */ ||
+           addr == 0x3C /* SSD1306 OLED */;
+}
+
+/* The configured address first, then the PCF8574's and the PCF8574A's. */
+static bool find_expander(void)
+{
+    if (hal_esp_i2c_probe(CONFIG_ATALAIA_KP_I2C_ADDR)) {
+        kp_addr = CONFIG_ATALAIA_KP_I2C_ADDR;
+        return true;
+    }
+    static const uint8_t bases[] = {0x20, 0x38};
+    for (size_t b = 0; b < sizeof(bases); b++) {
+        for (uint8_t a = bases[b]; a < bases[b] + 8; a++) {
+            if (a == CONFIG_ATALAIA_KP_I2C_ADDR || reserved(a)) continue;
+            if (hal_esp_i2c_probe(a)) {
+                kp_addr = a;
+                return true;
+            }
+        }
+    }
+    return false;
+}
 
 static int esp_keypad_init(void)
 {
@@ -76,18 +106,25 @@ static int esp_keypad_init(void)
     gpio_config(&int_cfg);
 #endif
 
-    /* Set all pins high (idle / pull-up state). */
-    uint8_t all_high = 0xFF;
-    esp_err_t err = i2c_master_write_to_device(
-        CONFIG_ATALAIA_KP_I2C_PORT, CONFIG_ATALAIA_KP_I2C_ADDR, &all_high, 1, pdMS_TO_TICKS(100));
-    present = err == ESP_OK;
-    if (!present) {
+    if (!find_expander()) {
         /* Non-fatal: scan returns KEY_NONE and the box runs on its buttons. */
-        ESP_LOGW(TAG, "PCF8574 keypad not found at 0x%02X (%s): keypad disabled",
-                 CONFIG_ATALAIA_KP_I2C_ADDR, esp_err_to_name(err));
+        present = false;
+        ESP_LOGW(TAG, "PCF8574 keypad not found (0x%02X, 0x20-0x27, 0x38-0x3F): keypad disabled",
+                 CONFIG_ATALAIA_KP_I2C_ADDR);
         return -1;
     }
-    ESP_LOGI(TAG, "PCF8574 keypad at 0x%02X", CONFIG_ATALAIA_KP_I2C_ADDR);
+
+    /* Set all pins high (idle / pull-up state). */
+    uint8_t all_high = 0xFF;
+    esp_err_t err = i2c_master_write_to_device(CONFIG_ATALAIA_KP_I2C_PORT, kp_addr, &all_high, 1,
+                                               pdMS_TO_TICKS(100));
+    present = err == ESP_OK;
+    if (!present) {
+        ESP_LOGW(TAG, "PCF8574 keypad at 0x%02X did not take a write (%s): keypad disabled",
+                 kp_addr, esp_err_to_name(err));
+        return -1;
+    }
+    ESP_LOGI(TAG, "PCF8574 keypad at 0x%02X%s", kp_addr, kp_addr >= 0x38 ? " (PCF8574A)" : "");
     return 0;
 }
 
@@ -101,22 +138,22 @@ static char esp_keypad_scan(void)
          * Byte layout: P7 P6 P5 P4 P3 P2 P1 P0
          */
         uint8_t out = (uint8_t)(0xFF & ~(1u << r));
-        esp_err_t err = i2c_master_write_to_device(
-            CONFIG_ATALAIA_KP_I2C_PORT, CONFIG_ATALAIA_KP_I2C_ADDR, &out, 1, pdMS_TO_TICKS(10));
+        esp_err_t err = i2c_master_write_to_device(CONFIG_ATALAIA_KP_I2C_PORT, kp_addr, &out, 1,
+                                                   pdMS_TO_TICKS(10));
         if (err != ESP_OK) continue;
 
         /* Read back the port to see which columns were pulled low. */
         uint8_t in = 0xFF;
-        err = i2c_master_read_from_device(CONFIG_ATALAIA_KP_I2C_PORT, CONFIG_ATALAIA_KP_I2C_ADDR,
-                                          &in, 1, pdMS_TO_TICKS(10));
+        err = i2c_master_read_from_device(CONFIG_ATALAIA_KP_I2C_PORT, kp_addr, &in, 1,
+                                          pdMS_TO_TICKS(10));
         if (err != ESP_OK) continue;
 
         for (int c = 0; c < NUM_COLS; c++) {
             if (!(in & (1u << (c + 4)))) {
                 /* Key found -- restore idle state before returning. */
                 uint8_t idle = 0xFF;
-                i2c_master_write_to_device(CONFIG_ATALAIA_KP_I2C_PORT, CONFIG_ATALAIA_KP_I2C_ADDR,
-                                           &idle, 1, pdMS_TO_TICKS(10));
+                i2c_master_write_to_device(CONFIG_ATALAIA_KP_I2C_PORT, kp_addr, &idle, 1,
+                                           pdMS_TO_TICKS(10));
                 return keymap[r][c];
             }
         }
@@ -124,8 +161,7 @@ static char esp_keypad_scan(void)
 
     /* No key pressed -- restore idle state. */
     uint8_t idle = 0xFF;
-    i2c_master_write_to_device(CONFIG_ATALAIA_KP_I2C_PORT, CONFIG_ATALAIA_KP_I2C_ADDR, &idle, 1,
-                               pdMS_TO_TICKS(10));
+    i2c_master_write_to_device(CONFIG_ATALAIA_KP_I2C_PORT, kp_addr, &idle, 1, pdMS_TO_TICKS(10));
     return HAL_KEY_NONE;
 }
 

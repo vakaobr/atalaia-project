@@ -130,7 +130,7 @@ prices ([hardware overview](../README.md)).
 | 4 | 2.4 GHz FPC antenna with IPEX 1.0 lead | 1 | IPEX 1.0 connector, 2.4 GHz | Required: the kit has only the LoRa antenna |
 | 5 | 60 mm arcade button with LED | 2 (up to 4) | Microswitch with COM, NO and NC terminals; LED rated **5 V** | 12 V LED versions will be dim on 5 V; the LED is optional. Not waterproof: see [section 5](#5-enclosure-preparation). Industrial IP65 mushroom buttons are a sturdier alternative |
 | 6 | 3x4 membrane keypad, 7-pin | 1 | 12 keys (1-9, *, 0, #), 7-pin ribbon, self-adhesive back | Pin order varies by maker: you will identify it with a meter |
-| 7 | PCF8574 I/O expander module | 1 | Chip marked **PCF8574** (address 0x20-0x27), address jumpers A0-A2 | A **PCF8574A** answers at 0x38-0x3F and needs a firmware setting. Do **not** use an "LCD I2C backpack": its pins are wired to an LCD connector and a transistor |
+| 7 | PCF8574 I/O expander module | 1 | Chip marked **PCF8574** or **PCF8574A**, address jumpers A0-A2 | Listings sell both under one name: the firmware finds either (0x20-0x27, or 0x38-0x3F for the A). Power it from **3V3** even if the listing says 5V: its pull-ups go to its supply. Do **not** use an "LCD I2C backpack": its pins are wired to an LCD connector and a transistor |
 | 8 | 2.8" SPI TFT, 320x240, ILI9341 (or ST7789) | 1 | SPI interface (pins CS, RESET, DC, SDI/MOSI, SCK, LED); 3.3 V logic | Touch pins can stay unconnected. Note which controller it has: ST7789 needs a firmware setting |
 | 9 | WS2812B LED ring, 24 LEDs | 1 | 5 V, pads DIN / DOUT / 5V / GND | 12- or 16-LED rings work with a firmware setting (`LED_COUNT`) |
 | 10 | 74AHCT125 (or 74HCT125), DIP-14, plus a 14-pin socket | 1 | The letters **AHCT** or **HCT** | **Not** 74HC125 or 74AHC125: those need more than 3.3 V at the input when powered from 5 V |
@@ -807,7 +807,6 @@ again, then flash. Common changes:
 | V4.2 board | `CONFIG_ATALAIA_BOARD_HELTEC_V4_2=y` and `# CONFIG_ATALAIA_BOARD_HELTEC_V4_3 is not set` |
 | ST7789 display | `CONFIG_ATALAIA_DISP_ST7789=y` and `# CONFIG_ATALAIA_DISP_ILI9341 is not set` |
 | Backlight wired to 3V3 | `CONFIG_ATALAIA_DISP_BL_PIN=-1` |
-| PCF8574A expander | `CONFIG_ATALAIA_KP_I2C_ADDR=0x38` (or the address its jumpers give) |
 | 12- or 16-LED ring | `CONFIG_ATALAIA_LED_COUNT=12` (or 16) |
 | Antenna with more than 2 dBi | `CONFIG_ATALAIA_RADIO_ANTENNA_GAIN_DBI=` its gain, rounded **up** |
 | Two-team box, free the pins | `CONFIG_ATALAIA_BTN3_PIN=-1` and `CONFIG_ATALAIA_BTN4_PIN=-1` (optional) |

@@ -152,8 +152,11 @@ menu "Atalaia Field Box Configuration"
             depends on ATALAIA_KP_PCF8574
             default 0x20
             help
-                7-bit I2C address of the PCF8574 keypad expander.
-                Common values: 0x20-0x27 (A0-A2 address pins).
+                7-bit I2C address of the PCF8574 keypad expander, tried
+                first. Without an answer there the box looks for it at
+                0x20-0x27 (PCF8574, A0-A2 jumpers) and 0x38-0x3F
+                (PCF8574A, often sold under the same name), never at
+                0x24 (NFC), 0x36 (battery gauge) or 0x3C (OLED).
 
         config ATALAIA_KP_INT_PIN
             int "PCF8574 INT GPIO (-1 = poll)"
