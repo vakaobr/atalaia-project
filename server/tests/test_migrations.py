@@ -32,7 +32,8 @@ TABLES = {"fields", "users", "roles", "user_field_roles", "sessions", "audit_log
           "field_api_keys", "controllers", "games", "game_events", "game_node_scores", "game_nodes", "user_game_roles",
           "field_player_ids", "marshal_keys", "replicas", "chrono_readings", "chrono_rejects", "chrono_violations",
           "scheduled_games", "game_registrations", "registration_replicas", "player_id_claims",
-          "platform_links", "external_game_links"}
+          "platform_links", "external_game_links", "branding_images", "clubs", "club_members", "club_reports",
+          "field_teams"}
 
 SCHEMA_SQL = (
     ("columns", "SELECT table_name, column_name, data_type, is_nullable, column_default, character_maximum_length "
@@ -295,6 +296,45 @@ class MigrationTests(unittest.TestCase):
         command.downgrade(self.cfg, "0007_registration")
         self.assertNotIn("platform_links", self.tables())
         self.assertNotIn("external_game_links", self.tables())
+        self.db.fetch("DELETE FROM fields")
+
+    def test_0009_with_data(self) -> None:
+        """0009_clubs: a club with a member and a report, a field's branding and saved team, and back."""
+        command.upgrade(self.cfg, "0008_integrations")
+        field = self.db.fetch("INSERT INTO fields (name, slug) VALUES ('Campo', 'campo') RETURNING id")[0][0]
+        user = self.db.fetch("INSERT INTO users (username, password_hash) VALUES ('rita', 'x') RETURNING id")[0][0]
+        command.upgrade(self.cfg, "0009_clubs")
+        sha = "ab" * 32
+        self.db.fetch("INSERT INTO branding_images (sha256, content_type, width, height, bytes, data) "
+                      "VALUES ($1, 'image/png', 16, 16, 3, 'abc')", sha)
+        club = self.db.fetch("INSERT INTO clubs (name, short_name, slug, crest_sha256, created_by) "
+                             "VALUES ('Lobos', 'Lobos', 'lobos', $1, $2) RETURNING id", sha, user)[0][0]
+        self.assertEqual(self.db.fetch("SELECT public_page FROM clubs")[0][0], False)  # off by default
+        self.db.fetch("INSERT INTO club_members (club_id, user_id) VALUES ($1, $2)", club, user)
+        self.assertEqual(tuple(self.db.fetch("SELECT role, accepted_at FROM club_members")[0]), ("member", None))
+        with self.assertRaisesRegex(Exception, "ck_club_members_role"):
+            self.db.fetch("UPDATE club_members SET role = 'owner'")
+        with self.assertRaisesRegex(Exception, "ck_clubs_colour"):
+            self.db.fetch("UPDATE clubs SET colour = 'red'")
+        self.db.fetch("INSERT INTO club_reports (club_id, reason) VALUES ($1, 'rights')", club)
+        with self.assertRaisesRegex(Exception, "ck_field_teams_named"):
+            self.db.fetch("INSERT INTO field_teams (field_id) VALUES ($1)", field)
+        self.db.fetch("INSERT INTO field_teams (field_id, club_id) VALUES ($1, $2)", field, club)
+        self.db.fetch("UPDATE fields SET accent = '#1e6b3a', logo_sha256 = $1", sha)
+        with self.assertRaisesRegex(Exception, "ck_fields_accent"):
+            self.db.fetch("UPDATE fields SET accent = '#1E6B3A'")
+        with self.assertRaisesRegex(Exception, "fk_clubs_crest_sha256_branding_images"):
+            self.db.fetch("DELETE FROM branding_images")  # an image in use cannot go
+        self.db.fetch("DELETE FROM users")  # the account's membership goes; the club stays, unlinked
+        self.assertEqual(self.db.fetch("SELECT count(*) FROM club_members")[0][0], 0)
+        self.assertIsNone(self.db.fetch("SELECT created_by FROM clubs")[0][0])
+        self.db.fetch("DELETE FROM clubs")  # its reports and the fields' teams of it go with it
+        self.assertEqual(self.db.fetch("SELECT count(*) FROM club_reports")[0][0], 0)
+        self.assertEqual(self.db.fetch("SELECT count(*) FROM field_teams")[0][0], 0)
+        command.downgrade(self.cfg, "0008_integrations")
+        for table in ("clubs", "club_members", "club_reports", "field_teams", "branding_images"):
+            self.assertNotIn(table, self.tables())
+        self.assertEqual(self.db.fetch("SELECT name FROM fields")[0][0], "Campo")
         self.db.fetch("DELETE FROM fields")
 
     def test_one_linear_history(self) -> None:

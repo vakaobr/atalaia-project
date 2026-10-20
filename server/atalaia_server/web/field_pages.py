@@ -158,10 +158,10 @@ class Page:
         return " ".join(out)
 
     def render(self, request: Request, title: str, content: str, modified: datetime, head: str = "",
-               status_code: int = 200) -> Response:
+               status_code: int = 200, footer: Optional[str] = None) -> Response:
         body = TEMPLATES["page"].substitute(
             lang=self.lang, title=esc(title), head=head, language_label=esc(self.t["language"]),
-            languages=self.languages(), content=content, footer=esc(self.t["footer"]))
+            languages=self.languages(), content=content, footer=esc(footer or self.t["footer"]))
         return answer(request, body, HTML_TYPE, modified, CACHE_PAGE, status_code=status_code,
                       extra={"Content-Language": self.lang, "Vary": "Accept-Language"})
 

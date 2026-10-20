@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """ORM models (ADR-P4-1; migrations 0001_base, 0002_accounts, 0003_personal_data, 0004_sync, 0005_chrono,
-0006_scheduling, 0007_registration, 0008_integrations).
+0006_scheduling, 0007_registration, 0008_integrations, 0009_clubs).
 
 Fields, users, roles, per-field roles, sessions and the audit log, as
 ADR-P4-1 defines them, with plan phase 11's additions for accounts: the
@@ -19,7 +19,9 @@ the field page's columns on ``fields`` (``public_page``, ``description``, ``addr
 ``game_registrations``, ``registration_replicas``, ``player_id_claims``, the link from a scheduled
 game to the controller's game (``scheduled_games.controller_game``, ``walkins``) and the field's
 check-in rules for registering (``fields.limit_template``, ``max_replicas``); plan phase 17's platform
-adapters (migration 0008_integrations): ``platform_links`` and ``external_game_links``. A table that holds personal data must also be added to
+adapters (migration 0008_integrations): ``platform_links`` and ``external_game_links``; plan phase 18's
+clubs and branding (migration 0009_clubs, P4R19): ``branding_images``, ``clubs``, ``club_members``,
+``club_reports``, ``field_teams`` and the field's branding columns on ``fields``. A table that holds personal data must also be added to
 ``personal_data.py`` (access, export, erasure, the purge) in the same plan
 phase. Every later plan phase adds its own tables here and in
 its own Alembic migration; ``tests.test_migrations`` checks that the
@@ -93,8 +95,14 @@ class Field(Base):
     # max_replicas, so a pre-declared replica is one the field's check-in accepts.
     limit_template: Mapped[str] = mapped_column(String(32), nullable=False, server_default="portugal")
     max_replicas: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="5")
+    # The field's branding (plan phase 18, P4R19): what its controllers show with [sync] branding = "site".
+    branding_name: Mapped[Optional[str]] = mapped_column(String(48))
+    accent: Mapped[Optional[str]] = mapped_column(String(7))
+    logo_sha256: Mapped[Optional[str]] = mapped_column(ForeignKey("branding_images.sha256"))
+    wallpaper_sha256: Mapped[Optional[str]] = mapped_column(ForeignKey("branding_images.sha256"))
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _updated()
+    __table_args__ = (CheckConstraint("accent IS NULL OR accent ~ '^#[0-9a-f]{6}$'", name="accent"),)
 
 
 # Roles that need TOTP (ADR-P4-2): granting one to an account without TOTP fails, and they
@@ -731,3 +739,126 @@ class ExternalGameLink(Base):
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     last_error: Mapped[Optional[str]] = mapped_column(String(64))
     created_at: Mapped[datetime] = _created()
+
+
+# --- clubs and branding (plan phase 18, migration 0009_clubs; P4R19) -------------------
+
+CLUB_ROLES = ("admin", "member")
+REPORT_REASONS = ("rights", "offensive", "impersonation", "other")
+REPORT_STATUSES = ("open", "dismissed", "actioned")
+
+
+class BrandingImage(Base):
+    """An image checked by the controller's ``images.py`` (the same limits as the controller's uploads), stored
+    once as checked (metadata stripped) and named by the SHA-256 of those bytes, which controllers fetch it by.
+    Who uploaded it is in the audit log, not here; one no club, field or saved team uses is deleted by the daily
+    purge a day after its upload."""
+
+    __tablename__ = "branding_images"
+
+    sha256: Mapped[str] = mapped_column(String(64), primary_key=True)
+    content_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    width: Mapped[int] = mapped_column(Integer, nullable=False)
+    height: Mapped[int] = mapped_column(Integer, nullable=False)
+    bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = _created()
+
+
+class Club(Base):
+    """A club's profile: its name, the short name its teams carry on controllers, a description, a colour, a logo
+    and a crest. Its public page (``/c/<slug>/``) is off by default; a server administrator can hide it
+    (``hidden_at``), after a report or not."""
+
+    __tablename__ = "clubs"
+    __table_args__ = (
+        CheckConstraint("colour IS NULL OR colour ~ '^#[0-9a-f]{6}$'", name="colour"),
+        Index("idx_clubs_created_by", "created_by"),
+        Index("idx_clubs_hidden_by", "hidden_by"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    short_name: Mapped[str] = mapped_column(String(32), nullable=False)
+    slug: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    colour: Mapped[Optional[str]] = mapped_column(String(7))
+    logo_sha256: Mapped[Optional[str]] = mapped_column(ForeignKey("branding_images.sha256"))
+    crest_sha256: Mapped[Optional[str]] = mapped_column(ForeignKey("branding_images.sha256"))
+    public_page: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    hidden_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    hidden_reason: Mapped[Optional[str]] = mapped_column(String(512))
+    hidden_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = _created()
+    updated_at: Mapped[datetime] = _updated()
+
+
+class ClubMember(Base):
+    """An account's membership of a club, with its club role: ``admin`` edits the club and its members,
+    ``member`` is listed. A club admin invites an account by its username; it is a member once the person
+    accepts (``accepted_at``); an invitation not accepted goes after 30 days. Personal data
+    (``personal_data.py``)."""
+
+    __tablename__ = "club_members"
+    __table_args__ = (
+        UniqueConstraint("club_id", "user_id"),
+        CheckConstraint("role IN ('admin', 'member')", name="role"),
+        Index("idx_club_members_user", "user_id"),
+        Index("idx_club_members_added_by", "added_by"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    club_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("clubs.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    role: Mapped[str] = mapped_column(String(16), nullable=False, server_default="member")
+    added_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = _created()
+
+
+class ClubReport(Base):
+    """A report of a public club page (its report button): a reason and a text, the reporting account if
+    logged in (no address is kept), and the server administrator's decision."""
+
+    __tablename__ = "club_reports"
+    __table_args__ = (
+        CheckConstraint("reason IN ('rights', 'offensive', 'impersonation', 'other')", name="reason"),
+        CheckConstraint("status IN ('open', 'dismissed', 'actioned')", name="status"),
+        Index("idx_club_reports_status_created", "status", "created_at"),
+        Index("idx_club_reports_club", "club_id"),
+        Index("idx_club_reports_reporter", "reporter_id"),
+        Index("idx_club_reports_decided_by", "decided_by"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    club_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("clubs.id", ondelete="CASCADE"), nullable=False)
+    reason: Mapped[str] = mapped_column(String(16), nullable=False)
+    text: Mapped[Optional[str]] = mapped_column(Text)
+    reporter_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="open")
+    decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    decided_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = _created()
+
+
+class FieldTeam(Base):
+    """A field's saved team (a controller's team preset, BR14): a club's team (its short name and crest unless
+    the team sets its own) or a team of its own; the colour it usually plays. Synced to the field's controllers
+    with ``[sync] branding = "site"``. A club's deletion takes its teams with it."""
+
+    __tablename__ = "field_teams"
+    __table_args__ = (
+        CheckConstraint("name IS NOT NULL OR club_id IS NOT NULL", name="named"),
+        Index("idx_field_teams_field", "field_id"),
+        Index("idx_field_teams_club", "club_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    field_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), nullable=False)
+    club_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("clubs.id", ondelete="CASCADE"))
+    name: Mapped[Optional[str]] = mapped_column(String(32))
+    colour: Mapped[Optional[str]] = mapped_column(String(23))
+    crest_sha256: Mapped[Optional[str]] = mapped_column(ForeignKey("branding_images.sha256"))
+    created_at: Mapped[datetime] = _created()
+    updated_at: Mapped[datetime] = _updated()

@@ -1476,6 +1476,19 @@ saved teams; the controller fetches changed images and applies them
 when `[sync] branding = "site"` (default `"local"`). Tests on both sides,
 including a crest that follows a team to a second field's controller.
 
+*Built 2026-10-20 (decisions S18-1 to S18-12, open; in software, tested
+against PostgreSQL in Docker and the real controller, not yet on a real
+deployment):* migration `0009_clubs` (`branding_images`, `clubs`,
+`club_members` with invitations the person accepts, `club_reports`,
+`field_teams`, the field's branding columns); `api/clubs.py`,
+`api/branding.py`, `services/branding.py`, `web/club_pages.py`; `GET
+/api/v1/sync/field` and `GET /api/v1/sync/images/{sha256}` checked by
+`sync_format.check_field`; the controller's `[sync] branding`,
+`SyncClient._site_branding` and `Branding.apply_site`. A club's teams carry a
+`short_name` (32 characters at most, what fits a controller's team name);
+the field's branding name is its own setting (48, the poster's limit), not the
+field's name.
+
 ---
 
 ## Plan phase 19: Device health, firmware catalogue and remote GM

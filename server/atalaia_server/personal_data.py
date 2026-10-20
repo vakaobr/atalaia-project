@@ -28,6 +28,9 @@ What holds personal data now (plan phases 10-12):
 | ``player_id_claims`` (plan phase 16) | the person's claims of a phone's player id (``player_id_claims.json``) | deleted | 30 days after the claim was made |
 | imported ``game_registrations`` (plan phase 17: ``source`` not ``site``, no account) with their replicas | (no account: the field's staff see them in the game's list and its CSV export) | (no account to erase; the field answers a request from the person, as the data controller of what it imported) | deleted 30 days after the game, the guest rule (ADR-P4-8, ADR-P4-12) |
 | ``platform_links``, ``external_game_links`` (plan phase 17) | (the field's: no person in them) | | |
+| ``club_members`` (plan phase 18) | the person's clubs, club role and invitations (``clubs.json``) | deleted (a club whose last admin goes keeps its profile; a server administrator can still manage it) | an invitation not accepted, 30 days after it was made; a membership with the account |
+| ``club_reports`` (plan phase 18) | the reports the person made while logged in (``club_reports.json``; never an address) | kept for the moderation record, without the link to the account (reporter and deciding administrator) | 12 months after the decision (an open report stays until decided) |
+| ``clubs``, ``field_teams``, ``branding_images``, the field's branding columns (plan phase 18) | (a club's or a field's public profile: no person in them; who made a club is ``created_by``, unlinked at erasure) | ``created_by`` and ``hidden_by`` cleared | an image nothing uses, a day after its upload |
 
 The synced games (plan phase 13) come from field controllers and hold no
 account: their events carry only the field's pseudonymous player ids
@@ -60,6 +63,10 @@ another platform, with only the import's columns (any other column is never read
 the data controller for them and must have its own basis for that list (the import asks the staff
 to confirm it); they are guests, so the whole registration goes 30 days after its game.
 
+Clubs (plan phase 18) are organisations' public profiles; who belongs to one is the person's
+(``club_members``). A membership exists only once the invited person accepts it (decision S18-9).
+Reports of club pages keep the reporting account only when it was logged in, and never an address.
+
 Erasure is anonymisation, not deletion (ADR-P4-8): the ``users`` row stays
 under a random ``deleted-`` name with no email, no password and no consent,
 so the rows that point at it (the audit log; game, chrono and history rows
@@ -84,9 +91,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from . import chrono_registry
 from .audit import record
-from .models import (ROLE_BY_ID, AuditLog, ChronoReading, ChronoReject, Consent, Field, FieldPlayerId, Game,
-                     GameRegistration, MarshalKey, PlayerIdClaim, RegistrationReplica, Replica, ScheduledGame, User,
-                     UserFieldRole, UserGameRole, UserSession)
+from .models import (ROLE_BY_ID, AuditLog, ChronoReading, ChronoReject, Club, ClubMember, ClubReport, Consent, Field,
+                     FieldPlayerId, Game, GameRegistration, MarshalKey, PlayerIdClaim, RegistrationReplica, Replica,
+                     ScheduledGame, User, UserFieldRole, UserGameRole, UserSession)
+from .services import branding
 
 log = logging.getLogger("atalaia.server.purge")
 
@@ -106,6 +114,8 @@ GAME_RETENTION = timedelta(days=730)     # 24 months: game history, after the ga
 FEDERATION_RETENTION = timedelta(days=30)  # a registration's federation number, after the game (ADR-P4-11)
 CLAIM_RETENTION = timedelta(days=30)     # a claim of a phone's player id, after it was made
 GUEST_RETENTION = timedelta(days=30)     # an imported registration (no account), after its game (ADR-P4-8)
+INVITATION_RETENTION = timedelta(days=30)  # a club invitation not accepted, after it was made (plan phase 18)
+REPORT_RETENTION = timedelta(days=365)   # a club page report, after its decision (plan phase 18)
 
 
 def _iso(value: Optional[datetime]) -> Optional[str]:
@@ -165,6 +175,10 @@ async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.U
             reps[d.registration].append(d)
     claims = await db.scalars(select(PlayerIdClaim).where(PlayerIdClaim.user_id == user.id)
                               .order_by(PlayerIdClaim.created_at))
+    clubs = await db.execute(select(ClubMember, Club).join(Club, Club.id == ClubMember.club_id)
+                             .where(ClubMember.user_id == user.id).order_by(Club.slug))
+    reports = await db.execute(select(ClubReport, Club.slug).join(Club, Club.id == ClubReport.club_id)
+                               .where(ClubReport.reporter_id == user.id).order_by(ClubReport.created_at))
     return {
         "format": FORMAT,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -211,6 +225,11 @@ async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.U
         "scheduled_games": [{"id": str(g.id), "field_id": str(g.field_id), "field": name, "title": g.title,
                              "starts_at": _iso(g.starts_at), "ends_at": _iso(g.ends_at), "status": g.status,
                              "created_at": _iso(g.created_at)} for g, name in scheduled],
+        "clubs": [{"club_id": str(c.id), "slug": c.slug, "name": c.name, "role": m.role,
+                   "invited_at": _iso(m.created_at), "accepted_at": _iso(m.accepted_at),
+                   "created_by_you": c.created_by == user.id} for m, c in clubs],
+        "club_reports": [{"id": str(r.id), "club": slug, "reason": r.reason, "text": r.text, "status": r.status,
+                          "created_at": _iso(r.created_at), "decided_at": _iso(r.decided_at)} for r, slug in reports],
     }
 
 
@@ -268,6 +287,10 @@ scheduled_games.json
                     status). They are the field's and stay when you erase your account,
                     without your name.
                     Os jogos que marcou para um campo, como staff.
+clubs.json          The clubs you belong to or were invited to, with your club role.
+                    Os clubes a que pertence e os convites recebidos, com o papel no clube.
+club_reports.json   The reports of club pages you made while logged in.
+                    As denúncias de páginas de clubes que fez com sessão iniciada.
 
 Game events name players only by the field's pseudonymous player ids; yours
 are listed in player_ids.json. Positions never reach the site server.
@@ -283,7 +306,8 @@ def export_zip(data: dict[str, Any]) -> bytes:
         "player_ids.json": data["player_ids"], "player_id_claims.json": data["player_id_claims"],
         "registrations.json": data["registrations"],
         "chrono_records.json": data["chrono_records"], "marshal_keys.json": data["marshal_keys"],
-        "scheduled_games.json": data["scheduled_games"],
+        "scheduled_games.json": data["scheduled_games"], "clubs.json": data["clubs"],
+        "club_reports.json": data["club_reports"],
     }
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as zf:
@@ -334,6 +358,19 @@ async def erase(db: AsyncSession, user_id: uuid.UUID, reason: str = "user_reques
     # The field's schedule stays; who scheduled a game does not.
     await db.execute(update(ScheduledGame).where(ScheduledGame.created_by == user_id).values(created_by=None)
                      .execution_options(synchronize_session=False))
+    # Clubs (plan phase 18): memberships and invitations go; clubs, reports and the moderation record stay,
+    # without the links to the account.
+    await db.execute(delete(ClubMember).where(ClubMember.user_id == user_id))
+    await db.execute(update(ClubMember).where(ClubMember.added_by == user_id).values(added_by=None)
+                     .execution_options(synchronize_session=False))
+    await db.execute(update(Club).where(Club.created_by == user_id).values(created_by=None)
+                     .execution_options(synchronize_session=False))
+    await db.execute(update(Club).where(Club.hidden_by == user_id).values(hidden_by=None)
+                     .execution_options(synchronize_session=False))
+    await db.execute(update(ClubReport).where(ClubReport.reporter_id == user_id).values(reporter_id=None)
+                     .execution_options(synchronize_session=False))
+    await db.execute(update(ClubReport).where(ClubReport.decided_by == user_id).values(decided_by=None)
+                     .execution_options(synchronize_session=False))
     # The log keeps what happened, not where from: the person's addresses go.
     await db.execute(update(AuditLog).where(AuditLog.user_id == user_id, AuditLog.ip_address.is_not(None))
                      .values(ip_address=None))
@@ -371,6 +408,14 @@ async def purge(db: AsyncSession, now: Optional[datetime] = None, dry_run: bool 
         GameRegistration.source != "site", GameRegistration.user_id.is_(None),
         GameRegistration.scheduled_game.in_(guests_ended)))
     counts["imported_registrations"] = guests.rowcount or 0
+    # Clubs (plan phase 18): invitations never accepted, decided reports, then images nothing uses.
+    invitations = await db.execute(delete(ClubMember).where(ClubMember.accepted_at.is_(None),
+                                                            ClubMember.created_at < now - INVITATION_RETENTION))
+    counts["club_invitations"] = invitations.rowcount or 0
+    reports = await db.execute(delete(ClubReport).where(ClubReport.status != "open",
+                                                        ClubReport.decided_at < now - REPORT_RETENTION))
+    counts["club_reports"] = reports.rowcount or 0
+    counts["branding_images"] = await branding.purge_images(db, now)
     if dry_run:
         await db.rollback()
         return counts

@@ -16,6 +16,8 @@
     GET  /api/v1/sync/schedule?days=14         the field's published games of the coming days
     GET  /api/v1/sync/roster?scheduled_game_id= one scheduled game's live registrations
     GET  /api/v1/sync/claims                   accounts' claims of player ids, waiting for this field's verdict
+    GET  /api/v1/sync/field                    the field's branding and saved teams, images by SHA-256 (plan phase 18)
+    GET  /api/v1/sync/images/{sha256}          one of those images, as stored (checked, metadata stripped)
     WS   /api/v1/sync/stream   the POST bodies on one socket the controller keeps open
 
 The controller opens every connection (P4R12); nothing here connects to it.
@@ -34,12 +36,12 @@ from typing import Any, Awaitable, Callable
 
 from atalaia_controller import sync_format
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from .. import sync
 from ..auth import UNAUTHORISED, bearer
 from ..models import FieldApiKey
-from ..services import registration
+from ..services import branding, registration
 
 router = APIRouter(prefix="/api/v1/sync", tags=["sync"])
 NO_STORE = {"Cache-Control": "no-store"}
@@ -160,6 +162,29 @@ async def pending_claims(request: Request) -> JSONResponse:
     async def build(db: Any, caller: sync.Caller) -> Any:
         return await registration.pending_claims(db, caller.field_id)
     return await _pull(request, build)
+
+
+@router.get("/field")
+async def field_branding(request: Request) -> JSONResponse:
+    async def build(db: Any, caller: sync.Caller) -> Any:
+        return await branding.field_answer(db, caller.field_id)
+    return await _pull(request, build)
+
+
+@router.get("/images/{sha256}")
+async def field_image(sha256: str, request: Request) -> Response:
+    """An image the field's branding or saved teams use, by its SHA-256 (immutable: cached for a year)."""
+    async with request.app.state.sessionmaker() as db:
+        caller = await sync.authenticate(db, bearer(request))
+        if caller is None:
+            return JSONResponse({"detail": "invalid_api_key"}, status_code=401, headers=UNAUTHORISED)
+        image = await branding.field_image(db, caller.field_id, sha256)
+        await db.commit()  # the key's last use
+        if image is None:
+            return JSONResponse({"detail": "image_not_found"}, status_code=404, headers=NO_STORE)
+        return Response(image.data, media_type=image.content_type, headers={
+            "ETag": f'"{image.sha256}"', "Cache-Control": "private, max-age=31536000, immutable",
+            "Content-Disposition": "inline"})
 
 
 @router.websocket("/stream")

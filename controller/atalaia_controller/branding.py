@@ -16,6 +16,13 @@ it is personal data. Uploads are PNG, JPEG or WebP only, checked and
 stripped of metadata by images.py; the uploader is responsible for having
 the rights to them (the console says so).
 
+With ``[sync] branding = "site"`` (plan phase 18; P4R19) the field's
+branding and its saved teams come from the site server: the sync client
+fetches them and ``apply_site`` makes this controller's match, keeping the
+team presets it made in a setting (``branding.site_presets``, site team id
+to preset id). Then the console cannot change the field's branding nor those
+presets (409); presets made here stay the GM's.
+
 Images are stored once, by the SHA-256 of their checked bytes, which is
 also their ETag. A logo or wallpaper that is replaced is deleted at once
 when nothing else uses it; a crest that no game and no team preset refers
@@ -26,6 +33,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 import time
 from typing import TYPE_CHECKING, Any, Optional
@@ -37,9 +45,12 @@ from .engine import Conflict, ControllerError, NotFound, display_name
 if TYPE_CHECKING:
     from .engine import Controller
 
+log = logging.getLogger("atalaia.branding")
+
 ACCENT_RE = re.compile(r"#[0-9a-fA-F]{6}")
 SLOTS = {"logo": images.LOGO, "wallpaper": images.WALLPAPER}
 SETTING = "branding.field"
+SITE_PRESETS = "branding.site_presets"  # {site team id: team preset id} (plan phase 18)
 NAME_SETTING = "branding.field_name"  # only without check-in (the poster keeps the name otherwise)
 FIELD_NAME_MAX = 48
 CREST_MAX = 500           # crests kept at once (decision BR8)
@@ -60,6 +71,9 @@ class Branding:
         self.rate = RateLimit(240)  # public reads per address and minute
         self._last_purge = 0.0
         controller.branding = self
+        sync = getattr(controller, "sync", None)
+        if sync is not None:
+            sync.branding = self  # the site server's branding, with [sync] branding = "site"
 
     # --- the field --------------------------------------------------------------
 
@@ -108,8 +122,18 @@ class Branding:
         self.ctrl._emit({"type": "branding", "branding": view})
         return view
 
+    def from_site(self) -> bool:
+        """The field's branding and saved teams are the site server's (``[sync] branding = "site"``)."""
+        return bool(getattr(self.cfg, "sync_enabled", False)) and getattr(self.cfg, "sync_branding", "") == "site"
+
+    def _local_only(self) -> None:
+        if self.from_site():
+            raise Conflict("the field's branding comes from the site server ([sync] branding = \"site\"): "
+                           "change it there")
+
     def set_field(self, spec: dict[str, Any]) -> dict[str, Any]:
         """PUT /api/v1/field/branding {"field_name"?, "accent"?}: the GM's settings."""
+        self._local_only()
         unknown = set(spec) - {"field_name", "accent"}
         if unknown:
             raise ControllerError(f"unknown branding fields {sorted(unknown)} (images have their own endpoints)")
@@ -136,6 +160,7 @@ class Branding:
 
     def put_image(self, slot: str, data: bytes, content_type: str) -> dict[str, Any]:
         """PUT /api/v1/field/branding/{logo|wallpaper}: raw PNG, JPEG or WebP (images.check)."""
+        self._local_only()
         checked = images.check(data, content_type, SLOTS[slot])
         image_id = hashlib.sha256(checked.data).hexdigest()
         self.store.put_image(image_id, slot, checked.content_type, checked.width, checked.height, checked.data)
@@ -148,6 +173,7 @@ class Branding:
         return self._changed()
 
     def delete_image(self, slot: str) -> dict[str, Any]:
+        self._local_only()
         saved = self._saved()
         old = saved.pop(slot, None)
         self._save(saved)
@@ -218,6 +244,7 @@ class Branding:
             current = self.store.team_preset(preset_id)
             if current is None:
                 raise NotFound(f"no team preset {preset_id}")
+            self._not_site_preset(preset_id)
         name, colour, crest = self._preset_spec(spec, current)
         try:
             out = self.store.save_team_preset(name, colour, crest, preset_id)
@@ -231,19 +258,134 @@ class Branding:
         current = self.store.team_preset(preset_id)
         if current is None:
             raise NotFound(f"no team preset {preset_id}")
+        self._not_site_preset(preset_id)
         self.store.delete_team_preset(preset_id)
         if current["crest_id"]:
             self._drop_if_unused(current["crest_id"], grace=True)
         return {"deleted": preset_id}
 
+    def _not_site_preset(self, preset_id: int) -> None:
+        if self.from_site() and preset_id in self._site_presets().values():
+            raise Conflict("this team preset comes from the site server's saved teams: change it there")
+
     @staticmethod
-    def preset_view(p: dict[str, Any]) -> dict[str, Any]:
+    def preset_view(p: dict[str, Any], site: bool = False) -> dict[str, Any]:
         out = dict(p)
         out["crest_url"] = f"/api/v1/crests/{p['crest_id']}" if p.get("crest_id") else None
+        if site:
+            out["source"] = "site"
         return out
 
     def team_presets(self) -> list[dict[str, Any]]:
-        return [self.preset_view(p) for p in self.store.team_presets()]
+        site = set(self._site_presets().values()) if self.from_site() else set()
+        return [self.preset_view(p, p["id"] in site) for p in self.store.team_presets()]
+
+    # --- from the site server (plan phase 18) ------------------------------------------
+
+    def _site_presets(self) -> dict[str, int]:
+        try:
+            saved = json.loads(self.store.get_setting(SITE_PRESETS) or "{}")
+        except ValueError:
+            saved = {}
+        if not isinstance(saved, dict):
+            return {}
+        return {k: v for k, v in saved.items() if isinstance(k, str) and isinstance(v, int)}
+
+    def apply_site(self, answer: dict[str, Any], unavailable: Optional[set[str]] = None) -> dict[str, int]:
+        """Makes the field's branding and the site's team presets match the site server's answer (checked by
+        ``sync_format.check_field``; its images already in the store, except those in ``unavailable``, which
+        keep what was there). A preset made here with a site team's name becomes that team's. Returns the counts
+        of what changed; the console hears of a change as for a GM's edit."""
+        unavailable = unavailable or set()
+        out = {"field": 0, "added": 0, "updated": 0, "removed": 0, "conflicts": 0}
+        field = answer["field"]
+        saved = self._saved()
+        before = dict(saved)
+        replaced: list[str] = []  # a logo or wallpaper: deleted at once when unused (BR8)
+        dropped: list[str] = []   # crests: a day after their upload, as the console's
+        for slot in SLOTS:
+            ref = field[slot]
+            want = ref["sha256"] if ref is not None else None
+            if want is not None and (want in unavailable or self.store.image(want, with_data=False) is None):
+                continue  # not fetched yet: the next cycle tries again
+            if saved.get(slot) != want:
+                if saved.get(slot):
+                    replaced.append(saved[slot])
+                if want is None:
+                    saved.pop(slot, None)
+                else:
+                    saved[slot] = want
+        if field["accent"] is None:
+            saved.pop("accent", None)
+        else:
+            saved["accent"] = field["accent"]
+        if saved != before:
+            self._save(saved)
+            out["field"] += 1
+        name = field["field_name"]
+        if name is not None and name != self.field_name():
+            try:
+                if self.ctrl.checkin is not None:
+                    self.ctrl.checkin.set_poster({"field_name": name})
+                else:
+                    self.store.set_setting(NAME_SETTING, name)
+                out["field"] += 1
+            except ControllerError as exc:
+                log.warning("the site server's field name is not used: %s", exc)
+        out.update(self._apply_site_teams(answer["teams"], unavailable, dropped))
+        for image_id in replaced:
+            self._drop_if_unused(image_id)
+        for image_id in dropped:
+            self._drop_if_unused(image_id, grace=True)
+        if out["field"] or out["added"] or out["updated"] or out["removed"]:
+            self._changed()
+        return out
+
+    def _apply_site_teams(self, teams: list[dict[str, Any]], unavailable: set[str],
+                          dropped: list[str]) -> dict[str, int]:
+        out = {"added": 0, "updated": 0, "removed": 0, "conflicts": 0}
+        mapping = self._site_presets()
+        by_name = {p["name"]: p for p in self.store.team_presets()}
+        kept: dict[str, int] = {}
+        for team in teams:
+            crest = team["crest"]["sha256"] if team["crest"] is not None else None
+            current = self.store.team_preset(mapping[team["team_id"]]) if team["team_id"] in mapping else None
+            if current is None:
+                current = by_name.get(team["name"])  # one made here with that name becomes the site's
+            if crest is not None and (crest in unavailable or self.store.image(crest, with_data=False) is None):
+                crest = current["crest_id"] if current is not None else None
+            if current is not None and (current["name"], current["colour"], current["crest_id"]) == \
+                    (team["name"], team["colour"], crest):
+                kept[team["team_id"]] = current["id"]
+                continue
+            try:
+                row = self.store.save_team_preset(team["name"], team["colour"], crest,
+                                                  current["id"] if current is not None else None)
+            except ValueError:
+                out["conflicts"] += 1  # another preset already has the name: it is left alone
+                log.warning("site team %s: a team preset named %r already exists", team["team_id"], team["name"])
+                if current is not None:
+                    kept[team["team_id"]] = current["id"]
+                continue
+            kept[team["team_id"]] = row["id"]
+            if current is None:
+                out["added"] += 1
+            else:
+                out["updated"] += 1
+                if current["crest_id"] and current["crest_id"] != crest:
+                    dropped.append(current["crest_id"])
+        for team_id, preset_id in mapping.items():
+            if team_id in kept or preset_id in kept.values():
+                continue
+            gone = self.store.team_preset(preset_id)
+            if gone is not None:
+                self.store.delete_team_preset(preset_id)
+                out["removed"] += 1
+                if gone["crest_id"]:
+                    dropped.append(gone["crest_id"])
+        if kept != mapping:
+            self.store.set_setting(SITE_PRESETS, json.dumps(kept, sort_keys=True))
+        return out
 
     def game_teams(self, game_id: int) -> dict[str, Any]:
         """GET /api/v1/games/{id}/teams: each team's colour, display name and crest (no token: an Android

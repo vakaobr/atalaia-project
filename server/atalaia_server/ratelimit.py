@@ -13,6 +13,7 @@
 - 5 failed TOTP codes for one account in 15 minutes lock that account's TOTP
   checks for 15 minutes.
 - 10 registrations from one IP address an hour.
+- 5 reports of club pages from one IP address an hour (plan phase 18).
 - 100 API requests a minute from one IP address (``RequestLimitMiddleware``);
   the health check is not counted, so an uptime monitor never trips it.
 
@@ -136,11 +137,13 @@ class Limits:
         self.totp = Lockout(5, 15 * 60, 15 * 60, clock)           # per account
         self.register = Lockout(10, 3600, 3600, clock)            # per IP address (each one counts)
         self.requests = RequestLimit(100, 60, clock)              # per IP address
+        self.reports = RequestLimit(5, 3600, clock)               # club page reports per IP address (plan phase 18)
 
 
 UNLIMITED_PATHS = ("/api/v1/health",)
-# The API and the public field pages and feeds (plan phase 15) share the per-address limit.
-LIMITED_PREFIXES = ("/api/", "/f/")
+# The API, the public field pages and feeds (plan phase 15) and the club pages (plan phase 18) share the
+# per-address limit.
+LIMITED_PREFIXES = ("/api/", "/f/", "/c/")
 
 
 def client_ip(scope: dict[str, Any]) -> str:

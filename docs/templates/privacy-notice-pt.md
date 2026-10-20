@@ -40,6 +40,7 @@ instruções, ao abrigo de um acordo de subcontratação.]
 | [Quando o campo as usar:] leituras do cronógrafo das tuas réplicas, assinadas por quem fez a cronografagem | A segurança de quem joga (limites de potência das réplicas) | O nosso interesse legítimo na segurança (f)) |
 | [Quando o campo a usar:] a partilha das tuas leituras do cronógrafo com outros campos | Para outro campo ver o histórico de uma réplica | O teu consentimento à parte, por campo, que podes retirar (a)) |
 | [Quando o campo o usar:] o teu número de federado numa inscrição | Quando as regras do campo para um jogo o exigem; nunca é verificado automaticamente | [A confirmar na revisão jurídica: as regras do campo para esse jogo] |
+| [Quando o servidor tiver clubes:] os clubes a que pertences (o clube e o teu papel nele) e os convites que recebeste; as denúncias de páginas de clubes que fizeste com sessão iniciada (nunca o teu endereço) | Mostrar quem pertence a um clube e permitir a quem o administra geri-lo; moderar as páginas públicas dos clubes | O teu consentimento para a conta (a)); para as denúncias, o nosso interesse legítimo em moderar páginas públicas (f)) |
 
 A tua posição no campo (GPS) **nunca chega a este servidor**: o controlador
 do jogo no campo usa-a só durante o jogo e apaga-a quando o jogo acaba. O que
@@ -60,6 +61,9 @@ perfis, e não tomamos decisões automatizadas sobre ti.
 | Leituras do cronógrafo | [365 dias] |
 | Histórico dos jogos | [24 meses] |
 | Dados de inscrição de quem não tem conta | 30 dias depois do jogo |
+| Pertença a clubes | Até saíres do clube ou apagares a conta |
+| Convites de clubes não aceites | 30 dias |
+| Denúncias de páginas de clubes | 12 meses depois da decisão |
 
 O servidor apaga todos os dias o que passou destes prazos.
 

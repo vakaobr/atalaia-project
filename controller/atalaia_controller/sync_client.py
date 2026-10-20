@@ -53,6 +53,17 @@ without these endpoints (an older one) is skipped quietly. The site server
 never sends anything into a running game: a roster pulled after the start is
 not applied.
 
+**Branding** (plan phase 18; P4R19): with ``[sync] branding = "site"`` the
+client then pulls the field's branding and saved teams (``GET
+/api/v1/sync/field``) and each image the store does not have yet by its
+SHA-256 (``GET /api/v1/sync/images/{sha256}``). An image must hash to the
+SHA-256 it was asked for and pass ``images.check`` with the same limits as
+an upload to the console, stripped bytes unchanged; then ``Branding.apply_site``
+makes the field's branding and the site's team presets match the answer.
+With ``"local"`` (the default) nothing is pulled and the console's branding
+stays the controller's own. A site server without these endpoints is
+skipped quietly, as for game day.
+
 **Never sent:** positions (P4R25), check-in names and federation numbers,
 tokens, the game, join and token keys, private keys. The bodies carry the fields listed in
 protocol/sync.md only; a node's info goes through a list of allowed keys, and
@@ -84,7 +95,7 @@ import uuid
 from typing import Any, Callable, Optional
 from urllib.parse import urlsplit
 
-from . import __version__
+from . import __version__, images
 from .sync_format import (ANSWERS, MAX_EVENTS, MAX_MARSHALS, MAX_READINGS, MAX_REPLICAS, MAX_ROSTER, SYNC_VERSION,
                           SyncFormatError, check_checkins, check_claims, check_event, check_marshal, check_nodes,
                           check_reading, check_replica)
@@ -100,6 +111,8 @@ FIELD_RUN = re.compile(r"field-(\d{1,6})")
 LIVE = ("running", "paused")
 SCHEDULE_DAYS = 14
 UNSUPPORTED = (404, 405, 501)  # an older site server without the game-day endpoints
+UNSUPPORTED_CODES = ("Not Found", "Method Not Allowed", "http_404", "http_405", "http_501")
+IMAGES_PER_CYCLE = 50  # branding images fetched in one cycle; the rest in the next ones
 
 
 def api_key_ok(key: str) -> bool:
@@ -200,10 +213,18 @@ class HttpTransport:
             "Authorization": self._auth, "Accept": "application/json", "User-Agent": self.user_agent})
         return self._send(req)
 
-    def _send(self, req: urllib.request.Request) -> dict[str, Any]:
+    def get_bytes(self, path: str, limit: int) -> bytes:
+        """A raw download (a branding image, plan phase 18), at most ``limit`` bytes (more: ``too_large``)."""
+        req = urllib.request.Request(self.base_url + path, method="GET", headers={
+            "Authorization": self._auth, "User-Agent": self.user_agent})
+        raw = self._send(req, raw_limit=limit)
+        assert isinstance(raw, bytes)
+        return raw
+
+    def _send(self, req: urllib.request.Request, raw_limit: Optional[int] = None) -> Any:
         try:
             with self._opener.open(req, timeout=self.timeout_s) as resp:
-                raw = resp.read(1024 * 1024)
+                raw = resp.read((raw_limit + 1) if raw_limit is not None else 1024 * 1024)
         except urllib.error.HTTPError as exc:
             try:
                 detail = json.loads(exc.read(64 * 1024) or b"{}")
@@ -216,6 +237,10 @@ class HttpTransport:
                             detail) from None
         except (urllib.error.URLError, http.client.HTTPException, OSError, ValueError) as exc:
             raise SyncError("unreachable", detail=str(getattr(exc, "reason", exc))) from None
+        if raw_limit is not None:
+            if len(raw) > raw_limit:
+                raise SyncError("too_large")
+            return raw
         try:
             answer = json.loads(raw)
         except ValueError:
@@ -230,10 +255,12 @@ class SyncClient:
 
     def __init__(self, cfg: Any, store: Any, *, api_key: Optional[str] = None,
                  transport: Optional[Any] = None, wall: Callable[[], float] = time.time,
-                 checkin: Optional[Any] = None) -> None:
+                 checkin: Optional[Any] = None, branding: Optional[Any] = None) -> None:
         self.cfg = cfg
         self.store = store
         self.checkin = checkin  # checkin.Checkin: applies rosters and makes outcomes (plan phase 16)
+        # branding.Branding: applies the site's branding (plan phase 18); a Branding made later sets it itself.
+        self.branding = branding
         key, source = (api_key, "given") if api_key else resolve_api_key(cfg, store)
         self.key_source = source
         self.key_fingerprint = key_fingerprint(key) if key else None
@@ -257,6 +284,10 @@ class SyncClient:
         self.game_day_supported = True
         self.schedule_pulled_at: Optional[float] = None
         self.claims_answered = 0
+        self.branding_supported = True
+        self.branding_pulled_at: Optional[float] = None
+        self.branding_error: Optional[str] = None
+        self.images_fetched = 0
 
     # --- identity ---------------------------------------------------------------------
 
@@ -339,6 +370,7 @@ class SyncClient:
                     self._sync_game(game)
                 self._sync_registry()
                 self._game_day()
+                self._site_branding()
             except SyncError as exc:
                 self.failures += 1
                 self.retry_after = exc.retry_after
@@ -699,6 +731,75 @@ class SyncClient:
                               code, where)
             self.store.mark_synced("checkins", {item: sha})
 
+    # --- branding and saved teams (plan phase 18) ------------------------------------------
+
+    def _site_branding(self) -> None:
+        """With ``[sync] branding = "site"``: the field's branding and saved teams, then the images missing here."""
+        if getattr(self.cfg, "sync_branding", "local") != "site" or self.branding is None \
+                or not hasattr(self.transport, "get"):
+            return
+        self.pulls += 1
+        try:
+            answer = self.transport.get("/api/v1/sync/field")
+        except SyncError as exc:
+            if exc.status in UNSUPPORTED and exc.code in UNSUPPORTED_CODES:
+                if self.branding_supported:
+                    log.info("the site server has no branding sync: skipped")
+                self.branding_supported = False
+                return
+            raise
+        self.branding_supported = True
+        try:
+            answer = ANSWERS["field"](answer)
+        except SyncFormatError as exc:
+            raise SyncError("bad_answer", detail=str(exc)) from None
+        wanted: dict[str, tuple[str, dict[str, Any]]] = {}  # sha256 -> (kind, ref)
+        for slot in ("logo", "wallpaper"):
+            if answer["field"][slot] is not None:
+                wanted.setdefault(answer["field"][slot]["sha256"], (slot, answer["field"][slot]))
+        for team in answer["teams"]:
+            if team["crest"] is not None:
+                wanted.setdefault(team["crest"]["sha256"], ("crest", team["crest"]))
+        missing = [sha for sha in wanted if self.store.image(sha, with_data=False) is None]
+        failed = set()
+        for sha in missing[:IMAGES_PER_CYCLE]:
+            kind, ref = wanted[sha]
+            if not self._fetch_image(sha, kind, ref):
+                failed.add(sha)
+        failed |= set(missing[IMAGES_PER_CYCLE:])
+        self.branding_error = f"{len(failed)} images not fetched yet" if failed else None
+        self.branding.apply_site(answer, unavailable=failed)
+        self.branding_pulled_at = self._wall()
+
+    def _fetch_image(self, sha: str, kind: str, ref: dict[str, Any]) -> bool:
+        """One image by its SHA-256: it must hash to it and pass ``images.check`` unchanged (the site server
+        stores images as checked, so checking them again strips nothing)."""
+        self.pulls += 1
+        limits = images.KINDS[kind]
+        try:
+            data = self.transport.get_bytes(f"/api/v1/sync/images/{sha}", limits.max_bytes)
+        except SyncError as exc:
+            if exc.status == 404 or exc.code == "too_large":
+                log.warning("branding image %s (%s) not fetched: %s", sha[:12], kind, exc.code)
+                return False
+            raise
+        problem = None
+        if hashlib.sha256(data).hexdigest() != sha:
+            problem = "its SHA-256 differs"
+        else:
+            try:
+                checked = images.check(data, ref["content_type"], limits)
+                if checked.data != data:
+                    problem = "it was not stripped as the controller strips it"
+            except images.ImageError as exc:
+                problem = str(exc)
+        if problem:
+            log.error("branding image %s (%s) from the site server refused: %s", sha[:12], kind, problem)
+            return False
+        self.store.put_image(sha, kind, checked.content_type, checked.width, checked.height, checked.data)
+        self.images_fetched += 1
+        return True
+
     # --- what is sent -------------------------------------------------------------------
 
     def meta(self, game: dict[str, Any]) -> dict[str, Any]:
@@ -782,4 +883,7 @@ class SyncClient:
                 "refused_readings": self.refused_readings,
                 "game_day": {"supported": self.game_day_supported, "schedule_pulled_at": self.schedule_pulled_at,
                              "linked_games": len(self.store.schedule_links()),
-                             "claims_answered": self.claims_answered}}
+                             "claims_answered": self.claims_answered},
+                "branding": {"source": getattr(self.cfg, "sync_branding", "local"),
+                             "supported": self.branding_supported, "pulled_at": self.branding_pulled_at,
+                             "error": self.branding_error, "images_fetched": self.images_fetched}}

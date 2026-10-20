@@ -32,15 +32,15 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from . import __version__, integrations, personal_data
-from .api import (auth, chrono, fields, games, health, integrations as integrations_api, me, registration_import,
-                  registrations, scheduling, sync)
+from .api import (auth, branding, chrono, clubs, fields, games, health, integrations as integrations_api, me,
+                  registration_import, registrations, scheduling, sync)
 from .config import Settings, redact_url
 from .db import make_engine, make_sessionmaker
 from .ratelimit import Limits, RequestLimitMiddleware
 from .security_headers import SecurityHeadersMiddleware
 from .tokens import Keys, UsedTokens
 from .totp import SeedBox
-from .web import field_pages
+from .web import club_pages, field_pages
 
 log = logging.getLogger("atalaia.server")
 
@@ -94,7 +94,10 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.include_router(registration_import.router)  # before registrations' /registrations/{reg_id}
     app.include_router(registrations.router)
     app.include_router(integrations_api.router)
+    app.include_router(branding.router)
+    app.include_router(clubs.router)
     app.include_router(field_pages.router)
+    app.include_router(club_pages.router)
     return app
 
 

@@ -72,3 +72,15 @@ dl.details dd { margin: 0; overflow-wrap: anywhere; }
 }
 footer { margin-top: 3rem; padding-block: 1rem 2rem; color: var(--muted); font-size: 0.85rem;
          border-top: 1px solid var(--line); }
+/* Club pages (plan phase 18): the club's colour as a band, its crest and logo, the report form. */
+.club-band { height: 0.5rem; border-radius: 0.25rem; margin-top: 0.5rem; }
+.club-images { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin: 1rem 0 0; }
+.club-images img { max-height: 6rem; max-width: 100%; height: auto; width: auto; }
+.short-name { color: var(--muted); margin-top: -0.75rem; }
+form.report fieldset { border: 1px solid var(--line); border-radius: 0.3rem; padding: 0.5rem 1rem; }
+form.report label { display: block; margin: 0.25rem 0; }
+form.report textarea { width: 100%; min-height: 6rem; font: inherit; color: inherit; background: transparent;
+                       border: 1px solid var(--line); border-radius: 0.3rem; padding: 0.5rem; }
+form.report button { margin-top: 1rem; padding: 0.5rem 1.25rem; border: 0; border-radius: 0.3rem;
+                     background: var(--accent); color: var(--ground); font: inherit; font-weight: 600; }
+section.report-link { margin-top: 3rem; font-size: 0.9rem; color: var(--muted); }

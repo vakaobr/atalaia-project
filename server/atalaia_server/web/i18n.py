@@ -65,6 +65,26 @@ STRINGS: dict[str, dict[str, str]] = {
         "reg_data": "O campo recebe o nome escolhido para o jogo, a preferência de equipa, o número de federado "
                     "(se o jogo o pedir) e as réplicas declaradas, e apaga-os 30 dias depois do jogo.",
         "reg_unavailable": "As inscrições para este jogo não estão abertas, ou já não há lugares.",
+        # Club pages (plan phase 18)
+        "club_footer": "Página pública do clube, feita pelo servidor Atalaia.",
+        "club_logo": "Logótipo de {club}",
+        "club_crest": "Emblema de {club}",
+        "report": "Denunciar esta página",
+        "report_title": "Denunciar: {club}",
+        "report_intro": "Se esta página usa imagens ou nomes sem autorização, é ofensiva ou se faz passar por outra "
+                        "pessoa ou clube, avise a administração deste servidor, que pode escondê-la.",
+        "report_reason": "Motivo",
+        "reason_rights": "Imagens ou nomes usados sem autorização",
+        "reason_offensive": "Conteúdo ofensivo",
+        "reason_impersonation": "Faz-se passar por outra pessoa ou clube",
+        "reason_other": "Outro motivo",
+        "report_text": "Detalhes (opcional, até 1000 caracteres)",
+        "report_send": "Enviar a denúncia",
+        "report_privacy": "O endereço de quem denuncia não é guardado.",
+        "report_done": "A denúncia foi enviada à administração do servidor. Agradecemos o aviso.",
+        "report_invalid": "A denúncia não foi aceite: escolha um motivo e escreva até 1000 caracteres.",
+        "report_too_many": "Demasiadas denúncias a partir deste endereço. Tente mais tarde.",
+        "back_club": "Voltar a {club}",
     },
     "en": {
         "upcoming": "Upcoming games",
@@ -114,6 +134,26 @@ STRINGS: dict[str, dict[str, str]] = {
         "reg_data": "The field gets the name you choose for the game, your team preference, your federation number "
                     "(if the game asks for one) and the declared replicas, and erases them 30 days after the game.",
         "reg_unavailable": "Registration for this game is not open, or there are no places left.",
+        # Club pages (plan phase 18)
+        "club_footer": "The club's public page, made by the Atalaia server.",
+        "club_logo": "{club}'s logo",
+        "club_crest": "{club}'s crest",
+        "report": "Report this page",
+        "report_title": "Report: {club}",
+        "report_intro": "If this page uses images or names without permission, is offensive or impersonates another "
+                        "person or club, tell this server's administrators, who can hide it.",
+        "report_reason": "Reason",
+        "reason_rights": "Images or names used without permission",
+        "reason_offensive": "Offensive content",
+        "reason_impersonation": "Impersonates another person or club",
+        "reason_other": "Another reason",
+        "report_text": "Details (optional, up to 1000 characters)",
+        "report_send": "Send the report",
+        "report_privacy": "The reporter's address is not kept.",
+        "report_done": "The report went to the server's administrators. Thank you for telling us.",
+        "report_invalid": "The report was not accepted: choose a reason and write up to 1000 characters.",
+        "report_too_many": "Too many reports from this address. Try again later.",
+        "back_club": "Back to {club}",
     },
 }
 LANGUAGE_NAMES = {"pt": "Português", "en": "English"}

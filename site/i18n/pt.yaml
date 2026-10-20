@@ -621,7 +621,7 @@ roadmap:
     title: Servidor do clube e jogo avançado
     short: >-
       Servidor do clube, marcação de jogos e inscrições, cenários personalizados, modos avançados,
-      ATAK. Começada: modos avançados (Mestre e Satélites, o Terminal de Hacking, VIP / Carga e as regras das Janelas de Alvo), o motor dos cenários personalizados e o seu compilador, os utilitários geográficos no núcleo, o feed ATAK, e as contas, os direitos sobre os dados pessoais, a sincronização, o registo de cronógrafo e a marcação de jogos com páginas públicas, feeds e inscrições do servidor do clube estão feitos em software.
+      ATAK. Começada: modos avançados (Mestre e Satélites, o Terminal de Hacking, VIP / Carga e as regras das Janelas de Alvo), o motor dos cenários personalizados e o seu compilador, os utilitários geográficos no núcleo, o feed ATAK, e as contas, os direitos sobre os dados pessoais, a sincronização, o registo de cronógrafo, a marcação de jogos com páginas públicas, feeds e inscrições, e os perfis de clube com a sincronização da imagem do campo, do servidor do clube, estão feitos em software.
     text: >-
       Servidor do clube (contas, histórico dos jogos, registo de cronografagem, marcação de jogos,
       inscrições e publicação), cenários personalizados, modos avançados (zonas mestre e satélites,
@@ -658,7 +658,10 @@ roadmap:
       abertos iCalendar e JSON dos jogos (sem dados pessoais), e as inscrições nesses jogos com
       réplicas declaradas e um bilhete de check-in: o controlador de campo recebe a lista e devolve
       quem veio; a inscrição pela aplicação, e a importação de uma lista de inscrições (CSV ou JSON)
-      exportada de outra plataforma.
+      exportada de outra plataforma; e os perfis de clube (nome, cor, logótipo e emblema, membros,
+      uma página pública desligada por omissão com um botão para denunciar e moderação), com a imagem
+      do campo e as equipas guardadas sincronizadas com os seus controladores, para que o emblema de
+      um clube chegue a todos os campos que guardaram a sua equipa.
     gate: >-
       Prova: um <a href="{{ page.to.glossary }}#glossario-milsim">milsim</a> de fim de semana decorre do princípio ao fim
       com a Atalaia.

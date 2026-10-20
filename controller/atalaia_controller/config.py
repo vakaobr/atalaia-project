@@ -76,6 +76,8 @@
     interval_game_s = 30.0      # between syncs while a game runs
     interval_idle_s = 300.0     # between games; failures double the wait, up to interval_idle_s
     timeout_s = 15.0            # per request
+    branding = "local"          # "site": the field's branding and saved teams come from the site
+                                # server (plan phase 18) and the console cannot change them
 
     [atak]                      # Cursor on Target for ATAK (ADR-P4-7 as amended, P4R18; atak.py)
     enabled = false
@@ -107,7 +109,8 @@ SECTIONS = {
     "api": ("host", "port", "gm_token", "read_token", "tls_port", "tls_dir", "tls_names"),
     "mqtt": ("enabled", "host", "port", "username", "password"),
     "join": ("key",),
-    "sync": ("enabled", "url", "api_key", "ca_file", "interval_game_s", "interval_idle_s", "timeout_s"),
+    "sync": ("enabled", "url", "api_key", "ca_file", "interval_game_s", "interval_idle_s", "timeout_s",
+             "branding"),
     "checkin": ("field_id", "field_name", "operator", "confirm", "federation", "federation_label",
                 "max_replicas", "max_players", "chrono_valid_for", "rate_per_minute", "urls",
                 "wifi_ssid", "limit_template", "notice_version", "notice_pt", "notice_en",
@@ -183,6 +186,7 @@ class Config:
     sync_interval_game_s: float = 30.0
     sync_interval_idle_s: float = 300.0
     sync_timeout_s: float = 15.0
+    sync_branding: str = "local"  # "local" (the console's) or "site" (pulled from the site server)
     # [atak]
     atak_enabled: bool = False
     atak_multicast: str = "239.2.3.1:6969"
@@ -273,6 +277,8 @@ def _check_sync(cfg: "Config") -> None:
                           "the second")
     if not 1.0 <= cfg.sync_timeout_s <= 300.0:
         raise ConfigError("sync.timeout_s must be 1-300 seconds")
+    if cfg.sync_branding not in ("local", "site"):
+        raise ConfigError("sync.branding must be 'local' (the console's) or 'site' (the site server's)")
 
 
 def _check_atak(cfg: "Config") -> None:

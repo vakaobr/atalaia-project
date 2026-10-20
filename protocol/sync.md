@@ -5,9 +5,9 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Controller sync
 
-How a field controller pushes its games to a site server: the games' metadata, their event logs, their score counters and their nodes; the field's chrono registry: the marshals' public keys, the replica registry and the signed chrono readings (plan phase 14); and game day (plan phase 16): the schedule and rosters it pulls, the registrations' outcomes and the claims' verdicts it pushes. Design: ADR-P4-3 and ADR-P4-5 with their 2026-10-19 amendments in `docs/phase-4-site-server/ADR.md`; decisions P4R10-P4R15, S13-1 onwards, S14-1 onwards and S16-1 onwards in `docs/review/decisions-to-review.md`.
+How a field controller pushes its games to a site server: the games' metadata, their event logs, their score counters and their nodes; the field's chrono registry: the marshals' public keys, the replica registry and the signed chrono readings (plan phase 14); game day (plan phase 16): the schedule and rosters it pulls, the registrations' outcomes and the claims' verdicts it pushes; and branding (plan phase 18): the field's branding and saved teams it pulls with `[sync] branding = "site"`. Design: ADR-P4-3 and ADR-P4-5 with their 2026-10-19 amendments in `docs/phase-4-site-server/ADR.md`; decisions P4R10-P4R15, S13-1 onwards, S14-1 onwards, S16-1 onwards and S18-1 onwards in `docs/review/decisions-to-review.md`.
 
-Implementations: `controller/atalaia_controller/sync_client.py` (the controller's client) and `server/atalaia_server/sync.py` with `api/sync.py` (the site server). Both check bodies with the same plain-Python module, `controller/atalaia_controller/sync_format.py`, and both are tested against the shared vectors in [`vectors/sync.json`](vectors/sync.json): 14 valid bodies, 65 invalid ones with the error code and path they must fail with, 3 score merges worked out by hand, and under `answers` 4 valid and 14 invalid answers of the endpoints the controller pulls (`sync_format.ANSWERS`). The site server verifies each chrono reading with the controller's own `controller/atalaia_controller/chrono.py` (`server/atalaia_server/chrono_verify.py`), against [`vectors/chrono_record.json`](vectors/chrono_record.json) too.
+Implementations: `controller/atalaia_controller/sync_client.py` (the controller's client) and `server/atalaia_server/sync.py` with `api/sync.py` (the site server). Both check bodies with the same plain-Python module, `controller/atalaia_controller/sync_format.py`, and both are tested against the shared vectors in [`vectors/sync.json`](vectors/sync.json): 14 valid bodies, 65 invalid ones with the error code and path they must fail with, 3 score merges worked out by hand, and under `answers` 6 valid and 23 invalid answers of the endpoints the controller pulls (`sync_format.ANSWERS`). The site server verifies each chrono reading with the controller's own `controller/atalaia_controller/chrono.py` (`server/atalaia_server/chrono_verify.py`), against [`vectors/chrono_record.json`](vectors/chrono_record.json) too.
 
 ## The link
 
@@ -216,6 +216,31 @@ Once a game made from a scheduled game has ended (and again only if it changes):
 | `registrations` | array | at most 5,000 of `{registration_id, player_id, outcome, declarations, ticket_sha256?}` |
 
 `outcome` is `checked_in` (the player came) or `no_show`; `declarations` are up to 20 `{declaration_id, state, reading_id?}` with the final states of [checkin.md](checkin.md) (`pending`, `passed`, `refused`, `withdrawn`). `ticket_sha256` only for a registration the controller had from the app and not from a roster: the site server applies it only if it is that registration's ticket. Never a name, a team preference or a federation number. Answer: `200 {"linked": true|false, "applied": n, "ignored": n, "declarations": n}`; an unknown scheduled game is `linked: false`, not an error.
+
+## Branding and saved teams (plan phase 18)
+
+P4R19. Only a controller with `[sync] branding = "site"` pulls these (the default, `"local"`, keeps the console's branding); it does so after game day in each cycle, and skips a site server without them (`404`, `405`). The field's branding and saved teams are edited on the site server by the field's staff; a saved team is a club's team (the club's short name and crest unless the team sets its own) or one of the field's own.
+
+### GET /api/v1/sync/field
+
+`200 {"sync_version": 1, "field": {...}, "teams": [...]}`, checked on both sides with `sync_format.check_field`:
+
+| Field | Type | Values |
+| --- | --- | --- |
+| `field.field_name` | text or null | 1-48 characters, no control characters, no space at either end: the controller's field name (its check-in poster's); null keeps the controller's own |
+| `field.accent` | text or null | `#rrggbb`, lower-case |
+| `field.logo`, `field.wallpaper` | image or null | see below |
+| `teams` | array | at most 200 `{team_id, name, colour, crest, club}`; each `team_id` (UUID) and each `name` once |
+| `teams[].name` | text | 1-32 characters: the team preset's display name |
+| `teams[].colour` | text or null | the colour the team usually plays, a team name as games use it (1-23 bytes, no spaces) |
+| `teams[].crest` | image or null | a crest |
+| `teams[].club` | object or null | `{slug, name}` of the club whose team it is |
+
+An image is `{sha256, content_type, width, height, bytes}`: the SHA-256 (64 lower-case hex) of the image as the site server stores it (checked by `controller/atalaia_controller/images.py`, metadata stripped), `image/png`, `image/jpeg` or `image/webp`, and its size within the limits of its kind (logo: 16-2048 px, 1 MiB; wallpaper: 320-4096 px, 4 MiB; crest: 16-1024 px, 512 KiB).
+
+### GET /api/v1/sync/images/{sha256}
+
+The image's bytes with its `Content-Type`, for an image the field's branding or one of its saved teams uses (any other: `404 {"detail": "image_not_found"}`, whatever another field uses). The controller fetches only images it does not have, at most 50 a cycle, and stores one only if its bytes hash to the SHA-256 asked for and `images.check` accepts them with the limits of their kind without changing them; otherwise it keeps what it had and tries again in the next cycle. It then makes its field branding and its site-made team presets match the answer: a preset made on the controller with a site team's name becomes that team's; a team gone from the answer loses its preset. With `"site"` the console cannot change the field's branding nor those presets (`409`); the GM's own presets stay the GM's.
 
 ## WS /api/v1/sync/stream
 

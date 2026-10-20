@@ -38,6 +38,9 @@ no names) and ``check_claims`` (its verdicts on accounts' claims of player ids:
 no hashes), and the answers of the three endpoints it pulls, in ``ANSWERS``
 (``check_schedule``, ``check_roster``, ``check_claims_list``), which the site
 server's tests check its own answers with.
+
+Branding (plan phase 18; P4R19): the answer of ``GET /api/v1/sync/field``, the field's branding and
+saved teams with their images by SHA-256 (``check_field``, in ``ANSWERS`` too).
 """
 
 from __future__ import annotations
@@ -48,7 +51,7 @@ import re
 import uuid
 from typing import Any
 
-from . import chrono
+from . import chrono, images
 
 SYNC_VERSION = 1
 MAX_EVENTS = 500            # events per batch
@@ -716,12 +719,83 @@ def check_claims(body: Any) -> dict[str, Any]:
     return body
 
 
+# --- branding and saved teams (plan phase 18; P4R19) -----------------------------------------
+#
+# With ``[sync] branding = "site"`` the controller pulls its field's branding and saved teams
+# (``GET /api/v1/sync/field``) and each image it does not have yet by its SHA-256
+# (``GET /api/v1/sync/images/{sha256}``), which it checks again with ``images.py`` and the same limits.
+
+MAX_SYNC_TEAMS = 200        # saved teams in one field answer
+FIELD_NAME_MAX = 48         # the poster's field name (checkin_poster.FIELD_NAME_MAX, branding.FIELD_NAME_MAX)
+TEAM_DISPLAY_MAX = 32       # a team's display name (engine.TEAM_DISPLAY_MAX)
+ACCENT = re.compile(r"#[0-9a-f]{6}")
+CLUB_SLUG = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?")
+
+
+def check_image_ref(value: Any, path: str, kind: str) -> Any:
+    """An image as the field answer names it: its SHA-256, type, size in pixels and bytes, within the limits
+    ``images.py`` sets for its kind (logo, wallpaper, crest); or null."""
+    if value is None:
+        return None
+    ref = _obj(value, path)
+    _keys(ref, path, ("sha256", "content_type", "width", "height", "bytes"))
+    _text(ref["sha256"], f"{path}.sha256", 64, pattern=SHA256_HEX)
+    if ref["content_type"] not in images.TYPES:
+        _fail("bad_type", f"{path}.content_type")
+    lim = images.KINDS[kind]
+    _int(ref["width"], f"{path}.width", lim.min_side, lim.max_side)
+    _int(ref["height"], f"{path}.height", lim.min_side, lim.max_side)
+    _int(ref["bytes"], f"{path}.bytes", 1, lim.max_bytes)
+    return ref
+
+
+def check_field(body: Any) -> dict[str, Any]:
+    """GET /api/v1/sync/field's answer: the field's branding (name, accent, logo, wallpaper) and its saved teams
+    (a display name, the colour they usually play, a crest, the club they are), images by SHA-256."""
+    body = _answer_envelope(body, ("field", "teams"))
+    f = _obj(body["field"], "field")
+    _keys(f, "field", (), ("field_name", "accent", "logo", "wallpaper"))
+    name = _text(f.setdefault("field_name", None), "field.field_name", FIELD_NAME_MAX, null=True)
+    if name is not None and name != name.strip():
+        _fail("bad_text", "field.field_name")
+    _text(f.setdefault("accent", None), "field.accent", 7, null=True, pattern=ACCENT)
+    for slot in ("logo", "wallpaper"):
+        check_image_ref(f.setdefault(slot, None), f"field.{slot}", slot)
+    ids: set[str] = set()
+    names: set[str] = set()
+    for i, t in enumerate(_list(body["teams"], "teams", MAX_SYNC_TEAMS)):
+        path = f"teams[{i}]"
+        t = _obj(t, path)
+        _keys(t, path, ("team_id", "name"), ("colour", "crest", "club"))
+        _uuid(t["team_id"], f"{path}.team_id")
+        if t["team_id"] in ids:
+            _fail("duplicate_team", f"{path}.team_id")
+        ids.add(t["team_id"])
+        _text(t["name"], f"{path}.name", TEAM_DISPLAY_MAX)
+        if t["name"] != t["name"].strip():
+            _fail("bad_text", f"{path}.name")
+        if t["name"] in names:
+            _fail("duplicate_team", f"{path}.name")
+        names.add(t["name"])
+        colour = _team(t.setdefault("colour", None), f"{path}.colour", null=True)
+        if colour is not None and " " in colour:
+            _fail("bad_text", f"{path}.colour")
+        check_image_ref(t.setdefault("crest", None), f"{path}.crest", "crest")
+        club = t.setdefault("club", None)
+        if club is not None:
+            club = _obj(club, f"{path}.club")
+            _keys(club, f"{path}.club", ("slug", "name"))
+            _text(club["slug"], f"{path}.club.slug", 128, pattern=CLUB_SLUG)
+            _text(club["name"], f"{path}.club.name", 128)
+    return body
+
+
 CHECKS = {"games": check_game, "events": check_events, "scores": check_scores, "nodes": check_nodes,
           "marshals": check_marshals, "replicas": check_replicas, "chrono": check_chrono,
           "checkins": check_checkins, "claims": check_claims}
 GAME_KINDS = ("games", "events", "scores", "nodes", "checkins")  # the bodies about one game; the rest are the field's
-# The answers of the GET endpoints the controller pulls (plan phase 16).
-ANSWERS = {"schedule": check_schedule, "roster": check_roster, "claims": check_claims_list}
+# The answers of the GET endpoints the controller pulls (plan phases 16 and 18).
+ANSWERS = {"schedule": check_schedule, "roster": check_roster, "claims": check_claims_list, "field": check_field}
 
 
 def parse(kind: str, raw: bytes) -> dict[str, Any]:

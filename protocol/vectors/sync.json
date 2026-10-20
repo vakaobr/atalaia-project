@@ -1,5 +1,5 @@
 {
- "description": "Controller sync bodies (protocol/sync.md). Every valid body passes its kind's check (games, events, scores, nodes, marshals, replicas, chrono, checkins, claims); nodes_unknown_info_dropped keeps only the info keys listed under info. Every invalid body fails with the error code and path given (the first problem found, in the order of protocol/sync.md's tables). merge: the snapshots merged in order by maximum per (source, team) give counters, and the totals are the counters' sum per team plus the deltas (GM adjustments, score.delta), worked out by hand from protocol/sync.md's rule (decision P4R10). The chrono bodies use the marshal test key and records of chrono_record.json: chrono_readings verifies on the site server once marshals_with_a_rotated_key is stored (its second key is that test key, valid from 1792000000). answers (plan phase 16): the answers of the GET endpoints the controller pulls (schedule, roster, claims), each valid one passing sync_format.ANSWERS[kind] and each invalid one failing with its error and path; the site server's own answers are checked with the same functions in its tests.",
+ "description": "Controller sync bodies (protocol/sync.md). Every valid body passes its kind's check (games, events, scores, nodes, marshals, replicas, chrono, checkins, claims); nodes_unknown_info_dropped keeps only the info keys listed under info. Every invalid body fails with the error code and path given (the first problem found, in the order of protocol/sync.md's tables). merge: the snapshots merged in order by maximum per (source, team) give counters, and the totals are the counters' sum per team plus the deltas (GM adjustments, score.delta), worked out by hand from protocol/sync.md's rule (decision P4R10). The chrono bodies use the marshal test key and records of chrono_record.json: chrono_readings verifies on the site server once marshals_with_a_rotated_key is stored (its second key is that test key, valid from 1792000000). answers (plan phases 16 and 18): the answers of the GET endpoints the controller pulls (schedule, roster, claims, and field: the branding and saved teams, images by SHA-256), each valid one passing sync_format.ANSWERS[kind] and each invalid one failing with its error and path; the site server's own answers are checked with the same functions in its tests.",
  "valid": [
   {
    "name": "game_minimal",
@@ -10151,6 +10151,70 @@
       }
      ]
     }
+   },
+   {
+    "name": "field",
+    "kind": "field",
+    "body": {
+     "sync_version": 1,
+     "field": {
+      "field_name": "Campo Norte",
+      "accent": "#1e6b3a",
+      "logo": {
+       "sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "content_type": "image/png",
+       "width": 512,
+       "height": 256,
+       "bytes": 48211
+      },
+      "wallpaper": {
+       "sha256": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+       "content_type": "image/jpeg",
+       "width": 1920,
+       "height": 1080,
+       "bytes": 901234
+      }
+     },
+     "teams": [
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c001",
+       "name": "Lobos",
+       "colour": "red",
+       "crest": {
+        "sha256": "3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d",
+        "content_type": "image/webp",
+        "width": 256,
+        "height": 256,
+        "bytes": 12040
+       },
+       "club": {
+        "slug": "lobos-do-pinhal",
+        "name": "Lobos do Pinhal Airsoft Clube"
+       }
+      },
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c002",
+       "name": "Corvos",
+       "colour": null,
+       "crest": null,
+       "club": null
+      }
+     ]
+    }
+   },
+   {
+    "name": "field_empty",
+    "kind": "field",
+    "body": {
+     "sync_version": 1,
+     "field": {
+      "field_name": null,
+      "accent": null,
+      "logo": null,
+      "wallpaper": null
+     },
+     "teams": []
+    }
    }
   ],
   "invalid": [
@@ -10685,6 +10749,475 @@
     },
     "error": "unknown_field",
     "path": "claims[0].player_secret"
+   },
+   {
+    "name": "field_accent_upper_case",
+    "kind": "field",
+    "body": {
+     "sync_version": 1,
+     "field": {
+      "field_name": "Campo Norte",
+      "accent": "#1E6B3A",
+      "logo": {
+       "sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "content_type": "image/png",
+       "width": 512,
+       "height": 256,
+       "bytes": 48211
+      },
+      "wallpaper": {
+       "sha256": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+       "content_type": "image/jpeg",
+       "width": 1920,
+       "height": 1080,
+       "bytes": 901234
+      }
+     },
+     "teams": [
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c001",
+       "name": "Lobos",
+       "colour": "red",
+       "crest": {
+        "sha256": "3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d",
+        "content_type": "image/webp",
+        "width": 256,
+        "height": 256,
+        "bytes": 12040
+       },
+       "club": {
+        "slug": "lobos-do-pinhal",
+        "name": "Lobos do Pinhal Airsoft Clube"
+       }
+      },
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c002",
+       "name": "Corvos",
+       "colour": null,
+       "crest": null,
+       "club": null
+      }
+     ]
+    },
+    "error": "bad_text",
+    "path": "field.accent"
+   },
+   {
+    "name": "field_logo_sha256_not_hex",
+    "kind": "field",
+    "body": {
+     "sync_version": 1,
+     "field": {
+      "field_name": "Campo Norte",
+      "accent": "#1e6b3a",
+      "logo": {
+       "sha256": "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+       "content_type": "image/png",
+       "width": 512,
+       "height": 256,
+       "bytes": 48211
+      },
+      "wallpaper": {
+       "sha256": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+       "content_type": "image/jpeg",
+       "width": 1920,
+       "height": 1080,
+       "bytes": 901234
+      }
+     },
+     "teams": [
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c001",
+       "name": "Lobos",
+       "colour": "red",
+       "crest": {
+        "sha256": "3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d",
+        "content_type": "image/webp",
+        "width": 256,
+        "height": 256,
+        "bytes": 12040
+       },
+       "club": {
+        "slug": "lobos-do-pinhal",
+        "name": "Lobos do Pinhal Airsoft Clube"
+       }
+      },
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c002",
+       "name": "Corvos",
+       "colour": null,
+       "crest": null,
+       "club": null
+      }
+     ]
+    },
+    "error": "bad_text",
+    "path": "field.logo.sha256"
+   },
+   {
+    "name": "field_wallpaper_too_narrow",
+    "kind": "field",
+    "body": {
+     "sync_version": 1,
+     "field": {
+      "field_name": "Campo Norte",
+      "accent": "#1e6b3a",
+      "logo": {
+       "sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "content_type": "image/png",
+       "width": 512,
+       "height": 256,
+       "bytes": 48211
+      },
+      "wallpaper": {
+       "sha256": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+       "content_type": "image/jpeg",
+       "width": 319,
+       "height": 1080,
+       "bytes": 901234
+      }
+     },
+     "teams": [
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c001",
+       "name": "Lobos",
+       "colour": "red",
+       "crest": {
+        "sha256": "3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d",
+        "content_type": "image/webp",
+        "width": 256,
+        "height": 256,
+        "bytes": 12040
+       },
+       "club": {
+        "slug": "lobos-do-pinhal",
+        "name": "Lobos do Pinhal Airsoft Clube"
+       }
+      },
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c002",
+       "name": "Corvos",
+       "colour": null,
+       "crest": null,
+       "club": null
+      }
+     ]
+    },
+    "error": "out_of_range",
+    "path": "field.wallpaper.width"
+   },
+   {
+    "name": "field_logo_svg",
+    "kind": "field",
+    "body": {
+     "sync_version": 1,
+     "field": {
+      "field_name": "Campo Norte",
+      "accent": "#1e6b3a",
+      "logo": {
+       "sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "content_type": "image/svg+xml",
+       "width": 512,
+       "height": 256,
+       "bytes": 48211
+      },
+      "wallpaper": {
+       "sha256": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+       "content_type": "image/jpeg",
+       "width": 1920,
+       "height": 1080,
+       "bytes": 901234
+      }
+     },
+     "teams": [
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c001",
+       "name": "Lobos",
+       "colour": "red",
+       "crest": {
+        "sha256": "3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d",
+        "content_type": "image/webp",
+        "width": 256,
+        "height": 256,
+        "bytes": 12040
+       },
+       "club": {
+        "slug": "lobos-do-pinhal",
+        "name": "Lobos do Pinhal Airsoft Clube"
+       }
+      },
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c002",
+       "name": "Corvos",
+       "colour": null,
+       "crest": null,
+       "club": null
+      }
+     ]
+    },
+    "error": "bad_type",
+    "path": "field.logo.content_type"
+   },
+   {
+    "name": "field_crest_over_512_kib",
+    "kind": "field",
+    "body": {
+     "sync_version": 1,
+     "field": {
+      "field_name": "Campo Norte",
+      "accent": "#1e6b3a",
+      "logo": {
+       "sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "content_type": "image/png",
+       "width": 512,
+       "height": 256,
+       "bytes": 48211
+      },
+      "wallpaper": {
+       "sha256": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+       "content_type": "image/jpeg",
+       "width": 1920,
+       "height": 1080,
+       "bytes": 901234
+      }
+     },
+     "teams": [
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c001",
+       "name": "Lobos",
+       "colour": "red",
+       "crest": {
+        "sha256": "3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d",
+        "content_type": "image/webp",
+        "width": 256,
+        "height": 256,
+        "bytes": 524289
+       },
+       "club": {
+        "slug": "lobos-do-pinhal",
+        "name": "Lobos do Pinhal Airsoft Clube"
+       }
+      },
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c002",
+       "name": "Corvos",
+       "colour": null,
+       "crest": null,
+       "club": null
+      }
+     ]
+    },
+    "error": "out_of_range",
+    "path": "teams[0].crest.bytes"
+   },
+   {
+    "name": "field_duplicate_team_id",
+    "kind": "field",
+    "body": {
+     "sync_version": 1,
+     "field": {
+      "field_name": "Campo Norte",
+      "accent": "#1e6b3a",
+      "logo": {
+       "sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "content_type": "image/png",
+       "width": 512,
+       "height": 256,
+       "bytes": 48211
+      },
+      "wallpaper": {
+       "sha256": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+       "content_type": "image/jpeg",
+       "width": 1920,
+       "height": 1080,
+       "bytes": 901234
+      }
+     },
+     "teams": [
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c001",
+       "name": "Lobos",
+       "colour": "red",
+       "crest": {
+        "sha256": "3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d",
+        "content_type": "image/webp",
+        "width": 256,
+        "height": 256,
+        "bytes": 12040
+       },
+       "club": {
+        "slug": "lobos-do-pinhal",
+        "name": "Lobos do Pinhal Airsoft Clube"
+       }
+      },
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c001",
+       "name": "Corvos",
+       "colour": null,
+       "crest": null,
+       "club": null
+      }
+     ]
+    },
+    "error": "duplicate_team",
+    "path": "teams[1].team_id"
+   },
+   {
+    "name": "field_duplicate_team_name",
+    "kind": "field",
+    "body": {
+     "sync_version": 1,
+     "field": {
+      "field_name": "Campo Norte",
+      "accent": "#1e6b3a",
+      "logo": {
+       "sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "content_type": "image/png",
+       "width": 512,
+       "height": 256,
+       "bytes": 48211
+      },
+      "wallpaper": {
+       "sha256": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+       "content_type": "image/jpeg",
+       "width": 1920,
+       "height": 1080,
+       "bytes": 901234
+      }
+     },
+     "teams": [
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c001",
+       "name": "Lobos",
+       "colour": "red",
+       "crest": {
+        "sha256": "3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d",
+        "content_type": "image/webp",
+        "width": 256,
+        "height": 256,
+        "bytes": 12040
+       },
+       "club": {
+        "slug": "lobos-do-pinhal",
+        "name": "Lobos do Pinhal Airsoft Clube"
+       }
+      },
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c002",
+       "name": "Lobos",
+       "colour": null,
+       "crest": null,
+       "club": null
+      }
+     ]
+    },
+    "error": "duplicate_team",
+    "path": "teams[1].name"
+   },
+   {
+    "name": "field_team_name_too_long",
+    "kind": "field",
+    "body": {
+     "sync_version": 1,
+     "field": {
+      "field_name": "Campo Norte",
+      "accent": "#1e6b3a",
+      "logo": {
+       "sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "content_type": "image/png",
+       "width": 512,
+       "height": 256,
+       "bytes": 48211
+      },
+      "wallpaper": {
+       "sha256": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+       "content_type": "image/jpeg",
+       "width": 1920,
+       "height": 1080,
+       "bytes": 901234
+      }
+     },
+     "teams": [
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c001",
+       "name": "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL",
+       "colour": "red",
+       "crest": {
+        "sha256": "3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d",
+        "content_type": "image/webp",
+        "width": 256,
+        "height": 256,
+        "bytes": 12040
+       },
+       "club": {
+        "slug": "lobos-do-pinhal",
+        "name": "Lobos do Pinhal Airsoft Clube"
+       }
+      },
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c002",
+       "name": "Corvos",
+       "colour": null,
+       "crest": null,
+       "club": null
+      }
+     ]
+    },
+    "error": "bad_text",
+    "path": "teams[0].name"
+   },
+   {
+    "name": "field_team_unknown_key",
+    "kind": "field",
+    "body": {
+     "sync_version": 1,
+     "field": {
+      "field_name": "Campo Norte",
+      "accent": "#1e6b3a",
+      "logo": {
+       "sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "content_type": "image/png",
+       "width": 512,
+       "height": 256,
+       "bytes": 48211
+      },
+      "wallpaper": {
+       "sha256": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+       "content_type": "image/jpeg",
+       "width": 1920,
+       "height": 1080,
+       "bytes": 901234
+      }
+     },
+     "teams": [
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c001",
+       "name": "Lobos",
+       "colour": "red",
+       "crest": {
+        "sha256": "3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d",
+        "content_type": "image/webp",
+        "width": 256,
+        "height": 256,
+        "bytes": 12040
+       },
+       "club": {
+        "slug": "lobos-do-pinhal",
+        "name": "Lobos do Pinhal Airsoft Clube"
+       },
+       "members": []
+      },
+      {
+       "team_id": "0192f3a4-0000-7000-8000-00000000c002",
+       "name": "Corvos",
+       "colour": null,
+       "crest": null,
+       "club": null
+      }
+     ]
+    },
+    "error": "unknown_field",
+    "path": "teams[0].members"
    }
   ]
  }

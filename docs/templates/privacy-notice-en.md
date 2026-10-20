@@ -40,6 +40,7 @@ under a data processing agreement.]
 | [When the field uses them:] chronograph readings of your replicas, signed by the marshal | The safety of players (replica power limits) | Our legitimate interest in safety (f) |
 | [When the field uses it:] sharing your chronograph readings with other fields | So another field can see a replica's history | Your separate consent, per field, which you can withdraw (a) |
 | [When the field uses it:] your federation number on a registration | When the field's rules for a game require it; it is never checked automatically | [To be confirmed by the legal review: the field's rules for that game] |
+| [When the server has clubs:] the clubs you belong to (the club and your role in it) and the club invitations you received; the reports of club pages you made while logged in (never your address) | To show who belongs to a club and let its admins manage it; to moderate public club pages | Your consent to the account (a); for reports, our legitimate interest in moderating public pages (f) |
 
 Your position on the field (GPS) **never reaches this server**: the field's
 game controller uses it during a game only, and deletes it when the game
@@ -60,6 +61,9 @@ automated decisions about you.
 | Chronograph readings | [365 days] |
 | Game history | [24 months] |
 | Registration data of people without an account | 30 days after the game |
+| Club memberships | Until you leave the club or erase your account |
+| Club invitations not accepted | 30 days |
+| Reports of club pages | 12 months after they are decided |
 
 The server deletes what is past these periods every day.
 

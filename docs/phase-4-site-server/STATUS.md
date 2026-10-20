@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Implementation (plan phases 1 to 7, 9 and 10 to 17 built in software, 2026-10-20; sync over 4G: HW1; a real ATAK device: HW3)
+**Current phase:** Implementation (plan phases 1 to 7, 9 and 10 to 18 built in software, 2026-10-20; sync over 4G: HW1; a real ATAK device: HW3)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-20 (plan phase 9, full check: tools/check.sh, the console's browser tests, the formatter, reuse lint)
-**Next step:** plan phase 8 (scenarios in the controller, console and app) on the modes chain; plan phase 18 (club profiles and branding sync) on the site server chain
+**Last verified:** 2026-10-20 (plan phase 18, full clean-copy check)
+**Next step:** plan phase 8 (scenarios in the controller, console and app) on the modes chain; plan phase 19 (device health, firmware catalogue, remote GM) on the site server chain
 
 ## Completed
 
@@ -56,7 +56,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | 15 | Scheduling, field pages and feeds | Software, now | 11 | Pending |
 | 16 | Registration and game-day sync | Software, now | 13, 15 | **Done in software** (2026-10-20; the app's screens with 17, a real game day: HW1) |
 | 17 | Registration import and adapters | Software, now | 16 | **Done in software** (2026-10-20, with the app's registration screens; no real platform) |
-| 18 | Club profiles and branding sync | Software, now | 13 | Pending |
+| 18 | Club profiles and branding sync | Software, now | 13 | **Done in software** (2026-10-20; not yet on a real deployment) |
 | 19 | Device health, firmware catalogue, remote GM | Software, now | 13 | Pending |
 | 20 | Game history and the scenario library | Software, now | 13, 7 | Pending |
 | 21 | Hosted multi-tenant mode | Software, now | 10-20 | Pending |
@@ -603,6 +603,36 @@ screens against a stand-in site server, their goldens and an integration test.
 Verified 2026-10-20 from a clean copy rebased on main (check, ASan, firmware
 host tests, 936 Dart tests, NDK, APK, REUSE). Not yet: a real platform, a real
 deployment, a phone. Decisions S17-1 to S17-17, all open.
+
+## Plan phase 18: club profiles and branding sync (built 2026-10-20, in software)
+
+What exists: on the site server, clubs (`/api/v1/clubs`: a name, a short name
+for its teams on controllers, a slug, a description, a colour, a logo and a
+crest; members invited by the club's admins, who accept, the last admin kept)
+with a public page off by default (`/c/<slug>/`, pt-PT and English, no
+JavaScript, no member named), a report button (a plain form, no address kept,
+5 an hour per address) and a server administrator who sees the reports and can
+hide a page. A field's staff edit its branding (name, accent, logo, wallpaper)
+and its saved teams (a club's team carries the club's short name and crest
+unless it sets its own; a club that is not public only by its members). Every
+image is checked with the controller's own `images.py` (the same limits,
+metadata stripped), stored once by SHA-256, each upload with the rights
+reminder (`rights_confirmed=true`). `GET /api/v1/sync/field` carries the
+branding and the saved teams with their images' SHA-256s and `GET
+/api/v1/sync/images/{sha256}` the field's own images. On the controller,
+`[sync] branding = "site"` (default `"local"`) pulls them, fetches the
+images it lacks, checks each again and applies them; the console then gets
+409 for what the site sets, its own presets stay the GM's. Club membership is
+personal data (access, export, erasure, the purge). Migration `0009_clubs`;
+`protocol/sync.md`; the privacy notice templates.
+
+Tests: `test_clubs.py`, `test_branding_sync.py` (with the real controller: a
+club's crest follows its team to a second field's controller, each controller
+checking it again; a team the site drops leaves the controller), the
+migration's data test, and the controller's `test_sync_branding.py` against an
+in-memory site server; the shared vectors gain 2 valid and 9 invalid field
+answers. Not yet: a real deployment, the console's "from the site server"
+label. Decisions S18-1 to S18-12, all open.
 
 ## Dependencies
 
