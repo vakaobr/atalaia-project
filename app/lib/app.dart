@@ -6,6 +6,7 @@
 /// settings, the language and the theme.
 library;
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -22,8 +23,13 @@ import 'modes/mode_catalog.dart';
 import 'platform/channels.dart';
 import 'platform/location.dart';
 import 'platform/services.dart';
+import 'platform/links.dart';
 import 'player/field_feed.dart';
 import 'pod/pod_transports.dart';
+import 'site/site_api.dart';
+import 'site/site_client.dart';
+import 'site/site_link.dart';
+import 'site/site_screens.dart';
 import 'storage/app_store.dart';
 import 'ui/home_screen.dart';
 import 'ui/theme.dart';
@@ -62,12 +68,16 @@ class AppServices {
     this.location,
     this.linkConnect,
     BrandingSourceFor? brandingSource,
+    SiteHttp Function(Uri origin)? siteHttp,
+    this.links,
   }) : modes = modes ?? ModeCatalog.builtin(),
        brandingSource = brandingSource ?? ioBrandingSource,
        branding = BrandingCache(store),
        fieldHttp = fieldHttp ?? IoFieldHttp.new,
        trust = FieldTrust(store, fetch: caFetch),
-       checkins = CheckinStore(store);
+       checkins = CheckinStore(store),
+       sites = SiteSessions(store, siteHttp ?? IoSiteHttp.new),
+       tickets = TicketStore(store);
 
   /// The phone's own plugins, the core from the APK.
   factory AppServices.platform(AppStore store, DeviceServices device) =>
@@ -82,6 +92,7 @@ class AppServices {
         usbPods: ChannelPodTransport.usb,
         blePods: ChannelPodTransport.ble,
         location: ChannelLocationService(),
+        links: ChannelAppLinks(),
       );
 
   final NodeRunner runner;
@@ -115,6 +126,13 @@ class AppServices {
   /// field, and how it asks a controller for it (tests give a fake).
   final BrandingCache branding;
   final BrandingSourceFor brandingSource;
+
+  /// Online registration on a field's site server (decision S16-13): a
+  /// session per site (tests give a fake server), the tickets kept, and the
+  /// links that open the app at a field's games (null: none).
+  final SiteSessions sites;
+  final TicketStore tickets;
+  final AppLinks? links;
 }
 
 /// The settings, saved whenever they change.
@@ -173,9 +191,33 @@ class AtalaiaApp extends StatefulWidget {
 
 class _AtalaiaAppState extends State<AtalaiaApp> {
   late final controller = AppController(widget.services, widget.settings);
+  final _navigator = GlobalKey<NavigatorState>();
+  StreamSubscription<String>? _links;
+
+  @override
+  void initState() {
+    super.initState();
+    final links = widget.services.links;
+    if (links != null) {
+      _links = links.links.listen(_open);
+      unawaited(links.initial().then((l) => l == null ? null : _open(l)));
+    }
+  }
+
+  /// A link to a field's games (`atalaia://register?...`): its screen on
+  /// top of whatever is open; anything else is ignored.
+  void _open(String text) {
+    final link = SiteGameLink.parse(text);
+    final nav = _navigator.currentState;
+    if (link == null || nav == null) return;
+    unawaited(
+      nav.push(MaterialPageRoute<void>(builder: (_) => SiteScreen(link: link))),
+    );
+  }
 
   @override
   void dispose() {
+    unawaited(_links?.cancel());
     controller.dispose();
     super.dispose();
   }
@@ -190,6 +232,7 @@ class _AtalaiaAppState extends State<AtalaiaApp> {
         return StringsScope(
           strings: strings,
           child: MaterialApp(
+            navigatorKey: _navigator,
             title: 'Atalaia',
             debugShowCheckedModeBanner: false,
             theme: atalaiaTheme(Brightness.light),

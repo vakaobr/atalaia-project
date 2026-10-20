@@ -55,8 +55,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "back_game": "Voltar a {game}",
         "reg_intro": "A inscrição faz-se com uma conta neste site, na app Atalaia.",
         "reg_step_account": "Criar uma conta neste site (ou entrar com a que já existe).",
-        "reg_step_app": "Na app Atalaia, abrir este campo e este jogo e fazer a inscrição, com as réplicas "
+        "reg_step_app": "Na app Atalaia, abrir este jogo com o botão abaixo (ou colar o endereço desta página em "
+                        "Participante › Inscrições online), entrar com a conta e fazer a inscrição, com as réplicas "
                         "que vão ser usadas, se o jogo as pedir.",
+        "reg_open_app": "Abrir na app Atalaia",
+        "reg_address": "Endereço desta página, para colar na app:",
         "reg_step_ticket": "A app guarda o bilhete de check-in e usa-o no dia, no campo. Sem a app, o bilhete "
                            "pode ser impresso e mostrado a um marshal.",
         "reg_data": "O campo recebe o nome escolhido para o jogo, a preferência de equipa, o número de federado "
@@ -101,8 +104,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "back_game": "Back to {game}",
         "reg_intro": "You register with an account on this site, in the Atalaia app.",
         "reg_step_account": "Make an account on this site (or log in with the one you have).",
-        "reg_step_app": "In the Atalaia app, open this field and this game and register, with the replicas you "
+        "reg_step_app": "In the Atalaia app, open this game with the button below (or paste this page's address in "
+                        "Player › Online registration), log in with your account and register, with the replicas you "
                         "will use, if the game asks for them.",
+        "reg_open_app": "Open in the Atalaia app",
+        "reg_address": "This page's address, to paste in the app:",
         "reg_step_ticket": "The app keeps the check-in ticket and uses it on the day, at the field. Without the app, "
                            "print the ticket and show it to a marshal.",
         "reg_data": "The field gets the name you choose for the game, your team preference, your federation number "

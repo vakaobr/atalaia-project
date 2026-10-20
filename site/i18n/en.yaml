@@ -622,7 +622,8 @@ roadmap:
       sharing between fields with consent; not yet with a real chronograph), and game scheduling with a public page per field and open
       iCalendar and JSON feeds of its games (no personal data on them), and registration for those
       games with pre-declared replicas and a check-in ticket: the field controller pulls the list
-      and reports who came (the app's registration screens are still to come).
+      and reports who came; registering from the app, and importing a registration list (CSV or
+      JSON) exported from another platform.
     gate: >-
       Gate: a weekend <a href="{{ page.to.glossary }}#glossary-milsim">milsim</a> runs on Atalaia end to end.
   p5:

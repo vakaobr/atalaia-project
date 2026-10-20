@@ -1,0 +1,351 @@
+// SPDX-FileCopyrightText: 2026 The Atalaia contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+/// A stand-in for a field's site server (server/atalaia_server/api/auth.py,
+/// api/registrations.py and the app's field listing), for the app's tests:
+/// the same paths, bodies, error codes and refresh-token rotation (a spent
+/// refresh token that comes back ends the session), with its state in
+/// memory.
+library;
+
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:atalaia_app/site/site_client.dart';
+
+class FakeSite {
+  FakeSite({this.totp = false});
+
+  /// Whether the account has TOTP (the login then asks for [code]).
+  bool totp;
+  final username = 'falcao';
+  final password = 'correct horse battery';
+  final code = '123456';
+  var offline = false;
+
+  /// Access tokens live this many seconds.
+  var accessTtl = 900;
+
+  final requests = <String>[];
+  final bodies = <String, Object?>{};
+  var _n = 0;
+
+  // --- sessions ---------------------------------------------------------------
+  final _live = <String>{}; // refresh tokens not yet spent
+  final _spent = <String>{};
+  final _access = <String>{};
+  var sessionEnded = false;
+  var refreshes = 0;
+
+  /// Ends every access token (as if they had expired).
+  void expireAccess() => _access.clear();
+
+  String _newRefresh() {
+    final t = 'rt-${++_n}';
+    _live.add(t);
+    return t;
+  }
+
+  SiteResponse _session() {
+    final a = 'at-${++_n}';
+    _access.add(a);
+    return SiteResponse(200, {
+      'access_token': a,
+      'token_type': 'bearer',
+      'expires_in': accessTtl,
+      'mfa': totp,
+      'user': {'id': 'u1', 'username': username},
+    }, refreshToken: _newRefresh());
+  }
+
+  // --- the field ----------------------------------------------------------------
+  final fieldId = '0192f3a0-0000-7000-8000-00000000f1e1';
+  final slug = 'campo-norte';
+  final games = <Map<String, Object?>>[
+    {
+      'id': '0192f3a0-0000-7000-8000-000000000001',
+      'title': 'Domingo de manhã',
+      'description': 'Domination, 4 horas.',
+      'starts_at': '2026-11-08T09:00:00+00:00',
+      'ends_at': '2026-11-08T13:00:00+00:00',
+      'location': 'Serra da Arrábida',
+      'mode_id': 'org.atalaia.domination',
+      'teams': ['red', 'blue'],
+      'max_players': 60,
+      'places_left': 12,
+      'registration_opens_at': null,
+      'registration_closes_at': '2026-11-07T20:00:00+00:00',
+      'registration_state': 'open',
+      'registration_open': true,
+      'federation': 'required',
+      'predeclare_replicas': true,
+      'status': 'published',
+      'cancelled_reason': null,
+    },
+    {
+      'id': '0192f3a0-0000-7000-8000-000000000002',
+      'title': 'Noturno',
+      'description': null,
+      'starts_at': '2026-11-14T20:00:00+00:00',
+      'ends_at': '2026-11-14T23:30:00+00:00',
+      'location': null,
+      'mode_id': null,
+      'teams': <String>[],
+      'max_players': null,
+      'places_left': null,
+      'registration_opens_at': '2026-11-09T09:00:00+00:00',
+      'registration_closes_at': null,
+      'registration_state': 'not_yet',
+      'registration_open': false,
+      'federation': 'off',
+      'predeclare_replicas': false,
+      'status': 'published',
+      'cancelled_reason': null,
+    },
+  ];
+  final regs = <String, Map<String, Object?>>{};
+  final claims = <Map<String, Object?>>[];
+  final linked = <String, String>{};
+
+  Map<String, Object?> _field() => {
+    'id': fieldId,
+    'slug': slug,
+    'name': 'Campo Norte',
+    'timezone': 'Europe/Lisbon',
+    'federation_label': 'FPA',
+    'limit_template': 'portugal',
+    'classes': ['cqb', 'dmr', 'rifle', 'sniper'],
+    'max_replicas': 3,
+  };
+
+  Map<String, Object?> _regJson(Map<String, Object?> r) {
+    final g = games.firstWhere((x) => x['id'] == r['scheduled_game_id']);
+    return {
+      ...r,
+      'field_id': fieldId,
+      'source': 'site',
+      'has_ticket': r['status'] == 'registered',
+      'game': {
+        'title': g['title'],
+        'starts_at': g['starts_at'],
+        'ends_at': g['ends_at'],
+        'status': g['status'],
+      },
+      'field': {'name': 'Campo Norte', 'slug': slug},
+    };
+  }
+
+  Map<String, Object?> _withTicket(Map<String, Object?> r) {
+    final n = ++_n;
+    // Not real tickets (the codec has its own vector tests): only their shape.
+    return {
+      ..._regJson(r),
+      'ticket': 'T${'k' * 41}$n'.substring(0, 43),
+      'ticket_text': 'atalaia:ticket:FAKE-${r['id']}-$n',
+    };
+  }
+
+  SiteHttp http(Uri origin) => _FakeSiteHttp(this);
+
+  SiteResponse handle(
+    String method,
+    String path,
+    Object? body,
+    String? bearer,
+    String? refresh,
+  ) {
+    requests.add('$method $path');
+    bodies['$method $path'] = body;
+    final b = body is Map ? body.cast<String, Object?>() : <String, Object?>{};
+    SiteResponse err(int status, String detail) =>
+        SiteResponse(status, {'detail': detail});
+    switch ('$method $path') {
+      case 'POST /auth/login':
+        if (b['username'] != username || b['password'] != password) {
+          return err(401, 'invalid_credentials');
+        }
+        if (totp) {
+          return const SiteResponse(200, {
+            'totp_required': true,
+            'totp_session': 'totp-step',
+          });
+        }
+        return _session();
+      case 'POST /auth/login/totp':
+        if (b['totp_session'] != 'totp-step') {
+          return err(401, 'invalid_totp_session');
+        }
+        if (b['code'] != code) return err(401, 'invalid_code');
+        return _session();
+      case 'POST /auth/refresh':
+        refreshes++;
+        if (refresh == null) return err(401, 'invalid_refresh_token');
+        if (_spent.contains(refresh)) {
+          // A replay: the whole session ends (api/auth.py).
+          sessionEnded = true;
+          _live.clear();
+          _access.clear();
+          return err(401, 'invalid_refresh_token');
+        }
+        if (!_live.remove(refresh)) return err(401, 'invalid_refresh_token');
+        _spent.add(refresh);
+        return _session();
+      case 'POST /auth/logout':
+        _access.remove(bearer);
+        _live.clear();
+        return const SiteResponse(204, null);
+    }
+    if (bearer == null || !_access.contains(bearer)) {
+      return err(401, 'not_authenticated');
+    }
+    final regPath = RegExp(
+      r'^/fields/([0-9a-f-]+)/scheduled-games/([0-9a-f-]+)/registrations$',
+    ).firstMatch(path);
+    if (method == 'POST' && regPath != null) {
+      final gid = regPath.group(2)!;
+      final g = games.where((x) => x['id'] == gid).firstOrNull;
+      if (g == null) return err(404, 'scheduled_game_not_found');
+      if (g['registration_open'] != true) {
+        return err(409, 'registration_closed');
+      }
+      if (regs.values.any(
+        (r) => r['scheduled_game_id'] == gid && r['status'] == 'registered',
+      )) {
+        return err(409, 'already_registered');
+      }
+      if (g['federation'] == 'required' && b['federation_number'] == null) {
+        return err(400, 'federation_number_required');
+      }
+      final id =
+          '0192f3a0-0000-7000-8000-0000000a${(++_n).toString().padLeft(4, '0')}';
+      final r = <String, Object?>{
+        'id': id,
+        'scheduled_game_id': gid,
+        'player_id': linked[fieldId] ??= 'p-sitemade2345',
+        'display_name': b['display_name'],
+        'team_preference': b['team_preference'],
+        'federation_number': b['federation_number'],
+        'status': 'registered',
+        'replicas': [
+          for (final x in (b['replicas'] as List?) ?? const [])
+            {...(x as Map).cast<String, Object?>(), 'state': null},
+        ],
+      };
+      regs[id] = r;
+      return SiteResponse(201, _withTicket(r));
+    }
+    final mine = RegExp(
+      r'^/me/registrations/([0-9a-f-]+)(/ticket)?$',
+    ).firstMatch(path);
+    if (mine != null) {
+      final r = regs[mine.group(1)];
+      if (r == null) return err(404, 'registration_not_found');
+      if (mine.group(2) != null && method == 'POST') {
+        return SiteResponse(200, _withTicket(r));
+      }
+      if (method == 'PATCH') {
+        for (final k in [
+          'display_name',
+          'team_preference',
+          'federation_number',
+        ]) {
+          if (b.containsKey(k)) r[k] = b[k];
+        }
+        if (b['replicas'] is List) {
+          r['replicas'] = [
+            for (final x in b['replicas']! as List)
+              {...(x as Map).cast<String, Object?>(), 'state': null},
+          ];
+        }
+        return SiteResponse(200, _regJson(r));
+      }
+      if (method == 'DELETE') {
+        r['status'] = 'cancelled';
+        return const SiteResponse(204, null);
+      }
+    }
+    switch ('$method $path') {
+      case 'GET /fields-by-slug/campo-norte':
+        return SiteResponse(200, {'field': _field(), 'games': games});
+      case 'GET /me/registrations':
+        return SiteResponse(200, [for (final r in regs.values) _regJson(r)]);
+      case 'GET /me/player-ids':
+        return SiteResponse(200, {
+          'player_ids': [
+            for (final e in linked.entries)
+              {'field_id': e.key, 'player_id': e.value, 'linked_at': 'x'},
+          ],
+          'claims': claims,
+        });
+      case 'POST /me/player-ids':
+        if (linked.containsKey(b['field_id'])) {
+          return err(409, 'player_id_exists');
+        }
+        final c = {
+          'id': 'c${++_n}',
+          'field_id': b['field_id'],
+          'player_id': b['player_id'],
+          'status': 'pending',
+        };
+        claims.add(c);
+        return SiteResponse(202, c);
+    }
+    return err(404, 'Not Found');
+  }
+}
+
+class _FakeSiteHttp implements SiteHttp {
+  _FakeSiteHttp(this.site);
+  final FakeSite site;
+
+  @override
+  Future<SiteResponse> send(
+    String method,
+    String path, {
+    Object? body,
+    String? bearer,
+    String? refreshToken,
+  }) async {
+    if (site.offline) throw SiteException(0, 'offline');
+    return site.handle(method, path, body, bearer, refreshToken);
+  }
+}
+
+/// [site] over real HTTP on 127.0.0.1 (a free port), for the dart:io client:
+/// the refresh token as the `__Secure-atalaia_refresh` cookie, as the site
+/// server sets and reads it.
+Future<HttpServer> serveFakeSite(FakeSite site) async {
+  final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+  server.listen((req) async {
+    final text = await utf8.decodeStream(req);
+    final auth = req.headers.value('authorization');
+    String? refresh;
+    if (req.headers.value('x-atalaia-refresh') == '1') {
+      for (final c in req.cookies) {
+        if (c.name == refreshCookie) refresh = c.value;
+      }
+    }
+    final path = req.uri.path.replaceFirst('/api/v1', '');
+    final r = site.handle(
+      req.method,
+      path,
+      text.isEmpty ? null : jsonDecode(text),
+      auth != null && auth.startsWith('Bearer ') ? auth.substring(7) : null,
+      refresh,
+    );
+    req.response.statusCode = r.status;
+    if (r.refreshToken != null) {
+      req.response.headers.add(
+        'set-cookie',
+        '$refreshCookie=${r.refreshToken}; HttpOnly; Max-Age=2592000; '
+            'Path=/api/v1/auth/refresh; SameSite=strict; Secure',
+      );
+    }
+    if (r.body != null) {
+      req.response.headers.contentType = ContentType.json;
+      req.response.write(jsonEncode(r.body));
+    }
+    await req.response.close();
+  });
+  return server;
+}

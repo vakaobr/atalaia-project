@@ -560,4 +560,137 @@ const Map<String, String> enStrings = {
       'Only during the game; the controller decides who sees it (your squad if the game allows it, the organisers and the marshals).',
   'checkin.team_squad': '{team} › squad {squad}',
   'branding.logo': 'Logo of {name}',
+  // Online registration on the field's site server (decision S16-13)
+  'player.site': 'Online registration',
+  'site.title': 'Online registration',
+  'site.intro':
+      'You register for a game with an account on the field\'s site. Use the '
+      '"Register" button on the game\'s page, or paste the address of the '
+      'field\'s or the game\'s page here.',
+  'site.address': 'Address of the field\'s or the game\'s page',
+  'site.open': 'Open',
+  'site.bad_address':
+      'This is not the address of a field or game page (https://…/f/…).',
+  'site.confirm_text':
+      'You are about to log in with your account at {host}. Only go on if it '
+      'is the site of the field where you will play: whoever made the link '
+      'could have named another site.',
+  'site.confirm': 'This is the site, go on',
+  'site.login_at': 'Log in at {host}',
+  'site.login_hint':
+      'With the account you made on this site. The app keeps the session on '
+      'this phone; the password is not kept.',
+  'site.username': 'Username',
+  'site.password': 'Password',
+  'site.login': 'Log in',
+  'site.need_login': 'Type your username and password.',
+  'site.totp_text':
+      'This account has two-step verification: type the code from your '
+      'authenticator app.',
+  'site.code': '6-digit code',
+  'site.logged_in': 'With the account {user} at {host}',
+  'site.logout': 'Log out',
+  'site.games': 'Games',
+  'site.no_games': 'This field has no games published for the coming days.',
+  'site.game_gone': 'That game is no longer published or has ended.',
+  'site.cancelled': 'Cancelled',
+  'site.cancelled_reason': 'This game has been cancelled: {reason}',
+  'site.open_until': 'Registration open until {when}',
+  'site.left': '{n} places',
+  'site.opens': 'Registration opens {when}',
+  'site.full': 'Full',
+  'site.closed': 'Registration closed',
+  'site.no_online': 'No online registration: ask the field\'s organisers.',
+  'site.reg.registered': 'You are registered for this game.',
+  'site.reg.checked_in': 'You checked in for this game.',
+  'site.reg.no_show': 'You did not come to this game.',
+  'site.reg.cancelled': 'You cancelled your registration.',
+  'site.form': 'Registration',
+  'site.form_change': 'Change your registration',
+  'site.name_hint': 'The name the organisers and marshals see in this game.',
+  'site.replicas': 'Replicas you will use (up to {n})',
+  'site.class_not_here': '{class}: this field has no such class',
+  'site.too_many': 'This field takes up to {n} replicas per person.',
+  'site.register': 'Register',
+  'site.save': 'Save the changes',
+  'site.changed': 'Registration changed.',
+  'site.cancel_reg': 'Cancel the registration',
+  'site.cancel_title': 'Cancel the registration?',
+  'site.cancel_text':
+      'You give up your place in {game} and the check-in ticket stops working.',
+  'site.cancel_yes': 'Cancel the registration',
+  'site.data_note':
+      'The field gets the name you choose for the game, your team preference, '
+      'your federation number (if the game asks for one) and the declared '
+      'replicas, and erases them 30 days after the game.',
+  'site.show_ticket': 'Show the check-in ticket',
+  'site.no_ticket_here':
+      'This registration\'s ticket is not on this phone. Ask for a new one: '
+      'the old one stops working.',
+  'site.new_ticket': 'Ask for a new ticket',
+  'site.ticket': 'Check-in ticket',
+  'site.ticket_text':
+      'At the field, show this code to a marshal, or check in in the app with '
+      '"Check in at the field" and pick this registration. The ticket\'s text:',
+  'site.copy': 'Copy the text',
+  'site.copied': 'Copied.',
+  'site.ticket_secret':
+      'Whoever has this ticket can check in in your place: do not share it.',
+  'site.my_tickets': 'My tickets',
+  'site.no_tickets': 'No tickets on this phone yet.',
+  'site.claim': 'Use this phone\'s id',
+  'site.claim_text':
+      'If you have checked in at {field} with this phone, the account can '
+      'take the same player id (your replicas and chrono readings). The '
+      'field\'s controller confirms it at its next sync.',
+  'site.claim_pick': 'This phone\'s ids',
+  'site.claim_at': 'At the controller {field}',
+  'site.claim_none': 'This phone has not checked in at any field yet.',
+  'site.claim_send': 'Claim this id',
+  'site.claim_linked': 'The account already has the id {id} at this field.',
+  'site.claim.pending':
+      'Sent: waiting for the field\'s controller to confirm it.',
+  'site.claim.confirmed': 'Confirmed.',
+  'site.claim.refused':
+      'The field\'s controller did not confirm that id (another phone, or a '
+      'check-in made by hand).',
+  'site.error': 'The site refused: {error}',
+  'site.err.offline': 'The site cannot be reached. Try again in a while.',
+  'site.err.login_required': 'The session has ended: log in again.',
+  'site.err.invalid_credentials': 'Wrong username or password.',
+  'site.err.invalid_code': 'Wrong code. Try the next one.',
+  'site.err.invalid_totp_session':
+      'The code step has expired: type your password again.',
+  'site.err.too_many_attempts': 'Too many attempts: wait a little.',
+  'site.err.field_not_found': 'This site has no such field.',
+  'site.err.http_404':
+      'This site has no online registration (an older server?).',
+  'site.err.scheduled_game_not_found': 'That game no longer exists.',
+  'site.err.registration_not_found': 'That registration no longer exists.',
+  'site.err.registration_closed': 'Registration for this game is closed.',
+  'site.err.game_full': 'This game is full.',
+  'site.err.already_registered': 'You are already registered for this game.',
+  'site.err.not_registered': 'This registration is no longer live.',
+  'site.err.game_started': 'The game has started.',
+  'site.err.federation_number_required':
+      'This game asks for a federation number.',
+  'site.err.display_name_invalid': 'The name must be 1 to 32 characters.',
+  'site.err.team_preference_invalid': 'That team is not in this game.',
+  'site.err.too_many_replicas': 'Too many replicas for this field.',
+  'site.err.replica_class_invalid':
+      'One of the replicas has a class this field does not have.',
+  'site.err.replicas_not_asked':
+      'This game does not ask for replicas at registration.',
+  'site.err.player_id_exists':
+      'The account already has a player id at this field.',
+  'site.err.player_id_taken': 'That id belongs to another account.',
+  'site.err.player_secret_invalid': 'This id\'s secret is not valid.',
+  'checkin.registered': 'Online registration',
+  'checkin.no_registration': 'None (walk-in)',
+  'checkin.registered_hint':
+      'If you registered on the field\'s site, pick the registration: its '
+      'ticket goes with the check-in.',
+  'checkin.ticket_other_id':
+      'This phone already has another id at this field. Use "Use this phone\'s '
+      'id" in online registration, or check in without the registration.',
 };

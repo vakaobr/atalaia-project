@@ -31,7 +31,8 @@ from .base import SERVER, TempDatabase, alembic_config
 TABLES = {"fields", "users", "roles", "user_field_roles", "sessions", "audit_log", "refresh_tokens", "consents",
           "field_api_keys", "controllers", "games", "game_events", "game_node_scores", "game_nodes", "user_game_roles",
           "field_player_ids", "marshal_keys", "replicas", "chrono_readings", "chrono_rejects", "chrono_violations",
-          "scheduled_games", "game_registrations", "registration_replicas", "player_id_claims"}
+          "scheduled_games", "game_registrations", "registration_replicas", "player_id_claims",
+          "platform_links", "external_game_links"}
 
 SCHEMA_SQL = (
     ("columns", "SELECT table_name, column_name, data_type, is_nullable, column_default, character_maximum_length "
@@ -273,6 +274,27 @@ class MigrationTests(unittest.TestCase):
         command.downgrade(self.cfg, "0006_scheduling")
         self.assertNotIn("game_registrations", self.tables())
         self.assertEqual(self.db.fetch("SELECT name FROM fields")[0][0], "Campo")
+        self.db.fetch("DELETE FROM fields")
+
+    def test_0008_with_data(self) -> None:
+        """0008_integrations: a field's platform link (off by default) and a game's external link, and back."""
+        command.upgrade(self.cfg, "0007_registration")
+        field = self.db.fetch("INSERT INTO fields (name, slug) VALUES ('Campo', 'campo') RETURNING id")[0][0]
+        game = self.db.fetch("INSERT INTO scheduled_games (field_id, title, starts_at, ends_at, status) VALUES "
+                             "($1, 'Domingo', '2030-11-09T09:00:00Z', '2030-11-09T13:00:00Z', 'published') "
+                             "RETURNING id", field)[0][0]
+        command.upgrade(self.cfg, "0008_integrations")
+        self.db.fetch("INSERT INTO platform_links (field_id, adapter_id) VALUES ($1, 'test')", field)
+        self.assertEqual(tuple(self.db.fetch("SELECT enabled, config_enc FROM platform_links")[0]), (False, None))
+        with self.assertRaisesRegex(Exception, "uq_platform_links_field_id_adapter_id"):
+            self.db.fetch("INSERT INTO platform_links (field_id, adapter_id) VALUES ($1, 'test')", field)
+        self.db.fetch("INSERT INTO external_game_links (scheduled_game_id, adapter_id, external_ref) "
+                      "VALUES ($1, 'test', 'ev-1')", game)
+        self.db.fetch("DELETE FROM scheduled_games")  # the external links go with the game
+        self.assertEqual(self.db.fetch("SELECT count(*) FROM external_game_links")[0][0], 0)
+        command.downgrade(self.cfg, "0007_registration")
+        self.assertNotIn("platform_links", self.tables())
+        self.assertNotIn("external_game_links", self.tables())
         self.db.fetch("DELETE FROM fields")
 
     def test_one_linear_history(self) -> None:

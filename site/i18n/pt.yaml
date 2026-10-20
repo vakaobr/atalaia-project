@@ -646,7 +646,8 @@ roadmap:
       só chaves públicas, partilha entre campos com consentimento; ainda sem um cronógrafo real) e a marcação de jogos com uma página pública por campo e feeds
       abertos iCalendar e JSON dos jogos (sem dados pessoais), e as inscrições nesses jogos com
       réplicas declaradas e um bilhete de check-in: o controlador de campo recebe a lista e devolve
-      quem veio (os ecrãs de inscrição da aplicação ainda estão por fazer).
+      quem veio; a inscrição pela aplicação, e a importação de uma lista de inscrições (CSV ou JSON)
+      exportada de outra plataforma.
     gate: >-
       Prova: um <a href="{{ page.to.glossary }}#glossario-milsim">milsim</a> de fim de semana decorre do princípio ao fim
       com a Atalaia.

@@ -16,7 +16,12 @@ Bluetooth scan needs it too.
 
 Cleartext HTTP is still allowed for the GM console and the read-only
 player view, which the field controller serves over plain HTTP on the
-field's own network (decision PD11). Field check-in, the player token and
+field's own network (decision PD11).
+
+Links: `atalaia://register?site=...&field=...&game=...`, the button on a
+site server's register page, opens the app at that field's games
+(decision S16-13). Flutter's own deep linking is off: the app reads the
+link through its LinkPlugin and checks it itself. Field check-in, the player token and
 the prop's Wi-Fi link use HTTPS with the field's own CA, pinned by the app
 (ADR-P3-9, ADR-P3-13; decision PE3). Backups are off: the settings hold the
 field join key, the marshal's private key and the field identities.
@@ -74,6 +79,15 @@ field join key, the marshal's private key and the field identities.
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="atalaia" android:host="register" />
+            </intent-filter>
+            <meta-data
+                android:name="flutter_deeplinking_enabled"
+                android:value="false" />
         </activity>
         <!-- The QR scanner (CameraX and ZXing). -->
         <activity

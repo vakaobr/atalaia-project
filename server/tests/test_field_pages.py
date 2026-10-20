@@ -380,6 +380,14 @@ class RegisterButtonTests(PagesCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn("A inscrição faz-se com uma conta neste site, na app Atalaia.", r.text)
         self.assertIn("apaga-os 30 dias depois do jogo", r.text)
+        # The link into the app (decision S17-10) and the address to paste there.
+        link = "atalaia://register?site=https%3A%2F%2Fcampo.example.pt&amp;field=campo-tejo&amp;game=" + str(game.id)
+        self.assertIn(f'<a class="button" href="{link}">Abrir na app Atalaia</a>', r.text)
+        self.assertIn(f"<code>https://campo.example.pt/f/campo-tejo/games/{game.id}</code>", r.text)
+        self.assertIn("Participante › Inscrições online", r.text)
+        en_reg = (await self.client.get(f"/f/campo-tejo/games/{game.id}/register", params={"lang": "en"})).text
+        self.assertIn(">Open in the Atalaia app</a>", en_reg)
+        self.assertIn("Player › Online registration", en_reg)
         en = (await self.client.get(f"/f/campo-tejo/games/{game.id}", params={"lang": "en"})).text
         self.assertIn(f'href="/f/campo-tejo/games/{game.id}/register?lang=en">Register</a>', en)
         await self.registrations(game, 1)

@@ -90,6 +90,43 @@ class FieldIdentities {
     return id;
   }
 
+  /// Every identity this phone has, one per field controller.
+  Future<List<FieldIdentity>> all() async => [
+    for (final j in await store.loadList(_list))
+      if (j['field_id'] is String &&
+          j['player_id'] is String &&
+          j['secret'] is String &&
+          playerIdOk(j['player_id']! as String) &&
+          secretOk(j['secret']! as String))
+        FieldIdentity(
+          j['field_id']! as String,
+          j['player_id']! as String,
+          j['secret']! as String,
+        ),
+  ];
+
+  /// The identity at [fieldId], or null when this phone has none there.
+  Future<FieldIdentity?> existing(String fieldId) async =>
+      (await all()).where((x) => x.fieldId == fieldId).firstOrNull;
+
+  /// Takes [playerId] (a player id a site server made for the account's
+  /// registration) as this phone's id at [fieldId], with a new secret: the
+  /// controller keeps that secret's hash at the check-in that presents the
+  /// registration's ticket (decision S16-8). Only when the phone has no
+  /// identity there yet; otherwise the existing one is returned as it is.
+  Future<FieldIdentity> adopt(String fieldId, String playerId) async {
+    final have = await existing(fieldId);
+    if (have != null) return have;
+    if (!playerIdOk(playerId)) throw ArgumentError.value(playerId, 'playerId');
+    final id = FieldIdentity(fieldId, playerId, newPlayerSecret(random));
+    await store.saveList(_list, [
+      for (final j in await store.loadList(_list))
+        if (j['field_id'] != fieldId) j,
+      id.toJson(),
+    ]);
+    return id;
+  }
+
   /// Forgets the identity at [fieldId] (the player's choice: a new id next time).
   Future<void> forget(String fieldId) async => store.saveList(_list, [
     for (final j in await store.loadList(_list))

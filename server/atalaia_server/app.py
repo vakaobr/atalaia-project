@@ -31,8 +31,9 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from . import __version__, personal_data
-from .api import auth, chrono, fields, games, health, me, registrations, scheduling, sync
+from . import __version__, integrations, personal_data
+from .api import (auth, chrono, fields, games, health, integrations as integrations_api, me, registration_import,
+                  registrations, scheduling, sync)
 from .config import Settings, redact_url
 from .db import make_engine, make_sessionmaker
 from .ratelimit import Limits, RequestLimitMiddleware
@@ -73,6 +74,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.state.started = time.monotonic()
     app.state.keys = Keys(settings.secret_key)
     app.state.seed_box = SeedBox(app.state.keys.totp_seed)
+    app.state.config_box = integrations.ConfigBox(app.state.keys.platform_config)
+    app.state.adapters = integrations.default_registry(settings.test_adapter)
     app.state.limits = Limits()
     app.state.used_totp_steps = UsedTokens()
     app.state.clock = time.time
@@ -88,7 +91,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.include_router(chrono.router)
     app.include_router(sync.router)
     app.include_router(scheduling.router)
+    app.include_router(registration_import.router)  # before registrations' /registrations/{reg_id}
     app.include_router(registrations.router)
+    app.include_router(integrations_api.router)
     app.include_router(field_pages.router)
     return app
 

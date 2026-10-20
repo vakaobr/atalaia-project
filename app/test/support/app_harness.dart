@@ -12,7 +12,9 @@ import 'package:atalaia_app/checkin/field_trust.dart';
 import 'package:atalaia_app/controller/prop_link.dart';
 import 'package:atalaia_app/core/node_runner.dart';
 import 'package:atalaia_app/l10n/strings.dart';
+import 'package:atalaia_app/platform/links.dart';
 import 'package:atalaia_app/player/field_feed.dart';
+import 'package:atalaia_app/site/site_client.dart';
 import 'package:atalaia_app/storage/app_store.dart';
 import 'package:flutter/material.dart';
 
@@ -28,7 +30,13 @@ class Harness {
     this.caFetch,
     this.linkConnect,
     this.brandingSource,
+    this.siteHttp,
+    this.links,
   }) : qr = qr ?? FakeQr();
+
+  /// A fake site server (test/support/fake_site.dart); none: offline.
+  final SiteHttp Function(Uri origin)? siteHttp;
+  final AppLinks? links;
 
   /// A fake field controller for check-in (test/support/fake_field.dart).
   final FieldHttp Function(PinnedField field)? fieldHttp;
@@ -63,6 +71,8 @@ class Harness {
     caFetch: caFetch ?? _noCa,
     linkConnect: linkConnect,
     brandingSource: brandingSource ?? (_, _) => const _NoBranding(),
+    siteHttp: siteHttp ?? (_) => const _NoSite(),
+    links: links,
   );
 
   /// The app; a new harness is a new app (its own state), even when pumped
@@ -86,6 +96,19 @@ class _NoBranding implements BrandingSource {
       Future.error(StateError('no network'));
 }
 
+class _NoSite implements SiteHttp {
+  const _NoSite();
+
+  @override
+  Future<SiteResponse> send(
+    String method,
+    String path, {
+    Object? body,
+    String? bearer,
+    String? refreshToken,
+  }) => Future.error(SiteException(0, 'offline'));
+}
+
 Harness harness({
   AppLanguage language = AppLanguage.pt,
   NodeRunner? runner,
@@ -96,6 +119,8 @@ Harness harness({
   CaFetcher? caFetch,
   LinkConnect? linkConnect,
   BrandingSourceFor? brandingSource,
+  SiteHttp Function(Uri origin)? siteHttp,
+  AppLinks? links,
 }) => Harness(
   settings: (settings ?? AppSettings())..language = language,
   runner: runner ?? FakeNodeRunner(),
@@ -105,4 +130,6 @@ Harness harness({
   caFetch: caFetch,
   linkConnect: linkConnect,
   brandingSource: brandingSource,
+  siteHttp: siteHttp,
+  links: links,
 );

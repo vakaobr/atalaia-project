@@ -281,11 +281,19 @@ class CheckinClient {
     String? federationNumber,
     String? teamPreference,
     List<Declaration>? replicas,
+    String? registrationId,
+    String? registrationTicket,
   }) async => CheckinTicket(
     await _call(
       'POST',
       '/checkin',
       body: {
+        // A registration on the field's site server and its ticket, both or
+        // neither (decision S16-8).
+        if (registrationId != null && registrationTicket != null) ...{
+          'registration_id': registrationId,
+          'ticket': registrationTicket,
+        },
         'game_id': gameId,
         'player_id': playerId,
         'player_secret': secret,

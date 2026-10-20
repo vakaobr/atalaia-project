@@ -7,6 +7,9 @@
 /// points, who holds each objective, lives, eliminated teams, the GM's
 /// messages and the game's events, in the app's language.
 ///
+/// Plan phase 16 (phase 4, decision S16-13): *Online registration* opens
+/// the field's site server (lib/site/).
+///
 /// Plan phase E: checking in at the field with its poster (lib/checkin/)
 /// gives a player token; the view then follows the game over the field's
 /// pinned HTTPS, shows the game's events from before the phone connected,
@@ -32,6 +35,7 @@ import '../checkin/checkin_screen.dart';
 import '../l10n/strings.dart';
 import '../position/position_reporter.dart';
 import '../prop/game_timer.dart';
+import '../site/site_screens.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'field_feed.dart';
@@ -115,6 +119,16 @@ class _PlayerStartScreenState extends State<PlayerStartScreen> {
             ),
           ),
           const _ContinueCheckin(),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            key: const Key('player-site'),
+            icon: const Icon(Icons.event_available),
+            label: Text(s.t('player.site')),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(builder: (_) => const SiteScreen()),
+            ),
+          ),
           SectionTitle(s.t('player.watch')),
           FilledButton.icon(
             key: const Key('player-scan'),

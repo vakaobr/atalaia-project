@@ -8,8 +8,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 **Current phase:** Implementation (plan phases 1 to 7 and 10 to 16 built in software, 2026-10-20; sync over 4G: HW1)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-20 (plan phase 7, full clean-copy check)
-**Next step:** plan phase 8 (scenarios in the controller, console and app) on the modes chain; plan phase 17 (registration import and platform adapters) on the site server chain
+**Last verified:** 2026-10-20 (plan phase 17, full clean-copy check)
+**Next step:** plan phase 8 (scenarios in the controller, console and app) on the modes chain, with phase 9 (ATAK / CoT) under way; plan phase 18 (club profiles and branding sync) on the site server chain
 
 ## Completed
 
@@ -54,8 +54,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | 13 | Controller sync | Software, now | 10, 11 | **Done in software** (2026-10-20; over 4G: HW1) |
 | 14 | Chrono registry | Software, now | 13 | **Done in software** (2026-10-20; a real chronograph: HW4) |
 | 15 | Scheduling, field pages and feeds | Software, now | 11 | Pending |
-| 16 | Registration and game-day sync | Software, now | 13, 15 | **Done in software** (2026-10-20; the app's screens later, a real game day: HW1) |
-| 17 | Registration import and adapters | Software, now | 16 | Pending |
+| 16 | Registration and game-day sync | Software, now | 13, 15 | **Done in software** (2026-10-20; the app's screens with 17, a real game day: HW1) |
+| 17 | Registration import and adapters | Software, now | 16 | **Done in software** (2026-10-20, with the app's registration screens; no real platform) |
 | 18 | Club profiles and branding sync | Software, now | 13 | Pending |
 | 19 | Device health, firmware catalogue, remote GM | Software, now | 13 | Pending |
 | 20 | Game history and the scenario library | Software, now | 13, 7 | Pending |
@@ -536,6 +536,34 @@ registration import (17). Decisions S16-1 to S16-14, all open; S16-4 (claims
 confirmed by the controller), S16-6 (the field's limit template set on both
 sides) and S16-9 (no registration form on the public pages) want the
 maintainer's eye.
+
+## Plan phase 17: registration import and platform adapters, and the app's registration screens (built 2026-10-20, in software)
+
+What exists: on the site server, a field's `admin` or `gm` imports a
+registration list exported from another platform into a scheduled game
+(`POST .../registrations/import`, CSV per RFC 4180 or JSON, at most 1 MiB and
+5,000 rows, only the listed columns read, a dry run that writes nothing,
+upsert by `(source, external_ref)`, a real import only after the staff confirm
+the field's basis for the list); imported registrations are guests (no account,
+no ticket, in the roster, deleted 30 days after their game). A game's list
+exports as a formula-safe CSV that imports back unchanged. Platform adapters
+(`atalaia_server/integrations/`): the `PlatformAdapter` interface, per-field
+links off by default, configuration encrypted at rest, calls only when the
+staff ask, 20 s each, every call audited; only an in-memory test adapter
+(`ATALAIA_TEST_ADAPTER=on`), no adapter for a named platform (F22). Migration
+`0008_integrations`; `server/docs/integrations.md`. In the app (S16-13):
+*Participante › Inscrições online* logs in to a field's site server
+(password, then TOTP), lists its games, registers with pre-declared replicas,
+keeps the check-in ticket (QR and text) and sends it with the check-in,
+changes and cancels, and claims the phone's player id; the public register
+page opens it with an `atalaia://register` link.
+
+Tests: `test_import_format.py` (also in tools/check.sh), `test_integrations.py`,
+the import's endpoint tests and the migration's; the app's site client and
+screens against a stand-in site server, their goldens and an integration test.
+Verified 2026-10-20 from a clean copy rebased on main (check, ASan, firmware
+host tests, 936 Dart tests, NDK, APK, REUSE). Not yet: a real platform, a real
+deployment, a phone. Decisions S17-1 to S17-17, all open.
 
 ## Dependencies
 

@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """ORM models (ADR-P4-1; migrations 0001_base, 0002_accounts, 0003_personal_data, 0004_sync, 0005_chrono,
-0006_scheduling, 0007_registration).
+0006_scheduling, 0007_registration, 0008_integrations).
 
 Fields, users, roles, per-field roles, sessions and the audit log, as
 ADR-P4-1 defines them, with plan phase 11's additions for accounts: the
@@ -18,7 +18,8 @@ the field page's columns on ``fields`` (``public_page``, ``description``, ``addr
 ``federation_label``); plan phase 16's registrations (migration 0007_registration):
 ``game_registrations``, ``registration_replicas``, ``player_id_claims``, the link from a scheduled
 game to the controller's game (``scheduled_games.controller_game``, ``walkins``) and the field's
-check-in rules for registering (``fields.limit_template``, ``max_replicas``). A table that holds personal data must also be added to
+check-in rules for registering (``fields.limit_template``, ``max_replicas``); plan phase 17's platform
+adapters (migration 0008_integrations): ``platform_links`` and ``external_game_links``. A table that holds personal data must also be added to
 ``personal_data.py`` (access, export, erasure, the purge) in the same plan
 phase. Every later plan phase adds its own tables here and in
 its own Alembic migration; ``tests.test_migrations`` checks that the
@@ -695,3 +696,38 @@ class PlayerIdClaim(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="pending")
     created_at: Mapped[datetime] = _created()
     decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class PlatformLink(Base):
+    """A field's link to an external platform through one adapter (ADR-P4-12; plan phase 17): off until
+    the field's admin turns it on, its configuration (credentials included) encrypted with Fernet under a
+    key derived from ATALAIA_SECRET_KEY (``integrations.ConfigBox``)."""
+
+    __tablename__ = "platform_links"
+    __table_args__ = (UniqueConstraint("field_id", "adapter_id"),)
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    field_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), nullable=False)
+    adapter_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    config_enc: Mapped[Optional[bytes]] = mapped_column(LargeBinary)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    created_at: Mapped[datetime] = _created()
+    updated_at: Mapped[datetime] = _updated()
+
+
+class ExternalGameLink(Base):
+    """A scheduled game as it is known on an external platform: the platform's reference, when it was
+    last sent and the last error (a failing platform never blocks scheduling, publication or check-in)."""
+
+    __tablename__ = "external_game_links"
+    __table_args__ = (UniqueConstraint("scheduled_game_id", "adapter_id"),)
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    scheduled_game_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("scheduled_games.id", ondelete="CASCADE"),
+                                                         nullable=False)
+    adapter_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    external_ref: Mapped[Optional[str]] = mapped_column(String(256))
+    cancelled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[Optional[str]] = mapped_column(String(64))
+    created_at: Mapped[datetime] = _created()

@@ -12,7 +12,8 @@ import io.flutter.embedding.engine.FlutterEngine
  * phase D) on the Flutter engine, each on its own channel (lib/platform/
  * channels.dart, lib/pod/pod_transports.dart), and forwards the activity
  * events they need: resume and pause (NFC reader mode), permission answers
- * and activity results (the QR scanner).
+ * and activity results (the QR scanner), and links that open the app
+ * (LinkPlugin: the site server's register page, decision S16-13).
  */
 class MainActivity : FlutterActivity() {
     private var device: DevicePlugin? = null
@@ -20,6 +21,7 @@ class MainActivity : FlutterActivity() {
     private var qr: QrScanPlugin? = null
     private var usb: UsbPodPlugin? = null
     private var ble: BlePodPlugin? = null
+    private var links: LinkPlugin? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -32,6 +34,13 @@ class MainActivity : FlutterActivity() {
         usb = UsbPodPlugin(this, messenger)
         ble = BlePodPlugin(this, messenger)
         LocationPlugin(this, messenger)
+        links = LinkPlugin(messenger, intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        links?.onNewIntent(intent)
     }
 
     override fun onResume() {

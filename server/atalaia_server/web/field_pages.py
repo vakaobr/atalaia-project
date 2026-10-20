@@ -5,7 +5,9 @@
     GET /f/<slug>/                     the field page: its description, address and upcoming games
     GET /f/<slug>/games/<id>           one game: details, places, requirements, schema.org JSON-LD, and a
                                        *Register* button while registration is open and places are left
-    GET /f/<slug>/games/<id>/register  how to register for it (with an account, plan phase 16)
+    GET /f/<slug>/games/<id>/register  how to register for it (with an account, plan phase 16): a link that
+                                       opens the game in the app (atalaia://register?site=&field=&game=,
+                                       decision S17-10) and the page's address to paste there
     GET /f/<slug>/games.ics            iCalendar (RFC 5545) of the field's games
     GET /f/<slug>/games/<id>.ics       iCalendar of one game
     GET /f/<slug>/games.json           the JSON feed (``atalaia.games`` version 1)
@@ -36,6 +38,7 @@ from email.utils import format_datetime, parsedate_to_datetime
 from pathlib import Path
 from string import Template
 from typing import Any, Optional
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Request
@@ -387,7 +390,13 @@ async def register_page(slug: str, name: str, request: Request, db: AsyncSession
     t = page.t
     if svc.can_register(game, now, registered):
         steps = "".join(f"<li>{esc(t[k])}</li>\n" for k in ("reg_step_account", "reg_step_app", "reg_step_ticket"))
-        text = f'<p>{esc(t["reg_intro"])}</p>\n<ol class="steps">\n{steps}</ol>\n<p class="address">{esc(t["reg_data"])}</p>\n'
+        site = base_url(request)
+        app_link = "atalaia://register?" + urlencode({"site": site, "field": field.slug, "game": str(game.id)})
+        address = f"{site}/f/{field.slug}/games/{game.id}"
+        text = (f'<p>{esc(t["reg_intro"])}</p>\n<ol class="steps">\n{steps}</ol>\n'
+                f'<p class="register"><a class="button" href="{esc(app_link)}">{esc(t["reg_open_app"])}</a></p>\n'
+                f'<p>{esc(t["reg_address"])} <code>{esc(address)}</code></p>\n'
+                f'<p class="address">{esc(t["reg_data"])}</p>\n')
     else:
         text = f'<p class="notice">{esc(t["reg_unavailable"])}</p>\n'
     content = TEMPLATES["register"].substitute(

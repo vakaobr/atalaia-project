@@ -11,6 +11,8 @@
     PATCH  /api/v1/me/registrations/{reg}               change them while the window is open
     DELETE /api/v1/me/registrations/{reg}               cancel while the window is open
     POST   /api/v1/me/registrations/{reg}/ticket        a new ticket (shown once), until the game starts
+    GET    /api/v1/fields-by-slug/{slug}                any account: the field and its games that can be
+                                                        registered for, for the app (plan phase 17, S17-9)
     GET    /api/v1/me/player-ids                        the account's player ids and its claims
     POST   /api/v1/me/player-ids                        {field_id, player_id, player_secret}: claim the
                                                         id a phone already has at that field; the field's
@@ -36,7 +38,8 @@ from ..auth import Principal, current_principal, require_field_role
 from ..db import get_session
 from ..models import Field, FieldPlayerId, GameRegistration, PlayerIdClaim, ScheduledGame
 from ..services import registration as svc
-from .fields import NO_STORE
+from ..services import scheduling
+from .fields import NO_STORE, SLUG
 
 router = APIRouter(prefix="/api/v1", tags=["registrations"])
 
@@ -184,6 +187,45 @@ async def staff_cancel(field_id: uuid.UUID, game_id: uuid.UUID, reg_id: uuid.UUI
            resource_id=reg.id, details={"field_id": str(field_id), "by": "staff"})
     await db.commit()
     return Response(status_code=204)
+
+
+# --- the field's games for the app (decisions S16-13, S17-9) -------------------------------
+
+@router.get("/fields-by-slug/{slug}")
+async def field_games(slug: str, principal: Principal = Depends(current_principal),
+                      db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    """A field by its slug (as the public register page's link names it) with its published games that have
+    not ended, and what registering needs: the teams, the federation number, the replicas' classes. Any
+    logged-in account; drafts never; no person (only the places left)."""
+    if not SLUG.fullmatch(slug):
+        raise HTTPException(404, "field_not_found")
+    field = await db.scalar(select(Field).where(Field.slug == slug))
+    if field is None:
+        raise HTTPException(404, "field_not_found")
+    now = svc.now_utc()
+    games = list(await db.scalars(select(ScheduledGame).where(
+        ScheduledGame.field_id == field.id, ScheduledGame.status != "draft", ScheduledGame.ends_at > now)
+        .order_by(ScheduledGame.starts_at, ScheduledGame.id).limit(200)))
+    n = await svc.counts(db, [g.id for g in games])
+    out = []
+    for g in games:
+        registered = n.get(g.id, 0)
+        out.append({
+            "id": str(g.id), "title": g.title, "description": g.description,
+            "starts_at": g.starts_at.isoformat(), "ends_at": g.ends_at.isoformat(),
+            "location": scheduling.location(g, field), "mode_id": g.mode_id, "teams": list(g.teams or ()),
+            "max_players": g.max_players, "places_left": scheduling.places_left(g, registered),
+            "registration_opens_at": g.registration_opens_at.isoformat() if g.registration_opens_at else None,
+            "registration_closes_at": g.registration_closes_at.isoformat() if g.registration_closes_at else None,
+            "registration_state": scheduling.registration_state(g, now),
+            "registration_open": scheduling.can_register(g, now, registered), "federation": g.federation,
+            "predeclare_replicas": g.predeclare_replicas, "status": g.status, "cancelled_reason": g.cancelled_reason})
+    return JSONResponse({"field": {"id": str(field.id), "slug": field.slug, "name": field.name,
+                                   "timezone": field.timezone, "federation_label": field.federation_label,
+                                   "limit_template": field.limit_template,
+                                   "classes": list(svc.classes(field.limit_template)),
+                                   "max_replicas": field.max_replicas},
+                         "games": out}, headers=NO_STORE)
 
 
 # --- the account's own ----------------------------------------------------------------------

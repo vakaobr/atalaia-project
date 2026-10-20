@@ -360,6 +360,7 @@ def registration_json(reg: GameRegistration, replicas: list[RegistrationReplica]
         "id": str(reg.id), "scheduled_game_id": str(reg.scheduled_game), "field_id": str(reg.field_id),
         "player_id": reg.player_id, "display_name": reg.display_name, "team_preference": reg.team_preference,
         "federation_number": reg.federation_number, "status": reg.status, "source": reg.source,
+        "external_ref": reg.external_ref,
         "has_ticket": reg.ticket_hash is not None, "replicas": [replica_json(r) for r in replicas],
         "created_at": _iso(reg.created_at), "updated_at": _iso(reg.updated_at),
         "cancelled_at": _iso(reg.cancelled_at), "outcome_at": _iso(reg.outcome_at),

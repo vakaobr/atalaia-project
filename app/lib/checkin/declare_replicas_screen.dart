@@ -106,7 +106,7 @@ class _DeclareReplicasScreenState extends State<DeclareReplicasScreen> {
   Future<void> _add() async {
     final r = await showDialog<MyReplica>(
       context: context,
-      builder: (_) => _NewReplicaDialog(classes: _classes),
+      builder: (_) => NewReplicaDialog(classes: _classes),
     );
     if (r == null) return;
     await store.saveReplica(r);
@@ -176,15 +176,17 @@ class _DeclareReplicasScreenState extends State<DeclareReplicasScreen> {
   }
 }
 
-class _NewReplicaDialog extends StatefulWidget {
-  const _NewReplicaDialog({required this.classes});
+/// A new replica for "my replicas": its type, a class of [classes], make
+/// and model (also the site server's registration form, lib/site/).
+class NewReplicaDialog extends StatefulWidget {
+  const NewReplicaDialog({required this.classes, super.key});
   final List<String> classes;
 
   @override
-  State<_NewReplicaDialog> createState() => _NewReplicaDialogState();
+  State<NewReplicaDialog> createState() => _NewReplicaDialogState();
 }
 
-class _NewReplicaDialogState extends State<_NewReplicaDialog> {
+class _NewReplicaDialogState extends State<NewReplicaDialog> {
   String _type = 'aeg';
   late String _class = widget.classes.first;
   final _make = TextEditingController();

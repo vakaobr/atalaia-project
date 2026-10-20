@@ -1363,6 +1363,15 @@ screens (account login, the field's games, registering, keeping and sending the
 ticket; the app's Dart ticket codec is built), `[sync] push_walkins` and the
 guest registrations it implies (S16-13).
 
+*App screens built 2026-10-20 with plan phase 17 (decisions S17-9 to S17-16):*
+*Participante › Inscrições online* logs in to the field's site server (password,
+then TOTP; the refresh token rotated), lists the field's games through a new
+`GET /api/v1/fields-by-slug/{slug}`, registers with replicas, keeps the ticket on
+the phone (QR and text) and can send it with the app's check-in, changes and
+cancels, and claims the phone's player id; the public register page links to it
+with `atalaia://register?site=&field=&game=` (or its address pasted). Still not
+built: making an account in the app (S17-16), `[sync] push_walkins`.
+
 ---
 
 ## Plan phase 17: Registration import and platform adapters
@@ -1375,6 +1384,25 @@ interface with a test adapter, off by default, encrypted configuration,
 every call audited; `server/docs/integrations.md`. No adapter for a
 named platform (F22). Tests: `test_registration_import.py`,
 `test_integrations.py`.
+
+**Built 2026-10-20** (in software; decisions S17-1 to S17-17). Differences from
+the text above, as built: the migration is `0008_integrations`, with the two
+adapter tables only (the import's `source` and `external_ref` came with
+`0007_registration`, S17-1); the code is `atalaia_server/integrations/`, not
+`server/src/integrations/`. The import is
+`POST .../registrations/import?source=&dry_run=&basis_confirmed=` (a real
+import needs the staff to confirm the field's basis for the list, S17-4), with
+the format in `import_format.py` (plain Python, also run by tools/check.sh in
+`tests.test_import_format`), at most 1 MiB and 5,000 rows, row-level codes, and
+the rules of S17-3 (cancelled ones skipped, missing ones listed, never
+cancelled). A CSV export of a game's registrations, safe from spreadsheet
+formulas and importable back, is added (S17-17). Imported registrations are
+guests, deleted 30 days after their game (S17-5). Adapter calls happen only
+when the staff ask (`.../integrations/{adapter}/push`, `.../registrations`),
+with 20 seconds each, every call audited (S17-7); the test adapter is offered
+only with `ATALAIA_TEST_ADAPTER=on` (S17-6). The app's registration screens that
+plan phase 16 left out (S16-13) were built at the same time (S17-9 to S17-16).
+AC-19 also runs `tests.test_import_format`.
 
 ---
 

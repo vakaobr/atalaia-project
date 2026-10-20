@@ -51,6 +51,14 @@ class SettingsTests(unittest.TestCase):
             with self.subTest(raw=raw), self.assertRaisesRegex(ConfigError, "ATALAIA_PUBLIC_URL"):
                 Settings.from_env({**BASE, "ATALAIA_PUBLIC_URL": raw})
 
+    def test_test_adapter(self) -> None:
+        self.assertFalse(Settings.from_env(BASE).test_adapter)  # off unless asked for (plan phase 17)
+        self.assertFalse(Settings.from_env({**BASE, "ATALAIA_TEST_ADAPTER": "Off"}).test_adapter)
+        self.assertTrue(Settings.from_env({**BASE, "ATALAIA_TEST_ADAPTER": " on "}).test_adapter)
+        for raw in ("1", "yes", "true"):
+            with self.subTest(raw=raw), self.assertRaisesRegex(ConfigError, "ATALAIA_TEST_ADAPTER"):
+                Settings.from_env({**BASE, "ATALAIA_TEST_ADAPTER": raw})
+
     def test_every_setting(self) -> None:
         s = Settings.from_env({
             **BASE, "ATALAIA_DB_POOL_SIZE": "10", "ATALAIA_DB_MAX_OVERFLOW": "0",

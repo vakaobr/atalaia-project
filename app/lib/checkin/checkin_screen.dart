@@ -24,6 +24,7 @@ import '../marshal/chrono_queue.dart';
 import '../player/field_feed.dart';
 import '../player/player_screens.dart';
 import '../protocol/checkin_poster.dart';
+import '../site/site_api.dart';
 import '../ui/widgets.dart';
 import 'checkin_client.dart';
 import 'declare_replicas_screen.dart';
@@ -59,12 +60,22 @@ class _CheckinScreenState extends State<CheckinScreen> {
   String? _team;
   final _picked = <String>{};
 
+  /// The tickets of online registrations the phone keeps (lib/site/), and
+  /// the one picked to go with this check-in.
+  List<KeptTicket> _tickets = const [];
+  KeptTicket? _ticket;
+
   @override
   void initState() {
     super.initState();
     final st = AppScope.read(context).settings;
     _name.text = st.displayName ?? '';
     unawaited(context.services.checkins.load());
+    unawaited(
+      context.services.tickets.all().then((t) {
+        if (mounted) setState(() => _tickets = t.reversed.toList());
+      }),
+    );
     if (widget.posterText != null) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _usePoster(widget.posterText!),
@@ -208,7 +219,25 @@ class _CheckinScreenState extends State<CheckinScreen> {
     });
     final services = context.services;
     final app = AppScope.read(context);
-    final id = await FieldIdentities(services.store).forField(field.fieldId);
+    final ids = FieldIdentities(services.store);
+    final kept = _ticket;
+    final FieldIdentity id;
+    if (kept == null) {
+      id = await ids.forField(field.fieldId);
+    } else {
+      // The registration's player id, which this phone takes here if it has
+      // no id at this field yet (the controller keeps the new secret's hash).
+      id = await ids.adopt(field.fieldId, kept.playerId);
+      if (id.playerId != kept.playerId) {
+        if (!mounted) return;
+        setState(() {
+          _step = _Step.form;
+          _error = 'checkin.ticket_other_id';
+          _errorArgs = const {};
+        });
+        return;
+      }
+    }
     final game = info.games.firstWhere((g) => g['game_id'] == gameId);
     final pending = FieldCheckin(
       fieldId: field.fieldId,
@@ -236,6 +265,8 @@ class _CheckinScreenState extends State<CheckinScreen> {
         federationNumber: info.federation == 'off' || fed.isEmpty ? null : fed,
         teamPreference: _team,
         replicas: decls.isEmpty ? null : decls,
+        registrationId: kept?.registrationId,
+        registrationTicket: kept?.ticket,
       );
       pending.update(ticket);
       await store.saveCheckin(pending);
@@ -433,6 +464,32 @@ class _CheckinScreenState extends State<CheckinScreen> {
                 DropdownMenuItem(value: t, child: Text(s.team(t))),
             ],
             onChanged: (v) => setState(() => _team = v),
+          ),
+        if (_tickets.isNotEmpty)
+          DropdownButtonFormField<KeptTicket?>(
+            key: const Key('checkin-registration'),
+            initialValue: _ticket,
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: s.t('checkin.registered'),
+              helperText: s.t('checkin.registered_hint'),
+              helperMaxLines: 3,
+            ),
+            items: [
+              DropdownMenuItem(
+                value: null,
+                child: Text(s.t('checkin.no_registration')),
+              ),
+              for (final t in _tickets)
+                DropdownMenuItem(
+                  value: t,
+                  child: Text(
+                    '${t.gameTitle} · ${t.fieldName}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            onChanged: (v) => setState(() => _ticket = v),
           ),
         if (mine.isNotEmpty) ...[
           SectionTitle(s.t('checkin.bring')),

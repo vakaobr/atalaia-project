@@ -26,6 +26,8 @@ What holds personal data now (plan phases 10-12):
 | ``scheduled_games`` (plan phase 15) | the games the person scheduled as the field's staff (``scheduled_games.json``) | kept (they are the field's), without the link to the account (``created_by``) | 24 months after the game's end, as game history |
 | ``game_registrations`` with ``registration_replicas`` (plan phase 16) | the person's registrations with their pre-declared replicas and outcomes (``registrations.json``; never the ticket's hash) | a game not yet started: cancelled; every one: the account, the name, the team preference, the federation number and the ticket's hash cleared, the replicas' make and model too (the outcome and the declarations' states stay, the field's history) | the federation number 30 days after the game (ADR-P4-11); the rest with the scheduled game (24 months) |
 | ``player_id_claims`` (plan phase 16) | the person's claims of a phone's player id (``player_id_claims.json``) | deleted | 30 days after the claim was made |
+| imported ``game_registrations`` (plan phase 17: ``source`` not ``site``, no account) with their replicas | (no account: the field's staff see them in the game's list and its CSV export) | (no account to erase; the field answers a request from the person, as the data controller of what it imported) | deleted 30 days after the game, the guest rule (ADR-P4-8, ADR-P4-12) |
+| ``platform_links``, ``external_game_links`` (plan phase 17) | (the field's: no person in them) | | |
 
 The synced games (plan phase 13) come from field controllers and hold no
 account: their events carry only the field's pseudonymous player ids
@@ -53,6 +55,10 @@ applies there); what comes back holds no name. The account's player id at a fiel
 on its first registration there or adopted from the phone (a claim the controller confirms);
 from then on the field's synced events and chrono records under that id are the person's
 (``field_player_ids``), and erasure drops that link as before.
+Imported registrations (plan phase 17) belong to no account: a list the field brought from
+another platform, with only the import's columns (any other column is never read). The field is
+the data controller for them and must have its own basis for that list (the import asks the staff
+to confirm it); they are guests, so the whole registration goes 30 days after its game.
 
 Erasure is anonymisation, not deletion (ADR-P4-8): the ``users`` row stays
 under a random ``deleted-`` name with no email, no password and no consent,
@@ -91,14 +97,15 @@ PURPOSES = (ACCOUNT, CHRONO_SHARING)
 ERASED_PREFIX = "deleted-"
 ERASED_PASSWORD = "DELETED"  # not an Argon2 hash: passwords.verify_password never accepts it
 
-# Retention (ADR-P4-8's table; decisions S12-6, S13-10, S14-8, S16-7). Guest data comes with its table (plan
-# phase 17's imports); game history is 24 months, fixed until fields get a setting; the chrono registry keeps each
-# field's fields.default_retention_days (365 by default, the controller's CHRONO_RETENTION_DAYS).
+# Retention (ADR-P4-8's table; decisions S12-6, S13-10, S14-8, S16-7, S17-5). Guest data is plan phase 17's
+# imports (GUEST_RETENTION); game history is 24 months, fixed until fields get a setting; the chrono registry
+# keeps each field's fields.default_retention_days (365 by default, the controller's CHRONO_RETENTION_DAYS).
 SESSION_RETENTION = timedelta(days=30)   # after a session expired or was revoked
 AUDIT_RETENTION = timedelta(days=1095)   # 36 months
 GAME_RETENTION = timedelta(days=730)     # 24 months: game history, after the game ended (scheduled games too)
 FEDERATION_RETENTION = timedelta(days=30)  # a registration's federation number, after the game (ADR-P4-11)
 CLAIM_RETENTION = timedelta(days=30)     # a claim of a phone's player id, after it was made
+GUEST_RETENTION = timedelta(days=30)     # an imported registration (no account), after its game (ADR-P4-8)
 
 
 def _iso(value: Optional[datetime]) -> Optional[str]:
@@ -358,6 +365,12 @@ async def purge(db: AsyncSession, now: Optional[datetime] = None, dry_run: bool 
     counts["federation_numbers"] = federation.rowcount or 0
     claims = await db.execute(delete(PlayerIdClaim).where(PlayerIdClaim.created_at < now - CLAIM_RETENTION))
     counts["player_id_claims"] = claims.rowcount or 0
+    # Imported registrations (plan phase 17) are guests: the whole row 30 days after the game (replicas cascade).
+    guests_ended = select(ScheduledGame.id).where(ScheduledGame.ends_at < now - GUEST_RETENTION).scalar_subquery()
+    guests = await db.execute(delete(GameRegistration).where(
+        GameRegistration.source != "site", GameRegistration.user_id.is_(None),
+        GameRegistration.scheduled_game.in_(guests_ended)))
+    counts["imported_registrations"] = guests.rowcount or 0
     if dry_run:
         await db.rollback()
         return counts

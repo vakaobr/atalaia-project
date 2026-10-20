@@ -568,4 +568,137 @@ const Map<String, String> ptStrings = {
       'Só durante o jogo; o controlador decide quem a vê (a tua squad, se o jogo o permitir, a organização e os marshals).',
   'checkin.team_squad': '{team} › squad {squad}',
   'branding.logo': 'Logótipo de {name}',
+  // Inscrições online no servidor do campo (decisão S16-13)
+  'player.site': 'Inscrições online',
+  'site.title': 'Inscrições online',
+  'site.intro':
+      'As inscrições num jogo fazem-se com uma conta no site do campo. '
+      'Abre o botão «Fazer a inscrição» da página do jogo, ou cola aqui o '
+      'endereço da página do campo ou do jogo.',
+  'site.address': 'Endereço da página do campo ou do jogo',
+  'site.open': 'Abrir',
+  'site.bad_address':
+      'Isto não é o endereço de uma página de campo ou de jogo (https://…/f/…).',
+  'site.confirm_text':
+      'Vais entrar com a tua conta em {host}. Só continues se for o site do '
+      'campo onde vais jogar: quem fez a ligação pode ter escrito outro site.',
+  'site.confirm': 'É este o site, continuar',
+  'site.login_at': 'Entrar em {host}',
+  'site.login_hint':
+      'Com a conta que criaste neste site. A app guarda a sessão neste '
+      'telemóvel; a palavra-passe não fica guardada.',
+  'site.username': 'Nome de utilizador',
+  'site.password': 'Palavra-passe',
+  'site.login': 'Entrar',
+  'site.need_login': 'Escreve o nome de utilizador e a palavra-passe.',
+  'site.totp_text':
+      'Esta conta tem verificação em dois passos: escreve o código da tua '
+      'app de autenticação.',
+  'site.code': 'Código de 6 algarismos',
+  'site.logged_in': 'Com a conta {user} em {host}',
+  'site.logout': 'Sair da conta',
+  'site.games': 'Jogos',
+  'site.no_games': 'Este campo não tem jogos publicados para os próximos dias.',
+  'site.game_gone': 'Esse jogo já não está publicado ou já terminou.',
+  'site.cancelled': 'Cancelado',
+  'site.cancelled_reason': 'Este jogo foi cancelado: {reason}',
+  'site.open_until': 'Inscrições abertas até {when}',
+  'site.left': '{n} lugares',
+  'site.opens': 'As inscrições abrem a {when}',
+  'site.full': 'Esgotado',
+  'site.closed': 'Inscrições fechadas',
+  'site.no_online': 'Sem inscrição online: fala com a organização do campo.',
+  'site.reg.registered': 'Tens inscrição neste jogo.',
+  'site.reg.checked_in': 'Fizeste o check-in neste jogo.',
+  'site.reg.no_show': 'Não compareceste a este jogo.',
+  'site.reg.cancelled': 'Cancelaste a inscrição.',
+  'site.form': 'Inscrição',
+  'site.form_change': 'Alterar a inscrição',
+  'site.name_hint': 'O nome que a organização e os marshals veem neste jogo.',
+  'site.replicas': 'Réplicas que vais usar (até {n})',
+  'site.class_not_here': '{class}: este campo não tem esta classe',
+  'site.too_many': 'Este campo aceita até {n} réplicas por pessoa.',
+  'site.register': 'Fazer a inscrição',
+  'site.save': 'Guardar as alterações',
+  'site.changed': 'Inscrição alterada.',
+  'site.cancel_reg': 'Cancelar a inscrição',
+  'site.cancel_title': 'Cancelar a inscrição?',
+  'site.cancel_text':
+      'Deixas de ter lugar em {game} e o bilhete de check-in deixa de valer.',
+  'site.cancel_yes': 'Cancelar a inscrição',
+  'site.data_note':
+      'O campo recebe o nome escolhido para o jogo, a preferência de equipa, '
+      'o número de federado (se o jogo o pedir) e as réplicas declaradas, e '
+      'apaga-os 30 dias depois do jogo.',
+  'site.show_ticket': 'Mostrar o bilhete de check-in',
+  'site.no_ticket_here':
+      'O bilhete desta inscrição não está neste telemóvel. Pede um novo: o '
+      'antigo deixa de valer.',
+  'site.new_ticket': 'Pedir um bilhete novo',
+  'site.ticket': 'Bilhete de check-in',
+  'site.ticket_text':
+      'No campo, mostra este código a um marshal, ou faz o check-in na app '
+      'com «Check-in no campo» e escolhe esta inscrição. O texto do bilhete:',
+  'site.copy': 'Copiar o texto',
+  'site.copied': 'Copiado.',
+  'site.ticket_secret':
+      'Quem tiver este bilhete pode fazer o check-in no teu lugar: não o '
+      'partilhes.',
+  'site.my_tickets': 'Os meus bilhetes',
+  'site.no_tickets': 'Ainda não há bilhetes neste telemóvel.',
+  'site.claim': 'Usar o meu ID deste telemóvel',
+  'site.claim_text':
+      'Se já fizeste check-in em {field} com este telemóvel, a conta pode '
+      'ficar com o mesmo ID de participante (as tuas réplicas e '
+      'cronografagens). O controlador do campo confirma-o na próxima '
+      'sincronização.',
+  'site.claim_pick': 'Os IDs deste telemóvel',
+  'site.claim_at': 'No controlador {field}',
+  'site.claim_none': 'Este telemóvel ainda não fez check-in em nenhum campo.',
+  'site.claim_send': 'Pedir este ID',
+  'site.claim_linked': 'A conta já tem o ID {id} neste campo.',
+  'site.claim.pending':
+      'Pedido enviado: à espera da confirmação do controlador do campo.',
+  'site.claim.confirmed': 'Confirmado.',
+  'site.claim.refused':
+      'O controlador do campo não confirmou esse ID (outro telemóvel, ou um '
+      'check-in feito à mão).',
+  'site.error': 'O site recusou: {error}',
+  'site.err.offline': 'Sem ligação ao site. Tenta outra vez daqui a pouco.',
+  'site.err.login_required': 'A sessão terminou: entra outra vez.',
+  'site.err.invalid_credentials':
+      'Nome de utilizador ou palavra-passe errados.',
+  'site.err.invalid_code': 'Código errado. Tenta o código seguinte.',
+  'site.err.invalid_totp_session':
+      'O passo do código expirou: escreve outra vez a palavra-passe.',
+  'site.err.too_many_attempts': 'Demasiadas tentativas: espera um pouco.',
+  'site.err.field_not_found': 'Este site não tem esse campo.',
+  'site.err.http_404':
+      'Este site não tem inscrições online (versão antiga do servidor?).',
+  'site.err.scheduled_game_not_found': 'Esse jogo já não existe.',
+  'site.err.registration_not_found': 'Essa inscrição já não existe.',
+  'site.err.registration_closed': 'As inscrições deste jogo estão fechadas.',
+  'site.err.game_full': 'Este jogo está esgotado.',
+  'site.err.already_registered': 'Já tens inscrição neste jogo.',
+  'site.err.not_registered': 'Esta inscrição já não está ativa.',
+  'site.err.game_started': 'O jogo já começou.',
+  'site.err.federation_number_required': 'Este jogo pede o número de federado.',
+  'site.err.display_name_invalid': 'O nome tem de ter 1 a 32 caracteres.',
+  'site.err.team_preference_invalid': 'Essa equipa não está neste jogo.',
+  'site.err.too_many_replicas': 'Réplicas a mais para este campo.',
+  'site.err.replica_class_invalid':
+      'Uma das réplicas tem uma classe que este campo não tem.',
+  'site.err.replicas_not_asked': 'Este jogo não pede réplicas na inscrição.',
+  'site.err.player_id_exists':
+      'A conta já tem um ID de participante neste campo.',
+  'site.err.player_id_taken': 'Esse ID já é de outra conta.',
+  'site.err.player_secret_invalid': 'O segredo deste ID não é válido.',
+  'checkin.registered': 'Inscrição online',
+  'checkin.no_registration': 'Sem inscrição (entrada no dia)',
+  'checkin.registered_hint':
+      'Se te inscreveste no site do campo, escolhe a inscrição: o bilhete vai '
+      'com o check-in.',
+  'checkin.ticket_other_id':
+      'Este telemóvel já tem outro ID neste campo. Usa «Usar o meu ID deste '
+      'telemóvel» nas inscrições online, ou faz o check-in sem a inscrição.',
 };

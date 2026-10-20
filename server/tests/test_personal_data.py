@@ -25,9 +25,9 @@ from atalaia_server.ratelimit import Limits
 
 from .base import PASSWORD, SECRET_KEY, AppTestCase
 
-# Plan phase 14's and 15's counts.
+# Plan phase 14's to 17's counts.
 NO_CHRONO = {"chrono_readings": 0, "chrono_rejects": 0, "replicas": 0, "marshal_keys": 0, "scheduled_games": 0,
-             "federation_numbers": 0, "player_id_claims": 0}
+             "federation_numbers": 0, "player_id_claims": 0, "imported_registrations": 0}
 
 NEW_PASSWORD = "a different long passphrase 7"
 
@@ -377,7 +377,8 @@ class PurgeTests(PersonalDataTestCase):
                 else:
                     os.environ[k] = v
         rest = (", 0 chrono readings rows, 0 chrono rejects rows, 0 replicas rows, 0 marshal keys rows, "
-                "0 scheduled games rows, 0 federation numbers rows, 0 player id claims rows\n")
+                "0 scheduled games rows, 0 federation numbers rows, 0 player id claims rows, "
+                "0 imported registrations rows\n")
         self.assertEqual(outputs, ["Retention purge would delete: 1 sessions rows, 0 audit log rows, 0 games rows" + rest,
                                    "Retention purge deleted: 1 sessions rows, 0 audit log rows, 0 games rows" + rest])
         self.assertEqual((await self.fetch("SELECT count(*) FROM sessions"))[0][0], 0)

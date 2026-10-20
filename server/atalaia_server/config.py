@@ -19,6 +19,8 @@
     ATALAIA_PUBLIC_URL      the site's public origin (https://campo.example.pt): the links in
                             the field pages and feeds and the host name in iCalendar UIDs;
                             unset, they follow the request (a local trial only)
+    ATALAIA_TEST_ADAPTER    "on" offers the platform adapters' test adapter (an in-memory stand-in
+                            for a platform, for trials and tests); "off" by default (plan phase 17)
 
 Plain Python with no third-party imports, so its tests also run in the
 atalaia-dev image (tools/check.sh). A setting that is present but wrong is
@@ -122,6 +124,15 @@ def _purge_hour(env: Mapping[str, str]) -> Optional[int]:
     return int(_number(env, "ATALAIA_PURGE_HOUR", 3, 0, 23, int))
 
 
+def _on_off(env: Mapping[str, str], name: str) -> bool:
+    raw = env.get(name, "").strip().lower()
+    if raw in ("", "off"):
+        return False
+    if raw == "on":
+        return True
+    raise ConfigError(f"{name} must be on or off, not {raw}")
+
+
 @dataclass(frozen=True)
 class Settings:
     database_url: str = field(repr=False)
@@ -134,6 +145,7 @@ class Settings:
     purge_hour: Optional[int] = 3
     privacy_notice_version: str = DEFAULT_NOTICE_VERSION
     public_url: Optional[str] = None
+    test_adapter: bool = False
 
     def __post_init__(self) -> None:
         _check_url(self.database_url)
@@ -157,7 +169,7 @@ class Settings:
                 f"db_max_overflow={self.db_max_overflow}, db_timeout_s={self.db_timeout_s}, "
                 f"metrics_token={'set' if self.metrics_token else 'unset'}, log_level={self.log_level!r}, "
                 f"purge_hour={self.purge_hour!r}, privacy_notice_version={self.privacy_notice_version!r}, "
-                f"public_url={self.public_url!r})")
+                f"public_url={self.public_url!r}, test_adapter={self.test_adapter!r})")
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Settings":
@@ -177,4 +189,5 @@ class Settings:
             purge_hour=_purge_hour(env),
             privacy_notice_version=env.get("ATALAIA_PRIVACY_NOTICE_VERSION", "").strip() or DEFAULT_NOTICE_VERSION,
             public_url=env.get("ATALAIA_PUBLIC_URL", "").strip() or None,
+            test_adapter=_on_off(env, "ATALAIA_TEST_ADAPTER"),
         )

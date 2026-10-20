@@ -182,6 +182,9 @@ class FakeField {
         );
         row['display_name'] = b['display_name'];
         row['federation_number'] = b['federation_number'];
+        // A site server registration's id and ticket (decision S16-8).
+        row['registration_id'] = b['registration_id'];
+        row['registration_ticket'] = b['ticket'];
         if (b['replicas'] is List) _declare(row, b['replicas']! as List);
         return FieldResponse(created ? 201 : 200, _ticket(pid));
       case 'POST /checkin/token':

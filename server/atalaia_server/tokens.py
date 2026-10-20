@@ -57,6 +57,7 @@ class Keys:
         self.access = _derive(secret_key, "access token")
         self.totp_step = _derive(secret_key, "totp login step")
         self.totp_seed = base64.urlsafe_b64encode(_derive(secret_key, "totp seed"))  # a Fernet key
+        self.platform_config = base64.urlsafe_b64encode(_derive(secret_key, "platform config"))  # a Fernet key
 
     def __repr__(self) -> str:
         return "Keys(...)"
