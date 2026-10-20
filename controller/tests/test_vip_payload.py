@@ -17,12 +17,24 @@
 from __future__ import annotations
 
 import json
+import re
 import unittest
 from typing import Any
 
 from p3support import GM, READ, P3Case, bearer
 
 from atalaia_controller.mqtt import MqttBridge
+
+
+_JSON_STRING = re.compile(r'"((?:[^"\\]|\\.)*)"')
+_UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+
+
+def leaked(secret: str, text: str) -> list[str]:
+    """The JSON strings in text that carry secret: a code leaks in a value or a message, never in a
+    number (a timestamp such as 941.4711146 is not a leak) or a UUID (ids are random hex)."""
+    return [s for s in _JSON_STRING.findall(text) if secret in s and not _UUID.fullmatch(s)]
+
 
 VIP = "org.atalaia.vip_payload"
 HACK = "org.atalaia.hacking_terminal"
@@ -168,7 +180,7 @@ class GmOnlyTests(Case):
                 self.client.websocket_connect(f"/api/v1/stream?token={self.marshal[1]}") as marshal, \
                 self.client.websocket_connect("/api/v1/stream?token=gm-secret") as gm:
             hellos = [ws.receive_json() for ws in (player, read, marshal, gm)]
-            self.assertNotIn("4711", json.dumps(hellos[:2]))      # the game's reveal_code
+            self.assertEqual(leaked("4711", json.dumps(hellos[:2])), [])      # the game's reveal_code
             self.assertEqual(hellos[2]["game"]["params"]["reveal_code"], "4711")
             self.assertEqual(hellos[3]["game"]["params"]["reveal_code"], "4711")
             self.solve()
@@ -178,7 +190,7 @@ class GmOnlyTests(Case):
             solved = [m["event"] for m in msgs if m["type"] == "event" and m["event"]["type"] == "hacking.solved"]
             self.assertEqual([e["data"] for e in solved], [{"puzzle": "wires"}], name)
             self.assertTrue([m for m in msgs if m["type"] == "game"], name)
-            self.assertNotIn("4711", json.dumps(msgs), name)
+            self.assertEqual(leaked("4711", json.dumps(msgs)), [], name)
         for name, msgs in zip(("marshal", "gm"), got[2:]):
             solved = [m["event"] for m in msgs if m["type"] == "event" and m["event"]["type"] == "hacking.solved"]
             self.assertEqual(solved[0]["data"]["code"], "4711", name)
@@ -186,7 +198,7 @@ class GmOnlyTests(Case):
             self.assertEqual(game["params"]["reveal_code"], "4711", name)
         # A later connection's hello: its latest events.
         with self.client.websocket_connect(f"/api/v1/stream?token={self.player[1]}") as player:
-            self.assertNotIn("4711", json.dumps(player.receive_json()))
+            self.assertEqual(leaked("4711", json.dumps(player.receive_json())), [])
         with self.client.websocket_connect(f"/api/v1/stream?token={self.marshal[1]}") as marshal:
             hello = marshal.receive_json()
             self.assertIn("4711", json.dumps([e for e in hello["events"] if e["type"] == "hacking.solved"]))
@@ -196,7 +208,7 @@ class GmOnlyTests(Case):
         for headers in (bearer(self.player[1]), READ):
             text = json.dumps([self.client.get(p, headers=headers).json() for p in (
                 f"/api/v1/games/{self.gid}/log", f"/api/v1/games/{self.gid}", "/api/v1/games")])
-            self.assertNotIn("4711", text)
+            self.assertEqual(leaked("4711", text), [])
             self.assertIn("hacking.solved", text)
             self.assertIn('"puzzle": "wires"', text)
         for headers in (GM, bearer(self.marshal[1])):
@@ -208,7 +220,7 @@ class GmOnlyTests(Case):
                          "4711")
         sent = [d for t, d in self.mqtt.sent if t.endswith("/events/hacking.solved")]
         self.assertEqual([d["data"] for d in sent], [{"puzzle": "wires"}])
-        self.assertNotIn("4711", self.mqtt.text())
+        self.assertEqual(leaked("4711", self.mqtt.text()), [])
 
     def test_presets_for_the_read_token(self):
         r = self.client.post("/api/v1/presets", headers=GM, json={
