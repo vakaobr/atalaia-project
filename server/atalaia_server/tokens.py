@@ -19,6 +19,12 @@ session and makes the stored TOTP seeds unreadable (their owners enrol again).
   A random 256-bit value cannot be guessed, so a fast hash is enough (as for
   the controllers' API keys, P4R13), and looking a token up by its hash leaks
   nothing through timing.
+
+In hosted mode (plan phase 21) both JWTs also carry ``ten``, the tenant's
+schema they were made in, and are read only in that tenant: a token from one
+field's address is refused at another's even before its session is looked
+up (decision S21-6). In single-field mode they carry no ``ten`` and one
+that does is refused.
 """
 
 from __future__ import annotations
@@ -35,6 +41,8 @@ from typing import Any, Callable, Optional
 import jwt
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
+from . import tenancy
 
 ISSUER = "atalaia-server"
 ALGORITHM = "HS256"
@@ -79,6 +87,9 @@ def _encode(key: bytes, claims: dict[str, Any], ttl_s: int, now: Optional[float]
     issued = int(time.time() if now is None else now)
     exp = issued + ttl_s
     payload = {"iss": ISSUER, "iat": issued, "exp": exp, "jti": secrets.token_urlsafe(16), **claims}
+    tenant = tenancy.current_schema()
+    if tenant is not None:
+        payload["ten"] = tenant
     return jwt.encode(payload, key, algorithm=ALGORITHM), exp
 
 
@@ -90,6 +101,8 @@ def _decode(key: bytes, token: str, typ: str) -> dict[str, Any]:
         raise TokenError(type(e).__name__) from None
     if claims.get("typ") != typ:
         raise TokenError("wrong token type")
+    if claims.get("ten") != tenancy.current_schema():
+        raise TokenError("another tenant's token")
     return claims
 
 

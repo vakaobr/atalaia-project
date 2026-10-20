@@ -24,6 +24,12 @@
     ATALAIA_FIRMWARE_KEYS   the Ed25519 public keys (32 bytes in standard base64, separated by
                             commas, at most 8) whose signatures the firmware catalogue accepts
                             (plan phase 19); unset, the catalogue takes no entry at all
+    ATALAIA_HOSTED          "on": hosted multi-tenant mode (ADR-P4-4, plan phase 21): one PostgreSQL
+                            schema per field, each field at https://<slug>.<ATALAIA_HOSTED_DOMAIN>,
+                            row-level security underneath (atalaia_server/tenancy.py, hosted.py);
+                            "off" by default: a club's own single-field server, as before
+    ATALAIA_HOSTED_DOMAIN   hosted mode only, and required there: the hub's domain (hub.example.pt);
+                            ATALAIA_PUBLIC_URL must then be unset (each field has its own address)
 
 Plain Python with no third-party imports, so its tests also run in the
 atalaia-dev image (tools/check.sh). A setting that is present but wrong is
@@ -50,6 +56,8 @@ _KEY_HINT = "(python3 -c \"import secrets; print(secrets.token_urlsafe(32))\")"
 
 
 MAX_FIRMWARE_KEYS = 8
+# A DNS name of two labels or more, lower case, no port: the hosted hub's domain (plan phase 21).
+HOSTED_DOMAIN = re.compile(r"(?=.{4,200}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?")
 
 
 class ConfigError(ValueError):
@@ -167,6 +175,8 @@ class Settings:
     public_url: Optional[str] = None
     test_adapter: bool = False
     firmware_keys: tuple[str, ...] = ()
+    hosted: bool = False
+    hosted_domain: Optional[str] = None
 
     def __post_init__(self) -> None:
         _check_url(self.database_url)
@@ -186,6 +196,20 @@ class Settings:
         if len(self.firmware_keys) > MAX_FIRMWARE_KEYS:
             raise ConfigError(f"ATALAIA_FIRMWARE_KEYS: at most {MAX_FIRMWARE_KEYS} keys")
         object.__setattr__(self, "firmware_keys", tuple(check_firmware_key(k) for k in self.firmware_keys))
+        if self.hosted:
+            domain = (self.hosted_domain or "").strip().lower()
+            if not domain:
+                raise ConfigError("ATALAIA_HOSTED_DOMAIN is not set: hosted mode needs the hub's domain "
+                                  "(each field is at https://<slug>.<domain>)")
+            if not HOSTED_DOMAIN.fullmatch(domain):
+                raise ConfigError("ATALAIA_HOSTED_DOMAIN must be a domain name such as hub.example.pt "
+                                  "(no scheme, port or path)")
+            object.__setattr__(self, "hosted_domain", domain)
+            if self.public_url is not None:
+                raise ConfigError("ATALAIA_PUBLIC_URL must be unset in hosted mode: each field's address is "
+                                  "https://<slug>.<ATALAIA_HOSTED_DOMAIN>")
+        elif self.hosted_domain is not None:
+            raise ConfigError("ATALAIA_HOSTED_DOMAIN is only for hosted mode (ATALAIA_HOSTED=on)")
 
     def __repr__(self) -> str:
         return (f"Settings(database_url={redact_url(self.database_url)!r}, secret_key=set, "
@@ -194,7 +218,8 @@ class Settings:
                 f"metrics_token={'set' if self.metrics_token else 'unset'}, log_level={self.log_level!r}, "
                 f"purge_hour={self.purge_hour!r}, privacy_notice_version={self.privacy_notice_version!r}, "
                 f"public_url={self.public_url!r}, test_adapter={self.test_adapter!r}, "
-                f"firmware_keys={len(self.firmware_keys)})")
+                f"firmware_keys={len(self.firmware_keys)}, hosted={self.hosted!r}, "
+                f"hosted_domain={self.hosted_domain!r})")
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Settings":
@@ -216,4 +241,6 @@ class Settings:
             public_url=env.get("ATALAIA_PUBLIC_URL", "").strip() or None,
             test_adapter=_on_off(env, "ATALAIA_TEST_ADAPTER"),
             firmware_keys=tuple(k for k in env.get("ATALAIA_FIRMWARE_KEYS", "").split(",") if k.strip()),
+            hosted=_on_off(env, "ATALAIA_HOSTED"),
+            hosted_domain=env.get("ATALAIA_HOSTED_DOMAIN", "").strip() or None,
         )

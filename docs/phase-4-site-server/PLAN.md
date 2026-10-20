@@ -1611,6 +1611,27 @@ earlier table must exist first; hosted mode does not go live before the
 legal review (P4-6). Tests: `test_tenants.py` (no row of one field
 visible from another, even with a routing bug simulated).
 
+*Built 2026-10-20 (decisions S21-1 to S21-12, open; in software, tested
+against PostgreSQL 16 in Docker, not yet on a real hosted deployment; not live
+before P4-6):* `ATALAIA_HOSTED=on` with `ATALAIA_HOSTED_DOMAIN` (off by default:
+the single-field server and its whole test suite unchanged, S21-4). Each field
+is a schema `field_<slug>` with every table at the same revision, accounts
+included (S21-2); `public` holds only the registry and the hub's audit log,
+made by `hosted init` (S21-7). The tenant comes from the host name only, and an
+API key is checked inside it (S21-3; this replaces "routing by API key").
+Transaction-local `search_path` and `atalaia.tenant` per transaction, no
+schema on a connection's own path, and under them `FORCE ROW LEVEL SECURITY`
+with one policy per table on the schema's name, since ADR-P4-4's `field_id`
+policy fits only some tables (S21-1, S21-5); the server's role owns nothing and
+cannot bypass, checked at start. Tokens, lockouts and remote GM links per
+tenant (S21-6). Alembic over every tenant (`hosted migrate`); export as a ZIP of
+CSV with a manifest instead of `pg_dump` (none in the image), with
+`import-field` into a single-field server, and no API endpoint (S21-8);
+deletion by `DROP SCHEMA` in one audited transaction (S21-9); the purge and
+`create-admin --field` per field (S21-10). Files: `atalaia_server/tenancy.py`,
+`atalaia_server/hosted.py`, `migrations/env.py`, `cli.py`,
+`server/docs/DEPLOY.md` ("Hosted mode"). Tests: `test_tenants.py`.
+
 ---
 
 ## Plan phase 22: Deployment

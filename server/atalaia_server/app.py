@@ -16,6 +16,11 @@ The app's own state: ``keys`` (derived from ATALAIA_SECRET_KEY), ``seed_box``
 ATALAIA_PURGE_HOUR is off) and ``clock`` (the time TOTP codes are checked at;
 the tests move it). All of it is in memory, for the one worker process the
 image runs (ADR-P4-2).
+
+In hosted mode (``ATALAIA_HOSTED=on``, plan phase 21) ``tenancy.TenantMiddleware``
+picks each request's field from its host name, the app refuses to start when
+its database role could bypass the isolation (``tenancy.check_app_role``) and
+the daily purge runs once per field.
 """
 
 from __future__ import annotations
@@ -31,7 +36,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from . import __version__, integrations, personal_data
+from . import __version__, integrations, personal_data, tenancy
 from .api import (auth, branding, chrono, clubs, devices, fields, firmware, games, health, history,
                   integrations as integrations_api, me, registration_import, registrations, remote_gm, scenarios,
                   scheduling, sync)
@@ -54,11 +59,22 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.engine = make_engine(settings)
-        app.state.sessionmaker = make_sessionmaker(app.state.engine)
-        log.info("site server %s starting, database %s", __version__, redact_url(settings.database_url))
+        app.state.sessionmaker = make_sessionmaker(app.state.engine, hosted=settings.hosted)
+        log.info("site server %s starting%s, database %s", __version__,
+                 f" in hosted mode for *.{settings.hosted_domain}" if settings.hosted else "",
+                 redact_url(settings.database_url))
+        if settings.hosted:
+            try:
+                await tenancy.check_app_role(app.state.engine)
+            except BaseException:
+                await app.state.engine.dispose()
+                raise
         purge = None
         if settings.purge_hour is not None:  # the daily retention purge (ADR-P4-8)
-            purge = asyncio.create_task(personal_data.purge_daily(app.state.sessionmaker, settings.purge_hour),
+            engine = app.state.engine
+            tenants = (lambda: tenancy.active_tenants(engine)) if settings.hosted else None
+            purge = asyncio.create_task(personal_data.purge_daily(app.state.sessionmaker, settings.purge_hour,
+                                                                  tenants=tenants),
                                         name="retention-purge")
         app.state.purge_task = purge
         try:
@@ -83,8 +99,10 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.state.clock = time.time
     app.state.remote_hub = RemoteHub()  # the remote GM's open controller links (plan phase 19)
     app.add_exception_handler(RequestValidationError, _invalid_request)
-    # The last one added runs first: security headers wrap everything, the 429s included.
+    # The last one added runs first: security headers wrap everything, the 429s and the hosted mode's
+    # refusals included; the tenant is chosen before anything else reads the database.
     app.add_middleware(RequestLimitMiddleware, get_limits=lambda: app.state.limits)
+    app.add_middleware(tenancy.TenantMiddleware, get_state=lambda: app.state)
     app.add_middleware(SecurityHeadersMiddleware)
     app.include_router(health.router)
     app.include_router(auth.router)

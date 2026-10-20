@@ -104,6 +104,8 @@ def field_json(f: Field, roles: Any = None) -> dict[str, Any]:
 @router.post("/fields", status_code=201)
 async def create_field(body: FieldIn, request: Request, principal: Principal = Depends(server_admin),
                        db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    if request.app.state.settings.hosted:  # one field per tenant, made by the hub's operator (S21-2)
+        raise HTTPException(403, "hosted_one_field")
     name = body.name.strip()
     if not name:
         raise HTTPException(400, "name_invalid")

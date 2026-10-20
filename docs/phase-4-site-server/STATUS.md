@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Implementation (plan phases 1 to 20 and 22 built in software, 2026-10-20; sync over 4G: HW1; a real ATAK device: HW3; a real deployment with a real domain: HW1)
+**Current phase:** Implementation (plan phases 1 to 22 built in software, 2026-10-21; sync over 4G: HW1; a real ATAK device: HW3; a real deployment with a real domain, and a real hosted deployment: HW1)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-21 (plan phase 22, full clean-copy check and the deployment test)
-**Next step:** plan phase 21 (hosted multi-tenant mode), the last software plan phase; then the hardware phases HW1-HW4
+**Last verified:** 2026-10-21 (plan phase 21: full clean-copy check, the site server's tests, migrations and the deployment test)
+**Next step:** the hardware phases HW1-HW4 (the boards); hosted mode waits for the legal review (P4-6) before going live
 
 ## Completed
 
@@ -59,7 +59,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | 18 | Club profiles and branding sync | Software, now | 13 | **Done in software** (2026-10-20; not yet on a real deployment) |
 | 19 | Device health, firmware catalogue, remote GM | Software, now | 13 | **Done in software** (2026-10-20; not yet on a real deployment or over 4G) |
 | 20 | Game history and the scenario library | Software, now | 13, 7 | **Done in software** (2026-10-20; not yet on a real deployment) |
-| 21 | Hosted multi-tenant mode | Software, now | 10-20 | Pending |
+| 21 | Hosted multi-tenant mode | Software, now | 10-20 | **Done in software** (2026-10-20; tested against PostgreSQL in Docker, not yet on a real hosted deployment; not live before P4-6) |
 | 22 | Deployment (Caddy, setup, backup, restore) | Software, now | 10 | **Done in software** (2026-10-20; tested in Docker with Caddy's own CA, not yet on a real server with a real domain and certificate) |
 | HW1 | Sync over a real 4G link | Hardware and a deployment | 13, phase 2 F | Waiting for boards |
 | HW2 | Target addon | Hardware | 2 | Waiting for the addon |
@@ -760,6 +760,49 @@ keeping its scenario, presets waiting for their mode, off, an older site
 server, a corrupt answer); the shared vectors gain 3 valid and 9 invalid
 answers. Not yet: a real deployment, a console or web page for the history
 and the library. Decisions S20-1 to S20-8, all open.
+
+## Plan phase 21: hosted multi-tenant mode (built 2026-10-20, in software)
+
+What exists: with `ATALAIA_HOSTED=on` and `ATALAIA_HOSTED_DOMAIN` one site
+server serves many fields from one PostgreSQL database (ADR-P4-4 as built).
+Each field is a schema `field_<slug>` holding every table a single-field
+server has, at the same revision, accounts and clubs included; `public` holds
+only the registry (`atalaia_tenants`, read-only for the server) and the hub's
+audit log (unreadable by the server). The field comes from the host name
+(`<slug>.<domain>`), any other name gets 404 and a suspended field 403, and a
+controller's API key is checked inside the field its host chose. Every
+transaction sets `search_path` and `atalaia.tenant` with `set_config(...,
+true)` (transaction-local), connections start with only `pg_catalog` on their
+path, and under that every table of a field has `FORCE ROW LEVEL SECURITY`
+and one policy on the schema's own name; the server's role owns nothing, has
+no `BYPASSRLS` or `TRUNCATE`, and the server refuses to start otherwise.
+Access tokens carry their field; lockouts and the remote GM's links are per
+field; one field per tenant. The operator's commands (`hosted.py`, the owner
+role): `hosted init|create|list|migrate|suspend|resume|export|delete`, each in
+the hub's audit log; the export is a ZIP of every table as CSV with a
+manifest (mode 0600), which `import-field` loads into a single-field server;
+deletion drops the schema in one transaction and keeps only counts;
+`create-admin --field` and the purge per field. Off (the default), nothing of
+it runs and the single-field server is unchanged. `server/docs/DEPLOY.md`,
+"Hosted mode", is the procedure by hand.
+
+Tests: `test_tenants.py` (27 tests), each class on a hub of its own with an
+owner role, a server role and two fields made by the operator's commands:
+field A's credentials and ids against field B on every surface (host
+routing, accounts, tokens and refresh tokens, lockouts, field and game ids,
+lists, the sync over HTTP and the WebSocket, the remote GM's links, history,
+the public pages, feeds, scoreboard and club pages, personal-data exports and
+erasure, metrics); the row-level security as the server's own role (no setting
+reads nothing, another field's setting reads and writes nothing, the setting
+ends with its transaction, one pooled connection shared by both fields
+carries nothing on, `TRUNCATE`, `SET row_security = off`, dropping a policy,
+`SET ROLE` and writing the registry all refused, every table covered); the
+server refusing the owner and a superuser; the export (everything of A,
+nothing of B), its import into a single-field server, suspension, migration
+and deletion (B untouched); plus `test_config`'s hosted settings. The rest of
+the suite runs unchanged in single-field mode. Not yet: a real hosted
+deployment (wildcard names and certificates), restoring a hosted hub's backup,
+the legal review (P4-6). Decisions S21-1 to S21-12, all open.
 
 ## Plan phase 22: deployment (built 2026-10-20, in software)
 

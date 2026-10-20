@@ -88,12 +88,12 @@ import secrets
 import uuid
 import zipfile
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Optional
+from typing import Any, Awaitable, Callable, Optional
 
 from sqlalchemy import DateTime, delete, func, literal, literal_column, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from . import chrono_registry
+from . import chrono_registry, tenancy
 from .audit import record
 from .models import (ROLE_BY_ID, AuditLog, ChronoReading, ChronoReject, Club, ClubMember, ClubReport, Consent, Field,
                      FieldPlayerId, FirmwareRelease, Game, GameRegistration, MarshalKey, PlayerIdClaim, RegistrationReplica, Replica,
@@ -481,17 +481,31 @@ def seconds_until(now: datetime, hour: int) -> float:
 
 
 async def purge_daily(maker: async_sessionmaker[AsyncSession], hour: int,
-                      now: Callable[[], datetime] = lambda: datetime.now(timezone.utc)) -> None:
+                      now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+                      tenants: Optional[Callable[[], Awaitable[list[tenancy.Tenant]]]] = None) -> None:
     """Runs ``purge`` every day at ``hour``:00 UTC until cancelled (the app's lifespan task).
     A failed run is logged and the next one is the next day; ``python -m atalaia_server purge``
-    runs it by hand."""
+    runs it by hand. In hosted mode (``tenants``: the active ones, plan phase 21) it runs once
+    per field, each in its own tenant, and one field's failure does not stop the others."""
     while True:
         await asyncio.sleep(seconds_until(now(), hour))
         try:
-            async with maker() as db:
-                counts = await purge(db)
-            log.info("retention purge: %s", ", ".join(f"{k} {v}" for k, v in counts.items()))
+            for tenant in (await tenants()) if tenants is not None else [None]:
+                await _purge_one(maker, tenant)
         except asyncio.CancelledError:
             raise
         except Exception:  # noqa: BLE001  (the database down, say: tomorrow's run tries again)
             log.exception("retention purge failed")
+
+
+async def _purge_one(maker: async_sessionmaker[AsyncSession], tenant: Optional[tenancy.Tenant]) -> None:
+    where = f" ({tenant.slug})" if tenant is not None else ""
+    try:
+        with tenancy.use(tenant):
+            async with maker() as db:
+                counts = await purge(db)
+        log.info("retention purge%s: %s", where, ", ".join(f"{k} {v}" for k, v in counts.items()))
+    except asyncio.CancelledError:
+        raise
+    except Exception:  # noqa: BLE001  (logged; the next field, or tomorrow, tries again)
+        log.exception("retention purge failed%s", where)

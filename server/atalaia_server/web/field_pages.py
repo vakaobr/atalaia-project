@@ -45,6 +45,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import tenancy
 from ..db import get_session
 from ..feeds import FeedField, ical, json_feed
 from ..models import Field, ScheduledGame
@@ -92,8 +93,11 @@ def json_ld(document: dict[str, Any]) -> str:
 
 
 def base_url(request: Request) -> str:
-    configured = request.app.state.settings.public_url
-    return configured or str(request.base_url).rstrip("/")
+    settings = request.app.state.settings
+    tenant = tenancy.current()
+    if settings.hosted and tenant is not None:  # hosted mode: the field's own address (plan phase 21)
+        return f"https://{tenant.host(settings.hosted_domain)}"
+    return settings.public_url or str(request.base_url).rstrip("/")
 
 
 def _http_date(value: datetime) -> str:

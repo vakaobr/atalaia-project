@@ -69,6 +69,26 @@ class SettingsTests(unittest.TestCase):
             with self.subTest(raw=raw), self.assertRaisesRegex(ConfigError, "ATALAIA_TEST_ADAPTER"):
                 Settings.from_env({**BASE, "ATALAIA_TEST_ADAPTER": raw})
 
+    def test_hosted_mode(self) -> None:
+        s = Settings.from_env(BASE)
+        self.assertEqual((s.hosted, s.hosted_domain), (False, None))  # off: a club's own server (plan phase 21)
+        s = Settings.from_env({**BASE, "ATALAIA_HOSTED": "on", "ATALAIA_HOSTED_DOMAIN": " Hub.Example.PT "})
+        self.assertEqual((s.hosted, s.hosted_domain), (True, "hub.example.pt"))
+        for env, reason in (({"ATALAIA_HOSTED": "on"}, "ATALAIA_HOSTED_DOMAIN is not set"),
+                            ({"ATALAIA_HOSTED": "yes"}, "ATALAIA_HOSTED must be on or off"),
+                            ({"ATALAIA_HOSTED_DOMAIN": "hub.example.pt"}, "only for hosted mode"),
+                            ({"ATALAIA_HOSTED": "on", "ATALAIA_HOSTED_DOMAIN": "hub.example.pt",
+                              "ATALAIA_PUBLIC_URL": "https://hub.example.pt"}, "ATALAIA_PUBLIC_URL must be unset"),
+                            ({"ATALAIA_HOSTED": "on", "ATALAIA_HOSTED_DOMAIN": "https://hub.example.pt"},
+                             "domain name"),
+                            ({"ATALAIA_HOSTED": "on", "ATALAIA_HOSTED_DOMAIN": "hub.example.pt:8443"}, "domain name"),
+                            ({"ATALAIA_HOSTED": "on", "ATALAIA_HOSTED_DOMAIN": "localhost"}, "domain name"),
+                            ({"ATALAIA_HOSTED": "on", "ATALAIA_HOSTED_DOMAIN": "-hub.example.pt"}, "domain name")):
+            with self.subTest(env=env), self.assertRaisesRegex(ConfigError, reason):
+                Settings.from_env({**BASE, **env})
+        self.assertIn("hosted=True", repr(Settings.from_env({**BASE, "ATALAIA_HOSTED": "on",
+                                                             "ATALAIA_HOSTED_DOMAIN": "hub.example.pt"})))
+
     def test_every_setting(self) -> None:
         s = Settings.from_env({
             **BASE, "ATALAIA_DB_POOL_SIZE": "10", "ATALAIA_DB_MAX_OVERFLOW": "0",

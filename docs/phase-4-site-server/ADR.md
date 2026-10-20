@@ -1224,6 +1224,21 @@ mechanism.
 review (decision P4-6). With the controller-initiated link (ADR-P4-3's
 amendment) the API key also selects the tenant on the sync WebSocket.
 
+**As built 2026-10-20 (plan phase 21; decisions S21-1 to S21-12, open):**
+schema per field as decided, each schema a whole single-field database (its
+own `users`, its own `alembic_version`), `public` holding only
+`atalaia_tenants` and the hub's audit log. Three changes from the text above:
+the tenant comes from the host name only and the API key is checked inside
+that tenant, so a key never selects one (S21-3); the search path and the
+tenant setting are set per transaction with `set_config(..., true)`, never per
+session, and a connection's own path is `pg_catalog` (S21-5); the RLS policy
+compares the setting with the schema's own name, so it covers every table
+(the `field_id` policy above fits only the tables that have that column), with
+`FORCE ROW LEVEL SECURITY` and a server role that owns nothing and has no
+`BYPASSRLS` (S21-1). The export is a ZIP of CSV files with a manifest made by
+the operator's command, with an import into a single-field server, instead of
+`pg_dump` and an admin endpoint (S21-8).
+
 ---
 
 ### ADR-P4-5: Chrono record signing

@@ -2,8 +2,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """The site server's commands: ``python -m atalaia_server <command>``.
 
-    python -m atalaia_server create-admin --username NAME [--email EMAIL] [--password-stdin]
+    python -m atalaia_server create-admin --username NAME [--email EMAIL] [--password-stdin] [--field SLUG]
     python -m atalaia_server purge [--dry-run]
+    python -m atalaia_server hosted init|create|list|migrate|suspend|resume|export|delete ...
+    python -m atalaia_server import-field FILE.zip
 
 ``create-admin`` makes a server administrator (ADR-P4-2): it asks for the
 password twice (or reads one line from standard input with
@@ -18,6 +20,13 @@ It needs ATALAIA_DATABASE_URL and ATALAIA_SECRET_KEY, as the server does.
 deleted (``--dry-run``: what it would delete). The server runs it by itself
 every day at ATALAIA_PURGE_HOUR (03:00 UTC by default); the command is for a
 deployment that turns that off and schedules it elsewhere, or for a check.
+
+In hosted mode (ATALAIA_HOSTED=on, plan phase 21) ``create-admin`` needs
+``--field SLUG``: the account is made in that field's schema and administers
+that field only, and ``purge`` runs once per active field. ``hosted ...`` are
+the hub operator's commands and ``import-field`` loads a field's export into
+a single-field server (``hosted.py``); they need only ATALAIA_DATABASE_URL,
+with the owner role's credentials.
 """
 
 from __future__ import annotations
@@ -25,19 +34,21 @@ from __future__ import annotations
 import argparse
 import asyncio
 import getpass
+import os
 import sys
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Callable, Optional, TextIO
+from pathlib import Path
+from typing import Any, Callable, Optional, TextIO
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from . import passwords, personal_data, totp
+from . import hosted, passwords, personal_data, tenancy, totp
 from .api.auth import EMAIL, username_problem
 from .audit import record
-from .config import ConfigError, Settings
+from .config import ConfigError, Settings, database_url_from_env
 from .db import make_engine, make_sessionmaker
 from .models import User
 from .tokens import Keys
@@ -52,8 +63,28 @@ class CommandError(Exception):
 
 async def create_admin(settings: Settings, username: str, email: Optional[str], password: str,
                        read_code: Callable[[str, str], str], out: TextIO,
-                       clock: Callable[[], float] = time.time) -> uuid.UUID:
-    """Creates the administrator once a code for its new TOTP secret is confirmed; returns its id."""
+                       clock: Callable[[], float] = time.time, field: Optional[str] = None) -> uuid.UUID:
+    """Creates the administrator once a code for its new TOTP secret is confirmed; returns its id.
+    In hosted mode ``field`` (a tenant's slug) is required: the account is that field's."""
+    if settings.hosted != (field is not None):
+        raise CommandError("--field SLUG names the field in hosted mode (ATALAIA_HOSTED=on) and only there")
+    engine = make_engine(settings)
+    try:
+        tenant = None
+        if field is not None:
+            tenant = await tenancy.lookup(engine, tenancy.check_slug(field))
+            if tenant is None:
+                raise CommandError(f"no field {field!r} on this hub")
+        with tenancy.use(tenant):
+            return await _create_admin(settings, engine, username, email, password, read_code, out, clock)
+    except tenancy.TenantError as e:
+        raise CommandError(str(e)) from None
+    finally:
+        await engine.dispose()
+
+
+async def _create_admin(settings: Settings, engine: Any, username: str, email: Optional[str], password: str,
+                        read_code: Callable[[str, str], str], out: TextIO, clock: Callable[[], float]) -> uuid.UUID:
     username = username.strip().lower()
     email = email.strip().lower() if email and email.strip() else None
     if username_problem(username) == "username_reserved":
@@ -69,58 +100,61 @@ async def create_admin(settings: Settings, username: str, email: Optional[str], 
                             "password_too_long": f"the password may have at most {passwords.MAX_LENGTH} characters",
                             "password_is_username": "the password may not be the username",
                             "password_breached": "that password is on the list of breached passwords"}[problem])
-    engine = make_engine(settings)
-    try:
-        maker = make_sessionmaker(engine)
-        async with maker() as db:
-            if await db.scalar(select(User.id).where(User.username == username)) is not None:
-                raise CommandError(f"an account named {username!r} already exists")
-        secret = totp.new_secret()
-        uri = totp.provisioning_uri(secret, username)
-        print("Add this account to an authenticator app (scan the URI as a QR code, or type the secret):",
-              file=out)
-        print(f"  {uri}", file=out)
-        print(f"  secret: {secret}", file=out)
-        step = None
-        for _ in range(CODE_TRIES):
-            step = totp.verify(secret, read_code(uri, secret), clock(), None)
-            if step is not None:
-                break
-            print("That code is not right; try the current one.", file=out)
-        if step is None:
-            raise CommandError("no valid TOTP code: nothing was created")
-        hashed = await passwords.hash_password(password)
-        async with maker() as db:
-            user = User(username=username, email=email, password_hash=hashed, server_admin=True,
-                        totp_enabled=True, totp_secret_enc=SeedBox(Keys(settings.secret_key).totp_seed).seal(secret),
-                        totp_last_step=step, gdpr_consent_at=datetime.now(timezone.utc))
-            db.add(user)
-            try:
-                await db.flush()
-            except IntegrityError:
-                raise CommandError("that username or email address is already taken") from None
-            personal_data.give_consent(db, user.id, personal_data.ACCOUNT, settings.privacy_notice_version,
-                                       user.gdpr_consent_at)
-            record(db, "admin_create", None, user_id=user.id, resource="user", resource_id=user.id,
-                   details={"via": "cli"})
-            await db.commit()
-            print(f"Server administrator {username!r} created ({user.id}).", file=out)
-            return user.id
-    finally:
-        await engine.dispose()
+    maker = make_sessionmaker(engine, hosted=settings.hosted)
+    async with maker() as db:
+        if await db.scalar(select(User.id).where(User.username == username)) is not None:
+            raise CommandError(f"an account named {username!r} already exists")
+    secret = totp.new_secret()
+    uri = totp.provisioning_uri(secret, username)
+    print("Add this account to an authenticator app (scan the URI as a QR code, or type the secret):",
+          file=out)
+    print(f"  {uri}", file=out)
+    print(f"  secret: {secret}", file=out)
+    step = None
+    for _ in range(CODE_TRIES):
+        step = totp.verify(secret, read_code(uri, secret), clock(), None)
+        if step is not None:
+            break
+        print("That code is not right; try the current one.", file=out)
+    if step is None:
+        raise CommandError("no valid TOTP code: nothing was created")
+    hashed = await passwords.hash_password(password)
+    async with maker() as db:
+        user = User(username=username, email=email, password_hash=hashed, server_admin=True,
+                    totp_enabled=True, totp_secret_enc=SeedBox(Keys(settings.secret_key).totp_seed).seal(secret),
+                    totp_last_step=step, gdpr_consent_at=datetime.now(timezone.utc))
+        db.add(user)
+        try:
+            await db.flush()
+        except IntegrityError:
+            raise CommandError("that username or email address is already taken") from None
+        personal_data.give_consent(db, user.id, personal_data.ACCOUNT, settings.privacy_notice_version,
+                                   user.gdpr_consent_at)
+        record(db, "admin_create", None, user_id=user.id, resource="user", resource_id=user.id,
+               details={"via": "cli"})
+        await db.commit()
+        print(f"Server administrator {username!r} created ({user.id}).", file=out)
+        return user.id
 
 
 async def run_purge(settings: Settings, dry_run: bool, out: TextIO) -> dict[str, int]:
     engine = make_engine(settings)
+    total: dict[str, int] = {}
     try:
-        async with make_sessionmaker(engine)() as db:
-            counts = await personal_data.purge(db, dry_run=dry_run)
+        maker = make_sessionmaker(engine, hosted=settings.hosted)
+        for tenant in (await tenancy.active_tenants(engine)) if settings.hosted else [None]:
+            with tenancy.use(tenant):
+                async with maker() as db:
+                    counts = await personal_data.purge(db, dry_run=dry_run)
+            verb = "would delete" if dry_run else "deleted"
+            where = f" ({tenant.slug})" if tenant is not None else ""
+            print(f"Retention purge{where} {verb}: "
+                  + ", ".join(f"{n} {what.replace('_', ' ')} rows" for what, n in counts.items()), file=out)
+            for what, n in counts.items():
+                total[what] = total.get(what, 0) + n
     finally:
         await engine.dispose()
-    verb = "would delete" if dry_run else "deleted"
-    print(f"Retention purge {verb}: " + ", ".join(f"{n} {what.replace('_', ' ')} rows" for what, n in counts.items()),
-          file=out)
-    return counts
+    return total
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -131,14 +165,95 @@ def _parser() -> argparse.ArgumentParser:
     admin.add_argument("--email")
     admin.add_argument("--password-stdin", action="store_true",
                        help="read the password from the first line of standard input, the TOTP code from the next")
+    admin.add_argument("--field", help="hosted mode: the field (slug) the administrator belongs to")
     purge = sub.add_parser("purge", help="delete what is past its retention period (ADR-P4-8), once")
     purge.add_argument("--dry-run", action="store_true", help="count, delete nothing")
+    imp = sub.add_parser("import-field", help="load a hosted field's export into this single-field server")
+    imp.add_argument("archive")
+    host = sub.add_parser("hosted", help="the hosted hub's operator commands (plan phase 21; owner role)")
+    hsub = host.add_subparsers(dest="action", required=True)
+    role_help = f"the server's database role (default ATALAIA_APP_ROLE or {hosted.DEFAULT_APP_ROLE})"
+    for name, text in (("init", "make the registry and the hub's audit log"),
+                       ("migrate", "bring every field to the newest revision, grants and policies again")):
+        p = hsub.add_parser(name, help=text)
+        p.add_argument("--app-role", help=role_help)
+        p.add_argument("--actor")
+    p = hsub.add_parser("create", help="a new field: its schema, migrations, row-level security")
+    p.add_argument("slug")
+    p.add_argument("--name", required=True)
+    p.add_argument("--field-type", default="outdoor", choices=hosted.FIELD_TYPES)
+    p.add_argument("--timezone", default="Europe/Lisbon")
+    p.add_argument("--app-role", help=role_help)
+    p.add_argument("--actor")
+    hsub.add_parser("list", help="the fields on this hub")
+    for name, text in (("suspend", "refuse every request to the field"), ("resume", "serve the field again")):
+        p = hsub.add_parser(name, help=text)
+        p.add_argument("slug")
+        p.add_argument("--reason", required=True)
+        p.add_argument("--actor")
+    p = hsub.add_parser("export", help="the field's whole dataset as a ZIP (mode 0600)")
+    p.add_argument("slug")
+    p.add_argument("--out", required=True)
+    p.add_argument("--reason", required=True, help="whose instruction (the data controller's)")
+    p.add_argument("--actor")
+    p = hsub.add_parser("delete", help="drop the field's schema and everything in it, for good")
+    p.add_argument("slug")
+    p.add_argument("--confirm", required=True, help="the slug again")
+    p.add_argument("--reason", required=True)
+    p.add_argument("--actor")
     return parser
+
+
+def run_hosted(args: argparse.Namespace, url: str, out: TextIO) -> None:
+    """One ``hosted`` command (or ``import-field``); raises ``hosted.HostedError`` or ``TenantError``."""
+    if args.command == "import-field":
+        counts = asyncio.run(hosted.import_field(url, Path(args.archive)))
+        print(f"Imported {sum(counts.values())} rows into {len(counts)} tables; everyone logs in and enrols TOTP "
+              "again, platform links need setting up again.", file=out)
+        return
+    action = args.action
+    actor = getattr(args, "actor", None) or None
+    app_role = getattr(args, "app_role", None) or os.environ.get("ATALAIA_APP_ROLE", "").strip() \
+        or hosted.DEFAULT_APP_ROLE
+    if action == "init":
+        asyncio.run(hosted.init_hub(url, app_role, actor))
+        print(f"Hosted hub ready; the server's role is {app_role}.", file=out)
+    elif action == "create":
+        tenant = hosted.create_tenant(url, args.slug, args.name, args.field_type, args.timezone, app_role, actor)
+        print(f"Field {tenant.slug} created: schema {tenant.schema}, field id {tenant.field_id}. Its administrator: "
+              f"python -m atalaia_server create-admin --field {tenant.slug} --username NAME", file=out)
+    elif action == "list":
+        for row in asyncio.run(hosted.list_tenants(url)):
+            print(f"{row['slug']}\t{row['status']}\t{row['schema_name']}\t{row['field_id']}\t"
+                  f"{row['created_at'].isoformat()}", file=out)
+    elif action == "migrate":
+        done = hosted.migrate_all(url, app_role, actor)
+        print(f"Migrated {len(done)} fields: {', '.join(done) or '-'}", file=out)
+    elif action in ("suspend", "resume"):
+        asyncio.run(hosted.set_status(url, args.slug, "suspended" if action == "suspend" else "active", args.reason,
+                                      actor))
+        print(f"Field {args.slug} {'suspended' if action == 'suspend' else 'resumed'}.", file=out)
+    elif action == "export":
+        result = asyncio.run(hosted.export_tenant(url, args.slug, Path(args.out), args.reason, actor))
+        rows = sum(t["rows"] for t in result.manifest["tables"])
+        print(f"Exported {args.slug}: {rows} rows in {len(result.manifest['tables'])} tables to {result.path} "
+              f"(SHA-256 {result.sha256}). It holds personal data: hand it over encrypted.", file=out)
+    elif action == "delete":
+        counts = asyncio.run(hosted.delete_tenant(url, args.slug, args.confirm, args.reason, actor))
+        print(f"Field {args.slug} deleted: {sum(counts.values())} rows in {len(counts)} tables. Backups keep it "
+              "until they expire (ATALAIA_BACKUP_DAYS).", file=out)
 
 
 def main(argv: Optional[list[str]] = None, stdin: TextIO = sys.stdin, out: TextIO = sys.stdout,
          err: TextIO = sys.stderr, ask: Callable[[str], str] = getpass.getpass) -> int:
     args = _parser().parse_args(argv)
+    if args.command in ("hosted", "import-field"):
+        try:
+            run_hosted(args, database_url_from_env(), out)
+        except (ConfigError, hosted.HostedError, tenancy.TenantError) as e:
+            print(f"atalaia_server: {e}", file=err)
+            return 1
+        return 0
     try:
         settings = Settings.from_env()
     except ConfigError as e:
@@ -162,7 +277,7 @@ def main(argv: Optional[list[str]] = None, stdin: TextIO = sys.stdin, out: TextI
         def read_code(uri: str, secret: str) -> str:
             return input("TOTP code from the app: ").strip()
     try:
-        asyncio.run(create_admin(settings, args.username, args.email, password, read_code, out))
+        asyncio.run(create_admin(settings, args.username, args.email, password, read_code, out, field=args.field))
     except CommandError as e:
         print(f"atalaia_server: {e}", file=err)
         return 1

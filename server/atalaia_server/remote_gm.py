@@ -19,7 +19,9 @@ Nothing here is stored: live views stay in memory (they hold no position:
 ``sync_format.check_live`` refuses one) and the commands are in the audit log.
 The links live in the server's one worker process (ADR-P4-2; decision S19-4):
 a server with several workers would need a shared channel, which the
-deployment (plan phase 22) does not have.
+deployment (plan phase 22) does not have. In hosted mode (plan phase 21) a link
+belongs to the tenant whose address the controller connected to, and only that
+tenant's requests see it.
 """
 
 from __future__ import annotations
@@ -30,6 +32,8 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable, Optional
+
+from . import tenancy
 
 COMMAND_TIMEOUT_S = 10.0
 
@@ -58,6 +62,11 @@ class Link:
     live: Optional[dict[str, Any]] = None
     live_at: Optional[datetime] = None
     pending: dict[str, "asyncio.Future[dict[str, Any]]"] = field(default_factory=dict)
+    tenant: Optional[str] = field(default_factory=tenancy.current_schema)  # hosted mode's schema, else None
+
+    @property
+    def key(self) -> tuple[Optional[str], uuid.UUID, str]:
+        return (self.tenant, self.field_id, self.controller_id)
 
     def json(self) -> dict[str, Any]:
         return {"controller_id": self.controller_id, "controller": str(self.controller_row) if self.controller_row
@@ -67,30 +76,34 @@ class Link:
 
 
 class RemoteHub:
-    """The open links, by (field, controller id); one per controller (a new socket replaces the old)."""
+    """The open links, by (tenant, field, controller id); one per controller (a new socket replaces the old).
+    Every lookup is in the current tenant (``tenancy.current_schema()``; None in single-field mode)."""
 
     def __init__(self, timeout_s: float = COMMAND_TIMEOUT_S) -> None:
         self.timeout_s = timeout_s
-        self._links: dict[tuple[uuid.UUID, str], Link] = {}
+        self._links: dict[tuple[Optional[str], uuid.UUID, str], Link] = {}
 
     def attach(self, link: Link) -> None:
-        old = self._links.get((link.field_id, link.controller_id))
-        self._links[(link.field_id, link.controller_id)] = link
+        old = self._links.get(link.key)
+        self._links[link.key] = link
         if old is not None and old is not link:
             self._fail_pending(old, "controller_offline")
 
     def detach(self, link: Link) -> None:
-        if self._links.get((link.field_id, link.controller_id)) is link:
-            del self._links[(link.field_id, link.controller_id)]
+        if self._links.get(link.key) is link:
+            del self._links[link.key]
         self._fail_pending(link, "controller_offline")
 
     def detach_key(self, key_id: uuid.UUID) -> None:
         """A revoked API key: its links can no longer take commands."""
-        for link in [lk for lk in self._links.values() if lk.key_id == key_id]:
+        tenant = tenancy.current_schema()
+        for link in [lk for lk in self._links.values() if lk.key_id == key_id and lk.tenant == tenant]:
             self.detach(link)
 
     def links(self, field_id: uuid.UUID) -> list[Link]:
-        return sorted((lk for (f, _), lk in self._links.items() if f == field_id), key=lambda lk: lk.controller_id)
+        tenant = tenancy.current_schema()
+        return sorted((lk for (t, f, _), lk in self._links.items() if t == tenant and f == field_id),
+                      key=lambda lk: lk.controller_id)
 
     def pick(self, field_id: uuid.UUID, controller_id: Optional[str]) -> Link:
         """The link a command goes to: the one named, or the only one that takes commands and is in charge
@@ -117,7 +130,7 @@ class RemoteHub:
         """Sends a checked command and waits for its result (``command.result``'s body)."""
         if not link.remote_gm:
             raise RemoteProblem(409, "remote_gm_off")
-        if self._links.get((link.field_id, link.controller_id)) is not link:
+        if self._links.get(link.key) is not link or link.tenant != tenancy.current_schema():
             raise RemoteProblem(409, "controller_offline")
         future: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
         link.pending[command["id"]] = future

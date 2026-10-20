@@ -35,7 +35,7 @@ import math
 import threading
 import time
 from collections import deque
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 Clock = Callable[[], float]
 
@@ -122,10 +122,12 @@ class RequestLimit:
             return 0
 
 
-def login_key(address: str, username: str) -> str:
+def login_key(address: str, username: str, tenant: Optional[str] = None) -> str:
     """The per (address, username) lockout key; the username only as a truncated hash, so a
     password typed into the username box never sits in memory as text."""
     digest = hashlib.sha256(username.strip().lower().encode("utf-8", "surrogatepass")).hexdigest()[:32]
+    if tenant is not None:  # hosted mode: one field's "ana" is not another's (plan phase 21)
+        return f"{address}#{tenant}#{digest}"
     return f"{address}#{digest}"
 
 

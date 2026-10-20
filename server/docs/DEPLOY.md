@@ -259,6 +259,73 @@ only when `docker-compose.yml` pins a new image; PostgreSQL stays on major
 version 16 (a new major version needs a dump and restore, which these
 scripts do).
 
+## Hosted mode
+
+A hub that hosts many fields on one server (ADR-P4-4 as built, plan phase 21,
+decisions S21-1 to S21-12; the design is in [../README.md](../README.md#hosted-mode)).
+**It does not go live before a lawyer has reviewed the privacy notice and the
+data processing agreement (decision P4-6).** It is tested against PostgreSQL
+in Docker (`python3 tools/docker_server.py test tests.test_tenants`), not yet
+on a real hosted deployment, and `docker-compose.yml` does not set it up for
+you: what follows is the procedure, by hand, on top of the stack above.
+
+1. **A database of its own.** Hosted mode refuses a database whose `public`
+   schema already holds a single-field server's tables.
+2. **Two roles.** The owner role owns the schemas and runs the migrations and
+   the operator's commands; the server connects as a second role that is no
+   superuser, has no `BYPASSRLS` and owns nothing (the server refuses to start
+   otherwise). In `psql` as PostgreSQL's administrator:
+
+   ```sql
+   CREATE ROLE atalaia_owner LOGIN PASSWORD '...' NOSUPERUSER NOBYPASSRLS;
+   CREATE ROLE atalaia_app   LOGIN PASSWORD '...' NOSUPERUSER NOBYPASSRLS;
+   CREATE DATABASE atalaia_hub OWNER atalaia_owner;
+   ```
+3. **The registry**, as the owner (every `hosted` command needs only
+   `ATALAIA_DATABASE_URL`, with the **owner's** credentials):
+   `python -m atalaia_server hosted init --app-role atalaia_app`.
+4. **The server's settings:** `ATALAIA_DATABASE_URL` with the **server
+   role's** credentials, `ATALAIA_HOSTED=on`, `ATALAIA_HOSTED_DOMAIN=hub.example.pt`,
+   and no `ATALAIA_PUBLIC_URL`. The image's command runs `alembic upgrade head`
+   first, which refuses to run in hosted mode: start the server with
+   `uvicorn --factory atalaia_server.app:create_app --host 0.0.0.0 --port 8000
+   --workers 1 --proxy-headers --no-server-header` instead, and migrate with
+   `python -m atalaia_server hosted migrate` (owner) before each start of a new
+   release.
+5. **Names and certificates.** Each field is at `https://<slug>.hub.example.pt`:
+   a wildcard DNS record, and in Caddy a wildcard site (`*.hub.example.pt`)
+   with a certificate from a DNS challenge, or on-demand TLS limited to the
+   registered fields. Caddy must pass the `Host` header on unchanged (it does
+   by default).
+6. **A field:** `python -m atalaia_server hosted create campo-tejo --name
+   "Campo Tejo"` (owner), then its administrator:
+   `python -m atalaia_server create-admin --field campo-tejo --username NAME`
+   (the server's settings). Its controllers use `https://campo-tejo.hub.example.pt`
+   and a key made there.
+
+At the field's request (it is the data controller; the hub is its processor
+under the DPA):
+
+- `hosted export campo-tejo --out campo-tejo.zip --reason "..."`: the field's
+  whole dataset, personal data and credential hashes included (mode 0600). Hand
+  it over encrypted. On the field's own server, at the same release, with an
+  empty migrated database: `python -m atalaia_server import-field
+  campo-tejo.zip`; everyone logs in and enrols TOTP again.
+- `hosted suspend campo-tejo --reason "..."` and `hosted resume ...`: every
+  request refused, data kept.
+- `hosted delete campo-tejo --confirm campo-tejo --reason "..."`: the schema and
+  every row in it, at once. The hub's audit log (`public.atalaia_hub_audit`)
+  keeps who, when, why and the row counts. The backups still hold the field
+  until they expire (`ATALAIA_BACKUP_DAYS`, 30): say so when confirming the
+  deletion in writing, as the DPA asks.
+
+Every command is written to the hub's audit log with `--actor` (by default
+the system user). `backup.sh` covers the whole database, every field in it;
+`restore.sh` restores with `--no-owner`, which suits a single-field server
+only: a hosted hub's restore must keep the owner role and the server role
+(create both roles first, then `pg_restore` without `--no-owner`), and is not
+scripted or tested yet.
+
 ## Monitoring
 
 - `GET /api/v1/health` (no authentication; not rate limited): `status`,

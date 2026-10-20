@@ -601,7 +601,7 @@ roadmap:
     title: Site server and advanced play
     short: >-
       Site server, game scheduling and registration, custom scenarios, advanced modes, ATAK.
-      Started: advanced modes (Master and Satellites, the Hacking Terminal, VIP / Payload and the logic of Target Windows), custom scenarios (their runtime, compiler, console editor and objectives in the app), geo utilities in the core, the ATAK feed, and the site server's accounts, personal data rights, controller sync, chrono registry, game scheduling with public field pages, feeds and registration, club profiles with branding sync, game history and the scenario library, device health, a firmware catalogue, the remote GM and the deployment (HTTPS, encrypted backups, restore) are built in software.
+      Started: advanced modes (Master and Satellites, the Hacking Terminal, VIP / Payload and the logic of Target Windows), custom scenarios (their runtime, compiler, console editor and objectives in the app), geo utilities in the core, the ATAK feed, and the site server's accounts, personal data rights, controller sync, chrono registry, game scheduling with public field pages, feeds and registration, club profiles with branding sync, game history and the scenario library, device health, a firmware catalogue, the remote GM and the deployment (HTTPS, encrypted backups, restore), hosted mode for many fields on one server are built in software.
     text: >-
       Site server (accounts, game history, the chrono registry, scheduling games, registration and
       publishing), custom scenarios, advanced modes (master and satellite zones, VIP escort, hacking
@@ -654,7 +654,11 @@ roadmap:
       controller checks them and installed by every controller of the field, a standby included; and
       the deployment: HTTPS through Caddy with an automatic certificate, a setup script that makes
       every secret, encrypted daily backups and a restore into a fresh database, tested in Docker on a
-      computer, not yet on a real server with a real domain.
+      computer, not yet on a real server with a real domain; and hosted mode: one server for many
+      fields, each in a database schema of its own at its own address, with row-level security
+      underneath so that no field ever sees another's data, and the operator's commands to export a
+      field's data or delete it, tested against PostgreSQL in Docker, not yet on a real hosted server
+      and not offered before a lawyer has reviewed the templates.
     gate: >-
       Gate: a weekend <a href="{{ page.to.glossary }}#glossary-milsim">milsim</a> runs on Atalaia end to end.
   p5:

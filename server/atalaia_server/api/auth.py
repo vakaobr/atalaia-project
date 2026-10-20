@@ -37,7 +37,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import passwords, personal_data, totp
+from .. import passwords, personal_data, tenancy, totp
 from ..audit import record, request_ip
 from ..auth import Principal, current_principal, load_roles
 from ..db import get_session
@@ -173,7 +173,8 @@ async def _check_password(db: AsyncSession, request: Request, user: Optional[Use
     higher one per address against spraying many usernames from one place."""
     limits = request.app.state.limits
     address = _ip_key(request)
-    key = login_key(address, username if username is not None else (user.username if user else ""))
+    key = login_key(address, username if username is not None else (user.username if user else ""),
+                    tenancy.current_schema())
     wait = max(limits.login.retry_after(key), limits.login_address.retry_after(address))
     if wait:
         raise _too_many(wait)
@@ -197,7 +198,8 @@ async def _check_password(db: AsyncSession, request: Request, user: Optional[Use
 async def _check_code(db: AsyncSession, request: Request, user: User, secret: Optional[str], code: str,
                       where: str) -> int:
     """Verifies a TOTP code under the per-account lockout and spends its step; returns the step."""
-    key = str(user.id)
+    tenant = tenancy.current_schema()  # hosted mode: per field, as the login lockouts (plan phase 21)
+    key = f"{tenant}#{user.id}" if tenant is not None else str(user.id)
     wait = request.app.state.limits.totp.retry_after(key)
     if wait:
         raise _too_many(wait)
