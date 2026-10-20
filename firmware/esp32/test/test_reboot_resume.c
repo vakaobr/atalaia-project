@@ -5,10 +5,10 @@
  * Tests for reboot resume: save game state, destroy the runner (simulate
  * power loss), then resume from the persisted data and verify continuity.
  *
- * Note: Lua in-script state (e.g. the bomb fuse timer) is not serialised.
- * After resume the mode re-initialises from game.start, so the bomb must
- * be re-armed. The shell-level game timer and game_time_ms are restored
- * correctly.
+ * A game picked on the box gets its mode's state.node, scores and seed back
+ * (decision HB-7): an armed bomb stays armed and its fuse goes on from the
+ * mode's node.rebooted handler. A field game (restore_mode_state false)
+ * starts its mode afresh: its controller sets it up again.
  */
 #include <stdio.h>
 #include <string.h>
@@ -108,7 +108,8 @@ static void test_bomb_resume_after_reboot(void)
     }
 
     /* 4. Save state. */
-    CHECK(state_persist_save(r.node, &r.timer, r.preset_index, r.team_count));
+    r.game_seed = 0xC0FFEE;
+    CHECK(state_persist_save(r.node, &r.timer, r.preset_index, r.team_count, r.game_seed));
 
     /* 5. Destroy the runner (simulate power loss). */
     node_runner_stop(&r);
@@ -118,6 +119,8 @@ static void test_bomb_resume_after_reboot(void)
     state_persist_data_t saved;
     CHECK(state_persist_load(&saved));
     CHECK(saved.game_time_ms >= 2000);
+    CHECK(saved.game_seed == 0xC0FFEE);
+    CHECK(strstr(saved.node_state, "\"phase\":\"armed\"") != NULL);
 
     /* 7. Resume from saved state. */
     preset_t loaded;
@@ -126,17 +129,20 @@ static void test_bomb_resume_after_reboot(void)
     node_runner_t r2;
     node_runner_init(&r2, &hal, 0);
     CHECK(node_runner_resume(&r2, &saved, loaded.source, loaded.source_len, loaded.params_json,
-                             teams, 2));
+                             teams, 2, true));
     CHECK(r2.running);
     CHECK(r2.game_time_ms >= 2000);
+    CHECK(r2.game_seed == 0xC0FFEE);
 
-    /* 8. Re-arm the bomb after resume. The Lua state was lost on reboot,
-     * so the mode re-entered standby via game.start. */
-    CHECK(node_runner_input(&r2, "team_input.hold", "{\"team\":\"red\",\"ms\":0}"));
-    CHECK(strcmp(r2.last_event_type, "bomb.armed") == 0);
+    /* 8. Still armed, no new bomb.armed: the screen shows the fuse left. */
+    CHECK(strcmp(r2.last_event_type, "bomb.armed") != 0);
+    const screen_update_t *last = &r2.queues.screens[r2.queues.screen_count - 1];
+    CHECK(r2.queues.screen_count > 0 && strcmp(last->template_name, "countdown") == 0);
+    CHECK(strstr(last->data_json, "\"left\":3") != NULL);
 
-    /* 9. Tick 6 seconds -> bomb should explode (fuse_s=5). */
-    for (int i = 0; i < 6; i++) {
+    /* 9. Tick 4 seconds -> the bomb explodes on its own fuse (armed at 0, fuse_s=5). */
+    r2.queues.screen_count = 0;
+    for (int i = 0; i < 4; i++) {
         node_runner_tick(&r2, 1000);
     }
 
@@ -153,9 +159,21 @@ static void test_bomb_resume_after_reboot(void)
     CHECK(found_exploded);
 
     /* Verify game time is cumulative (pre-reboot + post-reboot). */
-    CHECK(r2.game_time_ms >= 8000); /* 2s before + 6s after */
-
+    CHECK(r2.game_time_ms >= 6000); /* 2s before + 4s after */
     node_runner_stop(&r2);
+
+    /* A field game's resume starts the mode afresh: the bomb is in standby. */
+    node_runner_t r3;
+    node_runner_init(&r3, &hal, 0);
+    CHECK(node_runner_resume(&r3, &saved, loaded.source, loaded.source_len, loaded.params_json,
+                             teams, 2, false));
+    last = &r3.queues.screens[r3.queues.screen_count - 1];
+    CHECK(r3.queues.screen_count > 0 && strcmp(last->template_name, "standby") == 0);
+    for (int i = 0; i < 6; i++) {
+        node_runner_tick(&r3, 1000);
+    }
+    CHECK(strcmp(r3.last_event_type, "bomb.exploded") != 0);
+    node_runner_stop(&r3);
 }
 
 /* ---- test_reboot_emits_node_rebooted ---- */
@@ -203,7 +221,7 @@ static void test_reboot_emits_node_rebooted(void)
     }
 
     /* Save and destroy. */
-    CHECK(state_persist_save(r.node, &r.timer, r.preset_index, r.team_count));
+    CHECK(state_persist_save(r.node, &r.timer, r.preset_index, r.team_count, r.game_seed));
     node_runner_stop(&r);
 
     /* Resume. */
@@ -217,7 +235,10 @@ static void test_reboot_emits_node_rebooted(void)
     node_runner_init(&r2, &hal, 0);
 
     CHECK(node_runner_resume(&r2, &saved, loaded.source, loaded.source_len, loaded.params_json,
-                             teams, 2));
+                             teams, 2, true));
+
+    /* The scores come back: red had 3 points, and keeps scoring from there. */
+    CHECK(atalaia_score_net(atalaia_node_score(r2.node), 1) == 3);
 
     /* Verify that node.rebooted was received by the mode and it
      * emitted rebooted.ack in response. */

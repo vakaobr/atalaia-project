@@ -15,7 +15,9 @@
 #include "game_timer.h"
 
 #define STATE_PERSIST_MAGIC   0x41544C53u /* "ATLS" */
-#define STATE_PERSIST_VERSION 1
+#define STATE_PERSIST_VERSION 2
+/* The mode's state.node as JSON (decision HB-7); a larger state is not kept. */
+#define STATE_PERSIST_NODE_MAX 1024
 
 typedef struct {
     uint32_t magic;
@@ -27,6 +29,8 @@ typedef struct {
     uint32_t gained[8]; /* scores for up to 8 teams */
     uint32_t lost[8];
     uint8_t team_count;
+    uint32_t game_seed;                      /* rand() replays the same after a reboot */
+    char node_state[STATE_PERSIST_NODE_MAX]; /* "" when the mode keeps none */
 } state_persist_data_t;
 
 /*
@@ -38,8 +42,8 @@ int state_persist_init(const char *base_path);
 /*
  * Save current game state. Extracts scores from the node and timer state.
  */
-bool state_persist_save(const atalaia_node_t *node, const game_timer_t *timer, int preset_index,
-                        uint8_t team_count);
+bool state_persist_save(atalaia_node_t *node, const game_timer_t *timer, int preset_index,
+                        uint8_t team_count, uint32_t game_seed);
 
 /*
  * Load previously saved state. Returns true if valid state was found.

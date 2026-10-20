@@ -12,20 +12,22 @@
 
 static char state_dir[128];
 static char state_file[160];
+static char state_tmp[168];
 
 int state_persist_init(const char *base_path)
 {
     if (!base_path) return -1;
     snprintf(state_dir, sizeof(state_dir), "%s", base_path);
     snprintf(state_file, sizeof(state_file), "%s/current.bin", state_dir);
+    snprintf(state_tmp, sizeof(state_tmp), "%s/current.tmp", state_dir);
 #ifndef _WIN32
     mkdir(state_dir, 0755); /* fails harmlessly when it already exists */
 #endif
     return 0;
 }
 
-bool state_persist_save(const atalaia_node_t *node, const game_timer_t *timer, int preset_index,
-                        uint8_t team_count)
+bool state_persist_save(atalaia_node_t *node, const game_timer_t *timer, int preset_index,
+                        uint8_t team_count, uint32_t game_seed)
 {
     if (!node || !timer) return false;
 
@@ -38,6 +40,12 @@ bool state_persist_save(const atalaia_node_t *node, const game_timer_t *timer, i
     d.game_time_ms = atalaia_node_time(node);
     d.preset_index = preset_index;
     d.team_count = team_count;
+    d.game_seed = game_seed;
+    /* -1 (too large, or a value JSON cannot hold) keeps no state: the mode
+     * then starts from its defaults after a reboot, as before HB-7. */
+    if (atalaia_node_state_save(node, d.node_state, sizeof(d.node_state)) < 0) {
+        d.node_state[0] = '\0';
+    }
 
     const atalaia_score_t *score = atalaia_node_score(node);
     if (score) {
@@ -47,11 +55,16 @@ bool state_persist_save(const atalaia_node_t *node, const game_timer_t *timer, i
         }
     }
 
-    FILE *f = fopen(state_file, "wb");
+    /* Written whole, then renamed over the old file: a power loss during the
+     * write leaves the previous second's state, never a torn one. */
+    FILE *f = fopen(state_tmp, "wb");
     if (!f) return false;
     size_t written = fwrite(&d, sizeof(d), 1, f);
-    fclose(f);
-    return written == 1;
+    if (fclose(f) != 0 || written != 1) {
+        remove(state_tmp);
+        return false;
+    }
+    return rename(state_tmp, state_file) == 0;
 }
 
 bool state_persist_load(state_persist_data_t *out)
@@ -66,10 +79,12 @@ bool state_persist_load(state_persist_data_t *out)
     if (n != 1) return false;
     if (out->magic != STATE_PERSIST_MAGIC) return false;
     if (out->version != STATE_PERSIST_VERSION) return false;
+    out->node_state[sizeof(out->node_state) - 1] = '\0';
     return true;
 }
 
 void state_persist_clear(void)
 {
     remove(state_file);
+    remove(state_tmp);
 }

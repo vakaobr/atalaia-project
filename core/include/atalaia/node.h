@@ -100,6 +100,28 @@ bool atalaia_node_load(atalaia_node_t *node, const char *source, size_t len,
                        const char *chunk_name);
 
 /*
+ * The script's state.node table (decision HB-7), so a host can keep a game's
+ * state across a power loss. atalaia_node_state_save writes it as JSON
+ * (keys sorted) into buf, always NUL-terminated, and returns its length; 0
+ * when the script has no state; -1 when it does not fit in cap or holds a
+ * value JSON cannot (a function, a table with mixed keys), with the reason in
+ * atalaia_node_last_error. atalaia_node_state_restore gives that table back
+ * to the script loaded next on this node: call it before atalaia_node_load,
+ * and the script's state.node { defaults } keeps the restored values and
+ * fills only the keys that are missing. Timers do not travel: a mode
+ * schedules again from its state on node.rebooted. Returns false (and loads
+ * nothing) for text that is not a JSON object or a node that already has a
+ * script.
+ */
+int atalaia_node_state_save(atalaia_node_t *node, char *buf, size_t cap);
+bool atalaia_node_state_restore(atalaia_node_t *node, const char *json);
+
+/* Gives a node its score counters back after a power loss (merged: each
+ * counter keeps the larger value), as the host saved them from
+ * atalaia_node_score. No event is emitted. */
+void atalaia_node_score_restore(atalaia_node_t *node, const atalaia_score_t *score);
+
+/*
  * Dispatches an event to the script's handlers at the current game time:
  * hardware and semantic events (team_input.hold) or game events from the
  * field (game.start, game.pause, game.end). data_json may be NULL.
@@ -113,6 +135,16 @@ bool atalaia_node_input(atalaia_node_t *node, const char *type, const char *data
  * stops while the game is paused, so hosts should not advance then.
  */
 void atalaia_node_advance(atalaia_node_t *node, uint32_t now_ms);
+
+/*
+ * Sets game time to now_ms without running the time in between, for a host
+ * resuming a game after a power loss with the mode's state restored
+ * (decision HB-7): replaying it would count again what the restored state
+ * already holds. Repeating timers keep their rhythm from their next tick
+ * after now_ms; a one-shot timer that fell due meanwhile fires once at the
+ * next atalaia_node_advance. Only moves forward, on a running node.
+ */
+void atalaia_node_resume_at(atalaia_node_t *node, uint32_t now_ms);
 
 atalaia_node_status_t atalaia_node_status(const atalaia_node_t *node);
 const char *atalaia_node_status_name(atalaia_node_status_t status);

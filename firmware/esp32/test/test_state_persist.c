@@ -87,7 +87,7 @@ static void test_save_load_roundtrip(void)
     game_timer_init(&t, 60000);
     game_timer_tick(&t, 5000, NULL);
 
-    CHECK(state_persist_save(n, &t, 3, 2));
+    CHECK(state_persist_save(n, &t, 3, 2, 77));
 
     state_persist_data_t data = {0};
     CHECK(state_persist_load(&data));
@@ -100,7 +100,59 @@ static void test_save_load_roundtrip(void)
     CHECK(data.team_count == 2);
     /* Red should have gained points from the every(1s) timer. */
     CHECK(data.gained[0] >= 4); /* at least 4 ticks in 5s */
+    CHECK(data.game_seed == 77);
+    CHECK(data.node_state[0] == '\0'); /* no state.node in this script */
 
+    atalaia_node_destroy(n);
+}
+
+/* The mode's state.node travels as JSON (HB-7); one that cannot is left out. */
+static void test_node_state_saved(void)
+{
+    setup_state_dir();
+    atalaia_node_t *n = make_sp_node();
+    const char *src = "local s = state.node { phase = 'armed', at = 12 }";
+    CHECK(atalaia_node_load(n, src, strlen(src), "=node_state"));
+    game_timer_t t;
+    game_timer_init(&t, 0);
+    CHECK(state_persist_save(n, &t, 1, 2, 0));
+    state_persist_data_t data = {0};
+    CHECK(state_persist_load(&data));
+    CHECK(strcmp(data.node_state, "{\"at\":12,\"phase\":\"armed\"}") == 0);
+    atalaia_node_destroy(n);
+
+    n = make_sp_node();
+    src = "local s = state.node {}\n s.f = print";
+    CHECK(atalaia_node_load(n, src, strlen(src), "=node_state_fn"));
+    CHECK(state_persist_save(n, &t, 1, 2, 0));
+    CHECK(state_persist_load(&data));
+    CHECK(data.node_state[0] == '\0');
+    atalaia_node_destroy(n);
+}
+
+/* A write cut short leaves the temporary file, never a torn current.bin. */
+static void test_torn_write_keeps_last_state(void)
+{
+    setup_state_dir();
+    atalaia_node_t *n = make_sp_node();
+    CHECK(atalaia_node_load(n, "-- noop", 7, "=torn"));
+    game_timer_t t;
+    game_timer_init(&t, 10000);
+    t.elapsed_ms = 4000;
+    CHECK(state_persist_save(n, &t, 1, 2, 0));
+
+    char path[512];
+    snprintf(path, sizeof(path), "%s/current.tmp", temp_dir);
+    FILE *f = fopen(path, "wb");
+    CHECK(f != NULL);
+    fwrite("half", 1, 4, f);
+    fclose(f);
+
+    state_persist_data_t data = {0};
+    CHECK(state_persist_load(&data));
+    CHECK(data.timer_elapsed_ms == 4000);
+    state_persist_clear();
+    CHECK(access(path, F_OK) != 0); /* clear removes the leftover too */
     atalaia_node_destroy(n);
 }
 
@@ -115,7 +167,7 @@ static void test_clear(void)
     game_timer_t t;
     game_timer_init(&t, 10000);
 
-    CHECK(state_persist_save(n, &t, 1, 2));
+    CHECK(state_persist_save(n, &t, 1, 2, 0));
 
     state_persist_data_t data = {0};
     CHECK(state_persist_load(&data));
@@ -158,7 +210,7 @@ static void test_resume_after_reboot(void)
     game_timer_init(&t, 10000);
     game_timer_tick(&t, 5000, n);
 
-    CHECK(state_persist_save(n, &t, 1, 2));
+    CHECK(state_persist_save(n, &t, 1, 2, 0));
     atalaia_node_destroy(n);
 
     /* Simulate reboot: load state. */
@@ -194,4 +246,6 @@ void run_state_persist_tests(void)
     test_clear();
     test_invalid_magic();
     test_resume_after_reboot();
+    test_node_state_saved();
+    test_torn_write_keeps_last_state();
 }

@@ -451,6 +451,65 @@ bool atalaia_node_set_params(atalaia_node_t *n, const char *params_json)
     return run_protected(n, p_set_params, &args);
 }
 
+static int p_state_restore(lua_State *L)
+{
+    step_args_t *args = (step_args_t *)lua_touserdata(L, 1);
+    check_object_text(L, args->a, "state");
+    atalaia_json_push_decoded(L, args->a);
+    lua_setfield(L, LUA_REGISTRYINDEX, REG_STATE);
+    return 0;
+}
+
+bool atalaia_node_state_restore(atalaia_node_t *n, const char *json)
+{
+    if (n == NULL || json == NULL || n->status != ATALAIA_NODE_EMPTY) {
+        return false;
+    }
+    step_args_t args = {n, json, NULL, 0, 0};
+    return run_protected(n, p_state_restore, &args);
+}
+
+typedef struct {
+    char *buf;
+    size_t cap;
+    int len;
+} state_save_args_t;
+
+static int p_state_save(lua_State *L)
+{
+    state_save_args_t *args = (state_save_args_t *)lua_touserdata(L, 1);
+    if (lua_getfield(L, LUA_REGISTRYINDEX, REG_STATE) != LUA_TTABLE) {
+        args->len = 0;
+        return 0;
+    }
+    atalaia_json_push_encoded(L, -1);
+    size_t len = 0;
+    const char *text = lua_tolstring(L, -1, &len);
+    if (len + 1 > args->cap) {
+        return luaL_error(L, "state does not fit: %d bytes", (int)len);
+    }
+    memcpy(args->buf, text, len + 1);
+    args->len = (int)len;
+    return 0;
+}
+
+int atalaia_node_state_save(atalaia_node_t *n, char *buf, size_t cap)
+{
+    if (n == NULL || buf == NULL || cap == 0) {
+        return -1;
+    }
+    buf[0] = '\0';
+    if (n->status == ATALAIA_NODE_EMPTY) {
+        return 0;
+    }
+    state_save_args_t args = {buf, cap, -1};
+    if (!run_protected(n, p_state_save, &args)) {
+        buf[0] = '\0';
+        return -1;
+    }
+    return args.len;
+}
+
 bool atalaia_node_load(atalaia_node_t *n, const char *source, size_t len, const char *chunk_name)
 {
     if (n == NULL || source == NULL || n->status != ATALAIA_NODE_EMPTY) {
@@ -482,6 +541,26 @@ void atalaia_node_advance(atalaia_node_t *n, uint32_t now_ms)
     }
     step_args_t args = {n, NULL, NULL, 0, now_ms};
     run_protected(n, p_advance, &args);
+}
+
+void atalaia_node_resume_at(atalaia_node_t *n, uint32_t now_ms)
+{
+    if (n == NULL || n->status != ATALAIA_NODE_RUNNING || now_ms <= n->now_ms) {
+        return;
+    }
+    for (size_t i = 0; i < ATALAIA_NODE_MAX_TIMERS; i++) {
+        node_timer_t *t = &n->timers[i];
+        if (!t->active || t->due_ms > now_ms) {
+            continue;
+        }
+        if (t->interval_ms != 0) {
+            uint32_t missed = (now_ms - t->due_ms) / t->interval_ms + 1;
+            t->due_ms += missed * t->interval_ms;
+        } else {
+            t->due_ms = now_ms + 1; /* fires once, on the next advance */
+        }
+    }
+    n->now_ms = now_ms;
 }
 
 atalaia_node_status_t atalaia_node_status(const atalaia_node_t *n)
@@ -523,6 +602,13 @@ size_t atalaia_node_mem_used(const atalaia_node_t *n)
 const atalaia_score_t *atalaia_node_score(const atalaia_node_t *n)
 {
     return &n->score;
+}
+
+void atalaia_node_score_restore(atalaia_node_t *n, const atalaia_score_t *score)
+{
+    if (n != NULL && score != NULL) {
+        atalaia_score_merge(&n->score, score);
+    }
 }
 
 uint8_t atalaia_node_team_id(const atalaia_node_t *n, const char *name)

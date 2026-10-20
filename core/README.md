@@ -39,6 +39,8 @@ atalaia_node_input(node, "team_input.hold", "{\"team\":\"red\",\"ms\":5000}");
 atalaia_node_advance(node, now_ms);
 ```
 
+A host that keeps a game across a power loss saves the script's `state.node` with `atalaia_node_state_save` (JSON) and the score counters, and on resume calls `atalaia_node_state_restore` before `atalaia_node_load`, then `atalaia_node_resume_at` to set the time without replaying it, and `atalaia_node_score_restore` (decision HB-7; modes/README.md, "After a power loss").
+
 ## Sandbox limits
 
 | Limit | Default | When it trips |

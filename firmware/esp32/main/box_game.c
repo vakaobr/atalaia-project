@@ -471,7 +471,7 @@ bool box_game_resume(box_game_t *g, uint32_t now_ms)
         prepare_runner(g);
         if (node_runner_resume(g->runner, &saved, g->preset->source, g->preset->source_len,
                                g->preset->params_json[0] ? g->preset->params_json : NULL, g->teams,
-                               g->join.team_count)) {
+                               g->join.team_count, false)) {
             g->runner->preset_index = g->preset_index;
             g->phase = BOX_PLAYING;
             g->link.game_state = FIELD_GAME_RUNNING;

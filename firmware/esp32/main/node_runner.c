@@ -146,7 +146,7 @@ bool node_runner_start(node_runner_t *r, const preset_t *preset, const char *con
 
 bool node_runner_resume(node_runner_t *r, const state_persist_data_t *saved, const char *source,
                         size_t source_len, const char *params_json, const char *const *teams,
-                        uint8_t team_count)
+                        uint8_t team_count, bool restore_mode_state)
 {
     if (!r || !saved || !source || !teams || team_count == 0) return false;
 
@@ -164,6 +164,7 @@ bool node_runner_resume(node_runner_t *r, const state_persist_data_t *saved, con
     r->persist_accum_ms = 0;
     r->team_count = team_count;
     r->preset_index = saved->preset_index;
+    if (restore_mode_state && saved->game_seed != 0) r->game_seed = saved->game_seed;
     announce_mode(r, params_json);
 
     /* Create the node. */
@@ -192,6 +193,20 @@ bool node_runner_resume(node_runner_t *r, const state_persist_data_t *saved, con
         atalaia_node_set_params(r->node, params_json);
     }
 
+    /* The mode's state (HB-7) goes in before the script runs: its
+     * state.node { defaults } then fills only what is missing. */
+    if (restore_mode_state) {
+        /* A state the core rejects is not set: the mode starts from its defaults. */
+        if (saved->node_state[0]) atalaia_node_state_restore(r->node, saved->node_state);
+        atalaia_score_t score;
+        atalaia_score_init(&score);
+        for (uint8_t t = 1; t <= team_count && t <= 8; t++) {
+            score.gained[t] = saved->gained[t - 1];
+            score.lost[t] = saved->lost[t - 1];
+        }
+        atalaia_node_score_restore(r->node, &score);
+    }
+
     /* Load mode source. */
     if (!atalaia_node_load(r->node, source, source_len, "mode/node.lua")) {
         atalaia_node_destroy(r->node);
@@ -209,7 +224,12 @@ bool node_runner_resume(node_runner_t *r, const state_persist_data_t *saved, con
 
     /* Advance game time to where we left off. */
     r->game_time_ms = saved->game_time_ms;
-    atalaia_node_advance(r->node, saved->game_time_ms);
+    if (restore_mode_state) {
+        /* The state already holds what happened: do not replay the time. */
+        atalaia_node_resume_at(r->node, saved->game_time_ms);
+    } else {
+        atalaia_node_advance(r->node, saved->game_time_ms);
+    }
 
     /* Notify the mode that we resumed from a reboot. */
     atalaia_node_input(r->node, "node.rebooted", NULL);
@@ -234,7 +254,7 @@ void node_runner_tick(node_runner_t *r, uint32_t delta_ms)
     r->persist_accum_ms += delta_ms;
     if (r->persist_accum_ms >= 1000) {
         r->persist_accum_ms -= 1000;
-        state_persist_save(r->node, &r->timer, r->preset_index, r->team_count);
+        state_persist_save(r->node, &r->timer, r->preset_index, r->team_count, r->game_seed);
     }
 }
 

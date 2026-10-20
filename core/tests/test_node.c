@@ -452,8 +452,87 @@ static void test_sequence_numbers(void)
     atalaia_node_destroy(n);
 }
 
+/* state.node across a power loss (decision HB-7): saved as JSON, given back
+ * before the next load, and the script's defaults fill only missing keys. */
+static void test_state_save_restore(void)
+{
+    recorder_t r;
+    char buf[256];
+    atalaia_node_t *n = make_node(&r, 1, 0);
+    CHECK(atalaia_node_state_save(n, buf, sizeof(buf)) == 0); /* no script yet */
+    CHECK(load(
+        n,
+        "local s = state.node { phase = 'standby', at = 0 }\n"
+        "on('team_input.press', function(e) s.phase = 'armed'; s.at = 42; s.by = e.team end)\n"));
+    CHECK(atalaia_node_input(n, "team_input.press", "{\"team\":\"red\"}"));
+    int len = atalaia_node_state_save(n, buf, sizeof(buf));
+    CHECK(len > 0 && (size_t)len == strlen(buf));
+    CHECK(strcmp(buf, "{\"at\":42,\"by\":\"red\",\"phase\":\"armed\"}") == 0);
+    char small[8];
+    CHECK(atalaia_node_state_save(n, small, sizeof(small)) == -1); /* does not fit */
+    CHECK(small[0] == '\0');
+    CHECK(atalaia_node_status(n) == ATALAIA_NODE_RUNNING);
+    CHECK(!atalaia_node_state_restore(n, buf)); /* a script is loaded already */
+    atalaia_node_destroy(n);
+
+    /* After the reboot: restored before the load, the defaults do not win. */
+    n = make_node(&r, 1, 0);
+    CHECK(!atalaia_node_state_restore(n, "[1,2]"));
+    CHECK(atalaia_node_state_restore(n, buf));
+    CHECK(load(n, "local s = state.node { phase = 'standby', at = 0, extra = 7 }\n"
+                  "log('state', s.phase, s.at, s.by, s.extra)\n"));
+    CHECK(r.logs == 1 && strcmp(r.log[0], "state armed 42 red 7") == 0);
+    atalaia_node_destroy(n);
+
+    /* A value JSON cannot hold: not saved, the game goes on. */
+    n = make_node(&r, 1, 0);
+    CHECK(load(n, "local s = state.node {}\n s.f = function() end\n"));
+    CHECK(atalaia_node_state_save(n, buf, sizeof(buf)) == -1);
+    CHECK(atalaia_node_status(n) == ATALAIA_NODE_RUNNING);
+    atalaia_node_destroy(n);
+
+    /* Scores come back merged, with no event. */
+    n = make_node(&r, 1, 0);
+    CHECK(load(n, "score.add('red', 5)\n"));
+    atalaia_score_t saved;
+    atalaia_score_init(&saved);
+    saved.gained[1] = 40;
+    saved.lost[2] = 3;
+    int events = r.events;
+    atalaia_node_score_restore(n, &saved);
+    CHECK(atalaia_score_net(atalaia_node_score(n), 1) == 40);
+    CHECK(atalaia_score_net(atalaia_node_score(n), 2) == -3);
+    CHECK(r.events == events);
+    atalaia_node_destroy(n);
+
+    /* Resuming at a time skips what lay between: no tick replayed, the
+     * rhythm kept, a one-shot that fell due fires once. */
+    n = make_node(&r, 1, 0);
+    CHECK(load(n, "every(1, function() score.add('red', 1, 'tick') end)\n"
+                  "after(3, function() log('late') end)\n"));
+    atalaia_node_resume_at(n, 10500);
+    CHECK(atalaia_node_time(n) == 10500);
+    CHECK(atalaia_score_net(atalaia_node_score(n), 1) == 0);
+    CHECK(r.logs == 0);
+    atalaia_node_advance(n, 10600);
+    CHECK(r.logs == 1 && strcmp(r.log[0], "late") == 0);
+    CHECK(atalaia_score_net(atalaia_node_score(n), 1) == 0);
+    atalaia_node_advance(n, 11000); /* the 11 s tick: rhythm kept */
+    CHECK(atalaia_score_net(atalaia_node_score(n), 1) == 1);
+    atalaia_node_resume_at(n, 5000); /* never backwards */
+    CHECK(atalaia_node_time(n) == 11000);
+    atalaia_node_destroy(n);
+
+    /* A script without state.node saves nothing. */
+    n = make_node(&r, 1, 0);
+    CHECK(load(n, "local x = 1\n"));
+    CHECK(atalaia_node_state_save(n, buf, sizeof(buf)) == 0 && buf[0] == '\0');
+    atalaia_node_destroy(n);
+}
+
 void run_node_tests(void)
 {
+    test_state_save_restore();
     test_emit_and_handlers();
     test_default_priority();
     test_timers();

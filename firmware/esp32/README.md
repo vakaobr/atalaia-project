@@ -424,8 +424,14 @@ the box stops the script, forgets the saved state so a reboot does not
 resume a finished game, shows the final screen when the mode drew none of
 its own, and the next key brings the picker back, as after a field game
 (`end_standalone_game()` in `main/shell.c`). Until then a reboot resumes the
-game at the time it had; the mode's own script state does not survive it yet
-(modes/README.md), so a Bomb comes back in standby.
+game where it was (decision HB-7): `state_persist.c` writes the game's time,
+timer, scores, seed and the mode's `state.node` (as JSON, up to 1 KB) to
+`/state/current.bin` every second, through a temporary file renamed over it
+so a power loss mid-write keeps the previous second's state, and
+`node_runner_resume()` gives them back without replaying the time between
+(`atalaia_node_resume_at`); an armed Bomb comes back armed with the fuse it
+had left (modes/README.md, "After a power loss"). A field game resumes its
+time only; its controller sets the mode up again.
 
 A join may name a main mode with modifiers (`org.atalaia.domination+org.atalaia.codes`,
 see [modes/README.md](../../modes/README.md#main-modes-modifiers-role-packages-and-scenarios)): the box

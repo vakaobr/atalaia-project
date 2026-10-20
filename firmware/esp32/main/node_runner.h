@@ -83,12 +83,15 @@ atalaia_node_status_t node_runner_status(const node_runner_t *r);
 /*
  * Resume a game from persisted state after a reboot. Creates the node,
  * loads the mode source, sets params, restores game time and timer,
- * then sends "node.rebooted". params_json may be NULL.
+ * then sends "node.rebooted". params_json may be NULL. With
+ * restore_mode_state (a game picked on the box, decision HB-7) the mode's
+ * state.node, its scores and the game's seed come back too; a field game
+ * passes false: its controller sets the box up again after node.rebooted.
  * Returns true on success.
  */
 bool node_runner_resume(node_runner_t *r, const state_persist_data_t *saved, const char *source,
                         size_t source_len, const char *params_json, const char *const *teams,
-                        uint8_t team_count);
+                        uint8_t team_count, bool restore_mode_state);
 
 /* Destroy the node and reset the runner. */
 void node_runner_stop(node_runner_t *r);

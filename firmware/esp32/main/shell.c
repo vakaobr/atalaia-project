@@ -803,7 +803,7 @@ void app_main(void)
             if (tc > 4) tc = 4;
             node_runner_set_mode(&runner, game_preset.mode_id);
             if (node_runner_resume(&runner, &saved, game_preset.source, game_preset.source_len,
-                                   game_preset.params_json, default_teams, tc)) {
+                                   game_preset.params_json, default_teams, tc, true)) {
                 button_tracker_init(&btn_tracker, default_teams, tc);
                 runner.preset_index = saved.preset_index;
                 resumed = true;

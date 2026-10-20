@@ -97,6 +97,23 @@ end
 
 on("game.start", show_standby)
 
+-- After a power loss a box picked for a game on its own gives the state back
+-- (decision HB-7): an armed bomb goes on with the fuse it had left (or
+-- explodes at once when it ran out meanwhile), and the screen shows the
+-- phase again. In a field game the state starts afresh: standby.
+on("node.rebooted", function()
+  holding = nil
+  if s.phase == "armed" then
+    local left = s.explode_at - game.time()
+    if left > 0 then
+      fuse_timer = after(left, explode)
+    else
+      return explode()
+    end
+  end
+  show_phase()
+end)
+
 -- The share of a hold, in hundredths, so the screen gets few distinct values.
 local function share(ms, total)
   return math.floor(ms * 100 / total) / 100

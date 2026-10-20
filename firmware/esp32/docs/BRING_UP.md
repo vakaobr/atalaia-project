@@ -349,9 +349,14 @@ and two boards at least 1 m apart, both antennas fitted.
 1. Start a new game.
 2. After 5 minutes, disconnect the battery.
 3. Reconnect the battery.
-4. Verify: game resumes from persisted state (`/state/current.bin`).
+4. Verify: game resumes from persisted state (`/state/current.bin`):
+   the log shows `Resumed game from saved state`.
 5. Verify: `node.rebooted` event emitted.
-6. Verify: timer continues from where it left off.
+6. Verify: timer continues from where it left off, and the scores are the
+   ones before the power loss.
+7. With Bomb: arm it, cut the power for 30 s, reconnect: it comes back
+   armed with the fuse it had left (the time the box was off does not
+   count: game time stops with it), and explodes when that runs out.
 
 ## Step 14: Environmental
 
