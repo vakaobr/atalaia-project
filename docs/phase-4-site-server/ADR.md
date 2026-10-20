@@ -2808,6 +2808,15 @@ P4R17, proposed):**
   `atalaia_server.app:app`, and the settings are `ATALAIA_*` variables
   (`ATALAIA_DATABASE_URL`, ...) rather than this ADR's `DATABASE_URL`;
   decisions S10-1 and S10-7, proposed.
+- *Built 2026-10-20 (plan phase 22; decisions S22-1 to S22-10, proposed):*
+  Caddy is in `server/docker-compose.yml` (not an option) and the only
+  container with published ports; the server and PostgreSQL are on internal
+  networks; nginx (option B) is not provided. `server/setup.sh` makes the
+  real `ATALAIA_*` settings (no `REFRESH_SECRET`, `HOSTED_MODE`,
+  `ALLOWED_ORIGINS`); backups are encrypted (AES-256-GCM, the key in `.env`)
+  and there is no `app-data` volume (everything is in the database); the
+  restore is `server/restore.sh`, into a freshly created database. The
+  operator's guide is `server/docs/DEPLOY.md`.
 
 ---
 

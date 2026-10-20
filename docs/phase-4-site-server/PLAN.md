@@ -1127,7 +1127,7 @@ job. Decisions P4R9, P4R16, P4R17.
 | `server/migrations/env.py`, `server/alembic.ini`, `server/migrations/versions/0001_base.py` | AGPL-3.0-or-later | Async Alembic; the base tables only (each later plan phase adds its own migration) |
 | `server/requirements.in`, `server/requirements.txt` (hash-pinned) | AGPL-3.0-or-later | Dependencies (P4R16) |
 | `server/Dockerfile` | AGPL-3.0-or-later | Stage 1 builds `libatalaia_core.so` (the core) with cmake; stage 2 `python:3.12-slim` with the requirements, `server/`, `controller/atalaia_controller/` and `simulator/atalaia_sim/` (the shared Python), the core library; a `test` target adds the tests |
-| `server/docker-compose.yml` | AGPL-3.0-or-later | The server and `postgres:16-alpine` (Caddy in plan phase 22) |
+| `server/docker-compose.yml` | AGPL-3.0-or-later | The server and `postgres:16-alpine` (Caddy since plan phase 22) |
 | `server/docker-compose.test.yml` | AGPL-3.0-or-later | An ephemeral `postgres:16-alpine` (tmpfs, health check) and the test image |
 | `server/tests/__init__.py`, `base.py`, `test_health.py`, `test_migrations.py`, `test_shared_imports.py` | AGPL-3.0-or-later | `unittest` base classes: a fresh database per test class, an httpx ASGI client; the shared modules import without FastAPI on the controller's side |
 | `tools/docker_server.py` | GPL-3.0-or-later | `test`, `migrations`, `build`, `up`, `down` |
@@ -1624,6 +1624,19 @@ into a new one and running the tests' checks against it;
 `server/docs/DEPLOY.md`. Validation: `python3 tools/docker_server.py
 test`, plus the backup and restore test.
 
+*Built 2026-10-20 (decisions S22-1 to S22-10, open; in software, tested in
+Docker on one computer with Caddy's own CA, not yet on a real server with a
+real domain and certificate):* `server/docker-compose.yml` with Caddy
+(`server/Caddyfile`, `caddy:2.11.7-alpine` pinned by digest, only it publishes
+ports; the server and PostgreSQL on internal networks, S22-1, S22-2, S22-6),
+the image's one worker with `--proxy-headers` (S22-4, S22-10); `server/setup.sh`
+(S22-5, S22-8); `server/backup.sh`, encrypted with
+`atalaia_server/backup_crypt.py` (AES-256-GCM, STREAM; S22-3); a restore script
+of its own, `server/restore.sh` (S22-7); `server/docs/DEPLOY.md`. The backup and
+restore test is `python3 tools/docker_server.py deploy` (`tools/server_deploy.py`,
+`server/tests/deploy_probe.py`, CI job `server-deploy`, S22-9): it also runs the
+stack behind Caddy and checks HTTPS and the WebSocket through it.
+
 ---
 
 ## HW1: Sync over a real link
@@ -1851,7 +1864,7 @@ server/
     tests/                     base.py and test_*.py (unittest, PostgreSQL 16)
     docs/                      feeds.md, integrations.md, DEPLOY.md, API.md
     Dockerfile, docker-compose.yml, docker-compose.test.yml,
-    requirements.in, requirements.txt, setup.sh, backup.sh, alembic.ini
+    requirements.in, requirements.txt, setup.sh, backup.sh, restore.sh, Caddyfile, alembic.ini
 
 controller/atalaia_controller/
     sync_client.py, atak.py

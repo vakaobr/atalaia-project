@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Implementation (plan phases 1 to 20 built in software, 2026-10-20; sync over 4G: HW1; a real ATAK device: HW3)
+**Current phase:** Implementation (plan phases 1 to 20 and 22 built in software, 2026-10-20; sync over 4G: HW1; a real ATAK device: HW3; a real deployment with a real domain: HW1)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-20 (plan phase 20, full clean-copy check)
-**Next step:** plan phase 21 (hosted multi-tenant mode); plan phase 22 (deployment) under way
+**Last verified:** 2026-10-21 (plan phase 22, full clean-copy check and the deployment test)
+**Next step:** plan phase 21 (hosted multi-tenant mode), the last software plan phase; then the hardware phases HW1-HW4
 
 ## Completed
 
@@ -60,7 +60,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | 19 | Device health, firmware catalogue, remote GM | Software, now | 13 | **Done in software** (2026-10-20; not yet on a real deployment or over 4G) |
 | 20 | Game history and the scenario library | Software, now | 13, 7 | **Done in software** (2026-10-20; not yet on a real deployment) |
 | 21 | Hosted multi-tenant mode | Software, now | 10-20 | Pending |
-| 22 | Deployment (Caddy, setup, backup, restore) | Software, now | 10 | Pending |
+| 22 | Deployment (Caddy, setup, backup, restore) | Software, now | 10 | **Done in software** (2026-10-20; tested in Docker with Caddy's own CA, not yet on a real server with a real domain and certificate) |
 | HW1 | Sync over a real 4G link | Hardware and a deployment | 13, phase 2 F | Waiting for boards |
 | HW2 | Target addon | Hardware | 2 | Waiting for the addon |
 | HW3 | Phones in the field (VIP, payload, terminal, ATAK) | Hardware | 4, 5, 9, phase 3 G | Waiting for boards and phones |
@@ -760,6 +760,49 @@ keeping its scenario, presets waiting for their mode, off, an older site
 server, a corrupt answer); the shared vectors gain 3 valid and 9 invalid
 answers. Not yet: a real deployment, a console or web page for the history
 and the library. Decisions S20-1 to S20-8, all open.
+
+## Plan phase 22: deployment (built 2026-10-20, in software)
+
+What exists: `server/docker-compose.yml` is now the deployment: **Caddy**
+(`caddy:2.11.7-alpine`, pinned by digest; `server/Caddyfile`) terminates TLS
+with a certificate it gets and renews by itself, redirects HTTP to HTTPS,
+proxies everything to the server, the controllers' WebSocket included, adds
+`Permissions-Policy`, `Cross-Origin-Opener-Policy` and
+`X-Permitted-Cross-Domain-Policies`, removes `Server` and `Via`, and is the
+only container with published ports. The server and PostgreSQL sit on
+internal networks (`app`, `db`): neither the database nor the server's port can
+be reached from outside, and the server has no way out to the internet. The
+image always runs one worker (`--workers 1`, ADR-P4-2, S19-4) with
+`--proxy-headers`, so the rate limits and the audit log see the client's
+address. **`server/setup.sh DOMAIN`** writes `server/.env` (mode 0600) with the
+domain, `ATALAIA_PUBLIC_URL` and four secrets of 32 random bytes (database
+password, secret key, metrics token, backup key), never printed, keeps every
+existing value when run again, then builds and starts the stack.
+**`server/backup.sh`** pipes `pg_dump -Fc` through `backup-crypt seal`
+(AES-256-GCM in the STREAM construction, the server's image with no network,
+`atalaia_server/backup_crypt.py`), so the dump is never on disk in clear, opens
+the new backup in full before naming it, keeps 30 days; **`server/restore.sh
+FILE --yes`** opens the whole backup first, then drops and recreates the
+database, restores it in one transaction and starts the server (migrations
+included). **`server/docs/DEPLOY.md`** is the operator's guide (install, `.env`
+and what to keep safe, the network layout, a field server with no public name,
+cron, restore on a new machine, erasures after a backup, updates, monitoring).
+`python3 tools/docker_server.py up` now runs the same file behind Caddy on
+`https://localhost:8443`.
+
+Tests: `test_backup_crypt.py` (11; McGrew and Viega's GCM test cases, round
+trips at the chunk boundaries, every kind of damage; also in tools/check.sh),
+and the deployment test, `python3 tools/docker_server.py deploy`
+(`tools/server_deploy.py`, `server/tests/deploy_probe.py`, new CI job
+`server-deploy`): `setup.sh` and its re-run, the stack behind Caddy with its
+own CA under the name `atalaia.test`, HTTPS, the headers, the redirect, the
+closed ports, the sync over the WebSocket through Caddy with the controller's
+own client, the client's address in the audit log, one server process; an
+encrypted backup, pruning, a damaged backup refused with nothing changed; then
+everything deleted, a fresh stack, the restore into a fresh database with every
+table's rows compared by digest, and the restored API key and events used
+through Caddy. Not yet: a real server with a real domain and a public
+certificate (HW1). Decisions S22-1 to S22-10, all open.
 
 ## Dependencies
 

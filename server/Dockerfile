@@ -52,8 +52,11 @@ USER atalaia
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=4)"]
-# Migrate, then serve (behind Caddy from plan phase 22).
-CMD ["sh", "-c", "alembic upgrade head && exec uvicorn --factory atalaia_server.app:create_app --host 0.0.0.0 --port 8000"]
+# Migrate, then serve behind Caddy (server/docker-compose.yml). One worker process, always
+# (ADR-P4-2; decision S19-4): the rate limits and the remote GM's links live in its memory;
+# --workers 1 also overrides a WEB_CONCURRENCY in the environment. --proxy-headers takes the
+# client's address from Caddy, for the peers FORWARDED_ALLOW_IPS names (decision S22-4).
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn --factory atalaia_server.app:create_app --host 0.0.0.0 --port 8000 --workers 1 --proxy-headers --no-server-header"]
 
 FROM server AS test
 USER root

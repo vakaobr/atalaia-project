@@ -7,8 +7,9 @@
     python3 tools/docker_server.py test tests.test_health     only these (unittest names)
     python3 tools/docker_server.py migrations                 upgrade head, downgrade base, upgrade head, check
     python3 tools/docker_server.py build                      build the server image (atalaia-server)
-    python3 tools/docker_server.py up                         run it on http://127.0.0.1:8000 (ATALAIA_PORT)
+    python3 tools/docker_server.py up                         run it behind Caddy on https://localhost:8443
     python3 tools/docker_server.py down                       stop it and delete its database
+    python3 tools/docker_server.py deploy                     the deployment test (setup, Caddy, backup, restore)
 
 Works from any folder; Docker with the Compose plugin must be running. `test`
 and `migrations` build the test image (server/Dockerfile, target test) and
@@ -16,11 +17,17 @@ run `sh tests/run.sh test|migrations` in it with Docker Compose
 (server/docker-compose.test.yml) next to an ephemeral postgres:16-alpine in a
 tmpfs, then remove the containers whatever the result: CI's server job runs
 the same image and the same commands against a service container. `up` is a
-local trial with a random database password and secret key
-(server/docker-compose.yml): `down` deletes its data. In a running trial,
-`docker compose -p atalaia-server-trial exec server python -m atalaia_server
-create-admin --username NAME` makes a server administrator. ATALAIA_VOLUME_SUFFIX keeps the Compose projects and
-images of two checkouts (e.g. a git worktree) apart.
+local trial of the deployment (server/docker-compose.yml: Caddy, the server,
+PostgreSQL) with a random database password and secret key, on
+https://localhost:8443 (ATALAIA_HTTPS_PORT; HTTP on ATALAIA_HTTP_PORT, 8080)
+with a certificate from Caddy's own CA, which browsers warn about: `down`
+deletes its data. In a running trial, `docker compose -p
+atalaia-server-trial exec server python -m atalaia_server create-admin
+--username NAME` makes a server administrator. `deploy` builds both images
+and runs tools/server_deploy.py: setup.sh, the stack behind Caddy, HTTPS and
+the WebSocket through it, backup.sh and restore.sh into a fresh database.
+ATALAIA_VOLUME_SUFFIX keeps the Compose projects and images of two checkouts
+(e.g. a git worktree) apart.
 """
 
 from __future__ import annotations
@@ -93,24 +100,48 @@ def in_tests_image(what: str, args: list[str]) -> int:
 
 
 def trial(what: str) -> int:
-    env = {**os.environ, "ATALAIA_SERVER_IMAGE": SERVER_IMAGE}
+    # The trial never reads an operator's server/.env (--env-file /dev/null): only these values.
+    env = {**os.environ, "ATALAIA_SERVER_IMAGE": SERVER_IMAGE, "ATALAIA_DOMAIN": "localhost",
+           "ATALAIA_TLS": "internal", "ATALAIA_BIND": "127.0.0.1"}
+    env.setdefault("ATALAIA_HTTP_PORT", "8080")
+    env.setdefault("ATALAIA_HTTPS_PORT", "8443")
     file = "docker-compose.yml"
     unused = {"POSTGRES_PASSWORD": "unused", "ATALAIA_SECRET_KEY": "unused"}
+
+    def trial_compose(*args: str) -> list[str]:
+        return ["docker", "compose", "--env-file", os.devnull, *compose(file, TRIAL_PROJECT, *args)[2:]]
+
     if what == "build":
-        return run(compose(file, TRIAL_PROJECT, "build", "server"), {**env, **unused})
+        return run(trial_compose("build", "server"), {**env, **unused})
     if what == "down":
-        return run(compose(file, TRIAL_PROJECT, "down", "--volumes", "--remove-orphans"), {**env, **unused})
+        return run(trial_compose("down", "--volumes", "--remove-orphans"), {**env, **unused})
     # up: a new password and key each time is fine, since down deletes the database with them.
-    env.setdefault("POSTGRES_PASSWORD", secrets.token_urlsafe(24))
-    env.setdefault("ATALAIA_SECRET_KEY", secrets.token_urlsafe(32))
-    code = run(compose(file, TRIAL_PROJECT, "up", "--detach", "--build", "--wait"), env)
+    env.setdefault("POSTGRES_PASSWORD", secrets.token_hex(32))
+    env.setdefault("ATALAIA_SECRET_KEY", secrets.token_hex(32))
+    url = f"https://localhost:{env['ATALAIA_HTTPS_PORT']}"
+    env.setdefault("ATALAIA_PUBLIC_URL", url)
+    code = run(trial_compose("up", "--detach", "--build", "--wait"), env)
     if code == 0:
-        port = env.get("ATALAIA_PORT", "8000")
-        print(f"\ndocker_server: the site server is up: http://127.0.0.1:{port}/api/v1/health "
-              f"(python3 tools/docker_server.py down stops it and deletes its data; an administrator: "
-              f"docker compose -p {TRIAL_PROJECT} exec server python -m atalaia_server create-admin "
-              f"--username NAME)")
+        print(f"\ndocker_server: the site server is up behind Caddy: {url}/api/v1/health (a certificate from "
+              f"Caddy's own CA: browsers warn; curl -k). python3 tools/docker_server.py down stops it and deletes "
+              f"its data; an administrator: docker compose -p {TRIAL_PROJECT} exec server python -m "
+              f"atalaia_server create-admin --username NAME")
     return code
+
+
+def deploy() -> int:
+    """Builds the server and test images, then runs the deployment test (tools/server_deploy.py)."""
+    env = {**os.environ, "ATALAIA_SERVER_IMAGE": SERVER_IMAGE, "ATALAIA_SERVER_TEST_IMAGE": TEST_IMAGE,
+           "ATALAIA_DOMAIN": "unused", "POSTGRES_PASSWORD": "unused", "ATALAIA_SECRET_KEY": "unused"}
+    if run(["docker", "compose", "--env-file", os.devnull, *compose("docker-compose.yml", TRIAL_PROJECT,
+                                                                     "build", "server")[2:]], env) != 0:
+        return fail("building the server image failed")
+    if run(compose("docker-compose.test.yml", TEST_PROJECT, "build", "tests"), env) != 0:
+        return fail("building the test image failed")
+    sys.path.insert(0, str(REPO / "tools"))
+    import server_deploy
+
+    return server_deploy.run(SUFFIX, SERVER_IMAGE, TEST_IMAGE)
 
 
 def main(argv: list[str]) -> int:
@@ -118,8 +149,8 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 0 if argv else 2
     what, args = argv[0], argv[1:]
-    if what not in ("test", "migrations", "build", "up", "down"):
-        return fail(f"unknown command '{what}' (test, migrations, build, up, down)")
+    if what not in ("test", "migrations", "build", "up", "down", "deploy"):
+        return fail(f"unknown command '{what}' (test, migrations, build, up, down, deploy)")
     if what != "test" and args:
         return fail(f"'{what}' takes no arguments")
     try:
@@ -131,6 +162,8 @@ def main(argv: list[str]) -> int:
         return fail("the docker command was not found; install Docker")
     if what in ("test", "migrations"):
         return in_tests_image(what, args)
+    if what == "deploy":
+        return deploy()
     return trial(what)
 
 

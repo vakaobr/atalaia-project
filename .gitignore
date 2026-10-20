@@ -39,6 +39,8 @@ Thumbs.db
 
 # Secrets: never commit these
 .env
+# The site server's backups (server/backup.sh's default folder)
+server/backups/
 *.pem
 *.key
 secrets.*

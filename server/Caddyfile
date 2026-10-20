@@ -1,0 +1,50 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Caddy in front of the site server (ADR-P4-10, plan phase 22; server/docs/DEPLOY.md).
+# Caddy terminates TLS with a certificate it gets and renews by itself (ACME,
+# Let's Encrypt or ZeroSSL), redirects HTTP to HTTPS and proxies everything,
+# the controllers' WebSocket (WS /api/v1/sync/stream) included, to the one
+# server process. Values come from server/.env through docker-compose.yml:
+#   ATALAIA_DOMAIN  the site's name (DNS must point at this machine, ports 80 and 443 open)
+#   ATALAIA_TLS     acme (default: a public certificate) or internal (Caddy's own CA:
+#                   a trial or the deployment test, never a real site)
+
+(tls-acme) {
+	# Caddy's defaults: a public certificate over ACME, renewed in time.
+}
+
+(tls-internal) {
+	tls internal
+}
+
+{
+	# No admin endpoint: nothing changes this configuration at run time.
+	admin off
+}
+
+{$ATALAIA_DOMAIN} {
+	import tls-{$ATALAIA_TLS:acme}
+
+	# The site server sends HSTS, nosniff, X-Frame-Options, its CSP and the
+	# referrer policy itself (atalaia_server/security_headers.py); Caddy adds
+	# what it does not and hides the software versions.
+	header {
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		X-Permitted-Cross-Domain-Policies "none"
+		-Server
+		-Via
+		-X-Powered-By
+		defer
+	}
+
+	reverse_proxy server:8000 {
+		# The client's address reaches the server in X-Forwarded-For (Caddy
+		# replaces whatever a client sent), for the per-address rate limits and
+		# the audit log (uvicorn's --proxy-headers).
+		# A configuration reload would drop the controllers' sockets at once;
+		# give them time to finish (they reconnect anyway).
+		stream_close_delay 5m
+	}
+}

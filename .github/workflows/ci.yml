@@ -74,7 +74,7 @@ jobs:
         env:
           ATALAIA_CORE_LIB: ${{ github.workspace }}/build/libatalaia_core.so
         working-directory: server
-        run: /usr/bin/python3 -m unittest tests.test_config tests.test_ids tests.test_shared_imports tests.test_chrono_verify tests.test_feeds -v
+        run: /usr/bin/python3 -m unittest tests.test_config tests.test_ids tests.test_shared_imports tests.test_chrono_verify tests.test_feeds tests.test_backup_crypt -v
 
   console:
     name: GM console and scoreboard in a browser (Chromium)
@@ -127,6 +127,21 @@ jobs:
         run: |
           docker run --rm --network host -e ATALAIA_DATABASE_URL atalaia-server-test \
             sh tests/run.sh migrations
+
+  server-deploy:
+    name: Site server deployment (setup.sh, Caddy, backup and restore)
+    # The real server/docker-compose.yml (Caddy, the server, PostgreSQL 16) with
+    # Caddy's own CA and the site name atalaia.test, as `python3 tools/docker_server.py
+    # deploy` runs it locally (plan phase 22): setup.sh, HTTPS and the WebSocket
+    # through Caddy, an encrypted backup, and its restore into a fresh database
+    # with every table compared.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Shell scripts (POSIX sh)
+        run: sh -n server/setup.sh && sh -n server/backup.sh && sh -n server/restore.sh
+      - name: Deployment test
+        run: python3 tools/docker_server.py deploy
 
   flutter-test:
     name: Player app (Dart, with the core through dart:ffi)

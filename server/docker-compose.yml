@@ -1,13 +1,49 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
-# The site server and its PostgreSQL 16 (ADR-P4-10). Plan phase 22 adds Caddy
-# for HTTPS, server/setup.sh for the secrets and the backups; until then this
-# is for trying the server locally: `python3 tools/docker_server.py up`
-# (which sets POSTGRES_PASSWORD and ATALAIA_SECRET_KEY) and `... down`. The
-# server listens on 127.0.0.1 only.
+# The site server's deployment (ADR-P4-10, plan phase 22; server/docs/DEPLOY.md):
+# Caddy for HTTPS in front of the site server, and PostgreSQL 16. Values come
+# from server/.env, which server/setup.sh makes (mode 0600, never committed):
+#   sh server/setup.sh campo.example.pt        secrets, .env, then start
+#   sh server/backup.sh                        an encrypted backup (cron: daily)
+#   sh server/restore.sh FILE --yes            restore one into a fresh database
+# For a trial on this computer: python3 tools/docker_server.py up (https://localhost:8443,
+# Caddy's own certificate); its deployment test: python3 tools/docker_server.py deploy.
+#
+# Only Caddy publishes ports. The server is on "app" with Caddy alone and
+# PostgreSQL on "db" with the server alone; both networks are internal (no
+# way out to the internet), so neither the database nor the server's own port
+# can be reached from outside, and the server makes no outbound connection.
+
+name: atalaia
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
 
 services:
+  caddy:
+    image: caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    environment:
+      ATALAIA_DOMAIN: "${ATALAIA_DOMAIN:?set ATALAIA_DOMAIN (server/setup.sh)}"
+      ATALAIA_TLS: "${ATALAIA_TLS:-acme}"
+    ports:
+      - "${ATALAIA_BIND:-0.0.0.0}:${ATALAIA_HTTP_PORT:-80}:80"
+      - "${ATALAIA_BIND:-0.0.0.0}:${ATALAIA_HTTPS_PORT:-443}:443"
+      - "${ATALAIA_BIND:-0.0.0.0}:${ATALAIA_HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data        # certificates and their keys: renewable, not in the backups
+      - caddy-config:/config
+    networks: [edge, app]
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *logging
+
   server:
     image: ${ATALAIA_SERVER_IMAGE:-atalaia-server}
     build:
@@ -15,37 +51,68 @@ services:
       dockerfile: server/Dockerfile
       target: server
     environment:
-      ATALAIA_DATABASE_URL: "postgresql+asyncpg://atalaia:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/atalaia"
-      ATALAIA_SECRET_KEY: "${ATALAIA_SECRET_KEY:?set ATALAIA_SECRET_KEY}"
+      ATALAIA_DATABASE_URL: "postgresql+asyncpg://atalaia:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD (server/setup.sh)}@postgres:5432/atalaia"
+      ATALAIA_SECRET_KEY: "${ATALAIA_SECRET_KEY:?set ATALAIA_SECRET_KEY (server/setup.sh)}"
+      ATALAIA_PUBLIC_URL: "${ATALAIA_PUBLIC_URL:-}"
       ATALAIA_METRICS_TOKEN: "${ATALAIA_METRICS_TOKEN:-}"
+      ATALAIA_FIRMWARE_KEYS: "${ATALAIA_FIRMWARE_KEYS:-}"
       ATALAIA_LOG_LEVEL: "${ATALAIA_LOG_LEVEL:-info}"
-    ports:
-      - "127.0.0.1:${ATALAIA_PORT:-8000}:8000"
+      ATALAIA_PURGE_HOUR: "${ATALAIA_PURGE_HOUR:-}"
+      ATALAIA_PRIVACY_NOTICE_VERSION: "${ATALAIA_PRIVACY_NOTICE_VERSION:-}"
+      # Trust X-Forwarded-For/-Proto from any peer: only Caddy can reach this
+      # port (the internal "app" network), and it replaces what clients send.
+      FORWARDED_ALLOW_IPS: "*"
+    networks: [app, db]
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    logging: *logging
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=4)"]
       interval: 10s
       timeout: 5s
-      start_period: 20s
+      start_period: 30s
       retries: 3
 
   postgres:
     image: postgres:16.15-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
     environment:
       POSTGRES_USER: atalaia
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD (server/setup.sh)}"
       POSTGRES_DB: atalaia
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks: [db]
     restart: unless-stopped
+    logging: *logging
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U atalaia -d atalaia"]
       interval: 5s
       timeout: 5s
       retries: 20
 
+  # The backups' encryption (server/backup.sh, restore.sh; decision S22-3): the
+  # server's image with no network at all, the key from .env, data on stdin/stdout.
+  # Never started by `up`; the scripts run it: docker compose run --rm -T backup-crypt seal|open
+  backup-crypt:
+    image: ${ATALAIA_SERVER_IMAGE:-atalaia-server}
+    profiles: [tools]
+    entrypoint: ["python", "-m", "atalaia_server.backup_crypt"]
+    environment:
+      ATALAIA_BACKUP_KEY: "${ATALAIA_BACKUP_KEY:-}"
+    network_mode: none
+    read_only: true
+    logging: *logging
+
+networks:
+  edge: {}
+  app:
+    internal: true
+  db:
+    internal: true
+
 volumes:
   pgdata:
+  caddy-data:
+  caddy-config:
