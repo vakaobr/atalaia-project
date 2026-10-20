@@ -26,7 +26,8 @@
     "feed": "Registo",
     "controller": "Controlador",
     "settings": "Definições",
-    "checkin": "Check-in"
+    "checkin": "Check-in",
+    "scenarios": "Cenários"
   },
   "common": {
     "yes": "Sim",
@@ -258,7 +259,12 @@
     "standby_join": "Entrar no jogo",
     "standby_done": "Este controlador está agora de reserva no jogo {game}.",
     "gm_only": "Só a organização pode gerar dados de entrada.",
-    "standby_cannot_issue": "Um controlador de reserva não gera dados de entrada; usa o controlador ativo."
+    "standby_cannot_issue": "Um controlador de reserva não gera dados de entrada; usa o controlador ativo.",
+    "for_named": "Caixa {node}: {name} ({role})",
+    "scenario_name": "Caixa do cenário",
+    "scenario_none": "— nenhuma (escolher a função) —",
+    "scenario_box": "caixa {node}",
+    "scenario_hint": "O cenário encontra as suas caixas por estes nomes: {done} de {n} já têm caixa."
   },
   "presets": {
     "title": "Predefinições",
@@ -521,5 +527,40 @@
     "saved": "Equipas guardadas.",
     "crest_alt": "Emblema de {team}",
     "remove_crest": "Tirar o emblema"
+  },
+  "scenario": {
+    "title": "Editor de cenários",
+    "intro": "Um cenário é um manifesto YAML: as caixas a que a organização dá nomes, e os objetivos (capturar, código, etiquetas, bomba, escolta, defender, sobreviver). O controlador verifica-o enquanto escreves; instalado, cria-se um jogo com ele e com os Objetivos no separador Jogo.",
+    "text": "Manifesto (YAML)",
+    "example": "Exemplo",
+    "check": "Verificar",
+    "install": "Instalar",
+    "checking": "A verificar…",
+    "ok": "Sem problemas: o field.lua gerado carrega no núcleo.",
+    "ok_no_core": "Sem problemas no manifesto (o núcleo não está carregado neste controlador).",
+    "ok_warnings": "Sem erros, com avisos:",
+    "has_errors": "{n} erro(s): corrige antes de instalar.",
+    "whole": "(manifesto)",
+    "levels": {
+      "error": "Erro",
+      "warning": "Aviso"
+    },
+    "nodes_title": "Caixas a nomear",
+    "nodes_hint": "No separador Juntar, dá cada um destes nomes a uma caixa.",
+    "roles": {
+      "objective": "objetivo",
+      "bomb_site": "local da bomba"
+    },
+    "player_node": "uma pessoa com a função {role} no check-in",
+    "objectives": "Objetivos",
+    "installed": "Cenários instalados",
+    "none": "Ainda não há cenários instalados.",
+    "name": "Nome",
+    "version": "Versão",
+    "open": "Abrir",
+    "game_hint": "Um jogo de um cenário: no separador Jogo, escolhe o cenário e marca Objetivos.",
+    "installed_done": "Cenário {name} {version} instalado.",
+    "replaced": "Cenário {name} substituído pela versão {version}.",
+    "read_only": "Com o código de leitura só se verifica: instalar é da organização."
   }
 }

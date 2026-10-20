@@ -11,6 +11,9 @@ which browsers cannot give headers, also takes ``?token=``.
     GET  /api/v1/nodes                     nodes, capabilities, health (live game, or ?game=)
     GET  /api/v1/modes                     installed mode packages and their parameters
     POST /api/v1/modes                     upload a mode package {"files": {name: text}}
+    POST /api/v1/scenarios/check           a scenario manifest's problems {"manifest": text} (GM or read token)
+    GET|POST /api/v1/scenarios             installed scenarios / GM: compile and install {"manifest": text}
+    GET  /api/v1/scenarios/{id}            GM: its manifest and generated package (mode.yaml, field.lua)
     GET  /api/v1/presets                   saved presets
     POST /api/v1/presets                   save a preset {"name", "mode_id", "params"}
     GET  /api/v1/games                     every game
@@ -25,7 +28,7 @@ which browsers cannot give headers, also takes ``?token=``.
     GET  /api/v1/controller                controller and radio status
     POST /api/v1/controller/promote        manual failover: stand for election
     POST /api/v1/join                      a join payload for a box or a standby controller
-    POST /api/v1/nodes/{id}/join           the same, for node id {id}
+    POST /api/v1/nodes/{id}/join           the same, for node id {id} ({"name"}: a scenario's box)
     POST /api/v1/controller/join           this controller takes a game as standby
     GET  /api/v1/field                     whether a field image is uploaded
     GET|PUT|DELETE /api/v1/field/image     the field image (map or floor plan) of the console
@@ -101,6 +104,7 @@ from . import checkin as checkinmod
 from . import schedule as schedulemod
 from . import georef as georefmod
 from . import images, visibility
+from . import scenario_service as scenarios
 from .branding import SLOTS, Branding, etag
 from .checkin import Viewer
 from .engine import Controller, ControllerError
@@ -227,6 +231,11 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     async def mode_error(request: Request, exc: ModeError):
         return JSONResponse({"detail": str(exc)}, status_code=400)
 
+    @app.exception_handler(scenarios.Refused)
+    async def scenario_refused(request: Request, exc: scenarios.Refused):
+        return JSONResponse({"detail": str(exc), "problems": [p.to_dict() for p in exc.problems]},
+                            status_code=exc.status)
+
     @app.exception_handler(images.ImageError)
     async def image_error(request: Request, exc: images.ImageError):
         return JSONResponse({"detail": str(exc)}, status_code=exc.status)
@@ -264,6 +273,26 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         files = body_map(body).get("files")
         return controller.modes.install(files).to_api()
 
+    # --- scenarios (plan phase 8, scenario_service.py) ----------------------------------
+
+    @app.post("/api/v1/scenarios/check", dependencies=[Depends(require_console)])
+    def scenario_check(body: Any = Body(None)) -> dict[str, Any]:
+        return scenarios.check(controller, scenarios.manifest_text(body))
+
+    @app.get("/api/v1/scenarios", dependencies=[Depends(require_console)])
+    def scenario_list() -> list[dict[str, Any]]:
+        return scenarios.listing(controller)
+
+    @app.post("/api/v1/scenarios", status_code=201, dependencies=[Depends(require_gm)])
+    def scenario_install(body: Any = Body(None)) -> dict[str, Any]:
+        out = scenarios.install(controller, scenarios.manifest_text(body))
+        controller._emit({"type": "modes"})
+        return out
+
+    @app.get("/api/v1/scenarios/{scenario_id}", dependencies=[Depends(require_gm)])
+    def scenario_read(scenario_id: str) -> JSONResponse:
+        return JSONResponse(scenarios.read(controller, scenario_id), headers=NO_STORE)
+
     @app.get("/api/v1/presets")
     def presets(role: str = Depends(require_console)) -> list[dict[str, Any]]:
         out = controller.store.presets()
@@ -288,7 +317,7 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
 
     @app.get("/api/v1/games")
     def games(v: Viewer = Depends(require_read)) -> list[dict[str, Any]]:
-        return [g if visibility.is_staff(v, g["id"]) else controller.players_game(g)
+        return [g if visibility.is_staff(v, g["id"]) else controller.players_game(g, v)
                 for g in controller.list_games()]
 
     @app.post("/api/v1/games", status_code=201, dependencies=[Depends(require_gm)])
@@ -298,7 +327,7 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     @app.get("/api/v1/games/{game_id}")
     def game(game_id: int, v: Viewer = Depends(require_read)) -> dict[str, Any]:
         out = controller.get_game(game_id)
-        return out if visibility.is_staff(v, game_id) else controller.players_game(out)
+        return out if visibility.is_staff(v, game_id) else controller.players_game(out, v)
 
     @app.post("/api/v1/games/{game_id}/start", dependencies=[Depends(require_gm)])
     def start(game_id: int) -> dict[str, Any]:
@@ -339,7 +368,7 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     def game_log(game_id: int, since_ms: Optional[int] = None,
                  v: Viewer = Depends(require_read)) -> list[dict[str, Any]]:
         out = controller.log(game_id, since_ms)
-        return out if visibility.is_staff(v, game_id) else [visibility.public_event(e) for e in out]
+        return out if visibility.is_staff(v, game_id) else [controller.event_for(v, game_id, e) for e in out]
 
     @app.get("/api/v1/controller", dependencies=[Depends(require_console)])
     def status() -> dict[str, Any]:
@@ -891,11 +920,11 @@ def _snapshot(controller: Controller, viewer: Optional[Viewer] = None) -> dict[s
         events = [{k: e.get(k) for k in ("node", "seq", "t", "type", "team", "squad", "prio", "data")}
                   for e in controller.store.events(game_id)[-HELLO_EVENTS:]]
         if not staff:
-            events = [visibility.public_event(e) for e in events]
+            events = [controller.event_for(viewer, game_id, e) for e in events]
     game = controller.get_game(game_id) if game_id else None
     out: dict[str, Any] = {
         "type": "hello",
-        "game": game if game is None or staff else controller.players_game(game),
+        "game": game if game is None or staff else controller.players_game(game, viewer),
         "score": controller.score(game_id) if game_id else None,
         "nodes": controller.nodes(game_id) if game_id else [],
         "events": events,
@@ -946,13 +975,14 @@ def make_route(controller: Controller) -> Callable[[Any, dict[str, Any]], Any]:
         if v.kind == "player" and msg.get("type") not in PLAYER_TYPES:
             return None
         out = public(msg)
-        # Decision M5-1: gm_only event data and game parameters to staff only.
+        # Decision M5-1: gm_only event data and game parameters to staff only; a scenario's
+        # objectives to the players they are for (P4R24).
         if out.get("type") == "event" and isinstance(out.get("event"), dict) \
                 and not visibility.is_staff(v, out.get("game")):
-            out["event"] = visibility.public_event(out["event"])
+            out["event"] = controller.event_for(v, out.get("game"), out["event"])
         elif out.get("type") == "game" and isinstance(out.get("game"), dict) \
                 and not visibility.is_staff(v, out["game"].get("id")):
-            out["game"] = controller.players_game(out["game"])
+            out["game"] = controller.players_game(out["game"], v)
         return out
 
     return route

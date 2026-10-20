@@ -5,7 +5,9 @@
 // time: a Bomb prop on the APK's own core, armed by holding the red button
 // and then exploding; a game joined with a join text; and the player's
 // view following a field controller over a WebSocket (a stand-in served on
-// the phone itself), with the score changing as events arrive.
+// the phone itself), with the score changing as events arrive; and a
+// scenario's objectives (phase 4 plan phase 8): a hidden one appears when
+// the controller sends the game again with it, in progress once revealed.
 
 import 'dart:async';
 import 'dart:convert';
@@ -169,6 +171,89 @@ void main() {
             w.data == '5',
       ),
     );
+    await ws.close();
+  });
+
+  testWidgets('the player view shows a scenario objective once revealed', (
+    tester,
+  ) async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    final socket = Completer<WebSocket>();
+    server.listen((req) async {
+      if (req.uri.path == '/api/v1/stream' &&
+          req.uri.queryParameters['token'] == 'read-code') {
+        socket.complete(await WebSocketTransformer.upgrade(req));
+      } else {
+        req.response.statusCode = 404;
+        await req.response.close();
+      }
+    });
+    Map<String, Object?> objective(String id, String name, String pt) => {
+      'id': id,
+      'type': 'enter_code',
+      'name': name,
+      'i18n': {
+        'pt': {'name': pt},
+      },
+      'team': 'red',
+      'visibility': id == 'vault' ? 'hidden' : 'team',
+    };
+    Map<String, Object?> game(List<Map<String, Object?>> objectives) => {
+      'id': 4,
+      'name': 'Jogo do cofre',
+      'teams': ['red', 'blue'],
+      'state': 'running',
+      'game_time_ms': 1000,
+      'live': true,
+      'scenario': {
+        'id': 'org.club.cofre',
+        'name': 'Vault',
+        'objectives': objectives,
+      },
+    };
+    final bridge = objective('bridge', 'Take the bridge', 'Tomar a ponte');
+    final link = FieldLink.parse('127.0.0.1:${server.port}', 'read-code')!;
+    await tester.pumpWidget(deviceApp(home: PlayerScreen(link: link)));
+    final ws = await socket.future.timeout(const Duration(seconds: 20));
+    ws.add(
+      jsonEncode({
+        'type': 'hello',
+        'game': game([bridge]),
+        'score': {
+          'game': 4,
+          'teams': {'red': 0, 'blue': 0},
+        },
+        'nodes': <Object?>[],
+      }),
+    );
+    await waitFor(tester, find.text('Tomar a ponte'));
+    expect(find.text('Abrir o cofre'), findsNothing);
+    ws
+      ..add(
+        jsonEncode({
+          'type': 'game',
+          'game': game([
+            bridge,
+            objective('vault', 'Open the vault', 'Abrir o cofre'),
+          ]),
+        }),
+      )
+      ..add(
+        jsonEncode({
+          'type': 'event',
+          'game': 4,
+          'event': {
+            'node': 1,
+            't': 5000,
+            'type': 'scenario.objective.revealed',
+            'team': 'red',
+            'data': {'objective': 'vault', 'team': 'red'},
+          },
+        }),
+      );
+    await waitFor(tester, find.text('Abrir o cofre'));
+    expect(find.text('Em curso · Para a equipa vermelha'), findsNWidgets(2));
     await ws.close();
   });
 }

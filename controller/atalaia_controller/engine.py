@@ -48,6 +48,7 @@ from atalaia_sim.mode import COMMAND_NAME, SEPARATOR, ModeError
 from atalaia_sim.packet import Header, vf_make
 
 from . import channels, radio_modem, visibility
+from . import scenario_service as scenarios
 from .config import Config
 from .modem_framing import RxPacket
 from .modes import ModeRegistry, resolve_params
@@ -166,7 +167,11 @@ class FieldScript:
 
     def _nodes(self, role: Optional[str]) -> list[dict[str, Any]]:
         fc = self._fc()
-        return [{"id": n.node_id, "name": n.name, "role": n.role, "owner": n.owner_name(fc.teams)}
+        # A scenario's node names, as the GM gave them to the boxes in the Join tab (M6-7, P4R8);
+        # else the box's own name.
+        names = self.engine.scenario_names
+        return [{"id": n.node_id, "name": names.get(n.node_id, n.name), "role": n.role,
+                 "owner": n.owner_name(fc.teams)}
                 for n in sorted(fc.nodes.values(), key=lambda n: n.node_id)
                 if role is None or n.role == role]
 
@@ -242,6 +247,8 @@ class Controller:
         self.transport: Optional[ModemTransport] = None
         self.field: Optional[FieldScript] = None
         self._field_scores: dict[str, dict[str, int]] = {}  # field.lua points per run
+        self.scenario_names: dict[int, str] = {}  # the live game's box names for its scenario (Join tab)
+        self._meta_cache: dict[str, tuple[int, Optional[scenarios.Meta]]] = {}
         self.key_lost = False
         self._key = b""
         self.tx_status: Counter[str] = Counter()
@@ -366,6 +373,7 @@ class Controller:
         self.fc = fc
         self.game = game
         self._key = key
+        self.scenario_names = scenarios.node_names(self, game["id"])
 
     def _restore(self) -> None:
         game = self.store.live_game()
@@ -428,6 +436,7 @@ class Controller:
         self._key = b""
         self.game = None
         self.key_lost = False
+        self.scenario_names = {}
 
     # --- public API (REST, MQTT, console) ------------------------------------
 
@@ -435,6 +444,12 @@ class Controller:
         out = dict(game)
         live = self.game is not None and self.game["id"] == game["id"]
         out["live"] = live
+        meta = self.scenario_meta(game.get("mode_id"))
+        if meta is not None:
+            # The staff's view: every objective, and the boxes the GM named (Join tab).
+            out["scenario"] = meta.staff_view()
+            names = self.scenario_names if live else scenarios.node_names(self, game["id"])
+            out["scenario_nodes"] = {str(k): v for k, v in sorted(names.items())}
         if live and self.fc is not None:
             out["game_time_ms"] = self.fc.game_time_ms
             out["term"] = self.fc.term
@@ -442,11 +457,45 @@ class Controller:
             out["key_lost"] = True
         return out
 
-    def players_game(self, game: dict[str, Any]) -> dict[str, Any]:
+    def players_game(self, game: dict[str, Any], viewer: Any = None) -> dict[str, Any]:
         """A game as players and the read token see it: without its gm_only parameters
-        (decision M5-1, visibility.py)."""
+        (decision M5-1, visibility.py), and of its scenario only the objectives this viewer may
+        know (P4R24): none of the boxes' names, targets or dependencies."""
         pkg = self.modes.get(game.get("mode_id")) if isinstance(game.get("mode_id"), str) else None
-        return {**game, "params": visibility.public_params(pkg.mode if pkg else None, game.get("params"))}
+        out = {**game, "params": visibility.public_params(pkg.mode if pkg else None, game.get("params"))}
+        out.pop("scenario_nodes", None)
+        meta = self.scenario_meta(game.get("mode_id"))
+        if meta is not None:
+            out["scenario"] = meta.player_view(viewer, game, scenarios.revealed(self, game["id"]))
+        return out
+
+    def scenario_meta(self, mode_id: Any) -> Optional[scenarios.Meta]:
+        """The scenario a game's id leads with (its package's mode.yaml, M7-8), or None."""
+        if not isinstance(mode_id, str):
+            return None
+        cached = self._meta_cache.get(mode_id)
+        if cached is not None and cached[0] == self.modes.generation:
+            return cached[1]
+        meta = None
+        try:
+            pkg = self.modes.get(mode_id) if SEPARATOR in mode_id else None
+        except ModeError:
+            pkg = None
+        if pkg is not None:
+            meta = scenarios.Meta.parse(pkg.files.get("mode.yaml", ""))
+        self._meta_cache[mode_id] = (self.modes.generation, meta)
+        return meta
+
+    def event_for(self, viewer: Any, game_id: Any, ev: dict[str, Any]) -> dict[str, Any]:
+        """An event as this viewer may see it (visibility.scenario_event: gm_only data for staff,
+        and a scenario objective's id for the players it is for)."""
+        if visibility.is_staff(viewer, game_id if isinstance(game_id, int) else None):
+            return ev
+        if ev.get("type") not in visibility.OBJECTIVE_EVENTS or not isinstance(game_id, int):
+            return visibility.public_event(ev)
+        game = self.game if self.game is not None and self.game["id"] == game_id else self.store.game(game_id)
+        meta = self.scenario_meta(game.get("mode_id")) if game is not None else None
+        return visibility.scenario_event(viewer, ev, game, meta.objectives if meta else None)
 
     def list_games(self) -> list[dict[str, Any]]:
         return [self.public_game(g) for g in self.store.games()]
@@ -480,6 +529,10 @@ class Controller:
             pkg = self.modes.get(mode_id) if isinstance(mode_id, str) else None
             if pkg is None:
                 raise ControllerError(f"unknown mode {mode_id!r}")
+            if len(pkg.id.encode()) > joinfmt.MODE_MAX:
+                # A standby controller's join carries the whole id (decisions M6-1, M7-1).
+                raise ControllerError(f"the game's id {pkg.id} is {len(pkg.id.encode())} bytes; a join carries "
+                                      f"at most {joinfmt.MODE_MAX}: drop a part, or give the scenario a shorter id")
             teams = spec.get("teams", ["red", "blue"])
             if (not isinstance(teams, list) or not 1 <= len(teams) <= 8
                     or not all(isinstance(t, str) and 0 < len(t.encode()) <= TEAM_NAME_MAX for t in teams)
@@ -761,6 +814,19 @@ class Controller:
             kind = spec.get("kind", "node")
             if kind not in joinfmt.KINDS:
                 raise ControllerError(f"kind: one of {', '.join(sorted(joinfmt.KINDS))}")
+            # A scenario's box: the name the GM gives it (P4R8, M6-7), whose role is the scenario's.
+            scenario_name = spec.get("name")
+            if scenario_name is not None:
+                meta = self.scenario_meta(self.game["mode_id"])
+                boxes = meta.box_nodes() if meta is not None else {}
+                if kind != "node" or meta is None:
+                    raise ControllerError("name: only a box of a scenario's game takes a scenario node's name")
+                if not isinstance(scenario_name, str) or scenario_name not in boxes:
+                    raise ControllerError(f"name: one of the scenario's boxes {sorted(boxes)}")
+                if spec.get("role") is not None and spec["role"] != boxes[scenario_name]:
+                    raise ControllerError(f"{scenario_name} is a {boxes[scenario_name]} in the scenario, "
+                                          f"not a {spec['role']}")
+                spec = {**spec, "role": boxes[scenario_name]}
             pkg = self.modes.get(self.game["mode_id"])
             if kind == "node":
                 role = spec.get("role")
@@ -818,8 +884,10 @@ class Controller:
                 self.game["assignments"][str(node_id)] = role
                 self.store.update_game(self.game["id"], assignments=self.game["assignments"])
                 fc.register_node(node_id, f"node-{node_id}", role)
+            if scenario_name is not None:
+                self.scenario_names = scenarios.name_node(self, self.game["id"], node_id, scenario_name)
             out = {
-                "game": self.game["id"], "node_id": node_id, "kind": kind, "role": role,
+                "game": self.game["id"], "node_id": node_id, "kind": kind, "role": role, "name": scenario_name,
                 "controller_id": self.node_id, "channel_hz": join["channel_hz"],
                 "max_hops": join["max_hops"], "bytes": len(payload),
                 "text": joinfmt.to_text(payload), "payload_hex": payload.hex(),
@@ -827,7 +895,7 @@ class Controller:
                 "wifi_link": bool(link),
             }
             self._emit({"type": "join", "game": self.game["id"], "node_id": node_id, "kind": kind,
-                        "role": role})
+                        "role": role, "name": scenario_name})
             return out
 
     def join_as_standby(self, text: Any) -> dict[str, Any]:
@@ -850,9 +918,16 @@ class Controller:
                 raise ControllerError(f"join payload refused ({exc.reason}): {exc}") from None
             if j["kind"] != "controller":
                 raise ControllerError("this join payload is for a box, not a standby controller")
-            pkg = self.modes.get(j["mode_id"])
+            try:
+                pkg = self.modes.get(j["mode_id"])
+            except ModeError as exc:
+                raise Conflict(f"mode {j['mode_id']}: {exc}") from None
             if pkg is None:
-                raise Conflict(f"mode {j['mode_id']} is not installed on this controller")
+                # A scenario is an upload (P4R7): the standby needs it too (decision M6-1, M8-3).
+                missing = [m for m in j["mode_id"].split(SEPARATOR) if not any(p.id == m for p in self.modes.all())]
+                raise Conflict(f"mode {j['mode_id']} is not installed on this controller (missing: "
+                               f"{', '.join(missing)}); install a scenario here first, with the same manifest "
+                               "(the leading controller's GET /api/v1/scenarios/{id} gives it)")
             if pkg.field_script is not None and self.core is None:
                 raise Unavailable("this mode has a field.lua and the core library is not loaded")
             existing = self.store.game(j["game_id"])
@@ -1209,6 +1284,12 @@ class Controller:
             return
         ev = _public_event(record)
         self._emit({"type": "event", "game": self.game["id"], "event": ev})
+        if record.get("type") == scenarios.REVEALED:
+            # A hidden objective's names reach its players with the game (P4R24): send it again.
+            meta = self.scenario_meta(self.game["mode_id"])
+            objective = meta.objectives.get((record.get("data") or {}).get("objective")) if meta else None
+            if objective is not None and objective.get("visibility") == "hidden":
+                self._emit({"type": "game", "game": self.public_game(self.game)})
         if self.positions is not None:
             self.positions.on_event(self.game["id"], record)
         if self.field is not None and record["node"] != self.node_id:

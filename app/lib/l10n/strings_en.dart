@@ -256,6 +256,20 @@ const Map<String, String> enStrings = {
   'player.node': 'Box {n}',
   'player.held_by': 'Held by {team}',
   'player.held_by_none': 'Held by nobody',
+  'player.scenario': 'Scenario objectives',
+  'player.objective_waiting': 'Starts with the game',
+  'player.objective_active': 'In progress',
+  'player.objective_done': 'Completed by {team}',
+  'player.objective_done_no_team': 'Completed',
+  'player.objective_failed': 'Failed',
+  'player.objective_failed_captured': 'Failed: taken by another team',
+  'player.objective_failed_defused': 'Failed: the bomb was defused',
+  'player.objective_failed_time': 'Failed: out of time',
+  'player.objective_failed_blocked': 'Failed: an earlier objective failed',
+  'player.objective_failed_lives': 'Failed: too few lives left',
+  'player.objective_for_team': 'For {team}',
+  'player.objective_for_squad': 'For {team}, squad {squad}',
+  'player.objective_points': '+{n}',
   'player.lives': 'Lives',
   'player.events': 'What happened',
   'player.no_events': 'Nothing yet.',
@@ -308,6 +322,14 @@ const Map<String, String> enStrings = {
   'event.scenario.objective.failed.no_team': 'An objective failed',
   'event.scenario.objective.revealed': 'A new objective for {team}',
   'event.scenario.objective.revealed.no_team': 'A new objective',
+  'event.scenario.objective.completed.named': '{team} completed: {objective}',
+  'event.scenario.objective.completed.named.no_team': 'Completed: {objective}',
+  'event.scenario.objective.failed.named': '{team} failed: {objective}',
+  'event.scenario.objective.failed.named.no_team': 'Failed: {objective}',
+  'event.scenario.objective.revealed.named':
+      'A new objective for {team}: {objective}',
+  'event.scenario.objective.revealed.named.no_team':
+      'A new objective: {objective}',
 
   // GM
   'gm.intro':

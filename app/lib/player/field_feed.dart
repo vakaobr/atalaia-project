@@ -14,6 +14,11 @@
 /// positions the controller lets this player see, and when the GM changes
 /// the player's team or role (close 4409) it asks [onAssignment] for a new
 /// token before it reconnects.
+///
+/// A scenario's game (plan phase 8, decision P4R24): the game carries the
+/// scenario's objectives this connection may know (`game.scenario`, with
+/// their names in English and Portuguese), and the objective events say
+/// which were revealed, completed or failed: [objectives].
 library;
 
 import 'dart:async';
@@ -117,6 +122,50 @@ Future<FeedSocket> pinnedConnect(Uri uri, PinnedField field) async => _IoSocket(
 
 enum FeedState { connecting, open, closed, denied }
 
+/// Where a scenario objective stands for the player view.
+enum ObjectiveState { waiting, active, done, failed }
+
+/// One objective of the game's scenario, as this player may know it: its
+/// names and assignee from the game (controller: scenario_service.Meta's
+/// player view) and its state from the objective events.
+final class ScenarioObjective {
+  const ScenarioObjective(this.info, this.state, {this.team, this.reason});
+
+  /// id, type, name, i18n, team, squad, visibility, points, win.
+  final Map<String, Object?> info;
+  final ObjectiveState state;
+
+  /// The team that completed or failed it.
+  final String? team;
+
+  /// Why it failed (captured, defused, time, blocked, lives).
+  final String? reason;
+
+  String get id => '${info['id']}';
+
+  /// Its name in [lang] (the scenario's `i18n`), else in English.
+  String name(String lang) => _text(info, lang, 'name') ?? id;
+
+  String? description(String lang) => _text(info, lang, 'description');
+
+  int? get points => info['points'] is int ? info['points']! as int : null;
+
+  String? get assigneeTeam =>
+      info['team'] is String ? info['team']! as String : null;
+
+  int? get assigneeSquad => info['squad'] is int ? info['squad']! as int : null;
+}
+
+String? _text(Map<String, Object?> entry, String lang, String key) {
+  final i18n = entry['i18n'];
+  if (i18n is Map && i18n[lang] is Map) {
+    final v = (i18n[lang] as Map)[key];
+    if (v is String && v.isNotEmpty) return v;
+  }
+  final v = entry[key];
+  return v is String && v.isNotEmpty ? v : null;
+}
+
 /// One event of the game, as the controller logged it.
 final class FeedEvent {
   const FeedEvent(this.type, this.team, this.data, this.tMs, this.node);
@@ -169,6 +218,10 @@ class FieldFeed extends ChangeNotifier {
 
   /// Lives left by player or team, from player.respawn.
   final lives = <String, int>{};
+
+  /// What the objective events said of each objective (by id): the state,
+  /// and the team that completed or failed it, and why.
+  final _objectiveNews = <String, (ObjectiveState, String?, String?)>{};
 
   /// The ETag of the field's branding as the stream last told it (the
   /// snapshot, then `branding` messages): the view fetches it when it changes.
@@ -257,6 +310,7 @@ class FieldFeed extends ChangeNotifier {
         events.clear();
         eliminated.clear();
         lives.clear();
+        _objectiveNews.clear();
         for (final e in (m['events'] as List?) ?? const []) {
           if (e is Map<String, Object?>) _onEvent(e);
         }
@@ -276,6 +330,7 @@ class FieldFeed extends ChangeNotifier {
             events.clear();
             eliminated.clear();
             lives.clear();
+            _objectiveNews.clear();
             totals = const {};
           }
           _setGame(g);
@@ -342,7 +397,56 @@ class FieldFeed extends ChangeNotifier {
       case 'zone.captured':
         final n = nodes[ev.node];
         if (n != null && ev.team != null) n['owner'] = ev.team;
+      case 'scenario.objective.revealed':
+        final id = data['objective'];
+        if (id is String && _objectiveNews[id] == null) {
+          _objectiveNews[id] = (ObjectiveState.active, null, null);
+        }
+      case 'scenario.objective.completed' || 'scenario.objective.failed':
+        final id = data['objective'];
+        final reason = data['reason'];
+        if (id is String) {
+          _objectiveNews[id] = (
+            ev.type.endsWith('completed')
+                ? ObjectiveState.done
+                : ObjectiveState.failed,
+            ev.team,
+            reason is String ? reason : null,
+          );
+        }
     }
+  }
+
+  /// The game's scenario as this connection may see it (its name and
+  /// objectives), or null.
+  Map<String, Object?>? get scenario {
+    final s = game?['scenario'];
+    return s is Map ? s.cast<String, Object?>() : null;
+  }
+
+  /// The scenario's objectives this player may know, in the scenario's
+  /// order. The controller sends only those (a hidden one once revealed);
+  /// one with no event yet is waiting before the game starts and active
+  /// after (its reveal may be older than the events the stream kept).
+  List<ScenarioObjective> get objectives {
+    final list = scenario?['objectives'];
+    if (list is! List) return const [];
+    final started = gameState != null && gameState != 'ready';
+    return [
+      for (final o in list)
+        if (o is Map && o['id'] is String)
+          _objective(o.cast<String, Object?>(), started),
+    ];
+  }
+
+  ScenarioObjective _objective(Map<String, Object?> info, bool started) {
+    final news = _objectiveNews[info['id']];
+    return ScenarioObjective(
+      info,
+      news?.$1 ?? (started ? ObjectiveState.active : ObjectiveState.waiting),
+      team: news?.$2,
+      reason: news?.$3,
+    );
   }
 
   void _setGame(Map<String, Object?>? g) {

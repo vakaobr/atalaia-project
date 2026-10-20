@@ -6,7 +6,7 @@
   "review_iteration": 0,
   "failing_experts": [],
   "created_at": "2026-10-17T00:00:00Z",
-  "updated_at": "2026-10-20T22:30:00Z",
+  "updated_at": "2026-10-20T23:30:00Z",
   "artifacts": {
     "RESEARCH.md": "complete",
     "ADR.md": "complete",
@@ -19,7 +19,7 @@
     "design_only": false,
     "stop_after": null,
     "resume_with": "--implement",
-    "next_plan_phase": "8 (scenarios in the controller, console and app) on the modes chain; 19 (device health, firmware catalogue, remote GM) on the site server chain",
+    "next_plan_phase": "19 (device health, firmware catalogue, remote GM), then 20 (scenario library on the site server)",
     "completed_plan_phases": [
       "1",
       "2",
@@ -28,6 +28,7 @@
       "5",
       "6",
       "7",
+      "8",
       "9",
       "10",
       "11",

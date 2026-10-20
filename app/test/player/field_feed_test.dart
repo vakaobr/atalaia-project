@@ -375,4 +375,103 @@ void main() {
       expect(tokens, ['apt1.old', 'apt1.new']);
     });
   });
+
+  group('scenario objectives (plan phase 8)', () {
+    Map<String, Object?> objective(String id, String name, {String? pt}) => {
+      'id': id,
+      'type': 'capture_and_hold',
+      'name': name,
+      if (pt != null)
+        'i18n': {
+          'pt': {'name': pt},
+        },
+      'visibility': 'public',
+    };
+
+    Map<String, Object?> event(String type, String id, {String? team}) => {
+      'type': 'event',
+      'game': 7,
+      'event': {
+        'node': 1,
+        't': 1000,
+        'type': type,
+        'team': ?team,
+        'data': {
+          'objective': id,
+          if (type.endsWith('failed')) 'reason': 'time',
+        },
+      },
+    };
+
+    test('names from the game, states from the events', () {
+      final feed = FieldFeed(FieldLink.parse('10.0.0.1', 'c')!);
+      addTearDown(feed.dispose);
+      final game = {
+        ...hello['game']! as Map<String, Object?>,
+        'state': 'ready',
+        'scenario': {
+          'id': 'org.club.x',
+          'name': 'Bridge',
+          'objectives': [
+            objective('bridge', 'Take the bridge', pt: 'Tomar a ponte'),
+            objective('radio', 'Call home'),
+          ],
+        },
+      };
+      feed.onMessage({...hello, 'game': game, 'events': <Object?>[]});
+      expect(feed.objectives.map((o) => o.state), [
+        ObjectiveState.waiting,
+        ObjectiveState.waiting,
+      ]);
+      expect(feed.objectives.first.name('pt'), 'Tomar a ponte');
+      expect(feed.objectives.first.name('en'), 'Take the bridge');
+      expect(feed.objectives.last.name('pt'), 'Call home'); // no translation
+      feed
+        ..onMessage({
+          'type': 'game',
+          'game': {...game, 'state': 'running'},
+        })
+        ..onMessage(event('scenario.objective.revealed', 'bridge'))
+        ..onMessage(
+          event('scenario.objective.completed', 'bridge', team: 'red'),
+        )
+        ..onMessage(event('scenario.objective.failed', 'radio', team: 'blue'));
+      final [bridge, radio] = feed.objectives;
+      expect((bridge.state, bridge.team), (ObjectiveState.done, 'red'));
+      expect(
+        (radio.state, radio.team, radio.reason),
+        (ObjectiveState.failed, 'blue', 'time'),
+      );
+      // An event without the objective (another team's) changes nothing.
+      feed.onMessage({
+        'type': 'event',
+        'game': 7,
+        'event': {
+          'node': 1,
+          't': 2000,
+          'type': 'scenario.objective.revealed',
+          'team': 'blue',
+          'data': <String, Object?>{},
+        },
+      });
+      expect(feed.objectives, hasLength(2));
+      // A new game starts over.
+      feed.onMessage({
+        'type': 'game',
+        'game': {...game, 'id': 8, 'live': true, 'state': 'running'},
+      });
+      expect(feed.objectives.map((o) => o.state), [
+        ObjectiveState.active,
+        ObjectiveState.active,
+      ]);
+    });
+
+    test('a game without a scenario has no objectives', () {
+      final feed = FieldFeed(FieldLink.parse('10.0.0.1', 'c')!)
+        ..onMessage(hello);
+      addTearDown(feed.dispose);
+      expect(feed.scenario, isNull);
+      expect(feed.objectives, isEmpty);
+    });
+  });
 }

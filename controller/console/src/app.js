@@ -14,11 +14,12 @@ import { NodeList } from './components/node-list.js';
 import { FieldView } from './components/field-view.js';
 import { JoinPanel } from './components/join-panel.js';
 import { PresetBuilder } from './components/preset-builder.js';
+import { ScenarioBuilder } from './components/scenario-builder.js';
 import { RadioSettings } from './components/radio-settings.js';
 import { CheckinPanel } from './components/checkin-panel.js';
 import { BrandingSettings, TeamPresets, FieldBrand, accentRef } from './components/branding-settings.js';
 
-const TABS = ['game', 'checkin', 'field', 'nodes', 'join', 'presets', 'feed', 'controller', 'settings'];
+const TABS = ['game', 'checkin', 'field', 'nodes', 'join', 'presets', 'scenarios', 'feed', 'controller', 'settings'];
 const FEED_MAX = 500;
 const ALERTS_MAX = 50;
 const HISTORY_MAX = 240;
@@ -186,6 +187,9 @@ class App extends Component {
             }
             this.refreshStatus();
             if (this.state.radio) this.loadRadio(); // a live game locks the channel
+            break;
+        case 'modes':
+            this.loadCatalogue(); // a scenario was installed (here or in another console)
             break;
         case 'radio':
             this.setState({ radio: msg.radio });
@@ -393,6 +397,8 @@ class App extends Component {
             return html`<${JoinPanel} app=${this} />`;
         case 'presets':
             return html`<${PresetBuilder} app=${this} />`;
+        case 'scenarios':
+            return html`<${ScenarioBuilder} app=${this} />`;
         case 'feed':
             return html`<${LiveFeed} app=${this} />`;
         case 'controller':

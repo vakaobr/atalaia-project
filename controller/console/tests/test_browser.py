@@ -31,8 +31,8 @@ HERE = Path(__file__).resolve().parent
 CONTROLLER = HERE.parents[1]
 sys.path.insert(0, str(CONTROLLER / "tests"))
 
-from support import (CORE, MESSAGE_TYPES, MODEM_HOST, HostModem, config, free_port,  # noqa: E402
-                     node_packet, packet_decrypt, wait_for)
+from support import (BOX_HOST, CORE, MESSAGE_TYPES, MODEM_HOST, AirHub, BoxHost, HostModem,  # noqa: E402
+                     config, free_port, node_packet, packet_decrypt, wait_for)
 
 import httpx  # noqa: E402
 import uvicorn  # noqa: E402
@@ -64,8 +64,10 @@ BOX = 7
 class Field:
     """A running controller (uvicorn, real port) with the C host modem."""
 
-    def __init__(self, *modem_args: str) -> None:
-        self.host = HostModem(0, *modem_args)
+    def __init__(self, *modem_args: str, hub: "AirHub | None" = None) -> None:
+        self.host = HostModem(0, *modem_args, hub=hub)
+        if hub is not None:  # host boxes share the air (plan phase 8's scenario test)
+            hub.add(self.host.air_port)
         self.tmp = tempfile.TemporaryDirectory()
         self.port = free_port()
         cfg = config(self.tmp.name, port=self.host.url, api_port=self.port, host="127.0.0.1",
@@ -512,6 +514,90 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(done).to_contain_text("red completed the objective bridge")
         expect(feed.locator('[data-type="scenario.objective.revealed"]')).to_have_count(3)
         expect(feed).to_contain_text("The objective intel is revealed to every team")
+
+    @unittest.skipUnless(BOX_HOST, "host box not built")
+    def test_scenario_builder_to_a_two_objective_game_on_host_boxes(self):
+        """Plan phase 8: the GM writes a scenario in the builder (the example, a mistake shown
+        with its place in the manifest, fixed), installs it, makes a game of it with the
+        objectives package, names two host boxes in the Join tab with the scenario's names,
+        and plays it: the bridge's capture completes it and reveals the vault, whose code
+        typed on the other box completes the vault; the score and the feed follow."""
+        self.field.close()
+        hub = AirHub()
+        self.addCleanup(hub.close)
+        self.field = Field(hub=hub)
+        page = self.console()
+        page.get_by_test_id("tab-scenarios").click()
+        expect(page.get_by_test_id("scenario-none")).to_be_visible()
+        page.get_by_test_id("scenario-example").click()
+        expect(page.get_by_test_id("scenario-ok")).to_contain_text("Sem problemas")
+        expect(page.get_by_test_id("scenario-nodes")).to_contain_text("vault · objetivo")
+        editor = page.get_by_test_id("scenario-text")
+        example = editor.input_value()
+        editor.fill(example.replace("depends_on: [bridge]", "depends_on: [brige]"))
+        problem = page.locator('[data-testid=scenario-problems] [data-code="unknown_reference"]')
+        expect(problem).to_contain_text("objectives[1].depends_on[0]")
+        expect(page.get_by_test_id("scenario-install")).to_be_disabled()
+        editor.fill(example)
+        expect(page.get_by_test_id("scenario-ok")).to_be_visible()
+        page.get_by_test_id("scenario-install").click()
+        expect(page.get_by_test_id("scenario-installed")).to_contain_text("Ponte e cofre 1")
+        expect(page.get_by_test_id("scenario-list")).to_contain_text("Tomar a ponte, Abrir o cofre")
+        self.no_horizontal_scroll(page)
+
+        page.get_by_test_id("tab-game").click()
+        page.get_by_test_id("game-name").fill("Ponte")
+        page.get_by_test_id("game-source").select_option("mode:org.club.bridge-and-vault")
+        page.get_by_test_id("game-roles").locator('input[value="org.atalaia.objectives"]').check()
+        page.get_by_test_id("game-create").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("pronto")
+
+        page.get_by_test_id("tab-join").click()
+        boxes = {}
+        for name in ("bridge", "vault"):
+            box = BoxHost(hub, os.path.join(self.field.tmp.name, name), JOIN_KEY, name=f"caixa-{name}")
+            self.addCleanup(box.close)
+            page.get_by_test_id("join-name").select_option(name)
+            expect(page.locator("#j-role")).to_have_count(0)  # the scenario says the role
+            page.get_by_test_id("join-generate").click()
+            expect(page.get_by_test_id("join-result")).to_contain_text(f": {name} (objective)")
+            box.join(page.get_by_test_id("join-text").input_value())
+            self.assertTrue(wait_for(lambda b=box: b.logged("LOG join: joined"), 5), box.lines[-5:])
+            boxes[name] = box
+        expect(page.get_by_test_id("join-names")).to_contain_text("2 de 2")
+
+        page.get_by_test_id("tab-game").click()
+        page.get_by_test_id("game-start").click()
+        page.get_by_test_id("game-start-yes").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("a decorrer")
+
+        def screens(box, template):
+            return [line for line in list(box.lines) if line.startswith(f"SCREEN {template} ")]
+
+        self.assertTrue(wait_for(lambda: screens(boxes["bridge"], "obj_capture"), 10), boxes["bridge"].lines[-8:])
+        boxes["bridge"].hold(1, 3300)
+        page.get_by_test_id("tab-feed").click()
+        feed = page.get_by_test_id("feed")
+        done = feed.locator('[data-type="scenario.objective.completed"]')
+        expect(done).to_contain_text("A equipa red cumpriu o objetivo bridge", timeout=10000)
+        expect(feed).to_contain_text("O objetivo vault foi revelado à equipa red")
+        self.assertTrue(wait_for(lambda: screens(boxes["vault"], "obj_code"), 10), boxes["vault"].lines[-8:])
+        boxes["vault"].send("keys 4711#")
+        expect(done).to_have_count(2, timeout=10000)
+        expect(done.first).to_contain_text("A equipa red cumpriu o objetivo vault")
+        page.get_by_test_id("tab-game").click()
+        expect(page.get_by_test_id("score-red")).to_have_text("150", timeout=10000)
+
+    def test_scenario_builder_with_the_read_token(self):
+        """The read token checks a manifest but cannot install it or open one."""
+        page = self.console(READ)
+        page.get_by_test_id("tab-scenarios").click()
+        page.get_by_test_id("lang").first.select_option("en")
+        page.get_by_test_id("scenario-text").fill("id: org.club.x\nversion: 1\nname: X\nobjectives: []\n")
+        expect(page.get_by_test_id("scenario-problems")).to_contain_text("Error")
+        expect(page.get_by_test_id("scenario-install")).to_have_count(0)
+        expect(page.get_by_test_id("tab-scenarios")).to_have_text("Scenarios")
+        expect(page.locator("main")).to_contain_text("The read-only code checks only")
 
     def test_join_qr_code_reads_back_as_the_join_text(self):
         if not ZBARIMG:

@@ -21,6 +21,16 @@ any scoreboard on the field's network may read). The radio, the controller's
 own log and the sync to the site server (whose event pages and game
 parameters are for staff only, protocol/sync.md) keep the whole event: the
 boxes need the codes, and the GM needs the log.
+
+Scenario objectives (decision P4R24, plan phase 8): which objective a
+``scenario.objective.*`` event is about (its ``objective``, gm_only in the
+schema since plan phase 6, M6-5) also reaches the players it is for, by the
+objective's visibility in the scenario package's ``mode.yaml`` (M7-8):
+``public`` to everyone, ``team`` to the assignee team's players, ``squad`` to
+that team's squad, ``hidden`` to its assignee (squad, else team, else everyone)
+once revealed; the scenario's runtime sends nothing about a hidden objective
+before its reveal. Everyone else gets the event without ``objective``, as
+before. ``objective_visible`` is that rule; ``scenario_event`` applies it.
 """
 
 from __future__ import annotations
@@ -51,6 +61,53 @@ def public_event(ev: dict[str, Any]) -> dict[str, Any]:
     if not hidden or not isinstance(data, dict) or not hidden & data.keys():
         return ev
     return {**ev, "data": {k: v for k, v in data.items() if k not in hidden}}
+
+
+OBJECTIVE_EVENTS = frozenset({"scenario.objective.completed", "scenario.objective.failed",
+                              "scenario.objective.revealed"})
+
+
+def _player_team(viewer: Optional["Viewer"], game: dict[str, Any]) -> Optional[str]:
+    """A player token's team name in this game (None: not a player of it, or no team)."""
+    if viewer is None or viewer.kind != "player" or viewer.game_id != game.get("id"):
+        return None
+    teams = game.get("teams") or []
+    return teams[viewer.team - 1] if 1 <= viewer.team <= len(teams) else None
+
+
+def objective_visible(viewer: Optional["Viewer"], objective: dict[str, Any], game: dict[str, Any]) -> bool:
+    """Whether a viewer may know this objective (its id, names and state; P4R24).
+
+    ``objective`` is one entry of a scenario package's ``scenario.objectives`` (M7-8): its
+    ``visibility`` and its assignee's ``team`` and ``squad``. Whether a hidden one has been
+    revealed yet is the caller's to know (the runtime never sends an event about it before).
+    """
+    if is_staff(viewer, game.get("id")):
+        return True
+    vis = objective.get("visibility", "public")
+    team, squad = objective.get("team"), objective.get("squad")
+    if vis == "hidden":
+        vis = "squad" if squad is not None else "team" if team is not None else "public"
+    if vis == "public" or team is None:
+        return True
+    if _player_team(viewer, game) != team:
+        return False
+    return vis == "team" or squad is None or (viewer is not None and str(viewer.squad) == str(squad))
+
+
+def scenario_event(viewer: Optional["Viewer"], ev: dict[str, Any], game: Optional[dict[str, Any]],
+                   objectives: Optional[dict[str, dict[str, Any]]]) -> dict[str, Any]:
+    """An event as this viewer may see it: whole for staff and, for a scenario objective's event,
+    for the players the objective is for (``objectives``: the game's scenario objectives by id);
+    else without its gm_only data (``public_event``)."""
+    if is_staff(viewer, game.get("id") if game is not None else None):
+        return ev
+    data = ev.get("data")
+    if game is not None and objectives and ev.get("type") in OBJECTIVE_EVENTS and isinstance(data, dict):
+        objective = objectives.get(data.get("objective"))  # type: ignore[arg-type]
+        if objective is not None and objective_visible(viewer, objective, game):
+            return ev
+    return public_event(ev)
 
 
 def public_params(mode: Optional["Mode"], params: Any) -> dict[str, Any]:

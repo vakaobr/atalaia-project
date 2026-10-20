@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Implementation (plan phases 1 to 7, 9 and 10 to 18 built in software, 2026-10-20; sync over 4G: HW1; a real ATAK device: HW3)
+**Current phase:** Implementation (plan phases 1 to 18 built in software, 2026-10-20; sync over 4G: HW1; a real ATAK device: HW3)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-20 (plan phase 18, full clean-copy check)
-**Next step:** plan phase 8 (scenarios in the controller, console and app) on the modes chain; plan phase 19 (device health, firmware catalogue, remote GM) on the site server chain
+**Last verified:** 2026-10-20 (plan phase 8, full clean-copy check)
+**Next step:** the modes chain (plan phases 1 to 9) is built in software; plan phase 19 (device health, firmware catalogue, remote GM) on the site server chain, then 20 (the site server's scenario library, which should also carry a scenario to a standby controller, M8-3)
 
 ## Completed
 
@@ -46,14 +46,14 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | 5 | VIP / Payload | Software, now | 3 | Done in software (2026-10-20; real GPS in the field: HW3) |
 | 6 | Scenario packages and the objectives role package | Software, now | -- | Done in software (2026-10-20; not on radio hardware) |
 | 7 | Scenario compiler and validator | Software, now | 3, 6 | Done in software (2026-10-20; not on radio hardware) |
-| 8 | Scenarios in the controller, console and app | Software, now | 7 | Pending |
+| 8 | Scenarios in the controller, console and app | Software, now | 7 | Done in software (2026-10-20; not on radio hardware or a real phone) |
 | 9 | ATAK / CoT emitter | Software, now | 3 | Done in software (2026-10-20; a real ATAK device: HW3) |
 | 10 | Site server skeleton and test tooling | Software, now | -- | **Done in software** (2026-10-19) |
 | 11 | Accounts, sessions and roles | Software, now | 10 | **Done in software** (2026-10-19) |
 | 12 | Personal data | Software, now | 11 | **Done in software** (2026-10-19) |
 | 13 | Controller sync | Software, now | 10, 11 | **Done in software** (2026-10-20; over 4G: HW1) |
 | 14 | Chrono registry | Software, now | 13 | **Done in software** (2026-10-20; a real chronograph: HW4) |
-| 15 | Scheduling, field pages and feeds | Software, now | 11 | Pending |
+| 15 | Scheduling, field pages and feeds | Software, now | 11 | **Done in software** (2026-10-20) |
 | 16 | Registration and game-day sync | Software, now | 13, 15 | **Done in software** (2026-10-20; the app's screens with 17, a real game day: HW1) |
 | 17 | Registration import and adapters | Software, now | 16 | **Done in software** (2026-10-20, with the app's registration screens; no real platform) |
 | 18 | Club profiles and branding sync | Software, now | 13 | **Done in software** (2026-10-20; not yet on a real deployment) |
@@ -289,6 +289,51 @@ six YAML tests that play the hand-written package. Not run: a real box on
 the radio, Wokwi (R7). The site server's own import check
 (`server/tests/test_shared_imports.py`) does not list the package yet
 (plan phase 20). Decisions M7-1 to M7-9 (open).
+
+## Plan phase 8: scenarios in the controller, console and app (built 2026-10-20, in software)
+
+ADR-P4-6 as amended (P4-1, P4R8, P4R24): the controller's scenario
+endpoints (`scenario_service.py`): `POST /api/v1/scenarios/check` (GM or
+read token: every problem of a manifest with its place, then the compiled
+`field.lua`'s load in the core), `POST /api/v1/scenarios` (GM: compile and
+install as a mode package, the manifest kept next to it), `GET
+/api/v1/scenarios` and `GET /api/v1/scenarios/{id}` (GM: the manifest and
+the generated files). In the Join tab the GM gives each box one of the
+scenario's names; `field.nodes()` returns it. The routing of P4R24
+(`visibility.py`, `engine.event_for`, `api.make_route`): staff see every
+objective; players see an objective by its visibility (`public`, the
+assignee team's, its squad's, a hidden one only once revealed) on the
+stream, its first message, the log and the game, which carries the
+scenario's names and only the objectives each viewer may know; the game is
+sent again at a hidden objective's reveal; anyone else (MQTT, other teams,
+the read token for a team's objective) learns only that a team completed,
+failed or was shown an objective. The GM console's *Cenários* / *Scenarios*
+tab (`components/scenario-builder.js`): a YAML editor checked by the
+controller as it is typed, with an example, the problems, the boxes to name
+and the installed scenarios. The app's player view: "Objetivos do cenário"
+with the names in the app's language, the state (waiting, in progress,
+completed by a team, failed and why), the assignee and the points; the
+events name them. M6-1: a standby controller that lacks the scenario refuses
+its join with what to install, and takes it once the same manifest is
+installed (not carried automatically: plan phase 20). A game id over 63
+bytes is refused at creation.
+
+Tested: `controller/tests/test_scenario_api.py` (10 tests: each endpoint
+and token, refusals, the live game keeping its scenario, the 63-byte id,
+the join's names and `field.nodes()`, the routing of a three-objective
+scenario to staff, team, squad, other teams and the read token on the
+stream, the log and the first message, a hidden objective before and after
+its reveal, a standby without and with the scenario); the console's browser
+tests (2 new: the builder from the example through a located mistake to an
+install, a game of it, two C host boxes named in the Join tab, the bridge
+held on one box and the vault's code typed on the other's keypad, 150
+points; the read token checks only); the app: `field_feed_test.dart` (2
+new), `player_objectives_test.dart` (3, both languages), two new golden
+images (`player_scenario_pt`, `_en`) and one new on-device case in
+`integration_test/game_flow_test.dart` (a hidden objective appearing once
+revealed; not run here: it needs the emulator, CI's `flutter-integration`).
+Not run: a real box on the radio, a real phone in the field, Wokwi (R7).
+Decisions M8-1 to M8-9 (open).
 
 ## Plan phase 9: ATAK / CoT emitter (built 2026-10-20, in software)
 

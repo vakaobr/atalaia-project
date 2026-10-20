@@ -107,6 +107,13 @@ void main() {
       for (final st in LinkState.values) 'prop.link.${st.name}',
       // Plan phase F: the radio link through an I/O pod.
       for (final st in RadioLinkState.values) 'prop.radio.${st.name}',
+      // Phase 4 plan phase 8: a scenario objective's failure reasons.
+      for (final r in ['captured', 'defused', 'time', 'blocked', 'lives'])
+        'player.objective_failed_$r',
+      for (final t in ['completed', 'failed', 'revealed']) ...[
+        'event.scenario.objective.$t.named',
+        'event.scenario.objective.$t.named.no_team',
+      ],
       'prop.radio.heard',
       'prop.pod_opened',
     ];

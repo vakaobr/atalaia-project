@@ -162,6 +162,7 @@ class ModeRegistry:
     def __init__(self, store: Store, dirs: list[str], core: Optional[Core]) -> None:
         self.store = store
         self.core = core
+        self.generation = 0  # counts installs: what a cache of the uploads compares
         self._builtin: dict[str, ModePackage] = {}
         for folder in dirs:
             path = Path(folder)
@@ -216,4 +217,5 @@ class ModeRegistry:
             raise ModeError("the core library is not loaded, so scripts cannot be checked")
         check_scripts(self.core, pkg)
         self.store.save_mode(pkg.id, pkg.mode.version, pkg.files)
+        self.generation += 1
         return pkg

@@ -129,9 +129,10 @@ export function saveToken(token) {
 }
 
 export class ApiError extends Error {
-    constructor(status, detail) {
+    constructor(status, detail, body) {
         super(detail || `HTTP ${status}`);
         this.status = status;
+        this.body = body || null; // the JSON answer, such as a refused scenario's problems
     }
 }
 
@@ -149,13 +150,14 @@ export async function api(token, method, path, body, raw) {
     const r = await fetch(`/api/v1${path}`, { method, headers, body: payload, cache: 'no-store' });
     if (!r.ok) {
         let detail = '';
+        let j = null;
         try {
-            const j = await r.json();
+            j = await r.json();
             detail = typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail);
         } catch (e) {
             detail = r.statusText;
         }
-        throw new ApiError(r.status, detail);
+        throw new ApiError(r.status, detail, j);
     }
     const type = r.headers.get('content-type') || '';
     return type.includes('application/json') ? r.json() : r.blob();

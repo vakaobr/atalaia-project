@@ -16,6 +16,11 @@
 /// and lets the player share their position while the game runs (ADR-P3-6:
 /// the controller decides who sees it).
 ///
+/// A scenario's game (phase 4 plan phase 8, decision P4R24): the scenario's
+/// objectives this player may know, with their names in the app's language
+/// and where each stands (the controller sends a hidden one only once it is
+/// revealed, and another team's or squad's never).
+///
 /// The field's branding (decisions BR1-BR24): its logo and name in the
 /// header, its wallpaper behind the view (dimmed), its accent on the
 /// primary buttons, and each team's crest and display name, downloaded
@@ -430,6 +435,9 @@ class PlayerView extends StatelessWidget {
       for (final e in feed.events)
         if (e.type == 'gm.message' && e.data['text'] is String) e,
     ];
+    final objectiveNames = {
+      for (final o in feed.objectives) o.id: o.name(s.code),
+    };
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -515,6 +523,8 @@ class PlayerView extends StatelessWidget {
                 style: TextStyle(color: Theme.of(context).hintColor),
               ),
             ),
+          if (feed.objectives.isNotEmpty)
+            _ScenarioObjectives(feed: feed, teams: teams),
           if (feed.nodes.isNotEmpty) ...[
             SectionTitle(s.t('player.objectives')),
             for (final n in feed.nodes.values)
@@ -557,13 +567,103 @@ class PlayerView extends StatelessWidget {
             ListTile(
               dense: true,
               leading: TeamDot(e.team, size: 12),
-              title: Text(eventText(s, e, teams)),
+              title: Text(eventText(s, e, teams, objectiveNames)),
               trailing: Text(clockText(e.tMs)),
             ),
         ],
       ],
     );
   }
+}
+
+/// The scenario's objectives this player may know, and where each stands.
+class _ScenarioObjectives extends StatelessWidget {
+  const _ScenarioObjectives({required this.feed, required this.teams});
+
+  final FieldFeed feed;
+  final TeamBranding teams;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    final scenario = feed.scenario ?? const {};
+    final title = _scenarioName(scenario, s.code);
+    return Column(
+      key: const Key('player-scenario'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionTitle(s.t('player.scenario')),
+        if (title != null)
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+        for (final o in feed.objectives)
+          ListTile(
+            key: Key('player-objective-${o.id}'),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(switch (o.state) {
+              ObjectiveState.waiting => Icons.hourglass_empty,
+              ObjectiveState.active => Icons.flag_outlined,
+              ObjectiveState.done => Icons.check_circle,
+              ObjectiveState.failed => Icons.cancel_outlined,
+            }, color: _stateColor(context, o)),
+            title: Text(o.name(s.code)),
+            subtitle: Text(
+              [
+                _stateText(s, o),
+                if (o.assigneeTeam != null) _assignee(s, o),
+              ].join(' · '),
+            ),
+            trailing: o.points == null
+                ? null
+                : Text(
+                    s.t('player.objective_points', {'n': o.points}),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+          ),
+      ],
+    );
+  }
+
+  Color? _stateColor(BuildContext context, ScenarioObjective o) =>
+      switch (o.state) {
+        ObjectiveState.done =>
+          o.team == null ? null : AtalaiaColors.team(o.team!),
+        ObjectiveState.failed => Theme.of(context).colorScheme.error,
+        _ => null,
+      };
+
+  String _stateText(Strings s, ScenarioObjective o) => switch (o.state) {
+    ObjectiveState.waiting => s.t('player.objective_waiting'),
+    ObjectiveState.active => s.t('player.objective_active'),
+    ObjectiveState.done =>
+      o.team == null
+          ? s.t('player.objective_done_no_team')
+          : s.t('player.objective_done', {
+              'team': teamLabel(s, teams, o.team!),
+            }),
+    ObjectiveState.failed => s.tOr(
+      'player.objective_failed_${o.reason}',
+      s.t('player.objective_failed'),
+    ),
+  };
+
+  String _assignee(Strings s, ScenarioObjective o) {
+    final team = teamLabel(s, teams, o.assigneeTeam!);
+    final squad = o.assigneeSquad;
+    return squad == null
+        ? s.t('player.objective_for_team', {'team': team})
+        : s.t('player.objective_for_squad', {'team': team, 'squad': squad});
+  }
+}
+
+String? _scenarioName(Map<String, Object?> scenario, String lang) {
+  final i18n = scenario['i18n'];
+  if (i18n is Map && i18n[lang] is Map) {
+    final v = (i18n[lang] as Map)['name'];
+    if (v is String && v.isNotEmpty) return v;
+  }
+  final v = scenario['name'];
+  return v is String && v.isNotEmpty ? v : null;
 }
 
 class _SharePosition extends StatelessWidget {
@@ -700,16 +800,27 @@ class _TeamRow extends StatelessWidget {
 
 /// An event of the game in words (the types of protocol/schema/events.yaml
 /// that players care about; others show their type).
-String eventText(Strings s, FeedEvent e, [TeamBranding? teams]) {
+String eventText(
+  Strings s,
+  FeedEvent e, [
+  TeamBranding? teams,
+  Map<String, String> objectives = const {},
+]) {
   String name(String t) => teamLabel(s, teams, t);
   final team = e.team == null ? '' : name(e.team!);
   final d = e.data;
   String? str(String k) => d[k] is String ? d[k]! as String : null;
+  // A scenario objective this player knows is named (plan phase 8): its name
+  // from the game's scenario, in the app's language.
+  final objective = objectives[str('objective')];
+  final type = objective != null && e.type.startsWith('scenario.objective.')
+      ? '${e.type}.named'
+      : e.type;
   // An event that can come without a team has a text of its own for that
   // (`event.<type>.no_team`, such as a Hacking Terminal solved by nobody known).
-  final key = team.isEmpty && s.tOr('event.${e.type}.no_team', '').isNotEmpty
-      ? 'event.${e.type}.no_team'
-      : 'event.${e.type}';
+  final key = team.isEmpty && s.tOr('event.$type.no_team', '').isNotEmpty
+      ? 'event.$type.no_team'
+      : 'event.$type';
   final args = <String, Object?>{
     'team': team,
     'zone': str('zone') ?? s.t('player.node', {'n': e.node}),
@@ -723,6 +834,7 @@ String eventText(Strings s, FeedEvent e, [TeamBranding? teams]) {
     'fuse': d['fuse_s'] ?? '',
     'reason': str('reason') ?? '',
     'remaining': d['remaining'] ?? '',
+    'objective': objective ?? '',
   };
   return s.tOr(key, e.type, args);
 }

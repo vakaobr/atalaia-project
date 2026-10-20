@@ -971,6 +971,38 @@ tests (build, check, install, run a two-objective scenario on host
 boxes); Dart widget and golden tests of the objectives in the player
 view; the on-device test gets one case.
 
+**Built 2026-10-20 (in software; not yet on radio hardware or a real phone
+in the field).** What differs from the design above, or fills what it left
+open (decisions M8-1 to M8-9):
+
+- The endpoints (M8-1): `check` answers every problem even for a text that
+  is not a manifest (`bad_manifest`) and, without errors, loads the
+  compiled Lua in the core (`lua_does_not_load`); `POST` refuses with the
+  problems (400), or 409 when the live game runs the scenario or the id is
+  another kind of package; `GET /api/v1/scenarios/{id}` is the GM's only
+  (the Lua holds the codes). The manifest is kept in the settings table
+  (`scenario.manifest:<id>`), and so are the boxes' names per game: no
+  schema change (M8-2).
+- The routing (M8-4, M8-5): `visibility.objective_visible` and
+  `scenario_event` (`visibility.py`), read from the package's `scenario:`
+  block; anyone the objective is not for gets the event without
+  `objective`, as M6-5 did; MQTT is unchanged. The game carries the
+  scenario's names and, for a player, only the objectives that player may
+  know (a hidden one once revealed); the controller sends the game again at
+  a hidden objective's reveal. The routing lives in `engine.py`
+  (`event_for`, `players_game`) and `api.py` (`make_route`, the first
+  message, the log); `PLAYER_TYPES` did not change.
+- The Join tab (M8-6): a scenario box's name in the join sets its role;
+  `field.nodes()` returns it. The console's builder asks the controller
+  instead of reading `protocol/vectors/scenario.json` in JavaScript (M8-7);
+  its tab is *Cenários* / *Scenarios*, between *Predefinições* and *Registo*.
+- M6-1 (a standby needs the scenario): a standby that lacks it refuses the
+  join with the parts to install and how (M8-3); carrying it automatically
+  is left to plan phase 20. A game whose id is over 63 bytes is refused at
+  creation (M8-9).
+- The app (M8-8): a "Objetivos do cenário" section in the player view;
+  the events name the objectives the player knows.
+
 ### Validation
 
 ```sh

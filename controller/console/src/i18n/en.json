@@ -26,7 +26,8 @@
     "feed": "Log",
     "controller": "Controller",
     "settings": "Settings",
-    "checkin": "Check-in"
+    "checkin": "Check-in",
+    "scenarios": "Scenarios"
   },
   "common": {
     "yes": "Yes",
@@ -258,7 +259,12 @@
     "standby_join": "Join the game",
     "standby_done": "This controller is now on standby in game {game}.",
     "gm_only": "Only the organisers can make join data.",
-    "standby_cannot_issue": "A standby controller does not make join data; use the controller in charge."
+    "standby_cannot_issue": "A standby controller does not make join data; use the controller in charge.",
+    "for_named": "Box {node}: {name} ({role})",
+    "scenario_name": "Scenario box",
+    "scenario_none": "— none (pick the role) —",
+    "scenario_box": "box {node}",
+    "scenario_hint": "The scenario finds its boxes by these names: {done} of {n} have a box."
   },
   "presets": {
     "title": "Presets",
@@ -521,5 +527,40 @@
     "saved": "Teams saved.",
     "crest_alt": "Crest of {team}",
     "remove_crest": "Remove the crest"
+  },
+  "scenario": {
+    "title": "Scenario editor",
+    "intro": "A scenario is a YAML manifest: the boxes the GM names, and the objectives (capture, code, tags, bomb, escort, defend, survive). The controller checks it as you type; once installed, create a game of it with Objectives in the Game tab.",
+    "text": "Manifest (YAML)",
+    "example": "Example",
+    "check": "Check",
+    "install": "Install",
+    "checking": "Checking…",
+    "ok": "No problems: the generated field.lua loads in the core.",
+    "ok_no_core": "No problems in the manifest (the core is not loaded on this controller).",
+    "ok_warnings": "No errors, with warnings:",
+    "has_errors": "{n} error(s): fix them before installing.",
+    "whole": "(manifest)",
+    "levels": {
+      "error": "Error",
+      "warning": "Warning"
+    },
+    "nodes_title": "Boxes to name",
+    "nodes_hint": "In the Join tab, give each of these names to a box.",
+    "roles": {
+      "objective": "objective",
+      "bomb_site": "bomb site"
+    },
+    "player_node": "a player whose check-in role is {role}",
+    "objectives": "Objectives",
+    "installed": "Installed scenarios",
+    "none": "No scenarios installed yet.",
+    "name": "Name",
+    "version": "Version",
+    "open": "Open",
+    "game_hint": "A game of a scenario: in the Game tab, pick the scenario and tick Objectives.",
+    "installed_done": "Scenario {name} {version} installed.",
+    "replaced": "Scenario {name} replaced by version {version}.",
+    "read_only": "The read-only code checks only: installing is the GM's."
   }
 }

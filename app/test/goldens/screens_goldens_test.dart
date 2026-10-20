@@ -3,7 +3,8 @@
 
 // The main screens in European Portuguese and English, on a 360x780 phone:
 // the role selector, a prop's game (Bomb counting down, its team buttons),
-// setting up a prop's game, the player's view, the marshal's chrono with a
+// setting up a prop's game, the player's view (and of a scenario's game,
+// phase 4 plan phase 8), the marshal's chrono with a
 // PASS, and the settings. Drawn with Roboto, as on Android.
 
 import 'dart:io';
@@ -27,6 +28,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_harness.dart';
 import '../support/fakes.dart';
+import '../support/scenario_feed.dart';
 
 Future<void> phone(WidgetTester tester) async {
   tester.view.physicalSize = const Size(360, 780);
@@ -157,6 +159,23 @@ void main() {
       );
       await tester.pumpAndSettle();
       await snap(tester, 'player', lang);
+    });
+
+    testWidgets('player view of a scenario (${lang.code})', (tester) async {
+      await phone(tester);
+      tester.view.physicalSize = const Size(360, 1100);
+      final feed = scenarioFeed();
+      final h = harness(
+        language: lang,
+        settings: AppSettings()..myTeam = 'red',
+      );
+      await tester.pumpWidget(
+        h.app(
+          home: PlayerScreen(link: feed.link, feed: feed),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await snap(tester, 'player_scenario', lang);
     });
 
     testWidgets('chrono check-in: PASS (${lang.code})', (tester) async {

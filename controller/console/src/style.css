@@ -936,3 +936,28 @@ button.link.danger {
 .team-branding {
     margin-top: 0.8rem;
 }
+
+/* ---- scenario builder (plan phase 8) ---- */
+
+textarea.scenario-editor {
+    white-space: pre;
+    word-break: normal;
+    overflow-wrap: normal;
+    overflow-x: auto;
+    tab-size: 2;
+}
+
+.problems {
+    list-style: none;
+    padding: 0;
+}
+
+.problems li {
+    padding: 0.25rem 0;
+    border-bottom: 1px solid var(--line);
+    overflow-wrap: anywhere;
+}
+
+.scenario-names code {
+    overflow-wrap: anywhere;
+}

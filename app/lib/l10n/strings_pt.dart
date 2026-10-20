@@ -264,6 +264,20 @@ const Map<String, String> ptStrings = {
   'player.node': 'Caixa {n}',
   'player.held_by': 'Da equipa {team}',
   'player.held_by_none': 'De ninguém',
+  'player.scenario': 'Objetivos do cenário',
+  'player.objective_waiting': 'Começa com o jogo',
+  'player.objective_active': 'Em curso',
+  'player.objective_done': 'Cumprido pela equipa {team}',
+  'player.objective_done_no_team': 'Cumprido',
+  'player.objective_failed': 'Falhado',
+  'player.objective_failed_captured': 'Falhado: tomado por outra equipa',
+  'player.objective_failed_defused': 'Falhado: a bomba foi desarmada',
+  'player.objective_failed_time': 'Falhado: o tempo acabou',
+  'player.objective_failed_blocked': 'Falhado: um objetivo anterior falhou',
+  'player.objective_failed_lives': 'Falhado: sem vidas suficientes',
+  'player.objective_for_team': 'Para a equipa {team}',
+  'player.objective_for_squad': 'Para a equipa {team}, squad {squad}',
+  'player.objective_points': '+{n}',
   'player.lives': 'Vidas',
   'player.events': 'O que aconteceu',
   'player.no_events': 'Ainda nada.',
@@ -314,6 +328,16 @@ const Map<String, String> ptStrings = {
   'event.scenario.objective.failed.no_team': 'Um objetivo falhou',
   'event.scenario.objective.revealed': 'Novo objetivo para a equipa {team}',
   'event.scenario.objective.revealed.no_team': 'Novo objetivo',
+  'event.scenario.objective.completed.named':
+      'A equipa {team} cumpriu: {objective}',
+  'event.scenario.objective.completed.named.no_team': 'Cumprido: {objective}',
+  'event.scenario.objective.failed.named':
+      'A equipa {team} falhou: {objective}',
+  'event.scenario.objective.failed.named.no_team': 'Falhado: {objective}',
+  'event.scenario.objective.revealed.named':
+      'Novo objetivo para a equipa {team}: {objective}',
+  'event.scenario.objective.revealed.named.no_team':
+      'Novo objetivo: {objective}',
   'event.chrono.violation': 'Réplica acima do limite',
   'event.node.tamper': 'Alguém mexeu numa caixa ({reason})',
 

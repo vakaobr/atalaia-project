@@ -6,6 +6,10 @@
 // a QR code, the text form (atalaia:join:...) to copy, and the bytes to
 // write on an NTAG215/216 card. A second controller joins as standby by
 // pasting such a text here.
+//
+// A scenario's game (plan phase 8, decisions P4R8, M6-7): the GM gives each box one of the
+// names the scenario's manifest lists under "nodes"; the box's role is that node's, and the
+// scenario finds its boxes by those names.
 
 import { html, Component, createRef, t } from '../ui.js';
 import qrcode from '../lib/qrcode.module.js';
@@ -35,7 +39,7 @@ export function QrCode({ text, label }) {
 export class JoinPanel extends Component {
     constructor() {
         super();
-        this.state = { kind: 'node', role: '', nodeId: '', result: null, copied: false,
+        this.state = { kind: 'node', role: '', nodeId: '', name: '', result: null, copied: false,
                        standbyText: '', standbyGame: null };
         this.text = createRef();
     }
@@ -47,11 +51,20 @@ export class JoinPanel extends Component {
         return game ? gameRoles(modes, game.mode_id) : [];
     }
 
+    /** The boxes a scenario's game names: [[name, role]] (game.scenario.nodes, staff only). */
+    scenarioBoxes() {
+        const { game } = this.props.app.state;
+        const nodes = (game && game.scenario && game.scenario.nodes) || {};
+        return Object.entries(nodes).filter(([, spec]) => !spec.player).map(([name, spec]) => [name, spec.role]);
+    }
+
     async generate(e) {
         e.preventDefault();
         const body = { kind: this.state.kind };
         const roles = this.roles();
-        if (this.state.kind === 'node') body.role = this.state.role || roles[0];
+        const box = this.state.kind === 'node' && this.scenarioBoxes().find(([n]) => n === this.state.name);
+        if (box) body.name = box[0];
+        else if (this.state.kind === 'node') body.role = this.state.role || roles[0];
         if (this.state.nodeId) body.node_id = parseInt(this.state.nodeId, 10);
         const result = await this.props.app.call('POST', '/join', body);
         if (result) this.setState({ result, copied: false });
@@ -90,10 +103,29 @@ export class JoinPanel extends Component {
         }
     }
 
+    renderScenario() {
+        const { game } = this.props.app.state;
+        const boxes = this.scenarioBoxes();
+        if (boxes.length === 0) return null;
+        const named = (game && game.scenario_nodes) || {};
+        const byName = {};
+        for (const [node, name] of Object.entries(named)) byName[name] = node;
+        return html`<div class="field"><label for="j-name">${t('join.scenario_name')}</label>
+            <select id="j-name" data-testid="join-name" value=${this.state.name}
+                onChange=${(e) => this.setState({ name: e.target.value })}>
+                <option value="">${t('join.scenario_none')}</option>
+                ${boxes.map(([name, role]) => html`<option value=${name}>${name} · ${t(`scenario.roles.${role}`)}${
+                    byName[name] ? ` · ${t('join.scenario_box', { node: byName[name] })}` : ''}</option>`)}
+            </select>
+            <p class="muted small" data-testid="join-names">${t('join.scenario_hint', {
+                done: Object.keys(byName).length, n: boxes.length })}</p></div>`;
+    }
+
     renderIssue() {
         const { state } = this;
         const roles = this.roles();
         const r = state.result;
+        const scenarioBox = state.kind === 'node' && state.name && this.scenarioBoxes().some(([n]) => n === state.name);
         return html`<section class="card" aria-labelledby="join-h">
             <h2 id="join-h">${t('join.title')}</h2>
             <p class="muted">${t('join.intro')}</p>
@@ -104,7 +136,8 @@ export class JoinPanel extends Component {
                         <option value="node">${t('join.kinds.node')}</option>
                         <option value="controller">${t('join.kinds.controller')}</option>
                     </select></div>
-                ${state.kind === 'node' && html`<div class="field"><label for="j-role">${t('join.role')}</label>
+                ${state.kind === 'node' && this.renderScenario()}
+                ${state.kind === 'node' && !scenarioBox && html`<div class="field"><label for="j-role">${t('join.role')}</label>
                     <select id="j-role" value=${state.role || roles[0]} onChange=${(e) => this.setState({ role: e.target.value })}>
                         ${roles.map((ro) => html`<option value=${ro}>${ro}</option>`)}
                     </select></div>`}
@@ -115,7 +148,8 @@ export class JoinPanel extends Component {
             </form>
             ${r && html`<div class="join-result" data-testid="join-result">
                 <p class="warning" role="note">${t('join.warning')}</p>
-                <p><strong>${r.kind === 'node' ? t('join.for_node', { node: r.node_id, role: r.role })
+                <p><strong>${r.kind === 'node' ? t(r.name ? 'join.for_named' : 'join.for_node',
+                    { node: r.node_id, role: r.role, name: r.name })
                     : t('join.for_controller', { node: r.node_id })}</strong>${` · ${t('join.bytes', { n: r.bytes })} · ${
                     t('join.channel', { mhz: (r.channel_hz / 1e6).toFixed(3) })}`}</p>
                 <div class="qr-wrap"><${QrCode} text=${r.text} label=${t('join.qr_label')} /></div>
