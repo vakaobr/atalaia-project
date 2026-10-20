@@ -39,9 +39,11 @@ void main() {
       find.byKey(const Key('site-password')),
       site.password,
     );
+    // Done on the password logs in (as a player would): tapping site-login
+    // as well raced the login, which on a fast emulator had already
+    // replaced the form.
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
-    await tapVisible(tester, find.byKey(const Key('site-login')));
     const game = 'site-game-0192f3a0-0000-7000-8000-000000000001';
     await waitFor(tester, find.byKey(const Key(game)));
     await tapVisible(tester, find.byKey(const Key(game)));
@@ -53,6 +55,9 @@ void main() {
     await tapVisible(tester, find.byKey(const Key('reg-submit')));
     await waitFor(tester, find.byKey(const Key('ticket-qr')));
     expect(site.regs.values.single['federation_number'], 'FPA-1');
+    // The ticket's page slides in over the form: until it settles, both
+    // pages (and both back buttons) are on screen.
+    await tester.pumpAndSettle();
     await goBack(tester);
     await waitFor(tester, find.text('Tens inscrição neste jogo.'));
   });
