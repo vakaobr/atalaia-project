@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """ORM models (ADR-P4-1; migrations 0001_base, 0002_accounts, 0003_personal_data, 0004_sync, 0005_chrono,
-0006_scheduling).
+0006_scheduling, 0007_registration).
 
 Fields, users, roles, per-field roles, sessions and the audit log, as
 ADR-P4-1 defines them, with plan phase 11's additions for accounts: the
@@ -15,7 +15,10 @@ factor on ``sessions``, and ``refresh_tokens`` (only hashes); plan phase 12's
 ``chrono_violations`` and ``field_player_ids``, with ``consents.field_id``
 for the per-field ``chrono_sharing`` consent; plan phase 15's ``scheduled_games`` (ADR-P4-11) and
 the field page's columns on ``fields`` (``public_page``, ``description``, ``address_text``,
-``federation_label``). A table that holds personal data must also be added to
+``federation_label``); plan phase 16's registrations (migration 0007_registration):
+``game_registrations``, ``registration_replicas``, ``player_id_claims``, the link from a scheduled
+game to the controller's game (``scheduled_games.controller_game``, ``walkins``) and the field's
+check-in rules for registering (``fields.limit_template``, ``max_replicas``). A table that holds personal data must also be added to
 ``personal_data.py`` (access, export, erasure, the purge) in the same plan
 phase. Every later plan phase adds its own tables here and in
 its own Alembic migration; ``tests.test_migrations`` checks that the
@@ -85,6 +88,10 @@ class Field(Base):
     description: Mapped[Optional[str]] = mapped_column(Text)
     address_text: Mapped[Optional[str]] = mapped_column(String(512))
     federation_label: Mapped[Optional[str]] = mapped_column(String(16))
+    # Registration's replica rules (plan phase 16): the controller's [checkin] limit_template and
+    # max_replicas, so a pre-declared replica is one the field's check-in accepts.
+    limit_template: Mapped[str] = mapped_column(String(32), nullable=False, server_default="portugal")
+    max_replicas: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="5")
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _updated()
 
@@ -554,8 +561,9 @@ class ScheduledGame(Base):
     (shown in ``fields.timezone``), the mode if already chosen, the registration window and its rules.
     ``draft`` is seen by staff only; ``published`` and later are on the field page and the feeds;
     ``cancelled`` stays visible with its reason. ``ical_sequence`` is the iCalendar ``SEQUENCE``, raised
-    when the time, the place or the status of a published game changes (ADR-P4-12). Registrations and
-    ``controller_game_id`` come with plan phase 16; presets and scenarios with plan phase 20."""
+    when the time, the place or the status of a published game changes (ADR-P4-12). Its registrations
+    (``game_registrations``) and the controller's game made from it (``controller_game``) are plan phase
+    16's; ``in_progress`` and ``completed`` follow that game's state. Presets and scenarios: plan phase 20."""
 
     __tablename__ = "scheduled_games"
     __table_args__ = (
@@ -566,8 +574,10 @@ class ScheduledGame(Base):
                         "OR registration_closes_at > registration_opens_at", name="window"),
         CheckConstraint("max_players IS NULL OR max_players BETWEEN 1 AND 10000", name="max_players"),
         CheckConstraint("ical_sequence >= 0", name="ical_sequence"),
+        CheckConstraint("walkins IS NULL OR walkins >= 0", name="walkins"),
         Index("idx_scheduled_games_field_starts", "field_id", "starts_at"),
         Index("idx_scheduled_games_created_by", "created_by"),
+        Index("idx_scheduled_games_controller_game", "controller_game"),
     )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
@@ -590,5 +600,98 @@ class ScheduledGame(Base):
     cancelled_reason: Mapped[Optional[str]] = mapped_column(String(512))
     ical_sequence: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     created_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # Plan phase 16: the controller's game made from this one (ADR-P4-11's controller_game_id; a
+    # games.id, not the radio's 16-bit game_id, decision S13-6) and how many walked in (a count only).
+    controller_game: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("games.id", ondelete="SET NULL"))
+    walkins: Mapped[Optional[int]] = mapped_column(Integer)
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _updated()
+
+
+# --- registration (plan phase 16, migration 0007_registration) ---------------------------
+
+REGISTRATION_STATUSES = ("registered", "cancelled", "checked_in", "no_show")
+CLAIM_STATUSES = ("pending", "confirmed", "refused")
+
+
+class GameRegistration(Base):
+    """A registration for a scheduled game (ADR-P4-11): the player's id at the field, a display name for
+    that game, a team preference, the federation number when the game asks for one, and the SHA-256 of
+    the check-in ticket (the secret is shown once to the player and never stored). ``user_id`` is the
+    account (null once erased, and for plan phase 17's imports). The outcome (``checked_in``,
+    ``no_show``) comes from the controller after the game; the controller is the authority on the day."""
+
+    __tablename__ = "game_registrations"
+    __table_args__ = (
+        UniqueConstraint("scheduled_game", "player_id"),
+        UniqueConstraint("scheduled_game", "user_id"),
+        UniqueConstraint("scheduled_game", "source", "external_ref"),
+        CheckConstraint("status IN ('registered', 'cancelled', 'checked_in', 'no_show')", name="status"),
+        Index("idx_game_registrations_user", "user_id"),
+        Index("idx_game_registrations_field_player", "field_id", "player_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    scheduled_game: Mapped[uuid.UUID] = mapped_column(ForeignKey("scheduled_games.id", ondelete="CASCADE"),
+                                                      nullable=False)
+    field_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    player_id: Mapped[str] = mapped_column(String(14), nullable=False)
+    display_name: Mapped[Optional[str]] = mapped_column(String(32))
+    team_preference: Mapped[Optional[str]] = mapped_column(String(32))
+    federation_number: Mapped[Optional[str]] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="registered")
+    ticket_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    source: Mapped[str] = mapped_column(String(32), nullable=False, server_default="site")
+    external_ref: Mapped[Optional[str]] = mapped_column(String(128))
+    cancelled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    outcome_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = _created()
+    updated_at: Mapped[datetime] = _updated()
+
+
+class RegistrationReplica(Base):
+    """A pre-declared replica: it becomes a declaration (``declaration_id``) in the controller's
+    "replicas to chrono" list. ``state`` and ``reading_id`` are the controller's final ones, after the game."""
+
+    __tablename__ = "registration_replicas"
+    __table_args__ = (
+        UniqueConstraint("declaration_id"),
+        CheckConstraint("state IS NULL OR state IN ('pending', 'passed', 'refused', 'withdrawn')", name="state"),
+        Index("idx_registration_replicas_registration", "registration"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    registration: Mapped[uuid.UUID] = mapped_column(ForeignKey("game_registrations.id", ondelete="CASCADE"),
+                                                    nullable=False)
+    declaration_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    replica_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))
+    replica_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    replica_class: Mapped[str] = mapped_column(String(32), nullable=False)
+    make_model: Mapped[Optional[str]] = mapped_column(String(64))
+    position: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    state: Mapped[Optional[str]] = mapped_column(String(16))
+    reading_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))
+
+
+class PlayerIdClaim(Base):
+    """An account's claim to a player id its phone already has at a field (a phase 3 field identity made
+    without an account), with the SHA-256 of the phone's secret. The site server never had that secret's
+    hash: the field's controller does, and confirms or refuses the claim over its sync (decision S16-4).
+    Only a confirmed claim becomes a ``field_player_ids`` link."""
+
+    __tablename__ = "player_id_claims"
+    __table_args__ = (
+        CheckConstraint("status IN ('pending', 'confirmed', 'refused')", name="status"),
+        Index("idx_player_id_claims_field_status", "field_id", "status"),
+        Index("idx_player_id_claims_user", "user_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    field_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), nullable=False)
+    player_id: Mapped[str] = mapped_column(String(14), nullable=False)
+    secret_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="pending")
+    created_at: Mapped[datetime] = _created()
+    decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

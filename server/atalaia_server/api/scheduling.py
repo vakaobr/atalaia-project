@@ -33,7 +33,7 @@ from ..audit import record
 from ..auth import Principal, current_principal, require_field_role
 from ..db import get_session
 from ..models import SCHEDULED_STATUSES, Field, ScheduledGame
-from ..services import scheduling as svc
+from ..services import registration, scheduling as svc
 from .fields import NO_STORE
 
 router = APIRouter(prefix="/api/v1", tags=["scheduling"])
@@ -130,7 +130,8 @@ def _now() -> datetime:
 
 async def _answer(db: AsyncSession, game: ScheduledGame, field: Field, status_code: int = 200) -> JSONResponse:
     await db.refresh(game)
-    return JSONResponse(svc.staff_json(game, field, _now()), status_code=status_code, headers=NO_STORE)
+    n = (await registration.counts(db, [game.id])).get(game.id, 0)
+    return JSONResponse(svc.staff_json(game, field, _now(), n), status_code=status_code, headers=NO_STORE)
 
 
 @router.post("/fields/{field_id}/scheduled-games", status_code=201)
@@ -173,9 +174,10 @@ async def list_games(field_id: uuid.UUID, status: Optional[str] = Query(default=
             query = query.where(ScheduledGame.ends_at > svc.aware(since, "from"))
         except svc.ScheduleError as exc:
             raise _error(exc) from None
-    rows = await db.scalars(query.order_by(ScheduledGame.starts_at, ScheduledGame.id))
+    rows = list(await db.scalars(query.order_by(ScheduledGame.starts_at, ScheduledGame.id)))
     now = _now()
-    return JSONResponse([svc.staff_json(g, field, now) for g in rows], headers=NO_STORE)
+    n = await registration.counts(db, [g.id for g in rows])
+    return JSONResponse([svc.staff_json(g, field, now, n.get(g.id, 0)) for g in rows], headers=NO_STORE)
 
 
 @router.get("/fields/{field_id}/scheduled-games/{game_id}")
@@ -184,7 +186,8 @@ async def get_game(field_id: uuid.UUID, game_id: uuid.UUID, principal: Principal
     require_field_role(principal, field_id, "admin", "gm")
     field = await _field(db, field_id)
     game = await _game(db, field_id, game_id)
-    return JSONResponse(svc.staff_json(game, field, _now()), headers=NO_STORE)
+    n = (await registration.counts(db, [game.id])).get(game.id, 0)
+    return JSONResponse(svc.staff_json(game, field, _now(), n), headers=NO_STORE)
 
 
 @router.patch("/fields/{field_id}/scheduled-games/{game_id}")

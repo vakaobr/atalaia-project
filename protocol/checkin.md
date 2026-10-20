@@ -7,7 +7,9 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 A player arrives at the field, scans the **check-in poster** with the Atalaia app, checks in at the field controller and gets a player token, then declares the replicas they will use in that game. The controller keeps, per game, the **"replicas to chrono" list** that marshals work from; a signed chrono check-in series marks each declared replica passed or refused. Design: ADR-P3-13 in `docs/phase-3-android-players/ADR.md`; decisions F1-F12 and PE1 onwards in `docs/review/decisions-to-review.md`. Everything works with no internet and no site server.
 
-Implementations: `controller/atalaia_controller/checkin_poster.py` (the poster codec) and `checkin.py` (the rules, Python: the field controller), `app/lib/protocol/checkin_poster.dart` and `app/lib/checkin/` (Dart: the app). Both check the shared vectors in [`vectors/checkin.json`](vectors/checkin.json): 3 valid posters (decode, re-encode byte for byte, text form), 47 invalid ones with the reason they must fail, 8 invalid texts, a poster with keys to skip, and the rules for declarations and field identities.
+Implementations: `controller/atalaia_controller/checkin_poster.py` (the poster codec), `checkin_ticket.py` (the ticket codec) and `checkin.py` (the rules, Python: the field controller), `app/lib/protocol/checkin_poster.dart`, `app/lib/protocol/checkin_ticket.dart` and `app/lib/checkin/` (Dart: the app). Both check the shared vectors in [`vectors/checkin.json`](vectors/checkin.json): 3 valid posters (decode, re-encode byte for byte, text form), 47 invalid ones with the reason they must fail, 8 invalid texts, a poster with keys to skip, the rules for declarations and field identities, and under `tickets` 2 valid tickets, 22 invalid ones, 6 invalid texts and a ticket with keys to skip (built byte by byte from RFC 8949's rules, not by the codecs).
+
+With a site server, players can register for a scheduled game beforehand (ADR-P4-11, phase 4 plan phase 16): the controller then knows them as **expected** check-ins before they arrive ([Registered players](#registered-players) below). Nothing else here changes, and a field without a site server loses nothing.
 
 ## The poster
 
@@ -75,7 +77,7 @@ No names are ever in it. The app shows the notice once per field and version, th
  "notice_version": 1, "replicas": [ <declarations> ]}
 ```
 
-`federation_number`, `team_preference` and `replicas` are optional. Answers 201 (a new check-in) or 200 (the same identity again), with no caching:
+`federation_number`, `team_preference` and `replicas` are optional. A registered player's app adds `"registration_id"` (the site server's registration, a lowercase UUID) and `"ticket"` (the ticket secret, 43 characters of base64url without padding), always together ([Registered players](#registered-players)). Answers 201 (a new check-in) or 200 (the same identity again), with no caching:
 
 ```json
 {"game_id": 4242, "player_id": "p-abcdefgh2345", "token": "apt1....", "exp": 1792339200,
@@ -146,14 +148,49 @@ The series is judged by its highest energy against the class of the matching dec
 
 Events: **`chrono.checkin` (35)** once per passing check-in or retest series, with its highest reading; a refusal adds no event (it is in the list, which only staff see). Spot checks log **`chrono.spotcheck` (36)**, and **`chrono.violation` (17)** on WARN or FAIL. Events carry ids, never names.
 
+## Registered players
+
+A site server (phase 4, plan phase 16; ADR-P4-11 and decisions S16-*) takes registrations for its field's scheduled games. Each registration has the player's id at the field, a display name for that game, a team preference, the federation number when the game asks for one, pre-declared replicas (declarations as above, each with its `declaration_id`) and a **ticket**: 32 random bytes, shown once to the player; the site server keeps only its SHA-256.
+
+**The roster.** When the GM makes a game from a scheduled game (`POST /api/v1/schedule/{scheduled_game_id}/game`), the controller's sync client pulls that game's roster (`GET /api/v1/sync/roster`, [sync.md](sync.md)) at every cycle **until the game starts**. Each registration becomes a check-in with status **`expected`**, its name, federation number and team preference, the ticket's SHA-256, and its declarations already `pending` in the "replicas to chrono" list, so marshals can prepare before the gate opens. A newer roster changes an expected check-in, and one whose registration was cancelled goes; anyone already at the field stays as the controller has them. A declaration this field's check-in would refuse (a class of another limit template, more than `max_replicas`, a declaration id another player holds) is dropped. After the start, nothing from the site server changes the game: staff changes on the day win.
+
+**Arriving.** An expected check-in becomes `checked_in` (or `pending` with `confirm = "staff"`) in one of three ways:
+
+- the app checks in with the registration's `registration_id` and `ticket` (`POST /api/v1/checkin`): the ticket's SHA-256 must be the roster's (403 otherwise), and the check-in's `player_id` the registration's (409 otherwise). A player id the roster brought and this controller never saw (the site server made it) is refused without the ticket (403); once the phone has checked in, its secret is the identity as for anyone;
+- a marshal scans the printed ticket (`POST /api/v1/games/{id}/checkins/ticket` with `{"ticket": "atalaia:ticket:..."}`): the registration must be in this game's roster and the ticket its own;
+- staff tick the player by name (`PATCH .../checkins/{player}` with `status: "checked_in"`).
+
+Without a roster (no internet, or no pull yet) a registered player is a walk-in; the app's `registration_id` and the ticket's SHA-256 are kept with the check-in, so the site server can match them when the controller reports back.
+
+**What goes back.** After the game (`POST /api/v1/sync/checkins`, [sync.md](sync.md)): per registration its outcome (`checked_in`: the player came, or `no_show`), its declarations' final states and deciding `reading_id`s, and the walk-ins as a count. Never a name or a federation number. A registration known only from the app carries its ticket's SHA-256, which the site server compares with its own.
+
+**Claims of a phone's id.** A player whose phone checked in at this field without an account can link that id to their account on the site server: the site server keeps the SHA-256 of the phone's secret in a claim, and the controller, which compares it with the hash it kept at the phone's first check-in, answers `confirmed`, `refused` (another secret, or an id checked in by hand) or `unknown` (`GET`/`POST /api/v1/sync/claims`). The controller's own hashes never leave it.
+
+### The ticket
+
+The printed ticket is a QR code of a text, the poster's sibling:
+
+```
+atalaia:ticket:<base64url without padding of: version (1 byte) | body (CBOR map)>
+```
+
+| Key | Field | Type | Values |
+| --- | --- | --- | --- |
+| 1 | `registration_id` | text | the registration, a lowercase UUID |
+| 2 | `player_id` | text | the player's id at the field, `p-` and 12 of `a-z2-7` |
+| 3 | `secret` | bytes | the 32-byte ticket secret |
+
+Version 1, at most 128 bytes with the version byte. All three keys are required. The decoding rules are the poster's: a missing key, a repeated key, a wrong type, a `null`, trailing bytes, a key of 32 or more, a negative or text key are refused; keys 0 and 4-31 are skipped. The reasons in the vectors are `text`, `length`, `version` and `body`. The ticket only matches an arrival to a registration, offline: it opens nothing on the radio and is no game credential.
+
 ## Staff
 
 | Method | Path | Who | |
 | --- | --- | --- | --- |
-| GET | `/api/v1/games/{id}/checkins` | GM token, marshal or gm player token | The check-ins with names, counts, settings, whether check-in is open |
+| GET | `/api/v1/games/{id}/checkins` | GM token, marshal or gm player token | The check-ins with names, counts, settings, whether check-in is open; each row's `registration_id` and `registered`, and `registrations: {expected, arrived, walkins}` |
 | POST | `/api/v1/games/{id}/checkins` | the same | A hand check-in `{"display_name", "federation_number"?, "team_preference"?, "replicas"?}`: checked in at once; the answer has the controller's new `player_id` |
 | PATCH | `/api/v1/games/{id}/checkins/{player}` | GM token: `team`, `squad`, `role`; staff: `status: "checked_in"` (confirm), `federation_seen`, `replicas` | |
 | DELETE | `/api/v1/games/{id}/checkins/{player}` | GM token | Remove: status `removed`, personal fields erased, the player's tokens refused |
+| POST | `/api/v1/games/{id}/checkins/ticket` | the same | `{"ticket": "atalaia:ticket:..."}`: a registered player's printed ticket, scanned; checked in at once |
 | GET | `/api/v1/games/{id}/chrono-list` | GM token, marshal or gm player token | Players with declarations, pending first in check-in order; counts |
 | GET | `/api/v1/games/{id}/checkins.csv` | GM token | The list as CSV for the field's own records (cells that a spreadsheet would read as a formula start with `'`) |
 | POST | `/api/v1/games/{id}/checkin/open` · `/close` | GM token | Check-in is open from a game's creation until it ends, unless closed |
@@ -176,7 +213,7 @@ On `WS /api/v1/stream` a player token may connect too. Every message is routed b
 
 ## Personal data
 
-Kept: the field identity (id, hash of the secret), per check-in the display name, the federation number if given, the team preference, the time and the state, and the declarations. Nothing else. Names and federation numbers never reach events, MQTT, the radio, the controller's log lines or the read token's views (the tests check all four). The display name, federation number, team preference and declarations are erased `[checkin] retention_days` (30) days after the game; a field identity not seen for 365 days is deleted; chrono readings older than 365 days are deleted (decision B12). The default privacy notice is `controller/templates/checkin-notice-pt.md` and `-en.md` (`{operator}` and `{retention_days}` are filled in), for the legal review of decision P4-6.
+Kept: the field identity (id, hash of the secret), per check-in the display name, the federation number if given, the team preference, the time and the state, the declarations, and for a registered player the registration's id and its ticket's SHA-256. Nothing else. Names and federation numbers never reach events, MQTT, the radio, the controller's log lines or the read token's views (the tests check all four). The display name, federation number, team preference and declarations are erased `[checkin] retention_days` (30) days after the game; a field identity not seen for 365 days is deleted; chrono readings older than 365 days are deleted (decision B12). The default privacy notice is `controller/templates/checkin-notice-pt.md` and `-en.md` (`{operator}` and `{retention_days}` are filled in), for the legal review of decision P4-6.
 
 ## Offline
 

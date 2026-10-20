@@ -49,6 +49,19 @@ STRINGS: dict[str, dict[str, str]] = {
         "language": "Idioma",
         "footer": "Página pública do campo, feita pelo servidor Atalaia. Não mostra quem se inscreveu.",
         "past": "Já terminou.",
+        "full": "esgotados",
+        "register": "Fazer a inscrição",
+        "register_title": "Inscrição: {game}",
+        "back_game": "Voltar a {game}",
+        "reg_intro": "A inscrição faz-se com uma conta neste site, na app Atalaia.",
+        "reg_step_account": "Criar uma conta neste site (ou entrar com a que já existe).",
+        "reg_step_app": "Na app Atalaia, abrir este campo e este jogo e fazer a inscrição, com as réplicas "
+                        "que vão ser usadas, se o jogo as pedir.",
+        "reg_step_ticket": "A app guarda o bilhete de check-in e usa-o no dia, no campo. Sem a app, o bilhete "
+                           "pode ser impresso e mostrado a um marshal.",
+        "reg_data": "O campo recebe o nome escolhido para o jogo, a preferência de equipa, o número de federado "
+                    "(se o jogo o pedir) e as réplicas declaradas, e apaga-os 30 dias depois do jogo.",
+        "reg_unavailable": "As inscrições para este jogo não estão abertas, ou já não há lugares.",
     },
     "en": {
         "upcoming": "Upcoming games",
@@ -82,6 +95,19 @@ STRINGS: dict[str, dict[str, str]] = {
         "language": "Language",
         "footer": "The field's public page, made by the Atalaia server. It never shows who registered.",
         "past": "It has ended.",
+        "full": "full",
+        "register": "Register",
+        "register_title": "Register: {game}",
+        "back_game": "Back to {game}",
+        "reg_intro": "You register with an account on this site, in the Atalaia app.",
+        "reg_step_account": "Make an account on this site (or log in with the one you have).",
+        "reg_step_app": "In the Atalaia app, open this field and this game and register, with the replicas you "
+                        "will use, if the game asks for them.",
+        "reg_step_ticket": "The app keeps the check-in ticket and uses it on the day, at the field. Without the app, "
+                           "print the ticket and show it to a marshal.",
+        "reg_data": "The field gets the name you choose for the game, your team preference, your federation number "
+                    "(if the game asks for one) and the declared replicas, and erases them 30 days after the game.",
+        "reg_unavailable": "Registration for this game is not open, or there are no places left.",
     },
 }
 LANGUAGE_NAMES = {"pt": "Português", "en": "English"}

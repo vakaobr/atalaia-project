@@ -7,6 +7,7 @@
 !core/
 !simulator/atalaia_sim/
 !controller/atalaia_controller/
+!app/lib/chrono/limit_templates/
 !modes/
 !protocol/vectors/sync.json
 !protocol/vectors/chrono_record.json

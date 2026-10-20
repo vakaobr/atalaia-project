@@ -623,10 +623,10 @@ class SettingsTests(unittest.TestCase):
 # Keys a request body may have, by where they are (protocol/sync.md); "*" is any key (a team, a source).
 ALLOWED = {
     "": {"sync_version", "controller", "game", "meta", "after_id", "events", "counters", "nodes", "marshals",
-         "replicas", "readings"},
+         "replicas", "readings", "scheduled_game_id", "walkins", "registrations", "results"},
     "controller": {"id", "version"}, "game": {"game_id", "game_seed"},
     "meta": {"name", "mode_id", "teams", "team_info", "params", "squads", "duration_ms", "state", "node_id",
-             "joined", "created_at", "started_at", "ended_at"},
+             "joined", "created_at", "started_at", "ended_at", "scheduled_game_id"},
     "meta.team_info": "any",  # team names
     "meta.team_info.*": {"display_name", "crest_id"},
     "events[]": {"id", "node", "seq", "t", "type", "team", "squad", "prio", "data", "epoch", "pkt_seq"},
@@ -636,6 +636,10 @@ ALLOWED = {
     "replicas[]": {"replica_id", "owner_player_id", "type", "class", "make_model", "registered_at", "tag_type",
                    "tag_uid"},
     "readings[]": {"record", "series_id", "outcome", "received_at", "game_seed"},
+    # Plan phase 16: outcomes and claim verdicts; never a name, a federation number or a secret's hash.
+    "registrations[]": {"registration_id", "player_id", "outcome", "ticket_sha256", "declarations"},
+    "registrations[].declarations[]": {"declaration_id", "state", "reading_id"},
+    "results[]": {"claim_id", "result"},
 }
 # The signed record's fields (protocol/chrono-record.md): what a reading's record may carry.
 RECORD = {"reading_id", "replica_id", "player_id", "type", "velocity_mps", "bb_weight_g", "energy_j", "chrono_id",

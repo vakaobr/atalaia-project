@@ -5,9 +5,9 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Controller sync
 
-How a field controller pushes its games to a site server: the games' metadata, their event logs, their score counters and their nodes; and the field's chrono registry: the marshals' public keys, the replica registry and the signed chrono readings (plan phase 14). Design: ADR-P4-3 and ADR-P4-5 with their 2026-10-19 amendments in `docs/phase-4-site-server/ADR.md`; decisions P4R10-P4R15, S13-1 onwards and S14-1 onwards in `docs/review/decisions-to-review.md`.
+How a field controller pushes its games to a site server: the games' metadata, their event logs, their score counters and their nodes; the field's chrono registry: the marshals' public keys, the replica registry and the signed chrono readings (plan phase 14); and game day (plan phase 16): the schedule and rosters it pulls, the registrations' outcomes and the claims' verdicts it pushes. Design: ADR-P4-3 and ADR-P4-5 with their 2026-10-19 amendments in `docs/phase-4-site-server/ADR.md`; decisions P4R10-P4R15, S13-1 onwards, S14-1 onwards and S16-1 onwards in `docs/review/decisions-to-review.md`.
 
-Implementations: `controller/atalaia_controller/sync_client.py` (the controller's client) and `server/atalaia_server/sync.py` with `api/sync.py` (the site server). Both check bodies with the same plain-Python module, `controller/atalaia_controller/sync_format.py`, and both are tested against the shared vectors in [`vectors/sync.json`](vectors/sync.json): 10 valid bodies, 50 invalid ones with the error code and path they must fail with, and 3 score merges worked out by hand. The site server verifies each chrono reading with the controller's own `controller/atalaia_controller/chrono.py` (`server/atalaia_server/chrono_verify.py`), against [`vectors/chrono_record.json`](vectors/chrono_record.json) too.
+Implementations: `controller/atalaia_controller/sync_client.py` (the controller's client) and `server/atalaia_server/sync.py` with `api/sync.py` (the site server). Both check bodies with the same plain-Python module, `controller/atalaia_controller/sync_format.py`, and both are tested against the shared vectors in [`vectors/sync.json`](vectors/sync.json): 14 valid bodies, 65 invalid ones with the error code and path they must fail with, 3 score merges worked out by hand, and under `answers` 4 valid and 14 invalid answers of the endpoints the controller pulls (`sync_format.ANSWERS`). The site server verifies each chrono reading with the controller's own `controller/atalaia_controller/chrono.py` (`server/atalaia_server/chrono_verify.py`), against [`vectors/chrono_record.json`](vectors/chrono_record.json) too.
 
 ## The link
 
@@ -50,10 +50,11 @@ Creates the game or updates its metadata. `meta`:
 | `node_id` | integer or null | no | the sending controller's node id in the game |
 | `joined` | boolean | no | the sending controller joined as a standby |
 | `started_at`, `ended_at` | number or null | no | seconds since 1970 |
+| `scheduled_game_id` | text or null | no | the site server's scheduled game this game was made from (a lowercase UUID; plan phase 16) |
 
 Never in `meta`: the game key, the node assignments, check-ins.
 
-Answer: `200 {"game": "<the site server's id>", "created": true|false, "state": "<the stored state>"}`.
+Answer: `200 {"game": "<the site server's id>", "created": true|false, "state": "<the stored state>"}`, and with a `scheduled_game_id` also `"scheduled": true|false`: whether that scheduled game is this field's and was linked. A linked scheduled game follows the game: `in_progress` once it runs, `completed` once it ended (never back); a scheduled game made into a game again is linked to the last one.
 
 **Merging two controllers' metadata** (a primary and its standby push the same game): the state only moves forward (`ready` < `running` = `paused` < `ended`; between `running` and `paused` the last one wins; `ended` stays), `started_at` keeps the earliest time and `ended_at` the latest, and everything else is the last one sent. A standby controller (`joined: true`) that says `ended` may only have left the game, so its `ended` counts as `running` (or `ready` if the game never started); a `game.end` event, which only the controller that ends the game logs, ends it on the site server too (decision S13-5).
 
@@ -184,10 +185,42 @@ The record travels as text so that the site server can keep it **verbatim**. Thi
 
 Answer: `200 {"accepted": n, "duplicates": n, "refused": [{"index", "reading_id", "reason", "detail"}], "violations": n}`.
 
+## Game day (plan phase 16)
+
+ADR-P4-11 as amended. The controller pulls with `GET` (the same key; answers are checked by both sides with `sync_format.ANSWERS`) and pushes with `POST`, in each cycle after its games and the chrono registry. A site server without these endpoints (a `404` or `405` from an older one) is skipped. **The site server never sends anything into a running game**: a roster is applied only while its game has not started.
+
+### GET /api/v1/sync/schedule?days=14
+
+The field's `published` and `in_progress` scheduled games that have not ended and start within `days` (1-60): `200 {"sync_version": 1, "games": [...]}`, at most 200, by start. A game: `scheduled_game_id` (UUID), `title` (1-256), `starts_at`, `ends_at` (seconds since 1970), `status`, `teams` (up to 16 names of 1-32 characters: a controller game's names must fit the radio, 23 bytes), `federation` (`off`, `optional`, `required`), `predeclare_replicas`, `registered` (the live registrations' count), and if set `mode_id`, `max_players`, `location`. The controller keeps the last one for the GM.
+
+### GET /api/v1/sync/roster?scheduled_game_id=
+
+One scheduled game's live registrations (`404 {"detail": "scheduled_game_not_found"}` for another field's or none): `200 {"sync_version": 1, "scheduled_game_id", "status", "federation", "registrations": [...]}`, at most 5,000. A registration: `registration_id` (UUID), `player_id` (`p-` and 12 base32), `display_name` (1-32), `replicas` (up to 20 declarations of [checkin.md](checkin.md): `declaration_id`, `type`, `class`, `replica_id`?, `make_model`?; no state), and if set `team_preference`, `federation_number` (only when `federation` is not `off`), `ticket_sha256` (64 lowercase hex). Only what the check-in holds: no account, no email. Each registration and each player id once; each declaration id once in the roster.
+
+### GET /api/v1/sync/claims
+
+Accounts' claims of a player id of this field, waiting for its verdict: `200 {"sync_version": 1, "claims": [{"claim_id", "player_id", "secret_sha256"}]}`, at most 500. `secret_sha256` is the SHA-256 of the secret the claiming phone holds for that id.
+
+### POST /api/v1/sync/claims
+
+The controller's verdicts, a body of the field (no `game`): `results`: 1-500 `{claim_id, result}`, `result` one of `confirmed` (it knows the id with that secret's hash, compared in constant time), `refused` (with another, or with none: an id made for a hand check-in) or `unknown` (the claim waits). The controller's own hashes are never sent. Answer: `200 {"confirmed": n, "refused": n, "pending": n}`; a confirmed claim links the id to the account unless another account holds it already.
+
+### POST /api/v1/sync/checkins
+
+Once a game made from a scheduled game has ended (and again only if it changes): the common part with `game`, and
+
+| Field | Type | Values |
+| --- | --- | --- |
+| `scheduled_game_id` | text | the scheduled game (UUID) |
+| `walkins` | integer | 0-100,000: players at the field without a registration, a count only |
+| `registrations` | array | at most 5,000 of `{registration_id, player_id, outcome, declarations, ticket_sha256?}` |
+
+`outcome` is `checked_in` (the player came) or `no_show`; `declarations` are up to 20 `{declaration_id, state, reading_id?}` with the final states of [checkin.md](checkin.md) (`pending`, `passed`, `refused`, `withdrawn`). `ticket_sha256` only for a registration the controller had from the app and not from a roster: the site server applies it only if it is that registration's ticket. Never a name, a team preference or a federation number. Answer: `200 {"linked": true|false, "applied": n, "ignored": n, "declarations": n}`; an unknown scheduled game is `linked: false`, not an error.
+
 ## WS /api/v1/sync/stream
 
-One WebSocket the controller opens (the `Authorization: Bearer` header on the upgrade; close code 4401 for a wrong key). Each message is a JSON object with `type` `games`, `events`, `scores`, `nodes`, `marshals`, `replicas` or `chrono` and otherwise the same body as the POST of that name; the answer is `{"type": "<type>.ack", ...the POST's answer}`, or `{"type": "error", "detail", "error", "path"}` (the socket stays open). `{"type": "ping"}` gets `{"type": "pong"}`. Plan phase 19 adds the remote GM's commands, which travel the other way on this socket (off by default, P4R12). The controller's client uses the HTTP endpoints in this version (decision S13-8).
+One WebSocket the controller opens (the `Authorization: Bearer` header on the upgrade; close code 4401 for a wrong key). Each message is a JSON object with `type` `games`, `events`, `scores`, `nodes`, `marshals`, `replicas`, `chrono`, `checkins` or `claims` and otherwise the same body as the POST of that name; the answer is `{"type": "<type>.ack", ...the POST's answer}`, or `{"type": "error", "detail", "error", "path"}` (the socket stays open). `{"type": "ping"}` gets `{"type": "pong"}`. Plan phase 19 adds the remote GM's commands, which travel the other way on this socket (off by default, P4R12). The controller's client uses the HTTP endpoints in this version (decision S13-8).
 
 ## Never sent
 
-Positions (they stay on the controller and are deleted when the game ends, P4R25), tokens and keys (the game key, the join key, player-token keys, the GM and read tokens, marshals' private keys), check-in names and federation numbers (until plan phase 16 defines what goes back for registered players), the players' field secrets and their hashes. Player ids in event data (`player`) are the field's pseudonymous ids (`p-` and 12 base32 characters). What the chrono registry carries is what a signed record already holds (the player id, the replica, the marshal's id and name as signed) and the replica registry's own fields.
+Positions (they stay on the controller and are deleted when the game ends, P4R25), tokens and keys (the game key, the join key, player-token keys, the GM and read tokens, marshals' private keys), check-in names and federation numbers (what goes back for registered players is their outcome and declarations' states, plan phase 16), the players' field secrets and their hashes (a claim's verdict is computed on the controller). Player ids in event data (`player`) are the field's pseudonymous ids (`p-` and 12 base32 characters). What the chrono registry carries is what a signed record already holds (the player id, the replica, the marshal's id and name as signed) and the replica registry's own fields.

@@ -3,7 +3,9 @@
 """The public field page, its game pages and the open feeds (ADR-P4-11, ADR-P4-12; plan phase 15).
 
     GET /f/<slug>/                     the field page: its description, address and upcoming games
-    GET /f/<slug>/games/<id>           one game: details, places, requirements, schema.org JSON-LD
+    GET /f/<slug>/games/<id>           one game: details, places, requirements, schema.org JSON-LD, and a
+                                       *Register* button while registration is open and places are left
+    GET /f/<slug>/games/<id>/register  how to register for it (with an account, plan phase 16)
     GET /f/<slug>/games.ics            iCalendar (RFC 5545) of the field's games
     GET /f/<slug>/games/<id>.ics       iCalendar of one game
     GET /f/<slug>/games.json           the JSON feed (``atalaia.games`` version 1)
@@ -18,7 +20,8 @@ is data, which the policy does not run). pt-PT or English: ``?lang=pt|en``, else
 
 Every answer has an ``ETag`` (SHA-256 of the body) and ``Last-Modified``, and a matching
 ``If-None-Match`` (or, without it, ``If-Modified-Since``) gets 304, so calendars can poll
-cheaply. The feeds send ``Access-Control-Allow-Origin: *`` (read-only, no cookies). Links use
+cheaply. ``HEAD`` is answered like ``GET`` without the body (the same headers, the GET's
+``Content-Length``), as calendar clients use it (decision S16-10). The feeds send ``Access-Control-Allow-Origin: *`` (read-only, no cookies). Links use
 ``ATALAIA_PUBLIC_URL``, or the request's own address when it is not set.
 """
 
@@ -42,7 +45,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db import get_session
 from ..feeds import FeedField, ical, json_feed
 from ..models import Field, ScheduledGame
-from ..services import scheduling as svc
+from ..services import registration, scheduling as svc
 from ..api.fields import SLUG
 from . import i18n
 
@@ -59,7 +62,8 @@ def _load(name: str) -> Template:
     return Template("".join(line for line in lines if not line.startswith("<!-- SPDX-")))
 
 
-TEMPLATES = {name: _load(f"{name}.html") for name in ("page", "field", "game", "not_found")}
+TEMPLATES = {name: _load(f"{name}.html") for name in ("page", "field", "game", "register", "not_found")}
+GET_HEAD = ["GET", "HEAD"]
 CSS = (HERE / "static" / "field.css").read_bytes()
 STARTED = datetime.now(timezone.utc)  # the style sheet's Last-Modified: it changes only with the server
 
@@ -117,7 +121,15 @@ def answer(request: Request, body: str, media_type: str, modified: datetime, cac
     headers = {"ETag": etag, "Last-Modified": _http_date(modified), "Cache-Control": cache, **(extra or {})}
     if status_code == 200 and _not_modified(request, etag, modified):
         return Response(status_code=304, headers=headers)
+    if request.method == "HEAD":  # the GET's headers, its length, no body (RFC 9110 section 9.3.2)
+        return Response(media_type=media_type, status_code=status_code,
+                        headers={**headers, "Content-Length": str(len(data))})
     return Response(content=data, media_type=media_type, headers=headers, status_code=status_code)
+
+
+def no_feed() -> Response:
+    """A feed that is not there: 404, not cached (the same for HEAD: no body either way)."""
+    return Response(status_code=404, headers={"Cache-Control": "no-store"})
 
 
 class Page:
@@ -167,7 +179,7 @@ def _game_line(page: Page, game: ScheduledGame, field: Field) -> str:
             f"{badge}</li>\n")
 
 
-def _details(page: Page, game: ScheduledGame, field: Field, now: datetime) -> str:
+def _details(page: Page, game: ScheduledGame, field: Field, now: datetime, registered: int) -> str:
     t, zone = page.t, field.timezone
     rows: list[tuple[str, str]] = [
         (t["when"], esc(i18n.span(game.starts_at, game.ends_at, zone, page.lang)) + " <small>("
@@ -178,8 +190,8 @@ def _details(page: Page, game: ScheduledGame, field: Field, now: datetime) -> st
     rows.append((t["mode"], f"<code>{esc(game.mode_id)}</code>" if game.mode_id else esc(t["mode_later"])))
     if game.teams:
         rows.append((t["teams"], esc(", ".join(game.teams))))
-    left = svc.places_left(game)
-    rows.append((t["places"], esc(left) if left is not None else esc(t["places_open"])))
+    left = svc.places_left(game, registered)
+    rows.append((t["places"], (esc(left) if left else esc(t["full"])) if left is not None else esc(t["places_open"])))
     state = svc.registration_state(game, now)
     if state == "not_yet":
         assert game.registration_opens_at is not None
@@ -224,12 +236,12 @@ def _alternates(page: Page, field: Field) -> str:
             f'<link rel="alternate" type="application/json" href="/f/{esc(field.slug)}/games.json">\n')
 
 
-@router.get("/static/field.css")
+@router.api_route("/static/field.css", methods=GET_HEAD)
 async def stylesheet(request: Request) -> Response:
     return answer(request, CSS.decode("utf-8"), "text/css; charset=utf-8", STARTED, "public, max-age=3600")
 
 
-@router.get("/f/{slug}")
+@router.api_route("/f/{slug}", methods=GET_HEAD)
 async def field_redirect(slug: str, request: Request) -> Response:
     if not SLUG.fullmatch(slug):
         return Page(request).not_found(request)
@@ -237,7 +249,7 @@ async def field_redirect(slug: str, request: Request) -> Response:
     return RedirectResponse(f"/f/{slug}/{query}", status_code=308)
 
 
-@router.get("/f/{slug}/")
+@router.api_route("/f/{slug}/", methods=GET_HEAD)
 async def field_page(slug: str, request: Request, db: AsyncSession = Depends(get_session)) -> Response:
     page = Page(request)
     field = await svc.public_field(db, slug)
@@ -261,29 +273,44 @@ def _feed_headers() -> dict[str, str]:
     return {"Access-Control-Allow-Origin": "*"}
 
 
-@router.get("/f/{slug}/games.ics")
+async def _feed_games(db: AsyncSession, field: Field, now: datetime) -> tuple[datetime, list[Any]]:
+    """The feed's games and its Last-Modified: the places left change with the registrations."""
+    from sqlalchemy import func, select  # noqa: PLC0415
+
+    from ..models import GameRegistration  # noqa: PLC0415
+
+    games = await svc.public_games(db, field.id, now)
+    n = await registration.counts(db, [g.id for g in games])
+    modified = svc.last_modified(field, games)
+    if games:
+        last = await db.scalar(select(func.max(GameRegistration.updated_at)).where(
+            GameRegistration.scheduled_game.in_([g.id for g in games])))
+        modified = max(modified, last) if last is not None else modified
+    return modified, [svc.feed_game(g, field, now, n.get(g.id, 0)) for g in games]
+
+
+@router.api_route("/f/{slug}/games.ics", methods=GET_HEAD)
 async def field_calendar(slug: str, request: Request, db: AsyncSession = Depends(get_session)) -> Response:
     field = await svc.public_field(db, slug)
     if field is None:
-        return Response(status_code=404, headers={"Cache-Control": "no-store"})
+        return no_feed()
     now = datetime.now(timezone.utc)
-    games = await svc.public_games(db, field.id, now)
+    modified, feed = await _feed_games(db, field, now)
     f = svc.feed_field(field, base_url(request))
-    body = ical.calendar(f, [svc.feed_game(g, field, now) for g in games])
-    return answer(request, body, ical.MEDIA_TYPE, svc.last_modified(field, games), CACHE_FEED, _feed_headers())
+    body = ical.calendar(f, feed)
+    return answer(request, body, ical.MEDIA_TYPE, modified, CACHE_FEED, _feed_headers())
 
 
-@router.get("/f/{slug}/games.json")
+@router.api_route("/f/{slug}/games.json", methods=GET_HEAD)
 async def field_json(slug: str, request: Request, db: AsyncSession = Depends(get_session)) -> Response:
     field = await svc.public_field(db, slug)
     if field is None:
-        return Response(status_code=404, headers={"Cache-Control": "no-store"})
+        return no_feed()
     now = datetime.now(timezone.utc)
-    games = await svc.public_games(db, field.id, now)
+    modified, feed = await _feed_games(db, field, now)
     f = svc.feed_field(field, base_url(request))
-    body = json_feed.dumps(json_feed.feed(f, [svc.feed_game(g, field, now) for g in games]))
-    return answer(request, body, json_feed.MEDIA_TYPE, svc.last_modified(field, games), CACHE_FEED,
-                  _feed_headers())
+    body = json_feed.dumps(json_feed.feed(f, feed))
+    return answer(request, body, json_feed.MEDIA_TYPE, modified, CACHE_FEED, _feed_headers())
 
 
 def _game_id(text: str) -> Optional[uuid.UUID]:
@@ -293,7 +320,7 @@ def _game_id(text: str) -> Optional[uuid.UUID]:
         return None
 
 
-@router.get("/f/{slug}/games/{name}")
+@router.api_route("/f/{slug}/games/{name}", methods=GET_HEAD)
 async def game_page(slug: str, name: str, request: Request, db: AsyncSession = Depends(get_session)) -> Response:
     """One game's page, or its ``.ics`` (``<id>.ics``)."""
     page = Page(request)
@@ -303,13 +330,15 @@ async def game_page(slug: str, name: str, request: Request, db: AsyncSession = D
     game = await svc.public_game(db, field.id, game_id) if field is not None and game_id is not None else None
     if field is None or game is None:
         if want_ics:
-            return Response(status_code=404, headers={"Cache-Control": "no-store"})
+            return no_feed()
         return page.not_found(request)
     now = datetime.now(timezone.utc)
     f = svc.feed_field(field, base_url(request))
-    modified = svc.last_modified(field, [game])
+    registered = (await registration.counts(db, [game.id])).get(game.id, 0)
+    # The places left change with every registration: the page and its feed change with them.
+    modified = max(svc.last_modified(field, [game]), await _last_registration(db, game))
     if want_ics:
-        body = ical.calendar(f, [svc.feed_game(game, field, now)], name=f"{field.name}: {game.title}")
+        body = ical.calendar(f, [svc.feed_game(game, field, now, registered)], name=f"{field.name}: {game.title}")
         return answer(request, body, ical.MEDIA_TYPE, modified, CACHE_FEED, _feed_headers())
     notice = ""
     if game.status == "cancelled":
@@ -317,11 +346,52 @@ async def game_page(slug: str, name: str, request: Request, db: AsyncSession = D
         notice = f'<p class="notice">{esc(page.t["cancelled_notice"])}{reason}</p>\n'
     elif game.ends_at <= now:
         notice = f'<p class="notice">{esc(page.t["past"])}</p>\n'
+    register = ""
+    if svc.can_register(game, now, registered):  # only while it is open and places are left
+        href = page.link(f"/f/{field.slug}/games/{game.id}/register")
+        register = f'<p class="register"><a class="button" href="{esc(href)}">{esc(page.t["register"])}</a></p>\n'
     content = TEMPLATES["game"].substitute(
         field_url=esc(page.link(f"/f/{field.slug}/")), back=esc(page.t["back"].format(field=field.name)),
-        title=esc(game.title), notice=notice, details=_details(page, game, field, now),
+        title=esc(game.title), notice=notice, details=_details(page, game, field, now, registered),
+        register=register,
         description=paragraphs(game.description), ics_url=esc(f"/f/{field.slug}/games/{game.id}.ics"),
         add_to_calendar=esc(page.t["add_to_calendar"]))
     head = json_ld(_event_ld(game, field, f)) + _alternates(page, field)
     return page.render(request, f"{game.title} · {field.name}", content, modified, head=head)
 
+
+
+async def _last_registration(db: AsyncSession, game: ScheduledGame) -> datetime:
+    """When the game's registrations last changed (its own ``updated_at`` if never)."""
+    from sqlalchemy import func, select  # noqa: PLC0415
+
+    from ..models import GameRegistration  # noqa: PLC0415
+
+    when = await db.scalar(select(func.max(GameRegistration.updated_at)).where(
+        GameRegistration.scheduled_game == game.id))
+    return max(when, game.updated_at) if when is not None else game.updated_at
+
+
+@router.api_route("/f/{slug}/games/{name}/register", methods=GET_HEAD)
+async def register_page(slug: str, name: str, request: Request, db: AsyncSession = Depends(get_session)) -> Response:
+    """How to register: with an account on this site, in the Atalaia app (no form here: the pages have no
+    JavaScript and no login, decision S16-9). Only while registration is open."""
+    page = Page(request)
+    game_id = _game_id(name)
+    field = await svc.public_field(db, slug)
+    game = await svc.public_game(db, field.id, game_id) if field is not None and game_id is not None else None
+    if field is None or game is None:
+        return page.not_found(request)
+    now = datetime.now(timezone.utc)
+    registered = (await registration.counts(db, [game.id])).get(game.id, 0)
+    t = page.t
+    if svc.can_register(game, now, registered):
+        steps = "".join(f"<li>{esc(t[k])}</li>\n" for k in ("reg_step_account", "reg_step_app", "reg_step_ticket"))
+        text = f'<p>{esc(t["reg_intro"])}</p>\n<ol class="steps">\n{steps}</ol>\n<p class="address">{esc(t["reg_data"])}</p>\n'
+    else:
+        text = f'<p class="notice">{esc(t["reg_unavailable"])}</p>\n'
+    content = TEMPLATES["register"].substitute(
+        game_url=esc(page.link(f"/f/{field.slug}/games/{game.id}")), back=esc(t["back_game"].format(game=game.title)),
+        heading=esc(t["register_title"].format(game=game.title)), text=text)
+    modified = max(svc.last_modified(field, [game]), await _last_registration(db, game))
+    return page.render(request, f"{t['register']} · {game.title}", content, modified)

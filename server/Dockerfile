@@ -3,7 +3,7 @@
 #
 # The site server's image (ADR-P4-10 as amended, decisions P4R9 and P4R16).
 # The build context is the repository root; Dockerfile.dockerignore next to
-# this file lets only core/, the shared Python and server/ in.
+# this file lets only core/, the shared Python, the chrono limit templates and server/ in.
 #   docker build -f server/Dockerfile -t atalaia-server .                    the server
 #   docker build -f server/Dockerfile --target test -t atalaia-server-test .  plus its tests
 # tools/docker_server.py builds both through Docker Compose.
@@ -42,6 +42,8 @@ COPY --from=core /build/out/libatalaia_core.so /opt/atalaia/lib/libatalaia_core.
 # The pure-Python code shared with the field controller (P4R16).
 COPY simulator/atalaia_sim /app/simulator/atalaia_sim
 COPY controller/atalaia_controller /app/controller/atalaia_controller
+# The chrono limit templates the controller and the app use: a registration's replica classes (plan phase 16).
+COPY app/lib/chrono/limit_templates /app/app/lib/chrono/limit_templates
 COPY server/atalaia_server /app/server/atalaia_server
 COPY server/migrations /app/server/migrations
 COPY server/alembic.ini /app/server/alembic.ini

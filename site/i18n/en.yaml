@@ -593,7 +593,7 @@ roadmap:
     title: Site server and advanced play
     short: >-
       Site server, game scheduling and registration, custom scenarios, advanced modes, ATAK.
-      Started: advanced modes (Master and Satellites, the Hacking Terminal, VIP / Payload and the logic of Target Windows), the runtime of custom scenarios, geo utilities in the core, and the site server's accounts, personal data rights, controller sync, chrono registry and game scheduling with public field pages and feeds are built in software.
+      Started: advanced modes (Master and Satellites, the Hacking Terminal, VIP / Payload and the logic of Target Windows), the runtime of custom scenarios, geo utilities in the core, and the site server's accounts, personal data rights, controller sync, chrono registry and game scheduling with public field pages, feeds and registration are built in software.
     text: >-
       Site server (accounts, game history, the chrono registry, scheduling games, registration and
       publishing), custom scenarios, advanced modes (master and satellite zones, VIP escort, hacking
@@ -618,7 +618,9 @@ roadmap:
       and scores to the site server, offline first and safe to replay; not yet over a real 4G
       link), and the chrono registry (signed readings verified and kept as signed, public keys only,
       sharing between fields with consent; not yet with a real chronograph), and game scheduling with a public page per field and open
-      iCalendar and JSON feeds of its games (no personal data on them).
+      iCalendar and JSON feeds of its games (no personal data on them), and registration for those
+      games with pre-declared replicas and a check-in ticket: the field controller pulls the list
+      and reports who came (the app's registration screens are still to come).
     gate: >-
       Gate: a weekend <a href="{{ page.to.glossary }}#glossary-milsim">milsim</a> runs on Atalaia end to end.
   p5:

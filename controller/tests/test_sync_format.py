@@ -28,7 +28,9 @@ VECTORS = json.loads((REPO / "protocol" / "vectors" / "sync.json").read_text(enc
 
 class VectorTests(unittest.TestCase):
     def test_counts(self) -> None:
-        self.assertEqual((len(VECTORS["valid"]), len(VECTORS["invalid"]), len(VECTORS["merge"])), (10, 50, 3))
+        self.assertEqual((len(VECTORS["valid"]), len(VECTORS["invalid"]), len(VECTORS["merge"])), (14, 65, 3))
+        self.assertEqual((len(VECTORS["answers"]["valid"]), len(VECTORS["answers"]["invalid"])), (4, 14))
+        self.assertEqual({v["kind"] for v in VECTORS["answers"]["valid"]}, set(fmt.ANSWERS))
         self.assertEqual({v["kind"] for v in VECTORS["valid"]}, set(fmt.CHECKS))
         self.assertEqual({v["kind"] for v in VECTORS["invalid"]}, set(fmt.CHECKS))
 
@@ -47,6 +49,17 @@ class VectorTests(unittest.TestCase):
             with self.subTest(vector=vector["name"]):
                 with self.assertRaises(fmt.SyncFormatError) as caught:
                     fmt.CHECKS[vector["kind"]](copy.deepcopy(vector["body"]))
+                self.assertEqual((caught.exception.code, caught.exception.path), (vector["error"], vector["path"]))
+
+    def test_answers(self) -> None:
+        """The answers of the GET endpoints the controller pulls (plan phase 16)."""
+        for vector in VECTORS["answers"]["valid"]:
+            with self.subTest(vector=vector["name"]):
+                fmt.ANSWERS[vector["kind"]](copy.deepcopy(vector["body"]))
+        for vector in VECTORS["answers"]["invalid"]:
+            with self.subTest(vector=vector["name"]):
+                with self.assertRaises(fmt.SyncFormatError) as caught:
+                    fmt.ANSWERS[vector["kind"]](copy.deepcopy(vector["body"]))
                 self.assertEqual((caught.exception.code, caught.exception.path), (vector["error"], vector["path"]))
 
     def test_merge(self) -> None:

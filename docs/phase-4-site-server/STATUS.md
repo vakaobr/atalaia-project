@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Implementation (plan phases 1 to 6 and 10 to 15 built in software, 2026-10-20; sync over 4G: HW1)
+**Current phase:** Implementation (plan phases 1 to 6 and 10 to 16 built in software, 2026-10-20; sync over 4G: HW1)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-20 (plan phase 6, full clean-copy check)
-**Next step:** plan phase 7 (scenario compiler and validator) on the modes chain; plan phase 16 (registration and game-day sync) on the site server chain
+**Last verified:** 2026-10-20 (plan phase 16, full clean-copy check)
+**Next step:** plan phase 7 (scenario compiler and validator) on the modes chain; plan phase 17 (registration import and platform adapters) on the site server chain
 
 ## Completed
 
@@ -54,7 +54,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | 13 | Controller sync | Software, now | 10, 11 | **Done in software** (2026-10-20; over 4G: HW1) |
 | 14 | Chrono registry | Software, now | 13 | **Done in software** (2026-10-20; a real chronograph: HW4) |
 | 15 | Scheduling, field pages and feeds | Software, now | 11 | Pending |
-| 16 | Registration and game-day sync | Software, now | 13, 15 | Pending |
+| 16 | Registration and game-day sync | Software, now | 13, 15 | **Done in software** (2026-10-20; the app's screens later, a real game day: HW1) |
 | 17 | Registration import and adapters | Software, now | 16 | Pending |
 | 18 | Club profiles and branding sync | Software, now | 13 | Pending |
 | 19 | Device health, firmware catalogue, remote GM | Software, now | 13 | Pending |
@@ -451,6 +451,54 @@ feed's `registration.open` stays false; the registration import (17); a
 deployment with its public address (22). Decisions S15-1 to S15-15, all
 open; S15-10 (the public address) and S15-11 (the limit for calendar
 services) want the maintainer's eye.
+
+## Plan phase 16: registration and game-day sync (built 2026-10-20, in software)
+
+What exists: on the site server (`services/registration.py`,
+`api/registrations.py`, migration `0007_registration`), an account registers
+for a published game while its window is open and places are left: a display
+name, a team preference, the federation number when asked, pre-declared
+replicas (one of theirs in the field's registry, or a type and a class of the
+field's limit template, at most the field's `max_replicas`), and a check-in
+ticket shown once (`ticket`, and `ticket_text`, a printable `atalaia:ticket:`
+code; only its SHA-256 is kept). The player changes or cancels until the
+window closes, staff until the start. The account's player id at the field is
+made on its first registration, or adopted from the phone: a claim with the
+phone's secret's SHA-256 that the field's controller confirms (the controller's
+hashes never leave it). The controller (`sync_client.py`, `schedule.py`,
+`checkin.py`, store schema 7) pulls the schedule, makes a game from a scheduled
+game, pulls its roster until the game starts as **expected** check-ins with
+their replicas pending in the chrono list, takes arrivals with the ticket (the
+app, a marshal's scan, a tick by name), keeps the app's registration id for a
+walk-in when it had no roster, and after the game pushes each registration's
+outcome and its declarations' states (no names) and the walk-ins as a count;
+the scheduled game follows its game to `in_progress` and `completed`. The
+public game page shows *Register* only while registration is open and places
+are left; the feed's `registration.open` follows. The pages and feeds answer
+`HEAD`. Registrations and claims join access, export, erasure and the purge.
+The console's *Check-in* tab has *From the schedule*, expected rows,
+*Arrived*, a ticket box and the counts. Shared: `checkin_ticket.py` and
+`app/lib/protocol/checkin_ticket.dart` with 30 ticket vectors in
+`checkin.json`; 4 + 15 new sync body vectors and 4 + 14 answer vectors in
+`sync.json`.
+
+Tests: 303 in the site server's image against PostgreSQL 16 (21 new:
+`test_registrations.py`, 14, registering, the window and places, replica
+rules, changes, the staff list, claims, the schedule, the roster, the link and
+the outcomes, personal data; `test_field_pages.py`, 5, `HEAD` like `GET` and
+the register button; 0007 with data; `test_sync_e2e.py`'s game day, the real
+controller client and engine against the site server under uvicorn: a claim
+confirmed, three registrations, the roster, arrivals by ticket and by scan,
+a chrono pass, the outcomes); 296 controller tests (18 new:
+`test_sync_schedule.py`, 11; `test_checkin_ticket.py`, 6; the answer vectors);
+the console's browser tests (1 new: a game from the schedule, expected players,
+*Arrived*, a scanned ticket, the counts); the Dart ticket tests against the
+same vectors. Not yet: the app's screens for logging in, registering and
+sending the ticket; a real game day (HW1); `[sync] push_walkins`; the
+registration import (17). Decisions S16-1 to S16-14, all open; S16-4 (claims
+confirmed by the controller), S16-6 (the field's limit template set on both
+sides) and S16-9 (no registration form on the public pages) want the
+maintainer's eye.
 
 ## Dependencies
 

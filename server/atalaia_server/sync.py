@@ -15,6 +15,11 @@ controller's own ``sync_format`` (shared, plain Python) and hand it here:
   entry with the latest ``last_seen``.
 - The field's chrono registry (``marshals``, ``replicas``, ``chrono``; plan phase 14)
   is handed on to ``chrono_registry``, which verifies every reading.
+- Registration and game day (plan phase 16): a game's ``meta.scheduled_game_id`` links
+  it to the scheduled game it was made from (whose status then follows it);
+  ``checkins`` (registrations' outcomes) and ``claims`` (the controller's verdicts on
+  accounts' claims of player ids) go to ``services.registration``, which also builds
+  the answers of the GET endpoints the controller pulls.
 - ``totals``: a game's totals, derived as the controller derives them (P4R10):
   the counters' sum per team plus every ``score.delta`` amount, negative ones
   included. Totals are never stored, so they can never be merged wrongly.
@@ -37,6 +42,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import chrono_registry
 from .models import Controller, FieldApiKey, Game, GameEvent, GameNode, GameNodeScore
+from .services import registration
 
 MAX_LIVE_KEYS = 2  # a field's live API keys: the old one and the new one during a rotation
 
@@ -161,7 +167,11 @@ async def _games(db: AsyncSession, caller: Caller, body: dict[str, Any]) -> dict
               "ended_at": func.greatest(Game.ended_at, ex.ended_at), "updated_at": func.now()},
     ).returning(Game.id, Game.state, text("(xmax = 0) AS created"))
     row = (await db.execute(stmt)).one()
-    return {"game": str(row[0]), "created": bool(row[2]), "state": row[1]}
+    answer = {"game": str(row[0]), "created": bool(row[2]), "state": row[1]}
+    if meta["scheduled_game_id"] is not None:
+        answer["scheduled"] = await registration.link_game(db, caller.field_id, meta["scheduled_game_id"], row[0],
+                                                          row[1])
+    return answer
 
 
 async def _events(db: AsyncSession, caller: Caller, body: dict[str, Any]) -> dict[str, Any]:
@@ -228,8 +238,18 @@ async def _chrono(db: AsyncSession, caller: Caller, body: dict[str, Any]) -> dic
     return await chrono_registry.apply_chrono(db, caller.field_id, caller.controller, body)
 
 
+async def _checkins(db: AsyncSession, caller: Caller, body: dict[str, Any]) -> dict[str, Any]:
+    game = await find_game(db, caller.field_id, body)
+    return await registration.apply_checkins(db, caller.field_id, game, body, datetime.now(timezone.utc))
+
+
+async def _claims(db: AsyncSession, caller: Caller, body: dict[str, Any]) -> dict[str, Any]:
+    return await registration.apply_claims(db, caller.field_id, body, datetime.now(timezone.utc))
+
+
 HANDLERS = {"games": _games, "events": _events, "scores": _scores, "nodes": _nodes,
-            "marshals": _marshals, "replicas": _replicas, "chrono": _chrono}
+            "marshals": _marshals, "replicas": _replicas, "chrono": _chrono, "checkins": _checkins,
+            "claims": _claims}
 
 
 async def apply(db: AsyncSession, caller: Caller, kind: str, body: dict[str, Any]) -> dict[str, Any]:

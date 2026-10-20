@@ -26,7 +26,8 @@ from atalaia_server.ratelimit import Limits
 from .base import PASSWORD, SECRET_KEY, AppTestCase
 
 # Plan phase 14's and 15's counts.
-NO_CHRONO = {"chrono_readings": 0, "chrono_rejects": 0, "replicas": 0, "marshal_keys": 0, "scheduled_games": 0}
+NO_CHRONO = {"chrono_readings": 0, "chrono_rejects": 0, "replicas": 0, "marshal_keys": 0, "scheduled_games": 0,
+             "federation_numbers": 0, "player_id_claims": 0}
 
 NEW_PASSWORD = "a different long passphrase 7"
 
@@ -78,7 +79,7 @@ class AccessTests(PersonalDataTestCase):
         data = r.json()
         self.assertEqual(set(data), {"format", "generated_at", "user", "field_roles", "sessions", "audit_log",
                                      "audit_log_about_you", "consents", "games", "player_ids", "chrono_records",
-                                     "marshal_keys", "scheduled_games"})
+                                     "marshal_keys", "scheduled_games", "registrations", "player_id_claims"})
         self.assertEqual(data["format"], "atalaia-personal-data/1")
         self.assertEqual((data["user"]["id"], data["user"]["username"], data["user"]["email"]),
                          (user["id"], "rita", "rita@example.pt"))
@@ -126,7 +127,7 @@ class AccessTests(PersonalDataTestCase):
             self.assertEqual(names, sorted(f"export/{n}" for n in (
                 "profile.json", "field_roles.json", "sessions.json", "audit_log.json", "audit_log_about_you.json",
                 "consents.json", "games.json", "player_ids.json", "chrono_records.json", "marshal_keys.json",
-                "scheduled_games.json", "README.txt")))
+                "scheduled_games.json", "registrations.json", "player_id_claims.json", "README.txt")))
             files = {n: zf.read(n).decode("utf-8") for n in names}
         self.assertEqual(json.loads(files["export/profile.json"]), data["user"])
         self.assertEqual(json.loads(files["export/consents.json"]), data["consents"])
@@ -376,7 +377,7 @@ class PurgeTests(PersonalDataTestCase):
                 else:
                     os.environ[k] = v
         rest = (", 0 chrono readings rows, 0 chrono rejects rows, 0 replicas rows, 0 marshal keys rows, "
-                "0 scheduled games rows\n")
+                "0 scheduled games rows, 0 federation numbers rows, 0 player id claims rows\n")
         self.assertEqual(outputs, ["Retention purge would delete: 1 sessions rows, 0 audit log rows, 0 games rows" + rest,
                                    "Retention purge deleted: 1 sessions rows, 0 audit log rows, 0 games rows" + rest])
         self.assertEqual((await self.fetch("SELECT count(*) FROM sessions"))[0][0], 0)

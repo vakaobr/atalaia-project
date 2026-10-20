@@ -550,5 +550,217 @@
         "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh9"
       ]
     }
+  },
+  "tickets": {
+    "description": "Check-in ticket vectors (protocol/checkin.md): version byte and CBOR body {1: registration_id, 2: player_id, 3: secret}, text form atalaia:ticket: + base64url. Built byte by byte from RFC 8949's encoding rules, not by the codecs. Every valid payload decodes to its fields (the secret in hex), re-encodes byte for byte and gives its text; secret_sha256 is SHA-256 of the secret in hex, as the roster carries it. optional_keys_skipped decodes like basic. Every invalid payload fails with its reason; every invalid text with reason text.",
+    "valid": [
+      {
+        "name": "basic",
+        "fields": {
+          "registration_id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+          "player_id": "p-abcdefgh2345",
+          "secret": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+        },
+        "payload": "01a301782430313932663361342d356236632d376438652d396630312d323334353637383961626364026e702d616263646566676832333435035820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "text": "atalaia:ticket:AaMBeCQwMTkyZjNhNC01YjZjLTdkOGUtOWYwMS0yMzQ1Njc4OWFiY2QCbnAtYWJjZGVmZ2gyMzQ1A1ggAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+        "secret_sha256": "630dcd2966c4336691125448bbb25b4ff412a49c732db2c8abc1b8581bd710dd"
+      },
+      {
+        "name": "other",
+        "fields": {
+          "registration_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "player_id": "p-zzzzzzzzzzzz",
+          "secret": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        },
+        "payload": "01a301782437633965363637392d373432352d343064652d393434622d653037666331663930616537026e702d7a7a7a7a7a7a7a7a7a7a7a7a035820ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "text": "atalaia:ticket:AaMBeCQ3YzllNjY3OS03NDI1LTQwZGUtOTQ0Yi1lMDdmYzFmOTBhZTcCbnAtenp6enp6enp6enp6A1gg__________________________________________8",
+        "secret_sha256": "af9613760f72635fbdb44a5a0a63c39f12af30f950a6ee5c971be188e89c4051"
+      }
+    ],
+    "optional_keys_skipped": {
+      "payload": "01a6000701782430313932663361342d356236632d376438652d396630312d323334353637383961626364026e702d616263646566676832333435035820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f04656c61746572181f4101",
+      "same_as": "basic",
+      "why": "keys 0, 4 and 31 are skipped"
+    },
+    "invalid": [
+      {
+        "name": "empty",
+        "payload": "",
+        "reason": "length",
+        "why": "no bytes"
+      },
+      {
+        "name": "version_only",
+        "payload": "01",
+        "reason": "length",
+        "why": "a version byte and no body"
+      },
+      {
+        "name": "over_128_bytes",
+        "payload": "01a401782430313932663361342d356236632d376438652d396630312d323334353637383961626364026e702d616263646566676832333435035820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f04782278787878787878787878787878787878787878787878787878787878787878787878",
+        "reason": "length",
+        "why": "a skipped key makes it 129 bytes"
+      },
+      {
+        "name": "version_2",
+        "payload": "02a301782430313932663361342d356236632d376438652d396630312d323334353637383961626364026e702d616263646566676832333435035820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "reason": "version",
+        "why": "unknown version"
+      },
+      {
+        "name": "not_a_map",
+        "payload": "0183782430313932663361342d356236632d376438652d396630312d3233343536373839616263646e702d6162636465666768323334355820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "reason": "body",
+        "why": "an array, not a map"
+      },
+      {
+        "name": "no_secret",
+        "payload": "01a201782430313932663361342d356236632d376438652d396630312d323334353637383961626364026e702d616263646566676832333435",
+        "reason": "body",
+        "why": "key 3 is required"
+      },
+      {
+        "name": "no_player",
+        "payload": "01a201782430313932663361342d356236632d376438652d396630312d323334353637383961626364035820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "reason": "body",
+        "why": "key 2 is required"
+      },
+      {
+        "name": "no_registration",
+        "payload": "01a2026e702d616263646566676832333435035820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "reason": "body",
+        "why": "key 1 is required"
+      },
+      {
+        "name": "secret_31_bytes",
+        "payload": "01a301782430313932663361342d356236632d376438652d396630312d323334353637383961626364026e702d61626364656667683233343503581f000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e",
+        "reason": "body",
+        "why": "the secret is 32 bytes"
+      },
+      {
+        "name": "secret_33_bytes",
+        "payload": "01a301782430313932663361342d356236632d376438652d396630312d323334353637383961626364026e702d616263646566676832333435035821000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f00",
+        "reason": "body",
+        "why": "the secret is 32 bytes"
+      },
+      {
+        "name": "secret_as_text",
+        "payload": "01a301782430313932663361342d356236632d376438652d396630312d323334353637383961626364026e702d61626364656667683233343503782b41414543417751464267634943516f4c4441304f4478415245684d554652595847426b6147787764486838",
+        "reason": "body",
+        "why": "the secret is a byte string"
+      },
+      {
+        "name": "registration_upper_case",
+        "payload": "01a301782430313932463341342d354236432d374438452d394630312d323334353637383941424344026e702d616263646566676832333435035820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "reason": "body",
+        "why": "a lowercase UUID"
+      },
+      {
+        "name": "registration_not_uuid",
+        "payload": "01a30178203031393266336134356236633764386539663031323334353637383961626364026e702d616263646566676832333435035820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "reason": "body",
+        "why": "the UUID's canonical form, with hyphens"
+      },
+      {
+        "name": "registration_as_bytes",
+        "payload": "01a301500192f3a45b6c7d8e9f0123456789abcd026e702d616263646566676832333435035820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "reason": "body",
+        "why": "the id is text"
+      },
+      {
+        "name": "player_bad_alphabet",
+        "payload": "01a301782430313932663361342d356236632d376438652d396630312d323334353637383961626364026e702d616263646566676832333431035820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "reason": "body",
+        "why": "base32 has no 0, 1, 8 or 9"
+      },
+      {
+        "name": "player_too_short",
+        "payload": "01a301782430313932663361342d356236632d376438652d396630312d323334353637383961626364026d702d6162636465666768323334035820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "reason": "body",
+        "why": "p- and 12 characters"
+      },
+      {
+        "name": "null_player",
+        "payload": "01a301782430313932663361342d356236632d376438652d396630312d32333435363738396162636402f6035820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "reason": "body",
+        "why": "null: leave nothing out instead"
+      },
+      {
+        "name": "repeated_key",
+        "payload": "01a401782430313932663361342d356236632d376438652d396630312d323334353637383961626364026e702d616263646566676832333435035820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f026e702d7a7a7a7a7a7a7a7a7a7a7a7a",
+        "reason": "body",
+        "why": "key 2 twice"
+      },
+      {
+        "name": "trailing_byte",
+        "payload": "01a301782430313932663361342d356236632d376438652d396630312d323334353637383961626364026e702d616263646566676832333435035820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f00",
+        "reason": "body",
+        "why": "a byte after the map"
+      },
+      {
+        "name": "key_32",
+        "payload": "01a401782430313932663361342d356236632d376438652d396630312d323334353637383961626364026e702d616263646566676832333435035820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f182000",
+        "reason": "body",
+        "why": "keys are below 32"
+      },
+      {
+        "name": "negative_key",
+        "payload": "01a401782430313932663361342d356236632d376438652d396630312d323334353637383961626364026e702d616263646566676832333435035820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2000",
+        "reason": "body",
+        "why": "keys are not negative"
+      },
+      {
+        "name": "text_key",
+        "payload": "01a401782430313932663361342d356236632d376438652d396630312d323334353637383961626364026e702d616263646566676832333435035820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f617800",
+        "reason": "body",
+        "why": "keys are integers"
+      }
+    ],
+    "texts": {
+      "same": {
+        "name": "spaces_around",
+        "text": "  atalaia:ticket:AaMBeCQwMTkyZjNhNC01YjZjLTdkOGUtOWYwMS0yMzQ1Njc4OWFiY2QCbnAtYWJjZGVmZ2gyMzQ1A1ggAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\r\n",
+        "same_as": "basic",
+        "why": "spaces and line ends around the text are ignored"
+      },
+      "invalid": [
+        {
+          "name": "poster_prefix",
+          "text": "atalaia:checkin:AaMBeCQwMTkyZjNhNC01YjZjLTdkOGUtOWYwMS0yMzQ1Njc4OWFiY2QCbnAtYWJjZGVmZ2gyMzQ1A1ggAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+          "reason": "text",
+          "why": "another kind of code"
+        },
+        {
+          "name": "no_prefix",
+          "text": "AaMBeCQwMTkyZjNhNC01YjZjLTdkOGUtOWYwMS0yMzQ1Njc4OWFiY2QCbnAtYWJjZGVmZ2gyMzQ1A1ggAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+          "reason": "text",
+          "why": "the prefix is required"
+        },
+        {
+          "name": "padding",
+          "text": "atalaia:ticket:AaMBeCQwMTkyZjNhNC01YjZjLTdkOGUtOWYwMS0yMzQ1Njc4OWFiY2QCbnAtYWJjZGVmZ2gyMzQ1A1ggAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+          "reason": "text",
+          "why": "base64url without padding"
+        },
+        {
+          "name": "standard_alphabet",
+          "text": "atalaia:ticket:AaMBeCQwMTkyZjNhNC01YjZjLTdkOGUtOWYwMS0yMzQ1Njc4OWFiY2QCbnAtYWJjZGVmZ2gyMzQ1A1ggAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh+",
+          "reason": "text",
+          "why": "+ and / are not base64url"
+        },
+        {
+          "name": "not_canonical",
+          "text": "atalaia:ticket:AaMBeCQwMTkyZjNhNC01YjZjLTdkOGUtOWYwMS0yMzQ1Njc4OWFiY2QCbnAtYWJjZGVmZ2gyMzQ1A1ggAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh9",
+          "reason": "text",
+          "why": "unused bits set in the last character"
+        },
+        {
+          "name": "empty",
+          "text": "atalaia:ticket:",
+          "reason": "text",
+          "why": "nothing after the prefix"
+        }
+      ]
+    }
   }
 }

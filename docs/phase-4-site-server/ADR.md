@@ -2973,6 +2973,33 @@ proposed):**
   controller pulls and pushes over its own connection; the site server
   never sends anything into a running game.
 
+**Amendment 2026-10-20 (plan phase 16, as built; decisions S16-1 to
+S16-14, open):**
+
+- **Adopting a phone's id.** The site server cannot compare the phone's
+  secret with the controller's SHA-256: it never receives the controller's
+  hashes (protocol/sync.md's never-sent list). An account's claim keeps the
+  SHA-256 of the secret the phone sends once; the controller pulls the
+  field's claims (`GET /api/v1/sync/claims`), compares each with its own hash
+  and answers `confirmed`, `refused` or `unknown` (`POST
+  /api/v1/sync/claims`); only a confirmed claim becomes a
+  `field_player_ids` link (S16-4).
+- **The roster** is `GET /api/v1/sync/roster?scheduled_game_id=` and the
+  schedule's horizon is `days` 1-60; both answers, and the claims', are
+  checked on both sides by the shared `sync_format.ANSWERS` (S16-3).
+  The link to the controller's game is `scheduled_games.controller_game`
+  (a `games.id`), set from the game's metadata (`meta.scheduled_game_id`).
+- **The replicas' classes** come from the field's `limit_template` and
+  `max_replicas` on the site server, the same names as the controller's
+  `[checkin]` settings; a pre-declared replica the controller would refuse
+  is dropped from its expected check-in (S16-6, S16-14).
+- **Outcomes** go back once the game has ended (not in batches during it);
+  walk-ins as a count only; `[sync] push_walkins` is not built (S16-11,
+  S16-13).
+- **Registering on the web pages**: the public pages have no login and no
+  JavaScript, so their *Register* button leads to a page that says how to
+  register in the app with an account (S16-9).
+
 ---
 
 ### ADR-P4-12: Open feeds, registration import and platform adapters

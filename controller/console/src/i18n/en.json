@@ -344,6 +344,7 @@
     "print_poster": "Print the poster",
     "csv": "Export CSV",
     "statuses": {
+      "expected": "expected",
       "pending": "waiting for confirmation",
       "checked_in": "checked in",
       "left": "left",
@@ -429,7 +430,21 @@
     "no_game": "No game is live: create one to open check-in. The poster can be printed now.",
     "team_squad": "Team › squad",
     "squad_n": "squad {n}",
-    "no_squad": "no squad"
+    "no_squad": "no squad",
+    "registered_counts": "Registered: {expected} expected, {arrived} arrived · walk-ins: {walkins}",
+    "registered_badge": "registered",
+    "arrived": "Arrived",
+    "ticket_title": "Printed ticket",
+    "ticket_hint": "Scan or paste the code of a registered player's printed ticket (atalaia:ticket:…).",
+    "ticket_label": "Ticket code",
+    "ticket_submit": "Check in",
+    "ticket_done": "{name} checked in.",
+    "schedule_title": "From the schedule",
+    "schedule_intro": "The site server's published games of the coming days. A game made from one takes its title, mode and teams; its registered players then appear here as expected.",
+    "schedule_create": "Create the game",
+    "schedule_made": "made: game {ids}",
+    "schedule_registered": "{n} registered",
+    "schedule_none": "No scheduled games pulled from the site server yet."
   },
   "poster": {
     "title": "Check-in poster",

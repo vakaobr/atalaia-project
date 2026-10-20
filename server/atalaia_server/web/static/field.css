@@ -51,6 +51,17 @@ ul.list li:last-child { border-bottom: 1px solid var(--line); }
   font-size: 0.8rem;
   text-transform: uppercase;
 }
+.register { margin: 1.5rem 0; }
+a.button {
+  display: inline-block;
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.3rem;
+  background: var(--accent);
+  color: var(--ground);
+  font-weight: 600;
+  text-decoration: none;
+}
+ol.steps li { margin-bottom: 0.4rem; }
 .notice { border-left: 4px solid var(--warn); padding: 0.25rem 0.75rem; }
 dl.details { display: grid; grid-template-columns: minmax(8rem, max-content) 1fr; gap: 0.4rem 1rem; }
 dl.details dt { color: var(--muted); }

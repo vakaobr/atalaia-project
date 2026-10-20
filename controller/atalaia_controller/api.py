@@ -62,6 +62,9 @@ which browsers cannot give headers, also takes ``?token=``.
     GET|POST /api/v1/marshals              GM: marshals' public keys
     GET|PUT /api/v1/checkin/settings       GM: confirm, federation, limits
     GET|PUT /api/v1/checkin/poster         GM: the check-in poster's text and fields
+    POST /api/v1/games/{id}/checkins/ticket  staff: a registered player's printed ticket, scanned
+    GET  /api/v1/schedule                  the site server's schedule as last pulled (plan phase 16)
+    POST /api/v1/schedule/{id}/game        GM: a game made from a scheduled game, linked to it
     GET|DELETE /api/v1/players/{player}    GM (or the player): their data / erase it (?chrono=1: readings too)
     GET|POST /api/v1/positions             player positions: the ones the caller may see / report (player token)
     WS   /api/v1/prop                      an Android prop's Wi-Fi link (prop_link.py)
@@ -93,6 +96,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import __version__
 from . import checkin as checkinmod
+from . import schedule as schedulemod
 from . import images, visibility
 from .branding import SLOTS, Branding, etag
 from .checkin import Viewer
@@ -636,6 +640,20 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     @app.delete("/api/v1/games/{game_id}/checkins/{player_id}")
     def checkins_remove(game_id: int, player_id: str, v: Viewer = Depends(require_read)) -> dict[str, Any]:
         return need_checkin().remove_checkin(v, game_id, player_id)
+
+    @app.post("/api/v1/games/{game_id}/checkins/ticket")
+    def checkins_ticket(game_id: int, v: Viewer = Depends(require_read), body: Any = Body(None)) -> dict[str, Any]:
+        return need_checkin().ticket_checkin(v, game_id, body_map(body))
+
+    # --- the site server's schedule (plan phase 16, schedule.py) ------------------------------
+
+    @app.get("/api/v1/schedule", dependencies=[Depends(require_console)])
+    def schedule_list() -> JSONResponse:
+        return JSONResponse(schedulemod.schedule(controller), headers=NO_STORE)
+
+    @app.post("/api/v1/schedule/{scheduled_game_id}/game", status_code=201, dependencies=[Depends(require_gm)])
+    def schedule_game(scheduled_game_id: str, body: Any = Body(None)) -> dict[str, Any]:
+        return schedulemod.create_game(controller, scheduled_game_id, body if body is not None else {})
 
     @app.get("/api/v1/games/{game_id}/chrono-list")
     def chrono_list(game_id: int, v: Viewer = Depends(require_read)) -> JSONResponse:

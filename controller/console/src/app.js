@@ -149,6 +149,7 @@ class App extends Component {
         case 'checkin':
         case 'checkin_open':
         case 'checkin_settings':
+        case 'roster':
             if (this.checkinPanel) this.checkinPanel.onStream(msg);
             break;
         case 'chrono_list':

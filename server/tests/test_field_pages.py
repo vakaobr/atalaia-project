@@ -301,8 +301,8 @@ class FeedTests(PagesCase):
         g = doc["games"][0]
         self.assertEqual((g["id"], g["starts_at"], g["status"], g["mode"]),
                          (str(game.id), "2030-11-09T09:00:00Z", "published", "org.atalaia.domination"))
-        # The window is open, but nothing can be registered for until plan phase 16.
-        self.assertEqual((g["registration"]["open"], g["registration"]["places_left"]), (False, 60))
+        # The window is open and nobody has registered yet (plan phase 16).
+        self.assertEqual((g["registration"]["open"], g["registration"]["places_left"]), (True, 60))
         self.assertEqual(g["requirements"], {"federation": "optional", "federation_label": "FPA"})
         self.assertEqual(doc["games"][1]["cancelled_reason"], "Chuva")
 
@@ -326,6 +326,95 @@ class LinksWithoutPublicUrlTests(PagesCase):
         self.assertEqual(r.json()["games"][0]["url"], f"https://server.test/f/campo-tejo/games/{game.id}")
         r = await self.client.get("/f/campo-tejo/games.ics")
         self.assertIn(f"UID:{game.id}@server.test", ical.unfold(r.text))
+
+
+class HeadTests(PagesCase):
+    """HEAD is GET without the body (RFC 9110 section 9.3.2): calendar clients poll with it (decision S16-10)."""
+
+    async def test_head_answers_like_get(self) -> None:
+        game = await self.game()
+        for path in ("/f/campo-tejo/", "/f/campo-tejo/games.ics", "/f/campo-tejo/games.json",
+                     f"/f/campo-tejo/games/{game.id}", f"/f/campo-tejo/games/{game.id}.ics",
+                     f"/f/campo-tejo/games/{game.id}/register", "/static/field.css", "/f/nope/",
+                     "/f/nope/games.ics", f"/f/campo-tejo/games/{uuid.uuid4()}"):
+            with self.subTest(path=path):
+                got = await self.client.get(path)
+                head = await self.client.head(path)
+                self.assertEqual(head.status_code, got.status_code)
+                self.assertNotEqual(head.status_code, 405)
+                self.assertEqual(head.content, b"")
+                self.assertEqual(int(head.headers.get("content-length", "0")), len(got.content))
+                for name in ("etag", "last-modified", "cache-control", "content-type", "access-control-allow-origin",
+                             "content-language"):
+                    self.assertEqual(head.headers.get(name), got.headers.get(name), name)
+                if got.status_code == 200 and "etag" in got.headers:
+                    again = await self.client.head(path, headers={"If-None-Match": got.headers["etag"]})
+                    self.assertEqual((again.status_code, again.content), (304, b""))
+                    since = await self.client.head(path, headers={"If-Modified-Since": got.headers["last-modified"]})
+                    self.assertEqual(since.status_code, 304)
+
+    async def test_the_redirect_too(self) -> None:
+        r = await self.client.head("/f/campo-tejo")
+        self.assertEqual((r.status_code, r.headers["location"]), (308, "/f/campo-tejo/"))
+
+
+class RegisterButtonTests(PagesCase):
+    """The game page offers *Register* only while registration is open and places are left (plan phase 16)."""
+
+    async def open_game(self, **values: Any) -> ScheduledGame:
+        return await self.game(registration_opens_at=hour(-1), registration_closes_at=hour(5), **values)
+
+    async def registrations(self, game: ScheduledGame, n: int, status: str = "registered") -> None:
+        start = (await self.fetch("SELECT count(*) FROM game_registrations"))[0][0]
+        for i in range(start, start + n):
+            await self.fetch("INSERT INTO game_registrations (scheduled_game, field_id, player_id, display_name, status) "
+                             "VALUES ($1, $2, $3, 'Alguém', $4)", game.id, self.field_id, f"p-{chr(97 + i) * 12}",
+                             status)
+
+    async def test_open_with_places(self) -> None:
+        game = await self.open_game(max_players=2)
+        page = (await self.client.get(f"/f/campo-tejo/games/{game.id}")).text
+        self.assertIn(f'<a class="button" href="/f/campo-tejo/games/{game.id}/register">Fazer a inscrição</a>', page)
+        self.assertIn("<dt>Lugares</dt><dd>2</dd>", page)
+        r = await self.client.get(f"/f/campo-tejo/games/{game.id}/register")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("A inscrição faz-se com uma conta neste site, na app Atalaia.", r.text)
+        self.assertIn("apaga-os 30 dias depois do jogo", r.text)
+        en = (await self.client.get(f"/f/campo-tejo/games/{game.id}", params={"lang": "en"})).text
+        self.assertIn(f'href="/f/campo-tejo/games/{game.id}/register?lang=en">Register</a>', en)
+        await self.registrations(game, 1)
+        await self.registrations(game, 1, "cancelled")  # a cancelled one frees its place
+        page = (await self.client.get(f"/f/campo-tejo/games/{game.id}")).text
+        self.assertIn("<dt>Lugares</dt><dd>1</dd>", page)
+        feed = (await self.client.get("/f/campo-tejo/games.json")).json()["games"][0]["registration"]
+        self.assertEqual((feed["open"], feed["places_left"]), (True, 1))
+
+    async def test_full(self) -> None:
+        game = await self.open_game(max_players=1)
+        first = await self.client.get("/f/campo-tejo/games.json")
+        await self.registrations(game, 1)
+        page = (await self.client.get(f"/f/campo-tejo/games/{game.id}")).text
+        self.assertNotIn('class="button"', page)
+        self.assertIn("<dt>Lugares</dt><dd>esgotados</dd>", page)
+        r = await self.client.get("/f/campo-tejo/games.json", headers={"If-None-Match": first.headers["etag"]})
+        self.assertEqual(r.status_code, 200)  # the places changed: so did the feed
+        feed = r.json()["games"][0]["registration"]
+        self.assertEqual((feed["open"], feed["places_left"]), (False, 0))
+        r = await self.client.get(f"/f/campo-tejo/games/{game.id}/register")
+        self.assertIn("ou já não há lugares", r.text)
+
+    async def test_not_open(self) -> None:
+        cases = {"no window": await self.game("Sem janela"),
+                 "not yet": await self.game("Mais tarde", registration_opens_at=hour(2)),
+                 "closed": await self.game("Fechadas", registration_opens_at=hour(-5), registration_closes_at=hour(-1)),
+                 "cancelled": await self.game("Cancelado", status="cancelled", cancelled_reason="Chuva",
+                                              registration_opens_at=hour(-1))}
+        for name, game in cases.items():
+            with self.subTest(name):
+                page = (await self.client.get(f"/f/campo-tejo/games/{game.id}")).text
+                self.assertNotIn('class="button"', page)
+                feed = (await self.client.get("/f/campo-tejo/games.json")).json()["games"]
+                self.assertFalse(next(g for g in feed if g["id"] == str(game.id))["registration"]["open"])
 
 
 class LanguageTests(unittest.TestCase):

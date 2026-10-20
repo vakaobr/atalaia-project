@@ -6,7 +6,8 @@
     GET    /api/v1/fields                                   the fields the caller has a role on (all, for a server administrator)
     PATCH  /api/v1/fields/{field_id}                        the field's admin: {chrono_sharing_enabled} (plan phase 14),
                                                             {public_page, description, address_text,
-                                                            federation_label} (plan phase 15)
+                                                            federation_label} (plan phase 15), {limit_template,
+                                                            max_replicas} (plan phase 16: registration's replicas)
     GET    /api/v1/fields/{field_id}/roles                  the field's admin or gm
     PUT    /api/v1/fields/{field_id}/roles                  {username, role}: grant
     DELETE /api/v1/fields/{field_id}/roles/{user_id}/{role} revoke
@@ -44,7 +45,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import sync
-from ..services import scheduling
+from ..services import registration, scheduling
 from ..audit import record
 from ..auth import Principal, current_principal, require_field_role, server_admin
 from ..db import get_session
@@ -75,6 +76,8 @@ class FieldPatch(BaseModel):
     description: Optional[str] = None
     address_text: Optional[str] = None
     federation_label: Optional[str] = None
+    limit_template: Optional[str] = PydanticField(default=None, max_length=32)
+    max_replicas: Optional[int] = None
 
 
 class SyncKeyIn(BaseModel):
@@ -91,7 +94,8 @@ class GrantIn(BaseModel):
 def field_json(f: Field, roles: Any = None) -> dict[str, Any]:
     body = {"id": str(f.id), "name": f.name, "slug": f.slug, "field_type": f.field_type, "timezone": f.timezone,
             "chrono_sharing_enabled": f.chrono_sharing_enabled, "public_page": f.public_page,
-            "description": f.description, "address_text": f.address_text, "federation_label": f.federation_label}
+            "description": f.description, "address_text": f.address_text, "federation_label": f.federation_label,
+            "limit_template": f.limit_template, "max_replicas": f.max_replicas}
     if roles is not None:
         body["my_roles"] = sorted(roles)
     return body
@@ -172,6 +176,15 @@ async def update_field(field_id: uuid.UUID, body: FieldPatch, request: Request,
         if value != getattr(field, name):
             setattr(field, name, value)
             changed[name] = "set" if value is not None else "cleared"
+    # Registration's replica rules: the same as the field controller's [checkin] settings.
+    if body.limit_template is not None and body.limit_template != field.limit_template:
+        if body.limit_template not in registration.limit_templates():
+            raise HTTPException(400, "limit_template_invalid")
+        field.limit_template = changed["limit_template"] = body.limit_template
+    if body.max_replicas is not None and body.max_replicas != field.max_replicas:
+        if isinstance(body.max_replicas, bool) or not 1 <= body.max_replicas <= registration.MAX_REPLICAS:
+            raise HTTPException(400, "max_replicas_invalid")
+        field.max_replicas = changed["max_replicas"] = body.max_replicas
     if "address_text" in changed:
         await scheduling.bump_for_field_address(db, field.id, datetime.now(timezone.utc))
     if changed:

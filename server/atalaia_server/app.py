@@ -32,7 +32,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from . import __version__, personal_data
-from .api import auth, chrono, fields, games, health, me, scheduling, sync
+from .api import auth, chrono, fields, games, health, me, registrations, scheduling, sync
 from .config import Settings, redact_url
 from .db import make_engine, make_sessionmaker
 from .ratelimit import Limits, RequestLimitMiddleware
@@ -88,6 +88,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.include_router(chrono.router)
     app.include_router(sync.router)
     app.include_router(scheduling.router)
+    app.include_router(registrations.router)
     app.include_router(field_pages.router)
     return app
 

@@ -144,7 +144,7 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
     hub = Hub()
     sync = None
     if cfg.sync_enabled:
-        sync = SyncClient(cfg, store)
+        sync = SyncClient(cfg, store, checkin=controller.checkin)
         controller.sync = sync
         controller.add_listener(sync.on_controller_message)
 

@@ -344,6 +344,7 @@
     "print_poster": "Imprimir o cartaz",
     "csv": "Exportar CSV",
     "statuses": {
+      "expected": "por chegar",
       "pending": "à espera de confirmação",
       "checked_in": "com check-in",
       "left": "saiu",
@@ -429,7 +430,21 @@
     "no_game": "Não há nenhum jogo a decorrer: cria um jogo para abrir o check-in. O cartaz pode ser impresso já.",
     "team_squad": "Equipa › squad",
     "squad_n": "squad {n}",
-    "no_squad": "sem squad"
+    "no_squad": "sem squad",
+    "registered_counts": "Inscrições: {expected} por chegar, {arrived} já chegaram · sem inscrição: {walkins}",
+    "registered_badge": "com inscrição",
+    "arrived": "Chegou",
+    "ticket_title": "Bilhete impresso",
+    "ticket_hint": "Ler ou colar o código do bilhete impresso de uma inscrição (atalaia:ticket:…).",
+    "ticket_label": "Código do bilhete",
+    "ticket_submit": "Fazer o check-in",
+    "ticket_done": "Check-in feito: {name}.",
+    "schedule_title": "Da agenda do site",
+    "schedule_intro": "Os jogos publicados no servidor do site para os próximos dias. Um jogo criado a partir de um deles fica com o título, o modo e as equipas; as inscrições aparecem depois aqui como “por chegar”.",
+    "schedule_create": "Criar o jogo",
+    "schedule_made": "já criado: jogo {ids}",
+    "schedule_registered": "{n} inscrições",
+    "schedule_none": "Ainda não chegou nenhum jogo da agenda do servidor do site."
   },
   "poster": {
     "title": "Cartaz de check-in",

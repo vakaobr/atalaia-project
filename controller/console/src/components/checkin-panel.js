@@ -7,11 +7,14 @@
 // staff, and nowhere else), confirms them, ticks "card seen" for a
 // federation number, gives teams, squads and roles, checks in a player
 // without the app, and works through the "replicas to chrono" list that
-// the marshals' signed readings fill in.
+// the marshals' signed readings fill in. With a site server (plan phase 16):
+// a game made from the schedule, its registered players as "expected"
+// until they arrive, a printed ticket scanned or pasted, and the counts of
+// registered players and walk-ins.
 
 import { html, Component, t } from '../ui.js';
 
-const STATUSES = ['pending', 'checked_in', 'left', 'removed'];
+const STATUSES = ['expected', 'pending', 'checked_in', 'left', 'removed'];
 const ROLES = ['player', 'squad_leader', 'vip', 'marshal', 'gm', 'spectator'];
 
 /** A game's squads are sub-groups inside each team, and only some games have them (decision PE25). */
@@ -42,7 +45,7 @@ function StateBadge({ state, refusedToday }) {
 export class CheckinPanel extends Component {
     constructor() {
         super();
-        this.state = { list: null, chrono: null, poster: null, classes: [], manual: null, busy: false };
+        this.state = { list: null, chrono: null, poster: null, classes: [], manual: null, busy: false, schedule: null, ticket: '' };
     }
 
     componentDidMount() {
@@ -64,8 +67,9 @@ export class CheckinPanel extends Component {
         const app = this.props.app;
         if (app.state.role !== 'gm') return;
         const g = this.game();
-        const [poster, info] = await Promise.all([app.call('GET', '/checkin/poster'), app.call('GET', '/checkin')]);
-        this.setState({ poster, classes: info ? info.limits.classes : [] });
+        const [poster, info, schedule] = await Promise.all([app.call('GET', '/checkin/poster'), app.call('GET', '/checkin'),
+            app.call('GET', '/schedule')]);
+        this.setState({ poster, classes: info ? info.limits.classes : [], schedule });
         if (!g) {
             this.setState({ list: null, chrono: null });
             return;
@@ -91,6 +95,8 @@ export class CheckinPanel extends Component {
             this.setState({ list: { ...this.state.list, checkins: rows, counts: counts(rows) } });
         } else if (msg.type === 'chrono_list') {
             this.reloadChrono();
+        } else if (msg.type === 'roster') {
+            this.load();
         } else if (msg.type === 'checkin_open' && this.state.list) {
             this.setState({ list: { ...this.state.list, open: msg.open } });
         } else if (msg.type === 'checkin_settings' && this.state.list) {
@@ -174,6 +180,54 @@ export class CheckinPanel extends Component {
         setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }
 
+    async ticketCheckin(e) {
+        e.preventDefault();
+        const g = this.game();
+        const row = await this.props.app.call('POST', `/games/${g.id}/checkins/ticket`, { ticket: this.state.ticket.trim() });
+        if (row) {
+            this.setState({ ticket: '' });
+            this.onStream({ type: 'checkin', game: g.id, checkin: row });
+            this.props.app.showToast(t('checkin.ticket_done', { name: row.display_name || row.player_id }));
+        }
+    }
+
+    async fromSchedule(id) {
+        const game = await this.props.app.call('POST', `/schedule/${id}/game`, {});
+        if (game) {
+            this.props.app.setGame(game);
+            this.load();
+        }
+    }
+
+    renderSchedule() {
+        const sc = this.state.schedule;
+        if (!sc || !sc.enabled) return null;
+        const live = this.game();
+        return html`<section class="card" aria-labelledby="csch-h" data-testid="schedule">
+            <h2 id="csch-h">${t('checkin.schedule_title')}</h2>
+            <p class="muted">${t('checkin.schedule_intro')}</p>
+            ${sc.games.length === 0 && html`<p class="muted" data-testid="schedule-empty">${t('checkin.schedule_none')}</p>`}
+            <ul class="chrono-list">${sc.games.map((sg) => html`<li data-testid=${`schedule-${sg.scheduled_game_id}`}>
+                <strong>${sg.title}</strong> · ${new Date(sg.starts_at * 1000).toLocaleString()}
+                · ${t('checkin.schedule_registered', { n: sg.registered })}
+                ${sg.games.length > 0 && html` <span class="small muted">${t('checkin.schedule_made', { ids: sg.games.join(', ') })}</span>`}
+                ${' '}<button type="button" data-testid="schedule-create" disabled=${!!live}
+                    onClick=${() => this.fromSchedule(sg.scheduled_game_id)}>${t('checkin.schedule_create')}</button>
+            </li>`)}</ul>
+        </section>`;
+    }
+
+    renderTicket(g) {
+        return html`<form class="form inline" data-testid="ticket-form" onSubmit=${(e) => this.ticketCheckin(e)}>
+            <h3>${t('checkin.ticket_title')}</h3>
+            <p class="muted small">${t('checkin.ticket_hint')}</p>
+            <div class="field"><label for="ct-ticket">${t('checkin.ticket_label')}</label>
+                <input id="ct-ticket" data-testid="ticket-input" required maxlength="256" value=${this.state.ticket}
+                    onInput=${(e) => this.setState({ ticket: e.target.value })} /></div>
+            <button type="submit" class="primary" data-testid="ticket-submit">${t('checkin.ticket_submit')}</button>
+        </form>`;
+    }
+
     async manualCheckin(e) {
         e.preventDefault();
         const g = this.game();
@@ -205,6 +259,8 @@ export class CheckinPanel extends Component {
                 <button type="button" data-testid="checkin-csv" onClick=${() => this.exportCsv()}>${t('checkin.csv')}</button>
             </div>
             <p class="small" data-testid="checkin-counts">${STATUSES.map((s) => `${t(`checkin.statuses.${s}`)}: ${c[s] || 0}`).join(' · ')}</p>
+            ${registeredCounts(list.checkins) && html`<p class="small" data-testid="checkin-registered">${
+                t('checkin.registered_counts', registeredCounts(list.checkins))}</p>`}
         </section>`;
     }
 
@@ -222,6 +278,7 @@ export class CheckinPanel extends Component {
                 <tbody>${rows.map((r) => this.renderRow(g, s, r))}</tbody>
             </table></div>`}
             ${this.renderManual(g, s)}
+            ${this.renderTicket(g)}
         </section>`;
     }
 
@@ -233,10 +290,13 @@ export class CheckinPanel extends Component {
         return html`<tr data-testid=${`checkin-row-${r.player_id}`} class=${active ? '' : 'muted'}>
             <td><strong data-testid="checkin-name">${r.display_name || t('checkin.erased')}</strong>
                 ${r.manual && html` <span class="badge">${t('checkin.by_hand')}</span>`}
+                ${r.registered && html` <span class="badge" data-testid="checkin-registered-badge">${t('checkin.registered_badge')}</span>`}
                 <div class="small muted">${r.player_id}${r.team_preference ? ` · ${t('checkin.prefers', { team: r.team_preference })}` : ''}</div></td>
             <td><span class=${`badge status-${r.status}`}>${t(`checkin.statuses.${r.status}`)}</span>
                 ${r.status === 'pending' && html` <button type="button" class="primary" data-testid="checkin-confirm"
-                    onClick=${() => this.patch(r.player_id, { status: 'checked_in' })}>${t('checkin.confirm')}</button>`}</td>
+                    onClick=${() => this.patch(r.player_id, { status: 'checked_in' })}>${t('checkin.confirm')}</button>`}
+                ${r.status === 'expected' && html` <button type="button" class="primary" data-testid="checkin-arrived"
+                    onClick=${() => this.patch(r.player_id, { status: 'checked_in' })}>${t('checkin.arrived')}</button>`}</td>
             <td>${active ? html`<select aria-label=${t('checkin.team')} data-testid="checkin-team" value=${r.team || ''}
                     onChange=${(e) => this.patch(r.player_id, { team: e.target.value || null, squad: 0 })}>
                     <option value="">–</option>${g.teams.map((tm) => html`<option value=${tm}>${tm}</option>`)}</select>${
@@ -380,6 +440,7 @@ export class CheckinPanel extends Component {
         const list = this.state.list;
         return html`<div>
             ${!g && html`<section class="card"><p class="muted" data-testid="checkin-no-game">${t('checkin.no_game')}</p></section>`}
+            ${this.renderSchedule()}
             ${g && list && this.renderHead(g, list)}
             ${g && list && this.renderList(g, list)}
             ${g && this.renderChrono()}
@@ -387,6 +448,14 @@ export class CheckinPanel extends Component {
             ${this.renderPoster()}
         </div>`;
     }
+}
+
+/** Registered players expected and arrived, and walk-ins; null when nobody here registered online. */
+function registeredCounts(rows) {
+    if (!rows.some((r) => r.registered)) return null;
+    const here = rows.filter((r) => r.status === 'pending' || r.status === 'checked_in');
+    return { expected: rows.filter((r) => r.status === 'expected').length,
+        arrived: here.filter((r) => r.registered).length, walkins: here.filter((r) => !r.registered).length };
 }
 
 function counts(rows) {

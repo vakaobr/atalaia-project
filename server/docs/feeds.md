@@ -19,13 +19,16 @@ curl -X PATCH https://<site>/api/v1/fields/<field_id> -H "Authorization: Bearer 
 | Address | What |
 | --- | --- |
 | `/f/<slug>/` | The field page: name, description, address and the upcoming games (pt-PT or English) |
-| `/f/<slug>/games/<id>` | One game: when (in the field's time zone), where, mode, teams, places, registration window, federation requirement; schema.org `Event` JSON-LD |
+| `/f/<slug>/games/<id>` | One game: when (in the field's time zone), where, mode, teams, places, registration window, federation requirement; schema.org `Event` JSON-LD; a *Register* button only while registration is open and places are left |
+| `/f/<slug>/games/<id>/register` | How to register: with an account on the site, in the Atalaia app (plan phase 16) |
 | `/f/<slug>/games.ics` | iCalendar of the field's games |
 | `/f/<slug>/games/<id>.ics` | iCalendar of one game |
 | `/f/<slug>/games.json` | The JSON feed, `atalaia.games` version 1 |
 
 A field with its page off, an unknown slug, a draft or another field's game all answer
-404, the same as a page that never existed.
+404, the same as a page that never existed. Every address answers `HEAD` too, with the
+headers a `GET` would have (`ETag`, `Last-Modified`, `Content-Length`) and no body, and a
+conditional `HEAD` or `GET` gets `304` when nothing changed.
 
 **No personal data.** The pages and feeds never show who registered, how many did, or any
 account: only the places left. Drafts never appear.
@@ -110,7 +113,7 @@ END:VCALENDAR
       "status": "published", "cancelled_reason": null, "mode": "org.atalaia.domination",
       "teams": ["red", "blue"], "location": "Estrada da Mata, Lisboa",
       "registration": {"opens_at": "2026-10-25T09:00:00Z", "closes_at": "2026-11-07T20:00:00Z",
-                       "open": false, "max_players": 60, "places_left": 60},
+                       "open": true, "max_players": 60, "places_left": 48},
       "requirements": {"federation": "required", "federation_label": "FPA"},
       "url": "https://campo.example.pt/f/campo-tejo/games/0192f6a0-0000-7000-8000-000000000001",
       "ics": "https://campo.example.pt/f/campo-tejo/games/0192f6a0-0000-7000-8000-000000000001.ics",
@@ -125,7 +128,7 @@ END:VCALENDAR
 | `starts_at`, `ends_at`, `updated_at`, `registration.opens_at`, `closes_at` | RFC 3339 in UTC, to the second; `field.timezone` (IANA) is the field's local time for showing them |
 | `status` | `published`, `in_progress`, `completed` or `cancelled` (with `cancelled_reason`); never `draft` |
 | `mode` | The Atalaia mode id, or `null` while the GM has not chosen one |
-| `registration.open` | Whether a player can register on the site server now. **Always `false` until online registration exists (plan phase 16)**, even inside the window |
+| `registration.open` | Whether a player can register on the site server now: the window is open and places are left (from plan phase 16; before it, always `false`) |
 | `registration.max_players`, `places_left` | `null` with no limit; `places_left` never counts below 0 |
 | `requirements.federation` | `off`, `optional` or `required`: the player's federation number (the field's `federation_label`, e.g. FPA), checked by hand at the field, never automatically |
 

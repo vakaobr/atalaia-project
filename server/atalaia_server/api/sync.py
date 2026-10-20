@@ -10,7 +10,13 @@
     POST /api/v1/sync/replicas the field's replica registry
     POST /api/v1/sync/chrono   signed chrono readings with the controller's series and outcomes: each
                                verified, the ones that fail kept apart and named in the answer
-    WS   /api/v1/sync/stream   the same seven on one socket the controller keeps open
+    POST /api/v1/sync/checkins after a game made from a scheduled game: each registration's outcome and
+                               its declarations' final states, the walk-ins as a count (plan phase 16)
+    POST /api/v1/sync/claims   the controller's verdicts on accounts' claims of its player ids
+    GET  /api/v1/sync/schedule?days=14         the field's published games of the coming days
+    GET  /api/v1/sync/roster?scheduled_game_id= one scheduled game's live registrations
+    GET  /api/v1/sync/claims                   accounts' claims of player ids, waiting for this field's verdict
+    WS   /api/v1/sync/stream   the POST bodies on one socket the controller keeps open
 
 The controller opens every connection (P4R12); nothing here connects to it.
 Bodies are checked by ``atalaia_controller.sync_format``, the code the
@@ -22,7 +28,9 @@ the controller seen.
 from __future__ import annotations
 
 import json
-from typing import Any
+import uuid
+from datetime import datetime, timezone
+from typing import Any, Awaitable, Callable
 
 from atalaia_controller import sync_format
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
@@ -31,6 +39,7 @@ from fastapi.responses import JSONResponse
 from .. import sync
 from ..auth import UNAUTHORISED, bearer
 from ..models import FieldApiKey
+from ..services import registration
 
 router = APIRouter(prefix="/api/v1/sync", tags=["sync"])
 NO_STORE = {"Cache-Control": "no-store"}
@@ -91,6 +100,66 @@ async def replicas(request: Request) -> JSONResponse:
 @router.post("/chrono")
 async def chrono(request: Request) -> JSONResponse:
     return await _handle(request, "chrono")
+
+
+@router.post("/checkins")
+async def checkins(request: Request) -> JSONResponse:
+    return await _handle(request, "checkins")
+
+
+@router.post("/claims")
+async def claims(request: Request) -> JSONResponse:
+    return await _handle(request, "claims")
+
+
+async def _pull(request: Request, build: Callable[[Any, sync.Caller], Awaitable[Any]]) -> JSONResponse:
+    """A GET the controller makes: the same key, the answer checked by the shared format's ``ANSWERS``."""
+    async with request.app.state.sessionmaker() as db:
+        caller = await sync.authenticate(db, bearer(request))
+        if caller is None:
+            return JSONResponse({"detail": "invalid_api_key"}, status_code=401, headers=UNAUTHORISED)
+        try:
+            answer = await build(db, caller)
+        except sync.SyncProblem as exc:
+            await db.rollback()
+            return JSONResponse(exc.body(), status_code=exc.status, headers=NO_STORE)
+        await db.commit()  # the key's last use
+    return JSONResponse(answer, headers=NO_STORE)
+
+
+@router.get("/schedule")
+async def schedule(request: Request) -> JSONResponse:
+    raw = request.query_params.get("days", str(registration.SCHEDULE_DAYS))
+    if not raw.isdigit() or not 1 <= int(raw) <= registration.SCHEDULE_DAYS_MAX:
+        return JSONResponse({"detail": "invalid_query", "error": "out_of_range", "path": "days"}, status_code=400,
+                            headers=NO_STORE)
+
+    async def build(db: Any, caller: sync.Caller) -> Any:
+        return await registration.schedule(db, caller.field_id, datetime.now(timezone.utc), int(raw))
+    return await _pull(request, build)
+
+
+@router.get("/roster")
+async def roster(request: Request) -> JSONResponse:
+    try:
+        wanted = uuid.UUID(request.query_params.get("scheduled_game_id", ""))
+    except ValueError:
+        return JSONResponse({"detail": "invalid_query", "error": "not_a_uuid", "path": "scheduled_game_id"},
+                            status_code=400, headers=NO_STORE)
+
+    async def build(db: Any, caller: sync.Caller) -> Any:
+        answer = await registration.roster(db, caller.field_id, wanted)
+        if answer is None:
+            raise sync.SyncProblem(404, "scheduled_game_not_found")
+        return answer
+    return await _pull(request, build)
+
+
+@router.get("/claims")
+async def pending_claims(request: Request) -> JSONResponse:
+    async def build(db: Any, caller: sync.Caller) -> Any:
+        return await registration.pending_claims(db, caller.field_id)
+    return await _pull(request, build)
 
 
 @router.websocket("/stream")

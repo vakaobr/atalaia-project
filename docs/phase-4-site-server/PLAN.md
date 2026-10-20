@@ -1285,6 +1285,33 @@ phase 3 built (`protocol/checkin.md`, `controller/atalaia_controller/checkin.py`
   `controller/tests/test_sync_schedule.py`), plus the ticket vectors in
   Python and Dart.
 
+**Built 2026-10-20** (in software; decisions S16-1 to S16-14). Differences
+from the text above, as built: the migration is `0007_registration` (0006 is
+the schedule's) with `game_registrations`, `registration_replicas`,
+`player_id_claims`, `scheduled_games.controller_game` (a `games.id`, S13-6's
+rule) and `walkins`, and the field's `limit_template` and `max_replicas` for the
+replicas' classes (S16-1, S16-6); the controller's store schema is 7, not 6
+(S14-4), with `schedule_games`, `schedule_links` and three columns on
+`checkins` (S16-2). The roster is `GET /api/v1/sync/roster?scheduled_game_id=`;
+the controller also pulls `GET /api/v1/sync/claims` and pushes `POST
+/api/v1/sync/claims`: an account's adoption of a phone's player id is
+confirmed by the controller, which alone holds the secret's hash (S16-4). The
+answers the controller pulls are checked by `sync_format.ANSWERS` on both sides,
+with 4 valid and 14 invalid new vectors, and 4 valid and 15 invalid new body
+vectors (S16-3). The ticket codec is `checkin_ticket.py` and
+`app/lib/protocol/checkin_ticket.dart`, with its vectors in `checkin.json`
+(`tickets`). Outcomes go back once the game has ended, not during it (S16-11).
+The player's account API is `api/registrations.py` (`/api/v1/fields/{field}/
+scheduled-games/{id}/registrations`, `/api/v1/me/registrations`,
+`/api/v1/me/player-ids`); the public game page has *Register* only while the
+window is open and places are left, leading to a page that says how to register
+in the app (no form on the pages, S16-9); the pages and feeds answer `HEAD`
+(S16-10). The console has *From the schedule*, expected rows with *Arrived*, a
+ticket box and the registered and walk-in counts. Not built here: the app's
+screens (account login, the field's games, registering, keeping and sending the
+ticket; the app's Dart ticket codec is built), `[sync] push_walkins` and the
+guest registrations it implies (S16-13).
+
 ---
 
 ## Plan phase 17: Registration import and platform adapters

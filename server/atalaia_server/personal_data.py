@@ -24,6 +24,8 @@ What holds personal data now (plan phases 10-12):
 | ``replicas`` (plan phase 14) | the replicas of the person's player ids (in ``chrono_records.json``) | kept for the readings, without make, model and tag | the field's retention after the last change, once no reading names them |
 | ``marshal_keys`` (plan phase 14) | the keys the person registered as a marshal (``marshal_keys.json``) | kept, so what they signed still verifies, without the link to the account | the field's retention after the key's period ended, once no reading needs it |
 | ``scheduled_games`` (plan phase 15) | the games the person scheduled as the field's staff (``scheduled_games.json``) | kept (they are the field's), without the link to the account (``created_by``) | 24 months after the game's end, as game history |
+| ``game_registrations`` with ``registration_replicas`` (plan phase 16) | the person's registrations with their pre-declared replicas and outcomes (``registrations.json``; never the ticket's hash) | a game not yet started: cancelled; every one: the account, the name, the team preference, the federation number and the ticket's hash cleared, the replicas' make and model too (the outcome and the declarations' states stay, the field's history) | the federation number 30 days after the game (ADR-P4-11); the rest with the scheduled game (24 months) |
+| ``player_id_claims`` (plan phase 16) | the person's claims of a phone's player id (``player_id_claims.json``) | deleted | 30 days after the claim was made |
 
 The synced games (plan phase 13) come from field controllers and hold no
 account: their events carry only the field's pseudonymous player ids
@@ -43,7 +45,14 @@ nothing leads from them to the person any more.
 
 The schedule (plan phase 15) is the field's: a scheduled game names only the staff
 account that made it (``created_by``), and the public pages and feeds show no person at all.
-Registrations, with their player ids, names and replicas, are plan phase 16's.
+Registrations (plan phase 16) are the person's: a display name for the game, a team
+preference, the federation number when the game asks for one, the pre-declared replicas
+and, from the controller after the game, the outcome. The roster sent to the field's
+controller holds only what the check-in holds (the controller's own 30-day rule then
+applies there); what comes back holds no name. The account's player id at a field is made
+on its first registration there or adopted from the phone (a claim the controller confirms);
+from then on the field's synced events and chrono records under that id are the person's
+(``field_player_ids``), and erasure drops that link as before.
 
 Erasure is anonymisation, not deletion (ADR-P4-8): the ``users`` row stays
 under a random ``deleted-`` name with no email, no password and no consent,
@@ -70,7 +79,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from . import chrono_registry
 from .audit import record
 from .models import (ROLE_BY_ID, AuditLog, ChronoReading, ChronoReject, Consent, Field, FieldPlayerId, Game,
-                     MarshalKey, Replica, ScheduledGame, User, UserFieldRole, UserGameRole, UserSession)
+                     GameRegistration, MarshalKey, PlayerIdClaim, RegistrationReplica, Replica, ScheduledGame, User,
+                     UserFieldRole, UserGameRole, UserSession)
 
 log = logging.getLogger("atalaia.server.purge")
 
@@ -81,12 +91,14 @@ PURPOSES = (ACCOUNT, CHRONO_SHARING)
 ERASED_PREFIX = "deleted-"
 ERASED_PASSWORD = "DELETED"  # not an Argon2 hash: passwords.verify_password never accepts it
 
-# Retention (ADR-P4-8's table; decisions S12-6, S13-10, S14-8). Guest data comes with its table (plan
-# phase 16); game history is 24 months, fixed until fields get a setting; the chrono registry keeps each
+# Retention (ADR-P4-8's table; decisions S12-6, S13-10, S14-8, S16-7). Guest data comes with its table (plan
+# phase 17's imports); game history is 24 months, fixed until fields get a setting; the chrono registry keeps each
 # field's fields.default_retention_days (365 by default, the controller's CHRONO_RETENTION_DAYS).
 SESSION_RETENTION = timedelta(days=30)   # after a session expired or was revoked
 AUDIT_RETENTION = timedelta(days=1095)   # 36 months
 GAME_RETENTION = timedelta(days=730)     # 24 months: game history, after the game ended (scheduled games too)
+FEDERATION_RETENTION = timedelta(days=30)  # a registration's federation number, after the game (ADR-P4-11)
+CLAIM_RETENTION = timedelta(days=30)     # a claim of a phone's player id, after it was made
 
 
 def _iso(value: Optional[datetime]) -> Optional[str]:
@@ -134,6 +146,18 @@ async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.U
     scheduled = await db.execute(
         select(ScheduledGame, Field.name).join(Field, Field.id == ScheduledGame.field_id)
         .where(ScheduledGame.created_by == user.id).order_by(ScheduledGame.starts_at))
+    regs = list(await db.execute(
+        select(GameRegistration, ScheduledGame, Field.name).join(ScheduledGame, ScheduledGame.id ==
+                                                                 GameRegistration.scheduled_game)
+        .join(Field, Field.id == GameRegistration.field_id)
+        .where(GameRegistration.user_id == user.id).order_by(ScheduledGame.starts_at, GameRegistration.id)))
+    reps = {r.id: [] for r, _, _ in regs}
+    if reps:
+        for d in await db.scalars(select(RegistrationReplica).where(RegistrationReplica.registration.in_(list(reps)))
+                                  .order_by(RegistrationReplica.position)):
+            reps[d.registration].append(d)
+    claims = await db.scalars(select(PlayerIdClaim).where(PlayerIdClaim.user_id == user.id)
+                              .order_by(PlayerIdClaim.created_at))
     return {
         "format": FORMAT,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -163,6 +187,18 @@ async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.U
                   for role_id, granted_at, g, field_name in game_roles],
         "player_ids": [{"field_id": str(field_id), "field": name, "player_id": pid, "linked_at": _iso(at)}
                        for field_id, name, pid, at in player_ids],
+        "player_id_claims": [{"field_id": str(c.field_id), "player_id": c.player_id, "status": c.status,
+                              "created_at": _iso(c.created_at), "decided_at": _iso(c.decided_at)} for c in claims],
+        "registrations": [{"id": str(r.id), "field": name, "scheduled_game_id": str(g.id), "title": g.title,
+                           "starts_at": _iso(g.starts_at), "player_id": r.player_id, "display_name": r.display_name,
+                           "team_preference": r.team_preference, "federation_number": r.federation_number,
+                           "status": r.status, "source": r.source, "created_at": _iso(r.created_at),
+                           "updated_at": _iso(r.updated_at), "outcome_at": _iso(r.outcome_at),
+                           "replicas": [{"declaration_id": str(d.declaration_id),
+                                         "replica_id": _str(d.replica_id), "type": d.replica_type,
+                                         "class": d.replica_class, "make_model": d.make_model, "state": d.state}
+                                        for d in reps[r.id]]}
+                          for r, g, name in regs],
         "chrono_records": await chrono_registry.my_history(db, user.id),
         "marshal_keys": [{"field": name, **chrono_registry.key_json(k)} for k, name in keys],
         "scheduled_games": [{"id": str(g.id), "field_id": str(g.field_id), "field": name, "title": g.title,
@@ -203,6 +239,14 @@ games.json          The games you hold a role on (gm, marshal, player...): the g
                     Os jogos em que tem um papel.
 player_ids.json     Your player id at each field (the field's pseudonymous id for you).
                     O seu identificador de jogador em cada campo.
+player_id_claims.json
+                    Your requests to link a phone's player id at a field to your
+                    account, and whether the field's controller confirmed them.
+                    Os seus pedidos para ligar à conta o identificador de um telemóvel.
+registrations.json  Your registrations for scheduled games: the name you chose for the
+                    game, team preference, federation number, the replicas you declared
+                    and, after the game, whether you checked in. Never the ticket.
+                    As suas inscrições em jogos, com as réplicas declaradas.
 chrono_records.json Per field: your chrono readings, each with the record exactly as
                     the marshal signed it (record_json) and the marshal's public key,
                     so anyone can check it; your replicas; spot checks over the limit;
@@ -218,8 +262,8 @@ scheduled_games.json
                     without your name.
                     Os jogos que marcou para um campo, como staff.
 
-Game events name players only by the field's pseudonymous player ids, which
-are not linked to accounts yet. Positions never reach the site server.
+Game events name players only by the field's pseudonymous player ids; yours
+are listed in player_ids.json. Positions never reach the site server.
 """
 
 
@@ -228,7 +272,9 @@ def export_zip(data: dict[str, Any]) -> bytes:
     files = {
         "profile.json": data["user"], "field_roles.json": data["field_roles"], "sessions.json": data["sessions"],
         "audit_log.json": data["audit_log"], "audit_log_about_you.json": data["audit_log_about_you"],
-        "consents.json": data["consents"], "games.json": data["games"], "player_ids.json": data["player_ids"],
+        "consents.json": data["consents"], "games.json": data["games"],
+        "player_ids.json": data["player_ids"], "player_id_claims.json": data["player_id_claims"],
+        "registrations.json": data["registrations"],
         "chrono_records.json": data["chrono_records"], "marshal_keys.json": data["marshal_keys"],
         "scheduled_games.json": data["scheduled_games"],
     }
@@ -262,6 +308,22 @@ async def erase(db: AsyncSession, user_id: uuid.UUID, reason: str = "user_reques
     await db.execute(update(MarshalKey).where(MarshalKey.user_id == user_id).values(user_id=None)
                      .execution_options(synchronize_session=False))
     await db.execute(delete(FieldPlayerId).where(FieldPlayerId.user_id == user_id))
+    # Registrations (plan phase 16): one for a game still to come is cancelled; every one loses the
+    # account, the name, the team preference, the federation number and the ticket, and its replicas their
+    # make and model. The outcome and the declarations' states stay, as the field's history.
+    now = datetime.now(timezone.utc)
+    upcoming = select(ScheduledGame.id).where(ScheduledGame.starts_at > now).scalar_subquery()
+    await db.execute(update(GameRegistration).where(
+        GameRegistration.user_id == user_id, GameRegistration.status == "registered",
+        GameRegistration.scheduled_game.in_(upcoming)).values(status="cancelled", cancelled_at=now)
+        .execution_options(synchronize_session=False))
+    mine = select(GameRegistration.id).where(GameRegistration.user_id == user_id).scalar_subquery()
+    await db.execute(update(RegistrationReplica).where(RegistrationReplica.registration.in_(mine))
+                     .values(make_model=None).execution_options(synchronize_session=False))
+    await db.execute(update(GameRegistration).where(GameRegistration.user_id == user_id).values(
+        user_id=None, display_name=None, team_preference=None, federation_number=None, ticket_hash=None,
+        updated_at=now).execution_options(synchronize_session=False))
+    await db.execute(delete(PlayerIdClaim).where(PlayerIdClaim.user_id == user_id))
     # The field's schedule stays; who scheduled a game does not.
     await db.execute(update(ScheduledGame).where(ScheduledGame.created_by == user_id).values(created_by=None)
                      .execution_options(synchronize_session=False))
@@ -288,6 +350,14 @@ async def purge(db: AsyncSession, now: Optional[datetime] = None, dry_run: bool 
     # The schedule (plan phase 15): a scheduled game is game history once it has ended.
     scheduled = await db.execute(delete(ScheduledGame).where(ScheduledGame.ends_at < now - GAME_RETENTION))
     counts["scheduled_games"] = scheduled.rowcount or 0
+    # Registrations (plan phase 16): the federation number 30 days after the game; claims after 30 days.
+    ended = select(ScheduledGame.id).where(ScheduledGame.ends_at < now - FEDERATION_RETENTION).scalar_subquery()
+    federation = await db.execute(update(GameRegistration).where(
+        GameRegistration.federation_number.is_not(None), GameRegistration.scheduled_game.in_(ended))
+        .values(federation_number=None).execution_options(synchronize_session=False))
+    counts["federation_numbers"] = federation.rowcount or 0
+    claims = await db.execute(delete(PlayerIdClaim).where(PlayerIdClaim.created_at < now - CLAIM_RETENTION))
+    counts["player_id_claims"] = claims.rowcount or 0
     if dry_run:
         await db.rollback()
         return counts

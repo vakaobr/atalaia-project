@@ -31,7 +31,7 @@ from .base import SERVER, TempDatabase, alembic_config
 TABLES = {"fields", "users", "roles", "user_field_roles", "sessions", "audit_log", "refresh_tokens", "consents",
           "field_api_keys", "controllers", "games", "game_events", "game_node_scores", "game_nodes", "user_game_roles",
           "field_player_ids", "marshal_keys", "replicas", "chrono_readings", "chrono_rejects", "chrono_violations",
-          "scheduled_games"}
+          "scheduled_games", "game_registrations", "registration_replicas", "player_id_claims"}
 
 SCHEMA_SQL = (
     ("columns", "SELECT table_name, column_name, data_type, is_nullable, column_default, character_maximum_length "
@@ -240,6 +240,38 @@ class MigrationTests(unittest.TestCase):
                           "registering")  # computed from the window, never stored
         command.downgrade(self.cfg, "0005_chrono")
         self.assertNotIn("scheduled_games", self.tables())
+        self.assertEqual(self.db.fetch("SELECT name FROM fields")[0][0], "Campo")
+        self.db.fetch("DELETE FROM fields")
+
+    def test_0007_with_data(self) -> None:
+        """0007_registration: a field gets the controller's default rules, registrations' checks, and back down."""
+        command.upgrade(self.cfg, "0006_scheduling")
+        field = self.db.fetch("INSERT INTO fields (name, slug) VALUES ('Campo', 'campo') RETURNING id")[0][0]
+        game = self.db.fetch("INSERT INTO scheduled_games (field_id, title, starts_at, ends_at, status) VALUES "
+                             "($1, 'Domingo', '2030-11-09T09:00:00Z', '2030-11-09T13:00:00Z', 'published') "
+                             "RETURNING id", field)[0][0]
+        command.upgrade(self.cfg, "0007_registration")
+        self.assertEqual(tuple(self.db.fetch("SELECT limit_template, max_replicas FROM fields")[0]), ("portugal", 5))
+        self.assertEqual(tuple(self.db.fetch("SELECT controller_game, walkins FROM scheduled_games")[0]), (None, None))
+        insert = ("INSERT INTO game_registrations (scheduled_game, field_id, player_id, display_name, status) "
+                  "VALUES ($1, $2, $3, 'Falcão', $4) RETURNING id")
+        reg = self.db.fetch(insert, game, field, "p-abcdefgh2345", "registered")[0][0]
+        with self.assertRaisesRegex(Exception, "uq_game_registrations_scheduled_game_player_id"):
+            self.db.fetch(insert, game, field, "p-abcdefgh2345", "registered")
+        with self.assertRaisesRegex(Exception, "ck_game_registrations_status"):
+            self.db.fetch(insert, game, field, "p-zzzzzzzzzzzz", "maybe")
+        decl = ("INSERT INTO registration_replicas (registration, declaration_id, replica_type, replica_class, "
+                "position, state) VALUES ($1, $2, 'aeg', 'rifle', 0, $3)")
+        did = uuid.uuid4()
+        self.db.fetch(decl, reg, did, None)
+        with self.assertRaisesRegex(Exception, "uq_registration_replicas_declaration_id"):
+            self.db.fetch(decl, reg, did, None)
+        with self.assertRaisesRegex(Exception, "ck_registration_replicas_state"):
+            self.db.fetch(decl, reg, uuid.uuid4(), "chronographed")
+        self.db.fetch("DELETE FROM scheduled_games")  # registrations and their replicas go with the game
+        self.assertEqual(self.db.fetch("SELECT count(*) FROM registration_replicas")[0][0], 0)
+        command.downgrade(self.cfg, "0006_scheduling")
+        self.assertNotIn("game_registrations", self.tables())
         self.assertEqual(self.db.fetch("SELECT name FROM fields")[0][0], "Campo")
         self.db.fetch("DELETE FROM fields")
 

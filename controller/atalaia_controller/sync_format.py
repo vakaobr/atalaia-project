@@ -31,6 +31,13 @@ record's JSON text exactly as the controller stored it: this module checks
 only its size; the site server verifies each record on its own with
 ``chrono.py`` and keeps the ones that fail apart, so one bad record never
 refuses a batch.
+
+Game day (plan phase 16; ADR-P4-11): two more bodies the controller pushes,
+``check_checkins`` (a scheduled game's registrations' outcomes, after the game:
+no names) and ``check_claims`` (its verdicts on accounts' claims of player ids:
+no hashes), and the answers of the three endpoints it pulls, in ``ANSWERS``
+(``check_schedule``, ``check_roster``, ``check_claims_list``), which the site
+server's tests check its own answers with.
 """
 
 from __future__ import annotations
@@ -202,7 +209,8 @@ def check_game(body: Any) -> dict[str, Any]:
     body = _envelope(body, ("meta",))
     meta = _obj(body["meta"], "meta")
     _keys(meta, "meta", ("name", "mode_id", "teams", "state", "created_at"),
-          ("team_info", "params", "squads", "duration_ms", "node_id", "joined", "started_at", "ended_at"))
+          ("team_info", "params", "squads", "duration_ms", "node_id", "joined", "started_at", "ended_at",
+           "scheduled_game_id"))
     _text(meta["name"], "meta.name", 64)
     _text(meta["mode_id"], "meta.mode_id", 128, pattern=MODE_ID)
     teams = meta["teams"]
@@ -234,6 +242,9 @@ def check_game(body: Any) -> dict[str, Any]:
     _num(meta["created_at"], "meta.created_at", 0, TIME_MAX)
     _num(meta.setdefault("started_at", None), "meta.started_at", 0, TIME_MAX, null=True)
     _num(meta.setdefault("ended_at", None), "meta.ended_at", 0, TIME_MAX, null=True)
+    # The site server's scheduled game this game was made from (plan phase 16), if any.
+    _text(meta.setdefault("scheduled_game_id", None), "meta.scheduled_game_id", 36, null=True,
+          pattern=chrono.UUID_RE)
     return body
 
 
@@ -500,14 +511,222 @@ def check_chrono(body: Any) -> dict[str, Any]:
     return body
 
 
+# --- registration and game-day sync (plan phase 16; ADR-P4-11) ---------------------------
+#
+# The controller pulls (GET) the field's schedule, the roster of each scheduled game it made a game
+# from, and the accounts' claims of player ids; it pushes (POST) each registration's outcome after
+# the game and its verdict on each claim. The answers it pulls are checked here too, by the
+# controller before it uses them and by the site server's tests before they are sent.
+
+MAX_SCHEDULE = 200          # scheduled games in one schedule answer
+MAX_ROSTER = 5000           # registrations in one roster answer or check-ins body (the controller's max_players)
+MAX_CLAIMS = 500            # player id claims per answer or body
+MAX_DECLARATIONS = 20       # a registration's pre-declared replicas (the controller's max_replicas bound)
+SCHEDULED_STATES = ("published", "in_progress", "completed", "cancelled")
+ROSTER_STATES = ("published", "in_progress", "completed", "cancelled")
+OUTCOMES_CHECKIN = ("checked_in", "no_show")
+DECLARATION_STATES = ("pending", "passed", "refused", "withdrawn")
+CLAIM_RESULTS = ("confirmed", "refused", "unknown")
+PLAYER_ID = re.compile(r"p-[a-z2-7]{12}")
+SHA256_HEX = re.compile(r"[0-9a-f]{64}")
+SCHEDULE_TEAM_MAX = 32       # a scheduled game's team names (the site server's limit; a controller game: 23 bytes)
+
+
+def _uuid(value: Any, path: str, null: bool = False) -> Any:
+    return _text(value, path, 36, null=null, pattern=chrono.UUID_RE)
+
+
+def _bool(value: Any, path: str) -> bool:
+    if not isinstance(value, bool):
+        _fail("not_a_boolean", path)
+    return value
+
+
+def _list(value: Any, path: str, hi: int, lo: int = 0) -> list[Any]:
+    if not isinstance(value, list) or not lo <= len(value) <= hi:
+        _fail("bad_batch_size", path)
+    return value
+
+
+def _answer_envelope(body: Any, required: tuple[str, ...]) -> dict[str, Any]:
+    body = _obj(body, "")
+    _keys(body, "", ("sync_version", *required))
+    if body["sync_version"] != SYNC_VERSION or isinstance(body["sync_version"], bool):
+        _fail("unsupported_version", "sync_version")
+    return body
+
+
+def check_schedule(body: Any) -> dict[str, Any]:
+    """GET /api/v1/sync/schedule's answer: the field's published scheduled games of the coming days."""
+    body = _answer_envelope(body, ("games",))
+    seen: set[str] = set()
+    for i, g in enumerate(_list(body["games"], "games", MAX_SCHEDULE)):
+        path = f"games[{i}]"
+        g = _obj(g, path)
+        _keys(g, path, ("scheduled_game_id", "title", "starts_at", "ends_at", "status", "teams", "federation",
+                        "predeclare_replicas", "registered"), ("mode_id", "max_players", "location"))
+        _uuid(g["scheduled_game_id"], f"{path}.scheduled_game_id")
+        if g["scheduled_game_id"] in seen:
+            _fail("duplicate_game", f"{path}.scheduled_game_id")
+        seen.add(g["scheduled_game_id"])
+        _text(g["title"], f"{path}.title", 256)
+        _num(g["starts_at"], f"{path}.starts_at", 0, TIME_MAX)
+        _num(g["ends_at"], f"{path}.ends_at", 0, TIME_MAX)
+        if g["ends_at"] <= g["starts_at"]:
+            _fail("bad_period", f"{path}.ends_at")
+        if g["status"] not in SCHEDULED_STATES:
+            _fail("bad_state", f"{path}.status")
+        teams = _list(g["teams"], f"{path}.teams", 16)
+        for j, team in enumerate(teams):
+            _text(team, f"{path}.teams[{j}]", SCHEDULE_TEAM_MAX)
+        if len(set(teams)) != len(teams):
+            _fail("bad_teams", f"{path}.teams")
+        if g["federation"] not in ("off", "optional", "required"):
+            _fail("bad_value", f"{path}.federation")
+        _bool(g["predeclare_replicas"], f"{path}.predeclare_replicas")
+        _int(g["registered"], f"{path}.registered", 0, 10000)
+        _text(g.setdefault("mode_id", None), f"{path}.mode_id", 128, null=True, pattern=MODE_ID)
+        _int(g.setdefault("max_players", None), f"{path}.max_players", 1, 10000, null=True)
+        _text(g.setdefault("location", None), f"{path}.location", 512, null=True)
+    return body
+
+
+def check_declaration(d: Any, path: str) -> dict[str, Any]:
+    """A pre-declared replica in a roster, as protocol/checkin.md's declarations (no state)."""
+    d = _obj(d, path)
+    _keys(d, path, ("declaration_id", "type", "class"), ("replica_id", "make_model"))
+    _uuid(d["declaration_id"], f"{path}.declaration_id")
+    _uuid(d.setdefault("replica_id", None), f"{path}.replica_id", null=True)
+    if d["type"] not in REPLICA_TYPES:
+        _fail("bad_type", f"{path}.type")
+    _text(d["class"], f"{path}.class", 32, pattern=REPLICA_CLASS)
+    mm = d.setdefault("make_model", None)
+    if mm is not None:
+        _name(mm, f"{path}.make_model")
+    return d
+
+
+def check_roster(body: Any) -> dict[str, Any]:
+    """GET /api/v1/sync/roster's answer: a scheduled game's live registrations, with what the check-in
+    list needs and nothing more (ADR-P4-11): the player's id at the field, the display name, the team
+    preference, the federation number only when the game asks for one, the ticket's SHA-256 and the
+    pre-declared replicas."""
+    body = _answer_envelope(body, ("scheduled_game_id", "status", "federation", "registrations"))
+    _uuid(body["scheduled_game_id"], "scheduled_game_id")
+    if body["status"] not in ROSTER_STATES:
+        _fail("bad_state", "status")
+    if body["federation"] not in ("off", "optional", "required"):
+        _fail("bad_value", "federation")
+    regs, players, decls = set(), set(), set()
+    for i, r in enumerate(_list(body["registrations"], "registrations", MAX_ROSTER)):
+        path = f"registrations[{i}]"
+        r = _obj(r, path)
+        _keys(r, path, ("registration_id", "player_id", "display_name", "replicas"),
+              ("team_preference", "federation_number", "ticket_sha256"))
+        _uuid(r["registration_id"], f"{path}.registration_id")
+        _text(r["player_id"], f"{path}.player_id", 14, pattern=PLAYER_ID)
+        if r["registration_id"] in regs or r["player_id"] in players:
+            _fail("duplicate_registration", path)
+        regs.add(r["registration_id"])
+        players.add(r["player_id"])
+        _text(r["display_name"], f"{path}.display_name", 32)
+        _text(r.setdefault("team_preference", None), f"{path}.team_preference", SCHEDULE_TEAM_MAX, null=True)
+        fed = _text(r.setdefault("federation_number", None), f"{path}.federation_number", 32, null=True)
+        if fed is not None and body["federation"] == "off":
+            _fail("not_asked", f"{path}.federation_number")
+        _text(r.setdefault("ticket_sha256", None), f"{path}.ticket_sha256", 64, null=True, pattern=SHA256_HEX)
+        for j, d in enumerate(_list(r["replicas"], f"{path}.replicas", MAX_DECLARATIONS)):
+            check_declaration(d, f"{path}.replicas[{j}]")
+            if d["declaration_id"] in decls:
+                _fail("duplicate_declaration", f"{path}.replicas[{j}].declaration_id")
+            decls.add(d["declaration_id"])
+    return body
+
+
+def check_claims_list(body: Any) -> dict[str, Any]:
+    """GET /api/v1/sync/claims's answer: accounts that claim a player id of this field, each with the
+    SHA-256 of the secret their phone holds; the controller compares it with its own (protocol/checkin.md)."""
+    body = _answer_envelope(body, ("claims",))
+    seen: set[str] = set()
+    for i, c in enumerate(_list(body["claims"], "claims", MAX_CLAIMS)):
+        path = f"claims[{i}]"
+        c = _obj(c, path)
+        _keys(c, path, ("claim_id", "player_id", "secret_sha256"))
+        _uuid(c["claim_id"], f"{path}.claim_id")
+        if c["claim_id"] in seen:
+            _fail("duplicate_claim", f"{path}.claim_id")
+        seen.add(c["claim_id"])
+        _text(c["player_id"], f"{path}.player_id", 14, pattern=PLAYER_ID)
+        _text(c["secret_sha256"], f"{path}.secret_sha256", 64, pattern=SHA256_HEX)
+    return body
+
+
+def check_checkins(body: Any) -> dict[str, Any]:
+    """POST /api/v1/sync/checkins: after a game made from a scheduled game, each registration's outcome
+    and its declarations' final states, and how many walked in (a count only). No names, no federation
+    numbers. ``ticket_sha256`` only for a registration the controller did not have in a roster (the app
+    sent its registration id and ticket at check-in): the site server compares it with its own."""
+    body = _envelope(body, ("scheduled_game_id", "registrations", "walkins"))
+    _uuid(body["scheduled_game_id"], "scheduled_game_id")
+    _int(body["walkins"], "walkins", 0, 100000)
+    seen: set[str] = set()
+    for i, r in enumerate(_list(body["registrations"], "registrations", MAX_ROSTER)):
+        path = f"registrations[{i}]"
+        r = _obj(r, path)
+        _keys(r, path, ("registration_id", "player_id", "outcome", "declarations"), ("ticket_sha256",))
+        _uuid(r["registration_id"], f"{path}.registration_id")
+        if r["registration_id"] in seen:
+            _fail("duplicate_registration", f"{path}.registration_id")
+        seen.add(r["registration_id"])
+        _text(r["player_id"], f"{path}.player_id", 14, pattern=PLAYER_ID)
+        if r["outcome"] not in OUTCOMES_CHECKIN:
+            _fail("bad_outcome", f"{path}.outcome")
+        _text(r.setdefault("ticket_sha256", None), f"{path}.ticket_sha256", 64, null=True, pattern=SHA256_HEX)
+        decls = set()
+        for j, d in enumerate(_list(r["declarations"], f"{path}.declarations", MAX_DECLARATIONS)):
+            dpath = f"{path}.declarations[{j}]"
+            d = _obj(d, dpath)
+            _keys(d, dpath, ("declaration_id", "state"), ("reading_id",))
+            _uuid(d["declaration_id"], f"{dpath}.declaration_id")
+            if d["declaration_id"] in decls:
+                _fail("duplicate_declaration", f"{dpath}.declaration_id")
+            decls.add(d["declaration_id"])
+            if d["state"] not in DECLARATION_STATES:
+                _fail("bad_state", f"{dpath}.state")
+            _uuid(d.setdefault("reading_id", None), f"{dpath}.reading_id", null=True)
+    return body
+
+
+def check_claims(body: Any) -> dict[str, Any]:
+    """POST /api/v1/sync/claims: the controller's verdict on each claim it was given: ``confirmed`` (it
+    knows the player id with that secret's hash), ``refused`` (it knows the id with another secret, or
+    with none: a player checked in by hand) or ``unknown`` (it never saw the id; the claim waits)."""
+    body = _envelope(body, ("results",), game=False)
+    seen: set[str] = set()
+    for i, r in enumerate(_list(body["results"], "results", MAX_CLAIMS, lo=1)):
+        path = f"results[{i}]"
+        r = _obj(r, path)
+        _keys(r, path, ("claim_id", "result"))
+        _uuid(r["claim_id"], f"{path}.claim_id")
+        if r["claim_id"] in seen:
+            _fail("duplicate_claim", f"{path}.claim_id")
+        seen.add(r["claim_id"])
+        if r["result"] not in CLAIM_RESULTS:
+            _fail("bad_value", f"{path}.result")
+    return body
+
+
 CHECKS = {"games": check_game, "events": check_events, "scores": check_scores, "nodes": check_nodes,
-          "marshals": check_marshals, "replicas": check_replicas, "chrono": check_chrono}
-GAME_KINDS = ("games", "events", "scores", "nodes")  # the bodies about one game; the rest are the field's
+          "marshals": check_marshals, "replicas": check_replicas, "chrono": check_chrono,
+          "checkins": check_checkins, "claims": check_claims}
+GAME_KINDS = ("games", "events", "scores", "nodes", "checkins")  # the bodies about one game; the rest are the field's
+# The answers of the GET endpoints the controller pulls (plan phase 16).
+ANSWERS = {"schedule": check_schedule, "roster": check_roster, "claims": check_claims_list}
 
 
 def parse(kind: str, raw: bytes) -> dict[str, Any]:
     """Parses and checks a request body of one kind (games, events, scores, nodes, marshals, replicas,
-    chrono)."""
+    chrono, checkins, claims)."""
     if len(raw) > MAX_BODY:
         _fail("too_large", "")
     try:

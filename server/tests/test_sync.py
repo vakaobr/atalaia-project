@@ -341,7 +341,7 @@ class VectorTests(SyncTestCase):
         for vector in VECTORS["valid"]:
             with self.subTest(vector=vector["name"]):
                 body = copy.deepcopy(vector["body"])
-                if vector["kind"] in ("events", "scores", "nodes"):
+                if vector["kind"] in ("events", "scores", "nodes", "checkins"):
                     await self.post("games", envelope(game=body["game"], meta=META))
                 answer = await self.post(vector["kind"], body)
                 if vector["kind"] == "chrono":  # its records verify with the marshals vector's key
@@ -361,7 +361,7 @@ class VectorTests(SyncTestCase):
                                             "path": vector["path"]})
         self.assertEqual(await self.count("game_events"), 0)
         self.assertEqual(await self.count("game_node_scores"), 0)
-        for table in ("marshal_keys", "replicas", "chrono_readings", "chrono_rejects"):
+        for table in ("marshal_keys", "replicas", "chrono_readings", "chrono_rejects", "field_player_ids"):
             self.assertEqual(await self.count(table), 0, table)
 
 

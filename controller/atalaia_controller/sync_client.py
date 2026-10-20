@@ -39,6 +39,20 @@ before readings, so the site server can verify every reading it gets; one it
 cannot verify is kept apart there and named in the answer, never silently
 dropped, and logged here. Private keys never leave the marshals' phones.
 
+**Game day** (plan phase 16; ADR-P4-11): after the pushes, the client pulls
+the field's schedule of the coming days (``GET /api/v1/sync/schedule``, kept in
+the store for the GM's *Create from the schedule*), the roster of each
+scheduled game a game here was made from while that game has not started
+(``GET /api/v1/sync/roster``, applied by ``Checkin.apply_roster`` as expected
+check-ins), and accounts' claims of this field's player ids (``GET
+/api/v1/sync/claims``), which it answers by comparing the claimed secret's
+hash with its own (``POST /api/v1/sync/claims``: the hashes never leave the
+controller). Once a linked game has ended, its registrations' outcomes go back
+(``POST /api/v1/sync/checkins``), again only when they change. A site server
+without these endpoints (an older one) is skipped quietly. The site server
+never sends anything into a running game: a roster pulled after the start is
+not applied.
+
 **Never sent:** positions (P4R25), check-in names and federation numbers,
 tokens, the game, join and token keys, private keys. The bodies carry the fields listed in
 protocol/sync.md only; a node's info goes through a list of allowed keys, and
@@ -71,8 +85,9 @@ from typing import Any, Callable, Optional
 from urllib.parse import urlsplit
 
 from . import __version__
-from .sync_format import (MAX_EVENTS, MAX_MARSHALS, MAX_READINGS, MAX_REPLICAS, SYNC_VERSION, SyncFormatError,
-                          check_event, check_marshal, check_nodes, check_reading, check_replica)
+from .sync_format import (ANSWERS, MAX_EVENTS, MAX_MARSHALS, MAX_READINGS, MAX_REPLICAS, MAX_ROSTER, SYNC_VERSION,
+                          SyncFormatError, check_checkins, check_claims, check_event, check_marshal, check_nodes,
+                          check_reading, check_replica)
 
 log = logging.getLogger("atalaia.sync")
 
@@ -83,6 +98,8 @@ BATCHES_PER_GAME = 20   # events batches per game and cycle (10,000 events), so 
 BATCHES_PER_KIND = 20   # chrono registry batches per kind and cycle
 FIELD_RUN = re.compile(r"field-(\d{1,6})")
 LIVE = ("running", "paused")
+SCHEDULE_DAYS = 14
+UNSUPPORTED = (404, 405, 501)  # an older site server without the game-day endpoints
 
 
 def api_key_ok(key: str) -> bool:
@@ -175,6 +192,15 @@ class HttpTransport:
         req = urllib.request.Request(self.base_url + path, data=data, method="POST", headers={
             "Authorization": self._auth, "Content-Type": "application/json", "Accept": "application/json",
             "User-Agent": self.user_agent})
+        return self._send(req)
+
+    def get(self, path: str) -> dict[str, Any]:
+        """A pull (plan phase 16): the same key, no body."""
+        req = urllib.request.Request(self.base_url + path, method="GET", headers={
+            "Authorization": self._auth, "Accept": "application/json", "User-Agent": self.user_agent})
+        return self._send(req)
+
+    def _send(self, req: urllib.request.Request) -> dict[str, Any]:
         try:
             with self._opener.open(req, timeout=self.timeout_s) as resp:
                 raw = resp.read(1024 * 1024)
@@ -203,9 +229,11 @@ class SyncClient:
     """Pushes the store's games to the site server; ``start`` runs it in a thread."""
 
     def __init__(self, cfg: Any, store: Any, *, api_key: Optional[str] = None,
-                 transport: Optional[Any] = None, wall: Callable[[], float] = time.time) -> None:
+                 transport: Optional[Any] = None, wall: Callable[[], float] = time.time,
+                 checkin: Optional[Any] = None) -> None:
         self.cfg = cfg
         self.store = store
+        self.checkin = checkin  # checkin.Checkin: applies rosters and makes outcomes (plan phase 16)
         key, source = (api_key, "given") if api_key else resolve_api_key(cfg, store)
         self.key_source = source
         self.key_fingerprint = key_fingerprint(key) if key else None
@@ -223,7 +251,12 @@ class SyncClient:
         self.last_error: Optional[str] = None
         self.registry_error: Optional[str] = None  # the last refusal of a chrono registry body
         self.refused_readings = 0  # readings the site server kept apart (it could not verify them)
-        self.requests = 0
+        self.requests = 0  # POSTs (what was pushed)
+        self.pulls = 0  # GETs (plan phase 16)
+        self.game_day_error: Optional[str] = None
+        self.game_day_supported = True
+        self.schedule_pulled_at: Optional[float] = None
+        self.claims_answered = 0
 
     # --- identity ---------------------------------------------------------------------
 
@@ -305,6 +338,7 @@ class SyncClient:
                 for game in self.store.games():
                     self._sync_game(game)
                 self._sync_registry()
+                self._game_day()
             except SyncError as exc:
                 self.failures += 1
                 self.retry_after = exc.retry_after
@@ -538,6 +572,133 @@ class SyncClient:
                 log.warning("replica %s not sent: %s", rep.get("replica_id"), exc)
         return out
 
+    # --- game day (plan phase 16) -------------------------------------------------------
+
+    def _get(self, path: str, kind: str) -> Optional[dict[str, Any]]:
+        """A pull, its answer checked with the shared format; None when the server has no such endpoint."""
+        self.pulls += 1
+        try:
+            answer = self.transport.get(path)
+        except SyncError as exc:
+            if exc.status in UNSUPPORTED and exc.code in ("Not Found", "Method Not Allowed", "http_404",
+                                                          "http_405", "http_501"):
+                if self.game_day_supported:
+                    log.info("the site server has no game-day sync (%s): skipped", path)
+                self.game_day_supported = False
+                return None
+            raise
+        self.game_day_supported = True
+        try:
+            return ANSWERS[kind](answer)
+        except SyncFormatError as exc:
+            raise SyncError("bad_answer", detail=str(exc)) from None
+
+    def _game_day(self) -> None:
+        if not hasattr(self.transport, "get"):
+            return
+        self.game_day_error = None
+        schedule = self._get(f"/api/v1/sync/schedule?days={SCHEDULE_DAYS}", "schedule")
+        if schedule is None:
+            return
+        now = self._wall()
+        self.store.set_schedule(schedule["games"], now)
+        self.schedule_pulled_at = now
+        self._pull_rosters()
+        self._answer_claims()
+        self._push_checkins()
+
+    def _linked(self) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+        out = []
+        for link in self.store.schedule_links():
+            game = self.store.game(link["game_id"])
+            if game is not None and int(game["game_seed"]) == int(link["game_seed"]):
+                out.append((link, game))
+        return out
+
+    def _pull_rosters(self) -> None:
+        """Each linked game's roster until the game starts; after the start the controller's list is the
+        authority and nothing from the site server changes it (ADR-P4-11)."""
+        if self.checkin is None:
+            return
+        for link, game in self._linked():
+            if game["state"] != "ready":
+                continue
+            path = f"/api/v1/sync/roster?scheduled_game_id={link['scheduled_game_id']}"
+            try:
+                roster = self._get(path, "roster")
+            except SyncError as exc:
+                if exc.status != 404:
+                    raise
+                self.store.roster_pulled(game["id"], game["game_seed"], self._wall(), None, exc.code)
+                continue  # the scheduled game is gone or another field's: the game goes on as it is
+            if roster is None:
+                return
+            if roster["scheduled_game_id"] != link["scheduled_game_id"]:
+                raise SyncError("bad_answer", detail="the roster of another game")
+            result = self.checkin.apply_roster(game["id"], roster)
+            self.store.roster_pulled(game["id"], game["game_seed"], self._wall(), len(roster["registrations"]),
+                                     None)
+            if result.get("conflicts") or result.get("dropped_declarations"):
+                log.warning("roster of game %d: %d conflicts, %d declarations dropped", game["id"],
+                            result["conflicts"], result["dropped_declarations"])
+
+    def _answer_claims(self) -> None:
+        """Accounts that claim a player id of this field: confirmed when this controller knows the id with
+        the same secret's hash (compared in constant time), refused when it knows it with another or with
+        none (a hand check-in), unknown otherwise. The hashes themselves never leave the controller."""
+        import hmac  # noqa: PLC0415
+
+        claims = self._get("/api/v1/sync/claims", "claims")
+        if not claims or not claims["claims"]:
+            return
+        results = []
+        for c in claims["claims"]:
+            known = self.store.field_player(c["player_id"])
+            if known is None:
+                result = "unknown"
+            elif known["secret_sha256"] is None:
+                result = "refused"
+            else:
+                result = "confirmed" if hmac.compare_digest(known["secret_sha256"].hex(), c["secret_sha256"]) \
+                    else "refused"
+            results.append({"claim_id": c["claim_id"], "result": result})
+        body = check_claims({**self._envelope(), "results": results})
+        try:
+            self._post("/api/v1/sync/claims", body)
+        except SyncError as exc:
+            self._registry_refused("/api/v1/sync/claims", exc)
+        self.claims_answered += sum(1 for r in results if r["result"] != "unknown")
+
+    def _push_checkins(self) -> None:
+        """Once a linked game has ended: its registrations' outcomes, again only when they change."""
+        if self.checkin is None:
+            return
+        sent = self.store.sync_items("checkins")
+        for link, game in self._linked():
+            if game["state"] != "ended":
+                continue
+            out = self.checkin.outcomes(game["id"])
+            item = f"{game['id']}:{game['game_seed']}"
+            sha = digest(out)  # before the check below fills in its defaults
+            if sha == sent.get(item):
+                continue
+            env = self._envelope(game)
+            regs = out["registrations"]
+            for start in range(0, max(len(regs), 1), MAX_ROSTER):
+                body = {**env, "scheduled_game_id": link["scheduled_game_id"], "walkins": out["walkins"],
+                        "registrations": json.loads(json.dumps(regs[start:start + MAX_ROSTER]))}
+                try:
+                    self._bound(game, "/api/v1/sync/checkins", check_checkins(body))
+                except SyncFormatError as exc:
+                    log.error("game %d: the check-in outcomes are not in protocol/sync.md's form: %s", game["id"], exc)
+                except SyncError as exc:
+                    if exc.status != 400:
+                        raise
+                    code, where = _refusal(exc)
+                    log.error("the site server refused the check-in outcomes of game %d (%s at %s)", game["id"],
+                              code, where)
+            self.store.mark_synced("checkins", {item: sha})
+
     # --- what is sent -------------------------------------------------------------------
 
     def meta(self, game: dict[str, Any]) -> dict[str, Any]:
@@ -553,7 +714,12 @@ class SyncClient:
                 "duration_ms": int(game.get("duration_ms") or 0), "state": game["state"],
                 "node_id": game.get("node_id"), "joined": bool(game.get("joined")),
                 "created_at": game["created_at"], "started_at": game.get("started_at"),
-                "ended_at": game.get("ended_at")}
+                "ended_at": game.get("ended_at"), "scheduled_game_id": self._scheduled(game)}
+
+    def _scheduled(self, game: dict[str, Any]) -> Optional[str]:
+        """The site server's scheduled game this game was made from (plan phase 16), or None."""
+        link = self.store.schedule_link(int(game["id"]), int(game["game_seed"]))
+        return link["scheduled_game_id"] if link else None
 
     def counters(self, game: dict[str, Any]) -> dict[str, dict[str, int]]:
         """The game's score counters per source, as the controller merges them (P4R10): each node's
@@ -613,4 +779,7 @@ class SyncClient:
                 "last_ok_at": self.last_ok_at, "last_attempt_at": self.last_attempt_at,
                 "last_error": self.last_error, "failures": self.failures, "pending_events": pending,
                 "pending_readings": self.store.count_readings_unsynced(), "registry_error": self.registry_error,
-                "refused_readings": self.refused_readings}
+                "refused_readings": self.refused_readings,
+                "game_day": {"supported": self.game_day_supported, "schedule_pulled_at": self.schedule_pulled_at,
+                             "linked_games": len(self.store.schedule_links()),
+                             "claims_answered": self.claims_answered}}

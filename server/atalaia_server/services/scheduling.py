@@ -18,9 +18,9 @@ not seen the game before.
 30 days ago or has not ended, cancelled ones included, so calendars keep a just-played or
 just-cancelled game for a while; the field page lists only games that have not ended.
 
-**Registration** comes with plan phase 16: until then nothing can be registered for, so
-``registration.open`` is false in the feeds and ``places_left`` is ``max_players``
-(``ONLINE_REGISTRATION``, decision S15-6).
+**Registration** (plan phase 16, ``services/registration.py``): ``places_left`` is ``max_players``
+less the live registrations, and ``registration.open`` in the feeds is true while the window is open
+and places are left (decision S15-7 as amended by S16-9).
 """
 
 from __future__ import annotations
@@ -37,8 +37,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..feeds import FeedField, FeedGame
 from ..models import FEDERATION_RULES, Field, ScheduledGame
 
-# Plan phase 16 turns this on with the registrations themselves.
-ONLINE_REGISTRATION = False
+# Online registration (plan phase 16): on.
+ONLINE_REGISTRATION = True
 
 FEED_PAST = timedelta(days=30)        # games stay in the feeds this long after their end
 MAX_DURATION = timedelta(days=14)     # a weekend milsim fits easily
@@ -177,9 +177,17 @@ def registration_state(game: ScheduledGame, now: datetime) -> Optional[str]:
     return "open"
 
 
-def places_left(game: ScheduledGame) -> Optional[int]:
-    """Places left, once there are registrations (plan phase 16): today ``max_players``."""
-    return game.max_players
+def places_left(game: ScheduledGame, registered: int = 0) -> Optional[int]:
+    """``max_players`` less the live registrations (``registered``), or None for no limit."""
+    if game.max_players is None:
+        return None
+    return max(game.max_players - registered, 0)
+
+
+def can_register(game: ScheduledGame, now: datetime, registered: int = 0) -> bool:
+    """Whether the public may register now: online registration on, the window open, places left."""
+    left = places_left(game, registered)
+    return ONLINE_REGISTRATION and registration_state(game, now) == "open" and (left is None or left > 0)
 
 
 def location(game: ScheduledGame, field: Field) -> Optional[str]:
@@ -194,14 +202,14 @@ def feed_field(field: Field, base_url: str) -> FeedField:
                      federation_label=field.federation_label)
 
 
-def feed_game(game: ScheduledGame, field: Field, now: datetime) -> FeedGame:
+def feed_game(game: ScheduledGame, field: Field, now: datetime, registered: int = 0) -> FeedGame:
     return FeedGame(
         id=game.id, title=game.title, starts_at=game.starts_at, ends_at=game.ends_at, status=game.status,
         updated_at=game.updated_at, sequence=game.ical_sequence, description=game.description,
         location=location(game, field), mode_id=game.mode_id, teams=tuple(game.teams or ()),
-        max_players=game.max_players, places_left=places_left(game),
+        max_players=game.max_players, places_left=places_left(game, registered),
         registration_opens_at=game.registration_opens_at, registration_closes_at=game.registration_closes_at,
-        registration_open=ONLINE_REGISTRATION and registration_state(game, now) == "open",
+        registration_open=can_register(game, now, registered),
         federation=game.federation, cancelled_reason=game.cancelled_reason)
 
 
@@ -237,13 +245,13 @@ def _iso(value: Optional[datetime]) -> Optional[str]:
     return value.isoformat() if value is not None else None
 
 
-def staff_json(game: ScheduledGame, field: Field, now: datetime) -> dict[str, Any]:
+def staff_json(game: ScheduledGame, field: Field, now: datetime, registered: int = 0) -> dict[str, Any]:
     """A scheduled game as its field's staff see it in the API."""
     return {
         "id": str(game.id), "field_id": str(game.field_id), "title": game.title, "description": game.description,
         "starts_at": _iso(game.starts_at), "ends_at": _iso(game.ends_at), "location_text": game.location_text,
         "location": location(game, field), "mode_id": game.mode_id, "teams": list(game.teams or ()),
-        "max_players": game.max_players, "places_left": places_left(game),
+        "max_players": game.max_players, "places_left": places_left(game, registered), "registered": registered,
         "registration_opens_at": _iso(game.registration_opens_at),
         "registration_closes_at": _iso(game.registration_closes_at),
         "registration_state": registration_state(game, now), "federation": game.federation,
@@ -251,5 +259,6 @@ def staff_json(game: ScheduledGame, field: Field, now: datetime) -> dict[str, An
         "published_at": _iso(game.published_at), "cancelled_at": _iso(game.cancelled_at),
         "cancelled_reason": game.cancelled_reason, "ical_sequence": game.ical_sequence,
         "created_by": str(game.created_by) if game.created_by else None,
+        "controller_game": str(game.controller_game) if game.controller_game else None, "walkins": game.walkins,
         "created_at": _iso(game.created_at), "updated_at": _iso(game.updated_at),
     }

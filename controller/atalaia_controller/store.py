@@ -40,6 +40,13 @@ site server (``marshal_keys`` keeps one current key per marshal, as before);
 and ``sync_items``: what the sync client last sent of the field's chrono
 registry (each marshal key's and replica's hash, each reading's id), so a
 cycle sends only what is new or changed.
+
+Schema 7 (phase 4, plan phase 16; ADR-P4-11) adds game-day sync with a site server:
+``schedule_games`` (the field's published games as last pulled), ``schedule_links`` (which
+controller game was made from which scheduled game, and its roster's last pull), and on
+``checkins`` the registration a check-in belongs to (``registration_id``, the SHA-256 of its
+ticket, ``from_roster``) next to a new status, ``expected``: a registered player who has not
+arrived yet. A schema 6 file is upgraded in place.
 """
 
 from __future__ import annotations
@@ -52,7 +59,7 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes
 
 SCHEMA = """
@@ -150,7 +157,7 @@ CREATE TABLE IF NOT EXISTS field_players (
 CREATE TABLE IF NOT EXISTS checkins (
     game_id           INTEGER NOT NULL,
     player_id         TEXT NOT NULL,
-    status            TEXT NOT NULL,                   -- pending, checked_in, left, removed
+    status            TEXT NOT NULL,                   -- expected (schema 7), pending, checked_in, left, removed
     display_name      TEXT,                            -- personal data: erased after retention
     federation_number TEXT,
     federation_seen   INTEGER NOT NULL DEFAULT 0,
@@ -219,7 +226,7 @@ CREATE TABLE IF NOT EXISTS marshal_key_history (
 );
 CREATE INDEX IF NOT EXISTS idx_marshal_key_history ON marshal_key_history (marshal_id);
 CREATE TABLE IF NOT EXISTS sync_items (
-    kind    TEXT NOT NULL,                             -- schema 6: marshal, replica or reading
+    kind    TEXT NOT NULL,                             -- schema 6: marshal, replica, reading; 7: checkins
     item_id TEXT NOT NULL,
     sha     TEXT NOT NULL,                             -- SHA-256 of what was sent (readings: their id)
     PRIMARY KEY (kind, item_id)
@@ -254,6 +261,21 @@ CREATE TABLE IF NOT EXISTS sync_state (
     last_error TEXT,
     PRIMARY KEY (game_id, game_seed)
 );
+CREATE TABLE IF NOT EXISTS schedule_games (
+    scheduled_game_id TEXT PRIMARY KEY,                -- schema 7: the site server's scheduled game
+    data_json         TEXT NOT NULL,                   -- as GET /api/v1/sync/schedule gave it
+    pulled_at         REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS schedule_links (
+    game_id           INTEGER NOT NULL,                -- schema 7: a game made from a scheduled game
+    game_seed         INTEGER NOT NULL,
+    scheduled_game_id TEXT NOT NULL,
+    linked_at         REAL NOT NULL,
+    roster_pulled_at  REAL,                            -- the last roster applied (until the game starts)
+    roster_count      INTEGER,
+    roster_error      TEXT,
+    PRIMARY KEY (game_id, game_seed)
+);
 CREATE TABLE IF NOT EXISTS player_positions (
     game_id     INTEGER NOT NULL,
     player_id   TEXT NOT NULL,
@@ -272,6 +294,13 @@ GAME_COLUMNS_V2 = (
     ("controller_id", "INTEGER"),              # joined game: the controller that made the join
     ("squads", "INTEGER NOT NULL DEFAULT 0"),  # schema 3: squads per team (0: the game has none)
     ("team_info_json", "TEXT"),                # schema 4: {team: {display_name, crest_id}}
+)
+
+# Columns added to checkins in schema 7 (plan phase 16): a registration from the site server's roster.
+CHECKIN_COLUMNS_V7 = (
+    ("registration_id", "TEXT"),                  # the site server's registration (a UUID)
+    ("ticket_sha256", "TEXT"),                    # its ticket's SHA-256 (hex): from the roster or the app
+    ("from_roster", "INTEGER NOT NULL DEFAULT 0"),  # 1: the roster brought it (the registration is verified)
 )
 
 LIVE_STATES = ("ready", "running", "paused")
@@ -320,6 +349,10 @@ class Store:
             for name, decl in GAME_COLUMNS_V2:
                 if name not in have:
                     self._db.execute(f"ALTER TABLE games ADD COLUMN {name} {decl}")
+            have = {r["name"] for r in self._db.execute("PRAGMA table_info(checkins)").fetchall()}
+            for name, decl in CHECKIN_COLUMNS_V7:
+                if name not in have:
+                    self._db.execute(f"ALTER TABLE checkins ADD COLUMN {name} {decl}")
             self.set_setting("schema_version", str(SCHEMA_VERSION))
         if path != ":memory:":
             for name in (path, path + "-wal", path + "-shm"):
@@ -576,7 +609,7 @@ class Store:
 
     # --- the chrono registry's sync (schema 6, plan phase 14) -----------------
 
-    SYNC_KINDS = ("marshal", "replica", "reading")
+    SYNC_KINDS = ("marshal", "replica", "reading", "checkins")  # checkins: per linked game (schema 7)
 
     def sync_items(self, kind: str) -> dict[str, str]:
         """What was last sent of one kind: {item id: hash}."""
@@ -754,14 +787,70 @@ class Store:
 
     CHECKIN_FIELDS = ("status", "display_name", "federation_number", "federation_seen", "team_preference",
                       "team", "squad", "role", "manual", "notice_version", "updated_at", "checked_in_at",
-                      "erased_at")
+                      "erased_at", "registration_id", "ticket_sha256", "from_roster")
 
     @staticmethod
     def _checkin(row: sqlite3.Row) -> dict[str, Any]:
         out = {k: row[k] for k in row.keys()}
         out["federation_seen"] = bool(out["federation_seen"])
         out["manual"] = bool(out["manual"])
+        out["from_roster"] = bool(out.get("from_roster"))
         return out
+
+    def checkin_by_registration(self, game_id: int, registration_id: str) -> Optional[dict[str, Any]]:
+        row = self._exec("SELECT * FROM checkins WHERE game_id = ? AND registration_id = ?",
+                         (game_id, registration_id)).fetchone()
+        return self._checkin(row) if row else None
+
+    def delete_checkin(self, game_id: int, player_id: str) -> None:
+        """An expected check-in whose registration was cancelled (schema 7): it and its declarations go."""
+        with self._lock:
+            self._exec("DELETE FROM declarations WHERE game_id = ? AND player_id = ?", (game_id, player_id))
+            self._exec("DELETE FROM checkins WHERE game_id = ? AND player_id = ?", (game_id, player_id))
+
+    # --- game-day sync (schema 7, plan phase 16) ------------------------------------------
+
+    def set_schedule(self, games: list[dict[str, Any]], now: float) -> None:
+        """The field's schedule as just pulled: it replaces the last one."""
+        with self._lock:
+            self._exec("DELETE FROM schedule_games")
+            for g in games:
+                self._exec("INSERT INTO schedule_games (scheduled_game_id, data_json, pulled_at) VALUES (?, ?, ?)",
+                           (g["scheduled_game_id"], json.dumps(g, sort_keys=True), now))
+
+    def schedule(self) -> list[dict[str, Any]]:
+        rows = self._exec("SELECT data_json, pulled_at FROM schedule_games").fetchall()
+        out = [{**json.loads(r["data_json"]), "pulled_at": r["pulled_at"]} for r in rows]
+        return sorted(out, key=lambda g: (g["starts_at"], g["scheduled_game_id"]))
+
+    def schedule_game(self, scheduled_game_id: str) -> Optional[dict[str, Any]]:
+        row = self._exec("SELECT data_json, pulled_at FROM schedule_games WHERE scheduled_game_id = ?",
+                         (scheduled_game_id,)).fetchone()
+        return {**json.loads(row["data_json"]), "pulled_at": row["pulled_at"]} if row else None
+
+    def link_schedule(self, game_id: int, game_seed: int, scheduled_game_id: str, now: float) -> None:
+        self._exec("INSERT INTO schedule_links (game_id, game_seed, scheduled_game_id, linked_at) VALUES (?, ?, ?, ?) "
+                   "ON CONFLICT(game_id, game_seed) DO UPDATE SET scheduled_game_id = excluded.scheduled_game_id, "
+                   "linked_at = excluded.linked_at, roster_pulled_at = NULL, roster_count = NULL, "
+                   "roster_error = NULL", (game_id, game_seed, scheduled_game_id, now))
+
+    def schedule_link(self, game_id: int, game_seed: int) -> Optional[dict[str, Any]]:
+        row = self._exec("SELECT * FROM schedule_links WHERE game_id = ? AND game_seed = ?",
+                         (game_id, game_seed)).fetchone()
+        return {k: row[k] for k in row.keys()} if row else None
+
+    def schedule_links(self) -> list[dict[str, Any]]:
+        rows = self._exec("SELECT * FROM schedule_links ORDER BY linked_at").fetchall()
+        return [{k: r[k] for k in r.keys()} for r in rows]
+
+    def roster_pulled(self, game_id: int, game_seed: int, now: float, count: Optional[int],
+                      error: Optional[str]) -> None:
+        if error is None:
+            self._exec("UPDATE schedule_links SET roster_pulled_at = ?, roster_count = ?, roster_error = NULL "
+                       "WHERE game_id = ? AND game_seed = ?", (now, count, game_id, game_seed))
+        else:
+            self._exec("UPDATE schedule_links SET roster_error = ? WHERE game_id = ? AND game_seed = ?",
+                       (error, game_id, game_seed))
 
     def checkin(self, game_id: int, player_id: str) -> Optional[dict[str, Any]]:
         row = self._exec("SELECT * FROM checkins WHERE game_id = ? AND player_id = ?",

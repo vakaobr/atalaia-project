@@ -1,5 +1,5 @@
 {
- "description": "Controller sync bodies (protocol/sync.md). Every valid body passes its kind's check (games, events, scores, nodes, marshals, replicas, chrono); nodes_unknown_info_dropped keeps only the info keys listed under info. Every invalid body fails with the error code and path given (the first problem found, in the order of protocol/sync.md's tables). merge: the snapshots merged in order by maximum per (source, team) give counters, and the totals are the counters' sum per team plus the deltas (GM adjustments, score.delta), worked out by hand from protocol/sync.md's rule (decision P4R10). The chrono bodies use the marshal test key and records of chrono_record.json: chrono_readings verifies on the site server once marshals_with_a_rotated_key is stored (its second key is that test key, valid from 1792000000).",
+ "description": "Controller sync bodies (protocol/sync.md). Every valid body passes its kind's check (games, events, scores, nodes, marshals, replicas, chrono, checkins, claims); nodes_unknown_info_dropped keeps only the info keys listed under info. Every invalid body fails with the error code and path given (the first problem found, in the order of protocol/sync.md's tables). merge: the snapshots merged in order by maximum per (source, team) give counters, and the totals are the counters' sum per team plus the deltas (GM adjustments, score.delta), worked out by hand from protocol/sync.md's rule (decision P4R10). The chrono bodies use the marshal test key and records of chrono_record.json: chrono_readings verifies on the site server once marshals_with_a_rotated_key is stored (its second key is that test key, valid from 1792000000). answers (plan phase 16): the answers of the GET endpoints the controller pulls (schedule, roster, claims), each valid one passing sync_format.ANSWERS[kind] and each invalid one failing with its error and path; the site server's own answers are checked with the same functions in its tests.",
  "valid": [
   {
    "name": "game_minimal",
@@ -310,6 +310,123 @@
       "series_id": "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
       "outcome": null,
       "received_at": 1792339510.0
+     }
+    ]
+   }
+  },
+  {
+   "name": "game_from_a_scheduled_game",
+   "kind": "games",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "meta": {
+     "name": "Domingo",
+     "mode_id": "org.atalaia.domination",
+     "teams": [
+      "red",
+      "blue"
+     ],
+     "state": "ready",
+     "created_at": 1792000000.5,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001"
+    }
+   }
+  },
+  {
+   "name": "checkins_after_the_game",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ]
+   }
+  },
+  {
+   "name": "checkins_none_registered",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 0,
+    "registrations": []
+   }
+  },
+  {
+   "name": "claim_results",
+   "kind": "claims",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "results": [
+     {
+      "claim_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "result": "confirmed"
+     },
+     {
+      "claim_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "result": "refused"
+     },
+     {
+      "claim_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "result": "unknown"
      }
     ]
    }
@@ -9173,6 +9290,631 @@
    },
    "error": "bad_batch_size",
    "path": "readings"
+  },
+  {
+   "name": "game_scheduled_id_not_a_uuid",
+   "kind": "games",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "meta": {
+     "name": "Domingo",
+     "mode_id": "org.atalaia.domination",
+     "teams": [
+      "red",
+      "blue"
+     ],
+     "state": "ready",
+     "created_at": 1792000000.5,
+     "scheduled_game_id": "42"
+    }
+   },
+   "error": "bad_text",
+   "path": "meta.scheduled_game_id"
+  },
+  {
+   "name": "checkins_without_a_game",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ]
+   },
+   "error": "missing",
+   "path": "game"
+  },
+  {
+   "name": "checkins_no_walkins",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ]
+   },
+   "error": "missing",
+   "path": "walkins"
+  },
+  {
+   "name": "checkins_with_a_name",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ],
+      "display_name": "Falcão"
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ]
+   },
+   "error": "unknown_field",
+   "path": "registrations[0].display_name"
+  },
+  {
+   "name": "checkins_with_a_federation_number",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ],
+      "federation_number": "12345"
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ]
+   },
+   "error": "unknown_field",
+   "path": "registrations[0].federation_number"
+  },
+  {
+   "name": "checkins_bad_outcome",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "left",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ]
+   },
+   "error": "bad_outcome",
+   "path": "registrations[0].outcome"
+  },
+  {
+   "name": "checkins_bad_player_id",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-17",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ]
+   },
+   "error": "bad_text",
+   "path": "registrations[0].player_id"
+  },
+  {
+   "name": "checkins_twice",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ]
+   },
+   "error": "duplicate_registration",
+   "path": "registrations[1].registration_id"
+  },
+  {
+   "name": "checkins_ticket_upper_case",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F",
+      "declarations": []
+     }
+    ]
+   },
+   "error": "bad_text",
+   "path": "registrations[2].ticket_sha256"
+  },
+  {
+   "name": "checkins_bad_state",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": 3,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "chronographed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ]
+   },
+   "error": "bad_state",
+   "path": "registrations[0].declarations[0].state"
+  },
+  {
+   "name": "checkins_negative_walkins",
+   "kind": "checkins",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    },
+    "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+    "walkins": -1,
+    "registrations": [
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "player_id": "p-abcdefgh2345",
+      "outcome": "checked_in",
+      "declarations": [
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+        "state": "passed",
+        "reading_id": "0192f3a4-0000-7000-8000-00000000d001"
+       },
+       {
+        "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+        "state": "withdrawn"
+       }
+      ]
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "player_id": "p-zzzzzzzzzzzz",
+      "outcome": "no_show",
+      "declarations": []
+     },
+     {
+      "registration_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "player_id": "p-bbbbbbbbbbbb",
+      "outcome": "checked_in",
+      "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "declarations": []
+     }
+    ]
+   },
+   "error": "out_of_range",
+   "path": "walkins"
+  },
+  {
+   "name": "claims_with_a_game",
+   "kind": "claims",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "results": [
+     {
+      "claim_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "result": "confirmed"
+     },
+     {
+      "claim_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "result": "refused"
+     },
+     {
+      "claim_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "result": "unknown"
+     }
+    ],
+    "game": {
+     "game_id": 4242,
+     "game_seed": 3735928559
+    }
+   },
+   "error": "unknown_field",
+   "path": "game"
+  },
+  {
+   "name": "claims_empty",
+   "kind": "claims",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "results": []
+   },
+   "error": "bad_batch_size",
+   "path": "results"
+  },
+  {
+   "name": "claims_bad_result",
+   "kind": "claims",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "results": [
+     {
+      "claim_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "result": "maybe"
+     },
+     {
+      "claim_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "result": "refused"
+     },
+     {
+      "claim_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "result": "unknown"
+     }
+    ]
+   },
+   "error": "bad_value",
+   "path": "results[0].result"
+  },
+  {
+   "name": "claims_with_the_secret",
+   "kind": "claims",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "results": [
+     {
+      "claim_id": "0192f3a4-0000-7000-8000-00000000b001",
+      "result": "confirmed",
+      "secret_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f"
+     },
+     {
+      "claim_id": "0192f3a4-0000-7000-8000-00000000b002",
+      "result": "refused"
+     },
+     {
+      "claim_id": "0192f3a4-0000-7000-8000-00000000b003",
+      "result": "unknown"
+     }
+    ]
+   },
+   "error": "unknown_field",
+   "path": "results[0].secret_sha256"
   }
  ],
  "merge": [
@@ -9308,5 +10050,642 @@
     "red": -10
    }
   }
- ]
+ ],
+ "answers": {
+  "valid": [
+   {
+    "name": "schedule",
+    "kind": "schedule",
+    "body": {
+     "sync_version": 1,
+     "games": [
+      {
+       "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+       "title": "Domingo de manhã",
+       "starts_at": 1792400400.0,
+       "ends_at": 1792414800.0,
+       "status": "published",
+       "mode_id": "org.atalaia.domination",
+       "teams": [
+        "red",
+        "blue"
+       ],
+       "max_players": 60,
+       "federation": "required",
+       "predeclare_replicas": true,
+       "registered": 2,
+       "location": "Campo Norte, Sintra"
+      },
+      {
+       "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000b001",
+       "title": "Milsim",
+       "starts_at": 1792500000,
+       "ends_at": 1792586400,
+       "status": "in_progress",
+       "teams": [],
+       "federation": "off",
+       "predeclare_replicas": false,
+       "registered": 0
+      }
+     ]
+    }
+   },
+   {
+    "name": "schedule_empty",
+    "kind": "schedule",
+    "body": {
+     "sync_version": 1,
+     "games": []
+    }
+   },
+   {
+    "name": "roster",
+    "kind": "roster",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "status": "published",
+     "federation": "required",
+     "registrations": [
+      {
+       "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+       "player_id": "p-abcdefgh2345",
+       "display_name": "Falcão",
+       "team_preference": "red",
+       "federation_number": "FPA-1234",
+       "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "replicas": [
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+         "type": "aeg",
+         "class": "rifle",
+         "make_model": "Tokyo Marui M4"
+        },
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+         "replica_id": "0192f3a4-0000-7000-8000-00000000d001",
+         "type": "sniper",
+         "class": "sniper"
+        }
+       ]
+      },
+      {
+       "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+       "player_id": "p-zzzzzzzzzzzz",
+       "display_name": "Coruja",
+       "replicas": []
+      }
+     ]
+    }
+   },
+   {
+    "name": "claims",
+    "kind": "claims",
+    "body": {
+     "sync_version": 1,
+     "claims": [
+      {
+       "claim_id": "0192f3a4-0000-7000-8000-00000000b001",
+       "player_id": "p-abcdefgh2345",
+       "secret_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f"
+      }
+     ]
+    }
+   }
+  ],
+  "invalid": [
+   {
+    "name": "schedule_version_2",
+    "kind": "schedule",
+    "body": {
+     "sync_version": 2,
+     "games": [
+      {
+       "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+       "title": "Domingo de manhã",
+       "starts_at": 1792400400.0,
+       "ends_at": 1792414800.0,
+       "status": "published",
+       "mode_id": "org.atalaia.domination",
+       "teams": [
+        "red",
+        "blue"
+       ],
+       "max_players": 60,
+       "federation": "required",
+       "predeclare_replicas": true,
+       "registered": 2,
+       "location": "Campo Norte, Sintra"
+      },
+      {
+       "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000b001",
+       "title": "Milsim",
+       "starts_at": 1792500000,
+       "ends_at": 1792586400,
+       "status": "in_progress",
+       "teams": [],
+       "federation": "off",
+       "predeclare_replicas": false,
+       "registered": 0
+      }
+     ]
+    },
+    "error": "unsupported_version",
+    "path": "sync_version"
+   },
+   {
+    "name": "schedule_draft",
+    "kind": "schedule",
+    "body": {
+     "sync_version": 1,
+     "games": [
+      {
+       "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+       "title": "Domingo de manhã",
+       "starts_at": 1792400400.0,
+       "ends_at": 1792414800.0,
+       "status": "draft",
+       "mode_id": "org.atalaia.domination",
+       "teams": [
+        "red",
+        "blue"
+       ],
+       "max_players": 60,
+       "federation": "required",
+       "predeclare_replicas": true,
+       "registered": 2,
+       "location": "Campo Norte, Sintra"
+      },
+      {
+       "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000b001",
+       "title": "Milsim",
+       "starts_at": 1792500000,
+       "ends_at": 1792586400,
+       "status": "in_progress",
+       "teams": [],
+       "federation": "off",
+       "predeclare_replicas": false,
+       "registered": 0
+      }
+     ]
+    },
+    "error": "bad_state",
+    "path": "games[0].status"
+   },
+   {
+    "name": "schedule_ends_before_it_starts",
+    "kind": "schedule",
+    "body": {
+     "sync_version": 1,
+     "games": [
+      {
+       "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+       "title": "Domingo de manhã",
+       "starts_at": 1792400400.0,
+       "ends_at": 1792400400.0,
+       "status": "published",
+       "mode_id": "org.atalaia.domination",
+       "teams": [
+        "red",
+        "blue"
+       ],
+       "max_players": 60,
+       "federation": "required",
+       "predeclare_replicas": true,
+       "registered": 2,
+       "location": "Campo Norte, Sintra"
+      },
+      {
+       "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000b001",
+       "title": "Milsim",
+       "starts_at": 1792500000,
+       "ends_at": 1792586400,
+       "status": "in_progress",
+       "teams": [],
+       "federation": "off",
+       "predeclare_replicas": false,
+       "registered": 0
+      }
+     ]
+    },
+    "error": "bad_period",
+    "path": "games[0].ends_at"
+   },
+   {
+    "name": "schedule_twice",
+    "kind": "schedule",
+    "body": {
+     "sync_version": 1,
+     "games": [
+      {
+       "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+       "title": "Domingo de manhã",
+       "starts_at": 1792400400.0,
+       "ends_at": 1792414800.0,
+       "status": "published",
+       "mode_id": "org.atalaia.domination",
+       "teams": [
+        "red",
+        "blue"
+       ],
+       "max_players": 60,
+       "federation": "required",
+       "predeclare_replicas": true,
+       "registered": 2,
+       "location": "Campo Norte, Sintra"
+      },
+      {
+       "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+       "title": "Milsim",
+       "starts_at": 1792500000,
+       "ends_at": 1792586400,
+       "status": "in_progress",
+       "teams": [],
+       "federation": "off",
+       "predeclare_replicas": false,
+       "registered": 0
+      }
+     ]
+    },
+    "error": "duplicate_game",
+    "path": "games[1].scheduled_game_id"
+   },
+   {
+    "name": "schedule_unknown_member",
+    "kind": "schedule",
+    "body": {
+     "sync_version": 1,
+     "games": [
+      {
+       "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+       "title": "Domingo de manhã",
+       "starts_at": 1792400400.0,
+       "ends_at": 1792414800.0,
+       "status": "published",
+       "mode_id": "org.atalaia.domination",
+       "teams": [
+        "red",
+        "blue"
+       ],
+       "max_players": 60,
+       "federation": "required",
+       "predeclare_replicas": true,
+       "registered": 2,
+       "location": "Campo Norte, Sintra",
+       "created_by": "0192f3a4-0000-7000-8000-00000000b001"
+      },
+      {
+       "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000b001",
+       "title": "Milsim",
+       "starts_at": 1792500000,
+       "ends_at": 1792586400,
+       "status": "in_progress",
+       "teams": [],
+       "federation": "off",
+       "predeclare_replicas": false,
+       "registered": 0
+      }
+     ]
+    },
+    "error": "unknown_field",
+    "path": "games[0].created_by"
+   },
+   {
+    "name": "roster_with_an_email",
+    "kind": "roster",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "status": "published",
+     "federation": "required",
+     "registrations": [
+      {
+       "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+       "player_id": "p-abcdefgh2345",
+       "display_name": "Falcão",
+       "team_preference": "red",
+       "federation_number": "FPA-1234",
+       "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "replicas": [
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+         "type": "aeg",
+         "class": "rifle",
+         "make_model": "Tokyo Marui M4"
+        },
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+         "replica_id": "0192f3a4-0000-7000-8000-00000000d001",
+         "type": "sniper",
+         "class": "sniper"
+        }
+       ],
+       "email": "a@b.pt"
+      },
+      {
+       "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+       "player_id": "p-zzzzzzzzzzzz",
+       "display_name": "Coruja",
+       "replicas": []
+      }
+     ]
+    },
+    "error": "unknown_field",
+    "path": "registrations[0].email"
+   },
+   {
+    "name": "roster_federation_number_not_asked",
+    "kind": "roster",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "status": "published",
+     "federation": "off",
+     "registrations": [
+      {
+       "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+       "player_id": "p-abcdefgh2345",
+       "display_name": "Falcão",
+       "team_preference": "red",
+       "federation_number": "FPA-1234",
+       "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "replicas": [
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+         "type": "aeg",
+         "class": "rifle",
+         "make_model": "Tokyo Marui M4"
+        },
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+         "replica_id": "0192f3a4-0000-7000-8000-00000000d001",
+         "type": "sniper",
+         "class": "sniper"
+        }
+       ]
+      },
+      {
+       "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+       "player_id": "p-zzzzzzzzzzzz",
+       "display_name": "Coruja",
+       "replicas": []
+      }
+     ]
+    },
+    "error": "not_asked",
+    "path": "registrations[0].federation_number"
+   },
+   {
+    "name": "roster_long_name",
+    "kind": "roster",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "status": "published",
+     "federation": "required",
+     "registrations": [
+      {
+       "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+       "player_id": "p-abcdefgh2345",
+       "display_name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+       "team_preference": "red",
+       "federation_number": "FPA-1234",
+       "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "replicas": [
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+         "type": "aeg",
+         "class": "rifle",
+         "make_model": "Tokyo Marui M4"
+        },
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+         "replica_id": "0192f3a4-0000-7000-8000-00000000d001",
+         "type": "sniper",
+         "class": "sniper"
+        }
+       ]
+      },
+      {
+       "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+       "player_id": "p-zzzzzzzzzzzz",
+       "display_name": "Coruja",
+       "replicas": []
+      }
+     ]
+    },
+    "error": "bad_text",
+    "path": "registrations[0].display_name"
+   },
+   {
+    "name": "roster_same_player_twice",
+    "kind": "roster",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "status": "published",
+     "federation": "required",
+     "registrations": [
+      {
+       "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+       "player_id": "p-abcdefgh2345",
+       "display_name": "Falcão",
+       "team_preference": "red",
+       "federation_number": "FPA-1234",
+       "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "replicas": [
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+         "type": "aeg",
+         "class": "rifle",
+         "make_model": "Tokyo Marui M4"
+        },
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+         "replica_id": "0192f3a4-0000-7000-8000-00000000d001",
+         "type": "sniper",
+         "class": "sniper"
+        }
+       ]
+      },
+      {
+       "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+       "player_id": "p-abcdefgh2345",
+       "display_name": "Coruja",
+       "replicas": []
+      }
+     ]
+    },
+    "error": "duplicate_registration",
+    "path": "registrations[1]"
+   },
+   {
+    "name": "roster_declaration_twice",
+    "kind": "roster",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "status": "published",
+     "federation": "required",
+     "registrations": [
+      {
+       "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+       "player_id": "p-abcdefgh2345",
+       "display_name": "Falcão",
+       "team_preference": "red",
+       "federation_number": "FPA-1234",
+       "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "replicas": [
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+         "type": "aeg",
+         "class": "rifle",
+         "make_model": "Tokyo Marui M4"
+        },
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+         "replica_id": "0192f3a4-0000-7000-8000-00000000d001",
+         "type": "sniper",
+         "class": "sniper"
+        }
+       ]
+      },
+      {
+       "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+       "player_id": "p-zzzzzzzzzzzz",
+       "display_name": "Coruja",
+       "replicas": [
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+         "type": "aeg",
+         "class": "rifle",
+         "make_model": "Tokyo Marui M4"
+        }
+       ]
+      }
+     ]
+    },
+    "error": "duplicate_declaration",
+    "path": "registrations[1].replicas[0].declaration_id"
+   },
+   {
+    "name": "roster_declaration_with_a_state",
+    "kind": "roster",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "status": "published",
+     "federation": "required",
+     "registrations": [
+      {
+       "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+       "player_id": "p-abcdefgh2345",
+       "display_name": "Falcão",
+       "team_preference": "red",
+       "federation_number": "FPA-1234",
+       "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "replicas": [
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+         "type": "aeg",
+         "class": "rifle",
+         "make_model": "Tokyo Marui M4",
+         "state": "passed"
+        },
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+         "replica_id": "0192f3a4-0000-7000-8000-00000000d001",
+         "type": "sniper",
+         "class": "sniper"
+        }
+       ]
+      },
+      {
+       "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+       "player_id": "p-zzzzzzzzzzzz",
+       "display_name": "Coruja",
+       "replicas": []
+      }
+     ]
+    },
+    "error": "unknown_field",
+    "path": "registrations[0].replicas[0].state"
+   },
+   {
+    "name": "roster_bad_type",
+    "kind": "roster",
+    "body": {
+     "sync_version": 1,
+     "scheduled_game_id": "0192f3a4-0000-7000-8000-00000000a001",
+     "status": "published",
+     "federation": "required",
+     "registrations": [
+      {
+       "registration_id": "0192f3a4-0000-7000-8000-00000000b001",
+       "player_id": "p-abcdefgh2345",
+       "display_name": "Falcão",
+       "team_preference": "red",
+       "federation_number": "FPA-1234",
+       "ticket_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "replicas": [
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c001",
+         "type": "laser",
+         "class": "rifle",
+         "make_model": "Tokyo Marui M4"
+        },
+        {
+         "declaration_id": "0192f3a4-0000-7000-8000-00000000c002",
+         "replica_id": "0192f3a4-0000-7000-8000-00000000d001",
+         "type": "sniper",
+         "class": "sniper"
+        }
+       ]
+      },
+      {
+       "registration_id": "0192f3a4-0000-7000-8000-00000000b002",
+       "player_id": "p-zzzzzzzzzzzz",
+       "display_name": "Coruja",
+       "replicas": []
+      }
+     ]
+    },
+    "error": "bad_type",
+    "path": "registrations[0].replicas[0].type"
+   },
+   {
+    "name": "claims_secret_not_hex",
+    "kind": "claims",
+    "body": {
+     "sync_version": 1,
+     "claims": [
+      {
+       "claim_id": "0192f3a4-0000-7000-8000-00000000b001",
+       "player_id": "p-abcdefgh2345",
+       "secret_sha256": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      }
+     ]
+    },
+    "error": "bad_text",
+    "path": "claims[0].secret_sha256"
+   },
+   {
+    "name": "claims_with_the_secret",
+    "kind": "claims",
+    "body": {
+     "sync_version": 1,
+     "claims": [
+      {
+       "claim_id": "0192f3a4-0000-7000-8000-00000000b001",
+       "player_id": "p-abcdefgh2345",
+       "secret_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+       "player_secret": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      }
+     ]
+    },
+    "error": "unknown_field",
+    "path": "claims[0].player_secret"
+   }
+  ]
+ }
 }

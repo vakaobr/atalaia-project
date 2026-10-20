@@ -841,6 +841,57 @@ class ConsoleBrowserTests(unittest.TestCase):
         read.get_by_test_id("tab-checkin").click()
         expect(read.locator("main.content")).not_to_contain_text("Coruja")
 
+    def test_a_game_from_the_schedule_and_its_registered_players(self):
+        """Plan phase 16: the site server's schedule, a game made from it, the roster's players expected."""
+        import hashlib
+        import uuid
+
+        from atalaia_controller import checkin_ticket
+
+        class Sync:  # the sync client's part the console sees; no site server in this test
+            def kick(self) -> None:
+                pass
+
+            def status(self) -> dict:
+                return {"enabled": True}
+
+        ctrl = self.field.bundle.controller
+        ctrl.sync = Sync()
+        sid = "0192f3a4-0000-7000-8000-00000000a001"
+        now = __import__("time").time()
+        self.field.bundle.store.set_schedule([{
+            "scheduled_game_id": sid, "title": "Domingo no pinhal", "starts_at": now + 3600, "ends_at": now + 4 * 3600,
+            "status": "published", "mode_id": DOMINATION, "teams": ["red", "blue"], "federation": "off",
+            "predeclare_replicas": True, "registered": 2}], now)
+        page = self.console()
+        page.get_by_test_id("tab-checkin").click()
+        expect(page.get_by_test_id(f"schedule-{sid}")).to_contain_text("Domingo no pinhal")
+        expect(page.get_by_test_id(f"schedule-{sid}")).to_contain_text("2 inscrições")
+        page.get_by_test_id("schedule-create").click()
+        self.assertTrue(wait_for(lambda: self.field.bundle.store.schedule_links(), 5))
+        gid = self.field.bundle.store.schedule_links()[0]["game_id"]
+        raw = os.urandom(32)
+        regs = [{"registration_id": str(uuid.uuid4()), "player_id": pid, "display_name": name,
+                 "ticket_sha256": hashlib.sha256(raw).hexdigest() if name == "Mocho" else None,
+                 "replicas": [{"declaration_id": str(uuid.uuid4()), "type": "aeg", "class": "rifle"}]}
+                for pid, name in (("p-falcaofalcao", "Falcão"), ("p-mochomochomo", "Mocho"))]
+        regs[0].pop("ticket_sha256")
+        ctrl.checkin.apply_roster(gid, {"registrations": regs})
+        row = page.get_by_test_id("checkin-row-p-falcaofalcao")
+        expect(row).to_contain_text("por chegar")  # the roster message reloads the tab
+        expect(row.get_by_test_id("checkin-registered-badge")).to_be_visible()
+        expect(page.get_by_test_id("checkin-registered")).to_contain_text("2 por chegar")
+        expect(page.get_by_test_id("chrono-counts")).to_contain_text("por cronografar: 2")
+        row.get_by_test_id("checkin-arrived").click()
+        expect(row).to_contain_text("com check-in")
+        ticket = checkin_ticket.make({"registration_id": regs[1]["registration_id"], "player_id": "p-mochomochomo",
+                                      "secret": raw})
+        page.get_by_test_id("ticket-input").fill(ticket)
+        page.get_by_test_id("ticket-submit").click()
+        expect(page.get_by_test_id("checkin-row-p-mochomochomo")).to_contain_text("com check-in")
+        self.check_in(gid, "Zé")
+        expect(page.get_by_test_id("checkin-registered")).to_contain_text("2 já chegaram · sem inscrição: 1")
+
     def test_checkin_tab_with_squads(self):
         page = self.console()
         page.get_by_test_id("game-name").fill("Milsim")

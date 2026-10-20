@@ -19,6 +19,18 @@ and the retention purge erases them 30 days after the game.
 The controller is the authority: a token's role, team and squad are checked
 against the player's current check-in on every request, so a demotion, a
 team change or a removal takes effect at once.
+
+**Registrations** (phase 4, plan phase 16; ADR-P4-11): with a site server, the
+sync client pulls the roster of a scheduled game the GM made this game from,
+until the game starts. Each registration becomes an **expected** check-in
+(``apply_roster``) with its pre-declared replicas already ``pending`` in the
+"replicas to chrono" list; a cancelled one that has not arrived goes. The
+player arrives with the app (the check-in carries ``registration_id`` and the
+ticket, whose SHA-256 the roster holds), shows a printed ``atalaia:ticket:``
+code to a marshal (``ticket_checkin``), or is ticked by name. Without a roster
+the app's registration id and ticket are kept with the walk-in, so the site
+server can match them later. What goes back after the game (``outcomes``) is
+each registration's outcome and declarations' states, never a name.
 """
 
 from __future__ import annotations
@@ -46,6 +58,7 @@ import yaml
 
 from . import REPO_ROOT, chrono, player_token
 from . import checkin_poster as posterfmt
+from . import checkin_ticket as ticketfmt
 from .engine import Conflict, ControllerError, NotFound
 
 if TYPE_CHECKING:
@@ -59,7 +72,8 @@ UUID_RE = chrono.UUID_RE
 CLASS_RE = re.compile(r"[a-z0-9_]{1,32}")
 MARSHAL_ID_RE = chrono.ID_RE
 REPLICA_TYPES = ("aeg", "gbb", "hpa", "bolt_action", "dmr", "sniper", "pistol", "shotgun")
-STATUSES = ("pending", "checked_in", "left", "removed")
+STATUSES = ("expected", "pending", "checked_in", "left", "removed")
+ARRIVED = ("pending", "checked_in", "left")  # at the field (a registration's outcome: checked_in)
 STATES = ("pending", "passed", "refused", "withdrawn")
 NAME_MAX = 32
 FEDERATION_MAX = 32
@@ -509,7 +523,7 @@ class Checkin:
         if not self.rate.allow(client):
             raise TooMany("too many check-ins from this address; wait a minute")
         allowed = {"game_id", "player_id", "player_secret", "display_name", "federation_number",
-                   "team_preference", "notice_version", "replicas"}
+                   "team_preference", "notice_version", "replicas", "registration_id", "ticket"}
         unknown = set(body) - allowed
         if unknown:
             raise ControllerError(f"unknown fields {sorted(unknown)}")
@@ -528,13 +542,10 @@ class Checkin:
         if not player_id_ok(pid):
             raise ControllerError("player_id: p- and 12 of a-z 2-7")
         secret = secret_bytes(body.get("player_secret"))
+        reg_id, ticket_hex = self._registration_proof(body)
         st = self.settings()
         name = _text("display_name", body.get("display_name"), NAME_MAX)
-        fed = _text("federation_number", body.get("federation_number") or None, FEDERATION_MAX, optional=True)
-        if st["federation"] == "off":
-            fed = None
-        elif st["federation"] == "required" and fed is None:
-            raise ControllerError(f"federation_number: this field asks for your {st['federation_label']} number")
+        fed_in = _text("federation_number", body.get("federation_number") or None, FEDERATION_MAX, optional=True)
         pref = body.get("team_preference")
         if pref is not None:
             self._team_id(game, pref, "team_preference")
@@ -549,14 +560,23 @@ class Checkin:
         digest = hashlib.sha256(secret).digest()
         with self._lock:
             known = self.store.field_player(pid)
+            row = self.store.checkin(game_id, pid)
+            expected = self._expected_match(game_id, pid, row, known, reg_id, ticket_hex)
             if known is not None:
                 if known["secret_sha256"] is None or not hmac.compare_digest(known["secret_sha256"], digest):
                     raise Conflict("this player id is someone else's at this field")
                 self.store.touch_field_player(pid, now)
-            row = self.store.checkin(game_id, pid)
             if row is not None and row["status"] == "removed":
                 raise Forbidden("staff removed this check-in; ask at the desk")
-            created = row is None
+            # A registered player's roster entry fills in what the app did not send.
+            fed = fed_in if fed_in is not None or expected is None else expected["federation_number"]
+            if pref is None and expected is not None and expected["team_preference"] in game["teams"]:
+                pref = expected["team_preference"]
+            if st["federation"] == "off":
+                fed = None
+            elif st["federation"] == "required" and fed is None:
+                raise ControllerError(f"federation_number: this field asks for your {st['federation_label']} number")
+            created = row is None or row["status"] == "expected"  # an expected player arriving is a new check-in
             emit = False
             if created:
                 if self.store.count_checkins(game_id) >= st["max_players"]:
@@ -564,10 +584,15 @@ class Checkin:
                 if known is None:
                     self.store.add_field_player(pid, digest, now)
                 status = "checked_in" if st["confirm"] == "auto" else "pending"
-                self.store.add_checkin(game_id, pid, {
-                    "status": status, "display_name": name, "federation_number": fed,
-                    "team_preference": pref, "notice_version": notice,
-                    "checked_in_at": now if status == "checked_in" else None}, now)
+                fields = {"status": status, "display_name": name, "federation_number": fed,
+                          "team_preference": pref, "notice_version": notice,
+                          "checked_in_at": now if status == "checked_in" else None}
+                if row is None:
+                    if reg_id is not None:  # no roster here: kept, so the site server can match it later
+                        fields.update(registration_id=reg_id, ticket_sha256=ticket_hex)
+                    self.store.add_checkin(game_id, pid, fields, now)
+                else:
+                    self.store.update_checkin(game_id, pid, **fields, updated_at=now)
                 emit = status == "checked_in"
             else:
                 status = row["status"]
@@ -581,6 +606,8 @@ class Checkin:
                     fields["federation_seen"] = False
                 if emit:
                     fields["checked_in_at"] = now
+                if reg_id is not None and row["registration_id"] is None:
+                    fields.update(registration_id=reg_id, ticket_sha256=ticket_hex)
                 self.store.update_checkin(game_id, pid, **fields)
             if decls is not None:
                 self._replace_declarations(game, pid, decls, staff=False, now=now)
@@ -597,6 +624,38 @@ class Checkin:
         return {"game_id": game["id"], "player_id": row["player_id"], "token": token, "exp": exp,
                 "status": row["status"], "team": self._team_name(game, row["team"]), "team_id": row["team"],
                 "squad": row["squad"], "role": row["role"]}
+
+    def _registration_proof(self, body: dict[str, Any]) -> tuple[Optional[str], Optional[str]]:
+        """``registration_id`` and ``ticket`` (both or neither): the id and the SHA-256 (hex) of the ticket."""
+        reg_id, ticket = body.get("registration_id"), body.get("ticket")
+        if reg_id is None and ticket is None:
+            return None, None
+        if reg_id is None or ticket is None:
+            raise ControllerError("registration_id and ticket go together")
+        if not isinstance(reg_id, str) or not UUID_RE.fullmatch(reg_id):
+            raise ControllerError("registration_id: a lowercase UUID")
+        try:
+            return reg_id, ticketfmt.secret_sha256(ticketfmt.secret_from_text(ticket))
+        except ticketfmt.TicketError:
+            raise ControllerError("ticket: 32 bytes in base64url without padding (43 characters)") from None
+
+    def _expected_match(self, game_id: int, pid: str, row: Optional[dict[str, Any]],
+                        known: Optional[dict[str, Any]], reg_id: Optional[str],
+                        ticket_hex: Optional[str]) -> Optional[dict[str, Any]]:
+        """The roster's check-in this arrival is, checked against its ticket; None for a walk-in.
+        A player id the roster brought and this controller never saw needs the registration's ticket:
+        the site server made that id, so no phone has proved it here yet."""
+        if reg_id is not None:
+            match = self.store.checkin_by_registration(game_id, reg_id)
+            if match is not None and match["from_roster"]:
+                if match["player_id"] != pid:
+                    raise Conflict("this registration is for another player id at this field")
+                if not match["ticket_sha256"] or not hmac.compare_digest(match["ticket_sha256"], ticket_hex or ""):
+                    raise Forbidden("this ticket is not this registration's (was a newer one made?)")
+                return match
+        if row is not None and row["from_roster"] and known is None:
+            raise Forbidden("this player id is registered for the game: check in with the registration's ticket")
+        return row if row is not None and row["from_roster"] else None
 
     def refresh_token(self, viewer: Viewer) -> dict[str, Any]:
         game = self.store.game(viewer.game_id)
@@ -636,7 +695,8 @@ class Checkin:
         out = {"game_id": game["id"], "player_id": row["player_id"], "status": row["status"],
                "team": self._team_name(game, row["team"]), "team_id": row["team"], "squad": row["squad"],
                "role": row["role"], "manual": row["manual"], "checked_in_at": row["checked_in_at"],
-               "seq": row["seq"]}
+               "seq": row["seq"], "registration_id": row.get("registration_id"),
+               "registered": bool(row.get("registration_id"))}
         if names:
             out.update({"display_name": row["display_name"], "federation_number": row["federation_number"],
                         "federation_seen": row["federation_seen"], "team_preference": row["team_preference"]})
@@ -741,9 +801,14 @@ class Checkin:
         game = self._staff(viewer, game_id)
         rows = [self.row_view(game, r) for r in self.store.checkins(game_id)]
         counts = collections.Counter(r["status"] for r in rows)
+        arrived = [r for r in rows if r["status"] in ("pending", "checked_in")]
         return {"game_id": game_id, "open": self.is_open(game_id), "settings": self.settings(),
                 "squads": int(game.get("squads") or 0),
-                "counts": {s: counts.get(s, 0) for s in STATUSES}, "checkins": rows}
+                "counts": {s: counts.get(s, 0) for s in STATUSES}, "checkins": rows,
+                # Plan phase 16: registered players expected and arrived, and walk-ins (not registered).
+                "registrations": {"expected": counts.get("expected", 0),
+                                  "arrived": sum(1 for r in arrived if r["registered"]),
+                                  "walkins": sum(1 for r in arrived if not r["registered"])}}
 
     def manual_checkin(self, viewer: Viewer, game_id: int, body: dict[str, Any]) -> dict[str, Any]:
         """A player without the app, checked in by a marshal or the GM (ADR-P3-13)."""
@@ -823,7 +888,7 @@ class Checkin:
         if "status" in body:
             if body["status"] != "checked_in":
                 raise ControllerError("status: only \"checked_in\" (confirm); remove with DELETE")
-            if row["status"] == "pending":
+            if row["status"] in ("pending", "expected"):  # a confirmation, or a registered player ticked by name
                 fields["status"] = "checked_in"
                 fields["checked_in_at"] = now
                 emit = True
@@ -860,6 +925,145 @@ class Checkin:
                     self.store.put_declaration({**d, "state": "withdrawn"}, now)
         self._notify(game_id, pid, assignment=True)
         return {"game_id": game["id"], "player_id": pid, "status": "removed"}
+
+    # --- registrations from a site server (plan phase 16) -----------------------------------
+
+    def ticket_checkin(self, viewer: Viewer, game_id: int, body: dict[str, Any]) -> dict[str, Any]:
+        """POST /api/v1/games/{id}/checkins/ticket: a marshal scans a registered player's printed
+        ``atalaia:ticket:`` code. The registration must be in this game's roster and the ticket its own;
+        the player is checked in at once (staff saw them). Scanning it again changes nothing."""
+        game = self._staff(viewer, game_id)
+        if game["state"] == "ended":
+            raise Conflict("the game has ended")
+        if set(body) - {"ticket"}:
+            raise ControllerError(f"unknown fields {sorted(set(body) - {'ticket'})}")
+        try:
+            ticket = ticketfmt.parse(body.get("ticket"))
+        except ticketfmt.TicketError as exc:
+            raise ControllerError(f"ticket: {exc}") from None
+        digest = ticketfmt.secret_sha256(ticket["secret"])
+        now = self._wall()
+        with self._lock:
+            row = self.store.checkin_by_registration(game_id, ticket["registration_id"])
+            if row is None or not row["from_roster"]:
+                raise NotFound("this ticket's registration is not on this game's roster")
+            if row["player_id"] != ticket["player_id"] or not row["ticket_sha256"] \
+                    or not hmac.compare_digest(row["ticket_sha256"], digest):
+                raise Forbidden("this ticket is not this registration's (was a newer one made?)")
+            if row["status"] == "removed":
+                raise Forbidden("staff removed this check-in")
+            emit = row["status"] == "expected"
+            if emit:
+                st = self.settings()
+                if self.store.count_checkins(game_id) >= st["max_players"]:
+                    raise Forbidden(f"game {game_id} is full ({st['max_players']} players)")
+                self.store.update_checkin(game_id, row["player_id"], status="checked_in", checked_in_at=now,
+                                          updated_at=now)
+            row = self.store.checkin(game_id, row["player_id"])
+            assert row is not None
+        if emit:
+            self._emit_checkin_event(game, row)
+        self._notify(game_id, row["player_id"])
+        return self.row_view(game, row)
+
+    def apply_roster(self, game_id: int, roster: dict[str, Any]) -> dict[str, Any]:
+        """A roster pulled from the site server (checked by ``sync_format.check_roster``) becomes this
+        game's expected check-ins, until the game starts (ADR-P4-11): new registrations are added with
+        their declarations ``pending``, an expected one takes the roster's latest data, a cancelled one
+        that has not arrived goes, and anyone already at the field stays as the controller has them.
+        A declaration this field's check-in would refuse (a class of another limit template, a declaration
+        id another player holds, more than ``max_replicas``) is dropped and counted."""
+        out = {"added": 0, "updated": 0, "removed": 0, "kept": 0, "conflicts": 0, "dropped_declarations": 0,
+               "frozen": False}
+        game = self.store.game(game_id)
+        if game is None or game["state"] != "ready":
+            out["frozen"] = True  # started (or gone): the controller's list is the authority now
+            return out
+        st = self.settings()
+        now = self._wall()
+        listed: set[str] = set()
+        with self._lock:
+            for reg in roster["registrations"]:
+                pid, rid = reg["player_id"], reg["registration_id"]
+                listed.add(rid)
+                by_reg = self.store.checkin_by_registration(game_id, rid)
+                row = self.store.checkin(game_id, pid)
+                if (by_reg is not None and by_reg["player_id"] != pid) or (
+                        row is not None and row["registration_id"] not in (None, rid)):
+                    out["conflicts"] += 1
+                    continue
+                try:
+                    name = _text("display_name", reg["display_name"], NAME_MAX)
+                except ControllerError:
+                    out["conflicts"] += 1
+                    continue
+                fed = reg.get("federation_number") if st["federation"] != "off" else None
+                pref = reg.get("team_preference") if reg.get("team_preference") in game["teams"] else None
+                decls = self._roster_declarations(game_id, pid, reg["replicas"], st, out)
+                fields = {"display_name": name, "federation_number": fed, "team_preference": pref,
+                          "registration_id": rid, "ticket_sha256": reg.get("ticket_sha256"), "from_roster": 1}
+                if row is None:
+                    self.store.add_checkin(game_id, pid, {"status": "expected", **fields}, now)
+                    self._replace_declarations(game, pid, decls, staff=True, now=now)
+                    out["added"] += 1
+                elif row["status"] == "expected":
+                    self.store.update_checkin(game_id, pid, **fields, updated_at=now)
+                    self._replace_declarations(game, pid, decls, staff=True, now=now)
+                    out["updated"] += 1
+                else:
+                    if row["registration_id"] is None:  # a walk-in who turns out to be registered
+                        self.store.update_checkin(game_id, pid, registration_id=rid, from_roster=1,
+                                                  ticket_sha256=reg.get("ticket_sha256"), updated_at=now)
+                    out["kept"] += 1
+            for row in self.store.checkins(game_id):
+                if row["status"] == "expected" and row["registration_id"] not in listed:
+                    self.store.delete_checkin(game_id, row["player_id"])
+                    out["removed"] += 1
+        if any(out[k] for k in ("added", "updated", "removed")):
+            self.ctrl._emit({"type": "roster", "game": game_id, "counts": dict(out), "_staff": True})
+            log.info("roster for game %d: %s", game_id, out)  # ids and counts only, never a name
+        return out
+
+    def _roster_declarations(self, game_id: int, pid: str, items: list[dict[str, Any]], st: dict[str, Any],
+                             out: dict[str, Any]) -> list[dict[str, Any]]:
+        decls = []
+        for item in items:
+            try:
+                d = validate_declaration(item)
+            except ControllerError:
+                out["dropped_declarations"] += 1
+                continue
+            other = self.store.declaration(d["declaration_id"])
+            if d["class"] not in self.limits["classes"] or len(decls) >= st["max_replicas"] or (
+                    other is not None and (other["game_id"] != game_id or other["player_id"] != pid)):
+                out["dropped_declarations"] += 1
+                continue
+            decls.append(d)
+        return decls
+
+    def outcomes(self, game_id: int) -> dict[str, Any]:
+        """What goes back to the site server after the game (POST /api/v1/sync/checkins): per registration
+        its outcome (``checked_in``: the player came; ``no_show``) and its declarations' final states, and
+        the walk-ins as a count. No names, no federation numbers. A registration this controller had only
+        from the app (no roster) carries its ticket's hash, which the site server checks."""
+        regs, walkins = [], 0
+        for r in self.store.checkins(game_id):
+            arrived = r["status"] in ARRIVED or (r["status"] == "removed" and r["checked_in_at"] is not None)
+            if not r["registration_id"]:
+                walkins += arrived
+                continue
+            if not r["from_roster"] and not r["ticket_sha256"]:
+                continue
+            entry: dict[str, Any] = {
+                "registration_id": r["registration_id"], "player_id": r["player_id"],
+                "outcome": "checked_in" if arrived else "no_show",
+                "declarations": [{"declaration_id": d["declaration_id"], "state": d["state"],
+                                  "reading_id": d["reading_id"]}
+                                 for d in self.store.declarations(game_id, r["player_id"])][:20]}
+            if not r["from_roster"]:
+                entry["ticket_sha256"] = r["ticket_sha256"]
+            regs.append(entry)
+        return {"registrations": regs, "walkins": int(walkins)}
 
     def csv_export(self, game_id: int) -> str:
         game = self.ctrl.get_game(game_id)
@@ -944,8 +1148,11 @@ class Checkin:
                 "chrono_valid_for": self.settings()["chrono_valid_for"], "players": players}
 
     def pending_count(self, game_id: int) -> int:
+        """Pending declarations of the players at the field (not of registered players who never came)."""
         game = self.store.game(game_id)
-        return self._chrono_list(game)["counts"]["pending"] if game else 0
+        if game is None:
+            return 0
+        return sum(p["pending"] for p in self._chrono_list(game)["players"] if p["status"] != "expected")
 
     # --- marshals and readings -------------------------------------------------------
 

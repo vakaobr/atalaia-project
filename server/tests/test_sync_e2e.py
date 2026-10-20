@@ -10,7 +10,11 @@ deliver them, and the GM adjusts the score down. Its sync client
 site server, served by uvicorn on 127.0.0.1 in this process, which stores in
 the test PostgreSQL. Then: the totals on both sides agree; a replay of
 everything changes nothing; a restarted client sends nothing new; a
-controller that was offline catches up. And the field's chrono registry: a
+controller that was offline catches up. Game day (plan phase 16): accounts register
+for a scheduled game on the site server (one adopts the player id its phone already
+has, which the controller confirms); the controller pulls the schedule, makes its game
+from it, pulls the roster as expected check-ins, players arrive with their tickets,
+and after the game the outcomes and the declarations' states go back. And the field's chrono registry: a
 marshal's key, rotated (a lost phone) between two series, the replica and the
 signed readings reach the site server, which verifies every one with the key
 of its period and stores the record exactly as the controller had it.
@@ -258,6 +262,124 @@ class SyncEndToEndTests(unittest.TestCase):
         store.reset_sync_state()
         self.assertTrue(SyncClient(cfg, store).run_once())
         self.assertEqual(self.db.fetch("SELECT count(*) FROM chrono_readings")[0][0], 6)
+
+    def api(self, method: str, path: str, body: Any = None, token: str = "") -> Any:
+        """The site server's account API over HTTP, as the app would call it."""
+        import urllib.request  # noqa: PLC0415
+
+        data = json.dumps(body).encode() if body is not None else None
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        req = urllib.request.Request(self.site.url + path, data=data, method=method, headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            raw = resp.read()
+        return json.loads(raw) if raw else None
+
+    def account(self, name: str) -> str:
+        """An account written to the database; its access token from a real login."""
+        import asyncio  # noqa: PLC0415
+
+        from atalaia_server import passwords  # noqa: PLC0415
+
+        digest = asyncio.run(passwords.hash_password("correct horse battery staple 42"))
+        self.db.fetch("INSERT INTO users (username, password_hash) VALUES ($1, $2)", name, digest)
+        out = self.api("POST", "/api/v1/auth/login", {"username": name, "password": "correct horse battery staple 42"})
+        return out["access_token"]
+
+    def test_game_day(self) -> None:
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+        from atalaia_controller import checkin_ticket, chrono, schedule
+        from atalaia_controller.checkin import Checkin, Viewer
+
+        cfg, store, ctrl = self.controller()
+        cfg.federation = "optional"
+        svc = Checkin(ctrl)
+        client = SyncClient(cfg, store, checkin=svc)
+        ctrl.sync = client
+
+        def secret() -> str:
+            return base64.urlsafe_b64encode(os.urandom(32)).rstrip(b"=").decode()
+
+        # Bea's phone checked in at this field before, with no account: a field identity of its own.
+        bea_phone = ("p-beabeabeabea", secret())
+        first = ctrl.create_game({"name": "Treino", "mode_id": DOMINATION, "teams": ["red", "blue"]})
+        svc.check_in({"game_id": first["id"], "player_id": bea_phone[0], "player_secret": bea_phone[1],
+                      "display_name": "Bea", "notice_version": 1}, "phone")
+        ctrl.end_game(first["id"], "time")
+
+        sid = self.db.fetch(
+            "INSERT INTO scheduled_games (field_id, title, starts_at, ends_at, status, teams, max_players, federation, "
+            "registration_opens_at, registration_closes_at, mode_id) VALUES ($1, 'Domingo', now() + interval '2 hours', "
+            "now() + interval '6 hours', 'published', '[\"red\", \"blue\"]', 10, 'optional', now() - interval '1 day', "
+            "now() + interval '1 hour', $2) RETURNING id", self.field, DOMINATION)[0][0]
+        base = f"/api/v1/fields/{self.field}/scheduled-games/{sid}/registrations"
+        ana, rui, bea = self.account("ana"), self.account("rui"), self.account("bea")
+        claim = self.api("POST", "/api/v1/me/player-ids", {"field_id": str(self.field), "player_id": bea_phone[0],
+                                                           "player_secret": bea_phone[1]}, bea)
+        self.assertEqual(claim["status"], "pending")
+        self.assertTrue(client.run_once(), client.last_error)  # the controller confirms Bea's phone id
+        self.assertEqual(self.db.fetch("SELECT player_id FROM field_player_ids")[0][0], bea_phone[0])
+        reg_ana = self.api("POST", base, {"display_name": "Falcão", "federation_number": "FPA-1",
+                                          "replicas": [{"type": "aeg", "class": "rifle", "make_model": "M4"}]}, ana)
+        reg_rui = self.api("POST", base, {"display_name": "Coruja"}, rui)
+        reg_bea = self.api("POST", base, {"display_name": "Bea"}, bea)
+        self.assertEqual(reg_bea["player_id"], bea_phone[0])
+
+        # Game day: the schedule, a game made from it, the roster as expected check-ins.
+        self.assertTrue(client.run_once(), client.last_error)
+        self.assertEqual([g["scheduled_game_id"] for g in store.schedule()], [str(sid)])
+        game = schedule.create_game(ctrl, str(sid), {"assignments": {"3": "zone", "4": "zone"}})
+        gid = game["id"]
+        self.assertTrue(client.run_once(), client.last_error)
+        rows = {r["player_id"]: r for r in store.checkins(gid)}
+        self.assertEqual({p: (r["status"], r["display_name"]) for p, r in rows.items()},
+                         {reg_ana["player_id"]: ("expected", "Falcão"), reg_rui["player_id"]: ("expected", "Coruja"),
+                          bea_phone[0]: ("expected", "Bea")})
+        self.assertEqual(rows[reg_ana["player_id"]]["federation_number"], "FPA-1")
+        self.assertEqual(self.db.fetch("SELECT controller_game IS NOT NULL FROM scheduled_games")[0][0], True)
+
+        # Arrivals: Ana's app with her ticket (her id was made by the site server), Bea's phone with its
+        # own identity and ticket, and a walk-in.
+        ana_phone = (reg_ana["player_id"], secret())
+        svc.check_in({"game_id": gid, "player_id": ana_phone[0], "player_secret": ana_phone[1], "display_name": "Falcão",
+                      "notice_version": 1, "registration_id": reg_ana["id"], "ticket": reg_ana["ticket"]}, "a")
+        ticket = checkin_ticket.parse(reg_bea["ticket_text"])
+        svc.ticket_checkin(Viewer("gm"), gid, {"ticket": reg_bea["ticket_text"]})  # a marshal scans it
+        self.assertEqual(ticket["player_id"], bea_phone[0])
+        svc.check_in({"game_id": gid, "player_id": "p-zezezezezeze", "player_secret": secret(),
+                      "display_name": "Zé", "notice_version": 1}, "z")
+        # Ana's declared replica passes the chrono at the gate.
+        key = Ed25519PrivateKey.generate()
+        pub = key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        svc.register_marshal({"marshal_id": "m-ana", "name": "Marta", "public_key": base64.b64encode(pub).decode()})
+        replica = str(uuid.uuid4())
+        rec = {"reading_id": str(uuid.uuid4()), "replica_id": replica, "player_id": ana_phone[0], "type": "checkin",
+               "velocity_mps": 100.0, "bb_weight_g": 0.2, "energy_j": chrono.round_half_away(chrono.energy_j(0.2, 100.0), 3),
+               "chrono_id": "c-1", "marshal_id": "m-ana", "marshal_name": "Marta", "field_id": cfg.field_id,
+               "game_id": str(gid), "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+        rec["signature"] = base64.b64encode(key.sign(chrono.canonical(rec))).decode()
+        judged = svc.upload_readings(Viewer("gm"), {"readings": [rec],
+                                                     "declaration_id": reg_ana["replicas"][0]["declaration_id"]})
+        self.assertEqual(judged["outcome"], "pass")
+
+        ctrl.start_game(gid)
+        ctrl.end_game(gid, "time")
+        self.assertTrue(client.run_once(), client.last_error)
+        regs = {str(r["id"]): r["status"] for r in self.db.fetch("SELECT id, status FROM game_registrations")}
+        self.assertEqual((regs[reg_ana["id"]], regs[reg_rui["id"]], regs[reg_bea["id"]]),
+                         ("checked_in", "no_show", "checked_in"))
+        state = self.db.fetch("SELECT state, reading_id FROM registration_replicas")[0]
+        self.assertEqual((state["state"], str(state["reading_id"])), ("passed", rec["reading_id"]))
+        sched = self.db.fetch("SELECT status, walkins FROM scheduled_games")[0]
+        self.assertEqual(tuple(sched), ("completed", 1))
+        self.assertEqual(self.db.fetch("SELECT count(*) FROM chrono_readings")[0][0], 1)
+        mine = self.api("GET", "/api/v1/me/registrations", token=ana)
+        self.assertEqual((mine[0]["status"], mine[0]["replicas"][0]["state"]), ("checked_in", "passed"))
+        # Nothing of the day's names went back to the site server beyond what the registrations held.
+        self.assertEqual(self.db.fetch("SELECT count(*) FROM game_registrations WHERE display_name = 'Zé'")[0][0], 0)
 
     def test_a_wrong_key_is_refused_and_nothing_moves(self) -> None:
         cfg, store, ctrl = self.controller()
