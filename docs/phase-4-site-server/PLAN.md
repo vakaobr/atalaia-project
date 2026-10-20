@@ -1010,6 +1010,60 @@ nothing is sent while `enabled` is false; **no player position is ever
 multicast**, staff endpoints only with `players = true`; a receiver on
 the loopback in the test gets the datagram.
 
+**Built 2026-10-20 (in software; a real ATAK device: HW3).** What
+differs from the design above, or fills what it left open (decisions M9-1
+to M9-10):
+
+- `protocol/vectors/cot.json`, not `cot.xml`: the CoT rules the emitter
+  must follow and the values of two TAK example events (`Marker -
+  Spot.cot`, `Marker - 2525.cot`), each with its source (the CoT
+  base-event schema, MITRE's CoT types, the TAK detail schemas and
+  examples, the TAK protocol description, the Developer's Guide to CoT).
+  The values only, not the files: the ATAK-CIV repository's licence is
+  not a plain one (M9-1). The emitter rebuilds both examples as known
+  answers.
+- Types (M9-2): every box and the extraction zone are coloured spot
+  markers, `b-m-p-s-m` (how `h-e` for a box placed on the image, `h-p` for
+  the pasted extraction point); players `a-f-G-U-C` (`m-g`). ADR-P4-7's
+  `a-n/a-f-G-E-X`, `a-f-G-U-C-V` (aviation in MITRE's list) and
+  `b-m-p-s-p-i` (a sensor point of interest) are not used. UIDs are
+  `atalaia.{field_id}.node.{id}`, `...game.{id}.extraction` and
+  `...player.{player_id}`, never a user's name.
+- The colour (M9-5): `<color argb>` with the console's team colour for
+  every owned marker, and `<__group name role="Team Member">` for a team
+  named after one of ATAK's 14 team colours (red, blue, green, yellow,
+  orange, purple, white, in English or Portuguese); other teams have the
+  colour and their display name in the remarks.
+- The georeference (M9-3, M9-4): two points are opposite corners of a
+  north-up image (latitude and longitude each linear in the image); 3-8
+  points (API only) give a least-squares affine map; degenerate, mirrored
+  and inconsistent points are refused. Kept in the store's `settings`
+  table (`field.georef`), so no store schema change (the plan's "schema
+  5" was taken by the sync). A new or removed image clears it.
+- Configuration: `multicast = "host:port"` instead of a separate `port`;
+  TTL 1, not the ADR's 2; at most 8 staff endpoints; `interval_s` 1-3600.
+- Transport (M9-7): TAK Protocol version 0 on both: one event per
+  datagram; on TCP one connection per endpoint and cycle, each event with
+  its XML declaration and a newline, no length prefix (the ADR's sketch
+  had one; TAK's raw CoT input has none).
+- Staff endpoints (M9-6): every player's latest GPS fix (staff see all, as
+  the GM and marshals do), callsign the pseudonymous player id (with
+  "VIP"), never the name; also the boxes and the zone.
+- Only the controller in charge sends (a standby does not); at a game's
+  end or when the georeference goes, each marker is dropped with a stale
+  time before its start (M9-8). The UDP socket is opened on the first
+  send and closed when the emitter stops.
+- The console (M9-9): under the field image, the GM pastes the top-left
+  and bottom-right corners as `latitude, longitude`; the four corners
+  come back, with a pin per point on the image, and the feed's state
+  (`GET /api/v1/atak`).
+- Not built (M9-10): the remote ATAK relay through the site server
+  (ADR-P4-7's amendment); it belongs with the site server's work on the
+  controller's link (plan phase 19).
+
+Tested: `controller/tests/test_atak.py` (35 tests) and the console's
+`test_field_georeference_two_corners`.
+
 ### Validation
 
 ```sh
@@ -1724,7 +1778,7 @@ modes/master_satellites/, target_windows/, hacking_terminal/, vip_payload/, obje
     (mode.yaml with i18n.pt, node.lua, field.lua where needed, assets/screens/, tests/)
 
 protocol/
-    sync.md, vectors/{sync.json, geo.json, scenario.json, cot.xml}
+    sync.md, vectors/{sync.json, geo.json, scenario.json, cot.json}
     schema/events.yaml (events 42-47, data keys 34-36), capability-proxy.md (hit)
 
 tools/docker_server.py

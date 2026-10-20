@@ -111,6 +111,8 @@ class P3Case(unittest.TestCase):
 
     def close_bundle(self) -> None:
         self.client.close()
+        if self.bundle.atak is not None:
+            self.bundle.atak.stop()  # its sockets (the app's lifespan stops it when it ran)
         self.ctrl.stop()
         self.bundle.store.close()
 

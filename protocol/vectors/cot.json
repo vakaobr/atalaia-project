@@ -1,0 +1,238 @@
+{
+  "description": "Facts about Cursor on Target (CoT) XML that the controller's ATAK emitter (controller/atalaia_controller/atak.py) must follow, each copied from its cited public source, never from the emitter's output; read by controller/tests/test_atak.py, which checks every event the emitter makes against them (decision M9-1). The sources: [base] MITRE, 'CoT Base-Event Schema (PUBLIC RELEASE).xsd' (Version 2.0, 13-June-2003, MITRE Case #11-3895), https://github.com/deptofdefense/AndroidTacticalAssaultKit-CIV/blob/main/takcot/mitre/ ; [types] MITRE, CoTtypes.xml (v1.80 2009/06/10), https://github.com/dB-SPL/cot-types/blob/main/CoTtypes.xml ; [tak] the TAK CoT definitions, https://github.com/deptofdefense/AndroidTacticalAssaultKit-CIV/tree/main/takcot (xsd/details/, examples/) ; [proto] TAK Protocol, commoncommo/core/impl/protobuf/protocol.txt in the same repository ; [guide] Mike Butler, 'The Developer's Guide to Cursor on Target', MITRE, August 2005 ; [mesh] Meshtastic, meshtastic/atak.proto (enum Team, enum MemberRole), https://github.com/meshtastic/protobufs .",
+  "event": {
+    "version": "2.0",
+    "required_attributes": [
+      "version",
+      "type",
+      "uid",
+      "time",
+      "start",
+      "stale",
+      "how"
+    ],
+    "children": [
+      "point",
+      "detail"
+    ],
+    "type_pattern": "\\w+(-\\w+)*(;[^;]*)?",
+    "how_pattern": "\\w(-\\w+)*",
+    "source": "[base] element event: xs:all of point and (minOccurs 0) detail; attributes version (xs:decimal, minInclusive 2), type (pattern \\w+(-\\w+)*(;[^;]*)?), uid, time, start, stale (xs:dateTime) and how (pattern \\w(-\\w+)*), all use=\"required\""
+  },
+  "point": {
+    "required_attributes": [
+      "lat",
+      "lon",
+      "hae",
+      "ce",
+      "le"
+    ],
+    "lat_range": [
+      -90,
+      90
+    ],
+    "lon_range": [
+      -180,
+      180
+    ],
+    "unknown_value": "9999999.0",
+    "source": "[base] element point: lat (xs:decimal, -90 to +90), lon (xs:decimal, -180 to +180), hae, ce, le (xs:decimal), all required; 'ce ... is intended to define a circular area around the event point, not necessarily an error (e.g. Describing a reservation area ...)'. unknown_value: [tak] examples/'Marker - Spot.cot', point hae='9999999.0' ce='9999999.0' le='9999999.0'"
+  },
+  "time": {
+    "valid": [
+      "2002-10-05T17:01:14.00Z",
+      "2002-10-05T18:00:23Z",
+      "2002-10-05T18:00:23.12Z",
+      "2002-10-05T18:00:23.123456Z",
+      "2020-12-16T19:59:34.910Z"
+    ],
+    "pattern": "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z",
+    "source": "[base] attribute time: 'standard date format (ISO 8601): CCYY-MM-DDThh:mm:ss.ssZ (e.g., 2002-10-05T17:01:14.00Z), where the presence of fractional seconds (including the delimeter) is optional ... The following are all valid: 2002-10-05T18:00:23Z, 2002-10-05T18:00:23.12Z, 2002-10-05T18:00:23.123456Z'; the last one from [tak] examples/'Marker - 2525.cot' time='2020-12-16T19:59:34.910Z'",
+    "drop_rule": "stale before start drops the marker: [guide] 'By convention, CoT allows the stale time to predate the start time. This reversal is how CoT indicates \"drop track.\"'"
+  },
+  "types": {
+    "b-m-p-s-m": {
+      "use": "a box (prop) and the extraction zone: a coloured spot marker",
+      "source": "[tak] examples/'Marker - Spot.cot': type='b-m-p-s-m' with <color argb='-65536'/> and <usericon iconsetpath='COT_MAPPING_SPOTMAP/b-m-p-s-m/-65536'/>; [base] taxonomy 'b - Bits ... m - Mapping, p - Designated point'"
+    },
+    "a-f-G-U-C": {
+      "use": "a player, to staff endpoints only",
+      "source": "[types] <cot cot=\"a-.-G-U-C\" full=\"Gnd/Combat\" desc=\"COMBAT\"/>, with affiliation 'f - Friend' from [base]; [tak] examples/'Marker - 2525.cot' link type='a-f-G-U-C' (an ATAK user's own marker)"
+    },
+    "a-.-G-E-X": {
+      "use": "not used (ADR-P4-7's prop type; decision M9-2)",
+      "source": "[types] <cot cot=\"a-.-G-E-X\" full=\"Gnd/Equip/Special Equipment\" desc=\"SPECIAL EQUIPMENT\"/>"
+    },
+    "a-.-G-U-C-V": {
+      "use": "not used: ADR-P4-7 had it for the VIP, but it is aviation (decision M9-2)",
+      "source": "[types] <cot cot=\"a-.-G-U-C-V\" full=\"Gnd/Combat/Aviation/AVIATION\" desc=\"AVIATION\"/>"
+    },
+    "b-m-p-s-p-i": {
+      "use": "not used: ADR-P4-7 had it for points of interest, but it is a sensor point of interest (decision M9-2)",
+      "source": "[types] <cot cot=\"b-m-p-s-p-i\" desc=\"spi\"/>"
+    }
+  },
+  "affiliations": {
+    "f": "Friend",
+    "n": "Neutral",
+    "h": "Hostile",
+    "u": "Unknown",
+    "source": "[base] 'CoT affiliation of these atoms: p - Pending, u - Unknown, a - Assumed friend, f - Friend, n - Neutral, s - Suspect, h - Hostile, j - Joker, k - Faker, o - None specified, x - Other'"
+  },
+  "how": {
+    "h-e": "human entered or modified, estimated",
+    "h-p": "human entered or modified, cut and paste from another window",
+    "m-g": "machine generated, derived from GPS receiver",
+    "source": "[base] attribute how: 'h - human entered or modified ... e - estimated (a swag by the user) ... p - cut and paste from another window; m - machine generated ... g - derived from GPS receiver'; [types] <how cot=\"m-g\" nick=\"gps\"/>, <how cot=\"h-e\" nick=\"swag\"/>"
+  },
+  "details": {
+    "contact": {
+      "required": [
+        "callsign"
+      ],
+      "source": "[tak] xsd/details/contact.xsd: attribute callsign use=\"required\""
+    },
+    "__group": {
+      "required": [
+        "name",
+        "role"
+      ],
+      "source": "[tak] xsd/details/__group.xsd: attributes name and role, use=\"required\""
+    },
+    "status": {
+      "integer": [
+        "battery"
+      ],
+      "source": "[tak] xsd/details/status.xsd: attribute battery type=\"xs:integer\""
+    },
+    "color": {
+      "required": [
+        "argb"
+      ],
+      "integer": [
+        "argb"
+      ],
+      "source": "[tak] xsd/details/color.xsd: attribute argb use=\"required\" type=\"xs:integer\"; examples/'Marker - Spot.cot' <color argb='-65536'/> (red), examples/'Marker - 2525.cot' <color argb='-1'/> (white): ARGB as a signed 32-bit integer"
+    },
+    "remarks": {
+      "source": "[tak] xsd/details/remarks.xsd: complexType remarks mixed=\"true\" (text)"
+    },
+    "usericon": {
+      "required": [
+        "iconsetpath"
+      ],
+      "example": "COT_MAPPING_SPOTMAP/b-m-p-s-m/-65536",
+      "source": "[tak] xsd/details/usericon.xsd: attribute iconsetpath use=\"required\"; examples/'Marker - Spot.cot' <usericon iconsetpath='COT_MAPPING_SPOTMAP/b-m-p-s-m/-65536'/>"
+    }
+  },
+  "argb_examples": [
+    {
+      "argb": -65536,
+      "rgb": "ff0000",
+      "source": "[tak] examples/'Marker - Spot.cot' (a red spot marker)"
+    },
+    {
+      "argb": -1,
+      "rgb": "ffffff",
+      "source": "[tak] examples/'Marker - 2525.cot'"
+    }
+  ],
+  "teams": {
+    "names": [
+      "White",
+      "Yellow",
+      "Orange",
+      "Magenta",
+      "Red",
+      "Maroon",
+      "Purple",
+      "Dark Blue",
+      "Blue",
+      "Cyan",
+      "Teal",
+      "Green",
+      "Dark Green",
+      "Brown"
+    ],
+    "roles": [
+      "Team Member",
+      "Team Lead",
+      "HQ",
+      "Sniper",
+      "Medic",
+      "Forward Observer",
+      "RTO",
+      "K9"
+    ],
+    "example": "<__group role='Team Member' name='Cyan'/>",
+    "source": "[mesh] enum Team labels White ... Brown (0 is 'Default (Cyan)'), enum MemberRole labels Team Member ... K9, and the comment's example <__group role='Team Member' name='Cyan'/>"
+  },
+  "transport": {
+    "multicast": "239.2.3.1:6969",
+    "staff_port": 4242,
+    "xml_declaration_then_newline": true,
+    "nothing_after_end_tag": true,
+    "source": "[proto] 'Traditional Protocol - \"Protocol Version 0\"': 'Each UDP datagram contains one (and only one) CoT XML message as its payload.' ... 'The TCP stream is comprised of one CoT <event> after another. Messages are delimited and broken apart by searching for the token \"</event>\" ... When sending, messages must be prefaced by XML header (<?xml ... ?>), followed by a newline, followed by the complete XML <event>. TAK servers require that no arbitrary newlines follow the </event> end of message'. The address and port: ADR-P4-7 (ATAK's defaults)."
+  },
+  "samples": [
+    {
+      "name": "spot marker",
+      "source": "[tak] examples/'Marker - Spot.cot' (deptofdefense/AndroidTacticalAssaultKit-CIV, branch main, fetched 2026-10-20): the values of the event's attributes, its point and the details the emitter also writes, copied one by one; the files' other details (status readiness, archive, link, precisionlocation) are left out, and the file itself is not copied (decision M9-1)",
+      "event": {
+        "version": "2.0",
+        "uid": "9405e320-9356-41c4-8449-f46990aa17f8",
+        "type": "b-m-p-s-m",
+        "time": "2020-12-16T19:59:34.913Z",
+        "start": "2020-12-16T19:59:34.913Z",
+        "stale": "2021-01-02T20:40:03.841Z",
+        "how": "h-g-i-g-o"
+      },
+      "point": {
+        "lat": "38.85606343062312",
+        "lon": "-77.0563755018233",
+        "hae": "9999999.0",
+        "ce": "9999999.0",
+        "le": "9999999.0"
+      },
+      "detail": {
+        "contact": {
+          "callsign": "R 1"
+        },
+        "color": {
+          "argb": "-65536"
+        },
+        "usericon": {
+          "iconsetpath": "COT_MAPPING_SPOTMAP/b-m-p-s-m/-65536"
+        }
+      }
+    },
+    {
+      "name": "2525 marker",
+      "source": "[tak] examples/'Marker - 2525.cot' (deptofdefense/AndroidTacticalAssaultKit-CIV, branch main, fetched 2026-10-20): the values of the event's attributes, its point and the details the emitter also writes, copied one by one; the files' other details (status readiness, archive, link, precisionlocation) are left out, and the file itself is not copied (decision M9-1)",
+      "event": {
+        "version": "2.0",
+        "uid": "a0c524c6-0422-4382-9981-e39d1dc71730",
+        "type": "a-u-G",
+        "time": "2020-12-16T19:59:34.910Z",
+        "start": "2020-12-16T19:59:34.910Z",
+        "stale": "2021-01-02T20:40:03.838Z",
+        "how": "h-g-i-g-o"
+      },
+      "point": {
+        "lat": "38.856650047254725",
+        "lon": "-77.06364199776728",
+        "hae": "9999999.0",
+        "ce": "9999999.0",
+        "le": "9999999.0"
+      },
+      "detail": {
+        "contact": {
+          "callsign": "U.16.135057"
+        },
+        "color": {
+          "argb": "-1"
+        }
+      }
+    }
+  ]
+}

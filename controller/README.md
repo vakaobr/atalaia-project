@@ -151,6 +151,27 @@ Some of a game's data is a secret until a team earns it: the code a Hacking Term
 
 An Android phone running a prop that joined with a join payload links to the controller over the field's Wi-Fi ([protocol/prop-link.md](../protocol/prop-link.md)): `WS /api/v1/prop`, an HMAC proof of the game key, then its HELLO, STATE and events as JSON, which the controller encodes with the radio's codecs and hands to the same FieldController as a box's packets. TIME beacons and commands reach the linked props too; without a modem, commands reach the Wi-Fi props and are reported as sent. The join payload for a box carries the CA's fingerprint and the https addresses (keys 13 and 14) when HTTPS is on; boxes skip them.
 
+## ATAK / Cursor on Target
+
+Off by default. With `[atak] enabled = true` the controller in charge of the live game puts the field on ATAK maps as Cursor on Target events (`atak.py`; ADR-P4-7 as amended, decisions P4R18 and M9-1 to M9-10). What is sent:
+
+- **every box placed on the field image** (the console's *Campo / Field* tab) as a coloured spot marker (`b-m-p-s-m`, as in the TAK examples): the box's name, its owner in the remarks, the owner team's colour (`<color>`) and, for a team named after one of ATAK's team colours, that team (`<__group>`), and its battery; a VIP / Payload game's extraction zone, with its radius as the circular error. Every `interval_s` (30 s) and **at once** when a box is captured or neutralised, moves on the image, or the game or the georeference changes; `stale` is twice the interval. When the game ends (or the georeference is removed) every marker is dropped (stale before start, CoT's "drop track");
+- **over UDP** to `multicast` (`239.2.3.1:6969`, ATAK's mesh default; TTL 1, so it stays on the field's network; a unicast `host:port` works too), one event per datagram (TAK Protocol version 0);
+- **player positions are never multicast**: anyone on the field Wi-Fi can read a multicast group, and positions are filtered per role (phase 3 constraint 9). Only with `players = true` do they go, and only to the staff ATAK devices in `staff_endpoints` (TCP, `"host:port"`, 4242 when no port is given; at most 8), which see every player as the GM and marshals do: the latest GPS fix of each player (`a-f-G-U-C`, `m-g`), by pseudonymous player id and never by name, with the team as `<__group>`. Staff endpoints also get the boxes and the zone.
+
+**Georeference.** Field Boxes have no GPS, so their places are fractions of the field image. In the *Campo / Field* tab, under the image, the GM gives two opposite corners of the image (top left and bottom right; the image must have north at the top) their latitude and longitude, pasted from a map app as `latitude, longitude` (`PUT /api/v1/field/georef`). The console shows the four corners back and a pin on the image per point. Through the API, 3-8 control points give a rotated or skewed image (a least-squares affine fit); points on one line, too close, mirrored or not fitting one flat image are refused. The points are kept in the store's settings (no schema change) and a new image clears them.
+
+```toml
+[atak]
+enabled = false
+multicast = "239.2.3.1:6969"   # "" for no UDP
+interval_s = 30.0
+staff_endpoints = []           # ["10.42.0.5:4242"]; ATALAIA_ATAK_STAFF_ENDPOINTS separates them with commas
+players = false
+```
+
+The XML is built with ElementTree, so names from users are escaped; characters XML does not allow are dropped and texts are capped. The CoT rules the tests check (`protocol/vectors/cot.json`) are copied from the CoT base-event schema, MITRE's CoT types, the TAK detail schemas and examples and the TAK protocol description, each cited, and two TAK examples are rebuilt by the emitter as known answers. Tested in software (a loopback receiver for UDP, multicast and TCP); **not yet with a real ATAK device** (HW3).
+
 ## Scenarios
 
 A GM writes a custom scenario as a YAML manifest (ADR-P4-6 as amended, decisions P4R7, P4R8 and M7-1 to M7-9); the compiler (`atalaia_controller/scenarios/`) turns it into a scenario package, `mode.yaml` and `field.lua` (`kind: scenario`), that runs on the controller over the built-in objectives package (`org.club.foxhound+org.atalaia.objectives`, [modes/README.md](../modes/README.md#custom-scenarios-and-the-objectives-package-phase-4)). Nothing changes on the boxes. Upload the package as any other (`POST /api/v1/modes`); the console's scenario builder and `/api/v1/scenarios` are plan phase 8.
@@ -227,6 +248,8 @@ Reading needs the read or GM token, changing anything the GM token: `Authorizati
 | GET | `/api/v1/games/{id}/teams` | No token: each team's colour, display name and crest (what an Android prop draws on its buttons) |
 | PUT | `/api/v1/games/{id}/teams/{team}` | GM token, until the game ends: `{"display_name"?, "crest_id"?, "team_preset_id"?}` (`null` clears) |
 | GET / PUT / DELETE | `/api/v1/field/image` | The field image of the console's field view: raw PNG, JPEG or WebP body, up to 4 MB |
+| GET / PUT / DELETE | `/api/v1/field/georef` | The field image's place on the map (GET: read token; PUT, DELETE: GM): `{"points": [{"x", "y", "lat", "lon"}, ...]}`, two opposite corners of a north-up image or 3-8 control points; answers with the four corners' latitude and longitude. A new or removed image clears it |
+| GET | `/api/v1/atak` | The ATAK feed's settings and counters (`enabled`, `multicast`, `staff_endpoints` as a count, `players`, `markers`, events sent, the last error); `{"enabled": false}` when off |
 | GET / PUT | `/api/v1/games/{id}/positions` · `/positions/{node}` | Where each node sits on the field image: `{"x", "y"}` as fractions 0-1 |
 | GET | `/api/v1/controller/ca` | The field CA's certificate (PEM; header `X-Atalaia-CA-SHA256`), no token |
 | GET / POST | `/api/v1/checkin` | No token, rate-limited: the field, the privacy notice, the settings, the limit classes, the open games / check in `{"game_id", "player_id", "player_secret", "display_name", "notice_version", "federation_number"?, "team_preference"?, "replicas"?, "registration_id"? and "ticket"? (together)}` → a player token |

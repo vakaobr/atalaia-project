@@ -3,7 +3,8 @@
 """Entry point: python -m atalaia_controller [run|tokens|join-key|ca|sync-key] [--config controller.toml].
 
     run       start the controller: radio modem, MQTT bridge, REST/WebSocket API, GM console
-              (HTTP on [api] port, HTTPS with the field CA on [api] tls_port)
+              (HTTP on [api] port, HTTPS with the field CA on [api] tls_port), and with
+              [atak] enabled the CoT feed for ATAK
     tokens    print the GM and read tokens (generated on first start if not configured)
     join-key  print the field join key that authenticates join cards (protocol/join.md):
               set it on every box of the field and on a standby controller
@@ -29,6 +30,7 @@ from atalaia_sim.core import Core, LibraryNotFound, find_library
 
 from . import tls as tlsmod
 from .api import Auth, create_app
+from .atak import AtakEmitter
 from .checkin import Checkin
 from .config import Config, ConfigError, load_config
 from .engine import Controller
@@ -118,6 +120,7 @@ class Bundle:
     app: Any
     tls: Optional[tlsmod.FieldTls] = None
     sync: Optional[SyncClient] = None
+    atak: Optional[AtakEmitter] = None
 
 
 def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = True,
@@ -147,6 +150,7 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
         sync = SyncClient(cfg, store, checkin=controller.checkin)
         controller.sync = sync
         controller.add_listener(sync.on_controller_message)
+    atak = AtakEmitter(cfg, controller) if cfg.atak_enabled else None
 
     def on_start() -> None:
         if modem is not None:
@@ -156,8 +160,12 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
         controller.start()
         if sync is not None:
             sync.start()
+        if atak is not None:
+            atak.start()
 
     def on_stop() -> None:
+        if atak is not None:
+            atak.stop()
         if sync is not None:
             sync.stop()
         controller.stop()
@@ -168,7 +176,7 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
 
     app = create_app(controller, hub, Auth(gm, read), on_start=on_start, on_stop=on_stop,
                      ca_pem=tls.ca_pem if tls else None)
-    return Bundle(cfg, store, controller, modem, mqtt, hub, app, tls, sync)
+    return Bundle(cfg, store, controller, modem, mqtt, hub, app, tls, sync, atak)
 
 
 def serve(bundle: Bundle, log_level: str = "info") -> None:

@@ -6,16 +6,19 @@
 // the GM and kept by the controller (positions are fractions of the image).
 // Without an image the markers sit on a plain grid. Works fully offline:
 // no map tiles are fetched (OpenStreetMap is left for a later phase).
+// Below it, with an image, its place on the map for the ATAK feed
+// (georef-panel.js), with a pin on the image per control point.
 
 import { html, Component, createRef, t, teamColour, OFFLINE_MS } from '../ui.js';
 import { linkBars } from './node-list.js';
+import { GeorefPanel, georefPins } from './georef-panel.js';
 
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 
 export class FieldView extends Component {
     constructor() {
         super();
-        this.state = { imageUrl: null, version: -1, drag: null, noImage: false };
+        this.state = { imageUrl: null, version: -1, geoVersion: -1, georef: null, drag: null, noImage: false };
         this.area = createRef();
     }
 
@@ -26,6 +29,7 @@ export class FieldView extends Component {
     componentDidUpdate() {
         const v = this.props.app.state.imageVersion || 0;
         if (v !== this.state.version) this.loadImage();
+        else if ((this.props.app.state.georefVersion || 0) !== this.state.geoVersion) this.loadGeoref();
     }
 
     componentWillUnmount() {
@@ -45,6 +49,15 @@ export class FieldView extends Component {
         }
         if (this.state.imageUrl) URL.revokeObjectURL(this.state.imageUrl);
         this.setState({ imageUrl: url, noImage: !url });
+        if (url) this.loadGeoref();
+        else this.setState({ georef: null, geoVersion: app.state.georefVersion || 0 });
+    }
+
+    async loadGeoref() {
+        const app = this.props.app;
+        this.setState({ geoVersion: app.state.georefVersion || 0 });
+        const out = await app.call('GET', '/field/georef');
+        if (out) this.setState({ georef: out.georef });
     }
 
     async upload(e) {
@@ -141,10 +154,13 @@ export class FieldView extends Component {
             </div>`}
             <div class=${`field-area ${state.imageUrl ? 'with-image' : 'grid'}`} ref=${this.area} data-testid="field-area">
                 ${state.imageUrl && html`<img src=${state.imageUrl} alt=${t('field.image_alt')} draggable="false" />`}
+                ${state.imageUrl && georefPins(state.georef)}
                 ${list.map((n, i) => this.marker(n, i, list.length, teams))}
             </div>
             <p class="muted small">${state.noImage ? t('field.no_image') : ''} ${role === 'gm' && game ? t('field.drag_hint') : ''}</p>
             ${list.length === 0 && html`<p class="muted">${t('nodes.none')}</p>`}
-        </section>`;
+        </section>
+        ${state.imageUrl && html`<${GeorefPanel} app=${app} georef=${state.georef}
+            onChange=${(georef) => this.setState({ georef })} />`}`;
     }
 }

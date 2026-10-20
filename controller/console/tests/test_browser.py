@@ -744,6 +744,45 @@ class ConsoleBrowserTests(unittest.TestCase):
         moved = other.locator(f'[data-testid=field-area] .marker[data-node="{BOX}"]')
         expect(moved).to_have_attribute("style", re.compile(r"left: 2[45](\.\d+)?%"))
 
+    def test_field_georeference_two_corners(self):
+        """Plan phase 9 (P4R18): the GM gives two corners of the field image a latitude and longitude."""
+        page = self.console()
+        page.get_by_test_id("tab-field").click()
+        expect(page.get_by_test_id("georef")).to_have_count(0)  # nothing to place without an image
+        page.get_by_test_id("field-upload").set_input_files(str(ICON))
+        expect(page.get_by_test_id("georef-none")).to_be_visible()
+        expect(page.get_by_test_id("atak-status")).to_contain_text("desligado")  # [atak] enabled = false
+        # A corner that is not "latitude, longitude" is refused in the page, before any request.
+        page.get_by_test_id("georef-top_left-input").fill("38.7240")
+        page.get_by_test_id("georef-bottom_right-input").fill("38.7200, -9.1360")
+        page.get_by_test_id("georef-save").click()
+        expect(page.get_by_test_id("georef-error")).to_contain_text("Canto superior esquerdo")
+        self.assertIsNone(self.field.http.get("/api/v1/field/georef").json()["georef"])
+        # Pasted from a map app.
+        page.get_by_test_id("georef-top_left-input").fill("38.7240, -9.1420")
+        page.get_by_test_id("georef-save").click()
+        expect(page.get_by_test_id("georef-top_right")).to_have_text("38.724000, -9.136000")
+        expect(page.get_by_test_id("georef-bottom_left")).to_have_text("38.720000, -9.142000")
+        expect(page.locator("[data-testid=field-area] .georef-pin")).to_have_count(2)
+        got = self.field.http.get("/api/v1/field/georef").json()["georef"]
+        self.assertEqual(got["points"], [{"x": 0, "y": 0, "lat": 38.724, "lon": -9.142},
+                                         {"x": 1, "y": 1, "lat": 38.72, "lon": -9.136}])
+        # Another page shows the corners back, in its form too; a read-only viewer sees no form.
+        other = self.console()
+        other.get_by_test_id("tab-field").click()
+        expect(other.get_by_test_id("georef-top_left-input")).to_have_value("38.724000, -9.142000")
+        viewer = self.console(READ)
+        viewer.get_by_test_id("tab-field").click()
+        expect(viewer.get_by_test_id("georef-bottom_right")).to_have_text("38.720000, -9.136000")
+        expect(viewer.get_by_test_id("georef-form")).to_have_count(0)
+        # Removed on one page, gone from the other through the live stream.
+        page.get_by_test_id("georef-remove").click()
+        page.get_by_test_id("georef-remove-yes").click()
+        expect(page.get_by_test_id("georef-none")).to_be_visible()
+        expect(other.get_by_test_id("georef-none")).to_be_visible()
+        self.assertIsNone(self.field.http.get("/api/v1/field/georef").json()["georef"])
+        self.no_horizontal_scroll(page)
+
     def test_reconnects_after_the_stream_drops(self):
         self.field.create_game(start=True)
         page = self.console()
@@ -766,9 +805,10 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v3').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v4').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
-        for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json"):
+        for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
+                     "/console/components/georef-panel.js"):
             self.assertIn(path, cached)
         # Offline, the page still opens from the cache (the API is unreachable, so
         # failed requests are expected in the console from here on).

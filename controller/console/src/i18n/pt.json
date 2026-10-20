@@ -210,6 +210,24 @@
     "no_image": "Sem imagem do campo: as caixas aparecem numa grelha.",
     "drag_hint": "Arrasta as caixas para o sítio onde estão no campo."
   },
+  "georef": {
+    "title": "Posição no mapa (ATAK)",
+    "intro": "Dá a latitude e a longitude a dois cantos opostos da imagem do campo, copiadas de uma app de mapas como \"latitude, longitude\". A imagem tem de ter o norte em cima. O feed ATAK usa-as para pôr as caixas num mapa; uma imagem nova apaga-as.",
+    "top_left": "Canto superior esquerdo",
+    "top_right": "Canto superior direito",
+    "bottom_right": "Canto inferior direito",
+    "bottom_left": "Canto inferior esquerdo",
+    "placeholder": "38.724000, -9.142000",
+    "bad_point": "{corner}: escreve \"latitude, longitude\", por exemplo 38.724000, -9.142000.",
+    "none": "A imagem ainda não tem posição no mapa: o feed ATAK não envia caixas.",
+    "points": "Definida com {n} pontos de controlo pela API (concordam a {residual} m). Guardar dois cantos substitui-os.",
+    "remove": "Remover posição no mapa",
+    "confirm_remove": "Remover a posição no mapa?",
+    "saved": "Posição no mapa guardada.",
+    "privacy": "O feed ATAK envia as caixas e a zona de extração a quem estiver no Wi-Fi do campo; as posições de quem joga nunca vão para lá, só para os dispositivos da organização definidos no controller.toml.",
+    "atak_off": "Feed ATAK: desligado (controller.toml, [atak] enabled = false).",
+    "atak_on": "Feed ATAK: ligado, {markers} marcadores no mapa, {sent} mensagens enviadas."
+  },
   "join": {
     "title": "Juntar caixas e controladores",
     "intro": "Gera os dados de entrada no jogo para uma caixa (cartão NFC ou consola série) ou para um controlador de reserva.",

@@ -722,6 +722,24 @@ tr.offline td {
     font-size: 0.9rem;
 }
 
+/* the georeference's control points (georef-panel.js), under the boxes */
+.georef-pin {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    width: 1.3rem;
+    height: 1.3rem;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    background: #1b6ee0;
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1.1rem;
+    text-align: center;
+    pointer-events: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
 /* ---- join ---- */
 
 .join-result {

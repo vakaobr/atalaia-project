@@ -86,3 +86,16 @@ ca_file = ""                      # a CA (PEM) to trust instead of the system's
 interval_game_s = 30.0            # while a game runs
 interval_idle_s = 300.0           # between games; failures double the wait up to this
 timeout_s = 15.0                  # per request
+
+[atak]
+# Cursor on Target for ATAK (ADR-P4-7 as amended, P4R18; atak.py). Props and the
+# extraction zone on ATAK maps, placed through the field image's georeference
+# (the GM console's Field tab: two corners of the image with their latitude and
+# longitude). Overridable as ATALAIA_ATAK_*.
+enabled = false
+multicast = "239.2.3.1:6969"      # UDP, props and zones only (TTL 1: the field's network);
+                                  # a unicast host:port works too; empty: no UDP
+interval_s = 30.0                 # every marker again this often; a capture goes at once
+staff_endpoints = []              # staff ATAK devices, ["10.42.0.5:4242"] (TCP; 4242 if no port);
+                                  # from the environment, separated by commas
+players = false                   # player GPS positions, to staff_endpoints ONLY (never multicast)

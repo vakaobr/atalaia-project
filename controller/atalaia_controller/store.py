@@ -381,6 +381,9 @@ class Store:
         self._exec("INSERT INTO settings (key, value) VALUES (?, ?) "
                    "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, value))
 
+    def delete_setting(self, key: str) -> None:
+        self._exec("DELETE FROM settings WHERE key = ?", (key,))
+
     def next_tx_epoch(self) -> int:
         """The controller's epoch for this run: stored epoch + 1, written before any TX (ADR-P2-2)."""
         with self._lock:

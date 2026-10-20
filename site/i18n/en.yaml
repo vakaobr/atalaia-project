@@ -601,7 +601,7 @@ roadmap:
     title: Site server and advanced play
     short: >-
       Site server, game scheduling and registration, custom scenarios, advanced modes, ATAK.
-      Started: advanced modes (Master and Satellites, the Hacking Terminal, VIP / Payload and the logic of Target Windows), the runtime of custom scenarios and their compiler, geo utilities in the core, and the site server's accounts, personal data rights, controller sync, chrono registry and game scheduling with public field pages, feeds and registration are built in software.
+      Started: advanced modes (Master and Satellites, the Hacking Terminal, VIP / Payload and the logic of Target Windows), the runtime of custom scenarios and their compiler, geo utilities in the core, the ATAK feed, and the site server's accounts, personal data rights, controller sync, chrono registry and game scheduling with public field pages, feeds and registration are built in software.
     text: >-
       Site server (accounts, game history, the chrono registry, scheduling games, registration and
       publishing), custom scenarios, advanced modes (master and satellite zones, VIP escort, hacking
@@ -619,8 +619,12 @@ roadmap:
       dependencies, reveals and time windows, checked with every problem located and explained, and
       compiled into such a scenario from the command line), the rules of Target
       Windows (a hit while the target shows a
-      team's colour scores for that team; the target addon is not built yet), and geo utilities
-      in the core (distances and zones for every script, identical on every platform). Site
+      team's colour scores for that team; the target addon is not built yet), geo utilities
+      in the core (distances and zones for every script, identical on every platform), and the
+      ATAK feed (the boxes and zones on ATAK maps over the field Wi-Fi, in their owners' colours,
+      placed by giving two corners of the field image their map position; player positions never
+      go to everyone, only to staff devices when the field turns it on; not yet tried with a real
+      ATAK phone). Site
       server: its skeleton (database, migrations, health check, in its own container), accounts
       (passwords, two-factor codes required for organisers and marshals, sessions and roles per
       field) and personal data rights (access, export, correction, erasure, consent records, a

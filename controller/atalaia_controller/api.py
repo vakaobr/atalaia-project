@@ -29,6 +29,8 @@ which browsers cannot give headers, also takes ``?token=``.
     POST /api/v1/controller/join           this controller takes a game as standby
     GET  /api/v1/field                     whether a field image is uploaded
     GET|PUT|DELETE /api/v1/field/image     the field image (map or floor plan) of the console
+    GET|PUT|DELETE /api/v1/field/georef    its georeference: 2-8 control points {x, y, lat, lon} (PUT, DELETE: GM)
+    GET  /api/v1/atak                      the ATAK / CoT feed's settings and counters (GM or read token)
     GET  /api/v1/field/branding            the field's name, logo, wallpaper and accent (no token, ETag)
     PUT  /api/v1/field/branding            GM: {"field_name"?, "accent"?}
     GET|PUT|DELETE /api/v1/field/branding/{logo|wallpaper}  the images (GET: no token, ETag)
@@ -97,6 +99,7 @@ from fastapi.staticfiles import StaticFiles
 from . import __version__
 from . import checkin as checkinmod
 from . import schedule as schedulemod
+from . import georef as georefmod
 from . import images, visibility
 from .branding import SLOTS, Branding, etag
 from .checkin import Viewer
@@ -420,15 +423,57 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         if not data:
             raise HTTPException(400, "empty image")
         controller.store.set_field_image(ctype, bytes(data))
+        # The control points were places on the old image (decision M9-4).
+        dropped = georefmod.clear(controller.store)
         controller._emit({"type": "field_image"})
-        return {"content_type": ctype, "bytes": len(data)}
+        if dropped:
+            controller._emit({"type": "field_georef", "georef": None})
+        return {"content_type": ctype, "bytes": len(data), "georef_cleared": dropped}
 
     @app.delete("/api/v1/field/image", dependencies=[Depends(require_gm)])
     def delete_field_image() -> dict[str, Any]:
         deleted = controller.store.delete_field_image()
+        dropped = georefmod.clear(controller.store)
         if deleted:
             controller._emit({"type": "field_image"})
+        if dropped:
+            controller._emit({"type": "field_georef", "georef": None})
         return {"deleted": deleted}
+
+    @app.get("/api/v1/field/georef", dependencies=[Depends(require_read)])
+    def get_georef() -> dict[str, Any]:
+        geo = georefmod.load(controller.store)
+        return {"georef": geo.to_api() if geo else None}
+
+    @app.put("/api/v1/field/georef", dependencies=[Depends(require_gm)])
+    def put_georef(body: Any = Body(None)) -> dict[str, Any]:
+        """Control points: two opposite corners of a north-up image, or 3-8 points (georef.py)."""
+        if controller.store.field_image() is None:
+            raise HTTPException(409, "upload the field image first: the points are places on it")
+        spec = body_map(body)
+        if set(spec) != {"points"}:
+            raise ControllerError("the body is {\"points\": [{\"x\", \"y\", \"lat\", \"lon\"}, ...]}")
+        try:
+            geo = georefmod.Georef(georefmod.check_points(spec["points"]))
+        except georefmod.GeorefError as exc:
+            raise ControllerError(str(exc)) from None
+        georefmod.save(controller.store, geo)
+        out = geo.to_api()
+        controller._emit({"type": "field_georef", "georef": out})
+        return {"georef": out}
+
+    @app.delete("/api/v1/field/georef", dependencies=[Depends(require_gm)])
+    def delete_georef() -> dict[str, Any]:
+        deleted = georefmod.clear(controller.store)
+        if deleted:
+            controller._emit({"type": "field_georef", "georef": None})
+        return {"deleted": deleted}
+
+    @app.get("/api/v1/atak", dependencies=[Depends(require_console)])
+    def atak_status() -> dict[str, Any]:
+        if controller.atak is None:
+            return {"enabled": False}
+        return controller.atak.status()
 
     @app.get("/api/v1/games/{game_id}/positions", dependencies=[Depends(require_read)])
     def positions(game_id: int) -> dict[str, Any]:

@@ -254,6 +254,7 @@ class Controller:
         self.prop_links: Any = None
         self.branding: Any = None  # branding.Branding: the field's logo, wallpaper, crests (BR1-BR24)
         self.sync: Any = None      # sync_client.SyncClient: the site server sync (ADR-P4-3), when on
+        self.atak: Any = None      # atak.AtakEmitter: CoT for ATAK (ADR-P4-7), when [atak] enabled
         self.ca_sha256: Optional[bytes] = None  # the field CA (tls.py): join payload key 13
         self.link_urls: list[str] = []          # its https addresses: join payload key 14
         self._last_scan: Optional[dict[str, Any]] = None

@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Implementation (plan phases 1 to 7 and 10 to 16 built in software, 2026-10-20; sync over 4G: HW1)
+**Current phase:** Implementation (plan phases 1 to 7, 9 and 10 to 17 built in software, 2026-10-20; sync over 4G: HW1; a real ATAK device: HW3)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-20 (plan phase 17, full clean-copy check)
-**Next step:** plan phase 8 (scenarios in the controller, console and app) on the modes chain, with phase 9 (ATAK / CoT) under way; plan phase 18 (club profiles and branding sync) on the site server chain
+**Last verified:** 2026-10-20 (plan phase 9, full check: tools/check.sh, the console's browser tests, the formatter, reuse lint)
+**Next step:** plan phase 8 (scenarios in the controller, console and app) on the modes chain; plan phase 18 (club profiles and branding sync) on the site server chain
 
 ## Completed
 
@@ -47,7 +47,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | 6 | Scenario packages and the objectives role package | Software, now | -- | Done in software (2026-10-20; not on radio hardware) |
 | 7 | Scenario compiler and validator | Software, now | 3, 6 | Done in software (2026-10-20; not on radio hardware) |
 | 8 | Scenarios in the controller, console and app | Software, now | 7 | Pending |
-| 9 | ATAK / CoT emitter | Software, now | 3 | Pending |
+| 9 | ATAK / CoT emitter | Software, now | 3 | Done in software (2026-10-20; a real ATAK device: HW3) |
 | 10 | Site server skeleton and test tooling | Software, now | -- | **Done in software** (2026-10-19) |
 | 11 | Accounts, sessions and roles | Software, now | 10 | **Done in software** (2026-10-19) |
 | 12 | Personal data | Software, now | 11 | **Done in software** (2026-10-19) |
@@ -289,6 +289,45 @@ six YAML tests that play the hand-written package. Not run: a real box on
 the radio, Wokwi (R7). The site server's own import check
 (`server/tests/test_shared_imports.py`) does not list the package yet
 (plan phase 20). Decisions M7-1 to M7-9 (open).
+
+## Plan phase 9: ATAK / CoT emitter (built 2026-10-20, in software)
+
+ADR-P4-7 as amended (P4R18): `controller/atalaia_controller/atak.py`, off
+by default (`[atak] enabled = false`). The controller in charge of the
+live game sends every box placed on the field image as a coloured spot
+marker (`b-m-p-s-m`: name, owner, the owner's colour as `<color>` and,
+for a team named after an ATAK team colour, `<__group>`, battery) and a
+VIP / Payload extraction zone, every `interval_s` (30 s) and at once on a
+capture, a neutralisation, a move or a game change; `stale` is twice the
+interval, and every marker is dropped when the game ends. Over UDP to
+`[atak] multicast` (`239.2.3.1:6969`, TTL 1), one event per datagram (TAK
+Protocol version 0). **Player positions are never multicast**: only with
+`players = true`, and only to the staff ATAK devices of `staff_endpoints`
+(TCP), by pseudonymous player id. XML built with ElementTree (escaped,
+characters XML forbids dropped, texts capped). The field image's
+georeference (`georef.py`, `GET`/`PUT`/`DELETE /api/v1/field/georef`): two
+opposite corners of a north-up image, or 3-8 points for a rotated one,
+kept in the store's settings and cleared by a new image; the console's
+*Campo / Field* tab takes the two corners as pasted `latitude, longitude`
+and shows the four corners back (`georef-panel.js`). `GET /api/v1/atak`
+gives the feed's counters. Shared vectors `protocol/vectors/cot.json`:
+the CoT rules and two TAK example events' values, each from its cited
+source.
+
+Tested: `controller/tests/test_atak.py` (35 tests): every event checked
+against cot.json; the two TAK examples rebuilt; hostile names escaped and the largest event within one datagram; an
+image position of 0.5, 0.5 in the middle of the two corners; the world
+file worked example and an affine map's parallelograms for 3-4 points;
+degenerate points refused; `__group` from the owner's colour; a capture
+sent at once (directly and through the worker thread); markers dropped at
+the end and without a georeference; nothing sent while disabled; players
+only to a staff TCP receiver and never on UDP, and not at all with
+`players = false`; a loopback receiver for UDP and a multicast group
+member on the loopback; the API, the stream and the configuration; the
+socket closed on stop. The console: `test_field_georeference_two_corners`
+(Chromium). Not run: a real ATAK device on the field Wi-Fi (HW3), the
+remote relay through the site server (not built, M9-10). Decisions M9-1
+to M9-10 (open).
 
 ## Plan phase 10: site server skeleton (built 2026-10-19, in software)
 

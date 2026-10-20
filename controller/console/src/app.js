@@ -210,6 +210,9 @@ class App extends Component {
         case 'field_image':
             this.setState((s) => ({ imageVersion: (s.imageVersion || 0) + 1 }));
             break;
+        case 'field_georef':
+            this.setState((s) => ({ georefVersion: (s.georefVersion || 0) + 1 }));
+            break;
         default:
             break;
         }

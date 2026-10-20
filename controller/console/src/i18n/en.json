@@ -210,6 +210,24 @@
     "no_image": "No field image: the boxes are shown on a grid.",
     "drag_hint": "Drag the boxes to where they are on the field."
   },
+  "georef": {
+    "title": "Map position (ATAK)",
+    "intro": "Give two opposite corners of the field image their latitude and longitude, copied from a map app as \"latitude, longitude\". The image must have north at the top. The ATAK feed uses them to put the boxes on a map; a new image clears them.",
+    "top_left": "Top-left corner",
+    "top_right": "Top-right corner",
+    "bottom_right": "Bottom-right corner",
+    "bottom_left": "Bottom-left corner",
+    "placeholder": "38.724000, -9.142000",
+    "bad_point": "{corner}: write \"latitude, longitude\", for example 38.724000, -9.142000.",
+    "none": "The image has no map position yet: the ATAK feed sends no boxes.",
+    "points": "Set with {n} control points through the API (they agree to {residual} m). Saving two corners replaces them.",
+    "remove": "Remove map position",
+    "confirm_remove": "Remove the map position?",
+    "saved": "Map position saved.",
+    "privacy": "The ATAK feed sends the boxes and the extraction zone to anyone on the field Wi-Fi; player positions never go there, only to the staff devices set in controller.toml.",
+    "atak_off": "ATAK feed: off (controller.toml, [atak] enabled = false).",
+    "atak_on": "ATAK feed: on, {markers} markers on the map, {sent} messages sent."
+  },
   "join": {
     "title": "Join boxes and controllers",
     "intro": "Make the join data for a box (NFC card or serial console) or for a standby controller.",

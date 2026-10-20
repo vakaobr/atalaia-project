@@ -76,6 +76,15 @@
     interval_game_s = 30.0      # between syncs while a game runs
     interval_idle_s = 300.0     # between games; failures double the wait, up to interval_idle_s
     timeout_s = 15.0            # per request
+
+    [atak]                      # Cursor on Target for ATAK (ADR-P4-7 as amended, P4R18; atak.py)
+    enabled = false
+    multicast = "239.2.3.1:6969"  # UDP, props and zones only (TTL 1); a unicast host:port works too;
+                                # empty: no UDP
+    interval_s = 30.0           # every marker again this often; owner changes go at once
+    staff_endpoints = []        # staff ATAK devices, "host:port" (TCP; 4242 if no port); from the
+                                # environment, separated by commas
+    players = false             # player positions to staff_endpoints only, never to multicast
 """
 
 from __future__ import annotations
@@ -103,6 +112,7 @@ SECTIONS = {
                 "max_replicas", "max_players", "chrono_valid_for", "rate_per_minute", "urls",
                 "wifi_ssid", "limit_template", "notice_version", "notice_pt", "notice_en",
                 "retention_days"),
+    "atak": ("enabled", "multicast", "interval_s", "staff_endpoints", "players"),
 }
 
 
@@ -173,6 +183,12 @@ class Config:
     sync_interval_game_s: float = 30.0
     sync_interval_idle_s: float = 300.0
     sync_timeout_s: float = 15.0
+    # [atak]
+    atak_enabled: bool = False
+    atak_multicast: str = "239.2.3.1:6969"
+    atak_interval_s: float = 30.0
+    atak_staff_endpoints: list[str] = field(default_factory=list)
+    atak_players: bool = False
 
     def validate(self) -> None:
         if not 0 <= self.node_id <= 0xFFFE:
@@ -198,6 +214,7 @@ class Config:
             raise ConfigError("api.tls_port must be 0 (off) or a port other than api.port")
         _check_checkin(self)
         _check_sync(self)
+        _check_atak(self)
         if self.join_key:
             try:
                 ok = len(bytes.fromhex(self.join_key)) == 32
@@ -258,6 +275,15 @@ def _check_sync(cfg: "Config") -> None:
         raise ConfigError("sync.timeout_s must be 1-300 seconds")
 
 
+def _check_atak(cfg: "Config") -> None:
+    from .atak import AtakConfigError, check_config  # noqa: PLC0415
+
+    try:
+        check_config(cfg)
+    except AtakConfigError as exc:
+        raise ConfigError(str(exc)) from None
+
+
 # (section, key) -> Config attribute
 _ATTR = {("api", "port"): "api_port", ("mqtt", "enabled"): "mqtt_enabled",
          ("mqtt", "host"): "mqtt_host", ("mqtt", "port"): "mqtt_port",
@@ -265,6 +291,9 @@ _ATTR = {("api", "port"): "api_port", ("mqtt", "enabled"): "mqtt_enabled",
          ("join", "key"): "join_key", ("checkin", "confirm"): "checkin_confirm",
          ("checkin", "urls"): "checkin_urls"}
 _ATTR.update({("sync", k): f"sync_{k}" for k in SECTIONS["sync"]})
+_ATTR.update({("atak", k): f"atak_{k}" for k in SECTIONS["atak"]})
+# Lists whose items contain ":" (host:port): from the environment they are separated by commas.
+COMMA_LISTS = {"atak_staff_endpoints"}
 
 
 def _attr(section: str, key: str) -> str:
@@ -318,6 +347,9 @@ def load_config(path: Optional[str] = None, env: Mapping[str, str] = os.environ)
             name = f"ATALAIA_{section.upper()}_{key.upper()}"
             if name in env:
                 attr = _attr(section, key)
-                setattr(cfg, attr, _coerce(name, env[name], defaults[attr]))
+                value: Any = env[name]
+                if attr in COMMA_LISTS:
+                    value = [v.strip() for v in value.split(",") if v.strip()]
+                setattr(cfg, attr, _coerce(name, value, defaults[attr]))
     cfg.validate()
     return cfg
