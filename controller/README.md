@@ -38,6 +38,7 @@ Status: phase 2, plan phases D and E; phase 3, plan phase E (field check-in, pla
 | `atalaia_controller/visibility.py` | What only staff may read: the schema's `gm_only` event data and mode parameters (decision M5-1) |
 | `atalaia_controller/prop_link.py` | Android props on the field's Wi-Fi ([protocol/prop-link.md](../protocol/prop-link.md)) |
 | `atalaia_controller/modes.py` | Built-in and uploaded mode packages, checked in the core before they are stored; scenario packages (`kind: scenario`, a `field.lua` only, decision P4R7) are uploads only, never built in |
+| `atalaia_controller/scenarios/` | The scenario compiler and validator (ADR-P4-6, decision P4-1): a scenario manifest (YAML) to a `kind: scenario` package; plain Python that the site server imports too; below, "Scenarios" |
 | `atalaia_controller/branding.py`, `images.py` | The field's branding (name, logo, wallpaper, accent), team crests and team presets; uploaded images checked and stripped of metadata without an image library |
 | `atalaia_controller/sync_client.py`, `sync_format.py` | The site server sync ([protocol/sync.md](../protocol/sync.md)): the client thread, its cursor in `sync_state`, the chrono registry's bookkeeping in `sync_items`, and the body checks the site server shares |
 | `console/src/` | The GM console and the scoreboard page (static files) |
@@ -150,6 +151,46 @@ Some of a game's data is a secret until a team earns it: the code a Hacking Term
 
 An Android phone running a prop that joined with a join payload links to the controller over the field's Wi-Fi ([protocol/prop-link.md](../protocol/prop-link.md)): `WS /api/v1/prop`, an HMAC proof of the game key, then its HELLO, STATE and events as JSON, which the controller encodes with the radio's codecs and hands to the same FieldController as a box's packets. TIME beacons and commands reach the linked props too; without a modem, commands reach the Wi-Fi props and are reported as sent. The join payload for a box carries the CA's fingerprint and the https addresses (keys 13 and 14) when HTTPS is on; boxes skip them.
 
+## Scenarios
+
+A GM writes a custom scenario as a YAML manifest (ADR-P4-6 as amended, decisions P4R7, P4R8 and M7-1 to M7-9); the compiler (`atalaia_controller/scenarios/`) turns it into a scenario package, `mode.yaml` and `field.lua` (`kind: scenario`), that runs on the controller over the built-in objectives package (`org.club.foxhound+org.atalaia.objectives`, [modes/README.md](../modes/README.md#custom-scenarios-and-the-objectives-package-phase-4)). Nothing changes on the boxes. Upload the package as any other (`POST /api/v1/modes`); the console's scenario builder and `/api/v1/scenarios` are plan phase 8.
+
+```sh
+cd controller
+python3 -m atalaia_controller.scenarios validate tests/scenarios/multi_objective.yaml  # the manifest's problems
+python3 -m atalaia_controller.scenarios check tests/scenarios/multi_objective.yaml     # + compile, load the Lua in the core
+python3 -m atalaia_controller.scenarios compile tests/scenarios/foxhound.yaml -o /tmp/foxhound  # write the package
+python3 -m atalaia_controller scenario check tests/scenarios/foxhound.yaml             # the same, from the main entry point
+```
+
+Each problem says where and why (`objectives[2].depends_on[0]: error: 'nowhere' is not an objective id (unknown_reference)`); `--json` prints them for programs. `check` and `compile` need the core library (`ATALAIA_CORE_LIB`), as an upload does; `--no-core` skips that check. Exit status 0 (warnings are fine), 1 (errors), 2 (not a manifest, or no core). From Python: `load(text)`, `validate(manifest)`, `compile_scenario(manifest)` and `check_package(core, package)`.
+
+The manifest ([tests/scenarios/foxhound.yaml](tests/scenarios/foxhound.yaml) and [multi_objective.yaml](tests/scenarios/multi_objective.yaml) are examples):
+
+| Key | What it is |
+| --- | --- |
+| `id`, `version`, `name`, `description`, `author` | The package's id (`org.club.name`, at most 40 bytes so the game's id fits a join; not `org.atalaia.`), its version, its texts in English |
+| `i18n.pt` | `name`, `description` and `params` labels in Portuguese |
+| `lang` | The boxes' screens: `pt` (the default) or `en`; each box shows the objective's name in that language |
+| `teams`, `squads` | The game's team names the scenario uses (default `[red, blue]`) and its squads per team (numbers 1 to `squads`, 0: none) |
+| `params` | Whole-number parameters for the GM (`{ type: int, min, max, default, label }`), for points: `effect.points: { param: name }` |
+| `nodes` | The names the GM gives the boxes (`box-a: { role: objective }`, `{ role: bomb_site }`) and the players an objective is about (`vip: { player: true, role: vip }`, `role` being the player's check-in role) |
+| `objectives` | A list; each has `id` (`[a-z][a-z0-9_]`, at most 24), `type`, `name` (one line; `description`, `i18n.pt`), `target`, `assignee` (`team`, `squad`), `params`, `visibility` (`public`, `team`, `squad`, `hidden`), `depends_on`, `time_window` (`start_min`, `end_min`), `effect` (`points`, `win`, `reveal`) |
+
+| Type | Target | Params | Completed | Failed |
+| --- | --- | --- | --- | --- |
+| `capture_and_hold` | an `objective` box | `hold_ms` (to take it), `duration_s` (to keep it; 0, the default: at the capture) | the team (only the assignee's, if one) has held it for `duration_s` | -- |
+| `defend` | an `objective` box | `duration_s` (required), `hold_ms`; an assignee team is required | the defenders still hold it `duration_s` after it opens (they start holding it) | another team captures it (`captured`) |
+| `enter_code` | an `objective` box with a keypad | `code` (1-8 digits, in quotes) | the code is typed (credited to the assignee, else the last team to press) | -- |
+| `scan_tags` | an `objective` box with NFC | `tag_count` (required), `any` (any cards, not only players' tags) | a team (the assignee, if one) scanned `tag_count` different tags | -- |
+| `destroy` | a `bomb_site` box | `hold_ms`, `defuse_ms`, `fuse_s` | the bomb explodes | it is defused (`defused`) |
+| `escort` | a player node (`player: true`) | `destination` (`{ lat, lon, radius_m }` or `{ points: [[lat, lon], ...] }`, 3-32 corners), `max_acc_m` | a GPS fix of a player with that role (of the assignee team) inside, no less precise than `max_acc_m` (default: the radius; 25 m for a polygon) | -- |
+| `survive` | none | `minimum_lives` (required); an assignee team and `time_window.end_min` are required | the team still has `minimum_lives` of Respawn's lives at the window's end (compose the game with `org.atalaia.respawn`, per-team lives) | fewer lives left, or the team eliminated (`lives`) |
+
+An objective opens when it is revealed (at the start, unless `hidden`; a hidden one when it could open, or when another's `effect.reveal` names it), its time window has started and everything in `depends_on` is completed; a box shows it inactive until then. One still open at `end_min` fails (`time`); a failed one fails what depends on it (`blocked`); an objective never revealed sends no event. Completing one scores its points for the team, reveals what `effect.reveal` lists and, with `effect.win`, ends the game won by that team. An objective of a team the game does not have is off. The validator checks unique ids, references and the dependency graph (a topological sort; every objective on a cycle is named), each type's target and parameters, teams and squads, time windows, destinations (a radius under 10 m is a warning; a polygon whose edges cross is an error), and sizes: every setup command fits a box's 127-byte command and every scenario event a LoRa packet. The rules are written as shared vectors, [`protocol/vectors/scenario.json`](../protocol/vectors/scenario.json).
+
+The generated `field.lua` is a data table (`SCENARIO`) followed by the scenario runtime, [`scenarios/runtime.lua`](atalaia_controller/scenarios/runtime.lua), the same code for every scenario (GPL-3.0-or-later, like the modes, since it is copied into every package; decision M7-2). No text from the manifest is ever Lua code: every value is written as a Lua literal, a quoted string with its quotes, backslashes and control characters escaped, so a name such as `"]] os.exit() --[[` is only ever a name. `mode.yaml` carries the names, teams, squads, nodes and each objective's id, type, names, assignee, visibility, dependencies and points (for plan phase 8's routing and player view); a code and a destination are only in `field.lua`.
+
 ## REST API v1
 
 Reading needs the read or GM token, changing anything the GM token: `Authorization: Bearer <token>` (the WebSocket also takes `?token=`). A player token (field check-in) reads what the read token reads about games, its own check-in and what its role allows; it cannot read modes, presets, the controller's or the radio's state.
@@ -239,5 +280,7 @@ Who may publish commands is Mosquitto's job: [`deploy/mosquitto.conf`](deploy/mo
 The phase 3 tests (`test_checkin.py`, `test_chrono_list.py`, `test_checkin_poster.py`, `test_positions.py`, `test_prop_link.py`, `test_tls.py`) run the whole controller from `main.build()` without a radio: the poster codec against `protocol/vectors/checkin.json`, check-in and its rules, player tokens and the role re-check, the role-filtered stream, the "replicas to chrono" list with readings signed in the test and the shared chrono vectors, the retention purge, the privacy rules (no names in events, MQTT, logs or read views), the visibility table, an Android prop's Wi-Fi link, and a real TLS connection that trusts only the field CA.
 
 `test_sync_client.py` runs the sync client against a small site server in the test process: the cursor and batches, a replay after a restart and after a lost answer, a game the site server lost, an event out of form skipped instead of blocking, a refused body that does not hold up the rest, the backoff and `Retry-After`, the game going on with nothing listening, the thread woken by a game's start and end, redirects refused (the key never goes elsewhere), TLS trusting only the configured CA, the settings and `sync-key`, a whole game with check-ins, positions, tokens and signed chrono readings with nothing private in any body, checked field by field, and the chrono registry (keys before readings, each item once, a key rotation with its periods, readings the site server keeps apart, batches, `--resend`, a reading's game). `test_sync_format.py` checks the shared body checker against `protocol/vectors/sync.json` and the score merge against the simulator's `FieldController`. The end-to-end test against the real site server and PostgreSQL is the site server's `tests/test_sync_e2e.py` (`python3 tools/docker_server.py test tests.test_sync_e2e`).
+
+`test_scenarios.py` checks the scenario compiler and validator: the shared vectors (`protocol/vectors/scenario.json`) and 3,000 mutated copies of them (problems, never a crash), every objective type compiled and played in the simulator over the objectives package (completion, failure, reveals, `scenario.started`, the dependency chain of the multi-objective example, time windows, `survive` against Respawn's lives, `escort` with `position.fix` in a circle and a polygon, a failure blocking what depends on it, a team the game lacks), Lua escaping of hostile texts (each text back from the core byte for byte), the core's load check and an install, the command line, and the import without the web stack. It compiles [`tests/scenarios/foxhound.yaml`](tests/scenarios/foxhound.yaml) and runs every YAML test of the objectives package that plays the hand-written example (`modes/objectives/tests/fixtures/foxhound`) against the compiled package instead.
 
 The console's browser tests (headless Chromium, `controller/console/tests/`) need a browser, so they run separately: `python tools/docker_console.py`, and CI's `console` job.

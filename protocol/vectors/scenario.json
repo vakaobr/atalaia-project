@@ -1,0 +1,2164 @@
+{
+ "description": "Scenario manifests (ADR-P4-6 as amended; controller/README.md, 'Scenarios') with the problems each must give, for every implementation of the scenario validator: controller/tests/test_scenarios.py (atalaia_controller.scenarios) now, the GM console's live checks and phase 5's visual editor later. 'valid' manifests give no error, and exactly the warnings listed; 'invalid' ones give exactly the errors listed (path and code; warnings are not listed). The expected problems follow the rules as written in ADR-P4-6 and the README, not either implementation; the messages are free text.",
+ "valid": [
+  {
+   "name": "One objective: a point to capture",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ]
+   }
+  },
+  {
+   "name": "Every objective type, squads, a parameter for points, dependencies, a reveal, time windows",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     },
+     "b": {
+      "role": "objective"
+     },
+     "site": {
+      "role": "bomb_site"
+     },
+     "vip": {
+      "player": true,
+      "role": "vip"
+     },
+     "c": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "intel",
+      "name": "Intel",
+      "i18n": {
+       "pt": {
+        "name": "Informações"
+       }
+      },
+      "type": "scan_tags",
+      "target": "a",
+      "assignee": {
+       "team": "red",
+       "squad": 1
+      },
+      "params": {
+       "tag_count": 3,
+       "any": true
+      },
+      "time_window": {
+       "start_min": 0,
+       "end_min": 90
+      },
+      "effect": {
+       "points": 50,
+       "reveal": [
+        "rescue"
+       ]
+      }
+     },
+     {
+      "id": "rescue",
+      "name": "Rescue",
+      "type": "escort",
+      "target": "vip",
+      "assignee": {
+       "team": "red",
+       "squad": 2
+      },
+      "params": {
+       "destination": {
+        "lat": 38.7223,
+        "lon": -9.1393,
+        "radius_m": 15
+       }
+      },
+      "visibility": "hidden",
+      "depends_on": [
+       "intel"
+      ],
+      "effect": {
+       "win": true
+      }
+     },
+     {
+      "id": "hq",
+      "name": "HQ",
+      "type": "defend",
+      "target": "b",
+      "assignee": {
+       "team": "blue"
+      },
+      "params": {
+       "duration_s": 2700
+      },
+      "effect": {
+       "points": 100
+      }
+     },
+     {
+      "id": "sabotage",
+      "name": "Sabotage",
+      "type": "destroy",
+      "target": "site",
+      "assignee": {
+       "team": "red"
+      },
+      "params": {
+       "fuse_s": 45
+      },
+      "depends_on": [
+       "intel"
+      ],
+      "effect": {
+       "points": {
+        "param": "sabotage_points"
+       }
+      }
+     },
+     {
+      "id": "vault",
+      "name": "Vault",
+      "type": "enter_code",
+      "target": "c",
+      "params": {
+       "code": "0815"
+      }
+     },
+     {
+      "id": "alive",
+      "name": "Alive",
+      "type": "survive",
+      "assignee": {
+       "team": "blue"
+      },
+      "params": {
+       "minimum_lives": 5
+      },
+      "time_window": {
+       "end_min": 120
+      }
+     }
+    ],
+    "squads": 2,
+    "lang": "en",
+    "params": {
+     "sabotage_points": {
+      "type": "int",
+      "min": 0,
+      "max": 500,
+      "default": 75,
+      "label": "Sabotage points"
+     }
+    },
+    "i18n": {
+     "pt": {
+      "name": "Vetores",
+      "params": {
+       "sabotage_points": "Pontos da sabotagem"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "Warnings only: a destination under 10 m, and a node no objective uses",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "vip": {
+      "player": true
+     },
+     "spare": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "rescue",
+      "name": "Rescue",
+      "type": "escort",
+      "target": "vip",
+      "params": {
+       "destination": {
+        "lat": 0,
+        "lon": 0,
+        "radius_m": 5
+       }
+      }
+     }
+    ]
+   },
+   "warnings": [
+    {
+     "path": "objectives[0].params.destination.radius_m",
+     "code": "small_radius"
+    },
+    {
+     "path": "nodes.spare",
+     "code": "unused_node"
+    }
+   ]
+  },
+  {
+   "name": "A polygon destination (a square)",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "vip": {
+      "player": true,
+      "role": "vip"
+     }
+    },
+    "objectives": [
+     {
+      "id": "out",
+      "name": "Out",
+      "type": "escort",
+      "target": "vip",
+      "params": {
+       "destination": {
+        "points": [
+         [
+          0,
+          0
+         ],
+         [
+          0,
+          0.001
+         ],
+         [
+          0.001,
+          0.001
+         ],
+         [
+          0.001,
+          0
+         ]
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "Hostile texts are valid: they are only ever data",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "r\"ed",
+     "blue"
+    ],
+    "nodes": {
+     "a\"]]": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Pon\"te]] os.exit() --[[ \\",
+      "type": "capture_and_hold",
+      "target": "a\"]]",
+      "description": "two\nlines ]]"
+     }
+    ]
+   }
+  }
+ ],
+ "invalid": [
+  {
+   "name": "No id",
+   "manifest": {
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "id",
+     "code": "missing"
+    }
+   ]
+  },
+  {
+   "name": "An id that is not a package id",
+   "manifest": {
+    "id": "Foxhound",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "id",
+     "code": "bad_id"
+    }
+   ]
+  },
+  {
+   "name": "An id too long for the game's id with the objectives package",
+   "manifest": {
+    "id": "org.club.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "id",
+     "code": "id_too_long"
+    }
+   ]
+  },
+  {
+   "name": "The built-in modes' namespace",
+   "manifest": {
+    "id": "org.atalaia.foxhound",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "id",
+     "code": "bad_id"
+    }
+   ]
+  },
+  {
+   "name": "No version",
+   "manifest": {
+    "id": "org.club.vectors",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "version",
+     "code": "missing"
+    }
+   ]
+  },
+  {
+   "name": "A key the manifest does not have",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ],
+    "objective": []
+   },
+   "errors": [
+    {
+     "path": "objective",
+     "code": "unknown_key"
+    }
+   ]
+  },
+  {
+   "name": "No objectives",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": []
+   },
+   "errors": [
+    {
+     "path": "objectives",
+     "code": "bad_objectives"
+    }
+   ]
+  },
+  {
+   "name": "Two objectives with one id",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     },
+     "b": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     },
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "b"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[1].id",
+     "code": "duplicate_id"
+    }
+   ]
+  },
+  {
+   "name": "An objective id with capitals",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "Hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].id",
+     "code": "bad_id"
+    }
+   ]
+  },
+  {
+   "name": "An objective id longer than 24",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hhhhhhhhhhhhhhhhhhhhhhhhh",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].id",
+     "code": "bad_id"
+    }
+   ]
+  },
+  {
+   "name": "A key an objective does not have",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a",
+      "dependencies": [
+       "x"
+      ]
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].dependencies",
+     "code": "unknown_key"
+    }
+   ]
+  },
+  {
+   "name": "No name",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].name",
+     "code": "missing"
+    }
+   ]
+  },
+  {
+   "name": "A name on two lines",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill\nos.exit()",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].name",
+     "code": "bad_text"
+    }
+   ]
+  },
+  {
+   "name": "An unknown type",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "king_of_the_hill",
+      "target": "a"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].type",
+     "code": "unknown_type"
+    }
+   ]
+  },
+  {
+   "name": "depends_on names an objective that does not exist",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a",
+      "depends_on": [
+       "nowhere"
+      ]
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].depends_on[0]",
+     "code": "unknown_reference"
+    }
+   ]
+  },
+  {
+   "name": "An objective depends on itself",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a",
+      "depends_on": [
+       "hill"
+      ]
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].depends_on[0]",
+     "code": "self_reference"
+    }
+   ]
+  },
+  {
+   "name": "A cycle: each depends on the other",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     },
+     "b": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "one",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a",
+      "depends_on": [
+       "two"
+      ]
+     },
+     {
+      "id": "two",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "b",
+      "depends_on": [
+       "one"
+      ]
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].depends_on",
+     "code": "cycle"
+    },
+    {
+     "path": "objectives[1].depends_on",
+     "code": "cycle"
+    }
+   ]
+  },
+  {
+   "name": "A reveal of an objective that does not exist",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a",
+      "effect": {
+       "reveal": [
+        "ghost"
+       ]
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].effect.reveal[0]",
+     "code": "unknown_reference"
+    }
+   ]
+  },
+  {
+   "name": "A target not in the nodes map",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "z"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].target",
+     "code": "unknown_node"
+    }
+   ]
+  },
+  {
+   "name": "No target",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].target",
+     "code": "missing_target"
+    }
+   ]
+  },
+  {
+   "name": "destroy needs a bomb_site",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "destroy",
+      "target": "a"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].target",
+     "code": "wrong_role"
+    }
+   ]
+  },
+  {
+   "name": "escort targets a player, not a box",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "escort",
+      "target": "a",
+      "params": {
+       "destination": {
+        "lat": 38.7223,
+        "lon": -9.1393,
+        "radius_m": 15
+       }
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].target",
+     "code": "wrong_role"
+    }
+   ]
+  },
+  {
+   "name": "survive has no target",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "survive",
+      "target": "a",
+      "assignee": {
+       "team": "red"
+      },
+      "params": {
+       "minimum_lives": 1
+      },
+      "time_window": {
+       "end_min": 60
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].target",
+     "code": "unexpected_target"
+    }
+   ]
+  },
+  {
+   "name": "Two objectives on one box",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     },
+     {
+      "id": "hill2",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[1].target",
+     "code": "node_shared"
+    }
+   ]
+  },
+  {
+   "name": "A box's role the objectives package does not have",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "zone"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "nodes.a.role",
+     "code": "bad_role"
+    }
+   ]
+  },
+  {
+   "name": "A time window that ends before it starts",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a",
+      "time_window": {
+       "start_min": 30,
+       "end_min": 30
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].time_window",
+     "code": "bad_time_window"
+    }
+   ]
+  },
+  {
+   "name": "A time window in fractions of a minute",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a",
+      "time_window": {
+       "start_min": 0.5
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].time_window.start_min",
+     "code": "bad_time_window"
+    }
+   ]
+  },
+  {
+   "name": "escort without a destination",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "vip": {
+      "player": true
+     }
+    },
+    "objectives": [
+     {
+      "id": "r",
+      "name": "R",
+      "type": "escort",
+      "target": "vip"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].params.destination",
+     "code": "missing_param"
+    }
+   ]
+  },
+  {
+   "name": "escort with a radius of 0",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "vip": {
+      "player": true
+     }
+    },
+    "objectives": [
+     {
+      "id": "r",
+      "name": "R",
+      "type": "escort",
+      "target": "vip",
+      "params": {
+       "destination": {
+        "lat": 38.7223,
+        "lon": -9.1393,
+        "radius_m": 0
+       }
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].params.destination.radius_m",
+     "code": "bad_destination"
+    }
+   ]
+  },
+  {
+   "name": "escort with a latitude past the pole",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "vip": {
+      "player": true
+     }
+    },
+    "objectives": [
+     {
+      "id": "r",
+      "name": "R",
+      "type": "escort",
+      "target": "vip",
+      "params": {
+       "destination": {
+        "lat": 95,
+        "lon": -9.1393,
+        "radius_m": 15
+       }
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].params.destination.lat",
+     "code": "bad_destination"
+    }
+   ]
+  },
+  {
+   "name": "A polygon whose edges cross (a bow tie)",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "vip": {
+      "player": true
+     }
+    },
+    "objectives": [
+     {
+      "id": "r",
+      "name": "R",
+      "type": "escort",
+      "target": "vip",
+      "params": {
+       "destination": {
+        "points": [
+         [
+          0,
+          0
+         ],
+         [
+          0.001,
+          0.001
+         ],
+         [
+          0,
+          0.001
+         ],
+         [
+          0.001,
+          0
+         ]
+        ]
+       }
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].params.destination.points",
+     "code": "polygon_not_simple"
+    }
+   ]
+  },
+  {
+   "name": "A polygon of two points",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "vip": {
+      "player": true
+     }
+    },
+    "objectives": [
+     {
+      "id": "r",
+      "name": "R",
+      "type": "escort",
+      "target": "vip",
+      "params": {
+       "destination": {
+        "points": [
+         [
+          0,
+          0
+         ],
+         [
+          0.001,
+          0.001
+         ]
+        ]
+       }
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].params.destination.points",
+     "code": "bad_polygon"
+    }
+   ]
+  },
+  {
+   "name": "scan_tags without tag_count",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "scan_tags",
+      "target": "a"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].params.tag_count",
+     "code": "missing_param"
+    }
+   ]
+  },
+  {
+   "name": "A parameter the type does not take",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a",
+      "params": {
+       "code": "1"
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].params.code",
+     "code": "unknown_param"
+    }
+   ]
+  },
+  {
+   "name": "A code written as a number (it would lose leading zeros)",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "enter_code",
+      "target": "a",
+      "params": {
+       "code": 815
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].params.code",
+     "code": "bad_param"
+    }
+   ]
+  },
+  {
+   "name": "A code with letters",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "enter_code",
+      "target": "a",
+      "params": {
+       "code": "12ab"
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].params.code",
+     "code": "bad_param"
+    }
+   ]
+  },
+  {
+   "name": "A capture's hold out of range",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a",
+      "params": {
+       "hold_ms": -1
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].params.hold_ms",
+     "code": "bad_param"
+    }
+   ]
+  },
+  {
+   "name": "A team the scenario does not have",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a",
+      "assignee": {
+       "team": "green"
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].assignee.team",
+     "code": "unknown_team"
+    }
+   ]
+  },
+  {
+   "name": "A squad in a scenario without squads",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a",
+      "assignee": {
+       "team": "red",
+       "squad": 1
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].assignee.squad",
+     "code": "unknown_squad"
+    }
+   ]
+  },
+  {
+   "name": "A squad past the scenario's squads",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a",
+      "assignee": {
+       "team": "red",
+       "squad": 3
+      }
+     }
+    ],
+    "squads": 2
+   },
+   "errors": [
+    {
+     "path": "objectives[0].assignee.squad",
+     "code": "unknown_squad"
+    }
+   ]
+  },
+  {
+   "name": "A squad without its team",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a",
+      "assignee": {
+       "squad": 1
+      },
+      "visibility": "public"
+     }
+    ],
+    "squads": 2
+   },
+   "errors": [
+    {
+     "path": "objectives[0].assignee.squad",
+     "code": "squad_needs_team"
+    }
+   ]
+  },
+  {
+   "name": "defend without the defending team",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "defend",
+      "target": "a",
+      "params": {
+       "duration_s": 60
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].assignee.team",
+     "code": "missing_team"
+    }
+   ]
+  },
+  {
+   "name": "survive without a time window's end",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {},
+    "objectives": [
+     {
+      "id": "s",
+      "name": "S",
+      "type": "survive",
+      "assignee": {
+       "team": "red"
+      },
+      "params": {
+       "minimum_lives": 1
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].time_window",
+     "code": "missing_end"
+    }
+   ]
+  },
+  {
+   "name": "Seen by a squad, without a squad",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a",
+      "assignee": {
+       "team": "red"
+      },
+      "visibility": "squad"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].visibility",
+     "code": "visibility_needs_squad"
+    }
+   ]
+  },
+  {
+   "name": "Seen by a team, without a team",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a",
+      "visibility": "team"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].visibility",
+     "code": "visibility_needs_team"
+    }
+   ]
+  },
+  {
+   "name": "Hidden and never revealed",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a",
+      "visibility": "hidden"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].visibility",
+     "code": "never_revealed"
+    }
+   ]
+  },
+  {
+   "name": "Points that are not whole",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a",
+      "effect": {
+       "points": 2.5
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].effect.points",
+     "code": "bad_points"
+    }
+   ]
+  },
+  {
+   "name": "Points from a parameter the scenario does not have",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a",
+      "effect": {
+       "points": {
+        "param": "nope"
+       }
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].effect.points.param",
+     "code": "unknown_param"
+    }
+   ]
+  },
+  {
+   "name": "A scenario parameter that is not a whole number",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ],
+    "params": {
+     "p": {
+      "type": "string",
+      "default": "x"
+     }
+    }
+   },
+   "errors": [
+    {
+     "path": "params.p.type",
+     "code": "bad_param_type"
+    }
+   ]
+  },
+  {
+   "name": "Translations in a language the scenario does not have",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a",
+      "i18n": {
+       "fr": {
+        "name": "Colline"
+       }
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].i18n.fr",
+     "code": "bad_lang"
+    }
+   ]
+  },
+  {
+   "name": "Screens in a language the boxes do not have",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ],
+    "lang": "fr"
+   },
+   "errors": [
+    {
+     "path": "lang",
+     "code": "bad_lang"
+    }
+   ]
+  },
+  {
+   "name": "Too many squads",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ],
+    "squads": 17
+   },
+   "errors": [
+    {
+     "path": "squads",
+     "code": "bad_squads"
+    }
+   ]
+  },
+  {
+   "name": "A team named twice",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "red"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "teams",
+     "code": "bad_teams"
+    }
+   ]
+  },
+  {
+   "name": "A setup too large for a box's command: the name is too long",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "rrrrrrrrrrrrrrrrrrrrrrr",
+     "red"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+      "type": "capture_and_hold",
+      "target": "a",
+      "assignee": {
+       "team": "red"
+      },
+      "params": {
+       "hold_ms": 600000
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].name",
+     "code": "setup_too_large"
+    }
+   ]
+  }
+ ]
+}

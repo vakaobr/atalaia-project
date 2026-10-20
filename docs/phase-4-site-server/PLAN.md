@@ -879,12 +879,63 @@ lives; `escort` with `position.fix`; Lua escaping of hostile texts (a
 name with `]]`, quotes, newlines); every invalid manifest refused with
 its reason; `Simulation.problems` empty in every run.
 
+**Built 2026-10-20 (in software; not yet on radio hardware).** What
+differs from the design above, or fills what it left open (decisions M7-1
+to M7-9):
+
+- The manifest (M7-1): ADR-P4-6's keys with P4R8's names (the game's team
+  names, `squads` as a number, node names the GM gives the boxes, a player
+  node `{ player: true, role: vip }` for `escort`), `lang` for the boxes'
+  screens (each box shows the objective's name in that language),
+  whole-number scenario `params` that an `effect.points: { param }` can
+  use, and texts in English with `i18n.pt`. A key given twice is refused.
+- The generated `field.lua` is a data table followed by one scenario
+  runtime, `scenarios/runtime.lua` (GPL-3.0-or-later, since it is copied
+  into every package, which is GPL too), instead of Lua templates per
+  objective (M7-2); every manifest value reaches it as an escaped Lua
+  literal and names must be one line (M7-3). `lua.py` writes the table
+  and the setups; `package.py` writes `mode.yaml` with a `scenario:`
+  block (names, teams, squads, nodes, each objective's assignee,
+  visibility, dependencies and points, never a code or a destination)
+  for plan phase 8 (M7-8).
+- Semantics (M7-4, M7-5): an objective opens when revealed, its window has
+  started and its dependencies are done; a hidden one is revealed when it
+  could open or by another's `effect.reveal`; one still open at `end_min`
+  fails (`time`); a failure fails its dependents (`blocked`); an objective
+  never revealed sends nothing (P4R24); an objective of a team the game
+  lacks is off. `capture_and_hold` takes `duration_s` 0 (at the capture)
+  by default; `defend` starts held by the defenders; `survive` needs
+  `time_window.end_min` and is judged then (scores freeze once a game has
+  ended), from Respawn's per-team `lives_left` and `team.eliminated`;
+  `escort` takes a circle or a polygon and `max_acc_m`. Squads travel as
+  text in events (data key 2 is a string) (M7-7).
+- The validator returns every problem as `(path, code, message, level)`
+  (M7-6); a box serves one objective; the scenario id is at most 40
+  bytes and not `org.atalaia.`. Shared vectors
+  `protocol/vectors/scenario.json` (5 valid, 54 invalid), read by Python
+  only: the app does not read manifests yet (M7-9).
+- The command line also has `validate` (no core needed), and is reachable
+  as `python3 -m atalaia_controller scenario ...`; `check` and `compile`
+  need the core library unless `--no-core` (M7-9).
+- Tests: `controller/tests/test_scenarios.py` (29 tests: the vectors and 3,000 mutated manifests,
+  every type in the simulator, the multi-objective chain, windows,
+  `survive` with Respawn, `escort` in a circle and a polygon, blocked
+  dependents, hostile texts round-tripped through the core, the load
+  check and an install, the command line, the import without the web
+  stack) and `tests/scenarios/foxhound.yaml`, the hand-written example
+  recompiled, which passes the objectives package's six YAML tests that
+  play the hand-written one.
+
 ### Validation
 
 ```sh
 docker run --rm -v "$PWD:/src" atalaia-dev sh -c "BUILD=/tmp/c sh tools/check.sh"
-docker run --rm -v "$PWD:/src" atalaia-dev sh -c "cd controller && python3 -m atalaia_controller.scenarios check tests/scenarios/multi_objective.yaml"
+docker run --rm -v "$PWD:/src" atalaia-dev sh -c "cmake -S core -B /tmp/c -DATALAIA_SHARED=ON && cmake --build /tmp/c && cd controller && ATALAIA_CORE_LIB=/tmp/c/libatalaia_core.so python3 -m atalaia_controller.scenarios check tests/scenarios/multi_objective.yaml"
 ```
+
+(2026-10-20: `check` loads the generated Lua in the core, so the second
+command builds the core first; without it the command stops with exit
+status 2, decision M7-9.)
 
 ---
 

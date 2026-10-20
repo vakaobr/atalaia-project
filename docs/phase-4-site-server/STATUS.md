@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Implementation (plan phases 1 to 6 and 10 to 16 built in software, 2026-10-20; sync over 4G: HW1)
+**Current phase:** Implementation (plan phases 1 to 7 and 10 to 16 built in software, 2026-10-20; sync over 4G: HW1)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-20 (plan phase 16, full clean-copy check)
-**Next step:** plan phase 7 (scenario compiler and validator) on the modes chain; plan phase 17 (registration import and platform adapters) on the site server chain
+**Last verified:** 2026-10-20 (plan phase 7, full clean-copy check)
+**Next step:** plan phase 8 (scenarios in the controller, console and app) on the modes chain; plan phase 17 (registration import and platform adapters) on the site server chain
 
 ## Completed
 
@@ -45,7 +45,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | 4 | Hacking Terminal | Software, now | -- | Done in software (2026-10-20; on a phone in the field: HW3) |
 | 5 | VIP / Payload | Software, now | 3 | Done in software (2026-10-20; real GPS in the field: HW3) |
 | 6 | Scenario packages and the objectives role package | Software, now | -- | Done in software (2026-10-20; not on radio hardware) |
-| 7 | Scenario compiler and validator | Software, now | 3, 6 | Pending |
+| 7 | Scenario compiler and validator | Software, now | 3, 6 | Done in software (2026-10-20; not on radio hardware) |
 | 8 | Scenarios in the controller, console and app | Software, now | 7 | Pending |
 | 9 | ATAK / CoT emitter | Software, now | 3 | Pending |
 | 10 | Site server skeleton and test tooling | Software, now | -- | **Done in software** (2026-10-19) |
@@ -252,6 +252,43 @@ scenario from the form, the feed in words); the Field Box host tests (the
 preset picked, set up, a capture and a bomb) and fifteen reference images;
 five app goldens. Not run: Wokwi (R7), a real box on the radio. Decisions
 M6-1 to M6-9 (open).
+
+## Plan phase 7: scenario compiler and validator (built 2026-10-20, in software)
+
+ADR-P4-6 as amended (P4-1, P4R7, P4R8): `controller/atalaia_controller/scenarios/`,
+plain Python (PyYAML only) that the site server can import without its web
+stack. A YAML (or JSON) manifest, with nodes the GM names, the game's team
+names, numbered squads and seven objective types (`capture_and_hold`,
+`defend`, `enter_code`, `scan_tags`, `destroy`, `escort` by `position.fix`,
+`survive` against Respawn's lives), compiles to a `kind: scenario` package
+over `org.atalaia.objectives`: `mode.yaml` (names in English and
+Portuguese, parameters, and a `scenario:` block with each objective's
+assignee, visibility and dependencies for plan phase 8) and `field.lua`
+(a data table followed by the one scenario runtime, `runtime.lua`). The
+validator returns every problem with its path, a code and a reason (unique
+ids, references, a dependency graph without cycles, targets and roles,
+parameters, teams and squads, time windows, destinations, setup and event
+sizes). No manifest text is ever Lua code: each value is an escaped Lua
+literal. Command line: `python3 -m atalaia_controller.scenarios
+validate|check|compile` (also `python3 -m atalaia_controller scenario`);
+`check` and `compile` load the Lua in the core as an upload does (P4R9).
+Shared vectors `protocol/vectors/scenario.json` (5 valid, 54 invalid).
+
+Tested: `controller/tests/test_scenarios.py` (29 tests): the vectors, and 3,000 mutated manifests that must give problems, never a crash; every
+type compiled and played in the simulator over the objectives package
+(completion, failure, reveals, `scenario.started`, the multi-objective
+example's dependency chain with squads, time windows, `survive` with
+Respawn, `escort` in a circle and a polygon, dependents blocked by a
+failure, a team the game lacks, English screens); hostile names, nodes and
+teams (quotes, `]]`, backslashes, control characters) round-tripped through
+the core byte for byte; the core's load check and an install on the
+controller; the command line; the import with FastAPI and pydantic blocked.
+The hand-written Foxhound, recompiled from
+`controller/tests/scenarios/foxhound.yaml`, passes the objectives package's
+six YAML tests that play the hand-written package. Not run: a real box on
+the radio, Wokwi (R7). The site server's own import check
+(`server/tests/test_shared_imports.py`) does not list the package yet
+(plan phase 20). Decisions M7-1 to M7-9 (open).
 
 ## Plan phase 10: site server skeleton (built 2026-10-19, in software)
 

@@ -1,0 +1,80 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# ADR-P4-6's example scenario, Operation Foxhound, with the names of decision P4R8: the game's
+# team names (red, blue), squads by number, nodes by the names the GM gives the boxes, objective
+# ids of [a-z][a-z0-9_]. Squad 1 of red scans the intel, which reveals the VIP's rescue to squad 2
+# and opens the sabotage; blue defends its HQ for 45 minutes.
+#
+#   python3 -m atalaia_controller.scenarios check tests/scenarios/multi_objective.yaml
+id: org.club.operation-foxhound
+version: 1
+name: Operation Foxhound
+author: The field's GM team
+description: >-
+  Red's first squad recovers three intel cards, which reveals the VIP's rescue to the second
+  squad and opens the sabotage of blue's radio; blue defends its HQ for 45 minutes.
+lang: pt
+teams: [red, blue]
+squads: 2
+i18n:
+  pt:
+    name: Operação Foxhound
+    description: >-
+      O primeiro squad da red recupera três cartões de informações, o que revela ao segundo
+      squad o resgate do VIP e abre a sabotagem do rádio da blue; a blue defende o seu QG
+      durante 45 minutos.
+
+# Node names the GM assigns to boxes in the console's Join tab; the VIP is a checked-in player
+# whose role is vip.
+nodes:
+  box-a: { role: objective }
+  box-b: { role: objective }
+  box-c: { role: bomb_site }
+  vip: { player: true, role: vip }
+
+objectives:
+  - id: intel
+    name: Intel
+    i18n: { pt: { name: Informações } }
+    type: scan_tags
+    assignee: { team: red, squad: 1 }
+    target: box-a
+    params: { tag_count: 3, any: true }
+    visibility: squad
+    time_window: { start_min: 0, end_min: 90 }
+    effect:
+      points: 50
+      reveal: [rescue]
+
+  - id: rescue
+    name: Rescue the VIP
+    i18n: { pt: { name: Resgatar o VIP } }
+    type: escort
+    assignee: { team: red, squad: 2 }
+    target: vip
+    params:
+      destination: { lat: 38.7223, lon: -9.1393, radius_m: 15 }
+    visibility: hidden
+    depends_on: [intel]
+    effect: { win: true }
+
+  - id: defend_hq
+    name: Defend the HQ
+    i18n: { pt: { name: Defender o QG } }
+    type: defend
+    assignee: { team: blue }
+    target: box-b
+    params: { duration_s: 2700 }
+    visibility: team
+    effect: { points: 100 }
+
+  - id: sabotage
+    name: Sabotage the radio
+    i18n: { pt: { name: Sabotar o rádio } }
+    type: destroy
+    assignee: { team: red, squad: 1 }
+    target: box-c
+    visibility: squad
+    depends_on: [intel]
+    effect: { points: 75 }

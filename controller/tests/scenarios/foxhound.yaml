@@ -1,0 +1,71 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Foxhound as a scenario manifest: the compiler's version of the hand-written example package
+# modes/objectives/tests/fixtures/foxhound. test_scenarios.py compiles it and runs every YAML
+# test of the objectives package that plays the hand-written one against the compiled package.
+id: org.club.foxhound
+version: 0.1.0
+name: Foxhound
+description: >-
+  Red takes the bridge, which reveals the vault to red; both teams race for the intel
+  (two players of a team scan their tags); red arms the bomb at site A and blue defends it.
+lang: pt
+teams: [red, blue]
+params:
+  vault_points: { type: int, min: 0, max: 1000, default: 100, label: "Points for the vault" }
+i18n:
+  pt:
+    name: Foxhound
+    description: >-
+      A equipa red toma a ponte, o que lhe revela o cofre; as duas equipas disputam as
+      informações (duas pessoas de uma equipa leem as suas etiquetas); a red arma a bomba no
+      local A e a blue defende-o.
+    params:
+      vault_points: Pontos do cofre
+
+nodes:
+  alpha: { role: objective }
+  bravo: { role: objective }
+  charlie: { role: objective }
+  site: { role: bomb_site }
+
+objectives:
+  - id: bridge
+    name: Bridge
+    i18n: { pt: { name: Ponte } }
+    type: capture_and_hold
+    target: alpha
+    assignee: { team: red }
+    params: { hold_ms: 3000 }
+    effect: { points: 50 }
+
+  - id: intel
+    name: Intel
+    description: Two players of one team scan their own tags here.
+    i18n: { pt: { name: Informações, description: Duas pessoas da mesma equipa leem aqui as suas etiquetas. } }
+    type: scan_tags
+    target: bravo
+    params: { tag_count: 2 }
+    effect: { points: 20 }
+
+  - id: vault
+    name: Vault
+    i18n: { pt: { name: Cofre } }
+    type: enter_code
+    target: charlie
+    assignee: { team: red }
+    params: { code: "4711" }
+    visibility: hidden
+    depends_on: [bridge]
+    effect: { points: { param: vault_points } }
+
+  - id: site_a
+    name: Site A
+    i18n: { pt: { name: Local A } }
+    type: destroy
+    target: site
+    assignee: { team: red }
+    params: { hold_ms: 5000, fuse_s: 60 }
+    visibility: public   # blue defends it: both teams see it
+    effect: { points: 30 }

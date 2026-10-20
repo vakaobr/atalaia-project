@@ -614,7 +614,7 @@ roadmap:
     title: Servidor do clube e jogo avançado
     short: >-
       Servidor do clube, marcação de jogos e inscrições, cenários personalizados, modos avançados,
-      ATAK. Começada: modos avançados (Mestre e Satélites, o Terminal de Hacking, VIP / Carga e as regras das Janelas de Alvo), o motor dos cenários personalizados, os utilitários geográficos no núcleo, e as contas, os direitos sobre os dados pessoais, a sincronização, o registo de cronógrafo e a marcação de jogos com páginas públicas, feeds e inscrições do servidor do clube estão feitos em software.
+      ATAK. Começada: modos avançados (Mestre e Satélites, o Terminal de Hacking, VIP / Carga e as regras das Janelas de Alvo), o motor dos cenários personalizados e o seu compilador, os utilitários geográficos no núcleo, e as contas, os direitos sobre os dados pessoais, a sincronização, o registo de cronógrafo e a marcação de jogos com páginas públicas, feeds e inscrições do servidor do clube estão feitos em software.
     text: >-
       Servidor do clube (contas, histórico dos jogos, registo de cronografagem, marcação de jogos,
       inscrições e publicação), cenários personalizados, modos avançados (zonas mestre e satélites,
@@ -630,7 +630,9 @@ roadmap:
       os tiver; as posições ficam no controlador de campo e no telemóvel), o motor dos cenários
       personalizados (o cenário corre no controlador de campo e diz às caixas do pacote de
       objetivos o que são: um ponto a capturar, um código, etiquetas ou cartões a ler, um local de
-      bomba; elas informam, o cenário pontua), as regras das Janelas de Alvo (um tiro
+      bomba; elas informam, o cenário pontua), o compilador de cenários (um cenário em YAML com sete tipos de objetivo,
+      dependências, revelações e janelas de tempo, verificado com cada problema localizado e
+      explicado, e compilado nesse pacote a partir da linha de comandos), as regras das Janelas de Alvo (um tiro
       enquanto o alvo mostra a cor de uma equipa pontua para essa equipa; o módulo de alvo ainda
       não está feito) e os utilitários geográficos no núcleo (distâncias e zonas para todos os
       scripts, idênticos em todas as plataformas). Servidor do clube: o esqueleto (base de dados,
