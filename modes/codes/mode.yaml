@@ -18,6 +18,7 @@ params:
     type: string
     default: ""
     max: 120
+    gm_only: true
     label: "Codes: digits:kind[:points][:team], comma-separated; kind is points, hint or unlock (e.g. 4711:points:50,0815:hint,2222:unlock:red)"
 i18n:
   pt:

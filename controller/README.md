@@ -33,7 +33,8 @@ Status: phase 2, plan phases D and E; phase 3, plan phase E (field check-in, pla
 | `atalaia_controller/mqtt.py` | MQTT topics of spec section 11 |
 | `atalaia_controller/tls.py` | The field's own CA and the controller's HTTPS certificate (ADR-P3-9) |
 | `atalaia_controller/checkin.py`, `checkin_poster.py` | Field check-in, player tokens, declarations, the "replicas to chrono" list, signed readings ([protocol/checkin.md](../protocol/checkin.md)) |
-| `atalaia_controller/positions.py` | Player positions and who may see them (ADR-P3-6) |
+| `atalaia_controller/positions.py` | Player positions and who may see them (ADR-P3-6); a VIP's GPS reports to the game's `field.lua` (`position.fix`, P4R6) |
+| `atalaia_controller/visibility.py` | What only staff may read: the schema's `gm_only` event data and mode parameters (decision M5-1) |
 | `atalaia_controller/prop_link.py` | Android props on the field's Wi-Fi ([protocol/prop-link.md](../protocol/prop-link.md)) |
 | `atalaia_controller/modes.py` | Built-in and uploaded mode packages, checked in the core before they are stored |
 | `atalaia_controller/branding.py`, `images.py` | The field's branding (name, logo, wallpaper, accent), team crests and team presets; uploaded images checked and stripped of metadata without an image library |
@@ -136,7 +137,11 @@ The controller has no image library: `images.py` checks each file's structure wi
 
 ## Player positions
 
-A checked-in player may share their position during a running game (`POST /api/v1/positions`, up to 5 reports). The controller keeps the latest per player for that game only and deletes them when it ends; it sends a position only to those who may see it (ADR-P3-6): a player sees their own (and their squad's with the game parameter `squad_visible`), a squad leader their squad, a VIP their team, marshals and the GM everyone, the read token nobody. A mode's `visibility.granted` event (team, `see_team`, `duration_s`) lets a team see another for a while; the controller logs `visibility.expired` when the time is up. Positions never go on the radio or MQTT.
+A checked-in player may share their position during a running game (`POST /api/v1/positions`, up to 5 reports). The controller keeps the latest per player for that game only and deletes them when it ends; it sends a position only to those who may see it (ADR-P3-6): a player sees their own (and their squad's with the game parameter `squad_visible`), a squad leader their squad, a VIP their team, marshals and the GM everyone, the read token nobody. A mode's `visibility.granted` event (team, `see_team`, `duration_s`) lets a team see another for a while; the controller logs `visibility.expired` when the time is up. Positions never go on the radio or MQTT. A VIP's GPS reports are also handed, oldest first, to the running game's `field.lua` as the input `position.fix` (`player`, `team`, `role`, `lat`, `lon`, `acc`, `src`; decision P4R6): VIP / Payload extracts the VIP with them. Nothing else gets them: no event, no log, no `state.field`, no standby controller.
+
+## What only staff may read
+
+Some of a game's data is a secret until a team earns it: the code a Hacking Terminal reveals, a Bomb's team codes, the Codes modifier's codes. The schema marks it (`gm_only` on an event's data fields in `protocol/schema/events.yaml`, `gm_only: true` on a mode's parameters in its `mode.yaml`), and the controller (`visibility.py`, decision M5-1) gives it to staff only: the GM token and the marshal and gm player tokens of the game. Players' connections, the read token (scoreboards, a read-only console) and MQTT get the events and the game without those fields, on the stream, `GET /games`, `/games/{id}`, `/games/{id}/log` and the read token's `/presets`. The radio, the controller's own log and the sync to the site server (where events and parameters are staff-only too) keep them whole.
 
 ## Android props on Wi-Fi
 
@@ -157,7 +162,7 @@ Reading needs the read or GM token, changing anything the GM token: `Authorizati
 | GET / POST | `/api/v1/games/{id}/score` | Totals / GM adjustment `{"team", "amount", "reason"}`, logged as `score.delta` |
 | POST | `/api/v1/nodes/{id}/cmd` | `{"cmd": "message" \| "set_owner" \| "reset" \| "reboot" \| "mode", "params": {...}}`; node 65535 = every node. `mode` is a mode command (CMD opcode 8): `params.name` must be one of the game's manifests' `commands` for the node's role, such as a medic kit's `{"name": "refill"}` |
 | GET | `/api/v1/games/{id}/log` | The merged event log, in game-time order (`?since_ms=`) |
-| WS | `/api/v1/stream` | A snapshot (with the live game's latest 100 events), then every event, score, node update, game change and alert (`radio.down`, `tx.failed`, role changes), the field channel (`radio`), scan progress (`radio_scan`) and the field's branding (`branding`, also in the snapshot); for staff also `checkin` and `chrono_list`; for a player token only the game's public messages, its own check-in and the positions it may see (code 4409: fetch a new token) |
+| WS | `/api/v1/stream` | A snapshot (with the live game's latest 100 events), then every event, score, node update, game change and alert (`radio.down`, `tx.failed`, role changes), the field channel (`radio`), scan progress (`radio_scan`) and the field's branding (`branding`, also in the snapshot); for staff also `checkin` and `chrono_list`; for a player token only the game's public messages, its own check-in and the positions it may see (code 4409: fetch a new token); `gm_only` data to staff only |
 | GET | `/api/v1/controller` | Role, term, radio state, modem identity and counters, the field channel and whether it was chosen |
 | GET | `/api/v1/radio` | The field's channel with its sub-band limits, where it came from, the candidates, whether it is locked (a live game or a scan), why a scan is unavailable, the last scan |
 | PUT | `/api/v1/radio/channel` | Set it `{"channel_hz", "source": "default" \| "scan" \| "random" \| "manual"}`; 409 while a game exists or a scan runs, 400 for a channel that does not fit in a sub-band |

@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+id: org.atalaia.vip_payload
+version: 0.1.0
+license: GPL-3.0-or-later
+min_tier: reduced
+name: VIP / Payload
+description: >-
+  One team escorts its VIP, a player who shares their position, or a payload, a phone with GPS, to an
+  extraction zone; the other teams try to stop them. Reaching the zone scores and can end the game.
+  Checkpoint boxes along the way are captured as in Domination and score while a team holds them.
+roles:
+  checkpoint: { requires: [team_input], optional: [team_display, display, audio] }
+  payload:    { requires: [gps], optional: [display, audio] }
+params:
+  vip_team:          { type: team, default: red, label: "Team that escorts the VIP and the payload" }
+  extraction:        { type: string, optional: true, max: 28, label: "Centre of the extraction zone, latitude,longitude in degrees, e.g. 38.722345,-9.139312 (empty: no extraction)" }
+  radius_m:          { type: int, min: 10, max: 1000, default: 25, label: "Radius of the extraction zone (m)" }
+  vip_points:        { type: int, min: 0, max: 1000, default: 100, label: "Points for the escorting team at the extraction" }
+  end_on_extract:    { type: bool, default: true, label: "The extraction ends the game, won by the escorting team" }
+  checkpoint_points: { type: int, min: 0, max: 1000, default: 1, label: "Points per tick for the team holding a checkpoint (0: none)" }
+  tick_s:            { type: int, min: 1, max: 600, default: 10, label: "Seconds per scoring tick of a checkpoint" }
+  capture_hold_ms:   { type: int, min: 0, max: 60000, default: 3000, label: "Hold time to capture a checkpoint (ms)" }
+  lang:              { type: string, default: pt, max: 2, label: "Language of the screens: pt or en" }
+i18n:
+  pt:
+    name: VIP / Carga
+    description: >-
+      Uma equipa escolta o seu VIP, quem partilha a sua posição, ou uma carga, um telemóvel com GPS, até
+      uma zona de extração; as outras equipas tentam impedi-lo. Chegar à zona dá pontos e pode acabar o
+      jogo. Os pontos de controlo pelo caminho capturam-se como no Domínio e dão pontos enquanto uma
+      equipa os tiver.
+    params:
+      vip_team: Equipa que escolta o VIP e a carga
+      extraction: "Centro da zona de extração, latitude,longitude em graus, ex.: 38.722345,-9.139312 (vazio: sem extração)"
+      radius_m: Raio da zona de extração (m)
+      vip_points: Pontos para a equipa que escolta, na extração
+      end_on_extract: A extração acaba o jogo, ganho pela equipa que escolta
+      checkpoint_points: "Pontos por intervalo para a equipa que tem um ponto de controlo (0: nenhum)"
+      tick_s: Segundos por intervalo de um ponto de controlo
+      capture_hold_ms: Tempo a premir para capturar um ponto de controlo (ms)
+      lang: "Língua dos ecrãs: pt ou en"

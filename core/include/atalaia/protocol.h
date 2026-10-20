@@ -217,6 +217,7 @@ enum {
     ATALAIA_EV_NODE_TAMPER = 39,                /* node.tamper */
     ATALAIA_EV_POD_CONNECTED = 40,              /* pod.connected */
     ATALAIA_EV_POD_DISCONNECTED = 41,           /* pod.disconnected */
+    ATALAIA_EV_VIP_EXTRACTED = 46,              /* vip.extracted */
     ATALAIA_EV_HACKING_SOLVED = 47,             /* hacking.solved */
     ATALAIA_EV_MEDIC_HEAL = 50,                 /* medic.heal */
     ATALAIA_EV_MEDIC_EMPTY = 51,                /* medic.empty */

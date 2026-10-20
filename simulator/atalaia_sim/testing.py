@@ -156,6 +156,25 @@ class _Runner:
             raise TestFailure("scan needs a player or a uid")
         self.sim.scan(self._default_node(arg), uid, payload)
 
+    def do_position(self, arg: Any) -> None:
+        """A VIP's (or any checked-in player's) position report for field.lua: position.fix."""
+        if not isinstance(arg, dict):
+            raise TestFailure("position takes a map: { player, team, role, lat, lon, acc, src }")
+        unknown = set(arg) - {"player", "team", "role", "lat", "lon", "acc", "src"}
+        if unknown:
+            raise TestFailure(f"position: unknown key(s) {sorted(unknown)}")
+        self.sim.position(str(arg["player"]), arg.get("team"), str(arg.get("role", "player")),
+                          float(arg["lat"]), float(arg["lon"]), arg.get("acc"), str(arg.get("src", "gps")))
+
+    def do_gps(self, arg: Any) -> None:
+        """A fix from a prop's own GPS: gps.fix to its node.lua ({} for no fix yet)."""
+        if not isinstance(arg, dict):
+            raise TestFailure("gps takes a map: { node, lat, lon, acc }")
+        unknown = set(arg) - {"node", "lat", "lon", "acc"}
+        if unknown:
+            raise TestFailure(f"gps: unknown key(s) {sorted(unknown)}")
+        self.sim.gps(self._default_node(arg), arg.get("lat"), arg.get("lon"), arg.get("acc"))
+
     def do_keys(self, arg: Any) -> None:
         if not isinstance(arg, dict):
             arg = {"keys": arg}

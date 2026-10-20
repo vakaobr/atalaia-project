@@ -306,6 +306,7 @@ const Map<String, String> ptStrings = {
   'event.medic.empty': 'Um kit de ligaduras ficou vazio',
   'event.hacking.solved': 'A equipa {team} hackeou um terminal',
   'event.hacking.solved.no_team': 'Um terminal foi hackeado',
+  'event.vip.extracted': 'A equipa {team} chegou à zona de extração',
   'event.chrono.violation': 'Réplica acima do limite',
   'event.node.tamper': 'Alguém mexeu numa caixa ({reason})',
 

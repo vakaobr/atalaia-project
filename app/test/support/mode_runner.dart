@@ -56,6 +56,24 @@ const fieldCommands = {
   'mode': 'cmd.mode',
 };
 
+/// Positions never travel as events (decisions P4R6, P4R25): event data with
+/// one of these keys, at any depth, is a problem (sim.py COORDINATE_KEYS).
+const coordinateKeys = {
+  'lat', 'lon', 'lng', 'latitude', 'longitude', 'alt', 'altitude', //
+  'position', 'positions', 'gps', 'coords', 'coordinates', 'x', 'y',
+};
+
+/// The position-like keys anywhere in an event's data.
+List<String> coordinateKeysIn(Object? data) => [
+  if (data is Map)
+    for (final e in data.entries) ...[
+      if (coordinateKeys.contains(e.key)) '${e.key}',
+      ...coordinateKeysIn(e.value),
+    ]
+  else if (data is List)
+    for (final v in data) ...coordinateKeysIn(v),
+];
+
 /// The name of a mode command (mode.py COMMAND_NAME).
 final commandName = RegExp(r'^[a-z][a-z0-9_]{0,23}$');
 
@@ -783,6 +801,13 @@ class Simulation {
     String dataJson,
   ) {
     final found = schema.problems(type, data);
+    final coords = coordinateKeysIn(data).toSet().toList()..sort();
+    if (coords.isNotEmpty) {
+      found.add(
+        "'$type' carries a position (${coords.join(', ')}): positions never "
+        'travel as events (P4R6)',
+      );
+    }
     final encoded = core.encodeEvent(
       node: node,
       seq: seq,
@@ -972,6 +997,46 @@ class Simulation {
     });
   }
 
+  /// A checked-in player's position report, as the field controller hands it
+  /// to field.lua (position.fix, decision P4R6): only the field script gets it.
+  Future<void> position(
+    String player,
+    String? team,
+    String role,
+    double lat,
+    double lon, {
+    double? acc,
+    String src = 'gps',
+  }) async {
+    final f = field;
+    if (f == null) {
+      throw TestFailure('position: ${mode.id} has no field.lua to give it to');
+    }
+    if (team != null) _checkTeam(team);
+    if (src != 'gps' && src != 'ble') {
+      throw TestFailure('position: src is one of gps, ble');
+    }
+    if (timeMs > f.timeMs) f.advance(timeMs);
+    f.input('position.fix', {
+      'player': player,
+      'role': role,
+      'lat': lat,
+      'lon': lon,
+      'src': src,
+      'team': ?team,
+      'acc': ?acc,
+    });
+    await _pump();
+  }
+
+  /// A fix from a prop's own GPS (gps.fix), as the Android prop shell gives
+  /// it; without lat and lon, the phone has no fix yet.
+  Future<void> gps(String nodeName, double? lat, double? lon, double? acc) =>
+      input(nodeName, 'gps.fix', {
+        if (lat != null && lon != null) ...{'lat': lat, 'lon': lon},
+        'acc': ?acc,
+      });
+
   Future<void> keys(String nodeName, String keys) async {
     for (final k in keys.split('')) {
       await input(nodeName, 'keypad.key', {'key': k});
@@ -1094,6 +1159,35 @@ class _Runner {
         );
       case 'scan':
         await _scan(arg);
+      case 'position':
+        if (arg is! Map<String, Object?>) {
+          throw TestFailure(
+            'position takes a map: { player, team, role, lat, lon, acc, src }',
+          );
+        }
+        _only('position', arg, {
+          'player', 'team', 'role', 'lat', 'lon', 'acc', 'src', //
+        });
+        await sim.position(
+          '${arg['player']}',
+          arg['team'] as String?,
+          '${arg['role'] ?? 'player'}',
+          (arg['lat']! as num).toDouble(),
+          (arg['lon']! as num).toDouble(),
+          acc: (arg['acc'] as num?)?.toDouble(),
+          src: '${arg['src'] ?? 'gps'}',
+        );
+      case 'gps':
+        if (arg is! Map<String, Object?>) {
+          throw TestFailure('gps takes a map: { node, lat, lon, acc }');
+        }
+        _only('gps', arg, {'node', 'lat', 'lon', 'acc'});
+        await sim.gps(
+          _node(arg),
+          (arg['lat'] as num?)?.toDouble(),
+          (arg['lon'] as num?)?.toDouble(),
+          (arg['acc'] as num?)?.toDouble(),
+        );
       case 'keys':
         final a = arg is Map<String, Object?> ? arg : {'keys': arg};
         await sim.keys(_node(a), '${a['keys']}');
@@ -1148,6 +1242,13 @@ class _Runner {
         }
       default:
         throw TestFailure("unknown step '$action'");
+    }
+  }
+
+  void _only(String step, Map<String, Object?> arg, Set<String> keys) {
+    final unknown = arg.keys.toSet().difference(keys);
+    if (unknown.isNotEmpty) {
+      throw TestFailure('$step: unknown key(s) ${unknown.toList()..sort()}');
     }
   }
 

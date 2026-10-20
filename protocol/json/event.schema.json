@@ -73,6 +73,7 @@
             "node.tamper",
             "pod.connected",
             "pod.disconnected",
+            "vip.extracted",
             "hacking.solved",
             "medic.heal",
             "medic.empty"
@@ -1329,6 +1330,34 @@
       "if": {
         "properties": {
           "type": {
+            "const": "vip.extracted"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "player": {
+                "$ref": "#/$defs/data/player"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
             "const": "hacking.solved"
           }
         }
@@ -1353,7 +1382,8 @@
             },
             "additionalProperties": false
           }
-        }
+        },
+        "$comment": "staff only (decision M5-1): code; left out of what players and the read token get"
       }
     },
     {

@@ -271,10 +271,10 @@ modes:
   intro: >-
     Os modos reagem à intenção («uma equipa está a capturar este dispositivo») e não ao hardware,
     por isso o mesmo script corre numa Field Box, numa caixa com teclado ou num telemóvel Android.
-    Há sete modos, um modificador e as Ligaduras já escritos e testados em software; ainda nenhum
+    Há onze modos, um modificador e as Ligaduras já escritos e testados em software; ainda nenhum
     correu num campo a sério.
   # The main page shows three modes, then this link to the modes page.
-  more: Ver os 7 modos →
+  more: Ver os 11 modos →
   # At the end of the modes page.
   try: Experimenta já um modo no browser →
   domination:
@@ -355,6 +355,14 @@ modes:
       pontos e capturar o terminal até outra equipa o voltar a hackear. Escrito e testado em
       software, ainda não jogado num telemóvel no campo.
     meta: Uma caixa ou um telemóvel com teclado · funciona sem o controlador de campo
+  vip_payload:
+    title: VIP / Carga
+    text: >-
+      Uma equipa escolta o seu VIP, quem partilha a posição na app, ou uma carga, um telemóvel com
+      GPS, até uma zona de extração; as outras tentam impedi-lo. Os pontos de controlo pelo caminho
+      dão pontos enquanto uma equipa os tiver. As posições ficam no controlador de campo e no
+      telemóvel; só sai o «extraído». Escrito e testado em software, ainda não jogado com GPS a sério.
+    meta: Caixas de ponto de controlo, um telemóvel com GPS ou o telemóvel do VIP · precisa do controlador de campo
   codes:
     title: Códigos (modificador)
     text: >-
@@ -364,7 +372,7 @@ modes:
   yours:
     title: O teu modo
     text: >-
-      Terminais de hacking, escolta de VIP, Money Factory… Os
+      Money Factory, capturar a bandeira, o modo do teu clube… Os
       modos são pequenos scripts. Propõe o teu com o modelo de ideia de modo de jogo.
     link: Partilha uma ideia de modo de jogo
 
@@ -606,7 +614,7 @@ roadmap:
     title: Servidor do clube e jogo avançado
     short: >-
       Servidor do clube, marcação de jogos e inscrições, cenários personalizados, modos avançados,
-      ATAK. Começada: os primeiros modos avançados, Mestre e Satélites, o Terminal de Hacking e as regras das Janelas de Alvo, os utilitários geográficos no núcleo, e o esqueleto, as contas, os direitos sobre os dados pessoais, a sincronização e o registo de cronógrafo do servidor do clube estão feitos em software.
+      ATAK. Começada: modos avançados (Mestre e Satélites, o Terminal de Hacking, VIP / Carga e as regras das Janelas de Alvo), os utilitários geográficos no núcleo, e as contas, os direitos sobre os dados pessoais, a sincronização e o registo de cronógrafo do servidor do clube estão feitos em software.
     text: >-
       Servidor do clube (contas, histórico dos jogos, registo de cronografagem, marcação de jogos,
       inscrições e publicação), cenários personalizados, modos avançados (zonas mestre e satélites,
@@ -617,7 +625,10 @@ roadmap:
       Feito em software e testado num computador, ainda não em caixas reais nem num servidor real.
       Modos: Mestre e Satélites (os satélites que uma equipa tem junto com a mestre aumentam os
       seus pontos; a mestre a mudar de mãos liberta-os), o Terminal de Hacking (um enigma no teclado
-      que revela um código ou captura o terminal), as regras das Janelas de Alvo (um tiro
+      que revela um código ou captura o terminal), VIP / Carga (uma equipa escolta o seu VIP ou um
+      telemóvel com GPS até uma zona de extração; os pontos de controlo pontuam enquanto uma equipa
+      os tiver; as posições ficam no controlador de campo e no telemóvel), as regras das Janelas de
+      Alvo (um tiro
       enquanto o alvo mostra a cor de uma equipa pontua para essa equipa; o módulo de alvo ainda
       não está feito) e os utilitários geográficos no núcleo (distâncias e zonas para todos os
       scripts, idênticos em todas as plataformas). Servidor do clube: o esqueleto (base de dados,

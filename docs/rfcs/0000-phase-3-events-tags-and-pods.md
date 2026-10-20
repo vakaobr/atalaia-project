@@ -78,8 +78,23 @@ Compatibility: no new frame, key or event; a receiver that does not know the typ
 | --- | --- | --- |
 | 47 | `hacking.solved` (critical) | `puzzle` (`code`, `wires` or `sequence`), `code` (the code the terminal reveals, when the game sets one); `team`: who solved it, left out when nobody known did |
 
-- **New data field:** `puzzle` (key 36, string). Keys 34 and 35 stay for `objective` and `scenario` (plan phase 6), and events 42-46 for the scenario events and `vip.extracted` (plan phases 5 and 6), each added with the code that first emits it.
+- **New data field:** `puzzle` (key 36, string). Keys 34 and 35 stay for `objective` and `scenario` (plan phase 6), and events 42-46 for the scenario events and `vip.extracted` (plan phases 5 and 6), each added with the code that first emits it (46: Amendment 3).
 - `code` (key 10) is reused: here it is the code itself, which the GM console shows; the players' feed shows only who hacked a terminal. Wrong answers are not events.
 - **Vector:** `protocol/vectors/events.yaml`, "Red solves a hacking terminal's wires and it reveals code 4711", bytes built by hand from RFC 8949's encoding rules (CBOR major types 0, 3 and 5, the shortest forms) and the schema's keys, checked by the C, Python and Dart codecs. JSON Schema: `protocol/json/event.schema.json` and the example `protocol/json/examples/hacking-solved.json`.
 
 Compatibility: as for the events of the design above, an older node passes the unknown id through as raw CBOR and an older controller logs it by its number; nothing else changes.
+
+## Amendment 3 (2026-10-20): the `vip.extracted` event and staff-only data (phase 4 plan phase 5)
+
+**Adds** the event of VIP / Payload (`modes/vip_payload/`, decision P4R6), and a mark in the schema for data that only staff may read (decision M5-1).
+
+| Id | Event | Data (besides `team` and `squad`) |
+| --- | --- | --- |
+| 46 | `vip.extracted` (critical) | `player` (key 14): the VIP, when the controller extracted them; left out when a payload prop did; `team`: the escorting team |
+
+- **Positions never travel.** A VIP's position reaches the controller's `field.lua` only, as the input `position.fix` (`player`, `team`, `role`, `lat`, `lon`, `acc`, `src`); a payload prop's GPS reaches its own `node.lua` only, as the input `gps.fix` (`lat`, `lon`, `acc`; empty before the phone's first fix). Neither is an event, and no event has a position data field; the simulator and the Dart test runner report any event whose data carries a key such as `lat`, `lon`, `position` or `gps`.
+- **Staff-only data.** An event may list some of its data fields as `gm_only` in `protocol/schema/events.yaml` (today `hacking.solved`'s `code`). On the radio, in the controller's log and in the sync to the site server the event is whole; on the controller's stream, its REST views and MQTT, only staff (the GM token, marshals, gm player tokens) get those fields. A mode's parameters may be marked `gm_only: true` in its manifest with the same effect on a game's parameters.
+- **Vectors:** `protocol/vectors/events.yaml`, "The controller logs red's VIP extracted" and "Blue's payload prop reaches the extraction zone", bytes built by hand from RFC 8949's encoding rules and the schema's keys, checked by the C, Python and Dart codecs. JSON Schema: `protocol/json/event.schema.json` (a `$comment` names the staff-only fields) and the example `protocol/json/examples/vip-extracted.json`.
+
+Compatibility: an older node or controller treats id 46 as it treats any id it does not know; `gm_only` changes nothing on the wire.
+

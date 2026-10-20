@@ -93,7 +93,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import __version__
 from . import checkin as checkinmod
-from . import images
+from . import images, visibility
 from .branding import SLOTS, Branding, etag
 from .checkin import Viewer
 from .engine import Controller, ControllerError
@@ -164,8 +164,8 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     checkin = controller.checkin
     players = controller.positions  # player positions (positions.py)
     auth.checkin = checkin
-    if hub.route is default_route and checkin is not None:
-        hub.route = make_route(controller)
+    if hub.route is default_route:
+        hub.route = make_route(controller)  # who gets what, gm_only data included (M5-1)
     controller.add_listener(hub.publish)
     branding = controller.branding if controller.branding is not None else Branding(controller)
 
@@ -257,9 +257,14 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         files = body_map(body).get("files")
         return controller.modes.install(files).to_api()
 
-    @app.get("/api/v1/presets", dependencies=[Depends(require_console)])
-    def presets() -> list[dict[str, Any]]:
-        return controller.store.presets()
+    @app.get("/api/v1/presets")
+    def presets(role: str = Depends(require_console)) -> list[dict[str, Any]]:
+        out = controller.store.presets()
+        if role == "gm":
+            return out
+        # The read token's console: without the gm_only parameters (decision M5-1).
+        return [{**p, "params": visibility.public_params(_mode_of(controller, p.get("mode_id")),
+                                                         p.get("params"))} for p in out]
 
     @app.post("/api/v1/presets", status_code=201, dependencies=[Depends(require_gm)])
     def save_preset(body: Any = Body(None)) -> dict[str, Any]:
@@ -274,17 +279,19 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         resolve_params(pkg.mode, params, None)  # raises ModeError -> 400
         return controller.store.save_preset(name, pkg.id, params)
 
-    @app.get("/api/v1/games", dependencies=[Depends(require_read)])
-    def games() -> list[dict[str, Any]]:
-        return controller.list_games()
+    @app.get("/api/v1/games")
+    def games(v: Viewer = Depends(require_read)) -> list[dict[str, Any]]:
+        return [g if visibility.is_staff(v, g["id"]) else controller.players_game(g)
+                for g in controller.list_games()]
 
     @app.post("/api/v1/games", status_code=201, dependencies=[Depends(require_gm)])
     def create_game(body: Any = Body(None)) -> dict[str, Any]:
         return controller.create_game(body_map(body))
 
-    @app.get("/api/v1/games/{game_id}", dependencies=[Depends(require_read)])
-    def game(game_id: int) -> dict[str, Any]:
-        return controller.get_game(game_id)
+    @app.get("/api/v1/games/{game_id}")
+    def game(game_id: int, v: Viewer = Depends(require_read)) -> dict[str, Any]:
+        out = controller.get_game(game_id)
+        return out if visibility.is_staff(v, game_id) else controller.players_game(out)
 
     @app.post("/api/v1/games/{game_id}/start", dependencies=[Depends(require_gm)])
     def start(game_id: int) -> dict[str, Any]:
@@ -321,9 +328,11 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         spec = body_map(body)
         return controller.send_node_cmd(node_id, spec.get("cmd"), spec.get("params"))
 
-    @app.get("/api/v1/games/{game_id}/log", dependencies=[Depends(require_read)])
-    def game_log(game_id: int, since_ms: Optional[int] = None) -> list[dict[str, Any]]:
-        return controller.log(game_id, since_ms)
+    @app.get("/api/v1/games/{game_id}/log")
+    def game_log(game_id: int, since_ms: Optional[int] = None,
+                 v: Viewer = Depends(require_read)) -> list[dict[str, Any]]:
+        out = controller.log(game_id, since_ms)
+        return out if visibility.is_staff(v, game_id) else [visibility.public_event(e) for e in out]
 
     @app.get("/api/v1/controller", dependencies=[Depends(require_console)])
     def status() -> dict[str, Any]:
@@ -814,12 +823,16 @@ def _snapshot(controller: Controller, viewer: Optional[Viewer] = None) -> dict[s
     status = controller.status()
     game_id = status["live_game"]
     events = []
+    staff = visibility.is_staff(viewer, game_id)
     if game_id:
         events = [{k: e.get(k) for k in ("node", "seq", "t", "type", "team", "squad", "prio", "data")}
                   for e in controller.store.events(game_id)[-HELLO_EVENTS:]]
+        if not staff:
+            events = [visibility.public_event(e) for e in events]
+    game = controller.get_game(game_id) if game_id else None
     out: dict[str, Any] = {
         "type": "hello",
-        "game": controller.get_game(game_id) if game_id else None,
+        "game": game if game is None or staff else controller.players_game(game),
         "score": controller.score(game_id) if game_id else None,
         "nodes": controller.nodes(game_id) if game_id else [],
         "events": events,
@@ -869,6 +882,19 @@ def make_route(controller: Controller) -> Callable[[Any, dict[str, Any]], Any]:
             return {"type": "positions", "game": msg.get("game"), "positions": pos.visible(v, msg.get("game"))}
         if v.kind == "player" and msg.get("type") not in PLAYER_TYPES:
             return None
-        return public(msg)
+        out = public(msg)
+        # Decision M5-1: gm_only event data and game parameters to staff only.
+        if out.get("type") == "event" and isinstance(out.get("event"), dict) \
+                and not visibility.is_staff(v, out.get("game")):
+            out["event"] = visibility.public_event(out["event"])
+        elif out.get("type") == "game" and isinstance(out.get("game"), dict) \
+                and not visibility.is_staff(v, out["game"].get("id")):
+            out["game"] = controller.players_game(out["game"])
+        return out
 
     return route
+
+
+def _mode_of(controller: Controller, mode_id: Any) -> Any:
+    pkg = controller.modes.get(mode_id) if isinstance(mode_id, str) else None
+    return pkg.mode if pkg else None

@@ -433,6 +433,45 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(solved.nth(1)).to_contain_text("red solved a hacking terminal (wires) and got the code 4711")
         expect(solved.nth(0)).to_contain_text("Nobody known solved a hacking terminal (code)")
 
+    def test_vip_payload_game_and_its_events(self):
+        """A VIP / Payload game from the form (the extraction zone in Portuguese); a checkpoint's
+        join; the payload's and the VIP's extractions read as words in the feed, in both languages."""
+        page = self.console()
+        page.get_by_test_id("game-name").fill("Escolta")
+        page.get_by_test_id("game-source").select_option("mode:org.atalaia.vip_payload")
+        expect(page.locator('label[for="game-extraction"]')).to_contain_text("Centro da zona de extração")
+        page.locator("#game-extraction").fill("38.722345,-9.139312")
+        page.locator("#game-end_on_extract").uncheck()
+        page.get_by_test_id("game-create").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("pronto")
+        game = self.field.bundle.controller.game
+        self.assertEqual((game["mode_id"], game["params"]["extraction"], game["params"]["end_on_extract"]),
+                         ("org.atalaia.vip_payload", "38.722345,-9.139312", False))
+
+        page.get_by_test_id("tab-join").click()
+        page.locator("#j-node").fill(str(BOX))
+        page.get_by_test_id("join-generate").click()
+        j = join.decode(join.from_text(page.get_by_test_id("join-text").input_value()), JOIN_KEY)
+        self.assertEqual((j["mode_id"], j["role"]), ("org.atalaia.vip_payload", "checkpoint"))
+
+        self.field.http.post(f"/api/v1/games/{game['id']}/start")
+        self.field.host.transmitted_all(0.3)
+        self.field.box_hello()
+        # The payload prop's extraction (from a node), then a VIP's (the controller's own event).
+        self.field.box("EVENT", codec.encode_event({"node": BOX, "seq": 1, "t": 9000, "type": "vip.extracted",
+                                                    "team": 2, "data": {"team": "blue"}}), ack=True)
+        self.field.bundle.controller.fc.controller_event("vip.extracted", {"player": "p-k7m2q4x9z3ab"},
+                                                         team="red", prio="critical")
+        page.get_by_test_id("tab-feed").click()
+        extracted = page.locator('[data-testid=feed] [data-type="vip.extracted"]')
+        expect(extracted).to_have_count(2)
+        # Newest game time first: the payload's (9 s) above the controller's (at 0 s here).
+        expect(extracted.nth(0)).to_contain_text("A carga da equipa blue chegou à zona de extração")
+        expect(extracted.nth(1)).to_contain_text("A equipa red extraiu o seu VIP (p-k7m2q4x9z3ab)")
+        page.get_by_test_id("lang").first.select_option("en")
+        expect(extracted.nth(0)).to_contain_text("blue's payload reached the extraction zone")
+        expect(extracted.nth(1)).to_contain_text("red extracted its VIP (p-k7m2q4x9z3ab)")
+
     def test_join_qr_code_reads_back_as_the_join_text(self):
         if not ZBARIMG:
             self.skipTest("zbarimg is not installed")

@@ -73,6 +73,11 @@ data_fields:
 
 # id: CBOR value of the type field (1-23 take one byte). prio: the default
 # priority. data: the fields this event may carry besides the common ones.
+# gm_only: data fields that only staff may read (decision M5-1): the field
+# controller strips them from what a player's or the read token's connection,
+# REST call or MQTT topic gets; the GM token, marshals and GMs see them. On the
+# radio, in the controller's log and in the sync to the site server (whose
+# event pages are for staff only) the event is whole.
 events:
   game.start:       { id: 1,  prio: critical,  data: [preset] }
   game.pause:       { id: 2,  prio: critical,  data: [reason] }
@@ -117,7 +122,8 @@ events:
   node.tamper:                { id: 39, prio: critical,  data: [reason] }   # e.g. kiosk_broken
   pod.connected:              { id: 40, prio: telemetry, data: [fw, tier] } # an I/O pod linked to this node
   pod.disconnected:           { id: 41, prio: telemetry, data: [reason] }
-  # Phase 4 (P4R1): 42-45 scenario events (plan phase 6) and 46 vip.extracted (plan phase 5) to come.
-  hacking.solved:             { id: 47, prio: critical,  data: [puzzle, code] }  # team: who solved it, if known; code: the code it reveals
+  # Phase 4 (P4R1): 42-45 scenario events (plan phase 6) to come.
+  vip.extracted:              { id: 46, prio: critical,  data: [player] }  # team: the escorting team; player: the VIP, or none for a payload prop (the node)
+  hacking.solved:             { id: 47, prio: critical,  data: [puzzle, code], gm_only: [code] }  # team: who solved it, if known; code: the code it reveals
   medic.heal:                 { id: 50, prio: normal,    data: [player, remaining, player_heals_used] }  # team: the player's
   medic.empty:                { id: 51, prio: normal,    data: [] }         # team: the team the kit serves, if one

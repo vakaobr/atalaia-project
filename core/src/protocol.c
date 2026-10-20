@@ -44,6 +44,7 @@ static const uint8_t data_visibility_expired[] = {29, 17};
 static const uint8_t data_node_tamper[] = {3};
 static const uint8_t data_pod_connected[] = {21, 22};
 static const uint8_t data_pod_disconnected[] = {3};
+static const uint8_t data_vip_extracted[] = {14};
 static const uint8_t data_hacking_solved[] = {36, 10};
 static const uint8_t data_medic_heal[] = {14, 32, 33};
 
@@ -89,6 +90,7 @@ const atalaia_event_def_t atalaia_event_defs[] = {
     {"node.tamper", ATALAIA_EV_NODE_TAMPER, ATALAIA_PRIO_CRITICAL, data_node_tamper, 1},
     {"pod.connected", ATALAIA_EV_POD_CONNECTED, ATALAIA_PRIO_TELEMETRY, data_pod_connected, 2},
     {"pod.disconnected", ATALAIA_EV_POD_DISCONNECTED, ATALAIA_PRIO_TELEMETRY, data_pod_disconnected, 1},
+    {"vip.extracted", ATALAIA_EV_VIP_EXTRACTED, ATALAIA_PRIO_CRITICAL, data_vip_extracted, 1},
     {"hacking.solved", ATALAIA_EV_HACKING_SOLVED, ATALAIA_PRIO_CRITICAL, data_hacking_solved, 2},
     {"medic.heal", ATALAIA_EV_MEDIC_HEAL, ATALAIA_PRIO_NORMAL, data_medic_heal, 3},
     {"medic.empty", ATALAIA_EV_MEDIC_EMPTY, ATALAIA_PRIO_NORMAL, NULL, 0},

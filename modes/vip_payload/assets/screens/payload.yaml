@@ -1,0 +1,77 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The payload prop (a phone with GPS). Data: team (the escorting team),
+# state (searching: no fix yet; weak: the fix is less precise than the zone,
+# metres is its accuracy; no_zone: the game has no extraction zone; moving:
+# metres is the distance to the zone's edge; extracted), metres. Texts in
+# params.lang (pt or en). Nothing here says where the zone or the phone is.
+template: payload
+style: { background: "{state == 'extracted' && team || 'background'}" }
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: team }
+    children:
+      - type: label
+        text: CARGA
+        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang != 'en'}" }
+      - type: label
+        text: PAYLOAD
+        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang == 'en'}" }
+  - type: spacer
+    height: fill
+  - type: icon
+    icon: gps
+    style: { font_size: 48, color: muted, visible: "{state == 'searching' || state == 'weak'}" }
+  - type: label
+    text: "{metres} m"
+    style: { font_size: 48, color: accent, visible: "{state == 'moving'}" }
+  - type: label
+    text: até à zona de extração
+    style: { font_size: 20, color: muted, visible: "{state == 'moving' && params.lang != 'en'}" }
+  - type: label
+    text: to the extraction zone
+    style: { font_size: 20, color: muted, visible: "{state == 'moving' && params.lang == 'en'}" }
+  - type: label
+    text: À procura de GPS
+    style: { font_size: 28, visible: "{state == 'searching' && params.lang != 'en'}" }
+  - type: label
+    text: Looking for GPS
+    style: { font_size: 28, visible: "{state == 'searching' && params.lang == 'en'}" }
+  - type: label
+    text: "GPS fraco ({metres} m)"
+    style: { font_size: 28, color: orange, visible: "{state == 'weak' && params.lang != 'en'}" }
+  - type: label
+    text: "Weak GPS ({metres} m)"
+    style: { font_size: 28, color: orange, visible: "{state == 'weak' && params.lang == 'en'}" }
+  - type: label
+    text: Sem zona de extração
+    style: { font_size: 28, color: muted, visible: "{state == 'no_zone' && params.lang != 'en'}" }
+  - type: label
+    text: No extraction zone
+    style: { font_size: 28, color: muted, visible: "{state == 'no_zone' && params.lang == 'en'}" }
+  - type: icon
+    icon: ok
+    style: { font_size: 48, color: contrast, visible: "{state == 'extracted'}" }
+  - type: label
+    text: EXTRAÇÃO CONCLUÍDA
+    style: { font_size: 20, color: contrast, visible: "{state == 'extracted' && params.lang != 'en'}" }
+  - type: label
+    text: EXTRACTED
+    style: { font_size: 28, color: contrast, visible: "{state == 'extracted' && params.lang == 'en'}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: Leva-me à zona de extração
+    style:
+      font_size: 14
+      color: muted
+      visible: "{state != 'extracted' && params.lang != 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: Take me to the extraction zone
+    style:
+      font_size: 14
+      color: muted
+      visible: "{state != 'extracted' && params.lang == 'en'}"
+      padding: { bottom: 10 }

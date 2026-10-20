@@ -17,6 +17,7 @@ class EventDef(NamedTuple):
     id: int
     prio: str  # default priority
     data: tuple[str, ...]  # data fields besides the common ones
+    gm_only: tuple[str, ...] = ()  # data fields only staff may read (decision M5-1)
 
 
 class PayloadField(NamedTuple):
@@ -153,7 +154,8 @@ EVENTS = {
     'node.tamper': EventDef(39, 'critical', ('reason',)),
     'pod.connected': EventDef(40, 'telemetry', ('fw', 'tier')),
     'pod.disconnected': EventDef(41, 'telemetry', ('reason',)),
-    'hacking.solved': EventDef(47, 'critical', ('puzzle', 'code')),
+    'vip.extracted': EventDef(46, 'critical', ('player',)),
+    'hacking.solved': EventDef(47, 'critical', ('puzzle', 'code'), ('code',)),
     'medic.heal': EventDef(50, 'normal', ('player', 'remaining', 'player_heals_used')),
     'medic.empty': EventDef(51, 'normal', ()),
 }

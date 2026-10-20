@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Without end_on_extract the game goes on: the extraction counts once.
+name: "The VIP enters, leaves and enters again: one extraction, 100 points, the game goes on"
+params: { extraction: "38.722345,-9.139312", end_on_extract: false }
+nodes: { cp1: checkpoint }
+steps:
+  - position: { player: p-vip, team: red, role: vip, lat: 38.722390, lon: -9.139312 }
+  - expect: { type: vip.extracted, team: red, data: { player: p-vip } }
+  - expect_no: game.end
+  - expect_score: { team: red, points: 100 }
+  - wait: 10
+  - position: { player: p-vip, team: red, role: vip, lat: 38.723244, lon: -9.139312 }
+  - wait: 10
+  - position: { player: p-vip, team: red, role: vip, lat: 38.722390, lon: -9.139312 }
+  - expect_no: vip.extracted
+  - expect_no: game.end
+  - expect_score: { team: red, points: 100 }
+  - expect_no: script.error

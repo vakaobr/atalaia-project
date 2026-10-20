@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "The GM frees a checkpoint and gives it to a team; the points follow the holder"
+params: { tick_s: 5 }
+nodes: { cp1: checkpoint }
+steps:
+  - input: { type: cmd.set_owner, data: { team: blue } }
+  - expect: { type: zone.captured, team: blue }
+  - expect_screen: { template: checkpoint_held, data: { team: blue } }
+  - wait: 6.5
+  - expect_score: { team: blue, points: 1 }
+  - input: { type: cmd.set_owner, data: { team: none } }
+  - expect: { type: zone.neutralized, data: { previous_team: blue } }
+  - expect_screen: { template: checkpoint_free }
+  - wait: 20
+  - expect_score: { team: blue, points: 1 }
+  - expect_no: script.error

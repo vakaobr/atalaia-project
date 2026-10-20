@@ -8,7 +8,11 @@
 /// draws the mode's screens (ui.screen) with the template renderer, plays
 /// its sounds, keeps the game's length and sends game.end when it runs out
 /// (decision PC6), and holds the foreground service, the screen manager and
-/// kiosk mode while the game runs (ADR-P3-5).
+/// kiosk mode while the game runs (ADR-P3-5). A role that uses `gps` (VIP /
+/// Payload's payload) gets the phone's fixes as `gps.fix` (lat, lon, acc;
+/// one without lat and lon when the game starts, before the first fix): they
+/// reach the mode's script on the phone only, never the controller (decision
+/// P4R6).
 ///
 /// With a [PropLink] (plan phase E, decision PD12) the prop takes part in the
 /// controller's game over Wi-Fi as a box does over the radio: its events and
@@ -32,6 +36,7 @@ import '../controller/dual_link.dart';
 import '../controller/prop_link.dart';
 import '../core/node_types.dart';
 import '../modes/mode_catalog.dart';
+import '../platform/location.dart';
 import '../platform/services.dart';
 import '../pod/pod_client.dart';
 import '../pod/pod_codec.dart';
@@ -110,6 +115,8 @@ class PropSession extends ChangeNotifier {
     this.modeName = '',
     this.link,
     this.radioLinkFor,
+    this.location,
+    this.gpsInterval = const Duration(seconds: 2),
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now,
        timer = GameTimer(setup.durationMs),
@@ -137,6 +144,13 @@ class PropSession extends ChangeNotifier {
   /// The radio link through a pod with a radio, for a joined game (null:
   /// none; the app gives the core's event codec and the stored epochs).
   final PodRadioLink? Function(PodClient pod)? radioLinkFor;
+
+  /// The phone's location, for a role that uses `gps` (null: none).
+  final LocationService? location;
+
+  /// How often the location service is asked for a fix.
+  final Duration gpsInterval;
+  StreamSubscription<LocationFix>? _gpsSub;
 
   /// The links to the controller: Wi-Fi and/or the pod's radio.
   final DualLink? _link;
@@ -251,6 +265,7 @@ class PropSession extends ChangeNotifier {
     final ok = await _node?.input('game.start') ?? false;
     if (!ok) return;
     phase = PropPhase.running;
+    _startGps();
     await screenManager.start();
     await foreground?.start(
       title: _fill(texts.notificationTitle, {'mode': modeName}),
@@ -258,6 +273,32 @@ class PropSession extends ChangeNotifier {
     );
     if (kioskEnabled) await kiosk?.start();
     notifyListeners();
+  }
+
+  /// Whether the role's script takes the phone's position (`gps`).
+  bool get usesGps => setup.mode.main.role(setup.role)?.uses('gps') ?? false;
+
+  /// The phone's fixes as gps.fix while the game runs: first one without a
+  /// position (the script shows that it is looking), then every fix. The
+  /// core drops them while the game is paused.
+  void _startGps() {
+    final l = location;
+    if (l == null || !usesGps || _gpsSub != null) return;
+    unawaited(_input('gps.fix', const {}));
+    _gpsSub = l
+        .fixes(gpsInterval)
+        .listen(gpsFix, onError: (Object e) => _log('location: $e'));
+  }
+
+  /// A fix from the phone's GPS for the mode's script (tests call it too).
+  Future<void> gpsFix(LocationFix f) {
+    if (!running) return Future.value();
+    return _input('gps.fix', {'lat': f.lat, 'lon': f.lon, 'acc': ?f.accuracyM});
+  }
+
+  void _stopGps() {
+    unawaited(_gpsSub?.cancel());
+    _gpsSub = null;
   }
 
   Future<void> pause() => _input('game.pause', {'reason': 'admin'});
@@ -542,6 +583,7 @@ class PropSession extends ChangeNotifier {
     phase = next;
     if (phase == PropPhase.halted) error = s.lastError;
     if (phase == PropPhase.ended || phase == PropPhase.halted) {
+      _stopGps();
       tracker.releaseAll();
       unawaited(foreground?.stop());
     }
@@ -680,6 +722,7 @@ class PropSession extends ChangeNotifier {
     if (_closed) return;
     _closed = true;
     _ticker?.cancel();
+    _stopGps();
     tracker.releaseAll();
     // Not awaited: a cancelled subscription has nothing left to say.
     unawaited(_sub?.cancel());

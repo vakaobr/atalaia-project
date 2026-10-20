@@ -264,10 +264,10 @@ modes:
   title: Game modes
   intro: >-
     Modes react to intent ("a team is claiming this prop"), not to hardware, so the same script
-    runs on a Field Box, a keypad box or an Android phone. Seven modes, one modifier and the Medic
+    runs on a Field Box, a keypad box or an Android phone. Eleven modes, one modifier and the Medic
     Kit are written and tested in software today; none has run on a real field yet.
   # The main page shows three modes, then this link to the modes page.
-  more: See all 7 modes →
+  more: See all 11 modes →
   # At the end of the modes page.
   try: Try a mode in your browser today →
   domination:
@@ -343,6 +343,14 @@ modes:
       until another team hacks it back. Written and tested in software, not yet played on a phone
       in the field.
     meta: A box or a phone with a keypad · works without the field controller
+  vip_payload:
+    title: VIP / Payload
+    text: >-
+      One team escorts its VIP, a player who shares their position from the app, or a payload, a
+      phone with GPS, to an extraction zone; the others try to stop them. Checkpoint boxes along the
+      way score while a team holds them. Positions stay on the field controller and the phone; only
+      "extracted" goes out. Written and tested in software, not yet played with real GPS.
+    meta: Checkpoint boxes, a phone with GPS or the VIP's phone · needs the field controller
   codes:
     title: Codes (modifier)
     text: >-
@@ -352,7 +360,7 @@ modes:
   yours:
     title: Your mode
     text: >-
-      Hacking terminals, VIP escort, Money Factory… Modes are short
+      Money Factory, capture the flag, your club's own… Modes are short
       scripts. Propose one with the game mode idea template.
     link: Share a game mode idea
 
@@ -585,7 +593,7 @@ roadmap:
     title: Site server and advanced play
     short: >-
       Site server, game scheduling and registration, custom scenarios, advanced modes, ATAK.
-      Started: the first advanced modes, Master and Satellites, the Hacking Terminal and the logic of Target Windows, and geo utilities in the core, and the site server's skeleton, accounts, personal data rights, controller sync and chrono registry are built in software.
+      Started: advanced modes (Master and Satellites, the Hacking Terminal, VIP / Payload and the logic of Target Windows), geo utilities in the core, and the site server's accounts, personal data rights, controller sync and chrono registry are built in software.
     text: >-
       Site server (accounts, game history, the chrono registry, scheduling games, registration and
       publishing), custom scenarios, advanced modes (master and satellite zones, VIP escort, hacking
@@ -595,7 +603,9 @@ roadmap:
       Done in software and tested on a computer, not yet on real boxes or a real server. Modes:
       Master and Satellites (satellites held with the master raise its points; the master
       changing hands frees them), the Hacking Terminal (a puzzle on the keypad that reveals a code
-      or captures the terminal), the rules of Target Windows (a hit while the target shows a
+      or captures the terminal), VIP / Payload (a team escorts its VIP or a phone with GPS to an
+      extraction zone; checkpoint boxes score while held; positions stay on the field controller
+      and the phone), the rules of Target Windows (a hit while the target shows a
       team's colour scores for that team; the target addon is not built yet), and geo utilities
       in the core (distances and zones for every script, identical on every platform). Site
       server: its skeleton (database, migrations, health check, in its own container), accounts

@@ -17,7 +17,8 @@ A mode can grant a team a temporary view of another team (a UAV sweep): the
 event ``visibility.granted`` (its envelope team sees ``see_team`` for
 ``duration_s``), ended by ``visibility.expired``, which the controller emits
 when the time is up. Positions are deleted when the game ends, and are never
-sent on the radio or MQTT.
+sent on the radio or MQTT. A VIP's GPS reports also go to the game's field.lua
+as the input position.fix (decision P4R6, VIP / Payload), and to nothing else.
 """
 
 from __future__ import annotations
@@ -158,7 +159,23 @@ class Positions:
                "squad": viewer.squad, **latest, "received_at": self._wall()}
         self.ctrl.store.set_player_position(game["id"], viewer.player_id, pos, self._wall())
         self.ctrl._emit({"type": "player_position", "game": game["id"], "position": pos, "_position": True})
+        if viewer.role == "vip":
+            self._to_field(game, viewer, checked)
         return {"stored": len(checked), "interval_s": self.interval(game)}
+
+    def _to_field(self, game: dict[str, Any], viewer: "Viewer", reports: list[dict[str, Any]]) -> None:
+        """A VIP's GPS reports, oldest first, to the game's field.lua as position.fix (decision
+        P4R6; VIP / Payload extracts the VIP with them). Indoor (BLE) reports carry no coordinates."""
+        team = self._team_name(game["id"], viewer.team)
+        for r in sorted((r for r in reports if r["source"] == "gps"), key=lambda r: r["t"]):
+            fix: dict[str, Any] = {"player": viewer.player_id, "role": viewer.role, "lat": r["lat"],
+                                   "lon": r["lon"], "src": "gps"}
+            if team is not None:
+                fix["team"] = team
+            if r.get("accuracy_m") is not None:
+                fix["acc"] = r["accuracy_m"]
+            if not self.ctrl.field_position(game["id"], fix):
+                return
 
     @staticmethod
     def interval(game: dict[str, Any]) -> int:

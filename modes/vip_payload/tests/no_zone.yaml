@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "A game without an extraction zone: the payload says so and the VIP extracts nowhere; checkpoints still play"
+nodes: { cargo: payload, cp1: checkpoint }
+steps:
+  - gps: { node: cargo, lat: 38.722345, lon: -9.139312 }
+  - expect_screen: { node: cargo, template: payload, data: { state: no_zone } }
+  - position: { player: p-vip, team: red, role: vip, lat: 38.722345, lon: -9.139312 }
+  - expect_no: vip.extracted
+  - hold: { node: cp1, team: blue, s: 3 }
+  - expect: { type: zone.captured, node: cp1, team: blue }
+  - expect_no: script.error

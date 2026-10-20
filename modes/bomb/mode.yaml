@@ -17,7 +17,7 @@ params:
   defuse_hold_ms:     { type: int, default: 10000, label: "Hold time to defuse (ms)" }
   reset_after_defuse: { type: bool, default: false, label: "Return to standby after defuse" }
   auto_arm_after_s:   { type: int, optional: true, label: "Arm automatically after (s)" }
-  team_codes:         { type: string, optional: true, max: 60, label: "Team codes, e.g. red=1234,blue=5678: the keypad arms (a team's code) and defuses (another team's code) instead of the buttons" }
+  team_codes:         { type: string, optional: true, max: 60, gm_only: true, label: "Team codes, e.g. red=1234,blue=5678: the keypad arms (a team's code) and defuses (another team's code) instead of the buttons" }
 i18n:
   pt:
     name: Bomba / Rush

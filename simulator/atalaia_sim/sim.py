@@ -32,6 +32,26 @@ FIELD_STEP_MS = 100
 # Amendment 5): its params carry the command's name, and the node's script gets
 # them as cmd.mode.
 FIELD_COMMANDS = {"set_owner": "cmd.set_owner", "message": "gm.message", "mode": "cmd.mode"}
+# Positions never travel as events (decisions P4R6, P4R25): an event whose data holds one of
+# these keys, at any depth, is a problem. The same list as the sync's (protocol/sync.md).
+COORDINATE_KEYS = frozenset({"lat", "lon", "lng", "latitude", "longitude", "alt", "altitude", "position",
+                             "positions", "gps", "coords", "coordinates", "x", "y"})
+# What a VIP's position report gives field.lua (position.fix): the controller's src values.
+POSITION_SOURCES = ("gps", "ble")
+
+
+def coordinate_keys(data: Any) -> list[str]:
+    """The position-like keys anywhere in an event's data."""
+    found: list[str] = []
+    if isinstance(data, dict):
+        for k, v in data.items():
+            if k in COORDINATE_KEYS:
+                found.append(k)
+            found += coordinate_keys(v)
+    elif isinstance(data, list):
+        for v in data:
+            found += coordinate_keys(v)
+    return found
 
 
 class SimError(Exception):
@@ -274,6 +294,10 @@ class Simulation:
     def _check_wire(self, who: str, event: dict[str, Any]) -> Optional[int]:
         """Checks an event against the schema and the LoRa payload size; returns the size."""
         problems = codec.schema_problems(event["type"], event["data"])
+        coords = coordinate_keys(event["data"])
+        if coords:
+            problems.append(f"'{event['type']}' carries a position ({', '.join(sorted(set(coords)))}): "
+                            "positions never travel as events (P4R6)")
         size = None
         try:
             size = len(codec.encode_event(event))
@@ -428,6 +452,39 @@ class Simulation:
         vnode.last_input = {"t": self.time_ms, "type": type_, "data": data or {}, "accepted": accepted}
         self._pump()
         return accepted
+
+    def position(self, player: str, team: Optional[str], role: str, lat: float, lon: float,
+                 acc: Optional[float] = None, src: str = "gps") -> None:
+        """A checked-in player's position report, as the field controller hands it to field.lua
+        (position.fix, decision P4R6): only the field script gets it; it is never an event, never
+        on the radio and never in the log."""
+        if self.field is None:
+            raise SimError(f"position: {self.mode.id} has no field.lua to give it to")
+        if team is not None:
+            self._check_team(team)
+        if src not in POSITION_SOURCES:
+            raise SimError(f"position: src is one of {', '.join(POSITION_SOURCES)}")
+        data: dict[str, Any] = {"player": player, "role": role, "lat": float(lat), "lon": float(lon),
+                                "src": src}
+        if team is not None:
+            data["team"] = team
+        if acc is not None:
+            data["acc"] = float(acc)
+        if self.time_ms > self.field.time_ms:
+            self.field.advance(self.time_ms)
+        self.field.input("position.fix", data)
+        self._pump()
+
+    def gps(self, node: str, lat: Optional[float] = None, lon: Optional[float] = None,
+            acc: Optional[float] = None) -> bool:
+        """A fix from a prop's own GPS (gps.fix: lat, lon, acc), as the Android prop shell gives
+        it to the node's script; without lat and lon, the phone has no fix yet."""
+        data: dict[str, Any] = {}
+        if lat is not None and lon is not None:
+            data = {"lat": float(lat), "lon": float(lon)}
+        if acc is not None:
+            data["acc"] = float(acc)
+        return self.input(node, "gps.fix", data)
 
     def scan(self, node: str, uid: bytes, payload: Optional[bytes]) -> bool:
         """An NFC tag read on a node: the core checks the tag against this game (atalaia/tag.h)

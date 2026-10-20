@@ -68,6 +68,12 @@ valid:
   - name: "Red solves a hacking terminal's wires and it reveals code 4711 (id 47, critical by default; puzzle, key 36)"
     event: {"node": 7, "seq": 4, "t": 95000, "type": "hacking.solved", "team": 1, "data": {"code": "4711", "puzzle": "wires", "team": "red"}}
     cbor: "a6 01 07 02 04 03 1a 00 01 73 18 04 18 2f 05 01 08 a3 0a 64 34 37 31 31 18 24 65 77 69 72 65 73 01 63 72 65 64"
+  - name: "The controller logs red's VIP extracted (id 46, critical by default; player, key 14)"
+    event: {"node": 0, "seq": 5, "t": 1800000, "type": "vip.extracted", "team": 1, "data": {"player": "p-7", "team": "red"}}
+    cbor: "a6 01 00 02 05 03 1a 00 1b 77 40 04 18 2e 05 01 08 a2 0e 63 70 2d 37 01 63 72 65 64"
+  - name: "Blue's payload prop reaches the extraction zone (id 46, no player)"
+    event: {"node": 12, "seq": 2, "t": 600000, "type": "vip.extracted", "team": 2, "data": {"team": "blue"}}
+    cbor: "a6 01 0c 02 02 03 1a 00 09 27 c0 04 18 2e 05 02 08 a1 01 64 62 6c 75 65"
 
 invalid:
   - name: "Truncated"  # truncated

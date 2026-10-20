@@ -697,11 +697,48 @@ checkpoint scoring. Controller: a `POST /api/v1/positions` by a VIP
 token ends the game; the stream and MQTT never carry the coordinates
 (as the phase 3 privacy tests). Dart: a prop session with fake fixes.
 
+**Built 2026-10-20 (in software; real GPS in the field: HW3).** What
+differs from the design above, or fills what it left open (decisions M5-1
+to M5-7):
+
+- First, a fix for M4-7 (M5-1): data only staff may read is marked in the
+  schema, `gm_only` on an event's data fields in `events.yaml` (generated
+  by protogen) and `gm_only: true` on a mode's parameters; the controller
+  (`visibility.py`) strips it from players' connections, the read token and
+  MQTT. The site server's synced events and parameters are staff-only
+  already (M5-2).
+- The zone is one text parameter, `extraction` (`latitude,longitude`), with
+  `radius_m`, `vip_points` (new: points at the extraction), `end_on_extract`,
+  `checkpoint_points`, `tick_s` (new), `capture_hold_ms` and `lang`: the
+  manifests have no number type and every join carries all of a main mode's
+  parameters in 200 bytes (M5-3). A malformed zone stops the game from
+  starting.
+- No new field operation was needed: `positions.py` hands a VIP's GPS
+  reports (oldest first, while the game runs on this controller) to
+  `Controller.field_position`, which gives `field.lua` the input
+  `position.fix`; fixes less precise than the zone do not count, nor do
+  other players or another team's VIP (M5-4).
+- One `node.lua` for both roles answers its own inputs (team inputs, or
+  `gps.fix`); the app sends a `gps.fix` without a position when the game
+  starts (M5-5). Checkpoints score in `field.lua`, counted in whole seconds
+  held (M5-7).
+- A Field Box preset after all, for the checkpoints (M5-6, amending P4R23):
+  a box joins only modes it has as presets.
+- Tests: 8 YAML files (the VIP enters; leaves and re-enters; others in the
+  zone; the payload with no fix, a weak fix, the metres left and the
+  extraction; once; no zone; checkpoints; the GM's override), in Python and
+  in Dart through the core; `simulator/tests/test_vip_payload.py`;
+  `controller/tests/test_vip_payload.py` (with the M5-1 tests);
+  `app/test/prop/prop_gps_session_test.dart`; the Field Box host tests and
+  reference images; app goldens; a console browser test.
+
 ### Validation
 
 ```sh
 python3 tools/docker_sim.py test modes/vip_payload
 python3 tools/docker_app.py
+python3 tools/docker_fw.py test && python3 tools/docker_fw.py build   # the checkpoint preset (M5-6)
+python3 tools/docker_console.py
 # clean-copy check (the controller's tests run in tools/check.sh)
 ```
 

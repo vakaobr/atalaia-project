@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The extraction zone: 25 m around 38.722345,-9.139312 (Lisbon). 38.723244 is
+# 100 m north of its centre, 38.722390 5 m north: inside.
+name: "The escorting team's VIP walks into the extraction zone: vip.extracted with the player, 100 points, and the game ends won by red"
+params: { extraction: "38.722345,-9.139312" }
+nodes: { cp1: checkpoint }
+steps:
+  - expect_screen: { node: cp1, template: checkpoint_free }
+  - wait: 60
+  - position: { player: p-vip, team: red, role: vip, lat: 38.723244, lon: -9.139312, acc: 5 }
+  - expect_no: vip.extracted
+  - wait: 30
+  - position: { player: p-vip, team: red, role: vip, lat: 38.722390, lon: -9.139312, acc: 5 }
+  - expect: { type: vip.extracted, node: controller, team: red, at: 90, data: { player: p-vip } }
+  - expect: { type: game.end, data: { winner: red } }
+  - expect_score: { team: red, points: 100 }
+  - expect_screen: { node: cp1, template: final_score }
+  - expect_no: script.error

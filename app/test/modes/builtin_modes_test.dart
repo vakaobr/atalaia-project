@@ -84,6 +84,16 @@ void main() {
       hack.params.firstWhere((p) => p.name == 'lockout_s').label('pt'),
       'Segundos de bloqueio depois de uma resposta errada (0: sem bloqueio)',
     );
+    final vip = catalog.byId('org.atalaia.vip_payload')!;
+    expect(vip.needsController, isTrue);
+    expect(vip.name('pt'), 'VIP / Carga');
+    expect(vip.roles.map((r) => r.name), ['checkpoint', 'payload']);
+    expect(vip.role('payload')!.requires, ['gps']);
+    expect(vip.role('payload')!.uses('team_input'), isFalse);
+    expect(
+      vip.screens.keys,
+      containsAll(['checkpoint_free', 'checkpoint_held', 'payload']),
+    );
     expect(catalog.byId('org.atalaia.respawn')!.needsController, isFalse);
   });
 

@@ -44,6 +44,11 @@ static const struct {
     {"Hacking Terminal", "org.atalaia.hacking_terminal",
      "{\"puzzle\":\"code\",\"digits\":4,\"lockout_s\":10,\"points\":10,\"capture\":false,"
      "\"lang\":\"pt\"}"},
+    /* A checkpoint (the payload role needs GPS, an Android prop's); the controller's field.lua
+     * scores checkpoints and extracts the VIP, so on its own a box only captures. */
+    {"VIP", "org.atalaia.vip_payload",
+     "{\"vip_team\":\"red\",\"radius_m\":25,\"vip_points\":100,\"end_on_extract\":true,"
+     "\"checkpoint_points\":1,\"tick_s\":10,\"capture_hold_ms\":3000,\"lang\":\"pt\"}"},
 };
 
 /* preset_t holds a 16 KB source buffer, so it is not put on a task stack;

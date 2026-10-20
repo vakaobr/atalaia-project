@@ -300,6 +300,7 @@ const Map<String, String> enStrings = {
   'event.medic.empty': 'A medic kit is empty',
   'event.hacking.solved': '{team} hacked a terminal',
   'event.hacking.solved.no_team': 'A terminal was hacked',
+  'event.vip.extracted': '{team} reached the extraction zone',
 
   // GM
   'gm.intro':

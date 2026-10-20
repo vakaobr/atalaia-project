@@ -165,6 +165,15 @@ static const uint8_t vector_19_cbor[] = {
     0x18, 0x24, 0x65, 0x77, 0x69, 0x72, 0x65, 0x73, 0x01, 0x63, 0x72, 0x65,
     0x64,
 };
+static const uint8_t vector_20_cbor[] = {
+    0xa6, 0x01, 0x00, 0x02, 0x05, 0x03, 0x1a, 0x00, 0x1b, 0x77, 0x40, 0x04,
+    0x18, 0x2e, 0x05, 0x01, 0x08, 0xa2, 0x0e, 0x63, 0x70, 0x2d, 0x37, 0x01,
+    0x63, 0x72, 0x65, 0x64,
+};
+static const uint8_t vector_21_cbor[] = {
+    0xa6, 0x01, 0x0c, 0x02, 0x02, 0x03, 0x1a, 0x00, 0x09, 0x27, 0xc0, 0x04,
+    0x18, 0x2e, 0x05, 0x02, 0x08, 0xa1, 0x01, 0x64, 0x62, 0x6c, 0x75, 0x65,
+};
 static const uint8_t bad_vector_0_cbor[] = {
     0xa4, 0x01, 0x01, 0x02, 0x01, 0x03, 0x19, 0x13, 0x88, 0x04,
 };
@@ -393,6 +402,14 @@ static const protocol_vector_t protocol_vectors[] = {
      {7, 4, 95000u, 1, 0, ATALAIA_PRIO_CRITICAL, "hacking.solved"},
      "{\"code\":\"4711\",\"puzzle\":\"wires\",\"team\":\"red\"}",
      vector_19_cbor, sizeof(vector_19_cbor)},
+    {"The controller logs red's VIP extracted (id 46, critical by default; player, key 14)",
+     {0, 5, 1800000u, 1, 0, ATALAIA_PRIO_CRITICAL, "vip.extracted"},
+     "{\"player\":\"p-7\",\"team\":\"red\"}",
+     vector_20_cbor, sizeof(vector_20_cbor)},
+    {"Blue's payload prop reaches the extraction zone (id 46, no player)",
+     {12, 2, 600000u, 2, 0, ATALAIA_PRIO_CRITICAL, "vip.extracted"},
+     "{\"team\":\"blue\"}",
+     vector_21_cbor, sizeof(vector_21_cbor)},
 };
 
 static const protocol_bad_vector_t protocol_bad_vectors[] = {

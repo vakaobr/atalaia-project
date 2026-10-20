@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# A team holds the checkpoint. Data: team, since (game time of the capture,
+# in seconds). The box does not score: the controller does, while it is held.
+# Texts in params.lang (pt or en).
+template: checkpoint_held
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: team }
+    children:
+      - type: label
+        text: PONTO CAPTURADO
+        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang != 'en'}" }
+      - type: label
+        text: CHECKPOINT HELD
+        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang == 'en'}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{team|upper}"
+    style: { font_size: 48, color: team }
+  - type: label
+    text: "desde {since|clock}"
+    style: { font_size: 20, color: muted, visible: "{params.lang != 'en'}" }
+  - type: label
+    text: "held since {since|clock}"
+    style: { font_size: 20, color: muted, visible: "{params.lang == 'en'}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: Mantém o teu botão para o tomar
+    style:
+      font_size: 14
+      color: muted
+      visible: "{params.lang != 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: Hold your button to take it over
+    style:
+      font_size: 14
+      color: muted
+      visible: "{params.lang == 'en'}"
+      padding: { bottom: 10 }

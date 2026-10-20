@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "Without end_on_extract the payload extracts once; outside and back in, nothing more; team buttons do nothing on it"
+params: { extraction: "38.722345,-9.139312", end_on_extract: false, vip_points: 40 }
+nodes: { cargo: payload }
+steps:
+  - gps: { lat: 38.722345, lon: -9.139312 }
+  - expect: { type: vip.extracted, node: cargo, team: red }
+  - expect_screen: { template: payload, data: { state: extracted } }
+  - expect_score: { team: red, points: 40 }
+  - gps: { lat: 38.723244, lon: -9.139312 }
+  - expect_screen: { template: payload, data: { state: extracted } }
+  - gps: { lat: 38.722345, lon: -9.139312 }
+  - expect_no: vip.extracted
+  - hold: { team: blue, s: 5 }
+  - expect_no: zone.captured
+  - expect_no: game.end
+  - expect_score: { team: red, points: 40 }
+  - expect_no: script.error

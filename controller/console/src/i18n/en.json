@@ -155,6 +155,8 @@
       "medic_empty": "A medic kit is empty",
       "hacking_solved": "{team} solved a hacking terminal ({puzzle})",
       "hacking_solved_code": "{team} solved a hacking terminal ({puzzle}) and got the code {code}",
+      "vip_extracted": "{team}'s payload reached the extraction zone",
+      "vip_extracted_vip": "{team} extracted its VIP ({player})",
       "nobody": "Nobody known"
     },
     "puzzles": {

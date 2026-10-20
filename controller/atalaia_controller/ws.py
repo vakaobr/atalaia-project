@@ -13,8 +13,11 @@ before it is queued (decision PE6): check-in and chrono-list messages
 (names!) only to staff (the GM token, marshal and gm player tokens) and,
 for their own row, to the player; player positions only to those who may
 see them (positions.Positions.can_see); a player's connection gets no
-radio or controller internals. Keys starting with "_" are routing marks and
-never leave the controller.
+radio or controller internals; data the schema marks gm_only (a Hacking
+Terminal's revealed code, a Bomb's team codes: decision M5-1, visibility.py)
+reaches staff only. Keys starting with "_" are routing marks and never leave
+the controller. api.create_app installs that route (api.make_route);
+``default_route`` is only for a hub with no controller behind it.
 """
 
 from __future__ import annotations
@@ -22,6 +25,8 @@ from __future__ import annotations
 import asyncio
 import threading
 from typing import Any, Callable, Optional
+
+from .visibility import public_event
 
 CLOSE = "close"  # a queued ("close", code): the sender closes the socket with that code
 
@@ -37,10 +42,15 @@ def public(msg: dict[str, Any]) -> dict[str, Any]:
 
 
 def default_route(viewer: Any, msg: dict[str, Any]) -> Any:
-    """Without check-in: every message to everyone, minus the routing marks."""
+    """Every message to everyone, minus the routing marks and the gm_only event data
+    (only the GM token sees that; no controller is known here to judge the rest)."""
     if msg.get("_staff") or "_player" in msg or msg.get("_position") or msg.get("_positions_refresh"):
         return None
-    return public(msg)
+    out = public(msg)
+    if out.get("type") == "event" and isinstance(out.get("event"), dict) \
+            and getattr(viewer, "kind", None) != "gm":
+        out["event"] = public_event(out["event"])
+    return out
 
 
 class Hub:

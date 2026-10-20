@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Nobody holds the checkpoint. No data; the hold time comes from the game's
+# parameters. Texts in params.lang (pt or en).
+template: checkpoint_free
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: panel }
+    children:
+      - type: label
+        text: PONTO DE CONTROLO
+        style: { font_size: 20, width: fill, align: center, visible: "{params.lang != 'en'}" }
+      - type: label
+        text: CHECKPOINT
+        style: { font_size: 20, width: fill, align: center, visible: "{params.lang == 'en'}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: MANTÉM PREMIDO
+    style: { font_size: 28, color: accent, visible: "{params.lang != 'en'}" }
+  - type: label
+    text: HOLD TO CAPTURE
+    style: { font_size: 28, color: accent, visible: "{params.lang == 'en'}" }
+  - type: label
+    text: "o botão {params.capture_hold_ms / 1000} s para capturar"
+    style: { font_size: 20, color: muted, visible: "{params.lang != 'en'}" }
+  - type: label
+    text: "Hold your button for {params.capture_hold_ms / 1000} s"
+    style: { font_size: 20, color: muted, visible: "{params.lang == 'en'}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: Ninguém tem este ponto
+    style:
+      font_size: 14
+      color: muted
+      visible: "{params.lang != 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: Nobody holds this checkpoint
+    style:
+      font_size: 14
+      color: muted
+      visible: "{params.lang == 'en'}"
+      padding: { bottom: 10 }

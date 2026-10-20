@@ -17,7 +17,7 @@ params:
   digits:      { type: int, min: 3, max: 6, default: 4, label: "Length: digits of the code, wires, keys of the sequence" }
   lockout_s:   { type: int, min: 0, max: 600, default: 10, label: "Seconds the terminal locks after a wrong answer (0: no lock)" }
   points:      { type: int, min: 0, max: 1000, default: 10, label: "Points for the team that solves it" }
-  reveal_code: { type: string, optional: true, max: 16, label: "Code shown and sent when it is solved (empty: none)" }
+  reveal_code: { type: string, optional: true, max: 16, gm_only: true, label: "Code shown and sent when it is solved (empty: none)" }
   capture:     { type: bool, default: false, label: "Solving captures the terminal; another team can hack it back" }
   team:        { type: team, optional: true, label: "Team credited when nobody pressed a team button first (empty: none)" }
   lang:        { type: string, default: pt, max: 2, label: "Language of the terminal's screen: pt or en" }

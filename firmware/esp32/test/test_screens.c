@@ -49,6 +49,8 @@ typedef struct {
 #define TARGET   "org.atalaia.target_windows {\"interval_s\":20,\"window_s\":5}"
 #define HACK     "org.atalaia.hacking_terminal {\"digits\":4,\"lockout_s\":10,\"lang\":\"pt\"}"
 #define HACK_EN  "org.atalaia.hacking_terminal {\"digits\":4,\"lockout_s\":10,\"lang\":\"en\"}"
+#define VIP      "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"pt\"}"
+#define VIP_EN   "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"en\"}"
 
 /* Data as the modes (modes/bomb, modes/domination, modes/codes) and the shell send it. */
 static const screen_case_t cases[] = {
@@ -179,6 +181,16 @@ static const screen_case_t cases[] = {
     {"yaml_hack_solved", "hack_solved", "{\"team\":\"red\",\"code\":\"4711\",\"capture\":true}",
      HACK},
     {"yaml_hack_solved_en", "hack_solved", "{\"capture\":false}", HACK_EN},
+    /* VIP / Payload: a checkpoint (the box's role), and the payload's screen (an Android prop's,
+     * drawn here too: the box carries every template). */
+    {"yaml_vip_checkpoint_free", "checkpoint_free", "{}", VIP},
+    {"yaml_vip_checkpoint_held_en", "checkpoint_held", "{\"team\":\"blue\",\"since\":95}", VIP_EN},
+    {"yaml_vip_payload_moving", "payload", "{\"team\":\"red\",\"state\":\"moving\",\"metres\":75}",
+     VIP},
+    {"yaml_vip_payload_weak_en", "payload", "{\"team\":\"red\",\"state\":\"weak\",\"metres\":40}",
+     VIP_EN},
+    {"yaml_vip_payload_extracted", "payload",
+     "{\"team\":\"red\",\"state\":\"extracted\",\"metres\":0}", VIP},
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))
 

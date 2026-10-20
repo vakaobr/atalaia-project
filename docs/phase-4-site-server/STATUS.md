@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Implementation (plan phases 1, 2, 3, 4, 10, 11, 12, 13 and 14 built in software, 2026-10-20; sync over 4G: HW1)
+**Current phase:** Implementation (plan phases 1, 2, 3, 4, 5, 10, 11, 12, 13 and 14 built in software, 2026-10-20; sync over 4G: HW1)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-20 (plan phase 14, full clean-copy check)
-**Next step:** plan phase 5 (VIP / Payload) on the modes chain; plan phase 15 (scheduling, field pages and feeds) on the site server chain
+**Last verified:** 2026-10-20 (plan phase 5, full clean-copy check)
+**Next step:** plan phase 6 (scenario packages and the objectives role package) on the modes chain; plan phase 15 (scheduling, field pages and feeds) on the site server chain
 
 ## Completed
 
@@ -43,7 +43,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | 2 | Target Windows (logic), `game.teams()`, `hit` input | Software, now | -- | Done in software (2026-10-19; the addon: HW2) |
 | 3 | Geo utilities in the core | Software, now | -- | Done in software (2026-10-20) |
 | 4 | Hacking Terminal | Software, now | -- | Done in software (2026-10-20; on a phone in the field: HW3) |
-| 5 | VIP / Payload | Software, now | 3 | **Next** (modes chain) |
+| 5 | VIP / Payload | Software, now | 3 | Done in software (2026-10-20; real GPS in the field: HW3) |
 | 6 | Scenario packages and the objectives role package | Software, now | -- | Pending |
 | 7 | Scenario compiler and validator | Software, now | 3, 6 | Pending |
 | 8 | Scenarios in the controller, console and app | Software, now | 7 | Pending |
@@ -139,7 +139,7 @@ and the Field Box, modem and pod builds. Checked once by hand: the
 core's `ctest` on arm64 and armv7 with gcc and clang (Alpine in QEMU)
 and the vectors' exact bits in an ESP-IDF app on the ESP32 and ESP32-S3
 in Espressif's QEMU. Not run: Wokwi (R7), real boards, Dart (no mode
-uses `geo` yet; VIP / Payload, plan phase 5, will). Decisions M3-1 to
+used `geo` yet; VIP / Payload, plan phase 5, now does). Decisions M3-1 to
 M3-3 (open).
 
 ## Plan phase 4: Hacking Terminal (built 2026-10-20, in software)
@@ -171,6 +171,42 @@ screen and typed back, the capture, the points, the GM's reset over the
 radio); the console in Chromium (the game form, the feed with the
 revealed code in both languages, the command). Not run: Wokwi (R7), a
 real box, a phone in the field (HW3). Decisions M4-1 to M4-9 (open).
+
+## Plan phase 5: VIP / Payload (built 2026-10-20, in software)
+
+`modes/vip_payload` (`org.atalaia.vip_payload`, "VIP / Carga"): the
+`vip_team` escorts its VIP, a checked-in player with the role `vip` who
+shares their position, or a payload, an Android prop with GPS, to a circle
+of `radius_m` around `extraction` (`latitude,longitude`, one text
+parameter: M5-3). The controller's `positions.py` hands a VIP's GPS reports
+to the game's `field.lua` only, as the input `position.fix` (P4R6): never
+an event, the radio, MQTT, the stream or `state.field`. The payload's
+script gets `gps.fix` from the phone (`PropSession.location`) and checks
+the zone itself (`geo.in_zone`; `geo.distance` for the metres on its
+screen). The extraction, once: `vip.extracted` (46, critical; `player`),
+`vip_points`, and with `end_on_extract` `game.win`. Checkpoints capture as
+in Domination; `field.lua` scores a checkpoint's holder every `tick_s`
+seconds held. The twelfth Field Box preset, for checkpoints (M5-6). Field
+Box image: `0x1787f0` (10.1 KB more; 26 % of the 2 MB OTA slot free).
+
+Done first in the same plan phase (M4-7, M5-1): data that only staff may
+read is marked in the schema (`gm_only` on `hacking.solved`'s `code` in
+`events.yaml`, `gm_only: true` on Bomb's `team_codes`, Codes' `codes` and
+the terminal's `reveal_code`), and the controller strips it from players'
+connections, the read token and MQTT (`visibility.py`). The site server's
+synced events and parameters are staff-only already (M5-2, for plan
+phase 20).
+
+Tested: 8 YAML event sequences (in Python and in Dart through the core:
+the first mode to run `geo` in Dart), the two event vectors through the
+C, Python and Dart codecs, simulator tests (no event may carry a
+position, a malformed zone, the join's 200 bytes), the controller (a VIP
+token's report ends the game; no coordinate on the stream, MQTT or the
+log; a player, the read token and MQTT never see the code; marshals and
+the GM do), a prop session with fake fixes, the Field Box host tests (the
+preset picked, a checkpoint captured) and five reference images, four app
+goldens, the console in Chromium. Not run: Wokwi (R7), a real box, real
+GPS on phones in the field (HW3). Decisions M5-1 to M5-7 (open).
 
 ## Plan phase 10: site server skeleton (built 2026-10-19, in software)
 

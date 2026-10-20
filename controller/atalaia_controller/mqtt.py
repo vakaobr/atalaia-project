@@ -3,7 +3,7 @@
 """MQTT bridge to the system Mosquitto broker (ADR-P2-5, spec section 11).
 
 Publishes:
-    field/v1/{game}/events/{type}         every game event, JSON (QoS 1)
+    field/v1/{game}/events/{type}         every game event, JSON (QoS 1), without gm_only data
     field/v1/{game}/score                 totals per team (retained)
     field/v1/{game}/nodes/{node}/state    owner, phase, game time, counters (retained)
     field/v1/{game}/nodes/{node}/health   battery, RSSI, SNR, last seen (retained)
@@ -31,6 +31,7 @@ import paho.mqtt.client as paho
 
 from .config import Config
 from .engine import Controller, ControllerError
+from .visibility import public_event
 
 log = logging.getLogger("atalaia.mqtt")
 
@@ -109,7 +110,9 @@ class MqttBridge:
         kind = msg.get("type")
         game = msg.get("game")
         if kind == "event":
-            ev = msg["event"]
+            # Any scoreboard on the field's network may read these topics: no gm_only data
+            # (a terminal's revealed code; decision M5-1). The GM console has it on the stream.
+            ev = public_event(msg["event"])
             self._publish(f"{PREFIX}/{game}/events/{ev['type']}", {"game": game, **ev})
         elif kind == "score":
             self._publish(f"{PREFIX}/{game}/score", {"game": game, "teams": msg["teams"],

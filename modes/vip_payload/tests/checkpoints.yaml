@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The controller counts each checkpoint's holder every second (the boxes'
+# reports): a team scores checkpoint_points for every tick_s seconds it has
+# held a checkpoint in a row, counted from the first whole second it is seen
+# holding it.
+name: "Checkpoints score while held: red holds cp1 from 3 s (a point at 14 s and 24 s), blue takes it over at 26 s; cp2 for blue"
+params: { tick_s: 10, checkpoint_points: 2 }
+nodes: { cp1: checkpoint, cp2: checkpoint }
+steps:
+  - hold: { node: cp1, team: red, s: 3 }
+  - expect: { type: zone.captured, node: cp1, team: red, at: 3 }
+  - expect_screen: { node: cp1, template: checkpoint_held, data: { team: red, since: 3 } }
+  - wait: 10.5
+  - expect_score: { team: red, points: 0 }
+  - wait: 1
+  - expect_score: { team: red, points: 2 }
+  - wait: 10
+  - expect_score: { team: red, points: 4 }
+  - hold: { node: cp1, team: blue, s: 3 }
+  - expect: { type: zone.captured, node: cp1, team: blue, data: { previous_team: red } }
+  - hold: { node: cp2, team: blue, s: 3 }
+  - wait: 15
+  # cp1 from 27 s and cp2 from 30 s: one tick each by 44.5 s.
+  - expect_score: { team: blue, points: 4 }
+  - expect_score: { team: red, points: 4 }
+  - expect_no: script.error

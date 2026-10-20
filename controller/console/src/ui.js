@@ -92,6 +92,8 @@ export function eventWords(e) {
         const p = t(`feed.puzzles.${puzzle}`);
         if (!p.startsWith('feed.')) puzzle = p;
     }
+    // VIP / Payload: the VIP (a player id) from the controller, or the payload prop.
+    if (e.type === 'vip.extracted' && d.player) key += '_vip';
     const s = t(key, { team, player: d.player || '', remaining: d.remaining,
                        used: d.player_heals_used, puzzle, code: d.code || '' });
     return s === key ? '' : s;

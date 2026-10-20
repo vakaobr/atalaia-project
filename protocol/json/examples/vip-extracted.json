@@ -1,0 +1,9 @@
+{
+  "id": "controller:5",
+  "t": 1800000,
+  "node": "controller",
+  "type": "vip.extracted",
+  "team": "red",
+  "data": { "player": "p-k7m2q4x9z3ab" },
+  "prio": "critical"
+}

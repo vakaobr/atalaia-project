@@ -263,10 +263,14 @@ class FieldTests(unittest.TestCase):
                          ("idle", "red"))
 
         self.assertTrue(wait_for(lambda: "hacking.solved" in self.log_types(gid, nid), 8))
-        solved = [e for e in self.client.get(f"/api/v1/games/{gid}/log", headers=READ).json()
+        solved = [e for e in self.client.get(f"/api/v1/games/{gid}/log", headers=GM).json()
                   if e["type"] == "hacking.solved"][0]
         self.assertEqual((solved["team"], solved["prio"], solved["data"]["puzzle"], solved["data"]["code"]),
                          ("red", "critical", "sequence", "4711"))
+        # The read token's scoreboards see who solved it, not the code (decision M5-1).
+        public = [e for e in self.client.get(f"/api/v1/games/{gid}/log", headers=READ).json()
+                  if e["type"] == "hacking.solved"][0]
+        self.assertEqual(public["data"], {"puzzle": "sequence", "team": "red"})
         self.assertTrue(wait_for(lambda: self.node(nid).get("owner") == "red", 8))
         self.assertTrue(wait_for(lambda: self.score(gid, "red") >= 10, 8))
 

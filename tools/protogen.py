@@ -128,6 +128,9 @@ def load_schema() -> dict[str, Any]:
         for d in data:
             require(d in fields, f"event {name}: data field {d!r} is not in data_fields")
             require(not fields[d].get("common"), f"event {name}: {d!r} is common to every event; do not list it")
+        gm_only = e.get("gm_only", [])
+        require(isinstance(gm_only, list) and all(g in data for g in gm_only),
+                f"event {name}: gm_only lists fields of its own data only")
     unique_ints({k: v["id"] for k, v in events.items()}, "event", 1, 255)
 
     # ---- payload field definitions ----
@@ -488,6 +491,7 @@ def gen_python(s: dict[str, Any]) -> str:
          "    id: int",
          "    prio: str  # default priority",
          "    data: tuple[str, ...]  # data fields besides the common ones",
+         "    gm_only: tuple[str, ...] = ()  # data fields only staff may read (decision M5-1)",
          "",
          "",
          "class PayloadField(NamedTuple):",
@@ -520,7 +524,8 @@ def gen_python(s: dict[str, Any]) -> str:
     L += [f"    {lit(k)}: DataField({v['key']}, {lit(v['type'])}, {bool(v.get('common'))}),"
           for k, v in s["fields"].items()]
     L += ["}", "", "EVENTS = {"]
-    L += [f"    {lit(k)}: EventDef({v['id']}, {lit(v['prio'])}, {tuple(v.get('data', []))!r}),"
+    L += [f"    {lit(k)}: EventDef({v['id']}, {lit(v['prio'])}, {tuple(v.get('data', []))!r}"
+          + (f", {tuple(v['gm_only'])!r}" if v.get("gm_only") else "") + "),"
           for k, v in s["events"].items()]
     L += ["}", ""]
     if s.get("payloads"):
@@ -552,9 +557,15 @@ def gen_json_schema(s: dict[str, Any]) -> str:
                 "properties": {n: {"$ref": f"#/$defs/data/{n}"} for n in common + names},
                 "additionalProperties": False}
 
+    def then(e: dict[str, Any]) -> dict[str, Any]:
+        out: dict[str, Any] = {"properties": {"data": data_schema(e.get("data", []))}}
+        if e.get("gm_only"):
+            out["$comment"] = ("staff only (decision M5-1): " + ", ".join(e["gm_only"])
+                               + "; left out of what players and the read token get")
+        return out
+
     per_type = [
-        {"if": {"properties": {"type": {"const": name}}},
-         "then": {"properties": {"data": data_schema(e.get("data", []))}}}
+        {"if": {"properties": {"type": {"const": name}}}, "then": then(e)}
         for name, e in s["events"].items()
     ]
     doc = {

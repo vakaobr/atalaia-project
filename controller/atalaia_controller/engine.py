@@ -47,7 +47,7 @@ from atalaia_sim.field_controller import (
 from atalaia_sim.mode import COMMAND_NAME, SEPARATOR, ModeError
 from atalaia_sim.packet import Header, vf_make
 
-from . import channels, radio_modem
+from . import channels, radio_modem, visibility
 from .config import Config
 from .modem_framing import RxPacket
 from .modes import ModeRegistry, resolve_params
@@ -440,6 +440,12 @@ class Controller:
         if live and self.key_lost:
             out["key_lost"] = True
         return out
+
+    def players_game(self, game: dict[str, Any]) -> dict[str, Any]:
+        """A game as players and the read token see it: without its gm_only parameters
+        (decision M5-1, visibility.py)."""
+        pkg = self.modes.get(game.get("mode_id")) if isinstance(game.get("mode_id"), str) else None
+        return {**game, "params": visibility.public_params(pkg.mode if pkg else None, game.get("params"))}
 
     def list_games(self) -> list[dict[str, Any]]:
         return [self.public_game(g) for g in self.store.games()]
@@ -1265,6 +1271,21 @@ class Controller:
         self.field.input("game.start")
         if self.fc.game_state == GAME_PAUSED:
             self.field.input("game.pause")
+
+    def field_position(self, game_id: int, fix: dict[str, Any]) -> bool:
+        """A VIP's position report for the game's field.lua, as the input position.fix (player,
+        team, role, lat, lon, acc, src; decision P4R6). Only the script gets it: it is not logged,
+        not emitted, not sent on the radio, MQTT or the stream, not kept in state.field and not
+        handed to a standby. True when the script got it (a running game on this controller)."""
+        with self._lock:
+            fc, field, game = self.fc, self.field, self.game
+            if (field is None or fc is None or game is None or game["id"] != game_id
+                    or not fc.is_controller or fc.game_state != GAME_RUNNING):
+                return False
+            field.advance(fc.game_time_ms)
+            field.input("position.fix", fix)
+            self._after_field()
+            return True
 
     def _after_field(self, may_end: bool = True) -> bool:
         """After field.lua ran: keeps its points with the game, and ends the game if it

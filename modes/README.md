@@ -27,6 +27,7 @@ The GM console builds its settings form from `params` in `mode.yaml`, so GMs nev
 | [Master and Satellites](master_satellites/) (Mestre e Satélites) | main mode | boxes + controller (`field.lua`) | Phase 4 plan phase 1, in software (not yet on radio hardware); 8 tests, plus controller, host-box and Field Box preset tests |
 | [Target Windows](target_windows/) (Janelas de Alvo) | main mode | boxes with the target addon (`hit`, `led`) | Phase 4 plan phase 2: the logic, in software; the addon does not exist yet (HW2), so it is not a Field Box preset and no Android prop offers it; 7 tests |
 | [Hacking Terminal](hacking_terminal/) (Terminal de Hacking) | main mode | boxes and Android props with a keypad | Phase 4 plan phase 4, in software (not yet on a phone in the field: HW3); 13 tests, plus controller, host-box, Field Box preset, browser and Dart tests |
+| [VIP / Payload](vip_payload/) (VIP / Carga) | main mode | checkpoint boxes and Android props, a payload prop with GPS (Android), the VIP's phone through the controller (`field.lua`) | Phase 4 plan phase 5, in software (not yet with real GPS in the field: HW3); 8 tests, plus simulator, controller, host-box, Field Box preset, browser and Dart tests |
 
 The script API is described in the "Game runtime and scripting" section of the [design specification](../docs/design-spec.md), and implemented in [`core/src/script_api.c`](../core/src/script_api.c).
 
@@ -82,6 +83,20 @@ Design specification section 15; decisions P4R1, P4R5, P4R23 and M4-1 to M4-9 in
 - **Screens** (`lang`: `pt`, the default, or `en`; the texts are in the templates): `hack_code`, `hack_wires`, `hack_sequence`, `hack_solved`; `final_score` at the end. The GM console's feed says who solved which puzzle and the code it revealed; the players' feed says only who hacked a terminal.
 
 It is the eleventh built-in Field Box preset, the second entry of the picker's second page. On a box picked from its own preset list it needs no controller.
+
+## VIP / Payload (phase 4)
+
+Design specification section 15; decisions P4R1, P4R6, P4R25 and M5-3 to M5-7 in `docs/review/decisions-to-review.md`.
+
+- **The escort:** the team `vip_team` (default red) takes its VIP, or a payload, to an extraction zone: a circle of `radius_m` (10-1,000 m, default 25) around `extraction`, the zone's centre as `latitude,longitude` in degrees (`38.722345,-9.139312`, as map apps copy it; spaces and a `+` are fine). A malformed `extraction` stops the game from starting, with the reason; without one there is no extraction and the checkpoints play alone.
+- **The VIP** is a checked-in player whose role is `vip` and who shares their position from the app (phase 3's position reports). The controller hands each of their GPS reports to `field.lua` only, as the input `position.fix` (`player`, `team`, `role`, `lat`, `lon`, `acc`, `src`): it is never an event, never on the radio, MQTT or the stream, and never in `state.field` (decision P4R6). A fix of the escorting team's VIP inside the zone extracts them (`geo.in_zone`, an edge counts as in); a fix less precise than the zone's radius (`acc` above `radius_m`) does not count, and neither does anyone else's: a player, a squad leader, another team's VIP.
+- **The payload** is an Android prop with GPS (the role `payload` requires `gps`). The app gives its script `gps.fix` (`lat`, `lon`, `acc`) every 2 s while the game runs, and one without `lat` and `lon` when the game starts, before the phone's first fix. The prop checks the zone itself and emits only `vip.extracted`: its position never leaves the phone. Its screen shows the metres left to the zone's edge (`geo.distance`, rounded up), a weak fix, or that it is extracted.
+- **The extraction** happens once per game: `vip.extracted` (46, critical) with the team and, for the VIP, `player` (from the controller), or from the payload's node; `vip_points` (default 100) for the escorting team; with `end_on_extract` (the default) the game ends, won by that team. Leaving the zone and coming back changes nothing.
+- **Checkpoints** (the role `checkpoint`, boxes or Android props) are captured by holding a team input for `capture_hold_ms`, as in Domination, and freed or given by the GM's owner override; they do not score on the box. Every second, `field.lua` counts who holds each checkpoint (the boxes' own reports): a team that has held one for `tick_s` seconds in a row (default 10) scores `checkpoint_points` (default 1; 0 for none), and counts again from zero.
+- **One script, two roles:** a script does not know its role, so `node.lua` answers its own inputs: team inputs reach only checkpoints, `gps.fix` only a payload (decision M5-5).
+- **Screens** (`lang`: `pt` or `en`): `checkpoint_free`, `checkpoint_held`, `payload`; `final_score` at the end.
+
+On a Field Box picked from its own preset list it is a checkpoint that only captures: the extraction and the checkpoints' points are `field.lua`'s. It is the twelfth built-in preset, the third entry of the picker's second page (decision M5-6).
 
 ## Phase 3 modes (player tags)
 
@@ -182,6 +197,8 @@ Modes react to semantic capabilities, so the same script works on a box with tea
 | `cmd.set_owner` | `team` (or `none`) | The GM's owner override from the console (decision E7); Hold-All and Last Stand handle it |
 | `cmd.mode` | `name`, then the command's own params | A mode command from the GM (a manifest's `commands`) or the field script (CMD opcode 8); the Medic Kit's `refill` and `heals` |
 | `gm.message` | `text` | A message from the GM |
+| `gps.fix` | `lat`, `lon`, `acc` (metres), or nothing before the first fix | A prop's own GPS (an Android prop whose role uses `gps`, every 2 s while the game runs); it stays on the phone (decision P4R6) |
+| `position.fix` | `player`, `team`, `role`, `lat`, `lon`, `acc`, `src` | `field.lua` only: a VIP's position report through the controller (decision P4R6); never an event |
 
 ## Positions and zones
 
@@ -197,7 +214,7 @@ if geo.in_zone(lat, lon, extraction) then ... end
 - Coordinates are WGS 84 degrees, latitude from -90 to 90 and longitude from -180 to 180; anything else (a string, NaN, a missing value) is a script error (`script.error`), as is a zone without a known `type`, a negative `radius_m` or a polygon with fewer than 3 or more than 32 points.
 - A point on a circle's edge, on a polygon's edge or on a vertex is inside (decision M3-2). Polygons are tested in plain latitude and longitude, so keep them simple (not self-intersecting) and off the 180th meridian; circles work anywhere.
 - The results are the same to the last bit on the Field Box, the controller and a phone, so a game replays the same everywhere (decision M3-1). Lua's own `math.sin` and friends come from each platform's C library and may differ in the last bit: use `geo` for positions.
-- Where positions come from: a VIP's phone through the controller (`position.fix`, for `field.lua` only) and a payload prop's own GPS (`gps.fix`), both in plan phase 5; positions are never events (P4R6).
+- Where positions come from: a VIP's phone through the controller (`position.fix`, for `field.lua` only) and a payload prop's own GPS (`gps.fix`), as VIP / Payload uses them; positions are never events (P4R6): the simulator reports an event whose data has a key such as `lat`, `lon`, `position` or `gps` as a problem, so a test fails.
 
 ## Tests
 
@@ -230,6 +247,8 @@ When the mode has a `field.lua`, it runs as the controller runs it: it receives 
 | `keys` | `keys: "4711#"` or `keys: { node: a, keys: "12#" }` | Keypad presses, one `keypad.key` per character |
 | `scan` | `scan: { player: b1, team: blue }` | A player tag read: signed with the test game's key and checked by the core as on a box. `forged: true` signs it with another key, `game: 7` writes it for another game, `scan: { uid: "04deadbeef" }` is a card without a player tag |
 | `input` | `input: { type: nfc.tag, data: { uid: "04a1" } }` | Any event to a node |
+| `position` | `position: { player: p-vip, team: red, role: vip, lat: 38.7224, lon: -9.1393, acc: 5 }` | A player's position report for `field.lua` (`position.fix`), as the controller hands a VIP's over; `src` defaults to `gps` |
+| `gps` | `gps: { node: cargo, lat: 38.7224, lon: -9.1393, acc: 8 }` | A fix from a prop's own GPS (`gps.fix`); `gps: { node: cargo }` is the one before the first fix |
 | `start`, `end`, `pause`, `resume` | `end: time` | Game events from the controller to every node |
 | `expect` | `expect: { type: zone.captured, team: red, at: 3, data: { previous_team: blue } }` | The next matching event exists; later `expect`s search after it |
 | `expect_no` | `expect_no: bomb.exploded` | No matching event since the last `expect` |

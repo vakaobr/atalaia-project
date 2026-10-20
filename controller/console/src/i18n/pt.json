@@ -155,6 +155,8 @@
       "medic_empty": "Um kit de ligaduras ficou vazio",
       "hacking_solved": "{team} resolveu um terminal de hacking ({puzzle})",
       "hacking_solved_code": "{team} resolveu um terminal de hacking ({puzzle}) e recebeu o código {code}",
+      "vip_extracted": "A carga da equipa {team} chegou à zona de extração",
+      "vip_extracted_vip": "A equipa {team} extraiu o seu VIP ({player})",
       "nobody": "Alguém por identificar"
     },
     "puzzles": {

@@ -88,6 +88,18 @@ class Mode:
         part = self.role_parts.get(role)
         return part.chunk_name if part else f"@{self.path.name}/node.lua"
 
+    @property
+    def gm_only_params(self) -> frozenset[str]:
+        """Parameters only staff may read (manifest `gm_only: true`, decision M5-1): a Bomb's
+        team codes, the codes of Codes, a terminal's revealed code. The field controller leaves
+        them out of what players and the read token get; the nodes still receive them."""
+        return frozenset(n for n, spec in self.params.items() if spec.get("gm_only"))
+
+    def public_params(self, params: dict[str, Any]) -> dict[str, Any]:
+        """A game's parameters without the gm_only ones."""
+        hidden = self.gm_only_params
+        return {k: v for k, v in params.items() if k not in hidden}
+
     def node_mode_id(self, role: str) -> str:
         """The mode id a node with this role is given in its join: what it runs."""
         part = self.role_parts.get(role)
@@ -153,6 +165,12 @@ def check_manifest(manifest: dict[str, Any], where: str) -> None:
     kind = manifest.get("kind", "mode")
     if kind not in KINDS:
         raise ModeError(f"{where}: kind must be one of {', '.join(KINDS)}, got {kind!r}")
+    params = manifest.get("params") or {}
+    if not isinstance(params, dict) or not all(isinstance(spec, dict) for spec in params.values()):
+        raise ModeError(f"{where}: params must map a parameter name to its schema")
+    for name, spec in params.items():
+        if not isinstance(spec.get("gm_only", False), bool):
+            raise ModeError(f"{where}: parameter {name!r}: gm_only is true or false")
     commands = manifest.get("commands")
     if commands is not None:
         if not isinstance(commands, dict):

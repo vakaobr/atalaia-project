@@ -93,6 +93,7 @@ class _PropGameScreenState extends State<PropGameScreen> {
           modeName: widget.modeName,
           link: _linkFor(services),
           radioLinkFor: (pod) => _radioFor(services, pod),
+          location: services.location,
         );
     unawaited(_open(services));
     unawaited(_loadBranding(services));
@@ -182,6 +183,11 @@ class _PropGameScreenState extends State<PropGameScreen> {
       // A role that needs the keypad (the Hacking Terminal) shows it at once.
       if (_keypadOffered && role!.requires.contains('keypad')) _keypad = true;
     });
+    // A payload (VIP / Payload) checks the extraction zone with the phone's
+    // GPS: the position stays on the phone (decision P4R6).
+    if (role != null && role.uses('gps') && features.location) {
+      await services.device.requestPermission('ACCESS_FINE_LOCATION');
+    }
     if (widget.pod != null) await session.attachPod(widget.pod!);
     if (role != null && role.uses('nfc') && features.nfc) {
       _tags = _nfc.reads.listen(session.tagRead);

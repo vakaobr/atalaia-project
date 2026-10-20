@@ -304,6 +304,7 @@ static const char *const builtin_folders[][2] = {
     {"medic", "org.atalaia.medic"},
     {"master_satellites", "org.atalaia.master_satellites"},
     {"hacking_terminal", "org.atalaia.hacking_terminal"},
+    {"vip_payload", "org.atalaia.vip_payload"},
 };
 enum { BUILTIN_N = sizeof(builtin_folders) / sizeof(builtin_folders[0]) };
 
@@ -440,6 +441,54 @@ static void test_hacking_terminal_from_the_picker(void)
     node_runner_stop(&runner);
 }
 
+/* VIP / Payload, the twelfth slot (second page, third entry): a box is a checkpoint. On its
+ * own it only captures: the controller's field.lua scores it and extracts the VIP. */
+static void test_vip_payload_checkpoint_from_the_picker(void)
+{
+    preset_summary_t list[PRESET_MAX_SLOTS];
+    seed_every_builtin(list);
+    CHECK(strcmp(list[11].mode_id, "org.atalaia.vip_payload") == 0);
+    CHECK(strcmp(list[11].label, "VIP") == 0);
+
+    preset_ui_t ui;
+    preset_ui_init(&ui, "1234", BUILTIN_N);
+    for (const char *k = "1234#03###"; *k; k++) preset_ui_handle_key(&ui, *k);
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_GAME_STARTED);
+    CHECK(preset_ui_selected_preset(&ui) == 12);
+
+    static preset_t p;
+    CHECK(preset_store_load(list[preset_ui_selected_preset(&ui) - 1].index, &p));
+    CHECK(strcmp(p.mode_id, "org.atalaia.vip_payload") == 0);
+    CHECK(strstr(p.params_json, "\"checkpoint_points\":1") != NULL);
+    CHECK(strstr(p.params_json, "extraction") == NULL); /* no zone: a box has no GPS */
+
+    hal_t hal;
+    hal_stub_init(&hal);
+    static node_runner_t runner;
+    node_runner_init(&runner, &hal, 0);
+    const char *teams[] = {"red", "blue"};
+    CHECK(node_runner_start(&runner, &p, teams, 2));
+    CHECK(strcmp(runner.queues.screens[0].template_name, SCREEN_MODE_MESSAGE) == 0);
+    CHECK(screen_render(SCREEN_MODE_MESSAGE, runner.queues.screens[0].data_json));
+    button_tracker_t buttons;
+    button_tracker_init(&buttons, teams, 2);
+    const screen_update_t *su = last_screen(&runner);
+    CHECK(su && strcmp(su->template_name, "checkpoint_free") == 0);
+    if (su) CHECK(screen_render(su->template_name, su->data_json));
+
+    runner.queues.screen_count = 0;
+    hold(&runner, &buttons, 0x2, 3100); /* blue holds 3 s: captured, no score on the box */
+    CHECK(strcmp(runner.last_event_type, "zone.captured") == 0);
+    su = last_screen(&runner);
+    CHECK(su && strcmp(su->template_name, "checkpoint_held") == 0);
+    CHECK(su && strstr(su->data_json, "\"team\":\"blue\"") != NULL);
+    if (su) CHECK(screen_render(su->template_name, su->data_json));
+    for (int i = 0; i < 2000; i++) node_runner_tick(&runner, 10); /* 20 s held */
+    const atalaia_score_t *score = atalaia_node_score(runner.node);
+    CHECK(score && score->gained[1] == 0 && score->gained[2] == 0);
+    node_runner_stop(&runner);
+}
+
 void run_builtin_presets_tests(void)
 {
     test_seed_empty_store();
@@ -451,4 +500,5 @@ void run_builtin_presets_tests(void)
     test_bomb_from_the_picker();
     test_every_builtin_and_master_satellites();
     test_hacking_terminal_from_the_picker();
+    test_vip_payload_checkpoint_from_the_picker();
 }

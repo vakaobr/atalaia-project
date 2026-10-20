@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "Nobody else extracts: a red player, blue's VIP, a fix of unknown team, a fix less precise than the zone; then red's VIP does"
+params: { extraction: "38.722345,-9.139312", vip_team: red }
+nodes: { cp1: checkpoint }
+steps:
+  - position: { player: p-red1, team: red, role: player, lat: 38.722345, lon: -9.139312 }
+  - position: { player: p-red2, team: red, role: squad_leader, lat: 38.722345, lon: -9.139312 }
+  - position: { player: p-bvip, team: blue, role: vip, lat: 38.722345, lon: -9.139312 }
+  - position: { player: p-nobody, role: vip, lat: 38.722345, lon: -9.139312 }
+  # Inside, but the phone says it may be 40 m off: more than the 25 m radius.
+  - position: { player: p-vip, team: red, role: vip, lat: 38.722345, lon: -9.139312, acc: 40 }
+  - expect_no: vip.extracted
+  - expect_score: { team: red, points: 0 }
+  # 24 m north of the centre, inside, with an accuracy of 25 m: as precise as the zone, so it counts.
+  - position: { player: p-vip, team: red, role: vip, lat: 38.722560, lon: -9.139312, acc: 25 }
+  - expect: { type: vip.extracted, team: red, data: { player: p-vip } }
+  - expect: { type: game.end, data: { winner: red } }
