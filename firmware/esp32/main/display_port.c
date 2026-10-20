@@ -10,11 +10,14 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "lvgl.h"
+#include "oled_view.h"
 
 static const char *TAG = "display";
 
 static lv_display_t *display;
 static const hal_display_ops_t *panel;
+static lv_display_t *oled_display;
+static const hal_oled_ops_t *oled;
 
 static uint32_t tick_ms(void)
 {
@@ -71,6 +74,39 @@ bool display_port_init(const hal_display_ops_t *ops)
              LVGL_VERSION_MINOR, LVGL_VERSION_PATCH, HAL_DISPLAY_WIDTH, HAL_DISPLAY_HEIGHT,
              (unsigned)buf_size);
     return panel_ok;
+}
+
+/* Full render mode: px_map is the whole 128x64 RGB565 frame. */
+static void flush_to_oled(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
+{
+    (void)area;
+    if (lv_display_flush_is_last(disp)) {
+        static uint8_t fb[HAL_OLED_FB_SIZE];
+        oled_pack((const uint16_t *)px_map, fb);
+        oled->write(fb);
+    }
+    lv_display_flush_ready(disp);
+}
+
+lv_obj_t *display_port_oled_init(const hal_oled_ops_t *ops)
+{
+    if (!display || !ops || !ops->init || ops->init() != 0) return NULL;
+    oled = ops;
+
+    /* 16 KB: in PSRAM when there is some, the I2C panel needs no DMA. */
+    const size_t buf_size = HAL_OLED_WIDTH * HAL_OLED_HEIGHT * 2;
+    void *buf = heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM);
+    if (!buf) buf = heap_caps_malloc(buf_size, MALLOC_CAP_8BIT);
+    if (!buf) {
+        ESP_LOGW(TAG, "no memory for the OLED frame: OLED status off");
+        return NULL;
+    }
+    oled_display = lv_display_create(HAL_OLED_WIDTH, HAL_OLED_HEIGHT);
+    lv_display_set_color_format(oled_display, LV_COLOR_FORMAT_RGB565);
+    lv_display_set_buffers(oled_display, buf, NULL, buf_size, LV_DISPLAY_RENDER_MODE_FULL);
+    lv_display_set_flush_cb(oled_display, flush_to_oled);
+    lv_display_set_default(display);
+    return lv_display_get_screen_active(oled_display);
 }
 
 unsigned display_port_handle(void)

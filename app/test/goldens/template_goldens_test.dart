@@ -23,7 +23,9 @@ final catalog = ModeCatalog.builtin();
 /// (golden name, mode folder or null for the shell's, screen, data JSON)
 const cases = [
   ('bomb_standby', 'bomb', 'standby', '{"arm":"red"}'),
+  ('bomb_standby_arming', 'bomb', 'standby', '{"arm":"red","progress":0.6}'),
   ('bomb_countdown', 'bomb', 'countdown', '{"left":299}'),
+  ('bomb_countdown_defusing', 'bomb', 'countdown', '{"left":231,"defuse":0.4}'),
   (
     'bomb_countdown_last_seconds',
     'bomb',

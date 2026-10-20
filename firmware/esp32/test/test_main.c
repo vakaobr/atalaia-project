@@ -29,6 +29,7 @@ int main(void)
     run_wifi_setup_tests();
     run_reboot_resume_tests();
     run_screen_renderer_tests();
+    run_oled_view_tests();
     run_builtin_presets_tests();
     run_key_filter_tests();
     run_event_log_tests();

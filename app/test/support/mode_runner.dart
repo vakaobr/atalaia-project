@@ -1268,11 +1268,14 @@ Map<String, Object?> _teamData(String team, String? squad) => {
 
 // ---- Tests (testing.py) ----------------------------------------------------------
 
+/// An expected null matches an absent key too: Lua leaves nil values out of the data.
 bool _subset(Object? expected, Object? actual) {
   if (expected is Map) {
     return actual is Map &&
         expected.entries.every(
-          (e) => actual.containsKey(e.key) && _subset(e.value, actual[e.key]),
+          (e) =>
+              (e.value == null && actual[e.key] == null) ||
+              (actual.containsKey(e.key) && _subset(e.value, actual[e.key])),
         );
   }
   return expected == actual;

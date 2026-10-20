@@ -100,7 +100,9 @@ static const screen_case_t cases[] = {
     {"wifi_setup", "wifi_setup", "{\"ssid\":\"atalaia-3F2A\"}", NULL},
     /* Declarative templates (ADR-P3-4): Bomb and Domination migrated, the phase 3 modes. */
     {"yaml_bomb_standby", "standby", "{\"arm\":\"red\"}", BOMB},
+    {"yaml_bomb_standby_arming", "standby", "{\"arm\":\"red\",\"progress\":0.6}", BOMB},
     {"yaml_bomb_countdown", "countdown", "{\"left\":299}", BOMB},
+    {"yaml_bomb_countdown_defusing", "countdown", "{\"left\":231,\"defuse\":0.4}", BOMB},
     {"yaml_bomb_countdown_last_seconds", "countdown", "{\"left\":7,\"team\":\"red\"}", BOMB},
     {"yaml_bomb_defused", "defused", "{\"team\":\"blue\"}", BOMB},
     {"yaml_bomb_defused_yellow", "defused", "{\"team\":\"yellow\"}", BOMB},

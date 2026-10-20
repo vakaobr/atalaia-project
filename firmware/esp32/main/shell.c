@@ -42,6 +42,7 @@
 #ifdef ESP_PLATFORM
 /* ---- ESP-IDF build ---------------------------------------------------- */
 #include "display_port.h"
+#include "oled_view.h"
 #include "esp_event.h"
 #include "esp_littlefs.h"
 #include "esp_log.h"
@@ -103,10 +104,10 @@ static const char *const default_teams[] = {"red", "blue", "green", "yellow"};
 /* A field controller's game (box_game.h) and its flash event log. */
 static box_game_t box;
 static event_log_t game_log;
-static bool box_teams_set;    /* the button tracker uses the joined game's teams */
-static bool box_was_active;   /* to notice the end of a field game */
-static bool after_field_game; /* a field game ended: the next key brings the picker back */
-static uint8_t nfc_mem[888];  /* NTAG216 user memory */
+static bool box_teams_set;   /* the button tracker uses the joined game's teams */
+static bool box_was_active;  /* to notice the end of a field game */
+static bool after_game;      /* a game ended: the next key brings the picker back */
+static uint8_t nfc_mem[888]; /* NTAG216 user memory */
 static uint8_t nfc_last_uid[10];
 static uint8_t nfc_last_uid_len;
 static uint32_t nfc_last_poll_ms;
@@ -455,6 +456,22 @@ static void start_game(void)
              (unsigned long)game_preset.duration_s);
 }
 
+/*
+ * A stand-alone game reached game.end (its timer ran out, or the mode ended
+ * it): stop the runner and forget the saved state, so a reboot does not
+ * resume a finished game, and let the next key bring the picker back, as
+ * after a field game. A mode that drew no screen in that last tick (drew_end)
+ * gets the final screen, not a frozen phase screen.
+ */
+static void end_standalone_game(bool drew_end)
+{
+    node_runner_stop(&runner);
+    state_persist_clear();
+    if (!drew_end) send_screen("final_score", "{}");
+    after_game = true;
+    ESP_LOGI(TAG, "game over: press any key for the game picker");
+}
+
 /* ------------------------------------------------------------------ */
 /* FreeRTOS tasks (ADR-P1-7)                                           */
 /* ------------------------------------------------------------------ */
@@ -507,8 +524,8 @@ static void task_game(void *arg)
                 char json[64];
                 snprintf(json, sizeof(json), "{\"key\":\"%c\"}", key);
                 node_runner_input(&runner, "keypad.key", json);
-            } else if (after_field_game) {
-                after_field_game = false;
+            } else if (after_game) {
+                after_game = false;
                 start_picker();
             }
         }
@@ -526,9 +543,13 @@ static void task_game(void *arg)
         if (box_game_active(&box)) {
             box_game_tick(&box, delta_ms, now);
         } else if (runner.running) {
+            int screens_before = runner.queues.screen_count;
             node_runner_tick(&runner, delta_ms);
+            if (node_runner_status(&runner) == ATALAIA_NODE_ENDED) {
+                end_standalone_game(runner.queues.screen_count > screens_before);
+            }
         }
-        if (box_was_active && !box_game_active(&box)) after_field_game = true;
+        if (box_was_active && !box_game_active(&box)) after_game = true;
         box_was_active = box_game_active(&box);
         if (runner.running || runner.queues.screen_count || runner.queues.audio_count) {
             /* Forward screen updates to the LVGL queue. */
@@ -548,6 +569,15 @@ static void task_game(void *arg)
     }
 }
 
+#ifndef CONFIG_ATALAIA_OLED_SPLASH_MS
+#define CONFIG_ATALAIA_OLED_SPLASH_MS 0
+#endif
+
+static uint32_t now_ms(void)
+{
+    return (uint32_t)(esp_timer_get_time() / 1000);
+}
+
 /*
  * lvgl_task -- core 1, priority 4, 5 ms.
  * Owns LVGL: brings up the display, renders queued screens, runs LVGL timers.
@@ -557,6 +587,12 @@ static void task_lvgl(void *arg)
     (void)arg;
     ESP_LOGI(TAG, "lvgl task started");
     display_port_init(hal.display);
+    lv_obj_t *oled_scr = display_port_oled_init(hal.oled);
+    if (oled_scr) {
+        char version[24];
+        snprintf(version, sizeof(version), "v%s", atalaia_version());
+        oled_view_splash(oled_scr, version, now_ms(), CONFIG_ATALAIA_OLED_SPLASH_MS);
+    }
 
     for (;;) {
         screen_update_t su;
@@ -565,7 +601,9 @@ static void task_lvgl(void *arg)
             if (!screen_render(su.template_name, su.data_json)) {
                 ESP_LOGW(TAG, "unknown screen template '%s'", su.template_name);
             }
+            if (oled_scr) oled_view_handle(oled_scr, su.template_name, su.data_json, now_ms());
         }
+        if (oled_scr) oled_view_poll(oled_scr, now_ms());
         display_port_handle();
         vTaskDelay(pdMS_TO_TICKS(5));
     }

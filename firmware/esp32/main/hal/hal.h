@@ -11,6 +11,7 @@
 #include "hal_keypad.h"
 #include "hal_leds.h"
 #include "hal_nfc.h"
+#include "hal_oled.h"
 #include "hal_radio.h"
 
 typedef struct {
@@ -18,6 +19,7 @@ typedef struct {
     const hal_keypad_ops_t *keypad;
     const hal_led_ops_t *leds;
     const hal_display_ops_t *display;
+    const hal_oled_ops_t *oled; /* on-board status OLED; NULL when the board has none */
     const hal_nfc_ops_t *nfc;
     const hal_audio_ops_t *audio;
     const hal_battery_ops_t *battery;

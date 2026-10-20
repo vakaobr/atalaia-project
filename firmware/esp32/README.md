@@ -113,11 +113,18 @@ python tools/docker_fw.py build                   firmware for the Field Box -> 
 python tools/docker_fw.py wokwi                   Wokwi emulator variant -> firmware/esp32/build-wokwi/
 python tools/docker_fw.py modem                   USB radio modem variant -> firmware/esp32/build-modem/
 python tools/docker_fw.py pod                     I/O pod variant -> firmware/esp32/build-pod/
+python tools/docker_fw.py bench                   bare board on the desk -> firmware/esp32/build-bench/
 python tools/docker_fw.py test                    host tests and screen reference images
 python tools/docker_fw.py test --update-screens   accept changed screens as the new references
 ```
 
-`build`, `wokwi`, `modem` and `pod` use the `espressif/idf:v5.3.2` image, like CI's
+The bench variant (`sdkconfig.bench`) is the Field Box firmware for a bare
+Heltec V4 on the desk, with no keypad and no TFT: keys typed on the USB serial
+console (`0`-`9`, `*`, `#`) drive the PIN screen and the picker, the Wi-Fi
+setup portal is skipped (admin PIN `1234`), and the board's own OLED shows
+the game. Never flash it to a box for a game.
+
+`build`, `wokwi`, `modem`, `pod` and `bench` use the `espressif/idf:v5.3.2` image, like CI's
 `esp32-build`, `esp32-modem-build` and `esp32-pod-build` jobs. `test` runs CI's `firmware-test` commands in the
 `atalaia-dev` image. With a toolchain of your own, the same commands are:
 
@@ -167,6 +174,33 @@ must, and the fallback to the C screens. After changing a screen on purpose, run
 commit them with the change. Rendered images land in
 `firmware/esp32/build-test/screens/` (or `<build>/screens/` with `ctest`),
 next to a `.diff.png` for each mismatch.
+
+### The on-board OLED
+
+The Heltec V4's own 0.96" OLED (SSD1306, 128x64, I2C 0x3C on the shared bus,
+reset on GPIO 21) mirrors every screen as a compact status
+(`main/oled_view.c`, driver `main/hal/esp/hal_esp_oled.c`): a header bar (the
+running mode, or the picker's step), one big value (the PIN dots, the chosen
+game, the timer, the countdown, the phase) and a footer (a team, a hint or a
+message). While a team holds its button the footer turns into a progress bar
+(the data's `progress`, or Bomb's `defuse` on the countdown). A mode's own
+templates map too: a countdown when the data has `left`, else the screen's
+name, with a team, owner or message below. The TFT keeps the full screen; a
+bare board without one can be set up and played on the OLED alone, and on a
+full box it is a status line for staff.
+
+It is a second LVGL display, rendered in RGB565 and packed to one bit per
+pixel on flush (`oled_pack`); only the 128-byte pages that changed go over
+the 100 kHz bus, so a countdown tick costs one or two pages and a full frame
+about 100 ms. At boot it shows a splash for 2 s (the tower from
+`site/favicon.svg`, drawn by `tools/oled_logo.py` into `main/oled_logo.c`,
+with the name and the version). Kconfig: `ATALAIA_OLED_STATUS` (on by
+default), `ATALAIA_OLED_ADDR`, `ATALAIA_OLED_RST_PIN`, `ATALAIA_OLED_FLIP`
+and `ATALAIA_OLED_SPLASH_MS`. Without an OLED at the address the box logs a
+warning and runs without it. The host tests render the view through the
+same LVGL build and compare it with [`test/screens/oled/`](test/screens/oled/)
+(`test/test_oled_screens.c`, 1 bit per pixel as the panel shows it), and
+`test/test_oled_view.c` checks the mapping.
 
 ## Wokwi emulator
 
@@ -384,6 +418,14 @@ does from the controller, so a Hacking Terminal sets a different puzzle each
 game (decision M4-6). Target Windows is the one mode in `modes/` that is not built in: it
 needs the target addon and its driver (decision P4R23, phase 4 HW2); its
 screen templates are in the image, as every mode's are.
+
+A game picked on the box ends when its timer runs out (or its mode ends it):
+the box stops the script, forgets the saved state so a reboot does not
+resume a finished game, shows the final screen when the mode drew none of
+its own, and the next key brings the picker back, as after a field game
+(`end_standalone_game()` in `main/shell.c`). Until then a reboot resumes the
+game at the time it had; the mode's own script state does not survive it yet
+(modes/README.md), so a Bomb comes back in standby.
 
 A join may name a main mode with modifiers (`org.atalaia.domination+org.atalaia.codes`,
 see [modes/README.md](../../modes/README.md#main-modes-modifiers-role-packages-and-scenarios)): the box

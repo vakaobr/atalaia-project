@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Seconds left until the bomb explodes, red for the last ten.
-# Data: left (seconds), team (with team codes: the arming team).
+# Data: left (seconds), team (with team codes: the arming team), defuse (0-1
+# while the defenders hold their button: the defuse bar fills).
 template: countdown
 layout:
   - type: row
@@ -24,6 +25,17 @@ layout:
     id: fuse_bar
     value: "{left / params.fuse_s}"
     style: { width: 240, height: 10, color: "{team || 'danger'}" }
+  - type: label
+    text: Defusing... keep holding
+    style:
+      font_size: 14
+      color: white
+      padding: { top: 8 }
+      visible: "{defuse}"
+  - type: progress_bar
+    id: defuse_bar
+    value: "{defuse}"
+    style: { width: 240, height: 12, color: "{params.defenders || 'blue'}", visible: "{defuse}" }
   - type: spacer
     height: fill
   - type: label

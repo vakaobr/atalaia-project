@@ -280,6 +280,7 @@ void hal_stub_init(hal_t *hal)
     hal->keypad = &stub_keypad_ops;
     hal->leds = &stub_led_ops;
     hal->display = &stub_display_ops;
+    hal->oled = NULL; /* the host tests render the OLED view directly */
     hal->nfc = &stub_nfc_ops;
     hal->audio = &stub_audio_ops;
     hal->battery = &stub_battery_ops;

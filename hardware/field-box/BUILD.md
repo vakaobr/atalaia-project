@@ -751,7 +751,9 @@ log both go over it.
    ```
 
    Press `Ctrl+]` to quit. You should see the boot messages described in
-   BRING_UP.md step 1, with a warning for each part that is not found.
+   BRING_UP.md step 1, with a warning for each part that is not found, and
+   the board's own small screen shows the Atalaia tower for 2 s, then the
+   same step as the main screen (a compact copy of it).
 
 **Alternative without Python, in Chrome or Edge:** make a single image
 file, then flash it with Espressif's browser-based esptool page at address
@@ -767,13 +769,12 @@ The image is `firmware\esp32\build\atalaia-merged.bin`.
 `~/atalaia-flash/bin/python` instead of `%FLASH%`, and `/dev/ttyACM0`
 (Linux) or `/dev/cu.usbmodem*` (macOS) instead of `COM5`.
 
-**Known limitation: typing into the console.** The firmware reads console
-input from UART0 (GPIO 43/44), which on the V4 is not connected to the USB
-port; only the log is copied to USB. So the boot log shows in miniterm,
-but lines you type there (`@joinkey`, `@join`, keypad keys over serial) do
-not reach the box. Until the firmware reads input from the USB port too,
-enter the field join key in the setup portal's "Field join key" field
-instead (BRING_UP.md step 10b).
+**Typing into the console.** What you type in miniterm reaches the box
+over the same USB port (`CONFIG_ATALAIA_CONSOLE_USB_INPUT`, checked on a
+V4.3 on 2026-10-20): `@joinkey` and `@join` lines on every build, and keypad
+keys (`0`-`9`, `*`, `#`) on the bench variant
+(firmware/esp32/README.md, Build). The setup portal's "Field join key" field
+does the same as `@joinkey` (BRING_UP.md step 10b).
 
 ## 12. Hand-off to bring-up
 
@@ -819,8 +820,10 @@ real values. Anything you change by hand is lost when you delete
 
 | Symptom | Likely cause and fix |
 | --- | --- |
-| No COM port appears | Charge-only USB cable or panel extension: try a known data cable straight into the board, and another USB port. Firmware that crashes very early can hide the built-in USB port: put the board in download mode by hand (hold PRG, tap RST, release PRG) and flash again |
-| Typed console commands do nothing | Known limitation on the V4: console input is read from UART0, not USB ([section 11](#11-first-flash)) |
+| No COM port appears | Charge-only USB cable or panel extension: try a known data cable straight into the board, and another USB port (with the first board only the computer's own USB-C port worked). Firmware that crashes very early can hide the built-in USB port: put the board in download mode by hand (hold PRG, tap RST, release PRG) and flash again |
+| A held button arms or captures only sometimes; the log shows `hal_btn: ... released` in the middle of a hold | The wire's pin does not touch its hole: solder the header (or the wire). Any release restarts a hold |
+| The board's small screen stays dark | The log says `SSD1306 OLED not found`: Vext (BRING_UP.md step 2); upside down: `ATALAIA_OLED_FLIP` |
+| Typed console commands do nothing | Keypad keys are read from the console only in the bench variant; `@join` lines need Enter at the end. Close any other program holding the port ([section 11](#11-first-flash)) |
 | esptool: "Failed to connect" | Put the board in download mode by hand (hold PRG, tap RST, release PRG); use `-b 115200`; close miniterm or any other program holding the port |
 | Boot loop, "brownout" in the log | Weak USB port or cable; low battery; a short on 3V3. If it happens when the screen and NFC start, the board's 3.3 V supply may be overloaded: report it ([section 7](#7-power-and-battery-safety)) |
 | Log shows the Wokwi settings (GPIO keypad, setup skipped) | `firmware\esp32\sdkconfig` was from a Wokwi or modem build: [section 11](#11-first-flash), step 1 |

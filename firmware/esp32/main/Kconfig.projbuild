@@ -238,6 +238,49 @@ menu "Atalaia Field Box Configuration"
         endchoice
     endmenu
 
+    # ---- On-board OLED --------------------------------------------------------
+    menu "On-board OLED"
+        depends on ATALAIA_NODE_MODE
+
+        config ATALAIA_OLED_STATUS
+            bool "Show a compact status on the board's own OLED"
+            default y
+            help
+                The Heltec V4's 0.96" SSD1306 (128x64, I2C 0x3C on the
+                shared bus) mirrors every screen in three lines: header,
+                one big value (PIN, choice, countdown, phase), footer. A
+                bare board without the 2.8" TFT can be set up and played
+                with it; on a full Field Box it is a status line for staff.
+                The TFT keeps the full game screen. Without an OLED at the
+                address the box logs a warning and runs without it.
+
+        config ATALAIA_OLED_ADDR
+            hex "OLED I2C address"
+            depends on ATALAIA_OLED_STATUS
+            default 0x3C
+
+        config ATALAIA_OLED_RST_PIN
+            int "OLED reset GPIO (-1 = none)"
+            depends on ATALAIA_OLED_STATUS
+            default 21
+            help
+                GPIO 21 on the Heltec V4 (board-internal).
+
+        config ATALAIA_OLED_FLIP
+            bool "Rotate the OLED picture by 180 degrees"
+            depends on ATALAIA_OLED_STATUS
+            default n
+            help
+                Off: upright with the board's USB port on the left. On:
+                for a board mounted the other way round.
+
+        config ATALAIA_OLED_SPLASH_MS
+            int "Boot splash time on the OLED (ms, 0 = none)"
+            depends on ATALAIA_OLED_STATUS
+            default 2000
+            range 0 10000
+    endmenu
+
     # ---- NFC (PN532 over I2C, shared bus with OLED and battery gauge) -------
     menu "NFC"
         config ATALAIA_NFC_SDA_PIN

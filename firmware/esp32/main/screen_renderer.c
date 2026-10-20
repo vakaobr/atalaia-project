@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "screen_json.h"
 #include "screen_template.h"
 
 static char last_template[SCREEN_TEMPLATE_MAX];
@@ -50,153 +51,8 @@ static const char *known_templates[] = {
 
 #include "lvgl.h"
 
-/* ---- A small JSON reader for template data ------------------------ */
-/*
- * Template data is a flat JSON object written by the core (mode screens)
- * or the shell (system screens). The reader walks one object level and
- * skips nested values, so a key inside a nested object never matches.
- */
-
-static const char *json_ws(const char *p)
-{
-    while (p && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) p++;
-    return p;
-}
-
-/* Returns the character after the string that starts at p (p points at '"'). */
-static const char *json_skip_string(const char *p)
-{
-    p++;
-    while (*p && *p != '"') {
-        if (*p == '\\' && p[1]) p++;
-        p++;
-    }
-    return *p == '"' ? p + 1 : NULL;
-}
-
-/* Returns the character after the value that starts at p, or NULL. */
-static const char *json_skip_value(const char *p)
-{
-    p = json_ws(p);
-    if (!p || !*p) return NULL;
-    if (*p == '"') return json_skip_string(p);
-    if (*p == '{' || *p == '[') {
-        int depth = 0;
-        while (*p) {
-            if (*p == '"') {
-                p = json_skip_string(p);
-                if (!p) return NULL;
-                continue;
-            }
-            if (*p == '{' || *p == '[') depth++;
-            if (*p == '}' || *p == ']') {
-                depth--;
-                if (depth == 0) return p + 1;
-            }
-            p++;
-        }
-        return NULL;
-    }
-    while (*p && *p != ',' && *p != '}' && *p != ']' && *p != ' ' && *p != '\n') p++;
-    return p;
-}
-
-/* Finds the value of a top-level key in a JSON object. */
-static const char *json_find(const char *json, const char *key)
-{
-    const char *p = json_ws(json);
-    if (!p || *p != '{') return NULL;
-    p = json_ws(p + 1);
-    size_t key_len = strlen(key);
-    while (p && *p == '"') {
-        const char *name = p + 1;
-        const char *after = json_skip_string(p);
-        if (!after) return NULL;
-        bool match = (size_t)(after - 1 - name) == key_len && memcmp(name, key, key_len) == 0;
-        p = json_ws(after);
-        if (*p != ':') return NULL;
-        p = json_ws(p + 1);
-        if (match) return p;
-        p = json_ws(json_skip_value(p));
-        if (!p || *p != ',') return NULL;
-        p = json_ws(p + 1);
-    }
-    return NULL;
-}
-
-/* Copies a JSON string value (p points at '"') into out, decoding escapes. */
-static bool json_copy_string(const char *p, char *out, size_t out_sz)
-{
-    if (!p || *p != '"' || out_sz == 0) return false;
-    p++;
-    size_t n = 0;
-    while (*p && *p != '"') {
-        char c = *p++;
-        if (c == '\\' && *p) {
-            char e = *p++;
-            if (e == 'n' || e == 't' || e == 'r') {
-                c = ' ';
-            } else if (e == 'u') {
-                long code = 0;
-                for (int i = 0; i < 4 && *p; i++, p++) {
-                    char h = *p;
-                    int v = (h >= '0' && h <= '9')   ? h - '0'
-                            : (h >= 'a' && h <= 'f') ? h - 'a' + 10
-                            : (h >= 'A' && h <= 'F') ? h - 'A' + 10
-                                                     : 0;
-                    code = code * 16 + v;
-                }
-                c = (code >= 0x20 && code < 0x7f) ? (char)code : '?';
-            } else {
-                c = e; /* \" \\ \/ */
-            }
-        }
-        if (n + 1 < out_sz) out[n++] = c;
-    }
-    out[n] = '\0';
-    return *p == '"';
-}
-
-static bool json_str(const char *json, const char *key, char *out, size_t out_sz)
-{
-    out[0] = '\0';
-    return json_copy_string(json_find(json, key), out, out_sz);
-}
-
-static bool json_int(const char *json, const char *key, long *out)
-{
-    const char *p = json_find(json, key);
-    if (!p) return false;
-    char *end;
-    double v = strtod(p, &end);
-    if (end == p) return false;
-    *out = (long)v;
-    return true;
-}
-
-static bool json_true(const char *json, const char *key)
-{
-    const char *p = json_find(json, key);
-    return p && strncmp(p, "true", 4) == 0;
-}
-
-/* Reads a JSON array of strings. Returns the number of entries copied. */
 #define LIST_MAX      9
 #define LIST_ITEM_MAX 40
-static int json_str_list(const char *json, const char *key, char out[][LIST_ITEM_MAX], int max)
-{
-    const char *p = json_find(json, key);
-    if (!p || *p != '[') return 0;
-    p = json_ws(p + 1);
-    int n = 0;
-    while (p && *p == '"' && n < max) {
-        json_copy_string(p, out[n++], LIST_ITEM_MAX);
-        p = json_ws(json_skip_string(p));
-        if (!p || *p != ',') break;
-        p = json_ws(p + 1);
-    }
-    return n;
-}
 
 /* ---- Colours, fonts and shared pieces ----------------------------- */
 
@@ -368,7 +224,7 @@ static void build_standby(lv_obj_t *scr)
 static void update_standby(const char *data)
 {
     char team[SCREEN_TEMPLATE_MAX];
-    bool has_team = json_str(data, "arm", team, sizeof(team)) && team[0];
+    bool has_team = screen_json_str(data, "arm", team, sizeof(team)) && team[0];
     lv_label_set_text(slot[0], has_team ? "Hold the button to arm" : "Waiting");
     if (has_team) {
         uint32_t rgb = team_rgb(team);
@@ -396,14 +252,14 @@ static void build_countdown(lv_obj_t *scr)
 static void update_countdown(const char *data)
 {
     long left = 0;
-    json_int(data, "left", &left);
+    screen_json_int(data, "left", &left);
     char buf[24];
     format_clock(left, buf, sizeof(buf));
     lv_label_set_text(slot[0], buf);
     set_colour(slot[0], left <= 10 ? COLOR_DANGER : COLOR_TEXT);
 
     char team[SCREEN_TEMPLATE_MAX];
-    if (json_str(data, "team", team, sizeof(team)) && team[0]) {
+    if (screen_json_str(data, "team", team, sizeof(team)) && team[0]) {
         uint32_t rgb = team_rgb(team);
         upper(team);
         char line[64];
@@ -429,7 +285,7 @@ static void build_result(lv_obj_t *scr, const char *symbol, const char *title)
 static void update_result(const char *data)
 {
     char team[SCREEN_TEMPLATE_MAX];
-    bool has_team = json_str(data, "team", team, sizeof(team)) && team[0];
+    bool has_team = screen_json_str(data, "team", team, sizeof(team)) && team[0];
     uint32_t bg = has_team ? team_rgb(team) : COLOR_PANEL;
     uint32_t fg = text_on(bg);
     set_bg(lv_screen_active(), bg);
@@ -467,7 +323,7 @@ static void build_final_score(lv_obj_t *scr)
 static void update_final_score(const char *data)
 {
     char owner[SCREEN_TEMPLATE_MAX];
-    bool has_owner = json_str(data, "owner", owner, sizeof(owner)) && owner[0];
+    bool has_owner = screen_json_str(data, "owner", owner, sizeof(owner)) && owner[0];
     lv_label_set_text(slot[0], has_owner ? "The zone was held by" : "No team held the zone");
     lv_obj_align(slot[0], LV_ALIGN_CENTER, 0, has_owner ? -36 : 0);
     if (has_owner) {
@@ -523,7 +379,7 @@ static void build_status(lv_obj_t *scr)
 static void update_status(const char *data)
 {
     char title[SCREEN_TEMPLATE_MAX];
-    if (!json_str(data, "title", title, sizeof(title)) || !title[0]) {
+    if (!screen_json_str(data, "title", title, sizeof(title)) || !title[0]) {
         snprintf(title, sizeof(title), "STATUS");
     }
     upper(title);
@@ -533,19 +389,19 @@ static void update_status(const char *data)
     int n = 0;
     char buf[LIST_ITEM_MAX];
     long v;
-    if (json_str(data, "mode", buf, sizeof(buf)) && buf[0]) {
+    if (screen_json_str(data, "mode", buf, sizeof(buf)) && buf[0]) {
         snprintf(rows[n][0], LIST_ITEM_MAX, "Game");
         snprintf(rows[n++][1], LIST_ITEM_MAX, "%s", buf);
     }
-    if (json_int(data, "timer_s", &v)) {
+    if (screen_json_int(data, "timer_s", &v)) {
         snprintf(rows[n][0], LIST_ITEM_MAX, "Timer");
         format_minutes(v, rows[n++][1], LIST_ITEM_MAX);
     }
-    if (json_int(data, "battery", &v) && v >= 0) {
+    if (screen_json_int(data, "battery", &v) && v >= 0) {
         snprintf(rows[n][0], LIST_ITEM_MAX, "Battery");
         snprintf(rows[n++][1], LIST_ITEM_MAX, "%ld%%", v);
     }
-    if (n < STATUS_ROWS && json_str(data, "version", buf, sizeof(buf)) && buf[0]) {
+    if (n < STATUS_ROWS && screen_json_str(data, "version", buf, sizeof(buf)) && buf[0]) {
         snprintf(rows[n][0], LIST_ITEM_MAX, "Firmware");
         snprintf(rows[n++][1], LIST_ITEM_MAX, "v%.30s", buf);
     }
@@ -579,7 +435,7 @@ static void build_pin_entry(lv_obj_t *scr)
 static void update_pin_entry(const char *data)
 {
     long digits = 0;
-    json_int(data, "digits", &digits);
+    screen_json_int(data, "digits", &digits);
     if (digits < 0) digits = 0;
     if (digits > PIN_DOTS) digits = PIN_DOTS;
     int shown = digits > 4 ? (int)digits : 4;
@@ -593,7 +449,7 @@ static void update_pin_entry(const char *data)
         set_bg(dot, filled ? COLOR_ACCENT : COLOR_BG);
         lv_obj_set_style_border_color(dot, lv_color_hex(filled ? COLOR_ACCENT : COLOR_MUTED), 0);
     }
-    show(slot[1 + PIN_DOTS], json_true(data, "error"));
+    show(slot[1 + PIN_DOTS], screen_json_true(data, "error"));
 }
 
 /* ---- code_entry: a mode's code typed on the keypad -------------------- */
@@ -626,14 +482,14 @@ static void build_code_entry(lv_obj_t *scr)
 static void update_code_entry(const char *data)
 {
     char text[CODE_TEXT_MAX];
-    if (!json_str(data, "title", text, sizeof(text)) || !text[0]) {
+    if (!screen_json_str(data, "title", text, sizeof(text)) || !text[0]) {
         snprintf(text, sizeof(text), "CODE");
     }
     upper(text);
     lv_label_set_text(slot[0], text);
 
     long left = 0;
-    bool has_left = json_int(data, "left", &left);
+    bool has_left = screen_json_int(data, "left", &left);
     if (has_left) {
         format_clock(left, text, sizeof(text));
         lv_label_set_text(slot[1], text);
@@ -641,7 +497,7 @@ static void update_code_entry(const char *data)
     show(slot[1], has_left);
 
     long digits = 0;
-    json_int(data, "digits", &digits);
+    screen_json_int(data, "digits", &digits);
     if (digits < 0) digits = 0;
     if (digits > CODE_DOTS) digits = CODE_DOTS;
     int shown = digits > 4 ? (int)digits : 4;
@@ -657,9 +513,9 @@ static void update_code_entry(const char *data)
     }
 
     lv_obj_t *msg = slot[2 + CODE_DOTS];
-    bool has_msg = json_str(data, "message", text, sizeof(text)) && text[0];
+    bool has_msg = screen_json_str(data, "message", text, sizeof(text)) && text[0];
     lv_label_set_text(msg, has_msg ? text : "");
-    set_colour(msg, json_true(data, "error") ? COLOR_DANGER : COLOR_ACCENT);
+    set_colour(msg, screen_json_true(data, "error") ? COLOR_DANGER : COLOR_ACCENT);
     show(msg, has_msg);
 }
 
@@ -697,16 +553,16 @@ static void build_preset_select(lv_obj_t *scr)
 static void update_preset_select(const char *data)
 {
     char names[LIST_MAX][LIST_ITEM_MAX];
-    int count = json_str_list(data, "presets", names, LIST_MAX);
+    int count = screen_json_str_list(data, "presets", names[0], LIST_ITEM_MAX, LIST_MAX);
     long selected = 1;
-    json_int(data, "selected", &selected);
+    screen_json_int(data, "selected", &selected);
 
     /* More than nine games: the list is one page of them, numbered 1-9, and 0 turns the page
      * (decision M2-1). Without "pages" the list is the only page. */
     long page = 1;
     long pages = 1;
-    json_int(data, "page", &page);
-    json_int(data, "pages", &pages);
+    screen_json_int(data, "page", &page);
+    screen_json_int(data, "pages", &pages);
     if (pages > 1) {
         char title[40];
         snprintf(title, sizeof(title), "CHOOSE A GAME  %ld/%ld", page, pages);
@@ -756,7 +612,7 @@ static void build_timer_adjust(lv_obj_t *scr)
 static void update_timer_adjust(const char *data)
 {
     long s = 0;
-    json_int(data, "timer_s", &s);
+    screen_json_int(data, "timer_s", &s);
     char buf[32];
     format_minutes(s, buf, sizeof(buf));
     lv_label_set_text(slot[0], buf);
@@ -778,12 +634,12 @@ static void build_start_confirm(lv_obj_t *scr)
 static void update_start_confirm(const char *data)
 {
     char name[LIST_ITEM_MAX];
-    if (!json_str(data, "label", name, sizeof(name)) || !name[0]) {
+    if (!screen_json_str(data, "label", name, sizeof(name)) || !name[0]) {
         snprintf(name, sizeof(name), "Game");
     }
     lv_label_set_text(slot[0], name);
     long s = 0;
-    json_int(data, "timer_s", &s);
+    screen_json_int(data, "timer_s", &s);
     char t[32], line[48];
     format_minutes(s, t, sizeof(t));
     snprintf(line, sizeof(line), "Timer: %s", t);
@@ -808,7 +664,7 @@ static void build_wifi_setup(lv_obj_t *scr)
 static void update_wifi_setup(const char *data)
 {
     char ssid[48];
-    if (!json_str(data, "ssid", ssid, sizeof(ssid)) || !ssid[0]) {
+    if (!screen_json_str(data, "ssid", ssid, sizeof(ssid)) || !ssid[0]) {
         snprintf(ssid, sizeof(ssid), "atalaia-....");
     }
     lv_label_set_text(slot[1], ssid);

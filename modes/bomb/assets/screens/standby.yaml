@@ -1,7 +1,8 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# The bomb waits to be armed. Data: arm (the attacking team).
+# The bomb waits to be armed. Data: arm (the attacking team), progress (0-1
+# while the attackers hold their button; the bar fills, letting go empties it).
 template: standby
 layout:
   - type: row
@@ -13,8 +14,8 @@ layout:
   - type: spacer
     height: fill
   - type: label
-    text: Hold the button to arm
-    style: { font_size: 20, color: muted, visible: "{arm}" }
+    text: "{progress && 'Arming... keep holding' || 'Hold the button to arm'}"
+    style: { font_size: 20, color: "{progress && 'white' || 'muted'}", visible: "{arm}" }
   - type: label
     text: Waiting
     style: { font_size: 20, color: muted, visible: "{!arm}" }
@@ -22,8 +23,8 @@ layout:
     text: "{arm|upper}"
     style: { font_size: 48, color: "{arm}", visible: "{arm}" }
   - type: progress_bar
-    value: 1
-    style: { width: 180, height: 8, color: "{arm}", visible: "{arm}" }
+    value: "{progress}"
+    style: { width: 220, height: 12, color: "{arm}", visible: "{arm}" }
   - type: spacer
     height: fill
   - type: label

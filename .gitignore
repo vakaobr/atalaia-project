@@ -12,6 +12,7 @@ firmware/esp32/build/
 firmware/esp32/build-wokwi/
 firmware/esp32/build-modem/
 firmware/esp32/build-pod/
+firmware/esp32/build-bench/
 firmware/esp32/build-test/
 sdkconfig
 sdkconfig.old

@@ -9,11 +9,15 @@
 
 #include "hal_esp.h"
 
+#include <stddef.h>
+#include "sdkconfig.h"
+
 /* Ops structs defined in each driver file. */
 extern const hal_button_ops_t hal_esp_button_ops;
 extern const hal_keypad_ops_t hal_esp_keypad_ops;
 extern const hal_led_ops_t hal_esp_led_ops;
 extern const hal_display_ops_t hal_esp_display_ops;
+extern const hal_oled_ops_t hal_esp_oled_ops;
 extern const hal_nfc_ops_t hal_esp_nfc_ops;
 extern const hal_audio_ops_t hal_esp_audio_ops;
 extern const hal_battery_ops_t hal_esp_battery_ops;
@@ -25,6 +29,11 @@ int hal_esp_init(hal_t *hal)
     hal->keypad = &hal_esp_keypad_ops;
     hal->leds = &hal_esp_led_ops;
     hal->display = &hal_esp_display_ops;
+#if CONFIG_ATALAIA_OLED_STATUS
+    hal->oled = &hal_esp_oled_ops;
+#else
+    hal->oled = NULL;
+#endif
     hal->nfc = &hal_esp_nfc_ops;
     hal->audio = &hal_esp_audio_ops;
     hal->battery = &hal_esp_battery_ops;

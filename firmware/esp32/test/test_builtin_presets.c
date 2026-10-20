@@ -232,14 +232,26 @@ static const screen_update_t *last_screen(const node_runner_t *r)
     return r->queues.screen_count ? &r->queues.screens[r->queues.screen_count - 1] : NULL;
 }
 
+/* The game task drains the screen queue every tick; keep only the latest
+ * screen here, as the display would show it (a hold draws its progress). */
+static void drain_screens(node_runner_t *r)
+{
+    if (r->queues.screen_count > 1) {
+        r->queues.screens[0] = r->queues.screens[r->queues.screen_count - 1];
+        r->queues.screen_count = 1;
+    }
+}
+
 static void hold(node_runner_t *r, button_tracker_t *t, uint8_t mask, uint32_t ms)
 {
     for (uint32_t t_ms = 0; t_ms < ms; t_ms += 10) {
         button_tracker_update(t, mask, 10, r);
         node_runner_tick(r, 10);
+        drain_screens(r);
     }
     button_tracker_update(t, 0, 10, r);
     node_runner_tick(r, 10);
+    drain_screens(r);
 }
 
 static void test_bomb_from_the_picker(void)

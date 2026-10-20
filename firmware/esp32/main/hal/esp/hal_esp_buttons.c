@@ -6,6 +6,7 @@
 #include "../hal_buttons.h"
 
 #include "driver/gpio.h"
+#include "esp_log.h"
 #include "esp_timer.h"
 
 #include <string.h>
@@ -35,6 +36,8 @@ static const int btn_pins[MAX_BUTTONS] = {
     CONFIG_ATALAIA_BTN4_PIN,
 };
 
+static const char *TAG = "hal_btn";
+
 static int64_t last_change_us[MAX_BUTTONS];
 static uint8_t stable_state;
 
@@ -59,6 +62,19 @@ static int esp_buttons_init(void)
             return -1;
         }
     }
+
+    /* Bring-up (BRING_UP.md step 4): a button that reads pressed at rest
+     * is wired to the switch's NC tab or shorted to ground. */
+    for (int i = 0; i < MAX_BUTTONS; i++) {
+        if (btn_pins[i] < 0) continue;
+        int level = gpio_get_level((gpio_num_t)btn_pins[i]);
+        if (level == 0) {
+            ESP_LOGW(TAG, "button %d (GPIO %d) reads pressed at rest: NC tab or short to ground?",
+                     i + 1, btn_pins[i]);
+        } else {
+            ESP_LOGI(TAG, "button %d (GPIO %d) released at rest", i + 1, btn_pins[i]);
+        }
+    }
     return 0;
 }
 
@@ -81,6 +97,8 @@ static uint8_t esp_buttons_poll(void)
                     stable_state &= (uint8_t) ~(1u << i);
                 }
                 last_change_us[i] = now;
+                ESP_LOGI(TAG, "button %d (GPIO %d) %s", i + 1, btn_pins[i],
+                         raw ? "pressed" : "released");
             }
         } else {
             last_change_us[i] = now;

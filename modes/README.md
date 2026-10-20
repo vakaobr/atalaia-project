@@ -16,7 +16,7 @@ The GM console builds its settings form from `params` in `mode.yaml`, so GMs nev
 | Mode | Kind | Runs on | Status |
 | --- | --- | --- | --- |
 | [Domination](domination/) | main mode | boxes | Runs in the simulator and on the Field Box; its screens are YAML templates since phase 3; 6 tests |
-| [Bomb / Rush](bomb/) | main mode | boxes | Runs in the simulator and on the Field Box; per-team keypad codes since the mode pack; its screens are YAML templates since phase 3; 10 tests |
+| [Bomb / Rush](bomb/) | main mode | boxes | Runs in the simulator and on the Field Box (played on a Heltec V4.3, 2026-10-20); per-team keypad codes since the mode pack; its screens are YAML templates since phase 3, with the arm and defuse holds filling a bar; 11 tests |
 | [Hold-All Domination](holdall/) | main mode | boxes + controller (`field.lua`) | Mode pack (phase 2); 5 tests, plus simulator, controller and host-box tests |
 | [Last Stand](laststand/) | main mode | boxes + controller (`field.lua`) | Mode pack (phase 2); 5 tests, plus simulator and controller tests |
 | [Codes](codes/) | modifier | boxes, alongside any main mode | Mode pack (phase 2); 3 tests (alone, with Domination, with Bomb's team codes), plus simulator and host-box tests |
@@ -41,6 +41,7 @@ Ideas from public community requests (design specification sections 2 and 15); t
 - **Hold-All Domination** (`org.atalaia.holdall`): boxes are captured as in Domination, but they do not score. The controller's `field.lua` scores a team only while it holds every zone box (`points_per_tick` every `tick_s` seconds, the first tick one full `tick_s` after the last box fell), and only with at least `min_zones` boxes in play. Events: `holdall.scoring_start` and `holdall.scoring_stop` (from the controller).
 - **Last Stand** (`org.atalaia.laststand`): the `defenders` hold every zone when the game starts. Once their defence is set up, a countdown of `countdown_s` runs while they hold `last_zones` zones or fewer (default: 1 of N); retaking a zone stops it, and it starts over (`reset`, the default) or carries on where it stopped. When it runs out, `laststand.defeated` is logged and, with `end_game`, the game ends with the `attackers` as winners. Events: `laststand.countdown_start` and `laststand.countdown_cancel` (with `duration_s`), `laststand.defeated`.
 - **Bomb team codes**: with `team_codes` (`red=1234,blue=5678`) the keypad arms and defuses instead of the team buttons. In standby a team's code arms the bomb for that team; once armed, another team's code defuses it. `bomb.armed` and `bomb.defused` then carry the team and `reason: code`. Without `team_codes` the bomb behaves exactly as before.
+- **Bomb hold progress**: while the attackers hold their button in standby, the `standby` screen's data has `progress` (0-1, in hundredths); while the defenders hold on the armed bomb, the `countdown`'s has `defuse`. Letting go early drops the key and the bar empties.
 - **Codes** (`org.atalaia.codes`, a modifier): `codes` lists keypad codes as `digits:kind[:points][:team]`, comma-separated, where kind is `points`, `hint` or `unlock` (`4711:points:50,0815:hint,2222:unlock:red`). Type the digits, then `#`; `*` clears. Each code works once per game on each box. `code.used` tells the GM which code (its place in the list), what it gave, the team it counted for (the code's team, else the team holding the box) and the team holding the box (`holder`). A points code with no team and no holder is refused.
 
 On a box without a controller (picked from the box's own preset list), Hold-All and Last Stand boxes only capture: their scoring and countdown live in `field.lua`.
@@ -278,7 +279,7 @@ When the mode has a `field.lua`, it runs as the controller runs it: it receives 
 | `expect` | `expect: { type: zone.captured, team: red, at: 3, data: { previous_team: blue } }` | The next matching event exists; later `expect`s search after it |
 | `expect_no` | `expect_no: bomb.exploded` | No matching event since the last `expect` |
 | `expect_score` | `expect_score: { team: red, points: 6 }` | Field total, or one node's with `node:` (`node: controller` for the field script's) |
-| `expect_screen` | `expect_screen: { template: countdown, data: { left: 1 } }` | The last screen a node showed |
+| `expect_screen` | `expect_screen: { template: countdown, data: { left: 1 } }` | The last screen a node showed; `data` lists the keys to check, and a key given as `null` must be absent (Lua leaves out `nil` values) |
 | `expect_status` | `expect_status: ended` | `running`, `ended` or `halted` |
 
 Steps that target a node take `node:`, which can be left out when the game has one node. In `expect`, a plain string matches the event type only; `data` matches a subset of the event's data; `node: controller` matches the controller's events (game lifecycle and the field script's). Events at the same game time keep the order in which they happened.

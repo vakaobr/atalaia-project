@@ -111,10 +111,14 @@ include(${CMAKE_CURRENT_LIST_DIR}/../main/builtin_screens.cmake)
 atalaia_builtin_screens("${MODES_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/builtin_screens.c")
 add_library(atalaia_screens_fw STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/screen_renderer.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../main/screen_json.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/screen_template.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../main/oled_view.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../main/oled_logo.c
     ${CMAKE_CURRENT_BINARY_DIR}/builtin_screens.c
 )
-target_include_directories(atalaia_screens_fw PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../main)
+target_include_directories(atalaia_screens_fw PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../main
+    ${CMAKE_CURRENT_SOURCE_DIR}/../main/hal)
 target_compile_definitions(atalaia_screens_fw PUBLIC ATALAIA_SCREEN_LVGL=1)
 target_link_libraries(atalaia_screens_fw PUBLIC atalaia_lvgl_host atalaia_core_fw)
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
@@ -174,6 +178,7 @@ set(TEST_SOURCES
     test_wifi_setup.c
     test_reboot_resume.c
     test_screen_renderer.c
+    test_oled_view.c
     test_builtin_presets.c
     test_key_filter.c
     test_display.c
@@ -242,6 +247,17 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(screen_test PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
 
+# The on-board OLED's status view, on its own 128x64 display: references in
+# test/screens/oled/.
+add_executable(oled_screen_test test_oled_screens.c)
+target_link_libraries(oled_screen_test PRIVATE atalaia_screens_fw atalaia_png_test)
+target_compile_definitions(oled_screen_test PRIVATE
+    "OLED_REF_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/screens/oled\""
+    "OLED_OUT_DIR=\"${CMAKE_CURRENT_BINARY_DIR}/screens/oled\"")
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(oled_screen_test PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
 # ---- Capability proxy frames (protocol/capability-proxy.md) ------------------
 # The shared vectors through the modem framing the I/O pod reuses.
 add_executable(proxy_codec_test test_proxy_codec.c ${SHELL_DIR}/modem/modem_framing.c)
@@ -267,5 +283,6 @@ endif()
 include(CTest)
 add_test(NAME firmware COMMAND firmware_test)
 add_test(NAME screens COMMAND screen_test)
+add_test(NAME oled_screens COMMAND oled_screen_test)
 add_test(NAME proxy_codec COMMAND proxy_codec_test)
 add_test(NAME ble_gatt_stub COMMAND ble_gatt_stub_test)

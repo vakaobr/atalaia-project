@@ -7,13 +7,15 @@
     python tools/docker_fw.py wokwi            Wokwi emulator variant -> firmware/esp32/build-wokwi/
     python tools/docker_fw.py modem            USB radio modem variant -> firmware/esp32/build-modem/
     python tools/docker_fw.py pod              I/O pod variant -> firmware/esp32/build-pod/
+    python tools/docker_fw.py bench            bare board on the desk (serial keys, no setup portal)
+                                               -> firmware/esp32/build-bench/
     python tools/docker_fw.py test             host tests and screen reference images (as CI)
     python tools/docker_fw.py test --update-screens
                                                accept new screen renders as the references
     python tools/docker_fw.py clean            delete the firmware build folders
 
 Works from any folder and any shell (cmd, PowerShell, bash). Docker must be
-running. `build`, `wokwi`, `modem` and `pod` use the espressif/idf:v5.3.2 image, the same as
+running. `build`, `wokwi`, `modem`, `pod` and `bench` use the espressif/idf:v5.3.2 image, the same as
 CI's esp32-build job, and write into firmware/esp32/ so that flashing tools
 and the Wokwi extension find the files. `test` runs CI's firmware-test
 commands in the atalaia-dev image (built on first use, like docker_sim.py)
@@ -43,6 +45,8 @@ MODEM_BUILD = "build-modem"
 MODEM_DEFAULTS = ("sdkconfig.defaults", "sdkconfig.modem")
 POD_BUILD = "build-pod"
 POD_DEFAULTS = ("sdkconfig.defaults", "sdkconfig.pod")
+BENCH_BUILD = "build-bench"
+BENCH_DEFAULTS = ("sdkconfig.defaults", "sdkconfig.bench")
 
 
 def fail(message: str) -> int:
@@ -129,6 +133,14 @@ def pod() -> int:
     return code
 
 
+def bench() -> int:
+    code = variant(BENCH_BUILD, BENCH_DEFAULTS)
+    if code == 0:
+        print(f"\nBench firmware: firmware/esp32/{BENCH_BUILD}/atalaia_esp32.bin "
+              "(for a bare board on the desk, never a box in a game; see BRING_UP.md)")
+    return code
+
+
 def ensure_dev_image() -> bool:
     dockerfile = (REPO / "tools" / "dev" / "Dockerfile").read_bytes().replace(b"\r\n", b"\n")
     wanted = hashlib.sha256(dockerfile).hexdigest()[:16]
@@ -155,19 +167,20 @@ def test(update_screens: bool) -> int:
         "{ ctest --test-dir /build/fw-test --output-on-failure; code=$?; "
         "mkdir -p firmware/esp32/build-test/screens && "
         "cp /build/fw-test/screens/*.png firmware/esp32/build-test/screens/ 2>/dev/null; "
+        "cp -r /build/fw-test/screens/oled firmware/esp32/build-test/screens/ 2>/dev/null; "
         "exit $code; }"
     )
     code = docker("run", "--rm", *interactive(), *env, "-v", f"{REPO}:/src",
                   "-v", f"{TEST_VOLUME}:/build", DEV_IMAGE, "sh", "-c", script)
-    print("\nRendered screens: firmware/esp32/build-test/screens/ "
-          "(references: firmware/esp32/test/screens/)")
+    print("\nRendered screens: firmware/esp32/build-test/screens/ and screens/oled/ "
+          "(references: firmware/esp32/test/screens/ and screens/oled/)")
     if update_screens and code == 0:
         print("References updated: look at every changed PNG (git status) before committing.")
     return code
 
 
 def clean() -> int:
-    for name in ("build", WOKWI_BUILD, MODEM_BUILD, POD_BUILD, "build-test"):
+    for name in ("build", WOKWI_BUILD, MODEM_BUILD, POD_BUILD, BENCH_BUILD, "build-test"):
         path = FW / name
         if path.exists():
             shutil.rmtree(path)
@@ -187,8 +200,8 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 0 if argv else 1
     command, options = argv[0], argv[1:]
-    known = {"build": [], "wokwi": [], "modem": [], "pod": [], "test": ["--update-screens"],
-             "clean": []}
+    known = {"build": [], "wokwi": [], "modem": [], "pod": [], "bench": [],
+             "test": ["--update-screens"], "clean": []}
     if command not in known:
         return fail(f"unknown command {command!r}; run with --help")
     for option in options:
@@ -210,6 +223,8 @@ def main(argv: list[str]) -> int:
             return modem()
         if command == "pod":
             return pod()
+        if command == "bench":
+            return bench()
         return test("--update-screens" in options)
     except KeyboardInterrupt:
         return 130

@@ -51,10 +51,12 @@ class TestResult:
 
 
 def _subset(expected: Any, actual: Any) -> bool:
-    """True if every key in expected matches actual (recursively for dicts)."""
+    """True if every key in expected matches actual (recursively for dicts). An expected null
+    matches a key that is absent too: Lua leaves nil values out of the data."""
     if isinstance(expected, dict):
         return isinstance(actual, dict) and all(
-            k in actual and _subset(v, actual[k]) for k, v in expected.items()
+            (v is None and actual.get(k) is None) or (k in actual and _subset(v, actual[k]))
+            for k, v in expected.items()
         )
     return expected == actual
 

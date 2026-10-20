@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: The screen shows how far an arm or defuse hold is, and letting go early empties it
+params: { fuse_s: 60 }
+steps:
+  - input: { type: team_input.hold, data: { team: red, ms: 2500 } }
+  - expect_screen: { template: standby, data: { arm: red, progress: 0.5 } }
+  - input: { type: team_input.hold, data: { team: red, ms: 3750 } }
+  - expect_screen: { template: standby, data: { progress: 0.75 } }
+  # The defenders' button does not fill the arm bar.
+  - input: { type: team_input.hold, data: { team: blue, ms: 4000 } }
+  - expect_screen: { template: standby, data: { progress: 0.75 } }
+  - input: { type: team_input.release, data: { team: red, ms: 3800 } }
+  - expect_screen: { template: standby, data: { arm: red, progress: null } }
+  - expect_no: bomb.armed
+  - hold: { team: red, s: 5 }
+  - expect: { type: bomb.armed }
+  - input: { type: team_input.hold, data: { team: blue, ms: 4000 } }
+  - expect_screen: { template: countdown, data: { defuse: 0.4 } }
+  - input: { type: team_input.release, data: { team: blue, ms: 4100 } }
+  - expect_screen: { template: countdown, data: { defuse: null } }
+  - expect_no: bomb.defused

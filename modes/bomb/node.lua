@@ -27,6 +27,9 @@ end
 local typed = ""
 local typing -- while a code prompt is up: the timer that gives the screen back to the phase
 local note, note_failed -- the prompt's message
+-- How far the team holding its button now is with arming or defusing
+-- (0-1), nil while nobody holds: the phase screen shows it as it fills.
+local holding
 
 -- The prop's screen follows the phase: standby, countdown, defused, exploded.
 local function show_countdown()
@@ -34,7 +37,7 @@ local function show_countdown()
   if use_codes then
     ui.screen("countdown", { left = left, team = s.armed_by })
   else
-    ui.screen("countdown", { left = left })
+    ui.screen("countdown", { left = left, defuse = holding })
   end
 end
 
@@ -42,7 +45,7 @@ local function show_standby()
   if use_codes then
     ui.screen("code_entry", { title = "ARM", digits = 0, message = "Enter your team code" })
   else
-    ui.screen("standby", { arm = params.attackers })
+    ui.screen("standby", { arm = params.attackers, progress = holding })
   end
 end
 
@@ -70,6 +73,7 @@ local function explode()
 end
 
 local function arm(team, how)
+  holding = nil
   s.phase = "armed"
   s.armed_by = team
   s.explode_at = game.time() + params.fuse_s
@@ -82,6 +86,7 @@ local function arm(team, how)
 end
 
 local function defuse(team, how)
+  holding = nil
   cancel(fuse_timer)
   audio.play("defused")
   s.defused_by = team
@@ -92,14 +97,42 @@ end
 
 on("game.start", show_standby)
 
+-- The share of a hold, in hundredths, so the screen gets few distinct values.
+local function share(ms, total)
+  return math.floor(ms * 100 / total) / 100
+end
+
 on("team_input.hold", function(e)
   if use_codes then
     return
   end
-  if s.phase == "standby" and e.team == params.attackers and e.ms >= params.arm_hold_ms then
-    arm(e.team)
-  elseif s.phase == "armed" and e.team == params.defenders and e.ms >= params.defuse_hold_ms then
-    defuse(e.team)
+  if s.phase == "standby" and e.team == params.attackers then
+    if e.ms >= params.arm_hold_ms then
+      arm(e.team)
+    else
+      holding = share(e.ms, params.arm_hold_ms)
+      show_standby()
+    end
+  elseif s.phase == "armed" and e.team == params.defenders then
+    if e.ms >= params.defuse_hold_ms then
+      defuse(e.team)
+    else
+      holding = share(e.ms, params.defuse_hold_ms)
+      show_countdown()
+    end
+  end
+end)
+
+-- Letting go early empties the bar.
+on("team_input.release", function(e)
+  if holding == nil then
+    return
+  end
+  local holder = (s.phase == "standby" and e.team == params.attackers)
+    or (s.phase == "armed" and e.team == params.defenders)
+  if holder then
+    holding = nil
+    show_phase()
   end
 end)
 

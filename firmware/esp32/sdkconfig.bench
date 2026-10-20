@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Bench variant, applied on top of sdkconfig.defaults:
+#   python tools/docker_fw.py bench
+# builds it into build-bench/. The Field Box firmware for a bare Heltec V4
+# on the desk (BRING_UP.md): no keypad, no TFT, maybe two buttons. The
+# board's own OLED shows the status (on in every build); keys typed on the
+# USB serial console drive the PIN screen and the picker, and the Wi-Fi
+# setup portal is skipped (admin PIN 1234). Never for a box in a game.
+
+CONFIG_ATALAIA_SERIAL_KEYS=y
+CONFIG_ATALAIA_SKIP_SETUP=y

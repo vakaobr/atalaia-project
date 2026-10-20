@@ -96,6 +96,18 @@ and unencrypted NVS -- no firmware changes are needed.
 - ESP-IDF v5.3+ installed, or Docker with `espressif/idf:v5.3.2`.
 - Serial terminal (115200 baud).
 
+## A bare board on the desk (bench variant)
+
+Before the box is built, a bare board with a button or two on its header
+can already run a game: `python tools/docker_fw.py bench` builds the Field
+Box firmware with keys from the USB serial console and no setup portal
+(firmware/esp32/README.md, Build). In a serial monitor type `1234#` (the
+admin PIN), then `1`, `#`, `#` for Bomb; the board's own OLED shows each
+step. Buttons must be soldered to the header (or to pins soldered there):
+a Dupont pin pushed into a bare hole loses contact while it is held, and
+any release, even 0.1 s, starts a hold again (seen on the first V4.3 board,
+2026-10-20).
+
 ## Step 1: First Boot Smoke Test
 
 1. Build it with `python tools/docker_fw.py build`, then flash it over the
@@ -123,6 +135,11 @@ and unencrypted NVS -- no firmware changes are needed.
    keeps booting; every part that is connected must not log one.
 6. Verify: on the very first boot, LittleFS formats the storage partition
    (`mount failed ... formatting`) and `stored 2 built-in preset(s)`.
+7. Verify: the board's own OLED logs `SSD1306 OLED at 0x3C (128x64)`, shows
+   the tower splash with the version for 2 s, then the PIN screen (or the
+   setup screen), upright with the USB port on the left
+   (`CONFIG_ATALAIA_OLED_FLIP` turns it round). Two `slow redraw` warnings
+   around then are the OLED's full frames on the 100 kHz bus.
 
 ## Step 2: Vext and External Peripherals
 
@@ -160,11 +177,20 @@ and unencrypted NVS -- no firmware changes are needed.
 
 ## Step 4: Buttons
 
-1. Start a Bomb game (admin PIN, game 1, `#`, `#`). Press each team
-   button (GPIO 4, 39; 33, 34 for teams 3 and 4).
-2. Hold the red button for 5 s: the log shows `game: event bomb.armed`
+1. At boot the log shows each button's state at rest (`hal_btn: button 1
+   (GPIO 4) released at rest`); `reads pressed at rest` means its wire is on
+   the switch's NC tab or shorted to ground. Every press and release is
+   logged (`hal_btn: button 2 (GPIO 39) pressed`).
+2. Start a Bomb game (admin PIN, game 1, `#`, `#`). Press each team
+   button (GPIO 4, 39; 33, 34 for teams 3 and 4). While red holds, the
+   screen and the OLED show the arming bar filling.
+3. Hold the red button for 5 s: the log shows `game: event bomb.armed`
    and the screen the countdown. Hold blue for 10 s: `bomb.defused`.
-3. A short press (under 5 s) must not arm the bomb.
+4. A short press (under 5 s) must not arm the bomb, and letting go empties
+   the bar.
+5. When the game's timer runs out the box shows the final screen and logs
+   `game over: press any key for the game picker`; a reboot then does not
+   bring the game back.
 
 ## Step 5: Keypad
 
