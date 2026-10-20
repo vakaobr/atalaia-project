@@ -25,6 +25,8 @@ from atalaia_server.ratelimit import Limits
 
 from .base import PASSWORD, SECRET_KEY, AppTestCase
 
+NO_CHRONO = {"chrono_readings": 0, "chrono_rejects": 0, "replicas": 0, "marshal_keys": 0}  # plan phase 14's counts
+
 NEW_PASSWORD = "a different long passphrase 7"
 
 
@@ -74,7 +76,8 @@ class AccessTests(PersonalDataTestCase):
         self.assertEqual(r.headers["cache-control"], "no-store")
         data = r.json()
         self.assertEqual(set(data), {"format", "generated_at", "user", "field_roles", "sessions", "audit_log",
-                                     "audit_log_about_you", "consents", "games"})
+                                     "audit_log_about_you", "consents", "games", "player_ids", "chrono_records",
+                                     "marshal_keys"})
         self.assertEqual(data["format"], "atalaia-personal-data/1")
         self.assertEqual((data["user"]["id"], data["user"]["username"], data["user"]["email"]),
                          (user["id"], "rita", "rita@example.pt"))
@@ -121,7 +124,8 @@ class AccessTests(PersonalDataTestCase):
             names = sorted(zf.namelist())
             self.assertEqual(names, sorted(f"export/{n}" for n in (
                 "profile.json", "field_roles.json", "sessions.json", "audit_log.json", "audit_log_about_you.json",
-                "consents.json", "games.json", "README.txt")))
+                "consents.json", "games.json", "player_ids.json", "chrono_records.json", "marshal_keys.json",
+                "README.txt")))
             files = {n: zf.read(n).decode("utf-8") for n in names}
         self.assertEqual(json.loads(files["export/profile.json"]), data["user"])
         self.assertEqual(json.loads(files["export/consents.json"]), data["consents"])
@@ -336,18 +340,21 @@ class PurgeTests(PersonalDataTestCase):
             await self.fetch("INSERT INTO audit_log (action, created_at) VALUES ('login', $1)", now - timedelta(days=days))
 
         async with self.app.state.sessionmaker() as db:
-            self.assertEqual(await personal_data.purge(db, now, dry_run=True), {"sessions": 2, "audit_log": 1, "games": 0})
+            self.assertEqual(await personal_data.purge(db, now, dry_run=True),
+                             {"sessions": 2, "audit_log": 1, "games": 0, **NO_CHRONO})
         self.assertEqual((await self.fetch("SELECT count(*) FROM sessions"))[0][0], 5)
         async with self.app.state.sessionmaker() as db:
-            self.assertEqual(await personal_data.purge(db, now), {"sessions": 2, "audit_log": 1, "games": 0})
+            self.assertEqual(await personal_data.purge(db, now),
+                             {"sessions": 2, "audit_log": 1, "games": 0, **NO_CHRONO})
         left = {r[0] for r in await self.fetch("SELECT id FROM sessions")}
         self.assertEqual(left, {sessions[n] for n in ("expired_recently", "revoked_recently", "live")})
         self.assertEqual((await self.fetch("SELECT count(*) FROM refresh_tokens"))[0][0], 3)
         self.assertEqual((await self.fetch("SELECT count(*) FROM audit_log WHERE action = 'login'"))[0][0], 1)
         purges = await self.audit("retention_purge")
-        self.assertEqual(json.loads(purges[0]["details"]), {"sessions": 2, "audit_log": 1, "games": 0})
+        self.assertEqual(json.loads(purges[0]["details"]), {"sessions": 2, "audit_log": 1, "games": 0, **NO_CHRONO})
         async with self.app.state.sessionmaker() as db:  # again: nothing left to do
-            self.assertEqual(await personal_data.purge(db, now), {"sessions": 0, "audit_log": 0, "games": 0})
+            self.assertEqual(await personal_data.purge(db, now),
+                             {"sessions": 0, "audit_log": 0, "games": 0, **NO_CHRONO})
 
     async def test_the_command(self) -> None:
         user_id, _, _ = await self.make_user()
@@ -367,8 +374,9 @@ class PurgeTests(PersonalDataTestCase):
                     os.environ.pop(k, None)
                 else:
                     os.environ[k] = v
-        self.assertEqual(outputs, ["Retention purge would delete: 1 sessions rows, 0 audit log rows, 0 games rows\n",
-                                   "Retention purge deleted: 1 sessions rows, 0 audit log rows, 0 games rows\n"])
+        rest = ", 0 chrono readings rows, 0 chrono rejects rows, 0 replicas rows, 0 marshal keys rows\n"
+        self.assertEqual(outputs, ["Retention purge would delete: 1 sessions rows, 0 audit log rows, 0 games rows" + rest,
+                                   "Retention purge deleted: 1 sessions rows, 0 audit log rows, 0 games rows" + rest])
         self.assertEqual((await self.fetch("SELECT count(*) FROM sessions"))[0][0], 0)
 
     async def test_the_daily_task(self) -> None:

@@ -13,6 +13,8 @@ controller's own ``sync_format`` (shared, plain Python) and hand it here:
   key, so replays, duplicates and out-of-order batches change nothing;
   counters are merged with ``GREATEST`` per (game, source, team); nodes keep the
   entry with the latest ``last_seen``.
+- The field's chrono registry (``marshals``, ``replicas``, ``chrono``; plan phase 14)
+  is handed on to ``chrono_registry``, which verifies every reading.
 - ``totals``: a game's totals, derived as the controller derives them (P4R10):
   the counters' sum per team plus every ``score.delta`` amount, negative ones
   included. Totals are never stored, so they can never be merged wrongly.
@@ -33,6 +35,7 @@ from sqlalchemy import func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from . import chrono_registry
 from .models import Controller, FieldApiKey, Game, GameEvent, GameNode, GameNodeScore
 
 MAX_LIVE_KEYS = 2  # a field's live API keys: the old one and the new one during a rotation
@@ -60,6 +63,7 @@ class SyncProblem(Exception):
 class Caller:
     field_id: uuid.UUID
     key_id: uuid.UUID
+    controller: Optional[uuid.UUID] = None  # the site server's row of the sending controller, once seen
 
 
 def new_key() -> str:
@@ -112,9 +116,10 @@ async def _seen(db: AsyncSession, caller: Caller, body: dict[str, Any]) -> None:
     ctrl = body["controller"]
     stmt = insert(Controller).values(field_id=caller.field_id, controller_id=uuid.UUID(ctrl["id"]),
                                      version=ctrl["version"], api_key_id=caller.key_id)
-    await db.execute(stmt.on_conflict_do_update(
+    caller.controller = await db.scalar(stmt.on_conflict_do_update(
         index_elements=["field_id", "controller_id"],
-        set_={"version": stmt.excluded.version, "api_key_id": stmt.excluded.api_key_id, "last_seen_at": func.now()}))
+        set_={"version": stmt.excluded.version, "api_key_id": stmt.excluded.api_key_id, "last_seen_at": func.now()},
+    ).returning(Controller.id))
 
 
 async def find_game(db: AsyncSession, field_id: uuid.UUID, body: dict[str, Any]) -> Game:
@@ -211,7 +216,20 @@ async def _nodes(db: AsyncSession, caller: Caller, body: dict[str, Any]) -> dict
     return {"nodes": len(rows)}
 
 
-HANDLERS = {"games": _games, "events": _events, "scores": _scores, "nodes": _nodes}
+async def _marshals(db: AsyncSession, caller: Caller, body: dict[str, Any]) -> dict[str, Any]:
+    return await chrono_registry.apply_marshals(db, caller.field_id, body)
+
+
+async def _replicas(db: AsyncSession, caller: Caller, body: dict[str, Any]) -> dict[str, Any]:
+    return await chrono_registry.apply_replicas(db, caller.field_id, body)
+
+
+async def _chrono(db: AsyncSession, caller: Caller, body: dict[str, Any]) -> dict[str, Any]:
+    return await chrono_registry.apply_chrono(db, caller.field_id, caller.controller, body)
+
+
+HANDLERS = {"games": _games, "events": _events, "scores": _scores, "nodes": _nodes,
+            "marshals": _marshals, "replicas": _replicas, "chrono": _chrono}
 
 
 async def apply(db: AsyncSession, caller: Caller, kind: str, body: dict[str, Any]) -> dict[str, Any]:

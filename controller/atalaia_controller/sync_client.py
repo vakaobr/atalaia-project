@@ -28,8 +28,19 @@ duplicates and nothing is doubled. Score counters merge by maximum per
 (source, team); GM adjustments are ``score.delta`` events and may be
 negative (P4R10).
 
+**The field's chrono registry** (plan phase 14; ADR-P4-5 as amended, P4R14,
+P4R15) goes after the games in every cycle: the marshals' public keys with
+their periods (the current one and the earlier ones of ``marshal_key_history``,
+store schema 6), then the replica registry, then the signed readings with
+their series and outcomes, each reading's record as the text the controller
+stored. ``sync_items`` keeps what was sent (each key's and replica's hash,
+each reading's id), so a cycle sends only what is new or changed. Keys go
+before readings, so the site server can verify every reading it gets; one it
+cannot verify is kept apart there and named in the answer, never silently
+dropped, and logged here. Private keys never leave the marshals' phones.
+
 **Never sent:** positions (P4R25), check-in names and federation numbers,
-tokens, the game, join and token keys. The bodies carry the fields listed in
+tokens, the game, join and token keys, private keys. The bodies carry the fields listed in
 protocol/sync.md only; a node's info goes through a list of allowed keys, and
 every event is checked with ``sync_format.check_event`` before it is sent
 (one that fails is skipped and counted, so it never stalls the queue).
@@ -60,7 +71,8 @@ from typing import Any, Callable, Optional
 from urllib.parse import urlsplit
 
 from . import __version__
-from .sync_format import MAX_EVENTS, SYNC_VERSION, SyncFormatError, check_event, check_nodes
+from .sync_format import (MAX_EVENTS, MAX_MARSHALS, MAX_READINGS, MAX_REPLICAS, SYNC_VERSION, SyncFormatError,
+                          check_event, check_marshal, check_nodes, check_reading, check_replica)
 
 log = logging.getLogger("atalaia.sync")
 
@@ -68,6 +80,7 @@ API_KEY = re.compile(r"[A-Za-z0-9_-]{43}")
 KEY_SETTING = "sync.api_key"
 ID_SETTING = "sync.controller_id"
 BATCHES_PER_GAME = 20   # events batches per game and cycle (10,000 events), so one game cannot hold the rest
+BATCHES_PER_KIND = 20   # chrono registry batches per kind and cycle
 FIELD_RUN = re.compile(r"field-(\d{1,6})")
 LIVE = ("running", "paused")
 
@@ -208,6 +221,8 @@ class SyncClient:
         self.last_ok_at: Optional[float] = None
         self.last_attempt_at: Optional[float] = None
         self.last_error: Optional[str] = None
+        self.registry_error: Optional[str] = None  # the last refusal of a chrono registry body
+        self.refused_readings = 0  # readings the site server kept apart (it could not verify them)
         self.requests = 0
 
     # --- identity ---------------------------------------------------------------------
@@ -221,9 +236,13 @@ class SyncClient:
             self.store.set_setting(ID_SETTING, cid)
         return cid
 
-    def _envelope(self, game: dict[str, Any]) -> dict[str, Any]:
-        return {"sync_version": SYNC_VERSION, "controller": {"id": self.controller_id, "version": __version__},
-                "game": {"game_id": int(game["id"]), "game_seed": int(game["game_seed"])}}
+    def _envelope(self, game: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+        """The common part of a body; without a game for the field's chrono registry."""
+        env: dict[str, Any] = {"sync_version": SYNC_VERSION,
+                               "controller": {"id": self.controller_id, "version": __version__}}
+        if game is not None:
+            env["game"] = {"game_id": int(game["id"]), "game_seed": int(game["game_seed"])}
+        return env
 
     # --- the thread ---------------------------------------------------------------------
 
@@ -251,8 +270,8 @@ class SyncClient:
             self._wake.set()
 
     def on_controller_message(self, msg: dict[str, Any]) -> None:
-        """The engine's listener: a game's state changed."""
-        if msg.get("type") == "game":
+        """The engine's listener: a game's state changed, or a chrono series was judged."""
+        if msg.get("type") in ("game", "chrono_list"):
             self.kick()
 
     def _run(self) -> None:
@@ -285,6 +304,7 @@ class SyncClient:
             try:
                 for game in self.store.games():
                     self._sync_game(game)
+                self._sync_registry()
             except SyncError as exc:
                 self.failures += 1
                 self.retry_after = exc.retry_after
@@ -406,6 +426,118 @@ class SyncClient:
                 break
         return acked
 
+    # --- the field's chrono registry (plan phase 14) ----------------------------------------
+
+    def _sync_registry(self) -> None:
+        """Marshal keys, then replicas, then readings: what is new or changed since the last cycle."""
+        env = self._envelope()
+        self._push_items("marshal", "/api/v1/sync/marshals", "marshals", self.marshal_entries(), MAX_MARSHALS, env)
+        self._push_items("replica", "/api/v1/sync/replicas", "replicas", self.replica_entries(), MAX_REPLICAS, env)
+        self._push_readings(env)
+
+    def _registry_refused(self, path: str, exc: SyncError) -> None:
+        """A 400 for a registry body: logged and kept; the body counts as sent, so it never blocks the rest."""
+        if exc.status != 400:
+            raise exc
+        code, where = _refusal(exc)
+        log.error("the site server refused %s (%s at %s)", path, code, where)
+        self.registry_error = f"{path}: {code} at {where}"
+
+    def _push_items(self, kind: str, path: str, field: str, entries: dict[str, dict[str, Any]], limit: int,
+                    env: dict[str, Any]) -> None:
+        sent = self.store.sync_items(kind)
+        due = {item: entry for item, entry in entries.items() if digest(entry) != sent.get(item)}
+        items = list(due.items())
+        for start in range(0, min(len(items), limit * BATCHES_PER_KIND), limit):
+            chunk = dict(items[start:start + limit])
+            try:
+                self._post(path, {**env, field: list(chunk.values())})
+            except SyncError as exc:
+                self._registry_refused(path, exc)
+            self.store.mark_synced(kind, {item: digest(entry) for item, entry in chunk.items()})
+
+    def _push_readings(self, env: dict[str, Any]) -> None:
+        for _ in range(BATCHES_PER_KIND):
+            rows = self.store.readings_unsynced(MAX_READINGS)
+            if not rows:
+                return
+            batch = []
+            for row in rows:
+                entry = {"record": row["record_json"], "series_id": row["series_id"], "outcome": row["outcome"],
+                         "received_at": row["received_at"]}
+                seed = self._game_seed(row["game_id"])
+                if seed is not None:
+                    entry["game_seed"] = seed
+                try:
+                    batch.append(check_reading(entry))
+                except SyncFormatError as exc:
+                    log.warning("chrono reading %s not sent: %s", row["reading_id"], exc)
+            if batch:
+                try:
+                    answer = self._post("/api/v1/sync/chrono", {**env, "readings": batch})
+                except SyncError as exc:
+                    self._registry_refused("/api/v1/sync/chrono", exc)
+                    answer = {}
+                refused = answer.get("refused") if isinstance(answer.get("refused"), list) else []
+                for item in refused:
+                    if isinstance(item, dict):
+                        log.error("the site server could not verify chrono reading %s (%s): it keeps it apart",
+                                  item.get("reading_id"), item.get("reason"))
+                self.refused_readings += len(refused)
+            self.store.mark_synced("reading", {r["reading_id"]: r["reading_id"] for r in rows})
+            if len(rows) < MAX_READINGS:
+                return
+
+    def _game_seed(self, game_id: Optional[str]) -> Optional[int]:
+        """The seed of the reading's game in this store (the site server links the reading to it)."""
+        if not game_id or not game_id.isdigit() or int(game_id) > 0xFFFF:
+            return None
+        game = self.store.game(int(game_id))
+        return int(game["game_seed"]) if game and game.get("game_seed") is not None else None
+
+    def marshal_entries(self) -> dict[str, dict[str, Any]]:
+        """Each marshal key once, by (marshal, key): its first registration and, for an earlier key,
+        when it was last replaced. Public keys only: the private keys are on the marshals' phones."""
+        import base64  # noqa: PLC0415
+
+        out: dict[str, dict[str, Any]] = {}
+        rows = [{**h, "current": False} for h in self.store.marshal_key_history()]
+        rows += [{**m, "current": True, "replaced_at": None} for m in self.store.marshals()]
+        for row in rows:  # oldest first, the current keys last
+            key = base64.b64encode(row["public_key"]).decode("ascii")
+            item = f"{row['marshal_id']}:{key}"
+            entry = out.get(item)
+            if entry is None:
+                entry = {"marshal_id": row["marshal_id"], "public_key": key, "registered_at": row["registered_at"],
+                         "replaced_at": None}
+                out[item] = entry
+            entry["name"] = row["name"]
+            entry["player_id"] = row["player_id"]
+            entry["registered_at"] = min(entry["registered_at"], row["registered_at"])
+            if row["current"]:
+                entry["replaced_at"] = None
+            else:
+                entry["replaced_at"] = max(entry["replaced_at"] or 0, row["replaced_at"])
+        for item, entry in list(out.items()):
+            try:
+                check_marshal(dict(entry), "marshal")
+            except SyncFormatError as exc:
+                log.warning("marshal key %s not sent: %s", entry["marshal_id"], exc)
+                del out[item]
+        return out
+
+    def replica_entries(self) -> dict[str, dict[str, Any]]:
+        """The replica registry as protocol/sync.md lists it; a replica out of that form is not sent."""
+        out: dict[str, dict[str, Any]] = {}
+        for rep in self.store.replicas():
+            entry = {k: rep[k] for k in ("replica_id", "owner_player_id", "type", "class", "make_model",
+                                         "registered_at", "tag_type", "tag_uid") if rep.get(k) is not None}
+            try:
+                out[entry["replica_id"]] = check_replica(dict(entry))
+            except (SyncFormatError, KeyError) as exc:
+                log.warning("replica %s not sent: %s", rep.get("replica_id"), exc)
+        return out
+
     # --- what is sent -------------------------------------------------------------------
 
     def meta(self, game: dict[str, Any]) -> dict[str, Any]:
@@ -479,4 +611,6 @@ class SyncClient:
         return {"enabled": True, "url": self.cfg.sync_url, "key": self.key_source,
                 "key_fingerprint": self.key_fingerprint, "controller_id": self.controller_id,
                 "last_ok_at": self.last_ok_at, "last_attempt_at": self.last_attempt_at,
-                "last_error": self.last_error, "failures": self.failures, "pending_events": pending}
+                "last_error": self.last_error, "failures": self.failures, "pending_events": pending,
+                "pending_readings": self.store.count_readings_unsynced(), "registry_error": self.registry_error,
+                "refused_readings": self.refused_readings}

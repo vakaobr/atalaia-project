@@ -10,7 +10,10 @@ deliver them, and the GM adjusts the score down. Its sync client
 site server, served by uvicorn on 127.0.0.1 in this process, which stores in
 the test PostgreSQL. Then: the totals on both sides agree; a replay of
 everything changes nothing; a restarted client sends nothing new; a
-controller that was offline catches up.
+controller that was offline catches up. And the field's chrono registry: a
+marshal's key, rotated (a lost phone) between two series, the replica and the
+signed readings reach the site server, which verifies every one with the key
+of its period and stores the record exactly as the controller had it.
 
 This runs in the site server's test image (``python3 tools/docker_server.py
 test tests.test_sync_e2e``): the image has the controller and simulator
@@ -19,6 +22,7 @@ packages and the core library (decision P4R16).
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -27,6 +31,7 @@ import tempfile
 import threading
 import time
 import unittest
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -195,6 +200,64 @@ class SyncEndToEndTests(unittest.TestCase):
         self.assertTrue(back.run_once())
         self.assertEqual(self.db.fetch("SELECT count(*) FROM game_events")[0][0], store.count_events(gid))
         self.assertEqual(self.server_totals(self.server_game()), ctrl.score(gid)["teams"])
+
+    def test_the_chrono_registry_reaches_the_site_server(self) -> None:
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+        from atalaia_controller import chrono
+
+        cfg, store, ctrl = self.controller()
+        replica = "8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50"
+        store.put_replica({"replica_id": replica, "owner_player_id": "p-abcdefghijkl", "type": "dmr",
+                           "class": "dmr", "make_model": "SR-25"}, 1792000000.0)
+        now = time.time()
+
+        def phone() -> tuple[Ed25519PrivateKey, bytes]:
+            key = Ed25519PrivateKey.generate()
+            return key, key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+
+        def series(key: Ed25519PrivateKey, at: float, n: int = 3) -> list[str]:
+            sid, out = str(uuid.uuid4()), []
+            for i in range(n):
+                v = 100.0 + i
+                rec = {"reading_id": str(uuid.uuid4()), "replica_id": replica, "player_id": "p-abcdefghijkl",
+                       "type": "checkin", "velocity_mps": v, "bb_weight_g": 0.25,
+                       "energy_j": chrono.round_half_away(chrono.energy_j(0.25, v), 3), "chrono_id": "c-1",
+                       "marshal_id": "m-ana", "marshal_name": "Ana", "field_id": "campo",
+                       "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(at))}
+                rec["signature"] = base64.b64encode(key.sign(chrono.canonical(rec))).decode()
+                store.add_reading(rec, sid, "pass", at + 1)
+                out.append(rec["reading_id"])
+            return out
+
+        first, first_pub = phone()
+        store.put_marshal("m-ana", "Ana", first_pub, None, now - 3600)
+        before = series(first, now - 1800)
+        client = SyncClient(cfg, store)
+        self.assertTrue(client.run_once(), client.last_error)
+        second, second_pub = phone()  # a lost phone: a new key, the old one keeps its period
+        store.put_marshal("m-ana", "Ana", second_pub, None, now - 600)
+        after = series(second, now - 300)
+        self.assertTrue(client.run_once(), client.last_error)
+        self.assertEqual(client.refused_readings, 0)
+
+        rows = self.db.fetch("SELECT r.reading_id, r.record_json, k.public_key FROM chrono_readings r "
+                             "JOIN marshal_keys k ON k.id = r.marshal_key")
+        self.assertEqual({str(r["reading_id"]) for r in rows}, set(before + after))
+        stored = {r["reading_id"]: r["record"] for r in store.readings(replica_id=replica)}
+        for r in rows:
+            self.assertEqual(json.loads(r["record_json"]), stored[str(r["reading_id"])])
+            chrono.parse(r["record_json"], bytes(r["public_key"]))
+            self.assertEqual(bytes(r["public_key"]), first_pub if str(r["reading_id"]) in before else second_pub)
+        keys = self.db.fetch("SELECT public_key, valid_until IS NULL AS current FROM marshal_keys ORDER BY valid_from")
+        self.assertEqual([(bytes(k[0]), k[1]) for k in keys], [(first_pub, False), (second_pub, True)])
+        self.assertEqual(tuple(self.db.fetch("SELECT replica_type, make_model FROM replicas")[0]), ("dmr", "SR-25"))
+        self.assertEqual(self.db.fetch("SELECT count(*) FROM chrono_rejects")[0][0], 0)
+        # Everything again: duplicates only.
+        store.reset_sync_state()
+        self.assertTrue(SyncClient(cfg, store).run_once())
+        self.assertEqual(self.db.fetch("SELECT count(*) FROM chrono_readings")[0][0], 6)
 
     def test_a_wrong_key_is_refused_and_nothing_moves(self) -> None:
         cfg, store, ctrl = self.controller()

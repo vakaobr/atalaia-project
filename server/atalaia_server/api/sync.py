@@ -6,7 +6,11 @@
     POST /api/v1/sync/events   a batch of a game's events: {after_id, events}, answers acked_id
     POST /api/v1/sync/scores   a game's score counters per source, merged by maximum; answers the totals
     POST /api/v1/sync/nodes    a game's nodes (name, role, health)
-    WS   /api/v1/sync/stream   the same four on one socket the controller keeps open
+    POST /api/v1/sync/marshals the field's marshal public keys with their periods (plan phase 14)
+    POST /api/v1/sync/replicas the field's replica registry
+    POST /api/v1/sync/chrono   signed chrono readings with the controller's series and outcomes: each
+                               verified, the ones that fail kept apart and named in the answer
+    WS   /api/v1/sync/stream   the same seven on one socket the controller keeps open
 
 The controller opens every connection (P4R12); nothing here connects to it.
 Bodies are checked by ``atalaia_controller.sync_format``, the code the
@@ -72,6 +76,21 @@ async def scores(request: Request) -> JSONResponse:
 @router.post("/nodes")
 async def nodes(request: Request) -> JSONResponse:
     return await _handle(request, "nodes")
+
+
+@router.post("/marshals")
+async def marshals(request: Request) -> JSONResponse:
+    return await _handle(request, "marshals")
+
+
+@router.post("/replicas")
+async def replicas(request: Request) -> JSONResponse:
+    return await _handle(request, "replicas")
+
+
+@router.post("/chrono")
+async def chrono(request: Request) -> JSONResponse:
+    return await _handle(request, "chrono")
 
 
 @router.websocket("/stream")

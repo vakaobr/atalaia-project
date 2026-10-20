@@ -5,9 +5,9 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Controller sync
 
-How a field controller pushes its games to a site server: the games' metadata, their event logs, their score counters and their nodes. Design: ADR-P4-3 and its 2026-10-19 amendment in `docs/phase-4-site-server/ADR.md`; decisions P4R10-P4R13 and S13-1 onwards in `docs/review/decisions-to-review.md`.
+How a field controller pushes its games to a site server: the games' metadata, their event logs, their score counters and their nodes; and the field's chrono registry: the marshals' public keys, the replica registry and the signed chrono readings (plan phase 14). Design: ADR-P4-3 and ADR-P4-5 with their 2026-10-19 amendments in `docs/phase-4-site-server/ADR.md`; decisions P4R10-P4R15, S13-1 onwards and S14-1 onwards in `docs/review/decisions-to-review.md`.
 
-Implementations: `controller/atalaia_controller/sync_client.py` (the controller's client) and `server/atalaia_server/sync.py` with `api/sync.py` (the site server). Both check bodies with the same plain-Python module, `controller/atalaia_controller/sync_format.py`, and both are tested against the shared vectors in [`vectors/sync.json`](vectors/sync.json): 7 valid bodies, 30 invalid ones with the error code and path they must fail with, and 3 score merges worked out by hand.
+Implementations: `controller/atalaia_controller/sync_client.py` (the controller's client) and `server/atalaia_server/sync.py` with `api/sync.py` (the site server). Both check bodies with the same plain-Python module, `controller/atalaia_controller/sync_format.py`, and both are tested against the shared vectors in [`vectors/sync.json`](vectors/sync.json): 10 valid bodies, 50 invalid ones with the error code and path they must fail with, and 3 score merges worked out by hand. The site server verifies each chrono reading with the controller's own `controller/atalaia_controller/chrono.py` (`server/atalaia_server/chrono_verify.py`), against [`vectors/chrono_record.json`](vectors/chrono_record.json) too.
 
 ## The link
 
@@ -25,6 +25,8 @@ Implementations: `controller/atalaia_controller/sync_client.py` (the controller'
 | `controller.version` | text | the controller's version, 1-32 of `A-Za-z0-9.+_-` |
 | `game.game_id` | integer | 0-65535: the game's id on the radio |
 | `game.game_seed` | integer | 0-4294967295: the game's random seed (in the join, so a standby controller has the same) |
+
+The chrono registry's three bodies (`marshals`, `replicas`, `chrono`) belong to the field, not to a game: they have `sync_version` and `controller` and **no `game`** (one is an error).
 
 A game is **`(field, game_id, game_seed)`** (P4R11): the field comes from the API key, the 16-bit `game_id` repeats over the months, the seed does not. The controller never needs to learn a site server id first. Unknown fields anywhere (except a node's `info`) are an error: a body carries what this page lists and nothing else.
 
@@ -121,10 +123,71 @@ The game's nodes:
 
 Answer: `200 {"nodes": n}`.
 
+## The chrono registry (plan phase 14)
+
+The controller sends these after its games, in this order, each item once and again only when it changed (the controller's `sync_items`, store schema 6): the marshals' keys first, so that the site server can verify every reading it then gets.
+
+### POST /api/v1/sync/marshals
+
+The marshals' Ed25519 **public** keys, each with the period it was the marshal's key on the sending controller (decision P4R14):
+
+| Field | Type | Values |
+| --- | --- | --- |
+| `marshals` | array | 1-512 keys |
+
+A key:
+
+| Field | Type | Required | Values |
+| --- | --- | --- | --- |
+| `marshal_id` | text | yes | 1-64 of `A-Za-z0-9._:-` (the records' `marshal_id`) |
+| `name` | text | yes | the marshal's name as shown: 1-64 characters, no control characters (the records' `marshal_name` rule) |
+| `public_key` | text | yes | the 32-byte public key in standard base64 with padding (44 characters) |
+| `registered_at` | number | yes | seconds since 1970: when the controller first registered this key |
+| `replaced_at` | number or null | no | when the controller replaced it with the marshal's next key; null (or absent): the marshal's current key |
+| `player_id` | text or null | no | the marshal's own player id at the field, when the marshal registered the key from the app |
+
+Each (marshal, key) once per body, and at most one current key per marshal. **Never a private key**: there is no field for it, and the marshals' phones never send one (P4R14). The site server keeps every key with its period (its earliest `registered_at`, the last `replaced_at` sent), so the records an earlier key signed still verify after a rotation; a field's admin can also revoke a key there as compromised.
+
+Answer: `200 {"marshals": n, "added": n, "resolved": n}`: `resolved` counts readings kept apart earlier for want of a key of their marshal (`marshal`, below) that verify now and are stored.
+
+### POST /api/v1/sync/replicas
+
+The field's replica registry, as the app makes it (`app/lib/chrono/replica.dart`):
+
+| Field | Type | Required | Values |
+| --- | --- | --- | --- |
+| `replicas` | array | yes | 1-500 replicas, each `replica_id` once |
+| `replica_id` | text | yes | a lowercase UUID |
+| `owner_player_id` | text | yes | the owner's player id at the field (1-64 of `A-Za-z0-9._:-`) |
+| `type` | text | yes | `aeg`, `gbb`, `hpa`, `bolt_action`, `dmr`, `sniper`, `pistol` or `shotgun` |
+| `class` | text | yes | the class of the field's limit template, 1-32 of `a-z0-9_` |
+| `make_model` | text | no | 1-64 characters, no control characters |
+| `registered_at` | text | no | `YYYY-MM-DDTHH:MM:SSZ` |
+| `tag_type`, `tag_uid` | text | no, both or neither | `nfc` with a UID of 4, 7 or 10 bytes (`04:A2:B3:C4`, upper-case hex), or `qr` with 1-64 printable ASCII characters |
+
+Answer: `200 {"replicas": n}`. The site server keeps the last one sent per `replica_id`.
+
+### POST /api/v1/sync/chrono
+
+The signed chrono readings ([`chrono-record.md`](chrono-record.md)), with the controller's series and its outcome (decision P4R15):
+
+| Field | Type | Required | Values |
+| --- | --- | --- | --- |
+| `readings` | array | yes | 1-500 readings |
+| `record` | text | yes | the signed record's JSON **text**, exactly as the controller stored it, at most 4,096 bytes of UTF-8 |
+| `series_id` | text | yes | the controller's series (a lowercase UUID): the readings of one upload |
+| `outcome` | text or null | yes | the series' result on the controller: `pass`, `fail`, `warn` or `unjudged` |
+| `received_at` | number | yes | seconds since 1970: when the controller received and verified the reading |
+| `game_seed` | integer | no | 0-4294967295: the seed of the record's `game_id` on the controller, so the site server can link the reading to that game |
+
+The record travels as text so that the site server can keep it **verbatim**. This page checks only that it is a text of at most 4,096 bytes; its content is the site server's to check, reading by reading, with `chrono.py`: the fields (`format`), the signature's presence (`unsigned`), a key of its `marshal_id` that was valid at `received_at` on the controller's clock, not replaced before then and not revoked (`marshal`), and the Ed25519 signature with each such key (`signature`). A reading under a stored `reading_id` with the same record (in any text) is a **duplicate**; with a different record it is a `conflict`. A reading that fails is **kept apart** (the site server's `chrono_rejects`, with its reason, for the field's staff) and named in the answer; it never refuses the batch, and the controller does not send it again (it logs it). A spot check whose series failed or warned becomes a violation on the site server. The field is the API key's: a record's own `field_id` is the controller's `[checkin] field_id` text and is kept as it is.
+
+Answer: `200 {"accepted": n, "duplicates": n, "refused": [{"index", "reading_id", "reason", "detail"}], "violations": n}`.
+
 ## WS /api/v1/sync/stream
 
-One WebSocket the controller opens (the `Authorization: Bearer` header on the upgrade; close code 4401 for a wrong key). Each message is a JSON object with `type` `games`, `events`, `scores` or `nodes` and otherwise the same body as the POST of that name; the answer is `{"type": "<type>.ack", ...the POST's answer}`, or `{"type": "error", "detail", "error", "path"}` (the socket stays open). `{"type": "ping"}` gets `{"type": "pong"}`. Plan phase 19 adds the remote GM's commands, which travel the other way on this socket (off by default, P4R12). The controller's client uses the HTTP endpoints in this version (decision S13-8).
+One WebSocket the controller opens (the `Authorization: Bearer` header on the upgrade; close code 4401 for a wrong key). Each message is a JSON object with `type` `games`, `events`, `scores`, `nodes`, `marshals`, `replicas` or `chrono` and otherwise the same body as the POST of that name; the answer is `{"type": "<type>.ack", ...the POST's answer}`, or `{"type": "error", "detail", "error", "path"}` (the socket stays open). `{"type": "ping"}` gets `{"type": "pong"}`. Plan phase 19 adds the remote GM's commands, which travel the other way on this socket (off by default, P4R12). The controller's client uses the HTTP endpoints in this version (decision S13-8).
 
 ## Never sent
 
-Positions (they stay on the controller and are deleted when the game ends, P4R25), tokens and keys (the game key, the join key, player-token keys, the GM and read tokens), check-in names and federation numbers (until plan phase 16 defines what goes back for registered players). Player ids in event data (`player`) are the field's pseudonymous ids (`p-` and 12 base32 characters).
+Positions (they stay on the controller and are deleted when the game ends, P4R25), tokens and keys (the game key, the join key, player-token keys, the GM and read tokens, marshals' private keys), check-in names and federation numbers (until plan phase 16 defines what goes back for registered players), the players' field secrets and their hashes. Player ids in event data (`player`) are the field's pseudonymous ids (`p-` and 12 base32 characters). What the chrono registry carries is what a signed record already holds (the player id, the replica, the marshal's id and name as signed) and the replica registry's own fields.

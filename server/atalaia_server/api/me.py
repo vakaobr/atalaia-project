@@ -9,6 +9,11 @@
     POST   /api/v1/me/password   Bearer, {password, new_password}
                                                               a new password; other sessions end
     DELETE /api/v1/me            Bearer, {password, code?}    erasure (Art. 17): anonymised
+    GET    /api/v1/me/chrono     Bearer                       the person's chrono history (plan phase 14):
+                                                              per field, readings, replicas, violations
+    PUT    /api/v1/me/consents/chrono-sharing/{field_id}      consent: that field's chrono records may be
+                                                              shown to other sharing fields, and theirs to it
+    DELETE /api/v1/me/consents/chrono-sharing/{field_id}      withdraw it
 
 ``GET /api/v1/me`` itself is in ``api/auth.py``. Changing or erasing the
 account needs the current password (and a TOTP code to erase an account that
@@ -21,18 +26,20 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import Field
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import passwords, personal_data
+from .. import chrono_registry, passwords, personal_data
 from ..audit import record
 from ..auth import Principal, current_principal, load_roles
 from ..db import get_session
-from ..models import UserSession
+from ..models import Consent, Field as FieldRow, UserSession
 from .auth import (NO_STORE, Strict, _check_code, _check_password, _clear_cookie, _secret, _user_for_update,
                    email_problem, normalise_email, user_json, username_problem)
 
@@ -149,3 +156,43 @@ async def erase_me(body: EraseIn, request: Request, principal: Principal = Depen
     response = Response(status_code=204)
     _clear_cookie(response)
     return response
+
+
+@router.get("/me/chrono")
+async def my_chrono(principal: Principal = Depends(current_principal),
+                    db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    """The chrono history of the player ids the account holds, each record as the marshal signed it."""
+    return JSONResponse({"fields": await chrono_registry.my_history(db, principal.user.id)}, headers=NO_STORE)
+
+
+def _sharing_consent(user_id: uuid.UUID, field_id: uuid.UUID) -> object:
+    return select(Consent).where(Consent.user_id == user_id, Consent.purpose == personal_data.CHRONO_SHARING,
+                                 Consent.field_id == field_id, Consent.withdrawn_at.is_(None)).with_for_update()
+
+
+@router.put("/me/consents/chrono-sharing/{field_id}")
+async def give_chrono_sharing(field_id: uuid.UUID, request: Request, principal: Principal = Depends(current_principal),
+                              db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    """Consent (ADR-P4-5, ADR-P4-8): this field's chrono records of the person may be shown to the other
+    fields the person also consented for, when both fields share; and theirs to this one. Per field,
+    withdrawable at any time."""
+    if await db.get(FieldRow, field_id) is None:
+        raise HTTPException(404, "field_not_found")
+    existing = await db.scalar(_sharing_consent(principal.user.id, field_id))
+    if existing is None:
+        personal_data.give_consent(db, principal.user.id, personal_data.CHRONO_SHARING,
+                                   request.app.state.settings.privacy_notice_version, field_id=field_id)
+        await db.commit()
+    return JSONResponse({"purpose": personal_data.CHRONO_SHARING, "field_id": str(field_id), "given": True},
+                        status_code=201 if existing is None else 200, headers=NO_STORE)
+
+
+@router.delete("/me/consents/chrono-sharing/{field_id}", status_code=204)
+async def withdraw_chrono_sharing(field_id: uuid.UUID, principal: Principal = Depends(current_principal),
+                                  db: AsyncSession = Depends(get_session)) -> Response:
+    existing = await db.scalar(_sharing_consent(principal.user.id, field_id))
+    if existing is None:
+        raise HTTPException(404, "consent_not_found")
+    existing.withdrawn_at = datetime.now(timezone.utc)
+    await db.commit()
+    return Response(status_code=204)

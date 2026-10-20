@@ -3,15 +3,14 @@
 """Signed chrono readings (ADR-P3-7, protocol/chrono-record.md): checks and Ed25519 verification.
 
 The marshal's phone signs each reading (app/lib/chrono/record_signer.dart);
-the controller, and later the site server, verify it with the marshal's
-public key. Both sides check protocol/vectors/chrono_record.json.
+the controller (checkin.py, POST /api/v1/chrono/readings) and the site server
+(server/atalaia_server/chrono_verify.py, the synced readings) verify it with
+the marshal's public key, with this module. Both sides check
+protocol/vectors/chrono_record.json.
 
     canonical = json.dumps(record without "signature", sort_keys=True,
                            separators=(",", ":"), ensure_ascii=False).encode()
     signature = Ed25519.sign(marshal_key, canonical)     # base64, 88 characters
-
-Not wired into the API yet: the chrono endpoints come with the player app
-(plan phases D and E).
 """
 
 from __future__ import annotations

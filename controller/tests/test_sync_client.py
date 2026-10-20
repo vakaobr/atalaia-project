@@ -5,8 +5,10 @@ in this process: no PostgreSQL (the real one: server/tests/test_sync_e2e.py).
 
 The cursor, a replay after a restart or a lost answer, the backoff, the
 offline-first rule (the game never waits for the network), refusals,
-redirects, TLS with a pinned CA, the settings and the sync-key command, and
-that nothing private is in any request body, checked field by field.
+redirects, TLS with a pinned CA, the settings and the sync-key command, the
+field's chrono registry (marshal keys with their periods, replicas, signed
+readings; plan phase 14), and that nothing private is in any request body,
+checked field by field.
 
     cd controller && python -m unittest discover -s tests
 """
@@ -22,12 +24,13 @@ import ssl
 import tempfile
 import threading
 import unittest
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Optional
 
 from support import CORE, config, wait_for
 
-from p3support import GM, P3Case, bearer
+from p3support import GM, T0, Marshal, P3Case, bearer, declaration
 
 from atalaia_controller import sync_format, tls as tlsmod
 from atalaia_controller.config import ConfigError, load_config
@@ -53,6 +56,10 @@ class FakeSite:
         self.lose: Optional[str] = None  # store the next body of this kind, then answer 500 (a lost answer)
         self.redirect_to: Optional[str] = None
         self.reject: Optional[str] = None  # refuse the next body of this kind with a 400
+        self.marshals: dict[tuple[str, str], dict[str, Any]] = {}
+        self.replicas: dict[str, dict[str, Any]] = {}
+        self.readings: list[dict[str, Any]] = []
+        self.refuse_readings: set[str] = set()  # reading ids to answer as kept apart
         self.lock = threading.Lock()
         site = self
 
@@ -103,6 +110,8 @@ class FakeSite:
                 body = sync_format.CHECKS[kind](body)
             except sync_format.SyncFormatError as exc:
                 return 400, {"detail": "invalid_body", "error": exc.code, "path": exc.path}, {}
+            if kind not in sync_format.GAME_KINDS:
+                return 200, self.registry(kind, body), {}
             game = sync_format.game_key(body)
             if kind != "games" and game not in self.games:
                 return 404, {"detail": "game_not_found"}, {}
@@ -128,6 +137,25 @@ class FakeSite:
                 self.lose = None
                 return 500, {"detail": "internal"}, {}
             return 200, answer, {}
+
+    def registry(self, kind: str, body: dict[str, Any]) -> dict[str, Any]:
+        if kind == "marshals":
+            for m in body["marshals"]:
+                self.marshals[(m["marshal_id"], m["public_key"])] = m
+            return {"marshals": len(body["marshals"]), "added": 0}
+        if kind == "replicas":
+            for r in body["replicas"]:
+                self.replicas[r["replica_id"]] = r
+            return {"replicas": len(body["replicas"])}
+        refused = []
+        for i, entry in enumerate(body["readings"]):
+            rid = json.loads(entry["record"])["reading_id"]
+            if rid in self.refuse_readings:
+                refused.append({"index": i, "reading_id": rid, "reason": "signature", "detail": "x"})
+            else:
+                self.readings.append(entry)
+        return {"accepted": len(body["readings"]) - len(refused), "duplicates": 0, "refused": refused,
+                "violations": 0}
 
     def totals(self, game: tuple[int, int]) -> dict[str, int]:
         deltas = [(e["data"]["team"], e["data"]["amount"]) for e in self.events.get(game, {}).values()
@@ -279,6 +307,138 @@ class CursorTests(SyncCase):
         self.assertEqual(self.site.requests, [])
         self.assertNotIn((first, self.seed(first)), self.site.counters)
         self.assertIn("bad_source", self.store.sync_state(first, self.seed(first))["last_error"] or "")
+
+
+class RegistryTests(SyncCase):
+    """The field's chrono registry: keys before readings, each item once, a rotation with its periods."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.marshal = Marshal("m-ana", "Ana")
+        self.replica = "8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50"
+
+    def register(self, marshal: Marshal, at: float) -> None:
+        import base64  # noqa: PLC0415
+
+        self.store.put_marshal(marshal.marshal_id, marshal.name, base64.b64decode(marshal.public_b64), "p-ana", at)
+
+    def readings(self, n: int = 3, outcome: str = "pass", at: float = T0 + 60,
+                 marshal: Optional[Marshal] = None) -> list[dict[str, Any]]:
+        series = (marshal or self.marshal).series(self.replica, "p-rita", [100.0 + i for i in range(n)])
+        sid = str(uuid.uuid4())
+        for rec in series:
+            self.store.add_reading(rec, sid, outcome, at)
+        return series
+
+    def kinds(self) -> list[str]:
+        return [k for k in self.site.paths() if k in ("marshals", "replicas", "chrono")]
+
+    def test_keys_then_replicas_then_readings_once(self) -> None:
+        self.register(self.marshal, T0)
+        self.store.put_replica({"replica_id": self.replica, "owner_player_id": "p-rita", "type": "aeg",
+                                "class": "rifle", "make_model": "M4", "tag_type": "nfc",
+                                "tag_uid": "04:A2:B3:C4"}, T0)
+        sent = self.readings()
+        client = self.client()
+        self.assertTrue(client.run_once(), client.last_error)
+        self.assertEqual(self.kinds(), ["marshals", "replicas", "chrono"])
+        self.assertEqual(len(self.site.readings), 3)
+        # The record goes as the text the controller stored, untouched.
+        stored = {r["reading_id"]: r["record"] for r in self.store.readings(replica_id=self.replica)}
+        for entry in self.site.readings:
+            record = json.loads(entry["record"])
+            self.assertEqual(record, stored[record["reading_id"]])
+            self.assertEqual((entry["outcome"], entry["received_at"]), ("pass", T0 + 60))
+        self.assertEqual({json.loads(e["record"])["reading_id"] for e in self.site.readings},
+                         {r["reading_id"] for r in sent})
+        self.assertEqual(client.status()["pending_readings"], 0)
+        self.site.requests.clear()
+        self.assertTrue(self.client().run_once())  # a restart: nothing again
+        self.assertEqual(self.kinds(), [])
+        self.readings(n=1)
+        self.assertTrue(client.run_once())
+        self.assertEqual(self.kinds(), ["chrono"])
+        self.assertEqual(len(self.site.requests[-1][2]["readings"]), 1)
+
+    def test_a_rotated_key_keeps_its_period(self) -> None:
+        import base64  # noqa: PLC0415
+
+        self.register(self.marshal, T0)
+        old = self.readings(at=T0 + 10)
+        client = self.client()
+        self.assertTrue(client.run_once())
+        self.assertEqual([m["replaced_at"] for m in self.site.marshals.values()], [None])
+        new = Marshal("m-ana", "Ana")  # a lost phone: a new key for the same marshal
+        self.register(new, T0 + 100)
+        self.readings(at=T0 + 200, marshal=new)
+        self.site.requests.clear()
+        self.assertTrue(client.run_once())
+        bodies = [b for p, _, b in self.site.requests if p.endswith("/marshals")]
+        self.assertEqual(len(bodies), 1)
+        self.assertEqual(len(bodies[0]["marshals"]), 2)  # the old key changed (its end), the new one is new
+        periods = {k: (m["registered_at"], m["replaced_at"]) for (_, k), m in self.site.marshals.items()}
+        self.assertEqual(periods, {self.marshal.public_b64: (T0, T0 + 100), new.public_b64: (T0 + 100, None)})
+        self.assertEqual(len(self.site.readings), 6)
+        self.assertTrue(old)
+        # The same key registered again keeps its first registration: earlier readings stay in its period.
+        self.store.put_marshal("m-ana", "Ana Silva", base64.b64decode(new.public_b64), "p-ana", T0 + 500)
+        self.assertEqual(self.store.marshal("m-ana")["registered_at"], T0 + 100)
+        self.assertEqual(self.store.marshal("m-ana")["name"], "Ana Silva")
+
+    def test_readings_the_site_server_keeps_apart_are_logged_not_resent(self) -> None:
+        self.register(self.marshal, T0)
+        sent = self.readings()
+        self.site.refuse_readings = {sent[1]["reading_id"]}
+        client = self.client()
+        self.assertTrue(client.run_once())
+        self.assertEqual((client.refused_readings, client.status()["pending_readings"]), (1, 0))
+
+    def test_a_refused_body_does_not_hold_up_the_rest(self) -> None:
+        self.register(self.marshal, T0)
+        self.readings()
+        self.site.reject = "marshals"
+        client = self.client()
+        self.assertTrue(client.run_once())
+        self.assertIn("/api/v1/sync/marshals", client.status()["registry_error"])
+        self.assertEqual(len(self.site.readings), 3)
+
+    def test_network_errors_keep_everything_for_later(self) -> None:
+        self.register(self.marshal, T0)
+        self.readings()
+        self.site.fail = [(503, {"detail": "unavailable"}, {})]
+        client = self.client()
+        self.assertFalse(client.run_once())
+        self.assertEqual(client.status()["pending_readings"], 3)
+        self.assertTrue(client.run_once())
+        self.assertEqual(len(self.site.readings), 3)
+
+    def test_big_registries_go_in_batches(self) -> None:
+        self.register(self.marshal, T0)
+        self.readings(n=sync_format.MAX_READINGS + 5)
+        self.assertTrue(self.client().run_once())
+        batches = [len(b["readings"]) for p, _, b in self.site.requests if p.endswith("/chrono")]
+        self.assertEqual(batches, [sync_format.MAX_READINGS, 5])
+
+    def test_resend_and_purge(self) -> None:
+        self.register(self.marshal, T0)
+        self.readings()
+        client = self.client()
+        self.assertTrue(client.run_once())
+        self.store.reset_sync_state()
+        self.site.requests.clear()
+        self.assertTrue(client.run_once())
+        self.assertEqual(self.kinds(), ["marshals", "chrono"])
+        # Readings deleted (retention, erasure) take their sync bookkeeping with them.
+        self.assertEqual(self.store.delete_readings(player_id="p-rita"), 3)
+        self.assertEqual(self.store.sync_items("reading"), {})
+
+    def test_the_game_seed_goes_with_a_readings_game(self) -> None:
+        gid = self.ctrl.create_game({"name": "x", "mode_id": DOMINATION})["id"]
+        self.register(self.marshal, T0)
+        rec = self.marshal.reading(self.replica, "p-rita", 100.0, game_id=gid)
+        self.store.add_reading(rec, "0f6e5d4c-3b2a-4198-8776-655443322110", "pass", T0)
+        self.assertTrue(self.client().run_once())
+        self.assertEqual(self.site.readings[0]["game_seed"], self.seed(gid))
 
 
 class BackoffTests(SyncCase):
@@ -462,7 +622,8 @@ class SettingsTests(unittest.TestCase):
 
 # Keys a request body may have, by where they are (protocol/sync.md); "*" is any key (a team, a source).
 ALLOWED = {
-    "": {"sync_version", "controller", "game", "meta", "after_id", "events", "counters", "nodes"},
+    "": {"sync_version", "controller", "game", "meta", "after_id", "events", "counters", "nodes", "marshals",
+         "replicas", "readings"},
     "controller": {"id", "version"}, "game": {"game_id", "game_seed"},
     "meta": {"name", "mode_id", "teams", "team_info", "params", "squads", "duration_ms", "state", "node_id",
              "joined", "created_at", "started_at", "ended_at"},
@@ -471,7 +632,14 @@ ALLOWED = {
     "events[]": {"id", "node", "seq", "t", "type", "team", "squad", "prio", "data", "epoch", "pkt_seq"},
     "nodes[]": {"node_id", "name", "role", "last_seen", "info"},
     "nodes[].info": set(sync_format.NODE_INFO),
+    "marshals[]": {"marshal_id", "name", "public_key", "player_id", "registered_at", "replaced_at"},
+    "replicas[]": {"replica_id", "owner_player_id", "type", "class", "make_model", "registered_at", "tag_type",
+                   "tag_uid"},
+    "readings[]": {"record", "series_id", "outcome", "received_at", "game_seed"},
 }
+# The signed record's fields (protocol/chrono-record.md): what a reading's record may carry.
+RECORD = {"reading_id", "replica_id", "player_id", "type", "velocity_mps", "bb_weight_g", "energy_j", "chrono_id",
+          "marshal_id", "marshal_name", "game_id", "field_id", "timestamp", "ref_reading_id", "signature"}
 
 
 class PrivacyTests(P3Case):
@@ -505,7 +673,15 @@ class PrivacyTests(P3Case):
     def test_nothing_private_is_sent(self) -> None:
         game = self.new_game(teams=["red", "blue"], team_info={"red": {"display_name": "Lobos"}})
         gid = game["id"]
-        me = self.check_in(gid, name="Rita Secreta", federation_number="FPA-778899")
+        replica = "8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50"
+        me = self.check_in(gid, name="Rita Secreta", federation_number="FPA-778899",
+                           replicas=[declaration(replica, make_model="Tokyo Marui M4")])
+        marshal, mtoken = self.make_marshal(gid, Marshal("m-ana", "Ana"))
+        series = marshal.series(replica, me["player_id"], [100.0, 101.0], game_id=gid)
+        r = self.client.post("/api/v1/chrono/readings", headers=bearer(mtoken), json={
+            "readings": series, "replica": {"replica_id": replica, "owner_player_id": me["player_id"], "type": "aeg",
+                                            "class": "rifle", "make_model": "Tokyo Marui M4"}})
+        self.assertEqual(r.status_code, 200, r.text)
         self.svc.rate.allow = lambda key: True
         self.client.post(f"/api/v1/games/{gid}/start", headers=GM)
         token = self.client.post("/api/v1/checkin/token", headers=bearer(me["token"])).json()["token"]
@@ -528,6 +704,14 @@ class PrivacyTests(P3Case):
                     "gm-secret", "read-secret", KEY, self.ctrl.join_key.hex(), self.svc.ctrl.store.get_setting("join_key")]
         key_rows = self.ctrl.store._exec("SELECT key FROM token_keys").fetchall()
         secrets_ += [bytes(r["key"]).hex() for r in key_rows]
+        from cryptography.hazmat.primitives import serialization  # noqa: PLC0415
+        import base64  # noqa: PLC0415
+
+        seed = marshal.key.private_bytes(serialization.Encoding.Raw, serialization.PrivateFormat.Raw,
+                                         serialization.NoEncryption())
+        secrets_ += [seed.hex(), base64.b64encode(seed).decode()]  # the marshal's private key: never
+        secret_sha = self.ctrl.store._exec("SELECT secret_sha256 FROM field_players").fetchall()
+        secrets_ += [bytes(r["secret_sha256"]).hex() for r in secret_sha if r["secret_sha256"]]
         for secret in secrets_:
             if secret:
                 with self.subTest(secret=secret[:12]):
@@ -536,9 +720,17 @@ class PrivacyTests(P3Case):
         for body in bodies:
             self.walk(body, "", problems)
         self.assertEqual(problems, [])
+        # The chrono registry went too: the signed records with their fields only, verbatim.
+        records = [json.loads(e["record"]) for b in bodies for e in b.get("readings", [])]
+        self.assertEqual({r["reading_id"] for r in records}, {r["reading_id"] for r in series})
+        for record in records:
+            self.assertLessEqual(set(record), RECORD)
+        self.assertTrue(any(b.get("marshals") for b in bodies))
+        self.assertTrue(any(b.get("replicas") for b in bodies))
         # The player appears only by the field's pseudonymous id (P4R25, ADR-P4-8's amendment).
         checkin = [e for b in bodies for e in b.get("events", []) if e["type"] == "player.checkin"]
-        self.assertEqual([e["data"] for e in checkin], [{"player": me["player_id"]}])
+        self.assertIn({"player": me["player_id"]}, [e["data"] for e in checkin])
+        self.assertTrue(all(set(e["data"]) == {"player"} for e in checkin))
         self.assertEqual(self.site.games[(gid, self.ctrl.store.game(gid)["game_seed"])]["team_info"],
                          {"red": {"display_name": "Lobos"}})
 

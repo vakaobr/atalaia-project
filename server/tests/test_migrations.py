@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import re
 import unittest
+import uuid
 from pathlib import Path
 
 from alembic import command
@@ -27,7 +28,8 @@ from atalaia_server.models import ROLES, Base
 from .base import SERVER, TempDatabase, alembic_config
 
 TABLES = {"fields", "users", "roles", "user_field_roles", "sessions", "audit_log", "refresh_tokens", "consents",
-          "field_api_keys", "controllers", "games", "game_events", "game_node_scores", "game_nodes", "user_game_roles"}
+          "field_api_keys", "controllers", "games", "game_events", "game_node_scores", "game_nodes", "user_game_roles",
+          "field_player_ids", "marshal_keys", "replicas", "chrono_readings", "chrono_rejects", "chrono_violations"}
 
 SCHEMA_SQL = (
     ("columns", "SELECT table_name, column_name, data_type, is_nullable, column_default, character_maximum_length "
@@ -175,6 +177,47 @@ class MigrationTests(unittest.TestCase):
         command.downgrade(self.cfg, "0003_personal_data")
         self.assertNotIn("games", self.tables())
         self.db.fetch("DELETE FROM fields")
+
+    def test_0005_with_data(self) -> None:
+        """0005_chrono: per-field consents beside the account consent, the registry's keys and checks, and
+        back down (the per-field consents go, the account consent stays)."""
+        command.upgrade(self.cfg, "0004_sync")
+        user = self.db.fetch("INSERT INTO users (username, password_hash) VALUES ('rita', 'x') RETURNING id")[0][0]
+        self.db.fetch("INSERT INTO consents (user_id, purpose, notice_version) VALUES ($1, 'account', 'v1')", user)
+        command.upgrade(self.cfg, "0005_chrono")
+        field = self.db.fetch("INSERT INTO fields (name, slug) VALUES ('Campo', 'campo') RETURNING id")[0][0]
+        other = self.db.fetch("INSERT INTO fields (name, slug) VALUES ('Arena', 'arena') RETURNING id")[0][0]
+        share = "INSERT INTO consents (user_id, purpose, notice_version, field_id) VALUES ($1, 'chrono_sharing', 'v1', $2)"
+        self.db.fetch(share, user, field)
+        self.db.fetch(share, user, other)  # one live consent per field
+        with self.assertRaisesRegex(Exception, "uq_consents_live_field"):
+            self.db.fetch(share, user, field)
+        with self.assertRaisesRegex(Exception, "uq_consents_live"):
+            self.db.fetch("INSERT INTO consents (user_id, purpose, notice_version) VALUES ($1, 'account', 'v2')", user)
+        key = ("INSERT INTO marshal_keys (field_id, marshal_id, name, public_key, source, valid_from) "
+               "VALUES ($1, 'm-ana', 'Ana', $2, 'controller', now()) RETURNING id")
+        key_id = self.db.fetch(key, field, bytes(32))[0][0]
+        with self.assertRaisesRegex(Exception, "uq_marshal_keys_field_id_marshal_id_public_key"):
+            self.db.fetch(key, field, bytes(32))
+        with self.assertRaisesRegex(Exception, "ck_marshal_keys_public_key"):
+            self.db.fetch(key, field, bytes(31))  # a public key is 32 bytes; nothing longer (no private key) fits
+        reading = ("INSERT INTO chrono_readings (field_id, reading_id, record_json, replica_id, player_id, type, "
+                   "velocity_mps, bb_weight_g, energy_j, chrono_id, marshal_id, record_field_id, timestamp, series_id, "
+                   "marshal_key, received_at) VALUES ($1, $2, '{}', gen_random_uuid(), 'p-1', $3, 100, 0.2, 1.0, 'c', "
+                   "'m-ana', 'f', now(), gen_random_uuid(), $4, now())")
+        rid = uuid.uuid4()
+        self.db.fetch(reading, field, rid, "checkin", key_id)
+        with self.assertRaisesRegex(Exception, "uq_chrono_readings_field_id_reading_id"):
+            self.db.fetch(reading, field, rid, "checkin", key_id)
+        with self.assertRaisesRegex(Exception, "ck_chrono_readings_type"):
+            self.db.fetch(reading, field, uuid.uuid4(), "guess", key_id)
+        command.downgrade(self.cfg, "0004_sync")
+        self.assertNotIn("chrono_readings", self.tables())
+        rows = self.db.fetch("SELECT purpose FROM consents")
+        self.assertEqual([r[0] for r in rows], ["account"])
+        self.db.fetch("DELETE FROM consents")
+        self.db.fetch("DELETE FROM fields")
+        self.db.fetch("DELETE FROM users")
 
     def test_one_linear_history(self) -> None:
         self.assertEqual(len(self.script.get_heads()), 1)

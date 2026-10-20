@@ -21,7 +21,7 @@ Both encodings come from the schema files in [`schema/`](schema/), so they canno
 | [`player-token.md`](player-token.md) | Player tokens: who a phone calling the controller's API is (player, team, squad, role, game), signed by the controller |
 | [`checkin.md`](checkin.md) | Field check-in: the printed poster's `atalaia:checkin:` text, trusting the field's CA, the check-in endpoints, per-game replica declarations and the "replicas to chrono" list; vectors in `vectors/checkin.json` |
 | [`prop-link.md`](prop-link.md) | An Android prop's link to the controller over Wi-Fi: the HMAC proof of the game key, HELLO, STATE and events up, TIME and commands down; with an I/O pod, the field's radio as well, and which one is used when |
-| [`sync.md`](sync.md) | The controller sync: how a field controller pushes its games, event logs, score counters and nodes to a site server, the merge rules, the API key; vectors in `vectors/sync.json` |
+| [`sync.md`](sync.md) | The controller sync: how a field controller pushes its games, event logs, score counters and nodes, and the field's chrono registry (marshals' public keys, replicas, signed readings), to a site server, the merge rules, the API key; vectors in `vectors/sync.json` |
 | [`usb-modem.md`](usb-modem.md) | The serial link between the field controller and its USB radio modem |
 | [`capability-proxy.md`](capability-proxy.md) | The link between an I/O pod and a phone (USB-OTG and BLE), version 1 |
 | [`json/event.schema.json`](json/event.schema.json) | JSON Schema of an event in the game log and the API (generated) |

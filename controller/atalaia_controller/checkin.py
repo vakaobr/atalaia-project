@@ -1201,6 +1201,8 @@ class Checkin:
                                         now)
         cutoff = datetime.datetime.fromtimestamp(now - CHRONO_RETENTION_DAYS * 86400, datetime.timezone.utc)
         out["readings"] = self.store.delete_readings(before=cutoff.strftime("%Y-%m-%dT%H:%M:%SZ"))
+        # A marshal's earlier keys outlive what they signed by the same period (schema 6).
+        out["marshal_keys"] = self.store.delete_marshal_history(now - CHRONO_RETENTION_DAYS * 86400)
         if any(out.values()):
             log.info("retention purge: %s", out)
         return out

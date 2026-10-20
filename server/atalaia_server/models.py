@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""ORM models (ADR-P4-1; migrations 0001_base, 0002_accounts, 0003_personal_data and 0004_sync).
+"""ORM models (ADR-P4-1; migrations 0001_base, 0002_accounts, 0003_personal_data, 0004_sync, 0005_chrono).
 
 Fields, users, roles, per-field roles, sessions and the audit log, as
 ADR-P4-1 defines them, with plan phase 11's additions for accounts: the
@@ -9,7 +9,10 @@ factor on ``sessions``, and ``refresh_tokens`` (only hashes); plan phase 12's
 ``consents`` (ADR-P4-8); plan phase 13's controller sync (ADR-P4-3 as amended):
 ``field_api_keys``, ``controllers``, ``games``, ``game_events``,
 ``game_node_scores``, ``game_nodes`` and the per-game roles,
-``user_game_roles``. A table that holds personal data must also be added to
+``user_game_roles``; plan phase 14's chrono registry (ADR-P4-5 as amended):
+``marshal_keys``, ``replicas``, ``chrono_readings``, ``chrono_rejects``,
+``chrono_violations`` and ``field_player_ids``, with ``consents.field_id``
+for the per-field ``chrono_sharing`` consent. A table that holds personal data must also be added to
 ``personal_data.py`` (access, export, erasure, the purge) in the same plan
 phase. Every later plan phase adds its own tables here and in
 its own Alembic migration; ``tests.test_migrations`` checks that the
@@ -24,8 +27,8 @@ import uuid
 from datetime import datetime
 from typing import Any, Optional
 
-from sqlalchemy import (BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, LargeBinary, MetaData,
-                        PrimaryKeyConstraint, SmallInteger, String, UniqueConstraint, func, text)
+from sqlalchemy import (BigInteger, Boolean, CheckConstraint, DateTime, Float, ForeignKey, Index, Integer, LargeBinary,
+                        MetaData, PrimaryKeyConstraint, SmallInteger, String, Text, UniqueConstraint, func, text)
 from sqlalchemy.dialects.postgresql import INET, JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -190,18 +193,23 @@ class Consent(Base):
     """A consent given (ADR-P4-8, plan phase 12): its purpose, the version of the privacy notice
     the person was shown, when, and when it was withdrawn. At most one live consent per purpose.
     ``users.gdpr_consent_at`` keeps the account consent's time, as ADR-P4-1 has it; this table is
-    the record that shows what was consented to (GDPR Art. 7(1)). Purposes: ``account`` now;
-    ``chrono_sharing`` comes with the chrono registry (plan phase 14)."""
+    the record that shows what was consented to (GDPR Art. 7(1)). Purposes: ``account``, and
+    ``chrono_sharing`` (plan phase 14) with the field whose chrono records the person lets other
+    sharing fields see (``field_id``; one live consent per field)."""
 
     __tablename__ = "consents"
     __table_args__ = (
         Index("idx_consents_user", "user_id"),
-        Index("uq_consents_live", "user_id", "purpose", unique=True, postgresql_where=text("withdrawn_at IS NULL")),
+        Index("uq_consents_live", "user_id", "purpose", unique=True,
+              postgresql_where=text("withdrawn_at IS NULL AND field_id IS NULL")),
+        Index("uq_consents_live_field", "user_id", "purpose", "field_id", unique=True,
+              postgresql_where=text("withdrawn_at IS NULL AND field_id IS NOT NULL")),
     )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     purpose: Mapped[str] = mapped_column(String(32), nullable=False)
+    field_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"))
     notice_version: Mapped[str] = mapped_column(String(64), nullable=False)
     given_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     withdrawn_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
@@ -346,3 +354,181 @@ class UserGameRole(Base):
     role_id: Mapped[int] = mapped_column(SmallInteger, ForeignKey("roles.id"), nullable=False)
     granted_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
     granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+# --- the chrono registry (plan phase 14, migration 0005_chrono) ---------------------------
+
+KEY_SOURCES = ("controller", "account")
+READING_TYPES = ("checkin", "spotcheck", "retest")
+OUTCOMES = ("pass", "fail", "warn", "unjudged")
+REJECT_REASONS = ("format", "unsigned", "signature", "marshal", "conflict")
+VIOLATION_TYPES = ("over_limit", "over_tolerance")
+VIOLATION_OUTCOMES = ("warning", "pulled", "ban")
+
+
+class FieldPlayerId(Base):
+    """An account's pseudonymous player id at one field (ADR-P4-11's ``field_player_ids``, the phase 3
+    form ``p-`` + 12 base32). Made here for the chrono registry's own history, erasure and sharing
+    (decision S14-3); an account adopts a phone's id with its secret in plan phase 16."""
+
+    __tablename__ = "field_player_ids"
+    __table_args__ = (UniqueConstraint("field_id", "player_id"), Index("idx_field_player_ids_user", "user_id"))
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    field_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), nullable=False)
+    player_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = _created()
+
+
+class MarshalKey(Base):
+    """A marshal's Ed25519 public key at a field, with the period it was the marshal's key in
+    (P4R14): from its first registration until it was replaced (``valid_until``, NULL while
+    current) or revoked as compromised. Never a private key. Old keys stay, so old records still
+    verify. ``user_id`` links the key to a marshal's account when the account registered it."""
+
+    __tablename__ = "marshal_keys"
+    __table_args__ = (
+        UniqueConstraint("field_id", "marshal_id", "public_key"),
+        CheckConstraint("octet_length(public_key) = 32", name="public_key"),
+        CheckConstraint("source IN ('controller', 'account')", name="source"),
+        Index("idx_marshal_keys_user", "user_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    field_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), nullable=False)
+    marshal_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    public_key: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    player_id: Mapped[Optional[str]] = mapped_column(String(64))
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    source: Mapped[str] = mapped_column(String(16), nullable=False)
+    valid_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    valid_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    revoked_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = _created()
+    updated_at: Mapped[datetime] = _updated()
+
+
+class Replica(Base):
+    """A replica of a field's registry (ADR-P4-1's amendment): the app's ``replica_id`` per field,
+    its owner by the field's pseudonymous player id, type (``sniper`` included), class."""
+
+    __tablename__ = "replicas"
+    __table_args__ = (UniqueConstraint("field_id", "replica_id"), Index("idx_replicas_owner", "field_id",
+                                                                        "owner_player_id"))
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    field_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), nullable=False)
+    replica_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    owner_player_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    replica_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    replica_class: Mapped[str] = mapped_column(String(32), nullable=False)
+    make_model: Mapped[Optional[str]] = mapped_column(String(64))
+    tag_type: Mapped[Optional[str]] = mapped_column(String(8))
+    tag_uid: Mapped[Optional[str]] = mapped_column(String(64))
+    registered_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = _created()
+    updated_at: Mapped[datetime] = _updated()
+
+
+class ChronoReading(Base):
+    """One signed chrono reading (P4R15): ``record_json`` exactly as the controller sent it, verified on
+    arrival with ``atalaia_controller.chrono`` and the marshal's key valid then (``marshal_key``); the
+    record's fields as columns for queries; the controller's series and its outcome."""
+
+    __tablename__ = "chrono_readings"
+    __table_args__ = (
+        UniqueConstraint("field_id", "reading_id"),
+        CheckConstraint("type IN ('checkin', 'spotcheck', 'retest')", name="type"),
+        CheckConstraint("outcome IS NULL OR outcome IN ('pass', 'fail', 'warn', 'unjudged')", name="outcome"),
+        Index("idx_chrono_readings_player", "field_id", "player_id"),
+        Index("idx_chrono_readings_replica", "field_id", "replica_id"),
+        Index("idx_chrono_readings_series", "field_id", "series_id"),
+        Index("idx_chrono_readings_time", "field_id", "timestamp"),
+        Index("idx_chrono_readings_key", "marshal_key"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    field_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), nullable=False)
+    reading_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    record_json: Mapped[str] = mapped_column(Text, nullable=False)
+    replica_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    player_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    type: Mapped[str] = mapped_column(String(16), nullable=False)
+    velocity_mps: Mapped[float] = mapped_column(Float, nullable=False)
+    bb_weight_g: Mapped[float] = mapped_column(Float, nullable=False)
+    energy_j: Mapped[float] = mapped_column(Float, nullable=False)
+    chrono_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    marshal_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    record_field_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    record_game_id: Mapped[Optional[str]] = mapped_column(String(64))
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ref_reading_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))
+    series_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    outcome: Mapped[Optional[str]] = mapped_column(String(16))
+    marshal_key: Mapped[uuid.UUID] = mapped_column(ForeignKey("marshal_keys.id"), nullable=False)
+    game: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("games.id", ondelete="SET NULL"))
+    controller: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("controllers.id", ondelete="SET NULL"))
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    verified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class ChronoReject(Base):
+    """A reading the site server could not verify, kept apart with its reason (``format``,
+    ``unsigned``, ``signature``, ``marshal``: no key of the marshal valid when the controller got it,
+    ``conflict``: another record under a stored reading id), never silently dropped. Once by its
+    text's SHA-256; ``times`` counts the arrivals."""
+
+    __tablename__ = "chrono_rejects"
+    __table_args__ = (
+        UniqueConstraint("field_id", "record_sha256"),
+        CheckConstraint("reason IN ('format', 'unsigned', 'signature', 'marshal', 'conflict')", name="reason"),
+        Index("idx_chrono_rejects_player", "field_id", "player_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    field_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), nullable=False)
+    record_text: Mapped[str] = mapped_column(Text, nullable=False)
+    record_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    reason: Mapped[str] = mapped_column(String(16), nullable=False)
+    detail: Mapped[str] = mapped_column(String(256), nullable=False)
+    reading_id: Mapped[Optional[str]] = mapped_column(String(64))
+    player_id: Mapped[Optional[str]] = mapped_column(String(64))
+    marshal_id: Mapped[Optional[str]] = mapped_column(String(64))
+    series_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))
+    outcome: Mapped[Optional[str]] = mapped_column(String(16))
+    controller: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("controllers.id", ondelete="SET NULL"))
+    received_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    times: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class ChronoViolation(Base):
+    """A spot check that failed (``over_limit``) or warned (``over_tolerance``), one per series, with
+    the series' deciding (highest energy) reading; staff record what was done (``outcome``)."""
+
+    __tablename__ = "chrono_violations"
+    __table_args__ = (
+        UniqueConstraint("field_id", "series_id"),
+        CheckConstraint("violation_type IN ('over_limit', 'over_tolerance')", name="violation_type"),
+        CheckConstraint("outcome IS NULL OR outcome IN ('warning', 'pulled', 'ban')", name="outcome"),
+        Index("idx_chrono_violations_reading", "reading"),
+        Index("idx_chrono_violations_player", "field_id", "player_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    field_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fields.id", ondelete="CASCADE"), nullable=False)
+    series_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    reading: Mapped[uuid.UUID] = mapped_column(ForeignKey("chrono_readings.id", ondelete="CASCADE"), nullable=False)
+    player_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    replica_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    violation_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    energy_j: Mapped[float] = mapped_column(Float, nullable=False)
+    game: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("games.id", ondelete="SET NULL"))
+    outcome: Mapped[Optional[str]] = mapped_column(String(16))
+    resolved_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = _created()

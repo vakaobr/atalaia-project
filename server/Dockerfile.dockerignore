@@ -9,6 +9,7 @@
 !controller/atalaia_controller/
 !modes/
 !protocol/vectors/sync.json
+!protocol/vectors/chrono_record.json
 !server/requirements.txt
 !server/requirements-test.txt
 !server/atalaia_server/

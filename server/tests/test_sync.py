@@ -341,9 +341,11 @@ class VectorTests(SyncTestCase):
         for vector in VECTORS["valid"]:
             with self.subTest(vector=vector["name"]):
                 body = copy.deepcopy(vector["body"])
-                if vector["kind"] != "games":
+                if vector["kind"] in ("events", "scores", "nodes"):
                     await self.post("games", envelope(game=body["game"], meta=META))
-                await self.post(vector["kind"], body)
+                answer = await self.post(vector["kind"], body)
+                if vector["kind"] == "chrono":  # its records verify with the marshals vector's key
+                    self.assertEqual((answer["accepted"], answer["refused"]), (len(body["readings"]), []))
         nodes = await self.fetch("SELECT node_id, info FROM game_nodes")
         want = next(v for v in VECTORS["valid"] if v["name"] == "nodes_unknown_info_dropped")["info"]
         self.assertEqual({str(r["node_id"]): json.loads(r["info"]) for r in nodes}, want)
@@ -359,6 +361,8 @@ class VectorTests(SyncTestCase):
                                             "path": vector["path"]})
         self.assertEqual(await self.count("game_events"), 0)
         self.assertEqual(await self.count("game_node_scores"), 0)
+        for table in ("marshal_keys", "replicas", "chrono_readings", "chrono_rejects"):
+            self.assertEqual(await self.count(table), 0, table)
 
 
 class GamesApiTests(SyncTestCase):

@@ -28,7 +28,9 @@ VECTORS = json.loads((REPO / "protocol" / "vectors" / "sync.json").read_text(enc
 
 class VectorTests(unittest.TestCase):
     def test_counts(self) -> None:
-        self.assertEqual((len(VECTORS["valid"]), len(VECTORS["invalid"]), len(VECTORS["merge"])), (7, 30, 3))
+        self.assertEqual((len(VECTORS["valid"]), len(VECTORS["invalid"]), len(VECTORS["merge"])), (10, 50, 3))
+        self.assertEqual({v["kind"] for v in VECTORS["valid"]}, set(fmt.CHECKS))
+        self.assertEqual({v["kind"] for v in VECTORS["invalid"]}, set(fmt.CHECKS))
 
     def test_valid(self) -> None:
         for vector in VECTORS["valid"]:
@@ -37,7 +39,8 @@ class VectorTests(unittest.TestCase):
                 if "info" in vector:
                     self.assertEqual({str(n["node_id"]): n["info"] for n in body["nodes"]}, vector["info"])
                 raw = json.dumps(vector["body"]).encode()
-                self.assertEqual(fmt.parse(vector["kind"], raw)["game"], vector["body"]["game"])
+                self.assertEqual(fmt.parse(vector["kind"], raw).get("game"), vector["body"].get("game"))
+                self.assertEqual("game" in vector["body"], vector["kind"] in fmt.GAME_KINDS)
 
     def test_invalid(self) -> None:
         for vector in VECTORS["invalid"]:
@@ -67,6 +70,48 @@ class VectorTests(unittest.TestCase):
                 for team, amount in case["deltas"]:
                     fc.adjust_score(team, amount)
                 self.assertEqual({t: fc.total_scores.get(t, 0) for t in case["teams"]}, case["totals"])
+
+
+class ChronoRegistryTests(unittest.TestCase):
+    """The chrono registry's bodies (plan phase 14) against the records and keys they carry."""
+
+    CHRONO = json.loads((REPO / "protocol" / "vectors" / "chrono_record.json").read_text(encoding="utf-8"))
+
+    def test_the_lists_are_the_controllers(self) -> None:
+        from atalaia_controller import checkin  # noqa: PLC0415
+
+        self.assertEqual(fmt.REPLICA_TYPES, checkin.REPLICA_TYPES)
+        self.assertEqual(fmt.REPLICA_CLASS.pattern, checkin.CLASS_RE.pattern)
+
+    def test_the_valid_readings_carry_valid_signed_records(self) -> None:
+        """The chrono vector's records verify with the key the marshals vector sends (the shared test key)."""
+        from atalaia_controller import chrono  # noqa: PLC0415
+
+        marshals = next(v for v in VECTORS["valid"] if v["kind"] == "marshals")["body"]["marshals"]
+        current = next(m for m in marshals if m["replaced_at"] is None)
+        key = fmt.public_key_bytes(current["public_key"])
+        self.assertEqual(key.hex(), self.CHRONO["public_key"])
+        for reading in next(v for v in VECTORS["valid"] if v["kind"] == "chrono")["body"]["readings"]:
+            with self.subTest(series=reading["series_id"]):
+                fields = chrono.parse(reading["record"], key)
+                self.assertGreaterEqual(reading["received_at"], current["registered_at"])
+                self.assertIn(fields["reading_id"], {v["record"]["reading_id"] for v in self.CHRONO["valid"]})
+
+    def test_public_keys(self) -> None:
+        import base64  # noqa: PLC0415
+
+        raw = bytes(range(32))
+        self.assertEqual(fmt.public_key_bytes(base64.b64encode(raw).decode()), raw)
+        for bad in (raw.hex(), base64.urlsafe_b64encode(b"\xfb" * 32).decode(), base64.b64encode(raw).decode()[:-1] + "B",
+                    None, 32):
+            with self.subTest(bad=bad):
+                with self.assertRaises(fmt.SyncFormatError):
+                    fmt.public_key_bytes(bad)
+
+    def test_check_reading_fills_defaults(self) -> None:
+        entry = fmt.check_reading({"record": "{}", "series_id": "0f6e5d4c-3b2a-4198-8776-655443322110",
+                                   "outcome": None, "received_at": 1.0})
+        self.assertIsNone(entry["game_seed"])
 
 
 class ParseTests(unittest.TestCase):

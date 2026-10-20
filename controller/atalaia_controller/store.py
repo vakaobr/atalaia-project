@@ -32,6 +32,14 @@ Schema 5 (phase 4, plan phase 13; ADR-P4-3's amendment, decision P4R11) adds
 ``sync_state``: per game, the last ``events.id`` the site server acknowledged
 (the sync client's push cursor) and the hashes of the game's metadata, score
 counters and nodes as last sent, so a cycle sends only what changed.
+
+Schema 6 (phase 4, plan phase 14; ADR-P4-5 as amended, decision P4R14) adds
+``marshal_key_history``: a marshal's earlier public keys with the time each
+was replaced, so readings signed before a key rotation still verify on the
+site server (``marshal_keys`` keeps one current key per marshal, as before);
+and ``sync_items``: what the sync client last sent of the field's chrono
+registry (each marshal key's and replica's hash, each reading's id), so a
+cycle sends only what is new or changed.
 """
 
 from __future__ import annotations
@@ -44,7 +52,7 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes
 
 SCHEMA = """
@@ -200,6 +208,21 @@ CREATE TABLE IF NOT EXISTS marshal_keys (
     public_key    BLOB NOT NULL,
     player_id     TEXT,
     registered_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS marshal_key_history (
+    marshal_id    TEXT NOT NULL,                       -- schema 6: keys a marshal had before the current one
+    name          TEXT NOT NULL,
+    public_key    BLOB NOT NULL,
+    player_id     TEXT,
+    registered_at REAL NOT NULL,
+    replaced_at   REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_marshal_key_history ON marshal_key_history (marshal_id);
+CREATE TABLE IF NOT EXISTS sync_items (
+    kind    TEXT NOT NULL,                             -- schema 6: marshal, replica or reading
+    item_id TEXT NOT NULL,
+    sha     TEXT NOT NULL,                             -- SHA-256 of what was sent (readings: their id)
+    PRIMARY KEY (kind, item_id)
 );
 CREATE TABLE IF NOT EXISTS images (
     id           TEXT PRIMARY KEY,                     -- SHA-256 of data, hex
@@ -545,8 +568,51 @@ class Store:
 
     def reset_sync_state(self) -> int:
         """Forgets what was sent (a new site server): everything is sent again, and dropped there as
-        duplicates where it is already stored. Returns the number of games forgotten."""
-        return self._exec("DELETE FROM sync_state").rowcount
+        duplicates where it is already stored. Returns the number of games forgotten (the field's chrono
+        registry is forgotten too, and sent again whole)."""
+        with self._lock:
+            self._exec("DELETE FROM sync_items")
+            return self._exec("DELETE FROM sync_state").rowcount
+
+    # --- the chrono registry's sync (schema 6, plan phase 14) -----------------
+
+    SYNC_KINDS = ("marshal", "replica", "reading")
+
+    def sync_items(self, kind: str) -> dict[str, str]:
+        """What was last sent of one kind: {item id: hash}."""
+        return {r["item_id"]: r["sha"] for r in self._exec(
+            "SELECT item_id, sha FROM sync_items WHERE kind = ?", (kind,)).fetchall()}
+
+    def mark_synced(self, kind: str, items: dict[str, str]) -> None:
+        if kind not in self.SYNC_KINDS:
+            raise ValueError(f"unknown sync kind {kind!r}")
+        with self._lock:
+            for item_id, sha in items.items():
+                self._exec("INSERT INTO sync_items (kind, item_id, sha) VALUES (?, ?, ?) "
+                           "ON CONFLICT(kind, item_id) DO UPDATE SET sha = excluded.sha", (kind, item_id, sha))
+
+    def readings_unsynced(self, limit: int) -> list[dict[str, Any]]:
+        """Readings not sent yet, in the order they were stored, with the text of their record."""
+        rows = self._exec(
+            "SELECT r.* FROM chrono_readings r LEFT JOIN sync_items s ON s.kind = 'reading' "
+            "AND s.item_id = r.reading_id WHERE s.item_id IS NULL ORDER BY r.rowid LIMIT ?", (limit,)).fetchall()
+        return [{"reading_id": r["reading_id"], "record_json": r["record_json"], "series_id": r["series_id"],
+                 "outcome": r["outcome"], "received_at": r["received_at"], "game_id": r["game_id"]} for r in rows]
+
+    def count_readings_unsynced(self) -> int:
+        row = self._exec("SELECT count(*) AS n FROM chrono_readings r LEFT JOIN sync_items s ON s.kind = 'reading' "
+                         "AND s.item_id = r.reading_id WHERE s.item_id IS NULL").fetchone()
+        return int(row["n"])
+
+    def replicas(self) -> list[dict[str, Any]]:
+        return [json.loads(r["data_json"]) for r in self._exec(
+            "SELECT data_json FROM replicas ORDER BY registered_at, replica_id").fetchall()]
+
+    def marshal_key_history(self) -> list[dict[str, Any]]:
+        """Every earlier key of every marshal, oldest first."""
+        return [{"marshal_id": r["marshal_id"], "name": r["name"], "public_key": bytes(r["public_key"]),
+                 "player_id": r["player_id"], "registered_at": r["registered_at"], "replaced_at": r["replaced_at"]}
+                for r in self._exec("SELECT * FROM marshal_key_history ORDER BY replaced_at, marshal_id").fetchall()]
 
     # --- field image and positions (GM console field view) ------------------
 
@@ -813,14 +879,43 @@ class Store:
                 for r in self._exec(sql, tuple(args)).fetchall()]
 
     def delete_readings(self, *, player_id: Optional[str] = None, before: Optional[str] = None) -> int:
-        if player_id is not None:
-            return self._exec("DELETE FROM chrono_readings WHERE player_id = ?", (player_id,)).rowcount
-        if before is not None:
-            return self._exec("DELETE FROM chrono_readings WHERE timestamp < ?", (before,)).rowcount
-        return 0
+        with self._lock:
+            if player_id is not None:
+                n = self._exec("DELETE FROM chrono_readings WHERE player_id = ?", (player_id,)).rowcount
+            elif before is not None:
+                n = self._exec("DELETE FROM chrono_readings WHERE timestamp < ?", (before,)).rowcount
+            else:
+                return 0
+            if n:
+                self._exec("DELETE FROM sync_items WHERE kind = 'reading' AND item_id NOT IN "
+                           "(SELECT reading_id FROM chrono_readings)")
+            return n
+
+    def delete_marshal_history(self, replaced_before: float) -> int:
+        """Earlier marshal keys replaced before then (retention: no reading they signed is left)."""
+        return self._exec("DELETE FROM marshal_key_history WHERE replaced_at < ?", (replaced_before,)).rowcount
 
     def put_marshal(self, marshal_id: str, name: str, public_key: bytes, player_id: Optional[str],
                     now: float) -> None:
+        """The marshal's current key; a different key replaces it and the old one goes to
+        ``marshal_key_history`` (schema 6), so what it signed still verifies elsewhere."""
+        with self._lock:
+            old = self.marshal(marshal_id)
+            if old is not None and old["public_key"] != bytes(public_key):
+                self._exec("INSERT INTO marshal_key_history (marshal_id, name, public_key, player_id, registered_at, "
+                           "replaced_at) VALUES (?, ?, ?, ?, ?, ?)", (marshal_id, old["name"], old["public_key"],
+                                                                      old["player_id"], old["registered_at"], now))
+            self._put_marshal(marshal_id, name, public_key, player_id, now, keep_since=old is not None
+                              and old["public_key"] == bytes(public_key))
+
+    def _put_marshal(self, marshal_id: str, name: str, public_key: bytes, player_id: Optional[str], now: float,
+                     keep_since: bool) -> None:
+        # The same key registered again keeps the time it was first registered: readings it signed
+        # before then still fall inside its period on the site server.
+        if keep_since:
+            self._exec("UPDATE marshal_keys SET name = ?, player_id = ? WHERE marshal_id = ?",
+                       (name, player_id, marshal_id))
+            return
         self._exec("INSERT INTO marshal_keys (marshal_id, name, public_key, player_id, registered_at) "
                    "VALUES (?, ?, ?, ?, ?) ON CONFLICT(marshal_id) DO UPDATE SET name = excluded.name, "
                    "public_key = excluded.public_key, player_id = excluded.player_id, "

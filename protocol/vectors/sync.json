@@ -1,5 +1,5 @@
 {
- "description": "Controller sync bodies (protocol/sync.md). Every valid body passes its kind's check (games, events, scores, nodes); nodes_unknown_info_dropped keeps only the info keys listed under info. Every invalid body fails with the error code and path given (the first problem found, in the order of protocol/sync.md's tables). merge: the snapshots merged in order by maximum per (source, team) give counters, and the totals are the counters' sum per team plus the deltas (GM adjustments, score.delta), worked out by hand from protocol/sync.md's rule (decision P4R10).",
+ "description": "Controller sync bodies (protocol/sync.md). Every valid body passes its kind's check (games, events, scores, nodes, marshals, replicas, chrono); nodes_unknown_info_dropped keeps only the info keys listed under info. Every invalid body fails with the error code and path given (the first problem found, in the order of protocol/sync.md's tables). merge: the snapshots merged in order by maximum per (source, team) give counters, and the totals are the counters' sum per team plus the deltas (GM adjustments, score.delta), worked out by hand from protocol/sync.md's rule (decision P4R10). The chrono bodies use the marshal test key and records of chrono_record.json: chrono_readings verifies on the site server once marshals_with_a_rotated_key is stored (its second key is that test key, valid from 1792000000).",
  "valid": [
   {
    "name": "game_minimal",
@@ -229,6 +229,89 @@
      ],
      "fw_version": "0.4.0"
     }
+   }
+  },
+  {
+   "name": "marshals_with_a_rotated_key",
+   "kind": "marshals",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "marshals": [
+     {
+      "marshal_id": "m-xyz789",
+      "name": "Jose",
+      "public_key": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "registered_at": 1791000000.0,
+      "replaced_at": 1791900000.0
+     },
+     {
+      "marshal_id": "m-xyz789",
+      "name": "José",
+      "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4=",
+      "player_id": "p-17",
+      "registered_at": 1792000000.0,
+      "replaced_at": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "replicas",
+   "kind": "replicas",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "replicas": [
+     {
+      "replica_id": "8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50",
+      "owner_player_id": "p-17",
+      "type": "aeg",
+      "class": "rifle",
+      "make_model": "Tokyo Marui M4",
+      "registered_at": "2026-10-18T14:20:00Z",
+      "tag_type": "nfc",
+      "tag_uid": "04:A2:B3:C4:D5:E6:F7"
+     },
+     {
+      "replica_id": "1d2c3b4a-5f6e-4d7c-9b8a-7f6e5d4c3b2a",
+      "owner_player_id": "ana.l",
+      "type": "sniper",
+      "class": "sniper"
+     }
+    ]
+   }
+  },
+  {
+   "name": "chrono_readings",
+   "kind": "chrono",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "readings": [
+     {
+      "record": "{\"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"energy_j\": 1.051, \"field_id\": \"field-cqb-porto\", \"game_id\": \"4242\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"player_id\": \"p-17\", \"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"type\": \"checkin\", \"velocity_mps\": 102.5}",
+      "series_id": "0f6e5d4c-3b2a-4198-8776-655443322110",
+      "outcome": "pass",
+      "received_at": 1792333805.0,
+      "game_seed": 3735928559
+     },
+     {
+      "record": "{\"reading_id\": \"0c9e7d6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"spotcheck\", \"velocity_mps\": 106.68, \"bb_weight_g\": 0.25, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"José \\\"Zé\\\" Silva \\\\ Porto\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T16:05:09Z\", \"ref_reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"energy_j\": 1.423, \"signature\": \"NJuqMqyhY4JPVqFq2/hebVKligAzN+CYIKXzEU3sr5+j88HwSula9OIExyU6dzRgBWaAPEP7+aTklswum+W1CQ==\"}",
+      "series_id": "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+      "outcome": null,
+      "received_at": 1792339510.0
+     }
+    ]
    }
   }
  ],
@@ -8640,6 +8723,456 @@
    },
    "error": "duplicate_node",
    "path": "nodes[1].node_id"
+  },
+  {
+   "name": "marshals_about_a_game",
+   "kind": "marshals",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "marshals": [
+     {
+      "marshal_id": "m-xyz789",
+      "name": "Jose",
+      "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4=",
+      "registered_at": 1792000000.0
+     }
+    ],
+    "game": {
+     "game_id": 1,
+     "game_seed": 1
+    }
+   },
+   "error": "unknown_field",
+   "path": "game"
+  },
+  {
+   "name": "a_private_key",
+   "kind": "marshals",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "marshals": [
+     {
+      "marshal_id": "m-xyz789",
+      "name": "Jose",
+      "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4=",
+      "registered_at": 1792000000.0,
+      "private_key": "1fb4308d07db5844d48e8b3feb9b16b91e87c24da09706726bf9d6246132ad2d"
+     }
+    ]
+   },
+   "error": "unknown_field",
+   "path": "marshals[0].private_key"
+  },
+  {
+   "name": "public_key_hex",
+   "kind": "marshals",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "marshals": [
+     {
+      "marshal_id": "m-xyz789",
+      "name": "Jose",
+      "public_key": "6b1a309749b88cb1803951b776f8b525aee7f8cc2b024f480bce5e2a9aed7c1e",
+      "registered_at": 1792000000.0
+     }
+    ]
+   },
+   "error": "bad_public_key",
+   "path": "marshals[0].public_key"
+  },
+  {
+   "name": "public_key_31_bytes",
+   "kind": "marshals",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "marshals": [
+     {
+      "marshal_id": "m-xyz789",
+      "name": "Jose",
+      "public_key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+      "registered_at": 1792000000.0
+     }
+    ]
+   },
+   "error": "bad_public_key",
+   "path": "marshals[0].public_key"
+  },
+  {
+   "name": "replaced_before_registered",
+   "kind": "marshals",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "marshals": [
+     {
+      "marshal_id": "m-xyz789",
+      "name": "Jose",
+      "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4=",
+      "registered_at": 1792000000.0,
+      "replaced_at": 1791999999.0
+     }
+    ]
+   },
+   "error": "bad_period",
+   "path": "marshals[0].replaced_at"
+  },
+  {
+   "name": "two_current_keys",
+   "kind": "marshals",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "marshals": [
+     {
+      "marshal_id": "m-xyz789",
+      "name": "Jose",
+      "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4=",
+      "registered_at": 1792000000.0
+     },
+     {
+      "marshal_id": "m-xyz789",
+      "name": "Jose",
+      "public_key": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "registered_at": 1792000000.0
+     }
+    ]
+   },
+   "error": "two_current_keys",
+   "path": "marshals[1].replaced_at"
+  },
+  {
+   "name": "the_same_key_twice",
+   "kind": "marshals",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "marshals": [
+     {
+      "marshal_id": "m-xyz789",
+      "name": "Jose",
+      "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4=",
+      "registered_at": 1792000000.0
+     },
+     {
+      "marshal_id": "m-xyz789",
+      "name": "Jose",
+      "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4=",
+      "registered_at": 1792000000.0,
+      "replaced_at": 1792000001.0
+     }
+    ]
+   },
+   "error": "duplicate_key",
+   "path": "marshals[1].public_key"
+  },
+  {
+   "name": "marshal_name_control",
+   "kind": "marshals",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "marshals": [
+     {
+      "marshal_id": "m-xyz789",
+      "name": "Jose\n",
+      "public_key": "axowl0m4jLGAOVG3dvi1Ja7n+MwrAk9IC85eKprtfB4=",
+      "registered_at": 1792000000.0
+     }
+    ]
+   },
+   "error": "bad_text",
+   "path": "marshals[0].name"
+  },
+  {
+   "name": "no_marshals",
+   "kind": "marshals",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "marshals": []
+   },
+   "error": "bad_batch_size",
+   "path": "marshals"
+  },
+  {
+   "name": "replica_unknown_type",
+   "kind": "replicas",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "replicas": [
+     {
+      "replica_id": "8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50",
+      "owner_player_id": "p-17",
+      "type": "rpg",
+      "class": "rifle"
+     }
+    ]
+   },
+   "error": "bad_type",
+   "path": "replicas[0].type"
+  },
+  {
+   "name": "replica_class_upper_case",
+   "kind": "replicas",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "replicas": [
+     {
+      "replica_id": "8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50",
+      "owner_player_id": "p-17",
+      "type": "aeg",
+      "class": "Rifle"
+     }
+    ]
+   },
+   "error": "bad_text",
+   "path": "replicas[0].class"
+  },
+  {
+   "name": "replica_nfc_uid_lower_case",
+   "kind": "replicas",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "replicas": [
+     {
+      "replica_id": "8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50",
+      "owner_player_id": "p-17",
+      "type": "aeg",
+      "class": "rifle",
+      "tag_type": "nfc",
+      "tag_uid": "04:a2:b3:c4"
+     }
+    ]
+   },
+   "error": "bad_tag",
+   "path": "replicas[0].tag_uid"
+  },
+  {
+   "name": "replica_tag_without_type",
+   "kind": "replicas",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "replicas": [
+     {
+      "replica_id": "8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50",
+      "owner_player_id": "p-17",
+      "type": "aeg",
+      "class": "rifle",
+      "tag_uid": "QR-1"
+     }
+    ]
+   },
+   "error": "bad_tag",
+   "path": "replicas[0].tag_uid"
+  },
+  {
+   "name": "replica_owner_name",
+   "kind": "replicas",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "replicas": [
+     {
+      "replica_id": "8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50",
+      "owner_player_id": "p-17",
+      "type": "aeg",
+      "class": "rifle",
+      "owner_name": "Rita"
+     }
+    ]
+   },
+   "error": "unknown_field",
+   "path": "replicas[0].owner_name"
+  },
+  {
+   "name": "the_same_replica_twice",
+   "kind": "replicas",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "replicas": [
+     {
+      "replica_id": "8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50",
+      "owner_player_id": "p-17",
+      "type": "aeg",
+      "class": "rifle"
+     },
+     {
+      "replica_id": "8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50",
+      "owner_player_id": "p-17",
+      "type": "aeg",
+      "class": "rifle"
+     }
+    ]
+   },
+   "error": "duplicate_replica",
+   "path": "replicas[1].replica_id"
+  },
+  {
+   "name": "record_as_an_object",
+   "kind": "chrono",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "readings": [
+     {
+      "record": {
+       "reading_id": "3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b",
+       "replica_id": "8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50",
+       "player_id": "p-17",
+       "type": "checkin",
+       "velocity_mps": 102.5,
+       "bb_weight_g": 0.2,
+       "chrono_id": "chrono-field-1",
+       "marshal_id": "m-xyz789",
+       "marshal_name": "Jose",
+       "game_id": "4242",
+       "field_id": "field-cqb-porto",
+       "timestamp": "2026-10-18T14:30:00Z",
+       "energy_j": 1.051,
+       "signature": "k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA=="
+      },
+      "series_id": "0f6e5d4c-3b2a-4198-8776-655443322110",
+      "outcome": "pass",
+      "received_at": 1792333805.0
+     }
+    ]
+   },
+   "error": "not_a_text",
+   "path": "readings[0].record"
+  },
+  {
+   "name": "record_too_large",
+   "kind": "chrono",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "readings": [
+     {
+      "record": "                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 ",
+      "series_id": "0f6e5d4c-3b2a-4198-8776-655443322110",
+      "outcome": "pass",
+      "received_at": 1792333805.0
+     }
+    ]
+   },
+   "error": "too_large",
+   "path": "readings[0].record"
+  },
+  {
+   "name": "unknown_outcome",
+   "kind": "chrono",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "readings": [
+     {
+      "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+      "series_id": "0f6e5d4c-3b2a-4198-8776-655443322110",
+      "outcome": "ok",
+      "received_at": 1792333805.0
+     }
+    ]
+   },
+   "error": "bad_outcome",
+   "path": "readings[0].outcome"
+  },
+  {
+   "name": "series_id_upper_case",
+   "kind": "chrono",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "readings": [
+     {
+      "record": "{\"reading_id\": \"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\", \"replica_id\": \"8a1f0c2e-7b3d-4c5e-8f9a-0b1c2d3e4f50\", \"player_id\": \"p-17\", \"type\": \"checkin\", \"velocity_mps\": 102.5, \"bb_weight_g\": 0.2, \"chrono_id\": \"chrono-field-1\", \"marshal_id\": \"m-xyz789\", \"marshal_name\": \"Jose\", \"game_id\": \"4242\", \"field_id\": \"field-cqb-porto\", \"timestamp\": \"2026-10-18T14:30:00Z\", \"energy_j\": 1.051, \"signature\": \"k0z65jo7aFbSKNgPEE8pBo0kgqUppF4gEB9U+BVig9+WCsN8TCw8owwx7Z70FmVUhDH0U6BH0ebwqv8QuHHVDA==\"}",
+      "series_id": "0F6E5D4C-3B2A-4198-8776-655443322110",
+      "outcome": "pass",
+      "received_at": 1792333805.0
+     }
+    ]
+   },
+   "error": "bad_text",
+   "path": "readings[0].series_id"
+  },
+  {
+   "name": "no_readings",
+   "kind": "chrono",
+   "body": {
+    "sync_version": 1,
+    "controller": {
+     "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+     "version": "0.1.0"
+    },
+    "readings": []
+   },
+   "error": "bad_batch_size",
+   "path": "readings"
   }
  ],
  "merge": [

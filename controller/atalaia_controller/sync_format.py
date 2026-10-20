@@ -20,6 +20,17 @@ data carries a coordinate is refused), tokens and keys (there is no field
 for them), check-in names (likewise). Event types are checked by their
 form, not against today's list, so a newer controller's events still reach
 an older site server.
+
+The field's chrono registry (plan phase 14; ADR-P4-5 as amended, P4R14,
+P4R15) travels in three bodies that belong to the field, not to one game,
+so they carry no ``game``: the marshals' public keys with their periods
+(``check_marshals``; never a private key), the replica registry
+(``check_replicas``) and the signed readings with the controller's series
+and outcomes (``check_chrono``). A reading's ``record`` is the signed
+record's JSON text exactly as the controller stored it: this module checks
+only its size; the site server verifies each record on its own with
+``chrono.py`` and keeps the ones that fail apart, so one bad record never
+refuses a batch.
 """
 
 from __future__ import annotations
@@ -30,6 +41,8 @@ import re
 import uuid
 from typing import Any
 
+from . import chrono
+
 SYNC_VERSION = 1
 MAX_EVENTS = 500            # events per batch
 MAX_SOURCES = 1024          # score counter sources per snapshot
@@ -37,6 +50,10 @@ MAX_NODES = 512             # nodes per snapshot
 MAX_EVENT_DATA = 1024       # bytes of an event's data, as compact JSON
 MAX_PARAMS = 8192           # bytes of a game's params, as compact JSON
 MAX_BODY = 1024 * 1024      # bytes of a request body
+MAX_MARSHALS = 512          # marshal keys per body
+MAX_REPLICAS = 500          # replicas per body
+MAX_READINGS = 500          # chrono readings per body
+MAX_RECORD = 4096           # bytes of a reading's signed record (its JSON text, UTF-8)
 TEAM_MAX = 23               # bytes of a team name (the core's ATALAIA_TEAM_NAME_MAX - 1)
 TEAMS_MAX = 8
 STATES = ("ready", "running", "paused", "ended")
@@ -60,6 +77,13 @@ DATA_KEY = re.compile(r"[a-z][a-z0-9_]{0,31}")
 # Keys that would carry a position (P4R25): refused anywhere in an event's data.
 POSITION_KEYS = frozenset({"lat", "lon", "lng", "latitude", "longitude", "alt", "altitude", "position",
                            "positions", "gps", "coords", "coordinates", "x", "y"})
+# The chrono registry (plan phase 14): as protocol/checkin.md and app/lib/chrono/replica.dart have them.
+REPLICA_TYPES = ("aeg", "gbb", "hpa", "bolt_action", "dmr", "sniper", "pistol", "shotgun")
+REPLICA_CLASS = re.compile(r"[a-z0-9_]{1,32}")
+TAG_NFC = re.compile(r"[0-9A-F]{2}(:[0-9A-F]{2}){3}((:[0-9A-F]{2}){3}){0,2}")
+TAG_QR = re.compile(r"[\x21-\x7e]{1,64}")
+OUTCOMES = ("pass", "fail", "warn", "unjudged")  # a series' result (checkin.py's _judge)
+PUBLIC_KEY_B64 = 44  # 32 bytes in standard base64 with padding
 # What a node's info may carry to the site server; anything else is dropped.
 NODE_INFO = {
     "owner": "team?", "phase": "int?", "battery_pct": "int?", "rssi": "int?", "snr": "num?", "epoch": "int?",
@@ -141,9 +165,10 @@ def _json_size(value: Any) -> int:
     return len(json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
 
 
-def _envelope(body: Any, extra: tuple[str, ...]) -> dict[str, Any]:
+def _envelope(body: Any, extra: tuple[str, ...], game: bool = True) -> dict[str, Any]:
+    """The common part: ``game`` only in the bodies about one game (not the field's chrono registry)."""
     body = _obj(body, "")
-    _keys(body, "", ("sync_version", "controller", "game", *extra))
+    _keys(body, "", ("sync_version", "controller", *(("game",) if game else ()), *extra))
     if body["sync_version"] != SYNC_VERSION or isinstance(body["sync_version"], bool):
         _fail("unsupported_version", "sync_version")
     ctrl = _obj(body["controller"], "controller")
@@ -157,10 +182,12 @@ def _envelope(body: Any, extra: tuple[str, ...]) -> dict[str, Any]:
     if parsed is None or str(parsed) != ctrl["id"]:
         _fail("not_a_uuid", "controller.id")  # the canonical lower-case form only
     _text(ctrl["version"], "controller.version", 32, pattern=VERSION)
-    game = _obj(body["game"], "game")
-    _keys(game, "game", ("game_id", "game_seed"))
-    _int(game["game_id"], "game.game_id", 0, U16)
-    _int(game["game_seed"], "game.game_seed", 0, U32)
+    if not game:
+        return body
+    ident = _obj(body["game"], "game")
+    _keys(ident, "game", ("game_id", "game_seed"))
+    _int(ident["game_id"], "game.game_id", 0, U16)
+    _int(ident["game_seed"], "game.game_seed", 0, U32)
     return body
 
 
@@ -341,11 +368,146 @@ def check_nodes(body: Any) -> dict[str, Any]:
     return body
 
 
-CHECKS = {"games": check_game, "events": check_events, "scores": check_scores, "nodes": check_nodes}
+# --- the chrono registry (plan phase 14) -------------------------------------------------
+
+def _name(value: Any, path: str) -> str:
+    """A marshal's name as chrono-record.md has marshal_name: 1-64 characters, no control characters."""
+    if not isinstance(value, str) or not 1 <= len(value) <= chrono.NAME_MAX or not chrono._text_ok(value):
+        _fail("bad_text", path)
+    return value
+
+
+def public_key_bytes(value: Any, path: str = "public_key") -> bytes:
+    """An Ed25519 public key as the sync sends it: 32 bytes in standard base64 with padding."""
+    import base64  # noqa: PLC0415
+    import binascii  # noqa: PLC0415
+
+    if not isinstance(value, str) or len(value) != PUBLIC_KEY_B64:
+        _fail("bad_public_key", path)
+    try:
+        raw = base64.b64decode(value.encode("ascii"), validate=True)
+    except (binascii.Error, UnicodeEncodeError):
+        _fail("bad_public_key", path)
+    if len(raw) != 32 or base64.b64encode(raw).decode("ascii") != value:
+        _fail("bad_public_key", path)
+    return raw
+
+
+def check_marshal(entry: Any, path: str = "marshal") -> dict[str, Any]:
+    """One marshal key: ``{marshal_id, name, public_key, registered_at, player_id?, replaced_at?}``.
+    ``replaced_at`` null (or absent) is the marshal's current key on the sending controller."""
+    entry = _obj(entry, path)
+    _keys(entry, path, ("marshal_id", "name", "public_key", "registered_at"), ("player_id", "replaced_at"))
+    _text(entry["marshal_id"], f"{path}.marshal_id", 64, pattern=chrono.ID_RE)
+    _name(entry["name"], f"{path}.name")
+    public_key_bytes(entry["public_key"], f"{path}.public_key")
+    _text(entry.setdefault("player_id", None), f"{path}.player_id", 64, null=True, pattern=chrono.ID_RE)
+    _num(entry["registered_at"], f"{path}.registered_at", 0, TIME_MAX)
+    _num(entry.setdefault("replaced_at", None), f"{path}.replaced_at", 0, TIME_MAX, null=True)
+    if entry["replaced_at"] is not None and entry["replaced_at"] < entry["registered_at"]:
+        _fail("bad_period", f"{path}.replaced_at")
+    return entry
+
+
+def check_marshals(body: Any) -> dict[str, Any]:
+    body = _envelope(body, ("marshals",), game=False)
+    marshals = body["marshals"]
+    if not isinstance(marshals, list) or not 1 <= len(marshals) <= MAX_MARSHALS:
+        _fail("bad_batch_size", "marshals")
+    seen: set[tuple[str, str]] = set()
+    current: set[str] = set()
+    for i, entry in enumerate(marshals):
+        path = f"marshals[{i}]"
+        check_marshal(entry, path)
+        key = (entry["marshal_id"], entry["public_key"])
+        if key in seen:
+            _fail("duplicate_key", f"{path}.public_key")
+        seen.add(key)
+        if entry["replaced_at"] is None:
+            if entry["marshal_id"] in current:
+                _fail("two_current_keys", f"{path}.replaced_at")
+            current.add(entry["marshal_id"])
+    return body
+
+
+def check_replica(entry: Any, path: str = "replica") -> dict[str, Any]:
+    """One replica of the field's registry, as app/lib/chrono/replica.dart writes it."""
+    entry = _obj(entry, path)
+    _keys(entry, path, ("replica_id", "owner_player_id", "type", "class"),
+          ("make_model", "registered_at", "tag_type", "tag_uid"))
+    _text(entry["replica_id"], f"{path}.replica_id", 36, pattern=chrono.UUID_RE)
+    _text(entry["owner_player_id"], f"{path}.owner_player_id", 64, pattern=chrono.ID_RE)
+    if entry["type"] not in REPLICA_TYPES:
+        _fail("bad_type", f"{path}.type")
+    _text(entry["class"], f"{path}.class", 32, pattern=REPLICA_CLASS)
+    mm = entry.setdefault("make_model", None)
+    if mm is not None:
+        _name(mm, f"{path}.make_model")
+    registered = entry.setdefault("registered_at", None)
+    if registered is not None:
+        _text(registered, f"{path}.registered_at", 20, pattern=chrono.TIME_RE)
+    tag_type, tag_uid = entry.setdefault("tag_type", None), entry.setdefault("tag_uid", None)
+    if (tag_type is None) != (tag_uid is None):
+        _fail("bad_tag", f"{path}.tag_uid")
+    if tag_type is not None:
+        if tag_type not in ("nfc", "qr"):
+            _fail("bad_tag", f"{path}.tag_type")
+        if not isinstance(tag_uid, str) or not (TAG_NFC if tag_type == "nfc" else TAG_QR).fullmatch(tag_uid):
+            _fail("bad_tag", f"{path}.tag_uid")
+    return entry
+
+
+def check_replicas(body: Any) -> dict[str, Any]:
+    body = _envelope(body, ("replicas",), game=False)
+    replicas = body["replicas"]
+    if not isinstance(replicas, list) or not 1 <= len(replicas) <= MAX_REPLICAS:
+        _fail("bad_batch_size", "replicas")
+    seen: set[str] = set()
+    for i, entry in enumerate(replicas):
+        check_replica(entry, f"replicas[{i}]")
+        if entry["replica_id"] in seen:
+            _fail("duplicate_replica", f"replicas[{i}].replica_id")
+        seen.add(entry["replica_id"])
+    return body
+
+
+def check_reading(entry: Any, path: str = "reading") -> dict[str, Any]:
+    """One stored reading: ``{record, series_id, outcome, received_at, game_seed?}``. ``record`` is the
+    signed record's JSON text as the controller stored it; its content is the site server's to verify
+    (chrono.py), not this check's."""
+    entry = _obj(entry, path)
+    _keys(entry, path, ("record", "series_id", "outcome", "received_at"), ("game_seed",))
+    record = entry["record"]
+    if not isinstance(record, str) or not record:
+        _fail("not_a_text", f"{path}.record")
+    if len(record.encode("utf-8", "surrogatepass")) > MAX_RECORD:
+        _fail("too_large", f"{path}.record")
+    _text(entry["series_id"], f"{path}.series_id", 36, pattern=chrono.UUID_RE)
+    if entry["outcome"] is not None and entry["outcome"] not in OUTCOMES:
+        _fail("bad_outcome", f"{path}.outcome")
+    _num(entry["received_at"], f"{path}.received_at", 0, TIME_MAX)
+    _int(entry.setdefault("game_seed", None), f"{path}.game_seed", 0, U32, null=True)
+    return entry
+
+
+def check_chrono(body: Any) -> dict[str, Any]:
+    body = _envelope(body, ("readings",), game=False)
+    readings = body["readings"]
+    if not isinstance(readings, list) or not 1 <= len(readings) <= MAX_READINGS:
+        _fail("bad_batch_size", "readings")
+    for i, entry in enumerate(readings):
+        check_reading(entry, f"readings[{i}]")
+    return body
+
+
+CHECKS = {"games": check_game, "events": check_events, "scores": check_scores, "nodes": check_nodes,
+          "marshals": check_marshals, "replicas": check_replicas, "chrono": check_chrono}
+GAME_KINDS = ("games", "events", "scores", "nodes")  # the bodies about one game; the rest are the field's
 
 
 def parse(kind: str, raw: bytes) -> dict[str, Any]:
-    """Parses and checks a request body of one kind (games, events, scores, nodes)."""
+    """Parses and checks a request body of one kind (games, events, scores, nodes, marshals, replicas,
+    chrono)."""
     if len(raw) > MAX_BODY:
         _fail("too_large", "")
     try:

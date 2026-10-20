@@ -4,6 +4,7 @@
 
     POST   /api/v1/fields                                   server administrator: a new field
     GET    /api/v1/fields                                   the fields the caller has a role on (all, for a server administrator)
+    PATCH  /api/v1/fields/{field_id}                        the field's admin: {chrono_sharing_enabled} (plan phase 14)
     GET    /api/v1/fields/{field_id}/roles                  the field's admin or gm
     PUT    /api/v1/fields/{field_id}/roles                  {username, role}: grant
     DELETE /api/v1/fields/{field_id}/roles/{user_id}/{role} revoke
@@ -62,6 +63,11 @@ class FieldIn(BaseModel):
     timezone: str = PydanticField(default="Europe/Lisbon", max_length=64)
 
 
+class FieldPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    chrono_sharing_enabled: Optional[bool] = None
+
+
 class SyncKeyIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     label: Optional[str] = PydanticField(default=None, max_length=64)
@@ -74,7 +80,8 @@ class GrantIn(BaseModel):
 
 
 def field_json(f: Field, roles: Any = None) -> dict[str, Any]:
-    body = {"id": str(f.id), "name": f.name, "slug": f.slug, "field_type": f.field_type, "timezone": f.timezone}
+    body = {"id": str(f.id), "name": f.name, "slug": f.slug, "field_type": f.field_type, "timezone": f.timezone,
+            "chrono_sharing_enabled": f.chrono_sharing_enabled}
     if roles is not None:
         body["my_roles"] = sorted(roles)
     return body
@@ -122,6 +129,26 @@ async def _field(db: AsyncSession, field_id: uuid.UUID) -> Field:
     if field is None:
         raise HTTPException(404, "field_not_found")
     return field
+
+
+@router.patch("/fields/{field_id}")
+async def update_field(field_id: uuid.UUID, body: FieldPatch, request: Request,
+                       principal: Principal = Depends(current_principal),
+                       db: AsyncSession = Depends(get_session)) -> JSONResponse:
+    """The field's settings: whether it shares chrono records with other sharing fields (ADR-P4-5), for
+    the players who consented to it (``PUT /api/v1/me/consents/chrono-sharing/{field_id}``)."""
+    require_field_role(principal, field_id, "admin")
+    field = await _field(db, field_id)
+    changed = {}
+    if body.chrono_sharing_enabled is not None and body.chrono_sharing_enabled != field.chrono_sharing_enabled:
+        field.chrono_sharing_enabled = body.chrono_sharing_enabled
+        changed["chrono_sharing_enabled"] = body.chrono_sharing_enabled
+    if changed:
+        record(db, "field_update", request, user_id=principal.user.id, resource="field", resource_id=field.id,
+               details=changed)
+    await db.commit()
+    await db.refresh(field)
+    return JSONResponse(field_json(field, principal.roles.get(field.id, set())), headers=NO_STORE)
 
 
 def _may_manage(principal: Principal, field_id: uuid.UUID, role: str) -> None:

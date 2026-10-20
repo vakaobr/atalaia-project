@@ -1122,6 +1122,28 @@ through the sync endpoint (every valid one accepted, every invalid one
 refused with its reason), a rotated key, a reading uploaded twice,
 erasure keeps the record and drops the link to the person.
 
+**Built 2026-10-20** (in software; decisions S14-1 to S14-12). Differences
+from the text above, as built: the three sync bodies belong to the field,
+not a game (no `game` in them), with 3 valid and 20 invalid new shared
+vectors in `protocol/vectors/sync.json`; a reading's record travels as the
+JSON text the controller stored, verified by `atalaia_server/chrono_verify.py`
+(plain Python over `atalaia_controller.chrono`, its tests in tools/check.sh)
+against the keys of its marshal valid when the **controller** received it
+(S14-2), and stored by `atalaia_server/chrono_registry.py`; a reading that
+fails goes to `chrono_rejects` and is named in the answer, and one kept apart
+for want of its marshal's key is checked again when the key arrives;
+violations are failed or warned spot checks only (S14-7). On the controller,
+store schema 6 adds `marshal_key_history` (a rotation keeps the old key's
+period) and `sync_items` (S14-4). `field_player_ids` is made here, not in
+plan phase 16 (S14-3); consents gain `field_id` for the per-field
+`chrono_sharing` consent, and sharing needs both fields and the person's
+consent for each (S14-5). Also: a marshal's account registers its phone's
+public key (`/api/v1/fields/{field}/marshal-keys`), a field's admin revokes a
+key, switches sharing (`PATCH /api/v1/fields/{field}`) and erases a player's
+chrono data (S14-10); the person's history is `GET /api/v1/me/chrono`; the
+staff views are `api/chrono.py` (S14-6). `GET /api/v1/sync/chrono` (the
+controller pulling other fields' records) waits for plan phase 16's roster.
+
 ---
 
 ## Plan phase 15: Scheduling, field pages and feeds
@@ -1152,12 +1174,14 @@ phase 3 built (`protocol/checkin.md`, `controller/atalaia_controller/checkin.py`
   `app/lib/chrono/limit_templates/`), per-field `player_id` of the
   phase 3 form (`p-` + 12 base32) made once or adopted from the phone's
   field identity with its secret (the SHA-256 compared, as the
-  controller does), ticket secrets (SHA-256 kept), `GET
+  controller does; *the `field_player_ids` table itself was made by plan
+  phase 14's `0005_chrono`, decision S14-3, 2026-10-20*), ticket secrets (SHA-256 kept), `GET
   /api/v1/sync/schedule`, `GET /api/v1/sync/roster`, `POST
   /api/v1/sync/checkins`; migration `0006_registration`.
 - Controller: `sync_client.py` pulls the schedule and roster until the
   game starts; `checkin.py` gets **expected** check-ins (a new
-  `status = 'expected'`, store schema 6) with their declarations
+  `status = 'expected'`, store schema 6, *now the next free number: plan
+  phase 14 took 6, decision S14-4, 2026-10-20*) with their declarations
   `pending` in the "replicas to chrono" list, check-in by registration
   id and ticket secret (`POST /api/v1/checkin` gains `registration_id`
   and `ticket`), a printed `atalaia:ticket:` code scanned by a marshal

@@ -1043,7 +1043,9 @@ standard library, offline first, its cursor in `sync_state` (store schema 5);
 both check bodies with `controller/atalaia_controller/sync_format.py` against
 `protocol/vectors/sync.json`. A joined controller's "ended" does not end a
 game; a `game.end` event does. The other endpoints of item 6 come with
-their plan phases.
+their plan phases. *(2026-10-20, plan phase 14: `POST /api/v1/sync/marshals`,
+`replicas` and `chrono` are built, field-level bodies without a `game`;
+`GET /api/v1/sync/chrono` still waits, see ADR-P4-5.)*
 
 ---
 
@@ -1389,6 +1391,25 @@ proposed):**
 - **Cross-field sharing** uses accounts: per-field player ids are
   pseudonymous on purpose (decision F3), so records of two fields are
   linked only through an account that adopted both ids and consented.
+
+*Built 2026-10-20 (plan phase 14; decisions S14-1 to S14-12, proposed):*
+the controller pushes `POST /api/v1/sync/marshals` (public keys with the
+period each was the marshal's key: the controller now keeps earlier keys in
+`marshal_key_history`, store schema 6), `POST /api/v1/sync/replicas` and
+`POST /api/v1/sync/chrono` (each record as the JSON text it stored, with the
+series, its outcome and when the controller received it). The site server
+verifies each reading with `atalaia_controller.chrono` against the keys of
+its marshal valid when the controller received it
+(`server/atalaia_server/chrono_verify.py`), stores it verbatim
+(`chrono_readings.record_json`), keeps the ones that fail apart
+(`chrono_rejects`, with the reason, rechecked when the marshal's keys
+arrive) and turns failed or warned spot checks into `chrono_violations`. A
+marshal can register their phone's public key from their account; a field's
+admin can revoke a key. No private key exists on the site server, and
+`protocol/chrono-record.md` now says so. Sharing between fields needs both
+fields' `chrono_sharing_enabled` and the person's consent for each of the two
+fields; the shared records carry the marshal's public key so that the other
+field can check them itself.
 
 ---
 
@@ -2185,6 +2206,13 @@ they end, the audit log after 36 months, server-wide) runs inside the
 server daily at `ATALAIA_PURGE_HOUR` (03:00 UTC) and as `python -m
 atalaia_server purge`. The templates are in `docs/templates/`. The list of
 personal data tables lives in `server/atalaia_server/personal_data.py`.
+*(2026-10-20, plan phase 14, S14-8: the chrono registry joined it. Access
+and export add `player_ids.json`, `chrono_records.json` (each record as
+signed, with the marshal's public key) and `marshal_keys.json`; erasure keeps
+the signed records and deletes the account's links to its per-field player
+ids (`field_player_ids`), clears the make, model and tag of its replicas and
+unlinks its marshal keys; the purge removes readings after the field's
+`default_retention_days` (365).)*
 
 ---
 

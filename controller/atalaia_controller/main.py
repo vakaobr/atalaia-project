@@ -10,7 +10,7 @@
     ca        print the field CA's fingerprint (it is on the check-in poster) and its folder
     sync-key  store the field's site server API key, read from standard input (ADR-P4-3);
               --status shows where the key comes from and its fingerprint, --clear forgets
-              the stored one, --resend sends every game to the site server again
+              the stored one, --resend sends every game and the chrono registry to the site server again
 """
 
 from __future__ import annotations
@@ -208,8 +208,8 @@ def sync_key(cfg: Config, store: Store, action: str, stdin: Any = sys.stdin) -> 
         return 0
     if action == "resend":
         n = store.reset_sync_state()
-        print(f"every game is sent again at the next sync ({n} were sent before); the site server "
-              "drops what it already has")
+        print(f"every game and the chrono registry are sent again at the next sync ({n} games were sent "
+              "before); the site server drops what it already has")
         return 0
     if stdin.isatty():
         import getpass  # noqa: PLC0415
@@ -235,7 +235,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--status", action="store_true", help="sync-key: where the API key comes from")
     group.add_argument("--clear", action="store_true", help="sync-key: forget the stored API key")
-    group.add_argument("--resend", action="store_true", help="sync-key: send every game again")
+    group.add_argument("--resend", action="store_true", help="sync-key: send every game and the chrono registry again")
     parser.add_argument("--config", help="TOML settings file (see controller/controller.example.toml)")
     parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args(argv)

@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Implementation (plan phases 1, 2, 3, 4, 10, 11, 12 and 13 built in software, 2026-10-20; sync over 4G: HW1)
+**Current phase:** Implementation (plan phases 1, 2, 3, 4, 10, 11, 12, 13 and 14 built in software, 2026-10-20; sync over 4G: HW1)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-20 (plan phase 4, full clean-copy check)
-**Next step:** plan phase 5 (VIP / Payload) on the modes chain; plan phase 14 (chrono registry) on the site server chain
+**Last verified:** 2026-10-20 (plan phase 14, full clean-copy check)
+**Next step:** plan phase 5 (VIP / Payload) on the modes chain; plan phase 15 (scheduling, field pages and feeds) on the site server chain
 
 ## Completed
 
@@ -51,8 +51,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | 10 | Site server skeleton and test tooling | Software, now | -- | **Done in software** (2026-10-19) |
 | 11 | Accounts, sessions and roles | Software, now | 10 | **Done in software** (2026-10-19) |
 | 12 | Personal data | Software, now | 11 | **Done in software** (2026-10-19) |
-| 13 | Controller sync | Software, now | 10, 11 | **Next** (site server chain) |
-| 14 | Chrono registry | Software, now | 13 | Pending |
+| 13 | Controller sync | Software, now | 10, 11 | **Done in software** (2026-10-20; over 4G: HW1) |
+| 14 | Chrono registry | Software, now | 13 | **Done in software** (2026-10-20; a real chronograph: HW4) |
 | 15 | Scheduling, field pages and feeds | Software, now | 11 | Pending |
 | 16 | Registration and game-day sync | Software, now | 13, 15 | Pending |
 | 17 | Registration import and adapters | Software, now | 16 | Pending |
@@ -288,6 +288,52 @@ their plan phases (chrono 14, check-ins and roster 16, field and branding
 18, presets 20); the history views (20). Decisions S13-1 to S13-12, all
 open; S13-8 (no controller stream client yet) and S13-12 (the request limit
 shared with sync) want the maintainer's eye.
+
+## Plan phase 14: chrono registry (built 2026-10-20, in software)
+
+What exists: the controller pushes the field's chrono registry after its
+games, each item once and again only when it changed: `POST
+/api/v1/sync/marshals` (the marshals' Ed25519 public keys with the period
+each was the marshal's key; the controller now keeps earlier keys after a
+rotation, `marshal_key_history`, and what it sent, `sync_items`: store schema
+6), `POST /api/v1/sync/replicas` and `POST /api/v1/sync/chrono` (every signed
+reading as the text the controller stored, with its series and outcome);
+also on the stream. The site server verifies each reading with the
+controller's own `chrono.py` against the keys of its marshal valid when the
+controller received it (`chrono_verify.py`), stores it verbatim, keeps the
+ones that do not verify apart with their reason (named in the answer,
+rechecked when the marshal's key arrives, never silently dropped), counts
+resends as duplicates and another record under a stored id as a conflict,
+and makes failed or warned spot checks into violations. Public keys only:
+no private key exists on the site server (P4R14), and
+`protocol/chrono-record.md` now says so. Views for the field's admin, gm and
+marshal (readings, rejects for admin and gm, violations and their outcome,
+replicas, keys, a player's history), a marshal's own key registration, key
+revocation, the person's own history (`GET /api/v1/me/chrono`), sharing
+between fields only with both fields switched on and the person's consent
+for each, a field's erasure of a player's chrono data; the registry in
+access, export, erasure (the signed records stay, the link to the person
+goes) and the purge (365 days, per field); migration `0005_chrono` with
+`field_player_ids` and per-field consents. No new dependency.
+
+Tests: 226 in the site server's image against PostgreSQL 16 (39 new: the
+shared chrono vectors through `POST /api/v1/sync/chrono`, every valid one
+accepted verbatim and every invalid one refused with its reason and kept
+apart; tampered records; a reading sent twice and a conflicting one; a
+rotated and a revoked key; violations; the views and their roles; sharing
+with consent; access, export, erasure and the purge; 0005 with data; the
+chrono part of `test_sync_e2e.py`, the real controller client with a key
+rotation against the site server under uvicorn); 37 of the server's tests
+(15 new, `test_chrono_verify.py`: the vectors, tampered records, key periods)
+run in tools/check.sh with no database; 270 controller tests (12 new: the
+registry's sync against the in-process site server, privacy with signed
+readings, the new shared vectors). Not yet: a real chronograph and phones
+(HW4); the account's adoption of a phone's player id (plan phase 16), so the
+own history and sharing have no real links yet; the controller pulling other
+fields' records (`GET /api/v1/sync/chrono`, with plan phase 16's roster); a
+controller's erasure reaching the site server by itself (S14-10). Decisions
+S14-1 to S14-12, all open; S14-5 (sharing consent per field) and S14-10
+(erasure propagation) want the maintainer's eye.
 
 ## Dependencies
 
