@@ -1,0 +1,9 @@
+{
+  "id": "controller:3",
+  "t": 900000,
+  "node": "controller",
+  "type": "scenario.objective.completed",
+  "team": "red",
+  "data": { "objective": "bridge" },
+  "prio": "critical"
+}

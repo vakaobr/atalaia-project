@@ -133,6 +133,7 @@ extern const char
     master_satellites_node_lua_start[] asm("_binary_master_satellites_node_lua_start");
 extern const char hacking_terminal_node_lua_start[] asm("_binary_hacking_terminal_node_lua_start");
 extern const char vip_payload_node_lua_start[] asm("_binary_vip_payload_node_lua_start");
+extern const char objectives_node_lua_start[] asm("_binary_objectives_node_lua_start");
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -663,6 +664,7 @@ static void seed_presets(void)
         {"org.atalaia.hacking_terminal", hacking_terminal_node_lua_start,
          strlen(hacking_terminal_node_lua_start)},
         {"org.atalaia.vip_payload", vip_payload_node_lua_start, strlen(vip_payload_node_lua_start)},
+        {"org.atalaia.objectives", objectives_node_lua_start, strlen(objectives_node_lua_start)},
     };
     int n = builtin_presets_seed(sources, (int)(sizeof(sources) / sizeof(sources[0])));
     if (n > 0) ESP_LOGI(TAG, "stored %d built-in preset(s)", n);

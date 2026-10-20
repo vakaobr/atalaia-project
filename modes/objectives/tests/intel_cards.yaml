@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The setup as a scenario's field.lua sends it (cmd.mode), given here by hand: any card
+# counts (intel cards found on the field), for the team that pressed its button.
+name: "Intel cards: any card counts once, for the team at the box; a card before any team pressed its button does not"
+nodes: { hq: objective }
+steps:
+  - input: { node: hq, type: cmd.mode, data: { name: setup, kind: tags, any: true, count: 2, label: HQ, lang: en } }
+  - expect_screen: { node: hq, template: obj_tags, data: { label: HQ, lang: en, have: 0, count: 2, any: true } }
+  - scan: { node: hq, uid: "04a1b2c3d4" }
+  - expect_screen: { node: hq, template: obj_tags, data: { note: team_first } }
+  - expect_no: tag.scanned
+  - press: { node: hq, team: blue }
+  - scan: { node: hq, uid: "04a1b2c3d4" }
+  - expect: { type: tag.scanned, node: hq, team: blue, data: { tag: "04a1b2c3d4" } }
+  - scan: { node: hq, uid: "04a1b2c3d4" }
+  - expect_screen: { node: hq, template: obj_tags, data: { team: blue, have: 1, note: again } }
+  # A player's own tag is a card too.
+  - scan: { node: hq, player: b1, team: blue }
+  - expect: { type: tag.scanned, node: hq, team: blue, data: { owner: b1 } }
+  - expect_screen: { node: hq, template: obj_tags, data: { team: blue, have: 2, count: 2 } }
+  - expect_no: script.error

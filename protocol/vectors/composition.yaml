@@ -1,0 +1,120 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# How the parts of a game compose (modes/README.md, "Main modes, modifiers, role packages and
+# scenarios"; decisions P4R7 and M6-1): which ids are a game, which mode id and parameters each
+# role's join carries (protocol/join.md: what that node runs), and the order of the field
+# scripts. Read by the simulator (simulator/tests/test_scenario.py, atalaia_sim.mode, which the
+# field controller uses too) and the app's Dart test runner (app/test/modes/
+# composition_vectors_test.dart, test/support/mode_runner.dart). The expected results follow
+# the rules written in modes/README.md, not either implementation; an error matches when the
+# message contains the text given.
+#
+# packages: the parts the cases use. kind: mode (the default), modifier, role or scenario;
+# roles, params (names only: each is an int with a default of 1); node_lua and field_lua: whether
+# the package has the script.
+packages:
+  org.atalaia.domination: { roles: [zone], params: [capture_hold_ms], node_lua: true }
+  org.atalaia.respawn: { roles: [respawn], params: [lives], node_lua: true }
+  org.atalaia.holdall: { roles: [zone], params: [min_zones], node_lua: true, field_lua: true }
+  org.atalaia.codes: { kind: modifier, roles: [], params: [codes], node_lua: true }
+  org.atalaia.medic: { kind: role, roles: [medic], params: [charges], node_lua: true, field_lua: true }
+  org.atalaia.objectives: { kind: role, roles: [objective, bomb_site], params: [], node_lua: true }
+  org.club.foxhound: { kind: scenario, roles: [], params: [vault_points], field_lua: true }
+  org.club.other: { kind: scenario, roles: [], params: [], field_lua: true }
+
+# A game id that composes. joins: role -> [the mode id its join names, the parameters it carries].
+# fields: whose field.lua runs, in order. main_id (for a composed game): what the main mode's
+# roles run ("" for none).
+valid:
+  - name: "A scenario over the objectives package: no node runs or is joined with the scenario"
+    id: org.club.foxhound+org.atalaia.objectives
+    roles: [objective, bomb_site]
+    joins:
+      objective: [org.atalaia.objectives, []]
+      bomb_site: [org.atalaia.objectives, []]
+    fields: [org.club.foxhound]
+    main_id: ""
+  - name: "A scenario over a main mode (Respawn's lives) and the objectives package"
+    id: org.club.foxhound+org.atalaia.respawn+org.atalaia.objectives
+    roles: [respawn, objective, bomb_site]
+    joins:
+      respawn: [org.atalaia.respawn, [lives]]
+      objective: [org.atalaia.objectives, []]
+      bomb_site: [org.atalaia.objectives, []]
+    fields: [org.club.foxhound]
+    main_id: org.atalaia.respawn
+  - name: "A scenario over a main mode with a field.lua: the scenario's field.lua runs first"
+    id: org.club.foxhound+org.atalaia.holdall+org.atalaia.objectives
+    roles: [zone, objective, bomb_site]
+    joins:
+      zone: [org.atalaia.holdall, [min_zones]]
+      objective: [org.atalaia.objectives, []]
+    fields: [org.club.foxhound, org.atalaia.holdall]
+    main_id: org.atalaia.holdall
+  - name: "A scenario over two role packages"
+    id: org.club.foxhound+org.atalaia.objectives+org.atalaia.medic
+    roles: [objective, bomb_site, medic]
+    joins:
+      objective: [org.atalaia.objectives, []]
+      medic: [org.atalaia.medic, [charges]]
+    fields: [org.club.foxhound, org.atalaia.medic]
+    main_id: ""
+  - name: "A main mode with a modifier and a role package (no scenario)"
+    id: org.atalaia.domination+org.atalaia.codes+org.atalaia.medic
+    roles: [zone, medic]
+    joins:
+      zone: [org.atalaia.domination+org.atalaia.codes, [capture_hold_ms, codes]]
+      medic: [org.atalaia.medic, [charges]]
+    fields: [org.atalaia.medic]
+    main_id: org.atalaia.domination+org.atalaia.codes
+  - name: "The objectives package on its own: its nodes wait for a scenario"
+    id: org.atalaia.objectives
+    roles: [objective, bomb_site]
+    joins:
+      objective: [org.atalaia.objectives, []]
+    fields: []
+
+invalid:
+  - name: "A scenario alone"
+    id: org.club.foxhound
+    error: "it needs a role package after it"
+  - name: "A scenario over a main mode only"
+    id: org.club.foxhound+org.atalaia.respawn
+    error: "it needs a role package after it"
+  - name: "A scenario after a main mode"
+    id: org.atalaia.domination+org.club.foxhound+org.atalaia.objectives
+    error: "a scenario leads the game's id"
+  - name: "Two scenarios"
+    id: org.club.foxhound+org.club.other+org.atalaia.objectives
+    error: "a scenario leads the game's id"
+  - name: "A role package leads a scenario"
+    id: org.atalaia.objectives+org.club.foxhound
+    error: "a game needs a main mode first"
+  - name: "A modifier with no main mode in a scenario's game"
+    id: org.club.foxhound+org.atalaia.codes+org.atalaia.objectives
+    error: "it runs with a main mode"
+  - name: "A main mode after a role package in a scenario's game"
+    id: org.club.foxhound+org.atalaia.objectives+org.atalaia.respawn
+    error: "right after the scenario"
+  - name: "Longer than a join's 63 bytes"
+    id: org.club.foxhound+org.atalaia.respawn+org.atalaia.codes+org.atalaia.objectives
+    error: "at most 63 bytes"
+  - name: "A part named twice"
+    id: org.club.foxhound+org.atalaia.objectives+org.atalaia.objectives
+    error: "is named twice"
+
+# Packages that are not packages at all: the manifest and the files they have.
+packages_invalid:
+  - name: "A scenario with a node.lua"
+    package: { kind: scenario, roles: [], params: [], node_lua: true, field_lua: true }
+    error: "a scenario has no node.lua"
+  - name: "A scenario without a field.lua"
+    package: { kind: scenario, roles: [], params: [] }
+    error: "a scenario needs a field.lua"
+  - name: "A scenario with roles"
+    package: { kind: scenario, roles: [objective], params: [], field_lua: true }
+    error: "a scenario has no roles"
+  - name: "A role package without a node.lua"
+    package: { kind: role, roles: [medic], params: [], field_lua: true }
+    error: "no node.lua"

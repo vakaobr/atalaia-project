@@ -157,6 +157,15 @@
       "hacking_solved_code": "{team} resolveu um terminal de hacking ({puzzle}) e recebeu o código {code}",
       "vip_extracted": "A carga da equipa {team} chegou à zona de extração",
       "vip_extracted_vip": "A equipa {team} extraiu o seu VIP ({player})",
+      "scenario_started": "O cenário {scenario} começou",
+      "scenario_objective_completed": "A equipa {team} cumpriu o objetivo {objective}",
+      "scenario_objective_completed_hidden": "A equipa {team} cumpriu um objetivo",
+      "scenario_objective_failed": "A equipa {team} falhou o objetivo {objective} ({reason})",
+      "scenario_objective_failed_hidden": "A equipa {team} falhou um objetivo",
+      "scenario_objective_revealed": "O objetivo {objective} foi revelado à equipa {team}",
+      "scenario_objective_revealed_hidden": "Foi revelado um objetivo à equipa {team}",
+      "scenario_objective_revealed_all": "O objetivo {objective} foi revelado a todas as equipas",
+      "scenario_objective_revealed_all_hidden": "Foi revelado um objetivo a todas as equipas",
       "nobody": "Alguém por identificar"
     },
     "puzzles": {

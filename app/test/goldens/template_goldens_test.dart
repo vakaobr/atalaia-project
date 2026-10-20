@@ -191,6 +191,33 @@ const cases = [
     'payload',
     '{"team":"red","state":"extracted","metres":0}',
   ),
+  // Objectives: a node waiting for its scenario, a red-only capture, a code
+  // accepted, tags counted, an armed bomb site (the setup gives the texts).
+  ('objectives_wait', 'objectives', 'obj_status', '{"state":"wait"}'),
+  (
+    'objectives_capture',
+    'objectives',
+    'obj_capture',
+    '{"label":"Ponte","only":"red","hold_ms":3000}',
+  ),
+  (
+    'objectives_code_ok',
+    'objectives',
+    'obj_code',
+    '{"label":"Cofre","team":"red","digits":0,"note":"ok"}',
+  ),
+  (
+    'objectives_tags',
+    'objectives',
+    'obj_tags',
+    '{"label":"Informações","team":"blue","have":1,"count":2}',
+  ),
+  (
+    'objectives_bomb_armed',
+    'objectives',
+    'obj_bomb',
+    '{"label":"Local A","phase":"armed","team":"red","left":42,"fuse_s":60}',
+  ),
   (
     'code_entry',
     null,

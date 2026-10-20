@@ -94,8 +94,16 @@ export function eventWords(e) {
     }
     // VIP / Payload: the VIP (a player id) from the controller, or the payload prop.
     if (e.type === 'vip.extracted' && d.player) key += '_vip';
+    // A scenario's objectives: which one is the staff's (decision M6-5); a reveal without a
+    // team is for every team.
+    if (String(e.type || '').startsWith('scenario.objective.')) {
+        if (e.type === 'scenario.objective.revealed' && !e.team) key += '_all';
+        else team = team || t('feed.events.nobody');
+        if (!d.objective) key += '_hidden';
+    }
     const s = t(key, { team, player: d.player || '', remaining: d.remaining,
-                       used: d.player_heals_used, puzzle, code: d.code || '' });
+                       used: d.player_heals_used, puzzle, code: d.code || '',
+                       objective: d.objective || '', scenario: d.scenario || '', reason: d.reason || '' });
     return s === key ? '' : s;
 }
 

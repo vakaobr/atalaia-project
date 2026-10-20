@@ -68,7 +68,8 @@ data_fields:
   holder:        { key: 31, type: string,  doc: "team holding the node when it happened" }
   remaining:     { key: 32, type: integer, doc: "uses left, such as a medic kit's heals" }
   player_heals_used: { key: 33, type: integer, doc: "heals a player has had in this game" }
-  # Phase 4 (P4R1): 34 objective and 35 scenario come with the scenario packages (plan phase 6).
+  objective:     { key: 34, type: string,  doc: "scenario objective id" }
+  scenario:      { key: 35, type: string,  doc: "scenario package id" }
   puzzle:        { key: 36, type: string,  doc: "hacking terminal puzzle: code, wires or sequence" }
 
 # id: CBOR value of the type field (1-23 take one byte). prio: the default
@@ -122,7 +123,12 @@ events:
   node.tamper:                { id: 39, prio: critical,  data: [reason] }   # e.g. kiosk_broken
   pod.connected:              { id: 40, prio: telemetry, data: [fw, tier] } # an I/O pod linked to this node
   pod.disconnected:           { id: 41, prio: telemetry, data: [reason] }
-  # Phase 4 (P4R1): 42-45 scenario events (plan phase 6) to come.
+  # Phase 4 (P4R1): the scenario events, from a scenario package's field.lua on the controller.
+  # Which objective stays the staff's until the player view routes it per team (P4R24, M6-5).
+  scenario.objective.completed: { id: 42, prio: critical, data: [objective], gm_only: [objective] }          # team: the team that completed it
+  scenario.objective.failed:    { id: 43, prio: critical, data: [objective, reason], gm_only: [objective] }  # team: the team that failed it, if one
+  scenario.objective.revealed:  { id: 44, prio: critical, data: [objective], gm_only: [objective] }          # team: the team it is revealed to; none: every team
+  scenario.started:             { id: 45, prio: critical, data: [scenario] }                                  # the scenario's package id
   vip.extracted:              { id: 46, prio: critical,  data: [player] }  # team: the escorting team; player: the VIP, or none for a payload prop (the node)
   hacking.solved:             { id: 47, prio: critical,  data: [puzzle, code], gm_only: [code] }  # team: who solved it, if known; code: the code it reveals
   medic.heal:                 { id: 50, prio: normal,    data: [player, remaining, player_heals_used] }  # team: the player's

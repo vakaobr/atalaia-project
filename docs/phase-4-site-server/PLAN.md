@@ -795,6 +795,44 @@ reboot and the `setup` sent again). Controller: install, the joins name
 only `org.atalaia.objectives`. Dart: the catalogue and the role
 package through the core. Field Box host tests and builds.
 
+**Built 2026-10-20 (in software; not yet on radio hardware).** What
+differs from the design above, or fills what it left open (decisions M6-1
+to M6-9):
+
+- Data keys 34 (`objective`) and 35 (`scenario`) as P4R1 and
+  `events.yaml` had them (they were free); events 42-45 all critical;
+  `objective` is `gm_only` on 42-44 (the M5-1 mechanism) until plan phase 8
+  routes objectives per team (M6-2, M6-5).
+- Composition (M6-1): a scenario leads the id, optionally followed by one
+  main mode and its modifiers, then at least one role package; a modifier
+  needs a main mode; the scenario's parameters are its `field.lua`'s and no
+  join carries them; its `field.lua` runs first. The whole id still fits 63
+  bytes (`org.club.foxhound+org.atalaia.objectives` is 40). Shared vectors:
+  `protocol/vectors/composition.yaml` (simulator and Dart runner).
+- The objectives package has no parameters: the language and the
+  objective's name come in the `setup` (so it composes with the Medic
+  Kit, whose `lang` would clash); `bomb_site` uses a screen and sound only
+  (the plan's keypad and LED had nothing to do there) (M6-3, M6-4). `tags`
+  counts players' own tags, or with `any` any card (the design
+  specification's intel tags), for the team at the box. A wrong code is
+  only on the screen, and `code.used` never carries the code.
+- After a reboot the scenario also sends what the node lost (`holder`,
+  `have`, an armed bomb's `armed` and `left`), and it sets up every second
+  any node it has not set up yet (a box that joins late) (M6-3).
+- No `node.role()` (M6-6): the setup's kind says what a node does.
+  Objectives find their nodes by name (`field.nodes()`): the test's names in
+  the simulator, a box's own name on the controller until plan phase 8
+  assigns names in the console (M6-7).
+- New test tooling: the `reboot` step and the `scenario:` key, in the
+  simulator and the Dart runner; a `field.send` too large for a box's
+  128-byte CMD buffer is now a problem in the simulator too (M6-9).
+- Tests: 9 YAML files (capture, code, tags, intel cards, a bomb defused and
+  one exploded, reboots, no scenario), `simulator/tests/test_scenario.py`,
+  `controller/tests/test_scenario.py`, a host-box test in
+  `test_box_e2e.py`, `app/test/modes/composition_vectors_test.dart`, the
+  catalogue, a console browser test, the Field Box host tests and fifteen
+  reference images, five app goldens.
+
 ### Validation
 
 ```sh

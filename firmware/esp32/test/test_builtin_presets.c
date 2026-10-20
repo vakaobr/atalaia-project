@@ -305,6 +305,7 @@ static const char *const builtin_folders[][2] = {
     {"master_satellites", "org.atalaia.master_satellites"},
     {"hacking_terminal", "org.atalaia.hacking_terminal"},
     {"vip_payload", "org.atalaia.vip_payload"},
+    {"objectives", "org.atalaia.objectives"},
 };
 enum { BUILTIN_N = sizeof(builtin_folders) / sizeof(builtin_folders[0]) };
 
@@ -489,6 +490,77 @@ static void test_vip_payload_checkpoint_from_the_picker(void)
     node_runner_stop(&runner);
 }
 
+/* Objectives, the thirteenth slot (second page, fourth entry): the role package of custom
+ * scenarios (decision P4R7). The box waits for the scenario's "setup" (a mode command, as
+ * box_game.c gives it: cmd.mode with the command's params), then plays what it was told: here
+ * a red-only capture, then a bomb site, with no score on the box. */
+static void test_objectives_from_the_picker(void)
+{
+    preset_summary_t list[PRESET_MAX_SLOTS];
+    seed_every_builtin(list);
+    CHECK(strcmp(list[12].mode_id, "org.atalaia.objectives") == 0);
+    CHECK(strcmp(list[12].label, "Objectives") == 0);
+
+    preset_ui_t ui;
+    preset_ui_init(&ui, "1234", BUILTIN_N);
+    for (const char *k = "1234#04###"; *k; k++) preset_ui_handle_key(&ui, *k);
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_GAME_STARTED);
+    CHECK(preset_ui_selected_preset(&ui) == 13);
+
+    static preset_t p;
+    CHECK(preset_store_load(list[preset_ui_selected_preset(&ui) - 1].index, &p));
+    CHECK(strcmp(p.mode_id, "org.atalaia.objectives") == 0);
+    CHECK(strcmp(p.params_json, "{}") == 0);
+
+    hal_t hal;
+    hal_stub_init(&hal);
+    static node_runner_t runner;
+    node_runner_init(&runner, &hal, 0);
+    const char *teams[] = {"red", "blue"};
+    CHECK(node_runner_start(&runner, &p, teams, 2));
+    /* The mode's announcement comes first: the display then finds the mode's templates. */
+    CHECK(strcmp(runner.queues.screens[0].template_name, SCREEN_MODE_MESSAGE) == 0);
+    CHECK(screen_render(SCREEN_MODE_MESSAGE, runner.queues.screens[0].data_json));
+    button_tracker_t buttons;
+    button_tracker_init(&buttons, teams, 2);
+    const screen_update_t *su = last_screen(&runner);
+    CHECK(su && strcmp(su->template_name, "obj_status") == 0);
+    CHECK(su && strstr(su->data_json, "\"state\":\"wait\"") != NULL);
+    if (su) CHECK(screen_render(su->template_name, su->data_json));
+    hold(&runner, &buttons, 0x1, 5100); /* nothing to capture yet */
+    CHECK(runner.event_count == 0);
+
+    node_runner_input(&runner, "cmd.mode",
+                      "{\"name\":\"setup\",\"kind\":\"capture\",\"team\":\"red\",\"hold_ms\":3000,"
+                      "\"label\":\"Ponte\"}");
+    su = last_screen(&runner);
+    CHECK(su && strcmp(su->template_name, "obj_capture") == 0);
+    CHECK(su && strstr(su->data_json, "\"only\":\"red\"") != NULL);
+    if (su) CHECK(screen_render(su->template_name, su->data_json));
+    hold(&runner, &buttons, 0x2, 3100); /* blue: not its objective */
+    CHECK(runner.event_count == 0);
+    hold(&runner, &buttons, 0x1, 3100);
+    CHECK(strcmp(runner.last_event_type, "zone.captured") == 0);
+    su = last_screen(&runner);
+    CHECK(su && strstr(su->data_json, "\"team\":\"red\"") != NULL);
+    if (su) CHECK(screen_render(su->template_name, su->data_json));
+
+    node_runner_input(&runner, "cmd.mode",
+                      "{\"name\":\"setup\",\"kind\":\"bomb\",\"team\":\"red\",\"hold_ms\":2000,"
+                      "\"fuse_s\":30}");
+    hold(&runner, &buttons, 0x1, 2100);
+    CHECK(strcmp(runner.last_event_type, "bomb.armed") == 0);
+    su = last_screen(&runner);
+    CHECK(su && strcmp(su->template_name, "obj_bomb") == 0);
+    CHECK(su && strstr(su->data_json, "\"phase\":\"armed\"") != NULL);
+    if (su) CHECK(screen_render(su->template_name, su->data_json));
+    for (int i = 0; i < 3100; i++) node_runner_tick(&runner, 10); /* the 30 s fuse */
+    CHECK(strcmp(runner.last_event_type, "bomb.exploded") == 0);
+    const atalaia_score_t *score = atalaia_node_score(runner.node);
+    CHECK(score && score->gained[1] == 0 && score->gained[2] == 0);
+    node_runner_stop(&runner);
+}
+
 void run_builtin_presets_tests(void)
 {
     test_seed_empty_store();
@@ -501,4 +573,5 @@ void run_builtin_presets_tests(void)
     test_every_builtin_and_master_satellites();
     test_hacking_terminal_from_the_picker();
     test_vip_payload_checkpoint_from_the_picker();
+    test_objectives_from_the_picker();
 }

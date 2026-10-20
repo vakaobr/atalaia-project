@@ -15,6 +15,7 @@ Both encodings come from the schema files in [`schema/`](schema/), so they canno
 | [`vectors/*.json`](vectors/) | Test vectors for header and message payload codecs, the join payload (`join.json`), player tags (`tag.json`), chrono records (`chrono_record.json`), player tokens (`player_token.json`) and the controller sync's bodies (`sync.json`) |
 | [`vectors/capability_proxy.yaml`](vectors/capability_proxy.yaml) | Test vectors for the capability proxy (I/O pod) frames and payloads |
 | [`vectors/geo.json`](vectors/geo.json) | Known answers (each with its source and tolerance), edge cases, argument errors and exact result bits for `geo.distance` and `geo.in_zone` (ADR-P4-9) |
+| [`vectors/composition.yaml`](vectors/composition.yaml) | How a game's parts compose: main modes, modifiers, role packages and scenarios (decision P4R7), the mode id and parameters each role's join carries, the order of the `field.lua` scripts, and the ids and packages refused; read by the simulator and the app's Dart test runner |
 | [`join.md`](join.md) | The join payload that brings a box or a standby controller into a game (NFC card, QR code, serial console) |
 | [`nfc-tag.md`](nfc-tag.md) | Player tags: the signed NFC tag of a player (Kill Confirmed, Respawn, Player Check-in, the Medic Kit) |
 | [`chrono-record.md`](chrono-record.md) | Chrono records: one chronograph reading signed with the marshal's Ed25519 key, and the canonical JSON that is signed |

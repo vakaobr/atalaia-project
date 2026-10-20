@@ -43,7 +43,12 @@ class SchemaTests(unittest.TestCase):
 
     def test_gm_only_data_and_parameters(self):
         self.assertEqual(EVENTS["hacking.solved"].gm_only, ("code",))
-        self.assertEqual({n for n, e in EVENTS.items() if e.gm_only}, {"hacking.solved"})
+        # Which objective a scenario event is about is the staff's too, until the player view
+        # routes objectives per team (decision M6-5).
+        self.assertEqual({n for n, e in EVENTS.items() if e.gm_only},
+                         {"hacking.solved", "scenario.objective.completed", "scenario.objective.failed",
+                          "scenario.objective.revealed"})
+        self.assertEqual(EVENTS["scenario.objective.revealed"].gm_only, ("objective",))
         self.assertEqual(load_mode(MODES / "hacking_terminal").gm_only_params, {"reveal_code"})
         self.assertEqual(load_mode(MODES / "bomb").gm_only_params, {"team_codes"})
         bomb_codes = compose(load_mode(MODES / "bomb"), [load_mode(MODES / "codes")])

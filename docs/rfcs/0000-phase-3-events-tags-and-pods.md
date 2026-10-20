@@ -98,3 +98,20 @@ Compatibility: as for the events of the design above, an older node passes the u
 
 Compatibility: an older node or controller treats id 46 as it treats any id it does not know; `gm_only` changes nothing on the wire.
 
+
+## Amendment 4 (2026-10-20): the scenario events (phase 4 plan phase 6)
+
+**Adds** the events of custom scenarios (decisions P4R1, P4R7): a scenario package's `field.lua` on the field controller logs them, over the nodes of the built-in role package `org.atalaia.objectives`, which report the standard `zone.captured`, `code.used`, `tag.scanned` and `bomb.*` events and never score on their own.
+
+| Id | Event | Data (besides `team` and `squad`) |
+| --- | --- | --- |
+| 42 | `scenario.objective.completed` (critical) | `objective` (key 34): the objective's id; `team`: the team that completed it |
+| 43 | `scenario.objective.failed` (critical) | `objective`; `reason` (key 3), such as `time` or `exploded`; `team`: the team that failed it, if one |
+| 44 | `scenario.objective.revealed` (critical) | `objective`; `team`: the team it is revealed to, none for every team |
+| 45 | `scenario.started` (critical) | `scenario` (key 35): the scenario package's id |
+
+- **New data fields:** `objective` (key 34, string: an objective id, `[a-z][a-z0-9_]{0,23}`, decision P4R8) and `scenario` (key 35, string). Texts (an objective's name and description) never travel: they are in the scenario package, in English and `i18n.pt`.
+- **Staff-only for now:** `objective` is `gm_only` on events 42-44 (decision M6-5), so players, the read token and MQTT learn that a team completed, failed or was shown an objective, not which one, until the player view routes each objective to its team and squad (decision P4R24, plan phase 8).
+- **Vectors:** `protocol/vectors/events.yaml`, "A scenario starts", "An objective is revealed to every team", "Red completes an objective", "Blue fails an objective with a reason", bytes built by hand from RFC 8949's encoding rules and the schema's keys, checked by the C, Python and Dart codecs. JSON Schema: `protocol/json/event.schema.json` and the example `protocol/json/examples/scenario-objective-completed.json`.
+
+Compatibility: an older node or controller treats ids 42-45 as it treats any id it does not know; the nodes' own events are the standard ones.

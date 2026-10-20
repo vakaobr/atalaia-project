@@ -175,6 +175,13 @@ class _Runner:
             raise TestFailure(f"gps: unknown key(s) {sorted(unknown)}")
         self.sim.gps(self._default_node(arg), arg.get("lat"), arg.get("lon"), arg.get("acc"))
 
+    def do_reboot(self, arg: Any) -> None:
+        """A node loses power and comes back in the running game, as a Field Box does: its script
+        starts again (no state survives) and it reports node.rebooted (reason power)."""
+        if not isinstance(arg, dict):
+            arg = {"node": arg}
+        self.sim.reboot(self._default_node(arg))
+
     def do_keys(self, arg: Any) -> None:
         if not isinstance(arg, dict):
             arg = {"keys": arg}
@@ -231,19 +238,27 @@ def _check_problems(sim: Simulation, where: str) -> None:
                           " (see protocol/schema/events.yaml)")
 
 
-def _composed(mode: Mode, spec: dict[str, Any]) -> Mode:
+def _composed(mode: Mode, spec: dict[str, Any], folder: Path) -> Mode:
     """The mode a test plays: a modifier's test may name a main mode (`main: domination`) and a
-    main mode's test its modifiers (`modifiers: [codes]`), as sibling folders of the mode."""
+    main mode's test its modifiers (`modifiers: [codes]`), as sibling folders of the mode. A role
+    package's test may name a scenario package (`scenario: fixtures/foxhound`, a folder relative
+    to the test file's) that leads the game (decision P4R7)."""
     main = spec.get("main")
     modifiers = spec.get("modifiers") or []
-    if main is None and not modifiers:
+    scenario = spec.get("scenario")
+    if main is None and not modifiers and scenario is None:
         return mode
-    if not isinstance(modifiers, list) or (main is not None and not isinstance(main, str)):
-        raise ModeError("main is a mode folder name and modifiers a list of them")
+    if (not isinstance(modifiers, list) or (main is not None and not isinstance(main, str))
+            or (scenario is not None and not isinstance(scenario, str))):
+        raise ModeError("main is a mode folder name, modifiers a list of them and scenario a folder "
+                        "relative to the test")
     others = [load_mode(mode.path.parent / name) for name in modifiers]
+    parts = [mode, *others]
     if main is not None:
-        return compose(load_mode(mode.path.parent / main), [mode, *others])
-    return compose(mode, others)
+        parts = [load_mode(mode.path.parent / main), *parts]
+    if scenario is not None:
+        parts = [load_mode((folder / scenario).resolve()), *parts]
+    return compose(parts[0], parts[1:])
 
 
 def run_test(core: Core, mode: Mode, path: Path) -> TestResult:
@@ -256,7 +271,7 @@ def run_test(core: Core, mode: Mode, path: Path) -> TestResult:
 
     sim: Optional[Simulation] = None
     try:
-        mode = _composed(mode, spec)
+        mode = _composed(mode, spec, path.parent)
         default_node = next(iter(mode.roles))
         nodes = spec.get("nodes", {default_node: default_node})
         params = mode.resolve_params(spec.get("params") or {}, teams)

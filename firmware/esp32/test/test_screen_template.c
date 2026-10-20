@@ -25,7 +25,7 @@ static const char *BOMB = "org.atalaia.bomb {\"attackers\":\"red\",\"fuse_s\":30
 static void test_every_builtin_template_parses(void)
 {
     /* Every mode's templates, Target Windows' too: not a preset yet, ready for the addon (M2-4). */
-    CHECK(builtin_screen_count == 27);
+    CHECK(builtin_screen_count == 32);
     for (int i = 0; i < builtin_screen_count; i++) {
         const builtin_screen_t *s = &builtin_screens[i];
         char err[160];

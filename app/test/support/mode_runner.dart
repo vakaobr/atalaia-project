@@ -56,6 +56,10 @@ const fieldCommands = {
   'mode': 'cmd.mode',
 };
 
+/// A CMD's parameters, as JSON, fit a box's 128-byte buffer
+/// (field_controller.py CMD_PARAMS_MAX).
+const cmdParamsMax = 127;
+
 /// Positions never travel as events (decisions P4R6, P4R25): event data with
 /// one of these keys, at any depth, is a problem (sim.py COORDINATE_KEYS).
 const coordinateKeys = {
@@ -122,13 +126,15 @@ class Mode {
     required this.fieldScript,
     this.roleParts = const {},
     String? mainId,
+    this.scenarioParams = const {},
   }) : mainId = mainId ?? id;
 
   final Directory dir;
   final String id;
   final String name;
 
-  /// mode, modifier or role (a role package, modes/README.md).
+  /// mode, modifier, role (a role package) or scenario (a field.lua over
+  /// role packages, decision P4R7; modes/README.md).
   final String kind;
   final Map<String, Object?> roles;
   final Map<String, Map<String, Object?>> params;
@@ -140,6 +146,10 @@ class Mode {
 
   /// For a composed mode: what the main mode's roles run (main + modifiers).
   final String mainId;
+
+  /// For a composed mode led by a scenario: its parameters, which only its
+  /// field.lua reads, so no node's join carries them.
+  final Set<String> scenarioParams;
 
   String get folder => dir.uri.pathSegments.lastWhere((s) => s.isNotEmpty);
 
@@ -163,7 +173,10 @@ class Mode {
           if (part.paramNames.contains(e.key)) e.key: e.value,
       };
     }
-    final others = {for (final p in roleParts.values) ...p.paramNames};
+    final others = {
+      for (final p in roleParts.values) ...p.paramNames,
+      ...scenarioParams,
+    };
     return {
       for (final e in values.entries)
         if (!others.contains(e.key)) e.key: e.value,
@@ -254,31 +267,72 @@ void _checkParam(
   }
 }
 
+/// The manifest's own checks that the scripts depend on (mode.py
+/// check_manifest, for a scenario: no roles and no commands).
+void checkManifest(Map<String, Object?> m, String where) {
+  const kinds = ['mode', 'modifier', 'role', 'scenario'];
+  final kind = m['kind'] ?? 'mode';
+  if (!kinds.contains(kind)) {
+    throw ModeError(
+      '$where: kind must be one of ${kinds.join(', ')}, got $kind',
+    );
+  }
+  if (kind == 'scenario') {
+    if ((m['roles'] as Map?)?.isNotEmpty ?? false) {
+      throw ModeError(
+        '$where: a scenario has no roles: its nodes run role packages',
+      );
+    }
+    if ((m['commands'] as Map?)?.isNotEmpty ?? false) {
+      throw ModeError(
+        "$where: a scenario has no commands: they are for the nodes' roles",
+      );
+    }
+  }
+}
+
+/// A scenario is a field.lua and no node.lua (decision P4R7); every other
+/// kind has a node.lua (mode.py check_files).
+void checkFiles(String kind, bool hasNode, bool hasField, String where) {
+  if (kind == 'scenario') {
+    if (hasNode) {
+      throw ModeError(
+        '$where: a scenario has no node.lua: its nodes run role packages',
+      );
+    }
+    if (!hasField) throw ModeError('$where: a scenario needs a field.lua');
+  } else if (!hasNode) {
+    throw ModeError('$where: no node.lua');
+  }
+}
+
 Mode loadMode(Directory dir) {
   final manifest = File('${dir.path}/mode.yaml');
   if (!manifest.existsSync()) throw ModeError('${dir.path}: no mode.yaml');
   final m =
       (plain(loadYaml(manifest.readAsStringSync())) as Map<String, Object?>?) ??
       {};
-  for (final key in ['id', 'version', 'roles']) {
+  final kind = (m['kind'] ?? 'mode') as String;
+  for (final key in ['id', 'version', if (kind != 'scenario') 'roles']) {
     if (!m.containsKey(key)) {
       throw ModeError("${manifest.path}: missing '$key'");
     }
   }
+  checkManifest(m, manifest.path);
   final node = File('${dir.path}/node.lua');
-  if (!node.existsSync()) throw ModeError('${dir.path}: no node.lua');
   final field = File('${dir.path}/field.lua');
+  checkFiles(kind, node.existsSync(), field.existsSync(), dir.path);
   return Mode(
     dir: dir,
     id: m['id']! as String,
     name: (m['name'] ?? m['id']) as String,
-    kind: (m['kind'] ?? 'mode') as String,
-    roles: (m['roles']! as Map<String, Object?>),
+    kind: kind,
+    roles: (m['roles'] as Map<String, Object?>?) ?? {},
     params: {
       for (final e in ((m['params'] as Map<String, Object?>?) ?? {}).entries)
         e.key: e.value! as Map<String, Object?>,
     },
-    nodeScript: node.readAsStringSync(),
+    nodeScript: node.existsSync() ? node.readAsStringSync() : '',
     fieldScript: field.existsSync() ? field.readAsStringSync() : null,
   );
 }
@@ -288,41 +342,92 @@ String composeScripts(List<String> scripts) => scripts.length == 1
     ? scripts.single
     : scripts.map((s) => 'do\n$s\nend\n').join();
 
+/// A game's id travels in a standby controller's join: 63 bytes at most.
+const modeIdMax = 63;
+
 /// A main mode with modifiers and role packages: one id, one parameter
 /// schema; the main mode's roles run it with the modifiers, and each role
-/// package's roles run that package alone (mode.py compose).
+/// package's roles run that package alone. A scenario leads the id and is
+/// followed by at least one role package, optionally after one main mode and
+/// its modifiers; it adds its field.lua (first) and its parameters, never a
+/// role (mode.py compose; protocol/vectors/composition.yaml).
 Mode compose(Mode main, List<Mode> modifiers) {
-  if (modifiers.isEmpty) return main;
-  if (main.kind != 'mode') {
-    throw ModeError(
-      '${main.id} is a ${main.kind}; a game needs a main mode first',
-    );
+  Mode? scenario;
+  Mode? lead;
+  var rest = modifiers;
+  const needsRole =
+      'it needs a role package after it, such as '
+      'org.atalaia.objectives';
+  if (main.kind == 'scenario') {
+    scenario = main;
+    if (rest.isEmpty) throw ModeError('${main.id} is a scenario: $needsRole');
+    if (rest.first.kind == 'mode') {
+      lead = rest.first;
+      rest = rest.sublist(1);
+    }
+  } else {
+    if (rest.isEmpty) return main;
+    if (main.kind != 'mode') {
+      throw ModeError(
+        '${main.id} is a ${main.kind}; a game needs a main mode first',
+      );
+    }
+    lead = main;
   }
-  final seen = {main.id};
-  final params = Map.of(main.params);
-  final roles = Map.of(main.roles);
+  final leaders = [?scenario, ?lead];
+  final first = leaders.first;
+  final seen = <String>{};
+  final params = <String, Map<String, Object?>>{};
+  for (final m in leaders) {
+    if (!seen.add(m.id)) throw ModeError('${m.id} is named twice');
+    final clash = params.keys.toSet().intersection(m.params.keys.toSet());
+    if (clash.isNotEmpty) {
+      throw ModeError(
+        '${m.id} and ${first.id} both have the parameter(s) $clash',
+      );
+    }
+    params.addAll(m.params);
+  }
+  final roles = lead == null ? <String, Object?>{} : Map.of(lead.roles);
   final mods = <Mode>[];
   final roleParts = <String, RolePart>{};
-  for (final mod in modifiers) {
+  for (final mod in rest) {
+    if (mod.kind == 'scenario') {
+      throw ModeError(
+        "${mod.id} is a scenario: a scenario leads the game's id",
+      );
+    }
     if (mod.kind == 'mode') {
+      if (scenario != null) {
+        throw ModeError(
+          "${mod.id} is a main mode: a scenario's game has one, right after "
+          'the scenario',
+        );
+      }
       throw ModeError('${mod.id} is a main mode, not a modifier');
     }
     if (!seen.add(mod.id)) throw ModeError('${mod.id} is named twice');
     final clash = params.keys.toSet().intersection(mod.params.keys.toSet());
     if (clash.isNotEmpty) {
       throw ModeError(
-        '${mod.id} and ${main.id} both have the parameter(s) $clash',
+        '${mod.id} and ${first.id} both have the parameter(s) $clash',
       );
     }
     params.addAll(mod.params);
     if (mod.kind == 'modifier') {
+      if (lead == null) {
+        throw ModeError(
+          '${mod.id} is a modifier: it runs with a main mode, and this '
+          "scenario's game has none",
+        );
+      }
       mods.add(mod);
       continue;
     }
     final roleClash = roles.keys.toSet().intersection(mod.roles.keys.toSet());
     if (roleClash.isNotEmpty) {
       throw ModeError(
-        '${mod.id} and ${main.id} both have the role(s) $roleClash',
+        '${mod.id} and ${first.id} both have the role(s) $roleClash',
       );
     }
     roles.addAll(mod.roles);
@@ -336,20 +441,32 @@ Mode compose(Mode main, List<Mode> modifiers) {
       roleParts[r] = part;
     }
   }
-  final parts = [main, ...modifiers];
-  final runs = [main, ...mods];
+  if (scenario != null && roleParts.isEmpty) {
+    throw ModeError('${scenario.id} is a scenario: $needsRole');
+  }
+  final parts = [...leaders, ...rest];
+  final id = parts.map((m) => m.id).join('+');
+  if (utf8.encode(id).length > modeIdMax) {
+    throw ModeError(
+      '$id: a mode with its modifiers is named in at most $modeIdMax bytes',
+    );
+  }
+  final runs = [?lead, ...mods];
   final fields = [for (final m in parts) ?m.fieldScript];
   return Mode(
-    dir: main.dir,
-    id: parts.map((m) => m.id).join('+'),
+    dir: first.dir,
+    id: id,
     name: parts.map((m) => m.name).join(' + '),
     kind: 'mode',
     roles: roles,
     params: params,
-    nodeScript: composeScripts([for (final m in runs) m.nodeScript]),
+    nodeScript: runs.isEmpty
+        ? ''
+        : composeScripts([for (final m in runs) m.nodeScript]),
     fieldScript: fields.isEmpty ? null : composeScripts(fields),
     roleParts: roleParts,
     mainId: runs.map((m) => m.id).join('+'),
+    scenarioParams: scenario?.params.keys.toSet() ?? const {},
   );
 }
 
@@ -506,7 +623,7 @@ class VirtualNode {
   VirtualNode(this.name, this.role);
   final String name;
   final String role;
-  late final SimNode runtime;
+  late SimNode runtime;
   final commands = <NodeCommand>[];
   final logs = <String>[];
 
@@ -560,6 +677,7 @@ class Simulation {
   final _toNodes = <(String, String, Map<String, Object?>)>[];
   (int, Map<String, Object?>)? _fieldEnd;
   var _ended = false;
+  var _started = false; // game.start broadcast, game.end not yet
 
   static Future<Simulation> create(
     AtalaiaCore core,
@@ -591,54 +709,7 @@ class Simulation {
         }
         final vnode = VirtualNode(e.key, e.value);
         sim.nodes[e.key] = vnode;
-        // A node runs what its role runs, with that part's parameters, as
-        // its join gives them (a role package's roles run it alone).
-        final spec = NodeSpec(
-          source: mode.nodeScriptFor(e.value),
-          chunkName: mode.chunkNameFor(e.value),
-          nodeId: nodeId,
-          gameSeed: seed,
-          teams: sim.teams,
-          params: mode.paramsFor(e.value, params),
-        );
-        switch (via) {
-          case Via.direct:
-            vnode.runtime = _DirectNode(
-              CoreNode.create(
-                core,
-                spec,
-                handlers: NodeHandlers(
-                  onEvent: (ev) => sim._record(vnode, ev),
-                  onCommand: vnode.commands.add,
-                  onLog: vnode.logs.add,
-                ),
-              ),
-              nodeId,
-            );
-          case Via.isolate:
-            vnode.runtime = _IsolateNode(
-              await GameLoopIsolate.spawn(
-                spec,
-                libraryPath: core.path,
-                clock: GameClock.manual,
-                onOutput: (out) {
-                  switch (out) {
-                    case NodeEventOutput(:final event):
-                      sim._record(vnode, event);
-                    case NodeCommandOutput(:final command):
-                      vnode.commands.add(command);
-                    case NodeLogOutput(:final line):
-                      vnode.logs.add(line);
-                    case NodeErrorOutput(:final message):
-                      sim.problems.add('${vnode.name}: $message');
-                    case NodeStatusOutput():
-                      break;
-                  }
-                },
-              ),
-              nodeId,
-            );
-        }
+        vnode.runtime = await sim._spawn(vnode, nodeId);
         if (!vnode.runtime.loaded) {
           throw TestFailure(
             "node '${e.key}' failed to load ${mode.id}: ${await vnode.runtime.lastError()}",
@@ -673,6 +744,102 @@ class Simulation {
       rethrow;
     }
     return sim;
+  }
+
+  /// A node's runtime: what its role runs, with that part's parameters, as
+  /// its join gives them (a role package's roles run it alone).
+  Future<SimNode> _spawn(VirtualNode vnode, int nodeId) async {
+    final spec = NodeSpec(
+      source: mode.nodeScriptFor(vnode.role),
+      chunkName: mode.chunkNameFor(vnode.role),
+      nodeId: nodeId,
+      gameSeed: seed,
+      teams: teams,
+      params: mode.paramsFor(vnode.role, params),
+    );
+    switch (via) {
+      case Via.direct:
+        return _DirectNode(
+          CoreNode.create(
+            core,
+            spec,
+            handlers: NodeHandlers(
+              onEvent: (ev) => _record(vnode, ev),
+              onCommand: vnode.commands.add,
+              onLog: vnode.logs.add,
+            ),
+          ),
+          nodeId,
+        );
+      case Via.isolate:
+        return _IsolateNode(
+          await GameLoopIsolate.spawn(
+            spec,
+            libraryPath: core.path,
+            clock: GameClock.manual,
+            onOutput: (out) {
+              switch (out) {
+                case NodeEventOutput(:final event):
+                  _record(vnode, event);
+                case NodeCommandOutput(:final command):
+                  vnode.commands.add(command);
+                case NodeLogOutput(:final line):
+                  vnode.logs.add(line);
+                case NodeErrorOutput(:final message):
+                  problems.add('${vnode.name}: $message');
+                case NodeStatusOutput():
+                  break;
+              }
+            },
+          ),
+          nodeId,
+        );
+    }
+  }
+
+  /// A node loses power and comes back in the running game, as a Field Box
+  /// does (node_runner_resume): its script is loaded again with no state, gets
+  /// game.start, is brought to the game's time and gets node.rebooted; the
+  /// box then reports node.rebooted (reason power) to the controller (sim.py
+  /// reboot).
+  Future<void> reboot(String name) async {
+    final vnode = node(name);
+    final nodeId = vnode.runtime.nodeId;
+    await vnode.runtime.close();
+    vnode.runtime = await _spawn(vnode, nodeId);
+    if (!vnode.runtime.loaded) {
+      throw TestFailure(
+        "node '$name' failed to load ${mode.id}: ${await vnode.runtime.lastError()}",
+      );
+    }
+    if (_started) {
+      await vnode.runtime.input('game.start', {
+        'preset': mode.nodeModeId(vnode.role),
+      });
+      await vnode.runtime.advance(timeMs);
+      await vnode.runtime.input('node.rebooted', {});
+    }
+    const data = {'reason': 'power'};
+    final prio = schema.defaultPrio('node.rebooted');
+    _checkWire(
+      name,
+      nodeId,
+      0,
+      timeMs,
+      'node.rebooted',
+      0,
+      0,
+      prio,
+      data,
+      jsonEncode(data),
+    );
+    _log.add(
+      LogEntry(timeMs, name, nodeId, 0, 'node.rebooted', null, prio, data),
+    );
+    if (field != null) {
+      _toField.add((timeMs, 'node.rebooted', {...data, 'node': nodeId}));
+    }
+    await _pump();
   }
 
   Future<void> close() async {
@@ -860,6 +1027,15 @@ class Simulation {
     if (cmd == 'mode' && !commandName.hasMatch('${params['name'] ?? ''}')) {
       return false; // a mode command names itself
     }
+    final size = utf8.encode(jsonEncode(params)).length;
+    if (params.isNotEmpty && size > cmdParamsMax) {
+      // The controller refuses it too: a box's buffer is 128 bytes.
+      problems.add(
+        "$controller: field.send(${target.name}, '$cmd') parameters are "
+        '$size bytes; at most $cmdParamsMax fit in a CMD',
+      );
+      return false;
+    }
     _toNodes.add((target.name, fieldCommands[cmd]!, Map.of(params)));
     return true;
   }
@@ -909,7 +1085,11 @@ class Simulation {
   ]) async {
     final d = data ?? {};
     _recordController(type, d, t);
-    if (type == 'game.end') _ended = true;
+    if (type == 'game.start') _started = true;
+    if (type == 'game.end') {
+      _ended = true;
+      _started = false;
+    }
     for (final v in nodes.values) {
       await v.runtime.input(type, d);
     }
@@ -1188,6 +1368,9 @@ class _Runner {
           (arg['lon'] as num?)?.toDouble(),
           (arg['acc'] as num?)?.toDouble(),
         );
+      case 'reboot':
+        final a = arg is Map<String, Object?> ? arg : {'node': arg};
+        await sim.reboot(_node(a));
       case 'keys':
         final a = arg is Map<String, Object?> ? arg : {'keys': arg};
         await sim.keys(_node(a), '${a['keys']}');
@@ -1350,20 +1533,32 @@ void _checkProblems(Simulation sim, String where) {
   }
 }
 
-/// The mode a test plays: `main:` and `modifiers:` name sibling mode folders.
-Mode _composed(Mode mode, Map<String, Object?> spec) {
+/// The mode a test plays: `main:` and `modifiers:` name sibling mode folders;
+/// `scenario:` a scenario package's folder, relative to the test file's, that
+/// leads the game (decision P4R7).
+Mode _composed(Mode mode, Map<String, Object?> spec, Directory folder) {
   final main = spec['main'];
   final modifiers = spec['modifiers'] ?? [];
-  if (main == null && (modifiers as List).isEmpty) return mode;
-  if (modifiers is! List || (main != null && main is! String)) {
-    throw ModeError('main is a mode folder name and modifiers a list of them');
+  final scenario = spec['scenario'];
+  if (main == null && (modifiers as List).isEmpty && scenario == null) {
+    return mode;
+  }
+  if (modifiers is! List ||
+      (main != null && main is! String) ||
+      (scenario != null && scenario is! String)) {
+    throw ModeError(
+      'main is a mode folder name, modifiers a list of them and scenario a '
+      'folder relative to the test',
+    );
   }
   final parent = mode.dir.parent.path;
-  final others = [for (final m in modifiers) loadMode(Directory('$parent/$m'))];
-  if (main != null) {
-    return compose(loadMode(Directory('$parent/$main')), [mode, ...others]);
-  }
-  return compose(mode, others);
+  final parts = [
+    if (scenario != null) loadMode(Directory('${folder.path}/$scenario')),
+    if (main != null) loadMode(Directory('$parent/$main')),
+    mode,
+    for (final m in modifiers) loadMode(Directory('$parent/$m')),
+  ];
+  return compose(parts.first, parts.sublist(1));
 }
 
 /// Runs one test file of [mode] with its nodes running [via].
@@ -1386,7 +1581,7 @@ Future<TestResult> runTest(
   final teams = ((spec['teams'] as List?) ?? defaultTeams).cast<String>();
   Simulation? sim;
   try {
-    final m = _composed(mode, spec);
+    final m = _composed(mode, spec, file.parent);
     final defaultNode = m.roles.keys.first;
     final nodeRoles = ((spec['nodes'] as Map?) ?? {defaultNode: defaultNode})
         .cast<String, String>();

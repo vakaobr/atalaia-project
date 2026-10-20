@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# An example scenario package, written by hand to prove the runtime before the scenario
+# compiler (plan phase 7) exists: what the compiler will emit for a four-objective scenario.
+# A scenario is uploaded to a controller, never built in, and leads the game's id:
+# org.club.foxhound+org.atalaia.objectives. Its nodes run org.atalaia.objectives; their
+# joins never name the scenario.
+id: org.club.foxhound
+version: 0.1.0
+license: GPL-3.0-or-later
+kind: scenario
+name: Foxhound
+description: >-
+  Red takes the bridge, which reveals the vault to red; both teams race for the intel
+  (two players of a team scan their tags); red arms the bomb at site A and blue defends it.
+params:
+  vault_points: { type: int, min: 0, max: 1000, default: 100, label: "Points for the vault" }
+i18n:
+  pt:
+    name: Foxhound
+    description: >-
+      A equipa red toma a ponte, o que lhe revela o cofre; as duas equipas disputam as
+      informações (duas pessoas de uma equipa leem as suas etiquetas); a red arma a bomba no
+      local A e a blue defende-o.
+    params:
+      vault_points: Pontos do cofre

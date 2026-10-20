@@ -49,6 +49,10 @@ static const struct {
     {"VIP", "org.atalaia.vip_payload",
      "{\"vip_team\":\"red\",\"radius_m\":25,\"vip_points\":100,\"end_on_extract\":true,"
      "\"checkpoint_points\":1,\"tick_s\":10,\"capture_hold_ms\":3000,\"lang\":\"pt\"}"},
+    /* A role package for custom scenarios (decision P4R7): the scenario's field.lua on the
+     * controller tells the box what it is for ("setup"), so a box needs it to join; picked on
+     * its own, a box waits for a scenario. */
+    {"Objectives", "org.atalaia.objectives", "{}"},
 };
 
 /* preset_t holds a 16 KB source buffer, so it is not put on a task stack;

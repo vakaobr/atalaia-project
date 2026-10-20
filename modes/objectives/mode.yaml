@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+id: org.atalaia.objectives
+version: 0.1.0
+license: GPL-3.0-or-later
+min_tier: reduced
+# A role package for custom scenarios (decision P4R7): a scenario package (kind: scenario, a
+# field.lua only) leads the game (org.club.foxhound+org.atalaia.objectives) and tells each node
+# what it is for with the mode command "setup". The box side never changes per scenario.
+kind: role
+name: Objectives
+description: >-
+  The boxes and props of a custom scenario. Each one waits for the scenario, on the field
+  controller, to tell it what it is for: a point to capture by holding a team button, a code to
+  type on the keypad, player tags to scan, or a bomb site to arm and defuse. It reports what
+  happens and never scores: the scenario decides when an objective is completed or failed, and
+  tells the node again after a reboot.
+roles:
+  objective: { requires: [team_input], optional: [keypad, nfc, display, audio, team_display] }
+  bomb_site: { requires: [team_input], optional: [display, audio] }
+i18n:
+  pt:
+    name: Objetivos
+    description: >-
+      As caixas e os adereços de um cenário personalizado. Cada um espera que o cenário, no
+      controlador de campo, lhe diga para que serve: um ponto a capturar mantendo premido o botão
+      de uma equipa, um código a marcar no teclado, etiquetas de jogador a ler, ou um local de
+      bomba a armar e a desarmar. Informa o que acontece e nunca pontua: o cenário decide quando um
+      objetivo é cumprido ou falhado, e volta a configurar o nó depois de um reinício.

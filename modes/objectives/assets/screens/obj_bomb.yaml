@@ -1,0 +1,89 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# A bomb site. Data: phase (standby, armed, defused, exploded), team (armed,
+# exploded: the team that armed it; defused: the team that defused it),
+# attackers (the only team that may arm it, if one), left (armed: seconds
+# left), fuse_s, label (the objective's name), lang (pt, the default, or en).
+template: obj_bomb
+style: { background: "{phase == 'exploded' && 'danger' || 'background'}" }
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: "{phase == 'armed' && 'danger' || 'panel'}" }
+    children:
+      - type: label
+        text: "{label || 'LOCAL DA BOMBA'}"
+        style: { font_size: 20, width: fill, align: center, visible: "{lang != 'en'}" }
+      - type: label
+        text: "{label || 'BOMB SITE'}"
+        style: { font_size: 20, width: fill, align: center, visible: "{lang == 'en'}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{left|clock}"
+    style: { font_size: 48, color: "{left <= 10 && 'danger' || 'white'}", visible: "{phase == 'armed'}" }
+  - type: progress_bar
+    value: "{left / fuse_s}"
+    style: { width: 240, height: 10, color: "{team || 'danger'}", visible: "{phase == 'armed'}" }
+  - type: label
+    text: Mantém premido para desarmar
+    style:
+      font_size: 14
+      color: muted
+      visible: "{phase == 'armed' && lang != 'en'}"
+      padding: { top: 6 }
+  - type: label
+    text: Hold to defuse
+    style:
+      font_size: 14
+      color: muted
+      visible: "{phase == 'armed' && lang == 'en'}"
+      padding: { top: 6 }
+  - type: label
+    text: Mantém premido para armar
+    style: { font_size: 20, color: accent, visible: "{phase == 'standby' && lang != 'en'}" }
+  - type: label
+    text: Hold to arm
+    style: { font_size: 28, color: accent, visible: "{phase == 'standby' && lang == 'en'}" }
+  - type: label
+    text: DESARMADA
+    style: { font_size: 28, color: "{team || 'accent'}", visible: "{phase == 'defused' && lang != 'en'}" }
+  - type: label
+    text: DEFUSED
+    style: { font_size: 28, color: "{team || 'accent'}", visible: "{phase == 'defused' && lang == 'en'}" }
+  - type: label
+    text: EXPLODIU
+    style: { font_size: 28, color: white, visible: "{phase == 'exploded' && lang != 'en'}" }
+  - type: label
+    text: EXPLODED
+    style: { font_size: 28, color: white, visible: "{phase == 'exploded' && lang == 'en'}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "Armada por {team|upper}"
+    style:
+      font_size: 14
+      color: team
+      visible: "{phase == 'armed' && lang != 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: "Armed by {team|upper}"
+    style:
+      font_size: 14
+      color: team
+      visible: "{phase == 'armed' && lang == 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: "Só a equipa {attackers} arma"
+    style:
+      font_size: 14
+      color: muted
+      visible: "{phase == 'standby' && attackers && lang != 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: "Only {attackers} arms it"
+    style:
+      font_size: 14
+      color: muted
+      visible: "{phase == 'standby' && attackers && lang == 'en'}"
+      padding: { bottom: 10 }

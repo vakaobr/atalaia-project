@@ -36,7 +36,7 @@ Status: phase 2, plan phases D and E; phase 3, plan phase E (field check-in, pla
 | `atalaia_controller/positions.py` | Player positions and who may see them (ADR-P3-6); a VIP's GPS reports to the game's `field.lua` (`position.fix`, P4R6) |
 | `atalaia_controller/visibility.py` | What only staff may read: the schema's `gm_only` event data and mode parameters (decision M5-1) |
 | `atalaia_controller/prop_link.py` | Android props on the field's Wi-Fi ([protocol/prop-link.md](../protocol/prop-link.md)) |
-| `atalaia_controller/modes.py` | Built-in and uploaded mode packages, checked in the core before they are stored |
+| `atalaia_controller/modes.py` | Built-in and uploaded mode packages, checked in the core before they are stored; scenario packages (`kind: scenario`, a `field.lua` only, decision P4R7) are uploads only, never built in |
 | `atalaia_controller/branding.py`, `images.py` | The field's branding (name, logo, wallpaper, accent), team crests and team presets; uploaded images checked and stripped of metadata without an image library |
 | `atalaia_controller/sync_client.py`, `sync_format.py` | The site server sync ([protocol/sync.md](../protocol/sync.md)): the client thread, its cursor in `sync_state`, the chrono registry's bookkeeping in `sync_items`, and the body checks the site server shares |
 | `console/src/` | The GM console and the scoreboard page (static files) |
@@ -154,7 +154,7 @@ Reading needs the read or GM token, changing anything the GM token: `Authorizati
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/api/v1/nodes` | Nodes of the live game (or `?game=`): owner, battery, RSSI, epoch, firmware, capabilities |
-| GET / POST | `/api/v1/modes` | Installed modes and modifiers (`kind`), their parameters and translations (`i18n`) / upload `{"files": {"mode.yaml": ..., "node.lua": ..., "field.lua": ...}}` |
+| GET / POST | `/api/v1/modes` | Installed modes, modifiers, role packages and scenarios (`kind`), their parameters and translations (`i18n`) / upload `{"files": {"mode.yaml": ..., "node.lua": ..., "field.lua": ...}}`; a scenario has `mode.yaml` and `field.lua` only, and a game of it is `{"mode_id": "org.club.foxhound", "modifiers": ["org.atalaia.objectives"]}` (each box's join then names `org.atalaia.objectives`; [modes/README.md](../modes/README.md#custom-scenarios-and-the-objectives-package-phase-4)) |
 | GET / POST | `/api/v1/presets` | List / save `{"name", "mode_id", "params"}` |
 | GET / POST | `/api/v1/games` | List / create `{"name", "mode_id" or "preset_id", "modifiers": [...], "teams", "squads", "params", "duration_ms", "assignments": {"7": "zone"}, "team_info": {"red": {"display_name", "crest_id" or "team_preset_id"}}}`; a game with modifiers gets the mode id `main+modifier`; `squads` (0-16 per team, 0 by default) only for games whose teams split into squads (milsims, big games) |
 | GET | `/api/v1/games/{id}` | One game |

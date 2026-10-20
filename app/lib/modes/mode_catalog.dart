@@ -113,8 +113,9 @@ final class ModeManifest {
   final String id;
   final String version;
 
-  /// mode, modifier or role (a role package such as the Medic Kit: a node
-  /// with its role runs it alone, modes/README.md).
+  /// mode, modifier, role (a role package such as the Medic Kit: a node
+  /// with its role runs it alone) or scenario (a field.lua only, run by the
+  /// field controller over role packages, decision P4R7; modes/README.md).
   final String kind;
   final Map<String, String> names;
   final Map<String, String> descriptions;
@@ -131,6 +132,10 @@ final class ModeManifest {
   bool get isModifier => kind == 'modifier';
 
   bool get isRolePackage => kind == 'role';
+
+  /// A scenario runs on the field controller only: no node runs it, and no
+  /// join names it.
+  bool get isScenario => kind == 'scenario';
 
   /// Modes with a field.lua need the field controller (Hold-All, Last
   /// Stand): a prop on its own cannot score them.
@@ -151,13 +156,23 @@ final class ModeManifest {
     final text = files['mode.yaml'];
     if (text == null) throw ModeException('$folder: no mode.yaml');
     final m = plainYaml(loadYaml(text)) as Map<String, Object?>? ?? {};
-    for (final key in ['id', 'version', 'roles']) {
+    for (final key in ['id', 'version', if (m['kind'] != 'scenario') 'roles']) {
       if (!m.containsKey(key)) {
         throw ModeException("$folder/mode.yaml: missing '$key'");
       }
     }
+    final kind = '${m['kind'] ?? 'mode'}';
     final node = files['node.lua'];
-    if (node == null) throw ModeException('$folder: no node.lua');
+    if (kind == 'scenario') {
+      if (node != null) {
+        throw ModeException('$folder: a scenario has no node.lua');
+      }
+      if (files['field.lua'] == null) {
+        throw ModeException('$folder: a scenario needs a field.lua');
+      }
+    } else if (node == null) {
+      throw ModeException('$folder: no node.lua');
+    }
     final i18n = (m['i18n'] as Map<String, Object?>?) ?? const {};
     final names = <String, String>{'en': '${m['name'] ?? m['id']}'};
     final descriptions = <String, String>{'en': '${m['description'] ?? ''}'};
@@ -203,12 +218,12 @@ final class ModeManifest {
       folder: folder,
       id: '${m['id']}',
       version: '${m['version']}',
-      kind: '${m['kind'] ?? 'mode'}',
+      kind: kind,
       names: names,
       descriptions: descriptions,
       roles: roles,
       params: params,
-      nodeScript: node,
+      nodeScript: node ?? '',
       fieldScript: files['field.lua'],
       screens: screens,
     );
@@ -306,7 +321,7 @@ class ModeCatalog {
 
   List<ModeManifest> get mainModes => [
     for (final m in modes)
-      if (!m.isModifier) m,
+      if (!m.isModifier && !m.isScenario) m,
   ];
 
   List<ModeManifest> get modifiers => [
@@ -327,6 +342,15 @@ class ModeCatalog {
     final parts = id.split('+');
     final main = byId(parts.first);
     if (main == null) throw ModeException('unknown mode ${parts.first}');
+    // A join names what a node runs (Mode.node_mode_id): never a scenario,
+    // which runs on the field controller alone (decision P4R7).
+    for (final p in parts) {
+      if (byId(p)?.isScenario ?? false) {
+        throw ModeException(
+          '$p is a scenario: it runs on the field controller, not on a node',
+        );
+      }
+    }
     // A modifier may run on its own (Codes alone is a code terminal), but
     // not as the main mode of others.
     if (main.isModifier && parts.length > 1) {

@@ -44,6 +44,10 @@ static const uint8_t data_visibility_expired[] = {29, 17};
 static const uint8_t data_node_tamper[] = {3};
 static const uint8_t data_pod_connected[] = {21, 22};
 static const uint8_t data_pod_disconnected[] = {3};
+static const uint8_t data_scenario_objective_completed[] = {34};
+static const uint8_t data_scenario_objective_failed[] = {34, 3};
+static const uint8_t data_scenario_objective_revealed[] = {34};
+static const uint8_t data_scenario_started[] = {35};
 static const uint8_t data_vip_extracted[] = {14};
 static const uint8_t data_hacking_solved[] = {36, 10};
 static const uint8_t data_medic_heal[] = {14, 32, 33};
@@ -90,6 +94,10 @@ const atalaia_event_def_t atalaia_event_defs[] = {
     {"node.tamper", ATALAIA_EV_NODE_TAMPER, ATALAIA_PRIO_CRITICAL, data_node_tamper, 1},
     {"pod.connected", ATALAIA_EV_POD_CONNECTED, ATALAIA_PRIO_TELEMETRY, data_pod_connected, 2},
     {"pod.disconnected", ATALAIA_EV_POD_DISCONNECTED, ATALAIA_PRIO_TELEMETRY, data_pod_disconnected, 1},
+    {"scenario.objective.completed", ATALAIA_EV_SCENARIO_OBJECTIVE_COMPLETED, ATALAIA_PRIO_CRITICAL, data_scenario_objective_completed, 1},
+    {"scenario.objective.failed", ATALAIA_EV_SCENARIO_OBJECTIVE_FAILED, ATALAIA_PRIO_CRITICAL, data_scenario_objective_failed, 2},
+    {"scenario.objective.revealed", ATALAIA_EV_SCENARIO_OBJECTIVE_REVEALED, ATALAIA_PRIO_CRITICAL, data_scenario_objective_revealed, 1},
+    {"scenario.started", ATALAIA_EV_SCENARIO_STARTED, ATALAIA_PRIO_CRITICAL, data_scenario_started, 1},
     {"vip.extracted", ATALAIA_EV_VIP_EXTRACTED, ATALAIA_PRIO_CRITICAL, data_vip_extracted, 1},
     {"hacking.solved", ATALAIA_EV_HACKING_SOLVED, ATALAIA_PRIO_CRITICAL, data_hacking_solved, 2},
     {"medic.heal", ATALAIA_EV_MEDIC_HEAL, ATALAIA_PRIO_NORMAL, data_medic_heal, 3},
@@ -132,6 +140,8 @@ const atalaia_data_field_def_t atalaia_data_field_defs[] = {
     {"holder", ATALAIA_DATA_HOLDER, ATALAIA_FIELD_STRING, false},
     {"remaining", ATALAIA_DATA_REMAINING, ATALAIA_FIELD_INTEGER, false},
     {"player_heals_used", ATALAIA_DATA_PLAYER_HEALS_USED, ATALAIA_FIELD_INTEGER, false},
+    {"objective", ATALAIA_DATA_OBJECTIVE, ATALAIA_FIELD_STRING, false},
+    {"scenario", ATALAIA_DATA_SCENARIO, ATALAIA_FIELD_STRING, false},
     {"puzzle", ATALAIA_DATA_PUZZLE, ATALAIA_FIELD_STRING, false},
 };
 const size_t atalaia_data_field_def_count =

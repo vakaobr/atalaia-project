@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The example scenario (fixtures/foxhound) over this package: four nodes, named as the
+# scenario names them (decision P4R8).
+name: "Red captures the bridge: completed for red, 50 points from the scenario, and the hidden vault is revealed to red and set up"
+scenario: fixtures/foxhound
+nodes: { alpha: objective, bravo: objective, charlie: objective, site: bomb_site }
+steps:
+  - expect: { type: scenario.started, node: controller, data: { scenario: org.club.foxhound } }
+  - expect: { type: scenario.objective.revealed, node: controller, team: red, data: { objective: bridge } }
+  - expect: { type: scenario.objective.revealed, node: controller, data: { objective: intel } }
+  - expect: { type: scenario.objective.revealed, node: controller, data: { objective: site_a } }
+  - expect_no: { type: scenario.objective.revealed, data: { objective: vault } }
+  - expect_screen: { node: alpha, template: obj_capture, data: { label: Ponte, only: red, hold_ms: 3000 } }
+  - expect_screen: { node: charlie, template: obj_status, data: { state: "off", label: Cofre } }
+  # Only red captures the bridge.
+  - hold: { node: alpha, team: blue, s: 4 }
+  - expect_no: zone.captured
+  - hold: { node: alpha, team: red, s: 3 }
+  - expect: { type: zone.captured, node: alpha, team: red, at: 7 }
+  - expect: { type: scenario.objective.completed, node: controller, team: red, data: { objective: bridge } }
+  - expect: { type: scenario.objective.revealed, node: controller, team: red, data: { objective: vault } }
+  - expect_score: { team: red, points: 50 }
+  - expect_score: { team: red, node: alpha, points: 0 }
+  - expect_screen: { node: alpha, template: obj_status, data: { state: done, team: red } }
+  - expect_screen: { node: charlie, template: obj_code, data: { label: Cofre, team: red, digits: 0 } }
+  - expect_no: scenario.objective.completed
+  - expect_no: script.error

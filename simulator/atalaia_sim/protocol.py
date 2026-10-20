@@ -109,6 +109,8 @@ DATA_FIELDS = {
     'holder': DataField(31, 'string', False),
     'remaining': DataField(32, 'integer', False),
     'player_heals_used': DataField(33, 'integer', False),
+    'objective': DataField(34, 'string', False),
+    'scenario': DataField(35, 'string', False),
     'puzzle': DataField(36, 'string', False),
 }
 
@@ -154,6 +156,10 @@ EVENTS = {
     'node.tamper': EventDef(39, 'critical', ('reason',)),
     'pod.connected': EventDef(40, 'telemetry', ('fw', 'tier')),
     'pod.disconnected': EventDef(41, 'telemetry', ('reason',)),
+    'scenario.objective.completed': EventDef(42, 'critical', ('objective',), ('objective',)),
+    'scenario.objective.failed': EventDef(43, 'critical', ('objective', 'reason'), ('objective',)),
+    'scenario.objective.revealed': EventDef(44, 'critical', ('objective',), ('objective',)),
+    'scenario.started': EventDef(45, 'critical', ('scenario',)),
     'vip.extracted': EventDef(46, 'critical', ('player',)),
     'hacking.solved': EventDef(47, 'critical', ('puzzle', 'code'), ('code',)),
     'medic.heal': EventDef(50, 'normal', ('player', 'remaining', 'player_heals_used')),

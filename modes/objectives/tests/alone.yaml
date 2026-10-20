@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "Without a scenario a node waits: holds, keys and tags do nothing"
+nodes: { a: objective, b: bomb_site }
+steps:
+  - expect_screen: { node: a, template: obj_status, data: { state: wait } }
+  - expect_screen: { node: b, template: obj_status, data: { state: wait } }
+  - hold: { node: a, team: red, s: 10 }
+  - hold: { node: b, team: red, s: 10 }
+  - keys: { node: a, keys: "1234#" }
+  - scan: { node: a, player: r1, team: red }
+  - expect_no: zone.captured
+  - expect_no: bomb.armed
+  - expect_no: code.used
+  - expect_no: tag.scanned
+  - expect_screen: { node: a, template: obj_status, data: { state: wait } }
+  - expect_no: script.error

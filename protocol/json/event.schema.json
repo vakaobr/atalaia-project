@@ -73,6 +73,10 @@
             "node.tamper",
             "pod.connected",
             "pod.disconnected",
+            "scenario.objective.completed",
+            "scenario.objective.failed",
+            "scenario.objective.revealed",
+            "scenario.started",
             "vip.extracted",
             "hacking.solved",
             "medic.heal",
@@ -1330,6 +1334,124 @@
       "if": {
         "properties": {
           "type": {
+            "const": "scenario.objective.completed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "objective": {
+                "$ref": "#/$defs/data/objective"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$comment": "staff only (decision M5-1): objective; left out of what players and the read token get"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "scenario.objective.failed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "objective": {
+                "$ref": "#/$defs/data/objective"
+              },
+              "reason": {
+                "$ref": "#/$defs/data/reason"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$comment": "staff only (decision M5-1): objective; left out of what players and the read token get"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "scenario.objective.revealed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "objective": {
+                "$ref": "#/$defs/data/objective"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$comment": "staff only (decision M5-1): objective; left out of what players and the read token get"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "scenario.started"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "scenario": {
+                "$ref": "#/$defs/data/scenario"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
             "const": "vip.extracted"
           }
         }
@@ -1579,6 +1701,14 @@
       "player_heals_used": {
         "type": "integer",
         "description": "heals a player has had in this game"
+      },
+      "objective": {
+        "type": "string",
+        "description": "scenario objective id"
+      },
+      "scenario": {
+        "type": "string",
+        "description": "scenario package id"
       },
       "puzzle": {
         "type": "string",

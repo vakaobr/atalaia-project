@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 from . import codec
 from .core import Command, Core, Emitted, FieldOps, Node
+from .field_controller import CMD_PARAMS_MAX
 from .mode import COMMAND_NAME, Mode
 from .protocol import MESSAGE_TYPES, RF_PAYLOAD_MAX
 
@@ -145,6 +146,9 @@ class Simulation:
         self._unreachable: set[str] = set()
         self._held: list[tuple[str, int, str, dict[str, Any]]] = []
 
+        self.seed = seed
+        self._mem_limit, self._instr_limit = mem_limit, instr_limit
+        self._started = False  # game.start broadcast, game.end not yet
         for node_id, (name, role) in enumerate(nodes.items(), start=1):
             if role not in mode.roles:
                 raise SimError(f"node '{name}': mode {mode.id} has no role '{role}'")
@@ -152,23 +156,8 @@ class Simulation:
             # gives them (a role package's roles run the package alone, modes/README.md).
             vnode = VirtualNode(name=name, role=role, runtime=None,  # type: ignore[arg-type]
                                 params=mode.params_for(role, params))
-            vnode.runtime = Node(
-                core,
-                node_id=node_id,
-                game_seed=seed,
-                teams=self.teams,
-                params=vnode.params,
-                source=mode.node_script_for(role),
-                chunk_name=mode.chunk_name_for(role),
-                mem_limit=mem_limit,
-                instr_limit=instr_limit,
-                on_event=lambda ev, n=vnode: self._record(n, ev),
-                on_command=vnode.commands.append,
-                on_log=vnode.logs.append,
-            )
+            vnode.runtime = self._load_node(vnode, node_id)
             self.nodes[name] = vnode
-            if not vnode.runtime.loaded:
-                raise SimError(f"node '{name}' failed to load {mode.id}: {vnode.runtime.last_error}")
         if mode.field_script is not None:
             ops = FieldOps(nodes=self._field_nodes, owner=self.owners.get, send=self._field_send)
             self.field = Node(core, 0, seed, self.teams, params, mode.field_script,
@@ -177,6 +166,57 @@ class Simulation:
                               on_log=self.field_logs.append, field_ops=ops)
             if not self.field.loaded:
                 raise SimError(f"field.lua of {mode.id} failed to load: {self.field.last_error}")
+
+    def _load_node(self, vnode: VirtualNode, node_id: int) -> Node:
+        runtime = Node(
+            self.core,
+            node_id=node_id,
+            game_seed=self.seed,
+            teams=self.teams,
+            params=vnode.params,
+            source=self.mode.node_script_for(vnode.role),
+            chunk_name=self.mode.chunk_name_for(vnode.role),
+            mem_limit=self._mem_limit,
+            instr_limit=self._instr_limit,
+            on_event=lambda ev, n=vnode: self._record(n, ev),
+            on_command=vnode.commands.append,
+            on_log=vnode.logs.append,
+        )
+        if not runtime.loaded:
+            error = runtime.last_error
+            runtime.close()
+            raise SimError(f"node '{vnode.name}' failed to load {self.mode.id}: {error}")
+        return runtime
+
+    def reboot(self, name: str) -> None:
+        """A node loses power and comes back in the running game, as a Field Box does
+        (firmware/esp32/main/node_runner.c, node_runner_resume): its script is loaded again with
+        no state, gets game.start, is brought to the game's time and gets node.rebooted; the box
+        then reports node.rebooted (reason power) to the controller (field_link_send_rebooted)."""
+        vnode = self.node(name)
+        node_id = vnode.runtime.node_id
+        vnode.runtime.close()
+        vnode.runtime = self._load_node(vnode, node_id)
+        if self._started:
+            vnode.runtime.input("game.start", {"preset": self.mode.node_mode_id(vnode.role)})
+            vnode.runtime.advance(self.time_ms)
+            vnode.runtime.input("node.rebooted", {})
+        self._record_rebooted(vnode, node_id)
+        self._pump()
+
+    def _record_rebooted(self, vnode: VirtualNode, node_id: int) -> None:
+        data = {"reason": "power"}
+        prio = codec.default_prio("node.rebooted")
+        size = self._check_wire(vnode.name, {"node": node_id, "seq": 0, "t": self.time_ms,
+                                             "type": "node.rebooted", "prio": prio, "data": data})
+        self._log.append(LogEntry(self.time_ms, vnode.name, node_id, 0, "node.rebooted", None,
+                                  prio, data, size))
+        if self.field is not None:
+            event = {**data, "node": node_id}
+            if vnode.name in self._unreachable:
+                self._held.append((vnode.name, self.time_ms, "node.rebooted", event))
+            else:
+                self._to_field.append((self.time_ms, "node.rebooted", event))
 
     def close(self) -> None:
         for vnode in self.nodes.values():
@@ -235,6 +275,12 @@ class Simulation:
             return False
         if cmd == "mode" and not COMMAND_NAME.match(str((params or {}).get("name", ""))):
             return False  # a mode command names itself: 1-24 of a-z, 0-9 and _
+        size = len(json.dumps(params or {}, separators=(",", ":"), ensure_ascii=False).encode())
+        if params and size > CMD_PARAMS_MAX:
+            # The controller refuses it too (FieldController.send_cmd): a box's buffer is 128 bytes.
+            self.problems.append(f"{CONTROLLER}: field.send({target.name}, {cmd!r}) parameters are "
+                                 f"{size} bytes; at most {CMD_PARAMS_MAX} fit in a CMD")
+            return False
         self.field_commands.append((self.time_ms, target.name, cmd, dict(params)))
         if target.name not in self._unreachable:
             self._to_nodes.append((target.name, FIELD_COMMANDS[cmd], dict(params)))
@@ -332,8 +378,11 @@ class Simulation:
                   t_ms: Optional[int] = None) -> None:
         """A game event from the controller to every node (and to the field script)."""
         self._record_controller(type_, data or {}, t_ms)
+        if type_ == "game.start":
+            self._started = True
         if type_ == "game.end":
             self._ended = True
+            self._started = False
         for vnode in self.nodes.values():
             vnode.runtime.input(type_, data or {})
         if self.field is not None:

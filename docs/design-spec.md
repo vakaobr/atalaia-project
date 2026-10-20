@@ -957,6 +957,8 @@ Each objective has:
 
 The console compiles a scenario into a field script, so it runs, syncs and survives controller failover like any mode. Scenarios save as presets and can be shared in the registry. The scenario builder arrives in phase 4; the visual editor in phase 5 covers what the blocks cannot express.
 
+How it runs (phase 4 decision P4R7, built in software in plan phase 6): boxes run only the scripts built into their firmware, so a scenario is a package of its own kind, `kind: scenario`, with a `field.lua` and no node script, which leads the game over the built-in role package `org.atalaia.objectives`. Each prop runs that package and is told what it is for (a point to capture, a code, tags or cards to scan, a bomb site) by the scenario's field script with a mode command, at the start and again after a reboot; the props report what happens and never score, and the field script decides, scores, reveals and logs `scenario.started` and `scenario.objective.revealed`, `completed` and `failed` ([modes/README.md](../modes/README.md#custom-scenarios-and-the-objectives-package-phase-4)). The compiler, the console's builder and objectives in the player app follow (phase 4 plan phases 7 and 8).
+
 ## 16. Roadmap
 
 Work runs in six phases, and each one closes with a real field test before the next begins. Phases are sequenced, not dated; dates get set once contributors are known.

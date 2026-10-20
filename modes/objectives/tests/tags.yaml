@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "The intel: two players of one team scan their tags; a tag counts once, a forged tag not at all; blue gets there first"
+scenario: fixtures/foxhound
+nodes: { bravo: objective }
+steps:
+  - expect_screen: { node: bravo, template: obj_tags, data: { label: "Informações", have: 0, count: 2 } }
+  - scan: { node: bravo, player: b1, team: blue }
+  - expect: { type: tag.scanned, node: bravo, team: blue, data: { owner: b1 } }
+  - expect_screen: { node: bravo, template: obj_tags, data: { team: blue, have: 1, count: 2 } }
+  - scan: { node: bravo, player: b1, team: blue }
+  - expect_screen: { node: bravo, template: obj_tags, data: { team: blue, have: 1, note: again } }
+  - expect_no: tag.scanned
+  - scan: { node: bravo, player: r1, team: red, forged: true }
+  - expect_screen: { node: bravo, template: obj_tags, data: { note: not_tag } }
+  - scan: { node: bravo, player: r1, team: red }
+  - expect: { type: tag.scanned, node: bravo, team: red, data: { owner: r1 } }
+  - expect_screen: { node: bravo, template: obj_tags, data: { team: red, have: 1 } }
+  - expect_no: scenario.objective.completed
+  - scan: { node: bravo, player: b2, team: blue }
+  - expect: { type: tag.scanned, node: bravo, team: blue, data: { owner: b2 } }
+  - expect: { type: scenario.objective.completed, node: controller, team: blue, data: { objective: intel } }
+  - expect_score: { team: blue, points: 20 }
+  - expect_screen: { node: bravo, template: obj_status, data: { state: done, team: blue } }
+  - expect_no: script.error

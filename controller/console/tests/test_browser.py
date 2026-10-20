@@ -472,6 +472,47 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(extracted.nth(0)).to_contain_text("blue's payload reached the extraction zone")
         expect(extracted.nth(1)).to_contain_text("red extracted its VIP (p-k7m2q4x9z3ab)")
 
+    def test_a_scenario_over_the_objectives_package(self):
+        """A scenario package (kind: scenario, the hand-written example of plan phase 6) uploaded,
+        then a game of it from the form with the objectives package ticked; a box's join names the
+        objectives package; the scenario's events read as words in the feed, which objective
+        included for the GM, in both languages."""
+        fixture = HERE.parents[2] / "modes" / "objectives" / "tests" / "fixtures" / "foxhound"
+        files = {n: (fixture / n).read_text(encoding="utf-8") for n in ("mode.yaml", "field.lua")}
+        self.assertEqual(self.field.http.post("/api/v1/modes", json={"files": files}).status_code, 201)
+        page = self.console()
+        page.get_by_test_id("game-name").fill("Foxhound")
+        page.get_by_test_id("game-source").select_option("mode:org.club.foxhound")
+        roles = page.get_by_test_id("game-roles")
+        expect(roles).to_contain_text("Objetivos")
+        roles.locator('input[value="org.atalaia.objectives"]').check()
+        expect(page.locator('label[for="game-vault_points"]')).to_contain_text("Pontos do cofre")
+        page.get_by_test_id("game-create").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("pronto")
+        game = self.field.bundle.controller.game
+        self.assertEqual(game["mode_id"], "org.club.foxhound+org.atalaia.objectives")
+
+        page.get_by_test_id("tab-join").click()
+        page.locator("#j-node").fill(str(BOX))
+        page.get_by_test_id("join-generate").click()
+        j = join.decode(join.from_text(page.get_by_test_id("join-text").input_value()), JOIN_KEY)
+        self.assertEqual((j["mode_id"], j["role"]), ("org.atalaia.objectives", "objective"))
+
+        self.field.http.post(f"/api/v1/games/{game['id']}/start")
+        self.field.host.transmitted_all(0.3)
+        self.field.bundle.controller.fc.controller_event(
+            "scenario.objective.completed", {"objective": "bridge"}, team="red", prio="critical")
+        page.get_by_test_id("tab-feed").click()
+        feed = page.get_by_test_id("feed")
+        expect(feed.locator('[data-type="scenario.started"]')).to_contain_text("O cenário org.club.foxhound começou")
+        expect(feed.locator('[data-type="scenario.objective.revealed"]').first).to_contain_text("foi revelado")
+        done = feed.locator('[data-type="scenario.objective.completed"]')
+        expect(done).to_contain_text("A equipa red cumpriu o objetivo bridge")
+        page.get_by_test_id("lang").first.select_option("en")
+        expect(done).to_contain_text("red completed the objective bridge")
+        expect(feed.locator('[data-type="scenario.objective.revealed"]')).to_have_count(3)
+        expect(feed).to_contain_text("The objective intel is revealed to every team")
+
     def test_join_qr_code_reads_back_as_the_join_text(self):
         if not ZBARIMG:
             self.skipTest("zbarimg is not installed")

@@ -362,10 +362,14 @@ the phase 3 modes Kill Confirmed, Respawn and Lives and Player Check-in, and
 the Medic Kit (a role package: the controller joins a kit with the kit's id
 alone, so the box loads it like any preset), and phase 4's Master and
 Satellites, Hacking Terminal and VIP / Payload (a box is one of its
-checkpoints; the payload is an Android prop with GPS, decision M5-6).
+checkpoints; the payload is an Android prop with GPS, decision M5-6), and the
+objectives package (a role package for custom scenarios, decision P4R7: a
+scenario's `field.lua` on the controller sets the box up with the mode command
+`setup`, so the box side never changes per scenario; picked on its own, a box
+waits for a scenario).
 At boot the firmware stores a preset, with the defaults from its
 `mode.yaml`, for each built-in mode that no stored preset uses yet (a new
-or erased box and every Wokwi run get all twelve, in that order; a box
+or erased box and every Wokwi run get all thirteen, in that order; a box
 updated to a firmware with more modes gets the new ones in free slots), and
 replaces the stored script of a built-in mode when the image has a
 different one (`main/builtin_presets.c`). The default admin PIN is 1234
@@ -373,8 +377,8 @@ until the setup portal sets one. The keypad picker shows nine presets a
 page (keys 1-9 on every page); with more than nine, `0` turns to the next
 page, and the header shows the page (`CHOOSE A GAME 1/2`), so the tenth,
 Master and Satellites, is the first entry of the second page (decision
-M2-1), the Hacking Terminal the second and VIP / Payload ("VIP") the
-third. A game picked on the box gets a
+M2-1), the Hacking Terminal the second, VIP / Payload ("VIP") the
+third and Objectives the fourth. A game picked on the box gets a
 new seed for the scripts' `rand()` (`esp_random()`), as every field game
 does from the controller, so a Hacking Terminal sets a different puzzle each
 game (decision M4-6). Target Windows is the one mode in `modes/` that is not built in: it
@@ -382,7 +386,7 @@ needs the target addon and its driver (decision P4R23, phase 4 HW2); its
 screen templates are in the image, as every mode's are.
 
 A join may name a main mode with modifiers (`org.atalaia.domination+org.atalaia.codes`,
-see [modes/README.md](../../modes/README.md#main-modes-modifiers-and-role-packages)): the box
+see [modes/README.md](../../modes/README.md#main-modes-modifiers-role-packages-and-scenarios)): the box
 composes the stored scripts into one chunk, as the controller and the
 simulator do (`main/box_game.c`). A preset holds up to 16 KB of script
 (`PRESET_SOURCE_MAX`) for that; Hold-All and Last Stand boxes play their part

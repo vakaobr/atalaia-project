@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Implementation (plan phases 1, 2, 3, 4, 5, 10, 11, 12, 13, 14 and 15 built in software, 2026-10-20; sync over 4G: HW1)
+**Current phase:** Implementation (plan phases 1 to 6 and 10 to 15 built in software, 2026-10-20; sync over 4G: HW1)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-20 (plan phase 15, full clean-copy check)
-**Next step:** plan phase 6 (scenario packages and the objectives role package) on the modes chain; plan phase 16 (registration and game-day sync) on the site server chain
+**Last verified:** 2026-10-20 (plan phase 6, full clean-copy check)
+**Next step:** plan phase 7 (scenario compiler and validator) on the modes chain; plan phase 16 (registration and game-day sync) on the site server chain
 
 ## Completed
 
@@ -44,7 +44,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | 3 | Geo utilities in the core | Software, now | -- | Done in software (2026-10-20) |
 | 4 | Hacking Terminal | Software, now | -- | Done in software (2026-10-20; on a phone in the field: HW3) |
 | 5 | VIP / Payload | Software, now | 3 | Done in software (2026-10-20; real GPS in the field: HW3) |
-| 6 | Scenario packages and the objectives role package | Software, now | -- | Pending |
+| 6 | Scenario packages and the objectives role package | Software, now | -- | Done in software (2026-10-20; not on radio hardware) |
 | 7 | Scenario compiler and validator | Software, now | 3, 6 | Pending |
 | 8 | Scenarios in the controller, console and app | Software, now | 7 | Pending |
 | 9 | ATAK / CoT emitter | Software, now | 3 | Pending |
@@ -207,6 +207,51 @@ the GM do), a prop session with fake fixes, the Field Box host tests (the
 preset picked, a checkpoint captured) and five reference images, four app
 goldens, the console in Chromium. Not run: Wokwi (R7), a real box, real
 GPS on phones in the field (HW3). Decisions M5-1 to M5-7 (open).
+
+## Plan phase 6: scenario packages and the objectives role package (built 2026-10-20, in software)
+
+The runtime that compiled scenarios need (P4R7). A new manifest kind,
+`scenario`: a `mode.yaml` and a `field.lua`, no `node.lua`, no roles, no
+commands; uploaded to a controller (`POST /api/v1/modes`), never built in
+(the controller refuses one in its mode folders). It leads a game's id over
+at least one role package, optionally with one main mode right after it
+(`org.club.foxhound+org.atalaia.objectives`,
+`org.club.foxhound+org.atalaia.respawn+org.atalaia.objectives`); its
+`field.lua` runs first and its parameters are its own (no join carries
+them); no node runs it and no join names it (M6-1). The rules changed in
+the simulator's `atalaia_sim.mode` (which the controller uses), the app's
+catalogue (a join never names a scenario) and the Dart test runner, all
+checked against the new shared vectors `protocol/vectors/composition.yaml`.
+
+`modes/objectives` (`org.atalaia.objectives`, "Objetivos", a role package
+with no parameters; roles `objective` and `bomb_site`): a node waits for the
+scenario's mode command `setup` and is then a point to capture, a code to
+type, player tags or any cards to scan, or a bomb site; it reports the
+standard events and never scores (M6-3, M6-4). The scenario sets every node
+up at the start, any node it has not set up yet every second, and a node
+again after `node.rebooted` (an armed bomb goes on with the fuse it had
+left). Events 42-45 and data keys 34 (`objective`) and 35 (`scenario`), with
+four hand-made vectors and draft RFC 0000 Amendment 4; `objective` is
+`gm_only` on 42-44 until the player view routes objectives per team (M6-5,
+P4R24, plan phase 8). The thirteenth Field Box preset (M6-8). A
+hand-written example scenario, `modes/objectives/tests/fixtures/foxhound`,
+stands in for the compiler (plan phase 7).
+
+Tested: 9 YAML event sequences (in Python and in Dart through the core,
+each node directly and in a game loop isolate): capture, code, player tags,
+intel cards, a bomb defused and one exploded, reboots, a node with no
+scenario; `simulator/tests/test_scenario.py` (the shared vectors, the
+example's setups, a too-large command, the Reduced box's heap: about 40 KB
+loaded); `app/test/modes/composition_vectors_test.dart` and the catalogue;
+`controller/tests/test_scenario.py` (the upload, the joins, the setups over
+the radio, the scores, a reboot, staff-only objectives on REST) and
+`test_box_e2e.py` (the scenario on two host boxes over the host modem: the
+setups reach the boxes, red's capture completes the bridge, a box that
+loses power is set up again); the console in Chromium (a game of the
+scenario from the form, the feed in words); the Field Box host tests (the
+preset picked, set up, a capture and a bomb) and fifteen reference images;
+five app goldens. Not run: Wokwi (R7), a real box on the radio. Decisions
+M6-1 to M6-9 (open).
 
 ## Plan phase 10: site server skeleton (built 2026-10-19, in software)
 

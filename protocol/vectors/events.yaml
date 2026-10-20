@@ -74,6 +74,20 @@ valid:
   - name: "Blue's payload prop reaches the extraction zone (id 46, no player)"
     event: {"node": 12, "seq": 2, "t": 600000, "type": "vip.extracted", "team": 2, "data": {"team": "blue"}}
     cbor: "a6 01 0c 02 02 03 1a 00 09 27 c0 04 18 2e 05 02 08 a1 01 64 62 6c 75 65"
+  # Scenario events (ids 42-45; objective and scenario, keys 34 and 35), from the controller's
+  # field.lua; bytes worked out by hand from RFC 8949 (major types 0, 3 and 5).
+  - name: "A scenario starts (id 45, critical by default; scenario, key 35)"
+    event: {"node": 0, "seq": 1, "t": 0, "type": "scenario.started", "data": {"scenario": "org.club.foxhound"}}
+    cbor: "a5 01 00 02 01 03 00 04 18 2d 08 a1 18 23 71 6f 72 67 2e 63 6c 75 62 2e 66 6f 78 68 6f 75 6e 64"
+  - name: "An objective is revealed to every team (id 44; objective, key 34)"
+    event: {"node": 0, "seq": 2, "t": 300000, "type": "scenario.objective.revealed", "data": {"objective": "intel"}}
+    cbor: "a5 01 00 02 02 03 1a 00 04 93 e0 04 18 2c 08 a1 18 22 65 69 6e 74 65 6c"
+  - name: "Red completes an objective (id 42)"
+    event: {"node": 0, "seq": 3, "t": 900000, "type": "scenario.objective.completed", "team": 1, "data": {"objective": "bridge", "team": "red"}}
+    cbor: "a6 01 00 02 03 03 1a 00 0d bb a0 04 18 2a 05 01 08 a2 18 22 66 62 72 69 64 67 65 01 63 72 65 64"
+  - name: "Blue fails an objective with a reason (id 43)"
+    event: {"node": 0, "seq": 4, "t": 1200000, "type": "scenario.objective.failed", "team": 2, "data": {"objective": "site_a", "reason": "exploded", "team": "blue"}}
+    cbor: "a6 01 00 02 04 03 1a 00 12 4f 80 04 18 2b 05 02 08 a3 18 22 66 73 69 74 65 5f 61 03 68 65 78 70 6c 6f 64 65 64 01 64 62 6c 75 65"
 
 invalid:
   - name: "Truncated"  # truncated

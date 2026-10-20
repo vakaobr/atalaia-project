@@ -3,17 +3,21 @@
 """Mode packages: the manifest (mode.yaml), scripts and tests.
 
 A package is a main mode (``kind: mode``, the default), a modifier
-(``kind: modifier``), which runs alongside a main mode on the same node, or
-a role package (``kind: role``), which brings roles of its own to any game:
+(``kind: modifier``), which runs alongside a main mode on the same node, a
+role package (``kind: role``), which brings roles of its own to any game:
 a node given one of its roles runs that package alone (a Medic Kit next to
-Domination's zone boxes runs no capture rules). A game names a main mode
-and its other parts with one id, joined by ``+``
-(``org.atalaia.domination+org.atalaia.codes+org.atalaia.medic``);
+Domination's zone boxes runs no capture rules), or a scenario
+(``kind: scenario``, decision P4R7): a ``field.lua`` with no ``node.lua``
+and no roles, which runs on the field controller over role packages such
+as ``org.atalaia.objectives`` and configures their nodes with mode
+commands. A game names a main mode and its other parts with one id, joined
+by ``+`` (``org.atalaia.domination+org.atalaia.codes+org.atalaia.medic``),
+a scenario first (``org.club.foxhound+org.atalaia.objectives``);
 :func:`compose` turns that into one mode: the main mode's roles run the
 main mode's and the modifiers' scripts in order, each in its own
 ``do ... end`` block, and each role package's roles run its script alone.
-A node's join names only what it runs (:meth:`Mode.node_mode_id`), so the
-Field Box builds the same chunk from its stored presets
+A node's join names only what it runs (:meth:`Mode.node_mode_id`), never a
+scenario, so the Field Box builds the same chunk from its stored presets
 (firmware/esp32/main/box_game.c) without knowing the kinds.
 """
 
@@ -26,7 +30,7 @@ from typing import Any, Optional
 
 import yaml
 
-KINDS = ("mode", "modifier", "role")
+KINDS = ("mode", "modifier", "role", "scenario")
 # A game's mode id travels in the join payload (protocol/join.md): 63 bytes at most.
 MODE_ID_MAX = 63
 SEPARATOR = "+"
@@ -73,6 +77,9 @@ class Mode:
     role_parts: dict[str, RolePart] = field(default_factory=dict)
     # For a composed mode: the id of what the main mode's roles run (main mode and modifiers).
     main_id: str = ""
+    # For a composed mode led by a scenario: the scenario's parameters, which only its field.lua
+    # reads, so no node's join carries them.
+    scenario_params: frozenset[str] = frozenset()
 
     @property
     def tests(self) -> list[Path]:
@@ -112,7 +119,7 @@ class Mode:
         part = self.role_parts.get(role)
         if part is not None:
             return {k: v for k, v in params.items() if k in part.param_names}
-        others = {n for p in self.role_parts.values() for n in p.param_names}
+        others = {n for p in self.role_parts.values() for n in p.param_names} | self.scenario_params
         return {k: v for k, v in params.items() if k not in others}
 
     def resolve_params(self, overrides: dict[str, Any], teams: list[str]) -> dict[str, Any]:
@@ -165,6 +172,13 @@ def check_manifest(manifest: dict[str, Any], where: str) -> None:
     kind = manifest.get("kind", "mode")
     if kind not in KINDS:
         raise ModeError(f"{where}: kind must be one of {', '.join(KINDS)}, got {kind!r}")
+    if kind == "scenario":
+        # A scenario runs on the field controller only (decision P4R7): its nodes run role
+        # packages, so it has no roles and no GM commands of its own.
+        if manifest.get("roles"):
+            raise ModeError(f"{where}: a scenario has no roles: its nodes run role packages")
+        if manifest.get("commands"):
+            raise ModeError(f"{where}: a scenario has no commands: they are for the nodes' roles")
     params = manifest.get("params") or {}
     if not isinstance(params, dict) or not all(isinstance(spec, dict) for spec in params.values()):
         raise ModeError(f"{where}: params must map a parameter name to its schema")
@@ -212,28 +226,39 @@ def load_mode(path: Path) -> Mode:
     if not manifest_path.exists():
         raise ModeError(f"{path}: no mode.yaml")
     manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
-    for key in ("id", "version", "roles"):
+    scenario = isinstance(manifest, dict) and manifest.get("kind") == "scenario"
+    for key in ("id", "version") if scenario else ("id", "version", "roles"):
         if key not in manifest:
             raise ModeError(f"{manifest_path}: missing '{key}'")
     check_manifest(manifest, str(manifest_path))
     node_path = path / "node.lua"
-    if not node_path.exists():
-        raise ModeError(f"{path}: no node.lua")
     field_path = path / "field.lua"
+    check_files(manifest.get("kind", "mode"), node_path.exists(), field_path.exists(), str(path))
     return Mode(
         path=path,
         id=manifest["id"],
         name=manifest.get("name", manifest["id"]),
         version=str(manifest["version"]),
-        roles=manifest["roles"],
+        roles=manifest.get("roles") or {},
         params=manifest.get("params") or {},
-        node_script=node_path.read_text(encoding="utf-8"),
+        node_script=node_path.read_text(encoding="utf-8") if node_path.exists() else "",
         field_script=field_path.read_text(encoding="utf-8") if field_path.exists() else None,
         kind=manifest.get("kind", "mode"),
         description=str(manifest.get("description", "")),
         i18n=manifest.get("i18n") or {},
         commands=manifest.get("commands") or {},
     )
+
+
+def check_files(kind: str, has_node: bool, has_field: bool, where: str) -> None:
+    """A scenario is a field.lua and no node.lua (decision P4R7); every other kind has a node.lua."""
+    if kind == "scenario":
+        if has_node:
+            raise ModeError(f"{where}: a scenario has no node.lua: its nodes run role packages")
+        if not has_field:
+            raise ModeError(f"{where}: a scenario needs a field.lua")
+    elif not has_node:
+        raise ModeError(f"{where}: no node.lua")
 
 
 def compose_scripts(scripts: list[str]) -> str:
@@ -258,45 +283,84 @@ def compose(main: Mode, modifiers: list[Mode]) -> Mode:
     in one chunk; each role package's roles run that package alone. The field
     scripts of every part run together on the controller, in the id's order.
     Parameter, role and command names must differ between the parts.
+
+    A scenario (decision P4R7) leads the id and is followed by at least one
+    role package (``org.club.foxhound+org.atalaia.objectives``), optionally
+    after one main mode and its modifiers
+    (``org.club.foxhound+org.atalaia.respawn+org.atalaia.objectives``). It adds
+    its field.lua (first) and its parameters, never a role: no node runs it,
+    and no join names it.
     """
-    if not modifiers:
-        return main
-    if main.kind != "mode":
-        raise ModeError(f"{main.id} is a {main.kind}; a game needs a main mode first")
-    seen = {main.id}
-    params = dict(main.params)
-    roles = dict(main.roles)
-    commands = dict(main.commands)
+    scenario: Optional[Mode] = None
+    if main.kind == "scenario":
+        scenario = main
+        if not modifiers:
+            raise ModeError(f"{main.id} is a scenario: it needs a role package after it, such as "
+                            "org.atalaia.objectives")
+        lead: Optional[Mode] = None
+        if modifiers[0].kind == "mode":
+            lead, modifiers = modifiers[0], modifiers[1:]
+    else:
+        if not modifiers:
+            return main
+        if main.kind != "mode":
+            raise ModeError(f"{main.id} is a {main.kind}; a game needs a main mode first")
+        lead = main
+    leaders = [m for m in (scenario, lead) if m is not None]
+    seen = {m.id for m in leaders}
+    if len(seen) != len(leaders):
+        raise ModeError(f"{leaders[-1].id} is named twice")
+    params: dict[str, dict[str, Any]] = {}
+    for m in leaders:
+        clash = set(params) & set(m.params)
+        if clash:
+            raise ModeError(f"{m.id} and {leaders[0].id} both have the parameter(s) {sorted(clash)}")
+        params.update(m.params)
+    roles = dict(lead.roles) if lead else {}
+    commands = dict(lead.commands) if lead else {}
+    first = leaders[0]
     mods: list[Mode] = []
     role_parts: dict[str, RolePart] = {}
     for mod in modifiers:
+        if mod.kind == "scenario":
+            raise ModeError(f"{mod.id} is a scenario: a scenario leads the game's id")
         if mod.kind == "mode":
+            if scenario is not None:
+                raise ModeError(f"{mod.id} is a main mode: a scenario's game has one, right after "
+                                "the scenario")
             raise ModeError(f"{mod.id} is a main mode, not a modifier")
         if mod.id in seen:
             raise ModeError(f"{mod.id} is named twice")
         seen.add(mod.id)
         clash = set(params) & set(mod.params)
         if clash:
-            raise ModeError(f"{mod.id} and {main.id} both have the parameter(s) {sorted(clash)}")
+            raise ModeError(f"{mod.id} and {first.id} both have the parameter(s) {sorted(clash)}")
         params.update(mod.params)
         clash = set(commands) & set(mod.commands)
         if clash:
-            raise ModeError(f"{mod.id} and {main.id} both have the command(s) {sorted(clash)}")
+            raise ModeError(f"{mod.id} and {first.id} both have the command(s) {sorted(clash)}")
         commands.update(mod.commands)
         if mod.kind == "modifier":
+            if lead is None:
+                raise ModeError(f"{mod.id} is a modifier: it runs with a main mode, and this "
+                                "scenario's game has none")
             mods.append(mod)
             continue
         clash = set(roles) & set(mod.roles)
         if clash:
-            raise ModeError(f"{mod.id} and {main.id} both have the role(s) {sorted(clash)}")
+            raise ModeError(f"{mod.id} and {first.id} both have the role(s) {sorted(clash)}")
         roles.update(mod.roles)
         part = RolePart(mod.id, mod.node_script, f"@{mod.path.name}/node.lua", tuple(mod.params))
         for role in mod.roles:
             role_parts[role] = part
-    parts = [main, *modifiers]
+    if scenario is not None and not role_parts:
+        raise ModeError(f"{scenario.id} is a scenario: it needs a role package after it, such as "
+                        "org.atalaia.objectives")
+    parts = [*leaders, *modifiers]
     mode_id = SEPARATOR.join(m.id for m in parts)
     if len(mode_id.encode()) > MODE_ID_MAX:
         raise ModeError(f"{mode_id}: a mode with its modifiers is named in at most {MODE_ID_MAX} bytes")
+    runs = [lead, *mods] if lead is not None else []
     fields = [m.field_script for m in parts if m.field_script is not None]
     i18n: dict[str, Any] = {}
     for lang in sorted({lang for m in parts for lang in m.i18n}):
@@ -309,25 +373,26 @@ def compose(main: Mode, modifiers: list[Mode]) -> Mode:
         entry: dict[str, Any] = {"name": " + ".join(names), "params": labels}
         if command_labels:
             entry["commands"] = command_labels
-        if "description" in main.i18n.get(lang, {}):
-            entry["description"] = main.i18n[lang]["description"]
+        if "description" in first.i18n.get(lang, {}):
+            entry["description"] = first.i18n[lang]["description"]
         i18n[lang] = entry
     return Mode(
-        path=main.path,
+        path=first.path,
         id=mode_id,
         name=" + ".join(m.name for m in parts),
-        version=main.version,
+        version=first.version,
         roles=roles,
         params=params,
-        node_script=compose_scripts([m.node_script for m in [main, *mods]]),
+        node_script=compose_scripts([m.node_script for m in runs]) if runs else "",
         field_script=compose_scripts(fields) if fields else None,
         kind="mode",
-        description=main.description,
+        description=first.description,
         i18n=i18n,
         parts=tuple(m.id for m in parts),
         commands=commands,
         role_parts=role_parts,
-        main_id=SEPARATOR.join(m.id for m in [main, *mods]),
+        main_id=SEPARATOR.join(m.id for m in runs),
+        scenario_params=frozenset(scenario.params) if scenario is not None else frozenset(),
     )
 
 

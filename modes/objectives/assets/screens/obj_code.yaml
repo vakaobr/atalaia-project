@@ -1,0 +1,69 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# A code to type on the keypad. Data: team (the team credited, if known),
+# digits (how many digits are typed: the code itself is never shown), note
+# (wrong: the last code was wrong; ok: the right code was typed), label (the
+# objective's name), lang (pt, the default, or en).
+template: obj_code
+style: { background: "{note == 'ok' && team || 'background'}" }
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: "{team || 'panel'}" }
+    children:
+      - type: label
+        text: "{label || 'CÓDIGO'}"
+        style: { font_size: 20, width: fill, align: center, color: "{team && 'contrast' || 'white'}", visible: "{lang != 'en'}" }
+      - type: label
+        text: "{label || 'CODE'}"
+        style: { font_size: 20, width: fill, align: center, color: "{team && 'contrast' || 'white'}", visible: "{lang == 'en'}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{digits}"
+    style: { font_size: 48, color: accent, visible: "{note != 'ok'}" }
+  - type: label
+    text: algarismos marcados
+    style: { font_size: 20, color: muted, visible: "{note != 'ok' && lang != 'en'}" }
+  - type: label
+    text: digits typed
+    style: { font_size: 20, color: muted, visible: "{note != 'ok' && lang == 'en'}" }
+  - type: icon
+    icon: ok
+    style: { font_size: 48, color: "{team && 'contrast' || 'accent'}", visible: "{note == 'ok'}" }
+  - type: label
+    text: CÓDIGO ACEITE
+    style: { font_size: 28, color: "{team && 'contrast' || 'white'}", visible: "{note == 'ok' && lang != 'en'}" }
+  - type: label
+    text: CODE ACCEPTED
+    style: { font_size: 28, color: "{team && 'contrast' || 'white'}", visible: "{note == 'ok' && lang == 'en'}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: Código errado
+    style:
+      font_size: 20
+      color: danger
+      visible: "{note == 'wrong' && lang != 'en'}"
+      padding: { bottom: 8 }
+  - type: label
+    text: Wrong code
+    style:
+      font_size: 20
+      color: danger
+      visible: "{note == 'wrong' && lang == 'en'}"
+      padding: { bottom: 8 }
+  - type: label
+    text: "Marca o código e #  (* apaga)"
+    style:
+      font_size: 14
+      color: muted
+      visible: "{!note && lang != 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: "Type the code, then #  (* clears)"
+    style:
+      font_size: 14
+      color: muted
+      visible: "{!note && lang == 'en'}"
+      padding: { bottom: 10 }

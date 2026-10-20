@@ -22,6 +22,7 @@ import os
 import tempfile
 import time
 import unittest
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -345,6 +346,56 @@ class FieldTests(unittest.TestCase):
         scan(north, "b3")
         north.hold(1, 1300)
         self.assertTrue(wait_for(lambda: len(heals(n_north)) == 2, 8))
+
+    def test_a_scenario_on_boxes(self):
+        """A scenario package (kind: scenario, the hand-written example of
+        modes/objectives/tests/fixtures/foxhound) uploaded to the controller and played on two
+        host boxes that run only their built-in objectives preset (decision P4R7): each box's
+        join names org.atalaia.objectives; the scenario's field.lua sets the boxes up over the
+        radio (the mode command "setup"), red's capture of the bridge completes it (50 points
+        from the controller), and a box that loses power is set up again: its armed bomb goes
+        on with the fuse it had left."""
+        fixture = Path(__file__).resolve().parents[2] / "modes" / "objectives" / "tests" / "fixtures" / "foxhound"
+        files = {n: (fixture / n).read_text(encoding="utf-8") for n in ("mode.yaml", "field.lua")}
+        self.assertEqual(self.client.post("/api/v1/modes", headers=GM, json={"files": files}).status_code, 201)
+        r = self.client.post("/api/v1/games", headers=GM, json={
+            "name": "foxhound", "mode_id": "org.club.foxhound", "modifiers": ["org.atalaia.objectives"],
+            "teams": ["red", "blue"]})
+        self.assertEqual(r.status_code, 201, r.text)
+        gid = r.json()["id"]
+        alpha, site = self.box("alpha"), self.box("site")
+        a = self.join(alpha, role="objective")
+        s = self.join(site, role="bomb_site")
+        self.assertTrue(alpha.logged("org.atalaia.objectives, objective"), alpha.lines[-5:])
+        self.assertTrue(site.logged("org.atalaia.objectives, bomb_site"), site.lines[-5:])
+        self.assertTrue(wait_for(lambda: self.node(a).get("name") == "alpha" and self.node(s).get("name") == "site", 5))
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+
+        def screens(box: BoxHost, name: str) -> list[dict]:
+            return [json.loads(line.split(" ", 2)[2]) for line in list(box.lines)
+                    if line.startswith(f"SCREEN {name} ")]
+
+        self.assertTrue(wait_for(lambda: any(d.get("only") == "red" for d in screens(alpha, "obj_capture")), 8),
+                        alpha.lines[-8:])
+        self.assertTrue(wait_for(lambda: any(d.get("phase") == "standby" for d in screens(site, "obj_bomb")), 8),
+                        site.lines[-8:])
+        alpha.hold(1, 3300)
+        self.assertTrue(wait_for(lambda: "scenario.objective.completed" in self.log_types(gid, self.cfg.node_id), 8))
+        done = [e for e in self.client.get(f"/api/v1/games/{gid}/log", headers=GM).json()
+                if e["type"] == "scenario.objective.completed"]
+        self.assertEqual((done[0]["team"], done[0]["data"]["objective"]), ("red", "bridge"))
+        self.assertTrue(wait_for(lambda: self.score(gid, "red") >= 50, 8))
+        self.assertTrue(wait_for(lambda: any(d.get("state") == "done" for d in screens(alpha, "obj_status")), 8))
+
+        site.hold(1, 5300)
+        self.assertTrue(wait_for(lambda: "bomb.armed" in self.log_types(gid, s), 8))
+        site.kill()
+        site.start()
+        self.assertTrue(wait_for(lambda: site.logged("rejoined the stored game"), 5))
+        self.assertTrue(wait_for(lambda: "node.rebooted" in self.log_types(gid, s), 8))
+        self.assertTrue(wait_for(lambda: any(d.get("phase") == "armed" and d.get("team") == "red"
+                                             for d in screens(site, "obj_bomb")), 8), site.lines[-8:])
+        self.assertEqual(self.log_types(gid, s).count("bomb.armed"), 1)
 
     def test_wrong_field_key_is_refused(self):
         self.game()

@@ -185,4 +185,66 @@ void main() {
       ),
     );
   });
+
+  test(
+    'the objectives package runs alone; a scenario never runs on a prop',
+    () {
+      final objectives = catalog.byId('org.atalaia.objectives')!;
+      expect(objectives.isRolePackage, isTrue);
+      expect(objectives.name('pt'), 'Objetivos');
+      expect(objectives.roles.map((r) => r.name), ['objective', 'bomb_site']);
+      expect(objectives.role('objective')!.uses('keypad'), isTrue);
+      expect(objectives.params, isEmpty);
+      expect(
+        objectives.screens.keys,
+        containsAll([
+          'obj_status',
+          'obj_capture',
+          'obj_code',
+          'obj_tags',
+          'obj_bomb',
+        ]),
+      );
+      // A join names the objectives package alone: what the node runs.
+      final node = catalog.compose('org.atalaia.objectives');
+      expect(node.nodeScript, objectives.nodeScript);
+      expect(node.resolveParams(const {}, const ['red', 'blue']), isEmpty);
+      // A scenario package (uploaded to a controller, never built in) reads,
+      // but is no game for a prop.
+      final dir = Directory('../modes/objectives/tests/fixtures/foxhound');
+      final foxhound = ModeManifest.parse('foxhound', {
+        for (final f in ['mode.yaml', 'field.lua'])
+          f: File('${dir.path}/$f').readAsStringSync(),
+      });
+      expect(foxhound.isScenario, isTrue);
+      expect(foxhound.roles, isEmpty);
+      expect(foxhound.nodeScript, '');
+      expect(catalog.modes.where((m) => m.isScenario), isEmpty);
+      final withIt = ModeCatalog([...catalog.modes, foxhound]);
+      expect(withIt.mainModes, isNot(contains(foxhound)));
+      for (final id in [
+        'org.club.foxhound',
+        'org.club.foxhound+org.atalaia.objectives',
+      ]) {
+        expect(
+          () => withIt.compose(id),
+          throwsA(
+            isA<ModeException>().having(
+              (e) => e.message,
+              'message',
+              contains('runs on the field controller'),
+            ),
+          ),
+        );
+      }
+      expect(
+        () => ModeManifest.parse('bad', {
+          'mode.yaml': 'id: org.t.bad\nversion: 1\nkind: scenario\n',
+          'node.lua': '-- no',
+          'field.lua': '-- ok',
+        }),
+        throwsA(isA<ModeException>()),
+      );
+    },
+  );
 }

@@ -157,6 +157,15 @@
       "hacking_solved_code": "{team} solved a hacking terminal ({puzzle}) and got the code {code}",
       "vip_extracted": "{team}'s payload reached the extraction zone",
       "vip_extracted_vip": "{team} extracted its VIP ({player})",
+      "scenario_started": "The scenario {scenario} started",
+      "scenario_objective_completed": "{team} completed the objective {objective}",
+      "scenario_objective_completed_hidden": "{team} completed an objective",
+      "scenario_objective_failed": "{team} failed the objective {objective} ({reason})",
+      "scenario_objective_failed_hidden": "{team} failed an objective",
+      "scenario_objective_revealed": "The objective {objective} is revealed to {team}",
+      "scenario_objective_revealed_hidden": "An objective is revealed to {team}",
+      "scenario_objective_revealed_all": "The objective {objective} is revealed to every team",
+      "scenario_objective_revealed_all_hidden": "An objective is revealed to every team",
       "nobody": "Nobody known"
     },
     "puzzles": {

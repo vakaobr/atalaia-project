@@ -51,6 +51,7 @@ typedef struct {
 #define HACK_EN  "org.atalaia.hacking_terminal {\"digits\":4,\"lockout_s\":10,\"lang\":\"en\"}"
 #define VIP      "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"pt\"}"
 #define VIP_EN   "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"en\"}"
+#define OBJ      "org.atalaia.objectives {}"
 
 /* Data as the modes (modes/bomb, modes/domination, modes/codes) and the shell send it. */
 static const screen_case_t cases[] = {
@@ -191,6 +192,42 @@ static const screen_case_t cases[] = {
      VIP_EN},
     {"yaml_vip_payload_extracted", "payload",
      "{\"team\":\"red\",\"state\":\"extracted\",\"metres\":0}", VIP},
+    /* Objectives: what a scenario's setup makes of a node (no parameters: the language and the
+     * objective's name come in the setup, as data). */
+    {"yaml_obj_wait", "obj_status", "{\"state\":\"wait\"}", OBJ},
+    {"yaml_obj_off_en", "obj_status", "{\"state\":\"off\",\"label\":\"Vault\",\"lang\":\"en\"}",
+     OBJ},
+    {"yaml_obj_done", "obj_status", "{\"state\":\"done\",\"team\":\"red\",\"label\":\"Ponte\"}",
+     OBJ},
+    {"yaml_obj_failed_en", "obj_status",
+     "{\"state\":\"failed\",\"label\":\"Site A\",\"lang\":\"en\"}", OBJ},
+    {"yaml_obj_capture", "obj_capture", "{\"label\":\"Ponte\",\"only\":\"red\",\"hold_ms\":3000}",
+     OBJ},
+    {"yaml_obj_capture_held_en", "obj_capture",
+     "{\"label\":\"Bridge\",\"team\":\"blue\",\"hold_ms\":3000,\"lang\":\"en\"}", OBJ},
+    {"yaml_obj_code", "obj_code", "{\"label\":\"Cofre\",\"team\":\"red\",\"digits\":3}", OBJ},
+    {"yaml_obj_code_wrong_en", "obj_code", "{\"digits\":0,\"note\":\"wrong\",\"lang\":\"en\"}",
+     OBJ},
+    {"yaml_obj_code_ok", "obj_code",
+     "{\"label\":\"Cofre\",\"team\":\"red\",\"digits\":0,\"note\":\"ok\"}", OBJ},
+    {"yaml_obj_tags_en", "obj_tags",
+     "{\"label\":\"Intel\",\"team\":\"blue\",\"have\":1,\"count\":2,\"lang\":\"en\"}", OBJ},
+    {"yaml_obj_tags_again", "obj_tags",
+     "{\"label\":\"Dados\",\"team\":\"red\",\"have\":2,\"count\":2,"
+     "\"note\":\"again\"}",
+     OBJ},
+    {"yaml_obj_tags_cards_en", "obj_tags",
+     "{\"label\":\"HQ\",\"have\":0,\"count\":2,\"note\":\"team_first\",\"any\":true,"
+     "\"lang\":\"en\"}",
+     OBJ},
+    {"yaml_obj_bomb_standby", "obj_bomb",
+     "{\"label\":\"Local A\",\"phase\":\"standby\",\"attackers\":\"red\",\"fuse_s\":60,"
+     "\"left\":0}",
+     OBJ},
+    {"yaml_obj_bomb_armed_en", "obj_bomb",
+     "{\"phase\":\"armed\",\"team\":\"red\",\"left\":42,\"fuse_s\":60,\"lang\":\"en\"}", OBJ},
+    {"yaml_obj_bomb_exploded", "obj_bomb",
+     "{\"phase\":\"exploded\",\"team\":\"red\",\"left\":0,\"fuse_s\":60}", OBJ},
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))
 

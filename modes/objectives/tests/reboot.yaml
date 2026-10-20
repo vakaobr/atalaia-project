@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "A node that reboots is set up again: an armed bomb goes on with the fuse it had left, a tag counted before the reboot does not count twice, a hidden objective stays off"
+scenario: fixtures/foxhound
+nodes: { bravo: objective, charlie: objective, site: bomb_site }
+steps:
+  - hold: { node: site, team: red, s: 5 }
+  - expect: { type: bomb.armed, node: site, team: red }
+  - wait: 15
+  - reboot: site
+  - expect: { type: node.rebooted, node: site, data: { reason: power } }
+  - expect_screen: { node: site, template: obj_bomb, data: { phase: armed, team: red, left: 45 } }
+  - expect_no: bomb.armed
+  - wait: 45
+  - expect: { type: bomb.exploded, node: site, team: red, at: 65 }
+  - expect: { type: scenario.objective.completed, team: red, data: { objective: site_a } }
+  # The intel node forgets its tags; the scenario does not count one twice.
+  - scan: { node: bravo, player: b1, team: blue }
+  - expect: { type: tag.scanned, node: bravo, team: blue }
+  - reboot: bravo
+  - expect_screen: { node: bravo, template: obj_tags, data: { have: 0, count: 2 } }
+  - scan: { node: bravo, player: b1, team: blue }
+  - expect: { type: tag.scanned, node: bravo, team: blue, data: { owner: b1 } }
+  - expect_no: { type: scenario.objective.completed, data: { objective: intel } }
+  - scan: { node: bravo, player: b2, team: blue }
+  - expect: { type: scenario.objective.completed, team: blue, data: { objective: intel } }
+  # A hidden objective is set up as hidden again.
+  - reboot: charlie
+  - expect_screen: { node: charlie, template: obj_status, data: { state: "off" } }
+  - expect_no: { type: scenario.objective.revealed, data: { objective: vault } }
+  - expect_no: script.error

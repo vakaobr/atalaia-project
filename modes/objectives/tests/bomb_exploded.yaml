@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "Site A: red arms it and the fuse runs out: completed for red, 30 points"
+scenario: fixtures/foxhound
+nodes: { site: bomb_site }
+steps:
+  - hold: { node: site, team: red, s: 5 }
+  - expect: { type: bomb.armed, node: site, team: red, at: 5 }
+  - wait: 59
+  - expect_no: bomb.exploded
+  - wait: 1
+  - expect: { type: bomb.exploded, node: site, team: red, at: 65 }
+  - expect: { type: scenario.objective.completed, node: controller, team: red, data: { objective: site_a } }
+  - expect_score: { team: red, points: 30 }
+  - expect_screen: { node: site, template: obj_status, data: { state: done, team: red } }
+  - expect_no: script.error

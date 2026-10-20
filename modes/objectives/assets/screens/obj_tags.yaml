@@ -1,0 +1,115 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Player tags to scan. Data: team (the team of the last tag counted, or the
+# only team that may scan), have (that team's tags counted), count (how many it
+# needs), note (not_tag: not a player tag of this game; team_first: a card, and
+# no team has pressed its button yet; wrong_team: a team that may not scan
+# here; again: a tag already counted, or the team already has them all), any
+# (any card counts, not only players' tags), label (the objective's name),
+# lang (pt, the default, or en).
+template: obj_tags
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: "{team || 'panel'}" }
+    children:
+      - type: label
+        text: "{label || 'ETIQUETAS'}"
+        style: { font_size: 20, width: fill, align: center, color: "{team && 'contrast' || 'white'}", visible: "{lang != 'en'}" }
+      - type: label
+        text: "{label || 'TAGS'}"
+        style: { font_size: 20, width: fill, align: center, color: "{team && 'contrast' || 'white'}", visible: "{lang == 'en'}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{have} / {count}"
+    style: { font_size: 48, color: "{team || 'accent'}" }
+  - type: progress_bar
+    value: "{have / count}"
+    style: { width: 260, height: 14, color: "{team || 'accent'}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: Não é uma etiqueta do jogo
+    style:
+      font_size: 20
+      color: danger
+      visible: "{note == 'not_tag' && lang != 'en'}"
+      padding: { bottom: 8 }
+  - type: label
+    text: Not a game tag
+    style:
+      font_size: 20
+      color: danger
+      visible: "{note == 'not_tag' && lang == 'en'}"
+      padding: { bottom: 8 }
+  - type: label
+    text: Objetivo de outra equipa
+    style:
+      font_size: 20
+      color: danger
+      visible: "{note == 'wrong_team' && lang != 'en'}"
+      padding: { bottom: 8 }
+  - type: label
+    text: Another team's objective
+    style:
+      font_size: 20
+      color: danger
+      visible: "{note == 'wrong_team' && lang == 'en'}"
+      padding: { bottom: 8 }
+  - type: label
+    text: Carrega no botão da equipa
+    style:
+      font_size: 20
+      color: danger
+      visible: "{note == 'team_first' && lang != 'en'}"
+      padding: { bottom: 8 }
+  - type: label
+    text: Press your team's button
+    style:
+      font_size: 20
+      color: danger
+      visible: "{note == 'team_first' && lang == 'en'}"
+      padding: { bottom: 8 }
+  - type: label
+    text: Esta etiqueta já conta
+    style:
+      font_size: 20
+      color: muted
+      visible: "{note == 'again' && lang != 'en'}"
+      padding: { bottom: 8 }
+  - type: label
+    text: This tag already counts
+    style:
+      font_size: 20
+      color: muted
+      visible: "{note == 'again' && lang == 'en'}"
+      padding: { bottom: 8 }
+  - type: label
+    text: Cada pessoa lê a sua etiqueta
+    style:
+      font_size: 14
+      color: muted
+      visible: "{!note && !any && lang != 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: Each player scans their own tag
+    style:
+      font_size: 14
+      color: muted
+      visible: "{!note && !any && lang == 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: Lê os cartões que encontraste
+    style:
+      font_size: 14
+      color: muted
+      visible: "{!note && any && lang != 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: Scan the cards you found
+    style:
+      font_size: 14
+      color: muted
+      visible: "{!note && any && lang == 'en'}"
+      padding: { bottom: 10 }

@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "The vault's code: nothing before the reveal, a wrong code only on the screen, the right one completes it for red with the scenario's vault_points"
+scenario: fixtures/foxhound
+params: { vault_points: 70 }
+nodes: { alpha: objective, charlie: objective }
+steps:
+  - expect_screen: { node: charlie, template: obj_status, data: { state: "off" } }
+  - keys: { node: charlie, keys: "4711#" }
+  - expect_no: code.used
+  - hold: { node: alpha, team: red, s: 3 }
+  - expect: { type: scenario.objective.revealed, team: red, data: { objective: vault } }
+  - keys: { node: charlie, keys: "12" }
+  - expect_screen: { node: charlie, template: obj_code, data: { digits: 2 } }
+  - keys: { node: charlie, keys: "#" }
+  - expect_screen: { node: charlie, template: obj_code, data: { digits: 0, note: wrong } }
+  - expect_no: code.used
+  - keys: { node: charlie, keys: "47*4711#" }
+  - expect: { type: code.used, node: charlie, team: red }
+  - expect: { type: scenario.objective.completed, node: controller, team: red, data: { objective: vault } }
+  - expect_score: { team: red, points: 120 }
+  - expect_screen: { node: charlie, template: obj_status, data: { state: done, team: red } }
+  # The code is never in an event.
+  - expect_no: { type: code.used, data: { code: "4711" } }
+  - expect_no: script.error

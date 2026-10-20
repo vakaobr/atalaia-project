@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "Site A: only red arms, blue defuses, and the objective fails for red with the reason defused"
+scenario: fixtures/foxhound
+nodes: { site: bomb_site }
+steps:
+  - expect_screen: { node: site, template: obj_bomb, data: { label: Local A, phase: standby, attackers: red } }
+  - hold: { node: site, team: blue, s: 6 }
+  - expect_no: bomb.armed
+  - hold: { node: site, team: red, s: 5 }
+  - expect: { type: bomb.armed, node: site, team: red, at: 11, data: { fuse_s: 60 } }
+  - wait: 10
+  - expect_screen: { node: site, template: obj_bomb, data: { phase: armed, team: red, left: 50 } }
+  - hold: { node: site, team: blue, s: 5 }
+  - expect: { type: bomb.defused, node: site, team: blue }
+  - expect: { type: scenario.objective.failed, node: controller, team: red, data: { objective: site_a, reason: defused } }
+  - expect_no: scenario.objective.completed
+  - expect_screen: { node: site, template: obj_status, data: { state: failed } }
+  - wait: 60
+  - expect_no: bomb.exploded
+  - expect_score: { team: red, points: 0 }
+  - expect_score: { team: blue, points: 0 }
+  - expect_no: script.error

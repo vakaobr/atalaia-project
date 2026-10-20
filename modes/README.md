@@ -5,7 +5,7 @@ Each mode is a folder with a manifest and one or two Lua scripts:
 ```
 <mode>/
   mode.yaml     id, version, licence, kind, minimum device tier, roles, parameters, GM commands, translations
-  node.lua      runs on each prop with the mode's role
+  node.lua      runs on each prop with the mode's role (a scenario has none)
   field.lua     optional: runs on the field controller for logic across props
   assets/       optional: sound clips, screen templates (assets/screens/<name>.yaml)
   tests/        event sequences with expected results
@@ -28,6 +28,7 @@ The GM console builds its settings form from `params` in `mode.yaml`, so GMs nev
 | [Target Windows](target_windows/) (Janelas de Alvo) | main mode | boxes with the target addon (`hit`, `led`) | Phase 4 plan phase 2: the logic, in software; the addon does not exist yet (HW2), so it is not a Field Box preset and no Android prop offers it; 7 tests |
 | [Hacking Terminal](hacking_terminal/) (Terminal de Hacking) | main mode | boxes and Android props with a keypad | Phase 4 plan phase 4, in software (not yet on a phone in the field: HW3); 13 tests, plus controller, host-box, Field Box preset, browser and Dart tests |
 | [VIP / Payload](vip_payload/) (VIP / Carga) | main mode | checkpoint boxes and Android props, a payload prop with GPS (Android), the VIP's phone through the controller (`field.lua`) | Phase 4 plan phase 5, in software (not yet with real GPS in the field: HW3); 8 tests, plus simulator, controller, host-box, Field Box preset, browser and Dart tests |
+| [Objectives](objectives/) (Objetivos) | role package for custom scenarios | boxes and Android props, set up by a scenario's `field.lua` on the controller | Phase 4 plan phase 6, in software (not yet on radio hardware); 9 tests, 7 of them with a hand-written example scenario, plus simulator, controller, host-box, Field Box preset, browser and Dart tests; the scenario compiler is plan phase 7 |
 
 The script API is described in the "Game runtime and scripting" section of the [design specification](../docs/design-spec.md), and implemented in [`core/src/script_api.c`](../core/src/script_api.c).
 
@@ -98,6 +99,28 @@ Design specification section 15; decisions P4R1, P4R6, P4R25 and M5-3 to M5-7 in
 
 On a Field Box picked from its own preset list it is a checkpoint that only captures: the extraction and the checkpoints' points are `field.lua`'s. It is the twelfth built-in preset, the third entry of the picker's second page (decision M5-6).
 
+## Custom scenarios and the objectives package (phase 4)
+
+Decisions P4R7, P4R8, P4R24 and M6-1 to M6-9 in `docs/review/decisions-to-review.md`. A Field Box runs only the scripts built into its firmware and refuses a join for a mode it does not have (decision K10), so a scenario never brings scripts of its own to the boxes:
+
+- **A scenario** is a package with `kind: scenario`: a `mode.yaml` (id, version, names, parameters, translations) and a `field.lua`, with no `node.lua`, no roles and no GM commands. It is uploaded to a controller (`POST /api/v1/modes`), never built in, and leads the game's id, followed by at least one role package: `org.club.foxhound+org.atalaia.objectives`, or with a main mode right after it, `org.club.foxhound+org.atalaia.respawn+org.atalaia.objectives`. No node runs it and no join names it: each box's join names what it runs (`org.atalaia.objectives`), without the scenario's parameters. Its `field.lua` runs first on the controller. The scenario compiler (plan phase 7) will write these packages from a YAML manifest; until then [`objectives/tests/fixtures/foxhound`](objectives/tests/fixtures/foxhound/) is a hand-written example.
+- **The objectives package** (`org.atalaia.objectives`, a role package, no parameters) is what the nodes run, a built-in preset on every Field Box. Its roles: `objective` (requires `team_input`; uses a keypad, NFC, a screen, sound and a team display when there are some) and `bomb_site` (requires `team_input`). A node does nothing until the scenario's `field.lua` tells it what it is for with the mode command `setup` (`field.send(node, "mode", { name = "setup", kind = "capture", ... })`, at most 127 bytes of JSON):
+
+  | `kind` | The node | Reports |
+  | --- | --- | --- |
+  | `capture` | A team holds its input for `hold_ms` (3000) to take it; `team`: only that team may | `zone.captured`; the GM's owner override gives `zone.captured` / `zone.neutralized` |
+  | `code` | Type `code` and `#` (`*` clears); a wrong code is only on the screen | `code.used` with the team (`team`, else the last team to press its input), never the code |
+  | `tags` | Players scan their own tags, each once, until a team has `count`; with `any: true`, any card counts (intel cards found on the field), for `team` or the last team to press its input | `tag.scanned` (`tag`: the card's uid, `owner`: the player, `team`) for each tag counted |
+  | `bomb` | `team` (the attackers, else anyone) holds `hold_ms` to arm, any other team holds `defuse_ms` to defuse; the fuse is `fuse_s` (60) | `bomb.armed`, `bomb.defused`, `bomb.exploded` |
+  | `off` / `done` / `failed` | Shows an inactive objective, or one completed (by `team`) or failed | nothing |
+
+  `label` is the objective's name on the screen and `lang` (`pt`, the default, or `en`) the screen's language; after a reboot the scenario also sends `holder` (capture), `have` (tags) or `armed` and `left` (a bomb goes on with the fuse it had left). The node never scores and never decides: the scenario's `field.lua` counts, completes or fails each objective, scores (`score.add`), reveals the next ones, and logs the scenario events: `scenario.started` (45, `scenario`), `scenario.objective.revealed` (44), `scenario.objective.completed` (42) and `scenario.objective.failed` (43, with `reason`), with `objective` (key 34, an objective id, never a text) and the team. Which objective an event is about is staff-only on the controller's stream, REST and MQTT until the player view routes objectives per team (decisions M6-5, P4R24, plan phase 8).
+- **Nodes and names:** the scenario finds its nodes by the names they have in the game (`field.nodes()`): the test's `nodes:` names in the simulator, a box's own name (its HELLO) on the controller until the console assigns names (plan phase 8). It sets up a node at the start, every second for one that has not been set up yet (a box that joins late), and again after `node.rebooted`, as the Medic Kit's `heals`. A script does not know its role (decision M5-5): the setup's `kind` says what a node does, so no `node.role()` is needed (decision M6-6).
+- **Secrets:** a code objective's digits travel only in the `setup` command to its node (CMDs are not on the stream); nothing secret goes into `state.field`, which players can read.
+- **Screens** (texts in the templates, the language from the setup): `obj_status` (waiting, inactive, completed, failed), `obj_capture`, `obj_code`, `obj_tags`, `obj_bomb`; `final_score` at the end.
+
+On a Field Box picked from its own preset list (the thirteenth built-in preset, the fourth entry of the picker's second page) a box of it waits for a scenario.
+
 ## Phase 3 modes (player tags)
 
 These modes identify players by their **player tag**: an NFC tag signed with the game key ([protocol/nfc-tag.md](../protocol/nfc-tag.md)). The box checks the tag before the script sees it and gives the script `nfc.tag` with `valid`, and `player` and `team` (or the `reason` it was refused). In a game a box picked from its own preset list there is no game key, so tags are refused there (`no_game`); these modes are for games run by a field controller. Each box counts on its own: no state is shared between boxes.
@@ -119,7 +142,7 @@ Requested by the maintainer (decisions MK1-MK8 and MK9 on in `docs/review/decisi
 - **Language:** `lang` (`pt`, the default, or `en`) picks the kit's screens; the texts are in the templates and the refusals in the script. The Field Box's fonts have no accented letters, so it draws "Le a tua etiqueta" for "Lê a tua etiqueta" (the app draws every character).
 - **Screens:** `medic_idle` ("Lê a tua etiqueta", "Restam N ligaduras"), `medic_hold` ("Mantém premido para tratar", a filling bar, the seconds left), `medic_healed`, `medic_refused` (the reason), `medic_empty`.
 
-## Main modes, modifiers and role packages
+## Main modes, modifiers, role packages and scenarios
 
 `kind: modifier` marks a package that runs alongside a main mode on the same node. `kind: role` marks a **role package**: it brings roles of its own to any game, and a node given one of them runs that package alone (a medic kit next to Domination's zone boxes runs no capture rules). A game and a preset name a main mode and its other parts with one id joined by `+`, main mode first:
 
@@ -147,6 +170,7 @@ Role packages are composed by role, not into the chunk:
 - The controller makes each box's join with **what that box runs**: a kit's join payload names `org.atalaia.medic` and carries the kit's parameters, a zone box's names `org.atalaia.domination+org.atalaia.codes` and the zone's parameters ([protocol/join.md](../protocol/join.md)). So the Field Box and the Android prop compose exactly as before and need not know the kinds; a standby controller's join names the whole game.
 - `field.lua` scripts of every part run together on the controller, in the id's order, and see every node's events.
 - A role package on its own is a valid game (a field of medic kits only); it cannot lead other parts.
+- A scenario (`kind: scenario`) leads the id, followed by an optional main mode (with its modifiers) and at least one role package; it adds its `field.lua` (run first) and its parameters (only its `field.lua` reads them: no join carries them), never a role. A modifier needs a main mode, so a scenario's game without one takes none. The rules are written down as shared vectors in [`protocol/vectors/composition.yaml`](../protocol/vectors/composition.yaml), which the simulator and the app's Dart test runner both pass.
 
 Scripts on one box that read keypad codes share them through the global table `keypad_codes`: each adds a function that says whether a code is its own, so a code meant for one script is not reported as wrong by the other (Bomb's team codes and Codes do this).
 
@@ -235,7 +259,7 @@ steps:
   - expect: { type: bomb.exploded, at: 65 }
 ```
 
-The game starts automatically at time 0 (`autostart: false` turns that off). Only `wait` and `hold` move time forward. A modifier's test may name a main mode to run with (`main: domination`, a sibling folder), and a main mode's test its modifiers (`modifiers: [codes]`).
+The game starts automatically at time 0 (`autostart: false` turns that off). Only `wait` and `hold` move time forward. A modifier's test may name a main mode to run with (`main: domination`, a sibling folder), a main mode's test its modifiers (`modifiers: [codes]`), and a role package's test a scenario package that leads the game (`scenario: fixtures/foxhound`, a folder relative to the test file).
 
 When the mode has a `field.lua`, it runs as the controller runs it: it receives every node's events (with `node` and `team` in the data), `field.owner()` is the team of each node's last `zone.captured` (as box STATE reports it), `field.send(node, "set_owner", "message" or "mode", params)` reaches the node as `cmd.set_owner`, `gm.message` or `cmd.mode`, its own events are logged from node `controller`, its points count in the field total, and a `game.win()` or `game.finish()` ends the game on every node. Time then moves in steps of 100 ms.
 
@@ -249,6 +273,7 @@ When the mode has a `field.lua`, it runs as the controller runs it: it receives 
 | `input` | `input: { type: nfc.tag, data: { uid: "04a1" } }` | Any event to a node |
 | `position` | `position: { player: p-vip, team: red, role: vip, lat: 38.7224, lon: -9.1393, acc: 5 }` | A player's position report for `field.lua` (`position.fix`), as the controller hands a VIP's over; `src` defaults to `gps` |
 | `gps` | `gps: { node: cargo, lat: 38.7224, lon: -9.1393, acc: 8 }` | A fix from a prop's own GPS (`gps.fix`); `gps: { node: cargo }` is the one before the first fix |
+| `reboot` | `reboot: site` | A node loses power and comes back in the running game, as a Field Box does: its script starts again with no state (`game.start`, the game's time, `node.rebooted`), and it reports `node.rebooted` (reason `power`) to `field.lua` |
 | `start`, `end`, `pause`, `resume` | `end: time` | Game events from the controller to every node |
 | `expect` | `expect: { type: zone.captured, team: red, at: 3, data: { previous_team: blue } }` | The next matching event exists; later `expect`s search after it |
 | `expect_no` | `expect_no: bomb.exploded` | No matching event since the last `expect` |
@@ -299,4 +324,4 @@ The simulator's mode tests check every template with the core's own parser (the 
 
 ## On the Field Box
 
-Every mode in this folder is built into the Field Box firmware (`firmware/esp32/main/CMakeLists.txt`) as a preset (the Medic Kit too, so a box can be joined as a kit), and a box adds the presets of built-in modes it does not have yet at boot; the scripts are data, so a mode needs no firmware code of its own. Its screen templates are built in the same way. A preset holds up to 16 KB of script (a main mode with its modifiers, composed). The largest combination, Bomb with Codes, takes about 50 KB of a Reduced-tier box's 64 KB Lua heap when loaded; Full-tier boxes have 256 KB.
+Every mode in this folder is built into the Field Box firmware (`firmware/esp32/main/CMakeLists.txt`) as a preset (the Medic Kit too, so a box can be joined as a kit, and the objectives package, so a box can play its part in any scenario), and a box adds the presets of built-in modes it does not have yet at boot; the scripts are data, so a mode needs no firmware code of its own. Its screen templates are built in the same way. A preset holds up to 16 KB of script (a main mode with its modifiers, composed). The largest combination, Bomb with Codes, takes about 50 KB of a Reduced-tier box's 64 KB Lua heap when loaded; Full-tier boxes have 256 KB.
