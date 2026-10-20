@@ -298,6 +298,8 @@ const Map<String, String> enStrings = {
   'event.medic.heal':
       '{player} was healed (heals left in the kit: {remaining})',
   'event.medic.empty': 'A medic kit is empty',
+  'event.hacking.solved': '{team} hacked a terminal',
+  'event.hacking.solved.no_team': 'A terminal was hacked',
 
   // GM
   'gm.intro':

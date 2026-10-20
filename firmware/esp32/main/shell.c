@@ -47,6 +47,7 @@
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_psram.h"
+#include "esp_random.h"
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -130,6 +131,7 @@ extern const char player_checkin_node_lua_start[] asm("_binary_player_checkin_no
 extern const char medic_node_lua_start[] asm("_binary_medic_node_lua_start");
 extern const char
     master_satellites_node_lua_start[] asm("_binary_master_satellites_node_lua_start");
+extern const char hacking_terminal_node_lua_start[] asm("_binary_hacking_terminal_node_lua_start");
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -434,6 +436,10 @@ static void start_game(void)
              (unsigned)game_preset.duration_s);
     send_screen("status", data);
 
+    /* A new seed for rand() in every game picked on the box, as the controller gives every
+     * field game one, so a Hacking Terminal does not set the same puzzle each game (M4-6). */
+    runner.game_seed = esp_random();
+
     /* Determine team count from config or default. */
     uint8_t team_count = 2;
     if (!node_runner_start(&runner, &game_preset, default_teams, team_count)) {
@@ -653,6 +659,8 @@ static void seed_presets(void)
         {"org.atalaia.medic", medic_node_lua_start, strlen(medic_node_lua_start)},
         {"org.atalaia.master_satellites", master_satellites_node_lua_start,
          strlen(master_satellites_node_lua_start)},
+        {"org.atalaia.hacking_terminal", hacking_terminal_node_lua_start,
+         strlen(hacking_terminal_node_lua_start)},
     };
     int n = builtin_presets_seed(sources, (int)(sizeof(sources) / sizeof(sources[0])));
     if (n > 0) ESP_LOGI(TAG, "stored %d built-in preset(s)", n);

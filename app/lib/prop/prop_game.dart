@@ -179,6 +179,8 @@ class _PropGameScreenState extends State<PropGameScreen> {
     setState(() {
       _teamButtons = role == null || role.uses('team_input');
       _keypadOffered = role != null && caps.offers(role, 'keypad');
+      // A role that needs the keypad (the Hacking Terminal) shows it at once.
+      if (_keypadOffered && role!.requires.contains('keypad')) _keypad = true;
     });
     if (widget.pod != null) await session.attachPod(widget.pod!);
     if (role != null && role.uses('nfc') && features.nfc) {

@@ -691,7 +691,11 @@ String eventText(Strings s, FeedEvent e, [TeamBranding? teams]) {
   final team = e.team == null ? '' : name(e.team!);
   final d = e.data;
   String? str(String k) => d[k] is String ? d[k]! as String : null;
-  final key = 'event.${e.type}';
+  // An event that can come without a team has a text of its own for that
+  // (`event.<type>.no_team`, such as a Hacking Terminal solved by nobody known).
+  final key = team.isEmpty && s.tOr('event.${e.type}.no_team', '').isNotEmpty
+      ? 'event.${e.type}.no_team'
+      : 'event.${e.type}';
   final args = <String, Object?>{
     'team': team,
     'zone': str('zone') ?? s.t('player.node', {'n': e.node}),

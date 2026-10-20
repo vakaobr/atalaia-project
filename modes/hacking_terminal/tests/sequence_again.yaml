@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "Sequence: while typing it back, * shows it again from the start (seed 1: 2, 6, 9); a team's press counts until the puzzle is solved"
+seed: 1
+params: { puzzle: sequence, digits: 3 }
+steps:
+  - press: { team: blue }
+  - keys: "1"
+  - wait: 3
+  - expect_screen: { template: hack_sequence, data: { phase: input, of: 3, team: blue } }
+  - keys: "2"
+  - expect_screen: { template: hack_sequence, data: { phase: input, step: 1 } }
+  - wait: 100
+  - keys: "*"
+  - expect_screen: { template: hack_sequence, data: { phase: show, step: 1, key: 2 } }
+  - wait: 3
+  - expect_screen: { template: hack_sequence, data: { phase: input, step: 0 } }
+  - keys: "269"
+  - expect: { type: hacking.solved, team: blue, at: 106, data: { puzzle: sequence } }
+  - expect_no: script.error

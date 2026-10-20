@@ -1,0 +1,109 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The code puzzle. Data: team (the team at the keypad, if known), owner (the
+# team holding a captured terminal), typed (the digits typed, "_" for the
+# rest), digits, tries, g1-g3 / r1-r3 / c1-c3 (the last guesses, newest
+# first: the guess, digits in the right place, digits in the code but
+# elsewhere), locked (seconds left of a lock, 0 when open, shown at the
+# bottom instead of the note), note (the line at the bottom: enter, short
+# for a guess too short, yours when its holder types). Texts in params.lang (pt or en).
+template: hack_code
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: "{team || owner || 'panel'}" }
+    children:
+      - type: label
+        text: DECIFRA O CÓDIGO
+        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang != 'en'}" }
+      - type: label
+        text: CRACK THE CODE
+        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang == 'en'}" }
+  - type: label
+    text: "Terminal: {owner|upper}"
+    style:
+      font_size: 14
+      color: "{owner}"
+      visible: "{owner}"
+      padding: { top: 4 }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{typed}"
+    style: { font_size: 48, color: "{locked && 'muted' || 'accent'}" }
+  - type: label
+    text: "{g1}: {r1} no sítio, {c1} fora"
+    style: { font_size: 20, visible: "{g1 && params.lang != 'en'}" }
+  - type: label
+    text: "{g1}: {r1} right, {c1} wrong place"
+    style: { font_size: 20, visible: "{g1 && params.lang == 'en'}" }
+  - type: label
+    text: "{g2}: {r2} no sítio, {c2} fora"
+    style: { font_size: 14, color: muted, visible: "{g2 && params.lang != 'en'}" }
+  - type: label
+    text: "{g2}: {r2} right, {c2} wrong place"
+    style: { font_size: 14, color: muted, visible: "{g2 && params.lang == 'en'}" }
+  - type: label
+    text: "{g3}: {r3} no sítio, {c3} fora"
+    style: { font_size: 14, color: muted, visible: "{g3 && params.lang != 'en'}" }
+  - type: label
+    text: "{g3}: {r3} right, {c3} wrong place"
+    style: { font_size: 14, color: muted, visible: "{g3 && params.lang == 'en'}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "Marca {digits} algarismos e #"
+    style:
+      font_size: 14
+      color: muted
+      visible: "{!locked && note == 'enter' && params.lang != 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: "Type {digits} digits, then #"
+    style:
+      font_size: 14
+      color: muted
+      visible: "{!locked && note == 'enter' && params.lang == 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: "O código tem {digits} algarismos"
+    style:
+      font_size: 14
+      color: muted
+      visible: "{!locked && note == 'short' && params.lang != 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: "The code has {digits} digits"
+    style:
+      font_size: 14
+      color: muted
+      visible: "{!locked && note == 'short' && params.lang == 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: "O terminal já é da tua equipa"
+    style:
+      font_size: 14
+      color: muted
+      visible: "{!locked && note == 'yours' && params.lang != 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: "Your team holds this terminal"
+    style:
+      font_size: 14
+      color: muted
+      visible: "{!locked && note == 'yours' && params.lang == 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: "BLOQUEADO {locked} s"
+    style:
+      font_size: 20
+      color: danger
+      visible: "{locked && params.lang != 'en'}"
+      padding: { bottom: 8 }
+  - type: label
+    text: "LOCKED {locked} s"
+    style:
+      font_size: 20
+      color: danger
+      visible: "{locked && params.lang == 'en'}"
+      padding: { bottom: 8 }

@@ -19,6 +19,7 @@
 #include "preset_store.h"
 #include "preset_ui.h"
 #include "screen_renderer.h"
+#include "screen_template.h"
 #include "state_persist.h"
 
 #ifndef MODES_DIR
@@ -290,43 +291,56 @@ static void test_bomb_from_the_picker(void)
     node_runner_stop(&runner);
 }
 
-/* Every built-in mode, as main/CMakeLists.txt puts them in the image: Master and Satellites,
- * the newest, takes the tenth slot, the picker's second page, and on its own (no controller) a
- * box of it only captures. */
-static void test_every_builtin_and_master_satellites(void)
+/* Every built-in mode, as main/CMakeLists.txt puts them in the image (shell.c's order). */
+static const char *const builtin_folders[][2] = {
+    {"bomb", "org.atalaia.bomb"},
+    {"domination", "org.atalaia.domination"},
+    {"holdall", "org.atalaia.holdall"},
+    {"laststand", "org.atalaia.laststand"},
+    {"codes", "org.atalaia.codes"},
+    {"kill_confirmed", "org.atalaia.kill_confirmed"},
+    {"respawn", "org.atalaia.respawn"},
+    {"player_checkin", "org.atalaia.player_checkin"},
+    {"medic", "org.atalaia.medic"},
+    {"master_satellites", "org.atalaia.master_satellites"},
+    {"hacking_terminal", "org.atalaia.hacking_terminal"},
+};
+enum { BUILTIN_N = sizeof(builtin_folders) / sizeof(builtin_folders[0]) };
+
+/* Seeds a fresh store with every built-in mode; fills list. */
+static void seed_every_builtin(preset_summary_t *list)
 {
     setup();
-    static const char *const folders[][2] = {
-        {"bomb", "org.atalaia.bomb"},       {"domination", "org.atalaia.domination"},
-        {"holdall", "org.atalaia.holdall"}, {"laststand", "org.atalaia.laststand"},
-        {"codes", "org.atalaia.codes"},     {"kill_confirmed", "org.atalaia.kill_confirmed"},
-        {"respawn", "org.atalaia.respawn"}, {"player_checkin", "org.atalaia.player_checkin"},
-        {"medic", "org.atalaia.medic"},     {"master_satellites", "org.atalaia.master_satellites"},
-    };
-    enum { N = sizeof(folders) / sizeof(folders[0]) };
-    static char src[N][PRESET_SOURCE_MAX];
-    builtin_source_t sources[N];
-    for (int i = 0; i < N; i++) {
+    static char src[BUILTIN_N][PRESET_SOURCE_MAX];
+    builtin_source_t sources[BUILTIN_N];
+    for (int i = 0; i < BUILTIN_N; i++) {
         char path[200];
-        snprintf(path, sizeof(path), MODES_DIR "/%s/node.lua", folders[i][0]);
-        sources[i].mode_id = folders[i][1];
+        snprintf(path, sizeof(path), MODES_DIR "/%s/node.lua", builtin_folders[i][0]);
+        sources[i].mode_id = builtin_folders[i][1];
         sources[i].source = src[i];
         sources[i].source_len = read_file(path, src[i], sizeof(src[i]));
         CHECK(sources[i].source_len > 0);
     }
-    CHECK(builtin_presets_seed(sources, N) == N);
+    CHECK(builtin_presets_seed(sources, BUILTIN_N) == BUILTIN_N);
+    CHECK(preset_store_list(list, PRESET_MAX_SLOTS) == BUILTIN_N);
+}
+
+/* Master and Satellites takes the tenth slot, the picker's second page, and on its own (no
+ * controller) a box of it only captures. */
+static void test_every_builtin_and_master_satellites(void)
+{
     preset_summary_t list[PRESET_MAX_SLOTS];
-    CHECK(preset_store_list(list, PRESET_MAX_SLOTS) == N);
-    CHECK(list[N - 1].index == N);
-    CHECK(strcmp(list[N - 1].mode_id, "org.atalaia.master_satellites") == 0);
-    CHECK(strcmp(list[N - 1].label, "Master and Satellites") == 0);
+    seed_every_builtin(list);
+    CHECK(list[9].index == 10);
+    CHECK(strcmp(list[9].mode_id, "org.atalaia.master_satellites") == 0);
+    CHECK(strcmp(list[9].label, "Master and Satellites") == 0);
 
     /* Picked on the box itself: PIN, '0' for the second page, its first entry (M2-1). */
     preset_ui_t ui;
-    preset_ui_init(&ui, "1234", N);
+    preset_ui_init(&ui, "1234", BUILTIN_N);
     for (const char *k = "1234#0###"; *k; k++) preset_ui_handle_key(&ui, *k);
     CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_GAME_STARTED);
-    CHECK(preset_ui_selected_preset(&ui) == N);
+    CHECK(preset_ui_selected_preset(&ui) == 10);
 
     static preset_t p;
     CHECK(preset_store_load(list[preset_ui_selected_preset(&ui) - 1].index, &p));
@@ -353,6 +367,79 @@ static void test_every_builtin_and_master_satellites(void)
     node_runner_stop(&runner);
 }
 
+static void keys(node_runner_t *r, const char *k)
+{
+    for (; *k; k++) {
+        char json[16];
+        snprintf(json, sizeof(json), "{\"key\":\"%c\"}", *k);
+        node_runner_input(r, "keypad.key", json);
+        node_runner_tick(r, 10);
+    }
+}
+
+/* The Hacking Terminal, the eleventh slot: picked on the box (second page, second entry), it
+ * runs on the keypad alone. With game seed 2 and node id 1 its code is 8517, as in the
+ * simulator (modes/hacking_terminal/tests/code_solved.yaml): the same core, the same rand(). */
+static void test_hacking_terminal_from_the_picker(void)
+{
+    preset_summary_t list[PRESET_MAX_SLOTS];
+    seed_every_builtin(list);
+    CHECK(strcmp(list[10].mode_id, "org.atalaia.hacking_terminal") == 0);
+    CHECK(strcmp(list[10].label, "Hacking Terminal") == 0);
+
+    preset_ui_t ui;
+    preset_ui_init(&ui, "1234", BUILTIN_N);
+    for (const char *k = "1234#02###"; *k; k++) preset_ui_handle_key(&ui, *k);
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_GAME_STARTED);
+    CHECK(preset_ui_selected_preset(&ui) == 11);
+
+    static preset_t p;
+    CHECK(preset_store_load(list[preset_ui_selected_preset(&ui) - 1].index, &p));
+    CHECK(strcmp(p.mode_id, "org.atalaia.hacking_terminal") == 0);
+    CHECK(strstr(p.params_json, "\"puzzle\":\"code\"") != NULL);
+    CHECK(strstr(p.params_json, "\"lockout_s\":10") != NULL);
+
+    hal_t hal;
+    hal_stub_init(&hal);
+    static node_runner_t runner;
+    node_runner_init(&runner, &hal, 0);
+    runner.game_seed = 2;
+    const char *teams[] = {"red", "blue"};
+    CHECK(node_runner_start(&runner, &p, teams, 2));
+    /* The mode's announcement comes first: the display then finds the mode's templates. */
+    CHECK(strcmp(runner.queues.screens[0].template_name, SCREEN_MODE_MESSAGE) == 0);
+    CHECK(screen_render(SCREEN_MODE_MESSAGE, runner.queues.screens[0].data_json));
+    button_tracker_t buttons;
+    button_tracker_init(&buttons, teams, 2);
+    const screen_update_t *su = last_screen(&runner);
+    CHECK(su && strcmp(su->template_name, "hack_code") == 0);
+    if (su) CHECK(screen_render(su->template_name, su->data_json));
+
+    /* Blue presses its button, then guesses wrong: the counts, and the lock. */
+    runner.queues.screen_count = 0;
+    hold(&runner, &buttons, 0x2, 100);
+    keys(&runner, "1234#");
+    su = last_screen(&runner);
+    CHECK(su && strcmp(su->template_name, "hack_code") == 0);
+    CHECK(su && strstr(su->data_json, "\"g1\":\"1234\"") != NULL);
+    CHECK(su && strstr(su->data_json, "\"r1\":0") != NULL);
+    CHECK(su && strstr(su->data_json, "\"c1\":1") != NULL);
+    CHECK(su && strstr(su->data_json, "\"locked\":10") != NULL);
+    CHECK(su && strstr(su->data_json, "\"team\":\"blue\"") != NULL);
+    if (su) CHECK(screen_render(su->template_name, su->data_json));
+    CHECK(strcmp(runner.last_event_type, "hacking.solved") != 0);
+
+    for (int i = 0; i < 1010; i++) node_runner_tick(&runner, 10); /* the 10 s lock */
+    runner.queues.screen_count = 0;
+    keys(&runner, "8517#");
+    CHECK(strcmp(runner.last_event_type, "hacking.solved") == 0);
+    su = last_screen(&runner);
+    CHECK(su && strcmp(su->template_name, "hack_solved") == 0);
+    CHECK(su && strstr(su->data_json, "\"team\":\"blue\"") != NULL);
+    if (su) CHECK(screen_render(su->template_name, su->data_json));
+    node_runner_stop(&runner);
+}
+
 void run_builtin_presets_tests(void)
 {
     test_seed_empty_store();
@@ -363,4 +450,5 @@ void run_builtin_presets_tests(void)
     test_picker_second_page();
     test_bomb_from_the_picker();
     test_every_builtin_and_master_satellites();
+    test_hacking_terminal_from_the_picker();
 }

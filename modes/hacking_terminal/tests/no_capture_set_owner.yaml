@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "Without capture the terminal is no zone: the GM's owner override does nothing, solving captures nothing"
+seed: 1
+params: { puzzle: wires }
+steps:
+  - input: { type: cmd.set_owner, data: { team: blue } }
+  - expect_no: zone.captured
+  - press: { team: red }
+  - keys: "1243"
+  - expect: { type: hacking.solved, team: red }
+  - expect_no: zone.captured
+  - expect_no: script.error

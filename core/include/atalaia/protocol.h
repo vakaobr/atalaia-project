@@ -171,6 +171,7 @@ enum {
     ATALAIA_DATA_HOLDER = 31,            /* team holding the node when it happened */
     ATALAIA_DATA_REMAINING = 32,         /* uses left, such as a medic kit's heals */
     ATALAIA_DATA_PLAYER_HEALS_USED = 33, /* heals a player has had in this game */
+    ATALAIA_DATA_PUZZLE = 36,            /* hacking terminal puzzle: code, wires or sequence */
 };
 
 /* Standard event ids: the CBOR value of the type field. */
@@ -216,6 +217,7 @@ enum {
     ATALAIA_EV_NODE_TAMPER = 39,                /* node.tamper */
     ATALAIA_EV_POD_CONNECTED = 40,              /* pod.connected */
     ATALAIA_EV_POD_DISCONNECTED = 41,           /* pod.disconnected */
+    ATALAIA_EV_HACKING_SOLVED = 47,             /* hacking.solved */
     ATALAIA_EV_MEDIC_HEAL = 50,                 /* medic.heal */
     ATALAIA_EV_MEDIC_EMPTY = 51,                /* medic.empty */
 };

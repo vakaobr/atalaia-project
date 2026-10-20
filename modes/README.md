@@ -26,6 +26,7 @@ The GM console builds its settings form from `params` in `mode.yaml`, so GMs nev
 | [Medic Kit](medic/) (Ligaduras) | role package | its own boxes and Android props with NFC, next to any main mode; controller (`field.lua`) | After phase 3 plan phase E; 7 tests, plus simulator, controller, host-box, browser and on-device tests |
 | [Master and Satellites](master_satellites/) (Mestre e Satélites) | main mode | boxes + controller (`field.lua`) | Phase 4 plan phase 1, in software (not yet on radio hardware); 8 tests, plus controller, host-box and Field Box preset tests |
 | [Target Windows](target_windows/) (Janelas de Alvo) | main mode | boxes with the target addon (`hit`, `led`) | Phase 4 plan phase 2: the logic, in software; the addon does not exist yet (HW2), so it is not a Field Box preset and no Android prop offers it; 7 tests |
+| [Hacking Terminal](hacking_terminal/) (Terminal de Hacking) | main mode | boxes and Android props with a keypad | Phase 4 plan phase 4, in software (not yet on a phone in the field: HW3); 13 tests, plus controller, host-box, Field Box preset, browser and Dart tests |
 
 The script API is described in the "Game runtime and scripting" section of the [design specification](../docs/design-spec.md), and implemented in [`core/src/script_api.c`](../core/src/script_api.c).
 
@@ -64,6 +65,23 @@ Design specification section 15; decisions P4R4, P4R26 and M2-2 to M2-5 in `docs
 - **Screens:** `standby` while the target is dark (the team of the last scoring hit, and how many there were), `window` while it is open (the team's colour and the seconds left); `final_score` is the Field Box's built-in screen.
 
 The addon and its driver are hardware work (phase 4 HW2): until they exist this mode runs in the simulator (the tests' `input` step gives `hit.hit`) and through the core in the app's tests, and is not a Field Box built-in preset (decision P4R23).
+
+## Hacking Terminal (phase 4)
+
+Design specification section 15; decisions P4R1, P4R5, P4R23 and M4-1 to M4-9 in `docs/review/decisions-to-review.md`.
+
+- **The terminal:** a box or an Android prop with a keypad (the role `terminal` requires `keypad`; the team buttons, a team display, a screen and sound are optional). On an Android prop the on-screen keypad is shown from the start. It sets one puzzle, `puzzle`, of length `digits` (3-6, default 4):
+  - `code` (the default): a code of `digits` different digits. Type a guess and `#` (`*` clears); the terminal shows how many digits are in the right place and how many are in the code but elsewhere, for the last three guesses.
+  - `wires`: `digits` numbered wires to cut in the right order: press a wire's number.
+  - `sequence`: any key shows a sequence of `digits` keys (1-9), one a second; then type it back (`*` shows it again).
+  An unknown `puzzle` plays the code.
+- **Wrong answers** (a wrong guess, a wrong wire, a wrong key) lock the terminal for `lockout_s` seconds (default 10; 0: no lock), with the seconds left on the screen; the wires are joined again and the sequence must be watched again, but the puzzle stays the same. Wrong answers are not events: the screen shows them.
+- **Seeded:** every puzzle comes from the scripts' `rand()`, seeded with the game's seed and the node's id, so a replay of the game sets the same puzzles and every terminal has its own. The controller gives every game a seed; a Field Box gives every game picked on the box a new one.
+- **The solving team** is the team that pressed its button last (`team_input.press`) since the last solve, or else the terminal's `team` parameter; with neither, nobody known solves it.
+- **Solving** emits `hacking.solved` (47, critical) with `puzzle` (36), the code it reveals (`reveal_code`, as `code`, 10) and the team, scores `points` (default 10) for the team, and shows `ACESSO CONCEDIDO` / `ACCESS GRANTED` with the team and the code. Without `capture` the terminal then stays solved; with `capture` the terminal becomes the team's zone (`zone.captured`, the team display), and after 10 s of the solved screen it sets a new puzzle for the other teams, which its holder cannot solve (the screen says so). The GM's owner override applies with `capture` only, and the box's command "New puzzle" (`reset`) sets a new puzzle at once, unlocked and unsolved.
+- **Screens** (`lang`: `pt`, the default, or `en`; the texts are in the templates): `hack_code`, `hack_wires`, `hack_sequence`, `hack_solved`; `final_score` at the end. The GM console's feed says who solved which puzzle and the code it revealed; the players' feed says only who hacked a terminal.
+
+It is the eleventh built-in Field Box preset, the second entry of the picker's second page. On a box picked from its own preset list it needs no controller.
 
 ## Phase 3 modes (player tags)
 

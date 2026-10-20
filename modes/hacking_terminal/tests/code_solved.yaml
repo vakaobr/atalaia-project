@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "Code: a wrong guess shows its counts and locks the terminal, keys do nothing while locked, the right code solves it for the team that pressed (seed 2: the code is 8517)"
+seed: 2
+steps:
+  - expect_screen: { template: hack_code, data: { typed: "_ _ _ _", digits: 4, tries: 0, locked: 0, note: enter } }
+  - press: { team: red }
+  - expect_screen: { template: hack_code, data: { team: red } }
+  - keys: "12"
+  - expect_screen: { template: hack_code, data: { typed: "1 2 _ _" } }
+  - keys: "34#"
+  # 1234 against 8517: no digit in its place, one (the 1) elsewhere.
+  - expect_screen: { template: hack_code, data: { g1: "1234", r1: 0, c1: 1, tries: 1, locked: 10, typed: "_ _ _ _" } }
+  - expect_no: hacking.solved
+  - wait: 4
+  - expect_screen: { template: hack_code, data: { locked: 6 } }
+  - keys: "8517#"
+  - expect_screen: { template: hack_code, data: { typed: "_ _ _ _", tries: 1 } }
+  - wait: 6
+  - expect_screen: { template: hack_code, data: { locked: 0 } }
+  # 8571: two in place, two elsewhere.
+  - keys: "8571#"
+  - expect_screen: { template: hack_code, data: { g1: "8571", r1: 2, c1: 2, g2: "1234", r2: 0, c2: 1, tries: 2 } }
+  - wait: 10
+  - keys: "8517#"
+  - expect: { type: hacking.solved, team: red, at: 20, data: { puzzle: code } }
+  - expect_score: { team: red, points: 10 }
+  - expect_screen: { template: hack_solved, data: { team: red, capture: false } }
+  # Solved for the rest of the game: keys do nothing.
+  - keys: "8517#"
+  - expect_no: hacking.solved
+  - expect_no: zone.captured
+  - end: time
+  - expect_screen: { template: final_score }
+  - expect_no: script.error

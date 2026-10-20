@@ -593,6 +593,46 @@ lockout, the code revealed, `capture`), `expect_screen` on each screen;
 Dart through the core and golden images of the screens; Field Box host
 tests with `keys`; three ESP-IDF builds.
 
+**Built 2026-10-20 (in software; on a phone in the field: HW3).** What
+differs from the design above, or fills what it left open (decisions M4-1
+to M4-9):
+
+- Portuguese name "Terminal de Hacking" (M4-1). The role is `terminal`
+  `{ requires: [keypad], optional: [team_input, team_display, display,
+  audio] }`; screens `hack_code`, `hack_wires`, `hack_sequence` and
+  `hack_solved`, their texts in the templates in both languages (`lang`;
+  the script sends which line, M4-8).
+- Puzzle rules (M4-2): the code has different digits and the screen shows
+  the last three guesses' counts; a wrong wire joins every wire again; the
+  sequence (keys 1-9) is shown one a second after any key, and `*` shows
+  it again. Every wrong answer locks for `lockout_s`, the puzzle stays
+  (M4-3).
+- The solving team is the last to press its button since the last solve,
+  else `team` (M4-4). New parameter `points` (default 10); without
+  `capture` the terminal stays solved; with `capture` it emits
+  `zone.captured` and sets a new puzzle after 10 s that its holder cannot
+  solve; the GM's owner override with `capture` only, and a mode command
+  `reset` ("New puzzle") (M4-5).
+- Seeded with the game's seed and the node's id; Field Box games picked on
+  the box now get `esp_random()` seeds (they had 42) (M4-6).
+- `hacking.solved` (47) and `puzzle` (36) in `events.yaml`, a vector built
+  by hand from RFC 8949, the JSON Schema and an example, draft RFC 0000
+  Amendment 2; the console's feed shows the revealed code, the players'
+  feed does not (M4-7: the raw stream still carries it, for review).
+- About 44 KB of a Reduced box's Lua heap loaded, and just under the
+  simulator's bound composed with Codes, which it should not be combined
+  with (M4-8).
+- Field Box: the eleventh preset (second page, second entry), ten reference
+  images, a host test that picks it, types a wrong guess, waits out the
+  lock and solves it. App: the generated catalogue, five goldens, the
+  players' feed text, the keypad shown from the start on a prop whose role
+  requires it. Controller: an end-to-end case with a host box, which now
+  prints the mode's screens (M4-9). Console: a browser test.
+- Tests: 13 YAML files (each puzzle solved, wrong answers and the lock,
+  `*` and short guesses, the code revealed, `capture` and a takeover, the
+  GM's override and `reset`, English, three seeds, six digits, two
+  terminals).
+
 ### Validation
 
 ```sh

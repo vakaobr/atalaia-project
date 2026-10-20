@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 4 -- Site Server and Advanced Play: Status
 
-**Current phase:** Implementation (plan phases 1, 2, 3, 10, 11, 12 and 13 built in software, 2026-10-20; sync over 4G: HW1)
+**Current phase:** Implementation (plan phases 1, 2, 3, 4, 10, 11, 12 and 13 built in software, 2026-10-20; sync over 4G: HW1)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-20 (plan phase 13, full clean-copy check)
-**Next step:** plan phase 4 (Hacking Terminal) on the modes chain; plan phase 14 (chrono registry) on the site server chain
+**Last verified:** 2026-10-20 (plan phase 4, full clean-copy check)
+**Next step:** plan phase 5 (VIP / Payload) on the modes chain; plan phase 14 (chrono registry) on the site server chain
 
 ## Completed
 
@@ -42,8 +42,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | 1 | Master and Satellites | Software, now | -- | Done in software (2026-10-19; not on radio hardware) |
 | 2 | Target Windows (logic), `game.teams()`, `hit` input | Software, now | -- | Done in software (2026-10-19; the addon: HW2) |
 | 3 | Geo utilities in the core | Software, now | -- | Done in software (2026-10-20) |
-| 4 | Hacking Terminal | Software, now | -- | **Next** |
-| 5 | VIP / Payload | Software, now | 3 | Pending |
+| 4 | Hacking Terminal | Software, now | -- | Done in software (2026-10-20; on a phone in the field: HW3) |
+| 5 | VIP / Payload | Software, now | 3 | **Next** (modes chain) |
 | 6 | Scenario packages and the objectives role package | Software, now | -- | Pending |
 | 7 | Scenario compiler and validator | Software, now | 3, 6 | Pending |
 | 8 | Scenarios in the controller, console and app | Software, now | 7 | Pending |
@@ -141,6 +141,36 @@ and the vectors' exact bits in an ESP-IDF app on the ESP32 and ESP32-S3
 in Espressif's QEMU. Not run: Wokwi (R7), real boards, Dart (no mode
 uses `geo` yet; VIP / Payload, plan phase 5, will). Decisions M3-1 to
 M3-3 (open).
+
+## Plan phase 4: Hacking Terminal (built 2026-10-20, in software)
+
+`modes/hacking_terminal` (`org.atalaia.hacking_terminal`, "Terminal de
+Hacking"): a box or an Android prop with a keypad sets a puzzle of
+`digits` (3-6): crack a code of different digits from the right-place
+and wrong-place counts of the last three guesses (`code`), cut numbered
+wires in the right order (`wires`) or type back a sequence of keys shown
+one a second (`sequence`). A wrong answer locks it for `lockout_s` and
+the puzzle stays. Puzzles come from `rand()` (the game's seed and the
+node's id), so replays agree. The last team to press its button, or the
+terminal's `team`, solves it: `hacking.solved` (47, critical; `puzzle`,
+key 36; `code`, the `reveal_code`), `points` for the team, and with
+`capture` the terminal becomes the team's zone and sets a new puzzle for
+the other teams. The GM's "New puzzle" command (`reset`). Screens in
+Portuguese and English; the eleventh Field Box preset; on an Android
+prop the keypad shows from the start. A game picked on a Field Box now
+gets a random seed (it had 42). Field Box image: `0x175f70` (19.7 KB more; 27 % of the 2 MB OTA slot free).
+
+Tested: 13 YAML event sequences (in Python and in Dart through the
+core); the event vector (bytes built by hand from RFC 8949) through the
+C, Python and Dart codecs, the JSON Schema and an example; the Field Box
+host tests (the preset picked on the box, a wrong guess, the lock, seed
+2's code 8517 as in the simulator) and ten reference images; five app
+goldens, the players' feed text, the prop keypad; the controller end to
+end with a host box over the host modem (the sequence read off the box's
+screen and typed back, the capture, the points, the GM's reset over the
+radio); the console in Chromium (the game form, the feed with the
+revealed code in both languages, the command). Not run: Wokwi (R7), a
+real box, a phone in the field (HW3). Decisions M4-1 to M4-9 (open).
 
 ## Plan phase 10: site server skeleton (built 2026-10-19, in software)
 

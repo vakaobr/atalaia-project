@@ -17,6 +17,7 @@ heard through another box's relay. Decision D18 is the box side of this.
 
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import time
@@ -220,6 +221,54 @@ class FieldTests(unittest.TestCase):
         freed = [e for e in self.client.get(f"/api/v1/games/{gid}/log", headers=READ).json()
                  if e["type"] == "zone.neutralized"][0]
         self.assertEqual((freed["node"], freed["data"]["previous_team"]), (n_sat, "red"))
+
+    def test_hacking_terminal_on_a_box(self):
+        """The Hacking Terminal on a host box: red presses its button, a key shows the sequence on
+        the box's screen (read here from its SCREEN lines, as a player reads the screen), typing
+        it back solves it; hacking.solved (critical) with the code it reveals, the capture and
+        red's points reach the controller over the radio; the GM's "reset" gives a new puzzle
+        at once."""
+        r = self.client.post("/api/v1/games", headers=GM, json={
+            "name": "hack", "mode_id": "org.atalaia.hacking_terminal", "teams": ["red", "blue"],
+            "params": {"puzzle": "sequence", "digits": 3, "reveal_code": "4711", "capture": True}})
+        self.assertEqual(r.status_code, 201, r.text)
+        gid = r.json()["id"]
+        box = self.box("terminal")
+        nid = self.join(box, role="terminal")
+        self.assertTrue(box.logged("org.atalaia.hacking_terminal, terminal"), box.lines[-5:])
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
+        box.hold(1, 100)  # red at the keypad
+
+        def screens(name: str) -> list[dict]:
+            return [json.loads(line.split(" ", 2)[2]) for line in list(box.lines)
+                    if line.startswith(f"SCREEN {name} ")]
+
+        box.send("keys 5")
+        self.assertTrue(wait_for(lambda: any(d.get("phase") == "input" for d in screens("hack_sequence")), 8),
+                        box.lines[-12:])
+        shown = {d["step"]: d["key"] for d in screens("hack_sequence") if d.get("phase") == "show"}
+        self.assertEqual(sorted(shown), [1, 2, 3])
+        self.assertTrue(all(1 <= k <= 9 for k in shown.values()), shown)
+        box.send("keys " + "".join(str(shown[i]) for i in (1, 2, 3)))
+        self.assertTrue(wait_for(lambda: any(d.get("code") == "4711" for d in screens("hack_solved")), 5))
+        # The solved screen stays 10 s before the next puzzle; the GM's "New puzzle" (a mode
+        # command, CMD opcode 8, over the radio) brings one at once.
+        before = len(screens("hack_sequence"))
+        r = self.client.post(f"/api/v1/nodes/{nid}/cmd", headers=GM,
+                             json={"cmd": "mode", "params": {"name": "reset"}})
+        self.assertEqual(r.status_code, 202, r.text)
+        self.assertTrue(wait_for(lambda: len(screens("hack_sequence")) > before, 5), box.lines[-5:])
+        self.assertEqual((screens("hack_sequence")[-1]["phase"], screens("hack_sequence")[-1]["owner"]),
+                         ("idle", "red"))
+
+        self.assertTrue(wait_for(lambda: "hacking.solved" in self.log_types(gid, nid), 8))
+        solved = [e for e in self.client.get(f"/api/v1/games/{gid}/log", headers=READ).json()
+                  if e["type"] == "hacking.solved"][0]
+        self.assertEqual((solved["team"], solved["prio"], solved["data"]["puzzle"], solved["data"]["code"]),
+                         ("red", "critical", "sequence", "4711"))
+        self.assertTrue(wait_for(lambda: self.node(nid).get("owner") == "red", 8))
+        self.assertTrue(wait_for(lambda: self.score(gid, "red") >= 10, 8))
 
     def test_codes_modifier_on_a_box(self):
         """Domination with the Codes modifier: the box composes both scripts; a code reaches the GM."""

@@ -40,6 +40,10 @@ static const struct {
     {"Master and Satellites", "org.atalaia.master_satellites",
      "{\"capture_hold_ms\":3000,\"tick_s\":10,\"points_per_tick\":2,\"satellite_bonus_pct\":50,"
      "\"min_satellites\":0}"},
+    /* The keypad alone; on its own a box credits the team that pressed its button. */
+    {"Hacking Terminal", "org.atalaia.hacking_terminal",
+     "{\"puzzle\":\"code\",\"digits\":4,\"lockout_s\":10,\"points\":10,\"capture\":false,"
+     "\"lang\":\"pt\"}"},
 };
 
 /* preset_t holds a 16 KB source buffer, so it is not put on a task stack;

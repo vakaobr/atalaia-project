@@ -139,6 +139,37 @@ const cases = [
     'window',
     '{"team":"red","left":4}',
   ),
+  // The Hacking Terminal: each puzzle, a lock, solved with a code (pt and en).
+  (
+    'hacking_terminal_code',
+    'hacking_terminal',
+    'hack_code',
+    '{"team":"red","typed":"8 5 _ _","digits":4,"tries":3,"locked":0,"note":"enter","g1":"8571","r1":2,"c1":2,"g2":"5678","r2":0,"c2":2,"g3":"1234","r3":0,"c3":1}',
+  ),
+  (
+    'hacking_terminal_code_locked',
+    'hacking_terminal',
+    'hack_code',
+    '{"owner":"blue","typed":"_ _ _ _ _ _","digits":6,"tries":1,"locked":7,"note":"short","g1":"012345","r1":1,"c1":3}',
+  ),
+  (
+    'hacking_terminal_wires',
+    'hacking_terminal',
+    'hack_wires',
+    '{"team":"blue","wires":"- - 3 4 - 6","cut":3,"of":6,"locked":0}',
+  ),
+  (
+    'hacking_terminal_sequence',
+    'hacking_terminal',
+    'hack_sequence',
+    '{"phase":"show","key":6,"step":2,"of":4,"locked":0}',
+  ),
+  (
+    'hacking_terminal_solved',
+    'hacking_terminal',
+    'hack_solved',
+    '{"team":"red","code":"4711","capture":true}',
+  ),
   (
     'code_entry',
     null,

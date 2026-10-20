@@ -1,0 +1,115 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The sequence puzzle. Data: team (the team at the keypad, if known), owner
+# (the team holding a captured terminal), phase (idle: waiting for a key;
+# show: the sequence is shown; input: the player types it back), key (the key
+# shown), step (the key shown, or the keys typed back so far), of (the
+# sequence's length), locked (seconds left of a lock, 0 when open), note
+# (yours when the holder's team types). Texts in params.lang (pt or en).
+template: hack_sequence
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: "{team || owner || 'panel'}" }
+    children:
+      - type: label
+        text: REPETE A SEQUÊNCIA
+        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang != 'en'}" }
+      - type: label
+        text: REPEAT THE SEQUENCE
+        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang == 'en'}" }
+  - type: label
+    text: "Terminal: {owner|upper}"
+    style:
+      font_size: 14
+      color: "{owner}"
+      visible: "{owner}"
+      padding: { top: 4 }
+  - type: spacer
+    height: fill
+  # Showing the sequence: the key, and its place in it.
+  - type: label
+    text: "{key}"
+    style: { font_size: 48, color: accent, visible: "{phase == 'show'}" }
+  - type: label
+    text: "{step} / {of}"
+    style: { font_size: 20, color: muted, visible: "{phase == 'show'}" }
+  # Typing it back.
+  - type: label
+    text: A TUA VEZ
+    style: { font_size: 28, color: accent, visible: "{phase == 'input' && params.lang != 'en'}" }
+  - type: label
+    text: YOUR TURN
+    style: { font_size: 28, color: accent, visible: "{phase == 'input' && params.lang == 'en'}" }
+  - type: progress_bar
+    value: "{step / of}"
+    style: { width: 260, height: 12, color: "{team || 'accent'}", visible: "{phase == 'input'}" }
+  - type: label
+    text: "{step} de {of}"
+    style:
+      font_size: 20
+      visible: "{phase == 'input' && params.lang != 'en'}"
+      padding: { top: 6 }
+  - type: label
+    text: "{step} of {of}"
+    style:
+      font_size: 20
+      visible: "{phase == 'input' && params.lang == 'en'}"
+      padding: { top: 6 }
+  # Waiting, or locked.
+  - type: label
+    text: "{of} TECLAS"
+    style: { font_size: 28, visible: "{phase == 'idle' && !locked && params.lang != 'en'}" }
+  - type: label
+    text: "{of} KEYS"
+    style: { font_size: 28, visible: "{phase == 'idle' && !locked && params.lang == 'en'}" }
+  - type: label
+    text: "TECLA ERRADA: BLOQUEADO {locked} s"
+    style: { font_size: 20, color: danger, visible: "{locked && params.lang != 'en'}" }
+  - type: label
+    text: "WRONG KEY: LOCKED {locked} s"
+    style: { font_size: 20, color: danger, visible: "{locked && params.lang == 'en'}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: O terminal já é da tua equipa
+    style:
+      font_size: 14
+      color: muted
+      visible: "{note == 'yours' && params.lang != 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: Your team holds this terminal
+    style:
+      font_size: 14
+      color: muted
+      visible: "{note == 'yours' && params.lang == 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: Carrega numa tecla para ver a sequência
+    style:
+      font_size: 14
+      color: muted
+      visible: "{!note && phase == 'idle' && !locked && params.lang != 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: Press a key to see the sequence
+    style:
+      font_size: 14
+      color: muted
+      visible: "{!note && phase == 'idle' && !locked && params.lang == 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: Memoriza as teclas
+    style:
+      font_size: 14
+      color: muted
+      visible: "{phase == 'show' && params.lang != 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: Remember the keys
+    style:
+      font_size: 14
+      color: muted
+      visible: "{phase == 'show' && params.lang == 'en'}"
+      padding: { bottom: 10 }

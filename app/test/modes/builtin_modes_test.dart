@@ -69,6 +69,21 @@ void main() {
       ms.screens.keys,
       containsAll(['standby', 'captured', 'master_status']),
     );
+    final hack = catalog.byId('org.atalaia.hacking_terminal')!;
+    expect(hack.needsController, isFalse);
+    expect(hack.name('pt'), 'Terminal de Hacking');
+    expect(hack.name('en'), 'Hacking Terminal');
+    expect(hack.roles.single.name, 'terminal');
+    expect(hack.roles.single.requires, ['keypad']);
+    expect(hack.role('terminal')!.uses('team_input'), isTrue);
+    expect(
+      hack.screens.keys,
+      containsAll(['hack_code', 'hack_wires', 'hack_sequence', 'hack_solved']),
+    );
+    expect(
+      hack.params.firstWhere((p) => p.name == 'lockout_s').label('pt'),
+      'Segundos de bloqueio depois de uma resposta errada (0: sem bloqueio)',
+    );
     expect(catalog.byId('org.atalaia.respawn')!.needsController, isFalse);
   });
 

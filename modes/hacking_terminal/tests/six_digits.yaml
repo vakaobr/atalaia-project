@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "Six digits with seed 1: the code is 392170, each digit once"
+seed: 1
+params: { digits: 6, lockout_s: 0 }
+steps:
+  - expect_screen: { template: hack_code, data: { typed: "_ _ _ _ _ _", digits: 6 } }
+  - keys: "012345#"
+  - expect_screen: { template: hack_code, data: { g1: "012345", r1: 1, c1: 3 } }
+  - keys: "392170#"
+  - expect: { type: hacking.solved, data: { puzzle: code } }
+  - expect_no: script.error

@@ -1,0 +1,90 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The wires puzzle. Data: team (the team at the keypad, if known), owner (the
+# team holding a captured terminal), wires (the wires' numbers, "-" for the
+# ones cut), cut and of (wires cut, of all of them), locked (seconds left of a
+# lock, 0 when open), note (yours when the holder's team types). Texts in
+# params.lang (pt or en).
+template: hack_wires
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: "{team || owner || 'panel'}" }
+    children:
+      - type: label
+        text: CORTA OS FIOS
+        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang != 'en'}" }
+      - type: label
+        text: CUT THE WIRES
+        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang == 'en'}" }
+  - type: label
+    text: "Terminal: {owner|upper}"
+    style:
+      font_size: 14
+      color: "{owner}"
+      visible: "{owner}"
+      padding: { top: 4 }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{wires}"
+    style: { font_size: 48, color: "{locked && 'muted' || 'accent'}" }
+  - type: progress_bar
+    value: "{cut / of}"
+    style: { width: 260, height: 12, color: "{team || 'accent'}" }
+  - type: label
+    text: "{cut} de {of} cortados"
+    style:
+      font_size: 20
+      visible: "{!locked && params.lang != 'en'}"
+      padding: { top: 6 }
+  - type: label
+    text: "{cut} of {of} cut"
+    style:
+      font_size: 20
+      visible: "{!locked && params.lang == 'en'}"
+      padding: { top: 6 }
+  - type: label
+    text: "FIO ERRADO: BLOQUEADO {locked} s"
+    style:
+      font_size: 20
+      color: danger
+      visible: "{locked && params.lang != 'en'}"
+      padding: { top: 6 }
+  - type: label
+    text: "WRONG WIRE: LOCKED {locked} s"
+    style:
+      font_size: 20
+      color: danger
+      visible: "{locked && params.lang == 'en'}"
+      padding: { top: 6 }
+  - type: spacer
+    height: fill
+  - type: label
+    text: O terminal já é da tua equipa
+    style:
+      font_size: 14
+      color: muted
+      visible: "{note == 'yours' && params.lang != 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: Your team holds this terminal
+    style:
+      font_size: 14
+      color: muted
+      visible: "{note == 'yours' && params.lang == 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: Carrega no número do fio a cortar
+    style:
+      font_size: 14
+      color: muted
+      visible: "{!note && params.lang != 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: Press the number of the wire to cut
+    style:
+      font_size: 14
+      color: muted
+      visible: "{!note && params.lang == 'en'}"
+      padding: { bottom: 10 }

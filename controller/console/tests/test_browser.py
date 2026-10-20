@@ -388,6 +388,51 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("tab-feed").click()
         expect(heal).to_contain_text("b1 was healed (heals left in the kit: 4; heals in this game: 1)")
 
+    def test_hacking_terminal_game_and_its_event(self):
+        """A Hacking Terminal game from the form (its parameters in Portuguese); the terminal's
+        join; a solved terminal reads as words in the feed, with the code it revealed for the GM,
+        in both languages; the GM's "New puzzle" command on the Boxes tab."""
+        page = self.console()
+        page.get_by_test_id("game-name").fill("Terminal")
+        page.get_by_test_id("game-source").select_option("mode:org.atalaia.hacking_terminal")
+        expect(page.locator('label[for="game-lockout_s"]')).to_contain_text("Segundos de bloqueio")
+        page.locator("#game-puzzle").fill("wires")
+        page.locator("#game-reveal_code").fill("4711")
+        page.get_by_test_id("game-create").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("pronto")
+        game = self.field.bundle.controller.game
+        self.assertEqual(game["mode_id"], "org.atalaia.hacking_terminal")
+        self.assertEqual((game["params"]["puzzle"], game["params"]["reveal_code"]), ("wires", "4711"))
+
+        page.get_by_test_id("tab-join").click()
+        page.locator("#j-node").fill(str(BOX))
+        page.get_by_test_id("join-generate").click()
+        j = join.decode(join.from_text(page.get_by_test_id("join-text").input_value()), JOIN_KEY)
+        self.assertEqual((j["mode_id"], j["role"]), ("org.atalaia.hacking_terminal", "terminal"))
+
+        self.field.http.post(f"/api/v1/games/{game['id']}/start")
+        self.field.host.transmitted_all(0.3)
+        self.field.box_hello()
+        for seq, data in ((1, {"puzzle": "wires", "code": "4711", "team": "red"}), (2, {"puzzle": "code"})):
+            ev = {"node": BOX, "seq": seq, "t": 9000 * seq, "type": "hacking.solved", "data": data}
+            if "team" in data:
+                ev["team"] = 1
+            self.field.box("EVENT", codec.encode_event(ev), ack=True)
+        page.get_by_test_id("tab-feed").click()
+        solved = page.locator('[data-testid=feed] [data-type="hacking.solved"]')
+        expect(solved).to_have_count(2)
+        expect(solved.nth(1)).to_contain_text("red resolveu um terminal de hacking (fios) e recebeu o código 4711")
+        expect(solved.nth(0)).to_contain_text("Alguém por identificar resolveu um terminal de hacking (código)")
+
+        page.get_by_test_id("tab-nodes").click()
+        expect(page.get_by_test_id(f"node-cmd-{BOX}-reset")).to_have_text("Novo enigma")
+
+        page.get_by_test_id("lang").first.select_option("en")
+        expect(page.get_by_test_id(f"node-cmd-{BOX}-reset")).to_have_text("New puzzle")
+        page.get_by_test_id("tab-feed").click()
+        expect(solved.nth(1)).to_contain_text("red solved a hacking terminal (wires) and got the code 4711")
+        expect(solved.nth(0)).to_contain_text("Nobody known solved a hacking terminal (code)")
+
     def test_join_qr_code_reads_back_as_the_join_text(self):
         if not ZBARIMG:
             self.skipTest("zbarimg is not installed")

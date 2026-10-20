@@ -68,6 +68,8 @@ data_fields:
   holder:        { key: 31, type: string,  doc: "team holding the node when it happened" }
   remaining:     { key: 32, type: integer, doc: "uses left, such as a medic kit's heals" }
   player_heals_used: { key: 33, type: integer, doc: "heals a player has had in this game" }
+  # Phase 4 (P4R1): 34 objective and 35 scenario come with the scenario packages (plan phase 6).
+  puzzle:        { key: 36, type: string,  doc: "hacking terminal puzzle: code, wires or sequence" }
 
 # id: CBOR value of the type field (1-23 take one byte). prio: the default
 # priority. data: the fields this event may carry besides the common ones.
@@ -115,5 +117,7 @@ events:
   node.tamper:                { id: 39, prio: critical,  data: [reason] }   # e.g. kiosk_broken
   pod.connected:              { id: 40, prio: telemetry, data: [fw, tier] } # an I/O pod linked to this node
   pod.disconnected:           { id: 41, prio: telemetry, data: [reason] }
+  # Phase 4 (P4R1): 42-45 scenario events (plan phase 6) and 46 vip.extracted (plan phase 5) to come.
+  hacking.solved:             { id: 47, prio: critical,  data: [puzzle, code] }  # team: who solved it, if known; code: the code it reveals
   medic.heal:                 { id: 50, prio: normal,    data: [player, remaining, player_heals_used] }  # team: the player's
   medic.empty:                { id: 51, prio: normal,    data: [] }         # team: the team the kit serves, if one

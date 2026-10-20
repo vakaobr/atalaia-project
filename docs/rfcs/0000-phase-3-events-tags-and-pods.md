@@ -69,3 +69,17 @@ Older nodes pass unknown event ids through as raw CBOR (ADR-P3-8); the JSON Sche
 - **Not yet:** the addon's own firmware and the Field Box's addon port driver (phase 4 HW2). Until they exist, Target Windows is not a Field Box built-in preset, and Android props do not offer `hit` (a phone has no hit sensor; a pod that one day lists one would lend it as above).
 
 Compatibility: no new frame, key or event; a receiver that does not know the type `hit` ignores the descriptor, as for any capability type it does not use.
+
+## Amendment 2 (2026-10-20): the `hacking.solved` event (phase 4 plan phase 4)
+
+**Adds** the first of the phase 4 events (decision P4R1), with the Hacking Terminal (`modes/hacking_terminal/`, decision P4R5), its first user.
+
+| Id | Event | Data (besides `team` and `squad`) |
+| --- | --- | --- |
+| 47 | `hacking.solved` (critical) | `puzzle` (`code`, `wires` or `sequence`), `code` (the code the terminal reveals, when the game sets one); `team`: who solved it, left out when nobody known did |
+
+- **New data field:** `puzzle` (key 36, string). Keys 34 and 35 stay for `objective` and `scenario` (plan phase 6), and events 42-46 for the scenario events and `vip.extracted` (plan phases 5 and 6), each added with the code that first emits it.
+- `code` (key 10) is reused: here it is the code itself, which the GM console shows; the players' feed shows only who hacked a terminal. Wrong answers are not events.
+- **Vector:** `protocol/vectors/events.yaml`, "Red solves a hacking terminal's wires and it reveals code 4711", bytes built by hand from RFC 8949's encoding rules (CBOR major types 0, 3 and 5, the shortest forms) and the schema's keys, checked by the C, Python and Dart codecs. JSON Schema: `protocol/json/event.schema.json` and the example `protocol/json/examples/hacking-solved.json`.
+
+Compatibility: as for the events of the design above, an older node passes the unknown id through as raw CBOR and an older controller logs it by its number; nothing else changes.

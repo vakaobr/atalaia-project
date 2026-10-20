@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "Capture: solving makes the terminal the team's zone; after the solved screen a new puzzle comes, its holder cannot solve it, another team takes it over (seed 1: wires 1, 2, 4, 3, then 3, 4, 1, 2)"
+seed: 1
+params: { puzzle: wires, capture: true, lockout_s: 5 }
+steps:
+  - press: { team: red }
+  - keys: "1243"
+  - expect: { type: hacking.solved, team: red, at: 0, data: { puzzle: wires } }
+  - expect: { type: zone.captured, team: red, at: 0 }
+  - expect_score: { team: red, points: 10 }
+  - expect_screen: { template: hack_solved, data: { team: red, capture: true } }
+  # Keys on the solved screen do nothing.
+  - keys: "3412"
+  - wait: 9
+  - expect_screen: { template: hack_solved, data: { team: red } }
+  - wait: 1
+  - expect_screen: { template: hack_wires, data: { owner: red, wires: "1 2 3 4", cut: 0 } }
+  # The holder cannot hack its own terminal.
+  - press: { team: red }
+  - keys: "3"
+  - expect_screen: { template: hack_wires, data: { cut: 0, locked: 0, note: yours } }
+  # Blue can: a wrong wire locks it as before.
+  - press: { team: blue }
+  - keys: "34"
+  - expect_screen: { template: hack_wires, data: { team: blue, owner: red, cut: 2 } }
+  - keys: "2"
+  - expect_screen: { template: hack_wires, data: { cut: 0, locked: 5 } }
+  - wait: 5
+  - keys: "3412"
+  - expect: { type: hacking.solved, team: blue, at: 15, data: { puzzle: wires } }
+  - expect: { type: zone.captured, team: blue, at: 15, data: { previous_team: red } }
+  - expect_score: { team: blue, points: 10 }
+  - expect_score: { team: red, points: 10 }
+  - expect_no: script.error

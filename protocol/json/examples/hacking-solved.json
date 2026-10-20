@@ -1,0 +1,9 @@
+{
+  "id": "terminal-1:4",
+  "t": 95000,
+  "node": "terminal-1",
+  "type": "hacking.solved",
+  "team": "red",
+  "data": { "puzzle": "wires", "code": "4711" },
+  "prio": "critical"
+}

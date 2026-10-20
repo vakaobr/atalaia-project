@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "An unknown puzzle plays the code; the notes say which line the screen shows (its texts are in the templates, in params.lang)"
+seed: 2
+params: { lang: en, puzzle: maze, capture: true, team: red }
+steps:
+  - expect_screen: { template: hack_code, data: { note: enter } }
+  - keys: "1#"
+  - expect_screen: { template: hack_code, data: { note: short } }
+  - keys: "*8517#"
+  - expect: { type: hacking.solved, team: red, data: { puzzle: code } }
+  - wait: 10
+  - keys: "6830#"
+  - expect_screen: { template: hack_code, data: { note: yours } }
+  - expect_no: script.error

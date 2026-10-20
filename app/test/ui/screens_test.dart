@@ -181,6 +181,31 @@ void main() {
     expect(eventText(en, empty), 'A medic kit is empty');
   });
 
+  test("the Hacking Terminal's event in words, with and without a team", () {
+    const solved = FeedEvent(
+      'hacking.solved',
+      'red',
+      {'puzzle': 'wires', 'code': '4711'},
+      95000,
+      7,
+    );
+    const nobody = FeedEvent(
+      'hacking.solved',
+      null,
+      {'puzzle': 'code'},
+      96000,
+      8,
+    );
+    const pt = Strings(AppLanguage.pt);
+    const en = Strings(AppLanguage.en);
+    expect(eventText(pt, solved), 'A equipa vermelha hackeou um terminal');
+    expect(eventText(en, solved), 'red hacked a terminal');
+    expect(eventText(pt, nobody), 'Um terminal foi hackeado');
+    expect(eventText(en, nobody), 'A terminal was hacked');
+    // The code the terminal reveals is not in the players' feed.
+    expect(eventText(en, solved), isNot(contains('4711')));
+  });
+
   testWidgets('the player connects with the scoreboard QR code', (
     tester,
   ) async {

@@ -229,6 +229,32 @@ void main() {
     expect(bomb.node.inputs.last.$2, {'key': '7'});
   });
 
+  testWidgets('a role that requires the keypad shows it from the start', (
+    tester,
+  ) async {
+    await phone(tester);
+    final runner = FakeNodeRunner();
+    final h = harness(runner: runner);
+    await tester.pumpWidget(
+      h.app(
+        home: PropGameScreen(
+          setup: setupFor('org.atalaia.hacking_terminal', 'terminal'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('prop-start')));
+    await tester.pumpAndSettle();
+    await tester.tap(inDialog('Começar'));
+    await tester.pumpAndSettle();
+    // No tap on the keypad button: it is already shown (and can be hidden).
+    await tester.tap(find.byKey(const Key('key-4')));
+    await tester.pump();
+    expect(runner.node.inputs.last.$1, 'keypad.key');
+    expect(runner.node.inputs.last.$2, {'key': '4'});
+    expect(find.text('Esconder o teclado'), findsOneWidget);
+  });
+
   testWidgets('setting up: the mode, teams, the length, then the game', (
     tester,
   ) async {

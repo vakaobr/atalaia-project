@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "The GM: the owner override of a capture terminal, and the reset command that gives a new puzzle after it was solved (seed 2: code 8517, then 6830 for the other teams, and 6530 after the reset)"
+seed: 2
+params: { capture: true, team: blue }
+steps:
+  - input: { type: cmd.set_owner, data: { team: red } }
+  - expect: { type: zone.captured, team: red }
+  - expect_screen: { template: hack_code, data: { owner: red, team: blue } }
+  - input: { type: cmd.set_owner, data: { team: none } }
+  - expect: { type: zone.neutralized, data: { previous_team: red } }
+  - input: { type: cmd.set_owner, data: { team: none } }
+  - keys: "8517#"
+  - expect: { type: hacking.solved, team: blue }
+  - expect: { type: zone.captured, team: blue }
+  - input: { type: cmd.mode, data: { name: reset } }
+  - expect_screen: { template: hack_code, data: { owner: blue, tries: 0, locked: 0 } }
+  # Blue holds it, and blue is the terminal's team: nobody pressed, so blue is typing.
+  - keys: "6530#"
+  - expect_screen: { template: hack_code, data: { tries: 0, note: yours } }
+  - press: { team: red }
+  - keys: "6830#"
+  - expect_screen: { template: hack_code, data: { tries: 1, g1: "6830", r1: 3, c1: 0 } }
+  - wait: 10
+  - keys: "6530#"
+  - expect: { type: hacking.solved, team: red, at: 10 }
+  - expect: { type: zone.captured, team: red, at: 10, data: { previous_team: blue } }
+  - expect_no: script.error

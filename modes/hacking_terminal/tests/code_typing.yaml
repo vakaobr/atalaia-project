@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "Code: # with too few digits only says so, * clears, digits past the length are ignored; nobody pressed a team button and the terminal has no team: solved by nobody known, no points (seed 2)"
+seed: 2
+params: { digits: 4, lockout_s: 0 }
+steps:
+  - keys: "85#"
+  - expect_screen: { template: hack_code, data: { typed: "8 5 _ _", tries: 0, locked: 0, note: short } }
+  - keys: "*"
+  - expect_screen: { template: hack_code, data: { typed: "_ _ _ _", note: enter } }
+  - keys: "123456"
+  - expect_screen: { template: hack_code, data: { typed: "1 2 3 4" } }
+  # Without a lock, a wrong guess leaves the terminal open at once.
+  - keys: "#"
+  - expect_screen: { template: hack_code, data: { g1: "1234", tries: 1, locked: 0 } }
+  - keys: "5678#"
+  - keys: "9012#"
+  - keys: "1111#"
+  # The last three guesses, newest first.
+  - expect_screen: { template: hack_code, data: { g1: "1111", r1: 1, c1: 0, g2: "9012", g3: "5678", tries: 4 } }
+  - wait: 61
+  - keys: "8517#"
+  - expect: { type: hacking.solved, at: 61, data: { puzzle: code } }
+  - expect_score: { team: blue, points: 0 }
+  - expect_score: { team: red, points: 0 }
+  - expect_no: script.error

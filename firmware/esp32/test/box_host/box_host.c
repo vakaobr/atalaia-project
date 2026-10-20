@@ -27,7 +27,8 @@
  *   keys <0-9*#...>             keypad presses (keypad.key events to the mode)
  *   status                      print one STATUS line (JSON)
  *   quit
- * stdout: "READY air=<port>", then LOG, SCREEN and STATUS lines.
+ * stdout: "READY air=<port>", then LOG, SCREEN and STATUS lines (SCREEN: the shell's
+ * screens and the mode's, "SCREEN <template> <data JSON>", as the display gets them).
  */
 #define _POSIX_C_SOURCE 200809L
 
@@ -365,11 +366,17 @@ int main(int argc, char **argv)
 
     /* The built-in modes, as main/CMakeLists.txt puts them in the image. */
     static const char *const builtin_modes[][2] = {
-        {"bomb", "org.atalaia.bomb"},       {"domination", "org.atalaia.domination"},
-        {"holdall", "org.atalaia.holdall"}, {"laststand", "org.atalaia.laststand"},
-        {"codes", "org.atalaia.codes"},     {"kill_confirmed", "org.atalaia.kill_confirmed"},
-        {"respawn", "org.atalaia.respawn"}, {"player_checkin", "org.atalaia.player_checkin"},
-        {"medic", "org.atalaia.medic"},     {"master_satellites", "org.atalaia.master_satellites"},
+        {"bomb", "org.atalaia.bomb"},
+        {"domination", "org.atalaia.domination"},
+        {"holdall", "org.atalaia.holdall"},
+        {"laststand", "org.atalaia.laststand"},
+        {"codes", "org.atalaia.codes"},
+        {"kill_confirmed", "org.atalaia.kill_confirmed"},
+        {"respawn", "org.atalaia.respawn"},
+        {"player_checkin", "org.atalaia.player_checkin"},
+        {"medic", "org.atalaia.medic"},
+        {"master_satellites", "org.atalaia.master_satellites"},
+        {"hacking_terminal", "org.atalaia.hacking_terminal"},
     };
     enum { BUILTIN_COUNT = sizeof(builtin_modes) / sizeof(builtin_modes[0]) };
     builtin_source_t sources[BUILTIN_COUNT];
@@ -513,6 +520,10 @@ int main(int argc, char **argv)
             button_tracker_update(&buttons, pressed, delta, &runner);
         }
         box_game_tick(&game, delta, now);
+        for (int i = 0; i < runner.queues.screen_count; i++) {
+            const screen_update_t *su = &runner.queues.screens[i];
+            out("SCREEN %s %s", su->template_name, su->data_json);
+        }
         runner.queues.screen_count = 0;
         runner.queues.audio_count = 0;
     }

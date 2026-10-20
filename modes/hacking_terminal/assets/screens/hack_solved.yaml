@@ -1,0 +1,45 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The puzzle is solved. Data: team (the team that solved it, if known), code
+# (the code it reveals, if the game set one), capture (true when the terminal
+# is now that team's and another team can hack it back). Texts in
+# params.lang (pt or en).
+template: hack_solved
+style: { background: "{team || 'panel'}" }
+layout:
+  - type: icon
+    icon: ok
+    style: { font_size: 48, color: contrast }
+  - type: label
+    text: ACESSO CONCEDIDO
+    style: { font_size: 28, color: contrast, visible: "{params.lang != 'en'}" }
+  - type: label
+    text: ACCESS GRANTED
+    style: { font_size: 28, color: contrast, visible: "{params.lang == 'en'}" }
+  - type: label
+    text: "{team|upper}"
+    style: { font_size: 20, color: contrast, visible: "{team}" }
+  - type: label
+    text: Código
+    style:
+      font_size: 14
+      color: contrast
+      visible: "{code && params.lang != 'en'}"
+      padding: { top: 8 }
+  - type: label
+    text: Code
+    style:
+      font_size: 14
+      color: contrast
+      visible: "{code && params.lang == 'en'}"
+      padding: { top: 8 }
+  - type: label
+    text: "{code}"
+    style: { font_size: 48, color: contrast, visible: "{code}" }
+  - type: label
+    text: Outra equipa pode voltar a hackeá-lo
+    style: { font_size: 14, color: contrast, visible: "{capture && params.lang != 'en'}", padding: 6 }
+  - type: label
+    text: Another team can hack it back
+    style: { font_size: 14, color: contrast, visible: "{capture && params.lang == 'en'}", padding: 6 }

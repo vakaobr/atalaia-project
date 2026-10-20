@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+id: org.atalaia.hacking_terminal
+version: 0.1.0
+license: GPL-3.0-or-later
+min_tier: reduced
+name: Hacking Terminal
+description: >-
+  A terminal with a puzzle on its keypad: crack a code from right-place and wrong-place counts, cut the
+  wires in the right order, or repeat a sequence. A wrong answer locks it for a while. Solving it can
+  reveal a code, score points and capture the terminal for the team that solved it; the puzzle comes
+  from the game's seed, so a replay sees the same one.
+roles:
+  terminal: { requires: [keypad], optional: [team_input, team_display, display, audio] }
+params:
+  puzzle:      { type: string, default: code, max: 8, label: "Puzzle: code, wires or sequence" }
+  digits:      { type: int, min: 3, max: 6, default: 4, label: "Length: digits of the code, wires, keys of the sequence" }
+  lockout_s:   { type: int, min: 0, max: 600, default: 10, label: "Seconds the terminal locks after a wrong answer (0: no lock)" }
+  points:      { type: int, min: 0, max: 1000, default: 10, label: "Points for the team that solves it" }
+  reveal_code: { type: string, optional: true, max: 16, label: "Code shown and sent when it is solved (empty: none)" }
+  capture:     { type: bool, default: false, label: "Solving captures the terminal; another team can hack it back" }
+  team:        { type: team, optional: true, label: "Team credited when nobody pressed a team button first (empty: none)" }
+  lang:        { type: string, default: pt, max: 2, label: "Language of the terminal's screen: pt or en" }
+commands:
+  reset: { roles: [terminal], label: "New puzzle" }
+i18n:
+  pt:
+    name: Terminal de Hacking
+    description: >-
+      Um terminal com um enigma no teclado: descobrir um código pelos algarismos no sítio certo e fora do
+      sítio, cortar os fios pela ordem certa, ou repetir uma sequência. Uma resposta errada bloqueia-o
+      durante algum tempo. Resolvê-lo pode revelar um código, dar pontos e capturar o terminal para a
+      equipa que o resolveu; o enigma vem da semente do jogo, por isso uma repetição vê o mesmo.
+    params:
+      puzzle: "Enigma: code (código), wires (fios) ou sequence (sequência)"
+      digits: "Tamanho: algarismos do código, fios, teclas da sequência"
+      lockout_s: "Segundos de bloqueio depois de uma resposta errada (0: sem bloqueio)"
+      points: Pontos para a equipa que o resolve
+      reveal_code: "Código mostrado e enviado quando é resolvido (vazio: nenhum)"
+      capture: Resolver captura o terminal; outra equipa pode voltar a hackeá-lo
+      team: "Equipa creditada quando ninguém premiu primeiro um botão de equipa (vazio: nenhuma)"
+      lang: "Língua do ecrã do terminal: pt ou en"
+    commands:
+      reset: Novo enigma

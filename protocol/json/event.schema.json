@@ -73,6 +73,7 @@
             "node.tamper",
             "pod.connected",
             "pod.disconnected",
+            "hacking.solved",
             "medic.heal",
             "medic.empty"
           ]
@@ -1328,6 +1329,37 @@
       "if": {
         "properties": {
           "type": {
+            "const": "hacking.solved"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "puzzle": {
+                "$ref": "#/$defs/data/puzzle"
+              },
+              "code": {
+                "$ref": "#/$defs/data/code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
             "const": "medic.heal"
           }
         }
@@ -1517,6 +1549,10 @@
       "player_heals_used": {
         "type": "integer",
         "description": "heals a player has had in this game"
+      },
+      "puzzle": {
+        "type": "string",
+        "description": "hacking terminal puzzle: code, wires or sequence"
       }
     }
   }

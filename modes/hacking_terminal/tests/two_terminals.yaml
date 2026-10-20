@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "Two terminals in one game have their own codes (rand() is seeded with the game's seed and the node's id: with seed 2, 8517 and 8312), and each counts its own solution"
+seed: 2
+nodes: { north: terminal, south: terminal }
+params: { lockout_s: 0 }
+steps:
+  - press: { node: south, team: blue }
+  - keys: { node: south, keys: "8517#" }
+  - expect_screen: { node: south, template: hack_code, data: { g1: "8517", r1: 2, c1: 0 } }
+  - keys: { node: south, keys: "8312#" }
+  - expect: { type: hacking.solved, node: south, team: blue }
+  - expect_screen: { node: north, template: hack_code, data: { tries: 0 } }
+  - press: { node: north, team: red }
+  - keys: { node: north, keys: "8517#" }
+  - expect: { type: hacking.solved, node: north, team: red }
+  - expect_score: { team: red, points: 10 }
+  - expect_score: { team: blue, points: 10 }
+  - expect_no: script.error

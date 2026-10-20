@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "Wires: cut in the right order (seed 1: 1, 2, 4, 3); a wrong wire locks the terminal and joins every wire again; the solved screen shows the code it reveals"
+seed: 1
+params: { puzzle: wires, reveal_code: "4711", lockout_s: 20, points: 25 }
+steps:
+  - expect_screen: { template: hack_wires, data: { wires: "1 2 3 4", cut: 0, of: 4, locked: 0 } }
+  - press: { team: blue }
+  - keys: "12"
+  - expect_screen: { template: hack_wires, data: { wires: "- - 3 4", cut: 2, team: blue } }
+  # A wire already cut, a key that is no wire: nothing.
+  - keys: "1095*#"
+  - expect_screen: { template: hack_wires, data: { wires: "- - 3 4", cut: 2, locked: 0 } }
+  - keys: "3"
+  - expect_screen: { template: hack_wires, data: { wires: "1 2 3 4", cut: 0, locked: 20 } }
+  - expect_no: hacking.solved
+  - keys: "1243"
+  - expect_screen: { template: hack_wires, data: { cut: 0, locked: 20 } }
+  - wait: 20
+  - expect_screen: { template: hack_wires, data: { wires: "1 2 3 4", locked: 0 } }
+  - keys: "124"
+  - expect_screen: { template: hack_wires, data: { wires: "- - 3 -", cut: 3 } }
+  - keys: "3"
+  - expect: { type: hacking.solved, team: blue, at: 20, data: { puzzle: wires, code: "4711" } }
+  - expect_score: { team: blue, points: 25 }
+  - expect_screen: { template: hack_solved, data: { team: blue, code: "4711" } }
+  - expect_no: script.error

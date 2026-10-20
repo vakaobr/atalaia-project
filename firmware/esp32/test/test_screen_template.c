@@ -25,7 +25,7 @@ static const char *BOMB = "org.atalaia.bomb {\"attackers\":\"red\",\"fuse_s\":30
 static void test_every_builtin_template_parses(void)
 {
     /* Every mode's templates, Target Windows' too: not a preset yet, ready for the addon (M2-4). */
-    CHECK(builtin_screen_count == 20);
+    CHECK(builtin_screen_count == 24);
     for (int i = 0; i < builtin_screen_count; i++) {
         const builtin_screen_t *s = &builtin_screens[i];
         char err[160];
@@ -68,6 +68,14 @@ static void test_mode_picks_templates(void)
     CHECK(s != NULL && strcmp(s->mode_id, "org.atalaia.master_satellites") == 0);
     CHECK(screen_template_find("master_status") != NULL);
     CHECK(screen_template_find("final_score") == NULL); /* the Field Box's C screen */
+    /* The Hacking Terminal's four screens are its own. */
+    screen_render(SCREEN_MODE_MESSAGE, "org.atalaia.hacking_terminal {\"lang\":\"en\"}");
+    s = screen_template_find("hack_code");
+    CHECK(s != NULL && strcmp(s->mode_id, "org.atalaia.hacking_terminal") == 0);
+    CHECK(screen_template_find("hack_wires") != NULL);
+    CHECK(screen_template_find("hack_sequence") != NULL);
+    CHECK(screen_template_find("hack_solved") != NULL);
+    CHECK(screen_template_find("standby") == NULL);
     screen_render(SCREEN_MODE_MESSAGE, "");
     CHECK(screen_template_find("standby") == NULL);
     /* Parameters too long for the message arrive as "{}". */

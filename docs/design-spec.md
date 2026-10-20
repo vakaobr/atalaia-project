@@ -927,7 +927,7 @@ Modifiers are small packages (`kind: modifier`) that run alongside any main mode
 | Master and Satellites | Field + node | `team_input` | Satellites boost the master zone (each one held adds half the master's points per tick, rounded down: ×1.5 with one), and every satellite goes neutral when the master changes hands; upgradable and engineer-only satellites later (P4R3) | 4 (plan phase 1; built in software) |
 | Target Windows | Node + target addon | `hit`, `led` | Random team-colour scoring window: a hit while the target shows a team's colour scores for that team | 4 (plan phase 2; the logic built in software, the addon not yet: HW2) |
 | VIP / Payload | Node | `gps` or `imu` | Escort a moving prop, or a VIP player tracked by the player app | 4 |
-| Hacking Terminal | Node (Android) | `display` with touch | Solve a puzzle to unlock a code or capture | 4 |
+| Hacking Terminal | Node (box or Android prop) | `keypad` | Solve a puzzle on the keypad (crack a code from right-place and wrong-place counts, cut wires in order, repeat a sequence) to reveal a code, score and capture the terminal; wrong answers lock it for a while; puzzles from the game's seed. A touch-only puzzle waits for a `display.touch` input (P4R5) | 4 (plan phase 4; built in software) |
 
 ### Example: Master and Satellites without the cloud
 

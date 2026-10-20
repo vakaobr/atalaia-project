@@ -152,7 +152,15 @@
     "empty": "Ainda não há acontecimentos.",
     "events": {
       "medic_heal": "{player} recebeu tratamento (ligaduras no kit: {remaining}; tratamentos neste jogo: {used})",
-      "medic_empty": "Um kit de ligaduras ficou vazio"
+      "medic_empty": "Um kit de ligaduras ficou vazio",
+      "hacking_solved": "{team} resolveu um terminal de hacking ({puzzle})",
+      "hacking_solved_code": "{team} resolveu um terminal de hacking ({puzzle}) e recebeu o código {code}",
+      "nobody": "Alguém por identificar"
+    },
+    "puzzles": {
+      "code": "código",
+      "wires": "fios",
+      "sequence": "sequência"
     }
   },
   "nodes": {

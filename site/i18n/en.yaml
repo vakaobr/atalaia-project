@@ -334,6 +334,15 @@ modes:
       scores for that team. The game is written and tested in software; the target addon it needs
       (a plate with a hit sensor and a light ring) is not built yet.
     meta: A box with the target addon · not available yet
+  hacking_terminal:
+    title: Hacking Terminal
+    text: >-
+      A terminal sets a puzzle on its keypad: crack a code from how many digits are in the right
+      place, cut the wires in the right order, or repeat a sequence. A wrong answer locks it for a
+      while. Solving it can reveal a code for another objective, score, and capture the terminal
+      until another team hacks it back. Written and tested in software, not yet played on a phone
+      in the field.
+    meta: A box or a phone with a keypad · works without the field controller
   codes:
     title: Codes (modifier)
     text: >-
@@ -576,7 +585,7 @@ roadmap:
     title: Site server and advanced play
     short: >-
       Site server, game scheduling and registration, custom scenarios, advanced modes, ATAK.
-      Started: the first advanced modes, Master and Satellites and the logic of Target Windows, and geo utilities in the core, and the site server's skeleton, accounts, personal data rights and controller sync are built in software.
+      Started: the first advanced modes, Master and Satellites, the Hacking Terminal and the logic of Target Windows, and geo utilities in the core, and the site server's skeleton, accounts, personal data rights and controller sync are built in software.
     text: >-
       Site server (accounts, game history, the chrono registry, scheduling games, registration and
       publishing), custom scenarios, advanced modes (master and satellite zones, VIP escort, hacking
@@ -585,7 +594,8 @@ roadmap:
     done: >-
       Done in software and tested on a computer, not yet on real boxes or a real server. Modes:
       Master and Satellites (satellites held with the master raise its points; the master
-      changing hands frees them), the rules of Target Windows (a hit while the target shows a
+      changing hands frees them), the Hacking Terminal (a puzzle on the keypad that reveals a code
+      or captures the terminal), the rules of Target Windows (a hit while the target shows a
       team's colour scores for that team; the target addon is not built yet), and geo utilities
       in the core (distances and zones for every script, identical on every platform). Site
       server: its skeleton (database, migrations, health check, in its own container), accounts

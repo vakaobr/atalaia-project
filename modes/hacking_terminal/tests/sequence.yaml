@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "Sequence: any key shows it, one key a second (seed 1: 2, 6, 9, 2); a wrong key locks the terminal and it must be watched again; typing it back solves it"
+seed: 1
+params: { puzzle: sequence, lockout_s: 5, team: red }
+steps:
+  - expect_screen: { template: hack_sequence, data: { phase: idle, of: 4, locked: 0 } }
+  # Keys while nothing is shown and nobody asked: they start the show.
+  - keys: "#"
+  - expect_screen: { template: hack_sequence, data: { phase: show, key: 2, step: 1 } }
+  # Keys during the show do nothing.
+  - keys: "2692"
+  - wait: 1
+  - expect_screen: { template: hack_sequence, data: { phase: show, key: 6, step: 2 } }
+  - wait: 1
+  - expect_screen: { template: hack_sequence, data: { phase: show, key: 9, step: 3 } }
+  - wait: 1
+  - expect_screen: { template: hack_sequence, data: { phase: show, key: 2, step: 4 } }
+  - wait: 1
+  - expect_screen: { template: hack_sequence, data: { phase: input, step: 0 } }
+  - keys: "26"
+  - expect_screen: { template: hack_sequence, data: { phase: input, step: 2 } }
+  # 0 and # are not in a sequence (1-9): ignored (* would show it again).
+  - keys: "0#"
+  - expect_screen: { template: hack_sequence, data: { phase: input, step: 2 } }
+  - keys: "1"
+  - expect_screen: { template: hack_sequence, data: { phase: idle, locked: 5 } }
+  - expect_no: hacking.solved
+  - keys: "5"
+  - expect_screen: { template: hack_sequence, data: { phase: idle, locked: 5 } }
+  - wait: 5
+  - expect_screen: { template: hack_sequence, data: { phase: idle, locked: 0 } }
+  - keys: "5"
+  - wait: 4
+  - expect_screen: { template: hack_sequence, data: { phase: input } }
+  # Nobody pressed a team button: the terminal's team (params.team) solved it.
+  - keys: "2692"
+  - expect: { type: hacking.solved, team: red, at: 13, data: { puzzle: sequence } }
+  - expect_score: { team: red, points: 10 }
+  - expect_no: script.error

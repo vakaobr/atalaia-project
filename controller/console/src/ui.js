@@ -81,10 +81,19 @@ export function commandLabel(mode, name) {
 /** An event in words for the feed, when the language has words for its type (feed.events,
  * keyed by type with the dots as underscores), else ''. */
 export function eventWords(e) {
-    const key = `feed.events.${String(e.type || '').replace(/\./g, '_')}`;
+    let key = `feed.events.${String(e.type || '').replace(/\./g, '_')}`;
     const d = e.data || {};
-    const s = t(key, { team: e.team || '', player: d.player || '', remaining: d.remaining,
-                       used: d.player_heals_used });
+    let team = e.team || '';
+    let puzzle = d.puzzle || '';
+    if (e.type === 'hacking.solved') {
+        // The code a Hacking Terminal reveals is the GM's to see; who solved it may be unknown.
+        if (d.code) key += '_code';
+        team = team || t('feed.events.nobody');
+        const p = t(`feed.puzzles.${puzzle}`);
+        if (!p.startsWith('feed.')) puzzle = p;
+    }
+    const s = t(key, { team, player: d.player || '', remaining: d.remaining,
+                       used: d.player_heals_used, puzzle, code: d.code || '' });
     return s === key ? '' : s;
 }
 

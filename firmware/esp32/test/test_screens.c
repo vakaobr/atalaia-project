@@ -47,6 +47,8 @@ typedef struct {
 #define MEDIC_EN "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"en\"}"
 #define MASTER   "org.atalaia.master_satellites {\"capture_hold_ms\":3000,\"tick_s\":10}"
 #define TARGET   "org.atalaia.target_windows {\"interval_s\":20,\"window_s\":5}"
+#define HACK     "org.atalaia.hacking_terminal {\"digits\":4,\"lockout_s\":10,\"lang\":\"pt\"}"
+#define HACK_EN  "org.atalaia.hacking_terminal {\"digits\":4,\"lockout_s\":10,\"lang\":\"en\"}"
 
 /* Data as the modes (modes/bomb, modes/domination, modes/codes) and the shell send it. */
 static const screen_case_t cases[] = {
@@ -148,6 +150,35 @@ static const screen_case_t cases[] = {
     {"yaml_target_windows_standby", "standby", "{\"hits\":0}", TARGET},
     {"yaml_target_windows_standby_hit", "standby", "{\"team\":\"blue\",\"hits\":3}", TARGET},
     {"yaml_target_windows_window", "window", "{\"team\":\"red\",\"left\":4}", TARGET},
+    /* The Hacking Terminal: each puzzle, a lock, the solved screen with a code, in pt and en. */
+    {"yaml_hack_code", "hack_code",
+     "{\"team\":\"red\",\"typed\":\"8 5 _ _\",\"digits\":4,\"tries\":3,\"locked\":0,"
+     "\"note\":\"enter\",\"g1\":\"8571\",\"r1\":2,\"c1\":2,\"g2\":\"5678\","
+     "\"r2\":0,\"c2\":2,\"g3\":\"1234\",\"r3\":0,\"c3\":1}",
+     HACK},
+    {"yaml_hack_code_locked_en", "hack_code",
+     "{\"owner\":\"blue\",\"typed\":\"_ _ _ _ _ _\",\"digits\":6,\"tries\":1,\"locked\":7,"
+     "\"note\":\"enter\",\"g1\":\"012345\",\"r1\":1,\"c1\":3}",
+     HACK_EN},
+    {"yaml_hack_wires", "hack_wires",
+     "{\"team\":\"blue\",\"wires\":\"- - 3 4 - 6\",\"cut\":3,\"of\":6,\"locked\":0}", HACK},
+    {"yaml_hack_wires_yours", "hack_wires",
+     "{\"team\":\"red\",\"owner\":\"red\",\"wires\":\"1 2 3\",\"cut\":0,\"of\":3,\"locked\":0,"
+     "\"note\":\"yours\"}",
+     HACK},
+    {"yaml_hack_wires_locked_en", "hack_wires",
+     "{\"wires\":\"1 2 3 4\",\"cut\":0,\"of\":4,\"locked\":20}", HACK_EN},
+    {"yaml_hack_sequence_show", "hack_sequence",
+     "{\"phase\":\"show\",\"key\":6,\"step\":2,\"of\":4,\"locked\":0}", HACK},
+    {"yaml_hack_sequence_input_en", "hack_sequence",
+     "{\"team\":\"yellow\",\"owner\":\"red\",\"phase\":\"input\",\"step\":2,\"of\":5,"
+     "\"locked\":0}",
+     HACK_EN},
+    {"yaml_hack_sequence_idle", "hack_sequence",
+     "{\"phase\":\"idle\",\"step\":0,\"of\":4,\"locked\":0}", HACK},
+    {"yaml_hack_solved", "hack_solved", "{\"team\":\"red\",\"code\":\"4711\",\"capture\":true}",
+     HACK},
+    {"yaml_hack_solved_en", "hack_solved", "{\"capture\":false}", HACK_EN},
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))
 

@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: "The code comes from the game's seed: with seed 7 it is 9582, so seed 2's 8517 is wrong"
+seed: 7
+params: { lockout_s: 0 }
+steps:
+  - keys: "8517#"
+  - expect_screen: { template: hack_code, data: { g1: "8517", r1: 1, c1: 1 } }
+  - expect_no: hacking.solved
+  - keys: "9582#"
+  - expect: { type: hacking.solved, data: { puzzle: code } }
+  - expect_no: script.error

@@ -152,7 +152,15 @@
     "empty": "No events yet.",
     "events": {
       "medic_heal": "{player} was healed (heals left in the kit: {remaining}; heals in this game: {used})",
-      "medic_empty": "A medic kit is empty"
+      "medic_empty": "A medic kit is empty",
+      "hacking_solved": "{team} solved a hacking terminal ({puzzle})",
+      "hacking_solved_code": "{team} solved a hacking terminal ({puzzle}) and got the code {code}",
+      "nobody": "Nobody known"
+    },
+    "puzzles": {
+      "code": "code",
+      "wires": "wires",
+      "sequence": "sequence"
     }
   },
   "nodes": {
