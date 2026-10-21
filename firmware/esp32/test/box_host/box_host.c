@@ -18,7 +18,11 @@
  *
  *   box_host --state-dir DIR --modes DIR [--air-port N] [--air-peer N]
  *            [--join-key HEX] [--state-ms N] [--name NAME]
- *            [--as-box VERSION] [--release-keys HEX]
+ *            [--as-box VERSION] [--release-keys HEX] [--admin-pin PIN] [--mac MAC]
+ *
+ * Without --join-key (and no key stored in DIR) the box is unadopted
+ * (main/adoption.c, protocol/adoption.md); --admin-pin (1234) and --mac
+ * (02:00:00:00:00:01) are what "@adopt" checks and "@adopt-info" reports.
  *
  * --as-box VERSION: HELLO says a Field Box (esp32s3, full tier) running VERSION, so
  * the controller offers it firmware updates; a CMD update then prints
@@ -27,7 +31,10 @@
  *
  * stdin, one command per line:
  *   @join atalaia:join:...      join (as typed on the serial console)
- *   @joinkey <64 hex>           set the field join key
+ *   @joinkey <64 hex>           set the field join key (the adoption rules: never another field's)
+ *   @adopt-info                 one "ATALAIA-ADOPT {json}" line: name, MAC, adoption state
+ *   @adopt <64 hex> [<PIN>|-] [<field name>]  USB adoption; answers "ATALAIA-ADOPT {json}"
+ *   card <hex>                  an NFC tag's memory on the reader (a field card adopts the box)
  *   @tag <uid hex> [<tag hex>]  a player tag read (as the NFC reader would, in a game)
  *   hold <button 1-4> <ms>      hold a team button for ms, then release it
  *   keys <0-9*#...>             keypad presses (keypad.key events to the mode)
@@ -53,6 +60,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "adoption.h"
 #include "atalaia/version.h"
 #include "box_game.h"
 #include "builtin_presets.h"
@@ -241,6 +249,23 @@ static int shell_battery(void *user)
 
 static box_game_t game;
 
+/* ---- Adoption (adoption.h): the join key and the field's name in "NVS" ------------ */
+
+static adoption_t adopt;
+
+static bool adopt_busy(void *ctx)
+{
+    (void)ctx;
+    return box_game_active(&game);
+}
+
+static bool adopt_store(void *ctx, const uint8_t key[ADOPTION_KEY_SIZE], const char *name)
+{
+    (void)ctx;
+    return box_game_set_join_key(&game, key) &&
+           write_file("field_name", (const uint8_t *)name, strlen(name)) == 0;
+}
+
 const fw_desc_t atalaia_fw_desc = {
     .magic = {'A', 'T', 'F', 'W'}, .format = 1, .variant = "box", .board = "heltec_v4_3"};
 static char fw_version[32] = "host"; /* HELLO's fw_version, as esp_app_desc_t's */
@@ -353,9 +378,15 @@ int main(int argc, char **argv)
     const char *modes = NULL;
     const char *join_key_hex = NULL;
     const char *name = "box-host";
+    const char *admin_pin = "1234";
+    const char *mac = "02:00:00:00:00:01";
     bool as_box = false;
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--air-port") == 0) {
+        if (strcmp(argv[i], "--admin-pin") == 0 && i + 1 < argc) {
+            admin_pin = argv[++i];
+        } else if (strcmp(argv[i], "--mac") == 0 && i + 1 < argc) {
+            mac = argv[++i];
+        } else if (strcmp(argv[i], "--air-port") == 0) {
             air_port = arg_value(argc, argv, &i);
         } else if (strcmp(argv[i], "--air-peer") == 0) {
             peer_port = arg_value(argc, argv, &i);
@@ -476,7 +507,15 @@ int main(int argc, char **argv)
         fprintf(stderr, "box_host: --join-key needs 64 hex digits\n");
         return 2;
     }
-    box_game_load_join_key(&game);
+    adoption_ops_t aops = {adopt_busy, adopt_store, shell_screen, shell_log, NULL};
+    adoption_init(&adopt, &aops, admin_pin);
+    adoption_identity_t adopt_id = {name, mac, fw_version};
+    if (box_game_load_join_key(&game)) {
+        char field_name[ADOPTION_NAME_MAX + 1];
+        int n = read_file("field_name", (uint8_t *)field_name, ADOPTION_NAME_MAX);
+        field_name[n > 0 ? n : 0] = '\0';
+        adoption_restore(&adopt, game.join_key, field_name);
+    }
     game.state_interval_ms = (uint32_t)state_ms;
 
     uint32_t last = mono_ms();
@@ -528,10 +567,19 @@ int main(int argc, char **argv)
                         box_join_result_t r = box_game_join_text(&game, command + 5);
                         out("LOG join: %s", box_join_result_name(r));
                         button_tracker_init(&buttons, game.teams, game.join.team_count);
-                    } else if (strncmp(command, "joinkey ", 8) == 0) {
-                        out("LOG join key %s", box_game_set_join_key_hex(&game, command + 8)
-                                                   ? "stored"
-                                                   : "refused (64 hex digits)");
+                    } else if (strncmp(command, "joinkey ", 8) == 0 ||
+                               strncmp(command, "adopt", 5) == 0) {
+                        /* "@adopt-info", "@adopt ...", "@joinkey ...": the box's own rules. */
+                        static char reply[ADOPTION_REPLY_MAX];
+                        if (adoption_command(&adopt, command, &adopt_id, now, reply,
+                                             sizeof(reply))) {
+                            if (strncmp(reply, ADOPTION_REPLY_PREFIX,
+                                        sizeof(ADOPTION_REPLY_PREFIX) - 1) == 0) {
+                                out("%s", reply);
+                            } else {
+                                out("LOG %s", reply);
+                            }
+                        }
                     } else if (strncmp(command, "tag ", 4) == 0) {
                         out("LOG tag %s",
                             box_game_tag_text(&game, command + 4) ? "read" : "not read");
@@ -550,11 +598,25 @@ int main(int argc, char **argv)
                         release_at[b - 1] = now + ms;
                     } else if (strncmp(line, "keys ", 5) == 0) {
                         /* Keypad presses, as the shell sends them to a running mode. */
-                        for (const char *k = line + 5; *k && runner.running; k++) {
+                        for (const char *k = line + 5; *k; k++) {
+                            /* An admin PIN for another field's card first, as the shell does. */
+                            if (adoption_active(&adopt) && adoption_key(&adopt, *k, now)) continue;
+                            if (!runner.running) continue;
                             char json[16];
                             snprintf(json, sizeof(json), "{\"key\":\"%c\"}", *k);
                             node_runner_input(&runner, "keypad.key", json);
                         }
+                    } else if (strncmp(line, "card ", 5) == 0) {
+                        /* An NFC tag's memory (hex, from page 4) on the reader, between games. */
+                        static uint8_t mem[888];
+                        size_t n = 0;
+                        unsigned v;
+                        for (const char *h = line + 5; n < sizeof(mem) && sscanf(h, "%2x", &v) == 1;
+                             h += 2) {
+                            mem[n++] = (uint8_t)v;
+                        }
+                        adopt_result_t r;
+                        if (!adoption_tap(&adopt, mem, n, now, &r)) out("LOG card: no field card");
                     } else if (sscanf(line, "battery %d", &b) == 1) {
                         battery = b < 0 ? -1 : b > 100 ? 100 : b;
                     } else if (strcmp(line, "status") == 0) {
@@ -577,6 +639,7 @@ int main(int argc, char **argv)
             button_tracker_update(&buttons, pressed, delta, &runner);
         }
         box_game_tick(&game, delta, now);
+        adoption_tick(&adopt, now);
         for (int i = 0; i < runner.queues.screen_count; i++) {
             const screen_update_t *su = &runner.queues.screens[i];
             out("SCREEN %s %s", su->template_name, su->data_json);

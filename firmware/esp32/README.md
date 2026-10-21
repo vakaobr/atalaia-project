@@ -403,9 +403,10 @@ Field game options (under "Field network games"):
 - `ATALAIA_STATE_INTERVAL_S` -- seconds between STATE packets in a joined game (default 15)
 - `ATALAIA_BATTERY_LOW_PCT` -- send `battery.low` below this battery level (default 20; 0 = never; only with a MAX17048 gauge)
 - `ATALAIA_SERIAL_JOIN` -- accept `@join`, `@joinkey`, `@tag`, `@wifi` and `@update` lines on the serial console (default on)
+- `ATALAIA_SERIAL_ADOPT` -- accept `@adopt-info` and `@adopt` on the serial console: USB adoption by the field controller (default on; protocol/adoption.md)
 - `ATALAIA_CONSOLE_USB_INPUT` -- read the console input from the USB-C port (USB-Serial-JTAG, the Heltec V4's only USB) as well as UART0 (default on; off in the Wokwi build)
 - `ATALAIA_LED_BRIGHTNESS_PCT` -- LED ring brightness at boot (default 40%; under "LEDs")
-- `ATALAIA_DEV_JOIN_KEY` -- a development field join key, used only when none is stored (set in `sdkconfig.wokwi` only)
+- `ATALAIA_DEV_JOIN_KEY` -- a development field join key, used only when none is stored (set in `sdkconfig.wokwi` only); a box with only this key counts as unadopted
 
 Firmware update options (under "Firmware updates (OTA)", the Field Box only):
 - `ATALAIA_OTA_RELEASE_KEYS` -- the Ed25519 public keys (64 hex digits each, up to 4) whose releases the box installs; empty (the default until the project's release key exists): every update is refused
@@ -622,11 +623,29 @@ controller's game.
   ([protocol/join.md](../../protocol/join.md)) arrives on an NFC card (the
   PN532 reads the NTAG215/216 user memory: `hal_esp_nfc.c`) or as a line on
   the serial console, `@join atalaia:join:...`. Its tag is checked with the
-  **field join key**, which the box gets once: on the setup portal's optional
-  "field join key" field, or with `@joinkey <64 hex digits>` on the serial
-  console while no game is joined. The verified payload (game key included)
+  **field join key**, which the box gets once, when the field adopts it (next
+  item). The verified payload (game key included)
   is stored in NVS, the radio tunes to the game's channel, and the box sends
   HELLO and shows "Joined game N" until the controller starts the game.
+- **Adoption** -- `main/adoption.c` ([protocol/adoption.md](../../protocol/adoption.md),
+  decisions AD-*): how the box gets the field join key. An **NFC field card**
+  (MIME type `application/vnd.atalaia.field`: the key, the field's name and
+  an 8-byte check; the console's *Adopt* tab makes it) tapped between games,
+  or the **USB cable** from the field controller, which sends `@adopt-info`
+  (one `ATALAIA-ADOPT {json}` line: name, MAC, state) and `@adopt <64 hex>
+  [<admin PIN>|-] [<field name>]`; `@joinkey <64 hex>` and the setup
+  portal's field follow the same rules. An unadopted box (none stored; a
+  development key does not count) takes the first field; an adopted box takes
+  the same field again and another field's key only with its admin PIN (on
+  the keypad after the card, or in `@adopt`; five wrong ones lock it until a
+  restart); nothing while a game is joined or played, and a field card tapped
+  during a game is ignored, never a player tag. The screen shows ADOPTED with
+  the field's name and its key's fingerprint (`XXXX-XXXX`), or asks for the
+  PIN. The key stays in the "radio" NVS namespace, the name in `field_name`;
+  production boxes need NVS and flash encryption and secure boot (the
+  protocol document, section 2). Host tests: `test/test_adoption.c` against
+  `protocol/vectors/field_card.json`. In software; the field card not yet
+  read by a real PN532, the cable not yet used from a real controller.
 - **The game** -- on the controller's CMD start (or a TIME beacon that shows
   the game running), the box loads the mode for its role with the join's
   teams, parameters, node id and seed; CMD pause, resume and end, TIME, and

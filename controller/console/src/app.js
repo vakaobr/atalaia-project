@@ -13,6 +13,7 @@ import { LiveFeed } from './components/live-feed.js';
 import { NodeList } from './components/node-list.js';
 import { FieldView } from './components/field-view.js';
 import { JoinPanel } from './components/join-panel.js';
+import { AdoptPanel } from './components/adopt-panel.js';
 import { PresetBuilder } from './components/preset-builder.js';
 import { ScenarioBuilder } from './components/scenario-builder.js';
 import { RadioSettings } from './components/radio-settings.js';
@@ -20,7 +21,7 @@ import { FirmwarePanel } from './components/firmware-panel.js';
 import { CheckinPanel } from './components/checkin-panel.js';
 import { BrandingSettings, TeamPresets, FieldBrand, accentRef } from './components/branding-settings.js';
 
-const TABS = ['game', 'checkin', 'field', 'nodes', 'join', 'presets', 'scenarios', 'feed', 'controller', 'settings'];
+const TABS = ['game', 'checkin', 'field', 'nodes', 'join', 'adopt', 'presets', 'scenarios', 'feed', 'controller', 'settings'];
 const FEED_MAX = 500;
 const ALERTS_MAX = 50;
 const HISTORY_MAX = 240;
@@ -406,6 +407,8 @@ class App extends Component {
             return html`<${NodeList} app=${this} /><${FirmwarePanel} app=${this} />`;
         case 'join':
             return html`<${JoinPanel} app=${this} />`;
+        case 'adopt':
+            return html`<${AdoptPanel} app=${this} />`;
         case 'presets':
             return html`<${PresetBuilder} app=${this} />`;
         case 'scenarios':

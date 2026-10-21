@@ -48,6 +48,7 @@ int main(void)
     run_screen_template_tests();
     run_pod_tests();
     run_fw_update_tests();
+    run_adoption_tests();
 
     if (check_failures == 0) {
         printf("firmware: all %d checks passed\n", check_count);

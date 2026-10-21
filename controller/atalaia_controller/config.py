@@ -72,6 +72,14 @@
     key = ""                    # the field join key, 64 hex digits (protocol/join.md);
                                 # empty: generated on first start (see `join-key`)
 
+    [adopt]                     # adopting boxes (protocol/adoption.md): the field card and the USB cable
+    usb = true                  # look for Field Boxes plugged in by USB (Espressif USB-Serial-JTAG,
+                                # 303a:1001; the modem's own port is never touched) when the GM
+                                # asks in the console's Adopt tab
+    usb_ports = []              # more ports to look at, e.g. "socket://host.docker.internal:7001"
+                                # (a COM-to-TCP bridge on the Docker host); from the environment,
+                                # separated by commas
+
     [sync]                      # the site server (ADR-P4-3, protocol/sync.md); the controller
                                 # opens every connection and the game never waits for it
     enabled = false
@@ -149,6 +157,7 @@ SECTIONS = {
                 "retention_days"),
     "atak": ("enabled", "multicast", "interval_s", "staff_endpoints", "players", "remote", "remote_players"),
     "firmware": ("release_keys", "dir", "update_timeout_s", "variants"),
+    "adopt": ("usb", "usb_ports"),
 }
 
 
@@ -238,6 +247,9 @@ class Config:
     firmware_dir: str = ""
     firmware_update_timeout_s: float = 600.0
     firmware_variants: list[str] = field(default_factory=lambda: ["box"])
+    # [adopt]
+    adopt_usb: bool = True
+    adopt_usb_ports: list[str] = field(default_factory=list)
 
     def validate(self) -> None:
         if not 0 <= self.node_id <= 0xFFFE:
@@ -269,6 +281,11 @@ class Config:
         _check_sync(self)
         _check_atak(self)
         _check_firmware(self)
+        if len(self.adopt_usb_ports) > 8 or not all(
+                re.fullmatch(r"(/dev/[\w./:-]{1,120}|socket://[\w.\[\]:-]{1,120}|COM\d{1,3})", p)
+                for p in self.adopt_usb_ports):
+            raise ConfigError("adopt.usb_ports: at most 8 serial ports, each /dev/..., COMn or "
+                              "socket://host:port (a COM-to-TCP bridge)")
         if self.join_key:
             try:
                 ok = len(bytes.fromhex(self.join_key)) == 32
@@ -368,8 +385,9 @@ _ATTR.update({("sync", k): f"sync_{k}" for k in SECTIONS["sync"]})
 _ATTR.update({("atak", k): f"atak_{k}" for k in SECTIONS["atak"]})
 _ATTR.update({("health", k): f"health_{k}" for k in SECTIONS["health"]})
 _ATTR.update({("firmware", k): f"firmware_{k}" for k in SECTIONS["firmware"]})
+_ATTR.update({("adopt", k): f"adopt_{k}" for k in SECTIONS["adopt"]})
 # Lists whose items contain ":" (host:port) or "/" (base64): from the environment they are separated by commas.
-COMMA_LISTS = {"atak_staff_endpoints", "firmware_release_keys"}
+COMMA_LISTS = {"atak_staff_endpoints", "firmware_release_keys", "adopt_usb_ports"}
 
 
 def _attr(section: str, key: str) -> str:

@@ -159,6 +159,7 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/box_game.c
     ${SHELL_DIR}/serial_console.c
     ${SHELL_DIR}/fw_update.c
+    ${SHELL_DIR}/adoption.c
     ${SHELL_DIR}/hal/board_fem.c
     ${SHELL_DIR}/modem/modem.c
     ${SHELL_DIR}/modem/modem_framing.c
@@ -209,6 +210,7 @@ set(TEST_SOURCES
     test_screen_template.c
     test_pod.c
     test_fw_update.c
+    test_adoption.c
 )
 
 # ---- Executable --------------------------------------------------------------

@@ -23,6 +23,7 @@ const SHELL = [
     'poster.css',
     'i18n/pt.json',
     'i18n/en.json',
+    'components/adopt-panel.js',
     'components/branding-settings.js',
     'components/checkin-panel.js',
     'components/field-view.js',

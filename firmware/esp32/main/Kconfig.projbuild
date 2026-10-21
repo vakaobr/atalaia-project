@@ -622,6 +622,20 @@ menu "Atalaia Field Box Configuration"
                 CMD update does (protocol/firmware-update.md): the same checks. For bring-up and the
                 Wokwi emulator; a join still needs a payload signed with this
                 box's field join key, and a tag one signed with the game key.
+                "@joinkey" follows the adoption rules (protocol/adoption.md):
+                it never replaces another field's key.
+
+        config ATALAIA_SERIAL_ADOPT
+            bool "Accept @adopt-info and @adopt lines on the serial console (USB adoption)"
+            default y
+            help
+                The field controller adopts a box plugged into it by USB
+                (protocol/adoption.md): "@adopt-info" answers one line
+                "ATALAIA-ADOPT {json}" with the box's name, MAC and adoption
+                state, and "@adopt <64 hex> [<admin PIN>|-] [<field name>]"
+                stores the field join key under the adoption rules (an
+                unadopted box takes it; another field's box only with its
+                admin PIN). On in every Field Box build.
 
         config ATALAIA_DEV_JOIN_KEY
             string "Development field join key (64 hex digits)"
@@ -629,8 +643,9 @@ menu "Atalaia Field Box Configuration"
             help
                 Used only when no field join key is stored in NVS: for the
                 Wokwi emulator and the bench. Leave empty on Field Boxes, which
-                get the field's key once, with "@joinkey" or (later) the setup
-                portal; `python -m atalaia_controller join-key` prints it.
+                are adopted by their field (protocol/adoption.md: the field
+                card, the USB cable, "@joinkey"). A box with only this key
+                counts as unadopted: the first field to adopt it replaces it.
     endmenu
 
     # ---- Firmware updates over the air (protocol/firmware-update.md) --------

@@ -1,0 +1,135 @@
+{
+  "description": "NFC field card vectors (protocol/adoption.md): version 1, name length, name (UTF-8, 0-48 bytes), the field join key (32), check = HMAC-SHA256(key, \"atalaia-field-card\" | version | name length | name)[:8]. Every valid card decodes to its key and name, re-encodes byte for byte, has the fingerprint HMAC-SHA256(key, \"atalaia-field-fingerprint\")[:4] as XXXX-XXXX, and is found in ndef_tag (an NTAG215/216's memory from page 4, MIME type application/vnd.atalaia.field), where a join card reader finds nothing. Every invalid one fails with its reason (length, version, name, check). Made by hand from the specification with Python's hmac, not by either codec.",
+  "ndef_type": "application/vnd.atalaia.field",
+  "valid": [
+    {
+      "name": "named",
+      "join_key": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "field_name": "Campo da Atalaia",
+      "fingerprint": "604A-0A95",
+      "payload": "011043616d706f206461204174616c616961000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1fec92afd4e6ac026f",
+      "ndef_tag": "035ad21d3a6170706c69636174696f6e2f766e642e6174616c6169612e6669656c64011043616d706f206461204174616c616961000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1fec92afd4e6ac026ffe"
+    },
+    {
+      "name": "unnamed",
+      "join_key": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "field_name": "",
+      "fingerprint": "604A-0A95",
+      "payload": "0100000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f6a6579f5840b8ab3",
+      "ndef_tag": "034ad21d2a6170706c69636174696f6e2f766e642e6174616c6169612e6669656c640100000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f6a6579f5840b8ab3fe"
+    },
+    {
+      "name": "utf8_name_other_key",
+      "join_key": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+      "field_name": "Clube Ão — Évora",
+      "fingerprint": "DA4E-F9E1",
+      "payload": "0114436c75626520c3836f20e2809420c389766f72610102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2098dd18f33926ace5",
+      "ndef_tag": "035ed21d3e6170706c69636174696f6e2f766e642e6174616c6169612e6669656c640114436c75626520c3836f20e2809420c389766f72610102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2098dd18f33926ace5fe"
+    },
+    {
+      "name": "longest_name",
+      "join_key": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "field_name": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "fingerprint": "604A-0A95",
+      "payload": "0130414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f17036a39dafc1c88",
+      "ndef_tag": "037ad21d5a6170706c69636174696f6e2f766e642e6174616c6169612e6669656c640130414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f17036a39dafc1c88fe"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "empty",
+      "payload": "",
+      "reason": "length"
+    },
+    {
+      "name": "too_short",
+      "payload": "010543616d706f000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f970d",
+      "reason": "length"
+    },
+    {
+      "name": "too_long",
+      "payload": "0130414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f17036a39dafc1c8800",
+      "reason": "length"
+    },
+    {
+      "name": "version_0",
+      "payload": "000543616d706f000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f970da2b1da02b694",
+      "reason": "version"
+    },
+    {
+      "name": "version_2",
+      "payload": "020543616d706f000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f970da2b1da02b694",
+      "reason": "version"
+    },
+    {
+      "name": "name_length_too_big",
+      "payload": "010643616d706f000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f970da2b1da02b694",
+      "reason": "length"
+    },
+    {
+      "name": "name_length_too_small",
+      "payload": "010443616d706f000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f970da2b1da02b694",
+      "reason": "length"
+    },
+    {
+      "name": "name_over_48",
+      "payload": "013141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1fa60d41fc16c91e8e",
+      "reason": "length"
+    },
+    {
+      "name": "name_control_char",
+      "payload": "010643616d0a706f000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1fde3bee6df00efda9",
+      "reason": "name"
+    },
+    {
+      "name": "name_nul",
+      "payload": "010643616d00706f000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f30efbf65083dc1f4",
+      "reason": "name"
+    },
+    {
+      "name": "name_quote",
+      "payload": "010643616d22706f000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f1e41a02d42c320d5",
+      "reason": "name"
+    },
+    {
+      "name": "name_backslash",
+      "payload": "010643616d5c706f000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f4b353a00fe6ba5dc",
+      "reason": "name"
+    },
+    {
+      "name": "name_del",
+      "payload": "010643616d7f706f000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f3627f7b22838d25a",
+      "reason": "name"
+    },
+    {
+      "name": "name_bad_utf8",
+      "payload": "010643616dc3706f000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1fba048be2755f0e94",
+      "reason": "name"
+    },
+    {
+      "name": "name_overlong_utf8",
+      "payload": "010743616dc0af706f000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f5f35511542f849e7",
+      "reason": "name"
+    },
+    {
+      "name": "name_surrogate_utf8",
+      "payload": "0103eda080000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1fc3691a23acdbdd8f",
+      "reason": "name"
+    },
+    {
+      "name": "check_flipped",
+      "payload": "010543616d706f000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f970da2b1da02b695",
+      "reason": "check"
+    },
+    {
+      "name": "key_flipped",
+      "payload": "010543616d706f800102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f970da2b1da02b694",
+      "reason": "check"
+    },
+    {
+      "name": "name_changed",
+      "payload": "010543616d7069000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f970da2b1da02b694",
+      "reason": "check"
+    }
+  ]
+}

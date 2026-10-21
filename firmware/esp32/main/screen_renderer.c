@@ -393,11 +393,20 @@ static void update_status(const char *data)
         snprintf(rows[n][0], LIST_ITEM_MAX, "Game");
         snprintf(rows[n++][1], LIST_ITEM_MAX, "%s", buf);
     }
-    if (screen_json_int(data, "timer_s", &v)) {
+    /* Adoption (adoption.c): the field and its key's fingerprint. */
+    if (n < STATUS_ROWS && screen_json_str(data, "field", buf, sizeof(buf)) && buf[0]) {
+        snprintf(rows[n][0], LIST_ITEM_MAX, "Field");
+        snprintf(rows[n++][1], LIST_ITEM_MAX, "%s", buf);
+    }
+    if (n < STATUS_ROWS && screen_json_str(data, "fingerprint", buf, sizeof(buf)) && buf[0]) {
+        snprintf(rows[n][0], LIST_ITEM_MAX, "Key");
+        snprintf(rows[n++][1], LIST_ITEM_MAX, "%s", buf);
+    }
+    if (n < STATUS_ROWS && screen_json_int(data, "timer_s", &v)) {
         snprintf(rows[n][0], LIST_ITEM_MAX, "Timer");
         format_minutes(v, rows[n++][1], LIST_ITEM_MAX);
     }
-    if (screen_json_int(data, "battery", &v) && v >= 0) {
+    if (n < STATUS_ROWS && screen_json_int(data, "battery", &v) && v >= 0) {
         snprintf(rows[n][0], LIST_ITEM_MAX, "Battery");
         snprintf(rows[n++][1], LIST_ITEM_MAX, "%ld%%", v);
     }
@@ -434,6 +443,12 @@ static void build_pin_entry(lv_obj_t *scr)
 
 static void update_pin_entry(const char *data)
 {
+    /* "prompt" replaces the line above the dots (adoption: "PIN to change field"). */
+    char prompt[LIST_ITEM_MAX];
+    if (!screen_json_str(data, "prompt", prompt, sizeof(prompt)) || !prompt[0]) {
+        snprintf(prompt, sizeof(prompt), "Enter the admin PIN");
+    }
+    lv_label_set_text(slot[0], prompt);
     long digits = 0;
     screen_json_int(data, "digits", &digits);
     if (digits < 0) digits = 0;

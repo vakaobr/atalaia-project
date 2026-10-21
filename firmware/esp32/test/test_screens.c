@@ -78,6 +78,11 @@ static const screen_case_t cases[] = {
      NULL},
     {"pin_entry", "pin_entry", "{\"digits\":2,\"error\":false}", NULL},
     {"pin_entry_wrong", "pin_entry", "{\"digits\":0,\"error\":true}", NULL},
+    /* Adoption (adoption.c, protocol/adoption.md): adopted, and another field's card. */
+    {"status_adopted", "status",
+     "{\"title\":\"Adopted\",\"field\":\"Campo da Atalaia\",\"fingerprint\":\"604A-0A95\"}", NULL},
+    {"pin_entry_field", "pin_entry",
+     "{\"digits\":3,\"error\":false,\"prompt\":\"PIN to change field\"}", NULL},
     {"preset_select", "preset_select", "{\"presets\":[\"Bomb\",\"Domination\"],\"selected\":1}",
      NULL},
     {"preset_select_long", "preset_select",

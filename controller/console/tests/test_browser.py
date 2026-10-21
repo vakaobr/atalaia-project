@@ -355,6 +355,74 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertEqual(preset["mode_id"], "org.atalaia.bomb+org.atalaia.codes")
         self.assertEqual((preset["params"]["team_codes"], preset["params"]["codes"]), ("red=1234,blue=5678", "0815:hint"))
 
+    def test_adopt_tab_field_card_and_usb(self):
+        """Adopting boxes (protocol/adoption.md): the Adopt tab shows the field's fingerprint, makes the
+        NFC field card with its warning (the bytes decode to the field join key), and adopts two C host
+        boxes reached as socket:// ports (a COM-to-TCP bridge): an unadopted one, then one of another
+        field with its admin PIN (the page asks for it); the records list both; in both languages; a read
+        token sees none of it."""
+        sys.path.insert(0, str(CONTROLLER / "tests"))
+        from test_adoption import OTHER, BridgedBox  # noqa: PLC0415
+
+        from atalaia_sim import field_card  # noqa: PLC0415
+
+        boxes = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, boxes, True)
+        (boxes / "new").mkdir()
+        (boxes / "stranger").mkdir()
+        new = BridgedBox(str(boxes / "new"), mac="02:00:00:00:00:0A", name="porta-norte")
+        self.addCleanup(new.close)
+        stranger = BridgedBox(str(boxes / "stranger"), join_key=OTHER, mac="02:00:00:00:00:0B", name="vizinho")
+        self.addCleanup(stranger.close)
+        self.field.bundle.cfg.adopt_usb_ports = [new.url, stranger.url]
+        self.field.bundle.controller.adoption.lister = lambda: []
+
+        page = self.console()
+        page.get_by_test_id("tab-adopt").click()
+        expect(page.get_by_test_id("tab-adopt")).to_have_text("Adotar")
+        expect(page.get_by_test_id("adopt-field")).to_contain_text("604A-0A95")
+        expect(page.get_by_test_id("adopt-card-warning")).to_contain_text("segredo-mestre")
+        expect(page.get_by_test_id("adopt-card-lost")).to_contain_text("join-key --rotate")
+        expect(page.get_by_test_id("adopt-code")).to_be_visible()
+
+        page.get_by_test_id("adopt-card-make").click()
+        ndef = page.get_by_test_id("adopt-card-ndef").inner_text().strip()
+        card = field_card.decode(field_card.from_ndef_tag(bytes.fromhex(ndef)))
+        self.assertEqual(card["join_key"], JOIN_KEY)
+
+        page.get_by_test_id("adopt-scan").click()
+        row = page.get_by_test_id("adopt-box-02:00:00:00:00:0A")
+        expect(row).to_contain_text("porta-norte")
+        expect(row).to_contain_text("não adotada")
+        other = page.get_by_test_id("adopt-box-02:00:00:00:00:0B")
+        expect(other).to_contain_text(f"adotada por outro campo: — ({field_card.fingerprint(OTHER)})")
+        row.get_by_test_id("adopt-box-adopt").click()
+        expect(page.get_by_test_id("adopt-confirm")).to_contain_text("porta-norte (02:00:00:00:00:0A)")
+        expect(page.get_by_test_id("adopt-pin")).to_have_count(0)
+        page.get_by_test_id("adopt-confirm-yes").click()
+        expect(page.get_by_test_id("adopt-result")).to_contain_text("está adotada")
+        expect(row).to_contain_text("adotada por este campo")
+        self.assertEqual((boxes / "new" / "join_key").read_bytes(), JOIN_KEY)
+
+        other.get_by_test_id("adopt-box-adopt").click()
+        page.get_by_test_id("adopt-pin").fill("1234")
+        page.get_by_test_id("adopt-confirm-yes").click()
+        expect(page.get_by_test_id("adopt-result")).to_contain_text("passou para este campo")
+        self.assertEqual((boxes / "stranger" / "join_key").read_bytes(), JOIN_KEY)
+        expect(page.get_by_test_id("adopt-log")).to_contain_text("vizinho (02:00:00:00:00:0B)")
+        expect(page.get_by_test_id("adopt-log")).to_contain_text("cartão de campo")
+
+        page.get_by_test_id("lang").first.select_option("en")
+        expect(page.get_by_test_id("adopt-card-warning")).to_contain_text("master secret")
+        expect(other).to_contain_text("adopted by this field")
+        self.no_horizontal_scroll(page)
+
+        # A read token sees no adoption at all.
+        read = self.console(READ)
+        read.get_by_test_id("tab-adopt").click()
+        expect(read.get_by_test_id("adopt-scan")).to_have_count(0)
+        expect(read.get_by_test_id("adopt-card-make")).to_have_count(0)
+
     def test_firmware_update_from_the_boxes_tab(self):
         """Firmware updates (protocol/firmware-update.md): the GM uploads a signed release in the
         Boxes tab and updates a box before the game starts; the CMD update goes on the air; the box's

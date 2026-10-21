@@ -22,7 +22,9 @@ A reader checks the tag first, in constant time, and reads the body only if it m
 ADR-P2-2 and ADR-P2-12 authenticate the payload with "the controller's long-term key", so every reader must hold the same key. It is a 32-byte random **field join key**, made once per field (not per game):
 
 - the field controller generates it on first start and keeps it in its store; `python -m atalaia_controller join-key` prints it as 64 hex digits, and `[join] key = "..."` in `controller.toml` sets it (so a second controller can share it);
-- a box gets it once, when the field owner sets the box up (decision E2 in `docs/review/decisions-to-review.md`), and keeps it in encrypted NVS next to the game key.
+- a box gets it once, when the field **adopts** it ([adoption.md](adoption.md), decisions AD-1 to AD-14): an NFC field card (MIME type `application/vnd.atalaia.field`, written from the console's *Adopt* tab and tapped on the box), the USB cable from the controller (`@adopt` after `@adopt-info`, the GM confirming the box's name and MAC), and later a pairing code over LoRa; `@joinkey <hex>` on the console and the setup portal's field remain for bring-up. An unadopted box takes the first field's key; a box adopted to another field takes a new one only with its admin PIN. It keeps the key in NVS next to the game key (encrypted NVS on production boxes; plain on development boards, adoption.md section 2).
+
+With the sealed radio invites the join key is the field's **master secret**: a field card holds it, so cards are kept locked away, and a lost card means `join-key --rotate` and adopting every box again (adoption.md section 5).
 
 Game keys change with every game; the join key does not. A box with another field's join key refuses the card ("bad tag").
 
@@ -75,4 +77,4 @@ A **standby controller** (kind 1) checks the tag with its own copy of the join k
 
 - The tag stops forged cards; it does not stop cloning: anyone who reads a card has that game's key until the game ends (ADR-P2-12 accepts this; a new game gets a new key).
 - The QR code and the text carry the game key in clear. Show them only to the people setting up the field.
-- The join key never leaves the controllers and the boxes' encrypted NVS; it is not in the payload, the API or the logs.
+- The join key never leaves the controllers, the boxes' NVS and the field cards made to adopt boxes ([adoption.md](adoption.md)); it is not in a join payload, the API's other answers or the logs.

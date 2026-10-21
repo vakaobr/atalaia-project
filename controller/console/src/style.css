@@ -961,3 +961,27 @@ textarea.scenario-editor {
 .scenario-names code {
     overflow-wrap: anywhere;
 }
+
+/* Adopt tab (components/adopt-panel.js) */
+.mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    overflow-wrap: anywhere;
+}
+
+.list {
+    list-style: none;
+    padding: 0;
+}
+
+.list li {
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--line);
+    overflow-wrap: anywhere;
+}
+
+.confirm-box {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+}

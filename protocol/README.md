@@ -12,11 +12,12 @@ Both encodings come from the schema files in [`schema/`](schema/), so they canno
 | [`schema/messages.yaml`](schema/messages.yaml) | Packet header and message types (draft) |
 | [`schema/events.yaml`](schema/events.yaml) | Standard events: ids, priorities, CBOR keys and data fields (draft) |
 | [`vectors/events.yaml`](vectors/events.yaml) | Test vectors every event codec must pass |
-| [`vectors/*.json`](vectors/) | Test vectors for header and message payload codecs, the join payload (`join.json`), player tags (`tag.json`), chrono records (`chrono_record.json`), player tokens (`player_token.json`), the controller sync's bodies (`sync.json`) and firmware releases (`firmware.json`: RFC 8032's Ed25519 vectors, signed manifests, versions, image descriptors, reports) |
+| [`vectors/*.json`](vectors/) | Test vectors for header and message payload codecs, the join payload (`join.json`), the NFC field card that adopts a box (`field_card.json`), player tags (`tag.json`), chrono records (`chrono_record.json`), player tokens (`player_token.json`), the controller sync's bodies (`sync.json`) and firmware releases (`firmware.json`: RFC 8032's Ed25519 vectors, signed manifests, versions, image descriptors, reports) |
 | [`vectors/capability_proxy.yaml`](vectors/capability_proxy.yaml) | Test vectors for the capability proxy (I/O pod) frames and payloads |
 | [`vectors/geo.json`](vectors/geo.json) | Known answers (each with its source and tolerance), edge cases, argument errors and exact result bits for `geo.distance` and `geo.in_zone` (ADR-P4-9) |
 | [`vectors/composition.yaml`](vectors/composition.yaml) | How a game's parts compose: main modes, modifiers, role packages and scenarios (decision P4R7), the mode id and parameters each role's join carries, the order of the `field.lua` scripts, and the ids and packages refused; read by the simulator and the app's Dart test runner |
 | [`join.md`](join.md) | The join payload that brings a box or a standby controller into a game (NFC card, QR code, serial console) |
+| [`adoption.md`](adoption.md) | Adopting a box: how it gets the field join key once (the NFC field card, the USB cable; the pairing code over LoRa, designed), its adoption state and who may move it, where the key is kept, rotating the key, threat models; vectors in `vectors/field_card.json` |
 | [`nfc-tag.md`](nfc-tag.md) | Player tags: the signed NFC tag of a player (Kill Confirmed, Respawn, Player Check-in, the Medic Kit) |
 | [`chrono-record.md`](chrono-record.md) | Chrono records: one chronograph reading signed with the marshal's Ed25519 key, and the canonical JSON that is signed |
 | [`player-token.md`](player-token.md) | Player tokens: who a phone calling the controller's API is (player, team, squad, role, game), signed by the controller |
@@ -44,6 +45,7 @@ The generator writes these files; none of them should be edited by hand:
 | `core/tests/packet_vectors.h` | C: header, payload, AES-CCM, join and player tag test vectors (from `vectors/*.json`) |
 | `core/tests/proxy_vectors.h` | C: capability proxy test vectors (from `vectors/capability_proxy.yaml`) |
 | `firmware/esp32/test/firmware_vectors.h` | C: the Field Box's firmware update vectors (from `vectors/firmware.json`) |
+| `firmware/esp32/test/field_card_vectors.h` | C: the Field Box's field card vectors (from `vectors/field_card.json`) |
 | `core/tests/geo_vectors.h` | C: geo test vectors, as exact hexadecimal doubles (from `vectors/geo.json`) |
 | `simulator/atalaia_sim/protocol.py` | Python: the same tables |
 | `protocol/json/event.schema.json` | Anyone consuming events as JSON |

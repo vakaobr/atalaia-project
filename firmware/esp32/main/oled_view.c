@@ -153,7 +153,14 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
         if (!screen_json_str(data, "title", s, sizeof(s)) || !s[0]) set(s, sizeof(s), "status");
         upper(s);
         set(out->head, sizeof(out->head), s);
-        if (screen_json_str(data, "mode", s, sizeof(s)) && s[0]) set(out->big, sizeof(out->big), s);
+        if (screen_json_str(data, "mode", s, sizeof(s)) && s[0]) {
+            set(out->big, sizeof(out->big), s);
+        } else if (screen_json_str(data, "field", s, sizeof(s)) && s[0]) {
+            set(out->big, sizeof(out->big), s); /* adoption: the field, its fingerprint below */
+            if (screen_json_str(data, "fingerprint", s, sizeof(s)) && s[0]) {
+                set(out->foot, sizeof(out->foot), s);
+            }
+        }
         if (screen_json_int(data, "timer_s", &v)) clock_text(v, out->foot, sizeof(out->foot));
         return true;
     }

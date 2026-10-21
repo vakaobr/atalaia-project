@@ -271,6 +271,7 @@ class Controller:
         # Why the live game may not start now (firmware updates still running), or None.
         self.start_guard: Optional[Callable[[], Optional[str]]] = None
         self.firmware: Any = None  # firmware_updates.FirmwareUpdates, set by main.build
+        self.adoption: Any = None  # adoption.Adoption: field cards and USB adoption, set by main.build
         self._last_scan: Optional[dict[str, Any]] = None
         saved_scan = store.get_setting("radio.last_scan")
         if saved_scan:

@@ -27,7 +27,8 @@
     "controller": "Controller",
     "settings": "Settings",
     "checkin": "Check-in",
-    "scenarios": "Scenarios"
+    "scenarios": "Scenarios",
+    "adopt": "Adopt"
   },
   "common": {
     "yes": "Yes",
@@ -629,5 +630,60 @@
       "not_in_game": "not in this game",
       "radio": "the radio is down"
     }
+  },
+  "adopt": {
+    "title": "Adopt boxes",
+    "intro": "A new box is adopted once by this field: it then holds the field join key and takes this field's join cards. A box adopted by another field (or to this field's old key) moves only with its admin PIN.",
+    "field": "This field: {name}, key",
+    "previous": "The field join key was rotated; boxes still on the old key ({field}) need their admin PIN to be adopted again.",
+    "gm_only": "Only the organisers can adopt boxes.",
+    "usb_title": "USB cable",
+    "usb_intro": "Plug the new box into this controller by USB and look for it. Check its name and MAC (the box shows them on its serial console; the MAC is also on its USB port's serial number) before you adopt it.",
+    "usb_off": "USB adoption is off on this controller ([adopt] usb = false).",
+    "scan": "Look for boxes",
+    "scanning": "Looking…",
+    "none": "No box found. Check the cable (a data cable, not only power) and that the box is switched on.",
+    "silent": "{n} port(s) did not answer",
+    "busy": "a game is joined: end it first",
+    "locked": "too many wrong PINs: restart the box",
+    "adopt": "Adopt",
+    "confirm": "Adopt box {name} ({mac}) for this field?",
+    "confirm_hint": "The controller checks it is still that box before it writes the key.",
+    "pin": "The box's admin PIN",
+    "pin_hint": "This box belongs to another field (or to this field's old key): its admin PIN is needed. Five wrong PINs lock adoption until the box restarts.",
+    "state": {
+      "none": "not adopted",
+      "this_field": "adopted by this field",
+      "previous_key": "adopted to this field's old key ({field})",
+      "other_field": "adopted by another field: {name} ({field})"
+    },
+    "result": {
+      "adopted": "Box {name} ({mac}) is adopted.",
+      "same": "Box {name} ({mac}) was already adopted by this field.",
+      "readopted": "Box {name} ({mac}) moved to this field.",
+      "need_pin": "Box {name} belongs to another field: type its admin PIN.",
+      "bad_pin": "Wrong admin PIN for box {name}.",
+      "locked": "Box {name}: too many wrong PINs; restart it before trying again.",
+      "busy": "Box {name} has a game joined: end the game first.",
+      "bad_key": "Box {name} refused the key.",
+      "bad_card": "A damaged field card was tapped.",
+      "store_failed": "Box {name} could not store the key.",
+      "card_made": "a field card was made"
+    },
+    "method": {
+      "usb": "USB",
+      "card": "field card"
+    },
+    "card_title": "Field card (NFC)",
+    "card_intro": "Write these bytes on an NTAG215 or NTAG216 card, as a join card, and tap it once on each new box. A box adopted by another field asks for its admin PIN on the keypad.",
+    "card_warning": "This card is the field's master secret: it holds the field join key. Whoever has it can make join cards for this field's boxes and read the keys of later games sent over the radio. Keep it locked away, never give it to players, and make as few as you need.",
+    "card_make": "Make the field card",
+    "card_for": "Field card of {name} ({field})",
+    "card_hint": "Bytes to write to the card's memory from page 4 (NDEF message, type application/vnd.atalaia.field).",
+    "card_hide": "Hide the bytes",
+    "card_lost": "A field card lost or copied? Rotate the key on the controller (python3 -m atalaia_controller join-key --rotate), restart it, adopt every box again and destroy the old cards.",
+    "code_title": "Pairing code (radio)",
+    "code_later": "A box with a screen will show a short code that you type here to adopt it over the radio. It comes with the radio invites; until then use the cable or the field card.",
+    "log_title": "Recent adoptions"
   }
 }

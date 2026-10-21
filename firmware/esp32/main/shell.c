@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "adoption.h"
 #include "atalaia/join.h"
 #include "atalaia/packet.h"
 #include "atalaia/version.h"
@@ -50,6 +51,7 @@
 #include "esp_event.h"
 #include "esp_littlefs.h"
 #include "esp_log.h"
+#include "esp_mac.h"
 #include "esp_netif.h"
 #include "esp_psram.h"
 #include "esp_random.h"
@@ -65,7 +67,8 @@
 
 /* Console input (keys, "@join", "@joinkey") from UART0 and, on the Heltec V4
  * whose only USB port is the ESP32-S3's own, from USB-Serial-JTAG. */
-#define SERIAL_WANTED (CONFIG_ATALAIA_SERIAL_KEYS || CONFIG_ATALAIA_SERIAL_JOIN)
+#define SERIAL_WANTED                                                                              \
+    (CONFIG_ATALAIA_SERIAL_KEYS || CONFIG_ATALAIA_SERIAL_JOIN || CONFIG_ATALAIA_SERIAL_ADOPT)
 /* A team button on UART0's RX pin (GPIO 44 on the ESP32-S3) takes that pin
  * from the console: no console input on UART0 then (decision PIN-5). */
 #define U0RXD_PIN 44
@@ -126,6 +129,12 @@ static uint8_t nfc_mem[888]; /* NTAG216 user memory */
 static uint8_t nfc_last_uid[10];
 static uint8_t nfc_last_uid_len;
 static uint32_t nfc_last_poll_ms;
+/* Adoption (adoption.h): the field card, "@adopt" over the USB cable, "@joinkey". */
+static adoption_t adopt;
+static char adopt_mac[18];
+static char adopt_name[25] = "field-box";
+static adoption_identity_t adopt_id = {adopt_name, adopt_mac, ""};
+static uint32_t now_ms(void);
 #if SERIAL_UART
 static serial_console_t console_uart;
 static bool uart_input;
@@ -221,6 +230,9 @@ static void serial_input_init(void)
 #if CONFIG_ATALAIA_SERIAL_KEYS
     ESP_LOGI(TAG, "serial keys on: type 0-9, * and # on the console");
 #endif
+#if CONFIG_ATALAIA_SERIAL_ADOPT
+    ESP_LOGI(TAG, "USB adoption on: \"@adopt-info\", \"@adopt <hex> [<PIN>|-] [<name>]\"");
+#endif
 #if CONFIG_ATALAIA_SERIAL_JOIN
     ESP_LOGI(TAG, "serial join on: \"@join atalaia:join:...\", \"@joinkey <hex>\", "
                   "\"@tag <uid> [<tag>]\", \"@wifi <ssid> <password>\" or "
@@ -228,8 +240,35 @@ static void serial_input_init(void)
 #endif
 }
 
+#if CONFIG_ATALAIA_SERIAL_ADOPT
+#define SERIAL_ADOPT_ON 1
+#else
+#define SERIAL_ADOPT_ON 0
+#endif
+#if CONFIG_ATALAIA_SERIAL_JOIN
+#define SERIAL_JOIN_ON 1
+#else
+#define SERIAL_JOIN_ON 0
+#endif
+
 static void serial_command(const char *cmd)
 {
+    bool adopt_cmd =
+        SERIAL_ADOPT_ON && (strcmp(cmd, "adopt-info") == 0 || strncmp(cmd, "adopt ", 6) == 0);
+    bool joinkey_cmd = SERIAL_JOIN_ON && strncmp(cmd, "joinkey ", 8) == 0;
+    if (adopt_cmd || joinkey_cmd) {
+        /* The controller reads the "ATALAIA-ADOPT {json}" line (protocol/adoption.md). */
+        static char reply[ADOPTION_REPLY_MAX];
+        if (adoption_command(&adopt, cmd, &adopt_id, now_ms(), reply, sizeof(reply))) {
+            if (adopt_cmd) {
+                printf("%s\n", reply);
+                fflush(stdout);
+            } else {
+                ESP_LOGI(TAG, "%s", reply);
+            }
+        }
+        return;
+    }
 #if CONFIG_ATALAIA_SERIAL_JOIN
     if (strncmp(cmd, "join ", 5) == 0) {
         box_join_result_t r = box_game_join_text(&box, cmd + 5);
@@ -272,16 +311,6 @@ static void serial_command(const char *cmd)
             }
         } else {
             ESP_LOGW(TAG, "update: \"@update <version> <release id>\"");
-        }
-        return;
-    }
-    if (strncmp(cmd, "joinkey ", 8) == 0) {
-        if (box_game_active(&box)) {
-            ESP_LOGW(TAG, "join key: refused while a game is joined");
-        } else {
-            ESP_LOGI(TAG, "join key: %s",
-                     box_game_set_join_key_hex(&box, cmd + 8) ? "stored"
-                                                              : "refused (64 hex digits)");
         }
         return;
     }
@@ -396,9 +425,37 @@ static int update_battery(void)
     return box_battery(NULL);
 }
 
+/* The setup portal's "field join key" follows the adoption rules too (no PIN: a box
+ * adopted to another field keeps that field). */
 static bool portal_join_key(const char *hex)
 {
-    return box_game_set_join_key_hex(&box, hex);
+    char cmd[80], reply[ADOPTION_REPLY_MAX];
+    snprintf(cmd, sizeof(cmd), "joinkey %.70s", hex);
+    adoption_command(&adopt, cmd, &adopt_id, now_ms(), reply, sizeof(reply));
+    ESP_LOGI(TAG, "setup portal: %s", reply);
+    return strcmp(reply, "join key: stored") == 0;
+}
+
+/* ---- adoption's shell ops (adoption.h) ---- */
+
+static bool adopt_busy(void *user)
+{
+    (void)user;
+    return box_game_active(&box) || runner.running; /* a field game joined, or a game played */
+}
+
+static bool adopt_store(void *user, const uint8_t key[ADOPTION_KEY_SIZE], const char *name)
+{
+    (void)user;
+    if (!box_game_set_join_key(&box, key)) return false;
+    config_store_set_str("field_name", name);
+    return true;
+}
+
+static void adopt_log(void *user, const char *line)
+{
+    (void)user;
+    ESP_LOGI(TAG, "%s", line);
 }
 
 /*
@@ -425,6 +482,19 @@ static void poll_nfc(uint32_t now)
     memcpy(nfc_last_uid, tag.uid, sizeof(nfc_last_uid));
     nfc_last_uid_len = tag.uid_len;
     int n = hal.nfc->read_user_memory(nfc_mem, sizeof(nfc_mem));
+    /* A field card (adoption.h) is neither a player tag nor a join; during a game it is
+     * only logged, so the field's master secret never reaches a mode. */
+    const uint8_t *card = NULL;
+    if (n > 0 && adoption_card_from_ndef_tag(nfc_mem, (size_t)n, &card) > 0) {
+        adopt_result_t ar;
+        if (playing) {
+            ESP_LOGW(TAG, "field card: ignored during a game");
+        } else {
+            adoption_tap(&adopt, nfc_mem, (size_t)n, now, &ar);
+        }
+        memset(nfc_mem, 0, sizeof(nfc_mem));
+        return;
+    }
     if (playing) {
         const uint8_t *payload = NULL;
         size_t len = n > 0 ? atalaia_tag_from_ndef_tag(nfc_mem, (size_t)n, &payload) : 0;
@@ -479,13 +549,35 @@ static void box_start(const char *tier)
         ESP_LOGW(TAG, "NVS encryption is off: the game key and the field join key are stored in "
                       "plain NVS (development only; BRING_UP.md step 0)");
     }
-    if (!box_game_load_join_key(&box)) {
+    char admin_pin[9] = "1234";
+    config_store_get_str("admin_pin", admin_pin, sizeof(admin_pin));
+    adoption_ops_t aops = {.busy = adopt_busy,
+                           .store = adopt_store,
+                           .screen = box_screen,
+                           .log = adopt_log,
+                           .ctx = NULL};
+    adoption_init(&adopt, &aops, admin_pin);
+    uint8_t mac[6];
+    if (esp_efuse_mac_get_default(mac) == ESP_OK) {
+        /* As the ESP32-S3's USB-Serial-JTAG gives it for its serial number. */
+        snprintf(adopt_mac, sizeof(adopt_mac), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1],
+                 mac[2], mac[3], mac[4], mac[5]);
+    }
+    snprintf(adopt_name, sizeof(adopt_name), "%s", name);
+    adopt_id.fw = esp_app_get_description()->version;
+    if (box_game_load_join_key(&box)) {
+        char field_name[ADOPTION_NAME_MAX + 1] = "";
+        config_store_get_str("field_name", field_name, sizeof(field_name));
+        adoption_restore(&adopt, box.join_key, field_name);
+        ESP_LOGI(TAG, "adopted to field %s \"%s\"", adopt.fingerprint, adopt.name);
+    } else {
         const char *dev = CONFIG_ATALAIA_DEV_JOIN_KEY;
         if (dev[0] != '\0' && box_game_use_join_key_hex(&box, dev)) {
-            ESP_LOGW(TAG, "using the development field join key (CONFIG_ATALAIA_DEV_JOIN_KEY)");
+            ESP_LOGW(TAG, "not adopted; using the development field join key "
+                          "(CONFIG_ATALAIA_DEV_JOIN_KEY)");
         } else {
-            ESP_LOGW(TAG, "no field join key: join cards are refused until it is set "
-                          "(\"@joinkey\" or the setup portal)");
+            ESP_LOGW(TAG, "not adopted: join cards are refused until the field adopts this box "
+                          "(a field card, the USB cable or \"@joinkey\"; protocol/adoption.md)");
         }
     }
     wifi_setup_set_join_key_handler(portal_join_key);
@@ -589,6 +681,13 @@ static void task_game(void *arg)
         char serial = serial_poll();
         if (key == HAL_KEY_NONE) key = serial;
 #endif
+        if (key != HAL_KEY_NONE && adoption_active(&adopt) && adoption_key(&adopt, key, now)) {
+            key = HAL_KEY_NONE; /* the admin PIN for another field's card, or closing a result */
+        }
+        if (adoption_tick(&adopt, now) && picker_active) {
+            memset(&picker_screen, 0, sizeof(picker_screen));
+            show_picker(); /* adoption left the screen: the picker's step again */
+        }
         if (key != HAL_KEY_NONE) {
             if (picker_active) {
                 preset_ui_handle_key(&preset_ui, key);

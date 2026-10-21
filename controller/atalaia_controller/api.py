@@ -61,6 +61,10 @@ which browsers cannot give headers, also takes ``?token=``.
     GET  /api/v1/firmware/{id}/release     a box: the signed release text, no token (protocol/firmware-update.md)
     GET  /api/v1/firmware/{id}/image       a box: the image, no token
     POST /api/v1/firmware/report           a box: how its update went, with the game key's MAC
+    GET  /api/v1/adopt                     GM: the field's fingerprint and name, the adoption records
+    POST /api/v1/adopt/card                GM: the NFC field card's bytes (the field join key; protocol/adoption.md)
+    POST /api/v1/adopt/usb/scan            GM: the Field Boxes plugged into this controller by USB
+    POST /api/v1/adopt/usb                 GM: adopt one {"port", "mac" (as confirmed), "pin"?}
     GET  /api/v1/checkin                   field check-in: field, notice, settings, open games (no token)
     POST /api/v1/checkin                   check in with a field identity: a player token
     POST /api/v1/checkin/token             a new player token (player token)
@@ -723,6 +727,31 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
 
         data, _ = await read_upload(request, REPORT_MAX, "report")
         return firmware().report(data, request.headers.get("x-atalaia-mac"))
+
+    # --- adopting boxes (protocol/adoption.md): GM only, never cached --------------------
+
+    def adoption() -> Any:
+        if controller.adoption is None:
+            raise HTTPException(503, "adoption is not set up on this controller")
+        return controller.adoption
+
+    @app.get("/api/v1/adopt", dependencies=[Depends(require_gm)])
+    def adopt_info() -> JSONResponse:
+        return JSONResponse(adoption().info(), headers=NO_STORE)
+
+    @app.post("/api/v1/adopt/card", dependencies=[Depends(require_gm)])
+    def adopt_card() -> JSONResponse:
+        """The NFC field card's bytes: the field join key, the field's master secret."""
+        return JSONResponse(adoption().field_card(), headers=NO_STORE)
+
+    @app.post("/api/v1/adopt/usb/scan", dependencies=[Depends(require_gm)])
+    def adopt_usb_scan() -> JSONResponse:
+        return JSONResponse(adoption().scan(), headers=NO_STORE)
+
+    @app.post("/api/v1/adopt/usb", dependencies=[Depends(require_gm)])
+    def adopt_usb(body: Any = Body(None)) -> JSONResponse:
+        b = body_map(body)
+        return JSONResponse(adoption().adopt_usb(b.get("port"), b.get("mac"), b.get("pin")), headers=NO_STORE)
 
     # --- field check-in (ADR-P3-13, protocol/checkin.md) ------------------------------
 

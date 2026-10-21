@@ -135,7 +135,7 @@ firmware no longer reads a button there.
    idf.py -B build monitor -p /dev/ttyACM0
    ```
    The log goes to UART0 and to this USB port; what you type on the USB
-   port (`@join`, `@joinkey`) reaches the box
+   port (`@join`, `@joinkey`, `@adopt-info`) reaches the box
    (`CONFIG_ATALAIA_CONSOLE_USB_INPUT`).
 3. Verify: boot log shows firmware version, PSRAM detection (2 MB on
    V4.3), tier selection (should be "full").
@@ -234,7 +234,8 @@ firmware no longer reads a button there.
 2. Write a join card: in the GM console's *Join* tab, make a payload for
    this box and write its NFC bytes to an NTAG215 or NTAG216 card (any NFC
    writer that can write raw NDEF memory; the console shows the bytes for
-   page 4 onwards). The box needs the field join key first (step 10b).
+   page 4 onwards). The box needs the field join key first: adopt it (step
+   10a), by cable or with a field card, which this reader takes too.
 3. With no game being played, hold the card on the reader: the log shows
    `join card: joined` and the screen `JOINED GAME <id>`. A card made with
    another field's key shows `join refused: bad tag`; holding the same card
@@ -318,37 +319,50 @@ firmware no longer reads a button there.
    controller and at least two nodes (step 10b). Single-box radio health can be
    verified by monitoring `radio_task` log lines for TX/RX activity.
 
-## Step 10a: The USB radio modem's screen
+## Step 10a: Adopting the box (USB cable, field card)
 
-The modem board (`python tools/docker_fw.py modem`, plugged into the
-controller) shows its status on its own OLED; the full reading of each line
-is in [README.md](../README.md#the-modems-oled).
+[protocol/adoption.md](../../../protocol/adoption.md). Board 1 (the Field Box bench build) on
+its USB-C port; the controller and its modem (board 2) as in step 10b.
 
-1. Power it from a laptop or the controller with the antenna fitted. The log
-   (UART0, not the USB port) shows `SSD1306 OLED at 0x3C (128x64)` and,
-   after the 2 s splash (tower, ATALAIA, MODEM MODE, version), `OLED status
-   on`. The screen reads `LINK waiting`, `IDLE no game`, `CH 869.525 MHz`,
-   zero counts and the full budget (`DUTY 360.0s left` on the g2 sub-band).
-2. Start the controller: within a second `LINK OK` (its first ping or
-   IDENT). Create and start a game in the console: `GAME <id>`, and `TX`
-   climbs with the TIME beacons; `RX` climbs once a box is joined and heard.
-3. Stop the controller: about 12 s later `LINK DOWN`, inverted. Start it
-   again: back to `LINK OK` without touching the modem.
-4. Without the SX1262 (or with a TCXO fault) the screen shows `RADIO FAULT`
-   and the reason from the log (`SX1262 not found (BUSY stuck)`, `SX1262
-   errors 0x0020 (TCXO)`); the controller sees `"radio": "none"`.
-5. A board without an OLED (or with Vext off) logs one `SSD1306 OLED not
-   found` warning and works as a modem all the same.
+1. **By hand first.** In a serial monitor on the box's port type `@adopt-info`. One line
+   comes back, `ATALAIA-ADOPT {"v":1,"kind":"info","name":"field-box","mac":"..",...,
+   "state":"unadopted",...}` (a board that was given `@joinkey` before says `adopted`).
+   Check that `mac` is the port's USB serial number (Windows: Device Manager, the port's
+   *Details*, *Device instance path*; Linux: `udevadm info /dev/ttyACM0 | grep SERIAL_SHORT`):
+   the console relies on it to tell boxes apart.
+2. **From the controller.** On the Pi, plug the box into a USB port; with the controller in
+   Docker on Windows/WSL, either bridge the box's COM port to TCP on Windows
+   (`python tools/serial_bridge.py COM3 7001`, with pyserial installed and the serial
+   monitor closed) and start the controller with
+   `ATALAIA_ADOPT_USB_PORTS=socket://host.docker.internal:7001`, or attach the board to
+   WSL with `usbipd attach --wsl --busid <id>` and pass `--device /dev/ttyACM1` to the
+   container. In the console's *Adotar / Adopt* tab press *Look for boxes*: the board is
+   listed with its name, MAC and *not adopted*; the modem's port is not. Press *Adopt*,
+   check the name and MAC, confirm. The box's screen and OLED show ADOPTED, the field's
+   name and the fingerprint the tab shows (`join-key --fingerprint` prints it too); the
+   log shows `adoption (usb): adopted, field XXXX-XXXX`. Adopt again: *already adopted*.
+3. **Another field's box.** Give the board another key by hand (`@adopt <64 other hex
+   digits> 1234`: the bench build's admin PIN), then adopt it from the console: it asks
+   for the admin PIN; `9999` gives *wrong PIN*, `1234` moves it back. Five wrong PINs lock
+   it until a reset.
+4. **The field card** (once a PN532 is fitted, step 7): *Make the field card*, write the
+   bytes to an NTAG215 from page 4, tap it on an unadopted board (ADOPTED, the fingerprint)
+   and on a board of another field (the PIN screen: type `1234#` on the keypad or the
+   serial keys). A field card held on the reader during a game logs
+   `field card: ignored during a game`. Keep the card locked away: it is the field's
+   master secret.
+5. After the tests, `python3 -m atalaia_controller join-key --rotate` on a test controller
+   shows the boxes as *adopted to this field's old key*; adopt them again with the PIN.
 
 ## Step 10b: Joining a field controller's game
 
 Needs the field controller with its USB radio modem (controller/README.md)
 and two boards at least 1 m apart, both antennas fitted.
 
-1. Give the box the field join key: `python -m atalaia_controller join-key`
-   on the controller prints it; type `@joinkey <the 64 hex digits>` on the
-   box's serial console (the log shows `join key: stored`), or enter it in
-   the setup portal's "Field join key" field.
+1. Adopt the box (step 10a). By hand still works: `python -m atalaia_controller join-key`
+   on the controller prints the key; type `@joinkey <the 64 hex digits>` on the
+   box's serial console (the log shows `join key: stored`; a box adopted to
+   another field refuses it), or enter it in the setup portal's "Field join key" field.
 2. Create a game in the GM console, open *Join*, choose the role, and type
    the text it shows on the box's console as one line:
    `@join atalaia:join:...`. The log shows `field: joined game <id> as node
@@ -458,6 +472,28 @@ section 11 (`%FLASH%`, `COM5`).
      fails (`core FAILED`: an image without a release key could never be updated again), and
      the box comes back on 0.2.1-bench.1 (`rolling back`, then the old version's boot log).
 9. **Afterwards:** delete `~/atalaia-bench` (the keys with it) and flash a normal build.
+
+## Step 10d: The USB radio modem's screen
+
+The modem board (`python tools/docker_fw.py modem`, plugged into the
+controller) shows its status on its own OLED; the full reading of each line
+is in [README.md](../README.md#the-modems-oled).
+
+1. Power it from a laptop or the controller with the antenna fitted. The log
+   (UART0, not the USB port) shows `SSD1306 OLED at 0x3C (128x64)` and,
+   after the 2 s splash (tower, ATALAIA, MODEM MODE, version), `OLED status
+   on`. The screen reads `LINK waiting`, `IDLE no game`, `CH 869.525 MHz`,
+   zero counts and the full budget (`DUTY 360.0s left` on the g2 sub-band).
+2. Start the controller: within a second `LINK OK` (its first ping or
+   IDENT). Create and start a game in the console: `GAME <id>`, and `TX`
+   climbs with the TIME beacons; `RX` climbs once a box is joined and heard.
+3. Stop the controller: about 12 s later `LINK DOWN`, inverted. Start it
+   again: back to `LINK OK` without touching the modem.
+4. Without the SX1262 (or with a TCXO fault) the screen shows `RADIO FAULT`
+   and the reason from the log (`SX1262 not found (BUSY stuck)`, `SX1262
+   errors 0x0020 (TCXO)`); the controller sees `"radio": "none"`.
+5. A board without an OLED (or with Vext off) logs one `SSD1306 OLED not
+   found` warning and works as a modem all the same.
 
 ## Step 11: Wi-Fi Setup Portal
 

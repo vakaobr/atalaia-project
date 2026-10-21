@@ -7,7 +7,9 @@
               [atak] enabled the CoT feed for ATAK
     tokens    print the GM and read tokens (generated on first start if not configured)
     join-key  print the field join key that authenticates join cards (protocol/join.md):
-              set it on every box of the field and on a standby controller
+              boxes get it when they are adopted (protocol/adoption.md), a standby controller
+              in [join] key; --fingerprint prints only its fingerprint, --rotate makes a new one
+              (after a field card is lost: every box must then be adopted again)
     ca        print the field CA's fingerprint (it is on the check-in poster) and its folder
     sync-key  store the field's site server API key, read from standard input (ADR-P4-3);
               --status shows where the key comes from and its fingerprint, --clear forgets
@@ -29,6 +31,7 @@ from typing import Any, Callable, Optional
 from atalaia_sim.core import Core, LibraryNotFound, find_library
 
 from . import tls as tlsmod
+from .adoption import PREVIOUS_SETTING, Adoption
 from .api import Auth, create_app
 from .atak import AtakEmitter
 from .checkin import Checkin
@@ -148,6 +151,7 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
     PropLinks(controller)
     FirmwareUpdates(controller, firmware_dir(cfg.db_path, cfg.firmware_dir), cfg.firmware_release_keys,
                     cfg.firmware_update_timeout_s, variants=cfg.firmware_variants)
+    Adoption(controller)
     mqtt = maybe_bridge(cfg, controller)
     hub = Hub()
     sync = None
@@ -253,6 +257,30 @@ def sync_key(cfg: Config, store: Store, action: str, stdin: Any = sys.stdin) -> 
     return 0
 
 
+def join_key_command(cfg: Config, store: Store, action: str) -> int:
+    """join-key: print the key (show), its fingerprint, or make a new one (rotate, protocol/adoption.md)."""
+    from atalaia_sim.field_card import fingerprint  # noqa: PLC0415
+
+    if action == "rotate":
+        if cfg.join_key:
+            print("atalaia_controller: [join] key is set in the settings; put a new one there "
+                  "(64 hex digits) instead", file=sys.stderr)
+            return 2
+        old = ensure_join_key(cfg, store)
+        new = secrets.token_bytes(32)
+        store.set_setting(PREVIOUS_SETTING, fingerprint(old))
+        store.set_setting("join_key", new.hex())
+        log.warning("adoption: the field join key was rotated (%s -> %s)", fingerprint(old), fingerprint(new))
+        print(f"new field join key, fingerprint {fingerprint(new)} (was {fingerprint(old)}).\n"
+              "Restart the controller. Then adopt every box again (field card or USB cable; a box still on\n"
+              "the old key asks for its admin PIN), write new field cards and destroy the old ones, and\n"
+              "give a standby controller the new key ([join] key). Join cards made before no longer work.")
+        return 0
+    key = ensure_join_key(cfg, store)
+    print(fingerprint(key) if action == "fingerprint" else key.hex())
+    return 0
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m atalaia_controller", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -262,6 +290,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     group.add_argument("--status", action="store_true", help="sync-key: where the API key comes from")
     group.add_argument("--clear", action="store_true", help="sync-key: forget the stored API key")
     group.add_argument("--resend", action="store_true", help="sync-key: send every game and the chrono registry again")
+    group.add_argument("--fingerprint", action="store_true",
+                       help="join-key: print only the key's fingerprint (what boxes and the console show)")
+    group.add_argument("--rotate", action="store_true",
+                       help="join-key: make a new field join key (after a field card is lost); every box "
+                            "and standby controller must then be given the new one")
     parser.add_argument("--config", help="TOML settings file (see controller/controller.example.toml)")
     parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args(argv)
@@ -280,8 +313,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         action = "status" if args.status else "clear" if args.clear else "resend" if args.resend else "set"
         return sync_key(cfg, Store(cfg.db_path), action)
     if args.command == "join-key":
-        print(ensure_join_key(cfg, Store(cfg.db_path)).hex())
-        return 0
+        action = "rotate" if args.rotate else "fingerprint" if args.fingerprint else "show"
+        return join_key_command(cfg, Store(cfg.db_path), action)
     if args.command == "ca":
         tls = ensure_tls(cfg)
         if tls is None:

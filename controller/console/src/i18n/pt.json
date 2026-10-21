@@ -27,7 +27,8 @@
     "controller": "Controlador",
     "settings": "Definições",
     "checkin": "Check-in",
-    "scenarios": "Cenários"
+    "scenarios": "Cenários",
+    "adopt": "Adotar"
   },
   "common": {
     "yes": "Sim",
@@ -629,5 +630,60 @@
       "not_in_game": "não está neste jogo",
       "radio": "o rádio está em baixo"
     }
+  },
+  "adopt": {
+    "title": "Adotar caixas",
+    "intro": "Uma caixa nova é adotada uma vez por este campo: passa a guardar a chave de entrada do campo e a aceitar os cartões de entrada deste campo. Uma caixa adotada por outro campo (ou pela chave antiga deste) só muda com o seu PIN de administração.",
+    "field": "Este campo: {name}, chave",
+    "previous": "A chave de entrada do campo foi mudada; as caixas que ainda têm a chave antiga ({field}) precisam do seu PIN de administração para serem adotadas de novo.",
+    "gm_only": "Só a organização pode adotar caixas.",
+    "usb_title": "Cabo USB",
+    "usb_intro": "Liga a caixa nova a este controlador por USB e procura-a. Confirma o nome e o MAC (a caixa mostra-os na consola série; o MAC é também o número de série da porta USB) antes de a adotar.",
+    "usb_off": "A adoção por USB está desligada neste controlador ([adopt] usb = false).",
+    "scan": "Procurar caixas",
+    "scanning": "A procurar…",
+    "none": "Nenhuma caixa encontrada. Verifica o cabo (de dados, não só de carga) e se a caixa está ligada.",
+    "silent": "{n} porta(s) não responderam",
+    "busy": "tem um jogo: termina-o primeiro",
+    "locked": "demasiados PIN errados: reinicia a caixa",
+    "adopt": "Adotar",
+    "confirm": "Adotar a caixa {name} ({mac}) para este campo?",
+    "confirm_hint": "O controlador confirma que é ainda essa caixa antes de escrever a chave.",
+    "pin": "PIN de administração da caixa",
+    "pin_hint": "Esta caixa pertence a outro campo (ou à chave antiga deste): é preciso o seu PIN de administração. Cinco PIN errados bloqueiam a adoção até a caixa reiniciar.",
+    "state": {
+      "none": "não adotada",
+      "this_field": "adotada por este campo",
+      "previous_key": "adotada com a chave antiga deste campo ({field})",
+      "other_field": "adotada por outro campo: {name} ({field})"
+    },
+    "result": {
+      "adopted": "A caixa {name} ({mac}) está adotada.",
+      "same": "A caixa {name} ({mac}) já era deste campo.",
+      "readopted": "A caixa {name} ({mac}) passou para este campo.",
+      "need_pin": "A caixa {name} pertence a outro campo: escreve o seu PIN de administração.",
+      "bad_pin": "PIN de administração errado para a caixa {name}.",
+      "locked": "Caixa {name}: demasiados PIN errados; reinicia-a antes de tentar de novo.",
+      "busy": "A caixa {name} tem um jogo: termina o jogo primeiro.",
+      "bad_key": "A caixa {name} recusou a chave.",
+      "bad_card": "Foi encostado um cartão de campo danificado.",
+      "store_failed": "A caixa {name} não conseguiu guardar a chave.",
+      "card_made": "foi gerado um cartão de campo"
+    },
+    "method": {
+      "usb": "USB",
+      "card": "cartão de campo"
+    },
+    "card_title": "Cartão de campo (NFC)",
+    "card_intro": "Escreve estes bytes num cartão NTAG215 ou NTAG216, como um cartão de entrada, e encosta-o uma vez a cada caixa nova. Uma caixa adotada por outro campo pede o seu PIN de administração no teclado.",
+    "card_warning": "Este cartão é o segredo-mestre do campo: leva a chave de entrada do campo. Quem o tiver pode fazer cartões de entrada para as caixas deste campo e ler as chaves dos jogos seguintes enviadas por rádio. Guarda-o fechado à chave, nunca o dês a quem joga e faz só os que precisares.",
+    "card_make": "Gerar o cartão de campo",
+    "card_for": "Cartão de campo de {name} ({field})",
+    "card_hint": "Bytes a escrever na memória do cartão a partir da página 4 (mensagem NDEF, tipo application/vnd.atalaia.field).",
+    "card_hide": "Esconder os bytes",
+    "card_lost": "Perdeste ou copiaram um cartão de campo? Muda a chave no controlador (python3 -m atalaia_controller join-key --rotate), reinicia-o, adota de novo todas as caixas e destrói os cartões antigos.",
+    "code_title": "Código de emparelhamento (rádio)",
+    "code_later": "Uma caixa com ecrã vai mostrar um código curto que escreves aqui para a adotar por rádio. Chega com os convites por rádio; até lá usa o cabo ou o cartão de campo.",
+    "log_title": "Adoções recentes"
   }
 }
