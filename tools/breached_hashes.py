@@ -49,6 +49,8 @@ def build(source: bytes) -> str:
         raise SystemExit("breached_hashes: the source is not the pinned list (SHA-256 differs)")
     words = source.decode("utf-8").splitlines()
     kept = {entry_hash(w) for w in words if len(unicodedata.normalize("NFKC", w)) >= MIN_LENGTH}
+    # The generated file's own tags, not this script's:
+    # REUSE-IgnoreStart
     header = [
         "# SPDX-FileCopyrightText: 2018 Daniel Miessler and the SecLists contributors",
         "# SPDX-License-Identifier: MIT",
@@ -60,6 +62,7 @@ def build(source: bytes) -> str:
         "# 'atalaia-breached-v1\\0' + the entry, first 16 bytes as hex, sorted.",
         f"# {len(kept)} entries.",
     ]
+    # REUSE-IgnoreEnd
     return "\n".join(header + sorted(kept)) + "\n"
 
 
