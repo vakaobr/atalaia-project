@@ -70,6 +70,27 @@ void node_runner_set_mode(node_runner_t *r, const char *mode_id)
     snprintf(r->mode_id, sizeof(r->mode_id), "%s", mode_id ? mode_id : "");
 }
 
+/* A mode that nearly fills the script memory may run out mid-game: on a
+ * Reduced box (Heltec V3, 64 KB) some combinations come close, e.g. the
+ * Hacking Terminal with the Codes modifier (decision M4-8). */
+#define MEM_WARN_PCT 85
+
+static void warn_if_memory_tight(node_runner_t *r)
+{
+    r->memory_tight = false;
+    if (!r->node || r->mem_limit == 0) return;
+    size_t used = atalaia_node_mem_used(r->node);
+    if (used * 100u >= r->mem_limit * MEM_WARN_PCT) {
+        r->memory_tight = true;
+#ifdef ESP_PLATFORM
+        ESP_LOGW(TAG,
+                 "the mode uses %u KB of this box's %u KB script memory after loading: it may run "
+                 "out during the game (a Reduced box: Heltec V3); prefer a lighter combination",
+                 (unsigned)(used / 1024u), (unsigned)(r->mem_limit / 1024u));
+#endif
+    }
+}
+
 void node_runner_init(node_runner_t *r, hal_t *hal, size_t mem_limit)
 {
     memset(r, 0, sizeof(*r));
@@ -133,6 +154,7 @@ bool node_runner_start(node_runner_t *r, const preset_t *preset, const char *con
         r->node = NULL;
         return false;
     }
+    warn_if_memory_tight(r);
 
     /* Initialise the game timer. */
     game_timer_init(&r->timer, preset->duration_s * 1000u);
@@ -213,6 +235,7 @@ bool node_runner_resume(node_runner_t *r, const state_persist_data_t *saved, con
         r->node = NULL;
         return false;
     }
+    warn_if_memory_tight(r);
 
     /* Restore the game timer from saved state. */
     game_timer_init(&r->timer, saved->timer_duration_ms);

@@ -73,6 +73,8 @@ The addon and its driver are hardware work (phase 4 HW2): until they exist this 
 
 Design specification section 15; decisions P4R1, P4R5, P4R23 and M4-1 to M4-9 in `docs/review/decisions-to-review.md`.
 
+**On a Heltec V3 (Reduced tier, 64 KB):** the terminal composed with the Codes modifier uses about 57 KB of script memory, close to the limit; it runs, and the box logs a warning when it loads (decision M4-8). A V4 has room to spare.
+
 - **The terminal:** a box or an Android prop with a keypad (the role `terminal` requires `keypad`; the team buttons, a team display, a screen and sound are optional). On an Android prop the on-screen keypad is shown from the start. It sets one puzzle, `puzzle`, of length `digits` (3-6, default 4):
   - `code` (the default): a code of `digits` different digits. Type a guess and `#` (`*` clears); the terminal shows how many digits are in the right place and how many are in the code but elsewhere, for the last three guesses.
   - `wires`: `digits` numbered wires to cut in the right order: press a wire's number.

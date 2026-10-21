@@ -22,6 +22,7 @@ at once: a burst of logins waits instead of taking the server's memory.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import threading
 import unicodedata
 from pathlib import Path
@@ -41,8 +42,11 @@ MAX_LENGTH = 1024
 MAX_PARALLEL_HASHES = 2
 
 # The UK NCSC's list of the 100,000 passwords seen most often in breaches (from
-# Have I Been Pwned), as published in SecLists; README.md has its source and hash.
-BREACHED_LIST = Path(__file__).resolve().parent / "data" / "breached-passwords.txt"
+# Have I Been Pwned), as published in SecLists, kept as hashes only (decision
+# S11-4; tools/breached_hashes.py builds the file and says how).
+BREACHED_LIST = Path(__file__).resolve().parent / "data" / "breached-passwords.sha256"
+BREACHED_PREFIX = b"atalaia-breached-v1\x00"
+BREACHED_DIGEST_BYTES = 16
 
 HASHER = PasswordHasher(time_cost=TIME_COST, memory_cost=MEMORY_COST_KIB, parallelism=PARALLELISM,
                         hash_len=HASH_LEN, salt_len=SALT_LEN, type=Type.ID)
@@ -58,13 +62,19 @@ def normalise(password: str) -> str:
     return unicodedata.normalize("NFKC", password)
 
 
+def breached_hash(password: str) -> str:
+    """A password's entry in the breached file: NFKC, lower-cased, prefixed SHA-256, 16 bytes in hex."""
+    text = normalise(password).lower()
+    return hashlib.sha256(BREACHED_PREFIX + text.encode("utf-8")).digest()[:BREACHED_DIGEST_BYTES].hex()
+
+
 def breached_passwords() -> frozenset[str]:
-    """The breached list, lower-cased, only the entries long enough to pass the length rule."""
+    """The breached list's hashes (only entries long enough to pass the length rule are in it)."""
     global _breached
     with _breached_lock:
         if _breached is None:
-            words = BREACHED_LIST.read_text(encoding="utf-8").splitlines()
-            _breached = frozenset(w.lower() for w in (normalise(w) for w in words) if len(w) >= MIN_LENGTH)
+            lines = BREACHED_LIST.read_text(encoding="utf-8").splitlines()
+            _breached = frozenset(line for line in lines if line and not line.startswith("#"))
         return _breached
 
 
@@ -77,7 +87,7 @@ def policy_problem(password: str, username: Optional[str] = None) -> Optional[st
         return "password_too_long"
     if username and pw.casefold() == username.casefold():
         return "password_is_username"
-    if pw.lower() in breached_passwords():
+    if breached_hash(pw) in breached_passwords():
         return "password_breached"
     return None
 

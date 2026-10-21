@@ -169,8 +169,57 @@ static void test_screen_updates(void)
     node_runner_stop(&r);
 }
 
+/* Decision M4-8: a mode that nearly fills a Reduced box's 64 KB is flagged
+ * (and logged on the device) right after it loads. Memory grows in 1 KB
+ * strings, so loading never needs a large temporary copy. */
+static bool start_with_strings(node_runner_t *r, hal_t *hal, unsigned count)
+{
+    static const char src[] =
+        "big = {}\nfor i = 1, params.k do big[i] = string.rep('x', 1000) .. i end\n";
+    preset_t p = {0};
+    snprintf(p.mode_id, sizeof(p.mode_id), "org.atalaia.test_memory");
+    snprintf(p.params_json, sizeof(p.params_json), "{\"k\":%u}", count);
+    memcpy(p.source, src, sizeof(src) - 1);
+    p.source_len = sizeof(src) - 1;
+    static const char *const teams[] = {"red", "blue"};
+    node_runner_init(r, hal, 64u * 1024u);
+    return node_runner_start(r, &p, teams, 2);
+}
+
+static void test_memory_warning_on_a_reduced_box(void)
+{
+    setup_runner_env();
+    hal_t hal;
+    hal_stub_init(&hal);
+    node_runner_t r;
+
+    CHECK(start_with_strings(&r, &hal, 0));
+    size_t base = atalaia_node_mem_used(r.node);
+    CHECK(!r.memory_tight);
+    node_runner_stop(&r);
+    CHECK(start_with_strings(&r, &hal, 10));
+    size_t per = (atalaia_node_mem_used(r.node) - base) / 10;
+    CHECK(!r.memory_tight);
+    node_runner_stop(&r);
+
+    /* Step up from the estimate until the flag goes up: it must do so while the
+     * mode still loads, and exactly when the use crosses 85%. */
+    size_t warn_at = 64u * 1024u * 85u / 100u;
+    CHECK(per > 0 && base < warn_at);
+    bool flagged = false;
+    for (unsigned k = (unsigned)((warn_at - base) / per); k < 64 && !flagged; k++) {
+        if (!start_with_strings(&r, &hal, k)) break; /* past the limit: no flag seen in time */
+        size_t used = atalaia_node_mem_used(r.node);
+        CHECK(r.memory_tight == (used >= warn_at));
+        flagged = r.memory_tight;
+        node_runner_stop(&r);
+    }
+    CHECK(flagged);
+}
+
 void run_node_runner_tests(void)
 {
+    test_memory_warning_on_a_reduced_box();
     test_load_and_start();
     test_event_processing();
     test_timer_expiry();

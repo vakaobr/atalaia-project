@@ -68,12 +68,12 @@ precedence = "override"
 SPDX-FileCopyrightText = "2009 Kazuhiko Arase"
 SPDX-License-Identifier = "MIT"
 
-# The site server's breached-password list (ADR-P4-2): SecLists'
-# Passwords/Common-Credentials/100k-most-used-passwords-NCSC.txt at commit
-# 1a7bb9127eca9e6ff2fc0301c597fe6e16a0cb56, unmodified, under SecLists' MIT
-# licence (server/README.md has its source and SHA-256; decision S11-4).
+# The site server's breached-password list (ADR-P4-2) as hashes, derived from
+# SecLists' Passwords/Common-Credentials/100k-most-used-passwords-NCSC.txt at
+# commit 1a7bb9127eca9e6ff2fc0301c597fe6e16a0cb56 under SecLists' MIT licence
+# by tools/breached_hashes.py (decision S11-4).
 [[annotations]]
-path = "server/atalaia_server/data/breached-passwords.txt"
+path = "server/atalaia_server/data/breached-passwords.sha256"
 precedence = "override"
 SPDX-FileCopyrightText = "2018 Daniel Miessler and the SecLists contributors"
 SPDX-License-Identifier = "MIT"

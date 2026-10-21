@@ -102,6 +102,12 @@ logs.
 | Reduced | Heltec V3 (no PSRAM) | 64 KB | Monochrome OLED |
 | Proxy | Cannot run scripts | -- | Thin node on controller |
 
+A mode that uses 85% or more of the box's script memory right after it loads
+logs a warning (`the mode uses N KB of this box's M KB script memory ...`):
+it may run out during the game. On a Reduced box (Heltec V3) the Hacking
+Terminal with the Codes modifier comes close (about 57 KB of 64 KB, decision
+M4-8): it is offered, with that warning; prefer a lighter combination or a V4.
+
 ## Build
 
 Everything builds in Docker (Docker Desktop must be running); no compiler is

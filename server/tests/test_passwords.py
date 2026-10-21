@@ -15,7 +15,7 @@ from atalaia_server import passwords
 
 # SHA-256 of SecLists' Passwords/Common-Credentials/100k-most-used-passwords-NCSC.txt at commit
 # 1a7bb9127eca9e6ff2fc0301c597fe6e16a0cb56, the file shipped unmodified (server/README.md).
-BREACHED_SHA256 = "c2e5696882c603b76bb67a47ee970897e5a76fc4c3f5547abe3d0ca340c576e0"
+BREACHED_SHA256 = "3e8b6a7ca06679888e4bfaca865acd049bdd16231d0a0448396d6a45b89704be"  # tools/breached_hashes.py's output from the pinned list
 
 
 class HashTests(unittest.TestCase):
@@ -88,13 +88,19 @@ class PolicyTests(unittest.TestCase):
             with self.subTest(pw=pw):
                 self.assertEqual(passwords.policy_problem(pw), "password_breached")
 
-    def test_the_breached_list_is_the_published_file(self) -> None:
+    def test_the_breached_list_is_the_generated_file(self) -> None:
         data = passwords.BREACHED_LIST.read_bytes()
         self.assertEqual(hashlib.sha256(data).hexdigest(), BREACHED_SHA256)
-        self.assertEqual(len(data.decode("utf-8").splitlines()), 99840)
         loaded = passwords.breached_passwords()
-        self.assertGreater(len(loaded), 9000)  # the entries of 10 characters or more
-        self.assertTrue(all(len(w) >= passwords.MIN_LENGTH for w in loaded))
+        self.assertEqual(len(loaded), 9126)  # the list's entries of 10 characters or more
+        self.assertTrue(all(len(h) == 32 and int(h, 16) >= 0 for h in loaded))
+        # Hashes only: no entry of the list is there in clear (decision S11-4).
+        self.assertNotIn(b"basketball", data.lower())
+        self.assertNotIn(b"password12", data.lower())
+
+    def test_a_long_unlisted_password_passes(self) -> None:
+        self.assertIsNone(passwords.policy_problem("correct horse battery staple"))
+        self.assertNotIn(passwords.breached_hash("correct horse battery staple"), passwords.breached_passwords())
 
 
 if __name__ == "__main__":

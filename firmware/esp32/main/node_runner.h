@@ -28,6 +28,7 @@ typedef struct {
     uint32_t game_time_ms;
     uint32_t persist_accum_ms;
     size_t mem_limit;
+    bool memory_tight; /* the loaded mode uses 85%+ of mem_limit (decision M4-8) */
     bool running;
     /* The running mode's id: its screen templates (screen_template.h) apply. */
     char mode_id[PRESET_MODE_ID_MAX];
