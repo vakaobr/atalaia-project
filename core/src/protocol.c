@@ -200,6 +200,7 @@ const char *atalaia_msg_type_name(unsigned type)
     case ATALAIA_MSG_CONFIG: return "CONFIG";
     case ATALAIA_MSG_CLAIM: return "CLAIM";
     case ATALAIA_MSG_FIELD: return "FIELD";
+    case ATALAIA_MSG_PAIR: return "PAIR";
     default: return NULL;
     }
 }

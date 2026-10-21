@@ -592,6 +592,21 @@ CMD opcode **9, `update`**: the controller offers a box a firmware release. Its 
 
 **Reason:** on the first field test with real boxes (2026-10-21) every game needed every box joined again by card, QR code or serial line, and a GM could start a game no box had joined. Field frames let the controller find the free boxes and bring them into the next game from the console; the start guard (controller side, no wire change) refuses a start while a role has no joined node unless the GM confirms.
 
+## Amendment 8 (2026-10-21, proposed): Pair frames, adopting a box by its code
+
+**Status:** proposed with the pairing code over the radio, the third way to adopt a box (decisions AD-1, accepted by the maintainer, and AD-15 to AD-27); for review.
+
+**Change:**
+
+1. **Message type 10, `PAIR`**: a frame outside any game, with Amendment 7's header rules (`game_id` 0, `source` 0, `seq` 0, `hop_limit` 0, never relayed) but **not encrypted** (`version_flags` 0x28): the box has no key yet. After the header comes a CBOR body of at most 200 bytes (so 10-209 bytes in all), the kind first: OFFER (an unadopted box showing a code: a random pair id, its name, tier), START (a controller: the pair id, a 16-byte sid, CPace's Ya), REPLY (the box: Yb and its key confirmation), KEY (the controller: its confirmation, a 13-byte nonce and the field join key and name sealed with AES-128-CCM), DONE (the box: its adoption result and the fingerprint of the key it holds, authenticated). Tables and rules in [protocol/adoption.md](../../protocol/adoption.md) section 7; shared vectors in `protocol/vectors/pairing.json`.
+2. **The security is CPace** (draft-irtf-cfrg-cpace-14, `CPACE-X25519-SHA512`), run with the 6-digit code the box shows as its password, `CI` = `lv_cat("atalaia pair v1", pair id)`. From its ISK, HKDF-SHA256 (RFC 5869, salt the sid) gives the two confirmation keys, the AES-128-CCM key and the key of KEY's nonce pseudonym; the nonce follows Amendment 7's rule with a sender id the controller draws for every run, boot 1, count 0. Only the controller encrypts. The draft's Appendix B.1 and B.1.10 vectors are checked by both implementations.
+3. **The USB modem** carries type 10 as it carries type 9 (FIELD_TX, FIELD_RX), checking only its shape (version 1, not encrypted, game 0, 10-209 bytes), and says so in IDENT (`"pair": true`).
+4. **Where**: an unadopted box listens on its default channel (869.525 MHz unless its build says otherwise). A box offers itself only while its code shows (5 minutes), at most every max(15 s, its time on air / 5 % of the sub-band's duty cycle); it answers a START once per sid (twice at most for a repeated one), burns its code after every failed run, waits a minute after three and stops after ten until it restarts.
+
+**Compatibility:** the version bits do not change. A box or a modem from before drops type 10 (game id 0 and not a field frame); a controller from before ignores what it hears in FIELD_RX that does not open as a field frame. Pairing needs both the box's and the modem's new firmware.
+
+**Reason:** the maintainer's decision (2026-10-21) to adopt boxes three ways: a field card, a USB cable and, for a box with a screen and nothing else at hand, its code over the radio, where an eavesdropper without the code learns nothing and an active attacker gets one guess per run.
+
 ## Open questions
 
 - Per-node session keys (HKDF-derived from the game key) would limit

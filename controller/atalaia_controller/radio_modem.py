@@ -205,6 +205,12 @@ class RadioModem:
         """The modem's firmware relays field frames (IDENT "field": true)."""
         return (self.ident or {}).get("field") is True
 
+    @property
+    def has_pair_frames(self) -> bool:
+        """The modem's firmware also carries pair frames, type 10 (IDENT "pair": true;
+        protocol/adoption.md): adopting a box by its code."""
+        return (self.ident or {}).get("pair") is True
+
     def send_packet(self, header: Header, payload: bytes) -> bool:
         """Queues a TX frame: the modem encrypts and transmits it. False if the link is not up."""
         if self.state != UP:

@@ -59,6 +59,7 @@ from atalaia_sim.packet import Header, vf_make
 
 from . import channels, radio_modem, visibility
 from . import scenario_service as scenarios
+from .pairing import Pairing
 from .reinvite import Reinvite
 from .config import Config
 from .modem_framing import RxPacket
@@ -308,14 +309,16 @@ class Controller:
 
         # Free boxes and invites between games (reinvite.py); needs the field join key.
         self.reinvite: Optional[Reinvite] = Reinvite(self) if join_key else None
+        # Unadopted boxes paired by the code they show (pairing.py, protocol/adoption.md).
+        self.pairing: Optional[Pairing] = Pairing(self) if join_key else None
         if modem is not None:
             modem.on_rx = self._on_rx
             modem.on_tx_ack = self._on_tx_ack
             modem.on_state = self._on_modem_state
             modem.on_error = self._on_modem_error
             if self.reinvite is not None:
-                modem.on_field_rx = self.reinvite.on_field_rx
-                modem.on_field_ack = self.reinvite.on_field_ack
+                modem.on_field_rx = self._on_field_rx
+                modem.on_field_ack = self._on_field_ack
         self._restore()
 
     # --- plumbing -----------------------------------------------------------
@@ -782,6 +785,7 @@ class Controller:
             self.store.set_setting("radio.channel_set_at", str(time.time()))
             if self.modem is not None and self.modem.is_up:
                 self.modem.set_channel(hz)
+                self._modem_moved("the field's channel changed")
             log.info("field channel set to %d Hz (%s)", hz, source)
         out = self.radio_settings()
         self._emit({"type": "radio", "radio": out})
@@ -810,6 +814,7 @@ class Controller:
             modem = self.modem
             self.scan = channels.Scan(lambda hz, ms: modem.measure(hz, ms), total,
                                       self.cfg.quiet_threshold_dbm, self._on_scan)
+            self._modem_moved("a channel scan started")
             self.scan.start()
             return self.scan.public()
 
@@ -831,6 +836,7 @@ class Controller:
             self.store.set_setting("radio.last_scan", json.dumps(state))
             if self.modem is not None and self.modem.is_up:
                 self.modem.set_channel(self.field_channel)  # back on the field's channel
+                self._modem_moved("a channel scan ended")
         self._emit({"type": "radio_scan", "scan": state})
 
     def game_key(self, game_id: int) -> bytes:
@@ -1355,6 +1361,8 @@ class Controller:
             self.branding.purge()  # crests nothing refers to any more, at most every 10 minutes
         if self.reinvite is not None:
             self.reinvite.tick(self.now_ms())  # invites and their retries, with or without a game
+        if self.pairing is not None:
+            self.pairing.tick(self.now_ms())  # pairing runs, offers heard, the listening window
         with self._lock:
             fc = self.fc
             if fc is None:
@@ -1426,6 +1434,7 @@ class Controller:
                 if self.fc is None and self.modem is not None and not (
                         self.scan is not None and self.scan.running):
                     self.modem.set_channel(self.field_channel)  # no game: listen on the field's channel
+                    self._modem_moved("the modem came back")
                 if self.fc is not None:
                     known = {n.node_id: n.epoch for n in self.fc.nodes.values() if n.epoch}
                     if known and self.modem is not None:
@@ -1435,6 +1444,24 @@ class Controller:
 
     def _on_modem_error(self, code: str, message: str) -> None:
         self._emit({"type": "system", "kind": "modem.error", "code": code, "message": message})
+
+    def _modem_moved(self, why: str) -> None:
+        """The modem was tuned to the field's channel: pairing is no longer listening on its own."""
+        if self.pairing is not None:
+            self.pairing.channel_moved(why)
+
+    def _on_field_rx(self, frame: bytes, rssi: int, snr: int) -> None:
+        """FIELD_RX: a pair frame (type 10) is pairing's, a field frame (type 9) the invites'."""
+        if self.pairing is not None and self.pairing.is_ours(frame):
+            self.pairing.on_frame(frame, rssi, snr)
+        elif self.reinvite is not None:
+            self.reinvite.on_field_rx(frame, rssi, snr)
+
+    def _on_field_ack(self, tx_id: int, status: str) -> None:
+        if self.pairing is not None and self.pairing.owns_tx(tx_id):
+            self.pairing.on_ack(tx_id, status)
+        elif self.reinvite is not None:
+            self.reinvite.on_field_ack(tx_id, status)
 
     # --- FieldController hooks ---------------------------------------------------
 

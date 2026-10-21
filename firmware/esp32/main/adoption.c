@@ -270,6 +270,12 @@ static void log_result(adoption_t *a, const char *via, adopt_result_t r)
     say(a, line);
 }
 
+void adoption_report(adoption_t *a, const char *via, adopt_result_t r, uint32_t now_ms)
+{
+    log_result(a, via, r);
+    if (r != ADOPT_BUSY) show_result(a, r, now_ms);
+}
+
 bool adoption_tap(adoption_t *a, const uint8_t *mem, size_t len, uint32_t now_ms,
                   adopt_result_t *result)
 {

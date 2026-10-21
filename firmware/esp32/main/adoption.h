@@ -155,6 +155,9 @@ adopt_result_t adoption_offer(adoption_t *a, const uint8_t key[ADOPTION_KEY_SIZE
 bool adoption_tap(adoption_t *a, const uint8_t *mem, size_t len, uint32_t now_ms,
                   adopt_result_t *result);
 
+/* Logs and shows the result of an offer made another way (the pairing code: via "radio"). */
+void adoption_report(adoption_t *a, const char *via, adopt_result_t r, uint32_t now_ms);
+
 /* True while a card waits for its PIN or a result is on the screen: keys go to adoption_key. */
 bool adoption_active(const adoption_t *a);
 /* A keypad key: digits, '*' deletes (cancels when empty), '#' enters the PIN; any key

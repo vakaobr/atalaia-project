@@ -71,6 +71,9 @@ which browsers cannot give headers, also takes ``?token=``.
     POST /api/v1/adopt/card                GM: the NFC field card's bytes (the field join key; protocol/adoption.md)
     POST /api/v1/adopt/usb/scan            GM: the Field Boxes plugged into this controller by USB
     POST /api/v1/adopt/usb                 GM: adopt one {"port", "mac" (as confirmed), "pin"?}
+    GET  /api/v1/adopt/pair                GM: boxes offering a pairing code over the radio, the run
+    POST /api/v1/adopt/pair/listen         GM: keep the modem on 869.525 MHz for 5 minutes (no live game)
+    POST /api/v1/adopt/pair                GM: pair {"pair_id", "code"} (CPace with the box's code)
     GET  /api/v1/checkin                   field check-in: field, notice, settings, open games (no token)
     POST /api/v1/checkin                   check in with a field identity: a player token
     POST /api/v1/checkin/token             a new player token (player token)
@@ -796,6 +799,24 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     def adopt_usb(body: Any = Body(None)) -> JSONResponse:
         b = body_map(body)
         return JSONResponse(adoption().adopt_usb(b.get("port"), b.get("mac"), b.get("pin")), headers=NO_STORE)
+
+    def pairing() -> Any:
+        if controller.pairing is None:
+            raise HTTPException(503, "pairing needs the field join key")
+        return controller.pairing
+
+    @app.get("/api/v1/adopt/pair", dependencies=[Depends(require_gm)])
+    def adopt_pair_status() -> JSONResponse:
+        return JSONResponse(pairing().status(), headers=NO_STORE)
+
+    @app.post("/api/v1/adopt/pair/listen", dependencies=[Depends(require_gm)])
+    def adopt_pair_listen() -> JSONResponse:
+        return JSONResponse(pairing().listen(), headers=NO_STORE)
+
+    @app.post("/api/v1/adopt/pair", dependencies=[Depends(require_gm)])
+    def adopt_pair(body: Any = Body(None)) -> JSONResponse:
+        b = body_map(body)
+        return JSONResponse(pairing().pair(b.get("pair_id"), b.get("code")), headers=NO_STORE)
 
     # --- field check-in (ADR-P3-13, protocol/checkin.md) ------------------------------
 

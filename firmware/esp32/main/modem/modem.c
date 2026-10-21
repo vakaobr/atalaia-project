@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "atalaia/duty_cycle.h"
+#include "atalaia/pair_frame.h"
 #include "atalaia/version.h"
 
 /* ---- Output frames -------------------------------------------------------- */
@@ -84,7 +85,7 @@ void modem_send_ident(modem_t *m)
     int n = snprintf(json, sizeof(json),
                      "{\"fw\":\"atalaia-modem\",\"fw_version\":\"%s\",\"core_version\":\"%s\","
                      "\"framing\":%d,\"radio\":\"%s\",\"payload_max\":%d,\"epoch_window\":%u,"
-                     "\"measure\":%s,\"field\":true}",
+                     "\"measure\":%s,\"field\":true,\"pair\":true}",
                      m->fw_version != NULL ? m->fw_version : "unknown", atalaia_version(),
                      MODEM_PROTOCOL_VERSION, m->radio_present ? "sx1262" : "none",
                      ATALAIA_RF_PAYLOAD_MAX, (unsigned)m->epoch_window,
@@ -388,15 +389,22 @@ static void send_field_ack(modem_t *m, uint16_t id, modem_tx_status_t status)
     send_frame(m, MODEM_FRAME_FIELD_ACK, buf, sizeof(buf));
 }
 
-/* The shape of a field frame: version 1, encrypted, game 0, type FIELD, 31-217 bytes. The
- * modem cannot check more: the key is the field's, which only the controllers and boxes hold. */
+/* The shape of a field frame: version 1, encrypted, game 0, type FIELD, 31-217 bytes; or of
+ * a pair frame (protocol/adoption.md): version 1, not encrypted, game 0, type PAIR, 10-209
+ * bytes. The modem cannot check more: a field frame's key is the field's, which only the
+ * controllers and boxes hold, and a pair frame's security is CPace's, between its two ends. */
 static bool field_frame_shape(const uint8_t *pkt, size_t len)
 {
     atalaia_header_t h;
-    if (len < MODEM_FIELD_MIN || len > MODEM_FIELD_MAX || !atalaia_header_decode(pkt, &h)) {
+    if (len < ATALAIA_PF_MIN || len > MODEM_FIELD_MAX || !atalaia_header_decode(pkt, &h) ||
+        h.game_id != 0) {
         return false;
     }
-    return h.game_id == 0 && h.type == ATALAIA_MSG_FIELD && ATALAIA_VF_ENC(h.version_flags);
+    if (h.type == ATALAIA_MSG_PAIR) { /* as atalaia_pf_is_frame(), without its codec */
+        return len <= ATALAIA_PF_MAX && !ATALAIA_VF_ENC(h.version_flags) &&
+               ATALAIA_VF_VERSION(h.version_flags) == 1;
+    }
+    return len >= MODEM_FIELD_MIN && h.type == ATALAIA_MSG_FIELD && ATALAIA_VF_ENC(h.version_flags);
 }
 
 static void handle_field_tx(modem_t *m, const uint8_t *p, size_t len)
@@ -420,7 +428,7 @@ static void handle_field_tx(modem_t *m, const uint8_t *p, size_t len)
         send_field_ack(m, id, MODEM_TX_INVALID);
         return;
     }
-    /* Never relayed: hop_limit 0 (it is outside the AAD, so the MIC still holds). */
+    /* Never relayed: hop_limit 0 (outside a field frame's AAD, so its MIC still holds). */
     uint8_t pkt[MODEM_FIELD_MAX];
     memcpy(pkt, frame, n);
     pkt[ATALAIA_RF_HOP_LIMIT_OFFSET] = 0;

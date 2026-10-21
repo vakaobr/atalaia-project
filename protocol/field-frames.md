@@ -110,7 +110,7 @@ Time on air at SF7/125 kHz (the LoRa formula, `eu868.airtime_ms`):
 
 ## What is not covered
 
-- **Room for adopting a box over LoRa** ([adoption.md](adoption.md), decision AD-14): kinds 4-7 of this message type are reserved for it (decoders refuse them today, so both sides change together), but its `PAIR_*` messages run before a box holds the join key, so they cannot be sealed with this key: they fit best as a sibling message type 10 with the same header (game id 0, `hop_limit` 0, never relayed), which the modem would carry like type 9 once its shape check accepts it. `PAIR_KEY` can reuse `atalaia_ff_seal` with a key derived from CPace's ISK and this nonce rule, and `atalaia_hkdf_sha256` / `hkdf_sha256` are on both sides.
+- **Adopting a box over the radio** is not a field frame: its messages run before the box holds the join key, so they are a sibling message type 10 (`PAIR`, RFC 0001 Amendment 8) with this header's rules but in the clear, secured by CPace with the code the box shows ([adoption.md](adoption.md) section 7, decisions AD-15 to AD-27). The modem carries both types in FIELD_TX / FIELD_RX; its KEY message's nonce follows this file's rule, and both use `atalaia_hkdf_sha256` / `hkdf_sha256`. Kinds 4-7 of type 9 stay unused (decoders refuse them).
 - Android props link over Wi-Fi ([prop-link.md](prop-link.md)), not LoRa: they are not invited over the radio yet (they count for the start guard as soon as they are linked). The app's HELLO codec reads and writes key 10.
 - A box listens on its last game's channel: after the field's channel changes (RFC 0001 Amendment 3), its next game needs a card once.
 - Field frames are not relayed: a box out of the modem's direct range is not heard between games.

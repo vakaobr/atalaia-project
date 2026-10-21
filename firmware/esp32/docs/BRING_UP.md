@@ -319,7 +319,7 @@ firmware no longer reads a button there.
    controller and at least two nodes (step 10b). Single-box radio health can be
    verified by monitoring `radio_task` log lines for TX/RX activity.
 
-## Step 10a: Adopting the box (USB cable, field card)
+## Step 10a: Adopting the box (USB cable, field card, pairing code)
 
 [protocol/adoption.md](../../../protocol/adoption.md). Board 1 (the Field Box bench build) on
 its USB-C port; the controller and its modem (board 2) as in step 10b.
@@ -351,7 +351,19 @@ its USB-C port; the controller and its modem (board 2) as in step 10b.
    serial keys). A field card held on the reader during a game logs
    `field card: ignored during a game`. Keep the card locked away: it is the field's
    master secret.
-5. After the tests, `python3 -m atalaia_controller join-key --rotate` on a test controller
+5. **The pairing code over the radio** (board 1 unadopted, board 2 the controller's modem
+   with this firmware: its IDENT says `"pair": true`). Erase board 1's NVS first if it was
+   adopted (`idf.py -B build-bench erase-flash` and flash it again, or `esptool.py erase_region
+   0x9000 0x6000`: the NVS partition, partitions.csv). At start it logs `pairing: listening on
+   869525000 Hz` and `pairing: code NNN NNN ...`; the OLED shows the code (the bench build has
+   no TFT). In the *Adopt* tab, *Pair by code (radio)* → *Look for boxes on the radio*: within
+   about 15 s the board is listed by name with its RSSI. Type a wrong code first: the console
+   says the code was not the one it shows, and after 10 s the board shows `Try again` with a
+   new code. Type the new code: `adoption (radio): adopted, field XXXX-XXXX`, ADOPTED on the
+   OLED, the run *adopted* in the console and in its records, then the board announces itself
+   as a free box (step 10b's invites); `@pair` on it now says it is adopted. Note the RSSI
+   at 1 m and how far the pairing still works.
+6. After the tests, `python3 -m atalaia_controller join-key --rotate` on a test controller
    shows the boxes as *adopted to this field's old key*; adopt them again with the PIN.
 
 ## Step 10b: Joining a field controller's game

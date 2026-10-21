@@ -53,6 +53,7 @@ set(CORE_SOURCES
     ${CORE_DIR}/src/msg_codec.c
     ${CORE_DIR}/src/join.c
     ${CORE_DIR}/src/field_frame.c
+    ${CORE_DIR}/src/pair_frame.c
     ${CORE_DIR}/src/tag.c
     ${CORE_DIR}/src/screen_template.c
     ${CORE_DIR}/src/proxy.c
@@ -162,6 +163,8 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/serial_console.c
     ${SHELL_DIR}/fw_update.c
     ${SHELL_DIR}/adoption.c
+    ${SHELL_DIR}/cpace.c
+    ${SHELL_DIR}/box_pair.c
     ${SHELL_DIR}/hal/board_fem.c
     ${SHELL_DIR}/modem/modem.c
     ${SHELL_DIR}/modem/modem_framing.c
@@ -213,6 +216,7 @@ set(TEST_SOURCES
     test_pod.c
     test_fw_update.c
     test_adoption.c
+    test_box_pair.c
 )
 
 # ---- Executable --------------------------------------------------------------

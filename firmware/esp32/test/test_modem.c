@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "atalaia/pair_frame.h"
 #include "check.h"
 #include "modem/modem.h"
 
@@ -837,6 +838,70 @@ static void test_field_frames(void)
     CHECK(field_ack(NULL) == MODEM_TX_NO_RADIO);
 }
 
+/* ---- Pair frames (protocol/adoption.md): type 10, in the clear, carried like field frames ---- */
+
+static size_t pair_offer(uint8_t *out, uint16_t game, bool enc)
+{
+    atalaia_pf_msg_t m;
+    memset(&m, 0, sizeof(m));
+    m.kind = ATALAIA_PF_OFFER;
+    memset(m.pair_id, 0xb0, sizeof(m.pair_id));
+    memcpy(m.name, "porta-norte", 12);
+    size_t n = atalaia_pf_encode(&m, out, ATALAIA_PF_MAX);
+    atalaia_header_t h = {.version_flags = ATALAIA_VF_MAKE(1, 1, 0, enc ? 1 : 0),
+                          .game_id = game,
+                          .hop_limit = 3,
+                          .type = ATALAIA_MSG_PAIR};
+    atalaia_header_encode(&h, out);
+    return n;
+}
+
+static void test_pair_frames(void)
+{
+    setup(true, 16);
+    host_send(MODEM_FRAME_CMD, (const uint8_t[]){MODEM_CMD_IDENT}, 1);
+    int ident = last_of(MODEM_FRAME_IDENT);
+    char json[MODEM_FRAME_PAYLOAD_MAX + 1] = "";
+    if (ident >= 0) {
+        memcpy(json, io_state.payload[ident], io_state.len[ident]);
+        json[io_state.len[ident]] = '\0';
+    }
+    CHECK(strstr(json, "\"pair\":true") != NULL);
+
+    clear_out();
+    uint8_t f[MODEM_FIELD_MAX + 8];
+    size_t n = pair_offer(f, 0, false);
+    CHECK(n > 0 && atalaia_pf_is_frame(f, n));
+    host_field_tx(0x0101, f, n);
+    CHECK(io_state.sent == 1 && io_state.pkt_len[0] == n && io_state.pkt[0][7] == 0);
+    CHECK(io_state.tag[0] == (MODEM_FIELD_TAG | 0x0101u));
+    /* Encrypted, a game's id, too long, the header alone: not a pair frame. */
+    n = pair_offer(f, 0, true);
+    host_field_tx(2, f, n);
+    CHECK(field_ack(NULL) == MODEM_TX_INVALID);
+    n = pair_offer(f, 77, false);
+    host_field_tx(3, f, n);
+    CHECK(field_ack(NULL) == MODEM_TX_INVALID);
+    n = pair_offer(f, 0, false);
+    memset(f + n, 0, ATALAIA_PF_MAX + 1 - n);
+    host_field_tx(4, f, ATALAIA_PF_MAX + 1);
+    CHECK(field_ack(NULL) == MODEM_TX_INVALID);
+    host_field_tx(5, f, ATALAIA_RF_HEADER_SIZE);
+    CHECK(field_ack(NULL) == MODEM_TX_INVALID);
+    CHECK(io_state.sent == 1);
+
+    /* Heard on air: to the host as FIELD_RX, with or without a game. */
+    clear_out();
+    n = pair_offer(f, 0, false);
+    modem_on_air_rx(&modem, f, n, -80, -3);
+    int rx = last_of(MODEM_FRAME_FIELD_RX);
+    CHECK(rx >= 0 && io_state.len[rx] == n + 2 && memcmp(io_state.payload[rx], f, n) == 0);
+    configure(77, 0, 1, 2, 869525000u, KEY);
+    clear_out();
+    modem_on_air_rx(&modem, f, n, -80, -3);
+    CHECK(last_of(MODEM_FRAME_FIELD_RX) >= 0 && last_of(MODEM_FRAME_RX) < 0);
+}
+
 void run_modem_tests(void)
 {
     test_ident_and_ping();
@@ -850,4 +915,5 @@ void run_modem_tests(void)
     test_clear_forgets_the_game();
     test_measure();
     test_field_frames();
+    test_pair_frames();
 }

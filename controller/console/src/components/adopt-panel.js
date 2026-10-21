@@ -8,7 +8,10 @@
 //   - the USB cable: the boxes plugged into the controller, each with its name,
 //     MAC and adoption state; the GM confirms the one to adopt (with the box's
 //     admin PIN when it belongs to another field or to this field's old key).
-// A pairing code over LoRa (the third way) comes with the radio invites.
+//   - the pairing code over the radio: an unadopted box shows a 6-digit code; the
+//     GM listens for boxes offering themselves, picks one, types its code, and the
+//     controller and the box run CPace with it (pairing.py, protocol/adoption.md
+//     section 7); the page follows the run until the box is adopted or it fails.
 
 import { html, Component, t } from '../ui.js';
 
@@ -18,11 +21,89 @@ export class AdoptPanel extends Component {
     constructor() {
         super();
         this.state = { info: null, card: null, scan: null, scanning: false, confirm: null, pin: '',
-                       result: null, adopting: false };
+                       result: null, adopting: false, pair: null, codes: {}, pairing: false };
+        this.poller = null;
     }
 
     componentDidMount() {
         if (this.props.app.state.role === 'gm') this.load(); // GM only: a read token is refused
+    }
+
+    componentWillUnmount() {
+        clearInterval(this.poller);
+    }
+
+    // ---- pairing by code ----------------------------------------------------------
+
+    async listen() {
+        const pair = await this.props.app.call('POST', '/adopt/pair/listen');
+        if (!pair) return;
+        this.setState({ pair });
+        clearInterval(this.poller);
+        // Polled while the card is open: the offers and the run (5 minutes at most).
+        const until = Date.now() + 5 * 60 * 1000;
+        this.poller = setInterval(() => {
+            if (Date.now() > until) clearInterval(this.poller);
+            else this.pollPair();
+        }, 1000);
+    }
+
+    async pollPair() {
+        const pair = await this.props.app.call('GET', '/adopt/pair');
+        if (!pair) return;
+        const was = this.state.pair && this.state.pair.run;
+        this.setState({ pair });
+        if (pair.run && ['done', 'failed'].includes(pair.run.state) && (!was || was.state !== pair.run.state)) {
+            this.load(); // the record of the run
+        }
+    }
+
+    async pairWith(e, offer) {
+        e.preventDefault();
+        const code = (this.state.codes[offer.pair_id] || '').replace(/\s/g, '');
+        this.setState({ pairing: true });
+        const pair = await this.props.app.call('POST', '/adopt/pair', { pair_id: offer.pair_id, code });
+        this.setState({ pairing: false, codes: { ...this.state.codes, [offer.pair_id]: '' } });
+        if (pair) this.setState({ pair });
+    }
+
+    renderPair() {
+        const { pair } = this.state;
+        const run = pair && pair.run;
+        return html`<section class="card" aria-labelledby="adopt-code-h">
+            <h2 id="adopt-code-h">${t('adopt.code_title')}</h2>
+            <p class="muted" data-testid="adopt-code">${t('adopt.code_intro')}</p>
+            <button type="button" data-testid="adopt-pair-listen" onClick=${() => this.listen()}>${
+                pair ? t('adopt.code_listen_again') : t('adopt.code_listen')}</button>
+            ${pair && html`<p class="muted small" data-testid="adopt-pair-channel">${t('adopt.code_channel', {
+                mhz: (pair.channel_hz / 1e6).toFixed(3) })}</p>`}
+            ${pair && pair.offers.length === 0 && html`<p class="muted" data-testid="adopt-pair-none">${
+                t('adopt.code_none')}</p>`}
+            ${pair && pair.offers.length > 0 && html`<ul class="list" data-testid="adopt-pair-offers">
+                ${pair.offers.map((o) => html`<li data-testid=${`adopt-pair-${o.pair_id}`}>
+                    <strong>${o.name}</strong> <span class="mono" data-testid="adopt-pair-id">${
+                        t('adopt.code_id', { id: o.short_id })}</span>
+                    <span class="muted small">${t('adopt.code_heard', {
+                        rssi: o.rssi, s: Math.round(o.seen_ms_ago / 1000) })}</span>
+                    ${(o.duplicate_name || o.conflict) && html`<p class="notice small" data-testid="adopt-pair-warn">${
+                        t('adopt.code_duplicate')}</p>`}
+                    <form class="form inline" onSubmit=${(e) => this.pairWith(e, o)}>
+                        <label class="sr-only" for=${`pc-${o.pair_id}`}>${t('adopt.code_label')}</label>
+                        <input id=${`pc-${o.pair_id}`} data-testid="adopt-pair-code" inputmode="numeric"
+                            autocomplete="off" pattern="[0-9 ]{6,7}" required placeholder="000 000"
+                            value=${this.state.codes[o.pair_id] || ''}
+                            onInput=${(e) => this.setState({ codes: { ...this.state.codes, [o.pair_id]: e.target.value } })} />
+                        <button type="submit" class="primary" data-testid="adopt-pair-go"
+                            disabled=${this.state.pairing || (run && ['starting', 'sealing'].includes(run.state))}>${
+                            t('adopt.code_pair')}</button>
+                    </form>
+                </li>`)}
+            </ul>`}
+            ${run && html`<p class=${run.state === 'done' ? 'ok' : run.state === 'failed' ? 'notice' : 'muted'}
+                role="status" data-testid="adopt-pair-run">${t(`adopt.code_run.${run.state}`, { name: run.name })}${
+                run.state === 'failed' && run.detail ? ` ${t(`adopt.code_why.${run.detail}`)}` : ''}${
+                run.result && run.state === 'failed' ? ` (${t(`adopt.result.${run.result}`, { name: run.name, mac: '' })})` : ''}</p>`}
+        </section>`;
     }
 
     async load() {
@@ -155,7 +236,7 @@ export class AdoptPanel extends Component {
             <h2 id="adopt-log-h">${t('adopt.log_title')}</h2>
             <ul class="list small" data-testid="adopt-log">${log.map((r) => html`<li>
                 <span class="mono">${r.at}</span> · ${t(`adopt.method.${r.method}`)} · ${
-                    r.method === 'usb' ? `${r.box || '—'} (${r.mac}) · ` : ''}${t(`adopt.result.${r.result}`, { name: r.box, mac: r.mac })}
+                    r.method === 'usb' ? `${r.box || '—'} (${r.mac}) · ` : r.method === 'radio' ? `${r.box || '—'} · ` : ''}${t(`adopt.result.${r.result}`, { name: r.box, mac: r.mac })}
             </li>`)}</ul>
         </section>`;
     }
@@ -168,10 +249,7 @@ export class AdoptPanel extends Component {
             ${this.renderField()}
             ${this.renderUsb()}
             ${this.renderCard()}
-            <section class="card" aria-labelledby="adopt-code-h">
-                <h2 id="adopt-code-h">${t('adopt.code_title')}</h2>
-                <p class="muted" data-testid="adopt-code">${t('adopt.code_later')}</p>
-            </section>
+            ${this.renderPair()}
             ${this.renderLog()}
         </div>`;
     }

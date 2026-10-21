@@ -27,6 +27,7 @@ set(CORE_SOURCES
     "${CORE_ROOT}/src/msg_codec.c"
     "${CORE_ROOT}/src/join.c"
     "${CORE_ROOT}/src/field_frame.c"
+    "${CORE_ROOT}/src/pair_frame.c"
     "${CORE_ROOT}/src/tag.c"
     "${CORE_ROOT}/src/screen_template.c"
     "${CORE_ROOT}/src/proxy.c"

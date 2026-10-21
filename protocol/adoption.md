@@ -5,13 +5,13 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Adopting boxes
 
-Before a Field Box can join a field's games it must be **adopted** by the field: it must get the field's 32-byte **field join key** ([join.md](join.md)), which authenticates every join payload. With the sealed radio re-invites (RJ decisions, built in parallel) the join key also becomes the field's **master secret**: the keys that seal a game's invite are derived from it, so whoever holds it and records the radio can read later games' keys (accepted by the maintainer). Adoption is how that secret reaches a box, once, and how the box refuses to give itself to anyone else.
+Before a Field Box can join a field's games it must be **adopted** by the field: it must get the field's 32-byte **field join key** ([join.md](join.md)), which authenticates every join payload. With the sealed radio re-invites ([field-frames.md](field-frames.md), RJ decisions) the join key also becomes the field's **master secret**: the keys that seal a game's invite are derived from it, so whoever holds it and records the radio can read later games' keys (accepted by the maintainer). Adoption is how that secret reaches a box, once, and how the box refuses to give itself to anyone else.
 
 The maintainer chose three ways (decision AD-1, 2026-10-21):
 
 | # | Method | Status |
 | --- | --- | --- |
-| 1 | **Pairing code over LoRa**: the box shows a short code, the GM types it in the console, a code-authenticated key exchange (CPace) runs over the radio and the join key is sent sealed under the agreed key | Designed here (section 7), to be built on the re-invite work's message ids and key derivation |
+| 1 | **Pairing code over LoRa**: the box shows a short code, the GM types it in the console, a code-authenticated key exchange (CPace) runs over the radio and the join key is sent sealed under the agreed key | Built (section 7): firmware, controller, console; in software and host tests (the C host box through the C host modem), not yet on the boards |
 | 2 | **NFC field card**: an NTAG215/216 holding the join key, written from the console, tapped once on each new box | Built: firmware, controller, console; in software and host tests, not yet on a reader (no PN532 fitted on the bench board) |
 | 3 | **USB cable**: the new box plugged into the controller once; the controller finds it and writes the key with a serial command after the GM confirms which box | Built: firmware, controller, console; tested with the C host box through a TCP bridge, not yet with a real board on the controller's USB |
 
@@ -57,9 +57,10 @@ The rules are the box's own (`adoption_offer()` in `adoption.c`); the controller
 | Another field's card | GAME MASTER, "PIN to change field", the PIN's dots; `#` enters, `*` deletes, `*` on nothing cancels; a minute without a key cancels | ADMIN PIN, dots |
 | Wrong PIN | the same, "Wrong PIN, try again" | "Wrong PIN" |
 | Locked, bad card, not stored | ADOPTION LOCKED / BAD FIELD CARD / NOT STORED with the field the box keeps | the same title |
+| Unadopted, at start | PAIR THIS BOX, Code: the 6 digits, Id: the pair id's start (TRY AGAIN after a failed run; PAIR PAUSED for a minute after three; PAIR LOCKED, restart the box, after ten) | the code, "id b0c5 console"; paused or locked in the footer |
 | A game joined | nothing changes; the log says why | |
 
-The serial console logs every attempt (`adoption (card|usb|joinkey): adopted, field 604A-0A95 "Campo"` or `refused, need_pin`), never the key or the PIN. An unadopted box logs it at boot; with method 1 an unadopted box with a screen will show its pairing code (section 7).
+The serial console logs every attempt (`adoption (card|usb|joinkey): adopted, field 604A-0A95 "Campo"` or `refused, need_pin`), never the key or the PIN. An unadopted box logs it at boot and shows its pairing code (section 7).
 
 ## 4. The NFC field card (method 2)
 
@@ -145,86 +146,87 @@ Docker on Windows does not see COM ports. Two ways:
 - **A COM-to-TCP bridge** on Windows: `python tools/serial_bridge.py COM3 7001` (needs only `pip install pyserial`; it opens the port without raising DTR or RTS, and serves the radio modem the same way with `--baud 921600`), then `[adopt] usb_ports = ["socket://host.docker.internal:7001"]` (or `ATALAIA_ADOPT_USB_PORTS`). Close any serial monitor on that COM port first.
 - **usbipd-win**: `usbipd bind --busid <id>` and `usbipd attach --wsl --busid <id>`; the board appears in WSL as `/dev/ttyACM0`; run the controller's container with `--device /dev/ttyACM0` (and the modem's device as before). The scan then finds it by its USB ids, which `usbipd` passes through.
 
-## 7. The pairing code over LoRa (method 1, designed, not built)
+## 7. The pairing code over the radio (method 1)
 
-For a box with a screen and no cable or card at hand. It is built after the re-invite work, on its message ids, its framing of packets outside a game and its key derivation.
+For a box with a screen and no cable or card at hand (decisions AD-15 to AD-27). Built on the re-invite work: the same header rules as field frames (game id 0, `hop_limit` 0, never relayed, [field-frames.md](field-frames.md)), carried by the USB modem in FIELD_TX / FIELD_RX, its nonce rule (RJ-15), its HKDF-SHA256 (`atalaia_hkdf_sha256` / `hkdf_sha256`) and AES-128-CCM.
 
-### Choice of PAKE: CPace on X25519 with SHA-512
+Implementations: [`core/src/pair_frame.c`](../core/src/pair_frame.c) and [`simulator/atalaia_sim/pair_frame.py`](../simulator/atalaia_sim/pair_frame.py) (the frames, the keys, the tags, the sealed key), [`firmware/esp32/main/cpace.c`](../firmware/esp32/main/cpace.c) and [`simulator/atalaia_sim/cpace.py`](../simulator/atalaia_sim/cpace.py) (CPace), [`firmware/esp32/main/box_pair.c`](../firmware/esp32/main/box_pair.c) (the box), [`controller/atalaia_controller/pairing.py`](../controller/atalaia_controller/pairing.py) (the controller) and the *Adopt* tab's *Pair by code*. Shared vectors: [`vectors/pairing.json`](vectors/pairing.json) (`tools/pairing_vectors.py` writes and `--check`s it): the CPace draft's Appendix B.1 and B.1.10, a whole run of this exchange, 19 bodies and 6 frames that must be refused; checked by C (`core/tests/test_pair_frame.c`, `firmware/esp32/test/test_box_pair.c`, which also plays the run against the box and compares its REPLY and DONE byte for byte) and Python (`simulator/tests/test_pair_frame.py`).
 
-**CPace** (draft-irtf-cfrg-cpace-14, the CFRG's recommended balanced PAKE), its X25519 / SHA-512 cipher suite (`CPACE-X25519-SHA512`), rather than SPAKE2 (RFC 9382) (decision AD-10):
+### The PAKE: CPace on X25519 with SHA-512
 
-- Both sides have it from libraries already in the project. **The box**: Monocypher 4.0.2 (vendored for firmware updates, `components/monocypher`) has `crypto_x25519` and `crypto_elligator_map` (Elligator 2 on Curve25519) and, in its optional part, `crypto_sha512`; mbedtls (ESP-IDF) has HKDF-SHA256 and AES-CCM. **The controller**: `cryptography` (already a dependency) has X25519 (its `exchange` is the scalar multiplication on any u-coordinate) and `hashlib` SHA-512; the Elligator 2 map is a dozen lines of integer arithmetic modulo 2^255 - 19 in Python.
-- SPAKE2's RFC 9382 known answers are for P-256 only, and `cryptography` offers no P-256 point addition (SPAKE2 needs `x*G + w*M`): it would need hand-written curve arithmetic on the controller. SPAKE2 also needs the M and N constants and a password-to-scalar mapping; CPace has neither.
-- CPace's generator comes from the code by hashing (no fixed points, no trusted setup), and its messages are plain X25519 u-coordinates (32 bytes each), small enough for LoRa.
-- Checked while writing this design: Monocypher's `crypto_elligator_map` reads its input as 254 bits, while CPace decodes 255 bits; since the map depends only on r², feeding it `min(r, p - r)` gives CPace's generator. On the draft's B.1.1 vector (r < 2^254 already) Monocypher returns exactly the draft's `g`, and a Python Elligator 2 with `cryptography`'s X25519 reproduces `g`, `Ya`, `Yb`, `K` and `ISK_IR` of B.1 (both run on 2026-10-21).
+**CPace**, `CPACE-X25519-SHA512` (draft-irtf-cfrg-cpace-14, the CFRG's recommended balanced PAKE), rather than SPAKE2 (RFC 9382) (decision AD-10):
+
+- Both sides have it from libraries already in the project. **The box**: Monocypher 4.0.2 (vendored for firmware updates) `crypto_x25519`, `crypto_elligator_map` and its optional `crypto_sha512`. **The controller**: `cryptography`'s X25519 (`exchange` is the scalar multiplication on any u-coordinate) and `hashlib`; Elligator 2 (RFC 9380 6.7.1) is a dozen lines of Python integers.
+- SPAKE2's RFC vectors are P-256 only and `cryptography` has no P-256 point addition; SPAKE2 also needs fixed M and N points. CPace's generator comes from the code by hashing, and its messages are 32-byte u-coordinates.
+- Monocypher's `crypto_elligator_map` reads 254 bits and CPace decodes 255 (then reduces modulo p); the map depends only on r², so the box gives it `min(r, p - r)`, always below 2^254. Both sides reproduce the draft's `g`, `Ya`, `Yb`, `K` and `ISK` (B.1) and the low-order points' results (B.1.10, the abort case for u0-u5 and u7).
+
+The controller is CPace's initiator (A), the box its responder (B). `PRS` = the code's 6 ASCII digits; `CI` = `lv_cat("atalaia pair v1", pair id)`; `sid` = 16 bytes the controller draws for the run; `ADa` = `"atalaia controller"`, `ADb` = `"atalaia box"`; `ISK = SHA-512(lv_cat("CPace255_ISK", sid, K) || lv_cat(Ya, ADa) || lv_cat(Yb, ADb))`. A `K` of all zeros (a low-order point) aborts the run.
+
+### Frames (message type 10, PAIR)
+
+```
+header (9) | body (CBOR, 1-200 bytes)        10-209 bytes, in the clear
+```
+
+The header: `version_flags` 0x28 (version 1, normal priority, no ACK, **not encrypted**), game id 0, source 0, seq 0, `hop_limit` 0, type 10. The body is a CBOR map with integer keys, the kind (key 1) first; decoders refuse an unknown kind, a missing or repeated field, a value of the wrong type or size, a key of another kind, keys from 32 up and trailing bytes, and skip unknown keys up to 31.
+
+| Key | Field | Type | In |
+| --- | --- | --- | --- |
+| 1 | `kind` | uint | all: 1 OFFER, 2 START, 3 REPLY, 4 KEY, 5 DONE |
+| 2 | `pair_id` | bytes (8) | all: a random id the box draws for each pairing (not its MAC or device id) |
+| 3 | `name` | text (1-24) | OFFER: the box's name |
+| 4 | `tier` | uint (0-2) | OFFER |
+| 5 | `sid` | bytes (16) | START, REPLY, KEY, DONE |
+| 6 | `point` | bytes (32) | START: Ya; REPLY: Yb |
+| 7 | `tag` | bytes (16) | REPLY, KEY, DONE |
+| 8 | `nonce` | bytes (13) | KEY |
+| 9 | `sealed` | bytes (41-89) | KEY: the join key (32), the name's length (1), the field's name (0-48 bytes), the MIC (8) |
+| 10 | `result` | uint (0-9) | DONE: `adopted`, `same`, `readopted`, `need_pin`, `bad_pin`, `locked`, `busy`, `bad_key`, `bad_card`, `store_failed` (adoption.c's order) |
+| 11 | `fingerprint` | bytes (4) | DONE: the field fingerprint of the key the box now holds (zeros if it holds none) |
+
+From the ISK, `HKDF-SHA256(salt = sid, IKM = ISK)` with the labels `atalaia pair confirm a v1` (32 bytes, the controller's tag key), `atalaia pair confirm b v1` (32, the box's), `atalaia pair seal v1` (16, AES-128-CCM) and `atalaia pair nonce v1` (32, the nonce pseudonym's key). The tags are the first 16 bytes of HMAC-SHA256: REPLY's `(confirm_b, "atalaia pair reply")`, KEY's `(confirm_a, "atalaia pair key")`, DONE's `(confirm_b, "atalaia pair done" | result | fingerprint)`. KEY's sealed key: AES-128-CCM, 8-byte MIC, AAD `"atalaia pair key v1" | pair id | sid`, under the nonce **`HMAC-SHA256(nonce key, sender id)[0..7] | boot 1 | count 0`** with a sender id the controller draws with `os.urandom` for every run and never stores (field-frames.md's rule, decision RJ-15): a key new to every run and a nonce from no generator of the box's. **Only the controller encrypts**; the box seals nothing (decision AD-17).
 
 ### The exchange
 
-The controller is CPace's initiator (A) and the box its responder (B). They talk over packets outside a game (no game key: their integrity comes from CPace), on the channel where idle boxes listen for invites:
-
-| # | From | Message (proposed) | Content |
+| # | From | Frame | What |
 | --- | --- | --- | --- |
-| 0 | box | `PAIR_OFFER` (broadcast every 10 s while the code is on the screen) | `mac` (6), `box_nonce` (8), the box's name (≤ 24 bytes) |
-| 1 | controller | `PAIR_START` | `mac` (the box addressed), `sid` (16 random bytes), `Ya` (32) |
-| 2 | box | `PAIR_REPLY` | `sid`, `Yb` (32), `tag_b` (16) |
-| 3 | controller | `PAIR_KEY` | `sid`, `tag_a` (16), `sealed` (the join key and the field's name: 32 + ≤ 48 bytes, AES-128-CCM, 8-byte tag) |
-| 4 | box | `PAIR_DONE` | `sid`, `result` (as `@adopt`'s), `fingerprint` (4), `tag` (8) |
+| 0 | box | OFFER | while its code is on the screen: 1-3 s after it starts, then every max(15 s, its time on air / (5 % x the sub-band's duty cycle)) ± 10 % (about every 15 s on 869.525 MHz: 0.48 % of the hour's budget for 5 minutes) |
+| 1 | controller | START | the GM picked the box and typed its code: a fresh sid and scalar, Ya; sent again after 3 s, three times at most |
+| 2 | box | REPLY | Yb and the box's confirmation; computed once per sid, sent at most twice (a repeated START), then the box waits 10 s for KEY |
+| 3 | controller | KEY | only if the box's confirmation matches (else: `wrong_code`, nothing more is sent); the controller's confirmation, the nonce, the sealed join key and field name; again after 3 s, three times at most |
+| 4 | box | DONE | the box checks the controller's confirmation (else that KEY is ignored and the run keeps waiting), opens the key, adopts the field through `adoption_offer()` exactly as by a card or the cable, and answers with its result and the key's fingerprint, authenticated; a repeated KEY gets the same DONE again, twice at most |
 
-- `PRS` = the code's ASCII digits; `CI` = `lv_cat("atalaia-pair-v1", mac, box_nonce)`; `sid` from `PAIR_START`; `ADa` = the controller's node id (2 bytes), `ADb` = the box's MAC. The generator, `Ya = ya·g`, `Yb = yb·g`, `K` and `ISK = SHA-512(lv_cat("CPace255_ISK", sid, K) || transcript_ir(Ya, ADa, Yb, ADb))` exactly as the draft (initiator-responder ordering). A `K` of all zeros (a low-order point) aborts.
-- From `ISK`: `HKDF-SHA256(ikm = ISK, salt = sid, info = "atalaia pair v1 " + label)` for `confirm_a`, `confirm_b` (32 bytes each) and `seal` (16 bytes + 13-byte nonce). `tag_b = HMAC-SHA256(confirm_b, transcript)[:16]` and `tag_a` likewise: explicit key confirmation both ways; the box checks `tag_a` before it opens `sealed`, the controller checks `tag_b` before it sends `sealed`. Labels are registered next to the re-invite labels so no two derivations share one.
-- The box then stores the key under the same rules (`adoption_offer()`): an unadopted box offers a code by itself; a box adopted to another field offers one only after its admin PIN was typed on the keypad (an "Adopt to another field" entry in the admin menu), and that PIN is what lets the run replace its key.
+The controller then checks DONE's tag and that the fingerprint is this field's; the run is `done`, or `failed` with its reason (`wrong_code`, `no_answer`, `no_done`, `bad_answer`, `fingerprint`, `box_refused`, `channel_changed`). The adopted box's field frames start at once under the new key (box_lobby.c): it announces itself as a free box.
 
-### Limits
+### The box
 
-- The code: 6 random digits (about 20 bits), new at every run and after every failed one; on the screen with the box's name, for 5 minutes, then only after a key press.
-- One code, one run: a run that fails its confirmation burns the code; after 3 failed runs the box waits 60 s, after 10 it stops offering until restarted. The controller allows one run per code the GM types, 10 s per message and 30 s per run.
-- An active attacker on the air therefore gets **one guess per run** (one chance in a million) and few runs; a passive eavesdropper, even with every packet, learns nothing about the code or the key (CPace's security: no offline dictionary attack).
+- **When**: an unadopted box with a radio shows its code at start (over the preset picker; `*` gives the picker back, `#` shows a new code) and on `@pair` on the serial console; not during the setup portal, not on an adopted box (decision AD-16: an adopted box moves to another field by card or cable with its admin PIN; re-pairing it over the radio is left for later), not while a game is joined or played. The TFT shows *PAIR THIS BOX* with the code (`Code: 042 137`), the on-board OLED the code in large type; the log `pairing: code 042 137 on 869525000 Hz, for 5 minutes`.
+- **Where**: on `CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ`, 869.525 MHz by default, where the radio listens until a game sets a channel (decision AD-18); the box logs it at start (`pairing: listening on 869525000 Hz`).
+- **Limits** (decision AD-19): the code stays 5 minutes; one run per START's sid, a sid never runs twice (the last eight are remembered: a recorded START played back gets nothing); a failed run (a low-order point, or no KEY with the controller's confirmation within 10 s: the code was wrong, or the START was not our controller's) burns the code and shows a new one; a START that got a REPLY always burns it, since the REPLY's tag is one guess. A KEY whose confirmation does not match, or whose sealed key does not open, ends nothing: it is counted and ignored and the run keeps waiting for the controller's own (decision AD-25), since anyone who heard the sid could send one. A START while a run is on is refused, not a replacement. After three failed runs in a row the screen says *PAIR PAUSED, for 1 minute* (no code, no runs, no offers); after ten, *PAIR LOCKED, restart the box* until a key, and no pairing until the box restarts. A run's scalar, ISK and keys are wiped as soon as they are no longer needed and on every outcome. So without the code an attacker gets one guess per run (one in a million), three a minute, ten in all, and can make the box transmit at most two REPLYs per run.
+- **The code**: 6 digits from the box's seeded generator (RJ-15's), uniform (rejection sampling), never stored; the pair id likewise, new at every pairing. The screen also shows the pair id's first two bytes (`Id: b0c5`), which the console shows beside the box's offer (decision AD-26).
+
+### The controller
+
+- Hears OFFERs through FIELD_RX (pair frames are told from field frames by their type), lists the boxes offering for a minute after the last one, and runs one pairing at a time; `GET /api/v1/adopt/pair`, `POST /api/v1/adopt/pair/listen`, `POST /api/v1/adopt/pair {"pair_id", "code"}`, GM token only (decision AD-20). Every run's outcome is logged (`atalaia.adoption`) and kept with the other adoption records (method `radio`), never the code, the key or a secret of the run.
+- **The channel** (decision AD-18): when the field's channel is not 869.525 MHz and no game is live, *Look for boxes on the radio* tunes the modem there for five minutes and back to the field's channel afterwards (or as soon as a game is created); with a game live on another channel it refuses until the game ends. Whenever the engine tunes the modem back to the field's channel (the channel set, a scan, the modem reconnecting), pairing stops saying it listens and a run under way there fails (`channel_changed`, decision AD-27). A modem whose firmware does not say `"pair": true` in IDENT is refused (update it).
 
 ### Threat model
 
 | Threat | Outcome |
 | --- | --- |
-| Passive recording of the exchange | Nothing: the key travels sealed under a key only the two ends with the code can derive. |
-| Man in the middle on the air | One guess of the code per run, then the code changes; a failed run is visible on both ends. |
-| A neighbour field's controller adopting our new box | Needs the code from our box's screen: sight of the box. |
-| Our controller adopting the wrong unadopted box | The console shows the box's name and MAC from `PAIR_OFFER` before the GM types the code; the code binds the run to the box showing it. |
-| Jamming | Adoption fails; use the cable or the card. |
+| Passive recording of the whole exchange | Nothing: CPace gives an eavesdropper no offline test of the code, and the key travels sealed under a key derived from the ISK. |
+| Man in the middle on the air, or a fake controller | One guess of the code per run; a wrong guess shows on the box (a new code) and in the console (the run failed). The box adopts only after the controller's confirmation, so a fake controller without the code gets nothing and gives nothing. |
+| A fake box answering for ours | Without the box's code its REPLY fails the confirmation (`wrong_code`) and the join key is never sent. |
+| A neighbour field's controller adopting our new box | Needs the code from our box's screen: sight of the box. Keep new boxes in hand until adopted, as for the card and the cable. |
+| Replays (START, KEY, REPLY, DONE) | A START's sid runs once; a KEY or DONE of another run does not authenticate; the controller ignores frames of runs that are over. |
+| Making a box transmit | Offers only while the code shows (5 minutes, about 20), at most two REPLYs a run, three runs a minute, ten in all: well under the sub-band's budget. |
+| Denial of service on the air (jamming; STARTs answering every OFFER; forged KEYs) | A radio attacker can always keep a box from being paired: by jamming, or by taking its run with a START of its own (the GM's START then gets no answer: "another pairing under way, or interference; try again"), and its failed runs pause the box and, after ten, lock it until a restart, which the box's screen says. It cannot adopt the box, read the key, or end a real run with a forged KEY (ignored). Pair where the field is quiet, or use the cable or the card. |
+| A fake box offering under a real box's name | The console shows each offer's short id, RSSI and when it was last heard, flags two offers under one name and an OFFER that reuses a pair id under another name; the GM types the code into the entry whose id is on the box's screen. A wrong code into a fake entry gives the fake one guess per run, never the key, and the console says to read the box's screen again: a real box shows a new code after any failed run (if its code did not change, the entry was not that box). |
 
-### Known answers (from draft-irtf-cfrg-cpace-14, Appendix B.1, X25519 / SHA-512)
+### RFC 0001
 
-Copied from the draft (to go into `protocol/vectors/pairing.json` when this is built; both codecs must reproduce them before anything else):
-
-```
-PRS  = 50617373776f7264                                   ("Password")
-CI   = 6f630b425f726573706f6e6465720b415f696e69746961746f72
-sid  = 7e4b4791d6a8ef019b936c79fb7f2c57
-hash generator string (first 32 bytes of SHA-512, = the 255-bit field element)
-     = 92806dc608984dbf4e4aae478c6ec453ae979cc01ecc1a2a7cf49f5cee56551b
-g    = 64e8099e3ea682cfdc5cb665c057ebb514d06bf23ebc9f743b51b82242327074
-ya   = 21b4f4bd9e64ed355c3eb676a28ebedaf6d8f17bdc365995b319097153044080   ADa = 414461 ("ADa")
-Ya   = 1b02dad6dbd29a07b6d28c9e04cb2f184f0734350e32bb7e62ff9dbcfdb63d15
-yb   = 848b0779ff415f0af4ea14df9dd1d3c29ac41d836c7808896c4eba19c51ac40a   ADb = 414462 ("ADb")
-Yb   = 20cda5955f82c4931545bcbf40758ce1010d7db4db2a907013d79c7a8fcf957f
-K    = f97fdfcfff1c983ed6283856a401de3191ca919902b323c5f950c9703df7297a
-ISK_IR = a051ee5ee2499d16da3f69f430218b8ea94a18a45b67f9e86495b382c33d14a5
-         c38cecc0cc834f960e39e0d1bf7d76b9ef5d54eecc5e0f386c97ad12da8c3d5f
-```
-
-The draft's B.1.10 low-order points for `scalar_mult_vfy` (every one must give the all-zero `K` and abort) go into the same file.
-
-### Hooks needed from the re-invite work
-
-1. Message ids for the five `PAIR_*` messages (and their CBOR keys) in `protocol/schema/messages.yaml`, from the range the re-invites allocate.
-2. The framing of a packet **outside a game**: the header's game id (0?) and how the security layer is skipped for these ids only, with the receive path dropping them unless adoption is listening.
-3. The channel and schedule on which an idle box listens (the invites' idle channel), and the duty-cycle budget an unadopted box may spend on `PAIR_OFFER`.
-4. A single HKDF-SHA256 helper on both sides (core C with mbedtls, Python with `cryptography`) and one table of labels.
-5. In `field_link.c`'s idle receive, a dispatch of `PAIR_*` to `adoption.c` (a new `adoption_pair_*()` API there), and in the controller a pairing service next to the invite flow, under the GM token.
-6. The `PAIR_KEY` seal reuses the invites' AES-CCM construction (nonce layout, tag length) if it fits 80 bytes of plaintext.
-
-### RFC 0001 amendment (proposal text only; not applied to messages.yaml)
-
-> **Amendment N (proposed, numbered after the re-invite amendment): Adopting a box over the radio.** Five message types travel outside any game, between an unadopted (or PIN-unlocked) box and a field controller, on the idle-box channel defined by the re-invite amendment: `PAIR_OFFER` (box, broadcast, at most every 10 s and within the sub-band's duty cycle), `PAIR_START`, `PAIR_REPLY`, `PAIR_KEY`, `PAIR_DONE`. They carry no game id and no AES-CCM layer; their payloads are CBOR maps with integer keys as in section 7 of `protocol/adoption.md`, at most 120 bytes. Their security is CPace (draft-irtf-cfrg-cpace, `CPACE-X25519-SHA512`) with the code the box shows as its password, explicit key confirmation both ways, and the field join key sealed with AES-128-CCM under a key derived from CPace's ISK with HKDF-SHA256. A node that is not adopting drops them; a node relays none of them (hop limit 0). Known answers: the draft's Appendix B.1.
+Amendment 8 (2026-10-21, proposed) in [docs/rfcs/0001-skirmesh-rf-wire-format.md](../docs/rfcs/0001-skirmesh-rf-wire-format.md#amendment-8-2026-10-21-proposed-pair-frames-adopting-a-box-by-its-code): message type 10.
 
 ## Decisions
 
-AD-1 to AD-14 in [docs/review/decisions-to-review.md](../docs/review/decisions-to-review.md#adopting-boxes-2026-10-21).
+AD-1 to AD-14 in [docs/review/decisions-to-review.md](../docs/review/decisions-to-review.md#adopting-boxes-2026-10-21), AD-15 to AD-27 in its section on the pairing code.

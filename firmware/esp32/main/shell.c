@@ -24,6 +24,7 @@
 
 #include "adoption.h"
 #include "atalaia/join.h"
+#include "box_pair.h"
 #include "atalaia/packet.h"
 #include "atalaia/version.h"
 #include "box_game.h"
@@ -137,6 +138,9 @@ static adoption_t adopt;
 static char adopt_mac[18];
 static char adopt_name[25] = "field-box";
 static adoption_identity_t adopt_id = {adopt_name, adopt_mac, ""};
+/* Pairing by code over the radio (box_pair.c): an unadopted box shows a code at boot. */
+static box_pair_t pairing;
+static bool pair_at_boot;
 static uint32_t now_ms(void);
 #if SERIAL_UART
 static serial_console_t console_uart;
@@ -314,6 +318,18 @@ static void serial_command(const char *cmd)
             }
         } else {
             ESP_LOGW(TAG, "update: \"@update <version> <release id>\"");
+        }
+        return;
+    }
+    if (strcmp(cmd, "pair") == 0) {
+        /* A new pairing code (protocol/adoption.md): only on an unadopted box, with a radio. */
+        if (hal.radio == NULL) {
+            ESP_LOGW(TAG, "pair: no radio");
+        } else if (!box_pair_start(&pairing, now_ms())) {
+            ESP_LOGW(TAG, "pair: %s",
+                     adopt.adopted ? "this box is adopted (another field: the card or the cable, "
+                                     "with the admin PIN)"
+                                   : "locked after too many failed runs; restart the box");
         }
         return;
     }
@@ -643,6 +659,19 @@ static void box_start(const char *tier)
                           "(a field card, the USB cable or \"@joinkey\"; protocol/adoption.md)");
         }
     }
+    box_pair_ops_t pops = {.radio_send = box_radio_send,
+                           .random = box_random,
+                           .screen = box_screen,
+                           .log = adopt_log,
+                           .user = NULL};
+    uint32_t listen_hz = (uint32_t)CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ;
+    box_pair_init(&pairing, &pops, &adopt, &atalaia_crypto_mbedtls, name, hello.tier, listen_hz);
+    /* An unadopted box with a radio shows a pairing code once the picker is up (task_game). */
+    pair_at_boot = !adopt.adopted && hal.radio != NULL;
+    if (pair_at_boot) {
+        ESP_LOGI(TAG, "pairing: listening on %lu Hz (the default channel) for a field controller",
+                 (unsigned long)listen_hz);
+    }
     wifi_setup_set_join_key_handler(portal_join_key);
     fw_update_esp_init(&box, update_screen, update_battery);
 }
@@ -721,7 +750,13 @@ static void task_game(void *arg)
         /* ---- Radio: packets heard by the radio task ---- */
         radio_rx_msg_t rx;
         while (radio_task_recv(&rx)) {
+            /* A pair frame (type 10, in the clear) is pairing's; everything else the game's. */
+            if (box_pair_on_packet(&pairing, rx.data, rx.len, now)) continue;
             box_game_on_packet(&box, rx.data, rx.len, rx.rssi);
+        }
+        if (pair_at_boot) {
+            pair_at_boot = false;
+            box_pair_start(&pairing, now); /* over the picker; '*' gives the picker back */
         }
 
         /* ---- Poll buttons -> hold / release events ---- */
@@ -750,6 +785,14 @@ static void task_game(void *arg)
         char serial = serial_poll();
         if (key == HAL_KEY_NONE) key = serial;
 #endif
+        if (key != HAL_KEY_NONE && box_pair_showing(&pairing) && box_pair_key(&pairing, key, now)) {
+            key = HAL_KEY_NONE; /* '*' leaves pairing, '#' a new code */
+        }
+        if (box_pair_tick(&pairing, now) && picker_active && !adoption_active(&adopt)) {
+            memset(&picker_screen, 0, sizeof(picker_screen));
+            show_picker(); /* the code left the screen: the picker's step again */
+        }
+        if (box_pair_showing(&pairing)) box_lobby_cancel_ready_screen(&box);
         if (key != HAL_KEY_NONE && adoption_active(&adopt) && adoption_key(&adopt, key, now)) {
             key = HAL_KEY_NONE; /* the admin PIN for another field's card, or closing a result */
         }
@@ -1039,6 +1082,7 @@ void app_main(void)
 #endif
     if (!configured) {
         ESP_LOGI(TAG, "Not configured -- starting Wi-Fi setup portal");
+        pair_at_boot = false; /* the portal's screen; "@pair" after the setup */
         wifi_setup_start();
         char data[64];
         snprintf(data, sizeof(data), "{\"ssid\":\"%s\"}", wifi_setup_ssid());

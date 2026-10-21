@@ -52,6 +52,7 @@ MESSAGE_TYPES = {
     'CONFIG': 7,
     'CLAIM': 8,
     'FIELD': 9,
+    'PAIR': 10,
 }
 
 # Longest event type name plus one, as in C.

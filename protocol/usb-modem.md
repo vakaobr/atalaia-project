@@ -16,7 +16,7 @@ A receiver skips bytes until a `0xA5`, reads the length, and accepts the frame o
 
 | Type | Direction | Payload |
 | --- | --- | --- |
-| `0x01` IDENT | modem → controller | JSON: `fw`, `fw_version`, `core_version`, `framing`, `radio` (`"sx1262"` or `"none"`), `payload_max`, `epoch_window`, `measure` (true when the modem can answer MEASURE: it has a radio and its firmware knows the command), `field` (true: the firmware carries field frames) |
+| `0x01` IDENT | modem → controller | JSON: `fw`, `fw_version`, `core_version`, `framing`, `radio` (`"sx1262"` or `"none"`), `payload_max`, `epoch_window`, `measure` (true when the modem can answer MEASURE: it has a radio and its firmware knows the command), `field` (true: the firmware carries field frames), `pair` (true: and pair frames, type 10) |
 | `0x02` RX | modem → controller | header (9) + plaintext payload + rssi (int8) + snr (int8) + epoch (uint16 BE) |
 | `0x03` TX | controller → modem | header (9) + plaintext payload (up to 200) |
 | `0x04` TX_ACK | modem → controller | seq (uint16 BE) + status (1) |
@@ -56,6 +56,7 @@ Between games, boxes and controllers exchange **field frames** ([field-frames.md
 
 - **FIELD_TX**: the controller's id for it (its FIELD_ACK names it) and the whole frame, sealed by the controller. The modem checks only the shape (version 1, encrypted, game 0, type 9, 31-217 bytes), forces `hop_limit` to 0 (outside the MIC, so it still holds) and queues it on its current channel, the duty cycle counting as for any packet. FIELD_ACK: `ok`, `duty_cycle`, `timeout`, `invalid` (not a field frame's shape), `queue_full`, `no_radio`, or `busy` while a MEASURE runs. It never touches the game's nonce counter.
 - **FIELD_RX**: every packet heard with that shape, before any game check, with its RSSI and SNR. No dedupe and no relay: field frames are not flooded.
+- **Pair frames** ([adoption.md](adoption.md) section 7, RFC 0001 Amendment 8): message type 10 with game id 0, *not* encrypted (their security is CPace's, between a controller and an unadopted box), 10-209 bytes, go and come the same way, in FIELD_TX and FIELD_RX, with the same `hop_limit` 0 and duty-cycle rules; the shape check takes either type. IDENT says `"pair": true` when the firmware carries them.
 
 ## RX
 

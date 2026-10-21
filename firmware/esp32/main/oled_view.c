@@ -153,7 +153,17 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
         if (!screen_json_str(data, "title", s, sizeof(s)) || !s[0]) set(s, sizeof(s), "status");
         upper(s);
         set(out->head, sizeof(out->head), s);
-        if (screen_json_str(data, "mode", s, sizeof(s)) && s[0]) {
+        if (screen_json_str(data, "code", s, sizeof(s)) && s[0]) {
+            set(out->big, sizeof(out->big), s); /* pairing: the code to type in the console */
+            char id[8];
+            if (screen_json_str(data, "id", id, sizeof(id)) && id[0]) {
+                snprintf(out->foot, sizeof(out->foot), "id %s  console", id);
+            } else {
+                set(out->foot, sizeof(out->foot), "console: Adopt");
+            }
+        } else if (screen_json_str(data, "pairing", s, sizeof(s)) && s[0]) {
+            set(out->foot, sizeof(out->foot), s); /* pairing paused or locked */
+        } else if (screen_json_str(data, "mode", s, sizeof(s)) && s[0]) {
             set(out->big, sizeof(out->big), s);
         } else if (screen_json_str(data, "field", s, sizeof(s)) && s[0]) {
             set(out->big, sizeof(out->big), s); /* adoption: the field, its fingerprint below */

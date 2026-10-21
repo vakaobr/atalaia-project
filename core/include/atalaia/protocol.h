@@ -46,6 +46,7 @@ typedef enum {
     ATALAIA_MSG_CONFIG = 7, /* assigns a preset and role; parameters only */
     ATALAIA_MSG_CLAIM = 8,  /* controller election: candidate claims the role with a term number */
     ATALAIA_MSG_FIELD = 9,  /* outside any game, sealed with a key derived from the field join key: a box's announcement, a discovery, an invitation (protocol/field-frames.md) */
+    ATALAIA_MSG_PAIR = 10,  /* outside any game and in the clear: adopting a box with the code it shows, CPace over the radio (protocol/adoption.md) */
 } atalaia_msg_type_t;
 
 /* CBOR keys of HELLO payload fields. */

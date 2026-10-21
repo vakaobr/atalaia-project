@@ -18,12 +18,14 @@
  *
  *   box_host --state-dir DIR --modes DIR [--air-port N] [--air-peer N]
  *            [--join-key HEX] [--state-ms N] [--name NAME]
- *            [--as-box VERSION] [--release-keys HEX] [--admin-pin PIN] [--mac MAC]
+ *            [--as-box VERSION] [--release-keys HEX] [--admin-pin PIN] [--mac MAC] [--pair]
  *            [--announce-ms N]
  *
  * Without --join-key (and no key stored in DIR) the box is unadopted
  * (main/adoption.c, protocol/adoption.md); --admin-pin (1234) and --mac
- * (02:00:00:00:00:01) are what "@adopt" checks and "@adopt-info" reports.
+ * (02:00:00:00:00:01) are what "@adopt" checks and "@adopt-info" reports. --pair: an
+ * unadopted box shows a pairing code at once (main/box_pair.c; "LOG pairing: code NNN NNN ..."),
+ * on the air like the Field Box; "@pair" shows a new one.
  *
  * --announce-ms N: between games, announce N ms after a game ends and then every N ms
  * (instead of 2-20 s and the duty-cycle-based interval), so the tests need not wait.
@@ -69,6 +71,7 @@
 #include "adoption.h"
 #include "atalaia/version.h"
 #include "box_game.h"
+#include "box_pair.h"
 #include "builtin_presets.h"
 #include "button_tracker.h"
 #include "fw_update.h"
@@ -435,7 +438,12 @@ int main(int argc, char **argv)
     const char *admin_pin = "1234";
     const char *mac = "02:00:00:00:00:01";
     bool as_box = false;
+    bool pair = false;
     for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--pair") == 0) {
+            pair = true;
+            continue;
+        }
         if (strcmp(argv[i], "--admin-pin") == 0 && i + 1 < argc) {
             admin_pin = argv[++i];
         } else if (strcmp(argv[i], "--mac") == 0 && i + 1 < argc) {
@@ -586,6 +594,9 @@ int main(int argc, char **argv)
         adoption_restore(&adopt, game.join_key, field_name);
     }
     game.state_interval_ms = (uint32_t)state_ms;
+    static box_pair_t pairing;
+    box_pair_ops_t pops = {air_send, shell_random, shell_screen, shell_log, NULL};
+    box_pair_init(&pairing, &pops, &adopt, &atalaia_crypto_mbedtls, name, 0, 869525000u);
 
     uint32_t last = mono_ms();
     if (box_game_resume(&game, last)) {
@@ -600,6 +611,7 @@ int main(int argc, char **argv)
     socklen_t alen = sizeof(addr);
     getsockname(air_sock, (struct sockaddr *)&addr, &alen);
     out("READY air=%u", ntohs(addr.sin_port));
+    if (pair) box_pair_start(&pairing, last);
 
     serial_console_t console;
     serial_console_init(&console);
@@ -619,8 +631,10 @@ int main(int argc, char **argv)
         if (fds[0].revents & POLLIN) {
             uint8_t pkt[RADIO_MAX_PKT_LEN + 1];
             ssize_t got = recv(air_sock, pkt, sizeof(pkt), 0);
-            if (got > 0 && got <= RADIO_MAX_PKT_LEN)
+            if (got > 0 && got <= RADIO_MAX_PKT_LEN &&
+                !box_pair_on_packet(&pairing, pkt, (size_t)got, now)) {
                 box_game_on_packet(&game, pkt, (size_t)got, -48);
+            }
         }
         if (fds[1].revents & (POLLIN | POLLHUP)) {
             char buf[512];
@@ -636,6 +650,8 @@ int main(int argc, char **argv)
                         box_join_result_t r = box_game_join_text(&game, command + 5);
                         out("LOG join: %s", box_join_result_name(r));
                         button_tracker_init(&buttons, game.teams, game.join.team_count);
+                    } else if (strcmp(command, "pair") == 0) {
+                        if (!box_pair_start(&pairing, now)) out("LOG pair: refused");
                     } else if (strncmp(command, "joinkey ", 8) == 0 ||
                                strncmp(command, "adopt", 5) == 0) {
                         /* "@adopt-info", "@adopt ...", "@joinkey ...": the box's own rules. */
@@ -669,6 +685,9 @@ int main(int argc, char **argv)
                         /* Keypad presses, as the shell sends them to a running mode. */
                         for (const char *k = line + 5; *k; k++) {
                             /* An admin PIN for another field's card first, as the shell does. */
+                            if (box_pair_showing(&pairing) && box_pair_key(&pairing, *k, now)) {
+                                continue;
+                            }
                             if (adoption_active(&adopt) && adoption_key(&adopt, *k, now)) continue;
                             if (!runner.running) continue;
                             char json[16];
@@ -709,6 +728,7 @@ int main(int argc, char **argv)
         }
         box_game_tick(&game, delta, now);
         adoption_tick(&adopt, now);
+        box_pair_tick(&pairing, now);
         for (int i = 0; i < runner.queues.screen_count; i++) {
             const screen_update_t *su = &runner.queues.screens[i];
             out("SCREEN %s %s", su->template_name, su->data_json);

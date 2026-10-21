@@ -677,11 +677,19 @@
       "bad_key": "A caixa {name} recusou a chave.",
       "bad_card": "Foi encostado um cartão de campo danificado.",
       "store_failed": "A caixa {name} não conseguiu guardar a chave.",
-      "card_made": "foi gerado um cartão de campo"
+      "card_made": "foi gerado um cartão de campo",
+      "wrong_code": "código errado para a caixa {name}",
+      "no_answer": "a caixa {name} não respondeu",
+      "no_done": "a caixa {name} não confirmou",
+      "bad_answer": "a caixa {name} deu uma resposta inválida",
+      "fingerprint": "a caixa {name} tem outra chave",
+      "box_refused": "a caixa {name} recusou",
+      "channel_changed": "o rádio saiu do canal de emparelhamento durante o emparelhamento da caixa {name}"
     },
     "method": {
       "usb": "USB",
-      "card": "cartão de campo"
+      "card": "cartão de campo",
+      "radio": "código por rádio"
     },
     "card_title": "Cartão de campo (NFC)",
     "card_intro": "Escreve estes bytes num cartão NTAG215 ou NTAG216, como um cartão de entrada, e encosta-o uma vez a cada caixa nova. Uma caixa adotada por outro campo pede o seu PIN de administração no teclado.",
@@ -691,9 +699,34 @@
     "card_hint": "Bytes a escrever na memória do cartão a partir da página 4 (mensagem NDEF, tipo application/vnd.atalaia.field).",
     "card_hide": "Esconder os bytes",
     "card_lost": "Perdeste ou copiaram um cartão de campo? Muda a chave no controlador (python3 -m atalaia_controller join-key --rotate), reinicia-o, adota de novo todas as caixas e destrói os cartões antigos.",
-    "code_title": "Código de emparelhamento (rádio)",
-    "code_later": "Uma caixa com ecrã vai mostrar um código curto que escreves aqui para a adotar por rádio. Chega com os convites por rádio; até lá usa o cabo ou o cartão de campo.",
-    "log_title": "Adoções recentes"
+    "code_title": "Emparelhar por código (rádio)",
+    "log_title": "Adoções recentes",
+    "code_intro": "Uma caixa não adotada mostra um código de 6 algarismos quando arranca. Procura caixas pelo rádio, escolhe-a pelo nome e escreve o código que mostra: a caixa recebe a chave deste campo pelo rádio, selada, sem cabo nem cartão. Um código errado muda o código da caixa; três errados fazem-na esperar um minuto.",
+    "code_listen": "Procurar caixas pelo rádio",
+    "code_listen_again": "Procurar de novo",
+    "code_channel": "A ouvir em {mhz} MHz, onde as caixas novas ouvem, durante cinco minutos.",
+    "code_none": "Ainda nenhuma caixa se oferece. Confirma que o ecrã dela mostra um código (\"@pair\" ou reiniciar mostra um novo).",
+    "code_heard": "ouvida a {rssi} dBm, há {s} s",
+    "code_label": "O código dela",
+    "code_pair": "Emparelhar",
+    "code_run": {
+      "starting": "A emparelhar {name}: à espera da resposta…",
+      "sealing": "A emparelhar {name}: o código confere, a enviar a chave…",
+      "done": "{name} está adotada por este campo.",
+      "failed": "O emparelhamento de {name} falhou:"
+    },
+    "code_why": {
+      "wrong_code": "o código não era o que a caixa mostra. Lê o ecrã dela de novo: uma caixa verdadeira mostra agora outro código; se o código não mudou, esta entrada não era a tua caixa.",
+      "no_answer": "sem resposta: fora de alcance, o código já não está no ecrã, ou outro emparelhamento em curso com ela (interferência no rádio); tenta de novo.",
+      "no_done": "não confirmou; vê o ecrã dela.",
+      "bad_answer": "a resposta não era válida.",
+      "fingerprint": "tem outra chave que não a deste campo.",
+      "box_refused": "a caixa recusou.",
+      "duty_cycle": "o ciclo de trabalho do rádio está esgotado por agora.",
+      "channel_changed": "o rádio saiu de 869,525 MHz (o canal do campo, uma procura ou o modem a ligar de novo); procura caixas outra vez."
+    },
+    "code_id": "id {id}",
+    "code_duplicate": "Mais do que uma caixa se oferece com este nome: escreve o código só na entrada cujo id é o que está no ecrã da caixa."
   },
   "invites": {
     "open": "Convidar caixas",

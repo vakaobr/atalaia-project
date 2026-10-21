@@ -262,7 +262,9 @@ class BoxHost:
     def start(self) -> None:
         self.proc = subprocess.Popen(
             [BOX_HOST, "--state-dir", self.state_dir, "--modes", str(REPO / "modes"),
-             "--air-peer", str(self.hub.port), "--join-key", self.join_key.hex(),
+             "--air-peer", str(self.hub.port),
+             # No key: an unadopted box (protocol/adoption.md), e.g. to pair it by its code.
+             *(["--join-key", self.join_key.hex()] if self.join_key else []),
              "--state-ms", str(self.state_ms), "--name", self.name, *self.extra],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         # A box that rejoins a stored game logs that before it is READY.
@@ -572,6 +574,7 @@ class FakeModem:
         self.on_field_rx = self.on_field_ack = None
         self.fields: list[bytes] = []             # field frames sent (FIELD_TX)
         self.has_field_frames = True
+        self.has_pair_frames = True             # pair frames too (protocol/adoption.md)
         self.channels: list[int] = []             # SET_CHANNEL commands
         self.measured: list[tuple[int, int]] = []  # MEASURE (channel, dwell_ms)
         self.noise: dict[int, tuple[int, int]] = {}  # channel -> (p90 dBm, CAD detections of 10)

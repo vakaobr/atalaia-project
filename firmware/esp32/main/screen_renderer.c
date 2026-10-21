@@ -393,6 +393,19 @@ static void update_status(const char *data)
         snprintf(rows[n][0], LIST_ITEM_MAX, "Game");
         snprintf(rows[n++][1], LIST_ITEM_MAX, "%s", buf);
     }
+    /* Pairing (box_pair.c): the code to type in the console. */
+    if (n < STATUS_ROWS && screen_json_str(data, "code", buf, sizeof(buf)) && buf[0]) {
+        snprintf(rows[n][0], LIST_ITEM_MAX, "Code");
+        snprintf(rows[n++][1], LIST_ITEM_MAX, "%s", buf);
+    }
+    if (n < STATUS_ROWS && screen_json_str(data, "id", buf, sizeof(buf)) && buf[0]) {
+        snprintf(rows[n][0], LIST_ITEM_MAX, "Id");
+        snprintf(rows[n++][1], LIST_ITEM_MAX, "%s", buf);
+    }
+    if (n < STATUS_ROWS && screen_json_str(data, "pairing", buf, sizeof(buf)) && buf[0]) {
+        snprintf(rows[n][0], LIST_ITEM_MAX, "Pairing");
+        snprintf(rows[n++][1], LIST_ITEM_MAX, "%s", buf);
+    }
     /* Adoption (adoption.c): the field and its key's fingerprint. */
     if (n < STATUS_ROWS && screen_json_str(data, "field", buf, sizeof(buf)) && buf[0]) {
         snprintf(rows[n][0], LIST_ITEM_MAX, "Field");

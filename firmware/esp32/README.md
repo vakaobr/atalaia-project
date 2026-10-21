@@ -648,6 +648,22 @@ controller's game.
   protocol document, section 2). Host tests: `test/test_adoption.c` against
   `protocol/vectors/field_card.json`. In software; the field card not yet
   read by a real PN532, the cable not yet used from a real controller.
+- **Pairing by code** -- `main/box_pair.c`, `main/cpace.c` (protocol/adoption.md
+  section 7, RFC 0001 Amendment 8, decisions AD-15 to AD-27): an unadopted box
+  with a radio shows a 6-digit code at start ("PAIR THIS BOX", `Code: 042 137`;
+  `*` gives the picker back, `#` a new code, `@pair` on the console another
+  one) and offers itself in pair frames (type 10, in the clear) on
+  `CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ` (869.525 MHz) every 15 s or more for
+  5 minutes. A controller that the GM gives the code runs CPace
+  (CPACE-X25519-SHA512 on Monocypher's X25519, Elligator 2 and SHA-512) with
+  it; the box checks the controller's confirmation, opens the join key sealed
+  under the run's key and adopts the field through `adoption.c`, then its field
+  frames start. A failed run burns the code; three in a row make it wait a
+  minute, ten stop pairing until a restart; a sid runs once; a run's secrets
+  are wiped on every outcome; the box encrypts nothing itself. Host tests:
+  `test/test_box_pair.c` (the CPace draft's vectors, the vectors' whole run
+  byte for byte, the limits). In software and with the host box through the
+  host modem; not yet on the air.
 - **The game** -- on the controller's CMD start (or a TIME beacon that shows
   the game running), the box loads the mode for its role with the join's
   teams, parameters, node id and seed; CMD pause, resume and end, TIME, and

@@ -677,11 +677,19 @@
       "bad_key": "Box {name} refused the key.",
       "bad_card": "A damaged field card was tapped.",
       "store_failed": "Box {name} could not store the key.",
-      "card_made": "a field card was made"
+      "card_made": "a field card was made",
+      "wrong_code": "wrong code for box {name}",
+      "no_answer": "box {name} did not answer",
+      "no_done": "box {name} did not confirm",
+      "bad_answer": "box {name} gave an invalid answer",
+      "fingerprint": "box {name} holds another key",
+      "box_refused": "box {name} refused",
+      "channel_changed": "the radio left the pairing channel during {name}'s run"
     },
     "method": {
       "usb": "USB",
-      "card": "field card"
+      "card": "field card",
+      "radio": "radio code"
     },
     "card_title": "Field card (NFC)",
     "card_intro": "Write these bytes on an NTAG215 or NTAG216 card, as a join card, and tap it once on each new box. A box adopted by another field asks for its admin PIN on the keypad.",
@@ -691,9 +699,34 @@
     "card_hint": "Bytes to write to the card's memory from page 4 (NDEF message, type application/vnd.atalaia.field).",
     "card_hide": "Hide the bytes",
     "card_lost": "A field card lost or copied? Rotate the key on the controller (python3 -m atalaia_controller join-key --rotate), restart it, adopt every box again and destroy the old cards.",
-    "code_title": "Pairing code (radio)",
-    "code_later": "A box with a screen will show a short code that you type here to adopt it over the radio. It comes with the radio invites; until then use the cable or the field card.",
-    "log_title": "Recent adoptions"
+    "code_title": "Pair by code (radio)",
+    "log_title": "Recent adoptions",
+    "code_intro": "An unadopted box shows a 6-digit code when it starts. Look for boxes on the radio, pick it by its name, and type the code it shows: the box gets this field's key over the radio, sealed, without a cable or a card. A wrong code changes the box's code; three wrong ones make it wait a minute.",
+    "code_listen": "Look for boxes on the radio",
+    "code_listen_again": "Look again",
+    "code_channel": "Listening on {mhz} MHz, where new boxes listen, for five minutes.",
+    "code_none": "No box is offering itself yet. Check that its screen shows a code (\"@pair\" or a restart shows a new one).",
+    "code_heard": "heard at {rssi} dBm, {s} s ago",
+    "code_label": "Its code",
+    "code_pair": "Pair",
+    "code_run": {
+      "starting": "Pairing {name}: waiting for its answer…",
+      "sealing": "Pairing {name}: the code matched, sending the key…",
+      "done": "{name} is adopted by this field.",
+      "failed": "Pairing {name} failed:"
+    },
+    "code_why": {
+      "wrong_code": "the code was not the one the box shows. Read its screen again: a real box now shows a new code; if its code did not change, this entry was not your box.",
+      "no_answer": "no answer: out of range, the code no longer on its screen, or another pairing under way with it (radio interference); try again.",
+      "no_done": "it did not confirm; look at its screen.",
+      "bad_answer": "its answer was not valid.",
+      "fingerprint": "it holds another key than this field's.",
+      "box_refused": "the box refused it.",
+      "duty_cycle": "the radio's duty cycle is used up for now.",
+      "channel_changed": "the radio left 869.525 MHz (the field's channel, a scan or the modem reconnecting); look for boxes again."
+    },
+    "code_id": "id {id}",
+    "code_duplicate": "More than one box offers itself under this name: type the code only into the entry whose id is the one on the box's screen."
   },
   "invites": {
     "open": "Invite boxes",

@@ -25,6 +25,7 @@ messages:
   - { id: 7, name: CONFIG, doc: "assigns a preset and role; parameters only" }
   - { id: 8, name: CLAIM,  doc: "controller election: candidate claims the role with a term number" }
   - { id: 9, name: FIELD,  doc: "outside any game, sealed with a key derived from the field join key: a box's announcement, a discovery, an invitation (protocol/field-frames.md)" }
+  - { id: 10, name: PAIR,  doc: "outside any game and in the clear: adopting a box with the code it shows, CPace over the radio (protocol/adoption.md)" }
 
 payloads:
   HELLO:

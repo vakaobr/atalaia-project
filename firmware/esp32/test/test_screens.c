@@ -84,6 +84,10 @@ static const screen_case_t cases[] = {
     /* Adoption (adoption.c, protocol/adoption.md): adopted, and another field's card. */
     {"status_adopted", "status",
      "{\"title\":\"Adopted\",\"field\":\"Campo da Atalaia\",\"fingerprint\":\"604A-0A95\"}", NULL},
+    {"status_pair_locked", "status", "{\"title\":\"Pair locked\",\"pairing\":\"restart the box\"}",
+     NULL},
+    {"status_pair", "status",
+     "{\"title\":\"Pair this box\",\"code\":\"042 137\",\"id\":\"b0c5\",\"field\":\"none\"}", NULL},
     {"pin_entry_field", "pin_entry",
      "{\"digits\":3,\"error\":false,\"prompt\":\"PIN to change field\"}", NULL},
     {"preset_select", "preset_select", "{\"presets\":[\"Bomb\",\"Domination\"],\"selected\":1}",

@@ -109,6 +109,8 @@ else()
         "fw_update_esp.c"
         "fw_desc.c"
         "adoption.c"
+        "cpace.c"
+        "box_pair.c"
     )
     set(ATALAIA_EMBED EMBED_FILES "wifi_setup.html")
 endif()

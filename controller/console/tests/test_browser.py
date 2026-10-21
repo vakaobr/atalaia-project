@@ -514,6 +514,54 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(read.get_by_test_id("adopt-scan")).to_have_count(0)
         expect(read.get_by_test_id("adopt-card-make")).to_have_count(0)
 
+    def test_adopt_pair_by_code(self):
+        """Pairing by code over the radio (protocol/adoption.md section 7): an unadopted C host box
+        (main/box_pair.c) shows a code and offers itself on the C host modem's air; in the Adopt tab
+        the GM looks for boxes, types a wrong code (the run fails, the box shows a new one), then the
+        box's new code: the box is adopted with the field join key, in both languages."""
+        import re  # noqa: PLC0415
+
+        self.field.close()
+        hub = AirHub()
+        self.addCleanup(hub.close)
+        self.field = Field(hub=hub)
+        boxdir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, boxdir, True)
+        box = BoxHost(hub, str(boxdir), b"", name="porta-norte", extra=("--pair",))
+        self.addCleanup(box.close)
+        self.assertTrue(wait_for(lambda: box.logged("pairing: code"), 5))
+
+        def code() -> str:
+            found = [m.group(1) + m.group(2) for m in (re.search(r"code (\d{3}) (\d{3})", x) for x in box.lines) if m]
+            return found[-1]
+
+        page = self.console()
+        page.get_by_test_id("tab-adopt").click()
+        expect(page.get_by_test_id("adopt-code")).to_contain_text("6 algarismos")
+        page.get_by_test_id("adopt-pair-listen").click()
+        expect(page.get_by_test_id("adopt-pair-channel")).to_contain_text("869.525")
+        offers = page.get_by_test_id("adopt-pair-offers")
+        expect(offers).to_contain_text("porta-norte", timeout=10000)
+        # The id the box's screen shows is the one beside its entry (decision AD-26).
+        short = next(m.group(1) for m in (re.search(r'"id":"([0-9a-f]{4})"', x) for x in box.lines) if m)
+        expect(page.get_by_test_id("adopt-pair-id")).to_have_text(f"id {short}")
+        expect(page.get_by_test_id("adopt-pair-warn")).to_have_count(0)
+        first = code()
+        page.get_by_test_id("adopt-pair-code").fill(f"{(int(first) + 1) % 1000000:06d}")
+        page.get_by_test_id("adopt-pair-go").click()
+        run = page.get_by_test_id("adopt-pair-run")
+        expect(run).to_contain_text("o código não era o que a caixa mostra", timeout=15000)
+        self.assertTrue(wait_for(lambda: box.logged("pairing: new code"), 12))
+        self.assertFalse((boxdir / "join_key").exists())
+        page.get_by_test_id("adopt-pair-code").fill(code()[:3] + " " + code()[3:])
+        page.get_by_test_id("adopt-pair-go").click()
+        expect(run).to_contain_text("porta-norte está adotada por este campo", timeout=15000)
+        self.assertEqual((boxdir / "join_key").read_bytes(), JOIN_KEY)
+        expect(page.get_by_test_id("adopt-log")).to_contain_text("código por rádio")
+        page.get_by_test_id("lang").first.select_option("en")
+        expect(run).to_contain_text("porta-norte is adopted by this field")
+        self.no_horizontal_scroll(page)
+
     def test_firmware_update_from_the_boxes_tab(self):
         """Firmware updates (protocol/firmware-update.md): the GM uploads a signed release in the
         Boxes tab and updates a box before the game starts; the CMD update goes on the air; the box's
