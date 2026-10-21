@@ -206,7 +206,8 @@ pixel on flush (`oled_pack`); only the 128-byte pages that changed go over
 the 100 kHz bus, so a countdown tick costs one or two pages and a full frame
 about 100 ms. At boot it shows a splash for 2 s (the tower from
 `site/favicon.svg`, drawn by `tools/oled_logo.py` into `main/oled_logo.c`,
-with the name and the version). Kconfig: `ATALAIA_OLED_STATUS` (on by
+with the name and the version; the same file has the USB radio modem's
+small header tower). Kconfig: `ATALAIA_OLED_STATUS` (on by
 default), `ATALAIA_OLED_ADDR`, `ATALAIA_OLED_RST_PIN`, `ATALAIA_OLED_FLIP`
 and `ATALAIA_OLED_SPLASH_MS`. Without an OLED at the address the box logs a
 warning and runs without it. The host tests render the view through the
@@ -233,10 +234,63 @@ decrypts with AES-CCM (mbedtls, hardware AES), dedupes flood copies,
 enforces the duty cycle of the channel's sub-band, measures the noise on
 a channel when asked (MEASURE, only while no game is configured), and
 keeps the game key in RAM only; it has no
-Lua, screens or presets (~280 KB image). The log console stays on UART0
+Lua, game screens or presets (~480 KB image, ~190 KB of it LVGL and the
+fonts for its own OLED). The log console stays on UART0
 only, so it never mixes with the frames, and the task watchdog reboots a
 hung modem. `CONFIG_ATALAIA_MODEM_LINK_UART0` switches the link to UART0
 for boards with a USB-UART bridge.
+
+### The modem's OLED
+
+The board's own OLED tells a GM whether the modem works, without a laptop
+(`main/modem/modem_screen.c`, task `main/modem/modem_display.c`). At boot,
+for 2 s, the splash: the tower, "ATALAIA", "MODEM MODE" and the version.
+Then the status screen, under a header bar with a small tower and
+"MODEM MODE":
+
+```
+LINK          OK     the controller: OK, DOWN (inverted) or waiting
+GAME        4660     the game id, or IDLE  no game / IDLE  measuring
+CH   869.525 MHz     the channel the radio is on
+TX 1234   fail 3     packets sent, and TX failures
+RX 56k    auth 1     packets passed to the controller, and MIC failures
+DUTY 341.2s left     the duty-cycle budget left (inverted at 0.0s)
+```
+
+- **LINK OK**: a frame from the controller arrived in the last 12 s (it
+  pings every 5 s, `ping_interval_s`). **waiting**: none since the modem
+  started: the controller is not running, or the modem is on the wrong USB
+  port. **DOWN**: frames came, then stopped for 12 s: the controller
+  stopped or lost the port (it reconnects by itself after three missed
+  pings; check the controller before rebooting the modem).
+- **GAME n**: the controller sent CONFIGURE for game n; the modem passes
+  that game's packets. **IDLE no game**: no game yet, or the game was
+  cleared; nothing is passed on. **IDLE measuring**: a noise measurement
+  (MEASURE) is running.
+- **CH**: the radio's channel, the build's default until the controller
+  sets one.
+- **TX / fail, RX / auth**: the same counters as the controller's
+  `/api/v1/controller` (`tx`, `tx_fail`, `rx`, `rx_auth_fail`); above 9999
+  they shorten to 12k, 4M. Climbing `auth` means packets of the game that do
+  not decrypt (a box on an old key, or another game on the same id).
+- **DUTY**: the airtime left in the sub-band's duty-cycle budget
+  (`duty_ms`). At 0.0s the line turns inverted and TX waits for budget.
+- **RADIO FAULT** (inverted, in place of the last four lines): the SX1262
+  did not come up at boot, with the reason from `hal_esp_radio.c`
+  ("SX1262 not found (BUSY stuck)", "SX1262 errors 0x0020 (TCXO)", ...).
+  The modem still talks to the controller but cannot send or receive: the
+  board needs a look (or another board).
+
+The modem task publishes a copy of its state five times a second; the
+display task (priority 1, below the radio's 3 and the modem's 4) reads it
+twice a second and redraws only when a line changed, and only the changed
+128-byte pages go over the I2C bus, which carries nothing else on a modem.
+It never blocks the USB link or the radio; without an OLED it logs one
+warning and the modem runs as before. Kconfig: the "On-board OLED" options
+(`ATALAIA_OLED_STATUS`, `_ADDR`, `_RST_PIN`, `_FLIP`, `_SPLASH_MS`) and
+`ATALAIA_MODEM_LINK_TIMEOUT_S` (default 12). The host tests compare the
+modem screens with `test/screens/oled/modem_*.png` and check the lines in
+`test/test_modem_screen.c`.
 
 `main/modem/modem.c` and `modem_framing.c` are plain C: the host tests
 (`test/test_modem.c`, `test/test_modem_framing.c`) run them with the
@@ -365,8 +419,9 @@ The firmware variant is a choice at the top of the menu: `ATALAIA_NODE_MODE`
 
 USB radio modem options (under "USB radio modem"):
 `ATALAIA_MODEM_LINK_USB_SERIAL_JTAG` / `ATALAIA_MODEM_LINK_UART0`,
-`ATALAIA_MODEM_UART_BAUD`; `ATALAIA_MODEM_EPOCH_WINDOW` (default 16) for
-the modem and the pod.
+`ATALAIA_MODEM_UART_BAUD`, `ATALAIA_MODEM_LINK_TIMEOUT_S` (default 12: the
+OLED's LINK DOWN); `ATALAIA_MODEM_EPOCH_WINDOW` (default 16) for
+the modem and the pod. The "On-board OLED" options apply to the modem too.
 
 I/O pod options (under "I/O pod"): `ATALAIA_POD_BTN1_TEAM` ..
 `ATALAIA_POD_BTN4_TEAM` (a button's colour; empty, the default: button N is

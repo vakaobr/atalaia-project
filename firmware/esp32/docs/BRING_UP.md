@@ -318,6 +318,28 @@ firmware no longer reads a button there.
    controller and at least two nodes (step 10b). Single-box radio health can be
    verified by monitoring `radio_task` log lines for TX/RX activity.
 
+## Step 10a: The USB radio modem's screen
+
+The modem board (`python tools/docker_fw.py modem`, plugged into the
+controller) shows its status on its own OLED; the full reading of each line
+is in [README.md](../README.md#the-modems-oled).
+
+1. Power it from a laptop or the controller with the antenna fitted. The log
+   (UART0, not the USB port) shows `SSD1306 OLED at 0x3C (128x64)` and,
+   after the 2 s splash (tower, ATALAIA, MODEM MODE, version), `OLED status
+   on`. The screen reads `LINK waiting`, `IDLE no game`, `CH 869.525 MHz`,
+   zero counts and the full budget (`DUTY 360.0s left` on the g2 sub-band).
+2. Start the controller: within a second `LINK OK` (its first ping or
+   IDENT). Create and start a game in the console: `GAME <id>`, and `TX`
+   climbs with the TIME beacons; `RX` climbs once a box is joined and heard.
+3. Stop the controller: about 12 s later `LINK DOWN`, inverted. Start it
+   again: back to `LINK OK` without touching the modem.
+4. Without the SX1262 (or with a TCXO fault) the screen shows `RADIO FAULT`
+   and the reason from the log (`SX1262 not found (BUSY stuck)`, `SX1262
+   errors 0x0020 (TCXO)`); the controller sees `"radio": "none"`.
+5. A board without an OLED (or with Vext off) logs one `SSD1306 OLED not
+   found` warning and works as a modem all the same.
+
 ## Step 10b: Joining a field controller's game
 
 Needs the field controller with its USB radio modem (controller/README.md)

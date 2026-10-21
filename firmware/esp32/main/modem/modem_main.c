@@ -4,21 +4,26 @@
  *
  * Entry point of the USB radio modem firmware (CONFIG_ATALAIA_MODEM_MODE).
  * A Heltec V4.3 plugged into the field controller over USB: radio, AES-CCM,
- * dedupe and duty cycle on the ESP32-S3; no Lua, no screens, no presets
- * (ADR-P2-4). Build it with `python tools/docker_fw.py modem`.
+ * dedupe and duty cycle on the ESP32-S3; no Lua, no game screens, no presets
+ * (ADR-P2-4); the board's own OLED shows the modem's status
+ * (modem_screen.h). Build it with `python tools/docker_fw.py modem`.
  */
 #include <string.h>
 
 #include "atalaia/version.h"
+#include "esp_app_desc.h"
 #include "esp_log.h"
 #include "hal/hal.h"
+#include "hal_esp.h"
+#include "modem_display.h"
 #include "modem_task.h"
 #include "radio/radio_task.h"
+#include "sdkconfig.h"
 
 static const char *TAG = "atalaia-modem";
 
 extern const hal_radio_ops_t hal_esp_radio_ops;
-void hal_esp_board_power_on(void);
+extern const hal_oled_ops_t hal_esp_oled_ops;
 
 void app_main(void)
 {
@@ -34,5 +39,13 @@ void app_main(void)
     } else {
         radio_task_start(&hal);
     }
-    modem_task_start(&hal);
+    bool running = modem_task_start(&hal);
+#if CONFIG_ATALAIA_OLED_STATUS
+    if (running) {
+        modem_display_start(&hal_esp_oled_ops, esp_app_get_description()->version,
+                            hal.radio ? NULL : hal_esp_radio_fault());
+    }
+#else
+    (void)running;
+#endif
 }

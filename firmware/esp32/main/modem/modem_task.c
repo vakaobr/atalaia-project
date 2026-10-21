@@ -15,6 +15,7 @@
  */
 #include "modem_task.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include "driver/uart.h"
@@ -25,6 +26,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "atalaia/duty_cycle.h"
 #include "modem.h"
 #include "radio/radio_task.h"
 #include "sdkconfig.h"
@@ -43,6 +45,10 @@
 #define CONFIG_ATALAIA_MODEM_EPOCH_WINDOW 16
 #endif
 
+#ifndef CONFIG_ATALAIA_MODEM_LINK_TIMEOUT_S
+#define CONFIG_ATALAIA_MODEM_LINK_TIMEOUT_S 12
+#endif
+
 #if MODEM_LINK_UART && defined(CONFIG_ESP_CONSOLE_UART)
 #error                                                                                             \
     "The modem link uses UART0: move the console off it (CONFIG_ESP_CONSOLE_NONE or USB_SERIAL_JTAG)"
@@ -53,9 +59,18 @@
 #define MODEM_TASK_STACK 6144
 #define MODEM_TASK_PRIO  4
 
+/* How often the loop publishes its state for the OLED (modem_display.c). */
+#define SCREEN_PUBLISH_MS 200
+
 static const char *TAG = "modem";
 
 static modem_t modem;
+
+/* What the OLED task reads: only the modem task touches `modem`, and it
+ * publishes the screen's state here, so the display never races it. */
+static portMUX_TYPE screen_lock = portMUX_INITIALIZER_UNLOCKED;
+static modem_screen_state_t screen_state;
+static uint32_t idle_channel_hz;
 
 static int link_write(void *ctx, const uint8_t *buf, size_t len)
 {
@@ -131,6 +146,28 @@ static uint32_t io_now_ms(void *ctx)
     return (uint32_t)(esp_timer_get_time() / 1000);
 }
 
+/* The screen's state now (the link timeout counted from this moment). */
+static void publish_screen_state(void)
+{
+    uint32_t duty = modem.radio_present ? radio_task_duty_remaining_ms() : 0;
+    modem_screen_state_t s;
+    modem_screen_state(&modem, io_now_ms(NULL), CONFIG_ATALAIA_MODEM_LINK_TIMEOUT_S * 1000u,
+                       idle_channel_hz, duty, NULL, &s);
+    taskENTER_CRITICAL(&screen_lock);
+    screen_state = s;
+    taskEXIT_CRITICAL(&screen_lock);
+}
+
+void modem_task_screen_state(modem_screen_state_t *out, const char *fault)
+{
+    taskENTER_CRITICAL(&screen_lock);
+    *out = screen_state;
+    taskEXIT_CRITICAL(&screen_lock);
+    if (!out->radio_ok && fault && fault[0]) {
+        snprintf(out->fault, sizeof(out->fault), "%s", fault);
+    }
+}
+
 static modem_tx_status_t map_status(radio_tx_status_t status)
 {
     switch (status) {
@@ -149,8 +186,14 @@ static void modem_loop(void *arg)
     modem_send_ident(&modem);
 
     uint8_t buf[256];
+    uint32_t last_publish = io_now_ms(NULL);
     for (;;) {
         esp_task_wdt_reset();
+        uint32_t t = io_now_ms(NULL);
+        if (t - last_publish >= SCREEN_PUBLISH_MS) {
+            publish_screen_state();
+            last_publish = t;
+        }
         int n = link_read(buf, sizeof(buf));
         if (n > 0) {
             modem_feed_serial(&modem, buf, (size_t)n);
@@ -172,11 +215,11 @@ static void modem_loop(void *arg)
     }
 }
 
-void modem_task_start(const hal_t *hal)
+bool modem_task_start(const hal_t *hal)
 {
     if (!link_start()) {
         ESP_LOGE(TAG, "serial link driver failed to start");
-        return;
+        return false;
     }
     modem_io_t io = {
         .serial_write = link_write,
@@ -190,8 +233,14 @@ void modem_task_start(const hal_t *hal)
     const esp_app_desc_t *app = esp_app_get_description();
     modem_init(&modem, &io, &atalaia_crypto_mbedtls, app->version, hal->radio != NULL,
                CONFIG_ATALAIA_MODEM_EPOCH_WINDOW);
+    /* The radio's boot channel (hal_esp_radio.c), shown until the controller sets one. */
+    idle_channel_hz = atalaia_channel_ok(CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ)
+                          ? CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ
+                          : 869525000u;
+    publish_screen_state();
     ESP_LOGI(TAG, "modem ready on %s (radio %s, epoch window %d)",
              MODEM_LINK_UART ? "UART0" : "USB-Serial-JTAG", hal->radio != NULL ? "on" : "absent",
              CONFIG_ATALAIA_MODEM_EPOCH_WINDOW);
-    xTaskCreatePinnedToCore(modem_loop, "modem", MODEM_TASK_STACK, NULL, MODEM_TASK_PRIO, NULL, 1);
+    return xTaskCreatePinnedToCore(modem_loop, "modem", MODEM_TASK_STACK, NULL, MODEM_TASK_PRIO,
+                                   NULL, 1) == pdPASS;
 }

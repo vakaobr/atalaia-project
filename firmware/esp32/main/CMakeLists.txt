@@ -2,14 +2,22 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 if(CONFIG_ATALAIA_MODEM_MODE)
-    # USB radio modem (ADR-P2-4): radio, serial link and modem logic only.
+    # USB radio modem (ADR-P2-4): radio, serial link and modem logic, and
+    # the on-board OLED's status screen (modem_screen.c, LVGL).
     set(ATALAIA_SRCS
         "modem/modem_main.c"
         "modem/modem_task.c"
         "modem/modem.c"
         "modem/modem_framing.c"
+        "modem/modem_screen.c"
+        "modem/modem_display.c"
+        "oled_view.c"
+        "oled_logo.c"
+        "screen_json.c"
         "hal/esp/hal_esp_radio.c"
         "hal/esp/hal_esp_board.c"
+        "hal/esp/hal_esp_i2c.c"
+        "hal/esp/hal_esp_oled.c"
         "hal/board_fem.c"
         "radio/radio_task.c"
         "radio/radio_protocol.c"

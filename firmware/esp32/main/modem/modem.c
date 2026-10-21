@@ -445,6 +445,9 @@ void modem_on_air_rx(modem_t *m, const uint8_t *pkt, size_t len, int8_t rssi, in
 
 void modem_handle_frame(modem_t *m, uint8_t type, const uint8_t *payload, size_t len)
 {
+    /* Any whole frame (its CRC checked) shows the host is there. */
+    m->host_seen = true;
+    m->last_host_ms = now(m);
     switch (type) {
     case MODEM_FRAME_TX: handle_tx(m, payload, len); break;
     case MODEM_FRAME_CMD: handle_cmd(m, payload, len); break;

@@ -96,6 +96,8 @@ typedef struct {
     modem_dedupe_entry_t dedupe[MODEM_DEDUPE_SIZE];
     modem_counters_t count;
     uint32_t boot_ms;
+    bool host_seen;        /* a frame from the host has arrived since boot */
+    uint32_t last_host_ms; /* when the last one did (the OLED's link state) */
 } modem_t;
 
 /*

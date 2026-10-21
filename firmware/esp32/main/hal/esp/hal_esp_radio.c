@@ -29,6 +29,7 @@
 #include "../../radio/radio_limits.h"
 
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "driver/gpio.h"
@@ -245,6 +246,19 @@ static int sx_set_tx_power(int8_t power)
     return sx_cmd(cmd, sizeof(cmd), NULL, 0);
 }
 
+/* Why the last init failed, in a few words for the modem's OLED ("" = ok). */
+static char init_fault[40];
+
+static void set_fault(const char *why)
+{
+    snprintf(init_fault, sizeof(init_fault), "%s", why);
+}
+
+const char *hal_esp_radio_fault(void)
+{
+    return init_fault;
+}
+
 /* Undoes the probe steps that ran, newest first. */
 static void probe_cleanup(int steps_done)
 {
@@ -278,6 +292,7 @@ static int esp_radio_init(void)
 #define CONFIG_ATALAIA_RADIO_DEBUG_STEP 0
 #endif
     const int dbg = CONFIG_ATALAIA_RADIO_DEBUG_STEP;
+    set_fault(dbg ? "radio init stopped (debug step)" : "");
 
     /* Step 1: SPI bus init. */
     spi_bus_config_t bus_cfg = {
@@ -291,6 +306,7 @@ static int esp_radio_init(void)
     esp_err_t err = spi_bus_initialize(SPI3_HOST, &bus_cfg, SPI_DMA_CH_AUTO);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "radio SPI bus init failed: %s", esp_err_to_name(err));
+        set_fault("radio SPI bus failed");
         return -1;
     }
     ESP_LOGD(TAG, "probe step 1 done (spi_bus_initialize)");
@@ -309,6 +325,7 @@ static int esp_radio_init(void)
     err = spi_bus_add_device(SPI3_HOST, &dev_cfg, &spi_handle);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "radio SPI device add failed: %s", esp_err_to_name(err));
+        set_fault("radio SPI failed");
         probe_cleanup(1);
         return -1;
     }
@@ -344,6 +361,7 @@ static int esp_radio_init(void)
     dio1_sem = xSemaphoreCreateBinary();
     if (dio1_sem == NULL) {
         ESP_LOGW(TAG, "radio: no memory for the DIO1 semaphore");
+        set_fault("radio: no memory");
         probe_cleanup(3);
         return -1;
     }
@@ -364,6 +382,7 @@ static int esp_radio_init(void)
     vTaskDelay(pdMS_TO_TICKS(20));
     if (sx_wait_busy() != 0) {
         ESP_LOGW(TAG, "SX1262 not detected (BUSY stuck high after reset)");
+        set_fault("SX1262 not found (BUSY stuck)");
         probe_cleanup(4);
         return -1;
     }
@@ -377,12 +396,14 @@ static int esp_radio_init(void)
     uint8_t sync_hi = 0;
     if (sx_read_reg(0x0740, &sync_hi) != 0) {
         ESP_LOGW(TAG, "SX1262 not detected (no answer on SPI)");
+        set_fault("SX1262 not found (no SPI answer)");
         probe_cleanup(4);
         return -1;
     }
     ESP_LOGD(TAG, "probe step 6 done (sync_hi=0x%02X)", sync_hi);
     if (sync_hi == 0x00 || sync_hi == 0xFF) {
         ESP_LOGW(TAG, "SX1262 not detected (sync_hi=0x%02X)", sync_hi);
+        set_fault("SX1262 not found");
         probe_cleanup(4);
         return -1;
     }
@@ -455,6 +476,8 @@ static int esp_radio_init(void)
     if (rc == 0 && dev_errors != 0) {
         ESP_LOGE(TAG, "SX1262 device errors 0x%04x after calibration%s", dev_errors,
                  (dev_errors & SX_ERR_XOSC_START) ? " (TCXO did not start)" : "");
+        snprintf(init_fault, sizeof(init_fault), "SX1262 errors 0x%04x%s", dev_errors,
+                 (dev_errors & SX_ERR_XOSC_START) ? " (TCXO)" : "");
         fem_power_off();
         probe_cleanup(4);
         return -1;
@@ -509,6 +532,7 @@ static int esp_radio_init(void)
 
     if (rc != 0) {
         ESP_LOGE(TAG, "SX1262 configuration failed (BUSY timeout or SPI error)");
+        set_fault("SX1262 setup failed");
         fem_power_off();
         probe_cleanup(4);
         return -1;

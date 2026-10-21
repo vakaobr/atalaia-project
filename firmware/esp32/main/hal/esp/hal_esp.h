@@ -30,6 +30,12 @@ void hal_esp_board_power_on(void);
  */
 int hal_esp_keypad_p7_pressed(void);
 
+/**
+ * Why the radio's last init failed, in a few words ("SX1262 not found",
+ * "SX1262 errors 0x0020 (TCXO)"); "" when it succeeded or never ran.
+ */
+const char *hal_esp_radio_fault(void);
+
 #ifdef __cplusplus
 }
 #endif

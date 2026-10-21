@@ -67,8 +67,9 @@ menu "Atalaia Field Box Configuration"
             help
                 The controller's radio: a Heltec V4.3 plugged into the field
                 controller (Raspberry Pi) over USB. Radio, AES-CCM, dedupe and
-                duty cycle run here; no Lua, screens or presets. The frames on
-                the serial link are specified in protocol/usb-modem.md.
+                duty cycle run here; no Lua, game screens or presets (the
+                board's OLED shows the modem's status). The frames on the
+                serial link are specified in protocol/usb-modem.md.
 
         config ATALAIA_POD_MODE
             bool "I/O pod (capability proxy for a phone)"
@@ -280,19 +281,22 @@ menu "Atalaia Field Box Configuration"
 
     # ---- On-board OLED --------------------------------------------------------
     menu "On-board OLED"
-        depends on ATALAIA_NODE_MODE
+        depends on ATALAIA_NODE_MODE || ATALAIA_MODEM_MODE
 
         config ATALAIA_OLED_STATUS
             bool "Show a compact status on the board's own OLED"
             default y
             help
                 The Heltec V4's 0.96" SSD1306 (128x64, I2C 0x3C on the
-                shared bus) mirrors every screen in three lines: header,
-                one big value (PIN, choice, countdown, phase), footer. A
-                bare board without the 2.8" TFT can be set up and played
-                with it; on a full Field Box it is a status line for staff.
-                The TFT keeps the full game screen. Without an OLED at the
-                address the box logs a warning and runs without it.
+                shared bus). On a Field Box it mirrors every screen in three
+                lines: header, one big value (PIN, choice, countdown, phase),
+                footer. A bare board without the 2.8" TFT can be set up and
+                played with it; on a full Field Box it is a status line for
+                staff. The TFT keeps the full game screen. On the USB radio
+                modem it shows the link to the controller, the game, the
+                channel, the packet counts, the duty-cycle budget and any
+                radio fault. Without an OLED at the address the firmware logs
+                a warning and runs without it.
 
         config ATALAIA_OLED_ADDR
             hex "OLED I2C address"
@@ -699,6 +703,17 @@ menu "Atalaia Field Box Configuration"
             int "UART0 baud rate"
             default 921600
             depends on ATALAIA_MODEM_LINK_UART0
+
+        config ATALAIA_MODEM_LINK_TIMEOUT_S
+            int "Seconds without a host frame before the OLED shows LINK DOWN"
+            default 12
+            range 2 120
+            help
+                The field controller pings the modem every 5 s
+                (ping_interval_s) and reconnects after three missed pings.
+                12 s is two missed pings and some slack: a link that shows
+                DOWN has really stopped, and the screen says so before the
+                controller gives up. Only the OLED uses it.
 
     endmenu
 

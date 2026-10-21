@@ -115,6 +115,7 @@ add_library(atalaia_screens_fw STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/screen_template.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/oled_view.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/oled_logo.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../main/modem/modem_screen.c
     ${CMAKE_CURRENT_BINARY_DIR}/builtin_screens.c
 )
 target_include_directories(atalaia_screens_fw PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../main
@@ -189,6 +190,7 @@ set(TEST_SOURCES
     test_reboot_resume.c
     test_screen_renderer.c
     test_oled_view.c
+    test_modem_screen.c
     test_builtin_presets.c
     test_key_filter.c
     test_display.c
@@ -259,8 +261,8 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(screen_test PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
 
-# The on-board OLED's status view, on its own 128x64 display: references in
-# test/screens/oled/.
+# The on-board OLED's status view (and the USB radio modem's screens, modem_*),
+# on its own 128x64 display: references in test/screens/oled/.
 add_executable(oled_screen_test test_oled_screens.c)
 target_link_libraries(oled_screen_test PRIVATE atalaia_screens_fw atalaia_png_test)
 target_compile_definitions(oled_screen_test PRIVATE
