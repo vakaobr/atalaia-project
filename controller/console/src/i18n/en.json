@@ -186,6 +186,7 @@
     "owner": "Owner",
     "tier": "Tier",
     "battery": "Battery",
+    "battery_low": "low",
     "signal": "Signal",
     "last_seen": "Last heard",
     "firmware": "Firmware",

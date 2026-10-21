@@ -53,6 +53,22 @@ ZBARIMG = shutil.which("zbarimg")
 if REQUIRE and not ZBARIMG:
     raise RuntimeError("ATALAIA_REQUIRE_BROWSER=1 but zbarimg (zbar-tools) is not installed")
 
+
+def read_qr(image: str) -> subprocess.CompletedProcess:
+    """The QR codes zbarimg finds in a screenshot, one per line (--raw).
+
+    Only the QR decoder runs: with zbarimg's default every 1D decoder also
+    looks at the image, and once a second symbol ("C3$B", Code 39 characters
+    only: most likely a false 1D read in the QR code's modules) was printed on
+    its own line after the QR text, which made the exact comparison fail
+    (decision FU1-8). The text must still be
+    exactly the expected one, one symbol, nothing around it."""
+    out = subprocess.run([ZBARIMG, "-Sdisable", "-Sqrcode.enable", "--raw", "-q", image],
+                         capture_output=True, text=True, timeout=30)
+    # --raw ends each symbol with a newline; nothing else is taken away.
+    out.stdout = out.stdout.removesuffix("\n")
+    return out
+
 GM = "gm-secret"
 READ = "read-secret"
 JOIN_KEY = bytes(range(32))
@@ -112,12 +128,12 @@ class Field:
                                         "core_version": "0.2.0", "tier": 0, "capabilities": [0, 2],
                                         "transports": 1, "battery_pct": 87, "epoch": 1}))
 
-    def box_state(self, red: int, blue: int = 0, owner: int = 1) -> None:
+    def box_state(self, red: int, blue: int = 0, owner: int = 1, battery: int = 86) -> None:
         counters = {1: red}
         if blue:
             counters[2] = blue
         self.box("STATE", state_encode({"owner_team": owner, "phase": 1, "game_time_ms": 5000,
-                                        "counters": counters, "battery_pct": 86, "epoch": 1}))
+                                        "counters": counters, "battery_pct": battery, "epoch": 1}))
 
     def box_capture(self, team_id: int = 1, team: str = "red") -> None:
         ev = codec.encode_event({"node": BOX, "seq": 1, "t": 4000, "type": "zone.captured",
@@ -213,6 +229,21 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(row).to_contain_text("box-7")
         expect(row).to_contain_text("86%")
         self.assertEqual(page.evaluate("window.__sameDocument"), 42, "the page reloaded")
+
+        # Node health (decision FU1-5): a low battery is marked; node.offline flags the box at once,
+        # with its real last-heard time (the controller's threshold made short for the test).
+        self.field.box_state(red=45, blue=5, battery=12)
+        expect(page.get_by_test_id(f"node-battery-{BOX}")).to_have_text("12% fraca")
+        expect(page.get_by_test_id(f"node-seen-{BOX}")).not_to_contain_text("sem notícias")
+        ctrl = self.field.bundle.controller
+        with ctrl._lock:
+            ctrl.fc.node_offline_ms = ctrl.fc.link_gap_ms = 1500
+        expect(page.get_by_test_id(f"node-seen-{BOX}")).to_contain_text("sem notícias", timeout=10_000)
+        self.assertEqual(ctrl.fc.nodes[BOX].link, "offline")
+        self.field.box_state(red=45, blue=5, battery=12)
+        expect(page.get_by_test_id(f"node-seen-{BOX}")).not_to_contain_text("sem notícias", timeout=10_000)
+        with ctrl._lock:
+            ctrl.fc.node_offline_ms, ctrl.fc.link_gap_ms = 120_000, 60_000
 
         # A GM score adjustment and a pause, through the page.
         page.get_by_test_id("tab-game").click()
@@ -614,9 +645,9 @@ class ConsoleBrowserTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             shot = os.path.join(tmp, "qr.png")
             page.get_by_test_id("join-qr").screenshot(path=shot)
-            out = subprocess.run([ZBARIMG, "--raw", "-q", shot], capture_output=True, text=True, timeout=30)
+            out = read_qr(shot)
         self.assertEqual(out.returncode, 0, out.stderr)
-        self.assertEqual(out.stdout.strip(), text)
+        self.assertEqual(out.stdout, text)
         ndef = page.get_by_test_id("join-ndef").text_content().strip()
         self.assertEqual(join.from_ndef_tag(bytes.fromhex(ndef)), join.from_text(text))
 
@@ -1062,9 +1093,9 @@ class ConsoleBrowserTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             shot = os.path.join(tmp, "poster.png")
             poster.get_by_test_id("poster-qr").screenshot(path=shot)
-            out = subprocess.run([ZBARIMG, "--raw", "-q", shot], capture_output=True, text=True, timeout=30)
+            out = read_qr(shot)
         self.assertEqual(out.returncode, 0, out.stderr)
-        text = out.stdout.strip()
+        text = out.stdout
         self.assertEqual(text, expected["text"])
         decoded = checkin_poster.parse(text)
         self.assertEqual(decoded["ca_sha256"], self.field.bundle.tls.ca_sha256)
@@ -1077,8 +1108,8 @@ class ConsoleBrowserTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             shot = os.path.join(tmp, "wifi.png")
             poster.get_by_test_id("poster-wifi-svg").screenshot(path=shot)
-            out = subprocess.run([ZBARIMG, "--raw", "-q", shot], capture_output=True, text=True, timeout=30)
-        self.assertEqual(out.stdout.strip(), "WIFI:T:WPA;S:Atalaia Campo;P:segredo\\;1;;")
+            out = read_qr(shot)
+        self.assertEqual(out.stdout, "WIFI:T:WPA;S:Atalaia Campo;P:segredo\\;1;;")
         self.assertNotIn("segredo", self.field.http.get("/api/v1/checkin/poster").text)
         # A phone-sized window has no sideways scroll; printing hides the tools.
         poster.set_viewport_size({"width": 390, "height": 844})
@@ -1156,9 +1187,9 @@ class ConsoleBrowserTests(unittest.TestCase):
             for target in ("poster-qr", None):
                 shot = os.path.join(tmp, "poster.png")
                 (poster.get_by_test_id(target) if target else poster.locator("#poster")).screenshot(path=shot)
-                out = subprocess.run([ZBARIMG, "--raw", "-q", shot], capture_output=True, text=True, timeout=30)
+                out = read_qr(shot)
                 self.assertEqual(out.returncode, 0, out.stderr)
-                self.assertEqual(out.stdout.strip(), expected["text"], target or "the whole poster")
+                self.assertEqual(out.stdout, expected["text"], target or "the whole poster")
         poster.set_viewport_size({"width": 390, "height": 844})
         self.no_horizontal_scroll(poster)
         # Removing the logo brings the default look back, live.

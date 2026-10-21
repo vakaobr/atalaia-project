@@ -169,10 +169,17 @@ class App extends Component {
                 scoreHistory: [...s.scoreHistory, { at: now, teams: msg.teams }].slice(-HISTORY_MAX),
             }));
             break;
-        case 'node':
-            this.setState((s) => ({ nodes: { ...s.nodes, [msg.node.node_id]: msg.node },
-                                    seen: { ...s.seen, [msg.node.node_id]: now } }));
+        case 'node': {
+            // A link event (node.offline) is news about a box that said nothing: its own last-heard time.
+            const ago = msg.node.seen_ms_ago;
+            this.setState((s) => {
+                const seen = { ...s.seen };
+                if (ago === null) delete seen[msg.node.node_id];
+                else seen[msg.node.node_id] = ago === undefined ? now : now - ago;
+                return { nodes: { ...s.nodes, [msg.node.node_id]: msg.node }, seen };
+            });
             break;
+        }
         case 'game':
             if (!this.state.game || msg.game.live || msg.game.id === this.state.game.id) {
                 const isNew = !this.state.game || this.state.game.id !== msg.game.id;

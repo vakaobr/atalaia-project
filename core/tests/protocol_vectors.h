@@ -194,6 +194,19 @@ static const uint8_t vector_25_cbor[] = {
     0x65, 0x5f, 0x61, 0x03, 0x68, 0x65, 0x78, 0x70, 0x6c, 0x6f, 0x64, 0x65,
     0x64, 0x01, 0x64, 0x62, 0x6c, 0x75, 0x65,
 };
+static const uint8_t vector_26_cbor[] = {
+    0xa5, 0x01, 0x04, 0x02, 0x00, 0x03, 0x19, 0xee, 0x48, 0x04, 0x16, 0x08,
+    0xa1, 0x14, 0x13,
+};
+static const uint8_t vector_27_cbor[] = {
+    0xa5, 0x01, 0x03, 0x02, 0x01, 0x03, 0x1a, 0x00, 0x01, 0xe8, 0x48, 0x04,
+    0x14, 0x08, 0xa1, 0x17, 0x19, 0x13, 0x88,
+};
+static const uint8_t vector_28_cbor[] = {
+    0xa5, 0x01, 0x03, 0x02, 0x02, 0x03, 0x1a, 0x00, 0x01, 0xfb, 0xd0, 0x04,
+    0x13, 0x08, 0xa2, 0x15, 0x65, 0x30, 0x2e, 0x39, 0x2e, 0x30, 0x16, 0x64,
+    0x66, 0x75, 0x6c, 0x6c,
+};
 static const uint8_t bad_vector_0_cbor[] = {
     0xa4, 0x01, 0x01, 0x02, 0x01, 0x03, 0x19, 0x13, 0x88, 0x04,
 };
@@ -446,6 +459,18 @@ static const protocol_vector_t protocol_vectors[] = {
      {0, 4, 1200000u, 2, 0, ATALAIA_PRIO_CRITICAL, "scenario.objective.failed"},
      "{\"objective\":\"site_a\",\"reason\":\"exploded\",\"team\":\"blue\"}",
      vector_25_cbor, sizeof(vector_25_cbor)},
+    {"A box's battery gauge reads 19 % (id 22, telemetry by default; percent, key 20)",
+     {4, 0, 61000u, 0, 0, ATALAIA_PRIO_TELEMETRY, "battery.low"},
+     "{\"percent\":19}",
+     vector_26_cbor, sizeof(vector_26_cbor)},
+    {"The controller logs a silent box offline (id 20; last_seen, key 23)",
+     {3, 1, 125000u, 0, 0, ATALAIA_PRIO_TELEMETRY, "node.offline"},
+     "{\"last_seen\":5000}",
+     vector_27_cbor, sizeof(vector_27_cbor)},
+    {"The controller hears the box again (id 19; fw and tier, keys 21 and 22)",
+     {3, 2, 130000u, 0, 0, ATALAIA_PRIO_TELEMETRY, "node.online"},
+     "{\"fw\":\"0.9.0\",\"tier\":\"full\"}",
+     vector_28_cbor, sizeof(vector_28_cbor)},
 };
 
 static const protocol_bad_vector_t protocol_bad_vectors[] = {

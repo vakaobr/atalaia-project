@@ -13,6 +13,16 @@ the radio side of a game, independent of how packets travel:
 Both use this same class, so what the simulator tests is what runs on the
 Raspberry Pi. Hooks (``on_event``, ``on_node``, ``on_scores``, ``on_role``)
 let the host store and publish what happens.
+
+Node health (decisions S19-9, FU1-1 to FU1-4): with ``node_offline_ms`` set, the
+controller in charge logs ``node.online`` when it first hears a box and
+``node.offline`` when a box it heard has been silent that long, at most one
+link event per box every ``link_gap_ms`` (a flapping link reports where it
+ended up, not every flap); with ``battery_low_pct`` set, it logs
+``battery.low`` when a box's STATE or HELLO reports a level below it for
+``BATTERY_GRACE_MS`` and the box has not sent its own, once per crossing
+(``BATTERY_HYSTERESIS`` points above the threshold rearm it). These events
+are about the box, so their node is the box's id; they never go on air.
 """
 
 from __future__ import annotations
@@ -87,6 +97,13 @@ CMD_PARAMS_MAX = 127
 # Flood copies of a packet are dropped for this long (ADR-P2-6: 60 s on the controller).
 PACKET_DEDUPE_MS = 60_000
 
+# Node health (decisions FU1-1 to FU1-3).
+HEALTH_EVENTS = ("node.online", "node.offline", "battery.low")
+LINK_GAP_MS = 60_000      # at most one node.online/node.offline per box this often
+BATTERY_GRACE_MS = 30_000  # a low level waits this long for the box's own battery.low
+BATTERY_HYSTERESIS = 5     # points above the threshold that rearm battery.low
+TIER_NAMES = {0: "full", 1: "reduced", 2: "proxy"}
+
 
 class NotController(RuntimeError):
     """Raised when a command needs the controller role and this node is on standby."""
@@ -110,6 +127,15 @@ class FieldNode:
     rssi: Optional[int] = None
     snr: Optional[int] = None
     hello: dict[str, Any] = field(default_factory=dict)
+    # Health: heard in this run, the game time of the last packet, the link as the
+    # last node.online/node.offline said it (None: neither yet) and when that was
+    # logged (the controller's ms), and whether battery.low is logged for this crossing.
+    heard: bool = False
+    last_seen_game_ms: int = 0
+    link: Optional[str] = None
+    link_changed_ms: Optional[int] = None
+    battery_low: bool = False
+    battery_low_since: Optional[int] = None
 
     def owner_name(self, teams: list[str]) -> Optional[str]:
         if 1 <= self.owner_team <= len(teams):
@@ -246,6 +272,11 @@ class FieldController:
         self._last_tick: Optional[int] = None
         self._role_seen = election.role
         self._event_seq = 0  # the controller's own events (score adjustments)
+        # Node health (module docstring); 0 = off. The field controller turns both on.
+        self.node_offline_ms = 0
+        self.link_gap_ms = LINK_GAP_MS
+        self.battery_low_pct = 0
+        self.health_seq = 0  # seq of the health events this controller logs about boxes
 
         # Score aggregation: team name -> node key -> max value.
         self._scores: dict[str, dict[str, int]] = {t: {} for t in self.teams}
@@ -461,6 +492,8 @@ class FieldController:
         self.acks.record(source_node, epoch, header.seq)
         node = self._node(source_node)
         node.last_seen_ms = self._now
+        node.last_seen_game_ms = self.game_time_ms
+        node.heard = True
         node.last_seq = header.seq
         node.epoch = epoch
         if "rssi" in meta:
@@ -477,6 +510,7 @@ class FieldController:
 
         if vf_ack(header.version_flags) and self.election.is_leader:
             self._send_ack(source_node, epoch, self._now)
+        self._check_health(node, self._now)
 
     def _on_state(self, node: FieldNode, payload: bytes) -> None:
         """STATE: node snapshot and score counters (merged by maximum)."""
@@ -549,6 +583,9 @@ class FieldController:
         }
         entry["event"] = record
         self.event_log.append(entry)
+        if record["type"] == "battery.low":
+            node.battery_low = True  # the box spoke for itself: no second one from here
+            node.battery_low_since = None
         if self.on_event:
             self.on_event(record)
 
@@ -632,6 +669,8 @@ class FieldController:
         if (self.election.is_leader and self.game_state in (GAME_RUNNING, GAME_PAUSED)
                 and now_ms - self.last_beacon_ms >= self.beacon_interval_ms):
             self.send_time_beacon(now_ms=now_ms)
+        for node in list(self.nodes.values()):
+            self._check_health(node, now_ms)
 
         if now_ms - self._last_prune >= 10_000:
             self._last_prune = now_ms
@@ -682,6 +721,70 @@ class FieldController:
             "epoch": None,
             "pkt_seq": None,
             "received_ms": self._now,
+        }
+        self.event_log.append({"t_ms": self._now, "type": "event", "source": self.node_id,
+                               "event": record})
+        if self.on_event:
+            self.on_event(record)
+        return record
+
+    # --- node health ----------------------------------------------------------
+
+    def _check_health(self, node: FieldNode, now_ms: int) -> None:
+        """node.online/node.offline and battery.low for one box (module docstring)."""
+        if not self.election.is_leader or self.game_state == GAME_ENDED:
+            return
+        # A box restored as online after a restart and not heard since counts from then.
+        since = node.last_seen_ms if node.heard else node.link_changed_ms if node.link == "online" else None
+        if self.node_offline_ms > 0 and since is not None:
+            want = "online" if now_ms - since < self.node_offline_ms else "offline"
+            if want != node.link and (node.link_changed_ms is None
+                                      or now_ms - node.link_changed_ms >= self.link_gap_ms):
+                if want == "online":
+                    hello = node.hello
+                    data: dict[str, Any] = {}
+                    if isinstance(hello.get("fw_version"), str):
+                        data["fw"] = hello["fw_version"]
+                    if hello.get("tier") in TIER_NAMES:
+                        data["tier"] = TIER_NAMES[hello["tier"]]
+                else:
+                    data = {"last_seen": node.last_seen_game_ms}
+                node.link, node.link_changed_ms = want, now_ms
+                self.node_event(node.node_id, f"node.{want}", data)
+                if self.on_node:
+                    self.on_node(node, want)
+        pct = node.battery_pct
+        if self.battery_low_pct > 0 and isinstance(pct, int) and 0 <= pct <= 100:
+            if pct >= self.battery_low_pct + BATTERY_HYSTERESIS:
+                node.battery_low, node.battery_low_since = False, None
+            elif pct >= self.battery_low_pct or node.battery_low:
+                node.battery_low_since = None
+            elif node.battery_low_since is None:
+                node.battery_low_since = now_ms
+            elif now_ms - node.battery_low_since >= BATTERY_GRACE_MS:
+                node.battery_low, node.battery_low_since = True, None
+                self.node_event(node.node_id, "battery.low", {"percent": pct})
+
+    def node_event(self, node_id: int, type_: str, data: Optional[dict[str, Any]] = None,
+                   prio: str = "telemetry") -> dict[str, Any]:
+        """Logs an event the controller originates about a box: its node is the box's id,
+        its seq this controller's own count of such events (``health_seq``, which the host
+        continues after a restart), and it has no epoch (it never went on air)."""
+        self.health_seq = (self.health_seq % 0xFFFF) + 1
+        record = {
+            "node": node_id,
+            "seq": self.health_seq,
+            "t": self.game_time_ms,
+            "type": type_,
+            "team": None,
+            "team_id": 0,
+            "squad": 0,
+            "prio": prio,
+            "data": dict(data or {}),
+            "epoch": None,
+            "pkt_seq": None,
+            "received_ms": self._now,
+            "origin": "controller",
         }
         self.event_log.append({"t_ms": self._now, "type": "event", "source": self.node_id,
                                "event": record})

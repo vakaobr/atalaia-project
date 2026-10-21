@@ -71,6 +71,13 @@ typedef enum {
 } box_join_result_t;
 
 #define BOX_END_LINGER_MS 60000
+/* battery.low (decision FU1-6): the gauge is read this often in a joined game; below
+ * battery_low_pct the box sends one battery.low, and again only after the level has come
+ * back BOX_BATTERY_HYSTERESIS points above it. */
+#define BOX_BATTERY_CHECK_MS   10000
+#define BOX_BATTERY_HYSTERESIS 5
+#define BOX_BATTERY_LOW_PCT                                                                        \
+    20 /* the default; the ESP32 shell uses CONFIG_ATALAIA_BATTERY_LOW_PCT */
 
 typedef struct {
     node_runner_t *runner;
@@ -95,6 +102,9 @@ typedef struct {
     uint32_t ended_ms;
     uint32_t state_interval_ms; /* 0 = FIELD_LINK_STATE_MS */
     char last_message[128];
+    uint8_t battery_low_pct;  /* battery.low below this level; 0 = never */
+    bool battery_low;         /* battery.low sent for this crossing (until the level is back up) */
+    uint32_t battery_next_ms; /* next gauge reading */
 } box_game_t;
 
 void box_game_init(box_game_t *g, node_runner_t *runner, preset_t *preset_buf,

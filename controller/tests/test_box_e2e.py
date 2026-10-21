@@ -156,6 +156,42 @@ class FieldTests(unittest.TestCase):
         self.assertFalse(box.status()["have_key"])
         self.assertFalse(os.path.exists(os.path.join(box.state_dir, "join")))
 
+    def test_node_health_events(self):
+        """The box's own battery.low from its gauge, and the controller's node.online and node.offline
+        (decisions FU1-1 to FU1-6): a 2 s silence threshold here, so the test need not wait minutes."""
+        self.cfg.health_node_offline_s = 2.0  # read when the game goes on the radio
+        gid = self.game()
+        box = self.box("alpha")
+        nid = self.join(box)
+        self.assertTrue(wait_for(lambda: "node.online" in self.log_types(gid, nid), 5))
+        online = [e for e in self.client.get(f"/api/v1/games/{gid}/log", headers=READ).json()
+                  if e["type"] == "node.online"][0]
+        self.assertEqual((online["node"], online["epoch"], online["data"]), (nid, None, {"fw": "host", "tier": "full"}))
+        self.assertEqual(self.node(nid)["battery_pct"], 87)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
+
+        # The gauge falls to 12 %: the box sends battery.low itself (read every 10 s), once.
+        box.send("battery 12")
+        self.assertTrue(wait_for(lambda: "battery.low" in self.log_types(gid, nid), 15), box.lines[-5:])
+        low = [e for e in self.client.get(f"/api/v1/games/{gid}/log", headers=READ).json()
+               if e["type"] == "battery.low"]
+        self.assertEqual([(e["node"], e["data"], e["prio"]) for e in low], [(nid, {"percent": 12}, "telemetry")])
+        self.assertIsNotNone(low[0]["epoch"])  # it came over the air, from the box
+        self.assertTrue(box.logged("battery low: 12%"))
+        node = self.ctrl.fc.nodes[nid]
+        self.assertTrue(node.battery_low and node.battery_low_since is None)  # no second one from here
+        self.assertTrue(self.node(nid)["battery_low"])
+
+        # Battery pull: silent for 2 s, node.offline; back, node.online.
+        box.kill()
+        self.assertTrue(wait_for(lambda: self.log_types(gid, nid)[-1:] == ["node.offline"], 8))
+        self.assertEqual(self.node(nid)["link"], "offline")
+        box.start()
+        self.assertTrue(wait_for(lambda: self.log_types(gid, nid).count("node.online") == 2, 8))
+        self.assertEqual(self.node(nid)["link"], "online")
+        self.assertEqual(self.log_types(gid, nid).count("battery.low"), 1)
+
     def test_relay_through_another_box(self):
         """A box out of the modem's range is heard, and hears the controller, through another box."""
         gid = self.game()

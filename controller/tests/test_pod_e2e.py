@@ -162,11 +162,12 @@ class PodOnTheFieldRadio(unittest.TestCase):
         seq = self.tx(j, "EVENT", payload)
         self.assertTrue(self.acked(j, seq))
         log = self.client.get(f"/api/v1/games/{self.gid}/log", headers=READ).json()
-        self.assertEqual([e["type"] for e in log if e["node"] == nid], ["zone.captured"])
+        # (and the controller's own node.online about the phone's node, decision FU1-1)
+        self.assertEqual([e["type"] for e in log if e["node"] == nid], ["node.online", "zone.captured"])
         # The same event again (as the Wi-Fi link would resend it): no second entry.
         self.assertTrue(self.acked(j, self.tx(j, "EVENT", payload)))
         log = self.client.get(f"/api/v1/games/{self.gid}/log", headers=READ).json()
-        self.assertEqual(len([e for e in log if e["node"] == nid]), 1)
+        self.assertEqual(len([e for e in log if e["node"] == nid and e["type"] == "zone.captured"]), 1)
 
         # STATE with red's counter: the controller's score follows (merged by maximum).
         self.tx(j, "STATE", state_encode({"owner_team": 1, "phase": 1, "game_time_ms": 9000,

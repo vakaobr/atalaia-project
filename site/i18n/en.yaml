@@ -643,7 +643,8 @@ roadmap:
       members, a public page off by default with a report button and moderation) with the field's
       branding and saved teams synced to its controllers, so a club's crest reaches every field that
       saved its team; and device health (each box's battery, link and firmware from what the
-      controllers send), a firmware catalogue that only lists releases signed with a trusted key
+      controllers send; the field controller now reports a box that goes silent or comes back and a
+      low battery, which a box with a battery gauge also reports itself; not yet on real boards), a firmware catalogue that only lists releases signed with a trusted key
       (nothing is installed: over-the-air updates are not built yet), and the remote GM: an organiser
       with the GM role, logged in with a two-factor code, sees the live game and starts, pauses,
       resumes or ends it, or sends a message or a mode command, over a connection the field

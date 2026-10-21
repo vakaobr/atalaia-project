@@ -485,6 +485,19 @@ menu "Atalaia Field Box Configuration"
                 a capture). 15 s keeps a 5-box game far below the 10% duty
                 cycle of the 869.4-869.65 MHz sub-band.
 
+        config ATALAIA_BATTERY_LOW_PCT
+            int "Send battery.low below this battery level (percent; 0 = never)"
+            default 20
+            range 0 99
+            help
+                In a joined game, a box with a MAX17048 battery gauge sends
+                one battery.low event (telemetry: one packet, no ACK) when
+                its level falls below this, and again only after the level
+                has come back 5 points above it (hysteresis). The gauge is
+                read every 10 s; a box without a gauge sends nothing. The
+                controller also logs battery.low from the level in STATE if
+                the box's own event does not arrive (decisions FU1-3, FU1-6).
+
         config ATALAIA_CONSOLE_USB_INPUT
             bool "Read the serial console's input from the USB port (USB-Serial-JTAG)"
             default y

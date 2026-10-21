@@ -122,9 +122,12 @@ class MqttBridge:
             base = f"{PREFIX}/{game}/nodes/{node['node_id']}"
             self._publish(f"{base}/state", {k: node.get(k) for k in (
                 "node_id", "name", "role", "owner", "phase", "game_time_ms", "score")}, retain=True)
+            # A link event (node.offline) is news about a box that said nothing: its own last-heard time.
+            ago = node.get("seen_ms_ago")
+            seen = time.time() - ago / 1000 if isinstance(ago, int) else time.time()
             self._publish(f"{base}/health", {**{k: node.get(k) for k in (
-                "node_id", "battery_pct", "rssi", "snr", "epoch", "fw_version")}, "last_seen": time.time()},
-                retain=True)
+                "node_id", "battery_pct", "rssi", "snr", "epoch", "fw_version", "link", "battery_low")},
+                "last_seen": seen}, retain=True)
 
     # --- in ---------------------------------------------------------------------
 

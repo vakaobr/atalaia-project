@@ -186,6 +186,7 @@
     "owner": "Dona",
     "tier": "Nível",
     "battery": "Bateria",
+    "battery_low": "fraca",
     "signal": "Sinal",
     "last_seen": "Última notícia",
     "firmware": "Firmware",

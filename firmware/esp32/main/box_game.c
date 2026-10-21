@@ -237,6 +237,7 @@ void box_game_init(box_game_t *g, node_runner_t *runner, preset_t *preset_buf,
     g->log = log;
     g->hello = *hello;
     g->preset_index = -1;
+    g->battery_low_pct = BOX_BATTERY_LOW_PCT;
 }
 
 bool box_game_load_join_key(box_game_t *g)
@@ -392,6 +393,11 @@ static box_join_result_t apply(box_game_t *g, const atalaia_join_t *j, const uin
     if (g->shell.set_channel != NULL && !g->shell.set_channel(g->shell.user, j->channel_hz)) {
         say(g, "radio: cannot tune to %lu Hz (no radio, or refused)", (unsigned long)j->channel_hz);
     }
+    /* HELLO carries the battery level when the box has a gauge (0xFF: unknown). */
+    int battery = g->shell.battery_pct != NULL ? g->shell.battery_pct(g->shell.user) : -1;
+    g->hello.battery_pct = battery >= 0 && battery <= 100 ? (uint8_t)battery : 0xFF;
+    g->battery_low = false; /* a new game, or a reboot: battery.low may be sent again */
+    g->battery_next_ms = g->now_ms;
     field_link_io_t io = {.get_state = link_get_state,
                           .on_cmd = link_on_cmd,
                           .game_time = link_game_time,
@@ -489,6 +495,27 @@ void box_game_on_packet(box_game_t *g, const uint8_t *pkt, size_t len, int8_t rs
     field_link_on_packet(&g->link, pkt, len, rssi);
 }
 
+/* battery.low once per crossing below battery_low_pct, rearmed BOX_BATTERY_HYSTERESIS points
+ * above it; only with a gauge (battery_pct() >= 0) and in a joined game (decision FU1-6). */
+static void check_battery(box_game_t *g, uint32_t now_ms)
+{
+    if (g->battery_low_pct == 0 || g->shell.battery_pct == NULL ||
+        (g->phase != BOX_JOINED && g->phase != BOX_PLAYING) ||
+        (int32_t)(now_ms - g->battery_next_ms) < 0) {
+        return;
+    }
+    g->battery_next_ms = now_ms + BOX_BATTERY_CHECK_MS;
+    int pct = g->shell.battery_pct(g->shell.user);
+    if (pct < 0 || pct > 100) return; /* no gauge, or no reading */
+    if (!g->battery_low && pct < g->battery_low_pct) {
+        g->battery_low = true;
+        field_link_send_battery_low(&g->link, (uint8_t)pct, g->runner->game_time_ms);
+        say(g, "battery low: %d%%", pct);
+    } else if (g->battery_low && pct >= g->battery_low_pct + BOX_BATTERY_HYSTERESIS) {
+        g->battery_low = false;
+    }
+}
+
 void box_game_tick(box_game_t *g, uint32_t raw_delta_ms, uint32_t now_ms)
 {
     g->now_ms = now_ms;
@@ -497,6 +524,7 @@ void box_game_tick(box_game_t *g, uint32_t raw_delta_ms, uint32_t now_ms)
         node_runner_tick(g->runner, field_link_adjust_delta(&g->link, raw_delta_ms));
     }
     field_link_tick(&g->link, now_ms);
+    check_battery(g, now_ms);
     if (g->phase == BOX_ENDED &&
         (field_link_pending(&g->link) == 0 || now_ms - g->ended_ms >= BOX_END_LINGER_MS)) {
         leave_game(g);

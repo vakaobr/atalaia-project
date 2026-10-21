@@ -25,6 +25,7 @@
  *   @tag <uid hex> [<tag hex>]  a player tag read (as the NFC reader would, in a game)
  *   hold <button 1-4> <ms>      hold a team button for ms, then release it
  *   keys <0-9*#...>             keypad presses (keypad.key events to the mode)
+ *   battery <0-100|-1>          the battery gauge's reading (-1: no gauge); 87 at the start
  *   status                      print one STATUS line (JSON)
  *   quit
  * stdout: "READY air=<port>", then LOG, SCREEN and STATUS lines (SCREEN: the shell's
@@ -220,10 +221,13 @@ static bool shell_set_channel(void *user, uint32_t hz)
     return true;
 }
 
+/* The battery gauge's reading: "battery N" on stdin (-1: no gauge). */
+static int battery = 87;
+
 static int shell_battery(void *user)
 {
     (void)user;
-    return 87;
+    return battery;
 }
 
 /* ---- Files for the mode sources -------------------------------------------------- */
@@ -502,6 +506,8 @@ int main(int argc, char **argv)
                             snprintf(json, sizeof(json), "{\"key\":\"%c\"}", *k);
                             node_runner_input(&runner, "keypad.key", json);
                         }
+                    } else if (sscanf(line, "battery %d", &b) == 1) {
+                        battery = b < 0 ? -1 : b > 100 ? 100 : b;
                     } else if (strcmp(line, "status") == 0) {
                         print_status();
                     } else if (strcmp(line, "quit") == 0) {

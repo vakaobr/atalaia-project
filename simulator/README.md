@@ -82,7 +82,7 @@ They cover the Python event codec ([`codec.py`](atalaia_sim/codec.py), checked a
 | Web view of screens, outputs, sounds and events | Done (`serve`) |
 | Packet codec (header, payloads, AES-CCM) | Done (Phase 2A) |
 | RadioModel (lossy delivery, partition, dedupe) | Done (Phase 2B) |
-| FieldController (game lifecycle, TIME, scores) | Done (Phase 2B); ACKs, event log, transports (Phase 2D) |
+| FieldController (game lifecycle, TIME, scores) | Done (Phase 2B); ACKs, event log, transports (Phase 2D); node health events `node.online`, `node.offline`, `battery.low` (phase 4 follow-up, decisions FU1-1 to FU1-4; off unless the host sets `node_offline_ms` and `battery_low_pct`, as the field controller does) |
 | CLAIM election and failover | Done (Phase 2D), shared with the field controller |
 | `field.*` and `state.field` from Python (ctypes `field_ops`) | Done (Phase 2D) |
 | `field.lua` in a simulated game | Not yet: the field controller runs `field.lua`; the simulator's web view does not |

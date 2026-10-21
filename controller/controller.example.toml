@@ -28,6 +28,13 @@ max_hops = 2
 scan_dwell_s = 60.0               # "find a quiet channel": listening time, split across channels
 quiet_threshold_dbm = -105        # quiet: 90% of the noise readings at or below this
 
+[health]
+# Node health events, synced to the site server's device health. node.offline when
+# a box has been silent this long; keep it well above the boxes' STATE interval
+# (CONFIG_ATALAIA_STATE_INTERVAL_S, 15 s by default). 0 turns them off.
+node_offline_s = 120.0
+battery_low_pct = 20              # battery.low below this level, unless the box sent its own; 0 = off
+
 [modem]
 port = "/dev/ttyACM0"             # the USB radio modem; empty = run without a radio
 baudrate = 921600

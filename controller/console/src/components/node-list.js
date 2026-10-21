@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Node health: every box the controller knows in the live game, with what
-// its HELLO and STATE reports say, and (for the GM) a zone owner override and
+// its HELLO and STATE reports say and the controller's health events (link
+// "offline" after node.offline, battery_low after battery.low; decisions
+// FU1-1 to FU1-5), and (for the GM) a zone owner override and
 // the mode commands of the box's role (mode.yaml "commands", such as a medic
 // kit's refill: CMD opcode 8, RFC 0001 Amendment 5).
 
@@ -10,6 +12,13 @@ import { html, Component, t, age, teamColour, OFFLINE_MS } from '../ui.js';
 import { commandsFor } from './preset-builder.js';
 
 const TIERS = { 0: 'full', 1: 'reduced', 2: 'proxy' };
+// The site server's device health flags a battery below this too (services/devices.py).
+export const BATTERY_LOW_PCT = 20;
+
+/** True when the controller logged battery.low for the box, or its level is below BATTERY_LOW_PCT. */
+export function batteryLow(n) {
+    return Boolean(n.battery_low) || (typeof n.battery_pct === 'number' && n.battery_pct < BATTERY_LOW_PCT);
+}
 
 /** Link quality 0-4 from RSSI (dBm), for a bar display. */
 export function linkBars(rssi) {
@@ -57,7 +66,8 @@ export class NodeList extends Component {
                 </tr></thead>
                 <tbody>${list.map((n) => {
                     const ago = seen[n.node_id] !== undefined ? now - seen[n.node_id] : null;
-                    const offline = ago !== null && ago > OFFLINE_MS;
+                    const offline = n.link === 'offline' || (ago !== null && ago > OFFLINE_MS);
+                    const low = batteryLow(n);
                     return html`<tr class=${offline ? 'offline' : ''} data-node=${n.node_id}>
                         <td>${n.node_id}</td>
                         <td>${n.name}</td>
@@ -69,10 +79,10 @@ export class NodeList extends Component {
                             </select>`
                             : html`<span class="owner" ref=${(el) => { if (el) el.style.color = teamColour(n.owner, teams); }}>${n.owner || t('nodes.no_owner')}</span>`}</td>
                         <td>${n.tier === null || n.tier === undefined ? '–' : t(`nodes.tiers.${TIERS[n.tier] || 'full'}`)}</td>
-                        <td>${n.battery_pct === null || n.battery_pct === undefined ? '–' : `${n.battery_pct}%`}</td>
+                        <td data-testid=${`node-battery-${n.node_id}`}>${n.battery_pct === null || n.battery_pct === undefined ? '–' : `${n.battery_pct}%`}${low ? html` <strong class="warn">${t('nodes.battery_low')}</strong>` : ''}</td>
                         <td><span class=${`bars bars-${linkBars(n.rssi)}`} aria-hidden="true"></span>
                             ${n.rssi === null || n.rssi === undefined ? '–' : `${n.rssi} dBm`}${n.snr !== null && n.snr !== undefined ? ` / ${n.snr} dB` : ''}</td>
-                        <td>${offline ? html`<strong class="warn">${t('nodes.offline')} </strong>` : ''}${age(ago)}</td>
+                        <td data-testid=${`node-seen-${n.node_id}`}>${offline ? html`<strong class="warn">${t('nodes.offline')} </strong>` : ''}${age(ago)}</td>
                         <td>${n.fw_version || '–'}</td>
                         <td>${n.epoch === null || n.epoch === undefined ? '–' : n.epoch}</td>
                         ${gm && html`<td>${commandsFor(modes || [], game.mode_id, n.role).map((c) => html`

@@ -114,7 +114,8 @@ class EndpointTests(ApiCase):
         log = c.get(f"/api/v1/games/{gid}/log", headers=READ).json()
         self.assertEqual(log[0]["type"], "game.start")
         self.assertEqual({e["type"] for e in log},
-                         {"game.start", "game.pause", "game.resume", "zone.captured", "score.delta", "game.end"})
+                         {"game.start", "game.pause", "game.resume", "zone.captured", "score.delta", "game.end",
+                          "node.online"})  # the controller heard box 4 (decision FU1-1)
         self.assertEqual([e for e in log if e["type"] == "game.end"][0]["data"], {"reason": "time", "winner": "red"})
         self.assertEqual([e["t"] for e in log], sorted(e["t"] for e in log))  # in game-time order
         self.assertEqual(c.get(f"/api/v1/games/{gid}/score", headers=READ).json()["teams"],

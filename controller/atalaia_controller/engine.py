@@ -40,6 +40,8 @@ from atalaia_sim.field_controller import (
     GAME_PAUSED,
     GAME_RUNNING,
     GAME_WAITING,
+    HEALTH_EVENTS,
+    LINK_GAP_MS,
     FieldController,
     FieldNode,
     NotController,
@@ -364,6 +366,10 @@ class Controller:
         fc = FieldController(transport=self.transport, game_id=game["id"], teams=game["teams"],
                              node_id=node_id, election=election, max_hops=max_hops)
         fc.duration_ms = game["duration_ms"]
+        # Node health events (decisions FU1-1 to FU1-4): node.online/node.offline and battery.low.
+        fc.node_offline_ms = int(self.cfg.health_node_offline_s * 1000)
+        fc.link_gap_ms = min(LINK_GAP_MS, fc.node_offline_ms)
+        fc.battery_low_pct = self.cfg.health_battery_low_pct
         for node_id, role in game["assignments"].items():
             fc.register_node(int(node_id), f"node-{node_id}", role)
         fc.on_event = self._on_event
@@ -397,6 +403,9 @@ class Controller:
             fc.merge_scores(node["node_id"], node.get("score") or {})
             known = fc.register_node(node["node_id"], node["name"], node["role"])
             known.epoch = node.get("epoch") or 0
+            if isinstance(node.get("battery_pct"), int):
+                known.battery_pct = node["battery_pct"]
+        self._restore_health(fc, game["id"])
         saved = self.store.get_setting(f"game_time:{game['id']}")
         fc.game_time_ms = int(saved) if saved else 0
         fc.game_state = {"running": GAME_RUNNING, "paused": GAME_PAUSED}.get(game["state"], 0)
@@ -412,6 +421,21 @@ class Controller:
             except (ModeError, ControllerError) as exc:
                 log.error("field.lua cannot run after the restart: %s", exc)
         log.info("resumed game %d (%s) at %d ms", game["id"], game["state"], fc.game_time_ms)
+
+    def _restore_health(self, fc: FieldController, game_id: int) -> None:
+        """After a restart: the health events' seq goes on from the stored ones, each box's link is
+        what its last link event said (one that was online has node_offline_s from now to be
+        heard again before it counts as offline) and a battery.low already logged is not repeated."""
+        health = [e for t in HEALTH_EVENTS for e in self.store.events(game_id, event_type=t)]
+        fc.health_seq = max((e["seq"] for e in health if e["epoch"] is None), default=0)
+        now = self.now_ms()
+        for node in fc.nodes.values():
+            mine = [e for e in health if e["node"] == node.node_id]
+            links = [e for e in mine if e["type"] != "battery.low"]
+            if links:
+                node.link = max(links, key=lambda e: (e["t"], e["seq"]))["type"].split(".")[1]
+                node.link_changed_ms = now if node.link == "online" else None
+            node.battery_low = any(e["type"] == "battery.low" for e in mine)
 
     def _adjustments(self, game_id: int) -> dict[str, int]:
         out: dict[str, int] = {}
@@ -1111,6 +1135,8 @@ class Controller:
             "core_version": hello.get("core_version"), "tier": hello.get("tier"),
             "capabilities": hello.get("capabilities"),
             "score": {t: v.get(f"node-{node.node_id}", 0) for t, v in self.fc._scores.items()},
+            # Health as the controller logged it (node.online/node.offline, battery.low).
+            "link": node.link, "battery_low": node.battery_low,
         }
 
     def send_node_cmd(self, node_id: int, cmd: str, params: Optional[dict[str, Any]]) -> dict[str, Any]:
@@ -1292,7 +1318,8 @@ class Controller:
                 self._emit({"type": "game", "game": self.public_game(self.game)})
         if self.positions is not None:
             self.positions.on_event(self.game["id"], record)
-        if self.field is not None and record["node"] != self.node_id:
+        if self.field is not None and record["node"] != self.node_id and record.get("origin") != "controller":
+            # A box's events; not the health events the controller logs about a box (FU1-4).
             data = dict(record.get("data") or {})
             data.setdefault("node", record["node"])
             if record.get("team"):
@@ -1307,6 +1334,8 @@ class Controller:
         info = self._node_info(node)
         self.store.upsert_node(self.game["id"], node.node_id, node.name, node.role,
                                {k: v for k, v in info.items() if k not in ("node_id", "name", "role")})
+        # When it was last heard: a link event is news about a box that may have said nothing.
+        info["seen_ms_ago"] = max(0, self.now_ms() - node.last_seen_ms) if node.heard else None
         self._emit({"type": "node", "game": self.game["id"], "kind": kind, "node": info})
 
     def _on_scores(self, totals: dict[str, int]) -> None:

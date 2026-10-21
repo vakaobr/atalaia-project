@@ -341,6 +341,7 @@ Radio-specific Kconfig options (under "Atalaia Field Box Configuration > Radio")
 
 Field game options (under "Field network games"):
 - `ATALAIA_STATE_INTERVAL_S` -- seconds between STATE packets in a joined game (default 15)
+- `ATALAIA_BATTERY_LOW_PCT` -- send `battery.low` below this battery level (default 20; 0 = never; only with a MAX17048 gauge)
 - `ATALAIA_SERIAL_JOIN` -- accept `@join` and `@joinkey` lines on the serial console (default on)
 - `ATALAIA_CONSOLE_USB_INPUT` -- read the console input from the USB-C port (USB-Serial-JTAG, the Heltec V4's only USB) as well as UART0 (default on; off in the Wokwi build)
 - `ATALAIA_LED_BRIGHTNESS_PCT` -- LED ring brightness at boot (default 40%; under "LEDs")
@@ -506,13 +507,22 @@ controller's game.
   state, game time, points gained per team, epoch), follows the controller
   with the highest term, applies the time sync (slew, or a step ahead, or
   holding the clock), and relays every authenticated packet once.
+- **Battery** -- with a MAX17048 gauge, HELLO and STATE carry its level, and
+  in a joined game the box reads it every 10 s and sends one `battery.low`
+  (telemetry: one packet, no ACK, the level in `percent`) when it falls below
+  `CONFIG_ATALAIA_BATTERY_LOW_PCT`, again only after it has come 5 points
+  back above it (`main/box_game.c`, decision FU1-6). A box without a gauge
+  sends neither. The controller logs `battery.low` from the STATE level too
+  if the box's own does not arrive. In software and on the host box only:
+  the bench board has no gauge fitted.
 - **After a reboot** -- the stored join brings the box back: a new epoch,
   HELLO, the saved game state, `node.rebooted`, and the unacknowledged events
   from the flash log.
 - **Tests** -- the host tests (`test/test_field_link.c`,
   `test/test_box_game.c`, `test/test_serial_console.c`) run this code with
   the stub HAL; `test/box_host/` builds it into a Linux program on a UDP
-  "air" (team buttons, keypad presses and `@tag` player tags on its stdin), which the controller's end-to-end tests
+  "air" (team buttons, keypad presses, `@tag` player tags and the battery
+  gauge's reading on its stdin), which the controller's end-to-end tests
   (`controller/tests/test_box_e2e.py`) play whole games with, through the
   host modem. `wokwi/join.scenario.yaml` joins a game in the emulator.
 

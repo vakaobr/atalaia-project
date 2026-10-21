@@ -4,7 +4,8 @@
  *
  * A Field Box in a controller's game (main/box_game.c): the join and its
  * refusals, the game driven by CMD, events and scores going out over the
- * link, the end of the game (key erased), and the rejoin after a reboot.
+ * link, the end of the game (key erased), the rejoin after a reboot, and
+ * battery.low from the battery gauge (once per crossing, with hysteresis).
  * Real modes (modes/domination/node.lua) run in the real core.
  */
 #include <stdio.h>
@@ -312,6 +313,37 @@ static int events_named(const char *type)
         }
     }
     return c;
+}
+
+/* The battery gauge's reading for the shell (-1: no gauge). */
+static int fake_battery = -1;
+
+static int sh_battery(void *user)
+{
+    (void)user;
+    return fake_battery;
+}
+
+/* The percent of the last battery.low the box sent, or -1. */
+static int last_battery_low(void)
+{
+    int pct = -1;
+    for (int i = 0; i < shell.count; i++) {
+        atalaia_header_t h;
+        uint8_t pl[PKT_CAP];
+        size_t n;
+        atalaia_event_t ev;
+        char data[128];
+        if (atalaia_packet_decrypt(shell.pkt[i], shell.len[i], game.link.proto.epoch, GAME_KEY, &h,
+                                   pl, &n, &atalaia_crypto_test_stub) &&
+            h.type == ATALAIA_MSG_EVENT &&
+            atalaia_event_decode(pl, n, &ev, data, sizeof(data), NULL) &&
+            strcmp(ev.type, "battery.low") == 0) {
+            CHECK(ev.prio == ATALAIA_PRIO_TELEMETRY && !ATALAIA_VF_ACK(h.version_flags));
+            CHECK(sscanf(data, "{\"percent\":%d}", &pct) == 1);
+        }
+    }
+    return pct;
 }
 
 static void run_ms(uint32_t *now, uint32_t ms)
@@ -734,8 +766,90 @@ static void test_medic_kit(void)
     state_persist_clear();
 }
 
+/* battery.low: once per crossing below the threshold, rearmed 5 points above it; never
+ * without a gauge, never outside a joined game; HELLO carries the level. */
+static void test_battery_low(void)
+{
+    fixture(false);
+    game.shell.battery_pct = sh_battery;
+    CHECK(game.battery_low_pct == BOX_BATTERY_LOW_PCT);
+    CHECK(box_game_set_join_key_hex(&game, JOIN_KEY_HEX));
+    atalaia_join_t j;
+    make_join(&j);
+    uint8_t buf[ATALAIA_JOIN_MAX];
+
+    /* No gauge: HELLO says unknown, and nothing is ever sent. */
+    fake_battery = -1;
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    atalaia_header_t h;
+    uint8_t pl[PKT_CAP];
+    size_t pn;
+    atalaia_hello_t hello;
+    CHECK(last_of(ATALAIA_MSG_HELLO, &h, pl, &pn) && atalaia_hello_decode(pl, pn, &hello));
+    CHECK(hello.battery_pct == 0xFF);
+    ack_all();
+    uint32_t now = 10;
+    run_ms(&now, 3 * BOX_BATTERY_CHECK_MS);
+    CHECK(events_named("battery.low") == 0);
+
+    /* A gauge at 50 %: still nothing. */
+    fake_battery = 50;
+    run_ms(&now, 2 * BOX_BATTERY_CHECK_MS);
+    CHECK(events_named("battery.low") == 0);
+    /* Below 20 %: one battery.low with the level, sent once without an ACK. */
+    fake_battery = 19;
+    run_ms(&now, BOX_BATTERY_CHECK_MS);
+    CHECK(events_named("battery.low") == 1 && last_battery_low() == 19);
+    cmd(FIELD_CMD_START);
+    fake_battery = 12;
+    run_ms(&now, 3 * BOX_BATTERY_CHECK_MS);
+    CHECK(events_named("battery.low") == 1);
+    /* Back up to 24 % (inside the hysteresis) and down again: nothing new. */
+    fake_battery = 24;
+    run_ms(&now, 2 * BOX_BATTERY_CHECK_MS);
+    fake_battery = 18;
+    run_ms(&now, 2 * BOX_BATTERY_CHECK_MS);
+    CHECK(events_named("battery.low") == 1);
+    /* 25 % rearms it; 17 % sends a second one. */
+    fake_battery = 25;
+    run_ms(&now, 2 * BOX_BATTERY_CHECK_MS);
+    fake_battery = 17;
+    run_ms(&now, 2 * BOX_BATTERY_CHECK_MS);
+    CHECK(events_named("battery.low") == 2 && last_battery_low() == 17);
+    /* A reading that is not a level (the gauge went away) changes nothing. */
+    fake_battery = 101;
+    run_ms(&now, 2 * BOX_BATTERY_CHECK_MS);
+    CHECK(events_named("battery.low") == 2);
+
+    /* After the game, nothing: the box is in no game. */
+    cmd(FIELD_CMD_END);
+    ack_all();
+    run_ms(&now, 20);
+    CHECK(game.phase == BOX_IDLE);
+    int before = shell.count;
+    fake_battery = 5;
+    game.battery_low = false;
+    run_ms(&now, 2 * BOX_BATTERY_CHECK_MS);
+    CHECK(shell.count == before);
+
+    /* A threshold of 0 (CONFIG_ATALAIA_BATTERY_LOW_PCT=0) never sends it. */
+    fixture(false);
+    game.shell.battery_pct = sh_battery;
+    game.battery_low_pct = 0;
+    CHECK(box_game_set_join_key_hex(&game, JOIN_KEY_HEX));
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    CHECK(last_of(ATALAIA_MSG_HELLO, &h, pl, &pn) && atalaia_hello_decode(pl, pn, &hello));
+    CHECK(hello.battery_pct == 5);
+    now = 10;
+    run_ms(&now, 2 * BOX_BATTERY_CHECK_MS);
+    CHECK(events_named("battery.low") == 0);
+    fake_battery = -1;
+    state_persist_clear();
+}
+
 void run_box_game_tests(void)
 {
+    test_battery_low();
     test_medic_kit();
     test_player_tags();
     test_join_refusals();

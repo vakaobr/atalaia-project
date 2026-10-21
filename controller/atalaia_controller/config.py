@@ -22,6 +22,12 @@
     quiet_threshold_dbm = -105  # a channel whose 90th-percentile noise is at or below this
                                 # counts as quiet (decision CH4; to be calibrated at bring-up)
 
+    [health]                    # node health events (decisions FU1-1 to FU1-4)
+    node_offline_s = 120.0      # node.offline after a box is silent this long (more than its
+                                # STATE interval: 15 s by default); 0 = no link events
+    battery_low_pct = 20        # battery.low when a box reports a level below this and has not
+                                # sent its own; 0 = off
+
     [modem]
     port = "/dev/ttyACM0"       # or socket://host:port; empty = no radio
     baudrate = 921600
@@ -111,6 +117,7 @@ SECTIONS = {
     "controller": ("node_id", "db_path", "modes_dirs", "failover_mode", "power_source",
                    "battery_pct", "storage_ok", "persist_game_key", "tick_interval_s"),
     "radio": ("channel_hz", "max_hops", "scan_dwell_s", "quiet_threshold_dbm"),
+    "health": ("node_offline_s", "battery_low_pct"),
     "modem": ("port", "baudrate", "ping_interval_s"),
     "api": ("host", "port", "gm_token", "read_token", "tls_port", "tls_dir", "tls_names"),
     "mqtt": ("enabled", "host", "port", "username", "password"),
@@ -146,6 +153,9 @@ class Config:
     max_hops: int = 2
     scan_dwell_s: float = 60.0
     quiet_threshold_dbm: int = -105
+    # [health]
+    health_node_offline_s: float = 120.0
+    health_battery_low_pct: int = 20
     # [modem]
     port: str = ""
     baudrate: int = 921_600
@@ -220,6 +230,10 @@ class Config:
             raise ConfigError("radio.scan_dwell_s must be 1-600 seconds")
         if not -128 <= self.quiet_threshold_dbm <= 0:
             raise ConfigError("radio.quiet_threshold_dbm must be -128 to 0")
+        if not (self.health_node_offline_s == 0 or 1.0 <= self.health_node_offline_s <= 3600.0):
+            raise ConfigError("health.node_offline_s must be 0 (off) or 1-3600 seconds")
+        if not 0 <= self.health_battery_low_pct <= 99:
+            raise ConfigError("health.battery_low_pct must be 0 (off) to 99")
         if self.tick_interval_s <= 0 or self.ping_interval_s <= 0:
             raise ConfigError("intervals must be positive")
         if not 0 <= self.tls_port <= 65535 or (self.tls_port and self.tls_port == self.api_port):
@@ -308,6 +322,7 @@ _ATTR = {("api", "port"): "api_port", ("mqtt", "enabled"): "mqtt_enabled",
          ("checkin", "urls"): "checkin_urls"}
 _ATTR.update({("sync", k): f"sync_{k}" for k in SECTIONS["sync"]})
 _ATTR.update({("atak", k): f"atak_{k}" for k in SECTIONS["atak"]})
+_ATTR.update({("health", k): f"health_{k}" for k in SECTIONS["health"]})
 # Lists whose items contain ":" (host:port): from the environment they are separated by commas.
 COMMA_LISTS = {"atak_staff_endpoints"}
 

@@ -720,6 +720,10 @@ M9-10 had deferred here (it needs an authenticated endpoint, S19-10), positions 
 the remote view, a GM page on the site server and the console's screen for the log.
 Not yet: a real deployment, over 4G (HW1). Decisions S19-1 to S19-11, all open.
 
+## Follow-up: device health events (2026-10-21, in software)
+
+The controller in charge now logs `node.online`, `node.offline` (after `[health] node_offline_s`, 120 s of silence; at most one link event per box a minute) and `battery.low` (from a box's reported level under `[health] battery_low_pct`, 20 %, unless the box sent its own) about each box. The Field Box firmware sends its own `battery.low` from its MAX17048 gauge (`CONFIG_ATALAIA_BATTERY_LOW_PCT`, once per crossing, 5 points of hysteresis). The sync carries them to the site server's device health, tested end to end (host box -> controller; controller -> site server on PostgreSQL). The console's Boxes list marks a box offline and its battery low. The poster QR browser test is made robust (zbarimg QR decoder only). Not yet on real boards: the bench board has no gauge. Decisions FU1-1 to FU1-9, all open.
+
 ## Plan phase 20: game history and the scenario library (built 2026-10-20, in software)
 
 What exists: on the site server, the history of a field's synced games

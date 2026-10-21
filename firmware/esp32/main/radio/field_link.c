@@ -248,6 +248,18 @@ void field_link_send_rebooted(field_link_t *l, uint32_t t_ms)
     field_link_event(l, &ev, "{\"reason\":\"power\"}");
 }
 
+void field_link_send_battery_low(field_link_t *l, uint8_t percent, uint32_t t_ms)
+{
+    atalaia_event_t ev;
+    if (!atalaia_event_init(&ev, l->join.node_id, 0, t_ms, "battery.low", ATALAIA_TEAM_NONE,
+                            ATALAIA_SQUAD_NONE, ATALAIA_PRIO_TELEMETRY)) {
+        return;
+    }
+    char data[24];
+    snprintf(data, sizeof(data), "{\"percent\":%u}", (unsigned)percent);
+    field_link_event(l, &ev, data);
+}
+
 /* ---- Init -------------------------------------------------------------------- */
 
 bool field_link_init(field_link_t *l, const atalaia_join_t *join,

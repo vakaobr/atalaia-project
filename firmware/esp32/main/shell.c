@@ -403,6 +403,8 @@ static void box_start(const char *tier)
     box_game_init(&box, &runner, &game_preset, nvs ? atalaia_box_store_esp() : &no_store, &ops,
                   &atalaia_crypto_mbedtls, nvs, &game_log, &hello);
     box.state_interval_ms = (uint32_t)CONFIG_ATALAIA_STATE_INTERVAL_S * 1000u;
+    /* battery.low below this level, only with a MAX17048 (box_battery() is -1 without one). */
+    box.battery_low_pct = (uint8_t)CONFIG_ATALAIA_BATTERY_LOW_PCT;
     if (!atalaia_nvs_encrypted()) {
         ESP_LOGW(TAG, "NVS encryption is off: the game key and the field join key are stored in "
                       "plain NVS (development only; BRING_UP.md step 0)");

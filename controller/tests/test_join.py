@@ -261,15 +261,16 @@ class StandbyOverTheAirTests(unittest.TestCase):
         self.assertTrue(wait_for(lambda: b.get(f"/api/v1/games/{gid}", headers=READ).json()["state"] == "running", 5))
         self.assertEqual(b.get("/api/v1/controller", headers=READ).json()["leader"], 0)
 
-        # A box (played by the test) captures: both controllers log it; only the primary ACKs.
+        # A box (played by the test) captures: both controllers log it; only the primary ACKs, and
+        # only the primary logs node.online about the box (a standby logs no health events, FU1-1).
         ev = codec.encode_event({"node": 7, "seq": 1, "t": 1000, "type": "zone.captured", "team": 2,
                                  "data": {"team": "blue"}})
         self.hub.send(node_packet(key, gid, 7, 0, 1, "EVENT", ev, ack=True))
         st = state_encode({"owner_team": 2, "phase": 1, "game_time_ms": 1000, "counters": {2: 30}, "epoch": 1})
         self.hub.send(node_packet(key, gid, 7, 1, 1, "STATE", st))
-        for side in (a, b):
-            self.assertTrue(wait_for(lambda side=side: [e["type"] for e in side.get(
-                f"/api/v1/games/{gid}/log", headers=READ).json() if e["node"] == 7] == ["zone.captured"], 5))
+        for side, logged in ((a, ["node.online", "zone.captured"]), (b, ["zone.captured"])):
+            self.assertTrue(wait_for(lambda side=side, logged=logged: sorted(e["type"] for e in side.get(
+                f"/api/v1/games/{gid}/log", headers=READ).json() if e["node"] == 7) == logged, 5))
             self.assertTrue(wait_for(lambda side=side: side.get(f"/api/v1/games/{gid}/score", headers=READ)
                                      .json()["teams"]["blue"] == 30, 5))
         sources = set()

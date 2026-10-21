@@ -88,6 +88,18 @@ valid:
   - name: "Blue fails an objective with a reason (id 43)"
     event: {"node": 0, "seq": 4, "t": 1200000, "type": "scenario.objective.failed", "team": 2, "data": {"objective": "site_a", "reason": "exploded", "team": "blue"}}
     cbor: "a6 01 00 02 04 03 1a 00 12 4f 80 04 18 2b 05 02 08 a3 18 22 66 73 69 74 65 5f 61 03 68 65 78 70 6c 6f 64 65 64 01 64 62 6c 75 65"
+  # Node health (decisions S19-9, FU1-1 to FU1-6): a box's own battery.low (the link's event
+  # seq 0, telemetry by default so no prio key), and the link events the controller logs about a
+  # box (the box's node id). Bytes worked out by hand from RFC 8949 (major types 0, 3 and 5).
+  - name: "A box's battery gauge reads 19 % (id 22, telemetry by default; percent, key 20)"
+    event: {"node": 4, "seq": 0, "t": 61000, "type": "battery.low", "data": {"percent": 19}}
+    cbor: "a5 01 04 02 00 03 19 ee 48 04 16 08 a1 14 13"
+  - name: "The controller logs a silent box offline (id 20; last_seen, key 23)"
+    event: {"node": 3, "seq": 1, "t": 125000, "type": "node.offline", "data": {"last_seen": 5000}}
+    cbor: "a5 01 03 02 01 03 1a 00 01 e8 48 04 14 08 a1 17 19 13 88"
+  - name: "The controller hears the box again (id 19; fw and tier, keys 21 and 22)"
+    event: {"node": 3, "seq": 2, "t": 130000, "type": "node.online", "data": {"fw": "0.9.0", "tier": "full"}}
+    cbor: "a5 01 03 02 02 03 1a 00 01 fb d0 04 13 08 a2 15 65 30 2e 39 2e 30 16 64 66 75 6c 6c"
 
 invalid:
   - name: "Truncated"  # truncated

@@ -666,7 +666,9 @@ roadmap:
       uma página pública desligada por omissão com um botão para denunciar e moderação), com a imagem
       do campo e as equipas guardadas sincronizadas com os seus controladores, para que o emblema de
       um clube chegue a todos os campos que guardaram a sua equipa; e o estado das caixas (bateria,
-      ligação e firmware de cada caixa, a partir do que os controladores enviam), um catálogo de
+      ligação e firmware de cada caixa, a partir do que os controladores enviam; o controlador de campo
+      passa a avisar quando uma caixa se cala ou volta e quando a bateria está fraca, o que uma caixa
+      com medidor de bateria também avisa por si; ainda não em caixas reais), um catálogo de
       firmware que só lista versões assinadas com uma chave de confiança (nada é instalado: as
       atualizações pelo ar ainda não estão feitas), e o GM remoto: quem tem a função de GM no campo,
       com código de dois fatores, vê o jogo ao vivo e inicia-o, pausa-o, retoma-o ou termina-o, ou

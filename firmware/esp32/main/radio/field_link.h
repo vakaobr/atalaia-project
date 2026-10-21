@@ -189,4 +189,8 @@ size_t field_link_pending(const field_link_t *l);
 /* Sends node.rebooted (critical) from the link itself (event seq 0, game time t_ms). */
 void field_link_send_rebooted(field_link_t *l, uint32_t t_ms);
 
+/* Sends battery.low with the level in percent (telemetry: one packet, no ACK; event seq 0,
+ * game time t_ms). */
+void field_link_send_battery_low(field_link_t *l, uint8_t percent, uint32_t t_ms);
+
 #endif /* ATALAIA_FIELD_LINK_H */
