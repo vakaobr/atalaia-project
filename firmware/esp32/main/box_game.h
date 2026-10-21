@@ -48,6 +48,9 @@ typedef struct {
     int (*battery_pct)(void *user);               /* -1 if unknown; may be NULL */
     /* Puts a packet on air; NULL = the radio task's queue (radio_task_send). */
     bool (*radio_send)(void *user, const uint8_t *pkt, size_t len);
+    /* CMD update (protocol/firmware-update.md): the shell checks the offer and runs the update
+     * over Wi-Fi (fw_update.h); never called while a game is played. May be NULL. */
+    void (*update)(void *user, const char *params_json);
     void *user;
 } box_shell_ops_t;
 
@@ -143,6 +146,9 @@ void box_game_tick(box_game_t *g, uint32_t raw_delta_ms, uint32_t now_ms);
 
 /* True while the box belongs to a field controller's game (buttons go to the node). */
 bool box_game_active(const box_game_t *g);
+
+/* True while a joined game is being played (running or paused): no firmware update then. */
+bool box_game_playing(const box_game_t *g);
 
 /*
  * An NFC tag read while a game runs (joined or stand-alone): the node gets

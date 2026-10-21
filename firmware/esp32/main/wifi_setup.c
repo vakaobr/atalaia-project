@@ -141,11 +141,20 @@ static int parse_int_clamped(const char *s, int lo, int hi, int fallback)
 
 static esp_err_t config_post_handler(httpd_req_t *req)
 {
-    char buf[512];
-    int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
-    if (ret <= 0) {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Empty body");
+    /* With the field Wi-Fi's name and password URL-encoded, the form can pass 512 bytes. */
+    static char buf[1024];
+    if (req->content_len == 0 || req->content_len >= sizeof(buf)) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Empty or too long");
         return ESP_FAIL;
+    }
+    int ret = 0;
+    while (ret < (int)req->content_len) {
+        int n = httpd_req_recv(req, buf + ret, req->content_len - (size_t)ret);
+        if (n <= 0) {
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Empty body");
+            return ESP_FAIL;
+        }
+        ret += n;
     }
     buf[ret] = '\0';
 
@@ -190,7 +199,23 @@ static esp_err_t config_post_handler(httpd_req_t *req)
         }
     }
 
+    /* The field Wi-Fi a firmware update uses (protocol/firmware-update.md), optional. */
+    char wifi_ssid[33], wifi_pass[65];
+    bool have_wifi =
+        parse_form_field(buf, "wifissid", wifi_ssid, sizeof(wifi_ssid)) && wifi_ssid[0] != '\0';
+    if (!parse_form_field(buf, "wifipass", wifi_pass, sizeof(wifi_pass))) wifi_pass[0] = '\0';
+    size_t np = strlen(wifi_pass);
+    if (have_wifi && np > 0 && np < 8) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                            "The field Wi-Fi password is 8-64 characters, or none");
+        return ESP_FAIL;
+    }
+
     /* Write to config store. */
+    if (have_wifi) {
+        config_store_set_str("wifi_ssid", wifi_ssid);
+        config_store_set_str("wifi_pass", wifi_pass);
+    }
     config_store_set_str("node_name", name);
     config_store_set_str("region", region);
     config_store_set_str("admin_pin", pin);

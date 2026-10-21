@@ -601,7 +601,7 @@ roadmap:
     title: Site server and advanced play
     short: >-
       Site server, game scheduling and registration, custom scenarios, advanced modes, ATAK.
-      Started: advanced modes (Master and Satellites, the Hacking Terminal, VIP / Payload and the logic of Target Windows), custom scenarios (their runtime, compiler, console editor and objectives in the app), geo utilities in the core, the ATAK feed, and the site server's accounts, personal data rights, controller sync, chrono registry, game scheduling with public field pages, feeds and registration, club profiles with branding sync, game history and the scenario library, device health, a firmware catalogue, the remote GM, staff web pages for them and the deployment (HTTPS, encrypted backups, restore), hosted mode for many fields on one server, with its deployment, are built in software.
+      Started: advanced modes (Master and Satellites, the Hacking Terminal, VIP / Payload and the logic of Target Windows), custom scenarios (their runtime, compiler, console editor and objectives in the app), geo utilities in the core, the ATAK feed, and the site server's accounts, personal data rights, controller sync, chrono registry, game scheduling with public field pages, feeds and registration, club profiles with branding sync, game history and the scenario library, device health, a firmware catalogue, over-the-air firmware updates for the Field Box, the remote GM, staff web pages for them and the deployment (HTTPS, encrypted backups, restore), hosted mode for many fields on one server, with its deployment, are built in software.
     text: >-
       Site server (accounts, game history, the chrono registry, scheduling games, registration and
       publishing), custom scenarios, advanced modes (master and satellite zones, VIP escort, hacking
@@ -645,7 +645,11 @@ roadmap:
       saved its team; and device health (each box's battery, link and firmware from what the
       controllers send; the field controller now reports a box that goes silent or comes back and a
       low battery, which a box with a battery gauge also reports itself; not yet on real boards), a firmware catalogue that only lists releases signed with a trusted key
-      (nothing is installed: over-the-air updates are not built yet), and the remote GM: an organiser
+      and over-the-air firmware updates for the Field Box: the GM uploads a signed release to the
+      field controller and updates the boxes between games, never during one; each box downloads it
+      over the field Wi-Fi, checks the signature with keys built into its own firmware, installs it in
+      its spare slot and goes back to the old firmware if the new one does not start (in software,
+      not yet on a real board), and the remote GM: an organiser
       with the GM role, logged in with a two-factor code, sees the live game and starts, pauses,
       resumes or ends it, or sends a message or a mode command, over a connection the field
       controller opens itself, only when the field turns it on, with every command logged on both
@@ -813,8 +817,8 @@ glossary:
       Firmware is the program built into a device, which starts when you switch it on. Flashing
       means writing a new version of it onto the device, usually over a USB cable. Atalaia boxes
       are flashed by cable, and for now a new game mode comes with a new flash; later, modes will
-      arrive as scripts and firmware updates from the field controller over Wi-Fi or Bluetooth,
-      undoing themselves if a new version fails to start.
+      arrive as scripts. Firmware updates now come from the field controller over Wi-Fi (built in
+      software, not yet tried on a real board), undoing themselves if a new version fails to start.
   lora:
     id: glossary-lora
     term: LoRa

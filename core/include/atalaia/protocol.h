@@ -41,7 +41,7 @@ typedef enum {
     ATALAIA_MSG_EVENT = 2,  /* one game or system event */
     ATALAIA_MSG_ACK = 3,    /* confirms receipt of a sequence number */
     ATALAIA_MSG_STATE = 4,  /* periodic snapshot of local state and per-team counters */
-    ATALAIA_MSG_CMD = 5,    /* controller or GM instruction: start, pause, reset, set owner, message, a mode command */
+    ATALAIA_MSG_CMD = 5,    /* controller or GM instruction: start, pause, reset, set owner, message, a mode command, a firmware update */
     ATALAIA_MSG_TIME = 6,   /* game-clock beacon; also the controller heartbeat */
     ATALAIA_MSG_CONFIG = 7, /* assigns a preset and role; parameters only */
     ATALAIA_MSG_CLAIM = 8,  /* controller election: candidate claims the role with a term number */
@@ -81,7 +81,7 @@ enum {
 
 /* CBOR keys of CMD payload fields. */
 enum {
-    ATALAIA_PL_CMD_CMD = 1,    /* opcode: 0-8 */
+    ATALAIA_PL_CMD_CMD = 1,    /* opcode: 0-9 (9: firmware update, RFC 0001 Amendment 6) */
     ATALAIA_PL_CMD_PARAMS = 2, /* command-specific parameters */
     ATALAIA_PL_CMD_DEST = 3,   /* destination node; absent = broadcast */
 };

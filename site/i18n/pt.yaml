@@ -621,7 +621,7 @@ roadmap:
     title: Servidor do clube e jogo avançado
     short: >-
       Servidor do clube, marcação de jogos e inscrições, cenários personalizados, modos avançados,
-      ATAK. Começada: modos avançados (Mestre e Satélites, o Terminal de Hacking, VIP / Carga e as regras das Janelas de Alvo), os cenários personalizados (o motor, o compilador, o editor na consola e os objetivos na aplicação), os utilitários geográficos no núcleo, o feed ATAK, e as contas, os direitos sobre os dados pessoais, a sincronização, o registo de cronógrafo, a marcação de jogos com páginas públicas, feeds e inscrições, os perfis de clube com a sincronização da imagem do campo, o histórico dos jogos e a biblioteca de cenários, o estado das caixas, o catálogo de firmware, o GM remoto, páginas web para a organização do campo e a instalação (HTTPS, cópias de segurança cifradas, reposição), o modo alojado com vários campos num só servidor, com a sua instalação,, do servidor do clube, estão feitos em software.
+      ATAK. Começada: modos avançados (Mestre e Satélites, o Terminal de Hacking, VIP / Carga e as regras das Janelas de Alvo), os cenários personalizados (o motor, o compilador, o editor na consola e os objetivos na aplicação), os utilitários geográficos no núcleo, o feed ATAK, e as contas, os direitos sobre os dados pessoais, a sincronização, o registo de cronógrafo, a marcação de jogos com páginas públicas, feeds e inscrições, os perfis de clube com a sincronização da imagem do campo, o histórico dos jogos e a biblioteca de cenários, o estado das caixas, o catálogo de firmware, as atualizações de firmware pelo ar da caixa de campo, o GM remoto, páginas web para a organização do campo e a instalação (HTTPS, cópias de segurança cifradas, reposição), o modo alojado com vários campos num só servidor, com a sua instalação,, do servidor do clube, estão feitos em software.
     text: >-
       Servidor do clube (contas, histórico dos jogos, registo de cronografagem, marcação de jogos,
       inscrições e publicação), cenários personalizados, modos avançados (zonas mestre e satélites,
@@ -669,8 +669,11 @@ roadmap:
       ligação e firmware de cada caixa, a partir do que os controladores enviam; o controlador de campo
       passa a avisar quando uma caixa se cala ou volta e quando a bateria está fraca, o que uma caixa
       com medidor de bateria também avisa por si; ainda não em caixas reais), um catálogo de
-      firmware que só lista versões assinadas com uma chave de confiança (nada é instalado: as
-      atualizações pelo ar ainda não estão feitas), e o GM remoto: quem tem a função de GM no campo,
+      firmware que só lista versões assinadas com uma chave de confiança e as atualizações de firmware pelo ar da caixa de campo: o GM carrega uma versão assinada no
+      controlador de campo e atualiza as caixas entre jogos, nunca durante um; cada caixa descarrega-a
+      pelo Wi-Fi do campo, verifica a assinatura com as chaves do seu próprio firmware, instala-a na
+      partição livre e volta ao firmware anterior se o novo não arrancar (em software, ainda não numa
+      placa real), e o GM remoto: quem tem a função de GM no campo,
       com código de dois fatores, vê o jogo ao vivo e inicia-o, pausa-o, retoma-o ou termina-o, ou
       envia uma mensagem ou um comando do modo, por uma ligação que o próprio controlador de campo
       abre, só quando o campo o liga, com cada comando registado dos dois lados; e o histórico dos
@@ -851,9 +854,9 @@ glossary:
       O firmware é o programa que vem dentro de um aparelho e arranca quando o ligas. Gravar
       firmware (<em>flashing</em>, em inglês) é escrever uma versão nova desse programa no
       aparelho, normalmente por um cabo USB. As caixas da Atalaia gravam-se por cabo, e por agora
-      um modo de jogo novo chega com uma nova gravação; mais tarde, os modos vão chegar como scripts
-      e as atualizações do firmware vão vir do controlador de campo por Wi-Fi ou Bluetooth, e
-      desfazem-se sozinhas se a versão nova não arrancar.
+      um modo de jogo novo chega com uma nova gravação; mais tarde, os modos vão chegar como scripts.
+      As atualizações do firmware já vêm do controlador de campo por Wi-Fi (feitas em software, ainda
+      não experimentadas numa placa real), e desfazem-se sozinhas se a versão nova não arrancar.
   lora:
     id: glossario-lora
     term: LoRa

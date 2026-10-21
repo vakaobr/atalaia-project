@@ -821,10 +821,10 @@ A node with no controller still runs any cached preset that needs only `node.lua
 
 ### Firmware and app updates
 
-- **ESP32**: A/B partitions with automatic rollback if the new image fails to boot; images signed with Ed25519.
+- **ESP32**: A/B partitions with automatic rollback if the new image fails to boot; images signed with Ed25519. Built in software for the Field Box (phase 4 follow-up, [protocol/firmware-update.md](../protocol/firmware-update.md), decisions FU3-*): the controller offers an update over the radio and the box fetches it over the field Wi-Fi, pinned to the field CA, and verifies it itself; not yet run on a real board. The modem and the I/O pod are still updated by USB.
 - **Android**: GitHub Releases and F-Droid, signed APKs.
 - **Raspberry Pi**: a Debian package repository and a container image.
-- **Offline fields**: the controller caches images and pushes them to nodes over Wi-Fi or BLE.
+- **Offline fields**: the controller caches images and pushes them to nodes over Wi-Fi or BLE (built: the GM uploads them to the controller, the boxes fetch them over Wi-Fi; BLE is not used).
 - **Channels**: stable, beta and nightly; nodes only ever install builds signed by a project release key.
 
 ### Mode registry

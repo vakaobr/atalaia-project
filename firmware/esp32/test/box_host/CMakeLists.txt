@@ -46,7 +46,15 @@ add_executable(box_host
     ${MAIN_DIR}/radio/noise_stats.c
     ${MAIN_DIR}/hal/stub/hal_stub.c
     ${MAIN_DIR}/hal/stub/hal_radio_stub.c
+    ${MAIN_DIR}/fw_update.c
+    ${MAIN_DIR}/screen_json.c
 )
+# Monocypher (components/monocypher): fw_update.c's Ed25519.
+set(MONOCYPHER_DIR ${CMAKE_CURRENT_LIST_DIR}/../../components/monocypher/src)
+add_library(box_host_monocypher STATIC ${MONOCYPHER_DIR}/monocypher.c
+    ${MONOCYPHER_DIR}/optional/monocypher-ed25519.c)
+target_include_directories(box_host_monocypher PUBLIC ${MONOCYPHER_DIR} ${MONOCYPHER_DIR}/optional)
+target_link_libraries(box_host PRIVATE box_host_monocypher)
 target_include_directories(box_host PRIVATE ${MAIN_DIR} ${MAIN_DIR}/radio ${CORE_DIR}/src)
 target_link_libraries(box_host PRIVATE atalaia_core)
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")

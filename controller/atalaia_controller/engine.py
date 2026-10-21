@@ -184,6 +184,8 @@ class FieldScript:
     def _send(self, node_id: int, cmd: str, params: dict[str, Any]) -> bool:
         if cmd == "mode" and not COMMAND_NAME.match(str((params or {}).get("name", ""))):
             return False  # a mode command names itself (atalaia_sim.mode.COMMAND_NAME)
+        if cmd == "update":
+            return False  # firmware updates are the GM's alone (firmware_updates.py, decision FU3-4)
         try:
             return self._fc().send_cmd(cmd, params or None, dest=node_id,
                                        now_ms=self.engine.now_ms()) is not None
@@ -266,6 +268,9 @@ class Controller:
         self.atak: Any = None      # atak.AtakEmitter: CoT for ATAK (ADR-P4-7), when [atak] enabled
         self.ca_sha256: Optional[bytes] = None  # the field CA (tls.py): join payload key 13
         self.link_urls: list[str] = []          # its https addresses: join payload key 14
+        # Why the live game may not start now (firmware updates still running), or None.
+        self.start_guard: Optional[Callable[[], Optional[str]]] = None
+        self.firmware: Any = None  # firmware_updates.FirmwareUpdates, set by main.build
         self._last_scan: Optional[dict[str, Any]] = None
         saved_scan = store.get_setting("radio.last_scan")
         if saved_scan:
@@ -889,8 +894,9 @@ class Controller:
                 "params": params or None, "kind": kind,
             }
             # Android props link over Wi-Fi with the field CA and the controller's addresses
-            # (keys 13 and 14, RFC 0001 Amendment 4, proposed); boxes skip them. A payload too
-            # long with them is made without them (the prop then asks for the address).
+            # (keys 13 and 14, RFC 0001 Amendment 4, proposed); boxes use them for firmware
+            # updates (protocol/firmware-update.md). A payload too long with them is made
+            # without them (the prop then asks for the address; a box cannot be updated).
             link = {}
             if kind == "node" and self.ca_sha256 is not None:
                 link = {"ca_sha256": self.ca_sha256, "urls": list(self.link_urls[:3]) or None}
@@ -1002,6 +1008,9 @@ class Controller:
             assert self.game is not None
             if self.game["state"] != "ready":
                 raise Conflict(f"game {game_id} is {self.game['state']}; only a ready game starts")
+            reason = self.start_guard() if self.start_guard is not None else None
+            if reason:
+                raise Conflict(reason)
             fc.start_game(duration_ms=self.game["duration_ms"], now_ms=self.now_ms())
             preset = self.store.preset(self.game["preset_id"]) if self.game.get("preset_id") else None
             fc.controller_event("game.start", {"preset": preset["name"] if preset else self.game["mode_id"]},
@@ -1161,6 +1170,24 @@ class Controller:
             if seq is None:
                 raise Unavailable(f"the radio modem is {self.radio_state}; command not sent")
             return {"node": node_id, "cmd": cmd, "opcode": CMD_OPCODES[cmd], "seq": seq}
+
+    def send_update(self, node_id: int, params: dict[str, Any]) -> int:
+        """CMD update (RFC 0001 Amendment 6) to one box, only while the live game has not started
+        (firmware_updates.py checks the release and the box first). The packet's seq."""
+        with self._lock:
+            if self.game is None:
+                raise Conflict("no live game: the boxes to update must be joined to one")
+            fc = self._live(self.game["id"])
+            if self.game["state"] != "ready":
+                raise Conflict(f"game {self.game['id']} is {self.game['state']}: firmware updates only "
+                               "before a game starts, never during one")
+            try:
+                seq = fc.send_cmd("update", params, dest=node_id, now_ms=self.now_ms())
+            except ValueError as exc:
+                raise ControllerError(str(exc)) from None
+            if seq is None:
+                raise Unavailable(f"the radio modem is {self.radio_state}; command not sent")
+            return seq
 
     def _check_mode_command(self, fc: FieldController, node_id: int, params: dict[str, Any]) -> None:
         """A GM's mode command must be one the game's manifests declare, for the node's role."""

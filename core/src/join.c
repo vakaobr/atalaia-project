@@ -3,8 +3,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * Join payload codec (protocol/join.md), with a small SHA-256 and
- * HMAC-SHA256 so the core needs no crypto library for it: a box checks
- * one join payload, not a stream, so speed does not matter.
+ * HMAC-SHA256 so the core needs no crypto library for it. The same SHA-256
+ * hashes a firmware image as it downloads (about 50 cycles a byte: under a
+ * second for a 2 MB image on the ESP32-S3).
  */
 #include "atalaia/join.h"
 
@@ -17,12 +18,7 @@
 
 /* ---- SHA-256 (FIPS 180-4) ------------------------------------------------- */
 
-typedef struct {
-    uint32_t h[8];
-    uint8_t block[64];
-    size_t used;   /* bytes in block */
-    uint64_t bits; /* message length so far */
-} sha256_t;
+typedef atalaia_sha256_t sha256_t;
 
 static const uint32_t K256[64] = {
     0x428a2f98u, 0x71374491u, 0xb5c0fbcfu, 0xe9b5dba5u, 0x3956c25bu, 0x59f111f1u, 0x923f82a4u,
@@ -123,6 +119,21 @@ static void sha256_final(sha256_t *s, uint8_t out[32])
     }
 }
 
+void atalaia_sha256_init(atalaia_sha256_t *s)
+{
+    sha256_init(s);
+}
+
+void atalaia_sha256_update(atalaia_sha256_t *s, const uint8_t *data, size_t len)
+{
+    sha256_update(s, data, len);
+}
+
+void atalaia_sha256_final(atalaia_sha256_t *s, uint8_t out[32])
+{
+    sha256_final(s, out);
+}
+
 void atalaia_sha256(const uint8_t *msg, size_t len, uint8_t out[32])
 {
     sha256_t s;
@@ -216,7 +227,66 @@ bool atalaia_join_valid(const atalaia_join_t *j)
     if (!text_ok(j->mode_id, ATALAIA_JOIN_MODE_MAX)) return false;
     if (!text_ok(j->role, ATALAIA_JOIN_ROLE_MAX)) return false;
     if (j->kind > ATALAIA_JOIN_KIND_CONTROLLER) return false;
+    if (j->url_count > ATALAIA_JOIN_URLS_MAX) return false;
+    for (uint8_t u = 0; u < j->url_count; u++) {
+        if (!atalaia_join_url_ok(j->urls[u])) return false;
+        for (uint8_t v = 0; v < u; v++) {
+            if (strcmp(j->urls[u], j->urls[v]) == 0) return false;
+        }
+    }
     return true;
+}
+
+static bool is_alnum(char c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+}
+
+static bool is_hex(char c)
+{
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
+/* As simulator/atalaia_sim/join.py's URL_RE: https://, then DNS labels of 1-63 of
+ * [A-Za-z0-9-] joined by dots, or [2-45 of hex digits, ':' and '.'], then
+ * optionally ':' and a port 1-65535 without a leading zero. */
+bool atalaia_join_url_ok(const char *url)
+{
+    size_t n = strlen(url);
+    if (n > ATALAIA_JOIN_URL_MAX || strncmp(url, "https://", 8) != 0) return false;
+    const char *p = url + 8;
+    if (*p == '[') {
+        size_t k = 0;
+        p++;
+        while (is_hex(*p) || *p == ':' || *p == '.') {
+            p++;
+            k++;
+        }
+        if (k < 2 || k > 45 || *p != ']') return false;
+        p++;
+    } else {
+        for (;;) {
+            size_t k = 0;
+            while (is_alnum(*p) || *p == '-') {
+                p++;
+                k++;
+            }
+            if (k < 1 || k > 63) return false;
+            if (*p != '.') break;
+            p++;
+        }
+    }
+    if (*p == '\0') return true;
+    if (*p != ':' || p[1] < '1' || p[1] > '9') return false;
+    p++;
+    uint32_t port = 0;
+    size_t digits = 0;
+    while (*p >= '0' && *p <= '9') {
+        port = port * 10u + (uint32_t)(*p - '0');
+        p++;
+        if (++digits > 5) return false;
+    }
+    return *p == '\0' && port <= 65535u;
 }
 
 const char *atalaia_join_result_name(atalaia_join_result_t result)
@@ -245,7 +315,7 @@ size_t atalaia_join_encode(const atalaia_join_t *j, const uint8_t join_key[ATALA
     mc_init_writer(&w, buf + 1, cap - 1 - ATALAIA_JOIN_MAC_SIZE);
     bool params = j->params_json[0] != '\0';
 
-    mc_put_map(&w, params ? 12 : 11);
+    mc_put_map(&w, 11u + (params ? 1u : 0u) + (j->has_ca ? 1u : 0u) + (j->url_count ? 1u : 0u));
     mc_put_uint(&w, ATALAIA_JOIN_K_GAME_ID);
     mc_put_uint(&w, j->game_id);
     mc_put_uint(&w, ATALAIA_JOIN_K_GAME_KEY);
@@ -280,6 +350,15 @@ size_t atalaia_join_encode(const atalaia_join_t *j, const uint8_t join_key[ATALA
     }
     mc_put_uint(&w, ATALAIA_JOIN_K_KIND);
     mc_put_uint(&w, j->kind);
+    if (j->has_ca) {
+        mc_put_uint(&w, ATALAIA_JOIN_K_CA_SHA256);
+        mc_put_bytes(&w, j->ca_sha256, ATALAIA_JOIN_CA_SIZE);
+    }
+    if (j->url_count) {
+        mc_put_uint(&w, ATALAIA_JOIN_K_URLS);
+        mc_put_array(&w, j->url_count);
+        for (uint8_t u = 0; u < j->url_count; u++) mc_put_text(&w, j->urls[u]);
+    }
     if (!w.ok) return 0;
 
     size_t signed_len = 1 + w.pos;
@@ -337,7 +416,8 @@ static bool decode_body(const uint8_t *body, size_t len, atalaia_join_t *j)
     if (!mc_read_map(&r, &count)) return false;
     for (uint64_t i = 0; i < count && r.ok; i++) {
         uint64_t key, v;
-        /* Keys 13-31 are reserved for optional fields (skipped); 32 and up are invalid. */
+        /* Keys 13 and 14 are optional (RFC 0001 Amendment 4); 15-31 are reserved for
+         * optional fields (skipped); 32 and up are invalid. */
         if (!mc_read_uint(&r, &key) || key >= 32) return false;
         if (seen & JBIT(key)) return false; /* duplicate key */
         seen |= JBIT(key);
@@ -402,6 +482,24 @@ static bool decode_body(const uint8_t *body, size_t len, atalaia_join_t *j)
             if (!read_uint_max(&r, UINT8_MAX, &v)) return false;
             j->kind = (uint8_t)v;
             break;
+        case ATALAIA_JOIN_K_CA_SHA256: {
+            size_t n = 0;
+            if (!mc_read_bytes(&r, j->ca_sha256, sizeof(j->ca_sha256), &n) ||
+                n != ATALAIA_JOIN_CA_SIZE) {
+                return false;
+            }
+            j->has_ca = true;
+            break;
+        }
+        case ATALAIA_JOIN_K_URLS: {
+            uint64_t n;
+            if (!mc_read_array(&r, &n) || n < 1 || n > ATALAIA_JOIN_URLS_MAX) return false;
+            for (uint64_t u = 0; u < n; u++) {
+                if (!read_text(&r, j->urls[u], sizeof(j->urls[u]))) return false;
+            }
+            j->url_count = (uint8_t)n;
+            break;
+        }
         default:
             if (!mc_skip_value(&r)) return false;
             break;

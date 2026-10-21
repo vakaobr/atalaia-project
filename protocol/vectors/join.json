@@ -363,7 +363,7 @@
     }
   ],
   "controller_link": {
-    "description": "Optional keys 13 (ca_sha256, 32 bytes: the field CA's fingerprint) and 14 (urls: 1-3 https base addresses of the controller), RFC 0001 Amendment 4 (proposed), for Android props that link over Wi-Fi (protocol/prop-link.md). The app's and the simulator's codecs decode and re-encode these byte for byte; boxes (core/src/join.c) skip keys 13-31, so the C tests do not read this section.",
+    "description": "Optional keys 13 (ca_sha256, 32 bytes: the field CA's fingerprint) and 14 (urls: 1-3 https base addresses of the controller), RFC 0001 Amendment 4 (proposed), for Android props that link over Wi-Fi (protocol/prop-link.md). The app's, the simulator's and the core's (core/src/join.c, since boxes use them for firmware updates over Wi-Fi: protocol/firmware-update.md) codecs decode and re-encode these byte for byte; keys 15-31 are skipped.",
     "valid": [
       {
         "name": "prop_with_ca_and_urls",

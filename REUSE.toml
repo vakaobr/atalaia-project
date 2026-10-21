@@ -77,3 +77,12 @@ path = "server/atalaia_server/data/breached-passwords.sha256"
 precedence = "override"
 SPDX-FileCopyrightText = "2018 Daniel Miessler and the SecLists contributors"
 SPDX-License-Identifier = "MIT"
+
+# Monocypher 4.0.2, vendored unmodified for the Field Box's Ed25519 check of firmware
+# releases (firmware/esp32/components/monocypher/README.md has the version and checksums):
+# CC0-1.0 or BSD-2-Clause, at the user's choice (its LICENCE.md).
+[[annotations]]
+path = ["firmware/esp32/components/monocypher/src/**", "firmware/esp32/components/monocypher/LICENCE.md"]
+precedence = "override"
+SPDX-FileCopyrightText = ["2017-2023 Loup Vaillant", "2017-2019 Michael Savage", "2017-2023 Fabio Scotoni"]
+SPDX-License-Identifier = "CC0-1.0 OR BSD-2-Clause"

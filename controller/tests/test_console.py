@@ -27,6 +27,7 @@ from fastapi.testclient import TestClient
 from support import FakeModem, config
 from atalaia_controller.api import CONSOLE_DIR, SECURITY_HEADERS, Auth, create_app
 from atalaia_controller.engine import Controller
+from atalaia_controller.firmware_release import REPORT_RESULTS
 from atalaia_controller.store import Store
 from atalaia_controller.ws import Hub
 
@@ -212,7 +213,14 @@ class ConsoleFilesTests(unittest.TestCase):
                               ("controller.failover_modes", ("manual", "auto")),
                               ("nodes.tiers", ("full", "reduced", "proxy")),
                               ("tabs", ("game", "field", "nodes", "join", "presets", "feed", "controller")),
-                              ("app", ("lang_pt", "lang_en"))):
+                              ("app", ("lang_pt", "lang_en")),
+                              ("firmware.states", ("sent", "installed", "done", "failed", "rolled_back", "timeout",
+                                                   "cancelled")),
+                              ("firmware.reasons", tuple(r for r in REPORT_RESULTS if r != "installed")
+                               + ("self_test",)),
+                              ("firmware.results", ("sent", "unknown", "wrong_platform", "wrong_tier",
+                                                    "unknown_version", "not_newer", "in_progress", "not_in_game",
+                                                    "radio"))):
             for name in names:
                 self.assertIn(f"{prefix}.{name}", pt)
         # European Portuguese, not Brazilian.

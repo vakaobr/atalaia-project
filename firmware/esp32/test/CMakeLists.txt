@@ -125,6 +125,15 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(atalaia_screens_fw PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
 
+# ---- Monocypher 4.0.2 (vendored, components/monocypher): Ed25519 for firmware releases
+set(MONOCYPHER_DIR ${CMAKE_CURRENT_LIST_DIR}/../components/monocypher/src)
+add_library(atalaia_monocypher_host STATIC ${MONOCYPHER_DIR}/monocypher.c
+    ${MONOCYPHER_DIR}/optional/monocypher-ed25519.c)
+target_include_directories(atalaia_monocypher_host PUBLIC ${MONOCYPHER_DIR} ${MONOCYPHER_DIR}/optional)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(atalaia_monocypher_host PRIVATE -Wall -Wextra -Werror)
+endif()
+
 # ---- Shell sources (testable subset) -----------------------------------------
 set(SHELL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../main)
 set(SHELL_SOURCES
@@ -148,6 +157,7 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/radio/noise_stats.c
     ${SHELL_DIR}/box_game.c
     ${SHELL_DIR}/serial_console.c
+    ${SHELL_DIR}/fw_update.c
     ${SHELL_DIR}/hal/board_fem.c
     ${SHELL_DIR}/modem/modem.c
     ${SHELL_DIR}/modem/modem_framing.c
@@ -196,6 +206,7 @@ set(TEST_SOURCES
     test_board_fem.c
     test_screen_template.c
     test_pod.c
+    test_fw_update.c
 )
 
 # ---- Executable --------------------------------------------------------------
@@ -215,7 +226,8 @@ target_include_directories(firmware_test PRIVATE
     ${CORE_DIR}/tests # proxy_vectors.h
 )
 
-target_link_libraries(firmware_test PRIVATE atalaia_core_fw atalaia_lua_fw atalaia_screens_fw)
+target_link_libraries(firmware_test PRIVATE atalaia_core_fw atalaia_lua_fw atalaia_screens_fw
+    atalaia_monocypher_host)
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(firmware_test PRIVATE -Wall -Wextra -Wpedantic -Werror)

@@ -9,8 +9,9 @@
                                          notes?, released_at?}: added only if a trusted release key signed it
     DELETE /api/v1/firmware/{id}?reason= a server administrator: withdraw a release (it stays, marked)
 
-A list only (``firmware.py``): no image is stored, served or sent anywhere
-until OTA is built; a box will verify an image itself before installing it.
+A list only (``firmware.py``): no image is stored, served or sent anywhere (the
+field controller holds the images it offers its boxes, decision FU3-3); a box
+verifies an image itself before installing it (protocol/firmware-update.md).
 """
 
 from __future__ import annotations

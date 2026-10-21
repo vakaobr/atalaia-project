@@ -96,6 +96,9 @@ else()
         "radio/field_link.c"
         "box_game.c"
         "serial_console.c"
+        "fw_update.c"
+        "fw_update_esp.c"
+        "fw_desc.c"
     )
     set(ATALAIA_EMBED EMBED_FILES "wifi_setup.html")
 endif()
@@ -112,6 +115,11 @@ set(ATALAIA_REQUIRES
     esp_event
     esp_netif
     mbedtls
+    # Firmware updates over the air (fw_update_esp.c): the OTA slots, HTTPS, and
+    # Monocypher's Ed25519 for the release signatures (components/monocypher).
+    app_update
+    esp_http_client
+    monocypher
     # NimBLE (part of ESP-IDF) for the I/O pod's Bluetooth link. Always listed:
     # requirements are expanded before the sdkconfig is read. Without
     # CONFIG_BT_ENABLED (the Field Box, the modem) it builds and links nothing.
@@ -130,6 +138,12 @@ idf_component_register(
         ${ATALAIA_REQUIRES}
     ${ATALAIA_EMBED}
 )
+
+# The image's Atalaia descriptor (fw_desc.c, right after esp_app_desc_t) stays in
+# the image even where nothing would reference it.
+if(NOT CONFIG_ATALAIA_MODEM_MODE AND NOT CONFIG_ATALAIA_POD_MODE)
+    target_link_libraries(${COMPONENT_LIB} INTERFACE "-u atalaia_fw_desc")
+endif()
 
 # The screen templates build LVGL widgets on the device (ADR-P1-2), with the
 # same code and the same lv_conf.h as the host reference-image tests.

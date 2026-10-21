@@ -30,6 +30,9 @@
 #define ATALAIA_JOIN_MODE_MAX    63
 #define ATALAIA_JOIN_ROLE_MAX    31
 #define ATALAIA_JOIN_PARAMS_MAX  200 /* bytes of the parameters' compact JSON form */
+#define ATALAIA_JOIN_URLS_MAX    3   /* key 14: the controller's https addresses */
+#define ATALAIA_JOIN_URL_MAX     64  /* bytes of one address, without the NUL */
+#define ATALAIA_JOIN_CA_SIZE     32  /* key 13: SHA-256 of the field CA's DER certificate */
 #define ATALAIA_JOIN_TEXT_PREFIX "atalaia:join:"
 #define ATALAIA_JOIN_NDEF_TYPE   "application/vnd.atalaia.join"
 
@@ -47,6 +50,8 @@ enum {
     ATALAIA_JOIN_K_GAME_SEED = 10,
     ATALAIA_JOIN_K_PARAMS = 11,
     ATALAIA_JOIN_K_KIND = 12,
+    ATALAIA_JOIN_K_CA_SHA256 = 13, /* optional (RFC 0001 Amendment 4) */
+    ATALAIA_JOIN_K_URLS = 14,      /* optional (RFC 0001 Amendment 4) */
 };
 
 typedef enum {
@@ -68,6 +73,13 @@ typedef struct {
     uint32_t game_seed;
     char params_json[ATALAIA_JOIN_PARAMS_MAX + 1]; /* "" when the payload has none */
     uint8_t kind;                                  /* atalaia_join_kind_t */
+    /* The field CA and the controller's https addresses (keys 13 and 14), when the
+     * controller serves HTTPS: a box uses them only for firmware updates over Wi-Fi
+     * (protocol/firmware-update.md), pinning that CA. */
+    bool has_ca;
+    uint8_t ca_sha256[ATALAIA_JOIN_CA_SIZE];
+    uint8_t url_count; /* 0-3 */
+    char urls[ATALAIA_JOIN_URLS_MAX][ATALAIA_JOIN_URL_MAX + 1];
 } atalaia_join_t;
 
 typedef enum {
@@ -91,15 +103,21 @@ size_t atalaia_join_encode(const atalaia_join_t *j, const uint8_t join_key[ATALA
 
 /*
  * Checks the tag (in constant time) and then the body. Fills *out only
- * when the result is ATALAIA_JOIN_OK. Unknown body keys 13-31 are skipped,
- * so a newer controller may add optional fields; keys from 32 up are refused.
+ * when the result is ATALAIA_JOIN_OK. Keys 13 (ca_sha256) and 14 (urls) are
+ * read; unknown body keys 15-31 are skipped, so a newer controller may add
+ * optional fields; keys from 32 up are refused.
  */
 atalaia_join_result_t atalaia_join_decode(const uint8_t *buf, size_t len,
                                           const uint8_t join_key[ATALAIA_JOIN_KEY_SIZE],
                                           atalaia_join_t *out);
 
-/* Checks the fields of j as the decoder does (ranges, sizes, teams). */
+/* Checks the fields of j as the decoder does (ranges, sizes, teams, addresses). */
 bool atalaia_join_valid(const atalaia_join_t *j);
+
+/* True if url is "https://host[:port]" (host: DNS labels or a [bracketed IPv6]
+ * address; port 1-65535), ASCII, at most ATALAIA_JOIN_URL_MAX bytes: the
+ * check-in poster's rule (protocol/checkin.md). */
+bool atalaia_join_url_ok(const char *url);
 
 /*
  * The text form, as in a QR code or on the serial console:
@@ -142,6 +160,17 @@ void atalaia_hmac_sha256(const uint8_t *key, size_t key_len, const uint8_t *msg,
 
 /* SHA-256 of msg. */
 void atalaia_sha256(const uint8_t *msg, size_t len, uint8_t out[32]);
+
+/* SHA-256 of a stream (a firmware image as it downloads): init, update, final. */
+typedef struct {
+    uint32_t h[8];
+    uint8_t block[64];
+    size_t used;   /* bytes in block */
+    uint64_t bits; /* message length so far */
+} atalaia_sha256_t;
+void atalaia_sha256_init(atalaia_sha256_t *s);
+void atalaia_sha256_update(atalaia_sha256_t *s, const uint8_t *data, size_t len);
+void atalaia_sha256_final(atalaia_sha256_t *s, uint8_t out[32]);
 
 /* True if the channel lies inside an EU868 sub-band (g, g1, g2, g3). */
 bool atalaia_join_channel_ok(uint32_t channel_hz);

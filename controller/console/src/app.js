@@ -16,6 +16,7 @@ import { JoinPanel } from './components/join-panel.js';
 import { PresetBuilder } from './components/preset-builder.js';
 import { ScenarioBuilder } from './components/scenario-builder.js';
 import { RadioSettings } from './components/radio-settings.js';
+import { FirmwarePanel } from './components/firmware-panel.js';
 import { CheckinPanel } from './components/checkin-panel.js';
 import { BrandingSettings, TeamPresets, FieldBrand, accentRef } from './components/branding-settings.js';
 
@@ -197,6 +198,9 @@ class App extends Component {
             break;
         case 'modes':
             this.loadCatalogue(); // a scenario was installed (here or in another console)
+            break;
+        case 'firmware':
+            this.setState({ firmwareUpdates: msg.updates }); // firmware updates' progress (firmware-panel.js)
             break;
         case 'radio':
             this.setState({ radio: msg.radio });
@@ -399,7 +403,7 @@ class App extends Component {
         case 'field':
             return html`<${FieldView} app=${this} />`;
         case 'nodes':
-            return html`<${NodeList} app=${this} />`;
+            return html`<${NodeList} app=${this} /><${FirmwarePanel} app=${this} />`;
         case 'join':
             return html`<${JoinPanel} app=${this} />`;
         case 'presets':

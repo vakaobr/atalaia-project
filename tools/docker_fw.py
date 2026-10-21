@@ -14,6 +14,15 @@
                                                accept new screen renders as the references
     python tools/docker_fw.py clean            delete the firmware build folders
 
+`build`, `bench` and `wokwi` (the Field Box) also take:
+    --fw-version=0.2.1-bench.1                 the firmware's version instead of the core's
+                                               (a release candidate, or a bench test of an update)
+    --release-keys=<hex or base64>[,...]       the release public keys a box accepts updates from
+                                               (CONFIG_ATALAIA_OTA_RELEASE_KEYS; default: none, and
+                                               the box refuses every update). Public keys only:
+                                               tools/firmware_release.py keygen prints them.
+Both apply to that build folder only, and are reset when left out.
+
 Works from any folder and any shell (cmd, PowerShell, bash). Docker must be
 running. `build`, `wokwi`, `modem`, `pod` and `bench` use the espressif/idf:v5.3.2 image, the same as
 CI's esp32-build job, and write into firmware/esp32/ so that flashing tools
@@ -26,6 +35,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -92,8 +102,47 @@ def build() -> int:
     return code
 
 
+# Field Box options (main sets them): the firmware's version and its release keys.
+FW_OPTIONS: dict[str, str] = {}
+FIELD_BOX_BUILDS = ("build", WOKWI_BUILD, BENCH_BUILD)
+
+
+def release_keys_hex(text: str) -> str | None:
+    """Release public keys, hex or base64, separated by commas or spaces, as the Kconfig string."""
+    import base64
+    import binascii
+
+    out = []
+    for item in text.replace(",", " ").split():
+        try:
+            raw = bytes.fromhex(item) if len(item) == 64 else base64.b64decode(item, validate=True)
+        except (ValueError, binascii.Error):
+            return None
+        if len(raw) != 32:
+            return None
+        out.append(raw.hex())
+    return " ".join(out) if len(out) <= 4 else None
+
+
+def field_box_options(build_dir: str) -> tuple[list[str], tuple[str, ...]]:
+    """The Field Box's version (a CMake cache value, set on every build so that it never sticks)
+    and its release keys (a defaults file in the build folder, rewritten only when it changes)."""
+    if build_dir not in FIELD_BOX_BUILDS:
+        return [], ()
+    keys_file = FW / build_dir / "sdkconfig.release_keys"
+    text = ("# Written by tools/docker_fw.py (--release-keys): public keys only.\n"
+            f'CONFIG_ATALAIA_OTA_RELEASE_KEYS="{FW_OPTIONS.get("release_keys", "")}"\n')
+    keys_file.parent.mkdir(parents=True, exist_ok=True)
+    if not keys_file.exists() or keys_file.read_text() != text:
+        keys_file.write_text(text)
+    version = FW_OPTIONS.get("fw_version", "")
+    return [f"-D ATALAIA_FW_VERSION={version}"], (f"{build_dir}/sdkconfig.release_keys",)
+
+
 def variant(build_dir: str, defaults: tuple[str, ...]) -> int:
     """Builds a variant (defaults applied on top of sdkconfig.defaults) into build_dir."""
+    cmake_args, extra_defaults = field_box_options(build_dir)
+    defaults = defaults + extra_defaults
     # The variant's sdkconfig lives in its build folder. Regenerate it when
     # the defaults change, so edits to them always take effect.
     sdkconfig = FW / build_dir / "sdkconfig"
@@ -104,7 +153,7 @@ def variant(build_dir: str, defaults: tuple[str, ...]) -> int:
     script = (
         "set -e; . $IDF_PATH/export.sh > /dev/null; "
         f"idf.py -B {build_dir} -D SDKCONFIG={build_dir}/sdkconfig "
-        f"-D 'SDKCONFIG_DEFAULTS={';'.join(defaults)}' build"
+        f"-D 'SDKCONFIG_DEFAULTS={';'.join(defaults)}' {' '.join(cmake_args)} build"
     )
     return run_idf(script)
 
@@ -200,13 +249,26 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 0 if argv else 1
     command, options = argv[0], argv[1:]
-    known = {"build": [], "wokwi": [], "modem": [], "pod": [], "bench": [],
+    box = ["--fw-version=", "--release-keys="]
+    known = {"build": box, "wokwi": box, "modem": [], "pod": [], "bench": box,
              "test": ["--update-screens"], "clean": []}
     if command not in known:
         return fail(f"unknown command {command!r}; run with --help")
     for option in options:
-        if option not in known[command]:
+        name = option.split("=", 1)[0] + "=" if "=" in option else option
+        if name not in known[command]:
             return fail(f"unknown option {option!r} for {command}")
+        if name == "--fw-version=":
+            value = option.split("=", 1)[1]
+            if not re.fullmatch(r"\d{1,4}\.\d{1,4}\.\d{1,4}(-[0-9A-Za-z][0-9A-Za-z.]{0,19})?", value) \
+                    or len(value) > 31:
+                return fail("--fw-version: MAJOR.MINOR.PATCH[-pre-release], at most 31 characters")
+            FW_OPTIONS["fw_version"] = value
+        elif name == "--release-keys=":
+            keys = release_keys_hex(option.split("=", 1)[1])
+            if keys is None:
+                return fail("--release-keys: 1-4 Ed25519 public keys, 64 hex digits or 44 base64 characters each")
+            FW_OPTIONS["release_keys"] = keys
     if command == "clean":
         return clean()
     try:

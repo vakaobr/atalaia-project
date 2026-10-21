@@ -12,7 +12,7 @@ Both encodings come from the schema files in [`schema/`](schema/), so they canno
 | [`schema/messages.yaml`](schema/messages.yaml) | Packet header and message types (draft) |
 | [`schema/events.yaml`](schema/events.yaml) | Standard events: ids, priorities, CBOR keys and data fields (draft) |
 | [`vectors/events.yaml`](vectors/events.yaml) | Test vectors every event codec must pass |
-| [`vectors/*.json`](vectors/) | Test vectors for header and message payload codecs, the join payload (`join.json`), player tags (`tag.json`), chrono records (`chrono_record.json`), player tokens (`player_token.json`) and the controller sync's bodies (`sync.json`) |
+| [`vectors/*.json`](vectors/) | Test vectors for header and message payload codecs, the join payload (`join.json`), player tags (`tag.json`), chrono records (`chrono_record.json`), player tokens (`player_token.json`), the controller sync's bodies (`sync.json`) and firmware releases (`firmware.json`: RFC 8032's Ed25519 vectors, signed manifests, versions, image descriptors, reports) |
 | [`vectors/capability_proxy.yaml`](vectors/capability_proxy.yaml) | Test vectors for the capability proxy (I/O pod) frames and payloads |
 | [`vectors/geo.json`](vectors/geo.json) | Known answers (each with its source and tolerance), edge cases, argument errors and exact result bits for `geo.distance` and `geo.in_zone` (ADR-P4-9) |
 | [`vectors/composition.yaml`](vectors/composition.yaml) | How a game's parts compose: main modes, modifiers, role packages and scenarios (decision P4R7), the mode id and parameters each role's join carries, the order of the `field.lua` scripts, and the ids and packages refused; read by the simulator and the app's Dart test runner |
@@ -22,6 +22,7 @@ Both encodings come from the schema files in [`schema/`](schema/), so they canno
 | [`player-token.md`](player-token.md) | Player tokens: who a phone calling the controller's API is (player, team, squad, role, game), signed by the controller |
 | [`checkin.md`](checkin.md) | Field check-in: the printed poster's `atalaia:checkin:` text, trusting the field's CA, the check-in endpoints, per-game replica declarations and the "replicas to chrono" list; vectors in `vectors/checkin.json` |
 | [`prop-link.md`](prop-link.md) | An Android prop's link to the controller over Wi-Fi: the HMAC proof of the game key, HELLO, STATE and events up, TIME and commands down; with an I/O pod, the field's radio as well, and which one is used when |
+| [`firmware-update.md`](firmware-update.md) | Firmware updates for the Field Box over the field's Wi-Fi: the signed release (Ed25519 over a fixed manifest), CMD update (opcode 9), the image's descriptors, HTTPS pinned to the field CA, the box's checks, rollback and report; vectors in `vectors/firmware.json` |
 | [`sync.md`](sync.md) | The controller sync: how a field controller pushes its games, event logs, score counters and nodes, and the field's chrono registry (marshals' public keys, replicas, signed readings), to a site server, the merge rules, the API key; vectors in `vectors/sync.json` |
 | [`usb-modem.md`](usb-modem.md) | The serial link between the field controller and its USB radio modem |
 | [`capability-proxy.md`](capability-proxy.md) | The link between an I/O pod and a phone (USB-OTG and BLE), version 1 |
@@ -42,6 +43,7 @@ The generator writes these files; none of them should be edited by hand:
 | `core/tests/protocol_vectors.h` | C: event codec test vectors |
 | `core/tests/packet_vectors.h` | C: header, payload, AES-CCM, join and player tag test vectors (from `vectors/*.json`) |
 | `core/tests/proxy_vectors.h` | C: capability proxy test vectors (from `vectors/capability_proxy.yaml`) |
+| `firmware/esp32/test/firmware_vectors.h` | C: the Field Box's firmware update vectors (from `vectors/firmware.json`) |
 | `core/tests/geo_vectors.h` | C: geo test vectors, as exact hexadecimal doubles (from `vectors/geo.json`) |
 | `simulator/atalaia_sim/protocol.py` | Python: the same tables |
 | `protocol/json/event.schema.json` | Anyone consuming events as JSON |
@@ -124,7 +126,7 @@ Both codecs follow the schema field for field. Encoders always write every requi
 
 ### What a Field Box sends and expects
 
-A box in a game (`firmware/esp32/main/radio/field_link.c`) sends HELLO after it joins or reboots, every game event as EVENT, and STATE every 15 seconds and after a capture. Normal and critical events and HELLO ask for an ACK and are sent again, in a new packet, every 3 seconds until one arrives (normal events give up after 10 tries). In STATE, `counters` holds the points each team **gained** on the box, `owner_team` the team of its last capture, and `phase` the box's game state (0 waiting, 1 running, 2 paused, 3 ended). It follows the TIME beacons of the controller with the highest term (and acts on a start, pause or end it missed), takes CMDs for its node id or for every node (opcode 8, a mode command, reaches the mode as `cmd.mode`: RFC 0001 Amendment 5), and relays every authenticated packet once (hop_limit is the number of relays left, clamped to the join's `max_hops`). Decisions E6-E10 in `docs/review/decisions-to-review.md`.
+A box in a game (`firmware/esp32/main/radio/field_link.c`) sends HELLO after it joins or reboots, every game event as EVENT, and STATE every 15 seconds and after a capture. Normal and critical events and HELLO ask for an ACK and are sent again, in a new packet, every 3 seconds until one arrives (normal events give up after 10 tries). In STATE, `counters` holds the points each team **gained** on the box, `owner_team` the team of its last capture, and `phase` the box's game state (0 waiting, 1 running, 2 paused, 3 ended). It follows the TIME beacons of the controller with the highest term (and acts on a start, pause or end it missed), takes CMDs for its node id or for every node (opcode 8, a mode command, reaches the mode as `cmd.mode`: RFC 0001 Amendment 5; opcode 9 offers a firmware update, refused while a game is played: Amendment 6, [firmware-update.md](firmware-update.md)), and relays every authenticated packet once (hop_limit is the number of relays left, clamped to the join's `max_hops`). Decisions E6-E10 in `docs/review/decisions-to-review.md`.
 
 ## Joining a game
 

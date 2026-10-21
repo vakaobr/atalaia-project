@@ -68,8 +68,8 @@ class FieldTests(unittest.TestCase):
         self.hub.close()
         self.tmp.cleanup()
 
-    def box(self, name: str) -> BoxHost:
-        b = BoxHost(self.hub, os.path.join(self.tmp.name, name), JOIN_KEY, state_ms=500, name=name)
+    def box(self, name: str, *extra: str) -> BoxHost:
+        b = BoxHost(self.hub, os.path.join(self.tmp.name, name), JOIN_KEY, state_ms=500, name=name, extra=extra)
         self.boxes.append(b)
         return b
 
@@ -99,6 +99,44 @@ class FieldTests(unittest.TestCase):
 
     def score(self, gid: int, team: str) -> int:
         return self.client.get(f"/api/v1/games/{gid}/score", headers=READ).json()["teams"][team]
+
+    def test_firmware_update_offer_reaches_the_box(self):
+        """A firmware update (protocol/firmware-update.md) as far as it goes without Wi-Fi: the join
+        carries the field CA and the controller's addresses (keys 13 and 14), which the box now reads;
+        the GM's update reaches it as CMD update over the radio, and its own offer checks pass
+        (host_box prints them); never while the game is played, on either side."""
+        from test_firmware_updates import SIGNING, box_image, sign  # noqa: PLC0415
+
+        from atalaia_controller.firmware_updates import FirmwareUpdates  # noqa: PLC0415
+
+        self.ctrl.ca_sha256 = bytes(range(32))
+        self.ctrl.link_urls = ["https://10.42.0.1:8443", "https://atalaia.local:8443"]
+        fw = FirmwareUpdates(self.ctrl, Path(self.tmp.name) / "firmware", [SIGNING["public_key_b64"]])
+        image = box_image("0.3.0")
+        rel = fw.add(image, "esp32s3", "0.3.0", sign(image, "0.3.0"))
+        gid = self.game()
+        box = self.box("alpha", "--as-box", "0.2.0", "--release-keys", SIGNING["public_key"])
+        nid = self.join(box)
+        self.assertTrue(wait_for(lambda: self.node(nid).get("fw_version") == "0.2.0", 5))
+        self.assertEqual((self.node(nid)["platform"], self.node(nid)["tier"]), (1, 0))
+
+        r = self.client.post(f"/api/v1/firmware/{rel['id']}/install", headers=GM, json={"nodes": [nid]})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()["results"], [{"node_id": nid, "result": "sent"}])
+        offer = json.dumps({"id": rel["id"], "version": "0.3.0"}, separators=(",", ":"))
+        self.assertTrue(wait_for(lambda: box.logged(f"UPDATE {offer} link=yes/2 precheck=installed"), 5),
+                        box.lines[-5:])
+        # Not while the update is on its way; cancelled, the game starts.
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 409)
+        self.assertEqual(self.client.delete("/api/v1/firmware/updates", headers=GM).json(), {"cancelled": [nid]})
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
+        # During the game: the controller refuses, and a box refuses an offer that came anyway.
+        r = self.client.post(f"/api/v1/firmware/{rel['id']}/install", headers=GM, json={"nodes": [nid]})
+        self.assertEqual(r.status_code, 409)
+        self.ctrl.fc.send_cmd("update", {"id": rel["id"], "version": "0.3.0"}, dest=nid, now_ms=self.ctrl.now_ms())
+        self.assertTrue(wait_for(lambda: box.logged("firmware update refused: a game is being played"), 5))
+        self.assertEqual(sum("UPDATE " in line for line in box.lines), 1)
 
     def test_join_play_reboot_end(self):
         gid = self.game()

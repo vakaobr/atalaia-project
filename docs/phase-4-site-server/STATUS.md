@@ -8,7 +8,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 **Current phase:** Implementation (plan phases 1 to 22 built in software, 2026-10-21; sync over 4G: HW1; a real ATAK device: HW3; a real deployment with a real domain, and a real hosted deployment: HW1)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-21 (follow-up: hosted deployment; full clean-copy check, the site server's tests, migrations, deploy, deploy-hosted and browser tests)
+**Last verified:** 2026-10-21 (follow-up: over-the-air updates; full clean-copy check with every firmware build, the site server's tests)
 **Next step:** the hardware phases HW1-HW4 (the boards); hosted mode waits for the legal review (P4-6) before going live
 
 ## Completed
@@ -723,6 +723,10 @@ Not yet: a real deployment, over 4G (HW1). Decisions S19-1 to S19-11, all open.
 ## Follow-up: device health events (2026-10-21, in software)
 
 The controller in charge now logs `node.online`, `node.offline` (after `[health] node_offline_s`, 120 s of silence; at most one link event per box a minute) and `battery.low` (from a box's reported level under `[health] battery_low_pct`, 20 %, unless the box sent its own) about each box. The Field Box firmware sends its own `battery.low` from its MAX17048 gauge (`CONFIG_ATALAIA_BATTERY_LOW_PCT`, once per crossing, 5 points of hysteresis). The sync carries them to the site server's device health, tested end to end (host box -> controller; controller -> site server on PostgreSQL). The console's Boxes list marks a box offline and its battery low. The poster QR browser test is made robust (zbarimg QR decoder only). Not yet on real boards: the bench board has no gauge. Decisions FU1-1 to FU1-9, all open.
+
+## Follow-up: over-the-air firmware updates (2026-10-21, in software)
+
+The GM uploads a signed release (image and `.release.json` from `tools/firmware_release.py`) to the field controller (`[firmware] release_keys`, at most 4 releases) and updates one box or all while the live game has not started; the controller sends CMD update (opcode 9, RFC 0001 Amendment 6, proposed); the box fetches the release over the field Wi-Fi by HTTPS pinned to its join's field CA (keys 13 and 14, now read by the C core), verifies the Ed25519 signature (Monocypher 4.0.2) with keys built into its firmware, refuses a lower version or another board or variant, streams into the inactive OTA slot checking size and SHA-256, and only then sets the boot partition; a new image that fails its self-test or crashes is rolled back by the bootloader. Reports carry an HMAC with the game key; the box's HELLO shows the result. Shared vectors in C and Python (RFC 8032 among them), the update job tested with fakes, the controller's API, a host-box end to end and the console in Chromium. No release key exists yet (every update is refused until the key ceremony, RELEASE_SIGNING.md). Not yet on a real board (BRING_UP step 10c). Decisions FU3-1 to FU3-14, all open.
 
 ## Plan phase 20: game history and the scenario library (built 2026-10-20, in software)
 

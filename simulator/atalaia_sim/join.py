@@ -17,7 +17,8 @@ field's 32-byte join key. A join is a dict:
 ca_sha256 (key 13) and urls (key 14) are optional (RFC 0001 Amendment 4,
 proposed): the field CA's fingerprint and the controller's https addresses,
 for an Android prop that links to the controller over Wi-Fi
-(protocol/prop-link.md). Boxes skip them, as they skip every key from 13.
+(protocol/prop-link.md); boxes read them for firmware updates over Wi-Fi
+(protocol/firmware-update.md). Keys 15-31 are skipped.
 
 The codecs check protocol/vectors/join.json.
 """

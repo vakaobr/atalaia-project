@@ -15,8 +15,8 @@
 /// settings, then uses the game's id and key, its node id, mode, role, teams,
 /// parameters and seed. Optional keys 13 (the field CA's fingerprint) and 14
 /// (the controller's https addresses) let it link to the controller over
-/// Wi-Fi (protocol/prop-link.md, RFC 0001 Amendment 4, proposed); boxes skip
-/// them.
+/// Wi-Fi (protocol/prop-link.md, RFC 0001 Amendment 4, proposed); boxes use
+/// them only for firmware updates (protocol/firmware-update.md).
 library;
 
 import 'dart:convert';

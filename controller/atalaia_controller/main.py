@@ -34,6 +34,7 @@ from .atak import AtakEmitter
 from .checkin import Checkin
 from .config import Config, ConfigError, load_config
 from .engine import Controller
+from .firmware_updates import FirmwareUpdates, firmware_dir
 from .mqtt import MqttBridge, maybe_bridge
 from .positions import Positions
 from .prop_link import PropLinks
@@ -145,6 +146,8 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
     Checkin(controller, ca_sha256=tls.ca_sha256 if tls else None, default_urls=controller.link_urls)
     Positions(controller)
     PropLinks(controller)
+    FirmwareUpdates(controller, firmware_dir(cfg.db_path, cfg.firmware_dir), cfg.firmware_release_keys,
+                    cfg.firmware_update_timeout_s, variants=cfg.firmware_variants)
     mqtt = maybe_bridge(cfg, controller)
     hub = Hub()
     sync = None

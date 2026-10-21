@@ -17,6 +17,8 @@ or zbarimg is an error, never a skip.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import re
 import shutil
@@ -80,14 +82,14 @@ BOX = 7
 class Field:
     """A running controller (uvicorn, real port) with the C host modem."""
 
-    def __init__(self, *modem_args: str, hub: "AirHub | None" = None) -> None:
+    def __init__(self, *modem_args: str, hub: "AirHub | None" = None, cfg: "dict | None" = None) -> None:
         self.host = HostModem(0, *modem_args, hub=hub)
         if hub is not None:  # host boxes share the air (plan phase 8's scenario test)
             hub.add(self.host.air_port)
         self.tmp = tempfile.TemporaryDirectory()
         self.port = free_port()
         cfg = config(self.tmp.name, port=self.host.url, api_port=self.port, host="127.0.0.1",
-                     join_key=JOIN_KEY.hex(), scan_dwell_s=1.1)
+                     join_key=JOIN_KEY.hex(), scan_dwell_s=1.1, **(cfg or {}))
         self.bundle = build(cfg, core=CORE, load_core_lib=False)
         self.server = uvicorn.Server(uvicorn.Config(self.bundle.app, host="127.0.0.1", port=self.port,
                                                     log_level="error", lifespan="on"))
@@ -123,8 +125,8 @@ class Field:
         self.host.hear(node_packet(key, game["id"], BOX, self.box_seq, 1, msg_type, payload, ack=ack))
         self.box_seq += 1
 
-    def box_hello(self) -> None:
-        self.box("HELLO", hello_encode({"node_name": "box-7", "platform": 1, "fw_version": "0.3.0",
+    def box_hello(self, fw: str = "0.3.0") -> None:
+        self.box("HELLO", hello_encode({"node_name": "box-7", "platform": 1, "fw_version": fw,
                                         "core_version": "0.2.0", "tier": 0, "capabilities": [0, 2],
                                         "transports": 1, "battery_pct": 87, "epoch": 1}))
 
@@ -352,6 +354,81 @@ class ConsoleBrowserTests(unittest.TestCase):
         preset = next(p for p in self.field.http.get("/api/v1/presets").json() if p["name"] == "Bomba com pistas")
         self.assertEqual(preset["mode_id"], "org.atalaia.bomb+org.atalaia.codes")
         self.assertEqual((preset["params"]["team_codes"], preset["params"]["codes"]), ("red=1234,blue=5678", "0815:hint"))
+
+    def test_firmware_update_from_the_boxes_tab(self):
+        """Firmware updates (protocol/firmware-update.md): the GM uploads a signed release in the
+        Boxes tab and updates a box before the game starts; the CMD update goes on the air; the box's
+        report and its next HELLO show on the page, in both languages."""
+        sys.path.insert(0, str(CONTROLLER / "tests"))
+        from test_firmware_updates import SIGNING, box_image, sign  # noqa: PLC0415
+
+        from atalaia_controller import firmware_release as fr  # noqa: PLC0415
+
+        self.field.close()
+        self.field = Field(cfg={"firmware_release_keys": [SIGNING["public_key_b64"]]})
+        ctrl = self.field.bundle.controller
+        ctrl.ca_sha256 = bytes(range(32))  # as with [api] tls_port: the joins carry the field CA
+        ctrl.link_urls = ["https://10.42.0.1:8443"]
+        game = self.field.create_game()
+        self.field.box_hello("0.3.0")
+        image = box_image("0.4.0")
+        files = Path(self.field.tmp.name)
+        (files / "atalaia_esp32.bin").write_bytes(image)
+        (files / "atalaia_esp32.bin.release.json").write_text(json.dumps({
+            "platform": "esp32s3", "version": "0.4.0", "size": len(image),
+            "sha256": hashlib.sha256(image).hexdigest(), "signature": sign(image, "0.4.0")}))
+        release_id = hashlib.sha256(image).hexdigest()[:16]
+
+        page = self.console()
+        page.get_by_test_id("tab-nodes").click()
+        panel = page.get_by_test_id("firmware-panel")
+        expect(panel).to_contain_text("Atualizações de firmware")
+        page.get_by_test_id("firmware-image").set_input_files(str(files / "atalaia_esp32.bin"))
+        page.get_by_test_id("firmware-release").set_input_files(str(files / "atalaia_esp32.bin.release.json"))
+        page.get_by_test_id("firmware-upload").click()
+        expect(page.get_by_test_id("firmware-releases")).to_contain_text("0.4.0")
+        expect(page.get_by_test_id("firmware-releases")).to_contain_text("heltec_v4_3")
+        update = page.get_by_test_id(f"firmware-update-{BOX}")
+        expect(update).to_have_text("Atualizar para 0.4.0")
+
+        key = ctrl.game_key(game["id"])
+        epoch = ctrl.transport.epoch
+        self.field.host.transmitted_all(0.3)
+        update.click()
+        state = page.get_by_test_id(f"firmware-state-{BOX}")
+        expect(state).to_contain_text("0.4.0: enviada, à espera da caixa")
+        cmds = []
+
+        def heard_update() -> bool:
+            for pkt in self.field.host.transmitted_all(0.2):
+                hdr, plain = packet_decrypt(pkt, epoch, key)
+                if hdr.type == MESSAGE_TYPES["CMD"]:
+                    cmds.append(cmd_decode(plain))
+            return {"cmd": 9, "params": {"id": release_id, "version": "0.4.0"}, "dest": BOX} in cmds
+        self.assertTrue(wait_for(heard_update, 5), cmds)
+        expect(page.get_by_test_id("firmware-cancel")).to_be_visible()
+
+        # The box reports over HTTPS (its MAC is the game key's), restarts and says hello again.
+        body = fr.report_body(game["id"], BOX, release_id, "installed", "0.4.0")
+        r = httpx.post(self.field.base + "/api/v1/firmware/report", content=body,
+                       headers={"X-Atalaia-Mac": fr.report_mac(key, body)})
+        self.assertEqual(r.json(), {"accepted": True})
+        expect(state).to_contain_text("0.4.0: instalada, a reiniciar")
+        self.field.box_hello("0.4.0")
+        expect(state).to_contain_text("0.4.0: concluída")
+        expect(update).to_have_count(0)  # nothing newer for it now
+        page.get_by_test_id("lang").first.select_option("en")
+        expect(state).to_contain_text("0.4.0: done")
+        expect(page.get_by_test_id("firmware-not-ready")).to_have_count(0)
+
+        # Once the game runs, no update goes out: the buttons say so.
+        page.get_by_test_id("tab-game").click()
+        page.get_by_test_id("game-start").click()
+        page.get_by_test_id("game-start-yes").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("running")
+        page.get_by_test_id("tab-nodes").click()
+        expect(page.get_by_test_id("firmware-not-ready")).to_be_visible()
+        expect(page.get_by_test_id(f"firmware-all-{release_id}")).to_be_disabled()
 
     def test_medic_kits_next_to_a_mode(self):
         """The Medic Kit (a role package) from the game form; a kit's join names the kit alone;

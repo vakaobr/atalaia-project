@@ -244,7 +244,7 @@ class BoxHost:
     """
 
     def __init__(self, hub: AirHub, state_dir: str, join_key: bytes, *, state_ms: int = 500,
-                 name: str = "box") -> None:
+                 name: str = "box", extra: tuple[str, ...] = ()) -> None:
         if not BOX_HOST:
             raise unittest_skip("host box not built")
         self.hub = hub
@@ -252,6 +252,7 @@ class BoxHost:
         self.join_key = join_key
         self.state_ms = state_ms
         self.name = name
+        self.extra = tuple(extra)  # more box_host options (--as-box VERSION, --release-keys HEX)
         self.lines: list[str] = []
         self.proc: Optional[subprocess.Popen] = None
         self.air_port = 0
@@ -262,7 +263,7 @@ class BoxHost:
         self.proc = subprocess.Popen(
             [BOX_HOST, "--state-dir", self.state_dir, "--modes", str(REPO / "modes"),
              "--air-peer", str(self.hub.port), "--join-key", self.join_key.hex(),
-             "--state-ms", str(self.state_ms), "--name", self.name],
+             "--state-ms", str(self.state_ms), "--name", self.name, *self.extra],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         # A box that rejoins a stored game logs that before it is READY.
         while True:

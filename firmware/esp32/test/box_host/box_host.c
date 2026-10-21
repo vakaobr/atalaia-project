@@ -18,6 +18,12 @@
  *
  *   box_host --state-dir DIR --modes DIR [--air-port N] [--air-peer N]
  *            [--join-key HEX] [--state-ms N] [--name NAME]
+ *            [--as-box VERSION] [--release-keys HEX]
+ *
+ * --as-box VERSION: HELLO says a Field Box (esp32s3, full tier) running VERSION, so
+ * the controller offers it firmware updates; a CMD update then prints
+ * "UPDATE <params> link=<CA yes|no>/<addresses> precheck=<result>": the firmware's
+ * own offer checks (fw_update_precheck, with --release-keys), without Wi-Fi or a slot.
  *
  * stdin, one command per line:
  *   @join atalaia:join:...      join (as typed on the serial console)
@@ -51,6 +57,7 @@
 #include "box_game.h"
 #include "builtin_presets.h"
 #include "button_tracker.h"
+#include "fw_update.h"
 #include "hal/stub/hal_stub.h"
 #include "serial_console.h"
 #include "state_persist.h"
@@ -230,6 +237,37 @@ static int shell_battery(void *user)
     return battery;
 }
 
+/* ---- CMD update: the firmware's offer checks (fw_update.h) --------------------------- */
+
+static box_game_t game;
+
+const fw_desc_t atalaia_fw_desc = {
+    .magic = {'A', 'T', 'F', 'W'}, .format = 1, .variant = "box", .board = "heltec_v4_3"};
+static char fw_version[32] = "host"; /* HELLO's fw_version, as esp_app_desc_t's */
+static uint8_t release_keys[FW_KEYS_MAX][32];
+static int release_key_count;
+
+static void shell_update(void *user, const char *params)
+{
+    (void)user;
+    fw_job_t job;
+    memset(&job, 0, sizeof(job));
+    job.platform = "esp32s3";
+    job.running_version = fw_version;
+    job.desc = &atalaia_fw_desc;
+    job.keys = (const uint8_t(*)[32])release_keys;
+    job.key_count = (size_t)release_key_count;
+    job.slot_size = 0x200000;
+    job.playing = box_game_playing(&game);
+    job.battery_pct = battery;
+    job.min_battery_pct = 30;
+    job.join = &game.join;
+    fw_result_t r =
+        fw_offer_parse(params, job.id, job.version) ? fw_update_precheck(&job) : FW_BAD_OFFER;
+    out("UPDATE %s link=%s/%u precheck=%s", params, game.join.has_ca ? "yes" : "no",
+        (unsigned)game.join.url_count, fw_result_name(r));
+}
+
 /* ---- Files for the mode sources -------------------------------------------------- */
 
 static char *slurp(const char *path, size_t *len)
@@ -280,7 +318,6 @@ static int bind_udp(uint16_t port)
 /* preset_t holds 16 KB of source: static, like on the ESP32. */
 static preset_t preset;
 static node_runner_t runner;
-static box_game_t game;
 static hal_t hal;
 static event_log_t evlog;
 
@@ -316,6 +353,7 @@ int main(int argc, char **argv)
     const char *modes = NULL;
     const char *join_key_hex = NULL;
     const char *name = "box-host";
+    bool as_box = false;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--air-port") == 0) {
             air_port = arg_value(argc, argv, &i);
@@ -331,6 +369,16 @@ int main(int argc, char **argv)
             join_key_hex = argv[++i];
         } else if (strcmp(argv[i], "--name") == 0 && i + 1 < argc) {
             name = argv[++i];
+        } else if (strcmp(argv[i], "--as-box") == 0 && i + 1 < argc &&
+                   fw_version_valid(argv[i + 1]) && strlen(argv[i + 1]) < sizeof(fw_version)) {
+            snprintf(fw_version, sizeof(fw_version), "%s", argv[++i]);
+            as_box = true;
+        } else if (strcmp(argv[i], "--release-keys") == 0 && i + 1 < argc) {
+            release_key_count = fw_keys_parse(argv[++i], release_keys, FW_KEYS_MAX);
+            if (release_key_count < 0) {
+                fprintf(stderr, "box_host: --release-keys: 64 hex digits each\n");
+                return 2;
+            }
         } else {
             fprintf(stderr, "box_host: unknown option %s\n", argv[i]);
             return 2;
@@ -404,8 +452,8 @@ int main(int argc, char **argv)
     atalaia_hello_t hello;
     memset(&hello, 0, sizeof(hello));
     snprintf(hello.node_name, sizeof(hello.node_name), "%s", name);
-    hello.platform = 2; /* linux */
-    snprintf(hello.fw_version, sizeof(hello.fw_version), "host");
+    hello.platform = as_box ? 1 : 2; /* esp32s3 (--as-box) or linux */
+    snprintf(hello.fw_version, sizeof(hello.fw_version), "%s", fw_version);
     snprintf(hello.core_version, sizeof(hello.core_version), "%s", atalaia_version());
     hello.tier = 0;
     hello.capabilities_count = 0;
@@ -420,6 +468,7 @@ int main(int argc, char **argv)
                              .set_channel = shell_set_channel,
                              .battery_pct = shell_battery,
                              .radio_send = air_send,
+                             .update = shell_update,
                              .user = NULL};
     box_game_init(&game, &runner, &preset, &store, &shell, &atalaia_crypto_mbedtls, &nvs_ops,
                   &evlog, &hello);

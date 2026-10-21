@@ -11,7 +11,7 @@ Implementations: `controller/atalaia_controller/prop_link.py` (Python: the contr
 
 ## Where the controller is
 
-A join payload for a box (kind 0) carries two optional fields when the controller serves HTTPS (RFC 0001 Amendment 4, proposed): key 13 `ca_sha256`, the SHA-256 of the field CA's DER certificate (32 bytes, decision P3-8), and key 14 `urls`, 1-3 `https://host[:port]` base addresses of the controller. Boxes skip both. The phone fetches `GET /api/v1/controller/ca`, checks it against key 13 and trusts that CA for those addresses only, for the length of the game. A payload too long with them is made without them; the phone then asks for the controller's address.
+A join payload for a box (kind 0) carries two optional fields when the controller serves HTTPS (RFC 0001 Amendment 4, proposed): key 13 `ca_sha256`, the SHA-256 of the field CA's DER certificate (32 bytes, decision P3-8), and key 14 `urls`, 1-3 `https://host[:port]` base addresses of the controller. A box reads them only for firmware updates over Wi-Fi ([firmware-update.md](firmware-update.md)). The phone fetches `GET /api/v1/controller/ca`, checks it against key 13 and trusts that CA for those addresses only, for the length of the game. A payload too long with them is made without them; the phone then asks for the controller's address.
 
 ## The link
 

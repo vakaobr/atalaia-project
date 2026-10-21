@@ -208,7 +208,7 @@ Typical size: 20-40 bytes (2-team game).
 | 3 | `dest` | uint16 | no | Destination node; absent = broadcast |
 
 Opcodes: 0=start, 1=pause, 2=resume, 3=end, 4=set_owner,
-5=message, 6=reset, 7=reboot; 8=mode (Amendment 5).
+5=message, 6=reset, 7=reboot; 8=mode (Amendment 5); 9=update (Amendment 6).
 
 #### TIME (type 6)
 
@@ -544,6 +544,8 @@ An Android prop, which has no LoRa radio of its own, uses them to link to the co
 
 Nothing on the radio changes: the keys are inside the join payload's tag, which still authenticates the whole payload with the field join key.
 
+*Note (2026-10-21, with Amendment 6):* boxes now read keys 13 and 14 too (`core/src/join.c`, the vectors' `controller_link` section in the C tests), and use them only for firmware updates over Wi-Fi: the field CA to pin, the addresses to fetch from. Keys 15-31 are still skipped.
+
 ## Amendment 5 (2026-10-19, proposed): Mode commands (CMD opcode 8)
 
 **Status:** proposed with the Medic Kit (decision MK11); for review.
@@ -556,6 +558,18 @@ CMD opcode **8, `mode`**: a command for the node's mode script. Its `params` (ke
 Over Wi-Fi ([protocol/prop-link.md](../../protocol/prop-link.md)) the command is a `cmd` message with `cmd: "mode"` and `opcode: 8`. A box or prop from before this amendment logs the opcode as unknown and ignores it, so a game whose modes do not use mode commands is unaffected. The CMD payload's encoding is unchanged; `protocol/vectors/cmd.json` gains a vector with opcode 8.
 
 **Reason:** opcodes 0-7 are taken by the lifecycle and the GM's built-in commands, and a mode had no way to hear from the GM or from its controller script beyond `set_owner` and `message`, which mean something else to every box (`message` is also shown as the organisers' word). One generic opcode with a named command keeps new modes from needing new opcodes.
+
+## Amendment 6 (2026-10-21, proposed): Firmware updates (CMD opcode 9)
+
+**Status:** proposed with over-the-air firmware updates for the Field Box (decisions FU3-1 onwards); for review.
+
+CMD opcode **9, `update`**: the controller offers a box a firmware release. Its `params` (key 2) hold `id` (16 lower-case hex digits: the start of the image's SHA-256) and `version` (the release's version), and its `dest` (key 3) is always one box; the compact JSON form stays within the 127 bytes a box takes. Nothing of the image travels over LoRa: the box fetches the signed release text and the image over the field's Wi-Fi, by HTTPS pinned to the field CA of its join payload (Amendment 4's keys 13 and 14), and checks the Ed25519 signature with the release keys built into its firmware before it installs anything ([protocol/firmware-update.md](../../protocol/firmware-update.md)).
+
+- The controller sends it only at a GM's request (`POST /api/v1/firmware/{id}/install`), only while the live game has not started, and only to boxes whose HELLO says the release's platform, a box's tier and a lower version; a mode's `field.lua` cannot send it.
+- A box refuses it while a game is played (running or paused), and stops a download when a game starts.
+- A box or prop from before this amendment logs the opcode as unknown and ignores it. Android props (tier proxy) are never sent it. The CMD payload's encoding is unchanged; `protocol/vectors/cmd.json` gains a vector with opcode 9.
+
+**Reason:** a box hears the controller over LoRa during and between games, but has no Wi-Fi link to it until it needs one; a short command over the radio wakes the update, and everything that matters for safety (the signature, the version, the image's own descriptors, the hash) is checked by the box over the faster link.
 
 ## Open questions
 

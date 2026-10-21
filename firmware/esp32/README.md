@@ -124,6 +124,12 @@ python tools/docker_fw.py test                    host tests and screen referenc
 python tools/docker_fw.py test --update-screens   accept changed screens as the new references
 ```
 
+`build`, `bench` and `wokwi` also take `--fw-version=0.2.1-rc.1` (the firmware's version,
+`PROJECT_VER`, instead of the core's; HELLO reports it and a firmware update compares it)
+and `--release-keys=<hex or base64>[,...]` (the release public keys the box accepts
+updates from, `CONFIG_ATALAIA_OTA_RELEASE_KEYS`); both apply to that build folder only and
+are reset when left out. See [Firmware updates](#firmware-updates-over-the-air).
+
 The bench variant (`sdkconfig.bench`) is the Field Box firmware for a bare
 Heltec V4 on the desk, with no keypad and no TFT: keys typed on the USB serial
 console (`0`-`9`, `*`, `#`) drive the PIN screen and the picker, the Wi-Fi
@@ -342,10 +348,16 @@ Radio-specific Kconfig options (under "Atalaia Field Box Configuration > Radio")
 Field game options (under "Field network games"):
 - `ATALAIA_STATE_INTERVAL_S` -- seconds between STATE packets in a joined game (default 15)
 - `ATALAIA_BATTERY_LOW_PCT` -- send `battery.low` below this battery level (default 20; 0 = never; only with a MAX17048 gauge)
-- `ATALAIA_SERIAL_JOIN` -- accept `@join` and `@joinkey` lines on the serial console (default on)
+- `ATALAIA_SERIAL_JOIN` -- accept `@join`, `@joinkey`, `@tag`, `@wifi` and `@update` lines on the serial console (default on)
 - `ATALAIA_CONSOLE_USB_INPUT` -- read the console input from the USB-C port (USB-Serial-JTAG, the Heltec V4's only USB) as well as UART0 (default on; off in the Wokwi build)
 - `ATALAIA_LED_BRIGHTNESS_PCT` -- LED ring brightness at boot (default 40%; under "LEDs")
 - `ATALAIA_DEV_JOIN_KEY` -- a development field join key, used only when none is stored (set in `sdkconfig.wokwi` only)
+
+Firmware update options (under "Firmware updates (OTA)", the Field Box only):
+- `ATALAIA_OTA_RELEASE_KEYS` -- the Ed25519 public keys (64 hex digits each, up to 4) whose releases the box installs; empty (the default until the project's release key exists): every update is refused
+- `ATALAIA_OTA_VARIANT` -- the variant written into the image (`box`, `box-bench`, `box-dev`); a box installs only its own variant and board
+- `ATALAIA_OTA_MIN_BATTERY_PCT` -- refuse an update below this level (default 30; with a MAX17048 only)
+- `ATALAIA_OTA_WIFI_TIMEOUT_S` -- how long to wait for the field Wi-Fi (default 20)
 
 The firmware variant is a choice at the top of the menu: `ATALAIA_NODE_MODE`
 (the Field Box, default), `ATALAIA_MODEM_MODE` (`sdkconfig.modem`) or
@@ -373,12 +385,43 @@ Custom layout for 16 MB flash (`partitions.csv`):
 | Partition | Size | Purpose |
 |-----------|------|---------|
 | nvs | 24 KB | Configuration key-value store |
-| otadata | 8 KB | A/B OTA bookkeeping |
+| otadata | 8 KB | A/B OTA bookkeeping: which slot boots, and whether a new image has confirmed itself |
 | phy_init | 4 KB | PHY calibration data |
 | nvs_keys | 4 KB | Encryption keys for NVS (Phase 2; see BRING_UP.md step 0) |
-| ota_0 | 2 MB | Application slot A |
-| ota_1 | 2 MB | Application slot B |
+| ota_0 | 2 MB | Application slot A (the USB flash writes this one) |
+| ota_1 | 2 MB | Application slot B (a firmware update writes the slot not running) |
 | storage | 2 MB | LittleFS: presets, modes, state, audio |
+
+The Field Box image is 1,735,824 bytes (17% of its slot free) since firmware updates
+brought the Wi-Fi station, the HTTPS client and Monocypher in (+153 KB).
+
+## Firmware updates over the air
+
+A field controller updates a Field Box's firmware over the field's Wi-Fi, between games
+([protocol/firmware-update.md](../../protocol/firmware-update.md), decisions FU3-*). In
+software and in host tests; not yet run on a real board ([BRING_UP.md](docs/BRING_UP.md),
+step 10c).
+
+- **The box decides.** `main/fw_update.c` (platform-free, run by the host tests with fakes)
+  checks the offer (no game played, release keys built in, the join's field CA and addresses,
+  a higher version, the battery), the release text (its exact form, the Ed25519 signature over
+  the manifest with a key of `CONFIG_ATALAIA_OTA_RELEASE_KEYS`, checked with
+  [Monocypher](components/monocypher/README.md) 4.0.2, the platform, the version, the size),
+  the image's first bytes (`esp_app_desc_t` and the Atalaia descriptor of `main/fw_desc.c`:
+  version, project, variant, board) before it opens the slot, and the size and SHA-256 of
+  everything written before it sets the boot partition. Anything else aborts the slot's write.
+- **The ESP32 side** (`main/fw_update_esp.c`): the Wi-Fi station (`wifi_ssid`/`wifi_pass` in
+  NVS: the setup portal's "Field Wi-Fi" fields, or `@wifi <ssid> <password>`), `esp_http_client`
+  over HTTPS trusting only the field CA whose SHA-256 is key 13 of the box's join, `esp_ota_*`
+  into the inactive slot, on its own task while the game task and the radio carry on.
+- **Rollback.** `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` (`sdkconfig.defaults`, a new bootloader:
+  flash it once by USB). After an update the new image runs its self-test once the radio and the
+  storage are up (`fw_update_self_test`: SHA-256 and Ed25519 known answers, a release key,
+  a join round trip, a Lua node) and only then confirms itself; otherwise, or if it crashes
+  first, the previous image boots again.
+- **Starting one:** the controller's CMD update (opcode 9) from the GM console, or
+  `@update <version> <release id>` on the serial console (the same checks). Signing releases:
+  [docs/RELEASE_SIGNING.md](docs/RELEASE_SIGNING.md) and `tools/firmware_release.py`.
 
 ## IDF Component Dependencies
 
@@ -389,6 +432,9 @@ Listed in `main/idf_component.yml`:
 - `lvgl/lvgl` -- v9.2 display toolkit, configured by `lvgl_conf/lv_conf.h`
 - `espressif/led_strip` -- WS2812B RMT driver
 - `joltwallet/littlefs` -- LittleFS VFS
+
+Vendored in `components/`: `monocypher` (Monocypher 4.0.2, CC0-1.0 or BSD-2-Clause, for the
+Ed25519 check of firmware releases; ESP-IDF 5.3's mbedTLS has no Ed25519).
 
 The I/O pod's Bluetooth stack, NimBLE, is ESP-IDF's own `bt` component
 (v5.3.2, the image's version): no managed component, nothing new in
@@ -531,7 +577,8 @@ Still pending:
 - Running any of it on the radio boards (plan phase F): the SX1262 link,
   the PN532 reading real join cards, NVS encryption on a provisioned box.
 - Joining over Wi-Fi from the GM console (decision E3).
-- A/B OTA updates with Ed25519 signatures
+- Running a firmware update over the air on a real board (built and host-tested:
+  [Firmware updates](#firmware-updates-over-the-air)).
 - GNSS module support (GPIO 38-42 currently used for peripherals)
 
 ## Radio Region

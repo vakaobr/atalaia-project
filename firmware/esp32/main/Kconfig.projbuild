@@ -505,19 +505,22 @@ menu "Atalaia Field Box Configuration"
             help
                 The Heltec V4 has no USB-UART bridge: its USB-C port is the
                 ESP32-S3's own USB-Serial-JTAG. With this on, "@join",
-                "@joinkey" and (with ATALAIA_SERIAL_KEYS) keys typed in a
+                "@joinkey", "@wifi", "@update" and (with ATALAIA_SERIAL_KEYS) keys typed in a
                 serial monitor on that port reach the box, as well as those
                 on UART0. Off in the Wokwi build, whose console is UART0.
 
         config ATALAIA_SERIAL_JOIN
-            bool "Accept @join, @joinkey and @tag lines on the serial console"
+            bool "Accept @join, @joinkey, @tag, @wifi and @update lines on the serial console"
             default y
             help
                 "@join atalaia:join:..." joins a game from the text of a join
                 payload (the GM console shows it), "@joinkey <64 hex>"
                 sets the field join key while no game is joined, and
                 "@tag <uid hex> [<tag hex>]" reads a player tag (protocol/nfc-tag.md)
-                as if it had been tapped on the NFC reader. For bring-up and the
+                as if it had been tapped on the NFC reader. "@wifi <ssid> <password>"
+                stores the field Wi-Fi a firmware update uses, and
+                "@update <version> <release id>" starts one as the controller's
+                CMD update does (protocol/firmware-update.md): the same checks. For bring-up and the
                 Wokwi emulator; a join still needs a payload signed with this
                 box's field join key, and a tag one signed with the game key.
 
@@ -529,6 +532,51 @@ menu "Atalaia Field Box Configuration"
                 Wokwi emulator and the bench. Leave empty on Field Boxes, which
                 get the field's key once, with "@joinkey" or (later) the setup
                 portal; `python -m atalaia_controller join-key` prints it.
+    endmenu
+
+    # ---- Firmware updates over the air (protocol/firmware-update.md) --------
+    menu "Firmware updates (OTA)"
+        depends on ATALAIA_NODE_MODE
+
+        config ATALAIA_OTA_RELEASE_KEYS
+            string "Release public keys (64 hex digits each, separated by spaces)"
+            default ""
+            help
+                The Ed25519 public keys whose signatures this firmware accepts
+                on a firmware release (up to 4, so a key can be rotated: ship a
+                release with the old and the new key, then sign with the new
+                one). Public keys only: the private keys never come near the
+                repository or a build (firmware/esp32/docs/RELEASE_SIGNING.md).
+                `python3 tools/firmware_release.py keygen` prints the hex form.
+                Empty: the box refuses every update ("no_key"), and an image
+                without a key never confirms itself after an update, so the
+                bootloader goes back to the previous one.
+
+        config ATALAIA_OTA_VARIANT
+            string "Variant name in the image's descriptor (at most 11 characters)"
+            default "box-dev" if ATALAIA_KP_GPIO_MATRIX
+            default "box-bench" if ATALAIA_SERIAL_KEYS || ATALAIA_SKIP_SETUP
+            default "box"
+            help
+                Written into the image (main/fw_desc.c) next to the board
+                revision. A box installs only an image of its own variant and
+                board: a bench or Wokwi build never lands on a Field Box, nor
+                a V4.2 image on a V4.3 (their radio front ends differ).
+
+        config ATALAIA_OTA_MIN_BATTERY_PCT
+            int "Refuse an update below this battery level (percent; 0 = never)"
+            default 30
+            range 0 90
+            help
+                With a MAX17048 battery gauge fitted; a box without one
+                updates whatever its supply. A power loss during the download
+                leaves the running image untouched anyway; this avoids
+                starting an update that will not finish.
+
+        config ATALAIA_OTA_WIFI_TIMEOUT_S
+            int "Seconds to wait for the field Wi-Fi"
+            default 20
+            range 5 120
     endmenu
 
     # ---- USB radio modem (ADR-P2-4) -----------------------------------------

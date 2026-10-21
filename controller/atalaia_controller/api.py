@@ -53,6 +53,14 @@ which browsers cannot give headers, also takes ``?token=``.
     GET  /api/v1/games/{id}/positions      where the nodes are on the field image
     PUT  /api/v1/games/{id}/positions/{n}  move a node on it
     GET  /api/v1/controller/ca             the field CA's certificate (PEM), no token (ADR-P3-9)
+    GET|POST /api/v1/firmware              GM: firmware releases and updates / upload a signed release
+                                           (raw image; ?platform=&version=&signature=)
+    DELETE /api/v1/firmware/{id}           GM: delete a release
+    POST /api/v1/firmware/{id}/install     GM: update boxes of the live game before it starts {"nodes": [..] | "all"}
+    DELETE /api/v1/firmware/updates        GM: stop tracking the updates on their way
+    GET  /api/v1/firmware/{id}/release     a box: the signed release text, no token (protocol/firmware-update.md)
+    GET  /api/v1/firmware/{id}/image       a box: the image, no token
+    POST /api/v1/firmware/report           a box: how its update went, with the game key's MAC
     GET  /api/v1/checkin                   field check-in: field, notice, settings, open games (no token)
     POST /api/v1/checkin                   check in with a field identity: a player token
     POST /api/v1/checkin/token             a new player token (player token)
@@ -662,6 +670,59 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         return Response(ca_pem, media_type="application/x-pem-file",
                         headers={"X-Atalaia-CA-SHA256": hashlib.sha256(der).hexdigest(),
                                  "Cache-Control": "no-cache"})
+
+    # --- firmware updates (firmware_updates.py, protocol/firmware-update.md) -----------
+
+    def firmware() -> Any:
+        if controller.firmware is None:
+            raise HTTPException(503, "firmware updates are not set up on this controller")
+        return controller.firmware
+
+    @app.get("/api/v1/firmware", dependencies=[Depends(require_gm)])
+    def firmware_status() -> dict[str, Any]:
+        return firmware().status()
+
+    @app.post("/api/v1/firmware", status_code=201, dependencies=[Depends(require_gm)])
+    async def firmware_upload(request: Request, platform: str = "", version: str = "",
+                              signature: str = "") -> dict[str, Any]:
+        from .firmware_updates import SLOT_SIZE  # noqa: PLC0415
+
+        data, _ = await read_upload(request, SLOT_SIZE, "firmware image")
+        return firmware().add(data, platform, version, signature)
+
+    @app.delete("/api/v1/firmware/updates", dependencies=[Depends(require_gm)])
+    def firmware_cancel() -> dict[str, Any]:
+        return {"cancelled": firmware().cancel()}
+
+    @app.delete("/api/v1/firmware/{release_id}", dependencies=[Depends(require_gm)])
+    def firmware_delete(release_id: str) -> dict[str, Any]:
+        firmware().remove(release_id)
+        return {"deleted": release_id}
+
+    @app.post("/api/v1/firmware/{release_id}/install", dependencies=[Depends(require_gm)])
+    def firmware_install(release_id: str, body: Any = Body(None)) -> dict[str, Any]:
+        return firmware().install(release_id, body_map(body).get("nodes"))
+
+    @app.get("/api/v1/firmware/{release_id}/release")
+    def firmware_release_text(release_id: str) -> Response:
+        """For the boxes, no token: the release's manifest and signature, which the box verifies."""
+        return Response(firmware().release_text(release_id), media_type="text/plain; charset=utf-8",
+                        headers={"Cache-Control": "no-store"})
+
+    @app.get("/api/v1/firmware/{release_id}/image")
+    def firmware_image(release_id: str) -> Response:
+        from fastapi.responses import FileResponse  # noqa: PLC0415
+
+        return FileResponse(firmware().image_path(release_id), media_type="application/octet-stream",
+                            headers={"Cache-Control": "no-store"})
+
+    @app.post("/api/v1/firmware/report")
+    async def firmware_report(request: Request) -> dict[str, Any]:
+        """A box's report on its update: no token, the live game's key signs it (an HMAC)."""
+        from .firmware_updates import REPORT_MAX  # noqa: PLC0415
+
+        data, _ = await read_upload(request, REPORT_MAX, "report")
+        return firmware().report(data, request.headers.get("x-atalaia-mac"))
 
     # --- field check-in (ADR-P3-13, protocol/checkin.md) ------------------------------
 

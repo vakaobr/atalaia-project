@@ -91,6 +91,17 @@
     library = true              # install the field's scenario library and game presets from the
                                 # site server (plan phase 20), on every controller of the field
 
+    [firmware]                  # firmware updates for the Field Boxes (protocol/firmware-update.md,
+                                # firmware_updates.py): the GM uploads a signed release in the console
+                                # and starts an update per box or for all, never during a game
+    release_keys = []           # Ed25519 public keys (standard base64, 44 characters each, at most 8;
+                                # from the environment, separated by commas) whose releases the
+                                # controller accepts; empty: no release is accepted. A box checks the
+                                # signature again with the keys built into its own firmware
+    dir = ""                    # where the images are kept; empty: "firmware" next to db_path
+    update_timeout_s = 600.0    # an update not heard of (report or HELLO) this long counts as timed out
+    variants = ["box"]          # the image variants accepted ("box-bench" only for a test on the desk)
+
     [atak]                      # Cursor on Target for ATAK (ADR-P4-7 as amended, P4R18; atak.py)
     enabled = false
     multicast = "239.2.3.1:6969"  # UDP, props and zones only (TTL 1); a unicast host:port works too;
@@ -104,6 +115,7 @@
 from __future__ import annotations
 
 import os
+import re
 import tomllib
 from dataclasses import dataclass, field, fields
 from pathlib import Path
@@ -129,6 +141,7 @@ SECTIONS = {
                 "wifi_ssid", "limit_template", "notice_version", "notice_pt", "notice_en",
                 "retention_days"),
     "atak": ("enabled", "multicast", "interval_s", "staff_endpoints", "players"),
+    "firmware": ("release_keys", "dir", "update_timeout_s", "variants"),
 }
 
 
@@ -211,6 +224,11 @@ class Config:
     atak_interval_s: float = 30.0
     atak_staff_endpoints: list[str] = field(default_factory=list)
     atak_players: bool = False
+    # [firmware]
+    firmware_release_keys: list[str] = field(default_factory=list)
+    firmware_dir: str = ""
+    firmware_update_timeout_s: float = 600.0
+    firmware_variants: list[str] = field(default_factory=lambda: ["box"])
 
     def validate(self) -> None:
         if not 0 <= self.node_id <= 0xFFFE:
@@ -241,6 +259,7 @@ class Config:
         _check_checkin(self)
         _check_sync(self)
         _check_atak(self)
+        _check_firmware(self)
         if self.join_key:
             try:
                 ok = len(bytes.fromhex(self.join_key)) == 32
@@ -314,6 +333,18 @@ def _check_atak(cfg: "Config") -> None:
         raise ConfigError(str(exc)) from None
 
 
+def _check_firmware(cfg: "Config") -> None:
+    from .firmware_release import public_key_bytes  # noqa: PLC0415
+
+    if len(cfg.firmware_release_keys) > 8 or not all(public_key_bytes(k) for k in cfg.firmware_release_keys):
+        raise ConfigError("firmware.release_keys: at most 8 Ed25519 public keys, each 32 bytes in standard base64 "
+                          "(44 characters; `python3 tools/firmware_release.py keygen` prints it)")
+    if not 30.0 <= cfg.firmware_update_timeout_s <= 3600.0:
+        raise ConfigError("firmware.update_timeout_s must be 30-3600 seconds")
+    if not cfg.firmware_variants or not all(re.fullmatch(r"[a-z0-9][a-z0-9-]{0,10}", v) for v in cfg.firmware_variants):
+        raise ConfigError('firmware.variants: image variants such as "box" (1-11 of a-z, 0-9, -)')
+
+
 # (section, key) -> Config attribute
 _ATTR = {("api", "port"): "api_port", ("mqtt", "enabled"): "mqtt_enabled",
          ("mqtt", "host"): "mqtt_host", ("mqtt", "port"): "mqtt_port",
@@ -323,8 +354,9 @@ _ATTR = {("api", "port"): "api_port", ("mqtt", "enabled"): "mqtt_enabled",
 _ATTR.update({("sync", k): f"sync_{k}" for k in SECTIONS["sync"]})
 _ATTR.update({("atak", k): f"atak_{k}" for k in SECTIONS["atak"]})
 _ATTR.update({("health", k): f"health_{k}" for k in SECTIONS["health"]})
-# Lists whose items contain ":" (host:port): from the environment they are separated by commas.
-COMMA_LISTS = {"atak_staff_endpoints"}
+_ATTR.update({("firmware", k): f"firmware_{k}" for k in SECTIONS["firmware"]})
+# Lists whose items contain ":" (host:port) or "/" (base64): from the environment they are separated by commas.
+COMMA_LISTS = {"atak_staff_endpoints", "firmware_release_keys"}
 
 
 def _attr(section: str, key: str) -> str:

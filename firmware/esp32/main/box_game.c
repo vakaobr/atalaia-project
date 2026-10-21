@@ -216,6 +216,17 @@ static void link_on_cmd(void *user, uint8_t cmd, const char *params_json)
          * the script gets its params, name included, as on("cmd.mode", ...). */
         if (g->phase == BOX_PLAYING) node_runner_input(g->runner, "cmd.mode", params);
         break;
+    case FIELD_CMD_UPDATE:
+        /* A firmware update (RFC 0001 Amendment 6): never while a game is played. */
+        if (g->phase == BOX_PLAYING) {
+            say(g, "firmware update refused: a game is being played");
+        } else if (g->shell.update == NULL) {
+            say(g, "firmware update: not supported by this box");
+        } else {
+            say(g, "firmware update offered: %s", params ? params : "{}");
+            g->shell.update(g->shell.user, params ? params : "{}");
+        }
+        break;
     default: say(g, "unknown command %u ignored", cmd); break;
     }
 }
@@ -534,6 +545,11 @@ void box_game_tick(box_game_t *g, uint32_t raw_delta_ms, uint32_t now_ms)
 bool box_game_active(const box_game_t *g)
 {
     return g->phase != BOX_IDLE;
+}
+
+bool box_game_playing(const box_game_t *g)
+{
+    return g->phase == BOX_PLAYING;
 }
 
 /* ---- Player tags (atalaia/tag.h, protocol/nfc-tag.md) ------------------------ */

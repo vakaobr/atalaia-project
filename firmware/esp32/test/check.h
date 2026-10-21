@@ -50,5 +50,6 @@ void run_serial_console_tests(void);
 void run_board_fem_tests(void);
 void run_screen_template_tests(void);
 void run_pod_tests(void);
+void run_fw_update_tests(void);
 
 #endif /* ATALAIA_FW_TEST_CHECK_H */

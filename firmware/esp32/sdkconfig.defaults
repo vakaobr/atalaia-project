@@ -30,3 +30,12 @@ CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 
 # --- Compiler ---
 CONFIG_COMPILER_OPTIMIZATION_PERF=y
+
+# --- Firmware updates over the air (protocol/firmware-update.md) ---
+# An image a firmware update installed must confirm itself after its self-test
+# (fw_update_esp_boot); if it crashes or reboots first, the bootloader goes back
+# to the previous image. Changes the bootloader: flash it once over USB
+# (BRING_UP.md). For production, ESP-IDF's secure version in eFuse
+# (CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK, with secure boot) would add a hardware
+# anti-rollback under the box's own version check (decision FU3-8).
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y

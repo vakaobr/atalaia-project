@@ -317,6 +317,99 @@ and two boards at least 1 m apart, both antennas fitted.
    third box joined half-way, the far box's captures reach the console
    again through the middle box's relay.
 
+## Step 10c: Firmware update over the air (one board on the desk)
+
+The whole update path ([protocol/firmware-update.md](../../../protocol/firmware-update.md)) with
+the Heltec V4.3 alone: the controller runs on the PC without a radio, and the box is told to
+update from its serial console (`@update`, the same checks as the controller's CMD update),
+then downloads over the Wi-Fi from the controller, checks, installs and reboots. Not yet done
+on a real board: record what happens. The board needs its **2.4 GHz Wi-Fi antenna**, and the
+PC and the board the same 2.4 GHz network (the "field Wi-Fi" here is your own). In WSL:
+`python3`, in the repository; on Windows `cmd`: the flasher of `hardware/field-box/BUILD.md`
+section 11 (`%FLASH%`, `COM5`).
+
+1. **A throw-away bench key** (never used for anything else), outside the repository:
+
+   ```sh
+   python3 tools/firmware_release.py keygen --unencrypted --out ~/atalaia-bench/bench.pem
+   ```
+
+   Note its `public key (hex)` (HEX below) and `(base64)` (B64).
+2. **Image A (installed by USB) and image B (the update)**, both bench builds trusting that
+   key; B has a higher version. Each build replaces `build-bench/`, so copy each out:
+
+   ```sh
+   python3 tools/docker_fw.py bench --release-keys=HEX
+   cp -r firmware/esp32/build-bench /mnt/c/atalaia-bench-A
+   python3 tools/docker_fw.py bench --release-keys=HEX --fw-version=0.2.1-bench.1
+   mkdir -p ~/atalaia-bench/B && cp firmware/esp32/build-bench/atalaia_esp32.bin ~/atalaia-bench/B/
+   python3 tools/firmware_release.py sign ~/atalaia-bench/B/atalaia_esp32.bin --key ~/atalaia-bench/bench.pem
+   ```
+
+   The last command prints the variant (`box-bench`), the board and the release; the
+   **release id** is the first 16 hex digits of its `sha256`.
+3. **Flash A by USB, all of it** (the bootloader changed: it now rolls back an image that
+   does not confirm itself), from `cmd`:
+
+   ```
+   cd C:\atalaia-bench-A
+   %FLASH% -m esptool --chip esp32s3 -p COM5 -b 460800 --before default_reset --after hard_reset write_flash "@flash_args"
+   %FLASH% -m serial.tools.miniterm COM5 115200
+   ```
+
+   The log shows `Atalaia firmware v0.2.0` and `fw_update: 1 release key(s); version 0.2.0,
+   variant box-bench, board heltec_v4_3`.
+4. **The controller, without a radio, serving HTTPS on the PC's network address** (find it
+   with `ipconfig`: 192.168.1.50 below). A `bench.toml`:
+
+   ```toml
+   [controller]
+   db_path = "/home/<you>/atalaia-bench/controller.db"
+   [modem]
+   port = ""
+   [api]
+   tls_names = ["192.168.1.50"]
+   [firmware]
+   release_keys = ["B64"]
+   variants = ["box-bench"]
+   ```
+
+   Run `python3 -m atalaia_controller --config bench.toml` (controller/README.md) and allow
+   inbound TCP 8443 in the Windows firewall (with WSL's mirrored networking, the Hyper-V
+   firewall too). `python3 -m atalaia_controller --config bench.toml join-key` prints the
+   field join key.
+5. **Join the box.** In the console (`http://localhost:8080/console/`, the GM token from
+   `... tokens`): create a Domination game, *Join*: role zone, node 1, *Generate*. On the box's
+   serial console, one line each:
+
+   ```
+   @joinkey <the join key>
+   @join atalaia:join:...
+   @wifi <your network> <its password>
+   ```
+
+   The log shows `join key: stored`, `field: joined game ...` and `field Wi-Fi: stored`.
+6. **Upload B** in the console's *Boxes* tab (*Firmware updates*: the `.bin` and its
+   `.release.json`). It is listed as `0.2.1-bench.1`, `heltec_v4_3`, signed by the bench key.
+7. **Update:** on the serial console `@update 0.2.1-bench.1 <release id>`. Expected: the OLED
+   shows `UPDATING` and the percentage, the log `update to 0.2.1-bench.1 ... started`, then
+   `installed (... bytes): rebooting into it`; after the reboot `firmware 0.2.1-bench.1 confirmed
+   after its self-test` and `Atalaia firmware v0.2.1-bench.1`. The controller's log shows the
+   box's report (started from the console, the update was not one the controller sent: it logs
+   it and keeps no record). Note the download time and the heap left (`mem_monitor`).
+8. **What must be refused** (each leaves the box on the version it runs):
+   - `@update 0.2.1-bench.1 <release id>` again: `update refused: not_newer`.
+   - Another throw-away key K2 (step 1), its B64 added to `release_keys` (the controller
+     trusts it, the box does not): build `--fw-version=0.2.2-bench.1` with `--release-keys=HEX`,
+     sign it with K2, upload, `@update`: `update to 0.2.2-bench.1 failed: bad_signature`.
+   - The same image signed with the bench key, and the USB cable pulled while the OLED shows
+     about 50 %: after power-up the box still runs 0.2.1-bench.1.
+   - **Rollback:** build `--fw-version=0.2.3-bench.1` **without** `--release-keys`, sign it with
+     the bench key, upload, `@update 0.2.3-bench.1 <id>`: it installs and reboots, its self-test
+     fails (`core FAILED`: an image without a release key could never be updated again), and
+     the box comes back on 0.2.1-bench.1 (`rolling back`, then the old version's boot log).
+9. **Afterwards:** delete `~/atalaia-bench` (the keys with it) and flash a normal build.
+
 ## Step 11: Wi-Fi Setup Portal
 
 1. Reset configuration: hold reset during boot or enter admin PIN

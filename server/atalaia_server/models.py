@@ -867,8 +867,8 @@ class FieldTeam(Base):
 
 
 class FirmwareRelease(Base):
-    """A firmware release in the catalogue (plan phase 19): a list only, no image is stored or served (OTA is
-    not built). Each entry is signed with Ed25519 by a release key the server trusts
+    """A firmware release in the catalogue (plan phase 19): a list only, no image is stored or served (the
+    field controller holds the images it offers its boxes: decision FU3-3). Each entry is signed with Ed25519 by a release key the server trusts
     (``ATALAIA_FIRMWARE_KEYS``) over ``firmware.manifest``: platform, version, size and the image's SHA-256;
     ``key_id`` names the key. A withdrawn release keeps its row with ``yanked_at`` (decision S19-6)."""
 

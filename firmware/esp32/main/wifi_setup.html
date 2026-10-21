@@ -56,6 +56,12 @@ button:active{background:#00a0cc}
 <label for="joinkey">Field join key (optional, 64 hex digits)</label>
 <input type="text" id="joinkey" name="joinkey" pattern="[0-9a-fA-F]{64}" maxlength="64" autocomplete="off" spellcheck="false" placeholder="python -m atalaia_controller join-key">
 
+<label for="wifissid">Field Wi-Fi name (optional: firmware updates)</label>
+<input type="text" id="wifissid" name="wifissid" maxlength="32" autocomplete="off" spellcheck="false">
+
+<label for="wifipass">Field Wi-Fi password (8-64 characters, or none for an open network)</label>
+<input type="password" id="wifipass" name="wifipass" maxlength="64" autocomplete="off">
+
 <button type="submit">Save &amp; Reboot</button>
 </form>
 <p class="note">Connect to the node Wi-Fi and visit this page to configure.</p>

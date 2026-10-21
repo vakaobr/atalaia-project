@@ -113,3 +113,16 @@ interval_s = 30.0                 # every marker again this often; a capture goe
 staff_endpoints = []              # staff ATAK devices, ["10.42.0.5:4242"] (TCP; 4242 if no port);
                                   # from the environment, separated by commas
 players = false                   # player GPS positions, to staff_endpoints ONLY (never multicast)
+
+[firmware]
+# Firmware updates for the Field Boxes over the field Wi-Fi (protocol/firmware-update.md).
+# The GM uploads a signed release (the image and its .release.json from
+# tools/firmware_release.py) in the console's Boxes tab and starts an update per box
+# or for all, only while the live game has not started. Overridable as ATALAIA_FIRMWARE_*.
+release_keys = []                 # the release keys' public halves, ["<44 base64 characters>"];
+                                  # empty: no release is accepted. Each box checks the
+                                  # signature again with the keys built into its firmware
+dir = ""                          # where the images are kept; empty: "firmware" next to db_path
+update_timeout_s = 600.0          # an update with no news (report, HELLO) this long: timed out
+variants = ["box"]                # image variants accepted; ["box-bench"] only for a test on the desk
+                                  # (firmware/esp32/docs/BRING_UP.md); a box takes only its own anyway

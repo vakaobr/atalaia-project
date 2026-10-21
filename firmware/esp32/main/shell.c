@@ -13,6 +13,8 @@
  * game (box_game.c): joined with an NFC join card or "@join" on the serial
  * console, driven by the controller's CMD and TIME over the radio, its
  * events, STATE and scores sent back (radio/field_link.c, decision D18).
+ * Between games the controller can update its firmware over the field Wi-Fi
+ * (fw_update.c, fw_update_esp.c, protocol/firmware-update.md).
  */
 
 #include <stdio.h>
@@ -25,6 +27,7 @@
 #include "builtin_presets.h"
 #include "button_tracker.h"
 #include "config_store.h"
+#include "fw_update_esp.h"
 #include "game_timer.h"
 #include "hal/hal.h"
 #include "key_filter.h"
@@ -43,6 +46,7 @@
 /* ---- ESP-IDF build ---------------------------------------------------- */
 #include "display_port.h"
 #include "oled_view.h"
+#include "esp_app_desc.h"
 #include "esp_event.h"
 #include "esp_littlefs.h"
 #include "esp_log.h"
@@ -204,8 +208,9 @@ static void serial_input_init(void)
     ESP_LOGI(TAG, "serial keys on: type 0-9, * and # on the console");
 #endif
 #if CONFIG_ATALAIA_SERIAL_JOIN
-    ESP_LOGI(TAG, "serial join on: \"@join atalaia:join:...\", \"@joinkey <hex>\" or "
-                  "\"@tag <uid> [<tag>]\" on the console");
+    ESP_LOGI(TAG, "serial join on: \"@join atalaia:join:...\", \"@joinkey <hex>\", "
+                  "\"@tag <uid> [<tag>]\", \"@wifi <ssid> <password>\" or "
+                  "\"@update <version> <release id>\" on the console");
 #endif
 }
 
@@ -222,6 +227,37 @@ static void serial_command(const char *cmd)
         /* A player tag without a reader (bring-up, Wokwi): "@tag <uid hex> [<payload hex>]". */
         if (!box_game_tag_text(&box, cmd + 4)) {
             ESP_LOGW(TAG, "tag: refused (no game running, or not \"<uid hex> [<payload hex>]\")");
+        }
+        return;
+    }
+    if (strncmp(cmd, "wifi ", 5) == 0) {
+        /* "@wifi <ssid> <password>": the field Wi-Fi firmware updates use (no spaces in the
+         * SSID here; the setup portal takes any). An open network: "@wifi <ssid>". */
+        char ssid[33] = "", pass[65] = "";
+        const char *sp = strchr(cmd + 5, ' ');
+        size_t n = sp ? (size_t)(sp - (cmd + 5)) : strlen(cmd + 5);
+        if (n >= 1 && n < sizeof(ssid)) {
+            memcpy(ssid, cmd + 5, n);
+            snprintf(pass, sizeof(pass), "%s", sp ? sp + 1 : "");
+        }
+        ESP_LOGI(TAG, "field Wi-Fi: %s",
+                 fw_update_esp_set_wifi(ssid, pass)
+                     ? "stored"
+                     : "refused (SSID 1-32 bytes, password 8-64 or none)");
+        return;
+    }
+    if (strncmp(cmd, "update ", 7) == 0) {
+        /* "@update <version> <release id>": as the controller's CMD update (the same checks). */
+        char version[40] = "", id[24] = "", params[96];
+        if (sscanf(cmd + 7, "%39s %23s", version, id) == 2) {
+            snprintf(params, sizeof(params), "{\"id\":\"%s\",\"version\":\"%s\"}", id, version);
+            if (box_game_playing(&box)) {
+                ESP_LOGW(TAG, "update refused: a game is being played");
+            } else {
+                fw_update_esp_offer(params);
+            }
+        } else {
+            ESP_LOGW(TAG, "update: \"@update <version> <release id>\"");
         }
         return;
     }
@@ -329,6 +365,23 @@ static bool box_radio_send(void *user, const uint8_t *pkt, size_t len)
     return radio_task_send(pkt, len);
 }
 
+/* CMD update (protocol/firmware-update.md): box_game never passes one during a game. */
+static void box_update(void *user, const char *params_json)
+{
+    (void)user;
+    fw_update_esp_offer(params_json);
+}
+
+static void update_screen(const char *tmpl, const char *data_json)
+{
+    send_screen(tmpl, data_json);
+}
+
+static int update_battery(void)
+{
+    return box_battery(NULL);
+}
+
 static bool portal_join_key(const char *hex)
 {
     return box_game_set_join_key_hex(&box, hex);
@@ -387,7 +440,9 @@ static void box_start(const char *tier)
     config_store_get_str("node_name", name, sizeof(name));
     snprintf(hello.node_name, sizeof(hello.node_name), "%s", name);
     hello.platform = 1; /* esp32s3 */
-    snprintf(hello.fw_version, sizeof(hello.fw_version), "%s", atalaia_version());
+    /* The firmware's own version (PROJECT_VER: the core's, or a release candidate's), which a
+     * firmware update compares; the core's is core_version. */
+    snprintf(hello.fw_version, sizeof(hello.fw_version), "%s", esp_app_get_description()->version);
     snprintf(hello.core_version, sizeof(hello.core_version), "%s", atalaia_version());
     hello.tier = strcmp(tier, "full") == 0 ? 0 : 1;
     hello.transports = 1; /* LoRa */
@@ -399,6 +454,7 @@ static void box_start(const char *tier)
                            .set_channel = box_set_channel,
                            .battery_pct = box_battery,
                            .radio_send = box_radio_send,
+                           .update = box_update,
                            .user = NULL};
     box_game_init(&box, &runner, &game_preset, nvs ? atalaia_box_store_esp() : &no_store, &ops,
                   &atalaia_crypto_mbedtls, nvs, &game_log, &hello);
@@ -419,6 +475,7 @@ static void box_start(const char *tier)
         }
     }
     wifi_setup_set_join_key_handler(portal_join_key);
+    fw_update_esp_init(&box, update_screen, update_battery);
 }
 
 /* Start the game the picker chose. */
@@ -592,7 +649,7 @@ static void task_lvgl(void *arg)
     lv_obj_t *oled_scr = display_port_oled_init(hal.oled);
     if (oled_scr) {
         char version[24];
-        snprintf(version, sizeof(version), "v%s", atalaia_version());
+        snprintf(version, sizeof(version), "v%.20s", esp_app_get_description()->version);
         oled_view_splash(oled_scr, version, now_ms(), CONFIG_ATALAIA_OLED_SPLASH_MS);
     }
 
@@ -649,7 +706,7 @@ static void task_wifi(void *arg)
 /* Boot                                                                */
 /* ------------------------------------------------------------------ */
 
-static void mount_storage(void)
+static bool mount_storage(void)
 {
     esp_vfs_littlefs_conf_t conf = {
         .base_path = STORAGE_PATH,
@@ -661,6 +718,7 @@ static void mount_storage(void)
         ESP_LOGE(TAG, "storage mount failed (%s): presets and resume unavailable",
                  esp_err_to_name(err));
     }
+    return err == ESP_OK;
 }
 
 /*
@@ -725,7 +783,8 @@ void app_main(void)
         mem_limit = 64u * 1024u;
     }
 
-    ESP_LOGI(TAG, "Atalaia v%s  tier=%s", atalaia_version(), tier);
+    ESP_LOGI(TAG, "Atalaia firmware v%s (core v%s)  tier=%s", esp_app_get_description()->version,
+             atalaia_version(), tier);
 
     /* NVS init (needed for config_store and Wi-Fi). */
     esp_err_t err = nvs_flash_init();
@@ -751,7 +810,10 @@ void app_main(void)
 #endif
 
     /* Preset and state storage. */
-    mount_storage();
+    bool storage_ok = mount_storage();
+
+    /* An image a firmware update just installed confirms itself here, or rolls back. */
+    fw_update_esp_boot(hal.radio != NULL, storage_ok);
     preset_store_init(STORAGE_PATH);
     state_persist_init(STORAGE_PATH "/state");
     seed_presets();

@@ -26,6 +26,7 @@ const SHELL = [
     'components/branding-settings.js',
     'components/checkin-panel.js',
     'components/field-view.js',
+    'components/firmware-panel.js',
     'components/game-control.js',
     'components/georef-panel.js',
     'components/join-panel.js',

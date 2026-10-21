@@ -74,6 +74,9 @@ CMD_RESET = 6
 CMD_REBOOT = 7
 # A command for the node's mode script (RFC 0001 Amendment 5): params name it.
 CMD_MODE = 8
+# A firmware update over Wi-Fi (RFC 0001 Amendment 6, protocol/firmware-update.md):
+# params {"id", "version"}; the controller sends it only to boxes between games.
+CMD_UPDATE = 9
 CMD_OPCODES = {
     "start": CMD_START,
     "pause": CMD_PAUSE,
@@ -84,6 +87,7 @@ CMD_OPCODES = {
     "reset": CMD_RESET,
     "reboot": CMD_REBOOT,
     "mode": CMD_MODE,
+    "update": CMD_UPDATE,
 }
 
 PRIO_TELEMETRY = 0
@@ -419,7 +423,7 @@ class FieldController:
         if isinstance(cmd, str) and cmd not in CMD_OPCODES:
             raise ValueError(f"unknown command {cmd!r}")
         opcode = CMD_OPCODES[cmd] if isinstance(cmd, str) else int(cmd)
-        if not 0 <= opcode <= CMD_MODE:
+        if not 0 <= opcode <= CMD_UPDATE:
             raise ValueError(f"unknown command opcode {opcode}")
         return self._send_cmd(opcode, params, dest, now_ms=now_ms)
 

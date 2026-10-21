@@ -14,6 +14,8 @@ Outputs, each marked "do not edit":
     core/tests/packet_vectors.h         packet, payload, join and player tag vectors (C tests)
     core/tests/proxy_vectors.h          capability proxy vectors (C tests, core and firmware)
     core/tests/geo_vectors.h            geo.distance and geo.in_zone vectors (C tests)
+    firmware/esp32/test/firmware_vectors.h  firmware release, version, image and report vectors
+                                        (the Field Box's update checks, protocol/vectors/firmware.json)
     simulator/atalaia_sim/protocol.py   the same tables for Python
     protocol/json/event.schema.json     JSON Schema of an event in the game log
 
@@ -919,7 +921,7 @@ def gen_join_vectors(jv: dict[str, Any], byte_array: Any) -> list[str]:
               f"{f['channel_hz']}u, {f['max_hops']},",
               f"      {{{teams}}}, {len(f['teams'])},",
               f"      {c_string(f['mode_id'])}, {c_string(f['role'])}, {f['game_seed']}u, "
-              f"{c_string(params)}, {kinds[f['kind']]}}},",
+              f"{c_string(params)}, {kinds[f['kind']]}, false, {{0}}, 0, {{\"\"}}}},",
               f"     join_vec_{i}, join_vec_{i}_len, {c_string(v['text'])}, "
               f"join_tag_{i}, join_tag_{i}_len}},"]
     L += ["};",
@@ -936,6 +938,51 @@ def gen_join_vectors(jv: dict[str, Any], byte_array: Any) -> list[str]:
                  f"hmac_data_{i}, hmac_data_{i}_len, hmac_mac_{i}}},")
     L += ["};",
           "#define HMAC_VECTOR_COUNT (sizeof(hmac_vectors) / sizeof(hmac_vectors[0]))", ""]
+    L += gen_join_link_vectors(jv["controller_link"], byte_array, kinds)
+    return L
+
+
+def gen_join_link_vectors(lv: dict[str, Any], byte_array: Any, kinds: dict[str, str]) -> list[str]:
+    """Keys 13 (ca_sha256) and 14 (urls) of a join payload (RFC 0001 Amendment 4): boxes read them
+    for firmware updates over Wi-Fi (protocol/firmware-update.md)."""
+    L = ["/* ---- join payloads with the controller's link (keys 13 and 14) ---- */", "",
+         "typedef struct {", "    const char *name;", "    atalaia_join_t fields;", "    const uint8_t *payload;",
+         "    size_t payload_len;", "    const char *text;", "} join_link_vector_t;", ""]
+    for i, v in enumerate(lv["valid"]):
+        L += byte_array(f"join_link_{i}", v["payload"])
+    for i, v in enumerate(lv["invalid"]):
+        require(v["reason"] == "body", f"join.json controller_link {v['name']}: only body errors here")
+        L += byte_array(f"join_link_bad_{i}", v["payload"])
+    L += ["", "static const join_link_vector_t join_link_vectors[] = {"]
+    for i, v in enumerate(lv["valid"]):
+        f = v["fields"]
+        key = ", ".join(f"0x{b:02x}" for b in bytes.fromhex(f["game_key"]))
+        teams = ", ".join("{" + c_string(t) + "}" for t in f["teams"])
+        params = "" if f["params"] is None else json.dumps(f["params"], separators=(",", ":"), ensure_ascii=False)
+        ca = f.get("ca_sha256")
+        urls = f.get("urls") or []
+        L += [f"    {{{c_string(v['name'])},",
+              f"     {{.game_id = {f['game_id']}, .game_key = {{{key}}}, .node_id = {f['node_id']},",
+              f"      .controller_id = {f['controller_id']}, .channel_hz = {f['channel_hz']}u, "
+              f".max_hops = {f['max_hops']},",
+              f"      .teams = {{{teams}}}, .team_count = {len(f['teams'])},",
+              f"      .mode_id = {c_string(f['mode_id'])}, .role = {c_string(f['role'])}, "
+              f".game_seed = {f['game_seed']}u,",
+              f"      .params_json = {c_string(params)}, .kind = {kinds[f['kind']]},"]
+        if ca is not None:
+            L.append("      .has_ca = true, .ca_sha256 = {" + ", ".join(f"0x{b:02x}" for b in bytes.fromhex(ca)) + "},")
+        else:
+            L.append("      .has_ca = false, .ca_sha256 = {0},")
+        L.append(f"      .url_count = {len(urls)}, .urls = {{" + (", ".join("{" + c_string(u) + "}" for u in urls)
+                                                                   or "{\"\"}") + "}},")
+        L.append(f"     join_link_{i}, join_link_{i}_len, {c_string(v['text'])}}},")
+    L += ["};", "#define JOIN_LINK_VECTOR_COUNT (sizeof(join_link_vectors) / sizeof(join_link_vectors[0]))", "",
+          "static const join_bad_vector_t join_link_bad_vectors[] = {"]
+    for i, v in enumerate(lv["invalid"]):
+        L.append(f"    {{{c_string(v['name'])}, join_link_bad_{i}, join_link_bad_{i}_len, ATALAIA_JOIN_ERR_BODY, "
+                 f"{c_string(v.get('why', v['name']))}}},")
+    L += ["};", "#define JOIN_LINK_BAD_VECTOR_COUNT (sizeof(join_link_bad_vectors) / sizeof(join_link_bad_vectors[0]))",
+          ""]
     return L
 
 
@@ -1104,6 +1151,107 @@ def gen_geo_vectors(gv: dict[str, Any]) -> str:
     return "\n".join(L)
 
 
+# ---- firmware update vectors (protocol/vectors/firmware.json) ----------------
+
+FIRMWARE_VECTORS = REPO / "protocol" / "vectors" / "firmware.json"
+
+
+def gen_firmware_vectors(fv: dict[str, Any]) -> str:
+    """firmware/esp32/test/firmware_vectors.h: the Field Box's firmware update checks (fw_update.c)."""
+    L = c_spdx("Firmware update test vectors (protocol/vectors/firmware.json).")
+    L[5] = " * Generated by tools/protogen.py from protocol/vectors/firmware.json. Do not edit."
+    L += ["#ifndef ATALAIA_FIRMWARE_VECTORS_H", "#define ATALAIA_FIRMWARE_VECTORS_H", "",
+          "#include <stdbool.h>", "#include <stddef.h>", "#include <stdint.h>", ""]
+
+    def arr(name: str, data: bytes) -> list[str]:
+        if not data:
+            return [f"static const uint8_t {name}[1] = {{0}};", f"#define {name}_len 0"]
+        out = [f"static const uint8_t {name}[] = {{"]
+        for i in range(0, len(data), 12):
+            out.append("    " + ", ".join(f"0x{b:02x}" for b in data[i:i + 12]) + ",")
+        out += ["};", f"#define {name}_len {len(data)}"]
+        return out
+
+    def text_arr(name: str, text: str) -> list[str]:
+        return arr(name, text.encode("utf-8"))
+
+    L += ["typedef struct {", "    const char *name;", "    const uint8_t *public_key;", "    const uint8_t *message;",
+          "    size_t message_len;", "    const uint8_t *signature;", "} fw_rfc8032_vector_t;", ""]
+    for i, v in enumerate(fv["rfc8032"]):
+        L += arr(f"fw_rfc_pk_{i}", bytes.fromhex(v["public_key"]))
+        L += arr(f"fw_rfc_msg_{i}", bytes.fromhex(v["message"]))
+        L += arr(f"fw_rfc_sig_{i}", bytes.fromhex(v["signature"]))
+    L += ["static const fw_rfc8032_vector_t fw_rfc8032_vectors[] = {"]
+    for i, v in enumerate(fv["rfc8032"]):
+        L.append(f"    {{{c_string(v['name'])}, fw_rfc_pk_{i}, fw_rfc_msg_{i}, fw_rfc_msg_{i}_len, fw_rfc_sig_{i}}},")
+    L += ["};", "#define FW_RFC8032_VECTOR_COUNT (sizeof(fw_rfc8032_vectors) / sizeof(fw_rfc8032_vectors[0]))", ""]
+
+    L += arr("fw_signing_key", bytes.fromhex(fv["signing_key"]["public_key"]))
+    L += arr("fw_other_key", bytes.fromhex(fv["other_key"]["public_key"]))
+    L += arr("fw_signing_seed", bytes.fromhex(fv["signing_key"]["seed"]))
+    L += [f"#define FW_SIGNING_KEY_HEX {c_string(fv['signing_key']['public_key'])}",
+          f"#define FW_OTHER_KEY_HEX {c_string(fv['other_key']['public_key'])}", ""]
+
+    L += ["typedef struct {", "    const char *name;", "    const char *platform;", "    const char *version;",
+          "    uint32_t size;", "    const char *sha256;", "    const uint8_t *text;", "    size_t text_len;",
+          "    size_t manifest_len;", "    bool valid; /* signed by fw_signing_key */", "} fw_release_vector_t;", ""]
+    for i, v in enumerate(fv["releases"]):
+        require(v["release_text"] == v["manifest"] + f"signature={v['signature']}\n",
+                f"firmware.json {v['name']}: release_text is the manifest and the signature line")
+        L += text_arr(f"fw_rel_{i}", v["release_text"])
+    L += ["static const fw_release_vector_t fw_release_vectors[] = {"]
+    for i, v in enumerate(fv["releases"]):
+        L.append(f"    {{{c_string(v['name'])}, {c_string(v['platform'])}, {c_string(v['version'])}, {v['size']}u, "
+                 f"{c_string(v['sha256'])}, fw_rel_{i}, fw_rel_{i}_len, {len(v['manifest'].encode())}, "
+                 f"{'true' if v['valid'] else 'false'}}},")
+    L += ["};", "#define FW_RELEASE_VECTOR_COUNT (sizeof(fw_release_vectors) / sizeof(fw_release_vectors[0]))", ""]
+
+    L += ["typedef struct {", "    const char *name;", "    const uint8_t *text;", "    size_t text_len;",
+          "} fw_text_vector_t;", ""]
+    for i, v in enumerate(fv["release_texts_invalid"]):
+        L += text_arr(f"fw_bad_text_{i}", v["text"])
+    L += ["static const fw_text_vector_t fw_bad_text_vectors[] = {"]
+    for i, v in enumerate(fv["release_texts_invalid"]):
+        L.append(f"    {{{c_string(v['name'])}, fw_bad_text_{i}, fw_bad_text_{i}_len}},")
+    L += ["};", "#define FW_BAD_TEXT_VECTOR_COUNT (sizeof(fw_bad_text_vectors) / sizeof(fw_bad_text_vectors[0]))", ""]
+
+    ver = fv["versions"]
+
+    def strs(name: str, items: list[str]) -> list[str]:
+        return ([f"static const char *const {name}[] = {{"] + [f"    {c_string(x)}," for x in items]
+                + ["};", f"#define {name.upper()}_COUNT (sizeof({name}) / sizeof({name}[0]))", ""])
+
+    L += strs("fw_vec_semver_order", ver["semver_order"])
+    L += strs("fw_vec_semver_core_order", ver["semver_core_order"])
+    L += strs("fw_vec_version_order", ver["order"])
+    L += strs("fw_vec_version_equal", [x for pair in ver["equal"] for x in pair])
+    L += strs("fw_vec_version_valid", ver["valid"])
+    L += strs("fw_vec_version_invalid", ver["invalid"])
+
+    L += ["typedef struct {", "    const char *name;", "    const uint8_t *head;", "    size_t head_len;",
+          "    bool valid;", "    const char *version, *project, *variant, *board;", "} fw_image_vector_t;", ""]
+    images = [(v, True) for v in fv["images"]["valid"]] + [(v, False) for v in fv["images"]["invalid"]]
+    for i, (v, _) in enumerate(images):
+        L += arr(f"fw_img_{i}", bytes.fromhex(v["head"]))
+    L += ["static const fw_image_vector_t fw_image_vectors[] = {"]
+    for i, (v, ok) in enumerate(images):
+        f = [c_string(v.get(k, "")) for k in ("version", "project", "variant", "board")]
+        L.append(f"    {{{c_string(v['name'])}, fw_img_{i}, fw_img_{i}_len, {'true' if ok else 'false'}, "
+                 f"{', '.join(f)}}},")
+    L += ["};", "#define FW_IMAGE_VECTOR_COUNT (sizeof(fw_image_vectors) / sizeof(fw_image_vectors[0]))", ""]
+
+    rep = fv["reports"]
+    L += arr("fw_report_game_key", bytes.fromhex(rep["game_key"]))
+    L += ["typedef struct {", "    uint16_t game, node;", "    const char *release, *result, *version, *body, *mac;",
+          "} fw_report_vector_t;", "", "static const fw_report_vector_t fw_report_vectors[] = {"]
+    for v in rep["valid"]:
+        L.append(f"    {{{v['game']}, {v['node']}, {c_string(v['release'])}, {c_string(v['result'])}, "
+                 f"{c_string(v['version'])}, {c_string(v['body'])}, {c_string(v['mac'])}}},")
+    L += ["};", "#define FW_REPORT_VECTOR_COUNT (sizeof(fw_report_vectors) / sizeof(fw_report_vectors[0]))", "",
+          "#endif /* ATALAIA_FIRMWARE_VECTORS_H */", ""]
+    return "\n".join(L)
+
+
 # ---- main ------------------------------------------------------------------
 
 
@@ -1118,6 +1266,8 @@ def outputs() -> dict[Path, str]:
         REPO / "core/tests/packet_vectors.h": gen_packet_vectors(json_vectors),
         REPO / "core/tests/proxy_vectors.h": gen_proxy_vectors(load_yaml(PROXY_VECTORS)),
         REPO / "core/tests/geo_vectors.h": gen_geo_vectors(json.loads(GEO_VECTORS.read_text(encoding="utf-8"))),
+        REPO / "firmware/esp32/test/firmware_vectors.h":
+            gen_firmware_vectors(json.loads(FIRMWARE_VECTORS.read_text(encoding="utf-8"))),
         REPO / "simulator/atalaia_sim/protocol.py": gen_python(schema),
         REPO / "protocol/json/event.schema.json": gen_json_schema(schema),
     }
