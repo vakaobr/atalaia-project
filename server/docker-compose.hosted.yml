@@ -1,0 +1,93 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# A hosted hub (ADR-P4-4 as built, plan phase 21; Phase 4 follow-up, decisions
+# FU4-*; server/docs/DEPLOY.md, "Hosted mode"): an override of docker-compose.yml,
+# always used with it. server/setup.sh writes COMPOSE_FILE into server/.env so
+# that `docker compose ...` from server/ uses both; the scripts pass both files:
+#   sh server/setup.sh hub.example.pt --hosted       secrets, the two roles, the registry, start
+#   docker compose run --rm hub hosted create campo-tejo --name "Campo Tejo"
+#   sh server/backup.sh / sh server/restore.sh FILE --yes   (the hosted paths)
+# Its deployment test: python3 tools/docker_server.py deploy-hosted.
+#
+# What changes from the single-field stack:
+# - Caddy serves *.ATALAIA_DOMAIN with on-demand TLS (Caddyfile.hosted), asking
+#   tls-ask before each certificate;
+# - the server runs in hosted mode as atalaia_app, a role that is no superuser,
+#   has no BYPASSRLS and owns nothing (it refuses to start otherwise), and does
+#   not run the migrations;
+# - hub, the operator's commands as atalaia_owner (the role that owns the
+#   schemas): every `up` runs it once as `hosted migrate` (every field to the
+#   newest revision, grants and row-level security again) before the server
+#   starts, and `docker compose run --rm hub hosted ...` runs any other command;
+# - PostgreSQL's own superuser (atalaia, POSTGRES_PASSWORD) is used only by the
+#   scripts, inside its container: roles, pg_dump, pg_restore.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  caddy:
+    volumes:
+      - ./Caddyfile.hosted:/etc/caddy/Caddyfile:ro
+    depends_on:
+      tls-ask:
+        condition: service_healthy
+
+  server:
+    environment:
+      ATALAIA_DATABASE_URL: "postgresql+asyncpg://atalaia_app:${ATALAIA_APP_DB_PASSWORD:?set ATALAIA_APP_DB_PASSWORD (server/setup.sh --hosted)}@postgres:5432/atalaia"
+      ATALAIA_HOSTED: "on"
+      ATALAIA_HOSTED_DOMAIN: "${ATALAIA_DOMAIN:?set ATALAIA_DOMAIN (server/setup.sh)}"
+      # Each field's links are https://<slug>.ATALAIA_DOMAIN; the server refuses a public URL here.
+      ATALAIA_PUBLIC_URL: ""
+    # The image's command runs `alembic upgrade head`, which refuses hosted mode: hub migrates instead.
+    command: ["uvicorn", "--factory", "atalaia_server.app:create_app", "--host", "0.0.0.0", "--port", "8000",
+              "--workers", "1", "--proxy-headers", "--no-server-header"]
+    depends_on:
+      hub:
+        condition: service_completed_successfully
+
+  # Caddy's `ask` endpoint (atalaia_server/tls_ask.py): reads the registry as the server's role.
+  # On "app" (Caddy) and "db" only, both internal: never published, never proxied to.
+  tls-ask:
+    image: ${ATALAIA_SERVER_IMAGE:-atalaia-server}
+    pull_policy: never
+    command: ["uvicorn", "--factory", "atalaia_server.tls_ask:create_app", "--host", "0.0.0.0", "--port", "8001",
+              "--workers", "1", "--no-server-header", "--no-access-log"]
+    environment:
+      ATALAIA_DATABASE_URL: "postgresql+asyncpg://atalaia_app:${ATALAIA_APP_DB_PASSWORD:?set ATALAIA_APP_DB_PASSWORD (server/setup.sh --hosted)}@postgres:5432/atalaia"
+      ATALAIA_HOSTED_DOMAIN: "${ATALAIA_DOMAIN:?set ATALAIA_DOMAIN (server/setup.sh)}"
+    networks: [app, db]
+    read_only: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=4)"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  # The operator's commands, as the owner role: `docker compose run --rm hub hosted list|create|...`.
+  # Started by `up` once, as `hosted migrate`, before the server.
+  hub:
+    image: ${ATALAIA_SERVER_IMAGE:-atalaia-server}
+    pull_policy: never
+    entrypoint: ["python", "-m", "atalaia_server"]
+    command: ["hosted", "migrate"]
+    environment:
+      ATALAIA_DATABASE_URL: "postgresql+asyncpg://atalaia_owner:${ATALAIA_OWNER_DB_PASSWORD:?set ATALAIA_OWNER_DB_PASSWORD (server/setup.sh --hosted)}@postgres:5432/atalaia"
+      ATALAIA_APP_ROLE: atalaia_app
+    networks: [db]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    logging: *logging

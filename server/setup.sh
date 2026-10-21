@@ -4,12 +4,22 @@
 #
 # First-time setup of a site server (ADR-P4-10, plan phase 22; server/docs/DEPLOY.md).
 #   sh server/setup.sh campo.example.pt [--no-start]
+#   sh server/setup.sh hub.example.pt --hosted [--no-start]     a hosted hub (below)
 # Makes server/.env (mode 0600) with the site's name and new random secrets
 # (the database password, the secret key, the metrics token, the backup key),
 # then builds and starts Caddy, the server and PostgreSQL. Safe to run again:
 # values already in .env are kept (a new database password would lock the
 # server out of its own database), only missing ones are added, and the mode
 # is put back to 0600. Secrets are read from /dev/urandom and never printed.
+#
+# --hosted (Phase 4 follow-up, decisions FU4-*): a hosted hub, every field at
+# https://<slug>.DOMAIN (docker-compose.hosted.yml on top of docker-compose.yml).
+# .env gets ATALAIA_HOSTED=on, COMPOSE_FILE (so `docker compose` from server/
+# uses both files), no ATALAIA_PUBLIC_URL, and two more passwords: the owner
+# role's and the server role's. Starting then makes both roles
+# (hosted-roles.sh), the registry (`hosted init` as the owner) and the stack;
+# the server runs as the role that owns nothing. An existing .env of the other
+# mode is refused: one deployment is one mode.
 #
 # ATALAIA_ENV_FILE picks another file than server/.env and COMPOSE_PROJECT_NAME
 # another Compose project (the deployment test uses both). Any user who may
@@ -20,16 +30,19 @@ set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 env_file=${ATALAIA_ENV_FILE:-$here/.env}
 start=1
+hosted=0
 domain=
 
 usage() {
-    echo "usage: sh server/setup.sh DOMAIN [--no-start]   (DOMAIN: the site's name, e.g. campo.example.pt)" >&2
+    echo "usage: sh server/setup.sh DOMAIN [--hosted] [--no-start]   (DOMAIN: the site's name, e.g. campo.example.pt;" \
+        "with --hosted the hub's, e.g. hub.example.pt)" >&2
     exit 2
 }
 
 for arg in "$@"; do
     case "$arg" in
         --no-start) start=0 ;;
+        --hosted) hosted=1 ;;
         -h | --help) usage ;;
         -*) echo "setup.sh: unknown option $arg" >&2; usage ;;
         *)
@@ -85,6 +98,18 @@ else
         "# safe away from the server: server/docs/DEPLOY.md." >> "$env_file"
 fi
 
+old_mode=$(current ATALAIA_HOSTED)
+if [ -n "$(current ATALAIA_DOMAIN)" ]; then
+    if [ "$hosted" -eq 1 ] && [ "$old_mode" != on ]; then
+        echo "setup.sh: $env_file is a single-field server's; a hosted hub needs a deployment of its own" >&2
+        exit 1
+    fi
+    if [ "$hosted" -eq 0 ] && [ "$old_mode" = on ]; then
+        echo "setup.sh: $env_file is a hosted hub's: run setup.sh $domain --hosted" >&2
+        exit 1
+    fi
+fi
+
 old_domain=$(current ATALAIA_DOMAIN)
 if [ -n "$old_domain" ] && [ "$old_domain" != "$domain" ]; then
     echo "setup.sh: $env_file is for $old_domain, not $domain; edit ATALAIA_DOMAIN and ATALAIA_PUBLIC_URL" \
@@ -106,9 +131,18 @@ add_secret() {
 }
 
 add ATALAIA_DOMAIN "$domain"
-add ATALAIA_PUBLIC_URL "https://$domain"
+if [ "$hosted" -eq 1 ]; then
+    add ATALAIA_HOSTED on
+    add COMPOSE_FILE docker-compose.yml:docker-compose.hosted.yml
+else
+    add ATALAIA_PUBLIC_URL "https://$domain"
+fi
 add ATALAIA_TLS acme
 add_secret POSTGRES_PASSWORD
+if [ "$hosted" -eq 1 ]; then
+    add_secret ATALAIA_OWNER_DB_PASSWORD
+    add_secret ATALAIA_APP_DB_PASSWORD
+fi
 add_secret ATALAIA_SECRET_KEY
 add_secret ATALAIA_METRICS_TOKEN
 add_secret ATALAIA_BACKUP_KEY
@@ -123,13 +157,35 @@ else
 fi
 
 if [ "$start" -eq 0 ]; then
-    echo "setup.sh: not starting (--no-start); start with: docker compose --env-file $env_file -f $here/docker-compose.yml up -d --build --wait"
+    if [ "$hosted" -eq 1 ]; then
+        echo "setup.sh: not starting (--no-start); run setup.sh $domain --hosted again to start (it also makes the roles and the registry)"
+    else
+        echo "setup.sh: not starting (--no-start); start with: docker compose --env-file $env_file -f $here/docker-compose.yml up -d --build --wait"
+    fi
     exit 0
 fi
 
 if ! docker compose version > /dev/null 2>&1; then
     echo "setup.sh: Docker with the Compose plugin is needed (docker compose version)" >&2
     exit 1
+fi
+if [ "$hosted" -eq 1 ]; then
+    dc() {
+        docker compose --env-file "$env_file" -f "$here/docker-compose.yml" -f "$here/docker-compose.hosted.yml" "$@"
+    }
+    echo "setup.sh: building the server's image (the first build takes minutes)"
+    dc build server
+    ATALAIA_ENV_FILE=$env_file sh "$here/hosted-roles.sh"
+    echo "setup.sh: the hub's registry (hosted init, as the owner role)"
+    dc run --rm -T hub hosted init
+    echo "setup.sh: starting Caddy, the site server, its ask endpoint and PostgreSQL (hub migrates every field first)"
+    dc up -d --wait caddy server tls-ask
+    echo "setup.sh: up. Each field will be at https://<slug>.$domain (a wildcard DNS record *.$domain must point"
+    echo "here; Caddy gets each field's certificate on its first request). Next, from $here:"
+    echo "  docker compose --env-file $env_file run --rm hub hosted create SLUG --name \"Field name\""
+    echo "  docker compose --env-file $env_file exec server python -m atalaia_server create-admin --field SLUG --username NAME"
+    echo "and schedule server/backup.sh (server/docs/DEPLOY.md, hosted mode)."
+    exit 0
 fi
 echo "setup.sh: building and starting Caddy, the site server and PostgreSQL (the first build takes minutes)"
 docker compose --env-file "$env_file" -f "$here/docker-compose.yml" up -d --build --wait

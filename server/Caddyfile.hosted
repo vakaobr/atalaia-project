@@ -1,0 +1,63 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Caddy in front of a hosted hub (ADR-P4-4 as built, plan phase 21; Phase 4
+# follow-up, decisions FU4-*; server/docs/DEPLOY.md, "Hosted mode"). Used by
+# server/docker-compose.hosted.yml in place of server/Caddyfile.
+#
+# Every field is at https://<slug>.ATALAIA_DOMAIN (one DNS label; the DNS
+# needs a wildcard record *.ATALAIA_DOMAIN pointing at this machine). Caddy
+# gets each field's own certificate the first time a client asks for that
+# name (on-demand TLS), and only after the `ask` endpoint (the tls-ask
+# service, atalaia_server/tls_ask.py) says the name is an active field's:
+# nobody can make the hub request certificates for names of their choosing,
+# and a flood of made-up names is rate limited there. The hub's own name and
+# any other name get no certificate at all. Values come from server/.env:
+#   ATALAIA_DOMAIN  the hub's domain (hub.example.pt)
+#   ATALAIA_TLS     acme (default: public certificates, HTTP-01 or TLS-ALPN-01
+#                   per name) or internal (Caddy's own CA: the deployment test)
+# A wildcard certificate from a DNS challenge instead needs a Caddy built with
+# that DNS provider's plugin: server/docs/DEPLOY.md, "One wildcard certificate".
+
+(tls-acme) {
+	tls {
+		on_demand
+	}
+}
+
+(tls-internal) {
+	tls internal {
+		on_demand
+	}
+}
+
+{
+	# No admin endpoint: nothing changes this configuration at run time.
+	admin off
+	on_demand_tls {
+		# 200 only for an active field's <slug>.ATALAIA_DOMAIN; reachable only on the internal network.
+		ask http://tls-ask:8001/check
+	}
+}
+
+*.{$ATALAIA_DOMAIN} {
+	import tls-{$ATALAIA_TLS:acme}
+
+	# As server/Caddyfile: the server sends its own security headers; Caddy
+	# adds what it does not and hides the software versions.
+	header {
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		X-Permitted-Cross-Domain-Policies "none"
+		-Server
+		-Via
+		-X-Powered-By
+		defer
+	}
+
+	# The Host header goes on unchanged: the server picks the field from it
+	# (an unknown field: 404 unknown_field, a suspended one: 403).
+	reverse_proxy server:8000 {
+		stream_close_delay 5m
+	}
+}

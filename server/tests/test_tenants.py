@@ -841,5 +841,93 @@ class OperatorTests(HubCase):
         self.assertEqual(len(await self.sql(self.ta, "SELECT 1 FROM fields")), 1)
 
 
+class HubCheckTests(HubCase):
+    """``hosted check`` (Phase 4 follow-up, decisions FU4-*): what restore.sh runs after restoring a hub."""
+
+    async def asyncSetUp(self) -> None:
+        pass  # no app
+
+    async def asyncTearDown(self) -> None:
+        pass
+
+    async def owner(self, statement: str) -> None:
+        conn = await connect(self.hub.owner_url)
+        try:
+            await conn.execute(statement)
+        finally:
+            await conn.close()
+
+    async def check(self) -> hosted.HubCheck:
+        return await hosted.check_hub(self.hub.owner_url, self.hub.app_role)
+
+    async def test_a_sound_hub_passes(self) -> None:
+        report = await self.check()
+        self.assertEqual(report.problems, [])
+        self.assertEqual(report.fields, 2)
+        self.assertGreaterEqual(report.tables, 60)  # two fields, every table of each
+        out, err = io.StringIO(), io.StringIO()
+        with unittest.mock.patch.dict(os.environ, {"ATALAIA_DATABASE_URL": self.hub.owner_url,
+                                                   "ATALAIA_APP_ROLE": self.hub.app_role}):
+            code = await asyncio.to_thread(cli.main, ["hosted", "check"], io.StringIO(), out, err)
+        self.assertEqual(code, 0, err.getvalue())
+        self.assertIn("Hub check passed: 2 fields", out.getvalue())
+
+    async def test_every_weakening_is_found(self) -> None:
+        app = self.hub.app_role
+        breaks = [
+            ("ALTER TABLE field_campo_b.users NO FORCE ROW LEVEL SECURITY", "field_campo_b.users: row-level"),
+            ("ALTER TABLE field_campo_a.games DISABLE ROW LEVEL SECURITY", "field_campo_a.games: row-level"),
+            (f"GRANT TRUNCATE ON field_campo_a.game_events TO {app}", "TRUNCATE"),
+            (f"REVOKE DELETE ON field_campo_b.sessions FROM {app}", "field_campo_b.sessions, not"),
+            ("CREATE POLICY open_door ON field_campo_a.users USING (true)", "field_campo_a.users: the policies"),
+            ("DROP POLICY atalaia_tenant ON field_campo_b.clubs", "field_campo_b.clubs: the policies"),
+            (f"GRANT SELECT ON field_campo_a.alembic_version TO {app}", "field_campo_a.alembic_version"),
+            (f"GRANT SELECT ON public.atalaia_hub_audit TO {app}", "public.atalaia_hub_audit"),
+            (f"GRANT UPDATE ON public.atalaia_tenants TO {app}", "public.atalaia_tenants"),
+            (f"REVOKE USAGE ON SCHEMA field_campo_b FROM {app}", f"{app} has no USAGE on field_campo_b"),
+            ("CREATE SCHEMA field_orphan", "field_orphan is not registered"),
+        ]
+        for statement, problem in breaks:
+            with self.subTest(statement=statement):
+                await self.owner(statement)
+                try:
+                    problems = (await self.check()).problems
+                    self.assertTrue(any(problem in p for p in problems), problems)
+                finally:  # the operator's own repair: the grants and policies again
+                    await self.owner(f"DROP SCHEMA IF EXISTS field_orphan; DROP POLICY IF EXISTS open_door ON "
+                                     f"field_campo_a.users; REVOKE ALL ON public.atalaia_hub_audit FROM {app}; "
+                                     f"REVOKE ALL ON public.atalaia_tenants FROM {app}; "
+                                     f"GRANT SELECT ON public.atalaia_tenants TO {app}")
+                    await asyncio.to_thread(hosted.migrate_all, self.hub.owner_url, app, "test:operator")
+                self.assertEqual((await self.check()).problems, [])
+        await self.owner("ALTER TABLE field_campo_a.users NO FORCE ROW LEVEL SECURITY")
+        out, err = io.StringIO(), io.StringIO()
+        try:
+            with unittest.mock.patch.dict(os.environ, {"ATALAIA_DATABASE_URL": self.hub.owner_url,
+                                                       "ATALAIA_APP_ROLE": app}):
+                code = await asyncio.to_thread(cli.main, ["hosted", "check"], io.StringIO(), out, err)
+            self.assertEqual(code, 1)
+            self.assertIn("the hub check found 1 problems", err.getvalue())
+        finally:
+            await asyncio.to_thread(hosted.migrate_all, self.hub.owner_url, app, "test:operator")
+
+    async def test_the_server_role_and_a_missing_schema(self) -> None:
+        with self.assertRaisesRegex(hosted.HostedError, "does not exist"):
+            await hosted.check_hub(self.hub.owner_url, "nobody_here")
+        report = await hosted.check_hub(self.hub.app_url, self.hub.app_role)  # run as the wrong role
+        self.assertTrue(any("must run as the owner role" in p for p in report.problems), report.problems)
+        conn = await connect(self.hub.owner_url)
+        try:
+            await conn.execute("ALTER SCHEMA field_campo_b RENAME TO field_campo_b_moved")
+            try:
+                problems = (await self.check()).problems
+            finally:
+                await conn.execute("ALTER SCHEMA field_campo_b_moved RENAME TO field_campo_b")
+        finally:
+            await conn.close()
+        self.assertTrue(any("campo-b is registered but its schema field_campo_b is missing" in p for p in problems))
+        self.assertTrue(any("field_campo_b_moved is not registered" in p for p in problems))
+
+
 if __name__ == "__main__":
     unittest.main()

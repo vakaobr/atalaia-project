@@ -4,7 +4,7 @@
 
     python -m atalaia_server create-admin --username NAME [--email EMAIL] [--password-stdin] [--field SLUG]
     python -m atalaia_server purge [--dry-run]
-    python -m atalaia_server hosted init|create|list|migrate|suspend|resume|export|delete ...
+    python -m atalaia_server hosted init|create|list|migrate|check|suspend|resume|export|delete ...
     python -m atalaia_server import-field FILE.zip
 
 ``create-admin`` makes a server administrator (ADR-P4-2): it asks for the
@@ -178,6 +178,8 @@ def _parser() -> argparse.ArgumentParser:
         p = hsub.add_parser(name, help=text)
         p.add_argument("--app-role", help=role_help)
         p.add_argument("--actor")
+    p = hsub.add_parser("check", help="check the ownership, row-level security and grants of every field")
+    p.add_argument("--app-role", help=role_help)
     p = hsub.add_parser("create", help="a new field: its schema, migrations, row-level security")
     p.add_argument("slug")
     p.add_argument("--name", required=True)
@@ -229,6 +231,14 @@ def run_hosted(args: argparse.Namespace, url: str, out: TextIO) -> None:
     elif action == "migrate":
         done = hosted.migrate_all(url, app_role, actor)
         print(f"Migrated {len(done)} fields: {', '.join(done) or '-'}", file=out)
+    elif action == "check":
+        report = asyncio.run(hosted.check_hub(url, app_role))
+        if report.problems:
+            raise hosted.HostedError(f"the hub check found {len(report.problems)} problems: "
+                                     + "; ".join(report.problems))
+        print(f"Hub check passed: {report.fields} fields, {report.tables} tables, each owned by the owner role "
+              f"with row-level security forced and its one policy; {app_role} has exactly the server's grants.",
+              file=out)
     elif action in ("suspend", "resume"):
         asyncio.run(hosted.set_status(url, args.slug, "suspended" if action == "suspend" else "active", args.reason,
                                       actor))

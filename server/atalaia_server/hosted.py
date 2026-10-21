@@ -6,6 +6,7 @@
     python -m atalaia_server hosted create   SLUG --name NAME [--field-type T] [--timezone TZ] [--app-role ROLE]
     python -m atalaia_server hosted list
     python -m atalaia_server hosted migrate  [--app-role ROLE]
+    python -m atalaia_server hosted check    [--app-role ROLE]
     python -m atalaia_server hosted suspend  SLUG --reason TEXT
     python -m atalaia_server hosted resume   SLUG --reason TEXT
     python -m atalaia_server hosted export   SLUG --out FILE.zip --reason TEXT
@@ -27,6 +28,10 @@ role that is no superuser, has no BYPASSRLS and owns nothing.
   schema behind.
 - ``migrate`` brings every tenant to the newest revision, then applies the
   grants and policies again (a new table gets them too).
+- ``check`` reads what keeps the fields apart (``check_hub``: ownership,
+  forced row-level security and the one policy on every table, the server
+  role's exact privileges) and exits 1 on any problem; ``server/restore.sh``
+  runs it after restoring a hosted hub (Phase 4 follow-up, decisions FU4-*).
 - ``export`` writes one ZIP: ``manifest.json`` (format, revision, tables in load
   order, row counts, SHA-256 of each file) and ``tables/<table>.csv`` for every
   table of the tenant's schema (``COPY ... TO STDOUT``), read in one
@@ -401,6 +406,96 @@ async def _after_migrate(url: str, slug: str, schema: str, field_id: uuid.UUID, 
         await conn.close()
 
 
+# check --------------------------------------------------------------------------------------------
+
+TABLE_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER")
+SERVER_TABLE_PRIVILEGES = frozenset({"SELECT", "INSERT", "UPDATE", "DELETE"})
+
+
+@dataclass
+class HubCheck:
+    fields: int
+    tables: int
+    problems: list[str]
+
+
+async def check_hub(url: str, app_role: str = DEFAULT_APP_ROLE) -> HubCheck:
+    """What keeps the fields apart, checked as the owner role (``hosted check``; after a restore above all).
+
+    Every registered field has its schema and every ``field_*`` schema is registered; the owner role owns
+    every schema and table; every table has ENABLE and FORCE ROW LEVEL SECURITY and exactly one policy,
+    ``atalaia_tenant`` for that schema; the server's role is no superuser, has no BYPASSRLS, owns nothing, has
+    exactly SELECT, INSERT, UPDATE and DELETE on each field table, nothing on ``alembic_version``, only SELECT
+    on the registry and nothing on the hub's audit log. Reads only; returns the problems found."""
+    check_role(app_role)
+    conn = await _connect(url)
+    try:
+        await _need_registry(conn)
+        problems: list[str] = []
+        me = await conn.fetchval("SELECT current_user")
+        role = await conn.fetchrow("SELECT oid, rolsuper, rolbypassrls FROM pg_roles WHERE rolname = $1", app_role)
+        if role is None:
+            raise HostedError(f"the server's role {app_role!r} does not exist")
+        if role["rolsuper"] or role["rolbypassrls"]:
+            problems.append(f"{app_role} is a superuser or has BYPASSRLS")
+        if app_role == me:
+            problems.append("the check must run as the owner role, not the server's")
+        owned = await conn.fetchval("SELECT count(*) FROM pg_class WHERE relowner = $1", role["oid"]) \
+            + await conn.fetchval("SELECT count(*) FROM pg_namespace WHERE nspowner = $1", role["oid"])
+        if owned:
+            problems.append(f"{app_role} owns {owned} schemas or relations")
+        for table, allowed in (("public.atalaia_tenants", {"SELECT"}), ("public.atalaia_hub_audit", set())):
+            have = {p for p in TABLE_PRIVILEGES
+                    if await conn.fetchval("SELECT has_table_privilege($1, $2, $3)", app_role, table, p)}
+            if have != allowed:
+                problems.append(f"{app_role} has {sorted(have)} on {table}, not {sorted(allowed)}")
+        registered = {r["schema_name"]: r["slug"] for r in await conn.fetch(
+            "SELECT slug, schema_name FROM public.atalaia_tenants")}
+        present = {r["nspname"]: r["owner"] for r in await conn.fetch(
+            r"SELECT nspname, pg_get_userbyid(nspowner) AS owner FROM pg_namespace WHERE nspname LIKE 'field\_%'")}
+        for schema in sorted(set(registered) - set(present)):
+            problems.append(f"the field {registered[schema]} is registered but its schema {schema} is missing")
+        for schema in sorted(set(present) - set(registered)):
+            problems.append(f"the schema {schema} is not registered")
+        tables = 0
+        for schema in sorted(set(registered) & set(present)):
+            check_schema(schema)
+            if present[schema] != me:
+                problems.append(f"{schema} is owned by {present[schema]}, not {me}")
+            if not await conn.fetchval("SELECT has_schema_privilege($1, $2, 'USAGE')", app_role, schema):
+                problems.append(f"{app_role} has no USAGE on {schema}")
+            expected = f"(current_setting('atalaia.tenant'::text, true) = '{schema}'::text)"
+            rows = await conn.fetch(
+                "SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity, pg_get_userbyid(c.relowner) AS owner, "
+                "(SELECT array_agg(p.polname || '|' || p.polcmd::text || '|' || p.polpermissive::text || '|' "
+                "|| coalesce(pg_get_expr(p.polqual, p.polrelid), '') || '|' "
+                "|| coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '') || '|' || p.polroles::text) "
+                "FROM pg_policy p WHERE p.polrelid = c.oid) AS policies "
+                "FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+                "WHERE n.nspname = $1 AND c.relkind IN ('r', 'p') ORDER BY c.relname", schema)
+            for r in rows:
+                name, qualified = r["relname"], f"{schema}.{r['relname']}"
+                if r["owner"] != me:
+                    problems.append(f"{qualified} is owned by {r['owner']}, not {me}")
+                have = {p for p in TABLE_PRIVILEGES if await conn.fetchval(
+                    "SELECT has_table_privilege($1, $2, $3)", app_role, f"{_q(schema)}.{_q(name)}", p)}
+                if name == "alembic_version":
+                    if have:
+                        problems.append(f"{app_role} has {sorted(have)} on {qualified}")
+                    continue
+                tables += 1
+                if not (r["relrowsecurity"] and r["relforcerowsecurity"]):
+                    problems.append(f"{qualified}: row-level security is not enabled and forced")
+                if have != SERVER_TABLE_PRIVILEGES:
+                    problems.append(f"{app_role} has {sorted(have)} on {qualified}, not SELECT, INSERT, UPDATE, "
+                                    "DELETE")
+                if list(r["policies"] or []) != [f"atalaia_tenant|*|true|{expected}|{expected}|{{0}}"]:
+                    problems.append(f"{qualified}: the policies are not exactly atalaia_tenant for {schema}")
+        return HubCheck(fields=len(registered), tables=tables, problems=problems)
+    finally:
+        await conn.close()
+
+
 # suspend / resume ---------------------------------------------------------------------------------
 
 async def set_status(url: str, slug: str, status: str, reason: str, actor: Optional[str] = None) -> None:
@@ -581,5 +676,5 @@ async def delete_tenant(url: str, slug: str, confirm: str, reason: str, actor: O
         await conn.close()
 
 
-__all__ = ["HostedError", "TenantError", "apply_security", "create_tenant", "delete_tenant", "export_tenant",
-           "import_field", "init_hub", "list_tenants", "migrate_all", "set_status"]
+__all__ = ["HostedError", "TenantError", "apply_security", "check_hub", "create_tenant", "delete_tenant",
+           "export_tenant", "import_field", "init_hub", "list_tenants", "migrate_all", "set_status"]

@@ -156,6 +156,28 @@ jobs:
       - name: Deployment test
         run: python3 tools/docker_server.py deploy
 
+  server-deploy-hosted:
+    name: Hosted hub deployment (on-demand TLS, two fields, backup and restore)
+    # server/docker-compose.yml with docker-compose.hosted.yml, as `python3
+    # tools/docker_server.py deploy-hosted` runs it locally (Phase 4 follow-up):
+    # setup.sh --hosted (the two roles, the registry), the operator's commands,
+    # Caddy's on-demand TLS behind the ask endpoint with Caddy's own CA, each
+    # field at its own name, the isolation as the server's role, and an
+    # encrypted backup restored into a fresh hub with ownership, grants and
+    # row-level security compared.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Shell scripts (POSIX sh)
+        run: sh -n server/setup.sh && sh -n server/hosted-roles.sh && sh -n server/backup.sh && sh -n server/restore.sh
+      - name: ShellCheck (koalaman/shellcheck v0.11.0, pinned by digest)
+        run: >-
+          docker run --rm -v "$PWD/server:/mnt:ro" -w /mnt
+          koalaman/shellcheck@sha256:61862eba1fcf09a484ebcc6feea46f1782532571a34ed51fedf90dd25f925a8d
+          -s sh -x setup.sh hosted-roles.sh backup.sh restore.sh
+      - name: Hosted deployment test
+        run: python3 tools/docker_server.py deploy-hosted
+
   flutter-test:
     name: Player app (Dart, with the core through dart:ffi)
     # The pinned Flutter image that `python tools/docker_app.py` uses (Flutter

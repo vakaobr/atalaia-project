@@ -95,6 +95,9 @@ paste it into a chat.
 | `ATALAIA_BACKUP_DAYS` | 30 | How many days backups are kept |
 | `ATALAIA_FIRMWARE_KEYS` | empty | The Ed25519 release keys the firmware catalogue trusts (empty: no entries) |
 | `ATALAIA_LOG_LEVEL` | `info` | `debug`, `info`, `warning` or `error` |
+| `ATALAIA_HOSTED` | `on` with `--hosted` only | A hosted hub ([below](#hosted-mode)); the scripts take the hub's path. Never change it by hand |
+| `COMPOSE_FILE` | with `--hosted` only | `docker-compose.yml:docker-compose.hosted.yml`: `docker compose` from `server/` uses both |
+| `ATALAIA_OWNER_DB_PASSWORD`, `ATALAIA_APP_DB_PASSWORD` | random, with `--hosted` only | The passwords of the hub's owner role and of the server's role |
 
 The server's other settings (`ATALAIA_PURGE_HOUR`,
 `ATALAIA_PRIVACY_NOTICE_VERSION`) can be added to `.env` too; the list is in
@@ -262,69 +265,202 @@ scripts do).
 ## Hosted mode
 
 A hub that hosts many fields on one server (ADR-P4-4 as built, plan phase 21,
-decisions S21-1 to S21-12; the design is in [../README.md](../README.md#hosted-mode)).
+decisions S21-1 to S21-13; its deployment is a Phase 4 follow-up, decisions
+FU4-1 to FU4-10; the design is in [../README.md](../README.md#hosted-mode)).
 **It does not go live before a lawyer has reviewed the privacy notice and the
-data processing agreement (decision P4-6).** It is tested against PostgreSQL
-in Docker (`python3 tools/docker_server.py test tests.test_tenants`), not yet
-on a real hosted deployment, and `docker-compose.yml` does not set it up for
-you: what follows is the procedure, by hand, on top of the stack above.
+data processing agreement (decision P4-6).**
 
-1. **A database of its own.** Hosted mode refuses a database whose `public`
-   schema already holds a single-field server's tables.
-2. **Two roles.** The owner role owns the schemas and runs the migrations and
-   the operator's commands; the server connects as a second role that is no
-   superuser, has no `BYPASSRLS` and owns nothing (the server refuses to start
-   otherwise). In `psql` as PostgreSQL's administrator:
+**Status (2026-10-21):** the procedure below is tested in Docker on one
+computer by `python3 tools/docker_server.py deploy-hosted`, with Caddy's own
+certificate authority issuing on demand instead of a public one, and names
+that only the test's containers resolve. It has **not yet run on a real
+hosted server with a real domain, a real wildcard DNS record and public
+certificates.**
 
-   ```sql
-   CREATE ROLE atalaia_owner LOGIN PASSWORD '...' NOSUPERUSER NOBYPASSRLS;
-   CREATE ROLE atalaia_app   LOGIN PASSWORD '...' NOSUPERUSER NOBYPASSRLS;
-   CREATE DATABASE atalaia_hub OWNER atalaia_owner;
-   ```
-3. **The registry**, as the owner (every `hosted` command needs only
-   `ATALAIA_DATABASE_URL`, with the **owner's** credentials):
-   `python -m atalaia_server hosted init --app-role atalaia_app`.
-4. **The server's settings:** `ATALAIA_DATABASE_URL` with the **server
-   role's** credentials, `ATALAIA_HOSTED=on`, `ATALAIA_HOSTED_DOMAIN=hub.example.pt`,
-   and no `ATALAIA_PUBLIC_URL`. The image's command runs `alembic upgrade head`
-   first, which refuses to run in hosted mode: start the server with
-   `uvicorn --factory atalaia_server.app:create_app --host 0.0.0.0 --port 8000
-   --workers 1 --proxy-headers --no-server-header` instead, and migrate with
-   `python -m atalaia_server hosted migrate` (owner) before each start of a new
-   release.
-5. **Names and certificates.** Each field is at `https://<slug>.hub.example.pt`:
-   a wildcard DNS record, and in Caddy a wildcard site (`*.hub.example.pt`)
-   with a certificate from a DNS challenge, or on-demand TLS limited to the
-   registered fields. Caddy must pass the `Host` header on unchanged (it does
-   by default).
-6. **A field:** `python -m atalaia_server hosted create campo-tejo --name
-   "Campo Tejo"` (owner), then its administrator:
-   `python -m atalaia_server create-admin --field campo-tejo --username NAME`
-   (the server's settings). Its controllers use `https://campo-tejo.hub.example.pt`
-   and a key made there.
+### What is different from a field's own server
+
+- **Every field at its own name**, `https://<slug>.hub.example.pt`. The DNS
+  needs a wildcard record, `*.hub.example.pt`, pointing at the machine (`A`,
+  and `AAAA` with IPv6). The hub's own name, `hub.example.pt`, serves nothing.
+- **Certificates on demand.** Caddy gets each field's own certificate the
+  first time a client asks for that name (the first request takes a few
+  seconds longer), renews it by itself, and keeps it in the `caddy-data`
+  volume. Before it asks a certificate authority it asks the hub's `ask`
+  endpoint (the `tls-ask` container), which says yes only for an **active**
+  field's name: an unknown or suspended field, the hub's own name or any
+  other name gets no certificate, so nobody can make the hub spend its
+  certificate authority's limits on names of their choosing. The endpoint
+  answers at most 5 checks a second (bursts of 20); past that it says no
+  without touching the database. It is on the internal networks only: Caddy
+  reaches it, nobody else does.
+- **Two database roles.** The schemas, their tables and the hub's own tables
+  belong to `atalaia_owner`, which runs the migrations and the operator's
+  commands. The server, and the `ask` endpoint, connect as `atalaia_app`: no
+  superuser, no `BYPASSRLS`, owner of nothing, member of no role, only the
+  grants each field's tables need (the server refuses to start otherwise).
+  PostgreSQL's own superuser (`atalaia`, `POSTGRES_PASSWORD`) is used only by
+  the scripts, inside the database's container.
+- **The migrations** run in the `hub` container (`hosted migrate`, as the
+  owner) every time the stack starts, before the server; the server's own
+  command does not migrate. `hosted migrate` also applies every field's
+  grants and row-level security again, and writes one `tenant_migrate` entry
+  per field to the hub's audit log.
+
+| Service | Image | Networks | Reachable from outside |
+| --- | --- | --- | --- |
+| `caddy` | `caddy:2.11.7-alpine` (pinned by digest), [`Caddyfile.hosted`](../Caddyfile.hosted) | `edge`, `app` | Ports 80 and 443 only |
+| `server` | built from `server/Dockerfile`, hosted mode, as `atalaia_app` | `app`, `db` | No |
+| `tls-ask` | the server's image, [`atalaia_server/tls_ask.py`](../atalaia_server/tls_ask.py), as `atalaia_app` | `app`, `db` | No |
+| `hub` | the server's image, `python -m atalaia_server`, as `atalaia_owner`; runs and exits | `db` | No |
+| `postgres` | `postgres:16.15-alpine` (pinned by digest) | `db` | No |
+
+### Install a hub
+
+What the hub needs is what a field's server needs (above), plus the wildcard
+DNS record and more of everything: see ADR-P4-10's table for hosted hubs.
+
+```sh
+git clone https://github.com/vakaobr/atalaia-project.git
+cd atalaia-project
+sh server/setup.sh hub.example.pt --hosted
+```
+
+`setup.sh --hosted`:
+
+1. writes `server/.env` (mode 0600) with the hub's domain, `ATALAIA_HOSTED=on`,
+   `COMPOSE_FILE=docker-compose.yml:docker-compose.hosted.yml` (so that
+   `docker compose` from `server/` uses both files), no `ATALAIA_PUBLIC_URL`
+   (each field has its own address) and six secrets of 32 random bytes:
+   the four above plus `ATALAIA_OWNER_DB_PASSWORD` and
+   `ATALAIA_APP_DB_PASSWORD`. It never prints them;
+2. builds the server's image, starts PostgreSQL and makes the two roles with
+   those passwords ([`hosted-roles.sh`](../hosted-roles.sh): through `psql`'s
+   standard input, never a command line, with statement logging off; run
+   again, it sets the passwords from `.env` again);
+3. makes the hub's registry and audit log (`hosted init`, as the owner);
+4. starts everything: `hub` migrates, then the server, `tls-ask` and Caddy.
+
+Run again, it keeps every value and does it all again (`hosted init` is
+safe to repeat and writes a `hub_init` entry each time). It refuses a
+single-field server's `.env`, and `setup.sh` without `--hosted` refuses a
+hub's: one deployment is one mode.
+
+### The operator's commands
+
+From the `server` folder (`.env`'s `COMPOSE_FILE` picks both Compose files;
+from elsewhere, give `--env-file` and both `-f` files), every `hosted`
+command runs as the owner role in the `hub` container, and each is written to
+the hub's audit log with `--actor` (by default the container's user, so name
+yourself) and, where asked, `--reason`:
+
+```sh
+cd server
+docker compose run --rm hub hosted create campo-tejo --name "Campo Tejo" --actor ana
+docker compose run --rm hub hosted list
+docker compose exec server python -m atalaia_server create-admin --field campo-tejo --username NAME
+```
+
+`create-admin` runs in the server's container, as the server's role, and
+makes that field's first administrator (it shows a TOTP secret and asks for
+a code). The field is then at `https://campo-tejo.hub.example.pt`; its
+controllers use that address and a key made there.
 
 At the field's request (it is the data controller; the hub is its processor
 under the DPA):
 
-- `hosted export campo-tejo --out campo-tejo.zip --reason "..."`: the field's
-  whole dataset, personal data and credential hashes included (mode 0600). Hand
-  it over encrypted. On the field's own server, at the same release, with an
-  empty migrated database: `python -m atalaia_server import-field
+- `hosted export campo-tejo --out /tmp/campo-tejo.zip --reason "..."`: the
+  field's whole dataset, personal data and credential hashes included (mode
+  0600). The `hub` container's file system is gone when it exits: mount a
+  folder for it, `docker compose run --rm -v "$PWD/exports:/exports" hub
+  hosted export campo-tejo --out /exports/campo-tejo.zip --reason "..."`
+  (the folder must be writable by the container's user, uid 10001; this
+  recipe is not covered by the deployment test), and hand the file over
+  encrypted. On the field's own server, at the same release,
+  with an empty migrated database: `python -m atalaia_server import-field
   campo-tejo.zip`; everyone logs in and enrols TOTP again.
 - `hosted suspend campo-tejo --reason "..."` and `hosted resume ...`: every
-  request refused, data kept.
+  request refused, data kept. A suspended field gets no **new** certificate;
+  one it already has stays in Caddy's store until it expires.
 - `hosted delete campo-tejo --confirm campo-tejo --reason "..."`: the schema and
   every row in it, at once. The hub's audit log (`public.atalaia_hub_audit`)
   keeps who, when, why and the row counts. The backups still hold the field
   until they expire (`ATALAIA_BACKUP_DAYS`, 30): say so when confirming the
   deletion in writing, as the DPA asks.
+- `hosted check`: reads what keeps the fields apart (every schema and table
+  owned by the owner role, row-level security enabled and forced and exactly
+  one policy, `atalaia_tenant`, on every table, the server role's exact
+  grants, every schema registered) and exits 1 on any problem. Run it after
+  anything you did to the database by hand.
 
-Every command is written to the hub's audit log with `--actor` (by default
-the system user). `backup.sh` covers the whole database, every field in it;
-`restore.sh` restores with `--no-owner`, which suits a single-field server
-only: a hosted hub's restore must keep the owner role and the server role
-(create both roles first, then `pg_restore` without `--no-owner`), and is not
-scripted or tested yet.
+### Updates
+
+```sh
+sh server/backup.sh
+git pull
+cd server && docker compose up -d --build --wait caddy server tls-ask
+```
+
+`hub` runs `hosted migrate` before the new server starts; if a migration
+fails, the server does not start (`docker compose logs hub`).
+
+### Backups and restore of a hub
+
+`backup.sh` and `restore.sh` see `ATALAIA_HOSTED=on` in `.env` and take the
+hub's path by themselves; the commands, the schedule and the encryption are
+those above.
+
+- **The backup** is one `pg_dump` of the whole database by PostgreSQL's
+  superuser, which reads past the row-level security: every field's schema,
+  the registry and the hub's audit log, with their owners, grants,
+  row-level security and policies. The roles are not in a database dump;
+  their passwords are in `.env`, which you keep anyway.
+- **The restore** reads the backup's table of contents first and refuses a
+  single-field server's backup on a hub (and a hub's on a single-field
+  server) with nothing changed. Then it makes both roles again from `.env`
+  (on a new machine too), stops the server and `tls-ask`, creates the
+  database owned by `atalaia_owner` and restores **with** the owners and the
+  grants (no `--no-owner`), in one transaction. `hosted check` must then pass
+  (everything owned by the owner again, row-level security forced on every
+  table, the server role's grants exactly as they were), or the server stays
+  stopped; `hub` migrates (a backup from an older release is brought up to
+  date, grants and policies applied again), the server starts, and
+  `hosted check` runs once more.
+
+**On a new machine:** install Docker, clone the repository, put back your
+copy of `.env` as `server/.env` (mode 0600), run `sh server/setup.sh
+hub.example.pt --hosted` (it keeps your values and starts an empty hub),
+then `sh server/restore.sh FILE --yes`, and point the wildcard record at the
+new machine. Caddy gets every field's certificate again as clients come.
+
+Restoring one field alone from a hub's backup is not scripted: restore the
+whole backup on a spare machine and `hosted export` that field from there.
+The erasures made after the backup must be repeated, as on a field's own
+server, in each field's audit log.
+
+### One wildcard certificate instead (a DNS challenge)
+
+On-demand certificates are one per field, each from an HTTP-01 or TLS-ALPN-01
+challenge. A hub with very many fields can reach its certificate authority's
+limits (Let's Encrypt's limit on new certificates per registered domain was
+50 a week when this was written), and some operators prefer one certificate for `*.hub.example.pt`.
+That needs the ACME DNS-01 challenge, which needs Caddy built with the DNS
+provider's plugin and an API token for the DNS zone. The repository does not
+ship one: no single provider fits every hub, and a plugin build is not an
+image pinned and tested here. To do it:
+
+1. build Caddy with your provider's module (for example
+   `caddy-dns/cloudflare`) with `xcaddy` on the same Caddy release (2.11.7)
+   in a Dockerfile of your own, pin the module's version, and set
+   `services.caddy.image` (or `build`) to it in a Compose override of yours;
+2. replace the site block's `tls` in a copy of `Caddyfile.hosted` with
+   `tls { dns <provider> {env.DNS_API_TOKEN} }` and remove `on_demand` and
+   the `on_demand_tls` option (a wildcard certificate covers every field,
+   so `tls-ask` is then not needed for certificates);
+3. give the token only the right to edit that zone's TXT records, put it in
+   `.env` (mode 0600) and pass it to the Caddy container only.
+
+This is not tested here (decision FU4-2). Custom domains per field (a field's
+own name instead of a sub-domain of the hub) are not built.
 
 ## Monitoring
 

@@ -15,6 +15,19 @@
 # The current database is deleted: --yes is required. The server needs the
 # same ATALAIA_SECRET_KEY as when the backup was made, or every TOTP
 # enrolment and every session is lost (keep .env with the backups' key).
+#
+# One deployment is one mode: the backup's table of contents says whether it
+# is a single-field server's or a hosted hub's, and a backup of the other mode
+# than the env file's (ATALAIA_HOSTED) is refused before anything changes.
+# A hosted hub's restore (Phase 4 follow-up, decisions FU4-*) keeps the
+# ownership and the grants: it makes the two roles again from .env
+# (hosted-roles.sh), creates the database owned by atalaia_owner and restores
+# without --no-owner, so every schema and table belongs to atalaia_owner again
+# and atalaia_app has exactly the grants it had; then `hosted check` (as the
+# owner) must find FORCE ROW LEVEL SECURITY and the one policy on every table
+# and the server role's privileges as they should be, or the server stays
+# stopped. Starting runs `hosted migrate` (hub), which brings an older backup up
+# to date and applies the grants and policies again, and the check runs once more.
 # Settings: ATALAIA_ENV_FILE (server/.env), COMPOSE_PROJECT_NAME.
 set -eu
 
@@ -50,8 +63,13 @@ fi
 [ -f "$env_file" ] || fail "$env_file is missing (server/setup.sh makes it; on a new machine, put back your copy)"
 [ "$yes" -eq 1 ] || fail "this deletes the current database and replaces it with $file; add --yes to go on"
 
+hosted=$(sed -n 's/^ATALAIA_HOSTED=//p' "$env_file" | tail -n 1)
 dc() {
-    docker compose --env-file "$env_file" -f "$here/docker-compose.yml" "$@"
+    if [ "$hosted" = on ]; then
+        docker compose --env-file "$env_file" -f "$here/docker-compose.yml" -f "$here/docker-compose.hosted.yml" "$@"
+    else
+        docker compose --env-file "$env_file" -f "$here/docker-compose.yml" "$@"
+    fi
 }
 psql_admin() {
     dc exec -T postgres psql -U atalaia -d postgres -v ON_ERROR_STOP=1 -q "$@"
@@ -62,18 +80,48 @@ dc run --rm -T backup-crypt open < "$file" > /dev/null \
     || fail "$file does not open (damaged, cut short, or made with another ATALAIA_BACKUP_KEY); nothing was changed"
 
 dc up -d --wait postgres
-echo "restore.sh: stopping the server and replacing the database"
-dc stop server
-psql_admin -c "DROP DATABASE IF EXISTS atalaia WITH (FORCE)" -c "CREATE DATABASE atalaia OWNER atalaia"
-
 status=$(mktemp)
-trap 'rm -f "$status"' EXIT
+toc=$(mktemp)
+trap 'rm -f "$status" "$toc"' EXIT
+
+# Which mode the backup is of: its table of contents (pg_restore -l stops reading after it).
+dc run --rm -T backup-crypt open < "$file" 2> /dev/null | dc exec -T postgres pg_restore -l > "$toc" \
+    || fail "$file has no table of contents pg_restore can read; nothing was changed"
+if grep -q ' TABLE public atalaia_tenants ' "$toc"; then
+    kind=hosted
+elif grep -q ' TABLE public fields ' "$toc"; then
+    kind=single
+else
+    fail "$file is not a backup of a site server's database; nothing was changed"
+fi
+if [ "$kind" = hosted ] && [ "$hosted" != on ]; then
+    fail "$file is a hosted hub's backup and $env_file a single-field server's: restore it into a hosted" \
+        "deployment (setup.sh DOMAIN --hosted); nothing was changed"
+fi
+if [ "$kind" = single ] && [ "$hosted" = on ]; then
+    fail "$file is a single-field server's backup and $env_file a hosted hub's: restore it into a" \
+        "single-field deployment; nothing was changed"
+fi
+
+if [ "$hosted" = on ]; then
+    ATALAIA_ENV_FILE=$env_file sh "$here/hosted-roles.sh"
+    echo "restore.sh: stopping the server and replacing the hub's database"
+    dc stop server tls-ask
+    psql_admin -c "DROP DATABASE IF EXISTS atalaia WITH (FORCE)" -c "CREATE DATABASE atalaia OWNER atalaia_owner"
+    owner_option=
+else
+    echo "restore.sh: stopping the server and replacing the database"
+    dc stop server
+    psql_admin -c "DROP DATABASE IF EXISTS atalaia WITH (FORCE)" -c "CREATE DATABASE atalaia OWNER atalaia"
+    owner_option=--no-owner
+fi
+
 restored=1
 {
     rc=0
     dc run --rm -T backup-crypt open < "$file" || rc=$?
     echo "$rc" > "$status"
-} | dc exec -T postgres pg_restore -U atalaia -d atalaia --no-owner --exit-on-error --single-transaction \
+} | dc exec -T postgres pg_restore -U atalaia -d atalaia $owner_option --exit-on-error --single-transaction \
     || restored=0
 opened=$(cat "$status")
 if [ "$restored" -ne 1 ] || [ "$opened" != 0 ]; then
@@ -81,6 +129,18 @@ if [ "$restored" -ne 1 ] || [ "$opened" != 0 ]; then
         "and the server is stopped: fix the cause and run restore.sh again"
 fi
 
-echo "restore.sh: starting the server (it runs the migrations)"
-dc up -d --wait server caddy
+if [ "$hosted" = on ]; then
+    echo "restore.sh: checking the restored hub's isolation (hosted check, as the owner role)"
+    dc run --rm -T hub hosted check \
+        || fail "the restored hub fails the isolation check; the server stays stopped: see above"
+    echo "restore.sh: starting the hub (hub migrates every field, then the server and its ask endpoint)"
+    dc up -d --wait caddy server tls-ask
+    if ! dc run --rm -T hub hosted check; then
+        dc stop server tls-ask
+        fail "after the migrations the hub fails the isolation check; the server is stopped: see above"
+    fi
+else
+    echo "restore.sh: starting the server (it runs the migrations)"
+    dc up -d --wait server caddy
+fi
 echo "restore.sh: restored $file"

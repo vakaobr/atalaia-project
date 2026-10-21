@@ -15,6 +15,13 @@
 # certificates are not backed up (it gets new ones). Exit code 0 only when the
 # new backup is complete; cron mails anything else.
 #
+# A hosted hub (ATALAIA_HOSTED=on in the env file; Phase 4 follow-up, decisions
+# FU4-*) is backed up the same way, through both Compose files: the one dump
+# holds every field's schema, the registry and the hub's audit log, with their
+# owners, grants, row-level security and policies (pg_dump keeps them all;
+# PostgreSQL's superuser reads past the row-level security). The roles
+# themselves are not in a database dump: restore.sh makes them again from .env.
+#
 # Settings: ATALAIA_ENV_FILE (server/.env), ATALAIA_BACKUP_DIR (server/backups),
 # ATALAIA_BACKUP_DAYS (from the environment or the env file), COMPOSE_PROJECT_NAME.
 set -eu
@@ -38,8 +45,13 @@ setting() {
     printf '%s' "${value:-$2}"
 }
 
+hosted=$(sed -n 's/^ATALAIA_HOSTED=//p' "$env_file" | tail -n 1)
 dc() {
-    docker compose --env-file "$env_file" -f "$here/docker-compose.yml" "$@"
+    if [ "$hosted" = on ]; then
+        docker compose --env-file "$env_file" -f "$here/docker-compose.yml" -f "$here/docker-compose.hosted.yml" "$@"
+    else
+        docker compose --env-file "$env_file" -f "$here/docker-compose.yml" "$@"
+    fi
 }
 
 backup_dir=$(setting ATALAIA_BACKUP_DIR "$here/backups")
@@ -88,7 +100,11 @@ dc run --rm -T backup-crypt open < "$tmp" > /dev/null || fail "the new backup do
 chmod 600 "$tmp"
 mv "$tmp" "$out"
 size=$(wc -c < "$out" | tr -d ' ')
-echo "backup.sh: $out ($size bytes, encrypted)"
+if [ "$hosted" = on ]; then
+    echo "backup.sh: $out ($size bytes, encrypted; the hosted hub: every field, the registry, the hub's audit log)"
+else
+    echo "backup.sh: $out ($size bytes, encrypted)"
+fi
 
 for old in "$backup_dir"/atalaia-*.backup; do
     if [ ! -f "$old" ] || [ "$old" = "$out" ]; then

@@ -1632,6 +1632,18 @@ deletion by `DROP SCHEMA` in one audited transaction (S21-9); the purge and
 `atalaia_server/hosted.py`, `migrations/env.py`, `cli.py`,
 `server/docs/DEPLOY.md` ("Hosted mode"). Tests: `test_tenants.py`.
 
+*Follow-up 2026-10-21 (decisions FU4-1 to FU4-10, open; tested in Docker on one
+computer, not yet on a real hosted server with a real domain):* the hosted
+deployment S21-4 and S21-12 left by hand is built: `server/docker-compose.hosted.yml`
+with `Caddyfile.hosted` (on-demand certificates for `*.<domain>`, only for an
+active field's name, asked of `atalaia_server/tls_ask.py`; a DNS-01 wildcard is
+documented, not shipped), `setup.sh DOMAIN --hosted` (the owner and server
+roles, `hosted init`), the `hub` service (`hosted migrate` before each start;
+the operator's commands), `backup.sh` and `restore.sh` for a hub (owners and
+grants kept, modes never mixed, `hosted check` after the restore), and
+`python3 tools/docker_server.py deploy-hosted`. DEPLOY.md's "Hosted mode" is
+now that procedure.
+
 ---
 
 ## Plan phase 22: Deployment

@@ -12,6 +12,7 @@
     python3 tools/docker_server.py up                         run it behind Caddy on https://localhost:8443
     python3 tools/docker_server.py down                       stop it and delete its database
     python3 tools/docker_server.py deploy                     the deployment test (setup, Caddy, backup, restore)
+    python3 tools/docker_server.py deploy-hosted              the same for a hosted hub (on-demand TLS, two fields)
 
 Works from any folder; Docker with the Compose plugin must be running. `test`
 and `migrations` build the test image (server/Dockerfile, target test) and
@@ -30,8 +31,11 @@ deletes its data. In a running trial, `docker compose -p
 atalaia-server-trial exec server python -m atalaia_server create-admin
 --username NAME` makes a server administrator. `deploy` builds both images
 and runs tools/server_deploy.py: setup.sh, the stack behind Caddy, HTTPS and
-the WebSocket through it, backup.sh and restore.sh into a fresh database.
-ATALAIA_VOLUME_SUFFIX keeps the Compose projects and images of two checkouts
+the WebSocket through it, backup.sh and restore.sh into a fresh database. `deploy-hosted` builds the same images
+and runs tools/server_deploy_hosted.py: setup.sh --hosted, the hub behind
+Caddy's on-demand TLS with two fields made by the operator's commands, the
+ask endpoint, the isolation, backup.sh and restore.sh's hosted paths into a
+fresh hub (Phase 4 follow-up). ATALAIA_VOLUME_SUFFIX keeps the Compose projects and images of two checkouts
 (e.g. a git worktree) apart.
 """
 
@@ -139,8 +143,9 @@ def trial(what: str) -> int:
     return code
 
 
-def deploy() -> int:
-    """Builds the server and test images, then runs the deployment test (tools/server_deploy.py)."""
+def deploy(hosted: bool = False) -> int:
+    """Builds the server and test images, then runs the deployment test (tools/server_deploy.py, or
+    tools/server_deploy_hosted.py for a hosted hub)."""
     env = {**os.environ, "ATALAIA_SERVER_IMAGE": SERVER_IMAGE, "ATALAIA_SERVER_TEST_IMAGE": TEST_IMAGE,
            "ATALAIA_DOMAIN": "unused", "POSTGRES_PASSWORD": "unused", "ATALAIA_SECRET_KEY": "unused"}
     if run(["docker", "compose", "--env-file", os.devnull, *compose("docker-compose.yml", TRIAL_PROJECT,
@@ -149,6 +154,10 @@ def deploy() -> int:
     if run(compose("docker-compose.test.yml", TEST_PROJECT, "build", "tests"), env) != 0:
         return fail("building the test image failed")
     sys.path.insert(0, str(REPO / "tools"))
+    if hosted:
+        import server_deploy_hosted
+
+        return server_deploy_hosted.run(SUFFIX, SERVER_IMAGE, TEST_IMAGE)
     import server_deploy
 
     return server_deploy.run(SUFFIX, SERVER_IMAGE, TEST_IMAGE)
@@ -159,8 +168,8 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 0 if argv else 2
     what, args = argv[0], argv[1:]
-    if what not in ("test", "migrations", "browser", "build", "up", "down", "deploy"):
-        return fail(f"unknown command '{what}' (test, migrations, browser, build, up, down, deploy)")
+    if what not in ("test", "migrations", "browser", "build", "up", "down", "deploy", "deploy-hosted"):
+        return fail(f"unknown command '{what}' (test, migrations, browser, build, up, down, deploy, deploy-hosted)")
     if what not in ("test", "browser") and args:
         return fail(f"'{what}' takes no arguments")
     try:
@@ -172,8 +181,8 @@ def main(argv: list[str]) -> int:
         return fail("the docker command was not found; install Docker")
     if what in ("test", "migrations", "browser"):
         return in_tests_image(what, args)
-    if what == "deploy":
-        return deploy()
+    if what in ("deploy", "deploy-hosted"):
+        return deploy(hosted=what == "deploy-hosted")
     return trial(what)
 
 

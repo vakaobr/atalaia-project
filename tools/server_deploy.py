@@ -31,7 +31,6 @@ import os
 import re
 import secrets
 import shutil
-import socket
 import stat
 import subprocess
 import sys
@@ -81,8 +80,12 @@ def free_port() -> int:
 
 
 class Deployment:
+    # The Compose files, in order (the hosted test adds docker-compose.hosted.yml).
+    files: tuple[str, ...] = ("docker-compose.yml",)
+    name = "deploy"
+
     def __init__(self, suffix: str, server_image: str, test_image: str, work: Path) -> None:
-        self.project = f"atalaia-deploy{suffix}".lower()
+        self.project = f"atalaia-{self.name}{suffix}".lower()
         self.server_image = server_image
         self.test_image = test_image
         self.work = work
@@ -111,8 +114,8 @@ class Deployment:
         return done
 
     def dc(self, *args: str, **kw) -> subprocess.CompletedProcess:
-        return self.run(["docker", "compose", "--env-file", str(self.env_file), "-f",
-                         str(SERVER / "docker-compose.yml"), *args], **kw)
+        files = [arg for name in self.files for arg in ("-f", str(SERVER / name))]
+        return self.run(["docker", "compose", "--env-file", str(self.env_file), *files, *args], **kw)
 
     def sql(self, statement: str, *, db: str = "atalaia") -> str:
         done = self.dc("exec", "-T", "postgres", "psql", "-U", "atalaia", "-d", db, "-v", "ON_ERROR_STOP=1",

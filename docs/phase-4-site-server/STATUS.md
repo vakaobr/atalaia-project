@@ -8,7 +8,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 **Current phase:** Implementation (plan phases 1 to 22 built in software, 2026-10-21; sync over 4G: HW1; a real ATAK device: HW3; a real deployment with a real domain, and a real hosted deployment: HW1)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-21 (follow-up: the staff pages; full clean-copy check, the site server's tests, migrations, the deployment and browser tests)
+**Last verified:** 2026-10-21 (follow-up: hosted deployment; full clean-copy check, the site server's tests, migrations, deploy, deploy-hosted and browser tests)
 **Next step:** the hardware phases HW1-HW4 (the boards); hosted mode waits for the legal review (P4-6) before going live
 
 ## Completed
@@ -854,6 +854,10 @@ certificate (HW1). Decisions S22-1 to S22-10, all open.
 ## Follow-up: the site server's staff pages (built 2026-10-21, in software)
 
 Web pages for the APIs that had none (S19-11, S20-8): `/staff/` login (password, then TOTP), the field's game history (filters, settings), a game (score timeline as chart and table, event log, its boxes), the scenario library (check with every problem, save as revisions, archive), presets, device health and the remote GM (live view polled every 5 s, the commands, the log). Server-rendered in pt-PT and English with no data in the page; same-origin ES modules call the API with the bearer token, so each page has its API's role rules; CSP unchanged; no cookie authorises a request (CSRF); `textContent` only. Tests: `server/tests/test_staff_pages.py` (13), `server/tests_browser/` (10, headless Chromium over HTTPS, `python3 tools/docker_server.py browser`, CI job `server-browser`). Decisions FU2-1 to FU2-12. Not yet on a real deployment or phone.
+
+## Follow-up: hosted mode's deployment (2026-10-21, in software)
+
+`server/docker-compose.hosted.yml` + `Caddyfile.hosted` (Caddy on-demand TLS for `*.<domain>`, asked of `atalaia_server/tls_ask.py`: yes only for an active field's name, 5/s bursts of 20, 429 before the database), `setup.sh DOMAIN --hosted` (owner and server roles via `hosted-roles.sh`, `hosted init`), the `hub` service (`hosted migrate` before each start; `docker compose run --rm hub hosted ...`), `backup.sh`/`restore.sh` for a hub (owners and grants kept, modes never mixed, `hosted check` before and after the migrations), new `hosted check`. Tests: `test_tls_ask`, `test_tenants.HubCheckTests`, `python3 tools/docker_server.py deploy-hosted` (CI `server-deploy-hosted`, with ShellCheck): two fields at their own names over HTTPS, unknown/suspended/apex names refused a certificate, isolation as the server role in all 114 tables, a backup restored into a fresh hub with row digests, ownership, ACLs, policies and roles equal. Tested in Docker on one computer, not yet on a real hosted server with a real domain; not live before P4-6. Decisions FU4-1 to FU4-10, all open.
 
 ## Dependencies
 
