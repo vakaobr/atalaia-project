@@ -68,7 +68,7 @@ header:
   language: Idioma
 
 hero:
-  status: Pré-alfa · software das fases 1 e 2 pronto, primeira placa testada na bancada, fase 3 quase completa em software, fase 4 começada · ainda não pronta para o campo
+  status: Pré-alfa · software das fases 1 e 2 pronto, duas placas e o controlador de campo já funcionam juntos na bancada, fase 3 quase completa em software, fase 4 construída em software · ainda não pronta para o campo
   title: A plataforma aberta de <span class="nowrap">combate simulado</span>
   lead: >-
     A Atalaia é uma plataforma aberta para os dispositivos eletrónicos de jogo (os props) de
@@ -564,7 +564,7 @@ roadmap:
     title: Rede de campo
     short: >-
       Skirmesh-RF sobre LoRa, controlador de campo, API, consola da organização e um pacote de
-      modos, testados em software; duas placas já trocam pacotes de rádio na bancada.
+      modos, testados em software; na bancada, duas placas trocam pacotes de rádio e uma caixa já jogou com o controlador de campo através do modem USB.
     text: >-
       Skirmesh-RF sobre LoRa, controlador de campo, API, consola da organização e um pacote de
       modos, já escrito e testado em software: Domínio Total (só pontua quem tem todas as caixas),
