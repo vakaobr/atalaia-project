@@ -438,6 +438,14 @@ def payload_problems(msg_type: str, fields: dict[str, Any]) -> list[str]:
                 problems.append(f"missing required field {name} (key {pf.key})")
             continue
         problem = _type_problem(pf.type, fields[name], pf.max)
+        if problem is None and (msg_type, name) in _EXACT_BYTES:
+            exact = _EXACT_BYTES[(msg_type, name)]
+            problem = None if len(fields[name]) == exact else f"must be exactly {exact} bytes"
         if problem:
             problems.append(f"{name} {problem}")
     return problems
+
+
+# Byte fields of a fixed size (the schema gives only a maximum): HELLO's device id
+# (protocol/field-frames.md), as core/src/msg_codec.c checks it.
+_EXACT_BYTES = {("HELLO", "device_id"): 8}

@@ -166,7 +166,7 @@ class StandbyApiTests(unittest.TestCase):
         self.assertEqual(args[:2], (self.game["id"], 1))
         self.assertEqual(args[4:], (869_525_000, self.a.ctrl.game_key(self.game["id"])))
         # On standby the game cannot be driven, and a second join is refused.
-        self.assertEqual(c.post(f"/api/v1/games/{self.game['id']}/start", headers=GM).status_code, 409)
+        self.assertEqual(c.post(f"/api/v1/games/{self.game['id']}/start", headers=GM, json={"force": True}).status_code, 409)
         self.assertEqual(c.post("/api/v1/controller/join", headers=GM, json={"text": self.text}).status_code, 409)
 
         # The primary's TIME says running: the standby's game follows it.
@@ -257,7 +257,7 @@ class StandbyOverTheAirTests(unittest.TestCase):
         self.assertEqual(b.post("/api/v1/controller/join", headers=GM, json={"text": text}).status_code, 201)
 
         # The primary starts the game: its CMD and TIME reach the standby through both C modems.
-        self.assertEqual(a.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+        self.assertEqual(a.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
         self.assertTrue(wait_for(lambda: b.get(f"/api/v1/games/{gid}", headers=READ).json()["state"] == "running", 5))
         self.assertEqual(b.get("/api/v1/controller", headers=READ).json()["leader"], 0)
 

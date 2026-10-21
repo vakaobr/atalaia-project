@@ -8,6 +8,7 @@
 import { html, Component, t, clock, ConfirmButton, modeText, teamName } from '../ui.js';
 import { FirstSetupNotice, mhz } from './radio-settings.js';
 import { TeamFields, TeamsEditor, teamInfoBody } from './branding-settings.js';
+import { BoxInvites, StartCheck } from './box-invites.js';
 import {
     ParamFields, ModifierPicker, initialValues, mainModes, partsOf, schemaOf, modeName,
 } from './preset-builder.js';
@@ -69,7 +70,16 @@ class CreateGame extends Component {
             if (mods.length) body.modifiers = mods.map((m) => m.id);
         }
         const game = await this.props.app.call('POST', '/games', body);
-        if (game) this.props.app.setGame(game);
+        if (game) {
+            const app = this.props.app;
+            app.setGame(game);
+            app.setState({ invites: [] });
+            // The boxes for this game: when free boxes have been heard over the radio, the
+            // dialog opens with the last game's ticked (always there with "Invite boxes").
+            await app.loadBoxes(true);
+            const boxes = (app.state.boxes && app.state.boxes.boxes) || [];
+            if (boxes.length) app.setState({ invitePicker: true });
+        }
     }
 
     render(props, state) {
@@ -186,7 +196,21 @@ export class GameControl extends Component {
         const { game } = this.props.app.state;
         return this.props.app.call('POST', `/games/${game.id}/${action}`, body).then((g) => {
             if (g) this.props.app.setGame(g);
+            else if (action === 'start') this.props.app.refreshGame(); // what is missing now
         });
+    }
+
+    /** Start, or Start anyway when a role has no joined node yet (decision RJ-1). */
+    renderStart(game, pending, leading) {
+        const missing = (game.start_check && game.start_check.missing) || [];
+        const roles = missing.join(', ');
+        let question = pending ? t('game.confirm_start_pending', { n: pending }) : t('game.confirm_start');
+        if (missing.length) {
+            question = `${t('game.missing_short', { roles })} ${pending ? question : t('game.confirm_start_anyway')}`;
+        }
+        return html`<${ConfirmButton} testid="game-start" class=${missing.length ? 'danger' : 'primary'}
+            label=${missing.length ? t('game.start_anyway') : t('game.start')} question=${question}
+            disabled=${!leading} onConfirm=${() => this.lifecycle('start', missing.length ? { force: true } : undefined)} />`;
     }
 
     render(props) {
@@ -220,10 +244,11 @@ export class GameControl extends Component {
                 ${game.channel_hz && html`<dt>${t('radio.channel')}</dt><dd data-testid="game-channel">${mhz(game.channel_hz)} MHz</dd>`}
             </dl>
             ${game.joined && html`<p class="notice">${t('game.standby_notice')}</p>`}
+            ${s === 'ready' && !game.joined && html`<${StartCheck} game=${game} />`}
             ${gm && html`<div class="actions" data-testid="game-actions">
-                ${s === 'ready' && html`<${ConfirmButton} testid="game-start" class="primary" label=${t('game.start')}
-                    question=${pending ? t('game.confirm_start_pending', { n: pending }) : t('game.confirm_start')}
-                    disabled=${!leading} onConfirm=${() => this.lifecycle('start')} />`}
+                ${s === 'ready' && this.renderStart(game, pending, leading)}
+                ${s === 'ready' && leading && !game.joined && html`<button type="button" data-testid="game-invite"
+                    onClick=${() => app.setState({ invitePicker: true })}>${t('invites.open')}</button>`}
                 ${s === 'running' && html`<${ConfirmButton} testid="game-pause" label=${t('game.pause')}
                     question=${t('game.confirm_pause')} disabled=${!leading} onConfirm=${() => this.lifecycle('pause', {})} />`}
                 ${s === 'paused' && html`<${ConfirmButton} testid="game-resume" class="primary" label=${t('game.resume')}
@@ -235,6 +260,8 @@ export class GameControl extends Component {
             ${gm && leading && html`<${Broadcast} app=${app} />`}
             ${gm && leading && html`<${Adjust} app=${app} />`}
             ${gm && s !== 'ended' && html`<${TeamsEditor} app=${app} />`}
+            ${gm && leading && s === 'ready' && !game.joined && app.state.invitePicker
+                && html`<${BoxInvites} app=${app} onClose=${() => app.setState({ invitePicker: false })} />`}
         </section>`;
     }
 }

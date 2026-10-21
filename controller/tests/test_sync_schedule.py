@@ -200,7 +200,7 @@ class RosterTests(GameDayCase):
         self.assertEqual({r["display_name"] for r in rows.values()}, {"Coruja Grande", "Mocho"})
         self.assertEqual(self.chrono_list(gid)["counts"]["pending"], 2)
         # After the start nothing from the site server changes the game.
-        r = self.client.post(f"/api/v1/games/{gid}/start", headers=GM)
+        r = self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True})
         self.assertEqual(r.status_code, 200, r.text)
         self.assertEqual(r.json()["pending_declarations"], 0)  # nobody is at the field yet
         self.site.rosters[SCHEDULED] = []
@@ -282,7 +282,7 @@ class ArrivalTests(GameDayCase):
         late_raw, late_text, late_sha = ticket()
         late_reg = str(uuid.uuid4())
         late = self.check_in(self.gid, name="Atrasada", registration_id=late_reg, ticket=late_text)
-        self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM)
+        self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM, json={"force": True})
         self.cycle()
         self.assertEqual(self.site.bodies("checkins"), [])  # not before the game has ended
         self.client.post(f"/api/v1/games/{self.gid}/end", json={}, headers=GM)

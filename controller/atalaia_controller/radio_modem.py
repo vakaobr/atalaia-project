@@ -72,6 +72,8 @@ class RadioModem:
         on_tx_ack: Optional[Callable[[int, str], None]] = None,
         on_state: Optional[Callable[[str], None]] = None,
         on_error: Optional[Callable[[str, str], None]] = None,
+        on_field_rx: Optional[Callable[[bytes, int, int], None]] = None,
+        on_field_ack: Optional[Callable[[int, str], None]] = None,
     ) -> None:
         self.url = url
         self.ping_interval = ping_interval
@@ -83,6 +85,10 @@ class RadioModem:
         self.on_tx_ack = on_tx_ack
         self.on_state = on_state
         self.on_error = on_error
+        # Field frames (protocol/field-frames.md): heard (frame, rssi, snr) and sent (id, status).
+        self.on_field_rx = on_field_rx
+        self.on_field_ack = on_field_ack
+        self._field_id = 0
 
         self.state = CLOSED
         self.ident: Optional[dict[str, Any]] = None
@@ -184,6 +190,20 @@ class RadioModem:
             if not isinstance(result, mf.Noise) or result.channel_hz != channel_hz:
                 raise MeasureError("bad_frame", "the modem answered for another channel")
             return result
+
+    def send_field(self, frame: bytes) -> Optional[int]:
+        """Queues a field frame (FIELD_TX), with or without a game configured: the id its
+        FIELD_ACK will carry, or None if the link is not up. The modem sends it as it is."""
+        if self.state != UP:
+            return None
+        self._field_id = (self._field_id + 1) & 0xFFFF
+        tx_id = self._field_id
+        return tx_id if self._write(mf.FIELD_TX, mf.field_tx_payload(tx_id, frame)) else None
+
+    @property
+    def has_field_frames(self) -> bool:
+        """The modem's firmware relays field frames (IDENT "field": true)."""
+        return (self.ident or {}).get("field") is True
 
     def send_packet(self, header: Header, payload: bytes) -> bool:
         """Queues a TX frame: the modem encrypts and transmits it. False if the link is not up."""
@@ -319,6 +339,14 @@ class RadioModem:
                 seq, status = mf.decode_tx_ack(payload)
                 if self.on_tx_ack:
                     self.on_tx_ack(seq, status)
+            elif frame_type == mf.FIELD_RX:
+                frame, rssi, snr = mf.decode_field_rx(payload)
+                if self.on_field_rx:
+                    self.on_field_rx(frame, rssi, snr)
+            elif frame_type == mf.FIELD_ACK:
+                tx_id, status = mf.decode_field_ack(payload)
+                if self.on_field_ack:
+                    self.on_field_ack(tx_id, status)
             elif frame_type == mf.STATUS:
                 self.status = json.loads(payload.decode("utf-8"))
                 if self.status.get("ping") == self._pending_ping:

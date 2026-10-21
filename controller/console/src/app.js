@@ -20,6 +20,7 @@ import { RadioSettings } from './components/radio-settings.js';
 import { FirmwarePanel } from './components/firmware-panel.js';
 import { CheckinPanel } from './components/checkin-panel.js';
 import { BrandingSettings, TeamPresets, FieldBrand, accentRef } from './components/branding-settings.js';
+import { discover } from './components/box-invites.js';
 
 const TABS = ['game', 'checkin', 'field', 'nodes', 'join', 'adopt', 'presets', 'scenarios', 'feed', 'controller', 'settings'];
 const FEED_MAX = 500;
@@ -35,6 +36,7 @@ class App extends Component {
             nodes: {}, seen: {}, feed: [], alerts: [], modes: [], presets: [],
             positions: {}, scoreHistory: [], clockBase: null, toast: '', now: Date.now(),
             radio: null, chronoCounts: null, branding: null, teamPresets: [],
+            boxes: null, invites: [], invitePicker: false,
         };
         this.checkinPanel = null;
         this.stream = null;
@@ -114,6 +116,24 @@ class App extends Component {
         if (list) this.setState({ teamPresets: list });
     }
 
+    /** The free boxes heard over the radio (GET /boxes); with ask, a DISCOVER first. */
+    async loadBoxes(ask) {
+        if (this.state.role !== 'gm') return;
+        if (ask) await discover(this.token);
+        try {
+            this.setState({ boxes: await api(this.token, 'GET', '/boxes') });
+        } catch (e) {
+            this.setState({ boxes: { boxes: [], radio: false, error: e.message } });
+        }
+    }
+
+    async loadInvites() {
+        const g = this.state.game;
+        if (this.state.role !== 'gm' || !g || !g.live) return;
+        const out = await this.call('GET', `/games/${g.id}/invites`);
+        if (out) this.setState({ invites: out.invites });
+    }
+
     async loadRadio() {
         const radio = await this.call('GET', '/radio');
         if (radio) this.setState({ radio });
@@ -188,7 +208,7 @@ class App extends Component {
                 this.setGame(msg.game);
                 if (isNew) this.setState({ chronoCounts: null });
                 if (isNew && msg.game.live) this.loadChronoCounts(msg.game);
-                if (isNew) this.setState({ feed: [], scoreHistory: [], positions: {}, nodes: {}, seen: {} });
+                if (isNew) this.setState({ feed: [], scoreHistory: [], positions: {}, nodes: {}, seen: {}, invites: [] });
                 if (isNew && msg.game.live) {
                     this.loadPositions(msg.game.id);
                     this.reloadNodes();
@@ -205,6 +225,12 @@ class App extends Component {
             break;
         case 'radio':
             this.setState({ radio: msg.radio });
+            break;
+        case 'boxes':
+            this.setState((s) => ({ boxes: { ...(s.boxes || {}), boxes: msg.boxes } }));
+            break;
+        case 'invites':
+            if (this.state.game && msg.game === this.state.game.id) this.setState({ invites: msg.invites });
             break;
         case 'radio_scan':
             this.setState((s) => ({ radio: s.radio ? { ...s.radio, scan: msg.scan } : s.radio }));
@@ -240,6 +266,7 @@ class App extends Component {
         else if (msg.kind === 'tx.failed') this.alert('warn', t('alerts.tx_failed', { status: msg.status, seq: msg.seq }));
         else if (msg.kind === 'modem.error') this.alert('warn', t('alerts.modem_error', { message: msg.message }));
         else if (msg.kind === 'role') this.alert('info', t('alerts.role', { role: t(`controller.roles.${msg.role}`), term: msg.term }));
+        else if (msg.kind === 'start.forced') this.alert('warn', t('alerts.start_forced', { roles: (msg.missing || []).join(', ') }));
         this.refreshStatus();
     }
 

@@ -52,6 +52,7 @@ set(CORE_SOURCES
     ${CORE_DIR}/src/duty_cycle.c
     ${CORE_DIR}/src/msg_codec.c
     ${CORE_DIR}/src/join.c
+    ${CORE_DIR}/src/field_frame.c
     ${CORE_DIR}/src/tag.c
     ${CORE_DIR}/src/screen_template.c
     ${CORE_DIR}/src/proxy.c
@@ -157,6 +158,7 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/radio/radio_limits.c
     ${SHELL_DIR}/radio/noise_stats.c
     ${SHELL_DIR}/box_game.c
+    ${SHELL_DIR}/box_lobby.c
     ${SHELL_DIR}/serial_console.c
     ${SHELL_DIR}/fw_update.c
     ${SHELL_DIR}/adoption.c

@@ -194,7 +194,7 @@ class LibraryTests(unittest.TestCase):
         self.assertIn("end it before you replace the scenario", status["error"])
         self.assertEqual(node.scenarios(), {SCENARIO: "1"})
         self.assertNotIn(SCENARIO, status["from_site"]["refused"])  # tried again next cycle
-        node.client.post(f"/api/v1/games/{gid}/start", headers=GM)
+        node.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True})
         self.assertEqual(node.client.post(f"/api/v1/games/{gid}/end", headers=GM).status_code, 200)
         node.cycle()
         self.assertEqual(node.scenarios(), {SCENARIO: "2"})

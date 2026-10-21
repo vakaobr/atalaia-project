@@ -232,7 +232,9 @@ that moves the frames of [protocol/usb-modem.md](../../protocol/usb-modem.md)
 between the USB-Serial-JTAG port and the radio. The modem encrypts and
 decrypts with AES-CCM (mbedtls, hardware AES), dedupes flood copies,
 enforces the duty cycle of the channel's sub-band, measures the noise on
-a channel when asked (MEASURE, only while no game is configured), and
+a channel when asked (MEASURE, only while no game is configured), carries
+field frames as they are, with or without a game (FIELD_TX, FIELD_RX,
+FIELD_ACK: it never holds the field join key), and
 keeps the game key in RAM only; it has no
 Lua, game screens or presets (~480 KB image, ~190 KB of it LVGL and the
 fonts for its own OLED). The log console stays on UART0
@@ -402,7 +404,7 @@ Radio-specific Kconfig options (under "Atalaia Field Box Configuration > Radio")
 Field game options (under "Field network games"):
 - `ATALAIA_STATE_INTERVAL_S` -- seconds between STATE packets in a joined game (default 15)
 - `ATALAIA_BATTERY_LOW_PCT` -- send `battery.low` below this battery level (default 20; 0 = never; only with a MAX17048 gauge)
-- `ATALAIA_SERIAL_JOIN` -- accept `@join`, `@joinkey`, `@tag`, `@wifi` and `@update` lines on the serial console (default on)
+- `ATALAIA_SERIAL_JOIN` -- accept `@join`, `@joinkey`, `@tag`, `@wifi`, `@update` and `@lobby` lines on the serial console (default on)
 - `ATALAIA_SERIAL_ADOPT` -- accept `@adopt-info` and `@adopt` on the serial console: USB adoption by the field controller (default on; protocol/adoption.md)
 - `ATALAIA_CONSOLE_USB_INPUT` -- read the console input from the USB-C port (USB-Serial-JTAG, the Heltec V4's only USB) as well as UART0 (default on; off in the Wokwi build)
 - `ATALAIA_LED_BRIGHTNESS_PCT` -- LED ring brightness at boot (default 40%; under "LEDs")
@@ -672,6 +674,28 @@ controller's game.
 - **After a reboot** -- the stored join brings the box back: a new epoch,
   HELLO, the saved game state, `node.rebooted`, and the unacknowledged events
   from the flash log.
+- **Between games** -- `main/box_lobby.c` ([protocol/field-frames.md](../../protocol/field-frames.md),
+  RFC 0001 Amendment 7, proposed). A box with a field join key has an 8-byte
+  random **device id**, made once and kept in NVS (`device_id`), which its
+  HELLO carries (key 10). With no game, or once its game is over, it
+  announces itself in **field frames** (type 9, game id 0, sealed with
+  AES-CCM under HKDF-SHA256 of the join key) on its last game's channel: 2-20 s
+  after the game ends, then about every 72 s on 869.525 MHz (2 % of the
+  sub-band's duty cycle, at least a minute apart), and within 3 s of a
+  controller's DISCOVER. Its announcements carry a token that changes every
+  10 minutes and whenever it accepts an invite. An INVITE for its device id
+  and its current or previous token, in 1-3 parts, brings a join payload,
+  which goes through the card's checks; a box in a game answers "busy", an
+  old token gets no answer, a game it played to the end is refused. The box
+  answers how it went, and joins: "Invited / game: role" on its screen. 30 s
+  after a game ends the final screen gives way to "Ready / next game". `@lobby`
+  on the serial console prints the device id, whether the box is free, its
+  channel and its invites. A field frame's nonce is the device id's pseudonym,
+  a boot count kept in NVS (`ff_boot`, raised and stored before the first
+  frame of every run) and a frame count: never random (decision RJ-15). The
+  device id and tokens come from a generator seeded at boot with true entropy
+  (`bootloader_random_enable()`, before any ADC or I2S driver starts) and the
+  board's MAC.
 - **Tests** -- the host tests (`test/test_field_link.c`,
   `test/test_box_game.c`, `test/test_serial_console.c`) run this code with
   the stub HAL; `test/box_host/` builds it into a Linux program on a UDP
@@ -679,11 +703,16 @@ controller's game.
   gauge's reading on its stdin), which the controller's end-to-end tests
   (`controller/tests/test_box_e2e.py`) play whole games with, through the
   host modem. `wokwi/join.scenario.yaml` joins a game in the emulator.
+  `test/test_box_game.c` also runs the box between games (announcements, an
+  invite in two parts, DISCOVER, the ready screen, every refusal, a replayed
+  invite), and the host box (`--announce-ms N` for quick announcements) is
+  invited into a second game by the controller in `test_box_e2e.py`.
 
 Still pending:
 
 - Running any of it on the radio boards (plan phase F): the SX1262 link,
-  the PN532 reading real join cards, NVS encryption on a provisioned box.
+  the PN532 reading real join cards, NVS encryption on a provisioned box,
+  an invite between games over the air (BRING_UP.md, step 3b).
 - Joining over Wi-Fi from the GM console (decision E3).
 - Running a firmware update over the air on a real board (built and host-tested:
   [Firmware updates](#firmware-updates-over-the-air)).

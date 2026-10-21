@@ -187,7 +187,7 @@ class SyncCase(unittest.TestCase):
     def play(self, end: bool = True, captures: int = 3) -> int:
         gid = self.ctrl.create_game({"name": "Domingo", "mode_id": DOMINATION, "teams": ["red", "blue"],
                                      "assignments": {"3": "zone"}})["id"]
-        self.ctrl.start_game(gid)
+        self.ctrl.start_game(gid, force=True)
         fc = self.ctrl.fc
         for seq in range(1, captures + 1):
             self.ctrl._on_event({"node": 3, "seq": seq, "t": seq * 1000, "type": "zone.captured", "team": "red",
@@ -447,7 +447,7 @@ class BackoffTests(SyncCase):
         self.assertEqual(client.next_delay(), 300.0)  # between games
         gid = self.ctrl.create_game({"name": "x", "mode_id": DOMINATION})["id"]
         self.assertEqual(client.next_delay(), 300.0)  # ready, not yet running
-        self.ctrl.start_game(gid)
+        self.ctrl.start_game(gid, force=True)
         delays = []
         for failures in range(6):
             client.failures = failures
@@ -687,7 +687,7 @@ class PrivacyTests(P3Case):
                                             "class": "rifle", "make_model": "Tokyo Marui M4"}})
         self.assertEqual(r.status_code, 200, r.text)
         self.svc.rate.allow = lambda key: True
-        self.client.post(f"/api/v1/games/{gid}/start", headers=GM)
+        self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True})
         token = self.client.post("/api/v1/checkin/token", headers=bearer(me["token"])).json()["token"]
         for r in (self.client.post("/api/v1/positions", headers=bearer(token),
                                    json={"lat": 38.123456, "lon": -9.654321, "accuracy_m": 5.0, "source": "gps",

@@ -20,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -41,7 +42,8 @@ import uvicorn  # noqa: E402
 
 from atalaia_controller import checkin_poster  # noqa: E402
 from atalaia_controller.main import build  # noqa: E402
-from atalaia_sim import codec, join  # noqa: E402
+from atalaia_sim import codec, join, lobby  # noqa: E402
+from atalaia_sim import field_frame as ff  # noqa: E402
 from atalaia_sim.packet import cmd_decode, hello_encode, state_encode  # noqa: E402
 
 REQUIRE = os.environ.get("ATALAIA_REQUIRE_BROWSER") == "1"
@@ -115,7 +117,7 @@ class Field:
         assert r.status_code == 201, r.text
         game = r.json()
         if start:
-            assert self.http.post(f"/api/v1/games/{game['id']}/start").status_code == 200
+            assert self.http.post(f"/api/v1/games/{game['id']}/start", json={"force": True}).status_code == 200
         return game
 
     def box(self, msg_type: str, payload: bytes, ack: bool = False) -> None:
@@ -125,10 +127,12 @@ class Field:
         self.host.hear(node_packet(key, game["id"], BOX, self.box_seq, 1, msg_type, payload, ack=ack))
         self.box_seq += 1
 
-    def box_hello(self, fw: str = "0.3.0") -> None:
-        self.box("HELLO", hello_encode({"node_name": "box-7", "platform": 1, "fw_version": fw,
-                                        "core_version": "0.2.0", "tier": 0, "capabilities": [0, 2],
-                                        "transports": 1, "battery_pct": 87, "epoch": 1}))
+    def box_hello(self, fw: str = "0.3.0", device: "bytes | None" = None) -> None:
+        fields = {"node_name": "box-7", "platform": 1, "fw_version": fw, "core_version": "0.2.0", "tier": 0,
+                  "capabilities": [0, 2], "transports": 1, "battery_pct": 87, "epoch": 1}
+        if device is not None:
+            fields["device_id"] = device  # HELLO key 10 (protocol/field-frames.md)
+        self.box("HELLO", hello_encode(fields))
 
     def box_state(self, red: int, blue: int = 0, owner: int = 1, battery: int = 86) -> None:
         counters = {1: red}
@@ -257,6 +261,93 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("game-pause-yes").click()
         expect(page.get_by_test_id("game-state")).to_have_text("em pausa")
         self.assertEqual(self.field.bundle.controller.game["state"], "paused")
+
+    def test_boxes_for_the_next_game_and_the_start_guard(self):
+        """Decisions RJ-1 and RJ-5 in the console: after a game, the next one's dialog lists the free
+        boxes heard over the radio with the last game's ticked; the invite goes out sealed through the
+        modem; the box's answer and its HELLO show as they come; until then Start says what is missing."""
+        device = bytes.fromhex("5a17c0de0b0e1234")
+        key = ff.field_key(JOIN_KEY)
+        first = self.field.create_game("Sábado", assignments={str(BOX): "zone"})
+        self.field.box_hello(device=device)
+        self.assertTrue(wait_for(lambda: self.field.bundle.controller.start_check()["ok"], 5))
+        self.assertEqual(self.field.http.post(f"/api/v1/games/{first['id']}/start").status_code, 200)
+        self.assertEqual(self.field.http.post(f"/api/v1/games/{first['id']}/end", json={}).status_code, 200)
+        # The box, free again, announces itself (the simulator's model of main/box_lobby.c).
+        box = lobby.IdleBox(JOIN_KEY, "Zona Norte", device_id=device, rng=random.Random(2))
+        box.last_game, box.last_role = first["id"], "zone"
+        self.field.host.hear(ff.encode(key, box._announce(), box.nonces.next()))
+        reinvite = self.field.bundle.controller.reinvite
+        self.assertTrue(wait_for(lambda: device.hex() in reinvite.inviter.boxes, 5))
+
+        page = self.console()
+        page.get_by_test_id("game-name").fill("Domingo")
+        page.get_by_test_id("game-source").select_option(f"mode:{DOMINATION}")
+        page.get_by_test_id("game-create").click()
+        dialog = page.get_by_test_id("invite-dialog")
+        expect(dialog).to_be_visible()
+        expect(page.get_by_test_id("invite-previous")).to_contain_text("Sábado")
+        row = page.get_by_test_id(f"invite-row-{device.hex()}")
+        expect(row).to_contain_text("Zona Norte")
+        expect(row).to_contain_text("último jogo")
+        expect(page.get_by_test_id(f"invite-box-{device.hex()}")).to_be_checked()
+        self.field.host.transmitted_all()  # what the modem sent so far (the DISCOVER, TIME)
+        page.get_by_test_id("invite-send").click()
+        status = page.get_by_test_id(f"invite-status-{device.hex()}")
+        expect(status).to_have_text(re.compile("convidada|a enviar"))
+        # On air: the invite, sealed; the box reads it, joins, and answers.
+        invites: list[bytes] = []
+
+        def heard_invite() -> bool:
+            for f in self.field.host.transmitted_all(0.2):
+                if ff.is_frame(f) and ff.decode(key, f)["kind"] == "invite":
+                    invites.append(f)
+            return bool(invites)
+        self.assertTrue(wait_for(heard_invite, 5))
+        for f in invites:
+            box.on_frame(f, 1000)
+        self.assertEqual(box.phase, "joined")
+        for answer in box.tick(10_000):
+            self.field.host.hear(answer)
+        expect(status).to_have_text("aceitou, a juntar-se")
+        page.get_by_test_id("invite-close").click()
+        expect(dialog).to_be_hidden()
+        # Until the box's HELLO, Start says which role is missing and starts only "anyway".
+        expect(page.get_by_test_id("start-missing")).to_contain_text("zone")
+        expect(page.get_by_test_id("game-start")).to_have_text("Começar mesmo assim")
+        game = self.field.bundle.controller.game
+        game_key = self.field.bundle.controller.game_key(game["id"])
+        self.field.host.hear(node_packet(game_key, game["id"], box.game["node_id"], 0, 1, "HELLO", hello_encode(
+            {"node_name": "Zona Norte", "platform": 1, "fw_version": "0.4.0", "core_version": "0.2.0", "tier": 0,
+             "capabilities": [0], "transports": 1, "epoch": 1, "device_id": device}), ack=True))
+        expect(page.get_by_test_id("start-missing")).to_be_hidden()
+        expect(page.get_by_test_id("game-start")).to_have_text("Começar")
+        page.get_by_test_id("game-invite").click()
+        expect(status).to_have_text("juntou-se")
+        page.get_by_test_id("invite-close").click()
+        page.get_by_test_id("game-start").click()
+        page.get_by_test_id("game-start-yes").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("a decorrer")
+
+    def test_start_anyway_without_a_box(self):
+        """No box has joined and none was heard: no dialog, Start names the missing role and asks;
+        the GM's "Start anyway" starts the game (force), which the controller logs."""
+        page = self.console()
+        page.get_by_test_id("lang").select_option("en")
+        page.get_by_test_id("game-name").fill("Sunday")
+        page.get_by_test_id("game-source").select_option(f"mode:{DOMINATION}")
+        page.get_by_test_id("game-create").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("ready")
+        expect(page.get_by_test_id("invite-dialog")).to_have_count(0)
+        expect(page.get_by_test_id("start-missing")).to_contain_text("zone")
+        page.get_by_test_id("game-invite").click()
+        expect(page.get_by_test_id("invite-empty")).to_contain_text("No free box heard yet")
+        page.get_by_test_id("invite-close").click()
+        page.get_by_test_id("game-start").click()
+        expect(page.locator(".confirm-q")).to_have_text("No box has joined for: zone. Start anyway?")
+        page.get_by_test_id("game-start-yes").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("running")
+        self.assertEqual(self.field.bundle.controller.game["state"], "running")
 
     def test_presets_and_commands_to_boxes(self):
         page = self.console()
@@ -530,7 +621,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertNotIn("tick_s", j["params"])
 
         # A heal from the kit, in words in the log.
-        self.field.http.post(f"/api/v1/games/{game['id']}/start")
+        self.field.http.post(f"/api/v1/games/{game['id']}/start", json={"force": True})
         self.field.host.transmitted_all(0.3)  # CMD start and TIME
         self.field.box_hello()
         ev = codec.encode_event({"node": BOX, "seq": 1, "t": 9000, "type": "medic.heal", "team": 2,
@@ -588,7 +679,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         j = join.decode(join.from_text(page.get_by_test_id("join-text").input_value()), JOIN_KEY)
         self.assertEqual((j["mode_id"], j["role"]), ("org.atalaia.hacking_terminal", "terminal"))
 
-        self.field.http.post(f"/api/v1/games/{game['id']}/start")
+        self.field.http.post(f"/api/v1/games/{game['id']}/start", json={"force": True})
         self.field.host.transmitted_all(0.3)
         self.field.box_hello()
         for seq, data in ((1, {"puzzle": "wires", "code": "4711", "team": "red"}), (2, {"puzzle": "code"})):
@@ -632,7 +723,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         j = join.decode(join.from_text(page.get_by_test_id("join-text").input_value()), JOIN_KEY)
         self.assertEqual((j["mode_id"], j["role"]), ("org.atalaia.vip_payload", "checkpoint"))
 
-        self.field.http.post(f"/api/v1/games/{game['id']}/start")
+        self.field.http.post(f"/api/v1/games/{game['id']}/start", json={"force": True})
         self.field.host.transmitted_all(0.3)
         self.field.box_hello()
         # The payload prop's extraction (from a node), then a VIP's (the controller's own event).
@@ -676,7 +767,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         j = join.decode(join.from_text(page.get_by_test_id("join-text").input_value()), JOIN_KEY)
         self.assertEqual((j["mode_id"], j["role"]), ("org.atalaia.objectives", "objective"))
 
-        self.field.http.post(f"/api/v1/games/{game['id']}/start")
+        self.field.http.post(f"/api/v1/games/{game['id']}/start", json={"force": True})
         self.field.host.transmitted_all(0.3)
         self.field.bundle.controller.fc.controller_event(
             "scenario.objective.completed", {"objective": "bridge"}, team="red", prio="critical")
@@ -1067,7 +1158,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v4').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v5').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js"):
@@ -1383,7 +1474,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertEqual(self.field.http.get(f"/api/v1/games/{game['id']}/teams").json()["teams"][1]["display_name"],
                          "Águias Negras")
         # The scoreboard: crests and names, live; the colours stay.
-        self.field.http.post(f"/api/v1/games/{game['id']}/start")
+        self.field.http.post(f"/api/v1/games/{game['id']}/start", json={"force": True})
         board = self.page(f"/console/scoreboard.html#token={READ}&lang=en")
         expect(board.get_by_test_id("board-name-red")).to_have_text("Lobos")
         self.loaded(board.get_by_test_id("board-crest-red"))

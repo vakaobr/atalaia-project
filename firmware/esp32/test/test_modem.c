@@ -703,6 +703,140 @@ static void test_clear_forgets_the_game(void)
     CHECK(e >= 0 && io_state.payload[e][0] == MODEM_ERR_NOT_CONFIGURED);
 }
 
+/* ---- Field frames (protocol/field-frames.md): as they are, with or without a game ---- */
+
+/* A field frame's shape: header (game 0, type 9, encrypted) + nonce + body + MIC. The modem
+ * never opens one (it has no field key), so the bytes after the header are arbitrary here. */
+static size_t field_frame(uint8_t *out, size_t body_len, uint16_t game, uint8_t type, bool enc)
+{
+    atalaia_header_t h = {.version_flags = ATALAIA_VF_MAKE(1, 1, 0, enc ? 1 : 0),
+                          .game_id = game,
+                          .hop_limit = 3,
+                          .type = type};
+    atalaia_header_encode(&h, out);
+    size_t n = ATALAIA_RF_HEADER_SIZE + 13 + body_len + 8;
+    for (size_t i = ATALAIA_RF_HEADER_SIZE; i < n; i++) out[i] = (uint8_t)(i * 7);
+    return n;
+}
+
+static int field_ack(uint16_t *id)
+{
+    int i = last_of(MODEM_FRAME_FIELD_ACK);
+    if (i < 0 || io_state.len[i] != 3) return -1;
+    if (id) *id = (uint16_t)((io_state.payload[i][0] << 8) | io_state.payload[i][1]);
+    return io_state.payload[i][2];
+}
+
+static void host_field_tx(uint16_t id, const uint8_t *frame, size_t n)
+{
+    uint8_t buf[2 + MODEM_FIELD_MAX + 8];
+    put16(buf, id);
+    memcpy(buf + 2, frame, n);
+    host_send(MODEM_FRAME_FIELD_TX, buf, 2 + n);
+}
+
+static void test_field_frames(void)
+{
+    setup(true, 16);
+    host_send(MODEM_FRAME_CMD, (const uint8_t[]){MODEM_CMD_IDENT}, 1);
+    int ident = last_of(MODEM_FRAME_IDENT);
+    CHECK(ident >= 0);
+    char json[MODEM_FRAME_PAYLOAD_MAX + 1] = "";
+    if (ident >= 0) {
+        memcpy(json, io_state.payload[ident], io_state.len[ident]);
+        json[io_state.len[ident]] = '\0';
+    }
+    CHECK(strstr(json, "\"field\":true") != NULL);
+
+    /* Sent without any game configured, as it is, hop_limit forced to 0, tagged with bit 31. */
+    clear_out();
+    uint8_t f[MODEM_FIELD_MAX + 8];
+    size_t n = field_frame(f, 40, 0, ATALAIA_MSG_FIELD, true);
+    host_field_tx(0x1234, f, n);
+    CHECK(io_state.sent == 1 && io_state.pkt_len[0] == n);
+    CHECK(io_state.pkt[0][7] == 0 && memcmp(io_state.pkt[0] + 8, f + 8, n - 8) == 0);
+    CHECK(io_state.tag[0] == (MODEM_FIELD_TAG | 0x1234u));
+    CHECK(modem.count.field_tx == 1);
+    modem_on_tx_result(&modem, io_state.tag[0], MODEM_TX_OK);
+    uint16_t id = 0;
+    CHECK(field_ack(&id) == MODEM_TX_OK && id == 0x1234);
+    CHECK(last_of(MODEM_FRAME_TX_ACK) < 0); /* not a game TX_ACK */
+    modem_on_tx_result(&modem, MODEM_FIELD_TAG | 7u, MODEM_TX_DUTY_CYCLE);
+    CHECK(field_ack(&id) == MODEM_TX_DUTY_CYCLE && id == 7);
+    /* A game TX's tag for seq 0xFFFF is 0x10000: still a TX_ACK. */
+    modem_on_tx_result(&modem, 0x10000u, MODEM_TX_OK);
+    uint16_t seq = 0;
+    CHECK(tx_ack_status(&seq) == MODEM_TX_OK && seq == 0xFFFF);
+
+    /* The largest frame (217 bytes) goes; anything that is not a field frame does not. */
+    clear_out();
+    n = field_frame(f, 187, 0, ATALAIA_MSG_FIELD, true);
+    CHECK(n == MODEM_FIELD_MAX);
+    host_field_tx(1, f, n);
+    CHECK(io_state.sent == 1);
+    n = field_frame(f, 188, 0, ATALAIA_MSG_FIELD, true);
+    host_field_tx(2, f, n);
+    CHECK(field_ack(&id) == MODEM_TX_INVALID && id == 2);
+    n = field_frame(f, 40, 77, ATALAIA_MSG_FIELD, true); /* a game's id */
+    host_field_tx(3, f, n);
+    CHECK(field_ack(&id) == MODEM_TX_INVALID && id == 3);
+    n = field_frame(f, 40, 0, ATALAIA_MSG_CMD, true);
+    host_field_tx(4, f, n);
+    CHECK(field_ack(NULL) == MODEM_TX_INVALID);
+    n = field_frame(f, 40, 0, ATALAIA_MSG_FIELD, false);
+    host_field_tx(5, f, n);
+    CHECK(field_ack(NULL) == MODEM_TX_INVALID);
+    host_field_tx(6, f, 20); /* shorter than header + nonce + 1 + MIC */
+    CHECK(field_ack(NULL) == MODEM_TX_INVALID);
+    host_send(MODEM_FRAME_FIELD_TX, (const uint8_t[]){1}, 1);
+    CHECK(last_of(MODEM_FRAME_ERROR) >= 0);
+    CHECK(io_state.sent == 1);
+    io_state.radio_full = true;
+    n = field_frame(f, 40, 0, ATALAIA_MSG_FIELD, true);
+    host_field_tx(8, f, n);
+    CHECK(field_ack(NULL) == MODEM_TX_QUEUE_FULL);
+    io_state.radio_full = false;
+
+    /* Heard on air: to the host as it is, with rssi and snr, configured or not. */
+    clear_out();
+    modem_on_air_rx(&modem, f, n, -71, 6);
+    int rx = last_of(MODEM_FRAME_FIELD_RX);
+    CHECK(rx >= 0 && io_state.len[rx] == n + 2 && memcmp(io_state.payload[rx], f, n) == 0);
+    CHECK((int8_t)io_state.payload[rx][n] == -71 && io_state.payload[rx][n + 1] == 6);
+    configure(77, 0, 1, 2, 869525000u, KEY);
+    clear_out();
+    modem_on_air_rx(&modem, f, n, -70, 0);
+    CHECK(last_of(MODEM_FRAME_FIELD_RX) >= 0 && last_of(MODEM_FRAME_RX) < 0);
+    CHECK(modem.count.field_rx == 2);
+    /* A game packet is not a field frame, and a field-shaped packet of another game is dropped. */
+    clear_out();
+    uint8_t game_pkt[RADIO_MAX_PKT_LEN];
+    size_t g = air_packet(77, 5, 0, 1, KEY, "hi", game_pkt);
+    modem_on_air_rx(&modem, game_pkt, g, -60, 0);
+    CHECK(last_of(MODEM_FRAME_RX) >= 0 && last_of(MODEM_FRAME_FIELD_RX) < 0);
+    clear_out();
+    n = field_frame(f, 40, 78, ATALAIA_MSG_FIELD, true);
+    modem_on_air_rx(&modem, f, n, -60, 0);
+    CHECK(io_state.frames == 0);
+
+    /* During a MEASURE nothing is sent: busy. */
+    host_send(MODEM_FRAME_CMD, (const uint8_t[]){MODEM_CMD_CLEAR}, 1);
+    uint8_t m[MODEM_MEASURE_LEN] = {MODEM_CMD_MEASURE};
+    put32(m + 1, 869525000u);
+    put16(m + 5, 100);
+    host_send(MODEM_FRAME_CMD, m, sizeof(m));
+    CHECK(modem.measuring);
+    clear_out();
+    n = field_frame(f, 40, 0, ATALAIA_MSG_FIELD, true);
+    host_field_tx(9, f, n);
+    CHECK(field_ack(NULL) == MODEM_TX_BUSY && io_state.sent == 0);
+
+    /* Without a radio chip: no_radio. */
+    setup(false, 16);
+    host_field_tx(10, f, n);
+    CHECK(field_ack(NULL) == MODEM_TX_NO_RADIO);
+}
+
 void run_modem_tests(void)
 {
     test_ident_and_ping();
@@ -715,4 +849,5 @@ void run_modem_tests(void)
     test_rx_epoch_window();
     test_clear_forgets_the_game();
     test_measure();
+    test_field_frames();
 }

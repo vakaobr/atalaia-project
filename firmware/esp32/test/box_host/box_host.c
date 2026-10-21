@@ -19,10 +19,15 @@
  *   box_host --state-dir DIR --modes DIR [--air-port N] [--air-peer N]
  *            [--join-key HEX] [--state-ms N] [--name NAME]
  *            [--as-box VERSION] [--release-keys HEX] [--admin-pin PIN] [--mac MAC]
+ *            [--announce-ms N]
  *
  * Without --join-key (and no key stored in DIR) the box is unadopted
  * (main/adoption.c, protocol/adoption.md); --admin-pin (1234) and --mac
  * (02:00:00:00:00:01) are what "@adopt" checks and "@adopt-info" reports.
+ *
+ * --announce-ms N: between games, announce N ms after a game ends and then every N ms
+ * (instead of 2-20 s and the duty-cycle-based interval), so the tests need not wait.
+ * The box's device id is the file device_id in --state-dir (made at the first start).
  *
  * --as-box VERSION: HELLO says a Field Box (esp32s3, full tier) running VERSION, so
  * the controller offers it firmware updates; a CMD update then prints
@@ -39,7 +44,8 @@
  *   hold <button 1-4> <ms>      hold a team button for ms, then release it
  *   keys <0-9*#...>             keypad presses (keypad.key events to the mode)
  *   battery <0-100|-1>          the battery gauge's reading (-1: no gauge); 87 at the start
- *   status                      print one STATUS line (JSON)
+ *   status                      print one STATUS line (JSON): the game, the link, and between
+ *                               games the device id and whether the box takes an invite
  *   quit
  * stdout: "READY air=<port>", then LOG, SCREEN and STATUS lines (SCREEN: the shell's
  * screens and the mode's, "SCREEN <template> <data JSON>", as the display gets them).
@@ -207,6 +213,49 @@ static int store_save_join_key(void *ctx, const uint8_t key[ATALAIA_JOIN_KEY_SIZ
     return write_file("join_key", key, ATALAIA_JOIN_KEY_SIZE);
 }
 
+static int store_load_device_id(void *ctx, uint8_t id[ATALAIA_FF_DEVICE_SIZE])
+{
+    (void)ctx;
+    return read_file("device_id", id, ATALAIA_FF_DEVICE_SIZE) == ATALAIA_FF_DEVICE_SIZE ? 0 : -1;
+}
+
+static int store_save_device_id(void *ctx, const uint8_t id[ATALAIA_FF_DEVICE_SIZE])
+{
+    (void)ctx;
+    return write_file("device_id", id, ATALAIA_FF_DEVICE_SIZE);
+}
+
+static int store_load_ff_boot(void *ctx, uint32_t *boot)
+{
+    (void)ctx;
+    uint8_t b[4];
+    int n = read_file("ff_boot", b, 4);
+    if (n == 0) return -1; /* none stored yet */
+    if (n != 4) return -2; /* damaged */
+    *boot = (uint32_t)b[0] << 24 | (uint32_t)b[1] << 16 | (uint32_t)b[2] << 8 | b[3];
+    return 0;
+}
+
+static int store_save_ff_boot(void *ctx, uint32_t boot)
+{
+    (void)ctx;
+    uint8_t b[4] = {(uint8_t)(boot >> 24), (uint8_t)(boot >> 16), (uint8_t)(boot >> 8),
+                    (uint8_t)boot};
+    return write_file("ff_boot", b, 4);
+}
+
+/* The platform's random bytes, as the box's seeded generator gives them (never a nonce). */
+static void shell_random(void *user, uint8_t *buf, size_t len)
+{
+    (void)user;
+    FILE *f = fopen("/dev/urandom", "rb");
+    if (f == NULL || fread(buf, 1, len, f) != len) {
+        fprintf(stderr, "box_host: /dev/urandom unreadable\n");
+        exit(1);
+    }
+    fclose(f);
+}
+
 /* ---- Radio and shell ------------------------------------------------------------- */
 
 static bool air_send(void *user, const uint8_t *pkt, size_t len)
@@ -358,23 +407,28 @@ static void print_status(void)
         }
     }
     const field_link_stats_t *st = &game.link.stats;
+    char device[17];
+    box_lobby_device_hex(&game, device);
     out("STATUS {\"phase\":%d,\"paused\":%s,\"game_id\":%u,\"node_id\":%u,\"epoch\":%u,"
         "\"game_time_ms\":%lu,\"owner\":%u,\"scores\":[%s],\"pending\":%u,\"leader\":%u,"
         "\"term\":%lu,\"events_sent\":%lu,\"retries\":%lu,\"acked\":%lu,\"cmds\":%lu,"
         "\"times\":%lu,\"states\":%lu,\"rx_ok\":%lu,\"rx_rejected\":%lu,\"relayed\":%lu,"
-        "\"have_key\":%s}",
+        "\"have_key\":%s,\"device_id\":\"%s\",\"available\":%s,\"invites_accepted\":%lu,"
+        "\"invites_refused\":%lu,\"last_game\":%u}",
         (int)game.phase, game.paused ? "true" : "false", game.join.game_id, game.join.node_id,
         game.link.proto.epoch, (unsigned long)runner.game_time_ms, game.owner_team, scores,
         (unsigned)field_link_pending(&game.link), game.link.leader, (unsigned long)game.link.term,
         (unsigned long)st->events_sent, (unsigned long)st->retries, (unsigned long)st->acked,
         (unsigned long)st->cmds, (unsigned long)st->times, (unsigned long)st->states_sent,
         (unsigned long)st->rx_ok, (unsigned long)st->rx_rejected, (unsigned long)st->relayed,
-        game.link.proto.has_key ? "true" : "false");
+        game.link.proto.has_key ? "true" : "false", device,
+        box_lobby_available(&game) ? "true" : "false", (unsigned long)game.lobby.invites_accepted,
+        (unsigned long)game.lobby.invites_refused, game.lobby.last_game);
 }
 
 int main(int argc, char **argv)
 {
-    long air_port = 0, peer_port = 0, state_ms = 0;
+    long air_port = 0, peer_port = 0, state_ms = 0, announce_ms = 0;
     const char *modes = NULL;
     const char *join_key_hex = NULL;
     const char *name = "box-host";
@@ -392,6 +446,8 @@ int main(int argc, char **argv)
             peer_port = arg_value(argc, argv, &i);
         } else if (strcmp(argv[i], "--state-ms") == 0) {
             state_ms = arg_value(argc, argv, &i);
+        } else if (strcmp(argv[i], "--announce-ms") == 0) {
+            announce_ms = arg_value(argc, argv, &i);
         } else if (strcmp(argv[i], "--state-dir") == 0 && i + 1 < argc) {
             snprintf(dir, sizeof(dir), "%s", argv[++i]);
         } else if (strcmp(argv[i], "--modes") == 0 && i + 1 < argc) {
@@ -491,8 +547,16 @@ int main(int argc, char **argv)
     hello.transports = 1;
     hello.battery_pct = 87;
 
-    box_store_ops_t store = {store_load_join,     store_save_join,     store_erase_join,
-                             store_load_join_key, store_save_join_key, NULL};
+    box_store_ops_t store = {.load_join = store_load_join,
+                             .save_join = store_save_join,
+                             .erase_join = store_erase_join,
+                             .load_join_key = store_load_join_key,
+                             .save_join_key = store_save_join_key,
+                             .load_device_id = store_load_device_id,
+                             .save_device_id = store_save_device_id,
+                             .load_ff_boot = store_load_ff_boot,
+                             .save_ff_boot = store_save_ff_boot,
+                             .ctx = NULL};
     box_shell_ops_t shell = {.screen = shell_screen,
                              .log = shell_log,
                              .reboot = NULL,
@@ -500,9 +564,14 @@ int main(int argc, char **argv)
                              .battery_pct = shell_battery,
                              .radio_send = air_send,
                              .update = shell_update,
+                             .random = shell_random,
                              .user = NULL};
     box_game_init(&game, &runner, &preset, &store, &shell, &atalaia_crypto_mbedtls, &nvs_ops,
                   &evlog, &hello);
+    if (announce_ms > 0) {
+        game.lobby.first_min_ms = game.lobby.first_max_ms = (uint32_t)announce_ms;
+        game.lobby.interval_fixed_ms = (uint32_t)announce_ms;
+    }
     if (join_key_hex != NULL && !box_game_set_join_key_hex(&game, join_key_hex)) {
         fprintf(stderr, "box_host: --join-key needs 64 hex digits\n");
         return 2;

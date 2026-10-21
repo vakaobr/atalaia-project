@@ -16,6 +16,13 @@
  *   the last events are acknowledged (or after a minute).
  *   After a reboot the stored payload brings the box back into the game:
  *   new epoch, HELLO, unacknowledged events resent, node.rebooted.
+ *
+ * Between games (box_lobby.c, protocol/field-frames.md): a box with no game,
+ * or whose game is over, announces itself on its last channel in field frames
+ * sealed with a key derived from the field join key, answers a controller's
+ * DISCOVER, and takes an INVITE for its device id and current token: the
+ * join payload it carries goes through exactly the checks of a card. After
+ * BOX_READY_MS the final screen gives way to "Ready" for the next game.
  */
 #ifndef ATALAIA_BOX_GAME_H
 #define ATALAIA_BOX_GAME_H
@@ -24,6 +31,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "atalaia/field_frame.h"
 #include "atalaia/join.h"
 #include "atalaia/tag.h"
 #include "node_runner.h"
@@ -37,6 +45,13 @@ typedef struct {
     int (*erase_join)(void *ctx);                                        /* 0 = ok */
     int (*load_join_key)(void *ctx, uint8_t key[ATALAIA_JOIN_KEY_SIZE]); /* 0 = ok */
     int (*save_join_key)(void *ctx, const uint8_t key[ATALAIA_JOIN_KEY_SIZE]); /* 0 = ok */
+    /* The box's device id (field frames, HELLO key 10); NULL: a new one every boot. */
+    int (*load_device_id)(void *ctx, uint8_t id[ATALAIA_FF_DEVICE_SIZE]);       /* 0 = ok */
+    int (*save_device_id)(void *ctx, const uint8_t id[ATALAIA_FF_DEVICE_SIZE]); /* 0 = ok */
+    /* The field frames' boot count (their nonces, decision RJ-15): raised and stored before the
+     * first frame of every run. NULL, or a failed save: the box sends no field frame. */
+    int (*load_ff_boot)(void *ctx, uint32_t *boot); /* 0 = ok, -1 = none stored yet */
+    int (*save_ff_boot)(void *ctx, uint32_t boot);  /* 0 = ok */
     void *ctx;
 } box_store_ops_t;
 
@@ -51,6 +66,9 @@ typedef struct {
     /* CMD update (protocol/firmware-update.md): the shell checks the offer and runs the update
      * over Wi-Fi (fw_update.h); never called while a game is played. May be NULL. */
     void (*update)(void *user, const char *params_json);
+    /* Random bytes (the device id, tokens, timing spread; never a nonce): the ESP32 shell seeds
+     * them with entropy collected at boot (decision RJ-15). NULL: no field frames. */
+    void (*random)(void *user, uint8_t *buf, size_t len);
     void *user;
 } box_shell_ops_t;
 
@@ -74,6 +92,61 @@ typedef enum {
 } box_join_result_t;
 
 #define BOX_END_LINGER_MS 60000
+/* "Ready" (for the next game) replaces the final screen this long after the end. */
+#define BOX_READY_MS 30000
+
+/* Field frames between games (box_lobby.c; the same timings as atalaia_sim/lobby.py). */
+#define BOX_ANNOUNCE_FIRST_MIN_MS  2000  /* the first announcement after a game ends: */
+#define BOX_ANNOUNCE_FIRST_MAX_MS  20000 /* spread, so a field's boxes do not all talk at once */
+#define BOX_ANNOUNCE_MIN_MS        60000 /* never more often than once a minute */
+#define BOX_ANNOUNCE_SHARE_PCT     2     /* of the sub-band's hourly duty-cycle budget */
+#define BOX_DISCOVER_ANSWER_MAX_MS 3000
+#define BOX_INVITE_ANSWER_MIN_MS   100
+#define BOX_INVITE_ANSWER_MAX_MS   600
+#define BOX_TOKEN_ROTATE_MS        600000
+#define BOX_ANSWER_REPEAT_MS       10000
+#define BOX_ANSWER_IDS             8 /* invites answered lately: one answer each in 10 s */
+#define BOX_ANSWERS_PER_MIN        6 /* and at most this many answers a minute in all */
+#define BOX_ENDED_GAMES            4
+
+typedef struct {
+    bool ready; /* device id and key: field frames can be sent and read */
+    uint8_t key[ATALAIA_FF_KEY_SIZE];
+    uint8_t nonce_key[32]; /* the nonces' pseudonym key (atalaia_ff_nonce_key) */
+    bool boot_ok;          /* this run's boot count is stored and in use */
+    uint32_t boot;
+    uint32_t ctr; /* frames sent under boot; at 65536 the boot count rises again */
+    uint8_t device_id[ATALAIA_FF_DEVICE_SIZE];
+    uint8_t token[ATALAIA_FF_TOKEN_SIZE];
+    uint8_t prev_token[ATALAIA_FF_TOKEN_SIZE];
+    bool have_prev;
+    uint32_t rotate_ms;
+    bool announce_due;
+    uint32_t announce_ms;
+    bool announced; /* last_announce_ms is valid */
+    uint32_t last_announce_ms;
+    bool answer_due;
+    uint32_t answer_ms;
+    uint16_t answer_invite;
+    uint8_t answer_result;
+    uint16_t answered_ids[BOX_ANSWER_IDS]; /* 0 = free */
+    uint32_t answered_at[BOX_ANSWER_IDS];
+    uint32_t answer_times[BOX_ANSWERS_PER_MIN]; /* the last answers sent, a ring */
+    uint8_t answer_next;
+    bool boot_error_logged; /* the boot count could not be read (not "none yet") */
+    atalaia_ff_reasm_t reasm;
+    uint16_t last_game; /* the last game played, its role: in announcements */
+    char last_role[ATALAIA_JOIN_ROLE_MAX + 1];
+    uint16_t ended[BOX_ENDED_GAMES]; /* games played to their end: never joined again */
+    uint32_t channel_hz;             /* where it listens: its last game's channel */
+    bool ready_screen_due;
+    uint32_t ready_screen_ms;
+    bool invited; /* the current game came from an invite */
+    uint32_t invites_accepted, invites_refused, frames_ignored;
+    /* The timings (box_game_init sets the BOX_ANNOUNCE_* values; the host box shortens them). */
+    uint32_t first_min_ms, first_max_ms, interval_min_ms;
+    uint32_t interval_fixed_ms; /* the host box's tests: this interval, not the computed one */
+} box_lobby_t;
 /* battery.low (decision FU1-6): the gauge is read this often in a joined game; below
  * battery_low_pct the box sends one battery.low, and again only after the level has come
  * back BOX_BATTERY_HYSTERESIS points above it. */
@@ -108,6 +181,7 @@ typedef struct {
     uint8_t battery_low_pct;  /* battery.low below this level; 0 = never */
     bool battery_low;         /* battery.low sent for this crossing (until the level is back up) */
     uint32_t battery_next_ms; /* next gauge reading */
+    box_lobby_t lobby;        /* between games: field frames (box_lobby.c) */
 } box_game_t;
 
 void box_game_init(box_game_t *g, node_runner_t *runner, preset_t *preset_buf,
@@ -149,6 +223,38 @@ bool box_game_active(const box_game_t *g);
 
 /* True while a joined game is being played (running or paused): no firmware update then. */
 bool box_game_playing(const box_game_t *g);
+
+/* ---- Between games (box_lobby.c) ----------------------------------------------- */
+
+/* Sets up field frames once the join key is known (also after "@joinkey"): the device id
+ * (stored, or made now), the derived key, a token. False without a random source or key. */
+bool box_lobby_init(box_game_t *g);
+
+/* True when the box may take an invite: no game joined, or its game over, and no game
+ * picked on the box being played. */
+bool box_lobby_available(const box_game_t *g);
+
+/* A packet heard on the radio: true if it was a field frame (handled or ignored here). */
+bool box_lobby_on_packet(box_game_t *g, const uint8_t *pkt, size_t len);
+
+/* Time passes: answers, announcements, the token, the ready screen. */
+void box_lobby_tick(box_game_t *g, uint32_t now_ms);
+
+/* The game ended (box_game.c): remember it, announce soon, the ready screen later. */
+void box_lobby_game_over(box_game_t *g, uint32_t now_ms);
+
+/* The box joined a game (a card, a QR code, the serial console, an invite): its tokens go,
+ * so no invite recorded before can work afterwards (box_game.c). */
+void box_lobby_joined(box_game_t *g);
+
+/* The shell drew something else (the preset picker): no ready screen over it. */
+void box_lobby_cancel_ready_screen(box_game_t *g);
+
+/* The device id as 16 hex digits (NUL-terminated), "" before box_lobby_init. */
+void box_lobby_device_hex(const box_game_t *g, char out[17]);
+
+/* Internal to box_game.c and box_lobby.c: take a join payload from an invite. */
+box_join_result_t box_game_join_invited(box_game_t *g, const uint8_t *payload, size_t len);
 
 /*
  * An NFC tag read while a game runs (joined or stand-alone): the node gets

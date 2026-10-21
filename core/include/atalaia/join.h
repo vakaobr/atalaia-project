@@ -111,6 +111,10 @@ atalaia_join_result_t atalaia_join_decode(const uint8_t *buf, size_t len,
                                           const uint8_t join_key[ATALAIA_JOIN_KEY_SIZE],
                                           atalaia_join_t *out);
 
+/* True if s is valid UTF-8 without NUL, 1..max bytes: the payload's rule for text fields
+ * (also the field frames', atalaia/field_frame.h). */
+bool atalaia_join_text_ok(const char *s, size_t max);
+
 /* Checks the fields of j as the decoder does (ranges, sizes, teams, addresses). */
 bool atalaia_join_valid(const atalaia_join_t *j);
 

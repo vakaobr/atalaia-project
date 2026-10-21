@@ -84,7 +84,7 @@ void modem_send_ident(modem_t *m)
     int n = snprintf(json, sizeof(json),
                      "{\"fw\":\"atalaia-modem\",\"fw_version\":\"%s\",\"core_version\":\"%s\","
                      "\"framing\":%d,\"radio\":\"%s\",\"payload_max\":%d,\"epoch_window\":%u,"
-                     "\"measure\":%s}",
+                     "\"measure\":%s,\"field\":true}",
                      m->fw_version != NULL ? m->fw_version : "unknown", atalaia_version(),
                      MODEM_PROTOCOL_VERSION, m->radio_present ? "sx1262" : "none",
                      ATALAIA_RF_PAYLOAD_MAX, (unsigned)m->epoch_window,
@@ -380,6 +380,58 @@ static void handle_tx(modem_t *m, const uint8_t *p, size_t len)
     }
 }
 
+/* ---- Field frames: host <-> radio, as they are (protocol/field-frames.md) ---- */
+
+static void send_field_ack(modem_t *m, uint16_t id, modem_tx_status_t status)
+{
+    uint8_t buf[3] = {(uint8_t)(id >> 8), (uint8_t)(id & 0xFF), (uint8_t)status};
+    send_frame(m, MODEM_FRAME_FIELD_ACK, buf, sizeof(buf));
+}
+
+/* The shape of a field frame: version 1, encrypted, game 0, type FIELD, 31-217 bytes. The
+ * modem cannot check more: the key is the field's, which only the controllers and boxes hold. */
+static bool field_frame_shape(const uint8_t *pkt, size_t len)
+{
+    atalaia_header_t h;
+    if (len < MODEM_FIELD_MIN || len > MODEM_FIELD_MAX || !atalaia_header_decode(pkt, &h)) {
+        return false;
+    }
+    return h.game_id == 0 && h.type == ATALAIA_MSG_FIELD && ATALAIA_VF_ENC(h.version_flags);
+}
+
+static void handle_field_tx(modem_t *m, const uint8_t *p, size_t len)
+{
+    if (len < 2) {
+        send_error(m, MODEM_ERR_BAD_FRAME, "FIELD_TX shorter than its id");
+        return;
+    }
+    uint16_t id = be16(p);
+    const uint8_t *frame = p + 2;
+    size_t n = len - 2;
+    if (!m->radio_present) {
+        send_field_ack(m, id, MODEM_TX_NO_RADIO);
+        return;
+    }
+    if (m->measuring) {
+        send_field_ack(m, id, MODEM_TX_BUSY);
+        return;
+    }
+    if (!field_frame_shape(frame, n)) {
+        send_field_ack(m, id, MODEM_TX_INVALID);
+        return;
+    }
+    /* Never relayed: hop_limit 0 (it is outside the AAD, so the MIC still holds). */
+    uint8_t pkt[MODEM_FIELD_MAX];
+    memcpy(pkt, frame, n);
+    pkt[ATALAIA_RF_HOP_LIMIT_OFFSET] = 0;
+    if (m->io.radio_send == NULL || !m->io.radio_send(m->io.ctx, pkt, n, MODEM_FIELD_TAG | id)) {
+        m->count.tx_fail++;
+        send_field_ack(m, id, MODEM_TX_QUEUE_FULL);
+        return;
+    }
+    m->count.field_tx++;
+}
+
 void modem_on_tx_result(modem_t *m, uint32_t tag, modem_tx_status_t status)
 {
     if (tag == 0) return;
@@ -388,6 +440,10 @@ void modem_on_tx_result(modem_t *m, uint32_t tag, modem_tx_status_t status)
     } else {
         m->count.tx_fail++;
     }
+    if (tag & MODEM_FIELD_TAG) {
+        send_field_ack(m, (uint16_t)(tag & 0xFFFFu), status);
+        return;
+    }
     send_tx_ack(m, (uint16_t)(tag - 1u), status);
 }
 
@@ -395,6 +451,16 @@ void modem_on_tx_result(modem_t *m, uint32_t tag, modem_tx_status_t status)
 
 void modem_on_air_rx(modem_t *m, const uint8_t *pkt, size_t len, int8_t rssi, int8_t snr)
 {
+    /* A field frame: to the host as it is, with or without a game configured. */
+    if (field_frame_shape(pkt, len)) {
+        uint8_t frame[MODEM_FIELD_MAX + 2];
+        memcpy(frame, pkt, len);
+        frame[len] = (uint8_t)rssi;
+        frame[len + 1] = (uint8_t)snr;
+        m->count.field_rx++;
+        send_frame(m, MODEM_FRAME_FIELD_RX, frame, len + 2);
+        return;
+    }
     if (!m->configured || len < ATALAIA_RF_HEADER_SIZE + ATALAIA_RF_MIC_SIZE ||
         len > RADIO_MAX_PKT_LEN) {
         m->count.rx_dropped++;
@@ -451,6 +517,7 @@ void modem_handle_frame(modem_t *m, uint8_t type, const uint8_t *payload, size_t
     switch (type) {
     case MODEM_FRAME_TX: handle_tx(m, payload, len); break;
     case MODEM_FRAME_CMD: handle_cmd(m, payload, len); break;
+    case MODEM_FRAME_FIELD_TX: handle_field_tx(m, payload, len); break;
     default: send_error(m, MODEM_ERR_UNKNOWN_TYPE, "frame type not accepted by the modem"); break;
     }
 }

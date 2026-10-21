@@ -22,7 +22,7 @@ class PositionTests(P3Case):
         super().setUp()
         self.game = self.new_game(teams=["red", "blue"], params={}, squads=2)
         self.gid = self.game["id"]
-        self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM)
+        self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM, json={"force": True})
         self.people = {}
         for name, team, squad, role in (("red1", "red", 1, "player"), ("red2", "red", 1, "player"),
                                         ("red3", "red", 2, "player"), ("lead", "red", 1, "squad_leader"),

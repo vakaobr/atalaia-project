@@ -67,7 +67,7 @@ class MqttTests(unittest.TestCase):
         self.game = self.ctrl.create_game({"name": "g", "mode_id": "org.atalaia.domination",
                                            "teams": ["red", "blue"], "assignments": {"4": "zone"}})
         self.gid = self.game["id"]
-        self.ctrl.start_game(self.gid)
+        self.ctrl.start_game(self.gid, force=True)
 
     def tearDown(self):
         self.bridge.stop()

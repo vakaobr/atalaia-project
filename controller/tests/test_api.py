@@ -81,7 +81,7 @@ class EndpointTests(ApiCase):
         self.assertEqual(c.get("/api/v1/games", headers=READ).json()[0]["id"], gid)
         self.assertEqual(c.get(f"/api/v1/games/{gid}", headers=READ).json()["state"], "ready")
         # lifecycle
-        self.assertEqual(c.post(f"/api/v1/games/{gid}/start", headers=GM).json()["state"], "running")
+        self.assertEqual(c.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).json()["state"], "running")
         self.assertEqual(c.post(f"/api/v1/games/{gid}/pause", json={"reason": "medic"}, headers=GM)
                          .json()["state"], "paused")
         self.assertEqual(c.post(f"/api/v1/games/{gid}/resume", headers=GM).json()["state"], "running")
@@ -154,7 +154,7 @@ class EndpointTests(ApiCase):
         self.assertEqual(c.post("/api/v1/games", json={"name": "y", "mode_id": DOMINATION},
                                 headers=GM).status_code, 409)
         self.assertEqual(c.post(f"/api/v1/games/{gid}/resume", headers=GM).status_code, 409)
-        c.post(f"/api/v1/games/{gid}/start", headers=GM)
+        c.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True})
         self.assertEqual(c.post("/api/v1/nodes/4/cmd", json={"cmd": "start"}, headers=GM).status_code, 400)
         self.assertEqual(c.post(f"/api/v1/games/{gid}/score", json={"team": "green", "amount": 1},
                                 headers=GM).status_code, 400)
@@ -174,7 +174,7 @@ class StreamTests(ApiCase):
             self.assertEqual(hello["score"]["teams"], {"red": 0, "blue": 0})
             ws.send_json({"type": "ping"})
             self.assertEqual(ws.receive_json(), {"type": "pong"})
-            self.client.post(f"/api/v1/games/{gid}/start", headers=GM)
+            self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True})
             self.modem.rx(4, 0, "EVENT", codec.encode_event({"node": 4, "seq": 1, "t": 5, "type": "zone.captured",
                                                              "team": 2}), game_id=gid, epoch=1)
             seen = []

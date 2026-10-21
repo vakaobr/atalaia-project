@@ -152,7 +152,7 @@ class PodOnTheFieldRadio(unittest.TestCase):
         self.assertTrue(self.acked(j, seq))
 
         # The GM starts the game: the phone hears the start (a CMD, and TIME says running).
-        self.assertEqual(self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM).status_code, 200)
+        self.assertEqual(self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM, json={"force": True}).status_code, 200)
         self.assertIsNotNone(self.received("CMD", lambda pl: cmd_decode(pl)["cmd"] == 0))
         self.assertIsNotNone(self.received("TIME", lambda pl: time_decode(pl)["game_state"] == 1))
 

@@ -210,6 +210,11 @@ static bool text_ok(const char *s, size_t max)
     return true;
 }
 
+bool atalaia_join_text_ok(const char *s, size_t max)
+{
+    return text_ok(s, max);
+}
+
 bool atalaia_join_valid(const atalaia_join_t *j)
 {
     if (j->game_id == 0 || j->game_id == 0xFFFF) return false;

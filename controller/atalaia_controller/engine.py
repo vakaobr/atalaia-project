@@ -16,6 +16,14 @@ RFC 0001 Amendment 3): new games use it, it goes to the modem with
 SET_CHANNEL and CONFIGURE and to the boxes in the join payload. It can
 only change while no game is live, and the noise scan that helps choose
 it runs only then too (measuring takes the modem off the channel).
+
+Between games, free boxes announce themselves and the GM can invite them
+into the next game over the radio (reinvite.py, protocol/field-frames.md).
+A game starts only once every role it needs has a joined node (a box or a
+linked Android prop): ``start_check`` says which roles are missing, and the
+GM can start anyway with ``force`` (logged, and told to every console).
+Mode minimums (Hold-All's ``min_zones``, Last Stand's ``last_zones``) are
+warnings, never a block (decisions RJ-1 to RJ-3).
 """
 
 from __future__ import annotations
@@ -51,6 +59,7 @@ from atalaia_sim.packet import Header, vf_make
 
 from . import channels, radio_modem, visibility
 from . import scenario_service as scenarios
+from .reinvite import Reinvite
 from .config import Config
 from .modem_framing import RxPacket
 from .modes import ModeRegistry, resolve_params
@@ -83,6 +92,14 @@ class Conflict(ControllerError):
 
 class Unavailable(ControllerError):
     status = 503
+
+
+class StartBlocked(Conflict):
+    """Start refused: roles of the game with no joined node (start_check); force overrides it."""
+
+    def __init__(self, message: str, check: dict[str, Any]) -> None:
+        super().__init__(message)
+        self.check = check
 
 
 class ModemTransport:
@@ -289,11 +306,16 @@ class Controller:
             log.info("field channel %s Hz (chosen in the console; radio.channel_hz = %d is the "
                      "default)", stored, cfg.channel_hz)
 
+        # Free boxes and invites between games (reinvite.py); needs the field join key.
+        self.reinvite: Optional[Reinvite] = Reinvite(self) if join_key else None
         if modem is not None:
             modem.on_rx = self._on_rx
             modem.on_tx_ack = self._on_tx_ack
             modem.on_state = self._on_modem_state
             modem.on_error = self._on_modem_error
+            if self.reinvite is not None:
+                modem.on_field_rx = self.reinvite.on_field_rx
+                modem.on_field_ack = self.reinvite.on_field_ack
         self._restore()
 
     # --- plumbing -----------------------------------------------------------
@@ -485,6 +507,8 @@ class Controller:
             out["term"] = self.fc.term
         if live and self.key_lost:
             out["key_lost"] = True
+        if live and game.get("state") == "ready" and self.fc is not None and not game.get("joined"):
+            out["start_check"] = self.start_check()
         return out
 
     def players_game(self, game: dict[str, Any], viewer: Any = None) -> dict[str, Any]:
@@ -1003,7 +1027,73 @@ class Controller:
         self._emit({"type": "game", "game": out})
         return out
 
-    def start_game(self, game_id: int) -> dict[str, Any]:
+    # --- the start guard (decisions RJ-1 to RJ-3) -----------------------------------
+
+    def _joined_nodes(self) -> list[tuple[int, str]]:
+        """The live game's nodes that have joined: heard (HELLO first), or stored as heard before
+        a restart; boxes and Android props alike. (node id, role)."""
+        assert self.game is not None
+        out: dict[int, str] = {n["node_id"]: n["role"] for n in self.store.nodes(self.game["id"])}
+        if self.fc is not None:
+            for node in self.fc.nodes.values():
+                if node.heard or node.hello:
+                    out[node.node_id] = node.role
+        return sorted(out.items())
+
+    def _needed_roles(self) -> list[str]:
+        """The roles that must each have a joined node before the game starts.
+
+        A scenario's game: the roles of the boxes its manifest names (its ``nodes``); without
+        any, as for every other game: every role of the game's mode and role packages (each has
+        ``requires:`` capabilities), unless its manifest says ``needed: false``. A modifier
+        brings no role (modes/README.md)."""
+        assert self.game is not None
+        meta = self.scenario_meta(self.game.get("mode_id"))
+        if meta is not None:
+            boxes = sorted(set(meta.box_nodes().values()))
+            if boxes:
+                return boxes
+        try:
+            pkg = self.modes.get(self.game["mode_id"])
+        except ModeError:
+            pkg = None
+        if pkg is None:
+            return []
+        return sorted(r for r, spec in pkg.mode.roles.items()
+                      if not (isinstance(spec, dict) and spec.get("needed") is False))
+
+    def start_check(self) -> dict[str, Any]:
+        """What Start would say now: the needed roles, how many nodes of each have joined, the
+        missing ones (Start refuses unless forced) and the mode's minimums not met (warnings)."""
+        with self._lock:
+            if self.game is None:
+                raise Conflict("no live game")
+            needed = self._needed_roles()
+            joined: Counter[str] = Counter(role for _, role in self._joined_nodes())
+            missing = [r for r in needed if joined[r] == 0]
+            warnings = []
+            params = self.game.get("params") or {}
+            roles = set(needed) | set(joined)
+            for name, value in params.items():
+                if not isinstance(value, int) or isinstance(value, bool):
+                    continue
+                for prefix in ("min_", "last_"):
+                    role = name[len(prefix):-1] if name.startswith(prefix) and name.endswith("s") else None
+                    if role not in roles:
+                        continue
+                    have = joined[role]
+                    if prefix == "min_" and have < value:
+                        warnings.append({"code": "min", "param": name, "role": role, "value": value, "have": have,
+                                         "text": f"{have} {role} node(s) joined; {name} is {value}"})
+                    elif prefix == "last_" and 0 < have <= value:
+                        warnings.append({"code": "last", "param": name, "role": role, "value": value,
+                                         "have": have,
+                                         "text": f"only {have} {role} node(s) joined and {name} is {value}: "
+                                                 "the countdown can run from the start"})
+            return {"needed": needed, "joined": dict(sorted(joined.items())), "missing": missing,
+                    "warnings": warnings, "ok": not missing}
+
+    def start_game(self, game_id: int, force: bool = False) -> dict[str, Any]:
         with self._lock:
             fc = self._live(game_id)
             assert self.game is not None
@@ -1012,6 +1102,16 @@ class Controller:
             reason = self.start_guard() if self.start_guard is not None else None
             if reason:
                 raise Conflict(reason)
+            check = self.start_check()
+            if check["missing"] and not force:
+                raise StartBlocked("no box or prop has joined for: " + ", ".join(check["missing"])
+                                   + "; join them, or start anyway (force)", check)
+            if check["missing"]:
+                # The GM's override, after the console's confirmation: logged and told.
+                log.warning("game %d started anyway (forced) without nodes for: %s", game_id,
+                            ", ".join(check["missing"]))
+                self._emit({"type": "system", "kind": "start.forced", "game": game_id,
+                            "missing": check["missing"]})
             fc.start_game(duration_ms=self.game["duration_ms"], now_ms=self.now_ms())
             preset = self.store.preset(self.game["preset_id"]) if self.game.get("preset_id") else None
             fc.controller_event("game.start", {"preset": preset["name"] if preset else self.game["mode_id"]},
@@ -1075,6 +1175,8 @@ class Controller:
                 self.positions.end_game(game_id)  # ADR-P3-6: positions last as long as the game
             out = self._set_state(game_id, "ended", ended_at=time.time())
             self._deactivate()
+            if self.reinvite is not None:
+                self.reinvite.forget_game(game_id)  # no invite into a game that is over
             return self.public_game(self.store.game(game_id) or out)
 
     def _leave_standby(self, game_id: int, reason: str) -> dict[str, Any]:
@@ -1136,6 +1238,7 @@ class Controller:
     def _node_info(self, node: FieldNode) -> dict[str, Any]:
         assert self.fc is not None
         hello = node.hello
+        device = hello.get("device_id")
         return {
             "node_id": node.node_id, "name": node.name, "role": node.role,
             "owner": node.owner_name(self.fc.teams), "phase": node.phase,
@@ -1144,6 +1247,8 @@ class Controller:
             "platform": hello.get("platform"), "fw_version": hello.get("fw_version"),
             "core_version": hello.get("core_version"), "tier": hello.get("tier"),
             "capabilities": hello.get("capabilities"),
+            # The box's stable device id (HELLO key 10, protocol/field-frames.md), as hex.
+            "device_id": device.hex() if isinstance(device, (bytes, bytearray)) and len(device) == 8 else None,
             "score": {t: v.get(f"node-{node.node_id}", 0) for t, v in self.fc._scores.items()},
             # Health as the controller logged it (node.online/node.offline, battery.low).
             "link": node.link, "battery_low": node.battery_low,
@@ -1248,6 +1353,8 @@ class Controller:
             self.checkin.purge()  # retention (ADR-P3-13), at most every 10 minutes
         if self.branding is not None:
             self.branding.purge()  # crests nothing refers to any more, at most every 10 minutes
+        if self.reinvite is not None:
+            self.reinvite.tick(self.now_ms())  # invites and their retries, with or without a game
         with self._lock:
             fc = self.fc
             if fc is None:
@@ -1365,6 +1472,12 @@ class Controller:
         # When it was last heard: a link event is news about a box that may have said nothing.
         info["seen_ms_ago"] = max(0, self.now_ms() - node.last_seen_ms) if node.heard else None
         self._emit({"type": "node", "game": self.game["id"], "kind": kind, "node": info})
+        if kind == "hello":
+            if self.reinvite is not None:
+                self.reinvite.on_hello(node.node_id, info.get("device_id"))
+            if self.game.get("state") == "ready" and not self.game.get("joined"):
+                # The start check changed: the console's Start shows what is still missing.
+                self._emit({"type": "game", "game": self.public_game(self.game)})
 
     def _on_scores(self, totals: dict[str, int]) -> None:
         if self.game is None:

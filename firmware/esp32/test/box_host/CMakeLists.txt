@@ -30,6 +30,7 @@ add_subdirectory(${CORE_DIR} core)
 add_executable(box_host
     box_host.c
     ${MAIN_DIR}/box_game.c
+    ${MAIN_DIR}/box_lobby.c
     ${MAIN_DIR}/serial_console.c
     ${MAIN_DIR}/node_runner.c
     ${MAIN_DIR}/command_dispatch.c

@@ -49,6 +49,7 @@ add_executable(pod_host
     ${CORE_DIR}/src/proxy.c
     ${CORE_DIR}/src/tag.c
     ${CORE_DIR}/src/join.c
+    ${CORE_DIR}/src/field_frame.c
 )
 target_include_directories(pod_host PRIVATE
     ${CORE_DIR}/include ${CORE_DIR}/src ${MAIN_DIR} ${MBEDTLS_INCLUDE_DIR})

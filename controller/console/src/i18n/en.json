@@ -48,7 +48,8 @@
     "modem_error": "Modem error: {message}",
     "role": "This controller is now {role} (term {term}).",
     "node_offline": "Box {node} has not been heard for more than 90 s.",
-    "count": "{n} alerts"
+    "count": "{n} alerts",
+    "start_forced": "Game started without a box for: {roles}"
   },
   "game": {
     "title": "Game",
@@ -104,7 +105,15 @@
     "squads_hint": "0 = no squads (small games: teams only). In a milsim or a big game each team splits into squads.",
     "squads_each": "{n} squads per team",
     "role_packages": "Props with a role of their own",
-    "role_packages_hint": "Boxes and phones given their role run only them, next to the mode's boxes (for example medic kits)."
+    "role_packages_hint": "Boxes and phones given their role run only them, next to the mode's boxes (for example medic kits).",
+    "start_anyway": "Start anyway",
+    "missing_short": "No box has joined for: {roles}.",
+    "confirm_start_anyway": "Start anyway?",
+    "missing_roles": "Start waits for a box (or a linked phone) for: {roles}. Invite boxes, or start anyway.",
+    "start_warnings": {
+      "min": "{have} × {role} joined; the mode asks for {value} ({param}).",
+      "last": "Only {have} × {role} joined and {param} is {value}: the countdown can run from the start."
+    }
   },
   "controller": {
     "title": "Field controller",
@@ -685,5 +694,44 @@
     "code_title": "Pairing code (radio)",
     "code_later": "A box with a screen will show a short code that you type here to adopt it over the radio. It comes with the radio invites; until then use the cable or the field card.",
     "log_title": "Recent adoptions"
+  },
+  "invites": {
+    "open": "Invite boxes",
+    "title": "Boxes for this game",
+    "intro": "Boxes whose game is over announce themselves over the radio. Tick the ones for this game: the controller sends each one its join over the radio, encrypted with the field's key.",
+    "previous_game": "Ticked: the boxes of “{name}”.",
+    "previous": "last game",
+    "seen": "{s} s ago",
+    "last_role": "was {role}",
+    "box": "Box",
+    "heard": "Heard",
+    "role": "Role",
+    "progress": "Progress",
+    "send": "Invite ({n})",
+    "discover": "Look for boxes",
+    "close": "Close",
+    "empty": "No free box heard yet. A box announces itself up to 20 s after its game ends (its screen says “Ready”), then about once a minute; “Look for boxes” asks them now.",
+    "no_radio": "The radio modem is not connected: boxes can be neither heard nor invited.",
+    "old_modem": "The radio modem's firmware does not carry field frames: update it.",
+    "manual": "Join cards, QR codes and the serial console work as before (Join tab).",
+    "in_game": "in this game (node {node})",
+    "status": {
+      "sending": "sending",
+      "invited": "invited",
+      "accepted": "accepted, joining",
+      "joined": "joined",
+      "refused": "refused",
+      "failed": "failed",
+      "too_big": "too big"
+    },
+    "reasons": {
+      "busy": "in another game",
+      "refused": "join refused (another field's join key?)",
+      "no_mode": "the mode is not on the box",
+      "not_box": "not a box's join",
+      "storage": "the box could not store it",
+      "radio": "the box's radio may not transmit",
+      "ended": "it has played that game already"
+    }
   }
 }

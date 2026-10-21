@@ -156,7 +156,7 @@ class ChronoListTests(P3Case):
         me, _ = self.player(r1)
         pid = me["player_id"]
         self.upload(self.mtoken, self.marshal.series(r1, pid, [95.0], game_id=self.gid))  # 0.903 J
-        self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM)
+        self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM, json={"force": True})
         out = self.upload(self.mtoken, self.marshal.series(r1, pid, [96.0], rtype="spotcheck", game_id=self.gid))
         self.assertEqual(out["outcome"], "pass")
         out = self.upload(self.mtoken, self.marshal.series(r1, pid, [99.0], rtype="spotcheck", game_id=self.gid))
@@ -180,7 +180,7 @@ class ChronoListTests(P3Case):
         for headers in (READ, bearer(first["token"])):
             r = self.client.get(f"/api/v1/games/{self.gid}/chrono-list", headers=headers)
             self.assertEqual(r.status_code, 403)
-        start = self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM).json()
+        start = self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM, json={"force": True}).json()
         self.assertEqual(start["pending_declarations"], 2)  # a warning, the game started anyway
         self.assertEqual(start["state"], "running")
 

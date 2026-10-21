@@ -68,6 +68,7 @@ set(ATALAIA_CORE_SOURCES
     src/duty_cycle.c
     src/msg_codec.c
     src/join.c
+    src/field_frame.c
     src/tag.c
     src/screen_template.c
     src/proxy.c
@@ -127,7 +128,7 @@ if(BUILD_TESTING)
         tests/test_packet.c tests/test_flood.c tests/test_ack.c
         tests/test_duty_cycle.c tests/test_msg_codec.c
         tests/test_crypto_mbedtls.c tests/test_field_api.c tests/test_join.c
-        tests/test_tag.c tests/test_screen_template.c
+        tests/test_tag.c tests/test_field_frame.c tests/test_screen_template.c
         tests/test_proxy.c tests/test_geo.c)
     target_include_directories(test_core PRIVATE src)
     target_link_libraries(test_core PRIVATE atalaia_core)

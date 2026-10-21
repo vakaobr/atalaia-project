@@ -212,7 +212,7 @@ class AtakRelayEndToEndTests(unittest.TestCase):
         self.addCleanup(emitter.stop)
         gid = ctrl.create_game({"name": "Domingo", "mode_id": DOMINATION, "teams": ["red", "blue"],
                                 "assignments": {"3": "zone"}})["id"]
-        ctrl.start_game(gid)
+        ctrl.start_game(gid, force=True)
         georef.save(store, georef.Georef([TL, BR]))
         store.set_position(gid, 3, 0.5, 0.5)
         now = time.time()

@@ -45,6 +45,7 @@ typedef enum {
     ATALAIA_MSG_TIME = 6,   /* game-clock beacon; also the controller heartbeat */
     ATALAIA_MSG_CONFIG = 7, /* assigns a preset and role; parameters only */
     ATALAIA_MSG_CLAIM = 8,  /* controller election: candidate claims the role with a term number */
+    ATALAIA_MSG_FIELD = 9,  /* outside any game, sealed with a key derived from the field join key: a box's announcement, a discovery, an invitation (protocol/field-frames.md) */
 } atalaia_msg_type_t;
 
 /* CBOR keys of HELLO payload fields. */
@@ -58,6 +59,7 @@ enum {
     ATALAIA_PL_HELLO_TRANSPORTS = 7,   /* bitmask: bit 0=lora, 1=wifi, 2=ble */
     ATALAIA_PL_HELLO_BATTERY_PCT = 8,  /* 0-100 */
     ATALAIA_PL_HELLO_EPOCH = 9,        /* current nonce epoch */
+    ATALAIA_PL_HELLO_DEVICE_ID = 10,   /* the box's stable device id (protocol/field-frames.md) */
 };
 
 /* CBOR keys of ACK payload fields. */

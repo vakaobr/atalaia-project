@@ -46,7 +46,7 @@ class NodeHealthEngineTests(EngineCase):
         super().setUp()
         self.reopen(persist_game_key=True)
         self.gid = self.create()["id"]
-        self.ctrl.start_game(self.gid)
+        self.ctrl.start_game(self.gid, force=True)
 
     def health(self):
         return [e for e in self.store.events(self.gid) if e["type"] in HEALTH]
@@ -123,7 +123,7 @@ class NodeHealthEngineTests(EngineCase):
         self.ctrl.end_game(self.gid)
         self.reopen(persist_game_key=True, health_node_offline_s=0.0, health_battery_low_pct=0)
         gid = self.create()["id"]
-        self.ctrl.start_game(gid)
+        self.ctrl.start_game(gid, force=True)
         self.rx(4, 0, "STATE", low_state(3), epoch=2, game_id=gid)
         self.advance(300, step=10)
         self.assertEqual([e for e in self.store.events(gid) if e["type"] in HEALTH], [])
@@ -134,7 +134,7 @@ class FieldScriptTests(EngineCase):
 
     def test_field_lua_is_not_fed_controller_health_events(self):
         gid = self.create()["id"]
-        self.ctrl.start_game(gid)
+        self.ctrl.start_game(gid, force=True)
         fed = []
 
         class Recorder:

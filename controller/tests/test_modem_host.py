@@ -297,7 +297,7 @@ class EngineOverHostModemTests(unittest.TestCase):
         key = self.ctrl.game_key(game["id"])
         epoch = self.ctrl.transport.epoch
         self.assertTrue(wait_for(lambda: (self.modem.status or {}).get("configured") is True, 3))
-        self.ctrl.start_game(game["id"])
+        self.ctrl.start_game(game["id"], force=True)
         start_packets = self.host.transmitted_all()
         types = []
         for pkt in start_packets:

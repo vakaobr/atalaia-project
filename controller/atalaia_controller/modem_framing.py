@@ -29,6 +29,11 @@ CMD = 0x05
 STATUS = 0x06
 ERROR = 0x07
 NOISE = 0x08
+# Field frames (protocol/field-frames.md): sealed by the controller, carried as they are.
+FIELD_TX = 0x09   # controller -> modem: id (2) + a whole field frame
+FIELD_RX = 0x0A   # modem -> controller: a field frame heard + rssi + snr
+FIELD_ACK = 0x0B  # modem -> controller: id (2) + status (TX_STATUS)
+FIELD_FRAME_MAX = 217
 
 # CMD opcodes
 CMD_PING = 0x01
@@ -55,6 +60,7 @@ TX_STATUS = {
     5: "nonce_reuse",
     6: "queue_full",
     7: "no_radio",
+    8: "busy",
 }
 
 # ERROR codes
@@ -233,6 +239,28 @@ def tx_payload(header_bytes: bytes, plaintext: bytes) -> bytes:
     return header_bytes + plaintext
 
 
+def field_tx_payload(tx_id: int, frame: bytes) -> bytes:
+    if not 0 <= tx_id <= 0xFFFF or not 1 <= len(frame) <= FIELD_FRAME_MAX:
+        raise FrameError("FIELD_TX: an id of 0-65535 and a frame of at most 217 bytes")
+    return struct.pack(">H", tx_id) + frame
+
+
+def decode_field_rx(payload: bytes) -> tuple[bytes, int, int]:
+    """A FIELD_RX frame: (the field frame as heard, rssi, snr)."""
+    if len(payload) < HEADER_SIZE + 2:
+        raise FrameError("FIELD_RX shorter than a header and its trailer")
+    rssi, snr = struct.unpack(">bb", payload[-2:])
+    return payload[:-2], rssi, snr
+
+
+def decode_field_ack(payload: bytes) -> tuple[int, str]:
+    if len(payload) != 3:
+        raise FrameError("FIELD_ACK is 3 bytes")
+    tx_id, status = struct.unpack(">HB", payload)
+    return tx_id, TX_STATUS.get(status, f"status_{status}")
+
+
 def frame_name(frame_type: int) -> Optional[str]:
     return {IDENT: "IDENT", RX: "RX", TX: "TX", TX_ACK: "TX_ACK", CMD: "CMD", STATUS: "STATUS",
-            ERROR: "ERROR", NOISE: "NOISE"}.get(frame_type)
+            ERROR: "ERROR", NOISE: "NOISE", FIELD_TX: "FIELD_TX", FIELD_RX: "FIELD_RX",
+            FIELD_ACK: "FIELD_ACK"}.get(frame_type)

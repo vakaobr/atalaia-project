@@ -184,11 +184,16 @@ final class RfHello {
     required this.transports,
     required this.epoch,
     this.batteryPct,
+    this.deviceId,
   });
 
   factory RfHello.decode(List<int> payload) {
     final m = _map(payload);
-    _only(m, 9);
+    _only(m, 10);
+    final dev = m[10];
+    if (m.containsKey(10) && (dev is! Uint8List || dev.length != 8)) {
+      throw RfException('device_id is 8 bytes');
+    }
     final caps = m[6];
     if (caps is! List || caps.any((c) => c is! int || c < 0 || c > 255)) {
       throw RfException('capabilities is a list of 0-255');
@@ -203,6 +208,7 @@ final class RfHello {
       transports: _uint(m, 7, 'transports', 255),
       batteryPct: m.containsKey(8) ? _uint(m, 8, 'battery_pct', 100) : null,
       epoch: _uint(m, 9, 'epoch', 0xffff),
+      deviceId: dev is Uint8List ? dev : null,
     );
   }
 
@@ -210,6 +216,9 @@ final class RfHello {
   final int platform, tier, transports, epoch;
   final List<int> capabilities;
   final int? batteryPct;
+
+  /// The box's stable device id (key 10, optional; protocol/field-frames.md).
+  final Uint8List? deviceId;
 
   Uint8List encode() {
     if (utf8.encode(nodeName).length > 24) {
@@ -225,7 +234,13 @@ final class RfHello {
       7: _checked('transports', transports, 255),
       if (batteryPct != null) 8: _checked('battery_pct', batteryPct!, 100),
       9: _checked('epoch', epoch, 0xffff),
+      if (deviceId != null) 10: _deviceId(deviceId!),
     });
+  }
+
+  static Uint8List _deviceId(Uint8List id) {
+    if (id.length != 8) throw RfException('device_id is 8 bytes');
+    return id;
   }
 }
 

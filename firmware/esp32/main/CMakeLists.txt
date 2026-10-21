@@ -103,6 +103,7 @@ else()
         "radio/noise_stats.c"
         "radio/field_link.c"
         "box_game.c"
+        "box_lobby.c"
         "serial_console.c"
         "fw_update.c"
         "fw_update_esp.c"
@@ -124,6 +125,8 @@ set(ATALAIA_REQUIRES
     esp_event
     esp_netif
     mbedtls
+    # bootloader_random_enable() for the boot entropy of the field frames' tokens (RJ-15).
+    bootloader_support
     # Firmware updates over the air (fw_update_esp.c): the OTA slots, HTTPS, and
     # Monocypher's Ed25519 for the release signatures (components/monocypher).
     app_update

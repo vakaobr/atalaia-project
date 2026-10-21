@@ -97,7 +97,7 @@ class DeviceHealthEndToEndTests(unittest.TestCase):
         self.addCleanup(ctrl.stop)
         gid = ctrl.create_game({"name": "Domingo", "mode_id": DOMINATION, "teams": ["red", "blue"],
                                 "assignments": {"3": "zone", "4": "zone"}})["id"]
-        ctrl.start_game(gid)
+        ctrl.start_game(gid, force=True)
         for node, name, battery in ((3, "norte-1", 80), (4, "sul-2", 15)):
             self.rx(ctrl, gid, node, "HELLO", hello_encode({
                 "node_name": name, "platform": 1, "fw_version": "0.9.0", "core_version": "0.9.0", "tier": 0,

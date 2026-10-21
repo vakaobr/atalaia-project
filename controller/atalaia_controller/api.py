@@ -19,7 +19,13 @@ which browsers cannot give headers, also takes ``?token=``.
     GET  /api/v1/games                     every game
     POST /api/v1/games                     create a game from a mode or preset
     GET  /api/v1/games/{id}                one game
-    POST /api/v1/games/{id}/start|pause|resume|end
+    POST /api/v1/games/{id}/start|pause|resume|end   (start: {"force": true} starts without a node for
+                                           every role the game needs; refused with start_check otherwise)
+    GET  /api/v1/games/{id}/start-check    the roles the game needs, those joined, missing, warnings
+    GET  /api/v1/boxes                     GM: free boxes heard over the radio (protocol/field-frames.md)
+    POST /api/v1/boxes/discover            GM: ask the free boxes to announce themselves now
+    GET|POST /api/v1/games/{id}/invites    GM: invites into the live game / invite boxes
+                                           {"boxes": [{"device_id", "role"?, "name"?}]}
     GET  /api/v1/games/{id}/score          current totals
     POST /api/v1/games/{id}/score          GM adjustment, logged as score.delta
     POST /api/v1/nodes/{id}/cmd            a command to one node (65535: all)
@@ -120,7 +126,7 @@ from . import images, visibility
 from . import scenario_service as scenarios
 from .branding import SLOTS, Branding, etag
 from .checkin import Viewer
-from .engine import Controller, ControllerError
+from .engine import Controller, ControllerError, StartBlocked
 from .modes import resolve_params
 from .store import FIELD_IMAGE_MAX
 from .ws import PLAYER_TYPES, Hub, default_route, public
@@ -236,6 +242,11 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     async def controller_error(request: Request, exc: ControllerError):
         return JSONResponse({"detail": str(exc)}, status_code=exc.status)
 
+    @app.exception_handler(StartBlocked)
+    async def start_blocked(request: Request, exc: StartBlocked):
+        # The console shows the missing roles and offers "Start anyway" (decision RJ-1).
+        return JSONResponse({"detail": str(exc), "start_check": exc.check}, status_code=exc.status)
+
     @app.exception_handler(checkinmod.Refused)
     async def refused(request: Request, exc: checkinmod.Refused):
         return JSONResponse({"detail": str(exc), "reasons": exc.reasons}, status_code=exc.status)
@@ -343,12 +354,45 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         return out if visibility.is_staff(v, game_id) else controller.players_game(out, v)
 
     @app.post("/api/v1/games/{game_id}/start", dependencies=[Depends(require_gm)])
-    def start(game_id: int) -> dict[str, Any]:
-        out = controller.start_game(game_id)
+    def start(game_id: int, body: Any = Body(None)) -> dict[str, Any]:
+        force = body_map(body).get("force", False)
+        if not isinstance(force, bool):
+            raise ControllerError("force: true or false")
+        out = controller.start_game(game_id, force=force)
         if checkin is not None:
             # ADR-P3-13: a warning, not a block; the console asks before it starts.
             out = {**out, "pending_declarations": checkin.pending_count(game_id)}
         return out
+
+    @app.get("/api/v1/games/{game_id}/start-check", dependencies=[Depends(require_console)])
+    def start_check(game_id: int) -> dict[str, Any]:
+        game = controller.game
+        if game is None or game["id"] != game_id:
+            raise ControllerError(f"game {game_id} is not the live game")
+        return controller.start_check()
+
+    # --- re-inviting boxes over the radio (reinvite.py, protocol/field-frames.md) ----------
+
+    def need_reinvite() -> Any:
+        if controller.reinvite is None:
+            raise ControllerError("no field join key: boxes cannot be invited over the radio")
+        return controller.reinvite
+
+    @app.get("/api/v1/boxes", dependencies=[Depends(require_gm)])
+    def boxes() -> dict[str, Any]:
+        return need_reinvite().boxes()
+
+    @app.post("/api/v1/boxes/discover", dependencies=[Depends(require_gm)])
+    def boxes_discover() -> dict[str, Any]:
+        return need_reinvite().discover()
+
+    @app.get("/api/v1/games/{game_id}/invites", dependencies=[Depends(require_gm)])
+    def invites(game_id: int) -> dict[str, Any]:
+        return {"invites": need_reinvite().invites(game_id)}
+
+    @app.post("/api/v1/games/{game_id}/invites", dependencies=[Depends(require_gm)])
+    def invite(game_id: int, body: Any = Body(None)) -> dict[str, Any]:
+        return need_reinvite().invite(game_id, body_map(body).get("boxes"))
 
     @app.post("/api/v1/games/{game_id}/pause", dependencies=[Depends(require_gm)])
     def pause(game_id: int, body: Any = Body(None)) -> dict[str, Any]:

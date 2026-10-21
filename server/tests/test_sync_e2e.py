@@ -132,7 +132,7 @@ class SyncEndToEndTests(unittest.TestCase):
         game = ctrl.create_game({"name": "Domingo", "mode_id": DOMINATION, "teams": ["red", "blue"],
                                  "assignments": {"3": "zone", "4": "zone"}})
         gid = game["id"]
-        ctrl.start_game(gid)
+        ctrl.start_game(gid, force=True)
         fc = ctrl.fc
         assert fc is not None
         for seq, (node, team, t) in enumerate(((3, "red", 60_000), (4, "blue", 90_000), (3, "red", 120_000)), 1):
@@ -366,7 +366,7 @@ class SyncEndToEndTests(unittest.TestCase):
                                                      "declaration_id": reg_ana["replicas"][0]["declaration_id"]})
         self.assertEqual(judged["outcome"], "pass")
 
-        ctrl.start_game(gid)
+        ctrl.start_game(gid, force=True)
         ctrl.end_game(gid, "time")
         self.assertTrue(client.run_once(), client.last_error)
         regs = {str(r["id"]): r["status"] for r in self.db.fetch("SELECT id, status FROM game_registrations")}

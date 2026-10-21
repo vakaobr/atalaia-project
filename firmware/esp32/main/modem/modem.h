@@ -7,6 +7,8 @@
  *
  *   host --TX frame (header + plaintext)--> encrypt (AES-CCM) --> radio
  *   radio --packet--> dedupe, decrypt (epoch window) --RX frame--> host
+ *   host --FIELD_TX (a sealed field frame)--> radio, as it is, with or without a game
+ *   radio --field frame (game 0, type 9)--> FIELD_RX --> host, as it is
  *
  * The game key lives in RAM only: the controller sends it with CONFIGURE
  * after every connect. The controller owns its own epoch and sequence
@@ -72,6 +74,8 @@ typedef struct {
     uint32_t tx_fail;
     uint32_t cmds;
     uint32_t bad_frames;
+    uint32_t field_rx; /* field frames forwarded to the host */
+    uint32_t field_tx; /* field frames queued for the radio */
 } modem_counters_t;
 
 typedef struct {
@@ -117,7 +121,13 @@ void modem_feed_serial(modem_t *m, const uint8_t *data, size_t len);
 /* A packet from the radio, with its RSSI and SNR in dB. */
 void modem_on_air_rx(modem_t *m, const uint8_t *pkt, size_t len, int8_t rssi, int8_t snr);
 
-/* Outcome of a radio_send() call: tag is the packet's seq + 1. */
+/* A FIELD_TX's radio tag: bit 31 set, its id in the low 16 bits (a TX's tag is seq + 1). */
+#define MODEM_FIELD_TAG 0x80000000u
+/* A field frame's size on air (atalaia/field_frame.h: ATALAIA_FF_MIN, ATALAIA_FF_MAX). */
+#define MODEM_FIELD_MIN 31
+#define MODEM_FIELD_MAX 217
+
+/* Outcome of a radio_send() call: tag is the packet's seq + 1, or MODEM_FIELD_TAG | id. */
 void modem_on_tx_result(modem_t *m, uint32_t tag, modem_tx_status_t status);
 
 /*

@@ -164,12 +164,53 @@ static int store_save_join_key(void *ctx, const uint8_t key[ATALAIA_JOIN_KEY_SIZ
     return store_save_blob("join_key", key, ATALAIA_JOIN_KEY_SIZE);
 }
 
+/* The box's device id (protocol/field-frames.md): random, made once, kept until NVS is erased. */
+static int store_load_device_id(void *ctx, uint8_t id[ATALAIA_FF_DEVICE_SIZE])
+{
+    (void)ctx;
+    return store_load_blob("device_id", id, ATALAIA_FF_DEVICE_SIZE) == ATALAIA_FF_DEVICE_SIZE ? 0
+                                                                                              : -1;
+}
+
+static int store_save_device_id(void *ctx, const uint8_t id[ATALAIA_FF_DEVICE_SIZE])
+{
+    (void)ctx;
+    return store_save_blob("device_id", id, ATALAIA_FF_DEVICE_SIZE);
+}
+
+/* The field frames' boot count (their nonces, decision RJ-15). */
+static int store_load_ff_boot(void *ctx, uint32_t *boot)
+{
+    (void)ctx;
+    esp_err_t err = nvs_get_u32(nvs_h, "ff_boot", boot);
+    if (err == ESP_OK) return 0;
+    if (err == ESP_ERR_NVS_NOT_FOUND) return -1; /* none stored yet */
+    ESP_LOGE(TAG, "nvs read ff_boot: %s", esp_err_to_name(err));
+    return -2; /* unreadable: the box sends no field frame */
+}
+
+static int store_save_ff_boot(void *ctx, uint32_t boot)
+{
+    (void)ctx;
+    esp_err_t err = nvs_set_u32(nvs_h, "ff_boot", boot);
+    if (err == ESP_OK) err = nvs_commit(nvs_h);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "nvs write ff_boot: %s", esp_err_to_name(err));
+        return -1;
+    }
+    return 0;
+}
+
 static const box_store_ops_t esp_box_store = {
     .load_join = store_load_join,
     .save_join = store_save_join,
     .erase_join = store_erase_join,
     .load_join_key = store_load_join_key,
     .save_join_key = store_save_join_key,
+    .load_device_id = store_load_device_id,
+    .save_device_id = store_save_device_id,
+    .load_ff_boot = store_load_ff_boot,
+    .save_ff_boot = store_save_ff_boot,
     .ctx = NULL,
 };
 

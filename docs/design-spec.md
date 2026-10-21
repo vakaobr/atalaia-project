@@ -593,6 +593,8 @@ The controller broadcasts a `TIME` beacon every 30 s and nodes slew their clocks
 
 The controller creates a game with a game id and key. A node joins by tapping an NFC join card, scanning a QR code on the GM console, or BLE pairing from the GM's phone. Joining also pushes any scripts and assets the node is missing over Wi-Fi or BLE.
 
+Between games, a box whose game is over announces itself over the radio, and the GM invites it into the next game from the console: the controller sends it its join over LoRa, sealed with a key derived from the field join key, and the box joins without a card (built in software and in the firmware, not yet tried on the bench; RFC 0001 Amendment 7, [protocol/field-frames.md](../protocol/field-frames.md)). A game starts only once every role it needs has a joined node, unless the GM confirms "Start anyway" (decisions RJ-1 to RJ-3).
+
 ## 11. Field controller, site server and public API
 
 The field controller runs field scripts, bridges LoRa to the network, and exposes the public API over MQTT, REST and WebSocket. The reference build is a Raspberry Pi; an Android device with 4G is the supported alternative. An optional site server adds the internet-facing services described at the end of this section.
@@ -875,7 +877,7 @@ The target is "hard to cheat casually, obvious when someone tries", not bank-gra
 
 ### Keys and joining
 
-The controller generates the game key when a game is created. Nodes receive it during join by NFC card, QR code or BLE pairing, never over LoRa. A new game always gets a new key.
+The controller generates the game key when a game is created. Nodes receive it during join by NFC card, QR code or BLE pairing, or, for a box between games, inside an invite over LoRa encrypted with a key derived from the field join key (never in the clear over LoRa). A new game always gets a new key. The field join key is therefore a field secret: whoever holds it and records the radio can read the keys of games joined by invite (decision RJ-2).
 
 ### Player data and privacy
 

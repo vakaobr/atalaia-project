@@ -48,7 +48,7 @@ class ModePackEngineTests(EngineCase):
     def test_holdall_scores_on_the_controller_and_survives_a_restart(self):
         self.reopen(persist_game_key=True)
         gid = self.create(mode_id=HOLDALL, params={"tick_s": 5, "points_per_tick": 2})["id"]
-        self.ctrl.start_game(gid)
+        self.ctrl.start_game(gid, force=True)
         self.owners(RED, BLUE)
         self.rx(4, 1, "EVENT", ev(4, 1, 100, "zone.captured", team=RED))
         self.step(2, 4)
@@ -77,7 +77,7 @@ class ModePackEngineTests(EngineCase):
     def test_last_stand_defeat_ends_the_game_with_the_attackers_winning(self):
         gid = self.create(mode_id=LASTSTAND, params={"countdown_s": 10},
                           assignments={"4": "zone", "5": "zone", "6": "zone"})["id"]
-        self.ctrl.start_game(gid)
+        self.ctrl.start_game(gid, force=True)
         self.owners(BLUE, BLUE, BLUE)
         self.step(2, 4)
         self.owners(RED, RED, BLUE, seq=2)
@@ -94,7 +94,7 @@ class ModePackEngineTests(EngineCase):
 
     def test_takeover_starts_the_field_script(self):
         gid = self.create(mode_id=HOLDALL)["id"]
-        self.ctrl.start_game(gid)
+        self.ctrl.start_game(gid, force=True)
         self.ctrl.field.close()
         self.ctrl.field = None
         self.ctrl._on_role("leader", 2)
@@ -107,7 +107,7 @@ class ModePackEngineTests(EngineCase):
         pkg = self.ctrl.modes.get(game["mode_id"])
         self.assertEqual(pkg.to_api()["parts"], ["org.atalaia.domination", CODES])
         self.assertIn("do\n", pkg.mode.node_script)
-        self.ctrl.start_game(game["id"])
+        self.ctrl.start_game(game["id"], force=True)
         self.rx(4, 1, "EVENT", ev(4, 1, 100, "code.used", team=RED, code="1", kind="hint", holder="red"))
         [used] = self.log(game["id"], "code.used")
         self.assertEqual(used["data"], {"code": "1", "kind": "hint", "holder": "red"})

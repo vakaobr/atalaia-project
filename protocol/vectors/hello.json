@@ -29,6 +29,22 @@
         "epoch": 256
       },
       "cbor": "a901676374726c2d303102020365322e312e330465302e322e300500068400010203070708185509190100"
+    },
+    {
+      "name": "hello_with_device_id",
+      "fields": {
+        "node_name": "box-a3f1",
+        "platform": 1,
+        "fw_version": "0.4.0",
+        "core_version": "0.2.0",
+        "tier": 0,
+        "capabilities": [0, 1, 5],
+        "transports": 1,
+        "battery_pct": 87,
+        "epoch": 3,
+        "device_id": "5a17c0de0b0e1234"
+      },
+      "cbor": "aa0168626f782d6133663102010365302e342e300465302e322e3005000683000105070108185709030a485a17c0de0b0e1234"
     }
   ],
   "invalid": [
@@ -41,6 +57,11 @@
       "name": "hello_name_too_long",
       "cbor": "a80178196161616161616161616161616161616161616161616161616102000363312e300463302e31050006810007010901",
       "reason": "node_name exceeds max length of 24 bytes"
+    },
+    {
+      "name": "hello_device_id_too_short",
+      "cbor": "a90168626f782d6133663102010365302e342e300465302e322e3005000683000105070109030a475a17c0de0b0e12",
+      "reason": "device_id is exactly 8 bytes"
     }
   ]
 }

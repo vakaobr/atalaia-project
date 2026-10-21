@@ -116,9 +116,9 @@ class GameLifecycleTests(EngineCase):
         gid = game["id"]
         with self.assertRaises(Conflict):
             self.ctrl.pause_game(gid)
-        self.ctrl.start_game(gid)
+        self.ctrl.start_game(gid, force=True)
         with self.assertRaises(Conflict):
-            self.ctrl.start_game(gid)
+            self.ctrl.start_game(gid, force=True)
         self.clock.advance(2)
         self.ctrl.pause_game(gid, "medic")
         self.clock.advance(5)
@@ -147,7 +147,7 @@ class GameLifecycleTests(EngineCase):
 
     def test_auto_end_at_duration(self):
         gid = self.create(duration_ms=10_000)["id"]
-        self.ctrl.start_game(gid)
+        self.ctrl.start_game(gid, force=True)
         self.clock.advance(9)
         self.ctrl.tick()
         self.assertEqual(self.store.game(gid)["state"], "running")
@@ -158,7 +158,7 @@ class GameLifecycleTests(EngineCase):
 
     def test_beacons_from_the_tick(self):
         gid = self.create()["id"]
-        self.ctrl.start_game(gid)
+        self.ctrl.start_game(gid, force=True)
         n = len(self.modem.of("TIME"))
         self.clock.advance(29)
         self.ctrl.tick()
@@ -169,7 +169,7 @@ class GameLifecycleTests(EngineCase):
 
     def test_radio_down(self):
         gid = self.create()["id"]
-        self.ctrl.start_game(gid)
+        self.ctrl.start_game(gid, force=True)
         self.modem.state = "down"
         with self.assertRaises(Unavailable):
             self.ctrl.send_node_cmd(4, "message", {"text": "x"})
@@ -180,7 +180,7 @@ class RadioInputTests(EngineCase):
     def setUp(self):
         super().setUp()
         self.gid = self.create()["id"]
-        self.ctrl.start_game(self.gid)
+        self.ctrl.start_game(self.gid, force=True)
         self.modem.sent.clear()
 
     def test_events_are_stored_once_and_acked(self):
@@ -252,7 +252,7 @@ class RadioInputTests(EngineCase):
 class FailoverTests(EngineCase):
     def test_step_down_and_promote(self):
         gid = self.create()["id"]
-        self.ctrl.start_game(gid)
+        self.ctrl.start_game(gid, force=True)
         # Another controller beacons with a higher term: this one steps down.
         beacon = time_encode({"game_time_ms": 4000, "game_state": 1, "duration_ms": 0,
                               "wall_s": 1, "term": 2})
@@ -287,7 +287,7 @@ class RestartTests(EngineCase):
         game = self.create()
         gid = game["id"]
         key = self.ctrl.game_key(gid)
-        self.ctrl.start_game(gid)
+        self.ctrl.start_game(gid, force=True)
         self.rx(4, 0, "STATE", state(1, {1: 9}, epoch=4), epoch=4)
         self.ctrl.adjust_score(gid, "blue", 2, "")
         self.clock.advance(12)
@@ -307,7 +307,7 @@ class RestartTests(EngineCase):
 
     def test_lost_key_only_allows_ending(self):
         gid = self.create()["id"]
-        self.ctrl.start_game(gid)
+        self.ctrl.start_game(gid, force=True)
         self.reopen()
         self.assertTrue(self.ctrl.status()["key_lost"])
         with self.assertRaises(Conflict):
@@ -346,7 +346,7 @@ class FieldScriptTests(EngineCase):
         pkg = self.install()
         self.assertTrue(pkg.to_api()["field_script"])
         gid = self.create(mode_id="org.test.holdall")["id"]
-        self.ctrl.start_game(gid)
+        self.ctrl.start_game(gid, force=True)
         self.modem.sent.clear()
         self.rx(4, 0, "STATE", state(1, {}), epoch=1)
         self.rx(5, 0, "STATE", state(2, {}), epoch=1)

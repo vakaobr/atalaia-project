@@ -315,7 +315,7 @@ class UpdateTests(FirmwareCase):
         updates = self.client.get("/api/v1/firmware", headers=GM).json()["updates"]
         self.assertEqual((updates[0]["node_id"], updates[0]["state"], updates[0]["from_version"]), (4, "sent", "0.2.0"))
         # The game may not start while the update is on its way.
-        r = self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM)
+        r = self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM, json={"force": True})
         self.assertEqual(r.status_code, 409)
         self.assertIn("firmware", r.json()["detail"])
         # The box reports, signed with the game key; then its HELLO shows the new version.
@@ -324,7 +324,7 @@ class UpdateTests(FirmwareCase):
         self.hello(game, 4, "0.3.0", seq=1)
         self.assertEqual(self.fw.updates()[0]["state"], "done")
         self.assertTrue(any(m.get("type") == "firmware" for m in self.messages))
-        self.assertEqual(self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM).status_code, 200)
+        self.assertEqual(self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM, json={"force": True}).status_code, 200)
         # Never during a game.
         self.hello(game, 5, "0.2.0")
         r = self.client.post(f"/api/v1/firmware/{self.rel['id']}/install", json={"nodes": "all"}, headers=GM)
@@ -370,7 +370,7 @@ class UpdateTests(FirmwareCase):
         self.assertEqual(r.status_code, 409)
         self.assertIn("HTTPS", r.json()["detail"])
         self.ctrl.ca_sha256 = b"\xca" * 32
-        self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM)
+        self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM, json={"force": True})
         self.client.post(f"/api/v1/games/{game['id']}/pause", json={}, headers=GM)
         r = self.client.post(f"/api/v1/firmware/{self.rel['id']}/install", json={"nodes": "all"}, headers=GM)
         self.assertEqual(r.status_code, 409)  # paused is still a game being played
@@ -417,7 +417,7 @@ class UpdateTests(FirmwareCase):
         self.assertIsNotNone(self.fw.busy())
         self.assertEqual(self.client.delete("/api/v1/firmware/updates", headers=GM).json(), {"cancelled": [4]})
         self.assertIsNone(self.fw.busy())
-        self.assertEqual(self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM).status_code, 200)
+        self.assertEqual(self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM, json={"force": True}).status_code, 200)
 
     def test_radio_down(self) -> None:
         game = self.new_game()

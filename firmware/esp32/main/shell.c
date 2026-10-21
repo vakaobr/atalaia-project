@@ -14,7 +14,9 @@
  * console, driven by the controller's CMD and TIME over the radio, its
  * events, STATE and scores sent back (radio/field_link.c, decision D18).
  * Between games the controller can update its firmware over the field Wi-Fi
- * (fw_update.c, fw_update_esp.c, protocol/firmware-update.md).
+ * (fw_update.c, fw_update_esp.c, protocol/firmware-update.md), and invite
+ * the box into its next game over the radio (box_lobby.c,
+ * protocol/field-frames.md).
  */
 
 #include <stdio.h>
@@ -54,6 +56,7 @@
 #include "esp_mac.h"
 #include "esp_netif.h"
 #include "esp_psram.h"
+#include "bootloader_random.h"
 #include "esp_random.h"
 #include "esp_system.h"
 #include "esp_timer.h"
@@ -235,8 +238,8 @@ static void serial_input_init(void)
 #endif
 #if CONFIG_ATALAIA_SERIAL_JOIN
     ESP_LOGI(TAG, "serial join on: \"@join atalaia:join:...\", \"@joinkey <hex>\", "
-                  "\"@tag <uid> [<tag>]\", \"@wifi <ssid> <password>\" or "
-                  "\"@update <version> <release id>\" on the console");
+                  "\"@tag <uid> [<tag>]\", \"@wifi <ssid> <password>\", "
+                  "\"@update <version> <release id>\" or \"@lobby\" on the console");
 #endif
 }
 
@@ -312,6 +315,21 @@ static void serial_command(const char *cmd)
         } else {
             ESP_LOGW(TAG, "update: \"@update <version> <release id>\"");
         }
+        return;
+    }
+    if (strcmp(cmd, "lobby") == 0) {
+        /* Between games (protocol/field-frames.md): what the controller sees of this box. */
+        char hex[17];
+        box_lobby_device_hex(&box, hex);
+        ESP_LOGI(TAG,
+                 "lobby: device %s, %s, channel %lu Hz, last game %u (%s), invites %lu "
+                 "accepted, %lu refused, %lu frames ignored",
+                 hex[0] ? hex : "none (no join key)",
+                 box_lobby_available(&box) ? "free for an invite" : "in a game",
+                 (unsigned long)box.lobby.channel_hz, box.lobby.last_game,
+                 box.lobby.last_role[0] ? box.lobby.last_role : "-",
+                 (unsigned long)box.lobby.invites_accepted,
+                 (unsigned long)box.lobby.invites_refused, (unsigned long)box.lobby.frames_ignored);
         return;
     }
 #endif
@@ -406,6 +424,50 @@ static bool box_radio_send(void *user, const uint8_t *pkt, size_t len)
 {
     (void)user;
     return radio_task_send(pkt, len);
+}
+
+/* The ESP32-S3's hardware RNG (device id, tokens, field frame nonces). */
+/*
+ * Random bytes for the device id, the tokens and timing spread (never a field frame's nonce,
+ * which is counter-based: box_lobby.c, decision RJ-15). ESP-IDF calls the S3's RNG truly
+ * random only while Wi-Fi or Bluetooth runs, or between bootloader_random_enable() and
+ * _disable(), which a Field Box between games often is not. So app_main collects 32 bytes of
+ * true entropy at boot with the SAR ADC's noise on (before any ADC or I2S driver starts), and
+ * every request is SHA-256 of that seed, the board's MAC (two boards never share a stream), a
+ * counter and fresh esp_fill_random bytes: as good as the boot entropy even when the RNG is not.
+ */
+static uint8_t boot_seed[32];
+static uint32_t random_ctr;
+
+static void collect_boot_entropy(void)
+{
+    uint8_t pool[32 + 6] = {0};
+    bootloader_random_enable();
+    esp_fill_random(pool, 32);
+    bootloader_random_disable();
+    esp_efuse_mac_get_default(pool + 32);
+    atalaia_sha256(pool, sizeof(pool), boot_seed);
+    memset(pool, 0, sizeof(pool));
+}
+
+static void box_random(void *user, uint8_t *buf, size_t len)
+{
+    (void)user;
+    while (len > 0) {
+        uint8_t in[32 + 4 + 16];
+        memcpy(in, boot_seed, 32);
+        random_ctr++;
+        memcpy(in + 32, &random_ctr, 4);
+        esp_fill_random(in + 36, 16);
+        uint8_t out[32];
+        atalaia_sha256(in, sizeof(in), out);
+        size_t take = len < sizeof(out) ? len : sizeof(out);
+        memcpy(buf, out, take);
+        buf += take;
+        len -= take;
+        memset(in, 0, sizeof(in));
+        memset(out, 0, sizeof(out));
+    }
 }
 
 /* CMD update (protocol/firmware-update.md): box_game never passes one during a game. */
@@ -539,6 +601,7 @@ static void box_start(const char *tier)
                            .battery_pct = box_battery,
                            .radio_send = box_radio_send,
                            .update = box_update,
+                           .random = box_random,
                            .user = NULL};
     box_game_init(&box, &runner, &game_preset, nvs ? atalaia_box_store_esp() : &no_store, &ops,
                   &atalaia_crypto_mbedtls, nvs, &game_log, &hello);
@@ -672,6 +735,12 @@ static void task_game(void *arg)
             button_tracker_init(&btn_tracker, default_teams, 2);
             box_teams_set = false;
         }
+        /* An invite over the radio joined a game while the picker or the last game's
+         * final screen was showing: the next key is the new game's, not the picker's. */
+        if ((picker_active || after_game) && box.phase == BOX_JOINED) {
+            picker_active = false;
+            after_game = false;
+        }
         uint8_t buttons = hal.buttons->poll();
         button_tracker_update(&btn_tracker, buttons, delta_ms, &runner);
 
@@ -684,6 +753,8 @@ static void task_game(void *arg)
         if (key != HAL_KEY_NONE && adoption_active(&adopt) && adoption_key(&adopt, key, now)) {
             key = HAL_KEY_NONE; /* the admin PIN for another field's card, or closing a result */
         }
+        /* An adoption on the screen (its PIN prompt, its result): no "Ready" over it. */
+        if (adoption_active(&adopt)) box_lobby_cancel_ready_screen(&box);
         if (adoption_tick(&adopt, now) && picker_active) {
             memset(&picker_screen, 0, sizeof(picker_screen));
             show_picker(); /* adoption left the screen: the picker's step again */
@@ -698,6 +769,7 @@ static void task_game(void *arg)
                 node_runner_input(&runner, "keypad.key", json);
             } else if (after_game) {
                 after_game = false;
+                box_lobby_cancel_ready_screen(&box); /* the picker, not "ready", from now on */
                 start_picker();
             }
         }
@@ -711,9 +783,12 @@ static void task_game(void *arg)
             start_game();
         }
 
-        /* ---- Tick the game loop (a field game ticks its own runner, time-synced) ---- */
-        if (box_game_active(&box)) {
-            box_game_tick(&box, delta_ms, now);
+        /* ---- Tick the game loop (a field game ticks its own runner, time-synced; between
+         * games box_game_tick runs only the lobby: announcements, invites) ---- */
+        bool field_game = box_game_active(&box);
+        box_game_tick(&box, delta_ms, now);
+        if (field_game) {
+            /* ticked above */
         } else if (runner.running) {
             int screens_before = runner.queues.screen_count;
             node_runner_tick(&runner, delta_ms);
@@ -883,6 +958,10 @@ static void seed_presets(void)
 
 void app_main(void)
 {
+    /* True entropy first, while no ADC or I2S driver runs yet (bootloader_random_enable()
+     * takes the SAR ADC; decision RJ-15). */
+    collect_boot_entropy();
+
     /* PSRAM detection. */
     const char *tier;
     size_t psram_size = esp_psram_get_size();

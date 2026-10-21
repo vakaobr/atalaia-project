@@ -30,7 +30,7 @@ from atalaia_controller.engine import Controller
 from atalaia_controller.main import build
 from atalaia_controller.remote_gm import RemoteGm, stream_url
 from atalaia_controller.store import REMOTE_LOG_DAYS, SCHEMA_VERSION, Store
-from atalaia_sim.packet import cmd_decode
+from atalaia_sim.packet import cmd_decode, hello_encode
 from fastapi.testclient import TestClient
 
 KEY = "k" * 43
@@ -64,9 +64,15 @@ class RemoteCase(unittest.TestCase):
         self.store.close()
         self.tmp.cleanup()
 
-    def game(self, mode: str = DOMINATION, **spec: Any) -> dict[str, Any]:
+    def game(self, mode: str = DOMINATION, joined: bool = True, **spec: Any) -> dict[str, Any]:
         body = {"name": "Domingo", "mode_id": mode, "teams": ["red", "blue"], "assignments": {"4": "zone"}, **spec}
         game = self.ctrl.create_game(body)
+        if joined and mode == DOMINATION:
+            # Box 4 says HELLO: the zone has a box, so a remote start is not refused (decision RJ-1).
+            self.modem.rx(4, 0, "HELLO", hello_encode({"node_name": "box-4", "platform": 1, "fw_version": "0.4.0",
+                                                       "core_version": "0.2.0", "tier": 0, "capabilities": [0],
+                                                       "transports": 1, "epoch": 1}),
+                          game_id=game["id"], epoch=1)
         return self.store.game(game["id"])
 
     def state(self, game: dict[str, Any]) -> str:
@@ -93,10 +99,18 @@ class CommandTests(RemoteCase):
         pause = [e for e in self.store.events(game["id"]) if e["type"] == "game.pause"]
         self.assertEqual(pause[0]["data"], {"reason": "medic"})
 
+    def test_a_start_without_a_box_for_a_role_is_refused(self) -> None:
+        """The remote GM has no "Start anyway": the start guard holds (decision RJ-4)."""
+        game = self.game(joined=False)
+        out = self.remote.handle_command(command(game, "start"))
+        self.assertEqual(out["code"], "conflict")
+        self.assertIn("zone", out["detail"])
+        self.assertEqual(self.state(game), "ready")
+
     @unittest.skipIf(CORE is None, "the shared core library is not built")
     def test_a_message_and_a_mode_command_go_on_the_radio(self) -> None:
         game = self.game(MEDIC, assignments={"7": "medic"})
-        self.ctrl.start_game(game["id"])
+        self.ctrl.start_game(game["id"], force=True)
         out = self.remote.handle_command(command(game, "message", {"text": "5 minutos"}))
         self.assertEqual(out["code"], "done", out)
         self.assertEqual(cmd_decode(self.modem.of("CMD")[-1][1]), {"cmd": 5, "params": {"text": "5 minutos"}})
@@ -109,7 +123,7 @@ class CommandTests(RemoteCase):
 
     def test_commands_outside_the_list_are_refused_and_logged(self) -> None:
         game = self.game()
-        self.ctrl.start_game(game["id"])
+        self.ctrl.start_game(game["id"], force=True)
         sent = len(self.modem.of("CMD"))
         for what, params in (("set_owner", {"team": "red"}), ("reboot", {}), ("score", {"team": "red", "amount": 50}),
                              ("start", {"preset": "x"}), ("message", {"text": ""})):
@@ -163,7 +177,7 @@ class LiveTests(RemoteCase):
     def test_the_live_view(self) -> None:
         self.assertEqual(self.remote.live_body()["live"], None)
         game = self.game(MEDIC, assignments={"7": "medic"})
-        self.ctrl.start_game(game["id"])
+        self.ctrl.start_game(game["id"], force=True)
         self.ctrl._on_event({"node": 7, "seq": 1, "t": 1000, "type": "zone.captured", "team": "red", "squad": 0,
                              "prio": "normal", "data": {"zone": "alpha"}, "epoch": 1, "pkt_seq": 1})
         self.ctrl.adjust_score(game["id"], "red", -5, "penalty")
@@ -180,7 +194,7 @@ class LiveTests(RemoteCase):
 
     def test_at_most_fifty_events(self) -> None:
         game = self.game()
-        self.ctrl.start_game(game["id"])
+        self.ctrl.start_game(game["id"], force=True)
         for seq in range(1, 81):
             self.ctrl._on_event({"node": 4, "seq": seq, "t": seq, "type": "zone.captured", "team": "red", "squad": 0,
                                  "prio": "normal", "data": {}, "epoch": 1, "pkt_seq": seq})

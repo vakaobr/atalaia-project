@@ -380,6 +380,62 @@ and two boards at least 1 m apart, both antennas fitted.
    third box joined half-way, the far box's captures reach the console
    again through the middle box's relay.
 
+## Step 10b2: Invited into the next game over the radio (two boards on the desk)
+
+The box between games ([protocol/field-frames.md](../../../protocol/field-frames.md), decisions
+RJ-1 to RJ-15): after a game it announces itself, and the GM invites it into the next game from
+the console, with no card or text. Two Heltec V4.3 boards: **board 1** the Field Box (bench
+build) on COM3, **board 2** the USB modem on COM4, behind a controller running in Docker in WSL.
+
+1. **Flash both.** `python tools/docker_fw.py bench` and the `esptool` command it prints, with
+   `-p COM3`; `python tools/docker_fw.py modem` and its command with `-p COM4`.
+2. **The modem into WSL** (an administrator PowerShell; `usbipd` from the usbipd-win project):
+   `usbipd list` (note board 2's BUSID), `usbipd bind --busid <BUSID>`, then
+   `usbipd attach --wsl --busid <BUSID>`; in WSL it is `/dev/ttyACM0`.
+3. **The controller in Docker** (WSL, in the repository; `~/atalaia-bench` keeps its database):
+
+   ```sh
+   mkdir -p ~/atalaia-bench
+   docker run --rm -it --device /dev/ttyACM0 -p 8080:8080 -v "$PWD:/src" -v ~/atalaia-bench:/data \
+     -w /src -e ATALAIA_MODEM_PORT=/dev/ttyACM0 -e ATALAIA_API_HOST=0.0.0.0 \
+     -e ATALAIA_CONTROLLER_DB_PATH=/data/controller.db -e ATALAIA_MQTT_ENABLED=false atalaia-dev \
+     sh -c 'cmake -S core -B /tmp/c -DATALAIA_SHARED=ON >/dev/null && cmake --build /tmp/c >/dev/null &&
+            cd controller && ATALAIA_CORE_LIB=/tmp/c/libatalaia_core.so python3 -m atalaia_controller run'
+   ```
+
+   Expected in its log: `modem link up` and the modem's IDENT with `"field": true` (an older
+   modem image lacks it: flash board 2 again). In another WSL shell,
+   `docker exec <container> sh -c 'cd /src/controller && python3 -m atalaia_controller tokens'`
+   and `... join-key` print the GM token and the field join key.
+4. **Board 1 gets the key.** In a serial monitor on COM3: `@joinkey <the 64 hex digits>`. Expected:
+   `join key: stored`; `@lobby` prints the box's device id (16 hex digits), `free for an
+   invite`, the channel (869525000 Hz) and no invites yet. Within 20 s the bench log
+   (`ATALAIA_RADIO_LOG_PACKETS`) shows `TX 70-90 bytes`: its first announcement.
+5. **The first game, by text.** In the console (`http://localhost:8080/console/`, the GM token):
+   create a Domination game. The *Boxes for this game* dialog opens with board 1 (its name,
+   `field-box` by default, its RSSI and when it was heard): close it this once and join by
+   text as in step 10b (*Join*, role zone, `@join atalaia:join:...` on COM3). The game tab says
+   "Nenhuma caixa se juntou para: zone" until the box's HELLO, then *Começar* without
+   "mesmo assim": start, capture, end.
+6. **Free again.** After the end, board 1's log shows `game <id> ended`, an announcement within
+   2-20 s, and 30 s after the end the OLED shows **READY / next game**. `@lobby`: free, last game
+   `<id>` (zone). The announcements then come about every 72 s (note the times: decision RJ-11).
+7. **The invite.** Create a second game: the dialog lists board 1 ticked as *último jogo*, role
+   zone. *Convidar (1)*. Expected within a second or two: on COM3 `field: invite <n>: accepted`
+   and `joined game <id2> as node <n> ...`, the OLED **INVITED / <id2>: zone**; in the dialog
+   *convidada*, then *aceitou, a juntar-se*, then *juntou-se* (the box's HELLO). *Começar* starts
+   the game with no confirmation about missing boxes. Note the RSSI shown, and the modem's
+   `duty_ms` in the *Controlador* tab before and after.
+8. **Refusals.** End game 2; on board 1 press a key and start a Bomb game from the picker; create
+   game 3 and invite board 1: the row says *recusou: noutro jogo* and the Bomb game goes on.
+   Stop it (power cycle board 1: it boots free). Then `@joinkey` with another key on board 1:
+   it no longer appears after the dialog's *Procurar caixas*, and an invite to it fails after
+   three attempts (*falhou: no answer*); `@lobby` counts the controller's frames as ignored.
+   Give it the field's key again.
+9. **Record** in `docs/review/decisions-to-review.md` (RJ-11, RJ-15): the announcement interval
+   seen, the time from *Convidar* to *juntou-se*, the RSSI, and any refusal that should not have
+   happened.
+
 ## Step 10c: Firmware update over the air (one board on the desk)
 
 The whole update path ([protocol/firmware-update.md](../../../protocol/firmware-update.md)) with

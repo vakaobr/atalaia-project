@@ -117,7 +117,7 @@ class ScenarioControllerTests(unittest.TestCase):
     def start(self) -> None:
         for node_id in NAMES:
             self.hello(node_id)
-        self.assertEqual(self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM).status_code, 200)
+        self.assertEqual(self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM, json={"force": True}).status_code, 200)
 
     def test_the_game_and_the_catalogue(self):
         self.assertEqual(self.game["mode_id"], f"{FOXHOUND}+{OBJECTIVES}")

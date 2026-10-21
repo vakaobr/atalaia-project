@@ -1,6 +1,6 @@
 # Join payload
 
-A box, or a second field controller standing by, joins a game with a **join payload**: everything it needs to take part, carried by an NFC card, a QR code (or its text) or the serial console, and never over LoRa (ADR-P2-12, RFC 0001 section 9). The field controller makes it; this file is its specification, version 1.
+A box, or a second field controller standing by, joins a game with a **join payload**: everything it needs to take part, carried by an NFC card, a QR code (or its text) or the serial console (ADR-P2-12, RFC 0001 section 9), or, for a box whose last game is over, inside an INVITE over LoRa sealed with a key derived from the field join key ([field-frames.md](field-frames.md), RFC 0001 Amendment 7, proposed): never in the clear over LoRa. The field controller makes it; this file is its specification, version 1.
 
 Implementations: [`core/src/join.c`](../core/src/join.c) (C: boxes, the host test programs), [`simulator/atalaia_sim/join.py`](../simulator/atalaia_sim/join.py) (Python: the field controller) and [`app/lib/protocol/join_payload.dart`](../app/lib/protocol/join_payload.dart) (Dart: Android props joining by QR code, card or text, and the marshal's tag writer). All check the shared vectors in [`vectors/join.json`](vectors/join.json): 4 valid payloads (decode, re-encode byte for byte, text form, NFC tag memory, refused under another key), 38 invalid ones that must fail with the stated reason, an optional-field case, and RFC 4231 HMAC-SHA256 known answers.
 
@@ -27,6 +27,8 @@ ADR-P2-2 and ADR-P2-12 authenticate the payload with "the controller's long-term
 With the sealed radio invites the join key is the field's **master secret**: a field card holds it, so cards are kept locked away, and a lost card means `join-key --rotate` and adopting every box again (adoption.md section 5).
 
 Game keys change with every game; the join key does not. A box with another field's join key refuses the card ("bad tag").
+
+The join key also keys the **field frames** ([field-frames.md](field-frames.md)): HKDF-SHA256 with the label `atalaia field frame v1` gives the AES-128 key of the announcements, discoveries and invites between games. Whoever holds the join key can therefore read every invite sent over the radio, and the game key inside it: the join key is a field secret (decision RJ-2).
 
 ## Body
 
@@ -67,6 +69,8 @@ Readers ignore spaces and line ends around it and refuse anything that is not ca
 
 A box reads cards through its NFC reader and the text on its serial console as one line, `@join atalaia:join:...` (bring-up and the Wokwi emulator). A standby controller takes the text through `POST /api/v1/controller/join`. Boxes cannot scan QR codes; ADR-P2-12's "push over Wi-Fi" needs a box-side endpoint that does not exist yet (decision E3).
 
+**An invite over LoRa** ([field-frames.md](field-frames.md)): the controller cuts the payload into 1-3 INVITE parts of at most 153 bytes, for a free box's device id and token, sealed with the field frames' key. The box puts the parts back together and takes the payload through exactly the checks below; a typical box's payload is one or two parts.
+
 ## What a reader does
 
 A **box** (kind 0) checks the tag with its join key, refuses a controller payload, a mode it does not have (for `main+modifier`, any part it does not have, or parts whose scripts together exceed its 16 KB preset buffer), or a game it cannot fit, then stores the payload in encrypted NVS (ADR-P2-12: the key survives a reboot and is erased when the game ends), tunes to `channel_hz`, clamps relays to `max_hops`, sends HELLO from `node_id`, and waits for the controller's CMD start with the mode loaded for `role`, `teams`, `params` and `game_seed`.
@@ -77,4 +81,5 @@ A **standby controller** (kind 1) checks the tag with its own copy of the join k
 
 - The tag stops forged cards; it does not stop cloning: anyone who reads a card has that game's key until the game ends (ADR-P2-12 accepts this; a new game gets a new key).
 - The QR code and the text carry the game key in clear. Show them only to the people setting up the field.
+- An invite carries it encrypted under a key derived from the join key: safe from strangers, but anyone with the join key who recorded the radio can read it, for every game invited that way (decision RJ-2, accepted by the maintainer).
 - The join key never leaves the controllers, the boxes' NVS and the field cards made to adopt boxes ([adoption.md](adoption.md)); it is not in a join payload, the API's other answers or the logs.

@@ -406,7 +406,7 @@ class AtakCase(P3Case, CotChecks):
 
     def running_game(self, **spec: Any) -> int:
         game = self.new_game(assignments={"4": "zone", "5": "zone"}, **spec)
-        r = self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM)
+        r = self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM, json={"force": True})
         self.assertEqual(r.status_code, 200, r.text)
         return game["id"]
 
@@ -555,7 +555,7 @@ class EmitterTests(AtakCase):
         self.put_image_and_corners()
         game = self.new_game(mode_id="org.atalaia.vip_payload", assignments={"4": "checkpoint"},
                              params={"extraction": "38.7215,-9.1390", "radius_m": 40, "vip_team": "blue"})
-        self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM)
+        self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM, json={"force": True})
         self.emitter.cycle(full=True)
         got = self.events_by_uid(self.udp.drain())
         ev = got[f"atalaia.field.game.{game['id']}.extraction"]
@@ -671,7 +671,7 @@ class RemoteRelayTests(AtakCase):
         self.put_image_and_corners()
         game = self.new_game(mode_id="org.atalaia.vip_payload", assignments={"4": "checkpoint"},
                              params={"extraction": "38.7215,-9.1390", "radius_m": 40, "vip_team": "blue"})
-        self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM)
+        self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM, json={"force": True})
         self.place(game["id"], 4, 0.2, 0.3)
         fake = self.relay(players=False)
         self.emitter.cycle(full=True)
@@ -722,7 +722,7 @@ class DisabledTests(P3Case):
             self.client.put("/api/v1/field/image", headers={**GM, "Content-Type": "image/png"}, content=PNG)
             self.client.put("/api/v1/field/georef", headers=GM, json={"points": [TL, BR]})
             game = self.new_game()
-            self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM)
+            self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM, json={"force": True})
             self.client.put(f"/api/v1/games/{game['id']}/positions/4", headers=GM, json={"x": 0.5, "y": 0.5})
             with self.client:  # the app's lifespan runs: every service starts, ATAK has none
                 self.assertEqual(udp.drain(0.5), [])

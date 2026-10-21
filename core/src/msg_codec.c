@@ -71,7 +71,7 @@ size_t atalaia_hello_encode(const atalaia_hello_t *msg, uint8_t *buf, size_t cap
         return 0;
     }
 
-    mc_put_map(&w, msg->battery_pct != 0xFF ? 9 : 8);
+    mc_put_map(&w, (uint64_t)8 + (msg->battery_pct != 0xFF) + msg->has_device_id);
 
     mc_put_uint(&w, ATALAIA_PL_HELLO_NODE_NAME);
     mc_put_text(&w, msg->node_name);
@@ -96,6 +96,10 @@ size_t atalaia_hello_encode(const atalaia_hello_t *msg, uint8_t *buf, size_t cap
     }
     mc_put_uint(&w, ATALAIA_PL_HELLO_EPOCH);
     mc_put_uint(&w, msg->epoch);
+    if (msg->has_device_id) {
+        mc_put_uint(&w, ATALAIA_PL_HELLO_DEVICE_ID);
+        mc_put_bytes(&w, msg->device_id, sizeof(msg->device_id));
+    }
 
     return w.ok ? w.pos : 0;
 }
@@ -155,6 +159,15 @@ bool atalaia_hello_decode(const uint8_t *buf, size_t len, atalaia_hello_t *msg)
             if (!read_uint_max(&r, UINT16_MAX, &v)) return false;
             msg->epoch = (uint16_t)v;
             break;
+        case ATALAIA_PL_HELLO_DEVICE_ID: {
+            size_t n = 0;
+            if (!mc_read_bytes(&r, msg->device_id, sizeof(msg->device_id), &n) ||
+                n != sizeof(msg->device_id)) {
+                return false;
+            }
+            msg->has_device_id = true;
+            break;
+        }
         default:
             if (!mc_skip_value(&r)) return false;
             break;

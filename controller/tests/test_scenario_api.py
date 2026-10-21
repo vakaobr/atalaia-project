@@ -236,7 +236,7 @@ class GameTests(Case):
         for node_id, name in ((4, "bridge"), (5, "vault"), (6, "radio")):
             self.joined(node_id=node_id, name=name)
             self.hello(node_id, f"box-{node_id}")  # the box's own name is not the scenario's
-        self.assertEqual(self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM).status_code, 200)
+        self.assertEqual(self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM, json={"force": True}).status_code, 200)
 
     def test_the_join_gives_a_box_its_scenario_name(self):
         out = self.joined(node_id=4, name="bridge")

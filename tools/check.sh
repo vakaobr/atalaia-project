@@ -19,6 +19,7 @@ set -eu
 export ATALAIA_REQUIRE_ALL=1
 BUILD="${BUILD:-build}"
 python3 tools/protogen.py --check
+python3 tools/field_frame_vectors.py --check
 python3 tools/build_site.py --check
 python3 tools/check_wiring.py
 if command -v clang-format > /dev/null 2>&1 && command -v stylua > /dev/null 2>&1; then

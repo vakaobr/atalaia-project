@@ -101,6 +101,14 @@ static const uint8_t pl_hello_1[] = {
     0x08, 0x18, 0x55, 0x09, 0x19, 0x01, 0x00,
 };
 #define pl_hello_1_len sizeof(pl_hello_1)
+static const uint8_t pl_hello_2[] = {
+    0xaa, 0x01, 0x68, 0x62, 0x6f, 0x78, 0x2d, 0x61, 0x33, 0x66, 0x31, 0x02,
+    0x01, 0x03, 0x65, 0x30, 0x2e, 0x34, 0x2e, 0x30, 0x04, 0x65, 0x30, 0x2e,
+    0x32, 0x2e, 0x30, 0x05, 0x00, 0x06, 0x83, 0x00, 0x01, 0x05, 0x07, 0x01,
+    0x08, 0x18, 0x57, 0x09, 0x03, 0x0a, 0x48, 0x5a, 0x17, 0xc0, 0xde, 0x0b,
+    0x0e, 0x12, 0x34,
+};
+#define pl_hello_2_len sizeof(pl_hello_2)
 static const uint8_t pl_hello_bad_0[] = {
     0xa7, 0x01, 0x63, 0x62, 0x6f, 0x78, 0x02, 0x00, 0x03, 0x63, 0x31, 0x2e,
     0x30, 0x04, 0x63, 0x30, 0x2e, 0x31, 0x05, 0x00, 0x06, 0x81, 0x00, 0x07,
@@ -115,16 +123,25 @@ static const uint8_t pl_hello_bad_1[] = {
     0x09, 0x01,
 };
 #define pl_hello_bad_1_len sizeof(pl_hello_bad_1)
+static const uint8_t pl_hello_bad_2[] = {
+    0xa9, 0x01, 0x68, 0x62, 0x6f, 0x78, 0x2d, 0x61, 0x33, 0x66, 0x31, 0x02,
+    0x01, 0x03, 0x65, 0x30, 0x2e, 0x34, 0x2e, 0x30, 0x04, 0x65, 0x30, 0x2e,
+    0x32, 0x2e, 0x30, 0x05, 0x00, 0x06, 0x83, 0x00, 0x01, 0x05, 0x07, 0x01,
+    0x09, 0x03, 0x0a, 0x47, 0x5a, 0x17, 0xc0, 0xde, 0x0b, 0x0e, 0x12,
+};
+#define pl_hello_bad_2_len sizeof(pl_hello_bad_2)
 
 static const payload_vector_t hello_vectors[] = {
     {"hello_minimal", "{\"node_name\":\"box-a3f1\",\"platform\":1,\"fw_version\":\"1.0.0\",\"core_version\":\"0.2.0\",\"tier\":0,\"capabilities\":[0,1],\"transports\":3,\"epoch\":1}", pl_hello_0, pl_hello_0_len},
     {"hello_with_battery", "{\"node_name\":\"ctrl-01\",\"platform\":2,\"fw_version\":\"2.1.3\",\"core_version\":\"0.2.0\",\"tier\":0,\"capabilities\":[0,1,2,3],\"transports\":7,\"battery_pct\":85,\"epoch\":256}", pl_hello_1, pl_hello_1_len},
+    {"hello_with_device_id", "{\"node_name\":\"box-a3f1\",\"platform\":1,\"fw_version\":\"0.4.0\",\"core_version\":\"0.2.0\",\"tier\":0,\"capabilities\":[0,1,5],\"transports\":1,\"battery_pct\":87,\"epoch\":3,\"device_id\":\"5a17c0de0b0e1234\"}", pl_hello_2, pl_hello_2_len},
 };
 #define HELLO_VECTOR_COUNT (sizeof(hello_vectors) / sizeof(hello_vectors[0]))
 
 static const payload_bad_vector_t hello_bad_vectors[] = {
     {"hello_missing_required", pl_hello_bad_0, pl_hello_bad_0_len, "missing required field epoch (key 9)"},
     {"hello_name_too_long", pl_hello_bad_1, pl_hello_bad_1_len, "node_name exceeds max length of 24 bytes"},
+    {"hello_device_id_too_short", pl_hello_bad_2, pl_hello_bad_2_len, "device_id is exactly 8 bytes"},
 };
 #define HELLO_BAD_VECTOR_COUNT (sizeof(hello_bad_vectors) / sizeof(hello_bad_vectors[0]))
 

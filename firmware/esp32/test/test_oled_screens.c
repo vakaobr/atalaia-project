@@ -50,6 +50,8 @@ static const oled_case_t cases[] = {
     {"timer_adjust", NULL, "timer_adjust", "{\"timer_s\":600}"},
     {"start_confirm", NULL, "start_confirm", "{\"label\":\"Bomb\",\"timer_s\":600}"},
     {"status", NULL, "status", "{\"title\":\"Game on\",\"mode\":\"Bomb\",\"timer_s\":600}"},
+    {"status_invited", NULL, "status", "{\"title\":\"Invited\",\"mode\":\"3073: zone\"}"},
+    {"status_ready", NULL, "status", "{\"title\":\"Ready\",\"mode\":\"next game\"}"},
     {"standby", BOMB, "standby", "{\"arm\":\"red\"}"},
     {"standby_arming", BOMB, "standby", "{\"arm\":\"red\",\"progress\":0.6}"},
     {"countdown", BOMB, "countdown", "{\"left\":299}"},

@@ -150,6 +150,8 @@ static void end_game(box_game_t *g)
     state_persist_clear();
     field_link_state_now(&g->link);
     say(g, "game %u ended", g->join.game_id);
+    /* Free for the next game: announce soon, "ready for the next game" later (box_lobby.c). */
+    box_lobby_game_over(g, g->now_ms);
 }
 
 static void leave_game(box_game_t *g)
@@ -249,12 +251,16 @@ void box_game_init(box_game_t *g, node_runner_t *runner, preset_t *preset_buf,
     g->hello = *hello;
     g->preset_index = -1;
     g->battery_low_pct = BOX_BATTERY_LOW_PCT;
+    g->lobby.first_min_ms = BOX_ANNOUNCE_FIRST_MIN_MS;
+    g->lobby.first_max_ms = BOX_ANNOUNCE_FIRST_MAX_MS;
+    g->lobby.interval_min_ms = BOX_ANNOUNCE_MIN_MS;
 }
 
 bool box_game_load_join_key(box_game_t *g)
 {
     g->have_join_key =
         g->store.load_join_key != NULL && g->store.load_join_key(g->store.ctx, g->join_key) == 0;
+    if (g->have_join_key) box_lobby_init(g);
     return g->have_join_key;
 }
 
@@ -265,6 +271,7 @@ bool box_game_set_join_key(box_game_t *g, const uint8_t key[ATALAIA_JOIN_KEY_SIZ
     }
     memcpy(g->join_key, key, ATALAIA_JOIN_KEY_SIZE);
     g->have_join_key = true;
+    box_lobby_init(g); /* field frames under the new key */
     return true;
 }
 
@@ -305,6 +312,7 @@ bool box_game_use_join_key_hex(box_game_t *g, const char *hex)
     memcpy(g->join_key, key, ATALAIA_JOIN_KEY_SIZE);
     g->have_join_key = true;
     memset(key, 0, sizeof(key));
+    box_lobby_init(g);
     return true;
 }
 
@@ -373,8 +381,14 @@ static int find_preset(box_game_t *g, const char *mode_id)
 static void show_waiting(box_game_t *g)
 {
     char data[SCREEN_DATA_MAX];
-    snprintf(data, sizeof(data), "{\"title\":\"Joined game %u\",\"mode\":\"%.24s, node %u\"}",
-             g->join.game_id, g->join.role, g->join.node_id);
+    if (g->lobby.invited) {
+        /* An invite over the radio says so, in words short enough for the OLED too. */
+        snprintf(data, sizeof(data), "{\"title\":\"Invited\",\"mode\":\"%u: %.24s\"}",
+                 g->join.game_id, g->join.role);
+    } else {
+        snprintf(data, sizeof(data), "{\"title\":\"Joined game %u\",\"mode\":\"%.24s, node %u\"}",
+                 g->join.game_id, g->join.role, g->join.node_id);
+    }
     show(g, "status", data);
 }
 
@@ -404,9 +418,14 @@ static box_join_result_t apply(box_game_t *g, const atalaia_join_t *j, const uin
     if (g->shell.set_channel != NULL && !g->shell.set_channel(g->shell.user, j->channel_hz)) {
         say(g, "radio: cannot tune to %lu Hz (no radio, or refused)", (unsigned long)j->channel_hz);
     }
-    /* HELLO carries the battery level when the box has a gauge (0xFF: unknown). */
+    /* HELLO carries the battery level when the box has a gauge (0xFF: unknown), and the box's
+     * device id, so the controller knows it in the next game (protocol/field-frames.md). */
     int battery = g->shell.battery_pct != NULL ? g->shell.battery_pct(g->shell.user) : -1;
     g->hello.battery_pct = battery >= 0 && battery <= 100 ? (uint8_t)battery : 0xFF;
+    g->hello.has_device_id = g->lobby.ready;
+    if (g->lobby.ready) memcpy(g->hello.device_id, g->lobby.device_id, ATALAIA_FF_DEVICE_SIZE);
+    g->lobby.channel_hz = j->channel_hz; /* where it listens between games, from now on */
+    g->lobby.ready_screen_due = false;
     g->battery_low = false; /* a new game, or a reboot: battery.low may be sent again */
     g->battery_next_ms = g->now_ms;
     field_link_io_t io = {.get_state = link_get_state,
@@ -431,7 +450,60 @@ static box_join_result_t apply(box_game_t *g, const atalaia_join_t *j, const uin
     return BOX_JOIN_OK;
 }
 
+static box_join_result_t join_payload(box_game_t *g, const uint8_t *payload, size_t len);
+
 box_join_result_t box_game_join(box_game_t *g, const uint8_t *payload, size_t len)
+{
+    bool was = g->lobby.invited;
+    g->lobby.invited = false;
+    box_join_result_t r = join_payload(g, payload, len);
+    if (r != BOX_JOIN_OK) g->lobby.invited = was;
+    return r;
+}
+
+/* True if every part of a join's mode id is installed (find_preset's test, without loading). */
+static bool modes_installed(const char *mode_id)
+{
+    static preset_summary_t list[PRESET_MAX_SLOTS]; /* as find_preset: not on the stack */
+    int n = preset_store_list(list, PRESET_MAX_SLOTS);
+    for (const char *p = mode_id; *p;) {
+        const char *next = strchr(p, '+');
+        size_t len = next != NULL ? (size_t)(next - p) : strlen(p);
+        if (stored_mode(list, n, p, len) == NULL) return false;
+        p = next != NULL ? next + 1 : p + len;
+    }
+    return true;
+}
+
+box_join_result_t box_game_join_invited(box_game_t *g, const uint8_t *payload, size_t len)
+{
+    if (g->phase == BOX_JOINED || g->phase == BOX_PLAYING) return BOX_JOIN_BUSY;
+    if (g->phase == BOX_ENDED) {
+        /* A game over whose last events are still unacknowledged: leave it only for an invite
+         * the box will take, so a refused one keeps them. */
+        static atalaia_join_t j; /* not on the game task's stack */
+        atalaia_join_result_t r = g->have_join_key
+                                      ? atalaia_join_decode(payload, len, g->join_key, &j)
+                                      : ATALAIA_JOIN_ERR_MAC;
+        bool ok =
+            r == ATALAIA_JOIN_OK && j.kind == ATALAIA_JOIN_KIND_NODE && modes_installed(j.mode_id);
+        box_join_result_t why = r != ATALAIA_JOIN_OK               ? BOX_JOIN_REFUSED
+                                : j.kind != ATALAIA_JOIN_KIND_NODE ? BOX_JOIN_CONTROLLER
+                                                                   : BOX_JOIN_NO_MODE;
+        memset(&j, 0, sizeof(j));
+        if (!ok) {
+            say(g, "join refused: %s", box_join_result_name(why));
+            return why;
+        }
+        leave_game(g);
+    }
+    g->lobby.invited = true;
+    box_join_result_t r = join_payload(g, payload, len);
+    if (r != BOX_JOIN_OK) g->lobby.invited = false;
+    return r;
+}
+
+static box_join_result_t join_payload(box_game_t *g, const uint8_t *payload, size_t len)
 {
     if (!g->have_join_key) return BOX_JOIN_NO_KEY;
     atalaia_join_t j;
@@ -443,6 +515,7 @@ box_join_result_t box_game_join(box_game_t *g, const uint8_t *payload, size_t le
     box_join_result_t out = apply(g, &j, payload, len, true);
     memset(&j, 0, sizeof(j));
     if (out != BOX_JOIN_OK) say(g, "join refused: %s", box_join_result_name(out));
+    if (out == BOX_JOIN_OK) box_lobby_joined(g); /* no invite from before works now */
     return out;
 }
 
@@ -502,6 +575,7 @@ bool box_game_resume(box_game_t *g, uint32_t now_ms)
 
 void box_game_on_packet(box_game_t *g, const uint8_t *pkt, size_t len, int8_t rssi)
 {
+    if (box_lobby_on_packet(g, pkt, len)) return; /* a field frame: announcements, invites */
     if (g->phase == BOX_IDLE) return;
     field_link_on_packet(&g->link, pkt, len, rssi);
 }
@@ -530,6 +604,7 @@ static void check_battery(box_game_t *g, uint32_t now_ms)
 void box_game_tick(box_game_t *g, uint32_t raw_delta_ms, uint32_t now_ms)
 {
     g->now_ms = now_ms;
+    box_lobby_tick(g, now_ms);
     if (g->phase == BOX_IDLE) return;
     if (g->phase == BOX_PLAYING && !g->paused && g->runner->running) {
         node_runner_tick(g->runner, field_link_adjust_delta(&g->link, raw_delta_ms));

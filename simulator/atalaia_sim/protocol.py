@@ -51,6 +51,7 @@ MESSAGE_TYPES = {
     'TIME': 6,
     'CONFIG': 7,
     'CLAIM': 8,
+    'FIELD': 9,
 }
 
 # Longest event type name plus one, as in C.
@@ -177,6 +178,7 @@ PAYLOAD_FIELDS = {
         'transports': PayloadField(7, 'uint8', True),
         'battery_pct': PayloadField(8, 'uint8', False),
         'epoch': PayloadField(9, 'uint16', True),
+        'device_id': PayloadField(10, 'bytes', False, 8),
     },
     'ACK': {
         'ack_node': PayloadField(1, 'uint16', True),

@@ -127,9 +127,9 @@ class FieldTests(unittest.TestCase):
         self.assertTrue(wait_for(lambda: box.logged(f"UPDATE {offer} link=yes/2 precheck=installed"), 5),
                         box.lines[-5:])
         # Not while the update is on its way; cancelled, the game starts.
-        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 409)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 409)
         self.assertEqual(self.client.delete("/api/v1/firmware/updates", headers=GM).json(), {"cancelled": [nid]})
-        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
         self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
         # During the game: the controller refuses, and a box refuses an offer that came anyway.
         r = self.client.post(f"/api/v1/firmware/{rel['id']}/install", headers=GM, json={"nodes": [nid]})
@@ -137,6 +137,49 @@ class FieldTests(unittest.TestCase):
         self.ctrl.fc.send_cmd("update", {"id": rel["id"], "version": "0.3.0"}, dest=nid, now_ms=self.ctrl.now_ms())
         self.assertTrue(wait_for(lambda: box.logged("firmware update refused: a game is being played"), 5))
         self.assertEqual(sum("UPDATE " in line for line in box.lines), 1)
+
+    def test_a_box_invited_into_the_next_game(self):
+        """Decisions RJ-1 and RJ-5 on the firmware's own code: a box plays a game, the game ends, the
+        box announces itself in field frames (main/box_lobby.c) through the C host modem's FIELD_RX,
+        and the GM invites it into the next game over the radio: no card, no text. Until it has
+        joined, the next game does not start."""
+        gid = self.game()
+        box = self.box("alpha", "--announce-ms", "400")
+        nid = self.join(box)
+        self.assertTrue(wait_for(lambda: self.node(nid).get("device_id"), 5))
+        device = self.node(nid)["device_id"]
+        self.assertEqual(device, box.status()["device_id"])
+        # The zone has its box: Start needs no force.
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/end", headers=GM, json={}).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["available"], 5))
+
+        gid2 = self.game()
+        r = self.client.post(f"/api/v1/games/{gid2}/start", headers=GM)
+        self.assertEqual((r.status_code, r.json()["start_check"]["missing"]), (409, ["zone"]))
+
+        def listed():
+            return [b for b in self.client.get("/api/v1/boxes", headers=GM).json()["boxes"]
+                    if b["device_id"] == device]
+        self.assertTrue(wait_for(lambda: listed(), 5))
+        [entry] = listed()
+        self.assertEqual((entry["name"], entry["previous"], entry["previous_role"], entry["last_game"]),
+                         ("alpha", True, "zone", gid))
+        r = self.client.post(f"/api/v1/games/{gid2}/invites", headers=GM,
+                             json={"boxes": [{"device_id": device, "role": "zone"}]})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertIn(r.json()["invites"][0]["status"], ("sending", "invited"))
+        self.assertTrue(wait_for(lambda: box.status()["game_id"] == gid2, 8), box.lines[-8:])
+        screen = 'SCREEN status {"title":"Invited","mode":"' + str(gid2) + ': zone"}'
+        self.assertTrue(box.logged(screen), box.lines[-8:])
+
+        def invite_status():
+            return self.client.get(f"/api/v1/games/{gid2}/invites", headers=GM).json()["invites"][0]["status"]
+        self.assertTrue(wait_for(lambda: invite_status() == "joined", 8), invite_status())
+        self.assertTrue(self.client.get(f"/api/v1/games/{gid2}/start-check", headers=GM).json()["ok"])
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid2}/start", headers=GM).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 2 and box.status()["game_id"] == gid2, 5))
 
     def test_join_play_reboot_end(self):
         gid = self.game()
@@ -151,7 +194,7 @@ class FieldTests(unittest.TestCase):
         self.assertEqual((st["phase"], st["game_id"], st["node_id"], st["epoch"]), (1, gid, nid, 1))
 
         # The GM starts the game: the CMD reaches the box, which starts the mode.
-        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
         self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
 
         # Red holds the button: a capture, logged once and acknowledged.
@@ -206,7 +249,7 @@ class FieldTests(unittest.TestCase):
                   if e["type"] == "node.online"][0]
         self.assertEqual((online["node"], online["epoch"], online["data"]), (nid, None, {"fw": "host", "tier": "full"}))
         self.assertEqual(self.node(nid)["battery_pct"], 87)
-        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
         self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
 
         # The gauge falls to 12 %: the box sends battery.low itself (read every 10 s), once.
@@ -238,7 +281,7 @@ class FieldTests(unittest.TestCase):
         n_near = self.join(near)
         n_far = self.join(far)
         self.assertTrue(wait_for(lambda: self.node(n_far).get("fw_version") == "host", 8))
-        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
         self.assertTrue(wait_for(lambda: far.status()["phase"] == 2, 8))
         far.hold(2, 1300)
         self.assertTrue(wait_for(lambda: "zone.captured" in self.log_types(gid, n_far), 8))
@@ -256,7 +299,7 @@ class FieldTests(unittest.TestCase):
         gid = r.json()["id"]
         alpha, bravo = self.box("alpha"), self.box("bravo")
         n_alpha, n_bravo = self.join(alpha), self.join(bravo)
-        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
         self.assertTrue(wait_for(lambda: bravo.status()["phase"] == 2, 5))
         alpha.hold(1, 1300)
         self.assertTrue(wait_for(lambda: self.node(n_alpha).get("owner") == "red", 8))
@@ -281,7 +324,7 @@ class FieldTests(unittest.TestCase):
         master, sat = self.box("master"), self.box("sat")
         n_master, n_sat = self.join(master, role="master"), self.join(sat, role="satellite")
         self.assertTrue(master.logged("org.atalaia.master_satellites, master"), master.lines[-5:])
-        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
         self.assertTrue(wait_for(lambda: sat.status()["phase"] == 2, 5))
         sat.hold(1, 1300)
         self.assertTrue(wait_for(lambda: self.node(n_sat).get("owner") == "red", 8))
@@ -311,7 +354,7 @@ class FieldTests(unittest.TestCase):
         box = self.box("terminal")
         nid = self.join(box, role="terminal")
         self.assertTrue(box.logged("org.atalaia.hacking_terminal, terminal"), box.lines[-5:])
-        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
         self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
         box.hold(1, 100)  # red at the keypad
 
@@ -358,7 +401,7 @@ class FieldTests(unittest.TestCase):
         gid = r.json()["id"]
         box = self.box("alpha")
         nid = self.join(box)
-        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
         self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
         box.hold(1, 1300)
         self.assertTrue(wait_for(lambda: "zone.captured" in self.log_types(gid, nid), 8))
@@ -383,7 +426,7 @@ class FieldTests(unittest.TestCase):
         north, south = self.box("north"), self.box("south")
         n_north, n_south = self.join(north, role="medic"), self.join(south, role="medic")
         self.assertTrue(north.logged("org.atalaia.medic, medic"), north.lines[-5:])
-        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
         self.assertTrue(wait_for(lambda: south.status()["phase"] == 2, 5))
         key = self.ctrl.game_key(gid)
 
@@ -443,7 +486,7 @@ class FieldTests(unittest.TestCase):
         self.assertTrue(alpha.logged("org.atalaia.objectives, objective"), alpha.lines[-5:])
         self.assertTrue(site.logged("org.atalaia.objectives, bomb_site"), site.lines[-5:])
         self.assertTrue(wait_for(lambda: self.node(a).get("name") == "alpha" and self.node(s).get("name") == "site", 5))
-        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
 
         def screens(box: BoxHost, name: str) -> list[dict]:
             return [json.loads(line.split(" ", 2)[2]) for line in list(box.lines)

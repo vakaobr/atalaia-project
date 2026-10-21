@@ -24,6 +24,7 @@ messages:
   - { id: 6, name: TIME,   doc: "game-clock beacon; also the controller heartbeat" }
   - { id: 7, name: CONFIG, doc: "assigns a preset and role; parameters only" }
   - { id: 8, name: CLAIM,  doc: "controller election: candidate claims the role with a term number" }
+  - { id: 9, name: FIELD,  doc: "outside any game, sealed with a key derived from the field join key: a box's announcement, a discovery, an invitation (protocol/field-frames.md)" }
 
 payloads:
   HELLO:
@@ -36,6 +37,7 @@ payloads:
     - { key: 7, name: transports, type: uint8, required: true, doc: "bitmask: bit 0=lora, 1=wifi, 2=ble" }
     - { key: 8, name: battery_pct, type: uint8, required: false, doc: "0-100" }
     - { key: 9, name: epoch, type: uint16, required: true, doc: "current nonce epoch" }
+    - { key: 10, name: device_id, type: bytes, required: false, max: 8, doc: "the box's stable device id (protocol/field-frames.md)" }
   ACK:
     - { key: 1, name: ack_node, type: uint16, required: true, doc: "source node being acknowledged" }
     - { key: 2, name: ack_seq, type: uint16, required: true, doc: "highest contiguous seq received" }

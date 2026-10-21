@@ -71,6 +71,9 @@ void main() {
           transports: f['transports']! as int,
           batteryPct: f['battery_pct'] as int?,
           epoch: f['epoch']! as int,
+          deviceId: f['device_id'] == null
+              ? null
+              : hexDecode(f['device_id']! as String),
         );
         expect(hexEncode(hello.encode()), c['cbor']);
         final back = RfHello.decode(hexDecode(c['cbor'] as String));

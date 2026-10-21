@@ -104,7 +104,7 @@ class MedicKitControllerTests(unittest.TestCase):
 
     def test_kits_share_the_count_and_the_gm_refills(self):
         gid = self.game["id"]
-        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM).status_code, 200)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
         # Kit 5 heals b1: field.lua tells kit 6 (kit 5 knows its own heal).
         self.rx(5, 1, "EVENT", ev(5, 1, 30_000, "medic.heal", team=BLUE, player="b1", remaining=4,
                                   player_heals_used=1))

@@ -339,7 +339,7 @@ class StreamAndPrivacyTests(P3Case):
 
     def test_player_stream_hello_has_history_and_me(self):
         g = self.new_game()
-        self.client.post(f"/api/v1/games/{g['id']}/start", headers=GM)
+        self.client.post(f"/api/v1/games/{g['id']}/start", headers=GM, json={"force": True})
         a = self.check_in(g["id"], name=NAME)
         with self.client.websocket_connect(f"/api/v1/stream?token={a['token']}") as ws:
             hello = ws.receive_json()
@@ -372,7 +372,7 @@ class StreamAndPrivacyTests(P3Case):
         bridge._publish = lambda topic, payload, retain=False: published.append((topic, payload))
         try:
             g = self.new_game()
-            self.client.post(f"/api/v1/games/{g['id']}/start", headers=GM)
+            self.client.post(f"/api/v1/games/{g['id']}/start", headers=GM, json={"force": True})
             me = self.check_in(g["id"], name=NAME, team_preference="red", replicas=[declaration()])
             self.client.put("/api/v1/checkin/settings", json={"federation": "optional"}, headers=GM)
             self.check_in(g["id"], ident=me["_ident"], name=NAME, federation_number=FED, expect=200)

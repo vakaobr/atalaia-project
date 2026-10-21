@@ -569,6 +569,9 @@ class FakeModem:
         self.cleared = 0
         self.peers: dict[int, int] = {}
         self.on_rx = self.on_tx_ack = self.on_state = self.on_error = None
+        self.on_field_rx = self.on_field_ack = None
+        self.fields: list[bytes] = []             # field frames sent (FIELD_TX)
+        self.has_field_frames = True
         self.channels: list[int] = []             # SET_CHANNEL commands
         self.measured: list[tuple[int, int]] = []  # MEASURE (channel, dwell_ms)
         self.noise: dict[int, tuple[int, int]] = {}  # channel -> (p90 dBm, CAD detections of 10)
@@ -605,6 +608,13 @@ class FakeModem:
             return False
         self.sent.append((header, payload))
         return True
+
+    def send_field(self, frame: bytes):
+        """A field frame (FIELD_TX): its id, as the modem's FIELD_ACK would carry it."""
+        if not self.is_up:
+            return None
+        self.fields.append(frame)
+        return len(self.fields)
 
     def of(self, msg_type: str) -> list[tuple[Header, bytes]]:
         return [(h, p) for h, p in self.sent if h.type == MESSAGE_TYPES[msg_type]]

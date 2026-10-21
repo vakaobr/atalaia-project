@@ -32,6 +32,10 @@ typedef struct {
     uint8_t transports;
     uint8_t battery_pct; /* 0xFF = not present */
     uint16_t epoch;
+    /* Key 10 (optional): the box's stable device id, as in its field frames
+     * (protocol/field-frames.md), so the controller knows the box across games. */
+    bool has_device_id;
+    uint8_t device_id[8];
 } atalaia_hello_t;
 
 typedef struct {

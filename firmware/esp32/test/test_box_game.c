@@ -4,8 +4,11 @@
  *
  * A Field Box in a controller's game (main/box_game.c): the join and its
  * refusals, the game driven by CMD, events and scores going out over the
- * link, the end of the game (key erased), the rejoin after a reboot, and
- * battery.low from the battery gauge (once per crossing, with hysteresis).
+ * link, the end of the game (key erased), the rejoin after a reboot,
+ * battery.low from the battery gauge (once per crossing, with hysteresis),
+ * and between games (main/box_lobby.c, protocol/field-frames.md): the
+ * announcements, DISCOVER, an invite into the next game in two parts, and
+ * every refusal (busy, an old token, another field's key, an ended game).
  * Real modes (modes/domination/node.lua) run in the real core.
  */
 #include <stdio.h>
@@ -44,6 +47,12 @@ typedef struct {
     bool have_key;
     uint16_t epoch;
     bool have_epoch;
+    uint8_t device_id[8];
+    bool have_device_id;
+    uint32_t ff_boot;
+    bool have_ff_boot;
+    bool ff_boot_fails;
+    bool ff_boot_read_fails;
 } flash_t;
 
 static int st_load_join(void *ctx, uint8_t *buf, size_t cap)
@@ -77,6 +86,36 @@ static int st_save_key(void *ctx, const uint8_t key[32])
     flash_t *f = (flash_t *)ctx;
     memcpy(f->key, key, 32);
     f->have_key = true;
+    return 0;
+}
+static int st_load_device(void *ctx, uint8_t id[8])
+{
+    flash_t *f = (flash_t *)ctx;
+    if (!f->have_device_id) return -1;
+    memcpy(id, f->device_id, 8);
+    return 0;
+}
+static int st_save_device(void *ctx, const uint8_t id[8])
+{
+    flash_t *f = (flash_t *)ctx;
+    memcpy(f->device_id, id, 8);
+    f->have_device_id = true;
+    return 0;
+}
+static int st_load_ff_boot(void *ctx, uint32_t *boot)
+{
+    flash_t *f = (flash_t *)ctx;
+    if (f->ff_boot_read_fails) return -2; /* an NVS error, not "none stored" */
+    if (!f->have_ff_boot) return -1;
+    *boot = f->ff_boot;
+    return 0;
+}
+static int st_save_ff_boot(void *ctx, uint32_t boot)
+{
+    flash_t *f = (flash_t *)ctx;
+    if (f->ff_boot_fails) return -1;
+    f->ff_boot = boot;
+    f->have_ff_boot = true;
     return 0;
 }
 static int nv_read_epoch(void *ctx, uint16_t *e)
@@ -192,8 +231,16 @@ static void fixture(bool keep_flash)
     if (!keep_flash) memset(&flash, 0, sizeof(flash));
     nvs_ops = (atalaia_radio_nvs_ops_t){nv_read_epoch, nv_write_epoch, nv_read_key,
                                         nv_write_key,  nv_erase_key,   &flash};
-    box_store_ops_t store = {st_load_join, st_save_join, st_erase_join,
-                             st_load_key,  st_save_key,  &flash};
+    box_store_ops_t store = {.load_join = st_load_join,
+                             .save_join = st_save_join,
+                             .erase_join = st_erase_join,
+                             .load_join_key = st_load_key,
+                             .save_join_key = st_save_key,
+                             .load_device_id = st_load_device,
+                             .save_device_id = st_save_device,
+                             .load_ff_boot = st_load_ff_boot,
+                             .save_ff_boot = st_save_ff_boot,
+                             .ctx = &flash};
     box_shell_ops_t sh = {.screen = sh_screen,
                           .log = NULL,
                           .reboot = NULL,
@@ -847,8 +894,518 @@ static void test_battery_low(void)
     state_persist_clear();
 }
 
+/* ---- Between games (box_lobby.c, protocol/field-frames.md) -------------------------- */
+
+/* A deterministic "CSPRNG" for the tests (xorshift32). */
+static uint32_t rng_state = 0x1234567u;
+
+static void sh_random(void *user, uint8_t *buf, size_t len)
+{
+    (void)user;
+    for (size_t i = 0; i < len; i++) {
+        rng_state ^= rng_state << 13;
+        rng_state ^= rng_state >> 17;
+        rng_state ^= rng_state << 5;
+        buf[i] = (uint8_t)rng_state;
+    }
+}
+
+static uint8_t ff_key[ATALAIA_FF_KEY_SIZE];
+
+/* The fixture with field frames on: a random source and the join key. */
+static void lobby_fixture(void)
+{
+    fixture(false);
+    game.shell.random = sh_random;
+    CHECK(box_game_set_join_key_hex(&game, JOIN_KEY_HEX));
+    CHECK(game.lobby.ready && flash.have_device_id);
+    atalaia_ff_key(JOIN_KEY, ff_key);
+}
+
+/* The field frames the box sent from packet index `from`, opened; the last one in *m. */
+static int field_frames_since(int from, atalaia_ff_msg_t *m)
+{
+    int count = 0;
+    for (int i = from; i < shell.count; i++) {
+        uint8_t body[ATALAIA_FF_BODY_MAX];
+        size_t n = atalaia_ff_open(ff_key, shell.pkt[i], shell.len[i], body, sizeof(body),
+                                   &atalaia_crypto_test_stub);
+        if (n > 0 && atalaia_ff_body_decode(body, n, m)) count++;
+    }
+    return count;
+}
+
+/* A controller's frame to the box (sealed under key; nonce from the counter). */
+static void to_box(const uint8_t key[16], const atalaia_ff_msg_t *m, uint8_t *keep,
+                   size_t *keep_len)
+{
+    static uint8_t counter;
+    uint8_t body[ATALAIA_FF_BODY_MAX];
+    size_t n = atalaia_ff_body_encode(m, body, sizeof(body));
+    CHECK(n > 0);
+    uint8_t nonce[ATALAIA_FF_NONCE_SIZE] = {0xC0, counter++};
+    uint8_t frame[ATALAIA_FF_MAX];
+    size_t len =
+        atalaia_ff_seal(key, nonce, body, n, frame, sizeof(frame), &atalaia_crypto_test_stub);
+    CHECK(len > 0);
+    if (keep != NULL) {
+        memcpy(keep, frame, len);
+        *keep_len = len;
+    }
+    box_game_on_packet(&game, frame, len, -60);
+}
+
+/* An invite into game `gid` (node `node`) for token, in as many parts as it needs; each
+ * frame is kept in rec (when given) to be played back later. */
+static int invite_signed(const uint8_t key[16], const uint8_t *join_key, const uint8_t token[8],
+                         uint16_t gid, uint16_t node, uint16_t invite_id,
+                         uint8_t rec[][ATALAIA_FF_MAX], size_t *rec_len)
+{
+    atalaia_join_t j;
+    make_join(&j);
+    j.game_id = gid;
+    j.node_id = node;
+    j.game_key[0] ^= (uint8_t)gid;
+    /* Long enough to need two parts (the params: 200 bytes of JSON at most). */
+    snprintf(j.params_json, sizeof(j.params_json),
+             "{\"capture_hold_ms\":1000,\"tick_s\":1,\"points_per_tick\":5,\"note\":\"%s\"}",
+             "a field-long note to make the join payload longer than one part");
+    uint8_t payload[ATALAIA_JOIN_MAX];
+    size_t n = encode(&j, join_key, payload);
+    int parts = (int)atalaia_ff_parts_for(n);
+    for (int p = 0; p < parts; p++) {
+        atalaia_ff_msg_t m;
+        memset(&m, 0, sizeof(m));
+        m.kind = ATALAIA_FF_INVITE;
+        memcpy(m.device_id, game.lobby.device_id, 8);
+        memcpy(m.token, token, 8);
+        m.invite_id = invite_id;
+        m.parts = (uint8_t)parts;
+        m.part = (uint8_t)(parts - 1 - p); /* last part first */
+        size_t at = (size_t)m.part * ATALAIA_FF_CHUNK_MAX;
+        m.chunk_len = (uint8_t)(n - at < ATALAIA_FF_CHUNK_MAX ? n - at : ATALAIA_FF_CHUNK_MAX);
+        memcpy(m.chunk, payload + at, m.chunk_len);
+        to_box(key, &m, rec ? rec[p] : NULL, rec ? &rec_len[p] : NULL);
+    }
+    return parts;
+}
+
+static int invite(const uint8_t key[16], const uint8_t token[8], uint16_t gid, uint16_t node,
+                  uint16_t invite_id, uint8_t rec[][ATALAIA_FF_MAX], size_t *rec_len)
+{
+    return invite_signed(key, JOIN_KEY, token, gid, node, invite_id, rec, rec_len);
+}
+
+/* A CMD from the controller of the game the box is in now (invite() gave it its key). */
+static void cmd_now(uint8_t opcode)
+{
+    static uint16_t seq;
+    atalaia_cmd_msg_t c;
+    memset(&c, 0, sizeof(c));
+    c.cmd = opcode;
+    c.dest = 0xFFFF;
+    uint8_t pl[64];
+    size_t n = atalaia_cmd_encode(&c, pl, sizeof(pl));
+    atalaia_header_t h = {
+        ATALAIA_VF_MAKE(1, 2, 0, 1), game.join.game_id, 0, seq++, 2, ATALAIA_MSG_CMD};
+    uint8_t out[PKT_CAP];
+    size_t len = atalaia_packet_encrypt(&h, 1, game.join.game_key, pl, n, out, sizeof(out),
+                                        &atalaia_crypto_test_stub);
+    CHECK(len > 0);
+    box_game_on_packet(&game, out, len, -55);
+}
+
+/* Joins game GAME_ID by card, starts it, ends it: the box is free again. */
+static void play_and_end(uint32_t *now)
+{
+    atalaia_join_t j;
+    make_join(&j);
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    CHECK(!box_lobby_available(&game));
+    cmd(FIELD_CMD_START);
+    run_ms(now, 100);
+    cmd(FIELD_CMD_END);
+    CHECK(game.phase == BOX_ENDED && box_lobby_available(&game));
+}
+
+static void test_lobby_announce_and_invite(void)
+{
+    lobby_fixture();
+    uint32_t now = 10;
+    /* At first (no game) it announces 2-20 s after starting, then about every minute or more. */
+    int mark = shell.count;
+    run_ms(&now, BOX_ANNOUNCE_FIRST_MAX_MS + 100);
+    atalaia_ff_msg_t m;
+    CHECK(field_frames_since(mark, &m) == 1);
+    CHECK(m.kind == ATALAIA_FF_ANNOUNCE && memcmp(m.device_id, flash.device_id, 8) == 0);
+    CHECK(strcmp(m.name, "box") == 0 && m.last_game == 0 && m.answer == 0);
+    /* A field frame is not relayed, and its header is the field's, not a game's. */
+    atalaia_header_t h;
+    CHECK(atalaia_header_decode(shell.pkt[shell.count - 1], &h));
+    CHECK(h.game_id == 0 && h.type == ATALAIA_MSG_FIELD && h.hop_limit == 0);
+
+    play_and_end(&now);
+    /* The game's last role and id go in the announcements after it. */
+    mark = shell.count;
+    run_ms(&now, BOX_ANNOUNCE_FIRST_MAX_MS + 100);
+    CHECK(field_frames_since(mark, &m) >= 1);
+    CHECK(m.last_game == GAME_ID && strcmp(m.last_role, "zone") == 0);
+    uint8_t token[8];
+    memcpy(token, m.token, 8);
+
+    /* The invite for the next game, in two parts: joined, "Invited to game", an answer. */
+    mark = shell.count;
+    CHECK(invite(ff_key, token, 0x0C01, 31, 4242, NULL, NULL) == 2);
+    CHECK(game.phase == BOX_JOINED && game.join.game_id == 0x0C01 && game.join.node_id == 31);
+    CHECK(strstr(shell.screen_data, "\"Invited\",\"mode\":\"3073: zone\"") != NULL);
+    CHECK(game.lobby.invites_accepted == 1 && memcmp(game.lobby.token, token, 8) != 0);
+    run_ms(&now, BOX_INVITE_ANSWER_MAX_MS + 20);
+    int frames = field_frames_since(mark, &m);
+    CHECK(frames == 1 && m.answer == 4242 && m.result == ATALAIA_FF_ACCEPTED);
+    /* The new game's HELLO carries the device id. */
+    atalaia_hello_t hello;
+    uint8_t pl[PKT_CAP];
+    size_t pn = 0;
+    bool found = false;
+    for (int i = shell.count - 1; i >= 0 && !found; i--) {
+        uint8_t key2[16];
+        memcpy(key2, GAME_KEY, 16);
+        key2[0] ^= 0x01; /* invite(): game_key[0] ^= gid (0x0C01 -> 0x01) */
+        found = atalaia_packet_decrypt(shell.pkt[i], shell.len[i], game.link.proto.epoch, key2, &h,
+                                       pl, &pn, &atalaia_crypto_test_stub) &&
+                h.type == ATALAIA_MSG_HELLO;
+    }
+    CHECK(found && atalaia_hello_decode(pl, pn, &hello));
+    CHECK(hello.has_device_id && memcmp(hello.device_id, flash.device_id, 8) == 0);
+    /* While in that game it does not announce. */
+    mark = shell.count;
+    run_ms(&now, 3 * BOX_ANNOUNCE_MIN_MS);
+    CHECK(field_frames_since(mark, &m) == 0);
+    state_persist_clear();
+}
+
+static void test_lobby_refusals(void)
+{
+    lobby_fixture();
+    uint32_t now = 10;
+    play_and_end(&now);
+    uint8_t token[8];
+    memcpy(token, game.lobby.token, 8);
+
+    /* Another field's key: not even opened. */
+    uint8_t other_key[16];
+    static const uint8_t other_join[32] = {9, 9, 9};
+    atalaia_ff_key(other_join, other_key);
+    int mark = shell.count;
+    invite(other_key, token, 0x0C02, 31, 1, NULL, NULL);
+    CHECK(game.phase == BOX_ENDED && game.lobby.frames_ignored == 2);
+    /* An unknown token: silently refused. */
+    static const uint8_t old[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+    invite(ff_key, old, 0x0C02, 31, 2, NULL, NULL);
+    CHECK(game.phase == BOX_ENDED && game.lobby.invites_refused == 2);
+    /* Another box's device id: not for us. */
+    atalaia_ff_msg_t inv = {.kind = ATALAIA_FF_INVITE, .invite_id = 3, .parts = 1, .chunk_len = 1};
+    memcpy(inv.token, token, 8);
+    to_box(ff_key, &inv, NULL, NULL);
+    run_ms(&now, BOX_INVITE_ANSWER_MAX_MS + 20);
+    atalaia_ff_msg_t m;
+    CHECK(field_frames_since(mark, &m) == 0);
+
+    /* The game it has just played to the end, invited again: "ended". The answer carries a new
+     * token (every answered invite drops both, review finding 2): the controller learns it. */
+    static uint8_t rec[3][ATALAIA_FF_MAX];
+    size_t rec_len[3] = {0};
+    int parts = invite(ff_key, token, GAME_ID, 31, 4, rec, rec_len);
+    run_ms(&now, BOX_INVITE_ANSWER_MAX_MS + 20);
+    CHECK(field_frames_since(mark, &m) == 1 && m.answer == 4 && m.result == ATALAIA_FF_ENDED);
+    CHECK(game.phase != BOX_JOINED);
+    CHECK(memcmp(m.token, token, 8) != 0 && memcmp(m.token, game.lobby.token, 8) == 0);
+    CHECK(!game.lobby.have_prev);
+    /* That refused invite played back: an old token, silence. */
+    uint32_t refused = game.lobby.invites_refused;
+    for (int p = 0; p < parts; p++) box_game_on_packet(&game, rec[p], rec_len[p], -60);
+    CHECK(game.lobby.invites_refused == refused + (uint32_t)parts);
+    memcpy(token, m.token, 8);
+
+    /* A payload signed with another join key, under the right field key: "refused". */
+    mark = shell.count;
+    invite_signed(ff_key, other_join, token, 0x0C02, 31, 5, NULL, NULL);
+    run_ms(&now, BOX_INVITE_ANSWER_MAX_MS + 20);
+    CHECK(field_frames_since(mark, &m) == 1 && m.answer == 5 && m.result == ATALAIA_FF_REFUSED);
+    CHECK(memcmp(m.token, token, 8) != 0);
+    memcpy(token, m.token, 8);
+
+    /* A card join meanwhile drops the tokens too: the controller's last one gets no answer. */
+    atalaia_join_t j;
+    make_join(&j);
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    CHECK(memcmp(game.lobby.token, token, 8) != 0);
+    cmd(FIELD_CMD_START);
+    CHECK(game.phase == BOX_PLAYING);
+    mark = shell.count;
+    invite(ff_key, token, 0x0C03, 31, 6, NULL, NULL);
+    run_ms(&now, BOX_INVITE_ANSWER_MAX_MS + 20);
+    CHECK(field_frames_since(mark, &m) == 0);
+    /* With its current token: "busy", the game goes on, and that token is gone too. */
+    memcpy(token, game.lobby.token, 8);
+    mark = shell.count;
+    parts = invite(ff_key, token, 0x0C03, 31, 7, rec, rec_len);
+    run_ms(&now, BOX_INVITE_ANSWER_MAX_MS + 20);
+    CHECK(field_frames_since(mark, &m) == 1 && m.answer == 7 && m.result == ATALAIA_FF_BUSY);
+    CHECK(game.phase == BOX_PLAYING && game.join.game_id == GAME_ID);
+    CHECK(memcmp(game.lobby.token, token, 8) != 0);
+    /* The game ends; the busy invite played back cannot pull the box into game 0x0C03. */
+    cmd(FIELD_CMD_END);
+    CHECK(game.phase == BOX_ENDED);
+    for (int p = 0; p < parts; p++) box_game_on_packet(&game, rec[p], rec_len[p], -60);
+    CHECK(game.phase == BOX_ENDED && game.join.game_id == GAME_ID);
+    state_persist_clear();
+}
+
+/* Two recorded invites played back in turn get one answer each in 10 s, and at most
+ * BOX_ANSWERS_PER_MIN a minute in all (review finding 3). The worst case: tokens put back. */
+static void test_lobby_answers_are_limited(void)
+{
+    lobby_fixture();
+    uint32_t now = 10;
+    play_and_end(&now);
+    uint8_t token[8];
+    memcpy(token, game.lobby.token, 8);
+    int mark = shell.count;
+    for (int i = 0; i < 40; i++) {
+        memcpy(game.lobby.token, token, 8); /* as if the token never moved */
+        invite(ff_key, token, GAME_ID, 31, (uint16_t)(i % 2 ? 201 : 202), NULL, NULL);
+        run_ms(&now, 2000);
+    }
+    atalaia_ff_msg_t m;
+    int answers = 0;
+    for (int i = mark; i < shell.count; i++) {
+        uint8_t body[ATALAIA_FF_BODY_MAX];
+        size_t n = atalaia_ff_open(ff_key, shell.pkt[i], shell.len[i], body, sizeof(body),
+                                   &atalaia_crypto_test_stub);
+        if (n > 0 && atalaia_ff_body_decode(body, n, &m) && m.answer != 0) answers++;
+    }
+    CHECK(answers > 0 && answers <= 2 * BOX_ANSWERS_PER_MIN);
+    state_persist_clear();
+}
+
+/* A refused invite in BOX_ENDED keeps the last game's unacknowledged events (finding 7). */
+static void test_lobby_refused_invite_keeps_the_ended_game(void)
+{
+    lobby_fixture();
+    uint32_t now = 10;
+    atalaia_join_t j;
+    make_join(&j);
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    cmd(FIELD_CMD_START);
+    for (int ms = 250; ms <= 1000; ms += 250) {
+        char json[64];
+        snprintf(json, sizeof(json), "{\"team\":\"red\",\"ms\":%d}", ms);
+        node_runner_input(&runner, "team_input.hold", json);
+    }
+    cmd(FIELD_CMD_END);
+    CHECK(game.phase == BOX_ENDED && field_link_pending(&game.link) > 0);
+    size_t pending = field_link_pending(&game.link);
+    uint8_t token[8];
+    memcpy(token, game.lobby.token, 8);
+    static const uint8_t other_join[32] = {7, 7, 7};
+    invite_signed(ff_key, other_join, token, 0x0C20, 31, 9, NULL, NULL);
+    CHECK(game.phase == BOX_ENDED && field_link_pending(&game.link) == pending);
+    CHECK(game.link.proto.has_key); /* not left: the game key stays until the events are acked */
+    (void)now;
+    state_persist_clear();
+}
+
+/* The boot count unreadable (not "none yet"): no field frame at all (finding 6). */
+static void test_lobby_unreadable_boot_count(void)
+{
+    lobby_fixture();
+    flash.have_ff_boot = true;
+    flash.ff_boot = 7;
+    flash.ff_boot_read_fails = true;
+    uint32_t now = 10;
+    run_ms(&now, BOX_ANNOUNCE_FIRST_MAX_MS + 20);
+    CHECK(shell.count == 0 && flash.ff_boot == 7);
+    flash.ff_boot_read_fails = false;
+    run_ms(&now, 2 * BOX_ANNOUNCE_MIN_MS);
+    CHECK(shell.count > 0 && flash.ff_boot == 8); /* readable again: boot 8, not boot 1 */
+}
+
+static void test_lobby_replay_refused(void)
+{
+    lobby_fixture();
+    uint32_t now = 10;
+    play_and_end(&now);
+    static uint8_t rec[3][ATALAIA_FF_MAX];
+    size_t rec_len[3] = {0};
+    uint8_t token[8];
+    memcpy(token, game.lobby.token, 8);
+    int parts = invite(ff_key, token, 0x0C10, 40, 77, rec, rec_len);
+    CHECK(game.phase == BOX_JOINED && game.join.game_id == 0x0C10);
+    cmd_now(FIELD_CMD_END); /* that game ends too: the box is free again */
+    CHECK(game.phase == BOX_ENDED);
+    /* Someone plays the recorded invite back: an old token, nothing happens. */
+    uint32_t refused = game.lobby.invites_refused;
+    for (int p = 0; p < parts; p++) box_game_on_packet(&game, rec[p], rec_len[p], -60);
+    CHECK(game.phase == BOX_ENDED && game.lobby.invites_refused == refused + (uint32_t)parts);
+    /* The token rotates every 10 minutes; the previous one still works once. */
+    uint8_t before[8];
+    memcpy(before, game.lobby.token, 8);
+    run_ms(&now, BOX_TOKEN_ROTATE_MS + 20);
+    CHECK(memcmp(before, game.lobby.token, 8) != 0 && game.lobby.have_prev);
+    invite(ff_key, before, 0x0C11, 41, 78, NULL, NULL);
+    CHECK(game.phase == BOX_JOINED && game.join.game_id == 0x0C11);
+    state_persist_clear();
+}
+
+static void test_lobby_discover_and_ready_screen(void)
+{
+    lobby_fixture();
+    uint32_t now = 10;
+    play_and_end(&now);
+    /* The final screen stays BOX_READY_MS, then "Ready" for the next game. */
+    run_ms(&now, BOX_READY_MS - 200);
+    CHECK(strstr(shell.screen_data, "\"Ready\",\"mode\":\"next game\"") == NULL);
+    run_ms(&now, 300);
+    CHECK(strcmp(shell.screen, "status") == 0 &&
+          strstr(shell.screen_data, "\"Ready\",\"mode\":\"next game\"") != NULL);
+    /* DISCOVER: an answer within 3 s, but not twice within a quarter of the interval (no
+     * announcement for a long time, and the next periodic one far away). */
+    game.lobby.announced = false;
+    game.lobby.announce_ms = now + 10 * BOX_ANNOUNCE_MIN_MS;
+    int mark = shell.count;
+    atalaia_ff_msg_t d = {.kind = ATALAIA_FF_DISCOVER};
+    to_box(ff_key, &d, NULL, NULL);
+    run_ms(&now, BOX_DISCOVER_ANSWER_MAX_MS + 20);
+    atalaia_ff_msg_t m;
+    CHECK(field_frames_since(mark, &m) == 1 && m.kind == ATALAIA_FF_ANNOUNCE);
+    mark = shell.count;
+    to_box(ff_key, &d, NULL, NULL);
+    run_ms(&now, BOX_DISCOVER_ANSWER_MAX_MS + 20);
+    CHECK(field_frames_since(mark, &m) == 0);
+
+    /* The shell's picker: no ready screen over it. */
+    play_and_end(&now);
+    box_lobby_cancel_ready_screen(&game);
+    snprintf(shell.screen, sizeof(shell.screen), "preset_select");
+    run_ms(&now, BOX_READY_MS + 100);
+    CHECK(strcmp(shell.screen, "preset_select") == 0);
+
+    /* The announcement interval follows the sub-band's duty cycle: about a minute on
+     * 869.4-869.65 MHz (10 %), much longer at 1 %. */
+    game.lobby.channel_hz = 869525000u;
+    game.lobby.announce_ms = now + 1;
+    mark = shell.count;
+    run_ms(&now, 10 * BOX_ANNOUNCE_MIN_MS);
+    int g2 = field_frames_since(mark, &m);
+    CHECK(g2 >= 7 && g2 <= 10);
+    game.lobby.channel_hz = 868300000u;
+    run_ms(&now, 3 * BOX_ANNOUNCE_MIN_MS); /* the next one is already scheduled */
+    mark = shell.count;
+    run_ms(&now, 20 * BOX_ANNOUNCE_MIN_MS);
+    int g = field_frames_since(mark, &m);
+    CHECK(g >= 1 && g <= 3);
+    state_persist_clear();
+}
+
+/* The device id is made once and kept: the same after a reboot; none without a random source. */
+static void test_lobby_device_id(void)
+{
+    lobby_fixture();
+    uint8_t id[8];
+    memcpy(id, flash.device_id, 8);
+    char hex[17];
+    box_lobby_device_hex(&game, hex);
+    CHECK(strlen(hex) == 16);
+    fixture(true); /* a reboot: the same flash */
+    game.shell.random = sh_random;
+    CHECK(box_game_load_join_key(&game) && memcmp(game.lobby.device_id, id, 8) == 0);
+    fixture(false);
+    CHECK(box_game_set_join_key_hex(&game, JOIN_KEY_HEX)); /* no random source */
+    CHECK(!game.lobby.ready && !box_lobby_init(&game));
+    box_lobby_device_hex(&game, hex);
+    CHECK(hex[0] == '\0');
+    /* A field frame is still taken off the game path (not a game packet). */
+    atalaia_ff_msg_t d = {.kind = ATALAIA_FF_DISCOVER};
+    to_box(ff_key, &d, NULL, NULL);
+    CHECK(shell.count == 0);
+}
+
+/* The field frames' nonces never repeat (decision RJ-15): pseudonym | boot | count, the boot
+ * count stored before the first frame of a run, raised again after a reboot; no frame at all
+ * when it cannot be stored. */
+static void test_lobby_nonces(void)
+{
+    lobby_fixture();
+    uint32_t now = 10;
+    int mark = shell.count;
+    atalaia_ff_msg_t dsc = {.kind = ATALAIA_FF_DISCOVER};
+    for (int i = 0; i < 3; i++) {
+        game.lobby.announced = false;
+        to_box(ff_key, &dsc, NULL, NULL);
+        run_ms(&now, BOX_DISCOVER_ANSWER_MAX_MS + BOX_ANNOUNCE_FIRST_MAX_MS + 20);
+    }
+    CHECK(flash.have_ff_boot && flash.ff_boot == 1);
+    uint8_t nk[32];
+    atalaia_ff_nonce_key(JOIN_KEY, nk);
+    static uint8_t seen[64][ATALAIA_FF_NONCE_SIZE];
+    int seen_n = 0;
+    for (int i = mark; i < shell.count && seen_n < 64; i++) {
+        if (!atalaia_ff_is_frame(shell.pkt[i], shell.len[i])) continue;
+        const uint8_t *n = shell.pkt[i] + ATALAIA_RF_HEADER_SIZE;
+        uint8_t want[ATALAIA_FF_NONCE_SIZE];
+        atalaia_ff_nonce(nk, game.lobby.device_id, 1, (uint16_t)seen_n, want);
+        CHECK(memcmp(n, want, sizeof(want)) == 0); /* boot 1, count 0, 1, 2 ... */
+        memcpy(seen[seen_n++], n, ATALAIA_FF_NONCE_SIZE);
+    }
+    CHECK(seen_n >= 3);
+    /* A reboot (the same flash): boot 2, so the first frame's nonce is new. */
+    fixture(true);
+    game.shell.random = sh_random;
+    CHECK(box_game_load_join_key(&game));
+    mark = shell.count;
+    run_ms(&now, BOX_ANNOUNCE_FIRST_MAX_MS + 20);
+    CHECK(flash.ff_boot == 2);
+    bool fresh = false;
+    for (int i = mark; i < shell.count; i++) {
+        if (!atalaia_ff_is_frame(shell.pkt[i], shell.len[i])) continue;
+        uint8_t want[ATALAIA_FF_NONCE_SIZE];
+        atalaia_ff_nonce(nk, game.lobby.device_id, 2, 0, want);
+        fresh = memcmp(shell.pkt[i] + ATALAIA_RF_HEADER_SIZE, want, sizeof(want)) == 0;
+        break;
+    }
+    CHECK(fresh);
+    /* The count would wrap: the boot count rises first. */
+    game.lobby.ctr = ATALAIA_FF_CTR_MAX + 1u;
+    game.lobby.announced = false;
+    to_box(ff_key, &dsc, NULL, NULL);
+    run_ms(&now, BOX_DISCOVER_ANSWER_MAX_MS + 20);
+    CHECK(flash.ff_boot == 3 && game.lobby.boot == 3);
+    /* A boot count that cannot be stored: nothing is sent. */
+    fixture(false);
+    game.shell.random = sh_random;
+    flash.ff_boot_fails = true;
+    CHECK(box_game_set_join_key_hex(&game, JOIN_KEY_HEX));
+    run_ms(&now, BOX_ANNOUNCE_FIRST_MAX_MS + 20);
+    CHECK(shell.count == 0);
+    flash.ff_boot_fails = false;
+    state_persist_clear();
+}
+
 void run_box_game_tests(void)
 {
+    test_lobby_nonces();
+    test_lobby_answers_are_limited();
+    test_lobby_refused_invite_keeps_the_ended_game();
+    test_lobby_unreadable_boot_count();
+    test_lobby_announce_and_invite();
+    test_lobby_refusals();
+    test_lobby_replay_refused();
+    test_lobby_discover_and_ready_screen();
+    test_lobby_device_id();
     test_battery_low();
     test_medic_kit();
     test_player_tags();

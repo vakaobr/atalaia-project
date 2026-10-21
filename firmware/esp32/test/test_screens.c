@@ -76,6 +76,9 @@ static const screen_case_t cases[] = {
      "{\"title\":\"Game on\",\"mode\":\"Domination\",\"timer_s\":600,\"battery\":85,"
      "\"version\":\"0.1.0\"}",
      NULL},
+    /* Between games (main/box_lobby.c): an invite taken, and ready for the next game. */
+    {"status_invited", "status", "{\"title\":\"Invited\",\"mode\":\"3073: zone\"}", NULL},
+    {"status_ready", "status", "{\"title\":\"Ready\",\"mode\":\"next game\"}", NULL},
     {"pin_entry", "pin_entry", "{\"digits\":2,\"error\":false}", NULL},
     {"pin_entry_wrong", "pin_entry", "{\"digits\":0,\"error\":true}", NULL},
     /* Adoption (adoption.c, protocol/adoption.md): adopted, and another field's card. */

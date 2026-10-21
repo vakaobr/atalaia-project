@@ -70,6 +70,8 @@ class PendingPacket:
     header: Header       # decoded header (for inspection)
     deliver_at_ms: int   # simulation time when delivery occurs
     from_node: int       # source node id (immediate sender, may differ from header.source)
+    raw: bool = False    # a field frame (protocol/field-frames.md): delivered as it is, never relayed
+    dest: Optional[int] = None  # a field frame's one receiver (its loss was drawn at send)
 
 
 # --- duty-cycle tracker -------------------------------------------------------
@@ -150,6 +152,9 @@ class RadioModel:
         self.links: dict[tuple[int, int], bool] = {}
         # Record of all delivered packets: (dest_node_id, raw_data)
         self.delivered: list[tuple[int, bytes]] = []
+        # Field frames heard by each node, not yet taken (take_raw): sealed with the field's
+        # key, not the game's, so the model hands them over as they are (protocol/field-frames.md).
+        self.raw_inbox: dict[int, list[bytes]] = {}
         # Track the current simulation time for internal bookkeeping.
         self._now_ms: int = 0
 
@@ -315,6 +320,27 @@ class RadioModel:
 
         return raw
 
+    def send_raw(self, from_node: int, raw: bytes, now_ms: Optional[int] = None) -> bool:
+        """Puts a ready-made frame on air (a field frame): duty cycle and loss as for any packet,
+        no relay, no game key. False if the sender's duty-cycle budget is spent."""
+        if now_ms is None:
+            now_ms = self._now_ms
+        if not self._spend(from_node, len(raw), now_ms):
+            return False
+        hdr = header_decode(raw[:HEADER_SIZE])
+        for dest_id in self.nodes:
+            if dest_id == from_node or not self.is_linked(from_node, dest_id):
+                continue
+            if self.rng.random() < self.config.loss_rate:
+                continue
+            self.pending.append(PendingPacket(data=raw, header=hdr, from_node=from_node, raw=True, dest=dest_id,
+                                              deliver_at_ms=now_ms + self.rng.randint(_JITTER_MIN_MS, _JITTER_MAX_MS)))
+        return True
+
+    def take_raw(self, node_id: int) -> list[bytes]:
+        """The field frames node_id has heard since the last call."""
+        return self.raw_inbox.pop(node_id, [])
+
     # --- tick (deliver pending packets) ----------------------------------------
 
     def tick(self, now_ms: int) -> list[tuple[int, Header, bytes]]:
@@ -351,6 +377,10 @@ class RadioModel:
         results: list[tuple[int, Header, bytes]] = []
 
         for pkt in due:
+            if pkt.raw:
+                if pkt.dest in self.nodes and self.is_linked(pkt.from_node, pkt.dest):
+                    self.raw_inbox.setdefault(pkt.dest, []).append(pkt.data)
+                continue
             # Deliver to every connected node that hasn't seen it.
             for dest_id in list(self.nodes.keys()):
                 if dest_id == pkt.from_node:

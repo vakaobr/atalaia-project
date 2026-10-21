@@ -199,6 +199,7 @@ const char *atalaia_msg_type_name(unsigned type)
     case ATALAIA_MSG_TIME: return "TIME";
     case ATALAIA_MSG_CONFIG: return "CONFIG";
     case ATALAIA_MSG_CLAIM: return "CLAIM";
+    case ATALAIA_MSG_FIELD: return "FIELD";
     default: return NULL;
     }
 }

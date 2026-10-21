@@ -16,7 +16,7 @@ A receiver skips bytes until a `0xA5`, reads the length, and accepts the frame o
 
 | Type | Direction | Payload |
 | --- | --- | --- |
-| `0x01` IDENT | modem → controller | JSON: `fw`, `fw_version`, `core_version`, `framing`, `radio` (`"sx1262"` or `"none"`), `payload_max`, `epoch_window`, `measure` (true when the modem can answer MEASURE: it has a radio and its firmware knows the command) |
+| `0x01` IDENT | modem → controller | JSON: `fw`, `fw_version`, `core_version`, `framing`, `radio` (`"sx1262"` or `"none"`), `payload_max`, `epoch_window`, `measure` (true when the modem can answer MEASURE: it has a radio and its firmware knows the command), `field` (true: the firmware carries field frames) |
 | `0x02` RX | modem → controller | header (9) + plaintext payload + rssi (int8) + snr (int8) + epoch (uint16 BE) |
 | `0x03` TX | controller → modem | header (9) + plaintext payload (up to 200) |
 | `0x04` TX_ACK | modem → controller | seq (uint16 BE) + status (1) |
@@ -24,6 +24,9 @@ A receiver skips bytes until a `0xA5`, reads the length, and accepts the frame o
 | `0x06` STATUS | modem → controller | JSON, the reply to every successful CMD |
 | `0x07` ERROR | modem → controller | code (1) + UTF-8 message |
 | `0x08` NOISE | modem → controller | the result of a MEASURE command (below), 17 bytes |
+| `0x09` FIELD_TX | controller → modem | id (uint16 BE) + a whole field frame, 31-217 bytes ([field-frames.md](field-frames.md)) |
+| `0x0A` FIELD_RX | modem → controller | a field frame as heard + rssi (int8) + snr (int8) |
+| `0x0B` FIELD_ACK | modem → controller | id (uint16 BE) + status (1), the outcome of a FIELD_TX |
 
 The **epoch** at the end of RX is an addition to ADR-P2-4 (decision D2): it is the nonce epoch that authenticated the packet. A box restarts its sequence numbers at 0 with every new epoch (each reboot), so the controller needs it to tell a rebooted box's new packets from old ones and to acknowledge them per epoch. `snr` is sent as 0 until the radio HAL reports it.
 
@@ -41,10 +44,18 @@ The controller owns its own nonce counter (ADR-P2-2): it chooses `seq` and tells
 | 5 nonce_reuse | (epoch, seq) not above the last one sent: refused |
 | 6 queue_full | the radio queue is full |
 | 7 no_radio | no radio chip answered at boot |
+| 8 busy | (FIELD_ACK only) a MEASURE is running |
 
 `duty_cycle` follows the channel in use: the budget is the duty cycle of the channel's EU868 sub-band (10% of a sliding hour on 869.4-869.65 MHz, 1% on 868.0-868.6 and 869.7-870.0 MHz, 0.1% on 868.7-869.2 MHz), counted per sub-band, and a packet is refused when its LoRa time on air (SF7, 125 kHz) does not fit in what is left. The TX power follows the sub-band too: 500 mW ERP on 869.4-869.65 MHz, 25 mW elsewhere, less the front-end module's and the antenna's gains (RFC 0001 Amendment 3, decision C2).
 
-0-2 are ADR-P2-4's; 3-7 are additions (decision D3).
+0-2 are ADR-P2-4's; 3-7 are additions (decision D3); 8 came with the field frames (decision RJ-10).
+
+## Field frames: FIELD_TX, FIELD_RX, FIELD_ACK
+
+Between games, boxes and controllers exchange **field frames** ([field-frames.md](field-frames.md), RFC 0001 Amendment 7, proposed): message type 9 with game id 0, sealed with a key derived from the field join key, which the modem never holds. It carries them as they are, whether a game is configured or not:
+
+- **FIELD_TX**: the controller's id for it (its FIELD_ACK names it) and the whole frame, sealed by the controller. The modem checks only the shape (version 1, encrypted, game 0, type 9, 31-217 bytes), forces `hop_limit` to 0 (outside the MIC, so it still holds) and queues it on its current channel, the duty cycle counting as for any packet. FIELD_ACK: `ok`, `duty_cycle`, `timeout`, `invalid` (not a field frame's shape), `queue_full`, `no_radio`, or `busy` while a MEASURE runs. It never touches the game's nonce counter.
+- **FIELD_RX**: every packet heard with that shape, before any game check, with its RSSI and SNR. No dedupe and no relay: field frames are not flooded.
 
 ## RX
 
@@ -66,6 +77,8 @@ Every command except PING, IDENT and MEASURE is answered by a STATUS frame when 
 | `0x06` | CLEAR | none: forget the key and the game (sent when the game ends) |
 | `0x07` | IDENT | none: answered with IDENT |
 | `0x08` | MEASURE | channel_hz (uint32 BE), dwell_ms (uint16 BE, 10-10000), flags (1; bit 0: also count LoRa channel-activity detections): answered with NOISE |
+
+Field frames go and come in their own frame types (FIELD_TX, FIELD_RX, FIELD_ACK, above), not as commands.
 
 A **channel** (CONFIGURE, SET_CHANNEL, MEASURE) is accepted only when the whole 125 kHz LoRa channel fits inside one EU868 sub-band: centre - 62.5 kHz and centre + 62.5 kHz both within 868.0-868.6, 868.7-869.2, 869.4-869.65 or 869.7-870.0 MHz (RFC 0001 Amendment 3). 869.40 MHz, for example, is refused: its channel starts at 869.3375 MHz. Anything else is ERROR `bad_params`.
 

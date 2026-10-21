@@ -305,6 +305,8 @@ jobs:
         run: pip install -r simulator/requirements.txt check-jsonschema
       - name: Generated files are up to date
         run: python tools/protogen.py --check
+      - name: The field frame vectors are up to date
+        run: python tools/field_frame_vectors.py --check
       - name: The project page is up to date in every language
         run: python tools/build_site.py --check
       - name: The wiring diagrams match the firmware's pin defaults

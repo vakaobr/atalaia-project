@@ -310,7 +310,7 @@ class TeamBrandingTests(P3Case):
         self.restart()
         self.assertEqual(self.client.get(f"/api/v1/games/{game['id']}", headers=READ).json()["team_info"],
                          {"blue": {"display_name": "Águias", "crest_id": blue}})
-        self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM)
+        self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM, json={"force": True})
         self.client.post(f"/api/v1/games/{game['id']}/end", headers=GM, json={})
         self.assertEqual(self.client.put(f"/api/v1/games/{game['id']}/teams/blue", json={"display_name": "X"},
                                          headers=GM).status_code, 409)

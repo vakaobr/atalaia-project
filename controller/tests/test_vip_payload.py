@@ -88,7 +88,7 @@ class VipPositionTests(Case):
         self.game = self.new_game(mode_id=VIP, assignments={"4": "checkpoint"},
                                   params={"extraction": ZONE, "vip_points": 50})
         self.gid = self.game["id"]
-        r = self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM)
+        r = self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM, json={"force": True})
         self.assertEqual(r.status_code, 200, r.text)
         self.vip = self.person(self.gid, "Escoltada", "red", "vip")
         self.red = self.person(self.gid, "Ana", "red", "player")
@@ -138,13 +138,13 @@ class VipPositionTests(Case):
     def test_a_vip_without_a_zone_or_a_field_script_extracts_nothing(self):
         self.ctrl.end_game(self.gid, "test")
         game = self.new_game(mode_id=VIP, assignments={"4": "checkpoint"})  # no extraction zone
-        self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM)
+        self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM, json={"force": True})
         vip = self.person(game["id"], "Escoltada", "red", "vip")
         self.post(vip, INSIDE)
         self.assertEqual(self.events(game["id"], "vip.extracted"), [])
         self.ctrl.end_game(game["id"], "test")
         dom = self.new_game()  # Domination: no field.lua; the report is only a position
-        self.client.post(f"/api/v1/games/{dom['id']}/start", headers=GM)
+        self.client.post(f"/api/v1/games/{dom['id']}/start", headers=GM, json={"force": True})
         vip = self.person(dom["id"], "Escoltada", "red", "vip")
         self.post(vip, INSIDE)
         self.assertEqual(self.events(dom["id"], "vip.extracted"), [])
@@ -152,7 +152,7 @@ class VipPositionTests(Case):
     def test_a_malformed_zone_refuses_to_start(self):
         self.ctrl.end_game(self.gid, "test")
         game = self.new_game(mode_id=VIP, assignments={"4": "checkpoint"}, params={"extraction": "38.7;-9.1"})
-        r = self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM)
+        r = self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM, json={"force": True})
         self.assertEqual(r.status_code, 400, r.text)
         self.assertIn("extraction: latitude,longitude", r.text)
 
@@ -166,7 +166,7 @@ class GmOnlyTests(Case):
         self.game = self.new_game(mode_id=HACK, assignments={"4": "terminal"},
                                   params={"reveal_code": "4711", "puzzle": "wires"})
         self.gid = self.game["id"]
-        self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM)
+        self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM, json={"force": True})
         self.player = self.person(self.gid, "Ana", "red", "player")
         self.marshal = self.person(self.gid, "Rita", None, "marshal")
 

@@ -48,7 +48,8 @@
     "modem_error": "Erro do modem: {message}",
     "role": "O controlador agora é {role} (mandato {term}).",
     "node_offline": "A caixa {node} não dá notícias há mais de 90 s.",
-    "count": "{n} alertas"
+    "count": "{n} alertas",
+    "start_forced": "Jogo começado sem caixa para: {roles}"
   },
   "game": {
     "title": "Jogo",
@@ -104,7 +105,15 @@
     "squads_hint": "0 = sem squads (jogos pequenos: só equipas). Num milsim ou num jogo grande, cada equipa divide-se em squads.",
     "squads_each": "{n} squads por equipa",
     "role_packages": "Props com uma função própria",
-    "role_packages_hint": "As caixas e os telemóveis com essa função correm só isto, ao lado das caixas do modo (por exemplo, kits de ligaduras)."
+    "role_packages_hint": "As caixas e os telemóveis com essa função correm só isto, ao lado das caixas do modo (por exemplo, kits de ligaduras).",
+    "start_anyway": "Começar mesmo assim",
+    "missing_short": "Nenhuma caixa se juntou para: {roles}.",
+    "confirm_start_anyway": "Começar mesmo assim?",
+    "missing_roles": "O início espera por uma caixa (ou um telemóvel ligado) para: {roles}. Convide caixas ou comece mesmo assim.",
+    "start_warnings": {
+      "min": "{have} × {role} juntas; o modo pede {value} ({param}).",
+      "last": "Só {have} × {role} juntas e {param} é {value}: a contagem pode correr logo desde o início."
+    }
   },
   "controller": {
     "title": "Controlador de campo",
@@ -685,5 +694,44 @@
     "code_title": "Código de emparelhamento (rádio)",
     "code_later": "Uma caixa com ecrã vai mostrar um código curto que escreves aqui para a adotar por rádio. Chega com os convites por rádio; até lá usa o cabo ou o cartão de campo.",
     "log_title": "Adoções recentes"
+  },
+  "invites": {
+    "open": "Convidar caixas",
+    "title": "Caixas para este jogo",
+    "intro": "As caixas cujo jogo acabou anunciam-se pelo rádio. Marque as deste jogo: o controlador envia a cada uma a sua entrada pelo rádio, cifrada com a chave do campo.",
+    "previous_game": "Marcadas: as caixas de «{name}».",
+    "previous": "último jogo",
+    "seen": "há {s} s",
+    "last_role": "era {role}",
+    "box": "Caixa",
+    "heard": "Ouvida",
+    "role": "Papel",
+    "progress": "Estado",
+    "send": "Convidar ({n})",
+    "discover": "Procurar caixas",
+    "close": "Fechar",
+    "empty": "Ainda não se ouviu nenhuma caixa livre. Uma caixa anuncia-se até 20 s depois de o seu jogo acabar (o ecrã diz «Ready»), e depois mais ou menos uma vez por minuto; «Procurar caixas» pergunta-lhes agora.",
+    "no_radio": "O modem de rádio não está ligado: as caixas não se podem ouvir nem convidar.",
+    "old_modem": "O firmware do modem de rádio não transporta as tramas de campo: atualize-o.",
+    "manual": "Os cartões de entrada, os códigos QR e a consola série funcionam como antes (separador Juntar).",
+    "in_game": "neste jogo (nó {node})",
+    "status": {
+      "sending": "a enviar",
+      "invited": "convidada",
+      "accepted": "aceitou, a juntar-se",
+      "joined": "juntou-se",
+      "refused": "recusou",
+      "failed": "falhou",
+      "too_big": "grande demais"
+    },
+    "reasons": {
+      "busy": "noutro jogo",
+      "refused": "entrada recusada (chave de entrada de outro campo?)",
+      "no_mode": "o modo não está na caixa",
+      "not_box": "não é uma entrada de caixa",
+      "storage": "a caixa não a conseguiu guardar",
+      "radio": "o rádio da caixa não pode transmitir",
+      "ended": "já jogou esse jogo"
+    }
   }
 }

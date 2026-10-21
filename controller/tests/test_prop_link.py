@@ -69,7 +69,7 @@ class PropLinkTests(P3Case):
             self.assertEqual([(e["node"], e["type"]) for e in self.events(self.gid, "zone.captured")],
                              [(7, "zone.captured")])
             # The GM starts the game: the prop gets the command and the TIME beacon, as a box would.
-            self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM)
+            self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM, json={"force": True})
             got = [ws.receive_json(), ws.receive_json()]
             self.assertEqual({m["type"] for m in got}, {"cmd", "time"})
             cmd = next(m for m in got if m["type"] == "cmd")
@@ -97,7 +97,7 @@ class PropLinkTests(P3Case):
         ws = self.connect()
         try:
             ws.receive_json()
-            self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM)
+            self.client.post(f"/api/v1/games/{self.gid}/start", headers=GM, json={"force": True})
             ws.receive_json()
             ws.receive_json()
             self.client.post("/api/v1/nodes/4/cmd", headers=GM, json={"cmd": "reset"})

@@ -985,3 +985,40 @@ textarea.scenario-editor {
     border: 1px solid var(--line);
     border-radius: 6px;
 }
+
+/* The boxes for the next game (components/box-invites.js): a dialog over the page. */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 1rem;
+    overflow-y: auto;
+    z-index: 50;
+}
+
+.modal {
+    width: 100%;
+    max-width: 46rem;
+    margin-top: 2rem;
+}
+
+table.invites {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+table.invites td,
+table.invites th {
+    padding: 0.35rem 0.4rem;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    vertical-align: top;
+}
+
+.pill.small {
+    font-size: 0.75rem;
+    padding: 0 0.4rem;
+}

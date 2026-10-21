@@ -119,7 +119,7 @@ class ServerTests(unittest.TestCase):
                 game = http.post("/api/v1/games", headers=gm, json={
                     "name": "served", "mode_id": "org.atalaia.bomb", "teams": ["red", "blue"],
                     "assignments": {"2": "bomb"}}).json()
-                self.assertEqual(http.post(f"/api/v1/games/{game['id']}/start", headers=gm).status_code, 200)
+                self.assertEqual(http.post(f"/api/v1/games/{game['id']}/start", headers=gm, json={"force": True}).status_code, 200)
                 self.assertTrue(host.transmitted_all())  # CMD start and TIME went on air
 
                 async def stream():

@@ -571,6 +571,27 @@ CMD opcode **9, `update`**: the controller offers a box a firmware release. Its 
 
 **Reason:** a box hears the controller over LoRa during and between games, but has no Wi-Fi link to it until it needs one; a short command over the radio wakes the update, and everything that matters for safety (the signature, the version, the image's own descriptors, the hash) is checked by the box over the faster link.
 
+## Amendment 7 (2026-10-21, proposed): Field frames, and invites over LoRa
+
+**Status:** proposed with re-inviting boxes between games and the start guard (decisions RJ-1 to RJ-15); for review. The maintainer decided on 2026-10-21 to invite boxes over the radio with a key derived from the field join key, accepting the trade-off below (RJ-2).
+
+**Supersedes:** in section 9 and Amendment 2, that the join payload is "never sent over LoRa" (join.md); it may now travel inside an INVITE, sealed. Section 4 gains message type 9 and HELLO key 10.
+
+**Change:**
+
+1. **Message type 9, `FIELD`**: a frame outside any game, `game_id` 0 (game ids are 1-65534), `source` 0, `seq` 0, `hop_limit` 0, never relayed. After the 9-byte header comes a 13-byte nonce in the clear, then a CBOR body of at most 187 bytes encrypted with AES-128-CCM (8-byte MIC, AAD the header without `hop_limit` as in section 3), so a frame is at most 217 bytes, as any packet. The key is HKDF-SHA256 (RFC 5869) of the 32-byte field join key with no salt and the info `atalaia field frame v1`, 16 bytes. The nonce never comes from a random number generator: `HMAC-SHA256(K_n, sender id)[0..7] | boot (3 bytes) | ctr (2 bytes)`, with `K_n` = HKDF-SHA256 of the join key with the info `atalaia field nonce v1` (32 bytes), the sender id a box's device id (its boot count persisted in NVS before the first frame of every run, as section 3's epoch, and raised again when the frame count would wrap) or a controller's sender id, fresh from the CSPRNG at every start and never stored, so a restored backup or a copied database cannot roll it back. Section 3's game epochs are untouched.
+2. **Three bodies**, kind first: ANNOUNCE (a free box: its device id, a fresh token, its name, tier, last game and role, battery; or the answer to an invite: its id and the result), DISCOVER (a controller asks the free boxes to announce now), INVITE (to one box's device id with its current token: a random invite id and one of 1-3 parts of a join payload, 153 bytes each at most). The field tables, the decoders' rules, the box's and the controller's behaviour, timings and limits are in [protocol/field-frames.md](../../protocol/field-frames.md); shared vectors in `protocol/vectors/field_frame.json` (RFC 5869's own cases among them), checked by C and Python.
+3. **HELLO key 10, `device_id`** (bytes, exactly 8, optional): the box's stable device id, random, made once and kept in NVS. A HELLO without it is as before; older decoders skip it (section 4's rule for unknown keys), and the app's codec reads it.
+4. **A box accepts an invite** only while it has no game or its game is over, for its own device id and its current or previous token (it changes the token every 10 minutes and at every start, and drops it whenever it answers an invite, joins a game in any way or its game ends, so an invite recorded and played back never works), for a game it has not played to its end; the join payload then goes through every check of a card (its HMAC with the join key included). It answers with an ANNOUNCE carrying the invite's id and the result; its HELLO in the game confirms.
+5. **The USB modem** carries field frames as they are, with or without a game configured, and never holds the field key: FIELD_TX (0x09), FIELD_RX (0x0A), FIELD_ACK (0x0B) frames and TX status 8 `busy`, IDENT `"field": true` ([protocol/usb-modem.md](../../protocol/usb-modem.md)).
+6. **Duty cycle**: a free box's periodic announcements take at most 2 % of its sub-band's budget, never more than once a minute (about every 72 s on 869.4-869.65 MHz); invites are paced by their time on air and tried three times at most. The numbers are in field-frames.md.
+
+**Security trade-off (accepted by the maintainer):** anyone who holds the field join key and records the radio can open the invites and read the game keys of every game invited that way. A card or a QR code already exposes one game's key to whoever reads it; the invites make the join key a field secret on which every such game's confidentiality rests. It stays only on the controllers and in the boxes' encrypted NVS, and is changed everywhere if a box or a controller is lost (SECURITY.md).
+
+**Compatibility:** the version bits do not change. A box or a modem from before this amendment drops type 9 (another game's id); its HELLO has no key 10, so it is not listed as a previous game's box, and it joins by card as before. A controller from before ignores FIELD_RX frames (an unknown frame type is logged).
+
+**Reason:** on the first field test with real boxes (2026-10-21) every game needed every box joined again by card, QR code or serial line, and a GM could start a game no box had joined. Field frames let the controller find the free boxes and bring them into the next game from the console; the start guard (controller side, no wire change) refuses a start while a role has no joined node unless the GM confirms.
+
 ## Open questions
 
 - Per-node session keys (HKDF-derived from the game key) would limit

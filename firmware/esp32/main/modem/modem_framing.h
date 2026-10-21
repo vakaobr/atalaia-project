@@ -42,6 +42,11 @@ typedef enum {
     MODEM_FRAME_STATUS = 0x06, /* modem -> host: JSON status (reply to every CMD) */
     MODEM_FRAME_ERROR = 0x07,  /* modem -> host: error code + message */
     MODEM_FRAME_NOISE = 0x08,  /* modem -> host: result of a MEASURE command */
+    /* Field frames (protocol/field-frames.md): sealed by the controller with the field join
+     * key's derived key, which the modem never holds; it only puts them on air and back. */
+    MODEM_FRAME_FIELD_TX = 0x09,  /* host -> modem: id (u16) + a whole field frame to send */
+    MODEM_FRAME_FIELD_RX = 0x0A,  /* modem -> host: a field frame heard + rssi + snr */
+    MODEM_FRAME_FIELD_ACK = 0x0B, /* modem -> host: id (u16) + status, the outcome of a FIELD_TX */
 } modem_frame_type_t;
 
 /* CMD opcodes (first payload byte of a CMD frame). */
@@ -75,6 +80,7 @@ typedef enum {
     MODEM_TX_NONCE_REUSE = 5,    /* (epoch, seq) not above the last one sent: refused */
     MODEM_TX_QUEUE_FULL = 6,     /* radio TX queue full */
     MODEM_TX_NO_RADIO = 7,       /* no radio chip found at boot */
+    MODEM_TX_BUSY = 8,           /* FIELD_TX while a MEASURE runs */
 } modem_tx_status_t;
 
 /* ERROR frame codes. */
