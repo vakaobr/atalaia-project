@@ -548,7 +548,7 @@ roadmap:
     title: Field network
     short: >-
       Skirmesh-RF over LoRa, field controller, API, GM console and a mode pack, tested in
-      software; the first board's radio now transmits on the bench.
+      software; two boards now exchange radio packets on the bench.
     text: >-
       Skirmesh-RF over LoRa, field controller, API, GM console, and a mode pack, now written and
       tested in software: Hold-All Domination (score only while holding every box), Last Stand (a

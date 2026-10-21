@@ -564,7 +564,7 @@ roadmap:
     title: Rede de campo
     short: >-
       Skirmesh-RF sobre LoRa, controlador de campo, API, consola da organização e um pacote de
-      modos, testados em software; o rádio da primeira placa já transmite na bancada.
+      modos, testados em software; duas placas já trocam pacotes de rádio na bancada.
     text: >-
       Skirmesh-RF sobre LoRa, controlador de campo, API, consola da organização e um pacote de
       modos, já escrito e testado em software: Domínio Total (só pontua quem tem todas as caixas),
