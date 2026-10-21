@@ -65,7 +65,7 @@ class VectorTests(unittest.TestCase):
     def test_stream(self) -> None:
         """The remote GM's messages on the stream (plan phase 19): the controller's and the site server's."""
         stream = VECTORS["stream"]
-        self.assertEqual((len(stream["valid"]), len(stream["invalid"])), (13, 24))
+        self.assertEqual((len(stream["valid"]), len(stream["invalid"])), (15, 43))
         self.assertEqual({v["kind"] for v in stream["valid"]}, set(fmt.STREAM))
         for vector in stream["valid"]:
             with self.subTest(vector=vector["name"]):
@@ -75,6 +75,45 @@ class VectorTests(unittest.TestCase):
                 with self.assertRaises(fmt.SyncFormatError) as caught:
                     fmt.STREAM[vector["kind"]](copy.deepcopy(vector["body"]))
                 self.assertEqual((caught.exception.code, caught.exception.path), (vector["error"], vector["path"]))
+
+    def test_cot_details_in_the_emitters_forms(self) -> None:
+        """FU5-17: cot_event lets through the emitter's detail attributes only, in its forms; the constants
+        it keeps are the emitter's own (atak.py)."""
+        import time  # noqa: PLC0415
+
+        from atalaia_controller import atak  # noqa: PLC0415
+
+        self.assertEqual((fmt.COT_CALLSIGN_MAX, fmt.COT_REMARKS_MAX, fmt.COT_GROUP_ROLE, fmt.COT_TEAMS),
+                         (atak.CALLSIGN_MAX, atak.REMARKS_MAX, atak.GROUP_ROLE, atak.ATAK_TEAMS))
+        self.assertEqual(fmt.COT_ICONSET, f"COT_MAPPING_SPOTMAP/{atak.TYPE_PROP}/")
+        now = time.time()
+
+        def marker(detail: list) -> str:
+            return atak.event_xml(uid="atalaia.f.node.1", cot_type=atak.TYPE_PROP, how=atak.HOW_IMAGE, lat=1.0,
+                                  lon=2.0, now=now, start=now, stale=now + 60, detail=detail).decode()
+
+        # The emitter's widest marker: a long callsign and remark, a team, a battery, the lowest colour.
+        widest = atak.marker_detail("C" * 80, "Atalaia: " + "r" * 400, -(2**31), battery=100, group="Dark Blue")
+        fmt.cot_event(marker(widest))
+        fmt.cot_event(marker(atak.marker_detail("Caixa", "Atalaia: -", -1, battery=0)))
+        bad = {
+            "contact endpoint": [atak._el("contact", {"callsign": "x", "endpoint": "198.51.100.1:4242:tcp"})],
+            "contact empty": [atak._el("contact", {"callsign": ""})],
+            "contact text": [atak._el("contact", {"callsign": "x"}, "hello")],
+            "contact spaces": [atak._el("contact", {"callsign": "a  b"})],
+            "remarks attribute": [atak._el("remarks", {"to": "all"}, "Atalaia: -")],
+            "remarks empty": [atak._el("remarks")],
+            "colour out of range": [atak._el("color", {"argb": str(2**31)})],
+            "colour text": [atak._el("color", {"argb": "red"})],
+            "icon elsewhere": [atak._el("usericon", {"iconsetpath": "COT_MAPPING_SPOTMAP/b-m-p-s-m/../x"})],
+            "group role": [atak._el("__group", {"name": "Red", "role": "HQ"})],
+            "battery 101": [atak._el("status", {"battery": "101"})],
+            "battery and more": [atak._el("status", {"battery": "5", "readiness": "true"})],
+        }
+        for name, detail in bad.items():
+            with self.subTest(name), self.assertRaises(fmt.SyncFormatError) as caught:
+                fmt.cot_event(marker(detail))
+            self.assertEqual(caught.exception.code, "bad_detail")
 
     def test_command_defaults(self) -> None:
         body = copy.deepcopy(next(v["body"] for v in VECTORS["stream"]["valid"] if v["name"] == "command_mode_every_node"))

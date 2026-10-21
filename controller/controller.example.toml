@@ -113,6 +113,13 @@ interval_s = 30.0                 # every marker again this often; a capture goe
 staff_endpoints = []              # staff ATAK devices, ["10.42.0.5:4242"] (TCP; 4242 if no port);
                                   # from the environment, separated by commas
 players = false                   # player GPS positions, to staff_endpoints ONLY (never multicast)
+# true: the same events go to the site server on the sync's stream (this controller opens
+# it), which relays them to the field's enrolled ATAK devices away from the field over
+# TLS with a client certificate each (server/README.md, "Remote ATAK"). Needs
+# sync.enabled and a site server with ATALAIA_ATAK_RELAY=on. Off by default.
+remote = false
+remote_players = false            # with remote: player positions too, which the site server sends
+                                  # only to a gm's or a marshal's certificate (P4R18)
 
 [firmware]
 # Firmware updates for the Field Boxes over the field Wi-Fi (protocol/firmware-update.md).

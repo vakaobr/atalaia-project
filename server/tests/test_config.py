@@ -89,6 +89,30 @@ class SettingsTests(unittest.TestCase):
         self.assertIn("hosted=True", repr(Settings.from_env({**BASE, "ATALAIA_HOSTED": "on",
                                                              "ATALAIA_HOSTED_DOMAIN": "hub.example.pt"})))
 
+    def test_the_atak_relay(self) -> None:
+        """The remote ATAK relay (Phase 4 follow-up FU5): off by default; on, it needs a name for the devices."""
+        s = Settings.from_env(BASE)
+        self.assertEqual((s.atak_relay, s.atak_relay_port, s.relay_public_port()), (False, 8089, 8089))
+        with self.assertRaisesRegex(ConfigError, "ATALAIA_ATAK_RELAY=on needs ATALAIA_ATAK_RELAY_HOST"):
+            Settings.from_env({**BASE, "ATALAIA_ATAK_RELAY": "on"})
+        s = Settings.from_env({**BASE, "ATALAIA_ATAK_RELAY": "on", "ATALAIA_PUBLIC_URL": "https://Campo.example.pt"})
+        self.assertEqual(s.relay_host(), "campo.example.pt")
+        s = Settings.from_env({**BASE, "ATALAIA_ATAK_RELAY": "on", "ATALAIA_PUBLIC_URL": "https://campo.example.pt",
+                               "ATALAIA_ATAK_RELAY_HOST": "ATAK.Example.pt", "ATALAIA_ATAK_RELAY_PORT": "9443",
+                               "ATALAIA_ATAK_RELAY_PUBLIC_PORT": "443"})
+        self.assertEqual((s.relay_host(), s.atak_relay_port, s.relay_public_port()), ("atak.example.pt", 9443, 443))
+        for name, raw in (("ATALAIA_ATAK_RELAY", "yes"), ("ATALAIA_ATAK_RELAY_PORT", "0"),
+                          ("ATALAIA_ATAK_RELAY_PORT", "65536"), ("ATALAIA_ATAK_RELAY_PUBLIC_PORT", "x"),
+                          ("ATALAIA_ATAK_RELAY_HOST", "https://campo.example.pt"),
+                          ("ATALAIA_ATAK_RELAY_HOST", "campo.example.pt:8089")):
+            with self.subTest(name=name, raw=raw), self.assertRaisesRegex(ConfigError, name):
+                Settings.from_env({**BASE, name: raw})
+        hosted = {**BASE, "ATALAIA_HOSTED": "on", "ATALAIA_HOSTED_DOMAIN": "hub.example.pt", "ATALAIA_ATAK_RELAY": "on"}
+        s = Settings.from_env(hosted)
+        self.assertEqual((s.relay_host("campo-a"), s.relay_host()), ("campo-a.hub.example.pt", None))
+        with self.assertRaisesRegex(ConfigError, "ATALAIA_ATAK_RELAY_HOST must be unset in hosted mode"):
+            Settings.from_env({**hosted, "ATALAIA_ATAK_RELAY_HOST": "atak.example.pt"})
+
     def test_every_setting(self) -> None:
         s = Settings.from_env({
             **BASE, "ATALAIA_DB_POOL_SIZE": "10", "ATALAIA_DB_MAX_OVERFLOW": "0",

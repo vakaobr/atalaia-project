@@ -1954,7 +1954,16 @@ proposed):**
   relay needs an internet-facing endpoint for ATAK clients, and raw
   CoT on TCP 4242 has no authentication; it waits for a design with
   client certificates, as TAK's TLS streaming has, decision S19-10,
-  which answers M9-10.)*
+  which answers M9-10.)* *(2026-10-21, Phase 4 follow-up, decisions
+  FU5-1 to FU5-12: built that way. The controller pushes its events
+  on the stream it opens (`[atak] remote = true`, off by default),
+  the site server relays them over TLS on port 8089 with a client
+  certificate per device, issued by the field's admin or gm from a
+  per-field CA whose key is kept sealed; never raw CoT on 4242.
+  Props and zones to every enrolled device of the field; player
+  positions only with `remote_players = true` on the controller and
+  only to a certificate of a gm or a marshal issued with positions,
+  which amends "props and zones only" above.)*
 - **Configuration** is the controller's TOML (`[atak] enabled = false`,
   `multicast = "239.2.3.1:6969"`, `interval_s = 30`,
   `staff_endpoints = []`, `players = false`), overridable as

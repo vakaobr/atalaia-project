@@ -601,7 +601,7 @@ roadmap:
     title: Site server and advanced play
     short: >-
       Site server, game scheduling and registration, custom scenarios, advanced modes, ATAK.
-      Started: advanced modes (Master and Satellites, the Hacking Terminal, VIP / Payload and the logic of Target Windows), custom scenarios (their runtime, compiler, console editor and objectives in the app), geo utilities in the core, the ATAK feed, and the site server's accounts, personal data rights, controller sync, chrono registry, game scheduling with public field pages, feeds and registration, club profiles with branding sync, game history and the scenario library, device health, a firmware catalogue, over-the-air firmware updates for the Field Box, the remote GM, staff web pages for them and the deployment (HTTPS, encrypted backups, restore), hosted mode for many fields on one server, with its deployment, are built in software.
+      Started: advanced modes (Master and Satellites, the Hacking Terminal, VIP / Payload and the logic of Target Windows), custom scenarios (their runtime, compiler, console editor and objectives in the app), geo utilities in the core, the ATAK feed (on the field and, through the site server, for staff away from it), and the site server's accounts, personal data rights, controller sync, chrono registry, game scheduling with public field pages, feeds and registration, club profiles with branding sync, game history and the scenario library, device health, a firmware catalogue, over-the-air firmware updates for the Field Box, the remote GM, staff web pages for them and the deployment (HTTPS, encrypted backups, restore), hosted mode for many fields on one server, with its deployment, are built in software.
     text: >-
       Site server (accounts, game history, the chrono registry, scheduling games, registration and
       publishing), custom scenarios, advanced modes (master and satellite zones, VIP escort, hacking
@@ -627,8 +627,10 @@ roadmap:
       in the core (distances and zones for every script, identical on every platform), and the
       ATAK feed (the boxes and zones on ATAK maps over the field Wi-Fi, in their owners' colours,
       placed by giving two corners of the field image their map position; player positions never
-      go to everyone, only to staff devices when the field turns it on; not yet tried with a real
-      ATAK phone). Site
+      go to everyone, only to staff devices when the field turns it on; staff away from the
+      field get the same through the site server, over an encrypted connection with a certificate per
+      device that the field issues and can revoke at once, positions only to a GM's or a marshal's;
+      not yet tried with a real ATAK phone). Site
       server: its skeleton (database, migrations, health check, in its own container), accounts
       (passwords, two-factor codes required for organisers and marshals, sessions and roles per
       field) and personal data rights (access, export, correction, erasure, consent records, a

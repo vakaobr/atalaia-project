@@ -24,6 +24,16 @@ socket carries, as protocol/sync.md describes:
   (a standby controller refuses, a paused game does not pause again).
 - ``command.result`` back: ``done`` or why not.
 
+The same stream carries the remote ATAK relay (Phase 4 follow-up, decisions
+FU5-*): with ``[atak] remote = true`` the controller opens it even with
+``remote_gm`` off, says ``atak: true`` in its ``hello``, and once the site
+server's ``hello.ack`` says ``atak_relay: true`` pushes the CoT events its
+emitter makes (``atak.py``: the boxes and the extraction zone; player
+positions only with ``[atak] remote_players = true``) as ``cot`` messages. The
+site server relays them to the field's enrolled ATAK devices; it never connects
+to the controller. With ``remote_gm`` off no ``live`` view is sent and every
+command is refused, as before.
+
 Every command, carried out or refused, is in the store's ``remote_commands``
 (store schema 8): who sent it (the site server's account id and username),
 what it asked for, the game and the result; ``GET /api/v1/remote-gm`` shows
@@ -36,6 +46,7 @@ off, nothing starts.
 
 from __future__ import annotations
 
+import collections
 import copy
 import json
 import logging
@@ -46,8 +57,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 from . import __version__
 from .engine import Conflict, ControllerError, NotFound, Unavailable
-from .sync_format import (MAX_LIVE_EVENTS, NODE_INFO, STALE_S, SYNC_VERSION, SyncFormatError, check_command,
-                          check_event, check_live, check_nodes)
+from .sync_format import (MAX_COT_EVENTS, MAX_LIVE_EVENTS, NODE_INFO, STALE_S, SYNC_VERSION, SyncFormatError,
+                          check_command, check_event, check_live, check_nodes)
 from .ws_client import WebSocket, WsError
 
 log = logging.getLogger("atalaia.remote_gm")
@@ -61,6 +72,7 @@ BACKOFF_MIN_S = 5.0
 BACKOFF_MAX_S = 300.0
 AUTH_REFUSED = 4401
 BROADCAST = 0xFFFF   # every node (atalaia_sim.field_controller.BROADCAST)
+COT_QUEUE_MAX = 500  # CoT events waiting for the stream; older ones go first (the next full cycle resends)
 
 
 def stream_url(sync_url: str) -> str:
@@ -90,6 +102,12 @@ class RemoteGm:
         self.last_error: Optional[str] = None
         self.commands = 0  # commands received (carried out or not)
         self.lives = 0
+        # The remote ATAK relay (FU5): events waiting to go, whether the site server takes them on this socket,
+        # and the emitter's hook to send its whole picture again on a new socket.
+        self._cot: collections.deque[str] = collections.deque(maxlen=COT_QUEUE_MAX)
+        self.atak_relay = False
+        self.on_relay_open: Optional[Callable[[], None]] = None
+        self.cot_sent = 0
 
     # --- the thread ------------------------------------------------------------------------
 
@@ -97,8 +115,13 @@ class RemoteGm:
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, name="remote-gm", daemon=True)
         self._thread.start()
-        log.warning("remote GM is on: users with the gm role on this field at %s may act on the live game",
-                    self.cfg.sync_url)
+        if self.cfg.sync_remote_gm:
+            log.warning("remote GM is on: users with the gm role on this field at %s may act on the live game",
+                        self.cfg.sync_url)
+        if self.cfg.atak_remote:
+            log.warning("remote ATAK is on: this field's CoT events go to %s for its enrolled ATAK devices%s",
+                        self.cfg.sync_url, ", player positions included"
+                        if self.cfg.atak_remote_players else "")
 
     def stop(self) -> None:
         self._stop.set()
@@ -140,6 +163,7 @@ class RemoteGm:
                 self.last_error = "failed"
             finally:
                 self.connected = False
+                self.atak_relay = False
                 if ws is not None:
                     ws.close()
             if refused:
@@ -157,16 +181,24 @@ class RemoteGm:
         ws.send_text(json.dumps({"type": kind, **body}, separators=(",", ":"), ensure_ascii=False))
 
     def session(self, ws: Any) -> None:
-        """One open stream: hello, then commands as they come and the live view as it changes."""
-        self._send(ws, "hello", {**self.envelope(), "remote_gm": bool(self.cfg.sync_remote_gm)})
+        """One open stream: hello, then commands as they come, the live view as it changes (remote GM on) and
+        the CoT events as the emitter makes them (remote ATAK on and taken by the site server)."""
+        hello = {**self.envelope(), "remote_gm": bool(self.cfg.sync_remote_gm)}
+        if self.cfg.atak_remote:
+            hello["atak"] = True  # only then: an older site server refuses a hello with a field it does not know
+        self._send(ws, "hello", hello)
+        self.atak_relay = False
+        self._cot.clear()
         last_live = last_ping = 0.0
         self._dirty.set()
         while not self._stop.is_set():
             raw = ws.recv(RECV_S)
             if raw is not None:
                 self._on_message(ws, raw)
+            self._send_cot(ws)
             now = time.monotonic()
-            if (self._dirty.is_set() and now - last_live >= LIVE_MIN_S) or now - last_live >= LIVE_EVERY_S:
+            due = (self._dirty.is_set() and now - last_live >= LIVE_MIN_S) or now - last_live >= LIVE_EVERY_S
+            if due and self.cfg.sync_remote_gm:  # no live view leaves the field without the remote GM
                 self._dirty.clear()
                 body = self.live_body()
                 if body is not None:
@@ -186,13 +218,39 @@ class RemoteGm:
         if not isinstance(msg, dict):
             return
         kind = msg.pop("type", None)
-        if kind == "command":
+        if kind == "hello.ack":
+            wanted = bool(self.cfg.atak_remote)
+            self.atak_relay = wanted and msg.get("atak_relay") is True
+            if wanted and not self.atak_relay:
+                log.warning("remote ATAK: the site server does not relay CoT (its ATAK relay is off): nothing sent")
+            elif self.atak_relay and self.on_relay_open is not None:
+                self.on_relay_open()  # the emitter sends its whole picture again
+        elif kind == "command":
             result = self.handle_command(msg)
             self._send(ws, "command.result", {**self.envelope(), **result})
             self._dirty.set()
         elif kind == "error":
             log.warning("remote GM stream: the site server refused a message (%s %s at %s)", msg.get("detail"),
                         msg.get("error", ""), msg.get("path", ""))
+
+    # --- the remote ATAK relay (FU5) ---------------------------------------------------------
+
+    def push_cot(self, events: list[bytes]) -> int:
+        """The emitter's events for the relay: queued while the site server takes them, else dropped (the
+        emitter's next full cycle sends everything again). Returns how many were queued."""
+        if not self.connected or not self.atak_relay:
+            return 0
+        for data in events:
+            self._cot.append(data.decode("utf-8"))
+        return len(events)
+
+    def _send_cot(self, ws: Any) -> None:
+        while self._cot and self.atak_relay:
+            batch: list[str] = []
+            while self._cot and len(batch) < MAX_COT_EVENTS:
+                batch.append(self._cot.popleft())
+            self._send(ws, "cot", {**self.envelope(), "events": batch})
+            self.cot_sent += len(batch)
 
     # --- commands --------------------------------------------------------------------------
 
@@ -325,4 +383,6 @@ class RemoteGm:
 
     def status(self) -> dict[str, Any]:
         return {"enabled": bool(self.cfg.sync_remote_gm), "connected": self.connected,
-                "connected_at": self.connected_at, "last_error": self.last_error, "commands": self.commands}
+                "connected_at": self.connected_at, "last_error": self.last_error, "commands": self.commands,
+                "atak": {"enabled": bool(self.cfg.atak_remote), "relay": self.atak_relay,
+                         "sent": self.cot_sent}}

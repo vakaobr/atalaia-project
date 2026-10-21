@@ -9,6 +9,7 @@ import { $, api, boot, clear, effectiveRoles, el, errorText, link, roleName, sec
 const SECTIONS = [
     ['history', '/history', 'nav_history'], ['scenarios', '/scenarios', 'nav_scenarios'],
     ['presets', '/presets', 'nav_presets'], ['devices', '/devices', 'nav_devices'], ['remote', '/remote-gm', 'nav_remote'],
+    ['atak', '/atak', 'nav_atak'],
 ];
 
 async function main() {

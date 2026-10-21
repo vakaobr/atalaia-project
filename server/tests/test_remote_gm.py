@@ -103,7 +103,7 @@ class RemoteCase(AppTestCase):
         self.streams.append(stream)
         self.assertEqual((await stream.open())["type"], "websocket.accept")
         await stream.send({"type": "hello", "sync_version": 1, "controller": ctrl, "remote_gm": remote_gm})
-        self.assertEqual(await stream.receive(), {"type": "hello.ack", "remote_gm": remote_gm})
+        self.assertEqual(await stream.receive(), {"type": "hello.ack", "remote_gm": remote_gm, "atak_relay": False})
         if live is not None:
             await stream.send({"type": "live", "sync_version": 1, "controller": ctrl, "live": live})
         await asyncio.sleep(0.05)

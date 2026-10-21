@@ -1091,7 +1091,10 @@ to M9-10):
   (`GET /api/v1/atak`).
 - Not built (M9-10): the remote ATAK relay through the site server
   (ADR-P4-7's amendment); it belongs with the site server's work on the
-  controller's link (plan phase 19).
+  controller's link (plan phase 19). *(2026-10-21: built as a Phase 4
+  follow-up, decisions FU5-1 to FU5-12: `[atak] remote` on the
+  controller's stream, the site server's TLS relay with per-device
+  client certificates; server/README.md, "Remote ATAK".)*
 
 Tested: `controller/tests/test_atak.py` (35 tests) and the console's
 `test_field_georeference_two_corners`.
@@ -1556,7 +1559,8 @@ command again (S19-5). The controller's "`audit` entries" are a new table,
 `remote_commands` (store schema 8), with `remote_gm.py`, `ws_client.py` (its own
 RFC 6455 client, S19-2), `[sync] remote_gm` and `GET /api/v1/remote-gm` (S19-6).
 The site server gained `wsproto` so uvicorn serves the stream at all (S19-1).
-Not built: the remote ATAK relay that decision M9-10 had deferred here (S19-10),
+Not built: the remote ATAK relay that decision M9-10 had deferred here (S19-10;
+built on 2026-10-21 as a Phase 4 follow-up, decisions FU5-*),
 positions in the remote view (S19-7), a GM web page on the site server and the
 console's screen for the log (S19-11). Tests: `test_devices.py`,
 `test_firmware.py`, `test_remote_gm.py`, `test_remote_gm_e2e.py` (the real

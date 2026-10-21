@@ -12,7 +12,9 @@ is at /api/v1/openapi.json.
 
 The app's own state: ``keys`` (derived from ATALAIA_SECRET_KEY), ``seed_box``
 (TOTP seeds), ``limits`` (rate limits and lockouts), ``used_totp_steps``
-(spent TOTP login steps), ``remote_hub`` (the remote GM's controller links, plan phase 19), ``purge_task`` (the daily retention purge, unless
+(spent TOTP login steps), ``remote_hub`` (the remote GM's controller links, plan phase 19), ``atak_relay`` (the
+remote ATAK relay's TLS listener with ATALAIA_ATAK_RELAY=on, else None; Phase 4 follow-up FU5),
+``atak_box`` (seals the fields' ATAK CA keys), ``purge_task`` (the daily retention purge, unless
 ATALAIA_PURGE_HOUR is off) and ``clock`` (the time TOTP codes are checked at;
 the tests move it). All of it is in memory, for the one worker process the
 image runs (ADR-P4-2).
@@ -36,10 +38,11 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from . import __version__, integrations, personal_data, tenancy
-from .api import (auth, branding, chrono, clubs, devices, fields, firmware, games, health, history,
+from . import __version__, atak_pki, integrations, personal_data, tenancy
+from .api import (atak, auth, branding, chrono, clubs, devices, fields, firmware, games, health, history,
                   integrations as integrations_api, me, registration_import, registrations, remote_gm, scenarios,
                   scheduling, sync)
+from .atak_relay import AtakRelay
 from .config import Settings, redact_url
 from .db import make_engine, make_sessionmaker
 from .ratelimit import Limits, RequestLimitMiddleware
@@ -77,9 +80,17 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
                                                                   tenants=tenants),
                                         name="retention-purge")
         app.state.purge_task = purge
+        relay = None
+        if settings.atak_relay:  # the remote ATAK relay's TLS listener (FU5): off by default
+            relay = AtakRelay(settings, app.state.sessionmaker, app.state.engine)
+            await relay.start()
+        app.state.atak_relay = relay
         try:
             yield
         finally:
+            if relay is not None:
+                await relay.stop()
+                app.state.atak_relay = None
             if purge is not None:
                 purge.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
@@ -98,6 +109,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.state.used_totp_steps = UsedTokens()
     app.state.clock = time.time
     app.state.remote_hub = RemoteHub()  # the remote GM's open controller links (plan phase 19)
+    app.state.atak_relay = None  # the remote ATAK relay, started with the app when ATALAIA_ATAK_RELAY=on (FU5)
+    app.state.atak_box = atak_pki.CaBox(settings.secret_key)
     app.add_exception_handler(RequestValidationError, _invalid_request)
     # The last one added runs first: security headers wrap everything, the 429s and the hosted mode's
     # refusals included; the tenant is chosen before anything else reads the database.
@@ -120,6 +133,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.include_router(devices.router)
     app.include_router(firmware.router)
     app.include_router(remote_gm.router)
+    app.include_router(atak.router)  # the remote ATAK relay's enrolment (Phase 4 follow-up FU5)
     app.include_router(field_pages.router)
     app.include_router(club_pages.router)
     app.include_router(history.router)  # plan phase 20: game history, the scenario library, the scoreboard

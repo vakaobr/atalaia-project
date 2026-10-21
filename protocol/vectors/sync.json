@@ -11898,6 +11898,35 @@
      "id": "0192f3a4-0000-7000-8000-00000000c001",
      "code": "remote_gm_off"
     }
+   },
+   {
+    "name": "hello_atak_relay",
+    "kind": "hello",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "remote_gm": false,
+     "atak": true
+    }
+   },
+   {
+    "name": "cot_box_player_and_drop",
+    "kind": "cot",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "events": [
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.player.p-abcdefghijk2\" type=\"a-f-G-U-C\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"m-g\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"p-abcdefghijk2\" /><__group name=\"Red\" role=\"Team Member\" /><remarks>Atalaia: red, player</remarks></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T09:59:59.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail></detail></event>"
+     ]
+    }
    }
   ],
   "invalid": [
@@ -13291,6 +13320,407 @@
     },
     "error": "unknown_field",
     "path": "state"
+   },
+   {
+    "name": "hello_atak_not_boolean",
+    "kind": "hello",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "remote_gm": true,
+     "atak": "yes"
+    },
+    "error": "not_a_boolean",
+    "path": "atak"
+   },
+   {
+    "name": "cot_no_events",
+    "kind": "cot",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "events": []
+    },
+    "error": "bad_batch_size",
+    "path": "events"
+   },
+   {
+    "name": "cot_too_many_events",
+    "kind": "cot",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "events": [
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>",
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>"
+     ]
+    },
+    "error": "bad_batch_size",
+    "path": "events"
+   },
+   {
+    "name": "cot_without_declaration",
+    "kind": "cot",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "events": [
+      "<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>"
+     ]
+    },
+    "error": "not_cot",
+    "path": "events[0]"
+   },
+   {
+    "name": "cot_doctype",
+    "kind": "cot",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "events": [
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<!DOCTYPE event [<!ENTITY x \"y\">]><event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>"
+     ]
+    },
+    "error": "not_cot",
+    "path": "events[0]"
+   },
+   {
+    "name": "cot_file_transfer_type",
+    "kind": "cot",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "events": [
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-f-t-r\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>"
+     ]
+    },
+    "error": "bad_type",
+    "path": "events[0].type"
+   },
+   {
+    "name": "cot_not_atalaia_uid",
+    "kind": "cot",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "events": [
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"ANDROID-1234\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>"
+     ]
+    },
+    "error": "bad_uid",
+    "path": "events[0].uid"
+   },
+   {
+    "name": "cot_chat_detail",
+    "kind": "cot",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "events": [
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><__chat chatroom=\"All\" /></detail></event>"
+     ]
+    },
+    "error": "bad_detail",
+    "path": "events[0].detail"
+   },
+   {
+    "name": "cot_bad_stale",
+    "kind": "cot",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "events": [
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"tomorrow\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>"
+     ]
+    },
+    "error": "bad_time",
+    "path": "events[0].stale"
+   },
+   {
+    "name": "cot_latitude_out_of_range",
+    "kind": "cot",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "events": [
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"91.0\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>"
+     ]
+    },
+    "error": "bad_point",
+    "path": "events[0].point"
+   },
+   {
+    "name": "cot_too_large",
+    "kind": "cot",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "events": [
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><remarks>xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</remarks></detail></event>"
+     ]
+    },
+    "error": "too_large",
+    "path": "events[0]"
+   },
+   {
+    "name": "cot_contact_endpoint",
+    "kind": "cot",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "events": [
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" endpoint=\"203.0.113.9:4242:tcp\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>"
+     ]
+    },
+    "error": "bad_detail",
+    "path": "events[0].detail.contact"
+   },
+   {
+    "name": "cot_remarks_not_atalaia",
+    "kind": "cot",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "events": [
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Open https://example.invalid now</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>"
+     ]
+    },
+    "error": "bad_detail",
+    "path": "events[0].detail.remarks"
+   },
+   {
+    "name": "cot_remarks_too_long",
+    "kind": "cot",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "events": [
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>"
+     ]
+    },
+    "error": "bad_detail",
+    "path": "events[0].detail.remarks"
+   },
+   {
+    "name": "cot_usericon_other_path",
+    "kind": "cot",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "events": [
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"34ae1613-9645-4222-a9d2-e5f243dea2865/Military/x.png\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>"
+     ]
+    },
+    "error": "bad_detail",
+    "path": "events[0].detail.usericon"
+   },
+   {
+    "name": "cot_group_not_an_atak_team",
+    "kind": "cot",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "events": [
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Everyone\" role=\"HQ\" /></detail></event>"
+     ]
+    },
+    "error": "bad_detail",
+    "path": "events[0].detail.__group"
+   },
+   {
+    "name": "cot_player_with_icon",
+    "kind": "cot",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "events": [
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.player.p-abcdefghijk2\" type=\"a-f-G-U-C\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"m-g\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"p-abcdefghijk2\" /><__group name=\"Red\" role=\"Team Member\" /><remarks>Atalaia: red, player</remarks><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-1\" /></detail></event>"
+     ]
+    },
+    "error": "bad_detail",
+    "path": "events[0].detail.usericon"
+   },
+   {
+    "name": "cot_detail_twice",
+    "kind": "cot",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "events": [
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><contact callsign=\"Caixa 5\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>"
+     ]
+    },
+    "error": "bad_detail",
+    "path": "events[0].detail"
+   },
+   {
+    "name": "cot_event_access_attribute",
+    "kind": "cot",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "events": [
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T10:01:00.000Z\" how=\"h-e\" access=\"Unclassified\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail><contact callsign=\"Caixa 4\" /><remarks>Atalaia: red</remarks><color argb=\"-2676931\" /><usericon iconsetpath=\"COT_MAPPING_SPOTMAP/b-m-p-s-m/-2676931\" /><__group name=\"Red\" role=\"Team Member\" /></detail></event>"
+     ]
+    },
+    "error": "unknown_field",
+    "path": "events[0]"
    }
   ]
  }

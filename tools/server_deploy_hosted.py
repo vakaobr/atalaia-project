@@ -37,6 +37,13 @@ and the hub's domain hub.test, ports on 127.0.0.1 only:
     from before, ownership, grants, policies and the roles match exactly,
     the isolation checks of step 4 pass again and the probe finds both
     fields' data through Caddy, with new certificates from a new CA.
+The hub runs with the remote ATAK relay on (Phase 4 follow-up FU5): after step 3
+and again after the restore, the operator's `atak issue --field SLUG` (in the
+server's container) makes a data package per field, the published relay port
+answers TLS with the hub's relay certificate (*.DOMAIN), and
+tests/deploy_probe_atak.py checks that each field's device gets its own
+field's events and never the other's (the certificate's field picks the
+tenant).
 Everything it made is removed at the end, whatever the result.
 """
 
@@ -55,7 +62,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from server_deploy import SERVER, DeployFailure, Deployment, expect, free_port, say  # noqa: E402
+from server_deploy import SERVER, DeployFailure, Deployment, expect, say  # noqa: E402
 
 DOMAIN = "hub.test"
 FIELDS = (("campo-a", "Campo Alfa"), ("campo-b", "Campo Bravo"))
@@ -177,7 +184,7 @@ class HostedDeployment(Deployment):
             if b"ports are not available" not in done.stdout + done.stderr:
                 break
             self.dc("down", "--remove-orphans", check=False, quiet=True)
-            self.env["ATALAIA_HTTP_PORT"], self.env["ATALAIA_HTTPS_PORT"] = str(free_port()), str(free_port())
+            self.new_ports()
         raise DeployFailure("setup.sh --hosted could not start the hub")
 
     def hub(self, *args: str, check: bool = True) -> str:
@@ -383,6 +390,11 @@ def run(suffix: str, server_image: str, test_image: str) -> int:
         d.operator()
         d.ask_endpoint()
         d.probe("before")
+        say("   the remote ATAK relay: one device per field, each field's events to its own device only")
+        for slug, _ in FIELDS:
+            d.atak_enrol(slug, f"{slug}.{DOMAIN}", d.keys[slug])
+        d.atak_published(f"*.{DOMAIN}")
+        d.atak_probe([f"{slug}.{DOMAIN}" for slug, _ in FIELDS])
         d.server_connects_as_its_role()
         d.one_worker()
         say("4. the isolation")
@@ -395,6 +407,8 @@ def run(suffix: str, server_image: str, test_image: str) -> int:
         d.restore_hub(backup, expected, privileges)
         d.ask_endpoint()
         d.probe("after")
+        d.atak_published(f"*.{DOMAIN}")
+        d.atak_probe([f"{slug}.{DOMAIN}" for slug, _ in FIELDS])
         d.server_connects_as_its_role()
         say("every hosted deployment check passed (Caddy's local CA on this machine; not a real domain, "
             "a real DNS wildcard or a public certificate)")

@@ -110,6 +110,13 @@
     staff_endpoints = []        # staff ATAK devices, "host:port" (TCP; 4242 if no port); from the
                                 # environment, separated by commas
     players = false             # player positions to staff_endpoints only, never to multicast
+    remote = false              # true: push the same CoT events to the site server on the sync's stream
+                                # (the controller opens it, as for the remote GM), which relays them to
+                                # the field's enrolled ATAK devices over TLS with client certificates
+                                # (Phase 4 follow-up FU5); needs sync.enabled and a site server with
+                                # its relay on
+    remote_players = false      # with remote: player positions too, which the site server sends only
+                                # to certificates allowed to see them (a gm's or a marshal's, P4R18)
 """
 
 from __future__ import annotations
@@ -140,7 +147,7 @@ SECTIONS = {
                 "max_replicas", "max_players", "chrono_valid_for", "rate_per_minute", "urls",
                 "wifi_ssid", "limit_template", "notice_version", "notice_pt", "notice_en",
                 "retention_days"),
-    "atak": ("enabled", "multicast", "interval_s", "staff_endpoints", "players"),
+    "atak": ("enabled", "multicast", "interval_s", "staff_endpoints", "players", "remote", "remote_players"),
     "firmware": ("release_keys", "dir", "update_timeout_s", "variants"),
 }
 
@@ -224,6 +231,8 @@ class Config:
     atak_interval_s: float = 30.0
     atak_staff_endpoints: list[str] = field(default_factory=list)
     atak_players: bool = False
+    atak_remote: bool = False  # the remote ATAK relay through the site server (Phase 4 follow-up FU5)
+    atak_remote_players: bool = False
     # [firmware]
     firmware_release_keys: list[str] = field(default_factory=list)
     firmware_dir: str = ""
@@ -331,6 +340,10 @@ def _check_atak(cfg: "Config") -> None:
         check_config(cfg)
     except AtakConfigError as exc:
         raise ConfigError(str(exc)) from None
+    if cfg.atak_remote and not (cfg.atak_enabled and cfg.sync_enabled):
+        raise ConfigError("atak.remote needs atak.enabled and sync.enabled (the relay rides the sync's stream)")
+    if cfg.atak_remote_players and not cfg.atak_remote:
+        raise ConfigError("atak.remote_players needs atak.remote")
 
 
 def _check_firmware(cfg: "Config") -> None:

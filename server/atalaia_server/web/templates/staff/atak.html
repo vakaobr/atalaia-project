@@ -1,0 +1,58 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$atak_title</h1>
+<p>$atak_intro</p>
+<p id="atak-off" hidden>$atak_off</p>
+<p id="atak-connect" hidden></p>
+<section id="atak-issue" aria-labelledby="atak-issue-title" hidden>
+<h2 id="atak-issue-title">$atak_issue</h2>
+<form id="atak-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<label for="a-device">$atak_device</label>
+<input id="a-device" name="device_name" maxlength="48" required>
+<label for="a-holder">$atak_holder</label>
+<input id="a-holder" name="holder" maxlength="64" autocapitalize="none" spellcheck="false">
+<label for="a-days">$atak_days</label>
+<input id="a-days" name="days" type="number" min="1" max="30" value="7" required>
+<p><input type="checkbox" id="a-positions" name="positions"> <label for="a-positions">$atak_positions</label></p>
+<p><button type="submit">$atak_issue_button</button></p>
+</fieldset>
+</form>
+<div id="atak-issued" class="status ok" role="status" hidden>
+<p id="atak-issued-text"></p>
+<p><a id="atak-download" href="#" download="atalaia.zip">$atak_download</a></p>
+<p>$atak_password <code id="atak-password"></code></p>
+<p>$atak_password_once</p>
+</div>
+</section>
+<section aria-labelledby="atak-certs-title">
+<h2 id="atak-certs-title">$atak_certs</h2>
+<div class="table-wrap">
+<table id="atak-certs" class="data" hidden>
+<thead><tr><th scope="col">$col_device</th><th scope="col">$col_holder</th><th scope="col">$col_positions</th><th scope="col">$col_until</th><th scope="col">$col_state</th><th scope="col">$col_last</th><th scope="col"><span class="visually-hidden">$atak_revoke</span></th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p id="atak-certs-none" hidden>$atak_certs_none</p>
+</section>
+<section aria-labelledby="atak-connected-title">
+<h2 id="atak-connected-title">$atak_connected</h2>
+<div class="table-wrap">
+<table id="atak-connected" class="data" hidden>
+<thead><tr><th scope="col">$col_device</th><th scope="col">$col_since</th><th scope="col">$col_address</th><th scope="col">$col_positions</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p id="atak-connected-none" hidden>$atak_connected_none</p>
+</section>
+<section aria-labelledby="atak-log-title">
+<h2 id="atak-log-title">$atak_log</h2>
+<button type="button" id="atak-refresh">$refresh</button>
+<div class="table-wrap">
+<table id="atak-log" class="data" hidden>
+<thead><tr><th scope="col">$col_when</th><th scope="col">$col_who</th><th scope="col">$col_event</th><th scope="col">$col_device</th><th scope="col">$col_address</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p id="atak-log-none" hidden>$atak_log_none</p>
+</section>

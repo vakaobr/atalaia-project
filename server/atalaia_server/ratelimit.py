@@ -15,6 +15,10 @@
 - 10 registrations from one IP address an hour.
 - 5 reports of club pages from one IP address an hour (plan phase 18).
 - 30 remote GM commands a minute from one account (plan phase 19).
+- 20 ATAK certificates an hour from one account, and 30 new connections a
+  minute (16 open at once) from one address to the ATAK relay (Phase 4
+  follow-up FU5; the relay keeps its own, ``atak_relay.py``), and 120 ``cot``
+  messages a minute from one field's controller (FU5-15).
 - 100 API requests a minute from one IP address (``RequestLimitMiddleware``);
   the health check is not counted, so an uptime monitor never trips it.
 
@@ -142,6 +146,8 @@ class Limits:
         self.requests = RequestLimit(100, 60, clock)              # per IP address
         self.reports = RequestLimit(5, 3600, clock)               # club page reports per IP address (plan phase 18)
         self.remote_commands = RequestLimit(30, 60, clock)        # remote GM commands per account (plan phase 19)
+        self.atak_issue = RequestLimit(20, 3600, clock)           # ATAK certificates per account (FU5)
+        self.atak_cot = RequestLimit(120, 60, clock)              # a controller's cot messages per field (FU5-15)
 
 
 UNLIMITED_PATHS = ("/api/v1/health",)

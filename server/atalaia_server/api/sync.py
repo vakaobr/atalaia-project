@@ -23,7 +23,9 @@
     GET  /api/v1/sync/scenarios/{scenario_id}  one scenario's current manifest
     WS   /api/v1/sync/stream   the POST bodies on one socket the controller keeps open; with the
                                controller's [sync] remote_gm on, also its hello, live view and
-                               command results, and the remote GM's commands the other way (plan phase 19)
+                               command results, and the remote GM's commands the other way (plan phase 19);
+                               with its [atak] remote on, its CoT events for the remote ATAK relay
+                               (``cot``, Phase 4 follow-up FU5, ``atak_relay.py``)
 
 The controller opens every connection (P4R12); nothing here connects to it.
 Bodies are checked by ``atalaia_controller.sync_format``, the code the
@@ -44,7 +46,7 @@ from atalaia_controller import sync_format
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, Response
 
-from .. import remote_gm, sync
+from .. import remote_gm, sync, tenancy
 from ..auth import UNAUTHORISED, bearer
 from ..models import FieldApiKey
 from ..services import branding, library, registration
@@ -210,8 +212,9 @@ async def library_scenario(scenario_id: str, request: Request) -> JSONResponse:
     return await _pull(request, build)
 
 
-# The remote GM's messages from the controller (plan phase 19); ``command`` goes the other way only.
-STREAM_IN = ("hello", "live", "command.result")
+# The remote GM's messages from the controller (plan phase 19) and its CoT for the remote ATAK relay (FU5);
+# ``command`` goes the other way only.
+STREAM_IN = ("hello", "live", "command.result", "cot")
 
 
 class _Session:
@@ -295,12 +298,14 @@ async def _message(ws: WebSocket, caller: sync.Caller, raw: str,
 
 async def _remote(session: _Session, db: Any, kind: str, msg: dict[str, Any]) -> Optional[dict[str, Any]]:
     """The remote GM's messages (plan phase 19): ``hello`` registers the link (and is answered), ``live``
-    replaces its live view, ``command.result`` answers a waiting command; the last two get no answer."""
+    replaces its live view, ``command.result`` answers a waiting command, ``cot`` goes to the remote ATAK
+    relay (FU5); the last three get no answer."""
     try:
         body = sync_format.STREAM[kind](msg)
     except sync_format.SyncFormatError as exc:
         raise sync.SyncProblem(400, "invalid_body", exc.code, exc.path) from None
     hub: remote_gm.RemoteHub = session.ws.app.state.remote_hub
+    relay = session.ws.app.state.atak_relay
     if kind == "hello":
         await sync.seen(db, session.caller, body)
         await db.commit()
@@ -309,9 +314,9 @@ async def _remote(session: _Session, db: Any, kind: str, msg: dict[str, Any]) ->
         session.link = remote_gm.Link(
             field_id=session.caller.field_id, key_id=session.caller.key_id, controller_id=body["controller"]["id"],
             controller_row=session.caller.controller, version=body["controller"]["version"],
-            remote_gm=body["remote_gm"], send=session.send)
+            remote_gm=body["remote_gm"], send=session.send, atak=bool(body["atak"] and relay is not None))
         hub.attach(session.link)
-        return {"type": "hello.ack", "remote_gm": body["remote_gm"]}
+        return {"type": "hello.ack", "remote_gm": body["remote_gm"], "atak_relay": session.link.atak}
     link = session.link
     if link is None:
         raise sync.SyncProblem(409, "hello_first")
@@ -319,6 +324,12 @@ async def _remote(session: _Session, db: Any, kind: str, msg: dict[str, Any]) ->
         raise sync.SyncProblem(400, "invalid_body", "not_this_controller", "controller.id")
     if kind == "live":
         link.live, link.live_at = body["live"], datetime.now(timezone.utc)
+    elif kind == "cot":
+        if link.atak and relay is not None:  # else dropped: the hello.ack said the relay does not take them
+            # At most ``atak_cot`` messages a minute per field, whatever its streams (FU5-15).
+            if session.ws.app.state.limits.atak_cot.hit(f"{tenancy.current_schema()}:{session.caller.field_id}"):
+                raise sync.SyncProblem(429, "too_many_requests")
+            relay.publish(session.caller.field_id, [sync_format.cot_event(e) for e in body["events"]])
     else:
         hub.result(link, body)
     return None

@@ -26,7 +26,7 @@ from typing import Any, Optional
 from p3support import GM, READ, P3Case, bearer
 from support import config, free_port, wait_for
 
-from atalaia_controller import atak, georef
+from atalaia_controller import atak, georef, sync_format
 from atalaia_controller.config import ConfigError, load_config
 from atalaia_controller.georef import ControlPoint, Georef, GeorefError, fit_affine
 
@@ -422,6 +422,16 @@ class AtakCase(P3Case, CotChecks):
     def events_by_uid(self, datagrams: list[bytes]) -> dict[str, ET.Element]:
         return {r.get("uid"): r for r in (self.check_event(d) for d in datagrams)}
 
+    def player(self, gid: int, name: str, team: str, role: str = "player") -> tuple[str, str]:
+        me = self.check_in(gid, name=name)
+        self.svc.rate.allow = lambda key: True
+        self.gm_patch(gid, me["player_id"], team=team, role=role)
+        tok = self.client.post("/api/v1/checkin/token", headers=bearer(me["token"])).json()["token"]
+        r = self.client.post("/api/v1/positions", headers=bearer(tok),
+                             json={"lat": 38.7221, "lon": -9.1391, "accuracy_m": 6.0, "source": "gps", "t": 1})
+        self.assertEqual(r.status_code, 200, r.text)
+        return me["player_id"], tok
+
 
 class EmitterTests(AtakCase):
     def test_props_on_the_georeferenced_image(self):
@@ -565,16 +575,6 @@ class PlayerTests(AtakCase):
     players = True
     staff = True
 
-    def player(self, gid: int, name: str, team: str, role: str = "player") -> tuple[str, str]:
-        me = self.check_in(gid, name=name)
-        self.svc.rate.allow = lambda key: True
-        self.gm_patch(gid, me["player_id"], team=team, role=role)
-        tok = self.client.post("/api/v1/checkin/token", headers=bearer(me["token"])).json()["token"]
-        r = self.client.post("/api/v1/positions", headers=bearer(tok),
-                             json={"lat": 38.7221, "lon": -9.1391, "accuracy_m": 6.0, "source": "gps", "t": 1})
-        self.assertEqual(r.status_code, 200, r.text)
-        return me["player_id"], tok
-
     def test_players_only_to_staff_endpoints_never_multicast(self):
         self.put_image_and_corners()
         gid = self.running_game()
@@ -602,6 +602,94 @@ class PlayerTests(AtakCase):
         # Each event on the stream starts with its XML declaration and a newline (cot.json transport).
         self.assertTrue(self.tcp.connections[0].startswith(b"<?xml "))
         self.assertEqual(self.tcp.connections[0].count(b"?>\n<event "), 3)
+
+
+class FakeRelay:
+    """The site server's stream as the emitter sees it (remote_gm.RemoteGm): push_cot and atak_relay."""
+
+    def __init__(self) -> None:
+        self.events: list[bytes] = []
+        self.atak_relay = True
+        self.on_relay_open: Optional[Any] = None
+
+    def push_cot(self, events: list[bytes]) -> int:
+        self.events += events
+        return len(events)
+
+
+class RemoteRelayTests(AtakCase):
+    """[atak] remote (Phase 4 follow-up FU5): the same picture to the site server's relay, positions only with
+    remote_players, every event in the shared form the site server checks (sync_format.cot_event)."""
+
+    players = True  # [atak] players, for staff endpoints: there are none here, so it sends no position anywhere
+
+    def relay(self, players: bool) -> FakeRelay:
+        self.cfg.atak_remote, self.cfg.atak_remote_players = True, players
+        fake = FakeRelay()
+        self.emitter.remote = fake
+        return fake
+
+    def shared(self, events: list[bytes]) -> dict[str, dict[str, Any]]:
+        out = {}
+        for data in events:
+            ev = sync_format.cot_event(data.decode("utf-8"))
+            self.assertEqual(ev["xml"].encode("utf-8"), data)  # the site server relays these very bytes
+            out[ev["uid"]] = ev
+        return out
+
+    def test_props_go_to_the_relay_and_positions_only_with_remote_players(self):
+        self.put_image_and_corners()
+        gid = self.running_game()
+        self.place(gid, 4, 0.5, 0.5)
+        self.ctrl.fc.nodes[4].name = HOSTILE_NODE
+        red, _ = self.player(gid, "Falcão", "red")
+        fake = self.relay(players=False)
+        sent = self.emitter.cycle(full=True)
+        self.assertEqual(sent["remote"], 1)
+        got = self.shared(fake.events)
+        self.assertEqual(list(got), ["atalaia.field.node.4"])
+        self.assertTrue(got["atalaia.field.node.4"]["map"])
+        self.assertEqual(set(self.events_by_uid(self.udp.drain())), {"atalaia.field.node.4"})  # never a player
+        fake = self.relay(players=True)
+        self.emitter.cycle(full=True)
+        got = self.shared(fake.events)
+        self.assertEqual(set(got), {"atalaia.field.node.4", f"atalaia.field.player.{red}"})
+        self.assertFalse(got[f"atalaia.field.player.{red}"]["map"])  # the site server sends it only where allowed
+        self.assertNotIn("Falcão".encode(), b"".join(fake.events))
+        self.assertEqual(set(self.events_by_uid(self.udp.drain())), {"atalaia.field.node.4"})
+        # The game ends: every marker the relay got is dropped there too, the player's included.
+        fake.events.clear()
+        self.client.post(f"/api/v1/games/{gid}/end", headers=GM)
+        self.emitter.cycle(full=False)
+        drops = self.shared(fake.events)
+        self.assertEqual(set(drops), {"atalaia.field.node.4", f"atalaia.field.player.{red}"})
+        self.assertTrue(all(ev["stale"] < ev["start"] for ev in drops.values()))
+        status = self.emitter.status()
+        self.assertEqual((status["remote"], status["remote_players"], status["remote_relay"]), (True, True, True))
+
+    def test_extraction_zone_and_a_new_socket_get_everything_again(self):
+        self.put_image_and_corners()
+        game = self.new_game(mode_id="org.atalaia.vip_payload", assignments={"4": "checkpoint"},
+                             params={"extraction": "38.7215,-9.1390", "radius_m": 40, "vip_team": "blue"})
+        self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM)
+        self.place(game["id"], 4, 0.2, 0.3)
+        fake = self.relay(players=False)
+        self.emitter.cycle(full=True)
+        self.assertEqual(set(self.shared(fake.events)), {"atalaia.field.node.4",
+                                                         f"atalaia.field.game.{game['id']}.extraction"})
+        fake.events.clear()
+        self.assertEqual(self.emitter.cycle(full=False)["remote"], 0)
+        self.emitter.resend_all()  # what the stream does when the site server takes a new socket
+        self.assertEqual(self.emitter.cycle(full=False)["remote"], 2)
+
+    def test_off_by_default(self):
+        self.assertFalse(self.cfg.atak_remote)
+        self.assertIsNone(self.emitter.remote)
+        self.put_image_and_corners()
+        gid = self.running_game()
+        self.place(gid, 4, 0.5, 0.5)
+        self.assertEqual(self.emitter.cycle(full=True)["remote"], 0)
+        self.assertFalse(self.emitter.status()["remote"])
 
 
 class PlayersOffTests(AtakCase):

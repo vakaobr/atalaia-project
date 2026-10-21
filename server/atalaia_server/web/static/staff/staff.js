@@ -303,6 +303,7 @@ const SECTIONS = {
     presets: (r) => r.has('admin') || r.has('gm'),
     devices: (r) => r.has('admin') || r.has('gm'),
     remote: (r) => r.has('admin') || r.has('gm'),
+    atak: (r) => r.has('admin') || r.has('gm'),
 };
 
 export function sectionAllowed(name, roles) {

@@ -10,10 +10,19 @@
 # For a trial on this computer: python3 tools/docker_server.py up (https://localhost:8443,
 # Caddy's own certificate); its deployment test: python3 tools/docker_server.py deploy.
 #
-# Only Caddy publishes ports. The server is on "app" with Caddy alone and
+# Caddy publishes HTTP and HTTPS. The server is on "app" with Caddy alone and
 # PostgreSQL on "db" with the server alone; both networks are internal (no
 # way out to the internet), so neither the database nor the server's own port
 # can be reached from outside, and the server makes no outbound connection.
+# The one other published port is the remote ATAK relay's (Phase 4 follow-up
+# FU5, server/docs/DEPLOY.md "Remote ATAK"): TAK clients speak TLS with client
+# certificates on it, which Caddy's image cannot pass through (no layer-4
+# proxy), so the server publishes ATALAIA_ATAK_PORT (8089) itself, on "atak".
+# Docker publishes no port from an internal network, so "atak" is not one; its
+# outbound NAT is off (on a Linux host, packets from it leave without source
+# NAT and get no answer from the internet; Docker Desktop routes them anyway):
+# not a firewall, and the server's code makes no outbound connection either way.
+# Nothing listens on the port unless ATALAIA_ATAK_RELAY=on.
 
 name: atalaia
 
@@ -59,10 +68,17 @@ services:
       ATALAIA_LOG_LEVEL: "${ATALAIA_LOG_LEVEL:-info}"
       ATALAIA_PURGE_HOUR: "${ATALAIA_PURGE_HOUR:-}"
       ATALAIA_PRIVACY_NOTICE_VERSION: "${ATALAIA_PRIVACY_NOTICE_VERSION:-}"
+      # The remote ATAK relay (FU5): off unless ATALAIA_ATAK_RELAY=on; devices connect to
+      # ATALAIA_ATAK_RELAY_HOST (default: ATALAIA_PUBLIC_URL's host) on ATALAIA_ATAK_PORT.
+      ATALAIA_ATAK_RELAY: "${ATALAIA_ATAK_RELAY:-off}"
+      ATALAIA_ATAK_RELAY_HOST: "${ATALAIA_ATAK_RELAY_HOST:-}"
+      ATALAIA_ATAK_RELAY_PUBLIC_PORT: "${ATALAIA_ATAK_PORT:-8089}"
       # Trust X-Forwarded-For/-Proto from any peer: only Caddy can reach this
       # port (the internal "app" network), and it replaces what clients send.
       FORWARDED_ALLOW_IPS: "*"
-    networks: [app, db]
+    ports:
+      - "${ATALAIA_BIND:-0.0.0.0}:${ATALAIA_ATAK_PORT:-8089}:8089"
+    networks: [app, db, atak]
     depends_on:
       postgres:
         condition: service_healthy
@@ -111,6 +127,11 @@ networks:
     internal: true
   db:
     internal: true
+  # Only for the ATAK relay's published port: not internal (Docker publishes no port from an
+  # internal network), and with no outbound NAT (see the top of this file).
+  atak:
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
 
 volumes:
   pgdata:

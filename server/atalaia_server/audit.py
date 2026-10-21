@@ -14,7 +14,10 @@ Actions written by plan phase 11: ``register``, ``login``, ``login_failed``,
 ``profile_update`` (the names of the fields changed, never their values),
 ``password_change``, ``gdpr_erasure`` (no account, no address) and
 ``retention_purge`` (the counts deleted); a ``login_locked`` row says which
-lockout tripped (``scope``).
+lockout tripped (``scope``). The remote ATAK relay (Phase 4 follow-up FU5) adds
+``atak_cert_issued``, ``atak_cert_revoked``, ``atak_connect`` (a device's
+certificate accepted, with its address) and ``atak_refused`` (a certificate
+of a known field refused after the TLS handshake, and why).
 """
 
 from __future__ import annotations
@@ -41,6 +44,15 @@ def request_ip(request: Optional[Request]) -> Optional[str]:
 
 def record(db: AsyncSession, action: str, request: Optional[Request] = None, *,
            user_id: Optional[uuid.UUID] = None, resource: Optional[str] = None,
-           resource_id: Optional[uuid.UUID] = None, details: Optional[dict[str, Any]] = None) -> None:
+           resource_id: Optional[uuid.UUID] = None, details: Optional[dict[str, Any]] = None,
+           address: Optional[str] = None) -> None:
+    """One row; ``address`` is the client's address when there is no HTTP request (the ATAK relay's TLS
+    connections, FU5)."""
+    ip = request_ip(request)
+    if ip is None and address is not None:
+        try:
+            ip = str(ipaddress.ip_address(address))
+        except ValueError:
+            ip = None
     db.add(AuditLog(user_id=user_id, action=action, resource=resource, resource_id=resource_id,
-                    details=details, ip_address=request_ip(request)))
+                    details=details, ip_address=ip))

@@ -35,6 +35,8 @@ What holds personal data now (plan phases 10-12):
 | ``clubs``, ``field_teams``, ``branding_images``, the field's branding columns (plan phase 18) | (a club's or a field's public profile: no person in them; who made a club is ``created_by``, unlinked at erasure) | ``created_by`` and ``hidden_by`` cleared | an image nothing uses, a day after its upload |
 | ``firmware_releases`` (plan phase 19) | (the server's catalogue: no person in it; who added a release is ``added_by``, unlinked at erasure) | ``added_by`` cleared | (kept: withdrawn releases stay, marked) |
 | the remote GM's audit rows (plan phase 19: ``remote_gm_command``, ``remote_gm_denied``) | in the audit log as every other action | as every other audit row: kept without the person's addresses | 36 months, as the audit log |
+| ``atak_certs`` (Phase 4 follow-up FU5) | the ATAK certificates the person holds: device, field, dates, whether positions, last connection (``atak_certificates.json``; never a key) | revoked (``erasure``), the device's name replaced and the account unlinked (holder, issuer, revoker) | 30 days after the certificate expired |
+| ``atak_cas`` and the relay's audit rows (FU5: ``atak_cert_issued``, ``atak_cert_revoked``, ``atak_connect`` with the device's address, ``atak_refused``) | (a CA is the field's: no person in it) / in the audit log | / as every other audit row, and their details as the certificate's row (FU5-18): the person's devices' names replaced, the account's id taken out of ``holder_id`` and ``issued_by`` | / 36 months, as the audit log |
 
 The synced games (plan phase 13) come from field controllers and hold no
 account: their events carry only the field's pseudonymous player ids
@@ -90,10 +92,12 @@ import zipfile
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Optional
 
-from sqlalchemy import DateTime, delete, func, literal, literal_column, or_, select, update
+from sqlalchemy import DateTime, cast, delete, func, literal, literal_column, or_, select, update
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from . import chrono_registry, tenancy
+from .atak_models import AtakCert
 from .audit import record
 from .models import (ROLE_BY_ID, AuditLog, ChronoReading, ChronoReject, Club, ClubMember, ClubReport, Consent, Field,
                      FieldPlayerId, FirmwareRelease, Game, GameRegistration, MarshalKey, PlayerIdClaim, RegistrationReplica, Replica,
@@ -120,6 +124,7 @@ CLAIM_RETENTION = timedelta(days=30)     # a claim of a phone's player id, after
 GUEST_RETENTION = timedelta(days=30)     # an imported registration (no account), after its game (ADR-P4-8)
 INVITATION_RETENTION = timedelta(days=30)  # a club invitation not accepted, after it was made (plan phase 18)
 REPORT_RETENTION = timedelta(days=365)   # a club page report, after its decision (plan phase 18)
+ATAK_CERT_RETENTION = timedelta(days=30)  # an ATAK certificate, after it expired (FU5)
 
 
 def _iso(value: Optional[datetime]) -> Optional[str]:
@@ -235,6 +240,13 @@ async def collect(db: AsyncSession, user: User, current_session: Optional[uuid.U
         "club_reports": [{"id": str(r.id), "club": slug, "reason": r.reason, "text": r.text, "status": r.status,
                           "created_at": _iso(r.created_at), "decided_at": _iso(r.decided_at)} for r, slug in reports],
         "game_history": await history.player_history(db, user.id),
+        "atak_certificates": [{"id": str(c.id), "field_id": str(c.field_id), "field": name,
+                               "device_name": c.device_name, "positions": c.positions, "issued_at": _iso(c.issued_at),
+                               "not_after": _iso(c.not_after), "revoked_at": _iso(c.revoked_at),
+                               "last_connected_at": _iso(c.last_connected_at)}
+                              for c, name in await db.execute(
+                                  select(AtakCert, Field.name).join(Field, Field.id == AtakCert.field_id)
+                                  .where(AtakCert.holder_id == user.id).order_by(AtakCert.issued_at))],
     }
 
 
@@ -302,6 +314,12 @@ game_history.json   The games you played, by your player ids at each field: the 
                     a registration. Kept as the field's game history (24 months at most).
                     Os jogos em que participou: o jogo, as equipas, a pontuação final e os
                     eventos com o seu identificador de jogador.
+atak_certificates.json
+                    The ATAK certificates issued to you for a field's remote ATAK relay: the
+                    device's name, when issued, when they expire or were revoked, whether
+                    they see player positions, when they last connected. Never a key.
+                    Os certificados ATAK emitidos para si: o dispositivo, as datas, se veem
+                    posições de jogadores, a última ligação. Nunca uma chave.
 
 Game events name players only by the field's pseudonymous player ids; yours
 are listed in player_ids.json. Positions never reach the site server.
@@ -319,6 +337,7 @@ def export_zip(data: dict[str, Any]) -> bytes:
         "chrono_records.json": data["chrono_records"], "marshal_keys.json": data["marshal_keys"],
         "scheduled_games.json": data["scheduled_games"], "clubs.json": data["clubs"],
         "club_reports.json": data["club_reports"], "game_history.json": data["game_history"],
+        "atak_certificates.json": data["atak_certificates"],
     }
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as zf:
@@ -329,9 +348,15 @@ def export_zip(data: dict[str, Any]) -> bytes:
     return buffer.getvalue()
 
 
-async def erase(db: AsyncSession, user_id: uuid.UUID, reason: str = "user_request") -> str:
+ATAK_AUDIT = ("atak_cert_issued", "atak_cert_revoked", "atak_connect", "atak_refused")
+ERASED_DEVICE = "erased"
+
+
+async def erase(db: AsyncSession, user_id: uuid.UUID, reason: str = "user_request",
+                revoked_atak: Optional[list[uuid.UUID]] = None) -> str:
     """Anonymises the account (GDPR Art. 17, ADR-P4-8) in the caller's transaction; returns the
-    anonymised name. The caller commits."""
+    anonymised name. The caller commits. The ATAK certificates it revokes are added to ``revoked_atak``:
+    the caller closes their relay connections once committed (``AtakRelay.drop_cert``)."""
     tombstone = ERASED_PREFIX + secrets.token_hex(8)
     await db.execute(update(User).where(User.id == user_id).values(
         username=tombstone, email=None, password_hash=ERASED_PASSWORD, totp_secret_enc=None, totp_enabled=False,
@@ -385,6 +410,31 @@ async def erase(db: AsyncSession, user_id: uuid.UUID, reason: str = "user_reques
     # The firmware catalogue (plan phase 19) stays; who added a release does not.
     await db.execute(update(FirmwareRelease).where(FirmwareRelease.added_by == user_id).values(added_by=None)
                      .execution_options(synchronize_session=False))
+    # The remote ATAK relay (FU5): the person's certificates are revoked, their devices' names go, and no
+    # certificate keeps a link to the account (holder, issuer, revoker). The relay's audit rows keep what
+    # happened, with the same done to their details (FU5-18): the devices' names of the person's
+    # certificates replaced, the account's id out of ``holder_id`` and ``issued_by``.
+    held = [str(i) for i in await db.scalars(select(AtakCert.id).where(AtakCert.holder_id == user_id))]
+    revoked = await db.scalars(update(AtakCert).where(AtakCert.holder_id == user_id, AtakCert.revoked_at.is_(None))
+                               .values(revoked_at=now, revoke_reason="erasure").returning(AtakCert.id)
+                               .execution_options(synchronize_session=False))
+    if revoked_atak is not None:
+        revoked_atak.extend(revoked)
+    await db.execute(update(AtakCert).where(AtakCert.holder_id == user_id)
+                     .values(holder_id=None, device_name=ERASED_DEVICE).execution_options(synchronize_session=False))
+    for column in (AtakCert.issued_by, AtakCert.revoked_by):
+        await db.execute(update(AtakCert).where(column == user_id).values({column.key: None})
+                         .execution_options(synchronize_session=False))
+    atak_rows = AuditLog.action.in_(ATAK_AUDIT)
+    if held:
+        await db.execute(update(AuditLog).where(atak_rows, AuditLog.details["certificate"].astext.in_(held),
+                                                AuditLog.details.has_key("device_name"))
+                         .values(details=AuditLog.details.op("||")(cast({"device_name": ERASED_DEVICE}, JSONB)))
+                         .execution_options(synchronize_session=False))
+    for key in ("holder_id", "issued_by"):
+        await db.execute(update(AuditLog).where(atak_rows, AuditLog.details[key].astext == str(user_id))
+                         .values(details=AuditLog.details.op("||")(cast({key: None}, JSONB)))
+                         .execution_options(synchronize_session=False))
     # The log keeps what happened, not where from: the person's addresses go.
     await db.execute(update(AuditLog).where(AuditLog.user_id == user_id, AuditLog.ip_address.is_not(None))
                      .values(ip_address=None))
@@ -430,6 +480,8 @@ async def purge(db: AsyncSession, now: Optional[datetime] = None, dry_run: bool 
                                                         ClubReport.decided_at < now - REPORT_RETENTION))
     counts["club_reports"] = reports.rowcount or 0
     counts["branding_images"] = await branding.purge_images(db, now)
+    atak = await db.execute(delete(AtakCert).where(AtakCert.not_after < now - ATAK_CERT_RETENTION))
+    counts["atak_certificates"] = atak.rowcount or 0
     if dry_run:
         await db.rollback()
         return counts

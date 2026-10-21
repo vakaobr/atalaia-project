@@ -34,7 +34,7 @@ TABLES = {"fields", "users", "roles", "user_field_roles", "sessions", "audit_log
           "scheduled_games", "game_registrations", "registration_replicas", "player_id_claims",
           "platform_links", "external_game_links", "branding_images", "clubs", "club_members", "club_reports",
           "field_teams", "firmware_releases", "field_history_settings", "game_score_samples", "field_scenarios",
-          "field_scenario_revisions", "field_presets"}
+          "field_scenario_revisions", "field_presets", "atak_cas", "atak_certs"}
 
 SCHEMA_SQL = (
     ("columns", "SELECT table_name, column_name, data_type, is_nullable, column_default, character_maximum_length "
@@ -392,6 +392,39 @@ class MigrationTests(unittest.TestCase):
             self.assertNotIn(table, self.tables())
         self.assertEqual(self.db.fetch("SELECT name FROM fields")[0][0], "Campo")
         self.db.fetch("DELETE FROM fields")
+
+    def test_0012_with_data(self) -> None:
+        """0012_atak: one CA per field, unique serials and fingerprints, the checks, the holder unlinked when the
+        account goes, everything gone with the field, and back down."""
+        command.upgrade(self.cfg, "0012_atak")
+        field = self.db.fetch("INSERT INTO fields (name, slug) VALUES ('Campo', 'campo') RETURNING id")[0][0]
+        user = self.db.fetch("INSERT INTO users (username, password_hash) VALUES ('rita', 'x') RETURNING id")[0][0]
+        self.db.fetch("INSERT INTO atak_cas (field_id, cert_pem, key_sealed, ski, not_after) "
+                      "VALUES ($1, 'pem', '\\x00', repeat('a', 40), now() + interval '1 year')", field)
+        with self.assertRaisesRegex(Exception, "uq_atak_cas_field_id"):
+            self.db.fetch("INSERT INTO atak_cas (field_id, cert_pem, key_sealed, ski, not_after) "
+                          "VALUES ($1, 'pem', '\\x00', repeat('b', 40), now())", field)
+        insert = ("INSERT INTO atak_certs (field_id, serial, sha256, device_name, holder_id, issued_at, not_after) "
+                  "VALUES ($1, $2, $3, $4, $5, now(), now() + interval '7 days')")
+        self.db.fetch(insert, field, "0a1b", "c" * 64, "Tablet 1", user)
+        for serial, sha, name, check in (("0a1b", "d" * 64, "x", "uq_atak_certs_serial"),
+                                         ("0a1c", "c" * 64, "x", "uq_atak_certs_sha256"),
+                                         ("0A1C", "d" * 64, "x", "ck_atak_certs_serial"),
+                                         ("0a1c", "D" * 64, "x", "ck_atak_certs_sha256"),
+                                         ("0a1c", "d" * 64, "", "ck_atak_certs_device_name")):
+            with self.subTest(check=check), self.assertRaisesRegex(Exception, check):
+                self.db.fetch(insert, field, serial, sha, name, user)
+        with self.assertRaisesRegex(Exception, "ck_atak_certs_lifetime"):
+            self.db.fetch("INSERT INTO atak_certs (field_id, serial, sha256, device_name, issued_at, not_after) "
+                          "VALUES ($1, 'ff', repeat('e', 64), 'x', now(), now())", field)
+        self.db.fetch("DELETE FROM users")
+        self.assertIsNone(self.db.fetch("SELECT holder_id FROM atak_certs")[0][0])
+        self.db.fetch("DELETE FROM fields")
+        self.assertEqual(self.db.fetch("SELECT (SELECT count(*) FROM atak_cas) + (SELECT count(*) FROM atak_certs)")
+                         [0][0], 0)
+        command.downgrade(self.cfg, "0011_history")
+        for table in ("atak_cas", "atak_certs"):
+            self.assertNotIn(table, self.tables())
 
     def test_one_linear_history(self) -> None:
         self.assertEqual(len(self.script.get_heads()), 1)

@@ -30,6 +30,16 @@
                             "off" by default: a club's own single-field server, as before
     ATALAIA_HOSTED_DOMAIN   hosted mode only, and required there: the hub's domain (hub.example.pt);
                             ATALAIA_PUBLIC_URL must then be unset (each field has its own address)
+    ATALAIA_ATAK_RELAY      "on": the remote ATAK relay (Phase 4 follow-up FU5, atak_relay.py): a TLS
+                            listener for the fields' enrolled ATAK devices, client certificates
+                            required; "off" by default (no listener, no certificate can be issued)
+    ATALAIA_ATAK_RELAY_PORT the relay's port in the container (default 8089, TAK's streaming TLS port)
+    ATALAIA_ATAK_RELAY_HOST the name ATAK devices connect to, written into their data packages and the
+                            relay's certificate; default: ATALAIA_PUBLIC_URL's host (hosted mode: each
+                            field's <slug>.<ATALAIA_HOSTED_DOMAIN>, and this must be unset)
+    ATALAIA_ATAK_RELAY_PUBLIC_PORT
+                            the port ATAK devices connect to, if the deployment publishes the relay on
+                            another one (default: ATALAIA_ATAK_RELAY_PORT)
 
 Plain Python with no third-party imports, so its tests also run in the
 atalaia-dev image (tools/check.sh). A setting that is present but wrong is
@@ -56,6 +66,9 @@ _KEY_HINT = "(python3 -c \"import secrets; print(secrets.token_urlsafe(32))\")"
 
 
 MAX_FIRMWARE_KEYS = 8
+DEFAULT_ATAK_PORT = 8089  # TAK's streaming CoT over TLS (FU5)
+# A host name of one label or more, lower case, no port: where ATAK devices reach the relay.
+ATAK_HOST = re.compile(r"(?=.{1,200}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
 # A DNS name of two labels or more, lower case, no port: the hosted hub's domain (plan phase 21).
 HOSTED_DOMAIN = re.compile(r"(?=.{4,200}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?")
 
@@ -177,6 +190,10 @@ class Settings:
     firmware_keys: tuple[str, ...] = ()
     hosted: bool = False
     hosted_domain: Optional[str] = None
+    atak_relay: bool = False
+    atak_relay_port: int = DEFAULT_ATAK_PORT       # 0: any free port (the tests)
+    atak_relay_host: Optional[str] = None
+    atak_relay_public_port: Optional[int] = None
 
     def __post_init__(self) -> None:
         _check_url(self.database_url)
@@ -210,6 +227,36 @@ class Settings:
                                   "https://<slug>.<ATALAIA_HOSTED_DOMAIN>")
         elif self.hosted_domain is not None:
             raise ConfigError("ATALAIA_HOSTED_DOMAIN is only for hosted mode (ATALAIA_HOSTED=on)")
+        self._check_atak()
+
+    def _check_atak(self) -> None:
+        if not 0 <= self.atak_relay_port <= 65535:
+            raise ConfigError("ATALAIA_ATAK_RELAY_PORT must be a port of 1-65535")
+        if self.atak_relay_public_port is not None and not 1 <= self.atak_relay_public_port <= 65535:
+            raise ConfigError("ATALAIA_ATAK_RELAY_PUBLIC_PORT must be a port of 1-65535")
+        if self.atak_relay_host is not None:
+            host = self.atak_relay_host.strip().lower()
+            if not ATAK_HOST.fullmatch(host):
+                raise ConfigError("ATALAIA_ATAK_RELAY_HOST must be a host name such as campo.example.pt "
+                                  "(no scheme, port or path)")
+            if self.hosted:
+                raise ConfigError("ATALAIA_ATAK_RELAY_HOST must be unset in hosted mode: each field's ATAK "
+                                  "devices connect to <slug>.<ATALAIA_HOSTED_DOMAIN>")
+            object.__setattr__(self, "atak_relay_host", host)
+        if self.atak_relay and not self.hosted and self.relay_host() is None:
+            raise ConfigError("ATALAIA_ATAK_RELAY=on needs ATALAIA_ATAK_RELAY_HOST or ATALAIA_PUBLIC_URL: the "
+                              "name ATAK devices connect to")
+
+    def relay_host(self, slug: Optional[str] = None) -> Optional[str]:
+        """The name a field's ATAK devices connect to (hosted mode: that field's own name)."""
+        if self.hosted:
+            return f"{slug}.{self.hosted_domain}" if slug else None
+        if self.atak_relay_host:
+            return self.atak_relay_host
+        return urlsplit(self.public_url).hostname if self.public_url else None
+
+    def relay_public_port(self) -> int:
+        return self.atak_relay_public_port or self.atak_relay_port or DEFAULT_ATAK_PORT
 
     def __repr__(self) -> str:
         return (f"Settings(database_url={redact_url(self.database_url)!r}, secret_key=set, "
@@ -219,7 +266,9 @@ class Settings:
                 f"purge_hour={self.purge_hour!r}, privacy_notice_version={self.privacy_notice_version!r}, "
                 f"public_url={self.public_url!r}, test_adapter={self.test_adapter!r}, "
                 f"firmware_keys={len(self.firmware_keys)}, hosted={self.hosted!r}, "
-                f"hosted_domain={self.hosted_domain!r})")
+                f"hosted_domain={self.hosted_domain!r}, atak_relay={self.atak_relay!r}, "
+                f"atak_relay_port={self.atak_relay_port}, atak_relay_host={self.atak_relay_host!r}, "
+                f"atak_relay_public_port={self.atak_relay_public_port!r})")
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Settings":
@@ -243,4 +292,9 @@ class Settings:
             firmware_keys=tuple(k for k in env.get("ATALAIA_FIRMWARE_KEYS", "").split(",") if k.strip()),
             hosted=_on_off(env, "ATALAIA_HOSTED"),
             hosted_domain=env.get("ATALAIA_HOSTED_DOMAIN", "").strip() or None,
+            atak_relay=_on_off(env, "ATALAIA_ATAK_RELAY"),
+            atak_relay_port=int(_number(env, "ATALAIA_ATAK_RELAY_PORT", DEFAULT_ATAK_PORT, 1, 65535, int)),
+            atak_relay_host=env.get("ATALAIA_ATAK_RELAY_HOST", "").strip() or None,
+            atak_relay_public_port=(int(_number(env, "ATALAIA_ATAK_RELAY_PUBLIC_PORT", 0, 1, 65535, int))
+                                    if env.get("ATALAIA_ATAK_RELAY_PUBLIC_PORT", "").strip() else None),
         )

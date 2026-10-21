@@ -21,6 +21,14 @@ site name atalaia.test, ports on 127.0.0.1 only:
     empty database, restore.sh restores the backup into a fresh database, and
     every table's contents match what they were; the probe checks that the
     restored data and API key work through Caddy.
+The stack runs with the remote ATAK relay on (Phase 4 follow-up FU5): the
+operator issues a data package with `python -m atalaia_server atak issue` in
+the server's container, the relay's port answers TLS where the stack publishes
+it (127.0.0.1, from this machine), and tests/deploy_probe_atak.py, on the
+public network and the relay's own, checks that a device without a
+certificate is refused and the field's device gets what its controller pushes
+over the WebSocket through Caddy, before the backup and after the restore
+(the same package: the CA and the certificate came back with the data).
 Everything it made is removed at the end, whatever the result.
 """
 
@@ -31,6 +39,7 @@ import os
 import re
 import secrets
 import shutil
+import ssl
 import stat
 import subprocess
 import sys
@@ -94,7 +103,9 @@ class Deployment:
         self.env = {**os.environ, "ATALAIA_ENV_FILE": str(self.env_file), "COMPOSE_PROJECT_NAME": self.project,
                     "ATALAIA_SERVER_IMAGE": server_image, "ATALAIA_TLS": "internal", "ATALAIA_BIND": "127.0.0.1",
                     "ATALAIA_HTTP_PORT": str(free_port()), "ATALAIA_HTTPS_PORT": str(free_port()),
+                    "ATALAIA_ATAK_RELAY": "on", "ATALAIA_ATAK_PORT": str(free_port()),
                     "ATALAIA_BACKUP_DIR": str(self.backups)}
+        self.atak: list[str] = []  # the probe's fields: host|key|package|password
         self.secret_values: list[str] = []
 
     # --- running things -------------------------------------------------------------------------
@@ -180,8 +191,65 @@ class Deployment:
                 break
             # Docker Desktop on Windows cannot publish a port Windows itself holds: try others.
             self.dc("down", "--remove-orphans", check=False, quiet=True)
-            self.env["ATALAIA_HTTP_PORT"], self.env["ATALAIA_HTTPS_PORT"] = str(free_port()), str(free_port())
+            self.new_ports()
         raise DeployFailure("docker compose up failed")
+
+    def new_ports(self) -> None:
+        for name in ("ATALAIA_HTTP_PORT", "ATALAIA_HTTPS_PORT", "ATALAIA_ATAK_PORT"):
+            self.env[name] = str(free_port())
+
+    # --- the remote ATAK relay (FU5) ------------------------------------------------------------
+
+    def atak_enrol(self, slug: str, host: str, key: str) -> None:
+        """The operator's command in the server's container: a data package for one device of the field."""
+        inside = f"/tmp/atak-{slug}.zip"
+        out = self.dc("exec", "-T", "server", "python", "-m", "atalaia_server", "atak", "issue", "--field", slug,
+                      "--device", "Deploy probe", "--out", inside, quiet=True).stdout.decode()
+        m = re.search(r"shown once: (\S+)", out)
+        expect(m is not None, f"atak issue --field {slug} wrote a data package")
+        assert m is not None
+        self.secret_values.append(m.group(1))
+        folder = self.work / "atak"
+        folder.mkdir(exist_ok=True)
+        local = folder / f"{slug}.zip"
+        self.dc("cp", f"server:{inside}", str(local), quiet=True)
+        self.dc("exec", "-T", "server", "rm", "-f", inside, quiet=True)
+        local.chmod(0o644)  # the probe's container runs as another user; a test package only
+        self.atak.append(f"{host}|{key}|/atak/{slug}.zip|{m.group(1)}")
+
+    def atak_published(self, host: str) -> None:
+        """The relay's port where the stack publishes it, from this machine: TLS with the relay's certificate."""
+        port = int(self.env["ATALAIA_ATAK_PORT"])
+        pem = ""
+        for _ in range(30):
+            try:
+                pem = ssl.get_server_certificate(("127.0.0.1", port), timeout=10)
+                break
+            except OSError:
+                time.sleep(1)
+        der = ssl.PEM_cert_to_DER_cert(pem) if pem else b""
+        expect(b"Atalaia ATAK relay CA" in der and host.encode() in der,
+               f"the relay answers TLS on the published port 127.0.0.1:{port} (its certificate for {host})")
+
+    def atak_probe(self, hosts: list[str]) -> None:
+        """tests/deploy_probe_atak.py on the public network (Caddy) and the relay's network."""
+        ca = self.work / "root.crt"
+        name = f"{self.project}-atak-probe"
+        relay = f"{self.container_ip('server', 'atak')}:8089"
+        caddy = self.container_ip("caddy", "edge")
+        env = {**self.env, "ATALAIA_PROBE_ATAK_FIELDS": ";".join(self.atak)}
+        self.run(["docker", "rm", "-f", name], check=False, quiet=True)
+        try:
+            self.run(["docker", "create", "--name", name, "--network", f"{self.project}_edge",
+                      *[arg for host in hosts for arg in ("--add-host", f"{host}:{caddy}")],
+                      "-v", f"{ca}:/ca.crt:ro", "-v", f"{self.work / 'atak'}:/atak:ro",
+                      "-e", "ATALAIA_PROBE_CA=/ca.crt", "-e", f"ATALAIA_PROBE_ATAK_RELAY={relay}",
+                      "-e", "ATALAIA_PROBE_ATAK_FIELDS", self.test_image, "python", "-m", "tests.deploy_probe_atak"],
+                     env=env, quiet=True)
+            self.run(["docker", "network", "connect", f"{self.project}_atak", name], quiet=True)
+            self.run(["docker", "start", "-a", name], env=env)
+        finally:
+            self.run(["docker", "rm", "-f", name], check=False, quiet=True)
 
     def seed(self) -> str:
         key = secrets.token_urlsafe(32)
@@ -267,6 +335,10 @@ def run(suffix: str, server_image: str, test_image: str) -> int:
         d.up()
         key = d.seed()
         d.probe("before", key)
+        say("   the remote ATAK relay")
+        d.atak_enrol("campo-teste", DOMAIN, key)
+        d.atak_published(DOMAIN)
+        d.atak_probe([DOMAIN])
         address = d.sql("SELECT host(ip_address) FROM audit_log WHERE action = 'login_failed' ORDER BY id DESC LIMIT 1")
         caddy = d.container_ip("caddy", "app")
         expect(bool(address) and address != caddy,
@@ -278,6 +350,8 @@ def run(suffix: str, server_image: str, test_image: str) -> int:
         d.refused_restores(backup)
         d.restore(backup, expected)
         d.probe("after", key)
+        d.atak_published(DOMAIN)
+        d.atak_probe([DOMAIN])  # the same package: the CA and the certificate were restored
         say("every deployment check passed (Caddy's local CA on this machine; not a real domain or certificate)")
         return 0
     except DeployFailure as exc:

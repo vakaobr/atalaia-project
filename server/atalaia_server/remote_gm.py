@@ -58,6 +58,7 @@ class Link:
     version: str
     remote_gm: bool
     send: Callable[[dict[str, Any]], Awaitable[None]]
+    atak: bool = False                       # it pushes CoT for the remote ATAK relay (FU5) and the relay is on
     connected_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     live: Optional[dict[str, Any]] = None
     live_at: Optional[datetime] = None
@@ -71,7 +72,7 @@ class Link:
     def json(self) -> dict[str, Any]:
         return {"controller_id": self.controller_id, "controller": str(self.controller_row) if self.controller_row
                 else None, "version": self.version, "remote_gm": self.remote_gm,
-                "connected_at": self.connected_at.isoformat(),
+                "atak": self.atak, "connected_at": self.connected_at.isoformat(),
                 "live_at": self.live_at.isoformat() if self.live_at else None, "live": self.live}
 
 

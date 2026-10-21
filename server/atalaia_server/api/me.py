@@ -151,8 +151,13 @@ async def erase_me(body: EraseIn, request: Request, principal: Principal = Depen
     if user.server_admin and not await personal_data.live_server_admins(db, user.id):
         await db.rollback()
         raise HTTPException(409, "last_server_admin")
-    await personal_data.erase(db, user.id)
+    revoked: list[uuid.UUID] = []
+    await personal_data.erase(db, user.id, revoked_atak=revoked)
     await db.commit()
+    relay = request.app.state.atak_relay
+    if relay is not None:  # the revoked certificates' connections close now, not at the relay's next check
+        for cert_id in revoked:
+            relay.drop_cert(cert_id)
     response = Response(status_code=204)
     _clear_cookie(response)
     return response

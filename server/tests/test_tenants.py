@@ -370,7 +370,7 @@ class SyncTests(HubCase):
         self.assertEqual((await stream.open())["type"], "websocket.accept")
         try:
             await stream.send({"type": "hello", "sync_version": 1, "controller": CONTROLLER, "remote_gm": True})
-            self.assertEqual(await stream.receive(), {"type": "hello.ack", "remote_gm": True})
+            self.assertEqual(await stream.receive(), {"type": "hello.ack", "remote_gm": True, "atak_relay": False})
             await stream.send({"type": "live", "sync_version": 1, "controller": CONTROLLER, "live": LIVE})
             await asyncio.sleep(0.05)
             gm_a = await self.staff(self.ta, self.a, "gm")

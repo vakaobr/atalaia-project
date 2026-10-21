@@ -359,6 +359,83 @@ class StreamTests(RemoteCase):
         self.assertEqual(stream_url("http://127.0.0.1:8000"), "ws://127.0.0.1:8000/api/v1/sync/stream")
 
 
+class AtakStreamTests(RemoteCase):
+    """The remote ATAK relay on the same stream (Phase 4 follow-up FU5): opened with remote_gm off too."""
+
+    remote_gm = False
+
+    def start(self, site: FakeStream) -> RemoteGm:
+        self.cfg.sync_url = site.url
+        self.cfg.atak_enabled = self.cfg.atak_remote = True
+        remote = RemoteGm(self.cfg, self.store, self.ctrl, api_key=KEY, controller_id=lambda: CONTROLLER_ID)
+        self.reopened = 0
+
+        def again() -> None:
+            self.reopened += 1
+        remote.on_relay_open = again
+        remote.start()
+        self.addCleanup(remote.stop)
+        self.addCleanup(site.close)
+        return remote
+
+    def test_cot_goes_once_the_site_server_takes_it(self) -> None:
+        site = FakeStream()
+        self.game()
+        remote = self.start(site)
+        hello = site.next("hello")
+        self.assertEqual((hello["remote_gm"], hello["atak"]), (False, True))
+        sync_format.check_hello({k: v for k, v in hello.items() if k != "type"})
+        self.assertTrue(wait_for(lambda: remote.connected, 5))
+        events = [sync_format.cot_event(t)["xml"].encode() for t in COT_EVENTS]
+        self.assertEqual(remote.push_cot(events), 0)  # not before the site server said yes
+        site.send({"type": "hello.ack", "remote_gm": False, "atak_relay": True})
+        self.assertTrue(wait_for(lambda: remote.atak_relay, 5))
+        self.assertEqual(self.reopened, 1)  # the emitter is asked for its whole picture again
+        self.assertEqual(remote.push_cot(events), len(events))
+        cot = site.next("cot")
+        self.assertEqual(cot["events"], [e.decode() for e in events])
+        sync_format.check_cot({k: v for k, v in cot.items() if k != "type"})
+        self.assertEqual(remote.status()["atak"], {"enabled": True, "relay": True, "sent": len(events)})
+        # No live view leaves without the remote GM, and a command is still refused.
+        self.assertFalse(any(m.get("type") == "live" for m in list(site.received.queue)))
+        game = self.store.game(self.ctrl.game["id"])
+        site.send({"type": "command", **command(game, "start")})
+        self.assertEqual(site.next("command.result")["code"], "remote_gm_off")
+
+    def test_a_site_server_without_the_relay(self) -> None:
+        site = FakeStream()
+        remote = self.start(site)
+        site.next("hello")
+        site.send({"type": "hello.ack", "remote_gm": False, "atak_relay": False})
+        time.sleep(0.3)
+        self.assertFalse(remote.atak_relay)
+        self.assertEqual(remote.push_cot([b"x"]), 0)
+        self.assertEqual(self.reopened, 0)
+
+    def test_hello_without_atak_when_off(self) -> None:
+        self.cfg.sync_remote_gm = True
+        site = FakeStream()
+        self.cfg.sync_url = site.url
+        remote = RemoteGm(self.cfg, self.store, self.ctrl, api_key=KEY, controller_id=lambda: CONTROLLER_ID)
+        remote.start()
+        self.addCleanup(remote.stop)
+        self.addCleanup(site.close)
+        self.assertNotIn("atak", site.next("hello"))  # an older site server would refuse the field
+
+
+def _cot_events() -> list[str]:
+    from atalaia_controller import atak  # noqa: PLC0415
+
+    now = time.time()
+    return [atak.event_xml(uid="atalaia.field.node.4", cot_type=atak.TYPE_PROP, how=atak.HOW_IMAGE, lat=38.72,
+                           lon=-9.14, now=now, start=now, stale=now + 60,
+                           detail=atak.marker_detail("Caixa", "Atalaia: -", -1)).decode(),
+            atak.drop_xml("atalaia.field.node.5", atak.TYPE_PROP, 38.72, -9.14, now).decode()]
+
+
+COT_EVENTS = _cot_events()
+
+
 class WsClientTests(unittest.TestCase):
     def test_the_accept_key_of_rfc_6455(self) -> None:
         # RFC 6455 section 1.3's example.
@@ -407,6 +484,28 @@ class SettingsTests(unittest.TestCase):
             self.assertFalse(config(tmp).sync_remote_gm)
             with self.assertRaisesRegex(ConfigError, "remote_gm needs sync.enabled"):
                 config(tmp, sync_remote_gm=True)
+
+    def test_remote_atak_needs_the_feed_and_the_sync_and_is_off_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = config(tmp)
+            self.assertEqual((cfg.atak_remote, cfg.atak_remote_players), (False, False))
+            sync = {"sync_enabled": True, "sync_url": "https://site.example.org", "sync_api_key": KEY}
+            with self.assertRaisesRegex(ConfigError, "atak.remote needs atak.enabled and sync.enabled"):
+                config(tmp, atak_enabled=True, atak_remote=True)
+            with self.assertRaisesRegex(ConfigError, "atak.remote needs atak.enabled and sync.enabled"):
+                config(tmp, atak_remote=True, **sync)
+            with self.assertRaisesRegex(ConfigError, "atak.remote_players needs atak.remote"):
+                config(tmp, atak_enabled=True, atak_remote_players=True, **sync)
+            cfg = config(tmp, atak_enabled=True, atak_remote=True, atak_remote_players=True, **sync)
+            bundle = build(cfg, core=CORE, load_core_lib=False)
+            try:  # the stream is built for the relay alone, and the emitter pushes on it
+                self.assertIsNotNone(bundle.remote)
+                assert bundle.atak is not None
+                self.assertIs(bundle.atak.remote, bundle.remote)
+                self.assertEqual(bundle.remote.on_relay_open, bundle.atak.resend_all)
+            finally:
+                bundle.controller.stop()
+                bundle.store.close()
 
     def test_built_only_when_on_and_the_log_needs_the_gm_token(self) -> None:
         for on in (False, True):

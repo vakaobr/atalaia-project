@@ -53,11 +53,13 @@ id, revision and SHA-256, and its game presets: ``check_presets``) and ``GET /ap
 
 from __future__ import annotations
 
+import calendar
 import hashlib
 import json
 import math
 import re
 import uuid
+import xml.etree.ElementTree as ET
 from typing import Any
 
 from . import chrono, images
@@ -825,9 +827,13 @@ STALE_S = 60.0              # a command sent longer ago than this (or this far i
 
 
 def check_hello(body: Any) -> dict[str, Any]:
-    """The controller's first message on the stream: whether it takes remote GM commands."""
-    body = _envelope(body, ("remote_gm",), game=False)
+    """The controller's first message on the stream: whether it takes remote GM commands and, optionally
+    (the remote ATAK relay, Phase 4 follow-up FU5), whether it will push its CoT events (``atak``, false
+    when absent)."""
+    body = _obj(body, "")
+    _envelope({k: v for k, v in body.items() if k != "atak"}, ("remote_gm",), game=False)
     _bool(body["remote_gm"], "remote_gm")
+    _bool(body.setdefault("atak", False), "atak")
     return body
 
 
@@ -936,8 +942,154 @@ def check_result(body: Any) -> dict[str, Any]:
     return body
 
 
+# --- the remote ATAK relay (Phase 4 follow-up, decisions FU5-*) ----------------------------------------
+# With ``[atak] remote = true`` the controller pushes the CoT events its emitter makes (atak.py) on the stream,
+# ``{"type": "cot", sync_version, controller, events: [XML text, ...]}``, and the site server relays them to
+# the field's enrolled ATAK clients (TLS with a client certificate). Each event is one CoT ``<event>`` as
+# TAK Protocol version 0 carries it: the XML declaration, a newline, the event. Both sides check every event
+# with ``cot_event``: the site server parses only this narrow form (no DOCTYPE, entity, comment, CDATA or
+# processing instruction, only ``point`` and ``detail`` under the event, Atalaia's own uids) and forwards its
+# own serialisation of it, never the controller's bytes. ``MAP_TYPES`` and ``MAP_HOWS`` are what any enrolled
+# client may get (the boxes and the extraction zone: spot markers placed by hand); every other event (a
+# player's position, its drop) goes only to a certificate allowed to see positions (P4R18).
+
+MAX_COT_EVENTS = 100        # events in one cot message
+MAX_COT_BYTES = 2048        # bytes of one event's XML (the emitter's are under 1,400: atak.DATAGRAM_MAX)
+COT_DECL = "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n"  # atak.XML_DECL
+COT_UID = re.compile(r"atalaia\.[A-Za-z0-9._:-]{1,120}")
+COT_HOW = re.compile(r"[a-z](-[a-z]){0,4}")
+COT_TIME = re.compile(r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d{1,6})?Z")
+COT_NUMBER = re.compile(r"-?\d{1,9}(\.\d{1,9})?")
+MAP_TYPES = ("b-m-p-s-m",)  # a spot marker (atak.TYPE_PROP, TYPE_ZONE_POINT)
+MAP_HOWS = ("h-e", "h-p")   # placed on the image by the GM, pasted from a map app (atak.HOW_IMAGE, HOW_PASTED)
+COT_TYPES = (*MAP_TYPES, "a-f-G-U-C")  # and a player (atak.TYPE_PLAYER): nothing else is relayed
+# The detail elements the emitter writes (atak.marker_detail, AtakEmitter._players), with no children of their own,
+# and each one's attributes and text in the forms the emitter gives them (FU5-17): nothing else passes, so no
+# ``contact endpoint``, no free ``usericon`` path, no long remark is relayed to the staff's devices.
+COT_DETAILS = ("contact", "remarks", "color", "usericon", "__group", "status")
+COT_PLAYER_DETAILS = ("contact", "__group", "remarks")  # AtakEmitter._players: no colour, icon or battery
+COT_EVENT_ATTRS = ("version", "uid", "type", "how", "time", "start", "stale")  # atak.event_xml's, no others
+COT_CALLSIGN_MAX = 48        # atak.CALLSIGN_MAX
+COT_REMARKS_MAX = 160        # atak.REMARKS_MAX
+COT_REMARKS_PREFIX = "Atalaia: "
+COT_ARGB = re.compile(r"-?[0-9]{1,10}")
+COT_BATTERY = re.compile(r"100|[1-9]?[0-9]")
+COT_ICONSET = "COT_MAPPING_SPOTMAP/b-m-p-s-m/"  # atak.marker_detail: this prefix and the colour's argb
+COT_GROUP_ROLE = "Team Member"  # atak.GROUP_ROLE
+COT_TEAMS = ("White", "Yellow", "Orange", "Magenta", "Red", "Maroon", "Purple", "Dark Blue", "Blue", "Cyan",
+             "Teal", "Green", "Dark Green", "Brown")  # atak.ATAK_TEAMS
+_COT_FORBIDDEN = ("<!", "<?", "&#", "]]>")
+
+
+def _cot_text(value: Any, limit: int) -> bool:
+    """A text as ``atak.xml_text`` leaves it: whitespace folded, at most ``limit`` characters."""
+    return isinstance(value, str) and len(value) <= limit and value == " ".join(value.split())
+
+
+def _argb(value: Any) -> bool:
+    return isinstance(value, str) and COT_ARGB.fullmatch(value) is not None and -2**31 <= int(value) < 2**31
+
+
+def _cot_detail(child: ET.Element, kind: str) -> bool:
+    """One detail element as the emitter writes it (``atak.marker_detail``, ``AtakEmitter._players``)."""
+    a, tag = child.attrib, child.tag
+    if tag != "remarks" and child.text:
+        return False
+    if kind not in MAP_TYPES and tag not in COT_PLAYER_DETAILS:
+        return False
+    if tag == "contact":
+        return set(a) == {"callsign"} and _cot_text(a["callsign"], COT_CALLSIGN_MAX) and a["callsign"] != ""
+    if tag == "remarks":
+        text = child.text or ""
+        return not a and _cot_text(text, COT_REMARKS_MAX) and text.startswith(COT_REMARKS_PREFIX)
+    if tag == "color":
+        return set(a) == {"argb"} and _argb(a["argb"])
+    if tag == "usericon":
+        path = a.get("iconsetpath", "")
+        return set(a) == {"iconsetpath"} and path.startswith(COT_ICONSET) and _argb(path[len(COT_ICONSET):])
+    if tag == "__group":
+        return set(a) == {"name", "role"} and a["name"] in COT_TEAMS and a["role"] == COT_GROUP_ROLE
+    if tag == "status":
+        return set(a) == {"battery"} and COT_BATTERY.fullmatch(a["battery"]) is not None
+    return False
+
+
+def _cot_time(value: Any, path: str) -> float:
+    m = COT_TIME.fullmatch(value) if isinstance(value, str) else None
+    if m is None:
+        _fail("bad_time", path)
+    y, mo, d, h, mi, s = (int(g) for g in m.groups()[:6])
+    if not (1970 <= y <= 2500 and 1 <= mo <= 12 and 1 <= d <= 31 and h <= 23 and mi <= 59 and s <= 60):
+        _fail("bad_time", path)
+    return calendar.timegm((y, mo, d, h, mi, s)) + float(m.group(7) or 0)
+
+
+def cot_event(text: Any, path: str = "event") -> dict[str, Any]:
+    """One CoT event as the emitter makes it, checked: ``{uid, type, how, start, stale, map, xml}``, ``map``
+    true for what any enrolled ATAK client may see (``MAP_TYPES`` placed by hand), ``xml`` the event
+    serialised again by this module (the declaration, a newline, the event)."""
+    if not isinstance(text, str) or not text.startswith(COT_DECL):
+        _fail("not_cot", path)
+    if len(text.encode("utf-8")) > MAX_COT_BYTES:
+        _fail("too_large", path)
+    body = text[len(COT_DECL):]
+    if any(bad in body for bad in _COT_FORBIDDEN):
+        _fail("not_cot", path)  # no DOCTYPE, entity, CDATA, comment or second processing instruction
+    try:
+        root = ET.fromstring(body)
+    except ET.ParseError:
+        _fail("not_cot", path)
+    if root.tag != "event" or root.get("version") != "2.0":
+        _fail("not_cot", path)
+    if set(root.attrib) - set(COT_EVENT_ATTRS):
+        _fail("unknown_field", path)
+    uid, kind, how = root.get("uid"), root.get("type"), root.get("how")
+    if not isinstance(uid, str) or not COT_UID.fullmatch(uid):
+        _fail("bad_uid", f"{path}.uid")
+    if kind not in COT_TYPES:
+        _fail("bad_type", f"{path}.type")
+    if not isinstance(how, str) or not COT_HOW.fullmatch(how):
+        _fail("bad_how", f"{path}.how")
+    _cot_time(root.get("time"), f"{path}.time")
+    start = _cot_time(root.get("start"), f"{path}.start")
+    stale = _cot_time(root.get("stale"), f"{path}.stale")
+    children = list(root)
+    if [c.tag for c in children] != ["point", "detail"] or (root.text or "").strip():
+        _fail("not_cot", path)
+    point = children[0]
+    if set(point.attrib) != {"lat", "lon", "hae", "ce", "le"} or len(point):
+        _fail("bad_point", f"{path}.point")
+    for key in ("lat", "lon", "hae", "ce", "le"):
+        if not COT_NUMBER.fullmatch(point.get(key, "")):
+            _fail("bad_point", f"{path}.point.{key}")
+    if not (-90.0 <= float(point.get("lat")) <= 90.0 and -180.0 <= float(point.get("lon")) <= 180.0):
+        _fail("bad_point", f"{path}.point")
+    if (children[1].text or "").strip() or children[1].attrib:
+        _fail("bad_detail", f"{path}.detail")
+    seen: set[str] = set()
+    for child in children[1]:
+        if child.tag not in COT_DETAILS or len(child) or (child.tail or "").strip() or child.tag in seen:
+            _fail("bad_detail", f"{path}.detail")
+        seen.add(child.tag)
+        if not _cot_detail(child, kind):
+            _fail("bad_detail", f"{path}.detail.{child.tag}")
+    xml = COT_DECL + ET.tostring(root, encoding="unicode", short_empty_elements=True)
+    return {"uid": uid, "type": kind, "how": how, "start": start, "stale": stale,
+            "map": kind in MAP_TYPES and how in MAP_HOWS, "xml": xml}
+
+
+def check_cot(body: Any) -> dict[str, Any]:
+    """The controller's CoT events for the remote ATAK relay: 1-100, each checked by ``cot_event``."""
+    body = _envelope(body, ("events",), game=False)
+    events = _list(body["events"], "events", MAX_COT_EVENTS, lo=1)
+    for i, text in enumerate(events):
+        cot_event(text, f"events[{i}]")
+    return body
+
+
 # The stream's own messages (``type`` taken out): what the controller sends, and the command it gets.
-STREAM = {"hello": check_hello, "live": check_live, "command.result": check_result, "command": check_command}
+STREAM = {"hello": check_hello, "live": check_live, "command.result": check_result, "command": check_command,
+          "cot": check_cot}
 
 
 # --- the scenario library and presets (plan phase 20) -------------------------------------

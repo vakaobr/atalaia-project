@@ -6,6 +6,9 @@
     python -m atalaia_server purge [--dry-run]
     python -m atalaia_server hosted init|create|list|migrate|check|suspend|resume|export|delete ...
     python -m atalaia_server import-field FILE.zip
+    python -m atalaia_server atak issue --field SLUG --device NAME [--days N] --out FILE.zip
+    python -m atalaia_server atak list --field SLUG
+    python -m atalaia_server atak revoke --field SLUG CERTIFICATE_ID
 
 ``create-admin`` makes a server administrator (ADR-P4-2): it asks for the
 password twice (or reads one line from standard input with
@@ -20,6 +23,15 @@ It needs ATALAIA_DATABASE_URL and ATALAIA_SECRET_KEY, as the server does.
 deleted (``--dry-run``: what it would delete). The server runs it by itself
 every day at ATALAIA_PURGE_HOUR (03:00 UTC by default); the command is for a
 deployment that turns that off and schedules it elsewhere, or for a check.
+
+``atak`` is the operator's side of the remote ATAK relay's enrolment (Phase 4
+follow-up FU5; the field's admin and gm use ``/staff/fields/<field>/atak`` or
+the API): ``issue`` writes a TAK data package for a device of the field named
+by its slug (mode 0600) and prints its client certificate's password once;
+the certificate has no holder, so it gets the field's boxes and zones, never
+player positions. ``list`` shows the field's certificates; ``revoke`` revokes
+one (a running server closes its connections within 30 seconds; the API does
+it at once). They need ATALAIA_ATAK_RELAY=on and the server's settings.
 
 In hosted mode (ATALAIA_HOSTED=on, plan phase 21) ``create-admin`` needs
 ``--field SLUG``: the account is made in that field's schema and administers
@@ -45,12 +57,13 @@ from typing import Any, Callable, Optional, TextIO
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from . import hosted, passwords, personal_data, tenancy, totp
+from . import atak_pki, hosted, passwords, personal_data, tenancy, totp
 from .api.auth import EMAIL, username_problem
 from .audit import record
 from .config import ConfigError, Settings, database_url_from_env
 from .db import make_engine, make_sessionmaker
-from .models import User
+from .models import Field, User
+from .services import atak as enrolment
 from .tokens import Keys
 from .totp import SeedBox
 
@@ -157,6 +170,74 @@ async def run_purge(settings: Settings, dry_run: bool, out: TextIO) -> dict[str,
     return total
 
 
+async def run_atak(settings: Settings, args: argparse.Namespace, out: TextIO) -> None:
+    """The ``atak`` commands: issue (a data package with no holder: props and zones only), list, revoke."""
+    if args.action == "issue" and not settings.atak_relay:
+        raise CommandError("the ATAK relay is off (ATALAIA_ATAK_RELAY=on turns it on)")
+    engine = make_engine(settings)
+    try:
+        tenant = None
+        if settings.hosted:
+            tenant = await tenancy.lookup(engine, tenancy.check_slug(args.field))
+            if tenant is None:
+                raise CommandError(f"no field {args.field!r} on this hub")
+        with tenancy.use(tenant):
+            async with make_sessionmaker(engine, hosted=settings.hosted)() as db:
+                query = select(Field).where(Field.id == tenant.field_id) if tenant is not None \
+                    else select(Field).where(Field.slug == args.field)
+                field = (await db.execute(query)).scalars().first()
+                if field is None:
+                    raise CommandError(f"no field {args.field!r}")
+                if args.action == "list":
+                    for c in await enrolment.list_certs(db, field.id):
+                        print(f"{c['id']}\t{c['state']}\t{c['device_name']}\t{c['holder'] or '-'}\t"
+                              f"positions={'yes' if c['positions'] else 'no'}\tuntil {c['not_after']}", file=out)
+                    return
+                if args.action == "revoke":
+                    try:
+                        row = await enrolment.revoke(db, field.id, uuid.UUID(args.certificate), None)
+                    except (ValueError, enrolment.AtakProblem):
+                        raise CommandError(f"no certificate {args.certificate} at {args.field}") from None
+                    record(db, "atak_cert_revoked", None, resource="field", resource_id=field.id,
+                           details={"certificate": str(row.id), "device_name": row.device_name,
+                                    "reason": row.revoke_reason, "via": "command"})
+                    await db.commit()
+                    print(f"Revoked {row.device_name} ({row.id}); a running relay closes its connections within "
+                          f"30 seconds.", file=out)
+                    return
+                path = Path(args.out)
+                if path.exists():
+                    raise CommandError(f"{path} exists")
+                box = atak_pki.CaBox(settings.secret_key)
+                try:
+                    done = await enrolment.issue(db, box, field, device_name=args.device, days=args.days,
+                                                 holder=None, positions=False, issued_by=None, via="command")
+                except enrolment.AtakProblem as e:
+                    raise CommandError(f"refused: {e.detail}") from None
+                host = settings.relay_host(tenant.slug if tenant else None)
+                port = settings.relay_public_port()
+                password = atak_pki.new_package_password()
+                relay_ca, _ = atak_pki.server_ca(settings.secret_key)
+                package = atak_pki.data_package(issued=done.issued, field_ca=done.ca, relay_ca=relay_ca,
+                                                password=password, host=str(host), port=port,
+                                                description=f"Atalaia {field.name}"[:64],
+                                                name=atak_pki.package_name(field.slug, done.row.device_name))
+                record(db, "atak_cert_issued", None, resource="field", resource_id=field.id,
+                       details={"certificate": str(done.row.id), "device_name": done.row.device_name,
+                                "serial": done.row.serial, "holder_id": None, "positions": False,
+                                "not_after": done.row.not_after.isoformat(), "ca_made": done.ca_made,
+                                "via": "command"})
+                fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                with os.fdopen(fd, "wb") as f:
+                    f.write(package)
+                await db.commit()
+                print(f"Certificate {done.row.id} for {done.row.device_name} at {args.field}, valid until "
+                      f"{done.row.not_after.isoformat()}: {path} (connects to {host}:{port}). Its password, shown "
+                      f"once: {password}", file=out)
+    finally:
+        await engine.dispose()
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m atalaia_server", description="Atalaia site server commands")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -170,6 +251,18 @@ def _parser() -> argparse.ArgumentParser:
     purge.add_argument("--dry-run", action="store_true", help="count, delete nothing")
     imp = sub.add_parser("import-field", help="load a hosted field's export into this single-field server")
     imp.add_argument("archive")
+    atak = sub.add_parser("atak", help="the remote ATAK relay's certificates (Phase 4 follow-up FU5)")
+    asub = atak.add_subparsers(dest="action", required=True)
+    p = asub.add_parser("issue", help="a TAK data package for one device (boxes and zones, never positions)")
+    p.add_argument("--field", required=True, help="the field's slug")
+    p.add_argument("--device", required=True, help="the device's name (1-48 characters)")
+    p.add_argument("--days", type=int, default=atak_pki.DEFAULT_DAYS, help="1-30 (default 7)")
+    p.add_argument("--out", required=True, help="where to write the ZIP (mode 0600; must not exist)")
+    p = asub.add_parser("list", help="the field's certificates")
+    p.add_argument("--field", required=True)
+    p = asub.add_parser("revoke", help="revoke one certificate")
+    p.add_argument("--field", required=True)
+    p.add_argument("certificate", help="its id (atak list)")
     host = sub.add_parser("hosted", help="the hosted hub's operator commands (plan phase 21; owner role)")
     hsub = host.add_subparsers(dest="action", required=True)
     role_help = f"the server's database role (default ATALAIA_APP_ROLE or {hosted.DEFAULT_APP_ROLE})"
@@ -271,6 +364,13 @@ def main(argv: Optional[list[str]] = None, stdin: TextIO = sys.stdin, out: TextI
         return 2
     if args.command == "purge":
         asyncio.run(run_purge(settings, args.dry_run, out))
+        return 0
+    if args.command == "atak":
+        try:
+            asyncio.run(run_atak(settings, args, out))
+        except (CommandError, tenancy.TenantError) as e:
+            print(f"atalaia_server: {e}", file=err)
+            return 1
         return 0
     if args.password_stdin:
         password = stdin.readline().rstrip("\r\n")

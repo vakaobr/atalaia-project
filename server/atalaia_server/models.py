@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """ORM models (ADR-P4-1; migrations 0001_base, 0002_accounts, 0003_personal_data, 0004_sync, 0005_chrono,
 0006_scheduling, 0007_registration, 0008_integrations, 0009_clubs, 0010_firmware; 0011_history in
-``history_models``).
+``history_models``; 0012_atak in ``atak_models``).
 
 Fields, users, roles, per-field roles, sessions and the audit log, as
 ADR-P4-1 defines them, with plan phase 11's additions for accounts: the
@@ -23,7 +23,8 @@ check-in rules for registering (``fields.limit_template``, ``max_replicas``); pl
 adapters (migration 0008_integrations): ``platform_links`` and ``external_game_links``; plan phase 18's
 clubs and branding (migration 0009_clubs, P4R19): ``branding_images``, ``clubs``, ``club_members``,
 ``club_reports``, ``field_teams`` and the field's branding columns on ``fields``; plan phase 19's firmware
-catalogue (migration 0010_firmware): ``firmware_releases``. A table that holds personal data must also be added to
+catalogue (migration 0010_firmware): ``firmware_releases``; the remote ATAK relay's certificates (migration
+0012_atak, Phase 4 follow-up FU5) in ``atak_models``. A table that holds personal data must also be added to
 ``personal_data.py`` (access, export, erasure, the purge) in the same plan
 phase. Every later plan phase adds its own tables here and in
 its own Alembic migration; ``tests.test_migrations`` checks that the
@@ -898,3 +899,5 @@ class FirmwareRelease(Base):
 # Plan phase 20's tables (game history and the scenario library, migration 0011_history) live in their own
 # module; importing it here puts them in Base.metadata.
 from . import history_models  # noqa: E402,F401  (after Base and the tables it points at)
+# The remote ATAK relay's certificates (Phase 4 follow-up FU5, migration 0012_atak).
+from . import atak_models  # noqa: E402,F401

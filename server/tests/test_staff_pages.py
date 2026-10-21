@@ -34,6 +34,7 @@ PAGES = {
     "game": f"/staff/fields/{FIELD}/games/{GAME}", "scenarios": f"/staff/fields/{FIELD}/scenarios",
     "scenario": f"/staff/fields/{FIELD}/scenarios/org.test.two", "presets": f"/staff/fields/{FIELD}/presets",
     "devices": f"/staff/fields/{FIELD}/devices", "remote": f"/staff/fields/{FIELD}/remote-gm",
+    "atak": f"/staff/fields/{FIELD}/atak",
 }
 
 
@@ -148,7 +149,8 @@ class StaffPageTests(AppTestCase):
         self.assertEqual(r.status_code, 200, r.text)
         game = r.json()["game"]
         for path in (f"/staff/fields/{field_id}/history", f"/staff/fields/{field_id}/games/{game}",
-                     f"/staff/fields/{field_id}/devices", f"/staff/fields/{field_id}/remote-gm"):
+                     f"/staff/fields/{field_id}/devices", f"/staff/fields/{field_id}/remote-gm",
+                     f"/staff/fields/{field_id}/atak"):
             r = await self.client.get(path)
             self.assertEqual(r.status_code, 200)
             self.assertNotIn("Operação Noturna", r.text)

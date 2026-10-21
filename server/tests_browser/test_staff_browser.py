@@ -9,7 +9,8 @@ certificate made for the test (the refresh cookie is Secure), next to its own Po
 database (``tests/base.py``), and drives the pages as staff would: log in with the password and the TOTP
 code, then the game history and a game's timeline and log, the history settings, the scenario library (a
 manifest with problems, checked; fixed, saved, revised, archived), the presets, the device health and the
-remote GM against a controller's socket (``tests/test_remote_gm.Stream``). The roles are the API's: a
+remote GM against a controller's socket (``tests/test_remote_gm.Stream``) and the remote ATAK relay's
+enrolment (a data package downloaded, a certificate revoked). The roles are the API's: a
 player's session sees its role refused. Every page is checked for script errors and content security
 policy violations, for labels on its form controls, and for sideways scrolling at a phone's width.
 
@@ -26,6 +27,7 @@ import socket
 import tempfile
 import unittest
 import uuid
+import zipfile
 from pathlib import Path
 from typing import Any, Optional
 
@@ -33,9 +35,11 @@ import uvicorn
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.x509.oid import NameOID
 
 from atalaia_server import sync
+from atalaia_server.config import Settings
 from atalaia_server.ratelimit import RequestLimit
 
 from tests.base import PASSWORD, AppTestCase
@@ -432,7 +436,7 @@ class RemoteGmTests(BrowserCase):
         self.streams.append(stream)
         self.assertEqual((await stream.open())["type"], "websocket.accept")
         await stream.send({"type": "hello", "sync_version": 1, "controller": CTRL, "remote_gm": True})
-        self.assertEqual(await stream.receive(), {"type": "hello.ack", "remote_gm": True})
+        self.assertEqual(await stream.receive(), {"type": "hello.ack", "remote_gm": True, "atak_relay": False})
         await stream.send({"type": "live", "sync_version": 1, "controller": CTRL, "live": live})
         await asyncio.sleep(0.05)
         return stream
@@ -495,6 +499,74 @@ class RemoteGmTests(BrowserCase):
         await expect(page.locator("#status")).to_contain_text("This part needs the GM role on this field")
         await expect(page.locator("article.controller")).to_have_count(0)
         await expect(page.locator("#remote-log-none")).to_be_visible()
+
+
+class AtakTests(BrowserCase):
+    """The remote ATAK relay's page (Phase 4 follow-up FU5): a gm issues a device's certificate, downloads its
+    data package (made in the page from the API's answer), sees it listed, revokes it."""
+
+    def settings(self) -> Settings:
+        return Settings(**{**super().settings().__dict__, "atak_relay": True, "atak_relay_port": 0,
+                           "atak_relay_host": "localhost"})
+
+    async def test_issue_download_and_revoke(self) -> None:
+        name, secret = await self.staff("gm")
+        page = await self.new_page()
+        await self.login(page, name, secret, self.field_path("/atak"))
+        await expect(page.locator("#atak-connect")).to_have_text(
+            "Os dispositivos ligam-se a localhost:8089 (TLS com certificado de cliente).")
+        await expect(page.locator("#atak-certs-none")).to_be_visible()
+        await page.fill("#a-device", EVIL)
+        await page.fill("#a-days", "3")
+        await page.check("#a-positions")
+        await page.click("#atak-form button[type=submit]")
+        await expect(page.locator("#atak-issued")).to_be_visible()
+        password = await page.locator("#atak-password").text_content() or ""
+        self.assertGreaterEqual(len(password), 20)
+        async with page.expect_download() as info:
+            await page.click("#atak-download")
+        download = await info.value
+        self.assertRegex(download.suggested_filename, r"^atalaia-campo-norte-[A-Za-z0-9._-]+\.zip$")
+        path = await download.path()
+        assert path is not None
+        with zipfile.ZipFile(path) as z:
+            client = pkcs12.load_pkcs12(z.read("certs/client.p12"), password.encode())
+            self.assertIn(b"localhost:8089:ssl", z.read("certs/atalaia.pref"))
+        assert client.cert is not None
+        self.assertEqual(client.cert.certificate.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value, EVIL)
+        rows = page.locator("#atak-certs tbody tr")
+        await expect(rows).to_have_count(1)
+        await expect(rows.first).to_contain_text("válido")
+        await expect(rows.first.locator("th")).to_have_text(EVIL)  # a device's name is text, never markup
+        self.assertIsNone(await page.evaluate("() => window.pwned"))
+        await rows.first.get_by_role("button").click()  # the confirmation is accepted
+        await expect(page.locator("#status")).to_contain_text("Certificado revogado")
+        await expect(rows.first).to_contain_text("revogado")
+        await expect(page.locator("#atak-log tbody tr")).to_have_count(2)
+        self.assertIsNotNone((await self.fetch("SELECT revoked_at FROM atak_certs"))[0]["revoked_at"])
+        await self.check_page(page)
+
+    async def test_positions_for_a_player_and_a_marshal_without_the_role(self) -> None:
+        name, secret = await self.staff("admin")
+        player, _ = await self.staff("player", with_totp=False)
+        page = await self.new_page(lang="en-GB")
+        await self.login(page, name, secret, self.field_path("/atak"))
+        await page.fill("#a-device", "Phone")
+        await page.fill("#a-holder", player)
+        await page.check("#a-positions")
+        await page.click("#atak-form button[type=submit]")
+        # The field's admin alone may not issue positions at all (FU5-13: the issuer receives the key).
+        await expect(page.locator("#status")).to_have_text(
+            "Only someone with the GM or marshal role on this field may issue a certificate that sees positions.")
+        await page.uncheck("#a-positions")
+        await page.click("#atak-form button[type=submit]")
+        await expect(page.locator("#atak-certs tbody tr")).to_have_count(1)
+        await expect(page.locator("#atak-certs tbody tr").first).to_contain_text(player)
+        marshal, marshal_secret = await self.staff("marshal")
+        other = await self.new_page()
+        await self.login(other, marshal, marshal_secret, self.field_path("/atak"))
+        await expect(other.locator("#status")).to_contain_text("precisa da função administração ou GM neste campo")
+        await expect(other.locator('#sections li[data-section="atak"]')).to_be_hidden()
 
 
 class RoleTests(BrowserCase):

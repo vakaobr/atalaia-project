@@ -26,7 +26,8 @@ Please report anything that does not work as written.
   if the machine has IPv6) record points at the machine **before** the first
   start, since Caddy asks for the certificate as it starts.
 - Ports 80 (TCP) and 443 (TCP and UDP) open to the machine. Port 80 is
-  needed for the certificate and redirects to HTTPS; nothing else is
+  needed for the certificate and redirects to HTTPS. Port 8089 (TCP) only
+  if the field turns on the remote ATAK relay (below); nothing else is
   published.
 
 Run everything as an ordinary user who may use Docker (in the `docker`
@@ -111,13 +112,20 @@ Optional, for the ports: `ATALAIA_BIND` (`0.0.0.0`), `ATALAIA_HTTP_PORT`
 | Service | Image | Networks | Reachable from outside |
 | --- | --- | --- | --- |
 | `caddy` | `caddy:2.11.7-alpine` (pinned by digest) | `edge`, `app` | Ports 80 and 443 only |
-| `server` | built from `server/Dockerfile` | `app`, `db` | No |
+| `server` | built from `server/Dockerfile` | `app`, `db`, `atak` | Only port 8089, and only with `ATALAIA_ATAK_RELAY=on` (below) |
 | `postgres` | `postgres:16.15-alpine` (pinned by digest) | `db` | No |
 
 `app` and `db` are internal Docker networks: only Caddy talks to the
 server, only the server to the database, and neither the server nor the
 database can open a connection to the internet (the site server needs
-none). The site server runs as an unprivileged user in its container.
+none). The site server runs as an unprivileged user in its container. The
+server is also on `atak`, which only exists so that the remote ATAK relay's
+port can be published (below): Docker publishes no port from an internal
+network. `atak` has its outbound NAT turned off, so on a Linux host a
+packet the server sent out through it would leave with the container's
+private address and get no answer (Docker Desktop routes it anyway); that is
+not a firewall, and the site server's code opens no outbound connection
+either way. Nothing listens on 8089 while the relay is off.
 
 - **TLS:** Caddy gets and renews the certificate by itself and redirects
   HTTP to HTTPS. Its certificates live in the `caddy-data` volume; they are
@@ -166,6 +174,65 @@ A field's admin makes an API key on the site server
 is `https://campo.example.pt`. The controller always opens the connection
 itself, so it needs no open port, even behind a 4G router. See
 [protocol/sync.md](../../protocol/sync.md).
+
+## Remote ATAK (port 8089)
+
+Off by default (Phase 4 follow-up, decisions FU5-*; server/README.md, "Remote
+ATAK"). With it, a field's staff ATAK devices away from the field, or a TAK
+client in a command post, see the field's boxes and zones (and, for a gm's or
+a marshal's certificate issued with that option, player positions), relayed by
+the site server from the field controller's own stream.
+
+1. On the site server, add `ATALAIA_ATAK_RELAY=on` to `server/.env` and run
+   `docker compose up -d` from `server/`. Devices connect to the site's name
+   (`ATALAIA_PUBLIC_URL`'s host; `ATALAIA_ATAK_RELAY_HOST` for another one)
+   on port 8089 (`ATALAIA_ATAK_PORT` to publish another; the data packages
+   follow it). Open TCP 8089 in the machine's firewall. In hosted mode each
+   field's devices connect to `<slug>.DOMAIN:8089`; the hub's wildcard DNS
+   record already points there.
+2. Caddy does not carry this port: TAK clients speak TLS with client
+   certificates, which needs a layer-4 proxy that Caddy's pinned image does
+   not have. The server publishes 8089 straight from its container and
+   terminates the TLS itself (TLS 1.2 or 1.3, a client certificate signed by
+   the field's CA required, every certificate checked against the server's
+   list at each connection). Its own certificate is not Caddy's or a public
+   one: it comes from a CA derived from `ATALAIA_SECRET_KEY`, which every
+   data package's trust store holds. Changing `ATALAIA_SECRET_KEY` therefore
+   means making every device's package again (and every field's CA is
+   made again on its next certificate).
+3. On the field controller: `[atak] enabled = true`, `remote = true` (and
+   `remote_players = true` only if positions should go to the gm's and
+   marshals' certificates), with the sync on. The controller opens the
+   connection, as for the sync.
+4. The field's admin or gm, logged in with TOTP, issues a certificate per
+   device at `https://campo.example.pt/staff/fields/<field>/atak`: a device
+   name, whose account it is (positions only for a gm or a marshal), how many
+   days (7 by default, 30 at most). The page gives the TAK data package (a
+   ZIP: the connection, the relay's CA, the device's certificate) and the
+   certificate's password, **once**: the server keeps neither. Import the
+   package in ATAK and type the password when it asks. Revoke a lost device's
+   certificate on the same page; its connection closes at once. The operator
+   can do the same from the server's container:
+
+   ```sh
+   docker compose exec server python -m atalaia_server atak issue --field campo --device "Posto 1" --out /tmp/posto1.zip
+   docker compose cp server:/tmp/posto1.zip . && docker compose exec server rm /tmp/posto1.zip
+   docker compose exec server python -m atalaia_server atak list --field campo
+   docker compose exec server python -m atalaia_server atak revoke --field campo CERTIFICATE_ID
+   ```
+
+   (in hosted mode `--field` is the field's slug on the hub). Such a package
+   has no holder and never gets positions; a running server takes a CA the
+   command made within 15 s and closes a revoked certificate's connections
+   within 30 s.
+
+The relay sees each device's own address, which the audit log keeps with
+each connection (`atak_connect`, `atak_refused`). The CAs and certificates
+are in the database, so a restore brings them back and the same packages
+keep working with the same `ATALAIA_SECRET_KEY`. **Tested in Docker only**
+(`python3 tools/docker_server.py deploy` and `deploy-hosted` issue a package,
+reach the published port and push a box through the stack to a TLS client);
+not yet with a real ATAK device (HW3) or on a real server.
 
 ## Backups
 

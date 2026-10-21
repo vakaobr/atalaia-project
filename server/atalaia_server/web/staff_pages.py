@@ -13,6 +13,10 @@
     GET /staff/fields/<field>/devices                  the field's boxes with their health flags
     GET /staff/fields/<field>/remote-gm                the remote GM: each controller's live view, the
                                                        commands, the remote GM log
+    GET /staff/fields/<field>/atak                     the remote ATAK relay (Phase 4 follow-up FU5): issue a
+                                                       device's certificate (its TAK data package, made in the
+                                                       page from the API's answer), the field's certificates,
+                                                       revoking one, the devices connected now, the log
     GET /static/staff/<file>                           the pages' scripts and style sheet
 
 How they work (FU2-1, FU2-2): each page is rendered here, in pt-PT or English like the field pages
@@ -111,7 +115,7 @@ class StaffPage:
             base = f"/staff/fields/{field}"
             items += [("history", f"{base}/history", "nav_history"), ("scenarios", f"{base}/scenarios", "nav_scenarios"),
                       ("presets", f"{base}/presets", "nav_presets"), ("devices", f"{base}/devices", "nav_devices"),
-                      ("remote", f"{base}/remote-gm", "nav_remote")]
+                      ("remote", f"{base}/remote-gm", "nav_remote"), ("atak", f"{base}/atak", "nav_atak")]
         out = []
         for name, href, label in items:
             here = ' aria-current="page"' if name == current else ""
@@ -251,6 +255,11 @@ async def remote_gm(field: str, request: Request) -> Response:
     t = STRINGS[StaffPage(request).lang]
     return _field_page(request, field, "remote", "remote", "remote_title", data={"poll": str(REMOTE_POLL_S)},
                        remote_intro_text=esc(t["remote_intro"].format(s=REMOTE_POLL_S)))
+
+
+@router.api_route("/staff/fields/{field}/atak", methods=GET_HEAD)
+async def atak(field: str, request: Request) -> Response:
+    return _field_page(request, field, "atak", "atak", "atak_title")
 
 
 def page_names() -> list[str]:

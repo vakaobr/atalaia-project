@@ -19,7 +19,14 @@ owner, and one for a VIP / Payload extraction zone:
   devices listed in ``staff_endpoints`` (TCP, "host:port", ATAK's
   point-to-point port is 4242), which see every player as marshals and
   the GM do (positions.py): GPS reports only, by pseudonymous player id,
-  never by name (decision M9-6).
+  never by name (decision M9-6);
+- with ``[atak] remote = true`` (off by default; Phase 4 follow-up,
+  decisions FU5-*), the same props and zones to the site server, as ``cot``
+  messages on the sync's stream that the controller opens itself
+  (``remote_gm.py``), which relays them to the field's enrolled ATAK devices
+  over TLS with client certificates; player positions go there only with
+  ``remote_players = true`` too, and the site server sends them only to a
+  certificate allowed to see them (P4R18).
 
 The format is the CoT base event schema, version 2.0 (MITRE, "CoT
 Base-Event Schema (PUBLIC RELEASE).xsd", in the ATAK-CIV repository's
@@ -314,7 +321,7 @@ class AtakEmitter:
     """Follows the controller's messages and sends the picture over UDP and to staff over TCP."""
 
     def __init__(self, cfg: "Config", controller: "Controller", *, wall: Callable[[], float] = time.time,
-                 udp: Optional[Any] = None, tcp: Optional[Any] = None) -> None:
+                 udp: Optional[Any] = None, tcp: Optional[Any] = None, remote: Optional[Any] = None) -> None:
         self.cfg = cfg
         self.ctrl = controller
         self._wall = wall
@@ -324,6 +331,11 @@ class AtakEmitter:
         self.udp: Optional[Any] = udp
         self.tcp = tcp if tcp is not None else (TcpSender(cfg.atak_staff_endpoints)
                                                 if cfg.atak_staff_endpoints else None)
+        # The site server's stream (remote_gm.RemoteGm) with [atak] remote = true: push_cot(events) queues the
+        # events while the site server relays them; on a new socket it asks for the whole picture again.
+        self.remote = remote if cfg.atak_remote else None
+        if self.remote is not None:
+            self.remote.on_relay_open = self.resend_all
         self._lock = threading.Lock()
         self._send_lock = threading.Lock()  # sending and closing the sockets
         self._wake = threading.Event()
@@ -336,8 +348,10 @@ class AtakEmitter:
         self._sent_owner: dict[int, Optional[str]] = {}
         self._markers: dict[str, tuple[str, float, float]] = {}  # uid -> (type, lat, lon), on UDP
         self._staff_markers: dict[str, tuple[str, float, float]] = {}
+        self._remote_markers: dict[str, tuple[str, float, float]] = {}
         self._next_players = 0.0
-        self.stats: dict[str, Any] = {"udp_events": 0, "tcp_events": 0, "errors": 0, "last_error": None,
+        self.stats: dict[str, Any] = {"udp_events": 0, "tcp_events": 0, "remote_events": 0, "errors": 0,
+                                      "last_error": None,
                                       "last_sent_at": None, "no_georef": False}
         controller.atak = self
         controller.add_listener(self.on_controller_message)
@@ -386,7 +400,7 @@ class AtakEmitter:
             except Exception:
                 log.exception("ATAK cycle failed")
             wait = next_full - time.monotonic()
-            if self._players_on():
+            if self._players_on() or self._remote_players_on():
                 wait = min(wait, 1.0)  # player positions go at their own pace (positions.py)
             self._wake.wait(max(0.05, wait))
             self._wake.clear()
@@ -431,10 +445,20 @@ class AtakEmitter:
     def _players_on(self) -> bool:
         return bool(self.cfg.atak_players and self.tcp is not None)
 
+    def _remote_players_on(self) -> bool:
+        return bool(self.remote is not None and self.cfg.atak_remote_players)
+
+    def resend_all(self) -> None:
+        """Everything again at the next cycle (the site server's relay has just taken a new socket)."""
+        with self._lock:
+            self._all = True
+        self._wake.set()
+
     # --- one cycle -----------------------------------------------------------------------------
 
     def cycle(self, full: bool = True) -> dict[str, int]:
-        """Sends what is due; returns the number of events sent per transport (tests call it)."""
+        """Sends what is due; returns the number of events sent per transport, ``udp``, ``tcp`` and
+        ``remote`` (tests call it)."""
         with self._lock:
             dirty, self._dirty = self._dirty, set()
             everything = full or self._all
@@ -444,9 +468,11 @@ class AtakEmitter:
         now = self._wall()
         udp_out: list[bytes] = []
         tcp_out: list[bytes] = []
+        remote_out: list[bytes] = []
         if ended is not None:
             udp_out += self._drops(self._markers, now)
             tcp_out += self._drops(self._staff_markers, now)
+            remote_out += self._drops(self._remote_markers, now)
         game = self._live_game()
         geo = georefmod.load(self.ctrl.store) if game is not None else None
         self.stats["no_georef"] = game is not None and geo is None
@@ -454,17 +480,28 @@ class AtakEmitter:
             props = self._props(game, geo, now, hints, None if everything else dirty)
             udp_out += props
             tcp_out += props
+            if self.remote is not None:
+                remote_out += props
         else:
             # No live game here or no georeference any more: what ATAK shows is no longer true.
             udp_out += self._drops(self._markers, now)
             tcp_out += self._drops(self._staff_markers, now)
-        if game is not None and self._players_on() and (everything or now >= self._next_players):
-            tcp_out += self._players(game, now)
+            remote_out += self._drops(self._remote_markers, now)
+        staff, remote = self._players_on(), self._remote_players_on()
+        if game is not None and (staff or remote) and (everything or now >= self._next_players):
+            for uid, data, lat, lon in self._players(game, now):
+                if staff:
+                    tcp_out.append(data)
+                    self._staff_markers[uid] = (TYPE_PLAYER, lat, lon)
+                if remote:  # never without remote_players (P4R18): the site server filters again
+                    remote_out.append(data)
+                    self._remote_markers[uid] = (TYPE_PLAYER, lat, lon)
             self._next_players = now + self._player_interval(game)
-        return self._send(udp_out, tcp_out, now)
+        return self._send(udp_out, tcp_out, now, remote_out)
 
-    def _send(self, udp_out: list[bytes], tcp_out: list[bytes], now: float) -> dict[str, int]:
-        out = {"udp": 0, "tcp": 0}
+    def _send(self, udp_out: list[bytes], tcp_out: list[bytes], now: float,
+              remote_out: Optional[list[bytes]] = None) -> dict[str, int]:
+        out = {"udp": 0, "tcp": 0, "remote": 0}
         with self._send_lock:
             udp = self._udp_sender() if udp_out else None
             if udp is not None:
@@ -474,12 +511,15 @@ class AtakEmitter:
                 except OSError as exc:
                     self._error(f"UDP {self.cfg.atak_multicast}: {exc}")
             sent, errors = self.tcp.send(tcp_out) if self.tcp is not None and tcp_out else (0, [])
+            if self.remote is not None and remote_out:
+                out["remote"] = self.remote.push_cot(remote_out)
+                self.stats["remote_events"] += out["remote"]
         if sent or errors:
             out["tcp"] = sent
             self.stats["tcp_events"] += sent
             for e in errors:
                 self._error(f"TCP {e}")
-        if out["udp"] or out["tcp"]:
+        if out["udp"] or out["tcp"] or out["remote"]:
             self.stats["last_sent_at"] = now
         return out
 
@@ -535,8 +575,7 @@ class AtakEmitter:
                                                                node.get("battery_pct"), atak_team(owner)))
             out.append(data)
             self._sent_owner[nid] = owner
-            self._markers[uid] = (TYPE_PROP, lat, lon)
-            self._staff_markers[uid] = (TYPE_PROP, lat, lon)
+            self._mark(uid, TYPE_PROP, lat, lon)
         if only is None:
             out += self._zones(game, now, stale, teams)
         return out
@@ -555,20 +594,27 @@ class AtakEmitter:
                          start=now, stale=stale, ce=radius,
                          detail=marker_detail("Extraction", f"Atalaia: {self._display(game, team) or '-'}, "
                                               f"{radius:.0f} m", team_colour(team, teams), group=atak_team(team)))
-        self._markers[uid] = (TYPE_ZONE_POINT, where[0], where[1])
-        self._staff_markers[uid] = (TYPE_ZONE_POINT, where[0], where[1])
+        self._mark(uid, TYPE_ZONE_POINT, where[0], where[1])
         return [data]
+
+    def _mark(self, uid: str, cot_type: str, lat: float, lon: float) -> None:
+        """A box or zone sent: every transport that got it drops it at the end."""
+        self._markers[uid] = (cot_type, lat, lon)
+        self._staff_markers[uid] = (cot_type, lat, lon)
+        if self.remote is not None:
+            self._remote_markers[uid] = (cot_type, lat, lon)
 
     def _player_interval(self, game: dict[str, Any]) -> float:
         from .positions import Positions  # noqa: PLC0415
 
         return float(Positions.interval(game))
 
-    def _players(self, game: dict[str, Any], now: float) -> list[bytes]:
-        """Staff endpoints only, never UDP: every GPS position of the live game (staff see all)."""
+    def _players(self, game: dict[str, Any], now: float) -> list[tuple[str, bytes, float, float]]:
+        """Staff endpoints and the remote relay only, never UDP: every GPS position of the live game (staff
+        see all), as (uid, event, lat, lon)."""
         teams = list(game.get("teams") or [])
         interval = self._player_interval(game)
-        out: list[bytes] = []
+        out: list[tuple[str, bytes, float, float]] = []
         for pid, pos in sorted(self.ctrl.store.player_positions(game["id"]).items()):
             if pos.get("source") != "gps" or pos.get("lat") is None or pos.get("lon") is None:
                 continue
@@ -588,10 +634,10 @@ class AtakEmitter:
             detail.append(_el("remarks", None, xml_text(f"Atalaia: {self._display(game, team) or '-'}, {role}",
                                                          REMARKS_MAX, REMARKS_BYTES)))
             uid = self._uid("player", pid)
-            out.append(event_xml(uid=uid, cot_type=TYPE_PLAYER, how=HOW_GPS, lat=float(pos["lat"]),
-                                 lon=float(pos["lon"]), now=now, start=min(seen, now), stale=stale,
-                                 ce=pos.get("accuracy_m"), detail=detail))
-            self._staff_markers[uid] = (TYPE_PLAYER, float(pos["lat"]), float(pos["lon"]))
+            lat, lon = float(pos["lat"]), float(pos["lon"])
+            out.append((uid, event_xml(uid=uid, cot_type=TYPE_PLAYER, how=HOW_GPS, lat=lat, lon=lon, now=now,
+                                       start=min(seen, now), stale=stale, ce=pos.get("accuracy_m"), detail=detail),
+                        lat, lon))
         return out
 
     # --- status ----------------------------------------------------------------------------------
@@ -599,4 +645,6 @@ class AtakEmitter:
     def status(self) -> dict[str, Any]:
         return {"enabled": True, "multicast": self.cfg.atak_multicast or None,
                 "staff_endpoints": len(self.cfg.atak_staff_endpoints), "players": bool(self.cfg.atak_players),
-                "interval_s": self.cfg.atak_interval_s, "markers": len(self._markers), **self.stats}
+                "interval_s": self.cfg.atak_interval_s, "markers": len(self._markers),
+                "remote": self.remote is not None, "remote_players": self._remote_players_on(),
+                "remote_relay": bool(self.remote is not None and self.remote.atak_relay), **self.stats}
