@@ -495,6 +495,16 @@ menu "Atalaia Field Box Configuration"
                 one EU868 sub-band; the TX power and the duty-cycle budget
                 follow that sub-band (25 mW and 1% or 0.1% elsewhere). An
                 invalid value falls back to 869525000 with an error at boot.
+
+        config ATALAIA_RADIO_LOG_PACKETS
+            bool "Log every packet sent and received (bring-up)"
+            default n
+            help
+                Logs each packet the radio sends (its length and the
+                duty-cycle budget left) and receives (its length and RSSI),
+                for BRING_UP.md's radio checks with two boards. On in the
+                bench variant (sdkconfig.bench); off in a game, where a busy
+                field would flood the log.
     endmenu
 
     # ---- GNSS module on the board's connector (decision PIN-1) ----------------

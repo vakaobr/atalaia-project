@@ -290,8 +290,14 @@ firmware no longer reads a button there.
    than about 14 dB of real gain the default setting would exceed 500 mW
    ERP on the g2 sub-band with a 2 dBi antenna (13 dBm + gain + 2 dBi -
    2.15 must stay at or below 27 dBm ERP; decision E20).
+   With `ATALAIA_RADIO_LOG_PACKETS` (on in the bench variant) every sent
+   packet logs `TX <n> bytes, <ms> ms budget left`; a `TX timeout` on
+   every packet means the chip never transmits (before RF-1 this was the
+   missing TCXO), and an `SX1262 device errors` error at boot names the
+   chip's own fault.
 3. Check the receiver: with two boards 1-2 m apart, the RSSI of received
-   packets (log, or the controller's node list) should be roughly -30 to
+   packets (`RX <n> bytes, RSSI <dBm>` with `ATALAIA_RADIO_LOG_PACKETS`, or
+   the controller's node list) should be roughly -30 to
    -50 dBm. Much weaker (-80 dBm or below at that distance) means the FEM
    is not powered or the board revision is set wrong.
 4. If the log shows `SX1262 not detected` or `radio SPI bus init

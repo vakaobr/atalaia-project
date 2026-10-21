@@ -137,6 +137,16 @@ static void fem_power_off(void)
 #define SX_CMD_SET_PA_CONFIG        0x95
 #define SX_CMD_SET_CAD              0xC5
 #define SX_CMD_SET_CAD_PARAMS       0x88
+#define SX_CMD_GET_DEVICE_ERRORS    0x17
+#define SX_CMD_CLR_DEVICE_ERRORS    0x07
+
+/* The Heltec V3/V4 clock the SX1262 from a 1.8 V TCXO powered by its DIO3
+ * (as RadioLib and Meshtastic's Heltec variants set it). Without it the
+ * crystal oscillator never starts: registers still answer on the RC clock,
+ * but the PLL cannot lock and every SetTx times out. */
+#define SX_TCXO_1V8       0x02
+#define SX_TCXO_DELAY     320 /* 5 ms, in 15.625 us steps */
+#define SX_ERR_XOSC_START (1 << 5)
 
 /* IRQ masks. */
 #define SX_IRQ_TX_DONE      (1 << 0)
@@ -415,6 +425,14 @@ static int esp_radio_init(void)
     uint8_t standby_cmd[] = {SX_CMD_SET_STANDBY, 0x00};
     rc |= sx_cmd(standby_cmd, sizeof(standby_cmd), NULL, 0);
 
+    /* Power the TCXO from DIO3 before calibrating, then clear the
+     * oscillator start-up error the chip flags at power-on without it. */
+    uint8_t tcxo_cmd[] = {SX_CMD_SET_DIO3_AS_TCXO, SX_TCXO_1V8, (uint8_t)(SX_TCXO_DELAY >> 16),
+                          (uint8_t)(SX_TCXO_DELAY >> 8), (uint8_t)(SX_TCXO_DELAY & 0xFF)};
+    rc |= sx_cmd(tcxo_cmd, sizeof(tcxo_cmd), NULL, 0);
+    uint8_t clr_err_cmd[] = {SX_CMD_CLR_DEVICE_ERRORS, 0x00, 0x00};
+    rc |= sx_cmd(clr_err_cmd, sizeof(clr_err_cmd), NULL, 0);
+
     /* Set DIO2 as RF switch control. */
     uint8_t dio2_cmd[] = {SX_CMD_SET_DIO2_AS_RF_SW, 0x01};
     rc |= sx_cmd(dio2_cmd, sizeof(dio2_cmd), NULL, 0);
@@ -427,6 +445,20 @@ static int esp_radio_init(void)
     uint8_t cal_cmd[] = {SX_CMD_CALIBRATE, 0x7F};
     rc |= sx_cmd(cal_cmd, sizeof(cal_cmd), NULL, 0);
     vTaskDelay(pdMS_TO_TICKS(10));
+
+    /* A clock or calibration fault would time out every transmission:
+     * refuse the radio instead. */
+    uint8_t err_cmd[] = {SX_CMD_GET_DEVICE_ERRORS, 0x00};
+    uint8_t err_resp[2] = {0};
+    rc |= sx_cmd(err_cmd, sizeof(err_cmd), err_resp, sizeof(err_resp));
+    uint16_t dev_errors = (uint16_t)((err_resp[0] << 8) | err_resp[1]);
+    if (rc == 0 && dev_errors != 0) {
+        ESP_LOGE(TAG, "SX1262 device errors 0x%04x after calibration%s", dev_errors,
+                 (dev_errors & SX_ERR_XOSC_START) ? " (TCXO did not start)" : "");
+        fem_power_off();
+        probe_cleanup(4);
+        return -1;
+    }
 
     /* Set packet type to LoRa. */
     uint8_t pkt_cmd[] = {SX_CMD_SET_PACKET_TYPE, 0x01};
@@ -530,6 +562,9 @@ static int esp_radio_send(const uint8_t *data, size_t len)
     /* Wait for TX_DONE on DIO1 (max 2 seconds). */
     if (xSemaphoreTake(dio1_sem, pdMS_TO_TICKS(2000)) != pdTRUE) {
         ESP_LOGW(TAG, "TX timeout");
+        /* The chip may have sent it with only the interrupt lost: count the
+         * time on air anyway, so retries stay inside the duty cycle. */
+        radio_limits_record(&limits, len, now_ms());
         sx_start_rx();
         return -2;
     }

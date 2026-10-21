@@ -79,6 +79,12 @@ static void radio_task_loop(void *arg)
                     ESP_LOGW(TAG, "TX failed (%d)", rc);
                     status = RADIO_TX_RESULT_ERROR;
                 }
+#if CONFIG_ATALAIA_RADIO_LOG_PACKETS
+                else {
+                    ESP_LOGI(TAG, "TX %u bytes, %lu ms budget left", (unsigned)tx_msg.len,
+                             (unsigned long)radio_hal->radio->duty_cycle_remaining_ms());
+                }
+#endif
             } else {
                 ESP_LOGW(TAG, "TX skipped: duty-cycle exhausted");
                 status = RADIO_TX_RESULT_DUTY_CYCLE;
@@ -96,6 +102,9 @@ static void radio_task_loop(void *arg)
         int8_t rssi = 0;
         size_t rx_len = radio_hal->radio->recv(rx_buf, sizeof(rx_buf), &rssi);
         if (rx_len > 0) {
+#if CONFIG_ATALAIA_RADIO_LOG_PACKETS
+            ESP_LOGI(TAG, "RX %u bytes, RSSI %d dBm", (unsigned)rx_len, rssi);
+#endif
             radio_rx_msg_t rx_msg;
             memcpy(rx_msg.data, rx_buf, rx_len);
             rx_msg.len = rx_len;
