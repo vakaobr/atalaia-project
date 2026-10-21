@@ -240,6 +240,7 @@ class StaffScriptTests(AppTestCase):
 
     async def test_portuguese_is_inclusive(self) -> None:
         text = " ".join(STRINGS["pt"].values()).lower()
-        for word in ("utilizador", "jogadores", "administrador ", " o gm ", " um gm ", "gm remoto", "marshall",
+        # "GM remoto" is the maintainer's term (decision FU2-11): the role, not a person.
+        for word in ("utilizador", "jogadores", "administrador ", " o gm ", " um gm ", "marshall",
                      "esquadra", "time "):
             self.assertNotIn(word, text)

@@ -22,7 +22,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "nav_scenarios": "Cenários",
         "nav_presets": "Predefinições",
         "nav_devices": "Dispositivos",
-        "nav_remote": "GM à distância",
+        "nav_remote": "GM remoto",
         "logout": "Sair",
         "signed_in_as": "Sessão de {user}",
         "noscript": "Estas páginas precisam de JavaScript ativo no browser.",
@@ -218,8 +218,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "flag_ok": "sem alertas",
         "fw_latest": "mais recente: {v}",
         # Remote GM
-        "remote_title": "GM à distância",
-        "remote_intro": "Os controladores do campo ligados a este servidor com a função de GM à distância ativa. A vista "
+        "remote_title": "GM remoto",
+        "remote_intro": "Os controladores do campo ligados a este servidor com a função de GM remoto ativa. A vista "
                         "atualiza a cada {s} s; cada comando fica no registo, aqui e no controlador.",
         "remote_none": "Nenhum controlador ligado.",
         "controller": "Controlador {id}",
@@ -249,7 +249,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "result_done": "Feito: {command}.",
         "result_refused": "O controlador recusou: {code}{detail}.",
         "remote_off": "Este controlador não aceita comandos remotos (remote_gm desligado).",
-        "remote_log": "Registo de GM à distância",
+        "remote_log": "Registo de GM remoto",
         "remote_log_none": "Ainda não há comandos.",
         "col_when": "Quando",
         "col_who": "Quem",
