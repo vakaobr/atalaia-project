@@ -5,7 +5,8 @@
  * PCF8574 I2C keypad expander driver.
  *
  * Wiring: rows on P0-P3 (active-low output), columns on P4-P6 (input
- * with internal pull-up), P7 unused (kept high). The PCF8574 sits on
+ * with internal pull-up), P7 kept high: an input for a team button to GND
+ * (CONFIG_ATALAIA_KP_P7_BUTTON), read with every scan. The PCF8574 sits on
  * the shared OLED I2C bus (GPIO 17/18) at CONFIG_ATALAIA_KP_I2C_ADDR
  * (default 0x20), or wherever it answers: a PCF8574 at 0x20-0x27, a
  * PCF8574A (sold under the same name) at 0x38-0x3F. The other parts on the
@@ -20,6 +21,7 @@
 #if defined(ESP_PLATFORM) && !CONFIG_ATALAIA_KP_GPIO_MATRIX
 
 #include "../hal_keypad.h"
+#include "hal_esp.h"
 #include "hal_esp_i2c.h"
 
 #include "driver/gpio.h"
@@ -62,6 +64,12 @@ static const char keymap[NUM_ROWS][NUM_COLS] = {
 
 static bool present;
 static uint8_t kp_addr = CONFIG_ATALAIA_KP_I2C_ADDR;
+static volatile int p7_pressed = -1; /* -1 until the expander answers */
+
+int hal_esp_keypad_p7_pressed(void)
+{
+    return p7_pressed;
+}
 
 /* Addresses of the bus's other parts, never taken for the keypad. */
 static bool reserved(uint8_t addr)
@@ -125,6 +133,13 @@ static int esp_keypad_init(void)
         return -1;
     }
     ESP_LOGI(TAG, "PCF8574 keypad at 0x%02X%s", kp_addr, kp_addr >= 0x38 ? " (PCF8574A)" : "");
+    uint8_t in = 0xFF;
+    if (i2c_master_read_from_device(CONFIG_ATALAIA_KP_I2C_PORT, kp_addr, &in, 1,
+                                    pdMS_TO_TICKS(100)) == ESP_OK) {
+        p7_pressed = (in & 0x80) ? 0 : 1;
+    } else {
+        p7_pressed = 0;
+    }
     return 0;
 }
 
@@ -147,6 +162,7 @@ static char esp_keypad_scan(void)
         err = i2c_master_read_from_device(CONFIG_ATALAIA_KP_I2C_PORT, kp_addr, &in, 1,
                                           pdMS_TO_TICKS(10));
         if (err != ESP_OK) continue;
+        p7_pressed = (in & 0x80) ? 0 : 1; /* P7: a team button to GND */
 
         for (int c = 0; c < NUM_COLS; c++) {
             if (!(in & (1u << (c + 4)))) {

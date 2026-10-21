@@ -21,13 +21,18 @@ multimeter. You do not need to write code.
 > Photos will be added after the first prototype build; this manual never
 > uses mock-up or generated photos.
 
-> **Pins still moving.** The firmware's button pins are being adapted to the
-> Heltec V4 board revisions: button 2 has moved from GPIO 5 to GPIO 39, and
-> button 4 (GPIO 34, the GNSS connector's power control) may still move. The
-> diagrams are always drawn from the firmware's current defaults; the GPIO
-> numbers in this text are those at the time of writing. **If the text and a
-> diagram disagree, the diagram wins**; check the
-> [pin table](README.md#peripheral-pins) too before you solder the buttons.
+> **New pin map (2026-10-21): rewire if you followed the old one.** The
+> board's GNSS connector now keeps all its pins (GPIO 34, 38-42) so the GNSS
+> module from the kit can be used by later game modes. Moved: button 2
+> **GPIO 39 -> GPIO 48**, button 3 **GPIO 33 -> GPIO 44**, button 4
+> **GPIO 34 -> the PCF8574's P7**, LED ring data **GPIO 48 -> GPIO 35**,
+> display MOSI **40 -> 33**, SCK **41 -> 47**, CS **42 -> 1**, display
+> RESET **GPIO 38 -> 3V3**, display LED (backlight) **GPIO 47 -> 3V3**.
+> Unchanged: button 1 (GPIO 4), display DC (GPIO 3), I2C (17/18), audio
+> (6/15/16). A wire left on GPIO 39 would fight the GNSS module's output; a
+> wire on GPIO 34 would switch its power. The diagrams are always drawn from
+> the firmware's current defaults; **if the text and a diagram disagree, the
+> diagram wins**; check the [pin table](README.md#peripheral-pins) too.
 
 ## Contents
 
@@ -124,7 +129,7 @@ prices ([hardware overview](../README.md)).
 
 | # | Part | Qty | What to check | Alternatives and pitfalls |
 | --- | --- | --- | --- | --- |
-| 1 | Heltec WiFi LoRa 32 V4 (revision V4.2 or V4.3), bare board, 863-928 MHz | 1 | The 863-928 MHz version, **not** 433/470 MHz; bare board without the plastic shell | Either revision works once the firmware is told which ([section 6](#6-board-revision-and-antennas)). Kits may add an 868 MHz antenna, a 3000 mAh 1S LiPo, pin headers and a GNSS module: the antenna and LiPo are usable (rows 2 and 14), the **GNSS module is not** (its connector's pins carry the display and button 4 here; keep it for the later GPS-based modes). The Heltec V3 works in the reduced memory tier |
+| 1 | Heltec WiFi LoRa 32 V4 (revision V4.2 or V4.3), bare board, 863-928 MHz | 1 | The 863-928 MHz version, **not** 433/470 MHz; bare board without the plastic shell | Either revision works once the firmware is told which ([section 6](#6-board-revision-and-antennas)). Kits may add an 868 MHz antenna, a 3000 mAh 1S LiPo, pin headers and a GNSS module: the antenna and LiPo are usable (rows 2 and 14), and so is the GNSS module: it plugs into the board's own GNSS connector ([section 9.1](#91-main-board-and-rails)) and stays switched off until a GPS-based mode uses it. The Heltec V3 works in the reduced memory tier |
 | 2 | 868 MHz antenna, 2 dBi or less | 1 | Gain stated in dBi; tuned for 868 MHz | The kit antenna (an IPEX lead of about 120 mm with a short whip, or a small spring antenna) works behind the box's plastic wall. For more range: an SMA antenna outside, on row 3's pigtail. A higher-gain antenna needs the firmware setting changed ([section 6](#6-board-revision-and-antennas)) |
 | 3 | U.FL (IPEX 1.0) to SMA bulkhead pigtail, about 10-15 cm | 1 | **Female** SMA bulkhead (or matching your antenna's plug), with O-ring and nut, IPEX **1.0** (not IPEX 4 / MHF4) | Only needed for an antenna outside the box |
 | 4 | 2.4 GHz FPC antenna with IPEX 1.0 lead | 1 | IPEX 1.0 connector, 2.4 GHz | Required: the kit has only the LoRa antenna |
@@ -199,10 +204,10 @@ Read these before you start, and keep them in mind at every step.
    carry more than 3.3 V: the I2C modules must pull up to 3.3 V
    ([section 9.2](#92-i2c-modules)), and the LED ring is driven through the
    level shifter.
-7. **Never wire GPIO 5 or GPIO 46, and leave the GNSS connector empty.**
-   They drive the radio's front-end module on one board revision or the
-   other; the GNSS connector's pins carry the display and button 4 in this
-   pin map.
+7. **Never wire GPIO 5 or GPIO 46, nor GPIO 34 or 38-42.** GPIO 5 and 46
+   drive the radio's front-end module on one board revision or the other;
+   GPIO 34 and 38-42 belong to the board's GNSS connector and the module
+   plugged into it.
 8. **No game before the transmit-power check.** The high-power board can
    put out more than the EU868 limits allow; the firmware caps it with an
    assumed amplifier gain that has not been measured yet. Do not use a box
@@ -354,9 +359,12 @@ Follow [diagram 2/2](wiring/field-box-power.svg).
 - The 3.3 V parts (display, NFC, keypad expander, gauge logic) take their
   power from the board's **3V3** pin through the interconnect board. The
   board's switchable "Vext" rail (GPIO 36, active low) is **not** used for
-  them: the firmware does not switch it yet, and it also feeds parts of the
-  board itself (the OLED, among others).
-- The board's solar input (4.4-6 V) and GNSS connector stay unconnected.
+  them: the firmware switches it on at boot, but its current limit is not
+  documented and it also feeds parts of the board itself (the OLED, among
+  others).
+- The board's solar input (4.4-6 V) stays unconnected. The GNSS module, if
+  fitted, is powered by the board through its own connector (GPIO 34 switches
+  it; the firmware keeps it off until a mode needs it).
 
 Why not a 2S (7.4 V) pack? Because the board's battery input, its charger
 and the gauge only handle one cell. One cell plus a boost converter keeps
@@ -409,7 +417,8 @@ care:
 | Load | Rail | Typical | Peak |
 | --- | --- | --- | --- |
 | Main board (ESP32-S3, LoRa receive) | battery, via the board | 80-150 mA | 400-500 mA (Wi-Fi or LoRa transmit) |
-| Display incl. backlight | 3V3 | 40-100 mA | |
+| Display incl. backlight (always on) | 3V3 | 40-100 mA | |
+| GNSS module (only while a mode uses it; off otherwise) | 3V3, via the board's GNSS switch | **Verify at the first build** | |
 | PN532 NFC (field on) | 3V3 | 50-150 mA | |
 | PCF8574, MAX17048 | 3V3 | under 1 mA | |
 | LED ring, 24 LEDs | 5 V | ~25 mA (all off) to ~0.5 A (one full team colour) | ~1.4 A (all white, full brightness) |
@@ -456,7 +465,7 @@ underneath with tinned wire or solder bridges, and label them on the top:
 
 | Rail | Fed from | Pins needed |
 | --- | --- | --- |
-| 3V3 | board 3V3 pin | in, PCF8574, PN532, gauge, display |
+| 3V3 | board 3V3 pin | in, PCF8574, PN532, gauge, display (VCC, RESET, LED) |
 | GND | board GND pin | in, PCF8574, PN532, gauge, display, 4 buttons, 74AHCT125 |
 | SDA | board GPIO 17 | in, PCF8574, PN532, gauge |
 | SCL | board GPIO 18 | in, PCF8574, PN532, gauge |
@@ -472,7 +481,7 @@ continuity checks:
 | 74AHCT125 pin | Name | Connect to |
 | --- | --- | --- |
 | 1 | 1OE (output enable, active low) | GND rail |
-| 2 | 1A (input) | "LED data in" pin, wired to board GPIO 48 |
+| 2 | 1A (input) | "LED data in" pin, wired to board GPIO 35 |
 | 3 | 1Y (output) | 330 ohm resistor, then the "LED data out" pin |
 | 4, 5 | 2OE, 2A | GND rail |
 | 6 | 2Y | not connected |
@@ -509,12 +518,16 @@ pulls on a solder joint.
    SCL "in" pins: four short wires, under 15 cm.
 3. **Leave every other board pin unconnected.** In particular never wire
    GPIO 0, 45 or 46 (boot straps; 46 also drives the V4.2's front-end
-   module), GPIO 5 (the V4.3's front-end module), or the board-internal
-   GPIO 1, 2, 7, 8-14, 19-21, 35-37, 43-44. Leave the board's GNSS
-   connector empty: its pins (GPIO 34, 38-42) carry the display and
-   button 4 in this pin map, so the GNSS module from the kit must not be
-   plugged in.
-4. **Check:** no continuity between 3V3 and GND at the hub (a reading of a
+   module), GPIO 5 (the V4.3's front-end module), the board-internal
+   GPIO 2, 7, 8-14, 19-21, 26, 36, 37, 43, or the GNSS connector's GPIO 34
+   and 38-42. Three board pins are used on purpose, each only as the
+   diagram shows: GPIO 1 (display CS), GPIO 35 (LED ring data; the board's
+   white LED flickers with it) and GPIO 44 (button 3).
+4. **GNSS module (optional).** Plug the kit's GNSS module into the board's
+   8-pin GNSS connector with its own cable, and fix the module (its antenna
+   side up, under the lid) with double-sided foam tape. The firmware keeps
+   it switched off until a GPS-based mode uses it, so it can stay fitted.
+5. **Check:** no continuity between 3V3 and GND at the hub (a reading of a
    few hundred ohms or more is normal; a beep is a short).
 
 ### 9.2 I2C modules
@@ -525,7 +538,8 @@ The keypad expander (PCF8574), NFC reader (PN532) and battery gauge
 3V3, GND, SDA, SCL.
 
 1. **PCF8574:** set the address jumpers A0, A1 and A2 all to GND, which
-   gives address 0x20. Leave its INT pin and P7 unconnected.
+   gives address 0x20. Leave its INT pin unconnected; its P7 is team
+   button 4 ([section 9.6](#96-team-buttons)).
 2. **PN532:** set the mode switches (or jumpers) to **I2C**, following the
    table printed on the module. Use its 4-pin I2C header.
 3. **MAX17048:** connect its logic supply pin (if it has a separate one,
@@ -559,18 +573,12 @@ The keypad expander (PCF8574), NFC reader (PN532) and battery gauge
 
 ### 9.4 Display
 
-1. **Backlight current check.** Power the display from 3.3 V (VCC and GND),
-   then measure the current into its LED pin from 3.3 V (meter in series, mA
-   range). Most modules switch the backlight with a small transistor and draw
-   only a few mA here.
-   - **Under 10 mA:** wire LED to GPIO 47, as in the diagram (the firmware
-     turns the backlight on and off).
-   - **More than 10 mA:** do not drive it from a GPIO. Wire LED straight to
-     the 3V3 rail and set `CONFIG_ATALAIA_DISP_BL_PIN=-1` in the firmware
-     ([section 12](#12-hand-off-to-bring-up)); the backlight then stays on.
-2. Wire VCC and GND to the hub's display pins, then the six signals
-   straight from the board: CS to GPIO 42, RESET to GPIO 38, DC to GPIO 3,
-   SDI (MOSI) to GPIO 40, SCK to GPIO 41, LED to GPIO 47. SDO (MISO) and any
+1. Wire VCC, GND, **RESET** and **LED** (the backlight) to the hub's display
+   pins: VCC, RESET and LED all to the 3V3 rail, GND to GND. The firmware
+   resets the panel with a command, and the backlight is on whenever the box
+   is (no GPIO is left to switch it; decision PIN-3).
+2. Wire the four signals straight from the board: CS to GPIO 1, DC to
+   GPIO 3, SDI (MOSI) to GPIO 33, SCK to GPIO 47. SDO (MISO) and any
    touch-panel pins stay unconnected.
 3. **Keep these wires 15 cm or shorter** and bundle them together: the
    display bus runs at 40 MHz, and long wires show up as a garbled or white
@@ -584,27 +592,31 @@ The keypad expander (PCF8574), NFC reader (PN532) and battery gauge
 2. Ring **DIN** (not DOUT: check the arrow or label) to the hub's "LED
    data out" pin. Ring **5V** to the 5 V splice and **GND** to the 5 V GND
    splice, both 0.5 mm².
-3. Board **GPIO 48** to the hub's "LED data in" pin.
+3. Board **GPIO 35** to the hub's "LED data in" pin. The board's own white
+   LED is on the same pin and flickers faintly while the ring changes: that
+   is expected.
 4. Keep the data wire under about 30 cm.
 
 ### 9.6 Team buttons
 
 1. Each button: microswitch **COM** to a hub GND pin, the **NO** (normally
-   open) terminal to its GPIO: button 1 (red team) GPIO 4, button 2 (blue)
-   GPIO 39, button 3 GPIO 33, button 4 GPIO 34. The NC terminal stays
-   unconnected.
+   open) terminal to its signal: button 1 (red team) GPIO 4, button 2 (blue)
+   GPIO 48, button 3 GPIO 44, button 4 the PCF8574's **P7** (the keypad
+   expander reads it with the keys). The NC terminal stays unconnected.
 
-   > **Pending:** button 2 moved from GPIO 5 (now forbidden: the V4.3's
-   > front-end module) to GPIO 39, and button 4's GPIO 34 (the GNSS
-   > connector's power control; harmless with the connector empty) is under
-   > review and may move. Take the pins from the current diagram and
+   > **Moved on 2026-10-21:** button 2 was on GPIO 39 and button 4 on
+   > GPIO 34, both now the GNSS connector's; button 3 was on GPIO 33. A board
+   > wired the old way must be rewired before the GNSS module is plugged in.
+   > Take the pins from the current diagram and
    > [pin table](README.md#peripheral-pins), not from a printout. **Never
-   > use GPIO 5**, even if an older copy of this manual says so.
+   > use GPIO 5 or 39**, even if an older copy of this manual says so.
 2. Button LED (optional): LED+ to the hub's 5 V pin for that button, LED-
    joined to COM at the button. Check the LED's polarity marking.
 3. Two-team boxes simply leave buttons 3 and 4 out; an unwired button input
-   reads as "not pressed".
-4. **Check:** with the meter between each GPIO wire end and GND, the
+   reads as "not pressed". With button 3 on GPIO 44 (UART0's receive line),
+   the box takes no typed input on UART0's header pins; the USB-C console is
+   unaffected.
+4. **Check:** with the meter between each signal wire end and GND, the
    reading must beep only while that button is pressed.
 
 ### 9.7 Audio (optional)
@@ -792,8 +804,8 @@ from step 1. Things to know first:
   measured yet.
 - **Vext:** the standard build does not power its parts from it; check the
   hub's 3V3 rail where BRING_UP.md says "check Vext" for an external part.
-- **The board's own small OLED** stays dark: the firmware does not use it
-  yet.
+- **The board's own small OLED** shows the box's status (on in every
+  build); BRING_UP.md says what to expect on it.
 - On USB with the switch off, the gauge reports "not found" and the ring and
   amplifier are unpowered. That is expected; switch on to test them.
 
@@ -806,10 +818,10 @@ again, then flash. Common changes:
 | --- | --- |
 | V4.2 board | `CONFIG_ATALAIA_BOARD_HELTEC_V4_2=y` and `# CONFIG_ATALAIA_BOARD_HELTEC_V4_3 is not set` |
 | ST7789 display | `CONFIG_ATALAIA_DISP_ST7789=y` and `# CONFIG_ATALAIA_DISP_ILI9341 is not set` |
-| Backlight wired to 3V3 | `CONFIG_ATALAIA_DISP_BL_PIN=-1` |
 | 12- or 16-LED ring | `CONFIG_ATALAIA_LED_COUNT=12` (or 16) |
 | Antenna with more than 2 dBi | `CONFIG_ATALAIA_RADIO_ANTENNA_GAIN_DBI=` its gain, rounded **up** |
-| Two-team box, free the pins | `CONFIG_ATALAIA_BTN3_PIN=-1` and `CONFIG_ATALAIA_BTN4_PIN=-1` (optional) |
+| Two-team box, free the pins | `CONFIG_ATALAIA_BTN3_PIN=-1` and `CONFIG_ATALAIA_KP_P7_BUTTON=0` (optional) |
+| GNSS module switched on at boot (bench test only: nothing reads it yet) | `CONFIG_ATALAIA_GNSS_POWER_ON=y` |
 
 Never lower `CONFIG_ATALAIA_RADIO_FEM_GAIN_DB` or the antenna gain below the
 real values. Anything you change by hand is lost when you delete
@@ -833,10 +845,11 @@ real values. Anything you change by hand is lost when you delete
 | No I2C device found at all | SDA and SCL swapped or shorted at the hub; a module dragging the bus (unplug them one by one); 3V3 missing |
 | Display white or garbled | Wires too long or loose (keep under 15 cm); CS/DC/RESET swapped; wrong controller selected (ILI9341 vs ST7789) |
 | Display mirrored, upside down or wrong colours | Not a wiring fault: BRING_UP.md step 3 |
-| Display dark but the log says it initialised | Backlight: LED pin wiring, or the backlight check in [section 9.4](#94-display) |
+| Display dark but the log says it initialised | Backlight: its LED pin must go to 3V3 ([section 9.4](#94-display)) |
 | LED ring dark | Switch off (no 5 V on USB alone); DOUT used instead of DIN; 74AHCT125 missing, reversed or a 74HC part; pin 1 not at GND |
 | LED ring flickers or shows wrong colours | Missing capacitor; long data wire; no common GND between the hub and the ring's power |
-| A team button "presses" by itself | Long button wires picking up noise: add a 10 kohm resistor from the button's GPIO wire to 3V3 at the hub, and route the wires away from the LED ring and speaker wires |
+| A team button "presses" by itself | Long button wires picking up noise: add a 10 kohm resistor from the button's signal wire to 3V3 at the hub, and route the wires away from the LED ring and speaker wires |
+| Button 4 never registers | It is read through the keypad expander: the log must say `PCF8574 keypad at 0x..`; its wire goes to P7, not to a board GPIO |
 | No sound | Switch off (amplifier on 5 V); BCLK/LRC/DIN swapped; speaker wire touching GND |
 | Phone cannot see the `atalaia-XXXX` Wi-Fi | 2.4 GHz antenna missing or on the wrong connector; phone too far |
 | Fuse blows at switch-on | Battery reversed (the diode did its job: fix the battery wiring) or a short on BAT+ or 5 V |
@@ -867,11 +880,12 @@ the firmware, run `render` again (and update the
 `render` rewrites the SVG and PNG of both diagrams; commit them with the
 YAML. `check` (or `python3 tools/check_wiring.py` with PyYAML installed)
 fails if a Kconfig pin is not wired where the firmware expects it, if a
-board-internal, front-end-module (GPIO 5, 46) or boot-strap pin is wired,
-if two pins share a GPIO, if the keypad is not wired the way the firmware
-scans it, if the pin table disagrees with Kconfig, or if an SVG was not
-rendered from the current YAML and Kconfig defaults. It warns, without
-failing, about the pins on the board's GNSS connector.
+board-internal, front-end-module (GPIO 5, 46), GNSS-connector (GPIO 34,
+38-42) or boot-strap pin is wired, if one of the three board pins shared on
+purpose (GPIO 1, 35, 44) is used for anything else, if two pins share a
+GPIO, if the keypad or button 4 is not wired to the PCF8574 the way the
+firmware reads it, if the pin table disagrees with Kconfig, or if an SVG was
+not rendered from the current YAML and Kconfig defaults.
 
 ---
 

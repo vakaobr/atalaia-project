@@ -66,9 +66,20 @@
 /* Console input (keys, "@join", "@joinkey") from UART0 and, on the Heltec V4
  * whose only USB port is the ESP32-S3's own, from USB-Serial-JTAG. */
 #define SERIAL_WANTED (CONFIG_ATALAIA_SERIAL_KEYS || CONFIG_ATALAIA_SERIAL_JOIN)
-#define SERIAL_UART   (SERIAL_WANTED && CONFIG_ESP_CONSOLE_UART)
-#define SERIAL_USB    (SERIAL_WANTED && CONFIG_ATALAIA_CONSOLE_USB_INPUT)
-#define SERIAL_INPUT  (SERIAL_UART || SERIAL_USB)
+/* A team button on UART0's RX pin (GPIO 44 on the ESP32-S3) takes that pin
+ * from the console: no console input on UART0 then (decision PIN-5). */
+#define U0RXD_PIN 44
+#if CONFIG_ATALAIA_BTN1_PIN == U0RXD_PIN || CONFIG_ATALAIA_BTN2_PIN == U0RXD_PIN
+#define BUTTON_ON_U0RXD 1
+#elif CONFIG_ATALAIA_BTN3_PIN == U0RXD_PIN || CONFIG_ATALAIA_BTN4_PIN == U0RXD_PIN
+#define BUTTON_ON_U0RXD 1
+#else
+#define BUTTON_ON_U0RXD 0
+#endif
+#define UART_RX_FREE (CONFIG_ESP_CONSOLE_UART_NUM != 0 || !BUTTON_ON_U0RXD)
+#define SERIAL_UART  (SERIAL_WANTED && CONFIG_ESP_CONSOLE_UART && UART_RX_FREE)
+#define SERIAL_USB   (SERIAL_WANTED && CONFIG_ATALAIA_CONSOLE_USB_INPUT)
+#define SERIAL_INPUT (SERIAL_UART || SERIAL_USB)
 #if SERIAL_UART
 #include "driver/uart.h"
 #endif
@@ -185,6 +196,9 @@ static void start_picker(void)
 #if SERIAL_INPUT
 static void serial_input_init(void)
 {
+#if SERIAL_WANTED && CONFIG_ESP_CONSOLE_UART && !SERIAL_UART
+    ESP_LOGI(TAG, "no console input on UART0: GPIO %d is a team button", U0RXD_PIN);
+#endif
 #if SERIAL_UART
     serial_console_init(&console_uart);
     esp_err_t err = uart_driver_install(CONFIG_ESP_CONSOLE_UART_NUM, 1024, 0, 0, NULL, 0);

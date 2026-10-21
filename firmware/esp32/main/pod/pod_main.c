@@ -76,6 +76,10 @@ void app_main(void)
     hal.keypad = &hal_esp_keypad_ops;
     cfg.keypad = hal.keypad->init() == 0;
     if (!cfg.keypad) ESP_LOGW(TAG, "keypad: not available");
+#if CONFIG_ATALAIA_KP_P7_BUTTON > 0
+    /* That button is on the keypad expander's P7: fitted when the expander is. */
+    if (hal.buttons != NULL && cfg.keypad) cfg.button[CONFIG_ATALAIA_KP_P7_BUTTON - 1] = true;
+#endif
     hal.leds = &hal_esp_led_ops;
     cfg.leds = CONFIG_ATALAIA_LED_PIN >= 0 && CONFIG_ATALAIA_LED_COUNT > 0 && hal.leds->init() == 0;
     cfg.led_count = CONFIG_ATALAIA_LED_COUNT;

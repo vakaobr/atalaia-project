@@ -17,17 +17,20 @@ with --resolve before drawing. The check fails when:
 - a Kconfig pin does not go where it should (buttons, display, LED data, I2C
   bus, I2S audio), or the diagrams wire a GPIO no Kconfig pin claims;
 - a wired GPIO is board-internal (the list in Kconfig.projbuild's header, plus
-  the Heltec V4 front-end-module pins below) or a boot strapping pin;
+  the Heltec V4 front-end-module pins below), on the board's GNSS connector
+  (its module keeps those pins: decision PIN-1) or a boot strapping pin; or a
+  board pin the Field Box shares on purpose (GPIO 1, 35, 44: SHARED below) is
+  used for anything else than what it is shared for;
 - the keypad is not on the PCF8574 the way hal_esp_keypad.c scans it (rows on
-  P0-P3, columns on P4-P6), the expander address differs from the Kconfig
-  default, or its INT pin is wired while the firmware polls;
+  P0-P3, columns on P4-P6), the team button of ATALAIA_KP_P7_BUTTON is not on
+  its P7, the expander address differs from the Kconfig default, or its INT
+  pin is wired while the firmware polls;
 - the pin table in hardware/field-box/README.md disagrees with Kconfig;
 - a rendered SVG or PNG is missing, or an SVG was not rendered from the
   current source and Kconfig defaults (the render writes the SHA-256 of the
   resolved source into it).
 
-It warns, without failing, about pins that are usable only with the GNSS
-module unplugged. Needs only Python 3 and PyYAML. Exit code 0 = no errors.
+Needs only Python 3 and PyYAML. Exit code 0 = no errors.
 """
 
 from __future__ import annotations
@@ -103,7 +106,15 @@ README_ROWS = {
     "I2S BCLK": "ATALAIA_AUDIO_BCLK_PIN",
     "I2S LRCLK": "ATALAIA_AUDIO_LRCLK_PIN",
     "I2S DOUT": "ATALAIA_AUDIO_DOUT_PIN",
+    "GNSS power": "ATALAIA_GNSS_PWR_PIN",
+    "GNSS TX": "ATALAIA_GNSS_TX_PIN",
+    "GNSS RX": "ATALAIA_GNSS_RX_PIN",
+    "GNSS wake-up": "ATALAIA_GNSS_WAKE_PIN",
+    "GNSS PPS": "ATALAIA_GNSS_PPS_PIN",
+    "GNSS reset": "ATALAIA_GNSS_RST_PIN",
 }
+# The README names the button on the keypad expander's P7 this way.
+README_P7 = "PCF8574 P7"
 
 STRAPPING_FORBIDDEN = {0, 45, 46}  # GPIO 3 is a strapping pin the pin map uses on purpose
 SHARED_BUS = {17, 18}  # board-internal, but the shared I2C bus is meant to be wired
@@ -114,11 +125,22 @@ V4_RESERVED = {
     5: "front-end module CTX (LNA/bypass) line on the V4.3",
     46: "front-end module PA-mode line on the V4.2",
 }
-# Usable only while nothing is plugged into the board's GNSS connector.
+# The board's GNSS connector: its module keeps these pins (decision PIN-1).
+# They are in the Kconfig header's board-internal list too; this names them.
 V4_GNSS = {
-    34: "VGNSS_Ctrl (GNSS connector power)",
-    38: "GNSS connector", 39: "GNSS connector", 40: "GNSS connector",
-    41: "GNSS connector", 42: "GNSS connector",
+    34: "GNSS connector's power control (VGNSS_Ctrl)",
+    38: "GNSS module's RX line", 39: "GNSS module's TX line", 40: "GNSS module's wake-up line",
+    41: "GNSS module's PPS line", 42: "GNSS module's reset line",
+}
+# Board pins with a part of their own that the Field Box uses for one thing
+# that part tolerates (Kconfig.projbuild's header; decisions PIN-3, PIN-5):
+# GPIO -> (the Kconfig pins allowed on it, why only those).
+SHARED: dict[int, tuple[set[str], str]] = {
+    1: ({"ATALAIA_DISP_CS_PIN", "ATALAIA_DISP_DC_PIN", "ATALAIA_DISP_RST_PIN"},
+        "the battery-voltage ADC input, 100 kohm to GND: a low-speed output only"),
+    35: ({"ATALAIA_LED_PIN"}, "the board's white LED: the LED ring's data only"),
+    44: ({"ATALAIA_BTN1_PIN", "ATALAIA_BTN2_PIN", "ATALAIA_BTN3_PIN", "ATALAIA_BTN4_PIN"},
+         "UART0's RX line: a team button only (the box then takes no console input there)"),
 }
 
 
@@ -305,7 +327,12 @@ def connected(links, a: tuple[str, str], b: tuple[str, str]) -> bool:
 
 
 def check_readme(text: str, defaults: dict[str, int]) -> list[str]:
+    """Each row's GPIO cell starts with the Kconfig default (-1: not a GPIO).
+
+    The button on the keypad expander's P7 says README_P7 instead.
+    """
     errors = []
+    p7_row = f"Button {defaults.get('ATALAIA_KP_P7_BUTTON', 0)}"
     section = text.split("### Peripheral Pins", 1)
     if len(section) != 2:
         return ["README.md: no 'Peripheral Pins' table"]
@@ -316,10 +343,17 @@ def check_readme(text: str, defaults: dict[str, int]) -> list[str]:
             continue
         symbol = README_ROWS[cells[0]]
         seen.add(cells[0])
-        if not cells[1].lstrip("-").isdigit():
+        if cells[0] == p7_row:
+            if cells[1] != README_P7:
+                errors.append(f"README.md: {cells[0]} is on the keypad expander's P7 "
+                              f"(ATALAIA_KP_P7_BUTTON), the row says {cells[1]!r}, not "
+                              f"{README_P7!r}")
+            continue
+        m = re.match(r"-?\d+\b", cells[1])
+        if not m:
             errors.append(f"README.md: '{cells[0]}' row has no GPIO number ({cells[1]!r})")
-        elif int(cells[1]) != defaults.get(symbol):
-            errors.append(f"README.md: {cells[0]} is GPIO {cells[1]}, Kconfig {symbol} "
+        elif int(m.group(0)) != defaults.get(symbol):
+            errors.append(f"README.md: {cells[0]} is GPIO {m.group(0)}, Kconfig {symbol} "
                           f"defaults to {defaults.get(symbol)}")
     for row in README_ROWS:
         if row not in seen:
@@ -405,7 +439,16 @@ def check(diagram_paths: list[Path], kconfig_path: Path, readme_path: Path | Non
             errors.append(f"GPIO{gpio} is wired in the diagram but no Kconfig pin uses it")
         if gpio in STRAPPING_FORBIDDEN:
             errors.append(f"GPIO{gpio} ({who}) is a boot strapping pin and must not be wired")
-        if gpio in internal and gpio not in SHARED_BUS:
+        if gpio in V4_GNSS:
+            errors.append(f"GPIO{gpio} ({who}) is the {V4_GNSS[gpio]}: the GNSS module keeps "
+                          "it, wire nothing else to it")
+        elif gpio in SHARED:
+            allowed, why = SHARED[gpio]
+            wrong = [s for s in owners.get(gpio, []) if s not in allowed]
+            if wrong:
+                errors.append(f"GPIO{gpio} ({', '.join(wrong)}) is {why} "
+                              f"(allowed: {', '.join(sorted(allowed))})")
+        elif gpio in internal and gpio not in SHARED_BUS:
             errors.append(f"GPIO{gpio} ({who}) is board-internal (Kconfig.projbuild) "
                           "and must not be wired")
         if gpio in V4_RESERVED:
@@ -413,11 +456,13 @@ def check(diagram_paths: list[Path], kconfig_path: Path, readme_path: Path | Non
                           "be wired on a Heltec V4")
         if gpio not in SHARED_BUS and len(ends) > 1:
             errors.append(f"GPIO{gpio} is wired to more than one place: {sorted(ends)}")
-    on_gnss = [g for g in sorted(wired) if g in V4_GNSS]
-    if on_gnss:
-        warnings.append("GPIO " + ", ".join(map(str, on_gnss)) + " are on the board's GNSS "
-                        "connector (34 = its power control, VGNSS_Ctrl): the Field Box works "
-                        "only with the GNSS module unplugged")
+    # The GNSS pins are the connector's, as Heltec wires it.
+    for symbol, gpio in (("ATALAIA_GNSS_PWR_PIN", 34), ("ATALAIA_GNSS_TX_PIN", 38),
+                         ("ATALAIA_GNSS_RX_PIN", 39), ("ATALAIA_GNSS_WAKE_PIN", 40),
+                         ("ATALAIA_GNSS_PPS_PIN", 41), ("ATALAIA_GNSS_RST_PIN", 42)):
+        if defaults.get(symbol) not in (gpio, -1):
+            errors.append(f"Kconfig: {symbol} = {defaults.get(symbol)}, but the Heltec V4 "
+                          f"wires that line of its GNSS connector to GPIO {gpio}")
     for label in board_labels:
         m = re.fullmatch(r"GPIO(\d+)", label)
         if m and int(m.group(1)) not in wired:
@@ -439,6 +484,16 @@ def check(diagram_paths: list[Path], kconfig_path: Path, readme_path: Path | Non
     for key_pin, pcf_pin in KEYPAD_ON_PCF.items():
         if not connected(links, ("KEYPAD", key_pin), ("PCF8574", pcf_pin)):
             errors.append(f"KEYPAD.{key_pin} must go to PCF8574.{pcf_pin} (hal_esp_keypad.c)")
+    p7 = defaults.get("ATALAIA_KP_P7_BUTTON", 0)
+    for n in range(1, 5):
+        on_p7 = connected(links, (f"BTN{n}", "N/O"), ("PCF8574", "P7"))
+        if n == p7 and not on_p7:
+            errors.append(f"ATALAIA_KP_P7_BUTTON = {p7}: BTN{n}.N/O must go to PCF8574.P7")
+        elif n != p7 and on_p7:
+            errors.append(f"BTN{n}.N/O is wired to PCF8574.P7, but ATALAIA_KP_P7_BUTTON = {p7}")
+        if n == p7 and defaults.get(f"ATALAIA_BTN{n}_PIN", -1) >= 0:
+            errors.append(f"ATALAIA_KP_P7_BUTTON = {p7}, but ATALAIA_BTN{n}_PIN is a GPIO too "
+                          "(hal_esp_buttons.c refuses to build)")
     address = defaults.get("ATALAIA_KP_I2C_ADDR")
     if address is None or not re.search(rf"\b0x{address:02x}\b", pcf_text, re.IGNORECASE):
         errors.append("PCF8574 subtype must give the Kconfig address (ATALAIA_KP_I2C_ADDR = "

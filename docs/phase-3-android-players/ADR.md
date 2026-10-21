@@ -2007,7 +2007,7 @@ implemented interfaces.
 | R6: Hold-All and Last Stand | **Moved** | Into the phase 2 mode pack. Phase 3 modes: Kill Confirmed, Respawn, Player Check-in, Money Factory, chrono check-in (ADR-P3-8 updated). |
 | S1: Ed25519 for app signing | **Holds** | ESP32-S3 hardware secure boot is RSA-3072/ECDSA only; Ed25519 for application-level signing. |
 | D8: Codec corrections | **Noted** | Dart codecs must match schema-exact C payloads: HELLO capabilities is an array, STATE counters/CLAIM acks are maps, CMD params is text-keyed map (JSON <=127 bytes), required fields always encoded. |
-| E21: GPS on Field Box | **Not supported** | GNSS header pins used by display/buttons. Revisit in phase 4. I/O pod or phone GPS only. |
+| E21: GPS on Field Box | **Not supported** | GNSS header pins used by display/buttons. Revisit in phase 4. I/O pod or phone GPS only. *(2026-10-21: changed by the maintainer; the pin map now leaves the GNSS connector to its module, decision PIN-1; no GNSS driver yet.)* |
 
 ---
 

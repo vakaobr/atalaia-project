@@ -19,22 +19,22 @@ static const char *TAG = "hal_disp";
 /* ---- Kconfig pins (-1 = unassigned) ---- */
 
 #ifndef CONFIG_ATALAIA_DISP_MOSI_PIN
-#define CONFIG_ATALAIA_DISP_MOSI_PIN 40
+#define CONFIG_ATALAIA_DISP_MOSI_PIN 33
 #endif
 #ifndef CONFIG_ATALAIA_DISP_CLK_PIN
-#define CONFIG_ATALAIA_DISP_CLK_PIN 41
+#define CONFIG_ATALAIA_DISP_CLK_PIN 47
 #endif
 #ifndef CONFIG_ATALAIA_DISP_CS_PIN
-#define CONFIG_ATALAIA_DISP_CS_PIN 42
+#define CONFIG_ATALAIA_DISP_CS_PIN 1
 #endif
 #ifndef CONFIG_ATALAIA_DISP_DC_PIN
 #define CONFIG_ATALAIA_DISP_DC_PIN 3
 #endif
 #ifndef CONFIG_ATALAIA_DISP_RST_PIN
-#define CONFIG_ATALAIA_DISP_RST_PIN 38 /* GPIO freed from keypad; GNSS header */
+#define CONFIG_ATALAIA_DISP_RST_PIN -1 /* RESET wired to 3V3 */
 #endif
 #ifndef CONFIG_ATALAIA_DISP_BL_PIN
-#define CONFIG_ATALAIA_DISP_BL_PIN 47
+#define CONFIG_ATALAIA_DISP_BL_PIN -1 /* backlight wired to 3V3 */
 #endif
 #define CONFIG_ATALAIA_DISP_WIDTH  HAL_DISPLAY_WIDTH
 #define CONFIG_ATALAIA_DISP_HEIGHT HAL_DISPLAY_HEIGHT
@@ -138,7 +138,7 @@ static int esp_display_init(void)
     };
     gpio_config(&io_cfg);
 
-    /* Hardware reset (skip if RST is tied to Vext). */
+    /* Hardware reset (skipped when RESET is wired to 3V3: SWRESET below). */
 #if CONFIG_ATALAIA_DISP_RST_PIN >= 0
     gpio_set_level(CONFIG_ATALAIA_DISP_RST_PIN, 0);
     vTaskDelay(pdMS_TO_TICKS(20));

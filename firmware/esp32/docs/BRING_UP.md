@@ -42,16 +42,23 @@ colours, power, range and the 2-hour stability gate.
    Field Box and for the USB radio modem. The wrong choice leaves the
    receiver deaf (V4.3 LNA bypassed) or the transmitter weak (V4.2 PA
    bypassed).
-2. **Do not plug in the GNSS module** that ships with the V4. Its SH1.25
-   connector shares GPIO 34 and 38-42 with the Field Box's display and
-   button 4, and GPS is not supported in this pin map (decision E21).
+2. **The GNSS module** that ships with the V4 may stay plugged into its
+   SH1.25 connector: the pin map leaves the connector's GPIO 34 and 38-42 to
+   it (decision PIN-1), and the firmware keeps it switched off (GPIO 34
+   high) until a GPS-based mode uses it. No driver reads it yet.
 3. Fit the LoRa antenna before the first power-on (step 10 explains why).
 
-Pins that changed in phase E (for the wiring in `hardware/field-box/`):
-button 2 moved from GPIO 5 to **GPIO 39** (GPIO 5 is the V4.3 FEM's CTX
-control). The firmware now drives GPIO 36 (Vext) low at boot, and GPIO 7
-(FEM power) high, GPIO 2 (FEM enable) high and GPIO 5 low (V4.3) or
-GPIO 46 high (V4.2) once the SX1262 answers.
+> **Rewire if you wired the old pin map** (before 2026-10-21): button 2
+> **GPIO 39 -> 48**, button 3 **33 -> 44**, button 4 **34 -> the PCF8574's
+> P7**, LED ring data **48 -> 35**, display MOSI **40 -> 33**, SCK
+> **41 -> 47**, CS **42 -> 1**, display RESET and backlight (LED) **38 and
+> 47 -> 3V3**. A button left on GPIO 39 pulls the GNSS module's TX line to
+> ground and is no longer read; one on GPIO 34 switches the module's power.
+> Button 1 (GPIO 4), display DC (3), I2C (17/18) and audio (6/15/16) stay.
+
+Pins the firmware drives by itself: GPIO 36 (Vext) low and GPIO 34 (GNSS
+power) high at boot, then GPIO 7 (FEM power) high, GPIO 2 (FEM enable) high
+and GPIO 5 low (V4.3) or GPIO 46 high (V4.2) once the SX1262 answers.
 
 ## Step 0: eFuse HMAC Key Provisioning (Production Only)
 
@@ -106,7 +113,10 @@ admin PIN), then `1`, `#`, `#` for Bomb; the board's own OLED shows each
 step. Buttons must be soldered to the header (or to pins soldered there):
 a Dupont pin pushed into a bare hole loses contact while it is held, and
 any release, even 0.1 s, starts a hold again (seen on the first V4.3 board,
-2026-10-20).
+2026-10-20). The buttons go on **GPIO 4 (red) and GPIO 48 (blue)**: a
+board wired with blue on GPIO 39 (the pin map before 2026-10-21) must move
+that wire to GPIO 48, since GPIO 39 is now the GNSS module's line and the
+firmware no longer reads a button there.
 
 ## Step 1: First Boot Smoke Test
 
@@ -154,8 +164,12 @@ any release, even 0.1 s, starts a hold again (seen on the first V4.3 board,
    that line. Record the measurement here.
 3. If the on-board OLED stays dark or the radio is deaf, check Vext; if
    the external peripherals do not respond, check their 3V3 supply.
-4. Button 4 sits on GPIO 34, which is also the GNSS power control: with no
-   GNSS module plugged in, check it reads high (not pressed) at rest.
+4. The log shows `GNSS module off (GPIO 34 high)`. With the module plugged
+   in, its LED (if it has one) stays dark. Optional check of the connector
+   with a bench build where `CONFIG_ATALAIA_GNSS_POWER_ON=y`: the log says
+   `GNSS module on (GPIO 34 low)`, the module's 3.3 V pin (or its LED)
+   comes up, and outdoors its PPS (GPIO 41) starts blinking once it has a
+   fix. Record what you see; nothing in the firmware reads it yet.
 
 ## Step 3: Display
 
@@ -171,18 +185,24 @@ any release, even 0.1 s, starts a hold again (seen on the first V4.3 board,
 3. Note: the on-board 0.96" OLED (GPIO 17/18) shares the I2C bus
    with the NFC reader and battery gauge.  It can show status while
    the external TFT shows the game UI.
-4. If the display does not init, check its reset line: GPIO 38 in the
-   default wiring (`ATALAIA_DISP_RST_PIN`), pulsed low by the driver at
-   start-up; and its 3V3 supply.
+4. If the display does not init, check its RESET pin: on 3V3 in the default
+   wiring (`ATALAIA_DISP_RST_PIN=-1`; the driver resets the panel with the
+   SWRESET command); then CS (GPIO 1), DC (3), MOSI (33), SCK (47) and its
+   3V3 supply. A dark screen with a good log is the backlight: its LED pin
+   goes to 3V3.
 
 ## Step 4: Buttons
 
 1. At boot the log shows each button's state at rest (`hal_btn: button 1
    (GPIO 4) released at rest`); `reads pressed at rest` means its wire is on
    the switch's NC tab or shorted to ground. Every press and release is
-   logged (`hal_btn: button 2 (GPIO 39) pressed`).
+   logged (`hal_btn: button 2 (GPIO 48) pressed`). Button 4 is on the
+   keypad expander's P7 (`hal_btn: button 4 on the keypad expander's P7`,
+   then `button 4 (P7) pressed`); it needs the keypad expander (step 5).
+   With button 3 on GPIO 44 the log says `no console input on UART0`:
+   expected, the USB console still takes input.
 2. Start a Bomb game (admin PIN, game 1, `#`, `#`). Press each team
-   button (GPIO 4, 39; 33, 34 for teams 3 and 4). While red holds, the
+   button (GPIO 4, 48; GPIO 44 and P7 for teams 3 and 4). While red holds, the
    screen and the OLED show the arming bar filling.
 3. Hold the red button for 5 s: the log shows `game: event bomb.armed`
    and the screen the countdown. Hold blue for 10 s: `bomb.defused`.
@@ -204,7 +224,8 @@ any release, even 0.1 s, starts a hold again (seen on the first V4.3 board,
 
 1. Start a Domination game with two teams.
 2. Press and hold a team button until the zone is captured.
-3. Verify: LED ring (GPIO 48) shows the team colour.
+3. Verify: LED ring (GPIO 35) shows the team colour. The board's own white
+   LED, on the same pin, flickers faintly while the ring changes: expected.
 
 ## Step 7: NFC
 
@@ -466,9 +487,9 @@ section 11 (`%FLASH%`, `COM5`).
 - NVS encryption for the game key is supported via the eFuse HMAC
   scheme (see Step 0). On dev boards without the eFuse key, the key
   is stored in plaintext NVS.
-- GNSS header pins (GPIO 38-42) are used for external peripherals in
-  the default pin map. If GNSS support is added, these peripherals
-  must be moved to an I2C I/O expander or alternative pins.
+- The GNSS connector's pins (GPIO 34, 38-42) are kept for its module
+  since 2026-10-21 (decision PIN-1); a GNSS driver comes with the first
+  GPS-based mode (Kconfig: the GNSS menu has its pins and its power).
 - TX power for the FEM variant accounts for FEM and antenna gain via
   `radio_power.h` (Kconfig tuneable).
 
@@ -482,9 +503,9 @@ not fitted (its GPIOs are free). Do the board steps above that apply
 LEDs, audio), then these, which need the board and an Android phone with
 the app (`python tools/docker_app.py apk`). None of them has been run yet.
 
-1. **Boot.** Flash `build-pod/` as in step 1 and watch UART0 (GPIO 43/44,
-   a 3.3 V USB-UART adapter: the USB-C port carries the pod's frames, not
-   the log). Expect `Atalaia I/O pod`, `Vext on`, one line per part that is
+1. **Boot.** Flash `build-pod/` as in step 1 and watch UART0 on GPIO 43
+   (a 3.3 V USB-UART adapter's RX and GND only: GPIO 44 is team button 3;
+   the USB-C port carries the pod's frames, not the log). Expect `Atalaia I/O pod`, `Vext on`, one line per part that is
    missing, the SX1262 and FEM lines of step 10, `advertising as
    atalaia-pod-XXXX` and `I/O pod ... capabilities [...]` listing what is
    fitted.

@@ -51,19 +51,18 @@ connectors:
       - GPIO<ATALAIA_NFC_SDA_PIN>
       - GPIO<ATALAIA_NFC_SCL_PIN>
       - GPIO<ATALAIA_BTN3_PIN>
-      - GPIO<ATALAIA_BTN4_PIN>
-      - GPIO<ATALAIA_DISP_RST_PIN>
       - GPIO<ATALAIA_DISP_MOSI_PIN>
       - GPIO<ATALAIA_DISP_CLK_PIN>
       - GPIO<ATALAIA_DISP_CS_PIN>
-      - GPIO<ATALAIA_DISP_BL_PIN>
       - GPIO<ATALAIA_LED_PIN>
+      - GNSS connector
       - LoRa u.FL
       - 2.4 GHz u.FL
       - USB-C
     notes: >-
       Leave every other GPIO unconnected (BUILD.md 9.1). Never wire GPIO 5
-      (V4.3 FEM) or 46 (V4.2 FEM). Leave the GNSS connector empty.
+      (V4.3 FEM) or 46 (V4.2 FEM), nor GPIO 34 or 38-42 (the GNSS
+      connector's).
 
   HUB:
     type: Interconnect board
@@ -89,6 +88,8 @@ connectors:
       - SCL to gauge
       - 3V3 to TFT
       - GND to TFT
+      - 3V3 to TFT RESET
+      - 3V3 to TFT LED
       - GND to BTN1
       - 5V to BTN1 LED
       - GND to BTN2
@@ -116,13 +117,13 @@ connectors:
     loops: [[2, 4]]
   BTN4:
     type: Team 4 button (optional)
-    subtype: 60 mm arcade, 5 V LED
+    subtype: 60 mm arcade, 5 V LED; signal on the PCF8574's P7
     pinlabels: [N/O, COM, LED+, LED-]
     loops: [[2, 4]]
 
   PCF8574:
     type: PCF8574 module (not PCF8574A)
-    subtype: I2C address 0x20, A0-A2 to GND
+    subtype: I2C address 0x20, A0-A2 to GND; P7 is button 4
     pinlabels: [VCC, GND, SDA, SCL, INT, P0, P1, P2, P3, P4, P5, P6, P7]
   KEYPAD:
     type: 3x4 membrane keypad
@@ -141,6 +142,10 @@ connectors:
     type: MAX17048 fuel gauge
     subtype: 1 cell, 0x36
     pinlabels: [VDD (logic), GND, SDA, SCL]
+  GNSS:
+    type: GNSS module from the board's kit
+    subtype: its SH1.25 8-pin cable; off until a mode uses it
+    pinlabels: [SH1.25 8-pin]
   RING:
     type: WS2812B ring, 24 LEDs
     subtype: power in diagram 2/2
@@ -179,6 +184,7 @@ cables:
   W_LED: {category: bundle, gauge: 0.25 mm2, colors: [WH, WH]}
   W_AMP: {category: bundle, gauge: 0.25 mm2, colors: [GY, PK, BN]}
   W_SPK: {category: bundle, gauge: 0.25 mm2, colors: [RD, BK]}
+  W_GNSS: {type: the module's SH1.25 8-pin cable, wirecount: 1, colors: [BK]}
   W_LORA: {type: u.FL to SMA pigtail, wirecount: 1, colors: [BK]}
   W_WIFI: {type: antenna lead, wirecount: 1, colors: [GY]}
   W_USB: {type: USB-C extension, wirecount: 1, colors: [BK]}
@@ -203,7 +209,7 @@ connections:
   - - HUB: [GND to BTN3, 5V to BTN3 LED]
     - W_BTN3: [2, 3]
     - BTN3: [COM, LED+]
-  - - BOARD: [GPIO<ATALAIA_BTN4_PIN>]
+  - - PCF8574: [P7]
     - W_BTN4: [1]
     - BTN4: [N/O]
   - - HUB: [GND to BTN4, 5V to BTN4 LED]
@@ -226,18 +232,20 @@ connections:
     - W_GAUGE: [1, 2, 3, 4]
     - GAUGE: [VDD (logic), GND, SDA, SCL]
 
-  # Keypad on the expander: rows on P0-P3, columns on P4-P6.
+  # Keypad on the expander: rows on P0-P3, columns on P4-P6 (P7: button 4).
   - - PCF8574: [P0, P1, P2, P3, P4, P5, P6]
     - W_KEYPAD: [1, 2, 3, 4, 5, 6, 7]
     - KEYPAD: [R1, R2, R3, R4, C1, C2, C3]
 
   # Display: 3.3 V from the hub, SPI and control from the board.
-  - - HUB: [3V3 to TFT, GND to TFT]
-    - W_TFT: [1, 2]
-    - TFT: [VCC, GND]
-  - - BOARD: [GPIO<ATALAIA_DISP_CS_PIN>, GPIO<ATALAIA_DISP_RST_PIN>, GPIO<ATALAIA_DISP_DC_PIN>, GPIO<ATALAIA_DISP_MOSI_PIN>, GPIO<ATALAIA_DISP_CLK_PIN>, GPIO<ATALAIA_DISP_BL_PIN>]
-    - W_TFT: [3, 4, 5, 6, 7, 8]
-    - TFT: [CS, RESET, DC, SDI (MOSI), SCK, LED]
+  # RESET and the backlight (LED) on 3V3: the firmware resets the panel with
+  # a command, and the backlight is on whenever the box is (decision PIN-3).
+  - - HUB: [3V3 to TFT, GND to TFT, 3V3 to TFT RESET, 3V3 to TFT LED]
+    - W_TFT: [1, 2, 4, 8]
+    - TFT: [VCC, GND, RESET, LED]
+  - - BOARD: [GPIO<ATALAIA_DISP_CS_PIN>, GPIO<ATALAIA_DISP_DC_PIN>, GPIO<ATALAIA_DISP_MOSI_PIN>, GPIO<ATALAIA_DISP_CLK_PIN>]
+    - W_TFT: [3, 5, 6, 7]
+    - TFT: [CS, DC, SDI (MOSI), SCK]
 
   # LED ring data through the hub's 3.3 V to 5 V buffer.
   - - BOARD: [GPIO<ATALAIA_LED_PIN>]
@@ -254,6 +262,11 @@ connections:
   - - AMP: [SPK+, SPK-]
     - W_SPK: [1, 2]
     - SPK: [+, '-']
+
+  # The GNSS module plugs straight into the board's connector (decision PIN-1).
+  - - BOARD: [GNSS connector]
+    - W_GNSS: [1]
+    - GNSS: [SH1.25 8-pin]
 
   # Antennas and USB.
   - - BOARD: [LoRa u.FL]

@@ -375,8 +375,42 @@ default 47, -1 = none) and `ATALAIA_POD_TAMPER_OPEN_HIGH`,
 `ATALAIA_POD_BLE` (the Bluetooth link, default on) and
 `ATALAIA_POD_BLE_ENCRYPTED` (frames only on an encrypted link, default on).
 
-Default pin map avoids all Heltec V4.3 board-internal pins.
-See `Kconfig.projbuild` header and `hardware/field-box/README.md`.
+GNSS options (under "GNSS"): `ATALAIA_GNSS_PWR_PIN` (34, VGNSS_Ctrl,
+active low; driven high, module off, at boot), `ATALAIA_GNSS_POWER_ON`
+(default off), `ATALAIA_GNSS_TX_PIN` / `ATALAIA_GNSS_RX_PIN` (38 / 39, the
+ESP32's UART side), `ATALAIA_GNSS_WAKE_PIN` (40), `ATALAIA_GNSS_PPS_PIN`
+(41), `ATALAIA_GNSS_RST_PIN` (42), `ATALAIA_GNSS_BAUD` (9600). Pins only:
+no driver reads the module yet.
+
+### Default pin map (Heltec V4.2 / V4.3)
+
+Revised on 2026-10-21 so the GNSS module that comes with the V4 can use its
+connector (decisions PIN-1 to PIN-8 in `docs/review/decisions-to-review.md`;
+pins from Heltec's V4 pin map and V4.3.1 datasheet, cross-checked with
+Meshtastic's Heltec V4 variant). The ESP32-S3R2 has only 8 GPIOs free of any
+board part (3, 4, 6, 15, 16, 33, 47, 48) for 12 signals, so three board pins
+are shared on purpose and button 4 is read through the keypad expander.
+
+| Function | Before | Now | Notes |
+| --- | --- | --- | --- |
+| Button 1 | 4 | 4 | |
+| Button 2 | 39 | 48 | 39 is the GNSS module's TX line |
+| Button 3 | 33 | 44 | UART0's RX: no console input on UART0 then (USB is unaffected) |
+| Button 4 | 34 | PCF8574 P7 | `ATALAIA_KP_P7_BUTTON`, read with every keypad scan |
+| LED ring data | 48 | 35 | Also the board's white LED, which flickers with it |
+| Display MOSI / SCK | 40 / 41 | 33 / 47 | SPI2 |
+| Display CS | 42 | 1 | The board's battery-voltage ADC input, used as an output |
+| Display DC | 3 | 3 | Strapping pin (JTAG source select), ignored |
+| Display RST | 38 | -1 (3V3) | SWRESET command at start-up |
+| Display backlight | 47 | -1 (3V3) | Always on |
+| I2C SDA / SCL | 17 / 18 | 17 / 18 | OLED, PCF8574, PN532, MAX17048 |
+| I2S BCLK / LRCLK / DOUT | 6 / 15 / 16 | 6 / 15 / 16 | |
+| GNSS power, TX, RX, wake-up, PPS, reset | (display, buttons) | 34, 38, 39, 40, 41, 42 | The module keeps its connector; off at boot |
+
+`sdkconfig.wokwi` keeps the emulator's own display and ring pins (its
+`diagram.json`). The full list with the board-internal pins is in the
+`Kconfig.projbuild` header and `hardware/field-box/README.md`;
+`tools/check_wiring.py` checks the wiring diagrams against these defaults.
 
 ## Partition Table
 
@@ -579,7 +613,8 @@ Still pending:
 - Joining over Wi-Fi from the GM console (decision E3).
 - Running a firmware update over the air on a real board (built and host-tested:
   [Firmware updates](#firmware-updates-over-the-air)).
-- GNSS module support (GPIO 38-42 currently used for peripherals)
+- A GNSS driver for the module on the board's connector (its pins and power
+  control are in Kconfig; it stays off until a mode needs a position)
 
 ## Radio Region
 

@@ -50,6 +50,11 @@ no SPIRAM) and Kconfig `ATALAIA_MEMORY_TIER_REDUCED`.
   on GPIO 36, ADC_Ctrl on GPIO 37, UART0 console on GPIO 43-44).  The
   GNSS header pins (GPIO 34, 38-42) are used for external peripherals, so
   the V4's GNSS module is not supported (decision E21); revisit in phase 4.
+  *(Changed 2026-10-21, decisions E21 and PIN-1 to PIN-8: the GNSS
+  connector's GPIO 34 and 38-42 are now left to its module; the display,
+  buttons 2-4 and the LED ring moved, three board pins are shared on purpose
+  (GPIO 1 display CS, 35 ring data, 44 button 3) and button 4 is on the
+  keypad expander's P7. See `firmware/esp32/README.md`, Default pin map.)*
 
 - **Shared I2C bus:** NFC (PN532, addr 0x24), battery gauge (MAX17048,
   addr 0x36) and the on-board OLED (SSD1306, addr 0x3C) share the

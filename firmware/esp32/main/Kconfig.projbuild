@@ -7,30 +7,41 @@
 # The V4.2 (GC1109 front-end module) is selected under Radio > Board revision.
 #
 # Board-internal pins -- DO NOT reassign:
-#   1 (Vbat ADC), 2 (FEM_EN), 7 (VFEM_Ctrl: the FEM's LDO), 8-14 (SX1262),
-#   17-18 (OLED I2C), 19-20 (USB), 21 (OLED RST), 35 (LED),
-#   36 (Vext_Ctrl, active low), 37 (ADC_Ctrl), 43-44 (UART0 console),
+#   0 (PRG button), 2 (FEM_EN), 7 (VFEM_Ctrl: the FEM's LDO), 8-14 (SX1262),
+#   17-18 (OLED I2C), 19-20 (USB), 21 (OLED RST), 26-32 (flash and PSRAM),
+#   34 (VGNSS_Ctrl: the GNSS connector's power, active low),
+#   36 (Vext_Ctrl, active low), 37 (ADC_Ctrl),
+#   38-42 (GNSS connector: UART, wake-up, PPS, reset), 43 (UART0 TX: console),
 #   5 on the V4.3 (KCT8103L CTX: receive LNA or bypass),
 #   46 on the V4.2 (GC1109 CPS: PA or bypass).
-#   (Button 2 moved from GPIO 5 to GPIO 39 for the V4.3.)
+#
+# Board pins the Field Box shares on purpose (tools/check_wiring.py allows
+# only these uses; decisions PIN-3 to PIN-5):
+#   1  -- the battery-voltage ADC input (VBAT_Read). Display CS: an output
+#         only. The board's divider leaves 100 kohm to GND on it, which an
+#         output does not mind; the firmware never reads the battery there
+#         (the MAX17048 gauge does).
+#   35 -- the board's white LED. LED ring data: the white LED flickers
+#         faintly while the ring is updated.
+#   44 -- UART0 RX. Button 3: the box then takes no console input on UART0
+#         (the USB port's console is unaffected; logs still go out on 43).
 #
 # ESP32-S3 strapping pins:
 #   GPIO 0  -- boot mode (PRG button on V4.3). Do not use.
-#   GPIO 3  -- JTAG TMS.  Used here for DISP_DC; disables JTAG.
-#              Safe: JTAG is not needed in production; internal pull-up
-#              selects normal (non-JTAG) operation at reset.
+#   GPIO 3  -- JTAG source select, ignored unless an eFuse (not burnt on
+#              the V4) asks for it. Used here for DISP_DC.
 #   GPIO 45 -- VDD_SPI voltage.  NOT used.  An external pull-up here
 #              selects 1.8 V flash and prevents booting.
-#   GPIO 46 -- boot log verbosity.  NOT used in default config.
-#              An external pull-up suppresses boot log (harmless).
+#   GPIO 46 -- boot log verbosity.  NOT used (and the V4.2's FEM PA line).
 #
-# GNSS header (34, 38-42): the V4 ships with a GNSS module for its SH1.25
-# connector (34 = VGNSS_Ctrl, the module's power; 38-42 = its UART, wake,
-# PPS and reset). The Field Box uses these pins for the display and the
-# buttons instead: GPS is NOT supported in this pin map -- do not plug the
-# GNSS module in. Button 4 on GPIO 34 shares the GNSS power control: with
-# no module fitted, pressing it only switches the empty connector's
-# supply. The pin map is to be revisited when GPS-based modes arrive (phase 4).
+# GNSS connector (SH1.25, 8 pins): the module that comes with the V4 plugs in
+# there and keeps all its pins (decision PIN-1; Heltec's V4 pin map and V4.3.1
+# datasheet): 34 = VGNSS_Ctrl (low = module powered; the board pulls it high),
+# 38 = the module's RX (ESP32 TX), 39 = the module's TX (ESP32 RX),
+# 40 = wake-up, 41 = PPS, 42 = reset. The firmware keeps the module off
+# (GNSS menu) until a mode needs a position; no driver yet.
+# Button 4 is on the keypad expander's spare pin P7 (ATALAIA_KP_P7_BUTTON).
+#
 # NFC/battery/keypad share the OLED I2C bus (17/18):
 #   0x20 (PCF8574 keypad), 0x24 (PN532 NFC), 0x36 (MAX17048), 0x3C (OLED).
 #
@@ -77,31 +88,49 @@ menu "Atalaia Field Box Configuration"
 
         config ATALAIA_BTN2_PIN
             int "Button 2 GPIO (-1 = unused)"
-            default 39
+            default 48
             help
-                GPIO 39 (on the GNSS header, freed from the keypad matrix by
-                the PCF8574). Not GPIO 5: on the Heltec V4.3, GPIO 5 is the
-                front-end module's receive-path control (CTX).
+                GPIO 48 (decision PIN-2). Not GPIO 39: it is the GNSS
+                module's TX line (the ESP32's RX). Not GPIO 5: on the Heltec
+                V4.3, GPIO 5 is the front-end module's receive-path control
+                (CTX).
 
         config ATALAIA_BTN3_PIN
             int "Button 3 GPIO (-1 = unused)"
-            default 33
+            default 44
             help
-                GPIO 33, freed from the keypad matrix by the PCF8574
-                I2C expander. Set to -1 for 2-team play.
+                GPIO 44, UART0's RX pin (decision PIN-5): with a button on it
+                the box reads no console input on UART0; the USB port's
+                console (the only one a Heltec V4 has a socket for) is not
+                affected. Unwired, the pin's pull-up keeps the button
+                released.
 
         config ATALAIA_BTN4_PIN
-            int "Button 4 GPIO (-1 = unused)"
-            default 34
+            int "Button 4 GPIO (-1 = unused or on the keypad expander)"
+            default -1
             help
-                GPIO 34, freed from the keypad matrix by the PCF8574
-                I2C expander. Set to -1 for 2- or 3-team play.
+                -1: button 4 is on the keypad expander's spare pin P7
+                (ATALAIA_KP_P7_BUTTON), since the GNSS connector keeps GPIO
+                34 and 38-42 (decision PIN-1). A free GPIO here moves it
+                back to a GPIO (set ATALAIA_KP_P7_BUTTON to 0 then).
+
+        config ATALAIA_KP_P7_BUTTON
+            int "Team button on the keypad expander's P7 (0 = none)"
+            depends on ATALAIA_KP_PCF8574
+            range 0 4
+            default 4
+            help
+                The team button wired between the PCF8574's spare pin P7
+                and GND (decision PIN-4). The keypad scan reads it with the
+                keys (no extra I2C traffic); that button's GPIO must be -1.
+                It works only when the keypad expander answers at boot.
     endmenu
 
     # ---- PCF8574 I2C keypad expander ------------------------------------------
     # The 4x3 matrix keypad is wired through a PCF8574 on the shared OLED
-    # I2C bus (GPIO 17/18). Rows on P0-P3, columns on P4-P6, P7 unused.
-    # This frees GPIOs 6, 15, 16, 33, 34, 38, 39 for audio, buttons, etc.
+    # I2C bus (GPIO 17/18). Rows on P0-P3, columns on P4-P6, P7 is team
+    # button 4 (ATALAIA_KP_P7_BUTTON). This frees GPIOs for the audio, the
+    # buttons and the display, and leaves the GNSS connector to its module.
     menu "Keypad"
         choice ATALAIA_KP_INTERFACE
             prompt "Keypad interface"
@@ -172,7 +201,11 @@ menu "Atalaia Field Box Configuration"
     menu "LEDs"
         config ATALAIA_LED_PIN
             int "LED data GPIO"
-            default 48
+            default 35
+            help
+                GPIO 35, which also drives the Heltec V4's white LED
+                through 330 ohm (decision PIN-3): that LED flickers faintly
+                while the ring is updated. Any free output works.
 
         config ATALAIA_LED_COUNT
             int "Number of LEDs"
@@ -193,41 +226,45 @@ menu "Atalaia Field Box Configuration"
     menu "Display"
         config ATALAIA_DISP_MOSI_PIN
             int "Display SPI MOSI GPIO"
-            default 40
-            help
-                GPIO 40 is on the GNSS header.
+            default 33
 
         config ATALAIA_DISP_CLK_PIN
             int "Display SPI CLK GPIO"
-            default 41
+            default 47
 
         config ATALAIA_DISP_CS_PIN
             int "Display SPI CS GPIO"
-            default 42
+            default 1
+            help
+                GPIO 1, the board's battery-voltage ADC input, used as an
+                output (decision PIN-3): the divider's 100 kohm to GND on it
+                is harmless, and the firmware reads the battery from the
+                MAX17048 gauge instead.
 
         config ATALAIA_DISP_DC_PIN
             int "Display DC GPIO"
             default 3
             help
-                GPIO 3 is an ESP32-S3 JTAG strapping pin. Using it
-                for display DC disables the JTAG debug interface.
-                Safe: internal pull-up selects non-JTAG mode at reset.
+                GPIO 3 is an ESP32-S3 strapping pin (JTAG source select),
+                ignored unless an eFuse asks for it; not burnt on the V4.
 
         config ATALAIA_DISP_RST_PIN
-            int "Display RST GPIO (-1 = tied to Vext)"
-            default 38
+            int "Display RST GPIO (-1 = tied to 3V3)"
+            default -1
             help
-                GPIO 38, freed from the keypad matrix by the PCF8574
-                I2C expander (on the GNSS header). Set to -1 when the
-                display RST is wired to Vext_Ctrl (GPIO 36) instead.
+                -1 (decision PIN-3): the display's RESET is wired to 3V3 and
+                the firmware resets it with the SWRESET command instead. A
+                free GPIO here gives it a hardware reset pulse at boot.
 
         config ATALAIA_DISP_BL_PIN
-            int "Display backlight GPIO (-1 = always on via Vext)"
-            default 47
+            int "Display backlight GPIO (-1 = always on, wired to 3V3)"
+            default -1
             help
-                GPIO 47 is not a strapping pin. Safe for output.
-                Set to -1 to omit software backlight control (the
-                backlight stays on whenever Vext is high).
+                -1 (decisions M9, PIN-3): a 2.8" panel's backlight draws
+                more than a GPIO should source, so its LED pin is wired to
+                3V3 and the backlight is on whenever the box is. A GPIO here
+                switches it (only through a transistor if it draws more
+                than 10 mA).
 
         choice ATALAIA_DISP_CONTROLLER
             prompt "Display controller IC"
@@ -460,6 +497,54 @@ menu "Atalaia Field Box Configuration"
                 invalid value falls back to 869525000 with an error at boot.
     endmenu
 
+    # ---- GNSS module on the board's connector (decision PIN-1) ----------------
+    # Pins only for now: no driver reads the module yet. A later phase adds it
+    # for the modes that need a box's position.
+    menu "GNSS"
+        config ATALAIA_GNSS_PWR_PIN
+            int "GNSS power control GPIO (VGNSS_Ctrl, low = on; -1 = leave alone)"
+            default 34
+            help
+                Board-internal on the Heltec V4: GPIO 34 switches the GNSS
+                connector's 3.3 V through a P-MOSFET; the board pulls it high
+                (off). The firmware drives it at boot: high (module off)
+                unless ATALAIA_GNSS_POWER_ON.
+
+        config ATALAIA_GNSS_POWER_ON
+            bool "Power the GNSS module at boot"
+            default n
+            help
+                Off by default: the module draws current and nothing reads
+                it yet. A mode that needs a position will switch it on.
+
+        config ATALAIA_GNSS_TX_PIN
+            int "GPIO to the module's RX (the ESP32's UART TX)"
+            default 38
+
+        config ATALAIA_GNSS_RX_PIN
+            int "GPIO from the module's TX (the ESP32's UART RX)"
+            default 39
+
+        config ATALAIA_GNSS_WAKE_PIN
+            int "GNSS wake-up GPIO (-1 = not used)"
+            default 40
+
+        config ATALAIA_GNSS_PPS_PIN
+            int "GNSS PPS (pulse per second) GPIO (-1 = not used)"
+            default 41
+
+        config ATALAIA_GNSS_RST_PIN
+            int "GNSS reset GPIO (active low, -1 = not used)"
+            default 42
+
+        config ATALAIA_GNSS_BAUD
+            int "GNSS UART baud rate"
+            default 9600
+            help
+                The module's default NMEA rate (9600 baud for the L76K that
+                Meshtastic's Heltec V4 support names).
+    endmenu
+
     # ---- Board power ----------------------------------------------------------
     menu "Board power"
         config ATALAIA_VEXT_CTL_PIN
@@ -621,7 +706,7 @@ menu "Atalaia Field Box Configuration"
     # ---- I/O pod (ADR-P3-3, protocol/capability-proxy.md) -------------------
     # The pod uses the Field Box's pins for its buttons, keypad expander, LED
     # ring, NFC reader, battery gauge, amplifier and radio. It has no display,
-    # so the display's GPIOs (3, 38, 40-42, 47) are free on a pod.
+    # so the display's GPIOs (1, 3, 33, 47) are free on a pod.
     menu "I/O pod"
         depends on ATALAIA_POD_MODE
 
@@ -657,7 +742,7 @@ menu "Atalaia Field Box Configuration"
                 sends the "case" capability's "opened" event, which the phone
                 reports as node.tamper. The switch is armed only once it has
                 read closed, so a pod built without one never reports a
-                tamper. GPIO 47 is the Field Box's display backlight; a pod
+                tamper. GPIO 47 is the Field Box's display clock; a pod
                 has no display.
 
         config ATALAIA_POD_TAMPER_OPEN_HIGH

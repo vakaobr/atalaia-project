@@ -19,9 +19,9 @@ The emulator runs a variant of the firmware, built from
 | Part | In Wokwi | Notes |
 | --- | --- | --- |
 | ESP32-S3, 16 MB flash, 2 MB PSRAM | Yes | `board-esp32-s3-devkitc-1`; the Heltec V4.3 has no Wokwi model, so the DevKitC-1 stands in |
-| 2.8" ILI9341 SPI display, 320x240 | Yes | `lcd1`, on the display pins from Kconfig (MOSI 40, SCK 41, CS 42, DC 3, backlight 47) |
-| Team buttons | Yes | `btn1` red on GPIO 4, `btn2` blue on GPIO 5 (the Field Box uses GPIO 39, a keypad column here; the emulator has no radio front end on GPIO 5); buttons 3 and 4 are off (GPIO 33/34 are not on the DevKitC-1) |
-| WS2812 ring, 24 LEDs | Yes | `ring1` on GPIO 48 |
+| 2.8" ILI9341 SPI display, 320x240 | Yes | `lcd1` on MOSI 40, SCK 41, CS 42, DC 3, backlight 47: `sdkconfig.wokwi` keeps these (the Field Box's MOSI 33 is not on the DevKitC-1's headers and its CS 1 is a keypad column here; decision PIN-6) |
+| Team buttons | Yes | `btn1` red on GPIO 4, `btn2` blue on GPIO 5 (the Field Box's GPIO 48 carries the ring here; the emulator has no radio front end on GPIO 5); buttons 3 and 4 are off (GPIO 44 is the emulator's console input, and there is no PCF8574 for button 4's P7) |
+| WS2812 ring, 24 LEDs | Yes | `ring1` on GPIO 48 (the Field Box uses GPIO 35, the Heltec's white LED pin) |
 | 4x3 keypad | Yes, wired differently | `keypad1`; see below |
 | PCF8574 keypad expander | No | Wokwi has no PCF8574 part |
 | PN532 NFC, MAX17048 battery gauge | No | the firmware finds nothing on the I2C bus, logs a warning and carries on |
@@ -42,7 +42,7 @@ scans the membrane keypad directly on GPIOs the emulator leaves free:
 | --- | --- | --- |
 | R1, R2, R3 | 6, 15, 16 | these are the I2S audio pins, and Wokwi does not simulate the amplifier |
 | R4 | 7 | no front-end module on the DevKitC-1 |
-| C1, C2, C3 | 1, 2, 39 | not used by the Field Box pin map |
+| C1, C2, C3 | 1, 2, 39 | no battery divider, front-end module or GNSS module on the DevKitC-1 (the Wokwi build keeps its display off GPIO 1) |
 
 Everything above the driver (debouncing, the preset picker, keypad events
 to the game) is the same code as on the Field Box. The PCF8574 driver itself

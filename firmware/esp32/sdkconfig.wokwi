@@ -26,17 +26,26 @@ CONFIG_ATALAIA_AUDIO_BCLK_PIN=-1
 CONFIG_ATALAIA_AUDIO_LRCLK_PIN=-1
 CONFIG_ATALAIA_AUDIO_DOUT_PIN=-1
 
-# Two teams: GPIO 33/34 are not on the DevKitC-1 headers.
-# diagram.json wires button 2 to GPIO 5. The Field Box default moved to GPIO 39
-# (GPIO 5 is the Heltec V4.3 FEM's CTX pin), but here 39 is a keypad column and
-# the emulator has no FEM: the FEM pins are driven only after an SX1262 answers.
+# Two teams. diagram.json wires button 2 to GPIO 5 (the Field Box's GPIO 48
+# carries the ring here, and the emulator has no FEM: the FEM pins are driven
+# only after an SX1262 answers). Button 3's GPIO 44 is the emulator's console
+# input, and there is no PCF8574 for button 4.
 CONFIG_ATALAIA_BTN2_PIN=5
 CONFIG_ATALAIA_BTN3_PIN=-1
 CONFIG_ATALAIA_BTN4_PIN=-1
 
-# Wokwi does not simulate the ILI9341 RST pin, and GPIO 38 drives the
-# DevKitC-1's own RGB LED.
-CONFIG_ATALAIA_DISP_RST_PIN=-1
+# The display and the ring keep the pins diagram.json wires (decision PIN-6):
+# the Field Box's display pins 1 and 33 are a keypad column here and not on
+# the DevKitC-1's headers, and its ring pin 35 is the DevKitC-1's PSRAM on
+# some modules. Wokwi does not simulate the ILI9341 RST pin.
+CONFIG_ATALAIA_DISP_MOSI_PIN=40
+CONFIG_ATALAIA_DISP_CLK_PIN=41
+CONFIG_ATALAIA_DISP_CS_PIN=42
+CONFIG_ATALAIA_DISP_BL_PIN=47
+CONFIG_ATALAIA_LED_PIN=48
+
+# The DevKitC-1 has no GNSS connector: leave GPIO 34 alone.
+CONFIG_ATALAIA_GNSS_PWR_PIN=-1
 
 # The radio probes the SX1262 at boot, logs "SX1262 not detected" and
 # carries on. No CONFIG_ATALAIA_RADIO_DISABLE needed: the init is safe

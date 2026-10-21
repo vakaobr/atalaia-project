@@ -11,7 +11,7 @@
 /* ---- Kconfig pins ---- */
 
 #ifndef CONFIG_ATALAIA_LED_PIN
-#define CONFIG_ATALAIA_LED_PIN 48
+#define CONFIG_ATALAIA_LED_PIN 35
 #endif
 #ifndef CONFIG_ATALAIA_LED_COUNT
 #define CONFIG_ATALAIA_LED_COUNT 24
