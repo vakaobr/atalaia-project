@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Build context of tools/dev/server-browser/Dockerfile (the repository root): only the server's pinned
+# requirements; the code is mounted when the tests run.
+*
+!server/requirements.txt
+!server/requirements-test.txt

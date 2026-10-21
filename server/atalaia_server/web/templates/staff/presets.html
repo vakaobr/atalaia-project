@@ -1,0 +1,25 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$presets_title</h1>
+<p>$presets_intro</p>
+<div class="table-wrap">
+<table id="presets" class="data" hidden>
+<thead><tr><th scope="col">$preset_name</th><th scope="col">$preset_mode</th><th scope="col">$preset_params</th><th scope="col">$col_updated</th><th scope="col"><span class="visually-hidden">$edit</span></th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p id="presets-none" hidden>$presets_none</p>
+<section aria-labelledby="preset-form-title">
+<h2 id="preset-form-title">$preset_new</h2>
+<form id="preset-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<label for="p-name">$preset_name</label>
+<input id="p-name" name="name" maxlength="64" required>
+<label for="p-mode">$preset_mode</label>
+<input id="p-mode" name="mode_id" maxlength="128" autocapitalize="none" spellcheck="false" required>
+<label for="p-params">$preset_params</label>
+<textarea id="p-params" name="params" class="code" rows="8" spellcheck="false" autocapitalize="none">{}</textarea>
+<p><button type="submit">$save</button> <button type="button" id="p-cancel" hidden>$cancel</button></p>
+</fieldset>
+</form>
+</section>

@@ -1,0 +1,86 @@
+/* SPDX-FileCopyrightText: 2026 The Atalaia contributors */
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* The field staff's pages (staff_pages.py), on top of field.css: its colours, light and dark.
+   Tables scroll sideways inside their own box on a phone; every control is at least 44 px high. */
+body.staff main, body.staff footer { max-width: 64rem; }
+.skip { position: absolute; left: -999rem; }
+.skip:focus { left: 1rem; top: 0.5rem; background: var(--ground); padding: 0.5rem; z-index: 2; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);
+                   white-space: nowrap; }
+header.staff-top { max-width: 64rem; margin: 0 auto; padding: 0.75rem 1rem; display: flex; flex-wrap: wrap;
+                   gap: 0.5rem 1rem; align-items: center; border-bottom: 1px solid var(--line); }
+header.staff-top .brand { font-weight: 700; text-decoration: none; color: var(--ink); }
+header.staff-top nav.sections ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 0.9rem; }
+header.staff-top nav.sections a[aria-current="page"] { font-weight: 700; color: var(--ink); }
+header.staff-top .account { margin-left: auto; font-size: 0.9rem; color: var(--muted); }
+header.staff-top .languages { font-size: 0.9rem; }
+header.staff-top .languages a, header.staff-top .languages span { margin-left: 0.5rem; }
+header.staff-top .languages span { font-weight: 600; }
+[hidden] { display: none !important; }
+.field-name { color: var(--muted); margin: 1rem 0 0; }
+.field-name:empty { display: none; }
+.status:empty { display: none; }
+.status p, p.status { margin: 0.75rem 0; padding: 0.5rem 0.75rem; border-left: 4px solid var(--line); }
+.status.error p, p.status.error { border-left-color: var(--warn); }
+.status.ok p, p.status.ok { border-left-color: var(--accent); }
+.hint { color: var(--muted); font-size: 0.95rem; }
+ul.fields li .links { list-style: none; padding: 0; margin: 0.4rem 0 0; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; }
+ul.fields li .links li { border: 0; padding: 0; }
+/* Forms */
+.staff-form fieldset { border: 1px solid var(--line); border-radius: 0.3rem; padding: 0.5rem 1rem 1rem; margin: 1rem 0;
+                       min-width: 0; }
+.staff-form fieldset:disabled { opacity: 0.7; }
+.staff-form label { display: block; margin: 0.75rem 0 0.25rem; }
+.staff-form .check label, .check label { display: inline; margin: 0; }
+.check { margin: 0.75rem 0; }
+input, select, textarea, button, a.button { font: inherit; color: inherit; min-height: 2.75rem; }
+input:not([type="checkbox"]), select, textarea { width: 100%; max-width: 100%; padding: 0.4rem 0.5rem;
+                                                 background: transparent; border: 1px solid var(--muted);
+                                                 border-radius: 0.3rem; }
+input[type="checkbox"] { width: 1.25rem; height: 1.25rem; min-height: 0; vertical-align: middle; }
+select option { color: var(--ink); background: var(--ground); }
+textarea.code, pre.code, code.data { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+                                     font-size: 0.9rem; }
+pre.code { overflow: auto; max-height: 30rem; padding: 0.75rem; border: 1px solid var(--line); border-radius: 0.3rem;
+           white-space: pre; }
+code.data { overflow-wrap: anywhere; }
+button, a.button { display: inline-block; padding: 0.4rem 1rem; border: 1px solid var(--accent); border-radius: 0.3rem;
+                   background: var(--accent); color: var(--ground); font-weight: 600; cursor: pointer;
+                   text-decoration: none; margin: 0.25rem 0; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+button.danger { background: transparent; color: var(--warn); border-color: var(--warn); }
+button.link { background: none; border: 0; color: var(--accent); padding: 0 0.25rem; min-height: 0;
+              text-decoration: underline; font-weight: 400; margin: 0; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.staff-form.inline .row { display: inline-block; vertical-align: bottom; margin-right: 0.75rem; min-width: 10rem; }
+/* Tables */
+.table-wrap { overflow-x: auto; margin: 1rem 0; position: relative; }  /* also holds visually-hidden headers */
+table.data { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+table.data th, table.data td { border-top: 1px solid var(--line); padding: 0.45rem 0.5rem 0.45rem 0; text-align: left;
+                               vertical-align: top; }
+table.data thead th { color: var(--muted); font-weight: 600; border-top: 0; }
+table.data tbody th { font-weight: 600; }
+table.data .num { text-align: right; font-variant-numeric: tabular-nums; }
+table.data.problems tr.error th { color: var(--warn); }
+table.scores-table { max-width: 24rem; }
+ul.flags { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem; }
+ul.flags li.badge { margin: 0; text-transform: none; }
+.ok { color: var(--accent); }
+/* The score chart */
+.chart-svg { width: 100%; max-width: 40rem; height: auto; display: block; }
+.chart-svg .axis { stroke: var(--muted); stroke-width: 1; }
+.chart-svg .tick { fill: var(--muted); font-size: 12px; }
+ul.legend { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; }
+.swatch { display: inline-block; width: 1rem; height: 0.4rem; margin-right: 0.35rem; vertical-align: middle; }
+/* The remote GM */
+article.controller { border: 1px solid var(--line); border-radius: 0.3rem; padding: 0 1rem 1rem; margin: 1rem 0; }
+article.controller h2 { font-size: 1.1rem; overflow-wrap: anywhere; }
+fieldset.commands { border: 1px solid var(--line); border-radius: 0.3rem; padding: 0.5rem 1rem 1rem; margin-top: 1rem; }
+fieldset.commands label { display: block; margin: 0.75rem 0 0.25rem; }
+fieldset.commands .buttons button { margin-right: 0.25rem; }
+ul.compact { padding-left: 1.25rem; margin: 0.25rem 0; }
+ul.compact li { margin: 0.15rem 0; overflow-wrap: anywhere; }
+@media (max-width: 30rem) {
+  header.staff-top .account { margin-left: 0; }
+  .staff-form.inline .row { display: block; margin-right: 0; }
+}

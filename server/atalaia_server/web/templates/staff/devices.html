@@ -1,0 +1,20 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$devices_title</h1>
+<p>$devices_intro_text</p>
+<form id="devices-form" class="staff-form inline" method="post" novalidate>
+<fieldset disabled>
+<div class="row">
+<label for="d-days">$devices_days</label>
+<select id="d-days" name="days">$day_options</select>
+</div>
+<button type="submit">$refresh</button>
+</fieldset>
+</form>
+<div class="table-wrap">
+<table id="devices" class="data" hidden>
+<thead><tr><th scope="col">$col_node</th><th scope="col">$col_battery</th><th scope="col">$col_link</th><th scope="col">$col_firmware</th><th scope="col">$col_flags</th><th scope="col">$col_seen</th><th scope="col">$col_game</th><th scope="col" class="num">$col_games</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p id="devices-none" hidden>$devices_none</p>

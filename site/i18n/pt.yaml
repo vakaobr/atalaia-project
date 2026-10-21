@@ -621,7 +621,7 @@ roadmap:
     title: Servidor do clube e jogo avançado
     short: >-
       Servidor do clube, marcação de jogos e inscrições, cenários personalizados, modos avançados,
-      ATAK. Começada: modos avançados (Mestre e Satélites, o Terminal de Hacking, VIP / Carga e as regras das Janelas de Alvo), os cenários personalizados (o motor, o compilador, o editor na consola e os objetivos na aplicação), os utilitários geográficos no núcleo, o feed ATAK, e as contas, os direitos sobre os dados pessoais, a sincronização, o registo de cronógrafo, a marcação de jogos com páginas públicas, feeds e inscrições, os perfis de clube com a sincronização da imagem do campo, o histórico dos jogos e a biblioteca de cenários, o estado das caixas, o catálogo de firmware, o GM remoto e a instalação (HTTPS, cópias de segurança cifradas, reposição), o modo alojado com vários campos num só servidor, do servidor do clube, estão feitos em software.
+      ATAK. Começada: modos avançados (Mestre e Satélites, o Terminal de Hacking, VIP / Carga e as regras das Janelas de Alvo), os cenários personalizados (o motor, o compilador, o editor na consola e os objetivos na aplicação), os utilitários geográficos no núcleo, o feed ATAK, e as contas, os direitos sobre os dados pessoais, a sincronização, o registo de cronógrafo, a marcação de jogos com páginas públicas, feeds e inscrições, os perfis de clube com a sincronização da imagem do campo, o histórico dos jogos e a biblioteca de cenários, o estado das caixas, o catálogo de firmware, o GM remoto, páginas web para a organização do campo e a instalação (HTTPS, cópias de segurança cifradas, reposição), o modo alojado com vários campos num só servidor, do servidor do clube, estão feitos em software.
     text: >-
       Servidor do clube (contas, histórico dos jogos, registo de cronografagem, marcação de jogos,
       inscrições e publicação), cenários personalizados, modos avançados (zonas mestre e satélites,
@@ -678,7 +678,12 @@ roadmap:
       decorrer com um minuto de atraso, sem segredos nem identificadores de jogador), um marcador
       público por campo (desligado por omissão) e a biblioteca de cenários do campo com as
       predefinições de jogo, verificados como o controlador de campo os verifica e instalados por
-      todos os controladores do campo, incluindo o de reserva; e a instalação: HTTPS através do Caddy
+      todos os controladores do campo, incluindo o de reserva; e páginas web para a
+      organização do campo (entrada com o código de dois fatores; o histórico dos jogos com a evolução
+      da pontuação e os eventos de cada jogo, a biblioteca de cenários com todos os problemas mostrados
+      antes de guardar, revisões e predefinições, o estado das caixas, e a vista ao vivo e os comandos
+      do GM remoto), em português e inglês e num telemóvel, testadas num browser automático, ainda não
+      num servidor real; e a instalação: HTTPS através do Caddy
       com certificado automático, um script de instalação que gera todos os segredos, cópias de
       segurança diárias cifradas e a reposição numa base de dados nova, testados em Docker num
       computador, ainda não num servidor real com um domínio real; e o modo alojado: um servidor para

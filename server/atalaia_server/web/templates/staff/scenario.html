@@ -1,0 +1,46 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<p><a id="back" href="$scenarios_href">$scenario_back</a></p>
+<h1 id="scenario-heading">$heading</h1>
+<p id="archived-notice" class="notice" hidden>$archived_notice</p>
+<section id="current" aria-labelledby="current-title" hidden>
+<h2 id="current-title">$current_revision</h2>
+<dl id="current-details" class="details"></dl>
+<div id="current-warnings"></div>
+<details>
+<summary>$manifest</summary>
+<pre id="current-manifest" class="code"></pre>
+</details>
+<details id="package">
+<summary>$package_files</summary>
+<div id="package-files"></div>
+</details>
+<p><button type="button" id="edit">$edit</button> <button type="button" id="archive" class="danger">$archive</button></p>
+</section>
+<section id="revisions-section" aria-labelledby="revisions-title" hidden>
+<h2 id="revisions-title">$revisions</h2>
+<div class="table-wrap">
+<table id="revisions" class="data">
+<thead><tr><th scope="col" class="num">$col_revision</th><th scope="col">$col_version</th><th scope="col">$col_name</th><th scope="col">$col_updated</th><th scope="col"><span class="visually-hidden">$manifest</span></th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<section id="revision-view" aria-labelledby="revision-title" hidden>
+<h3 id="revision-title"></h3>
+<pre id="revision-manifest" class="code"></pre>
+</section>
+</section>
+<section id="editor" aria-labelledby="editor-title" hidden>
+<h2 id="editor-title">$editor_title</h2>
+<p class="hint">$editor_intro</p>
+<form id="editor-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<label for="manifest-file">$load_file</label>
+<input id="manifest-file" type="file" accept=".yaml,.yml,text/yaml,text/plain">
+<label for="manifest-text">$manifest</label>
+<textarea id="manifest-text" name="manifest" class="code" rows="20" spellcheck="false" autocapitalize="none" required></textarea>
+<p><button type="button" id="check">$check</button> <button type="submit">$save</button></p>
+</fieldset>
+</form>
+<div id="check-result" aria-live="polite"></div>
+</section>

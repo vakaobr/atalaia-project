@@ -8,7 +8,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 **Current phase:** Implementation (plan phases 1 to 22 built in software, 2026-10-21; sync over 4G: HW1; a real ATAK device: HW3; a real deployment with a real domain, and a real hosted deployment: HW1)
 **Phase status:** In progress
 **Risk level:** High
-**Last verified:** 2026-10-21 (plan phase 21: full clean-copy check, the site server's tests, migrations and the deployment test)
+**Last verified:** 2026-10-21 (follow-up: the staff pages; full clean-copy check, the site server's tests, migrations, the deployment and browser tests)
 **Next step:** the hardware phases HW1-HW4 (the boards); hosted mode waits for the legal review (P4-6) before going live
 
 ## Completed
@@ -850,6 +850,10 @@ everything deleted, a fresh stack, the restore into a fresh database with every
 table's rows compared by digest, and the restored API key and events used
 through Caddy. Not yet: a real server with a real domain and a public
 certificate (HW1). Decisions S22-1 to S22-10, all open.
+
+## Follow-up: the site server's staff pages (built 2026-10-21, in software)
+
+Web pages for the APIs that had none (S19-11, S20-8): `/staff/` login (password, then TOTP), the field's game history (filters, settings), a game (score timeline as chart and table, event log, its boxes), the scenario library (check with every problem, save as revisions, archive), presets, device health and the remote GM (live view polled every 5 s, the commands, the log). Server-rendered in pt-PT and English with no data in the page; same-origin ES modules call the API with the bearer token, so each page has its API's role rules; CSP unchanged; no cookie authorises a request (CSRF); `textContent` only. Tests: `server/tests/test_staff_pages.py` (13), `server/tests_browser/` (10, headless Chromium over HTTPS, `python3 tools/docker_server.py browser`, CI job `server-browser`). Decisions FU2-1 to FU2-12. Not yet on a real deployment or phone.
 
 ## Dependencies
 

@@ -33,3 +33,23 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  # The staff pages in headless Chromium (server/tests_browser/, decision FU2-10): only with
+  # --profile browser, which `python3 tools/docker_server.py browser` passes. The repository is
+  # mounted read-only; the image has the server's hashed packages, Playwright and Chromium.
+  browser:
+    image: ${ATALAIA_SERVER_BROWSER_IMAGE:-atalaia-server-browser}
+    profiles: ["browser"]
+    build:
+      context: ..
+      dockerfile: tools/dev/server-browser/Dockerfile
+    environment:
+      ATALAIA_DATABASE_URL: postgresql+asyncpg://atalaia:atalaia-test@db:5432/atalaia
+      ATALAIA_REQUIRE_BROWSER: "1"
+    volumes:
+      - ..:/src:ro
+    working_dir: /src
+    ipc: host
+    depends_on:
+      db:
+        condition: service_healthy

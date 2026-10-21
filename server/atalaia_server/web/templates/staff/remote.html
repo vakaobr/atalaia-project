@@ -1,0 +1,18 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$remote_title</h1>
+<p>$remote_intro_text</p>
+<div id="controllers" aria-live="off"></div>
+<p id="controllers-none" hidden>$remote_none</p>
+<div id="command-result" class="status" role="status" aria-live="assertive"></div>
+<section aria-labelledby="remote-log-title">
+<h2 id="remote-log-title">$remote_log</h2>
+<button type="button" id="log-refresh">$refresh</button>
+<div class="table-wrap">
+<table id="remote-log" class="data" hidden>
+<thead><tr><th scope="col">$col_when</th><th scope="col">$col_who</th><th scope="col">$col_command</th><th scope="col">$col_result</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p id="remote-log-none" hidden>$remote_log_none</p>
+</section>

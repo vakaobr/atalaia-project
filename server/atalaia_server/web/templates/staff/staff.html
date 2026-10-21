@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<html lang="$html_lang">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>$title</title>
+<link rel="stylesheet" href="/static/field.css">
+<link rel="stylesheet" href="/static/staff/staff.css">
+<script type="module" src="/static/staff/$script"></script>
+</head>
+<body class="staff" $data_attrs>
+<a class="skip" href="#main">$skip</a>
+<header class="staff-top">
+<a class="brand" href="$home">$site</a>
+<nav aria-label="$nav_label" class="sections" id="sections">$sections</nav>
+<div class="account"><span id="who"></span> <button type="button" id="logout" class="link" hidden>$logout</button></div>
+<nav aria-label="$language_label" class="languages">$languages</nav>
+</header>
+<main id="main" tabindex="-1">
+<noscript><p class="notice">$noscript</p></noscript>
+<p id="field-name" class="field-name"></p>
+<div id="status" class="status" role="status" aria-live="polite"></div>
+$content</main>
+<footer>
+<p>$footer</p>
+</footer>
+<script type="application/json" id="staff-strings">$strings</script>
+</body>
+</html>

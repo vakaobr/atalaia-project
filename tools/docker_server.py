@@ -6,6 +6,8 @@
     python3 tools/docker_server.py test                       every site server test
     python3 tools/docker_server.py test tests.test_health     only these (unittest names)
     python3 tools/docker_server.py migrations                 upgrade head, downgrade base, upgrade head, check
+    python3 tools/docker_server.py browser                    the staff pages in headless Chromium
+    python3 tools/docker_server.py browser tests_browser.test_staff_browser.RemoteGmTests   only these
     python3 tools/docker_server.py build                      build the server image (atalaia-server)
     python3 tools/docker_server.py up                         run it behind Caddy on https://localhost:8443
     python3 tools/docker_server.py down                       stop it and delete its database
@@ -16,7 +18,10 @@ and `migrations` build the test image (server/Dockerfile, target test) and
 run `sh tests/run.sh test|migrations` in it with Docker Compose
 (server/docker-compose.test.yml) next to an ephemeral postgres:16-alpine in a
 tmpfs, then remove the containers whatever the result: CI's server job runs
-the same image and the same commands against a service container. `up` is a
+the same image and the same commands against a service container. `browser`
+builds tools/dev/server-browser/Dockerfile (Playwright's image with the
+server's hashed packages) and runs server/tests_browser/run.sh in it next to
+the same PostgreSQL, with the repository mounted read-only. `up` is a
 local trial of the deployment (server/docker-compose.yml: Caddy, the server,
 PostgreSQL) with a random database password and secret key, on
 https://localhost:8443 (ATALAIA_HTTPS_PORT; HTTP on ATALAIA_HTTP_PORT, 8080)
@@ -45,6 +50,7 @@ SUFFIX = os.environ.get("ATALAIA_VOLUME_SUFFIX", "")
 TEST_PROJECT = f"atalaia-server-test{SUFFIX}".lower()
 TRIAL_PROJECT = f"atalaia-server-trial{SUFFIX}".lower()
 TEST_IMAGE = f"atalaia-server-test{SUFFIX}".lower()
+BROWSER_IMAGE = f"atalaia-server-browser{SUFFIX}".lower()
 SERVER_IMAGE = f"atalaia-server{SUFFIX}".lower()
 
 
@@ -83,17 +89,21 @@ def run_counting(cmd: list[str], env: dict[str, str]) -> tuple[int, int | None]:
 
 
 def in_tests_image(what: str, args: list[str]) -> int:
-    env = {**os.environ, "ATALAIA_SERVER_TEST_IMAGE": TEST_IMAGE}
+    env = {**os.environ, "ATALAIA_SERVER_TEST_IMAGE": TEST_IMAGE, "ATALAIA_SERVER_BROWSER_IMAGE": BROWSER_IMAGE}
     file = "docker-compose.test.yml"
-    if run(compose(file, TEST_PROJECT, "build", "tests"), env) != 0:
+    service, script, kind = "tests", ["sh", "tests/run.sh", what], "site server tests"
+    profile: list[str] = []
+    if what == "browser":
+        service, script, kind = "browser", ["sh", "server/tests_browser/run.sh"], "staff page browser tests"
+        profile = ["--profile", "browser"]
+    if run(compose(file, TEST_PROJECT, *profile, "build", service), env) != 0:
         return fail("building the test image failed")
     try:
-        code, ran = run_counting(compose(file, TEST_PROJECT, "run", "--rm", "tests", "sh", "tests/run.sh",
-                                         what, *args), env)
+        code, ran = run_counting(compose(file, TEST_PROJECT, *profile, "run", "--rm", service, *script, *args), env)
     finally:
-        run(compose(file, TEST_PROJECT, "down", "--volumes", "--remove-orphans"), env, quiet=True)
+        run(compose(file, TEST_PROJECT, *profile, "down", "--volumes", "--remove-orphans"), env, quiet=True)
     if ran is not None:
-        print(f"\ndocker_server: {ran} site server tests, exit code {code}")
+        print(f"\ndocker_server: {ran} {kind}, exit code {code}")
     elif code == 0:
         print(f"\ndocker_server: {what} passed")
     return code
@@ -149,9 +159,9 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 0 if argv else 2
     what, args = argv[0], argv[1:]
-    if what not in ("test", "migrations", "build", "up", "down", "deploy"):
-        return fail(f"unknown command '{what}' (test, migrations, build, up, down, deploy)")
-    if what != "test" and args:
+    if what not in ("test", "migrations", "browser", "build", "up", "down", "deploy"):
+        return fail(f"unknown command '{what}' (test, migrations, browser, build, up, down, deploy)")
+    if what not in ("test", "browser") and args:
         return fail(f"'{what}' takes no arguments")
     try:
         if run(["docker", "info"], dict(os.environ), quiet=True) != 0:
@@ -160,7 +170,7 @@ def main(argv: list[str]) -> int:
             return fail("the Docker Compose plugin is missing (docker compose version)")
     except FileNotFoundError:
         return fail("the docker command was not found; install Docker")
-    if what in ("test", "migrations"):
+    if what in ("test", "migrations", "browser"):
         return in_tests_image(what, args)
     if what == "deploy":
         return deploy()

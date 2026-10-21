@@ -1,0 +1,21 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$login_title</h1>
+<p>$login_intro</p>
+<form id="login-form" class="staff-form" method="post" novalidate>
+<fieldset id="login-fields" disabled>
+<label for="username">$username</label>
+<input id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="320" required>
+<label for="password">$password</label>
+<input id="password" name="password" type="password" autocomplete="current-password" maxlength="4096" required>
+<button type="submit">$login_button</button>
+</fieldset>
+</form>
+<form id="totp-form" class="staff-form" method="post" novalidate hidden>
+<fieldset id="totp-fields" disabled>
+<p>$totp_intro</p>
+<label for="code">$totp_code</label>
+<input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]{6,8}" required>
+<button type="submit">$totp_button</button>
+</fieldset>
+</form>

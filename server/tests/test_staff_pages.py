@@ -1,0 +1,245 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+"""The field staff's pages on PostgreSQL 16 (Phase 4 follow-up, decisions FU2-1 to FU2-12).
+
+Each page in pt-PT and English, its headers (no-store, noindex, the unchanged content security policy), that
+it loads only same-origin scripts and runs no inline one, that it holds no data (the API, with its role
+rules, gives the data), the pages' texts against what the scripts ask for, what the scripts may not do
+(parse HTML, load from elsewhere), the static files' caching, and the per-address limit. In a real browser,
+with the API behind it: ``server/tests_browser/`` (``python3 tools/docker_server.py browser``).
+
+    python3 tools/docker_server.py test tests.test_staff_pages
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from html.parser import HTMLParser
+from pathlib import Path
+
+from atalaia_server import sync
+from atalaia_server.ratelimit import Limits, RequestLimit
+from atalaia_server.security_headers import HEADERS
+from atalaia_server.web import staff_pages
+from atalaia_server.web.staff_i18n import STRINGS
+
+from .base import AppTestCase
+
+STATIC = Path(staff_pages.__file__).resolve().parent / "static" / "staff"
+FIELD = "0192f3a4-5b6c-7d8e-9f01-23456789abcd"
+GAME = "0192f3a4-5b6c-7d8e-9f01-000000000001"
+PAGES = {
+    "home": "/staff/", "login": "/staff/login", "history": f"/staff/fields/{FIELD}/history",
+    "game": f"/staff/fields/{FIELD}/games/{GAME}", "scenarios": f"/staff/fields/{FIELD}/scenarios",
+    "scenario": f"/staff/fields/{FIELD}/scenarios/org.test.two", "presets": f"/staff/fields/{FIELD}/presets",
+    "devices": f"/staff/fields/{FIELD}/devices", "remote": f"/staff/fields/{FIELD}/remote-gm",
+}
+
+
+class Scripts(HTMLParser):
+    """The page's <script> elements: their attributes and text."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.scripts: list[tuple[dict[str, str], str]] = []
+        self.inline_handlers: list[str] = []
+        self.ids: list[str] = []
+        self._open: dict[str, str] | None = None
+        self._text = ""
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = {k: v or "" for k, v in attrs}
+        self.inline_handlers += [k for k in values if k.startswith("on")]
+        if "id" in values:
+            self.ids.append(values["id"])
+        if tag == "script":
+            self._open, self._text = values, ""
+
+    def handle_data(self, data: str) -> None:
+        if self._open is not None:
+            self._text += data
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "script" and self._open is not None:
+            self.scripts.append((self._open, self._text))
+            self._open = None
+
+
+def parse(text: str) -> Scripts:
+    parser = Scripts()
+    parser.feed(text)
+    return parser
+
+
+class StaffPageTests(AppTestCase):
+    async def test_every_page_in_both_languages(self) -> None:
+        csp = dict(HEADERS)["content-security-policy"]
+        for name, path in PAGES.items():
+            for lang, html_lang in (("pt", "pt-PT"), ("en", "en")):
+                with self.subTest(page=name, lang=lang):
+                    r = await self.client.get(path, params={"lang": lang})
+                    self.assertEqual(r.status_code, 200, r.text)
+                    self.assertEqual(r.headers["content-type"], "text/html; charset=utf-8")
+                    self.assertEqual(r.headers["cache-control"], "no-store")
+                    self.assertEqual(r.headers["x-robots-tag"], "noindex")
+                    self.assertEqual(r.headers["content-language"], lang)
+                    self.assertEqual(r.headers["content-security-policy"], csp)  # the policy as it was
+                    self.assertIn(f'<html lang="{html_lang}">', r.text)
+                    self.assertIn("<noscript>", r.text)
+                    self.assertNotIn("$", re.sub(r'<script type="application/json".*?</script>', "", r.text,
+                                                 flags=re.S))  # every placeholder filled
+                    page = parse(r.text)
+                    self.assertEqual(page.inline_handlers, [], "no inline event handlers")
+                    self.assertEqual(len(page.ids), len(set(page.ids)), "ids are unique")
+                    srcs = [a["src"] for a, _ in page.scripts if "src" in a]
+                    self.assertEqual(srcs, [f"/static/staff/{name}.js"])
+                    for attrs, text in page.scripts:
+                        if "src" in attrs:
+                            self.assertEqual((attrs.get("type"), text.strip()), ("module", ""))
+                        else:  # the one inline block is data, which the policy never runs
+                            self.assertEqual(attrs.get("type"), "application/json")
+                            self.assertEqual(json.loads(text), STRINGS[lang])
+                    if path != "/staff/":
+                        self.assertIn(f'href="{path}?lang={"en" if lang == "pt" else "pt"}"', r.text)
+
+    async def test_accept_language_and_head(self) -> None:
+        r = await self.client.get("/staff/login", headers={"Accept-Language": "en-GB,en;q=0.9"})
+        self.assertIn(STRINGS["en"]["login_title"], r.text)
+        r = await self.client.get("/staff/login")
+        self.assertIn(STRINGS["pt"]["login_title"], r.text)
+        head = await self.client.head("/staff/login")
+        self.assertEqual((head.status_code, head.content), (200, b""))
+        r = await self.client.get("/staff", params={"lang": "en"})
+        self.assertEqual((r.status_code, r.headers["location"]), (308, "/staff/?lang=en"))
+
+    async def test_links_keep_the_language_asked_for(self) -> None:
+        r = await self.client.get(PAGES["game"], params={"lang": "en"})
+        self.assertIn(f'href="/staff/fields/{FIELD}/history?lang=en"', r.text)
+        self.assertIn('data-explicit="1"', r.text)
+        r = await self.client.get(PAGES["game"])
+        self.assertIn(f'href="/staff/fields/{FIELD}/history"', r.text)
+        self.assertIn('data-explicit=""', r.text)
+
+    async def test_a_path_without_a_valid_id_is_a_404(self) -> None:
+        for path in ("/staff/fields/nope/history", f"/staff/fields/{FIELD}/games/nope",
+                     f"/staff/fields/{FIELD}/scenarios/Not-An-Id", f"/staff/fields/{FIELD}/scenarios/x" + "a.b" * 20,
+                     f"/staff/fields/{FIELD}/scenarios/%3Cscript%3E.x", "/staff/fields/%22onmouseover%3D/devices"):
+            with self.subTest(path=path):
+                r = await self.client.get(path)
+                self.assertEqual(r.status_code, 404)
+                self.assertEqual(r.headers["cache-control"], "no-store")
+                self.assertNotIn("<script>", r.text)
+                self.assertNotIn('"onmouseover', r.text)  # escaped where the path is echoed (&quot;)
+        r = await self.client.get("/staff/nothing-here")
+        self.assertEqual(r.status_code, 404)
+
+    async def test_the_pages_hold_no_data(self) -> None:
+        """A page is the same for anyone: its data comes from the API, which checks the roles (FU2-2)."""
+        field_id = (await self.fetch("INSERT INTO fields (name, slug) VALUES ('Campo Secreto', 'secreto') "
+                                     "RETURNING id"))[0][0]
+        key = sync.new_key()
+        await self.fetch("INSERT INTO field_api_keys (field_id, key_sha256) VALUES ($1, $2)", field_id,
+                         sync.key_hash(key))
+        r = await self.client.post("/api/v1/sync/games", headers={"Authorization": f"Bearer {key}"}, json={
+            "sync_version": 1, "controller": {"id": FIELD, "version": "0.1.0"}, "game": {"game_id": 1, "game_seed": 2},
+            "meta": {"name": "Operação Noturna", "mode_id": "org.atalaia.domination", "teams": ["red", "blue"],
+                     "state": "running", "created_at": 1792000000.0}})
+        self.assertEqual(r.status_code, 200, r.text)
+        game = r.json()["game"]
+        for path in (f"/staff/fields/{field_id}/history", f"/staff/fields/{field_id}/games/{game}",
+                     f"/staff/fields/{field_id}/devices", f"/staff/fields/{field_id}/remote-gm"):
+            r = await self.client.get(path)
+            self.assertEqual(r.status_code, 200)
+            self.assertNotIn("Operação Noturna", r.text)
+            self.assertNotIn("Campo Secreto", r.text)
+        # The API the page calls refuses anyone without a role, as before.
+        r = await self.client.get(f"/api/v1/fields/{field_id}/history")
+        self.assertEqual(r.status_code, 401)
+
+    async def test_the_texts_block_cannot_be_closed(self) -> None:
+        block = staff_pages.strings_block({"x": "</script><script>alert(1)</script>&"})
+        self.assertNotIn("<", block)
+        self.assertNotIn(">", block)
+        self.assertEqual(json.loads(block), {"x": "</script><script>alert(1)</script>&"})
+
+    async def test_static_files(self) -> None:
+        for name in staff_pages.FILES:
+            with self.subTest(name=name):
+                r = await self.client.get(f"/static/staff/{name}")
+                self.assertEqual(r.status_code, 200)
+                kind = "text/javascript" if name.endswith(".js") else "text/css"
+                self.assertEqual(r.headers["content-type"], f"{kind}; charset=utf-8")
+                self.assertEqual(r.headers["cache-control"], "no-cache")
+                again = await self.client.get(f"/static/staff/{name}", headers={"If-None-Match": r.headers["etag"]})
+                self.assertEqual(again.status_code, 304)
+        for name in ("nope.js", "..%2Fstaff_pages.py", "staff.js.map", "STAFF.JS"):
+            with self.subTest(name=name):
+                r = await self.client.get(f"/static/staff/{name}")
+                self.assertEqual(r.status_code, 404)
+        r = await self.client.get("/static/field.css")
+        self.assertEqual(r.status_code, 200)  # the field pages' sheet, which the staff pages build on
+
+    async def test_the_staff_pages_count_towards_the_per_address_limit(self) -> None:
+        self.app.state.limits = Limits()
+        self.app.state.limits.requests = RequestLimit(3, 60)
+        for _ in range(3):
+            self.assertEqual((await self.client.get("/staff/login")).status_code, 200)
+        r = await self.client.get("/staff/login")
+        self.assertEqual(r.status_code, 429)
+        self.assertIn("retry-after", r.headers)
+
+
+class StaffScriptTests(AppTestCase):
+    """What the scripts may do, read from their source."""
+
+    def sources(self) -> dict[str, str]:
+        return {p.name: p.read_text(encoding="utf-8") for p in sorted(STATIC.glob("*.js"))}
+
+    async def test_every_page_has_its_script_and_every_file_its_licence(self) -> None:
+        names = set(staff_pages.FILES)
+        for page in staff_pages.page_names() + ["notfound"]:
+            self.assertIn(f"{page}.js", names)
+        for path in sorted(STATIC.iterdir()):
+            head = path.read_text(encoding="utf-8").splitlines()[:2]
+            tag = "SPDX-" + "License-Identifier: AGPL-3.0-or-later"  # split, so REUSE does not read it as this file's
+            self.assertTrue(any(tag in line for line in head), path.name)
+
+    async def test_no_html_parsing_and_nothing_from_elsewhere(self) -> None:
+        banned = re.compile(r"innerHTML|outerHTML|insertAdjacentHTML|document\.write|\beval\(|new Function|"
+                            r"setTimeout\(\s*['\"`]|https?://(?!www\.w3\.org/2000/svg)")
+        for name, text in self.sources().items():
+            with self.subTest(name=name):
+                self.assertIsNone(banned.search(text), banned.search(text))
+                for target in re.findall(r"from '([^']+)'", text):
+                    self.assertTrue(target.startswith("./") and (STATIC / target[2:]).is_file(), target)
+
+    async def test_every_text_a_script_asks_for_exists_in_both_languages(self) -> None:
+        self.assertEqual(set(STRINGS["pt"]), set(STRINGS["en"]))
+        asked: set[str] = set()
+        for text in self.sources().values():
+            asked |= set(re.findall(r"\bt\('([a-z0-9_]+)'", text))
+        missing = sorted(k for k in asked if k not in STRINGS["en"])
+        self.assertEqual(missing, [])
+        for lang, strings in STRINGS.items():  # the same {names} in both languages
+            for key, value in strings.items():
+                self.assertEqual(set(re.findall(r"\{(\w+)\}", value)),
+                                 set(re.findall(r"\{(\w+)\}", STRINGS["en"][key])), (lang, key))
+
+    async def test_state_changing_calls_carry_the_bearer_token(self) -> None:
+        """No request is authorised by a cookie: the scripts call the API through api() (Authorization:
+        Bearer); the only other fetches are the login steps and the refresh, which wants its own header."""
+        for name, text in self.sources().items():
+            with self.subTest(name=name):
+                for call in re.findall(r"fetch\(\s*'([^']+)'|fetch\((\w+)", text):
+                    target = call[0] or call[1]
+                    self.assertIn(target, ("/api/v1/auth/refresh", "path"), name)
+        staff = self.sources()["staff.js"]
+        self.assertIn("'X-Atalaia-Refresh': '1'", staff)
+        self.assertIn("Authorization: `Bearer ${s.token}`", staff)
+
+    async def test_portuguese_is_inclusive(self) -> None:
+        text = " ".join(STRINGS["pt"].values()).lower()
+        for word in ("utilizador", "jogadores", "administrador ", " o gm ", " um gm ", "gm remoto", "marshall",
+                     "esquadra", "time "):
+            self.assertNotIn(word, text)

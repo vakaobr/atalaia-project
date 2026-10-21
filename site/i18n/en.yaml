@@ -601,7 +601,7 @@ roadmap:
     title: Site server and advanced play
     short: >-
       Site server, game scheduling and registration, custom scenarios, advanced modes, ATAK.
-      Started: advanced modes (Master and Satellites, the Hacking Terminal, VIP / Payload and the logic of Target Windows), custom scenarios (their runtime, compiler, console editor and objectives in the app), geo utilities in the core, the ATAK feed, and the site server's accounts, personal data rights, controller sync, chrono registry, game scheduling with public field pages, feeds and registration, club profiles with branding sync, game history and the scenario library, device health, a firmware catalogue, the remote GM and the deployment (HTTPS, encrypted backups, restore), hosted mode for many fields on one server are built in software.
+      Started: advanced modes (Master and Satellites, the Hacking Terminal, VIP / Payload and the logic of Target Windows), custom scenarios (their runtime, compiler, console editor and objectives in the app), geo utilities in the core, the ATAK feed, and the site server's accounts, personal data rights, controller sync, chrono registry, game scheduling with public field pages, feeds and registration, club profiles with branding sync, game history and the scenario library, device health, a firmware catalogue, the remote GM, staff web pages for them and the deployment (HTTPS, encrypted backups, restore), hosted mode for many fields on one server are built in software.
     text: >-
       Site server (accounts, game history, the chrono registry, scheduling games, registration and
       publishing), custom scenarios, advanced modes (master and satellite zones, VIP escort, hacking
@@ -652,7 +652,11 @@ roadmap:
       sides; and game history (each game's score timeline and event log; players and spectators
       see a live game a minute behind, without secrets or player ids), a public scoreboard per field
       (off by default) and the field's scenario library with its game presets, checked as the field
-      controller checks them and installed by every controller of the field, a standby included; and
+      controller checks them and installed by every controller of the field, a standby included;
+      and web pages for the field's staff (log in with the two-factor code; the game history with each
+      game's score timeline and event log, the scenario library with every problem shown before
+      saving, revisions and presets, device health, and the remote GM's live view and commands), in
+      Portuguese and English and on a phone, tested in a headless browser, not yet on a real server; and
       the deployment: HTTPS through Caddy with an automatic certificate, a setup script that makes
       every secret, encrypted daily backups and a restore into a fresh database, tested in Docker on a
       computer, not yet on a real server with a real domain; and hosted mode: one server for many

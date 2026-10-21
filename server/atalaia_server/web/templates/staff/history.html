@@ -1,0 +1,53 @@
+<!-- SPDX-FileCopyrightText: 2026 The Atalaia contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<h1>$history_title</h1>
+<form id="filters" class="staff-form inline" method="post" novalidate>
+<fieldset disabled>
+<legend>$filters</legend>
+<div class="row">
+<label for="f-state">$filter_state</label>
+<select id="f-state" name="state">
+<option value="">$filter_any</option>
+<option value="ready">$state_ready</option>
+<option value="running">$state_running</option>
+<option value="paused">$state_paused</option>
+<option value="ended">$state_ended</option>
+</select>
+</div>
+<div class="row">
+<label for="f-mode">$filter_mode</label>
+<input id="f-mode" name="mode" maxlength="128" autocapitalize="none" spellcheck="false">
+</div>
+<div class="row">
+<label for="f-since">$filter_since</label>
+<input id="f-since" name="since" type="date">
+</div>
+<div class="row">
+<label for="f-until">$filter_until</label>
+<input id="f-until" name="until" type="date">
+</div>
+<button type="submit">$apply</button>
+</fieldset>
+</form>
+<div class="table-wrap">
+<table id="games" class="data" hidden>
+<thead><tr><th scope="col">$col_game</th><th scope="col">$col_mode</th><th scope="col">$col_state</th><th scope="col">$col_started</th><th scope="col">$col_scores</th><th scope="col">$col_winner</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p id="games-none" hidden>$games_none</p>
+<button type="button" id="games-more" hidden>$more</button>
+<section id="settings" aria-labelledby="settings-title" hidden>
+<h2 id="settings-title">$settings_title</h2>
+<p id="settings-readonly" hidden>$settings_readonly</p>
+<form id="settings-form" class="staff-form" method="post" novalidate>
+<fieldset disabled>
+<div class="check"><input id="s-public" name="public_scoreboard" type="checkbox"> <label for="s-public">$public_scoreboard</label></div>
+<label for="s-delay">$spectator_delay_label</label>
+<input id="s-delay" name="spectator_delay_s" type="number" min="0" max="$max_delay" step="1" required>
+<label for="s-retention">$retention_label</label>
+<input id="s-retention" name="retention_days" type="number" min="$min_retention" max="$max_retention" step="1" required>
+<button type="submit">$save</button>
+</fieldset>
+</form>
+</section>

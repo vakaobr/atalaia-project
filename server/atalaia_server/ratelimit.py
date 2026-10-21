@@ -145,9 +145,9 @@ class Limits:
 
 
 UNLIMITED_PATHS = ("/api/v1/health",)
-# The API, the public field pages and feeds (plan phase 15) and the club pages (plan phase 18) share the
-# per-address limit.
-LIMITED_PREFIXES = ("/api/", "/f/", "/c/")
+# The API, the public field pages and feeds (plan phase 15), the club pages (plan phase 18) and the staff pages
+# (decision FU2-9) share the per-address limit.
+LIMITED_PREFIXES = ("/api/", "/f/", "/c/", "/staff")
 
 
 def client_ip(scope: dict[str, Any]) -> str:

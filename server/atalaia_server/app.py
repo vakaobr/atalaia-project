@@ -47,7 +47,7 @@ from .remote_gm import RemoteHub
 from .security_headers import SecurityHeadersMiddleware
 from .tokens import Keys, UsedTokens
 from .totp import SeedBox
-from .web import club_pages, field_pages, scoreboard
+from .web import club_pages, field_pages, scoreboard, staff_pages
 
 log = logging.getLogger("atalaia.server")
 
@@ -125,6 +125,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.include_router(history.router)  # plan phase 20: game history, the scenario library, the scoreboard
     app.include_router(scenarios.router)
     app.include_router(scoreboard.router)
+    app.include_router(staff_pages.router)  # the field staff's pages (Phase 4 follow-up, FU2-1)
     return app
 
 

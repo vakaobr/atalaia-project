@@ -81,6 +81,13 @@ def https_checks(client: httpx.Client) -> None:
             check(False, "the system's CAs must not trust Caddy's local test CA")
         except httpx.ConnectError:
             check(True, "the certificate is Caddy's own CA's, which only the test trusts")
+    r = client.get(f"https://{HOST}/staff/login")
+    check(r.status_code == 200 and '<script type="module" src="/static/staff/login.js">' in r.text
+          and h.get("content-security-policy") == r.headers.get("content-security-policy"),
+          f"GET /staff/login through Caddy, under the same policy: {r.status_code}")
+    r = client.get(f"https://{HOST}/static/staff/staff.js")
+    check(r.status_code == 200 and r.headers.get("content-type", "").startswith("text/javascript"),
+          f"the staff pages' script through Caddy: {r.status_code}")
     r = httpx.get(f"http://{HOST}/api/v1/health", timeout=10)
     check(r.status_code in (301, 308) and r.headers.get("location") == f"https://{HOST}/api/v1/health",
           f"HTTP redirects to HTTPS: {r.status_code} {r.headers.get('location')}")
