@@ -71,7 +71,7 @@ void main() {
     );
     final hack = catalog.byId('org.atalaia.hacking_terminal')!;
     expect(hack.needsController, isFalse);
-    expect(hack.name('pt'), 'Terminal de Hacking');
+    expect(hack.name('pt'), 'Hackeia o terminal');
     expect(hack.name('en'), 'Hacking Terminal');
     expect(hack.roles.single.name, 'terminal');
     expect(hack.roles.single.requires, ['keypad']);

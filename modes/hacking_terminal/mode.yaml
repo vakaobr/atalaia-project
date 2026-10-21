@@ -25,7 +25,7 @@ commands:
   reset: { roles: [terminal], label: "New puzzle" }
 i18n:
   pt:
-    name: Terminal de Hacking
+    name: Hackeia o terminal
     description: >-
       Um terminal com um enigma no teclado: descobrir um código pelos algarismos no sítio certo e fora do
       sítio, cortar os fios pela ordem certa, ou repetir uma sequência. Uma resposta errada bloqueia-o

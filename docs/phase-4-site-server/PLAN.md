@@ -597,7 +597,7 @@ tests with `keys`; three ESP-IDF builds.
 differs from the design above, or fills what it left open (decisions M4-1
 to M4-9):
 
-- Portuguese name "Terminal de Hacking" (M4-1). The role is `terminal`
+- Portuguese name "Hackeia o terminal" (M4-1, the maintainer's choice on 2026-10-21; "Terminal de Hacking" before). The role is `terminal`
   `{ requires: [keypad], optional: [team_input, team_display, display,
   audio] }`; screens `hack_code`, `hack_wires`, `hack_sequence` and
   `hack_solved`, their texts in the templates in both languages (`lang`;
