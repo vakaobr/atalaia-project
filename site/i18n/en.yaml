@@ -702,9 +702,9 @@ roadmap:
     title: Community
     short: >-
       Visual mode editor complete in software, tested live in the simulator; signed mode packages, a
-      sandbox-escape battery in CI, the field controller installing signed modes, and the GM console
-      offering a box the signed modes it lacks. Next: the box fetching them, the registry,
-      translations.
+      sandbox-escape battery in CI, the field controller installing signed modes, and boxes getting
+      the signed modes they lack from the GM console. Next: scenario blocks in the console, the
+      registry, translations.
     text: >-
       Visual mode editor, mode registry, carrier PCB (a ready-made circuit board that makes builds
       easier), translations, build guides for other node types. Built in software: the visual mode
@@ -718,11 +718,11 @@ roadmap:
       them only with its own trusted keys, shows who signed each one and whether the project
       reviewed it. A battery of escape attempts runs on every change and closed two ways for a
       script to run past its time limit. In the GM console, a box that lacks a game's mode is
-      offered it: <em>Send missing modes</em> invites it again, and it fetches the signed package from the
-      field controller over the field Wi-Fi, only between games, while the game waits for it. Next:
-      the box's side of that (checking the package with keys built into its firmware and keeping
-      it); the registry; German and Traditional Chinese; the carrier PCB after the first built
-      boxes.
+      offered it: <em>Send missing modes</em> invites it again, and it fetches the signed package
+      from the field controller over the field Wi-Fi, only between games, while the game waits for
+      it; the box checks it with keys built into its firmware and keeps it (tested on a computer,
+      not yet on a real box). Next: scenario blocks in the GM console; the registry; German and
+      Traditional Chinese; the carrier PCB after the first built boxes.
     gate: Ongoing after the first release.
 
 hub:
