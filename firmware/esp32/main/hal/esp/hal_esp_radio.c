@@ -152,6 +152,8 @@ static void fem_power_off(void)
 /* IRQ masks. */
 #define SX_IRQ_TX_DONE      (1 << 0)
 #define SX_IRQ_RX_DONE      (1 << 1)
+#define SX_IRQ_HEADER_ERR   (1 << 5)
+#define SX_IRQ_CRC_ERR      (1 << 6)
 #define SX_IRQ_CAD_DONE     (1 << 7)
 #define SX_IRQ_CAD_DETECTED (1 << 8)
 #define SX_IRQ_TIMEOUT      (1 << 9)
@@ -543,11 +545,27 @@ static int esp_radio_init(void)
     return 0;
 }
 
-/* Back to continuous RX on the game channel (after TX or a TX failure). */
+/* Whether the chip is in continuous RX; anything that takes it out clears this. */
+static bool rx_armed;
+
+/* Continuous RX on the current channel, for packets of any length. The chip
+ * stays in RX after each packet, so recv() only collects them: re-arming per
+ * call left a deaf gap that lost a frame sent right after another (found on
+ * the bench: an invite's second part, a game's START right before its TIME). */
 static int sx_start_rx(void)
 {
+    uint8_t pkt_cmd[] = {SX_CMD_SET_PACKET_PARAMS, 0x00, LORA_PREAMBLE, 0x00, 0xFF, 0x01, 0x00};
+    uint8_t clr_cmd[] = {SX_CMD_CLR_IRQ_STATUS, 0xFF, 0xFF};
     uint8_t rx_cmd[] = {SX_CMD_SET_RX, 0xFF, 0xFF, 0xFF}; /* continuous */
-    return sx_cmd(rx_cmd, sizeof(rx_cmd), NULL, 0);
+    rx_armed = false;
+    if (sx_cmd(pkt_cmd, sizeof(pkt_cmd), NULL, 0) != 0 ||
+        sx_cmd(clr_cmd, sizeof(clr_cmd), NULL, 0) != 0) {
+        return -1;
+    }
+    xSemaphoreTake(dio1_sem, 0); /* drop a stale DIO1 edge */
+    if (sx_cmd(rx_cmd, sizeof(rx_cmd), NULL, 0) != 0) return -1;
+    rx_armed = true;
+    return 0;
 }
 
 static uint32_t now_ms(void)
@@ -562,6 +580,12 @@ static int esp_radio_send(const uint8_t *data, size_t len)
     if (!radio_limits_can_send(&limits, len, now_ms())) return -3;
 
     /* No channel hop -- all traffic uses the single game channel. */
+
+    /* Out of continuous RX first, so a packet finishing now cannot raise DIO1
+     * after the stale edge is dropped below and pass for TX_DONE. */
+    uint8_t stby[] = {SX_CMD_SET_STANDBY, 0x00};
+    rx_armed = false;
+    if (sx_cmd(stby, sizeof(stby), NULL, 0) != 0) return -1;
 
     /* Set packet parameters: preamble, header explicit, payload len, CRC on,
      * IQ standard. */
@@ -579,6 +603,7 @@ static int esp_radio_send(const uint8_t *data, size_t len)
     /* Clear IRQ and transmit (no timeout). */
     uint8_t clr_cmd[] = {SX_CMD_CLR_IRQ_STATUS, 0xFF, 0xFF};
     if (sx_cmd(clr_cmd, sizeof(clr_cmd), NULL, 0) != 0) return -1;
+    xSemaphoreTake(dio1_sem, 0); /* a packet received before standby is not TX_DONE */
 
     uint8_t tx_cmd[] = {SX_CMD_SET_TX, 0x00, 0x00, 0x00};
     if (sx_cmd(tx_cmd, sizeof(tx_cmd), NULL, 0) != 0) return -1;
@@ -604,33 +629,25 @@ static int esp_radio_send(const uint8_t *data, size_t len)
 
 static size_t esp_radio_recv(uint8_t *buf, size_t max_len, int8_t *rssi)
 {
-    /* Set packet params for max receive. */
-    uint8_t pkt_cmd[] = {SX_CMD_SET_PACKET_PARAMS, 0x00, LORA_PREAMBLE, 0x00, 0xFF, 0x01, 0x00};
-    if (sx_cmd(pkt_cmd, sizeof(pkt_cmd), NULL, 0) != 0) return 0;
+    if (!rx_armed && sx_start_rx() != 0) return 0;
 
-    /* Clear IRQ and set RX with 50ms timeout. */
-    uint8_t clr_cmd[] = {SX_CMD_CLR_IRQ_STATUS, 0xFF, 0xFF};
-    if (sx_cmd(clr_cmd, sizeof(clr_cmd), NULL, 0) != 0) return 0;
+    /* Up to 50 ms for a finished packet; the chip keeps listening meanwhile, so
+     * returning empty-handed loses nothing (a long packet completes later). */
+    if (xSemaphoreTake(dio1_sem, pdMS_TO_TICKS(50)) != pdTRUE) return 0;
 
-    /* Timeout in units of 15.625 us: 50ms = 3200. */
-    uint32_t timeout = 3200;
-    uint8_t rx_cmd[] = {SX_CMD_SET_RX, (uint8_t)(timeout >> 16), (uint8_t)(timeout >> 8),
-                        (uint8_t)(timeout & 0xFF)};
-    if (sx_cmd(rx_cmd, sizeof(rx_cmd), NULL, 0) != 0) return 0;
-
-    /* Wait for RX_DONE or timeout on DIO1. */
-    if (xSemaphoreTake(dio1_sem, pdMS_TO_TICKS(100)) != pdTRUE) {
-        return 0;
-    }
-
-    /* Check IRQ status. */
     uint8_t irq_cmd[] = {SX_CMD_GET_IRQ_STATUS, 0x00};
     uint8_t irq_resp[2];
     if (sx_cmd(irq_cmd, sizeof(irq_cmd), irq_resp, 2) != 0) return 0;
     uint16_t irq = ((uint16_t)irq_resp[0] << 8) | irq_resp[1];
-
-    if (!(irq & SX_IRQ_RX_DONE)) {
+    /* Clear at once: DIO1 falls, so the next packet raises a new edge. */
+    uint8_t clr_cmd[] = {SX_CMD_CLR_IRQ_STATUS, 0xFF, 0xFF};
+    if (sx_cmd(clr_cmd, sizeof(clr_cmd), NULL, 0) != 0) {
+        rx_armed = false;
         return 0;
+    }
+
+    if (!(irq & SX_IRQ_RX_DONE) || (irq & (SX_IRQ_CRC_ERR | SX_IRQ_HEADER_ERR))) {
+        return 0; /* a damaged packet; the chip is still listening */
     }
 
     /* Get RX buffer status: payload length and start offset. */
@@ -672,14 +689,19 @@ static int esp_radio_set_channel(uint32_t freq_hz)
                  (unsigned long)freq_hz);
         return -1;
     }
-    /* Power first when it drops, so the radio never sends at the old (higher)
-     * power on the new channel; frequency first when it rises. */
+    /* Retune from standby, not mid-receive. Power first when it drops, so the
+     * radio never sends at the old (higher) power on the new channel; frequency
+     * first when it rises. */
+    uint8_t stby[] = {SX_CMD_SET_STANDBY, 0x00};
+    rx_armed = false;
+    if (sx_cmd(stby, sizeof(stby), NULL, 0) != 0) return -1;
     if (power <= limits.tx_power_dbm) {
         if (sx_set_tx_power(power) != 0 || sx_set_frequency(freq_hz) != 0) return -1;
     } else {
         if (sx_set_frequency(freq_hz) != 0 || sx_set_tx_power(power) != 0) return -1;
     }
     radio_limits_set_channel(&limits, freq_hz);
+    rx_armed = false; /* the next recv() listens on the new channel */
     ESP_LOGI(TAG, "channel %lu Hz, TX %d dBm conducted, budget %lu ms left this hour",
              (unsigned long)freq_hz, power,
              (unsigned long)radio_limits_remaining_ms(&limits, now_ms()));
@@ -691,10 +713,12 @@ static int esp_radio_set_mode(hal_radio_mode_t mode)
     switch (mode) {
     case HAL_RADIO_MODE_SLEEP: {
         uint8_t cmd[] = {SX_CMD_SET_SLEEP, 0x00};
+        rx_armed = false;
         return sx_cmd(cmd, sizeof(cmd), NULL, 0);
     }
     case HAL_RADIO_MODE_STANDBY: {
         uint8_t cmd[] = {SX_CMD_SET_STANDBY, 0x00};
+        rx_armed = false;
         return sx_cmd(cmd, sizeof(cmd), NULL, 0);
     }
     case HAL_RADIO_MODE_RX: return sx_start_rx();
@@ -733,6 +757,7 @@ static bool sx_cad_once(bool *ok)
     uint8_t clr[] = {SX_CMD_CLR_IRQ_STATUS, 0xFF, 0xFF};
     uint8_t cad[] = {SX_CMD_SET_CAD};
     *ok = false;
+    rx_armed = false; /* the caller listens again with sx_start_rx() */
     if (sx_cmd(stby, sizeof(stby), NULL, 0) != 0 || sx_cmd(params, sizeof(params), NULL, 0) != 0 ||
         sx_cmd(clr, sizeof(clr), NULL, 0) != 0) {
         return false;

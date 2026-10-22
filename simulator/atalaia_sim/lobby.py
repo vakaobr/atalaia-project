@@ -51,6 +51,8 @@ INVITE_ATTEMPTS = 3
 DISCOVER_MIN_MS = 10_000     # a controller sends at most one DISCOVER in this time
 BOX_FORGET_MS = 2 * 3_600_000
 GAP_MS = 50                  # between a controller's frames, on top of their time on air
+PART_GAP_MS = 150            # between an invite's parts: the box re-arms its receiver after
+                             # each part, and back-to-back parts lost the second on the bench
 
 
 def announce_interval_ms(channel_hz: int, frame_len: int) -> int:
@@ -270,6 +272,7 @@ class Invite:
     next_ms: int = 0
     name: Optional[str] = None
     tx: set[int] = field(default_factory=set)
+    pending: list[bytes] = field(default_factory=list)  # this attempt's parts not yet sent
 
     @property
     def parts(self) -> int:
@@ -428,19 +431,27 @@ class Inviter:
             inv.status, inv.detail = "failed", "the box is no longer announcing itself"
             self._changed("invites")
             return
-        frames = ff.invite_frames(self.key, self.nonces, inv.device_id, token, inv.invite_id, inv.payload)
-        sent_any = False
-        for frame in frames:
-            tx = self.send(frame)
-            if tx is not None:
-                inv.tx.add(tx)
-                sent_any = True
+        if not inv.pending:  # a new attempt: all its parts, sent one per tick
+            inv.pending = ff.invite_frames(self.key, self.nonces, inv.device_id, token, inv.invite_id,
+                                           inv.payload)
+            inv.detail = None
+        frame = inv.pending.pop(0)
+        tx = self.send(frame)
+        if tx is not None:
+            inv.tx.add(tx)
+        else:
+            inv.detail = "radio: not sent"
+        airtime = int(eu868.airtime_ms(len(frame)))
+        if inv.status != "invited":  # out with its first part
+            inv.status = "invited"
+            self._changed("invites")
+        if inv.pending:  # the next part once this one is on air and the box listens again
+            self.busy_until = now_ms + airtime + PART_GAP_MS
+            inv.next_ms = self.busy_until
+            return
         inv.attempts += 1
-        inv.status = "invited"
-        inv.detail = None if sent_any else "radio: not sent"
-        airtime = sum(eu868.airtime_ms(len(f)) + GAP_MS for f in frames)
-        self.busy_until = now_ms + int(airtime)
-        inv.next_ms = now_ms + int(airtime) + INVITE_RETRY_MS
+        self.busy_until = now_ms + airtime + GAP_MS
+        inv.next_ms = now_ms + airtime + INVITE_RETRY_MS
         self._changed("invites")
 
 

@@ -298,11 +298,11 @@ class ConsoleBrowserTests(unittest.TestCase):
         # On air: the invite, sealed; the box reads it, joins, and answers.
         invites: list[bytes] = []
 
-        def heard_invite() -> bool:
+        def heard_invite() -> bool:  # every part: they go out one at a time, paced
             for f in self.field.host.transmitted_all(0.2):
                 if ff.is_frame(f) and ff.decode(key, f)["kind"] == "invite":
                     invites.append(f)
-            return bool(invites)
+            return bool(invites) and len(invites) >= ff.decode(key, invites[0])["parts"]
         self.assertTrue(wait_for(heard_invite, 5))
         for f in invites:
             box.on_frame(f, 1000)

@@ -539,10 +539,13 @@ bool box_game_resume(box_game_t *g, uint32_t now_ms)
 {
     g->now_ms = now_ms ? now_ms : 1;
     if (!g->have_join_key || g->store.load_join == NULL) return false;
-    uint8_t buf[ATALAIA_JOIN_MAX];
+    /* Static, not on the stack: resume runs once at boot on the main task, whose
+     * stack the join (~750 B), this buffer and the saved state (~1.1 KB) overflowed
+     * before the mode's restore ran (found on the bench, 2026-10-22). */
+    static uint8_t buf[ATALAIA_JOIN_MAX];
     int n = g->store.load_join(g->store.ctx, buf, sizeof(buf));
     if (n <= 0) return false;
-    atalaia_join_t j;
+    static atalaia_join_t j;
     if (atalaia_join_decode(buf, (size_t)n, g->join_key, &j) != ATALAIA_JOIN_OK) {
         say(g, "stored join no longer valid (another join key?): erased");
         if (g->store.erase_join != NULL) g->store.erase_join(g->store.ctx);
@@ -556,7 +559,7 @@ bool box_game_resume(box_game_t *g, uint32_t now_ms)
     }
 
     /* Was the game being played? Then carry on from the saved state. */
-    state_persist_data_t saved;
+    static state_persist_data_t saved; /* static: see buf above */
     if (state_persist_load(&saved)) {
         prepare_runner(g);
         if (node_runner_resume(g->runner, &saved, g->preset->source, g->preset->source_len,
