@@ -38,7 +38,7 @@ class App extends Component {
             nodes: {}, seen: {}, feed: [], alerts: [], modes: [], presets: [],
             positions: {}, scoreHistory: [], clockBase: null, toast: '', now: Date.now(),
             radio: null, chronoCounts: null, branding: null, teamPresets: [],
-            boxes: null, invites: [], invitePicker: false,
+            boxes: null, invites: [], invitePicker: false, mapFeatures: [],
         };
         this.checkinPanel = null;
         this.stream = null;
@@ -163,6 +163,7 @@ class App extends Component {
             }
             this.setState({ status: msg.status, score: msg.score, nodes, seen });
             if (msg.branding) this.setState({ branding: msg.branding });
+            this.loadFeatures();
             this.setGame(msg.game);
             if (msg.game) {
                 this.loadLog(msg.game.id);
@@ -259,6 +260,9 @@ class App extends Component {
         case 'field_georef':
             this.setState((s) => ({ georefVersion: (s.georefVersion || 0) + 1 }));
             break;
+        case 'map_features': // what this token may see (MF-10)
+            this.setState({ mapFeatures: msg.features || [] });
+            break;
         default:
             break;
         }
@@ -310,6 +314,12 @@ class App extends Component {
         if (this.state.role !== 'gm' || !game.live || game.state === 'ended') return;
         const list = await this.call('GET', `/games/${game.id}/chrono-list`);
         if (list) this.setState({ chronoCounts: list.counts });
+    }
+
+    /** The map features this token may see (decisions MF-0 to MF-16). */
+    async loadFeatures() {
+        const out = await this.call('GET', '/field/features');
+        if (out) this.setState({ mapFeatures: out.features });
     }
 
     async loadPositions(gameId) {

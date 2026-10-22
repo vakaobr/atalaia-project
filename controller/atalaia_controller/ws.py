@@ -15,7 +15,8 @@ for their own row, to the player; player positions only to those who may
 see them (positions.Positions.can_see); a player's connection gets no
 radio or controller internals; data the schema marks gm_only (a Hacking
 Terminal's revealed code, a Bomb's team codes: decision M5-1, visibility.py)
-reaches staff only. Keys starting with "_" are routing marks and never leave
+reaches staff only; map features (map_features.py) as each connection may see
+them (decision MF-10). Keys starting with "_" are routing marks and never leave
 the controller. api.create_app installs that route (api.make_route);
 ``default_route`` is only for a hub with no controller behind it.
 """
@@ -32,7 +33,7 @@ CLOSE = "close"  # a queued ("close", code): the sender closes the socket with t
 
 # What a player-token connection is sent (besides its own check-in messages).
 PLAYER_TYPES = {"hello", "game", "score", "node", "event", "field_state", "positions", "player_position",
-                "checkin", "chrono_list", "checkin_open", "pong", "branding"}
+                "checkin", "chrono_list", "checkin_open", "pong", "branding", "map_features"}
 
 Route = Callable[[Any, dict[str, Any]], Any]
 
@@ -44,7 +45,8 @@ def public(msg: dict[str, Any]) -> dict[str, Any]:
 def default_route(viewer: Any, msg: dict[str, Any]) -> Any:
     """Every message to everyone, minus the routing marks and the gm_only event data
     (only the GM token sees that; no controller is known here to judge the rest)."""
-    if msg.get("_staff") or "_player" in msg or msg.get("_position") or msg.get("_positions_refresh"):
+    if msg.get("_staff") or "_player" in msg or msg.get("_position") or msg.get("_positions_refresh") \
+            or msg.get("_map_features"):
         return None
     out = public(msg)
     if out.get("type") == "event" and isinstance(out.get("event"), dict) \

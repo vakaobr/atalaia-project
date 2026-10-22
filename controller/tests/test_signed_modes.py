@@ -301,7 +301,7 @@ class ConfigAndStoreTests(unittest.TestCase):
             self.assertEqual(store.modes(), [{"id": "org.x.y", "version": "1.0.0",
                                               "files": {"mode.yaml": "id: org.x.y"}, "signed": None}])
             self.assertEqual(store.get_setting("schema_version"), str(SCHEMA_VERSION))
-            self.assertEqual(SCHEMA_VERSION, 10)
+            self.assertGreaterEqual(SCHEMA_VERSION, 10)  # signed packages came with schema 10
             store.save_mode("org.x.y", "1.0.1", {"mode.yaml": "x"}, {"key_id": "k"}, b"tar")
             self.assertEqual((store.modes()[0]["signed"], store.mode_package("org.x.y")), ({"key_id": "k"}, b"tar"))
             store.close()

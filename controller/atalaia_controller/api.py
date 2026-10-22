@@ -47,6 +47,9 @@ which browsers cannot give headers, also takes ``?token=``.
     GET|PUT /api/v1/field/levels           a multi-story field: levels on or off, their number and names (PUT: GM)
     GET|PUT|DELETE /api/v1/field/levels/{n}/image   level n's floor plan (level 0: the field image)
     GET|PUT|DELETE /api/v1/field/levels/{n}/georef  level n's own control points (else level 0's)
+    GET  /api/v1/field/features            the map features this token may see (safe zones, respawns, HQs...)
+    POST /api/v1/field/features            GM: mark one {"type", "shape", "x", "y" | "points", "radius_m"?, ...}
+    PUT|DELETE /api/v1/field/features/{id} GM: change or delete one (map_features.py, decisions MF-*)
     GET  /api/v1/atak                      the ATAK / CoT feed's settings and counters (GM or read token)
     GET  /api/v1/field/branding            the field's name, logo, wallpaper and accent (no token, ETag)
     PUT  /api/v1/field/branding            GM: {"field_name"?, "accent"?}
@@ -134,6 +137,7 @@ from . import checkin as checkinmod
 from . import schedule as schedulemod
 from . import field_levels as levelsmod
 from . import georef as georefmod
+from . import map_features as mapmod
 from . import images, visibility
 from . import scenario_service as scenarios
 from .branding import SLOTS, Branding, etag
@@ -671,6 +675,7 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         removed = levelsmod.save(controller.store, meta)
         out = levelsmod.view(controller.store)
         controller._emit({"type": "field_levels", "levels": out})
+        controller._emit(FEATURES_CHANGED)  # which levels are in use, and the features of the levels that went
         return {**out, "removed": removed}
 
     @app.get("/api/v1/field/levels/{level}/image", dependencies=[Depends(require_read)])
@@ -696,6 +701,44 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     @app.delete("/api/v1/field/levels/{level}/georef", dependencies=[Depends(require_gm)])
     def delete_level_georef_route(level: int) -> dict[str, Any]:
         return delete_level_georef(level)
+
+    # --- map features (map_features.py, decisions MF-0 to MF-16) ----------------
+
+    def feature_or_404(feature_id: int) -> dict[str, Any]:
+        row = controller.store.map_feature(feature_id)
+        if row is None:
+            raise HTTPException(404, "no such map feature")
+        return row
+
+    @app.get("/api/v1/field/features")
+    def field_features(v: Viewer = Depends(require_read)) -> dict[str, Any]:
+        """What this token may see (MF-3): staff everything, a player their team's too, else everyone's."""
+        return {"features": mapmod.visible(controller.store, v)}
+
+    @app.post("/api/v1/field/features", status_code=201, dependencies=[Depends(require_gm)])
+    def add_field_feature(body: Any = Body(None)) -> dict[str, Any]:
+        data = mapmod.check(body, levels_meta())
+        if controller.store.count_map_features() >= mapmod.FEATURES_MAX:
+            raise HTTPException(409, f"the field has {mapmod.FEATURES_MAX} map features: delete one first")
+        level = data.pop("level")
+        fid = controller.store.add_map_feature(level, data)
+        controller._emit(FEATURES_CHANGED)
+        return mapmod.view(feature_or_404(fid))
+
+    @app.put("/api/v1/field/features/{feature_id}", dependencies=[Depends(require_gm)])
+    def put_field_feature(feature_id: int, body: Any = Body(None)) -> dict[str, Any]:
+        feature_or_404(feature_id)
+        data = mapmod.check(body, levels_meta())
+        controller.store.put_map_feature(feature_id, data.pop("level"), data)
+        controller._emit(FEATURES_CHANGED)
+        return mapmod.view(feature_or_404(feature_id))
+
+    @app.delete("/api/v1/field/features/{feature_id}", dependencies=[Depends(require_gm)])
+    def delete_field_feature(feature_id: int) -> dict[str, Any]:
+        feature_or_404(feature_id)
+        controller.store.delete_map_feature(feature_id)
+        controller._emit(FEATURES_CHANGED)
+        return {"deleted": True}
 
     @app.get("/api/v1/atak", dependencies=[Depends(require_console)])
     def atak_status() -> dict[str, Any]:
@@ -1206,6 +1249,9 @@ def _reason(spec: dict[str, Any]) -> str:
 
 
 HELLO_EVENTS = 100
+# A map feature was added, changed or deleted (or the levels in use changed): make_route sends each
+# connection the features it may see (MF-10). Routing marks never leave the controller (ws.py).
+FEATURES_CHANGED = {"type": "map_features", "_map_features": True}
 
 
 def _snapshot(controller: Controller, viewer: Optional[Viewer] = None) -> dict[str, Any]:
@@ -1272,6 +1318,9 @@ def make_route(controller: Controller) -> Callable[[Any, dict[str, Any]], Any]:
             if pos is None or v.kind == "read":
                 return None
             return {"type": "positions", "game": msg.get("game"), "positions": pos.visible(v, msg.get("game"))}
+        if msg.get("_map_features"):
+            # Each connection gets the features it may see, whole (MF-10): never another team's or the staff's.
+            return {"type": "map_features", "features": mapmod.visible(controller.store, v)}
         if v.kind == "player" and msg.get("type") not in PLAYER_TYPES:
             return None
         out = public(msg)

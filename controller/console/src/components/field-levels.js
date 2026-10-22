@@ -91,10 +91,12 @@ export class LevelSettings extends Component {
         }
     }
 
-    /** The levels that would go, with a plan, if the GM saved the form's count. */
+    /** The levels that would go, with a plan or map features (MF-8), if the GM saved the form's count. */
     losing(count) {
         const levels = this.props.levels;
-        return (levels.levels || []).filter((l) => l.level >= count && l.image).map((l) => levelName(levels, l.level));
+        const featured = new Set((this.props.app.state.mapFeatures || []).map((f) => f.level));
+        return (levels.levels || []).filter((l) => l.level >= count && (l.image || featured.has(l.level)))
+            .map((l) => levelName(levels, l.level));
     }
 
     save(e) {

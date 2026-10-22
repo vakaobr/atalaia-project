@@ -12,14 +12,22 @@
 // A multi-story field (field-levels.js, decisions ML-0 to ML-12) has a tab per
 // level, each with its own floor plan and the boxes on that level; the GM
 // moves a box to another level with the level list under the plan.
+//
+// Map features (map-features.js, decisions MF-0 to MF-16): safe zones, respawns, HQs, the car
+// park, first aid and objectives on the shown level's plan, under the boxes, with their editor
+// below the plan. While the GM places one, a press on the plan places it (the boxes and pins
+// let the press through).
 
 import { html, Component, createRef, t, teamColour, OFFLINE_MS } from '../ui.js';
 import { linkBars } from './node-list.js';
 import { GeorefPanel, georefPins } from './georef-panel.js';
 import { LevelSettings, LevelTabs, levelName, levelsInUse, shownLevel } from './field-levels.js';
+import { MapFeatures, featurePins, featureShapes, planScale } from './map-features.js';
 
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const NO_LEVELS = { enabled: false, count: 1, names: [''], levels: [] };
+const DEFAULT_TEAMS = ['red', 'blue'];
+const POLYGON_MAX = 12; // map_features.POLYGON_MAX
 
 /** The API path of a level's plan or georeference (level 0: the paths of a single image). */
 function levelPath(level, what) {
@@ -32,8 +40,9 @@ export class FieldView extends Component {
         super();
         this.state = {
             imageUrl: null, version: -1, geoVersion: -1, georef: null, ownGeoref: true, drag: null,
-            noImage: false, levels: NO_LEVELS, level: 0,
+            noImage: false, levels: NO_LEVELS, level: 0, draft: null,
         };
+        this.radiusDrag = false;
         this.area = createRef();
         this.loads = 0;
     }
@@ -87,7 +96,7 @@ export class FieldView extends Component {
 
     selectLevel(level) {
         if (level === this.state.level) return;
-        this.setState({ level });
+        this.setState({ level, draft: null });
         this.loadImage(level);
     }
 
@@ -167,6 +176,63 @@ export class FieldView extends Component {
         this.place(node.node_id, { x: p.x, y: p.y, level });
     }
 
+    // ---- map features: placing the draft on the plan ----
+
+    /** A place for the draft: a pin's or a circle's centre, or an area's next corner. */
+    placeDraft(p) {
+        const d = this.state.draft;
+        if (!d) return;
+        if (d.shape === 'polygon') {
+            if (d.points.length < POLYGON_MAX) this.setState({ draft: { ...d, points: [...d.points, p] } });
+        } else {
+            this.setState({ draft: { ...d, x: p.x, y: p.y } });
+        }
+    }
+
+    areaDown(e) {
+        const d = this.state.draft;
+        if (!d || !d.placing || this.props.app.state.role !== 'gm') return;
+        e.preventDefault();
+        this.placeDraft(this.point(e));
+        if (d.shape === 'circle' && planScale(this.state.georef)) {
+            // Press at the centre and drag to the edge: the radius, to the plan's scale.
+            this.radiusDrag = true;
+            e.currentTarget.setPointerCapture(e.pointerId);
+        }
+    }
+
+    areaMove(e) {
+        const d = this.state.draft;
+        const scale = planScale(this.state.georef);
+        if (!this.radiusDrag || !d || !scale) return;
+        const p = this.point(e);
+        const r = Math.hypot((p.x - d.x) * scale.w, (p.y - d.y) * scale.h);
+        this.setState({ draft: { ...d, radius_m: Math.min(2000, Math.max(1, Math.round(r))) } });
+    }
+
+    areaUp() {
+        this.radiusDrag = false;
+    }
+
+    /** The features shown on this level's plan: the stored ones, the one being edited as the GM has it. */
+    shownFeatures() {
+        const d = this.state.draft;
+        const list = (this.props.app.state.mapFeatures || []).filter((f) => f.level === this.state.level
+            && !(d && d.id === f.id));
+        return d && d.level === this.state.level ? [...list, d] : list;
+    }
+
+    editFeature(f) {
+        if (this.props.app.state.role !== 'gm') return;
+        this.setState({ draft: { ...f, draft: true, points: f.points ? [...f.points] : [], x: f.x ?? null,
+                                 y: f.y ?? null, radius_m: f.radius_m ?? 25, placing: false } });
+    }
+
+    setDraft(draft) {
+        this.setState({ draft });
+        if (draft === null) this.props.app.loadFeatures();
+    }
+
     canEdit() {
         const { role, game } = this.props.app.state;
         return role === 'gm' && game;
@@ -222,6 +288,10 @@ export class FieldView extends Component {
         const multi = levelsInUse(state.levels) > 1;
         const here = list.filter((n) => this.nodeLevel(n) === state.level);
         const name = levelName(state.levels, state.level);
+        const featureTeams = teams.length ? teams : DEFAULT_TEAMS;
+        const features = this.shownFeatures();
+        const scale = planScale(state.georef);
+        const placing = state.draft && state.draft.placing;
         return html`<section class="card" aria-labelledby="field-h">
             <h2 id="field-h">${t('field.title')}</h2>
             ${role === 'gm' && html`<${LevelSettings} app=${app} levels=${state.levels}
@@ -236,11 +306,15 @@ export class FieldView extends Component {
                 ${state.imageUrl && html`<button type="button" data-testid="field-remove"
                     onClick=${() => this.removeImage()}>${multi ? t('levels.remove') : t('field.remove')}</button>`}
             </div>`}
-            <div class=${`field-area ${state.imageUrl ? 'with-image' : 'grid'}`} ref=${this.area} data-testid="field-area"
-                data-level=${state.level}>
+            <div class=${`field-area ${state.imageUrl ? 'with-image' : 'grid'}${placing ? ' placing' : ''}`} ref=${this.area}
+                data-testid="field-area" data-level=${state.level}
+                onPointerDown=${(e) => this.areaDown(e)} onPointerMove=${(e) => this.areaMove(e)}
+                onPointerUp=${() => this.areaUp()} onPointerCancel=${() => this.areaUp()}>
                 ${state.imageUrl && html`<img src=${state.imageUrl} draggable="false"
                     alt=${multi ? t('levels.image_alt', { name }) : t('field.image_alt')} />`}
                 ${state.imageUrl && georefPins(state.georef)}
+                ${featureShapes(features, featureTeams, scale)}
+                ${featurePins(features, featureTeams, (f) => this.editFeature(f))}
                 ${here.map((n) => this.marker(n, list.indexOf(n), list.length, teams))}
             </div>
             <p class="muted small">${state.noImage ? t(multi ? 'levels.no_image' : 'field.no_image', { name }) : ''}
@@ -249,6 +323,9 @@ export class FieldView extends Component {
             ${this.renderNodeLevels(list)}
             </div>
         </section>
+        <${MapFeatures} app=${app} features=${app.state.mapFeatures || []} level=${state.level} teams=${featureTeams}
+            canEdit=${role === 'gm'} draft=${state.draft} scale=${scale}
+            onDraft=${(d) => this.setDraft(d)} onPlace=${(p) => this.placeDraft(p)} />
         ${state.imageUrl && html`<${GeorefPanel} app=${app} georef=${state.georef} level=${state.level}
             own=${state.ownGeoref} levelName=${multi ? name : null} groundName=${levelName(state.levels, 0)}
             onChange=${() => this.loadGeoref()} />`}`;

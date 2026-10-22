@@ -799,6 +799,127 @@ tr.offline td {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
+/* map features (map-features.js): the shapes under the boxes, a pin per feature, the editor */
+.mf-layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.mf-shape {
+    fill-opacity: 0.22;
+    stroke-width: 2;
+}
+
+.mf-shape.no-scale {
+    stroke-dasharray: 6 4;
+}
+
+.mf-shape.draft {
+    fill-opacity: 0.35;
+    stroke-dasharray: 3 3;
+}
+
+.mf-pin {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    width: 1.7rem;
+    height: 1.7rem;
+    min-height: auto;
+    padding: 0.2rem;
+    border-radius: 0.35rem;
+    border: 2px solid #fff;
+    color: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    display: grid;
+    place-items: center;
+}
+
+.mf-pin.draft {
+    outline: 2px dashed var(--fg);
+    outline-offset: 2px;
+}
+
+.field-area.placing {
+    cursor: crosshair;
+}
+
+.field-area.placing .marker,
+.field-area.placing .mf-pin {
+    pointer-events: none;
+}
+
+.mf-icon {
+    width: 1rem;
+    height: 1rem;
+    fill: currentColor;
+    flex: none;
+}
+
+.mf-swatch {
+    display: inline-grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 0.3rem;
+    color: #fff;
+    flex: none;
+}
+
+.mf-legend ul,
+.mf-list {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0;
+    display: grid;
+    gap: 0.4rem;
+}
+
+.mf-legend li,
+.mf-list li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    min-width: 0;
+}
+
+.mf-what {
+    display: grid;
+    flex: 1 1 12rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.mf-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.mf-shapes,
+.mf-keys {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0.5rem 0.7rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    align-items: end;
+    min-width: 0;
+}
+
+.mf-keys .field {
+    flex: 1 1 8rem;
+}
+
+.mf-new-type {
+    width: auto;
+    max-width: 100%;
+}
+
 /* ---- join ---- */
 
 .join-result {

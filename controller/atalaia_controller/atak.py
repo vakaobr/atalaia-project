@@ -30,7 +30,14 @@ owner, and one for a VIP / Payload extraction zone:
   (``remote_gm.py``), which relays them to the field's enrolled ATAK devices
   over TLS with client certificates; player positions go there only with
   ``remote_players = true`` too, and the site server sends them only to a
-  certificate allowed to see them (P4R18).
+  certificate allowed to see them (P4R18);
+- the field's map features (map_features.py, decisions MF-11 to MF-13), placed by their level's
+  georeference: a point as a spot marker, a circle as an ATAK drawn circle (``u-d-c-c``, its
+  radius in the ``<shape><ellipse>``), a polygon as a closed drawn shape (``u-d-f``, its corners as
+  ``<link point>``, the first again at the end). Only those for everyone go to multicast; the staff
+  devices get them all (a team's and the organisers' too: the feed is not per team); the remote
+  relay gets the points and circles for everyone, a circle as a spot marker with its radius as
+  ``ce`` (the extraction zone's form), never a polygon (the relay's narrow form, sync_format.py).
 
 The format is the CoT base event schema, version 2.0 (MITRE, "CoT
 Base-Event Schema (PUBLIC RELEASE).xsd", in the ATAK-CIV repository's
@@ -62,6 +69,7 @@ from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
 
 from . import field_levels as levelsmod
 from . import georef as georefmod
+from . import map_features as mapmod
 
 if TYPE_CHECKING:
     from .config import Config
@@ -80,6 +88,8 @@ REMARKS_MAX = 160
 # without them) stays under DATAGRAM_MAX whatever the characters ('"' is 6 bytes as &quot;).
 CALLSIGN_BYTES = 160
 REMARKS_BYTES = 320
+SHAPE_CALLSIGN_BYTES = 96            # a drawn shape's (map features, MF-11): its corners take the room
+SHAPE_REMARKS_BYTES = 192
 _ESCAPED = {"&": 5, "<": 4, ">": 4, '"': 6, "'": 6}
 TCP_TIMEOUT_S = 2.0
 UNKNOWN = "9999999.0"                 # hae, ce and le not known (takcot/examples use this value)
@@ -92,6 +102,19 @@ TYPE_PLAYER = "a-f-G-U-C"    # atoms, friend, ground, unit, combat (CoTtypes.xml
 # for an extraction zone pasted from a map app (decision M5-3); m-g "machine, GPS" for a phone's fix.
 HOW_IMAGE, HOW_PASTED, HOW_GPS = "h-e", "h-p", "m-g"
 GROUP_ROLE = "Team Member"   # __group role (takcot/xsd/details/__group.xsd: name and role required)
+# Map features' shapes (MF-11): ATAK's drawn circle and free-form shape (takcot/examples "Drawing Shapes -
+# Circle.cot" and "Drawing Shapes - Free Form.cot"; cot.json).
+TYPE_CIRCLE = "u-d-c-c"
+TYPE_POLYGON = "u-d-f"
+STYLE_LINK_TYPE = "b-x-KmlStyle"  # the circle's style link (the circle example; takcot/xsd/details/shape.xsd)
+STROKE_WEIGHT = "3.0"
+FILL_ALPHA = 0x60            # a translucent fill, the plan's features over the map (the examples use 0x96)
+# What ATAK shows for a map feature (English, as the extraction zone's "Extraction") and its colour when
+# it has no team, as the console's (console/src/components/map-features.js FEATURE_COLOURS).
+FEATURE_NAMES = {"safe_zone": "Safe zone", "respawn": "Respawn", "hq": "HQ", "parking": "Parking",
+                 "first_aid": "First aid", "objective": "Objective", "other": "Feature"}
+FEATURE_COLOURS = {"safe_zone": 0x14B8A6, "respawn": 0x6C757D, "hq": 0x6C757D, "parking": 0x546E7A,
+                   "first_aid": 0xE91E63, "objective": 0xF59E0B, "other": 0x94A3B8}
 
 # Team colours as the console shows them (console/src/ui.js TEAM_COLOURS and PALETTE), and the
 # ATAK team for each (ATAK's 14 team colours; decision M9-5). A team that is no colour gets the
@@ -164,6 +187,27 @@ def team_colour(team: Optional[str], teams: list[str]) -> int:
     return argb - (1 << 32)
 
 
+def argb_of(rgb: int, alpha: int = 0xFF) -> int:
+    """An RGB colour and an alpha as signed 32-bit ARGB."""
+    v = ((alpha & 0xFF) << 24) | (rgb & 0xFFFFFF)
+    return v - (1 << 32) if v >= 1 << 31 else v
+
+
+def kml_colour(argb: int) -> str:
+    """Signed ARGB as KML's aabbggrr (the circle example's <LineStyle><color>ffffffff for argb -1)."""
+    v = argb & 0xFFFFFFFF
+    a, r, g, b = (v >> 24) & 0xFF, (v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF
+    return f"{a:02x}{b:02x}{g:02x}{r:02x}"
+
+
+def feature_colour(feature: dict[str, Any], teams: list[str]) -> int:
+    """A map feature's ARGB: its team's colour, else its type's."""
+    team = feature.get("team")
+    if team:
+        return team_colour(team, teams)
+    return argb_of(FEATURE_COLOURS.get(feature.get("type"), FEATURE_COLOURS["other"]))
+
+
 def atak_team(team: Optional[str]) -> Optional[str]:
     """The ATAK team (``__group name``) for an Atalaia team named after a colour, else None."""
     if not team:
@@ -224,6 +268,55 @@ def marker_detail(callsign: str, remarks: str, argb: int, battery: Optional[int]
     if battery is not None and not isinstance(battery, bool) and isinstance(battery, int) and 0 <= battery <= 100:
         out.insert(0, _el("status", {"battery": str(battery)}))
     return out
+
+
+def shape_detail(callsign: str, remarks: str, argb: int) -> list[ET.Element]:
+    """A drawn shape's style and names, in the order of takcot/examples "Drawing Shapes - *.cot"; its texts
+    have tighter byte caps than a marker's, so a polygon's corners fit the datagram too."""
+    return [_el("strokeColor", {"value": str(argb)}), _el("strokeWeight", {"value": STROKE_WEIGHT}),
+            _el("fillColor", {"value": str(argb_of(argb, FILL_ALPHA))}),
+            _el("contact", {"callsign": xml_text(callsign, CALLSIGN_MAX, SHAPE_CALLSIGN_BYTES) or "?"}),
+            _el("remarks", None, xml_text(remarks, REMARKS_MAX, SHAPE_REMARKS_BYTES)),
+            _el("labels_on", {"value": "true"})]
+
+
+def feature_xml(*, uid: str, feature: dict[str, Any], geo: georefmod.Georef, now: float, stale: float,
+                callsign: str, remarks: str, argb: int,
+                group: Optional[str] = None) -> tuple[bytes, str, float, float]:
+    """A map feature's CoT event (MF-11): ``(event, type, lat, lon)``, the point being its pin (a polygon's
+    vertex average). A point is a spot marker; a circle ATAK's drawn circle (``<shape><ellipse>``, whose
+    major and minor ATAK reads as the radius in metres); a polygon ATAK's drawn shape, closed by giving
+    its first corner again at the end, as ATAK writes a closed shape."""
+    cx, cy = mapmod.centre(feature)
+    lat, lon = geo.to_latlon(cx, cy)
+    shape = feature["shape"]
+    if shape == "point":
+        data = event_xml(uid=uid, cot_type=TYPE_PROP, how=HOW_IMAGE, lat=lat, lon=lon, now=now, start=now,
+                         stale=stale, detail=marker_detail(callsign, remarks, argb, group=group))
+        return data, TYPE_PROP, lat, lon
+    detail: list[ET.Element] = []
+    if shape == "circle":
+        radius = f"{float(feature['radius_m']):.1f}"
+        el = ET.Element("shape")
+        ET.SubElement(el, "ellipse", {"major": radius, "minor": radius, "angle": "360"})
+        link = ET.SubElement(el, "link", {"uid": f"{uid}.Style", "type": STYLE_LINK_TYPE, "relation": "p-c"})
+        style = ET.SubElement(link, "Style")
+        line = ET.SubElement(style, "LineStyle")
+        ET.SubElement(line, "color").text = kml_colour(argb)
+        ET.SubElement(line, "width").text = STROKE_WEIGHT
+        poly = ET.SubElement(style, "PolyStyle")
+        ET.SubElement(poly, "color").text = kml_colour(argb_of(argb, FILL_ALPHA))
+        detail.append(el)
+        cot_type = TYPE_CIRCLE
+    else:
+        corners = [geo.to_latlon(p["x"], p["y"]) for p in feature["points"]]
+        for la, lo in [*corners, corners[0]]:
+            detail.append(_el("link", {"point": f"{_deg(la)},{_deg(lo)}"}))
+        cot_type = TYPE_POLYGON
+    detail += shape_detail(callsign, remarks, argb)
+    data = event_xml(uid=uid, cot_type=cot_type, how=HOW_IMAGE, lat=lat, lon=lon, now=now, start=now, stale=stale,
+                     detail=detail)
+    return data, cot_type, lat, lon
 
 
 def drop_xml(uid: str, cot_type: str, lat: float, lon: float, now: float) -> bytes:
@@ -357,7 +450,7 @@ class AtakEmitter:
         self._next_players = 0.0
         self.stats: dict[str, Any] = {"udp_events": 0, "tcp_events": 0, "remote_events": 0, "errors": 0,
                                       "last_error": None,
-                                      "last_sent_at": None, "no_georef": False}
+                                      "last_sent_at": None, "no_georef": False, "features": 0}
         controller.atak = self
         controller.add_listener(self.on_controller_message)
 
@@ -440,7 +533,7 @@ class AtakEmitter:
                 if game.get("state") == "ended" and isinstance(game.get("id"), int):
                     self._end = game["id"]
                 self._all = True
-            elif kind in ("field_georef", "field_image", "field_levels"):
+            elif kind in ("field_georef", "field_image", "field_levels", "map_features"):
                 self._all = True
             else:
                 wake = False
@@ -489,6 +582,11 @@ class AtakEmitter:
             tcp_out += props
             if self.remote is not None:
                 remote_out += props
+            if everything:
+                udp_f, tcp_f, remote_f = self._features(game, geos, levels, now)
+                udp_out += udp_f
+                tcp_out += tcp_f
+                remote_out += remote_f
         else:
             # No live game here or no georeference any more: what ATAK shows is no longer true.
             udp_out += self._drops(self._markers, now)
@@ -611,6 +709,63 @@ class AtakEmitter:
                                               f"{radius:.0f} m", team_colour(team, teams), group=atak_team(team)))
         self._mark(uid, TYPE_ZONE_POINT, where[0], where[1])
         return [data]
+
+    def _features(self, game: dict[str, Any], geos: dict[int, Optional[georefmod.Georef]], levels: dict[str, Any],
+                  now: float) -> tuple[list[bytes], list[bytes], list[bytes]]:
+        """The field's map features on levels in use whose level has a place on the map (MF-11 to MF-13),
+        as (multicast, staff, remote) events; a feature that went (deleted, moved off the map, or no longer
+        for everyone) is dropped where it was sent."""
+        stale = now + 2 * self.cfg.atak_interval_s
+        teams = list(game.get("teams") or [])
+        prefix = self._uid("feature") + "."
+        out: dict[str, list[bytes]] = {"udp": [], "tcp": [], "remote": []}
+        sent: dict[str, dict[str, tuple[str, float, float]]] = {"udp": {}, "tcp": {}, "remote": {}}
+        for f in mapmod.in_use(self.ctrl.store, levels):
+            geo = geos.get(f["level"])
+            if geo is None:
+                continue  # its level has no place on the map
+            uid = prefix + str(f["id"])
+            team = f.get("team")
+            name = FEATURE_NAMES.get(f["type"], FEATURE_NAMES["other"])
+            remarks = f"Atalaia: {name}"
+            if team:
+                remarks += f", {self._display(game, team)}"
+            if f["visibility"] == "team":
+                remarks += ", team only"
+            elif f["visibility"] == "organisers":
+                remarks += ", organisers only"
+            if f["shape"] == "circle":
+                remarks += f", {float(f['radius_m']):.0f} m"
+            if levels["enabled"]:
+                remarks += f", {levelsmod.label(levels, f['level'])}"
+            if f.get("note"):
+                remarks += f". {f['note']}"
+            argb = feature_colour(f, teams)
+            group = atak_team(team)
+            data, kind, lat, lon = feature_xml(uid=uid, feature=f, geo=geo, now=now, stale=stale,
+                                               callsign=f["label"] or name, remarks=remarks, argb=argb, group=group)
+            out["tcp"].append(data)  # the staff's devices see every feature, as the organisers do (MF-12)
+            sent["tcp"][uid] = (kind, lat, lon)
+            if f["visibility"] != "everyone":
+                continue  # never on the field's Wi-Fi, nor relayed (MF-12)
+            out["udp"].append(data)
+            sent["udp"][uid] = (kind, lat, lon)
+            if self.remote is not None and f["shape"] != "polygon":
+                # The relay's narrow form takes spot markers only (sync_format.cot_event; MF-13): a circle
+                # goes as its centre with the radius as ce, as the extraction zone does.
+                ce = float(f["radius_m"]) if f["shape"] == "circle" else None
+                out["remote"].append(event_xml(uid=uid, cot_type=TYPE_PROP, how=HOW_IMAGE, lat=lat, lon=lon,
+                                               now=now, start=now, stale=stale, ce=ce,
+                                               detail=marker_detail(f["label"] or name, remarks, argb,
+                                                                    group=group)))
+                sent["remote"][uid] = (TYPE_PROP, lat, lon)
+        for key, markers in (("udp", self._markers), ("tcp", self._staff_markers), ("remote", self._remote_markers)):
+            for uid in [u for u in markers if u.startswith(prefix) and u not in sent[key]]:
+                cot_type, lat, lon = markers.pop(uid)
+                out[key].append(drop_xml(uid, cot_type, lat, lon, now))
+            markers.update(sent[key])
+        self.stats["features"] = len(sent["tcp"])
+        return out["udp"], out["tcp"], out["remote"]
 
     def _mark(self, uid: str, cot_type: str, lat: float, lon: float) -> None:
         """A box or zone sent: every transport that got it drops it at the end."""

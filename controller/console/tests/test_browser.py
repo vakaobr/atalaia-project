@@ -1511,13 +1511,190 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.locator("[data-testid=field-area] img")).to_have_attribute("alt", "Floor plan: Floor 2")
         page.get_by_test_id("levels-count").select_option("2")
         page.get_by_test_id("levels-save").click()
-        expect(page.get_by_test_id("levels-confirm")).to_contain_text("the plans of Floor 2 are deleted")
+        expect(page.get_by_test_id("levels-confirm")).to_contain_text(
+            "the plans of Floor 2 are deleted, with their map features")
         page.get_by_test_id("levels-confirm-yes").click()
         expect(page.get_by_test_id("level-tab-2")).to_have_count(0)
         expect(page.get_by_test_id("level-tab-0")).to_have_attribute("aria-selected", "true")
         levels = self.field.http.get("/api/v1/field/levels").json()
         self.assertEqual((levels["count"], levels["names"]), (2, ["Ground floor", "Mezzanine"]))
         self.assertIsNone(self.field.bundle.controller.store.field_image(2))
+
+    # --- map features (decisions MF-0 to MF-16) ------------------------------------
+
+    def features(self) -> list:
+        return self.field.http.get("/api/v1/field/features").json()["features"]
+
+    def press_area(self, page, x: float, y: float, to: "tuple[float, float] | None" = None) -> None:
+        """A press on the plan at (x, y) as fractions of it; with ``to``, dragged there before letting go."""
+        page.get_by_test_id("field-area").scroll_into_view_if_needed()
+        area = page.get_by_test_id("field-area").bounding_box()
+        page.mouse.move(area["x"] + area["width"] * x, area["y"] + area["height"] * y)
+        page.mouse.down()
+        if to is not None:
+            page.mouse.move(area["x"] + area["width"] * to[0], area["y"] + area["height"] * to[1], steps=6)
+        page.mouse.up()
+
+    def test_map_features_on_the_plan(self):
+        """The maintainer's request (MF-0): a safe zone dragged to scale, a red respawn placed by keyboard, a car park
+        traced corner by corner and made the organisers' own, a read-only phone that sees only what is for everyone,
+        and a feature deleted after a confirmation; in pt-PT."""
+        h = self.field.http
+        h.put("/api/v1/field/image", headers={"Content-Type": "image/png"}, content=ICON.read_bytes())
+        h.put("/api/v1/field/georef", json={"points": [{"x": 0, "y": 0, "lat": 38.7240, "lon": -9.1420},
+                                                        {"x": 1, "y": 1, "lat": 38.7200, "lon": -9.1360}]})
+        page = self.console()
+        page.get_by_test_id("tab-field").click()
+        expect(page.get_by_role("heading", name="Marcações no mapa")).to_be_visible()
+        expect(page.get_by_test_id("mf-none")).to_be_visible()
+        # A safe zone: a circle, pressed at its centre and dragged to its edge, to the plan's scale.
+        page.get_by_test_id("mf-new-type").select_option("safe_zone")
+        page.get_by_test_id("mf-add").click()
+        expect(page.get_by_test_id("mf-shape-circle")).to_be_checked()
+        expect(page.get_by_test_id("mf-hint")).to_contain_text("arrasta até à borda")
+        expect(page.get_by_test_id("mf-no-scale")).to_have_count(0)
+        self.press_area(page, 0.3, 0.3, to=(0.4, 0.3))
+        radius = float(page.get_by_test_id("mf-radius").input_value())
+        self.assertAlmostEqual(radius, 52, delta=4)  # a tenth of a plan about 520 m wide
+        page.get_by_test_id("mf-label").fill("Zona A")
+        page.get_by_test_id("mf-save").click()
+        expect(page.get_by_test_id("mf-form")).to_have_count(0)
+        self.assertTrue(wait_for(lambda: len(self.features()) == 1, 5))
+        zone = self.features()[0]
+        self.assertEqual((zone["type"], zone["shape"], zone["label"], zone["visibility"]),
+                         ("safe_zone", "circle", "Zona A", "everyone"))
+        self.assertAlmostEqual(zone["x"], 0.3, delta=0.02)
+        self.assertEqual(zone["radius_m"], radius)
+        expect(page.locator("[data-testid=mf-layer] ellipse")).to_have_count(1)
+        expect(page.get_by_test_id(f"mf-pin-{zone['id']}")).to_have_attribute("aria-label", "Zona segura: Zona A")
+        # A respawn is a team's: red by default, for red only; placed with the keyboard.
+        page.get_by_test_id("mf-new-type").select_option("respawn")
+        page.get_by_test_id("mf-add").click()
+        expect(page.get_by_test_id("mf-team")).to_have_value("red")
+        expect(page.get_by_test_id("mf-visibility")).to_have_value("team")
+        page.get_by_test_id("mf-shape-point").check()
+        page.get_by_test_id("mf-across").fill("70")
+        page.get_by_test_id("mf-down").fill("20")
+        page.get_by_test_id("mf-put").click()
+        page.get_by_test_id("mf-save").click()
+        self.assertTrue(wait_for(lambda: len(self.features()) == 2, 5))
+        respawn = self.features()[1]
+        self.assertEqual((respawn["type"], respawn["shape"], respawn["team"], respawn["visibility"]),
+                         ("respawn", "point", "red", "team"))
+        self.assertEqual((respawn["x"], respawn["y"]), (0.7, 0.2))
+        expect(page.get_by_test_id(f"mf-item-{respawn['id']}")).to_contain_text("Só red")
+        # The car park: an area traced corner by corner, a wrong corner taken back, the last one typed.
+        page.get_by_test_id("mf-new-type").select_option("parking")
+        page.get_by_test_id("mf-add").click()
+        expect(page.get_by_test_id("mf-shape-polygon")).to_be_checked()
+        for x, y in ((0.1, 0.6), (0.3, 0.6), (0.9, 0.1), (0.3, 0.9)):
+            self.press_area(page, x, y)
+        expect(page.get_by_test_id("mf-hint")).to_contain_text("4 até agora")
+        page.get_by_test_id("mf-undo").click()
+        page.get_by_test_id("mf-save").click()  # three corners, but the wrong one among them
+        self.assertTrue(wait_for(lambda: len(self.features()) == 3, 5))
+        car = self.features()[2]
+        self.assertEqual(len(car["points"]), 3)
+        page.get_by_test_id(f"mf-edit-{car['id']}").click()
+        page.get_by_test_id("mf-place").click()
+        page.locator("button", has_text="Recomeçar").click()  # with no corners there is no undo
+        expect(page.get_by_test_id("mf-hint")).to_contain_text("0 até agora")
+        for x, y in ((0.1, 0.6), (0.3, 0.6), (0.3, 0.9)):
+            self.press_area(page, x, y)
+        page.get_by_test_id("mf-across").fill("10")
+        page.get_by_test_id("mf-down").fill("90")
+        page.get_by_test_id("mf-put").click()
+        page.get_by_test_id("mf-visibility").select_option("organisers")
+        page.get_by_test_id("mf-save").click()
+        self.assertTrue(wait_for(lambda: self.features()[2]["visibility"] == "organisers", 5))
+        car = self.features()[2]
+        self.assertEqual(len(car["points"]), 4)
+        self.assertEqual(car["points"][3], {"x": 0.1, "y": 0.9})
+        expect(page.locator("[data-testid=mf-layer] polygon")).to_have_count(1)
+        self.no_horizontal_scroll(page)
+        # A read-only phone sees only the safe zone: the respawn is red's, the car park the organisers'.
+        viewer = self.console(READ, width=390, height=844)
+        viewer.get_by_test_id("tab-field").click()
+        expect(viewer.get_by_test_id(f"mf-pin-{zone['id']}")).to_be_visible()
+        expect(viewer.locator(".mf-pin")).to_have_count(1)
+        expect(viewer.locator("[data-testid=mf-layer] polygon")).to_have_count(0)
+        expect(viewer.get_by_test_id("mf-add")).to_have_count(0)
+        expect(viewer.get_by_test_id(f"mf-edit-{zone['id']}")).to_have_count(0)
+        viewer.locator("[data-testid=mf-legend] summary").click()
+        expect(viewer.get_by_test_id("mf-legend")).to_contain_text("Primeiros socorros")
+        self.no_horizontal_scroll(viewer)
+        # The car park for everyone again: the phone gets it through the live stream.
+        page.get_by_test_id(f"mf-edit-{car['id']}").click()
+        page.get_by_test_id("mf-visibility").select_option("everyone")
+        page.get_by_test_id("mf-save").click()
+        expect(viewer.locator("[data-testid=mf-layer] polygon")).to_have_count(1)
+        # Deleted after a confirmation, on both pages.
+        page.get_by_test_id(f"mf-delete-{zone['id']}").click()
+        expect(page.get_by_role("group", name="Apagar Zona A do mapa?")).to_be_visible()
+        page.get_by_test_id(f"mf-delete-{zone['id']}-yes").click()
+        expect(page.get_by_test_id(f"mf-pin-{zone['id']}")).to_have_count(0)
+        expect(viewer.get_by_test_id(f"mf-pin-{zone['id']}")).to_have_count(0)
+        self.assertEqual([f["id"] for f in self.features()], [respawn["id"], car["id"]])
+        # The editor at phone width.
+        phone = self.console(width=390, height=844)
+        phone.get_by_test_id("tab-field").click()
+        phone.get_by_test_id("mf-add").click()
+        expect(phone.get_by_test_id("mf-form")).to_be_visible()
+        self.no_horizontal_scroll(phone)
+
+    def test_map_features_in_english_without_a_map_position(self):
+        """English; a plan without a map position draws a circle at a set size and says so; a feature for the
+        organisers only never reaches a read-only page."""
+        page = self.console()
+        page.get_by_test_id("lang").select_option("en")
+        page.get_by_test_id("tab-field").click()
+        viewer = self.console(READ)
+        viewer.get_by_test_id("tab-field").click()
+        expect(page.get_by_role("heading", name="Map features")).to_be_visible()
+        page.get_by_test_id("mf-new-type").select_option("safe_zone")
+        page.get_by_test_id("mf-add").click()
+        expect(page.get_by_test_id("mf-no-scale")).to_contain_text("drawn at a set size")
+        page.get_by_test_id("mf-radius").fill("40")
+        page.get_by_test_id("mf-save").click()
+        expect(page.get_by_test_id("mf-error")).to_have_text("Place it on the plan first.")
+        page.get_by_test_id("mf-across").fill("50")
+        page.get_by_test_id("mf-down").fill("150")
+        page.get_by_test_id("mf-put").click()
+        expect(page.get_by_test_id("mf-error")).to_have_text("Type two numbers from 0 to 100.")
+        page.get_by_test_id("mf-down").fill("50")
+        page.get_by_test_id("mf-put").click()
+        page.get_by_test_id("mf-save").click()
+        self.assertTrue(wait_for(lambda: len(self.features()) == 1, 5))
+        self.assertEqual(self.features()[0]["radius_m"], 40.0)
+        expect(page.locator("[data-testid=mf-layer] ellipse.no-scale")).to_have_count(1)
+        expect(viewer.locator("[data-testid=mf-layer] ellipse")).to_have_count(1)  # live, for everyone
+        # First aid for the organisers only, clicked on the grid.
+        page.get_by_test_id("mf-new-type").select_option("first_aid")
+        page.get_by_test_id("mf-add").click()
+        expect(page.get_by_test_id("mf-hint")).to_have_text("Click the plan where it goes.")
+        page.get_by_test_id("mf-visibility").select_option("organisers")
+        page.get_by_test_id("mf-label").fill("Medic tent")
+        self.press_area(page, 0.8, 0.8)
+        page.get_by_test_id("mf-save").click()
+        self.assertTrue(wait_for(lambda: len(self.features()) == 2, 5))
+        tent = self.features()[1]
+        self.assertEqual((tent["visibility"], tent["label"]), ("organisers", "Medic tent"))
+        expect(page.get_by_test_id(f"mf-pin-{tent['id']}")).to_have_attribute("aria-label", "First aid: Medic tent")
+        expect(page.get_by_test_id(f"mf-item-{tent['id']}")).to_contain_text("Organisers only")
+        viewer.reload()
+        viewer.get_by_test_id("tab-field").click()
+        expect(viewer.locator(".mf-pin")).to_have_count(1)
+        expect(viewer.get_by_test_id(f"mf-pin-{tent['id']}")).to_have_count(0)
+        r = httpx.get(self.field.base + "/api/v1/field/features", headers={"Authorization": f"Bearer {READ}"})
+        self.assertNotIn("Medic tent", r.text)
+        # "Other" needs a name.
+        page.get_by_test_id("mf-new-type").select_option("other")
+        page.get_by_test_id("mf-add").click()
+        self.press_area(page, 0.2, 0.2)
+        page.get_by_test_id("mf-save").click()
+        expect(page.get_by_test_id("mf-error")).to_have_text("Give it a name.")
+        page.get_by_test_id("mf-cancel").click()
+        expect(page.get_by_test_id("mf-form")).to_have_count(0)
 
     def test_reconnects_after_the_stream_drops(self):
         self.field.create_game(start=True)

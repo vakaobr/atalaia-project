@@ -35,6 +35,7 @@ const SHELL = [
     'components/georef-panel.js',
     'components/join-panel.js',
     'components/live-feed.js',
+    'components/map-features.js',
     'components/mode-packages.js',
     'components/node-list.js',
     'components/preset-builder.js',

@@ -1,5 +1,5 @@
 {
-  "description": "Facts about Cursor on Target (CoT) XML that the controller's ATAK emitter (controller/atalaia_controller/atak.py) must follow, each copied from its cited public source, never from the emitter's output; read by controller/tests/test_atak.py, which checks every event the emitter makes against them (decision M9-1). The sources: [base] MITRE, 'CoT Base-Event Schema (PUBLIC RELEASE).xsd' (Version 2.0, 13-June-2003, MITRE Case #11-3895), https://github.com/deptofdefense/AndroidTacticalAssaultKit-CIV/blob/main/takcot/mitre/ ; [types] MITRE, CoTtypes.xml (v1.80 2009/06/10), https://github.com/dB-SPL/cot-types/blob/main/CoTtypes.xml ; [tak] the TAK CoT definitions, https://github.com/deptofdefense/AndroidTacticalAssaultKit-CIV/tree/main/takcot (xsd/details/, examples/) ; [proto] TAK Protocol, commoncommo/core/impl/protobuf/protocol.txt in the same repository ; [guide] Mike Butler, 'The Developer's Guide to Cursor on Target', MITRE, August 2005 ; [mesh] Meshtastic, meshtastic/atak.proto (enum Team, enum MemberRole), https://github.com/meshtastic/protobufs .",
+  "description": "Facts about Cursor on Target (CoT) XML that the controller's ATAK emitter (controller/atalaia_controller/atak.py) must follow, each copied from its cited public source, never from the emitter's output; read by controller/tests/test_atak.py, which checks every event the emitter makes against them (decision M9-1). The sources: [base] MITRE, 'CoT Base-Event Schema (PUBLIC RELEASE).xsd' (Version 2.0, 13-June-2003, MITRE Case #11-3895), https://github.com/deptofdefense/AndroidTacticalAssaultKit-CIV/blob/main/takcot/mitre/ ; [types] MITRE, CoTtypes.xml (v1.80 2009/06/10), https://github.com/dB-SPL/cot-types/blob/main/CoTtypes.xml ; [tak] the TAK CoT definitions, https://github.com/deptofdefense/AndroidTacticalAssaultKit-CIV/tree/main/takcot (xsd/details/, examples/) ; [proto] TAK Protocol, commoncommo/core/impl/protobuf/protocol.txt in the same repository ; [guide] Mike Butler, 'The Developer's Guide to Cursor on Target', MITRE, August 2005 ; [atak] the ATAK-CIV source in the same repository, atak/ATAK/app/src/main/java/com/atakmap/android/ ; [mesh] Meshtastic, meshtastic/atak.proto (enum Team, enum MemberRole), https://github.com/meshtastic/protobufs .",
   "event": {
     "version": "2.0",
     "required_attributes": [
@@ -58,6 +58,14 @@
     "a-f-G-U-C": {
       "use": "a player, to staff endpoints only",
       "source": "[types] <cot cot=\"a-.-G-U-C\" full=\"Gnd/Combat\" desc=\"COMBAT\"/>, with affiliation 'f - Friend' from [base]; [tak] examples/'Marker - 2525.cot' link type='a-f-G-U-C' (an ATAK user's own marker)"
+    },
+    "u-d-c-c": {
+      "use": "a map feature's circle (decision MF-11): ATAK's drawn circle, its centre as the point and its radius in <shape><ellipse major minor>",
+      "source": "[tak] examples/'Drawing Shapes - Circle.cot': type='u-d-c-c' how='h-e', <shape><ellipse major='226.98412686380018' minor='226.98412686380018' angle='360'/><link uid='...Style' type='b-x-KmlStyle' relation='p-c'><Style><LineStyle><color>ffffffff</color><width>4.0</width></LineStyle><PolyStyle><color>96ffffff</color></PolyStyle></Style></link></shape>, then strokeColor, strokeWeight, fillColor, contact, remarks, labels_on; [tak] xsd/details/shape.xsd: ellipse (angle xs:integer, major and minor xs:decimal, all required) followed by link; [atak] drawing/importer/DrawingCircleImporter.java: an ellipse with major == minor and angle 0 (mod 360) is a circle, circle.setRadius(minor), and DrawingCircle.java 'Radius in meters'"
+    },
+    "u-d-f": {
+      "use": "a map feature's polygon (decision MF-11): ATAK's drawn free-form shape, its corners as <link point='lat,lon'/>, the first one again at the end to close it",
+      "source": "[tak] examples/'Drawing Shapes - Free Form.cot': type='u-d-f' how='h-e', seven <link point='lat,lon'/> whose last equals the first, then strokeColor, strokeWeight, fillColor, contact, remarks, labels_on; [atak] editableShapes/EditablePolyline.java: 'If it's closed, represent that in CoT by making it physically closed' (the first link added again); drawing/mapItems/DrawingShape.java getCotType() returns 'u-d-f'"
     },
     "a-.-G-E-X": {
       "use": "not used (ADR-P4-7's prop type; decision M9-2)",
@@ -123,6 +131,42 @@
       ],
       "example": "COT_MAPPING_SPOTMAP/b-m-p-s-m/-65536",
       "source": "[tak] xsd/details/usericon.xsd: attribute iconsetpath use=\"required\"; examples/'Marker - Spot.cot' <usericon iconsetpath='COT_MAPPING_SPOTMAP/b-m-p-s-m/-65536'/>"
+    },
+    "shape": {
+      "source": "[tak] xsd/details/shape.xsd: element shape, a choice of polyline or ellipse followed by link (the circle example)"
+    },
+    "link": {
+      "source": "[tak] xsd/details/link.xsd: element point 'concise version described as lat,lon,altHAE or lat,lon without a altitude'; examples/'Drawing Shapes - Free Form.cot' <link point='38.838231810315555,-77.06616468204862'/> (a link with a point only)"
+    },
+    "strokeColor": {
+      "required": [
+        "value"
+      ],
+      "integer": [
+        "value"
+      ],
+      "source": "[tak] xsd/details/strokeColor.xsd: attribute value use=\"required\" (declared xs:byte there, but the examples carry a signed 32-bit ARGB: <strokeColor value='-1'/>)"
+    },
+    "strokeWeight": {
+      "required": [
+        "value"
+      ],
+      "source": "[tak] xsd/details/strokeWeight.xsd: attribute value use=\"required\" type=\"xs:decimal\"; examples <strokeWeight value='4.0'/>"
+    },
+    "fillColor": {
+      "required": [
+        "value"
+      ],
+      "integer": [
+        "value"
+      ],
+      "source": "[tak] xsd/details/fillColor.xsd: attribute value use=\"required\" type=\"xs:int\"; examples <fillColor value='-1761607681'/> (0x96FFFFFF: white at alpha 0x96)"
+    },
+    "labels_on": {
+      "required": [
+        "value"
+      ],
+      "source": "[tak] xsd/details/labels_on.xsd: attribute value use=\"required\" type=\"xs:boolean\"; examples/'Drawing Shapes - Circle.cot' <labels_on value='true'/>"
     }
   },
   "argb_examples": [
@@ -135,6 +179,11 @@
       "argb": -1,
       "rgb": "ffffff",
       "source": "[tak] examples/'Marker - 2525.cot'"
+    },
+    {
+      "argb": -1761607681,
+      "rgb": "ffffff",
+      "source": "[tak] examples/'Drawing Shapes - Circle.cot' fillColor (alpha 0x96) and its KML <PolyStyle><color>96ffffff (aabbggrr)"
     }
   ],
   "teams": {

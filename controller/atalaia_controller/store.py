@@ -63,6 +63,12 @@ Schema 10 (phase 5 plan phase 6, decision P5C-17) adds signed mode packages: ``m
 (the release a trusted mode key signed, its key id, licence, whether the project reviewed it and
 where it came from) and ``modes.package`` (the archive exactly as signed, for the boxes later, plan
 phase 13); both NULL for a package uploaded unsigned. A schema 9 file is upgraded in place.
+
+Schema 11 (the maintainer's request of 2026-10-22, decisions MF-0 to MF-16) adds ``map_features``: what
+the GM marks on the field's plans besides the boxes (a safe zone, a team's respawn or HQ, the car park,
+first aid, objectives...), one row per feature with its level and the rest (type, label, shape and its
+coordinates, team, who may see it, a note) as JSON (map_features.py). A schema 10 file gets the empty
+table; nothing else changes.
 """
 
 from __future__ import annotations
@@ -77,7 +83,7 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 REMOTE_LOG_DAYS = 365  # the remote GM's log on the controller (decision S19-9)
 FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes, per level's plan
 FIELD_LEVELS_MAX = 10  # levels of a multi-story field (decision ML-1)
@@ -316,6 +322,13 @@ CREATE TABLE IF NOT EXISTS remote_commands (
     game_seed   INTEGER,
     result      TEXT NOT NULL,                         -- done, or why not (sync_format.RESULT_CODES)
     detail      TEXT
+);
+CREATE TABLE IF NOT EXISTS map_features (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,     -- schema 11 (map_features.py)
+    level       INTEGER NOT NULL CHECK (level BETWEEN 0 AND 9),
+    data_json   TEXT NOT NULL,                         -- type, label, shape, coordinates, team, visibility, note
+    created_at  REAL NOT NULL,
+    updated_at  REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS player_positions (
     game_id     INTEGER NOT NULL,
@@ -838,6 +851,42 @@ class Store:
     def move_positions_to_level0(self, levels_from: int) -> int:
         """Boxes on levels that no longer exist (``level >= levels_from``) go to level 0, in every game."""
         return self._exec("UPDATE positions SET level = 0 WHERE level >= ?", (levels_from,)).rowcount
+
+    # --- map features (schema 11, map_features.py) ----------------------------------
+
+    def map_features(self) -> list[dict[str, Any]]:
+        rows = self._exec("SELECT id, level, data_json, updated_at FROM map_features ORDER BY id").fetchall()
+        return [{"id": r["id"], "level": r["level"], "data": json.loads(r["data_json"]),
+                 "updated_at": r["updated_at"]} for r in rows]
+
+    def map_feature(self, feature_id: int) -> Optional[dict[str, Any]]:
+        r = self._exec("SELECT id, level, data_json, updated_at FROM map_features WHERE id = ?",
+                       (feature_id,)).fetchone()
+        return None if r is None else {"id": r["id"], "level": r["level"], "data": json.loads(r["data_json"]),
+                                       "updated_at": r["updated_at"]}
+
+    def count_map_features(self) -> int:
+        return int(self._exec("SELECT COUNT(*) AS n FROM map_features").fetchone()["n"])
+
+    def add_map_feature(self, level: int, data: dict[str, Any]) -> int:
+        """A new feature (``data`` without its level); returns its id."""
+        now = time.time()
+        with self._lock:
+            self._exec("INSERT INTO map_features (level, data_json, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                       (level, json.dumps(data, separators=(",", ":"), ensure_ascii=False), now, now))
+            return int(self._exec("SELECT last_insert_rowid() AS id").fetchone()["id"])
+
+    def put_map_feature(self, feature_id: int, level: int, data: dict[str, Any]) -> bool:
+        return self._exec("UPDATE map_features SET level = ?, data_json = ?, updated_at = ? WHERE id = ?",
+                          (level, json.dumps(data, separators=(",", ":"), ensure_ascii=False), time.time(),
+                           feature_id)).rowcount == 1
+
+    def delete_map_feature(self, feature_id: int) -> bool:
+        return self._exec("DELETE FROM map_features WHERE id = ?", (feature_id,)).rowcount == 1
+
+    def delete_map_features_from(self, levels_from: int) -> int:
+        """The features of levels that no longer exist (``level >= levels_from``)."""
+        return self._exec("DELETE FROM map_features WHERE level >= ?", (levels_from,)).rowcount
 
     # --- branding images and team presets (schema 4, decisions BR1-BR24) ------
 

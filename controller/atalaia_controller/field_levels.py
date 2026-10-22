@@ -12,8 +12,8 @@ say its level (positions.py).
 
 Kept in the settings key ``field.levels`` as ``{"enabled", "count", "names"}``. Turning levels
 off keeps everything (the plans, names and the boxes' levels) and uses only level 0; turning them
-on again brings it all back (decision ML-3). Fewer levels delete the plans and own control points
-of the levels that go, and move the boxes on them to level 0.
+on again brings it all back (decision ML-3). Fewer levels delete the plans, own control points and
+map features (map_features.py, MF-8) of the levels that go, and move the boxes on them to level 0.
 
 Where a level is shown, a position's level is read with ``shown``: a level that is not in use
 (levels off, or past the count) is shown on level 0.
@@ -101,14 +101,16 @@ def check(body: Any, current: dict[str, Any]) -> dict[str, Any]:
 
 def save(store: Any, meta: dict[str, Any]) -> list[int]:
     """Stores the settings; the levels that went (their plans, own points and boxes' levels) are
-    removed. Returns those levels."""
+    removed, and so are the map features drawn on their plans (decision MF-8). Returns those levels."""
     removed = []
+    featured = {f["level"] for f in store.map_features()}
     for level in range(meta["count"], LEVELS_MAX):
         plan = store.delete_field_image(level)
         points = georefmod.clear(store, level) if level else False
-        if plan or points:
+        if plan or points or level in featured:
             removed.append(level)
     store.move_positions_to_level0(meta["count"])
+    store.delete_map_features_from(meta["count"])
     store.set_setting(SETTING, json.dumps(meta, separators=(",", ":"), ensure_ascii=False))
     return removed
 
