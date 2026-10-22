@@ -7,7 +7,8 @@ or a node needs the GM token (spec section 11: "Publishing commands needs a
 GM token"). Tokens go in ``Authorization: Bearer <token>``; the WebSocket,
 which browsers cannot give headers, also takes ``?token=``.
 
-    GET  /api/v1/whoami                    which token this is: gm or read
+    GET  /api/v1/whoami                    which token this is: gm, read or player, and the console's
+                                           areas this controller serves ("features": FEATURES)
     GET  /api/v1/nodes                     nodes, capabilities, health (live game, or ?game=)
     GET  /api/v1/modes                     installed mode packages and their parameters
     POST /api/v1/modes                     upload a mode package {"files": {name: text}}
@@ -152,6 +153,11 @@ from .ws import PLAYER_TYPES, Hub, default_route, public
 
 CONSOLE_DIR = Path(__file__).resolve().parent.parent / "console" / "src"
 IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp"}
+# The GM console's areas this controller serves, in GET /api/v1/whoami's "features" (decision PE24-70).
+# The console hides the tabs and panels of an area a controller leaves out; the Android controller
+# (app/lib/controller/controller_api.dart, controllerFeatures) serves fewer. A new area goes in both.
+FEATURES = ("checkin", "join", "box_language", "positions", "presets", "branding", "radio", "boxes",
+            "adoption", "firmware", "atak", "field", "scenarios", "schedule", "mode_packages", "failover")
 NO_STORE = {"Cache-Control": "no-store"}
 # Served images: never sniffed as anything else, and inert if opened as a page (decision BR9).
 IMAGE_HEADERS = {"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox",
@@ -296,8 +302,9 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
 
     @app.get("/api/v1/whoami")
     def whoami(v: Viewer = Depends(require_read)) -> dict[str, Any]:
-        """Which token this is ("gm", "read" or "player"): the console hides GM controls for "read"."""
-        out: dict[str, Any] = {"role": v.kind, "version": __version__}
+        """Which token this is ("gm", "read" or "player"): the console hides GM controls for "read",
+        and the tabs and panels of an area missing from "features" (decision PE24-70)."""
+        out: dict[str, Any] = {"role": v.kind, "version": __version__, "features": list(FEATURES)}
         if v.kind == "player":
             out.update({"player_role": v.role, "player_id": v.player_id, "game_id": v.game_id,
                         "team": v.team, "squad": v.squad, "stale": v.stale})

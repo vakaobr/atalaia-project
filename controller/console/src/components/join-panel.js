@@ -189,7 +189,7 @@ export class JoinPanel extends Component {
             ${live && leading && this.renderIssue()}
             ${live && !leading && html`<section class="card"><p class="notice">${t('join.standby_cannot_issue')}</p></section>`}
             ${!live && html`<section class="card"><p class="muted">${t('join.no_game')}</p></section>`}
-            ${!live && this.renderStandby()}
+            ${!live && props.app.serves('failover') && this.renderStandby()}
         </div>`;
     }
 }

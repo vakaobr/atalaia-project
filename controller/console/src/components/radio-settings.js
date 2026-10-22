@@ -38,7 +38,7 @@ export class FirstSetupNotice extends Component {
     render(props) {
         const app = props.app;
         const { status, role } = app.state;
-        if (role !== 'gm' || !status || status.channel_confirmed !== false) return null;
+        if (role !== 'gm' || !status || status.channel_confirmed !== false || !app.serves('radio')) return null;
         return html`<div class="notice" data-testid="radio-first-setup">
             <p>${t('radio.first_setup', { channel: mhz(status.field_channel_hz) })}</p>
             <button type="button" data-testid="radio-first-setup-go"

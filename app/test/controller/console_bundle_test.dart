@@ -140,6 +140,88 @@ void main() {
       expect(get('/').status, 404);
     });
 
+    // Decision PE24-70: whoami's `features` names the console's areas this
+    // controller serves; the console hides the rest. One endpoint per area
+    // (the Pi's controller/tests/test_console.py has the same list): served
+    // when listed, unknown (the router's 404) when not, so the list cannot
+    // drift from the routes.
+    const areas = {
+      'checkin': ('GET', '/api/v1/checkin/poster'),
+      'join': ('POST', '/api/v1/join'),
+      'box_language': ('GET', '/api/v1/settings/box-language'),
+      'positions': ('GET', '/api/v1/positions'),
+      'presets': ('GET', '/api/v1/presets'),
+      'branding': ('GET', '/api/v1/field/branding'),
+      'radio': ('GET', '/api/v1/radio'),
+      'boxes': ('GET', '/api/v1/boxes'),
+      'adoption': ('GET', '/api/v1/adopt'),
+      'firmware': ('GET', '/api/v1/firmware'),
+      'atak': ('GET', '/api/v1/atak'),
+      'field': ('GET', '/api/v1/field/features'),
+      'scenarios': ('GET', '/api/v1/scenarios'),
+      'schedule': ('GET', '/api/v1/schedule'),
+      'mode_packages': ('GET', '/api/v1/mode-fetch'),
+      'failover': ('POST', '/api/v1/controller/promote'),
+    };
+
+    /// Whether the router knows [method] [path] (not its 404 or 405).
+    Future<bool> routed(String method, String path) async {
+      final r = await api.handleAsync(
+        method,
+        Uri.parse(path),
+        authorization: 'Bearer gm',
+        body: method == 'GET' ? '' : '{}',
+      );
+      final body = r.body;
+      final unknown =
+          body is Map && body['detail'] == 'Not Found' && r.status == 404;
+      return !(unknown || r.status == 405);
+    }
+
+    test("whoami's features: the areas served, the rest unknown", () async {
+      for (final token in ['gm', 'rd']) {
+        final who = api.handle(
+          'GET',
+          Uri.parse('/api/v1/whoami'),
+          authorization: 'Bearer $token',
+        );
+        expect(who.status, 200);
+        expect(
+          (who.body! as Map<String, Object?>)['features'],
+          controllerFeatures,
+          reason: token,
+        );
+      }
+      expect(
+        controllerFeatures.toSet().difference(areas.keys.toSet()),
+        isEmpty,
+      );
+      for (final MapEntry(key: area, value: (method, path)) in areas.entries) {
+        expect(
+          await routed(method, path),
+          controllerFeatures.contains(area),
+          reason: '$area: $method $path',
+        );
+      }
+      // The console's other calls in the areas left out.
+      for (final (method, path) in [
+        ('GET', '/api/v1/team-presets'),
+        ('POST', '/api/v1/crests'),
+        ('PUT', '/api/v1/games/1/teams/red'),
+        ('GET', '/api/v1/field'),
+        ('GET', '/api/v1/games/1/positions'),
+        ('GET', '/api/v1/games/1/invites'),
+        ('POST', '/api/v1/boxes/discover'),
+        ('GET', '/api/v1/mode-packages'),
+        ('POST', '/api/v1/modes'),
+        ('POST', '/api/v1/radio/scan'),
+        ('POST', '/api/v1/controller/join'),
+        ('POST', '/api/v1/schedule/1/game'),
+      ]) {
+        expect(await routed(method, path), isFalse, reason: '$method $path');
+      }
+    });
+
     test(
       'the field CA: 404 with HTTPS off, else the PEM with its fingerprint',
       () {

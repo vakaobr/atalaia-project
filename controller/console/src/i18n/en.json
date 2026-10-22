@@ -139,6 +139,7 @@
     "promote": "Promote to controller",
     "confirm_promote": "This controller will take charge of the game. Continue?",
     "promote_hint": "Promote a standby controller when the main one stops answering (manual failover, ADR-P2-8).",
+    "missing_areas": "This controller does not serve these parts of the console yet, so they are hidden: {areas}.",
     "roles": {
       "leader": "controller in charge",
       "follower": "standby",
@@ -527,6 +528,7 @@
     "close": "Close check-in",
     "reopen": "Open check-in",
     "print_poster": "Print the poster",
+    "webview_notice": "In the app on the phone, the poster cannot be printed and the CSV cannot be saved: open the console in a computer's browser for that.",
     "csv": "Export CSV",
     "statuses": {
       "expected": "expected",
@@ -1161,5 +1163,23 @@
     "will_forget": "Forgets them at its next invite",
     "undo": "Undo",
     "unknown_box": "box on node {node}"
+  },
+  "areas": {
+    "checkin": "check-in",
+    "join": "joining boxes",
+    "box_language": "the boxes' language",
+    "positions": "players' positions",
+    "presets": "presets and saved teams",
+    "branding": "the field's branding and team crests",
+    "radio": "the radio channel",
+    "boxes": "inviting boxes",
+    "adoption": "adopting boxes",
+    "firmware": "firmware updates",
+    "atak": "the ATAK feed",
+    "field": "the field map",
+    "scenarios": "scenarios",
+    "schedule": "the site server's schedule",
+    "mode_packages": "mode packages",
+    "failover": "standby controllers"
   }
 }

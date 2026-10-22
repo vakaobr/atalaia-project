@@ -333,10 +333,30 @@ golden images drawn again (the new role); 1 emulator test
 (`integration_test/controller_test.dart`, not run here). The contract cases
 and the Pi's code are unchanged.
 
+**The console's follow-ups of PE24-66** (2026-10-22, decisions PE24-70 to
+PE24-73), done:
+
+| Deliverable | Where | State |
+| --- | --- | --- |
+| The token in the address's fragment | `controller/console/src/ui.js` (`takeHashToken`), `app.js`; the app's `consoleAddress` in `controller_screen.dart` | Done: `/console/#token=...&lang=...` logs in as a typed token (stored once `whoami` accepts it), taken out of the address at once with `history.replaceState`, never in a query or a log; the app opens its console so instead of writing the console's storage (PE24-71) |
+| What the controller serves | `GET /api/v1/whoami` `features`: `api.py` `FEATURES`, `controller_api.dart` `controllerFeatures`; a shared contract case | Done: the Pi lists every console area, the phone `checkin`, `join`, `box_language`, `positions`; each side's list checked against one endpoint per area (PE24-70, an API addition for the maintainer) |
+| Hiding the rest | `app.js` and the panels in `components/` | Done: the *Campo*, *Adotar*, *Predefinições* and *Cenários* tabs, the radio, branding, saved teams, invites, firmware, mode packages, standby join, *Promote*, ATAK and schedule panels and their requests; the *Controlador* tab names what is not served yet (PE24-72) |
+| CSV export and printing in the web view | `components/checkin-panel.js` (`ui.js` `inWebView`) | Done: a short notice in Android's web view that they need a computer's browser (PE24-73) |
+
+Tests: 3 browser tests (`controller/console/tests/test_browser.py`: the
+`#token` flow with a tab kept, back and forward, a reload and a wrong token;
+a controller whose `whoami` gives the phone's list, at 390 px in pt-PT, with
+no hidden tab, panel or request and nothing refused; the web view's notice in
+both languages), 1 shared contract case (passing on both controllers), 1
+Python test (`test_console.py`: `FEATURES` = the console's `AREAS`, each
+area's endpoint served), 1 Dart test (`console_bundle_test.dart`: the phone's
+list, its areas served, the rest unknown to its router), the app's console
+test changed for the fragment.
+
 Remaining: **S7** after the field test: failover, presets, mode uploads,
 scenarios, role packages, branding, the channel scan, re-invites, adoption,
-pairing, firmware updates, the site sync, ATAK, the remote GM; and the
-console's follow-ups of PE24-66 (hide what a phone does not have, `#token=`).
+pairing, firmware updates, the site sync, ATAK, the remote GM, each added to
+`controllerFeatures` as it is ported.
 For the maintainer: PE24-2 (a phone as the only controller, not a standby),
 PE24-3 (not on plan phase G's gate), PE24-8 (the GM console's files in the
 app), PE24-11, PE24-12, PE24-42, PE24-44, PE24-52 and PE24-60 (players'
@@ -345,7 +365,8 @@ retention rules) are answered; PE24-51 was accepted by the coordinator;
 open for the maintainer: PE24-58 (the fix in the Pi controller's poster
 settings), PE24-62 (HTTPS only on the field's Wi-Fi, MQTT plain as on the
 Pi), PE24-64 (the engine kept past the activity, the service's type) and
-PE24-67 (the field CA on the phone, the pointycastle dependency); for the
+PE24-67 (the field CA on the phone, the pointycastle dependency) and PE24-70
+(`features` in `whoami`, an API addition); for the
 coordinator: PE24-61 (the console copied in at build time, CI's step).
 
 ## Medic Kit (2026-10-19)

@@ -139,6 +139,7 @@
     "promote": "Promover a controlador",
     "confirm_promote": "Este controlador passa a mandar no jogo. Continuar?",
     "promote_hint": "Promove um controlador de reserva quando o principal deixa de responder (substituição manual, ADR-P2-8).",
+    "missing_areas": "Este controlador ainda não serve estas partes da consola, por isso estão escondidas: {areas}.",
     "roles": {
       "leader": "controlador ativo",
       "follower": "de reserva",
@@ -527,6 +528,7 @@
     "close": "Fechar o check-in",
     "reopen": "Abrir o check-in",
     "print_poster": "Imprimir o cartaz",
+    "webview_notice": "Na app do telemóvel não é possível imprimir o cartaz nem guardar o CSV: para isso, abre a consola no navegador de um computador.",
     "csv": "Exportar CSV",
     "statuses": {
       "expected": "por chegar",
@@ -1161,5 +1163,23 @@
     "will_forget": "Esquece-os no próximo convite",
     "undo": "Anular",
     "unknown_box": "caixa no nó {node}"
+  },
+  "areas": {
+    "checkin": "check-in",
+    "join": "juntar caixas",
+    "box_language": "a língua das caixas",
+    "positions": "as posições de quem joga",
+    "presets": "predefinições e equipas guardadas",
+    "branding": "a identidade do campo e os emblemas das equipas",
+    "radio": "o canal de rádio",
+    "boxes": "convidar caixas",
+    "adoption": "adotar caixas",
+    "firmware": "atualizações de firmware",
+    "atak": "o feed ATAK",
+    "field": "o mapa do campo",
+    "scenarios": "cenários",
+    "schedule": "a agenda do site",
+    "mode_packages": "pacotes de modos",
+    "failover": "controladores de reserva"
   }
 }

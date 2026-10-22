@@ -182,7 +182,7 @@ class ConsoleBrowserTests(unittest.TestCase):
 
     # --- helpers --------------------------------------------------------------
 
-    def page(self, path: str = "/console/", width: int = 1280, height: int = 900, **ctx_kw):
+    def page(self, path: str = "/console/", width: int = 1280, height: int = 900, setup=None, **ctx_kw):
         ctx = self.browser.new_context(viewport={"width": width, "height": height}, device_scale_factor=2, **ctx_kw)
         self.contexts.append(ctx)
         page = ctx.new_page()
@@ -190,6 +190,8 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.on("console", lambda m: self.errors.append(f"console: {m.text}") if m.type == "error" else None)
         page.on("response", lambda r: self.errors.append(f"HTTP {r.status} {r.request.method} {r.url}")
                 if r.status >= 400 else None)
+        if setup is not None:
+            setup(page)  # routes or listeners before the first request
         page.goto(self.field.base + path)
         return page
 
@@ -1333,6 +1335,121 @@ class ConsoleBrowserTests(unittest.TestCase):
         board = self.page(f"/console/scoreboard.html#token={READ}", width=390, height=844)
         expect(board.get_by_test_id("board-score-red")).to_have_text("3")
         self.no_horizontal_scroll(board)
+
+    # --- the token in the address and a controller that serves fewer areas (PE24-70) ---
+
+    def test_token_in_the_fragment_is_kept_and_taken_out_of_the_address(self):
+        requests: list[str] = []
+        page = self.page(f"/console/#token={GM}&lang=en", setup=lambda p: p.on("request", lambda r: requests.append(r.url)))
+        expect(page.get_by_test_id("tab-game")).to_have_text("Game")
+        expect(page.get_by_test_id("tab-game")).to_have_attribute("aria-current", "page")
+        self.assertEqual(page.evaluate("location.hash"), "")
+        self.assertNotIn(GM, page.url)
+        self.assertEqual(page.evaluate("localStorage.getItem('atalaia.token')"), GM)  # as a typed token
+        self.assertEqual(page.evaluate("localStorage.getItem('atalaia.lang')"), "en")
+        # Every area served by the Pi's controller: nothing explained as missing.
+        page.get_by_test_id("tab-controller").click()
+        expect(page.get_by_test_id("controller-status")).to_be_visible()
+        expect(page.get_by_test_id("controller-missing")).to_have_count(0)
+        # The token went in the Authorization header only (the stream's ?token= is a WebSocket,
+        # not one of these requests), never in an address the page asked for.
+        self.assertTrue(requests)
+        self.assertEqual([u for u in requests if GM in u], [])
+        # The address was replaced, not added to: back leads to the page before, forward to no token.
+        page.go_back()
+        self.assertEqual(page.url, "about:blank")
+        page.go_forward()
+        self.assertEqual(page.url, f"{self.field.base}/console/")
+        expect(page.get_by_test_id("tab-game")).to_have_text("Game")  # kept, as a typed token
+        page.reload()
+        expect(page.get_by_test_id("tab-game")).to_have_text("Game")  # and across a reload
+        # A tab in the same fragment stays; the token and language go.
+        tab = self.page(f"/console/#field&token={GM}&lang=pt")
+        expect(tab.get_by_test_id("tab-field")).to_have_attribute("aria-current", "page")
+        expect(tab.get_by_test_id("tab-field")).to_have_text("Campo")
+        self.assertEqual(tab.evaluate("location.hash"), "#field")
+        # A wrong token: refused as a typed one, out of the address, not stored.
+        bad = self.page("/console/#token=not-a-token")
+        expect(bad.get_by_role("alert")).to_be_visible()
+        expect(bad.get_by_test_id("token")).to_be_visible()
+        self.assertEqual(bad.evaluate("location.hash"), "")
+        self.assertIsNone(bad.evaluate("localStorage.getItem('atalaia.token')"))
+        self.forget_refusal("/api/v1/whoami")
+
+    PHONE_FEATURES = ["checkin", "join", "box_language", "positions"]  # app/lib/controller/controller_api.dart
+    # The console's calls in the areas a phone controller does not serve yet.
+    PHONE_HIDDEN = re.compile(r"/api/v1/(presets|team-presets|crests|field\b|radio|boxes|adopt|firmware|atak"
+                              r"|scenarios|schedule|mode-packages|mode-fetch|controller/promote|controller/join"
+                              r"|remote-gm|games/\d+/(positions|invites|teams))")
+
+    def phone_controller(self, page, requests: list) -> None:
+        """whoami answers with the Android controller's features; every request is noted."""
+        def whoami(route):
+            resp = route.fetch()
+            body = resp.json()
+            body["features"] = self.PHONE_FEATURES
+            route.fulfill(response=resp, json=body)
+        page.route("**/api/v1/whoami", whoami)
+        page.on("request", lambda r: requests.append(r.url))
+
+    def test_a_phone_controller_hides_what_it_does_not_serve(self):
+        game = self.field.create_game(name="Sábado")
+        requests: list[str] = []
+        page = self.page(f"/console/#token={GM}", width=390, height=844,
+                         setup=lambda p: self.phone_controller(p, requests))
+        expect(page.get_by_test_id("tab-game")).to_have_text("Jogo")
+        expect(page.get_by_test_id("game-state")).to_be_visible()
+        for tab in ("field", "adopt", "presets", "scenarios"):
+            expect(page.get_by_test_id(f"tab-{tab}")).to_have_count(0)
+        expect(page.get_by_test_id("game-actions")).to_be_visible()
+        expect(page.get_by_test_id("game-invite")).to_have_count(0)  # boxes
+        expect(page.get_by_test_id("teams-editor")).to_have_count(0)  # branding
+        for tab in ("game", "checkin", "nodes", "join", "feed", "controller", "settings"):
+            page.get_by_test_id(f"tab-{tab}").click()
+            page.wait_for_timeout(200)
+            self.no_horizontal_scroll(page)
+        expect(page.get_by_role("heading", name="Língua das caixas")).to_be_visible()
+        expect(page.get_by_test_id("radio-current")).to_have_count(0)
+        expect(page.get_by_test_id("branding-settings")).to_have_count(0)
+        expect(page.get_by_test_id("team-presets")).to_have_count(0)
+        page.get_by_test_id("tab-controller").click()
+        missing = page.get_by_test_id("controller-missing")
+        expect(missing).to_contain_text("Este controlador ainda não serve estas partes da consola")
+        expect(missing).to_contain_text("o canal de rádio")
+        expect(missing).to_contain_text("o mapa do campo")
+        expect(missing).not_to_contain_text("check-in")
+        expect(page.get_by_test_id("promote")).to_have_count(0)
+        # No live game: the creation form without team names and crests, no standby join, no radio reminder.
+        self.field.http.post(f"/api/v1/games/{game['id']}/end", json={})
+        page.get_by_test_id("tab-game").click()
+        expect(page.get_by_test_id("game-ended")).to_be_visible()
+        expect(page.get_by_test_id("game-team-branding")).to_have_count(0)
+        expect(page.get_by_test_id("radio-first-setup")).to_have_count(0)
+        page.get_by_test_id("tab-join").click()
+        expect(page.get_by_test_id("standby-form")).to_have_count(0)
+        page.wait_for_timeout(300)
+        self.assertTrue(any("/api/v1/whoami" in u for u in requests))
+        self.assertEqual([u for u in requests if self.PHONE_HIDDEN.search(u)], [])
+        # A #field address opens the game instead of a tab that is not there.
+        field = self.page(f"/console/#field&token={GM}", setup=lambda p: self.phone_controller(p, []))
+        expect(field.get_by_test_id("tab-game")).to_have_attribute("aria-current", "page")
+        expect(field.get_by_test_id("tab-field")).to_have_count(0)
+
+    def test_csv_and_printing_notice_in_androids_web_view(self):
+        self.field.create_game()
+        webview = ("Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/AP1A.240505.005; wv) AppleWebKit/537.36 "
+                   "(KHTML, like Gecko) Version/4.0 Chrome/124.0.6367.82 Mobile Safari/537.36")
+        page = self.page(f"/console/#token={GM}", width=390, height=844, user_agent=webview)
+        page.get_by_test_id("tab-checkin").click()
+        expect(page.get_by_test_id("checkin-csv")).to_be_visible(timeout=15000)
+        expect(page.get_by_test_id("checkin-webview")).to_contain_text("navegador de um computador")
+        self.no_horizontal_scroll(page)
+        page.get_by_test_id("lang").first.select_option("en")
+        expect(page.get_by_test_id("checkin-webview")).to_contain_text("a computer's browser")
+        browser = self.console()
+        browser.get_by_test_id("tab-checkin").click()
+        expect(browser.get_by_test_id("checkin-csv")).to_be_visible()
+        expect(browser.get_by_test_id("checkin-webview")).to_have_count(0)
 
     # --- the field's radio channel (Settings) ------------------------------------
 

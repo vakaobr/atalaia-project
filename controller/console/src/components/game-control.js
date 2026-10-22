@@ -107,13 +107,13 @@ class CreateGame extends Component {
                 <input id="g-teams" data-testid="game-teams" required value=${state.teams}
                     onInput=${(e) => this.setState({ teams: e.target.value })} />
                 <small class="muted">${t('game.teams_hint')}</small></div>
-            <details class="team-branding" data-testid="game-team-branding">
+            ${props.app.serves('branding') && html`<details class="team-branding" data-testid="game-team-branding">
                 <summary>${t('teams.for_game')}</summary>
                 <p class="muted small">${t('teams.for_game_hint')}</p>
                 <${TeamFields} app=${props.app} teams=${teams} prefix="game" value=${state.teamInfo}
                     onChange=${(teamInfo) => this.setState({ teamInfo })} />
                 <p class="muted small">${t('branding.rights')}</p>
-            </details>
+            </details>`}
             <div class="field"><label for="g-minutes">${t('game.duration')}</label>
                 <input id="g-minutes" type="number" min="0" step="1" value=${state.minutes}
                     onInput=${(e) => this.setState({ minutes: e.target.value })} />
@@ -308,7 +308,7 @@ export class GameControl extends Component {
             ${s === 'ready' && !game.joined && html`<${StartCheck} game=${game} />`}
             ${gm && html`<div class="actions" data-testid="game-actions">
                 ${s === 'ready' && this.renderStart(game, pending, leading)}
-                ${s === 'ready' && leading && !game.joined && html`<button type="button" data-testid="game-invite"
+                ${s === 'ready' && leading && !game.joined && app.serves('boxes') && html`<button type="button" data-testid="game-invite"
                     onClick=${() => app.setState({ invitePicker: true })}>${t('invites.open')}</button>`}
                 ${s === 'running' && html`<${ConfirmButton} testid="game-pause" label=${t('game.pause')}
                     question=${t('game.confirm_pause')} disabled=${!leading} onConfirm=${() => this.lifecycle('pause', {})} />`}
@@ -321,8 +321,8 @@ export class GameControl extends Component {
             ${gm && !leading && html`<p class="notice">${t('game.not_leader')}</p>`}
             ${gm && leading && html`<${Broadcast} app=${app} />`}
             ${gm && leading && html`<${Adjust} app=${app} />`}
-            ${gm && s !== 'ended' && html`<${TeamsEditor} app=${app} />`}
-            ${gm && leading && s === 'ready' && !game.joined && app.state.invitePicker
+            ${gm && s !== 'ended' && app.serves('branding') && html`<${TeamsEditor} app=${app} />`}
+            ${gm && leading && s === 'ready' && !game.joined && app.state.invitePicker && app.serves('boxes')
                 && html`<${BoxInvites} app=${app} onClose=${() => app.setState({ invitePicker: false })} pending=${pending}
                     onStart=${(force) => this.lifecycle('start', force ? { force: true } : undefined)}
                     onReview=${() => this.reviewSettings()} />`}
@@ -338,7 +338,9 @@ export class ControllerPanel extends Component {
         const modem = status.modem || {};
         const ident = modem.ident || {};
         const tx = Object.entries(status.tx_status || {}).map(([k, v]) => `${k}: ${v}`).join(', ') || '–';
-        const canPromote = role === 'gm' && game && game.live && status.role && status.role !== 'leader';
+        const failover = app.serves('failover');
+        const canPromote = failover && role === 'gm' && game && game.live && status.role && status.role !== 'leader';
+        const missing = app.missingAreas();
         return html`<section class="card" aria-labelledby="ctl-h">
             <h2 id="ctl-h">${t('controller.title')}</h2>
             <dl class="facts" data-testid="controller-status">
@@ -357,7 +359,9 @@ export class ControllerPanel extends Component {
             </dl>
             ${canPromote && html`<div class="actions"><${ConfirmButton} testid="promote" class="danger" label=${t('controller.promote')}
                 question=${t('controller.confirm_promote')} onConfirm=${() => app.call('POST', '/controller/promote').then((s) => s && app.setState({ status: s }))} /></div>`}
-            <p class="muted small">${t('controller.promote_hint')}</p>
+            ${failover && html`<p class="muted small">${t('controller.promote_hint')}</p>`}
+            ${missing.length > 0 && html`<p class="notice" data-testid="controller-missing">${t('controller.missing_areas', {
+                areas: missing.map((a) => t(`areas.${a}`)).join(', ') })}</p>`}
         </section>`;
     }
 }

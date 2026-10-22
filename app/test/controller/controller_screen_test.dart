@@ -153,8 +153,12 @@ void main() {
 
       // The console on the phone's own address.
       await tapKey(tester, 'ctl-console');
+      // Logged in with the GM token and the app's language in the fragment.
       expect(
-        find.text('console http://127.0.0.1:8080/console/'),
+        find.text(
+          'console http://127.0.0.1:8080/console/'
+          '#token=gm-secret-token&lang=${lang.code}',
+        ),
         findsOneWidget,
       );
       tester.state<NavigatorState>(find.byType(Navigator).last).pop();
@@ -331,10 +335,17 @@ void main() {
     );
   }
 
-  test('the console logs in once with the GM token', () {
-    final js = consoleLoginScript('gm-"x"', 'en');
-    expect(js, contains(r'''s.setItem('atalaia.token',"gm-\"x\"")'''));
-    expect(js, contains('''s.setItem('atalaia.lang',"en")'''));
-    expect(js, contains("if(!s.getItem('atalaia.token'))"));
+  test('the console gets the GM token in the fragment, never the query', () {
+    final u = consoleAddress(
+      Uri.parse('http://127.0.0.1:8080/console/'),
+      'gm-a&b=c#d',
+      'en',
+    );
+    expect(
+      u.toString(),
+      'http://127.0.0.1:8080/console/#token=gm-a%26b%3Dc%23d&lang=en',
+    );
+    expect(u.query, isEmpty);
+    expect(u.path, '/console/');
   });
 }

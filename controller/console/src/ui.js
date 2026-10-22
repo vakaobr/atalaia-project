@@ -149,6 +149,63 @@ export function saveToken(token) {
     storageSet(TOKEN_KEY, token || null);
 }
 
+/**
+ * The token (and language) given in the address's fragment, #token=...&lang=en, as the
+ * scoreboard takes it: the app's web view opens the console so (decision PE24-70). Both are
+ * taken out of the address at once (history.replaceState), so the token does not stay in the
+ * address bar or the history; the rest of the fragment (a tab, #field) is kept. The fragment is
+ * never sent to the controller; the token is never put in a query string and never logged.
+ */
+export function takeHashToken() {
+    const raw = window.location.hash.replace(/^#/, '');
+    const out = {};
+    const rest = [];
+    let found = false;
+    for (const part of raw.split('&')) {
+        const i = part.indexOf('=');
+        const k = i < 0 ? part : part.slice(0, i);
+        if (k === 'token' || k === 'lang') {
+            found = true;
+            try {
+                const v = decodeURIComponent(i < 0 ? '' : part.slice(i + 1)).trim();
+                if (v) out[k] = v;
+            } catch (e) {
+                /* a malformed value is dropped */
+            }
+        } else if (part) {
+            rest.push(part);
+        }
+    }
+    if (found) {
+        const hash = rest.length ? `#${rest.join('&')}` : '';
+        try {
+            window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}${hash}`);
+        } catch (e) {
+            /* without the history API the address keeps it; the token still works */
+        }
+    }
+    return out;
+}
+
+// ---- what the controller serves (decision PE24-70) -------------------------------
+
+/** The console's areas a controller may serve: GET /api/v1/whoami's "features". The Pi's
+ * controller serves them all (api.py FEATURES); the Android controller fewer. */
+export const AREAS = ['checkin', 'join', 'box_language', 'positions', 'presets', 'branding', 'radio', 'boxes',
+    'adoption', 'firmware', 'atak', 'field', 'scenarios', 'schedule', 'mode_packages', 'failover'];
+
+/** Whether a controller whose whoami gave `features` serves `area`; one that gives no list (an
+ * older controller) serves them all. */
+export function serves(features, area) {
+    return !Array.isArray(features) || features.includes(area);
+}
+
+/** Android's web view (the app's own console on a phone controller): it has no downloads and no
+ * printing, which need a computer's browser. */
+export function inWebView() {
+    return /; wv\)/.test(navigator.userAgent || '');
+}
+
 export class ApiError extends Error {
     constructor(status, detail, body) {
         super(detail || `HTTP ${status}`);

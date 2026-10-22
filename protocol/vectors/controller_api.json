@@ -20,6 +20,16 @@
       ]
     },
     {
+      "name": "whoami: the console's areas both controllers serve (features, decision PE24-70)",
+      "steps": [
+        {"request": {"method": "GET", "path": "/api/v1/whoami", "token": "gm"}, "status": 200, "json": {"role": "gm", "features": {"$contains": ["checkin", "join", "box_language", "positions"]}}},
+        {"request": {"method": "GET", "path": "/api/v1/whoami", "token": "read"}, "status": 200, "json": {"role": "read", "features": {"$contains": ["checkin", "join", "box_language", "positions"]}}},
+        {"request": {"method": "GET", "path": "/api/v1/settings/box-language", "token": "read"}, "status": 200},
+        {"request": {"method": "GET", "path": "/api/v1/checkin/settings", "token": "gm"}, "status": 200},
+        {"request": {"method": "GET", "path": "/api/v1/checkin/poster", "token": "gm"}, "status": 200}
+      ]
+    },
+    {
       "name": "the modes this controller runs",
       "steps": [
         {"request": {"method": "GET", "path": "/api/v1/modes", "token": "read"}, "status": 200, "json": {"$contains": [

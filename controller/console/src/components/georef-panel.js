@@ -79,6 +79,7 @@ export class GeorefPanel extends Component {
     }
 
     async loadAtak() {
+        if (!this.props.app.serves('atak')) return;
         const out = await this.props.app.call('GET', '/atak');
         if (out) this.setState({ atak: out });
     }

@@ -324,7 +324,7 @@ Reading needs the read or GM token, changing anything the GM token: `Authorizati
 | POST | `/api/v1/radio/random` | A random candidate as `{"suggestion": ...}`; nothing changes |
 | POST | `/api/v1/controller/promote` | Manual failover: stand for election |
 | GET | `/api/v1/remote-gm` | GM: the remote GM's state (on or off, the stream) and its log of commands (phase 4 plan phase 19) |
-| GET | `/api/v1/whoami` | Which token this is: `{"role": "gm" \| "read"}` (the console hides GM controls for `read`) |
+| GET | `/api/v1/whoami` | Which token this is: `{"role": "gm" \| "read" \| "player", "version", "features"}` (the console hides GM controls for `read`). `features` lists the console's areas this controller serves (`api.py` `FEATURES`: every one here; the Android controller fewer); the console hides the tabs and panels of the rest, and a controller without the list serves them all (decision PE24-70) |
 | POST | `/api/v1/join` · `/api/v1/nodes/{id}/join` | A join payload ([protocol/join.md](../protocol/join.md)) for a box `{"role"}` (or, in a scenario's game, `{"name"}`: one of the scenario's boxes, whose role it takes) or a standby controller `{"kind": "controller"}`, optional `node_id`: QR/serial text, NFC tag bytes. GM only, `Cache-Control: no-store` (it carries the game key) |
 | POST | `/api/v1/controller/join` | This controller takes a game as standby: `{"text": "atalaia:join:..."}` |
 | GET | `/api/v1/field` | Whether a field image is uploaded: `{"image": {"content_type", "bytes", "updated_at"} \| null, "levels": ...}` (`levels` as `GET /api/v1/field/levels`) |

@@ -6,7 +6,8 @@
 // the panels in components/. Every change goes through the REST API v1.
 
 import { html, render, Component, t, loadLanguage, LANGS, api, ApiError, Stream,
-         savedToken, saveToken, clock, OFFLINE_MS, fetchBranding, brandingUrl } from './ui.js';
+         savedToken, saveToken, takeHashToken, serves, AREAS, clock, OFFLINE_MS, fetchBranding,
+         brandingUrl } from './ui.js';
 import { GameControl, ControllerPanel } from './components/game-control.js';
 import { ScorePanel } from './components/score-panel.js';
 import { LiveFeed } from './components/live-feed.js';
@@ -29,6 +30,11 @@ const TABS = ['game', 'checkin', 'field', 'nodes', 'join', 'adopt', 'presets', '
 const FEED_MAX = 500;
 const ALERTS_MAX = 50;
 const HISTORY_MAX = 240;
+// Tabs shown only when the controller serves one of their areas (decision PE24-70).
+const TAB_AREAS = { field: ['field'], adopt: ['adoption'], presets: ['presets', 'mode_packages'],
+                    scenarios: ['scenarios'] };
+// The token and language from #token=...&lang=..., taken out of the address before anything reads it.
+const GIVEN = takeHashToken();
 
 /** The tab to open with: the address's #tab (the field-map page comes back to #field), else the game. */
 function startTab() {
@@ -40,7 +46,7 @@ class App extends Component {
     constructor() {
         super();
         this.state = {
-            ready: false, lang: 'pt', token: savedToken(), role: null, loginError: '',
+            ready: false, lang: 'pt', token: GIVEN.token || savedToken(), role: null, loginError: '', features: null,
             tab: startTab(), connected: null, status: null, game: null, score: null,
             nodes: {}, seen: {}, feed: [], alerts: [], modes: [], presets: [],
             positions: {}, scoreHistory: [], clockBase: null, toast: '', now: Date.now(),
@@ -50,16 +56,18 @@ class App extends Component {
         this.checkinPanel = null;
         this.stream = null;
         this.token = '';
+        this.features = null; // whoami's "features": null serves every area (an older controller)
         this.offline = new Set();
         this.alertSeq = 0;
     }
 
     async componentDidMount() {
-        const l = await loadLanguage();
+        const l = await loadLanguage(GIVEN.lang);
         this.setState({ ready: true, lang: l });
         // The field's branding is public: the login page shows it before any token (decision BR3).
-        fetchBranding().then((b) => { if (b && !this.state.branding) this.setState({ branding: b }); });
+        // With a token, after whoami, and only from a controller that serves it (PE24-70).
         if (this.state.token) this.login(this.state.token);
+        else this.loadBranding();
         this.ticker = setInterval(() => this.tick(), 1000);
         this.refresher = setInterval(() => this.refresh(), 10000);
     }
@@ -98,36 +106,56 @@ class App extends Component {
             const who = await api(token, 'GET', '/whoami');
             saveToken(token);
             this.token = token; // used at once below: setState is applied later
-            this.setState({ token, role: who.role, loginError: '' });
+            this.features = Array.isArray(who.features) ? who.features : null;
+            this.setState({ token, role: who.role, loginError: '', features: this.features });
             this.startStream();
             this.loadCatalogue();
+            if (this.serves('branding')) this.loadBranding();
         } catch (e) {
             this.setState({ role: null, loginError: e.status === 401 ? t('login.bad') : e.message });
+            this.loadBranding(); // for the login page
         }
+    }
+
+    loadBranding() {
+        fetchBranding().then((b) => { if (b && !this.state.branding) this.setState({ branding: b }); });
     }
 
     logout(reason) {
         if (this.stream) this.stream.close();
         this.stream = null;
         this.token = '';
+        this.features = null;
         saveToken('');
-        this.setState({ token: '', role: null, connected: null, loginError: reason || '',
+        this.setState({ token: '', role: null, features: null, connected: null, loginError: reason || '',
                         game: null, status: null, nodes: {}, feed: [], alerts: [], radio: null });
     }
 
+    /** Whether the controller serves one of the console's areas (whoami's "features"; PE24-70). */
+    serves(area) {
+        return serves(this.features, area);
+    }
+
+    /** The areas this controller does not serve: their tabs and panels are hidden. */
+    missingAreas() {
+        return AREAS.filter((a) => !this.serves(a));
+    }
+
     async loadCatalogue() {
-        const [modes, presets] = await Promise.all([this.call('GET', '/modes'), this.call('GET', '/presets')]);
+        const [modes, presets] = await Promise.all([this.call('GET', '/modes'),
+            this.serves('presets') ? this.call('GET', '/presets') : []]);
         this.setState({ modes: modes || [], presets: presets || [] });
     }
 
     async loadTeamPresets() {
+        if (!this.serves('presets')) return;
         const list = await this.call('GET', '/team-presets');
         if (list) this.setState({ teamPresets: list });
     }
 
     /** The free boxes heard over the radio (GET /boxes); with ask, a DISCOVER first. */
     async loadBoxes(ask) {
-        if (this.state.role !== 'gm') return;
+        if (this.state.role !== 'gm' || !this.serves('boxes')) return;
         if (ask) await discover(this.token);
         try {
             this.setState({ boxes: await api(this.token, 'GET', '/boxes') });
@@ -138,14 +166,14 @@ class App extends Component {
 
     async loadInvites() {
         const g = this.state.game;
-        if (this.state.role !== 'gm' || !g || !g.live) return;
+        if (this.state.role !== 'gm' || !g || !g.live || !this.serves('boxes')) return;
         const out = await this.call('GET', `/games/${g.id}/invites`);
         if (out) this.setState({ invites: out.invites });
     }
 
     /** Missing modes sent to boxes (GET /mode-fetch): the offer per role, the fetches, what boxes keep. */
     async loadModeFetch() {
-        if (this.state.role !== 'gm') return;
+        if (this.state.role !== 'gm' || !this.serves('mode_packages')) return;
         try {
             this.setState({ modeFetch: await api(this.token, 'GET', '/mode-fetch') });
         } catch (e) {
@@ -154,6 +182,7 @@ class App extends Component {
     }
 
     async loadRadio() {
+        if (!this.serves('radio')) return;
         const radio = await this.call('GET', '/radio');
         if (radio) this.setState({ radio });
     }
@@ -340,11 +369,13 @@ class App extends Component {
 
     /** The map features this token may see (decisions MF-0 to MF-16). */
     async loadFeatures() {
+        if (!this.serves('field')) return;
         const out = await this.call('GET', '/field/features');
         if (out) this.setState({ mapFeatures: out.features });
     }
 
     async loadPositions(gameId) {
+        if (!this.serves('field')) return;
         const p = await this.call('GET', `/games/${gameId}/positions`);
         if (p) this.setState({ positions: p });
     }
@@ -467,13 +498,15 @@ class App extends Component {
         case 'field':
             return html`<${FieldView} app=${this} />`;
         case 'nodes':
-            return html`<${NodeList} app=${this} /><${FirmwarePanel} app=${this} /><${FetchedModes} app=${this} />`;
+            return html`<${NodeList} app=${this} />${this.serves('firmware') && html`<${FirmwarePanel} app=${this} />`}${
+                this.serves('mode_packages') && html`<${FetchedModes} app=${this} />`}`;
         case 'join':
             return html`<${JoinPanel} app=${this} />`;
         case 'adopt':
             return html`<${AdoptPanel} app=${this} />`;
         case 'presets':
-            return html`<${PresetBuilder} app=${this} /><${ModePackages} app=${this} />`;
+            return html`${this.serves('presets') && html`<${PresetBuilder} app=${this} />`}${
+                this.serves('mode_packages') && html`<${ModePackages} app=${this} />`}`;
         case 'scenarios':
             return html`<${ScenarioBuilder} app=${this} />`;
         case 'feed':
@@ -481,23 +514,32 @@ class App extends Component {
         case 'controller':
             return html`<${ControllerPanel} app=${this} />`;
         case 'settings':
-            return html`<${RadioSettings} app=${this} /><${BoxLanguageSettings} app=${this} /><${BrandingSettings} app=${this} /><${TeamPresets} app=${this} />`;
+            return html`${this.serves('radio') && html`<${RadioSettings} app=${this} />`}<${BoxLanguageSettings} app=${this} />${
+                this.serves('branding') && html`<${BrandingSettings} app=${this} />`}${
+                this.serves('presets') && html`<${TeamPresets} app=${this} />`}`;
         default:
             return null;
         }
     }
 
+    /** The tabs of the areas this controller serves (decision PE24-70). */
+    tabs() {
+        return TABS.filter((tab) => !TAB_AREAS[tab] || TAB_AREAS[tab].some((a) => this.serves(a)));
+    }
+
     render(props, state) {
         if (!state.ready) return html`<main class="loading">…</main>`;
         if (!state.role) return this.renderLogin();
+        const tabs = this.tabs();
+        const shown = tabs.includes(state.tab) ? state.tab : 'game';
         return html`<div class=${`app ${state.role === 'gm' ? 'is-gm' : 'is-read'}`}>
             ${this.renderHeader()}
             <nav class="tabs" aria-label=${t('app.sections')}>
-                ${TABS.map((tab) => html`<button type="button" data-testid=${`tab-${tab}`}
-                    class=${tab === state.tab ? 'active' : ''} aria-current=${tab === state.tab ? 'page' : undefined}
+                ${tabs.map((tab) => html`<button type="button" data-testid=${`tab-${tab}`}
+                    class=${tab === shown ? 'active' : ''} aria-current=${tab === shown ? 'page' : undefined}
                     onClick=${() => this.setState({ tab })}>${t(`tabs.${tab}`)}</button>`)}
             </nav>
-            <main class="content">${this.renderTab(state.tab)}</main>
+            <main class="content">${this.renderTab(shown)}</main>
             ${state.toast && html`<div class="toast" role="alert" data-testid="toast">
                 ${state.toast} <button type="button" class="link" onClick=${() => this.setState({ toast: '' })}>×</button></div>`}
         </div>`;

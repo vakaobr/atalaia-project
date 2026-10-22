@@ -15,7 +15,9 @@
 /// `Authorization: Bearer <token>`, compared in constant time.
 ///
 ///     GET  /healthz                          liveness, no token
-///     GET  /api/v1/whoami                    which token this is: gm, read or player
+///     GET  /api/v1/whoami                    which token this is: gm, read or player,
+///                                            and the console's areas served
+///                                            (`features`, [controllerFeatures])
 ///     GET  /api/v1/nodes                     nodes of the live game, or ?game=
 ///     GET  /api/v1/modes                     the modes this controller runs
 ///     GET  /api/v1/games                     every game
@@ -96,6 +98,15 @@ import 'console_files.dart';
 
 /// The app's version (pubspec.yaml), which /healthz and /whoami give.
 const controllerApiVersion = '0.2.0';
+
+/// The GM console's areas this controller serves, in /whoami's `features`
+/// (decision PE24-70): the console hides the tabs and panels of the rest.
+/// The Pi's api.py `FEATURES` has every area; this one leaves out presets
+/// and team presets, branding, the radio panel, boxes and invites,
+/// adoption, firmware, ATAK, the field (image, levels, map features, the
+/// boxes' places), scenarios, the schedule, mode packages and failover
+/// (PLAN.md, "PE24 slices"). An area served later is added here.
+const controllerFeatures = ['checkin', 'join', 'box_language', 'positions'];
 
 /// An answer: its status code, JSON body and extra headers.
 final class ApiResponse {
@@ -582,6 +593,7 @@ class ControllerApi {
   ApiResponse _whoami(_Request r, ApiViewer v) => ApiResponse(200, {
     'role': v.kind,
     'version': controllerApiVersion,
+    'features': controllerFeatures,
     if (v.kind == 'player') ...{
       'player_role': v.role,
       'player_id': v.playerId,

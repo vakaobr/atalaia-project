@@ -13,7 +13,6 @@
 library;
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -621,9 +620,11 @@ class _ControllerScreenState extends State<ControllerScreen> {
 }
 
 /// The GM console of this phone's own controller in the app's web view, on
-/// the loopback address (decision PE24-62). The console keeps its token in
-/// the web view's storage; the first time, the app puts the GM token and
-/// the app's language there, so the GM need not type it (PE24-66).
+/// the loopback address (decision PE24-62), logged in with the GM token and
+/// in the app's language given in the address's fragment (`#token=...&lang=`,
+/// [consoleAddress]): the console stores them as a typed token and takes
+/// them out of the address at once (PE24-66, PE24-70). The fragment never
+/// leaves the web view: it is not sent in the request.
 class ControllerConsoleScreen extends StatelessWidget {
   const ControllerConsoleScreen({
     required this.url,
@@ -637,52 +638,40 @@ class ControllerConsoleScreen extends StatelessWidget {
   final String language;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(context.s.t('ctl.console_title'))),
-    body: context.services.consoleView != null
-        ? context.services.consoleView!(context, url)
-        : _OwnConsoleView(url: url, gmToken: gmToken, language: language),
-  );
+  Widget build(BuildContext context) {
+    final address = consoleAddress(url, gmToken, language);
+    return Scaffold(
+      appBar: AppBar(title: Text(context.s.t('ctl.console_title'))),
+      body: context.services.consoleView != null
+          ? context.services.consoleView!(context, address)
+          : _OwnConsoleView(url: address),
+    );
+  }
 }
 
-/// The script that logs the console in once: the console's own storage
-/// keys (controller/console/src/ui.js `TOKEN_KEY`, `LANG_KEY`).
-String consoleLoginScript(String token, String language) =>
-    '(function(){try{var s=window.localStorage;'
-    "if(!s.getItem('atalaia.token')){s.setItem('atalaia.token',${jsonEncode(token)});"
-    "if(!s.getItem('atalaia.lang'))s.setItem('atalaia.lang',${jsonEncode(language)});"
-    'location.reload();}}catch(e){}})();';
+/// [url] with the GM token and the language in its fragment, as the console
+/// (controller/console/src/ui.js `takeHashToken`) and the scoreboard take
+/// them; never in the query string.
+Uri consoleAddress(Uri url, String token, String language) => url.replace(
+  fragment:
+      'token=${Uri.encodeComponent(token)}'
+      '&lang=${Uri.encodeComponent(language)}',
+);
 
 class _OwnConsoleView extends StatefulWidget {
-  const _OwnConsoleView({
-    required this.url,
-    required this.gmToken,
-    required this.language,
-  });
+  const _OwnConsoleView({required this.url});
 
   final Uri url;
-  final String gmToken;
-  final String language;
 
   @override
   State<_OwnConsoleView> createState() => _OwnConsoleViewState();
 }
 
 class _OwnConsoleViewState extends State<_OwnConsoleView> {
-  var _loggedIn = false;
   late final WebViewController _controller = WebViewController()
     ..setJavaScriptMode(JavaScriptMode.unrestricted)
     ..setNavigationDelegate(
       NavigationDelegate(
-        onPageFinished: (_) {
-          if (_loggedIn) return;
-          _loggedIn = true;
-          unawaited(
-            _controller.runJavaScript(
-              consoleLoginScript(widget.gmToken, widget.language),
-            ),
-          );
-        },
         // Only this phone's own console: anything else opens nowhere.
         onNavigationRequest: (r) {
           final u = Uri.tryParse(r.url);

@@ -25,8 +25,8 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from support import FakeModem, config
-from atalaia_controller.api import (CONSOLE_DIR, FIELD_MAP_HEADERS, FIELD_MAP_ORIGINS, SECURITY_HEADERS, Auth,
-                                   create_app)
+from atalaia_controller.api import (CONSOLE_DIR, FEATURES, FIELD_MAP_HEADERS, FIELD_MAP_ORIGINS, SECURITY_HEADERS,
+                                   Auth, create_app)
 from atalaia_controller.engine import BOX_LANGUAGES, Controller
 from atalaia_controller.firmware_release import REPORT_RESULTS
 from atalaia_controller.store import Store
@@ -315,6 +315,43 @@ class ConsoleFilesTests(unittest.TestCase):
             # console is GPL-3.0-or-later with the app-store permission (decision PE24-8).
             self.assertIn("SPDX-" + "License-Identifier: GPL-3.0-or-later", head, rel)
             self.assertIn("SPDX-" + "FileCopyrightText: 2026 The Atalaia contributors", head, rel)
+
+    # One endpoint per console area (decision PE24-70; the Android controller's
+    # app/test/controller/console_bundle_test.dart has the same list).
+    AREA_ENDPOINTS = {
+        "checkin": ("GET", "/api/v1/checkin/poster"),
+        "join": ("POST", "/api/v1/join"),
+        "box_language": ("GET", "/api/v1/settings/box-language"),
+        "positions": ("GET", "/api/v1/positions"),
+        "presets": ("GET", "/api/v1/presets"),
+        "branding": ("GET", "/api/v1/field/branding"),
+        "radio": ("GET", "/api/v1/radio"),
+        "boxes": ("GET", "/api/v1/boxes"),
+        "adoption": ("GET", "/api/v1/adopt"),
+        "firmware": ("GET", "/api/v1/firmware"),
+        "atak": ("GET", "/api/v1/atak"),
+        "field": ("GET", "/api/v1/field/features"),
+        "scenarios": ("GET", "/api/v1/scenarios"),
+        "schedule": ("GET", "/api/v1/schedule"),
+        "mode_packages": ("GET", "/api/v1/mode-fetch"),
+        "failover": ("POST", "/api/v1/controller/promote"),
+    }
+
+    def test_whoami_features_are_the_consoles_areas_and_served(self):
+        for token in ("gm-secret", "read-secret"):
+            who = self.client.get("/api/v1/whoami", headers={"Authorization": f"Bearer {token}"}).json()
+            self.assertEqual(who["features"], list(FEATURES), token)
+        # The console's own list (ui.js AREAS) names the same areas.
+        ui = (SRC / "ui.js").read_text(encoding="utf-8")
+        listed = re.search(r"export const AREAS = \[([^\]]*)\]", ui)
+        self.assertIsNotNone(listed)
+        self.assertEqual(re.findall(r"'([a-z_]+)'", listed.group(1)), list(FEATURES))
+        self.assertEqual(set(self.AREA_ENDPOINTS), set(FEATURES))
+        gm = {"Authorization": "Bearer gm-secret"}
+        for area, (method, path) in self.AREA_ENDPOINTS.items():
+            r = self.client.request(method, path, headers=gm, json=None if method == "GET" else {})
+            unknown = r.status_code == 405 or (r.status_code == 404 and r.json().get("detail") == "Not Found")
+            self.assertFalse(unknown, f"{area}: {method} {path} -> {r.status_code}")
 
     def test_field_info_and_whoami(self):
         gm = {"Authorization": "Bearer gm-secret"}

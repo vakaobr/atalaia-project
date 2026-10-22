@@ -12,7 +12,7 @@
 // until they arrive, a printed ticket scanned or pasted, and the counts of
 // registered players and walk-ins.
 
-import { html, Component, t, posterProblem } from '../ui.js';
+import { html, Component, t, posterProblem, inWebView } from '../ui.js';
 
 const STATUSES = ['expected', 'pending', 'checked_in', 'left', 'removed'];
 const ROLES = ['player', 'squad_leader', 'vip', 'marshal', 'gm', 'spectator'];
@@ -68,7 +68,7 @@ export class CheckinPanel extends Component {
         if (app.state.role !== 'gm') return;
         const g = this.game();
         const [poster, info, schedule] = await Promise.all([app.call('GET', '/checkin/poster'), app.call('GET', '/checkin'),
-            app.call('GET', '/schedule')]);
+            app.serves('schedule') ? app.call('GET', '/schedule') : null]);
         this.setState({ poster, classes: info ? info.limits.classes : [], schedule });
         if (!g) {
             this.setState({ list: null, chrono: null });
@@ -258,6 +258,7 @@ export class CheckinPanel extends Component {
                 <a class="button" href="poster.html" target="_blank" rel="noopener" data-testid="checkin-poster-link">${t('checkin.print_poster')}</a>
                 <button type="button" data-testid="checkin-csv" onClick=${() => this.exportCsv()}>${t('checkin.csv')}</button>
             </div>
+            ${inWebView() && html`<p class="muted small" data-testid="checkin-webview">${t('checkin.webview_notice')}</p>`}
             <p class="small" data-testid="checkin-counts">${STATUSES.map((s) => `${t(`checkin.statuses.${s}`)}: ${c[s] || 0}`).join(' · ')}</p>
             ${registeredCounts(list.checkins) && html`<p class="small" data-testid="checkin-registered">${
                 t('checkin.registered_counts', registeredCounts(list.checkins))}</p>`}
