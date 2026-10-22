@@ -461,5 +461,95 @@ class EditorTests(unittest.TestCase):
         self.assertEqual(selected, "atalaia_event_value")
 
 
+    # ---- testing in the simulator (plan phase 2) ----
+
+    def test_each_line_of_the_examples_knows_its_block(self):
+        """The map from a generated line to its block (generator.js lineBlocks), which puts the
+        simulator's errors on blocks: it exists for every script of both examples, and a line
+        maps to the block that wrote it."""
+        page = self.open("en")
+        for name in ("domination", "holdall"):
+            page.select_option("#example", name)
+            expect(page.locator("#code")).to_contain_text("local function")
+            for kind in ("node", "field") if name == "holdall" else ("node",):
+                with self.subTest(example=name, script=kind):
+                    lines = page.evaluate("k => window.atalaiaEditor.lineBlocks(k)", kind)
+                    code = page.evaluate("k => window.atalaiaEditor.files()[k + '_lua']", kind)
+                    self.assertIsNotNone(lines)
+                    self.assertEqual(len(lines), len(code.split("\n")))
+                    types = page.evaluate("([k, ids]) => ids.map((id) => id && window.atalaiaEditor.blockType(k, id))",
+                                          [kind, lines])
+                    for number, line in enumerate(code.split("\n")):
+                        if line.startswith(("on(", "every(")):
+                            self.assertTrue(types[number].startswith(("atalaia_on", "atalaia_every")),
+                                            (line, types[number]))
+                        if line.strip().startswith("score.add("):
+                            self.assertEqual(types[number], "atalaia_score_add", line)
+
+    def test_the_test_button_plays_the_mode_in_the_simulator(self):
+        page = self.open("en")
+        page.select_option("#example", "holdall")
+        expect(page.locator("#code")).to_contain_text("local function capture(team, squad)")
+        page.fill("#test-boxes", "2")
+        page.click("#test")
+        expect(page.locator("#test-message")).to_have_text(
+            "Hold-All Domination is running in the simulator with 2 boxes.")
+        self.assertEqual(self.game.sim.mode.id, "org.atalaia.holdall")
+        self.assertEqual(list(self.game.sim.nodes), ["zone1", "zone2"])
+        self.assertTrue(self.game.started)
+        # The simulator's page, opened from the editor, shows the mode and its field controller.
+        with page.context.expect_page() as info:
+            page.click("#test-open")
+        sim = info.value
+        expect(sim.locator("#mode")).to_have_text(re.compile("^Hold-All Domination"))
+        expect(sim.locator("#controller")).to_be_visible()
+        expect(sim.locator("#controller-status")).to_have_text("running")
+        expect(sim.locator(".node")).to_have_count(2)
+        # Playing it: red holds both boxes, and the controller's script scores for red.
+        for node in ("zone1", "zone2"):
+            self.game.act("hold", {"node": node, "team": "red"})
+            self.game.act("step", {"seconds": 3.5})
+            self.game.act("release", {"node": node})
+        self.game.act("step", {"seconds": 20})
+        expect(sim.locator("#controller-scores")).to_contain_text(re.compile(r"red [1-9]"))
+        expect(page.locator("#problems li")).to_have_count(0)
+
+    def test_simulator_errors_come_back_to_their_blocks(self):
+        page = self.open("en")
+        before = self.game.reloads
+        # A box script whose top-level code fails while it loads: the simulator keeps its game.
+        bad = B("atalaia_log", inputs={"TEXT": B("atalaia_idiv", inputs={"A": num(1), "B": num(0)})},
+                x=10, y=200)
+        page.evaluate("p => window.atalaiaEditor.load(p)", project(node=[on("game.start", B("atalaia_log", inputs={
+            "TEXT": text("hello")})), bad]))
+        page.click("#test")
+        expect(page.locator("#test-message")).to_contain_text("could not load")
+        self.assertEqual(self.game.reloads, before)
+        item = page.locator("#problems li[data-key=problem_sim]")
+        expect(item).to_have_count(1)
+        expect(item).to_contain_text("In the simulator:")
+        expect(item).to_contain_text("node.lua:")
+        item.click()
+        self.assertEqual(page.evaluate("() => Blockly.getSelected().id"), bad["id"])
+        self.assertTrue(page.evaluate("() => Blockly.getSelected().hasIcon(Blockly.icons.IconType.WARNING)"))
+        # An error in a handler, while the game runs: it loads, and the error points at its block.
+        inner = B("atalaia_log", inputs={"TEXT": B("atalaia_idiv", inputs={"A": num(2), "B": num(0)})})
+        page.evaluate("p => window.atalaiaEditor.load(p)", project(node=[on("game.start", inner)]))
+        expect(page.locator("#problems li")).to_have_count(0)  # the old errors went with the old files
+        page.click("#test")
+        expect(page.locator("#test-message")).to_contain_text("with script errors")
+        self.assertEqual(self.game.reloads, before + 1)
+        page.locator("#problems li[data-key=problem_sim]").click()
+        self.assertEqual(page.evaluate("() => Blockly.getSelected().id"), inner["id"])
+        # Changing the blocks clears the simulator's errors: they were about other files.
+        page.fill("#test-boxes", "1")
+        page.evaluate("() => window.atalaiaEditor.load(window.atalaiaEditor.project())")  # same files
+        expect(page.locator("#problems li[data-key=problem_sim]")).to_have_count(1)
+        page.click("#tab-mode")
+        page.fill("[name=name]", "Renamed")
+        expect(page.locator("#problems li[data-key=problem_sim]")).to_have_count(0)
+        expect(page.locator("#test-status")).to_be_hidden()
+
+
 if __name__ == "__main__":
     unittest.main()

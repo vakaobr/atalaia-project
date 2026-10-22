@@ -6,7 +6,7 @@
   "review_iteration": 0,
   "failing_experts": [],
   "created_at": "2026-10-17T12:00:00Z",
-  "updated_at": "2026-10-22T12:00:00Z",
+  "updated_at": "2026-10-22T18:00:00Z",
   "artifacts": {
     "RESEARCH.md": "complete",
     "ADR.md": "complete",
@@ -14,15 +14,16 @@
     "STATUS.md": "complete"
   },
   "metadata": {
-    "description": "Phase 5 (Community): visual mode editor, mode registry with signing and a verified badge, carrier PCB, translations, build guides, community processes. Refreshed 2026-10-22 after phases 2-4 software (decisions P5R-1 to P5R-14); plan phase 1 (the visual mode editor) built in software.",
+    "description": "Phase 5 (Community): visual mode editor, mode registry with signing and a verified badge, carrier PCB, translations, build guides, community processes. Refreshed 2026-10-22 after phases 2-4 software (decisions P5R-1 to P5R-14); plan phases 1 (the visual mode editor) and 2 (the editor and the simulator: field.lua shown in the web view, POST /api/reload, the editor's Test button, decisions P5B-1 to P5B-7) built in software; plan phase 13 (missing modes sent to boxes from the GM console, the maintainer's P5R-8; P5B-8 to P5B-17) planned.",
     "risk_level": "Medium",
     "design_only": false,
     "stop_after": null,
     "resume_with": "--implement",
     "refreshed_at": "2026-10-22",
-    "next_plan_phase": "2 (field.lua in the simulator's web view, POST /api/reload, the editor's Test button)",
+    "next_plan_phase": "3 (editor completeness), or 4 and 5 in parallel (they lead to 13)",
     "completed_plan_phases": [
-      "1"
+      "1",
+      "2"
     ],
     "hardware_plan_phases": [
       "HW1",
@@ -30,9 +31,11 @@
       "HW3"
     ],
     "awaiting_maintainer": [
-      "P5R-8",
-      "P5R-10",
+      "P5B-9 (which keys a box trusts for mode packages)",
       "P5-3 (creating atalaia-modes)"
+    ],
+    "planned_plan_phases": [
+      "13 (missing modes from the GM console, after 6)"
     ]
   }
 }

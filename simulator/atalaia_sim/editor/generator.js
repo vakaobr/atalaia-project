@@ -345,6 +345,39 @@ export function generateScript(g, ws, kind, info) {
     return result;
 }
 
+const MARK = /^\s*--@@'(.*)'$/;
+
+/**
+ * Which block each line of a generated script comes from, so an error the simulator reports
+ * at "node.lua:12" can point at its block. The script is generated again with Blockly's
+ * statement prefix set to a marker line before each statement block; with the markers taken
+ * out it must be the script `code` exactly, and then line n comes from the block of the last
+ * marker before it. Returns an array (index n - 1 for line n; null before any block), or null
+ * when the two do not agree.
+ */
+export function lineBlocks(g, ws, kind, info, code) {
+    g.STATEMENT_PREFIX = '--@@%1\n';
+    let marked;
+    try {
+        marked = generateScript(g, ws, kind, info).code;
+    } finally {
+        g.STATEMENT_PREFIX = null;
+    }
+    const plain = [];
+    const blocks = [];
+    let current = null;
+    for (const line of marked.split('\n')) {
+        const mark = MARK.exec(line);
+        if (mark) {
+            current = mark[1];
+        } else {
+            plain.push(line);
+            blocks.push(current);
+        }
+    }
+    return plain.join('\n') === code ? blocks : null;
+}
+
 /** The parameter declarations of a workspace: [name, spec, block] for mode.yaml. */
 function declarations(ws) {
     return ws.getTopBlocks(true).filter((b) => b.isEnabled() && b.type === 'atalaia_param_declare');

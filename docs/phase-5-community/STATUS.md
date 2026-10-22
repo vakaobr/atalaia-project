@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 5 -- Community: Status
 
-**Current phase:** Implementation (plan phase 1, the visual mode editor, built in software 2026-10-22)
+**Current phase:** Implementation (plan phases 1 and 2, the visual mode editor and its link to the simulator, built in software 2026-10-22)
 **Phase status:** In progress
 **Risk level:** Medium
-**Last updated:** 2026-10-22 (refreshed after phases 2-4 software; first written 2026-10-18)
-**Next step:** plan phase 2 (the simulator's web view runs `field.lua`, `POST /api/reload`, the editor's "Test" button)
+**Last updated:** 2026-10-22 (plan phase 2 built, plan phase 13 planned from P5R-8; refreshed after phases 2-4 software; first written 2026-10-18)
+**Next step:** plan phase 3 (editor completeness), or plan phases 4 and 5 in parallel (they lead to plan phase 13, the maintainer's P5R-8)
 
 Phase 5 is the community layer: visual mode editor (Blockly), mode
 registry with signing and a verified badge, carrier PCB, translations,
@@ -36,6 +36,26 @@ section 16).
   the same manifests; 15 browser tests (`python3 tools/docker_editor.py`, CI
   job `editor`) and 6 plain tests in `tools/check.sh`. Decisions P5A-1 to
   P5A-7. AC-1, AC-2, AC-3 met.
+- [x] **Plan phase 2, the editor and the simulator (2026-10-22), in software:**
+  the editor's *Test in the simulator* (with a number of boxes) sends the
+  generated files to the simulator's new `POST /api/reload`, which loads them
+  in the core first (on an error the running game goes on) and starts the
+  game; the simulator's page, in its own tab, shows it, now with a *Field
+  controller* panel for `field.lua` (which the web view already ran, but did
+  not show); errors on loading and while the game runs come back to the
+  editor's problems list and onto the blocks they come from (a line-to-block
+  map from Blockly's statement prefix). Same server rules (local Host, JSON
+  only, CSP `'self'`), 1 MB at most. 7 new simulator tests, 3 new browser
+  tests (18 in all). Decisions P5B-1 to P5B-7.
+- [x] **The maintainer's P5R-8 planned (2026-10-22):** plan phase 13, *Missing
+  modes from the GM console*: in the invite dialog, *Send missing modes*
+  re-invites boxes that answered "no mode" with join key 16; each fetches the
+  signed packages it lacks over Wi-Fi HTTPS pinned to the field CA (never
+  LoRa), checks them with mode keys built into its firmware and the sandbox,
+  keeps them on LittleFS (limits, the Reduced tier, rollback, removal), only
+  between games. K10 amended for that path (ADR.md, "Note 2026-10-22: P5R-8").
+  Design choices P5B-8 to P5B-17 (open; P5B-9, which keys a box trusts, is for
+  the maintainer). Not built.
 
 ## Refresh 2026-10-22: what changed
 
@@ -59,11 +79,12 @@ section 16).
 | # | Plan phase | Software now / hardware | Status |
 |---|------------|-------------------------|--------|
 | 1 | Visual mode editor | Software | **Built 2026-10-22** |
-| 2 | Editor and simulator (`field.lua` in the web view, reload, Test) | Software | Next |
-| 3 | Editor completeness (geo, commands, roles, kinds) | Software | |
+| 2 | Editor and simulator (`field.lua` in the web view, reload, Test) | Software | **Built 2026-10-22** |
+| 3 | Editor completeness (geo, commands, roles, kinds) | Software | Next |
 | 4 | Mode packages and signing | Software | |
 | 5 | Sandbox-escape battery | Software | |
 | 6 | Signed packages in the controller | Software | |
+| 13 | Missing modes from the GM console (P5R-8; built after 6) | Software (box side host-tested); real boxes: HW3 | Planned 2026-10-22 |
 | 7 | Scenario blocks in the console | Software | |
 | 8 | Registry repository template | Software; publishing needs the maintainer | |
 | 9 | Community processes | Software | |
@@ -80,10 +101,11 @@ section 16).
 |-----------|-------|--------|--------|
 | Script API (`script_api.c`) | 0, 2, 4 | Done | The editor's blocks map to it |
 | Field API (`state.field{}`, `field.*`) | 2 | Done | Field blocks built in plan phase 1 |
-| Simulator web view | 0 | Done; no `field.lua` yet | Plan phase 2 |
+| Simulator web view | 0 | Done; `field.lua` shown and reloads from the editor (plan phase 2) | -- |
 | Mode uploads on the controller | 2 | Done (`POST /api/v1/modes`) | Plan phase 6 |
 | Scenario compiler and console builder | 4 | Done | Plan phase 7 |
-| Firmware release signing | 4 | Done | Plan phase 4 reuses it |
+| Firmware release signing | 4 | Done | Plan phase 4 reuses it; plan phase 13 reuses its trust and HTTPS path |
+| Re-invites and the invite dialog | 4 | Done | Plan phase 13's *Send missing modes* step |
 | Field Box hardware | 1 | Boards on the bench; no built box | HW1-HW3 |
 
 ## Risks
@@ -93,7 +115,7 @@ section 16).
 | A Blockly upgrade breaks blocks or output | Medium | Pinned and vendored with checksums; the round trip and unit tests in CI (`editor`) |
 | A script API change breaks the editor | Medium | The round trip runs the examples against the hand-written modes' tests |
 | Registry signing key compromise | Low | Revocation list; one scheme with the firmware's, reviewed once |
-| Sandbox escape via a community script | Low | Plan phase 5 battery in the core's CI; boxes run built-in scripts only |
+| Sandbox escape via a community script | Low (Medium once plan phase 13 ships) | Plan phase 5 battery in the core's CI before plan phase 13; boxes run built-in scripts and only signed packages checked with keys in their firmware (P5B-9, P5B-14) |
 | Carrier PCB layout errors | Medium | Perfboard first, KiCad DRC/ERC in CI |
 | Language key drift | Medium | A parity test per domain; `tools/i18n_check.py` in plan phase 10 |
 
@@ -113,6 +135,7 @@ section 16).
 | AC-10 | Build guides for the Field Box and the Satellite | Field Box done; Satellite pending (plan phase 12) |
 | AC-11 | CONTRIBUTING.md documents mode submission | Pending (plan phase 9) |
 | AC-12 | CI includes a sandbox-escape job | Pending (plan phase 5) |
+| AC-13 | (new, P5R-8) A box gets a signed mode it lacks from its controller between games, checks and plays it | Pending (plan phase 13, HW3) |
 
 ## Verification of plan phase 1 (2026-10-22)
 
@@ -122,11 +145,19 @@ section 16).
 | `python3 tools/docker_editor.py` | 15 browser tests, OK |
 | `reuse lint` | See the commit |
 
+## Verification of plan phase 2 (2026-10-22)
+
+| Command | Result |
+|---------|--------|
+| `docker run --rm -v "$PWD:/src" atalaia-dev sh -c "BUILD=/tmp/c sh tools/check.sh"` (clean build folder) | See the coordinator's commit for the final run |
+| `python3 tools/docker_editor.py` | 18 browser tests, OK |
+| `python3 -m unittest tests.test_live` (in `simulator/`, also in `check.sh`) | 18 tests, OK |
+
 ## Next steps
 
-1. Plan phase 2: `field.lua` in the simulator's web view, `POST /api/reload`,
-   the editor's "Test" button.
-2. In parallel: plan phase 4 (mode packages and signing) and plan phase 5
-   (sandbox battery), which need nothing from the editor.
-3. The maintainer: P5R-8 (community node scripts on boxes) and P5R-10 (the
-   third language's order) before plan phases 6 and 10.
+1. Plan phase 3: the editor's remaining blocks (geo, GM commands, several
+   roles, kinds).
+2. In parallel: plan phase 4 (mode packages and signing, with P5B-10's
+   manifest lines) and plan phase 5 (sandbox battery); then 6, then 13.
+3. The maintainer: P5B-9 (which keys a box trusts for mode packages) before
+   plan phase 13; P5R-10 is answered (German first).

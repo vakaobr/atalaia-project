@@ -55,6 +55,9 @@ box's language tables existed. What changed, and why:
    controller, or a mode proposed for the built-in set (P5R-8). Signing
    reuses the firmware's release scheme and tooling (P5R-7). The
    `atalaia-modes` repository waits for the maintainer (P5-3, P5R-9).
+   **Later on 2026-10-22 the maintainer decided P5R-8:** a box may get,
+   from its field controller and only between games, the signed modes a
+   game needs that it lacks (plan phase 13, P5B-8 to P5B-17).
 7. **Languages.** Each domain keeps the format it was built with; modes
    already carry Portuguese in `mode.yaml` (AC-8 met); the box's texts
    are a runtime table; the third language is German, then Traditional
@@ -77,6 +80,7 @@ box's language tables existed. What changed, and why:
 | D3 | Build guide photos | HW2 |
 | (new) | Block view of the console's scenario builder | 7 |
 | (new) | A community scenario and a community mode on real boxes | HW3 |
+| (new, P5R-8) | Missing modes sent to boxes from the GM console | 13 |
 
 ---
 
@@ -118,7 +122,9 @@ plus, depending on what the plan phase touches:
 - Mode packages: archive format, Ed25519 signing with the firmware's
   release scheme, the registry index schema, shared vectors (4); the
   sandbox-escape battery (5); the controller installing signed packages
-  from an index (6).
+  from an index (6); boxes getting the signed modes a game needs that
+  they lack, from the GM console, between games (13, the maintainer's
+  P5R-8).
 - A block view of the GM console's scenario builder (7).
 - The registry repository's files as a template (8); the submission
   process, review checklist and verified badge in the docs (9).
@@ -134,8 +140,9 @@ plus, depending on what the plan phase touches:
 - A registry scenario and a community mode on real boxes (HW3).
 - Creating the `atalaia-modes` repository and publishing its index
   (P5-3; the maintainer's account).
-- Whether boxes may ever load signed community node scripts at run time
-  (P5R-8, for the maintainer; not in this plan).
+- Signed modes sent to boxes from the GM console (P5R-8, decided by the
+  maintainer 2026-10-22): plan phase 13 in software; on real boxes in
+  HW3; which keys a box trusts for them is for the maintainer (P5B-9).
 
 ### Out of scope
 
@@ -153,7 +160,7 @@ plus, depending on what the plan phase touches:
 |---|------------|--------------------------|
 | 1 | **Amended 2026-10-22:** a `CodeGenerator` (Blockly's `LuaGenerator` class) with the project's style; Blockly 13.3.0 vendored with checksums; the round trip against hand-written modes in CI (P5R-3, P5R-4, P5R-6) | Plan phases 1, 3, 7 |
 | 2 | **Amended 2026-10-22:** the mode editor is served by the simulator at `/editor/`; `POST /api/reload` keeps ADR-P5-2's shape and needs `field.lua` in the web view; the console's scenario builder gets the block view (P5R-2, P5R-5) | Plan phases 1, 2, 7 |
-| 3 | **Amended 2026-10-22:** boxes run built-in scripts only (K10); registry packages reach the field as controller packages (scenarios, field scripts); node scripts reach boxes through `modes/` and a signed firmware release (P5R-8) | Plan phases 4, 6, 8 |
+| 3 | **Amended 2026-10-22:** boxes run built-in scripts only (K10); registry packages reach the field as controller packages (scenarios, field scripts); node scripts reach boxes through `modes/` and a signed firmware release (P5R-8). **Amended again 2026-10-22 (the maintainer's P5R-8):** a box may also run a signed mode package it fetched from its controller for a game, checked with keys built into its firmware (P5B-8 to P5B-17) | Plan phases 4, 6, 8, 13 |
 | 4 | **Amended 2026-10-22:** Ed25519 over a text manifest like the firmware's (`atalaia-mode-package-v1`, id, version, size, sha256), key ids as release keys', tooling like `tools/firmware_release.py`, shared vectors (P5R-7) | Plan phase 4 |
 | 5 | Seven approved SPDX identifiers; an RFC to add one (ADR-P5-5) | Plan phases 1 (the Mode tab), 4, 9 |
 | 6 | Carrier PCB after 3+ perfboard boxes; KiCad 8; CERN-OHL-S-2.0 (ADR-P5-6) | HW1 |
@@ -169,11 +176,12 @@ plus, depending on what the plan phase touches:
 | # | Plan phase | Scope | Software now / hardware | Depends on | Size | Status |
 |---|------------|-------|-------------------------|------------|------|--------|
 | 1 | Visual mode editor | blocks for node and field scripts, Lua and `mode.yaml` generator, the page in the simulator, en + pt, round trip (AC-1 to AC-3) | Software, now | -- | M | **Built 2026-10-22** |
-| 2 | Editor and simulator | `field.lua` in the web view, `POST /api/reload`, the editor's "Test" button | Software, now | 1 | M | Next |
-| 3 | Editor completeness | geo blocks (zones, distances, `position.fix`), GM commands, several roles, modifiers and role packages, screen names from `assets/screens/` | Software, now | 1 | M | |
+| 2 | Editor and simulator | `field.lua` in the web view, `POST /api/reload`, the editor's "Test" button | Software, now | 1 | M | **Built 2026-10-22** |
+| 3 | Editor completeness | geo blocks (zones, distances, `position.fix`), GM commands, several roles, modifiers and role packages, screen names from `assets/screens/` | Software, now | 1 | M | Next |
 | 4 | Mode packages and signing | archive format, `tools/mode_package.py` (pack, keygen, sign, verify), `registry/schema/index.schema.json`, shared vectors, licence check (AC-4, AC-5) | Software, now | -- | M | |
 | 5 | Sandbox-escape battery | escape patterns as core C tests and through the simulator, in CI (AC-12) | Software, now | -- | S | |
 | 6 | Signed packages in the controller | import from an index (signature, revocation, size, licence), the author and an "unverified" warning in the console | Software, now | 4 | M | |
+| 13 | Missing modes from the GM console | P5R-8: the console's *Send missing modes* in the invite dialog; join key 16; a box fetches the signed packages it lacks over Wi-Fi HTTPS, checks them with its firmware's mode keys and the sandbox, keeps them on LittleFS (numbered 13 so the other numbers stay as P5R-1 has them; built here, after 6) | Software, now (box side host-tested); on real boxes: HW3 | 4, 5, 6 | L | Planned 2026-10-22 |
 | 7 | Scenario blocks in the console | a block view of the scenario builder writing the same YAML, en + pt, console browser tests | Software, now | 1 | M | |
 | 8 | Registry repository template | `index.json`, `keys/`, `revoked.json`, the registry CI workflow as files under `registry/template/` (AC-6 in this repository) | Software, now; publishing needs the maintainer | 4, 5 | S | |
 | 9 | Community processes | CONTRIBUTING.md "Submitting a community mode", review checklist, verified badge, RFC for the package format (AC-11) | Software, now | 4, 8 | S | |
@@ -182,13 +190,15 @@ plus, depending on what the plan phase touches:
 | 12 | Build guides for other node types | satellite, I/O pod, target addon as text, rendered on the project page (AC-10 text) | Software, now | -- | S | |
 | HW1 | Carrier PCB | KiCad schematic and layout, ERC/DRC in CI (AC-9) | Needs hardware (3 perfboard boxes) | phase 1 | -- | |
 | HW2 | Build guide photos | photos in place of the placeholders | Needs hardware | 12 | -- | |
-| HW3 | Community content on the field | a registry scenario on a real field; a community mode merged into `modes/` and shipped in a signed release | Needs hardware | 6, phase 2 F | -- | |
+| HW3 | Community content on the field | a registry scenario on a real field; a community mode merged into `modes/` and shipped in a signed release; a signed mode a box lacked, sent from the GM console (plan phase 13) | Needs hardware | 6, 13, phase 2 F | -- | |
 
 Sizes as phase 4's: S about a day of agent work, M two to three days.
 Plan phases 4-6 and 7 can run in parallel worktrees with 2-3; 10-12 are
-independent of the rest.
+independent of the rest; 13 needs 4, 5 and 6 (its 13a and 13b can then
+run in parallel). Sizes: L about a week of agent work.
 
-**Next: plan phase 2 (editor and simulator).**
+**Next: plan phase 3 (editor completeness), or 4 and 5 in parallel
+(they lead to 13).**
 
 ---
 
@@ -234,7 +244,8 @@ Hold-All tests and give the hand-written manifests.
 
 ## Plan phase 2: Editor and simulator
 
-*Software, can be done now. Depends on 1. Size M.*
+*Software, can be done now. Depends on 1. Size M. **Built 2026-10-22**
+(decisions P5B-1 to P5B-7).*
 
 - **`field.lua` in the web view**: `LiveGame` runs the mode's field
   script as the YAML tests do (`Simulation` already can), so modes like
@@ -249,6 +260,40 @@ Hold-All tests and give the hand-written manifests.
 - Tests: `simulator/tests/test_live.py` (reload: ok, syntax error kept
   out, field script running, size limit), a browser test of the Test
   button in `simulator/editor_tests/`.
+
+**Note 2026-10-22 (as built).** The web view already ran a mode's
+`field.lua`: `LiveGame` drives a `Simulation`, which has run it since
+phase 2 (`serve ../modes/holdall --node ...` scored through the
+controller's script). What was missing was seeing it, so the view now
+shows the controller (P5B-1). The reload's errors are objects, not
+strings, so the editor can place them (P5B-2).
+
+### Built
+
+| File | What |
+|------|------|
+| `simulator/atalaia_sim/mode.py` | `mode_from_text`: a mode from its files' text (`load_mode` reads a folder through it); YAML that does not parse is a `ModeError` |
+| `simulator/atalaia_sim/live.py` | `LiveGame.reload` (the same core, teams, seed and sandbox limits; the given boxes, else those whose role the mode has, else one; parameters checked; the scripts load first, and on an error the running game is untouched; the new game starts with its clock running; a reset replays the reloaded mode); `script_errors` (script.error and script.halted with the script and line they name); the snapshot's `controller` (status, error, memory, points, the commands it sent, its log), `reloads` and `script_errors` |
+| `simulator/atalaia_sim/web.py` | `POST /api/reload`: the Host check and JSON only as for actions, 1 000 000 bytes at most (`413` above), a body of the wrong shape `400`, a mode that does not load `200 {"status": "error", "errors": [...]}`, else `200 {"status": "ok", "errors": [errors on game.start], "reloads", "generation", "mode", "nodes"}` |
+| `simulator/atalaia_sim/web/index.html`, `app.js` | The *Field controller* panel: `field.lua`'s state, points, the commands it sent to boxes, its log |
+| `simulator/atalaia_sim/editor/generator.js` | `lineBlocks`: which block each generated line comes from (Blockly's statement prefix as marker lines, used only when the output without them is the real one) |
+| `simulator/atalaia_sim/editor/editor.js`, `index.html`, `editor.css`, `i18n/*.json` | *Test in the simulator* with a *Boxes* count; a status line with *Open the game* (a tab named `atalaia-sim`, which the *Simulator* link uses too); the simulator's errors in the problems list, grouped by message with the boxes named, on their blocks as warnings, polled each second while the tested mode runs and cleared when the generated files change |
+| `simulator/tests/test_live.py` | 7 new tests: Hold-All live with its controller, reload (ok, kept boxes, errors with script and line, the running game kept, errors on game.start), the server's rules for reload (403, 415, 400, 413, 404) |
+| `simulator/editor_tests/test_editor.py` | 3 new browser tests: the Test button playing Hold-All in the simulator's page with its controller scoring; errors back on their blocks (on loading and while running) and cleared by an edit; every line of both examples mapped to its block |
+
+### Validation
+
+```sh
+docker run --rm -v "$PWD:/src" atalaia-dev sh -c "BUILD=/tmp/c sh tools/check.sh"
+python3 tools/docker_editor.py
+```
+
+A mode author now: builds the mode from blocks at `/editor/`, sets how
+many boxes to try it with, presses *Test in the simulator*, and plays it
+in the simulator's tab (holding the boxes' buttons, watching the
+controller's script); an error the scripts hit, on loading or while the
+game runs, appears in the editor's problems list and on the block that
+caused it.
 
 ## Plan phase 3: Editor completeness
 
@@ -302,6 +347,129 @@ licence) and installs scenarios and field-script packages through the
 existing upload checks; the console shows who signed a package and
 "not reviewed by the project" for unverified ones. Store schema bump,
 controller tests, console browser tests.
+
+## Plan phase 13: Missing modes from the GM console
+
+*Software, can be done now (the box's side host-tested; on real boxes in
+HW3). Depends on 4, 5, 6. Size L (two parts: 13a the controller, the
+console and the protocol; 13b the box). Planned 2026-10-22 from the
+maintainer's decision on P5R-8; design choices P5B-8 to P5B-17, all
+open.*
+
+The maintainer (P5R-8, 2026-10-22): *"we should have a way to sync only
+new modes as needed from the GM console"*. A box gets from its field
+controller only the modes a game needs that it lacks, as signed
+packages, instead of every new mode waiting for a firmware release. K10
+is amended, not dropped: a box still runs only code it can check with
+keys built into its firmware (ADR.md, "Note 2026-10-22: P5R-8").
+
+**Where packages come from** (P5B-8). Only the field controller's mode
+store: a signed package the GM uploads in the console (made and signed
+with `tools/mode_package.py`, plan phase 4, from the editor's files) or
+one imported from a registry index (plan phase 6; later the site
+server's library). The editor never sends anything to a box, and a box
+never reaches the internet: it downloads from its controller.
+
+**The signature** (P5B-9, P5B-10). The mode package's signed manifest
+of P5R-7, with two more lines so that a box can decide without reading
+YAML: `atalaia-mode-package-v1`, `id=`, `version=`, `kind=` (`mode`,
+`modifier` or `role`; a scenario runs on the controller only and is
+never sent), `min_tier=` (`reduced` or `full`), `size=`, `sha256=` (of
+the archive). Ed25519, base64, key ids as release keys'. A box checks
+it with **mode keys built into its firmware** (`CONFIG_ATALAIA_MODE_KEYS`,
+up to 4, next to `CONFIG_ATALAIA_OTA_RELEASE_KEYS`; the release keys may
+sign modes too); the controller checks with the same list
+(`[modes] box_keys`) only to offer what a box will take. So a community
+mode reaches boxes once the project has signed it (the registry's
+verified badge, plan phase 8, becomes that signature); whether a field
+may add its own key for its club's modes is for the maintainer (P5B-9).
+
+**How a box receives it** (P5B-11). The trigger stays on the radio and
+small; the scripts never go over LoRa. In the invite dialog, a box that
+answered *no mode* (field-frame result 3) can be invited again with a
+join that carries a new optional key, **16 `fetch_modes`** (true). A box
+with that key takes the join as *fetching* instead of refusing it: for
+each part of its `mode_id` it lacks, it joins the field Wi-Fi and, over
+HTTPS pinned to the field CA (join keys 13 and 14, as a firmware update),
+`GET <url>/api/v1/mode-packages/<id>/release` (the manifest and
+signature) and `.../<id>/package` (the archive), then checks and installs
+it, and only then sends its HELLO as a joined box. A card or a QR code
+with key 16 does the same. Firmware without it skips key 16 (keys 16-31
+are skipped by every reader) and answers *no mode* as today.
+
+**Storage and limits** (P5B-12). On the box's `storage` LittleFS
+partition (2 MiB; presets already live there): `/littlefs/modes/<id>/`
+with `node.lua`, the screen templates (`assets/screens/*.yaml`, read by
+the core's parser as built-in ones are) and the signed release; its
+preset slot is marked *fetched* with the version, key id and SHA-256. A
+box takes an archive of at most 256 KiB (the controller takes 1 MB; the
+box hashes the whole archive as it streams and keeps only `node.lua` and
+`assets/screens/`), at most 8 fetched packages and 512 KiB in all,
+and a composed game within its 16 KB preset buffer, as today. A Reduced
+box (no PSRAM, 64 KB of Lua heap) uses the same storage, refuses
+`min_tier=full` (`tier`) and checks a script with its own heap.
+
+**When** (P5B-13). Only between games: a box fetches while it is
+joining (never while a game is running or paused; a game starting stops
+a fetch, `cancelled`), and the controller's start guard waits while a
+fetch is on its way (`[modes] fetch_timeout_s`, 300 s; the GM can stop
+waiting), as it does for firmware updates.
+
+**How the box checks and loads it** (P5B-14). In order, refusing with a
+reason at the first failure: the release text has exactly the
+manifest's lines and a signature; the id is the part it asked for; the
+signature with one of its mode keys; the kind (not `scenario`), the tier;
+the id is not one of its built-in ones (the firmware owns those, K10;
+`builtin`); the archive's size and SHA-256 as signed while it is
+streamed, before anything is kept; then the script loads in a fresh
+sandbox with the box's tier limits (the same `node_runner` load as a
+game, no game started) and the composed game still fits; only then is it
+written to storage and the slot marked. The sandbox (plan phase 5's
+battery) is what limits a signed script; the signature says who vouches
+for it.
+
+**Rollback and removal** (P5B-15). A newer version of a fetched id
+replaces the older one only after it has passed its checks; the older
+one stays until then, so a failed fetch leaves the box as it was. When
+space is needed, the box drops the fetched package least recently used
+by a game, never one the joined game needs and never a built-in one. The
+console's *Boxes* tab can tell a box to forget its fetched modes (in its
+next join, key 17 `forget_modes`); a factory reset forgets them too. A
+key that is revoked is taken out of the controller's list at once (it
+offers nothing signed by it) and out of boxes by a firmware release.
+
+**What the console shows** (P5B-16). In the invite dialog, next to the
+boxes that answered *no mode*: which parts the game needs that the
+controller holds as signed packages a box will take, *Send missing
+modes* (re-invites those boxes with key 16), and per box its progress:
+fetching, installed, refused with the reason (`no_wifi`, `unreachable`,
+`bad_signature`, `no_key`, `tier`, `builtin`, `too_big`, `no_space`,
+`bad_hash`, `load`, `cancelled`), failed. A part the controller does not
+hold, or holds unsigned, is named with what to do (upload a signed
+package). The box reports over HTTPS (`POST /api/v1/mode-packages/report`,
+an HMAC with the game key, as the firmware report) and, when HTTPS cannot
+carry it, with a new standard event `node.modes_failed` (critical, the
+reason and the part) over LoRa. The *Boxes* tab lists each box's fetched
+modes from its last report.
+
+**Work.** 13a: the manifest's lines in `tools/mode_package.py` and the
+shared vectors (plan phase 4), join key 16 and 17 in the three join
+codecs and `protocol/vectors/join.json`, `protocol/mode-packages.md`,
+the controller's endpoints and start guard, the console's step (en, pt),
+contract cases in `protocol/vectors/controller_api.json` for the Android
+controller role. 13b: `firmware/esp32/main/mode_fetch.c` (platform-free,
+host-tested with fakes, as `fw_update.c`) and its ESP-IDF side, the
+preset store's fetched slots, the box's screens from storage, the
+`node.modes_failed` event in `protocol/schema/events.yaml`. Android
+props get the same packages through their own Wi-Fi link in a later
+slice of PE24.
+
+**Tests.** The C codecs and checks against the shared vectors (a valid
+release, every refusal above, a tampered archive, a revoked or unknown
+key, the reduced tier); `box_host` runs a fetch from a fake controller;
+the controller's tests (offer, report, start guard, the console's
+browser tests); the simulator's join codec with keys 16 and 17. On real
+boxes: HW3.
 
 ## Plan phase 7: Scenario blocks in the console
 
@@ -386,6 +554,7 @@ release.
 | AC-10 | Build guides exist for the Field Box and the Satellite | 12, HW2 | Field Box done (`hardware/field-box/BUILD.md`); the rest pending |
 | AC-11 | CONTRIBUTING.md documents mode submission | 9 | Pending |
 | AC-12 | CI includes a sandbox-escape test job | 5 | Pending (`test_sandbox` covers the basics) |
+| AC-13 | (new, P5R-8) A box gets a signed mode it lacks from its field controller between games, checks it and plays it; it refuses an unsigned or tampered one | 13, HW3 | Pending (planned 2026-10-22) |
 
 ---
 
@@ -398,7 +567,7 @@ release.
 | A3 | The mode package format is stable | Built, with kinds, roles, `needed`, commands and `i18n:` |
 | A4 | Ed25519 for firmware images | Built (`protocol/firmware-update.md`); mode packages reuse it (P5R-7) |
 | A5 | The Heltec V4.3 pin map | Re-done with GNSS (2026-10-21); still to be proved in a built box |
-| A6 | The simulator's web view runs one mode at a time | Holds; it does not run `field.lua` yet (plan phase 2) |
+| A6 | The simulator's web view runs one mode at a time | Holds; it ran `field.lua` already (through `Simulation`); plan phase 2 shows the controller and reloads the mode from the editor |
 | A7 | Blockly's `CodeGenerator` can target Lua | Holds: Blockly ships a `LuaGenerator`; the editor uses its class |
 | A8 | CI on GitHub Actions | Holds; a new `editor` job |
 | A9 | The sandbox blocks `io`, `os`, `require` | Holds (`test_sandbox`); plan phase 5 widens the battery |
@@ -414,6 +583,6 @@ for now (all open):
 
 | # | Question | Recommended |
 |---|----------|-------------|
-| P5R-8 | May boxes ever load signed community node scripts at run time? | Not in phase 5: community node scripts reach boxes by joining `modes/` and a signed firmware release |
+| P5R-8 | May boxes ever load signed community node scripts at run time? | **Decided by the maintainer (2026-10-22):** yes, only what a game needs, as signed packages from the GM console: plan phase 13 (P5B-8 to P5B-17; P5B-9, which keys a box trusts, is for the maintainer) |
 | P5R-9 | When to create `atalaia-modes`? | After plan phase 8, from its template |
 | P5R-10 | Third language: German first, then Traditional Chinese? | Yes, German first (no new glyphs on the box) |

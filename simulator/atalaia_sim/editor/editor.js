@@ -6,17 +6,25 @@
 // (field.lua), the Mode tab's form for the rest of mode.yaml, and the generated files beside
 // them, regenerated on every change, with the problems found. Blocks are saved as one JSON file
 // (format "atalaia-mode-editor"); the last state is kept in this browser as a draft. The page
-// works offline: Blockly is vendored and nothing is fetched from elsewhere.
+// works offline: Blockly is vendored and nothing is fetched from elsewhere. "Test in the
+// simulator" (plan phase 2) sends the generated files to the simulator's POST /api/reload, which
+// makes them the game its web view shows (in another tab, "atalaia-sim"); the errors the
+// scripts hit there, on loading or while the game runs, come back to the problems list and to
+// the blocks they come from.
 /* global Blockly, lua */
 
-import { defineBlocks, toolbox } from './blocks.js';
-import { defaultInfo, generateProject, generateWorkspaces, LICENCES, makeGenerator } from './generator.js';
+import { defineBlocks, luaName, toolbox } from './blocks.js';
+import { defaultInfo, generateProject, generateWorkspaces, LICENCES, lineBlocks, makeGenerator } from './generator.js';
 
 const LANGS = ['pt', 'en'];
 const LANG_KEY = 'atalaia.editor.lang';
 const DRAFT_KEY = 'atalaia.editor.draft';
 export const FORMAT = 'atalaia-mode-editor';
 const FILE_NAMES = { node_lua: 'node.lua', field_lua: 'field.lua', mode_yaml: 'mode.yaml' };
+/** How often the editor asks the simulator for script errors while its mode runs there. */
+const TEST_POLL_MS = 1000;
+/** The id of the warnings the editor puts on blocks for the simulator's errors. */
+const SIM_WARNING = 'atalaia-sim';
 
 function storageGet(key) {
     try {
@@ -173,10 +181,12 @@ async function main() {
         code.textContent = files[activeFile];
         document.getElementById('no-field').hidden = !(activeFile === 'field_lua' && !files.field_lua);
         document.getElementById('download').disabled = !files[activeFile];
-        problemList.replaceChildren(...files.problems.map((p) => {
+        const problems = [...files.problems, ...simProblems];
+        problemList.replaceChildren(...problems.map((p) => {
             const li = document.createElement('li');
             li.textContent = t(p.key).replace('{name}', p.name || '');
             li.dataset.key = p.key;
+            if (p.key === 'problem_sim') li.classList.add('sim');
             if (p.block) {
                 li.addEventListener('click', () => {
                     const kind = p.script || (workspaces.field.getBlockById(p.block) ? 'field' : 'node');
@@ -190,12 +200,110 @@ async function main() {
             }
             return li;
         }));
-        document.getElementById('no-problems').hidden = files.problems.length > 0;
+        document.getElementById('no-problems').hidden = problems.length > 0;
     }
     function regenerate() {
         files = generateWorkspaces(g, info, workspaces.node, workspaces.field);
+        // The simulator's errors are about the files it got: once they change, they are gone.
+        if (tested && Object.keys(FILE_NAMES).some((f) => files[f] !== tested.files[f])) stopTest();
         show();
     }
+
+    // ---- testing in the simulator ----
+    let simProblems = [];
+    let tested = null; // { files, maps, reloads, since, timer } of the mode the simulator runs
+    const testStatus = document.getElementById('test-status');
+    const testBoxes = document.getElementById('test-boxes');
+    const setStatus = (key, values = {}, bad = false) => {
+        let text = ui(key);
+        for (const [k, v] of Object.entries(values)) text = text.replace(`{${k}}`, String(v));
+        document.getElementById('test-message').textContent = text;
+        document.getElementById('test-open').hidden = bad;
+        testStatus.classList.toggle('bad', bad);
+        testStatus.hidden = false;
+    };
+    /** The simulator's errors as problems, on their blocks where the line says which. */
+    function showSimErrors(errors) {
+        for (const p of simProblems) setWarning(p, null);
+        // One problem per message, naming the boxes that hit it (every box runs the same script).
+        const byMessage = new Map();
+        for (const err of errors) {
+            const script = err.script === 'node' || err.script === 'field' ? err.script : null;
+            const map = script && tested ? tested.maps[script] : null;
+            const block = map && err.line ? map[err.line - 1] || null : null;
+            const p = byMessage.get(err.message) || { key: 'problem_sim', block, script, message: err.message, nodes: [] };
+            if (err.node && err.node !== 'controller' && !p.nodes.includes(err.node)) p.nodes.push(err.node);
+            byMessage.set(err.message, p);
+        }
+        simProblems = [...byMessage.values()].map((p) => ({ ...p, name: (p.nodes.length ? p.nodes.join(', ') + ': ' : '') + p.message }));
+        for (const p of simProblems) setWarning(p, p.message);
+        show();
+    }
+    function setWarning(p, text) {
+        const block = p.block && p.script ? workspaces[p.script].getBlockById(p.block) : null;
+        if (block) block.setWarningText(text, SIM_WARNING);
+    }
+    function stopTest() {
+        if (tested) clearTimeout(tested.timer);
+        tested = null;
+        for (const p of simProblems) setWarning(p, null);
+        simProblems = [];
+        testStatus.hidden = true;
+    }
+    async function pollTest() {
+        const current = tested;
+        if (!current) return;
+        try {
+            const response = await fetch(`/api/state?since=${current.since}`, { cache: 'no-store' });
+            const state = await response.json();
+            if (tested !== current) return;
+            if (state.reloads !== current.reloads) return stopTest(); // another reload replaced it
+            current.since = state.events_from + state.events.length;
+            const seen = JSON.stringify(state.script_errors);
+            if (seen !== current.errors) {
+                current.errors = seen;
+                showSimErrors(state.script_errors);
+                if (state.script_errors.length) setStatus('test_running_errors', { name: state.mode.name });
+            }
+        } catch (e) {
+            // the simulator was stopped: keep what was shown, try again later
+        }
+        if (tested === current) current.timer = setTimeout(pollTest, TEST_POLL_MS);
+    }
+    async function test() {
+        clearTimeout(timer);
+        regenerate();
+        stopTest();
+        const count = Math.min(16, Math.max(1, Math.round(Number(testBoxes.value)) || 1));
+        const role = (luaName(info.role) || 'zone').slice(0, 20);
+        const nodes = {};
+        for (let i = 1; i <= count; i++) nodes[`${role}${i}`] = role;
+        const sent = { ...files };
+        const maps = {
+            node: sent.node_lua ? lineBlocks(g, workspaces.node, 'node', info, sent.node_lua) : null,
+            field: sent.field_lua ? lineBlocks(g, workspaces.field, 'field', info, sent.field_lua) : null,
+        };
+        setStatus('test_sending');
+        let answer;
+        try {
+            const response = await fetch('/api/reload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode_yaml: sent.mode_yaml, node_lua: sent.node_lua, field_lua: sent.field_lua || null, nodes }),
+            });
+            answer = await response.json();
+            if (!response.ok) throw new Error(answer.error || String(response.status));
+        } catch (err) {
+            return setStatus('test_offline', { error: err.message }, true);
+        }
+        // Kept until the files change; followed (polled) only when the simulator took the mode.
+        tested = { files: sent, maps, reloads: answer.reloads, since: 0, timer: null, errors: JSON.stringify(answer.errors) };
+        showSimErrors(answer.errors);
+        if (answer.status !== 'ok') return setStatus('test_failed', {}, true);
+        setStatus(answer.errors.length ? 'test_running_errors' : 'test_running', { name: answer.mode.name, boxes: answer.nodes.length });
+        tested.timer = setTimeout(pollTest, TEST_POLL_MS);
+    }
+    document.getElementById('test').addEventListener('click', () => test());
     function project() {
         return {
             format: FORMAT,
@@ -283,6 +391,9 @@ async function main() {
         project,
         files: () => files,
         selectTab,
+        test,
+        lineBlocks: (kind) => lineBlocks(g, workspaces[kind], kind, info, files[`${kind}_lua`]),
+        blockType: (kind, id) => workspaces[kind].getBlockById(id)?.type ?? null,
     };
     document.body.dataset.ready = 'true';
 }

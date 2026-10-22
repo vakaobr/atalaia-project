@@ -34,17 +34,27 @@ SPDX-License-Identifier: GPL-3.0-or-later
       </select>
     </div>
     <div class="group">
+      <label class="lang"><span data-i18n="test_boxes">Boxes</span>
+        <input id="test-boxes" class="boxes" type="number" min="1" max="16" value="3">
+      </label>
+      <button id="test" type="button" class="primary" data-i18n="test">Test in the simulator</button>
+    </div>
+    <div class="group">
       <label class="lang"><span data-i18n="language">Language</span>
         <select id="lang">
           <option value="pt">Português</option>
           <option value="en">English</option>
         </select>
       </label>
-      <a class="button" href="/" data-i18n="simulator">Simulator</a>
+      <a class="button" href="/" target="atalaia-sim" data-i18n="simulator">Simulator</a>
     </div>
   </header>
 
   <p class="intro muted small" data-i18n="intro"></p>
+  <p id="test-status" class="test-status small" role="status" hidden>
+    <span id="test-message"></span>
+    <a id="test-open" href="/" target="atalaia-sim" data-i18n="test_open">Open the game</a>
+  </p>
 
   <main class="layout">
     <section class="editor-pane">

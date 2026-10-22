@@ -4,13 +4,17 @@
 
 A small local web server (standard library only) around a LiveGame. The
 page in web/ polls GET /api/state and sends actions to POST /api/action.
-The mode editor (editor/, phase 5 plan phase A) is served at /editor/: a
-static page with its own vendored Blockly, which needs no network.
+The mode editor (editor/, phase 5 plan phase 1) is served at /editor/: a
+static page with its own vendored Blockly, which needs no network. Its
+"Test" button sends the mode it is editing to POST /api/reload (plan phase
+2), which makes it the game the web view shows.
 
 It is a development tool for one person's machine: it listens on localhost
 by default, answers only requests addressed to a local host name (so a web
 page elsewhere cannot reach it through DNS rebinding), and accepts actions
-only as JSON (so another site's form cannot send one).
+and reloads only as JSON (so another site's form cannot send one, and a
+script elsewhere cannot without a CORS preflight, which it never grants).
+A reloaded mode's scripts run in the core's sandbox, as every mode's do.
 """
 
 from __future__ import annotations
@@ -23,7 +27,7 @@ from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import parse_qs, urlsplit
 
-from .live import LiveError, LiveGame
+from .live import LiveError, LiveGame, ReloadError
 
 WEB = Path(__file__).resolve().parent / "web"
 STATIC = {
@@ -51,6 +55,10 @@ EDITOR_CSP = ("default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'se
 DEFAULT_CSP = "default-src 'self'; frame-ancestors 'none'; form-action 'none'"
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 MAX_BODY = 16 * 1024
+# A reload carries a mode's files: at most what the field controller takes as a mode package
+# (MAX_PACKAGE_BYTES in controller/atalaia_controller/modes.py, decision P5-6).
+MAX_RELOAD_BODY = 1_000_000
+POST_LIMITS = {"/api/action": MAX_BODY, "/api/reload": MAX_RELOAD_BODY}
 TICK_S = 0.05
 
 
@@ -153,7 +161,8 @@ class _Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         if not self._host_allowed():
             return self._error(HTTPStatus.FORBIDDEN, "unknown host")
-        if urlsplit(self.path).path != "/api/action":
+        path = urlsplit(self.path).path
+        if path not in POST_LIMITS:
             return self._error(HTTPStatus.NOT_FOUND, "not found")
         if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
             return self._error(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, "send JSON")
@@ -161,13 +170,18 @@ class _Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
             length = -1
-        if not 0 < length <= MAX_BODY:
+        if length > POST_LIMITS[path]:
+            return self._error(HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                               f"at most {POST_LIMITS[path]} bytes")
+        if length <= 0:
             return self._error(HTTPStatus.BAD_REQUEST, "bad request body")
         try:
             body = json.loads(self.rfile.read(length))
-            if not isinstance(body, dict) or not isinstance(body.get("action"), str):
-                raise ValueError
         except ValueError:
+            body = None
+        if path == "/api/reload":
+            return self._reload(body)
+        if not isinstance(body, dict) or not isinstance(body.get("action"), str):
             return self._error(HTTPStatus.BAD_REQUEST, "expected {\"action\": ...}")
         action = body.pop("action")
         try:
@@ -175,6 +189,30 @@ class _Handler(BaseHTTPRequestHandler):
         except LiveError as exc:
             return self._error(HTTPStatus.CONFLICT, str(exc))
         self._json(HTTPStatus.OK, {"ok": True})
+
+    def _reload(self, body: Any) -> None:
+        """POST /api/reload (ADR-P5-2): the mode editor's files become the game. A body of the
+        wrong shape is a 400; a mode that does not load is a 200 with status "error" and its
+        errors (the game that was running goes on), so the editor can show them on its blocks."""
+        texts = ("mode_yaml", "node_lua", "field_lua")
+        if (not isinstance(body, dict) or set(body) - {*texts, "params", "nodes"}
+                or not isinstance(body.get("mode_yaml"), str) or not isinstance(body.get("node_lua"), str)
+                or not isinstance(body.get("field_lua") or "", str)
+                or not isinstance(body.get("params") or {}, dict)
+                or not isinstance(body.get("nodes") or {}, dict)):
+            return self._error(HTTPStatus.BAD_REQUEST, "expected {\"mode_yaml\": ..., \"node_lua\": ..., "
+                               "\"field_lua\": ..., \"params\": {...}, \"nodes\": {...}}")
+        game = self.server.game
+        try:
+            errors = game.reload(body["mode_yaml"], body["node_lua"], body.get("field_lua"),
+                                 body.get("params"), body.get("nodes") or None)
+        except ReloadError as exc:
+            return self._json(HTTPStatus.OK, {"status": "error", "errors": exc.errors})
+        mode = game.sim.mode
+        self._json(HTTPStatus.OK, {"status": "ok", "errors": errors, "reloads": game.reloads,
+                                   "generation": game.generation,
+                                   "mode": {"id": mode.id, "name": mode.name, "version": mode.version},
+                                   "nodes": list(game.sim.nodes)})
 
 
 def make_server(game: LiveGame, host: str = "127.0.0.1", port: int = 8000,

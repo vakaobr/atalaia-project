@@ -11,6 +11,14 @@
     "example_domination": "Domination (boxes only)",
     "example_holdall": "Hold-All Domination (boxes and controller)",
     "simulator": "Simulator",
+    "test": "Test in the simulator",
+    "test_boxes": "Boxes",
+    "test_open": "Open the game",
+    "test_sending": "Loading the mode into the simulator…",
+    "test_running": "{name} is running in the simulator with {boxes} boxes.",
+    "test_running_errors": "{name} is running in the simulator, with script errors: see Problems.",
+    "test_failed": "The simulator could not load this mode; its game goes on as it was. See Problems.",
+    "test_offline": "The simulator does not answer ({error}). Is python -m atalaia_sim serve running?",
     "tab_node": "Boxes (node.lua)",
     "tab_field": "Controller (field.lua)",
     "tab_mode": "Mode",
@@ -178,6 +186,7 @@
     "problem_state_undeclared": "\"{name}\" is not in the memory block: give it a starting value there.",
     "problem_bad_id": "The mode id must look like org.club.my-mode (lower case, at least one dot).",
     "problem_no_name": "The mode needs a name.",
-    "problem_points_integer": "Points must be a whole number."
+    "problem_points_integer": "Points must be a whole number.",
+    "problem_sim": "In the simulator: {name}"
   }
 }

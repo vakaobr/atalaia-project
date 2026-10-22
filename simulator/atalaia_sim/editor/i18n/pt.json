@@ -11,6 +11,14 @@
     "example_domination": "Domínio (só caixas)",
     "example_holdall": "Domínio Total (caixas e controlador)",
     "simulator": "Simulador",
+    "test": "Testar no simulador",
+    "test_boxes": "Caixas",
+    "test_open": "Abrir o jogo",
+    "test_sending": "A carregar o modo no simulador…",
+    "test_running": "{name} está a correr no simulador com {boxes} caixas.",
+    "test_running_errors": "{name} está a correr no simulador, com erros nos scripts: vê os Problemas.",
+    "test_failed": "O simulador não conseguiu carregar este modo; o jogo dele continua como estava. Vê os Problemas.",
+    "test_offline": "O simulador não responde ({error}). O python -m atalaia_sim serve está a correr?",
     "tab_node": "Caixas (node.lua)",
     "tab_field": "Controlador (field.lua)",
     "tab_mode": "Modo",
@@ -178,6 +186,7 @@
     "problem_state_undeclared": "\"{name}\" não está no bloco de memória: dá-lhe lá um valor inicial.",
     "problem_bad_id": "O identificador do modo tem de ser como org.clube.o-meu-modo (minúsculas, pelo menos um ponto).",
     "problem_no_name": "O modo precisa de um nome.",
-    "problem_points_integer": "Os pontos têm de ser um número inteiro."
+    "problem_points_integer": "Os pontos têm de ser um número inteiro.",
+    "problem_sim": "No simulador: {name}"
   }
 }

@@ -65,7 +65,7 @@ header:
   language: Language
 
 hero:
-  status: Pre-alpha · phase 1 and 2 software done, two boards and the field controller working together on the bench, phase 3 nearly complete in software, phase 4 built in software, phase 5 started (the visual mode editor) · not field-ready yet
+  status: Pre-alpha · phase 1 and 2 software done, two boards and the field controller working together on the bench, phase 3 nearly complete in software, phase 4 built in software, phase 5 started (the visual mode editor, with live testing in the simulator) · not field-ready yet
   title: The open <span class="nowrap">force-on-force</span> platform
   lead: >-
     Atalaia is an open platform for the electronic props of airsoft, paintball and milsim: the
@@ -680,8 +680,9 @@ roadmap:
   p5:
     title: Community
     short: >-
-      Visual mode editor built in software: a mode's Lua and manifest from blocks, in Portuguese and
-      English. Next: testing modes live, signed packages, the registry, translations.
+      Visual mode editor built in software, with live testing in the simulator: a mode's Lua and
+      manifest from blocks, in Portuguese and English. Next: signed packages, sending missing modes
+      to boxes from the GM console, the registry, translations.
     text: >-
       Visual mode editor, mode registry, carrier PCB (a ready-made circuit board that makes builds
       easier), translations, build guides for other node types. Built in software: the visual mode
@@ -689,9 +690,12 @@ roadmap:
       team holds the button, timers, points, screens and sounds, the settings a GM can change, and
       the field controller's logic across boxes); it writes the mode's Lua scripts and manifest as
       you go, in Portuguese and English, and works offline. Its Domination and Hold-All Domination
-      examples pass the same tests as the hand-written modes. A mode made this way reaches the boxes
-      in a firmware release. Next: testing a mode live in the simulator, signed mode packages and
-      the registry, German and Traditional Chinese, and the carrier PCB after the first built boxes.
+      examples pass the same tests as the hand-written modes. A button tries the mode at once in the
+      simulator, with as many boxes as you choose, and the errors its scripts hit come back onto the
+      blocks. A mode made this way reaches the boxes in a firmware release; planned: the GM console
+      sending a box, between games, the signed modes a game needs that it lacks. Next: signed mode
+      packages and the registry, German and Traditional Chinese, and the carrier PCB after the first
+      built boxes.
     gate: Ongoing after the first release.
 
 hub:

@@ -53,6 +53,16 @@ SPDX-License-Identifier: GPL-3.0-or-later
         <ul id="scores" class="scores"></ul>
         <p id="params" class="muted small"></p>
       </section>
+      <section id="controller" class="panel" aria-label="Field controller" hidden>
+        <h2>Field controller <span class="muted small">field.lua</span>
+          <span id="controller-status" class="chip"></span></h2>
+        <p id="controller-scores" class="small"></p>
+        <ul id="controller-commands" class="outputs small" aria-label="Commands sent to boxes"></ul>
+        <details class="logs">
+          <summary class="small">Script log</summary>
+          <pre id="controller-logs"></pre>
+        </details>
+      </section>
       <section class="panel feed-panel">
         <h2>Events <span id="event-count" class="muted small"></span></h2>
         <div class="feed-wrap">

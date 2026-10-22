@@ -225,15 +225,35 @@ def load_mode(path: Path) -> Mode:
     manifest_path = path / "mode.yaml"
     if not manifest_path.exists():
         raise ModeError(f"{path}: no mode.yaml")
-    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
-    scenario = isinstance(manifest, dict) and manifest.get("kind") == "scenario"
-    for key in ("id", "version") if scenario else ("id", "version", "roles"):
-        if key not in manifest:
-            raise ModeError(f"{manifest_path}: missing '{key}'")
-    check_manifest(manifest, str(manifest_path))
     node_path = path / "node.lua"
     field_path = path / "field.lua"
-    check_files(manifest.get("kind", "mode"), node_path.exists(), field_path.exists(), str(path))
+    return mode_from_text(
+        path,
+        manifest_path.read_text(encoding="utf-8"),
+        node_path.read_text(encoding="utf-8") if node_path.exists() else None,
+        field_path.read_text(encoding="utf-8") if field_path.exists() else None,
+        where=str(manifest_path),
+    )
+
+
+def mode_from_text(path: Path, manifest_text: str, node_script: Optional[str],
+                   field_script: Optional[str], where: str = "mode.yaml") -> Mode:
+    """A mode from its files' text (load_mode reads them from a folder; the web view's
+    POST /api/reload gets them from the mode editor). `path` names the mode's folder: the
+    scripts' chunk names come from it. Raises ModeError, also for YAML that does not parse."""
+    try:
+        manifest = yaml.safe_load(manifest_text) or {}
+    except yaml.YAMLError as exc:
+        raise ModeError(f"{where}: not valid YAML: {exc}") from exc
+    if not isinstance(manifest, dict):
+        raise ModeError(f"{where}: a manifest is a map of keys and values")
+    scenario = manifest.get("kind") == "scenario"
+    for key in ("id", "version") if scenario else ("id", "version", "roles"):
+        if key not in manifest:
+            raise ModeError(f"{where}: missing '{key}'")
+    check_manifest(manifest, where)
+    check_files(manifest.get("kind", "mode"), node_script is not None, field_script is not None,
+                str(path))
     return Mode(
         path=path,
         id=manifest["id"],
@@ -241,8 +261,8 @@ def load_mode(path: Path) -> Mode:
         version=str(manifest["version"]),
         roles=manifest.get("roles") or {},
         params=manifest.get("params") or {},
-        node_script=node_path.read_text(encoding="utf-8") if node_path.exists() else "",
-        field_script=field_path.read_text(encoding="utf-8") if field_path.exists() else None,
+        node_script=node_script or "",
+        field_script=field_script,
         kind=manifest.get("kind", "mode"),
         description=str(manifest.get("description", "")),
         i18n=manifest.get("i18n") or {},

@@ -128,6 +128,7 @@ function render(next) {
   renderBar();
   renderProblems();
   renderScores();
+  renderController();
   for (const node of state.nodes) renderNode(node);
   renderEvents();
 }
@@ -179,6 +180,26 @@ function renderScores() {
   )));
   const params = Object.entries(state.params).map(([k, v]) => `${k} ${compact(v)}`).join(" · ");
   $("params").textContent = params ? `Parameters: ${params}` : "";
+}
+
+// The mode's field.lua, run as the field controller runs it: its state, its points, the
+// commands it sent to boxes and its log.
+function renderController() {
+  const c = state.controller;
+  $("controller").hidden = !c;
+  if (!c) return;
+  const status = $("controller-status");
+  status.textContent = c.status;
+  status.className = "chip " + (c.status === "running" ? "on" : c.status === "halted" ? "bad" : "");
+  status.title = c.error || "";
+  $("controller-scores").textContent =
+    `Points: ${state.teams.map((t) => `${t} ${c.scores[t]}`).join(" · ")} · ${(c.mem / 1024).toFixed(1)} KB`;
+  $("controller-commands").replaceChildren(...c.commands.map((cmd) => el("li", {
+    textContent: `${formatTime(cmd.t)} → ${cmd.node}: ${cmd.cmd}` +
+      (Object.keys(cmd.params).length ? ` ${compact(cmd.params)}` : ""),
+  })));
+  const text = c.logs.join("\n") || "(empty)";
+  if ($("controller-logs").textContent !== text) $("controller-logs").textContent = text;
 }
 
 function makeCard(node) {

@@ -68,7 +68,7 @@ header:
   language: Idioma
 
 hero:
-  status: Pré-alfa · software das fases 1 e 2 pronto, duas placas e o controlador de campo já funcionam juntos na bancada, fase 3 quase completa em software, fase 4 construída em software, fase 5 começada (o editor visual de modos) · ainda não pronta para o campo
+  status: Pré-alfa · software das fases 1 e 2 pronto, duas placas e o controlador de campo já funcionam juntos na bancada, fase 3 quase completa em software, fase 4 construída em software, fase 5 começada (o editor visual de modos, com teste ao vivo no simulador) · ainda não pronta para o campo
   title: A plataforma aberta de <span class="nowrap">combate simulado</span>
   lead: >-
     A Atalaia é uma plataforma aberta para os dispositivos eletrónicos de jogo (os props) de
@@ -708,9 +708,9 @@ roadmap:
   p5:
     title: Comunidade
     short: >-
-      Editor visual de modos construído em software: o Lua e o manifesto de um modo a partir de
-      blocos, em português e inglês. A seguir: experimentar modos ao vivo, pacotes assinados, o
-      registo, traduções.
+      Editor visual de modos construído em software, com teste ao vivo no simulador: o Lua e o
+      manifesto de um modo a partir de blocos, em português e inglês. A seguir: pacotes assinados,
+      enviar às caixas os modos que lhes faltam a partir da consola de GM, o registo, traduções.
     text: >-
       Editor visual de modos, registo de modos, placa de suporte (PCB) que facilita a montagem,
       traduções, guias de montagem para outros tipos de dispositivos. Construído em software: o
@@ -719,9 +719,11 @@ roadmap:
       definições que a organização pode mudar e a lógica do controlador de campo entre caixas);
       escreve os scripts Lua e o manifesto do modo à medida que se monta, em português e inglês, e
       funciona sem rede. Os exemplos Domínio e Domínio Total passam os mesmos testes que os modos
-      escritos à mão. Um modo feito assim chega às caixas numa versão do firmware. A seguir:
-      experimentar um modo ao vivo no simulador, pacotes de modos assinados e o registo, alemão e
-      chinês tradicional, e a placa de suporte depois das primeiras caixas montadas.
+      escritos à mão. Um botão experimenta logo o modo no simulador, com as caixas que escolheres, e
+      os erros dos scripts voltam aos blocos. Um modo feito assim chega às caixas numa versão do
+      firmware; planeado: a consola de GM enviar a uma caixa, entre jogos, os modos assinados que um
+      jogo precisa e lhe faltam. A seguir: pacotes de modos assinados e o registo, alemão e chinês
+      tradicional, e a placa de suporte depois das primeiras caixas montadas.
     gate: Continua depois da primeira versão.
 
 hub:

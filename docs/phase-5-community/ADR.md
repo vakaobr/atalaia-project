@@ -71,7 +71,33 @@ Facts the amendments rely on (all built, 2026-10-22):
   (`mode.yaml` `i18n:`), all in English and European Portuguese.
 - **Simulator web view** (`simulator/atalaia_sim/web.py`): static page,
   `GET /api/state`, `POST /api/action`, localhost only; it runs node scripts,
-  not `field.lua`.
+  not `field.lua`. *(Corrected 2026-10-22, plan phase 2: it did run
+  `field.lua`, through `Simulation`; it did not show it. P5B-1.)*
+
+### Note 2026-10-22: P5R-8, decided by the maintainer
+
+After this refresh the maintainer answered P5R-8: *"we should have a way to
+sync only new modes as needed from the GM console"*. This changes ADR-P5-3's
+amendment and decision K10 for one path, planned as plan phase 13 (PLAN.md,
+"Plan phase 13: Missing modes from the GM console"; decisions P5B-8 to
+P5B-17, open; P5B-9 for the maintainer):
+
+- **K10, amended (proposed in P5B-14):** a box runs the scripts built into its
+  firmware *and* signed mode packages it fetched from its own field controller
+  for a game, checked with mode keys built into its firmware; nothing
+  unsigned, never a scenario (the controller's only), never over LoRa, never in
+  place of a built-in id. Everything else in K10 stands: built-in modes come
+  with the firmware and are refreshed at boot.
+- **ADR-P5-3, amended again:** a registry package can now also reach boxes,
+  through the controller's mode store and the GM console's *Send missing
+  modes* step in the invite dialog, between games only.
+- **ADR-P5-4 / P5R-7, amended (P5B-10):** the signed manifest also carries
+  `kind` and `min_tier`, so a box can refuse a package without reading YAML;
+  mode packages are signed like firmware releases, and boxes check them with
+  `CONFIG_ATALAIA_MODE_KEYS` (and the release keys).
+- The trust and transport are the firmware update's (`protocol/firmware-update.md`):
+  the box decides with keys it carries; HTTPS pinned to the field CA of its
+  join; a report with the game key's HMAC, or a LoRa event when HTTPS cannot.
 
 ---
 
@@ -314,6 +340,13 @@ UI). The URL structure:
 - **`POST /api/reload` waits for plan phase 2**, which also teaches the web view
   to run `field.lua` (today only the YAML tests run it), so that a mode with a
   controller script can be played live. The endpoint keeps this ADR's shape.
+- **Built in plan phase 2 (2026-10-22; P5B-1 to P5B-7):** the web view did run
+  `field.lua` (through `Simulation`) and now shows the controller; the
+  endpoint keeps the shape above with an optional `nodes`, errors as objects
+  (`message`, `script`, `line`) so the editor can put them on their blocks,
+  `400`/`413` for requests that are not a mode, and starts the reloaded game.
+  The editor's *Test* does not open a window itself: a status line links to
+  the simulator's page in one named tab, which picks the new game up.
 
 ---
 
@@ -453,7 +486,9 @@ offline use. Modes are pushed to nodes over Wi-Fi or BLE during join
   reaches boxes only when it is merged into `modes/` and shipped in a signed
   firmware release. Whether boxes should ever load signed community node
   scripts at run time is **for the maintainer** (P5R-8); the recommendation is
-  not in phase 5.
+  not in phase 5. *(The maintainer decided otherwise on 2026-10-22: yes, only
+  the modes a game needs, signed, from the GM console; see "Note 2026-10-22:
+  P5R-8" above and plan phase 13.)*
 - **The repository.** `atalaia-project/atalaia-modes` is created only with the
   maintainer's go-ahead (P5-3, confirmed). Until then the index schema, the
   package and signing tools and their tests live in this repository

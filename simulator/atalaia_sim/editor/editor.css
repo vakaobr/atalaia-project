@@ -88,6 +88,14 @@ textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; 
 
 .intro { margin: 8px 16px 0; }
 
+.primary { background: var(--accent); color: var(--accent-text); border-color: transparent; }
+.primary:hover { background: var(--accent); filter: brightness(1.1); }
+.boxes { width: 4.5em; }
+.test-status { margin: 8px 16px 0; padding: 6px 10px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); }
+.test-status.bad { background: var(--warn-bg); color: var(--warn-text); }
+.test-status a { margin-left: 8px; color: inherit; }
+.problems li.sim { border-left: 3px solid var(--warn-text); }
+
 .layout {
   flex: 1;
   min-height: 0;
