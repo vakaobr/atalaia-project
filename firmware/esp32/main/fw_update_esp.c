@@ -22,6 +22,7 @@
 #include "config_store.h"
 #include "esp_app_desc.h"
 #include "esp_event.h"
+#include "esp_heap_caps.h"
 #include "esp_http_client.h"
 #include "esp_log.h"
 #include "esp_netif.h"
@@ -32,6 +33,8 @@
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
 #include "fw_update.h"
+#include "mbedtls/md.h"
+#include "mbedtls/pk.h"
 #include "mbedtls/sha256.h"
 #include "mbedtls/ssl.h"
 #include "mbedtls/x509_crt.h"
@@ -71,13 +74,70 @@ static size_t release_keys(void)
 static uint8_t s_pin[32];
 static mbedtls_x509_crt s_placeholder_ca; /* never matches: the callback decides */
 
+static bool is_field_ca(const mbedtls_x509_crt *crt)
+{
+    uint8_t h[32];
+    return mbedtls_sha256(crt->raw.p, crt->raw.len, h, 0) == 0 && memcmp(h, s_pin, 32) == 0;
+}
+
+/* Whether ca (a certificate the server sent) issued and signed child. */
+static bool signed_by(const mbedtls_x509_crt *child, mbedtls_x509_crt *ca)
+{
+    if (!ca->MBEDTLS_PRIVATE(ca_istrue)) {
+        ESP_LOGW(TAG, "the field CA is not marked as a CA");
+        return false;
+    }
+    if (child->issuer_raw.len != ca->subject_raw.len ||
+        memcmp(child->issuer_raw.p, ca->subject_raw.p, ca->subject_raw.len) != 0) {
+        ESP_LOGW(TAG, "the certificate's issuer is not the field CA's name");
+        return false;
+    }
+    if (!mbedtls_pk_can_do(&ca->pk, child->MBEDTLS_PRIVATE(sig_pk))) {
+        ESP_LOGW(TAG, "the field CA's key cannot check this signature type");
+        return false;
+    }
+    const mbedtls_md_info_t *md = mbedtls_md_info_from_type(child->MBEDTLS_PRIVATE(sig_md));
+    unsigned char hash[MBEDTLS_MD_MAX_SIZE];
+    int ret = md == NULL ? -1 : mbedtls_md(md, child->tbs.p, child->tbs.len, hash);
+    if (ret != 0) {
+        ESP_LOGW(TAG, "hashing the certificate failed (-0x%04x)", (unsigned)-ret);
+        return false;
+    }
+    ret = mbedtls_pk_verify_ext(child->MBEDTLS_PRIVATE(sig_pk), child->MBEDTLS_PRIVATE(sig_opts),
+                                &ca->pk, child->MBEDTLS_PRIVATE(sig_md), hash,
+                                mbedtls_md_get_size(md), child->MBEDTLS_PRIVATE(sig).p,
+                                child->MBEDTLS_PRIVATE(sig).len);
+    if (ret != 0)
+        ESP_LOGW(TAG, "the field CA's signature does not verify (-0x%04x)", (unsigned)-ret);
+    return ret == 0;
+}
+
+/* As ESP-IDF's certificate bundle does: mbedTLS marks "not trusted" on the
+ * certificate it could not chain to a trusted CA (on the bench, the
+ * controller's own certificate, though the server sent the field CA after
+ * it). Clear it only where the field CA of the join, found among the
+ * certificates the server sent, is that certificate itself or issued and
+ * signed it; every other flag stays. */
 static int pin_verify(void *ctx, mbedtls_x509_crt *crt, int depth, uint32_t *flags)
 {
     (void)ctx;
-    if (depth == 0) return 0; /* the controller's own certificate keeps every flag */
-    uint8_t h[32];
-    if (mbedtls_sha256(crt->raw.p, crt->raw.len, h, 0) == 0 && memcmp(h, s_pin, 32) == 0) {
-        *flags &= ~(uint32_t)MBEDTLS_X509_BADCERT_NOT_TRUSTED;
+    if (*flags & MBEDTLS_X509_BADCERT_NOT_TRUSTED) {
+        bool anchored = is_field_ca(crt);
+        for (mbedtls_x509_crt *ca = crt->next; !anchored && ca != NULL; ca = ca->next) {
+            anchored = is_field_ca(ca) && signed_by(crt, ca);
+        }
+        if (anchored) {
+            *flags &= ~(uint32_t)MBEDTLS_X509_BADCERT_NOT_TRUSTED;
+        } else {
+            ESP_LOGW(TAG, "certificate at depth %d: not the field CA of the join, nor signed by it",
+                     depth);
+        }
+    }
+    if (depth == 0 && *flags != 0) {
+        /* Say why a handshake is refused (name, usage, signature...). */
+        char why[160];
+        mbedtls_x509_crt_verify_info(why, sizeof(why), "", *flags);
+        ESP_LOGW(TAG, "the controller's certificate: %s", why);
     }
     return 0;
 }
@@ -143,7 +203,18 @@ static bool net_up(void *ctx)
     xEventGroupClearBits(s_wifi_events, WIFI_GOT_IP | WIFI_FAILED);
     s_retries = 0;
     wifi_init_config_t init = WIFI_INIT_CONFIG_DEFAULT();
-    if (esp_wifi_init(&init) != ESP_OK) return false;
+    /* The Wi-Fi driver's RX buffers need DMA-capable internal RAM: log the
+     * headroom before it starts, the figure that decides whether it can. */
+    ESP_LOGI(TAG, "Wi-Fi starting: DMA-capable RAM %u bytes free (largest %u), internal %u",
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    esp_err_t err = esp_wifi_init(&init);
+    if (err != ESP_OK) {
+        /* Reported as no_wifi; say here that the driver itself did not start. */
+        ESP_LOGE(TAG, "Wi-Fi driver did not start: %s", esp_err_to_name(err));
+        return false;
+    }
     s_wifi_on = true;
     esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, on_event, NULL, &s_on_wifi);
     esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, on_event, NULL, &s_on_ip);

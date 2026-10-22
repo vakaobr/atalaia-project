@@ -21,6 +21,34 @@ CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_QUAD=y
 CONFIG_SPIRAM_SPEED_80M=y
 
+# --- Wi-Fi memory (firmware updates, setup portal) ---
+# Wi-Fi's static TX/RX buffers and LwIP's are allocated in PSRAM: with the
+# game's tasks, the radio, the lobby, pairing and LVGL in internal RAM, the
+# 16 static TX buffers (~26 KB up front) no longer fitted there and the
+# driver failed to start (found on the bench, 2026-10-22). ESP-IDF keeps the
+# TX buffers static with this option, so there is no TX buffer type to set.
+# The static RX buffers must stay in internal RAM (DMA); the option raises
+# their default to 16 (~26 KB), which did not fit either: 6 here, and the
+# dynamic RX buffers cover bursts (one image download at a time).
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+# Ordinary allocations above 4 KB go to PSRAM (ESP-IDF's default keeps up to
+# 16 KB internal), leaving internal RAM to the drivers that need DMA.
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=6
+CONFIG_ESP_WIFI_RX_BA_WIN=6
+# Even so the driver ran out at its RX buffers with 47 KB of DMA-capable RAM
+# free before it started: fewer static TX buffers (one HTTPS download at a
+# time), and no Wi-Fi code in IRAM (~27 KB of internal RAM; throughput does
+# not matter for an image fetched between games).
+CONFIG_ESP_WIFI_STATIC_TX_BUFFER_NUM=8
+CONFIG_ESP_WIFI_IRAM_OPT=n
+CONFIG_ESP_WIFI_RX_IRAM_OPT=n
+# mbedTLS allocates in PSRAM (ESP-IDF's default is internal RAM only): the
+# TLS session's 16 KB input buffer and the ECDSA check of the controller's
+# certificate failed there with MBEDTLS_ERR_MPI_ALLOC_FAILED (bench,
+# 2026-10-22). Slower TLS, for one download between games.
+CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
+
 # --- FreeRTOS ---
 CONFIG_FREERTOS_HZ=1000
 
