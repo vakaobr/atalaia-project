@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 5 -- Community: Status
 
-**Current phase:** Implementation (plan phases 1-6 and 13a built in software 2026-10-22: the visual mode editor complete, its link to the simulator, signed mode packages, the sandbox-escape battery, signed packages in the controller, and the controller, console and protocol side of missing modes sent to boxes)
+**Current phase:** Implementation (plan phases 1-7 and 13a built in software 2026-10-22: the visual mode editor complete, its link to the simulator, signed mode packages, the sandbox-escape battery, signed packages in the controller, scenario blocks in the GM console, and the controller, console and protocol side of missing modes sent to boxes)
 **Phase status:** In progress
 **Risk level:** Medium
-**Last updated:** 2026-10-22 (plan phase 13a built; plan phases 3-6 built, P5B-9 answered; plan phase 2 built, plan phase 13 planned from P5R-8; refreshed after phases 2-4 software; first written 2026-10-18)
-**Next step:** plan phase 7 (scenario blocks in the console, in progress); plan phase 13 is built in software (13a and 13b), its test on real boxes is HW3
+**Last updated:** 2026-10-22 (plan phase 7 built; plan phase 13b built; plan phase 13a built; plan phases 3-6 built, P5B-9 answered; plan phase 2 built, plan phase 13 planned from P5R-8; refreshed after phases 2-4 software; first written 2026-10-18)
+**Next step:** plan phases 8 and 9 (the registry template, community processes) and 10 (German), in progress; plan phases 7 and 13 are built in software, 13's test on real boxes is HW3
 
 Phase 5 is the community layer: visual mode editor (Blockly), mode
 registry with signing and a verified badge, carrier PCB, translations,
@@ -96,6 +96,22 @@ section 16).
   vectors for 13b's C (`box_checks`, `reports`). 13 controller tests, 1 browser
   test. Decisions P5D-1 to P5D-12 (open; P5D-3, P5D-6, P5D-11 for the
   maintainer).
+- [x] **Plan phase 7, scenario blocks in the GM console (2026-10-22), in
+  software:** the *Scenarios* tab's editor has a *Blocks* view beside its
+  YAML: 30 blocks (the scenario, its texts, teams, parameters, boxes and
+  players, objectives with who, when, how and what they give), in European
+  Portuguese and English, by mouse, touch or keyboard, at phone width. The
+  YAML stays the editor's text: the blocks write it on each change and the
+  controller reads it for them (`manifest` in the check's answer), checks,
+  compiles and installs it as before; its problems are outlined on their
+  blocks, with *Show*. The blocks refuse a manifest they cannot hold as it is
+  rather than rewrite it. Blockly 13.3.0 vendored in the console (the mode
+  editor's bytes), loaded on demand and precached for offline use; the CSP
+  allows only the SHA-256 of Blockly's two stylesheets, no `'unsafe-inline'`.
+  The round trip of every scenario example (2 hand-written manifests, the
+  console's example, 5 valid vectors) compiles to the hand-written packages
+  byte for byte. 7 browser tests, 3 plain ones. Decisions P5F-1 to P5F-12
+  (open; P5F-2, P5F-4, P5F-5 for the maintainer).
 
 - [x] **Plan phase 13b, the box's side of missing modes (2026-10-22), in
   software (host-tested; on real boxes in HW3):** a join with key 16 whose
@@ -139,7 +155,7 @@ section 16).
 | 5 | Sandbox-escape battery | Software | **Built 2026-10-22** |
 | 6 | Signed packages in the controller | Software | **Built 2026-10-22** |
 | 13 | Missing modes from the GM console (P5R-8; built after 6) | Software (box side host-tested); real boxes: HW3 | Planned 2026-10-22 |
-| 7 | Scenario blocks in the console | Software | |
+| 7 | Scenario blocks in the console | Software | **Built 2026-10-22** |
 | 8 | Registry repository template | Software; publishing needs the maintainer | |
 | 9 | Community processes | Software | |
 | 10 | German | Software (after P5R-10) | |
@@ -207,15 +223,26 @@ section 16).
 | `python3 tools/docker_editor.py` | 18 browser tests, OK |
 | `python3 -m unittest tests.test_live` (in `simulator/`, also in `check.sh`) | 18 tests, OK |
 
+## Verification of plan phase 7 (2026-10-22)
+
+| Command | Result |
+|---------|--------|
+| `docker run --rm -v "$PWD:/src" -w /src -e BUILD=/tmp/c atalaia-dev sh tools/check.sh` | exit 0 (simulator 337, controller 611, server's shared tests 92, OK) |
+| `python3 tools/docker_console.py` | 54 browser tests, OK (7 new in `test_scenario_blocks.py`) |
+| `python3 tools/docker_editor.py` | 24 browser tests, OK (the mode editor unchanged) |
+| `reuse lint` (a copy without build output) | compliant |
+
 ## Next steps
 
 1. Plan phase 13 on real boxes (HW3): a Field Box with a mode key built in
    fetching from the bench controller; and the end-to-end test of the C host
    box (`box_host --mode-keys --mode-source`) against the real controller
    over HTTPS, which the host tests only model with files.
-2. Plan phase 7 (scenario blocks in the console); 8 and 9 (the registry
-   template and community processes) now have the package tools and the
-   battery to build on; 10 after P5R-10 (answered: German first).
+2. Plan phases 8 and 9 (the registry template and community processes) and 10
+   (German first, P5R-10), in progress. Plan phase 7 is built; its P5F-2 (the
+   CSP's two style hashes instead of `'unsafe-inline'`), P5F-4 (refuse rather
+   than rewrite; comments go once the blocks change the YAML) and P5F-5 (the
+   block set, typed references) are for the maintainer.
 3. Left from plan phases 3-6, small: the editor does not yet make a package
    itself (it downloads the files; `tools/mode_package.py pack` makes the
    archive, and signing stays offline); `protocol/vectors/controller_api.json`

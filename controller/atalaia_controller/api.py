@@ -1303,8 +1303,13 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
 
 # Same-origin only: no inline scripts or styles, nothing from other hosts
 # (only the field-map page below reaches OpenStreetMap and the DGT), images from blob: URLs.
+# The one exception: the two stylesheets Blockly 13.3.0 writes for the scenario blocks (its own
+# and its renderer's), allowed by their SHA-256 only (console/src/lib/README.md, decision P5F-2).
+BLOCKLY_STYLES = ("'sha256-m3jRF8xS4qsN1MRZbjUZslcyoZPGURDGaSwFOJRSdE4=' "
+                  "'sha256-VymAkX6JbIfPZPWb3Hm9NWNojJOyx0onFcNRManOZfM='")
 SECURITY_HEADERS = {
-    "Content-Security-Policy": ("default-src 'self'; script-src 'self'; style-src 'self'; "
+    "Content-Security-Policy": ("default-src 'self'; script-src 'self'; "
+                                f"style-src 'self' {BLOCKLY_STYLES}; "
                                 "img-src 'self' blob: data:; connect-src 'self'; "
                                 "manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; "
                                 "base-uri 'none'; form-action 'none'"),

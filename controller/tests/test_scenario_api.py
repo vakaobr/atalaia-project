@@ -140,6 +140,25 @@ class EndpointTests(Case):
         self.assertEqual((r.status_code, r.json()["problems"][0]["code"]), (400, "bad_manifest"))
         self.assertEqual(self.client.post("/api/v1/scenarios/check", json={"manifest": MANIFEST}).status_code, 401)
 
+    def test_check_hands_back_the_manifest_for_the_block_view(self):
+        """Phase 5 plan phase 7 (P5F-3): the manifest as the controller read it, when JSON holds it
+        unchanged (the console's block view is made from it); else None."""
+        out = self.client.post("/api/v1/scenarios/check", headers=READ, json={"manifest": MANIFEST}).json()
+        self.assertEqual(out["manifest"], yaml.safe_load(MANIFEST))
+        # Read as YAML (the version is a number here, kept as one), errors and all.
+        bad = MANIFEST.replace("target: radio", "target: attic")
+        out = self.client.post("/api/v1/scenarios/check", headers=GM, json={"manifest": bad}).json()
+        self.assertFalse(out["ok"])
+        self.assertEqual(out["manifest"]["version"], 1)
+        self.assertEqual(out["manifest"]["objectives"][2]["target"], "attic")
+        for text in (MANIFEST.replace("version: 1", "version: 2026-10-22"),  # a date
+                     MANIFEST.replace("version: 1", "version: .nan"),  # not a finite number
+                     MANIFEST.replace("version: 1", "version: 9007199254740993"),  # beyond 2**53
+                     MANIFEST.replace("squads: 2", "squads: 2\n7: seven"),  # a number as a key
+                     "- a list"):
+            out = self.client.post("/api/v1/scenarios/check", headers=GM, json={"manifest": text}).json()
+            self.assertIsNone(out["manifest"], text[:60])
+
     def test_install_list_and_read(self):
         self.assertEqual(self.client.post("/api/v1/scenarios", headers=READ,
                                           json={"manifest": MANIFEST}).status_code, 403)

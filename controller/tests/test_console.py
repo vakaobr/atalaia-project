@@ -37,6 +37,18 @@ VENDORED = {
     "lib/preact.module.js": "9ba8bb591b0c9a72132ff65a76e69c5a4e49cf71721b47b659f3243658bde05b",
     "lib/htm.module.js": "ab33dd3f38059b9be4d5f5350128eefb2356639c4e0bbe9d9e8b3ba75847e9e4",
     "lib/qrcode.module.js": "ea91d7118a5395289170da848b7c6758b996163bfbccf312591ab65a4911b7c0",
+    # Blockly 13.3.0 for the scenario blocks (phase 5 plan phase 7): the same files, byte for byte,
+    # as the mode editor's (simulator/atalaia_sim/editor/vendor/blockly/README.md).
+    "lib/blockly/blockly_compressed.js": "d3f46af56951a7aed27f09f872dca66ed70a932ca8be9aade3d9df06ceacd078",
+    "lib/blockly/msg/en.js": "155b0e29ad2bd59ad463ebde5c3ace7685ea5c25d019e950aab625b3259d7e02",
+    "lib/blockly/msg/pt.js": "6ff9ce8534c68b16c3ff463d598a7bd1b6d28c534e9eec038d349f13f9478579",
+    "lib/blockly/media/delete-icon.svg": "3eee02b06f476ce746566808178543389e53cd4e9d7fd32b69e329eff4fc71ef",
+    "lib/blockly/media/foldout-icon.svg": "0ac7478b56f5e5cc583c26710cb7ee5edcedb563cde65cd2385f4dd3e9e08c64",
+    "lib/blockly/media/handclosed.cur": "4a1637e16f33e1b02f96f699ada695edededfd089530372126d375ad9ed2f0a5",
+    "lib/blockly/media/handdelete.cur": "e53ef200d76fef617bd2e307a100d778834ad49784f80c1abc6da547e50b8040",
+    "lib/blockly/media/handopen.cur": "d2ec9a81d9a76b0f64b7168e5f05ee660ffb6ba7e35695caaf9851e6b01a04fd",
+    "lib/blockly/media/resize-handle.svg": "c95d07b3fb3aaa088e6665061b01952e7ea9dda462b7032a85e095bf8a12855b",
+    "lib/blockly/media/sprites.svg": "862de0ee081fa9baf504e673736d7446439c15246452258cab964a82566ef40f",
 }
 
 
@@ -255,6 +267,27 @@ class ConsoleFilesTests(unittest.TestCase):
         text = " ".join(pt.values()).lower()
         for br in ("celular", "tela ", "time ", "você", "arquivo", "usuário"):
             self.assertNotIn(br, text, br)
+
+    def test_scenario_blocks_have_their_texts(self):
+        """The scenario blocks' texts (phase 5 plan phase 7): every tr('...') of the blocks, the
+        names built at run time (objective types, who sees an objective, the blocks' own
+        problems), in both languages, with the same %1, %2... as in English."""
+        js = (SRC / "components" / "scenario-blocks.js").read_text(encoding="utf-8")
+        keys = set(re.findall(r"\btr\('([a-z_]+)'\)", js)) | set(re.findall(r"\bcat\('([a-z_]+)'", js))
+        keys |= {f"type_{v}" for v in re.search(r"export const TYPES = \[(.*?)\];", js).group(1)
+                 .replace("'", "").replace(" ", "").split(",")}
+        keys |= {f"visibility_{v}" for v in ("public", "team", "squad", "hidden")}
+        self.assertGreater(len(keys), 60)
+        for lang in ("pt", "en"):
+            d = json.loads((SRC / "i18n" / f"{lang}.json").read_text(encoding="utf-8"))["scenario_blocks"]
+            for key in keys:
+                self.assertIn(key, d["blocks"], f"{lang}: scenario_blocks.blocks.{key}")
+            self.assertEqual(sorted(d["problems"]), ["loose", "misplaced", "twice"], lang)
+        en = json.loads((SRC / "i18n" / "en.json").read_text(encoding="utf-8"))["scenario_blocks"]["blocks"]
+        pt = json.loads((SRC / "i18n" / "pt.json").read_text(encoding="utf-8"))["scenario_blocks"]["blocks"]
+        for key in en:
+            self.assertEqual(sorted(re.findall(r"%\d", pt[key])), sorted(re.findall(r"%\d", en[key])), key)
+        self.assertEqual(sorted(en), sorted(keys), "a text no block uses, or a block without its text")
 
     def test_vendored_libraries_are_unmodified(self):
         for rel, digest in VENDORED.items():

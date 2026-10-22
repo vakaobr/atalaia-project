@@ -1289,6 +1289,37 @@ textarea.scenario-editor {
     overflow-wrap: anywhere;
 }
 
+/* ---- scenario blocks (phase 5 plan phase 7: components/scenario-block-view.js) ---- */
+
+.scenario-views {
+    display: flex;
+    gap: 0.25rem;
+    margin: 0.4rem 0 0.6rem;
+}
+
+.scenario-views button[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-fg);
+    font-weight: 600;
+}
+
+.scn-blocks {
+    width: 100%;
+    height: 65vh;
+    min-height: 22rem;
+    max-height: 46rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+/* A block a problem points at (the controller's or the blocks' own). */
+.scn-problem > .blocklyPath {
+    stroke: var(--danger);
+    stroke-width: 3px;
+}
+
 /* Adopt tab (components/adopt-panel.js) */
 .mono {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

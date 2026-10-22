@@ -84,6 +84,10 @@ path = [
     "simulator/atalaia_sim/editor/vendor/blockly/*.js",
     "simulator/atalaia_sim/editor/vendor/blockly/msg/*.js",
     "simulator/atalaia_sim/editor/vendor/blockly/media/**",
+    # The same files, for the GM console's scenario blocks (controller/console/src/lib/README.md).
+    "controller/console/src/lib/blockly/*.js",
+    "controller/console/src/lib/blockly/msg/*.js",
+    "controller/console/src/lib/blockly/media/**",
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2011 Google LLC"

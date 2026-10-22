@@ -27,6 +27,7 @@ Per game, the names the GM gives the boxes in the Join tab (P4R8, M6-7) are kept
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Optional
 
@@ -156,7 +157,7 @@ def check(ctrl: "Controller", text: str) -> dict[str, Any]:
         manifest = load(text)
     except ManifestError as exc:
         return {"ok": False, "problems": [Problem("", "bad_manifest", str(exc)).to_dict()], "id": None,
-                "name": None, "nodes": [], "objectives": [], "installed": None}
+                "name": None, "nodes": [], "objectives": [], "installed": None, "manifest": None}
     problems = validate(manifest)
     if not errors(problems):
         try:
@@ -166,10 +167,33 @@ def check(ctrl: "Controller", text: str) -> dict[str, Any]:
         except ModeError as exc:
             problems.append(Problem("", "lua_does_not_load", str(exc)))
     out = {"ok": not errors(problems), "problems": [p.to_dict() for p in problems], **_summary(manifest)}
+    # The manifest as read, for the console's block view (phase 5 plan phase 7, decision P5F-3):
+    # only when JSON carries it unchanged, else None (the block view then says it cannot show it).
+    out["manifest"] = manifest if _json_exact(manifest) else None
     installed = _package(ctrl, out["id"])
     out["installed"] = installed.mode.version if installed is not None else None
     out["checked_in_core"] = ctrl.core is not None
     return out
+
+
+JSON_INT_MAX = 2**53  # a browser's numbers hold whole numbers exactly up to here
+
+
+def _json_exact(value: Any) -> bool:
+    """True when JSON (and a browser's JavaScript) holds the value as it is: maps with text keys,
+    lists, texts, booleans, null, whole numbers within 2**53 and finite numbers. A YAML date, a
+    set, a number as a key or a NaN would come back as something else."""
+    if value is None or isinstance(value, (bool, str)):
+        return True
+    if isinstance(value, int):
+        return -JSON_INT_MAX <= value <= JSON_INT_MAX
+    if isinstance(value, float):
+        return math.isfinite(value)
+    if isinstance(value, list):
+        return all(_json_exact(v) for v in value)
+    if isinstance(value, dict):
+        return all(isinstance(k, str) and _json_exact(v) for k, v in value.items())
+    return False
 
 
 def _uses(game: Optional[dict[str, Any]], scenario_id: str) -> bool:

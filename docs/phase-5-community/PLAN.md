@@ -183,7 +183,7 @@ plus, depending on what the plan phase touches:
 | 5 | Sandbox-escape battery | escape patterns as core C tests and through the simulator, in CI (AC-12) | Software, now | -- | S | **Built 2026-10-22** |
 | 6 | Signed packages in the controller | import from an index (signature, revocation, size, licence), the author and an "unverified" warning in the console | Software, now | 4 | M | **Built 2026-10-22** |
 | 13 | Missing modes from the GM console | P5R-8: the console's *Send missing modes* in the invite dialog; join key 16; a box fetches the signed packages it lacks over Wi-Fi HTTPS, checks them with its firmware's mode keys and the sandbox, keeps them on LittleFS (numbered 13 so the other numbers stay as P5R-1 has them; built here, after 6) | Software, now (box side host-tested); on real boxes: HW3 | 4, 5, 6 | L | 13a **built 2026-10-22** (P5D-1 to P5D-12); 13b (the box) **built 2026-10-22** (P5E-1 to P5E-14) |
-| 7 | Scenario blocks in the console | a block view of the scenario builder writing the same YAML, en + pt, console browser tests | Software, now | 1 | M | |
+| 7 | Scenario blocks in the console | a block view of the scenario builder writing the same YAML, en + pt, console browser tests | Software, now | 1 | M | **Built 2026-10-22** (P5F-1 to P5F-12) |
 | 8 | Registry repository template | `index.json`, `keys/`, `revoked.json`, the registry CI workflow as files under `registry/template/` (AC-6 in this repository) | Software, now; publishing needs the maintainer | 4, 5 | S | |
 | 9 | Community processes | CONTRIBUTING.md "Submitting a community mode", review checklist, verified badge, RFC for the package format (AC-11) | Software, now | 4, 8 | S | |
 | 10 | German | site, console, editor, app and box texts in German; `tools/i18n_check.py` across domains (AC-7) | Software, now (on a real box: with the boards) | -- | M | After the maintainer confirms P5R-10 |
@@ -198,8 +198,8 @@ Plan phases 4-6 and 7 can run in parallel worktrees with 2-3; 10-12 are
 independent of the rest; 13 needs 4, 5 and 6 (its 13a and 13b can then
 run in parallel). Sizes: L about a week of agent work.
 
-**Next (2026-10-22, plan phases 1-6 and 13a built): plan phase 13b (the
-box's side, in progress), then plan phase 7.**
+**Next (2026-10-22, plan phases 1-7 and 13a built): plan phase 13b (the
+box's side, in progress), then plan phases 8 and 9.**
 
 ---
 
@@ -570,6 +570,26 @@ same YAML manifest, checked by the same `POST /api/v1/scenarios/check`;
 Blockly vendored for the console as its other libraries
 (`controller/console/src/lib/`), the console's CSP adjusted for its
 styles only; en + pt; console browser tests.
+
+**Built 2026-10-22** (decisions P5F-1 to P5F-12; P5F-2, P5F-4 and P5F-5 for
+the maintainer). The block view is a second view of the *Scenarios* tab's one
+editor: the YAML stays its text, the blocks write it on every change, and the
+controller reads it for the blocks (the check's new `manifest`, P5F-3), so no
+rule or reader is repeated in the browser. The CSP is adjusted for styles by
+two SHA-256 hashes (Blockly's two stylesheets), not `'unsafe-inline'`
+(P5F-2). The round trip of all 8 scenario examples gives the hand-written
+packages byte for byte (P5F-9).
+
+| File | What |
+|------|------|
+| `controller/console/src/components/scenario-blocks.js` | 30 blocks (the scenario, texts, teams, parameters, boxes and players, objectives and their rules) and the toolbox; `manifestToState` (a manifest to Blockly's state, naming what the blocks cannot hold), `workspaceToManifest` (the blocks to the manifest, the block of each value, the blocks' own problems), `toYaml`; Blockly loaded on demand |
+| `controller/console/src/components/scenario-block-view.js` | The workspace: Blockly injected with the console's texts and theme, the YAML handed to the builder on every change, problems outlined on their blocks, *Show* |
+| `controller/console/src/components/scenario-builder.js` | *YAML* / *Blocks* views of one editor, the view remembered; the blocks' problems in the list; *Install* off while the blocks have an error |
+| `controller/console/src/lib/blockly/`, `lib/README.md`, `REUSE.toml` | Blockly 13.3.0 (the core, en and pt texts, 7 media files), the mode editor's bytes, Apache-2.0 |
+| `controller/atalaia_controller/api.py` (`BLOCKLY_STYLES`), `scenario_service.py` | The CSP's two style hashes; `manifest` in the check's answer |
+| `controller/console/src/i18n/*.json`, `style.css`, `sw.js` | `scenario_blocks` texts (en, pt-PT); the view's styles; Blockly precached |
+| `controller/console/tests/test_scenario_blocks.py` | 7 browser tests and 1 plain one: the round trip of every example, edit and install in pt then en, the keyboard, the read token on a phone, refusals, the stylesheets against the CSP in light and dark, offline |
+| `controller/tests/test_console.py`, `test_scenario_api.py` | The vendored files and the blocks' texts; the check's `manifest` |
 
 ## Plan phase 8: Registry repository template
 

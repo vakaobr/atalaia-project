@@ -348,6 +348,15 @@ UI). The URL structure:
   `400`/`413` for requests that are not a mode, and starts the reloaded game.
   The editor's *Test* does not open a window itself: a status line links to
   the simulator's page in one named tab, which picks the new game up.
+- **Built in plan phase 7 (2026-10-22; P5F-1 to P5F-12, open):** the GM
+  console's *Scenarios* tab has a *Blocks* view beside its YAML, writing the
+  same manifest, which the controller still reads, checks, compiles and
+  installs (it now hands the parsed manifest back with its check, so the
+  blocks never read YAML themselves). Blockly 13.3.0 is vendored a second time,
+  byte for byte, in `controller/console/src/lib/blockly/`, loaded only when
+  the view opens. Unlike the mode editor's page, the console keeps
+  `'unsafe-inline'` out of its CSP: `style-src` allows only `'self'` and the
+  SHA-256 of the two stylesheets Blockly writes (P5F-2, for the maintainer).
 
 ---
 
