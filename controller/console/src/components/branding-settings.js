@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Field and team branding (decisions BR1-BR24). Settings: the field's name,
 // logo, wallpaper and accent colour, and the saved teams (a name and a

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Field view (ADR-P2-10): the field's own image (a photo, an aerial view or
 // a floor plan the GM uploads) with a marker per box, dragged into place by

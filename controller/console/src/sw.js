@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Service worker of the GM console: keeps the static files (the "shell")
 // so the console opens without a connection to the controller. Static

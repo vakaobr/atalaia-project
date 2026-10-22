@@ -14,6 +14,14 @@ precedence = "closest"
 SPDX-FileCopyrightText = "2026 The Atalaia contributors"
 SPDX-License-Identifier = "AGPL-3.0-or-later"
 
+# The GM console is browser code, always delivered as source: GPL-3.0-or-later with the
+# app-store permission (app/APP-STORE-PERMISSION.md), so the app can ship it (decision PE24-8).
+[[annotations]]
+path = "controller/console/**"
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 The Atalaia contributors"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
 [[annotations]]
 path = "hardware/**"
 precedence = "closest"

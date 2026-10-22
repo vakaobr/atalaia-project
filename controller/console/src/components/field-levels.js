@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // A multi-story field (decisions ML-0 to ML-12): the GM ticks "Multi-story building", sets the
 // number of levels (2-10) and their names, and the field view gets a tab per level, each with

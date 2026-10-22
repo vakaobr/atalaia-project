@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Field check-in (ADR-P3-13, protocol/checkin.md): the GM opens or closes
 // check-in for the live game, sets the field's rules, prints the check-in

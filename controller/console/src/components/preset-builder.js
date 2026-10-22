@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Preset builder: forms drawn from each mode's parameter schema (mode.yaml
 // "params": int with min/max, bool, team, string; default, optional, label),

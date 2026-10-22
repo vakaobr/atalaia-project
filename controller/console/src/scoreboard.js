@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The example scoreboard (plan phase E): a read-only page for a TV or a
 // laptop at the safe zone. It needs only the READ token, given in the

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The GM console (ADR-P2-10): Preact + HTM, no build step. One App holds
 // the state the controller streams over WS /api/v1/stream and hands it to

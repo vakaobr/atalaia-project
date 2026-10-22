@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Firmware updates for the Field Boxes (protocol/firmware-update.md, decisions
 // FU3-*), for the GM, under the Boxes tab: upload a signed release (the image

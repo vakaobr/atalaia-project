@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Runs the GM console's browser tests: builds the core library, the C host
 # modem and the C host box (as tools/check.sh does), then the tests in this folder with

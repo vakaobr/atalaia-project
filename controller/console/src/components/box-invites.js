@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Boxes for the next game (protocol/field-frames.md, decisions RJ-1, RJ-2, RJ-13): a box whose
 // game is over announces itself over the radio; this dialog lists the free boxes the

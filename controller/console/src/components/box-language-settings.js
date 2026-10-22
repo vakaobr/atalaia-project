@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Settings: the language of the boxes' screens (join payload key 15, RFC 0001
 // Amendment 10). "auto", the default, gives each game the language of the

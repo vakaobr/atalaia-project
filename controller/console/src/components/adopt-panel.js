@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Adopting boxes (protocol/adoption.md, decisions AD-*), for the GM, under the
 // Adopt tab: a new Field Box gets the field join key once, by

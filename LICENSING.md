@@ -6,10 +6,13 @@ Atalaia uses copyleft licences: anyone may use, study, modify and even sell Atal
 | --- | --- | --- |
 | Core, protocol, firmware, modes, simulator, tools | `core/`, `protocol/`, `firmware/`, `modes/`, `simulator/`, `tools/` | `GPL-3.0-or-later` |
 | App (Android and iOS) | `app/` | `GPL-3.0-or-later`, plus the [app-store permission](app/APP-STORE-PERMISSION.md) |
-| Field controller and GM console | `controller/` | `AGPL-3.0-or-later` |
+| Field controller | `controller/` (except the console) | `AGPL-3.0-or-later` |
+| GM console | `controller/console/` | `GPL-3.0-or-later`, plus the [app-store permission](app/APP-STORE-PERMISSION.md) |
 | Site server | `server/` | `AGPL-3.0-or-later` |
 | Hardware designs | `hardware/` | `CERN-OHL-S-2.0` |
 | Documentation and the project page | `docs/`, `site/` | `CC-BY-SA-4.0` |
+
+The GM console was AGPL-3.0-or-later until 2026-10-22. It is browser code that every user's browser receives as readable source, so the AGPL's network clause added nothing to it, and the app could not ship it with the app-store permission under the AGPL. Its copyright holder moved it to GPL-3.0-or-later with that permission, so the phone controller can serve the same console (decision PE24-8); the controller's server code stays AGPL-3.0-or-later.
 
 Full licence texts are in [`LICENSES/`](LICENSES/). The root [`LICENSE`](LICENSE) file holds the GPL text because it covers most of the repository. Per-folder licences are declared in [`REUSE.toml`](REUSE.toml), following the [REUSE](https://reuse.software) conventions, and source files carry `SPDX-License-Identifier` headers.
 

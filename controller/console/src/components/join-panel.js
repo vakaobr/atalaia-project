@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Join flow (ADR-P2-12, protocol/join.md): the GM asks the controller for a
 // join payload for a box or a standby controller and gets it three ways:

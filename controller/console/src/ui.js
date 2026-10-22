@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Shared by the GM console and the scoreboard: Preact + HTM, the language
 // files, the REST client, the live stream and small formatting helpers.

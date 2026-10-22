@@ -8,7 +8,7 @@ Apple's App Store terms, and similar terms of other app stores, place usage rest
 
 **Additional permission under section 7 of the GNU General Public License, version 3**
 
-As an additional permission under section 7 of the GNU General Public License, version 3, the copyright holders of the Atalaia app grant you permission to convey covered works through mobile application distribution services (such as the Apple App Store or Google Play) whose terms of service impose usage restrictions or technical protection measures on recipients, provided that:
+As an additional permission under section 7 of the GNU General Public License, version 3, the copyright holders of the Atalaia app and of its GM console (`controller/console/`) grant you permission to convey covered works through mobile application distribution services (such as the Apple App Store or Google Play) whose terms of service impose usage restrictions or technical protection measures on recipients, provided that:
 
 1. the Corresponding Source of the conveyed work remains available to all recipients under the GNU General Public License, version 3 or (at your option) any later version, together with this additional permission; and
 2. recipients are told where they can obtain that Corresponding Source.

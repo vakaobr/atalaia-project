@@ -239,8 +239,9 @@ class ConsoleFilesTests(unittest.TestCase):
             if path.is_dir() or rel in VENDORED or path.suffix in (".png", ".json"):
                 continue  # vendored, binary and JSON files are covered by REUSE.toml
             head = path.read_text(encoding="utf-8")[:400]
-            # Split so that REUSE does not read these strings as this file's own tags.
-            self.assertIn("SPDX-" + "License-Identifier: AGPL-3.0-or-later", head, rel)
+            # Split so that REUSE does not read these strings as this file's own tags. The
+            # console is GPL-3.0-or-later with the app-store permission (decision PE24-8).
+            self.assertIn("SPDX-" + "License-Identifier: GPL-3.0-or-later", head, rel)
             self.assertIn("SPDX-" + "FileCopyrightText: 2026 The Atalaia contributors", head, rel)
 
     def test_field_info_and_whoami(self):

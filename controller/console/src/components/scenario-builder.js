@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Scenario builder (plan phase 8; ADR-P4-6 as amended, decisions P4-1, P4R8): a YAML editor
 // for a scenario manifest. The controller checks it as it is typed (POST /api/v1/scenarios/check:

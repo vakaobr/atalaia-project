@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Settings: the field's radio channel (RFC 0001 Amendment 3). The GM keeps
 // the recommended 869.525 MHz, scans for a quiet channel with the USB

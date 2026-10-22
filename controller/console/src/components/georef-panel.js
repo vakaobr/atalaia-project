@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The field image's place on the map (ADR-P4-7 as amended, decision P4R18):
 // Field Boxes have no GPS, so the ATAK feed puts them on a map through the

@@ -196,6 +196,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 - Built-in Bomb and Domination presets, stored on a box with an empty preset store; keypad debouncing with one press per key stroke (phase-1-single-box)
 
 ### Changed
+- The GM console (`controller/console/`) is now GPL-3.0-or-later with the app-store permission (was AGPL-3.0-or-later), so the app can ship it unchanged for the phone controller; the controller's server code stays AGPL-3.0-or-later (the maintainer's decision PE24-8; LICENSING.md, REUSE.toml, the console's file headers, app/APP-STORE-PERMISSION.md)
 - `[controller] persist_game_key` is on by default (decision OT-7): a live game survives a controller restart; the game key at rest beside the field join key, already there, adds little. Set it to `false` to keep the old behaviour.
 - A zone nobody holds reads "LIVRE" in Portuguese ("LIVRE · Mantém premido / 3 s para capturar a zona"; the maintainer's decision BN-14, BN-22); English stays "NEUTRAL · Hold to capture".
 - A Field Box's `@joinkey` and its setup portal's "field join key" follow the adoption rules (decision AD-7): they no longer replace another field's key (`refused (adopted to another field ...)`: use `@adopt <key> <admin PIN>`); the status screen takes `field` and `fingerprint` rows and the PIN screen a `prompt` (decision AD-2)
