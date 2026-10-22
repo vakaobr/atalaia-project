@@ -28,14 +28,17 @@
 ///     POST /api/v1/nodes/{id}/cmd            GM: a command to one node (65535: all)
 ///     GET  /api/v1/games/{id}/log            the merged event log (?since_ms=)
 ///     GET  /api/v1/controller                the controller's state
+///     WS   /api/v1/stream                    live games, events, scores, nodes
+///                                            (controller_stream.dart; the token
+///                                            also as ?token=)
 ///
 /// The read token gets games without their gm_only parameters and events
 /// without their gm_only data (decision M5-1), as on the Pi.
 ///
 /// [serve] listens on the loopback address unless told otherwise: a phone
 /// controller is reachable from the field's network only when the shell
-/// opens it there (PE24-7). The stream, check-in, player tokens, joins and
-/// the rest of the Pi's endpoints are later slices (PLAN.md, "PE24 slices").
+/// opens it there (PE24-7). Check-in, player tokens, joins and the rest of
+/// the Pi's endpoints are later slices (PLAN.md, "PE24 slices").
 library;
 
 import 'dart:async';
@@ -46,6 +49,7 @@ import 'package:crypto/crypto.dart';
 
 import '../modes/builtin_modes.g.dart';
 import 'controller_engine.dart';
+import 'controller_stream.dart';
 
 /// The app's version (pubspec.yaml), which /healthz and /whoami give.
 const controllerApiVersion = '0.2.0';
@@ -132,9 +136,14 @@ class ControllerApi {
       _route('GET', r'/api/v1/games/([^/]+)/log', _read(_log)),
       _route('GET', r'/api/v1/controller', _read(_status)),
     ];
+    hub = StreamHub(engine);
+    engine.addListener(hub.publish);
   }
 
   final ControllerEngine engine;
+
+  /// The live feed of WS /api/v1/stream.
+  late final StreamHub hub;
   final String gmToken;
   final String readToken;
   late final List<(String, RegExp, _Handler)> _routes;
@@ -237,6 +246,11 @@ class ControllerApi {
   }
 
   Future<void> _serveOne(HttpRequest req) async {
+    if (req.uri.path == '/api/v1/stream' &&
+        WebSocketTransformer.isUpgradeRequest(req)) {
+      await _stream(req);
+      return;
+    }
     final res = req.response;
     try {
       final chunks = <int>[];
@@ -259,6 +273,29 @@ class ControllerApi {
       _write(res, ApiResponse(500, {'detail': 'internal error: $e'}));
     }
     await res.close();
+  }
+
+  /// WS /api/v1/stream: a token in ?token= (browsers cannot set headers on a
+  /// WebSocket) or Authorization; an unknown token is closed with 4401.
+  Future<void> _stream(HttpRequest req) async {
+    var token = req.uri.queryParameters['token'];
+    final header = req.headers.value(HttpHeaders.authorizationHeader) ?? '';
+    if ((token == null || token.isEmpty) &&
+        header.toLowerCase().startsWith('bearer ')) {
+      token = header.substring(7).trim();
+    }
+    final who = role(token);
+    final WebSocket socket;
+    try {
+      socket = await WebSocketTransformer.upgrade(req);
+    } on WebSocketException {
+      return;
+    }
+    if (who == null) {
+      await socket.close(4401);
+      return;
+    }
+    hub.connect(socket, who);
   }
 
   static void _write(HttpResponse res, ApiResponse a) {

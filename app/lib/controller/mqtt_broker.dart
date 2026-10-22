@@ -11,14 +11,20 @@
 /// * retained messages, since the Pi's bridge publishes the score and the
 ///   node topics retained (a scoreboard that connects late sees them);
 /// * the controller itself publishes with [publish]; clients may publish
-///   only where [allowPublish] says (default: nowhere, as the read-only
-///   user of controller/deploy/atalaia.acl);
+///   only where [acl] or [allowPublish] says (default: nowhere);
+/// * with [users], a client must log in with a user name and its password
+///   (CONNACK 5 otherwise), and [acl] says what each user may read and
+///   write: [MqttAcl.field] is the Pi's controller/deploy/atalaia.acl (the
+///   `gm` and `reader` users, the GM and read tokens as their passwords on
+///   a phone controller; decision PE24-12), checked against the same shared
+///   cases (protocol/vectors/controller_api.json, mqtt_acl);
 /// * at most [maxClients] connections (20), the keep-alive enforced (1.5x),
-///   packets up to 64 KB.
+///   packets up to 64 KB;
+/// * the loopback address by default: the field's network only when the
+///   shell opens it there (decision PE24-7, slice S6).
 ///
 /// Not supported (refused or ignored, as the ADR says): QoS 2, wills,
-/// persistent sessions, authentication (the broker listens on the field
-/// network only), TLS.
+/// persistent sessions, TLS.
 library;
 
 import 'dart:async';
@@ -61,13 +67,63 @@ bool _filterOk(String f) {
   return true;
 }
 
+/// Who may read and write which topics, as Mosquitto's acl_file says it:
+/// per user, `read`, `write` or `readwrite` topic patterns with `+` and `#`.
+/// A user with no rules may do nothing.
+final class MqttAcl {
+  const MqttAcl(this.rules);
+
+  /// user -> (access, pattern) rules.
+  final Map<String, List<(String, String)>> rules;
+
+  /// controller/deploy/atalaia.acl: the controller, GM tools ("the GM
+  /// token") and scoreboards ("the read token").
+  static const field = MqttAcl({
+    'controller': [('readwrite', 'field/v1/#')],
+    'gm': [('read', 'field/v1/#'), ('write', 'field/v1/+/cmd/#')],
+    'reader': [
+      ('read', 'field/v1/+/events/#'),
+      ('read', 'field/v1/+/score'),
+      ('read', 'field/v1/+/nodes/#'),
+    ],
+  });
+
+  bool _may(String? user, String topic, String access) =>
+      user != null &&
+      (rules[user] ?? const []).any(
+        (r) =>
+            (r.$1 == access || r.$1 == 'readwrite') &&
+            topicMatches(r.$2, topic),
+      );
+
+  bool mayRead(String? user, String topic) => _may(user, topic, 'read');
+
+  bool mayWrite(String? user, String topic) => _may(user, topic, 'write');
+}
+
+bool _sameSecret(String a, String b) {
+  final x = utf8.encode(a);
+  final y = utf8.encode(b);
+  var diff = x.length ^ y.length;
+  for (var i = 0; i < x.length; i++) {
+    diff |= x[i] ^ (i < y.length ? y[i] : 0);
+  }
+  return diff == 0;
+}
+
 class _Client {
   _Client(this.socket);
   final Socket socket;
   final buffer = BytesBuilder(copy: false);
   final filters = <String, int>{}; // filter -> granted QoS
   var connected = false;
+
+  /// Refused at CONNECT: the CONNACK goes out, then the connection closes.
+  var refused = false;
   String id = '';
+
+  /// The user it logged in as (null: none).
+  String? user;
   int keepAlive = 0;
   DateTime lastSeen = DateTime.now();
   var nextId = 1;
@@ -79,15 +135,27 @@ class MqttBroker {
     InternetAddress? address,
     this.maxClients = 20,
     this.allowPublish,
-  }) : address = address ?? InternetAddress.anyIPv4;
+    this.users,
+    this.acl,
+  }) : address = address ?? InternetAddress.loopbackIPv4;
 
   /// 0: any free port ([boundPort] tells which).
   final int port;
   final InternetAddress address;
   final int maxClients;
 
-  /// Which topics a client may publish to (null: none).
+  /// Which topics a client may publish to (null: none), besides [acl].
   final bool Function(String clientId, String topic)? allowPublish;
+
+  /// User name -> password; null: no login (anonymous clients).
+  final Map<String, String>? users;
+
+  /// What each user may read and write; null: every client reads
+  /// everything (and writes where [allowPublish] says).
+  final MqttAcl? acl;
+
+  bool _mayRead(_Client c, String topic) =>
+      acl == null || acl!.mayRead(c.user, topic);
 
   ServerSocket? _server;
   final _clients = <_Client>{};
@@ -146,7 +214,7 @@ class MqttBroker {
       for (final e in c.filters.entries) {
         if (topicMatches(e.key, topic) && e.value > best) best = e.value;
       }
-      if (best >= 0) {
+      if (best >= 0 && _mayRead(c, topic)) {
         _sendPublish(c, topic, bytes, qos < best ? qos : best, false);
       }
     }
@@ -172,6 +240,13 @@ class MqttBroker {
     c.socket.destroy();
   }
 
+  /// Closes [c] once what was sent to it is out (unlike [_drop]).
+  void _refuse(_Client c) {
+    c.refused = true;
+    _clients.remove(c);
+    c.socket.close().then((_) {}, onError: (Object _) {});
+  }
+
   void _checkKeepAlive() {
     final now = DateTime.now();
     for (final c in List.of(_clients)) {
@@ -185,6 +260,7 @@ class MqttBroker {
   }
 
   void _onData(_Client c, Uint8List data) {
+    if (c.refused) return;
     c.lastSeen = DateTime.now();
     c.buffer.add(data);
     var bytes = c.buffer.takeBytes();
@@ -221,6 +297,7 @@ class MqttBroker {
         _drop(c);
         return;
       }
+      if (c.refused) return;
       bytes = Uint8List.sublistView(bytes, start + len);
     }
     c.buffer.add(bytes);
@@ -248,8 +325,20 @@ class MqttBroker {
             r.string();
             r.bytes();
           }
-          if (cflags & 0x80 != 0) r.string();
-          if (cflags & 0x40 != 0) r.bytes();
+          final user = cflags & 0x80 != 0 ? r.string() : null;
+          final password = cflags & 0x40 != 0 ? utf8.decode(r.bytes()) : null;
+          final known = users;
+          if (known != null) {
+            final want = user == null ? null : known[user];
+            if (want == null ||
+                password == null ||
+                !_sameSecret(password, want)) {
+              _send(c, _connack << 4, [0, 5]); // not authorised
+              _refuse(c);
+              return true;
+            }
+            c.user = user;
+          }
           if (c.id.isEmpty) c.id = 'client-${c.hashCode}';
           for (final other in List.of(_clients)) {
             if (other != c && other.connected && other.id == c.id) _drop(other);
@@ -264,7 +353,8 @@ class MqttBroker {
           final payload = r.rest();
           if (topic.contains('+') || topic.contains('#')) return false;
           if (qos == 1) _send(c, _puback << 4, [id >> 8, id & 0xff]);
-          if (allowPublish?.call(c.id, topic) ?? false) {
+          if ((acl?.mayWrite(c.user, topic) ?? false) ||
+              (allowPublish?.call(c.id, topic) ?? false)) {
             _received.add((c.id, topic, payload));
             publish(topic, payload, qos: qos, retain: flags & 1 != 0);
           }
@@ -291,7 +381,7 @@ class MqttBroker {
           _send(c, _suback << 4, [id >> 8, id & 0xff, ...granted]);
           for (final f in added) {
             for (final e in _retained.entries) {
-              if (topicMatches(f, e.key)) {
+              if (topicMatches(f, e.key) && _mayRead(c, e.key)) {
                 final q = e.value.$2 < c.filters[f]!
                     ? e.value.$2
                     : c.filters[f]!;

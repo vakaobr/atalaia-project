@@ -6,15 +6,22 @@
 // with a small client written here from the MQTT 3.1.1 packet layouts:
 // connect, subscribe with wildcards, the controller's publications at QoS 0
 // and 1, retained topics for late subscribers, ping, unsubscribe, the
-// limit of 20 connections, QoS 2 and client publications refused.
+// limit of 20 connections, QoS 2 and client publications refused, and the
+// logins and the ACL of the field's users (MqttAcl.field, the Pi's
+// controller/deploy/atalaia.acl), and the controller's topics on the broker
+// (controller_mqtt.dart): what a scoreboard reads, a GM tool's command.
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:atalaia_app/controller/controller_engine.dart';
+import 'package:atalaia_app/controller/controller_mqtt.dart';
 import 'package:atalaia_app/controller/mqtt_broker.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../support/recording_radio.dart';
 
 List<int> _len(int n) {
   final out = <int>[];
@@ -71,6 +78,8 @@ class Client {
     int port, {
     String id = 'board',
     int keepAlive = 30,
+    String? user,
+    String? password,
   }) async {
     final c = Client._(
       await Socket.connect(InternetAddress.loopbackIPv4, port),
@@ -79,10 +88,12 @@ class Client {
       packet(0x10, [
         ..._str('MQTT'),
         4,
-        0x02,
+        0x02 | (user != null ? 0x80 : 0) | (password != null ? 0x40 : 0),
         keepAlive >> 8,
         keepAlive & 0xff,
         ..._str(id),
+        if (user != null) ..._str(user),
+        if (password != null) ..._str(password),
       ]),
     );
     return c;
@@ -274,6 +285,159 @@ void main() {
     expect(heard.single.$2, 'field/v1/42/cmd/all');
     await c.close();
   });
+
+  group('logins and the field ACL', () {
+    setUp(() async {
+      await broker.stop();
+      broker = MqttBroker(
+        port: 0,
+        users: const {'gm': 'gm-secret', 'reader': 'read-secret'},
+        acl: MqttAcl.field,
+      );
+      await broker.start();
+    });
+
+    test('no login, an unknown user or a wrong password: CONNACK 5', () async {
+      for (final (user, password) in [
+        (null, null),
+        ('gm', null),
+        ('gm', 'read-secret'),
+        ('controller', ''),
+        ('nobody', 'gm-secret'),
+      ]) {
+        final c = await Client.connect(
+          broker.boundPort,
+          user: user,
+          password: password,
+        );
+        expect((await c.next(2)).$2, [0, 5], reason: '$user');
+        await c.closed.future.timeout(const Duration(seconds: 15));
+      }
+      expect(broker.clientCount, 0);
+    });
+
+    test('a reader gets events, score and nodes, never commands', () async {
+      final heard = <(String, String, Uint8List)>[];
+      broker.received.listen(heard.add);
+      final r = await Client.connect(
+        broker.boundPort,
+        user: 'reader',
+        password: 'read-secret',
+      );
+      expect((await r.next(2)).$2, [0, 0]);
+      broker.publish('field/v1/3/score', '{"r":1}', qos: 1, retain: true);
+      r.subscribe(1, [('#', 1)]);
+      await r.next(9);
+      expect(decodePublish(await r.next(3)).$1, 'field/v1/3/score');
+      broker
+        ..publish('field/v1/3/cmd/4', '{}')
+        ..publish('field/v1/3/events/zone.captured', '{}');
+      expect(
+        decodePublish(await r.next(3)).$1,
+        'field/v1/3/events/zone.captured',
+      );
+      r
+        ..send(
+          packet(0x30, [..._str('field/v1/3/cmd/all'), ...utf8.encode('{}')]),
+        )
+        ..send(packet(0xc0, const []));
+      await r.next(13);
+      expect(heard, isEmpty);
+      final g = await Client.connect(
+        broker.boundPort,
+        id: 'tool',
+        user: 'gm',
+        password: 'gm-secret',
+      );
+      expect((await g.next(2)).$2, [0, 0]);
+      g
+        ..send(
+          packet(0x30, [..._str('field/v1/3/cmd/all'), ...utf8.encode('{}')]),
+        )
+        ..send(
+          packet(0x30, [..._str('field/v1/3/score'), ...utf8.encode('{}')]),
+        )
+        ..send(packet(0xc0, const []));
+      await g.next(13);
+      expect([for (final h in heard) h.$2], ['field/v1/3/cmd/all']);
+      await r.close();
+      await g.close();
+    });
+  });
+
+  test(
+    'the controller\'s topics: a scoreboard reads, a GM tool commands',
+    () async {
+      await broker.stop();
+      broker = MqttBroker(
+        port: 0,
+        users: const {'gm': 'gm-secret', 'reader': 'read-secret'},
+        acl: MqttAcl.field,
+      );
+      await broker.start();
+      final radio = RecordingRadio();
+      final engine = ControllerEngine(transport: radio);
+      final bridge = ControllerMqtt.onBroker(engine, broker);
+      final id =
+          engine.createGame({
+                'name': 'd',
+                'mode_id': 'org.atalaia.domination',
+                'assignments': {'4': 'zone'},
+              })['id']!
+              as int;
+      engine
+        ..startGame(id, force: true)
+        ..adjustScore(id, 'blue', 2, 'bonus');
+      final board = await Client.connect(
+        broker.boundPort,
+        user: 'reader',
+        password: 'read-secret',
+      );
+      await board.next(2);
+      board.subscribe(1, [('field/v1/+/score', 1)]);
+      await board.next(9);
+      final score = decodePublish(await board.next(3));
+      expect(score.$1, 'field/v1/$id/score');
+      expect(score.$4, isTrue); // retained, for a board that connects late
+      expect(
+        jsonDecode(score.$2),
+        containsPair('teams', {'red': 0, 'blue': 2}),
+      );
+
+      final tool = await Client.connect(
+        broker.boundPort,
+        id: 'tool',
+        user: 'gm',
+        password: 'gm-secret',
+      );
+      await tool.next(2);
+      final before = radio.sent.length;
+      tool
+        ..send(
+          packet(0x32, [
+            ..._str('field/v1/$id/cmd/4'),
+            0,
+            1,
+            ...utf8.encode('{"cmd":"message","params":{"text":"go"}}'),
+          ]),
+        )
+        ..send(
+          packet(0x30, [
+            ..._str('field/v1/${id + 1}/cmd/all'),
+            ...utf8.encode('{"cmd":"message"}'),
+          ]),
+        );
+      await tool.next(4); // PUBACK
+      tool.send(packet(0xc0, const []));
+      await tool.next(13);
+      expect(radio.sent.length, before + 1);
+      expect(bridge.commands, 2);
+      expect(bridge.lastRefusal, contains('not live'));
+      await bridge.close();
+      await board.close();
+      await tool.close();
+    },
+  );
 
   test('at most 20 connections', () async {
     final clients = <Client>[];

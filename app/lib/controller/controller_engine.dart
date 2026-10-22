@@ -296,8 +296,16 @@ class ControllerEngine {
 
   String get radioState => transport.state;
 
+  /// The wall clock, in seconds since 1970 (what the MQTT topics' `at` and
+  /// `last_seen` give).
+  double wallSeconds() => _wall();
+
+  /// [fn] gets every message of the live feed (the stream, MQTT), in order.
   void addListener(void Function(Map<String, Object?>) fn) =>
       _listeners.add(fn);
+
+  void removeListener(void Function(Map<String, Object?>) fn) =>
+      _listeners.remove(fn);
 
   void _emit(Map<String, Object?> msg) {
     for (final fn in List.of(_listeners)) {

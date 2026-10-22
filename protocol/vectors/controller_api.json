@@ -1,5 +1,5 @@
 {
-  "description": "Contract cases for the field controller's REST API v1 (controller/atalaia_controller/api.py; the Android controller, app/lib/controller/controller_api.dart, decision PE24). Each case starts a fresh controller (no games, node id 0, a radio that is up, a clock at 0) and runs its steps in order. A 'request' step sends method and path with the token named (gm, read, none: no Authorization header, bad: an unknown token) and the JSON body if given; the answer must have the status and, if given, a body matching 'json'. 'save' keeps values of the answer (dotted paths) under names; '${name}' in a path or as a whole string value stands for a saved value. An 'rx' step is a decrypted packet from a box as the radio gives it (HELLO, STATE: the payload's fields by name, counters by team id; EVENT: the event, encoded by the core's codec, prio from the schema when not given). An 'advance_ms' step moves the controller's clock on and runs its tick once. Matching: an object matches when every key given matches (other keys are free); '$absent' as a value means the key must not be there and '$any' that it must be there; a list matches element by element and must have the same length, except {'$contains': [...]}, where each pattern must match some element. The Python controller is the reference: these cases describe what it does (controller/tests/test_api_contract.py), and the Android controller must do the same (app/test/controller/api_contract_test.dart).",
+  "description": "Contract cases for the field controller's REST API v1 (controller/atalaia_controller/api.py; the Android controller, app/lib/controller/controller_api.dart, decision PE24). Each case starts a fresh controller (no games, node id 0, a radio that is up, a clock at 0) and runs its steps in order. A 'request' step sends method and path with the token named (gm, read, none: no Authorization header, bad: an unknown token) and the JSON body if given; the answer must have the status and, if given, a body matching 'json'. 'save' keeps values of the answer (dotted paths) under names; '${name}' in a path or as a whole string value stands for a saved value. An 'rx' step is a decrypted packet from a box as the radio gives it (HELLO, STATE: the payload's fields by name, counters by team id; EVENT: the event, encoded by the core's codec, prio from the schema when not given). An 'advance_ms' step moves the controller's clock on and runs its tick once. Stream steps (WS /api/v1/stream, added with slice S2 of PE24): 'ws_connect' opens a connection under a name with the token named ('via': 'query', the default, puts it in ?token=, 'header' in Authorization), and the first message must match 'hello', or, with 'close', the controller must close it with that code before any message; 'ws' takes every message that connection got since its last 'ws' step (the runner publishes a marker {'type': 'pong', 'sentinel': n} through the stream after them and drops the markers), and they must match 'messages' as a list, so nothing may come in between or be missing; 'ws_send' sends 'json' and the next message must match 'reply'; 'ws_flood' hands 'count' messages {'type': 'system', 'kind': 'test', 'i': i} to every open connection at once, before any is sent, and the controller must close the connection named with code 'close' (a client more than 'stream_max_queue' messages behind, a case setting: 256 when not given). An 'mqtt' step takes every message the controller published to its MQTT broker since the last 'mqtt' step, as {'topic', 'qos', 'retain', 'payload' (the JSON payload)}, and they must match the list given. 'mqtt_acl' lists who may read and write which topics. Matching: an object matches when every key given matches (other keys are free); '$absent' as a value means the key must not be there and '$any' that it must be there; a list matches element by element and must have the same length, except {'$contains': [...]}, where each pattern must match some element. The Python controller is the reference: these cases describe what it does (controller/tests/test_api_contract.py), and the Android controller must do the same (app/test/controller/api_contract_test.dart).",
   "tokens": {"gm": "gm-secret", "read": "read-secret"},
   "cases": [
     {
@@ -185,6 +185,183 @@
         {"request": {"method": "POST", "path": "/api/v1/games/${gid}/score", "token": "gm", "body": {"team": "red", "amount": 1}}, "status": 409},
         {"request": {"method": "GET", "path": "/api/v1/games/${gid}/start-check", "token": "read"}, "status": 400}
       ]
+    },
+    {
+      "name": "the stream: tokens, the hello snapshot and ping",
+      "steps": [
+        {"ws_connect": "none", "token": "none", "close": 4401},
+        {"ws_connect": "bad", "token": "bad", "close": 4401},
+        {"ws_connect": "g", "token": "gm", "hello": {"type": "hello", "game": null, "score": null, "nodes": [], "events": [], "status": {"live_game": null, "role": null, "radio": "up", "node_id": 0}}},
+        {"ws_connect": "r", "token": "read", "via": "header", "hello": {"type": "hello", "game": null, "score": null, "nodes": [], "events": [], "status": {"live_game": null, "radio": "up"}}},
+        {"ws_send": "g", "json": {"type": "ping"}, "reply": {"type": "pong"}},
+        {"ws": "g", "messages": []},
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Hack", "mode_id": "org.atalaia.hacking_terminal", "assignments": {"7": "terminal"}, "params": {"reveal_code": "1234"}}}, "status": 201, "save": {"gid": "id"}},
+        {"ws": "g", "messages": [{"type": "game", "game": {"id": "${gid}", "state": "ready", "live": true, "params": {"reveal_code": "1234", "digits": 4}, "start_check": {"missing": ["terminal"], "ok": false}}}]},
+        {"ws": "r", "messages": [{"type": "game", "game": {"id": "${gid}", "state": "ready", "params": {"reveal_code": "$absent", "digits": 4}}}]},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}", "token": "read"}, "status": 200},
+        {"ws": "r", "messages": []},
+        {"ws_connect": "g2", "token": "gm", "via": "header", "hello": {"type": "hello", "game": {"id": "${gid}", "state": "ready", "params": {"reveal_code": "1234"}}, "score": {"game": "${gid}", "teams": {"red": 0, "blue": 0}}, "nodes": [{"node_id": 7, "name": "node-7", "role": "terminal", "link": null, "seen_ms_ago": null}], "events": [], "status": {"live_game": "${gid}", "role": "leader"}}},
+        {"ws_connect": "r2", "token": "read", "hello": {"type": "hello", "game": {"id": "${gid}", "params": {"reveal_code": "$absent"}}, "status": {"live_game": "${gid}"}}}
+      ]
+    },
+    {
+      "name": "the stream follows a game in order, gm_only data for the GM token only",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Hack", "mode_id": "org.atalaia.hacking_terminal", "assignments": {"7": "terminal"}, "params": {"reveal_code": "1234"}}}, "status": 201, "save": {"gid": "id"}},
+        {"ws_connect": "g", "token": "gm", "hello": {"type": "hello", "game": {"id": "${gid}", "state": "ready"}}},
+        {"ws_connect": "r", "token": "read", "hello": {"type": "hello", "game": {"id": "${gid}", "state": "ready"}}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm", "body": {"force": true}}, "status": 200},
+        {"ws": "g", "messages": [
+          {"type": "system", "kind": "start.forced", "game": "${gid}", "missing": ["terminal"]},
+          {"type": "event", "game": "${gid}", "event": {"node": 0, "seq": 1, "t": 0, "type": "game.start", "team": null, "squad": 0, "prio": "critical", "data": {"preset": "org.atalaia.hacking_terminal"}, "epoch": null, "pkt_seq": null}},
+          {"type": "game", "game": {"id": "${gid}", "state": "running", "params": {"reveal_code": "1234"}}}
+        ]},
+        {"ws": "r", "messages": [
+          {"type": "system", "kind": "start.forced", "game": "${gid}"},
+          {"type": "event", "game": "${gid}", "event": {"type": "game.start"}},
+          {"type": "game", "game": {"id": "${gid}", "state": "running", "params": {"reveal_code": "$absent", "digits": 4}}}
+        ]},
+        {"rx": {"source": 7, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-7", "platform": 1, "fw_version": "0.3.0", "core_version": "0.2.0", "tier": 0, "capabilities": [1, 2], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"ws": "g", "messages": [
+          {"type": "node", "game": "${gid}", "kind": "hello", "node": {"node_id": 7, "name": "box-7", "role": "terminal", "owner": null, "battery_pct": 90, "rssi": -60, "snr": 5, "epoch": 1, "fw_version": "0.3.0", "tier": 0, "capabilities": [1, 2], "score": {"red": 0, "blue": 0}, "battery_low": false, "seen_ms_ago": 0}},
+          {"type": "event", "game": "${gid}", "event": {"node": 7, "type": "node.online", "prio": "telemetry", "data": {"fw": "0.3.0", "tier": "full"}}},
+          {"type": "node", "game": "${gid}", "kind": "online", "node": {"node_id": 7, "link": "online", "seen_ms_ago": 0}}
+        ]},
+        {"rx": {"source": 7, "seq": 1, "epoch": 1, "type": "EVENT", "event": {"node": 7, "seq": 1, "t": 100, "type": "hacking.solved", "team": 2, "data": {"puzzle": "code", "code": "1234"}}}},
+        {"rx": {"source": 7, "seq": 1, "epoch": 1, "type": "EVENT", "event": {"node": 7, "seq": 1, "t": 100, "type": "hacking.solved", "team": 2, "data": {"puzzle": "code", "code": "1234"}}}},
+        {"ws": "g", "messages": [
+          {"type": "event", "game": "${gid}", "event": {"node": 7, "seq": 1, "t": 100, "type": "hacking.solved", "team": "blue", "squad": 0, "prio": "critical", "data": {"puzzle": "code", "code": "1234"}, "epoch": 1, "pkt_seq": 1}}
+        ]},
+        {"ws": "r", "messages": [
+          {"type": "node", "kind": "hello", "node": {"node_id": 7}},
+          {"type": "event", "event": {"type": "node.online"}},
+          {"type": "node", "kind": "online", "node": {"node_id": 7}},
+          {"type": "event", "game": "${gid}", "event": {"node": 7, "type": "hacking.solved", "team": "blue", "data": {"puzzle": "code", "code": "$absent"}, "epoch": 1, "pkt_seq": 1}}
+        ]},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/score", "token": "gm", "body": {"team": "blue", "amount": 3, "reason": "bonus"}}, "status": 200},
+        {"ws": "g", "messages": [
+          {"type": "event", "game": "${gid}", "event": {"node": 0, "type": "score.delta", "team": "blue", "data": {"team": "blue", "amount": 3, "reason": "bonus"}}},
+          {"type": "score", "game": "${gid}", "teams": {"red": 0, "blue": 3}}
+        ]},
+        {"ws_connect": "late", "token": "read", "hello": {"type": "hello",
+          "game": {"id": "${gid}", "state": "running", "params": {"reveal_code": "$absent"}},
+          "score": {"game": "${gid}", "teams": {"red": 0, "blue": 3}},
+          "nodes": [{"node_id": 7, "name": "box-7", "role": "terminal", "link": "online"}],
+          "events": {"$contains": [
+            {"node": 0, "seq": 1, "t": 0, "type": "game.start", "team": null, "squad": 0, "prio": "critical", "data": {"preset": "org.atalaia.hacking_terminal"}, "epoch": "$absent", "pkt_seq": "$absent"},
+            {"node": 7, "type": "node.online"},
+            {"node": 7, "seq": 1, "t": 100, "type": "hacking.solved", "team": "blue", "data": {"puzzle": "code", "code": "$absent"}, "epoch": "$absent"},
+            {"node": 0, "type": "score.delta", "team": "blue"}
+          ]},
+          "status": {"live_game": "${gid}", "role": "leader", "term": 1}}},
+        {"ws_connect": "lategm", "token": "gm", "hello": {"type": "hello", "game": {"params": {"reveal_code": "1234"}}, "events": {"$contains": [{"type": "hacking.solved", "data": {"code": "1234"}}]}}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm"}, "status": 200},
+        {"ws": "g", "messages": [
+          {"type": "event", "game": "${gid}", "event": {"node": 0, "type": "game.end", "prio": "critical", "data": {"winner": "blue"}}},
+          {"type": "game", "game": {"id": "${gid}", "state": "ended", "ended_at": "$any", "params": {"reveal_code": "1234"}}}
+        ]},
+        {"ws": "r", "messages": [
+          {"type": "event", "event": {"type": "score.delta"}},
+          {"type": "score", "teams": {"red": 0, "blue": 3}},
+          {"type": "event", "event": {"type": "game.end"}},
+          {"type": "game", "game": {"state": "ended", "params": {"reveal_code": "$absent"}}}
+        ]},
+        {"ws": "late", "messages": [
+          {"type": "event", "event": {"type": "game.end", "data": {"winner": "blue"}}},
+          {"type": "game", "game": {"state": "ended", "params": {"reveal_code": "$absent"}}}
+        ]},
+        {"ws_connect": "after", "token": "read", "hello": {"type": "hello", "game": null, "score": null, "nodes": [], "events": [], "status": {"live_game": null}}}
+      ]
+    },
+    {
+      "name": "a stream client that falls behind is dropped and catches up with a new hello",
+      "stream_max_queue": 2,
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sunday", "mode_id": "org.atalaia.domination", "assignments": {"4": "zone"}}}, "status": 201, "save": {"gid": "id"}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm", "body": {"force": true}}, "status": 200},
+        {"ws_connect": "r", "token": "read", "hello": {"type": "hello", "game": {"id": "${gid}", "state": "running"}, "events": [{"type": "game.start"}]}},
+        {"ws_flood": "r", "count": 50, "close": 4408},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/pause", "token": "gm", "body": {"reason": "medic"}}, "status": 200},
+        {"ws_connect": "r", "token": "read", "hello": {"type": "hello", "game": {"id": "${gid}", "state": "paused"}, "events": [{"type": "game.start"}, {"type": "game.pause", "data": {"reason": "medic"}}]}},
+        {"ws": "r", "messages": []}
+      ]
+    },
+    {
+      "name": "MQTT: the topics and payloads of a game",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sunday", "mode_id": "org.atalaia.domination", "teams": ["red", "blue"], "assignments": {"4": "zone"}}}, "status": 201, "save": {"gid": "id"}},
+        {"mqtt": []},
+        {"rx": {"source": 4, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-4", "platform": 1, "fw_version": "0.3.0", "core_version": "0.2.0", "tier": 0, "capabilities": [1, 2], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"mqtt": [
+          {"topic": "field/v1/${gid}/nodes/4/state", "qos": 1, "retain": true, "payload": {"node_id": 4, "name": "box-4", "role": "zone", "owner": null, "phase": 0, "game_time_ms": 0, "score": {"red": 0, "blue": 0}}},
+          {"topic": "field/v1/${gid}/nodes/4/health", "qos": 1, "retain": true, "payload": {"node_id": 4, "battery_pct": 90, "rssi": -60, "snr": 5, "epoch": 1, "fw_version": "0.3.0", "link": null, "battery_low": false, "last_seen": "$any"}},
+          {"topic": "field/v1/${gid}/events/node.online", "qos": 1, "retain": false, "payload": {"game": "${gid}", "node": 4, "seq": 1, "t": 0, "type": "node.online", "team": null, "squad": 0, "prio": "telemetry", "data": {"fw": "0.3.0", "tier": "full"}, "epoch": null, "pkt_seq": null}},
+          {"topic": "field/v1/${gid}/nodes/4/state", "qos": 1, "retain": true, "payload": {"node_id": 4}},
+          {"topic": "field/v1/${gid}/nodes/4/health", "qos": 1, "retain": true, "payload": {"node_id": 4, "link": "online"}}
+        ]},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm"}, "status": 200},
+        {"mqtt": [
+          {"topic": "field/v1/${gid}/events/game.start", "qos": 1, "retain": false, "payload": {"game": "${gid}", "node": 0, "t": 0, "type": "game.start", "prio": "critical", "data": {"preset": "org.atalaia.domination"}}}
+        ]},
+        {"rx": {"source": 4, "seq": 1, "epoch": 1, "type": "STATE", "state": {"owner_team": 1, "phase": 1, "game_time_ms": 10, "counters": {"1": 7}, "epoch": 1}}},
+        {"rx": {"source": 4, "seq": 2, "epoch": 1, "type": "EVENT", "event": {"node": 4, "seq": 1, "t": 50, "type": "zone.captured", "team": 1}}},
+        {"mqtt": [
+          {"topic": "field/v1/${gid}/score", "qos": 1, "retain": true, "payload": {"game": "${gid}", "teams": {"red": 7, "blue": 0}, "at": "$any"}},
+          {"topic": "field/v1/${gid}/nodes/4/state", "qos": 1, "retain": true, "payload": {"node_id": 4, "name": "box-4", "role": "zone", "owner": "red", "phase": 1, "game_time_ms": 10, "score": {"red": 7, "blue": 0}}},
+          {"topic": "field/v1/${gid}/nodes/4/health", "qos": 1, "retain": true, "payload": {"node_id": 4, "battery_pct": 90, "rssi": -60, "snr": 5, "epoch": 1, "fw_version": "0.3.0", "link": "online", "battery_low": false, "last_seen": "$any"}},
+          {"topic": "field/v1/${gid}/events/zone.captured", "qos": 1, "retain": false, "payload": {"game": "${gid}", "node": 4, "seq": 1, "t": 50, "type": "zone.captured", "team": "red", "squad": 0, "prio": "normal", "data": {}, "epoch": 1, "pkt_seq": 2}}
+        ]},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/score", "token": "gm", "body": {"team": "blue", "amount": 3, "reason": "bonus"}}, "status": 200},
+        {"mqtt": [
+          {"topic": "field/v1/${gid}/events/score.delta", "qos": 1, "retain": false, "payload": {"game": "${gid}", "type": "score.delta", "team": "blue", "data": {"team": "blue", "amount": 3, "reason": "bonus"}}},
+          {"topic": "field/v1/${gid}/score", "qos": 1, "retain": true, "payload": {"game": "${gid}", "teams": {"red": 7, "blue": 3}}}
+        ]},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/score", "token": "read"}, "status": 200},
+        {"mqtt": []},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm"}, "status": 200},
+        {"mqtt": [
+          {"topic": "field/v1/${gid}/events/game.end", "qos": 1, "retain": false, "payload": {"game": "${gid}", "type": "game.end", "data": {"winner": "red"}}}
+        ]}
+      ]
+    },
+    {
+      "name": "MQTT: gm_only event data never reaches the broker",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Hack", "mode_id": "org.atalaia.hacking_terminal", "assignments": {"7": "terminal"}, "params": {"reveal_code": "1234"}}}, "status": 201, "save": {"gid": "id"}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm", "body": {"force": true}}, "status": 200},
+        {"mqtt": [{"topic": "field/v1/${gid}/events/game.start"}]},
+        {"rx": {"source": 7, "seq": 0, "epoch": 1, "type": "EVENT", "event": {"node": 7, "seq": 1, "t": 100, "type": "hacking.solved", "team": 2, "data": {"puzzle": "code", "code": "1234"}}}},
+        {"mqtt": [
+          {"topic": "field/v1/${gid}/events/hacking.solved", "qos": 1, "retain": false, "payload": {"game": "${gid}", "node": 7, "type": "hacking.solved", "team": "blue", "data": {"puzzle": "code", "code": "$absent"}, "epoch": 1}},
+          {"topic": "field/v1/${gid}/events/node.online", "qos": 1, "retain": false, "payload": {"game": "${gid}", "node": 7, "type": "node.online"}},
+          {"topic": "field/v1/${gid}/nodes/7/state", "qos": 1, "retain": true, "payload": {"node_id": 7, "name": "node-7", "role": "terminal"}},
+          {"topic": "field/v1/${gid}/nodes/7/health", "qos": 1, "retain": true, "payload": {"node_id": 7, "battery_pct": null, "rssi": -60, "link": "online"}}
+        ]},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/log", "token": "gm"}, "status": 200, "json": {"$contains": [{"type": "hacking.solved", "data": {"code": "1234"}}]}}
+      ]
     }
-  ]
+  ],
+  "mqtt_acl": {
+    "description": "Who may read and write which topics on the controller's MQTT broker: the Pi's Mosquitto ACL (controller/deploy/atalaia.acl, checked by controller/tests/test_api_contract.py) and the Android controller's embedded broker (app/lib/controller/mqtt_broker.dart, MqttAcl.field, checked by app/test/controller/api_contract_test.dart). Users: 'gm' (GM tools: reads everything, publishes commands), 'reader' (scoreboards: events, score and nodes) and 'controller' (the field controller itself). A user not listed may do nothing.",
+    "users": ["gm", "reader"],
+    "checks": [
+      {"user": "reader", "topic": "field/v1/3/score", "read": true, "write": false},
+      {"user": "reader", "topic": "field/v1/3/events/zone.captured", "read": true, "write": false},
+      {"user": "reader", "topic": "field/v1/3/nodes/4/state", "read": true, "write": false},
+      {"user": "reader", "topic": "field/v1/3/nodes/4/health", "read": true, "write": false},
+      {"user": "reader", "topic": "field/v1/3/cmd/4", "read": false, "write": false},
+      {"user": "reader", "topic": "field/v1/3/cmd/all", "read": false, "write": false},
+      {"user": "reader", "topic": "field/v1/3/score/x", "read": false, "write": false},
+      {"user": "reader", "topic": "field/v2/3/score", "read": false, "write": false},
+      {"user": "gm", "topic": "field/v1/3/score", "read": true, "write": false},
+      {"user": "gm", "topic": "field/v1/3/events/game.end", "read": true, "write": false},
+      {"user": "gm", "topic": "field/v1/3/nodes/4/state", "read": true, "write": false},
+      {"user": "gm", "topic": "field/v1/3/cmd/4", "read": true, "write": true},
+      {"user": "gm", "topic": "field/v1/3/cmd/all", "read": true, "write": true},
+      {"user": "gm", "topic": "other/topic", "read": false, "write": false},
+      {"user": "controller", "topic": "field/v1/3/score", "read": true, "write": true},
+      {"user": "controller", "topic": "field/v1/3/cmd/4", "read": true, "write": true},
+      {"user": "someone", "topic": "field/v1/3/score", "read": false, "write": false}
+    ]
+  }
 }

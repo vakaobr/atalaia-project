@@ -5,9 +5,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 3 -- Android and Players: Status
 
-**Current phase:** Implementation: plan phases A-D and F done in software; plan phase E done in software except the Android controller role's shell (PE24: slice S1, the game engine and REST API, done 2026-10-22; S2-S7 to do); plan phase G (integration and field test) pending, it needs the hardware
+**Current phase:** Implementation: plan phases A-D and F done in software; plan phase E done in software except the Android controller role's shell (PE24: slices S1, the game engine and REST API, and S2, the live stream and MQTT, done 2026-10-22; S3-S7 to do); plan phase G (integration and field test) pending, it needs the hardware
 **Risk level:** Medium
-**Last verified:** 2026-10-22 (PE24 slice S1)
+**Last verified:** 2026-10-22 (PE24 slice S2)
 
 ## Completed
 
@@ -186,7 +186,7 @@ tools/docker_app.py` (Dart, NDK, APK) and `app\tool\emulator_tests.ps1`
 | Prop on Wi-Fi (PD12) | `protocol/prop-link.md`, `controller/atalaia_controller/prop_link.py`, `app/lib/controller/prop_link.dart`, `prop_session.dart`; join keys 13 and 14 (RFC 0001 Amendment 4, proposed) | Done: HELLO, STATE, events with ACK and resend, commands and TIME, `node.tamper` |
 | Positions (ADR-P3-6) | `controller/atalaia_controller/positions.py`, `POST`/`GET /api/v1/positions`; `app/lib/position/position_reporter.dart`, `app/lib/platform/location.dart`, `LocationPlugin.kt`, the foreground service's location type | Done for GPS; BLE beacons not built |
 | Teams and squads (maintainer) | games' `squads` (0 = none), squad pickers and the squad-leader role only where a game has squads (PE25) | Done in the controller, the console and the app |
-| Android controller role (ADR-P3-12) | `app/lib/controller/mqtt_broker.dart`, `visibility_engine.dart`; since 2026-10-22 `field_controller.dart`, `controller_engine.dart`, `controller_store.dart`, `controller_api.dart` | **Partly**: the broker and the visibility engine are built and tested; slice S1 of PE24 (2026-10-22, below): the game engine with `field.lua` on the core and the REST API for games, scores, the log and nodes; slices S2-S7 to do |
+| Android controller role (ADR-P3-12) | `app/lib/controller/mqtt_broker.dart`, `visibility_engine.dart`; since 2026-10-22 `field_controller.dart`, `controller_engine.dart`, `controller_store.dart`, `controller_api.dart`, `controller_stream.dart`, `controller_mqtt.dart` | **Partly**: the broker and the visibility engine are built and tested; slices S1 and S2 of PE24 (2026-10-22, below): the game engine with `field.lua` on the core, the REST API for games, scores, the log and nodes, the live stream and the MQTT topics with the Pi's ACL; slices S3-S7 to do |
 
 Tests: controller 201 (60 new: check-in, chrono list with the shared
 vectors, poster vectors, positions, prop link, TLS); console browser tests
@@ -220,8 +220,23 @@ Tests: 9 new controller tests (8 cases and the matcher), 27 new Dart tests
 (9 for the contract cases and the matcher, 10 for the radio side, 8 for the
 engine and the HTTP side).
 
-Remaining slices (`PLAN.md`, "PE24 slices"): **S2** the live stream and
-MQTT; **S3** keeping games across a restart; **S4** the I/O pod as the
+### Slice S2: the live stream and MQTT (2026-10-22)
+
+Decisions PE24-10 to PE24-15. Built and tested in software, on the loopback
+address only.
+
+| Deliverable | Where | State |
+| --- | --- | --- |
+| The live stream | `app/lib/controller/controller_stream.dart`, `WS /api/v1/stream` in `controller_api.dart` | Done: the GM and read tokens (`?token=` or the header; others closed with 4401), the hello snapshot (the live game, score, nodes, the latest 100 events, the controller's state), then the engine's game, event, score, node and system messages in order; gm_only parameters and event data for the GM token only, staff-marked messages to the GM only, routing marks never sent; ping and pong; a client more than 256 messages behind closed with 4408, its new hello is the catch-up (the Pi has no `since` replay: PE24-11) |
+| MQTT | `app/lib/controller/controller_mqtt.dart`, `mqtt_broker.dart` | Done: the Pi bridge's topics and payloads (`field/v1/{game}/events/{type}` without gm_only data, `score` and `nodes/{id}/state`, `health` retained, QoS 1), commands from `cmd/{node}` and `cmd/all`; the broker takes logins (`gm`, `reader`: the GM and read tokens, PE24-12) and the Pi's ACL (`MqttAcl.field` = `controller/deploy/atalaia.acl`) and listens on the loopback address by default (PE24-13) |
+| Shared contract cases | `protocol/vectors/controller_api.json` (new step kinds `ws_connect`, `ws`, `ws_send`, `ws_flood`, `mqtt`; the `mqtt_acl` table) | Done: 5 new cases (13 in all: the stream's tokens and hello, a game's messages in order with gm_only data by token, a client that falls behind and catches up, MQTT topics and payloads, gm_only data kept off MQTT) and 17 ACL checks, passing against both controllers (PE24-10) |
+
+Tests: 6 new controller tests (the 5 cases and the ACL against
+`atalaia.acl`; the Pi's code is unchanged), 14 new Dart tests (6 for the
+cases and the ACL, 5 for the stream's routing and hello, 3 for logins, the
+ACL and the bridge on a real broker).
+
+Remaining slices (`PLAN.md`, "PE24 slices"): **S3** keeping games across a restart; **S4** the I/O pod as the
 controller's radio, the Wi-Fi props and joins; **S5** check-in, player
 tokens, positions and the chrono list; **S6** the controller's shell and
 screens (controller isolate, foreground service, the GM console on the
@@ -229,8 +244,10 @@ phone, HTTPS, the field's Wi-Fi); **S7** after the field test: failover,
 presets, mode uploads, scenarios, role packages, branding, the channel
 scan, re-invites, adoption, pairing, firmware updates, the site sync,
 ATAK, the remote GM. For the maintainer: PE24-2 (a phone as the only
-controller, not a standby), PE24-3 (not on plan phase G's gate), PE24-8
-(the GM console's files in the app).
+controller, not a standby), PE24-3 (not on plan phase G's gate) and PE24-8
+(the GM console's files in the app) are answered; open for the maintainer:
+PE24-11 (no `since` replay on the stream, as on the Pi) and PE24-12 (the
+phone's MQTT passwords are the API tokens).
 
 ## Medic Kit (2026-10-19)
 
@@ -396,10 +413,11 @@ Phase G needs hardware.
 2. ~~Architecture~~ -- Complete
 3. ~~Planning~~ -- Complete
 4. Implementation -- plan phases A-F done in software (E without the
-   Android controller role's shell, PE24: its slice S1 done 2026-10-22), the
-   Medic Kit and branding; next: plan phase G (the field test: the boards,
-   the pods and real phones, with the Pi controller) and the controller
-   role's slices S2-S6
+   Android controller role's shell, PE24: its slices S1 and S2 done
+   2026-10-22), the Medic Kit and branding; next: plan phase G (the field
+   test: the boards, the pods and real phones, with the Pi controller) and
+   the controller role's slices S3-S6 (S3 next: keeping games across a
+   restart)
 
 ## How to resume with implementation
 

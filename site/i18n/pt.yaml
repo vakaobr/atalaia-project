@@ -612,12 +612,12 @@ roadmap:
     todo: >-
       <strong>Ainda falta.</strong> Em software: o telemóvel como controlador de campo, feito por
       partes (já feitos: o broker MQTT, o filtro de posições e o motor de jogo, com o field.lua no
-      núcleo partilhado e a API REST, verificados com os mesmos casos de contrato que o controlador
-      no Pi; faltam o stream em direto, guardar os jogos, o rádio pelo módulo, os dispositivos por
-      Wi-Fi, o check-in e o ecrã do controlador) e a versão iOS (por fazer: precisa de um Mac); o
-      modo Money Factory ficou para depois. A fase G do plano, o teste no campo com telemóveis e
-      módulos a sério, espera pelo hardware: até agora a app só correu em emuladores Android, e o
-      firmware do módulo só como o seu próprio código num computador.
+      núcleo partilhado, a API REST, o stream em direto e os tópicos MQTT, verificados com os mesmos
+      casos de contrato que o controlador no Pi; faltam guardar os jogos, o rádio pelo módulo, os
+      dispositivos por Wi-Fi, o check-in e o ecrã do controlador) e a versão iOS (por fazer: precisa
+      de um Mac); o modo Money Factory ficou para depois. A fase G do plano, o teste no campo com
+      telemóveis e módulos a sério, espera pelo hardware: até agora a app só correu em emuladores
+      Android, e o firmware do módulo só como o seu próprio código num computador.
     gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."
   p4:
     title: Servidor do clube e jogo avançado
