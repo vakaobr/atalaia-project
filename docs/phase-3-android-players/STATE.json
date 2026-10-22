@@ -6,7 +6,7 @@
   "review_iteration": 0,
   "failing_experts": [],
   "created_at": "2026-10-17T18:00:00Z",
-  "updated_at": "2026-10-19T23:59:00Z",
+  "updated_at": "2026-10-22T18:00:00Z",
   "artifacts": {
     "RESEARCH.md": "complete",
     "ADR.md": "complete",
@@ -24,7 +24,7 @@
       "B": "done in software (2026-10-19): chrono data model, energy, limit templates (unverified), spot checks, Ed25519-signed records, player tags and player tokens in Dart; shared vectors chrono_record.json and player_token.json checked in Dart and Python; decisions B1-B13",
       "C": "done in software (2026-10-19): dart:ffi bindings, isolate-local callbacks, game loop isolate, FFI stub with layout report, every mode test through the Dart bridge, Android NDK build (three ABIs) via CMake presets and Gradle, CI jobs flutter-test, core-android-ndk, flutter-build-android; core fix in field.common_owner; decisions PC1-PC11",
       "D": "done in software (2026-10-19): Flutter screen-template renderer checked against the core, Android prop shell (modes on the core, team buttons, keypad, NFC tags, game timer sending game.end, admin PIN, screen manager, kiosk and tamper), join by QR/NFC/text, player view on the controller feed, GM web view, marshal chrono/replicas/tag writer, pt-PT and English, Kotlin plugins (device, kiosk, foreground service, NFC, QR with CameraX+ZXing, USB and BLE pod), pod codec and client, CI job flutter-integration (emulator, not run locally); iOS not built; core fix in |clock; decisions PD1-PD24",
-      "E": "done in software (2026-10-19) except the Android controller role's shell (PE24): field check-in (poster, identities, tokens with the controller's own per-game key, declarations, replicas-to-chrono list fed by signed readings, retention), HTTPS with the field CA, role-filtered stream with the event history in hello, Android props on Wi-Fi (join keys 13 and 14), player positions with server-side visibility, teams and squads (PE25), GM console Check-in tab and poster, the app's screens; Dart MQTT broker and visibility engine; decisions PE1-PE25",
+      "E": "done in software (2026-10-19) except the Android controller role's shell (PE24): field check-in (poster, identities, tokens with the controller's own per-game key, declarations, replicas-to-chrono list fed by signed readings, retention), HTTPS with the field CA, role-filtered stream with the event history in hello, Android props on Wi-Fi (join keys 13 and 14), player positions with server-side visibility, teams and squads (PE25), GM console Check-in tab and poster, the app's screens; Dart MQTT broker and visibility engine; decisions PE1-PE25. The Android controller role in slices (PLAN.md, PE24 slices; decisions PE24-1 to PE24-9): S1 done in software 2026-10-22 (the game engine with field.lua on the core and the REST API, shared contract cases protocol/vectors/controller_api.json passing against the Pi and the Dart controller); S2-S7 to do",
       "F": "done in software (2026-10-19): I/O pod firmware variant (CONFIG_ATALAIA_POD_MODE, sdkconfig.pod), proxy, USB-Serial-JTAG and NimBLE GATT links, the Field Box HAL as capabilities, radio passthrough with the modem's code (RADIO_NOISE 0x0B), node.tamper from an enclosure switch, the host pod; the phone's radio link through a pod and DualLink with Wi-Fi; not run on a board or a phone; decisions PF1-PF15",
       "G": "pending (needs hardware: boards, pods, phones, the Pi)"
     }

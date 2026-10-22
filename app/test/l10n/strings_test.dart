@@ -55,7 +55,13 @@ void main() {
       used.addAll(quoted.allMatches(text).map((m) => m.group(1)!));
     }
     // Not translation keys: file names and event types that look alike.
-    used.removeAll({'replica.dart', 'nfc.tag', 'player.respawn', 'gm.message'});
+    used.removeAll({
+      'replica.dart',
+      'nfc.tag',
+      'player.respawn',
+      'gm.message',
+      'battery.low',
+    });
     expect(used.length, greaterThan(150));
     final missing = used.where((k) => !ptStrings.containsKey(k)).toList()
       ..sort();

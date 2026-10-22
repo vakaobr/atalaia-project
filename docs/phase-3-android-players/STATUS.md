@@ -5,9 +5,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 3 -- Android and Players: Status
 
-**Current phase:** Implementation: plan phases A-D and F done in software; plan phase E done in software except the Android controller role's shell (PE24); plan phase G (integration and field test) pending, it needs the hardware
+**Current phase:** Implementation: plan phases A-D and F done in software; plan phase E done in software except the Android controller role's shell (PE24: slice S1, the game engine and REST API, done 2026-10-22; S2-S7 to do); plan phase G (integration and field test) pending, it needs the hardware
 **Risk level:** Medium
-**Last verified:** 2026-10-19 (plan phase F)
+**Last verified:** 2026-10-22 (PE24 slice S1)
 
 ## Completed
 
@@ -186,7 +186,7 @@ tools/docker_app.py` (Dart, NDK, APK) and `app\tool\emulator_tests.ps1`
 | Prop on Wi-Fi (PD12) | `protocol/prop-link.md`, `controller/atalaia_controller/prop_link.py`, `app/lib/controller/prop_link.dart`, `prop_session.dart`; join keys 13 and 14 (RFC 0001 Amendment 4, proposed) | Done: HELLO, STATE, events with ACK and resend, commands and TIME, `node.tamper` |
 | Positions (ADR-P3-6) | `controller/atalaia_controller/positions.py`, `POST`/`GET /api/v1/positions`; `app/lib/position/position_reporter.dart`, `app/lib/platform/location.dart`, `LocationPlugin.kt`, the foreground service's location type | Done for GPS; BLE beacons not built |
 | Teams and squads (maintainer) | games' `squads` (0 = none), squad pickers and the squad-leader role only where a game has squads (PE25) | Done in the controller, the console and the app |
-| Android controller role (ADR-P3-12) | `app/lib/controller/mqtt_broker.dart`, `visibility_engine.dart` | **Partly**: the broker and the visibility engine are built and tested; the controller shell (`field.lua` and the API on the phone) is not (PE24) |
+| Android controller role (ADR-P3-12) | `app/lib/controller/mqtt_broker.dart`, `visibility_engine.dart`; since 2026-10-22 `field_controller.dart`, `controller_engine.dart`, `controller_store.dart`, `controller_api.dart` | **Partly**: the broker and the visibility engine are built and tested; slice S1 of PE24 (2026-10-22, below): the game engine with `field.lua` on the core and the REST API for games, scores, the log and nodes; slices S2-S7 to do |
 
 Tests: controller 201 (60 new: check-in, chrono list with the shared
 vectors, poster vectors, positions, prop link, TLS); console browser tests
@@ -201,6 +201,36 @@ Not run: real phones (GPS, background positions, the Wi-Fi link to a real
 controller on a field network), a controller on a Raspberry Pi serving HTTPS
 to phones, Wokwi (decision R7). Deviations and choices: decisions PE1-PE25 in
 `docs/review/decisions-to-review.md`.
+
+## The Android controller role, slice S1 (2026-10-22)
+
+Decision PE24's controller role, planned in seven slices
+(`PLAN.md`, "PE24 slices"; decisions PE24-1 to PE24-9). Slice S1 is
+built and tested in software; the phone cannot run a field yet.
+
+| Deliverable | Where | State |
+| --- | --- | --- |
+| The radio side of a game | `app/lib/controller/field_controller.dart` | Done: the simulator's FieldController in Dart (game clock, TIME beacons, commands, HELLO, STATE, events with flood copies and replays dropped, ACK bitmaps, scores merged by maximum per node and per field-script run, GM adjustments, node.online, node.offline, battery.low); no election (PE24-2) |
+| The game engine | `app/lib/controller/controller_engine.dart`, `controller_store.dart` | Done: create (the Pi's checks), the start check and forced start, pause, resume, end with the winner, the time limit, `field.lua` on the core with the field operations, `game.win` ending the game at the next tick, points kept per run, node commands and mode commands, the read token's view without gm_only parameters and event data; games in memory (S3 keeps them) |
+| The REST API | `app/lib/controller/controller_api.dart` | Done: healthz, whoami, nodes, modes, games, start-check, score, log, node commands, the controller's state, with the Pi's tokens, paths, bodies and status codes; loopback only (PE24-7) |
+| The event decoder | `app/lib/ffi/bindings.dart` (`AtalaiaCore.decodeEvent`) | Done: the core's `atalaia_event_decode` (PE24-5) |
+| Shared contract cases | `protocol/vectors/controller_api.json`; `controller/tests/test_api_contract.py`, `app/test/controller/api_contract_test.dart` | Done: 8 cases (tokens, the modes, a Domination game from creation to its end, Hold-All's and Last Stand's `field.lua`, the time limit, gm_only data, refused requests), passing against both controllers (PE24-4) |
+
+Tests: 9 new controller tests (8 cases and the matcher), 27 new Dart tests
+(9 for the contract cases and the matcher, 10 for the radio side, 8 for the
+engine and the HTTP side).
+
+Remaining slices (`PLAN.md`, "PE24 slices"): **S2** the live stream and
+MQTT; **S3** keeping games across a restart; **S4** the I/O pod as the
+controller's radio, the Wi-Fi props and joins; **S5** check-in, player
+tokens, positions and the chrono list; **S6** the controller's shell and
+screens (controller isolate, foreground service, the GM console on the
+phone, HTTPS, the field's Wi-Fi); **S7** after the field test: failover,
+presets, mode uploads, scenarios, role packages, branding, the channel
+scan, re-invites, adoption, pairing, firmware updates, the site sync,
+ATAK, the remote GM. For the maintainer: PE24-2 (a phone as the only
+controller, not a standby), PE24-3 (not on plan phase G's gate), PE24-8
+(the GM console's files in the app).
 
 ## Medic Kit (2026-10-19)
 
@@ -366,9 +396,10 @@ Phase G needs hardware.
 2. ~~Architecture~~ -- Complete
 3. ~~Planning~~ -- Complete
 4. Implementation -- plan phases A-F done in software (E without the
-   Android controller role's shell, PE24), the Medic Kit and branding; next:
-   the controller shell, then plan phase G (the field test: the boards, the
-   pods and real phones)
+   Android controller role's shell, PE24: its slice S1 done 2026-10-22), the
+   Medic Kit and branding; next: plan phase G (the field test: the boards,
+   the pods and real phones, with the Pi controller) and the controller
+   role's slices S2-S6
 
 ## How to resume with implementation
 

@@ -685,6 +685,56 @@ signed passing series for one and a failing series for the other mark
 them passed and refused; the read token never sees the player's name;
 the controller restarts and nothing is lost.
 
+### PE24 slices: the Android controller role (added 2026-10-22)
+
+Plan phase E built the Android controller role's broker and visibility
+engine and left the rest (decision PE24): `field.lua` on the phone, the
+controller's REST and WebSocket API, check-in and token issuing served
+by the app, with the same contract tests as the Pi controller. The Pi
+controller has grown a great deal since (about 120 endpoints, the
+radio's re-invites, adoption, pairing, firmware updates, the site sync,
+ATAK, the remote GM), so the role is built in slices, each one useful
+and tested on its own. Decisions PE24-1 to PE24-9.
+
+**What the field test needs.** Plan phase G's gate ("one game mixes
+ESP32 and Android props") runs with the Pi controller (section 6), so
+no slice is on the gate's path (PE24-3). The slices aim at a phone that
+runs a small game with no Pi: boxes through an I/O pod on the phone,
+Android props on the phone's Wi-Fi, players checking in. Whether a
+phone may also be a Pi's standby is the maintainer's choice (PE24-2);
+until slice S7 a phone and a Pi never run the same game.
+
+**How the contract is tested (PE24-4).** The shared cases are JSON in
+`protocol/vectors/controller_api.json`: requests with a token and a
+body, the status and a pattern the answer must match (keys given must
+match, `$absent`, `$any`, `$contains` for lists), values saved from an
+answer, decrypted packets from a box (`rx`: HELLO, STATE, EVENT) and
+clock steps (`advance_ms`, then one tick). The Pi controller is the
+reference: `controller/tests/test_api_contract.py` runs every case
+in-process (FastAPI's TestClient, a recording modem, a fake clock), and
+`app/test/controller/api_contract_test.dart` runs the same cases over
+HTTP on the loopback address against the Dart engine on the real core.
+A case is added on the Pi's side first; a case that fails on one side is
+a difference to fix, in the code or (with a dated note) in the case.
+Error texts (`detail`) are not part of the contract; status codes are.
+Later slices add step kinds: `ws` (stream messages, S2), `restart` (a
+new controller on the same store, S3), `tx` (what went on the radio,
+S4).
+
+| Slice | What | Contract and tests | State |
+| --- | --- | --- | --- |
+| S1 | The game engine and the REST API: `app/lib/controller/field_controller.dart` (the simulator's FieldController in Dart: game clock, TIME beacons, commands, HELLO, STATE, events with replays dropped, ACKs, scores merged by maximum, node health; no election), `controller_engine.dart` (create, start with the start check, pause, resume, end, the time limit, `field.lua` on the core with the field operations and its points per run, `game.win`, GM adjustments, node commands, the read token's view without gm_only data), `controller_store.dart` (in memory), `controller_api.dart` (healthz, whoami, nodes, modes, games, start-check, score, log, node commands, controller state; GM and read tokens; loopback by default); the core's event decoder in the bindings (PE24-5) | `controller_api.json` (8 cases) on both sides; Dart unit tests for the radio side and the engine | **Done 2026-10-22** (in software) |
+| S2 | The live stream and MQTT: `WS /api/v1/stream` for the GM and read tokens (the hello snapshot, game, event, score, node and system messages, gm_only data for staff only) and the Pi bridge's topics on the embedded broker (`field/v1/{game}/...`, score and nodes retained) | `ws` steps in the shared cases; the broker's topics against `controller/atalaia_controller/mqtt.py`'s | To do |
+| S3 | Keeping games: a file store in the app's private storage (games, events, scores, nodes, settings, the field script's points per run), the live game restored after a restart with its `field.lua` run; the game key kept only with `persist_game_key` (ADR-P2-4), else the game must be ended (`key_lost`) | `restart` steps; the Pi's restart tests as cases | To do |
+| S4 | The radio and the props: the I/O pod as the controller's radio (CONFIGURE with the game key, RX to the engine, TIME, CMD and ACK out, the transmit epoch stored per key), Android props on the phone's Wi-Fi (`WS /api/v1/prop`, protocol/prop-link.md, the server side), join payloads (`POST /api/v1/join`, `/nodes/{id}/join`, the field join key), the field's channel | `tx` steps; the join and prop-link vectors; the host pod and host box over a UDP air (as `test_pod_e2e.py`) | To do |
+| S5 | Check-in and players: the ADR-P3-13 endpoints, player tokens with a per-game token key, the role-filtered stream, positions through `visibility_engine.dart`, chrono readings and the replicas-to-chrono list, marshal keys | `test_checkin.py` and `test_chrono_list.py` cases moved into shared cases | To do |
+| S6 | The shell and its screens: the controller role on the home screen (Android only), the controller's isolate (never the UI isolate, constraint 1) with the foreground service and wake lock, the GM console in the app's web view on the phone's own API (PE24-8), HTTPS with a field CA made on the phone, opening the API and the broker to the field's Wi-Fi (PE24-7) | Widget tests; an emulator test of a game run from the phone | To do |
+| S7 | After the field test, as fields ask: failover (CLAIM, a phone as a Pi's standby or the other way round, PE24-2), presets, mode uploads and scenarios, role packages in a game, team branding, the channel scan, re-invites, adoption and pairing, firmware updates, the site sync, ATAK, the remote GM | The Pi's tests for each, as shared cases where they are API | Later |
+
+S1 to S6 make the phone a field controller for a small game; each
+slice ends with `python3 tools/docker_app.py` (check, ndk, apk) and the
+Pi's controller tests green, and the shared cases passing on both sides.
+
 ---
 
 ## Phase F: I/O pod firmware

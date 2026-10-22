@@ -107,7 +107,13 @@ final class ModeManifest {
     required this.nodeScript,
     required this.fieldScript,
     required this.screens,
+    this.manifest = const {},
   });
+
+  /// mode.yaml as plain Dart maps and lists: what the Android field
+  /// controller reads beyond the fields above (gm_only parameters, roles
+  /// marked `needed: false`, mode commands; lib/controller/).
+  final Map<String, Object?> manifest;
 
   final String folder;
   final String id;
@@ -226,6 +232,7 @@ final class ModeManifest {
       nodeScript: node ?? '',
       fieldScript: files['field.lua'],
       screens: screens,
+      manifest: m,
     );
   }
 
@@ -266,6 +273,19 @@ final class GameMode {
       : parts.map((m) => 'do\n${m.nodeScript}\nend\n').join();
 
   String get chunkName => '@${main.folder}/node.lua';
+
+  /// The field controller's script: every part's field.lua in the id's
+  /// order, one chunk as the simulator's compose_scripts makes it; null when
+  /// no part has one.
+  String? get fieldScript {
+    final scripts = [
+      for (final m in parts)
+        if (m.fieldScript != null) m.fieldScript!,
+    ];
+    if (scripts.isEmpty) return null;
+    if (scripts.length == 1) return scripts.first;
+    return scripts.map((s) => 'do\n$s\nend\n').join();
+  }
 
   /// The template for a screen name, from the first part that has it.
   String? screen(String name) {

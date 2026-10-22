@@ -19,6 +19,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
+import '../core/node_types.dart';
 import 'native_types.dart';
 
 /// An `atalaia_node_t *`: only the core looks inside.
@@ -250,6 +251,26 @@ class AtalaiaBindings {
         )
       >('atalaia_event_encode', isLeaf: true);
 
+  late final eventDecode = library
+      .lookupFunction<
+        Bool Function(
+          Pointer<Uint8>,
+          Size,
+          Pointer<AtalaiaEvent>,
+          Pointer<Utf8>,
+          Size,
+          Pointer<Pointer<Utf8>>,
+        ),
+        bool Function(
+          Pointer<Uint8>,
+          int,
+          Pointer<AtalaiaEvent>,
+          Pointer<Utf8>,
+          int,
+          Pointer<Pointer<Utf8>>,
+        )
+      >('atalaia_event_decode', isLeaf: true);
+
   /// Only in the FFI stub (core/tests/stub.c): the C structs' layout as JSON.
   late final stubLayout = library
       .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
@@ -268,6 +289,15 @@ final class EncodedEvent {
   final String? error;
 
   int get size => bytes?.length ?? 0;
+}
+
+/// An EVENT payload as the core's codec decodes it: the event, or why not.
+final class DecodedEvent {
+  const DecodedEvent(this.event, [this.error]);
+
+  /// Null when the codec refused the payload.
+  final EmittedEvent? event;
+  final String? error;
 }
 
 /// The loaded core, with the helpers that need no node.
@@ -512,6 +542,52 @@ class AtalaiaCore {
         ..free(buf)
         ..free(err);
       if (data != nullptr) calloc.free(data);
+    }
+  }
+
+  /// An EVENT payload decoded by the core's codec (atalaia/codec.h), as the
+  /// Android field controller reads a box's events: the event, or why the
+  /// codec refused the payload.
+  DecodedEvent decodeEvent(List<int> payload) {
+    const cap = 65536; // ATALAIA_CODEC_MAX_BYTES and the data JSON's NUL
+    final src = _nativeBytes(payload);
+    final ev = calloc<AtalaiaEvent>();
+    final data = calloc<Uint8>(cap);
+    final err = calloc<Pointer<Utf8>>();
+    try {
+      final ok = bindings.eventDecode(
+        src,
+        payload.length,
+        ev,
+        data.cast(),
+        cap,
+        err,
+      );
+      if (!ok) {
+        return DecodedEvent(
+          null,
+          err.value == nullptr ? 'refused' : err.value.toDartString(),
+        );
+      }
+      final e = ev.ref;
+      return DecodedEvent(
+        EmittedEvent(
+          node: e.node,
+          seq: e.seq,
+          tMs: e.tMs,
+          team: e.team,
+          squad: e.squad,
+          prio: e.prio,
+          type: fixedString(e.type, eventTypeMax),
+          dataJson: data.cast<Utf8>().toDartString(),
+        ),
+      );
+    } finally {
+      calloc
+        ..free(src)
+        ..free(ev)
+        ..free(data)
+        ..free(err);
     }
   }
 }
