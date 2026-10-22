@@ -232,7 +232,7 @@
   },
   "georef": {
     "title": "Posição no mapa (ATAK)",
-    "intro": "Dá a latitude e a longitude a dois cantos opostos da imagem do campo, copiadas de uma app de mapas como \"latitude, longitude\". A imagem tem de ter o norte em cima. O feed ATAK usa-as para pôr as caixas num mapa; uma imagem nova apaga-as.",
+    "intro": "Dá a latitude e a longitude a dois cantos opostos da imagem do campo, copiadas de uma app de mapas como \"latitude, longitude\": quaisquer dois (superior esquerdo e inferior direito, ou inferior esquerdo e superior direito); a consola vê qual é qual. A imagem tem de ter o norte em cima.",
     "top_left": "Canto superior esquerdo",
     "top_right": "Canto superior direito",
     "bottom_right": "Canto inferior direito",
@@ -246,7 +246,9 @@
     "saved": "Posição no mapa guardada.",
     "privacy": "O feed ATAK envia as caixas e a zona de extração a quem estiver no Wi-Fi do campo; as posições de quem joga nunca vão para lá, só para os dispositivos da organização definidos no controller.toml.",
     "atak_off": "Feed ATAK: desligado (controller.toml, [atak] enabled = false).",
-    "atak_on": "Feed ATAK: ligado, {markers} marcadores no mapa, {sent} mensagens enviadas."
+    "atak_on": "Feed ATAK: ligado, {markers} marcadores no mapa, {sent} mensagens enviadas.",
+    "corner_a": "Um canto",
+    "corner_b": "O canto oposto"
   },
   "levels": {
     "toggle": "Edifício com vários pisos",

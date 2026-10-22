@@ -1310,7 +1310,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("georef-top_left-input").fill("38.7240")
         page.get_by_test_id("georef-bottom_right-input").fill("38.7200, -9.1360")
         page.get_by_test_id("georef-save").click()
-        expect(page.get_by_test_id("georef-error")).to_contain_text("Canto superior esquerdo")
+        expect(page.get_by_test_id("georef-error")).to_contain_text("Um canto")
         self.assertIsNone(self.field.http.get("/api/v1/field/georef").json()["georef"])
         # Pasted from a map app.
         page.get_by_test_id("georef-top_left-input").fill("38.7240, -9.1420")
@@ -1335,6 +1335,16 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("georef-none")).to_be_visible()
         expect(other.get_by_test_id("georef-none")).to_be_visible()
         self.assertIsNone(self.field.http.get("/api/v1/field/georef").json()["georef"])
+        # Any two opposite corners (GR-1, the maintainer's bench values): a south-west corner and a
+        # north-east one are put at the bottom-left and top-right of the image, not mirrored.
+        page.get_by_test_id("georef-top_left-input").fill("38.804476, -9.132643")
+        page.get_by_test_id("georef-bottom_right-input").fill("38.804629, -9.132399")
+        page.get_by_test_id("georef-save").click()
+        expect(page.get_by_test_id("georef-top_right")).to_have_text("38.804629, -9.132399")
+        expect(page.get_by_test_id("georef-error")).to_have_count(0)
+        got = self.field.http.get("/api/v1/field/georef").json()["georef"]
+        self.assertEqual(got["points"], [{"x": 0, "y": 1, "lat": 38.804476, "lon": -9.132643},
+                                         {"x": 1, "y": 0, "lat": 38.804629, "lon": -9.132399}])
         self.no_horizontal_scroll(page)
 
     def test_field_levels_a_plan_per_level(self):

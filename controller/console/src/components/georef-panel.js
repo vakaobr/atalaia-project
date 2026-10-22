@@ -3,8 +3,11 @@
 //
 // The field image's place on the map (ADR-P4-7 as amended, decision P4R18):
 // Field Boxes have no GPS, so the ATAK feed puts them on a map through the
-// image. The GM gives two opposite corners of the (north-up) image their
-// latitude and longitude, pasted from a map app as "latitude, longitude",
+// image. The GM gives any two opposite corners of the (north-up) image their
+// latitude and longitude, pasted from a map app as "latitude, longitude"; the
+// page works out which is at the top (the northern one) and on the left (the
+// western one), so a south-west and a north-east corner work as well as the
+// top-left and bottom-right ones (found on the bench, 2026-10-22, GR-1),
 // saved with PUT /api/v1/field/georef; the controller answers with the four
 // corners it worked out, shown back here and as pins on the image. With the
 // API, 3-8 control points also work (a rotated image); the panel then shows
@@ -18,8 +21,18 @@ import { html, Component, t, ConfirmButton } from '../ui.js';
 
 const LATLON = /^\s*([+-]?\d{1,2}(?:\.\d+)?)\s*[,;]\s*([+-]?\d{1,3}(?:\.\d+)?)\s*$/;
 const CORNERS = ['top_left', 'top_right', 'bottom_right', 'bottom_left'];
-// The two corners the GM gives, as image positions (x across, y down).
-const GIVEN = { top_left: { x: 0, y: 0 }, bottom_right: { x: 1, y: 1 } };
+// The two corners the GM gives (the field names are kept from when they had to be the
+// top-left and bottom-right ones); their image positions follow from their coordinates.
+const GIVEN = { top_left: 'corner_a', bottom_right: 'corner_b' };
+
+/** Two opposite corners, as control points: the northern one at the top (y 0), the western
+ * one on the left (x 0), as on a north-up image. Two points level in latitude or longitude
+ * are left for the controller to refuse. */
+export function orientCorners(a, b) {
+    const ya = a.lat >= b.lat ? 0 : 1;
+    const xa = a.lon <= b.lon ? 0 : 1;
+    return [{ x: xa, y: ya, ...a }, { x: 1 - xa, y: 1 - ya, ...b }];
+}
 
 /** "latitude, longitude" as {lat, lon}, or null. */
 export function parseLatLon(text) {
@@ -38,13 +51,10 @@ export function formatLatLon(p) {
 /** The GM's two corners, when the georeference is exactly those (else null). */
 function givenCorners(georef) {
     if (!georef || georef.kind !== 'corners' || georef.points.length !== 2) return null;
-    const out = {};
-    for (const [name, at] of Object.entries(GIVEN)) {
-        const p = georef.points.find((q) => q.x === at.x && q.y === at.y);
-        if (!p) return null;
-        out[name] = formatLatLon(p);
-    }
-    return out;
+    const [a, b] = georef.points;
+    const corner = (q) => (q.x === 0 || q.x === 1) && (q.y === 0 || q.y === 1);
+    if (!corner(a) || !corner(b) || a.x === b.x || a.y === b.y) return null;
+    return { top_left: formatLatLon(a), bottom_right: formatLatLon(b) };
 }
 
 /** Pins on the field image where the georeference's control points are. */
@@ -94,15 +104,16 @@ export class GeorefPanel extends Component {
     async save(e) {
         e.preventDefault();
         const v = this.values();
-        const points = [];
-        for (const name of Object.keys(GIVEN)) {
+        const given = [];
+        for (const [name, label] of Object.entries(GIVEN)) {
             const p = parseLatLon(v[name]);
             if (!p) {
-                this.setState({ error: t('georef.bad_point', { corner: t(`georef.${name}`) }), saved: false });
+                this.setState({ error: t('georef.bad_point', { corner: t(`georef.${label}`) }), saved: false });
                 return;
             }
-            points.push({ ...GIVEN[name], ...p });
+            given.push(p);
         }
+        const points = orientCorners(given[0], given[1]);
         const out = await this.props.app.call('PUT', this.path(), { points });
         if (out) {
             this.setState({ edit: null, error: '', saved: true });
@@ -147,8 +158,8 @@ export class GeorefPanel extends Component {
                 n: georef.points.length, residual: georef.residual_m })}</p>`}`
             : html`<p class="muted" data-testid="georef-none">${t('georef.none')}</p>`}
             ${gm && html`<form class="form" onSubmit=${(e) => this.save(e)} data-testid="georef-form" novalidate>
-                ${Object.keys(GIVEN).map((name) => html`<div class="field">
-                    <label for=${`georef-${name}-in`}>${t(`georef.${name}`)}</label>
+                ${Object.entries(GIVEN).map(([name, label]) => html`<div class="field">
+                    <label for=${`georef-${name}-in`}>${t(`georef.${label}`)}</label>
                     <input id=${`georef-${name}-in`} data-testid=${`georef-${name}-input`} inputmode="decimal"
                         autocomplete="off" placeholder=${t('georef.placeholder')} value=${v[name]}
                         onInput=${(e) => this.set(name, e.target.value)} /></div>`)}

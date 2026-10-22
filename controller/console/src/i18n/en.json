@@ -232,7 +232,7 @@
   },
   "georef": {
     "title": "Map position (ATAK)",
-    "intro": "Give two opposite corners of the field image their latitude and longitude, copied from a map app as \"latitude, longitude\". The image must have north at the top. The ATAK feed uses them to put the boxes on a map; a new image clears them.",
+    "intro": "Give two opposite corners of the field image their latitude and longitude, copied from a map app as \"latitude, longitude\": any two (top-left and bottom-right, or bottom-left and top-right); the console works out which is which. The image must have north at the top.",
     "top_left": "Top-left corner",
     "top_right": "Top-right corner",
     "bottom_right": "Bottom-right corner",
@@ -246,7 +246,9 @@
     "saved": "Map position saved.",
     "privacy": "The ATAK feed sends the boxes and the extraction zone to anyone on the field Wi-Fi; player positions never go there, only to the staff devices set in controller.toml.",
     "atak_off": "ATAK feed: off (controller.toml, [atak] enabled = false).",
-    "atak_on": "ATAK feed: on, {markers} markers on the map, {sent} messages sent."
+    "atak_on": "ATAK feed: on, {markers} markers on the map, {sent} messages sent.",
+    "corner_a": "A corner",
+    "corner_b": "The opposite corner"
   },
   "levels": {
     "toggle": "Multi-story building",
