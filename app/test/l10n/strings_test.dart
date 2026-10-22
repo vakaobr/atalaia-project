@@ -61,6 +61,7 @@ void main() {
       'player.respawn',
       'gm.message',
       'battery.low',
+      'chrono.violation', // an event the phone controller logs (slice S5)
       'settings.json', // the controller store's file (controller_store.dart)
     });
     expect(used.length, greaterThan(150));

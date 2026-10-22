@@ -16,12 +16,18 @@ steps (``ws_*``, ``ws``) use the TestClient's WebSocket sessions, all on the
 one event loop of the entered TestClient; ``mqtt`` steps read what the MQTT
 bridge (mqtt.py) published to a recording client; the ``mqtt_acl`` checks
 run against the Mosquitto ACL the Pi installs (controller/deploy/atalaia.acl).
+Field check-in and player positions (slice S5) are set up on every controller
+as main.py sets them up, with HTTPS off (no field CA), the wall clock at the
+vectors' ``wall_start`` moving with the clock and the field's day in UTC;
+request and ``ws_connect`` steps may give a player token (``bearer``), and
+``ws_closed`` reads a connection to its end.
 """
 
 from __future__ import annotations
 
 import base64
 import contextlib
+import datetime
 import json
 import re
 import tempfile
@@ -36,7 +42,9 @@ from starlette.websockets import WebSocketDisconnect
 
 from support import CORE, FakeModem, config
 from atalaia_controller.api import Auth, create_app
+from atalaia_controller.checkin import Checkin
 from atalaia_controller.engine import Controller
+from atalaia_controller.positions import Positions
 from atalaia_controller import prop_link
 from atalaia_controller.mqtt import MqttBridge
 from atalaia_controller.prop_link import PropLinks
@@ -210,6 +218,11 @@ class ContractCase(unittest.TestCase):
             env.hub.max_queue = env.case["stream_max_queue"]
         MqttBridge(env.cfg, env.ctrl).client = env.mqtt  # type: ignore[assignment]
         PropLinks(env.ctrl)  # WS /api/v1/prop
+        wall = lambda: VECTORS["wall_start"] + now[0]  # noqa: E731
+        svc = Checkin(env.ctrl)  # no field CA: HTTPS off, as on the phone until its slice S6
+        svc._wall = wall
+        svc._tz = datetime.timezone.utc
+        Positions(env.ctrl, wall=wall)
         # Entered, so that every WebSocket session runs on one event loop with the hub.
         env.client = env.stack.enter_context(
             TestClient(create_app(env.ctrl, env.hub, Auth(env.cfg.gm_token, env.cfg.read_token))))
@@ -280,6 +293,19 @@ class ContractCase(unittest.TestCase):
             got = self.until_sentinel(env.sockets[step["ws"]], env)
             self.check(step["messages"], got, f"stream {step['ws']}", env)
             return
+        if "ws_closed" in step:
+            # Every message until the controller closes the connection.
+            ws = env.sockets.pop(step["ws_closed"])
+            got = []
+            with self.assertRaises(WebSocketDisconnect) as ctx:
+                while True:
+                    m = ws.receive_json()
+                    if m.get("type") == "pong" and "sentinel" in m:
+                        continue  # the markers of earlier looks at other connections
+                    got.append(m)
+            self.check(step["messages"], got, f"stream {step['ws_closed']}", env)
+            self.assertEqual(ctx.exception.code, step["close"])
+            return
         if "ws_send" in step:
             ws = env.sockets[step["ws_send"]]
             ws.send_json(step["json"])
@@ -346,7 +372,9 @@ class ContractCase(unittest.TestCase):
         req = substitute(step["request"], env.saved)
         headers = {}
         token = req.get("token", "none")
-        if token == "bad":
+        if "bearer" in req:
+            headers["Authorization"] = f"Bearer {req['bearer']}"
+        elif token == "bad":
             headers["Authorization"] = "Bearer not-a-token"
         elif token != "none":
             headers["Authorization"] = f"Bearer {VECTORS['tokens'][token]}"
@@ -392,6 +420,8 @@ class ContractCase(unittest.TestCase):
     def ws_connect(self, step: dict[str, Any], env: SimpleNamespace) -> None:
         token = step.get("token", "none")
         secret = "not-a-token" if token == "bad" else VECTORS["tokens"].get(token)
+        if "bearer" in step:
+            secret = substitute(step["bearer"], env.saved)
         path, headers = "/api/v1/stream", {}
         if secret is not None and step.get("via", "query") == "header":
             headers["Authorization"] = f"Bearer {secret}"

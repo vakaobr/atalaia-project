@@ -5,9 +5,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 3 -- Android and Players: Status
 
-**Current phase:** Implementation: plan phases A-D and F done in software; plan phase E done in software except the Android controller role's shell (PE24: slices S1, the game engine and REST API, S2, the live stream and MQTT, S3, keeping games across a restart, and S4, the pod as its radio, joins and Wi-Fi props, done 2026-10-22; S5-S7 to do); plan phase G (integration and field test) pending, it needs the hardware
+**Current phase:** Implementation: plan phases A-D and F done in software; plan phase E done in software except the Android controller role's shell (PE24: slices S1, the game engine and REST API, S2, the live stream and MQTT, S3, keeping games across a restart, S4, the pod as its radio, joins and Wi-Fi props, and S5, check-in, player tokens, positions and the chrono list, done 2026-10-22; S6-S7 to do); plan phase G (integration and field test) pending, it needs the hardware
 **Risk level:** Medium
-**Last verified:** 2026-10-22 (PE24 slice S4)
+**Last verified:** 2026-10-22 (PE24 slice S5)
 
 ## Completed
 
@@ -186,7 +186,7 @@ tools/docker_app.py` (Dart, NDK, APK) and `app\tool\emulator_tests.ps1`
 | Prop on Wi-Fi (PD12) | `protocol/prop-link.md`, `controller/atalaia_controller/prop_link.py`, `app/lib/controller/prop_link.dart`, `prop_session.dart`; join keys 13 and 14 (RFC 0001 Amendment 4, proposed) | Done: HELLO, STATE, events with ACK and resend, commands and TIME, `node.tamper` |
 | Positions (ADR-P3-6) | `controller/atalaia_controller/positions.py`, `POST`/`GET /api/v1/positions`; `app/lib/position/position_reporter.dart`, `app/lib/platform/location.dart`, `LocationPlugin.kt`, the foreground service's location type | Done for GPS; BLE beacons not built |
 | Teams and squads (maintainer) | games' `squads` (0 = none), squad pickers and the squad-leader role only where a game has squads (PE25) | Done in the controller, the console and the app |
-| Android controller role (ADR-P3-12) | `app/lib/controller/mqtt_broker.dart`, `visibility_engine.dart`; since 2026-10-22 `field_controller.dart`, `controller_engine.dart`, `controller_store.dart`, `controller_api.dart`, `controller_stream.dart`, `controller_mqtt.dart` | **Partly**: the broker and the visibility engine are built and tested; slices S1 and S2 of PE24 (2026-10-22, below): the game engine with `field.lua` on the core, the REST API for games, scores, the log and nodes, the live stream and the MQTT topics with the Pi's ACL; slice S3 (2026-10-22): games kept in files across a restart; slice S4 (2026-10-22): an I/O pod as its radio, joins, Android props on Wi-Fi; slices S5-S7 to do |
+| Android controller role (ADR-P3-12) | `app/lib/controller/mqtt_broker.dart`, `visibility_engine.dart`; since 2026-10-22 `field_controller.dart`, `controller_engine.dart`, `controller_store.dart`, `controller_api.dart`, `controller_stream.dart`, `controller_mqtt.dart` | **Partly**: the broker and the visibility engine are built and tested; slices S1 and S2 of PE24 (2026-10-22, below): the game engine with `field.lua` on the core, the REST API for games, scores, the log and nodes, the live stream and the MQTT topics with the Pi's ACL; slice S3 (2026-10-22): games kept in files across a restart; slice S4 (2026-10-22): an I/O pod as its radio, joins, Android props on Wi-Fi; slice S5 (2026-10-22, `controller_checkin.dart`, `controller_positions.dart`): field check-in, player tokens, the chrono list and positions; slices S6-S7 to do |
 
 Tests: controller 201 (60 new: check-in, chrono list with the shared
 vectors, poster vectors, positions, prop link, TLS); console browser tests
@@ -272,8 +272,28 @@ answers; the Pi's code is unchanged in S4), 16 new Dart tests (5 for the
 cases and the proof, 3 end to end, 4 for the pod modem, 2 for the app's prop
 client against the phone, 2 for the TX epochs).
 
-Remaining slices (`PLAN.md`, "PE24 slices"): **S5** check-in, player
-tokens, positions and the chrono list; **S6** the controller's shell and
+### Slice S5: check-in, player tokens, positions and the chrono list (2026-10-22)
+
+Decisions PE24-54 to PE24-60. Built and tested in software, on the loopback
+address only (PE24-7); the shell gives the notice texts, the limit template,
+and later the field CA and addresses (S6).
+
+| Deliverable | Where | State |
+| --- | --- | --- |
+| Field check-in | `app/lib/controller/controller_checkin.dart` (`ControllerCheckin`) | Done, as the Pi's `checkin.py`: `GET/POST /api/v1/checkin` (open games, no names; field identities with their secret's hash; the rate limits), `/checkin/token`, `/checkin/me` (read, leave, replicas, a marshal's key), the staff list, manual check-ins, the GM's changes and removals, the CSV, open and close, the settings and the poster (`https_off` until S6); the retention purge; the check-in and chrono-list messages to staff and to the player concerned (PE24-54) |
+| Player tokens | `controller_checkin.dart` (`resolve`), `controller_api.dart`, `controller_stream.dart` | Done: tokens signed with a key the phone makes per game (B8), checked against the check-in on every request (a stale token keeps the lesser role); player tokens on whoami, games, score, log and nodes, gm_only data for a game's staff; the player's stream with its own check-in and positions, 4409 after a change of team, squad or role |
+| The chrono list | `controller_checkin.dart` (`uploadReadings`, `chronoList`) | Done: Ed25519-signed series verified with the marshal's registered key (refusals by reason, nothing stored), judged against the class limits (pass, fail; spot checks pass, warn, fail), `chrono_valid_for`, "refused today", `player.checkin` and `chrono.*` events, `pending_declarations` on Start |
+| Positions | `app/lib/controller/controller_positions.dart`, `visibility_engine.dart` | Done, as the Pi's `positions.py`: reports checked, the level kept (ML-5), the visibility table and a team's temporary view (`visibility.granted`, `visibility.expired`), a VIP's GPS to `field.lua`, deleted when the game ends; listed by player id on both controllers (PE24-57) |
+| Keeping them | `controller_store.dart` (`document`, `putDocument`) | Done: the check-in's records and the positions as two documents of the store, in files with `FileControllerStore`, so they survive a restart (PE24-56) |
+| A fix in the Pi controller | `controller/atalaia_controller/checkin.py` (`set_poster`) | Done: the poster's fields are checked with HTTPS off too; a bad `game_id` closed check-in to every game without an error (PE24-58) |
+| Shared contract cases | `protocol/vectors/controller_api.json` (`wall_start`, `bearer`, `ws_closed`) | Done: the Pi runner sets up check-in and positions; 7 new cases (28 in all: the poster and tokens, declarations and the GM's changes, signed readings, the player stream, positions, a VIP's extraction in VIP / Payload, restarts), passing against both controllers (PE24-55) |
+
+Tests: 8 new controller tests (the 7 cases; the Pi unit test for PE24-58),
+13 new Dart tests (7 for the cases, 6 in `controller_checkin_test.dart`: the
+poster with a CA, the rate limit, the CSV, spot checks, erasing a player,
+retention).
+
+Remaining slices (`PLAN.md`, "PE24 slices"): **S6** the controller's shell and
 screens (controller isolate, foreground service, the GM console on the
 phone, HTTPS, the field's Wi-Fi); **S7** after the field test: failover,
 presets, mode uploads, scenarios, role packages, branding, the channel
@@ -285,7 +305,9 @@ stream, as on the Pi) and PE24-12 (the phone's MQTT passwords are the API
 tokens), PE24-42 (the fix in the Pi controller), PE24-44 (the game key at
 rest on a phone, in app-private storage) and PE24-52 (the channel choice
 moves to S7) are answered; PE24-51 (the host box built for the Dart tests)
-was accepted by the coordinator.
+was accepted by the coordinator; open for the maintainer: PE24-58 (the fix
+in the Pi controller's poster settings) and PE24-60 (players' personal data
+on a phone controller).
 
 ## Medic Kit (2026-10-19)
 
@@ -451,11 +473,12 @@ Phase G needs hardware.
 2. ~~Architecture~~ -- Complete
 3. ~~Planning~~ -- Complete
 4. Implementation -- plan phases A-F done in software (E without the
-   Android controller role's shell, PE24: its slices S1 to S4 done
+   Android controller role's shell, PE24: its slices S1 to S5 done
    2026-10-22), the Medic Kit and branding; next: plan phase G (the field
    test: the boards, the pods and real phones, with the Pi controller) and
-   the controller role's slices S5-S6 (S5 next: check-in, player tokens,
-   positions and the chrono list)
+   the controller role's slice S6 (the shell and its screens: the
+   controller isolate, the foreground service, the GM console on the phone,
+   HTTPS and the field's Wi-Fi)
 
 ## How to resume with implementation
 

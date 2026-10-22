@@ -13,7 +13,8 @@
 ///     spectator     nobody
 ///
 /// plus temporary grants (a UAV sweep): a team sees another team until the
-/// grant expires.
+/// grant expires. Since slice S5 of PE24 the phone controller's positions
+/// (controller_positions.dart) use it, one engine per game.
 library;
 
 final class Viewer {
@@ -90,7 +91,7 @@ class VisibilityEngine {
     if (v.role == 'vip' && sameTeam) return true;
     if (v.role == 'player' && sameSquad && squadVisible) return true;
     final exp = _grants[(v.team, p.team)];
-    return v.team != 0 && exp != null && exp.isAfter(_now());
+    return v.team != 0 && p.team != 0 && exp != null && exp.isAfter(_now());
   }
 
   List<PlayerPosition> visible(Viewer v, Iterable<PlayerPosition> all) => [

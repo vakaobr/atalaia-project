@@ -24,9 +24,15 @@
 /// pod_modem.dart: CONFIGURE, the controller's packets with a TX epoch per
 /// game key, what it hears, TX_ACKs, peer epochs), join payloads sealed with
 /// the field join key ([issueJoin]) and the Android props on Wi-Fi
-/// (controller_props.dart, through [wifiForward]). Not yet: check-in and
-/// player tokens (S5), presets, mode uploads, scenarios, role packages,
-/// branding, the channel choice and scans, re-invites, failover (S7).
+/// (controller_props.dart, through [wifiForward]). Slice S5: field check-in,
+/// player tokens and the chrono list ([checkin], controller_checkin.dart),
+/// player positions ([positions], controller_positions.dart), with the
+/// engine's hooks the Pi's engine has for them: the controller's own events
+/// ([logControllerEvent]), a VIP's position for field.lua
+/// ([fieldPosition]), the retention purge and the grants' expiry on [tick],
+/// positions deleted when a game ends. Not yet: presets, mode uploads,
+/// scenarios, role packages, branding, the channel choice and scans,
+/// re-invites, failover (S7).
 library;
 
 import 'dart:convert';
@@ -41,6 +47,8 @@ import '../modes/mode_catalog.dart';
 import '../protocol/join_payload.dart';
 import '../radio/rf_codec.dart';
 import '../security/ndef.dart';
+import 'controller_checkin.dart';
+import 'controller_positions.dart';
 import 'controller_radio.dart';
 import 'controller_store.dart';
 import 'field_controller.dart';
@@ -328,6 +336,13 @@ class ControllerEngine {
   Map<String, Map<String, int>> _fieldScores = {};
   final _listeners = <void Function(Map<String, Object?>)>[];
 
+  /// Field check-in (slice S5): set by [ControllerCheckin]'s constructor.
+  ControllerCheckin? checkin;
+
+  /// Player positions (slice S5): set by [ControllerPositions]'s
+  /// constructor.
+  ControllerPositions? positions;
+
   /// The live game came back after a restart without its key: it can only
   /// be ended (ADR-P2-4).
   bool _keyLost = false;
@@ -370,6 +385,45 @@ class ControllerEngine {
     for (final fn in List.of(_listeners)) {
       fn(msg);
     }
+  }
+
+  /// Sends [msg] to the live feed (the check-in and positions services;
+  /// keys starting with "_" are routing marks, controller_stream.dart).
+  void emit(Map<String, Object?> msg) => _emit(msg);
+
+  /// Logs an event of the controller's own (player.checkin, chrono.*,
+  /// visibility.expired) in [gameId] when it is the live game with its key,
+  /// as the Pi's `fc.controller_event`; false when it was not logged.
+  bool logControllerEvent(
+    int gameId,
+    String type,
+    Map<String, Object?> data, {
+    String? team,
+    String prio = 'normal',
+  }) {
+    final fc = _fc;
+    if (fc == null || _game == null || _game!['id'] != gameId) return false;
+    fc.controllerEvent(type, data, team, prio);
+    return true;
+  }
+
+  /// A VIP's position report for the game's field.lua, as the input
+  /// position.fix (decision P4R6; engine.py `field_position`). Only the
+  /// script gets it. True when the script got it (a running game).
+  bool fieldPosition(int gameId, Map<String, Object?> fix) {
+    final fc = _fc, field = _field, game = _game;
+    if (fc == null ||
+        field == null ||
+        game == null ||
+        game['id'] != gameId ||
+        fc.gameState != gameRunning) {
+      return false;
+    }
+    field
+      ..advance(fc.gameTimeMs)
+      ..input('position.fix', fix);
+    _afterField();
+    return true;
   }
 
   // --- games: what the API shows ------------------------------------------
@@ -983,6 +1037,7 @@ class ControllerEngine {
     store
       ..forgetGameKey(id) // the key does not outlive the game
       ..deleteSetting('key_tag:$id');
+    positions?.endGame(id); // ADR-P3-6: positions last as long as the game
     _setState(id, 'ended', {'ended_at': _wall()});
     _deactivate();
     return {...publicGame(store.game(id)!), 'game_over_frame': 'no_join_key'};
@@ -1400,9 +1455,11 @@ class ControllerEngine {
   /// Moves the controller on: the game clock, TIME beacons, node health,
   /// field.lua's timers, the game's time limit.
   void tick() {
+    checkin?.purge(); // retention (ADR-P3-13), at most every 10 minutes
     final fc = _fc;
     if (fc == null) return;
     fc.tick(nowMs());
+    positions?.tick();
     final field = _field;
     if (field != null && fc.gameState == gameRunning) {
       field.advance(fc.gameTimeMs);
@@ -1479,6 +1536,7 @@ class ControllerEngine {
     final id = game['id']! as int;
     if (!store.insertEvent(id, record)) return;
     _emit({'type': 'event', 'game': id, 'event': logRecord(record)});
+    positions?.onEvent(id, record);
     final field = _field;
     if (field != null &&
         record['node'] != nodeId &&

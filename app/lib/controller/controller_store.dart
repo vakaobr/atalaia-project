@@ -53,6 +53,14 @@ abstract interface class ControllerStore {
   String? getSetting(String key);
   void setSetting(String key, String value);
   void deleteSetting(String key);
+
+  /// A service's JSON document, or null when it was never stored (slice
+  /// S5: "checkin", the field check-in's records, and "positions", the
+  /// players' latest positions; decision PE24-56).
+  Object? document(String name);
+
+  /// Stores [value] (JSON data) as the document [name], replacing it whole.
+  void putDocument(String name, Object? value);
 }
 
 class MemoryControllerStore implements ControllerStore {
@@ -68,6 +76,7 @@ class MemoryControllerStore implements ControllerStore {
   final _scores = <int, Map<String, int>>{};
   final _nodes = <int, Map<int, Map<String, Object?>>>{};
   final _settings = <String, String>{};
+  final _documents = <String, Object?>{};
 
   static const _gameFields = {
     'state',
@@ -210,6 +219,13 @@ class MemoryControllerStore implements ControllerStore {
 
   @override
   void deleteSetting(String key) => _settings.remove(key);
+
+  @override
+  Object? document(String name) => _deep(_documents[name]);
+
+  @override
+  void putDocument(String name, Object? value) =>
+      _documents[name] = _deep(value);
 }
 
 /// The store's files are not in a form this app reads.
@@ -229,6 +245,8 @@ class ControllerStoreException implements Exception {
 ///     games/ID.events.jsonl  the event log, one JSON record per line
 ///     games/ID.scores.json   the totals per team
 ///     games/ID.nodes.json    the nodes heard, as the API lists them
+///     docs/NAME.json         a service's document (slice S5: the check-in's
+///                            records, the players' positions)
 ///
 /// Everything is read into memory when the store opens, and every change is
 /// written through before the call returns: a whole file is written to a
@@ -251,10 +269,12 @@ class FileControllerStore extends MemoryControllerStore {
   int unreadableLines = 0;
 
   Directory get _gamesDir => Directory('${directory.path}/games');
+  Directory get _docsDir => Directory('${directory.path}/docs');
   File _file(String name) => File('${directory.path}/$name');
   File _gameFile(int id, String suffix) => File('${_gamesDir.path}/$id$suffix');
 
   static final _gameFileName = RegExp(r'^(\d+)\.json$');
+  static final _docName = RegExp(r'^[a-z][a-z0-9_]{0,31}$');
 
   void _open() {
     _gamesDir.createSync(recursive: true);
@@ -272,6 +292,13 @@ class FileControllerStore extends MemoryControllerStore {
     final settings = _readJson(_file('settings.json'));
     if (settings is Map) {
       settings.forEach((k, v) => _settings['$k'] = '$v');
+    }
+    _docsDir.createSync(recursive: true);
+    for (final entity in _docsDir.listSync()) {
+      final name = entity.uri.pathSegments.last;
+      if (entity is! File || !name.endsWith('.json')) continue;
+      final doc = name.substring(0, name.length - 5);
+      if (_docName.hasMatch(doc)) _documents[doc] = _readJson(entity);
     }
     for (final entity in _gamesDir.listSync()) {
       final m = _gameFileName.firstMatch(entity.uri.pathSegments.last);
@@ -417,6 +444,13 @@ class FileControllerStore extends MemoryControllerStore {
     if (!_settings.containsKey(key)) return;
     super.deleteSetting(key);
     _writeJson(_file('settings.json'), _settings);
+  }
+
+  @override
+  void putDocument(String name, Object? value) {
+    if (!_docName.hasMatch(name)) throw ArgumentError('document name $name');
+    super.putDocument(name, value);
+    _writeJson(File('${_docsDir.path}/$name.json'), _documents[name]);
   }
 
   static Object? _readJson(File file) {

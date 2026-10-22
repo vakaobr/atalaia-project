@@ -11,7 +11,12 @@
 // the controller and opens a new one on it (slice S3). Stream steps connect real
 // WebSocket clients to WS /api/v1/stream on the loopback address; mqtt
 // steps read what the MQTT bridge (controller_mqtt.dart) published; the
-// mqtt_acl checks run against MqttAcl.field (mqtt_broker.dart).
+// mqtt_acl checks run against MqttAcl.field (mqtt_broker.dart). Field
+// check-in and player positions (slice S5) are set up on every controller
+// as the Pi runner sets them up: the portugal limit template, HTTPS off,
+// the wall clock at the vectors' wall_start moving with the clock, the
+// field's day in UTC; request and ws_connect steps may give a player token
+// ('bearer'), and ws_closed reads a connection to its end.
 
 import 'dart:async';
 import 'dart:collection';
@@ -20,7 +25,9 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:atalaia_app/controller/controller_api.dart';
+import 'package:atalaia_app/controller/controller_checkin.dart';
 import 'package:atalaia_app/controller/controller_engine.dart';
+import 'package:atalaia_app/controller/controller_positions.dart';
 import 'package:atalaia_app/controller/controller_mqtt.dart';
 import 'package:atalaia_app/controller/prop_link.dart' show propLinkProof;
 import 'package:atalaia_app/controller/controller_store.dart';
@@ -187,6 +194,10 @@ void main() {
   final vectors = loadVectors('controller_api.json');
   final tokens = (vectors['tokens'] as Map).cast<String, String>();
   final schema = EventSchema.load();
+  final wallStart = vectors['wall_start'] as int;
+  final limits = File(
+    'lib/chrono/limit_templates/portugal.yaml',
+  ).readAsStringSync();
   late AtalaiaCore core;
 
   setUpAll(() => core = AtalaiaCore.open(coreLibraryPath()));
@@ -265,7 +276,18 @@ void main() {
           core: core,
           modem: radio,
           clockMs: () => now,
+          wallSeconds: () => wallStart + now / 1000,
         )..joinKey = joinKey;
+        ControllerCheckin(
+          engine,
+          CheckinConfig(
+            limitsYaml: limits,
+            noticePt: 'Aviso: {operator}, {retention_days} dias.',
+            noticeEn: 'Notice: {operator}, {retention_days} days.',
+            utcDay: true,
+          ),
+        );
+        ControllerPositions(engine);
         api = ControllerApi(
           engine,
           gmToken: tokens['gm']!,
@@ -325,7 +347,9 @@ void main() {
 
       Future<void> wsConnect(Map<String, dynamic> step) async {
         final token = (step['token'] as String?) ?? 'none';
-        final secret = token == 'bad' ? 'not-a-token' : tokens[token];
+        final secret = step.containsKey('bearer')
+            ? substitute(step['bearer'], saved)! as String
+            : (token == 'bad' ? 'not-a-token' : tokens[token]);
         var url = 'ws://127.0.0.1:${server.port}/api/v1/stream';
         final headers = <String, Object>{};
         if (secret != null && step['via'] == 'header') {
@@ -414,6 +438,20 @@ void main() {
             final name = step['ws'] as String;
             final got = await untilSentinel(sockets[name]!);
             check(step['messages'], got, 'step $i: stream $name');
+            continue;
+          }
+          if (step.containsKey('ws_closed')) {
+            // Every message until the controller closes the connection.
+            final name = step['ws_closed'] as String;
+            final ws = sockets.remove(name)!;
+            final got = <Map<String, Object?>>[];
+            for (var m = await ws.next(); m != null; m = await ws.next()) {
+              // The markers of earlier looks at other connections.
+              if (m['type'] == 'pong' && m.containsKey('sentinel')) continue;
+              got.add(m);
+            }
+            check(step['messages'], got, 'step $i: stream $name');
+            expect(ws.socket.closeCode, step['close'], reason: 'step $i');
             continue;
           }
           if (step.containsKey('ws_send')) {
@@ -540,7 +578,9 @@ void main() {
             Uri.parse('http://127.0.0.1:${server.port}$path'),
           );
           final token = (req['token'] as String?) ?? 'none';
-          if (token == 'bad') {
+          if (req.containsKey('bearer')) {
+            request.headers.set('Authorization', 'Bearer ${req['bearer']}');
+          } else if (token == 'bad') {
             request.headers.set('Authorization', 'Bearer not-a-token');
           } else if (token != 'none') {
             request.headers.set('Authorization', 'Bearer ${tokens[token]}');

@@ -138,6 +138,23 @@ class PosterProblemTests(P3Case):
         p = self.poster()
         self.assertEqual((p["text"], p["problem_code"]), (None, "too_long"))
 
+    def test_fields_are_checked_with_https_off(self) -> None:
+        """Decision PE24-58: without the field CA the poster's fields were kept unchecked, so a
+        game_id of "x" closed check-in to every game ("for another game") without an error."""
+        self.svc.ca_sha256 = None
+        gm = {"Authorization": "Bearer gm-secret"}
+        for bad in ({"game_id": "x"}, {"game_id": 0}, {"field_name": " "}, {"wifi_ssid": "s" * 33},
+                    {"urls": ["http://10.0.0.1"]}):
+            with self.subTest(bad):
+                r = self.client.put("/api/v1/checkin/poster", json=bad, headers=gm)
+                self.assertEqual(r.status_code, 400, r.text)
+        self.assertIsNone(self.poster()["game_id"])
+        g = self.new_game()
+        r = self.client.put("/api/v1/checkin/poster", json={"game_id": g["id"], "wifi_ssid": "Campo"}, headers=gm)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual((r.json()["game_id"], r.json()["problem_code"]), (g["id"], "https_off"))
+        self.check_in(g["id"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1270,8 +1270,9 @@ class Store:
                    (game_id, player_id, json.dumps(report), now))
 
     def player_positions(self, game_id: int) -> dict[str, dict[str, Any]]:
-        rows = self._exec("SELECT player_id, report_json FROM player_positions WHERE game_id = ?",
-                          (game_id,)).fetchall()
+        # By player id: the order the API gives them in, on the phone controller too (PE24-57).
+        rows = self._exec("SELECT player_id, report_json FROM player_positions WHERE game_id = ? "
+                          "ORDER BY player_id", (game_id,)).fetchall()
         return {r["player_id"]: json.loads(r["report_json"]) for r in rows}
 
     def delete_player_positions(self, game_id: int) -> int:

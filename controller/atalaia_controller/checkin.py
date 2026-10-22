@@ -380,14 +380,17 @@ class Checkin:
             trial["wifi_ssid"] = None
         if not trial.get("urls"):
             trial["urls"] = self.cfg.checkin_urls or self.default_urls
-        if trial["ca_sha256"] is not None:
-            # No address yet (a container without [api] tls_names, OT-10): the rest is still checked
-            # and kept; GET says what is missing (problem_code no_address).
-            checked = trial if trial.get("urls") else {**trial, "urls": ["https://a.invalid"]}
-            try:
-                posterfmt.encode(checked)
-            except posterfmt.PosterError as exc:
-                raise ControllerError(str(exc)) from None
+        # No address yet (a container without [api] tls_names, OT-10) or no field CA (HTTPS off): the
+        # rest is still checked and kept, with a placeholder for what is missing; GET says what is
+        # missing (problem_code no_address, https_off). Unchecked, a bad game_id was kept and every
+        # check-in then refused as "for another game" (decision PE24-58).
+        checked = trial if trial.get("urls") else {**trial, "urls": ["https://a.invalid"]}
+        if checked["ca_sha256"] is None:
+            checked = {**checked, "ca_sha256": bytes(32)}
+        try:
+            posterfmt.encode(checked)
+        except posterfmt.PosterError as exc:
+            raise ControllerError(str(exc)) from None
         saved = {k: trial.get(k) for k in ("urls", "wifi_ssid", "game_id", "field_name")}
         if "urls" not in spec:
             saved.pop("urls")

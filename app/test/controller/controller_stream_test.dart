@@ -5,6 +5,7 @@
 // shared contract cases: messages marked for staff, the routing marks that
 // never leave the controller, and the hub without clients.
 
+import 'package:atalaia_app/controller/controller_checkin.dart';
 import 'package:atalaia_app/controller/controller_engine.dart';
 import 'package:atalaia_app/controller/controller_stream.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,20 +29,23 @@ void main() {
       '_player': 'p1',
       'checkin': {'name': 'A Person'},
     };
-    expect(hub.route('read', msg), isNull);
-    expect(hub.route('gm', msg), {
+    expect(hub.route(ApiViewer.read, msg), isNull);
+    expect(hub.route(ApiViewer.gm, msg), {
       'type': 'checkin',
       'game': 3,
       'checkin': {'name': 'A Person'},
     });
   });
 
-  test('positions wait for player tokens (slice S5)', () {
+  test('positions need the positions service (slice S5)', () {
     expect(
-      hub.route('gm', {'type': 'player_position', '_position': true}),
+      hub.route(ApiViewer.gm, {'type': 'player_position', '_position': true}),
       isNull,
     );
-    expect(hub.route('gm', {'type': 'x', '_positions_refresh': true}), isNull);
+    expect(
+      hub.route(ApiViewer.gm, {'type': 'x', '_positions_refresh': true}),
+      isNull,
+    );
   });
 
   test('gm_only event data and game parameters: GM token only', () {
@@ -53,8 +57,8 @@ void main() {
         'data': {'puzzle': 'code', 'code': '1234'},
       },
     };
-    expect(hub.route('gm', ev)!['event'], ev['event']);
-    expect((hub.route('read', ev)!['event']! as Map)['data'], {
+    expect(hub.route(ApiViewer.gm, ev)!['event'], ev['event']);
+    expect((hub.route(ApiViewer.read, ev)!['event']! as Map)['data'], {
       'puzzle': 'code',
     });
     final game = engine.createGame({
@@ -62,9 +66,12 @@ void main() {
       'mode_id': 'org.atalaia.hacking_terminal',
       'params': {'reveal_code': '1234'},
     });
-    final out = hub.route('read', {'type': 'game', 'game': game})!;
+    final out = hub.route(ApiViewer.read, {'type': 'game', 'game': game})!;
     expect((out['game']! as Map)['params'], isNot(contains('reveal_code')));
-    expect(hub.route('gm', {'type': 'game', 'game': game})!['game'], game);
+    expect(
+      hub.route(ApiViewer.gm, {'type': 'game', 'game': game})!['game'],
+      game,
+    );
   });
 
   test('publishing with no client connected does nothing', () {
@@ -74,7 +81,7 @@ void main() {
   });
 
   test('the hello without a live game', () {
-    expect(hub.snapshot('read'), {
+    expect(hub.snapshot(ApiViewer.read), {
       'type': 'hello',
       'game': null,
       'score': null,

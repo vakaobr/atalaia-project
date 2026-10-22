@@ -195,6 +195,13 @@ CheckinPoster decodePoster(List<int> data) {
   return _validate(p);
 }
 
+/// [encodePoster] of a poster's fields as a map (the controller's poster
+/// settings: `field_id`, `field_name`, `urls`, `ca_sha256`, `wifi_ssid`,
+/// `game_id`), checked as the decoder checks them; throws
+/// [PosterException].
+Uint8List encodePosterFields(Map<String, Object?> fields) =>
+    encodePoster(_validate(fields));
+
 /// The version byte and the body, keys in order, shortest form.
 Uint8List encodePoster(CheckinPoster poster) {
   final v = _validate({

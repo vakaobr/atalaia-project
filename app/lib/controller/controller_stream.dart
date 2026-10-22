@@ -7,18 +7,27 @@
 /// and `make_route`) with the same messages, order and filtering, checked by
 /// the shared contract cases (protocol/vectors/controller_api.json).
 ///
-/// A client connects with the GM token or the read token (`?token=` or
-/// `Authorization: Bearer`); any other token is closed with 4401. Its first
-/// message is the hello snapshot: the live game, its score, its nodes, its
-/// latest 100 events and the controller's state, so a client that connects
-/// mid-game shows what already happened. Then every message the engine
-/// emits (game, event, score, node, system, field_state), in the engine's
-/// order. `{"type": "ping"}` is answered with `{"type": "pong"}`.
+/// A client connects with the GM token, the read token or a player token
+/// (slice S5; `?token=` or `Authorization: Bearer`); any other token is
+/// closed with 4401. Its first message is the hello snapshot: the live
+/// game, its score, its nodes, its latest 100 events and the controller's
+/// state, so a client that connects mid-game shows what already happened; a
+/// player's hello has only the live game's id as its state, and its own
+/// check-in (`me`) and the positions it may see. Then every message the
+/// engine emits (game, event, score, node, system, field_state, check-in
+/// and positions), in the engine's order. `{"type": "ping"}` is answered
+/// with `{"type": "pong"}`.
 ///
-/// Filtering (decisions M5-1, PE6): the read token gets games without their
-/// gm_only parameters and events without their gm_only data; messages
-/// marked for staff (`_staff`, `_player`: check-in, from slice S5) reach the
-/// GM token only; keys starting with "_" never leave the controller.
+/// Filtering (decisions M5-1, PE6; api.py `make_route`): players and the
+/// read token get games without their gm_only parameters and events without
+/// their gm_only data; messages marked for staff (`_staff`, `_player`:
+/// check-in and the chrono list, with names) reach staff (the GM token, a
+/// marshal's or gm's token of that game) and, for their own row, the
+/// player, whose connection is closed with 4409 after a change of team,
+/// squad or role (`_assignment`: fetch a new token); a player position
+/// reaches those who may see it (controller_positions.dart); a player's
+/// connection gets nothing of the radio or the controller's internals. Keys
+/// starting with "_" never leave the controller.
 ///
 /// A client more than [StreamHub.maxQueue] messages behind is closed with
 /// 4408 rather than slowing everyone down; it reconnects and its new hello
@@ -34,6 +43,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'controller_checkin.dart';
 import 'controller_engine.dart';
 
 /// How many of a game's latest events the hello carries (api.py HELLO_EVENTS).
@@ -51,6 +61,25 @@ const _helloEventKeys = [
   'data',
 ];
 
+/// What a player-token connection is sent (besides its own check-in
+/// messages): ws.py's PLAYER_TYPES.
+const playerTypes = {
+  'hello',
+  'game',
+  'score',
+  'node',
+  'event',
+  'field_state',
+  'positions',
+  'player_position',
+  'checkin',
+  'chrono_list',
+  'checkin_open',
+  'pong',
+  'branding',
+  'map_features',
+};
+
 /// A message without its routing marks (keys starting with "_").
 Map<String, Object?> publicMessage(Map<String, Object?> msg) => {
   for (final e in msg.entries)
@@ -58,13 +87,14 @@ Map<String, Object?> publicMessage(Map<String, Object?> msg) => {
 };
 
 final class _Client {
-  _Client(this.socket, this.role);
+  _Client(this.socket, this.viewer);
 
   final WebSocket socket;
 
-  /// "gm" or "read" (player tokens: slice S5).
-  final String role;
+  /// Whose connection it is: the GM token, the read token or a player.
+  final ApiViewer viewer;
   final pending = Queue<Map<String, Object?>>();
+  int? closeWith;
   var scheduled = false;
   var closed = false;
 }
@@ -84,32 +114,63 @@ class StreamHub {
 
   int get clientCount => _clients.length;
 
-  /// What [role] gets of [msg], or null (api.py `make_route`).
-  Map<String, Object?>? route(String role, Map<String, Object?> msg) {
-    final staff = role == 'gm';
+  /// What [v] gets of [msg], or null (api.py `make_route`).
+  Map<String, Object?>? route(ApiViewer v, Map<String, Object?> msg) {
     if (msg['_staff'] == true || msg.containsKey('_player')) {
-      return staff ? publicMessage(msg) : null;
+      final game = msg['game'];
+      final staff = v.isStaff && (v.kind != 'player' || v.gameId == game);
+      final own = _own(v, msg);
+      return staff || own ? publicMessage(msg) : null;
     }
-    if (msg['_position'] == true || msg['_positions_refresh'] == true) {
-      return null; // player positions: slice S5
+    if (msg['_position'] == true) {
+      final pos = engine.positions;
+      final p = msg['position'];
+      return pos != null && p is Map<String, Object?> && pos.canSee(v, p)
+          ? publicMessage(msg)
+          : null;
     }
+    if (msg['_positions_refresh'] == true) {
+      final pos = engine.positions;
+      if (pos == null || v.kind == 'read') return null;
+      return {
+        'type': 'positions',
+        'game': msg['game'],
+        'positions': pos.visible(v, msg['game'] as int?),
+      };
+    }
+    if (v.kind == 'player' && !playerTypes.contains(msg['type'])) return null;
     final out = publicMessage(msg);
-    if (staff) return out;
     final ev = out['event'];
     final game = out['game'];
-    if (out['type'] == 'event' && ev is Map<String, Object?>) {
+    if (out['type'] == 'event' &&
+        ev is Map<String, Object?> &&
+        !v.isStaffOf(out['game'] as int?)) {
       out['event'] = publicEvent(ev);
-    } else if (out['type'] == 'game' && game is Map<String, Object?>) {
+    } else if (out['type'] == 'game' &&
+        game is Map<String, Object?> &&
+        !v.isStaffOf(game['id'] as int?)) {
       out['game'] = engine.playersGame(game);
     }
     return out;
   }
 
+  /// A message about [v]'s own check-in.
+  static bool _own(ApiViewer v, Map<String, Object?> msg) =>
+      v.kind == 'player' &&
+      v.playerId != null &&
+      v.playerId == msg['_player'] &&
+      v.gameId == msg['game'];
+
+  /// After [msg], [v]'s connection is closed with 4409: the GM changed the
+  /// player's team, squad or role, and the app fetches a new token.
+  static bool closesAfter(ApiViewer v, Map<String, Object?> msg) =>
+      msg['_assignment'] == true && _own(v, msg);
+
   /// The first message of a connection (api.py `_snapshot`).
-  Map<String, Object?> snapshot(String role) {
-    final staff = role == 'gm';
+  Map<String, Object?> snapshot(ApiViewer viewer) {
     final status = engine.status();
     final gameId = status['live_game'] as int?;
+    final staff = viewer.isStaffOf(gameId);
     var events = <Map<String, Object?>>[];
     Map<String, Object?>? game;
     if (gameId != null) {
@@ -122,21 +183,27 @@ class StreamHub {
       game = engine.getGame(gameId);
       if (!staff) game = engine.playersGame(game);
     }
-    return {
+    final out = <String, Object?>{
       'type': 'hello',
       'game': game,
       'score': gameId == null ? null : engine.score(gameId),
       'nodes': gameId == null ? const <Object?>[] : engine.nodes(gameId),
       'events': events,
-      'status': status,
     };
+    if (viewer.kind != 'player') return out..['status'] = status;
+    out['status'] = {'live_game': gameId};
+    final me = engine.checkin?.me(viewer, forHello: true);
+    if (me != null) out['me'] = me;
+    final pos = engine.positions;
+    if (pos != null) out['positions'] = pos.visible(viewer);
+    return out;
   }
 
-  /// Takes an accepted connection for [role] ("gm" or "read"): sends the
-  /// hello and follows the feed until either side closes.
-  void connect(WebSocket socket, String role) {
-    final c = _Client(socket, role);
-    socket.add(jsonEncode(snapshot(role)));
+  /// Takes an accepted connection for [viewer]: sends the hello and follows
+  /// the feed until either side closes.
+  void connect(WebSocket socket, ApiViewer viewer) {
+    final c = _Client(socket, viewer);
+    socket.add(jsonEncode(snapshot(viewer)));
     _clients.add(c);
     socket.listen(
       (data) {
@@ -167,9 +234,10 @@ class StreamHub {
   /// listener).
   void publish(Map<String, Object?> msg) {
     for (final c in List.of(_clients)) {
+      if (c.closeWith != null) continue;
       final Map<String, Object?>? out;
       try {
-        out = route(c.role, msg);
+        out = route(c.viewer, msg);
       } on Object {
         continue; // a routing bug must not stop the feed for everyone
       }
@@ -181,6 +249,7 @@ class StreamHub {
         continue;
       }
       c.pending.add(out);
+      if (closesAfter(c.viewer, msg)) c.closeWith = 4409;
       if (!c.scheduled) {
         c.scheduled = true;
         Timer.run(() => _send(c));
@@ -192,6 +261,11 @@ class StreamHub {
     c.scheduled = false;
     while (c.pending.isNotEmpty && !c.closed) {
       c.socket.add(jsonEncode(c.pending.removeFirst()));
+    }
+    final code = c.closeWith;
+    if (code != null && !c.closed) {
+      _remove(c);
+      unawaited(c.socket.close(code)); // e.g. 4409: fetch a new token
     }
   }
 
