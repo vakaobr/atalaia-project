@@ -704,8 +704,9 @@ roadmap:
     short: >-
       Visual mode editor complete in software, tested live in the simulator; signed mode packages, a
       sandbox-escape battery in CI, the field controller installing signed modes, boxes getting the
-      signed modes they lack from the GM console, and scenarios built from blocks in the console.
-      Next: the registry, translations.
+      signed modes they lack from the GM console, scenarios built from blocks in the console, and
+      the mode registry ready as a template, with its checks and the verified badge. Next: creating
+      the registry, translations.
     text: >-
       Visual mode editor, mode registry, carrier PCB (a ready-made circuit board that makes builds
       easier), translations, build guides for other node types. Built in software: the visual mode
@@ -725,8 +726,13 @@ roadmap:
       not yet on a real box). Scenarios can now be built from blocks in the GM console too: the
       boxes, the objectives and who sees them, when they open, what completes them and what they
       give, by mouse, touch or keyboard, in Portuguese and English, even on a phone; the field
-      controller checks and installs them exactly as if they had been written by hand. Next: the
-      registry; German and Traditional Chinese; the carrier PCB after the first built boxes.
+      controller checks and installs them exactly as if they had been written by hand. The registry
+      where authors share their modes is ready as a template: a pull request with a signed mode is
+      checked automatically (its signature, that its source is what was signed, its licence, its
+      tests in the simulator), and a mode the project has reviewed gets the verified badge, the
+      project's own signature, which is what lets it reach the boxes. How to submit a mode, the
+      review checklist, keys and moderation are written down. Next: creating the registry from its
+      template; German and Traditional Chinese; the carrier PCB after the first built boxes.
     gate: Ongoing after the first release.
 
 hub:

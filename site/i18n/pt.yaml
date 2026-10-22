@@ -736,8 +736,9 @@ roadmap:
     short: >-
       Editor visual de modos completo em software, testado ao vivo no simulador; pacotes de modos
       assinados, uma bateria de testes de fuga ao sandbox na CI, o controlador de campo a instalar
-      modos assinados, as caixas a receber da consola de GM os modos assinados que lhes faltam, e
-      cenários montados com blocos na consola. A seguir: o registo, traduções.
+      modos assinados, as caixas a receber da consola de GM os modos assinados que lhes faltam,
+      cenários montados com blocos na consola, e o registo de modos pronto como modelo, com as
+      verificações e o selo de verificado. A seguir: criar o registo, traduções.
     text: >-
       Editor visual de modos, registo de modos, placa de suporte (PCB) que facilita a montagem,
       traduções, guias de montagem para outros tipos de dispositivos. Construído em software: o
@@ -758,8 +759,13 @@ roadmap:
       numa caixa a sério). Os cenários também já se montam com blocos na consola de GM: as caixas,
       os objetivos e quem os vê, quando abrem, o que os cumpre e o que dão, com rato, toque ou
       teclado, em português e inglês, mesmo num telemóvel; o controlador de campo verifica-os e
-      instala-os tal como se tivessem sido escritos à mão. A seguir: o registo; alemão e chinês
-      tradicional; a placa de suporte depois das primeiras caixas montadas.
+      instala-os tal como se tivessem sido escritos à mão. O registo onde os autores partilham os
+      seus modos está pronto como modelo: um pedido de integração com um modo assinado é verificado
+      automaticamente (a assinatura, que o código é o que foi assinado, a licença, os testes no
+      simulador), e um modo revisto pelo projeto recebe o selo de verificado, a assinatura do
+      próprio projeto, que é o que o deixa chegar às caixas. Como submeter um modo, a lista de
+      revisão, as chaves e a moderação estão escritos. A seguir: criar o registo a partir do modelo;
+      alemão e chinês tradicional; a placa de suporte depois das primeiras caixas montadas.
     gate: Continua depois da primeira versão.
 
 hub:
