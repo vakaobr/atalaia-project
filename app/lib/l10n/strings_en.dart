@@ -567,6 +567,11 @@ const Map<String, String> enStrings = {
   'player.location_denied': 'No permission for the location.',
   'player.sharing_title': 'Atalaia: sharing your position',
   'player.sharing_text': 'During the game',
+  // The out-of-bounds warning (decisions MF-31 to MF-40)
+  'player.out_title': 'Out of bounds',
+  'player.out_text': 'You have left the field\'s boundary. Go back inside.',
+  'player.bounds_watch':
+      'This phone vibrates if you leave the field\'s boundary.',
   'prop.link.connecting': 'Connecting to the controller…',
   'prop.link.linked': 'Linked to the controller over Wi-Fi',
   'prop.link.refused': 'The controller refused this device (another game?)',

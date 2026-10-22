@@ -13,6 +13,7 @@ import 'package:atalaia_app/controller/prop_link.dart';
 import 'package:atalaia_app/core/node_runner.dart';
 import 'package:atalaia_app/l10n/strings.dart';
 import 'package:atalaia_app/platform/links.dart';
+import 'package:atalaia_app/platform/location.dart';
 import 'package:atalaia_app/player/field_feed.dart';
 import 'package:atalaia_app/site/site_client.dart';
 import 'package:atalaia_app/storage/app_store.dart';
@@ -32,7 +33,11 @@ class Harness {
     this.brandingSource,
     this.siteHttp,
     this.links,
+    this.location,
   }) : qr = qr ?? FakeQr();
+
+  /// The phone's location (none: not available).
+  final LocationService? location;
 
   /// A fake site server (test/support/fake_site.dart); none: offline.
   final SiteHttp Function(Uri origin)? siteHttp;
@@ -73,6 +78,7 @@ class Harness {
     brandingSource: brandingSource ?? (_, _) => const _NoBranding(),
     siteHttp: siteHttp ?? (_) => const _NoSite(),
     links: links,
+    location: location,
   );
 
   /// The app; a new harness is a new app (its own state), even when pumped
@@ -121,6 +127,7 @@ Harness harness({
   BrandingSourceFor? brandingSource,
   SiteHttp Function(Uri origin)? siteHttp,
   AppLinks? links,
+  LocationService? location,
 }) => Harness(
   settings: (settings ?? AppSettings())..language = language,
   runner: runner ?? FakeNodeRunner(),
@@ -132,4 +139,5 @@ Harness harness({
   brandingSource: brandingSource,
   siteHttp: siteHttp,
   links: links,
+  location: location,
 );

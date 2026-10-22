@@ -24,11 +24,16 @@ class PositionReporter extends ChangeNotifier {
     required this.location,
     required this.send,
     this.interval = const Duration(seconds: 10),
+    this.onFix,
   });
 
   final LocationService location;
   final SendReports send;
   Duration interval;
+
+  /// Each fix as it arrives, for the out-of-bounds warning (field_bounds.dart,
+  /// decision MF-31): the same fixes the reports carry, no extra GPS.
+  void Function(LocationFix fix)? onFix;
 
   StreamSubscription<LocationFix>? _sub;
   Timer? _timer;
@@ -52,6 +57,7 @@ class PositionReporter extends ChangeNotifier {
   void _onFix(LocationFix f) {
     _pending.add(f);
     if (_pending.length > 5) _pending.removeAt(0);
+    onFix?.call(f);
   }
 
   /// Sends what is waiting (tests call it directly).

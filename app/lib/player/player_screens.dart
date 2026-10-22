@@ -21,6 +21,12 @@
 /// and where each stands (the controller sends a hidden one only once it is
 /// revealed, and another team's or squad's never).
 ///
+/// The field's boundary (decisions MF-31 to MF-40): while the player shares
+/// their position in a running game, the phone tests its own fixes against
+/// the field's boundary (lib/position/field_bounds.dart) and, once they have
+/// stayed out, shows a banner, vibrates and says so in the sharing
+/// notification; nothing about it is sent to anyone.
+///
 /// The field's branding (decisions BR1-BR24): its logo and name in the
 /// header, its wallpaper behind the view (dimmed), its accent on the
 /// primary buttons, and each team's crest and display name, downloaded
@@ -38,6 +44,8 @@ import '../branding/field_branding.dart';
 import '../checkin/checkin_client.dart';
 import '../checkin/checkin_screen.dart';
 import '../l10n/strings.dart';
+import '../platform/location.dart';
+import '../position/field_bounds.dart';
 import '../position/position_reporter.dart';
 import '../prop/game_timer.dart';
 import '../site/site_screens.dart';
@@ -292,12 +300,110 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _brandEtagSeen = etag;
       if (_brand?.etag != etag) unawaited(_loadBranding());
     }
+    // The GM changed the map features: the boundary again (MF-10, MF-35).
+    final features = feed.mapFeatures;
+    if (features != null &&
+        !identical(features, _featuresSeen) &&
+        (_reporter?.running ?? false)) {
+      _featuresSeen = features;
+      unawaited(_loadBounds(features: features));
+    }
+    // Paused, ended, or no longer a playing role: no warning (MF-37).
+    if (_watch.out && !_warns) unawaited(_clearWarning());
   }
+
+  // --- the out-of-bounds warning (decisions MF-31 to MF-40) -------------------
+
+  FieldHttp? _http;
+  FieldBounds _bounds = FieldBounds.none;
+  final _watch = BoundsWatch();
+  List<Map<String, Object?>>? _featuresSeen;
+
+  /// Who is warned: a player, a squad leader or a VIP in a running game, on a
+  /// field with a boundary they may see (MF-37); not marshals, the GM's
+  /// phone nor spectators.
+  bool get _warns {
+    final role = feed.me?['role'];
+    return feed.gameState == 'running' &&
+        !_bounds.isEmpty &&
+        (role == null ||
+            role == 'player' ||
+            role == 'squad_leader' ||
+            role == 'vip');
+  }
+
+  /// The level the controller keeps for this player (ML-5), or null.
+  int? get _myLevel {
+    final me = feed.me?['player_id'];
+    final level = feed.positions[me]?['level'];
+    return level is int ? level : null;
+  }
+
+  Future<void> _loadBounds({List<Map<String, Object?>>? features}) async {
+    final http = _http;
+    if (http == null) return;
+    final b = await loadFieldBounds(http, feed.link.token, features: features);
+    if (!mounted || b == null) return;
+    setState(() => _bounds = b);
+    if (b.isEmpty && _watch.out) await _clearWarning();
+  }
+
+  void _onFix(LocationFix fix) {
+    if (!_warns) return;
+    final alert = _watch.check(
+      _bounds,
+      fix,
+      _myLevel,
+      DateTime.now().millisecondsSinceEpoch,
+    );
+    if (alert != BoundsAlert.none) unawaited(_alert(alert));
+  }
+
+  /// What the player feels and reads (MF-33): a long triple vibration and the
+  /// banner on leaving (again every minute while out), a short one on coming
+  /// back; the sharing notification says it too, for a phone in a pocket. No
+  /// sound: a tone could give a player's place away.
+  Future<void> _alert(BoundsAlert alert) async {
+    final services = context.services;
+    final s = context.s;
+    setState(() {});
+    if (alert == BoundsAlert.back) {
+      await services.device.vibrate(const [0, 200]);
+      await services.foreground.update(
+        title: s.t('player.sharing_title'),
+        text: s.t('player.sharing_text'),
+      );
+      return;
+    }
+    await services.device.vibrate(const [0, 600, 300, 600, 300, 600]);
+    await services.foreground.update(
+      title: s.t('player.out_title'),
+      text: s.t('player.out_text'),
+    );
+  }
+
+  /// Ends a warning without a buzz (the game paused or ended, the boundary
+  /// went away, sharing stopped).
+  Future<void> _clearWarning() async {
+    final services = context.services;
+    final s = context.s;
+    _watch.reset();
+    if (mounted) setState(() {});
+    if (_reporter?.running ?? false) {
+      await services.foreground.update(
+        title: s.t('player.sharing_title'),
+        text: s.t('player.sharing_text'),
+      );
+    }
+  }
+
+  /// The app's services, kept for dispose (no ancestor lookups there).
+  late final AppServices _services;
 
   @override
   void initState() {
     super.initState();
-    final services = context.services;
+    final services = _services = context.services;
     feed =
         widget.feed ??
         FieldFeed(
@@ -331,6 +437,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final field = widget.link.field;
     if (!on) {
       _reporter?.stop();
+      _watch.reset();
       await services.foreground.stop();
       await app.update((x) => x.sharePosition = false);
       if (mounted) setState(() {});
@@ -345,12 +452,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
       if (mounted) setState(() => _shareError = s.t('player.location_denied'));
       return;
     }
-    final client = CheckinClient(services.fieldHttp(field));
+    final http = _http ??= services.fieldHttp(field);
+    final client = CheckinClient(http);
     final r = _reporter ??= PositionReporter(
       location: location,
       send: (reports) => client.reportPositions(feed.link.token, reports),
+      onFix: _onFix,
     );
     r.start();
+    _featuresSeen = feed.mapFeatures;
+    unawaited(_loadBounds(features: _featuresSeen));
     await services.foreground.start(
       title: s.t('player.sharing_title'),
       text: s.t('player.sharing_text'),
@@ -365,7 +476,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _clock?.cancel();
     feed.removeListener(_onFeed);
     if (_reporter?.running ?? false) {
-      unawaited(context.services.foreground.stop());
+      unawaited(_services.foreground.stop());
     }
     _reporter?.dispose();
     if (widget.feed == null) feed.dispose();
@@ -385,19 +496,28 @@ class _PlayerScreenState extends State<PlayerScreen> {
           branding: _brand,
           child: ListenableBuilder(
             listenable: Listenable.merge([feed, ?_reporter]),
-            builder: (context, _) => PlayerView(
-              feed: feed,
-              teams: _teams,
-              sharing: widget.link.field == null
-                  ? null
-                  : _SharePosition(
-                      running: _reporter?.running ?? false,
-                      sent: _reporter?.sent ?? 0,
-                      stopped: _reporter?.stopReason,
-                      error: _shareError,
-                      onChanged: _share,
-                      squads: ((feed.game?['squads'] as int?) ?? 0) > 0,
-                    ),
+            builder: (context, _) => Column(
+              children: [
+                if (_watch.out && (_reporter?.running ?? false))
+                  const OutOfBoundsBanner(),
+                Expanded(
+                  child: PlayerView(
+                    feed: feed,
+                    teams: _teams,
+                    sharing: widget.link.field == null
+                        ? null
+                        : _SharePosition(
+                            running: _reporter?.running ?? false,
+                            sent: _reporter?.sent ?? 0,
+                            stopped: _reporter?.stopReason,
+                            error: _shareError,
+                            onChanged: _share,
+                            squads: ((feed.game?['squads'] as int?) ?? 0) > 0,
+                            bounds: _warns,
+                          ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -674,6 +794,7 @@ class _SharePosition extends StatelessWidget {
     required this.error,
     required this.onChanged,
     this.squads = false,
+    this.bounds = false,
   });
 
   final bool running;
@@ -684,6 +805,9 @@ class _SharePosition extends StatelessWidget {
 
   /// Whether the game has squads (the hint names them only then).
   final bool squads;
+
+  /// Whether the phone watches the field's boundary (MF-31).
+  final bool bounds;
 
   @override
   Widget build(BuildContext context) {
@@ -704,10 +828,70 @@ class _SharePosition extends StatelessWidget {
                   ),
           ),
         ),
+        if (running && bounds)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              s.t('player.bounds_watch'),
+              key: const Key('player-bounds-watch'),
+              style: TextStyle(color: Theme.of(context).hintColor),
+            ),
+          ),
         if (error != null) Notice(error!, kind: NoticeKind.warning),
         if (!running && stopped != null)
           Notice(s.t('player.share_stopped'), kind: NoticeKind.info),
       ],
+    );
+  }
+}
+
+/// The out-of-bounds warning (decision MF-33): above the game, in the error
+/// colour, announced by screen readers when it appears.
+class OutOfBoundsBanner extends StatelessWidget {
+  const OutOfBoundsBanner({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Material(
+        key: const Key('player-out-of-bounds'),
+        color: scheme.error,
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Icon(Icons.wrong_location, color: scheme.onError, size: 36),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.t('player.out_title'),
+                        style: text.titleLarge?.copyWith(
+                          color: scheme.onError,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        s.t('player.out_text'),
+                        style: text.bodyMedium?.copyWith(color: scheme.onError),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -577,6 +577,10 @@ const Map<String, String> ptStrings = {
   'player.location_denied': 'Sem autorização para a localização.',
   'player.sharing_title': 'Atalaia: a partilhar a posição',
   'player.sharing_text': 'Durante o jogo',
+  // O aviso de fora do campo (decisões MF-31 a MF-40)
+  'player.out_title': 'Fora do campo',
+  'player.out_text': 'Saíste do limite do campo. Volta para dentro.',
+  'player.bounds_watch': 'Este telemóvel vibra se saíres do limite do campo.',
   'prop.link.connecting': 'A ligar ao controlador…',
   'prop.link.linked': 'Ligado ao controlador pela rede Wi-Fi',
   'prop.link.refused': 'O controlador recusou este dispositivo (outro jogo?)',

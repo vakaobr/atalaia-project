@@ -223,6 +223,11 @@ class FieldFeed extends ChangeNotifier {
   /// and the team that completed or failed it, and why.
   final _objectiveNews = <String, (ObjectiveState, String?, String?)>{};
 
+  /// The field's map features as the stream last sent them (`map_features`,
+  /// decision MF-10: the whole list this connection may see, sent when one
+  /// changes); null until then (the hello has none: fetch them over REST).
+  List<Map<String, Object?>>? mapFeatures;
+
   /// The ETag of the field's branding as the stream last told it (the
   /// snapshot, then `branding` messages): the view fetches it when it changes.
   String? brandingEtag;
@@ -364,6 +369,11 @@ class FieldFeed extends ChangeNotifier {
         if (p is Map && p['player_id'] is String) {
           positions[p['player_id']! as String] = p.cast<String, Object?>();
         }
+      case 'map_features':
+        mapFeatures = [
+          for (final f in (m['features'] as List?) ?? const [])
+            if (f is Map) f.cast<String, Object?>(),
+        ];
       case 'positions':
         positions.clear();
         for (final p in (m['positions'] as List?) ?? const []) {
