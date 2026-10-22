@@ -710,9 +710,10 @@ roadmap:
   p5:
     title: Comunidade
     short: >-
-      Editor visual de modos construído em software, com teste ao vivo no simulador: o Lua e o
-      manifesto de um modo a partir de blocos, em português e inglês. A seguir: pacotes assinados,
-      enviar às caixas os modos que lhes faltam a partir da consola de GM, o registo, traduções.
+      Editor visual de modos completo em software, testado ao vivo no simulador; pacotes de modos
+      assinados, uma bateria de testes de fuga ao sandbox na CI e o controlador de campo a instalar
+      modos assinados. A seguir: enviar às caixas os modos que lhes faltam a partir da consola de
+      GM, o registo, traduções.
     text: >-
       Editor visual de modos, registo de modos, placa de suporte (PCB) que facilita a montagem,
       traduções, guias de montagem para outros tipos de dispositivos. Construído em software: o
@@ -720,12 +721,15 @@ roadmap:
       acontece quando uma equipa mantém o botão premido, temporizadores, pontos, ecrãs e sons, as
       definições que a organização pode mudar e a lógica do controlador de campo entre caixas);
       escreve os scripts Lua e o manifesto do modo à medida que se monta, em português e inglês, e
-      funciona sem rede. Os exemplos Domínio e Domínio Total passam os mesmos testes que os modos
-      escritos à mão. Um botão experimenta logo o modo no simulador, com as caixas que escolheres, e
-      os erros dos scripts voltam aos blocos. Um modo feito assim chega às caixas numa versão do
-      firmware; planeado: a consola de GM enviar a uma caixa, entre jogos, os modos assinados que um
-      jogo precisa e lhe faltam. A seguir: pacotes de modos assinados e o registo, alemão e chinês
-      tradicional, e a placa de suporte depois das primeiras caixas montadas.
+      funciona sem rede. Tem também blocos para zonas no mapa, comandos da organização, vários
+      papéis e os ecrãs do próprio modo; três exemplos passam os mesmos testes que os modos escritos
+      à mão, e um botão experimenta logo o modo no simulador. Os modos viajam em pacotes assinados
+      (um arquivo, assinado como uma versão do firmware); o controlador de campo só os instala com
+      as suas próprias chaves de confiança e mostra quem assinou cada um e se o projeto o reviu. Uma
+      bateria de tentativas de fuga corre a cada alteração e fechou duas maneiras de um script
+      passar do seu limite de tempo. A seguir: a consola de GM enviar a uma caixa, entre jogos, os
+      modos assinados que um jogo precisa; o registo; alemão e chinês tradicional; a placa de
+      suporte depois das primeiras caixas montadas.
     gate: Continua depois da primeira versão.
 
 hub:
