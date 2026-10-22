@@ -45,6 +45,58 @@ Protocol changes are made in `protocol/schema/*.yaml`; then run `python3 tools/p
 
 Bug fixes, refactors, new modes and documentation do not need an RFC.
 
+## Submitting a community mode
+
+A game mode you wrote can be shared through the community mode registry, the
+`atalaia-modes` repository, without changing this one. Fields install it from
+the registry's index; once the project has reviewed it, it carries the
+**verified** badge and Field Boxes can fetch it from their field controller.
+How the registry works, its review checklist, keys and moderation:
+[`docs/community/`](docs/community/README.md).
+
+> The registry repository does not exist yet (decision P5R-9): the maintainer
+> creates it from [`registry/template/`](registry/template/). Until then you can
+> run every step below against a copy of the template, and share ideas with the
+> *Game mode idea* issue template.
+
+1. **Write the mode.** Build it in the visual mode editor (in `simulator/`: `python3 -m atalaia_sim serve ../modes/domination`,
+   then `http://localhost:8000/editor/`; *Test in the simulator* plays it),
+   or by hand as [`modes/README.md`](modes/README.md) describes. Pick its id
+   (`org.yourclub.name`; `org.atalaia.` is the project's own) and a licence
+   from the approved seven (`GPL-3.0-or-later`, `LGPL-3.0-or-later`, `MIT`,
+   `Apache-2.0`, `BSD-2-Clause`, `BSD-3-Clause`, `CC0-1.0`); every file starts
+   with SPDX lines naming you and that licence.
+2. **Test it.** Write `tests/*.yaml` that show the game being won, scored and
+   ended (`modes/README.md`, "Tests"), and run them:
+   `python3 -m atalaia_sim test path/to/your-mode` (in `simulator/`).
+3. **Make your mode key**, once, outside every repository:
+   `python3 tools/mode_package.py keygen --out ~/atalaia-keys/modes.pem`. Keep
+   it and a backup offline ([`docs/community/keys.md`](docs/community/keys.md)).
+4. **Fork the registry** and put your mode's folder in `modes/<id>/`. Add your
+   public key once, then pack, sign and list the mode (from this repository,
+   with the registry checked out next to it):
+
+   ```sh
+   python3 tools/mode_package.py pubkey --key ~/atalaia-keys/modes.pem
+   python3 tools/registry_check.py key ../atalaia-modes --public <base64 key> --owner <your GitHub handle>
+   python3 tools/registry_check.py add ../atalaia-modes <id> --key ~/atalaia-keys/modes.pem \
+       --name "Name" --description "One line" --author "You or your club"
+   python3 tools/registry_check.py lint ../atalaia-modes
+   ```
+
+5. **Open a pull request** to the registry (commits signed off), filling in its
+   template. The CI checks the signatures, that the source is exactly what you
+   signed, the licence headers, the sandbox's rules, the size and the
+   translations, and runs your tests in the simulator.
+6. **Review.** A maintainer goes through the [review checklist](docs/community/review.md)
+   and merges it: your mode is listed, *not reviewed by the project*. The
+   **verified badge** follows when a maintainer has read your Lua and the tests
+   show the game working: they sign the same archive with the project's key.
+
+A new version: change the source, raise `version` in `mode.yaml`, run `add`
+again and open a pull request; a published version never changes. A mode's
+badge belongs to one version, so a new version is reviewed again.
+
 ## Pull requests
 
 - Keep each pull request focused on one change.

@@ -28,6 +28,8 @@ A field image drawn by the console's *Load the field from a map* (decisions MF-1
 
 Game modes shared through the registry may use any licence from an approved list, shown on each package. Built-in modes in `modes/` are GPL-3.0-or-later.
 
+The approved licences are `GPL-3.0-or-later`, `LGPL-3.0-or-later`, `MIT`, `Apache-2.0`, `BSD-2-Clause`, `BSD-3-Clause` and `CC0-1.0` (ADR-P5-5); adding one needs an RFC. The registry repository's own data (its index, keys and signatures) is `CC0-1.0`, so anyone may mirror it ([docs/community/registry.md](docs/community/registry.md), decision P5G-9). The registry's template in `registry/template/` and the sample mode in `registry/examples/` are part of this repository.
+
 ## The name
 
 Forks are welcome, but please give yours a different name so players can tell it apart from the original Atalaia project.

@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 5 -- Community: Status
 
-**Current phase:** Implementation (plan phases 1-7 and 13a built in software 2026-10-22: the visual mode editor complete, its link to the simulator, signed mode packages, the sandbox-escape battery, signed packages in the controller, scenario blocks in the GM console, and the controller, console and protocol side of missing modes sent to boxes)
+**Current phase:** Implementation (plan phases 1-9 and 13 built in software 2026-10-22: the visual mode editor complete, its link to the simulator, signed mode packages, the sandbox-escape battery, signed packages in the controller, scenario blocks in the GM console, missing modes sent to boxes (controller and box), the registry repository's template and the community processes)
 **Phase status:** In progress
 **Risk level:** Medium
-**Last updated:** 2026-10-22 (plan phase 7 built; plan phase 13b built; plan phase 13a built; plan phases 3-6 built, P5B-9 answered; plan phase 2 built, plan phase 13 planned from P5R-8; refreshed after phases 2-4 software; first written 2026-10-18)
-**Next step:** plan phases 8 and 9 (the registry template, community processes) and 10 (German), in progress; plan phases 7 and 13 are built in software, 13's test on real boxes is HW3
+**Last updated:** 2026-10-22 (plan phases 8 and 9 built; plan phase 7 built; plan phase 13b built; plan phase 13a built; plan phases 3-6 built, P5B-9 answered; plan phase 2 built, plan phase 13 planned from P5R-8; refreshed after phases 2-4 software; first written 2026-10-18)
+**Next step:** plan phase 10 (German), in progress; creating the registry repository waits for the maintainer; plan phase 13's test on real boxes is HW3
 
 Phase 5 is the community layer: visual mode editor (Blockly), mode
 registry with signing and a verified badge, carrier PCB, translations,
@@ -126,6 +126,27 @@ section 16).
   failure without HTTPS goes over LoRa as `node.modes_failed` (id 53) and the
   box is free again; key 17 forgets. The core's join codec reads keys 16 and
   17. Decisions P5E-1 to P5E-14. Binary +16 KB (0.9 %), static RAM +1 KB.
+- [x] **Plan phase 8, the registry repository's template (2026-10-22), in
+  software:** `registry/template/`, the `atalaia-modes` repository's files
+  (an empty index, keys and revocations, sources in `modes/`, REUSE, CODEOWNERS,
+  pull request and issue templates) with its CI (`registry-lint`: the JSON
+  Schemas, `tools/registry_check.py lint` and REUSE; `registry-test`: each
+  mode's tests in the simulator; `sandbox-escape`: the core's battery; then
+  publishing to GitHub Pages), on this repository's tools at a pinned ref.
+  Packages live beside the index; each mode's newest source must pack to
+  exactly its signed archive; the verified badge is a second signature, by the
+  project's registry key, over the same archive. `registry/tests/` runs every
+  check step of that workflow on a sample submission signed with throwaway keys
+  (CI job `registry-template`, `tools/check.sh`): 18 tests. AC-6 met in this
+  repository's template. Decisions P5G-1 to P5G-11.
+- [x] **Plan phase 9, the community processes (2026-10-22):**
+  `CONTRIBUTING.md` "Submitting a community mode"; `docs/community/` (how the
+  registry works, the review checklist as amended and the badge's criteria,
+  mode keys and their revocation, moderation); the draft RFC
+  `docs/rfcs/0000-mode-packages-and-registry.md` for version 1 of the package
+  format, the manifest and the index. AC-11 met. Decisions P5G-12 to P5G-14
+  (open; P5G-2, P5G-3, P5G-8, P5G-9, P5G-12, P5G-13 and P5G-14 for the
+  maintainer: governance, who holds the keys, moderation, licensing).
 
 ## Refresh 2026-10-22: what changed
 
@@ -156,8 +177,8 @@ section 16).
 | 6 | Signed packages in the controller | Software | **Built 2026-10-22** |
 | 13 | Missing modes from the GM console (P5R-8; built after 6) | Software (box side host-tested); real boxes: HW3 | Planned 2026-10-22 |
 | 7 | Scenario blocks in the console | Software | **Built 2026-10-22** |
-| 8 | Registry repository template | Software; publishing needs the maintainer | |
-| 9 | Community processes | Software | |
+| 8 | Registry repository template | Software; publishing needs the maintainer | **Built 2026-10-22** (the repository itself waits for the maintainer) |
+| 9 | Community processes | Software | **Built 2026-10-22** |
 | 10 | German | Software (after P5R-10) | |
 | 11 | Traditional Chinese (Taiwan) | Software | |
 | 12 | Build guides for other node types | Software | |
@@ -198,12 +219,12 @@ section 16).
 | AC-3 | The editor ships in English and Portuguese | **Met (2026-10-22)** |
 | AC-4 | Registry index format defined and documented | **Met in software (2026-10-22)**: `registry/schema/index.schema.json`, `protocol/mode-packages.md` |
 | AC-5 | Mode packages are Ed25519-signed and verifiable | **Met in software (2026-10-22)**: `tools/mode_package.py`, `protocol/vectors/mode_package.json` |
-| AC-6 | Registry CI runs mode tests and checks licences | Pending (plan phase 8; the repository needs the maintainer) |
+| AC-6 | Registry CI runs mode tests and checks licences | **Met in this repository's template (2026-10-22)**: CI job `registry-template` runs the template's workflow on a sample submission; in `atalaia-modes` once the maintainer creates it |
 | AC-7 | A language beyond en/pt on the site | Pending (plan phase 10) |
 | AC-8 | Built-in modes carry en and pt texts | **Met differently**: `mode.yaml` `i18n:` (P4R22) |
 | AC-9 | Carrier PCB schematic passes KiCad ERC | Pending (needs hardware) |
 | AC-10 | Build guides for the Field Box and the Satellite | Field Box done; Satellite pending (plan phase 12) |
-| AC-11 | CONTRIBUTING.md documents mode submission | Pending (plan phase 9) |
+| AC-11 | CONTRIBUTING.md documents mode submission | **Met (2026-10-22)**: "Submitting a community mode", `docs/community/` |
 | AC-12 | CI includes a sandbox-escape job | **Met (2026-10-22)**: CI job `sandbox-escape`, `core/tests/test_sandbox_escape.c` under ASan and UBSan |
 | AC-13 | (new, P5R-8) A box gets a signed mode it lacks from its controller between games, checks and plays it | Pending (plan phase 13, HW3) |
 
@@ -238,11 +259,14 @@ section 16).
    fetching from the bench controller; and the end-to-end test of the C host
    box (`box_host --mode-keys --mode-source`) against the real controller
    over HTTPS, which the host tests only model with files.
-2. Plan phases 8 and 9 (the registry template and community processes) and 10
-   (German first, P5R-10), in progress. Plan phase 7 is built; its P5F-2 (the
-   CSP's two style hashes instead of `'unsafe-inline'`), P5F-4 (refuse rather
-   than rewrite; comments go once the blocks change the YAML) and P5F-5 (the
-   block set, typed references) are for the maintainer.
+2. Plan phase 10 (German first, P5R-10), in progress. Plan phase 7 is built;
+   its P5F-2 (the CSP's two style hashes instead of `'unsafe-inline'`), P5F-4
+   (refuse rather than rewrite; comments go once the blocks change the YAML)
+   and P5F-5 (the block set, typed references) are for the maintainer. Plan
+   phases 8 and 9 are built: creating `atalaia-modes` from
+   `registry/template/` waits for the maintainer (P5-3, P5R-9;
+   `docs/community/registry.md`, "Creating the repository"), as do P5G-2,
+   P5G-3, P5G-8, P5G-9, P5G-12 (accepting the RFC), P5G-13 and P5G-14.
 3. Left from plan phases 3-6, small: the editor does not yet make a package
    itself (it downloads the files; `tools/mode_package.py pack` makes the
    archive, and signing stays offline); `protocol/vectors/controller_api.json`

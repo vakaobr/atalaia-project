@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+#
+# Every pull request needs a maintainer's review (branch protection: "Require review from Code
+# Owners"). The project's key, the revocations and the CI are the maintainers' alone
+# (decision P5G-13: replace the handle when the registry is created, if it is not this one).
+*                   @vakaobr
+/keys/project/      @vakaobr
+/keys/revoked.json  @vakaobr
+/.github/           @vakaobr
+/REUSE.toml         @vakaobr

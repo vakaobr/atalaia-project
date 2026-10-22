@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: MIT
+name: Letting go too soon does not take the hill
+steps:
+  - hold: { team: red, s: 4 }
+  - wait: 60
+  - expect_score: { team: red, points: 0 }

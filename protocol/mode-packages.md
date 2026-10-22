@@ -96,6 +96,8 @@ The controller then installs it through the same checks as an upload (`POST /api
 
 `tools/mode_package.py index index.json <archive>.release.json --url ... --name ...` adds a release to an index.
 
+The community registry (`atalaia-modes`, made from `registry/template/`) keeps its packages beside its index (`url` `packages/<id>-<version>.tar`), each signed by its author and, with the verified badge, by the project's registry key over the same archive (`<archive>.verified.json`; the index then lists that signature). Its rules and CI: [docs/community/registry.md](../docs/community/registry.md); `tools/registry_check.py`.
+
 ## Fetching missing modes
 
 A box gets from its field controller, between games, the signed packages a game needs that it lacks (the maintainer's P5R-8; plan phase 13; decisions P5B-8 to P5B-17 and P5D-1 onwards). This section is the contract between the controller (13a: `controller/atalaia_controller/mode_fetch.py`, the console's invite dialog) and the box (13b: `firmware/esp32/main/mode_fetch.c`). The Python reference of every box check and of the report is in `controller/atalaia_controller/mode_package.py` (`box_check_release`, `box_check_archive`, `report_body`, `parse_report`); the shared vectors are `box_limits`, `box_checks` and `reports` in `protocol/vectors/mode_package.json`, and `mode_fetch` in `protocol/vectors/join.json`.

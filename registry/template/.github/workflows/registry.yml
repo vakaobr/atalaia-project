@@ -1,0 +1,192 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The community mode registry's CI (ADR-P5-8, phase 5 plan phase 8). Every pull request and
+# every push runs three jobs with the Atalaia repository's own tools, checked out at
+# ATALAIA_REF next to the registry:
+#
+#   registry-lint   the index and revocation list against the JSON Schemas, then
+#                   tools/registry_check.py lint: keys, both signatures of every version,
+#                   the sources in modes/ against the newest package, the review checklist's
+#                   automated items, and (on a pull request) that no published version changed;
+#                   then REUSE
+#   registry-test   each mode's own tests in the simulator, on the real core
+#   sandbox-escape  the core's sandbox-escape battery under ASan and UBSan, and through the
+#                   simulator: the sandbox the registry relies on, at ATALAIA_REF
+#
+# A push to main that passes all three publishes the registry to GitHub Pages (index.json,
+# revoked.json, keys.json, packages/, badges/). Pull requests run without secrets
+# (pull_request, never pull_request_target): submitted Lua only ever runs inside the sandbox.
+#
+# Steps whose id starts with "check-" are the commands that the Atalaia repository's test
+# (registry/tests/test_registry_template.py) runs on a sample submission; keep them to plain
+# commands that use $ATALAIA, $ATALAIA_CORE_LIB and the registry as the working directory.
+name: Registry
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ATALAIA_REPOSITORY: vakaobr/atalaia-project
+  # Pin to an Atalaia release tag or commit when the registry is created, and move it on
+  # purpose (a pull request of its own): the checks are the tools at this ref (decision P5G-4).
+  ATALAIA_REF: main
+  ATALAIA: ${{ github.workspace }}/atalaia
+
+jobs:
+  registry-lint:
+    name: Index, keys, signatures, sources and licences
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: registry
+          persist-credentials: false
+      - name: The base branch, to check that no published version changed
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ env.ATALAIA_REPOSITORY }}
+          ref: ${{ env.ATALAIA_REF }}
+          path: atalaia
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install tools
+        run: pip install -r "$ATALAIA/simulator/requirements.txt" check-jsonschema reuse
+      - id: check-schemas
+        name: The index and the revocation list against the JSON Schemas
+        working-directory: registry
+        run: |
+          check-jsonschema --schemafile "$ATALAIA/registry/schema/index.schema.json" index.json
+          check-jsonschema --schemafile "$ATALAIA/registry/schema/revoked.schema.json" keys/revoked.json
+      - id: check-registry
+        name: Keys, signatures, sources, the review checklist's automated items
+        working-directory: registry
+        run: |
+          base=""
+          if [ -d ../base ]; then base="--base ../base"; fi
+          python "$ATALAIA/tools/registry_check.py" lint . $base
+      - id: check-licensing
+        name: Licensing (REUSE)
+        working-directory: registry
+        run: reuse lint
+
+  registry-test:
+    name: Each mode's tests in the simulator
+    runs-on: ubuntu-24.04
+    env:
+      ATALAIA_CORE_LIB: ${{ github.workspace }}/build/libatalaia_core.so
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: registry
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ env.ATALAIA_REPOSITORY }}
+          ref: ${{ env.ATALAIA_REF }}
+          path: atalaia
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libmbedtls-dev
+          pip install -r "$ATALAIA/simulator/requirements.txt"
+      - name: Build the core
+        run: |
+          cmake -S "$ATALAIA/core" -B build -DCMAKE_BUILD_TYPE=Debug -DATALAIA_SHARED=ON -DBUILD_TESTING=OFF
+          cmake --build build
+      - id: check-mode-tests
+        name: Every mode's tests/ on the real core
+        working-directory: registry
+        run: python "$ATALAIA/tools/registry_check.py" test . --lib "$ATALAIA_CORE_LIB"
+
+  sandbox-escape:
+    # The same battery as the Atalaia repository's own CI job of that name (phase 5 plan phase 5,
+    # AC-12), on the core at ATALAIA_REF.
+    name: Sandbox-escape battery
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ env.ATALAIA_REPOSITORY }}
+          ref: ${{ env.ATALAIA_REF }}
+          path: atalaia
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libmbedtls-dev
+          pip install -r "$ATALAIA/simulator/requirements.txt"
+      - name: The C battery under ASan and UBSan
+        run: |
+          cmake -S "$ATALAIA/core" -B build-asan -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
+          cmake --build build-asan --target test_sandbox_escape
+          ctest --test-dir build-asan -R sandbox_escape --output-on-failure
+      - name: Through the simulator (box and field scripts, a mode playing on)
+        run: |
+          cmake -S "$ATALAIA/core" -B build -DCMAKE_BUILD_TYPE=Debug -DATALAIA_SHARED=ON -DBUILD_TESTING=OFF
+          cmake --build build
+          cd "$ATALAIA/simulator"
+          ATALAIA_CORE_LIB="$GITHUB_WORKSPACE/build/libatalaia_core.so" python -m unittest tests.test_sandbox_escape -v
+
+  publish:
+    name: Publish to GitHub Pages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [registry-lint, registry-test, sandbox-escape]
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: registry
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ env.ATALAIA_REPOSITORY }}
+          ref: ${{ env.ATALAIA_REF }}
+          path: atalaia
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install tools
+        run: pip install -r "$ATALAIA/simulator/requirements.txt"
+      - id: check-site
+        name: Build what the registry publishes
+        working-directory: registry
+        run: python "$ATALAIA/tools/registry_check.py" site . ../_site
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v5

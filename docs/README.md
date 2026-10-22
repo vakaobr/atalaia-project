@@ -27,6 +27,13 @@ Protocol changes go through the RFC process in [`rfcs/`](rfcs/).
 | --- | --- | --- |
 | [RFC 0001](rfcs/0001-skirmesh-rf-wire-format.md) | Accepted | Skirmesh-RF wire format, encryption, duty cycle, join, failover. Amendment 1: single shared game channel (869.525 MHz g2). Amendment 2: join payload encoding. |
 
+## Community modes
+
+Sharing game modes through the community mode registry: how it works, the
+review checklist and the verified badge, mode keys and their revocation, and
+moderation, in [`community/`](community/README.md). Authors start at
+[Submitting a community mode](../CONTRIBUTING.md#submitting-a-community-mode).
+
 ## Templates
 
 Drafts for field operators, to be reviewed by a lawyer before use (decision

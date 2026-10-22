@@ -54,3 +54,8 @@ python3 -m unittest discover -s tests
 cd ../server
 python3 -m unittest tests.test_config tests.test_ids tests.test_shared_imports tests.test_chrono_verify tests.test_feeds \
     tests.test_import_format tests.test_firmware tests.test_backup_crypt
+# The mode registry's template and its CI's commands on a sample submission (phase 5 plan
+# phase 8); its JSON Schema and REUSE steps need tools this image lacks and run in CI's
+# registry-template job.
+cd ../registry
+python3 -m unittest discover -s tests

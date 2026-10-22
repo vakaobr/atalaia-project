@@ -12,12 +12,18 @@ maintainer creates `atalaia-modes` (ADR-P5-3, decision P5R-9).
 | [`schema/index.schema.json`](schema/index.schema.json) | JSON Schema of a registry index: each mode's signed versions, where to fetch them, their licence and whether the project reviewed them (the verified badge) |
 | [`schema/revoked.schema.json`](schema/revoked.schema.json) | JSON Schema of the list of revoked mode keys |
 | [`schema/examples/`](schema/examples/) | A valid index and revocation list (the shared vectors' own) and invalid ones; CI's protocol job checks them with `check-jsonschema` |
+| [`template/`](template/) | The `atalaia-modes` repository's files, from which the maintainer creates it: an empty `index.json`, `keys/` with `revoked.json`, `modes/`, `REUSE.toml`, the CI workflow (`registry-lint`, `registry-test`, `sandbox-escape`, then publishing to GitHub Pages), CODEOWNERS, the pull request and issue templates (plan phase 8) |
+| [`examples/org.example.hill/`](examples/org.example.hill/) | A sample community submission (MIT), with its tests |
+| [`tests/`](tests/) | Runs the template workflow's checks on the sample, signed with throwaway keys made at run time, and the refusals (`tools/check.sh`, CI job `registry-template`) |
 
 The package format, the signed manifest and the checks are
 [protocol/mode-packages.md](../protocol/mode-packages.md). The tools:
-`tools/mode_package.py` (`pack`, `keygen`, `sign`, `verify`, `index`). A field
+`tools/mode_package.py` (`pack`, `keygen`, `sign`, `verify`, `index`) and
+`tools/registry_check.py` (a registry's `lint`, `test`, `key`, `add`, `badge`,
+`site`). How the registry works, its review checklist and verified badge, keys
+and moderation: [docs/community/](../docs/community/README.md). A field
 controller imports signed packages from an index with its own trusted mode keys
 (plan phase 6, `controller/README.md`, "Signed mode packages").
 
-Still to come (`docs/phase-5-community/PLAN.md`): the registry repository's
-template with its CI (plan phase 8) and the submission process (plan phase 9).
+The registry repository itself waits for the maintainer (decisions P5-3, P5R-9;
+`docs/community/registry.md`, "Creating the repository").

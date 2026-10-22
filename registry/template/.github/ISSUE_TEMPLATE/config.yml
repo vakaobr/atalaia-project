@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: A security problem (a sandbox escape, a stolen key, a package that is not its source)
+    url: https://github.com/vakaobr/atalaia-project/security/advisories/new
+    about: Report it privately, never in a public issue.
+  - name: Questions about writing modes
+    url: https://github.com/vakaobr/atalaia-project/discussions
+    about: Ask in the Atalaia project's Discussions.

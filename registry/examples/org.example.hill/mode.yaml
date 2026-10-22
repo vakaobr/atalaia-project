@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: MIT
+#
+# A sample community submission for the registry's template and its CI test
+# (registry/tests/test_registry_template.py); not a built-in mode.
+id: org.example.hill
+version: 1.0.0
+license: MIT
+min_tier: reduced
+name: King of the Hill
+description: Hold the box to take the hill; the team on the hill scores every tick.
+roles:
+  hill: { requires: [team_input], optional: [team_display, audio] }
+params:
+  hold_ms: { type: int, min: 0, max: 60000, default: 5000, label: "Hold time to take the hill (ms)" }
+  tick_s:  { type: int, min: 1, max: 600,   default: 30,   label: "Seconds per point" }
+i18n:
+  pt:
+    name: Rei da Colina
+    description: Mantém a caixa premida para tomar a colina; a equipa na colina pontua a cada intervalo.
+    params:
+      hold_ms: Tempo a premir para tomar a colina (ms)
+      tick_s: Segundos por ponto

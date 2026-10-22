@@ -14,6 +14,10 @@ Useful reports include:
 
 We aim to acknowledge reports within 7 days.
 
+## Community modes and mode keys
+
+Report privately, as above, a community mode whose script gets around the sandbox, a mode key that may be known to someone else, or a registry package that is not what its source says. A key is revoked and the packages it signed are taken down as [docs/community/keys.md](docs/community/keys.md) and [docs/community/moderation.md](docs/community/moderation.md) describe. The project's registry key, which gives the verified badge and is built into the Field Box firmware, is kept offline by the maintainer and never in CI.
+
 ## In scope
 
 Game integrity matters as much as data security. Issues such as forged Skirmesh-RF packets, replayed events, players seeing enemy positions, or editable chrono records are all in scope.

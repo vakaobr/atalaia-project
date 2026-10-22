@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: MIT
+name: Holding the box takes the hill, which scores every tick
+steps:
+  - hold: { team: red, s: 5 }
+  - expect: { type: zone.captured, team: red, at: 5 }
+  - wait: 85                      # ticks at 30, 60 and 90 s
+  - expect_score: { team: red, points: 3 }
+  - expect_score: { team: blue, points: 0 }

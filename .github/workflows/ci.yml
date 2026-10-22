@@ -421,6 +421,38 @@ jobs:
           cd simulator
           ATALAIA_CORE_LIB="$PWD/../build/libatalaia_core.so" python -m unittest tests.test_sandbox_escape -v
 
+  registry-template:
+    # Phase 5 plan phase 8 (AC-6 in this repository, decisions P5G-1 onwards): the mode
+    # registry's template (registry/template/) with a sample submission
+    # (registry/examples/org.example.hill/) signed by throwaway keys made at run time; every
+    # "check-" step of the template's own workflow runs as written (the JSON Schemas,
+    # tools/registry_check.py lint, REUSE, the mode's tests in the simulator, the published site),
+    # then lint must refuse tampered and out-of-process registries. Locally in tools/check.sh,
+    # where the JSON Schema and REUSE steps are skipped (the dev container lacks those tools).
+    name: Mode registry template and its CI on a sample submission
+    runs-on: ubuntu-latest
+    env:
+      ATALAIA_REQUIRE_ALL: "1"
+      ATALAIA_REQUIRE_REGISTRY_TOOLS: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libmbedtls-dev
+          pip install -r simulator/requirements.txt check-jsonschema reuse
+      - name: Build the core
+        run: |
+          cmake -S core -B build -DCMAKE_BUILD_TYPE=Debug -DATALAIA_SHARED=ON -DBUILD_TESTING=OFF
+          cmake --build build
+      - name: The template's checks on the sample submission
+        env:
+          ATALAIA_CORE_LIB: ${{ github.workspace }}/build/libatalaia_core.so
+        run: python -m unittest discover -s registry/tests -v
+
   format:
     name: Formatting (clang-format, StyLua)
     # Pinned so a newer runner image cannot bring a clang-format that formats differently.

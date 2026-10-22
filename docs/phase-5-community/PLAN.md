@@ -184,8 +184,8 @@ plus, depending on what the plan phase touches:
 | 6 | Signed packages in the controller | import from an index (signature, revocation, size, licence), the author and an "unverified" warning in the console | Software, now | 4 | M | **Built 2026-10-22** |
 | 13 | Missing modes from the GM console | P5R-8: the console's *Send missing modes* in the invite dialog; join key 16; a box fetches the signed packages it lacks over Wi-Fi HTTPS, checks them with its firmware's mode keys and the sandbox, keeps them on LittleFS (numbered 13 so the other numbers stay as P5R-1 has them; built here, after 6) | Software, now (box side host-tested); on real boxes: HW3 | 4, 5, 6 | L | 13a **built 2026-10-22** (P5D-1 to P5D-12); 13b (the box) **built 2026-10-22** (P5E-1 to P5E-14) |
 | 7 | Scenario blocks in the console | a block view of the scenario builder writing the same YAML, en + pt, console browser tests | Software, now | 1 | M | **Built 2026-10-22** (P5F-1 to P5F-12) |
-| 8 | Registry repository template | `index.json`, `keys/`, `revoked.json`, the registry CI workflow as files under `registry/template/` (AC-6 in this repository) | Software, now; publishing needs the maintainer | 4, 5 | S | |
-| 9 | Community processes | CONTRIBUTING.md "Submitting a community mode", review checklist, verified badge, RFC for the package format (AC-11) | Software, now | 4, 8 | S | |
+| 8 | Registry repository template | `index.json`, `keys/`, `revoked.json`, the registry CI workflow as files under `registry/template/` (AC-6 in this repository) | Software, now; publishing needs the maintainer | 4, 5 | S | **Built 2026-10-22** (P5G-1 to P5G-11) |
+| 9 | Community processes | CONTRIBUTING.md "Submitting a community mode", review checklist, verified badge, RFC for the package format (AC-11) | Software, now | 4, 8 | S | **Built 2026-10-22** (P5G-12 to P5G-14) |
 | 10 | German | site, console, editor, app and box texts in German; `tools/i18n_check.py` across domains (AC-7) | Software, now (on a real box: with the boards) | -- | M | After the maintainer confirms P5R-10 |
 | 11 | Traditional Chinese (Taiwan) | the same, with CJK glyphs in the box's fonts and the app | Software, now; flash budget on the box to check | 10 | M | |
 | 12 | Build guides for other node types | satellite, I/O pod, target addon as text, rendered on the project page (AC-10 text) | Software, now | -- | S | |
@@ -198,8 +198,8 @@ Plan phases 4-6 and 7 can run in parallel worktrees with 2-3; 10-12 are
 independent of the rest; 13 needs 4, 5 and 6 (its 13a and 13b can then
 run in parallel). Sizes: L about a week of agent work.
 
-**Next (2026-10-22, plan phases 1-7 and 13a built): plan phase 13b (the
-box's side, in progress), then plan phases 8 and 9.**
+**Next (2026-10-22, plan phases 1-9 and 13 built in software): plan phase 10
+(German first, in progress); plan phase 13 on real boxes in HW3.**
 
 ---
 
@@ -602,6 +602,21 @@ packages byte for byte (P5F-9).
 repository's tools, and a test that runs that workflow's commands on a
 sample submission. The maintainer creates `atalaia-modes` from it.
 
+**Built 2026-10-22** (decisions P5G-1 to P5G-11; how it works:
+`docs/community/registry.md`). Beyond the plan: the registry keeps its packages
+beside its index (not as GitHub Release assets) with each mode's newest source,
+which must pack to exactly the signed archive; the verified badge is a second
+signature by the project's registry key over the same archive (P5G-2), the key
+Field Boxes have built in; a fourth job publishes to GitHub Pages.
+
+| File | What |
+|------|------|
+| `registry/template/` | `index.json` (empty, `schema_version: 1`), `keys/README.md`, `keys/revoked.json`, `modes/README.md`, `README.md`, `CONTRIBUTING.md`, `REUSE.toml`, `.github/workflows/registry.yml` (`registry-lint`, `registry-test`, `sandbox-escape`, `publish`, with this repository's tools at `ATALAIA_REF`), `.github/CODEOWNERS`, the pull request template and the *Flag a mode* and *Revoke a key* issue templates |
+| `tools/registry_check.py` | `lint` (with `--base`), `test`, `key`, `add`, `badge` (`--remove`), `site` |
+| `registry/examples/org.example.hill/` | A sample community submission (MIT) with two tests |
+| `registry/tests/test_registry_template.py` | 18 tests: the workflow's shape; the sample listed and verified with throwaway keys, every `check-` step of the workflow run as written, the published package verified as a controller does; the refusals |
+| `tools/check.sh`, `.github/workflows/ci.yml` (job `registry-template`) | The test in this repository's checks |
+
 ## Plan phase 9: Community processes
 
 *Software, can be done now. Size S.*
@@ -610,6 +625,16 @@ CONTRIBUTING.md "Submitting a community mode" (the editor, the
 package, signing, the PR, the checklist, the badge), the review
 checklist and badge criteria as amended, and an RFC for the package
 format, the manifest and the index.
+
+**Built 2026-10-22** (decisions P5G-12 to P5G-14; P5G-2, P5G-3, P5G-8, P5G-9,
+P5G-12, P5G-13 and P5G-14 for the maintainer).
+
+| File | What |
+|------|------|
+| `CONTRIBUTING.md` | "Submitting a community mode": the editor, tests, the key, `registry_check.py key` and `add`, the pull request, review and the badge |
+| `docs/community/README.md`, `registry.md`, `review.md`, `keys.md`, `moderation.md` | How the registry works and what its CI checks; the review checklist as amended and the badge's criteria and commands; making, keeping, rotating and revoking keys; reports, takedowns, ids and owners, appeals |
+| `docs/rfcs/0000-mode-packages-and-registry.md` | The RFC for the package format, the manifest and the index (draft, version 1 as built) |
+| `SECURITY.md`, `LICENSING.md`, `docs/README.md`, `docs/rfcs/README.md`, `registry/README.md`, `protocol/mode-packages.md` | Pointers to the above |
 
 ## Plan phase 10: German
 
@@ -656,12 +681,12 @@ release.
 | AC-3 | The editor ships in English and Portuguese | 1 | **Met (2026-10-22)**: `test_page_in_english_and_portuguese`, `test_languages_have_the_same_keys` |
 | AC-4 | The registry index format is defined and documented | 4 | **Met in software (2026-10-22)**: `registry/schema/index.schema.json`, `protocol/mode-packages.md` |
 | AC-5 | Mode packages are Ed25519-signed and verifiable | 4 | **Met in software (2026-10-22)**: `tools/mode_package.py`, the shared vectors |
-| AC-6 | Registry CI runs mode tests and checks licences | 8 | Pending (the repository needs the maintainer) |
+| AC-6 | Registry CI runs mode tests and checks licences | 8 | **Met in this repository's template (2026-10-22)**: `registry/template/.github/workflows/registry.yml` run on a sample submission by CI's `registry-template` job; in `atalaia-modes` once the maintainer creates it |
 | AC-7 | At least one language beyond en/pt on the site | 10 | Pending |
 | AC-8 | Built-in modes carry English and Portuguese texts | -- | **Met differently**: in `mode.yaml`'s `i18n:` (P4R22), every built-in mode |
 | AC-9 | The carrier PCB schematic passes KiCad ERC | HW1 | Pending (needs hardware) |
 | AC-10 | Build guides exist for the Field Box and the Satellite | 12, HW2 | Field Box done (`hardware/field-box/BUILD.md`); the rest pending |
-| AC-11 | CONTRIBUTING.md documents mode submission | 9 | Pending |
+| AC-11 | CONTRIBUTING.md documents mode submission | 9 | **Met (2026-10-22)**: "Submitting a community mode", `docs/community/` |
 | AC-12 | CI includes a sandbox-escape test job | 5 | **Met (2026-10-22)**: CI job `sandbox-escape` |
 | AC-13 | (new, P5R-8) A box gets a signed mode it lacks from its field controller between games, checks it and plays it; it refuses an unsigned or tampered one | 13, HW3 | Pending (planned 2026-10-22) |
 

@@ -1,0 +1,19 @@
+# The community mode registry's licensing, following the REUSE specification (https://reuse.software).
+# Mode sources in modes/ carry their own SPDX headers, with the licence their mode.yaml names;
+# each package archive in packages/ has a .license file beside it (tools/registry_check.py add
+# writes it). The registry's data is CC0-1.0, so anyone may mirror it (decision P5G-9); its
+# documents are CC-BY-SA-4.0 and its workflow GPL-3.0-or-later, as in the Atalaia repository.
+# After creating the repository, `reuse download --all` fetches the licence texts into LICENSES/.
+version = 1
+
+[[annotations]]
+path = ["index.json", "keys/**", "packages/*.json"]
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 The Atalaia contributors"
+SPDX-License-Identifier = "CC0-1.0"
+
+[[annotations]]
+path = ".github/**"
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 The Atalaia contributors"
+SPDX-License-Identifier = "CC-BY-SA-4.0"

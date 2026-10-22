@@ -511,6 +511,18 @@ offline use. Modes are pushed to nodes over Wi-Fi or BLE during join
 - The 1 MB package limit is already the controller's (`MAX_PACKAGE_BYTES`,
   decision P5-6).
 
+**Note 2026-10-22 (plan phase 8; decisions P5G-1, P5G-2, P5G-4, P5G-10, proposed):** the
+registry repository's files are a template in `registry/template/`. Packages live in
+the registry repository next to its index (`url` `packages/<id>-<version>.tar`), not as
+GitHub Release assets, so a pull request holds everything that is reviewed and a folder
+copy is an offline mirror; the source of each mode's newest version lives in `modes/<id>/`
+and must pack to exactly that archive. Every version carries its author's signature; the
+verified badge is a second signature by the project's registry key over the same archive
+(the key Field Boxes have built in), which the index then lists. Author keys are
+`keys/authors/<key id>.json` with an owner, not `keys/<author>.pub`. The CI runs this
+repository's tools at a pinned ref and publishes `index.json`, `revoked.json` (beside the
+index, where a controller looks), `keys.json`, `packages/` and badges to GitHub Pages.
+
 ---
 
 ### ADR-P5-4: Mode signing scheme
@@ -1070,3 +1082,14 @@ install older versions.
   registry submissions (plan phase 5); the registry's CI runs the same battery.
 - "Verified" also needs the package signed with the release-style manifest
   (ADR-P5-4's amendment) by a key that is not revoked.
+
+**Note 2026-10-22 (plan phases 8 and 9; decisions P5G-5 to P5G-8, P5G-12 to P5G-14, proposed;
+P5G-3, P5G-8, P5G-13 and P5G-14 for the maintainer):** the process is written down in
+`docs/community/` (the registry, the review checklist and badge, keys, moderation) and in
+`CONTRIBUTING.md`, "Submitting a community mode". The registry's CI checks items 1-5, 9, 11
+and 12 of the checklist (`tools/registry_check.py lint` and `test`, `reuse lint`); items 6,
+7, 8 and 10 are in the registry's pull request template. Item 5 is a scan of the code (outside
+comments and strings) for the names the sandbox removes, besides the battery. The badge needs
+a maintainer who is not the author and the project's signature (step 6 above: the maintainer's
+`registry_check.py badge`, not the CI, sets `verified`). The RFC is
+`docs/rfcs/0000-mode-packages-and-registry.md` (draft).
