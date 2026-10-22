@@ -282,8 +282,10 @@ ATAK, the remote GM. For the maintainer: PE24-2 (a phone as the only
 controller, not a standby), PE24-3 (not on plan phase G's gate) and PE24-8
 (the GM console's files in the app), PE24-11 (no `since` replay on the
 stream, as on the Pi) and PE24-12 (the phone's MQTT passwords are the API
-tokens) are answered; open for the maintainer: PE24-42 (the fix in the Pi
-controller), PE24-44 (the game key at rest on a phone) and PE24-52 (the channel choice moves to S7); for the coordinator: PE24-51 (the host box built for the Dart tests).
+tokens), PE24-42 (the fix in the Pi controller), PE24-44 (the game key at
+rest on a phone, in app-private storage) and PE24-52 (the channel choice
+moves to S7) are answered; PE24-51 (the host box built for the Dart tests)
+was accepted by the coordinator.
 
 ## Medic Kit (2026-10-19)
 
