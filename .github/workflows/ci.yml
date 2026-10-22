@@ -92,6 +92,22 @@ jobs:
           docker run --rm --ipc=host -e ATALAIA_REQUIRE_ALL=1 -e ATALAIA_REQUIRE_BROWSER=1 \
             -v "$PWD:/src" -w /src atalaia-console-test sh controller/console/tests/run.sh
 
+  editor:
+    name: Mode editor in a browser (Chromium), blocks to modes that pass their tests
+    # The GM console's image (tools/dev/console/Dockerfile), as `python tools/docker_editor.py`
+    # uses it locally: the editor served by the simulator's web server, its Lua generator run in
+    # Chromium, and the example projects' generated modes run against the hand-written modes'
+    # tests in the simulator (phase 5 plan phase A). A missing browser fails the job.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the browser test image
+        run: docker build -t atalaia-console-test tools/dev/console
+      - name: Browser tests
+        run: |
+          docker run --rm --ipc=host -e ATALAIA_REQUIRE_BROWSER=1 \
+            -v "$PWD:/src" -w /src atalaia-console-test sh simulator/editor_tests/run.sh
+
   server:
     name: Site server (FastAPI on PostgreSQL 16, migrations)
     # The image of server/Dockerfile (target test: python:3.12-slim, the

@@ -68,6 +68,19 @@ precedence = "override"
 SPDX-FileCopyrightText = "2009 Kazuhiko Arase"
 SPDX-License-Identifier = "MIT"
 
+# The mode editor's vendored Blockly 13.3.0
+# (simulator/atalaia_sim/editor/vendor/blockly/README.md has its files and checksums),
+# unmodified from its npm package; its README is the project's own.
+[[annotations]]
+path = [
+    "simulator/atalaia_sim/editor/vendor/blockly/*.js",
+    "simulator/atalaia_sim/editor/vendor/blockly/msg/*.js",
+    "simulator/atalaia_sim/editor/vendor/blockly/media/**",
+]
+precedence = "override"
+SPDX-FileCopyrightText = "2011 Google LLC"
+SPDX-License-Identifier = "Apache-2.0"
+
 # The site server's breached-password list (ADR-P4-2) as hashes, derived from
 # SecLists' Passwords/Common-Credentials/100k-most-used-passwords-NCSC.txt at
 # commit 1a7bb9127eca9e6ff2fc0301c597fe6e16a0cb56 under SecLists' MIT licence

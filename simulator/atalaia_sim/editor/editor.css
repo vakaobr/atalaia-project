@@ -1,0 +1,142 @@
+/*
+ * SPDX-FileCopyrightText: 2026 The Atalaia contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * The mode editor's page, in the simulator's colours (../web/style.css).
+ */
+:root {
+  color-scheme: light dark;
+  --bg: #f4f5f7;
+  --panel: #ffffff;
+  --text: #1c2024;
+  --muted: #60646c;
+  --line: #dfe1e6;
+  --button: #eceef2;
+  --button-hover: #e0e3e9;
+  --accent: #2f6fde;
+  --accent-text: #ffffff;
+  --code-bg: #12161c;
+  --code-text: #d7e3f4;
+  --warn-bg: #fff4e5;
+  --warn-text: #7a3e00;
+  --radius: 10px;
+  --mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111317;
+    --panel: #1a1d23;
+    --text: #e6e8eb;
+    --muted: #9ba1ab;
+    --line: #2c3038;
+    --button: #262a32;
+    --button-hover: #30353f;
+    --accent: #5b8ff0;
+    --accent-text: #0b1020;
+    --code-bg: #07090c;
+    --warn-bg: #3a2a10;
+    --warn-text: #ffd59a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+h2 { font-size: 15px; margin: 0 0 8px; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+
+button, select, .button, input, textarea {
+  font: inherit;
+  color: inherit;
+  background: var(--button);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 5px 10px;
+}
+button, select, .button { cursor: pointer; text-decoration: none; display: inline-block; }
+input, textarea { background: var(--panel); width: 100%; }
+button:hover, select:hover, .button:hover { background: var(--button-hover); }
+button:focus-visible, select:focus-visible, .button:focus-visible, input:focus-visible,
+textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 8px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.bar .group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.brand { font-weight: 700; letter-spacing: 0.02em; }
+.sub { color: var(--muted); margin-left: 6px; }
+.lang { display: inline-flex; align-items: center; gap: 6px; }
+
+.intro { margin: 8px 16px 0; }
+
+.layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 34%);
+  gap: 12px;
+  padding: 8px 16px 16px;
+}
+
+.editor-pane, .preview-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px;
+}
+
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.tabs [aria-selected="true"] { background: var(--accent); color: var(--accent-text); border-color: transparent; }
+
+.stage { position: relative; flex: 1; min-height: 420px; }
+/* The workspaces stay laid out while hidden, so Blockly keeps their size. */
+.ws { position: absolute; inset: 0; visibility: hidden; }
+.ws.active { visibility: visible; }
+
+.mode-form { overflow: auto; display: grid; gap: 10px; align-content: start; padding: 4px; }
+.mode-form label { display: grid; gap: 4px; }
+.mode-form label > span { font-size: 12px; color: var(--muted); }
+
+.code {
+  flex: 1;
+  min-height: 200px;
+  margin: 0 0 8px;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--code-bg);
+  color: var(--code-text);
+  font: 12.5px/1.5 var(--mono);
+  white-space: pre;
+}
+
+.problems-panel { margin-top: 12px; }
+.problems { margin: 0; padding-left: 18px; }
+.problems li { margin: 2px 0; padding: 4px 6px; border-radius: 6px; background: var(--warn-bg); color: var(--warn-text); cursor: pointer; }
+
+@media (max-width: 760px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .stage { min-height: 60vh; }
+}

@@ -11,7 +11,7 @@ Each mode is a folder with a manifest and one or two Lua scripts:
   tests/        event sequences with expected results
 ```
 
-The GM console builds its settings form from `params` in `mode.yaml`, so GMs never edit Lua.
+The GM console builds its settings form from `params` in `mode.yaml`, so GMs never edit Lua. A mode can also be written in blocks in the simulator's mode editor, which generates these files ([simulator/README.md](../simulator/README.md#write-a-mode-in-blocks)).
 
 | Mode | Kind | Runs on | Status |
 | --- | --- | --- | --- |

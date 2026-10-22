@@ -1,0 +1,1467 @@
+{
+ "format": "atalaia-mode-editor",
+ "version": 1,
+ "mode": {
+  "id": "org.atalaia.holdall",
+  "version": "0.1.0",
+  "name": "Hold-All Domination",
+  "description": "Teams capture boxes as in Domination, but a team scores only while it holds every box at once.",
+  "name_pt": "Domínio Total",
+  "description_pt": "As equipas capturam caixas como no Domínio, mas uma equipa só pontua enquanto tiver todas as caixas ao mesmo tempo.",
+  "role": "zone",
+  "license": "GPL-3.0-or-later",
+  "min_tier": "reduced",
+  "author": "The Atalaia contributors",
+  "year": "2026"
+ },
+ "node": {
+  "blocks": {
+   "languageVersion": 0,
+   "blocks": [
+    {
+     "type": "atalaia_state_node",
+     "id": "b71",
+     "x": 20,
+     "y": 28,
+     "inputs": {
+      "ITEMS": {
+       "block": {
+        "type": "atalaia_state_item",
+        "id": "b69",
+        "fields": {
+         "KEY": "owner"
+        },
+        "inputs": {
+         "VALUE": {
+          "block": {
+           "type": "logic_null",
+           "id": "b67"
+          }
+         }
+        },
+        "next": {
+         "block": {
+          "type": "atalaia_state_item",
+          "id": "b70",
+          "fields": {
+           "KEY": "since"
+          },
+          "inputs": {
+           "VALUE": {
+            "block": {
+             "type": "math_number",
+             "id": "b68",
+             "fields": {
+              "NUM": 0
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "atalaia_param_declare",
+     "id": "b72",
+     "x": 980,
+     "y": 20,
+     "fields": {
+      "NAME": "capture_hold_ms",
+      "TYPE": "int",
+      "DEFAULT": "3000",
+      "MIN": "0",
+      "MAX": "60000",
+      "LABEL": "Hold time to capture (ms)",
+      "LABEL_PT": "Tempo a premir para capturar (ms)"
+     }
+    },
+    {
+     "type": "procedures_defnoreturn",
+     "id": "b85",
+     "x": 20,
+     "y": 168,
+     "fields": {
+      "NAME": "show"
+     },
+     "inputs": {
+      "STACK": {
+       "block": {
+        "type": "controls_if",
+        "id": "b84",
+        "extraState": {
+         "hasElse": true
+        },
+        "inputs": {
+         "IF0": {
+          "block": {
+           "type": "atalaia_state_get",
+           "id": "b73",
+           "fields": {
+            "KEY": "owner"
+           }
+          }
+         },
+         "DO0": {
+          "block": {
+           "type": "atalaia_screen",
+           "id": "b78",
+           "fields": {
+            "NAME": "captured"
+           },
+           "inputs": {
+            "DATA": {
+             "block": {
+              "type": "atalaia_pair",
+              "id": "b75",
+              "fields": {
+               "KEY": "team"
+              },
+              "inputs": {
+               "VALUE": {
+                "block": {
+                 "type": "atalaia_state_get",
+                 "id": "b74",
+                 "fields": {
+                  "KEY": "owner"
+                 }
+                }
+               }
+              },
+              "next": {
+               "block": {
+                "type": "atalaia_pair",
+                "id": "b77",
+                "fields": {
+                 "KEY": "since"
+                },
+                "inputs": {
+                 "VALUE": {
+                  "block": {
+                   "type": "atalaia_state_get",
+                   "id": "b76",
+                   "fields": {
+                    "KEY": "since"
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "ELSE": {
+          "block": {
+           "type": "atalaia_screen",
+           "id": "b83",
+           "fields": {
+            "NAME": "neutral"
+           },
+           "inputs": {
+            "DATA": {
+             "block": {
+              "type": "atalaia_pair",
+              "id": "b82",
+              "fields": {
+               "KEY": "hold_s"
+              },
+              "inputs": {
+               "VALUE": {
+                "block": {
+                 "type": "atalaia_idiv",
+                 "id": "b81",
+                 "inputs": {
+                  "A": {
+                   "block": {
+                    "type": "atalaia_param",
+                    "id": "b79",
+                    "fields": {
+                     "NAME": "capture_hold_ms"
+                    }
+                   }
+                  },
+                  "B": {
+                   "block": {
+                    "type": "math_number",
+                    "id": "b80",
+                    "fields": {
+                     "NUM": 1000
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "procedures_defnoreturn",
+     "id": "b102",
+     "x": 20,
+     "y": 420,
+     "extraState": {
+      "params": [
+       {
+        "name": "team",
+        "id": "v-team"
+       },
+       {
+        "name": "squad",
+        "id": "v-squad"
+       }
+      ]
+     },
+     "fields": {
+      "NAME": "capture"
+     },
+     "inputs": {
+      "STACK": {
+       "block": {
+        "type": "atalaia_emit",
+        "id": "b92",
+        "fields": {
+         "TYPE": "zone.captured",
+         "PRIO": "default"
+        },
+        "inputs": {
+         "DATA": {
+          "block": {
+           "type": "atalaia_pair",
+           "id": "b87",
+           "fields": {
+            "KEY": "team"
+           },
+           "inputs": {
+            "VALUE": {
+             "block": {
+              "type": "variables_get",
+              "id": "b86",
+              "fields": {
+               "VAR": {
+                "id": "v-team"
+               }
+              }
+             }
+            }
+           },
+           "next": {
+            "block": {
+             "type": "atalaia_pair",
+             "id": "b89",
+             "fields": {
+              "KEY": "squad"
+             },
+             "inputs": {
+              "VALUE": {
+               "block": {
+                "type": "variables_get",
+                "id": "b88",
+                "fields": {
+                 "VAR": {
+                  "id": "v-squad"
+                 }
+                }
+               }
+              }
+             },
+             "next": {
+              "block": {
+               "type": "atalaia_pair",
+               "id": "b91",
+               "fields": {
+                "KEY": "previous_team"
+               },
+               "inputs": {
+                "VALUE": {
+                 "block": {
+                  "type": "atalaia_state_get",
+                  "id": "b90",
+                  "fields": {
+                   "KEY": "owner"
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        },
+        "next": {
+         "block": {
+          "type": "atalaia_state_set",
+          "id": "b94",
+          "fields": {
+           "KEY": "owner"
+          },
+          "inputs": {
+           "VALUE": {
+            "block": {
+             "type": "variables_get",
+             "id": "b93",
+             "fields": {
+              "VAR": {
+               "id": "v-team"
+              }
+             }
+            }
+           }
+          },
+          "next": {
+           "block": {
+            "type": "atalaia_state_set",
+            "id": "b97",
+            "fields": {
+             "KEY": "since"
+            },
+            "inputs": {
+             "VALUE": {
+              "block": {
+               "type": "math_round",
+               "id": "b96",
+               "fields": {
+                "OP": "ROUNDDOWN"
+               },
+               "inputs": {
+                "NUM": {
+                 "block": {
+                  "type": "atalaia_time",
+                  "id": "b95"
+                 }
+                }
+               }
+              }
+             }
+            },
+            "next": {
+             "block": {
+              "type": "atalaia_team_display",
+              "id": "b99",
+              "inputs": {
+               "TEAM": {
+                "block": {
+                 "type": "variables_get",
+                 "id": "b98",
+                 "fields": {
+                  "VAR": {
+                   "id": "v-team"
+                  }
+                 }
+                }
+               }
+              },
+              "next": {
+               "block": {
+                "type": "atalaia_sound",
+                "id": "b100",
+                "fields": {
+                 "CLIP": "captured"
+                },
+                "next": {
+                 "block": {
+                  "type": "procedures_callnoreturn",
+                  "id": "b101",
+                  "extraState": {
+                   "name": "show"
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "atalaia_on_node",
+     "id": "b104",
+     "x": 20,
+     "y": 784,
+     "fields": {
+      "EVENT": "game.start"
+     },
+     "inputs": {
+      "DO": {
+       "block": {
+        "type": "procedures_callnoreturn",
+        "id": "b103",
+        "extraState": {
+         "name": "show"
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "atalaia_on_node",
+     "id": "b116",
+     "x": 20,
+     "y": 882,
+     "fields": {
+      "EVENT": "team_input.hold"
+     },
+     "inputs": {
+      "DO": {
+       "block": {
+        "type": "controls_if",
+        "id": "b115",
+        "inputs": {
+         "IF0": {
+          "block": {
+           "type": "logic_operation",
+           "id": "b111",
+           "fields": {
+            "OP": "AND"
+           },
+           "inputs": {
+            "A": {
+             "block": {
+              "type": "logic_compare",
+              "id": "b107",
+              "fields": {
+               "OP": "NEQ"
+              },
+              "inputs": {
+               "A": {
+                "block": {
+                 "type": "atalaia_event_value",
+                 "id": "b105",
+                 "fields": {
+                  "KEY": "team"
+                 }
+                }
+               },
+               "B": {
+                "block": {
+                 "type": "atalaia_state_get",
+                 "id": "b106",
+                 "fields": {
+                  "KEY": "owner"
+                 }
+                }
+               }
+              }
+             }
+            },
+            "B": {
+             "block": {
+              "type": "logic_compare",
+              "id": "b110",
+              "fields": {
+               "OP": "GTE"
+              },
+              "inputs": {
+               "A": {
+                "block": {
+                 "type": "atalaia_event_value",
+                 "id": "b108",
+                 "fields": {
+                  "KEY": "ms"
+                 }
+                }
+               },
+               "B": {
+                "block": {
+                 "type": "atalaia_param",
+                 "id": "b109",
+                 "fields": {
+                  "NAME": "capture_hold_ms"
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "DO0": {
+          "block": {
+           "type": "procedures_callnoreturn",
+           "id": "b114",
+           "extraState": {
+            "name": "capture",
+            "params": [
+             "team",
+             "squad"
+            ]
+           },
+           "inputs": {
+            "ARG0": {
+             "block": {
+              "type": "atalaia_event_value",
+              "id": "b112",
+              "fields": {
+               "KEY": "team"
+              }
+             }
+            },
+            "ARG1": {
+             "block": {
+              "type": "atalaia_event_value",
+              "id": "b113",
+              "fields": {
+               "KEY": "squad"
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "atalaia_on_node",
+     "id": "b144",
+     "x": 20,
+     "y": 1064,
+     "icons": {
+      "comment": {
+       "text": "The GM's owner override from the console: a team, or none to free the box.",
+       "pinned": false,
+       "height": 80,
+       "width": 220
+      }
+     },
+     "fields": {
+      "EVENT": "cmd.set_owner"
+     },
+     "inputs": {
+      "DO": {
+       "block": {
+        "type": "controls_if",
+        "id": "b121",
+        "inputs": {
+         "IF0": {
+          "block": {
+           "type": "logic_compare",
+           "id": "b119",
+           "fields": {
+            "OP": "EQ"
+           },
+           "inputs": {
+            "A": {
+             "block": {
+              "type": "atalaia_event_value",
+              "id": "b117",
+              "fields": {
+               "KEY": "team"
+              }
+             }
+            },
+            "B": {
+             "block": {
+              "type": "atalaia_state_get",
+              "id": "b118",
+              "fields": {
+               "KEY": "owner"
+              }
+             }
+            }
+           }
+          }
+         },
+         "DO0": {
+          "block": {
+           "type": "atalaia_return",
+           "id": "b120"
+          }
+         }
+        },
+        "next": {
+         "block": {
+          "type": "controls_if",
+          "id": "b143",
+          "extraState": {
+           "hasElse": true
+          },
+          "inputs": {
+           "IF0": {
+            "block": {
+             "type": "logic_operation",
+             "id": "b132",
+             "fields": {
+              "OP": "OR"
+             },
+             "inputs": {
+              "A": {
+               "block": {
+                "type": "logic_operation",
+                "id": "b128",
+                "fields": {
+                 "OP": "OR"
+                },
+                "inputs": {
+                 "A": {
+                  "block": {
+                   "type": "logic_compare",
+                   "id": "b124",
+                   "fields": {
+                    "OP": "EQ"
+                   },
+                   "inputs": {
+                    "A": {
+                     "block": {
+                      "type": "atalaia_event_value",
+                      "id": "b122",
+                      "fields": {
+                       "KEY": "team"
+                      }
+                     }
+                    },
+                    "B": {
+                     "block": {
+                      "type": "logic_null",
+                      "id": "b123"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 "B": {
+                  "block": {
+                   "type": "logic_compare",
+                   "id": "b127",
+                   "fields": {
+                    "OP": "EQ"
+                   },
+                   "inputs": {
+                    "A": {
+                     "block": {
+                      "type": "atalaia_event_value",
+                      "id": "b125",
+                      "fields": {
+                       "KEY": "team"
+                      }
+                     }
+                    },
+                    "B": {
+                     "block": {
+                      "type": "text",
+                      "id": "b126",
+                      "fields": {
+                       "TEXT": ""
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              },
+              "B": {
+               "block": {
+                "type": "logic_compare",
+                "id": "b131",
+                "fields": {
+                 "OP": "EQ"
+                },
+                "inputs": {
+                 "A": {
+                  "block": {
+                   "type": "atalaia_event_value",
+                   "id": "b129",
+                   "fields": {
+                    "KEY": "team"
+                   }
+                  }
+                 },
+                 "B": {
+                  "block": {
+                   "type": "text",
+                   "id": "b130",
+                   "fields": {
+                    "TEXT": "none"
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           },
+           "DO0": {
+            "block": {
+             "type": "atalaia_emit",
+             "id": "b135",
+             "fields": {
+              "TYPE": "zone.neutralized",
+              "PRIO": "default"
+             },
+             "inputs": {
+              "DATA": {
+               "block": {
+                "type": "atalaia_pair",
+                "id": "b134",
+                "fields": {
+                 "KEY": "previous_team"
+                },
+                "inputs": {
+                 "VALUE": {
+                  "block": {
+                   "type": "atalaia_state_get",
+                   "id": "b133",
+                   "fields": {
+                    "KEY": "owner"
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             },
+             "next": {
+              "block": {
+               "type": "atalaia_state_set",
+               "id": "b137",
+               "fields": {
+                "KEY": "owner"
+               },
+               "inputs": {
+                "VALUE": {
+                 "block": {
+                  "type": "logic_null",
+                  "id": "b136"
+                 }
+                }
+               },
+               "next": {
+                "block": {
+                 "type": "atalaia_team_display",
+                 "id": "b139",
+                 "inputs": {
+                  "TEAM": {
+                   "block": {
+                    "type": "text",
+                    "id": "b138",
+                    "fields": {
+                     "TEXT": "none"
+                    }
+                   }
+                  }
+                 },
+                 "next": {
+                  "block": {
+                   "type": "procedures_callnoreturn",
+                   "id": "b140",
+                   "extraState": {
+                    "name": "show"
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           },
+           "ELSE": {
+            "block": {
+             "type": "procedures_callnoreturn",
+             "id": "b142",
+             "extraState": {
+              "name": "capture",
+              "params": [
+               "team",
+               "squad"
+              ]
+             },
+             "inputs": {
+              "ARG0": {
+               "block": {
+                "type": "atalaia_event_value",
+                "id": "b141",
+                "fields": {
+                 "KEY": "team"
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "atalaia_on_node",
+     "id": "b148",
+     "x": 20,
+     "y": 1484,
+     "fields": {
+      "EVENT": "game.end"
+     },
+     "inputs": {
+      "DO": {
+       "block": {
+        "type": "atalaia_screen",
+        "id": "b147",
+        "fields": {
+         "NAME": "final_score"
+        },
+        "inputs": {
+         "DATA": {
+          "block": {
+           "type": "atalaia_pair",
+           "id": "b146",
+           "fields": {
+            "KEY": "owner"
+           },
+           "inputs": {
+            "VALUE": {
+             "block": {
+              "type": "atalaia_state_get",
+              "id": "b145",
+              "fields": {
+               "KEY": "owner"
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  "variables": [
+   {
+    "name": "team",
+    "id": "v-team"
+   },
+   {
+    "name": "squad",
+    "id": "v-squad"
+   }
+  ]
+ },
+ "field": {
+  "blocks": {
+   "languageVersion": 0,
+   "blocks": [
+    {
+     "type": "atalaia_state_field",
+     "id": "b151",
+     "x": 20,
+     "y": 28,
+     "inputs": {
+      "ITEMS": {
+       "block": {
+        "type": "atalaia_state_item",
+        "id": "b150",
+        "fields": {
+         "KEY": "holder"
+        },
+        "inputs": {
+         "VALUE": {
+          "block": {
+           "type": "logic_null",
+           "id": "b149"
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "atalaia_param_declare",
+     "id": "b152",
+     "x": 980,
+     "y": 20,
+     "fields": {
+      "NAME": "tick_s",
+      "TYPE": "int",
+      "DEFAULT": "10",
+      "MIN": "1",
+      "MAX": "600",
+      "LABEL": "Seconds per scoring tick while one team holds every box",
+      "LABEL_PT": "Segundos por ponto enquanto uma equipa tem todas as caixas"
+     }
+    },
+    {
+     "type": "atalaia_param_declare",
+     "id": "b153",
+     "x": 980,
+     "y": 170,
+     "fields": {
+      "NAME": "points_per_tick",
+      "TYPE": "int",
+      "DEFAULT": "1",
+      "MIN": "1",
+      "MAX": "1000",
+      "LABEL": "Points per tick",
+      "LABEL_PT": "Pontos por intervalo"
+     }
+    },
+    {
+     "type": "atalaia_param_declare",
+     "id": "b154",
+     "x": 980,
+     "y": 320,
+     "fields": {
+      "NAME": "min_zones",
+      "TYPE": "int",
+      "DEFAULT": "2",
+      "MIN": "1",
+      "MAX": "64",
+      "LABEL": "Boxes in play before anyone can score",
+      "LABEL_PT": "Caixas em jogo antes de alguém poder pontuar"
+     }
+    },
+    {
+     "type": "procedures_defnoreturn",
+     "id": "b196",
+     "x": 20,
+     "y": 168,
+     "icons": {
+      "comment": {
+       "text": "One team scores while it holds every box (and enough boxes are in play).",
+       "pinned": false,
+       "height": 80,
+       "width": 220
+      }
+     },
+     "fields": {
+      "NAME": "check"
+     },
+     "inputs": {
+      "STACK": {
+       "block": {
+        "type": "variables_set",
+        "id": "b156",
+        "fields": {
+         "VAR": {
+          "id": "v-ids"
+         }
+        },
+        "inputs": {
+         "VALUE": {
+          "block": {
+           "type": "atalaia_field_ids",
+           "id": "b155",
+           "fields": {
+            "ROLE": "zone"
+           }
+          }
+         }
+        },
+        "next": {
+         "block": {
+          "type": "variables_set",
+          "id": "b158",
+          "fields": {
+           "VAR": {
+            "id": "v-team"
+           }
+          },
+          "inputs": {
+           "VALUE": {
+            "block": {
+             "type": "logic_null",
+             "id": "b157"
+            }
+           }
+          },
+          "next": {
+           "block": {
+            "type": "controls_if",
+            "id": "b166",
+            "inputs": {
+             "IF0": {
+              "block": {
+               "type": "logic_compare",
+               "id": "b162",
+               "fields": {
+                "OP": "GTE"
+               },
+               "inputs": {
+                "A": {
+                 "block": {
+                  "type": "lists_length",
+                  "id": "b160",
+                  "inputs": {
+                   "VALUE": {
+                    "block": {
+                     "type": "variables_get",
+                     "id": "b159",
+                     "fields": {
+                      "VAR": {
+                       "id": "v-ids"
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                },
+                "B": {
+                 "block": {
+                  "type": "atalaia_param",
+                  "id": "b161",
+                  "fields": {
+                   "NAME": "min_zones"
+                  }
+                 }
+                }
+               }
+              }
+             },
+             "DO0": {
+              "block": {
+               "type": "variables_set",
+               "id": "b165",
+               "fields": {
+                "VAR": {
+                 "id": "v-team"
+                }
+               },
+               "inputs": {
+                "VALUE": {
+                 "block": {
+                  "type": "atalaia_field_common_owner",
+                  "id": "b164",
+                  "inputs": {
+                   "NODES": {
+                    "block": {
+                     "type": "variables_get",
+                     "id": "b163",
+                     "fields": {
+                      "VAR": {
+                       "id": "v-ids"
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            },
+            "next": {
+             "block": {
+              "type": "controls_if",
+              "id": "b171",
+              "inputs": {
+               "IF0": {
+                "block": {
+                 "type": "logic_compare",
+                 "id": "b169",
+                 "fields": {
+                  "OP": "EQ"
+                 },
+                 "inputs": {
+                  "A": {
+                   "block": {
+                    "type": "variables_get",
+                    "id": "b167",
+                    "fields": {
+                     "VAR": {
+                      "id": "v-team"
+                     }
+                    }
+                   }
+                  },
+                  "B": {
+                   "block": {
+                    "type": "atalaia_state_get",
+                    "id": "b168",
+                    "fields": {
+                     "KEY": "holder"
+                    }
+                   }
+                  }
+                 }
+                }
+               },
+               "DO0": {
+                "block": {
+                 "type": "atalaia_return",
+                 "id": "b170"
+                }
+               }
+              },
+              "next": {
+               "block": {
+                "type": "controls_if",
+                "id": "b181",
+                "inputs": {
+                 "IF0": {
+                  "block": {
+                   "type": "logic_compare",
+                   "id": "b174",
+                   "fields": {
+                    "OP": "NEQ"
+                   },
+                   "inputs": {
+                    "A": {
+                     "block": {
+                      "type": "atalaia_state_get",
+                      "id": "b172",
+                      "fields": {
+                       "KEY": "holder"
+                      }
+                     }
+                    },
+                    "B": {
+                     "block": {
+                      "type": "logic_null",
+                      "id": "b173"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 "DO0": {
+                  "block": {
+                   "type": "atalaia_cancel",
+                   "id": "b175",
+                   "fields": {
+                    "TIMER": {
+                     "id": "v-tick"
+                    }
+                   },
+                   "next": {
+                    "block": {
+                     "type": "variables_set",
+                     "id": "b177",
+                     "fields": {
+                      "VAR": {
+                       "id": "v-tick"
+                      }
+                     },
+                     "inputs": {
+                      "VALUE": {
+                       "block": {
+                        "type": "logic_null",
+                        "id": "b176"
+                       }
+                      }
+                     },
+                     "next": {
+                      "block": {
+                       "type": "atalaia_emit",
+                       "id": "b180",
+                       "fields": {
+                        "TYPE": "holdall.scoring_stop",
+                        "PRIO": "default"
+                       },
+                       "inputs": {
+                        "DATA": {
+                         "block": {
+                          "type": "atalaia_pair",
+                          "id": "b179",
+                          "fields": {
+                           "KEY": "team"
+                          },
+                          "inputs": {
+                           "VALUE": {
+                            "block": {
+                             "type": "atalaia_state_get",
+                             "id": "b178",
+                             "fields": {
+                              "KEY": "holder"
+                             }
+                            }
+                           }
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                },
+                "next": {
+                 "block": {
+                  "type": "atalaia_state_set",
+                  "id": "b183",
+                  "fields": {
+                   "KEY": "holder"
+                  },
+                  "inputs": {
+                   "VALUE": {
+                    "block": {
+                     "type": "variables_get",
+                     "id": "b182",
+                     "fields": {
+                      "VAR": {
+                       "id": "v-team"
+                      }
+                     }
+                    }
+                   }
+                  },
+                  "next": {
+                   "block": {
+                    "type": "controls_if",
+                    "id": "b195",
+                    "inputs": {
+                     "IF0": {
+                      "block": {
+                       "type": "logic_compare",
+                       "id": "b186",
+                       "fields": {
+                        "OP": "NEQ"
+                       },
+                       "inputs": {
+                        "A": {
+                         "block": {
+                          "type": "variables_get",
+                          "id": "b184",
+                          "fields": {
+                           "VAR": {
+                            "id": "v-team"
+                           }
+                          }
+                         }
+                        },
+                        "B": {
+                         "block": {
+                          "type": "logic_null",
+                          "id": "b185"
+                         }
+                        }
+                       }
+                      }
+                     },
+                     "DO0": {
+                      "block": {
+                       "type": "atalaia_emit",
+                       "id": "b189",
+                       "fields": {
+                        "TYPE": "holdall.scoring_start",
+                        "PRIO": "default"
+                       },
+                       "inputs": {
+                        "DATA": {
+                         "block": {
+                          "type": "atalaia_pair",
+                          "id": "b188",
+                          "fields": {
+                           "KEY": "team"
+                          },
+                          "inputs": {
+                           "VALUE": {
+                            "block": {
+                             "type": "variables_get",
+                             "id": "b187",
+                             "fields": {
+                              "VAR": {
+                               "id": "v-team"
+                              }
+                             }
+                            }
+                           }
+                          }
+                         }
+                        }
+                       },
+                       "next": {
+                        "block": {
+                         "type": "atalaia_every_as",
+                         "id": "b194",
+                         "icons": {
+                          "comment": {
+                           "text": "The first points come one full tick after the last box fell.",
+                           "pinned": false,
+                           "height": 80,
+                           "width": 220
+                          }
+                         },
+                         "fields": {
+                          "TIMER": {
+                           "id": "v-tick"
+                          }
+                         },
+                         "inputs": {
+                          "SECONDS": {
+                           "block": {
+                            "type": "atalaia_param",
+                            "id": "b190",
+                            "fields": {
+                             "NAME": "tick_s"
+                            }
+                           }
+                          },
+                          "DO": {
+                           "block": {
+                            "type": "atalaia_score_add",
+                            "id": "b193",
+                            "fields": {
+                             "REASON": "holdall"
+                            },
+                            "inputs": {
+                             "POINTS": {
+                              "block": {
+                               "type": "atalaia_param",
+                               "id": "b191",
+                               "fields": {
+                                "NAME": "points_per_tick"
+                               }
+                              }
+                             },
+                             "TEAM": {
+                              "block": {
+                               "type": "atalaia_state_get",
+                               "id": "b192",
+                               "fields": {
+                                "KEY": "holder"
+                               }
+                              }
+                             }
+                            }
+                           }
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "atalaia_on_field",
+     "id": "b198",
+     "x": 20,
+     "y": 980,
+     "fields": {
+      "EVENT": "zone.captured"
+     },
+     "inputs": {
+      "DO": {
+       "block": {
+        "type": "procedures_callnoreturn",
+        "id": "b197",
+        "extraState": {
+         "name": "check"
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "atalaia_on_field",
+     "id": "b200",
+     "x": 20,
+     "y": 1078,
+     "fields": {
+      "EVENT": "zone.neutralized"
+     },
+     "inputs": {
+      "DO": {
+       "block": {
+        "type": "procedures_callnoreturn",
+        "id": "b199",
+        "extraState": {
+         "name": "check"
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "atalaia_every",
+     "id": "b203",
+     "x": 20,
+     "y": 1176,
+     "icons": {
+      "comment": {
+       "text": "Box owners come from the boxes' reports, a little after the event: check every second too.",
+       "pinned": false,
+       "height": 80,
+       "width": 220
+      }
+     },
+     "inputs": {
+      "SECONDS": {
+       "block": {
+        "type": "math_number",
+        "id": "b201",
+        "fields": {
+         "NUM": 1
+        }
+       }
+      },
+      "DO": {
+       "block": {
+        "type": "procedures_callnoreturn",
+        "id": "b202",
+        "extraState": {
+         "name": "check"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  "variables": [
+   {
+    "name": "ids",
+    "id": "v-ids"
+   },
+   {
+    "name": "team",
+    "id": "v-team"
+   },
+   {
+    "name": "tick",
+    "id": "v-tick"
+   }
+  ]
+ }
+}

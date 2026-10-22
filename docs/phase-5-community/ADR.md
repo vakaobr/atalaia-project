@@ -11,6 +11,68 @@ the i18n architecture, and the community governance process before any
 implementation begins. Each one answers a question the research phase
 identified and creates a constraint that the planning phase must respect.
 
+
+## Refresh 2026-10-22 (after phases 2, 3 and 4 software)
+
+These decisions were written on 2026-10-18, before phases 2-4 were built. Every
+ADR below was re-checked against the code as it is today (the core's script
+API, the modes, the field controller and its scenario compiler, the GM console,
+the simulator, the firmware's release signing and box texts, the app and the
+site server). Where the code and an ADR disagree, the code is the fact and the
+ADR gets a dated **Amendment 2026-10-22** at its end; the original text stays,
+so the history can be read. The amendments are proposals: decisions P5R-1 to
+P5R-14 in `docs/review/decisions-to-review.md`, all open; the ones marked "for
+the maintainer" need the maintainer's choice.
+
+| ADR | Re-check 2026-10-22 | Amendment |
+|-----|---------------------|-----------|
+| P5-1 Blockly-to-Lua | Holds (a `CodeGenerator`, named local functions, the memory first). Wrong on the field API ("blocked on 2C": built), the Blockly version (11.x; 13 is current), the folder (`editor/`) and the file split | Yes: today's API incl. field scripts, Blockly 13.3.0 vendored in the simulator, one blocks file and one generator file (P5R-3, P5R-4) |
+| P5-2 Editor and simulator | Holds as a separate page on the simulator's server; the "Test" button and `POST /api/reload` are not built; the web view does not run `field.lua` yet | Yes: where the editor lives (the simulator, for modes; the console, later, for scenarios), and the reload needs `field.lua` in the web view (P5R-2, P5R-5) |
+| P5-3 Registry hosting and index | The "controller pushes modes to nodes" step cannot happen: a box runs only the scripts built into its firmware (K10). Only field scripts install at run time (`POST /api/v1/modes`, scenarios) | Yes: what a registry package can be today, and the repository waits for the maintainer (P5R-8, P5R-9) |
+| P5-4 Signing | Ed25519 holds; the firmware already has a signing scheme, tooling and shared vectors that the registry should reuse instead of a second one | Yes: the firmware release format and tooling for mode packages (P5R-7) |
+| P5-5 Licence list | Holds; the editor offers exactly these seven | Note only |
+| P5-6 Carrier PCB | Holds; the build manual with wiring diagrams exists, the first boards are on the bench, no perfboard box is finished | Note only (still needs hardware) |
+| P5-7 i18n | Partly redundant: modes carry their translations inside `mode.yaml` (P4R22); the box's texts are a runtime table in English and Portuguese (BN-14), not compile-time headers; the console, app and editor use JSON or Dart tables, not YAML | Yes: per-domain formats as built, one parity check per domain, the third language (P5R-10, P5R-11) |
+| P5-8 Review and governance | Holds; the review checklist names `i18n/` folders and a separate sandbox job that the code does differently | Small: checklist items 6, 11 and the sandbox job (P5R-12, P5R-13) |
+
+Facts the amendments rely on (all built, 2026-10-22):
+
+- **Script API** (`core/src/script_api.c`): `on`, `emit`, `every`, `after`,
+  `cancel`, `rand`, `log`, `cap(id):method(...)`, `ui.*`, `audio.*`,
+  `game.time/start/finish/win/teams`, `score.add/get`, `state.node{}`,
+  `state.field{}`, `geo.distance/in_zone`, `params`; on the controller only,
+  `field.nodes/owner/send/score/common_owner`. The sandbox (`core/src/sandbox.c`)
+  keeps `string`, `math` (without `random`), `table`, `utf8`, `coroutine` and
+  removes `io`, `os`, `require`, `load*`, `dofile`, `debug`, bytecode; its C test
+  is `test_sandbox` in `core/tests/test_node.c`.
+- **Mode packages** (`modes/README.md`, `simulator/atalaia_sim/mode.py`):
+  `kind` mode, modifier, role package or scenario; roles with `requires`,
+  `optional` and `needed`; parameters of type `int`, `bool`, `team`, `string`;
+  GM `commands`; translations under `i18n:` in `mode.yaml`; screens as YAML
+  templates in `assets/screens/`; tests in YAML run by
+  `python -m atalaia_sim test`, with `field.lua` run as the controller runs it.
+- **How modes reach devices** (decision K10, confirmed): every mode in `modes/`
+  is built into the Field Box firmware as a preset; there is no upload path
+  for node scripts, so a new node script needs a firmware release. The field
+  controller installs uploaded packages (`POST /api/v1/modes`, checked by
+  loading them in the real core, at most 1 MB, decision P5-6) and runs their
+  `field.lua`; a scenario is a `kind: scenario` package with a `field.lua` only,
+  over the built-in objectives package (P4R7), compiled from a YAML manifest by
+  `controller/atalaia_controller/scenarios/` and written in the GM console's
+  scenario builder or kept in the site server's scenario library.
+- **Signing** (`protocol/firmware-update.md`, `controller/atalaia_controller/firmware_release.py`,
+  `tools/firmware_release.py`): Ed25519 (RFC 8032) over a text manifest
+  (`atalaia-firmware-release-v1`, platform, version, size, SHA-256), keys made
+  by `keygen` outside the repository, key ids from the key's SHA-256, shared
+  vectors checked by C (Monocypher on the box) and Python.
+- **Languages**: the site (YAML, `tools/build_site.py`), the GM console (JSON,
+  `controller/console/src/i18n/`), the app (Dart tables, `app/lib/l10n/`), the
+  box (`firmware/esp32/main/box_text.c`, chosen per game by the join), modes
+  (`mode.yaml` `i18n:`), all in English and European Portuguese.
+- **Simulator web view** (`simulator/atalaia_sim/web.py`): static page,
+  `GET /api/state`, `POST /api/action`, localhost only; it runs node scripts,
+  not `field.lua`.
+
 ---
 
 ### ADR-P5-1: Blockly-to-Lua code generation strategy
@@ -108,6 +170,42 @@ editor.
   until the field API ships in phase 2C. Node-script blocks can proceed
   immediately.
 
+**Amendment 2026-10-22 (after phases 2-4 software; decisions P5R-3, P5R-4, P5A-1 to P5A-7, proposed):**
+
+- **The API is today's, field scripts included.** The field API shipped (phase 2),
+  so the editor has a workspace for `node.lua` and one for `field.lua`, with the
+  Field category (`field.nodes` as "the boxes with role ...", `field.owner`,
+  `field.common_owner`, `field.send`, `field.score`), `game.teams()`,
+  `state.field{}` and the field script's inputs (`zone.captured`,
+  `zone.neutralized`, `node.rebooted`, `position.fix`). Geo blocks and GM
+  commands come in plan phase 3. The "Coming soon" Field category is superseded.
+- **Blockly 13.3.0, not 11.x**, vendored unmodified in
+  `simulator/atalaia_sim/editor/vendor/blockly/` (core, Blockly's own blocks, its
+  Lua generator, English and Portuguese messages, media; SHA-256 checked by a
+  test; Apache-2.0 in `REUSE.toml`), never from a CDN.
+- **The generator is an instance of Blockly's `LuaGenerator`** with the project's
+  blocks added and Blockly's own Lua kept for logic, numbers, text, lists,
+  variables and function calls. Beyond the five rules above: double-quoted
+  strings, Blockly variables become one `local a, b` line at the top (a block
+  variable is global to its script, as in Blockly), a function is placed before
+  the functions that call it (mutual calls are declared first), a handler that
+  only calls a function names it (`on("game.start", show)`), and each script
+  starts with SPDX lines from the Mode tab.
+- **Files:** `blocks.js` (definitions and toolboxes), `generator.js` (Lua and
+  `mode.yaml`), `editor.js`, `index.html`, `editor.css`, `i18n/en.json`,
+  `i18n/pt.json`, `examples/` in `simulator/atalaia_sim/editor/`, not sixteen
+  files under `editor/`: the page has no build step, and the simulator serves it.
+- **`mode.yaml`:** one role per mode for now (its name from the Mode tab);
+  inputs the box script reacts to are `requires` (`team_input`, `keypad`, `nfc`,
+  `hit`, `gps`), outputs it uses are `optional` (`team_display`, `audio`,
+  `display`); settings come from "setting ... is a ..." blocks, with English and
+  Portuguese labels.
+- **The round trip** runs in Chromium: the example projects (Domination; Hold-All
+  Domination, with a field script) give a `node.lua`, `field.lua` and `mode.yaml`
+  that pass every YAML test of the hand-written modes and give the same
+  manifest (`simulator/editor_tests/`, `python tools/docker_editor.py`, CI's
+  `editor` job). Built in plan phase 1, 2026-10-22.
+
 ---
 
 ### ADR-P5-2: Editor-simulator integration architecture
@@ -197,6 +295,25 @@ UI). The URL structure:
   is required.
 - WebSocket live updates (showing events as they fire) can be added
   later without changing the reload mechanism.
+
+**Amendment 2026-10-22 (after phases 2-4 software; decisions P5R-2, P5R-5, proposed):**
+
+- **Where the editor lives.** The mode editor is a page of the simulator
+  (`/editor/`, served by `simulator/atalaia_sim/web.py` from
+  `simulator/atalaia_sim/editor/`), as decided; it is the tool of whoever writes a
+  mode, on their own computer, offline. The GM console does **not** get the mode
+  editor: a box runs only built-in scripts (K10), so blocks made at the field
+  could not reach the boxes. What a GM can install at run time is a scenario,
+  and the console already has a scenario builder (YAML); plan phase 7 adds a
+  block view to it that writes the same scenario manifest, so both editors
+  exist, each for what its users can deploy.
+- **Paths.** `/editor/` and its files are served with their own
+  Content-Security-Policy (Blockly writes its stylesheet and inline styles:
+  `style-src 'self' 'unsafe-inline'`; scripts stay `'self'` only); the
+  simulator's own page keeps its stricter policy.
+- **`POST /api/reload` waits for plan phase 2**, which also teaches the web view
+  to run `field.lua` (today only the YAML tests run it), so that a mode with a
+  controller script can be played live. The endpoint keeps this ADR's shape.
 
 ---
 
@@ -325,6 +442,30 @@ offline use. Modes are pushed to nodes over Wi-Fi or BLE during join
   and CDN as the index. Authors with their own repositories can host
   releases there.
 
+**Amendment 2026-10-22 (after phases 2-4 software; decisions P5R-8, P5R-9, proposed):**
+
+- **What a registry package can be today.** Boxes run only the scripts built
+  into their firmware (K10, confirmed by the maintainer), so steps 7-8 of the
+  sync above cannot install a node script on a box. A registry package can
+  reach the field as (a) a scenario (`kind: scenario`, `field.lua` only, over the
+  built-in objectives package), installed on the controller like any upload;
+  (b) a mode package for the simulator and for review, whose node script
+  reaches boxes only when it is merged into `modes/` and shipped in a signed
+  firmware release. Whether boxes should ever load signed community node
+  scripts at run time is **for the maintainer** (P5R-8); the recommendation is
+  not in phase 5.
+- **The repository.** `atalaia-project/atalaia-modes` is created only with the
+  maintainer's go-ahead (P5-3, confirmed). Until then the index schema, the
+  package and signing tools and their tests live in this repository
+  (`registry/`), and plan phase 8 prepares the registry repository's files
+  as a template.
+- **The site server's scenario library** (phase 4 plan phase 20) is per field;
+  the registry is public. Plan phase 6 lets a controller (and later the site
+  server) import a signed package from a registry index; the library keeps
+  its own revisions.
+- The 1 MB package limit is already the controller's (`MAX_PACKAGE_BYTES`,
+  decision P5-6).
+
 ---
 
 ### ADR-P5-4: Mode signing scheme
@@ -424,6 +565,29 @@ as `SHA256:<base64>`. This is the same format used by SSH.
   malicious mode. The sandbox (core/README.md) is the primary defence
   against malicious scripts; signing provides attribution, not safety.
 
+**Amendment 2026-10-22 (after phases 2-4 software; decision P5R-7, proposed):**
+
+The firmware's release signing exists now (`protocol/firmware-update.md`), and
+a mode package should be signed the same way rather than with a second
+scheme:
+
+- **What is signed:** a text manifest, as for firmware, not the bare hex hash:
+  `atalaia-mode-package-v1`, then `id=`, `version=`, `size=`, `sha256=` (of the
+  package archive), each line ending in a line feed, UTF-8; the signature is
+  Ed25519 (RFC 8032), base64. Binding the id and version stops a valid
+  signature from being reused for another mode or an older version.
+- **Keys and ids:** made by a `keygen` like `tools/firmware_release.py`'s
+  (PKCS#8 PEM with a passphrase, refused inside the repository); a key's id is
+  the first 16 hex digits of the SHA-256 of its 32 bytes, as for release keys,
+  instead of an SSH-style `SHA256:` fingerprint.
+- **Tools and code:** `tools/mode_package.py` (pack, keygen, sign, verify),
+  sharing the Ed25519 and manifest helpers with
+  `controller/atalaia_controller/firmware_release.py`, and shared vectors in
+  `protocol/vectors/` so the controller (and any later implementation) checks
+  the same bytes. `registry/tools/keygen.py` and `sign.py` above are
+  superseded.
+- Revocation stays a list of key ids in the index repository.
+
 ---
 
 ### ADR-P5-5: Approved licence list for community modes
@@ -485,6 +649,10 @@ justification that the licence meets the criteria above.
 - The list can be expanded through the RFC process, but the bar is
   high: a new licence must meet all three criteria and have a clear
   use case not covered by the existing options.
+
+**Note 2026-10-22:** holds. The editor's Mode tab offers exactly these seven
+identifiers; the manifest a package carries is checked against them when the
+registry tooling exists (plan phase 4).
 
 ---
 
@@ -570,6 +738,12 @@ image and `kicad-cli`.
   different enclosure sizes and layouts.
 - Community contributors can order the PCB from any fabricator using
   the Gerbers; KiCad is free and cross-platform for modifications.
+
+**Note 2026-10-22:** holds; still needs hardware. Since this ADR, the Field
+Box build manual with wiring diagrams (`hardware/field-box/BUILD.md`) and the
+pin map with GNSS exist, and the first Heltec V4.3 boards run on the bench;
+no perfboard box is finished, so none of the three gates is met (plan phase
+HW1).
 
 ---
 
@@ -697,6 +871,31 @@ present in every language file, as enforced by the existing CI check).
   domains: translators should consult it for consistent Portuguese
   terms across the platform.
 
+**Amendment 2026-10-22 (after phases 2-4 software; decisions P5R-10, P5R-11, proposed):**
+
+- **Each domain keeps the format it was built with**, instead of YAML
+  everywhere: the site YAML (`site/i18n/`), the GM console JSON
+  (`controller/console/src/i18n/`), the mode editor JSON
+  (`simulator/atalaia_sim/editor/i18n/`, the same shape as the console's: no
+  `build_editor_i18n.py`), the app Dart tables (`app/lib/l10n/`), the box a C
+  table (`firmware/esp32/main/box_text.c`), modes `mode.yaml`'s `i18n:`. Each
+  already has, or gets in its plan phase, a test that every language has the
+  same keys and placeholders; `tools/i18n_check.py` comes with the third
+  language (plan phase 10) and runs those checks in one place.
+- **Modes:** no `i18n/` folders: every built-in mode already carries its
+  Portuguese name, description and parameter labels in `mode.yaml` (P4R22), so
+  AC-8 is met that way.
+- **Firmware:** the box's language is chosen per game at run time (join key 15,
+  decision BN-14), from one table with both languages; the compile-time
+  headers above are superseded. A language for the box is a column in that
+  table plus its glyphs in the box's fonts (`tools/gen_box_fonts.py`).
+- **The third language** (P5-1, changed by the maintainer: German and
+  Traditional Chinese (Taiwan) next, a call for translators for French,
+  Spanish and others): German first, in the site, the console, the editor, the
+  app and the box (plan phase 10), because it needs no new glyphs; Traditional
+  Chinese next (plan phase 11), because the box's fonts and the app need CJK
+  glyphs. The order is **for the maintainer** (P5R-10).
+
 ---
 
 ### ADR-P5-8: Community mode review and governance process
@@ -814,3 +1013,15 @@ install older versions.
   for controller implementations that parse the index.
 - CONTRIBUTING.md must be updated to document the mode submission
   process, linking to the registry repository and the review checklist.
+
+**Amendment 2026-10-22 (after phases 2-4 software; decisions P5R-12, P5R-13, proposed):**
+
+- Checklist item 6: a mode's texts belong in `mode.yaml`'s `i18n:` (P4R22), not
+  an `i18n/` folder; item 11 reads "If `i18n:` is present, every language has
+  the same keys".
+- The sandbox-escape battery runs in this repository's CI with the core's
+  tests (C, `core/tests/`) and through the simulator (Python), extending the
+  existing `test_sandbox`, so every change to the core is checked, not only
+  registry submissions (plan phase 5); the registry's CI runs the same battery.
+- "Verified" also needs the package signed with the release-style manifest
+  (ADR-P5-4's amendment) by a key that is not revoked.

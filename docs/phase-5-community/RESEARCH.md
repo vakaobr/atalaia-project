@@ -7,6 +7,15 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 ## Summary
 
+> **Refresh 2026-10-22.** This research was written on 2026-10-18, before
+> phases 2-4 were built. Where it says the field API is pending, that a
+> controller pushes modes to nodes, that firmware strings are compile-time
+> headers, that modes get `i18n/` folders or that Blockly 11 is the target,
+> the code now says otherwise: see "Refresh 2026-10-22" in `ADR.md` (the facts
+> and the amendments) and `PLAN.md` (the re-cut plan), and decisions P5R-1 to
+> P5R-14 in `docs/review/decisions-to-review.md`. The text below is kept as
+> written.
+
 Phase 5 adds the community layer around the platform built in phases 0-4:
 a visual mode editor (Blockly), a signed mode registry with a verified
 badge, the carrier PCB, translations beyond English and Portuguese, and

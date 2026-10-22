@@ -505,6 +505,8 @@ The core builds for desktop, so a simulator runs any number of virtual nodes wit
 
 A Blockly-based editor generates `node.lua` and `field.lua` from blocks such as "when team claims this box" and "every N seconds". Generated code stays readable, so a GM can graduate to editing it by hand.
 
+*Status (2026-10-22):* built in software as phase 5 plan phase 1: a page of the simulator (`/editor/`) with blocks for the node and field script API, generating `node.lua`, `field.lua` and `mode.yaml` in English and Portuguese; its examples reproduce Domination and Hold-All Domination and pass their tests. A block view of the console's scenario builder is planned (phase 5 plan phase 7).
+
 ## 10. Networking and protocol
 
 One message protocol, Skirmesh-RF, runs over five pluggable transports, with LoRa as the field backbone and Wi-Fi for anything bulky. Scores are built from events so that nodes cut off from the network keep scoring and merge cleanly when they return.

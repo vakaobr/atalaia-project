@@ -5,99 +5,128 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 5 -- Community: Status
 
-**Current phase:** Planning complete -- ready for implementation
+**Current phase:** Implementation (plan phase 1, the visual mode editor, built in software 2026-10-22)
+**Phase status:** In progress
 **Risk level:** Medium
-**Last updated:** 2026-10-18
+**Last updated:** 2026-10-22 (refreshed after phases 2-4 software; first written 2026-10-18)
+**Next step:** plan phase 2 (the simulator's web view runs `field.lua`, `POST /api/reload`, the editor's "Test" button)
 
 Phase 5 is the community layer: visual mode editor (Blockly), mode
 registry with signing and a verified badge, carrier PCB, translations,
 and build guides. It is ongoing after the first release (design-spec.md
-section 16). This is the last designed phase; future work resumes with
-`--implement`.
+section 16).
 
 ## Completed
 
 - [x] Research phase: `RESEARCH.md`
 - [x] Architecture decisions: `ADR.md` (8 ADRs: P5-1 through P5-8)
-- [x] Implementation plan: `PLAN.md` (4 phases: A through D)
+- [x] Implementation plan: `PLAN.md`
+- [x] **Refresh after phases 2-4 software (2026-10-22):** every ADR re-checked
+  against the built code, with dated amendments (P5-1, P5-2, P5-3, P5-4,
+  P5-7, P5-8) and notes (P5-5, P5-6); the plan re-cut into 12 software plan
+  phases and 3 hardware ones in build order; decisions P5R-1 to P5R-14 in
+  `docs/review/decisions-to-review.md` (all open; P5R-8 and P5R-10 are for
+  the maintainer)
+- [x] **Plan phase 1, the visual mode editor (2026-10-22), in software:**
+  Blockly 13.3.0 (vendored, checksummed) served by the simulator at
+  `/editor/`; 37 blocks for the node and field script API; a Lua generator
+  with the project's style and a `mode.yaml` generator; English and
+  Portuguese; Domination and Hold-All Domination as example projects whose
+  generated files pass every YAML test of the hand-written modes and give
+  the same manifests; 15 browser tests (`python3 tools/docker_editor.py`, CI
+  job `editor`) and 6 plain tests in `tools/check.sh`. Decisions P5A-1 to
+  P5A-7. AC-1, AC-2, AC-3 met.
 
-## Ready for implementation
+## Refresh 2026-10-22: what changed
 
-The plan is complete and thorough enough that an implementer can start
-from `PLAN.md` without re-reading the research or ADRs (though it
-references them). Implementation begins with Phase A (visual mode
-editor), which can start immediately -- it depends only on the phase 0
-script API and existing mode patterns.
+| Change | Why | Decisions | Files |
+|--------|-----|-----------|-------|
+| Plan re-cut into small plan phases in build order (1-12, HW1-HW3) | Old phases A-D were large and partly blocked; phases 2-4 removed most blocks | P5R-1 | PLAN.md |
+| The mode editor is a page of the simulator; the console gets a block view of its scenario builder later | A box runs only built-in scripts (K10): what a GM can install at the field is a scenario | P5R-2 | ADR.md (P5-2), PLAN.md 1, 7 |
+| Field-script blocks now, with today's API; Blockly 13.3.0 vendored; one blocks file and one generator file | The field API shipped in phase 2; Blockly 13 is current and drops jsdom; no build step | P5R-3, P5R-4 | ADR.md (P5-1), PLAN.md 1 |
+| `POST /api/reload` needs `field.lua` in the web view | The web view runs node scripts only | P5R-5 | ADR.md (P5-2), PLAN.md 2 |
+| Editor tests in Chromium (the generator is JavaScript) | The dev image has no JavaScript runtime; the console's image has Playwright | P5R-6 | PLAN.md |
+| Mode packages signed like firmware releases (text manifest with id and version, Ed25519, release-style key ids, shared vectors) | One scheme and one set of tools instead of two | P5R-7 | ADR.md (P5-4), PLAN.md 4 |
+| Registry packages are controller packages (scenarios, field scripts) or proposals for `modes/` | K10; boxes do not load scripts at run time | P5R-8 (for the maintainer) | ADR.md (P5-3) |
+| Registry tools in this repository first; the repository from a template, with the maintainer | P5-3 (confirmed: not yet) | P5R-9 | ADR.md (P5-3), PLAN.md 8 |
+| German first, then Traditional Chinese (Taiwan) | The maintainer's choice (P5-1); German needs no new glyphs on the box | P5R-10 (for the maintainer) | ADR.md (P5-7), PLAN.md 10, 11 |
+| Each language domain keeps its format; modes translate in `mode.yaml`; the box's texts are a runtime table | As built (P4R22, BN-14) | P5R-11 | ADR.md (P5-7) |
+| Review checklist and sandbox battery as built | `i18n:` in `mode.yaml`; the core already tests its sandbox | P5R-12, P5R-13 | ADR.md (P5-8), PLAN.md 5 |
+| Build guides: the Field Box's exists; the others remain | `hardware/field-box/BUILD.md` | P5R-14 | PLAN.md 12 |
 
-## Work streams
+## Plan summary (order to implement)
 
-| Stream | Scope | Can start now | Blocked on |
-|--------|-------|---------------|------------|
-| Visual editor (node scripts) | Blockly block definitions, Lua code generator, editor UI | Yes -- script API is stable | -- |
-| Visual editor (field scripts) | `state.field{}`, `field.*` blocks | No | Phase 2C: field API implementation |
-| Editor-simulator integration | Hot-reload endpoint, editor tab in web view | Yes (after Phase A) | Phase A: editor generates valid Lua |
-| Mode registry | Index format, signing tooling, submission process, CI | Yes -- independent of platform | -- |
-| Registry deployment | Live index on GitHub Pages, controller sync | No | Phase 2D: controller REST API |
-| Carrier PCB | KiCad schematic and layout | No | Phase 1 hardware: validated pin assignments |
-| Build guides (text) | BOM, assembly steps, firmware flashing, config | Yes -- existing docs cover this | -- |
-| Build guides (photos) | Step-by-step photos | No | Phase 1 hardware: physical prototypes |
-| i18n expansion (site + editor) | Additional language YAML files, site template updates | Yes -- workflow established | -- |
-| i18n expansion (modes) | `i18n/` folders in built-in modes | Yes -- format defined | -- |
-| i18n expansion (firmware) | Extract screen strings to locale table | Partially | Phase 1 hardware for testing |
-| Community processes | Mode submission docs, review checklist, CONTRIBUTING.md update | Yes | -- |
-| CI additions | editor-test, sandbox-escape, i18n-check, pcb-check | Yes (except pcb-check) | -- |
-
-## Plan phases
-
-| Phase | Focus | Can start now | Key deliverables |
-|-------|-------|---------------|-----------------|
-| A | Visual mode editor | Yes | Block definitions, Lua generator, editor UI, i18n, CI round-trip test |
-| B | Editor-simulator integration + Mode registry | Yes (registry); after Phase A (integration) | POST /api/reload, signing tooling, registry repo + CI, sandbox-escape tests |
-| C | i18n expansion, build guides, community processes | Yes (in parallel with B) | Unified i18n across 4 domains, third locale, build guide text, CONTRIBUTING.md update |
-| D | Carrier PCB + blocked items | No (blocked) | KiCad PCB, field-script blocks, build guide photos |
+| # | Plan phase | Software now / hardware | Status |
+|---|------------|-------------------------|--------|
+| 1 | Visual mode editor | Software | **Built 2026-10-22** |
+| 2 | Editor and simulator (`field.lua` in the web view, reload, Test) | Software | Next |
+| 3 | Editor completeness (geo, commands, roles, kinds) | Software | |
+| 4 | Mode packages and signing | Software | |
+| 5 | Sandbox-escape battery | Software | |
+| 6 | Signed packages in the controller | Software | |
+| 7 | Scenario blocks in the console | Software | |
+| 8 | Registry repository template | Software; publishing needs the maintainer | |
+| 9 | Community processes | Software | |
+| 10 | German | Software (after P5R-10) | |
+| 11 | Traditional Chinese (Taiwan) | Software | |
+| 12 | Build guides for other node types | Software | |
+| HW1 | Carrier PCB | Needs hardware | |
+| HW2 | Build guide photos | Needs hardware | |
+| HW3 | Community content on the field | Needs hardware | |
 
 ## Dependencies
 
 | Dependency | Phase | Status | Impact |
 |-----------|-------|--------|--------|
-| Script API (`script_api.c`) | 0 | Done | Editor blocks map 1:1 to this API |
-| Field API (`state.field{}`, `field.*`) | 2C | Pending | Field-script editor blocks wait on this |
-| Simulator web view | 0 | Done | Editor integrates with existing web view |
-| Mode push over Wi-Fi/BLE | 2D | Pending | Registry-to-node delivery |
-| Controller REST API | 2D | Pending | Mode upload endpoint |
-| Field Box hardware | 1 | Blocked on parts | Carrier PCB, build guide photos |
-| Firmware Ed25519 signing | 1-2 | Designed | Registry uses same scheme |
+| Script API (`script_api.c`) | 0, 2, 4 | Done | The editor's blocks map to it |
+| Field API (`state.field{}`, `field.*`) | 2 | Done | Field blocks built in plan phase 1 |
+| Simulator web view | 0 | Done; no `field.lua` yet | Plan phase 2 |
+| Mode uploads on the controller | 2 | Done (`POST /api/v1/modes`) | Plan phase 6 |
+| Scenario compiler and console builder | 4 | Done | Plan phase 7 |
+| Firmware release signing | 4 | Done | Plan phase 4 reuses it |
+| Field Box hardware | 1 | Boards on the bench; no built box | HW1-HW3 |
 
 ## Risks
 
 | Risk | Level | Mitigation |
 |------|-------|------------|
-| Blockly version breaks block definitions | Medium | Pin version, vendor or integrity hash, test on upgrade |
-| Script API changes break editor | Medium | CI: generate Lua from all example blocks, run in simulator |
-| Registry signing key compromise | Low | Key revocation list, incident response doc |
-| Sandbox escape via community mode | Low | Fuzz testing, CI escape-pattern job, maintainer review |
+| A Blockly upgrade breaks blocks or output | Medium | Pinned and vendored with checksums; the round trip and unit tests in CI (`editor`) |
+| A script API change breaks the editor | Medium | The round trip runs the examples against the hand-written modes' tests |
+| Registry signing key compromise | Low | Revocation list; one scheme with the firmware's, reviewed once |
+| Sandbox escape via a community script | Low | Plan phase 5 battery in the core's CI; boxes run built-in scripts only |
 | Carrier PCB layout errors | Medium | Perfboard first, KiCad DRC/ERC in CI |
-| i18n key drift across locales | Medium | CI completeness check (existing for en/pt, extended to all) |
+| Language key drift | Medium | A parity test per domain; `tools/i18n_check.py` in plan phase 10 |
 
 ## Acceptance criteria
 
 | # | Criterion | Status |
 |---|-----------|--------|
-| AC-1 | Blockly editor generates valid `node.lua` that passes simulator tests | Pending |
-| AC-2 | Generated Lua is readable and hand-editable | Pending |
-| AC-3 | Editor ships in English and Portuguese | Pending |
-| AC-4 | Mode registry index format is defined and documented | Pending |
-| AC-5 | Mode packages are Ed25519-signed and verifiable | Pending |
-| AC-6 | Registry CI runs mode tests and checks licences | Pending |
-| AC-7 | At least one additional language beyond en/pt is supported on the site | Pending |
-| AC-8 | Built-in modes have `i18n/` with en and pt translations | Pending |
-| AC-9 | Carrier PCB schematic passes KiCad ERC | Pending (blocked on hardware) |
-| AC-10 | Build guides exist for Field Box and Satellite | Pending (text can start; photos blocked) |
-| AC-11 | CONTRIBUTING.md documents mode submission process | Pending |
-| AC-12 | CI includes sandbox-escape test job | Pending |
+| AC-1 | The editor generates `node.lua` (and `field.lua`) that passes simulator tests | **Met in software (2026-10-22)** |
+| AC-2 | Generated Lua is readable and hand-editable | **Met (2026-10-22)** |
+| AC-3 | The editor ships in English and Portuguese | **Met (2026-10-22)** |
+| AC-4 | Registry index format defined and documented | Pending (plan phase 4) |
+| AC-5 | Mode packages are Ed25519-signed and verifiable | Pending (plan phase 4) |
+| AC-6 | Registry CI runs mode tests and checks licences | Pending (plan phase 8; the repository needs the maintainer) |
+| AC-7 | A language beyond en/pt on the site | Pending (plan phase 10) |
+| AC-8 | Built-in modes carry en and pt texts | **Met differently**: `mode.yaml` `i18n:` (P4R22) |
+| AC-9 | Carrier PCB schematic passes KiCad ERC | Pending (needs hardware) |
+| AC-10 | Build guides for the Field Box and the Satellite | Field Box done; Satellite pending (plan phase 12) |
+| AC-11 | CONTRIBUTING.md documents mode submission | Pending (plan phase 9) |
+| AC-12 | CI includes a sandbox-escape job | Pending (plan phase 5) |
+
+## Verification of plan phase 1 (2026-10-22)
+
+| Command | Result |
+|---------|--------|
+| `docker run --rm -v "$PWD:/src" atalaia-dev sh -c "BUILD=/tmp/c sh tools/check.sh"` (clean build folder) | See the coordinator's commit for the final run |
+| `python3 tools/docker_editor.py` | 15 browser tests, OK |
+| `reuse lint` | See the commit |
 
 ## Next steps
 
-1. Begin implementation with Phase A: Blockly block definitions for node-script API
-2. In parallel, start Phase B2: registry index schema, signing tooling, `atalaia-modes` repo setup
-3. In parallel, start Phase C streams that need no Phase A output: mode i18n, build guide text, community docs
+1. Plan phase 2: `field.lua` in the simulator's web view, `POST /api/reload`,
+   the editor's "Test" button.
+2. In parallel: plan phase 4 (mode packages and signing) and plan phase 5
+   (sandbox battery), which need nothing from the editor.
+3. The maintainer: P5R-8 (community node scripts on boxes) and P5R-10 (the
+   third language's order) before plan phases 6 and 10.

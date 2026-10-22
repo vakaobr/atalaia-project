@@ -68,7 +68,7 @@ header:
   language: Idioma
 
 hero:
-  status: Pré-alfa · software das fases 1 e 2 pronto, duas placas e o controlador de campo já funcionam juntos na bancada, fase 3 quase completa em software, fase 4 construída em software · ainda não pronta para o campo
+  status: Pré-alfa · software das fases 1 e 2 pronto, duas placas e o controlador de campo já funcionam juntos na bancada, fase 3 quase completa em software, fase 4 construída em software, fase 5 começada (o editor visual de modos) · ainda não pronta para o campo
   title: A plataforma aberta de <span class="nowrap">combate simulado</span>
   lead: >-
     A Atalaia é uma plataforma aberta para os dispositivos eletrónicos de jogo (os props) de
@@ -536,7 +536,6 @@ roadmap:
   done: Concluída
   software: Software pronto
   current: Em curso
-  designed: Planeada
   p0:
     title: Alicerces
     short: >-
@@ -709,12 +708,20 @@ roadmap:
   p5:
     title: Comunidade
     short: >-
-      Editor visual de modos, registo de modos, placa de suporte (PCB), traduções, guias de
-      montagem. Investigação, arquitetura e plano escritos; ainda sem código.
+      Editor visual de modos construído em software: o Lua e o manifesto de um modo a partir de
+      blocos, em português e inglês. A seguir: experimentar modos ao vivo, pacotes assinados, o
+      registo, traduções.
     text: >-
       Editor visual de modos, registo de modos, placa de suporte (PCB) que facilita a montagem,
-      traduções, guias de montagem para outros tipos de dispositivos. A investigação, a arquitetura
-      e o plano de implementação estão escritos; ainda não há código.
+      traduções, guias de montagem para outros tipos de dispositivos. Construído em software: o
+      editor visual de modos, uma página do simulador onde se monta um modo com blocos (o que
+      acontece quando uma equipa mantém o botão premido, temporizadores, pontos, ecrãs e sons, as
+      definições que a organização pode mudar e a lógica do controlador de campo entre caixas);
+      escreve os scripts Lua e o manifesto do modo à medida que se monta, em português e inglês, e
+      funciona sem rede. Os exemplos Domínio e Domínio Total passam os mesmos testes que os modos
+      escritos à mão. Um modo feito assim chega às caixas numa versão do firmware. A seguir:
+      experimentar um modo ao vivo no simulador, pacotes de modos assinados e o registo, alemão e
+      chinês tradicional, e a placa de suporte depois das primeiras caixas montadas.
     gate: Continua depois da primeira versão.
 
 hub:

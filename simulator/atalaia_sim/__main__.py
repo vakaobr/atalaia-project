@@ -100,7 +100,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
     server = make_server(game, args.host, args.port, args.allow_host)
     print(f"Atalaia core {core.version}: {mode.name} {mode.version} with {', '.join(nodes)}")
-    print(f"Open {server.url} (Ctrl+C stops)", flush=True)
+    print(f"Open {server.url} (Ctrl+C stops); the mode editor is at {server.url}editor/", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

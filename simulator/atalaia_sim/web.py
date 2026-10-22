@@ -4,6 +4,8 @@
 
 A small local web server (standard library only) around a LiveGame. The
 page in web/ polls GET /api/state and sends actions to POST /api/action.
+The mode editor (editor/, phase 5 plan phase A) is served at /editor/: a
+static page with its own vendored Blockly, which needs no network.
 
 It is a development tool for one person's machine: it listens on localhost
 by default, answers only requests addressed to a local host name (so a web
@@ -29,6 +31,24 @@ STATIC = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
+EDITOR = Path(__file__).resolve().parent / "editor"
+# The editor's files by suffix; anything else under editor/ is not served.
+EDITOR_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".json": "application/json",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".cur": "image/x-icon",
+    ".mp3": "audio/mpeg",
+}
+# Blockly writes its stylesheet into the page and draws with inline styles, so the editor's
+# pages allow inline styles (never inline scripts) and data: images.
+EDITOR_CSP = ("default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+              "frame-ancestors 'none'; form-action 'none'")
+DEFAULT_CSP = "default-src 'self'; frame-ancestors 'none'; form-action 'none'"
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 MAX_BODY = 16 * 1024
 TICK_S = 0.05
@@ -74,15 +94,14 @@ class _Handler(BaseHTTPRequestHandler):
 
     # -- responses --
 
-    def _send(self, status: int, body: bytes, content_type: str) -> None:
+    def _send(self, status: int, body: bytes, content_type: str, csp: str = DEFAULT_CSP) -> None:
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("Content-Security-Policy",
-                         "default-src 'self'; frame-ancestors 'none'; form-action 'none'")
+        self.send_header("Content-Security-Policy", csp)
         self.end_headers()
         self.wfile.write(body)
 
@@ -106,6 +125,14 @@ class _Handler(BaseHTTPRequestHandler):
         if url.path in STATIC:
             name, content_type = STATIC[url.path]
             return self._send(HTTPStatus.OK, (WEB / name).read_bytes(), content_type)
+        if url.path == "/editor":
+            self.send_response(HTTPStatus.MOVED_PERMANENTLY)
+            self.send_header("Location", "/editor/")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return None
+        if url.path.startswith("/editor/"):
+            return self._editor_file(url.path[len("/editor/"):] or "index.html")
         if url.path == "/api/state":
             try:
                 since = int(parse_qs(url.query).get("since", ["0"])[0])
@@ -113,6 +140,15 @@ class _Handler(BaseHTTPRequestHandler):
                 since = 0
             return self._json(HTTPStatus.OK, self.server.game.snapshot(since))
         self._error(HTTPStatus.NOT_FOUND, "not found")
+
+    def _editor_file(self, name: str) -> None:
+        """A file of editor/: plain names only, no dot files, a known suffix, inside the folder."""
+        parts = name.split("/")
+        path = EDITOR.joinpath(*parts)
+        if (any(not p or p.startswith(".") for p in parts) or path.suffix not in EDITOR_TYPES
+                or not path.resolve().is_relative_to(EDITOR) or not path.is_file()):
+            return self._error(HTTPStatus.NOT_FOUND, "not found")
+        self._send(HTTPStatus.OK, path.read_bytes(), EDITOR_TYPES[path.suffix], EDITOR_CSP)
 
     def do_POST(self) -> None:
         if not self._host_allowed():
