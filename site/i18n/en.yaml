@@ -704,11 +704,12 @@ roadmap:
   p5:
     title: Community
     short: >-
-      Visual mode editor complete in software, tested live in the simulator; signed mode packages, a
-      sandbox-escape battery in CI, the field controller installing signed modes, boxes getting the
-      signed modes they lack from the GM console, scenarios built from blocks in the console, the
-      mode registry ready as a template, with its checks and the verified badge, and German (a
-      draft, being reviewed). Next: creating the registry, more translations.
+      Visual mode editor complete in software, tested live in the simulator; signed mode packages,
+      made by the editor itself, a sandbox-escape battery in CI, the field controller installing
+      signed modes, boxes getting the signed modes they lack from the GM console, scenarios built
+      from blocks in the console, the mode registry ready as a template, with its checks and the
+      verified badge, and German (a draft, being reviewed). Next: creating the registry, more
+      translations.
     text: >-
       Visual mode editor, mode registry, carrier PCB (a ready-made circuit board that makes builds
       easier), translations, build guides for other node types. Built in software: the visual mode
@@ -720,14 +721,16 @@ roadmap:
       the hand-written modes, and a button tries the mode at once in the simulator. Modes travel as
       signed packages (one archive, signed like a firmware release); the field controller installs
       them only with its own trusted keys, shows who signed each one and whether the project
-      reviewed it. A battery of escape attempts runs on every change and closed two ways for a
-      script to run past its time limit. In the GM console, a box that lacks a game's mode is
-      offered it: <em>Send missing modes</em> invites it again, and it fetches the signed package
-      from the field controller over the field Wi-Fi, only between games, while the game waits for
-      it; the box checks it with keys built into its firmware and keeps it (tested on a computer,
-      not yet on a real box). Scenarios can now be built from blocks in the GM console too: the
-      boxes, the objectives and who sees them, when they open, what completes them and what they
-      give, by mouse, touch or keyboard, in Portuguese and English, even on a phone; the field
+      reviewed it. The editor also makes the mode's package itself, exactly the archive the packing
+      tool makes, and shows what the mode key will sign and the command that signs it; signing stays
+      on the author's own computer, offline. A battery of escape attempts runs on every change and
+      closed two ways for a script to run past its time limit. In the GM console, a box that lacks a
+      game's mode is offered it: <em>Send missing modes</em> invites it again, and it fetches the
+      signed package from the field controller over the field Wi-Fi, only between games, while the
+      game waits for it; the box checks it with keys built into its firmware and keeps it (tested on
+      a computer, not yet on a real box). Scenarios can now be built from blocks in the GM console
+      too: the boxes, the objectives and who sees them, when they open, what completes them and what
+      they give, by mouse, touch or keyboard, in Portuguese and English, even on a phone; the field
       controller checks and installs them exactly as if they had been written by hand. The registry
       where authors share their modes is ready as a template: a pull request with a signed mode is
       checked automatically (its signature, that its source is what was signed, its licence, its

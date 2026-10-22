@@ -738,11 +738,11 @@ roadmap:
     title: Comunidade
     short: >-
       Editor visual de modos completo em software, testado ao vivo no simulador; pacotes de modos
-      assinados, uma bateria de testes de fuga ao sandbox na CI, o controlador de campo a instalar
-      modos assinados, as caixas a receber da consola de GM os modos assinados que lhes faltam,
-      cenários montados com blocos na consola, o registo de modos pronto como modelo, com as
-      verificações e o selo de verificado, e alemão (um rascunho, em revisão). A seguir: criar o
-      registo, mais traduções.
+      assinados, criados pelo próprio editor, uma bateria de testes de fuga ao sandbox na CI, o
+      controlador de campo a instalar modos assinados, as caixas a receber da consola de GM os modos
+      assinados que lhes faltam, cenários montados com blocos na consola, o registo de modos pronto
+      como modelo, com as verificações e o selo de verificado, e alemão (um rascunho, em revisão). A
+      seguir: criar o registo, mais traduções.
     text: >-
       Editor visual de modos, registo de modos, placa de suporte (PCB) que facilita a montagem,
       traduções, guias de montagem para outros tipos de dispositivos. Construído em software: o
@@ -754,26 +754,28 @@ roadmap:
       papéis e os ecrãs do próprio modo; três exemplos passam os mesmos testes que os modos escritos
       à mão, e um botão experimenta logo o modo no simulador. Os modos viajam em pacotes assinados
       (um arquivo, assinado como uma versão do firmware); o controlador de campo só os instala com
-      as suas próprias chaves de confiança e mostra quem assinou cada um e se o projeto o reviu. Uma
-      bateria de tentativas de fuga corre a cada alteração e fechou duas maneiras de um script
-      passar do seu limite de tempo. Na consola de GM, uma caixa a quem falta o modo de um jogo pode
-      recebê-lo: «Enviar os modos em falta» convida-a de novo, e ela obtém o pacote assinado do
-      controlador de campo pelo Wi-Fi do campo, só entre jogos, enquanto o jogo espera por ela; a
-      caixa verifica-o com as chaves do seu firmware e guarda-o (testado num computador, ainda não
-      numa caixa a sério). Os cenários também já se montam com blocos na consola de GM: as caixas,
-      os objetivos e quem os vê, quando abrem, o que os cumpre e o que dão, com rato, toque ou
-      teclado, em português e inglês, mesmo num telemóvel; o controlador de campo verifica-os e
-      instala-os tal como se tivessem sido escritos à mão. O registo onde os autores partilham os
-      seus modos está pronto como modelo: um pedido de integração com um modo assinado é verificado
-      automaticamente (a assinatura, que o código é o que foi assinado, a licença, os testes no
-      simulador), e um modo revisto pelo projeto recebe o selo de verificado, a assinatura do
-      próprio projeto, que é o que o deixa chegar às caixas. Como submeter um modo, a lista de
-      revisão, as chaves e a moderação estão escritos. O Atalaia já está também em alemão (esta
-      página, a consola de GM, o editor de modos, a app e os ecrãs da Field Box), num rascunho feito
-      com um modelo de IA e ainda não revisto por quem joga em alemão: se jogas em alemão, ajuda-nos
-      a revê-lo; as traduções para outras línguas começam em docs/translations (em inglês). A
-      seguir: criar o registo a partir do modelo; a revisão do alemão; chinês tradicional; a placa
-      de suporte depois das primeiras caixas montadas.
+      as suas próprias chaves de confiança e mostra quem assinou cada um e se o projeto o reviu. O
+      editor cria também o pacote do modo, exatamente o arquivo que a ferramenta de empacotamento
+      cria, e mostra o que a chave de modos vai assinar e o comando que o assina; a assinatura
+      continua a fazer-se no próprio computador, sem rede. Uma bateria de tentativas de fuga corre a
+      cada alteração e fechou duas maneiras de um script passar do seu limite de tempo. Na consola
+      de GM, uma caixa a quem falta o modo de um jogo pode recebê-lo: «Enviar os modos em falta»
+      convida-a de novo, e ela obtém o pacote assinado do controlador de campo pelo Wi-Fi do campo,
+      só entre jogos, enquanto o jogo espera por ela; a caixa verifica-o com as chaves do seu
+      firmware e guarda-o (testado num computador, ainda não numa caixa a sério). Os cenários também
+      já se montam com blocos na consola de GM: as caixas, os objetivos e quem os vê, quando abrem,
+      o que os cumpre e o que dão, com rato, toque ou teclado, em português e inglês, mesmo num
+      telemóvel; o controlador de campo verifica-os e instala-os tal como se tivessem sido escritos
+      à mão. O registo onde os autores partilham os seus modos está pronto como modelo: um pedido de
+      integração com um modo assinado é verificado automaticamente (a assinatura, que o código é o
+      que foi assinado, a licença, os testes no simulador), e um modo revisto pelo projeto recebe o
+      selo de verificado, a assinatura do próprio projeto, que é o que o deixa chegar às caixas.
+      Como submeter um modo, a lista de revisão, as chaves e a moderação estão escritos. O Atalaia
+      já está também em alemão (esta página, a consola de GM, o editor de modos, a app e os ecrãs da
+      Field Box), num rascunho feito com um modelo de IA e ainda não revisto por quem joga em
+      alemão: se jogas em alemão, ajuda-nos a revê-lo; as traduções para outras línguas começam em
+      docs/translations (em inglês). A seguir: criar o registo a partir do modelo; a revisão do
+      alemão; chinês tradicional; a placa de suporte depois das primeiras caixas montadas.
     gate: Continua depois da primeira versão.
 
 hub:

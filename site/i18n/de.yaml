@@ -752,11 +752,11 @@ roadmap:
     title: Community
     short: >-
       Visueller Modus-Editor in Software komplett, live im Simulator getestet; signierte
-      Modus-Pakete, eine Sandbox-Ausbruch-Testreihe in der CI, der Feld-Controller installiert
-      signierte Modi, Boxen bekommen die signierten Modi, die ihnen fehlen, von der GM-Konsole,
-      Szenarien aus Blöcken in der Konsole, die Modus-Registry als Vorlage bereit, mit ihren
-      Prüfungen und dem Verifiziert-Siegel, und Deutsch (Entwurf, wird noch geprüft). Als Nächstes:
-      die Registry anlegen, weitere Übersetzungen.
+      Modus-Pakete, vom Editor selbst erstellt, eine Sandbox-Ausbruch-Testreihe in der CI, der
+      Feld-Controller installiert signierte Modi, Boxen bekommen die signierten Modi, die ihnen
+      fehlen, von der GM-Konsole, Szenarien aus Blöcken in der Konsole, die Modus-Registry als
+      Vorlage bereit, mit ihren Prüfungen und dem Verifiziert-Siegel, und Deutsch (Entwurf, wird
+      noch geprüft). Als Nächstes: die Registry anlegen, weitere Übersetzungen.
     text: >-
       Visueller Modus-Editor, Modus-Registry, Träger-Platine (eine fertige Leiterplatte, die den Bau
       erleichtert), Übersetzungen, Bauanleitungen für weitere Gerätetypen. In Software gebaut: der
@@ -770,15 +770,18 @@ roadmap:
       den Modus sofort im Simulator aus. Modi reisen als signierte Pakete (ein Archiv, signiert wie
       ein Firmware-Release); der Feld-Controller installiert sie nur mit seinen eigenen
       vertrauenswürdigen Schlüsseln, zeigt, wer jedes signiert hat und ob das Projekt es geprüft
-      hat. Eine Reihe von Ausbruchsversuchen läuft bei jeder Änderung und hat zwei Wege geschlossen,
-      auf denen ein Skript sein Zeitlimit überziehen konnte. In der GM-Konsole wird einer Box, der
-      der Modus eines Spiels fehlt, dieser angeboten: <em>Fehlende Modi senden</em> lädt sie erneut
-      ein, und sie holt das signierte Paket über das WLAN des Felds vom Feld-Controller, nur
-      zwischen den Spielen, während das Spiel auf sie wartet; die Box prüft es mit Schlüsseln, die
-      in ihre Firmware eingebaut sind, und behält es (auf einem Computer getestet, noch nicht auf
-      einer echten Box). Szenarien lassen sich jetzt auch in der GM-Konsole aus Blöcken bauen: die
-      Boxen, die Ziele und wer sie sieht, wann sie sich öffnen, was sie erfüllt und was sie bringen,
-      mit Maus, Touch oder Tastatur, auf Portugiesisch und Englisch, sogar auf dem Handy; der
+      hat. Der Editor erstellt auch selbst das Paket des Modus, genau das Archiv, das das
+      Pack-Werkzeug erstellt, und zeigt, was der Modus-Schlüssel signieren wird, und den Befehl
+      dazu; signiert wird weiterhin offline auf dem eigenen Computer. Eine Reihe von
+      Ausbruchsversuchen läuft bei jeder Änderung und hat zwei Wege geschlossen, auf denen ein
+      Skript sein Zeitlimit überziehen konnte. In der GM-Konsole wird einer Box, der der Modus eines
+      Spiels fehlt, dieser angeboten: <em>Fehlende Modi senden</em> lädt sie erneut ein, und sie
+      holt das signierte Paket über das WLAN des Felds vom Feld-Controller, nur zwischen den
+      Spielen, während das Spiel auf sie wartet; die Box prüft es mit Schlüsseln, die in ihre
+      Firmware eingebaut sind, und behält es (auf einem Computer getestet, noch nicht auf einer
+      echten Box). Szenarien lassen sich jetzt auch in der GM-Konsole aus Blöcken bauen: die Boxen,
+      die Ziele und wer sie sieht, wann sie sich öffnen, was sie erfüllt und was sie bringen, mit
+      Maus, Touch oder Tastatur, auf Portugiesisch und Englisch, sogar auf dem Handy; der
       Feld-Controller prüft und installiert sie genau so, als wären sie von Hand geschrieben. Die
       Registry, in der Autorinnen und Autoren ihre Modi teilen, ist als Vorlage bereit: Ein
       Pull-Request mit einem signierten Modus wird automatisch geprüft (seine Signatur, dass sein
