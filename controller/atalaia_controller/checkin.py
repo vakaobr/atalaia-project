@@ -352,18 +352,22 @@ class Checkin:
         out = {k: v for k, v in p.items() if k != "ca_sha256"}
         out["ca_sha256"] = p["ca_sha256"].hex() if p["ca_sha256"] else None
         out["ca_short"] = posterfmt.short_fingerprint(p["ca_sha256"]) if p["ca_sha256"] else None
+        # problem: the text in English (for logs and scripts); problem_code: what the console translates.
         if p["ca_sha256"] is None:
             out["text"] = None
+            out["problem_code"] = "https_off"
             out["problem"] = "HTTPS is off ([api] tls_port = 0): the poster needs the field's CA"
         elif not p["urls"]:
             out["text"] = None
+            out["problem_code"] = "no_address"
             out["problem"] = "no https address for the poster: set [checkin] urls or [api] tls_names"
         else:
             try:
                 out["text"] = posterfmt.make(p)
-                out["problem"] = None
+                out["problem"] = out["problem_code"] = None
             except posterfmt.PosterError as exc:
                 out["text"] = None
+                out["problem_code"] = "too_long" if exc.reason == "length" else "invalid"
                 out["problem"] = str(exc)
         return out
 
@@ -377,8 +381,11 @@ class Checkin:
         if not trial.get("urls"):
             trial["urls"] = self.cfg.checkin_urls or self.default_urls
         if trial["ca_sha256"] is not None:
+            # No address yet (a container without [api] tls_names, OT-10): the rest is still checked
+            # and kept; GET says what is missing (problem_code no_address).
+            checked = trial if trial.get("urls") else {**trial, "urls": ["https://a.invalid"]}
             try:
-                posterfmt.encode(trial)
+                posterfmt.encode(checked)
             except posterfmt.PosterError as exc:
                 raise ControllerError(str(exc)) from None
         saved = {k: trial.get(k) for k in ("urls", "wifi_ssid", "game_id", "field_name")}

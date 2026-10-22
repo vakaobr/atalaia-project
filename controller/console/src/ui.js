@@ -94,6 +94,12 @@ export function eventWords(e) {
     }
     // VIP / Payload: the VIP (a player id) from the controller, or the payload prop.
     if (e.type === 'vip.extracted' && d.player) key += '_vip';
+    // A box's failed firmware update said over the radio: why, in words (firmware.reasons).
+    let reason = d.reason || '';
+    if (e.type === 'node.update_failed') {
+        const r = t(`firmware.reasons.${reason}`);
+        if (!r.startsWith('firmware.')) reason = r;
+    }
     // A scenario's objectives: which one is the staff's (decision M6-5); a reveal without a
     // team is for every team.
     if (String(e.type || '').startsWith('scenario.objective.')) {
@@ -103,8 +109,16 @@ export function eventWords(e) {
     }
     const s = t(key, { team, player: d.player || '', remaining: d.remaining,
                        used: d.player_heals_used, puzzle, code: d.code || '',
-                       objective: d.objective || '', scenario: d.scenario || '', reason: d.reason || '' });
+                       objective: d.objective || '', scenario: d.scenario || '', reason });
     return s === key ? '' : s;
+}
+
+/** Why the check-in poster cannot be made, in the current language: GET /checkin/poster's
+ * problem_code (checkin.problems), else its English text. */
+export function posterProblem(p) {
+    const key = `checkin.problems.${p.problem_code}`;
+    const s = p.problem_code ? t(key, { detail: p.problem || '' }) : key;
+    return s === key ? (p.problem || '') : s;
 }
 
 /** t('game.start') or t('feed.count', {n: 3}): the text in the current language. */

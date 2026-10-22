@@ -51,6 +51,7 @@ static const uint8_t data_scenario_started[] = {35};
 static const uint8_t data_vip_extracted[] = {14};
 static const uint8_t data_hacking_solved[] = {36, 10};
 static const uint8_t data_medic_heal[] = {14, 32, 33};
+static const uint8_t data_node_update_failed[] = {37, 3, 21};
 
 const atalaia_event_def_t atalaia_event_defs[] = {
     {"game.start", ATALAIA_EV_GAME_START, ATALAIA_PRIO_CRITICAL, data_game_start, 1},
@@ -102,6 +103,7 @@ const atalaia_event_def_t atalaia_event_defs[] = {
     {"hacking.solved", ATALAIA_EV_HACKING_SOLVED, ATALAIA_PRIO_CRITICAL, data_hacking_solved, 2},
     {"medic.heal", ATALAIA_EV_MEDIC_HEAL, ATALAIA_PRIO_NORMAL, data_medic_heal, 3},
     {"medic.empty", ATALAIA_EV_MEDIC_EMPTY, ATALAIA_PRIO_NORMAL, NULL, 0},
+    {"node.update_failed", ATALAIA_EV_NODE_UPDATE_FAILED, ATALAIA_PRIO_CRITICAL, data_node_update_failed, 3},
 };
 const size_t atalaia_event_def_count =
     sizeof(atalaia_event_defs) / sizeof(atalaia_event_defs[0]);
@@ -143,6 +145,7 @@ const atalaia_data_field_def_t atalaia_data_field_defs[] = {
     {"objective", ATALAIA_DATA_OBJECTIVE, ATALAIA_FIELD_STRING, false},
     {"scenario", ATALAIA_DATA_SCENARIO, ATALAIA_FIELD_STRING, false},
     {"puzzle", ATALAIA_DATA_PUZZLE, ATALAIA_FIELD_STRING, false},
+    {"release", ATALAIA_DATA_RELEASE, ATALAIA_FIELD_STRING, false},
 };
 const size_t atalaia_data_field_def_count =
     sizeof(atalaia_data_field_defs) / sizeof(atalaia_data_field_defs[0]);

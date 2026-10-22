@@ -644,6 +644,16 @@ CMD opcode **9, `update`**: the controller offers a box a firmware release. Its 
 
 **Reason:** every box screen was fixed English while the fields play in Portuguese too; the language is a property of the game (the people on that field), so it travels with the game's join, which reaches the box by every path at once.
 
+## Amendment 11 (2026-10-22, proposed): A failed firmware update said over LoRa
+
+**Status:** proposed after the first update over the air on a bench board (decisions OT-5, OT-8); for review.
+
+**Change:** a new standard event **`node.update_failed`** (id 52, critical) with a new data field **`release`** (key 37, text: the release id, the first 16 hex digits of the image's SHA-256), besides `reason` (key 3, the update's result code: `no_wifi`, `unreachable`, `busy`...) and `fw` (key 21, the version the box still runs) (`protocol/schema/events.yaml`, a vector in `protocol/vectors/events.yaml`). A box sends it in its joined game when an update that Amendment 6's CMD offered stops where its HTTPS report cannot reach the controller: before an address answered, refused before any network, or a report that got no answer ([protocol/firmware-update.md](../../protocol/firmware-update.md)). Its envelope `seq` is the header seq of the first packet that carries it (as `node.rebooted` and `battery.low`, it comes from the link, not from the node's script), so two failures before the game starts (game time 0) are two events. The controller marks that box's update failed with the reason; any other receiver logs it as an event.
+
+**Compatibility:** no change to the packet or the envelope. A controller from before refuses the unknown event id (its radio log shows a decode error) and its update waits for its timeout as before; a box from before never sends it.
+
+**Reason:** on the bench (2026-10-22) an update that failed with `no_wifi` (the Wi-Fi driver did not start) never reached the controller, which kept it `in_progress` and refused another one to that box for its 10-minute timeout; the radio, the one link a box always has to its controller, can carry the few bytes that say why.
+
 ## Open questions
 
 - Per-node session keys (HKDF-derived from the game key) would limit

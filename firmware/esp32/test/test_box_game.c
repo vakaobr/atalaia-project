@@ -822,6 +822,70 @@ static void test_medic_kit(void)
     state_persist_clear();
 }
 
+/* The data and seq of the last event of this type the box sent (critical, ACK asked); false
+ * if none. */
+static bool last_event(const char *type, char *data, size_t cap, uint16_t *seq)
+{
+    bool found = false;
+    for (int i = 0; i < shell.count; i++) {
+        atalaia_header_t h;
+        uint8_t pl[PKT_CAP];
+        size_t n;
+        atalaia_event_t ev;
+        char d[160];
+        if (atalaia_packet_decrypt(shell.pkt[i], shell.len[i], game.link.proto.epoch, GAME_KEY, &h,
+                                   pl, &n, &atalaia_crypto_test_stub) &&
+            h.type == ATALAIA_MSG_EVENT && atalaia_event_decode(pl, n, &ev, d, sizeof(d), NULL) &&
+            strcmp(ev.type, type) == 0) {
+            CHECK(ev.prio == ATALAIA_PRIO_CRITICAL && ATALAIA_VF_ACK(h.version_flags));
+            snprintf(data, cap, "%s", d);
+            *seq = ev.seq;
+            found = true;
+        }
+    }
+    return found;
+}
+
+/* A firmware update that failed where the controller could not hear it over HTTPS goes over
+ * LoRa as node.update_failed (decision OT-8): with the release, the reason and the version the
+ * box still runs; two failures are two events; a CMD update during a game says busy; a box in
+ * no game says nothing (no key). */
+static void test_update_failed_over_lora(void)
+{
+    fixture(false);
+    CHECK(box_game_set_join_key_hex(&game, JOIN_KEY_HEX));
+    CHECK(!box_game_update_failed(&game, "0123456789abcdef", "no_wifi", "0.2.0"));
+    CHECK(shell.count == 0);
+    atalaia_join_t j;
+    make_join(&j);
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    ack_all();
+    CHECK(box_game_update_failed(&game, "0123456789abcdef", "no_wifi", "0.2.0"));
+    char data[160];
+    uint16_t seq1 = 0, seq2 = 0;
+    CHECK(last_event("node.update_failed", data, sizeof(data), &seq1));
+    CHECK(strstr(data, "\"release\":\"0123456789abcdef\"") != NULL);
+    CHECK(strstr(data, "\"reason\":\"no_wifi\"") != NULL);
+    CHECK(strstr(data, "\"fw\":\"0.2.0\"") != NULL);
+    /* Nothing that would need escaping reaches the JSON. */
+    CHECK(box_game_update_failed(&game, "\"x\\", "unreachable", "0.2.0"));
+    CHECK(last_event("node.update_failed", data, sizeof(data), &seq2));
+    CHECK(seq2 != seq1 && strstr(data, "\"release\":\"x\"") != NULL);
+    CHECK(strstr(data, "\"reason\":\"unreachable\"") != NULL);
+    CHECK(events_named("node.update_failed") == 2);
+    /* An offer that comes during a game anyway. */
+    cmd(FIELD_CMD_START);
+    CHECK(game.phase == BOX_PLAYING);
+    cmd_params(FIELD_CMD_UPDATE, "{\"id\":\"fedcba9876543210\",\"version\":\"0.3.0\"}");
+    CHECK(last_event("node.update_failed", data, sizeof(data), &seq2));
+    CHECK(strstr(data, "\"reason\":\"busy\"") != NULL);
+    CHECK(strstr(data, "\"release\":\"fedcba9876543210\"") != NULL);
+    cmd(FIELD_CMD_END);
+    ack_all();
+    state_persist_clear();
+}
+
 /* battery.low: once per crossing below the threshold, rearmed 5 points above it; never
  * without a gauge, never outside a joined game; HELLO carries the level. */
 static void test_battery_low(void)
@@ -1525,6 +1589,7 @@ void run_box_game_tests(void)
     test_lobby_discover_and_ready_screen();
     test_lobby_device_id();
     test_battery_low();
+    test_update_failed_over_lora();
     test_medic_kit();
     test_player_tags();
     test_join_refusals();

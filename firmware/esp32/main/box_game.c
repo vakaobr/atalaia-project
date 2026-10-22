@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "box_text.h"
+#include "screen_json.h"
 #include "screen_types.h"
 #include "state_persist.h"
 
@@ -229,6 +230,10 @@ static void link_on_cmd(void *user, uint8_t cmd, const char *params_json)
         /* A firmware update (RFC 0001 Amendment 6): never while a game is played. */
         if (g->phase == BOX_PLAYING) {
             say(g, "firmware update refused: a game is being played");
+            /* The controller sends none during a game; if one came, it hears why (OT-8). */
+            char id[24] = "";
+            if (params == NULL || !screen_json_str(params, "id", id, sizeof(id))) id[0] = '\0';
+            box_game_update_failed(g, id, "busy", g->hello.fw_version);
         } else if (g->shell.update == NULL) {
             say(g, "firmware update: not supported by this box");
         } else {
@@ -660,6 +665,15 @@ bool box_game_active(const box_game_t *g)
 bool box_game_playing(const box_game_t *g)
 {
     return g->phase == BOX_PLAYING;
+}
+
+bool box_game_update_failed(box_game_t *g, const char *release, const char *reason, const char *fw)
+{
+    if (g->phase == BOX_IDLE) return false;
+    field_link_send_update_failed(&g->link, release, reason, fw, g->runner->game_time_ms);
+    say(g, "firmware update failed (%s): told the controller over the radio",
+        reason ? reason : "?");
+    return true;
 }
 
 /* ---- Player tags (atalaia/tag.h, protocol/nfc-tag.md) ------------------------ */

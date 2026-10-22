@@ -28,6 +28,7 @@ import hashlib
 import ipaddress
 import logging
 import os
+import re
 import socket
 from dataclasses import dataclass
 from pathlib import Path
@@ -96,6 +97,54 @@ def local_names(extra: Iterable[str] = ()) -> list[str]:
         except OSError:
             pass
     return [n for n in names if n != "0.0.0.0"]
+
+
+# A container's host name as Docker and Podman make it: the container id, short or long.
+CONTAINER_ID = re.compile(r"[0-9a-f]{12}|[0-9a-f]{64}")
+
+
+def in_container() -> bool:
+    """True inside a Docker, Podman or other OCI container: its host name is the container's own
+    (resolved only inside it) and its addresses are usually on the container's own bridge."""
+    if os.path.exists("/.dockerenv") or os.path.exists("/run/.containerenv"):
+        return True
+    try:
+        with open("/proc/1/cgroup", encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return False
+    return any(k in text for k in ("docker", "containerd", "kubepods", "libpod", "/lxc"))
+
+
+def link_names(configured: Iterable[str], found: Iterable[str], container: Optional[bool] = None) -> list[str]:
+    """The names and addresses given to boxes (join key 14) and phones (the check-in poster) to reach
+    this controller, best first: the configured ones (``[api] tls_names``) in their order, then the
+    ones found on this host that another device can use. Found ones are left out when they are
+    loopback, link-local or unspecified addresses, ``localhost``, a host name shaped like a container
+    id (and its ``.local``), and all of them when the controller runs in a container: there its host
+    name resolves only inside the container and its addresses are on the container's bridge, so a
+    box spent seconds failing to look them up (decision OT-10). The certificate keeps them all."""
+    if container is None:
+        container = in_container()
+    out: list[str] = []
+
+    def reachable(n: str, was_found: bool) -> bool:
+        try:
+            ip = ipaddress.ip_address(n.strip("[]"))
+        except ValueError:
+            host = n[:-len(".local")] if n.endswith(".local") else n
+            return n != "localhost" and not (was_found and CONTAINER_ID.fullmatch(host))
+        return not (ip.is_loopback or ip.is_unspecified or (was_found and ip.is_link_local))
+
+    for n in configured:
+        n = n.strip()
+        if n and n not in out and reachable(n, False):
+            out.append(n)
+    if not container:
+        for n in found:
+            if n and n not in out and reachable(n, True):
+                out.append(n)
+    return out
 
 
 def _write(path: Path, data: bytes, private: bool) -> None:

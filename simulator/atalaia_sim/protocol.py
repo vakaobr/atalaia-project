@@ -114,6 +114,7 @@ DATA_FIELDS = {
     'objective': DataField(34, 'string', False),
     'scenario': DataField(35, 'string', False),
     'puzzle': DataField(36, 'string', False),
+    'release': DataField(37, 'string', False),
 }
 
 EVENTS = {
@@ -166,6 +167,7 @@ EVENTS = {
     'hacking.solved': EventDef(47, 'critical', ('puzzle', 'code'), ('code',)),
     'medic.heal': EventDef(50, 'normal', ('player', 'remaining', 'player_heals_used')),
     'medic.empty': EventDef(51, 'normal', ()),
+    'node.update_failed': EventDef(52, 'critical', ('release', 'reason', 'fw')),
 }
 
 PAYLOAD_FIELDS = {

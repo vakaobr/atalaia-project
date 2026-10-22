@@ -230,6 +230,14 @@ bool box_game_active(const box_game_t *g);
 /* True while a joined game is being played (running or paused): no firmware update then. */
 bool box_game_playing(const box_game_t *g);
 
+/*
+ * A firmware update that failed and could not be reported over HTTPS (no Wi-Fi, the controller
+ * unreachable, refused before any network: protocol/firmware-update.md): tells the controller
+ * over LoRa with node.update_failed, so its record does not wait for the timeout. Only in a
+ * joined game (the link's key); false otherwise. Call it on the game task.
+ */
+bool box_game_update_failed(box_game_t *g, const char *release, const char *reason, const char *fw);
+
 /* ---- Between games (box_lobby.c) ----------------------------------------------- */
 
 /* Sets up field frames once the join key is known (also after "@joinkey"): the device id

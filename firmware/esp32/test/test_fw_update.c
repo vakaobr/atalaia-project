@@ -238,6 +238,7 @@ typedef struct {
     int begins, ends, activates, aborts;
     size_t written;
     bool fail_begin, fail_end, fail_activate;
+    bool post_fails; /* the report gets no 200 */
     /* What happened. */
     int net_ups, net_downs, gets, posts;
     char got_base[80];
@@ -298,7 +299,7 @@ static void f_close(void *ctx)
     (void)ctx;
     F.open = false;
 }
-static void f_post(void *ctx, const char *base, const char *path, const char *body, const char *mac)
+static bool f_post(void *ctx, const char *base, const char *path, const char *body, const char *mac)
 {
     (void)ctx;
     CHECK(strcmp(path, "/api/v1/firmware/report") == 0);
@@ -306,6 +307,7 @@ static void f_post(void *ctx, const char *base, const char *path, const char *bo
     snprintf(F.post_base, sizeof(F.post_base), "%s", base);
     snprintf(F.report, sizeof(F.report), "%s", body);
     snprintf(F.report_mac, sizeof(F.report_mac), "%s", mac);
+    return !F.post_fails;
 }
 static bool f_cancelled(void *ctx)
 {
@@ -539,15 +541,23 @@ static void test_job_refusals(void)
     setup(&job);
     F.wifi = false;
     CHECK(fw_update_run(&job, &IO) == FW_NO_WIFI && F.gets == 0 && F.net_downs == 1);
+    CHECK(!job.reported); /* the box says it over LoRa instead (node.update_failed, OT-8) */
     /* No address answers: nothing to report to. */
     setup(&job);
     F.answering_url = -1;
     CHECK(fw_update_run(&job, &IO) == FW_UNREACHABLE && F.gets == 2 && F.posts == 0);
+    CHECK(!job.reported);
     /* Signed by a key this firmware does not trust. */
     setup(&job);
     job.keys = (const uint8_t(*)[32])fw_other_key;
     CHECK(fw_update_run(&job, &IO) == FW_BAD_SIGNATURE && F.begins == 0 && untouched());
     CHECK(F.posts == 1 && strstr(F.report, "result=bad_signature\nversion=0.2.0\n") != NULL);
+    CHECK(job.reported);
+    /* The same, but the report gets no answer: not reported, so LoRa says it. */
+    setup(&job);
+    job.keys = (const uint8_t(*)[32])fw_other_key;
+    F.post_fails = true;
+    CHECK(fw_update_run(&job, &IO) == FW_BAD_SIGNATURE && F.posts == 1 && !job.reported);
     /* A tampered release text: the version changed after signing. */
     setup(&job);
     char *v = strstr(F.text, "version=0.3.0");

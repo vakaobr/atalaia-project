@@ -197,4 +197,12 @@ void field_link_send_rebooted(field_link_t *l, uint32_t t_ms);
  * game time t_ms). */
 void field_link_send_battery_low(field_link_t *l, uint8_t percent, uint32_t t_ms);
 
+/* Sends node.update_failed (critical, retried until acknowledged): a firmware update the box
+ * could not report over HTTPS (protocol/firmware-update.md). release: the offer's id (16 hex
+ * digits, or "" if the offer had none), reason: the result code, fw: the version it still runs.
+ * The event seq is the header seq of the first packet that carries it, so two failures in one
+ * game (game time 0 before the start) are two events, not one taken for a copy of the other. */
+void field_link_send_update_failed(field_link_t *l, const char *release, const char *reason,
+                                   const char *fw, uint32_t t_ms);
+
 #endif /* ATALAIA_FIELD_LINK_H */

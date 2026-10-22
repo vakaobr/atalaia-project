@@ -75,8 +75,25 @@ class FieldCaTests(unittest.TestCase):
     def test_poster_urls(self):
         cfg = config(self.tmp.name, tls_names=["10.42.0.1", "fd00::1"])
         fake = tls.FieldTls(None, b"", b"\0" * 32, None, None, ["10.42.0.1", "fd00::1", "localhost", "x.local"])
-        self.assertEqual(poster_urls(cfg, fake),
+        self.assertEqual(poster_urls(cfg, fake, container=False),
                          ["https://10.42.0.1:8443", "https://[fd00::1]:8443", "https://x.local:8443"])
+        # In a container only the configured names: its own host name resolves only inside it (OT-10).
+        self.assertEqual(poster_urls(cfg, fake, container=True), ["https://10.42.0.1:8443", "https://[fd00::1]:8443"])
+        self.assertEqual(poster_urls(config(self.tmp.name), fake, container=True), [])
+
+    def test_link_names(self):
+        """What the bench showed (OT-5): in Docker the join carried the container's id as a host name (and
+        .local), which the box could not resolve. The configured names come first; found ones only if a
+        device elsewhere can use them."""
+        found = ["campo.lan", "localhost", "127.0.0.1", "26eeb750e075", "26eeb750e075.local", "172.17.0.2",
+                 "169.254.10.1", "::1", "0.0.0.0", "192.168.1.50", "myhost", "myhost.local", "a" * 64]
+        self.assertEqual(tls.link_names(["192.168.1.50", "campo.lan"], found, container=True),
+                         ["192.168.1.50", "campo.lan"])
+        self.assertEqual(tls.link_names(["192.168.1.50", "campo.lan"], found, container=False),
+                         ["192.168.1.50", "campo.lan", "172.17.0.2", "myhost", "myhost.local"])
+        self.assertEqual(tls.link_names([" 10.42.0.1 ", "localhost", "127.0.0.1", ""], [], container=False),
+                         ["10.42.0.1"])
+        self.assertIsInstance(tls.in_container(), bool)
 
 
 class HttpsServerTests(unittest.TestCase):
@@ -86,7 +103,7 @@ class HttpsServerTests(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         port = free_port()
-        cfg = config(tmp.name, tls_port=port, api_port=free_port(), tls_names=["127.0.0.1"],
+        cfg = config(tmp.name, tls_port=port, api_port=free_port(), tls_names=["127.0.0.1", "campo.example"],
                      join_key=bytes(range(32)).hex())
         bundle = build(cfg, core=CORE, load_core_lib=False)
         self.addCleanup(bundle.store.close)

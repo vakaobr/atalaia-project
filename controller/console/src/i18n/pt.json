@@ -166,6 +166,7 @@
     "events": {
       "medic_heal": "{player} recebeu tratamento (ligaduras no kit: {remaining}; tratamentos neste jogo: {used})",
       "medic_empty": "Um kit de ligaduras ficou vazio",
+      "node_update_failed": "A atualização do firmware de uma caixa falhou ({reason})",
       "hacking_solved": "{team} resolveu um terminal de hacking ({puzzle})",
       "hacking_solved_code": "{team} resolveu um terminal de hacking ({puzzle}) e recebeu o código {code}",
       "vip_extracted": "A carga da equipa {team} chegou à zona de extração",
@@ -482,6 +483,12 @@
     "schedule_create": "Criar o jogo",
     "schedule_made": "já criado: jogo {ids}",
     "schedule_registered": "{n} inscrições",
+    "problems": {
+      "https_off": "O HTTPS está desligado no controlador ([api] tls_port = 0): o cartaz precisa do certificado do campo.",
+      "no_address": "O cartaz não tem nenhum endereço https do controlador: indica os endereços abaixo, [checkin] urls ou [api] tls_names.",
+      "too_long": "O cartaz não cabe num código QR: menos endereços ou mais curtos, ou um nome de campo mais curto.",
+      "invalid": "O cartaz não pode ser feito: {detail}"
+    },
     "schedule_none": "Ainda não chegou nenhum jogo da agenda do servidor do site."
   },
   "poster": {
@@ -597,9 +604,11 @@
     "not_verified": "chave já não aceite",
     "update_all": "Atualizar todas as caixas",
     "delete": "Apagar",
-    "running": "Em uso",
+    "installed_version": "Versão instalada",
     "update": "Atualização",
     "update_to": "Atualizar para {version}",
+    "send_again": "Enviar de novo",
+    "send_again_hint": "A caixa ainda não respondeu: enviar a atualização de novo já (uma caixa que já está a atualizar ignora-a)",
     "cancel": "Deixar de esperar pelas atualizações em curso",
     "states": {
       "sent": "{version}: enviada, à espera da caixa",

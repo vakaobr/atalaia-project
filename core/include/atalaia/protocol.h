@@ -177,6 +177,7 @@ enum {
     ATALAIA_DATA_OBJECTIVE = 34,         /* scenario objective id */
     ATALAIA_DATA_SCENARIO = 35,          /* scenario package id */
     ATALAIA_DATA_PUZZLE = 36,            /* hacking terminal puzzle: code, wires or sequence */
+    ATALAIA_DATA_RELEASE = 37,           /* firmware release id: the first 16 hex digits of the image's SHA-256 */
 };
 
 /* Standard event ids: the CBOR value of the type field. */
@@ -230,6 +231,7 @@ enum {
     ATALAIA_EV_HACKING_SOLVED = 47,               /* hacking.solved */
     ATALAIA_EV_MEDIC_HEAL = 50,                   /* medic.heal */
     ATALAIA_EV_MEDIC_EMPTY = 51,                  /* medic.empty */
+    ATALAIA_EV_NODE_UPDATE_FAILED = 52,           /* node.update_failed */
 };
 
 typedef enum {

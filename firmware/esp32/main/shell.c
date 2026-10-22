@@ -831,6 +831,7 @@ static void task_game(void *arg)
         /* ---- Tick the game loop (a field game ticks its own runner, time-synced; between
          * games box_game_tick runs only the lobby: announcements, invites) ---- */
         bool field_game = box_game_active(&box);
+        fw_update_esp_poll(); /* a failed update the controller has not heard of: over LoRa */
         box_game_tick(&box, delta_ms, now);
         if (field_game) {
             /* ticked above */

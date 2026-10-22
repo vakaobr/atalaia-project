@@ -511,6 +511,7 @@ fw_result_t fw_update_run(fw_job_t *job, const fw_io_t *io)
     memset(&job->release, 0, sizeof(job->release));
     job->base[0] = '\0';
     job->written = 0;
+    job->reported = false;
     fw_result_t r = fw_update_precheck(job);
     if (r != FW_INSTALLED) return r;
     if (!io->net_up(io->ctx)) {
@@ -528,7 +529,7 @@ fw_result_t fw_update_run(fw_job_t *job, const fw_io_t *io)
         char body[FW_REPORT_MAX], mac[65];
         const char *version = r == FW_INSTALLED ? job->release.version : job->running_version;
         if (fw_report(job->join, job->id, r, version, body, sizeof(body), mac) > 0) {
-            io->post(io->ctx, job->base, "/api/v1/firmware/report", body, mac);
+            job->reported = io->post(io->ctx, job->base, "/api/v1/firmware/report", body, mac);
         }
     }
     io->net_down(io->ctx);

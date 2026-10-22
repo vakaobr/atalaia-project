@@ -62,7 +62,7 @@ The GM uploads the image and its `.release.json` in the console (*Boxes* tab), o
 
 **CMD opcode 9, `update`** (RFC 0001 Amendment 6), to that box alone: `params` `{"id": "<release id>", "version": "<version>"}`.
 
-The live game cannot start while an update is on its way (`sent` or `installed`, until `[firmware] update_timeout_s`, 600 s); the GM can stop waiting (`DELETE /api/v1/firmware/updates`). A box stops a download as soon as a game starts. A mode's `field.lua` can never send `update`.
+The live game cannot start while an update is on its way (`sent` or `installed`, until `[firmware] update_timeout_s`, 600 s); the GM can stop waiting (`DELETE /api/v1/firmware/updates`), or send the update again at once to a box it names (`{"nodes": [7]}`) while its update is still `sent` (decision OT-9: a box already updating ignores the second offer; `"all"` skips such boxes, and an `installed` box is never sent another). A box stops a download as soon as a game starts. A mode's `field.lua` can never send `update`.
 
 ## The box
 
@@ -79,6 +79,8 @@ Then, on its own task, while the radio and the joined game carry on:
 4. `GET <url>/api/v1/firmware/<id>/image`: a `Content-Length` other than the signed size is refused (`download`). The first 324 bytes must declare the release's version and `atalaia_esp32` (`bad_image`), the box's own variant and board (`wrong_board`); only then is the inactive slot opened (`esp_ota_begin`, which erases it) and written as the bytes come, hashed with SHA-256 on the way. More bytes than signed, fewer, a broken connection (`download`), a game starting (`cancelled`), a flash error (`flash`) abort the write (`esp_ota_abort`).
 5. The size and the SHA-256 must be the signed ones (`bad_hash`); `esp_ota_end` must find the image valid (`flash`); **only then** does `esp_ota_set_boot_partition` make it the next boot.
 6. Reports to the controller, reboots.
+
+Whatever stops it, the controller hears why: over HTTPS once an address has answered, over LoRa otherwise (below).
 
 Until step 5 the running image and the boot choice are never touched: an update that fails, or a power cut at any point before it, leaves the box running what it ran.
 
@@ -99,7 +101,11 @@ result=<installed, or the code it stopped with>
 version=<the version it will run: the new one when installed, its own otherwise>
 ```
 
-The controller accepts it only for its live game, with that game's key, and for an update it sent to that box. The box's next HELLO shows the version it runs: the new one (`done`) or, after `installed`, the old one (`rolled_back`: the new image did not confirm itself). With no news for `update_timeout_s` the update is `timeout`. `GET /api/v1/firmware` (GM token) lists the releases and the updates; the console shows them, and the stream sends `{"type": "firmware", "updates": [...]}` on every change.
+The controller accepts it only for its live game, with that game's key, and for an update it sent to that box.
+
+**Over LoRa when HTTPS cannot carry it** (decision OT-8, RFC 0001 Amendment 11): a box whose update failed before an address answered (`no_wifi`, `unreachable`), was refused before any network (the refusals above, `busy` included), or whose report got no `200` sends the standard event **`node.update_failed`** (id 52, critical: retried until the controller acknowledges it) in its joined game, with `release` (the offer's id, data key 37), `reason` (the result code) and `fw` (the version it still runs). It is sealed with the game key like all its events, and its event `seq` is the header seq of the first packet that carries it, so a second failure is a new event. The controller marks the update `failed` with that reason (only an update it sent to that box, still `sent` or `timeout`), the console shows it, and the event is in the game's log. A box in no game (an `@update` typed on its console) has no key to send it with.
+
+The box's next HELLO shows the version it runs: the new one (`done`) or, after `installed`, the old one (`rolled_back`: the new image did not confirm itself). With no news for `update_timeout_s` the update is `timeout`. `GET /api/v1/firmware` (GM token) lists the releases and the updates; the console shows them, and the stream sends `{"type": "firmware", "updates": [...]}` on every change.
 
 ## Vectors
 

@@ -12,7 +12,7 @@
 // until they arrive, a printed ticket scanned or pasted, and the counts of
 // registered players and walk-ins.
 
-import { html, Component, t } from '../ui.js';
+import { html, Component, t, posterProblem } from '../ui.js';
 
 const STATUSES = ['expected', 'pending', 'checked_in', 'left', 'removed'];
 const ROLES = ['player', 'squad_leader', 'vip', 'marshal', 'gm', 'spectator'];
@@ -418,7 +418,7 @@ export class CheckinPanel extends Component {
         return html`<section class="card" aria-labelledby="cp-h">
             <h2 id="cp-h">${t('checkin.poster')}</h2>
             <p class="muted">${t('checkin.poster_intro')}</p>
-            ${p.problem && html`<p class="warning" data-testid="poster-problem">${p.problem}</p>`}
+            ${p.problem && html`<p class="warning" data-testid="poster-problem">${posterProblem(p)}</p>`}
             ${p.ca_short && html`<p>${t('checkin.ca')}: <code data-testid="poster-ca">${p.ca_short}</code></p>`}
             <form class="form" data-testid="poster-form" onSubmit=${(e) => this.savePoster(e)}>
                 <div class="field"><label for="cp-urls">${t('checkin.poster_urls')}</label>

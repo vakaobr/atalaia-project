@@ -99,14 +99,20 @@ def ensure_tls(cfg: Config) -> Optional[tlsmod.FieldTls]:
     return tlsmod.ensure(tls_dir(cfg), tlsmod.local_names(cfg.tls_names), cfg.field_name)
 
 
-def poster_urls(cfg: Config, tls: Optional[tlsmod.FieldTls]) -> list[str]:
-    """The poster's default https addresses: the configured names first, then this host's addresses."""
+def poster_urls(cfg: Config, tls: Optional[tlsmod.FieldTls], container: Optional[bool] = None) -> list[str]:
+    """The https addresses of the poster and of the boxes' joins (key 14): the configured names first,
+    then this host's names and addresses that another device can reach (none in a container: OT-10)."""
     if tls is None:
         return []
+    if container is None:
+        container = tlsmod.in_container()
+    names = tlsmod.link_names(cfg.tls_names, tls.names, container)
+    if container and not cfg.tls_names:
+        log.warning("running in a container with no [api] tls_names: the boxes and the check-in poster get no "
+                    "address for this controller (its own host name and addresses resolve only inside the "
+                    "container); set [api] tls_names to the address the field reaches it at")
     out = []
-    for name in tls.names:
-        if name in ("localhost", "127.0.0.1"):
-            continue
+    for name in names:
         host = f"[{name}]" if ":" in name else name
         url = f"https://{host}:{cfg.tls_port}" if cfg.tls_port != 443 else f"https://{host}"
         if url not in out and len(url) <= 64:

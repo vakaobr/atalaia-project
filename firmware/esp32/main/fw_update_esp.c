@@ -50,6 +50,10 @@ static box_game_t *s_box;
 static void (*s_screen)(const char *tmpl, const char *data_json);
 static int (*s_battery)(void);
 static volatile bool s_busy;
+/* A failure the controller did not take over HTTPS: the update task sets it, the game task
+ * sends it over LoRa (fw_update_esp_poll) and clears it. */
+static volatile bool s_failed_due;
+static fw_result_t s_failed;
 static fw_job_t s_job;
 static atalaia_join_t s_join; /* a copy: the game task keeps its own */
 static uint8_t s_keys[FW_KEYS_MAX][32];
@@ -325,7 +329,7 @@ static void close_stream(void *ctx)
     s_http = NULL;
 }
 
-static void post(void *ctx, const char *base, const char *path, const char *body,
+static bool post(void *ctx, const char *base, const char *path, const char *body,
                  const char *mac_hex)
 {
     (void)ctx;
@@ -339,13 +343,14 @@ static void post(void *ctx, const char *base, const char *path, const char *body
         .disable_auto_redirect = true,
     };
     esp_http_client_handle_t h = esp_http_client_init(&cfg);
-    if (h == NULL) return;
+    if (h == NULL) return false;
     esp_http_client_set_header(h, "Content-Type", "text/plain");
     esp_http_client_set_header(h, "X-Atalaia-Mac", mac_hex);
     esp_http_client_set_post_field(h, body, (int)strlen(body));
-    if (esp_http_client_perform(h) != ESP_OK)
-        ESP_LOGW(TAG, "the report did not reach the controller");
+    bool ok = esp_http_client_perform(h) == ESP_OK && esp_http_client_get_status_code(h) == 200;
+    if (!ok) ESP_LOGW(TAG, "the report did not reach the controller: over LoRa instead");
     esp_http_client_cleanup(h);
+    return ok;
 }
 
 /* ---- the OTA slot ----------------------------------------------------------------------- */
@@ -445,8 +450,20 @@ static void update_task(void *arg)
     ESP_LOGW(TAG, "update to %s failed: %s; the running image is unchanged", s_job.version,
              fw_result_name(r));
     show(box_text(TX_UPDATE_FAILED), fw_result_name(r));
-    s_busy = false;
+    if (!s_job.reported && s_job.join != NULL) {
+        /* The game task tells the controller over LoRa (fw_update_esp_poll). */
+        s_failed = r;
+        __atomic_store_n(&s_failed_due, true, __ATOMIC_RELEASE);
+    }
+    __atomic_store_n(&s_busy, false, __ATOMIC_RELEASE);
     vTaskDelete(NULL);
+}
+
+void fw_update_esp_poll(void)
+{
+    if (s_box == NULL || !__atomic_load_n(&s_failed_due, __ATOMIC_ACQUIRE)) return;
+    box_game_update_failed(s_box, s_job.id, fw_result_name(s_failed), s_job.running_version);
+    __atomic_store_n(&s_failed_due, false, __ATOMIC_RELEASE);
 }
 
 void fw_update_esp_init(box_game_t *box, void (*screen)(const char *tmpl, const char *data_json),
@@ -473,6 +490,7 @@ void fw_update_esp_offer(const char *params_json)
         ESP_LOGW(TAG, "an update is already running");
         return;
     }
+    fw_update_esp_poll(); /* the last failure goes out before s_job is reused */
     const esp_partition_t *next = esp_ota_get_next_update_partition(NULL);
     memset(&s_job, 0, sizeof(s_job));
     s_join = s_box->join;
@@ -493,6 +511,9 @@ void fw_update_esp_offer(const char *params_json)
         ESP_LOGW(TAG, "update refused: %s", fw_result_name(r));
         show(box_text(TX_UPDATE_REFUSED), fw_result_name(r));
         memset(s_join.game_key, 0, sizeof(s_join.game_key));
+        /* Refused before any network: the controller hears why over LoRa (in a joined game). */
+        if (s_job.join != NULL)
+            box_game_update_failed(s_box, s_job.id, fw_result_name(r), s_job.running_version);
         return;
     }
     memcpy(s_pin, s_join.ca_sha256, sizeof(s_pin));

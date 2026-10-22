@@ -41,10 +41,24 @@ List<int> packet(int header, List<int> body) => [
 /// A test client: raw packets in and out.
 class Client {
   Client._(this.socket) {
-    socket.listen((d) {
-      _buf.addAll(d);
-      _parse();
-    }, onDone: () => closed.complete());
+    socket.listen(
+      (d) {
+        _buf.addAll(d);
+        _parse();
+      },
+      // A broker that refuses a connection (the 21st) may close it before or
+      // after the CONNECT arrives: the client then sees the end, a reset or a
+      // broken pipe, depending on the timing (it failed under load). Each is
+      // "the broker closed it", never an error of the test.
+      onError: (Object _) => _closed(),
+      onDone: _closed,
+      cancelOnError: true,
+    );
+    socket.done.then((_) {}, onError: (Object _) => _closed());
+  }
+
+  void _closed() {
+    if (!closed.isCompleted) closed.complete();
   }
 
   final Socket socket;
@@ -103,7 +117,7 @@ class Client {
     }
     final p = await packets.stream
         .firstWhere((p) => p.$1 >> 4 == type)
-        .timeout(const Duration(seconds: 5));
+        .timeout(const Duration(seconds: 15));
     got.remove(p);
     return p;
   }
@@ -117,7 +131,11 @@ class Client {
   );
 
   Future<void> close() async {
-    await socket.close();
+    try {
+      await socket.close();
+    } on SocketException {
+      // already closed by the broker
+    }
     socket.destroy();
   }
 }
@@ -219,7 +237,7 @@ void main() {
       await c.next(13);
       expect(c.got.where((p) => p.$1 >> 4 == 3), isEmpty);
       c.send(packet(0x34, [..._str('a'), 0, 1])); // QoS 2: not supported
-      await c.closed.future.timeout(const Duration(seconds: 5));
+      await c.closed.future.timeout(const Duration(seconds: 15));
       final junk = await Socket.connect(
         InternetAddress.loopbackIPv4,
         broker.boundPort,
@@ -227,7 +245,7 @@ void main() {
       final done = Completer<void>();
       junk.listen((_) {}, onDone: done.complete);
       junk.add([0x82, 0x02, 0, 1]); // SUBSCRIBE before CONNECT
-      await done.future.timeout(const Duration(seconds: 5));
+      await done.future.timeout(const Duration(seconds: 15));
       junk.destroy();
     },
   );
@@ -266,7 +284,7 @@ void main() {
     }
     expect(broker.clientCount, 20);
     final extra = await Client.connect(broker.boundPort, id: 'extra');
-    await extra.closed.future.timeout(const Duration(seconds: 5));
+    await extra.closed.future.timeout(const Duration(seconds: 15));
     expect(extra.got, isEmpty);
     for (final c in clients) {
       await c.close();

@@ -13,6 +13,7 @@ import unittest
 from pathlib import Path
 
 import support  # noqa: F401  (puts the controller on the path)
+from p3support import P3Case
 
 from atalaia_controller import checkin, checkin_poster as cp
 from atalaia_controller.engine import ControllerError
@@ -107,6 +108,35 @@ class DeclarationVectorTests(unittest.TestCase):
                 checkin.secret_bytes(s)
         for _ in range(50):
             self.assertTrue(checkin.player_id_ok(checkin.new_player_id()))
+
+
+class PosterProblemTests(P3Case):
+    """Why the poster cannot be made comes as a code the console translates (OT-5: the bench's
+    console showed "HTTPS is off ..." in English), next to the English text."""
+
+    def poster(self) -> dict:
+        return self.client.get("/api/v1/checkin/poster", headers={"Authorization": "Bearer gm-secret"}).json()
+
+    def test_problem_codes(self) -> None:
+        p = self.poster()
+        self.assertTrue(p["text"])
+        self.assertIsNone(p["problem"])
+        self.assertIsNone(p["problem_code"])
+        ca = self.svc.ca_sha256
+        self.svc.ca_sha256 = None
+        p = self.poster()
+        self.assertEqual((p["text"], p["problem_code"]), (None, "https_off"))
+        self.assertIn("HTTPS is off", p["problem"])
+        self.svc.ca_sha256 = ca
+        self.svc.default_urls = []
+        p = self.poster()
+        self.assertEqual((p["text"], p["problem_code"]), (None, "no_address"))
+        self.assertIn("tls_names", p["problem"])
+        # Three addresses of 64 bytes and a long name do not fit in a QR code's poster.
+        self.svc.default_urls = ["https://" + "a" * 42 + f"{i}.example:8443" for i in range(3)]
+        self.svc.cfg.field_name = "N" * 48
+        p = self.poster()
+        self.assertEqual((p["text"], p["problem_code"]), (None, "too_long"))
 
 
 if __name__ == "__main__":

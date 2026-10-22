@@ -80,7 +80,8 @@
             "vip.extracted",
             "hacking.solved",
             "medic.heal",
-            "medic.empty"
+            "medic.empty",
+            "node.update_failed"
           ]
         },
         {
@@ -1566,6 +1567,40 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "node.update_failed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "release": {
+                "$ref": "#/$defs/data/release"
+              },
+              "reason": {
+                "$ref": "#/$defs/data/reason"
+              },
+              "fw": {
+                "$ref": "#/$defs/data/fw"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
     }
   ],
   "$defs": {
@@ -1713,6 +1748,10 @@
       "puzzle": {
         "type": "string",
         "description": "hacking terminal puzzle: code, wires or sequence"
+      },
+      "release": {
+        "type": "string",
+        "description": "firmware release id: the first 16 hex digits of the image's SHA-256"
       }
     }
   }

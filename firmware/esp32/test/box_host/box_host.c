@@ -19,7 +19,7 @@
  *   box_host --state-dir DIR --modes DIR [--air-port N] [--air-peer N]
  *            [--join-key HEX] [--state-ms N] [--name NAME]
  *            [--as-box VERSION] [--release-keys HEX] [--admin-pin PIN] [--mac MAC] [--pair]
- *            [--announce-ms N]
+ *            [--announce-ms N] [--no-wifi]
  *
  * Without --join-key (and no key stored in DIR) the box is unadopted
  * (main/adoption.c, protocol/adoption.md); --admin-pin (1234) and --mac
@@ -35,6 +35,10 @@
  * the controller offers it firmware updates; a CMD update then prints
  * "UPDATE <params> link=<CA yes|no>/<addresses> precheck=<result>": the firmware's
  * own offer checks (fw_update_precheck, with --release-keys), without Wi-Fi or a slot.
+ * --no-wifi: an offer that passes them then runs the update (fw_update_run), which stops
+ * with no_wifi as on a box whose Wi-Fi did not start, and prints "UPDATE result=<code>";
+ * a refusal or that failure reaches the controller over LoRa (node.update_failed), as on
+ * the Field Box (decision OT-8).
  *
  * stdin, one command per line:
  *   @join atalaia:join:...      join (as typed on the serial console)
@@ -360,6 +364,18 @@ static char fw_version[32] = "host"; /* HELLO's fw_version, as esp_app_desc_t's 
 static uint8_t release_keys[FW_KEYS_MAX][32];
 static int release_key_count;
 
+static bool no_wifi; /* --no-wifi: run the update, which finds no Wi-Fi */
+
+static bool host_net_up(void *ctx)
+{
+    (void)ctx;
+    return false; /* the host box has no field Wi-Fi: no_wifi */
+}
+static void host_net_down(void *ctx)
+{
+    (void)ctx;
+}
+
 static void shell_update(void *user, const char *params)
 {
     (void)user;
@@ -379,6 +395,18 @@ static void shell_update(void *user, const char *params)
         fw_offer_parse(params, job.id, job.version) ? fw_update_precheck(&job) : FW_BAD_OFFER;
     out("UPDATE %s link=%s/%u precheck=%s", params, game.join.has_ca ? "yes" : "no",
         (unsigned)game.join.url_count, fw_result_name(r));
+    if (!no_wifi) return;
+    if (r == FW_INSTALLED) {
+        fw_io_t io;
+        memset(&io, 0, sizeof(io));
+        io.net_up = host_net_up;
+        io.net_down = host_net_down;
+        r = fw_update_run(&job, &io);
+        out("UPDATE result=%s", fw_result_name(r));
+    }
+    if (r != FW_INSTALLED && !job.reported) {
+        box_game_update_failed(&game, job.id, fw_result_name(r), job.running_version);
+    }
 }
 
 /* ---- Files for the mode sources -------------------------------------------------- */
@@ -505,6 +533,8 @@ int main(int argc, char **argv)
                    fw_version_valid(argv[i + 1]) && strlen(argv[i + 1]) < sizeof(fw_version)) {
             snprintf(fw_version, sizeof(fw_version), "%s", argv[++i]);
             as_box = true;
+        } else if (strcmp(argv[i], "--no-wifi") == 0) {
+            no_wifi = true;
         } else if (strcmp(argv[i], "--release-keys") == 0 && i + 1 < argc) {
             release_key_count = fw_keys_parse(argv[++i], release_keys, FW_KEYS_MAX);
             if (release_key_count < 0) {

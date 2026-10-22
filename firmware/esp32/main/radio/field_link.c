@@ -260,6 +260,38 @@ void field_link_send_battery_low(field_link_t *l, uint8_t percent, uint32_t t_ms
     field_link_event(l, &ev, data);
 }
 
+/* Copies a short code into out, keeping only what needs no JSON escape ([0-9A-Za-z._+-]). */
+static void plain_code(char *out, size_t cap, const char *in)
+{
+    size_t n = 0;
+    for (; in != NULL && *in != '\0' && n + 1 < cap; in++) {
+        char c = *in;
+        if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+            c == '.' || c == '_' || c == '+' || c == '-') {
+            out[n++] = c;
+        }
+    }
+    out[n] = '\0';
+}
+
+void field_link_send_update_failed(field_link_t *l, const char *release, const char *reason,
+                                   const char *fw, uint32_t t_ms)
+{
+    atalaia_event_t ev;
+    uint16_t seq = (uint16_t)(l->proto.seq + 1u); /* the header seq of the next packet */
+    if (!atalaia_event_init(&ev, l->join.node_id, seq, t_ms, "node.update_failed",
+                            ATALAIA_TEAM_NONE, ATALAIA_SQUAD_NONE, ATALAIA_PRIO_CRITICAL)) {
+        return;
+    }
+    char rel[17], why[24], ver[33], data[128];
+    plain_code(rel, sizeof(rel), release);
+    plain_code(why, sizeof(why), reason);
+    plain_code(ver, sizeof(ver), fw);
+    snprintf(data, sizeof(data), "{\"release\":\"%s\",\"reason\":\"%s\",\"fw\":\"%s\"}", rel, why,
+             ver);
+    field_link_event(l, &ev, data);
+}
+
 /* ---- Init -------------------------------------------------------------------- */
 
 bool field_link_init(field_link_t *l, const atalaia_join_t *join,

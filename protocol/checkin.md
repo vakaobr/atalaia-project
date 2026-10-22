@@ -195,7 +195,7 @@ Version 1, at most 128 bytes with the version byte. All three keys are required.
 | GET | `/api/v1/games/{id}/checkins.csv` | GM token | The list as CSV for the field's own records (cells that a spreadsheet would read as a formula start with `'`) |
 | POST | `/api/v1/games/{id}/checkin/open` · `/close` | GM token | Check-in is open from a game's creation until it ends, unless closed |
 | GET / PUT | `/api/v1/checkin/settings` | GM token | `confirm`, `federation`, `federation_label`, `max_replicas`, `max_players`, `chrono_valid_for` |
-| GET / PUT | `/api/v1/checkin/poster` | GM token | The poster's fields and text, `ca_short`, and why it cannot be made (`problem`); PUT `urls`, `wifi_ssid`, `game_id`, `field_name` |
+| GET / PUT | `/api/v1/checkin/poster` | GM token | The poster's fields and text, `ca_short`, and why it cannot be made (`problem` in English, `problem_code` for the console: `https_off`, `no_address`, `too_long`, `invalid`); PUT `urls`, `wifi_ssid`, `game_id`, `field_name` |
 | GET / POST | `/api/v1/marshals` | GM token | Marshals' public keys / register one `{"marshal_id", "name", "public_key", "player_id"?}` (base64 or hex, 32 bytes) |
 | GET / DELETE | `/api/v1/players/{player}/chrono` | GM token or the player's token | Their readings / erase them |
 | DELETE | `/api/v1/players/{player}` | GM token | Erase the field identity, check-ins and declarations (`?chrono=true`: the readings too) |

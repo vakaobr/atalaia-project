@@ -100,6 +100,39 @@ class FieldTests(unittest.TestCase):
     def score(self, gid: int, team: str) -> int:
         return self.client.get(f"/api/v1/games/{gid}/score", headers=READ).json()["teams"][team]
 
+    def test_firmware_update_failure_comes_back_over_the_radio(self):
+        """The bench's no_wifi (OT-5): the box's update stops before it has any network, so no HTTPS report;
+        the Field Box firmware's own game and radio code says it over LoRa (node.update_failed, OT-8), the
+        controller's record is failed with the reason at once, and the GM can send the update again."""
+        from test_firmware_updates import SIGNING, box_image, sign  # noqa: PLC0415
+
+        from atalaia_controller.firmware_updates import FirmwareUpdates  # noqa: PLC0415
+
+        self.ctrl.ca_sha256 = bytes(range(32))
+        self.ctrl.link_urls = ["https://10.42.0.1:8443"]
+        fw = FirmwareUpdates(self.ctrl, Path(self.tmp.name) / "firmware", [SIGNING["public_key_b64"]])
+        image = box_image("0.3.0")
+        rel = fw.add(image, "esp32s3", "0.3.0", sign(image, "0.3.0"))
+        gid = self.game()
+        box = self.box("alpha", "--as-box", "0.2.0", "--release-keys", SIGNING["public_key"], "--no-wifi")
+        nid = self.join(box)
+        self.assertTrue(wait_for(lambda: self.node(nid).get("fw_version") == "0.2.0", 5))
+        r = self.client.post(f"/api/v1/firmware/{rel['id']}/install", headers=GM, json={"nodes": [nid]})
+        self.assertEqual(r.json()["results"], [{"node_id": nid, "result": "sent"}])
+        self.assertTrue(wait_for(lambda: box.logged("UPDATE result=no_wifi"), 5), box.lines[-5:])
+
+        def state() -> tuple:
+            u = self.client.get("/api/v1/firmware", headers=GM).json()["updates"]
+            return (u[0]["state"], u[0]["reason"]) if u else ()
+        self.assertTrue(wait_for(lambda: state() == ("failed", "no_wifi"), 10), state())
+        self.assertIn("node.update_failed", self.log_types(gid, nid))
+        # Nothing on its way: the game may start; but first the GM tries again at once.
+        r = self.client.post(f"/api/v1/firmware/{rel['id']}/install", headers=GM, json={"nodes": [nid]})
+        self.assertEqual(r.json()["results"], [{"node_id": nid, "result": "sent"}])
+        self.assertTrue(wait_for(lambda: sum("UPDATE result=no_wifi" in line for line in box.lines) == 2, 5))
+        self.assertTrue(wait_for(lambda: state() == ("failed", "no_wifi"), 10), state())
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
+
     def test_firmware_update_offer_reaches_the_box(self):
         """A firmware update (protocol/firmware-update.md) as far as it goes without Wi-Fi: the join
         carries the field CA and the controller's addresses (keys 13 and 14), which the box now reads;

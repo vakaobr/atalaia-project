@@ -90,6 +90,8 @@ class Field:
             hub.add(self.host.air_port)
         self.tmp = tempfile.TemporaryDirectory()
         self.port = free_port()
+        # The address the boxes and the poster are given: in a container only configured ones (OT-10).
+        cfg = {"tls_names": ["10.42.0.1"], **(cfg or {})}
         cfg = config(self.tmp.name, port=self.host.url, api_port=self.port, host="127.0.0.1",
                      join_key=JOIN_KEY.hex(), scan_dwell_s=1.1, **(cfg or {}))
         self.bundle = build(cfg, core=CORE, load_core_lib=False)
@@ -704,6 +706,18 @@ class ConsoleBrowserTests(unittest.TestCase):
             return {"cmd": 9, "params": {"id": release_id, "version": "0.4.0"}, "dest": BOX} in cmds
         self.assertTrue(wait_for(heard_update, 5), cmds)
         expect(page.get_by_test_id("firmware-cancel")).to_be_visible()
+        expect(page.get_by_test_id("firmware-boxes")).to_contain_text("Versão instalada")
+        expect(page.get_by_test_id(f"firmware-again-{BOX}")).to_have_text("Enviar de novo")
+
+        # The box found no Wi-Fi: it says so over LoRa (OT-8) and the GM sends the update again at once.
+        self.field.box("EVENT", codec.encode_event({
+            "node": BOX, "seq": 2, "t": 0, "type": "node.update_failed",
+            "data": {"release": release_id, "reason": "no_wifi", "fw": "0.3.0"}}), ack=True)
+        expect(state).to_contain_text("0.4.0: falhou (a caixa não tem o Wi-Fi do campo)")
+        expect(page.get_by_test_id(f"firmware-again-{BOX}")).to_have_count(0)
+        expect(page.get_by_test_id("firmware-cancel")).to_have_count(0)
+        update.click()
+        expect(state).to_contain_text("0.4.0: enviada, à espera da caixa")
 
         # The box reports over HTTPS (its MAC is the game key's), restarts and says hello again.
         body = fr.report_body(game["id"], BOX, release_id, "installed", "0.4.0")

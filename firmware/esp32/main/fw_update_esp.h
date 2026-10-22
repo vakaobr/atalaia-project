@@ -34,6 +34,13 @@ void fw_update_esp_init(box_game_t *box, void (*screen)(const char *tmpl, const 
  */
 void fw_update_esp_offer(const char *params_json);
 
+/*
+ * On the game task, every loop: an update that failed on its task without the controller
+ * taking its HTTPS report (no Wi-Fi, the controller unreachable, the report lost) is told to
+ * the controller over LoRa here (box_game_update_failed: the link belongs to this task).
+ */
+void fw_update_esp_poll(void);
+
 /* The field Wi-Fi a firmware update uses (stored in NVS: wifi_ssid, wifi_pass). */
 bool fw_update_esp_set_wifi(const char *ssid, const char *password);
 

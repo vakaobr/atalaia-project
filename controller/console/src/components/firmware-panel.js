@@ -130,7 +130,7 @@ export class FirmwarePanel extends Component {
         const verified = fw.releases.filter((r) => r.verified);
         return html`<div class="table-wrap"><table class="table" data-testid="firmware-boxes">
             <thead><tr>
-                <th>${t('nodes.id')}</th><th>${t('nodes.name')}</th><th>${t('firmware.running')}</th>
+                <th>${t('nodes.id')}</th><th>${t('nodes.name')}</th><th>${t('firmware.installed_version')}</th>
                 <th>${t('firmware.update')}</th>
             </tr></thead>
             <tbody>${boxes.map((n) => {
@@ -140,6 +140,8 @@ export class FirmwarePanel extends Component {
                     && compareVersions(r.version, n.fw_version) === 1)
                     .sort((a, b) => compareVersions(b.version, a.version))[0];
                 const active = u && ACTIVE.includes(u.state);
+                // Sent and not heard of yet: the GM may send it again at once (decision OT-9).
+                const again = u && u.state === 'sent' && verified.find((r) => r.id === u.release);
                 return html`<tr data-node=${n.node_id}>
                     <td>${n.node_id}</td><td>${n.name}</td><td>${n.fw_version}</td>
                     <td data-testid=${`firmware-state-${n.node_id}`}>
@@ -150,6 +152,10 @@ export class FirmwarePanel extends Component {
                             data-testid=${`firmware-update-${n.node_id}`} disabled=${!canUpdate}
                             onClick=${() => this.install(offer, [n.node_id])}>
                             ${t('firmware.update_to', { version: offer.version })}</button>`}
+                        ${again && html`<button type="button" class="small link"
+                            data-testid=${`firmware-again-${n.node_id}`} disabled=${!canUpdate}
+                            title=${t('firmware.send_again_hint')}
+                            onClick=${() => this.install(again, [n.node_id])}>${t('firmware.send_again')}</button>`}
                     </td>
                 </tr>`;
             })}</tbody>

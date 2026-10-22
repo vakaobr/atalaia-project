@@ -12,7 +12,7 @@
 // the QR code, so the code reads as before.
 
 import qrcode from './lib/qrcode.module.js';
-import { t, loadLanguage, api, savedToken, fetchBranding, brandingUrl } from './ui.js';
+import { t, loadLanguage, api, savedToken, fetchBranding, brandingUrl, posterProblem } from './ui.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -79,7 +79,7 @@ async function main() {
         return;
     }
     if (!poster.text) {
-        tools.append(el('p', { class: 'error', 'data-testid': 'poster-error' }, poster.problem || t('poster.no_text')));
+        tools.append(el('p', { class: 'error', 'data-testid': 'poster-error' }, posterProblem(poster) || t('poster.no_text')));
         return;
     }
     document.getElementById('field-name').textContent = poster.field_name;

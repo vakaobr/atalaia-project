@@ -166,6 +166,7 @@
     "events": {
       "medic_heal": "{player} was healed (heals left in the kit: {remaining}; heals in this game: {used})",
       "medic_empty": "A medic kit is empty",
+      "node_update_failed": "A box's firmware update failed ({reason})",
       "hacking_solved": "{team} solved a hacking terminal ({puzzle})",
       "hacking_solved_code": "{team} solved a hacking terminal ({puzzle}) and got the code {code}",
       "vip_extracted": "{team}'s payload reached the extraction zone",
@@ -482,6 +483,12 @@
     "schedule_create": "Create the game",
     "schedule_made": "made: game {ids}",
     "schedule_registered": "{n} registered",
+    "problems": {
+      "https_off": "HTTPS is off on the controller ([api] tls_port = 0): the poster needs the field's certificate.",
+      "no_address": "The poster has no https address for the controller: set the addresses below, [checkin] urls or [api] tls_names.",
+      "too_long": "The poster does not fit in a QR code: fewer or shorter addresses, or a shorter field name.",
+      "invalid": "The poster cannot be made: {detail}"
+    },
     "schedule_none": "No scheduled games pulled from the site server yet."
   },
   "poster": {
@@ -597,9 +604,11 @@
     "not_verified": "key no longer trusted",
     "update_all": "Update every box",
     "delete": "Delete",
-    "running": "Running",
+    "installed_version": "Installed version",
     "update": "Update",
     "update_to": "Update to {version}",
+    "send_again": "Send again",
+    "send_again_hint": "The box has not answered yet: send the update again now (a box already updating ignores it)",
     "cancel": "Stop waiting for the updates on their way",
     "states": {
       "sent": "{version}: sent, waiting for the box",

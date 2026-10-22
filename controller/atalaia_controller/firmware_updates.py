@@ -52,6 +52,8 @@ BOX_TIERS = (0, 1)  # HELLO's tier: full, reduced (2 = proxy: a phone, never upd
 VARIANTS = ("box",)  # the Field Box's images ([firmware] variants: "box-bench" for a test on the desk)
 REPORT_MAX = 512
 ACTIVE = ("sent", "installed")  # an update on its way
+UPDATE_FAILED = "node.update_failed"  # a box's failure said over LoRa (protocol/schema/events.yaml, id 52)
+REASON = re.compile(r"[a-z][a-z_]{0,23}")  # a result code: no_wifi, unreachable, busy...
 
 
 class FirmwareUpdates:
@@ -210,8 +212,11 @@ class FirmwareUpdates:
             log.warning("firmware updates to boxes %s cancelled by the GM", nodes)
         return nodes
 
-    def eligibility(self, release: dict[str, Any], node: dict[str, Any]) -> Optional[str]:
-        """Why this box cannot take this release now, from what its HELLO said; None: it can."""
+    def eligibility(self, release: dict[str, Any], node: dict[str, Any], retry: bool = False) -> Optional[str]:
+        """Why this box cannot take this release now, from what its HELLO said; None: it can. With
+        ``retry`` (the GM named the box), an update still ``sent`` is sent again at once: a box whose
+        failure never reached the controller is not stuck for ``update_timeout_s`` (decision OT-9);
+        a box already running an update ignores the second offer."""
         if node.get("platform") is None or not node.get("fw_version"):
             return "unknown"  # never heard: no HELLO yet
         if fr.platform_name(node["platform"]) != release["platform"]:
@@ -223,7 +228,7 @@ class FirmwareUpdates:
         if fr.compare_versions(release["version"], str(node["fw_version"])) <= 0:
             return "not_newer"
         current = self.attempts.get(int(node["node_id"]))
-        if current is not None and current["state"] in ACTIVE:
+        if current is not None and current["state"] in ACTIVE and not (retry and current["state"] == "sent"):
             return "in_progress"
         return None
 
@@ -253,7 +258,7 @@ class FirmwareUpdates:
         for node_id in targets:
             node = known.get(node_id)
             with self._lock:
-                why = "not_in_game" if node is None else self.eligibility(e, node)
+                why = "not_in_game" if node is None else self.eligibility(e, node, retry=nodes != "all")
             if why is None:
                 try:
                     seq = c.send_update(node_id, params)
@@ -305,9 +310,31 @@ class FirmwareUpdates:
         self._emit()
         return {"accepted": True}
 
+    def on_failed_over_radio(self, ev: dict[str, Any]) -> None:
+        """node.update_failed: a box says over LoRa (sealed with the game key, like all its events) that
+        an update failed where it could not report over HTTPS: no Wi-Fi, the controller unreachable,
+        refused before any network (decision OT-8). Only for the update sent to that box."""
+        data = ev.get("data") or {}
+        node_id, release, reason = ev.get("node"), data.get("release"), data.get("reason")
+        if not isinstance(node_id, int) or not isinstance(reason, str) or not REASON.fullmatch(reason):
+            return
+        with self._lock:
+            a = self.attempts.get(node_id)
+            if a is None or a["release"] != release or a["state"] not in ("sent", "timeout"):
+                log.warning("box %d said over the radio that release %s failed (%s): not an update sent to it",
+                            node_id, release, reason)
+                return
+            a.update(state="failed", reason=reason, updated_at=self.clock())
+        log.warning("box %d: firmware update to %s failed: %s (said over the radio)", node_id, a["version"], reason)
+        self._emit()
+
     def on_message(self, msg: dict[str, Any]) -> None:
         """A box's HELLO shows what it runs: the update's version (done) or, once it said installed,
-        the old one (the new image did not confirm itself)."""
+        the old one (the new image did not confirm itself). A box's node.update_failed: failed."""
+        if msg.get("type") == "event" and isinstance(msg.get("event"), dict) and \
+                msg["event"].get("type") == UPDATE_FAILED:
+            self.on_failed_over_radio(msg["event"])
+            return
         if msg.get("type") != "node" or not isinstance(msg.get("node"), dict):
             return
         node = msg["node"]

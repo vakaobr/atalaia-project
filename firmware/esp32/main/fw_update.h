@@ -153,8 +153,9 @@ typedef struct {
     bool (*open)(void *ctx, const char *base, const char *path, int64_t *length);
     int (*read)(void *ctx, uint8_t *buf, size_t cap); /* >0 bytes, 0 at the end, <0 an error */
     void (*close)(void *ctx);
-    /* POST the report (text) with its MAC header; the answer does not matter. */
-    void (*post)(void *ctx, const char *base, const char *path, const char *body,
+    /* POST the report (text) with its MAC header: true if the controller answered 200 (it took
+     * the report, accepted or not); false and the box tells it over LoRa (node.update_failed). */
+    bool (*post)(void *ctx, const char *base, const char *path, const char *body,
                  const char *mac_hex);
     bool (*cancelled)(void *ctx); /* a game started: stop at once */
     void (*progress)(void *ctx, uint32_t done, uint32_t total);
@@ -183,6 +184,7 @@ typedef struct {
     fw_release_t release;
     uint32_t written;
     char base[ATALAIA_JOIN_URL_MAX + 1]; /* the address that answered */
+    bool reported; /* the controller took the HTTPS report; false: tell it over LoRa */
 } fw_job_t;
 
 /*

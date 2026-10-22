@@ -31,6 +31,7 @@ from atalaia_controller.engine import Controller
 from atalaia_controller.firmware_updates import MAX_RELEASES, FirmwareUpdates
 from atalaia_controller.store import Store
 from atalaia_controller.ws import Hub
+from atalaia_sim import codec
 from atalaia_sim.packet import cmd_decode, hello_encode
 
 REPO = Path(__file__).resolve().parents[2]
@@ -202,6 +203,13 @@ class FirmwareCase(unittest.TestCase):
             "tier": tier, "capabilities": [0], "transports": 1, "battery_pct": 80, "epoch": 1}),
             game_id=game["id"], epoch=1)
 
+    def failed_over_radio(self, game: dict, node: int, release: str, reason: str, seq: int,
+                          fw: str = "0.2.0") -> None:
+        """node.update_failed, as a box sends it over LoRa when it cannot report over HTTPS."""
+        self.modem.rx(node, seq, "EVENT", codec.encode_event({
+            "node": node, "seq": seq, "t": 0, "type": "node.update_failed",
+            "data": {"release": release, "reason": reason, "fw": fw}}), game_id=game["id"], epoch=1, ack=True)
+
     def update_cmds(self) -> list[dict]:
         return [d for d in (cmd_decode(p) for _, p in self.modem.of("CMD")) if d["cmd"] == 9]
 
@@ -346,7 +354,15 @@ class UpdateTests(FirmwareCase):
                          {4: "sent", 5: "not_newer", 6: "wrong_platform", 7: "wrong_tier", 8: "not_newer",
                           9: "unknown_version"})
         self.assertEqual([c["dest"] for c in self.update_cmds()], [4])
-        # Again: box 4's update is on its way.
+        # Again, for every box: box 4's update is on its way.
+        r = self.client.post(f"/api/v1/firmware/{self.rel['id']}/install", json={"nodes": "all"}, headers=GM)
+        self.assertEqual({x["node_id"]: x["result"] for x in r.json()["results"]}[4], "in_progress")
+        # Named by the GM, an update still "sent" goes again at once (decision OT-9) ...
+        r = self.client.post(f"/api/v1/firmware/{self.rel['id']}/install", json={"nodes": [4]}, headers=GM)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual([c["dest"] for c in self.update_cmds()], [4, 4])
+        # ... but not once the box said it installed it (it is restarting into it).
+        self.assertEqual(self.report(game, 4, self.rel["id"], "installed", "0.3.0").json(), {"accepted": True})
         r = self.client.post(f"/api/v1/firmware/{self.rel['id']}/install", json={"nodes": [4]}, headers=GM)
         self.assertEqual(r.status_code, 409)
         self.assertIn("in_progress", r.json()["detail"])
@@ -418,6 +434,39 @@ class UpdateTests(FirmwareCase):
         self.assertEqual(self.client.delete("/api/v1/firmware/updates", headers=GM).json(), {"cancelled": [4]})
         self.assertIsNone(self.fw.busy())
         self.assertEqual(self.client.post(f"/api/v1/games/{game['id']}/start", headers=GM, json={"force": True}).status_code, 200)
+
+    def test_failure_said_over_the_radio(self) -> None:
+        """A box that never reached the controller over HTTPS (no Wi-Fi: the bench, OT-5) says so over LoRa:
+        the record is failed with the reason at once, and the GM may retry at once (decision OT-8)."""
+        game = self.new_game()
+        for n in (4, 5):
+            self.hello(game, n, "0.2.0")
+        self.client.post(f"/api/v1/firmware/{self.rel['id']}/install", json={"nodes": "all"}, headers=GM)
+        self.assertIsNotNone(self.fw.busy())
+        self.failed_over_radio(game, 4, self.rel["id"], "no_wifi", seq=1)
+        states = {u["node_id"]: (u["state"], u["reason"]) for u in self.fw.updates()}
+        self.assertEqual(states[4], ("failed", "no_wifi"))
+        self.assertEqual(states[5], ("sent", None))
+        self.assertTrue(any(m.get("type") == "firmware" and any(u["state"] == "failed" for u in m["updates"])
+                            for m in self.messages))
+        # The event is in the game's log too, as every event of a box.
+        log_types = [e["type"] for e in self.client.get(f"/api/v1/games/{game['id']}/log", headers=GM).json()]
+        self.assertIn("node.update_failed", log_types)
+        # Not for another release, a box it was not sent to, or a reason that is not a code.
+        self.failed_over_radio(game, 5, "0123456789abcdef", "unreachable", seq=2)
+        self.failed_over_radio(game, 6, self.rel["id"], "unreachable", seq=3)
+        self.failed_over_radio(game, 5, self.rel["id"], "No Wi-Fi!", seq=4)
+        self.assertEqual({u["node_id"]: u["state"] for u in self.fw.updates()}, {4: "failed", 5: "sent"})
+        # The GM retries box 4 at once; a second failure (another seq) is heard again.
+        r = self.client.post(f"/api/v1/firmware/{self.rel['id']}/install", json={"nodes": [4]}, headers=GM)
+        self.assertEqual(r.json()["results"], [{"node_id": 4, "result": "sent"}])
+        self.failed_over_radio(game, 4, self.rel["id"], "unreachable", seq=9)
+        self.assertEqual(self.fw.updates()[0]["reason"], "unreachable")
+        # Box 5 after its timeout still counts.
+        self.clock.t += 601
+        self.failed_over_radio(game, 5, self.rel["id"], "busy", seq=5)
+        self.assertEqual({u["node_id"]: (u["state"], u["reason"]) for u in self.fw.updates()}[5], ("failed", "busy"))
+        self.assertIsNone(self.fw.busy())
 
     def test_radio_down(self) -> None:
         game = self.new_game()
