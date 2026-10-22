@@ -1239,6 +1239,9 @@ class ConsoleBrowserTests(unittest.TestCase):
         # A standby controller payload too.
         page.get_by_test_id("join-kind").select_option("controller")
         page.get_by_test_id("join-generate").click()
+        # Wait for the new payload itself: the old result can already contain a "2" (its game id),
+        # and reading the text field before it changes decoded the node's payload again.
+        expect(page.get_by_test_id("join-text")).not_to_have_value(text)
         expect(page.get_by_test_id("join-result")).to_contain_text("2")
         standby = join.decode(join.from_text(page.get_by_test_id("join-text").input_value()), JOIN_KEY)
         self.assertEqual((standby["kind"], standby["node_id"]), ("controller", 2))
@@ -1708,7 +1711,8 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(marker).to_be_visible()
         expect(page.get_by_test_id("level-tabs")).to_have_count(0)
         expect(page.get_by_label("Edifício com vários pisos")).not_to_be_checked()  # the checkbox, by its label
-        page.get_by_test_id("levels-toggle").check()
+        page.get_by_test_id("levels-toggle").click()  # checked once the controller has the change
+        expect(page.get_by_test_id("levels-toggle")).to_be_checked()
         expect(page.get_by_test_id("level-tab-0")).to_have_text("R/C")
         expect(page.get_by_test_id("level-tab-1")).to_have_text("1.º andar")
         page.get_by_test_id("levels-count").select_option("3")
@@ -1783,7 +1787,8 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         page.get_by_test_id("lang").select_option("en")
         page.get_by_test_id("tab-field").click()
-        page.get_by_test_id("levels-toggle").check()
+        page.get_by_test_id("levels-toggle").click()  # checked once the controller has the change
+        expect(page.get_by_test_id("levels-toggle")).to_be_checked()
         expect(page.get_by_test_id("level-tab-0")).to_have_text("Ground floor")
         expect(page.get_by_test_id("level-tab-1")).to_have_text("Floor 1")
         page.get_by_test_id("level-tab-1").click()
