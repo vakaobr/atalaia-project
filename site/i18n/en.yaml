@@ -592,12 +592,13 @@ roadmap:
     todo: >-
       <strong>Still to come.</strong> In software: the phone as the field controller, built in
       slices (done: its MQTT broker, position filter and game engine, with field.lua on the shared
-      core, the REST API, the live stream and the MQTT topics, checked by the same contract cases as
-      the Pi controller; to come: keeping games, the radio through a pod, Wi-Fi props, check-in and
-      the controller's screen) and the iOS version (not built: it needs a Mac); the Money Factory
-      mode is deferred. Plan phase G, the field test with real phones and pods, waits for the
-      hardware: so far the app has run only on Android emulators, and the pod firmware only as its
-      own code on a computer.
+      core, the REST API, the live stream and the MQTT topics, games kept across a restart, join
+      payloads, an I/O pod as its radio and Android props on its Wi-Fi, checked by the same contract
+      cases as the Pi controller and run with the pod's and the Field Box's own code on a computer;
+      to come: check-in and the controller's screen) and the iOS version (not built: it needs a
+      Mac); the Money Factory mode is deferred. Plan phase G, the field test with real phones and
+      pods, waits for the hardware: so far the app has run only on Android emulators, and the pod
+      firmware only as its own code on a computer.
     gate: "Gate: one game mixes ESP32 and Android props without issues."
   p4:
     title: Site server and advanced play
