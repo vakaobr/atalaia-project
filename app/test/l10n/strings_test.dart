@@ -7,6 +7,7 @@
 import 'dart:io';
 
 import 'package:atalaia_app/l10n/strings.dart';
+import 'package:atalaia_app/l10n/strings_de.dart';
 import 'package:atalaia_app/l10n/strings_en.dart';
 import 'package:atalaia_app/l10n/strings_pt.dart';
 import 'package:atalaia_app/prop/prop_session.dart';
@@ -141,6 +142,8 @@ void main() {
         'unavailable',
       ])
         'ctl.local_error_$e',
+      // The settings' language buttons (settings_screen.dart).
+      for (final l in AppLanguage.values) 'settings.lang_${l.code}',
     ];
     for (final k in keys) {
       expect(ptStrings.containsKey(k), isTrue, reason: k);
@@ -160,5 +163,50 @@ void main() {
     expect(AppLanguage.fromCode('en'), AppLanguage.en);
     expect(AppLanguage.fromCode('xx'), AppLanguage.pt);
     expect(AppLanguage.pt.locale.toString(), 'pt_PT');
+  });
+
+  // German (plan phase 10, decision P5H-2): drafted by an AI model, to be
+  // reviewed by a native-speaking player. Other work adds keys to English
+  // and Portuguese without German; such a key shows in English, so German
+  // may lack keys (tools/i18n_check.py lists them) but never has one
+  // English lacks, a different placeholder or an empty text.
+  group('German', () {
+    test('has no key English lacks', () {
+      expect(
+        deStrings.keys.toSet().difference(enStrings.keys.toSet()),
+        isEmpty,
+      );
+    });
+
+    test('has the same placeholders, and no empty text', () {
+      for (final k in deStrings.keys) {
+        expect(
+          placeholders(deStrings[k]!),
+          placeholders(enStrings[k]!),
+          reason: k,
+        );
+        expect(deStrings[k]!.trim(), isNotEmpty, reason: k);
+      }
+    });
+
+    test(
+      'a key German lacks shows in English; numbers have a decimal comma',
+      () {
+        const de = Strings(AppLanguage.de);
+        expect(de.t('settings.lang_de'), 'Deutsch');
+        expect(de.t('settings.language'), deStrings['settings.language']);
+        const missing = 'test.only_in_english';
+        expect(deStrings.containsKey(missing), isFalse);
+        expect(de.t(missing), missing); // no text anywhere: the key itself
+        final english = enStrings.keys.firstWhere(
+          (k) => !deStrings.containsKey(k),
+          orElse: () => '',
+        );
+        if (english.isNotEmpty) expect(de.t(english), enStrings[english]);
+        expect(de.number(1.25, 2), '1,25');
+        expect(AppLanguage.fromCode('de'), AppLanguage.de);
+        expect(AppLanguage.de.locale.toString(), 'de');
+      },
+    );
   });
 }

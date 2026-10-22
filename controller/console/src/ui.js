@@ -12,7 +12,10 @@ export { h, render, Component, createRef };
 
 // ---- languages ---------------------------------------------------------------
 
-export const LANGS = ['pt', 'en'];
+export const LANGS = ['pt', 'en', 'de'];
+// <html lang> for each; a language other than these two shows English for a text it lacks
+// (decision P5H-2: German may trail the other agents' new keys).
+const HTML_LANG = { pt: 'pt-PT', en: 'en', de: 'de' };
 const LANG_KEY = 'atalaia.lang';
 const TOKEN_KEY = 'atalaia.token';
 let dict = {};
@@ -42,15 +45,18 @@ async function fetchDict(lang) {
     return r.json();
 }
 
-/** Loads the remembered language (European Portuguese by default). */
+/** Loads the remembered language (European Portuguese by default). A text the language lacks
+ * comes from English (Portuguese for English itself: both are complete). */
 export async function loadLanguage(lang) {
     lang = LANGS.includes(lang) ? lang : storageGet(LANG_KEY) || 'pt';
     if (!LANGS.includes(lang)) lang = 'pt';
-    if (!fallback.app) fallback = await fetchDict('pt');
-    dict = lang === 'pt' ? fallback : await fetchDict(lang);
+    const base = lang === 'en' ? 'pt' : 'en';
+    const [d, f] = await Promise.all([fetchDict(lang), fetchDict(base)]);
+    dict = d;
+    fallback = f;
     current = lang;
     storageSet(LANG_KEY, lang);
-    document.documentElement.lang = lang === 'pt' ? 'pt-PT' : 'en';
+    document.documentElement.lang = HTML_LANG[lang];
     return lang;
 }
 
@@ -58,7 +64,8 @@ export function lang() {
     return current;
 }
 
-/** A mode's name or description in the current language (mode.yaml "i18n"), else the manifest's. */
+/** A mode's name or description in the current language (mode.yaml "i18n"), else the manifest's
+ * (English: modes have no German yet, decision P5H-7). */
 export function modeText(mode, key) {
     const tr = mode && mode.i18n && mode.i18n[current];
     return (tr && typeof tr[key] === 'string' && tr[key]) || (mode && mode[key]) || '';

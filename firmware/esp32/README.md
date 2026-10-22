@@ -737,8 +737,8 @@ controller's game.
   "Game on" until the mode draws (a zone: "Neutral: hold to capture", in
   Portuguese "Livre: mantém premido", or the
   team holding it, never the Bomb's "standby"); the mode's game over; then
-  "Ready" again. In the field's language, English or European Portuguese (join
-  key 15, kept between games; `main/box_text.c`, fonts with the Portuguese
+  "Ready" again. In the field's language, English, European Portuguese or German (join
+  key 15, kept between games; `main/box_text.c`, fonts with the Portuguese and German
   letters in `main/fonts/`, `tools/gen_box_fonts.py`).
 - **Between games** -- `main/box_lobby.c` ([protocol/field-frames.md](../../protocol/field-frames.md),
   RFC 0001 Amendment 7, proposed). A box with a field join key has an 8-byte

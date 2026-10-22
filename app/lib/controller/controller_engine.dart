@@ -1243,7 +1243,7 @@ class ControllerEngine {
     if (consoleLang is! String ||
         !boxLanguages.contains(consoleLang) ||
         consoleLang == 'auto') {
-      throw ControllerError('console_lang: pt or en');
+      throw ControllerError('console_lang: pt, en or de');
     }
     return consoleLang;
   }
@@ -1694,7 +1694,7 @@ String _hexOf(List<int> b) =>
     [for (final x in b) x.toRadixString(16).padLeft(2, '0')].join();
 
 /// The boxes' screen languages (join key 15): "auto" is the console's.
-const boxLanguages = ['auto', 'pt', 'en'];
+const boxLanguages = ['auto', 'pt', 'en', 'de'];
 
 /// An integer from JSON, as Python's int() takes it (decision PE24-6).
 int _int(Object? value, String name) {

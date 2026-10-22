@@ -4,6 +4,7 @@
     "language": "Language",
     "lang_pt": "Português",
     "lang_en": "English",
+    "lang_de": "Deutsch",
     "sections": "Sections",
     "reconnecting": "No connection to the field controller. Reconnecting…"
   },
@@ -1033,7 +1034,8 @@
     "choices": {
       "auto": "This console's language when the game is created",
       "pt": "Portuguese",
-      "en": "English"
+      "en": "English",
+      "de": "German"
     },
     "live": "The live game's boxes: {lang}",
     "saved": "Saved: games created from now on use it.",

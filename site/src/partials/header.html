@@ -5,7 +5,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 The skip link and the header of every page. The section links lead to the
 subpages and to sections of the main page, in this page's language;
 page.nav.<page> marks the link of the page being read. The language switcher
-leads to this same page in the other language.
+leads to this same page in the other languages.
 #}
   <a class="skip" href="#main">{{ header.skip }}</a>
 
@@ -33,6 +33,8 @@ leads to this same page in the other language.
         <a href="{{ page.href.pt }}" hreflang="pt-PT" lang="pt-PT"{{ page.current.pt }}>PT<span class="sr-only"> · Português</span></a>
         <span class="sep" aria-hidden="true">·</span>
         <a href="{{ page.href.en }}" hreflang="en" lang="en"{{ page.current.en }}>EN<span class="sr-only"> · English</span></a>
+        <span class="sep" aria-hidden="true">·</span>
+        <a href="{{ page.href.de }}" hreflang="de" lang="de"{{ page.current.de }}>DE<span class="sr-only"> · Deutsch</span></a>
       </nav>
     </div>
   </header>

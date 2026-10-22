@@ -4,7 +4,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 Template of the main page. tools/build_site.py renders it once per language,
 with the text from site/i18n/<language>.yaml, into site/index.html (Portuguese)
-and site/en/index.html (English). The other pages (modes, radio, roadmap,
+and site/en/index.html (English), site/de/index.html (German). The other pages (modes, radio, roadmap,
 glossary) have templates of their own beside this one; see site/README.md.
 
   {{ key }}            the text of key, inserted as HTML
@@ -45,13 +45,13 @@ the pages. Code blocks and anything else that is the same in every language stay
           <a class="button" href="https://github.com/vakaobr/atalaia-project">{{ hero.source }}</a>
         </div>
         <p class="name">{{ hero.name }} <a href="#name">{{ hero.why_name }}</a></p>
-        {# The night scene has its title painted in: each language has its own copy. #}
+        {# The night scene has its title painted in: Portuguese and English have their own copies; German shows the English one. #}
         <picture class="hero-art">
 {% if lang pt %}
           <source type="image/webp" srcset="{{ page.root }}img/watchtower-night-pt-960.webp 960w, {{ page.root }}img/watchtower-night-pt-1600.webp 1600w" sizes="(min-width: 1080px) 1048px, calc(100vw - 32px)">
           <img src="{{ page.root }}img/watchtower-night-pt-960.jpg" srcset="{{ page.root }}img/watchtower-night-pt-960.jpg 960w, {{ page.root }}img/watchtower-night-pt-1600.jpg 1600w" sizes="(min-width: 1080px) 1048px, calc(100vw - 32px)" width="1600" height="893" decoding="async" fetchpriority="high" alt="{{ hero.image_alt|text }}">
 {% endif %}
-{% if lang en %}
+{% if lang en de %}
           <source type="image/webp" srcset="{{ page.root }}img/watchtower-night-960.webp 960w, {{ page.root }}img/watchtower-night-1600.webp 1600w" sizes="(min-width: 1080px) 1048px, calc(100vw - 32px)">
           <img src="{{ page.root }}img/watchtower-night-960.jpg" srcset="{{ page.root }}img/watchtower-night-960.jpg 960w, {{ page.root }}img/watchtower-night-1600.jpg 1600w" sizes="(min-width: 1080px) 1048px, calc(100vw - 32px)" width="1600" height="893" decoding="async" fetchpriority="high" alt="{{ hero.image_alt|text }}">
 {% endif %}
@@ -125,8 +125,8 @@ the pages. Code blocks and anything else that is the same in every language stay
           </ol>
         </figure>
         <p class="note">{{ how.core }}</p>
-{% if lang en %}
-        {# English page only: its keys, how.image_*, are only in en.yaml. #}
+{% if lang en de %}
+        {# English and German pages (the picture's labels are English): its keys, how.image_*, are not in pt.yaml. #}
         <figure class="art">
           <picture>
             <source type="image/webp" srcset="{{ page.root }}img/field-isometric-960.webp 960w, {{ page.root }}img/field-isometric-1600.webp 1600w" sizes="(min-width: 800px) 760px, calc(100vw - 32px)">

@@ -2,14 +2,16 @@
  * SPDX-FileCopyrightText: 2026 The Atalaia contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * The box's own screen texts in the field's language (decision BN-14): English
- * and European Portuguese, one static table, looked up by id. The language is
- * the joined game's (join payload key 15, protocol/join.md); between games,
- * the last game's (kept in NVS by box_game.c), or English.
+ * The box's own screen texts in the field's language (decision BN-14): English,
+ * European Portuguese and German (P5H-4), one static table, looked up by id.
+ * The language is the joined game's (join payload key 15, protocol/join.md);
+ * between games, the last game's (kept in NVS by box_game.c), or English.
  *
  * Mode templates (modes/<mode>/assets/screens/, YAML) get the language as
- * "lang" in their data ("en" or "pt") when a game gave one and the mode does
- * not set it, so a template can show either text (screen_renderer.c).
+ * "lang" in their data ("en", "pt" or "de") when a game gave one and the mode
+ * does not set it, so a template can show its texts in that language
+ * (screen_renderer.c); the built-in templates have no German and show English
+ * for it ("{lang == 'pt' && ... || ...}", modes/README.md).
  *
  * Plain C, no LVGL: the renderer, the OLED view, the game and the lobby use it,
  * on the device and in the host tests. Set from the game task, read from the
@@ -23,6 +25,7 @@
 typedef enum {
     BOX_LANG_EN = 0,
     BOX_LANG_PT = 1,
+    BOX_LANG_DE = 2,
     BOX_LANG_COUNT,
 } box_lang_t;
 
@@ -35,9 +38,10 @@ box_lang_t box_lang(void);
 void box_lang_set_code(const char *code);
 bool box_lang_given(void);
 
-/* "pt" or "pt-..." is Portuguese; anything else (NULL, "", "en", "fr") English. */
+/* "pt" or "pt-..." is Portuguese, "de" or "de-..." German; anything else (NULL, "", "en",
+ * "fr") English. */
 box_lang_t box_lang_from_code(const char *code);
-const char *box_lang_code(box_lang_t lang); /* "en", "pt" */
+const char *box_lang_code(box_lang_t lang); /* "en", "pt", "de" */
 
 typedef enum {
     /* The Bomb's standby (no YAML of its own) */

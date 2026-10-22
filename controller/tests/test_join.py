@@ -160,7 +160,7 @@ class BoxLanguageTests(unittest.TestCase):
     def test_auto_takes_the_consoles_language(self):
         c = self.a.client
         self.assertEqual(c.get("/api/v1/settings/box-language", headers=READ).json(),
-                         {"box_language": "auto", "choices": ["auto", "pt", "en"], "game_box_language": None})
+                         {"box_language": "auto", "choices": ["auto", "pt", "en", "de"], "game_box_language": None})
         gid = self.game(console_lang="pt")
         self.assertEqual(self.lang_of(), "pt")
         self.assertEqual(c.get("/api/v1/settings/box-language", headers=READ).json()["game_box_language"], "pt")
@@ -170,6 +170,10 @@ class BoxLanguageTests(unittest.TestCase):
         self.end(gid)
         gid = self.game(console_lang="en")
         self.assertEqual(self.lang_of(), "en")
+        self.end(gid)
+        # German (plan phase 10): key 15 "de"; older boxes show English (BN-15).
+        gid = self.game(console_lang="de")
+        self.assertEqual(self.lang_of(), "de")
         self.end(gid)
         # Created through the API without a console: no key 15 (English).
         self.game()

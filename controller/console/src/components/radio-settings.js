@@ -13,12 +13,12 @@ import { html, Component, t, lang } from '../ui.js';
 /** 869525000 -> "869,525" (pt) or "869.525" (en). */
 export function mhz(hz) {
     const s = (hz / 1e6).toFixed(3);
-    return lang() === 'pt' ? s.replace('.', ',') : s;
+    return lang() === 'en' ? s : s.replace('.', ',');
 }
 
 function pct(value) {
     const s = String(value);
-    return lang() === 'pt' ? s.replace('.', ',') : s;
+    return lang() === 'en' ? s : s.replace('.', ',');
 }
 
 /** "10% of the time · 500 mW ERP" for a channel description from the API. */

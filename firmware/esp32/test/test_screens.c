@@ -8,8 +8,9 @@
  * compares it pixel by pixel with firmware/esp32/test/screens/<name>.png.
  *
  * A case whose name ends in "_pt" is drawn in Portuguese, as a box whose game's
- * join carried "pt" (box_text.h, decision BN-14); the others as a box no game
- * gave a language to (English, and the modes' templates in their default).
+ * join carried "pt" (box_text.h, decision BN-14), one ending in "_de" in
+ * German (P5H-4); the others as a box no game gave a language to (English,
+ * and the modes' templates in their default).
  *
  * To accept new renders on purpose, run with ATALAIA_UPDATE_SCREENS=1:
  *   ATALAIA_UPDATE_SCREENS=1 ctest --test-dir <build> -R screens
@@ -111,6 +112,34 @@ static const screen_case_t cases[] = {
     {"wifi_setup_pt", "wifi_setup", "{\"ssid\":\"atalaia-3F2A\"}", NULL},
     {"status_adopted_pt", "status",
      "{\"title\":\"Adotada\",\"field\":\"Campo da Atalaia\",\"fingerprint\":\"604A-0A95\"}", NULL},
+    /* The same in German (P5H-4); the modes' templates have no German and show English. */
+    {"waiting_invited_de", "waiting", "{\"game\":3073,\"role\":\"zone\",\"invited\":true}", NULL},
+    {"playing_de", "playing", "{\"game\":3073,\"role\":\"zone\"}", NULL},
+    {"ready_picker_de", "ready", "{\"picker\":true}", NULL},
+    {"neutral_de", "neutral", "{\"hold_s\":3}", NULL},
+    {"neutral_no_hold_de", "neutral", "{}", NULL},
+    {"captured_de", "captured", "{\"team\":\"red\",\"since\":95}", NULL},
+    {"standby_de", "standby", "{\"arm\":\"red\"}", NULL},
+    {"countdown_de", "countdown", "{\"left\":299,\"team\":\"red\"}", NULL},
+    {"defused_de", "defused", "{\"team\":\"blue\"}", NULL},
+    {"exploded_de", "exploded", "{\"team\":\"red\"}", NULL},
+    {"final_score_de", "final_score", "{\"owner\":\"red\"}", NULL},
+    {"final_score_no_owner_de", "final_score", "{}", NULL},
+    {"paused_de", "paused", "{}", NULL},
+    {"pin_entry_de", "pin_entry", "{\"digits\":2,\"error\":true}", NULL},
+    {"preset_select_de", "preset_select",
+     "{\"presets\":[\"Bombe\",\"Domination\"],\"selected\":1,\"page\":1,\"pages\":2}", NULL},
+    {"timer_adjust_de", "timer_adjust", "{\"timer_s\":0}", NULL},
+    {"start_confirm_de", "start_confirm", "{\"label\":\"Bombe\",\"timer_s\":600}", NULL},
+    {"wifi_setup_de", "wifi_setup", "{\"ssid\":\"atalaia-3F2A\"}", NULL},
+    {"status_adopted_de", "status",
+     "{\"title\":\"Aufgenommen\",\"field\":\"Campo da Atalaia\",\"fingerprint\":\"604A-0A95\"}",
+     NULL},
+    {"status_pair_de", "status",
+     "{\"title\":\"Box koppeln\",\"code\":\"042 137\",\"id\":\"b0c5\",\"field\":\"keins\"}", NULL},
+    {"pin_entry_locked_de", "pin_entry", "{\"digits\":0,\"error\":false,\"locked_min\":8}", NULL},
+    {"pin_entry_no_pin_de", "pin_entry", "{\"digits\":0,\"error\":false,\"no_pin\":true}", NULL},
+    {"yaml_domination_neutral_de", "neutral", "{}", DOM},
     {"pin_entry", "pin_entry", "{\"digits\":2,\"error\":false}", NULL},
     {"pin_entry_wrong", "pin_entry", "{\"digits\":0,\"error\":true}", NULL},
     /* The admin PIN after five wrong ones (a wait), and a Field Box with none set (AD-28, AD-29).
@@ -359,15 +388,18 @@ static void check_overlaps(const char *name)
     }
 }
 
-static bool portuguese(const char *name)
+/* "pt" for a name ending in "_pt", "de" for "_de", else "" (no language given: English). */
+static const char *language(const char *name)
 {
     size_t n = strlen(name);
-    return n > 3 && strcmp(name + n - 3, "_pt") == 0;
+    if (n > 3 && strcmp(name + n - 3, "_pt") == 0) return "pt";
+    if (n > 3 && strcmp(name + n - 3, "_de") == 0) return "de";
+    return "";
 }
 
 static void render(const screen_case_t *c)
 {
-    box_lang_set_code(portuguese(c->name) ? "pt" : "");
+    box_lang_set_code(language(c->name));
     if (c->mode) screen_render(SCREEN_MODE_MESSAGE, c->mode);
     if (!screen_render(c->template_name, c->data)) fail(c->name, "template not recognised");
     if (c->mode && !screen_template_widget_count()) fail(c->name, "not drawn from its template");

@@ -70,7 +70,7 @@ log = logging.getLogger("atalaia.controller")
 
 TEAM_NAME_MAX = 23  # ATALAIA_TEAM_NAME_MAX - 1 in the core
 SQUADS_MAX = 16     # squads per team a game may define
-BOX_LANGUAGES = ("auto", "pt", "en")  # the boxes' screens (join key 15); auto: the console's
+BOX_LANGUAGES = ("auto", "pt", "en", "de")  # the boxes' screens (join key 15); auto: the console's
 TEAM_DISPLAY_MAX = 32  # characters of a team's display name (decision BR13)
 CREST_ID_RE = re.compile(r"[0-9a-f]{64}")
 GAME_TIME_SAVE_MS = 5_000
@@ -777,7 +777,7 @@ class Controller:
 
     def box_language(self) -> dict[str, Any]:
         """The field setting (GET /api/v1/settings/box-language): "auto" (the default: the
-        language of the console that creates the game), "pt" or "en"; and the live game's."""
+        language of the console that creates the game), "pt", "en" or "de"; and the live game's."""
         with self._lock:
             live = self.store.get_setting(f"box_lang:{self.game['id']}") if self.game is not None else None
             return {"box_language": self.store.get_setting("box_language") or "auto",
@@ -792,7 +792,7 @@ class Controller:
         return self.box_language()
 
     def _box_lang_for(self, console_lang: Any) -> Optional[str]:
-        """A new game's box language: the setting, or with "auto" the console's ("pt", "en");
+        """A new game's box language: the setting, or with "auto" the console's ("pt", "en", "de");
         None (English, the join without key 15) when neither says."""
         setting = self.store.get_setting("box_language") or "auto"
         if setting != "auto":
@@ -800,7 +800,7 @@ class Controller:
         if console_lang is None:
             return None
         if console_lang not in BOX_LANGUAGES or console_lang == "auto":
-            raise ControllerError("console_lang: pt or en")
+            raise ControllerError("console_lang: pt, en or de")
         return console_lang
 
     def radio_settings(self) -> dict[str, Any]:

@@ -1,0 +1,1219 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+#
+# German text of the project pages (site/de/: the main page, modi/, funk/,
+# roadmap/ and glossar/). Every key the German pages use in the templates
+# site/src/*.html and site/src/partials/*.html must be here, and they must use
+# every key here; it has the keys of en.yaml (German shows the English-only
+# pictures too). A key can be used on several pages. Values are HTML; keys the
+# templates mark |text are plain text. After editing, run
+# python3 tools/build_site.py. The words follow docs/translations/glossary.md.
+#
+# German drafted by an AI model on 2026-10-22; needs review by a native-speaking
+# player before release (docs/translations/status.yaml, decision P5H-5).
+#
+# Links like href="{{ page.to.glossary }}#glossar-lora" point at the glossary
+# entries at the end of this file, on the glossary page; {{ page.to.<page> }}
+# becomes the relative link to that page from whichever page shows the text.
+# The ids (glossary.*.id) are stable: change them only together with every
+# link to them.
+
+# Each page's title, description and (optionally) social preview description,
+# under its name in the page table of tools/build_site.py. og_image_alt is the
+# same on every page, as they all share the preview image (English's, for now).
+meta:
+  index:
+    title: Atalaia · die offene Plattform für Force-on-Force
+    description: >-
+      Atalaia ist eine offene Plattform für Spielprops bei Airsoft, Paintball und Milsim, die ohne
+      Internet läuft: Props mit ESP32, Raspberry Pi, Arduino und Android, Spielmodi als Lua-Skripte
+      und ein offenes LoRa-Protokoll.
+    og_description: >-
+      Offene Spielprops für Airsoft, Paintball und Milsim, die ohne Internet laufen. Spielmodi sind
+      Skripte; jede Hardware passt.
+  modes:
+    title: Spielmodi · Atalaia
+    description: >-
+      Die Spielmodi von Atalaia für Airsoft, Paintball und Milsim: Domination, Bombe / Rush, Hold-All
+      Domination, Last Stand, Kill Confirmed, Respawn und Leben, Check-in, der Codes-Modifikator und
+      das Medic-Kit, jeweils ein kurzes Lua-Skript.
+  radio:
+    title: So funktioniert der Funk · Atalaia
+    description: >-
+      Was LoRa-Funk auf einem Airsoft- oder Paintball-Feld kann und was nicht, welchen Kanal Atalaia
+      nutzt und warum, und wie das Protokoll Skirmesh-RF auf jedem Gerät läuft.
+  roadmap:
+    title: Roadmap · Atalaia
+    description: >-
+      Die sechs Phasen von Atalaia, vom gemeinsamen Kern bis zur Community, jede mit einem echten
+      Feldtest als Abschluss, und wo jede heute steht.
+  glossary:
+    title: Glossar · Atalaia
+    description: >-
+      Die Fachbegriffe des Projekts Atalaia, von LoRa und ESP32 bis Copyleft, einfach erklärt für
+      Spielende, Feldbetreibende und die Spielleitung.
+  og_image_alt: >-
+    Ein Wachturm auf einem Hügel in der Dämmerung mit einer Funkbox darauf, verbunden mit leuchtenden
+    GAME-PROP-Boxen in einem bewaldeten Tal, unter den englischen Worten „Open-source project
+    ATALAIA“.
+
+header:
+  skip: Zum Inhalt springen
+  home: Atalaia-Startseite
+  sections: Bereiche
+  modes: Modi
+  radio: Funk
+  try: Ausprobieren
+  roadmap: Roadmap
+  hub: Community
+  glossary: Glossar
+  language: Sprache
+
+hero:
+  status: Pre-Alpha · Software der Phasen 1 und 2 fertig, zwei Boards und der Feld-Controller arbeiten auf dem Labortisch zusammen, Phase 3 in Software fast fertig, Phase 4 in Software gebaut, Phase 5 begonnen (der visuelle Modus-Editor, mit Live-Test im Simulator) · noch nicht feldtauglich
+  title: Die offene <span class="nowrap">Force-on-Force-Plattform</span>
+  lead: >-
+    Atalaia ist eine offene Plattform für die elektronischen Props von Airsoft, Paintball und
+    Milsim: die Boxen, die Teams einnehmen, die Bomben, die sie scharf machen und entschärfen. Bau
+    eine Domination-Box aus einem
+    <a href="{{ page.to.glossary }}#glossar-mikrocontroller">Mikrocontroller</a> für 20&nbsp;€ (eine
+    winzige, günstige Computerplatine), mach aus einem alten Android-Handy ein Hacking-Terminal, lass
+    ein Milsim-Wochenende mit 20 Boxen über ein <a href="{{ page.to.glossary }}#glossar-lora">LoRa-Mesh</a>
+    laufen (Funk mit großer Reichweite und wenig Strom, den die Boxen über das Feld weiterreichen),
+    und schreib deine eigenen Spielmodi als kleine Skripte. Jedes Spiel läuft auf dem Feld selbst:
+    keine Cloud, kein Internet nötig, und kein Hersteller kann dich festnageln.
+  discuss: Mitdiskutieren
+  design: Das Design lesen
+  source: Quellcode auf GitHub
+  name: >-
+    <em>Atalaia</em> (a-ta-LAI-a) ist Portugiesisch für <em>Wachturm</em>: ein Ausguck auf einem
+    Hügel, der nach Gefahr Ausschau hielt und die Warnung weitergab.
+  why_name: Warum dieser Name?
+  # The night scene: German shows the English copy (its title is painted in English).
+  image_alt: >-
+    Illustration: In der Dämmerung trägt ein steinerner Wachturm auf einem Hügel eine Funkbox, deren
+    Signale leuchtende orange GAME-PROP-Boxen in einem bewaldeten Tal erreichen, während eine Gruppe
+    Spielender an ihnen vorbeigeht. Der aufgemalte englische Text lautet „Open-source project
+    ATALAIA“.
+
+game:
+  title: So läuft ein Spiel
+  intro: >-
+    Zum Spielen brauchst du kein Technikwissen. So wird ein Spiel laufen, sobald die Boxen gebaut sind
+    (Phasen 1 und 2); der <a href="{{ page.to.glossary }}#glossar-simulator">Simulator</a> spielt
+    dieselben Modi heute schon auf einem Computer.
+  setup:
+    title: Aufbauen
+    text: >-
+      Die Orga verteilt die Boxen auf dem Feld und wählt einen Spielmodus, etwa Domination, am
+      Tastenfeld einer Box oder am Handy, in weniger als einer Minute.
+  capture:
+    title: Einnehmen
+    text: >-
+      Um eine Box einzunehmen, hält ein Team ein paar Sekunden lang den Knopf seiner Farbe gedrückt.
+      Die Box leuchtet in dieser Farbe und punktet für das Team, bis die Gegenseite sie zurückholt.
+  relay:
+    title: Weiterleiten
+    text: >-
+      Jede Box meldet sich per Funk beim
+      <a href="{{ page.to.glossary }}#glossar-feld-controller">Feld-Controller</a>, einem kleinen
+      Computer in der Basis; weit entfernte Boxen werden von denen dazwischen weitergeleitet. Eine
+      Box, die den Kontakt verliert, spielt weiter und holt später auf.
+  score:
+    title: Punkten
+    text: >-
+      Der Controller zählt alles zusammen. Die Orga verfolgt das Spiel live auf dem Handy, und das
+      Feld kann den Punktestand auf einem großen Bildschirm oder in einem Stream zeigen.
+
+why:
+  title: Warum Atalaia
+  intro: >-
+    Elektronische Props bringen viel ins Spiel, aber kommerzielle Systeme sperren die Regeln in
+    geschlossene <a href="{{ page.to.glossary }}#glossar-firmware">Firmware</a>. Neue Modi warten auf
+    den Hersteller, es gibt keine öffentliche
+    <a href="{{ page.to.glossary }}#glossar-api">API</a>, und eigene Hardware kannst du nicht
+    einbinden. Atalaia macht es anders.
+  local:
+    title: Local-first
+    text: >-
+      Jedes Spiel läuft <a href="{{ page.to.glossary }}#glossar-local-first">auf dem Feld selbst</a>,
+      komplett offline, vom einzelnen Haus bis zum kilometergroßen Wald. Internet ist optional.
+  hardware:
+    title: Jede Hardware
+    text: >-
+      Günstige <a href="{{ page.to.glossary }}#glossar-esp32">ESP32</a>-Boards, scheckkartengroße
+      <a href="{{ page.to.glossary }}#glossar-raspberry-pi">Raspberry-Pi</a>-Computer, einfache
+      Boards der <a href="{{ page.to.glossary }}#glossar-arduino">Arduino-Klasse</a> und neue oder
+      ausgediente <a href="{{ page.to.glossary }}#glossar-android-prop">Android-Handys</a> haben alle
+      ihren Platz im selben Spiel. Die Software für die ESP32-Boxen, den Feld-Controller und
+      Android-Handys ist geschrieben; die Boards der Arduino-Klasse kommen später.
+  scripts:
+    title: Modi sind Skripte
+    text: >-
+      Spielmodi sind kurze <a href="{{ page.to.glossary }}#glossar-lua">Lua-Skripte</a>, kleine
+      Textdateien mit Regeln, plus eine Datei mit Einstellungen: leicht zu lesen, zu ändern und zu
+      teilen, und kein Modus braucht eigenen Code in der eingebauten Software der Boxen. Vorerst haben
+      die Boxen ihre Modi eingebaut; einen neuen ohne Neuflashen (Neuinstallieren) dieser Software zu
+      schicken, kommt noch.
+  open:
+    title: Offenes Protokoll und API
+    text: >-
+      Props sprechen <a href="{{ page.to.glossary }}#glossar-skirmesh-rf">Skirmesh-RF</a>, ein
+      dokumentiertes Funkprotokoll, also kann jede und jeder ein Gerät bauen, das mitspielt. Der
+      Feld-Controller bietet MQTT-, REST- und WebSocket-APIs für Anzeigetafeln, Stream-Overlays und
+      andere Tools.
+  fields:
+    title: Fürs Spielfeld gebaut
+    text: >-
+      Rollen, Squads, Check-in am Feld mit einem gedruckten Aushang und ein
+      <a href="{{ page.to.glossary }}#glossar-chrono">Chrono</a>-Register, das die signierten Messwerte
+      jeder Replik für Stichproben aufbewahrt, sind in Software gebaut; eigene Szenarien kommen in
+      Phase&nbsp;4.
+  copyleft:
+    title: Copyleft
+    text: >-
+      Felder, die Eintritt nehmen, und Leute, die Boxen verkaufen, sind willkommen. Wer eine geänderte
+      Version weitergibt oder betreibt, <a href="{{ page.to.glossary }}#glossar-copyleft">teilt die
+      Änderungen</a>.
+
+how:
+  title: Wie alles zusammenpasst
+  intro: >-
+    Einfach gesagt: Die Props auf dem Feld funken mit dem Feld-Controller, einem kleinen Computer in
+    der Basis, der das Spiel leitet und die Punkte zählt. Handys verbinden sich per WLAN mit ihm,
+    Anzeigetafeln, Stream-Overlays und Karten-Apps wie
+    <a href="{{ page.to.glossary }}#glossar-atak">ATAK</a> über seine API. Ein optionaler
+    <a href="{{ page.to.glossary }}#glossar-site-server">Site-Server</a> im Internet verwaltet Konten
+    und Verlauf. Der Controller, seine API und die Konsole der Orga sind gebaut und auf einem Computer
+    getestet, noch nicht auf dem Feld; vom Site-Server gibt es bisher nur das Grundgerüst und die
+    Konten (Anmeldung mit Zwei-Faktor-Codes und Rollen pro Feld; noch keine Spieldaten).
+  core: >-
+    Unter der Haube nutzt jedes Gerät, das Spielmodi ausführt, denselben
+    <a href="{{ page.to.glossary }}#glossar-kern">gemeinsamen Kern</a>, geschrieben in C11, und
+    dieselben Lua-Modi; nur eine dünne Schicht pro Hardware-Art ist anders. Ein einmal geschriebener
+    Modus läuft auf einer Box, einem Handy oder einem Raspberry Pi gleich.
+  diagram:
+    title: >-
+      Ein optionaler Site-Server verbindet sich über das Internet mit dem Feld-Controller. Apps für
+      Spielleitung und Spielende erreichen den Controller per WLAN, Anzeigetafeln und andere Tools
+      über MQTT und REST, Props über das LoRa-Mesh Skirmesh-RF.
+    server: Site-Server (optional)
+    server_sub: Konten · Verlauf · Spieler-App
+    apps: Apps für GM und Spielende
+    apps_sub: WLAN
+    controller: Feld-Controller
+    controller_sub: Raspberry Pi oder Android
+    tools: Anzeigetafeln, ATAK
+    tools_sub: MQTT, REST, Webhooks
+    mesh: Skirmesh-RF · LoRa-Mesh
+    satellite: Satellit
+    android: Android-Prop
+    android_sub: mit einem ESP32-Pod
+    thin: Thin Node
+    thin_sub: Arduino-Klasse
+  list:
+    server: >-
+      <strong>Site-Server</strong> (optional): Konten, Verlauf und die Spieler-App, über das
+      Internet.
+    controller: >-
+      <strong>Feld-Controller</strong> auf einem Raspberry Pi oder Android: Apps für GM und Spielende
+      verbinden sich per WLAN; Anzeigetafeln und ATAK nutzen MQTT, REST und Webhooks.
+    props: >-
+      <strong>Props</strong> im LoRa-Mesh Skirmesh-RF: ESP32-<a href="{{ page.to.glossary }}#glossar-field-box">Field
+      Boxes und Satelliten</a>, Android-Props mit einem ESP32-Pod und Thin Nodes der Arduino-Klasse.
+  # English and German pages only: the Portuguese page shows this image in its hero.
+  image_alt: >-
+    Isometrische Illustration: Ein kleiner Steinturm mit einer Funkbox darauf steht in der Mitte einer
+    quadratischen Basis, umringt von acht orangen und gelben GAME-PROP-Koffern mit Antennen, alle
+    verbunden durch einen leuchtenden Kreis.
+  image_caption: >-
+    Der Feld-Controller ist der Wachturm: Von der Mitte des Felds behält er jedes Prop im Blick.
+
+radio:
+  title: So funktioniert der Funk
+  intro: >-
+    Die Props funken über <a href="{{ page.to.glossary }}#glossar-lora">LoRa</a>, einen Funk mit
+    großer Reichweite und wenig Strombedarf, im eigenen Protokoll von Atalaia,
+    <a href="{{ page.to.glossary }}#glossar-skirmesh-rf">Skirmesh-RF</a>. Diese zwei Diagramme
+    zeigen, was LoRa auf einem Feld kann und was nicht, und wie ein Protokoll auf sehr
+    unterschiedlichen Geräten läuft. Nichts davon war schon auf einem echten Feld: Reichweite und
+    Timing werden im Feldtest von Phase&nbsp;2 gemessen.
+  # The main page's short version of this section, with a link to the radio page.
+  teaser: >-
+    Die Props funken über <a href="{{ page.to.glossary }}#glossar-lora">LoRa</a>, einen Funk mit
+    großer Reichweite und wenig Strombedarf, im eigenen Protokoll von Atalaia,
+    <a href="{{ page.to.glossary }}#glossar-skirmesh-rf">Skirmesh-RF</a>. Zwei Diagramme zeigen, was
+    LoRa auf einem Feld kann und was nicht, und wie ein Protokoll auf sehr unterschiedlichen Geräten
+    läuft. Nichts davon war schon auf einem echten Feld.
+  more: So funktioniert der Funk, in zwei Diagrammen →
+  # Each diagram's alt text is its description, diagrams.*.desc, also used inside the SVG.
+  lora:
+    title: Was LoRa kann
+    lead: >-
+      LoRa tauscht Tempo gegen Reichweite: Es bringt kurze Nachrichten mit sehr wenig Akku über ein
+      Feld, und sein Signal kommt besser durch Wände und Bäume als WLAN, auch wenn Beton, Metall und
+      Hügel es weiter blockieren. Eine Box, die den Controller nicht erreicht, wird über die anderen
+      Boxen gehört, und die europäischen Regeln begrenzen, wie viel der Zeit jedes Gerät senden darf.
+  skirmesh:
+    title: Ein Protokoll auf jedem Gerät
+    lead: >-
+      Skirmesh-RF ist in Schichten aufgebaut, vom Funk bis zur API des Controllers. Eine Field Box
+      führt alles bis zu den Spielmodi aus; ein Controller auf dem Raspberry Pi überlässt die
+      Funkarbeit einem USB-Funkmodem; in Phase&nbsp;3 macht ein Android-Handy dasselbe mit einem
+      I/O-Pod. Handys im WLAN des Felds brauchen gar keinen LoRa-Funk.
+  channel:
+    title: Welcher Kanal, und warum 869,525&nbsp;MHz
+    lead: >-
+      Der ganze Verkehr eines Spiels teilt sich einen Kanal. Der Standard, 869,525&nbsp;MHz, ist die
+      Mitte von 869,4–869,65&nbsp;MHz, dem einzigen Teil des europäischen 868-MHz-Bands, in dem ein
+      Gerät bis zu 10&nbsp;% der Zeit mit bis zu 500&nbsp;mW senden darf. Sonst erlauben die Regeln im
+      Bereich 868–870&nbsp;MHz 1&nbsp;% der Zeit (0,1&nbsp;% auf 868,7–869,2&nbsp;MHz) mit 25&nbsp;mW:
+      etwa ein Zehntel der Sendezeit und viel weniger Reichweite. 868,1, 868,3 und 868,5&nbsp;MHz sind
+      die Standardkanäle von LoRaWAN und oft belegt. Auch der Standard wird geteilt: LoRaWAN-Gateways
+      senden manche Antworten auf 869,525&nbsp;MHz, und der europäische Standard von Meshtastic nutzt
+      ihn, also kann die Spielleitung in deren Nähe den Controller eine Minute lang jeden erlaubten
+      Kanal abhören und den ruhigsten wählen lassen, einen zufällig ziehen oder von Hand wählen. Die
+      Boxen halten sich dann an die Grenzen des gewählten Kanals.
+
+modes:
+  title: Spielmodi
+  intro: >-
+    Modi reagieren auf Absichten („ein Team beansprucht dieses Prop“), nicht auf Hardware, also läuft
+    dasselbe Skript auf einer Field Box, einer Box mit Tastenfeld oder einem Android-Handy. Elf Modi,
+    ein Modifikator und das Medic-Kit sind heute in Software geschrieben und getestet; noch keiner
+    lief auf einem echten Feld.
+  # The main page shows three modes, then this link to the modes page.
+  more: Alle 11 Modi ansehen →
+  # At the end of the modes page.
+  try: Probier heute einen Modus im Browser aus →
+  domination:
+    title: Domination
+    text: >-
+      Ein Team hält ein paar Sekunden lang den Eingang des Props, um es einzunehmen, und punktet in
+      jedem Takt, solange es das Prop hält. Das andere Team kann es jederzeit übernehmen.
+    meta: Team-Knöpfe · eine Box oder viele
+  bomb:
+    title: Bombe / Rush
+    text: >-
+      Die Angreifenden machen die Bombe scharf und verteidigen sie; die Verteidigenden müssen sie
+      entschärfen, bevor die Zündzeit abläuft. Scharf machen und entschärfen durch Gedrückthalten
+      eines Knopfs, oder jedes Team bekommt seinen eigenen Code fürs Tastenfeld.
+    meta: Team-Knöpfe oder Tastenfeld · Zünd- und Haltezeiten einstellbar
+  holdall:
+    title: Hold-All Domination
+    text: >-
+      Teams nehmen Boxen ein wie bei Domination, aber ein Team punktet nur, solange es alle Boxen
+      gleichzeitig hält. Geht eine verloren, stoppt die Wertung.
+    meta: Mehrere Boxen · braucht den Feld-Controller
+  laststand:
+    title: Last Stand
+    text: >-
+      Die Verteidigenden starten mit allen Zonen. Sobald sie nur noch ihre letzte haben, läuft ein
+      Countdown bis zur Niederlage, bis sie eine andere zurückerobern; läuft er ab, gewinnen die
+      Angreifenden.
+    meta: Mehrere Boxen · braucht den Feld-Controller
+  kill_confirmed:
+    title: Kill Confirmed
+    text: >-
+      Spielende tragen signierte NFC-Tags. Ein Team scannt die gesammelten Tags an einer Station: Ein
+      gegnerischer Tag bestätigt den Kill, ein Tag aus dem eigenen Team verweigert ihn. Gefälschte Tags
+      werden abgelehnt.
+    meta: NFC-Leser · Tags der Spielenden
+  respawn:
+    title: Respawn und Leben
+    text: >-
+      Ein Respawn-Punkt zählt Leben pro Team oder pro Person, mit einer Wartezeit zwischen zwei
+      Respawns. Hat ein Team keine Leben mehr, ist es raus.
+    meta: NFC-Leser oder Team-Knöpfe
+  player_checkin:
+    title: Check-in
+    text: >-
+      Spielende checken mit ihrem Tag an einem Checkpoint ein. Die Box zählt die Spielenden jedes
+      Teams und kann für jeden Check-in Punkte geben.
+    meta: NFC-Leser · Tags der Spielenden
+  medic:
+    title: Medic-Kit
+    text: >-
+      Neben jedem Modus: Wer getroffen wurde, scannt den eigenen Tag und hält einen Knopf eine
+      festgelegte Zeit lang gedrückt, um geheilt zu werden. Das Kit zeigt, wie viele Heilungen es noch
+      hat; jede Person bekommt pro Spiel an jedem Kit nur eine begrenzte Zahl, die Spielleitung füllt
+      ein Kit von der Konsole aus auf, und jede Heilung erscheint im Log der Spielleitung und in der
+      Ansicht der Spielenden.
+    meta: NFC-Leser und ein Knopf · Tags der Spielenden · braucht den Feld-Controller
+  master_satellites:
+    title: Master und Satelliten
+    text: >-
+      Teams nehmen eine Master-Box und ihre Satelliten ein. Nur der Master punktet, und jeder
+      Satellit, den dasselbe Team hält, erhöht seine Punkte; wechselt der Master den Besitz, werden
+      alle Satelliten wieder frei. In Software geschrieben und getestet, noch nicht auf echten Boxen
+      gespielt.
+    meta: Mehrere Boxen · braucht den Feld-Controller
+  target_windows:
+    title: Zielfenster
+    text: >-
+      Eine Zielscheibe leuchtet ein paar Sekunden in der Farbe eines zufälligen Teams, und ein Treffer
+      in dieser Zeit punktet für dieses Team. Das Spiel ist in Software geschrieben und getestet; das
+      nötige Ziel-Addon (eine Platte mit Treffersensor und Leuchtring) ist noch nicht gebaut.
+    meta: Eine Box mit dem Ziel-Addon · noch nicht verfügbar
+  hacking_terminal:
+    title: Hacking-Terminal
+    text: >-
+      Ein Terminal stellt ein Rätsel auf seinem Tastenfeld: einen Code knacken anhand der Ziffern an
+      der richtigen Stelle, die Drähte in der richtigen Reihenfolge durchtrennen oder eine Folge
+      wiederholen. Eine falsche Antwort sperrt es eine Weile. Wer es löst, kann einen Code für ein
+      anderes Ziel aufdecken, punkten und das Terminal halten, bis ein anderes Team es zurückhackt. In
+      Software geschrieben und getestet, noch nicht auf einem Handy im Feld gespielt.
+    meta: Eine Box oder ein Handy mit Tastenfeld · läuft ohne den Feld-Controller
+  vip_payload:
+    title: VIP / Payload
+    text: >-
+      Ein Team eskortiert seinen VIP, eine Person, die ihre Position aus der App teilt, oder einen
+      Payload, ein Handy mit GPS, in eine Extraktionszone; die anderen versuchen, das zu verhindern.
+      Checkpoint-Boxen auf dem Weg punkten, solange ein Team sie hält. Positionen bleiben auf dem
+      Feld-Controller und dem Handy; nur „extrahiert“ geht hinaus. In Software geschrieben und
+      getestet, noch nicht mit echtem GPS gespielt.
+    meta: Checkpoint-Boxen, ein Handy mit GPS oder das Handy des VIP · braucht den Feld-Controller
+  codes:
+    title: Codes (Modifikator)
+    text: >-
+      Läuft neben jedem Modus auf derselben Box: Codes am Tastenfeld bringen Punkte, Hinweise oder
+      Freischaltungen, und die Spielleitung sieht, wer jeden Code benutzt hat und welches Team die
+      Box hielt.
+    meta: Tastenfeld · passt zu jedem Modus
+  yours:
+    title: Dein Modus
+    text: >-
+      Money Factory, Capture the Flag, der eigene Modus deines Clubs… Modi sind kurze Skripte. Schlag
+      einen mit der Vorlage für Spielmodus-Ideen vor.
+    link: Eine Spielmodus-Idee teilen
+
+screens:
+  title: So sieht es aus
+  intro: >-
+    Acht Aufnahmen der echten Firmware der Field Box (ESP32, LVGL 9.2, 320&nbsp;×&nbsp;240&nbsp;TFT),
+    die im Emulator <a href="https://wokwi.com">Wokwi</a> läuft. Die Oberfläche der Box ist hier auf
+    Englisch. Die Firmware läuft inzwischen auf einem echten Heltec V4.3; diese Bilder stammen aus dem
+    Emulator. Tippe oder klicke auf ein Bild, um es größer zu sehen.
+  note: >-
+    Das <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">Bauhandbuch</a>
+    (auf Englisch) enthält den vollständigen Schaltplan und die Anleitung zum ersten Flashen für den
+    Heltec WiFi LoRa 32&nbsp;V4.
+  pin_entry:
+    alt: >-
+      Bildschirm der Field Box: Kopfzeile „GAME MASTER“, Aufforderung „Enter the admin PIN“ (Admin-PIN
+      eingeben), vier leere Kreise für Ziffern, Hinweis „# enter * delete“.
+    caption: Die Spielleitung gibt die Admin-PIN ein, um das Setup freizuschalten.
+  choose_game:
+    alt: >-
+      Bildschirm der Field Box: Kopfzeile „CHOOSE A GAME“ (Spiel wählen) mit der Liste 1 „Bomb“ (gelb
+      hervorgehoben), 2 „Domination“, 3 „Hold-All Domination“, 4 „Last Stand“ und 5 „Codes“, dazu der
+      Hinweis „1-9 choose # next * back“.
+    caption: Einen Spielmodus im Menü der Box wählen.
+  confirm:
+    alt: >-
+      Bildschirm der Field Box: Kopfzeile „START THE GAME?“ (Spiel starten?) auf einem orangen Balken,
+      Modusname „Bomb“, „Timer: 10 min“, Hinweis „# start * back“.
+    caption: Modus und Timer vor dem Start bestätigen.
+  standby:
+    alt: >-
+      Bildschirm der Field Box: Kopfzeile „STANDBY“, „Hold the button to arm“ (Knopf halten zum Scharfmachen),
+      „RED“ in Rot, unten „The bomb is not armed“ (die Bombe ist nicht scharf).
+    caption: Warten, bis das rote Team den Knopf zum Scharfmachen hält.
+  armed:
+    alt: >-
+      Bildschirm der Field Box: Kopfzeile „ARMED“ (scharf) auf einem roten Balken, großer Countdown
+      „5:00“, Beschriftung „until detonation“ (bis zur Explosion).
+    caption: Bombe scharf; das blaue Team hat 5 Minuten zum Entschärfen.
+  defused:
+    alt: >-
+      Bildschirm der Field Box: blauer Hintergrund, weißes Häkchen, groß „DEFUSED“ (entschärft),
+      darunter „BLUE team wins“ (Team Blau gewinnt).
+    caption: Das blaue Team hat die Bombe rechtzeitig entschärft.
+  joined:
+    alt: >-
+      Bildschirm der Field Box: Kopfzeile „JOINED GAME 4242“ (Spiel 4242 beigetreten), links
+      „Game“, rechts „zone, node 7“.
+    caption: Die Box ist dem Spiel des Felds per NFC-Karte oder serieller Konsole beigetreten.
+  code_entry:
+    alt: >-
+      Bildschirm der Field Box: Kopfzeile „CODE“, zwei von vier Kreisen gelb gefüllt, Hinweis
+      „# enter * delete“.
+    caption: Einen Code für den Codes-Modifikator eingeben (Punkte, Hinweise oder Freischaltungen).
+
+  app_title: Die Android-App
+  app_intro: >-
+    Die eigenen Bildschirme der App gibt es auf Portugiesisch, Englisch und Deutsch, und sie
+    zeichnet die Bildschirme jedes Modus aus denselben YAML-Dateien wie die Field Box. Das sind die
+    Testbilder der App, keine Fotos eines Handys: Die App lief bisher auf Android-Emulatoren, noch
+    nicht auf einem echten Handy.
+  app_roles:
+    alt: >-
+      Der erste Bildschirm der App, „Was soll dieses Handy machen?“: vier Auswahlmöglichkeiten mit
+      je einer Zeile, was sie tun: Spielprop, Spielen, Marshal und Spielleitung.
+    caption: Wähle, was dieses Handy im Spiel macht.
+  app_prop:
+    alt: >-
+      Ein Android-Handy als Bombe: der Countdown-Bildschirm des Modus, auf Englisch wie die
+      Bildschirme der Modi („ARMED“, „4:47“, „until detonation“), über zwei großen Knöpfen, rot
+      und blau, mit „Gedrückt halten“.
+    caption: Ein Handy als Bombe, mit den Knöpfen der Teams.
+  app_player:
+    alt: >-
+      Die Ansicht der Spielenden: der Name des Spiels, noch 20:00, die 20 Punkte des blauen Teams über
+      den 12 des roten, wer welches Ziel hält und was passiert ist.
+    caption: Spielende verfolgen das Spiel auf dem Handy.
+  app_branded:
+    alt: >-
+      Die Ansicht der Spielenden auf einem Feld mit eigenem Branding: Logo und Name des Felds, Campo
+      Norte, in der Kopfzeile, sein Hintergrundbild blass hinter der Ansicht, und die Teams Águias und
+      Lobos mit Wappen und Punkten, 20 zu 12.
+    caption: Logo, Hintergrundbild und Team-Wappen eines Felds.
+  app_chrono:
+    alt: >-
+      Der Chrono der Marshals: das Tastenfeld für die Geschwindigkeit, das BB-Gewicht und ein grünes
+      „OK“, mit dem Höchstwert und dem Limit.
+    caption: Chrono beim Check-in, der Messwert von Marshal signiert.
+  medic_intro: >-
+    Das Medic-Kit zeichnet seine Bildschirme aus denselben YAML-Dateien auf einer Field Box und auf
+    einem Android-Prop, auf Portugiesisch, außer die Spielleitung stellt Englisch ein. So zeichnet die
+    App sie:
+  medic_idle:
+    alt: >-
+      Bildschirm des Medic-Kits: Kopfzeile „LIGADURAS“ (Verbände), eine große 4, „Restam 4 ligaduras“
+      (noch 4 Heilungen) und gelb „Lê a tua etiqueta e mantém premido o botão“ (scanne deinen Tag und
+      halte den Knopf gedrückt).
+    caption: Wartet auf Spielende, noch 4 Heilungen.
+  medic_hold:
+    alt: >-
+      Bildschirm des Medic-Kits: die ID der Person, b1, in einer blauen Kopfzeile, „Mantém premido para
+      tratar“ (gedrückt halten zum Heilen), gelb noch 4 Sekunden über einem Fortschrittsbalken, und
+      „Largar antes do tempo cancela“ (zu frühes Loslassen bricht ab).
+    caption: b1 hält den Knopf gedrückt, um geheilt zu werden.
+  medic_healed:
+    alt: >-
+      Bildschirm des Medic-Kits auf Blau: ein weißes Kreuz, „DE VOLTA AO JOGO“ (zurück im Spiel), b1,
+      „Tratamento 1 de 2“ (Heilung 1 von 2) und „Restam 3 ligaduras“ (noch 3 Heilungen im Kit).
+    caption: Zurück im Spiel, mit der ersten von zwei Heilungen.
+  # The screenshot viewer (the dialog at the end of the main page).
+  viewer:
+    label: Screenshot
+    prev: Vorheriger Screenshot
+    next: Nächster Screenshot
+    close: Schließen
+try:
+  title: Heute ausprobieren
+  intro: >-
+    Hardware brauchst du nicht: Der gemeinsame Kern läuft auf einem Computer. Der Simulator spielt
+    einen Modus in deinem Browser: Halte Team-Knöpfe gedrückt, sieh dir den Bildschirm jedes Props an
+    und verfolge das Event-Log. Die Befehle unten tippst du in ein Terminal.
+  compiler: Mit einem C-Compiler
+  docker: Nur mit Docker
+  then: >-
+    Dann öffne <code>http://localhost:8000</code>. Du brauchst Python 3.10+ mit PyYAML. Die
+    <a href="https://github.com/vakaobr/atalaia-project/blob/main/simulator/README.md">Anleitung zum
+    Simulator</a> (auf Englisch) hat alle Optionen.
+  board:
+    title: Auf einem Board
+    text: >-
+      Die <a href="{{ page.to.glossary }}#glossar-firmware">Firmware</a> der Field Box, des
+      USB-Funkmodems und des I/O-Pods ist geschrieben, und alle drei laufen in Tests auf einem
+      Computer. Die der Field Box lief auf einem echten Heltec V4.3 auf dem Labortisch: Sie startet,
+      schaltet den Funk ein, liest zwei Knöpfe und spielt Bombe, wobei der kleine Bildschirm des Boards
+      das Spiel zeigt; die von Modem und Pod liefen noch auf keinem Board. Um ein nacktes Board ohne Box
+      zu testen, gibt es eine Labor-Version der Firmware (Tasten über das USB-Kabel). Um eine Box zu
+      bauen und zu flashen, folge dem
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">Bauhandbuch</a>;
+      die
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/firmware/esp32/README.md">Anleitung
+      zur Firmware</a> baut auch Modem und Pod (beide auf Englisch).
+  app:
+    title: Auf einem Android-Handy
+    text: >-
+      Bau die Debug-APK der App mit Docker und installiere sie auf einem Handy mit Android 8.0 oder
+      neuer oder im Android-Emulator, wie die
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/app/README.md#install-it-on-an-android-phone-from-windows">Anleitung
+      zur App</a> (auf Englisch) erklärt. Sie lief auf Emulatoren, noch nicht auf einem echten Handy.
+
+roadmap:
+  title: Roadmap
+  intro: >-
+    Sechs Phasen, jede mit einem echten Feldtest als Abschluss, ihrem Gate. Die Software ist der
+    Hardware vorausgeeilt: Die Phasen 1 und 2 sind in Software fertig, das erste Board spielt schon
+    Bombe auf dem Labortisch, und die Gates warten auf gebaute Boxen; Phase 3 ist in Software fast
+    fertig, und Phase 4 hat begonnen.
+  # The main page shows each phase's title and short line, then this link to the roadmap page.
+  more: Die ganze Roadmap, mit dem Inhalt jeder Phase und ihrem Gate →
+  # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
+  # hardware), in progress, designed (research, architecture and plan written; no code).
+  done: Fertig
+  software: Software fertig
+  current: In Arbeit
+  p0:
+    title: Grundlagen
+    short: >-
+      Gemeinsamer Kern, Lua-Sandbox, Skirmesh-RF-Codec und Browser-Simulator. Gate erreicht.
+    text: >-
+      Gemeinsamer Kern, <a href="{{ page.to.glossary }}#glossar-lua">Lua-Sandbox</a>,
+      <a href="{{ page.to.glossary }}#glossar-skirmesh-rf">Skirmesh-RF-Codec</a>, Browser-Simulator.
+    gate: >-
+      Gate: Der Simulator spielt Domination und Bombe aus Lua-Skripten. <strong>Erreicht.</strong>
+  p1:
+    title: Eine Box
+    short: >-
+      Firmware der Field Box und ein Bauhandbuch; das erste Board spielt Bombe auf dem Labortisch und
+      wartet auf die erste gebaute Box.
+    text: >-
+      Bau der Field Box, ESP32-Firmware, Presets auf dem Gerät und ein Bauhandbuch mit Schaltplan.
+    gate: >-
+      Gate: Eine Box läuft ein zweistündiges Club-Spiel ohne Neustart. Die Firmware und ihre
+      Bildschirme sind fertig und laufen in einem Emulator, und das Bauhandbuch mit seinen Schaltplänen
+      ist geschrieben. Das erste Board (Heltec V4.3, 20. Oktober 2026) startet, schaltet den Funk ein,
+      liest seine Knöpfe und spielt Bombe (scharf machen, entschärfen, ablaufende Zeit) auf seinem
+      kleinen Bildschirm; das Gate bleibt offen, bis eine gebaute Box die 2 Stunden durchhält.
+  p2:
+    title: Feldnetzwerk
+    short: >-
+      Skirmesh-RF über LoRa, Feld-Controller, API, GM-Konsole und ein Modus-Paket, in Software
+      getestet; auf dem Labortisch tauschen zwei Boards Funkpakete aus, und eine Box hat über ihr
+      USB-Modem ein Spiel mit dem Feld-Controller gespielt.
+    text: >-
+      Skirmesh-RF über LoRa, Feld-Controller, API, GM-Konsole und ein Modus-Paket, jetzt in Software
+      geschrieben und getestet: Hold-All Domination (Punkte nur, solange man alle Boxen hält), Last
+      Stand (ein Countdown bis zur Niederlage, solange man nur eine von dreien hält), Codes pro Team
+      zum Scharfmachen bei Bombe und der Codes-Modifikator (Codes am Tastenfeld, die Punkte, Hinweise
+      oder Freischaltungen bringen, wobei die Spielleitung erfährt, wer sie benutzt hat).
+    gate: >-
+      Gate: 5 Boxen auf einem <a href="{{ page.to.glossary }}#glossar-cqb">CQB</a>-Gelände und einem
+      Outdoor-Feld, keine verlorene Einnahme. Das verschlüsselte Funkprotokoll, der Feld-Controller mit
+      seiner API, das USB-Funkmodem, die Konsole der Orga mit Anzeigetafel, der Beitritt zu einem
+      Spiel per NFC-Karte oder QR-Code und die Firmware der Boxen im Gespräch mit dem Controller sind
+      gebaut und im Simulator, im Emulator und auf einem Computer getestet, ganze Spiele inklusive. Das
+      Gate braucht die Funk-Boards.
+  p3:
+    title: Android und Spielende
+    short: >-
+      Android-Props, der I/O-Pod, die Spieler-App und die Modi, die Handys brauchen: in Software
+      fertig, außer dem Handy als Feld-Controller und iOS; der Feldtest wartet auf echte Handys und
+      Pods.
+    text: >-
+      Android-Props, der <a href="{{ page.to.glossary }}#glossar-android-prop">I/O-Pod</a>, die App
+      für Spielende, Marshals und die Spielleitung und die Modi, die Handys und Tags der Spielenden
+      brauchen.
+    done: >-
+      <strong>In Software fertig</strong> (Planphasen A bis F): Kill Confirmed, Respawn und Leben und
+      Check-in, die signierte NFC-Tags der Spielenden lesen, und das Medic-Kit (wer getroffen wurde,
+      scannt den eigenen Tag und hält einen Knopf, um geheilt zu werden, mit einer begrenzten Zahl an
+      Heilungen); Modus-Bildschirme in YAML beschrieben, von Field Box und App gleich gezeichnet;
+      <a href="{{ page.to.glossary }}#glossar-chrono">Chrono beim Check-in</a> (Energie, Limits pro
+      Klasse, Stichproben, Messwerte von Marshal signiert). Die App nutzt denselben Spielkern wie die
+      Boxen, auf Portugiesisch und Englisch: Ein Android-Handy arbeitet als Box (jeder Modus, mit den
+      eigenen Bildschirmen des Modus, großen Team-Knöpfen, Tastenfeld und NFC-Tags) und tritt einem
+      Spiel per QR-Code, NFC-Karte oder Text bei; Spielende verfolgen das Spiel; Marshals haben den
+      Chrono, das Replik-Register und die Tags der Spielenden; die Spielleitung öffnet die Konsole.
+      Spielende checken am Feld ein, indem sie einen gedruckten Aushang scannen (kein Konto, kein
+      Internet), geben an, welche Repliken sie nutzen, und sehen, ob sie den Chrono bestanden haben;
+      Marshals arbeiten diese Liste „Repliken zum Chronen“ ab, und ihre signierten Messwerte markieren
+      jede Replik als bestanden oder abgelehnt. Spielende können während eines Spiels ihre Position
+      teilen, und der Controller entscheidet, wer sie sieht. Ein Android-Prop nimmt am Spiel des
+      Controllers über das WLAN des Felds teil, oder über seinen Funk mit einem I/O-Pod, dessen
+      Firmware dem Handy per USB oder Bluetooth die Team-Knöpfe, das Tastenfeld, die Lichter, die
+      Sirene, den NFC-Leser, den Gehäuseschalter und den LoRa-Funk eines Heltec-Boards leiht. Ein Feld
+      oder Club mit eigenem Controller kann sein Logo, Hintergrundbild und seine Farbe in der App, auf
+      der Anzeigetafel und auf dem Aushang zeigen und seinen Teams Namen und Wappen geben.
+    todo: >-
+      <strong>Noch offen.</strong> In Software: das Handy als Feld-Controller, in Scheiben gebaut
+      (fertig: sein MQTT-Broker, Positionsfilter und Spiel-Engine, mit field.lua auf dem gemeinsamen
+      Kern, die REST-API, der Live-Stream und die MQTT-Topics, Spiele über einen Neustart hinweg,
+      Beitritts-Payloads, ein I/O-Pod als sein Funk, Android-Props in seinem WLAN und der Check-in am
+      Feld mit Spieler-Tokens, der Liste „Repliken zum Chronen“ und den Positionen der Spielenden,
+      geprüft mit denselben Vertragsfällen wie der Pi-Controller und ausgeführt mit dem Code von Pod
+      und Field Box auf einem Computer; noch offen: der Bildschirm des Controllers) und die iOS-Version
+      (nicht gebaut: sie braucht einen Mac); der Modus Money Factory ist zurückgestellt. Planphase G,
+      der Feldtest mit echten Handys und Pods, wartet auf die Hardware: Bisher lief die App nur auf
+      Android-Emulatoren und die Pod-Firmware nur als eigener Code auf einem Computer.
+    gate: "Gate: Ein Spiel mischt ESP32- und Android-Props ohne Probleme."
+  p4:
+    title: Site-Server und erweitertes Spiel
+    short: >-
+      Site-Server, Spielplanung und Anmeldung, eigene Szenarien, erweiterte Modi, ATAK. Begonnen: Erweiterte Modi (Master und Satelliten, das Hacking-Terminal, VIP / Payload und die Logik von Zielfenster), eigene Szenarien (ihre Laufzeit, ihr Compiler, der Editor in der Konsole und die Ziele in der App), Geo-Funktionen im Kern, der ATAK-Feed (auf dem Feld und, über den Site-Server, für Staff außerhalb), und die Konten des Site-Servers, Rechte an persönlichen Daten, Controller-Sync, Chrono-Register, Spielplanung mit öffentlichen Feldseiten, Feeds und Anmeldung, Club-Profile mit Branding-Sync, Spielverlauf und die Szenario-Bibliothek, Gerätezustand, ein Firmware-Katalog, Firmware-Updates per Funk für die Field Box, Boxen ins Feld aufnehmen (NFC-Feldkarte, USB-Kabel oder der Code, den die Box zeigt), Boxen per Funk ins nächste Spiel einladen und ein Start, der wartet, bis jede Rolle eine Box hat, die Remote-Spielleitung, Webseiten für das Staff und das Deployment (HTTPS, verschlüsselte Backups, Wiederherstellung), der Hosted-Modus für viele Felder auf einem Server, mit seinem Deployment, sind in Software gebaut.
+    text: >-
+      Site-Server (Konten, Spielverlauf, das Chrono-Register, Spielplanung, Anmeldung und
+      Veröffentlichung), eigene Szenarien, erweiterte Modi (Master- und Satellitenzonen, VIP-Eskorte,
+      Hacking-Terminals und mehr) und <a href="{{ page.to.glossary }}#glossar-atak">ATAK</a>. Recherche,
+      Architektur und Umsetzungsplan sind geschrieben, und der Plan wird in kleinen Schritten gebaut.
+    done: >-
+      In Software fertig und auf einem Computer getestet, noch nicht auf echten Boxen oder einem echten
+      Server. Modi: Master und Satelliten (Satelliten, die zusammen mit dem Master gehalten werden,
+      erhöhen seine Punkte; wechselt der Master den Besitz, werden sie frei), das Hacking-Terminal (ein
+      Rätsel am Tastenfeld, das einen Code aufdeckt oder das Terminal einnimmt), VIP / Payload (ein Team
+      eskortiert seinen VIP oder ein Handy mit GPS in eine Extraktionszone; Checkpoint-Boxen punkten,
+      solange sie gehalten werden; Positionen bleiben auf dem Feld-Controller und dem Handy), die
+      Laufzeit eigener Szenarien (ein Szenario läuft auf dem Feld-Controller und sagt den Boxen des
+      eingebauten Ziel-Pakets, was sie sein sollen: ein Punkt zum Einnehmen, ein Code, Tags oder Karten
+      zum Scannen, ein Bombenplatz; sie melden, das Szenario zählt die Punkte), der Szenario-Compiler
+      (ein YAML-Szenario mit sieben Zieltypen, mit Abhängigkeiten, Aufdeckungen und Zeitfenstern,
+      geprüft mit jedem Problem verortet und erklärt und auf der Kommandozeile zu einem solchen
+      Szenario kompiliert), Szenarien in der GM-Konsole und der App (der Szenario-Editor der Konsole
+      listet jedes Problem schon beim Tippen und installiert das Szenario; die Boxen bekommen die Namen
+      des Szenarios beim Beitritt; Spielende sehen in der App die Ziele, die für sie bestimmt sind, mit
+      ihren Namen und ihrem Stand, ein verdecktes erst, wenn es aufgedeckt ist), die Regeln von
+      Zielfenster (ein Treffer, während die Zielscheibe die Farbe eines Teams zeigt, punktet für dieses
+      Team; das Ziel-Addon ist noch nicht gebaut), Geo-Funktionen im Kern (Entfernungen und Zonen für
+      jedes Skript, auf jeder Plattform gleich) und der ATAK-Feed (die Boxen und Zonen auf ATAK-Karten
+      über das WLAN des Felds, in der Farbe ihres Teams, platziert, indem man zwei Ecken des Feldbilds
+      ihrer Kartenposition zuordnet; die Spielleitung markiert auch sichere Zonen, den Respawn und die
+      Basis jedes Teams, den Parkplatz, die Erste Hilfe und Ziele auf dem Plan des Felds, als Punkt,
+      Kreis oder Fläche, jeweils sichtbar für alle, für ein Team oder nur für die Orga, in der Konsole
+      und auf ATAK; das Feld lässt sich auch aus einer Karte laden: Die Spielleitung zeichnet den echten
+      Umriss des Felds auf OpenStreetMap nach, und der Browser zeichnet das Feldbild aus den Daten von
+      OpenStreetMap, über dem DGT-Orthofoto in Portugal, mit seiner Kartenposition und dem Umriss als
+      Feldgrenze, das Außen abgedunkelt; Positionen der Spielenden gehen nie an alle, nur an Geräte des
+      Staffs, wenn das Feld es einschaltet; Staff außerhalb des Felds bekommt dasselbe über den
+      Site-Server, über eine verschlüsselte Verbindung mit einem Zertifikat pro Gerät, das das Feld
+      ausstellt und sofort widerrufen kann, Positionen nur für Spielleitung oder Marshal; noch nicht
+      mit einem echten ATAK-Handy probiert). Site-Server: sein Grundgerüst (Datenbank, Migrationen,
+      Health-Check, in einem eigenen Container), Konten (Passwörter, Zwei-Faktor-Codes Pflicht für Orga
+      und Marshals, Sitzungen und Rollen pro Feld) und Rechte an persönlichen Daten (Auskunft, Export,
+      Berichtigung, Löschung, Einwilligungsnachweise, eine tägliche Löschung nach Aufbewahrungsfrist),
+      und der Controller-Sync (Feld-Controller schicken ihre Spiele, Logs und Punkte an den Site-Server,
+      offline zuerst und sicher wiederholbar; noch nicht über eine echte 4G-Verbindung), und das
+      Chrono-Register (signierte Messwerte geprüft und signiert aufbewahrt, nur öffentliche Schlüssel,
+      Austausch zwischen Feldern mit Einwilligung; noch nicht mit einem echten Chronografen), und die
+      Spielplanung mit einer öffentlichen Seite pro Feld und offenen iCalendar- und JSON-Feeds seiner
+      Spiele (ohne persönliche Daten), und die Anmeldung zu diesen Spielen mit vorab angegebenen
+      Repliken und einem Check-in-Ticket: Der Feld-Controller holt die Liste und meldet, wer gekommen
+      ist; Anmeldung aus der App und Import einer Anmeldeliste (CSV oder JSON), exportiert von einer
+      anderen Plattform; und Club-Profile (Name, Farbe, Logo und Wappen, Mitglieder, eine öffentliche
+      Seite, standardmäßig aus, mit Melde-Knopf und Moderation) mit dem Branding des Felds und
+      gespeicherten Teams, die mit seinen Controllern synchronisiert werden, sodass das Wappen eines
+      Clubs jedes Feld erreicht, das sein Team gespeichert hat; und der Gerätezustand (Akku, Verbindung
+      und Firmware jeder Box aus dem, was die Controller schicken; der Feld-Controller meldet jetzt eine
+      Box, die verstummt oder zurückkommt, und einen schwachen Akku, den eine Box mit Akkuanzeige auch
+      selbst meldet; noch nicht auf echten Boards), ein Firmware-Katalog, der nur Releases listet, die
+      mit einem vertrauenswürdigen Schlüssel signiert sind, und Firmware-Updates per Funk für die Field
+      Box: Die Spielleitung lädt ein signiertes Release auf den Feld-Controller und aktualisiert die
+      Boxen zwischen den Spielen, nie währenddessen; jede Box lädt es über das WLAN des Felds herunter,
+      prüft die Signatur mit Schlüsseln, die in ihre eigene Firmware eingebaut sind, installiert es in
+      ihren Reserve-Slot und geht zur alten Firmware zurück, wenn die neue nicht startet (in Software,
+      noch nicht auf einem echten Board), Boxen ins Feld aufnehmen mit einer NFC-Feldkarte, dem
+      USB-Kabel des Controllers oder dem 6-stelligen Code, den die Box zeigt, per Funk gekoppelt (in
+      Software, noch nicht auf einem echten Board), Boxen, deren Spiel vorbei ist, melden sich per Funk,
+      sodass die Spielleitung sie von der Konsole aus ins nächste Spiel einlädt, ohne Karte oder
+      QR-Code (der Beitritt reist verschlüsselt unter einem Schlüssel, der aus dem Beitrittsschlüssel
+      des Felds abgeleitet ist), und ein Spiel, das erst startet, wenn jede Rolle eine Box hat, außer die
+      Spielleitung wählt „Trotzdem starten“ (getestet auf zwei Labor-Boards mit dem Feld-Controller),
+      Boxen, die in jedem neuen Spiel gehört werden (der Nonce-Zähler des Funks gilt jetzt pro Spiel,
+      ein Fehler, der auf dem Labortisch gefunden wurde), und Bildschirme der Box, die dem Spiel folgen
+      (Bereit, Warten, Frei) in der Sprache des Felds, Englisch oder Portugiesisch (getestet auf zwei
+      Labor-Boards), ein Controller, der mitten im Spiel neu startet, nimmt es wieder auf, einer, der
+      den Schlüssel des Spiels verloren hat, sagt seinen Boxen trotzdem per Funk, dass das Spiel vorbei
+      ist, und falsche Admin-PINs müssen immer länger warten, gezählt über Neustarts hinweg, ohne
+      Standard-PIN auf einer echten Box (in Software, noch nicht auf den Labor-Boards), und Felder mit
+      mehreren Etagen in der Konsole: ein Grundriss pro Ebene und jede Box auf ihrer Ebene (in Software,
+      noch nicht auf einem Feld probiert), und die Remote-Spielleitung: Wer in der Orga die Rolle GM hat
+      und mit einem Zwei-Faktor-Code angemeldet ist, sieht das laufende Spiel und startet, pausiert,
+      setzt fort oder beendet es, oder schickt eine Nachricht oder einen Modus-Befehl, über eine
+      Verbindung, die der Feld-Controller selbst öffnet, nur wenn das Feld es einschaltet, mit jedem
+      Befehl auf beiden Seiten geloggt; und der Spielverlauf (Punkteverlauf und Event-Log jedes Spiels;
+      Spielende und Zuschauende sehen ein laufendes Spiel eine Minute verzögert, ohne Geheimnisse oder
+      Spieler-IDs), eine öffentliche Anzeigetafel pro Feld (standardmäßig aus) und die
+      Szenario-Bibliothek des Felds mit ihren Spiel-Presets, geprüft wie der Feld-Controller sie prüft
+      und von jedem Controller des Felds installiert, auch einem in Bereitschaft; und Webseiten für das
+      Staff des Felds (Anmeldung mit dem Zwei-Faktor-Code; der Spielverlauf mit Punkteverlauf und
+      Event-Log jedes Spiels, die Szenario-Bibliothek mit jedem Problem vor dem Speichern, Revisionen
+      und Presets, der Gerätezustand und die Live-Ansicht und Befehle der Remote-Spielleitung), auf
+      Portugiesisch und Englisch und auf dem Handy, getestet in einem Headless-Browser, noch nicht auf
+      einem echten Server; und das Deployment: HTTPS über Caddy mit automatischem Zertifikat, ein
+      Setup-Skript, das jedes Geheimnis erzeugt, verschlüsselte tägliche Backups und eine
+      Wiederherstellung in eine frische Datenbank, getestet in Docker auf einem Computer, noch nicht
+      auf einem echten Server mit echter Domain; und der Hosted-Modus: ein Server für viele Felder,
+      jedes in einem eigenen Datenbankschema unter einer eigenen Adresse, mit Row-Level-Security
+      darunter, sodass kein Feld je die Daten eines anderen sieht, und den Befehlen des Betriebs, um die
+      Daten eines Felds zu exportieren oder zu löschen, getestet gegen PostgreSQL in Docker, und sein
+      Deployment: ein Setup-Skript, das die Datenbankrollen des Hubs anlegt, jedes Feld unter seiner
+      eigenen Adresse mit einem Zertifikat, das nur der Name eines aktiven Felds bekommen kann, und
+      verschlüsselte Backups, wiederhergestellt mit jedem Feld getrennt wie zuvor, getestet in Docker
+      auf einem Computer, noch nicht auf einem echten gehosteten Server mit echter Domain und nicht
+      angeboten, bevor eine Anwältin oder ein Anwalt die Vorlagen geprüft hat.
+    gate: >-
+      Gate: Ein <a href="{{ page.to.glossary }}#glossar-milsim">Milsim</a>-Wochenende läuft von Anfang
+      bis Ende mit Atalaia.
+  p5:
+    title: Community
+    short: >-
+      Visueller Modus-Editor in Software komplett, live im Simulator getestet; signierte Modus-Pakete,
+      eine Sandbox-Ausbruch-Testreihe in der CI, der Feld-Controller installiert signierte Modi, und
+      Boxen bekommen die signierten Modi, die ihnen fehlen, von der GM-Konsole. Als Nächstes:
+      Szenario-Blöcke in der Konsole, die Registry, Übersetzungen.
+    text: >-
+      Visueller Modus-Editor, Modus-Registry, Träger-Platine (eine fertige Leiterplatte, die den Bau
+      erleichtert), Übersetzungen, Bauanleitungen für weitere Gerätetypen. In Software gebaut: der
+      visuelle Modus-Editor, eine Seite des Simulators, auf der ein Modus aus Blöcken zusammengesetzt
+      wird (was passiert, wenn ein Team den Knopf hält, Timer, Punkte, Bildschirme und Töne, die
+      Einstellungen, die die Spielleitung ändern kann, und die Logik des Feld-Controllers über mehrere
+      Boxen); er schreibt die Lua-Skripte und das Manifest des Modus während du arbeitest, auf
+      Portugiesisch und Englisch, und läuft offline. Er hat auch Blöcke für Zonen auf der Karte,
+      GM-Befehle, mehrere Rollen und die eigenen Bildschirme des Modus; drei Beispiele bestehen
+      dieselben Tests wie die handgeschriebenen Modi, und ein Knopf probiert den Modus sofort im
+      Simulator aus. Modi reisen als signierte Pakete (ein Archiv, signiert wie ein Firmware-Release);
+      der Feld-Controller installiert sie nur mit seinen eigenen vertrauenswürdigen Schlüsseln, zeigt,
+      wer jedes signiert hat und ob das Projekt es geprüft hat. Eine Reihe von Ausbruchsversuchen läuft
+      bei jeder Änderung und hat zwei Wege geschlossen, auf denen ein Skript sein Zeitlimit überziehen
+      konnte. In der GM-Konsole wird einer Box, der der Modus eines Spiels fehlt, dieser angeboten:
+      <em>Fehlende Modi senden</em> lädt sie erneut ein, und sie holt das signierte Paket über das WLAN
+      des Felds vom Feld-Controller, nur zwischen den Spielen, während das Spiel auf sie wartet; die Box
+      prüft es mit Schlüsseln, die in ihre Firmware eingebaut sind, und behält es (auf einem Computer
+      getestet, noch nicht auf einer echten Box). Als Nächstes: Szenario-Blöcke in der GM-Konsole; die
+      Registry; Deutsch und traditionelles Chinesisch; die Träger-Platine nach den ersten gebauten
+      Boxen.
+    gate: Fortlaufend nach dem ersten Release.
+
+hub:
+  title: Community-Hub
+  intro: >-
+    Hier werden sich Felder, Teams und Bastelnde treffen. Alles ist freiwillig: Der Hub enthält nur,
+    was Leute veröffentlichen möchten, und Spieldaten bleiben auf den eigenen Servern jedes Felds.
+  open: Offen
+  planned: Geplant
+  later: Später
+  discussion:
+    title: Diskussion
+    text: Fragen, Ideen, Reviews des Designs und Berichte von Events.
+    link: Zu den Discussions
+  gallery:
+    title: Bau-Galerie
+    text: >-
+      Fotos, Stücklisten, Gehäusedateien und Verdrahtungsnotizen für jeden Bau, angefangen mit den
+      ersten Prototypen der Field Box.
+  directory:
+    title: Verzeichnis von Feldern und Teams
+    text: >-
+      Eine freiwillige Liste von Feldern und Teams, die Atalaia nutzen, mit Region, Geländeart und
+      einem Kontakt-Link.
+  browser:
+    title: Modus- und Szenario-Browser
+    text: Die Modus-Registry, mit Beschreibungen, Downloads und Bewertungen der Community.
+  stats:
+    title: Nutzungsstatistik
+    text: Freiwillige, anonyme Summen von Versionen, Plattformen und gespielten Modi. Standardmäßig aus.
+  hosting:
+    title: Gehostete Site-Server
+    text: Für Clubs ohne IT-Unterstützung, zum Selbstkostenpreis, mit getrennten und exportierbaren Daten jedes Clubs.
+
+# Each entry: id (the anchor, stable ASCII), term (as shown) and text (1-3 sentences).
+glossary:
+  id: glossar
+  title: Glossar
+  intro: >-
+    Die Fachbegriffe dieser Seiten, einfach erklärt. Die Links im Text jeder Seite führen hierher.
+  groups:
+    game: Das Spiel
+    hardware: Hardware
+    radio: Funk und Verbindungen
+    software: Software
+    licences: Lizenzen
+  props:
+    id: glossar-props
+    term: Props
+    text: >-
+      Die elektronischen Geräte eines Spiels: Boxen zum Einnehmen, Bomben zum Scharfmachen und
+      Entschärfen, Terminals zum Hacken, Zielscheiben zum Treffen. Bei Atalaia kann jedes Gerät eins
+      sein: eine eigens gebaute Box, ein Handy oder ein kleines Board.
+  field_box:
+    id: glossar-field-box
+    term: Field Box und Satellit
+    text: >-
+      Die eigenen Prop-Designs von Atalaia, gebaut aus handelsüblichen Teilen rund um einen ESP32. Die
+      Field Box ist das Hauptgerät, mit großen Arcade-Knöpfen, Tastenfeld, Bildschirm, Lichtern,
+      Lautsprecher und NFC-Leser in einem wetterfesten Gehäuse, für etwa
+      <span class="nowrap">70–110&nbsp;€</span> an Teilen; der Satellit ist eine kleinere Box für einen
+      Nebenpunkt, für etwa <span class="nowrap">30–40&nbsp;€</span>. Firmware und Bauhandbuch der Field
+      Box sind fertig; ihre ersten Prototypen warten auf ihre Teile (Phase&nbsp;1).
+  milsim:
+    id: glossar-milsim
+    term: Milsim
+    text: >-
+      Kurz für Military Simulation: lange Spiele, oft ein ganzes Wochenende, mit Missionen, einer
+      Befehlskette und realistischen Regeln. Es ist der größte Test für Atalaia: 10 bis 20 Boxen und
+      Satelliten auf einer großen Fläche.
+  cqb:
+    id: glossar-cqb
+    term: CQB
+    text: >-
+      Close Quarters Battle: Spiele in Häusern, Villen, Lagerhallen und anderen engen Räumen, meist
+      unter etwa 150 m Ausdehnung. Alles ist nah und schnell, also nutzt das CQB-Profil von Atalaia
+      kürzere Einnahme- und Bombenzeiten und platziert die Boxen auf einem Grundriss statt per GPS.
+  chrono:
+    id: glossar-chrono
+    term: Chrono und Joule
+    text: >-
+      Ein Chrono (Chronograf) misst, wie schnell eine Replik eine BB verschießt. Aus der
+      Geschwindigkeit und dem Gewicht der BB ergibt sich ihre Energie in Joule, die Felder je nach Art
+      der Replik begrenzen: eine BB mit 0,20&nbsp;g bei 100&nbsp;m/s (etwa 328&nbsp;fps) hat 1 Joule.
+      Atalaia bewahrt die Messwerte jeder Replik auf, von Marshal signiert, damit Marshals im Lauf des
+      Tages Stichproben machen können (in Software gebaut, noch nicht auf einem Feld genutzt); über
+      jede Strafe entscheidet immer ein Mensch.
+  microcontroller:
+    id: glossar-mikrocontroller
+    term: Mikrocontroller
+    text: >-
+      Ein vollständiger, winziger Computer auf einem einzigen Chip, gemacht für ein einziges Programm.
+      Er startet im Nu, braucht sehr wenig Akku und ist günstig, deshalb ist er das übliche Gehirn
+      eines elektronischen Props. ESP32- und Arduino-Boards sind Mikrocontroller-Boards.
+  esp32:
+    id: glossar-esp32
+    term: ESP32
+    text: >-
+      Ein beliebter, günstiger Mikrocontroller mit eingebautem WLAN und Bluetooth; viele Boards haben
+      auch einen LoRa-Funk. Er ist das Gehirn der Field Box, des Satelliten und des I/O-Pods und sollte
+      ein Prop mit einem Akku ein bis drei Tage am Laufen halten (eine Schätzung, noch nicht gemessen).
+      Boards, die Leute schon besitzen, können auch mitmachen, selbst ohne zusätzlichen Speicher
+      (PSRAM), mit ein paar Einschränkungen.
+  arduino:
+    id: glossar-arduino
+    term: Board der Arduino-Klasse, Thin Node
+    text: >-
+      Einfache, sehr günstige Mikrocontroller-Boards im Arduino-Stil, etwa mit AVR- oder
+      RP2040-Chips. Sie sind zu klein, um Spielmodi auszuführen, also arbeiten sie bei Atalaia als Thin
+      Nodes: Sie leihen ihre Knöpfe, Lichter oder Sensoren einer Box in der Nähe oder dem
+      Feld-Controller, der die Regeln für sie ausführt.
+  raspberry_pi:
+    id: glossar-raspberry-pi
+    term: Raspberry Pi
+    text: >-
+      Ein kleiner, günstiger Computer etwa in Scheckkartengröße, der Linux ausführt. Mit einer
+      LoRa-Funkplatine dazu wird er der übliche Feld-Controller (etwa
+      <span class="nowrap">80–150&nbsp;€</span> für den ganzen Aufbau), und er kann auch Props betreiben,
+      die einen großen Bildschirm oder eine Kamera brauchen.
+  android:
+    id: glossar-android-prop
+    term: Android-Prop und I/O-Pod
+    text: >-
+      Die App von Atalaia macht aus einem Android-Handy oder -Tablet, neu oder ein ausgedientes ab
+      Baujahr 2017, ein Prop, das jeden Spielmodus auf seinem Bildschirm ausführt. Handys haben keinen
+      LoRa-Funk, und Touchscreens sind mit Handschuhen schwer zu bedienen, also verbindet sich eine
+      kleine ESP32-Box, der I/O-Pod (Input/Output), per Kabel oder Bluetooth und bringt Funk, große
+      Knöpfe, Lichter und eine Sirene dazu. Beide sind in Software gebaut (Phase&nbsp;3) und auf
+      Emulatoren und einem Computer getestet, noch nicht auf einem echten Handy oder Pod.
+  firmware:
+    id: glossar-firmware
+    term: Firmware und Flashen
+    text: >-
+      Firmware ist das Programm, das in ein Gerät eingebaut ist und beim Einschalten startet. Flashen
+      heißt, eine neue Version davon auf das Gerät zu schreiben, meist über ein USB-Kabel. Boxen von
+      Atalaia werden per Kabel geflasht, und vorerst kommt ein neuer Spielmodus mit einem neuen Flash;
+      später kommen Modi als Skripte. Firmware-Updates kommen jetzt vom Feld-Controller per WLAN (in
+      Software gebaut, noch nicht auf einem echten Board probiert) und machen sich selbst rückgängig,
+      wenn eine neue Version nicht startet.
+  lora:
+    id: glossar-lora
+    term: LoRa
+    text: >-
+      Kurz für <em>Long Range</em>: ein Funk, der kleine Nachrichten mit sehr wenig Strom weit
+      schickt, ohne SIM-Karte, Mobilfunknetz oder Abo. Auf einem typischen Feld sollte er etwa
+      <span class="nowrap">0,5–2&nbsp;km</span> weit reichen (eine Schätzung aus dem Design, noch zu
+      messen) und kommt besser durch dicke Wände als WLAN. Der Haken: Nachrichten müssen kurz sein, und
+      jedes Gerät darf nur einen kleinen Teil der Zeit senden. Atalaia nutzt standardmäßig
+      869,525&nbsp;MHz, im einzigen Teilband von EU868, das 10&nbsp;% Duty Cycle und 500&nbsp;mW
+      erlaubt, also bis zu 6 Minuten Sendezeit pro Stunde für jede Box — genug für Events, Punkte und
+      Zeitsignale, mit reichlich Reserve. Ein Feld kann einen anderen Kanal wählen, der 1&nbsp;% der
+      Zeit oder weniger und 25&nbsp;mW erlaubt. Boxen schicken nur, was sich ändert, etwa „Rot hat B
+      eingenommen“.
+  mesh:
+    id: glossar-mesh
+    term: Mesh
+    text: >-
+      Ein Netz, in dem Geräte Nachrichten füreinander weiterreichen, sodass eine Box, die zu weit von
+      der Basis entfernt ist, über die Boxen dazwischen gehört wird. Atalaia wiederholt jede Nachricht
+      nur ein paar Mal, damit der Funk nicht verstopft, und die Orga kann in schwierigem Gelände
+      zusätzliche Boxen als Repeater aufstellen.
+  skirmesh:
+    id: glossar-skirmesh-rf
+    term: Skirmesh-RF
+    text: >-
+      Das eigene Funkprotokoll von Atalaia: das vereinbarte Format, in dem Boxen, Controller und Apps
+      Nachrichten austauschen, über LoRa, WLAN oder Bluetooth. Es ist öffentlich dokumentiert, also
+      kann jede und jeder ein Gerät bauen, das mitspielt, und jede Nachricht ist mit einem Schlüssel für
+      dieses Spiel verschlüsselt und signiert, sodass niemand mit einem Funkgerät einfach eine
+      Einnahme fälschen kann. Es ist in Software gebaut und getestet, noch nicht auf einem Feld.
+  links:
+    id: glossar-wlan-ble-nfc-qr
+    term: WLAN, BLE, NFC und QR-Codes
+    text: >-
+      Alltägliche Verbindungen mit kurzer Reichweite, jede mit ihrer Aufgabe. WLAN (etwa
+      <span class="nowrap">50–150&nbsp;m</span>) trägt das Sperrige: die Konsole der Orga, die
+      Spieler-App, neue Modi und Updates; BLE, Bluetooth Low Energy
+      (<span class="nowrap">10–30&nbsp;m</span>), verbindet ein Handy mit seinem Pod und koppelt Geräte.
+      NFC ist Antippen zum Lesen, wie bei einer kontaktlosen Karte, für Team-Tags, Armbänder und
+      Beitrittskarten, und QR-Codes werden mit der Handykamera gescannt, um einem Spiel beizutreten
+      oder einen Code einzugeben.
+  api:
+    id: glossar-api
+    term: "API: MQTT, REST und WebSocket"
+    text: >-
+      Eine API ist ein dokumentierter Weg, über den andere Programme ein Spiel lesen und, mit
+      Erlaubnis, steuern können. Damit kann ein Club eine große LED-Anzeigetafel ansteuern, ein
+      Live-Overlay mit Punkten in einem Stream, Alarme in Discord oder Telegram, oder ein Relais, das
+      Rauch und Sirenen auslöst, wenn die Bombe hochgeht. MQTT, REST und WebSocket sind drei
+      Standardwege hinein, also funktionieren gewöhnliche Tools damit. Der Feld-Controller hat sie seit
+      Phase&nbsp;2, mit einer fertigen Anzeigetafel-Seite; sie ist auf einem Computer getestet, noch
+      nicht auf einem Feld.
+  atak:
+    id: glossar-atak
+    term: ATAK
+    text: >-
+      Das Android Team Awareness Kit: eine Karten-App fürs Militär, mit einer kostenlosen zivilen
+      Version, die viele Milsim-Teams nutzen, um ihre Leute auf einer gemeinsamen Karte zu sehen. Der
+      Feld-Controller von Atalaia soll die Boxen auf diesen Karten zeigen können, und welches Team
+      jede hält (Phase&nbsp;4).
+  local_first:
+    id: glossar-local-first
+    term: Local-first
+    text: >-
+      Alles, was ein Spiel braucht, läuft auf dem Feld selbst, auf den Boxen und dem Feld-Controller,
+      also funktioniert es ganz ohne Internet oder Mobilfunknetz. Ist Internet da, bringt es nur
+      Extras, etwa Konten und Spielverlauf. Eine Box, die den Kontakt verliert, spielt weiter, zählt
+      weiter Punkte und holt auf, wenn die Verbindung zurückkommt.
+  core:
+    id: glossar-kern
+    term: Gemeinsamer Kern (C11)
+    text: >-
+      Das Herz von Atalaia: ein Programm, geschrieben in der Programmiersprache C (ihrer Version von
+      2011, daher C11), das jedes Gerät nutzt, das Spielmodi ausführt. Es verarbeitet Events, Punkte und
+      Funknachrichten und führt die Spielmodi sicher aus; jede Hardware-Art fügt nur eine dünne
+      Schicht mit den Treibern für ihre Knöpfe, ihren Bildschirm und ihren Funk hinzu. Es gibt ihn
+      heute schon.
+  lua:
+    id: glossar-lua
+    term: Lua und Spielmodus-Skripte
+    text: >-
+      Ein Spielmodus ist ein Skript: eine kurze Textdatei mit Regeln wie „5 Sekunden halten zum
+      Einnehmen“, geschrieben in Lua, einer kleinen Programmiersprache, bekannt aus dem Modding von
+      Videospielen. Skripte laufen in einer Sandbox, einem abgeschlossenen Raum ohne Zugriff auf
+      Dateien oder Netzwerk, sodass ein geteilter Modus einem Gerät nicht schaden kann. Die Orga muss
+      Lua nie anfassen: Sie wählt einen Modus und füllt seine Einstellungen aus, und ein visueller
+      Editor mit Blöcken folgt in Phase&nbsp;5.
+  simulator:
+    id: glossar-simulator
+    term: Simulator
+    text: >-
+      Ein Programm, das einen Spielmodus mit virtuellen Boxen in deinem Webbrowser spielt: Du drückst
+      die Team-Knöpfe auf dem Bildschirm und siehst die Anzeige jeder Box und das Event-Log. Er läuft
+      auf einem gewöhnlichen Computer und existiert heute, also kann jede und jeder Domination und
+      Bombe ausprobieren, bevor irgendeine Hardware gebaut ist.
+  controller:
+    id: glossar-feld-controller
+    term: Feld-Controller
+    text: >-
+      Die Basisstation eines Spiels: ein kleiner Computer, meist ein Raspberry Pi oder ein
+      Android-Gerät, der jede Box per Funk hört, die Regeln über mehrere Boxen hinweg ausführt, den
+      offiziellen Punktestand führt und die Konsole der Orga auf ihre Handys bringt. Fällt er aus,
+      spielen die Boxen weiter und ein anderes geeignetes Gerät übernimmt, und eine einzelne Box kann
+      ein Spiel auch ohne ihn leiten. Er ist gebaut (Phase&nbsp;2) und auf einem Computer getestet, noch
+      nicht auf einem Feld; der Betrieb auf einem Android-Gerät kommt noch.
+  server:
+    id: glossar-site-server
+    term: Site-Server
+    text: >-
+      Ein optionaler Computer, am Feld oder online gemietet, der aufbewahrt, was über ein Spiel hinaus
+      bleibt: Konten der Spielenden, Spielverlauf, das Chrono-Register und die Dienste hinter der
+      Spieler-App. Spiele warten nie auf ihn. Er kommt in Phase 4, und der Community-Hub plant gehostete
+      Server zum Selbstkostenpreis für Clubs ohne IT-Unterstützung.
+  open_source:
+    id: glossar-open-source
+    term: Open Source und freie Software
+    text: >-
+      Der Quellcode, das für Menschen lesbare Rezept eines Programms, ist öffentlich, und alle dürfen
+      ihn nutzen, untersuchen, ändern und teilen, auch kommerziell. „Frei“ heißt hier Freiheit, nicht
+      kostenlos: Felder dürfen Eintritt nehmen und Boxen dürfen verkauft werden.
+  copyleft:
+    id: glossar-copyleft
+    term: "Copyleft: GPL und AGPL"
+    text: >-
+      Die Regel, die Atalaia offen hält: Es so zu nutzen, wie es ist, verlangt nichts von dir, aber
+      wer eine geänderte Version weitergibt, teilt ihren Quellcode unter derselben Lizenz. Die GPL, für
+      Kern, Firmware, App und Modi, gilt, wenn du Kopien weitergibst oder verkaufst; die AGPL, für den
+      Feld-Controller und den Site-Server, gilt auch, wenn du eine geänderte Version für andere über
+      ein Netzwerk betreibst. Hardware-Designs (CERN-OHL-S) und Dokumentation (CC BY-SA) funktionieren
+      genauso.
+
+involved:
+  title: Mitmachen
+  intro: "Atalaia wird von Spielenden, Feldbetreibenden und Bastelnden gebaut. Du kannst heute schon helfen:"
+  review: >-
+    die <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/design-spec.md">Design-Spezifikation</a>
+    (auf Englisch) prüfen und <a href="https://github.com/vakaobr/atalaia-project/issues">Issues
+    eröffnen</a>;
+  propose: >-
+    Spielmodi mit der
+    <a href="https://github.com/vakaobr/atalaia-project/issues/new/choose">Vorlage für
+    Spielmodus-Ideen</a> vorschlagen;
+  share: erzählen, wie auf deinem Feld gespielt wird, damit die Standardwerte zu echten Spielen passen;
+  code: >-
+    Code schreiben: Fang mit
+    <a href="https://github.com/vakaobr/atalaia-project/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>
+    (auf Englisch) an.
+  rules: >-
+    Jeder Commit trägt eine Zeile <code>Signed-off-by</code>, und das Projekt ist strikt Clean-Room,
+    von Grund auf neu geschrieben: kein Code, keine Firmware, keine Handbücher, Töne oder Bilder aus
+    einem kommerziellen Produkt.
+
+name:
+  title: Der Name
+  badge_alt: >-
+    Das Atalaia-Abzeichen: drei Wachtürme auf Sanddünen, mit Signalfeuern auf ihren Spitzen, durch
+    einen Bogen verbunden, über dem Wort ATALAIA.
+  word: >-
+    Eine <em>atalaia</em> ist ein Wachturm: ein Ausguck auf einem Hügel oder an einem Küstenstreifen.
+    Das Wort kam aus dem Arabischen <em>aṭ-ṭalāʾiʿ</em>, „die Späher“, ins Portugiesische, und
+    <em>estar de atalaia</em> heißt noch heute „auf der Hut sein“.
+  fit: >-
+    Ein Feld-Controller sieht jedes Prop auf dem Feld und sagt der Spielleitung sofort, wenn sich
+    etwas ändert. Auch Wachtürme waren local-first und betrieben das ursprüngliche Mesh mit wenig
+    Bandbreite: Rauch bei Tag, Feuer bei Nacht, von Turm zu Turm weitergegeben. Skirmesh-RF folgt
+    denselben Regeln mit LoRa.
+
+safety:
+  title: Sicherheit auf dem Feld
+  text: >-
+    Props von Atalaia sind Spielausrüstung. Lass sie wie Spielprops aussehen: kräftige Farben, klare
+    Aufschriften „GAME PROP“ und nichts, was einem echten Sprengsatz ähnelt. Transportiere sie in
+    beschrifteten Koffern, lass sie außerhalb des Felds nie unbeaufsichtigt und geh sorgsam mit
+    Lithium-Akkus um.
+
+footer:
+  licences: >-
+    Atalaia ist freie Software: GPL-3.0-or-later für Kern, Firmware, App und Modi; AGPL-3.0-or-later
+    für den Feld-Controller und den Site-Server; CERN-OHL-S-2.0 für Hardware; CC BY-SA 4.0 für die
+    Dokumentation und diese Seite.
+  licensing: Lizenzen
+  independent: >-
+    Unabhängig und von der Community getragen; mit keinem kommerziellen Prop-Hersteller verbunden.
+    Diese Seite setzt keine Cookies und lädt nichts von anderen Seiten.
+
+# The two radio diagrams: site/src/diagrams/*.svg, built into site/img/diagrams/.
+# Plain text, not HTML. Each text has a fixed room in the drawing; if a
+# translation does not fit, tools/build_site.py names the key and the line.
+diagrams:
+  lora:
+    title: So funktioniert LoRa-Funk
+    desc: >-
+      Fünf Felder. Chirps: LoRa sendet jedes Symbol als Ton, der über den Kanal gleitet, und ein
+      Empfänger, der das Muster kennt, kann es sogar unter dem Grundrauschen entschlüsseln, also
+      reicht es mit wenig Strom weit, trägt aber nur kurze Nachrichten. Spreizfaktor: Jede Stufe über
+      SF7 verdoppelt etwa die Sendezeit einer Nachricht, für etwas mehr Reichweite; die Boxen nutzen
+      heute SF7. Reichweite: am größten auf offenem Gelände mit Sichtverbindung, kürzer durch Wald,
+      Menschen und Fahrzeuge, viel kürzer in Gebäuden, und abgeschnitten durch Beton, Metall oder
+      einen Hügel, wo eine Box dazwischen weiterleiten kann; 868 MHz kommt besser durch Hindernisse
+      als WLAN oder Bluetooth auf 2,4 GHz. Die Schätzung aus dem Design von etwa 0,5 bis 2 km auf einem
+      typischen Outdoor-Feld wird im Feldtest von Phase 2 noch gemessen. Weiterleitung: Eine Box
+      außerhalb der Reichweite des Controllers wird über die anderen Boxen gehört, und eine Nachricht
+      wird standardmäßig höchstens zweimal weitergegeben. Regeln in Europa: ein gemeinsamer
+      Spielkanal, standardmäßig 869,525 MHz, der einzige Teil des Bands, der 500 mW und 10 % der Zeit
+      erlaubt, 6 Minuten pro Stunde für jedes Gerät; andere Kanäle erlauben 25 mW und 1 % oder weniger.
+    chirp:
+      title: "Chirps: unter dem Rauschen hörbar"
+      sweep: ein Chirp gleitet über den Kanal
+      noise: Rauschen
+      below: auch unter dem Rauschen dekodiert
+      text: >-
+        Der Empfänger kennt das Muster und hört es unter dem Rauschen: weit mit wenig Strom, aber
+        langsam, daher kurze Nachrichten.
+    sf:
+      title: Spreizfaktor (SF)
+      axis: Sendezeit für dieselbe Nachricht
+      text: >-
+        Jede Stufe verdoppelt etwa die Sendezeit, für etwas mehr Reichweite. Heute SF7; für große
+        Outdoor-Felder plant das Design SF9–10.
+    range:
+      title: Offenes Gelände oder drinnen
+      axis: Reichweite einer Nachricht (Skizze)
+      open: Offenes Gelände, mit Sichtverbindung
+      woods: Wald, Menschen, Fahrzeuge
+      walls: "Drinnen: Ziegel- und Steinwände"
+      blocked: Beton, Metall, hinter einem Hügel
+      relay: → eine Box leitet weiter
+      text: >-
+        868 MHz dringt besser durch Wände und Laub als WLAN (2,4 GHz); Beton, Metall und Hügel
+        bremsen es stark.
+      note: >-
+        Schätzung aus dem Design: etwa 0,5–2 km auf einem typischen Outdoor-Feld. Der Feldtest von
+        Phase 2 wird es messen.
+    relay:
+      title: Boxen leiten füreinander weiter
+      controller: Controller
+      box_a: Box A wiederholt
+      box_b: Box B
+      text: >-
+        Eine Box außer Reichweite des Controllers wird über die anderen gehört. Eine Nachricht geht
+        höchstens zweimal weiter (Hop-Limit), damit der Kanal frei bleibt.
+    rules:
+      title: Funkregeln in Europa (EU868)
+      hour: 1 Stunde
+      share: Jedes Gerät darf höchstens 10 % der Zeit senden, 6 Minuten pro Stunde.
+      text: >-
+        Ein gemeinsamer Kanal, standardmäßig 869,525 MHz: der einzige Teil des Bands mit 500 mW und
+        10 %. Andere Kanäle: 25 mW, 1 % oder weniger. Keine Lizenz, keine SIM-Karte.
+  skirmesh:
+    title: Skirmesh-RF auf allen Geräten
+    desc: >-
+      Links die fünf Schichten von Skirmesh-RF von unten nach oben: 1, der LoRa-Funk auf einem
+      gemeinsamen Spielkanal; 2, das Skirmesh-RF-Paket, mit AES-128-CCM-Verschlüsselung unter einem
+      Schlüssel pro Spiel, Epoche und Sequenznummern gegen Wiederholungen, einem Hop-Limit für die
+      Weiterleitung (standardmäßig zwei Weiterleitungen), ACKs, TIME-Signalen und CLAIM für die
+      Übernahme durch einen anderen Controller; 3, die Nachrichten HELLO, EVENT, ACK, STATE, CMD,
+      TIME, CONFIG und CLAIM in CBOR; 4, der gemeinsame C-Kern und die Lua-Spielmodi; 5, die REST-,
+      WebSocket- und MQTT-APIs des Feld-Controllers, GM-Konsole, Anzeigetafel und Beitrittscodes
+      (NFC-Karten für Boxen, QR-Codes für einen Controller in Bereitschaft und, in Phase 3, Handys).
+      Rechts, welche Schichten jedes Gerät ausführt. In Software gebaut und getestet, noch nicht auf
+      einem Feld: die Field Box (Schichten 1 bis 4), das USB-Funkmodem (1 und 2) und der
+      Feld-Controller auf einem Raspberry Pi oder PC (2 bis 5), und die GM-Konsole auf Handys per
+      WLAN, die Schicht 5 ohne LoRa-Funk nutzen. Ebenfalls in Software für Phase 3 gebaut: der I/O-Pod
+      (1 und 2), der einem Android-Handy oder -Tablet (2 bis 4) einen Funk gibt, und die Spieler-App.
+      Geplant: die Satelliten-Box (1 bis 4).
+    stack: Ein Protokoll, in Schichten
+    l5:
+      title: Dienste des Feld-Controllers
+      text: >-
+        APIs für REST, WebSocket und MQTT, GM-Konsole, Anzeigetafel. Beitritt: NFC-Karten für Boxen,
+        QR-Codes für Reserve-Controller und (Phase 3) Handys.
+    l4:
+      title: "Spiel: gemeinsamer Kern, Lua-Modi"
+      text: >-
+        Derselbe C-Kern und dieselben Lua-Modi auf jedem Gerät, das spielt: Zonenregeln auf den
+        Boxen, Feldregeln auf dem Controller.
+    l3:
+      title: Nachrichten
+      text: >-
+        HELLO, EVENT, ACK, STATE, CMD, TIME, CONFIG und CLAIM, kompakt als CBOR verpackt. Per WLAN
+        reisen dieselben Events als JSON.
+    l2:
+      title: Skirmesh-RF-Paket
+      crypto: AES-128-CCM, Schlüssel pro Spiel
+      replay: "Epoche und Sequenz: keine Replays"
+      hops: "Hop-Limit: standardmäßig max. 2"
+      acks: "ACKs: Verlorenes wird neu gesendet"
+      time: TIME-Signale gleichen Uhren ab
+      claim: "CLAIM: Reserve übernimmt"
+    l1:
+      title: LoRa-Funk
+      text: Ein gemeinsamer Spielkanal (Standard 869,525 MHz), auf dem jedes Gerät hört.
+    devices: Welches Gerät welche Schichten hat
+    cells: >-
+      Farbig: seine Schichten
+    box_sub: ESP32-S3 und ein LoRa-Funk SX1262
+    satellite: Satelliten-Box
+    satellite_sub: "Geplant: eine kleinere ESP32-Box"
+    modem: USB-Funkmodem
+    modem_sub: "Am Controller: Funk, Verschlüsselung"
+    controller: Feld-Controller
+    controller_sub: "Raspberry Pi oder PC: Spiel, API"
+    pod: I/O-Pod
+    pod_sub: "Phase 3: Funk und Knöpfe fürs Handy"
+    android: Android-Gerät
+    android_sub: "Phase 3: Handy oder Tablet führt Modi aus"
+    wifi: Handys im WLAN
+    wifi_sub: GM-Konsole und Spieler-App
+    legend: >-
+      Durchgezogen: auf Computer und Emulator gebaut und getestet, noch nicht auf einem Feld.
+      Gestrichelt: geplant. Handys im WLAN nutzen Schicht 5, ohne LoRa-Funk.

@@ -2,9 +2,11 @@
  * SPDX-FileCopyrightText: 2026 The Atalaia contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * The box's screen texts (main/box_text.c, decision BN-14): every text in
- * both languages, the OLED's within its 16 characters, only letters the fonts
- * have, and the language codes.
+ * The box's screen texts (main/box_text.c, decisions BN-14, P5H-4): every
+ * text in every language, the OLED's within its 16 characters, only letters
+ * the fonts have, and the language codes. The screens with the texts are
+ * checked by the "_pt" and "_de" reference images (test_screens.c,
+ * test_oled_screens.c).
  */
 #include <string.h>
 
@@ -44,6 +46,10 @@ static void test_every_text(void)
     CHECK(strcmp(box_text_in(BOX_LANG_EN, TX_NEUTRAL_UP), "NEUTRAL") == 0);
     /* The maintainer's word for a zone nobody holds (BN-14). */
     CHECK(strcmp(box_text_in(BOX_LANG_PT, TX_NEUTRAL_UP), "LIVRE") == 0);
+    /* German (P5H-4): a zone nobody holds is FREI; the game's end is not "Spielende" (players). */
+    CHECK(strcmp(box_text_in(BOX_LANG_DE, TX_NEUTRAL_UP), "FREI") == 0);
+    CHECK(strcmp(box_text_in(BOX_LANG_DE, TX_DEFUSED_UP), "ENTSCH\xc3\x84RFT") == 0);
+    CHECK(strcmp(box_text_in(BOX_LANG_DE, TX_GAME_OVER_UP), "SPIEL VORBEI") == 0);
     CHECK(strcmp(box_text_in(BOX_LANG_COUNT, TX_NEUTRAL_UP), "NEUTRAL") == 0); /* English */
     CHECK(strcmp(box_text_in(BOX_LANG_PT, TX_COUNT), "") == 0);
 }
@@ -57,7 +63,17 @@ static void test_language_codes(void)
     CHECK(box_lang_from_code("ptx") == BOX_LANG_EN);
     CHECK(box_lang_from_code("") == BOX_LANG_EN);
     CHECK(box_lang_from_code(NULL) == BOX_LANG_EN);
+    CHECK(box_lang_from_code("de") == BOX_LANG_DE);
+    CHECK(box_lang_from_code("de-at") == BOX_LANG_DE);
+    CHECK(box_lang_from_code("dex") == BOX_LANG_EN);
+    CHECK(box_lang_from_code("d") == BOX_LANG_EN);
     CHECK(strcmp(box_lang_code(BOX_LANG_PT), "pt") == 0);
+    CHECK(strcmp(box_lang_code(BOX_LANG_DE), "de") == 0);
+    CHECK(strcmp(box_lang_code(BOX_LANG_EN), "en") == 0);
+    CHECK(strcmp(box_lang_code(BOX_LANG_COUNT), "en") == 0);
+    box_lang_set_code("de");
+    CHECK(box_lang() == BOX_LANG_DE && box_lang_given());
+    CHECK(strcmp(box_text(TX_READY_UP), "BEREIT") == 0);
     box_lang_set_code("pt");
     CHECK(box_lang() == BOX_LANG_PT && box_lang_given());
     CHECK(strcmp(box_text(TX_READY_UP), "PRONTA") == 0);

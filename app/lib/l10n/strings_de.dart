@@ -1,0 +1,751 @@
+// SPDX-FileCopyrightText: 2026 The Atalaia contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+/// German (strings.dart). Drafted by an AI model on 2026-10-22; to be
+/// reviewed by a native-speaking player (docs/translations/status.yaml).
+library;
+
+const Map<String, String> deStrings = {
+  // Common
+  'common.cancel': 'Abbrechen',
+  'common.close': 'Schließen',
+  'common.ok': 'OK',
+  'common.save': 'Speichern',
+
+  // Home and roles
+  'home.choose': 'Was soll dieses Handy machen?',
+  'home.no_prop':
+      'Dieses Handy kann kein Spielprop sein: Das geht nur mit Android (es '
+      'braucht Kiosk-Modus, NFC im Hintergrund und USB).',
+  'role.prop': 'Spielprop',
+  'role.prop_hint':
+      'Dieses Handy arbeitet als Box: Es führt den Spielmodus aus, mit '
+      'Team-Tasten auf dem Bildschirm, NFC-Tags und optional einem I/O-Pod.',
+  'role.player': 'Spielen',
+  'role.player_hint':
+      'Das Spiel verfolgen: Zeit, Punkte, Ziele, Leben und Nachrichten der '
+      'Spielleitung.',
+  'role.marshal': 'Marshal',
+  'role.marshal_hint':
+      'Chrono beim Check-in und Stichproben, das Replik-Register und die Tags '
+      'der Spielenden.',
+  'role.gm': 'Spielleitung',
+  'role.gm_hint': 'Die GM-Konsole, bereitgestellt vom Feld-Controller.',
+
+  // Settings
+  'settings.title': 'Einstellungen',
+  'settings.language': 'Sprache',
+  'settings.lang_pt': 'Português',
+  'settings.lang_en': 'English',
+  'settings.lang_de': 'Deutsch',
+  'settings.theme': 'Darstellung',
+  'settings.theme_system': 'System',
+  'settings.theme_dark': 'Dunkel',
+  'settings.theme_light': 'Hell (Sonne)',
+  'settings.field': 'Spielfeld',
+  'settings.join_key': 'Beitrittsschlüssel des Felds',
+  'settings.join_key_none':
+      'Nicht gesetzt: Ohne ihn kannst du keinem Spiel beitreten.',
+  'settings.join_key_set': 'Gesetzt (endet auf …{end})',
+  'settings.join_key_hint':
+      'Die 64 Hex-Ziffern, die der Feld-Controller mit '
+      '"python3 -m atalaia_controller join-key" ausgibt. Sie belegen, dass '
+      'eine Beitrittskarte oder ein QR-Code zu diesem Feld gehört.',
+  'settings.join_key_bad':
+      'Der Beitrittsschlüssel hat 64 Hex-Ziffern (0-9, a-f).',
+  'settings.join_key_clear': 'Löschen',
+  'settings.pin': 'Admin-PIN',
+  'settings.pin_none':
+      'Keine PIN: Alle können ein Spiel auf diesem Prop pausieren oder beenden.',
+  'settings.pin_set':
+      'Gesetzt: wird beim Starten, Pausieren, Beenden und Verlassen abgefragt.',
+  'settings.pin_hint': '4 bis 8 Ziffern.',
+  'settings.pin_remove': 'PIN entfernen',
+  'settings.kiosk': 'Kiosk-Modus',
+  'settings.kiosk_hint':
+      'Während eines Spiels ist das Handy an die App gebunden. Verlässt jemand '
+      'sie, warnt die App.',
+  'settings.about': 'Über',
+  'settings.version': 'Atalaia {version}',
+  'settings.core': 'Spielkern {version}',
+  'settings.no_core': 'Kein Spielkern auf diesem Handy.',
+  'settings.licence': 'Lizenz',
+  'settings.licence_text':
+      'Freie Software: GPL-3.0 oder neuer, mit der zusätzlichen Erlaubnis für '
+      'App-Stores (APP-STORE-PERMISSION.md).',
+  'pin.title': 'Admin-PIN',
+  'pin.wrong': 'Falsche PIN.',
+
+  // Battery
+  'battery.title': 'Akku und Hintergrund',
+  'battery.intro':
+      'Während eines Spiels kann Android Apps im Hintergrund beenden, um Akku '
+      'zu sparen. Damit ein Prop stundenlang durchhält, nimm Atalaia aus der '
+      'Akku-Optimierung heraus.',
+  'battery.exempt': 'Atalaia ist bereits von der Akku-Optimierung ausgenommen.',
+  'battery.not_exempt':
+      'Atalaia unterliegt noch der Akku-Optimierung: Android kann die App '
+      'während eines Spiels beenden.',
+  'battery.request': 'Ausnahme anfordern',
+  'battery.open_settings': 'Akku-Einstellungen öffnen',
+  'battery.on_samsung_title': 'Samsung',
+  'battery.on_samsung':
+      'Einstellungen › Akku › Einschränkungen der Hintergrundnutzung: Atalaia '
+      'aus den inaktiven Apps nehmen. Dann Einstellungen › Apps › Atalaia › '
+      'Akku › Nicht eingeschränkt.',
+  'battery.on_xiaomi_title': 'Xiaomi, Redmi, POCO',
+  'battery.on_xiaomi':
+      'Einstellungen › Akku › App-Akkusparmodus › Atalaia › Keine '
+      'Einschränkungen. Unter Sicherheit › Autostart Atalaia einschalten.',
+  'battery.on_huawei_title': 'Huawei, Honor',
+  'battery.on_huawei':
+      'Einstellungen › Akku › App-Start › Atalaia: automatische Verwaltung '
+      'ausschalten und die drei Optionen eingeschaltet lassen (automatischer '
+      'Start, Start durch andere Apps, Ausführung im Hintergrund).',
+  'battery.on_oneplus_title': 'OnePlus, OPPO, realme',
+  'battery.on_oneplus':
+      'Einstellungen › Akku › Akku-Optimierung › Atalaia › Nicht optimieren. '
+      'Bei manchen Modellen auch: Einstellungen › Apps › Atalaia › '
+      'Akkunutzung › Hintergrundaktivität zulassen.',
+  'battery.on_generic_title': 'Andere Handys',
+  'battery.on_generic':
+      'Einstellungen › Apps › Atalaia › Akku: „Nicht eingeschränkt" oder '
+      '„Nicht optimieren" wählen. Die Namen unterscheiden sich je nach '
+      'Hersteller.',
+
+  // Prop
+  'prop.intro':
+      'Ein neues Spiel nur auf diesem Handy oder eines der Spiele des '
+      'Feld-Controllers (mit der Beitrittskarte oder dem QR-Code der '
+      'Spielleitung).',
+  'prop.new_game': 'Neues Spiel',
+  'prop.join': 'Einem Spiel beitreten',
+  'prop.capabilities': 'Was dieses Handy hat',
+  'prop.start': 'Starten',
+  'prop.confirm_start': 'Spiel jetzt starten?',
+  'prop.pause': 'Pause',
+  'prop.resume': 'Fortsetzen',
+  'prop.end': 'Spiel beenden',
+  'prop.confirm_end': 'Spiel jetzt beenden?',
+  'prop.leave': 'Verlassen',
+  'prop.confirm_leave': 'Spiel verlassen?',
+  'prop.confirm_leave_body':
+      'Das Spiel läuft noch: Dieses Prop zählt dann nicht mehr mit.',
+  'prop.log': 'Spielprotokoll',
+  'prop.admin': 'Spielleitung',
+  'prop.loading': 'Modus wird geladen…',
+  'prop.waiting': 'Warten auf den Start',
+  'prop.paused': 'PAUSIERT',
+  'prop.paused_hint': 'Warte auf die Spielleitung.',
+  'prop.ended': 'Spiel vorbei',
+  'prop.script_error': 'Der Modus wurde angehalten',
+  'prop.tamper':
+      'Jemand hat während des Spiels den Kiosk-Modus verlassen. Sag der '
+      'Spielleitung Bescheid.',
+  'prop.pod_opened':
+      'Jemand hat während des Spiels den I/O-Pod geöffnet. Sag der '
+      'Spielleitung Bescheid.',
+  'prop.hold': 'Gedrückt halten\n{team}',
+  'prop.nfc_hint': 'Halte den Tag an die Rückseite des Handys.',
+  'prop.keypad': 'Tastenfeld',
+  'prop.keypad_hide': 'Tastenfeld ausblenden',
+  'prop.phase_loading': 'wird geladen',
+  'prop.phase_ready': 'startbereit',
+  'prop.phase_running': 'läuft',
+  'prop.phase_paused': 'pausiert',
+  'prop.phase_ended': 'beendet',
+  'prop.phase_halted': 'durch einen Fehler angehalten',
+  'prop.phase_failed': 'nicht gestartet',
+  'prop.notification_title': 'Atalaia: {mode}',
+  'prop.notification_running': 'Spiel läuft',
+  'prop.notification_left': 'noch {time}',
+
+  // Setup
+  'setup.title': 'Neues Spiel',
+  'setup.joined': 'Spiel des Controllers',
+  'setup.join_info':
+      'Spiel {game}, dieses Prop ist Knoten {node}, Kanal {mhz} MHz.',
+  'setup.mode': 'Spielmodus',
+  'setup.with': 'Mit {mode}',
+  'setup.role': 'Rolle im Modus',
+  'setup.teams': 'Teams',
+  'setup.params': 'Parameter des Modus',
+  'setup.any_team': 'Alle Teams',
+  'setup.length': 'Dauer',
+  'setup.minutes': 'Minuten',
+  'setup.minutes_hint': '0 = kein Limit. Danach endet das Spiel von selbst.',
+  'setup.prepare': 'Spiel vorbereiten',
+  'setup.missing':
+      'Diesem Handy fehlt: {caps}. Verbinde einen I/O-Pod, der das hat.',
+  'setup.needs_controller':
+      'Dieser Modus zählt Punkte über mehrere Boxen mit dem Feld-Controller. '
+      'Allein übernimmt dieses Prop nur seinen eigenen Teil.',
+  'setup.unknown_mode': 'Dieses Prop hat den Modus dieses Spiels nicht.',
+  'setup.unknown_role': 'Der Modus dieses Spiels hat diese Rolle nicht.',
+
+  // Join
+  'join.intro':
+      'Scanne den Beitritts-QR-Code in der GM-Konsole, halte die '
+      'Beitrittskarte an das Handy oder füge den Text atalaia:join:… ein.',
+  'join.scan': 'QR-Code scannen',
+  'join.scan_hint': 'Richte die Kamera auf den Beitritts-QR-Code.',
+  'join.card': 'Beitrittskarte (NFC)',
+  'join.card_ready': 'Halte die Karte an die Rückseite des Handys.',
+  'join.text': 'Beitrittstext',
+  'join.use_text': 'Diesen Text verwenden',
+  'join.warning':
+      'Karte und Code enthalten den Spielschlüssel: Zeig sie nur den Leuten, '
+      'die das Feld aufbauen.',
+  'join.no_key':
+      'Setze zuerst den Beitrittsschlüssel des Felds in den Einstellungen.',
+  'join.no_camera': 'Es gibt keine Kamera, um den Code zu lesen.',
+  'join.bad_text': 'Das ist kein gültiger Beitrittscode.',
+  'join.not_a_card': 'Diese Karte enthält keine Beitrittsdaten.',
+  'join.other_field':
+      'Dieser Code gehört zu einem anderen Feld (der Beitrittsschlüssel passt '
+      'nicht).',
+  'join.bad_body': 'Die Beitrittsdaten sind beschädigt.',
+  'join.for_controller':
+      'Dieser Code ist für einen Standby-Controller, nicht für ein Prop.',
+  'nfc.off': 'NFC ist aus: Schalte es in den Einstellungen des Handys ein.',
+  'nfc.none': 'Dieses Handy hat kein NFC.',
+
+  // I/O pod
+  'pod.title': 'I/O-Pod',
+  'pod.intro':
+      'Ein I/O-Pod leiht dem Handy große Tasten, Lichter, eine Sirene, einen '
+      'NFC-Leser und LoRa-Funk, über USB (bevorzugt) oder Bluetooth.',
+  'pod.none': 'Kein Pod verbunden: Das Spiel nutzt nur das Handy.',
+  'pod.link': 'Pod verbinden',
+  'pod.find': 'Pods suchen',
+  'pod.found_none': 'Kein Pod gefunden.',
+  'pod.linked': 'Pod über {kind} verbunden: Firmware {fw}, {n} Funktionen.',
+  'pod.open_failed': 'Die Verbindung zum Pod ließ sich nicht öffnen.',
+  'pod.no_ident': 'Der Pod hat nicht geantwortet.',
+
+  // Capabilities
+  'cap.team_input': 'Team-Tasten',
+  'cap.keypad': 'Tastenfeld',
+  'cap.display': 'Bildschirm',
+  'cap.team_display': 'Teamfarbe',
+  'cap.led': 'Lichter',
+  'cap.audio': 'Ton',
+  'cap.haptic': 'Vibration',
+  'cap.nfc': 'NFC',
+  'cap.gps': 'GPS',
+  'cap.imu': 'Beschleunigungssensor',
+  'cap.qr_scanner': 'QR-Leser',
+  'cap.button': 'Tasten',
+  'cap.lora': 'LoRa-Funk',
+
+  // Teams
+  'team.red': 'Rot',
+  'team.blue': 'Blau',
+  'team.green': 'Grün',
+  'team.yellow': 'Gelb',
+  'team.orange': 'Orange',
+  'team.purple': 'Lila',
+
+  // Player
+  'player.intro':
+      'Verbinde dich mit dem Feld-Controller: Scanne den QR-Code der '
+      'Anzeigetafel oder gib die Adresse und den Zugangscode der Spielleitung '
+      'ein.',
+  'player.scan': 'QR-Code der Anzeigetafel scannen',
+  'player.scan_hint': 'Richte die Kamera auf den QR-Code der Anzeigetafel.',
+  'player.by_hand': 'Oder eintippen',
+  'player.address': 'Adresse des Controllers',
+  'player.code': 'Zugangscode',
+  'player.connect': 'Verbinden',
+  'player.bad_link': 'Adresse oder Zugangscode fehlt.',
+  'player.connecting': 'Verbindung zum Feld-Controller…',
+  'player.offline': 'Offline. Verbindung wird wiederhergestellt…',
+  'player.denied': 'Der Zugangscode wurde abgelehnt.',
+  'player.no_game': 'Es läuft noch kein Spiel.',
+  'player.left': 'verbleibend',
+  'player.score': 'Punkte',
+  'player.my_team': 'dein Team',
+  'player.pick_team': 'Tippe auf dein Team, um es hervorzuheben.',
+  'player.eliminated': 'ausgeschieden',
+  'player.lives_left': '{n} Leben',
+  'player.objectives': 'Ziele',
+  'player.node': 'Box {n}',
+  'player.held_by': 'Gehalten von Team {team}',
+  'player.held_by_none': 'Von niemandem gehalten',
+  'player.scenario': 'Szenario-Ziele',
+  'player.objective_waiting': 'Beginnt mit dem Spiel',
+  'player.objective_active': 'Läuft',
+  'player.objective_done': 'Erfüllt von Team {team}',
+  'player.objective_done_no_team': 'Erfüllt',
+  'player.objective_failed': 'Gescheitert',
+  'player.objective_failed_captured':
+      'Gescheitert: von einem anderen Team genommen',
+  'player.objective_failed_defused': 'Gescheitert: Die Bombe wurde entschärft',
+  'player.objective_failed_time': 'Gescheitert: Zeit abgelaufen',
+  'player.objective_failed_blocked':
+      'Gescheitert: Ein früheres Ziel ist gescheitert',
+  'player.objective_failed_lives': 'Gescheitert: zu wenige Leben übrig',
+  'player.objective_for_team': 'Für Team {team}',
+  'player.objective_for_squad': 'Für Team {team}, Squad {squad}',
+  'player.objective_points': '+{n}',
+  'player.lives': 'Leben',
+  'player.events': 'Was passiert ist',
+  'player.no_events': 'Noch nichts.',
+  'player.message': 'Spielleitung: {text}',
+  'player.ended': 'Das Spiel ist vorbei.',
+  'player.tie': 'Unentschieden',
+  'player.winner': 'Team {team} gewinnt',
+  'state.ready': 'bereit',
+  'state.running': 'läuft',
+  'state.paused': 'pausiert',
+  'state.ended': 'beendet',
+
+  // Events
+  'event.game.start': 'Das Spiel hat begonnen',
+  'event.game.pause': 'Spiel pausiert',
+  'event.game.resume': 'Das Spiel geht weiter',
+  'event.game.end': 'Das Spiel ist zu Ende',
+  'event.zone.captured': 'Team {team} hat {zone} eingenommen',
+  'event.zone.neutralized': '{zone} ist frei',
+  'event.bomb.armed': 'Bombe scharf gemacht von Team {team} ({fuse} s)',
+  'event.bomb.defused': 'Bombe entschärft von Team {team}',
+  'event.bomb.exploded': 'Die Bombe ist hochgegangen',
+  'event.bomb.reset': 'Die Bombe wurde zurückgesetzt',
+  'event.score.delta': 'Punkte für Team {team}: {amount}',
+  'event.code.used': 'Team {team} hat einen Code benutzt',
+  'event.player.respawn': '{player} ist wieder drin ({lives} Leben)',
+  'event.player.checkin': '{player} hat eingecheckt',
+  'event.kill.confirmed': 'Kill bestätigt von Team {team} ({player})',
+  'event.kill.denied': 'Team {team} hat den Tag von {player} zurückgeholt',
+  'event.team.eliminated': 'Team {team} hat keine Leben mehr',
+  'event.holdall.scoring_start': 'Team {team} hält alle Zonen',
+  'event.holdall.scoring_stop': 'Team {team} hat eine Zone verloren',
+  'event.laststand.countdown_start': 'Last Stand: Der Countdown läuft',
+  'event.laststand.countdown_cancel': 'Last Stand: Countdown abgebrochen',
+  'event.laststand.defeated': 'Last Stand: Die Verteidigung ist gefallen',
+  'event.gm.message': 'Spielleitung: {text}',
+  'event.visibility.granted': 'Team {team} sieht das Spielfeld',
+  'event.chrono.violation': 'Eine Replik über dem Limit',
+  'event.node.tamper': 'Jemand hat an einer Box manipuliert ({reason})',
+  'event.medic.heal':
+      '{player} wurde geheilt (Heilungen im Kit übrig: {remaining})',
+  'event.medic.empty': 'Ein Medic-Kit ist leer',
+  'event.hacking.solved': 'Team {team} hat ein Terminal gehackt',
+  'event.hacking.solved.no_team': 'Ein Terminal wurde gehackt',
+  'event.vip.extracted': 'Team {team} hat die Extraktionszone erreicht',
+  'event.scenario.started': 'Das Szenario hat begonnen',
+  'event.scenario.objective.completed': 'Team {team} hat ein Ziel erfüllt',
+  'event.scenario.objective.completed.no_team': 'Ein Ziel wurde erfüllt',
+  'event.scenario.objective.failed':
+      'Team {team} ist an einem Ziel gescheitert',
+  'event.scenario.objective.failed.no_team': 'Ein Ziel ist gescheitert',
+  'event.scenario.objective.revealed': 'Ein neues Ziel für Team {team}',
+  'event.scenario.objective.revealed.no_team': 'Ein neues Ziel',
+  'event.scenario.objective.completed.named':
+      'Team {team} erfüllt: {objective}',
+  'event.scenario.objective.completed.named.no_team': 'Erfüllt: {objective}',
+  'event.scenario.objective.failed.named':
+      'Team {team} gescheitert: {objective}',
+  'event.scenario.objective.failed.named.no_team': 'Gescheitert: {objective}',
+  'event.scenario.objective.revealed.named':
+      'Ein neues Ziel für Team {team}: {objective}',
+  'event.scenario.objective.revealed.named.no_team':
+      'Ein neues Ziel: {objective}',
+
+  // GM
+  'gm.intro':
+      'Die GM-Konsole des Feld-Controllers. Gib die Adresse des Controllers '
+      'ein; die Konsole fragt nach dem Zugangscode.',
+  'gm.address': 'Adresse der Konsole',
+  'gm.open': 'Konsole öffnen',
+  'gm.bad_url': 'Diese Adresse funktioniert nicht.',
+  'gm.change': 'Adresse ändern',
+
+  // Marshal
+  'marshal.no_identity':
+      'Bevor du Messwerte aufzeichnest, gib Namen und ID an und erstelle '
+      'deinen Marshal-Schlüssel (unten, unter „Wer du bist").',
+  'marshal.identity': 'Wer du bist',
+  'marshal.name': 'Name des Marshals',
+  'marshal.id': 'ID des Marshals',
+  'marshal.field_id': 'ID des Felds',
+  'marshal.chrono_id': 'ID des Chronos',
+  'marshal.key': 'Signaturschlüssel',
+  'marshal.no_key': 'Noch kein Schlüssel: Messwerte müssen signiert sein.',
+  'marshal.key_id': 'Öffentlicher Schlüssel {id}…',
+  'marshal.make_key': 'Erstellen',
+  'marshal.new_key': 'Neuer Schlüssel',
+  'marshal.new_key_body':
+      'Alte Messwerte bleiben mit dem alten Schlüssel signiert; neue werden '
+      'mit dem neuen Schlüssel signiert.',
+  'marshal.records': 'Gespeicherte Messwerte',
+  'marshal.readings':
+      '{n} Messwerte auf diesem Handy. Sie werden 365 Tage aufbewahrt und dann '
+      'gelöscht.',
+  'marshal.erase': 'Messwerte einer Person löschen',
+  'marshal.erase_do': 'Löschen',
+
+  // Chrono
+  'chrono.title': 'Chrono',
+  'chrono.hint': 'Check-in und Stichproben, gegen das Limit des Felds.',
+  'chrono.template': 'Limits des Felds',
+  'chrono.unverified':
+      'Die Limits „{name}" sind nicht geprüft: Sie stammen aus der Recherche '
+      'des Projekts, nicht aus einer offiziellen Quelle. Prüfe sie vor dem '
+      'Einsatz gegen die aktuellen Regeln.',
+  'chrono.checkin': 'Check-in',
+  'chrono.spotcheck': 'Stichprobe',
+  'chrono.replica': 'Replik',
+  'chrono.replica_nfc': 'Oder halte den Tag der Replik an das Handy.',
+  'chrono.unknown_tag': 'Dieser Tag ist nicht im Replik-Register.',
+  'chrono.no_class': 'Die Limits des Felds haben keine Klasse „{class}".',
+  'chrono.limit': 'Limit: {j} J ({fps} fps mit 0,20 g)',
+  'chrono.bb': 'BB-Gewicht',
+  'chrono.velocity': 'Geschwindigkeit',
+  'chrono.energy': 'Energie: {j} J',
+  'chrono.record': 'Schuss aufzeichnen',
+  'chrono.new_series': 'Neue Serie',
+  'chrono.pass': 'OK',
+  'chrono.warn': 'WARNUNG',
+  'chrono.fail': 'DURCHGEFALLEN',
+  'chrono.highest': 'Höchstwert: {j} J · Limit {limit} J',
+  'chrono.vs_checkin': 'Beim Check-in: {j} J (+{pct} % Toleranz)',
+
+  // Replicas
+  'replica.title': 'Replik-Register',
+  'replica.add': 'Replik registrieren',
+  'replica.none': 'Noch keine Repliken registriert.',
+  'replica.count': '{n} Repliken registriert',
+  'replica.owner': 'ID der spielenden Person',
+  'replica.type': 'Typ',
+  'replica.class': 'Klasse',
+  'replica.model': 'Hersteller und Modell',
+  'replica.tag': 'Tag der Replik',
+  'replica.tap_tag':
+      'Halte den NFC-Tag der Replik an das Handy oder scanne ihr QR-Etikett.',
+  'replica.tag_read': 'Tag: {uid}',
+  'replica.scan': 'QR-Etikett scannen',
+  'replica.scan_hint': 'Richte die Kamera auf das QR-Etikett der Replik.',
+  'replica.needs_tag': 'Klasse oder Tag der Replik fehlt.',
+  'replica.type_aeg': 'AEG',
+  'replica.type_gbb': 'GBB',
+  'replica.type_hpa': 'HPA',
+  'replica.type_bolt_action': 'Repetierer',
+  'replica.type_dmr': 'DMR',
+  'replica.type_sniper': 'Sniper',
+  'replica.type_pistol': 'Pistole',
+  'replica.type_shotgun': 'Shotgun',
+
+  // Tags
+  'tags.title': 'Tags der Spielenden',
+  'tags.hint': 'Die signierten NFC-Tags für ein Spiel schreiben.',
+  'tags.intro':
+      'Tags werden mit dem Schlüssel des Spiels signiert, also hat jedes Spiel '
+      'seine eigenen. Wähle das Spiel mit seiner Beitrittskarte oder seinem '
+      'QR-Code.',
+  'tags.game': 'Spiel wählen',
+  'tags.for_game': 'Spiel {game} ({mode})',
+  'tags.other_game': 'Anderes Spiel',
+  'tags.player': 'ID der spielenden Person',
+  'tags.player_hint': 'Buchstaben, Ziffern, - _ und . (bis zu 32), z. B. p-17',
+  'tags.bad_player': 'Die ID hat 1 bis 32 Buchstaben, Ziffern, -, _ oder .',
+  'tags.no_team': 'Kein Team',
+  'tags.write': 'Tag schreiben',
+  'tags.hold': 'Halte den Tag an die Rückseite des Handys…',
+  'tags.written': 'Gerade geschrieben',
+  'tags.write_not_ndef': 'Dieser Tag nimmt keine NDEF-Daten an.',
+  'tags.write_read_only': 'Dieser Tag ist gesperrt.',
+  'tags.write_too_small': 'Der Tag ist zu klein.',
+  'tags.write_io':
+      'Schreiben fehlgeschlagen: Halte den Tag still und versuch es nochmal.',
+  'tags.write_unavailable': 'Dieses Handy kann keine NFC-Tags schreiben.',
+
+  // Field check-in, replicas to chrono, positions (plan phase E)
+  'checkin.title': 'Am Feld einchecken',
+  'checkin.intro':
+      'Scanne das Check-in-Plakat des Felds mit der Kamera (oder füge seinen Text ein). Das Handy erreicht den Controller des Felds über das WLAN des Felds; Internet ist nicht nötig.',
+  'checkin.scan': 'Plakat scannen',
+  'checkin.scan_hint': 'Richte die Kamera auf den QR-Code des Check-in-Plakats',
+  'checkin.by_text': 'Oder füge den Text des Plakats ein',
+  'checkin.text_hint': 'atalaia:checkin:…',
+  'checkin.use_text': 'Diesen Text verwenden',
+  'checkin.bad_poster':
+      'Dieses Check-in-Plakat ist nicht lesbar. Frag die Orga nach einem anderen.',
+  'checkin.not_poster': 'Das ist kein Check-in-Plakat von Atalaia.',
+  'checkin.unreachable':
+      'Der Controller des Felds antwortet nicht. Bist du im WLAN des Felds?',
+  'checkin.join_wifi':
+      'Der Controller des Felds antwortet nicht: Verbinde dich mit dem WLAN „{ssid}" und versuch es nochmal.',
+  'checkin.mismatch':
+      'Der antwortende Controller ist nicht der des Plakats (Plakat {poster}, Controller {got}). Mach nicht weiter und sag der Orga Bescheid.',
+  'checkin.not_controller':
+      'Unter dieser Adresse antwortet kein Feld-Controller.',
+  'checkin.changed':
+      'Diesem Feld wurde mit einem anderen Zertifikat vertraut ({old}); das Plakat zeigt {new}. Wenn die Orga bestätigt, dass der Controller gewechselt hat, vergiss das Feld und scanne das Plakat erneut.',
+  'checkin.forget_field': 'Dieses Feld vergessen',
+  'checkin.error': 'Der Controller hat abgelehnt: {error}',
+  'checkin.offline':
+      'Keine Verbindung zum Controller des Felds: Versuch es im Netz des Felds nochmal.',
+  'checkin.expired': 'Dieser Check-in gilt nicht mehr: Checke erneut ein.',
+  'checkin.connecting': 'Verbindung zum Controller des Felds…',
+  'checkin.notice_title': 'Deine Daten bei {field}',
+  'checkin.notice_ok': 'Gelesen, weiter',
+  'checkin.trusted': 'Zertifikat des Felds {ca}',
+  'checkin.no_games': 'An diesem Feld ist kein Spiel für den Check-in offen.',
+  'checkin.game': 'Spiel',
+  'checkin.for_game': 'Spiel: {game}',
+  'checkin.name': 'Name oder Callsign',
+  'checkin.name_hint': 'Orga und Marshals sehen ihn; andere Spielende nicht.',
+  'checkin.federation_required': 'Verbandsnummer ({label})',
+  'checkin.federation_optional': 'Verbandsnummer ({label}, optional)',
+  'checkin.federation_hint':
+      'Die Orga sieht sich den Ausweis am Tisch an; die App prüft ihn nicht.',
+  'checkin.need_name': 'Gib einen Namen oder ein Callsign ein.',
+  'checkin.need_federation':
+      'Dieses Feld verlangt deine Verbandsnummer ({label}).',
+  'checkin.pick_game': 'Wähle das Spiel.',
+  'checkin.team_pref': 'Wunschteam',
+  'checkin.any_team': 'Egal',
+  'checkin.bring': 'Repliken, die du mitbringst',
+  'checkin.submit': 'Einchecken',
+  'checkin.status_title': 'Mein Check-in',
+  'checkin.status.pending': 'Wartet auf Bestätigung am Orga-Tisch.',
+  'checkin.status.checked_in': 'Eingecheckt.',
+  'checkin.status.left': 'Du hast dieses Spiel verlassen.',
+  'checkin.status.removed': 'Die Orga hat diesen Check-in entfernt.',
+  'checkin.role.player': 'Spielen',
+  'checkin.role.squad_leader': 'Squad-Lead',
+  'checkin.role.vip': 'VIP',
+  'checkin.role.marshal': 'Marshal',
+  'checkin.role.gm': 'GM',
+  'checkin.role.spectator': 'Zuschauen',
+  'checkin.my_declaration': 'Meine Repliken in diesem Spiel',
+  'checkin.no_replicas': 'Du hast noch keine Replik angemeldet.',
+  'checkin.declare': 'Repliken wählen',
+  'checkin.follow': 'Spiel verfolgen',
+  'checkin.leave': 'Spiel verlassen',
+  'checkin.leave_body':
+      'Dein Name und deine Verbandsnummer werden aus diesem Spiel gelöscht. Bereits gechronte Repliken bleiben gespeichert.',
+  'checkin.left': 'Du hast das Spiel verlassen; deine Daten wurden gelöscht.',
+  'chrono_state.pending': 'nicht gechront',
+  'chrono_state.passed': 'bestanden',
+  'chrono_state.refused': 'abgelehnt',
+  'chrono_state.withdrawn': 'zurückgezogen',
+  'chrono_state.refused_today': 'heute abgelehnt',
+  'declare.title': 'Repliken für dieses Spiel',
+  'declare.intro':
+      'Wähle die Repliken, die du in diesem Spiel nutzt (bis zu {max}). Bring sie zu den Marshals zum Chronen.',
+  'declare.none': 'Noch keine Repliken: Füge deine hinzu.',
+  'declare.add': 'Replik hinzufügen',
+  'declare.type': 'Typ',
+  'declare.class': 'Klasse',
+  'declare.make': 'Hersteller und Modell (optional)',
+  'declare.save': 'Speichern',
+  'declare.saved': 'Gespeichert: Orga und Marshals sehen sie jetzt.',
+  'declare.locked':
+      'Eine gechronte Replik bleibt angemeldet: Bitte einen Marshal, sie zu ändern.',
+  'queue.title': 'Repliken zum Chronen',
+  'queue.hint':
+      'Die Liste des Felds: wer Repliken angemeldet hat, die noch nicht gechront wurden.',
+  'queue.check_in_first':
+      'Checke zuerst mit dem Plakat am Feld ein; danach gibt dir die Orga die Marshal-Rolle.',
+  'queue.not_marshal': 'Diese Liste ist nur für Marshals und die Orga.',
+  'queue.counts':
+      'Zu chronen: {pending} · bestanden: {passed} · abgelehnt: {refused}',
+  'queue.scan': 'Etikett einer Replik scannen',
+  'queue.scan_hint': 'Richte die Kamera auf das QR-Etikett der Replik',
+  'queue.not_found':
+      'Diese Replik ist in diesem Spiel nicht angemeldet: Wähle die Anmeldung der spielenden Person.',
+  'queue.refresh': 'Aktualisieren',
+  'queue.empty': 'Noch niemand hat Repliken angemeldet.',
+  'queue.manual': 'Von Hand einchecken',
+  'queue.manual_do': 'Einchecken',
+  'queue.manual_done': 'Eingecheckt: {id}',
+  'queue.send_pending': '{n} noch nicht gesendete Serien senden',
+  'queue.send_failed':
+      '{n} Serien wurden nicht angenommen; sie bleiben auf diesem Handy.',
+  'queue.waiting_confirmation': 'wartet auf Bestätigung',
+  'queue.unregistered': 'noch nicht registriert',
+  'chrono.send': 'An den Controller senden',
+  'chrono.sent_pass': 'Gesendet: bestanden.',
+  'chrono.sent_fail': 'Gesendet: abgelehnt.',
+  'chrono.sent_warn': 'Gesendet: Warnung.',
+  'chrono.sent_unjudged': 'Gesendet: keine Klasse zum Vergleich.',
+  'chrono.sent_null': 'Gesendet.',
+  'chrono.send_failed':
+      'Nicht gesendet: {error}. Bleibt auf diesem Handy und wird später gesendet.',
+  'player.checkin': 'Am Feld einchecken',
+  'player.watch': 'Ein Spiel ohne Check-in verfolgen',
+  'player.continue': 'Weiter: {game}',
+  'player.me': 'Du: {role}, {team}',
+  'player.no_team': 'noch kein Team',
+  'player.positions': 'Sichtbare Positionen: {n}',
+  'player.share': 'Meine Position teilen',
+  'player.share_hint':
+      'Nur während des Spiels; der Controller entscheidet, wer sie sieht (die Orga und die Marshals).',
+  'player.share_on': 'Wird geteilt: {n} Position(en) gesendet',
+  'player.share_stopped':
+      'Teilen beendet: Das Spiel ist vorbei oder der Check-in hat sich geändert.',
+  'player.no_location': 'Dieses Handy hat keinen Standort.',
+  'player.location_denied': 'Keine Berechtigung für den Standort.',
+  'player.sharing_title': 'Atalaia: Deine Position wird geteilt',
+  'player.sharing_text': 'Während des Spiels',
+  'prop.link.connecting': 'Verbindung zum Controller…',
+  'prop.link.linked': 'Über WLAN mit dem Controller verbunden',
+  'prop.link.refused':
+      'Der Controller hat dieses Gerät abgelehnt (anderes Spiel?)',
+  'prop.link.offline': 'Keine Verbindung zum Controller: neuer Versuch…',
+  'prop.link.closed':
+      'Ein anderes Gerät hat den Platz dieses Geräts übernommen',
+  'prop.radio.configuring': 'Funk des Pods wird eingerichtet…',
+  'prop.radio.linked': 'Der Funk des Pods ist auf dem Kanal des Felds',
+  'prop.radio.heard': 'Über den Funk des Pods mit dem Controller verbunden',
+  'prop.radio.offline': 'Der Funk des Pods antwortet nicht: neuer Versuch…',
+  'prop.radio.closed': 'Der Funk des Pods ist aus',
+  'prop.gm_message': 'Orga: {text}',
+  'player.share_hint_squads':
+      'Nur während des Spiels; der Controller entscheidet, wer sie sieht (dein Squad, wenn das Spiel es erlaubt, die Orga und die Marshals).',
+  'checkin.team_squad': '{team} › Squad {squad}',
+  'branding.logo': 'Logo von {name}',
+  // Online registration on the field's site server (decision S16-13)
+  'player.site': 'Online-Anmeldung',
+  'site.title': 'Online-Anmeldung',
+  'site.intro':
+      'Du meldest dich mit einem Konto auf der Website des Felds für ein '
+      'Spiel an. Nutze den Button „Anmelden" auf der Seite des Spiels oder '
+      'füge hier die Adresse der Seite des Felds oder des Spiels ein.',
+  'site.address': 'Adresse der Seite des Felds oder des Spiels',
+  'site.open': 'Öffnen',
+  'site.bad_address':
+      'Das ist nicht die Adresse einer Feld- oder Spielseite (https://…/f/…).',
+  'site.confirm_text':
+      'Du meldest dich gleich mit deinem Konto bei {host} an. Mach nur weiter, '
+      'wenn das die Website des Felds ist, auf dem du spielst: Wer den Link '
+      'erstellt hat, könnte eine andere Website angegeben haben.',
+  'site.confirm': 'Das ist die Website, weiter',
+  'site.login_at': 'Bei {host} anmelden',
+  'site.login_hint':
+      'Mit dem Konto, das du auf dieser Website erstellt hast. Die App behält '
+      'die Sitzung auf diesem Handy; das Passwort wird nicht gespeichert.',
+  'site.username': 'Benutzername',
+  'site.password': 'Passwort',
+  'site.login': 'Anmelden',
+  'site.need_login': 'Gib Benutzername und Passwort ein.',
+  'site.totp_text':
+      'Dieses Konto hat Zwei-Faktor-Authentifizierung: Gib den Code aus deiner '
+      'Authenticator-App ein.',
+  'site.code': '6-stelliger Code',
+  'site.logged_in': 'Mit dem Konto {user} bei {host}',
+  'site.logout': 'Abmelden',
+  'site.games': 'Spiele',
+  'site.no_games':
+      'Dieses Feld hat für die nächsten Tage keine Spiele veröffentlicht.',
+  'site.game_gone':
+      'Dieses Spiel ist nicht mehr veröffentlicht oder schon vorbei.',
+  'site.cancelled': 'Abgesagt',
+  'site.cancelled_reason': 'Dieses Spiel wurde abgesagt: {reason}',
+  'site.open_until': 'Anmeldung offen bis {when}',
+  'site.left': '{n} Plätze',
+  'site.opens': 'Anmeldung öffnet {when}',
+  'site.full': 'Ausgebucht',
+  'site.closed': 'Anmeldung geschlossen',
+  'site.no_online': 'Keine Online-Anmeldung: Frag die Orga des Felds.',
+  'site.reg.registered': 'Du bist für dieses Spiel angemeldet.',
+  'site.reg.checked_in': 'Du hast für dieses Spiel eingecheckt.',
+  'site.reg.no_show': 'Du bist zu diesem Spiel nicht gekommen.',
+  'site.reg.cancelled': 'Du hast deine Anmeldung storniert.',
+  'site.form': 'Anmeldung',
+  'site.form_change': 'Anmeldung ändern',
+  'site.name_hint': 'Der Name, den Orga und Marshals in diesem Spiel sehen.',
+  'site.replicas': 'Repliken, die du nutzt (bis zu {n})',
+  'site.class_not_here': '{class}: Diese Klasse gibt es auf diesem Feld nicht',
+  'site.too_many': 'Dieses Feld erlaubt bis zu {n} Repliken pro Person.',
+  'site.register': 'Anmelden',
+  'site.save': 'Änderungen speichern',
+  'site.changed': 'Anmeldung geändert.',
+  'site.cancel_reg': 'Anmeldung stornieren',
+  'site.cancel_title': 'Anmeldung stornieren?',
+  'site.cancel_text':
+      'Du gibst deinen Platz in {game} auf, und das Check-in-Ticket gilt nicht mehr.',
+  'site.cancel_yes': 'Anmeldung stornieren',
+  'site.data_note':
+      'Das Feld erhält den Namen, den du für das Spiel wählst, deinen '
+      'Teamwunsch, deine Verbandsnummer (wenn das Spiel danach fragt) und die '
+      'angemeldeten Repliken, und löscht sie 30 Tage nach dem Spiel.',
+  'site.show_ticket': 'Check-in-Ticket zeigen',
+  'site.no_ticket_here':
+      'Das Ticket dieser Anmeldung ist nicht auf diesem Handy. Fordere ein '
+      'neues an: Das alte gilt dann nicht mehr.',
+  'site.new_ticket': 'Neues Ticket anfordern',
+  'site.ticket': 'Check-in-Ticket',
+  'site.ticket_text':
+      'Zeig diesen Code am Feld einem Marshal oder checke in der App mit '
+      '„Am Feld einchecken" ein und wähle diese Anmeldung. Der Text des '
+      'Tickets:',
+  'site.copy': 'Text kopieren',
+  'site.copied': 'Kopiert.',
+  'site.ticket_secret':
+      'Wer dieses Ticket hat, kann an deiner Stelle einchecken: Teile es nicht.',
+  'site.my_tickets': 'Meine Tickets',
+  'site.no_tickets': 'Noch keine Tickets auf diesem Handy.',
+  'site.claim': 'ID dieses Handys verwenden',
+  'site.claim_text':
+      'Wenn du mit diesem Handy bei {field} eingecheckt hast, kann das Konto '
+      'dieselbe Spiel-ID übernehmen (deine Repliken und Chrono-Werte). Der '
+      'Controller des Felds bestätigt das bei seiner nächsten Synchronisation.',
+  'site.claim_pick': 'IDs dieses Handys',
+  'site.claim_at': 'Beim Controller {field}',
+  'site.claim_none': 'Dieses Handy hat noch an keinem Feld eingecheckt.',
+  'site.claim_send': 'Diese ID beanspruchen',
+  'site.claim_linked': 'Das Konto hat an diesem Feld schon die ID {id}.',
+  'site.claim.pending':
+      'Gesendet: wartet auf die Bestätigung durch den Controller des Felds.',
+  'site.claim.confirmed': 'Bestätigt.',
+  'site.claim.refused':
+      'Der Controller des Felds hat diese ID nicht bestätigt (ein anderes '
+      'Handy oder ein Check-in von Hand).',
+  'site.error': 'Die Website hat abgelehnt: {error}',
+  'site.err.offline':
+      'Die Website ist nicht erreichbar. Versuch es später nochmal.',
+  'site.err.login_required': 'Die Sitzung ist abgelaufen: Melde dich neu an.',
+  'site.err.invalid_credentials':
+      'Falscher Benutzername oder falsches Passwort.',
+  'site.err.invalid_code': 'Falscher Code. Versuch den nächsten.',
+  'site.err.invalid_totp_session':
+      'Der Code-Schritt ist abgelaufen: Gib dein Passwort erneut ein.',
+  'site.err.too_many_attempts': 'Zu viele Versuche: Warte kurz.',
+  'site.err.field_not_found': 'Diese Website hat kein solches Feld.',
+  'site.err.http_404':
+      'Diese Website hat keine Online-Anmeldung (ein älterer Server?).',
+  'site.err.scheduled_game_not_found': 'Dieses Spiel gibt es nicht mehr.',
+  'site.err.registration_not_found': 'Diese Anmeldung gibt es nicht mehr.',
+  'site.err.registration_closed':
+      'Die Anmeldung für dieses Spiel ist geschlossen.',
+  'site.err.game_full': 'Dieses Spiel ist ausgebucht.',
+  'site.err.already_registered': 'Du bist für dieses Spiel schon angemeldet.',
+  'site.err.not_registered': 'Diese Anmeldung ist nicht mehr gültig.',
+  'site.err.game_started': 'Das Spiel hat begonnen.',
+  'site.err.federation_number_required':
+      'Dieses Spiel verlangt eine Verbandsnummer.',
+  'site.err.display_name_invalid': 'Der Name muss 1 bis 32 Zeichen lang sein.',
+  'site.err.team_preference_invalid':
+      'Dieses Team gibt es in diesem Spiel nicht.',
+  'site.err.too_many_replicas': 'Zu viele Repliken für dieses Feld.',
+  'site.err.replica_class_invalid':
+      'Eine der Repliken hat eine Klasse, die es auf diesem Feld nicht gibt.',
+  'site.err.replicas_not_asked':
+      'Dieses Spiel fragt bei der Anmeldung nicht nach Repliken.',
+  'site.err.player_id_exists':
+      'Das Konto hat an diesem Feld schon eine Spiel-ID.',
+  'site.err.player_id_taken': 'Diese ID gehört zu einem anderen Konto.',
+  'site.err.player_secret_invalid': 'Das Geheimnis dieser ID ist ungültig.',
+  'checkin.registered': 'Online-Anmeldung',
+  'checkin.no_registration': 'Keine (spontan da)',
+  'checkin.registered_hint':
+      'Wenn du dich auf der Website des Felds angemeldet hast, wähle die '
+      'Anmeldung: Ihr Ticket geht mit dem Check-in mit.',
+  'checkin.ticket_other_id':
+      'Dieses Handy hat an diesem Feld schon eine andere ID. Nutze „ID dieses '
+      'Handys verwenden" in der Online-Anmeldung oder checke ohne die '
+      'Anmeldung ein.',
+};

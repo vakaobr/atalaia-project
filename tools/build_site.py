@@ -16,6 +16,7 @@ templates site/src/diagrams/<name>.svg, the script writes, each marked
     site/<folder>/index.html      each page in Portuguese (pt-PT), the default
                                   language: site/index.html is the main page
     site/en/<folder>/index.html   each page in English
+    site/de/<folder>/index.html   each page in German (decision P5H-3)
     site/img/diagrams/<name>-<layout>-<code>.svg   each diagram, per layout and language
     site/sitemap.xml              every page in every language, with its translations
 
@@ -96,12 +97,20 @@ class Language:
     html_lang: str  # <html lang> and hreflang
     og_locale: str
     path: str  # the language's folder relative to the site root: "" or "en/"
+    # The language whose social preview image (img/og-<code>.jpg, with its title painted in) the
+    # pages use: its own, or English's while it has none (P5H-3).
+    og_image: str = ""
+
+    @property
+    def og_code(self) -> str:
+        return self.og_image or self.code
 
 
 # The first language is the default, served at the site root.
 LANGUAGES = (
     Language("pt", "pt-PT", "pt_PT", ""),
     Language("en", "en", "en_GB", "en/"),
+    Language("de", "de", "de_DE", "de/", og_image="en"),
 )
 
 
@@ -114,11 +123,11 @@ class Page:
 # Every page, in every language. A folder is "" (the language's main page) or a
 # slug in that language ending in "/". Keep the slugs stable: other sites link to them.
 PAGES = (
-    Page("index", {"pt": "", "en": ""}),
-    Page("modes", {"pt": "modos/", "en": "modes/"}),
-    Page("radio", {"pt": "radio/", "en": "radio/"}),
-    Page("roadmap", {"pt": "roadmap/", "en": "roadmap/"}),
-    Page("glossary", {"pt": "glossario/", "en": "glossary/"}),
+    Page("index", {"pt": "", "en": "", "de": ""}),
+    Page("modes", {"pt": "modos/", "en": "modes/", "de": "modi/"}),
+    Page("radio", {"pt": "radio/", "en": "radio/", "de": "funk/"}),
+    Page("roadmap", {"pt": "roadmap/", "en": "roadmap/", "de": "roadmap/"}),
+    Page("glossary", {"pt": "glossario/", "en": "glossary/", "de": "glossar/"}),
 )
 
 # page.* values that come from the page's meta.<page>.* texts: value -> (key, fallback key).
@@ -303,7 +312,7 @@ def page_values(page: Page, lang: Language, texts: dict[str, str], file_name: st
         "page.name": page.name,
         "page.root": "../" * here.count("/"),
         "page.url.self": SITE_URL + here,
-        "page.og_image": f"{SITE_URL}img/og-{lang.code}.jpg",
+        "page.og_image": f"{SITE_URL}img/og-{lang.og_code}.jpg",
     }
     for other in LANGUAGES:
         # The same page in each language, for hreflang and the language switcher.
@@ -403,10 +412,11 @@ def resolve(address: str, here: str) -> tuple[str, str | None]:
     return target, (fragment if hash_sign else None)
 
 
-def check_addresses(rendered: dict[str, tuple[Links, str, str]]) -> None:
+def check_addresses(rendered: dict[str, tuple[Links, str, str]], generated: set[str]) -> None:
     """Fails unless every address that stays on the site leads to a page or a published file,
     and every #id to an id on that page. rendered maps each page's site path to its links,
-    its folder and how to name it in a message."""
+    its folder and how to name it in a message; generated holds the site paths of the other files
+    this build writes (the diagrams), which count as published before they are written."""
     problems = []
     for path, (links, here, where) in rendered.items():
         bad = []
@@ -424,7 +434,7 @@ def check_addresses(rendered: dict[str, tuple[Links, str, str]]) -> None:
                 continue
             if not target.endswith("index.html") and f"{target}/index.html" in rendered:
                 bad.append(f"line {line}: {address} leads to a page's folder; end it with /")
-            elif target.split("/")[0] in UNPUBLISHED or not (SITE / target).is_file():
+            elif target.split("/")[0] in UNPUBLISHED or not ((SITE / target).is_file() or target in generated):
                 bad.append(f"line {line}: {address} leads to site/{target}, which is not a page "
                            f"or a published file")
             elif fragment:
@@ -739,7 +749,7 @@ def build() -> dict[Path, str]:
             rendered[out.relative_to(SITE).as_posix()] = (parser, folder(page, lang), where)
             external[page.name, lang] = parser.external
             pages[out] = text
-    check_addresses(rendered)
+    check_addresses(rendered, {out.relative_to(SITE).as_posix() for lang in LANGUAGES for out, _, _ in variants[lang]})
 
     first = LANGUAGES[0]
     for page in PAGES:

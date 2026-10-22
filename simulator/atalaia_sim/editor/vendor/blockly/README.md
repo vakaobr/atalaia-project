@@ -18,6 +18,7 @@ The mode editor has no build step and must work with no network (ADR-P5-1 as ame
 | `lua_compressed.js` | `lua_compressed.js` (the Lua generator the editor's generator extends: `window.lua`) | `7426d6fb2686e5c3009bdcf078ab946e1bc3151ba2a40b82f37bb7cac3436d4a` |
 | `msg/en.js` | `msg/en.js` (Blockly's own texts in English) | `155b0e29ad2bd59ad463ebde5c3ace7685ea5c25d019e950aab625b3259d7e02` |
 | `msg/pt.js` | `msg/pt.js` (in European Portuguese; `pt-br.js` is not used) | `6ff9ce8534c68b16c3ff463d598a7bd1b6d28c534e9eec038d349f13f9478579` |
+| `msg/de.js` | `msg/de.js` (in German, decision P5H-2) | `dfddfebd68232fcb47771881e57c99f9fe5514bfbf33ed4a9036007508f5e0d4` |
 | `media/1x1.gif` | `media/` | `a1d88b2c952b790f5f23473c63ef99473327d02e11ebe174799ad912db08f629` |
 | `media/click.mp3` | `media/` | `1048f2539ac47e4eaa4bd1688968c0d7b9956bd6fef507644ee5131924c6517c` |
 | `media/delete-icon.svg` | `media/` | `3eee02b06f476ce746566808178543389e53cd4e9d7fd32b69e329eff4fc71ef` |

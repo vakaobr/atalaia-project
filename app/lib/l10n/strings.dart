@@ -1,24 +1,30 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-/// The app's texts in European Portuguese (the default) and English, like
-/// the GM console's (controller/console/src/i18n/) and the project page's
-/// (site/i18n/): flat keys, `{name}` placeholders. Portuguese is written
-/// as players say it, addressing the reader as "tu" and naming people
-/// inclusively ("quem joga", "participante"). Material's own strings come
-/// from flutter_localizations (pt_PT and en). The tests check that both
-/// languages have the same keys and placeholders and that every key the
-/// code uses exists.
+/// The app's texts in European Portuguese (the default), English and
+/// German, like the GM console's (controller/console/src/i18n/) and the
+/// project page's (site/i18n/): flat keys, `{name}` placeholders.
+/// Portuguese is written as players say it, addressing the reader as "tu"
+/// and naming people inclusively ("quem joga", "participante"); German
+/// with "du" and neutral forms ("Spielende", "die Orga"), drafted by an AI
+/// model and waiting for a native-speaking player's review
+/// (docs/translations/). Material's own strings come from
+/// flutter_localizations (pt_PT, en and de). The tests check that
+/// Portuguese and English have the same keys and placeholders, that every
+/// key the code uses exists, and that German has no key English lacks; a
+/// key German lacks shows in English (decision P5H-2).
 library;
 
 import 'package:flutter/widgets.dart';
 
+import 'strings_de.dart';
 import 'strings_en.dart';
 import 'strings_pt.dart';
 
 enum AppLanguage {
   pt(Locale('pt', 'PT'), ptStrings),
-  en(Locale('en'), enStrings);
+  en(Locale('en'), enStrings),
+  de(Locale('de'), deStrings);
 
   const AppLanguage(this.locale, this.table);
 
@@ -63,10 +69,11 @@ class Strings {
   /// names it.
   String team(String name) => tOr('team.$name', name);
 
-  /// [v] with [decimals] decimals, with a decimal comma in Portuguese.
+  /// [v] with [decimals] decimals, with a decimal comma in Portuguese and
+  /// German.
   String number(double v, int decimals) {
     final t = v.toStringAsFixed(decimals);
-    return language == AppLanguage.pt ? t.replaceAll('.', ',') : t;
+    return language == AppLanguage.en ? t : t.replaceAll('.', ',');
   }
 
   static Strings of(BuildContext context) =>

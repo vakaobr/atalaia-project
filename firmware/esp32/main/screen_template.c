@@ -9,8 +9,9 @@
  * (6 px and 4 px gaps) with their children centred. "fill" takes the room
  * left along the parent's direction (flex grow) and the whole parent across
  * it. Fonts: Montserrat 14, 20, 28 and 48 (font_size picks the nearest,
- * 20 by default) with ASCII and the letters of Portuguese (main/fonts,
- * decision BN-14), so texts are folded first (other accents dropped,
+ * 20 by default) with ASCII and the letters of Portuguese and German
+ * (main/fonts, decisions BN-14, P5H-4), so texts are folded first (other
+ * accents dropped,
  * screen_template_fold_text). A progress bar is a track with a filled part,
  * 200x12 by default. Colours not set: white text on the dark background,
  * accent bars.
@@ -89,9 +90,12 @@ static const char latin1_base[] =
 /* The letters the box's fonts have (tools/gen_box_fonts.py): kept as they are. */
 static bool in_fonts_c3(unsigned char d)
 {
-    static const unsigned char kept[] = {0x80, 0x81, 0x82, 0x83, 0x87, 0x89, 0x8A, 0x8D,
-                                         0x93, 0x94, 0x95, 0x9A, 0xA0, 0xA1, 0xA2, 0xA3,
-                                         0xA7, 0xA9, 0xAA, 0xAD, 0xB3, 0xB4, 0xB5, 0xBA};
+    static const unsigned char kept[] = {/* Portuguese */
+                                         0x80, 0x81, 0x82, 0x83, 0x87, 0x89, 0x8A, 0x8D, 0x93, 0x94,
+                                         0x95, 0x9A, 0xA0, 0xA1, 0xA2, 0xA3, 0xA7, 0xA9, 0xAA, 0xAD,
+                                         0xB3, 0xB4, 0xB5, 0xBA,
+                                         /* German: Ä Ö Ü ß ä ö ü (P5H-4) */
+                                         0x84, 0x96, 0x9C, 0x9F, 0xA4, 0xB6, 0xBC};
     for (size_t i = 0; i < sizeof(kept); i++) {
         if (kept[i] == d) return true;
     }

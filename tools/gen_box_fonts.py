@@ -5,9 +5,11 @@
 
 They are LVGL's built-in Montserrat Medium fonts (sizes 14, 20, 28 and 48, 4 bits per pixel,
 ASCII, the degree sign, the bullet and LVGL's symbols) with the letters European Portuguese
-needs added (decision BN-14: box screens in Portuguese). The command is LVGL's own
-(lvgl/scripts/built_in_font/built_in_font_gen.py, LVGL 9.2.2) with more ranges, so every
-ASCII glyph, and so every English screen, is drawn exactly as before.
+and German need added (decisions BN-14 and P5H-4: box screens in Portuguese and German). The
+command is LVGL's own (lvgl/scripts/built_in_font/built_in_font_gen.py, LVGL 9.2.2) with more
+ranges, so every ASCII glyph, and so every English screen, is drawn exactly as before.
+clang-format (tools/format.sh) then rewraps the licence header the way the committed files
+have it.
 
 Needs Node.js with lv_font_conv 1.5.2 (npm install lv_font_conv@1.5.2) and LVGL 9.2.2's
 scripts/built_in_font/ (Montserrat-Medium.ttf, FontAwesome5-Solid+Brands+Regular.woff):
@@ -33,9 +35,10 @@ SIZES = (14, 20, 28, 48)
 # accent on a capital or a cedilla may reach a pixel or two past its line.
 METRICS = {14: (16, 3), 20: (22, 4), 28: (30, 5), 48: (52, 9)}
 # ASCII, degree sign and bullet as LVGL's built-in fonts; then a and o ordinals, the middle dot
-# and the accented letters of Portuguese.
+# and the accented letters of Portuguese; then the umlauts and the sharp s of German (P5H-4).
 LATIN = "0x20-0x7F,0xB0,0x2022,0xAA,0xB7,0xBA,0xC0-0xC3,0xC7,0xC9,0xCA,0xCD,0xD3-0xD5,0xDA," \
-        "0xE0-0xE3,0xE7,0xE9,0xEA,0xED,0xF3-0xF5,0xFA"
+        "0xE0-0xE3,0xE7,0xE9,0xEA,0xED,0xF3-0xF5,0xFA," \
+        "0xC4,0xD6,0xDC,0xDF,0xE4,0xF6,0xFC"
 # LVGL's built-in symbols (LV_SYMBOL_*), as built_in_font_gen.py lists them.
 SYMBOLS = ("61441,61448,61451,61452,61452,61453,61457,61459,61461,61465,61468,61473,61478,61479,"
            "61480,61502,61507,61512,61515,61516,61517,61521,61522,61523,61524,61543,61544,61550,"

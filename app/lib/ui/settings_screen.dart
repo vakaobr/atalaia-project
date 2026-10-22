@@ -37,14 +37,11 @@ class SettingsScreen extends StatelessWidget {
           SegmentedButton<AppLanguage>(
             key: const Key('language'),
             segments: [
-              ButtonSegment(
-                value: AppLanguage.pt,
-                label: Text(s.t('settings.lang_pt')),
-              ),
-              ButtonSegment(
-                value: AppLanguage.en,
-                label: Text(s.t('settings.lang_en')),
-              ),
+              for (final l in AppLanguage.values)
+                ButtonSegment(
+                  value: l,
+                  label: Text(s.t('settings.lang_${l.code}')),
+                ),
             ],
             selected: {st.language},
             onSelectionChanged: (v) => app.update((x) => x.language = v.single),

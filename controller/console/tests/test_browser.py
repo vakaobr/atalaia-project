@@ -1254,6 +1254,32 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("tab-nodes")).to_have_text("Caixas")
         self.assertEqual(page.evaluate("document.documentElement.lang"), "pt-PT")
 
+    def test_german_and_english_for_what_it_lacks(self):
+        """Plan phase 10 (P5H-2): German, and a key its table lacks (another change's new text)
+        shown in English, never as the key; a German console's game gets German boxes."""
+        page = self.page(service_workers="block")  # so that the route below sees the request
+        de = json.loads((HERE.parent / "src" / "i18n" / "de.json").read_text(encoding="utf-8"))
+        del de["tabs"]["presets"]
+        page.route("**/i18n/de.json", lambda route: route.fulfill(
+            status=200, content_type="application/json", body=json.dumps(de)))
+        page.get_by_test_id("token").fill(GM)
+        page.get_by_test_id("login").click()
+        page.get_by_test_id("lang").first.select_option("de")
+        expect(page.get_by_test_id("tab-nodes")).to_have_text("Boxen")
+        expect(page.get_by_test_id("tab-presets")).to_have_text("Presets")  # English's text
+        self.assertEqual(page.evaluate("document.documentElement.lang"), "de")
+        page.get_by_test_id("tab-game").click()
+        page.get_by_test_id("game-name").fill("Sonntag")
+        page.get_by_test_id("game-source").select_option(f"mode:{DOMINATION}")
+        page.get_by_test_id("game-create").click()
+        expect(page.get_by_test_id("game-state")).to_have_text(de["game"]["states"]["ready"])
+        page.get_by_test_id("tab-join").click()
+        page.get_by_test_id("join-generate").click()
+        j = join.decode(join.from_text(page.get_by_test_id("join-text").input_value()), JOIN_KEY)
+        self.assertEqual(j["lang"], "de")
+        page.get_by_test_id("tab-settings").click()
+        expect(page.get_by_test_id("box-language-game")).to_contain_text("Deutsch")
+
     def test_read_token_sees_no_gm_controls(self):
         self.field.create_game(start=True)
         page = self.console(READ)

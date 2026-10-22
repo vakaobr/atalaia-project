@@ -20,7 +20,9 @@ import {
     ROLE_INPUTS, testNodes,
 } from './generator.js';
 
-const LANGS = ['pt', 'en'];
+const LANGS = ['pt', 'en', 'de'];
+// <html lang> for each (German: decision P5H-2; a text it lacks shows in English).
+const HTML_LANG = { pt: 'pt-PT', en: 'en', de: 'de' };
 const LANG_KEY = 'atalaia.editor.lang';
 const DRAFT_KEY = 'atalaia.editor.draft';
 export const FORMAT = 'atalaia-mode-editor';
@@ -70,14 +72,18 @@ function storageSet(key, value) {
     }
 }
 
-/** ?lang=, then the remembered language, then the browser's (Portuguese or English). */
+/** ?lang=, then the remembered language, then the browser's first one the editor has, else English. */
 function pickLanguage() {
     const asked = new URLSearchParams(window.location.search).get('lang');
     if (LANGS.includes(asked)) return asked;
     const kept = storageGet(LANG_KEY);
     if (LANGS.includes(kept)) return kept;
     const browser = (navigator.languages || [navigator.language || 'en']).map((l) => String(l).toLowerCase());
-    return browser.find((l) => l.startsWith('pt') || l.startsWith('en'))?.startsWith('pt') ? 'pt' : 'en';
+    for (const l of browser) {
+        const code = LANGS.find((c) => l === c || l.startsWith(`${c}-`));
+        if (code) return code;
+    }
+    return 'en';
 }
 
 function loadScript(src) {
@@ -131,7 +137,7 @@ function theme() {
 async function main() {
     const lang = pickLanguage();
     storageSet(LANG_KEY, lang);
-    document.documentElement.lang = lang === 'pt' ? 'pt-PT' : 'en';
+    document.documentElement.lang = HTML_LANG[lang];
     if (lang !== 'en') await loadScript(`vendor/blockly/msg/${lang}.js`);
     const en = await fetchJson('i18n/en.json');
     const dict = lang === 'en' ? en : await fetchJson(`i18n/${lang}.json`);

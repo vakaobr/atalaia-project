@@ -10,7 +10,8 @@
  * with firmware/esp32/test/screens/oled/<name>.png.
  *
  * ATALAIA_UPDATE_SCREENS=1 rewrites the references, as for test_screens.c.
- * A case whose name ends in "_pt" is drawn in Portuguese (box_text.h), as there.
+ * A case whose name ends in "_pt" is drawn in Portuguese, "_de" in German
+ * (box_text.h), as there.
  */
 #define _POSIX_C_SOURCE 200809L
 
@@ -77,6 +78,23 @@ static const oled_case_t cases[] = {
     {"preset_select_pt", NULL, "preset_select",
      "{\"presets\":[\"Bomba\",\"Domínio\"],\"selected\":2,\"page\":1,\"pages\":2}"},
     {"start_confirm_pt", NULL, "start_confirm", "{\"label\":\"Bomba\",\"timer_s\":600}"},
+    /* German (P5H-4). */
+    {"pin_entry_locked_de", NULL, "pin_entry", "{\"digits\":0,\"error\":false,\"locked_min\":60}"},
+    {"pin_entry_no_pin_de", NULL, "pin_entry", "{\"digits\":0,\"error\":false,\"no_pin\":true}"},
+    {"pin_entry_wrong_de", NULL, "pin_entry", "{\"digits\":0,\"error\":true}"},
+    {"waiting_invited_de", NULL, "waiting", "{\"game\":3073,\"role\":\"zone\",\"invited\":true}"},
+    {"playing_de", DOM, "playing", "{\"game\":3073,\"role\":\"zone\"}"},
+    {"neutral_de", DOM, "neutral", "{}"},
+    {"captured_de", DOM, "captured", "{\"team\":\"red\",\"points\":12,\"since\":95}"},
+    {"final_score_de", DOM, "final_score", "{\"owner\":\"red\",\"points\":12}"},
+    {"ready_picker_de", NULL, "ready", "{\"picker\":true}"},
+    {"standby_de", BOMB, "standby", "{\"arm\":\"red\"}"},
+    {"standby_arming_de", BOMB, "standby", "{\"arm\":\"red\",\"progress\":0.6}"},
+    {"countdown_defusing_de", BOMB, "countdown", "{\"left\":231,\"defuse\":0.4}"},
+    {"preset_select_de", NULL, "preset_select",
+     "{\"presets\":[\"Bombe\",\"Domination\"],\"selected\":2,\"page\":1,\"pages\":2}"},
+    {"timer_adjust_de", NULL, "timer_adjust", "{\"timer_s\":600}"},
+    {"start_confirm_de", NULL, "start_confirm", "{\"label\":\"Bombe\",\"timer_s\":600}"},
     {"status_pair_locked", NULL, "status",
      "{\"title\":\"Pair locked\",\"pairing\":\"restart the box\"}"},
     {"status_pair", NULL, "status",
@@ -188,7 +206,8 @@ static void capture(lv_obj_t *scr)
 static void render(const oled_case_t *c)
 {
     size_t n = strlen(c->name);
-    box_lang_set_code(n > 3 && strcmp(c->name + n - 3, "_pt") == 0 ? "pt" : "");
+    const char *suffix = n > 3 ? c->name + n - 3 : "";
+    box_lang_set_code(strcmp(suffix, "_pt") == 0 ? "pt" : strcmp(suffix, "_de") == 0 ? "de" : "");
     lv_obj_t *scr = lv_screen_active();
     fake_ms += 10000;
     if (!c->template_name) {

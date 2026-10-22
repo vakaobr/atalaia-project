@@ -27,7 +27,7 @@ from fastapi.testclient import TestClient
 from support import FakeModem, config
 from atalaia_controller.api import (CONSOLE_DIR, FIELD_MAP_HEADERS, FIELD_MAP_ORIGINS, SECURITY_HEADERS, Auth,
                                    create_app)
-from atalaia_controller.engine import Controller
+from atalaia_controller.engine import BOX_LANGUAGES, Controller
 from atalaia_controller.firmware_release import REPORT_RESULTS
 from atalaia_controller.store import Store
 from atalaia_controller.ws import Hub
@@ -253,7 +253,8 @@ class ConsoleFilesTests(unittest.TestCase):
                               ("controller.failover_modes", ("manual", "auto")),
                               ("nodes.tiers", ("full", "reduced", "proxy")),
                               ("tabs", ("game", "field", "nodes", "join", "presets", "feed", "controller")),
-                              ("app", ("lang_pt", "lang_en")),
+                              ("app", ("lang_pt", "lang_en", "lang_de")),
+                              ("box_language.choices", BOX_LANGUAGES),
                               ("firmware.states", ("sent", "installed", "done", "failed", "rolled_back", "timeout",
                                                    "cancelled")),
                               ("firmware.reasons", tuple(r for r in REPORT_RESULTS if r != "installed")
@@ -267,6 +268,16 @@ class ConsoleFilesTests(unittest.TestCase):
         text = " ".join(pt.values()).lower()
         for br in ("celular", "tela ", "time ", "você", "arquivo", "usuário"):
             self.assertNotIn(br, text, br)
+        # German (plan phase 10, P5H-2): every language the console offers has a table; German
+        # may lack a key (the console shows English: ui.js), never have one English lacks.
+        langs = re.search(r"export const LANGS = \[([^\]]*)\]", (SRC / "ui.js").read_text(encoding="utf-8"))
+        self.assertEqual(re.findall(r"'(\w+)'", langs.group(1)), ["pt", "en", "de"])
+        de = flat(json.loads((SRC / "i18n" / "de.json").read_text(encoding="utf-8")))
+        self.assertEqual(set(de) - set(en), set())
+        for k, v in de.items():
+            self.assertTrue(isinstance(v, str) and v.strip(), f"de: {k} is empty")
+            self.assertEqual(sorted(re.findall(r"\{(\w+)\}", v)), sorted(re.findall(r"\{(\w+)\}", en[k])), k)
+        self.assertIn("i18n/de.json", (SRC / "sw.js").read_text(encoding="utf-8"))
 
     def test_scenario_blocks_have_their_texts(self):
         """The scenario blocks' texts (phase 5 plan phase 7): every tr('...') of the blocks, the

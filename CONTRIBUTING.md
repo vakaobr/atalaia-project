@@ -103,7 +103,7 @@ badge belongs to one version, so a new version is reviewed again.
 - Describe what you changed, why, and how you tested it.
 - Add or update tests: C code in `core/tests/`, modes in `modes/<mode>/tests/`, the app's Dart in `app/test/` (`python tools/docker_app.py`).
 - Add an `SPDX-License-Identifier` header to new source files.
-- Write code, comments, commit messages and docs in English. Translations of user-facing text are welcome in `i18n/` folders.
+- Write code, comments, commit messages and docs in English. Translations of user-facing text are welcome: see [docs/translations/](docs/translations/README.md) for where each part's texts are, the glossary and how a translation is reviewed.
 
 ## Commit messages
 

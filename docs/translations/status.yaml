@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+#
+# The project's languages and the state of each translation (docs/translations/README.md).
+# tools/i18n_check.py reads it: a "complete" language must have every key of English in every
+# domain it lists (a missing key fails the check); any other language may lack keys, which then
+# show in English, and the check lists them as warnings (decision P5H-2). Every language must
+# have the same placeholders as English and no key English lacks.
+#
+# review: who wrote it and who checked it. A translation drafted by a machine or an AI model
+# says so here until a native speaker who plays has reviewed it (decision P5H-5); a release
+# note names every language still "draft".
+
+languages:
+  en:
+    name: English
+    status: complete
+    review: the base language; every text is written in English first
+  pt:
+    name: Português (Portugal)
+    status: complete
+    review: written by the maintainer and the project's contributors, European Portuguese
+  de:
+    name: Deutsch
+    status: draft
+    drafted: 2026-10-22
+    review: >-
+      drafted by an AI model (Claude) on 2026-10-22, not yet reviewed by a native-speaking player.
+      Review it with docs/translations/glossary.md, then set status to complete and name the
+      reviewer here.
+    reviewed_by: null
+    # Where German exists. Mode manifests (mode.yaml i18n) and the site server's pages have none
+    # yet (decisions P5H-7, P5H-8).
+    domains: [site, console, editor, app, box]

@@ -22,7 +22,7 @@ On a phone, "Add to home screen" installs it as an app (PWA, display standalone)
 
 ## Languages
 
-European Portuguese by default, and English; the choice is remembered. The texts are in [`src/i18n/pt.json`](src/i18n/pt.json) and [`src/i18n/en.json`](src/i18n/en.json), with the project page's terms (caixa / box, equipa / team, controlador de campo / field controller, organização). Both files must have the same keys (checked by `controller/tests/test_console.py`); to add a language, copy `en.json`, translate it and add its code to `LANGS` in [`src/ui.js`](src/ui.js).
+European Portuguese by default, English and German (drafted by an AI model, to be reviewed: [docs/translations/](../../docs/translations/README.md)); the choice is remembered. The texts are in [`src/i18n/pt.json`](src/i18n/pt.json), [`src/i18n/en.json`](src/i18n/en.json) and [`src/i18n/de.json`](src/i18n/de.json), with the project page's terms (caixa / box, equipa / team, controlador de campo / field controller, organização). Portuguese and English must have the same keys (checked by `controller/tests/test_console.py`); German may lack a newer key, which then shows in English (`tools/i18n_check.py` lists them). To add a language, copy `en.json`, translate it and add its code to `LANGS` and `HTML_LANG` in [`src/ui.js`](src/ui.js) and to `sw.js`.
 
 ## What is in it
 

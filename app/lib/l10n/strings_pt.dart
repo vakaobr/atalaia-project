@@ -42,6 +42,7 @@ const Map<String, String> ptStrings = {
   'settings.language': 'Língua',
   'settings.lang_pt': 'Português',
   'settings.lang_en': 'English',
+  'settings.lang_de': 'Deutsch',
   'settings.theme': 'Aspeto',
   'settings.theme_system': 'Do sistema',
   'settings.theme_dark': 'Escuro',

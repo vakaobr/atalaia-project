@@ -599,6 +599,17 @@ class EditorTests(unittest.TestCase):
         expect(page.locator("body")).to_have_attribute("data-ready", "true")
         expect(page.locator("#tab-mode")).to_have_text("Modo")
 
+    def test_page_in_german(self):
+        """Plan phase 10 (P5H-2): the editor's German table and Blockly's msg/de.js."""
+        page = self.open("de")
+        expect(page.locator("html")).to_have_attribute("lang", "de")
+        expect(page.locator("#tab-node")).to_have_text("Boxen (node.lua)")
+        expect(page.locator("#ws-node .blocklyToolbox")).to_contain_text("Ereignisse")
+        expect(page.locator("#ws-node .blocklyToolbox")).to_contain_text("Box-Hardware")
+        page.locator("#ws-node .blocklyToolboxCategory", has_text="Logik").click()
+        expect(page.locator("#ws-node .blocklyToolboxFlyout")).to_contain_text("sonst")
+        expect(page.locator("#lang")).to_have_value("de")
+
     def test_an_example_through_the_page(self):
         page = self.open("en")
         page.select_option("#example", "holdall")

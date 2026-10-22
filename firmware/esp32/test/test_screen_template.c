@@ -153,14 +153,18 @@ static void fold_is(const char *in, const char *want)
     CHECK(strcmp(buf, want) == 0);
 }
 
-/* The fonts have ASCII and the letters of Portuguese (BN-14): those stay, other accents go. */
+/* The fonts have ASCII and the letters of Portuguese (BN-14) and German (P5H-4): those stay,
+ * other accents go. */
 static void test_text_fold(void)
 {
     fold_is("L\xc3\xaa a tua etiqueta", "L\xc3\xaa a tua etiqueta");
     fold_is("Mant\xc3\xa9m premido para tratar", "Mant\xc3\xa9m premido para tratar");
     fold_is("A\xc3\x87\xc3\x83O \xc3\xa7\xc3\xa3 \xc3\xbf",
             "A\xc3\x87\xc3\x83O \xc3\xa7\xc3\xa3 y");
-    fold_is("\xc3\x91o\xc3\xb1o \xc3\xa8 \xc3\xbc", "Nono e u");
+    fold_is("\xc3\x91o\xc3\xb1o \xc3\xa8 \xc3\xbc", "Nono e \xc3\xbc");
+    /* Ä Ö Ü ä ö ü ß */
+    fold_is("\xc3\x84\xc3\x96\xc3\x9c \xc3\xa4\xc3\xb6\xc3\xbc\xc3\x9f",
+            "\xc3\x84\xc3\x96\xc3\x9c \xc3\xa4\xc3\xb6\xc3\xbc\xc3\x9f");
     fold_is("1.\xc2\xba \xc2\xab x \xc2\xbb 20\xc2\xb0 \xc2\xb7 \xe2\x80\xa2",
             "1.\xc2\xba \" x \" 20\xc2\xb0 \xc2\xb7 \xe2\x80\xa2");
     fold_is("a \xe2\x80\x94 b\xe2\x80\xa6 \xe2\x80\x9cq\xe2\x80\x9d \xe2\x80\x99",
