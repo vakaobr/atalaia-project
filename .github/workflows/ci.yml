@@ -330,6 +330,22 @@ jobs:
         run: python tools/field_frame_vectors.py --check
       - name: Pairing vectors are up to date
         run: python tools/pairing_vectors.py --check
+      - name: The mode package vectors are up to date
+        run: python tools/mode_package_vectors.py --check
+      - name: The registry's JSON Schemas accept their examples and reject the invalid ones
+        working-directory: registry/schema
+        run: |
+          check-jsonschema --check-metaschema index.schema.json revoked.schema.json
+          check-jsonschema --schemafile index.schema.json examples/index.json
+          check-jsonschema --schemafile revoked.schema.json examples/revoked.json
+          for f in examples/invalid/*.json; do
+            schema=index.schema.json
+            case "$f" in examples/invalid/revoked_*) schema=revoked.schema.json ;; esac
+            if check-jsonschema --schemafile "$schema" "$f" > /dev/null; then
+              echo "::error file=registry/schema/$f::the schema accepts this invalid example"
+              exit 1
+            fi
+          done
       - name: The project page is up to date in every language
         run: python tools/build_site.py --check
       - name: The wiring diagrams match the firmware's pin defaults
@@ -364,6 +380,37 @@ jobs:
           cmake --build build
       - name: Test
         run: ctest --test-dir build --output-on-failure
+
+  sandbox-escape:
+    # Phase 5 plan phase 5 (AC-12): scripts that try to leave the Lua sandbox, crash the runtime
+    # or run without limits, as box and controller scripts, under ASan and UBSan; then the same
+    # through the simulator's ctypes bindings. The registry's CI runs this battery too.
+    name: Sandbox-escape battery
+    runs-on: ubuntu-latest
+    env:
+      ATALAIA_REQUIRE_ALL: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libmbedtls-dev
+          pip install -r simulator/requirements.txt
+      - name: The C battery under ASan and UBSan
+        run: |
+          cmake -S core -B build-asan -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
+          cmake --build build-asan --target test_sandbox_escape
+          ctest --test-dir build-asan -R sandbox_escape --output-on-failure
+      - name: Through the simulator (box and field scripts, a mode playing on)
+        run: |
+          cmake -S core -B build -DCMAKE_BUILD_TYPE=Debug -DATALAIA_SHARED=ON -DBUILD_TESTING=OFF
+          cmake --build build
+          cd simulator
+          ATALAIA_CORE_LIB="$PWD/../build/libatalaia_core.so" python -m unittest tests.test_sandbox_escape -v
 
   format:
     name: Formatting (clang-format, StyLua)

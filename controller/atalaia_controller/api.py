@@ -11,6 +11,10 @@ which browsers cannot give headers, also takes ``?token=``.
     GET  /api/v1/nodes                     nodes, capabilities, health (live game, or ?game=)
     GET  /api/v1/modes                     installed mode packages and their parameters
     POST /api/v1/modes                     upload a mode package {"files": {name: text}}
+    GET  /api/v1/mode-packages             GM: trusted mode keys and the index's signed packages (?refresh=1)
+    POST /api/v1/mode-packages             GM: upload a signed package (the archive; ?id&version&kind&min_tier
+                                           &signature&key_id from its .release.json; protocol/mode-packages.md)
+    POST /api/v1/mode-packages/install     GM: install a signed package from the index {"id", "version"}
     POST /api/v1/scenarios/check           a scenario manifest's problems {"manifest": text} (GM or read token)
     GET|POST /api/v1/scenarios             installed scenarios / GM: compile and install {"manifest": text}
     GET  /api/v1/scenarios/{id}            GM: its manifest and generated package (mode.yaml, field.lua)
@@ -296,14 +300,50 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     def nodes(game: Optional[int] = None) -> list[dict[str, Any]]:
         return controller.nodes(game)
 
+    def signed_modes() -> Any:
+        if controller.signed_modes is None:
+            raise HTTPException(503, "signed mode packages are not set up on this controller")
+        return controller.signed_modes
+
+    def mode_api(m: Any) -> dict[str, Any]:
+        out = m.to_api()
+        return controller.signed_modes.annotate(out) if controller.signed_modes is not None else out
+
     @app.get("/api/v1/modes", dependencies=[Depends(require_console)])
     def modes() -> list[dict[str, Any]]:
-        return [m.to_api() for m in controller.modes.all()]
+        return [mode_api(m) for m in controller.modes.all()]
 
     @app.post("/api/v1/modes", status_code=201, dependencies=[Depends(require_gm)])
     def upload_mode(body: Any = Body(None)) -> dict[str, Any]:
         files = body_map(body).get("files")
-        return controller.modes.install(files).to_api()
+        out = mode_api(controller.modes.install(files))
+        controller._emit({"type": "modes"})
+        return out
+
+    # --- signed mode packages (signed_modes.py, protocol/mode-packages.md) ----------------
+
+    @app.get("/api/v1/mode-packages", dependencies=[Depends(require_gm)])
+    def mode_packages(refresh: bool = False) -> dict[str, Any]:
+        return signed_modes().status(refresh)
+
+    @app.post("/api/v1/mode-packages", status_code=201, dependencies=[Depends(require_gm)])
+    async def mode_package_upload(request: Request, id: str = "", version: str = "", kind: str = "",
+                                  min_tier: str = "", signature: str = "", key_id: str = "") -> dict[str, Any]:
+        from .mode_package import MAX_PACKAGE_BYTES  # noqa: PLC0415
+
+        data, _ = await read_upload(request, MAX_PACKAGE_BYTES, "mode package")
+        fields = {"id": id, "version": version, "kind": kind, "min_tier": min_tier, "signature": signature,
+                  "key_id": key_id or None}
+        out = signed_modes().upload(data, fields)
+        controller._emit({"type": "modes"})
+        return out
+
+    @app.post("/api/v1/mode-packages/install", status_code=201, dependencies=[Depends(require_gm)])
+    def mode_package_install(body: Any = Body(None)) -> dict[str, Any]:
+        b = body_map(body)
+        out = signed_modes().install_from_index(b.get("id"), b.get("version"))
+        controller._emit({"type": "modes"})
+        return out
 
     # --- scenarios (plan phase 8, scenario_service.py) ----------------------------------
 

@@ -110,6 +110,17 @@
     update_timeout_s = 600.0    # an update not heard of (report or HELLO) this long counts as timed out
     variants = ["box"]          # the image variants accepted ("box-bench" only for a test on the desk)
 
+    [modes]                     # signed mode packages (protocol/mode-packages.md, signed_modes.py):
+                                # the GM uploads one, or installs one from the index, in the console
+    keys = []                   # trusted mode keys: Ed25519 public keys (standard base64, at most 8;
+                                # from the environment, separated by commas) whose packages the
+                                # controller installs; empty: no signed package is installed
+                                # (`python3 tools/mode_package.py keygen` prints one)
+    revoked = []                # key ids (16 hex digits) that no longer count, even when listed above;
+                                # an index's revoked.json is added to them
+    index = ""                  # a registry index: an https:// URL, or the path of an index.json
+                                # whose packages are next to it (a field without internet); empty: none
+
     [atak]                      # Cursor on Target for ATAK (ADR-P4-7 as amended, P4R18; atak.py)
     enabled = false
     multicast = "239.2.3.1:6969"  # UDP, props and zones only (TTL 1); a unicast host:port works too;
@@ -157,6 +168,7 @@ SECTIONS = {
                 "retention_days"),
     "atak": ("enabled", "multicast", "interval_s", "staff_endpoints", "players", "remote", "remote_players"),
     "firmware": ("release_keys", "dir", "update_timeout_s", "variants"),
+    "modes": ("keys", "revoked", "index"),
     "adopt": ("usb", "usb_ports"),
 }
 
@@ -247,6 +259,10 @@ class Config:
     firmware_dir: str = ""
     firmware_update_timeout_s: float = 600.0
     firmware_variants: list[str] = field(default_factory=lambda: ["box"])
+    # [modes]
+    modes_keys: list[str] = field(default_factory=list)
+    modes_revoked: list[str] = field(default_factory=list)
+    modes_index: str = ""
     # [adopt]
     adopt_usb: bool = True
     adopt_usb_ports: list[str] = field(default_factory=list)
@@ -281,6 +297,7 @@ class Config:
         _check_sync(self)
         _check_atak(self)
         _check_firmware(self)
+        _check_modes(self)
         if len(self.adopt_usb_ports) > 8 or not all(
                 re.fullmatch(r"(/dev/[\w./:-]{1,120}|socket://[\w.\[\]:-]{1,120}|COM\d{1,3})", p)
                 for p in self.adopt_usb_ports):
@@ -363,6 +380,19 @@ def _check_atak(cfg: "Config") -> None:
         raise ConfigError("atak.remote_players needs atak.remote")
 
 
+def _check_modes(cfg: "Config") -> None:
+    from .firmware_release import public_key_bytes  # noqa: PLC0415
+
+    if len(cfg.modes_keys) > 8 or not all(public_key_bytes(k) for k in cfg.modes_keys):
+        raise ConfigError("modes.keys: at most 8 Ed25519 public keys, each 32 bytes in standard base64 "
+                          "(44 characters; `python3 tools/mode_package.py keygen` prints it)")
+    if not all(re.fullmatch(r"[0-9a-f]{16}", k) for k in cfg.modes_revoked):
+        raise ConfigError("modes.revoked: key ids, 16 lower-case hex digits each")
+    index = cfg.modes_index.strip()
+    if index and (index.startswith(("http://", "file:", "ftp:")) or "://" in index and not index.startswith("https://")):
+        raise ConfigError("modes.index: an https:// URL or the path of an index.json")
+
+
 def _check_firmware(cfg: "Config") -> None:
     from .firmware_release import public_key_bytes  # noqa: PLC0415
 
@@ -385,9 +415,10 @@ _ATTR.update({("sync", k): f"sync_{k}" for k in SECTIONS["sync"]})
 _ATTR.update({("atak", k): f"atak_{k}" for k in SECTIONS["atak"]})
 _ATTR.update({("health", k): f"health_{k}" for k in SECTIONS["health"]})
 _ATTR.update({("firmware", k): f"firmware_{k}" for k in SECTIONS["firmware"]})
+_ATTR.update({("modes", k): f"modes_{k}" for k in SECTIONS["modes"]})
 _ATTR.update({("adopt", k): f"adopt_{k}" for k in SECTIONS["adopt"]})
 # Lists whose items contain ":" (host:port) or "/" (base64): from the environment they are separated by commas.
-COMMA_LISTS = {"atak_staff_endpoints", "firmware_release_keys", "adopt_usb_ports"}
+COMMA_LISTS = {"atak_staff_endpoints", "firmware_release_keys", "adopt_usb_ports", "modes_keys", "modes_revoked"}
 
 
 def _attr(section: str, key: str) -> str:

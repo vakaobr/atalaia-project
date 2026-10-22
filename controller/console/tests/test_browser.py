@@ -671,6 +671,67 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(run).to_contain_text("porta-norte is adopted by this field")
         self.no_horizontal_scroll(page)
 
+    def test_signed_mode_packages_in_the_presets_tab(self):
+        """Signed mode packages (phase 5 plan phase 6, protocol/mode-packages.md): the GM uploads a
+        package signed with a trusted mode key, then installs one from the field's registry index;
+        each shows who signed it and whether the project reviewed it, in both languages, and a
+        phone-width page does not scroll sideways."""
+        from test_signed_modes import KEY, OTHER_SIGNING, package  # noqa: PLC0415
+
+        registry = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, registry, True)
+        (registry / "packages").mkdir()
+        entries = []
+        for (archive, release), verified in ((package("org.club.second"), True),
+                                             (package("org.club.foreign", key=OTHER_SIGNING), False)):
+            name = f"{release['id']}.tar"
+            (registry / "packages" / name).write_bytes(archive)
+            entries.append({"id": release["id"], "name": release["id"].split(".")[-1].title(), "author": "A club",
+                            "versions": [{**{k: release[k] for k in ("version", "kind", "min_tier", "size", "sha256",
+                                                                      "signature", "key_id", "license")},
+                                          "url": f"packages/{name}", "verified": verified}]})
+        (registry / "index.json").write_text(json.dumps({"schema_version": 1, "modes": entries}))
+        self.field.close()
+        self.field = Field(cfg={"modes_keys": [KEY["public_key_b64"]], "modes_index": str(registry / "index.json")})
+
+        archive, release = package()
+        files = Path(self.field.tmp.name)
+        (files / "tagger.tar").write_bytes(archive)
+        (files / "tagger.tar.release.json").write_text(json.dumps(release))
+
+        page = self.console()
+        page.get_by_test_id("tab-presets").click()
+        panel = page.get_by_test_id("mode-packages")
+        expect(panel).to_contain_text("Pacotes de modos assinados")
+        expect(page.get_by_test_id("packages-keys")).to_contain_text(KEY["key_id"])
+        page.get_by_test_id("packages-archive").set_input_files(str(files / "tagger.tar"))
+        page.get_by_test_id("packages-release").set_input_files(str(files / "tagger.tar.release.json"))
+        page.get_by_test_id("packages-upload").click()
+        signed = page.get_by_test_id("packages-signed-org.club.tagger")
+        expect(signed).to_contain_text(KEY["key_id"])
+        expect(signed).to_contain_text("não revisto pelo projeto")
+        # The new mode is offered for presets and games at once (the stream's "modes").
+        self.assertIn("org.club.tagger", [m["id"] for m in self.field.http.get("/api/v1/modes").json()])
+
+        # From the index: a package signed by a trusted key installs; one signed by another does not.
+        expect(page.get_by_test_id("packages-entry-org.club.foreign")).to_contain_text(
+            "assinado com uma chave em que este controlador não confia")
+        page.get_by_test_id("packages-install-org.club.second").click()
+        expect(page.get_by_test_id("packages-entry-org.club.second")).to_contain_text("instalado")
+        expect(page.get_by_test_id("packages-signed-org.club.second")).to_contain_text("revisto pelo projeto")
+        page.get_by_test_id("lang").first.select_option("en")
+        expect(page.get_by_test_id("packages-signed-org.club.tagger")).to_contain_text("not reviewed by the project")
+        expect(page.get_by_test_id("packages-entry-org.club.second")).to_contain_text("installed")
+
+        # A read token sees no such panel; a phone-width page fits.
+        reader = self.console(token=READ, width=390, height=800)
+        reader.get_by_test_id("tab-presets").click()
+        expect(reader.get_by_test_id("mode-packages")).to_have_count(0)
+        phone = self.console(width=390, height=800)
+        phone.get_by_test_id("tab-presets").click()
+        expect(phone.get_by_test_id("mode-packages")).to_be_visible()
+        self.no_horizontal_scroll(phone)
+
     def test_firmware_update_from_the_boxes_tab(self):
         """Firmware updates (protocol/firmware-update.md): the GM uploads a signed release in the
         Boxes tab and updates a box before the game starts; the CMD update goes on the air; the box's
@@ -1480,7 +1541,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v5').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v6').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js"):

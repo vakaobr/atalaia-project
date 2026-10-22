@@ -27,7 +27,7 @@ from typing import Any, Optional
 from p3support import GM, T0, P3Case, bearer, declaration, new_identity
 
 from atalaia_controller import checkin_ticket, sync_format
-from atalaia_controller.store import Store
+from atalaia_controller.store import SCHEMA_VERSION, Store
 from atalaia_controller.sync_client import SyncClient, SyncError
 
 logging.getLogger("atalaia.sync").setLevel(logging.CRITICAL)
@@ -341,7 +341,7 @@ class StoreUpgradeTests(unittest.TestCase):
             store = Store(path)
             row = store.checkin(1, "p-abcdefgh2345")
             self.assertEqual((row["registration_id"], row["from_roster"], store.get_setting("schema_version")),
-                             (None, False, "9"))
+                             (None, False, str(SCHEMA_VERSION)))
             store.close()
 
 

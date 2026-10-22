@@ -31,6 +31,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
         <option value="" data-i18n="example_pick">Load an example…</option>
         <option value="domination" data-i18n="example_domination">Domination</option>
         <option value="holdall" data-i18n="example_holdall">Hold-All Domination</option>
+        <option value="master_satellites" data-i18n="example_master_satellites">Master and Satellites</option>
       </select>
     </div>
     <div class="group">
@@ -73,7 +74,26 @@ SPDX-License-Identifier: GPL-3.0-or-later
           <label><span data-i18n="mode_description">Description</span><textarea name="description" rows="2"></textarea></label>
           <label><span data-i18n="mode_name_pt">Name in Portuguese</span><input name="name_pt" lang="pt-PT"></label>
           <label><span data-i18n="mode_description_pt">Description in Portuguese</span><textarea name="description_pt" rows="2" lang="pt-PT"></textarea></label>
-          <label><span data-i18n="mode_role">Role</span><input name="role" spellcheck="false"></label>
+          <label><span data-i18n="mode_kind">Kind</span>
+            <select name="kind">
+              <option value="mode" data-i18n="kind_mode">Main mode</option>
+              <option value="modifier" data-i18n="kind_modifier">Modifier</option>
+              <option value="role" data-i18n="kind_role">Role package</option>
+            </select>
+          </label>
+          <fieldset class="roles">
+            <legend data-i18n="mode_roles">Roles</legend>
+            <p class="muted small" data-i18n="roles_hint"></p>
+            <div id="roles"></div>
+            <button id="role-add" type="button" data-i18n="role_add">Add a role</button>
+          </fieldset>
+          <fieldset class="screens">
+            <legend data-i18n="mode_screens">Screens</legend>
+            <p class="muted small" data-i18n="screens_hint"></p>
+            <ul id="screens" class="screen-list"></ul>
+            <label class="button" for="screen-files"><span data-i18n="screens_add">Add screens…</span></label>
+            <input id="screen-files" type="file" accept=".yaml,.yml" multiple hidden>
+          </fieldset>
           <label><span data-i18n="mode_license">Licence</span><select name="license"></select></label>
           <label><span data-i18n="mode_tier">Smallest box</span>
             <select name="min_tier">
@@ -93,6 +113,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
         <button type="button" role="tab" data-file="node_lua" aria-selected="true">node.lua</button>
         <button type="button" role="tab" data-file="field_lua" aria-selected="false">field.lua</button>
         <button type="button" role="tab" data-file="mode_yaml" aria-selected="false">mode.yaml</button>
+        <span id="screen-tabs"></span>
       </div>
       <pre id="code" class="code" tabindex="0"></pre>
       <p id="no-field" class="muted small" data-i18n="no_field" hidden></p>

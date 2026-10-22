@@ -22,7 +22,7 @@ from test_atak import BR, PNG, TL, AtakCase, split_stream
 
 from atalaia_controller import atak, field_levels, georef
 from atalaia_controller.scenarios import compile_scenario, load, validate
-from atalaia_controller.store import Store
+from atalaia_controller.store import SCHEMA_VERSION, Store
 
 JPG = b"\xff\xd8\xff\xe0" + b"\1" * 40
 
@@ -46,7 +46,7 @@ class StoreUpgradeTests(unittest.TestCase):
             self.assertEqual(store.field_image(), ("image/png", PNG, 12.5))
             self.assertEqual(store.field_image(0), store.field_image())
             self.assertEqual(store.positions(1), {4: {"x": 0.25, "y": 0.75, "level": 0}})
-            self.assertEqual(store.get_setting("schema_version"), "9")
+            self.assertEqual(store.get_setting("schema_version"), str(SCHEMA_VERSION))  # 9 or later
             self.assertEqual(field_levels.load(store), {"enabled": False, "count": 1, "names": [""]})
             store.close()
             # The old table is gone, and opening again changes nothing.

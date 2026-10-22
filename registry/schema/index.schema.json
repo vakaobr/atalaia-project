@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/vakaobr/atalaia-project/registry/schema/index.schema.json",
+  "$comment": "Licensed by REUSE.toml. The checks are controller/atalaia_controller/mode_package.py parse_index (which also refuses a version listed twice); protocol/mode-packages.md describes the format.",
+  "title": "Atalaia mode registry index",
+  "description": "The signed mode packages a registry offers (decisions P5R-7, P5C-11). Each version names its archive (url), the manifest's fields, the Ed25519 signature over the manifest and the key that made it; a controller checks the signature with its own trusted mode keys, never with anything the index says.",
+  "type": "object",
+  "required": ["schema_version", "modes"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "name": { "type": "string", "maxLength": 120 },
+    "modes": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": { "$ref": "#/$defs/mode" }
+    }
+  },
+  "$defs": {
+    "mode": {
+      "type": "object",
+      "required": ["id", "name", "versions"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/mode_id" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "\\S" },
+        "description": { "type": "string", "maxLength": 2000 },
+        "author": { "type": "string", "maxLength": 120 },
+        "versions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": { "$ref": "#/$defs/version" }
+        }
+      }
+    },
+    "mode_id": {
+      "type": "string",
+      "maxLength": 63,
+      "pattern": "^[a-z0-9][a-z0-9_-]*(\\.[a-z0-9][a-z0-9_-]*)+$"
+    },
+    "version": {
+      "type": "object",
+      "required": ["version", "kind", "min_tier", "size", "sha256", "signature", "key_id", "license", "url", "verified"],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string",
+          "maxLength": 35,
+          "pattern": "^\\d{1,4}\\.\\d{1,4}\\.\\d{1,4}(-[0-9A-Za-z][0-9A-Za-z.]{0,19})?$"
+        },
+        "kind": { "enum": ["mode", "modifier", "role", "scenario"] },
+        "min_tier": { "enum": ["reduced", "full"] },
+        "size": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "signature": { "type": "string", "pattern": "^[A-Za-z0-9+/]{86}==$" },
+        "key_id": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+        "license": {
+          "enum": ["GPL-3.0-or-later", "LGPL-3.0-or-later", "MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "CC0-1.0"]
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 500,
+          "anyOf": [
+            { "pattern": "^https://[^\\s\\\\]+$" },
+            { "pattern": "^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$", "not": { "pattern": "(^|/)\\.\\.(/|$)" } }
+          ]
+        },
+        "verified": { "type": "boolean" }
+      }
+    }
+  }
+}

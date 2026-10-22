@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import ctypes
 import json
+import logging
 import os
 import sys
 from dataclasses import dataclass, field
@@ -13,6 +14,8 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from .protocol import EVENT_TYPE_MAX, PRIORITIES
+
+_LOG = logging.getLogger(__name__)
 
 PRIO_NAMES = {v: k for k, v in PRIORITIES.items()}
 STATUS_NAMES = {0: "empty", 1: "running", 2: "ended", 3: "halted"}
@@ -337,11 +340,19 @@ class Node:
         if self._field is not None and self._field.on_state is not None:
             self._field.on_state(key.decode(), json.loads(value_json.decode()))
 
+    # The host's field ops never let an exception reach the core: ctypes would hand it an
+    # undefined value (field.send "succeeding"), so a failing host answers "nothing" or "not
+    # sent" instead (the sandbox-escape battery, simulator/tests/test_sandbox_escape.py).
+
     def _field_nodes(self, _user, role) -> Optional[int]:
         if _MALLOC is None or self._field is None:
             return None  # the core treats NULL as an empty list
-        nodes = self._field.nodes(role.decode() if role else None)
-        data = json.dumps(nodes).encode() + bytes(1)
+        try:
+            nodes = self._field.nodes(role.decode(errors="replace") if role else None)
+            data = json.dumps(nodes).encode() + bytes(1)
+        except Exception:  # noqa: BLE001 - see above
+            _LOG.exception("field.nodes failed in the host")
+            return None
         ptr = _MALLOC(len(data))
         if not ptr:
             return None
@@ -349,8 +360,12 @@ class Node:
         return ptr
 
     def _field_owner(self, _user, node_id) -> Optional[int]:
-        team = self._field.owner(int(node_id)) if self._field is not None else None
-        if team is None:
+        try:
+            team = self._field.owner(int(node_id)) if self._field is not None else None
+        except Exception:  # noqa: BLE001 - see _field_nodes
+            _LOG.exception("field.owner failed in the host")
+            return None
+        if not isinstance(team, str):
             return None
         # Kept alive until the next call, as field_ops.h asks; the core copies it before then.
         self._owner_buf = ctypes.create_string_buffer(team.encode())
@@ -359,8 +374,12 @@ class Node:
     def _field_send(self, _user, node_id, cmd, params) -> bool:
         if self._field is None:
             return False
-        args = json.loads(params.decode()) if params else {}
-        return bool(self._field.send(int(node_id), cmd.decode(), args))
+        try:
+            args = json.loads(params.decode()) if params else {}
+            return bool(self._field.send(int(node_id), cmd.decode(errors="replace"), args))
+        except Exception:  # noqa: BLE001 - see _field_nodes
+            _LOG.exception("field.send failed in the host")
+            return False
 
     # -- driving the node --
 

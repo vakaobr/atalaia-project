@@ -142,7 +142,8 @@ plus, depending on what the plan phase touches:
   (P5-3; the maintainer's account).
 - Signed modes sent to boxes from the GM console (P5R-8, decided by the
   maintainer 2026-10-22): plan phase 13 in software; on real boxes in
-  HW3; which keys a box trusts for them is for the maintainer (P5B-9).
+  HW3; a box trusts mode keys built into its firmware only (P5B-9, the
+  maintainer's answer of 2026-10-22).
 
 ### Out of scope
 
@@ -177,10 +178,10 @@ plus, depending on what the plan phase touches:
 |---|------------|-------|-------------------------|------------|------|--------|
 | 1 | Visual mode editor | blocks for node and field scripts, Lua and `mode.yaml` generator, the page in the simulator, en + pt, round trip (AC-1 to AC-3) | Software, now | -- | M | **Built 2026-10-22** |
 | 2 | Editor and simulator | `field.lua` in the web view, `POST /api/reload`, the editor's "Test" button | Software, now | 1 | M | **Built 2026-10-22** |
-| 3 | Editor completeness | geo blocks (zones, distances, `position.fix`), GM commands, several roles, modifiers and role packages, screen names from `assets/screens/` | Software, now | 1 | M | Next |
-| 4 | Mode packages and signing | archive format, `tools/mode_package.py` (pack, keygen, sign, verify), `registry/schema/index.schema.json`, shared vectors, licence check (AC-4, AC-5) | Software, now | -- | M | |
-| 5 | Sandbox-escape battery | escape patterns as core C tests and through the simulator, in CI (AC-12) | Software, now | -- | S | |
-| 6 | Signed packages in the controller | import from an index (signature, revocation, size, licence), the author and an "unverified" warning in the console | Software, now | 4 | M | |
+| 3 | Editor completeness | geo blocks (zones, distances, `position.fix`), GM commands, several roles, modifiers and role packages, screen names from `assets/screens/` | Software, now | 1 | M | **Built 2026-10-22** |
+| 4 | Mode packages and signing | archive format, `tools/mode_package.py` (pack, keygen, sign, verify), `registry/schema/index.schema.json`, shared vectors, licence check (AC-4, AC-5) | Software, now | -- | M | **Built 2026-10-22** |
+| 5 | Sandbox-escape battery | escape patterns as core C tests and through the simulator, in CI (AC-12) | Software, now | -- | S | **Built 2026-10-22** |
+| 6 | Signed packages in the controller | import from an index (signature, revocation, size, licence), the author and an "unverified" warning in the console | Software, now | 4 | M | **Built 2026-10-22** |
 | 13 | Missing modes from the GM console | P5R-8: the console's *Send missing modes* in the invite dialog; join key 16; a box fetches the signed packages it lacks over Wi-Fi HTTPS, checks them with its firmware's mode keys and the sandbox, keeps them on LittleFS (numbered 13 so the other numbers stay as P5R-1 has them; built here, after 6) | Software, now (box side host-tested); on real boxes: HW3 | 4, 5, 6 | L | Planned 2026-10-22 |
 | 7 | Scenario blocks in the console | a block view of the scenario builder writing the same YAML, en + pt, console browser tests | Software, now | 1 | M | |
 | 8 | Registry repository template | `index.json`, `keys/`, `revoked.json`, the registry CI workflow as files under `registry/template/` (AC-6 in this repository) | Software, now; publishing needs the maintainer | 4, 5 | S | |
@@ -197,8 +198,8 @@ Plan phases 4-6 and 7 can run in parallel worktrees with 2-3; 10-12 are
 independent of the rest; 13 needs 4, 5 and 6 (its 13a and 13b can then
 run in parallel). Sizes: L about a week of agent work.
 
-**Next: plan phase 3 (editor completeness), or 4 and 5 in parallel
-(they lead to 13).**
+**Next (2026-10-22, plan phases 1-6 built): plan phase 13 (13a and 13b
+can run in parallel), or plan phase 7.**
 
 ---
 
@@ -307,6 +308,20 @@ caused it.
 - A third example (Master and Satellites or Last Stand) in the round
   trip; the editor's problems for a role without its inputs.
 
+**Built 2026-10-22** (decisions P5C-1 to P5C-7). Code beats the plan in
+one place: a GM command reaches a box as `cmd.mode` with its name (RFC
+0001 Amendment 5, the Medic Kit's `refill`), not as `cmd.<name>`, so the
+handler block is "when the mode command *name* arrives" (P5C-2).
+
+| File | What |
+|------|------|
+| `simulator/atalaia_sim/editor/blocks.js` | 10 new blocks: *Places* (`geo.distance`, `geo.in_zone`, a circle, an area and its corners, "the event has a position"), *GM commands* (the declaration, "when the mode command ... arrives"), the controller's "send the mode command ..."; event values `lat`, `lon`, `acc`, `player`, `role`, `strength`; a list's item; the box's built-in screens and the mode's own as screen blocks in the toolbox |
+| `simulator/atalaia_sim/editor/generator.js` | Their Lua; `mode.yaml` with `kind`, several roles (`requires` from the script or the role's own, `optional`, `needed: false`), `commands:` and their Portuguese labels; `modeRoles`, `testNodes`; problems: `problem_no_role`, `problem_bad_role`, `problem_role_twice`, `problem_role_input_unhandled`, `problem_role_no_input`, `problem_role_unknown`, `problem_command_twice`, `problem_command_unhandled`, `problem_screen_unknown`, `problem_polygon_points`; a for-each loop's variable is no longer declared at the top |
+| `simulator/atalaia_sim/editor/editor.js`, `index.html`, `editor.css`, `i18n/*.json` | The *Mode* tab's kind, roles (a row each: name, inputs, *needed to start*) and screens (*Add screens…*, checked: a template name, at most 4096 bytes, `template:` naming the file); the screens in the saved project (`screens`, optional) and as preview tabs; *Test* starts a box per role |
+| `simulator/atalaia_sim/editor/examples/master_satellites.json` | Master and Satellites as blocks, with its three screen files |
+| `simulator/editor_tests/test_editor.py` | 6 new browser tests (geo, GM commands, roles and kinds, the Mode tab, the third round trip, Test with two roles); the line map checked on the third example |
+| `simulator/tests/test_editor_files.py` | The third example: its roles and screens are the mode's |
+
 ## Plan phase 4: Mode packages and signing
 
 *Software, can be done now. Size M.* (ADR-P5-3 and P5-4 as amended.)
@@ -326,6 +341,20 @@ caused it.
 - Tests: `unittest` for pack, sign, verify, tampering, wrong id or
   version, revoked key, licence and size refusals.
 
+**Built 2026-10-22** (decisions P5C-8 to P5C-13; the format is
+`protocol/mode-packages.md`). The archive is an uncompressed ustar tar in
+one canonical form that readers enforce by packing again (P5C-8); the
+manifest has P5B-10's `kind` and `min_tier` lines (P5C-9).
+
+| File | What |
+|------|------|
+| `controller/atalaia_controller/mode_package.py` | The shared code: `pack`, `unpack` (strict), the manifest, the release text, `verify` (fails closed, in a fixed order), `sign_release`, `parse_index`, `parse_revoked` |
+| `tools/mode_package.py` | `pack`, `keygen`, `pubkey`, `sign`, `verify`, `index` |
+| `tools/mode_package_vectors.py`, `protocol/vectors/mode_package.json` | The shared vectors (`--check` in `check.sh` and CI's protocol job) |
+| `registry/schema/index.schema.json`, `revoked.schema.json`, `examples/` | The index's and revocation list's JSON Schemas, a valid and 10 invalid examples (CI's protocol job, `check-jsonschema`) |
+| `protocol/mode-packages.md` | The format and the checks |
+| `controller/tests/test_mode_package.py` | 17 tests: the vectors, every built-in mode as a package the controller takes, licence, size, names, manifests that are not the archive's, the tool's commands |
+
 ## Plan phase 5: Sandbox-escape battery
 
 *Software, can be done now. Size S.*
@@ -337,6 +366,17 @@ instruction and memory limits) as C tests next to `test_sandbox` in
 `core/tests/test_node.c` and a Python test through the ctypes bindings
 for node and field scripts; ASan/UBSan.
 
+**Built 2026-10-22** (decisions P5C-14 to P5C-16). The battery is its own
+program (`core/tests/test_sandbox_escape.c`, ctest `sandbox_escape`, CI job
+`sandbox-escape` under ASan and UBSan) rather than part of `test_node.c`, so
+CI and the registry's CI can run it alone; `test_sandbox` stays. It found two
+real escapes from the instruction watchdog, both closed in `core/src/sandbox.c`
+(P5C-15): `__gc` finalizers, which Lua runs with hooks off, and `xpcall`'s
+message handler after the watchdog's own error. 43 cases x 2 heaps x box and
+controller; `simulator/tests/test_sandbox_escape.py` (4 tests: the cases
+through ctypes, odd host answers and a host that raises, bytecode, a mode in
+the simulator whose box trips the sandbox while the game plays on).
+
 ## Plan phase 6: Signed packages in the controller
 
 *Software, can be done now. Depends on 4. Size M.*
@@ -347,6 +387,19 @@ licence) and installs scenarios and field-script packages through the
 existing upload checks; the console shows who signed a package and
 "not reviewed by the project" for unverified ones. Store schema bump,
 controller tests, console browser tests.
+
+**Built 2026-10-22** (decisions P5C-17 to P5C-21): the GM also uploads a
+signed package directly (as a firmware release); every kind installs through
+`ModeRegistry.install` (scenarios, field scripts, and modes, which boxes get
+from plan phase 13).
+
+| File | What |
+|------|------|
+| `controller/atalaia_controller/signed_modes.py` | Trusted keys and revocations, the index (https or a file, `revoked.json` beside it, fail closed), upload and install from the index, each package's trust today |
+| `controller/atalaia_controller/api.py` | `GET|POST /api/v1/mode-packages`, `POST /api/v1/mode-packages/install`; `signed` in `GET /api/v1/modes`; the stream's `modes` after any install |
+| `controller/atalaia_controller/modes.py`, `store.py` (schema 10), `config.py` (`[modes] keys`, `revoked`, `index`), `main.py`, `engine.py` | The signed release and archive kept with the package |
+| `controller/console/src/components/mode-packages.js`, `app.js`, `sw.js`, `style.css`, `i18n/*.json` | The *Signed mode packages* panel in the *Presets* tab, en + pt |
+| `controller/tests/test_signed_modes.py`, `controller/console/tests/test_browser.py` | 9 controller tests (upload, refusals, revoked and removed keys, index on disk and over https, bad indexes, the stream, config, the schema 9 upgrade), 1 browser test |
 
 ## Plan phase 13: Missing modes from the GM console
 
@@ -382,7 +435,10 @@ sign modes too); the controller checks with the same list
 (`[modes] box_keys`) only to offer what a box will take. So a community
 mode reaches boxes once the project has signed it (the registry's
 verified badge, plan phase 8, becomes that signature); whether a field
-may add its own key for its club's modes is for the maintainer (P5B-9).
+may add its own key for its club's modes was for the maintainer (P5B-9).
+**The maintainer, 2026-10-22: accepted as recommended, mode keys built into
+the box's firmware only.** (The controller's own `[modes] keys` of plan
+phase 6 decide what it installs; `[modes] box_keys` lists the boxes' keys.)
 
 **How a box receives it** (P5B-11). The trigger stays on the radio and
 small; the scripts never go over LoRa. In the invite dialog, a box that
@@ -545,15 +601,15 @@ release.
 | AC-1 | The Blockly editor generates a valid `node.lua` (and `field.lua`) that passes simulator tests | 1 | **Met in software (2026-10-22)**: `python3 tools/docker_editor.py`, the Domination and Hold-All round trips |
 | AC-2 | Generated Lua is readable and hand-editable | 1 | **Met (2026-10-22)**: checked by `assertReadable` and by review of the examples' output |
 | AC-3 | The editor ships in English and Portuguese | 1 | **Met (2026-10-22)**: `test_page_in_english_and_portuguese`, `test_languages_have_the_same_keys` |
-| AC-4 | The registry index format is defined and documented | 4 | Pending |
-| AC-5 | Mode packages are Ed25519-signed and verifiable | 4 | Pending |
+| AC-4 | The registry index format is defined and documented | 4 | **Met in software (2026-10-22)**: `registry/schema/index.schema.json`, `protocol/mode-packages.md` |
+| AC-5 | Mode packages are Ed25519-signed and verifiable | 4 | **Met in software (2026-10-22)**: `tools/mode_package.py`, the shared vectors |
 | AC-6 | Registry CI runs mode tests and checks licences | 8 | Pending (the repository needs the maintainer) |
 | AC-7 | At least one language beyond en/pt on the site | 10 | Pending |
 | AC-8 | Built-in modes carry English and Portuguese texts | -- | **Met differently**: in `mode.yaml`'s `i18n:` (P4R22), every built-in mode |
 | AC-9 | The carrier PCB schematic passes KiCad ERC | HW1 | Pending (needs hardware) |
 | AC-10 | Build guides exist for the Field Box and the Satellite | 12, HW2 | Field Box done (`hardware/field-box/BUILD.md`); the rest pending |
 | AC-11 | CONTRIBUTING.md documents mode submission | 9 | Pending |
-| AC-12 | CI includes a sandbox-escape test job | 5 | Pending (`test_sandbox` covers the basics) |
+| AC-12 | CI includes a sandbox-escape test job | 5 | **Met (2026-10-22)**: CI job `sandbox-escape` |
 | AC-13 | (new, P5R-8) A box gets a signed mode it lacks from its field controller between games, checks it and plays it; it refuses an unsigned or tampered one | 13, HW3 | Pending (planned 2026-10-22) |
 
 ---
@@ -583,6 +639,6 @@ for now (all open):
 
 | # | Question | Recommended |
 |---|----------|-------------|
-| P5R-8 | May boxes ever load signed community node scripts at run time? | **Decided by the maintainer (2026-10-22):** yes, only what a game needs, as signed packages from the GM console: plan phase 13 (P5B-8 to P5B-17; P5B-9, which keys a box trusts, is for the maintainer) |
+| P5R-8 | May boxes ever load signed community node scripts at run time? | **Decided by the maintainer (2026-10-22):** yes, only what a game needs, as signed packages from the GM console: plan phase 13 (P5B-8 to P5B-17; P5B-9, which keys a box trusts, answered by the maintainer 2026-10-22: firmware-built mode keys only) |
 | P5R-9 | When to create `atalaia-modes`? | After plan phase 8, from its template |
 | P5R-10 | Third language: German first, then Traditional Chinese? | Yes, German first (no new glyphs on the box) |

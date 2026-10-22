@@ -126,6 +126,17 @@ textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; 
 .mode-form { overflow: auto; display: grid; gap: 10px; align-content: start; padding: 4px; }
 .mode-form label { display: grid; gap: 4px; }
 .mode-form label > span { font-size: 12px; color: var(--muted); }
+.mode-form fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px 10px; display: grid; gap: 8px; }
+.mode-form legend { font-size: 12px; color: var(--muted); padding: 0 4px; }
+.mode-form fieldset p { margin: 0; }
+.role-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 6px 0; border-top: 1px solid var(--line); }
+.role-row:first-child { border-top: 0; }
+.role-row .role-name { width: 12em; }
+.mode-form .role-row label, .mode-form .check { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+.mode-form .role-row input[type=checkbox] { width: auto; }
+.role-inputs { display: inline-flex; flex-wrap: wrap; gap: 4px 10px; }
+.screen-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.screen-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font: 12.5px var(--mono); }
 
 .code {
   flex: 1;

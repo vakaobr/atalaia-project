@@ -137,4 +137,14 @@ if(BUILD_TESTING)
         target_compile_options(test_core PRIVATE -Wall -Wextra -Wpedantic -Werror)
     endif()
     add_test(NAME core COMMAND test_core)
+
+    # The sandbox-escape battery (phase 5 plan phase 5): its own program, so that CI's
+    # sandbox-escape job can run it alone.
+    add_executable(test_sandbox_escape tests/test_sandbox_escape.c)
+    target_include_directories(test_sandbox_escape PRIVATE src)
+    target_link_libraries(test_sandbox_escape PRIVATE atalaia_core)
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(test_sandbox_escape PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    endif()
+    add_test(NAME sandbox_escape COMMAND test_sandbox_escape)
 endif()

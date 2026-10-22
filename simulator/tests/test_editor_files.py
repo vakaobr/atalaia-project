@@ -124,13 +124,19 @@ class EditorFilesTests(unittest.TestCase):
             self.assertIn(key, en["ui"], key)
 
     def test_examples_are_editor_projects(self):
-        for name in ("domination", "holdall"):
+        for name in ("domination", "holdall", "master_satellites"):
             project = json.loads((EDITOR / "examples" / f"{name}.json").read_text(encoding="utf-8"))
             self.assertEqual((project["format"], project["version"]), ("atalaia-mode-editor", 1))
             self.assertEqual(project["mode"]["id"], f"org.atalaia.{name}")
             self.assertTrue(project["node"]["blocks"]["blocks"])
-        holdall = json.loads((EDITOR / "examples" / "holdall.json").read_text(encoding="utf-8"))
-        self.assertTrue(holdall["field"]["blocks"]["blocks"])
+        for name in ("holdall", "master_satellites"):
+            project = json.loads((EDITOR / "examples" / f"{name}.json").read_text(encoding="utf-8"))
+            self.assertTrue(project["field"]["blocks"]["blocks"])
+        # The example's screens are the mode's files (the browser round trip checks them byte for byte).
+        project = json.loads((EDITOR / "examples" / "master_satellites.json").read_text(encoding="utf-8"))
+        screens = EDITOR.parents[2] / "modes" / "master_satellites" / "assets" / "screens"
+        self.assertEqual(project["screens"], {p.stem: p.read_text(encoding="utf-8") for p in sorted(screens.glob("*.yaml"))})
+        self.assertEqual([r["name"] for r in project["mode"]["roles"]], ["master", "satellite"])
 
 
 if __name__ == "__main__":

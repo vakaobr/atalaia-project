@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "name": "Example registry",
+  "modes": [
+    {
+      "id": "org.example.relay",
+      "name": "Relay",
+      "description": "A box that passes a message on.",
+      "author": "Example Club",
+      "versions": [
+        {
+          "version": "1.2.0-rc.1",
+          "kind": "role",
+          "min_tier": "full",
+          "size": 4096,
+          "sha256": "92b13c9a5f42c796e2fbd900430bc286efa21d49e7ec1c44593aea538d74ae51",
+          "signature": "u8Lu6YRCD8W+0rm4J62jVFk/7bNRsC1CrVXA+Ma9KiX5yA1pCPsgWa5jvYIXmzeJRTOXFb1q4ZZo9l71eYVBCQ==",
+          "key_id": "21fe31dfa154a261",
+          "license": "MIT",
+          "url": "packages/org.example.relay-1.2.0-rc.1.tar",
+          "verified": true
+        }
+      ]
+    }
+  ]
+}

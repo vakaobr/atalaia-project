@@ -6,7 +6,7 @@
   "review_iteration": 0,
   "failing_experts": [],
   "created_at": "2026-10-17T12:00:00Z",
-  "updated_at": "2026-10-22T18:00:00Z",
+  "updated_at": "2026-10-22T23:00:00Z",
   "artifacts": {
     "RESEARCH.md": "complete",
     "ADR.md": "complete",
@@ -14,16 +14,20 @@
     "STATUS.md": "complete"
   },
   "metadata": {
-    "description": "Phase 5 (Community): visual mode editor, mode registry with signing and a verified badge, carrier PCB, translations, build guides, community processes. Refreshed 2026-10-22 after phases 2-4 software (decisions P5R-1 to P5R-14); plan phases 1 (the visual mode editor) and 2 (the editor and the simulator: field.lua shown in the web view, POST /api/reload, the editor's Test button, decisions P5B-1 to P5B-7) built in software; plan phase 13 (missing modes sent to boxes from the GM console, the maintainer's P5R-8; P5B-8 to P5B-17) planned.",
+    "description": "Phase 5 (Community): visual mode editor, mode registry with signing and a verified badge, carrier PCB, translations, build guides, community processes. Refreshed 2026-10-22 after phases 2-4 software (decisions P5R-1 to P5R-14); plan phases 1 (the visual mode editor) and 2 (the editor and the simulator: field.lua shown in the web view, POST /api/reload, the editor's Test button, decisions P5B-1 to P5B-7) built in software; plan phase 13 (missing modes sent to boxes from the GM console, the maintainer's P5R-8; P5B-8 to P5B-17) planned. Plan phases 3 (the editor's geo, GM command, role and kind blocks, screens; P5C-1 to P5C-7), 4 (signed mode packages: canonical ustar archive, Ed25519 manifest, tools/mode_package.py, registry index schema, shared vectors; P5C-8 to P5C-13), 5 (the sandbox-escape battery, which closed two watchdog escapes; P5C-14 to P5C-16) and 6 (signed packages in the controller and console; P5C-17 to P5C-21) built in software; P5B-9 answered by the maintainer (firmware-built mode keys only).",
     "risk_level": "Medium",
     "design_only": false,
     "stop_after": null,
     "resume_with": "--implement",
     "refreshed_at": "2026-10-22",
-    "next_plan_phase": "3 (editor completeness), or 4 and 5 in parallel (they lead to 13)",
+    "next_plan_phase": "13 (13a and 13b in parallel), or 7",
     "completed_plan_phases": [
       "1",
-      "2"
+      "2",
+      "3",
+      "4",
+      "5",
+      "6"
     ],
     "hardware_plan_phases": [
       "HW1",
@@ -31,8 +35,8 @@
       "HW3"
     ],
     "awaiting_maintainer": [
-      "P5B-9 (which keys a box trusts for mode packages)",
-      "P5-3 (creating atalaia-modes)"
+      "P5-3 (creating atalaia-modes)",
+      "P5C-1 to P5C-21 (design choices of plan phases 3-6, open)"
     ],
     "planned_plan_phases": [
       "13 (missing modes from the GM console, after 6)"

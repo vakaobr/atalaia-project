@@ -19,6 +19,7 @@ import { ScenarioBuilder } from './components/scenario-builder.js';
 import { RadioSettings } from './components/radio-settings.js';
 import { BoxLanguageSettings } from './components/box-language-settings.js';
 import { FirmwarePanel } from './components/firmware-panel.js';
+import { ModePackages } from './components/mode-packages.js';
 import { CheckinPanel } from './components/checkin-panel.js';
 import { BrandingSettings, TeamPresets, FieldBrand, accentRef } from './components/branding-settings.js';
 import { discover } from './components/box-invites.js';
@@ -440,7 +441,7 @@ class App extends Component {
         case 'adopt':
             return html`<${AdoptPanel} app=${this} />`;
         case 'presets':
-            return html`<${PresetBuilder} app=${this} />`;
+            return html`<${PresetBuilder} app=${this} /><${ModePackages} app=${this} />`;
         case 'scenarios':
             return html`<${ScenarioBuilder} app=${this} />`;
         case 'feed':

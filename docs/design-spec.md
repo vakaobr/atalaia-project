@@ -505,7 +505,7 @@ The core builds for desktop, so a simulator runs any number of virtual nodes wit
 
 A Blockly-based editor generates `node.lua` and `field.lua` from blocks such as "when team claims this box" and "every N seconds". Generated code stays readable, so a GM can graduate to editing it by hand.
 
-*Status (2026-10-22):* built in software as phase 5 plan phase 1: a page of the simulator (`/editor/`) with blocks for the node and field script API, generating `node.lua`, `field.lua` and `mode.yaml` in English and Portuguese; its examples reproduce Domination and Hold-All Domination and pass their tests. A block view of the console's scenario builder is planned (phase 5 plan phase 7).
+*Status (2026-10-22):* built in software as phase 5 plan phase 1: a page of the simulator (`/editor/`) with blocks for the node and field script API, generating `node.lua`, `field.lua` and `mode.yaml` in English and Portuguese; its examples reproduce Domination and Hold-All Domination and pass their tests. Plan phases 2 and 3 added *Test in the simulator* and the remaining blocks (geo, GM commands, several roles, the kinds modifier and role package, the mode's screens), with a third example, Master and Satellites. A block view of the console's scenario builder is planned (phase 5 plan phase 7).
 
 ## 10. Networking and protocol
 
@@ -643,6 +643,7 @@ Reading needs a read token, which can be printed as a QR code for spectators and
 | GET | `/api/v1/nodes` | Nodes, capabilities, health |
 | GET | `/api/v1/modes` | Installed mode packages and their parameter schemas |
 | POST | `/api/v1/modes` | Upload a mode package |
+| GET / POST | `/api/v1/mode-packages` | Signed mode packages: the registry index and its states / upload a signed package (phase 5, built in software) |
 | GET / POST | `/api/v1/presets` | List or save presets |
 | POST | `/api/v1/games` | Create a game from presets and node assignments |
 | POST | `/api/v1/games/{id}/start` · `/pause` · `/resume` · `/end` | Game lifecycle |
@@ -839,6 +840,8 @@ Shared modes live in a Git-based registry: an index repository listing each mode
 - Packages are signed by their author; the controller shows who signed a mode before installing it.
 - A **verified** badge means the mode passed its own tests in CI and a maintainer review.
 - Manifests declare the minimum core API version, so old nodes never receive modes they cannot run.
+
+*Status (2026-10-22):* the package format, its signature and the index are built in software (phase 5 plan phases 4 and 6, [protocol/mode-packages.md](../protocol/mode-packages.md)): a canonical archive signed with Ed25519 like a firmware release, `tools/mode_package.py`, the index's JSON Schema, and the controller installing signed packages, uploaded or from an index (online or a file on an offline field), with the signer and *not reviewed by the project* shown in the console. The controller reads the index on demand rather than syncing it, and checks with its own trusted keys. The registry repository itself waits for the maintainer (P5-3, plan phase 8). The sandbox-escape battery runs in this repository's CI (plan phase 5).
 
 ### Community hub
 

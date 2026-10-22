@@ -830,5 +830,53 @@
     "live": "As caixas do jogo em curso: {lang}",
     "saved": "Guardado: os jogos criados a partir de agora usam-na.",
     "read_only": "Só quem dirige o jogo a muda."
+  },
+  "packages": {
+    "title": "Pacotes de modos assinados",
+    "hint": "Instala um modo assinado com uma das chaves de modos deste controlador: envia o ficheiro do pacote e o .release.json (tools/mode_package.py), ou escolhe-o no índice do registo do campo. O controlador verifica a assinatura, o pacote e os scripts antes de instalar o que quer que seja.",
+    "no_keys": "Este controlador não tem chaves de modos configuradas ([modes] keys): nenhum pacote assinado é instalado.",
+    "keys": "Chaves de modos de confiança:",
+    "archive": "Pacote (.tar)",
+    "release_file": "Versão (.release.json)",
+    "upload": "Enviar e instalar",
+    "choose_both": "Escolhe o pacote e o respetivo .release.json.",
+    "bad_release_file": "Não foi possível ler o ficheiro .release.json.",
+    "installed_toast": "{id} {version} instalado.",
+    "installed": "Instalados",
+    "none_installed": "Nenhum modo instalado além dos incluídos.",
+    "mode": "Modo",
+    "version": "Versão",
+    "licence": "Licença",
+    "signature": "Assinatura",
+    "actions": "Ações",
+    "unsigned": "sem assinatura",
+    "signed_by": "assinado por",
+    "verified": "revisto pelo projeto",
+    "not_reviewed": "não revisto pelo projeto",
+    "trust": {
+      "revoked": "a chave foi revogada",
+      "untrusted": "a chave já não é de confiança aqui"
+    },
+    "from_index": "Do índice do registo",
+    "no_index": "Não há índice de registo configurado ([modes] index: um endereço https://, ou um index.json com os pacotes ao lado).",
+    "index": "Índice",
+    "refresh": "Ler de novo",
+    "index_error": "Não foi possível ler o índice, por isso nada é oferecido a partir dele: {error}",
+    "index_empty": "O índice não tem pacotes.",
+    "install": "Instalar",
+    "update_to": "Atualizar para {version}",
+    "states": {
+      "installed": "instalado",
+      "no_key": "assinado com uma chave em que este controlador não confia",
+      "revoked": "a chave foi revogada",
+      "builtin": "um modo incluído tem este id",
+      "available": "disponível"
+    },
+    "kinds": {
+      "mode": "modo principal",
+      "modifier": "modificador",
+      "role": "pacote de papel",
+      "scenario": "cenário"
+    }
   }
 }

@@ -43,6 +43,7 @@ class ModePackage:
     mode: Mode
     files: dict[str, str]
     builtin: bool
+    signed: Optional[dict[str, Any]] = None  # a signed package's release (signed_modes.py), else None
 
     @property
     def id(self) -> str:
@@ -73,6 +74,7 @@ class ModePackage:
             "field_script": self.field_script is not None,
             "builtin": self.builtin,
             "files": sorted(self.files),
+            "signed": self.signed,
         }
 
 
@@ -183,6 +185,7 @@ class ModeRegistry:
         for row in self.store.modes():
             if row["id"] not in self._builtin:
                 mods[row["id"]] = parse_package(row["files"])
+                mods[row["id"]].signed = row.get("signed")
         return [mods[k] for k in sorted(mods)]
 
     def get(self, mode_id: str) -> Optional[ModePackage]:
@@ -209,13 +212,17 @@ class ModeRegistry:
             files["field.lua"] = mode.field_script
         return ModePackage(mode, files, builtin=all(p.builtin for p in parts))
 
-    def install(self, files: dict[str, str]) -> ModePackage:
+    def install(self, files: dict[str, str], signed: Optional[dict[str, Any]] = None,
+                archive: Optional[bytes] = None) -> ModePackage:
+        """Checks and keeps a package; ``signed`` and ``archive`` when signed_modes.py verified it
+        (an unsigned upload replaces a signed one, signature and all)."""
         pkg = parse_package(files)
         if pkg.id in self._builtin:
             raise ModeError(f"{pkg.id} is a built-in mode; give your version another id")
         if self.core is None:
             raise ModeError("the core library is not loaded, so scripts cannot be checked")
         check_scripts(self.core, pkg)
-        self.store.save_mode(pkg.id, pkg.mode.version, pkg.files)
+        pkg.signed = signed
+        self.store.save_mode(pkg.id, pkg.mode.version, pkg.files, signed, archive)
         self.generation += 1
         return pkg

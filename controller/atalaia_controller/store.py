@@ -58,6 +58,11 @@ multi-story building with a floor plan per level. ``field_levels`` holds each le
 is the field image of before: a schema 8 file's ``field_image`` row is moved there and that table
 dropped), the settings key ``field.levels`` whether levels are on, their number and names
 (field_levels.py), and ``positions.level`` the level a box is on (0 for every older row).
+
+Schema 10 (phase 5 plan phase 6, decision P5C-17) adds signed mode packages: ``modes.signed_json``
+(the release a trusted mode key signed, its key id, licence, whether the project reviewed it and
+where it came from) and ``modes.package`` (the archive exactly as signed, for the boxes later, plan
+phase 13); both NULL for a package uploaded unsigned. A schema 9 file is upgraded in place.
 """
 
 from __future__ import annotations
@@ -72,7 +77,7 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 REMOTE_LOG_DAYS = 365  # the remote GM's log on the controller (decision S19-9)
 FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes, per level's plan
 FIELD_LEVELS_MAX = 10  # levels of a multi-story field (decision ML-1)
@@ -332,6 +337,12 @@ GAME_COLUMNS_V2 = (
     ("team_info_json", "TEXT"),                # schema 4: {team: {display_name, crest_id}}
 )
 
+# Columns added to modes in schema 10 (phase 5 plan phase 6): a signed package's release and archive.
+MODE_COLUMNS_V10 = (
+    ("signed_json", "TEXT"),  # the signed release and who signed it (signed_modes.py); NULL: unsigned
+    ("package", "BLOB"),      # the archive as signed (protocol/mode-packages.md); NULL: unsigned
+)
+
 # Columns added to checkins in schema 7 (plan phase 16): a registration from the site server's roster.
 CHECKIN_COLUMNS_V7 = (
     ("registration_id", "TEXT"),                  # the site server's registration (a UUID)
@@ -389,6 +400,10 @@ class Store:
             for name, decl in CHECKIN_COLUMNS_V7:
                 if name not in have:
                     self._db.execute(f"ALTER TABLE checkins ADD COLUMN {name} {decl}")
+            have = {r["name"] for r in self._db.execute("PRAGMA table_info(modes)").fetchall()}
+            for name, decl in MODE_COLUMNS_V10:
+                if name not in have:
+                    self._db.execute(f"ALTER TABLE modes ADD COLUMN {name} {decl}")
             self._upgrade_field_levels()
             self.set_setting("schema_version", str(SCHEMA_VERSION))
         if path != ":memory:":
@@ -466,16 +481,28 @@ class Store:
 
     # --- modes --------------------------------------------------------------
 
-    def save_mode(self, mode_id: str, version: str, files: dict[str, str]) -> None:
-        self._exec("INSERT INTO modes (id, version, files_json, installed_at) VALUES (?, ?, ?, ?) "
+    def save_mode(self, mode_id: str, version: str, files: dict[str, str],
+                  signed: Optional[dict[str, Any]] = None, package: Optional[bytes] = None) -> None:
+        """Installs or replaces a package; an unsigned one (signed None) clears a signature it replaces."""
+        self._exec("INSERT INTO modes (id, version, files_json, installed_at, signed_json, package) "
+                   "VALUES (?, ?, ?, ?, ?, ?) "
                    "ON CONFLICT(id) DO UPDATE SET version = excluded.version, "
-                   "files_json = excluded.files_json, installed_at = excluded.installed_at",
-                   (mode_id, version, json.dumps(files), time.time()))
+                   "files_json = excluded.files_json, installed_at = excluded.installed_at, "
+                   "signed_json = excluded.signed_json, package = excluded.package",
+                   (mode_id, version, json.dumps(files), time.time(),
+                    json.dumps(signed) if signed is not None else None,
+                    package if signed is not None else None))
 
     def modes(self) -> list[dict[str, Any]]:
-        rows = self._exec("SELECT * FROM modes ORDER BY id").fetchall()
-        return [{"id": r["id"], "version": r["version"], "files": json.loads(r["files_json"])}
+        rows = self._exec("SELECT id, version, files_json, signed_json FROM modes ORDER BY id").fetchall()
+        return [{"id": r["id"], "version": r["version"], "files": json.loads(r["files_json"]),
+                 "signed": json.loads(r["signed_json"]) if r["signed_json"] else None}
                 for r in rows]
+
+    def mode_package(self, mode_id: str) -> Optional[bytes]:
+        """A signed package's archive, exactly as signed (None for an unsigned or unknown one)."""
+        row = self._exec("SELECT package FROM modes WHERE id = ?", (mode_id,)).fetchone()
+        return bytes(row["package"]) if row is not None and row["package"] is not None else None
 
     # --- presets ------------------------------------------------------------
 

@@ -4,7 +4,9 @@
  *
  * The Lua sandbox: a memory-capped allocator, an instruction-count
  * watchdog, and only the safe standard libraries (no io, os, package,
- * debug, load or bytecode).
+ * debug, load or bytecode); setmetatable without __gc and an xpcall whose
+ * handler runs with the watchdog on. core/tests/test_sandbox_escape.c is the
+ * battery every change here must pass (phase 5 plan phase 5).
  *
  * Known limit: time spent inside C library functions (for example a slow
  * string pattern) is not counted by the instruction hook.
@@ -70,6 +72,57 @@ static int panic(lua_State *L)
     abort();
 }
 
+/*
+ * Lua runs two kinds of script code with debug hooks switched off, where the
+ * instruction watchdog cannot stop it (found by the sandbox-escape battery,
+ * core/tests/test_sandbox_escape.c, decision P5C-15):
+ *
+ * - __gc metamethods (lgc.c GCTM: "stop debug hooks during GC metamethod"),
+ *   so setmetatable() refuses a metatable with a __gc field. Lua marks a table
+ *   for finalization only when its metatable has __gc at that moment, so a
+ *   __gc added later is never called. Scripts cannot make userdata.
+ * - xpcall()'s message handler when the error came from the watchdog itself
+ *   (the hook raises it while hooks are off, and Lua calls the handler right
+ *   there), so xpcall() is replaced by one that calls the handler after the
+ *   protected call has unwound, with the watchdog on. Unlike Lua's, it cannot
+ *   yield across the call; the handler sees the error but no traceback (the
+ *   debug library is not there anyway).
+ */
+static int safe_setmetatable(lua_State *L)
+{
+    if (lua_type(L, 2) == LUA_TTABLE) {
+        lua_pushliteral(L, "__gc");
+        if (lua_rawget(L, 2) != LUA_TNIL) {
+            return luaL_error(L, "setmetatable: __gc metamethods are not allowed in the sandbox");
+        }
+        lua_pop(L, 1);
+    }
+    lua_pushvalue(L, lua_upvalueindex(1)); /* the standard setmetatable */
+    lua_insert(L, 1);
+    lua_call(L, lua_gettop(L) - 1, 1);
+    return 1;
+}
+
+static int safe_xpcall(lua_State *L)
+{
+    int args = lua_gettop(L) - 2;
+    luaL_checktype(L, 2, LUA_TFUNCTION);
+    luaL_checkany(L, 1);
+    lua_pushboolean(L, 1); /* the first result if all goes well */
+    lua_pushvalue(L, 1);
+    lua_rotate(L, 3, 2); /* f, handler, true, f, args... */
+    if (lua_pcall(L, args, LUA_MULTRET, 0) == LUA_OK) {
+        return lua_gettop(L) - 2;
+    }
+    /* f, handler, true, error: the handler runs now, as any script code. */
+    lua_pushvalue(L, 2);
+    lua_insert(L, -2);
+    lua_call(L, 1, 1);
+    lua_pushboolean(L, 0);
+    lua_insert(L, -2);
+    return 2;
+}
+
 static void remove_field(lua_State *L, const char *table, const char *field)
 {
     if (table == NULL) {
@@ -110,6 +163,13 @@ static int init_state(lua_State *L)
     remove_field(L, LUA_STRLIBNAME, "dump");
     remove_field(L, LUA_MATHLIBNAME, "random");
     remove_field(L, LUA_MATHLIBNAME, "randomseed");
+
+    /* No script code where the watchdog cannot reach (see safe_setmetatable). */
+    lua_getglobal(L, "setmetatable");
+    lua_pushcclosure(L, safe_setmetatable, 1);
+    lua_setglobal(L, "setmetatable");
+    lua_pushcfunction(L, safe_xpcall);
+    lua_setglobal(L, "xpcall");
 
     static const char *const registry_tables[] = {
         REG_HANDLERS,

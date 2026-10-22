@@ -5,7 +5,8 @@
 // the script API in core/src/script_api.c, for node scripts (node.lua, on every box) and field
 // scripts (field.lua, on the field controller), plus a few of Blockly's own (logic, numbers,
 // text, lists, variables, functions). generator.js turns them into Lua; toolbox() lists them
-// for a script kind ('node' or 'field').
+// for a script kind ('node' or 'field'). Plan phase 3 added geo (distances, zones, positions),
+// the mode's GM commands and the mode commands a box gets, and screens by name.
 
 /** Lua words that cannot name a memory value, a setting or a data key. */
 const LUA_WORDS = new Set(('and break do else elseif end false for function goto if in local nil not or '
@@ -48,13 +49,38 @@ export const EVENTS = {
 const EVENT_KEYS = [
     ['key_team', 'team'], ['key_squad', 'squad'], ['key_ms', 'ms'], ['key_key', 'key'],
     ['key_uid', 'uid'], ['key_node', 'node'], ['key_previous_team', 'previous_team'],
-    ['key_name', 'name'],
+    ['key_name', 'name'], ['key_lat', 'lat'], ['key_lon', 'lon'], ['key_acc', 'acc'],
+    ['key_player', 'player'], ['key_role', 'role'], ['key_strength', 'strength'],
 ];
 
-const HUE = { events: 30, timers: 200, memory: 290, game: 350, score: 60, box: 160, settings: 330, field: 120 };
+/** The box's own screens (firmware/esp32/main/screen_renderer.c), which a mode may show without a file. */
+export const BUILTIN_SCREENS = ['neutral', 'captured', 'countdown', 'standby', 'code_entry', 'defused', 'exploded',
+    'final_score'];
+
+/** The most points a polygon zone may have (ATALAIA_GEO_POLYGON_MAX in core/include/atalaia/geo.h). */
+export const POLYGON_MAX = 32;
+
+const HUE = {
+    events: 30, timers: 200, memory: 290, game: 350, score: 60, box: 160, settings: 330, field: 120, geo: 180,
+    commands: 20,
+};
 
 const PAIR = 'AtalaiaPair';
 const PAIR_ITEM = 'AtalaiaStateItem';
+const POINT = 'AtalaiaPoint';
+const ZONE = 'AtalaiaZone';
+
+/** A list of role names separated by commas (medic, terminal), or null. */
+function roleList(text) {
+    const names = String(text).split(',').map((r) => r.trim()).filter(Boolean);
+    return names.length && names.every((r) => luaName(r)) ? names.join(', ') : null;
+}
+
+/** A command name: 1-24 of a-z, 0-9 and _, starting with a letter (mode.yaml commands:). */
+export function commandName(text) {
+    const name = String(text).trim();
+    return /^[a-z][a-z0-9_]{0,23}$/.test(name) ? name : null;
+}
 
 /** A text field that keeps only what the validator accepts. */
 function nameField(name, text, check = luaName) {
@@ -244,6 +270,55 @@ function definitions(t) {
             inputsInline: true, output: 'Number', colour: 230, tooltip: t('idiv_tip'),
         }),
 
+        // ---- geo: geo.distance(), geo.in_zone(), zones, positions (ADR-P4-9) ----
+        value({
+            type: 'atalaia_geo_distance', message0: t('geo_distance'),
+            args0: ['LAT1', 'LON1', 'LAT2', 'LON2'].map((name) => ({ type: 'input_value', name, check: 'Number' })),
+            inputsInline: true, output: 'Number', colour: HUE.geo, tooltip: t('geo_distance_tip'),
+        }),
+        value({
+            type: 'atalaia_geo_in_zone', message0: t('geo_in_zone'),
+            args0: [
+                { type: 'input_value', name: 'LAT', check: 'Number' },
+                { type: 'input_value', name: 'LON', check: 'Number' },
+                { type: 'input_value', name: 'ZONE', check: ZONE },
+            ],
+            inputsInline: true, output: 'Boolean', colour: HUE.geo, tooltip: t('geo_in_zone_tip'),
+        }),
+        value({
+            type: 'atalaia_geo_circle', message0: t('geo_circle'),
+            args0: ['LAT', 'LON', 'RADIUS'].map((name) => ({ type: 'input_value', name, check: 'Number' })),
+            inputsInline: true, output: ZONE, colour: HUE.geo, tooltip: t('geo_circle_tip'),
+        }),
+        value({
+            type: 'atalaia_geo_polygon', message0: t('geo_polygon'),
+            message1: '%1', args1: [{ type: 'input_statement', name: 'POINTS', check: POINT }],
+            output: ZONE, colour: HUE.geo, tooltip: t('geo_polygon_tip'),
+        }),
+        {
+            type: 'atalaia_geo_point', message0: t('geo_point'),
+            args0: [{ type: 'input_value', name: 'LAT', check: 'Number' }, { type: 'input_value', name: 'LON', check: 'Number' }],
+            inputsInline: true, previousStatement: POINT, nextStatement: POINT, colour: HUE.geo, tooltip: t('geo_point_tip'),
+        },
+        value({
+            type: 'atalaia_event_has_position', message0: t('event_has_position'),
+            output: 'Boolean', colour: HUE.geo, tooltip: t('event_has_position_tip'),
+        }),
+
+        // ---- GM commands (mode.yaml commands:) and the mode commands a box gets (cmd.mode) ----
+        {
+            type: 'atalaia_command_declare', message0: t('command_declare'),
+            args0: [nameField('NAME', 'refill', commandName), nameField('ROLES', 'zone', roleList)],
+            message1: t('param_label'), args1: [{ type: 'field_input', name: 'LABEL', text: 'Refill' }],
+            message2: t('param_label_pt'), args2: [{ type: 'field_input', name: 'LABEL_PT', text: '' }],
+            colour: HUE.commands, tooltip: t('command_declare_tip'),
+        },
+        {
+            type: 'atalaia_on_command', message0: t('on_command'),
+            args0: [nameField('NAME', 'refill', commandName)],
+            message1: '%1', args1: [doInput], colour: HUE.events, tooltip: t('on_command_tip'),
+        },
+
         // ---- field.* (field scripts only) ----
         value({
             type: 'atalaia_field_ids', message0: t('field_ids'), args0: [nameField('ROLE', 'zone')],
@@ -263,6 +338,12 @@ function definitions(t) {
             args0: [nameField('CMD', 'set_owner'), { type: 'input_value', name: 'NODE' }],
             message1: t('field_send_with'), args1: [{ type: 'input_statement', name: 'DATA', check: PAIR }],
             colour: HUE.field, tooltip: t('field_send_tip'),
+        }),
+        statement({
+            type: 'atalaia_field_send_mode', message0: t('field_send_mode'),
+            args0: [nameField('NAME', 'status', commandName), { type: 'input_value', name: 'NODE' }],
+            message1: t('field_send_with'), args1: [{ type: 'input_statement', name: 'DATA', check: PAIR }],
+            colour: HUE.field, tooltip: t('field_send_mode_tip'),
         }),
         value({
             type: 'atalaia_field_score', message0: t('field_score'), args0: [{ type: 'input_value', name: 'TEAM' }],
@@ -298,8 +379,11 @@ export function defineBlocks(Blockly, t) {
 const num = (n) => ({ shadow: { type: 'math_number', fields: { NUM: n } } });
 const txt = (s) => ({ shadow: { type: 'text', fields: { TEXT: s } } });
 
-/** The toolbox of one kind of script ('node' or 'field'), category names from t(key). */
-export function toolbox(kind, t) {
+/**
+ * The toolbox of one kind of script ('node' or 'field'), category names from t(key). `screens`:
+ * the names of the mode's own screens (assets/screens/), offered with the box's built-in ones.
+ */
+export function toolbox(kind, t, screens = []) {
     const category = (key, colour, contents) => ({ kind: 'category', name: t(key), colour, contents });
     const block = (type, inputs, fields) => ({ kind: 'block', type, ...(inputs ? { inputs } : {}), ...(fields ? { fields } : {}) });
     const events = [
@@ -324,13 +408,23 @@ export function toolbox(kind, t) {
         block('atalaia_score_add', { POINTS: num(1) }), block('atalaia_score_get'),
         ...(kind === 'field' ? [block('atalaia_field_score')] : []),
     ];
+    const screenNames = [...new Set([...screens, ...BUILTIN_SCREENS])];
     const box = [
-        block('atalaia_screen'), block('atalaia_sound'), block('atalaia_team_display', { TEAM: txt('red') }),
+        ...screenNames.map((name) => block('atalaia_screen', null, { NAME: name })),
+        block('atalaia_sound'), block('atalaia_team_display', { TEAM: txt('red') }),
     ];
     const field = [
         block('atalaia_field_ids'), block('atalaia_field_owner'), block('atalaia_field_common_owner'),
-        block('atalaia_field_send'),
+        block('atalaia_field_send'), block('atalaia_field_send_mode'),
     ];
+    const geo = [
+        block('atalaia_geo_in_zone', { LAT: { block: { type: 'atalaia_event_value', fields: { KEY: 'lat' } } },
+            LON: { block: { type: 'atalaia_event_value', fields: { KEY: 'lon' } } } }),
+        block('atalaia_geo_circle', { LAT: num(38.7), LON: num(-9.1), RADIUS: num(25) }),
+        block('atalaia_geo_polygon'), block('atalaia_geo_point', { LAT: num(38.7), LON: num(-9.1) }),
+        block('atalaia_geo_distance'), block('atalaia_event_has_position'),
+    ];
+    const commands = [block('atalaia_command_declare'), block('atalaia_on_command')];
     const settings = [block('atalaia_param'), block('atalaia_param_declare')];
     const logic = [
         block('controls_if'), { kind: 'block', type: 'controls_if', extraState: { hasElse: true } },
@@ -344,7 +438,7 @@ export function toolbox(kind, t) {
         block('atalaia_rand', { FROM: num(1), TO: num(6) }),
     ];
     const text = [block('text'), block('text_join')];
-    const lists = [block('lists_length'), block('lists_create_with')];
+    const lists = [block('lists_length'), block('lists_create_with'), block('lists_getIndex')];
     return {
         kind: 'categoryToolbox',
         contents: [
@@ -354,6 +448,8 @@ export function toolbox(kind, t) {
             category('cat_game', HUE.game, game),
             category('cat_score', HUE.score, score),
             ...(kind === 'node' ? [category('cat_box', HUE.box, box)] : [category('cat_field', HUE.field, field)]),
+            category('cat_geo', HUE.geo, geo),
+            ...(kind === 'node' ? [category('cat_commands', HUE.commands, commands)] : []),
             category('cat_settings', HUE.settings, settings),
             { kind: 'sep' },
             category('cat_logic', 210, logic),

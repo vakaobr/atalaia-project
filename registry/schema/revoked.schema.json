@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/vakaobr/atalaia-project/registry/schema/revoked.schema.json",
+  "$comment": "Licensed by REUSE.toml. The checks are controller/atalaia_controller/mode_package.py parse_revoked.",
+  "title": "Atalaia revoked mode keys",
+  "description": "Mode keys that no longer count, by key id: a controller installs nothing they signed, even when the key is still in its own list (decisions P5R-7, P5C-11).",
+  "type": "object",
+  "required": ["schema_version", "keys"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "keys": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "required": ["key_id"],
+        "additionalProperties": false,
+        "properties": {
+          "key_id": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+          "reason": { "type": "string", "maxLength": 500 },
+          "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }
+        }
+      }
+    }
+  }
+}

@@ -10,11 +10,15 @@
 // simulator" (plan phase 2) sends the generated files to the simulator's POST /api/reload, which
 // makes them the game its web view shows (in another tab, "atalaia-sim"); the errors the
 // scripts hit there, on loading or while the game runs, come back to the problems list and to
-// the blocks they come from.
+// the blocks they come from. The Mode tab (plan phase 3) also sets the kind (main mode, modifier,
+// role package), the roles with the inputs each needs, and the mode's own screen files.
 /* global Blockly, lua */
 
-import { defineBlocks, luaName, toolbox } from './blocks.js';
-import { defaultInfo, generateProject, generateWorkspaces, LICENCES, lineBlocks, makeGenerator } from './generator.js';
+import { defineBlocks, toolbox } from './blocks.js';
+import {
+    defaultInfo, generateProject, generateWorkspaces, LICENCES, lineBlocks, makeGenerator, modeKind, modeRoles,
+    ROLE_INPUTS, testNodes,
+} from './generator.js';
 
 const LANGS = ['pt', 'en'];
 const LANG_KEY = 'atalaia.editor.lang';
@@ -25,6 +29,30 @@ const FILE_NAMES = { node_lua: 'node.lua', field_lua: 'field.lua', mode_yaml: 'm
 const TEST_POLL_MS = 1000;
 /** The id of the warnings the editor puts on blocks for the simulator's errors. */
 const SIM_WARNING = 'atalaia-sim';
+/** A screen template's file (assets/screens/<name>.yaml): its name, and its size as the core's parser takes it. */
+const SCREEN_NAME = /^[a-z0-9_]{1,31}$/;
+const SCREEN_MAX = 4096; // ATALAIA_TPL_SOURCE_MAX
+const SCREEN_PREFIX = 'assets/screens/';
+
+/**
+ * A screen file the editor keeps: [name, text], or null when it is not one (its name is not a
+ * template name, it is larger than the box takes, or its `template:` line does not name it).
+ */
+export function screenFile(fileName, text) {
+    const name = String(fileName).replace(/\.ya?ml$/, '');
+    if (!SCREEN_NAME.test(name) || new TextEncoder().encode(text).length > SCREEN_MAX) return null;
+    const declared = /^template:\s*["']?([a-z0-9_]+)["']?\s*$/m.exec(text);
+    return declared && declared[1] === name ? [name, text] : null;
+}
+
+/** The Mode tab's form of a saved project: the defaults, then what it says (one role or several). */
+function modeInfo(mode) {
+    const info = { ...defaultInfo(), ...(mode || {}) };
+    info.roles = modeRoles(mode && Array.isArray(mode.roles) ? mode : { role: (mode && mode.role) || 'zone' });
+    info.kind = modeKind(info);
+    delete info.role;
+    return info;
+}
 
 function storageGet(key) {
     try {
@@ -144,15 +172,122 @@ async function main() {
     const form = document.getElementById('mode-form');
     const licence = form.elements.license;
     for (const id of LICENCES) licence.add(new Option(id, id));
-    let info = defaultInfo();
+    let info = modeInfo(null);
+    let screens = {}; // the mode's screen templates: name -> YAML text (assets/screens/)
     const showInfo = () => {
-        for (const [key, value] of Object.entries(info)) if (form.elements[key]) form.elements[key].value = value;
+        for (const [key, value] of Object.entries(info)) {
+            if (form.elements[key] && typeof value === 'string') form.elements[key].value = value;
+        }
+        renderRoles();
     };
     form.addEventListener('input', () => {
         for (const el of form.elements) if (el.name) info[el.name] = el.value;
         changed();
     });
     form.addEventListener('submit', (e) => e.preventDefault());
+
+    // The roles: a row each, with the inputs it needs (those the box script reacts to, or its
+    // own) and whether a game needs one before it starts (mode.yaml needed: false).
+    const rolesBox = document.getElementById('roles');
+    const check = (cls, checked, label, disabled = false) => {
+        const box = Object.assign(document.createElement('input'), { type: 'checkbox', className: cls, checked, disabled });
+        const wrap = document.createElement('label');
+        wrap.append(box, document.createTextNode(label));
+        return wrap;
+    };
+    function renderRoles() {
+        rolesBox.replaceChildren(...info.roles.map((role, i) => {
+            const row = document.createElement('div');
+            row.className = 'role-row';
+            row.dataset.index = String(i);
+            const name = Object.assign(document.createElement('input'), {
+                className: 'role-name', value: role.name, spellcheck: false,
+            });
+            name.setAttribute('aria-label', ui('role_name'));
+            const inputs = document.createElement('span');
+            inputs.className = 'role-inputs';
+            for (const cap of ROLE_INPUTS) {
+                const box = check('role-input', Boolean(role.inputs && role.inputs.includes(cap)), cap, !role.inputs);
+                box.querySelector('input').value = cap;
+                inputs.append(box);
+            }
+            const remove = Object.assign(document.createElement('button'), {
+                type: 'button', className: 'role-remove', textContent: ui('role_remove'), disabled: info.roles.length < 2,
+            });
+            remove.addEventListener('click', () => {
+                info.roles.splice(i, 1);
+                renderRoles();
+                changed();
+            });
+            row.append(name, check('role-auto', !role.inputs, ui('role_auto')), inputs,
+                check('role-needed', role.needed, ui('role_needed')), remove);
+            return row;
+        }));
+    }
+    // Before the form's own listener (which regenerates): the rows into info.roles.
+    rolesBox.addEventListener('input', (e) => {
+        const row = e.target.closest('.role-row');
+        if (!row) return;
+        const auto = row.querySelector('.role-auto').checked;
+        const name = row.querySelector('.role-name').value.trim();
+        let inputs = auto ? null : [...row.querySelectorAll('.role-input')].filter((b) => b.checked).map((b) => b.value);
+        if (e.target.classList.contains('role-auto') && !auto) {
+            // Its own inputs start as those the box script reacts to now (the manifest's requires).
+            const line = files.mode_yaml.split('\n').find((l) => l.startsWith(`  ${name}: {`)) || '';
+            inputs = ((/requires: \[([^\]]*)\]/.exec(line) || [])[1] || '').split(', ').filter(Boolean);
+        }
+        info.roles[Number(row.dataset.index)] = { name, inputs, needed: row.querySelector('.role-needed').checked };
+        if (e.target.classList.contains('role-auto')) renderRoles();
+    });
+    document.getElementById('role-add').addEventListener('click', () => {
+        info.roles.push({ name: `role${info.roles.length + 1}`, inputs: null, needed: true });
+        renderRoles();
+        changed();
+    });
+
+    // The screens: template files the mode brings (assets/screens/<name>.yaml), offered in the
+    // boxes' toolbox with the box's own and kept in the saved project.
+    const screenList = document.getElementById('screens');
+    function renderScreens() {
+        screenList.replaceChildren(...Object.keys(screens).sort().map((name) => {
+            const li = document.createElement('li');
+            li.dataset.screen = name;
+            const remove = Object.assign(document.createElement('button'), { type: 'button', textContent: ui('role_remove') });
+            remove.addEventListener('click', () => {
+                delete screens[name];
+                screensChanged();
+            });
+            li.append(document.createTextNode(`${SCREEN_PREFIX}${name}.yaml`), remove);
+            return li;
+        }));
+        const tabs = document.getElementById('screen-tabs');
+        tabs.replaceChildren(...Object.keys(screens).sort().map((name) => {
+            const button = Object.assign(document.createElement('button'), { type: 'button', textContent: `${name}.yaml` });
+            button.setAttribute('role', 'tab');
+            button.dataset.file = `${SCREEN_PREFIX}${name}.yaml`;
+            button.addEventListener('click', () => selectFile(button.dataset.file));
+            return button;
+        }));
+        workspaces.node.updateToolbox(toolbox('node', t, Object.keys(screens).sort()));
+    }
+    function screensChanged() {
+        renderScreens();
+        if (!(activeFile in files) || (activeFile.startsWith(SCREEN_PREFIX) && !screens[activeFile.slice(SCREEN_PREFIX.length, -5)])) {
+            activeFile = 'mode_yaml';
+        }
+        changed();
+    }
+    document.getElementById('screen-files').addEventListener('change', async (e) => {
+        const bad = [];
+        for (const file of e.target.files) {
+            const found = screenFile(file.name, await file.text());
+            if (found) screens[found[0]] = found[1];
+            else bad.push(file.name);
+        }
+        e.target.value = '';
+        screensChanged();
+        if (bad.length) window.alert(ui('bad_screen').replace('{name}', bad.join(', ')));
+    });
 
     // ---- tabs ----
     let activeFile = 'node_lua';
@@ -203,7 +338,8 @@ async function main() {
         document.getElementById('no-problems').hidden = problems.length > 0;
     }
     function regenerate() {
-        files = generateWorkspaces(g, info, workspaces.node, workspaces.field);
+        files = generateWorkspaces(g, info, workspaces.node, workspaces.field, Object.keys(screens));
+        for (const [name, text] of Object.entries(screens)) files[`${SCREEN_PREFIX}${name}.yaml`] = text;
         // The simulator's errors are about the files it got: once they change, they are gone.
         if (tested && Object.keys(FILE_NAMES).some((f) => files[f] !== tested.files[f])) stopTest();
         show();
@@ -275,13 +411,12 @@ async function main() {
         regenerate();
         stopTest();
         const count = Math.min(16, Math.max(1, Math.round(Number(testBoxes.value)) || 1));
-        const role = (luaName(info.role) || 'zone').slice(0, 20);
-        const nodes = {};
-        for (let i = 1; i <= count; i++) nodes[`${role}${i}`] = role;
+        const nodes = testNodes(info, count);
         const sent = { ...files };
+        const names = Object.keys(screens);
         const maps = {
-            node: sent.node_lua ? lineBlocks(g, workspaces.node, 'node', info, sent.node_lua) : null,
-            field: sent.field_lua ? lineBlocks(g, workspaces.field, 'field', info, sent.field_lua) : null,
+            node: sent.node_lua ? lineBlocks(g, workspaces.node, 'node', info, sent.node_lua, names) : null,
+            field: sent.field_lua ? lineBlocks(g, workspaces.field, 'field', info, sent.field_lua, names) : null,
         };
         setStatus('test_sending');
         let answer;
@@ -308,9 +443,10 @@ async function main() {
         return {
             format: FORMAT,
             version: 1,
-            mode: { ...info },
+            mode: { ...info, roles: info.roles.map((r) => ({ ...r })) },
             node: Blockly.serialization.workspaces.save(workspaces.node),
             field: Blockly.serialization.workspaces.save(workspaces.field),
+            ...(Object.keys(screens).length ? { screens: { ...screens } } : {}),
         };
     }
     function saveDraft() {
@@ -331,8 +467,14 @@ async function main() {
     }
     function load(p) {
         if (!p || p.format !== FORMAT || typeof p.version !== 'number') throw new Error(ui('bad_file'));
-        info = { ...defaultInfo(), ...(p.mode || {}) };
+        info = modeInfo(p.mode);
+        screens = {};
+        for (const [name, text] of Object.entries(p.screens && typeof p.screens === 'object' ? p.screens : {})) {
+            const found = typeof text === 'string' ? screenFile(name, text) : null;
+            if (found) screens[found[0]] = found[1];
+        }
         showInfo();
+        renderScreens();
         for (const kind of ['node', 'field']) {
             workspaces[kind].clear();
             if (p[kind]) Blockly.serialization.workspaces.load(p[kind], workspaces[kind]);
@@ -367,7 +509,7 @@ async function main() {
         if (name && mayReplace()) load(await fetchJson(`examples/${name}.json`));
     });
     document.getElementById('download').addEventListener('click', () => {
-        download(FILE_NAMES[activeFile], files[activeFile], 'text/plain');
+        download(FILE_NAMES[activeFile] || activeFile.split('/').pop(), files[activeFile], 'text/plain');
     });
 
     // The draft from the last visit, else an empty mode.
@@ -392,7 +534,7 @@ async function main() {
         files: () => files,
         selectTab,
         test,
-        lineBlocks: (kind) => lineBlocks(g, workspaces[kind], kind, info, files[`${kind}_lua`]),
+        lineBlocks: (kind) => lineBlocks(g, workspaces[kind], kind, info, files[`${kind}_lua`], Object.keys(screens)),
         blockType: (kind, id) => workspaces[kind].getBlockById(id)?.type ?? null,
     };
     document.body.dataset.ready = 'true';

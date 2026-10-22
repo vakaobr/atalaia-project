@@ -80,7 +80,8 @@ After this refresh the maintainer answered P5R-8: *"we should have a way to
 sync only new modes as needed from the GM console"*. This changes ADR-P5-3's
 amendment and decision K10 for one path, planned as plan phase 13 (PLAN.md,
 "Plan phase 13: Missing modes from the GM console"; decisions P5B-8 to
-P5B-17, open; P5B-9 for the maintainer):
+P5B-17, open; P5B-9 answered by the maintainer on 2026-10-22: mode keys built
+into the box's firmware only):
 
 - **K10, amended (proposed in P5B-14):** a box runs the scripts built into its
   firmware *and* signed mode packages it fetched from its own field controller

@@ -8,9 +8,11 @@
 // it), then the handlers and timers in the order the blocks sit on the workspace, a blank line
 // between each. A handler that only calls a function without arguments names it
 // (on("game.start", show)). Problems the Lua would hit at run time, or the manifest at install
-// time, are listed with each block's id, so the editor can point at the block.
+// time, are listed with each block's id, so the editor can point at the block. Plan phase 3
+// added geo, the mode's GM commands (mode.yaml commands: and their cmd.mode handlers), several
+// roles with their own inputs, the kinds modifier and role, and the mode's screens by name.
 
-import { luaName } from './blocks.js';
+import { BUILTIN_SCREENS, luaName, POLYGON_MAX } from './blocks.js';
 
 const PROCEDURES = new Set(['procedures_defnoreturn', 'procedures_defreturn']);
 const CALLS = new Set(['procedures_callnoreturn', 'procedures_callreturn']);
@@ -18,13 +20,17 @@ const CALLS = new Set(['procedures_callnoreturn', 'procedures_callreturn']);
 const STANDARD = [
     'controls_if', 'logic_compare', 'logic_operation', 'logic_negate', 'logic_boolean', 'logic_null',
     'logic_ternary', 'math_number', 'math_arithmetic', 'math_round', 'math_single', 'text', 'text_join',
-    'lists_length', 'lists_create_with', 'variables_get', 'variables_set', 'procedures_callnoreturn',
+    'lists_length', 'lists_create_with', 'lists_getIndex', 'variables_get', 'variables_set', 'procedures_callnoreturn',
     'procedures_callreturn',
 ];
 /** Inputs a script reacts to, and the capability each one needs (mode.yaml roles: requires). */
 const INPUT_CAPS = [['team_input.', 'team_input'], ['keypad.', 'keypad'], ['nfc.', 'nfc'], ['hit.', 'hit'], ['gps.', 'gps']];
 /** Outputs a script uses, and the capability each one may use (roles: optional). */
 const OUTPUT_CAPS = [['atalaia_team_display', 'team_display'], ['atalaia_sound', 'audio'], ['atalaia_screen', 'display']];
+/** The inputs a role may require, in the order mode.yaml lists them. */
+export const ROLE_INPUTS = INPUT_CAPS.map(([, cap]) => cap);
+/** The kinds the editor makes (a scenario is made in the GM console, P5R-2). */
+export const KINDS = ['mode', 'modifier', 'role'];
 
 /** The approved licences of community modes (ADR-P5-5). */
 export const LICENCES = ['GPL-3.0-or-later', 'LGPL-3.0-or-later', 'MIT', 'Apache-2.0', 'BSD-2-Clause',
@@ -166,7 +172,11 @@ export function makeGenerator(lua) {
         },
         atalaia_score_get: (block) => ['score.get(' + value(block, 'TEAM', Order.NONE) + ')', Order.HIGH],
 
-        atalaia_screen: (block) => 'ui.screen(' + quote(block.getFieldValue('NAME')) + ', ' + table(block, 'DATA') + ')\n',
+        atalaia_screen: (block) => {
+            const name = block.getFieldValue('NAME');
+            if (!BUILTIN_SCREENS.includes(name) && !g.screens_.includes(name)) problem('problem_screen_unknown', block, { name });
+            return 'ui.screen(' + quote(name) + ', ' + table(block, 'DATA') + ')\n';
+        },
         atalaia_sound: (block) => 'audio.play(' + quote(block.getFieldValue('CLIP')) + ')\n',
         atalaia_team_display: (block) => 'cap("team_display"):show(' + value(block, 'TEAM', Order.NONE) + ')\n',
 
@@ -183,7 +193,46 @@ export function makeGenerator(lua) {
             value(block, 'A', Order.MULTIPLICATIVE, '0') + ' // ' + value(block, 'B', Order.EXPONENTIATION, '1'),
             Order.MULTIPLICATIVE],
 
+        atalaia_geo_distance: (block) => [
+            'geo.distance(' + ['LAT1', 'LON1', 'LAT2', 'LON2'].map((n) => value(block, n, Order.NONE, '0')).join(', ') + ')',
+            Order.HIGH],
+        atalaia_geo_in_zone: (block) => [
+            'geo.in_zone(' + value(block, 'LAT', Order.NONE, '0') + ', ' + value(block, 'LON', Order.NONE, '0') + ', '
+                + value(block, 'ZONE', Order.NONE) + ')', Order.HIGH],
+        atalaia_geo_circle: (block) => [
+            '{ type = "circle", lat = ' + value(block, 'LAT', Order.NONE, '0') + ', lon = ' + value(block, 'LON', Order.NONE, '0')
+                + ', radius_m = ' + value(block, 'RADIUS', Order.NONE, '0') + ' }', Order.HIGH],
+        atalaia_geo_polygon: (block) => {
+            const points = [];
+            for (let b = block.getInputTargetBlock('POINTS'); b; b = b.getNextBlock()) {
+                if (b.isEnabled() && b.type === 'atalaia_geo_point') {
+                    points.push('{ ' + value(b, 'LAT', Order.NONE, '0') + ', ' + value(b, 'LON', Order.NONE, '0') + ' }');
+                }
+            }
+            if (points.length < 3 || points.length > POLYGON_MAX) problem('problem_polygon_points', block, { name: String(POLYGON_MAX) });
+            return ['{ type = "polygon", points = { ' + points.join(', ') + ' } }', Order.HIGH];
+        },
+        atalaia_geo_point: () => '',
+        atalaia_event_has_position: (block) => {
+            eventValue(block, 'lat');
+            return ['type(e.lat) == "number" and type(e.lon) == "number"', Order.AND];
+        },
+
+        atalaia_command_declare: () => '',
+        // A mode command (the GM's from the console, or field.send(node, "mode", ...)) reaches the
+        // box as cmd.mode with its name: one handler per name, which returns at once for another.
+        atalaia_on_command: (block) => {
+            const frame = { event: true, used: true };
+            g.frames_.push(frame);
+            const code = g.statementToCode(block, 'DO');
+            g.frames_.pop();
+            const i = g.INDENT;
+            return 'on("cmd.mode", function(e)\n' + i + 'if e.name ~= ' + quote(block.getFieldValue('NAME')) + ' then\n'
+                + i + i + 'return\n' + i + 'end\n' + code + 'end)\n';
+        },
+
         atalaia_field_ids: (block) => {
+            g.rolesUsed_.push([block.getFieldValue('ROLE'), block]);
             const helper = g.provideFunction_('node_ids', [
                 `local function ${g.FUNCTION_NAME_PLACEHOLDER_}(role)`,
                 '  local found = {}',
@@ -203,6 +252,12 @@ export function makeGenerator(lua) {
             const args = [value(block, 'NODE', Order.NONE, '0'), quote(block.getFieldValue('CMD'))];
             if (data !== '{}') args.push(data);
             return 'field.send(' + args.join(', ') + ')\n';
+        },
+        atalaia_field_send_mode: (block) => {
+            const data = table(block, 'DATA');
+            const name = 'name = ' + quote(block.getFieldValue('NAME'));
+            const params = data === '{}' ? '{ ' + name + ' }' : '{ ' + name + ', ' + data.slice(2);
+            return 'field.send(' + value(block, 'NODE', Order.NONE, '0') + ', "mode", ' + params + ')\n';
         },
         atalaia_field_score: (block) => ['field.score()[' + value(block, 'TEAM', Order.NONE) + ']', Order.HIGH],
 
@@ -254,6 +309,14 @@ function orderProcedures(procs) {
     return { ordered: out, forward };
 }
 
+/** Whether a block sits in the body of a for-each loop over the variable `id`. */
+function insideLoopOf(block, id) {
+    for (let b = block.getSurroundParent(); b; b = b.getSurroundParent()) {
+        if (b.type === 'controls_forEach' && b.getFieldValue('VAR') === id) return true;
+    }
+    return false;
+}
+
 /** The variables the script keeps at the top level: not function parameters, not only loop variables. */
 function topVariables(ws, procs) {
     const params = new Set();
@@ -265,7 +328,9 @@ function topVariables(ws, procs) {
             for (const field of input.fieldRow) {
                 if (field.referencesVariables && field.referencesVariables()) {
                     const id = field.getValue();
-                    const loopOnly = block.type === 'controls_forEach' && field.name === 'VAR';
+                    // A for-each loop's variable is local to the loop in Lua, and so is reading it inside one.
+                    const loopOnly = (block.type === 'controls_forEach' && field.name === 'VAR')
+                        || (block.type === 'variables_get' && insideLoopOf(block, id));
                     if (!used.has(id)) used.set(id, true);
                     if (!loopOnly) used.set(id, false);
                 }
@@ -282,8 +347,10 @@ function topVariables(ws, procs) {
  * tab's form (name, description, licence, author, year). Returns { code, problems, used }, code
  * '' when the workspace has no script blocks.
  */
-export function generateScript(g, ws, kind, info) {
+export function generateScript(g, ws, kind, info, screens = []) {
     g.kind_ = kind;
+    g.screens_ = screens;
+    g.rolesUsed_ = [];
     g.problems_ = [];
     g.frames_ = [];
     g.paramsUsed_ = [];
@@ -303,7 +370,7 @@ export function generateScript(g, ws, kind, info) {
     const { ordered, forward } = orderProcedures(procs);
     g.forward_ = forward;
     const skip = new Set(['atalaia_state_node', 'atalaia_state_field', 'atalaia_state_item', 'atalaia_pair',
-        'atalaia_param_declare']);
+        'atalaia_param_declare', 'atalaia_command_declare', 'atalaia_geo_point']);
     const rest = top.filter((b) => !PROCEDURES.has(b.type) && !skip.has(b.type) && !b.outputConnection);
 
     const procCode = ordered.map((b) => g.blockToCode(b));
@@ -329,7 +396,7 @@ export function generateScript(g, ws, kind, info) {
     chunks.push(...procCode, ...restCode);
     const body = chunks.filter((c) => c && c.trim());
     const used = new Set(g.paramsUsed_.map(([name]) => name));
-    const result = { code: '', problems: g.problems_, params: g.paramsUsed_, used };
+    const result = { code: '', problems: g.problems_, params: g.paramsUsed_, used, roles: g.rolesUsed_ };
     if (!body.length) return result;
     const where = kind === 'field' ? 'on the field controller' : 'on each box';
     // The generated files' own licence headers (REUSE-IgnoreStart)
@@ -355,11 +422,11 @@ const MARK = /^\s*--@@'(.*)'$/;
  * marker before it. Returns an array (index n - 1 for line n; null before any block), or null
  * when the two do not agree.
  */
-export function lineBlocks(g, ws, kind, info, code) {
+export function lineBlocks(g, ws, kind, info, code, screens = []) {
     g.STATEMENT_PREFIX = '--@@%1\n';
     let marked;
     try {
-        marked = generateScript(g, ws, kind, info).code;
+        marked = generateScript(g, ws, kind, info, screens).code;
     } finally {
         g.STATEMENT_PREFIX = null;
     }
@@ -420,9 +487,34 @@ function yamlValue(v) {
 }
 
 /**
- * mode.yaml from the Mode tab's form and both workspaces: the settings from their declaration
- * blocks, the role's capabilities from the blocks the box script uses (inputs it reacts to are
- * required, outputs it uses are optional). Returns { code, problems }.
+ * The mode's roles from the Mode tab: [{ name, inputs, needed }], `inputs` null for "the inputs the
+ * box script reacts to" or a list of ROLE_INPUTS. A project saved before plan phase 3 has one
+ * `role` (a name) instead.
+ */
+export function modeRoles(info) {
+    const roles = Array.isArray(info.roles) ? info.roles : [{ name: info.role || 'zone' }];
+    return roles.map((r) => ({
+        name: String((r && r.name) || '').trim(),
+        inputs: r && Array.isArray(r.inputs) ? ROLE_INPUTS.filter((cap) => r.inputs.includes(cap)) : null,
+        needed: !(r && r.needed === false),
+    }));
+}
+
+/** The kind the Mode tab says (mode, modifier, role), mode when it says nothing else. */
+export function modeKind(info) {
+    return KINDS.includes(info.kind) ? info.kind : 'mode';
+}
+
+/** The command declarations of a workspace. */
+function commandBlocks(ws) {
+    return ws.getTopBlocks(true).filter((b) => b.isEnabled() && b.type === 'atalaia_command_declare');
+}
+
+/**
+ * mode.yaml from the Mode tab's form and both workspaces: the settings and GM commands from their
+ * declaration blocks; each role's capabilities from the blocks the box script uses (inputs it
+ * reacts to are required, unless the role lists its own; outputs it uses are optional). Returns
+ * { code, problems }.
  */
 export function generateManifest(info, nodeWs, fieldWs, scripts) {
     const problems = [];
@@ -451,12 +543,62 @@ export function generateManifest(info, nodeWs, fieldWs, scripts) {
     const blocks = nodeWs.getAllBlocks(false).filter((b) => b.isEnabled());
     const events = blocks.filter((b) => b.type === 'atalaia_on_node' || b.type === 'atalaia_on_custom')
         .map((b) => b.getFieldValue('EVENT'));
-    const requires = INPUT_CAPS.filter(([prefix]) => events.some((e) => e.startsWith(prefix))).map(([, cap]) => cap);
+    const handled = INPUT_CAPS.filter(([prefix]) => events.some((e) => e.startsWith(prefix))).map(([, cap]) => cap);
     const optional = OUTPUT_CAPS.filter(([type]) => blocks.some((b) => b.type === type)).map(([, cap]) => cap);
-    const role = luaName(info.role) || 'zone';
-    const caps = [];
-    if (requires.length) caps.push(`requires: [${requires.join(', ')}]`);
-    if (optional.length) caps.push(`optional: [${optional.join(', ')}]`);
+
+    // ---- roles ----
+    const roles = modeRoles(info);
+    const roleNames = new Set();
+    const roleLines = [];
+    if (!roles.length) problems.push({ key: 'problem_no_role', block: null });
+    for (const role of roles) {
+        if (!luaName(role.name)) {
+            problems.push({ key: 'problem_bad_role', block: null, name: role.name });
+            continue;
+        }
+        if (roleNames.has(role.name)) {
+            problems.push({ key: 'problem_role_twice', block: null, name: role.name });
+            continue;
+        }
+        roleNames.add(role.name);
+        const requires = role.inputs || handled;
+        if (role.inputs && role.inputs.some((cap) => !handled.includes(cap))) {
+            problems.push({ key: 'problem_role_input_unhandled', block: null, name: role.name });
+        }
+        if (role.inputs && !role.inputs.length && handled.length) {
+            problems.push({ key: 'problem_role_no_input', block: null, name: role.name });
+        }
+        const caps = [];
+        if (requires.length) caps.push(`requires: [${requires.join(', ')}]`);
+        if (optional.length) caps.push(`optional: [${optional.join(', ')}]`);
+        if (!role.needed) caps.push('needed: false');
+        roleLines.push(`  ${role.name}: { ${caps.join(', ')} }`.replace('{  }', '{}'));
+    }
+    for (const script of scripts) {
+        for (const [name, block] of script.roles || []) {
+            if (!roleNames.has(name)) problems.push({ key: 'problem_role_unknown', block: block.id, name });
+        }
+    }
+
+    // ---- GM commands ----
+    const commands = [];
+    const commandNames = new Set();
+    const handlers = new Set(blocks.filter((b) => b.type === 'atalaia_on_command').map((b) => b.getFieldValue('NAME')));
+    for (const block of commandBlocks(nodeWs)) {
+        const name = block.getFieldValue('NAME');
+        if (commandNames.has(name)) {
+            problems.push({ key: 'problem_command_twice', block: block.id, name });
+            continue;
+        }
+        commandNames.add(name);
+        const forRoles = String(block.getFieldValue('ROLES')).split(',').map((r) => r.trim()).filter(Boolean);
+        for (const role of forRoles.filter((r) => !roleNames.has(r))) {
+            problems.push({ key: 'problem_role_unknown', block: block.id, name: role });
+        }
+        if (!handlers.has(name)) problems.push({ key: 'problem_command_unhandled', block: block.id, name });
+        commands.push([name, forRoles, String(block.getFieldValue('LABEL') || '').trim() || name,
+            String(block.getFieldValue('LABEL_PT') || '').trim()]);
+    }
 
     // (REUSE-IgnoreStart)
     const lines = [
@@ -466,11 +608,11 @@ export function generateManifest(info, nodeWs, fieldWs, scripts) {
         `version: ${info.version}`,
         `license: ${info.license}`,
         `min_tier: ${info.min_tier}`,
-        'kind: mode',
+        `kind: ${modeKind(info)}`,
         `name: ${yamlValue(info.name)}`,
         `description: ${yamlValue(info.description)}`,
         'roles:',
-        `  ${role}: { ${caps.join(', ')} }`.replace('{  }', '{}'),
+        ...roleLines,
     ];
     if (params.length) {
         lines.push('params:');
@@ -479,14 +621,25 @@ export function generateManifest(info, nodeWs, fieldWs, scripts) {
             lines.push(`  ${name}: { ${fields.join(', ')} }`);
         }
     }
+    if (commands.length) {
+        lines.push('commands:');
+        for (const [name, forRoles, label] of commands) {
+            lines.push(`  ${name}: { roles: [${forRoles.join(', ')}], label: ${yamlValue(label)} }`);
+        }
+    }
     const labelsPt = params.filter(([, , pt]) => pt);
-    if (info.name_pt || info.description_pt || labelsPt.length) {
+    const commandsPt = commands.filter(([, , , pt]) => pt);
+    if (info.name_pt || info.description_pt || labelsPt.length || commandsPt.length) {
         lines.push('i18n:', '  pt:');
         if (info.name_pt) lines.push(`    name: ${yamlValue(info.name_pt)}`);
         if (info.description_pt) lines.push(`    description: ${yamlValue(info.description_pt)}`);
         if (labelsPt.length) {
             lines.push('    params:');
             for (const [name, , pt] of labelsPt) lines.push(`      ${name}: ${yamlValue(pt)}`);
+        }
+        if (commandsPt.length) {
+            lines.push('    commands:');
+            for (const [name, , , pt] of commandsPt) lines.push(`      ${name}: ${yamlValue(pt)}`);
         }
     }
     return { code: lines.join('\n') + '\n', problems };
@@ -496,9 +649,27 @@ export function generateManifest(info, nodeWs, fieldWs, scripts) {
 export function defaultInfo() {
     return {
         id: 'org.club.my-mode', version: '0.1.0', name: 'My mode', description: '', name_pt: '',
-        description_pt: '', role: 'zone', license: 'GPL-3.0-or-later', min_tier: 'reduced',
-        author: 'The Atalaia contributors', year: String(new Date().getFullYear()),
+        description_pt: '', kind: 'mode', roles: [{ name: 'zone', inputs: null, needed: true }],
+        license: 'GPL-3.0-or-later', min_tier: 'reduced', author: 'The Atalaia contributors',
+        year: String(new Date().getFullYear()),
     };
+}
+
+/**
+ * The boxes the editor's Test starts the simulator with: `count` boxes, one for each role but
+ * the last and the rest for the last (Master and Satellites: master1, satellite1, satellite2),
+ * at least one per role. Names are the role and a number, at most 24 characters.
+ */
+export function testNodes(info, count) {
+    const names = [...new Set(modeRoles(info).map((r) => r.name).filter((n) => luaName(n)))];
+    if (!names.length) names.push('zone');
+    const total = Math.min(16, Math.max(names.length, count));
+    const nodes = {};
+    names.forEach((role, i) => {
+        const n = i < names.length - 1 ? 1 : total - (names.length - 1);
+        for (let k = 1; k <= n; k++) nodes[`${role.slice(0, 20)}${k}`] = role;
+    });
+    return nodes;
 }
 
 /**
@@ -507,6 +678,8 @@ export function defaultInfo() {
  */
 export function generateProject(Blockly, g, project) {
     const info = { ...defaultInfo(), ...(project.mode || {}) };
+    if (project.mode && !Array.isArray(project.mode.roles)) info.roles = modeRoles(project.mode);
+    const screens = Object.keys(project.screens || {});
     const load = (state) => {
         const ws = new Blockly.Workspace();
         if (state) Blockly.serialization.workspaces.load(state, ws);
@@ -515,17 +688,17 @@ export function generateProject(Blockly, g, project) {
     const nodeWs = load(project.node);
     const fieldWs = load(project.field);
     try {
-        return generateWorkspaces(g, info, nodeWs, fieldWs);
+        return generateWorkspaces(g, info, nodeWs, fieldWs, screens);
     } finally {
         nodeWs.dispose();
         fieldWs.dispose();
     }
 }
 
-/** Every file from the two live (or headless) workspaces. */
-export function generateWorkspaces(g, info, nodeWs, fieldWs) {
-    const node = generateScript(g, nodeWs, 'node', info);
-    const field = generateScript(g, fieldWs, 'field', info);
+/** Every file from the two live (or headless) workspaces; `screens`: the names of the mode's own. */
+export function generateWorkspaces(g, info, nodeWs, fieldWs, screens = []) {
+    const node = generateScript(g, nodeWs, 'node', info, screens);
+    const field = generateScript(g, fieldWs, 'field', info, screens);
     const manifest = generateManifest(info, nodeWs, fieldWs, [node, field]);
     return {
         node_lua: node.code,

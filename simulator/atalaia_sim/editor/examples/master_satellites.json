@@ -1,0 +1,3113 @@
+{
+ "format": "atalaia-mode-editor",
+ "version": 1,
+ "mode": {
+  "id": "org.atalaia.master_satellites",
+  "version": "0.1.0",
+  "name": "Master and Satellites",
+  "description": "Teams capture a master box and its satellites as in Domination. Only the master scores, and the satellites its holder also holds raise its points; when the master changes hands, every satellite goes back to neutral.",
+  "name_pt": "Mestre e Satélites",
+  "description_pt": "As equipas capturam uma caixa mestre e os seus satélites como no Domínio. Só a mestre pontua, e os satélites que a mesma equipa tiver aumentam os seus pontos; quando a mestre muda de mãos, todos os satélites voltam a ficar neutros.",
+  "kind": "mode",
+  "roles": [
+   {
+    "name": "master",
+    "inputs": null,
+    "needed": true
+   },
+   {
+    "name": "satellite",
+    "inputs": null,
+    "needed": true
+   }
+  ],
+  "license": "GPL-3.0-or-later",
+  "min_tier": "reduced",
+  "author": "The Atalaia contributors",
+  "year": "2026"
+ },
+ "node": {
+  "blocks": {
+   "languageVersion": 0,
+   "blocks": [
+    {
+     "type": "atalaia_state_node",
+     "id": "m5",
+     "x": 20,
+     "y": 28,
+     "icons": {
+      "comment": {
+       "text": "Who holds this box, and since when (game time in seconds).",
+       "pinned": false,
+       "height": 80,
+       "width": 240
+      }
+     },
+     "inputs": {
+      "ITEMS": {
+       "block": {
+        "type": "atalaia_state_item",
+        "id": "m2",
+        "fields": {
+         "KEY": "owner"
+        },
+        "inputs": {
+         "VALUE": {
+          "block": {
+           "type": "logic_null",
+           "id": "m1"
+          }
+         }
+        },
+        "next": {
+         "block": {
+          "type": "atalaia_state_item",
+          "id": "m4",
+          "fields": {
+           "KEY": "since"
+          },
+          "inputs": {
+           "VALUE": {
+            "block": {
+             "type": "math_number",
+             "id": "m3",
+             "fields": {
+              "NUM": 0
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "atalaia_param_declare",
+     "id": "m6",
+     "x": 1000,
+     "y": 20,
+     "fields": {
+      "NAME": "capture_hold_ms",
+      "TYPE": "int",
+      "DEFAULT": "3000",
+      "MIN": "0",
+      "MAX": "60000",
+      "LABEL": "Hold time to capture (ms)",
+      "LABEL_PT": "Tempo a premir para capturar (ms)"
+     }
+    },
+    {
+     "type": "procedures_defnoreturn",
+     "id": "m29",
+     "x": 20,
+     "y": 180,
+     "icons": {
+      "comment": {
+       "text": "A box the controller told it is the master shows its holder's satellites; others who holds them.",
+       "pinned": false,
+       "height": 80,
+       "width": 240
+      }
+     },
+     "fields": {
+      "NAME": "show"
+     },
+     "inputs": {
+      "STACK": {
+       "block": {
+        "type": "controls_if",
+        "id": "m28",
+        "extraState": {
+         "elseIfCount": 1,
+         "hasElse": true
+        },
+        "inputs": {
+         "IF0": {
+          "block": {
+           "type": "logic_compare",
+           "id": "m9",
+           "fields": {
+            "OP": "EQ"
+           },
+           "inputs": {
+            "A": {
+             "block": {
+              "type": "atalaia_state_get",
+              "id": "m7",
+              "fields": {
+               "KEY": "owner"
+              }
+             }
+            },
+            "B": {
+             "block": {
+              "type": "logic_null",
+              "id": "m8"
+             }
+            }
+           }
+          }
+         },
+         "DO0": {
+          "block": {
+           "type": "atalaia_screen",
+           "id": "m10",
+           "fields": {
+            "NAME": "neutral"
+           },
+           "inputs": {}
+          }
+         },
+         "IF1": {
+          "block": {
+           "type": "variables_get",
+           "id": "m11",
+           "fields": {
+            "VAR": {
+             "id": "v-master"
+            }
+           }
+          }
+         },
+         "DO1": {
+          "block": {
+           "type": "atalaia_screen",
+           "id": "m22",
+           "fields": {
+            "NAME": "master_status"
+           },
+           "inputs": {
+            "DATA": {
+             "block": {
+              "type": "atalaia_pair",
+              "id": "m13",
+              "fields": {
+               "KEY": "team"
+              },
+              "inputs": {
+               "VALUE": {
+                "block": {
+                 "type": "atalaia_state_get",
+                 "id": "m12",
+                 "fields": {
+                  "KEY": "owner"
+                 }
+                }
+               }
+              },
+              "next": {
+               "block": {
+                "type": "atalaia_pair",
+                "id": "m15",
+                "fields": {
+                 "KEY": "since"
+                },
+                "inputs": {
+                 "VALUE": {
+                  "block": {
+                   "type": "atalaia_state_get",
+                   "id": "m14",
+                   "fields": {
+                    "KEY": "since"
+                   }
+                  }
+                 }
+                },
+                "next": {
+                 "block": {
+                  "type": "atalaia_pair",
+                  "id": "m17",
+                  "fields": {
+                   "KEY": "held"
+                  },
+                  "inputs": {
+                   "VALUE": {
+                    "block": {
+                     "type": "variables_get",
+                     "id": "m16",
+                     "fields": {
+                      "VAR": {
+                       "id": "v-held"
+                      }
+                     }
+                    }
+                   }
+                  },
+                  "next": {
+                   "block": {
+                    "type": "atalaia_pair",
+                    "id": "m19",
+                    "fields": {
+                     "KEY": "of"
+                    },
+                    "inputs": {
+                     "VALUE": {
+                      "block": {
+                       "type": "variables_get",
+                       "id": "m18",
+                       "fields": {
+                        "VAR": {
+                         "id": "v-of"
+                        }
+                       }
+                      }
+                     }
+                    },
+                    "next": {
+                     "block": {
+                      "type": "atalaia_pair",
+                      "id": "m21",
+                      "fields": {
+                       "KEY": "points"
+                      },
+                      "inputs": {
+                       "VALUE": {
+                        "block": {
+                         "type": "variables_get",
+                         "id": "m20",
+                         "fields": {
+                          "VAR": {
+                           "id": "v-points"
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "ELSE": {
+          "block": {
+           "type": "atalaia_screen",
+           "id": "m27",
+           "fields": {
+            "NAME": "captured"
+           },
+           "inputs": {
+            "DATA": {
+             "block": {
+              "type": "atalaia_pair",
+              "id": "m24",
+              "fields": {
+               "KEY": "team"
+              },
+              "inputs": {
+               "VALUE": {
+                "block": {
+                 "type": "atalaia_state_get",
+                 "id": "m23",
+                 "fields": {
+                  "KEY": "owner"
+                 }
+                }
+               }
+              },
+              "next": {
+               "block": {
+                "type": "atalaia_pair",
+                "id": "m26",
+                "fields": {
+                 "KEY": "since"
+                },
+                "inputs": {
+                 "VALUE": {
+                  "block": {
+                   "type": "atalaia_state_get",
+                   "id": "m25",
+                   "fields": {
+                    "KEY": "since"
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "procedures_defnoreturn",
+     "id": "m52",
+     "x": 20,
+     "y": 520,
+     "icons": {
+      "comment": {
+       "text": "A new holder of the master starts with no satellites (they are freed); the controller's next status confirms it.",
+       "pinned": false,
+       "height": 80,
+       "width": 240
+      }
+     },
+     "extraState": {
+      "params": [
+       {
+        "name": "team",
+        "id": "v-team"
+       },
+       {
+        "name": "squad",
+        "id": "v-squad"
+       }
+      ]
+     },
+     "fields": {
+      "NAME": "capture"
+     },
+     "inputs": {
+      "STACK": {
+       "block": {
+        "type": "atalaia_emit",
+        "id": "m36",
+        "fields": {
+         "TYPE": "zone.captured",
+         "PRIO": "default"
+        },
+        "inputs": {
+         "DATA": {
+          "block": {
+           "type": "atalaia_pair",
+           "id": "m31",
+           "fields": {
+            "KEY": "team"
+           },
+           "inputs": {
+            "VALUE": {
+             "block": {
+              "type": "variables_get",
+              "id": "m30",
+              "fields": {
+               "VAR": {
+                "id": "v-team"
+               }
+              }
+             }
+            }
+           },
+           "next": {
+            "block": {
+             "type": "atalaia_pair",
+             "id": "m33",
+             "fields": {
+              "KEY": "squad"
+             },
+             "inputs": {
+              "VALUE": {
+               "block": {
+                "type": "variables_get",
+                "id": "m32",
+                "fields": {
+                 "VAR": {
+                  "id": "v-squad"
+                 }
+                }
+               }
+              }
+             },
+             "next": {
+              "block": {
+               "type": "atalaia_pair",
+               "id": "m35",
+               "fields": {
+                "KEY": "previous_team"
+               },
+               "inputs": {
+                "VALUE": {
+                 "block": {
+                  "type": "atalaia_state_get",
+                  "id": "m34",
+                  "fields": {
+                   "KEY": "owner"
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        },
+        "next": {
+         "block": {
+          "type": "atalaia_state_set",
+          "id": "m38",
+          "fields": {
+           "KEY": "owner"
+          },
+          "inputs": {
+           "VALUE": {
+            "block": {
+             "type": "variables_get",
+             "id": "m37",
+             "fields": {
+              "VAR": {
+               "id": "v-team"
+              }
+             }
+            }
+           }
+          },
+          "next": {
+           "block": {
+            "type": "atalaia_state_set",
+            "id": "m41",
+            "fields": {
+             "KEY": "since"
+            },
+            "inputs": {
+             "VALUE": {
+              "block": {
+               "type": "math_round",
+               "id": "m40",
+               "fields": {
+                "OP": "ROUNDDOWN"
+               },
+               "inputs": {
+                "NUM": {
+                 "block": {
+                  "type": "atalaia_time",
+                  "id": "m39"
+                 }
+                }
+               }
+              }
+             }
+            },
+            "next": {
+             "block": {
+              "type": "atalaia_team_display",
+              "id": "m43",
+              "inputs": {
+               "TEAM": {
+                "block": {
+                 "type": "variables_get",
+                 "id": "m42",
+                 "fields": {
+                  "VAR": {
+                   "id": "v-team"
+                  }
+                 }
+                }
+               }
+              },
+              "next": {
+               "block": {
+                "type": "atalaia_sound",
+                "id": "m44",
+                "fields": {
+                 "CLIP": "captured"
+                },
+                "next": {
+                 "block": {
+                  "type": "controls_if",
+                  "id": "m50",
+                  "inputs": {
+                   "IF0": {
+                    "block": {
+                     "type": "variables_get",
+                     "id": "m45",
+                     "fields": {
+                      "VAR": {
+                       "id": "v-master"
+                      }
+                     }
+                    }
+                   },
+                   "DO0": {
+                    "block": {
+                     "type": "variables_set",
+                     "id": "m47",
+                     "fields": {
+                      "VAR": {
+                       "id": "v-held"
+                      }
+                     },
+                     "inputs": {
+                      "VALUE": {
+                       "block": {
+                        "type": "math_number",
+                        "id": "m46",
+                        "fields": {
+                         "NUM": 0
+                        }
+                       }
+                      }
+                     },
+                     "next": {
+                      "block": {
+                       "type": "variables_set",
+                       "id": "m49",
+                       "fields": {
+                        "VAR": {
+                         "id": "v-points"
+                        }
+                       },
+                       "inputs": {
+                        "VALUE": {
+                         "block": {
+                          "type": "atalaia_param",
+                          "id": "m48",
+                          "fields": {
+                           "NAME": "points_per_tick"
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  },
+                  "next": {
+                   "block": {
+                    "type": "procedures_callnoreturn",
+                    "id": "m51",
+                    "extraState": {
+                     "name": "show"
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "atalaia_on_node",
+     "id": "m54",
+     "x": 20,
+     "y": 960,
+     "fields": {
+      "EVENT": "game.start"
+     },
+     "inputs": {
+      "DO": {
+       "block": {
+        "type": "procedures_callnoreturn",
+        "id": "m53",
+        "extraState": {
+         "name": "show"
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "atalaia_on_node",
+     "id": "m66",
+     "x": 20,
+     "y": 1060,
+     "fields": {
+      "EVENT": "team_input.hold"
+     },
+     "inputs": {
+      "DO": {
+       "block": {
+        "type": "controls_if",
+        "id": "m65",
+        "inputs": {
+         "IF0": {
+          "block": {
+           "type": "logic_operation",
+           "id": "m61",
+           "fields": {
+            "OP": "AND"
+           },
+           "inputs": {
+            "A": {
+             "block": {
+              "type": "logic_compare",
+              "id": "m57",
+              "fields": {
+               "OP": "NEQ"
+              },
+              "inputs": {
+               "A": {
+                "block": {
+                 "type": "atalaia_event_value",
+                 "id": "m55",
+                 "fields": {
+                  "KEY": "team"
+                 }
+                }
+               },
+               "B": {
+                "block": {
+                 "type": "atalaia_state_get",
+                 "id": "m56",
+                 "fields": {
+                  "KEY": "owner"
+                 }
+                }
+               }
+              }
+             }
+            },
+            "B": {
+             "block": {
+              "type": "logic_compare",
+              "id": "m60",
+              "fields": {
+               "OP": "GTE"
+              },
+              "inputs": {
+               "A": {
+                "block": {
+                 "type": "atalaia_event_value",
+                 "id": "m58",
+                 "fields": {
+                  "KEY": "ms"
+                 }
+                }
+               },
+               "B": {
+                "block": {
+                 "type": "atalaia_param",
+                 "id": "m59",
+                 "fields": {
+                  "NAME": "capture_hold_ms"
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "DO0": {
+          "block": {
+           "type": "procedures_callnoreturn",
+           "id": "m64",
+           "extraState": {
+            "name": "capture",
+            "params": [
+             "team",
+             "squad"
+            ]
+           },
+           "inputs": {
+            "ARG0": {
+             "block": {
+              "type": "atalaia_event_value",
+              "id": "m62",
+              "fields": {
+               "KEY": "team"
+              }
+             }
+            },
+            "ARG1": {
+             "block": {
+              "type": "atalaia_event_value",
+              "id": "m63",
+              "fields": {
+               "KEY": "squad"
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "atalaia_on_node",
+     "id": "m111",
+     "x": 20,
+     "y": 1260,
+     "icons": {
+      "comment": {
+       "text": "The GM's owner override, and the controller freeing the satellites: a team, or none to free the box (a free box stays as it is).",
+       "pinned": false,
+       "height": 80,
+       "width": 240
+      }
+     },
+     "fields": {
+      "EVENT": "cmd.set_owner"
+     },
+     "inputs": {
+      "DO": {
+       "block": {
+        "type": "controls_if",
+        "id": "m87",
+        "inputs": {
+         "IF0": {
+          "block": {
+           "type": "logic_operation",
+           "id": "m85",
+           "fields": {
+            "OP": "OR"
+           },
+           "inputs": {
+            "A": {
+             "block": {
+              "type": "logic_compare",
+              "id": "m69",
+              "fields": {
+               "OP": "EQ"
+              },
+              "inputs": {
+               "A": {
+                "block": {
+                 "type": "atalaia_event_value",
+                 "id": "m67",
+                 "fields": {
+                  "KEY": "team"
+                 }
+                }
+               },
+               "B": {
+                "block": {
+                 "type": "atalaia_state_get",
+                 "id": "m68",
+                 "fields": {
+                  "KEY": "owner"
+                 }
+                }
+               }
+              }
+             }
+            },
+            "B": {
+             "block": {
+              "type": "logic_operation",
+              "id": "m84",
+              "fields": {
+               "OP": "AND"
+              },
+              "inputs": {
+               "A": {
+                "block": {
+                 "type": "logic_operation",
+                 "id": "m80",
+                 "fields": {
+                  "OP": "OR"
+                 },
+                 "inputs": {
+                  "A": {
+                   "block": {
+                    "type": "logic_operation",
+                    "id": "m76",
+                    "fields": {
+                     "OP": "OR"
+                    },
+                    "inputs": {
+                     "A": {
+                      "block": {
+                       "type": "logic_compare",
+                       "id": "m72",
+                       "fields": {
+                        "OP": "EQ"
+                       },
+                       "inputs": {
+                        "A": {
+                         "block": {
+                          "type": "atalaia_event_value",
+                          "id": "m70",
+                          "fields": {
+                           "KEY": "team"
+                          }
+                         }
+                        },
+                        "B": {
+                         "block": {
+                          "type": "logic_null",
+                          "id": "m71"
+                         }
+                        }
+                       }
+                      }
+                     },
+                     "B": {
+                      "block": {
+                       "type": "logic_compare",
+                       "id": "m75",
+                       "fields": {
+                        "OP": "EQ"
+                       },
+                       "inputs": {
+                        "A": {
+                         "block": {
+                          "type": "atalaia_event_value",
+                          "id": "m73",
+                          "fields": {
+                           "KEY": "team"
+                          }
+                         }
+                        },
+                        "B": {
+                         "block": {
+                          "type": "text",
+                          "id": "m74",
+                          "fields": {
+                           "TEXT": ""
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  },
+                  "B": {
+                   "block": {
+                    "type": "logic_compare",
+                    "id": "m79",
+                    "fields": {
+                     "OP": "EQ"
+                    },
+                    "inputs": {
+                     "A": {
+                      "block": {
+                       "type": "atalaia_event_value",
+                       "id": "m77",
+                       "fields": {
+                        "KEY": "team"
+                       }
+                      }
+                     },
+                     "B": {
+                      "block": {
+                       "type": "text",
+                       "id": "m78",
+                       "fields": {
+                        "TEXT": "none"
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               },
+               "B": {
+                "block": {
+                 "type": "logic_compare",
+                 "id": "m83",
+                 "fields": {
+                  "OP": "EQ"
+                 },
+                 "inputs": {
+                  "A": {
+                   "block": {
+                    "type": "atalaia_state_get",
+                    "id": "m81",
+                    "fields": {
+                     "KEY": "owner"
+                    }
+                   }
+                  },
+                  "B": {
+                   "block": {
+                    "type": "logic_null",
+                    "id": "m82"
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "DO0": {
+          "block": {
+           "type": "atalaia_return",
+           "id": "m86"
+          }
+         }
+        },
+        "next": {
+         "block": {
+          "type": "controls_if",
+          "id": "m110",
+          "extraState": {
+           "hasElse": true
+          },
+          "inputs": {
+           "IF0": {
+            "block": {
+             "type": "logic_operation",
+             "id": "m98",
+             "fields": {
+              "OP": "OR"
+             },
+             "inputs": {
+              "A": {
+               "block": {
+                "type": "logic_operation",
+                "id": "m94",
+                "fields": {
+                 "OP": "OR"
+                },
+                "inputs": {
+                 "A": {
+                  "block": {
+                   "type": "logic_compare",
+                   "id": "m90",
+                   "fields": {
+                    "OP": "EQ"
+                   },
+                   "inputs": {
+                    "A": {
+                     "block": {
+                      "type": "atalaia_event_value",
+                      "id": "m88",
+                      "fields": {
+                       "KEY": "team"
+                      }
+                     }
+                    },
+                    "B": {
+                     "block": {
+                      "type": "logic_null",
+                      "id": "m89"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 "B": {
+                  "block": {
+                   "type": "logic_compare",
+                   "id": "m93",
+                   "fields": {
+                    "OP": "EQ"
+                   },
+                   "inputs": {
+                    "A": {
+                     "block": {
+                      "type": "atalaia_event_value",
+                      "id": "m91",
+                      "fields": {
+                       "KEY": "team"
+                      }
+                     }
+                    },
+                    "B": {
+                     "block": {
+                      "type": "text",
+                      "id": "m92",
+                      "fields": {
+                       "TEXT": ""
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              },
+              "B": {
+               "block": {
+                "type": "logic_compare",
+                "id": "m97",
+                "fields": {
+                 "OP": "EQ"
+                },
+                "inputs": {
+                 "A": {
+                  "block": {
+                   "type": "atalaia_event_value",
+                   "id": "m95",
+                   "fields": {
+                    "KEY": "team"
+                   }
+                  }
+                 },
+                 "B": {
+                  "block": {
+                   "type": "text",
+                   "id": "m96",
+                   "fields": {
+                    "TEXT": "none"
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           },
+           "DO0": {
+            "block": {
+             "type": "atalaia_emit",
+             "id": "m101",
+             "fields": {
+              "TYPE": "zone.neutralized",
+              "PRIO": "default"
+             },
+             "inputs": {
+              "DATA": {
+               "block": {
+                "type": "atalaia_pair",
+                "id": "m100",
+                "fields": {
+                 "KEY": "previous_team"
+                },
+                "inputs": {
+                 "VALUE": {
+                  "block": {
+                   "type": "atalaia_state_get",
+                   "id": "m99",
+                   "fields": {
+                    "KEY": "owner"
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             },
+             "next": {
+              "block": {
+               "type": "atalaia_state_set",
+               "id": "m103",
+               "fields": {
+                "KEY": "owner"
+               },
+               "inputs": {
+                "VALUE": {
+                 "block": {
+                  "type": "logic_null",
+                  "id": "m102"
+                 }
+                }
+               },
+               "next": {
+                "block": {
+                 "type": "atalaia_team_display",
+                 "id": "m105",
+                 "inputs": {
+                  "TEAM": {
+                   "block": {
+                    "type": "text",
+                    "id": "m104",
+                    "fields": {
+                     "TEXT": "none"
+                    }
+                   }
+                  }
+                 },
+                 "next": {
+                  "block": {
+                   "type": "procedures_callnoreturn",
+                   "id": "m106",
+                   "extraState": {
+                    "name": "show"
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           },
+           "ELSE": {
+            "block": {
+             "type": "procedures_callnoreturn",
+             "id": "m109",
+             "extraState": {
+              "name": "capture",
+              "params": [
+               "team",
+               "squad"
+              ]
+             },
+             "inputs": {
+              "ARG0": {
+               "block": {
+                "type": "atalaia_event_value",
+                "id": "m107",
+                "fields": {
+                 "KEY": "team"
+                }
+               }
+              },
+              "ARG1": {
+               "block": {
+                "type": "logic_null",
+                "id": "m108"
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "atalaia_on_command",
+     "id": "m129",
+     "x": 20,
+     "y": 1720,
+     "icons": {
+      "comment": {
+       "text": "From field.lua, to the master box only: its holder's satellites and points per tick.",
+       "pinned": false,
+       "height": 80,
+       "width": 240
+      }
+     },
+     "fields": {
+      "NAME": "status"
+     },
+     "inputs": {
+      "DO": {
+       "block": {
+        "type": "controls_if",
+        "id": "m116",
+        "inputs": {
+         "IF0": {
+          "block": {
+           "type": "logic_compare",
+           "id": "m114",
+           "fields": {
+            "OP": "NEQ"
+           },
+           "inputs": {
+            "A": {
+             "block": {
+              "type": "atalaia_event_value",
+              "id": "m112",
+              "fields": {
+               "KEY": "team"
+              }
+             }
+            },
+            "B": {
+             "block": {
+              "type": "atalaia_state_get",
+              "id": "m113",
+              "fields": {
+               "KEY": "owner"
+              }
+             }
+            }
+           }
+          }
+         },
+         "DO0": {
+          "block": {
+           "type": "atalaia_return",
+           "id": "m115"
+          }
+         }
+        },
+        "next": {
+         "block": {
+          "type": "variables_set",
+          "id": "m118",
+          "fields": {
+           "VAR": {
+            "id": "v-master"
+           }
+          },
+          "inputs": {
+           "VALUE": {
+            "block": {
+             "type": "logic_boolean",
+             "id": "m117",
+             "fields": {
+              "BOOL": "TRUE"
+             }
+            }
+           }
+          },
+          "next": {
+           "block": {
+            "type": "variables_set",
+            "id": "m121",
+            "fields": {
+             "VAR": {
+              "id": "v-held"
+             }
+            },
+            "inputs": {
+             "VALUE": {
+              "block": {
+               "type": "math_round",
+               "id": "m120",
+               "fields": {
+                "OP": "ROUNDDOWN"
+               },
+               "inputs": {
+                "NUM": {
+                 "block": {
+                  "type": "atalaia_event_value_custom",
+                  "id": "m119",
+                  "fields": {
+                   "KEY": "held"
+                  }
+                 }
+                }
+               }
+              }
+             }
+            },
+            "next": {
+             "block": {
+              "type": "variables_set",
+              "id": "m124",
+              "fields": {
+               "VAR": {
+                "id": "v-of"
+               }
+              },
+              "inputs": {
+               "VALUE": {
+                "block": {
+                 "type": "math_round",
+                 "id": "m123",
+                 "fields": {
+                  "OP": "ROUNDDOWN"
+                 },
+                 "inputs": {
+                  "NUM": {
+                   "block": {
+                    "type": "atalaia_event_value_custom",
+                    "id": "m122",
+                    "fields": {
+                     "KEY": "of"
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              },
+              "next": {
+               "block": {
+                "type": "variables_set",
+                "id": "m127",
+                "fields": {
+                 "VAR": {
+                  "id": "v-points"
+                 }
+                },
+                "inputs": {
+                 "VALUE": {
+                  "block": {
+                   "type": "math_round",
+                   "id": "m126",
+                   "fields": {
+                    "OP": "ROUNDDOWN"
+                   },
+                   "inputs": {
+                    "NUM": {
+                     "block": {
+                      "type": "atalaia_event_value_custom",
+                      "id": "m125",
+                      "fields": {
+                       "KEY": "points"
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                },
+                "next": {
+                 "block": {
+                  "type": "procedures_callnoreturn",
+                  "id": "m128",
+                  "extraState": {
+                   "name": "show"
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "atalaia_on_node",
+     "id": "m133",
+     "x": 20,
+     "y": 2060,
+     "fields": {
+      "EVENT": "game.end"
+     },
+     "inputs": {
+      "DO": {
+       "block": {
+        "type": "atalaia_screen",
+        "id": "m132",
+        "fields": {
+         "NAME": "final_score"
+        },
+        "inputs": {
+         "DATA": {
+          "block": {
+           "type": "atalaia_pair",
+           "id": "m131",
+           "fields": {
+            "KEY": "owner"
+           },
+           "inputs": {
+            "VALUE": {
+             "block": {
+              "type": "atalaia_state_get",
+              "id": "m130",
+              "fields": {
+               "KEY": "owner"
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  "variables": [
+   {
+    "name": "team",
+    "id": "v-team"
+   },
+   {
+    "name": "squad",
+    "id": "v-squad"
+   },
+   {
+    "name": "master",
+    "id": "v-master"
+   },
+   {
+    "name": "held",
+    "id": "v-held"
+   },
+   {
+    "name": "of",
+    "id": "v-of"
+   },
+   {
+    "name": "points",
+    "id": "v-points"
+   }
+  ]
+ },
+ "field": {
+  "blocks": {
+   "languageVersion": 0,
+   "blocks": [
+    {
+     "type": "atalaia_state_field",
+     "id": "m138",
+     "x": 20,
+     "y": 28,
+     "icons": {
+      "comment": {
+       "text": "Who holds the master, and how many satellites they hold too (the console shows both).",
+       "pinned": false,
+       "height": 80,
+       "width": 240
+      }
+     },
+     "inputs": {
+      "ITEMS": {
+       "block": {
+        "type": "atalaia_state_item",
+        "id": "m135",
+        "fields": {
+         "KEY": "master"
+        },
+        "inputs": {
+         "VALUE": {
+          "block": {
+           "type": "logic_null",
+           "id": "m134"
+          }
+         }
+        },
+        "next": {
+         "block": {
+          "type": "atalaia_state_item",
+          "id": "m137",
+          "fields": {
+           "KEY": "held"
+          },
+          "inputs": {
+           "VALUE": {
+            "block": {
+             "type": "math_number",
+             "id": "m136",
+             "fields": {
+              "NUM": 0
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "atalaia_param_declare",
+     "id": "m139",
+     "x": 1000,
+     "y": 20,
+     "fields": {
+      "NAME": "tick_s",
+      "TYPE": "int",
+      "DEFAULT": "10",
+      "MIN": "1",
+      "MAX": "600",
+      "LABEL": "Seconds per scoring tick while a team holds the master",
+      "LABEL_PT": "Segundos por intervalo enquanto uma equipa tem a mestre"
+     }
+    },
+    {
+     "type": "atalaia_param_declare",
+     "id": "m140",
+     "x": 1000,
+     "y": 170,
+     "fields": {
+      "NAME": "points_per_tick",
+      "TYPE": "int",
+      "DEFAULT": "2",
+      "MIN": "1",
+      "MAX": "1000",
+      "LABEL": "Points per tick for the master alone",
+      "LABEL_PT": "Pontos por intervalo só pela mestre"
+     }
+    },
+    {
+     "type": "atalaia_param_declare",
+     "id": "m141",
+     "x": 1000,
+     "y": 320,
+     "fields": {
+      "NAME": "satellite_bonus_pct",
+      "TYPE": "int",
+      "DEFAULT": "50",
+      "MIN": "0",
+      "MAX": "1000",
+      "LABEL": "Bonus per satellite held, in % of the master's points (rounded down)",
+      "LABEL_PT": "Bónus por satélite, em % dos pontos da mestre (arredondado para baixo)"
+     }
+    },
+    {
+     "type": "atalaia_param_declare",
+     "id": "m142",
+     "x": 1000,
+     "y": 470,
+     "fields": {
+      "NAME": "min_satellites",
+      "TYPE": "int",
+      "DEFAULT": "0",
+      "MIN": "0",
+      "MAX": "63",
+      "LABEL": "Satellites the master's holder needs before the master scores",
+      "LABEL_PT": "Satélites de que a equipa da mestre precisa antes de a mestre pontuar"
+     }
+    },
+    {
+     "type": "procedures_defreturn",
+     "id": "m161",
+     "x": 20,
+     "y": 180,
+     "icons": {
+      "comment": {
+       "text": "How many satellites a team holds.",
+       "pinned": false,
+       "height": 80,
+       "width": 240
+      }
+     },
+     "extraState": {
+      "params": [
+       {
+        "name": "team",
+        "id": "v-team"
+       }
+      ]
+     },
+     "fields": {
+      "NAME": "satellites_held"
+     },
+     "inputs": {
+      "STACK": {
+       "block": {
+        "type": "variables_set",
+        "id": "m144",
+        "fields": {
+         "VAR": {
+          "id": "v-count"
+         }
+        },
+        "inputs": {
+         "VALUE": {
+          "block": {
+           "type": "math_number",
+           "id": "m143",
+           "fields": {
+            "NUM": 0
+           }
+          }
+         }
+        },
+        "next": {
+         "block": {
+          "type": "controls_forEach",
+          "id": "m159",
+          "fields": {
+           "VAR": {
+            "id": "v-n"
+           }
+          },
+          "inputs": {
+           "LIST": {
+            "block": {
+             "type": "atalaia_field_ids",
+             "id": "m145",
+             "fields": {
+              "ROLE": "satellite"
+             }
+            }
+           },
+           "DO": {
+            "block": {
+             "type": "controls_if",
+             "id": "m158",
+             "inputs": {
+              "IF0": {
+               "block": {
+                "type": "logic_operation",
+                "id": "m153",
+                "fields": {
+                 "OP": "AND"
+                },
+                "inputs": {
+                 "A": {
+                  "block": {
+                   "type": "logic_compare",
+                   "id": "m148",
+                   "fields": {
+                    "OP": "NEQ"
+                   },
+                   "inputs": {
+                    "A": {
+                     "block": {
+                      "type": "variables_get",
+                      "id": "m146",
+                      "fields": {
+                       "VAR": {
+                        "id": "v-team"
+                       }
+                      }
+                     }
+                    },
+                    "B": {
+                     "block": {
+                      "type": "logic_null",
+                      "id": "m147"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 "B": {
+                  "block": {
+                   "type": "logic_compare",
+                   "id": "m152",
+                   "fields": {
+                    "OP": "EQ"
+                   },
+                   "inputs": {
+                    "A": {
+                     "block": {
+                      "type": "atalaia_field_owner",
+                      "id": "m150",
+                      "inputs": {
+                       "NODE": {
+                        "block": {
+                         "type": "variables_get",
+                         "id": "m149",
+                         "fields": {
+                          "VAR": {
+                           "id": "v-n"
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    },
+                    "B": {
+                     "block": {
+                      "type": "variables_get",
+                      "id": "m151",
+                      "fields": {
+                       "VAR": {
+                        "id": "v-team"
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              },
+              "DO0": {
+               "block": {
+                "type": "variables_set",
+                "id": "m157",
+                "fields": {
+                 "VAR": {
+                  "id": "v-count"
+                 }
+                },
+                "inputs": {
+                 "VALUE": {
+                  "block": {
+                   "type": "math_arithmetic",
+                   "id": "m156",
+                   "fields": {
+                    "OP": "ADD"
+                   },
+                   "inputs": {
+                    "A": {
+                     "block": {
+                      "type": "variables_get",
+                      "id": "m154",
+                      "fields": {
+                       "VAR": {
+                        "id": "v-count"
+                       }
+                      }
+                     }
+                    },
+                    "B": {
+                     "block": {
+                      "type": "math_number",
+                      "id": "m155",
+                      "fields": {
+                       "NUM": 1
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      },
+      "RETURN": {
+       "block": {
+        "type": "variables_get",
+        "id": "m160",
+        "fields": {
+         "VAR": {
+          "id": "v-count"
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "procedures_defreturn",
+     "id": "m176",
+     "x": 20,
+     "y": 420,
+     "icons": {
+      "comment": {
+       "text": "The master's points per tick: the points alone plus a bonus per satellite, rounded down; none below the smallest number of satellites.",
+       "pinned": false,
+       "height": 80,
+       "width": 240
+      }
+     },
+     "extraState": {
+      "params": [
+       {
+        "name": "satellites",
+        "id": "v-satellites"
+       }
+      ]
+     },
+     "fields": {
+      "NAME": "points_for"
+     },
+     "inputs": {
+      "RETURN": {
+       "block": {
+        "type": "logic_ternary",
+        "id": "m175",
+        "inputs": {
+         "IF": {
+          "block": {
+           "type": "logic_compare",
+           "id": "m164",
+           "fields": {
+            "OP": "LT"
+           },
+           "inputs": {
+            "A": {
+             "block": {
+              "type": "variables_get",
+              "id": "m162",
+              "fields": {
+               "VAR": {
+                "id": "v-satellites"
+               }
+              }
+             }
+            },
+            "B": {
+             "block": {
+              "type": "atalaia_param",
+              "id": "m163",
+              "fields": {
+               "NAME": "min_satellites"
+              }
+             }
+            }
+           }
+          }
+         },
+         "THEN": {
+          "block": {
+           "type": "math_number",
+           "id": "m165",
+           "fields": {
+            "NUM": 0
+           }
+          }
+         },
+         "ELSE": {
+          "block": {
+           "type": "math_arithmetic",
+           "id": "m174",
+           "fields": {
+            "OP": "ADD"
+           },
+           "inputs": {
+            "A": {
+             "block": {
+              "type": "atalaia_param",
+              "id": "m166",
+              "fields": {
+               "NAME": "points_per_tick"
+              }
+             }
+            },
+            "B": {
+             "block": {
+              "type": "atalaia_idiv",
+              "id": "m173",
+              "inputs": {
+               "A": {
+                "block": {
+                 "type": "math_arithmetic",
+                 "id": "m171",
+                 "fields": {
+                  "OP": "MULTIPLY"
+                 },
+                 "inputs": {
+                  "A": {
+                   "block": {
+                    "type": "math_arithmetic",
+                    "id": "m169",
+                    "fields": {
+                     "OP": "MULTIPLY"
+                    },
+                    "inputs": {
+                     "A": {
+                      "block": {
+                       "type": "atalaia_param",
+                       "id": "m167",
+                       "fields": {
+                        "NAME": "points_per_tick"
+                       }
+                      }
+                     },
+                     "B": {
+                      "block": {
+                       "type": "variables_get",
+                       "id": "m168",
+                       "fields": {
+                        "VAR": {
+                         "id": "v-satellites"
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  },
+                  "B": {
+                   "block": {
+                    "type": "atalaia_param",
+                    "id": "m170",
+                    "fields": {
+                     "NAME": "satellite_bonus_pct"
+                    }
+                   }
+                  }
+                 }
+                }
+               },
+               "B": {
+                "block": {
+                 "type": "math_number",
+                 "id": "m172",
+                 "fields": {
+                  "NUM": 100
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "procedures_defnoreturn",
+     "id": "m183",
+     "x": 20,
+     "y": 600,
+     "fields": {
+      "NAME": "free_satellites"
+     },
+     "inputs": {
+      "STACK": {
+       "block": {
+        "type": "controls_forEach",
+        "id": "m182",
+        "fields": {
+         "VAR": {
+          "id": "v-n"
+         }
+        },
+        "inputs": {
+         "LIST": {
+          "block": {
+           "type": "atalaia_field_ids",
+           "id": "m177",
+           "fields": {
+            "ROLE": "satellite"
+           }
+          }
+         },
+         "DO": {
+          "block": {
+           "type": "atalaia_field_send",
+           "id": "m181",
+           "fields": {
+            "CMD": "set_owner"
+           },
+           "inputs": {
+            "NODE": {
+             "block": {
+              "type": "variables_get",
+              "id": "m178",
+              "fields": {
+               "VAR": {
+                "id": "v-n"
+               }
+              }
+             }
+            },
+            "DATA": {
+             "block": {
+              "type": "atalaia_pair",
+              "id": "m180",
+              "fields": {
+               "KEY": "team"
+              },
+              "inputs": {
+               "VALUE": {
+                "block": {
+                 "type": "text",
+                 "id": "m179",
+                 "fields": {
+                  "TEXT": "none"
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "procedures_defnoreturn",
+     "id": "m276",
+     "x": 20,
+     "y": 760,
+     "icons": {
+      "comment": {
+       "text": "Box owners come from the boxes' reports, which can arrive a little after the capture event, so this also runs every second. When the master leaves a team's hands, every satellite is freed.",
+       "pinned": false,
+       "height": 80,
+       "width": 240
+      }
+     },
+     "fields": {
+      "NAME": "check"
+     },
+     "inputs": {
+      "STACK": {
+       "block": {
+        "type": "variables_set",
+        "id": "m187",
+        "fields": {
+         "VAR": {
+          "id": "v-id"
+         }
+        },
+        "inputs": {
+         "VALUE": {
+          "block": {
+           "type": "lists_getIndex",
+           "id": "m186",
+           "fields": {
+            "MODE": "GET",
+            "WHERE": "FROM_START"
+           },
+           "inputs": {
+            "VALUE": {
+             "block": {
+              "type": "atalaia_field_ids",
+              "id": "m184",
+              "fields": {
+               "ROLE": "master"
+              }
+             }
+            },
+            "AT": {
+             "block": {
+              "type": "math_number",
+              "id": "m185",
+              "fields": {
+               "NUM": 1
+              }
+             }
+            }
+           }
+          }
+         }
+        },
+        "next": {
+         "block": {
+          "type": "variables_set",
+          "id": "m195",
+          "fields": {
+           "VAR": {
+            "id": "v-owner"
+           }
+          },
+          "inputs": {
+           "VALUE": {
+            "block": {
+             "type": "logic_ternary",
+             "id": "m194",
+             "inputs": {
+              "IF": {
+               "block": {
+                "type": "logic_compare",
+                "id": "m190",
+                "fields": {
+                 "OP": "NEQ"
+                },
+                "inputs": {
+                 "A": {
+                  "block": {
+                   "type": "variables_get",
+                   "id": "m188",
+                   "fields": {
+                    "VAR": {
+                     "id": "v-id"
+                    }
+                   }
+                  }
+                 },
+                 "B": {
+                  "block": {
+                   "type": "logic_null",
+                   "id": "m189"
+                  }
+                 }
+                }
+               }
+              },
+              "THEN": {
+               "block": {
+                "type": "atalaia_field_owner",
+                "id": "m192",
+                "inputs": {
+                 "NODE": {
+                  "block": {
+                   "type": "variables_get",
+                   "id": "m191",
+                   "fields": {
+                    "VAR": {
+                     "id": "v-id"
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              },
+              "ELSE": {
+               "block": {
+                "type": "logic_null",
+                "id": "m193"
+               }
+              }
+             }
+            }
+           }
+          },
+          "next": {
+           "block": {
+            "type": "controls_if",
+            "id": "m232",
+            "inputs": {
+             "IF0": {
+              "block": {
+               "type": "logic_compare",
+               "id": "m198",
+               "fields": {
+                "OP": "NEQ"
+               },
+               "inputs": {
+                "A": {
+                 "block": {
+                  "type": "variables_get",
+                  "id": "m196",
+                  "fields": {
+                   "VAR": {
+                    "id": "v-owner"
+                   }
+                  }
+                 }
+                },
+                "B": {
+                 "block": {
+                  "type": "atalaia_state_get",
+                  "id": "m197",
+                  "fields": {
+                   "KEY": "master"
+                  }
+                 }
+                }
+               }
+              }
+             },
+             "DO0": {
+              "block": {
+               "type": "controls_if",
+               "id": "m205",
+               "inputs": {
+                "IF0": {
+                 "block": {
+                  "type": "logic_compare",
+                  "id": "m201",
+                  "fields": {
+                   "OP": "NEQ"
+                  },
+                  "inputs": {
+                   "A": {
+                    "block": {
+                     "type": "variables_get",
+                     "id": "m199",
+                     "fields": {
+                      "VAR": {
+                       "id": "v-tick"
+                      }
+                     }
+                    }
+                   },
+                   "B": {
+                    "block": {
+                     "type": "logic_null",
+                     "id": "m200"
+                    }
+                   }
+                  }
+                 }
+                },
+                "DO0": {
+                 "block": {
+                  "type": "atalaia_cancel",
+                  "id": "m202",
+                  "fields": {
+                   "TIMER": {
+                    "id": "v-tick"
+                   }
+                  },
+                  "next": {
+                   "block": {
+                    "type": "variables_set",
+                    "id": "m204",
+                    "fields": {
+                     "VAR": {
+                      "id": "v-tick"
+                     }
+                    },
+                    "inputs": {
+                     "VALUE": {
+                      "block": {
+                       "type": "logic_null",
+                       "id": "m203"
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               },
+               "next": {
+                "block": {
+                 "type": "controls_if",
+                 "id": "m210",
+                 "inputs": {
+                  "IF0": {
+                   "block": {
+                    "type": "logic_compare",
+                    "id": "m208",
+                    "fields": {
+                     "OP": "NEQ"
+                    },
+                    "inputs": {
+                     "A": {
+                      "block": {
+                       "type": "atalaia_state_get",
+                       "id": "m206",
+                       "fields": {
+                        "KEY": "master"
+                       }
+                      }
+                     },
+                     "B": {
+                      "block": {
+                       "type": "logic_null",
+                       "id": "m207"
+                      }
+                     }
+                    }
+                   }
+                  },
+                  "DO0": {
+                   "block": {
+                    "type": "procedures_callnoreturn",
+                    "id": "m209",
+                    "extraState": {
+                     "name": "free_satellites"
+                    }
+                   }
+                  }
+                 },
+                 "next": {
+                  "block": {
+                   "type": "atalaia_state_set",
+                   "id": "m212",
+                   "fields": {
+                    "KEY": "master"
+                   },
+                   "inputs": {
+                    "VALUE": {
+                     "block": {
+                      "type": "variables_get",
+                      "id": "m211",
+                      "fields": {
+                       "VAR": {
+                        "id": "v-owner"
+                       }
+                      }
+                     }
+                    }
+                   },
+                   "next": {
+                    "block": {
+                     "type": "variables_set",
+                     "id": "m214",
+                     "fields": {
+                      "VAR": {
+                       "id": "v-told"
+                      }
+                     },
+                     "inputs": {
+                      "VALUE": {
+                       "block": {
+                        "type": "logic_null",
+                        "id": "m213"
+                       }
+                      }
+                     },
+                     "next": {
+                      "block": {
+                       "type": "controls_if",
+                       "id": "m231",
+                       "inputs": {
+                        "IF0": {
+                         "block": {
+                          "type": "logic_compare",
+                          "id": "m217",
+                          "fields": {
+                           "OP": "NEQ"
+                          },
+                          "inputs": {
+                           "A": {
+                            "block": {
+                             "type": "variables_get",
+                             "id": "m215",
+                             "fields": {
+                              "VAR": {
+                               "id": "v-owner"
+                              }
+                             }
+                            }
+                           },
+                           "B": {
+                            "block": {
+                             "type": "logic_null",
+                             "id": "m216"
+                            }
+                           }
+                          }
+                         }
+                        },
+                        "DO0": {
+                         "block": {
+                          "type": "atalaia_every_as",
+                          "id": "m230",
+                          "icons": {
+                           "comment": {
+                            "text": "The first points come one full tick after the capture.",
+                            "pinned": false,
+                            "height": 80,
+                            "width": 240
+                           }
+                          },
+                          "fields": {
+                           "TIMER": {
+                            "id": "v-tick"
+                           }
+                          },
+                          "inputs": {
+                           "SECONDS": {
+                            "block": {
+                             "type": "atalaia_param",
+                             "id": "m218",
+                             "fields": {
+                              "NAME": "tick_s"
+                             }
+                            }
+                           },
+                           "DO": {
+                            "block": {
+                             "type": "variables_set",
+                             "id": "m222",
+                             "fields": {
+                              "VAR": {
+                               "id": "v-amount"
+                              }
+                             },
+                             "inputs": {
+                              "VALUE": {
+                               "block": {
+                                "type": "procedures_callreturn",
+                                "id": "m221",
+                                "extraState": {
+                                 "name": "points_for",
+                                 "params": [
+                                  "satellites"
+                                 ]
+                                },
+                                "inputs": {
+                                 "ARG0": {
+                                  "block": {
+                                   "type": "procedures_callreturn",
+                                   "id": "m220",
+                                   "extraState": {
+                                    "name": "satellites_held",
+                                    "params": [
+                                     "team"
+                                    ]
+                                   },
+                                   "inputs": {
+                                    "ARG0": {
+                                     "block": {
+                                      "type": "atalaia_state_get",
+                                      "id": "m219",
+                                      "fields": {
+                                       "KEY": "master"
+                                      }
+                                     }
+                                    }
+                                   }
+                                  }
+                                 }
+                                }
+                               }
+                              }
+                             },
+                             "next": {
+                              "block": {
+                               "type": "controls_if",
+                               "id": "m229",
+                               "inputs": {
+                                "IF0": {
+                                 "block": {
+                                  "type": "logic_compare",
+                                  "id": "m225",
+                                  "fields": {
+                                   "OP": "GT"
+                                  },
+                                  "inputs": {
+                                   "A": {
+                                    "block": {
+                                     "type": "variables_get",
+                                     "id": "m223",
+                                     "fields": {
+                                      "VAR": {
+                                       "id": "v-amount"
+                                      }
+                                     }
+                                    }
+                                   },
+                                   "B": {
+                                    "block": {
+                                     "type": "math_number",
+                                     "id": "m224",
+                                     "fields": {
+                                      "NUM": 0
+                                     }
+                                    }
+                                   }
+                                  }
+                                 }
+                                },
+                                "DO0": {
+                                 "block": {
+                                  "type": "atalaia_score_add",
+                                  "id": "m228",
+                                  "fields": {
+                                   "REASON": "master"
+                                  },
+                                  "inputs": {
+                                   "POINTS": {
+                                    "block": {
+                                     "type": "variables_get",
+                                     "id": "m226",
+                                     "fields": {
+                                      "VAR": {
+                                       "id": "v-amount"
+                                      }
+                                     }
+                                    }
+                                   },
+                                   "TEAM": {
+                                    "block": {
+                                     "type": "atalaia_state_get",
+                                     "id": "m227",
+                                     "fields": {
+                                      "KEY": "master"
+                                     }
+                                    }
+                                   }
+                                  }
+                                 }
+                                }
+                               }
+                              }
+                             }
+                            }
+                           }
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            },
+            "next": {
+             "block": {
+              "type": "variables_set",
+              "id": "m235",
+              "fields": {
+               "VAR": {
+                "id": "v-held"
+               }
+              },
+              "inputs": {
+               "VALUE": {
+                "block": {
+                 "type": "procedures_callreturn",
+                 "id": "m234",
+                 "extraState": {
+                  "name": "satellites_held",
+                  "params": [
+                   "team"
+                  ]
+                 },
+                 "inputs": {
+                  "ARG0": {
+                   "block": {
+                    "type": "variables_get",
+                    "id": "m233",
+                    "fields": {
+                     "VAR": {
+                      "id": "v-owner"
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              },
+              "next": {
+               "block": {
+                "type": "variables_set",
+                "id": "m238",
+                "fields": {
+                 "VAR": {
+                  "id": "v-of"
+                 }
+                },
+                "inputs": {
+                 "VALUE": {
+                  "block": {
+                   "type": "lists_length",
+                   "id": "m237",
+                   "inputs": {
+                    "VALUE": {
+                     "block": {
+                      "type": "atalaia_field_ids",
+                      "id": "m236",
+                      "fields": {
+                       "ROLE": "satellite"
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                },
+                "next": {
+                 "block": {
+                  "type": "controls_if",
+                  "id": "m244",
+                  "inputs": {
+                   "IF0": {
+                    "block": {
+                     "type": "logic_compare",
+                     "id": "m241",
+                     "fields": {
+                      "OP": "NEQ"
+                     },
+                     "inputs": {
+                      "A": {
+                       "block": {
+                        "type": "atalaia_state_get",
+                        "id": "m239",
+                        "fields": {
+                         "KEY": "held"
+                        }
+                       }
+                      },
+                      "B": {
+                       "block": {
+                        "type": "variables_get",
+                        "id": "m240",
+                        "fields": {
+                         "VAR": {
+                          "id": "v-held"
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   },
+                   "DO0": {
+                    "block": {
+                     "type": "atalaia_state_set",
+                     "id": "m243",
+                     "fields": {
+                      "KEY": "held"
+                     },
+                     "inputs": {
+                      "VALUE": {
+                       "block": {
+                        "type": "variables_get",
+                        "id": "m242",
+                        "fields": {
+                         "VAR": {
+                          "id": "v-held"
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  },
+                  "next": {
+                   "block": {
+                    "type": "controls_if",
+                    "id": "m275",
+                    "inputs": {
+                     "IF0": {
+                      "block": {
+                       "type": "logic_compare",
+                       "id": "m247",
+                       "fields": {
+                        "OP": "NEQ"
+                       },
+                       "inputs": {
+                        "A": {
+                         "block": {
+                          "type": "variables_get",
+                          "id": "m245",
+                          "fields": {
+                           "VAR": {
+                            "id": "v-owner"
+                           }
+                          }
+                         }
+                        },
+                        "B": {
+                         "block": {
+                          "type": "logic_null",
+                          "id": "m246"
+                         }
+                        }
+                       }
+                      }
+                     },
+                     "DO0": {
+                      "block": {
+                       "type": "variables_set",
+                       "id": "m257",
+                       "fields": {
+                        "VAR": {
+                         "id": "v-status"
+                        }
+                       },
+                       "inputs": {
+                        "VALUE": {
+                         "block": {
+                          "type": "text_join",
+                          "id": "m256",
+                          "extraState": {
+                           "itemCount": 7
+                          },
+                          "inputs": {
+                           "ADD0": {
+                            "block": {
+                             "type": "variables_get",
+                             "id": "m248",
+                             "fields": {
+                              "VAR": {
+                               "id": "v-owner"
+                              }
+                             }
+                            }
+                           },
+                           "ADD1": {
+                            "block": {
+                             "type": "text",
+                             "id": "m249",
+                             "fields": {
+                              "TEXT": " "
+                             }
+                            }
+                           },
+                           "ADD2": {
+                            "block": {
+                             "type": "variables_get",
+                             "id": "m250",
+                             "fields": {
+                              "VAR": {
+                               "id": "v-held"
+                              }
+                             }
+                            }
+                           },
+                           "ADD3": {
+                            "block": {
+                             "type": "text",
+                             "id": "m251",
+                             "fields": {
+                              "TEXT": " "
+                             }
+                            }
+                           },
+                           "ADD4": {
+                            "block": {
+                             "type": "variables_get",
+                             "id": "m252",
+                             "fields": {
+                              "VAR": {
+                               "id": "v-of"
+                              }
+                             }
+                            }
+                           },
+                           "ADD5": {
+                            "block": {
+                             "type": "text",
+                             "id": "m253",
+                             "fields": {
+                              "TEXT": " "
+                             }
+                            }
+                           },
+                           "ADD6": {
+                            "block": {
+                             "type": "procedures_callreturn",
+                             "id": "m255",
+                             "extraState": {
+                              "name": "points_for",
+                              "params": [
+                               "satellites"
+                              ]
+                             },
+                             "inputs": {
+                              "ARG0": {
+                               "block": {
+                                "type": "variables_get",
+                                "id": "m254",
+                                "fields": {
+                                 "VAR": {
+                                  "id": "v-held"
+                                 }
+                                }
+                               }
+                              }
+                             }
+                            }
+                           }
+                          }
+                         }
+                        }
+                       },
+                       "next": {
+                        "block": {
+                         "type": "controls_if",
+                         "id": "m274",
+                         "inputs": {
+                          "IF0": {
+                           "block": {
+                            "type": "logic_compare",
+                            "id": "m260",
+                            "fields": {
+                             "OP": "NEQ"
+                            },
+                            "inputs": {
+                             "A": {
+                              "block": {
+                               "type": "variables_get",
+                               "id": "m258",
+                               "fields": {
+                                "VAR": {
+                                 "id": "v-status"
+                                }
+                               }
+                              }
+                             },
+                             "B": {
+                              "block": {
+                               "type": "variables_get",
+                               "id": "m259",
+                               "fields": {
+                                "VAR": {
+                                 "id": "v-told"
+                                }
+                               }
+                              }
+                             }
+                            }
+                           }
+                          },
+                          "DO0": {
+                           "block": {
+                            "type": "variables_set",
+                            "id": "m262",
+                            "fields": {
+                             "VAR": {
+                              "id": "v-told"
+                             }
+                            },
+                            "inputs": {
+                             "VALUE": {
+                              "block": {
+                               "type": "variables_get",
+                               "id": "m261",
+                               "fields": {
+                                "VAR": {
+                                 "id": "v-status"
+                                }
+                               }
+                              }
+                             }
+                            },
+                            "next": {
+                             "block": {
+                              "type": "atalaia_field_send_mode",
+                              "id": "m273",
+                              "fields": {
+                               "NAME": "status"
+                              },
+                              "inputs": {
+                               "NODE": {
+                                "block": {
+                                 "type": "variables_get",
+                                 "id": "m263",
+                                 "fields": {
+                                  "VAR": {
+                                   "id": "v-id"
+                                  }
+                                 }
+                                }
+                               },
+                               "DATA": {
+                                "block": {
+                                 "type": "atalaia_pair",
+                                 "id": "m265",
+                                 "fields": {
+                                  "KEY": "team"
+                                 },
+                                 "inputs": {
+                                  "VALUE": {
+                                   "block": {
+                                    "type": "variables_get",
+                                    "id": "m264",
+                                    "fields": {
+                                     "VAR": {
+                                      "id": "v-owner"
+                                     }
+                                    }
+                                   }
+                                  }
+                                 },
+                                 "next": {
+                                  "block": {
+                                   "type": "atalaia_pair",
+                                   "id": "m267",
+                                   "fields": {
+                                    "KEY": "held"
+                                   },
+                                   "inputs": {
+                                    "VALUE": {
+                                     "block": {
+                                      "type": "variables_get",
+                                      "id": "m266",
+                                      "fields": {
+                                       "VAR": {
+                                        "id": "v-held"
+                                       }
+                                      }
+                                     }
+                                    }
+                                   },
+                                   "next": {
+                                    "block": {
+                                     "type": "atalaia_pair",
+                                     "id": "m269",
+                                     "fields": {
+                                      "KEY": "of"
+                                     },
+                                     "inputs": {
+                                      "VALUE": {
+                                       "block": {
+                                        "type": "variables_get",
+                                        "id": "m268",
+                                        "fields": {
+                                         "VAR": {
+                                          "id": "v-of"
+                                         }
+                                        }
+                                       }
+                                      }
+                                     },
+                                     "next": {
+                                      "block": {
+                                       "type": "atalaia_pair",
+                                       "id": "m272",
+                                       "fields": {
+                                        "KEY": "points"
+                                       },
+                                       "inputs": {
+                                        "VALUE": {
+                                         "block": {
+                                          "type": "procedures_callreturn",
+                                          "id": "m271",
+                                          "extraState": {
+                                           "name": "points_for",
+                                           "params": [
+                                            "satellites"
+                                           ]
+                                          },
+                                          "inputs": {
+                                           "ARG0": {
+                                            "block": {
+                                             "type": "variables_get",
+                                             "id": "m270",
+                                             "fields": {
+                                              "VAR": {
+                                               "id": "v-held"
+                                              }
+                                             }
+                                            }
+                                           }
+                                          }
+                                         }
+                                        }
+                                       }
+                                      }
+                                     }
+                                    }
+                                   }
+                                  }
+                                 }
+                                }
+                               }
+                              }
+                             }
+                            }
+                           }
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "atalaia_on_field",
+     "id": "m278",
+     "x": 20,
+     "y": 1900,
+     "fields": {
+      "EVENT": "zone.captured"
+     },
+     "inputs": {
+      "DO": {
+       "block": {
+        "type": "procedures_callnoreturn",
+        "id": "m277",
+        "extraState": {
+         "name": "check"
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "atalaia_on_field",
+     "id": "m280",
+     "x": 20,
+     "y": 2000,
+     "fields": {
+      "EVENT": "zone.neutralized"
+     },
+     "inputs": {
+      "DO": {
+       "block": {
+        "type": "procedures_callnoreturn",
+        "id": "m279",
+        "extraState": {
+         "name": "check"
+        }
+       }
+      }
+     }
+    },
+    {
+     "type": "atalaia_every",
+     "id": "m283",
+     "x": 20,
+     "y": 2100,
+     "inputs": {
+      "SECONDS": {
+       "block": {
+        "type": "math_number",
+        "id": "m281",
+        "fields": {
+         "NUM": 1
+        }
+       }
+      },
+      "DO": {
+       "block": {
+        "type": "procedures_callnoreturn",
+        "id": "m282",
+        "extraState": {
+         "name": "check"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  "variables": [
+   {
+    "name": "team",
+    "id": "v-team"
+   },
+   {
+    "name": "satellites",
+    "id": "v-satellites"
+   },
+   {
+    "name": "count",
+    "id": "v-count"
+   },
+   {
+    "name": "n",
+    "id": "v-n"
+   },
+   {
+    "name": "id",
+    "id": "v-id"
+   },
+   {
+    "name": "owner",
+    "id": "v-owner"
+   },
+   {
+    "name": "tick",
+    "id": "v-tick"
+   },
+   {
+    "name": "told",
+    "id": "v-told"
+   },
+   {
+    "name": "held",
+    "id": "v-held"
+   },
+   {
+    "name": "of",
+    "id": "v-of"
+   },
+   {
+    "name": "status",
+    "id": "v-status"
+   },
+   {
+    "name": "amount",
+    "id": "v-amount"
+   }
+  ]
+ },
+ "screens": {
+  "captured": "# SPDX-FileCopyrightText: 2026 The Atalaia contributors\n# SPDX-License-Identifier: GPL-3.0-or-later\n#\n# A team holds a satellite (or a box with no controller). Data: team, since\n# (game time of the capture, in seconds). Boxes do not score: the master does;\n# lang (pt or en) from the box.\ntemplate: captured\nlayout:\n  - type: row\n    style: { width: fill, height: 44, background: team }\n    children:\n      - type: label\n        text: \"{lang == 'pt' && 'ZONA OCUPADA' || 'ZONE HELD'}\"\n        style: { font_size: 20, width: fill, align: center, color: contrast }\n  - type: spacer\n    height: fill\n  - type: label\n    text: \"{team|upper}\"\n    style: { font_size: 48, color: team }\n  - type: label\n    text: \"{lang == 'pt' && 'desde' || 'held since'} {since|clock}\"\n    style: { font_size: 20, color: muted }\n  - type: spacer\n    height: fill\n  - type: label\n    text: \"{lang == 'pt' && 'Mantém o botão premido para a tomar' || 'Hold your button to take it over'}\"\n    style:\n      font_size: 14\n      color: muted\n      padding: { bottom: 10 }\n",
+  "master_status": "# SPDX-FileCopyrightText: 2026 The Atalaia contributors\n# SPDX-License-Identifier: GPL-3.0-or-later\n#\n# A team holds the master. Data: team, since (game time of the capture, in\n# seconds), held and of (the satellites the team holds, of all of them) and\n# points (the master's points per tick with that bonus), from the controller;\n# lang (pt or en) from the box.\ntemplate: master_status\nlayout:\n  - type: row\n    style: { width: fill, height: 44, background: team }\n    children:\n      - type: label\n        text: \"{lang == 'pt' && 'MASTER OCUPADO' || 'MASTER HELD'}\"\n        style: { font_size: 20, width: fill, align: center, color: contrast }\n  - type: spacer\n    height: fill\n  - type: label\n    text: \"{team|upper}\"\n    style: { font_size: 48, color: team }\n  - type: label\n    text: \"{held} {lang == 'pt' && 'de' || 'of'} {of} {lang == 'pt' && 'satélites' || 'satellites'}\"\n    style: { font_size: 20 }\n  - type: label\n    text: \"{points} {lang == 'pt' && 'pontos a cada' || 'points every'} {params.tick_s} s\"\n    style: { font_size: 20, color: \"{points > 0 && 'white' || 'danger'}\" }\n  - type: label\n    text: \"{lang == 'pt' && 'desde' || 'held since'} {since|clock}\"\n    style: { font_size: 14, color: muted }\n  - type: spacer\n    height: fill\n  - type: label\n    text: \"{lang == 'pt' && 'Mantém o botão premido para a tomar' || 'Hold your button to take it over'}\"\n    style:\n      font_size: 14\n      color: muted\n      padding: { bottom: 10 }\n",
+  "neutral": "# SPDX-FileCopyrightText: 2026 The Atalaia contributors\n# SPDX-License-Identifier: GPL-3.0-or-later\n#\n# Nobody holds the box (a master or a satellite) in a running game (decision\n# BN-11). No data of the mode's; the hold time comes from the game's\n# parameters, lang (pt or en) from the box.\ntemplate: neutral\nlayout:\n  - type: row\n    style: { width: fill, height: 44, background: panel }\n    children:\n      - type: label\n        text: \"{lang == 'pt' && 'ZONA' || 'ZONE'}\"\n        style: { font_size: 20, width: fill, align: center }\n  - type: spacer\n    height: fill\n  - type: label\n    text: \"{lang == 'pt' && 'LIVRE' || 'NEUTRAL'}\"\n    style: { font_size: 48 }\n  - type: label\n    text: \"{lang == 'pt' && 'Mantém premido' || 'Hold to capture'}\"\n    style: { font_size: 20, color: accent }\n  - type: label\n    text: \"Hold your button for {params.capture_hold_ms / 1000} s\"\n    style: { font_size: 14, color: muted, visible: \"{lang != 'pt'}\" }\n  - type: label\n    text: \"{params.capture_hold_ms / 1000} s para capturar a zona\"\n    style: { font_size: 14, color: muted, visible: \"{lang == 'pt'}\" }\n  - type: spacer\n    height: fill\n  - type: label\n    text: \"{lang == 'pt' && 'Nenhuma equipa tem esta zona' || 'Nobody holds this zone'}\"\n    style:\n      font_size: 14\n      color: muted\n      padding: { bottom: 10 }\n"
+ }
+}

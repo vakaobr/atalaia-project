@@ -1,11 +1,11 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Browser tests of the mode editor (phase 5 plan phase A; AC-1 to AC-3).
+"""Browser tests of the mode editor (phase 5 plan phases 1-3; AC-1 to AC-3).
 
 The editor's page, served by the simulator's real web server, runs in headless
 Chromium (Playwright). The Lua generator runs where it runs for a user, in the
 page, through window.atalaiaEditor.generate(project), so the same code is
-tested: small projects give exact Lua (the generator's unit tests); the two
+tested: small projects give exact Lua (the generator's unit tests); the three
 example projects give node.lua, field.lua and mode.yaml that pass every YAML
 test of the modes they copy, in the simulator, with the mode's own tests
 (the round trip, AC-1), and keep the style of the hand-written modes (AC-2);
@@ -342,7 +342,15 @@ class EditorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp) / name
             shutil.copytree(original / "tests", folder / "tests")
-            if (original / "assets").is_dir():
+            screens = proj.get("screens") or {}
+            if screens:
+                # The project's own screen files (plan phase 3) are the mode's, byte for byte.
+                (folder / "assets" / "screens").mkdir(parents=True)
+                for screen, text in screens.items():
+                    self.assertEqual(text, (original / "assets" / "screens" / f"{screen}.yaml").read_text(
+                        encoding="utf-8"), screen)
+                    (folder / "assets" / "screens" / f"{screen}.yaml").write_text(text, encoding="utf-8")
+            elif (original / "assets").is_dir():
                 shutil.copytree(original / "assets", folder / "assets")
             self.write_mode(folder, out)
             mode = load_mode(folder)
@@ -385,6 +393,190 @@ class EditorTests(unittest.TestCase):
         self.assertIn("local function capture(team, squad)\n", out["node_lua"])
         self.assertIn("local fs = state.field { holder = nil }\n", out["field_lua"])
         self.assertIn("every(1, check)\n", out["field_lua"])
+
+    def test_master_satellites_round_trip_with_two_roles_and_screens(self):
+        """Plan phase 3's example: two roles running one box script, a mode command from the
+        controller (cmd.mode "status"), the mode's own screen, the controller's list index."""
+        out = self.round_trip("master_satellites", has_field=True)
+        self.assertIn('on("cmd.mode", function(e)\n  if e.name ~= "status" then\n    return\n  end\n', out["node_lua"])
+        self.assertIn('ui.screen("master_status", {', out["node_lua"])
+        self.assertIn('field.send(id, "mode", { name = "status", team = owner,', out["field_lua"])
+        self.assertIn('id = (node_ids("master"))[1]\n', out["field_lua"])
+        self.assertIn('local count, id, owner,', out["field_lua"])  # n is the loops' own
+
+    # ---- plan phase 3: geo, GM commands, roles, kinds, screens ----
+
+    def test_geo_blocks(self):
+        page = self.open()
+        zone = B("atalaia_geo_polygon", inputs={"POINTS": seq(*(
+            B("atalaia_geo_point", inputs={"LAT": num(lat), "LON": num(lon)}) for lat, lon in ((1, 2), (1, 3), (2, 3))))})
+        circle = B("atalaia_geo_circle", inputs={"LAT": num(38.7), "LON": num(-9.1), "RADIUS": num(25)})
+        handler = on("gps.fix", seq(
+            B("controls_if", inputs={"IF0": B("logic_negate", inputs={"BOOL": B("atalaia_event_has_position")}),
+                                     "DO0": B("atalaia_return")}),
+            B("controls_if", inputs={"IF0": B("atalaia_geo_in_zone", inputs={"LAT": ev("lat"), "LON": ev("lon"),
+                                                                              "ZONE": circle}),
+                                     "DO0": B("atalaia_emit", {"TYPE": "x.club.inside", "PRIO": "default"})}),
+            B("atalaia_log", inputs={"TEXT": B("atalaia_geo_distance", inputs={
+                "LAT1": ev("lat"), "LON1": ev("lon"), "LAT2": num(38.7), "LON2": num(-9.1)})}),
+            B("atalaia_log", inputs={"TEXT": B("atalaia_geo_in_zone", inputs={"LAT": num(1.5), "LON": num(2.5),
+                                                                              "ZONE": zone})}),
+        ))
+        out = self.generate(page, project(node=[handler]))
+        self.assertEqual(out["problems"], [])
+        self.assertEqual(body(out["node_lua"]), (
+            'on("gps.fix", function(e)\n'
+            '  if not (type(e.lat) == "number" and type(e.lon) == "number") then\n'
+            '    return\n'
+            '  end\n'
+            '  if geo.in_zone(e.lat, e.lon, { type = "circle", lat = 38.7, lon = -9.1, radius_m = 25 }) then\n'
+            '    emit("x.club.inside")\n'
+            '  end\n'
+            '  log(geo.distance(e.lat, e.lon, 38.7, -9.1))\n'
+            '  log(geo.in_zone(1.5, 2.5, { type = "polygon", points = { { 1, 2 }, { 1, 3 }, { 2, 3 } } }))\n'
+            'end)\n'))
+        self.assertEqual(yaml.safe_load(out["mode_yaml"])["roles"], {"zone": {"requires": ["gps"]}})
+        # The VIP's field input, with its values; an area needs 3 corners.
+        field = on("position.fix", B("controls_if", inputs={
+            "IF0": B("logic_compare", {"OP": "EQ"}, {"A": ev("role"), "B": text("vip")}),
+            "DO0": B("atalaia_log", inputs={"TEXT": B("atalaia_geo_in_zone", inputs={
+                "LAT": ev("lat"), "LON": ev("lon"), "ZONE": B("atalaia_geo_polygon", inputs={
+                    "POINTS": B("atalaia_geo_point", inputs={"LAT": num(1), "LON": num(2)})})})})}), kind="field")
+        out = self.generate(page, project(field=[field]))
+        self.assertIn('if e.role == "vip" then\n    log(geo.in_zone(e.lat, e.lon, { type = "polygon", points = { { 1, 2 } } }))',
+                      out["field_lua"])
+        self.assertEqual([p["key"] for p in out["problems"]], ["problem_polygon_points"])
+        # It runs: a GPS fix inside the circle, in the simulator.
+        out = self.generate(page, project(node=[handler]))
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "unit"
+            (folder / "tests").mkdir(parents=True)
+            self.write_mode(folder, out)
+            (folder / "tests" / "geo.yaml").write_text(
+                "name: geo\nsteps:\n  - input: { node: zone, type: gps.fix, data: {} }\n"
+                "  - input: { node: zone, type: gps.fix, data: { lat: 38.7001, lon: -9.1, acc: 5 } }\n"
+                "  - expect: x.club.inside\n  - expect_no: script.error\n")
+            mode = load_mode(folder)
+            result = run_test(CORE, mode, mode.tests[0])
+            self.assertTrue(result.passed, f"{result.message}\n{out['node_lua']}")
+
+    def test_gm_commands_in_the_manifest(self):
+        page = self.open()
+        declare = B("atalaia_command_declare", {"NAME": "refill", "ROLES": "medic", "LABEL": "Refill the kit",
+                                                "LABEL_PT": "Repor as ligaduras"}, x=500)
+        handler = B("atalaia_on_command", {"NAME": "refill"}, {"DO": B("atalaia_log", inputs={"TEXT": ev("name")})})
+        proj = project(node=[declare, handler], roles=[{"name": "medic", "inputs": None, "needed": True}],
+                       name_pt="Kit")
+        out = self.generate(page, proj)
+        self.assertEqual(out["problems"], [])
+        self.assertEqual(body(out["node_lua"]), (
+            'on("cmd.mode", function(e)\n'
+            '  if e.name ~= "refill" then\n'
+            '    return\n'
+            '  end\n'
+            '  log(e.name)\n'
+            'end)\n'))
+        manifest = yaml.safe_load(out["mode_yaml"])
+        self.assertEqual(manifest["commands"], {"refill": {"roles": ["medic"], "label": "Refill the kit"}})
+        self.assertEqual(manifest["i18n"]["pt"]["commands"], {"refill": "Repor as ligaduras"})
+        # The manifest is one the simulator and the controller take.
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "unit"
+            folder.mkdir()
+            self.write_mode(folder, out)
+            self.assertEqual(load_mode(folder).commands["refill"]["roles"], ["medic"])
+        # Problems: a command for a role the mode lacks, one without its handler, one twice (the
+        # first on the workspace counts, the medic one further right is the second).
+        bad = project(node=[declare, B("atalaia_command_declare", {"NAME": "refill", "ROLES": "zone", "LABEL": "x",
+                                                                   "LABEL_PT": ""}),
+                            B("atalaia_command_declare", {"NAME": "open", "ROLES": "zone, gate", "LABEL": "Open",
+                                                          "LABEL_PT": ""})])
+        out = self.generate(page, bad)
+        self.assertEqual(sorted((p["key"], p.get("name")) for p in out["problems"]), [
+            ("problem_command_twice", "refill"), ("problem_command_unhandled", "open"),
+            ("problem_command_unhandled", "refill"), ("problem_role_unknown", "gate")])
+
+    def test_roles_and_kinds(self):
+        page = self.open()
+        node = [on("team_input.hold", B("atalaia_log", inputs={"TEXT": ev("team")}), y=0),
+                on("gps.fix", B("atalaia_log", inputs={"TEXT": ev("lat")}), y=200),
+                B("atalaia_screen", {"NAME": "captured"})]
+        roles = [{"name": "checkpoint", "inputs": ["team_input"], "needed": True},
+                 {"name": "payload", "inputs": ["gps"], "needed": False}]
+        out = self.generate(page, project(node=[on("game.start", node[2], y=400), node[0], node[1]], roles=roles,
+                                          kind="role"))
+        self.assertEqual(out["problems"], [])
+        manifest = yaml.safe_load(out["mode_yaml"])
+        self.assertEqual(manifest["kind"], "role")
+        self.assertEqual(manifest["roles"], {
+            "checkpoint": {"requires": ["team_input"], "optional": ["display"]},
+            "payload": {"requires": ["gps"], "optional": ["display"], "needed": False}})
+        # Without its own inputs a role needs every input the script reacts to (as before plan phase 3).
+        out = self.generate(page, project(node=node[:2], roles=[{"name": "zone"}], kind="modifier"))
+        manifest = yaml.safe_load(out["mode_yaml"])
+        self.assertEqual((manifest["kind"], manifest["roles"]), ("modifier", {"zone": {"requires": ["team_input", "gps"]}}))
+        # A project saved before plan phase 3 (one "role") still opens as that role.
+        self.assertEqual(yaml.safe_load(self.generate(page, project(role="gate"))["mode_yaml"])["roles"], {"gate": {}})
+        # Problems: an input the script never reacts to, a role with none of them, a role twice, a bad
+        # name, a role the controller looks for that the mode lacks, an unknown screen.
+        field = [B("atalaia_every", inputs={"SECONDS": num(1), "DO": B("atalaia_log", inputs={
+            "TEXT": B("lists_length", inputs={"VALUE": B("atalaia_field_ids", {"ROLE": "zone"})})})})]
+        bad = project(node=[node[0], on("game.start", B("atalaia_screen", {"NAME": "nowhere"}), y=300)], field=field,
+                      roles=[{"name": "a", "inputs": ["keypad"]}, {"name": "b", "inputs": []}, {"name": "a"},
+                             {"name": "Bad Name"}])
+        out = self.generate(page, bad)
+        self.assertEqual(sorted((p["key"], p.get("name")) for p in out["problems"]), [
+            ("problem_bad_role", "Bad Name"), ("problem_role_input_unhandled", "a"), ("problem_role_no_input", "b"),
+            ("problem_role_twice", "a"), ("problem_role_unknown", "zone"), ("problem_screen_unknown", "nowhere")])
+        self.assertEqual(self.generate(page, project(roles=[]))["problems"][0]["key"], "problem_no_role")
+
+    def test_the_mode_tab_roles_kind_and_screens(self):
+        page = self.open("en")
+        page.click("#tab-mode")
+        expect(page.locator(".role-row")).to_have_count(1)
+        page.select_option("[name=kind]", "role")
+        expect(page.locator("#code")).to_contain_text("kind: role")
+        page.click("#role-add")
+        page.locator(".role-row").nth(1).locator(".role-name").fill("gate")
+        page.locator(".role-row").nth(1).locator(".role-needed").uncheck()
+        expect(page.locator("#code")).to_contain_text("  gate: { needed: false }")
+        # Its own inputs: a keypad the (empty) box script never reacts to is a problem.
+        page.locator(".role-row").nth(1).locator(".role-auto").uncheck()
+        page.locator(".role-row").nth(1).locator(".role-input[value=keypad]").check()
+        expect(page.locator("#problems li[data-key=problem_role_input_unhandled]")).to_have_count(1)
+        page.locator(".role-row").nth(1).locator(".role-remove").click()
+        expect(page.locator(".role-row")).to_have_count(1)
+        expect(page.locator("#problems li")).to_have_count(0)
+        # Screens from files: offered in the boxes' toolbox, kept in the saved project, refused when bad.
+        good = b"template: banner\nlayout:\n  - type: label\n    text: Hi\n"
+        page.set_input_files("#screen-files", files=[
+            {"name": "banner.yaml", "mimeType": "application/yaml", "buffer": good},
+            {"name": "other.yaml", "mimeType": "application/yaml", "buffer": b"template: banner\n"}])
+        expect(page.locator("#screens li")).to_have_count(1)
+        expect(page.locator("#screens li")).to_contain_text("assets/screens/banner.yaml")
+        page.click("#tab-node")
+        page.locator("#ws-node .blocklyToolboxCategory", has_text="Box hardware").click()
+        expect(page.locator("#ws-node .blocklyToolboxFlyout")).to_contain_text("banner")
+        page.click("[data-file='assets/screens/banner.yaml']")
+        expect(page.locator("#code")).to_have_text(good.decode())
+        saved = page.evaluate("() => window.atalaiaEditor.project()")
+        self.assertEqual(saved["screens"], {"banner": good.decode()})
+        self.assertEqual(saved["mode"]["kind"], "role")
+        page.click("#tab-mode")
+        page.locator("#screens li button").click()
+        expect(page.locator("#screens li")).to_have_count(0)
+
+    def test_the_test_button_starts_a_box_per_role(self):
+        page = self.open("en")
+        page.select_option("#example", "master_satellites")
+        expect(page.locator("#code")).to_contain_text("local function capture(team, squad)")
+        page.fill("#test-boxes", "3")
+        page.click("#test")
+        expect(page.locator("#test-message")).to_have_text(
+            "Master and Satellites is running in the simulator with 3 boxes.")
+        self.assertEqual(self.game.sim.mode.id, "org.atalaia.master_satellites")
+        self.assertEqual(list(self.game.sim.nodes), ["master1", "satellite1", "satellite2"])
+        expect(page.locator("#problems li")).to_have_count(0)
 
     # ---- the page ----
 
@@ -468,10 +660,10 @@ class EditorTests(unittest.TestCase):
         simulator's errors on blocks: it exists for every script of both examples, and a line
         maps to the block that wrote it."""
         page = self.open("en")
-        for name in ("domination", "holdall"):
+        for name in ("domination", "holdall", "master_satellites"):
             page.select_option("#example", name)
             expect(page.locator("#code")).to_contain_text("local function")
-            for kind in ("node", "field") if name == "holdall" else ("node",):
+            for kind in ("node", "field") if name != "domination" else ("node",):
                 with self.subTest(example=name, script=kind):
                     lines = page.evaluate("k => window.atalaiaEditor.lineBlocks(k)", kind)
                     code = page.evaluate("k => window.atalaiaEditor.files()[k + '_lua']", kind)

@@ -481,6 +481,7 @@ progress {
 .table-wrap {
     overflow-x: auto;
     max-width: 100%;
+    position: relative; /* keeps a header's .sr-only text inside the scrolled box */
 }
 
 .table {

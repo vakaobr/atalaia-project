@@ -830,5 +830,53 @@
     "live": "The live game's boxes: {lang}",
     "saved": "Saved: games created from now on use it.",
     "read_only": "Only the game master changes it."
+  },
+  "packages": {
+    "title": "Signed mode packages",
+    "hint": "Install a mode signed with one of this controller's mode keys: upload its archive and .release.json (tools/mode_package.py), or take it from the field's registry index. The controller checks the signature, the archive and the scripts before it installs anything.",
+    "no_keys": "No mode key is configured on this controller ([modes] keys): no signed package is installed.",
+    "keys": "Trusted mode keys:",
+    "archive": "Package (.tar)",
+    "release_file": "Release (.release.json)",
+    "upload": "Upload and install",
+    "choose_both": "Choose the package and its .release.json.",
+    "bad_release_file": "The .release.json file could not be read.",
+    "installed_toast": "{id} {version} installed.",
+    "installed": "Installed",
+    "none_installed": "No mode installed besides the built-in ones.",
+    "mode": "Mode",
+    "version": "Version",
+    "licence": "Licence",
+    "signature": "Signature",
+    "actions": "Actions",
+    "unsigned": "not signed",
+    "signed_by": "signed by",
+    "verified": "reviewed by the project",
+    "not_reviewed": "not reviewed by the project",
+    "trust": {
+      "revoked": "its key is revoked",
+      "untrusted": "its key is no longer trusted here"
+    },
+    "from_index": "From the registry index",
+    "no_index": "No registry index is configured ([modes] index: an https:// address, or an index.json with its packages next to it).",
+    "index": "Index",
+    "refresh": "Read again",
+    "index_error": "The index could not be read, so nothing is offered from it: {error}",
+    "index_empty": "The index lists no packages.",
+    "install": "Install",
+    "update_to": "Update to {version}",
+    "states": {
+      "installed": "installed",
+      "no_key": "signed with a key this controller does not trust",
+      "revoked": "its key is revoked",
+      "builtin": "a built-in mode has this id",
+      "available": "available"
+    },
+    "kinds": {
+      "mode": "main mode",
+      "modifier": "modifier",
+      "role": "role package",
+      "scenario": "scenario"
+    }
   }
 }
