@@ -1269,6 +1269,9 @@ class ConsoleBrowserTests(unittest.TestCase):
             status=200, content_type="application/json", body=json.dumps(de)))
         page.get_by_test_id("token").fill(GM)
         page.get_by_test_id("login").click()
+        # The game view first: picked while the login was under way, the language went to the login
+        # page's own picker, which the logged-in view replaced before its change event, unheard.
+        expect(page.get_by_test_id("tab-game")).to_be_visible()
         page.get_by_test_id("lang").first.select_option("de")
         expect(page.get_by_test_id("tab-nodes")).to_have_text("Boxen")
         expect(page.get_by_test_id("tab-presets")).to_have_text("Presets")  # English's text
@@ -1472,8 +1475,8 @@ class ConsoleBrowserTests(unittest.TestCase):
         webview = ("Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/AP1A.240505.005; wv) AppleWebKit/537.36 "
                    "(KHTML, like Gecko) Version/4.0 Chrome/124.0.6367.82 Mobile Safari/537.36")
         page = self.page(f"/console/#token={GM}", width=390, height=844, user_agent=webview)
-        page.get_by_test_id("tab-checkin").click()
-        expect(page.get_by_test_id("checkin-csv")).to_be_visible(timeout=15000)
+        page.get_by_test_id("tab-checkin").click()  # often before the stream has told the page the game
+        expect(page.get_by_test_id("checkin-csv")).to_be_visible()
         expect(page.get_by_test_id("checkin-webview")).to_contain_text("navegador de um computador")
         self.no_horizontal_scroll(page)
         page.get_by_test_id("lang").first.select_option("en")
@@ -1482,6 +1485,23 @@ class ConsoleBrowserTests(unittest.TestCase):
         browser.get_by_test_id("tab-checkin").click()
         expect(browser.get_by_test_id("checkin-csv")).to_be_visible()
         expect(browser.get_by_test_id("checkin-webview")).to_have_count(0)
+
+    def test_checkin_tab_follows_the_live_game(self):
+        """Decision FL-1: the Check-in tab, open with no game, shows the game once it is made, and the next
+        one's (empty) list after the first has ended, without leaving the tab."""
+        page = self.console()
+        page.get_by_test_id("tab-checkin").click()
+        expect(page.get_by_test_id("checkin-no-game")).to_be_visible()
+        first = self.field.create_game("Sábado")
+        expect(page.get_by_test_id("checkin-open")).to_contain_text("Sábado")
+        expect(page.get_by_test_id("checkin-csv")).to_be_visible()
+        self.check_in(first["id"], "Coruja")
+        expect(page.get_by_test_id("checkin-table")).to_contain_text("Coruja")
+        self.field.http.post(f"/api/v1/games/{first['id']}/end", json={})
+        expect(page.get_by_test_id("checkin-no-game")).to_be_visible()
+        self.field.create_game("Domingo")
+        expect(page.get_by_test_id("checkin-open")).to_contain_text("Domingo")
+        expect(page.get_by_test_id("checkin-empty")).to_be_visible()
 
     # --- the field's radio channel (Settings) ------------------------------------
 
@@ -2275,7 +2295,10 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id(f"chrono-player-{me['player_id']}")).to_contain_text("Well MB4402")
         row.get_by_test_id("checkin-confirm").click()
         expect(row).to_contain_text("com check-in")
-        row.get_by_test_id("checkin-card-seen").check()
+        # Ticked from the controller's answer: a re-render before it (the page's clock, every second) shows the
+        # stored value again, so Playwright's check() could find it unticked. Click, then wait for the tick.
+        row.get_by_test_id("checkin-card-seen").click()
+        expect(row.get_by_test_id("checkin-card-seen")).to_be_checked()
         expect(row).to_contain_text("cartão visto")
         # A game without squads: teams only, no squad picker or squad-leader role.
         expect(row.get_by_test_id("checkin-squad")).to_have_count(0)

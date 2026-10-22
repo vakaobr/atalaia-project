@@ -52,10 +52,12 @@ export class CheckinPanel extends Component {
         this.load();
     }
 
-    componentDidUpdate(prev) {
-        const g = this.props.app.state.game;
-        const before = prev.app.state.game;
-        if ((g && g.id) !== (before && before.id)) this.load();
+    componentDidUpdate() {
+        // A reload when the live game changes (the stream's first game after the tab was opened, a new game,
+        // the game's end). Compared with the game the last load was for: the previous props cannot tell, as
+        // their "app" is the App itself and already holds the new game (decision FL-1).
+        const g = this.game();
+        if ((g ? g.id : null) !== this.loadedFor) this.load();
     }
 
     game() {
@@ -65,10 +67,16 @@ export class CheckinPanel extends Component {
 
     async load() {
         const app = this.props.app;
-        if (app.state.role !== 'gm') return;
         const g = this.game();
+        const id = g ? g.id : null;
+        if (id !== this.loadedFor && this.state.list) this.setState({ list: null, chrono: null }); // not the last game's
+        this.loadedFor = id;
+        if (app.state.role !== 'gm') return;
+        // Only the latest load is shown: an earlier one (for no game, or the game before) can answer last.
+        const seq = (this.loadSeq = (this.loadSeq || 0) + 1);
         const [poster, info, schedule] = await Promise.all([app.call('GET', '/checkin/poster'), app.call('GET', '/checkin'),
             app.serves('schedule') ? app.call('GET', '/schedule') : null]);
+        if (seq !== this.loadSeq) return;
         this.setState({ poster, classes: info ? info.limits.classes : [], schedule });
         if (!g) {
             this.setState({ list: null, chrono: null });
@@ -76,6 +84,7 @@ export class CheckinPanel extends Component {
         }
         const [list, chrono] = await Promise.all([app.call('GET', `/games/${g.id}/checkins`),
             app.call('GET', `/games/${g.id}/chrono-list`)]);
+        if (seq !== this.loadSeq) return;
         this.setState({ list, chrono });
         if (chrono) app.setState({ chronoCounts: chrono.counts });
     }
