@@ -1,0 +1,223 @@
+{#
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: CC-BY-SA-4.0
+
+The build guides page (phase 5 plan phase 12): the Satellite, the I/O pod and
+the target addon, shortened from hardware/<node>/BUILD.md, which stay the full
+guides (in English), and a pointer to the Field Box's build manual. Built into
+site/montagem/, site/en/build-guides/ and site/de/bauen/.
+
+The pin tables are the same in every language, so their GPIO numbers live here,
+not in the language files: each GPIO cell names its Kconfig symbol in
+data-kconfig, and tools/check_wiring.py (in tools/check.sh) fails if a number
+is not that symbol's default in firmware/esp32/main/Kconfig.projbuild. The
+photo placeholders (class "photo") stay until the first builds' photos (plan
+phase HW2); never a mock-up or generated photo. See site/README.md.
+#}
+<html lang="{{ page.lang }}">
+<head>
+{% include head %}
+</head>
+<body>
+{% include header %}
+
+  <main id="main">
+    <section class="page-head" aria-labelledby="build">
+      <div class="wrap">
+        <h1 id="build">{{ build.title }}</h1>
+        <p class="lead">{{ build.intro }}</p>
+      </div>
+    </section>
+
+    <div class="content band">
+      <div class="wrap guide">
+        <p class="status-note">{{ build.status }}</p>
+        <nav class="toc" aria-label="{{ build.toc|text }}">
+          <a href="#safety">{{ build.safety.title }}</a>
+          <a href="#field-box">{{ build.field_box.title }}</a>
+          <a href="#satellite">{{ build.satellite.title }}</a>
+          <a href="#io-pod">{{ build.pod.title }}</a>
+          <a href="#target-addon">{{ build.target.title }}</a>
+        </nav>
+
+        <section id="safety" aria-labelledby="safety-title">
+          <h2 id="safety-title">{{ build.safety.title }}</h2>
+          <p>{{ build.safety.intro }}</p>
+          <ul class="ways">
+            <li>{{ build.safety.antenna }}</li>
+            <li>{{ build.safety.cell }}</li>
+            <li>{{ build.safety.charge }}</li>
+            <li>{{ build.safety.volts }}</li>
+            <li>{{ build.safety.pins }}</li>
+            <li>{{ build.safety.power_check }}</li>
+            <li>{{ build.safety.enclosure }}</li>
+            <li>{{ build.safety.hits }}</li>
+          </ul>
+        </section>
+
+        <section id="field-box" aria-labelledby="field-box-title">
+          <h2 id="field-box-title">{{ build.field_box.title }}</h2>
+          <p>{{ build.field_box.text }}</p>
+        </section>
+
+        <section id="satellite" aria-labelledby="satellite-title">
+          <h2 id="satellite-title">{{ build.satellite.title }}</h2>
+          <p>{{ build.satellite.what }}</p>
+          <p>{{ build.satellite.plays }}</p>
+
+          <h3>{{ build.parts }}</h3>
+          <ul class="ways">
+            <li>{{ build.satellite.parts.board }}</li>
+            <li>{{ build.satellite.parts.antennas }}</li>
+            <li>{{ build.satellite.parts.buttons }}</li>
+            <li>{{ build.satellite.parts.ring }}</li>
+            <li>{{ build.satellite.parts.gauge }}</li>
+            <li>{{ build.satellite.parts.power }}</li>
+            <li>{{ build.satellite.parts.sound }}</li>
+            <li>{{ build.satellite.parts.box }}</li>
+          </ul>
+
+          <h3>{{ build.pins }}</h3>
+          <p>{{ build.pins_intro }}</p>
+          <div class="table">
+            <table class="pins">
+              <thead><tr><th scope="col">{{ build.pin_what }}</th><th scope="col">{{ build.pin_gpio }}</th></tr></thead>
+              <tbody>
+                <tr><td>{{ build.pin.btn1 }}</td><td data-kconfig="ATALAIA_BTN1_PIN">4</td></tr>
+                <tr><td>{{ build.pin.btn2 }}</td><td data-kconfig="ATALAIA_BTN2_PIN">48</td></tr>
+                <tr><td>{{ build.pin.btn3 }}</td><td data-kconfig="ATALAIA_BTN3_PIN">44</td></tr>
+                <tr><td>{{ build.pin.led }}</td><td data-kconfig="ATALAIA_LED_PIN">35</td></tr>
+                <tr><td>{{ build.pin.sda_gauge }}</td><td data-kconfig="ATALAIA_BATT_SDA_PIN">17</td></tr>
+                <tr><td>{{ build.pin.scl }}</td><td data-kconfig="ATALAIA_BATT_SCL_PIN">18</td></tr>
+                <tr><td>{{ build.pin.bclk }}</td><td data-kconfig="ATALAIA_AUDIO_BCLK_PIN">6</td></tr>
+                <tr><td>{{ build.pin.lrclk }}</td><td data-kconfig="ATALAIA_AUDIO_LRCLK_PIN">15</td></tr>
+                <tr><td>{{ build.pin.dout }}</td><td data-kconfig="ATALAIA_AUDIO_DOUT_PIN">16</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>{{ build.satellite.free_pins }}</p>
+
+          <h3>{{ build.steps }}</h3>
+          <ol class="ways">
+            <li>{{ build.satellite.steps.revision }}</li>
+            <li>{{ build.satellite.steps.enclosure }}</li>
+            <li>{{ build.satellite.steps.power }}</li>
+            <li>{{ build.satellite.steps.hub }}</li>
+            <li>{{ build.satellite.steps.wiring }}</li>
+            <li>{{ build.satellite.steps.check }}</li>
+            <li>{{ build.satellite.steps.flash }}</li>
+            <li>{{ build.satellite.steps.bring_up }}</li>
+            <li>{{ build.satellite.steps.field }}</li>
+          </ol>
+          <figure class="photo"><figcaption>{{ build.photo }} {{ build.satellite.photo }}</figcaption></figure>
+
+          <h3>{{ build.open }}</h3>
+          <ul class="ways">
+            <li>{{ build.satellite.open.buzzer }}</li>
+            <li>{{ build.satellite.open.enclosure }}</li>
+            <li>{{ build.satellite.open.runtime }}</li>
+            <li>{{ build.satellite.open.diagram }}</li>
+          </ul>
+          <p class="more">{{ build.satellite.full }}</p>
+        </section>
+
+        <section id="io-pod" aria-labelledby="io-pod-title">
+          <h2 id="io-pod-title">{{ build.pod.title }}</h2>
+          <p>{{ build.pod.what }}</p>
+          <p>{{ build.pod.lends }}</p>
+
+          <h3>{{ build.parts }}</h3>
+          <ul class="ways">
+            <li>{{ build.pod.parts.same }}</li>
+            <li>{{ build.pod.parts.antennas }}</li>
+            <li>{{ build.pod.parts.switch }}</li>
+            <li>{{ build.pod.parts.usb }}</li>
+            <li>{{ build.pod.parts.uart }}</li>
+          </ul>
+
+          <h3>{{ build.pins }}</h3>
+          <p>{{ build.pins_intro }}</p>
+          <div class="table">
+            <table class="pins">
+              <thead><tr><th scope="col">{{ build.pin_what }}</th><th scope="col">{{ build.pin_gpio }}</th></tr></thead>
+              <tbody>
+                <tr><td>{{ build.pin.btn1 }}</td><td data-kconfig="ATALAIA_BTN1_PIN">4</td></tr>
+                <tr><td>{{ build.pin.btn2 }}</td><td data-kconfig="ATALAIA_BTN2_PIN">48</td></tr>
+                <tr><td>{{ build.pin.btn3 }}</td><td data-kconfig="ATALAIA_BTN3_PIN">44</td></tr>
+                <tr><td>{{ build.pin.btn4 }}</td><td data-kconfig="ATALAIA_KP_P7_BUTTON">PCF8574 P7</td></tr>
+                <tr><td>{{ build.pin.led }}</td><td data-kconfig="ATALAIA_LED_PIN">35</td></tr>
+                <tr><td>{{ build.pin.sda_bus }}</td><td data-kconfig="ATALAIA_NFC_SDA_PIN">17</td></tr>
+                <tr><td>{{ build.pin.scl }}</td><td data-kconfig="ATALAIA_NFC_SCL_PIN">18</td></tr>
+                <tr><td>{{ build.pin.bclk }}</td><td data-kconfig="ATALAIA_AUDIO_BCLK_PIN">6</td></tr>
+                <tr><td>{{ build.pin.lrclk }}</td><td data-kconfig="ATALAIA_AUDIO_LRCLK_PIN">15</td></tr>
+                <tr><td>{{ build.pin.dout }}</td><td data-kconfig="ATALAIA_AUDIO_DOUT_PIN">16</td></tr>
+                <tr><td>{{ build.pin.tamper }}</td><td data-kconfig="ATALAIA_POD_TAMPER_PIN">47</td></tr>
+                <tr><td>{{ build.pin.log }}</td><td>43</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>{{ build.pod.free_pins }}</p>
+
+          <h3>{{ build.steps }}</h3>
+          <ol class="ways">
+            <li>{{ build.pod.steps.like_box }}</li>
+            <li>{{ build.pod.steps.switch }}</li>
+            <li>{{ build.pod.steps.flash }}</li>
+            <li>{{ build.pod.steps.log }}</li>
+            <li>{{ build.pod.steps.link }}</li>
+            <li>{{ build.pod.steps.bring_up }}</li>
+          </ol>
+          <figure class="photo"><figcaption>{{ build.photo }} {{ build.pod.photo }}</figcaption></figure>
+
+          <h3>{{ build.open }}</h3>
+          <ul class="ways">
+            <li>{{ build.pod.open.siren }}</li>
+            <li>{{ build.pod.open.phone_power }}</li>
+            <li>{{ build.pod.open.enclosure }}</li>
+            <li>{{ build.pod.open.settings }}</li>
+          </ul>
+          <p class="more">{{ build.pod.full }}</p>
+        </section>
+
+        <section id="target-addon" aria-labelledby="target-addon-title">
+          <h2 id="target-addon-title">{{ build.target.title }}</h2>
+          <p class="warn">{{ build.target.status }}</p>
+          <p>{{ build.target.what }}</p>
+
+          <h3>{{ build.target.decided_title }}</h3>
+          <ul class="ways">
+            <li>{{ build.target.decided.parts }}</li>
+            <li>{{ build.target.decided.port }}</li>
+            <li>{{ build.target.decided.capability }}</li>
+            <li>{{ build.target.decided.mode }}</li>
+            <li>{{ build.target.decided.next }}</li>
+          </ul>
+
+          <h3>{{ build.open }}</h3>
+          <ol class="ways">
+            <li>{{ build.target.open.mcu }}</li>
+            <li>{{ build.target.open.protocol }}</li>
+            <li>{{ build.target.open.connector }}</li>
+            <li>{{ build.target.open.voltage }}</li>
+            <li>{{ build.target.open.interrupt }}</li>
+            <li>{{ build.target.open.ring }}</li>
+            <li>{{ build.target.open.sensor }}</li>
+          </ol>
+
+          <h3>{{ build.target.safety_title }}</h3>
+          <ul class="ways">
+            <li>{{ build.target.safety.eyes }}</li>
+            <li>{{ build.target.safety.ricochet }}</li>
+            <li>{{ build.target.safety.shield }}</li>
+            <li>{{ build.target.safety.limits }}</li>
+          </ul>
+          <figure class="photo"><figcaption>{{ build.photo }} {{ build.target.photo }}</figcaption></figure>
+          <p class="more">{{ build.target.full }}</p>
+        </section>
+      </div>
+    </div>
+  </main>
+
+{% include footer %}
+</body>
+</html>

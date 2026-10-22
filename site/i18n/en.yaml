@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: CC-BY-SA-4.0
 #
 # English text of the project pages (site/en/: the main page, modes/, radio/,
-# roadmap/ and glossary/). Every key the English pages use in the templates
+# roadmap/, build/ and glossary/). Every key the English pages use in the templates
 # site/src/*.html and site/src/partials/*.html must be here, and they must use
 # every key here; apart from the parts only one language shows, pt.yaml has the
 # same keys. A key can be used on several pages. Values are HTML; keys the
@@ -43,6 +43,11 @@ meta:
     description: >-
       Atalaia's six phases, from the shared core to the community, each closed by a real field test,
       and where each one stands today.
+  build:
+    title: Build guides · Atalaia
+    description: >-
+      How to build Atalaia's Satellite and I/O pod from off-the-shelf parts, what is decided for the
+      target addon, and where the Field Box's build manual is.
   glossary:
     title: Glossary · Atalaia
     description: >-
@@ -60,6 +65,7 @@ header:
   radio: Radio
   try: Try it
   roadmap: Roadmap
+  build: Build
   hub: Community
   glossary: Glossary
   language: Language
@@ -708,8 +714,9 @@ roadmap:
       made by the editor itself, a sandbox-escape battery in CI, the field controller installing
       signed modes, boxes getting the signed modes they lack from the GM console, scenarios built
       from blocks in the console, the mode registry ready as a template, with its checks and the
-      verified badge, and German (a draft, being reviewed). Next: creating the registry, more
-      translations.
+      verified badge, and German (a draft, being reviewed); <a href="{{ page.to.build }}">build
+      guides</a> for the Satellite, the I/O pod and the target addon, as text. Next: creating the
+      registry, more translations.
     text: >-
       Visual mode editor, mode registry, carrier PCB (a ready-made circuit board that makes builds
       easier), translations, build guides for other node types. Built in software: the visual mode
@@ -743,6 +750,299 @@ roadmap:
       from its template; the review of the German; Traditional Chinese; the carrier PCB after the
       first built boxes.
     gate: Ongoing after the first release.
+
+build:
+  title: Build guides
+  intro: >-
+    Atalaia's props are built from off-the-shelf parts around one ESP32 board, with no custom
+    circuit board. This page has the guides for the Satellite, the I/O pod and the target addon,
+    shortened; the full guides, with every check and the troubleshooting tables, are in the
+    repository.
+  status: >-
+    <strong>No box of any kind has been built from these guides yet.</strong> Their pins are checked
+    automatically against the firmware, but every physical step (enclosure, power, runtime, radio
+    range) is untested, and the photos will come with the first builds. If you build one, please
+    tell us what you find.
+  toc: On this page
+  parts: Parts
+  pins: Pins
+  pins_intro: >-
+    The firmware's defaults. Every board pin that is not in this table stays unconnected.
+  pin_what: What
+  pin_gpio: GPIO
+  steps: Steps
+  open: Not decided yet
+  photo: "Photo to come, after the first build:"
+  pin:
+    btn1: Team button 1 (the game's first team)
+    btn2: Team button 2 (the second team)
+    btn3: >-
+      Team button 3, optional (the board's UART0 receive line)
+    btn4: Team button 4 (on the keypad expander)
+    led: LED ring data, through the 74AHCT125 level shifter
+    sda_gauge: I2C SDA, for the battery gauge (the board's own bus)
+    sda_bus: >-
+      I2C SDA, for the keypad expander, the NFC reader and the battery gauge (the board's own bus)
+    scl: I2C SCL
+    bclk: Amplifier BCLK (optional)
+    lrclk: Amplifier LRC
+    dout: Amplifier DIN
+    tamper: Enclosure switch, to GND
+    log: >-
+      Log output (UART0 TX): only a 3.3&nbsp;V USB-serial adapter's RX, on the bench
+  safety:
+    title: Safety first
+    intro: These rules hold for every build on this page, as for the Field Box.
+    antenna: >-
+      <strong>Never power a board without its LoRa antenna</strong>, not even from USB:
+      transmitting into an open antenna port can destroy the radio's amplifier. Fit both antennas
+      first and leave them on.
+    cell: >-
+      <strong>One Li-ion cell in series only</strong> (1S, 3.0–4.2&nbsp;V): protected cells, a fuse
+      close to the cell and a diode against a cell put in the wrong way round. The board's battery
+      socket and charger take one cell; a 2S pack destroys them. Check the polarity with a meter
+      before every connection: small battery plugs have no standard polarity.
+    charge: >-
+      <strong>Charge under supervision</strong>, never in a closed case, only between about 0 and
+      45&nbsp;°C, and keep the cells in a fire-safe bag while you work, with the cells out of the
+      box. Never use a cell that is dented, swollen, hot or below 2.5&nbsp;V.
+    volts: >-
+      <strong>3.3&nbsp;V signals only</strong> into the board: the LED ring is driven through a level
+      shifter, and every I2C module must pull its lines up to 3.3&nbsp;V, never 5&nbsp;V.
+    pins: >-
+      <strong>Never wire GPIO 5 or 46</strong> (the radio's front end) <strong>nor GPIO 34 or
+      38–42</strong> (the board's GPS connector).
+    power_check: >-
+      <strong>No game before the transmit-power check</strong> of the bring-up list: the firmware
+      keeps the radio within the legal limit with an amplifier gain that has not been measured yet.
+    enclosure: >-
+      <strong>Plastic, never metal</strong> (the radio must get out), weatherproof, in a bright
+      colour with a "GAME PROP" label, and nothing that looks like an explosive device.
+    hits: >-
+      <strong>BBs and paintballs will hit it.</strong> Keep the cells and boards away from the walls
+      and out of the line of fire, put a phone's screen behind clear polycarbonate (never glass), and
+      never place a box where players have to shoot at it, unless it is a target.
+  field_box:
+    title: Field Box
+    text: >-
+      The main prop, with team buttons, a keypad, a colour screen, an LED ring, an NFC reader and a
+      speaker. Its
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">build
+      manual</a> has the parts, the wiring diagrams, power and battery safety, the first flash and
+      troubleshooting; the guides below refer to it for every step they share.
+  satellite:
+    title: Satellite
+    what: >-
+      A small box for a secondary point or a beacon: the Field Box's board with two big team buttons
+      (a third is possible), an LED ring that shows the team holding it, the board's own small
+      screen, and one 18650 cell. About <span class="nowrap">€30–40</span> in parts (the design's
+      estimate). It runs the <strong>Field Box's own firmware</strong> with fewer parts fitted: the
+      firmware reports each missing part once at start-up and carries on.
+    plays: >-
+      Without a keypad it cannot choose a game on its own: it plays the games a
+      <a href="{{ page.to.glossary }}#glossary-field-controller">field controller</a> invites it
+      into, as a satellite or the master of
+      <a href="{{ page.to.modes }}#master-satellites">Master and Satellites</a>, or as a zone of any
+      mode that needs only team buttons (Domination, Hold-All Domination, Last Stand). It joins a
+      field by USB cable or by the pairing code on its small screen (it has no NFC reader for a
+      field card).
+    parts:
+      board: >-
+        Heltec WiFi LoRa 32 V4 board, revision V4.2 or V4.3, 863–928&nbsp;MHz, without its shell.
+      antennas: >-
+        An 868&nbsp;MHz antenna of 2&nbsp;dBi or less (the board kit's) and a 2.4&nbsp;GHz antenna,
+        which is required: the first setup, mode downloads and firmware updates use Wi-Fi.
+      buttons: >-
+        Two (or three) 60&nbsp;mm arcade buttons with 5&nbsp;V LEDs.
+      ring: >-
+        A WS2812B LED ring (24 LEDs by default; 12 or 16 with one firmware setting), with the
+        74AHCT125 level shifter, a 330&nbsp;Ω resistor and a 1000&nbsp;µF capacitor, on a small
+        perfboard.
+      gauge: >-
+        A MAX17048 battery gauge, recommended: without it the box never knows its battery level.
+      power: >-
+        One protected 18650 cell in a holder (or a 1S pack with a protection board), a 5&nbsp;A fuse,
+        a Schottky diode, a covered main switch, a 5&nbsp;V boost converter for the ring, and lever
+        splices: the Field Box's power path with one cell.
+      sound: >-
+        Sound is optional: the Field Box's MAX98357A amplifier and a small speaker.
+      box: >-
+        A plastic IP65 box in a bright colour, with a vent and cable glands, and "GAME PROP" labels.
+    free_pins: >-
+      The firmware still drives the Field Box's screen pins (GPIO 1, 3, 33 and 47): leave them
+      unconnected.
+    steps:
+      revision: >-
+        Read the chip next to the board's LoRa antenna connector: KCT8103L is a V4.3 (the firmware's
+        default), GC1109 a V4.2. Fit and label both antennas before the board is ever powered.
+      enclosure: >-
+        Plan the box on paper, then drill every hole before any electronics go in: buttons and ring
+        on the lid, the switch recessed or covered, a vent low down.
+      power: >-
+        Build the power path without the board: cell, fuse, diode, switch, splices; set the boost
+        converter to 5.0–5.2&nbsp;V on its own before anything is connected to it.
+      hub: >-
+        Build the small interconnect board: the 3V3, GND and 5V rails (and SDA and SCL for the gauge)
+        and the level shifter, as in the Field Box's manual.
+      wiring: >-
+        Wire the buttons (to GND when pressed), the ring through the level shifter, the gauge and the
+        optional amplifier, by the pins above.
+      check: >-
+        Check with the meter, the cell out: no short between the rails, each button only while
+        pressed, the polarity of the board's battery lead.
+      flash: >-
+        Build and flash the Field Box firmware as its manual says, set for your board revision and
+        your ring's number of LEDs.
+      bring_up: >-
+        Do the bring-up steps that apply to a Satellite: start-up, buttons, LEDs, battery, and the
+        radio and its transmit power before any game.
+      field: >-
+        Set its name, region and admin PIN in its Wi-Fi setup page from a phone, adopt it into your
+        field by USB cable or pairing code, and invite it into a game from the GM console.
+    photo: the finished Satellite, inside and out.
+    open:
+      buzzer: >-
+        <strong>The piezo buzzer</strong> of the original design: the firmware makes sound only
+        through the amplifier, so a buzzer would need a firmware change.
+      enclosure: >-
+        <strong>The enclosure</strong>: no box has been chosen yet.
+      runtime: >-
+        <strong>The runtime</strong> on one cell: not measured.
+      diagram: >-
+        <strong>A wiring diagram of its own</strong>: for now the Field Box's diagrams show every wire
+        a Satellite has.
+    full: >-
+      The full guide:
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/satellite/BUILD.md">Satellite
+      build guide</a>.
+  pod:
+    title: I/O pod
+    what: >-
+      The box that lends an <a href="{{ page.to.glossary }}#glossary-android-prop">Android prop</a>
+      what a phone lacks: big team buttons, a keypad, an LED ring, sound, an NFC reader, a switch
+      that tells when the box is opened, and a LoRa radio. The phone runs the game mode; the pod is
+      its hands and its radio, over a USB cable or Bluetooth. It is the Field Box's hardware without
+      the colour screen, running the pod firmware, which has been tested on a computer but not yet
+      on a board. About <span class="nowrap">€35</span> in parts (the design's estimate).
+    lends: >-
+      Every part but the board is optional: the pod tells the phone what it has, and the phone uses
+      only that. Button 1 is the game's first team, as on a Field Box. An opened enclosure reaches
+      the GM console as a tamper alert.
+    parts:
+      same: >-
+        The Field Box's parts, less the screen: the board, the buttons (up to four), the keypad and
+        its PCF8574 expander, the LED ring with its level shifter, the PN532 NFC reader, the
+        amplifier and speaker, the battery gauge, and the same one-cell power path.
+      antennas: >-
+        Both antennas: LoRa, and 2.4&nbsp;GHz for Bluetooth.
+      switch: >-
+        A microswitch that the closed lid holds pressed: the enclosure switch.
+      usb: >-
+        A panel USB-C socket with data lines (not charge-only) for the phone's cable, and a USB-C OTG
+        cable for the phone.
+      uart: >-
+        On the bench only: a 3.3&nbsp;V USB-serial adapter to read the pod's log.
+    free_pins: >-
+      The pod does not use the Field Box's other screen pins (GPIO 1, 3 and 33): leave them
+      unconnected.
+    steps:
+      like_box: >-
+        Build it as a Field Box without the screen: board revision, antennas, enclosure, power path,
+        interconnect board, then the keypad, ring, NFC reader, buttons and amplifier you fit, each
+        with the manual's checks.
+      switch: >-
+        Mount the microswitch so the closed lid presses it, and wire it from GPIO 47 to GND. The pod
+        watches it only after it has read closed once, so a pod without one never raises an alarm.
+      flash: >-
+        Build the pod firmware (<code>python tools/docker_fw.py pod</code>) and flash it from the
+        <code>build-pod</code> folder, as the Field Box's.
+      log: >-
+        Read its log on GPIO 43 with the USB-serial adapter: the USB-C port carries the pod's link
+        to the phone, not the log.
+      link: >-
+        In the app, link it over a USB-C OTG cable, then over Bluetooth (Android asks to pair once).
+      bring_up: >-
+        Run the pod's bring-up checks, including the radio's transmit power before any game.
+    photo: the finished pod, with its enclosure switch, and the phone linked to it.
+    open:
+      siren: >-
+        <strong>A separate siren or strobe</strong>: the pod's sound is its amplifier; switching
+        other loads is not in its firmware.
+      phone_power: >-
+        <strong>Power from the phone</strong>: on a cable, the phone powers the pod and may charge
+        its cell. Whether it should, and how much a phone gives, are to be checked at the first build.
+      enclosure: >-
+        <strong>The enclosure</strong>, and how the phone and the pod are carried together.
+      settings: >-
+        <strong>Settings from the phone</strong>: button colours, the number of LEDs and the rest are
+        set in the firmware build for now.
+    full: >-
+      The full guide:
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/io-pod/BUILD.md">I/O
+      pod build guide</a>, and the pod's checks with a phone in the
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/firmware/esp32/docs/BRING_UP.md">bring-up
+      list</a>.
+  target:
+    title: Target addon
+    status: >-
+      Not buildable yet: the target addon is designed only. Do not wire a plate to a box from this
+      page.
+    what: >-
+      A plate that players shoot at, with a sensor that feels each hit and a ring of lights. It
+      plugs into a box and turns it into a scoring target for
+      <a href="{{ page.to.modes }}#target-windows">Target Windows</a>, whose rules are built and
+      tested in the simulator.
+    decided_title: What is decided
+    decided:
+      parts: >-
+        A steel or polycarbonate plate, a piezo sensor, a small processor of its own (RP2040 or
+        ATtiny class) to detect hits, and an LED ring. About <span class="nowrap">€20–30</span> in
+        parts (the design's estimate).
+      port: >-
+        It plugs into a waterproof 5-pin M12 connector on the box: ground, 5&nbsp;V, the two I2C lines
+        and an interrupt line, for cables of up to about 1–2&nbsp;m. Its processor tells the box what
+        it is, so the box needs no new driver per addon.
+      capability: >-
+        Game scripts see each hit with its strength (0 to 255), and can arm and disarm the target.
+        The same is defined for a phone's I/O pod.
+      mode: >-
+        Target Windows lights the target in a random team's colour for a few seconds; a hit strong
+        enough in that window scores for that team.
+      next: >-
+        Then come the addon's own firmware, the box's driver for its port, and the sensor tuned on
+        real steel and polycarbonate plates; Target Windows then becomes a mode a box offers.
+    open:
+      mcu: The processor (RP2040 or ATtiny) and its firmware.
+      protocol: >-
+        How the box and the addon talk over I2C: the address, how the addon says what it is, how a
+        hit is reported, how it is armed.
+      connector: The M12 connector's pin order and the cable.
+      voltage: >-
+        The voltage on the I2C lines: the box's bus is 3.3&nbsp;V while the connector also carries
+        5&nbsp;V; pulling the bus up to 5&nbsp;V could damage the board.
+      interrupt: >-
+        The interrupt line's pin: a Field Box already uses all eight of its board's free pins, so it
+        has none left for it.
+      ring: Whether the window is shown on the addon's own LED ring or on the box's.
+      sensor: The sensor circuit and its mounting, and the plate, its stand and its angle.
+    safety_title: Safety, once there is something to build
+    safety:
+      eyes: >-
+        <strong>Eye and face protection</strong> for everyone within range while anyone shoots at
+        it, at the bench too.
+      ricochet: >-
+        <strong>BBs bounce off a hard plate</strong>, and some come back: angle a steel plate so they
+        go down to the ground, never flat towards the shooter.
+      shield: >-
+        <strong>Only the plate is a target</strong>: never shoot at the box, the cable or the
+        connector, and keep the electronics behind the plate or in their own enclosure.
+      limits: >-
+        <strong>The field's power limits</strong> apply to shooting at targets as at players.
+    photo: the finished target, plate, sensor and LED ring, and the port on a box.
+    full: >-
+      What is decided, with the documents behind each decision:
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/target-addon/BUILD.md">target
+      addon guide</a>.
 
 hub:
   title: Community hub

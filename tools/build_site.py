@@ -127,6 +127,7 @@ PAGES = (
     Page("modes", {"pt": "modos/", "en": "modes/", "de": "modi/"}),
     Page("radio", {"pt": "radio/", "en": "radio/", "de": "funk/"}),
     Page("roadmap", {"pt": "roadmap/", "en": "roadmap/", "de": "roadmap/"}),
+    Page("build", {"pt": "montagem/", "en": "build-guides/", "de": "bauen/"}),
     Page("glossary", {"pt": "glossario/", "en": "glossary/", "de": "glossar/"}),
 )
 

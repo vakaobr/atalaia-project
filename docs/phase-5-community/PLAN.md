@@ -188,7 +188,7 @@ plus, depending on what the plan phase touches:
 | 9 | Community processes | CONTRIBUTING.md "Submitting a community mode", review checklist, verified badge, RFC for the package format (AC-11) | Software, now | 4, 8 | S | **Built 2026-10-22** (P5G-12 to P5G-14) |
 | 10 | German | site, console, editor, app and box texts in German; `tools/i18n_check.py` across domains (AC-7) | Software, now (on a real box: with the boards) | -- | M | **Built 2026-10-22** (P5H-1 to P5H-11; German drafted by an AI model, native review pending) |
 | 11 | Traditional Chinese (Taiwan) | the same, with CJK glyphs in the box's fonts and the app | Software, now; flash budget on the box to check | 10 | M | |
-| 12 | Build guides for other node types | satellite, I/O pod, target addon as text, rendered on the project page (AC-10 text) | Software, now | -- | S | |
+| 12 | Build guides for other node types | satellite, I/O pod, target addon as text, rendered on the project page (AC-10 text) | Software, now | -- | S | **Built 2026-10-22** (P5J-1 to P5J-14; photos: HW2) |
 | HW1 | Carrier PCB | KiCad schematic and layout, ERC/DRC in CI (AC-9) | Needs hardware (3 perfboard boxes) | phase 1 | -- | |
 | HW2 | Build guide photos | photos in place of the placeholders | Needs hardware | 12 | -- | |
 | HW3 | Community content on the field | a registry scenario on a real field; a community mode merged into `modes/` and shipped in a signed release; a signed mode a box lacked, sent from the GM console (plan phase 13) | Needs hardware | 6, 13, phase 2 F | -- | |
@@ -198,7 +198,7 @@ Plan phases 4-6 and 7 can run in parallel worktrees with 2-3; 10-12 are
 independent of the rest; 13 needs 4, 5 and 6 (its 13a and 13b can then
 run in parallel). Sizes: L about a week of agent work.
 
-**Next (2026-10-22, plan phases 1-10 and 13 built in software): the review of the
+**Next (2026-10-22, plan phases 1-10, 12 and 13 built in software): the review of the
 German by German-speaking players (P5H-5); the leftover contract cases for the
 mode-package endpoints (the editor making packages is built, P5I-1 to P5I-6); plan phase 13
 on real boxes in HW3.**
@@ -678,6 +678,23 @@ Text guides for the Satellite, the I/O pod and the target addon in the
 manner of `hardware/field-box/BUILD.md`, with `<!-- PHOTO: ... -->`
 placeholders, linked and rendered on the project page.
 
+**Built 2026-10-22** (decisions P5J-1 to P5J-14; P5J-2, P5J-4, P5J-7, P5J-8,
+P5J-9 and P5J-11 for the maintainer). The Satellite is the Field Box's board
+and firmware with two or three buttons, the LED ring and the board's OLED (no
+variant, P5J-2); the I/O pod is the Field Box's parts without the TFT, plus the
+enclosure switch on GPIO 47 (P5J-6); the target addon's guide lists what is
+decided and what is not, with no wiring: it is not buildable yet, and a Field
+Box has no free GPIO for its interrupt line (P5J-9). No guide has been followed
+on real hardware; photos are HW2.
+
+| File | What |
+|------|------|
+| `hardware/satellite/BUILD.md`, `hardware/io-pod/BUILD.md`, `hardware/target-addon/BUILD.md` | The guides, in the Field Box manual's manner, with `<!-- PHOTO: ... -->` placeholders (P5J-10) |
+| `hardware/README.md`, `hardware/{satellite,io-pod,target-addon}/README.md`, `README.md` | Pointers to the guides |
+| `site/src/build.html`, `site/i18n/{pt,en,de}.yaml`, `site/style.css`, `site/src/partials/header.html`, `tools/build_site.py` | The build page: `/montagem/`, `/en/build-guides/`, `/de/bauen/`, in the header (P5J-11) |
+| `tools/check_wiring.py` | The guides' and the page's pin tables checked against the Kconfig defaults (P5J-13) |
+| `docs/translations/glossary.md`, `site/README.md`, `tools/README.md` | The new words; how the page and its pin tables work |
+
 ## HW1-HW3
 
 *Need hardware.* HW1 the carrier PCB (ADR-P5-6's gates, KiCad 8 ERC
@@ -700,7 +717,7 @@ release.
 | AC-7 | At least one language beyond en/pt on the site | 10 | **Met in software (2026-10-22)**: `/de/` built and checked by `build_site.py --check`; review pending (P5H-5) |
 | AC-8 | Built-in modes carry English and Portuguese texts | -- | **Met differently**: in `mode.yaml`'s `i18n:` (P4R22), every built-in mode |
 | AC-9 | The carrier PCB schematic passes KiCad ERC | HW1 | Pending (needs hardware) |
-| AC-10 | Build guides exist for the Field Box and the Satellite | 12, HW2 | Field Box done (`hardware/field-box/BUILD.md`); the rest pending |
+| AC-10 | Build guides exist for the Field Box and the Satellite | 12, HW2 | **Met in text (2026-10-22)**: `hardware/field-box/BUILD.md`, `hardware/satellite/BUILD.md` (and the I/O pod's and the target addon's), on the project page in three languages; photos with HW2 |
 | AC-11 | CONTRIBUTING.md documents mode submission | 9 | **Met (2026-10-22)**: "Submitting a community mode", `docs/community/` |
 | AC-12 | CI includes a sandbox-escape test job | 5 | **Met (2026-10-22)**: CI job `sandbox-escape` |
 | AC-13 | (new, P5R-8) A box gets a signed mode it lacks from its field controller between games, checks it and plays it; it refuses an unsigned or tampered one | 13, HW3 | Pending (planned 2026-10-22) |

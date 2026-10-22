@@ -112,6 +112,12 @@ ones a reviewer should look at first.
 | field owners | donos de campo | Feldbetreibende | |
 | modifier / role package | modificador / pacote de papel | Modifikator / Rollenpaket | |
 | event (in a script) | evento | Ereignis | |
+| build guide | guia de montagem | Bauanleitung | the project page's `/montagem/`, `/de/bauen/` (P5J-11) |
+| Satellite (the box) | caixa satélite, satélite | Satellit, Satelliten-Box | |
+| I/O pod | módulo de E/S | I/O-Pod | |
+| target addon | módulo de alvo | Ziel-Addon | *(check)* |
+| enclosure switch (tamper) | interruptor da caixa | Gehäuseschalter | the alert: "violação" / "Manipulationsalarm" *(check)* |
+| Li-ion cell | célula (de iões de lítio) | Zelle, Akku | "pilha" is a disposable battery |
 
 ## Mode names
 

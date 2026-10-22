@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 5 -- Community: Status
 
-**Current phase:** Implementation (plan phases 1-9 and 13 built in software 2026-10-22: the visual mode editor complete, its link to the simulator, signed mode packages, the sandbox-escape battery, signed packages in the controller, scenario blocks in the GM console, missing modes sent to boxes (controller and box), the registry repository's template and the community processes)
+**Current phase:** Implementation (plan phases 1-10, 12 and 13 built in software 2026-10-22: the visual mode editor complete, its link to the simulator, signed mode packages, the sandbox-escape battery, signed packages in the controller, scenario blocks in the GM console, missing modes sent to boxes (controller and box), the registry repository's template and the community processes, German, the build guides for the other node types)
 **Phase status:** In progress
 **Risk level:** Medium
-**Last updated:** 2026-10-22 (the editor makes the package itself, P5I-1 to P5I-6; plan phases 8 and 9 built; plan phase 7 built; plan phase 13b built; plan phase 13a built; plan phases 3-6 built, P5B-9 answered; plan phase 2 built, plan phase 13 planned from P5R-8; refreshed after phases 2-4 software; first written 2026-10-18)
-**Next step:** the review of the German (P5H-5); P5I-1 and P5I-3 (the editor's package: made in the page, signed offline) for the maintainer; creating the registry repository waits for the maintainer; plan phase 13's test on real boxes is HW3
+**Last updated:** 2026-10-22 (plan phase 12 built; the editor makes the package itself, P5I-1 to P5I-6; plan phases 8 and 9 built; plan phase 7 built; plan phase 13b built; plan phase 13a built; plan phases 3-6 built, P5B-9 answered; plan phase 2 built, plan phase 13 planned from P5R-8; refreshed after phases 2-4 software; first written 2026-10-18)
+**Next step:** the review of the German (P5H-5); P5I-1 and P5I-3 (the editor's package: made in the page, signed offline) for the maintainer; creating the registry repository waits for the maintainer; plan phase 13's test on real boxes is HW3; plan phase 11 (Traditional Chinese) is the last software plan phase; the build guides wait for their first builds and photos (HW2) and the maintainer's P5J decisions
 
 Phase 5 is the community layer: visual mode editor (Blockly), mode
 registry with signing and a verified badge, carrier PCB, translations,
@@ -170,6 +170,19 @@ section 16).
   Drafted by an AI model, **not yet reviewed by a native-speaking player**
   (`docs/translations/status.yaml`). AC-7 met in software. Decisions P5H-1 to
   P5H-11 (open; P5H-5, P5H-10 and P5H-11 for the maintainer).
+- [x] **Plan phase 12, build guides for the other node types (2026-10-22), as
+  text:** `hardware/satellite/BUILD.md` (the Field Box's board and firmware
+  with two or three team buttons, the LED ring and the board's OLED; plays the
+  games a field controller invites it into), `hardware/io-pod/BUILD.md` (the
+  Field Box's parts without the TFT, plus the enclosure switch on GPIO 47; the
+  pod firmware from `build-pod`) and `hardware/target-addon/BUILD.md` (what is
+  decided and what is not: **not buildable yet**), with photo placeholders and
+  safety notes (cells, enclosures, hits); the project page's new build page
+  (`/montagem/`, `/en/build-guides/`, `/de/bauen/`), in the header; every pin of the
+  guides and the page checked against the Kconfig defaults by
+  `tools/check_wiring.py`. No guide followed on real hardware yet. AC-10 met in
+  text. Decisions P5J-1 to P5J-14 (open; P5J-2, P5J-4, P5J-7, P5J-8, P5J-9 and
+  P5J-11 for the maintainer).
 
 ## Refresh 2026-10-22: what changed
 
@@ -204,7 +217,7 @@ section 16).
 | 9 | Community processes | Software | **Built 2026-10-22** |
 | 10 | German | Software (after P5R-10) | **Built 2026-10-22** (AI-drafted, review pending) |
 | 11 | Traditional Chinese (Taiwan) | Software | |
-| 12 | Build guides for other node types | Software | |
+| 12 | Build guides for other node types | Software | **Built 2026-10-22** (text; photos: HW2) |
 | HW1 | Carrier PCB | Needs hardware | |
 | HW2 | Build guide photos | Needs hardware | |
 | HW3 | Community content on the field | Needs hardware | |
@@ -243,10 +256,10 @@ section 16).
 | AC-4 | Registry index format defined and documented | **Met in software (2026-10-22)**: `registry/schema/index.schema.json`, `protocol/mode-packages.md` |
 | AC-5 | Mode packages are Ed25519-signed and verifiable | **Met in software (2026-10-22)**: `tools/mode_package.py`, `protocol/vectors/mode_package.json` |
 | AC-6 | Registry CI runs mode tests and checks licences | **Met in this repository's template (2026-10-22)**: CI job `registry-template` runs the template's workflow on a sample submission; in `atalaia-modes` once the maintainer creates it |
-| AC-7 | A language beyond en/pt on the site | Pending (plan phase 10) |
+| AC-7 | A language beyond en/pt on the site | **Met in software (2026-10-22)**: `/de/`, review pending (P5H-5) |
 | AC-8 | Built-in modes carry en and pt texts | **Met differently**: `mode.yaml` `i18n:` (P4R22) |
 | AC-9 | Carrier PCB schematic passes KiCad ERC | Pending (needs hardware) |
-| AC-10 | Build guides for the Field Box and the Satellite | Field Box done; Satellite pending (plan phase 12) |
+| AC-10 | Build guides for the Field Box and the Satellite | **Met in text (2026-10-22)**: the Satellite's (and the I/O pod's and target addon's) beside the Field Box's, on the project page in pt, en, de; photos with HW2 |
 | AC-11 | CONTRIBUTING.md documents mode submission | **Met (2026-10-22)**: "Submitting a community mode", `docs/community/` |
 | AC-12 | CI includes a sandbox-escape job | **Met (2026-10-22)**: CI job `sandbox-escape`, `core/tests/test_sandbox_escape.c` under ASan and UBSan |
 | AC-13 | (new, P5R-8) A box gets a signed mode it lacks from its controller between games, checks and plays it | Pending (plan phase 13, HW3) |
@@ -307,3 +320,21 @@ section 16).
    fixes) and P5C-18 (packages stay installed when their key is revoked) were
    accepted by the maintainer; the other decisions of P5C-1 to P5C-21 are open
    for the maintainer's review.
+4. Plan phase 12 is built as text: the first Satellite and the first I/O pod
+   built from their guides (photos in place of the placeholders, the
+   **Verify at the first build** items answered: runtime, the pod's current from
+   a phone, the enclosures) are HW2. For the maintainer: P5J-2 (the Satellite is
+   the Field Box's firmware with fewer parts), P5J-4 (no piezo buzzer without a
+   firmware change), P5J-7 (no separate siren on the pod), P5J-8 (a phone
+   charging the pod's cell), P5J-9 (the target addon's open questions: the bus
+   voltage, and no free GPIO on a Field Box for its interrupt line) and P5J-11
+   (the page's address and words).
+
+## Verification of plan phase 12 (2026-10-22)
+
+| Command | Result |
+|---------|--------|
+| `docker run --rm -v "$PWD:/src" -w /src -e BUILD=/tmp/c atalaia-dev sh tools/check.sh` | see the report of the commit |
+| `python3 tools/check_wiring.py` | OK; mutated pins in each guide and in the page fail as expected |
+| `python3 tools/build_site.py --check` | OK (18 pages, the new page in three languages) |
+| Every page in Chromium at 320, 360 and 1200 px | no horizontal scroll (the German main page's hero fixed, P5J-14) |

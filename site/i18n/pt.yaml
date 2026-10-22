@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: CC-BY-SA-4.0
 #
 # Portuguese (pt-PT) text of the project pages, the default language (site/:
-# the main page, modos/, radio/, roadmap/ and glossario/). Every key the
+# the main page, modos/, radio/, roadmap/, montagem/ and glossario/). Every key the
 # Portuguese pages use in the templates site/src/*.html and
 # site/src/partials/*.html must be here, and they must use every key here;
 # apart from the parts only one language shows, en.yaml has the same keys. A
@@ -45,6 +45,11 @@ meta:
     description: >-
       As seis fases da Atalaia, do núcleo partilhado à comunidade, cada uma fechada por um teste a
       sério no campo, e em que ponto está cada uma.
+  build:
+    title: Guias de montagem · Atalaia
+    description: >-
+      Como montar a caixa satélite e o módulo de E/S da Atalaia com peças à venda em qualquer loja,
+      o que está decidido para o módulo de alvo, e onde está o manual de montagem da Field Box.
   glossary:
     title: Glossário · Atalaia
     description: >-
@@ -63,6 +68,7 @@ header:
   radio: Rádio
   try: Experimentar
   roadmap: Roadmap
+  build: Montagem
   hub: Comunidade
   glossary: Glossário
   language: Idioma
@@ -741,8 +747,9 @@ roadmap:
       assinados, criados pelo próprio editor, uma bateria de testes de fuga ao sandbox na CI, o
       controlador de campo a instalar modos assinados, as caixas a receber da consola de GM os modos
       assinados que lhes faltam, cenários montados com blocos na consola, o registo de modos pronto
-      como modelo, com as verificações e o selo de verificado, e alemão (um rascunho, em revisão). A
-      seguir: criar o registo, mais traduções.
+      como modelo, com as verificações e o selo de verificado, e alemão (um rascunho, em revisão);
+      <a href="{{ page.to.build }}">guias de montagem</a> da caixa satélite, do módulo de E/S e do
+      módulo de alvo, em texto. A seguir: criar o registo, mais traduções.
     text: >-
       Editor visual de modos, registo de modos, placa de suporte (PCB) que facilita a montagem,
       traduções, guias de montagem para outros tipos de dispositivos. Construído em software: o
@@ -777,6 +784,317 @@ roadmap:
       docs/translations (em inglês). A seguir: criar o registo a partir do modelo; a revisão do
       alemão; chinês tradicional; a placa de suporte depois das primeiras caixas montadas.
     gate: Continua depois da primeira versão.
+
+build:
+  title: Guias de montagem
+  intro: >-
+    Os dispositivos da Atalaia montam-se com peças à venda em qualquer loja de eletrónica, à volta
+    de uma placa ESP32, sem placa de circuito feita de propósito. Aqui estão os guias da caixa
+    satélite, do módulo de E/S e do módulo de alvo, em resumo; os guias completos, com todas as
+    verificações e as tabelas de problemas e soluções, estão no repositório (em inglês).
+  status: >-
+    <strong>Ainda não se montou nenhuma caixa a partir destes guias.</strong> Os pinos são
+    verificados automaticamente contra o firmware, mas todos os passos físicos (caixa, alimentação,
+    autonomia, alcance do rádio) estão por testar, e as fotografias chegam com as primeiras
+    montagens. Se montares uma, conta-nos o que encontraste.
+  toc: Nesta página
+  parts: Peças
+  pins: Pinos
+  pins_intro: >-
+    Os valores por omissão do firmware. Qualquer pino da placa que não esteja nesta tabela fica
+    sem ligação.
+  pin_what: O quê
+  pin_gpio: GPIO
+  steps: Passos
+  open: Ainda por decidir
+  photo: "Fotografia a acrescentar depois da primeira montagem:"
+  pin:
+    btn1: Botão de equipa 1 (a primeira equipa do jogo)
+    btn2: Botão de equipa 2 (a segunda equipa)
+    btn3: >-
+      Botão de equipa 3, opcional (a linha de receção da UART0 da placa)
+    btn4: Botão de equipa 4 (no expansor do teclado)
+    led: Dados do anel de LED, através do conversor de nível 74AHCT125
+    sda_gauge: I2C SDA, para o medidor de bateria (o barramento da própria placa)
+    sda_bus: >-
+      I2C SDA, para o expansor do teclado, o leitor NFC e o medidor de bateria (o barramento da
+      própria placa)
+    scl: I2C SCL
+    bclk: BCLK do amplificador (opcional)
+    lrclk: LRC do amplificador
+    dout: DIN do amplificador
+    tamper: Interruptor da caixa, para GND
+    log: >-
+      Saída do registo (UART0 TX): só para o RX de um adaptador USB-série de 3,3&nbsp;V, na bancada
+  safety:
+    title: Primeiro, a segurança
+    intro: Estas regras valem para todas as montagens desta página, tal como para a Field Box.
+    antenna: >-
+      <strong>Nunca ligues uma placa sem a antena LoRa</strong>, nem sequer por USB: emitir com a
+      saída da antena aberta pode destruir o amplificador do rádio. Monta as duas antenas primeiro e
+      deixa-as sempre ligadas.
+    cell: >-
+      <strong>Uma só célula de iões de lítio em série</strong> (1S, 3,0–4,2&nbsp;V): células
+      protegidas, um fusível perto da célula e um díodo contra uma célula ligada ao contrário. A
+      entrada de bateria e o carregador da placa só aceitam uma célula; uma bateria 2S destrói-os.
+      Confirma a polaridade com um multímetro antes de cada ligação: as fichas pequenas de bateria
+      não têm uma polaridade padrão.
+    charge: >-
+      <strong>Carrega sempre com alguém a vigiar</strong>, nunca dentro de uma mala fechada, só entre
+      cerca de 0 e 45&nbsp;°C, e guarda as células num saco à prova de fogo enquanto trabalhas, fora
+      da caixa. Nunca uses uma célula amolgada, inchada, quente ou abaixo de 2,5&nbsp;V.
+    volts: >-
+      <strong>Só sinais de 3,3&nbsp;V</strong> na placa: o anel de LED é comandado através de um
+      conversor de nível, e cada módulo I2C tem de puxar as suas linhas para 3,3&nbsp;V, nunca para
+      5&nbsp;V.
+    pins: >-
+      <strong>Nunca ligues nada ao GPIO 5 nem ao 46</strong> (a entrada do rádio) <strong>nem aos
+      GPIO 34 e 38–42</strong> (o conector de GPS da placa).
+    power_check: >-
+      <strong>Nenhum jogo antes de medir a potência de emissão</strong>, como diz a lista de
+      arranque: o firmware mantém o rádio dentro do limite legal com um ganho do amplificador que
+      ainda não foi medido.
+    enclosure: >-
+      <strong>Caixa de plástico, nunca de metal</strong> (o sinal de rádio tem de sair), estanque,
+      de cor viva, com o rótulo «GAME PROP», e nada que se pareça com um engenho explosivo.
+    hits: >-
+      <strong>Vai levar com BBs e bolas de paintball.</strong> Mantém as células e as placas longe
+      das paredes e fora da linha de tiro, protege o ecrã de um telemóvel com policarbonato
+      transparente (nunca vidro) e nunca ponhas uma caixa onde quem joga tenha de lhe disparar, a
+      não ser que seja um alvo.
+  field_box:
+    title: Field Box
+    text: >-
+      O dispositivo principal, com botões de equipa, teclado, ecrã a cores, anel de LED, leitor NFC
+      e altifalante. O
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">manual
+      de montagem</a> (em inglês) tem as peças, os esquemas de ligações, a alimentação e a segurança
+      das baterias, a primeira gravação do firmware e a resolução de problemas; os guias abaixo
+      remetem para ele em todos os passos que partilham.
+  satellite:
+    title: Caixa satélite
+    what: >-
+      Uma caixa pequena para um ponto secundário ou um farol: a placa da Field Box com dois botões
+      de equipa grandes (pode ter um terceiro), um anel de LED que mostra a equipa que a tem, o
+      pequeno ecrã da própria placa e uma célula 18650. Cerca de
+      <span class="nowrap">30–40&nbsp;€</span> em peças (a estimativa do projeto). Corre o
+      <strong>próprio firmware da Field Box</strong> com menos peças: o firmware avisa uma vez, ao
+      arrancar, de cada peça que falta, e continua.
+    plays: >-
+      Sem teclado, não escolhe um jogo sozinha: joga os jogos para que um
+      <a href="{{ page.to.glossary }}#glossario-controlador-de-campo">controlador de campo</a> a
+      convida, como satélite ou como mestre do
+      <a href="{{ page.to.modes }}#master-satellites">Mestre e Satélites</a>, ou como zona de
+      qualquer modo que só precise de botões de equipa (Domínio, Domínio Total, Último Elemento).
+      Entra num campo pelo cabo USB ou pelo código de emparelhamento que mostra no pequeno ecrã (não
+      tem leitor NFC para o cartão de campo).
+    parts:
+      board: >-
+        Placa Heltec WiFi LoRa 32 V4, revisão V4.2 ou V4.3, 863–928&nbsp;MHz, sem a caixa de plástico.
+      antennas: >-
+        Uma antena de 868&nbsp;MHz com 2&nbsp;dBi ou menos (a do kit da placa) e uma antena de
+        2,4&nbsp;GHz, obrigatória: a primeira configuração, a descarga de modos e as atualizações de
+        firmware usam o Wi-Fi.
+      buttons: >-
+        Dois (ou três) botões arcade de 60&nbsp;mm com LED de 5&nbsp;V.
+      ring: >-
+        Um anel de LED WS2812B (24 LED por omissão; 12 ou 16 com uma definição do firmware), com o
+        conversor de nível 74AHCT125, uma resistência de 330&nbsp;Ω e um condensador de
+        1000&nbsp;µF, numa pequena placa perfurada.
+      gauge: >-
+        Um medidor de bateria MAX17048, recomendado: sem ele, a caixa nunca sabe quanta bateria tem.
+      power: >-
+        Uma célula 18650 protegida num suporte (ou uma bateria 1S com placa de proteção), um fusível
+        de 5&nbsp;A, um díodo Schottky, um interruptor principal tapado, um conversor elevador de
+        5&nbsp;V para o anel e ligadores de alavanca: a alimentação da Field Box com uma só célula.
+      sound: >-
+        Som, se quiseres: o amplificador MAX98357A da Field Box e um altifalante pequeno.
+      box: >-
+        Uma caixa de plástico IP65 de cor viva, com respiro e bucins, e rótulos «GAME PROP».
+    free_pins: >-
+      O firmware continua a comandar os pinos do ecrã da Field Box (GPIO 1, 3, 33 e 47): deixa-os
+      sem ligação.
+    steps:
+      revision: >-
+        Lê o chip ao lado do conector da antena LoRa da placa: KCT8103L é uma V4.3 (a do firmware
+        por omissão), GC1109 uma V4.2. Monta e identifica as duas antenas antes de a placa receber
+        corrente pela primeira vez.
+      enclosure: >-
+        Planeia a caixa em papel e fura todos os buracos antes de entrar qualquer eletrónica: botões
+        e anel na tampa, o interruptor embutido ou tapado, um respiro em baixo.
+      power: >-
+        Monta a alimentação sem a placa: célula, fusível, díodo, interruptor, ligadores; regula o
+        conversor elevador para 5,0–5,2&nbsp;V sozinho, antes de lhe ligares seja o que for.
+      hub: >-
+        Monta a pequena placa de ligações: as linhas 3V3, GND e 5V (e SDA e SCL para o medidor) e o
+        conversor de nível, como no manual da Field Box.
+      wiring: >-
+        Liga os botões (a GND quando premidos), o anel através do conversor de nível, o medidor e o
+        amplificador opcional, pelos pinos acima.
+      check: >-
+        Verifica com o multímetro, sem a célula: nenhum curto-circuito entre linhas, cada botão só
+        quando premido, a polaridade do cabo de bateria da placa.
+      flash: >-
+        Compila e grava o firmware da Field Box como diz o manual, para a revisão da tua placa e o
+        número de LED do teu anel.
+      bring_up: >-
+        Faz os passos da lista de arranque que se aplicam a uma caixa satélite: arranque, botões,
+        LED, bateria, e o rádio e a sua potência de emissão antes de qualquer jogo.
+      field: >-
+        Dá-lhe um nome, a região e o PIN de administração na página de configuração Wi-Fi, a partir
+        de um telemóvel, adota-a no teu campo pelo cabo USB ou pelo código de emparelhamento, e
+        convida-a para um jogo na consola da organização.
+    photo: a caixa satélite acabada, por dentro e por fora.
+    open:
+      buzzer: >-
+        <strong>O besouro piezoelétrico</strong> do desenho original: o firmware só faz som através
+        do amplificador, por isso um besouro precisaria de uma alteração ao firmware.
+      enclosure: >-
+        <strong>A caixa</strong>: ainda não se escolheu nenhuma.
+      runtime: >-
+        <strong>A autonomia</strong> com uma célula: por medir.
+      diagram: >-
+        <strong>Um esquema de ligações próprio</strong>: para já, os esquemas da Field Box mostram
+        todos os fios que uma caixa satélite tem.
+    full: >-
+      O guia completo (em inglês):
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/satellite/BUILD.md">guia
+      de montagem da caixa satélite</a>.
+  pod:
+    title: Módulo de E/S
+    what: >-
+      A caixa que empresta a um
+      <a href="{{ page.to.glossary }}#glossario-dispositivo-android">dispositivo Android</a> o que
+      falta a um telemóvel: botões de equipa grandes, teclado, anel de LED, som, leitor NFC, um
+      interruptor que avisa quando a caixa é aberta, e um rádio LoRa. O telemóvel corre o modo de
+      jogo; o módulo é as suas mãos e o seu rádio, por cabo USB ou Bluetooth. É o hardware da Field
+      Box sem o ecrã a cores, com o firmware do módulo, que já foi testado num computador mas ainda
+      não numa placa. Cerca de <span class="nowrap">35&nbsp;€</span> em peças (a estimativa do
+      projeto).
+    lends: >-
+      Tirando a placa, todas as peças são opcionais: o módulo diz ao telemóvel o que tem, e o
+      telemóvel só usa isso. O botão 1 é a primeira equipa do jogo, como numa Field Box. Uma caixa
+      aberta chega à consola da organização como alerta de violação.
+    parts:
+      same: >-
+        As peças da Field Box, menos o ecrã: a placa, os botões (até quatro), o teclado e o seu
+        expansor PCF8574, o anel de LED com o conversor de nível, o leitor NFC PN532, o amplificador e
+        o altifalante, o medidor de bateria e a mesma alimentação de uma célula.
+      antennas: >-
+        As duas antenas: LoRa, e 2,4&nbsp;GHz para o Bluetooth.
+      switch: >-
+        Um microinterruptor que a tampa fechada mantém premido: o interruptor da caixa.
+      usb: >-
+        Uma tomada USB-C de painel com linhas de dados (não só de carga) para o cabo do telemóvel, e
+        um cabo USB-C OTG para o telemóvel.
+      uart: >-
+        Só na bancada: um adaptador USB-série de 3,3&nbsp;V para ler o registo do módulo.
+    free_pins: >-
+      O módulo não usa os outros pinos do ecrã da Field Box (GPIO 1, 3 e 33): deixa-os sem ligação.
+    steps:
+      like_box: >-
+        Monta-o como uma Field Box sem o ecrã: revisão da placa, antenas, caixa, alimentação, placa
+        de ligações, e depois o teclado, o anel, o leitor NFC, os botões e o amplificador que
+        puseres, cada um com as verificações do manual.
+      switch: >-
+        Fixa o microinterruptor de forma a que a tampa fechada o prima, e liga-o entre o GPIO 47 e
+        GND. O módulo só o vigia depois de o ler fechado uma vez, por isso um módulo sem interruptor
+        nunca dá alarme.
+      flash: >-
+        Compila o firmware do módulo (<code>python tools/docker_fw.py pod</code>) e grava-o a partir
+        da pasta <code>build-pod</code>, como o da Field Box.
+      log: >-
+        Lê o registo no GPIO 43 com o adaptador USB-série: a porta USB-C leva a ligação do módulo ao
+        telemóvel, não o registo.
+      link: >-
+        Na app, liga-o por um cabo USB-C OTG e depois por Bluetooth (o Android pede o emparelhamento
+        uma vez).
+      bring_up: >-
+        Faz as verificações de arranque do módulo, incluindo a potência de emissão do rádio antes de
+        qualquer jogo.
+    photo: o módulo acabado, com o interruptor da caixa, e o telemóvel ligado a ele.
+    open:
+      siren: >-
+        <strong>Uma sirene ou um estroboscópio à parte</strong>: o som do módulo é o seu amplificador;
+        comandar outras cargas não faz parte do firmware.
+      phone_power: >-
+        <strong>A alimentação pelo telemóvel</strong>: por cabo, o telemóvel alimenta o módulo e pode
+        carregar-lhe a célula. Se deve fazê-lo, e quanta corrente um telemóvel dá, fica para
+        verificar na primeira montagem.
+      enclosure: >-
+        <strong>A caixa</strong>, e a forma de levar o telemóvel e o módulo juntos.
+      settings: >-
+        <strong>As definições a partir do telemóvel</strong>: as cores dos botões, o número de LED e o
+        resto definem-se, por agora, ao compilar o firmware.
+    full: >-
+      O guia completo (em inglês):
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/io-pod/BUILD.md">guia
+      de montagem do módulo de E/S</a>, e as verificações do módulo com um telemóvel na
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/firmware/esp32/docs/BRING_UP.md">lista
+      de arranque</a>.
+  target:
+    title: Módulo de alvo
+    status: >-
+      Ainda não se pode montar: o módulo de alvo só existe no papel. Não ligues uma placa de alvo a
+      uma caixa a partir desta página.
+    what: >-
+      Uma placa onde se dispara, com um sensor que sente cada impacto e um anel de luz. Liga-se a
+      uma caixa e transforma-a num alvo que pontua, para as
+      <a href="{{ page.to.modes }}#target-windows">Janelas de Alvo</a>, cujas regras já estão
+      escritas e testadas no simulador.
+    decided_title: O que está decidido
+    decided:
+      parts: >-
+        Uma placa de aço ou de policarbonato, um sensor piezoelétrico, um pequeno processador
+        próprio (da classe RP2040 ou ATtiny) para detetar os impactos, e um anel de LED. Cerca de
+        <span class="nowrap">20–30&nbsp;€</span> em peças (a estimativa do projeto).
+      port: >-
+        Liga-se a um conector M12 estanque de 5 pinos na caixa: massa, 5&nbsp;V, as duas linhas I2C
+        e uma linha de interrupção, para cabos até cerca de 1–2&nbsp;m. O seu processador diz à caixa
+        o que é, por isso a caixa não precisa de um controlador novo para cada acessório.
+      capability: >-
+        Os scripts dos modos recebem cada impacto com a sua força (de 0 a 255) e podem armar e
+        desarmar o alvo. O mesmo está definido para o módulo de E/S de um telemóvel.
+      mode: >-
+        As Janelas de Alvo acendem o alvo na cor de uma equipa ao acaso durante alguns segundos; um
+        impacto forte o suficiente nessa janela pontua para essa equipa.
+      next: >-
+        Seguem-se o firmware do próprio módulo, o controlador da caixa para a sua porta e o sensor
+        afinado em placas reais de aço e de policarbonato; depois, as Janelas de Alvo passam a ser
+        um modo que a caixa oferece.
+    open:
+      mcu: O processador (RP2040 ou ATtiny) e o seu firmware.
+      protocol: >-
+        Como a caixa e o módulo falam por I2C: o endereço, como o módulo diz o que é, como comunica
+        um impacto, como é armado.
+      connector: A ordem dos pinos do conector M12 e o cabo.
+      voltage: >-
+        A tensão nas linhas I2C: o barramento da caixa é de 3,3&nbsp;V, mas o conector também leva
+        5&nbsp;V; puxar o barramento para 5&nbsp;V pode estragar a placa.
+      interrupt: >-
+        O pino da linha de interrupção: uma Field Box já usa os oito pinos livres da sua placa, por
+        isso não lhe sobra nenhum.
+      ring: Se a janela aparece no anel de LED do próprio módulo ou no da caixa.
+      sensor: O circuito do sensor e a sua fixação, e a placa, o suporte e o ângulo.
+    safety_title: A segurança, quando houver alguma coisa para montar
+    safety:
+      eyes: >-
+        <strong>Proteção de olhos e cara</strong> para toda a gente ao alcance enquanto alguém
+        dispara contra ele, também na bancada.
+      ricochet: >-
+        <strong>As BBs fazem ricochete numa placa dura</strong>, e algumas voltam para trás: inclina
+        uma placa de aço para as mandar para o chão, nunca de frente para quem dispara.
+      shield: >-
+        <strong>Só a placa é alvo</strong>: nunca dispares contra a caixa, o cabo ou o conector, e
+        mantém a eletrónica atrás da placa ou numa caixa própria.
+      limits: >-
+        <strong>Os limites de potência do campo</strong> valem para disparar contra alvos como contra
+        quem joga.
+    photo: o alvo acabado, a placa, o sensor e o anel de LED, e a porta numa caixa.
+    full: >-
+      O que está decidido, com os documentos por trás de cada decisão (em inglês):
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/target-addon/BUILD.md">guia
+      do módulo de alvo</a>.
 
 hub:
   title: Espaço da comunidade

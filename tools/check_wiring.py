@@ -26,6 +26,11 @@ with --resolve before drawing. The check fails when:
   its P7, the expander address differs from the Kconfig default, or its INT
   pin is wired while the firmware polls;
 - the pin table in hardware/field-box/README.md disagrees with Kconfig;
+- a pin table of another node's build guide (the Satellite's and the I/O
+  pod's BUILD.md, GUIDES below) or of the project page's build page
+  (site/src/build.html, its cells marked data-kconfig) gives a GPIO that is
+  not its Kconfig default, a pin no part may use, or leaves out a pin it must
+  list (phase 5 plan phase 12);
 - a rendered SVG or PNG is missing, or an SVG was not rendered from the
   current source and Kconfig defaults (the render writes the SHA-256 of the
   resolved source into it).
@@ -48,6 +53,24 @@ WIRING = REPO / "hardware" / "field-box" / "wiring"
 DIAGRAMS = [WIRING / "field-box-wiring.yml", WIRING / "field-box-power.yml"]
 KCONFIG = REPO / "firmware" / "esp32" / "main" / "Kconfig.projbuild"
 README = REPO / "hardware" / "field-box" / "README.md"
+SITE_BUILD = REPO / "site" / "src" / "build.html"
+
+# The build guides of the other node types (phase 5 plan phase 12): each uses the Field Box's
+# pins for the parts it has, in a table whose rows name their Kconfig symbol in backticks
+# ("| Button 1 | 4 | `ATALAIA_BTN1_PIN` | ..."); these symbols must each have a row.
+GUIDES: dict[Path, tuple[str, ...]] = {
+    REPO / "hardware" / "satellite" / "BUILD.md": (
+        "ATALAIA_BTN1_PIN", "ATALAIA_BTN2_PIN", "ATALAIA_BTN3_PIN", "ATALAIA_LED_PIN",
+        "ATALAIA_BATT_SDA_PIN", "ATALAIA_BATT_SCL_PIN", "ATALAIA_AUDIO_BCLK_PIN",
+        "ATALAIA_AUDIO_LRCLK_PIN", "ATALAIA_AUDIO_DOUT_PIN"),
+    REPO / "hardware" / "io-pod" / "BUILD.md": (
+        "ATALAIA_BTN1_PIN", "ATALAIA_BTN2_PIN", "ATALAIA_BTN3_PIN", "ATALAIA_KP_P7_BUTTON",
+        "ATALAIA_LED_PIN", "ATALAIA_NFC_SDA_PIN", "ATALAIA_NFC_SCL_PIN", "ATALAIA_AUDIO_BCLK_PIN",
+        "ATALAIA_AUDIO_LRCLK_PIN", "ATALAIA_AUDIO_DOUT_PIN", "ATALAIA_POD_TAMPER_PIN"),
+}
+GUIDE_SYMBOL = re.compile(r"`(ATALAIA_\w+)`")
+# The project page's build page: <td data-kconfig="ATALAIA_BTN1_PIN">4</td>.
+SITE_CELL = re.compile(r'data-kconfig="(ATALAIA_\w+)"[^>]*>([^<]*)<')
 
 BOARD = "BOARD"
 HASH_MARK = "atalaia-wiring-source-sha256:"
@@ -361,6 +384,90 @@ def check_readme(text: str, defaults: dict[str, int]) -> list[str]:
     return errors
 
 
+def check_pin(where: str, symbol: str, cell: str, defaults: dict[str, int],
+              internal: set[int]) -> list[str]:
+    """One pin of a build guide's table: its cell against the Kconfig default and the board."""
+    if symbol == "ATALAIA_KP_P7_BUTTON":
+        if defaults.get(symbol, 0) <= 0:
+            return [f"{where}: {symbol} is 0 by default: no button on the keypad expander's P7"]
+        if cell != README_P7:
+            return [f"{where}: the button of {symbol} is on the keypad expander's P7, the table "
+                    f"says {cell!r}, not {README_P7!r}"]
+        return []
+    if symbol not in defaults:
+        return [f"{where}: {symbol} is not a Kconfig symbol with a numeric default"]
+    m = re.match(r"-?\d+\b", cell)
+    if not m:
+        return [f"{where}: {symbol}'s row has no GPIO number ({cell!r})"]
+    gpio = int(m.group(0))
+    if gpio != defaults[symbol]:
+        return [f"{where}: {symbol} is GPIO {gpio} in the table, Kconfig defaults to "
+                f"{defaults[symbol]}"]
+    if gpio < 0:
+        return [f"{where}: {symbol} is disabled by default (-1): a guide lists wired pins only"]
+    if gpio in STRAPPING_FORBIDDEN:
+        return [f"{where}: {symbol} = GPIO {gpio}, a boot strapping pin"]
+    if gpio in V4_GNSS:
+        return [f"{where}: {symbol} = GPIO {gpio}, the {V4_GNSS[gpio]}"]
+    if gpio in V4_RESERVED:
+        return [f"{where}: {symbol} = GPIO {gpio}, the {V4_RESERVED[gpio]}"]
+    if gpio in SHARED:
+        allowed, why = SHARED[gpio]
+        if symbol not in allowed:
+            return [f"{where}: {symbol} = GPIO {gpio}, which is {why}"]
+    elif gpio in internal and gpio not in SHARED_BUS:
+        return [f"{where}: {symbol} = GPIO {gpio}, a board-internal pin"]
+    return []
+
+
+def check_guide(name: str, text: str, required: tuple[str, ...], defaults: dict[str, int],
+                internal: set[int]) -> list[str]:
+    """A build guide's pin table: each row whose cell is a backticked Kconfig symbol has the
+    GPIO (or "PCF8574 P7") in the cell before it; every required symbol has a row."""
+    errors: list[str] = []
+    seen: set[str] = set()
+    for line in text.splitlines():
+        if not line.lstrip().startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        for i, cell in enumerate(cells):
+            m = GUIDE_SYMBOL.fullmatch(cell)
+            if not m or i == 0:
+                continue
+            seen.add(m.group(1))
+            errors += check_pin(name, m.group(1), cells[i - 1], defaults, internal)
+    errors += [f"{name}: the pin table has no row for {s}" for s in required if s not in seen]
+    return errors
+
+
+def check_site_build(text: str, required: set[str], defaults: dict[str, int],
+                     internal: set[int]) -> list[str]:
+    """The project page's build page: each cell marked data-kconfig holds that pin's GPIO."""
+    errors: list[str] = []
+    seen: set[str] = set()
+    for symbol, cell in SITE_CELL.findall(text):
+        seen.add(symbol)
+        errors += check_pin(SITE_BUILD.name, symbol, cell.strip(), defaults, internal)
+    errors += [f"{SITE_BUILD.name}: no data-kconfig cell for {s}" for s in sorted(required)
+               if s not in seen]
+    return errors
+
+
+def check_guides(kconfig_path: Path) -> list[str]:
+    """The pin tables of the other nodes' build guides and of the project page's build page."""
+    kconfig_text = kconfig_path.read_text(encoding="utf-8")
+    defaults = read_kconfig_defaults(kconfig_text)
+    internal = read_board_internal(kconfig_text)
+    errors: list[str] = []
+    for path, required in GUIDES.items():
+        name = path.relative_to(REPO).as_posix()
+        errors += check_guide(name, path.read_text(encoding="utf-8"), required, defaults, internal)
+    required_all = {s for symbols in GUIDES.values() for s in symbols}
+    errors += check_site_build(SITE_BUILD.read_text(encoding="utf-8"), required_all, defaults,
+                               internal)
+    return errors
+
+
 def text_hash(text: str) -> str:
     return hashlib.sha256(text.replace("\r\n", "\n").encode("utf-8")).hexdigest()
 
@@ -530,6 +637,7 @@ def main(argv: list[str]) -> int:
         return 0
     errors, warnings = check(args.diagram or DIAGRAMS, args.kconfig, args.readme,
                              render_check=not args.no_render_check)
+    errors += check_guides(args.kconfig)
     for warning in warnings:
         print(f"check_wiring: warning: {warning}", file=sys.stderr)
     for error in errors:
@@ -537,7 +645,8 @@ def main(argv: list[str]) -> int:
     if errors:
         print(f"check_wiring: {len(errors)} problem(s)", file=sys.stderr)
         return 1
-    print("check_wiring: the wiring diagrams, the Field Box pin table and the Kconfig defaults agree")
+    print("check_wiring: the wiring diagrams, the pin tables (Field Box, build guides, project "
+          "page) and the Kconfig defaults agree")
     return 0
 
 

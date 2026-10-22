@@ -24,6 +24,7 @@ Every page exists in every language, and its folder is named in its language:
 | Game modes | `/modos/` | `/en/modes/` | `/de/modi/` | `src/modes.html` | Every mode, the Codes modifier, the Medic Kit and "your mode" |
 | Radio | `/radio/` | `/en/radio/` | `/de/funk/` | `src/radio.html` | How the radio works: both diagrams with their lead-ins, and the channel |
 | Roadmap | `/roadmap/` | `/en/roadmap/` | `/de/roadmap/` | `src/roadmap.html` | The six phases in full, with their gates. "Roadmap" stays in English in Portuguese too |
+| Build guides | `/montagem/` | `/en/build-guides/` | `/de/bauen/` | `src/build.html` | Safety rules for every build; the Satellite, the I/O pod and the target addon shortened from `hardware/<node>/BUILD.md` (the full guides, in English), with their pin tables and photo placeholders; a pointer to the Field Box's build manual (phase 5 plan phase 12, decisions P5J-1 to P5J-13) |
 | Glossary | `/glossario/` | `/en/glossary/` | `/de/glossar/` | `src/glossary.html` | Every glossary entry; the glossary links of every page lead here |
 
 | Path | What it is |
@@ -147,6 +148,17 @@ partial is unused; or if the site holds a generated page or diagram that nothing
 5. Run `python3 tools/build_site.py`: it writes every language and adds the page to
    `sitemap.xml`. Renaming or removing a page leaves its old files behind; the build names them,
    and you delete them.
+
+### The build guides page
+
+`src/build.html` keeps the pin tables in the template, since their GPIO numbers are the same in
+every language: each GPIO cell names its Kconfig symbol (`<td data-kconfig="ATALAIA_BTN1_PIN">4</td>`),
+and `tools/check_wiring.py` (in `tools/check.sh`) fails if a number is not that symbol's default
+in `firmware/esp32/main/Kconfig.projbuild`. When a pin default changes, change the number here,
+in `hardware/satellite/BUILD.md` and in `hardware/io-pod/BUILD.md` together. The dashed
+`figure.photo` boxes mark where the first builds' photos go (plan phase HW2); never a mock-up or
+generated picture. Portuguese words: guia de montagem, caixa satélite, módulo de E/S, módulo de
+alvo; German: Bauanleitung, Satellit, I/O-Pod, Ziel-Addon.
 
 ### Diagrams
 
