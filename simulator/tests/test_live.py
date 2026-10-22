@@ -349,7 +349,17 @@ class WebServerTests(unittest.TestCase):
                     {**files, "nodes": ["a"]}, {**files, "params": 3}):
             with self.subTest(body=bad):
                 self.assertEqual(self.reload(bad)[0].status, 400)
-        res, _ = self.reload({**files, "node_lua": "-" * 1_000_001})
+        # Refused from its Content-Length, before the body is read: only the headers are sent, as the
+        # server may close the connection before a 1 MB body is written (a broken pipe on a busy host).
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        conn.putrequest("POST", "/api/reload", skip_host=True)
+        for name, value in (("Host", f"localhost:{self.port}"), ("Content-Type", "application/json"),
+                            ("Content-Length", "1000001")):
+            conn.putheader(name, value)
+        conn.endheaders()
+        res = conn.getresponse()
+        res.read()
+        conn.close()
         self.assertEqual(res.status, 413)
         res, _ = self.request("GET", "/api/reload")
         self.assertEqual(res.status, 404)
