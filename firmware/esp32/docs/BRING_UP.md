@@ -486,8 +486,8 @@ update from its serial console (`@update`, the same checks as the controller's C
 then downloads over the Wi-Fi from the controller, checks, installs and reboots. Done on a
 Heltec V4.3 on 2026-10-22 (decisions OT-1 to OT-6), sent by the controller over LoRa from a
 controller in Docker: steps 1-7 pass (download, check and install in about 11 s on a home
-network, confirmed after the self-test, the controller's record `done`); step 8's refusals
-are still to run. If it fails, the log names why: `Wi-Fi starting: DMA-capable RAM ...`,
+network, confirmed after the self-test, the controller's record `done`); step 8 passes too
+(OT-6). If it fails, the log names why: `Wi-Fi starting: DMA-capable RAM ...`,
 `Wi-Fi driver did not start: ...`, `the controller's certificate: ...`. The board needs its **2.4 GHz Wi-Fi antenna**, and the
 PC and the board the same 2.4 GHz network (the "field Wi-Fi" here is your own). In WSL:
 `python3`, in the repository; on Windows `cmd`: the flasher of `hardware/field-box/BUILD.md`
