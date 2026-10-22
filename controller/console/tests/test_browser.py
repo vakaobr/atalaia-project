@@ -1535,6 +1535,27 @@ class ConsoleBrowserTests(unittest.TestCase):
             page.mouse.move(area["x"] + area["width"] * to[0], area["y"] + area["height"] * to[1], steps=6)
         page.mouse.up()
 
+    def test_map_features_shape_chosen_before_the_type(self):
+        """Found on the bench (MF-17): the GM chose an area, then the type; a safe zone's or a respawn's usual
+        circle must not take the area's place."""
+        self.field.http.put("/api/v1/field/image", headers={"Content-Type": "image/png"}, content=ICON.read_bytes())
+        page = self.console()
+        page.get_by_test_id("tab-field").click()
+        page.get_by_test_id("mf-new-type").select_option("safe_zone")
+        page.get_by_test_id("mf-add").click()
+        expect(page.get_by_test_id("mf-shape-circle")).to_be_checked()
+        page.locator("label", has=page.get_by_test_id("mf-shape-polygon")).click()
+        page.get_by_test_id("mf-type").select_option("respawn")
+        expect(page.get_by_test_id("mf-shape-polygon")).to_be_checked()
+        expect(page.get_by_test_id("mf-radius")).to_have_count(0)
+        for x, y in ((0.3, 0.5), (0.6, 0.5), (0.5, 0.8)):
+            self.press_area(page, x, y)
+        expect(page.get_by_test_id("mf-hint")).to_contain_text("3 até agora")
+        page.get_by_test_id("mf-save").click()
+        self.assertTrue(wait_for(lambda: len(self.features()) == 1, 5))
+        got = self.features()[0]
+        self.assertEqual((got["type"], got["shape"], len(got["points"])), ("respawn", "polygon", 3))
+
     def test_map_features_on_the_plan(self):
         """The maintainer's request (MF-0): a safe zone dragged to scale, a red respawn placed by keyboard, a car park
         traced corner by corner and made the organisers' own, a read-only phone that sees only what is for everyone,

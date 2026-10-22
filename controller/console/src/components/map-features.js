@@ -159,9 +159,10 @@ export class MapFeatures extends Component {
     setType(type) {
         const d = this.props.draft;
         const fresh = newDraft(type, d.level, this.props.teams);
-        // A type that is a team's own picks a team; the shape follows the type until the GM placed something.
+        // A type that is a team's own picks a team; the shape follows the type until the GM chose one or
+        // placed something (an area chosen before the type stayed a circle: found on the bench, MF-17).
         const placed = d.x !== null || d.points.length;
-        this.set({ type, shape: placed ? d.shape : fresh.shape, team: d.team || fresh.team,
+        this.set({ type, shape: placed || d.shapeChosen ? d.shape : fresh.shape, team: d.team || fresh.team,
                    visibility: d.team || fresh.team ? 'team' : d.visibility === 'team' ? 'everyone' : d.visibility });
     }
 
@@ -172,7 +173,7 @@ export class MapFeatures extends Component {
     }
 
     setShape(shape) {
-        this.set({ shape, placing: true });
+        this.set({ shape, shapeChosen: true, placing: true });
     }
 
     /** A place typed with the keyboard: across and down the plan, in %. */
