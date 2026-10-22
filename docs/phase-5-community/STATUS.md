@@ -8,8 +8,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 **Current phase:** Implementation (plan phases 1-9 and 13 built in software 2026-10-22: the visual mode editor complete, its link to the simulator, signed mode packages, the sandbox-escape battery, signed packages in the controller, scenario blocks in the GM console, missing modes sent to boxes (controller and box), the registry repository's template and the community processes)
 **Phase status:** In progress
 **Risk level:** Medium
-**Last updated:** 2026-10-22 (plan phases 8 and 9 built; plan phase 7 built; plan phase 13b built; plan phase 13a built; plan phases 3-6 built, P5B-9 answered; plan phase 2 built, plan phase 13 planned from P5R-8; refreshed after phases 2-4 software; first written 2026-10-18)
-**Next step:** the review of the German (P5H-5); creating the registry repository waits for the maintainer; plan phase 13's test on real boxes is HW3
+**Last updated:** 2026-10-22 (the editor makes the package itself, P5I-1 to P5I-6; plan phases 8 and 9 built; plan phase 7 built; plan phase 13b built; plan phase 13a built; plan phases 3-6 built, P5B-9 answered; plan phase 2 built, plan phase 13 planned from P5R-8; refreshed after phases 2-4 software; first written 2026-10-18)
+**Next step:** the review of the German (P5H-5); P5I-1 and P5I-3 (the editor's package: made in the page, signed offline) for the maintainer; creating the registry repository waits for the maintainer; plan phase 13's test on real boxes is HW3
 
 Phase 5 is the community layer: visual mode editor (Blockly), mode
 registry with signing and a verified badge, carrier PCB, translations,
@@ -147,6 +147,19 @@ section 16).
   format, the manifest and the index. AC-11 met. Decisions P5G-12 to P5G-14
   (open; P5G-2, P5G-3, P5G-8, P5G-9, P5G-12, P5G-13 and P5G-14 for the
   maintainer: governance, who holds the keys, moderation, licensing).
+- [x] **Leftover of plan phases 3-6: the editor makes the package (2026-10-22),
+  in software:** *Make the package* in the mode editor downloads the canonical,
+  unsigned archive of the mode it edits (`<id>-<version>.tar`: `mode.yaml`,
+  `node.lua`, `field.lua` when there is one, the Mode tab's screens), made in
+  the page by `editor/package.js` and byte for byte what `tools/mode_package.py
+  pack` makes of the same files (proved in Chromium against the Python packer
+  for the shared vectors, all 14 built-in modes, the three examples and 18 edge
+  cases); it shows the manifest a mode key will sign (size, SHA-256) and the
+  exact `sign` and `verify` commands. Signing stays offline on the command line;
+  no key reaches the page or the simulator; the CSP is unchanged. Refused, with
+  the reason, while the generator lists problems or for a bad version, licence
+  or size. 5 new browser tests (30 in all). Decisions P5I-1 to P5I-6 (open;
+  P5I-1, where the archive is made, and P5I-3, how to sign, for the maintainer).
 - [x] **Plan phase 10, German (2026-10-22), in software:** German in the
   project page (`/de/`), the GM console, the mode editor (with Blockly's own
   German), the app and the Field Box's screens (join key 15 `de`; the fonts
@@ -263,6 +276,14 @@ section 16).
 | `python3 tools/docker_editor.py` | 24 browser tests, OK (the mode editor unchanged) |
 | `reuse lint` (a copy without build output) | compliant |
 
+## Verification of the editor's package (2026-10-22)
+
+| Command | Result |
+|---------|--------|
+| `python3 tools/docker_editor.py` | 30 browser tests, OK (5 new: the shared vectors, every built-in mode, refusals alike, the three examples through the button with `sign` and `verify` run as shown, refusals in the page); a mutation of the header (mode `0640`) fails 25 subtests |
+| `docker run --rm -v "$PWD:/src" -w /src -e BUILD=/tmp/c atalaia-dev sh tools/check.sh` | exit 0 (simulator 344, controller 629, server's shared tests 92, registry template 18, OK; `i18n_check`: editor 241/241 in en, pt and de; `build_site --check` OK) |
+| `reuse lint` (a copy without build output) | compliant (1854 files) |
+
 ## Next steps
 
 1. Plan phase 13 on real boxes (HW3): a Field Box with a mode key built in
@@ -278,9 +299,9 @@ section 16).
    `registry/template/` waits for the maintainer (P5-3, P5R-9;
    `docs/community/registry.md`, "Creating the repository"), as do P5G-2,
    P5G-3, P5G-8, P5G-9, P5G-12 (accepting the RFC), P5G-13 and P5G-14.
-3. Left from plan phases 3-6, small: the editor does not yet make a package
-   itself (it downloads the files; `tools/mode_package.py pack` makes the
-   archive, and signing stays offline); `protocol/vectors/controller_api.json`
+3. Left from plan phases 3-6, small (the editor making the package itself is
+   built, P5I-1 to P5I-6, signing staying offline):
+   `protocol/vectors/controller_api.json`
    has no contract cases for the new `/api/v1/mode-packages` endpoints yet
    (the Android controller role does not serve them); P5C-15 (the two sandbox
    fixes) and P5C-18 (packages stay installed when their key is revoked) were

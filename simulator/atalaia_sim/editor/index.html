@@ -118,7 +118,22 @@ SPDX-License-Identifier: GPL-3.0-or-later
       </div>
       <pre id="code" class="code" tabindex="0"></pre>
       <p id="no-field" class="muted small" data-i18n="no_field" hidden></p>
-      <button id="download" type="button" data-i18n="download">Download this file</button>
+      <div class="file-actions">
+        <button id="download" type="button" data-i18n="download">Download this file</button>
+        <button id="make-package" type="button" data-i18n="package_make">Make the package</button>
+      </div>
+      <section id="package-panel" class="package-panel" hidden>
+        <h2 data-i18n="package">Package</h2>
+        <p id="package-message" class="small" role="status"></p>
+        <div id="package-ready" hidden>
+          <p class="small" data-i18n="package_manifest">What your mode key will sign:</p>
+          <pre id="package-manifest" class="code short" tabindex="0"></pre>
+          <p id="package-release" class="small muted"></p>
+          <p class="small" data-i18n="package_sign_hint"></p>
+          <pre id="package-commands" class="code short" tabindex="0"></pre>
+          <p class="small muted"><span data-i18n="package_keygen"></span> <code id="package-keygen"></code></p>
+        </div>
+      </section>
       <section class="problems-panel">
         <h2 data-i18n="problems">Problems</h2>
         <p id="no-problems" class="muted small" data-i18n="no_problems">No problems found.</p>

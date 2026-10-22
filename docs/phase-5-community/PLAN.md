@@ -199,8 +199,9 @@ independent of the rest; 13 needs 4, 5 and 6 (its 13a and 13b can then
 run in parallel). Sizes: L about a week of agent work.
 
 **Next (2026-10-22, plan phases 1-10 and 13 built in software): the review of the
-German by German-speaking players (P5H-5); the leftovers (the editor making packages,
-contract cases for the mode-package endpoints); plan phase 13 on real boxes in HW3.**
+German by German-speaking players (P5H-5); the leftover contract cases for the
+mode-package endpoints (the editor making packages is built, P5I-1 to P5I-6); plan phase 13
+on real boxes in HW3.**
 
 ---
 
@@ -355,6 +356,19 @@ manifest has P5B-10's `kind` and `min_tier` lines (P5C-9).
 | `registry/schema/index.schema.json`, `revoked.schema.json`, `examples/` | The index's and revocation list's JSON Schemas, a valid and 10 invalid examples (CI's protocol job, `check-jsonschema`) |
 | `protocol/mode-packages.md` | The format and the checks |
 | `controller/tests/test_mode_package.py` | 17 tests: the vectors, every built-in mode as a package the controller takes, licence, size, names, manifests that are not the archive's, the tool's commands |
+
+**Leftover built 2026-10-22** (decisions P5I-1 to P5I-6): the mode editor makes
+the package itself. *Make the package* downloads the canonical, unsigned archive
+of the mode it edits, made in the page and byte for byte what `pack` makes of the
+same files, and shows the manifest a mode key will sign with the exact `sign` and
+`verify` commands; signing stays offline on the command line.
+
+| File | What |
+|------|------|
+| `simulator/atalaia_sim/editor/package.js` | The canonical ustar writer (as `mode_package.pack`, with its refusal codes), the manifest, SHA-256 (FIPS 180-4), the editor's package of its generated files |
+| `simulator/atalaia_sim/editor/editor.js`, `index.html`, `editor.css`, `i18n/*.json` | *Make the package* and its panel (the manifest, size, SHA-256, the commands; refusals with the reason), in English, Portuguese and German |
+| `simulator/editor_tests/test_editor.py` | 5 browser tests: the shared vectors, every built-in mode, refusals alike, the three examples through the button with `sign` and `verify` run as shown, refusals in the page |
+| `simulator/tests/test_editor_files.py` | `package.js` served as JavaScript, naming no network address |
 
 ## Plan phase 5: Sandbox-escape battery
 

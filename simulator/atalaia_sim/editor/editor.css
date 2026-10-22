@@ -151,6 +151,13 @@ textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; 
   white-space: pre;
 }
 
+.file-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.package-panel { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--line); }
+.package-panel p { margin: 6px 0; overflow-wrap: anywhere; }
+.package-panel .bad { padding: 4px 6px; border-radius: 6px; background: var(--warn-bg); color: var(--warn-text); }
+.code.short { flex: none; min-height: 0; max-height: 12em; margin: 0; }
+code { font: 12px var(--mono); overflow-wrap: anywhere; }
+
 .problems-panel { margin-top: 12px; }
 .problems { margin: 0; padding-left: 18px; }
 .problems li { margin: 2px 0; padding: 4px 6px; border-radius: 6px; background: var(--warn-bg); color: var(--warn-text); cursor: pointer; }

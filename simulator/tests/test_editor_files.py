@@ -69,6 +69,7 @@ class EditorFilesTests(unittest.TestCase):
         response, _ = self.get("/editor")
         self.assertEqual((response.status, response.getheader("Location")), (301, "/editor/"))
         for path, kind in (("/editor/editor.js", "text/javascript; charset=utf-8"),
+                           ("/editor/package.js", "text/javascript; charset=utf-8"),
                            ("/editor/i18n/pt.json", "application/json"),
                            ("/editor/vendor/blockly/media/sprites.svg", "image/svg+xml"),
                            ("/editor/vendor/blockly/msg/pt.js", "text/javascript; charset=utf-8"),
@@ -94,7 +95,7 @@ class EditorFilesTests(unittest.TestCase):
             self.assertTrue((EDITOR / name).is_file(), name)
         self.assertNotRegex(html, r"<script>|<style>|\son[a-z]+=", "no inline scripts, styles or handlers")
         self.assertNotRegex(html, r"https?://", "nothing from the network")
-        for name in ("editor.js", "blocks.js", "generator.js"):
+        for name in ("editor.js", "blocks.js", "generator.js", "package.js"):
             self.assertNotRegex((EDITOR / name).read_text(encoding="utf-8"), r"https?://", name)
 
     def test_vendored_blockly_is_unmodified(self):

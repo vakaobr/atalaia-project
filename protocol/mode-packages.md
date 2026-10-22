@@ -28,7 +28,7 @@ A POSIX ustar archive (IEEE Std 1003.1, `pax` "ustar" format) of the package's f
 
 A reader takes only this form: it parses each header strictly, then packs the files it read again and refuses the archive unless the bytes are the same. So nothing in an archive can name a path outside its root, a link or a device, and an archive cannot carry anything a reader does not see. Nothing is extracted to disk: the files are read into memory.
 
-`tools/mode_package.py pack modes/domination` makes it from a mode folder (`tests/` and other files are left out and listed).
+`tools/mode_package.py pack modes/domination` makes it from a mode folder (`tests/` and other files are left out and listed). The mode editor's *Make the package* (`simulator/atalaia_sim/editor/package.js`, decisions P5I-1 to P5I-6) makes the same bytes from the files it generates, in the browser; its tests compare it with `pack` for these vectors and every built-in mode. Neither signs: signing is `tools/mode_package.py sign`, offline.
 
 ## The manifest and the release
 

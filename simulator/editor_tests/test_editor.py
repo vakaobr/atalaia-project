@@ -22,7 +22,10 @@ import itertools
 import json
 import os
 import re
+import shlex
 import shutil
+import subprocess
+import sys
 import tempfile
 import threading
 import unittest
@@ -38,6 +41,9 @@ from atalaia_sim.web import make_server
 
 REPO = Path(__file__).resolve().parents[2]
 EDITOR = REPO / "simulator" / "atalaia_sim" / "editor"
+# The reference packer (P5I-1): the editor's archive must be its bytes exactly.
+sys.path.insert(0, str(REPO / "controller"))
+from atalaia_controller import mode_package as mp  # noqa: E402
 REQUIRE = os.environ.get("ATALAIA_REQUIRE_BROWSER") == "1"
 
 try:
@@ -609,6 +615,7 @@ class EditorTests(unittest.TestCase):
         page.locator("#ws-node .blocklyToolboxCategory", has_text="Logik").click()
         expect(page.locator("#ws-node .blocklyToolboxFlyout")).to_contain_text("sonst")
         expect(page.locator("#lang")).to_have_value("de")
+        expect(page.locator("#make-package")).to_have_text("Paket erstellen")
 
     def test_an_example_through_the_page(self):
         page = self.open("en")
@@ -752,6 +759,186 @@ class EditorTests(unittest.TestCase):
         page.fill("[name=name]", "Renamed")
         expect(page.locator("#problems li[data-key=problem_sim]")).to_have_count(0)
         expect(page.locator("#test-status")).to_be_hidden()
+
+    # ---- the package (decisions P5I-1 to P5I-6) ----
+
+    def js_pack(self, page, mode_id, files):
+        return page.evaluate("([id, f]) => window.atalaiaEditor.pack(id, f)", [mode_id, files])
+
+    def py_pack(self, mode_id, files):
+        try:
+            archive = mp.pack(mode_id, files)
+        except mp.PackageError as exc:
+            return {"code": exc.code}
+        return {"hex": archive.hex(), "sha256": mp.sha256(archive)}
+
+    def test_the_package_matches_the_shared_vectors(self):
+        """The vectors' canonical archive (protocol/vectors/mode_package.json), its SHA-256 and
+        the manifests of its valid releases, byte for byte from the page's package code."""
+        page = self.open()
+        vectors = json.loads((REPO / "protocol" / "vectors" / "mode_package.json").read_text(encoding="utf-8"))
+        archive = vectors["archive"]
+        made = self.js_pack(page, archive["mode_id"], archive["files"])
+        self.assertEqual(made, {"hex": archive["hex"], "sha256": archive["sha256"]})
+        self.assertEqual(len(made["hex"]) // 2, archive["size"])
+        checked = 0
+        for release in vectors["releases"]:
+            if not release["valid"]:
+                continue
+            fields = {k: release[k] for k in ("id", "version", "kind", "min_tier")}
+            text = page.evaluate("([f, size, sha]) => window.atalaiaEditor.manifest(f, size, sha)",
+                                 [fields, release["size"], release["sha256"]])
+            self.assertEqual(text, release["manifest"], release["name"])
+            checked += 1
+        self.assertGreater(checked, 0)
+        # SHA-256 itself, around the padding's edges and in UTF-8, against hashlib.
+        import hashlib
+        for sample in ("", "abc", "a" * 55, "a" * 56, "a" * 63, "a" * 64, "a" * 65, "a" * 1000,
+                       "Domínio ✓ 🎯 Übung", "x" * 200_000):
+            self.assertEqual(page.evaluate("t => window.atalaiaEditor.sha256(t)", sample),
+                             hashlib.sha256(sample.encode("utf-8")).hexdigest(), len(sample))
+
+    def test_the_package_of_every_built_in_mode_is_the_packers(self):
+        """Every mode folder in modes/, as tools/mode_package.py pack reads it, packs to the same
+        bytes in the page as in Python."""
+        page = self.open()
+        count = 0
+        for folder in sorted(p.parent for p in (REPO / "modes").glob("*/mode.yaml")):
+            files = {}
+            for path in sorted(p for p in folder.rglob("*") if p.is_file() and not p.is_symlink()):
+                rel = path.relative_to(folder).as_posix()
+                try:
+                    mp.check_file_name(rel)
+                    files[rel] = path.read_text(encoding="utf-8")
+                except (mp.PackageError, UnicodeDecodeError):
+                    continue
+            mode_id = yaml.safe_load(files["mode.yaml"])["id"]
+            with self.subTest(mode=folder.name):
+                expected = self.py_pack(mode_id, files)
+                self.assertIn("hex", expected)
+                self.assertEqual(self.js_pack(page, mode_id, files), expected)
+            count += 1
+        self.assertGreaterEqual(count, 14)
+
+    def test_the_package_refuses_what_the_packer_refuses(self):
+        page = self.open()
+        many = {f"assets/f{i:02}.txt": "" for i in range(65)}
+        fits = 1_000_000 - 3 * 512 - 64  # one file: its header, its data padded, two end blocks
+        cases = [
+            ("Bad", {"mode.yaml": "x"}),
+            ("org.a", {"mode.yaml": "x"}),
+            ("a." + "b" * 62, {"mode.yaml": "x"}),
+            ("org.a.b", {}),
+            ("org.a.b", many),
+            ("org.a.b", dict(list(many.items())[:64])),
+            ("org.a.b", {"../x": ""}),
+            ("org.a.b", {"assets/.hidden": ""}),
+            ("org.a.b", {"assets//x": ""}),
+            ("org.a.b", {"assets/a b": ""}),
+            ("org.a.b", {"tests/a.yaml": ""}),
+            ("org.a.b", {"README.md": ""}),
+            ("org.a.b", {"node.lua": "a\0b"}),
+            ("org.a.b", {"assets/" + "a" * 85: ""}),
+            ("org.a.b", {"assets/" + "a" * 86: ""}),
+            ("org.a.b", {"node.lua": "x" * fits}),
+            ("org.a.b", {"node.lua": "x" * (fits + 1)}),
+            ("org.a.b", {"mode.yaml": "nome: Domínio ✓ 🎯\r\n", "assets/B": "1", "assets/a": "2",
+                         "assets/_x": "3", "assets/-y": "4", "assets/A.b/c": "5", "field.lua": ""}),
+        ]
+        codes = set()
+        for mode_id, files in cases:
+            with self.subTest(mode_id=mode_id, files=list(files)[:2]):
+                expected = self.py_pack(mode_id, files)
+                self.assertEqual(self.js_pack(page, mode_id, files), expected)
+                codes.add(expected.get("code", "ok"))
+        self.assertEqual(codes, {"ok", "bad_archive", "too_big"})
+
+    def make_package(self, page):
+        with page.expect_download() as info:
+            page.click("#make-package")
+        expect(page.locator("#package-ready")).to_be_visible()
+        return info.value.suggested_filename, Path(info.value.path()).read_bytes()
+
+    def test_make_the_package_of_each_example(self):
+        """*Make the package* downloads the archive tools/mode_package.py pack makes of the
+        generated files (and the screens), shows the manifest a mode key signs, and the commands
+        it shows sign it and verify it."""
+        page = self.open("en")
+        for name in ("domination", "holdall", "master_satellites"):
+            with self.subTest(example=name):
+                page.select_option("#example", name)
+                expect(page.locator("#no-problems")).to_be_visible()
+                file_name, archive = self.make_package(page)
+                gen = page.evaluate("() => window.atalaiaEditor.files()")
+                files = {"mode.yaml": gen["mode_yaml"], "node.lua": gen["node_lua"]}
+                if gen["field_lua"]:
+                    files["field.lua"] = gen["field_lua"]
+                files.update({k: v for k, v in gen.items() if k.startswith("assets/")})
+                own = mp.manifest_fields(files)
+                self.assertEqual(archive, mp.pack(own["id"], files))
+                self.assertEqual(file_name, f"{own['id']}-{own['version']}.tar")
+                self.assertEqual(mp.unpack(archive), (own["id"], files))
+                self.assertEqual(bool(gen["field_lua"]), name != "domination")
+                if name == "master_satellites":
+                    self.assertIn("assets/screens/master_status.yaml", files)
+                manifest = mp.manifest(own["id"], own["version"], own["kind"], own["min_tier"], len(archive),
+                                       mp.sha256(archive)).decode()
+                expect(page.locator("#package-manifest")).to_have_text(manifest)
+                expect(page.locator("#package-message")).to_contain_text(mp.sha256(archive))
+                expect(page.locator("#package-message")).to_contain_text(f"{len(archive)} bytes")
+        # The commands as shown, with a throw-away key: sign, then verify as the controller does.
+        commands = page.locator("#package-commands").inner_text().strip().splitlines()
+        keygen = page.locator("#package-keygen").inner_text()
+        self.assertEqual(keygen, "python3 tools/mode_package.py keygen --out ~/atalaia-keys/modes.pem")
+        self.assertEqual(commands[0], f"python3 tools/mode_package.py sign {file_name} "
+                                      "--key ~/atalaia-keys/modes.pem")
+        tool = str(REPO / "tools" / "mode_package.py")
+        with tempfile.TemporaryDirectory() as tmp:
+            key = Path(tmp) / "modes.pem"
+            out = subprocess.run([sys.executable, tool, "keygen", "--unencrypted", "--out", str(key)],
+                                 capture_output=True, text=True, check=True).stdout
+            public = re.search(r"public key \(base64\): (\S+)", out).group(1)
+            (Path(tmp) / file_name).write_bytes(archive)
+            for line in commands:
+                line = line.replace("tools/mode_package.py", tool).replace("~/atalaia-keys/modes.pem", str(key))
+                line = line.replace("<your public key>", public)
+                result = subprocess.run(shlex.split(line), cwd=tmp, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, f"{line}\n{result.stdout}{result.stderr}")
+            self.assertTrue(result.stdout.startswith("OK: "), result.stdout)
+            release = json.loads((Path(tmp) / f"{file_name}.release.json").read_text(encoding="utf-8"))
+            self.assertEqual(mp.release_from(release).manifest().decode(), manifest)
+
+    def test_the_package_is_refused_with_problems_and_goes_when_the_files_change(self):
+        page = self.open("en")
+        page.select_option("#example", "domination")
+        expect(page.locator("#no-problems")).to_be_visible()
+        message = page.locator("#package-message")
+        page.click("#tab-mode")
+        page.fill("[name=version]", "1.0")
+        page.click("#make-package")
+        expect(message).to_contain_text("The version must look like 1.0.0")
+        expect(message).to_have_class(re.compile(r"\bbad\b"))
+        expect(page.locator("#package-ready")).to_be_hidden()
+        page.fill("[name=version]", "1.0.0-rc.1")
+        expect(page.locator("#package-panel")).to_be_hidden()  # the files changed
+        page.fill("[name=id]", "Bad Id")
+        page.click("#make-package")
+        expect(message).to_contain_text("Fix the problems first")
+        page.fill("[name=id]", "org.club.my-domination")
+        page.select_option("[name=license]", "MIT")
+        file_name, archive = self.make_package(page)
+        self.assertEqual(file_name, "org.club.my-domination-1.0.0-rc.1.tar")
+        root, files = mp.unpack(archive)
+        self.assertEqual((root, mp.manifest_fields(files)["license"]), ("org.club.my-domination", "MIT"))
+        expect(message).not_to_have_class(re.compile(r"\bbad\b"))
+        page.fill("[name=name]", "Renamed")
+        expect(page.locator("#package-panel")).to_be_hidden()
+        # The panel speaks the page's language.
+        page = self.open("pt")
+        page.select_option("#example", "domination")
+        expect(page.locator("#make-package")).to_have_text("Criar o pacote")
+        self.make_package(page)
+        expect(page.locator("#package-message")).to_contain_text("descarregado")
 
 
 if __name__ == "__main__":

@@ -60,7 +60,9 @@ How the registry works, its review checklist, keys and moderation:
 > *Game mode idea* issue template.
 
 1. **Write the mode.** Build it in the visual mode editor (in `simulator/`: `python3 -m atalaia_sim serve ../modes/domination`,
-   then `http://localhost:8000/editor/`; *Test in the simulator* plays it),
+   then `http://localhost:8000/editor/`; *Test in the simulator* plays it, and
+   *Make the package* downloads its unsigned archive and the commands that sign
+   it, for a field controller of your own; the registry packs from the source),
    or by hand as [`modes/README.md`](modes/README.md) describes. Pick its id
    (`org.yourclub.name`; `org.atalaia.` is the project's own) and a licence
    from the approved seven (`GPL-3.0-or-later`, `LGPL-3.0-or-later`, `MIT`,

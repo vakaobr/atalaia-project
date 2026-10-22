@@ -12,6 +12,9 @@
 // scripts hit there, on loading or while the game runs, come back to the problems list and to
 // the blocks they come from. The Mode tab (plan phase 3) also sets the kind (main mode, modifier,
 // role package), the roles with the inputs each needs, and the mode's own screen files.
+// *Make the package* (decisions P5I-1 to P5I-6) downloads the mode's canonical, unsigned package
+// archive, byte for byte what tools/mode_package.py pack makes of the same files (package.js),
+// and shows what a mode key will sign and the commands that sign it, offline, outside the page.
 /* global Blockly, lua */
 
 import { defineBlocks, toolbox } from './blocks.js';
@@ -19,6 +22,7 @@ import {
     defaultInfo, generateProject, generateWorkspaces, LICENCES, lineBlocks, makeGenerator, modeKind, modeRoles,
     ROLE_INPUTS, testNodes,
 } from './generator.js';
+import { makePackage, manifest, pack, PackageError, sha256Hex } from './package.js';
 
 const LANGS = ['pt', 'en', 'de'];
 // <html lang> for each (German: decision P5H-2; a text it lacks shows in English).
@@ -102,8 +106,8 @@ async function fetchJson(url) {
     return response.json();
 }
 
-function download(name, text, type) {
-    const url = URL.createObjectURL(new Blob([text], { type }));
+function download(name, content, type) {
+    const url = URL.createObjectURL(new Blob([content], { type }));
     const a = document.createElement('a');
     a.href = url;
     a.download = name;
@@ -112,6 +116,8 @@ function download(name, text, type) {
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+const hex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 
 /** A dark workspace when the system is dark, like the rest of the page. */
 function theme() {
@@ -348,8 +354,65 @@ async function main() {
         for (const [name, text] of Object.entries(screens)) files[`${SCREEN_PREFIX}${name}.yaml`] = text;
         // The simulator's errors are about the files it got: once they change, they are gone.
         if (tested && Object.keys(FILE_NAMES).some((f) => files[f] !== tested.files[f])) stopTest();
+        // A package shown is of the files it was made from: once they change, it is gone.
+        if (packaged && JSON.stringify(packaged.files) !== JSON.stringify(filesOnly(files))) hidePackage();
         show();
     }
+
+    // ---- the package (P5I-1 to P5I-6) ----
+    let packaged = null; // { files } the package shown was made from
+    const packagePanel = document.getElementById('package-panel');
+    const packageMessage = document.getElementById('package-message');
+    const filesOnly = (f) => Object.fromEntries(Object.entries(f).filter(([k]) => k !== 'problems'));
+    const KEY_FILE = '~/atalaia-keys/modes.pem';
+    const PACKAGE_REASONS = {
+        id: 'package_bad_id', version: 'package_bad_version', license: 'package_bad_licence',
+    };
+    function hidePackage() {
+        packaged = null;
+        packagePanel.hidden = true;
+    }
+    function packageRefused(key, values = {}) {
+        let text = ui(key);
+        for (const [k, v] of Object.entries(values)) text = text.replace(`{${k}}`, String(v));
+        packageMessage.textContent = text;
+        packageMessage.classList.add('bad');
+        document.getElementById('package-ready').hidden = true;
+        packagePanel.hidden = false;
+        packaged = { files: filesOnly(files) };
+    }
+    /** Makes the package of the files as they are now, downloads it and shows how to sign it. */
+    function makeThePackage() {
+        clearTimeout(timer);
+        regenerate();
+        saveDraft();
+        if (files.problems.length) return packageRefused('package_problems');
+        let made;
+        try {
+            made = makePackage(info, modeKind(info), LICENCES, files);
+        } catch (err) {
+            if (!(err instanceof PackageError)) throw err;
+            if (err.code === 'too_big') return packageRefused('package_too_big', { size: err.what });
+            const key = PACKAGE_REASONS[err.what] || 'package_bad_file';
+            return packageRefused(key, { name: err.what });
+        }
+        download(made.file, made.bytes, 'application/x-tar');
+        packageMessage.classList.remove('bad');
+        packageMessage.textContent = ui('package_made').replace('{file}', made.file).replace('{size}', made.size)
+            .replace('{sha256}', made.sha256);
+        document.getElementById('package-manifest').textContent = made.manifest;
+        document.getElementById('package-release').textContent = ui('package_release').replace('{release}', made.release);
+        document.getElementById('package-commands').textContent = [
+            `python3 tools/mode_package.py sign ${made.file} --key ${KEY_FILE}`,
+            `python3 tools/mode_package.py verify ${made.file} ${made.release} --keys ${ui('package_public_key')}`,
+        ].join('\n');
+        document.getElementById('package-keygen').textContent = `python3 tools/mode_package.py keygen --out ${KEY_FILE}`;
+        document.getElementById('package-ready').hidden = false;
+        packagePanel.hidden = false;
+        packaged = { files: filesOnly(files) };
+        return made;
+    }
+    document.getElementById('make-package').addEventListener('click', () => makeThePackage());
 
     // ---- testing in the simulator ----
     let simProblems = [];
@@ -542,6 +605,23 @@ async function main() {
         test,
         lineBlocks: (kind) => lineBlocks(g, workspaces[kind], kind, info, files[`${kind}_lua`], Object.keys(screens)),
         blockType: (kind, id) => workspaces[kind].getBlockById(id)?.type ?? null,
+        // The package code itself, for the byte-for-byte tests against tools/mode_package.py:
+        // the archive of some files as hex, or the refusal's code; and SHA-256 of some text.
+        pack: (modeId, packFiles) => {
+            try {
+                const bytes = pack(modeId, packFiles);
+                return { hex: hex(bytes), sha256: sha256Hex(bytes) };
+            } catch (err) {
+                if (err instanceof PackageError) return { code: err.code };
+                throw err;
+            }
+        },
+        sha256: (text) => sha256Hex(new TextEncoder().encode(text)),
+        manifest,
+        makePackage: () => {
+            const made = makeThePackage();
+            return made ? { ...made, bytes: hex(made.bytes) } : null;
+        },
     };
     document.body.dataset.ready = 'true';
 }

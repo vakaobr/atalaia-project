@@ -88,6 +88,7 @@ ones a reviewer should look at first.
 | ready | pronta | BEREIT | |
 | settings | definições | Einstellungen | |
 | signed package | pacote assinado | signiertes Paket | |
+| mode key / manifest / sign | chave de modos / manifesto / assinar | Modus-Schlüssel / Manifest / signieren | the editor's *Make the package* (P5I-1 to P5I-6) |
 | registry | registo | Registry | |
 | licence | licença | Lizenz | |
 | Wi-Fi | Wi-Fi | WLAN | |
