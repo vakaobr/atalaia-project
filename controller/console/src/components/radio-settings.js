@@ -8,17 +8,15 @@
 // Only while no game is live. Also FirstSetupNotice, shown on the game tab
 // until the channel has been chosen once.
 
-import { html, Component, t, lang } from '../ui.js';
+import { html, Component, t, decimal } from '../ui.js';
 
-/** 869525000 -> "869,525" (pt) or "869.525" (en). */
+/** 869525000 -> "869,525" (pt, de) or "869.525" (en, zh-tw). */
 export function mhz(hz) {
-    const s = (hz / 1e6).toFixed(3);
-    return lang() === 'en' ? s : s.replace('.', ',');
+    return decimal((hz / 1e6).toFixed(3));
 }
 
 function pct(value) {
-    const s = String(value);
-    return lang() === 'en' ? s : s.replace('.', ',');
+    return decimal(value);
 }
 
 /** "10% of the time · 500 mW ERP" for a channel description from the API. */

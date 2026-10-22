@@ -12,10 +12,13 @@ export { h, render, Component, createRef };
 
 // ---- languages ---------------------------------------------------------------
 
-export const LANGS = ['pt', 'en', 'de'];
-// <html lang> for each; a language other than these two shows English for a text it lacks
-// (decision P5H-2: German may trail the other agents' new keys).
-const HTML_LANG = { pt: 'pt-PT', en: 'en', de: 'de' };
+export const LANGS = ['pt', 'en', 'de', 'zh-tw'];
+// <html lang> for each; a language other than pt and en shows English for a text it lacks
+// (decision P5H-2: German and Traditional Chinese may trail the other agents' new keys).
+// zh-Hant-TW also picks the CJK font stack (console.css, :lang(zh)).
+const HTML_LANG = { pt: 'pt-PT', en: 'en', de: 'de', 'zh-tw': 'zh-Hant-TW' };
+// The languages that write a decimal comma (869,525 MHz); English and Chinese use a point.
+const DECIMAL_COMMA = new Set(['pt', 'de']);
 const LANG_KEY = 'atalaia.lang';
 const TOKEN_KEY = 'atalaia.token';
 let dict = {};
@@ -58,6 +61,11 @@ export async function loadLanguage(lang) {
     storageSet(LANG_KEY, lang);
     document.documentElement.lang = HTML_LANG[lang];
     return lang;
+}
+
+/** s ("869.525", "0.1") with the current language's decimal separator. */
+export function decimal(s) {
+    return DECIMAL_COMMA.has(current) ? String(s).replace('.', ',') : String(s);
 }
 
 export function lang() {

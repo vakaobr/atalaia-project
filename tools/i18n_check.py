@@ -7,12 +7,15 @@
     python3 tools/i18n_check.py --missing de    also list every key German lacks, per domain
     python3 tools/i18n_check.py --strict de     fail on a key German lacks (before calling it complete)
 
+A language's id is its code in docs/translations/status.yaml ("de", "zh-tw"); file names carry it
+as they can: zh-tw.json, zh-tw.yaml, strings_zh_tw.dart (the map zhTwStrings), BOX_LANG_ZH_TW.
+
 Each domain keeps the format it was built with (decision P5R-11):
 
     site      site/i18n/<lang>.yaml                         (tools/build_site.py builds the pages)
     console   controller/console/src/i18n/<lang>.json       the GM console
     editor    simulator/atalaia_sim/editor/i18n/<lang>.json the mode editor
-    app       app/lib/l10n/strings_<lang>.dart              the Flutter app
+    app       app/lib/l10n/strings_<lang>.dart              the Flutter app ("-" as "_")
     box       firmware/esp32/main/box_text.c                the Field Box's screens (one column a language)
     server    server/atalaia_server/web/i18n.py, staff_i18n.py   the site server's pages
     modes     modes/*/mode.yaml (i18n.<lang>)               the built-in modes' names, read only for the table
@@ -145,8 +148,11 @@ def dart_strings(text: str, name: str) -> dict[str, str]:
 def read_app(root: Path) -> Domain:
     tables, where = {}, {}
     for path in sorted((root / "app" / "lib" / "l10n").glob("strings_*.dart")):
-        lang = path.stem.removeprefix("strings_")
-        tables[lang] = dart_strings(path.read_text(encoding="utf-8"), f"{lang}Strings")
+        stem = path.stem.removeprefix("strings_")  # zh_tw
+        lang = stem.replace("_", "-")  # zh-tw
+        first, *rest = stem.split("_")
+        name = first + "".join(part.capitalize() for part in rest) + "Strings"  # zhTwStrings
+        tables[lang] = dart_strings(path.read_text(encoding="utf-8"), name)
         where[lang] = rel(path, root)
     return Domain("app", BRACES, tables, where)
 
@@ -164,7 +170,9 @@ def read_box(root: Path) -> Domain:
     """box_text.c's table: one row per id, one column per language in box_lang_t's order."""
     path = root / "firmware" / "esp32" / "main" / "box_text.c"
     header = (root / "firmware" / "esp32" / "main" / "box_text.h").read_text(encoding="utf-8")
-    order = [m.lower() for m in re.findall(r"\bBOX_LANG_([A-Z]{2})\s*=\s*\d+", header)]
+    # BOX_LANG_DE = 2 is "de", BOX_LANG_ZH_TW = 3 "zh-tw".
+    order = [m.lower().replace("_", "-")
+             for m in re.findall(r"\bBOX_LANG_([A-Z]{2}(?:_[A-Z]{2,4})?)\s*=\s*\d+", header)]
     text = path.read_text(encoding="utf-8")
     body = text[text.index("texts[TX_COUNT][BOX_LANG_COUNT]"):]
     body = re.sub(r"/\*.*?\*/", " ", body[:body.index("\n};")], flags=re.S)  # no comments

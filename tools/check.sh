@@ -25,6 +25,8 @@ python3 tools/mode_package_vectors.py --check
 python3 tools/build_site.py --check
 # Every translation against English; a language still being translated only warns (P5H-2).
 python3 tools/i18n_check.py
+# The box's fonts carry exactly the letters of its texts, Chinese included (P5K-3).
+python3 tools/gen_box_fonts.py --check
 python3 tools/check_wiring.py
 if command -v clang-format > /dev/null 2>&1 && command -v stylua > /dev/null 2>&1; then
     sh tools/format.sh --check

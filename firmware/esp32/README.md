@@ -737,9 +737,13 @@ controller's game.
   "Game on" until the mode draws (a zone: "Neutral: hold to capture", in
   Portuguese "Livre: mantém premido", or the
   team holding it, never the Bomb's "standby"); the mode's game over; then
-  "Ready" again. In the field's language, English, European Portuguese or German (join
-  key 15, kept between games; `main/box_text.c`, fonts with the Portuguese and German
-  letters in `main/fonts/`, `tools/gen_box_fonts.py`).
+  "Ready" again. In the field's language, English, European Portuguese, German or
+  Traditional Chinese as written in Taiwan (join key 15 `zh-tw` or `zh-hant`, kept between
+  games; `main/box_text.c`, fonts with the Portuguese and German letters and the Chinese
+  letters the box's texts use, from Noto Sans TC, in `main/fonts/`, `tools/gen_box_fonts.py`,
+  whose `--check` fails when a text uses a letter the fonts lack; decision P5K-3). Chinese
+  names in a game's data (teams, objectives, presets typed in Chinese) are not in the fonts:
+  the box's own screens draw them as empty boxes, the modes' templates as `?` (P5K-5).
 - **Between games** -- `main/box_lobby.c` ([protocol/field-frames.md](../../protocol/field-frames.md),
   RFC 0001 Amendment 7, proposed). A box with a field join key has an 8-byte
   random **device id**, made once and kept in NVS (`device_id`), which its

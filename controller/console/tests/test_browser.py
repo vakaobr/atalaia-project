@@ -1282,6 +1282,35 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("tab-settings").click()
         expect(page.get_by_test_id("box-language-game")).to_contain_text("Deutsch")
 
+    def test_traditional_chinese(self):
+        """Plan phase 11: Traditional Chinese (Taiwan) on a phone: its texts, <html lang>, a Han
+        font of Taiwan's in the stack, a decimal point, no tab scrolling sideways, and a game
+        whose boxes get "zh-tw" (join key 15)."""
+        page = self.console(width=360, height=800)
+        page.get_by_test_id("lang").first.select_option("zh-tw")
+        expect(page.get_by_test_id("tab-nodes")).to_have_text("盒子")
+        self.assertEqual(page.evaluate("document.documentElement.lang"), "zh-Hant-TW")
+        self.assertIn("Noto Sans TC", page.evaluate("getComputedStyle(document.body).fontFamily"))
+        for tab in ("game", "field", "nodes", "join", "presets", "feed", "controller", "checkin", "scenarios",
+                    "adopt", "settings"):
+            page.get_by_test_id(f"tab-{tab}").click()
+            self.no_horizontal_scroll(page)
+        expect(page.get_by_test_id("radio-channel")).to_have_text("869.525 MHz")  # a decimal point
+        page.get_by_test_id("tab-game").click()
+        page.get_by_test_id("game-name").fill("週日場")
+        page.get_by_test_id("game-source").select_option(f"mode:{DOMINATION}")
+        page.get_by_test_id("game-create").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("就緒")
+        self.no_horizontal_scroll(page)
+        page.get_by_test_id("tab-join").click()
+        page.get_by_test_id("join-generate").click()
+        j = join.decode(join.from_text(page.get_by_test_id("join-text").input_value()), JOIN_KEY)
+        self.assertEqual(j["lang"], "zh-tw")
+        page.get_by_test_id("tab-settings").click()
+        expect(page.get_by_test_id("box-language-game")).to_contain_text("繁體中文（台灣）")
+        page.reload()
+        expect(page.get_by_test_id("tab-nodes")).to_have_text("盒子")  # remembered
+
     def test_read_token_sees_no_gm_controls(self):
         self.field.create_game(start=True)
         page = self.console(READ)

@@ -34,17 +34,21 @@ class SettingsScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           SectionTitle(s.t('settings.language')),
-          SegmentedButton<AppLanguage>(
+          // One chip a language, wrapping onto a second line on a narrow
+          // phone: four languages no longer fit a segmented button.
+          Wrap(
             key: const Key('language'),
-            segments: [
+            spacing: 8,
+            runSpacing: 8,
+            children: [
               for (final l in AppLanguage.values)
-                ButtonSegment(
-                  value: l,
+                ChoiceChip(
+                  key: Key('language-${l.code}'),
                   label: Text(s.t('settings.lang_${l.code}')),
+                  selected: st.language == l,
+                  onSelected: (_) => app.update((x) => x.language = l),
                 ),
             ],
-            selected: {st.language},
-            onSelectionChanged: (v) => app.update((x) => x.language = v.single),
           ),
           SectionTitle(s.t('settings.theme')),
           SegmentedButton<ThemeMode>(

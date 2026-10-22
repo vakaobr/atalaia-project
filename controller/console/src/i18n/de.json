@@ -5,6 +5,7 @@
     "lang_pt": "Português",
     "lang_en": "English",
     "lang_de": "Deutsch",
+    "lang_zh-tw": "中文（台灣）",
     "sections": "Bereiche",
     "reconnecting": "Keine Verbindung zum Feld-Controller. Verbinde neu …"
   },
@@ -1037,7 +1038,8 @@
       "auto": "Die Sprache dieser Konsole beim Erstellen des Spiels",
       "pt": "Portugiesisch",
       "en": "Englisch",
-      "de": "Deutsch"
+      "de": "Deutsch",
+      "zh-tw": "Traditionelles Chinesisch (Taiwan)"
     },
     "live": "Die Boxen des laufenden Spiels: {lang}",
     "saved": "Gespeichert: Ab jetzt erstellte Spiele verwenden sie.",

@@ -436,7 +436,7 @@ screens:
 
   app_title: A app Android
   app_intro: >-
-    Os ecrãs da própria app estão em português ou em inglês, e ela desenha os ecrãs de cada modo a
+    Os ecrãs da própria app estão em português, inglês, alemão e chinês tradicional, e ela desenha os ecrãs de cada modo a
     partir dos mesmos ficheiros YAML da Field Box. Estas são as imagens dos testes da app, não
     fotografias de um telemóvel: a app já correu em emuladores Android, mas ainda não num telemóvel
     a sério.
@@ -747,7 +747,8 @@ roadmap:
       assinados, criados pelo próprio editor, uma bateria de testes de fuga ao sandbox na CI, o
       controlador de campo a instalar modos assinados, as caixas a receber da consola de GM os modos
       assinados que lhes faltam, cenários montados com blocos na consola, o registo de modos pronto
-      como modelo, com as verificações e o selo de verificado, e alemão (um rascunho, em revisão);
+      como modelo, com as verificações e o selo de verificado, e alemão e chinês tradicional
+      (rascunhos, em revisão);
       <a href="{{ page.to.build }}">guias de montagem</a> da caixa satélite, do módulo de E/S e do
       módulo de alvo, em texto. A seguir: criar o registo, mais traduções.
     text: >-
@@ -778,11 +779,12 @@ roadmap:
       que foi assinado, a licença, os testes no simulador), e um modo revisto pelo projeto recebe o
       selo de verificado, a assinatura do próprio projeto, que é o que o deixa chegar às caixas.
       Como submeter um modo, a lista de revisão, as chaves e a moderação estão escritos. O Atalaia
-      já está também em alemão (esta página, a consola de GM, o editor de modos, a app e os ecrãs da
-      Field Box), num rascunho feito com um modelo de IA e ainda não revisto por quem joga em
-      alemão: se jogas em alemão, ajuda-nos a revê-lo; as traduções para outras línguas começam em
-      docs/translations (em inglês). A seguir: criar o registo a partir do modelo; a revisão do
-      alemão; chinês tradicional; a placa de suporte depois das primeiras caixas montadas.
+      já está também em alemão e em chinês tradicional, como se escreve em Taiwan (esta página, a
+      consola de GM, o editor de modos, a app e os ecrãs da Field Box), em rascunhos feitos com um
+      modelo de IA e ainda não revistos por quem joga nessas línguas: se jogas em alemão ou em
+      chinês, ajuda-nos a revê-los; as traduções para outras línguas começam em docs/translations
+      (em inglês). A seguir: criar o registo a partir do modelo; a revisão do alemão e do chinês; a
+      placa de suporte depois das primeiras caixas montadas.
     gate: Continua depois da primeira versão.
 
 build:

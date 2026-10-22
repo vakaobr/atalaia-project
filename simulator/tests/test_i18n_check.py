@@ -65,17 +65,23 @@ class I18nCheckTests(unittest.TestCase):
         self.assertEqual(code, 0, err.getvalue())
         self.assertIn("console", out.getvalue())
         self.assertIn("de: draft", out.getvalue())
+        self.assertIn("zh-tw: draft", out.getvalue())
 
     def test_every_domain_is_read(self):
         status = i18n_check.load_status(self.root)
         self.assertEqual(status["de"]["status"], "draft")
         box = i18n_check.read_box(self.root)
-        self.assertEqual(set(box.tables), {"en", "pt", "de"})
+        self.assertEqual(set(box.tables), {"en", "pt", "de", "zh-tw"})
+        self.assertEqual(box.tables["zh-tw"]["TX_NEUTRAL_UP"], "中立")
+        self.assertEqual(box.tables["en"].keys(), box.tables["zh-tw"].keys())
         self.assertEqual(box.tables["de"]["TX_NEUTRAL_UP"], "FREI")
         self.assertEqual(box.tables["pt"]["TX_WAITING_UP"], "À ESPERA")
         self.assertEqual(box.tables["en"].keys(), box.tables["de"].keys())
         app = i18n_check.read_app(self.root)
         self.assertEqual(app.tables["de"]["settings.lang_de"], "Deutsch")
+        # strings_zh_tw.dart's zhTwStrings is the language zh-tw (P5K-2).
+        self.assertEqual(app.where["zh-tw"], "app/lib/l10n/strings_zh_tw.dart")
+        self.assertEqual(app.tables["en"].keys(), app.tables["zh-tw"].keys())
         self.assertEqual(app.tables["en"].keys(), app.tables["pt"].keys())
 
     def test_a_missing_german_key_is_a_warning(self):
@@ -148,6 +154,67 @@ class I18nCheckTests(unittest.TestCase):
         code, _, err = self.run_check()
         self.assertEqual(code, 1)
         self.assertIn("'fr' is not in docs/translations/status.yaml", err)
+
+
+GEN_SPEC = importlib.util.spec_from_file_location("gen_box_fonts", REPO / "tools" / "gen_box_fonts.py")
+gen_box_fonts = importlib.util.module_from_spec(GEN_SPEC)
+GEN_SPEC.loader.exec_module(gen_box_fonts)
+
+
+class BoxFontCheckTests(unittest.TestCase):
+    """tools/gen_box_fonts.py --check: the box's fonts carry exactly the Chinese letters of
+    box_text.c (P5K-3), so a new text cannot use a letter the box would draw as an empty box."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        for name in ("firmware/esp32/main/box_text.c", "firmware/esp32/main/box_text.h",
+                     "firmware/esp32/main/fonts"):
+            src, dst = REPO / name, self.root / name
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            if src.is_dir():
+                shutil.copytree(src, dst)
+            else:
+                shutil.copy(src, dst)
+        self.box = self.root / "firmware/esp32/main/box_text.c"
+        self.text = self.box.read_text(encoding="utf-8")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def check(self):
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stderr(err):
+            code = gen_box_fonts.check(self.root, out=out)
+        return code, out.getvalue(), err.getvalue()
+
+    def test_the_repository_passes(self):
+        code, out, err = self.check()
+        self.assertEqual(code, 0, err)
+        self.assertIn("48 px: ", out)
+
+    def test_a_letter_the_fonts_lack_fails(self):
+        # 閒 is in no box text: the fonts lack it at every size.
+        self.box.write_text(self.text.replace('"中立"', '"閒置"'), encoding="utf-8")
+        code, _, err = self.check()
+        self.assertEqual(code, 1)
+        self.assertIn("lv_font_atalaia_14.c: lacks 閒", err)
+        self.assertIn("lv_font_atalaia_48.c: lacks 閒", err)  # TX_NEUTRAL_UP is drawn at 48 px
+
+    def test_a_letter_no_text_uses_any_more_fails(self):
+        # 爆 is only in TX_EXPLODED_UP (48 px) and TX_UNTIL_DETONATION: the fonts carry it for nothing.
+        text = self.text.replace('"已爆炸"', '"爆炸了"').replace('"後引爆"', '"後炸"')
+        self.box.write_text(text.replace('"爆炸了"', '"炸了"'), encoding="utf-8")
+        code, _, err = self.check()
+        self.assertEqual(code, 1)
+        self.assertIn("has 爆 U+7206, which no box text uses", err)
+
+    def test_a_letter_in_no_font_at_all_fails(self):
+        # Polish l with stroke is neither in LATIN nor Chinese.
+        self.box.write_text(self.text.replace('"FREI"', '"FREI\u0142"'), encoding="utf-8")
+        code, _, err = self.check()
+        self.assertEqual(code, 1)
+        self.assertIn("add it to LATIN", err)
 
 
 if __name__ == "__main__":

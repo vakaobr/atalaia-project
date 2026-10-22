@@ -268,16 +268,32 @@ class ConsoleFilesTests(unittest.TestCase):
         text = " ".join(pt.values()).lower()
         for br in ("celular", "tela ", "time ", "você", "arquivo", "usuário"):
             self.assertNotIn(br, text, br)
-        # German (plan phase 10, P5H-2): every language the console offers has a table; German
-        # may lack a key (the console shows English: ui.js), never have one English lacks.
+        # German and Traditional Chinese (plan phases 10 and 11, P5H-2): every language the
+        # console offers has a table, a name in the switcher and a box-language choice; either may
+        # lack a key (the console shows English: ui.js), never have one English lacks.
         langs = re.search(r"export const LANGS = \[([^\]]*)\]", (SRC / "ui.js").read_text(encoding="utf-8"))
-        self.assertEqual(re.findall(r"'(\w+)'", langs.group(1)), ["pt", "en", "de"])
-        de = flat(json.loads((SRC / "i18n" / "de.json").read_text(encoding="utf-8")))
-        self.assertEqual(set(de) - set(en), set())
-        for k, v in de.items():
-            self.assertTrue(isinstance(v, str) and v.strip(), f"de: {k} is empty")
-            self.assertEqual(sorted(re.findall(r"\{(\w+)\}", v)), sorted(re.findall(r"\{(\w+)\}", en[k])), k)
-        self.assertIn("i18n/de.json", (SRC / "sw.js").read_text(encoding="utf-8"))
+        self.assertEqual(re.findall(r"'([\w-]+)'", langs.group(1)), ["pt", "en", "de", "zh-tw"])
+        for code in ("pt", "en", "de", "zh-tw"):
+            self.assertIn(f"app.lang_{code}", en)
+            self.assertIn(f"box_language.choices.{code}", en)
+        for code in ("de", "zh-tw"):
+            other = flat(json.loads((SRC / "i18n" / f"{code}.json").read_text(encoding="utf-8")))
+            self.assertEqual(set(other) - set(en), set(), code)
+            for k, v in other.items():
+                self.assertTrue(isinstance(v, str) and v.strip(), f"{code}: {k} is empty")
+                self.assertEqual(sorted(re.findall(r"\{(\w+)\}", v)), sorted(re.findall(r"\{(\w+)\}", en[k])),
+                                 f"{code}: {k}")
+                self.assertEqual(sorted(re.findall(r"%\d", v)), sorted(re.findall(r"%\d", en[k])), f"{code}: {k}")
+            self.assertIn(f"i18n/{code}.json", (SRC / "sw.js").read_text(encoding="utf-8"))
+        # Taiwan's conventions: full-width punctuation after Han, no Simplified characters and
+        # "你", not "您" (docs/translations/glossary.md; the decimal point: test_browser.py).
+        zh = flat(json.loads((SRC / "i18n" / "zh-tw.json").read_text(encoding="utf-8")))
+        text = "".join(zh.values())
+        for simplified in "这设启动队游戏据点无线电开关时间对选择":
+            self.assertNotIn(simplified, text, simplified)
+        # ("緯度, 經度" is what to type, with the ASCII comma a map app copies.)
+        self.assertEqual(re.findall(r"[\u4e00-\u9fff][,;:!?]", text.replace("緯度, 經度", "")), [])
+        self.assertNotIn("您", text)
 
     def test_scenario_blocks_have_their_texts(self):
         """The scenario blocks' texts (phase 5 plan phase 7): every tr('...') of the blocks, the

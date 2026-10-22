@@ -17,6 +17,8 @@ templates site/src/diagrams/<name>.svg, the script writes, each marked
                                   language: site/index.html is the main page
     site/en/<folder>/index.html   each page in English
     site/de/<folder>/index.html   each page in German (decision P5H-3)
+    site/zh-tw/<folder>/index.html  each page in Traditional Chinese (Taiwan), with
+                                  English slugs (decision P5K)
     site/img/diagrams/<name>-<layout>-<code>.svg   each diagram, per layout and language
     site/sitemap.xml              every page in every language, with its translations
 
@@ -100,10 +102,22 @@ class Language:
     # The language whose social preview image (img/og-<code>.jpg, with its title painted in) the
     # pages use: its own, or English's while it has none (P5H-3).
     og_image: str = ""
+    # The language of the app screenshots the main page shows (img/screens/app-*-<code>.png,
+    # copied from the app's golden images): its own, or English's until its own are copied.
+    screenshots: str = ""
 
     @property
     def og_code(self) -> str:
         return self.og_image or self.code
+
+    @property
+    def screenshots_code(self) -> str:
+        return self.screenshots or self.code
+
+    @property
+    def key(self) -> str:
+        """The code in page.* names, where a placeholder takes no hyphen: page.url.zh_tw."""
+        return self.code.replace("-", "_")
 
 
 # The first language is the default, served at the site root.
@@ -111,6 +125,7 @@ LANGUAGES = (
     Language("pt", "pt-PT", "pt_PT", ""),
     Language("en", "en", "en_GB", "en/"),
     Language("de", "de", "de_DE", "de/", og_image="en"),
+    Language("zh-tw", "zh-Hant-TW", "zh_TW", "zh-tw/", og_image="en"),
 )
 
 
@@ -121,14 +136,16 @@ class Page:
 
 
 # Every page, in every language. A folder is "" (the language's main page) or a
-# slug in that language ending in "/". Keep the slugs stable: other sites link to them.
+# slug in that language ending in "/" (ASCII: Traditional Chinese keeps English's, since Han
+# letters in an address are percent-encoded when shared). Keep the slugs stable: other sites
+# link to them.
 PAGES = (
-    Page("index", {"pt": "", "en": "", "de": ""}),
-    Page("modes", {"pt": "modos/", "en": "modes/", "de": "modi/"}),
-    Page("radio", {"pt": "radio/", "en": "radio/", "de": "funk/"}),
-    Page("roadmap", {"pt": "roadmap/", "en": "roadmap/", "de": "roadmap/"}),
-    Page("build", {"pt": "montagem/", "en": "build-guides/", "de": "bauen/"}),
-    Page("glossary", {"pt": "glossario/", "en": "glossary/", "de": "glossar/"}),
+    Page("index", {"pt": "", "en": "", "de": "", "zh-tw": ""}),
+    Page("modes", {"pt": "modos/", "en": "modes/", "de": "modi/", "zh-tw": "modes/"}),
+    Page("radio", {"pt": "radio/", "en": "radio/", "de": "funk/", "zh-tw": "radio/"}),
+    Page("roadmap", {"pt": "roadmap/", "en": "roadmap/", "de": "roadmap/", "zh-tw": "roadmap/"}),
+    Page("build", {"pt": "montagem/", "en": "build-guides/", "de": "bauen/", "zh-tw": "build-guides/"}),
+    Page("glossary", {"pt": "glossario/", "en": "glossary/", "de": "glossar/", "zh-tw": "glossary/"}),
 )
 
 # page.* values that come from the page's meta.<page>.* texts: value -> (key, fallback key).
@@ -150,7 +167,7 @@ COMMENT = re.compile(r"\{#(?:(?!#\}).)*#\}", re.S)
 # {% include name %} on a line of its own; partials do not include others.
 INCLUDE = re.compile(r"^[ \t]*\{%\s*include\s+([a-z0-9_-]+)\s*%\}[ \t]*\n", re.M)
 # {% if lang pt en %} ... {% endif %}, each tag on a line of its own; blocks do not nest.
-IF_LANG = re.compile(r"^[ \t]*\{%\s*if\s+lang\s+([a-z ]+?)\s*%\}[ \t]*\n(.*?)^[ \t]*\{%\s*endif\s*%\}[ \t]*\n",
+IF_LANG = re.compile(r"^[ \t]*\{%\s*if\s+lang\s+([a-z -]+?)\s*%\}[ \t]*\n(.*?)^[ \t]*\{%\s*endif\s*%\}[ \t]*\n",
                      re.S | re.M)
 # {% if layout wide %} ... {% endif %}, in diagram templates only; blocks do not nest.
 IF_LAYOUT = re.compile(r"^[ \t]*\{%\s*if\s+layout\s+([a-z ]+?)\s*%\}[ \t]*\n(.*?)^[ \t]*\{%\s*endif\s*%\}[ \t]*\n",
@@ -260,11 +277,32 @@ def flatten(data: Any, prefix: str, path: Path) -> dict[str, str]:
     return flat
 
 
+# A space YAML folding left between Han letters, or beside full-width punctuation, (a line of the
+# file broken between two of them), which a browser would show: Chinese has no spaces between
+# words. A space between a Han letter and a Latin one or a digit stays (Taiwan's convention:
+# "GM 控制台", "3 秒"). Tags in between are looked through: "的 <a href=...>微控制器</a>".
+HAN = "\u2e80-\u303e\u3040-\u9fff\uf900-\ufaff\uff00-\uffef"
+CJK_PUNCT = "\u3000-\u303f\uff01-\uff0f\uff1a-\uff20\uff3b-\uff40\uff5b-\uff65"
+TAGS = r"(?:<[^<>]+>)*"
+CJK_SPACE = (re.compile(rf"(?<=[{HAN}])({TAGS}) +(?={TAGS}[{HAN}])"),
+             re.compile(rf"(?<=[{CJK_PUNCT}])({TAGS}) +"),
+             re.compile(rf" +(?={TAGS}[{CJK_PUNCT}])"))
+
+
+def unfold_cjk(text: str) -> str:
+    """Drops the spaces folding put between Han letters and beside full-width punctuation."""
+    for pattern in CJK_SPACE:
+        text = pattern.sub(lambda m: m.group(1) if m.groups() else "", text)
+    return text
+
+
 def load_texts(lang: Language) -> dict[str, str]:
     path = I18N / f"{lang.code}.yaml"
     if not path.exists():
         raise SiteError(f"{rel(path)} is missing")
     texts = flatten(yaml.safe_load(path.read_text(encoding="utf-8")) or {}, "", path)
+    if lang.html_lang.startswith(("zh", "ja")):
+        texts = {key: unfold_cjk(text) for key, text in texts.items()}
     reserved = sorted(k for k in texts if k.split(".")[0] == "page")
     if reserved:
         raise SiteError(f"{rel(path)}: page.* keys are set by the script: {', '.join(reserved)}")
@@ -276,6 +314,7 @@ def language_values(lang: Language) -> dict[str, str]:
     return {
         "page.lang": lang.html_lang,
         "page.code": lang.code,  # the language's short code, as in file names (lora-wide-en.svg)
+        "page.screenshots": lang.screenshots_code,  # the app screenshots' language (app-roles-en.png)
         "page.og_locale": lang.og_locale,
         "page.og_locale_alternate": ",".join(o.og_locale for o in LANGUAGES if o != lang),
     }
@@ -317,9 +356,9 @@ def page_values(page: Page, lang: Language, texts: dict[str, str], file_name: st
     }
     for other in LANGUAGES:
         # The same page in each language, for hreflang and the language switcher.
-        values[f"page.url.{other.code}"] = SITE_URL + folder(page, other)
-        values[f"page.href.{other.code}"] = relative(here, folder(page, other))
-        values[f"page.current.{other.code}"] = ' aria-current="page"' if other == lang else ""
+        values[f"page.url.{other.key}"] = SITE_URL + folder(page, other)
+        values[f"page.href.{other.key}"] = relative(here, folder(page, other))
+        values[f"page.current.{other.key}"] = ' aria-current="page"' if other == lang else ""
     for target in PAGES:
         values[f"page.to.{target.name}"] = relative(here, folder(target, lang))
         values[f"page.nav.{target.name}"] = ' aria-current="page"' if target is page else ""
@@ -518,15 +557,40 @@ def text_width(text: str, size: float, bold: bool) -> float:
     return width * size
 
 
+# Han, kana and full-width forms: a line may break between any two of them (CJK has no spaces),
+# except before closing punctuation or after opening punctuation (line-break: strict).
+CJK = re.compile(r"[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef]")
+NO_LINE_START = set("，。、：；！？）」』〉》】,.:;!?)")
+NO_LINE_END = set("（「『〈《【(")
+
+
+def words(paragraph: str) -> list[tuple[str, str]]:
+    """The pieces a line may break between, each with the text that joins it to the one before:
+    a space between words, nothing between CJK letters."""
+    pieces: list[tuple[str, str]] = []
+    for word in paragraph.split(" "):
+        if not word:
+            continue
+        joiner = " "
+        piece = ""
+        for char in word:
+            if piece and (CJK.match(char) or CJK.match(piece[-1])) and char not in NO_LINE_START \
+                    and piece[-1] not in NO_LINE_END:
+                pieces.append((joiner, piece))
+                joiner, piece = "", char
+            else:
+                piece += char
+        pieces.append((joiner, piece))
+    return pieces
+
+
 def wrap(text: str, width: float, size: float, bold: bool) -> list[str]:
-    """Breaks text into lines at spaces, and at its own line breaks."""
+    """Breaks text into lines at spaces, between CJK letters, and at its own line breaks."""
     lines = []
     for paragraph in text.split("\n"):
         line = ""
-        for word in paragraph.split(" "):
-            if not word:
-                continue
-            longer = f"{line} {word}" if line else word
+        for joiner, word in words(paragraph):
+            longer = f"{line}{joiner}{word}" if line else word
             if line and text_width(longer, size, bold) > width:
                 lines.append(line)
                 line = word

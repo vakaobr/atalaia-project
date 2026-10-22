@@ -1180,9 +1180,22 @@ static void test_screen_language(void)
     cmd(FIELD_CMD_START);
     cmd(FIELD_CMD_END);
     ack_all();
-    /* A German game (plan phase 10, P5H-4): German screens, kept across a reboot. */
+    /* A Traditional Chinese game (plan phase 11, P5K-2): zh-tw, kept as given. */
     make_join(&j);
     j.game_id = GAME_ID + 2;
+    snprintf(j.lang, sizeof(j.lang), "zh-tw");
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    CHECK(box_lang() == BOX_LANG_ZH_TW && box_lang_given());
+    CHECK(flash.have_lang && strcmp(flash.lang, "zh-tw") == 0);
+    oled_text_for("", shell.screen, shell.screen_data, &o);
+    CHECK(strcmp(o.head, "等待中") == 0);
+    CHECK(strcmp(box_text(TX_NOT_STARTED), "遊戲尚未開始") == 0);
+    cmd(FIELD_CMD_START);
+    cmd(FIELD_CMD_END);
+    ack_all();
+    /* A German game (plan phase 10, P5H-4): German screens, kept across a reboot. */
+    make_join(&j);
+    j.game_id = GAME_ID + 3;
     snprintf(j.lang, sizeof(j.lang), "de");
     CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
     CHECK(box_lang() == BOX_LANG_DE && box_lang_given());

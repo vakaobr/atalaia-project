@@ -424,7 +424,7 @@ screens:
 
   app_title: The Android app
   app_intro: >-
-    The app's own screens are in Portuguese or English, and it draws each mode's screens from the
+    The app's own screens are in Portuguese, English, German and Traditional Chinese, and it draws each mode's screens from the
     same YAML files as the Field Box. These are the app's test images, not photos of a phone: the
     app has run on Android emulators, not yet on a real phone.
   app_roles:
@@ -714,8 +714,8 @@ roadmap:
       made by the editor itself, a sandbox-escape battery in CI, the field controller installing
       signed modes, boxes getting the signed modes they lack from the GM console, scenarios built
       from blocks in the console, the mode registry ready as a template, with its checks and the
-      verified badge, and German (a draft, being reviewed); <a href="{{ page.to.build }}">build
-      guides</a> for the Satellite, the I/O pod and the target addon, as text. Next: creating the
+      verified badge, and German and Traditional Chinese (drafts, being reviewed);
+      <a href="{{ page.to.build }}">build guides</a> for the Satellite, the I/O pod and the target addon, as text. Next: creating the
       registry, more translations.
     text: >-
       Visual mode editor, mode registry, carrier PCB (a ready-made circuit board that makes builds
@@ -743,12 +743,12 @@ roadmap:
       checked automatically (its signature, that its source is what was signed, its licence, its
       tests in the simulator), and a mode the project has reviewed gets the verified badge, the
       project's own signature, which is what lets it reach the boxes. How to submit a mode, the
-      review checklist, keys and moderation are written down. Atalaia is now in German too (this
-      page, the GM console, the mode editor, the app and the Field Box's screens), drafted by an AI
-      model and not yet reviewed by German-speaking players: if you play in German, help us review
-      it; translations into other languages start at docs/translations. Next: creating the registry
-      from its template; the review of the German; Traditional Chinese; the carrier PCB after the
-      first built boxes.
+      review checklist, keys and moderation are written down. Atalaia is now in German and in
+      Traditional Chinese as written in Taiwan too (this page, the GM console, the mode editor, the
+      app and the Field Box's screens), both drafted by an AI model and not yet reviewed by players
+      who speak them: if you play in German or in Chinese, help us review them; translations into
+      other languages start at docs/translations. Next: creating the registry from its template; the
+      review of the German and the Chinese; the carrier PCB after the first built boxes.
     gate: Ongoing after the first release.
 
 build:

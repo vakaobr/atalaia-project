@@ -5,6 +5,7 @@
     "lang_pt": "Português",
     "lang_en": "English",
     "lang_de": "Deutsch",
+    "lang_zh-tw": "中文（台灣）",
     "sections": "Sections",
     "reconnecting": "No connection to the field controller. Reconnecting…"
   },
@@ -1037,7 +1038,8 @@
       "auto": "This console's language when the game is created",
       "pt": "Portuguese",
       "en": "English",
-      "de": "German"
+      "de": "German",
+      "zh-tw": "Traditional Chinese (Taiwan)"
     },
     "live": "The live game's boxes: {lang}",
     "saved": "Saved: games created from now on use it.",

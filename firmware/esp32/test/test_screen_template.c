@@ -173,6 +173,10 @@ static void test_text_fold(void)
     fold_is("\xe2\x82\xac 5 \xf0\x9f\x98\x80 \xc3", "? 5 ? ?"); /* euro, emoji, a cut sequence */
     fold_is("\x80x\xc2", "?x?");
     fold_is("", "");
+    /* Han letters in a template's data (a Chinese team or objective name) are a "?" each: the
+     * fonts carry only the letters of the box's own Chinese texts, which never pass through a
+     * template (P5K-3), so a name would be half drawn, half empty boxes. 紅隊 */
+    fold_is("A \xe7\xb4\x85\xe9\x9a\x8a", "A ??");
 }
 
 /* The Medic Kit's Portuguese screens on the box: folded, and the language follows params.lang. */

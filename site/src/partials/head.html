@@ -4,8 +4,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 The inside of every page's <head>. page.title, page.description and
 page.og_description are the page's meta.<page>.* texts, escaped; the social
-preview image is the language's own (img/og-<language>.jpg; German uses
-English's until it has its own) on every page.
+preview image is the language's own (img/og-<language>.jpg; German and
+Traditional Chinese use English's until they have their own) on every page.
 #}
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -16,6 +16,7 @@ English's until it has its own) on every page.
   <link rel="alternate" hreflang="pt-PT" href="{{ page.url.pt }}">
   <link rel="alternate" hreflang="en" href="{{ page.url.en }}">
   <link rel="alternate" hreflang="de" href="{{ page.url.de }}">
+  <link rel="alternate" hreflang="zh-Hant-TW" href="{{ page.url.zh_tw }}">
   <link rel="alternate" hreflang="x-default" href="{{ page.url.pt }}">
   <meta property="og:title" content="{{ page.title }}">
   <meta property="og:description" content="{{ page.og_description }}">

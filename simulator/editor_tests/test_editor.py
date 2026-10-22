@@ -617,6 +617,42 @@ class EditorTests(unittest.TestCase):
         expect(page.locator("#lang")).to_have_value("de")
         expect(page.locator("#make-package")).to_have_text("Paket erstellen")
 
+    def test_page_in_traditional_chinese(self):
+        """Plan phase 11 (P5K): the editor's zh-tw table and Blockly's msg/zh-hant.js; a block's
+        CJK text stays inside its block (Blockly measures the text it draws)."""
+        page = self.open("zh-tw")
+        expect(page.locator("html")).to_have_attribute("lang", "zh-Hant-TW")
+        expect(page.locator("#tab-node")).to_have_text("盒子（node.lua）")
+        expect(page.locator("#ws-node .blocklyToolbox")).to_contain_text("事件")
+        expect(page.locator("#ws-node .blocklyToolbox")).to_contain_text("盒子硬體")
+        page.locator("#ws-node .blocklyToolboxCategory", has_text="邏輯").click()
+        expect(page.locator("#ws-node .blocklyToolboxFlyout")).to_contain_text("否則")
+        expect(page.locator("#lang")).to_have_value("zh-tw")
+        expect(page.locator("#make-package")).to_have_text("製作套件")
+        page.select_option("#example", "domination")
+        expect(page.locator("#ws-node .blocklyBlockCanvas", has_text="遊戲開始")).to_have_count(1)
+        clipped = page.evaluate("""() => {
+            const out = [];
+            let seen = 0;
+            for (const block of document.querySelectorAll('#ws-node .blocklyBlockCanvas > .blocklyDraggable')) {
+                const path = block.querySelector(':scope > path.blocklyPath').getBoundingClientRect();
+                for (const t of block.querySelectorAll(':scope > g > text, :scope > text')) {
+                    const r = t.getBoundingClientRect();
+                    if (r.width) seen++;
+                    if (r.width && (r.right > path.right + 1 || r.left < path.left - 1)) out.push(t.textContent);
+                }
+            }
+            return { out, seen };
+        }""")
+        self.assertEqual(clipped["out"], [])
+        self.assertGreater(clipped["seen"], 10)
+
+    def test_browser_in_taiwan_gets_traditional_chinese(self):
+        """A browser asking for zh-TW (or zh-Hant, zh-HK) and no remembered language gets zh-tw."""
+        page = self.open(None, {"locale": "zh-TW"})
+        expect(page.locator("#lang")).to_have_value("zh-tw")
+        expect(page.locator("html")).to_have_attribute("lang", "zh-Hant-TW")
+
     def test_an_example_through_the_page(self):
         page = self.open("en")
         page.select_option("#example", "holdall")

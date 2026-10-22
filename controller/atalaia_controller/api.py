@@ -62,7 +62,7 @@ which browsers cannot give headers, also takes ``?token=``.
     PUT|DELETE /api/v1/team-presets/{id}   GM
     GET  /api/v1/games/{id}/teams          a game's team colours, display names and crests (no token)
     PUT  /api/v1/games/{id}/teams/{team}   GM: {"display_name"?, "crest_id"?, "team_preset_id"?}
-    GET|PUT /api/v1/settings/box-language  the boxes' screen language: "auto" (the console's), "pt", "en", "de"
+    GET|PUT /api/v1/settings/box-language  the boxes' screen language: "auto" (the console's), "pt", "en", "de", "zh-tw"
     GET  /api/v1/radio                     the field's radio channel, its limits, candidates, last scan
     PUT  /api/v1/radio/channel             set it {"channel_hz", "source"} (no live game)
     POST /api/v1/radio/scan                find a quiet channel: noise scan with the modem {"dwell_s"?}

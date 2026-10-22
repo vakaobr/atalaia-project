@@ -41,6 +41,7 @@ const Map<String, String> enStrings = {
   'settings.lang_pt': 'Português',
   'settings.lang_en': 'English',
   'settings.lang_de': 'Deutsch',
+  'settings.lang_zh-tw': '中文（台灣）',
   'settings.theme': 'Look',
   'settings.theme_system': 'System',
   'settings.theme_dark': 'Dark',

@@ -5,22 +5,41 @@
 
 They are LVGL's built-in Montserrat Medium fonts (sizes 14, 20, 28 and 48, 4 bits per pixel,
 ASCII, the degree sign, the bullet and LVGL's symbols) with the letters European Portuguese
-and German need added (decisions BN-14 and P5H-4: box screens in Portuguese and German). The
-command is LVGL's own (lvgl/scripts/built_in_font/built_in_font_gen.py, LVGL 9.2.2) with more
-ranges, so every ASCII glyph, and so every English screen, is drawn exactly as before.
-clang-format (tools/format.sh) then rewraps the licence header the way the committed files
-have it.
+and German need added (decisions BN-14 and P5H-4: box screens in Portuguese and German), and
+the Han letters and full-width punctuation of the box's Traditional Chinese texts from Noto
+Sans TC Medium (decision P5K-3). The command is LVGL's own
+(lvgl/scripts/built_in_font/built_in_font_gen.py, LVGL 9.2.2) with more ranges and the glyphs
+compressed (lv_font_conv's RLE, LV_USE_FONT_COMPRESSED in lv_conf.h; lossless, so every ASCII
+glyph, and so every English screen, is drawn exactly as before). clang-format (tools/format.sh)
+then rewraps the licence header the way the committed files have it.
 
-Needs Node.js with lv_font_conv 1.5.2 (npm install lv_font_conv@1.5.2) and LVGL 9.2.2's
-scripts/built_in_font/ (Montserrat-Medium.ttf, FontAwesome5-Solid+Brands+Regular.woff):
+Chinese costs flash (about 90, 150, 250 and 480 bytes a letter at 14, 20, 28 and 48 px,
+compressed; half as much again without), so the fonts carry exactly the letters
+firmware/esp32/main/box_text.c uses, read from its table: every
+one at 14, 20 and 28 px (the TFT's texts and the whole OLED), and at 48 px only those of the
+texts the TFT draws at 48 (AT_48). The 48 px font falls back on the 28 px one, so a letter it
+lacks is drawn smaller, never as an empty box; the host tests fail when any screen needs that
+(test_screens.c and test_oled_screens.c check every letter of every label against its font).
+
+Needs Node.js with lv_font_conv 1.5.2 (npm install lv_font_conv@1.5.2), LVGL 9.2.2's
+scripts/built_in_font/ (Montserrat-Medium.ttf, FontAwesome5-Solid+Brands+Regular.woff) and
+Noto Sans TC 2.004 Medium (notofonts/noto-cjk, tag Sans2.004, Sans/SubsetOTF/TC/
+NotoSansTC-Medium.otf, SHA-256 in NOTO_SHA256):
 
     python3 tools/gen_box_fonts.py --lv-font-conv node_modules/.bin/lv_font_conv \\
-        --fonts <lvgl>/scripts/built_in_font
+        --fonts <lvgl>/scripts/built_in_font --cjk-font NotoSansTC-Medium.otf
+
+    python3 tools/gen_box_fonts.py --check
+
+--check (in tools/check.sh, needs only Python) fails when a box text uses a letter the fonts
+lack, or the fonts carry a Chinese letter no text uses: change box_text.c, then make the fonts
+again.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import re
 import subprocess
 import sys
@@ -28,11 +47,15 @@ import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / "tools"))
+import i18n_check  # noqa: E402  (box_text.c's reader)
+
 OUT = REPO / "firmware" / "esp32" / "main" / "fonts"
 SIZES = (14, 20, 28, 48)
 # LVGL's line height and baseline for each size. The accents and the cedilla would make the lines
 # 1-3 pixels taller; kept as LVGL's, every English screen keeps its layout to the pixel, and an
-# accent on a capital or a cedilla may reach a pixel or two past its line.
+# accent on a capital or a cedilla may reach a pixel or two past its line. Han letters fit the
+# line (Noto Sans TC's ideographic box is the font size).
 METRICS = {14: (16, 3), 20: (22, 4), 28: (30, 5), 48: (52, 9)}
 # ASCII, degree sign and bullet as LVGL's built-in fonts; then a and o ordinals, the middle dot
 # and the accented letters of Portuguese; then the umlauts and the sharp s of German (P5H-4).
@@ -45,35 +68,132 @@ SYMBOLS = ("61441,61448,61451,61452,61452,61453,61457,61459,61461,61465,61468,61
            "61552,61553,61556,61559,61560,61561,61563,61587,61589,61636,61637,61639,61641,61664,"
            "61671,61674,61683,61724,61732,61787,61931,62016,62017,62018,62019,62020,62087,62099,"
            "62212,62189,62810,63426,63650")
+# The box texts the TFT draws at 48 px (screen_renderer.c: the results, pause, a free zone, the
+# ready and waiting screens, the timer without a limit). Their letters also go into the 48 px
+# font; every other Chinese letter is in 14, 20 and 28 px only (P5K-3).
+AT_48 = ("TX_DEFUSED_UP", "TX_EXPLODED_UP", "TX_PAUSED_UP", "TX_NEUTRAL_UP", "TX_NEXT_GAME",
+         "TX_GAME_N", "TX_NO_LIMIT")
+# The 48 px font's fallback: a letter it lacks comes from the 28 px font (LVGL 9's
+# lv_font_t.fallback), smaller rather than an empty box.
+FALLBACK = {48: 28}
+NOTO_SHA256 = "bf206dca0975779bac71cb49a037a364156ca98a0c431b1b7d6b29fb8952ac7e"
 HEADER = """\
 /*
  * SPDX-FileCopyrightText: 2011 The Montserrat Project Authors (https://github.com/JulietaUla/Montserrat)
  * SPDX-FileCopyrightText: Fonticons, Inc. (https://fontawesome.com)
+ * SPDX-FileCopyrightText: 2014-2021 Adobe (http://www.adobe.com/)
  * SPDX-License-Identifier: OFL-1.1
  *
  * Generated by tools/gen_box_fonts.py (lv_font_conv 1.5.2) from LVGL 9.2.2's
- * Montserrat-Medium.ttf and FontAwesome5-Solid+Brands+Regular.woff. Do not edit.
+ * Montserrat-Medium.ttf and FontAwesome5-Solid+Brands+Regular.woff, and Noto Sans TC
+ * 2.004 Medium for the letters of the box's Chinese texts. Do not edit.
  */
 /* clang-format off */
 """
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--lv-font-conv", required=True, help="the lv_font_conv program")
-    ap.add_argument("--fonts", required=True, type=Path, help="LVGL's scripts/built_in_font")
-    args = ap.parse_args()
+def latin_codepoints() -> set[int]:
+    out: set[int] = set()
+    for part in LATIN.split(","):
+        lo, _, hi = part.partition("-")
+        out.update(range(int(lo, 16), int(hi or lo, 16) + 1))
+    return out
+
+
+def is_cjk(cp: int) -> bool:
+    """Han letters, CJK punctuation and the full-width forms: Noto Sans TC's part."""
+    return 0x2E80 <= cp <= 0x9FFF or 0xF900 <= cp <= 0xFAFF or 0xFF00 <= cp <= 0xFFEF
+
+
+def needed(root: Path = REPO) -> tuple[dict[int, set[int]], list[str]]:
+    """The letters each size must have beyond LATIN (from box_text.c), and the problems: a letter
+    neither in LATIN nor CJK (add it to LATIN and in_fonts_c3, screen_template.c)."""
+    box = i18n_check.read_box(root)
+    latin = latin_codepoints()
+    every: set[int] = set()
+    big: set[int] = set()
+    problems = []
+    for lang, table in box.tables.items():
+        for key, text in table.items():
+            for ch in text:
+                cp = ord(ch)
+                if cp in latin:
+                    continue
+                if not is_cjk(cp):
+                    problems.append(f"box_text.c: {key} ({lang}) uses {ch!r} U+{cp:04X}, which is "
+                                    "in no font: add it to LATIN in tools/gen_box_fonts.py")
+                    continue
+                every.add(cp)
+                if key in AT_48:
+                    big.add(cp)
+    return {14: every, 20: every, 28: every, 48: big}, problems
+
+
+def font_codepoints(path: Path) -> set[int]:
+    """The code points of an lv_font_conv font source: its cmaps (ranges and sparse lists)."""
+    text = path.read_text(encoding="utf-8")
+    lists = {m.group(1): [int(x, 0) for x in re.findall(r"0x[0-9a-fA-F]+", m.group(2))]
+             for m in re.finditer(r"static const uint16_t (unicode_list_\d+)\[\] = \{(.*?)\};",
+                                  text, re.S)}
+    out: set[int] = set()
+    for m in re.finditer(r"\.range_start = (\d+), \.range_length = (\d+),.*?"
+                         r"\.unicode_list = (\w+),", text, re.S):
+        start, length, ulist = int(m.group(1)), int(m.group(2)), m.group(3)
+        if ulist == "NULL":
+            out.update(range(start, start + length))
+        else:
+            out.update(start + ofs for ofs in lists[ulist])
+    return out
+
+
+def check(root: Path = REPO, out=sys.stdout) -> int:
+    want, problems = needed(root)
+    for size in SIZES:
+        path = root / "firmware" / "esp32" / "main" / "fonts" / f"lv_font_atalaia_{size}.c"
+        have = {cp for cp in font_codepoints(path) if is_cjk(cp)}
+        for cp in sorted(want[size] - have):
+            problems.append(f"{path.name}: lacks {chr(cp)} U+{cp:04X}, which box_text.c uses at "
+                            f"{size} px: make the fonts again (tools/gen_box_fonts.py)")
+        for cp in sorted(have - want[size]):
+            problems.append(f"{path.name}: has {chr(cp)} U+{cp:04X}, which no box text uses at "
+                            f"{size} px: make the fonts again (tools/gen_box_fonts.py)")
+    for p in problems:
+        print(f"gen_box_fonts: {p}", file=sys.stderr)
+    if problems:
+        return 1
+    print("gen_box_fonts: the fonts have every letter of the box texts, and no Chinese letter "
+          "more (" + ", ".join(f"{s} px: {len(want[s])}" for s in SIZES) + ")", file=out)
+    return 0
+
+
+def generate(conv: str, fonts: Path, cjk_font: Path) -> int:
+    digest = hashlib.sha256(cjk_font.read_bytes()).hexdigest()
+    if digest != NOTO_SHA256:
+        print(f"gen_box_fonts: {cjk_font} is not Noto Sans TC 2.004 Medium (SHA-256 {digest})",
+              file=sys.stderr)
+        return 1
+    want, problems = needed()
+    if problems:
+        for p in problems:
+            print(f"gen_box_fonts: {p}", file=sys.stderr)
+        return 1
     OUT.mkdir(parents=True, exist_ok=True)
     for size in SIZES:
         name = f"lv_font_atalaia_{size}"
+        cjk = ",".join(f"0x{cp:X}" for cp in sorted(want[size]))
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / f"{name}.c"
-            subprocess.run([args.lv_font_conv, "--no-compress", "--no-prefilter", "--bpp", "4",
-                            "--size", str(size), "--font", str(args.fonts / "Montserrat-Medium.ttf"),
-                            "-r", LATIN, "--font",
-                            str(args.fonts / "FontAwesome5-Solid+Brands+Regular.woff"),
-                            "-r", SYMBOLS, "--format", "lvgl", "-o", str(raw),
-                            "--force-fast-kern-format"], check=True)
+            # Compressed (RLE, no prefilter): the Chinese letters cost 117 KB uncompressed and the
+            # image had 13% of its slot free; compressed, every font is smaller (P5K-3).
+            cmd = [conv, "--no-prefilter", "--bpp", "4",
+                   "--size", str(size), "--font", str(fonts / "Montserrat-Medium.ttf"),
+                   "-r", LATIN, "--font",
+                   str(fonts / "FontAwesome5-Solid+Brands+Regular.woff"),
+                   "-r", SYMBOLS]
+            if cjk:
+                cmd += ["--font", str(cjk_font), "-r", cjk]
+            cmd += ["--format", "lvgl", "-o", str(raw), "--force-fast-kern-format"]
+            subprocess.run(cmd, check=True)
             text = raw.read_text(encoding="utf-8")
         # The include as LVGL's own fonts, and no tool comment with the local paths.
         start = text.index("#ifdef LV_LVGL_H_INCLUDE_SIMPLE")
@@ -86,9 +206,35 @@ def main() -> int:
         line, base = METRICS[size]
         text = re.sub(r"\.line_height = \d+,", f".line_height = {line},", text)
         text = re.sub(r"\.base_line = \d+,", f".base_line = {base},", text)
+        if size in FALLBACK:
+            other = f"lv_font_atalaia_{FALLBACK[size]}"
+            anchor = "\n/*-----------------\n *  PUBLIC FONT"
+            text = text.replace(anchor, f"\n/*A letter this font lacks: from {other}.*/\n"
+                                        f"extern const lv_font_t {other};\n" + anchor, 1)
+            text = text.replace("    .dsc = &font_dsc ",
+                                f"    .fallback = &{other},\n    .dsc = &font_dsc ", 1)
+            if f".fallback = &{other}" not in text:
+                print(f"gen_box_fonts: {name}: no place for the fallback", file=sys.stderr)
+                return 1
         (OUT / f"{name}.c").write_text(HEADER + text, encoding="utf-8")
-        print(f"{name}.c")
-    return 0
+        print(f"{name}.c: {len(want[size])} Chinese letters")
+    return check()
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--check", action="store_true",
+                    help="only check that the fonts have the box texts' letters (no Node.js)")
+    ap.add_argument("--lv-font-conv", help="the lv_font_conv program")
+    ap.add_argument("--fonts", type=Path, help="LVGL's scripts/built_in_font")
+    ap.add_argument("--cjk-font", type=Path, help="NotoSansTC-Medium.otf (Noto Sans TC 2.004)")
+    ap.add_argument("--root", type=Path, default=REPO, help=argparse.SUPPRESS)  # the tests' copies
+    args = ap.parse_args()
+    if args.check:
+        return check(args.root)
+    if not (args.lv_font_conv and args.fonts and args.cjk_font):
+        ap.error("--lv-font-conv, --fonts and --cjk-font are needed to make the fonts")
+    return generate(args.lv_font_conv, args.fonts, args.cjk_font)
 
 
 if __name__ == "__main__":

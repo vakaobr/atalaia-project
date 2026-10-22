@@ -9,8 +9,10 @@
  *
  * A case whose name ends in "_pt" is drawn in Portuguese, as a box whose game's
  * join carried "pt" (box_text.h, decision BN-14), one ending in "_de" in
- * German (P5H-4); the others as a box no game gave a language to (English,
- * and the modes' templates in their default).
+ * German (P5H-4), one ending in "_zh-tw" in Traditional Chinese (P5K-2); the
+ * others as a box no game gave a language to (English, and the modes'
+ * templates in their default). Every letter of every label must be in that
+ * label's own font (font_check.h), never an empty box or a fallback.
  *
  * To accept new renders on purpose, run with ATALAIA_UPDATE_SCREENS=1:
  *   ATALAIA_UPDATE_SCREENS=1 ctest --test-dir <build> -R screens
@@ -27,6 +29,7 @@
 
 #include "lvgl.h"
 #include "box_text.h"
+#include "font_check.h"
 #include "png_io.h"
 #include "screen_renderer.h"
 #include "screen_template.h"
@@ -140,6 +143,37 @@ static const screen_case_t cases[] = {
     {"pin_entry_locked_de", "pin_entry", "{\"digits\":0,\"error\":false,\"locked_min\":8}", NULL},
     {"pin_entry_no_pin_de", "pin_entry", "{\"digits\":0,\"error\":false,\"no_pin\":true}", NULL},
     {"yaml_domination_neutral_de", "neutral", "{}", DOM},
+    /* The same in Traditional Chinese (P5K-2). Mode and preset names stay English, as the
+     * modes have no Chinese (P5H-7); so do the modes' templates (yaml_domination_neutral_zh-tw). */
+    {"waiting_invited_zh-tw", "waiting", "{\"game\":3073,\"role\":\"zone\",\"invited\":true}",
+     NULL},
+    {"playing_zh-tw", "playing", "{\"game\":3073,\"role\":\"zone\"}", NULL},
+    {"ready_picker_zh-tw", "ready", "{\"picker\":true}", NULL},
+    {"neutral_zh-tw", "neutral", "{\"hold_s\":3}", NULL},
+    {"neutral_no_hold_zh-tw", "neutral", "{}", NULL},
+    {"captured_zh-tw", "captured", "{\"team\":\"red\",\"since\":95}", NULL},
+    {"standby_zh-tw", "standby", "{\"arm\":\"red\"}", NULL},
+    {"countdown_zh-tw", "countdown", "{\"left\":299,\"team\":\"red\"}", NULL},
+    {"defused_zh-tw", "defused", "{\"team\":\"blue\"}", NULL},
+    {"exploded_zh-tw", "exploded", "{\"team\":\"red\"}", NULL},
+    {"final_score_zh-tw", "final_score", "{\"owner\":\"red\"}", NULL},
+    {"final_score_no_owner_zh-tw", "final_score", "{}", NULL},
+    {"paused_zh-tw", "paused", "{}", NULL},
+    {"pin_entry_zh-tw", "pin_entry", "{\"digits\":2,\"error\":true}", NULL},
+    {"preset_select_zh-tw", "preset_select",
+     "{\"presets\":[\"Bomb\",\"Domination\"],\"selected\":1,\"page\":1,\"pages\":2}", NULL},
+    {"timer_adjust_zh-tw", "timer_adjust", "{\"timer_s\":0}", NULL},
+    {"timer_adjust_10_zh-tw", "timer_adjust", "{\"timer_s\":600}", NULL},
+    {"start_confirm_zh-tw", "start_confirm", "{\"label\":\"Bomb\",\"timer_s\":600}", NULL},
+    {"wifi_setup_zh-tw", "wifi_setup", "{\"ssid\":\"atalaia-3F2A\"}", NULL},
+    {"status_adopted_zh-tw", "status",
+     "{\"title\":\"已綁定\",\"field\":\"Campo da Atalaia\",\"fingerprint\":\"604A-0A95\"}", NULL},
+    {"status_pair_zh-tw", "status",
+     "{\"title\":\"配對這個盒子\",\"code\":\"042 137\",\"id\":\"b0c5\",\"field\":\"無\"}", NULL},
+    {"pin_entry_locked_zh-tw", "pin_entry", "{\"digits\":0,\"error\":false,\"locked_min\":8}",
+     NULL},
+    {"pin_entry_no_pin_zh-tw", "pin_entry", "{\"digits\":0,\"error\":false,\"no_pin\":true}", NULL},
+    {"yaml_domination_neutral_zh-tw", "neutral", "{}", DOM},
     {"pin_entry", "pin_entry", "{\"digits\":2,\"error\":false}", NULL},
     {"pin_entry_wrong", "pin_entry", "{\"digits\":0,\"error\":true}", NULL},
     /* The admin PIN after five wrong ones (a wait), and a Field Box with none set (AD-28, AD-29).
@@ -388,13 +422,22 @@ static void check_overlaps(const char *name)
     }
 }
 
-/* "pt" for a name ending in "_pt", "de" for "_de", else "" (no language given: English). */
+/* "pt" for a name ending in "_pt", "de" for "_de", "zh-tw" for "_zh-tw", else "" (no language
+ * given: English). */
 static const char *language(const char *name)
 {
     size_t n = strlen(name);
     if (n > 3 && strcmp(name + n - 3, "_pt") == 0) return "pt";
     if (n > 3 && strcmp(name + n - 3, "_de") == 0) return "de";
+    if (n > 6 && strcmp(name + n - 6, "_zh-tw") == 0) return "zh-tw";
     return "";
+}
+
+/* Every letter on the screen is in its label's own font (font_check.h). */
+static void check_glyphs(const char *name)
+{
+    char msg[200] = "";
+    if (font_check_labels(lv_screen_active(), msg, sizeof(msg)) > 0) fail(name, msg);
 }
 
 static void render(const screen_case_t *c)
@@ -535,6 +578,7 @@ int main(void)
         lv_area_t screen = {0, 0, W - 1, H - 1};
         check_bounds(cases[i].name, lv_screen_active(), &screen);
         check_overlaps(cases[i].name);
+        check_glyphs(cases[i].name);
         compare_with_reference(&cases[i]);
     }
     check_patch_matches_build();

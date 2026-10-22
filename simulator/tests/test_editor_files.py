@@ -75,6 +75,8 @@ class EditorFilesTests(unittest.TestCase):
                            ("/editor/vendor/blockly/msg/pt.js", "text/javascript; charset=utf-8"),
                            ("/editor/vendor/blockly/msg/de.js", "text/javascript; charset=utf-8"),
                            ("/editor/i18n/de.json", "application/json"),
+                           ("/editor/vendor/blockly/msg/zh-hant.js", "text/javascript; charset=utf-8"),
+                           ("/editor/i18n/zh-tw.json", "application/json"),
                            ("/editor/examples/holdall.json", "application/json")):
             response, _ = self.get(path)
             self.assertEqual((response.status, response.getheader("Content-Type")), (200, kind), path)
@@ -118,19 +120,22 @@ class EditorFilesTests(unittest.TestCase):
                                  sorted(re.findall(r"%\d|\{\w+\}", pt[part][key])), key)
         # German (plan phase 10, P5H-2): may lack a key (English shows), never have one English
         # lacks or other placeholders; the page offers every language it has a table for.
-        de = json.loads((EDITOR / "i18n" / "de.json").read_text(encoding="utf-8"))
-        for part in ("ui", "blocks"):
-            self.assertEqual(set(de[part]) - set(en[part]), set(), part)
-            for key, text in de[part].items():
-                self.assertTrue(text.strip(), key)
-                self.assertEqual(sorted(re.findall(r"%\d|\{\w+\}", text)),
-                                 sorted(re.findall(r"%\d|\{\w+\}", en[part][key])), key)
+        # Traditional Chinese (plan phase 11, P5K) the same way.
+        for other in ("de", "zh-tw"):
+            tr = json.loads((EDITOR / "i18n" / f"{other}.json").read_text(encoding="utf-8"))
+            for part in ("ui", "blocks"):
+                self.assertEqual(set(tr[part]) - set(en[part]), set(), part)
+                for key, text in tr[part].items():
+                    self.assertTrue(text.strip(), key)
+                    self.assertEqual(sorted(re.findall(r"%\d|\{\w+\}", text)),
+                                     sorted(re.findall(r"%\d|\{\w+\}", en[part][key])), key)
         html = (EDITOR / "index.html").read_text(encoding="utf-8")
-        offered = re.findall(r'<option value="([a-z]{2})">', html)
+        offered = re.findall(r'<option value="([a-z]{2}(?:-[a-z]+)?)">', html)
         self.assertEqual(sorted(offered), sorted(p.stem for p in (EDITOR / "i18n").glob("*.json")))
+        blockly_msg = {"zh-tw": "zh-hant"}  # BLOCKLY_MSG in editor.js
         for lang in offered:
             if lang != "en":
-                self.assertTrue((VENDOR / "msg" / f"{lang}.js").is_file(), lang)
+                self.assertTrue((VENDOR / "msg" / f"{blockly_msg.get(lang, lang)}.js").is_file(), lang)
         for key in re.findall(r'data-i18n="([a-z_]+)"', html):
             self.assertIn(key, en["ui"], key)
         code = "".join((EDITOR / n).read_text(encoding="utf-8") for n in ("blocks.js", "generator.js", "editor.js"))

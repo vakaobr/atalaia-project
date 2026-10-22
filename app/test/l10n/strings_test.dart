@@ -10,6 +10,7 @@ import 'package:atalaia_app/l10n/strings.dart';
 import 'package:atalaia_app/l10n/strings_de.dart';
 import 'package:atalaia_app/l10n/strings_en.dart';
 import 'package:atalaia_app/l10n/strings_pt.dart';
+import 'package:atalaia_app/l10n/strings_zh_tw.dart';
 import 'package:atalaia_app/prop/prop_session.dart';
 import 'package:atalaia_app/ui/theme.dart';
 import 'package:atalaia_app/chrono/replica.dart';
@@ -17,6 +18,8 @@ import 'package:atalaia_app/controller/controller_shell.dart';
 import 'package:atalaia_app/controller/prop_link.dart';
 import 'package:atalaia_app/platform/services.dart';
 import 'package:atalaia_app/radio/pod_radio_link.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Set<String> placeholders(String s) =>
@@ -208,5 +211,86 @@ void main() {
         expect(AppLanguage.de.locale.toString(), 'de');
       },
     );
+  });
+
+  // Traditional Chinese as written in Taiwan (plan phase 11): drafted by an
+  // AI model like German, to be reviewed by a native-speaking player; it may
+  // lack keys (English shows) but never has one English lacks, a different
+  // placeholder or an empty text. Its code is "zh-tw" (mode manifests, the
+  // console's ?lang=, the boxes' join key 15), its locale zh-Hant-TW, which
+  // makes Flutter and Android draw Traditional (Taiwan) glyphs.
+  group('Traditional Chinese (Taiwan)', () {
+    test('has no key English lacks', () {
+      expect(
+        zhTwStrings.keys.toSet().difference(enStrings.keys.toSet()),
+        isEmpty,
+      );
+    });
+
+    test('has the same placeholders, and no empty text', () {
+      for (final k in zhTwStrings.keys) {
+        expect(
+          placeholders(zhTwStrings[k]!),
+          placeholders(enStrings[k]!),
+          reason: k,
+        );
+        expect(zhTwStrings[k]!.trim(), isNotEmpty, reason: k);
+      }
+    });
+
+    test('full-width punctuation between Han characters', () {
+      // A half-width comma, colon or brackets right after a Han character is
+      // a slip (Taiwan writes ，：（）); "?" or "!" likewise.
+      final halfWidth = RegExp(r'[\u4e00-\u9fff][,:;?!()]');
+      for (final k in zhTwStrings.keys) {
+        expect(halfWidth.hasMatch(zhTwStrings[k]!), isFalse, reason: k);
+      }
+    });
+
+    test('the code, the locale, the fallback and the decimal point', () {
+      const zh = Strings(AppLanguage.zhTw);
+      expect(AppLanguage.zhTw.code, 'zh-tw');
+      expect(AppLanguage.fromCode('zh-tw'), AppLanguage.zhTw);
+      expect(AppLanguage.fromCode('zhTw'), AppLanguage.pt);
+      expect(AppLanguage.fromCode('de'), AppLanguage.de);
+      expect(AppLanguage.zhTw.locale.toLanguageTag(), 'zh-Hant-TW');
+      expect(zh.t('settings.lang_zh-tw'), '中文（台灣）');
+      expect(zh.t('player.winner', {'team': zh.team('red')}), '紅隊獲勝');
+      expect(zh.team('Lobos'), 'Lobos');
+      const missing = 'test.only_in_english';
+      expect(zh.t(missing), missing);
+      final english = enStrings.keys.firstWhere(
+        (k) => !zhTwStrings.containsKey(k),
+        orElse: () => '',
+      );
+      if (english.isNotEmpty) expect(zh.t(english), enStrings[english]);
+      expect(zh.number(1.25, 2), '1.25');
+      expect(const Strings(AppLanguage.de).number(1.25, 2), '1,25');
+    });
+
+    testWidgets("Material's own texts come in Traditional Chinese (Taiwan)", (
+      tester,
+    ) async {
+      late MaterialLocalizations material;
+      late Locale locale;
+      // As app.dart sets the MaterialApp up.
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: AppLanguage.zhTw.locale,
+          supportedLocales: [for (final l in AppLanguage.values) l.locale],
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          home: Builder(
+            builder: (context) {
+              material = MaterialLocalizations.of(context);
+              locale = Localizations.localeOf(context);
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+      expect(locale.toLanguageTag(), 'zh-Hant-TW');
+      // Traditional characters (Simplified Chinese would say 确定).
+      expect(material.okButtonLabel, '確定');
+    });
   });
 }

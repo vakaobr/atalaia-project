@@ -35,3 +35,17 @@ languages:
     # Where German exists. Mode manifests (mode.yaml i18n) and the site server's pages have none
     # yet (decisions P5H-7, P5H-8).
     domains: [site, console, editor, app, box]
+  zh-tw:
+    name: 繁體中文（台灣）
+    status: draft
+    drafted: 2026-10-22
+    review: >-
+      Traditional Chinese as written in Taiwan, drafted by an AI model (Claude) on 2026-10-22, not
+      yet reviewed by a native-speaking player. Review it with docs/translations/glossary.md (the
+      zh-tw column), in the running console, app and editor and in the box's reference images
+      (firmware/esp32/test/screens/*_zh-tw.png), then set status to complete and name the
+      reviewer here.
+    reviewed_by: null
+    # Where Traditional Chinese exists. Mode manifests (mode.yaml i18n) and the site server's
+    # pages have none yet (decisions P5H-7, P5H-8, P5K-1).
+    domains: [site, console, editor, app, box]

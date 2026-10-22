@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 5 -- Community: Status
 
-**Current phase:** Implementation (plan phases 1-10, 12 and 13 built in software 2026-10-22: the visual mode editor complete, its link to the simulator, signed mode packages, the sandbox-escape battery, signed packages in the controller, scenario blocks in the GM console, missing modes sent to boxes (controller and box), the registry repository's template and the community processes, German, the build guides for the other node types)
+**Current phase:** Implementation (plan phases 1-13 built in software 2026-10-22: the visual mode editor complete, its link to the simulator, signed mode packages, the sandbox-escape battery, signed packages in the controller, scenario blocks in the GM console, missing modes sent to boxes (controller and box), the registry repository's template and the community processes, German, Traditional Chinese (Taiwan), the build guides for the other node types)
 **Phase status:** In progress
 **Risk level:** Medium
-**Last updated:** 2026-10-22 (plan phase 12 built; the editor makes the package itself, P5I-1 to P5I-6; plan phases 8 and 9 built; plan phase 7 built; plan phase 13b built; plan phase 13a built; plan phases 3-6 built, P5B-9 answered; plan phase 2 built, plan phase 13 planned from P5R-8; refreshed after phases 2-4 software; first written 2026-10-18)
-**Next step:** the review of the German (P5H-5); P5I-1 and P5I-3 (the editor's package: made in the page, signed offline) for the maintainer; creating the registry repository waits for the maintainer; plan phase 13's test on real boxes is HW3; plan phase 11 (Traditional Chinese) is the last software plan phase; the build guides wait for their first builds and photos (HW2) and the maintainer's P5J decisions
+**Last updated:** 2026-10-22 (plan phase 11 built, P5K-1 to P5K-12; plan phase 12 built; the editor makes the package itself, P5I-1 to P5I-6; plan phases 8 and 9 built; plan phase 7 built; plan phase 13b built; plan phase 13a built; plan phases 3-6 built, P5B-9 answered; plan phase 2 built, plan phase 13 planned from P5R-8; refreshed after phases 2-4 software; first written 2026-10-18)
+**Next step:** the review of the German and the Traditional Chinese by native-speaking players (P5H-5, P5K-11), and the maintainer's P5K-3, P5K-4, P5K-5, P5K-7 and P5K-12 (box flash and fonts, OLED readability, typed Chinese names, the app's font, the radio band on the Chinese page); P5I-1 and P5I-3 (the editor's package: made in the page, signed offline) for the maintainer; creating the registry repository waits for the maintainer; plan phase 13's test on real boxes is HW3; every software plan phase is built; the build guides wait for their first builds and photos (HW2) and the maintainer's P5J decisions
 
 Phase 5 is the community layer: visual mode editor (Blockly), mode
 registry with signing and a verified badge, carrier PCB, translations,
@@ -183,6 +183,19 @@ section 16).
   `tools/check_wiring.py`. No guide followed on real hardware yet. AC-10 met in
   text. Decisions P5J-1 to P5J-14 (open; P5J-2, P5J-4, P5J-7, P5J-8, P5J-9 and
   P5J-11 for the maintainer).
+- [x] **Plan phase 11, Traditional Chinese as written in Taiwan (2026-10-22), in
+  software:** `zh-tw` in the project page (`/zh-tw/`), the GM console, the mode
+  editor (with Blockly's own `zh-hant`), the app (Android's CJK font; test fonts
+  for the goldens) and the Field Box's screens (join key 15 `zh-tw`, no
+  protocol change; older firmware shows English). The box's fonts carry exactly
+  the 153 letters of its Chinese texts (17 at 48 px), from Noto Sans TC, checked
+  by `tools/gen_box_fonts.py --check` and by every reference screen's letters
+  against their own font; the fonts are now compressed, so the Field Box image
+  is 0x1bf220, 1 KB more than before (13 % free; uncompressed the letters cost
+  117 KB). 43 `_zh-tw` reference images, each looked at; the 14 px OLED lines
+  are dense (P5K-4). Drafted by an AI model, **not yet reviewed by a
+  native-speaking player**. Decisions P5K-1 to P5K-12 (open; P5K-3, P5K-4,
+  P5K-5, P5K-7, P5K-11 and P5K-12 for the maintainer).
 
 ## Refresh 2026-10-22: what changed
 
@@ -216,7 +229,7 @@ section 16).
 | 8 | Registry repository template | Software; publishing needs the maintainer | **Built 2026-10-22** (the repository itself waits for the maintainer) |
 | 9 | Community processes | Software | **Built 2026-10-22** |
 | 10 | German | Software (after P5R-10) | **Built 2026-10-22** (AI-drafted, review pending) |
-| 11 | Traditional Chinese (Taiwan) | Software | |
+| 11 | Traditional Chinese (Taiwan) | Software | **Built 2026-10-22** (AI-drafted, review pending) |
 | 12 | Build guides for other node types | Software | **Built 2026-10-22** (text; photos: HW2) |
 | HW1 | Carrier PCB | Needs hardware | |
 | HW2 | Build guide photos | Needs hardware | |

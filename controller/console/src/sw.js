@@ -26,6 +26,7 @@ const SHELL = [
     'i18n/pt.json',
     'i18n/en.json',
     'i18n/de.json',
+    'i18n/zh-tw.json',
     'components/adopt-panel.js',
     'components/box-invites.js',
     'components/box-language-settings.js',

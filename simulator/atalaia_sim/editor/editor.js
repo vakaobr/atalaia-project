@@ -24,9 +24,13 @@ import {
 } from './generator.js';
 import { makePackage, manifest, pack, PackageError, sha256Hex } from './package.js';
 
-const LANGS = ['pt', 'en', 'de'];
-// <html lang> for each (German: decision P5H-2; a text it lacks shows in English).
-const HTML_LANG = { pt: 'pt-PT', en: 'en', de: 'de' };
+const LANGS = ['pt', 'en', 'de', 'zh-tw'];
+// <html lang> for each (German, Traditional Chinese: decisions P5H-2, P5K; a text a language lacks
+// shows in English), and Blockly's own message file where its name is not the language's.
+const HTML_LANG = { pt: 'pt-PT', en: 'en', de: 'de', 'zh-tw': 'zh-Hant-TW' };
+const BLOCKLY_MSG = { 'zh-tw': 'zh-hant' };
+// Browser languages that read Traditional Chinese as Taiwan writes it.
+const ZH_HANT = /^zh-(tw|hk|mo|hant)(-|$)/;
 const LANG_KEY = 'atalaia.editor.lang';
 const DRAFT_KEY = 'atalaia.editor.draft';
 export const FORMAT = 'atalaia-mode-editor';
@@ -84,6 +88,7 @@ function pickLanguage() {
     if (LANGS.includes(kept)) return kept;
     const browser = (navigator.languages || [navigator.language || 'en']).map((l) => String(l).toLowerCase());
     for (const l of browser) {
+        if (ZH_HANT.test(l)) return 'zh-tw';
         const code = LANGS.find((c) => l === c || l.startsWith(`${c}-`));
         if (code) return code;
     }
@@ -144,7 +149,7 @@ async function main() {
     const lang = pickLanguage();
     storageSet(LANG_KEY, lang);
     document.documentElement.lang = HTML_LANG[lang];
-    if (lang !== 'en') await loadScript(`vendor/blockly/msg/${lang}.js`);
+    if (lang !== 'en') await loadScript(`vendor/blockly/msg/${BLOCKLY_MSG[lang] || lang}.js`);
     const en = await fetchJson('i18n/en.json');
     const dict = lang === 'en' ? en : await fetchJson(`i18n/${lang}.json`);
     const t = (key) => dict.blocks[key] ?? en.blocks[key] ?? key;

@@ -115,6 +115,11 @@ void main() {
     expect(find.text('Settings'), findsOneWidget);
     expect(h.settings.language.code, 'en');
     expect((await h.store.loadSettings()).language.code, 'en');
+    // Traditional Chinese: its code is zh-tw, kept as such (plan phase 11).
+    await tester.tap(find.text('中文（台灣）'));
+    await tester.pumpAndSettle();
+    expect(find.text('設定'), findsOneWidget);
+    expect((await h.store.loadSettings()).language.code, 'zh-tw');
   });
 
   testWidgets('settings: the join key and the PIN', (tester) async {

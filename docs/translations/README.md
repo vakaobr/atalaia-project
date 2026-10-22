@@ -5,9 +5,10 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Translating Atalaia
 
-Atalaia is written in English first and ships in European Portuguese, with German being
-reviewed (plan phase 10 of phase 5, decisions P5H-1 to P5H-11 in
-[`docs/review/decisions-to-review.md`](../review/decisions-to-review.md)). Translations are
+Atalaia is written in English first and ships in European Portuguese, with German (plan
+phase 10 of phase 5, decisions P5H-1 to P5H-11) and Traditional Chinese as written in Taiwan
+(`zh-tw`, plan phase 11, decisions P5K-1 to P5K-12) being reviewed; both are in
+[`docs/review/decisions-to-review.md`](../review/decisions-to-review.md). Translations are
 welcome for any language people play in; you do not need to write code.
 
 | File | What it is |
@@ -27,9 +28,14 @@ English's in every language.
 | GM console | [`controller/console/src/i18n/en.json`](../../controller/console/src/i18n/en.json) | nested JSON, `{name}` placeholders | Also the scoreboard, the poster and the field map |
 | Mode editor | [`simulator/atalaia_sim/editor/i18n/en.json`](../../simulator/atalaia_sim/editor/i18n/en.json) | JSON (`ui`, `blocks`), `%1` inputs and `{name}` | A block's text is a sentence with its inputs; their order may change. Blockly's own texts come from its `msg/<lang>.js` (vendored, checksummed) |
 | App | [`app/lib/l10n/strings_en.dart`](../../app/lib/l10n/strings_en.dart) | Dart map, `{name}` placeholders | Long texts are split over adjacent literals |
-| Field Box screens | [`firmware/esp32/main/box_text.c`](../../firmware/esp32/main/box_text.c) | one C table, one column a language, `%s`/`%u`/`%ld` | The OLED's lines (`TXO_*`) have 16 characters; the screens are checked by reference images. Letters outside the box's fonts need new glyphs (`tools/gen_box_fonts.py`) |
-| Modes | `modes/<mode>/mode.yaml` | `i18n.<lang>:` name, description, parameter labels, commands | No German yet (P5H-7) |
+| Field Box screens | [`firmware/esp32/main/box_text.c`](../../firmware/esp32/main/box_text.c) | one C table, one column a language, `%s`/`%u`/`%ld` | The OLED's lines (`TXO_*`) have 16 columns, a Han letter taking two; the screens are checked by reference images. Letters outside the box's fonts need new glyphs: Latin ones in `LATIN` of `tools/gen_box_fonts.py`; Chinese ones are taken from the table itself, so after changing a Chinese text make the fonts again (`python3 tools/gen_box_fonts.py --check`, in CI, names a missing or unused letter; P5K-3) |
+| Modes | `modes/<mode>/mode.yaml` | `i18n.<lang>:` name, description, parameter labels, commands | No German or Chinese yet (P5H-7, P5K-1) |
 | Site server pages | `server/atalaia_server/web/i18n.py`, `staff_i18n.py` | Python dicts | Portuguese and English only (P5H-8) |
+
+A language's code is the same everywhere (`status.yaml`, the console's `LANGS`, the join's key
+15): `de`, and `zh-tw` for Traditional Chinese (Taiwan). Files carry it as they can: `zh-tw.json`,
+`zh-tw.yaml`, `strings_zh_tw.dart` with the map `zhTwStrings`, `BOX_LANG_ZH_TW`; the pages say
+`lang="zh-Hant-TW"`.
 
 ## Rules
 
@@ -42,6 +48,10 @@ English's in every language.
   move it in the sentence.
 - Keep texts short where the English is short: buttons, tabs, the box's screens.
 - Decimal separators, quotation marks and dates as your language writes them.
+- Chinese, Japanese or Korean: the box's fonts carry only the letters its texts use, the OLED
+  draws them at 14 px on one bit per pixel (prefer common letters with few strokes in its
+  `TXO_*` lines), and lines break between letters, never before a closing or after an opening
+  full-width sign (P5K-6).
 
 ## Adding or finishing a language
 
@@ -55,16 +65,18 @@ English's in every language.
    for any text a language lacks.
 4. Wire the language into each part's language list (once per language, a maintainer can do
    it): `LANGS` in `controller/console/src/ui.js` and `simulator/atalaia_sim/editor/editor.js`
-   (with Blockly's `msg/<lang>.js` vendored, checksum in its README), `AppLanguage` in
+   (with Blockly's `msg/<lang>.js` vendored, checksum in its README; `BLOCKLY_MSG` maps a
+   code Blockly names otherwise, as `zh-tw` to `zh-hant`), `AppLanguage` in
    `app/lib/l10n/strings.dart`, `LANGUAGES` and `PAGES` in `tools/build_site.py` (the pages'
-   folders are named in the language), `box_lang_t` and `box_lang_from_code` in
+   folders are named in the language, or in English where its letters would be
+   percent-encoded, as Chinese's, P5K-9), `box_lang_t` and `box_lang_from_code` in
    `firmware/esp32/main/box_text.c` and `BOX_LANGUAGES` in the controller (join key 15 carries
    any 2-8 letter code; older boxes show English).
 5. Run `python3 tools/i18n_check.py --missing <lang>` to see what is left, and the checks of
    each part you touched (see [CONTRIBUTING.md](../../CONTRIBUTING.md)).
 6. A native speaker who plays reviews the whole language with the glossary, in the running
    app, console and box screens (the reference images under `firmware/esp32/test/screens/`,
-   `*_de.png` for German). Then `status: complete`, `reviewed_by:` and
+   `*_de.png` for German, `*_zh-tw.png` for Traditional Chinese). Then `status: complete`, `reviewed_by:` and
    `python3 tools/i18n_check.py --strict <lang>` must pass: from then on a missing key fails CI.
 
 New English texts are added with their Portuguese in the same change; other languages may

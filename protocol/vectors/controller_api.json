@@ -538,7 +538,7 @@
         {"request": {"method": "POST", "path": "/api/v1/nodes/1/join", "token": "gm", "body": {}}, "status": 409},
         {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {}}, "status": 200, "json": {"node_id": 3}, "save": {"text3": "text"}},
         {"join_decode": "${text3}", "json": {"node_id": 3, "game_key": "${key1}"}},
-        {"request": {"method": "GET", "path": "/api/v1/settings/box-language", "token": "read"}, "status": 200, "json": {"box_language": "auto", "choices": ["auto", "pt", "en", "de"], "game_box_language": "pt"}},
+        {"request": {"method": "GET", "path": "/api/v1/settings/box-language", "token": "read"}, "status": 200, "json": {"box_language": "auto", "choices": ["auto", "pt", "en", "de", "zh-tw"], "game_box_language": "pt"}},
         {"request": {"method": "PUT", "path": "/api/v1/settings/box-language", "token": "gm", "body": {"box_language": "xx"}}, "status": 400},
         {"request": {"method": "PUT", "path": "/api/v1/settings/box-language", "token": "read", "body": {"box_language": "en"}}, "status": 403},
         {"request": {"method": "PUT", "path": "/api/v1/settings/box-language", "token": "gm", "body": {"box_language": "en"}}, "status": 200, "json": {"box_language": "en", "game_box_language": "pt"}},

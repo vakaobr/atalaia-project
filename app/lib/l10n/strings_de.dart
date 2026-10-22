@@ -42,6 +42,7 @@ const Map<String, String> deStrings = {
   'settings.lang_pt': 'Português',
   'settings.lang_en': 'English',
   'settings.lang_de': 'Deutsch',
+  'settings.lang_zh-tw': '中文（台灣）',
   'settings.theme': 'Darstellung',
   'settings.theme_system': 'System',
   'settings.theme_dark': 'Dunkel',

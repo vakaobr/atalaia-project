@@ -448,7 +448,7 @@ screens:
 
   app_title: Die Android-App
   app_intro: >-
-    Die eigenen Bildschirme der App gibt es auf Portugiesisch, Englisch und Deutsch, und sie
+    Die eigenen Bildschirme der App gibt es auf Portugiesisch, Englisch, Deutsch und traditionellem Chinesisch, und sie
     zeichnet die Bildschirme jedes Modus aus denselben YAML-Dateien wie die Field Box. Das sind die
     Testbilder der App, keine Fotos eines Handys: Die App lief bisher auf Android-Emulatoren, noch
     nicht auf einem echten Handy.
@@ -761,8 +761,8 @@ roadmap:
       Modus-Pakete, vom Editor selbst erstellt, eine Sandbox-Ausbruch-Testreihe in der CI, der
       Feld-Controller installiert signierte Modi, Boxen bekommen die signierten Modi, die ihnen
       fehlen, von der GM-Konsole, Szenarien aus Blöcken in der Konsole, die Modus-Registry als
-      Vorlage bereit, mit ihren Prüfungen und dem Verifiziert-Siegel, und Deutsch (Entwurf, wird
-      noch geprüft); <a href="{{ page.to.build }}">Bauanleitungen</a> für Satellit, I/O-Pod und
+      Vorlage bereit, mit ihren Prüfungen und dem Verifiziert-Siegel, und Deutsch und
+      traditionelles Chinesisch (Entwürfe, werden noch geprüft); <a href="{{ page.to.build }}">Bauanleitungen</a> für Satellit, I/O-Pod und
       Ziel-Addon, als Text. Als Nächstes: die Registry anlegen, weitere Übersetzungen.
     text: >-
       Visueller Modus-Editor, Modus-Registry, Träger-Platine (eine fertige Leiterplatte, die den Bau
@@ -795,11 +795,13 @@ roadmap:
       Quelltext das Signierte ist, seine Lizenz, seine Tests im Simulator), und ein vom Projekt
       geprüfter Modus bekommt das Verifiziert-Siegel, die eigene Signatur des Projekts, die ihn erst
       zu den Boxen lässt. Wie man einen Modus einreicht, die Prüfliste, Schlüssel und Moderation
-      sind aufgeschrieben. Atalaia gibt es jetzt auch auf Deutsch (diese Seite, die GM-Konsole, der
-      Modus-Editor, die App und die Bildschirme der Field Box), von einem KI-Modell entworfen und
-      noch nicht von deutschsprachigen Spielenden geprüft: Wenn du auf Deutsch spielst, hilf uns
-      beim Prüfen. Als Nächstes: die Registry aus ihrer Vorlage anlegen; die Prüfung des Deutschen;
-      traditionelles Chinesisch; die Träger-Platine nach den ersten gebauten Boxen.
+      sind aufgeschrieben. Atalaia gibt es jetzt auch auf Deutsch und in traditionellem
+      Chinesisch, wie es in Taiwan geschrieben wird (diese Seite, die GM-Konsole, der Modus-Editor,
+      die App und die Bildschirme der Field Box), beides von einem KI-Modell entworfen und noch
+      nicht von Spielenden geprüft, die diese Sprachen sprechen: Wenn du auf Deutsch oder
+      Chinesisch spielst, hilf uns beim Prüfen. Als Nächstes: die Registry aus ihrer Vorlage
+      anlegen; die Prüfung des Deutschen und des Chinesischen; die Träger-Platine nach den ersten
+      gebauten Boxen.
     gate: Fortlaufend nach dem ersten Release.
 
 build:

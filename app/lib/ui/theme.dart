@@ -34,6 +34,14 @@ abstract final class AtalaiaColors {
 /// The colours a player can pick for a team: the palette's team colours.
 const teamColourNames = ['red', 'blue', 'green', 'yellow', 'orange', 'purple'];
 
+/// The family text falls back on for Han characters (Traditional Chinese,
+/// plan phase 11). The app bundles no CJK font: on Android no family has
+/// this name, so the system's CJK font draws them, in its Traditional
+/// (Taiwan) forms because the app's locale is zh-Hant-TW. The widget tests,
+/// which have no system fonts, load a subset of Noto Sans TC (OFL-1.1) under
+/// this name (test/support/fonts.dart).
+const cjkFontFallback = ['Noto Sans TC'];
+
 ThemeData atalaiaTheme(Brightness brightness) {
   final dark = brightness == Brightness.dark;
   final scheme = dark
@@ -55,7 +63,11 @@ ThemeData atalaiaTheme(Brightness brightness) {
           surfaceContainer: Color(0xFFF2F4F6),
           error: Color(0xFFB71C1C),
         );
-  final base = ThemeData(colorScheme: scheme, useMaterial3: true);
+  final base = ThemeData(
+    colorScheme: scheme,
+    useMaterial3: true,
+    fontFamilyFallback: cjkFontFallback,
+  );
   return base.copyWith(
     scaffoldBackgroundColor: scheme.surface,
     // A size up from Material's defaults: read at arm's length, outdoors.

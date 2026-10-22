@@ -5,6 +5,7 @@
     "lang_pt": "Português",
     "lang_en": "English",
     "lang_de": "Deutsch",
+    "lang_zh-tw": "中文（台灣）",
     "sections": "Secções",
     "reconnecting": "Sem ligação ao controlador de campo. A voltar a ligar…"
   },
@@ -1037,7 +1038,8 @@
       "auto": "A língua desta consola quando o jogo é criado",
       "pt": "Português",
       "en": "Inglês",
-      "de": "Alemão"
+      "de": "Alemão",
+      "zh-tw": "Chinês tradicional (Taiwan)"
     },
     "live": "As caixas do jogo em curso: {lang}",
     "saved": "Guardado: os jogos criados a partir de agora usam-na.",

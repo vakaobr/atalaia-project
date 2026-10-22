@@ -37,6 +37,15 @@ body {
     overflow-x: hidden;
 }
 
+/* Traditional Chinese (<html lang="zh-Hant-TW">, ui.js): Taiwan's Han fonts right after the
+ * system font, which draws the Latin letters, so Han characters never fall back to a Simplified
+ * Chinese or Japanese face. Browsers break CJK lines between characters by themselves. */
+:root:lang(zh),
+:root:lang(zh) body {
+    font-family: system-ui, -apple-system, "PingFang TC", "Noto Sans TC", "Noto Sans CJK TC",
+        "Microsoft JhengHei", "Segoe UI", Roboto, sans-serif;
+}
+
 .board {
     min-height: 100vh;
     padding: 2vh 3vw;

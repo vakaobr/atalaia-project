@@ -10,8 +10,9 @@
  * with firmware/esp32/test/screens/oled/<name>.png.
  *
  * ATALAIA_UPDATE_SCREENS=1 rewrites the references, as for test_screens.c.
- * A case whose name ends in "_pt" is drawn in Portuguese, "_de" in German
- * (box_text.h), as there.
+ * A case whose name ends in "_pt" is drawn in Portuguese, "_de" in German,
+ * "_zh-tw" in Traditional Chinese (box_text.h), as there; and every letter of
+ * every label must be in its own font (font_check.h).
  */
 #define _POSIX_C_SOURCE 200809L
 
@@ -22,6 +23,7 @@
 #include <sys/stat.h>
 
 #include "box_text.h"
+#include "font_check.h"
 #include "lvgl.h"
 #include "modem/modem_screen.h"
 #include "oled_view.h"
@@ -95,6 +97,30 @@ static const oled_case_t cases[] = {
      "{\"presets\":[\"Bombe\",\"Domination\"],\"selected\":2,\"page\":1,\"pages\":2}"},
     {"timer_adjust_de", NULL, "timer_adjust", "{\"timer_s\":600}"},
     {"start_confirm_de", NULL, "start_confirm", "{\"label\":\"Bombe\",\"timer_s\":600}"},
+    /* Traditional Chinese (P5K-2): mode and preset names stay English (P5H-7). */
+    {"pin_entry_zh-tw", NULL, "pin_entry", "{\"digits\":2,\"error\":false}"},
+    {"pin_entry_locked_zh-tw", NULL, "pin_entry",
+     "{\"digits\":0,\"error\":false,\"locked_min\":60}"},
+    {"pin_entry_no_pin_zh-tw", NULL, "pin_entry", "{\"digits\":0,\"error\":false,\"no_pin\":true}"},
+    {"pin_entry_wrong_zh-tw", NULL, "pin_entry", "{\"digits\":0,\"error\":true}"},
+    {"waiting_invited_zh-tw", NULL, "waiting",
+     "{\"game\":3073,\"role\":\"zone\",\"invited\":true}"},
+    {"playing_zh-tw", DOM, "playing", "{\"game\":3073,\"role\":\"zone\"}"},
+    {"neutral_zh-tw", DOM, "neutral", "{}"},
+    {"captured_zh-tw", DOM, "captured", "{\"team\":\"red\",\"points\":12,\"since\":95}"},
+    {"final_score_zh-tw", DOM, "final_score", "{\"owner\":\"red\",\"points\":12}"},
+    {"ready_picker_zh-tw", NULL, "ready", "{\"picker\":true}"},
+    {"standby_zh-tw", BOMB, "standby", "{\"arm\":\"red\"}"},
+    {"standby_arming_zh-tw", BOMB, "standby", "{\"arm\":\"red\",\"progress\":0.6}"},
+    {"countdown_defusing_zh-tw", BOMB, "countdown", "{\"left\":231,\"defuse\":0.4}"},
+    {"preset_select_zh-tw", NULL, "preset_select",
+     "{\"presets\":[\"Bomb\",\"Domination\"],\"selected\":2,\"page\":1,\"pages\":2}"},
+    {"preset_select_one_page_zh-tw", NULL, "preset_select",
+     "{\"presets\":[\"Bomb\",\"Domination\"],\"selected\":1,\"page\":1,\"pages\":1}"},
+    {"timer_adjust_zh-tw", NULL, "timer_adjust", "{\"timer_s\":600}"},
+    {"start_confirm_zh-tw", NULL, "start_confirm", "{\"label\":\"Bomb\",\"timer_s\":600}"},
+    {"wifi_setup_zh-tw", NULL, "wifi_setup", "{\"ssid\":\"atalaia-3F2A\"}"},
+    {"paused_zh-tw", DOM, "paused", "{}"},
     {"status_pair_locked", NULL, "status",
      "{\"title\":\"Pair locked\",\"pairing\":\"restart the box\"}"},
     {"status_pair", NULL, "status",
@@ -207,7 +233,11 @@ static void render(const oled_case_t *c)
 {
     size_t n = strlen(c->name);
     const char *suffix = n > 3 ? c->name + n - 3 : "";
-    box_lang_set_code(strcmp(suffix, "_pt") == 0 ? "pt" : strcmp(suffix, "_de") == 0 ? "de" : "");
+    bool zh = n > 6 && strcmp(c->name + n - 6, "_zh-tw") == 0;
+    box_lang_set_code(zh                           ? "zh-tw"
+                      : strcmp(suffix, "_pt") == 0 ? "pt"
+                      : strcmp(suffix, "_de") == 0 ? "de"
+                                                   : "");
     lv_obj_t *scr = lv_screen_active();
     fake_ms += 10000;
     if (!c->template_name) {
@@ -324,6 +354,8 @@ int main(void)
 
     for (int i = 0; i < CASE_COUNT; i++) {
         render(&cases[i]);
+        char msg[200] = "";
+        if (font_check_labels(lv_screen_active(), msg, sizeof(msg)) > 0) fail(cases[i].name, msg);
         compare_with_reference(cases[i].name);
     }
     for (int i = 0; i < MODEM_CASE_COUNT; i++) {

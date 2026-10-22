@@ -56,6 +56,18 @@
   }
 }
 
+/* Traditional Chinese (Taiwan) pages: Barlow has no Han letters, so name Taiwan's system fonts
+   before the generic ones, which on a machine set to another language may draw Simplified or
+   Japanese forms. No web font: a CJK font is megabytes. Lines break between Han letters with
+   Taiwan's strict rules (no line starts with ，。！？ or a closing bracket). */
+:root:lang(zh) {
+  --body: "Barlow", "PingFang TC", "Noto Sans TC", "Noto Sans CJK TC", "Microsoft JhengHei", "Heiti TC", system-ui, sans-serif;
+  --display: "Barlow Condensed", "PingFang TC", "Noto Sans TC", "Noto Sans CJK TC", "Microsoft JhengHei", "Heiti TC", system-ui, sans-serif;
+}
+:lang(zh) { line-break: strict; overflow-wrap: anywhere; }
+:lang(zh) h1 { max-width: 10em; line-height: 1.2; }
+:lang(zh) h2, :lang(zh) h3 { line-height: 1.3; }
+
 * { box-sizing: border-box; }
 
 html { scroll-behavior: smooth; }

@@ -39,7 +39,8 @@ function loadScript(src) {
     });
 }
 
-/** Blockly with its own texts in lang (pt or en): the core once, the texts when lang changes. */
+/** Blockly with its own texts (its menus) in Portuguese, else English (the console vendors only
+ * those two): the core once, the texts when lang changes. */
 export async function loadBlockly(lang) {
     if (!core) {
         core = loadScript(new URL('blockly_compressed.js', BLOCKLY_DIR).href).catch((e) => {
@@ -49,7 +50,7 @@ export async function loadBlockly(lang) {
     }
     await core;
     if (!messages || messages.lang !== lang) {
-        const script = await loadScript(new URL(`msg/${lang === 'en' ? 'en' : 'pt'}.js`, BLOCKLY_DIR).href);
+        const script = await loadScript(new URL(`msg/${lang === 'pt' ? 'pt' : 'en'}.js`, BLOCKLY_DIR).href);
         script.remove(); // it has set Blockly.Msg; the next language's file sets them again
         messages = { lang };
     }

@@ -14,24 +14,27 @@ that changes it, leaving out `src/`, `i18n/` and this README.
 ## Pages
 
 A short main page, and a page of its own for each long section. Portuguese (pt-PT) is the default
-language, at the site root; English is under `/en/` and German under `/de/` (decision P5H-3; drafted
-by an AI model and waiting for a native speaker's review, [docs/translations/](../docs/translations/README.md)).
-Every page exists in every language, and its folder is named in its language:
+language, at the site root; English is under `/en/`, German under `/de/` (decision P5H-3) and
+Traditional Chinese as written in Taiwan under `/zh-tw/` (plan phase 11); both drafted by an AI model
+and waiting for a native speaker's review ([docs/translations/](../docs/translations/README.md)).
+Every page exists in every language, and its folder is named in its language, except in Chinese,
+which keeps English's ASCII folders (Han letters in an address are percent-encoded when shared):
 
-| Page | Portuguese | English | German | Template | What it holds |
-| --- | --- | --- | --- | --- | --- |
-| Main page | `/` | `/en/` | `/de/` | `src/index.html` | The hero, how a game works, why Atalaia, how it fits together, a short radio section, three game modes, the screenshots, try it, the roadmap in one line per phase, the community hub, getting involved, the name and field safety |
-| Game modes | `/modos/` | `/en/modes/` | `/de/modi/` | `src/modes.html` | Every mode, the Codes modifier, the Medic Kit and "your mode" |
-| Radio | `/radio/` | `/en/radio/` | `/de/funk/` | `src/radio.html` | How the radio works: both diagrams with their lead-ins, and the channel |
-| Roadmap | `/roadmap/` | `/en/roadmap/` | `/de/roadmap/` | `src/roadmap.html` | The six phases in full, with their gates. "Roadmap" stays in English in Portuguese too |
-| Build guides | `/montagem/` | `/en/build-guides/` | `/de/bauen/` | `src/build.html` | Safety rules for every build; the Satellite, the I/O pod and the target addon shortened from `hardware/<node>/BUILD.md` (the full guides, in English), with their pin tables and photo placeholders; a pointer to the Field Box's build manual (phase 5 plan phase 12, decisions P5J-1 to P5J-13) |
-| Glossary | `/glossario/` | `/en/glossary/` | `/de/glossar/` | `src/glossary.html` | Every glossary entry; the glossary links of every page lead here |
+| Page | Portuguese | English | German | Chinese | Template | What it holds |
+| --- | --- | --- | --- | --- | --- | --- |
+| Main page | `/` | `/en/` | `/de/` | `/zh-tw/` | `src/index.html` | The hero, how a game works, why Atalaia, how it fits together, a short radio section, three game modes, the screenshots, try it, the roadmap in one line per phase, the community hub, getting involved, the name and field safety |
+| Game modes | `/modos/` | `/en/modes/` | `/de/modi/` | `/zh-tw/modes/` | `src/modes.html` | Every mode, the Codes modifier, the Medic Kit and "your mode" |
+| Radio | `/radio/` | `/en/radio/` | `/de/funk/` | `/zh-tw/radio/` | `src/radio.html` | How the radio works: both diagrams with their lead-ins, and the channel |
+| Roadmap | `/roadmap/` | `/en/roadmap/` | `/de/roadmap/` | `/zh-tw/roadmap/` | `src/roadmap.html` | The six phases in full, with their gates. "Roadmap" stays in English in Portuguese too |
+| Build guides | `/montagem/` | `/en/build-guides/` | `/de/bauen/` | `/zh-tw/build-guides/` | `src/build.html` | Safety rules for every build; the Satellite, the I/O pod and the target addon shortened from `hardware/<node>/BUILD.md` (the full guides, in English), with their pin tables and photo placeholders; a pointer to the Field Box's build manual (phase 5 plan phase 12, decisions P5J-1 to P5J-13) |
+| Glossary | `/glossario/` | `/en/glossary/` | `/de/glossar/` | `/zh-tw/glossary/` | `src/glossary.html` | Every glossary entry; the glossary links of every page lead here |
 
 | Path | What it is |
 | --- | --- |
 | `index.html`, `<folder>/index.html` | The Portuguese pages. Generated |
 | `en/index.html`, `en/<folder>/index.html` | The English pages. Generated |
 | `de/index.html`, `de/<folder>/index.html` | The German pages. Generated |
+| `zh-tw/index.html`, `zh-tw/<folder>/index.html` | The Traditional Chinese (Taiwan) pages. Generated |
 | `sitemap.xml` | Every page in every language, each with its translations (`hreflang`). Generated |
 | `style.css`, `favicon.svg` | Shared by every page |
 | `img/` | The badge and illustrations (see [Images](#images)) |
@@ -41,7 +44,7 @@ Every page exists in every language, and its folder is named in its language:
 | `src/<page>.html` | The template of each page, built in every language |
 | `src/partials/` | The parts every page shares: `head.html` (title, description, canonical and `hreflang` addresses, social preview tags), `header.html` (navigation and language switcher) and `footer.html` |
 | `src/diagrams/` | The templates of the radio diagrams |
-| `i18n/pt.yaml`, `i18n/en.yaml`, `i18n/de.yaml` | The text of every page, one file per language |
+| `i18n/pt.yaml`, `i18n/en.yaml`, `i18n/de.yaml`, `i18n/zh-tw.yaml` | The text of every page, one file per language |
 
 ### Old links and anchors
 
@@ -62,10 +65,10 @@ the rest of this folder (see [REUSE.toml](../REUSE.toml)); the top-level README 
 | Files | What they are | Where they appear |
 | --- | --- | --- |
 | `logo-1024.png`, `logo-512.png`, `logo-192.png` | The round badge: watchtowers with signal fires on dunes | The Name section of both main pages, the apple-touch-icon (192), the top of the README. The header keeps the small SVG mark and `favicon.svg`, as the badge is too detailed at that size |
-| `watchtower-night-960/1600` (`.jpg`, `.webp`) | Night scene: a hilltop watchtower linked to GAME PROP boxes across a valley, with the English text "Open-source project ATALAIA" painted in | Hero of the English and German main pages; the README banner |
+| `watchtower-night-960/1600` (`.jpg`, `.webp`) | Night scene: a hilltop watchtower linked to GAME PROP boxes across a valley, with the English text "Open-source project ATALAIA" painted in | Hero of the English, German and Chinese main pages; the README banner |
 | `watchtower-night-pt-960/1600` (`.jpg`, `.webp`) | The same night scene with its text in Portuguese, "Projeto de código aberto ATALAIA" | Hero of the Portuguese main page |
-| `field-isometric-960/1600` (`.jpg`, `.webp`) | Isometric stone tower ringed by GAME PROP cases | "How it fits together" on the English and German main pages |
-| `og-pt.jpg`, `og-en.jpg` | 1200 × 630 social previews (`og:image`) | Link previews of every page in that language; the German pages use `og-en.jpg` (`og_image` in `LANGUAGES`) until one is drawn with German text |
+| `field-isometric-960/1600` (`.jpg`, `.webp`) | Isometric stone tower ringed by GAME PROP cases | "How it fits together" on the English, German and Chinese main pages |
+| `og-pt.jpg`, `og-en.jpg` | 1200 × 630 social previews (`og:image`) | Link previews of every page in that language; the German and Chinese pages use `og-en.jpg` (`og_image` in `LANGUAGES`) until one is drawn with their text |
 | `screens/` | Screenshots (see [Screenshots](#screenshots)) | "What it looks like" on the main page; some in the top-level README |
 
 Each main page loads only its own hero image (WebP, with JPEG for older browsers, at 960 or 1600
@@ -78,7 +81,7 @@ pixels wide as the screen needs) and lazy-loads everything below it.
 | Files | What they are |
 | --- | --- |
 | `bomb-*.png`, `join-joined.png`, `codes-entry.png` | The Field Box firmware (320 × 240) in the Wokwi emulator |
-| `app-<screen>-pt.png`, `app-<screen>-en.png`, `app-<screen>-de.png` | The app's golden test images (360 × 780), copied from `app/test/goldens/images/screens/` (`home` as `app-roles`, `prop_game` as `app-prop-game`, `player`, `chrono`) and `branding/` (`player` as `app-player-branded`); each language's page shows its own |
+| `app-<screen>-pt.png`, `-en.png`, `-de.png`, `-zh-tw.png` | The app's golden test images (360 × 780), copied from `app/test/goldens/images/screens/` (`home` as `app-roles`, `prop_game` as `app-prop-game`, `player`, `chrono`) and `branding/` (`player` as `app-player-branded`); each language's page shows its own (`app-<screen>-zh-tw.png` from the `_zh-tw` goldens; `screenshots` in `LANGUAGES` can point a new language at English's until its goldens exist) |
 | `app-medic-*.png` | The Medic Kit's screens (320 × 240) as the app draws them, from `app/test/goldens/images/templates/medic_*.png`; the kit's screens are Portuguese by default, so every language shows the same copies |
 
 When the app's golden images change (`python tools/docker_app.py goldens`), copy them again.
@@ -172,7 +175,8 @@ and `narrow` (one column, which the page shows on screens up to 760 px wide). Li
 
 An SVG shown as an image cannot use the page's fonts, so most readers see their system's sans
 serif instead of Barlow. Each translated text therefore declares its room: `data-width` on its
-`<text>`, and for `{{ key|wrap }}` also `data-lines`. The build wraps the text at spaces and fails
+`<text>`, and for `{{ key|wrap }}` also `data-lines`. The build wraps the text at spaces (and between
+Han letters, never before closing or after opening punctuation, a Han letter counting as 1 em) and fails
 if a line would be too wide in the widest common fallback font (DejaVu Sans), naming the key and
 the line: shorten the translation, or give it more room in the template. Each diagram has an
 opaque light background, so it reads on dark pages too, and its colours are the page's.
@@ -186,7 +190,7 @@ radio...)"), and link the harder ones to the glossary page:
 
 - Each glossary entry has `id`, `term` and `text` keys under `glossary` in every file. The ids
   are ASCII and differ by language (`glossario-lora` on the Portuguese glossary page,
-  `glossary-lora` on the English one, `glossar-lora` on the German one); keep them stable, since other sites may link to them, and
+  `glossary-lora` on the English and Chinese ones, `glossar-lora` on the German one); keep them stable, since other sites may link to them, and
   change a link whenever you change an id.
 - A glossary text is one to three sentences: what the thing is, and why Atalaia uses it.
 - Check each claim against the [design specification](../docs/design-spec.md). Prices are the
@@ -231,3 +235,14 @@ players write. Keep these choices consistent when you edit it:
 
 Product and technical names stay as they are: Atalaia, Skirmesh-RF, Field Box, LoRa, ESP32,
 Raspberry Pi, Arduino, Android, Lua, MQTT, REST, WebSocket, ATAK, GitHub.
+
+### Traditional Chinese
+
+The Chinese text is Traditional Chinese as Taiwanese airsoft (生存遊戲) players write it, with the
+words of the zh-tw column of [docs/translations/glossary.md](../docs/translations/glossary.md):
+"你", full-width punctuation (，。：「」), a half-width space between Han letters and Latin letters
+or digits ("GM 控制台", "第 2 階段"), a decimal point. YAML folds a broken line into a space, which a
+browser would show between two Han letters: `build_site.py` drops such spaces (and those beside
+full-width punctuation) in the Chinese texts, so a line of `zh-tw.yaml` may break anywhere. The
+pages use the system's Traditional Chinese fonts (PingFang TC, Noto Sans TC, Microsoft JhengHei;
+`:lang(zh)` in `style.css`), never a web font, and break lines with `line-break: strict`.

@@ -670,6 +670,25 @@ As 10 for `zh-TW`, with a CJK subset in the box's fonts
 (`tools/gen_box_fonts.py`) sized against the image's free space, and a
 CJK font for the app and the pages.
 
+**Built 2026-10-22** (decisions P5K-1 to P5K-12; P5K-3, P5K-4, P5K-5,
+P5K-7, P5K-11 and P5K-12 for the maintainer). One code, `zh-tw`, in every
+part and in join key 15 (no protocol change; older boxes show English).
+Drafted by an AI model, **not yet reviewed by a native-speaking player**
+(`docs/translations/status.yaml`). The box's fonts carry exactly the 153
+letters of its Chinese texts (17 at 48 px), from Noto Sans TC, and are now
+compressed: the Field Box image is 0x1bf220, 1 KB more than before, 13 % of
+its slot free (uncompressed the letters cost 117 KB, 7 % free). The app
+uses Android's CJK font; the console, editor and page the system's.
+
+| File | What |
+|------|------|
+| `site/i18n/zh-tw.yaml`, `site/zh-tw/`, `site/img/diagrams/*-zh-tw.svg`, `site/img/screens/app-*-zh-tw.png`, `tools/build_site.py`, `site/src/`, `site/style.css`, `site/README.md` | The project page at `/zh-tw/` (P5K-9), CJK wrapping and fonts (P5K-6, P5K-8) |
+| `controller/console/src/i18n/zh-tw.json`, `ui.js`, `sw.js`, `components/radio-settings.js`, `components/scenario-blocks.js`, `*.css`, `controller/atalaia_controller/engine.py`, `api.py`, `protocol/vectors/controller_api.json` | The GM console and the box-language setting (P5K-2, P5K-10) |
+| `simulator/atalaia_sim/editor/i18n/zh-tw.json`, `vendor/blockly/msg/zh-hant.js`, `editor.js`, `index.html`, `editor.css` | The mode editor with Blockly's own Traditional Chinese |
+| `app/lib/l10n/strings_zh_tw.dart`, `strings.dart`, `ui/theme.dart`, `ui/settings_screen.dart`, `controller/controller_engine.dart`, `app/test/fonts/`, `app/test/l10n/cjk_font_test.dart` | The app, its font fallback and test fonts (P5K-7) |
+| `firmware/esp32/main/box_text.{c,h}`, `main/fonts/`, `lvgl_conf/lv_conf.h`, `tools/gen_box_fonts.py`, `firmware/esp32/test/font_check.h`, `test_box_text.c`, `test_screens.c`, `test_oled_screens.c`, 43 `_zh-tw` reference images | The box's Chinese column, the subset fonts and their checks (P5K-3 to P5K-5) |
+| `tools/i18n_check.py`, `tools/check.sh`, `docs/translations/` | The checks; the zh-tw status, glossary column and process |
+
 ## Plan phase 12: Build guides for other node types
 
 *Software, can be done now. Size S.*
