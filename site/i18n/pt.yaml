@@ -736,8 +736,8 @@ roadmap:
     short: >-
       Editor visual de modos completo em software, testado ao vivo no simulador; pacotes de modos
       assinados, uma bateria de testes de fuga ao sandbox na CI, o controlador de campo a instalar
-      modos assinados e as caixas a receber da consola de GM os modos assinados que lhes faltam. A
-      seguir: blocos de cenários na consola, o registo, traduções.
+      modos assinados, as caixas a receber da consola de GM os modos assinados que lhes faltam, e
+      cenários montados com blocos na consola. A seguir: o registo, traduções.
     text: >-
       Editor visual de modos, registo de modos, placa de suporte (PCB) que facilita a montagem,
       traduções, guias de montagem para outros tipos de dispositivos. Construído em software: o
@@ -755,7 +755,10 @@ roadmap:
       recebê-lo: «Enviar os modos em falta» convida-a de novo, e ela obtém o pacote assinado do
       controlador de campo pelo Wi-Fi do campo, só entre jogos, enquanto o jogo espera por ela; a
       caixa verifica-o com as chaves do seu firmware e guarda-o (testado num computador, ainda não
-      numa caixa a sério). A seguir: blocos de cenários na consola de GM; o registo; alemão e chinês
+      numa caixa a sério). Os cenários também já se montam com blocos na consola de GM: as caixas,
+      os objetivos e quem os vê, quando abrem, o que os cumpre e o que dão, com rato, toque ou
+      teclado, em português e inglês, mesmo num telemóvel; o controlador de campo verifica-os e
+      instala-os tal como se tivessem sido escritos à mão. A seguir: o registo; alemão e chinês
       tradicional; a placa de suporte depois das primeiras caixas montadas.
     gate: Continua depois da primeira versão.
 
