@@ -413,18 +413,21 @@ progress {
     vertical-align: middle;
 }
 
-.facts {
+.facts,
+.settings-list {
     display: grid;
     grid-template-columns: max-content 1fr;
     gap: 0.25rem 1rem;
     margin: 0;
 }
 
-.facts dt {
+.facts dt,
+.settings-list dt {
     color: var(--muted);
 }
 
-.facts dd {
+.facts dd,
+.settings-list dd {
     margin: 0;
     overflow-wrap: anywhere;
 }
@@ -1021,4 +1024,34 @@ table.invites th {
 .pill.small {
     font-size: 0.75rem;
     padding: 0 0.4rem;
+}
+
+/* The dialog's "ready to start" (decision GM-1): every needed role has a box. */
+.ready {
+    border-left: 4px solid var(--ok);
+    background: var(--info-bg);
+    padding: 0.5rem 0.7rem;
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+ul.warning {
+    margin: 0.5rem 0;
+    padding-left: 1.6rem;
+}
+
+/* The live game's settings as created (game-control.js), opened by "Review settings". */
+.game-settings {
+    margin: 0.6rem 0;
+}
+
+/* Parameter labels can be long: they wrap rather than widen the page on a phone. */
+.settings-list {
+    grid-template-columns: minmax(0, 1fr) auto;
+    margin-top: 0.4rem;
+}
+
+.game-settings summary {
+    cursor: pointer;
+    font-weight: 600;
 }

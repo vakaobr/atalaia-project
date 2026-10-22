@@ -5,7 +5,7 @@
 // resume and end it (each confirmed in place), send a message to every
 // box, adjust a team's score. ControllerPanel: role, term, radio, promote.
 
-import { html, Component, t, clock, ConfirmButton, modeText, teamName } from '../ui.js';
+import { html, Component, createRef, t, clock, ConfirmButton, modeText, teamName } from '../ui.js';
 import { FirstSetupNotice, mhz } from './radio-settings.js';
 import { TeamFields, TeamsEditor, teamInfoBody } from './branding-settings.js';
 import { BoxInvites, StartCheck } from './box-invites.js';
@@ -191,13 +191,65 @@ class Adjust extends Component {
     }
 }
 
+/** The live game's settings as created: its parameters (labels in the current language). Opened
+ * and focused when the invite dialog's "Review settings" is chosen (props.review counts those). */
+class GameSettings extends Component {
+    constructor() {
+        super();
+        this.state = { open: false };
+        this.summary = createRef();
+        this.box = createRef();
+    }
+
+    componentDidUpdate(prev) {
+        if (this.props.review !== prev.review && this.props.review) this.reveal();
+    }
+
+    reveal() {
+        this.setState({ open: true }, () => {
+            const card = this.box.current && this.box.current.closest('section');
+            if (card && card.scrollIntoView) card.scrollIntoView({ block: 'start' });
+            if (this.summary.current) this.summary.current.focus();
+        });
+    }
+
+    value(spec, v) {
+        if (v === undefined || v === null || v === '') return '–';
+        if (spec && spec.type === 'bool') return v ? t('common.yes') : t('common.no');
+        return String(v);
+    }
+
+    render(props, state) {
+        const { modes } = props.app.state;
+        const { game } = props;
+        const { main, mods } = partsOf(modes, game.mode_id);
+        const { schema, labels } = schemaOf(main, mods);
+        const params = game.params || {};
+        const names = [...Object.keys(schema), ...Object.keys(params).filter((n) => !(n in schema))];
+        return html`<details class="game-settings" data-testid="game-settings" ref=${this.box} open=${state.open}
+            onToggle=${(e) => this.setState({ open: e.currentTarget.open })}>
+            <summary ref=${this.summary} data-testid="game-settings-summary">${t('game.settings')}</summary>
+            ${names.length === 0 ? html`<p class="muted">${t('presets.no_params')}</p>`
+                : html`<dl class="settings-list" data-testid="game-params">${names.map((n) => html`
+                    <dt>${labels[n] || n}</dt><dd data-testid=${`game-param-${n}`}>${this.value(schema[n], params[n])}</dd>`)}</dl>`}
+            <p class="muted small">${t('game.settings_hint')}</p>
+        </details>`;
+    }
+}
+
 export class GameControl extends Component {
     lifecycle(action, body) {
         const { game } = this.props.app.state;
         return this.props.app.call('POST', `/games/${game.id}/${action}`, body).then((g) => {
             if (g) this.props.app.setGame(g);
             else if (action === 'start') this.props.app.refreshGame(); // what is missing now
+            return !!g;
         });
+    }
+
+    /** The invite dialog's "Review settings" (decision GM-3): close it, open the game's settings. */
+    reviewSettings() {
+        this.props.app.setState({ invitePicker: false, reviewSettings: (this.props.app.state.reviewSettings || 0) + 1 });
     }
 
     /** Start, or Start anyway when a role has no joined node yet (decision RJ-1). */
@@ -243,6 +295,7 @@ export class GameControl extends Component {
                 <dt>${t('game.id')}</dt><dd>${game.id}</dd>
                 ${game.channel_hz && html`<dt>${t('radio.channel')}</dt><dd data-testid="game-channel">${mhz(game.channel_hz)} MHz</dd>`}
             </dl>
+            <${GameSettings} app=${app} game=${game} review=${app.state.reviewSettings || 0} />
             ${game.joined && html`<p class="notice">${t('game.standby_notice')}</p>`}
             ${s === 'ready' && !game.joined && html`<${StartCheck} game=${game} />`}
             ${gm && html`<div class="actions" data-testid="game-actions">
@@ -261,7 +314,9 @@ export class GameControl extends Component {
             ${gm && leading && html`<${Adjust} app=${app} />`}
             ${gm && s !== 'ended' && html`<${TeamsEditor} app=${app} />`}
             ${gm && leading && s === 'ready' && !game.joined && app.state.invitePicker
-                && html`<${BoxInvites} app=${app} onClose=${() => app.setState({ invitePicker: false })} />`}
+                && html`<${BoxInvites} app=${app} onClose=${() => app.setState({ invitePicker: false })} pending=${pending}
+                    onStart=${(force) => this.lifecycle('start', force ? { force: true } : undefined)}
+                    onReview=${() => this.reviewSettings()} />`}
         </section>`;
     }
 }

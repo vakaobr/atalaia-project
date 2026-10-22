@@ -9,8 +9,15 @@
 // join over the radio, sealed with the field's key. Each box's progress follows (invited,
 // accepted, joined, refused and why, failed). Cards, QR codes and the serial console still
 // work as before (Join tab).
+//
+// Readiness and Start (decisions GM-1 to GM-4): the dialog shows, live, what the start guard
+// (the engine's start_check, carried in the game and pushed on every HELLO) says: "ready to
+// start" with the joined count per role once every needed role has a box, the mode's unmet
+// minimums as warnings, else the roles still waiting. Its Start asks "review the game's other
+// settings first?": Review settings closes the dialog and opens the game's settings; Start now
+// starts (Start anyway, with force, when a role has no box, as the game card's Start does).
 
-import { html, Component, t, api } from '../ui.js';
+import { html, Component, createRef, t, api } from '../ui.js';
 import { gameRoles } from './preset-builder.js';
 
 const DONE = new Set(['joined']);
@@ -28,7 +35,35 @@ function shortId(id) {
 export class BoxInvites extends Component {
     constructor(props) {
         super(props);
-        this.state = { picked: null, roles: {}, sending: false };
+        this.state = { picked: null, roles: {}, sending: false, asking: false, starting: false };
+        this.startRef = createRef();
+        this.choiceRef = createRef();
+    }
+
+    componentDidUpdate(prevProps, prevState) {
+        // Focus follows the confirmation: onto its first choice, and back onto Start after it.
+        if (this.state.asking && !prevState.asking && this.choiceRef.current) this.choiceRef.current.focus();
+        if (!this.state.asking && prevState.asking && this.startRef.current) this.startRef.current.focus();
+    }
+
+    onKey(e) {
+        if (e.key !== 'Escape') return;
+        e.stopPropagation();
+        if (this.state.asking) this.setState({ asking: false });
+        else this.props.onClose();
+    }
+
+    /** Start now (or anyway, forced, when a needed role has no box): the game card's own path. */
+    async start(force) {
+        this.setState({ asking: false, starting: true });
+        const started = await this.props.onStart(force);
+        this.setState({ starting: false });
+        if (started) this.props.onClose();
+    }
+
+    review() {
+        this.setState({ asking: false });
+        this.props.onReview();
     }
 
     componentDidMount() {
@@ -139,8 +174,56 @@ export class BoxInvites extends Component {
         </tr>`;
     }
 
+    /** What the start guard says now, in words: ready (with the joined count per role), or the
+     * roles still waiting; the mode's unmet minimums as warnings. */
+    renderReadiness(check) {
+        if (!check) return null;
+        const joined = check.joined || {};
+        const counts = check.needed.map((r) => `${joined[r] || 0} × ${r}`).join(', ') || t('invites.none_joined');
+        let line;
+        if (!check.missing.length) {
+            line = html`<p class="ready" data-testid="invite-ready">${check.needed.length
+                ? t('invites.ready', { counts }) : t('invites.no_roles')}</p>`;
+        } else {
+            line = html`<p class="notice" data-testid="invite-waiting">${t('invites.waiting',
+                { roles: check.missing.join(', '), counts })}</p>`;
+        }
+        return html`${line}${check.warnings.length > 0 && html`<ul class="warning small" data-testid="invite-warnings">${
+            check.warnings.map((w) => html`<li>${t(`game.start_warnings.${w.code}`,
+                { role: w.role, have: w.have, value: w.value, param: w.param })}</li>`)}</ul>`}`;
+    }
+
+    /** Start from the dialog: asks first whether to review the game's settings. */
+    renderStart(check) {
+        const { state } = this;
+        const missing = check.missing || [];
+        const pending = this.props.pending || 0;
+        if (!state.asking) {
+            return html`<div class="actions"><button type="button" ref=${this.startRef} data-testid="invite-start"
+                class=${missing.length ? 'danger' : 'primary'} disabled=${state.starting}
+                onClick=${() => this.setState({ asking: true })}>${missing.length
+                    ? t('game.start_anyway') : t('invites.start')}</button></div>`;
+        }
+        return html`<div class="confirm-box" role="group" aria-labelledby="inv-start-q" data-testid="invite-start-confirm">
+            ${missing.length > 0 && html`<p class="warning" data-testid="invite-start-missing">${t('game.missing_short',
+                { roles: missing.join(', ') })}</p>`}
+            ${pending > 0 && html`<p class="warning">${t('invites.pending_note', { n: pending })}</p>`}
+            <p class="confirm-q" id="inv-start-q">${t('invites.start_question')}</p>
+            <div class="actions">
+                <button type="button" ref=${this.choiceRef} class="primary" data-testid="invite-review"
+                    onClick=${() => this.review()}>${t('invites.review')}</button>
+                <button type="button" class=${missing.length ? 'danger' : ''} data-testid="invite-start-now"
+                    onClick=${() => this.start(missing.length > 0)}>${missing.length
+                        ? t('game.start_anyway') : t('invites.start_now')}</button>
+                <button type="button" data-testid="invite-start-back"
+                    onClick=${() => this.setState({ asking: false })}>${t('invites.back')}</button>
+            </div>
+        </div>`;
+    }
+
     render(props, state) {
         const { app } = props;
+        const check = app.state.game && app.state.game.start_check;
         const info = app.state.boxes;
         const boxes = this.boxes();
         const invites = this.invites();
@@ -150,7 +233,8 @@ export class BoxInvites extends Component {
         // Invites for boxes no longer announcing (they joined, or went quiet) stay visible.
         const gone = Object.values(invites).filter((i) => !boxes.some((b) => b.device_id === i.device_id));
         return html`<div class="modal-backdrop" onClick=${(e) => e.target === e.currentTarget && props.onClose()}>
-            <div class="modal card" role="dialog" aria-modal="true" aria-labelledby="inv-h" data-testid="invite-dialog">
+            <div class="modal card" role="dialog" aria-modal="true" aria-labelledby="inv-h" data-testid="invite-dialog"
+                onKeyDown=${(e) => this.onKey(e)}>
                 <h2 id="inv-h">${t('invites.title')}</h2>
                 <p class="muted small">${t('invites.intro')}</p>
                 ${info && info.radio === false && html`<p class="warning" data-testid="invite-no-radio">${t('invites.no_radio')}</p>`}
@@ -169,12 +253,14 @@ export class BoxInvites extends Component {
                                 <td data-testid=${`invite-status-${i.device_id}`} class=${i.status === 'joined' ? 'ok'
                                     : i.status === 'refused' || i.status === 'failed' ? 'error' : ''}>${this.status(i)}</td></tr>`)}
                         </tbody></table></div>`}
+                <div role="status" aria-live="polite" data-testid="invite-readiness">${this.renderReadiness(check)}</div>
                 <div class="actions">
-                    <button type="button" class="primary" data-testid="invite-send" disabled=${!count || state.sending}
+                    <button type="button" class=${check && check.ok ? '' : 'primary'} data-testid="invite-send" disabled=${!count || state.sending}
                         onClick=${() => this.send()}>${t('invites.send', { n: count })}</button>
                     <button type="button" data-testid="invite-discover" onClick=${() => app.loadBoxes(true)}>${t('invites.discover')}</button>
                     <button type="button" data-testid="invite-close" onClick=${() => props.onClose()}>${t('invites.close')}</button>
                 </div>
+                ${props.onStart && check && this.renderStart(check)}
                 <p class="muted small">${t('invites.manual')}</p>
             </div>
         </div>`;

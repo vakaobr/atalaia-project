@@ -113,7 +113,9 @@
     "start_warnings": {
       "min": "{have} × {role} juntas; o modo pede {value} ({param}).",
       "last": "Só {have} × {role} juntas e {param} é {value}: a contagem pode correr logo desde o início."
-    }
+    },
+    "settings": "Definições do jogo",
+    "settings_hint": "Definidas ao criar o jogo; para as mudar, termine este jogo e crie outro."
   },
   "controller": {
     "title": "Controlador de campo",
@@ -765,6 +767,16 @@
       "storage": "a caixa não a conseguiu guardar",
       "radio": "o rádio da caixa não pode transmitir",
       "ended": "já jogou esse jogo"
-    }
+    },
+    "ready": "Tudo pronto para começar: cada papel tem uma caixa ({counts}). Pode fechar esta janela.",
+    "waiting": "Ainda à espera de uma caixa para: {roles}. Já se juntaram: {counts}.",
+    "no_roles": "Este jogo não precisa de nenhuma caixa para começar. Pode fechar esta janela.",
+    "none_joined": "nenhuma",
+    "start": "Começar o jogo",
+    "start_question": "Rever primeiro as outras definições do jogo?",
+    "review": "Rever definições",
+    "start_now": "Começar agora",
+    "pending_note": "Há {n} réplica(s) declarada(s) por cronografar.",
+    "back": "Voltar"
   }
 }

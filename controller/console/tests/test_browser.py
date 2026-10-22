@@ -349,6 +349,90 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("game-state")).to_have_text("running")
         self.assertEqual(self.field.bundle.controller.game["state"], "running")
 
+    def ready_game_with_the_dialog(self, lang: str = "en", **spec):
+        """A Hold-All game (min_zones 2 by default) waiting for its zone box (node 7), and the
+        console with the invite dialog open."""
+        self.field.create_game("Sunday", mode_id="org.atalaia.holdall", assignments={str(BOX): "zone"}, **spec)
+        page = self.console()
+        if lang != "pt":
+            page.get_by_test_id("lang").select_option(lang)
+        expect(page.get_by_test_id("game-state")).to_have_text("ready" if lang == "en" else "pronto")
+        page.get_by_test_id("game-invite").click()
+        expect(page.get_by_test_id("invite-dialog")).to_be_visible()
+        return page
+
+    def test_invite_dialog_says_ready_and_starts_the_game(self):
+        """Decisions GM-1 and GM-2: the dialog says, live, when every role the game needs has a box
+        (with the count per role) and warns about the mode's minimum still unmet; its Start asks
+        whether to review the settings first, and "Start now" starts the game (not forced)."""
+        told: list[dict] = []
+        self.field.bundle.controller.add_listener(told.append)
+        page = self.ready_game_with_the_dialog()
+        expect(page.get_by_test_id("invite-waiting")).to_have_text(
+            "Still waiting for a box for: zone. Joined so far: 0 × zone.")
+        expect(page.get_by_test_id("invite-ready")).to_have_count(0)
+        expect(page.get_by_test_id("invite-start")).to_have_text("Start anyway")
+        self.field.box_hello()  # the last (only) needed box joins
+        expect(page.get_by_test_id("invite-ready")).to_have_text(
+            "Ready to start: every role has a box (1 × zone). You can close this dialog.")
+        expect(page.get_by_test_id("invite-waiting")).to_have_count(0)
+        expect(page.get_by_test_id("invite-warnings")).to_have_text(
+            "1 × zone joined; the mode asks for 2 (min_zones).")
+        expect(page.get_by_test_id("invite-readiness")).to_have_attribute("aria-live", "polite")
+        start = page.get_by_test_id("invite-start")
+        expect(start).to_have_text("Start game")
+        start.click()
+        expect(page.locator("#inv-start-q")).to_have_text("Review the game's other settings first?")
+        expect(page.get_by_test_id("invite-review")).to_be_focused()
+        expect(page.get_by_test_id("invite-start-missing")).to_have_count(0)
+        page.keyboard.press("Escape")  # back to the Start button, the dialog still open
+        expect(page.get_by_test_id("invite-start-confirm")).to_have_count(0)
+        expect(start).to_be_focused()
+        start.press("Enter")
+        page.get_by_test_id("invite-start-now").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("running")
+        expect(page.get_by_test_id("invite-dialog")).to_have_count(0)
+        self.assertEqual(self.field.bundle.controller.game["state"], "running")
+        self.assertFalse(any(m.get("kind") == "start.forced" for m in told))
+
+    def test_invite_dialog_review_settings(self):
+        """Decision GM-3, in European Portuguese: "Rever definições" closes the dialog and opens
+        the game's settings (its parameters as created), focused; the game stays ready."""
+        page = self.ready_game_with_the_dialog("pt", params={"min_zones": 1})
+        self.field.box_hello()
+        expect(page.get_by_test_id("invite-ready")).to_contain_text("Tudo pronto para começar: cada papel tem uma caixa")
+        expect(page.get_by_test_id("invite-warnings")).to_have_count(0)  # min_zones 1 is met
+        page.get_by_test_id("invite-start").click()
+        expect(page.locator("#inv-start-q")).to_have_text("Rever primeiro as outras definições do jogo?")
+        page.get_by_test_id("invite-review").click()
+        expect(page.get_by_test_id("invite-dialog")).to_have_count(0)
+        settings = page.get_by_test_id("game-settings")
+        expect(settings).to_have_attribute("open", "")
+        expect(page.get_by_test_id("game-settings-summary")).to_be_focused()
+        expect(page.get_by_test_id("game-param-min_zones")).to_have_text("1")
+        expect(settings).to_contain_text("Caixas em jogo antes de alguém poder pontuar")
+        expect(page.get_by_test_id("game-state")).to_have_text("pronto")
+        self.assertEqual(self.field.bundle.controller.game["state"], "ready")
+        page.set_viewport_size({"width": 360, "height": 800})  # the long labels wrap on a phone
+        self.no_horizontal_scroll(page)
+
+    def test_invite_dialog_start_anyway(self):
+        """Decision GM-2's guard path: with the zone box missing, the dialog's Start says "Start
+        anyway", names the missing role in the confirmation, and starts with force (logged)."""
+        page = self.ready_game_with_the_dialog()
+        start = page.get_by_test_id("invite-start")
+        expect(start).to_have_text("Start anyway")
+        start.click()
+        expect(page.get_by_test_id("invite-start-missing")).to_have_text("No box has joined for: zone.")
+        now = page.get_by_test_id("invite-start-now")
+        expect(now).to_have_text("Start anyway")
+        with self.assertLogs("atalaia.controller", "WARNING") as logs:
+            now.click()
+            expect(page.get_by_test_id("game-state")).to_have_text("running")
+        self.assertTrue(any("started anyway (forced)" in line for line in logs.output))
+        expect(page.get_by_test_id("invite-dialog")).to_have_count(0)
+        self.assertEqual(self.field.bundle.controller.game["state"], "running")
+
     def test_presets_and_commands_to_boxes(self):
         page = self.console()
         page.get_by_test_id("tab-presets").click()

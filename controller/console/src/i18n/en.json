@@ -113,7 +113,9 @@
     "start_warnings": {
       "min": "{have} × {role} joined; the mode asks for {value} ({param}).",
       "last": "Only {have} × {role} joined and {param} is {value}: the countdown can run from the start."
-    }
+    },
+    "settings": "Game settings",
+    "settings_hint": "Set when the game was created; to change them, end this game and create another one."
   },
   "controller": {
     "title": "Field controller",
@@ -765,6 +767,16 @@
       "storage": "the box could not store it",
       "radio": "the box's radio may not transmit",
       "ended": "it has played that game already"
-    }
+    },
+    "ready": "Ready to start: every role has a box ({counts}). You can close this dialog.",
+    "waiting": "Still waiting for a box for: {roles}. Joined so far: {counts}.",
+    "no_roles": "This game needs no box to start. You can close this dialog.",
+    "none_joined": "none",
+    "start": "Start game",
+    "start_question": "Review the game's other settings first?",
+    "review": "Review settings",
+    "start_now": "Start now",
+    "pending_note": "{n} declared replica(s) not chronographed yet.",
+    "back": "Back"
   }
 }

@@ -105,6 +105,20 @@ class StartGuardTests(Case):
         games = [m["game"] for m in self.messages if m["type"] == "game"]
         self.assertTrue(games and games[-1]["id"] == gid and games[-1]["start_check"]["ok"])
 
+    def test_the_pushed_check_carries_what_the_invite_dialog_shows(self):
+        """Decision GM-1: the invite dialog's "ready to start" comes from the game the controller
+        pushes on each HELLO, with the engine's check: needed roles, joined count per role, missing
+        roles and unmet minimums; the console computes none of it."""
+        gid = self.game("org.atalaia.holdall", assignments={"4": "zone"})  # min_zones 2 by default
+        self.messages.clear()
+        self.heard(4)
+        check = [m["game"] for m in self.messages if m["type"] == "game"][-1]["start_check"]
+        self.assertEqual((check["needed"], check["joined"], check["missing"], check["ok"]),
+                         (["zone"], {"zone": 1}, [], True))
+        self.assertEqual([(w["code"], w["param"], w["value"], w["have"]) for w in check["warnings"]],
+                         [("min", "min_zones", 2, 1)])
+        self.assertEqual(self.client.get(f"/api/v1/games/{gid}/start-check", headers=GM).json(), check)
+
     def test_force_starts_anyway_and_says_so(self):
         gid = self.game()
         self.assertEqual(self.ctrl.start_game(gid, force=True)["state"], "running")
