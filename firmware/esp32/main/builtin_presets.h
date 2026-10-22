@@ -12,6 +12,7 @@
 #ifndef ATALAIA_BUILTIN_PRESETS_H
 #define ATALAIA_BUILTIN_PRESETS_H
 
+#include <stdbool.h>
 #include <stddef.h>
 
 typedef struct {
@@ -30,5 +31,9 @@ typedef struct {
  * are skipped. Returns the number of presets written.
  */
 int builtin_presets_seed(const builtin_source_t *sources, int source_count);
+
+/* True if mode_id is a built-in mode's: the firmware owns it, a mode package never replaces it
+ * (mode_fetch.h, decision P5B-14). */
+bool builtin_presets_has(const char *mode_id);
 
 #endif /* ATALAIA_BUILTIN_PRESETS_H */

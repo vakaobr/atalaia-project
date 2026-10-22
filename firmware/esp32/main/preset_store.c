@@ -255,3 +255,64 @@ bool preset_store_delete(int index)
     preset_path(index, path, sizeof(path));
     return remove(path) == 0;
 }
+
+int preset_store_add(const char *mode_id, const char *label, const char *params_json)
+{
+    if (!mode_id || !mode_id[0] || strlen(mode_id) >= PRESET_MODE_ID_MAX) return -1;
+    char path[256];
+    int index = 0;
+    for (int i = 1; i <= PRESET_MAX_SLOTS && index == 0; i++) {
+        preset_path(i, path, sizeof(path));
+        FILE *f = fopen(path, "r");
+        if (f) {
+            fclose(f);
+        } else {
+            index = i;
+        }
+    }
+    if (index == 0) return -1;
+    FILE *f = fopen(path, "w");
+    if (!f) return -1;
+    fputc('{', f);
+    write_json_string(f, "mode_id", mode_id);
+    if (label && label[0]) {
+        fputc(',', f);
+        write_json_string(f, "label", label);
+    }
+    fprintf(f, ",\"duration_s\":0,\"params\":%s}",
+            params_json && params_json[0] == '{' ? params_json : "{}");
+    return fclose(f) == 0 ? index : -1;
+}
+
+/* True if slot index holds a preset of mode_id. */
+static bool slot_mode_is(int index, const char *mode_id)
+{
+    char path[256];
+    preset_path(index, path, sizeof(path));
+    FILE *f = fopen(path, "r");
+    if (!f) return false;
+    char buf[1024], id[PRESET_MODE_ID_MAX];
+    size_t len = fread(buf, 1, sizeof(buf) - 1, f);
+    fclose(f);
+    buf[len] = '\0';
+    return json_get_string(buf, "mode_id", id, sizeof(id)) && strcmp(id, mode_id) == 0;
+}
+
+int preset_store_find_mode(const char *mode_id)
+{
+    if (!mode_id) return -1;
+    for (int i = 1; i <= PRESET_MAX_SLOTS; i++) {
+        if (slot_mode_is(i, mode_id)) return i;
+    }
+    return -1;
+}
+
+int preset_store_remove_mode(const char *mode_id)
+{
+    if (!mode_id) return 0;
+    int removed = 0;
+    for (int i = 1; i <= PRESET_MAX_SLOTS; i++) {
+        if (slot_mode_is(i, mode_id) && preset_store_delete(i)) removed++;
+    }
+    return removed;
+}

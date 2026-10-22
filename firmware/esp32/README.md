@@ -404,7 +404,7 @@ Radio-specific Kconfig options (under "Atalaia Field Box Configuration > Radio")
 Field game options (under "Field network games"):
 - `ATALAIA_STATE_INTERVAL_S` -- seconds between STATE packets in a joined game (default 15)
 - `ATALAIA_BATTERY_LOW_PCT` -- send `battery.low` below this battery level (default 20; 0 = never; only with a MAX17048 gauge)
-- `ATALAIA_SERIAL_JOIN` -- accept `@join`, `@joinkey`, `@tag`, `@wifi`, `@update` and `@lobby` lines on the serial console (default on)
+- `ATALAIA_SERIAL_JOIN` -- accept `@join`, `@joinkey`, `@tag`, `@wifi`, `@update`, `@modes`, `@forgetmodes` and `@lobby` lines on the serial console (default on)
 - `ATALAIA_SERIAL_ADOPT` -- accept `@adopt-info` and `@adopt` on the serial console: USB adoption by the field controller (default on; protocol/adoption.md)
 - `ATALAIA_CONSOLE_USB_INPUT` -- read the console input from the USB-C port (USB-Serial-JTAG, the Heltec V4's only USB) as well as UART0 (default on; off in the Wokwi build)
 - `ATALAIA_LED_BRIGHTNESS_PCT` -- LED ring brightness at boot (default 40%; under "LEDs")
@@ -414,6 +414,9 @@ Firmware update options (under "Firmware updates (OTA)", the Field Box only):
 - `ATALAIA_OTA_RELEASE_KEYS` -- the Ed25519 public keys (64 hex digits each, up to 4) whose releases the box installs; empty (the default until the project's release key exists): every update is refused
 - `ATALAIA_OTA_VARIANT` -- the variant written into the image (`box`, `box-bench`, `box-dev`); a box installs only its own variant and board
 - `ATALAIA_OTA_MIN_BATTERY_PCT` -- refuse an update below this level (default 30; with a MAX17048 only)
+
+Mode package options (under "Mode packages", the Field Box only):
+- `ATALAIA_MODE_KEYS` -- the Ed25519 public keys (64 hex digits each, up to 4) that sign the mode packages a box fetches for a game; empty (the default): a join asking to fetch a missing mode is answered *no mode*, as before (`tools/mode_package.py keygen` prints the line)
 - `ATALAIA_OTA_WIFI_TIMEOUT_S` -- how long to wait for the field Wi-Fi (default 20)
 
 The firmware variant is a choice at the top of the menu: `ATALAIA_NODE_MODE`
@@ -514,6 +517,35 @@ step 10c).
 - **Starting one:** the controller's CMD update (opcode 9) from the GM console, or
   `@update <version> <release id>` on the serial console (the same checks). Signing releases:
   [docs/RELEASE_SIGNING.md](docs/RELEASE_SIGNING.md) and `tools/firmware_release.py`.
+
+## Mode packages fetched for a game
+
+A Field Box that lacks a part of a game's mode gets it from its field controller, between
+games, as a signed package ([protocol/mode-packages.md](../../protocol/mode-packages.md),
+"Fetching missing modes"; phase 5 plan phase 13b, decisions P5E-*). In software and in host
+tests; not yet run on a real board.
+
+- **When.** A join with key 16 (`fetch_modes`) and keys 13 and 14, on a box with a mode key
+  built in (`CONFIG_ATALAIA_MODE_KEYS`) and no game being played: the box takes the join as
+  *fetching* (`BOX_FETCHING`), gets each missing part, then says HELLO as after any join.
+  Key 17 (`forget_modes`) first forgets every package it fetched.
+- **The checks** (`main/mode_package.c`, `main/mode_fetch.c`, platform-free, run by the host
+  tests against `protocol/vectors/mode_package.json` and fakes): the release text's exact form
+  and id, its Ed25519 signature with a mode key (then a release key) of this firmware, its kind
+  and tier, never a built-in id, at most 256 KiB, room among the kept packages; the archive
+  streamed into a file and hashed before any of it is read, then its canonical ustar form;
+  the script loaded in a fresh sandbox with the box's Lua heap, its screens parsed, the
+  composed game within the 16 KB preset buffer.
+- **Storage** (`main/mode_store.c`): `/littlefs/modes/<id>/` (`node.lua`, `assets/screens/`,
+  the signed `release`, the slot `fetched`), at most 8 packages and 512 KiB of archives, the
+  least recently used dropped for room (never one of the joined game's parts), committed by
+  renames so a failed or interrupted fetch leaves the box as it was; at boot every kept
+  release is verified again with this firmware's keys. Their screens come from storage
+  (`screen_template_set_fetched`).
+- **Reports**: `POST /api/v1/mode-packages/report` after each part (HMAC with the game key);
+  without HTTPS, `node.modes_failed` over LoRa in the game's link, which the box then leaves.
+- **Console** (`ATALAIA_SERIAL_JOIN`): `@modes` lists the kept packages, `@forgetmodes`
+  forgets them between games.
 
 ## IDF Component Dependencies
 

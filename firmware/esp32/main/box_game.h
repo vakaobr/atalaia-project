@@ -73,6 +73,10 @@ typedef struct {
     /* Random bytes (the device id, tokens, timing spread; never a nonce): the ESP32 shell seeds
      * them with entropy collected at boot (decision RJ-15). NULL: no field frames. */
     void (*random)(void *user, uint8_t *buf, size_t len);
+    /* A join whose mode the box lacks asks it to fetch the signed packages (join key 16,
+     * mode_fetch.h): the shell fetches them for join (on its own task on the ESP32) and then
+     * calls box_game_fetch_done on the game's task. NULL: the box answers "no mode" as before. */
+    void (*fetch_modes)(void *user, const atalaia_join_t *join);
     void *user;
 } box_shell_ops_t;
 
@@ -81,6 +85,7 @@ typedef enum {
     BOX_JOINED,   /* joined, waiting for the controller to start */
     BOX_PLAYING,  /* running or paused */
     BOX_ENDED,    /* ended; the key goes once the last events are acknowledged */
+    BOX_FETCHING, /* took a join, getting the mode packages it lacks; not on the game's link yet */
 } box_phase_t;
 
 typedef enum {
@@ -191,6 +196,14 @@ typedef struct {
     uint32_t battery_next_ms; /* next gauge reading */
     box_lobby_t lobby;        /* between games: field frames (box_lobby.c) */
     bool has_picker;          /* the shell has the game picker: "ready" says a key brings it */
+    /* Fetching mode packages (BOX_FETCHING, mode_fetch.h): the join payload taken, joined once
+     * the packages are in; fetch_cancel stops the fetch (the game is over). */
+    uint8_t fetch_payload[ATALAIA_JOIN_MAX];
+    size_t fetch_len;
+    volatile bool fetch_cancel;
+    /* The box took part in its game only to say over LoRa that the fetch failed (P5E-8): its
+     * link reports "waiting", and it leaves once the event is acknowledged (not an ended game). */
+    bool fetch_failed_link;
 } box_game_t;
 
 void box_game_init(box_game_t *g, node_runner_t *runner, preset_t *preset_buf,
@@ -241,6 +254,18 @@ bool box_game_playing(const box_game_t *g);
  */
 bool box_game_update_failed(box_game_t *g, const char *release, const char *reason, const char *fw);
 
+/*
+ * The shell's fetch of the joined game's mode packages (shell.fetch_modes) is over, on the game
+ * task: result is an mf_result_t (mode_fetch.h), part the part it is about, reported whether the
+ * controller took the HTTPS report. Installed: the box joins the game (HELLO) as from the join
+ * itself. Otherwise it says why on its screen and, when the controller has not heard it over
+ * HTTPS, tells it over LoRa (node.modes_failed) in that game's link, which it then leaves.
+ */
+void box_game_fetch_done(box_game_t *g, int result, const char *part, bool reported);
+
+/* True while the box is fetching mode packages for a join (BOX_FETCHING). */
+bool box_game_fetching(const box_game_t *g);
+
 /* ---- Between games (box_lobby.c) ----------------------------------------------- */
 
 /* Sets up field frames once the join key is known (also after "@joinkey"): the device id
@@ -262,6 +287,11 @@ void box_lobby_tick(box_game_t *g, uint32_t now_ms);
 
 /* The game ended (box_game.c): remember it, announce soon, the ready screen later. */
 void box_lobby_game_over(box_game_t *g, uint32_t now_ms);
+
+/* A join the box took to fetch its modes failed (mode_fetch.h): it is free again, as after a
+ * game (a new token, an announcement soon, "ready" later), but the game is not an ended one, so
+ * the GM may invite it again. */
+void box_lobby_free_again(box_game_t *g);
 
 /* The box joined a game (a card, a QR code, the serial console, an invite): its tokens go,
  * so no invite recorded before can work afterwards (box_game.c). */

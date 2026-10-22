@@ -72,6 +72,7 @@ data_fields:
   scenario:      { key: 35, type: string,  doc: "scenario package id" }
   puzzle:        { key: 36, type: string,  doc: "hacking terminal puzzle: code, wires or sequence" }
   release:       { key: 37, type: string,  doc: "firmware release id: the first 16 hex digits of the image's SHA-256" }
+  mode:          { key: 38, type: string,  doc: "mode package id: one part of a game's mode id" }
 
 # id: CBOR value of the type field (1-23 take one byte). prio: the default
 # priority. data: the fields this event may carry besides the common ones.
@@ -106,7 +107,8 @@ events:
   script.error:     { id: 23, prio: normal,    data: [message] }          # a handler failed; the node keeps running
   script.halted:    { id: 24, prio: critical,  data: [reason] }           # the sandbox stopped the script
   # Phase 3 (ADR-P3-8) uses 25-27 and 33-41; the phase 2 mode pack uses 28-32; phase 4 plans 42-49;
-  # the Medic Kit (after phase 3 plan phase E) uses 50-51; firmware updates over the air 52.
+  # the Medic Kit (after phase 3 plan phase E) uses 50-51; firmware updates over the air 52;
+  # mode packages fetched by boxes (phase 5 plan phase 13) 53.
   kill.confirmed:   { id: 25, prio: normal,    data: [player, owner] }    # team: the team credited; player and owner: whose tag
   kill.denied:      { id: 26, prio: normal,    data: [player, owner] }    # a team recovered its own player's tag: no points
   team.eliminated:  { id: 27, prio: normal,    data: [] }                 # team: the team whose lives ran out
@@ -138,3 +140,7 @@ events:
   # before any network): reason is the update's result code, fw the version it still runs
   # (protocol/firmware-update.md, decision OT-8).
   node.update_failed:         { id: 52, prio: critical,  data: [release, reason, fw] }
+  # A box that could not get a mode package its game needs and could not say so over HTTPS (no
+  # Wi-Fi, the controller unreachable, refused before any network): mode is the part, reason the
+  # fetch's result code (protocol/mode-packages.md, phase 5 plan phase 13, decisions P5B-16, P5E-8).
+  node.modes_failed:          { id: 53, prio: critical,  data: [mode, reason] }

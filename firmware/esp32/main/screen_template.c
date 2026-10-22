@@ -27,6 +27,12 @@
 
 static char mode_id[MODE_ID_MAX];
 static char mode_params[SCREEN_DATA_MAX] = "{}";
+static screen_template_fetched_fn fetched_find;
+
+void screen_template_set_fetched(screen_template_fetched_fn fn)
+{
+    fetched_find = fn;
+}
 
 void screen_template_set_mode(const char *data)
 {
@@ -67,6 +73,9 @@ const builtin_screen_t *screen_template_find(const char *name)
                 return s;
             }
         }
+        /* A fetched mode package's own, from storage (mode_store.h). */
+        const builtin_screen_t *s = fetched_find != NULL ? fetched_find(part, n, name) : NULL;
+        if (s != NULL) return s;
         if (!end) break;
         part = end + 1;
     }

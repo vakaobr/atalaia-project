@@ -34,6 +34,8 @@
 #include "button_tracker.h"
 #include "config_store.h"
 #include "fw_update_esp.h"
+#include "mode_fetch_esp.h"
+#include "mode_store.h"
 #include "game_timer.h"
 #include "hal/hal.h"
 #include "key_filter.h"
@@ -42,6 +44,7 @@
 #include "preset_store.h"
 #include "preset_ui.h"
 #include "screen_renderer.h"
+#include "screen_template.h"
 #include "state_persist.h"
 #include "radio/event_log.h"
 #include "radio/radio_task.h"
@@ -249,7 +252,8 @@ static void serial_input_init(void)
 #if CONFIG_ATALAIA_SERIAL_JOIN
     ESP_LOGI(TAG, "serial join on: \"@join atalaia:join:...\", \"@joinkey <hex>\", "
                   "\"@tag <uid> [<tag>]\", \"@wifi <ssid> <password>\", "
-                  "\"@update <version> <release id>\" or \"@lobby\" on the console");
+                  "\"@update <version> <release id>\", \"@modes\", \"@forgetmodes\" "
+                  "or \"@lobby\" on the console");
 #endif
 }
 
@@ -332,6 +336,27 @@ static void serial_command(const char *cmd)
             }
         } else {
             ESP_LOGW(TAG, "update: \"@update <version> <release id>\"");
+        }
+        return;
+    }
+    if (strcmp(cmd, "modes") == 0) {
+        /* The mode packages this box fetched (mode_store.h). */
+        ms_fetched_t m[MS_FETCHED_MAX];
+        int n = mode_store_list(m, MS_FETCHED_MAX);
+        ESP_LOGI(TAG, "%d fetched mode package(s); %u mode key(s)", n,
+                 (unsigned)mode_fetch_esp_key_count());
+        for (int i = 0; i < n; i++) {
+            ESP_LOGI(TAG, "  %s %s key %s, %lu bytes", m[i].id, m[i].version, m[i].key_id,
+                     (unsigned long)m[i].bytes);
+        }
+        return;
+    }
+    if (strcmp(cmd, "forgetmodes") == 0) {
+        if (box_game_active(&box)) {
+            ESP_LOGW(TAG, "forgetmodes: not in a game");
+        } else {
+            ESP_LOGI(TAG, "forgot %d fetched mode(s)", mode_store_forget_all());
+            load_preset_list();
         }
         return;
     }
@@ -505,6 +530,13 @@ static void box_update(void *user, const char *params_json)
 {
     (void)user;
     fw_update_esp_offer(params_json);
+}
+
+/* A join whose mode packages the box lacks (mode_fetch.h): fetched on their own task. */
+static void box_fetch_modes(void *user, const atalaia_join_t *join)
+{
+    (void)user;
+    mode_fetch_esp_start(join);
 }
 
 static void update_screen(const char *tmpl, const char *data_json)
@@ -696,6 +728,8 @@ static void box_start(const char *tier)
                            .battery_pct = box_battery,
                            .radio_send = box_radio_send,
                            .update = box_update,
+                           /* A join may fetch missing modes only with a mode key built in. */
+                           .fetch_modes = mode_fetch_esp_key_count() > 0 ? box_fetch_modes : NULL,
                            .random = box_random,
                            .user = NULL};
     box_game_init(&box, &runner, &game_preset, nvs ? atalaia_box_store_esp() : &no_store, &ops,
@@ -754,6 +788,7 @@ static void box_start(const char *tier)
     }
     wifi_setup_set_join_key_handler(portal_join_key);
     fw_update_esp_init(&box, update_screen, update_battery);
+    mode_fetch_esp_init(&box, update_screen, hello.tier != 0, mem_limit);
 }
 
 /* Start the game the picker chose. */
@@ -909,7 +944,8 @@ static void task_game(void *arg)
         /* ---- Tick the game loop (a field game ticks its own runner, time-synced; between
          * games box_game_tick runs only the lobby: announcements, invites) ---- */
         bool field_game = box_game_active(&box);
-        fw_update_esp_poll(); /* a failed update the controller has not heard of: over LoRa */
+        fw_update_esp_poll();  /* a failed update the controller has not heard of: over LoRa */
+        mode_fetch_esp_poll(); /* a mode fetch that is over: join its game, or say why not */
         box_game_tick(&box, delta_ms, now);
         if (field_game) {
             /* ticked above */
@@ -1131,6 +1167,10 @@ void app_main(void)
     /* An image a firmware update just installed confirms itself here, or rolls back. */
     fw_update_esp_boot(hal.radio != NULL, storage_ok);
     preset_store_init(STORAGE_PATH);
+    /* Fetched mode packages (mode_store.h): a commit a power loss cut short is finished or
+     * forgotten; their screens come from storage. */
+    mode_store_init(STORAGE_PATH);
+    screen_template_set_fetched(mode_store_screen);
     state_persist_init(STORAGE_PATH "/state");
     seed_presets();
     load_preset_list();

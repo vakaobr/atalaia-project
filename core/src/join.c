@@ -322,6 +322,8 @@ const char *atalaia_join_result_name(atalaia_join_result_t result)
 
 /* ---- Encoding ------------------------------------------------------------- */
 
+#define JOIN_CBOR_TRUE 21u /* simple value 21: 0xf5 */
+
 size_t atalaia_join_encode(const atalaia_join_t *j, const uint8_t join_key[ATALAIA_JOIN_KEY_SIZE],
                            uint8_t *buf, size_t cap)
 {
@@ -336,7 +338,7 @@ size_t atalaia_join_encode(const atalaia_join_t *j, const uint8_t join_key[ATALA
 
     bool lang = j->lang[0] != '\0';
     mc_put_map(&w, 11u + (params ? 1u : 0u) + (j->has_ca ? 1u : 0u) + (j->url_count ? 1u : 0u) +
-                       (lang ? 1u : 0u));
+                       (lang ? 1u : 0u) + (j->fetch_modes ? 1u : 0u) + (j->forget_modes ? 1u : 0u));
     mc_put_uint(&w, ATALAIA_JOIN_K_GAME_ID);
     mc_put_uint(&w, j->game_id);
     mc_put_uint(&w, ATALAIA_JOIN_K_GAME_KEY);
@@ -383,6 +385,15 @@ size_t atalaia_join_encode(const atalaia_join_t *j, const uint8_t join_key[ATALA
     if (lang) {
         mc_put_uint(&w, ATALAIA_JOIN_K_LANG);
         mc_put_text(&w, j->lang);
+    }
+    /* Keys 16 and 17 only when true (false is refused, so a join has one encoding). */
+    if (j->fetch_modes) {
+        mc_put_uint(&w, ATALAIA_JOIN_K_FETCH_MODES);
+        mc_put_head(&w, CBOR_MAJOR_SIMPLE, JOIN_CBOR_TRUE);
+    }
+    if (j->forget_modes) {
+        mc_put_uint(&w, ATALAIA_JOIN_K_FORGET_MODES);
+        mc_put_head(&w, CBOR_MAJOR_SIMPLE, JOIN_CBOR_TRUE);
     }
     if (!w.ok) return 0;
 
@@ -441,8 +452,9 @@ static bool decode_body(const uint8_t *body, size_t len, atalaia_join_t *j)
     if (!mc_read_map(&r, &count)) return false;
     for (uint64_t i = 0; i < count && r.ok; i++) {
         uint64_t key, v;
-        /* Keys 13 and 14 are optional (RFC 0001 Amendment 4), 15 too (Amendment 10); 16-31
-         * are reserved for optional fields (skipped); 32 and up are invalid. */
+        /* Keys 13 and 14 are optional (RFC 0001 Amendment 4), 15 too (Amendment 10), 16 and 17
+         * too (plan phase 13); 18-31 are reserved for optional fields (skipped); 32 and up are
+         * invalid. */
         if (!mc_read_uint(&r, &key) || key >= 32) return false;
         if (seen & JBIT(key)) return false; /* duplicate key */
         seen |= JBIT(key);
@@ -531,6 +543,18 @@ static bool decode_body(const uint8_t *body, size_t len, atalaia_join_t *j)
                 return false;
             }
             break;
+        case ATALAIA_JOIN_K_FETCH_MODES:
+        case ATALAIA_JOIN_K_FORGET_MODES: {
+            /* Only CBOR true (plan phase 13): false, null or anything else is a bad body. */
+            if (mc_remaining(&r) < 1 || *r.p != 0xF5) return false; /* true, in its one form */
+            r.p++;
+            if (key == ATALAIA_JOIN_K_FETCH_MODES) {
+                j->fetch_modes = true;
+            } else {
+                j->forget_modes = true;
+            }
+            break;
+        }
         default:
             if (!mc_skip_value(&r)) return false;
             break;

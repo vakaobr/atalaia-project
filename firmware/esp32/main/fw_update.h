@@ -110,6 +110,11 @@ typedef struct {
 /* Parses a release text (manifest + "signature=<base64>\n", exactly). false if malformed. */
 bool fw_release_parse(const char *text, size_t len, fw_release_t *out);
 
+/* A signature as Python's base64.b64decode(validate=True) reads 88 characters: 86 of the
+ * standard alphabet, then "=="; the last character's unused bits are ignored, as there. Mode
+ * packages' signatures too (mode_package.c). */
+bool fw_signature_decode(const char *s, size_t n, uint8_t out[64]);
+
 /* True if one of keys signed the manifest (text's first manifest_len bytes) with Ed25519. */
 bool fw_release_signed(const fw_release_t *rel, const char *text, const uint8_t (*keys)[32],
                        size_t key_count);
@@ -147,9 +152,11 @@ typedef struct {
 typedef struct {
     bool (*net_up)(void *ctx); /* join the field Wi-Fi; false: none set or it failed */
     void (*net_down)(void *ctx);
-    /* GET base+path into buf (NUL-terminated); its length, or -1 (no answer, not 200, too big). */
+    /* GET base+path into buf (NUL-terminated); its length, or -1 (no answer), -2 (an answer other
+     * than 200), -3 (a 200 too big for buf). */
     int (*get_text)(void *ctx, const char *base, const char *path, char *buf, size_t cap);
-    /* GET base+path as a stream: true with the Content-Length (-1 if none). */
+    /* GET base+path as a stream: true with the Content-Length (-1 if none); false, with *length
+     * -2 when the server answered other than 200. */
     bool (*open)(void *ctx, const char *base, const char *path, int64_t *length);
     int (*read)(void *ctx, uint8_t *buf, size_t cap); /* >0 bytes, 0 at the end, <0 an error */
     void (*close)(void *ctx);

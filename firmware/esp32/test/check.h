@@ -53,6 +53,8 @@ void run_board_fem_tests(void);
 void run_screen_template_tests(void);
 void run_pod_tests(void);
 void run_fw_update_tests(void);
+void run_mode_package_tests(void);
+void run_mode_fetch_tests(void);
 void run_adoption_tests(void);
 void run_admin_pin_tests(void);
 void run_box_pair_tests(void);

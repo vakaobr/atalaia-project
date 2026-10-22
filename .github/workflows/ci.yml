@@ -380,6 +380,15 @@ jobs:
           cmake --build build
       - name: Test
         run: ctest --test-dir build --output-on-failure
+      # The Field Box's host tests too, for the code that reads what comes from elsewhere
+      # (mode packages and their archives, plan phase 13b; joins; field frames). Leak checks
+      # off: some older fixtures leave a game's node behind between tests.
+      - name: Firmware host tests under AddressSanitizer and UBSan
+        run: |
+          cmake -S firmware/esp32/test -B fw-asan -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
+          cmake --build fw-asan --target firmware_test
+          cd fw-asan && ASAN_OPTIONS=detect_leaks=0 ./firmware_test
 
   sandbox-escape:
     # Phase 5 plan phase 5 (AC-12): scripts that try to leave the Lua sandbox, crash the runtime

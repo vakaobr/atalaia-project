@@ -19,6 +19,8 @@ Outputs, each marked "do not edit":
     firmware/esp32/test/firmware_vectors.h  firmware release, version, image and report vectors
                                         (the Field Box's update checks, protocol/vectors/firmware.json)
     firmware/esp32/test/field_card_vectors.h  NFC field card vectors (adoption, protocol/vectors/field_card.json)
+    firmware/esp32/test/mode_package_vectors.h  signed mode package vectors (the Field Box's package
+                                        checks, protocol/vectors/mode_package.json)
     simulator/atalaia_sim/protocol.py   the same tables for Python
     protocol/json/event.schema.json     JSON Schema of an event in the game log
 
@@ -924,7 +926,7 @@ def gen_join_vectors(jv: dict[str, Any], byte_array: Any) -> list[str]:
               f"{f['channel_hz']}u, {f['max_hops']},",
               f"      {{{teams}}}, {len(f['teams'])},",
               f"      {c_string(f['mode_id'])}, {c_string(f['role'])}, {f['game_seed']}u, "
-              f"{c_string(params)}, {kinds[f['kind']]}, false, {{0}}, 0, {{\"\"}}, \"\"}},",
+              f"{c_string(params)}, {kinds[f['kind']]}, false, {{0}}, 0, {{\"\"}}, \"\", false, false}},",
               f"     join_vec_{i}, join_vec_{i}_len, {c_string(v['text'])}, "
               f"join_tag_{i}, join_tag_{i}_len}},"]
     L += ["};",
@@ -943,6 +945,7 @@ def gen_join_vectors(jv: dict[str, Any], byte_array: Any) -> list[str]:
           "#define HMAC_VECTOR_COUNT (sizeof(hmac_vectors) / sizeof(hmac_vectors[0]))", ""]
     L += gen_join_link_vectors(jv["controller_link"], byte_array, kinds)
     L += gen_join_lang_vectors(jv["box_language"], byte_array, kinds)
+    L += gen_join_fetch_vectors(jv["mode_fetch"], byte_array, kinds)
     return L
 
 
@@ -978,6 +981,52 @@ def gen_join_lang_vectors(lv: dict[str, Any], byte_array: Any, kinds: dict[str, 
         L.append(f"    {{{c_string(v['name'])}, join_lang_bad_{i}, join_lang_bad_{i}_len, ATALAIA_JOIN_ERR_BODY, "
                  f"{c_string(v['why'])}}},")
     L += ["};", "#define JOIN_LANG_BAD_VECTOR_COUNT (sizeof(join_lang_bad_vectors) / sizeof(join_lang_bad_vectors[0]))",
+          ""]
+    return L
+
+
+def gen_join_fetch_vectors(mv: dict[str, Any], byte_array: Any, kinds: dict[str, str]) -> list[str]:
+    """Keys 16 (fetch_modes) and 17 (forget_modes) of a join payload (phase 5 plan phase 13): true only."""
+    L = ["/* ---- join payloads asking a box to fetch or forget mode packages (keys 16 and 17) ---- */", "",
+         "typedef struct {", "    const char *name;", "    atalaia_join_t fields;", "    const uint8_t *payload;",
+         "    size_t payload_len;", "    const char *text;", "} join_fetch_vector_t;", ""]
+    for i, v in enumerate(mv["valid"]):
+        L += byte_array(f"join_fetch_{i}", v["payload"])
+    for i, v in enumerate(mv["invalid"]):
+        require(v["reason"] == "body", f"join.json mode_fetch {v['name']}: only body errors here")
+        L += byte_array(f"join_fetch_bad_{i}", v["payload"])
+    L += ["", "static const join_fetch_vector_t join_fetch_vectors[] = {"]
+    for i, v in enumerate(mv["valid"]):
+        f = v["fields"]
+        key = ", ".join(f"0x{b:02x}" for b in bytes.fromhex(f["game_key"]))
+        teams = ", ".join("{" + c_string(t) + "}" for t in f["teams"])
+        params = "" if f["params"] is None else json.dumps(f["params"], separators=(",", ":"), ensure_ascii=False)
+        ca = f.get("ca_sha256")
+        urls = f.get("urls") or []
+        L += [f"    {{{c_string(v['name'])},",
+              f"     {{.game_id = {f['game_id']}, .game_key = {{{key}}}, .node_id = {f['node_id']},",
+              f"      .controller_id = {f['controller_id']}, .channel_hz = {f['channel_hz']}u, "
+              f".max_hops = {f['max_hops']},",
+              f"      .teams = {{{teams}}}, .team_count = {len(f['teams'])},",
+              f"      .mode_id = {c_string(f['mode_id'])}, .role = {c_string(f['role'])}, "
+              f".game_seed = {f['game_seed']}u,",
+              f"      .params_json = {c_string(params)}, .kind = {kinds[f['kind']]},"]
+        if ca is not None:
+            L.append("      .has_ca = true, .ca_sha256 = {" + ", ".join(f"0x{b:02x}" for b in bytes.fromhex(ca)) + "},")
+        else:
+            L.append("      .has_ca = false, .ca_sha256 = {0},")
+        L.append(f"      .url_count = {len(urls)}, .urls = {{" + (", ".join("{" + c_string(u) + "}" for u in urls)
+                                                                   or "{\"\"}") + "},")
+        L.append(f"      .lang = {c_string(f.get('lang') or '')}, "
+                 f".fetch_modes = {'true' if f.get('fetch_modes') else 'false'}, "
+                 f".forget_modes = {'true' if f.get('forget_modes') else 'false'}}},")
+        L.append(f"     join_fetch_{i}, join_fetch_{i}_len, {c_string(v['text'])}}},")
+    L += ["};", "#define JOIN_FETCH_VECTOR_COUNT (sizeof(join_fetch_vectors) / sizeof(join_fetch_vectors[0]))", "",
+          "static const join_bad_vector_t join_fetch_bad_vectors[] = {"]
+    for i, v in enumerate(mv["invalid"]):
+        L.append(f"    {{{c_string(v['name'])}, join_fetch_bad_{i}, join_fetch_bad_{i}_len, ATALAIA_JOIN_ERR_BODY, "
+                 f"{c_string(v.get('why', v['name']))}}},")
+    L += ["};", "#define JOIN_FETCH_BAD_VECTOR_COUNT (sizeof(join_fetch_bad_vectors) / sizeof(join_fetch_bad_vectors[0]))",
           ""]
     return L
 
@@ -1339,6 +1388,164 @@ def gen_field_card_vectors(fc: dict[str, Any]) -> str:
     return "\n".join(L)
 
 
+# ---- mode package vectors (protocol/vectors/mode_package.json) -----------------
+
+MODE_PACKAGE_VECTORS = REPO / "protocol" / "vectors" / "mode_package.json"
+
+def gen_mode_package_vectors(mv: dict[str, Any]) -> str:
+    """firmware/esp32/test/mode_package_vectors.h: the Field Box's package checks (mode_package.c).
+
+    Archives are mostly zero padding, so each is written as its size and the runs of bytes between
+    long zero stretches (offset, hex), which the test puts back together."""
+    import base64
+    import hashlib
+
+    L = c_spdx("Mode package test vectors (protocol/vectors/mode_package.json).")
+    L[5] = " * Generated by tools/protogen.py from protocol/vectors/mode_package.json. Do not edit."
+    L += ["#ifndef ATALAIA_MODE_PACKAGE_VECTORS_H", "#define ATALAIA_MODE_PACKAGE_VECTORS_H", "",
+          "#include <stdbool.h>", "#include <stddef.h>", "#include <stdint.h>", ""]
+
+    def key_hex(b64: str) -> str:
+        return base64.b64decode(b64).hex()
+
+    def key_id(raw_hex: str) -> str:
+        return hashlib.sha256(bytes.fromhex(raw_hex)).hexdigest()[:16]
+
+    def segments(name: str, data: bytes) -> list[str]:
+        runs: list[tuple[int, bytes]] = []
+        i = 0
+        while i < len(data):
+            if data[i] == 0:
+                i += 1
+                continue
+            start, zeros, j = i, 0, i
+            while j < len(data) and zeros < 16:
+                zeros = zeros + 1 if data[j] == 0 else 0
+                j += 1
+            runs.append((start, data[start:j - zeros]))
+            i = j
+        out = [f"static const mpv_seg_t {name}[] = {{"]
+        for off, chunk in runs:
+            hexs = chunk.hex()
+            parts = [hexs[k:k + 96] for k in range(0, len(hexs), 96)]
+            out.append(f"    {{{off}u, {len(chunk)}u,")
+            out += [f'     "{p}"' for p in parts[:-1]]
+            out.append(f'     "{parts[-1]}"}},')
+        if not runs:
+            out.append('    {0u, 0u, ""},')
+        out += ["};", f"#define {name}_count (sizeof({name}) / sizeof({name}[0]))"]
+        return out
+
+    L += ["typedef struct {", "    uint32_t offset;", "    uint32_t len;", "    const char *hex;", "} mpv_seg_t;", "",
+          "typedef struct {", "    const char *name;", "    uint32_t size;", "    const mpv_seg_t *segs;",
+          "    size_t seg_count;", "    const char *code; /* bad_archive, too_big, mismatch */",
+          "} mpv_archive_t;", ""]
+    for which in ("signing_key", "other_key"):
+        raw = mv[which]["public_key"]
+        require(key_hex(mv[which]["public_key_b64"]) == raw, f"mode_package.json {which}: base64 and hex agree")
+        require(key_id(raw) == mv[which]["key_id"], f"mode_package.json {which}: key id")
+        L.append(f"#define MPV_{which.upper()}_HEX {c_string(raw)}")
+        L.append(f"#define MPV_{which.upper()}_ID {c_string(mv[which]['key_id'])}")
+    # RFC 8032 TEST 1's secret: a public test key (never a mode key), for packages the tests sign.
+    L += [f"#define MPV_SIGNING_SEED_HEX {c_string(mv['signing_key']['seed'])}", ""]
+
+    a = mv["archive"]
+    data = bytes.fromhex(a["hex"])
+    require(len(data) == a["size"] and hashlib.sha256(data).hexdigest() == a["sha256"],
+            "mode_package.json archive: size and sha256")
+    L += segments("mpv_archive_segs", data)
+    L += segments("mpv_tampered_segs", bytes.fromhex(a["tampered_hex"]))
+    L += [f"#define MPV_ARCHIVE_ID {c_string(a['mode_id'])}", f"#define MPV_ARCHIVE_SIZE {a['size']}u",
+          f"#define MPV_ARCHIVE_SHA256 {c_string(a['sha256'])}", ""]
+    L += ["typedef struct {", "    const char *name;", "    const char *text;", "} mpv_file_t;", "",
+          "static const mpv_file_t mpv_archive_files[] = {"]
+    for name in sorted(a["files"]):
+        L.append(f"    {{{c_string(name)}, {c_string(a['files'][name])}}},")
+    L += ["};", "#define MPV_ARCHIVE_FILE_COUNT (sizeof(mpv_archive_files) / sizeof(mpv_archive_files[0]))", ""]
+
+    for i, v in enumerate(mv["archives_invalid"]):
+        L += segments(f"mpv_bad_{i}", bytes.fromhex(v["hex"]))
+    L += ["", "static const mpv_archive_t mpv_bad_archives[] = {"]
+    for i, v in enumerate(mv["archives_invalid"]):
+        L.append(f"    {{{c_string(v['name'])}, {len(bytes.fromhex(v['hex']))}u, mpv_bad_{i}, mpv_bad_{i}_count, "
+                 f"{c_string(v['code'])}}},")
+    L += ["};", "#define MPV_BAD_ARCHIVE_COUNT (sizeof(mpv_bad_archives) / sizeof(mpv_bad_archives[0]))", ""]
+
+    L += ["typedef struct {", "    const char *name;", "    const char *id, *version, *kind, *tier;", "    uint32_t size;",
+          "    const char *sha256;", "    const char *text;", "    size_t manifest_len;",
+          "    bool valid; /* signed by signing_key */", "} mpv_release_t;", "",
+          "static const mpv_release_t mpv_releases[] = {"]
+    # Whether signing_key signed a release's manifest (its "valid" says whether the whole check
+    # passes): the Python's own whole checks say so where the signature is reached, that is when
+    # one with signing_key trusted ends past it ("ok", "revoked", "mismatch").
+    signed = {v["name"]: v["valid"] for v in mv["releases"]}
+    for v in mv["verify"]:
+        if v["result"] in ("ok", "revoked", "mismatch") and mv["signing_key"]["public_key_b64"] in v["keys"]:
+            signed[v["release"]] = True
+    for v in mv["releases"]:
+        require(v["release_text"] == v["manifest"] + f"signature={v['signature']}\n",
+                f"mode_package.json {v['name']}: release_text is the manifest and the signature line")
+        L.append(f"    {{{c_string(v['name'])}, {c_string(v['id'])}, {c_string(v['version'])}, {c_string(v['kind'])}, "
+                 f"{c_string(v['min_tier'])}, {v['size']}u, {c_string(v['sha256'])}, {c_string(v['release_text'])}, "
+                 f"{len(v['manifest'].encode())}, {'true' if signed[v['name']] else 'false'}}},")
+    L += ["};", "#define MPV_RELEASE_COUNT (sizeof(mpv_releases) / sizeof(mpv_releases[0]))", ""]
+
+    lim = mv["box_limits"]
+    L += [f"#define MPV_BOX_MAX_PACKAGE_BYTES {lim['max_package_bytes']}u",
+          f"#define MPV_BOX_MAX_FETCHED {lim['max_fetched']}",
+          f"#define MPV_BOX_MAX_FETCHED_BYTES {lim['max_fetched_bytes']}u", ""]
+
+    # A Field Box's checks in its order (protocol/mode-packages.md, "Fetching missing modes").
+    archives = {None: "MPV_NONE", "archive": "MPV_ARCHIVE", "tampered": "MPV_TAMPERED",
+                "truncated": "MPV_TRUNCATED"}
+    for i, v in enumerate(mv["box_checks"]):
+        if v.get("archive_hex"):
+            L += segments(f"mpv_check_{i}", bytes.fromhex(v["archive_hex"]))
+    L += ["", "typedef enum { MPV_NONE, MPV_ARCHIVE, MPV_TAMPERED, MPV_TRUNCATED, MPV_HEX } mpv_archive_kind_t;",
+          "", "typedef struct {", "    const char *name;", "    const char *release_text;", "    const char *wanted_id;",
+          "    size_t key_count;", "    const char *keys[2]; /* hex */", "    bool reduced;",
+          "    const char *builtin[2];", "    mpv_archive_kind_t archive;",
+          "    const mpv_seg_t *segs; /* MPV_HEX */", "    size_t seg_count;", "    uint32_t hex_size;",
+          "    const char *result; /* ok, or the code */", "    const char *key_id;",
+          "    const char *kept[4];", "} mpv_box_check_t;", "", "static const mpv_box_check_t mpv_box_checks[] = {"]
+    for i, v in enumerate(mv["box_checks"]):
+        keys = [key_hex(k) for k in v["keys"]]
+        require(len(keys) <= 2 and len(v["builtin"]) <= 2 and len(v.get("kept") or []) <= 4,
+                f"mode_package.json box_checks {v['name']}: sizes")
+        ks = ", ".join(c_string(k) for k in keys) or "NULL"
+        bs = ", ".join(c_string(k) for k in v["builtin"]) or "NULL"
+        kept = ", ".join(c_string(k) for k in v.get("kept") or []) or "NULL"
+        if v.get("archive_hex"):
+            arch = f"MPV_HEX, mpv_check_{i}, mpv_check_{i}_count, {len(bytes.fromhex(v['archive_hex']))}u"
+        else:
+            arch = f"{archives[v['archive']]}, NULL, 0, 0u"
+        L.append(f"    {{{c_string(v['name'])}, {c_string(v['release_text'])}, {c_string(v['wanted_id'])}, "
+                 f"{len(keys)}, {{{ks}}}, {'true' if v['tier'] == 'reduced' else 'false'}, {{{bs}}}, {arch}, "
+                 f"{c_string(v['result'])}, {c_string(v.get('key_id') or '')}, {{{kept}}}}},")
+    L += ["};", "#define MPV_BOX_CHECK_COUNT (sizeof(mpv_box_checks) / sizeof(mpv_box_checks[0]))", ""]
+
+    rep = mv["reports"]
+    L += [f"#define MPV_REPORT_GAME_KEY_HEX {c_string(rep['game_key'])}", "",
+          "typedef struct {", "    uint16_t game, node;", "    const char *mode, *version, *result;",
+          "    const char *kept_ids[8], *kept_versions[8];", "    const char *body, *mac;", "} mpv_report_t;", "",
+          "static const mpv_report_t mpv_reports[] = {"]
+    for v in rep["valid"]:
+        ids = sorted(v["kept"])
+        ki = ", ".join(c_string(k) for k in ids) or "NULL"
+        kv = ", ".join(c_string(v["kept"][k]) for k in ids) or "NULL"
+        ver = c_string(v["version"]) if v["version"] is not None else "NULL"
+        L.append(f"    {{{v['game']}, {v['node']}, {c_string(v['mode'])}, {ver}, {c_string(v['result'])}, {{{ki}}}, "
+                 f"{{{kv}}}, {c_string(v['body'])}, {c_string(v['mac'])}}},")
+    L += ["};", "#define MPV_REPORT_COUNT (sizeof(mpv_reports) / sizeof(mpv_reports[0]))", ""]
+
+    L += ["static const char *const mpv_bad_texts[] = {"]
+    for v in mv["release_texts_invalid"]:
+        L.append(f"    {c_string(v['text'])}, /* {c_comment(v['name'])} */")
+    L += ["};", "#define MPV_BAD_TEXT_COUNT (sizeof(mpv_bad_texts) / sizeof(mpv_bad_texts[0]))", "",
+          "#endif /* ATALAIA_MODE_PACKAGE_VECTORS_H */", ""]
+    return "\n".join(L)
+
+
 # ---- pairing vectors (protocol/vectors/pairing.json) ---------------------------
 
 PAIRING_VECTORS = REPO / "protocol" / "vectors" / "pairing.json"
@@ -1559,6 +1766,8 @@ def outputs() -> dict[Path, str]:
             gen_firmware_vectors(json.loads(FIRMWARE_VECTORS.read_text(encoding="utf-8"))),
         REPO / "firmware/esp32/test/field_card_vectors.h":
             gen_field_card_vectors(json.loads(FIELD_CARD_VECTORS.read_text(encoding="utf-8"))),
+        REPO / "firmware/esp32/test/mode_package_vectors.h":
+            gen_mode_package_vectors(json.loads(MODE_PACKAGE_VECTORS.read_text(encoding="utf-8"))),
         REPO / "simulator/atalaia_sim/protocol.py": gen_python(schema),
         REPO / "protocol/json/event.schema.json": gen_json_schema(schema),
     }

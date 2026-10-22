@@ -23,6 +23,8 @@
 #include "epoch_store_fake.h"
 #include "oled_view.h"
 #include "hal/stub/hal_stub.h"
+#include "mode_fetch.h"
+#include "mode_store.h"
 #include "state_persist.h"
 
 #ifndef MODES_DIR
@@ -1672,6 +1674,173 @@ static void test_lobby_nonces(void)
     state_persist_clear();
 }
 
+/* ---- Fetching a game's missing modes (main/mode_fetch.h, protocol/mode-packages.md) -------- */
+
+static int fetch_calls;
+static atalaia_join_t fetch_join;
+
+static void sh_fetch(void *user, const atalaia_join_t *j)
+{
+    (void)user;
+    fetch_calls++;
+    fetch_join = *j;
+}
+
+/* A fetched mode on the box, as mode_store_commit leaves it (the fetch itself is mode_fetch.c's,
+ * test_mode_fetch.c). */
+static void keep_mode(const char *id)
+{
+    CHECK(mode_store_stage_begin());
+    FILE *f = mode_store_stage_open("node.lua", "wb");
+    CHECK(f != NULL);
+    if (f) {
+        fputs("on(\"team_input.press\", function(e) end)\n", f);
+        fclose(f);
+    }
+    ms_fetched_t m;
+    memset(&m, 0, sizeof(m));
+    snprintf(m.id, sizeof(m.id), "%s", id);
+    snprintf(m.version, sizeof(m.version), "1.0.0");
+    snprintf(m.key_id, sizeof(m.key_id), "0123456789abcdef");
+    snprintf(m.sha256, sizeof(m.sha256), "%064d", 0);
+    m.bytes = 2048;
+    CHECK(mode_store_commit(&m, "r\n", 2));
+}
+
+static void fetch_join_of(atalaia_join_t *j, const char *mode_id)
+{
+    make_join(j);
+    snprintf(j->mode_id, sizeof(j->mode_id), "%s", mode_id);
+    j->params_json[0] = '\0';
+    j->fetch_modes = true;
+    j->has_ca = true;
+    memset(j->ca_sha256, 0xCA, sizeof(j->ca_sha256));
+    j->url_count = 1;
+    snprintf(j->urls[0], sizeof(j->urls[0]), "https://10.42.0.1:8443");
+}
+
+static void fetch_fixture(void)
+{
+    fixture(false);
+    CHECK(mode_store_init(base) == 0);
+    CHECK(box_game_set_join_key_hex(&game, JOIN_KEY_HEX));
+    game.shell.fetch_modes = sh_fetch;
+    fetch_calls = 0;
+}
+
+static void test_fetch_modes(void)
+{
+    atalaia_join_t j;
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    uint8_t pl[PKT_CAP];
+    size_t pn;
+    atalaia_header_t h;
+    uint32_t now = 10;
+
+    /* Without key 16, without keys 13 and 14, or a shell that cannot fetch (no mode key built
+     * in): no mode, as before. */
+    fetch_fixture();
+    fetch_join_of(&j, "org.example.relay");
+    j.fetch_modes = false;
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_NO_MODE);
+    fetch_join_of(&j, "org.example.relay");
+    j.has_ca = false;
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_NO_MODE);
+    fetch_join_of(&j, "org.example.relay");
+    j.url_count = 0;
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_NO_MODE);
+    game.shell.fetch_modes = NULL;
+    fetch_join_of(&j, "org.example.relay");
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_NO_MODE);
+    CHECK(fetch_calls == 0 && game.phase == BOX_IDLE);
+
+    /* Key 16 with the link: the box takes the join as fetching. No HELLO, nothing stored. */
+    game.shell.fetch_modes = sh_fetch;
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    CHECK(box_game_fetching(&game) && box_game_active(&game) && !box_game_playing(&game));
+    CHECK(fetch_calls == 1 && strcmp(fetch_join.mode_id, "org.example.relay") == 0);
+    CHECK(fetch_join.has_ca && fetch_join.url_count == 1);
+    CHECK(!last_of(ATALAIA_MSG_HELLO, &h, pl, &pn) && flash.join_len == 0);
+    CHECK(strcmp(shell.screen, "status") == 0 && strstr(shell.screen_data, "Getting modes"));
+    CHECK(!box_lobby_available(&game));
+    CHECK(!box_game_update_failed(&game, "0123456789abcdef", "no_wifi", "0.2.0"));
+    int sent = shell.count;
+    run_ms(&now, 2000);
+    CHECK(shell.count == sent); /* not on the game's link */
+    /* Another game's card meanwhile: busy, and the fetch stops. */
+    atalaia_join_t other;
+    make_join(&other);
+    other.game_id = GAME_ID + 1;
+    CHECK(box_game_join(&game, buf, encode(&other, JOIN_KEY, buf)) == BOX_JOIN_BUSY);
+    CHECK(game.fetch_cancel);
+    game.fetch_cancel = false;
+    /* The packages are in: the box joins its game (HELLO, the join stored). */
+    keep_mode("org.example.relay");
+    box_game_fetch_done(&game, MF_INSTALLED, "org.example.relay", true);
+    CHECK(game.phase == BOX_JOINED && last_of(ATALAIA_MSG_HELLO, &h, pl, &pn));
+    CHECK(flash.join_len > 0 && fetch_calls == 1);
+    CHECK(strcmp(shell.screen, "waiting") == 0);
+    ack_all();
+    cmd(FIELD_CMD_START);
+    CHECK(game.phase == BOX_PLAYING && runner.running);
+    cmd(FIELD_CMD_END);
+    ack_all();
+    state_persist_clear();
+
+    /* A failure the controller heard over HTTPS: the box is free again at once, the game is not
+     * an ended one, and nothing goes over the radio. */
+    fetch_fixture();
+    fetch_join_of(&j, "org.example.relay");
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    sent = shell.count;
+    box_game_fetch_done(&game, MF_BAD_SIGNATURE, "org.example.relay", true);
+    CHECK(game.phase == BOX_IDLE && shell.count == sent && flash.join_len == 0);
+    CHECK(strstr(shell.screen_data, "Modes refused") && strstr(shell.screen_data, "bad_signature"));
+    CHECK(!box_lobby_played_to_the_end(&game, GAME_ID) && box_lobby_available(&game));
+    /* The GM sends it again: it fetches again. */
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    CHECK(fetch_calls == 2 && box_game_fetching(&game));
+
+    /* A failure it could not report over HTTPS: HELLO and node.modes_failed in the game, then
+     * it leaves once that is acknowledged, free again (not an ended game). */
+    box_game_fetch_done(&game, MF_NO_WIFI, "org.example.relay", false);
+    CHECK(game.phase == BOX_ENDED && game.fetch_failed_link);
+    CHECK(last_of(ATALAIA_MSG_HELLO, &h, pl, &pn));
+    char data[160];
+    uint16_t seq = 0;
+    CHECK(last_event("node.modes_failed", data, sizeof(data), &seq));
+    CHECK(strcmp(data, "{\"mode\":\"org.example.relay\",\"reason\":\"no_wifi\"}") == 0);
+    CHECK(flash.join_len == 0);
+    ack_all();
+    run_ms(&now, 100);
+    CHECK(game.phase == BOX_IDLE && !game.fetch_failed_link);
+    CHECK(!box_lobby_played_to_the_end(&game, GAME_ID));
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    CHECK(fetch_calls == 3);
+    /* Cancelled (the game it fetched for is over): nothing joined, nothing over the radio. */
+    game.fetch_cancel = true;
+    keep_mode("org.example.relay");
+    sent = shell.count;
+    box_game_fetch_done(&game, MF_INSTALLED, "org.example.relay", true);
+    CHECK(game.phase == BOX_IDLE && shell.count == sent);
+    CHECK(strstr(shell.screen_data, "cancelled") != NULL);
+    box_game_fetch_done(&game, MF_INSTALLED, "x", true); /* not fetching: ignored */
+    CHECK(game.phase == BOX_IDLE);
+
+    /* Key 17: the box forgets every package it fetched, whatever happens to the join. */
+    fetch_fixture();
+    keep_mode("org.example.relay");
+    keep_mode("org.example.other");
+    make_join(&j);
+    j.forget_modes = true;
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    CHECK(!mode_store_has("org.example.relay") && !mode_store_has("org.example.other"));
+    CHECK(mode_store_has("org.atalaia.domination"));
+    cmd(FIELD_CMD_END);
+    ack_all();
+    state_persist_clear();
+}
+
 void run_box_game_tests(void)
 {
     test_lobby_nonces();
@@ -1696,4 +1865,5 @@ void run_box_game_tests(void)
     test_screens_follow_the_game();
     test_screen_language();
     test_old_card_refused();
+    test_fetch_modes();
 }

@@ -11,6 +11,8 @@
 #include <string.h>
 
 #include "box_text.h"
+#include "mode_fetch.h"
+#include "mode_store.h"
 #include "screen_json.h"
 #include "screen_types.h"
 #include "state_persist.h"
@@ -54,6 +56,7 @@ const char *box_join_result_name(box_join_result_t r)
 
 static uint8_t game_state_of(const box_game_t *g)
 {
+    if (g->fetch_failed_link) return FIELD_GAME_WAITING; /* never in the game (P5E-8) */
     switch (g->phase) {
     case BOX_PLAYING: return g->paused ? FIELD_GAME_PAUSED : FIELD_GAME_RUNNING;
     case BOX_ENDED: return FIELD_GAME_ENDED;
@@ -178,6 +181,8 @@ static void leave_game(box_game_t *g)
     node_runner_stop(g->runner);
     state_persist_clear();
     g->phase = BOX_IDLE;
+    if (g->fetch_failed_link) box_lobby_free_again(g); /* the fetch's failure is told */
+    g->fetch_failed_link = false;
     say(g, "left game %u; the game key is erased", g->join.game_id);
 }
 
@@ -423,6 +428,11 @@ static void show_waiting(box_game_t *g)
     show(g, "waiting", data);
 }
 
+static bool link_up(box_game_t *g, const atalaia_join_t *j, bool fresh);
+static bool wants_fetch(const box_game_t *g, const atalaia_join_t *j);
+static box_join_result_t start_fetch(box_game_t *g, const atalaia_join_t *j, const uint8_t *payload,
+                                     size_t len);
+
 /* Takes a verified join: from a card or text (fresh), or from the store (reboot). */
 static box_join_result_t apply(box_game_t *g, const atalaia_join_t *j, const uint8_t *payload,
                                size_t len, bool fresh)
@@ -432,9 +442,18 @@ static box_join_result_t apply(box_game_t *g, const atalaia_join_t *j, const uin
                 j->game_id == g->join.game_id && j->node_id == g->join.node_id &&
                 memcmp(j->game_key, g->join.game_key, sizeof(j->game_key)) == 0;
     if (same) return BOX_JOIN_OK; /* the same card tapped again: nothing changes */
-    if (g->phase == BOX_PLAYING) return BOX_JOIN_BUSY;
+    if (g->phase == BOX_FETCHING && fresh) {
+        /* Another game's card while fetching: the fetch stops (cancelled); a tap once the box
+         * is free again joins (protocol/mode-packages.md, section 3; decision P5E-9). */
+        g->fetch_cancel = true;
+        return BOX_JOIN_BUSY;
+    }
+    if (g->phase == BOX_PLAYING || g->phase == BOX_FETCHING) return BOX_JOIN_BUSY;
     int index = find_preset(g, j->mode_id);
-    if (index < 0) return BOX_JOIN_NO_MODE;
+    if (index < 0) {
+        if (fresh && wants_fetch(g, j)) return start_fetch(g, j, payload, len);
+        return BOX_JOIN_NO_MODE;
+    }
     if (fresh) {
         if (g->store.save_join == NULL || g->store.save_join(g->store.ctx, payload, len) != 0) {
             return BOX_JOIN_STORAGE;
@@ -442,10 +461,25 @@ static box_join_result_t apply(box_game_t *g, const atalaia_join_t *j, const uin
         /* A new game: nothing from an earlier game may be resumed or resent. */
         state_persist_clear();
         if (g->log != NULL) event_log_clear(g->log);
+        mode_store_touch(j->mode_id); /* its fetched parts: the most recently used (P5B-15) */
     }
-    g->join = *j;
-    take_language(g, j);
+    if (!link_up(g, j, fresh)) return BOX_JOIN_RADIO;
     g->preset_index = index;
+    g->phase = BOX_JOINED;
+    g->paused = false;
+    g->owner_team = ATALAIA_TEAM_NONE;
+    say(g, "joined game %u as node %u (%s, %s), %u teams, channel %lu Hz, epoch %u", j->game_id,
+        j->node_id, j->mode_id, j->role, j->team_count, (unsigned long)j->channel_hz,
+        g->link.proto.epoch);
+    show_waiting(g);
+    return BOX_JOIN_OK;
+}
+
+/* The game's link, from a verified join: the radio's channel, HELLO, the link's keys. */
+static bool link_up(box_game_t *g, const atalaia_join_t *j, bool fresh)
+{
+    if (j != &g->join) g->join = *j; /* after a fetch, the join is g->join itself */
+    take_language(g, j);
     for (uint8_t t = 0; t < j->team_count; t++) g->teams[t] = g->join.teams[t];
     if (g->shell.set_channel != NULL && !g->shell.set_channel(g->shell.user, j->channel_hz)) {
         say(g, "radio: cannot tune to %lu Hz (no radio, or refused)", (unsigned long)j->channel_hz);
@@ -470,17 +504,107 @@ static box_join_result_t apply(box_game_t *g, const atalaia_join_t *j, const uin
     g->now_ms = g->now_ms ? g->now_ms : 1;
     if (!field_link_init(&g->link, j, g->crypto, g->nvs, g->log, &g->hello, &io, g->now_ms,
                          !fresh)) {
-        return BOX_JOIN_RADIO;
+        return false;
     }
     if (g->state_interval_ms != 0) g->link.state_interval_ms = g->state_interval_ms;
-    g->phase = BOX_JOINED;
-    g->paused = false;
-    g->owner_team = ATALAIA_TEAM_NONE;
-    say(g, "joined game %u as node %u (%s, %s), %u teams, channel %lu Hz, epoch %u", j->game_id,
-        j->node_id, j->mode_id, j->role, j->team_count, (unsigned long)j->channel_hz,
-        g->link.proto.epoch);
-    show_waiting(g);
+    return true;
+}
+
+/* ---- Fetching the mode packages a join needs (mode_fetch.h) ------------------------------- */
+
+/* A join whose mode the box lacks makes it fetch (protocol/mode-packages.md, section 1): key 16
+ * with keys 13 and 14, a shell that can (fetch_modes is set only with a mode key built in), and
+ * no game being played on the box (P5B-13). Otherwise: no mode, as before. */
+static bool wants_fetch(const box_game_t *g, const atalaia_join_t *j)
+{
+    return g->shell.fetch_modes != NULL && j->fetch_modes && j->has_ca && j->url_count > 0 &&
+           (g->runner == NULL || !g->runner->running);
+}
+
+static void show_status(box_game_t *g, box_text_id_t title, const char *text)
+{
+    char data[SCREEN_DATA_MAX];
+    snprintf(data, sizeof(data), "{\"title\":\"%s\",\"mode\":\"%.40s\"}", box_text(title), text);
+    show(g, "status", data);
+}
+
+/* Takes the join as fetching: it is kept in RAM only (a reboot forgets it), the box is not on
+ * the game's link yet (no HELLO), and the shell fetches what it lacks. */
+static box_join_result_t start_fetch(box_game_t *g, const atalaia_join_t *j, const uint8_t *payload,
+                                     size_t len)
+{
+    memcpy(g->fetch_payload, payload, len);
+    g->fetch_len = len;
+    g->join = *j;
+    take_language(g, j);
+    g->fetch_cancel = false;
+    g->phase = BOX_FETCHING;
+    g->lobby.ready_screen_due = false;
+    say(g, "game %u: fetching the mode packages of %s it lacks", j->game_id, j->mode_id);
+    show_status(g, TX_MODES_FETCHING, j->mode_id);
+    g->shell.fetch_modes(g->shell.user, &g->join);
     return BOX_JOIN_OK;
+}
+
+/* A failed fetch the controller did not hear of over HTTPS: the box joins the game's link only to
+ * say so (HELLO, then node.modes_failed), reports "waiting", and leaves once it is acknowledged
+ * (decision P5E-8). Not a game played to its end: the GM may invite it again. */
+static void fetch_failed_over_lora(box_game_t *g, const atalaia_join_t *j, const char *part,
+                                   const char *reason)
+{
+    state_persist_clear();
+    if (g->log != NULL) event_log_clear(g->log);
+    if (!link_up(g, j, true)) {
+        say(g, "the fetch's failure cannot be told over the radio either");
+        memset(g->join.game_key, 0, sizeof(g->join.game_key));
+        return;
+    }
+    g->fetch_failed_link = true;
+    g->phase = BOX_ENDED;
+    g->ended_ms = g->now_ms;
+    field_link_send_modes_failed(&g->link, part, reason, 0);
+    say(g, "mode packages: %s (%s), told the controller over the radio", reason, part);
+}
+
+void box_game_fetch_done(box_game_t *g, int result, const char *part, bool reported)
+{
+    if (g->phase != BOX_FETCHING) return;
+    mf_result_t r = (mf_result_t)result;
+    const atalaia_join_t *j = &g->join; /* apply copies it onto itself: no second copy in RAM */
+    g->phase = BOX_IDLE;
+    if (r == MF_INSTALLED && g->fetch_cancel) r = MF_CANCELLED;
+    box_join_result_t out = BOX_JOIN_NO_MODE;
+    if (r == MF_INSTALLED) {
+        out = apply(g, j, g->fetch_payload, g->fetch_len, true);
+        if (out == BOX_JOIN_OK) {
+            say(g, "game %u: its mode packages are in", j->game_id);
+        } else {
+            /* Every part is in, yet the game does not start (the composed script is too big for
+             * the preset buffer, storage): as a failed load. */
+            say(g, "game %u: %s after the fetch", j->game_id, box_join_result_name(out));
+            r = MF_LOAD;
+            part = j->mode_id;
+            reported = false;
+        }
+    }
+    if (out != BOX_JOIN_OK) {
+        const char *why = mf_result_name(r);
+        say(g, "game %u: mode packages %s (%s)", j->game_id, why, part ? part : "");
+        show_status(g, TX_MODES_FAILED, why);
+        if (!reported && r != MF_CANCELLED) {
+            fetch_failed_over_lora(g, j, part ? part : "", why);
+        } else {
+            memset(g->join.game_key, 0, sizeof(g->join.game_key));
+            box_lobby_free_again(g); /* not an ended game: the GM may invite it again */
+        }
+    }
+    memset(g->fetch_payload, 0, sizeof(g->fetch_payload));
+    g->fetch_len = 0;
+}
+
+bool box_game_fetching(const box_game_t *g)
+{
+    return g->phase == BOX_FETCHING;
 }
 
 static box_join_result_t join_payload(box_game_t *g, const uint8_t *payload, size_t len);
@@ -510,7 +634,9 @@ static bool modes_installed(const char *mode_id)
 
 box_join_result_t box_game_join_invited(box_game_t *g, const uint8_t *payload, size_t len)
 {
-    if (g->phase == BOX_JOINED || g->phase == BOX_PLAYING) return BOX_JOIN_BUSY;
+    if (g->phase == BOX_JOINED || g->phase == BOX_PLAYING || g->phase == BOX_FETCHING) {
+        return BOX_JOIN_BUSY;
+    }
     if (g->phase == BOX_ENDED) {
         /* A game over whose last events are still unacknowledged: leave it only for an invite
          * the box will take, so a refused one keeps them. */
@@ -518,8 +644,8 @@ box_join_result_t box_game_join_invited(box_game_t *g, const uint8_t *payload, s
         atalaia_join_result_t r = g->have_join_key
                                       ? atalaia_join_decode(payload, len, g->join_key, &j)
                                       : ATALAIA_JOIN_ERR_MAC;
-        bool ok =
-            r == ATALAIA_JOIN_OK && j.kind == ATALAIA_JOIN_KIND_NODE && modes_installed(j.mode_id);
+        bool ok = r == ATALAIA_JOIN_OK && j.kind == ATALAIA_JOIN_KIND_NODE &&
+                  (modes_installed(j.mode_id) || wants_fetch(g, &j));
         box_join_result_t why = r != ATALAIA_JOIN_OK               ? BOX_JOIN_REFUSED
                                 : j.kind != ATALAIA_JOIN_KIND_NODE ? BOX_JOIN_CONTROLLER
                                                                    : BOX_JOIN_NO_MODE;
@@ -544,6 +670,12 @@ static box_join_result_t join_payload(box_game_t *g, const uint8_t *payload, siz
     if (r != ATALAIA_JOIN_OK) {
         say(g, "join refused: %s", atalaia_join_result_name(r));
         return BOX_JOIN_REFUSED;
+    }
+    /* Key 17 first (protocol/mode-packages.md, section 1): the join is authentic, so the box
+     * forgets every package it fetched, whatever happens to the join afterwards; never under a
+     * game being played or a fetch on its way (their scripts and screens are in use). */
+    if (j.forget_modes && g->phase != BOX_PLAYING && g->phase != BOX_FETCHING) {
+        say(g, "forgot %d fetched mode package(s), as the join asks", mode_store_forget_all());
     }
     /* A card, a QR code or a text of a game this box has played to its end, or of an old game
      * whose key the epoch store keeps only as retired: its nonces may not be used again
@@ -621,7 +753,7 @@ bool box_game_resume(box_game_t *g, uint32_t now_ms)
 void box_game_on_packet(box_game_t *g, const uint8_t *pkt, size_t len, int8_t rssi)
 {
     if (box_lobby_on_packet(g, pkt, len)) return; /* a field frame: announcements, invites */
-    if (g->phase == BOX_IDLE) return;
+    if (g->phase == BOX_IDLE || g->phase == BOX_FETCHING) return; /* not on a game's link */
     field_link_on_packet(&g->link, pkt, len, rssi);
 }
 
@@ -650,7 +782,7 @@ void box_game_tick(box_game_t *g, uint32_t raw_delta_ms, uint32_t now_ms)
 {
     g->now_ms = now_ms;
     box_lobby_tick(g, now_ms);
-    if (g->phase == BOX_IDLE) return;
+    if (g->phase == BOX_IDLE || g->phase == BOX_FETCHING) return;
     if (g->phase == BOX_PLAYING && !g->paused && g->runner->running) {
         node_runner_tick(g->runner, field_link_adjust_delta(&g->link, raw_delta_ms));
     }
@@ -674,7 +806,7 @@ bool box_game_playing(const box_game_t *g)
 
 bool box_game_update_failed(box_game_t *g, const char *release, const char *reason, const char *fw)
 {
-    if (g->phase == BOX_IDLE) return false;
+    if (g->phase == BOX_IDLE || g->phase == BOX_FETCHING) return false;
     field_link_send_update_failed(&g->link, release, reason, fw, g->runner->game_time_ms);
     say(g, "firmware update failed (%s): told the controller over the radio",
         reason ? reason : "?");

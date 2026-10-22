@@ -55,6 +55,14 @@ static const struct {
     {"Objectives", "org.atalaia.objectives", "{}"},
 };
 
+bool builtin_presets_has(const char *mode_id)
+{
+    for (size_t i = 0; mode_id != NULL && i < sizeof(builtin) / sizeof(builtin[0]); i++) {
+        if (strcmp(builtin[i].mode_id, mode_id) == 0) return true;
+    }
+    return false;
+}
+
 /* preset_t holds a 16 KB source buffer, so it is not put on a task stack;
  * nor is the list of stored presets (3.7 KB). */
 static preset_t scratch;

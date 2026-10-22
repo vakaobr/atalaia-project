@@ -51,9 +51,11 @@ enum {
     ATALAIA_JOIN_K_GAME_SEED = 10,
     ATALAIA_JOIN_K_PARAMS = 11,
     ATALAIA_JOIN_K_KIND = 12,
-    ATALAIA_JOIN_K_CA_SHA256 = 13, /* optional (RFC 0001 Amendment 4) */
-    ATALAIA_JOIN_K_URLS = 14,      /* optional (RFC 0001 Amendment 4) */
-    ATALAIA_JOIN_K_LANG = 15,      /* optional (RFC 0001 Amendment 10) */
+    ATALAIA_JOIN_K_CA_SHA256 = 13,    /* optional (RFC 0001 Amendment 4) */
+    ATALAIA_JOIN_K_URLS = 14,         /* optional (RFC 0001 Amendment 4) */
+    ATALAIA_JOIN_K_LANG = 15,         /* optional (RFC 0001 Amendment 10) */
+    ATALAIA_JOIN_K_FETCH_MODES = 16,  /* optional, true only (phase 5 plan phase 13) */
+    ATALAIA_JOIN_K_FORGET_MODES = 17, /* optional, true only (phase 5 plan phase 13) */
 };
 
 typedef enum {
@@ -85,6 +87,11 @@ typedef struct {
     /* The language of the box's screens (key 15): "pt", "en", "pt-br"...; "" when the payload
      * has none (English). A box that does not know the language uses English. */
     char lang[ATALAIA_JOIN_LANG_MAX + 1];
+    /* Keys 16 and 17 (protocol/mode-packages.md, "Fetching missing modes"): a box that lacks a
+     * part of mode_id fetches the signed packages from the controller (with keys 13 and 14);
+     * forget_modes: it first forgets every package it fetched. Written only when true. */
+    bool fetch_modes;
+    bool forget_modes;
 } atalaia_join_t;
 
 typedef enum {
@@ -108,9 +115,9 @@ size_t atalaia_join_encode(const atalaia_join_t *j, const uint8_t join_key[ATALA
 
 /*
  * Checks the tag (in constant time) and then the body. Fills *out only
- * when the result is ATALAIA_JOIN_OK. Keys 13 (ca_sha256) and 14 (urls) are
- * read; unknown body keys 15-31 are skipped, so a newer controller may add
- * optional fields; keys from 32 up are refused.
+ * when the result is ATALAIA_JOIN_OK. Keys 13 (ca_sha256), 14 (urls), 15 (lang),
+ * 16 (fetch_modes) and 17 (forget_modes) are read; unknown body keys 18-31 are skipped, so a newer
+ * controller may add optional fields; keys from 32 up are refused.
  */
 atalaia_join_result_t atalaia_join_decode(const uint8_t *buf, size_t len,
                                           const uint8_t join_key[ATALAIA_JOIN_KEY_SIZE],

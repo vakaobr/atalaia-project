@@ -10,8 +10,10 @@
 #define ATALAIA_FW_UPDATE_ESP_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "box_game.h"
+#include "fw_update.h"
 
 /*
  * At boot, once the storage and the radio have come up: an image an update just
@@ -40,6 +42,16 @@ void fw_update_esp_offer(const char *params_json);
  * the controller over LoRa here (box_game_update_failed: the link belongs to this task).
  */
 void fw_update_esp_poll(void);
+
+/*
+ * The same Wi-Fi and HTTPS for a mode fetch (mode_fetch_esp.c): the operations, with HTTPS
+ * pinned to ca_sha256 (the join's key 13). Its cancelled and progress are the update's: a caller
+ * copies the struct and sets its own. One user at a time: claim it first (false while an update
+ * or a fetch runs), release it after.
+ */
+const fw_io_t *fw_update_esp_net(const uint8_t ca_sha256[32]);
+bool fw_update_esp_net_claim(void);
+void fw_update_esp_net_release(void);
 
 /* The field Wi-Fi a firmware update uses (stored in NVS: wifi_ssid, wifi_pass). */
 bool fw_update_esp_set_wifi(const char *ssid, const char *password);

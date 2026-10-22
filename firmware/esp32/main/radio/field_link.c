@@ -292,6 +292,22 @@ void field_link_send_update_failed(field_link_t *l, const char *release, const c
     field_link_event(l, &ev, data);
 }
 
+void field_link_send_modes_failed(field_link_t *l, const char *mode, const char *reason,
+                                  uint32_t t_ms)
+{
+    atalaia_event_t ev;
+    uint16_t seq = (uint16_t)(l->proto.seq + 1u); /* the header seq of the next packet */
+    if (!atalaia_event_init(&ev, l->join.node_id, seq, t_ms, "node.modes_failed", ATALAIA_TEAM_NONE,
+                            ATALAIA_SQUAD_NONE, ATALAIA_PRIO_CRITICAL)) {
+        return;
+    }
+    char id[ATALAIA_JOIN_MODE_MAX + 1], why[24], data[128];
+    plain_code(id, sizeof(id), mode);
+    plain_code(why, sizeof(why), reason);
+    snprintf(data, sizeof(data), "{\"mode\":\"%s\",\"reason\":\"%s\"}", id, why);
+    field_link_event(l, &ev, data);
+}
+
 /* ---- Init -------------------------------------------------------------------- */
 
 bool field_link_init(field_link_t *l, const atalaia_join_t *join,

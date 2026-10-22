@@ -135,6 +135,9 @@ typedef enum {
     TX_RESTARTING,
     TX_UPDATE_FAILED,
     TX_UPDATE_REFUSED,
+    /* mode packages fetched for a game (mode_fetch.h) */
+    TX_MODES_FETCHING,
+    TX_MODES_FAILED,
     TX_PIN_LOCKED,    /* the admin PIN's wait (decision AD-28) */
     TX_TRY_IN_MIN,    /* "%lu": minutes */
     TX_NO_ADMIN_PIN,  /* a Field Box with no admin PIN set (AD-29) */

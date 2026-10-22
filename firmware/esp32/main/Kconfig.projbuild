@@ -648,6 +648,25 @@ menu "Atalaia Field Box Configuration"
                 counts as unadopted: the first field to adopt it replaces it.
     endmenu
 
+    # ---- Signed mode packages (protocol/mode-packages.md, phase 5 plan 13) ----
+    menu "Mode packages"
+        depends on ATALAIA_NODE_MODE
+
+        config ATALAIA_MODE_KEYS
+            string "Mode public keys (64 hex digits each, separated by spaces)"
+            default ""
+            help
+                The Ed25519 public keys whose signatures this firmware accepts
+                on a mode package a game needs and the box lacks, fetched from
+                its field controller between games (up to 4, for rotation).
+                The only keys a box trusts for modes (decision P5B-9: built
+                into the firmware, never sent by a controller); a release key
+                may be listed here too. Public keys only:
+                `python3 tools/mode_package.py keygen` prints this line.
+                Empty: every package is refused ("no_key") and a game whose
+                mode the box lacks is answered "no mode", as before.
+    endmenu
+
     # ---- Firmware updates over the air (protocol/firmware-update.md) --------
     menu "Firmware updates (OTA)"
         depends on ATALAIA_NODE_MODE

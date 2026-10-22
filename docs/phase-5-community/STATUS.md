@@ -9,7 +9,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 **Phase status:** In progress
 **Risk level:** Medium
 **Last updated:** 2026-10-22 (plan phase 13a built; plan phases 3-6 built, P5B-9 answered; plan phase 2 built, plan phase 13 planned from P5R-8; refreshed after phases 2-4 software; first written 2026-10-18)
-**Next step:** plan phase 13b (the box's side of missing modes, against the contract in `protocol/mode-packages.md`), then plan phase 7 (scenario blocks in the console)
+**Next step:** plan phase 7 (scenario blocks in the console, in progress); plan phase 13 is built in software (13a and 13b), its test on real boxes is HW3
 
 Phase 5 is the community layer: visual mode editor (Blockly), mode
 registry with signing and a verified badge, carrier PCB, translations,
@@ -96,6 +96,20 @@ section 16).
   vectors for 13b's C (`box_checks`, `reports`). 13 controller tests, 1 browser
   test. Decisions P5D-1 to P5D-12 (open; P5D-3, P5D-6, P5D-11 for the
   maintainer).
+
+- [x] **Plan phase 13b, the box's side of missing modes (2026-10-22), in
+  software (host-tested; on real boxes in HW3):** a join with key 16 whose
+  mode the box lacks (with keys 13 and 14 and a mode key built in,
+  `CONFIG_ATALAIA_MODE_KEYS`) makes the Field Box fetch each missing part over
+  the field Wi-Fi and HTTPS pinned to the field CA, check it in the contract's
+  order (release, Ed25519 with its own keys, kind, tier, built-in, 256 KiB,
+  room, the archive hashed before it is read and in its canonical form, the
+  script and screens in the sandbox, the composed game), keep it on LittleFS
+  (8 packages, 512 KiB, least recently used dropped, commits by renames,
+  re-verified at boot), report each part (HMAC) and only then say HELLO; a
+  failure without HTTPS goes over LoRa as `node.modes_failed` (id 53) and the
+  box is free again; key 17 forgets. The core's join codec reads keys 16 and
+  17. Decisions P5E-1 to P5E-14. Binary +16 KB (0.9 %), static RAM +1 KB.
 
 ## Refresh 2026-10-22: what changed
 
@@ -195,15 +209,10 @@ section 16).
 
 ## Next steps
 
-1. Plan phase 13b (in progress, in parallel with 13a, which is built):
-   `mode_fetch.c` with the box's C reader of the package vectors
-   (`box_checks`, `reports`), keys 16 and 17 in `core/src/join.c` (the
-   `mode_fetch` join vectors), `CONFIG_ATALAIA_MODE_KEYS`, fetched slots on
-   LittleFS, `node.modes_failed` (id 53, data `mode` key 38) in
-   `protocol/schema/events.yaml`, all as `protocol/mode-packages.md`,
-   "Fetching missing modes", says. Then the end-to-end test with the C host
-   box against the real controller. P5B-9 is answered: mode keys built into the
-   box's firmware only.
+1. Plan phase 13 on real boxes (HW3): a Field Box with a mode key built in
+   fetching from the bench controller; and the end-to-end test of the C host
+   box (`box_host --mode-keys --mode-source`) against the real controller
+   over HTTPS, which the host tests only model with files.
 2. Plan phase 7 (scenario blocks in the console); 8 and 9 (the registry
    template and community processes) now have the package tools and the
    battery to build on; 10 after P5R-10 (answered: German first).

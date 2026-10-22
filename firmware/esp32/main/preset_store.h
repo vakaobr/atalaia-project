@@ -61,4 +61,16 @@ long preset_store_read_source(const char *mode_id, char *buf, size_t cap);
 /* Replace a stored mode's source. Returns true on success. */
 bool preset_store_write_source(const char *mode_id, const char *source, size_t len);
 
+/*
+ * A preset for a mode whose source is already stored (a fetched mode package, mode_store.h):
+ * its metadata only, in the lowest free slot, with no time limit. Returns the slot, or -1.
+ */
+int preset_store_add(const char *mode_id, const char *label, const char *params_json);
+
+/* The first slot with a preset of the mode, or -1. */
+int preset_store_find_mode(const char *mode_id);
+
+/* Deletes every preset of a mode (a fetched mode forgotten). Returns how many. */
+int preset_store_remove_mode(const char *mode_id);
+
 #endif /* ATALAIA_PRESET_STORE_H */

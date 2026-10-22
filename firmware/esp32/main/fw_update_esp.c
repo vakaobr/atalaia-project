@@ -282,7 +282,14 @@ static int get_text(void *ctx, const char *base, const char *path, char *buf, si
     esp_http_client_handle_t h = http_open(base, path);
     if (h == NULL) return -1;
     int got = -1;
-    if (http_answer(h, &length) && length > 0 && (size_t)length < cap) {
+    int64_t headers = esp_http_client_fetch_headers(h);
+    if (headers >= 0 && esp_http_client_get_status_code(h) != 200) {
+        got = -2; /* the controller answered: not this (404, 409) */
+    } else if (headers >= 0) {
+        length = esp_http_client_is_chunked_response(h) ? -1 : headers;
+        if (length <= 0 || (size_t)length >= cap) got = -3; /* longer than such a text may be */
+    }
+    if (got == -1 && headers >= 0 && length > 0) {
         got = 0;
         while (got < (int)length) {
             int n = esp_http_client_read(h, buf + got, (int)length - got);
@@ -303,6 +310,8 @@ static bool open_stream(void *ctx, const char *base, const char *path, int64_t *
     s_http = http_open(base, path);
     if (s_http == NULL) return false;
     if (!http_answer(s_http, length)) {
+        /* An answer other than 200 (the controller does not offer it): *length -2. */
+        *length = esp_http_client_get_status_code(s_http) > 0 ? -2 : -1;
         esp_http_client_close(s_http);
         esp_http_client_cleanup(s_http);
         s_http = NULL;
@@ -457,6 +466,24 @@ static void update_task(void *arg)
     }
     __atomic_store_n(&s_busy, false, __ATOMIC_RELEASE);
     vTaskDelete(NULL);
+}
+
+const fw_io_t *fw_update_esp_net(const uint8_t ca_sha256[32])
+{
+    memcpy(s_pin, ca_sha256, sizeof(s_pin));
+    return &IO;
+}
+
+bool fw_update_esp_net_claim(void)
+{
+    bool idle = false;
+    return __atomic_compare_exchange_n(&s_busy, &idle, true, false, __ATOMIC_ACQ_REL,
+                                       __ATOMIC_ACQUIRE);
+}
+
+void fw_update_esp_net_release(void)
+{
+    __atomic_store_n(&s_busy, false, __ATOMIC_RELEASE);
 }
 
 void fw_update_esp_poll(void)

@@ -15,8 +15,10 @@
  * screen message (screen_template_set_mode), in order with the screens,
  * so the LVGL task always draws with the right mode.
  *
- * Templates come from the image only for now: there is no upload path yet
- * (decision K10), so LittleFS is not read.
+ * A built-in mode's templates come from the image only (decision K10); a mode
+ * package the box fetched and checked for a game (phase 5 plan phase 13,
+ * mode_store.h) brings its own, read from LittleFS through the function the
+ * shell sets with screen_template_set_fetched.
  */
 #ifndef ATALAIA_FW_SCREEN_TEMPLATE_H
 #define ATALAIA_FW_SCREEN_TEMPLATE_H
@@ -40,6 +42,12 @@ const char *screen_template_params(void);
 
 /* The running mode's template of this name, or NULL. */
 const builtin_screen_t *screen_template_find(const char *name);
+
+/* Where a fetched mode part's templates are found (part: n bytes of the "a+b" mode id); the
+ * shell sets mode_store_screen. NULL (the default): only the image's. */
+typedef const builtin_screen_t *(*screen_template_fetched_fn)(const char *part, size_t n,
+                                                              const char *name);
+void screen_template_set_fetched(screen_template_fetched_fn fn);
 
 /* Forgets the mode and the widgets (tests). */
 void screen_template_reset(void);

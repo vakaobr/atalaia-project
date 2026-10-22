@@ -110,7 +110,7 @@ void box_lobby_device_hex(const box_game_t *g, char out[17])
 
 bool box_lobby_available(const box_game_t *g)
 {
-    if (g->phase == BOX_JOINED || g->phase == BOX_PLAYING) return false;
+    if (g->phase == BOX_JOINED || g->phase == BOX_PLAYING || g->phase == BOX_FETCHING) return false;
     /* A game picked on the box itself is being played. */
     if (g->phase == BOX_IDLE && g->runner != NULL && g->runner->running) return false;
     return true;
@@ -327,8 +327,10 @@ static void on_invite(box_game_t *g, const atalaia_ff_msg_t *m)
 static void on_game_over(box_game_t *g, const atalaia_ff_msg_t *m)
 {
     box_lobby_t *l = &g->lobby;
-    if (g->phase != BOX_JOINED && g->phase != BOX_PLAYING) return; /* no game, or over already */
-    if (m->game_id != g->join.game_id) return;                     /* another game's */
+    if (g->phase != BOX_JOINED && g->phase != BOX_PLAYING && g->phase != BOX_FETCHING) {
+        return; /* no game, or over already */
+    }
+    if (m->game_id != g->join.game_id) return; /* another game's */
     uint8_t tag[ATALAIA_EPOCH_TAG_SIZE];
     atalaia_radio_epoch_tag(g->join.game_key, tag);
     bool same = memcmp(tag, m->key_tag, sizeof(tag)) == 0;
@@ -339,6 +341,12 @@ static void on_game_over(box_game_t *g, const atalaia_ff_msg_t *m)
         return;
     }
     l->games_over_heard++;
+    if (g->phase == BOX_FETCHING) {
+        /* The game it was fetching for is over: the fetch stops (cancelled, P5B-13). */
+        say(g, "game %u is over: the mode fetch stops", m->game_id);
+        g->fetch_cancel = true;
+        return;
+    }
     say(g, "game %u is over (said by a field controller)", m->game_id);
     box_game_end_by_field(g);
 }
@@ -384,6 +392,18 @@ void box_lobby_game_over(box_game_t *g, uint32_t now_ms)
     l->ready_screen_due = true;
     l->ready_screen_ms = now_ms + BOX_READY_MS;
     g->now_ms = now_ms;
+    if (l->ready) {
+        new_token(g, false); /* free again: nothing sent before this counts */
+        schedule_announce(g, l->first_min_ms, l->first_max_ms, true);
+    }
+}
+
+void box_lobby_free_again(box_game_t *g)
+{
+    box_lobby_t *l = &g->lobby;
+    l->invited = false;
+    l->ready_screen_due = true;
+    l->ready_screen_ms = g->now_ms + BOX_READY_MS;
     if (l->ready) {
         new_token(g, false); /* free again: nothing sent before this counts */
         schedule_announce(g, l->first_min_ms, l->first_max_ms, true);

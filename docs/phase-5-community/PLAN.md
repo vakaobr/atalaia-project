@@ -182,7 +182,7 @@ plus, depending on what the plan phase touches:
 | 4 | Mode packages and signing | archive format, `tools/mode_package.py` (pack, keygen, sign, verify), `registry/schema/index.schema.json`, shared vectors, licence check (AC-4, AC-5) | Software, now | -- | M | **Built 2026-10-22** |
 | 5 | Sandbox-escape battery | escape patterns as core C tests and through the simulator, in CI (AC-12) | Software, now | -- | S | **Built 2026-10-22** |
 | 6 | Signed packages in the controller | import from an index (signature, revocation, size, licence), the author and an "unverified" warning in the console | Software, now | 4 | M | **Built 2026-10-22** |
-| 13 | Missing modes from the GM console | P5R-8: the console's *Send missing modes* in the invite dialog; join key 16; a box fetches the signed packages it lacks over Wi-Fi HTTPS, checks them with its firmware's mode keys and the sandbox, keeps them on LittleFS (numbered 13 so the other numbers stay as P5R-1 has them; built here, after 6) | Software, now (box side host-tested); on real boxes: HW3 | 4, 5, 6 | L | 13a **built 2026-10-22** (P5D-1 to P5D-12); 13b in progress |
+| 13 | Missing modes from the GM console | P5R-8: the console's *Send missing modes* in the invite dialog; join key 16; a box fetches the signed packages it lacks over Wi-Fi HTTPS, checks them with its firmware's mode keys and the sandbox, keeps them on LittleFS (numbered 13 so the other numbers stay as P5R-1 has them; built here, after 6) | Software, now (box side host-tested); on real boxes: HW3 | 4, 5, 6 | L | 13a **built 2026-10-22** (P5D-1 to P5D-12); 13b (the box) **built 2026-10-22** (P5E-1 to P5E-14) |
 | 7 | Scenario blocks in the console | a block view of the scenario builder writing the same YAML, en + pt, console browser tests | Software, now | 1 | M | |
 | 8 | Registry repository template | `index.json`, `keys/`, `revoked.json`, the registry CI workflow as files under `registry/template/` (AC-6 in this repository) | Software, now; publishing needs the maintainer | 4, 5 | S | |
 | 9 | Community processes | CONTRIBUTING.md "Submitting a community mode", review checklist, verified badge, RFC for the package format (AC-11) | Software, now | 4, 8 | S | |
@@ -545,6 +545,20 @@ role serves no mode packages yet (P5D-1).
 | `controller/atalaia_controller/mode_fetch.py`, `engine.py`, `reinvite.py`, `api.py`, `config.py` (`[modes] box_keys`, `fetch_timeout_s`), `main.py` | The offer, the endpoints boxes fetch from, the report, `node.modes_failed`, the start guard, keys 16 and 17 in invites and card joins |
 | `controller/console/src/components/box-invites.js`, `fetched-modes.js`, `app.js`, `sw.js`, `i18n/*.json` | *Send missing modes* in the invite dialog, the fetch's progress, *Stop waiting*; *Modes fetched by boxes* in the Boxes tab |
 | `controller/tests/test_mode_fetch.py`, `test_mode_package.py`, `simulator/tests/test_join.py`, `test_reinvite_sim.py`, `controller/console/tests/test_browser.py` | 13 + 2 + 3 + 2 tests and 1 browser test |
+
+**13b built 2026-10-22** (the box; decisions P5E-1 to P5E-14, against 13a's contract in
+`protocol/mode-packages.md`, "Fetching missing modes"). Host-tested; on real boxes in HW3.
+
+| File | What |
+|------|------|
+| `firmware/esp32/main/mode_package.c` | The release text, its Ed25519 check, a streaming reader of the canonical archive (every refusal of the vectors, fed in pieces of any size) |
+| `firmware/esp32/main/mode_fetch.c` | The fetch in the contract's order: release, signature (mode keys, then release keys), kind, tier, built-in, size, room, download hashed into a file, archive, load and screens in the sandbox, the composed game, the commit; the reports (HMAC) |
+| `firmware/esp32/main/mode_store.c` | `/littlefs/modes/<id>/` with its slot, commits by renames finished or forgotten at boot, 8 packages and 512 KiB, least recently used dropped, boot re-verification, forgetting, the screens from storage |
+| `firmware/esp32/main/mode_fetch_esp.c`, `Kconfig.projbuild` | The task over the firmware update's Wi-Fi and pinned HTTPS, `CONFIG_ATALAIA_MODE_KEYS` |
+| `firmware/esp32/main/box_game.c`, `box_lobby.c` | `BOX_FETCHING`: a key-16 join taken as fetching, HELLO once the packages are in, key 17, `node.modes_failed` over LoRa when HTTPS cannot carry the failure, free again (not an ended game), cancelled by the game's end or another card |
+| `core/src/join.c` | Join keys 16 and 17 (true only), against `join.json`'s `mode_fetch` |
+| `protocol/schema/events.yaml` | `node.modes_failed` (id 53) and the data field `mode` (key 38) |
+| `firmware/esp32/test/test_mode_package.c`, `test_mode_fetch.c`, `test_box_game.c`, `box_host` | The vectors (`box_checks`, `reports`, the archives), a fake controller, the box's join and fetch; `box_host --mode-keys --mode-source` |
 
 ## Plan phase 7: Scenario blocks in the console
 

@@ -19,7 +19,7 @@
  *   box_host --state-dir DIR --modes DIR [--air-port N] [--air-peer N]
  *            [--join-key HEX] [--state-ms N] [--name NAME]
  *            [--as-box VERSION] [--release-keys HEX] [--admin-pin PIN] [--mac MAC] [--pair]
- *            [--announce-ms N] [--no-wifi]
+ *            [--announce-ms N] [--no-wifi] [--mode-keys HEX] [--mode-source DIR]
  *
  * Without --join-key (and no key stored in DIR) the box is unadopted
  * (main/adoption.c, protocol/adoption.md); --admin-pin (1234) and --mac
@@ -35,6 +35,14 @@
  * the controller offers it firmware updates; a CMD update then prints
  * "UPDATE <params> link=<CA yes|no>/<addresses> precheck=<result>": the firmware's
  * own offer checks (fw_update_precheck, with --release-keys), without Wi-Fi or a slot.
+ * --mode-keys HEX: the mode keys built into this "firmware" (CONFIG_ATALAIA_MODE_KEYS): a join with
+ * key 16 whose mode the box lacks is taken as fetching (protocol/mode-packages.md, "Fetching
+ * missing modes") and the box runs the firmware's own fetch (mode_fetch.c) once the join is in:
+ * from --mode-source DIR (DIR/<id>/release and DIR/<id>/package stand for the controller's
+ * answers, a missing file for its 404), or, without it, with no Wi-Fi (no_wifi). It prints
+ * "REPORT <the report's lines joined by |>" for each report it would post (taken: 200) and
+ * "FETCH result=<code> part=<id>", then joins the game, or says why over LoRa
+ * (node.modes_failed) and is free again.
  * --no-wifi: an offer that passes them then runs the update (fw_update_run), which stops
  * with no_wifi as on a box whose Wi-Fi did not start, and prints "UPDATE result=<code>";
  * a refusal or that failure reaches the controller over LoRa (node.update_failed), as on
@@ -80,6 +88,8 @@
 #include "builtin_presets.h"
 #include "button_tracker.h"
 #include "fw_update.h"
+#include "mode_fetch.h"
+#include "mode_store.h"
 #include "hal/stub/hal_stub.h"
 #include "serial_console.h"
 #include "state_persist.h"
@@ -409,6 +419,134 @@ static void shell_update(void *user, const char *params)
     }
 }
 
+/* ---- Fetching a game's missing modes (mode_fetch.h) ------------------------------------ */
+
+static uint8_t mode_keys[FW_KEYS_MAX][32];
+static int mode_key_count;
+static const char *mode_source; /* --mode-source: the controller's answers as files */
+static bool fetch_due;
+static atalaia_join_t fetch_for;
+
+static void shell_fetch_modes(void *user, const atalaia_join_t *join)
+{
+    (void)user;
+    fetch_for = *join; /* fetched from the main loop, as the shell's task would */
+    fetch_due = true;
+}
+
+static bool mf_net_up(void *ctx)
+{
+    (void)ctx;
+    return mode_source != NULL;
+}
+
+/* "/api/v1/mode-packages/<id>/<what>" -> DIR/<id>/<what>. */
+static FILE *mf_file(const char *path)
+{
+    const char *prefix = "/api/v1/mode-packages/";
+    if (strncmp(path, prefix, strlen(prefix)) != 0 || strstr(path, "..") != NULL) return NULL;
+    char p[400];
+    snprintf(p, sizeof(p), "%s/%s", mode_source, path + strlen(prefix));
+    return fopen(p, "rb");
+}
+
+static int mf_get_text(void *ctx, const char *base, const char *path, char *buf, size_t cap)
+{
+    (void)ctx;
+    (void)base;
+    FILE *f = mf_file(path);
+    if (f == NULL) return -2; /* the controller's 404 */
+    size_t n = fread(buf, 1, cap - 1, f);
+    bool more = fgetc(f) != EOF;
+    fclose(f);
+    if (more || n == 0) return -3;
+    buf[n] = '\0';
+    return (int)n;
+}
+
+static FILE *mf_stream;
+
+static bool mf_open(void *ctx, const char *base, const char *path, int64_t *length)
+{
+    (void)ctx;
+    (void)base;
+    mf_stream = mf_file(path);
+    if (mf_stream == NULL) {
+        *length = -2;
+        return false;
+    }
+    fseek(mf_stream, 0, SEEK_END);
+    *length = ftell(mf_stream);
+    fseek(mf_stream, 0, SEEK_SET);
+    return true;
+}
+
+static int mf_read(void *ctx, uint8_t *buf, size_t cap)
+{
+    (void)ctx;
+    return mf_stream != NULL ? (int)fread(buf, 1, cap, mf_stream) : -1;
+}
+
+static void mf_close(void *ctx)
+{
+    (void)ctx;
+    if (mf_stream != NULL) fclose(mf_stream);
+    mf_stream = NULL;
+}
+
+static bool mf_post(void *ctx, const char *base, const char *path, const char *body,
+                    const char *mac_hex)
+{
+    (void)ctx;
+    (void)base;
+    (void)path;
+    (void)mac_hex;
+    char line[MF_REPORT_MAX];
+    snprintf(line, sizeof(line), "%s", body);
+    for (char *c = line; *c; c++) {
+        if (*c == '\n') *c = c[1] ? '|' : '\0';
+    }
+    out("REPORT %s", line);
+    return true;
+}
+
+static bool mf_cancelled(void *ctx)
+{
+    (void)ctx;
+    return game.fetch_cancel;
+}
+
+static void run_fetch(void)
+{
+    static uint8_t buf[4096];
+    static char scratch[PRESET_SOURCE_MAX];
+    fw_io_t io;
+    memset(&io, 0, sizeof(io));
+    io.net_up = mf_net_up;
+    io.net_down = host_net_down;
+    io.get_text = mf_get_text;
+    io.open = mf_open;
+    io.read = mf_read;
+    io.close = mf_close;
+    io.post = mf_post;
+    io.cancelled = mf_cancelled;
+    mf_job_t job;
+    memset(&job, 0, sizeof(job));
+    job.keys = (const uint8_t(*)[32])mode_keys;
+    job.key_count = (size_t)mode_key_count;
+    job.mem_limit = 256u * 1024u;
+    job.builtin = builtin_presets_has;
+    job.join = &fetch_for;
+    job.buf = buf;
+    job.buf_cap = sizeof(buf);
+    job.scratch = scratch;
+    job.scratch_cap = sizeof(scratch);
+    mf_result_t r = mf_run(&job, &io);
+    out("FETCH result=%s part=%s", mf_result_name(r), job.part);
+    memset(fetch_for.game_key, 0, sizeof(fetch_for.game_key));
+    box_game_fetch_done(&game, (int)r, job.part, job.reported);
+}
+
 /* ---- Files for the mode sources -------------------------------------------------- */
 
 static char *slurp(const char *path, size_t *len)
@@ -533,6 +671,14 @@ int main(int argc, char **argv)
                    fw_version_valid(argv[i + 1]) && strlen(argv[i + 1]) < sizeof(fw_version)) {
             snprintf(fw_version, sizeof(fw_version), "%s", argv[++i]);
             as_box = true;
+        } else if (strcmp(argv[i], "--mode-keys") == 0 && i + 1 < argc) {
+            mode_key_count = fw_keys_parse(argv[++i], mode_keys, FW_KEYS_MAX);
+            if (mode_key_count < 0) {
+                fprintf(stderr, "box_host: --mode-keys: 64 hex digits each\n");
+                return 2;
+            }
+        } else if (strcmp(argv[i], "--mode-source") == 0 && i + 1 < argc) {
+            mode_source = argv[++i];
         } else if (strcmp(argv[i], "--no-wifi") == 0) {
             no_wifi = true;
         } else if (strcmp(argv[i], "--release-keys") == 0 && i + 1 < argc) {
@@ -571,6 +717,8 @@ int main(int argc, char **argv)
     snprintf(sub, sizeof(sub), "%s/presets", dir);
     mkdir(sub, 0700);
     preset_store_init(sub);
+    mode_store_init(sub); /* fetched mode packages beside the presets, as on the box */
+    mode_store_verify((const uint8_t(*)[32])mode_keys, (size_t)mode_key_count);
     snprintf(sub, sizeof(sub), "%s/state", dir);
     mkdir(sub, 0700);
     state_persist_init(sub);
@@ -642,6 +790,7 @@ int main(int argc, char **argv)
                              .radio_send = air_send,
                              .update = shell_update,
                              .random = shell_random,
+                             .fetch_modes = mode_key_count > 0 ? shell_fetch_modes : NULL,
                              .user = NULL};
     box_game_init(&game, &runner, &preset, &store, &shell, &atalaia_crypto_mbedtls, &nvs_ops,
                   &evlog, &hello);
@@ -795,6 +944,10 @@ int main(int argc, char **argv)
         }
         if (game.phase == BOX_PLAYING && !game.paused && runner.running) {
             button_tracker_update(&buttons, pressed, delta, &runner);
+        }
+        if (fetch_due) {
+            fetch_due = false;
+            run_fetch();
         }
         box_game_tick(&game, delta, now);
         adoption_tick(&adopt, now);

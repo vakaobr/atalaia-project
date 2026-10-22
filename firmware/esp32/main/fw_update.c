@@ -167,9 +167,7 @@ static int b64_value(char c)
     return -1;
 }
 
-/* The signature as Python's base64.b64decode(validate=True) reads 88 characters: 86 of the
- * standard alphabet, then "=="; the last character's unused bits are ignored, as there. */
-static bool signature_decode(const char *s, size_t n, uint8_t out[64])
+bool fw_signature_decode(const char *s, size_t n, uint8_t out[64])
 {
     if (n != 88 || s[86] != '=' || s[87] != '=') return false;
     uint32_t acc = 0;
@@ -259,7 +257,7 @@ bool fw_release_parse(const char *text, size_t len, fw_release_t *out)
     memcpy(out->sha256_hex, v, 64);
     out->manifest_len = (size_t)(p - text);
 
-    if (!take_line(&p, end, "signature", &v, &n) || !signature_decode(v, n, out->signature)) {
+    if (!take_line(&p, end, "signature", &v, &n) || !fw_signature_decode(v, n, out->signature)) {
         return false;
     }
     return p == end;

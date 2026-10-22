@@ -205,4 +205,10 @@ void field_link_send_battery_low(field_link_t *l, uint8_t percent, uint32_t t_ms
 void field_link_send_update_failed(field_link_t *l, const char *release, const char *reason,
                                    const char *fw, uint32_t t_ms);
 
+/* Sends node.modes_failed (critical, retried until acknowledged): a fetch of the game's mode
+ * packages that failed and could not be reported over HTTPS (mode_fetch.h, decision P5E-8).
+ * mode: the part it could not get, reason: the fetch's result code. Its seq as above. */
+void field_link_send_modes_failed(field_link_t *l, const char *mode, const char *reason,
+                                  uint32_t t_ms);
+
 #endif /* ATALAIA_FIELD_LINK_H */

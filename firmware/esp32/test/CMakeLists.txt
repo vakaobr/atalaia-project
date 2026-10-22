@@ -165,6 +165,9 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/box_lobby.c
     ${SHELL_DIR}/serial_console.c
     ${SHELL_DIR}/fw_update.c
+    ${SHELL_DIR}/mode_package.c
+    ${SHELL_DIR}/mode_store.c
+    ${SHELL_DIR}/mode_fetch.c
     ${SHELL_DIR}/admin_pin.c
     ${SHELL_DIR}/adoption.c
     ${SHELL_DIR}/cpace.c
@@ -220,6 +223,8 @@ set(TEST_SOURCES
     test_screen_template.c
     test_pod.c
     test_fw_update.c
+    test_mode_package.c
+    test_mode_fetch.c
     test_adoption.c
     test_admin_pin.c
     test_box_pair.c

@@ -81,7 +81,8 @@
             "hacking.solved",
             "medic.heal",
             "medic.empty",
-            "node.update_failed"
+            "node.update_failed",
+            "node.modes_failed"
           ]
         },
         {
@@ -1601,6 +1602,37 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "node.modes_failed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "mode": {
+                "$ref": "#/$defs/data/mode"
+              },
+              "reason": {
+                "$ref": "#/$defs/data/reason"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
     }
   ],
   "$defs": {
@@ -1752,6 +1784,10 @@
       "release": {
         "type": "string",
         "description": "firmware release id: the first 16 hex digits of the image's SHA-256"
+      },
+      "mode": {
+        "type": "string",
+        "description": "mode package id: one part of a game's mode id"
       }
     }
   }

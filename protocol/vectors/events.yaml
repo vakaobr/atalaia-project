@@ -103,6 +103,9 @@ valid:
   - name: "A box tells the controller over LoRa that its firmware update failed without Wi-Fi (id 52; release, key 37)"
     event: {"node": 3, "seq": 5, "t": 0, "type": "node.update_failed", "data": {"fw": "0.2.0", "reason": "no_wifi", "release": "0123456789abcdef"}}
     cbor: "a5 01 03 02 05 03 00 04 18 34 08 a3 15 65 30 2e 32 2e 30 03 67 6e 6f 5f 77 69 66 69 18 25 70 30 31 32 33 34 35 36 37 38 39 61 62 63 64 65 66"
+  - name: "A box tells the controller over LoRa that it could not get a mode package without Wi-Fi (id 53; mode, key 38)"
+    event: {"node": 3, "seq": 6, "t": 0, "type": "node.modes_failed", "data": {"mode": "org.example.relay", "reason": "no_wifi"}}
+    cbor: "a5 01 03 02 06 03 00 04 18 35 08 a2 18 26 71 6f 72 67 2e 65 78 61 6d 70 6c 65 2e 72 65 6c 61 79 03 67 6e 6f 5f 77 69 66 69"
 
 invalid:
   - name: "Truncated"  # truncated
