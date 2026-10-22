@@ -31,6 +31,10 @@ const Map<String, String> deStrings = {
       'der Spielenden.',
   'role.gm': 'Spielleitung',
   'role.gm_hint': 'Die GM-Konsole, bereitgestellt vom Feld-Controller.',
+  'role.controller': 'Feld-Controller',
+  'role.controller_hint':
+      'Dieses Handy betreibt das Spiel ohne Raspberry Pi: die Konsole, den '
+      'Check-in und die Boxen über einen I/O-Pod.',
 
   // Settings
   'settings.title': 'Einstellungen',
@@ -590,6 +594,11 @@ const Map<String, String> deStrings = {
   'player.location_denied': 'Keine Berechtigung für den Standort.',
   'player.sharing_title': 'Atalaia: Deine Position wird geteilt',
   'player.sharing_text': 'Während des Spiels',
+  // The out-of-bounds warning (decisions MF-31 to MF-40)
+  'player.out_title': 'Außerhalb des Felds',
+  'player.out_text': 'Du hast die Feldgrenze verlassen. Geh zurück hinein.',
+  'player.bounds_watch':
+      'Dieses Handy vibriert, wenn du die Feldgrenze verlässt.',
   'prop.link.connecting': 'Verbindung zum Controller…',
   'prop.link.linked': 'Über WLAN mit dem Controller verbunden',
   'prop.link.refused':
@@ -748,4 +757,127 @@ const Map<String, String> deStrings = {
       'Dieses Handy hat an diesem Feld schon eine andere ID. Nutze „ID dieses '
       'Handys verwenden" in der Online-Anmeldung oder checke ohne die '
       'Anmeldung ein.',
+
+  // Field controller (slice S6 of PE24)
+  'ctl.intro':
+      'Dieses Handy ist der Feld-Controller eines kleinen Spiels, ohne '
+      'Raspberry Pi: Es führt das Spiel aus, stellt die GM-Konsole, den '
+      'Check-in und die Anzeigetafel im WLAN des Felds bereit und spricht über '
+      'einen I/O-Pod mit den Boxen. Es läuft auch bei ausgeschaltetem '
+      'Bildschirm weiter.',
+  'ctl.refresh': 'Aktualisieren',
+  'ctl.phase_stopped': 'Gestoppt',
+  'ctl.phase_starting': 'Startet…',
+  'ctl.phase_running': 'Läuft',
+  'ctl.phase_stopping': 'Stoppt…',
+  'ctl.stopped_hint':
+      'Spiele bleiben erhalten: Beim nächsten Start geht das laufende Spiel '
+      'weiter.',
+  'ctl.no_game': 'Kein laufendes Spiel. Erstelle eines in der Konsole.',
+  'ctl.game': '{name}: {state}',
+  'ctl.game_ready': 'startbereit',
+  'ctl.game_running': 'läuft',
+  'ctl.game_paused': 'pausiert',
+  'ctl.game_ended': 'beendet',
+  'ctl.clients':
+      'Verbindungen: {stream} zur Konsole oder Anzeigetafel, {mqtt} über MQTT, '
+      '{props} von Spielprops im WLAN.',
+  'ctl.start': 'Controller starten',
+  'ctl.stop': 'Controller stoppen',
+  'ctl.error_storage':
+      'Dieses Handy hat der App keinen privaten Ordner gegeben: Der '
+      'Controller kann seine Spiele nicht speichern.',
+  'ctl.error_start': 'Der Controller ist nicht gestartet.',
+  'ctl.error_ended': 'Der Controller hat sich von selbst beendet.',
+  'ctl.no_foreground':
+      'Android hat dem Controller seine Benachrichtigung nicht erlaubt: Bei '
+      'ausgeschaltetem Bildschirm kann er stoppen. Lass die App offen oder '
+      'erlaube ihre Benachrichtigungen.',
+  'ctl.battery':
+      'Die Akku-Optimierung kann den Controller mitten im Spiel stoppen.',
+  'ctl.battery_ask': 'Ausnahme anfordern',
+  'ctl.network': 'Netz des Felds',
+  'ctl.open': 'Im WLAN des Felds erreichbar',
+  'ctl.open_on':
+      'Handys, Computer und Spielprops verbinden sich über HTTPS (Port 8443, '
+      'mit der CA des Felds) und MQTT (Port 1883).',
+  'ctl.open_off':
+      'Nur dieses Handy erreicht den Controller: Im Netz lauscht nichts.',
+  'ctl.addresses': 'Die Konsole, auf Computern im Netz des Felds:',
+  'ctl.no_address':
+      'Dieses Handy ist in keinem WLAN: Schalte seinen Hotspot ein oder '
+      'verbinde es mit dem Netz des Felds.',
+  'ctl.ca': 'Fingerabdruck der CA des Felds',
+  'ctl.ca_hint':
+      'Er steht auf dem Check-in-Plakat: Die Handys der Spielenden prüfen ihn.',
+  'ctl.wifi': 'WLAN des Felds',
+  'ctl.wifi_unavailable': 'Das WLAN dieses Handys lässt sich nicht abfragen.',
+  'ctl.wifi_off': 'WLAN aus',
+  'ctl.wifi_network': 'Im Netz {ssid}',
+  'ctl.wifi_unknown': 'In einem WLAN (für den Namen ist der Standort nötig)',
+  'ctl.hotspot_on': 'Hotspot an',
+  'ctl.hotspot_off': 'Hotspot aus',
+  'ctl.hotspot_unknown': 'Hotspot: Zustand unbekannt',
+  'ctl.hotspot_settings': 'Hotspot-Einstellungen',
+  'ctl.wifi_settings': 'WLAN-Einstellungen',
+  'ctl.local_intro':
+      'Kein Router und kein Hotspot? Das Handy kann ein Netz nur für dieses '
+      'Spiel aufbauen (Android wählt Name und Passwort und ändert sie jedes '
+      'Mal: Schreib sie nicht aufs Plakat).',
+  'ctl.local_start': 'Netz für das Spiel aufbauen',
+  'ctl.local_stop': 'Netz des Spiels ausschalten',
+  'ctl.local_on': 'Netz des Spiels: {ssid}',
+  'ctl.local_password': 'Passwort: {password}',
+  'ctl.local_qr':
+      'QR-Code für das Netz {ssid}: Spielende scannen ihn mit der Kamera.',
+  'ctl.local_error_permission':
+      'Die Berechtigung für Geräte in der Nähe (oder für den Standort) fehlt.',
+  'ctl.local_error_location_off':
+      'Schalte den Standort ein und versuch es erneut.',
+  'ctl.local_error_incompatible_mode':
+      'Dieses Handy kann das Netz nicht aufbauen, solange es in einem anderen '
+      'WLAN ist oder sein Hotspot an ist.',
+  'ctl.local_error_tethering_disallowed':
+      'Dieses Handy erlaubt nicht, seine Verbindung zu teilen.',
+  'ctl.local_error_no_channel': 'Kein WLAN-Kanal ist frei.',
+  'ctl.local_error_generic': 'Android hat das Netz nicht aufgebaut.',
+  'ctl.local_error_unavailable': 'Dieses Handy kann keine Netze aufbauen.',
+  'ctl.radio': 'Funk',
+  'ctl.radio_none': 'Kein Funk: nur Spielprops im WLAN',
+  'ctl.radio_pod': 'I/O-Pod: {name}',
+  'ctl.radio_hint':
+      'Die Boxen des Felds brauchen einen I/O-Pod, verbunden über USB oder '
+      'Bluetooth.',
+  'ctl.radio_locked': 'Um den Funk zu ändern, stoppe den Controller.',
+  'ctl.radio_up': 'Funk aktiv',
+  'ctl.radio_down': 'Funk ausgefallen',
+  'ctl.radio_connecting': 'Funk wird verbunden…',
+  'ctl.pod_forget': 'Pod entkoppeln',
+  'ctl.codes': 'Zugangscodes',
+  'ctl.codes_hint':
+      'Die Konsole fragt nach einem davon. Der GM-Code steuert das Spiel: '
+      'Zeig ihn nicht den Spielenden.',
+  'ctl.code_gm': 'GM-Code',
+  'ctl.code_read': 'Lese-Code (Anzeigetafel)',
+  'ctl.code_hidden': 'Verborgen',
+  'ctl.show_codes': 'Codes zeigen',
+  'ctl.hide_codes': 'Codes verbergen',
+  'ctl.copy': 'Kopieren: {what}',
+  'ctl.copied': 'Kopiert: {what}',
+  'ctl.console': 'GM-Konsole',
+  'ctl.open_console': 'Konsole öffnen',
+  'ctl.console_title': 'Konsole dieses Controllers',
+  'ctl.no_console':
+      'Diese App wurde ohne die Dateien der Konsole gebaut: Öffne sie von '
+      'einem Computer aus.',
+  'ctl.poster_hint':
+      'Um das Check-in-Plakat zu drucken, öffne {url} auf einem Computer im '
+      'Netz des Felds (Tab Check-in).',
+  'ctl.poster_hint_closed':
+      'Für das Check-in-Plakat muss der Controller im WLAN des Felds '
+      'erreichbar sein.',
+  'ctl.notif_title': 'Atalaia: Feld-Controller',
+  'ctl.notif_starting': 'Startet…',
+  'ctl.notif_idle': 'Kein laufendes Spiel',
+  'ctl.notif_game': '{name}: {state}',
 };

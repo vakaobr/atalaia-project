@@ -24,6 +24,9 @@ languages:
     name: Deutsch
     status: draft
     drafted: 2026-10-22
+    # Texts added in English and Portuguese after the draft (the GM console's scenario blocks and
+    # hidden areas, the app's phone controller and out-of-bounds warning) drafted the same way.
+    gaps_filled: 2026-10-22
     review: >-
       drafted by an AI model (Claude) on 2026-10-22, not yet reviewed by a native-speaking player.
       Review it with docs/translations/glossary.md, then set status to complete and name the
