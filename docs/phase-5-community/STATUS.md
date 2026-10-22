@@ -193,5 +193,7 @@ section 16).
    itself (it downloads the files; `tools/mode_package.py pack` makes the
    archive, and signing stays offline); `protocol/vectors/controller_api.json`
    has no contract cases for the new `/api/v1/mode-packages` endpoints yet
-   (the Android controller role does not serve them); the decisions P5C-1 to
-   P5C-21 are open for the maintainer's review.
+   (the Android controller role does not serve them); P5C-15 (the two sandbox
+   fixes) and P5C-18 (packages stay installed when their key is revoked) were
+   accepted by the maintainer; the other decisions of P5C-1 to P5C-21 are open
+   for the maintainer's review.
