@@ -155,9 +155,12 @@ class DevicePlugin(private val activity: Activity, messenger: BinaryMessenger) :
 
     private fun requestPermission(name: String, result: MethodChannel.Result) {
         // Before Android 12 a Bluetooth scan needs the location permission
-        // instead; before 13 notifications need none.
+        // instead; before 13 notifications need none, and a local-only
+        // hotspot (the field controller's Wi-Fi) needs location instead.
         val permission = when {
             name == "POST_NOTIFICATIONS" && Build.VERSION.SDK_INT < 33 -> null
+            name == "NEARBY_WIFI_DEVICES" && Build.VERSION.SDK_INT < 33 ->
+                "android.permission.ACCESS_FINE_LOCATION"
             (name == "BLUETOOTH_SCAN" || name == "BLUETOOTH_CONNECT") && Build.VERSION.SDK_INT < 31 ->
                 if (name == "BLUETOOTH_SCAN") "android.permission.ACCESS_FINE_LOCATION" else null
             else -> "android.permission.$name"

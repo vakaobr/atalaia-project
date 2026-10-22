@@ -14,6 +14,12 @@ their position during a game (ADR-P3-6), with the foreground service's
 location type so it goes on with the screen off; below Android 12 a
 Bluetooth scan needs it too.
 
+The field controller role (slice S6 of PE24): the same foreground service
+with its wake and Wi-Fi locks while the phone serves a field; the field's
+Wi-Fi (FieldWifiPlugin): the network's name (location), the hotspot's
+state, and a local-only hotspot, which needs NEARBY_WIFI_DEVICES from
+Android 13 (never used for location) and location before.
+
 Cleartext HTTP is still allowed for the GM console and the read-only
 player view, which the field controller serves over plain HTTP on the
 field's own network (decision PD11).
@@ -48,6 +54,9 @@ field join key, the marshal's private key and the field identities.
         android:name="android.permission.BLUETOOTH_SCAN"
         android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission
+        android:name="android.permission.NEARBY_WIFI_DEVICES"
+        android:usesPermissionFlags="neverForLocation" />
 
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
@@ -95,8 +104,8 @@ field join key, the marshal's private key and the field identities.
             android:exported="false"
             android:screenOrientation="unspecified"
             android:theme="@style/ScanTheme" />
-        <!-- A prop's game, or a player sharing their position: wake lock, Wi-Fi lock,
-             persistent notification. -->
+        <!-- A prop's game, a player sharing their position, or the phone as the field
+             controller: wake lock, Wi-Fi lock, persistent notification. -->
         <service
             android:name=".AtalaiaForegroundService"
             android:exported="false"

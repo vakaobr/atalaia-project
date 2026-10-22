@@ -29,6 +29,9 @@ $grant = Start-Job -ArgumentList $adb, $Device -ScriptBlock {
 }
 try {
     Push-Location $app
+    # The GM console and the check-in notices into assets/ (decision PE24-61).
+    dart tool/sync_console.dart
+    if ($LASTEXITCODE -ne 0) { throw 'sync_console failed' }
     flutter test $Test -d $Device
     $code = $LASTEXITCODE
 } finally {

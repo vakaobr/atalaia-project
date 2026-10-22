@@ -19,6 +19,8 @@ set -u
 DEVICE=${1:-emulator-5554}
 TEST=${2:-integration_test}
 cd "$(dirname "$0")/.."
+# The GM console and the check-in notices into assets/ (decision PE24-61).
+dart tool/sync_console.dart || exit 1
 (while true; do adb -s "$DEVICE" shell pm grant org.atalaia.app android.permission.POST_NOTIFICATIONS; sleep 0.3; done) >/dev/null 2>&1 &
 grant=$!
 flutter test "$TEST" -d "$DEVICE"

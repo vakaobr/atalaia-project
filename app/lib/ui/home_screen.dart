@@ -3,12 +3,13 @@
 
 /// The role selector (plan phase D): a game prop (Android only, ADR-P3-10),
 /// a player's view of the game, the marshal's tools (chrono check-in,
-/// replicas, player tags) and the GM console. The field controller role
-/// comes with the Android controller in plan phase E.
+/// replicas, player tags), the GM console, and the field controller
+/// (Android only; slice S6 of PE24: the phone runs the field itself).
 library;
 
 import 'package:flutter/material.dart';
 
+import '../controller/controller_screen.dart';
 import '../l10n/strings.dart';
 import '../marshal/marshal_home.dart';
 import '../platform/platform_check.dart';
@@ -53,6 +54,14 @@ class HomeScreen extends StatelessWidget {
         s.t('role.gm_hint'),
         (_) => const GmScreen(),
       ),
+      if (controllerRoleAvailable)
+        (
+          'role-controller',
+          Icons.cell_tower,
+          s.t('role.controller'),
+          s.t('role.controller_hint'),
+          (_) => const ControllerScreen(),
+        ),
     ];
     return Scaffold(
       appBar: AppBar(

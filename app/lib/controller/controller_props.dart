@@ -386,6 +386,9 @@ class PropLinks {
     return _Link(nodeId, gameId, socket);
   }
 
+  /// The Android props linked now.
+  int get count => _links.length;
+
   /// Ends every link (the controller stops).
   Future<void> close() async {
     for (final l in _links.values.toList()) {

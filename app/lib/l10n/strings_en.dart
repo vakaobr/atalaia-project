@@ -30,6 +30,10 @@ const Map<String, String> enStrings = {
       'tags.',
   'role.gm': 'Game master',
   'role.gm_hint': "The game master's console, served by the field controller.",
+  'role.controller': 'Field controller',
+  'role.controller_hint':
+      'This phone runs the game with no Raspberry Pi: the console, check-in '
+      'and the boxes through an I/O pod.',
 
   // Settings
   'settings.title': 'Settings',
@@ -720,4 +724,119 @@ const Map<String, String> enStrings = {
   'checkin.ticket_other_id':
       'This phone already has another id at this field. Use "Use this phone\'s '
       'id" in online registration, or check in without the registration.',
+
+  // Field controller (slice S6 of PE24)
+  'ctl.intro':
+      'This phone is the field controller of a small game, with no Raspberry '
+      'Pi: it runs the game, serves the game master\'s console, check-in and '
+      'the scoreboard on the field\'s Wi-Fi, and talks to the boxes through an '
+      'I/O pod. It keeps running with the screen off.',
+  'ctl.refresh': 'Refresh',
+  'ctl.phase_stopped': 'Stopped',
+  'ctl.phase_starting': 'Starting…',
+  'ctl.phase_running': 'Running',
+  'ctl.phase_stopping': 'Stopping…',
+  'ctl.stopped_hint':
+      'Games are kept: when it starts again, the live game goes on.',
+  'ctl.no_game': 'No live game. Create one in the console.',
+  'ctl.game': '{name}: {state}',
+  'ctl.game_ready': 'ready to start',
+  'ctl.game_running': 'running',
+  'ctl.game_paused': 'paused',
+  'ctl.game_ended': 'ended',
+  'ctl.clients':
+      'Connections: {stream} to the console or scoreboard, {mqtt} over MQTT, '
+      '{props} from game props on Wi-Fi.',
+  'ctl.start': 'Start the controller',
+  'ctl.stop': 'Stop the controller',
+  'ctl.error_storage':
+      'This phone gave the app no private folder: the controller cannot keep '
+      'its games.',
+  'ctl.error_start': 'The controller did not start.',
+  'ctl.error_ended': 'The controller stopped by itself.',
+  'ctl.no_foreground':
+      'Android did not let the controller show its notification: with the '
+      'screen off it may stop. Keep the app open, or allow its notifications.',
+  'ctl.battery': 'Battery optimisation may stop the controller mid-game.',
+  'ctl.battery_ask': 'Ask for the exemption',
+  'ctl.network': "Field's network",
+  'ctl.open': "Open on the field's Wi-Fi",
+  'ctl.open_on':
+      'Phones, computers and game props connect over HTTPS (port 8443, with '
+      "the field's CA) and MQTT (port 1883).",
+  'ctl.open_off':
+      'Only this phone reaches the controller: nothing listens on the network.',
+  'ctl.addresses': "The console, on computers on the field's network:",
+  'ctl.no_address':
+      'This phone is on no Wi-Fi network: turn its hotspot on or join the '
+      "field's network.",
+  'ctl.ca': "The field CA's fingerprint",
+  'ctl.ca_hint': "It is on the check-in poster: players' phones check it.",
+  'ctl.wifi': "Field's Wi-Fi",
+  'ctl.wifi_unavailable': "This phone's Wi-Fi cannot be seen.",
+  'ctl.wifi_off': 'Wi-Fi off',
+  'ctl.wifi_network': 'On the network {ssid}',
+  'ctl.wifi_unknown': 'On a Wi-Fi network (its name needs location)',
+  'ctl.hotspot_on': 'Hotspot on',
+  'ctl.hotspot_off': 'Hotspot off',
+  'ctl.hotspot_unknown': 'Hotspot: state unknown',
+  'ctl.hotspot_settings': 'Hotspot settings',
+  'ctl.wifi_settings': 'Wi-Fi settings',
+  'ctl.local_intro':
+      'No router or hotspot? The phone can make a network for this game only '
+      '(Android picks its name and password and changes them each time: do '
+      'not put them on the poster).',
+  'ctl.local_start': 'Make a network for the game',
+  'ctl.local_stop': "Turn the game's network off",
+  'ctl.local_on': "The game's network: {ssid}",
+  'ctl.local_password': 'Password: {password}',
+  'ctl.local_qr':
+      'QR code to join the network {ssid}: players scan it with their camera.',
+  'ctl.local_error_permission':
+      'The nearby devices (or location) permission is missing.',
+  'ctl.local_error_location_off': 'Turn location on and try again.',
+  'ctl.local_error_incompatible_mode':
+      'This phone cannot make the network while on another Wi-Fi network or '
+      'with its hotspot on.',
+  'ctl.local_error_tethering_disallowed':
+      'This phone does not allow sharing its connection.',
+  'ctl.local_error_no_channel': 'No Wi-Fi channel is free.',
+  'ctl.local_error_generic': 'Android did not make the network.',
+  'ctl.local_error_unavailable': 'This phone cannot make networks.',
+  'ctl.radio': 'Radio',
+  'ctl.radio_none': 'No radio: game props on Wi-Fi only',
+  'ctl.radio_pod': 'I/O pod: {name}',
+  'ctl.radio_hint':
+      "The field's boxes need an I/O pod linked over USB or Bluetooth.",
+  'ctl.radio_locked': 'To change the radio, stop the controller.',
+  'ctl.radio_up': 'Radio up',
+  'ctl.radio_down': 'Radio down',
+  'ctl.radio_connecting': 'Reaching the radio…',
+  'ctl.pod_forget': 'Unlink the pod',
+  'ctl.codes': 'Access codes',
+  'ctl.codes_hint':
+      "The console asks for one of these. The game master's runs the game: "
+      'do not show it to players.',
+  'ctl.code_gm': "Game master's code",
+  'ctl.code_read': 'Read-only code (scoreboard)',
+  'ctl.code_hidden': 'Hidden',
+  'ctl.show_codes': 'Show the codes',
+  'ctl.hide_codes': 'Hide the codes',
+  'ctl.copy': 'Copy: {what}',
+  'ctl.copied': 'Copied: {what}',
+  'ctl.console': "Game master's console",
+  'ctl.open_console': 'Open the console',
+  'ctl.console_title': "This controller's console",
+  'ctl.no_console':
+      "This app was built without the console's files: open it from a "
+      'computer.',
+  'ctl.poster_hint':
+      "To print the check-in poster, open {url} on a computer on the field's "
+      'network (Check-in tab).',
+  'ctl.poster_hint_closed':
+      "The check-in poster needs the controller open on the field's Wi-Fi.",
+  'ctl.notif_title': 'Atalaia: field controller',
+  'ctl.notif_starting': 'Starting…',
+  'ctl.notif_idle': 'No live game',
+  'ctl.notif_game': '{name}: {state}',
 };

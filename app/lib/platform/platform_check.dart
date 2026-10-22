@@ -16,3 +16,8 @@ bool get isIOS => defaultTargetPlatform == TargetPlatform.iOS;
 /// The prop role needs kiosk mode, background NFC, USB-OTG and the core:
 /// Android only (ADR-P3-10).
 bool get propRoleAvailable => !kIsWeb && isAndroid;
+
+/// The field controller role needs the core, a foreground service that
+/// keeps it running with the screen off, servers on the field's Wi-Fi and
+/// the I/O pod's USB link: Android only (ADR-P3-10, slice S6 of PE24).
+bool get controllerRoleAvailable => !kIsWeb && isAndroid;

@@ -168,3 +168,98 @@ abstract interface class QrScanner {
   /// camera picture.
   Future<String?> scan({required String hint, required String cancel});
 }
+
+/// The field's Wi-Fi for a phone that is the field controller (slice S6 of
+/// PE24; FieldWifiPlugin.kt): what network the phone is on, its hotspot,
+/// Android's settings for both, and a local-only hotspot the app starts
+/// itself (a network of its own whose name and password Android chooses,
+/// with no internet, gone when the app lets it go).
+abstract interface class FieldWifiService {
+  Future<FieldWifiInfo> info();
+
+  /// Opens Android's hotspot (tethering) settings; false when it cannot.
+  Future<bool> openHotspotSettings();
+
+  /// Opens Android's Wi-Fi settings; false when it cannot.
+  Future<bool> openWifiSettings();
+
+  /// Starts a local-only hotspot, or says why Android refused
+  /// ([LocalHotspot.error]).
+  Future<LocalHotspot> startLocalHotspot();
+  Future<void> stopLocalHotspot();
+}
+
+enum HotspotState { on, off, unknown }
+
+final class FieldWifiInfo {
+  const FieldWifiInfo({
+    this.available = false,
+    this.wifiEnabled = false,
+    this.ssid,
+    this.hotspot = HotspotState.unknown,
+    this.localHotspot,
+  });
+
+  /// The plugin answered (false: iOS, a test without a fake).
+  final bool available;
+  final bool wifiEnabled;
+
+  /// The network the phone is on, when Android tells (it needs location).
+  final String? ssid;
+  final HotspotState hotspot;
+
+  /// The local-only hotspot the app holds now, if any.
+  final LocalHotspot? localHotspot;
+
+  static FieldWifiInfo fromMap(Map<Object?, Object?> m) {
+    final ssid = m['ssid'];
+    final local = m['local'];
+    return FieldWifiInfo(
+      available: m.isNotEmpty,
+      wifiEnabled: m['wifi_enabled'] == true,
+      ssid: ssid is String && ssid.isNotEmpty ? ssid : null,
+      hotspot:
+          HotspotState.values.asNameMap()[m['hotspot']] ?? HotspotState.unknown,
+      localHotspot: local is Map ? LocalHotspot.fromMap(local) : null,
+    );
+  }
+}
+
+final class LocalHotspot {
+  const LocalHotspot({this.ssid, this.passphrase, this.error});
+
+  final String? ssid;
+  final String? passphrase;
+
+  /// Why it did not start: permission, location_off, incompatible_mode,
+  /// tethering_disallowed, no_channel, generic, unavailable.
+  final String? error;
+
+  bool get started => ssid != null && error == null;
+
+  /// The text of a Wi-Fi QR code (the "WIFI:" form phones' cameras read):
+  /// players join the network by scanning it.
+  String? get qrText {
+    final s = ssid;
+    if (s == null) return null;
+    String esc(String v) {
+      final out = StringBuffer();
+      for (final c in v.split('')) {
+        if (r'\;,:"'.contains(c)) out.write(r'\');
+        out.write(c);
+      }
+      return out.toString();
+    }
+
+    final p = passphrase;
+    return p == null || p.isEmpty
+        ? 'WIFI:T:nopass;S:${esc(s)};;'
+        : 'WIFI:T:WPA;S:${esc(s)};P:${esc(p)};;';
+  }
+
+  static LocalHotspot fromMap(Map<Object?, Object?> m) => LocalHotspot(
+    ssid: m['ssid'] as String?,
+    passphrase: m['passphrase'] as String?,
+    error: m['error'] as String?,
+  );
+}

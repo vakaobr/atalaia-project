@@ -68,15 +68,21 @@
 /// (the GM token, a marshal's or gm's token of the game) everything, as on
 /// the Pi.
 ///
+/// Slice S6 (controller_host.dart): the GM console and the scoreboard
+/// (`/`, `/console/...`, `/scoreboard`; console_files.dart) and the field
+/// CA (`GET /api/v1/controller/ca`, no token), as the Pi serves them.
+///
 /// [serve] listens on the loopback address unless told otherwise: a phone
 /// controller is reachable from the field's network only when the shell
-/// opens it there (PE24-7). The rest of the Pi's endpoints are later slices
+/// opens it there, over HTTPS ([serveRequest] on the shell's own servers;
+/// PE24-7, PE24-62). The rest of the Pi's endpoints are later slices
 /// (PLAN.md, "PE24 slices").
 library;
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
@@ -86,6 +92,7 @@ import 'controller_engine.dart';
 import 'controller_positions.dart';
 import 'controller_props.dart';
 import 'controller_stream.dart';
+import 'console_files.dart';
 
 /// The app's version (pubspec.yaml), which /healthz and /whoami give.
 const controllerApiVersion = '0.2.0';
@@ -94,6 +101,7 @@ const controllerApiVersion = '0.2.0';
 final class ApiResponse {
   const ApiResponse(this.status, this.body, [this.headers = const {}])
     : text = null,
+      data = null,
       contentType = null;
 
   /// An answer that is not JSON: [text] as [contentType].
@@ -102,11 +110,22 @@ final class ApiResponse {
     String this.text,
     String this.contentType, [
     this.headers = const {},
-  ]) : body = null;
+  ]) : body = null,
+       data = null;
+
+  /// A file's bytes as [contentType] (the GM console's files, slice S6).
+  const ApiResponse.bytes(
+    this.status,
+    Uint8List this.data,
+    String this.contentType, [
+    this.headers = const {},
+  ]) : body = null,
+       text = null;
 
   final int status;
   final Object? body;
   final String? text;
+  final Uint8List? data;
   final String? contentType;
   final Map<String, String> headers;
 }
@@ -208,6 +227,8 @@ class ControllerApi {
       _route('POST', r'/api/v1/nodes/([^/]+)/cmd', _gm(_nodeCmd)),
       _route('GET', r'/api/v1/games/([^/]+)/log', _viewer(_log)),
       _route('GET', r'/api/v1/controller', _read(_status)),
+      // Slice S6: the field CA (no token), as the Pi's api.py `field_ca`.
+      _route('GET', r'/api/v1/controller/ca', _fieldCa),
       // Slice S4: joins and the boxes' language.
       _route('POST', r'/api/v1/join', _gm(_join)),
       _route('POST', r'/api/v1/nodes/([^/]+)/join', _gm(_joinNode)),
@@ -241,6 +262,17 @@ class ControllerApi {
   final String gmToken;
   final String readToken;
   late final List<(String, RegExp, _Handler)> _routes;
+
+  /// The GM console and the scoreboard (console_files.dart; slice S6): the
+  /// controller/console/src files the app carries. Empty: none served, as a
+  /// Pi without the console's folder.
+  ConsoleFiles console = ConsoleFiles(const {});
+
+  /// The field CA's certificate (PEM) and SHA-256 when the phone serves
+  /// HTTPS (field_tls.dart; slice S6); null: `GET /api/v1/controller/ca`
+  /// is 404, as on a Pi with `tls_port = 0`.
+  String? caPem;
+  String? caSha256Hex;
 
   static (String, RegExp, _Handler) _route(
     String method,
@@ -370,6 +402,10 @@ class ControllerApi {
     String body,
     String client,
   ) {
+    if (method == 'GET' || method == 'HEAD') {
+      final file = _consoleAnswer(uri.path);
+      if (file != null) return file;
+    }
     String? token;
     if (authorization != null &&
         authorization.toLowerCase().startsWith('bearer ')) {
@@ -395,6 +431,22 @@ class ControllerApi {
         : const ApiResponse(404, {'detail': 'Not Found'});
   }
 
+  /// The console's file or redirect for [path], with the Pi's security
+  /// headers on /console answers; null when [path] is the API's.
+  ApiResponse? _consoleAnswer(String path) {
+    final a = console.answer(path);
+    if (a == null) return null;
+    final headers = {
+      if (path.startsWith('/console')) ...consoleSecurityHeaders,
+      if (a.location != null) 'Location': a.location!,
+    };
+    return switch (a.status) {
+      200 => ApiResponse.bytes(200, a.bytes!, a.contentType!, headers),
+      404 => ApiResponse(404, const {'detail': 'Not Found'}, headers),
+      _ => ApiResponse(a.status, null, headers),
+    };
+  }
+
   static ApiResponse _errorAnswer(Object e) => switch (e) {
     _HttpError() => ApiResponse(e.status, {'detail': e.detail}, e.headers),
     ControllerError() => ApiResponse(e.status, {
@@ -411,11 +463,14 @@ class ControllerApi {
       address ?? InternetAddress.loopbackIPv4,
       port,
     );
-    server.listen((req) => unawaited(_serveOne(req)));
+    server.listen((req) => unawaited(serveRequest(req)));
     return server;
   }
 
-  Future<void> _serveOne(HttpRequest req) async {
+  /// Answers one request of a server the caller bound (the phone's shell
+  /// binds HTTP on the loopback address and HTTPS for the field's Wi-Fi,
+  /// controller_host.dart).
+  Future<void> serveRequest(HttpRequest req) async {
     if (req.uri.path == '/api/v1/stream' &&
         WebSocketTransformer.isUpgradeRequest(req)) {
       await _stream(req);
@@ -446,7 +501,7 @@ class ControllerApi {
         body: utf8.decode(chunks, allowMalformed: true),
         client: req.connectionInfo?.remoteAddress.address ?? '?',
       );
-      _write(res, answer);
+      _write(res, answer, head: req.method == 'HEAD');
     } on _HttpError catch (e) {
       _write(res, ApiResponse(e.status, {'detail': e.detail}));
     } on Object catch (e) {
@@ -478,9 +533,21 @@ class ControllerApi {
     hub.connect(socket, who);
   }
 
-  static void _write(HttpResponse res, ApiResponse a) {
+  static void _write(HttpResponse res, ApiResponse a, {bool head = false}) {
     res.statusCode = a.status;
     res.headers.set('Cache-Control', 'no-store');
+    final data = a.data;
+    if (data != null) {
+      res.headers.contentType = ContentType.parse(a.contentType!);
+      a.headers.forEach(res.headers.set);
+      res.contentLength = data.length;
+      if (!head) res.add(data);
+      return;
+    }
+    if (a.status >= 300 && a.status < 400 && a.body == null) {
+      a.headers.forEach(res.headers.set);
+      return;
+    }
     final text = a.text;
     if (text != null) {
       res.headers.contentType = ContentType.parse(a.contentType!);
@@ -494,6 +561,17 @@ class ControllerApi {
   }
 
   // --- endpoints ------------------------------------------------------------
+
+  ApiResponse _fieldCa(_Request r) {
+    final pem = caPem;
+    if (pem == null) {
+      throw _HttpError(404, 'HTTPS is off on this phone controller');
+    }
+    return ApiResponse.text(200, pem, 'application/x-pem-file', {
+      'X-Atalaia-CA-SHA256': caSha256Hex ?? '',
+      'Cache-Control': 'no-cache',
+    });
+  }
 
   ApiResponse _healthz(_Request r) => ApiResponse(200, {
     'ok': true,

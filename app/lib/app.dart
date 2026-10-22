@@ -16,6 +16,8 @@ import 'branding/field_branding.dart';
 import 'checkin/checkin_client.dart';
 import 'checkin/field_trust.dart';
 import 'checkin/my_replicas.dart';
+import 'controller/controller_isolate.dart';
+import 'controller/controller_shell.dart';
 import 'controller/prop_link.dart';
 import 'core/node_runner.dart';
 import 'l10n/strings.dart';
@@ -70,7 +72,18 @@ class AppServices {
     BrandingSourceFor? brandingSource,
     SiteHttp Function(Uri origin)? siteHttp,
     this.links,
+    this.wifi,
+    ControllerLauncher? controllerLauncher,
+    ControllerAssetsLoader? controllerAssets,
+    String? controllerDir,
   }) : modes = modes ?? ModeCatalog.builtin(),
+       controller = ControllerShell(
+         device: device,
+         foreground: foreground,
+         launcher: controllerLauncher,
+         assets: controllerAssets,
+         directory: controllerDir,
+       ),
        brandingSource = brandingSource ?? ioBrandingSource,
        branding = BrandingCache(store),
        fieldHttp = fieldHttp ?? IoFieldHttp.new,
@@ -93,6 +106,7 @@ class AppServices {
         blePods: ChannelPodTransport.ble,
         location: ChannelLocationService(),
         links: ChannelAppLinks(),
+        wifi: ChannelFieldWifi(),
       );
 
   final NodeRunner runner;
@@ -133,6 +147,13 @@ class AppServices {
   final SiteSessions sites;
   final TicketStore tickets;
   final AppLinks? links;
+
+  /// The field's Wi-Fi for the controller role (null: not available).
+  final FieldWifiService? wifi;
+
+  /// The phone's field controller (slice S6 of PE24): it outlives its
+  /// screen, so it lives here (tests give a fake launcher and assets).
+  final ControllerShell controller;
 }
 
 /// The settings, saved whenever they change.

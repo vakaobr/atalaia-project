@@ -12,7 +12,9 @@ import 'package:atalaia_app/l10n/strings_pt.dart';
 import 'package:atalaia_app/prop/prop_session.dart';
 import 'package:atalaia_app/ui/theme.dart';
 import 'package:atalaia_app/chrono/replica.dart';
+import 'package:atalaia_app/controller/controller_shell.dart';
 import 'package:atalaia_app/controller/prop_link.dart';
+import 'package:atalaia_app/platform/services.dart';
 import 'package:atalaia_app/radio/pod_radio_link.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -45,7 +47,7 @@ void main() {
     final used = <String>{};
     final literal = RegExp(r"""\bt(?:Or)?\(\s*'([a-z_]+\.[a-z0-9_.]+)'""");
     final quoted = RegExp(
-      r"'((?:setup|join|chrono|replica|tags|pod|player|marshal|prop|battery|settings|nfc|gm|pin|role|home|common)\.[a-z_]+)'",
+      r"'((?:setup|join|chrono|replica|tags|pod|player|marshal|prop|battery|settings|nfc|gm|pin|role|home|common|ctl)\.[a-z_]+)'",
     );
     for (final f in Directory('lib').listSync(recursive: true)) {
       if (f is! File || !f.path.endsWith('.dart')) continue;
@@ -124,6 +126,21 @@ void main() {
       ],
       'prop.radio.heard',
       'prop.pod_opened',
+      // PE24 slice S6: the field controller's screen.
+      for (final p in ControllerPhase.values) 'ctl.phase_${p.name}',
+      for (final s in ['ready', 'running', 'paused', 'ended']) 'ctl.game_$s',
+      for (final h in HotspotState.values) 'ctl.hotspot_${h.name}',
+      for (final r in ['none', 'up', 'down', 'connecting']) 'ctl.radio_$r',
+      for (final e in [
+        'permission',
+        'location_off',
+        'incompatible_mode',
+        'tethering_disallowed',
+        'no_channel',
+        'generic',
+        'unavailable',
+      ])
+        'ctl.local_error_$e',
     ];
     for (final k in keys) {
       expect(ptStrings.containsKey(k), isTrue, reason: k);

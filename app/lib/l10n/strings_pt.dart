@@ -32,6 +32,10 @@ const Map<String, String> ptStrings = {
   'role.gm': 'Organização',
   'role.gm_hint':
       'A consola da organização, servida pelo controlador de campo.',
+  'role.controller': 'Controlador de campo',
+  'role.controller_hint':
+      'Este telemóvel corre o jogo sem Raspberry Pi: a consola, o check-in e '
+      'as caixas através de um módulo de E/S.',
 
   // Definições
   'settings.title': 'Definições',
@@ -729,4 +733,125 @@ const Map<String, String> ptStrings = {
   'checkin.ticket_other_id':
       'Este telemóvel já tem outro ID neste campo. Usa «Usar o meu ID deste '
       'telemóvel» nas inscrições online, ou faz o check-in sem a inscrição.',
+
+  // Controlador de campo (fatia S6 da PE24)
+  'ctl.intro':
+      'Este telemóvel faz de controlador de campo de um jogo pequeno, sem '
+      'Raspberry Pi: corre o jogo, serve a consola da organização, o '
+      'check-in e o marcador na rede Wi-Fi do campo, e fala com as caixas '
+      'através de um módulo de E/S. Continua a correr com o ecrã apagado.',
+  'ctl.refresh': 'Atualizar',
+  'ctl.phase_stopped': 'Parado',
+  'ctl.phase_starting': 'A arrancar…',
+  'ctl.phase_running': 'A funcionar',
+  'ctl.phase_stopping': 'A parar…',
+  'ctl.stopped_hint':
+      'Os jogos ficam guardados: ao arrancar outra vez, o jogo em curso '
+      'continua.',
+  'ctl.no_game': 'Sem jogo em curso. Cria um na consola.',
+  'ctl.game': '{name}: {state}',
+  'ctl.game_ready': 'pronto a começar',
+  'ctl.game_running': 'a decorrer',
+  'ctl.game_paused': 'em pausa',
+  'ctl.game_ended': 'terminado',
+  'ctl.clients':
+      'Ligações: {stream} à consola ou ao marcador, {mqtt} por MQTT, {props} '
+      'de dispositivos de jogo por Wi-Fi.',
+  'ctl.start': 'Arrancar o controlador',
+  'ctl.stop': 'Parar o controlador',
+  'ctl.error_storage':
+      'Este telemóvel não deu uma pasta privada à app: o controlador não '
+      'pode guardar os jogos.',
+  'ctl.error_start': 'O controlador não arrancou.',
+  'ctl.error_ended': 'O controlador parou sozinho.',
+  'ctl.no_foreground':
+      'O Android não deixou abrir a notificação do controlador: com o ecrã '
+      'apagado, pode parar. Deixa a app aberta ou dá-lhe a permissão de '
+      'notificações.',
+  'ctl.battery':
+      'A otimização da bateria pode parar o controlador a meio de um jogo.',
+  'ctl.battery_ask': 'Pedir a exceção',
+  'ctl.network': 'Rede do campo',
+  'ctl.open': 'Aberto na rede Wi-Fi do campo',
+  'ctl.open_on':
+      'Telemóveis, computadores e dispositivos de jogo ligam-se por HTTPS '
+      '(porta 8443, com a CA do campo) e por MQTT (porta 1883).',
+  'ctl.open_off':
+      'Só este telemóvel chega ao controlador: nada fica à escuta na rede.',
+  'ctl.addresses': 'A consola, nos computadores da rede do campo:',
+  'ctl.no_address':
+      'Este telemóvel não está em nenhuma rede Wi-Fi: liga o hotspot ou '
+      'junta-te à rede do campo.',
+  'ctl.ca': 'Impressão digital da CA do campo',
+  'ctl.ca_hint':
+      'Vai no cartaz de check-in: os telemóveis de quem joga confirmam-na.',
+  'ctl.wifi': 'Wi-Fi do campo',
+  'ctl.wifi_unavailable': 'Não é possível ver o Wi-Fi neste telemóvel.',
+  'ctl.wifi_off': 'Wi-Fi desligado',
+  'ctl.wifi_network': 'Na rede {ssid}',
+  'ctl.wifi_unknown': 'Numa rede Wi-Fi (o nome precisa da localização)',
+  'ctl.hotspot_on': 'Hotspot ligado',
+  'ctl.hotspot_off': 'Hotspot desligado',
+  'ctl.hotspot_unknown': 'Hotspot: estado desconhecido',
+  'ctl.hotspot_settings': 'Definições do hotspot',
+  'ctl.wifi_settings': 'Definições de Wi-Fi',
+  'ctl.local_intro':
+      'Sem router nem hotspot? O telemóvel pode criar uma rede só para este '
+      'jogo (o Android escolhe o nome e a palavra-passe e muda-os de cada '
+      'vez: não os ponhas no cartaz).',
+  'ctl.local_start': 'Criar uma rede para o jogo',
+  'ctl.local_stop': 'Desligar a rede do jogo',
+  'ctl.local_on': 'Rede do jogo: {ssid}',
+  'ctl.local_password': 'Palavra-passe: {password}',
+  'ctl.local_qr':
+      'Código QR para entrar na rede {ssid}: quem joga lê-o com a câmara.',
+  'ctl.local_error_permission':
+      'Falta a permissão de dispositivos próximos (ou de localização).',
+  'ctl.local_error_location_off': 'Liga a localização e tenta outra vez.',
+  'ctl.local_error_incompatible_mode':
+      'Este telemóvel não cria a rede enquanto está noutra rede Wi-Fi ou com '
+      'o hotspot ligado.',
+  'ctl.local_error_tethering_disallowed':
+      'Este telemóvel não deixa partilhar a ligação.',
+  'ctl.local_error_no_channel': 'Não há um canal Wi-Fi livre.',
+  'ctl.local_error_generic': 'O Android não criou a rede.',
+  'ctl.local_error_unavailable': 'Não é possível criar redes neste telemóvel.',
+  'ctl.radio': 'Rádio',
+  'ctl.radio_none': 'Sem rádio: só dispositivos de jogo por Wi-Fi',
+  'ctl.radio_pod': 'Módulo de E/S: {name}',
+  'ctl.radio_hint':
+      'As caixas do campo precisam de um módulo de E/S ligado por USB ou '
+      'Bluetooth.',
+  'ctl.radio_locked': 'Para mudar o rádio, para o controlador.',
+  'ctl.radio_up': 'Rádio ligado',
+  'ctl.radio_down': 'Rádio em baixo',
+  'ctl.radio_connecting': 'A ligar ao rádio…',
+  'ctl.pod_forget': 'Desligar o módulo',
+  'ctl.codes': 'Códigos de acesso',
+  'ctl.codes_hint':
+      'A consola pede um destes. O da organização manda no jogo: não o '
+      'mostres a quem joga.',
+  'ctl.code_gm': 'Código da organização',
+  'ctl.code_read': 'Código só de leitura (marcador)',
+  'ctl.code_hidden': 'Escondido',
+  'ctl.show_codes': 'Mostrar os códigos',
+  'ctl.hide_codes': 'Esconder os códigos',
+  'ctl.copy': 'Copiar: {what}',
+  'ctl.copied': 'Copiado: {what}',
+  'ctl.console': 'Consola da organização',
+  'ctl.open_console': 'Abrir a consola',
+  'ctl.console_title': 'Consola deste controlador',
+  'ctl.no_console':
+      'Esta app foi feita sem os ficheiros da consola: abre-a a partir de um '
+      'computador.',
+  'ctl.poster_hint':
+      'Para imprimir o cartaz de check-in, abre {url} num computador da rede '
+      'do campo (separador Check-in).',
+  'ctl.poster_hint_closed':
+      'O cartaz de check-in precisa do controlador aberto na rede Wi-Fi do '
+      'campo.',
+  'ctl.notif_title': 'Atalaia: controlador de campo',
+  'ctl.notif_starting': 'A arrancar…',
+  'ctl.notif_idle': 'Sem jogo em curso',
+  'ctl.notif_game': '{name}: {state}',
 };

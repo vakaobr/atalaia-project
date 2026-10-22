@@ -32,7 +32,10 @@
 /// ([fieldPosition]), the retention purge and the grants' expiry on [tick],
 /// positions deleted when a game ends. Not yet: presets, mode uploads,
 /// scenarios, role packages, branding, the channel choice and scans,
-/// re-invites, failover (S7).
+/// re-invites, failover (S7). Slice S6: the shell runs the engine on the
+/// controller's own isolate (controller_host.dart) and gives it the field
+/// CA and the phone's addresses for join keys 13 and 14 ([caSha256],
+/// [linkUrls]).
 library;
 
 import 'dart:convert';
@@ -1251,6 +1254,13 @@ class ControllerEngine {
   /// sealed with it. Empty: no joins (503), as on a Pi without one.
   Uint8List joinKey = Uint8List(0);
 
+  /// The field CA's SHA-256 and the phone's https addresses, once it serves
+  /// HTTPS (slice S6, field_tls.dart): join payload keys 13 and 14 for a
+  /// box or an Android prop (the Pi's `ca_sha256` and `link_urls`). Null:
+  /// no HTTPS, joins without them.
+  Uint8List? caSha256;
+  List<String> linkUrls = const [];
+
   Set<int> _issuedIds() {
     final saved = store.getSetting('issued_nodes:${_game!['id']}');
     return saved == null
@@ -1347,7 +1357,12 @@ class ControllerEngine {
       );
     }
     final params = (g['params'] as Map?)?.cast<String, Object?>() ?? {};
-    final join = JoinPayload(
+    // Android props link over Wi-Fi with the field CA and the phone's
+    // addresses (keys 13 and 14, RFC 0001 Amendment 4, proposed), as the
+    // Pi's issue_join: a payload too long with them is made without them.
+    final ca = caSha256;
+    final withLink = kind == 'node' && ca != null;
+    JoinPayload joinWith({required bool link}) => JoinPayload(
       gameId: id,
       gameKey: _key,
       nodeId: node,
@@ -1361,10 +1376,21 @@ class ControllerEngine {
       params: params.isEmpty ? null : params,
       kind: kind == 'node' ? JoinKind.node : JoinKind.controller,
       lang: store.getSetting('box_lang:$id'),
+      caSha256: link ? ca : null,
+      urls: link && linkUrls.isNotEmpty ? linkUrls.take(3).toList() : null,
     );
-    final Uint8List payload;
+    var join = joinWith(link: withLink);
+    var linked = withLink;
+    Uint8List payload;
     try {
-      payload = encodeJoin(join, joinKey);
+      try {
+        payload = encodeJoin(join, joinKey);
+      } on JoinException catch (e) {
+        if (!withLink || e.reason != JoinFailure.length) rethrow;
+        join = joinWith(link: false);
+        linked = false;
+        payload = encodeJoin(join, joinKey);
+      }
     } on JoinException catch (e) {
       throw ControllerError.conflict(
         'this game does not fit in a join payload: ${e.message}',
@@ -1395,9 +1421,7 @@ class ControllerEngine {
       'text': joinToText(payload),
       'payload_hex': _hexOf(payload),
       'ndef_tag_hex': _hexOf(type2Memory(payload, joinNdefType)),
-      // Keys 13 and 14 (the field CA and the https addresses) come with
-      // HTTPS on the phone, slice S6: an Android prop asks for the address.
-      'wifi_link': false,
+      'wifi_link': linked,
     };
     _emit({
       'type': 'join',

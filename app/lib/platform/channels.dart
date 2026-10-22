@@ -114,6 +114,41 @@ class ChannelForegroundService implements ForegroundService {
   Future<void> stop() => _call<void>(_ch, 'stop', null);
 }
 
+class ChannelFieldWifi implements FieldWifiService {
+  static const _ch = MethodChannel('$_prefix/wifi');
+
+  @override
+  Future<FieldWifiInfo> info() async {
+    final m = await _call<Map<Object?, Object?>>(_ch, 'info', const {});
+    return FieldWifiInfo.fromMap(m);
+  }
+
+  @override
+  Future<bool> openHotspotSettings() =>
+      _call<bool>(_ch, 'openHotspotSettings', false);
+
+  @override
+  Future<bool> openWifiSettings() =>
+      _call<bool>(_ch, 'openWifiSettings', false);
+
+  @override
+  Future<LocalHotspot> startLocalHotspot() async {
+    try {
+      final m = await _call<Map<Object?, Object?>>(
+        _ch,
+        'startLocalHotspot',
+        const {'error': 'unavailable'},
+      );
+      return LocalHotspot.fromMap(m);
+    } on PlatformException catch (e) {
+      return LocalHotspot(error: e.code);
+    }
+  }
+
+  @override
+  Future<void> stopLocalHotspot() => _call<void>(_ch, 'stopLocalHotspot', null);
+}
+
 class ChannelNfcService implements NfcService {
   static const _ch = MethodChannel('$_prefix/nfc');
   static const _events = EventChannel('$_prefix/nfc/reads');

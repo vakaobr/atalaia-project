@@ -17,7 +17,9 @@ import android.os.IBinder
 import android.os.PowerManager
 
 /**
- * The prop's foreground service (ADR-P3-5): while a game runs it keeps the
+ * The prop's foreground service (ADR-P3-5), also the field controller's
+ * (slice S6 of PE24: the controller's isolate serves the field while it
+ * runs, and MainActivity keeps the Flutter engine past its activity): while a game runs it keeps the
  * process in the foreground with a quiet persistent notification (channel
  * `atalaia_game`: the mode and the time left), holds a partial wake lock
  * (`atalaia:game_loop`, visible in `dumpsys power`) so the CPU keeps

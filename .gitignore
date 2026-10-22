@@ -24,6 +24,9 @@ app/build/
 app/.flutter-plugins
 app/.flutter-plugins-dependencies
 app/android/local.properties
+# Copied in at build time by app/tool/sync_console.dart (decision PE24-61).
+app/assets/console/
+app/assets/notices/
 app/ios/Pods/
 
 # Python

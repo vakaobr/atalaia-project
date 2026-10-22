@@ -30,6 +30,10 @@ dependencies:
   cryptography: 2.9.0
   # calloc, malloc and UTF-8 strings for the dart:ffi bridge to the core (Dart team).
   ffi: 2.2.0
+  # ECDSA P-256 for the field CA a phone controller makes (slice S6 of PE24,
+  # field_tls.dart): key generation and RFC 6979 signatures (the Legion of
+  # the Bouncy Castle, pure Dart). The certificates' DER is the app's own.
+  pointycastle: 4.0.0
   # QR code matrices for the qr_code template widget (kevmoo.com, pure Dart);
   # the app draws the modules itself (lib/ui/qr_painter.dart).
   qr: 4.0.0
@@ -51,3 +55,18 @@ flutter:
   uses-material-design: true
   assets:
     - lib/chrono/limit_templates/
+    # The GM console (controller/console/src) and the check-in notices
+    # (controller/templates/checkin-notice-*.md), copied in at build time by
+    # tool/sync_console.dart (app/tool/check.sh, CI); never committed here
+    # (.gitignore). A phone controller serves them (slice S6 of PE24, PE24-61).
+    # Flutter's asset folders are not recursive: one line per folder, which
+    # test/controller/console_bundle_test.dart checks against the console.
+    - assets/console/
+    - assets/console/components/
+    - assets/console/i18n/
+    - assets/console/icons/
+    - assets/console/lib/
+    - assets/console/lib/blockly/
+    - assets/console/lib/blockly/media/
+    - assets/console/lib/blockly/msg/
+    - assets/notices/

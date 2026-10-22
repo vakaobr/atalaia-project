@@ -32,8 +32,11 @@
 #
 # The repository is at $ATALAIA_SRC (default /src), mounted read-only except
 # for format, lock, gen and goldens: the work happens on a copy of app/,
-# core/, modes/ and protocol/, so nothing is written into the checkout.
-# Those four copy their results back and need it writable.
+# core/, modes/, protocol/ and the GM console (controller/console/src,
+# controller/templates), so nothing is written into the checkout. Those four
+# copy their results back and need it writable. The console and the check-in
+# notices go into the app's assets with tool/sync_console.dart first (slice
+# S6 of PE24: the phone controller serves them; decision PE24-61).
 set -eu
 SRC="${ATALAIA_SRC:-/src}"
 MODE="${1:-check}"
@@ -52,9 +55,14 @@ DART_DIRS="lib test integration_test tool"
 rm -rf "$W"
 mkdir -p "$W"
 cp -r "$SRC/app" "$SRC/core" "$SRC/modes" "$SRC/protocol" "$W/"
+mkdir -p "$W/controller/console"
+cp -r "$SRC/controller/console/src" "$W/controller/console/"
+cp -r "$SRC/controller/templates" "$W/controller/"
 rm -rf "$W/app/.dart_tool" "$W/app/build" "$W/app/android/.gradle" "$W/app/android/app/.cxx" \
     "$W/core/build"
 cd "$W/app"
+# The GM console and the check-in notices into assets/ (never committed).
+dart tool/sync_console.dart
 
 need_core_libs() {
     for var in ATALAIA_CORE_LIB ATALAIA_CORE_STUB_LIB ATALAIA_POD_HOST ATALAIA_MODEM_HOST ATALAIA_BOX_HOST; do
@@ -164,6 +172,15 @@ case "$MODE" in
             unzip -o -q "$apk" "lib/$abi/libatalaia_core.so" -d "/tmp/apk-lib/$abi"
             check_android_lib "/tmp/apk-lib/$abi/lib/$abi/libatalaia_core.so" "$abi"
         done
+        # The GM console the phone controller serves: every file of controller/console/src
+        # (and the check-in notices) in the APK's assets (decision PE24-61).
+        n=0
+        for f in $(cd assets && find console notices -type f); do
+            echo "$listing" | grep -q " assets/flutter_assets/assets/$f\$" \
+                || { echo "check.sh: $apk has no assets/$f" >&2; exit 1; }
+            n=$((n + 1))
+        done
+        echo "ok   the GM console and the check-in notices in the APK ($n files)"
         # No proprietary SDKs (decision PD5): no Google Play services or ML Kit classes.
         mkdir -p /tmp/apk-dex
         unzip -o -q "$apk" 'classes*.dex' -d /tmp/apk-dex

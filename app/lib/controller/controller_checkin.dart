@@ -351,8 +351,8 @@ class ControllerCheckin {
   final ControllerEngine engine;
   final CheckinConfig config;
 
-  /// The field CA's SHA-256 for the poster; null until the phone serves
-  /// HTTPS (slice S6), so the poster says `https_off`.
+  /// The field CA's SHA-256 for the poster (the shell's field CA since
+  /// slice S6, controller_host.dart); null: the poster says `https_off`.
   Uint8List? caSha256;
   List<String> defaultUrls;
   final LimitTemplate limits;

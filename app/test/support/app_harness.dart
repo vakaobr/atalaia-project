@@ -5,16 +5,22 @@
 /// settings kept in memory.
 library;
 
+import 'dart:typed_data';
+
 import 'package:atalaia_app/app.dart';
 import 'package:atalaia_app/branding/field_branding.dart';
 import 'package:atalaia_app/checkin/checkin_client.dart';
 import 'package:atalaia_app/checkin/field_trust.dart';
+import 'package:atalaia_app/controller/controller_host.dart';
+import 'package:atalaia_app/controller/controller_isolate.dart';
+import 'package:atalaia_app/controller/controller_shell.dart';
 import 'package:atalaia_app/controller/prop_link.dart';
 import 'package:atalaia_app/core/node_runner.dart';
 import 'package:atalaia_app/l10n/strings.dart';
 import 'package:atalaia_app/platform/links.dart';
 import 'package:atalaia_app/platform/location.dart';
 import 'package:atalaia_app/player/field_feed.dart';
+import 'package:atalaia_app/pod/pod_client.dart';
 import 'package:atalaia_app/site/site_client.dart';
 import 'package:atalaia_app/storage/app_store.dart';
 import 'package:flutter/material.dart';
@@ -34,10 +40,19 @@ class Harness {
     this.siteHttp,
     this.links,
     this.location,
+    this.controllerLauncher,
+    this.controllerAssets,
   }) : qr = qr ?? FakeQr();
 
   /// The phone's location (none: not available).
   final LocationService? location;
+
+  /// The phone controller's isolate (slice S6); none: a [FakeControllerRun].
+  final ControllerLauncher? controllerLauncher;
+  final ControllerAssetsLoader? controllerAssets;
+  final wifi = FakeFieldWifi();
+  final controllerRuns = <FakeControllerRun>[];
+  final controllerBoots = <ControllerBoot>[];
 
   /// A fake site server (test/support/fake_site.dart); none: offline.
   final SiteHttp Function(Uri origin)? siteHttp;
@@ -79,7 +94,28 @@ class Harness {
     siteHttp: siteHttp ?? (_) => const _NoSite(),
     links: links,
     location: location,
+    wifi: wifi,
+    controllerLauncher: controllerLauncher ?? _fakeLaunch,
+    controllerAssets:
+        controllerAssets ??
+        (_) async => ControllerAssets(
+          console: {
+            'index.html': Uint8List.fromList(const [60]),
+          },
+          limitsYaml: 'x',
+        ),
+    controllerDir: '/controller',
   );
+
+  Future<ControllerRun> _fakeLaunch(
+    ControllerBoot boot, {
+    PodTransport? pod,
+  }) async {
+    controllerBoots.add(boot);
+    final run = FakeControllerRun(boot);
+    controllerRuns.add(run);
+    return run;
+  }
 
   /// The app; a new harness is a new app (its own state), even when pumped
   /// over another one in the same test.
@@ -128,6 +164,7 @@ Harness harness({
   SiteHttp Function(Uri origin)? siteHttp,
   AppLinks? links,
   LocationService? location,
+  ControllerLauncher? controllerLauncher,
 }) => Harness(
   settings: (settings ?? AppSettings())..language = language,
   runner: runner ?? FakeNodeRunner(),
@@ -140,4 +177,5 @@ Harness harness({
   siteHttp: siteHttp,
   links: links,
   location: location,
+  controllerLauncher: controllerLauncher,
 );

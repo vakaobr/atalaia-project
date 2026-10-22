@@ -5,9 +5,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 3 -- Android and Players: Status
 
-**Current phase:** Implementation: plan phases A-D and F done in software; plan phase E done in software except the Android controller role's shell (PE24: slices S1, the game engine and REST API, S2, the live stream and MQTT, S3, keeping games across a restart, S4, the pod as its radio, joins and Wi-Fi props, and S5, check-in, player tokens, positions and the chrono list, done 2026-10-22; S6-S7 to do); plan phase G (integration and field test) pending, it needs the hardware
+**Current phase:** Implementation: plan phases A-D and F done in software; plan phase E done in software, with the Android controller role in slices (PE24: S1, the game engine and REST API, S2, the live stream and MQTT, S3, keeping games across a restart, S4, the pod as its radio, joins and Wi-Fi props, S5, check-in, player tokens, positions and the chrono list, and S6, the shell and its screen, done 2026-10-22, in software; S7 after the field test); plan phase G (integration and field test) pending, it needs the hardware
 **Risk level:** Medium
-**Last verified:** 2026-10-22 (PE24 slice S5)
+**Last verified:** 2026-10-22 (PE24 slice S6)
 
 ## Completed
 
@@ -186,7 +186,7 @@ tools/docker_app.py` (Dart, NDK, APK) and `app\tool\emulator_tests.ps1`
 | Prop on Wi-Fi (PD12) | `protocol/prop-link.md`, `controller/atalaia_controller/prop_link.py`, `app/lib/controller/prop_link.dart`, `prop_session.dart`; join keys 13 and 14 (RFC 0001 Amendment 4, proposed) | Done: HELLO, STATE, events with ACK and resend, commands and TIME, `node.tamper` |
 | Positions (ADR-P3-6) | `controller/atalaia_controller/positions.py`, `POST`/`GET /api/v1/positions`; `app/lib/position/position_reporter.dart`, `app/lib/platform/location.dart`, `LocationPlugin.kt`, the foreground service's location type | Done for GPS; BLE beacons not built. Since 2026-10-22 the out-of-bounds warning on the player's phone (`app/lib/position/field_bounds.dart`, decisions MF-31 to MF-40): the phone's own fixes against the field boundary, with a margin, the fix's accuracy and a dwell; a banner, vibration and the notification; nothing sent |
 | Teams and squads (maintainer) | games' `squads` (0 = none), squad pickers and the squad-leader role only where a game has squads (PE25) | Done in the controller, the console and the app |
-| Android controller role (ADR-P3-12) | `app/lib/controller/mqtt_broker.dart`, `visibility_engine.dart`; since 2026-10-22 `field_controller.dart`, `controller_engine.dart`, `controller_store.dart`, `controller_api.dart`, `controller_stream.dart`, `controller_mqtt.dart` | **Partly**: the broker and the visibility engine are built and tested; slices S1 and S2 of PE24 (2026-10-22, below): the game engine with `field.lua` on the core, the REST API for games, scores, the log and nodes, the live stream and the MQTT topics with the Pi's ACL; slice S3 (2026-10-22): games kept in files across a restart; slice S4 (2026-10-22): an I/O pod as its radio, joins, Android props on Wi-Fi; slice S5 (2026-10-22, `controller_checkin.dart`, `controller_positions.dart`): field check-in, player tokens, the chrono list and positions; slices S6-S7 to do |
+| Android controller role (ADR-P3-12) | `app/lib/controller/mqtt_broker.dart`, `visibility_engine.dart`; since 2026-10-22 `field_controller.dart`, `controller_engine.dart`, `controller_store.dart`, `controller_api.dart`, `controller_stream.dart`, `controller_mqtt.dart` | **Partly**: the broker and the visibility engine are built and tested; slices S1 and S2 of PE24 (2026-10-22, below): the game engine with `field.lua` on the core, the REST API for games, scores, the log and nodes, the live stream and the MQTT topics with the Pi's ACL; slice S3 (2026-10-22): games kept in files across a restart; slice S4 (2026-10-22): an I/O pod as its radio, joins, Android props on Wi-Fi; slice S5 (2026-10-22, `controller_checkin.dart`, `controller_positions.dart`): field check-in, player tokens, the chrono list and positions; slice S6 (2026-10-22, `controller_screen.dart`, `controller_shell.dart`, `controller_isolate.dart`, `controller_host.dart`, `field_tls.dart`): the role on the home screen, its own isolate under the foreground service, the GM console from the APK, HTTPS with a field CA made on the phone, the field's Wi-Fi; not yet on a phone; slice S7 after the field test |
 
 Tests: controller 201 (60 new: check-in, chrono list with the shared
 vectors, poster vectors, positions, prop link, TLS); console browser tests
@@ -293,21 +293,60 @@ Tests: 8 new controller tests (the 7 cases; the Pi unit test for PE24-58),
 poster with a CA, the rate limit, the CSV, spot checks, erasing a player,
 retention).
 
-Remaining slices (`PLAN.md`, "PE24 slices"): **S6** the controller's shell and
-screens (controller isolate, foreground service, the GM console on the
-phone, HTTPS, the field's Wi-Fi); **S7** after the field test: failover,
-presets, mode uploads, scenarios, role packages, branding, the channel
-scan, re-invites, adoption, pairing, firmware updates, the site sync,
-ATAK, the remote GM. For the maintainer: PE24-2 (a phone as the only
-controller, not a standby), PE24-3 (not on plan phase G's gate) and PE24-8
-(the GM console's files in the app), PE24-11 (no `since` replay on the
-stream, as on the Pi) and PE24-12 (the phone's MQTT passwords are the API
-tokens), PE24-42 (the fix in the Pi controller), PE24-44 (the game key at
-rest on a phone, in app-private storage) and PE24-52 (the channel choice
-moves to S7) are answered; PE24-51 (the host box built for the Dart tests)
-was accepted by the coordinator; open for the maintainer: PE24-58 (the fix
-in the Pi controller's poster settings) and PE24-60 (players' personal data
-on a phone controller).
+### Slice S6: the shell and its screen (2026-10-22)
+
+Decisions PE24-61 to PE24-69. Built and tested in software, on one machine:
+the controller's isolate, its servers, TLS and the pod's relay for real
+(the core, sockets, Dart's TLS, the host pod), the screen with the phone's
+plugins replaced by fakes; the Kotlin side compiled into the APK, not run.
+The emulator test is written for CI's `flutter-integration` job (no KVM
+here); a real phone is plan phase G's (PE24-69).
+
+| Deliverable | Where | State |
+| --- | --- | --- |
+| The role on the home screen | `app/lib/ui/home_screen.dart`, `app/lib/platform/platform_check.dart` (`controllerRoleAvailable`) | Done: *Controlador de campo* / *Field controller*, Android only (tested on both platforms) |
+| The controller's isolate (constraint 1) | `app/lib/controller/controller_isolate.dart`, `controller_host.dart` | Done: one isolate opens the core and runs the store (`FileControllerStore` in the app's private storage), the engine, check-in, positions, the API, the broker and the 100 ms tick; the UI isolate gets its status at once, every second and on a change, and sends only stop; an I/O pod's bytes relayed from the UI isolate's USB or Bluetooth link (PE24-63) |
+| The foreground service and wake lock | `app/lib/controller/controller_shell.dart`; `AtalaiaForegroundService.kt`, `ForegroundServicePlugin.kt`, `MainActivity.kt` | Done: the service (notification with the live game, partial wake lock, Wi-Fi lock) before the isolate, the battery exemption asked once; the Flutter engine now outlives the activity while the service runs, so the controller (and a prop's game loop) survives the back button and a swipe away (PE24-64) |
+| The GM console in the app's web view | `controller_screen.dart` (`ControllerConsoleScreen`), `console_files.dart`, `console_assets.dart`, `controller_api.dart`; `app/tool/sync_console.dart` | Done: the Pi's console files (copied in at build time, checked byte for byte, PE24-61) served as the Pi serves them, on the loopback address for the web view, which logs in once with the GM token (PE24-66) |
+| HTTPS with a field CA made on the phone | `app/lib/controller/field_tls.dart`, `app/lib/security/der.dart`; `GET /api/v1/controller/ca` | Done: the Pi's CA and server certificate (ECDSA P-256, RFC 6979, pointycastle 4.0.0), renewed for a new address or near its end; the poster's `ca_sha256` and addresses, join keys 13 and 14 (`wifi_link`) (PE24-67) |
+| The field's Wi-Fi | `controller_host.dart`, `FieldWifiPlugin.kt`, `lib/platform/services.dart` (`FieldWifiService`) | Done: opened (HTTPS 8443, MQTT 1883 at every address) or closed (loopback only) from the screen (PE24-62); the phone's addresses watched; the network's name, the hotspot's state, Android's settings, a local-only hotspot with a QR code to join (PE24-68) |
+| The screen | `app/lib/controller/controller_screen.dart`, `lib/l10n/strings_{pt,en}.dart` | Done: start and stop, the live game, the addresses and the CA's fingerprint, the pod, the GM and read codes (hidden until asked), the console, the poster's hint, the Wi-Fi; European Portuguese and English, 320 px wide, Android's accessibility guidelines (tap targets, labels, contrast) checked |
+| Tooling | `app/tool/check.sh` (the console copied in every mode, every console file checked in the APK), `.github/workflows/ci.yml` (`flutter-integration`: the copy), `app/tool/emulator_tests.{sh,ps1}`, `.gitignore` | Done |
+
+Tests: 34 new Dart tests (1086 in all): 8 in `field_tls_test.dart` (the CA
+through Dart's TLS by address and by name, the app's pinned client, another
+CA and an uncovered name refused, the Pi's renewal rules, the certificates'
+fields, keys and signatures, the addresses' order), 7 in
+`console_bundle_test.dart` (the APK's console byte for byte with
+controller/console/src, `pubspec.yaml`'s folders, the notices, the
+redirects, types and headers, the field CA's endpoint), 5 in
+`controller_host_test.dart` (a game over HTTPS trusting only the field CA,
+the poster and joins naming it, closed to the Wi-Fi, a new address, a
+restart, the host pod through the relay), 3 in
+`controller_isolate_test.dart` (served from its own isolate and stopped, the
+pod relayed across isolates, a start that fails), 11 in
+`controller_screen_test.dart` (the role by platform, start and stop with the
+foreground service in both languages, the Wi-Fi opening's restart,
+failures, the field's Wi-Fi, the hotspot's QR text, 320 px and the
+accessibility guidelines in both languages, the console's log-in); 2 home
+golden images drawn again (the new role); 1 emulator test
+(`integration_test/controller_test.dart`, not run here). The contract cases
+and the Pi's code are unchanged.
+
+Remaining: **S7** after the field test: failover, presets, mode uploads,
+scenarios, role packages, branding, the channel scan, re-invites, adoption,
+pairing, firmware updates, the site sync, ATAK, the remote GM; and the
+console's follow-ups of PE24-66 (hide what a phone does not have, `#token=`).
+For the maintainer: PE24-2 (a phone as the only controller, not a standby),
+PE24-3 (not on plan phase G's gate), PE24-8 (the GM console's files in the
+app), PE24-11, PE24-12, PE24-42, PE24-44, PE24-52 and PE24-60 (players'
+personal data on a phone controller, in app-private storage with the Pi's
+retention rules) are answered; PE24-51 was accepted by the coordinator;
+open for the maintainer: PE24-58 (the fix in the Pi controller's poster
+settings), PE24-62 (HTTPS only on the field's Wi-Fi, MQTT plain as on the
+Pi), PE24-64 (the engine kept past the activity, the service's type) and
+PE24-67 (the field CA on the phone, the pointycastle dependency); for the
+coordinator: PE24-61 (the console copied in at build time, CI's step).
 
 ## Medic Kit (2026-10-19)
 
@@ -472,13 +511,12 @@ Phase G needs hardware.
 1. ~~Research~~ -- Complete
 2. ~~Architecture~~ -- Complete
 3. ~~Planning~~ -- Complete
-4. Implementation -- plan phases A-F done in software (E without the
-   Android controller role's shell, PE24: its slices S1 to S5 done
-   2026-10-22), the Medic Kit and branding; next: plan phase G (the field
-   test: the boards, the pods and real phones, with the Pi controller) and
-   the controller role's slice S6 (the shell and its screens: the
-   controller isolate, the foreground service, the GM console on the phone,
-   HTTPS and the field's Wi-Fi)
+4. Implementation -- plan phases A-F done in software (E with the
+   Android controller role's slices S1 to S6, PE24, done 2026-10-22; its
+   slice S7 comes after the field test), the Medic Kit and branding; next: plan phase G (the field
+   test: the boards, the pods and real phones, with the Pi controller), with
+   the phone controller's bench test (a phone, a pod, a box and a prop;
+   PE24-3, PE24-69), then slice S7 as fields ask
 
 ## How to resume with implementation
 

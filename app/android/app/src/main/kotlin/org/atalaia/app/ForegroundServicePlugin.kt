@@ -19,13 +19,16 @@ class ForegroundServicePlugin(private val activity: Activity, messenger: BinaryM
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
-        val intent = Intent(activity, AtalaiaForegroundService::class.java)
+        // The application's context: the activity may be gone while the
+        // service and the engine run on (MainActivity).
+        val context = activity.applicationContext
+        val intent = Intent(context, AtalaiaForegroundService::class.java)
             .putExtra(AtalaiaForegroundService.EXTRA_TITLE, call.argument<String>("title") ?: "")
             .putExtra(AtalaiaForegroundService.EXTRA_TEXT, call.argument<String>("text") ?: "")
             .putExtra(AtalaiaForegroundService.EXTRA_LOCATION, call.argument<Boolean>("location") ?: false)
         when (call.method) {
             "start" -> try {
-                activity.startForegroundService(intent)
+                context.startForegroundService(intent)
                 result.success(true)
             } catch (e: RuntimeException) {
                 // Android 12+ refuses a start from the background; the game runs on.
@@ -34,7 +37,7 @@ class ForegroundServicePlugin(private val activity: Activity, messenger: BinaryM
             "update" -> {
                 if (AtalaiaForegroundService.running) {
                     try {
-                        activity.startService(intent)
+                        context.startService(intent)
                     } catch (e: RuntimeException) {
                         // Not allowed now; the next update tries again.
                     }
@@ -42,7 +45,7 @@ class ForegroundServicePlugin(private val activity: Activity, messenger: BinaryM
                 result.success(null)
             }
             "stop" -> {
-                activity.stopService(Intent(activity, AtalaiaForegroundService::class.java))
+                context.stopService(Intent(context, AtalaiaForegroundService::class.java))
                 result.success(null)
             }
             else -> result.notImplemented()

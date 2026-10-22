@@ -9,6 +9,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:atalaia_app/controller/controller_host.dart';
+import 'package:atalaia_app/controller/controller_isolate.dart';
 import 'package:atalaia_app/core/node_types.dart';
 import 'package:atalaia_app/platform/services.dart';
 
@@ -262,4 +264,101 @@ abstract final class NfcReadFake {
   /// A tag holding the NDEF message [ndef].
   static NfcRead card(List<int> ndef, [List<int> uid = const [4, 1, 2, 3]]) =>
       NfcRead(uid: Uint8List.fromList(uid), ndef: Uint8List.fromList(ndef));
+}
+
+/// The field's Wi-Fi (FieldWifiPlugin.kt) for the controller's screen.
+class FakeFieldWifi implements FieldWifiService {
+  FieldWifiInfo current = const FieldWifiInfo(
+    available: true,
+    wifiEnabled: true,
+    ssid: 'Campo',
+    hotspot: HotspotState.off,
+  );
+  LocalHotspot next = const LocalHotspot(
+    ssid: 'AndroidShare_1234',
+    passphrase: 'abc;def',
+  );
+  final calls = <String>[];
+
+  @override
+  Future<FieldWifiInfo> info() async => current;
+
+  @override
+  Future<bool> openHotspotSettings() async {
+    calls.add('hotspotSettings');
+    return true;
+  }
+
+  @override
+  Future<bool> openWifiSettings() async {
+    calls.add('wifiSettings');
+    return true;
+  }
+
+  @override
+  Future<LocalHotspot> startLocalHotspot() async {
+    calls.add('startLocal');
+    return next;
+  }
+
+  @override
+  Future<void> stopLocalHotspot() async => calls.add('stopLocal');
+}
+
+/// A phone controller that runs nowhere: its status is what a test says.
+class FakeControllerRun implements ControllerRun {
+  FakeControllerRun(this.boot)
+    : _status = ControllerStatus({
+        'running': true,
+        'open': boot.open,
+        'http_port': 8080,
+        'https_port': boot.open ? 8443 : null,
+        'mqtt_port': 1883,
+        'addresses': boot.open ? ['192.168.43.1'] : <String>[],
+        'urls': boot.open ? ['https://192.168.43.1:8443'] : <String>[],
+        'ca_sha256': 'ab' * 32,
+        'ca_short': 'ABAB ABAB ABAB ABAB',
+        'gm_token': 'gm-secret-token',
+        'read_token': 'rd-read-token',
+        'radio': boot.pod ? 'up' : 'none',
+        'pod': boot.pod,
+        'game': null,
+        'stream_clients': 1,
+        'mqtt_clients': 0,
+        'props': 0,
+        'console': boot.console.isNotEmpty,
+      });
+
+  final ControllerBoot boot;
+  ControllerStatus _status;
+  final _changes = StreamController<ControllerStatus>.broadcast();
+  final _ended = Completer<String?>();
+  bool stopped = false;
+
+  /// A new status, as the controller's isolate sends one.
+  void emit(Map<String, Object?> changes) {
+    _status = ControllerStatus({..._status.raw, ...changes});
+    _changes.add(_status);
+  }
+
+  /// The isolate ending by itself.
+  void crash(String why) {
+    if (!_ended.isCompleted) _ended.complete(why);
+  }
+
+  @override
+  ControllerStatus get status => _status;
+
+  @override
+  Stream<ControllerStatus> get changes => _changes.stream;
+
+  @override
+  Future<String?> get ended => _ended.future;
+
+  @override
+  Future<void> stop() async {
+    stopped = true;
+    if (!_ended.isCompleted) _ended.complete(null);
+    await _changes.close();
+  }
 }
