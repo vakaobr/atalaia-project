@@ -67,7 +67,9 @@ PACKAGE_SUFFIXES = (".tar", ".tar.release.json", ".tar.verified.json", ".tar.lic
 FORBIDDEN_LUA = re.compile(
     r"(?<![\w.:])(io|os|require|load|loadfile|dofile|loadstring|debug|package|_G|_ENV|collectgarbage)\b"
     r"|\bstring\s*\.\s*dump\b|:\s*dump\s*\(")
+# REUSE-IgnoreStart (SPDX text the checks look for, not this file's licence)
 SPDX_LICENCE = re.compile(r"SPDX-License-Identifier:\s*(\S+)")
+# REUSE-IgnoreEnd
 
 
 # ---- reading a registry -----------------------------------------------------------------------
@@ -319,9 +321,11 @@ def lint(root: Path, base: Optional[Path] = None) -> Report:
         owner = reg.keys[package.key_id].owner
         owners.setdefault(rel.id, set()).add(owner)
         lic_text = licence_path.read_text(encoding="utf-8")
+        # REUSE-IgnoreStart (SPDX text the checks look for, not this file's licence)
         if f"SPDX-License-Identifier: {package.license}" not in lic_text or "SPDX-FileCopyrightText:" not in lic_text:
             report.error(f"packages/{licence_path.name}",
                          f"needs SPDX-FileCopyrightText and SPDX-License-Identifier: {package.license}")
+        # REUSE-IgnoreEnd
         check_package_files(where, package.files, package.license, report)
         # The index's signature: the author's, or the project's with the badge.
         if entry.verified:
@@ -532,9 +536,11 @@ def cmd_add(args: argparse.Namespace) -> int:
         print(f"registry_check: note: key {kid} is not in keys/authors/ yet; add it with `key` (lint refuses "
               f"the package until then)", file=sys.stderr)
     copyright_text = copyright_lines(files) or ["the author"]
+    # REUSE-IgnoreStart (SPDX text the checks look for, not this file's licence)
     (packages / (name + ".license")).write_text(
         "".join(f"SPDX-FileCopyrightText: {c}\n" for c in copyright_text)
         + f"SPDX-License-Identifier: {own['license']}\n", encoding="utf-8")
+    # REUSE-IgnoreEnd
     stale = packages / (name + ".verified.json")
     if stale.exists():
         stale.unlink()

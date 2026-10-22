@@ -346,6 +346,7 @@ class RefusalTests(unittest.TestCase):
         self.assertRefused(ws, "which this controller does not trust")
 
     def test_the_checklists_automated_items(self):
+        # REUSE-IgnoreStart (SPDX text the checks look for, not this file's licence)
         cases = [
             ("1.0.1", lambda f: (f / "node.lua").write_text((f / "node.lua").read_text().replace(
                 "local previous", 'local f = io.open("/etc/passwd")\n  local previous')), "uses 'io'"),
@@ -359,6 +360,7 @@ class RefusalTests(unittest.TestCase):
                 "# SPDX-FileCopyrightText: 2026 The Atalaia contributors\n# SPDX-License-Identifier: MIT\n"
                 + "# padding\n" * 60000), "(checklist item 9)"),
         ]
+        # REUSE-IgnoreEnd
         for version, edit, text in cases:
             with self.subTest(version=version):
                 ws = self.listed()
