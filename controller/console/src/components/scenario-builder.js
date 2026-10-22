@@ -183,7 +183,8 @@ export class ScenarioBuilder extends Component {
         return html`<div class="scenario-names" data-testid="scenario-nodes">
             <h3>${t('scenario.nodes_title')}</h3>
             <p class="muted small">${t('scenario.nodes_hint')}</p>
-            <ul>${boxes.map((n) => html`<li><code>${n.name}</code> · ${t(`scenario.roles.${n.role}`) || n.role}</li>`)}
+            <ul>${boxes.map((n) => html`<li><code>${n.name}</code> · ${t(`scenario.roles.${n.role}`) || n.role}${
+                Number.isInteger(n.level) ? ` · ${t('scenario.node_level', { n: n.level })}` : ''}</li>`)}
                 ${players.map((n) => html`<li><code>${n.name}</code> · ${t('scenario.player_node', { role: n.role })}</li>`)}</ul>
             ${r.objectives && r.objectives.length > 0 && html`<h3>${t('scenario.objectives')}</h3>
                 <ol>${r.objectives.map((o) => html`<li><code>${o.id}</code> · ${o.name || ''} · ${o.type}</li>`)}</ol>`}

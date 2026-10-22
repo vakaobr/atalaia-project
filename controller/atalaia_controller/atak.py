@@ -20,6 +20,10 @@ owner, and one for a VIP / Payload extraction zone:
   point-to-point port is 4242), which see every player as marshals and
   the GM do (positions.py): GPS reports only, by pseudonymous player id,
   never by name (decision M9-6);
+- on a multi-story field (field_levels.py) each box is placed by its
+  level's georeference (its own control points, else level 0's) and its
+  ``<remarks>`` end with the level's name; a player's, only when the phone
+  said its level (decisions ML-6, ML-7). The point's ``hae`` stays unknown;
 - with ``[atak] remote = true`` (off by default; Phase 4 follow-up,
   decisions FU5-*), the same props and zones to the site server, as ``cot``
   messages on the sync's stream that the controller opens itself
@@ -56,6 +60,7 @@ import time
 import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
 
+from . import field_levels as levelsmod
 from . import georef as georefmod
 
 if TYPE_CHECKING:
@@ -435,7 +440,7 @@ class AtakEmitter:
                 if game.get("state") == "ended" and isinstance(game.get("id"), int):
                     self._end = game["id"]
                 self._all = True
-            elif kind in ("field_georef", "field_image"):
+            elif kind in ("field_georef", "field_image", "field_levels"):
                 self._all = True
             else:
                 wake = False
@@ -474,10 +479,12 @@ class AtakEmitter:
             tcp_out += self._drops(self._staff_markers, now)
             remote_out += self._drops(self._remote_markers, now)
         game = self._live_game()
-        geo = georefmod.load(self.ctrl.store) if game is not None else None
-        self.stats["no_georef"] = game is not None and geo is None
-        if game is not None and geo is not None:
-            props = self._props(game, geo, now, hints, None if everything else dirty)
+        levels = levelsmod.load(self.ctrl.store)
+        geos = {lv: georefmod.for_level(self.ctrl.store, lv) for lv in range(levelsmod.in_use(levels))} \
+            if game is not None else {}
+        self.stats["no_georef"] = game is not None and not any(geos.values())
+        if game is not None and any(geos.values()):
+            props = self._props(game, geos, levels, now, hints, None if everything else dirty)
             udp_out += props
             tcp_out += props
             if self.remote is not None:
@@ -551,8 +558,10 @@ class AtakEmitter:
         name = info.get("display_name")
         return f"{name} ({team})" if isinstance(name, str) and name else team
 
-    def _props(self, game: dict[str, Any], geo: georefmod.Georef, now: float, hints: dict[int, Optional[str]],
-               only: Optional[set[int]]) -> list[bytes]:
+    def _props(self, game: dict[str, Any], geos: dict[int, Optional[georefmod.Georef]], levels: dict[str, Any],
+               now: float, hints: dict[int, Optional[str]], only: Optional[set[int]]) -> list[bytes]:
+        """Each placed box on the map by its level's georeference (its own, else level 0's: ML-6); on a
+        multi-story field the remarks name its level (ML-7)."""
         stale = now + 2 * self.cfg.atak_interval_s  # ADR-P4-7: start + 2 x the update interval
         teams = list(game.get("teams") or [])
         places = self.ctrl.store.positions(game["id"])
@@ -564,12 +573,18 @@ class AtakEmitter:
             place = places.get(nid)
             if place is None:
                 continue  # not placed on the image: nowhere to put it
+            level = levelsmod.shown(levels, place.get("level"))
+            geo = geos.get(level)
+            if geo is None:
+                continue  # its level has no place on the map
             node = nodes.get(nid, {})
             owner = hints[nid] if nid in hints else node.get("owner")
             lat, lon = geo.to_latlon(place["x"], place["y"])
             uid = self._uid("node", nid)
             name = node.get("name") or f"{nid}"
             remarks = f"Atalaia: {self._display(game, owner)}" if owner else "Atalaia: -"
+            if levels["enabled"]:
+                remarks += f", {levelsmod.label(levels, level)}"
             data = event_xml(uid=uid, cot_type=TYPE_PROP, how=HOW_IMAGE, lat=lat, lon=lon, now=now, start=now,
                              stale=stale, detail=marker_detail(name, remarks, team_colour(owner, teams),
                                                                node.get("battery_pct"), atak_team(owner)))
@@ -614,6 +629,7 @@ class AtakEmitter:
         see all), as (uid, event, lat, lon)."""
         teams = list(game.get("teams") or [])
         interval = self._player_interval(game)
+        levels = levelsmod.load(self.ctrl.store)
         out: list[tuple[str, bytes, float, float]] = []
         for pid, pos in sorted(self.ctrl.store.player_positions(game["id"]).items()):
             if pos.get("source") != "gps" or pos.get("lat") is None or pos.get("lon") is None:
@@ -631,8 +647,10 @@ class AtakEmitter:
             group = atak_team(team)
             if group is not None:
                 detail.append(_el("__group", {"name": group, "role": GROUP_ROLE}))
-            detail.append(_el("remarks", None, xml_text(f"Atalaia: {self._display(game, team) or '-'}, {role}",
-                                                         REMARKS_MAX, REMARKS_BYTES)))
+            remarks = f"Atalaia: {self._display(game, team) or '-'}, {role}"
+            if levels["enabled"] and isinstance(pos.get("level"), int) and pos["level"] < levelsmod.in_use(levels):
+                remarks += f", {levelsmod.label(levels, pos['level'])}"  # ML-7: only a level the phone gave
+            detail.append(_el("remarks", None, xml_text(remarks, REMARKS_MAX, REMARKS_BYTES)))
             uid = self._uid("player", pid)
             lat, lon = float(pos["lat"]), float(pos["lon"])
             out.append((uid, event_xml(uid=uid, cot_type=TYPE_PLAYER, how=HOW_GPS, lat=lat, lon=lon, now=now,

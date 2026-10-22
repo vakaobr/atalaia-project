@@ -40,6 +40,9 @@ which browsers cannot give headers, also takes ``?token=``.
     GET  /api/v1/field                     whether a field image is uploaded
     GET|PUT|DELETE /api/v1/field/image     the field image (map or floor plan) of the console
     GET|PUT|DELETE /api/v1/field/georef    its georeference: 2-8 control points {x, y, lat, lon} (PUT, DELETE: GM)
+    GET|PUT /api/v1/field/levels           a multi-story field: levels on or off, their number and names (PUT: GM)
+    GET|PUT|DELETE /api/v1/field/levels/{n}/image   level n's floor plan (level 0: the field image)
+    GET|PUT|DELETE /api/v1/field/levels/{n}/georef  level n's own control points (else level 0's)
     GET  /api/v1/atak                      the ATAK / CoT feed's settings and counters (GM or read token)
     GET  /api/v1/field/branding            the field's name, logo, wallpaper and accent (no token, ETag)
     PUT  /api/v1/field/branding            GM: {"field_name"?, "accent"?}
@@ -57,8 +60,8 @@ which browsers cannot give headers, also takes ``?token=``.
     GET  /api/v1/radio/scan                the scan's progress and results
     DELETE /api/v1/radio/scan              cancel the scan
     POST /api/v1/radio/random              a random legal channel, as a suggestion
-    GET  /api/v1/games/{id}/positions      where the nodes are on the field image
-    PUT  /api/v1/games/{id}/positions/{n}  move a node on it
+    GET  /api/v1/games/{id}/positions      where the nodes are on the field image: {x, y, level}
+    PUT  /api/v1/games/{id}/positions/{n}  move a node on it (or to another level)
     GET  /api/v1/controller/ca             the field CA's certificate (PEM), no token (ADR-P3-9)
     GET|POST /api/v1/firmware              GM: firmware releases and updates / upload a signed release
                                            (raw image; ?platform=&version=&signature=)
@@ -125,6 +128,7 @@ from fastapi.staticfiles import StaticFiles
 from . import __version__
 from . import checkin as checkinmod
 from . import schedule as schedulemod
+from . import field_levels as levelsmod
 from . import georef as georefmod
 from . import images, visibility
 from . import scenario_service as scenarios
@@ -497,25 +501,32 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     def random_channel() -> dict[str, Any]:
         return {"suggestion": controller.random_channel()}
 
-    # --- field image and node positions (console field view) ------------------
+    # --- field image(s) and node positions (console field view) ----------------
+    # One image, or one floor plan per level of a multi-story field (field_levels.py, ML-1 to ML-12).
 
-    @app.get("/api/v1/field", dependencies=[Depends(require_read)])
-    def field_info() -> dict[str, Any]:
-        """Whether a field image is uploaded (the console asks before fetching it)."""
-        image = controller.store.field_image()
-        if image is None:
-            return {"image": None}
-        return {"image": {"content_type": image[0], "bytes": len(image[1]), "updated_at": image[2]}}
+    def levels_meta() -> dict[str, Any]:
+        return levelsmod.load(controller.store)
 
-    @app.get("/api/v1/field/image", dependencies=[Depends(require_read)])
-    def field_image() -> Response:
-        image = controller.store.field_image()
+    def level_or_404(level: int, write: bool = False) -> None:
+        why = levelsmod.check_level(levels_meta(), level, write)
+        if why is not None:
+            raise (ControllerError(why) if write else HTTPException(404, why))
+
+    def image_info(level: int) -> Optional[dict[str, Any]]:
+        image = controller.store.field_image(level)
         if image is None:
-            raise HTTPException(404, "no field image uploaded")
+            return None
+        return {"content_type": image[0], "bytes": len(image[1]), "updated_at": image[2]}
+
+    def get_image(level: int) -> Response:
+        level_or_404(level)
+        image = controller.store.field_image(level)
+        if image is None:
+            raise HTTPException(404, "no field image uploaded" if level == 0 else "no plan uploaded for this level")
         return Response(image[1], media_type=image[0], headers=NO_STORE)
 
-    @app.put("/api/v1/field/image", dependencies=[Depends(require_gm)])
-    async def put_field_image(request: Request) -> dict[str, Any]:
+    async def put_image(request: Request, level: int) -> dict[str, Any]:
+        level_or_404(level, write=True)
         ctype = request.headers.get("content-type", "").split(";")[0].strip().lower()
         if ctype not in IMAGE_TYPES:
             raise HTTPException(415, f"the field image must be one of {sorted(IMAGE_TYPES)}")
@@ -529,33 +540,35 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
                 raise HTTPException(413, f"the field image is over {FIELD_IMAGE_MAX} bytes")
         if not data:
             raise HTTPException(400, "empty image")
-        controller.store.set_field_image(ctype, bytes(data))
+        controller.store.set_field_image(ctype, bytes(data), level)
         # The control points were places on the old image (decision M9-4).
-        dropped = georefmod.clear(controller.store)
-        controller._emit({"type": "field_image"})
+        dropped = georefmod.clear(controller.store, level)
+        controller._emit({"type": "field_image", "level": level})
         if dropped:
-            controller._emit({"type": "field_georef", "georef": None})
-        return {"content_type": ctype, "bytes": len(data), "georef_cleared": dropped}
+            controller._emit({"type": "field_georef", "level": level, "georef": None})
+        return {"content_type": ctype, "bytes": len(data), "level": level, "georef_cleared": dropped}
 
-    @app.delete("/api/v1/field/image", dependencies=[Depends(require_gm)])
-    def delete_field_image() -> dict[str, Any]:
-        deleted = controller.store.delete_field_image()
-        dropped = georefmod.clear(controller.store)
+    def delete_image(level: int) -> dict[str, Any]:
+        if not 0 <= level < levelsmod.LEVELS_MAX:
+            raise HTTPException(404, f"level: 0 to {levelsmod.LEVELS_MAX - 1}")
+        deleted = controller.store.delete_field_image(level)
+        dropped = georefmod.clear(controller.store, level)
         if deleted:
-            controller._emit({"type": "field_image"})
+            controller._emit({"type": "field_image", "level": level})
         if dropped:
-            controller._emit({"type": "field_georef", "georef": None})
+            controller._emit({"type": "field_georef", "level": level, "georef": None})
         return {"deleted": deleted}
 
-    @app.get("/api/v1/field/georef", dependencies=[Depends(require_read)])
-    def get_georef() -> dict[str, Any]:
-        geo = georefmod.load(controller.store)
-        return {"georef": geo.to_api() if geo else None}
+    def get_level_georef(level: int) -> dict[str, Any]:
+        level_or_404(level)
+        own = georefmod.load(controller.store, level)
+        geo = own or georefmod.for_level(controller.store, level)
+        return {"georef": geo.to_api() if geo else None, "own": own is not None}
 
-    @app.put("/api/v1/field/georef", dependencies=[Depends(require_gm)])
-    def put_georef(body: Any = Body(None)) -> dict[str, Any]:
+    def put_level_georef(level: int, body: Any) -> dict[str, Any]:
         """Control points: two opposite corners of a north-up image, or 3-8 points (georef.py)."""
-        if controller.store.field_image() is None:
+        level_or_404(level, write=True)
+        if controller.store.field_image(level) is None:
             raise HTTPException(409, "upload the field image first: the points are places on it")
         spec = body_map(body)
         if set(spec) != {"points"}:
@@ -564,17 +577,85 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
             geo = georefmod.Georef(georefmod.check_points(spec["points"]))
         except georefmod.GeorefError as exc:
             raise ControllerError(str(exc)) from None
-        georefmod.save(controller.store, geo)
+        georefmod.save(controller.store, geo, level)
         out = geo.to_api()
-        controller._emit({"type": "field_georef", "georef": out})
+        controller._emit({"type": "field_georef", "level": level, "georef": out})
         return {"georef": out}
+
+    def delete_level_georef(level: int) -> dict[str, Any]:
+        if not 0 <= level < levelsmod.LEVELS_MAX:
+            raise HTTPException(404, f"level: 0 to {levelsmod.LEVELS_MAX - 1}")
+        deleted = georefmod.clear(controller.store, level)
+        if deleted:
+            controller._emit({"type": "field_georef", "level": level, "georef": None})
+        return {"deleted": deleted}
+
+    @app.get("/api/v1/field", dependencies=[Depends(require_read)])
+    def field_info() -> dict[str, Any]:
+        """Whether a field image is uploaded (the console asks before fetching it), and the levels."""
+        return {"image": image_info(0), "levels": levelsmod.view(controller.store)}
+
+    @app.get("/api/v1/field/image", dependencies=[Depends(require_read)])
+    def field_image() -> Response:
+        return get_image(0)
+
+    @app.put("/api/v1/field/image", dependencies=[Depends(require_gm)])
+    async def put_field_image(request: Request) -> dict[str, Any]:
+        return await put_image(request, 0)
+
+    @app.delete("/api/v1/field/image", dependencies=[Depends(require_gm)])
+    def delete_field_image() -> dict[str, Any]:
+        return delete_image(0)
+
+    @app.get("/api/v1/field/georef", dependencies=[Depends(require_read)])
+    def get_georef() -> dict[str, Any]:
+        geo = georefmod.load(controller.store)
+        return {"georef": geo.to_api() if geo else None}
+
+    @app.put("/api/v1/field/georef", dependencies=[Depends(require_gm)])
+    def put_georef(body: Any = Body(None)) -> dict[str, Any]:
+        return put_level_georef(0, body)
 
     @app.delete("/api/v1/field/georef", dependencies=[Depends(require_gm)])
     def delete_georef() -> dict[str, Any]:
-        deleted = georefmod.clear(controller.store)
-        if deleted:
-            controller._emit({"type": "field_georef", "georef": None})
-        return {"deleted": deleted}
+        return delete_level_georef(0)
+
+    @app.get("/api/v1/field/levels", dependencies=[Depends(require_read)])
+    def field_levels() -> dict[str, Any]:
+        return levelsmod.view(controller.store)
+
+    @app.put("/api/v1/field/levels", dependencies=[Depends(require_gm)])
+    def put_field_levels(body: Any = Body(None)) -> dict[str, Any]:
+        """Levels on or off, their number (2-10) and names (field_levels.py)."""
+        meta = levelsmod.check(body, levels_meta())
+        removed = levelsmod.save(controller.store, meta)
+        out = levelsmod.view(controller.store)
+        controller._emit({"type": "field_levels", "levels": out})
+        return {**out, "removed": removed}
+
+    @app.get("/api/v1/field/levels/{level}/image", dependencies=[Depends(require_read)])
+    def level_image(level: int) -> Response:
+        return get_image(level)
+
+    @app.put("/api/v1/field/levels/{level}/image", dependencies=[Depends(require_gm)])
+    async def put_level_image(level: int, request: Request) -> dict[str, Any]:
+        return await put_image(request, level)
+
+    @app.delete("/api/v1/field/levels/{level}/image", dependencies=[Depends(require_gm)])
+    def delete_level_image(level: int) -> dict[str, Any]:
+        return delete_image(level)
+
+    @app.get("/api/v1/field/levels/{level}/georef", dependencies=[Depends(require_read)])
+    def level_georef(level: int) -> dict[str, Any]:
+        return get_level_georef(level)
+
+    @app.put("/api/v1/field/levels/{level}/georef", dependencies=[Depends(require_gm)])
+    def put_level_georef_route(level: int, body: Any = Body(None)) -> dict[str, Any]:
+        return put_level_georef(level, body)
+
+    @app.delete("/api/v1/field/levels/{level}/georef", dependencies=[Depends(require_gm)])
+    def delete_level_georef_route(level: int) -> dict[str, Any]:
+        return delete_level_georef(level)
 
     @app.get("/api/v1/atak", dependencies=[Depends(require_console)])
     def atak_status() -> dict[str, Any]:
@@ -600,8 +681,13 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
                     or not 0.0 <= v <= 1.0:
                 raise ControllerError(f"{name}: a number from 0 to 1 (fraction of the image)")
             xy.append(float(v))
-        controller.store.set_position(game_id, node_id, xy[0], xy[1])
-        msg = {"type": "position", "game": game_id, "node_id": node_id, "x": xy[0], "y": xy[1]}
+        level = spec.get("level")  # absent or null: the level it is on (decision ML-4)
+        if level is not None:
+            if isinstance(level, bool) or not isinstance(level, int):
+                raise ControllerError("level: a level in use, from 0")
+            level_or_404(level, write=True)
+        level = controller.store.set_position(game_id, node_id, xy[0], xy[1], level)
+        msg = {"type": "position", "game": game_id, "node_id": node_id, "x": xy[0], "y": xy[1], "level": level}
         controller._emit(msg)
         return msg
 

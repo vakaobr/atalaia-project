@@ -140,7 +140,8 @@ def _summary(manifest: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": manifest.get("id") if isinstance(manifest.get("id"), str) else None,
         "name": manifest.get("name") if isinstance(manifest.get("name"), str) else None,
-        "nodes": [{"name": str(name), "role": spec.get("role"), "player": bool(spec.get("player"))}
+        "nodes": [{"name": str(name), "role": spec.get("role"), "player": bool(spec.get("player")),
+                   **({"level": spec["level"]} if isinstance(spec.get("level"), int) else {})}
                   for name, spec in nodes.items() if isinstance(spec, dict)],
         "objectives": [{"id": o.get("id"), "type": o.get("type"), "name": o.get("name")}
                        for o in objectives if isinstance(o, dict)],
@@ -209,7 +210,8 @@ def describe(pkg: "ModePackage", has_manifest: bool) -> dict[str, Any]:
                            "params": pkg.mode.params, "manifest": has_manifest, "compiled": meta is not None}
     if meta is not None:
         out.update({"lang": meta.lang, "teams": meta.teams, "squads": meta.squads,
-                    "nodes": [{"name": n, "role": s.get("role"), "player": bool(s.get("player"))}
+                    "nodes": [{"name": n, "role": s.get("role"), "player": bool(s.get("player")),
+                               **({"level": s["level"]} if isinstance(s.get("level"), int) else {})}
                               for n, s in meta.nodes.items()],
                     "objectives": [{"id": o["id"], "type": o.get("type"), "name": o.get("name"),
                                     "i18n": o.get("i18n") or {}} for o in meta.objectives.values()]})

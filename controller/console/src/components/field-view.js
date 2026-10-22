@@ -8,18 +8,34 @@
 // no map tiles are fetched (OpenStreetMap is left for a later phase).
 // Below it, with an image, its place on the map for the ATAK feed
 // (georef-panel.js), with a pin on the image per control point.
+//
+// A multi-story field (field-levels.js, decisions ML-0 to ML-12) has a tab per
+// level, each with its own floor plan and the boxes on that level; the GM
+// moves a box to another level with the level list under the plan.
 
 import { html, Component, createRef, t, teamColour, OFFLINE_MS } from '../ui.js';
 import { linkBars } from './node-list.js';
 import { GeorefPanel, georefPins } from './georef-panel.js';
+import { LevelSettings, LevelTabs, levelName, levelsInUse, shownLevel } from './field-levels.js';
 
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+const NO_LEVELS = { enabled: false, count: 1, names: [''], levels: [] };
+
+/** The API path of a level's plan or georeference (level 0: the paths of a single image). */
+function levelPath(level, what) {
+    if (level === 0) return what === 'image' ? '/field/image' : '/field/georef';
+    return `/field/levels/${level}/${what}`;
+}
 
 export class FieldView extends Component {
     constructor() {
         super();
-        this.state = { imageUrl: null, version: -1, geoVersion: -1, georef: null, drag: null, noImage: false };
+        this.state = {
+            imageUrl: null, version: -1, geoVersion: -1, georef: null, ownGeoref: true, drag: null,
+            noImage: false, levels: NO_LEVELS, level: 0,
+        };
         this.area = createRef();
+        this.loads = 0;
     }
 
     componentDidMount() {
@@ -36,28 +52,43 @@ export class FieldView extends Component {
         if (this.state.imageUrl) URL.revokeObjectURL(this.state.imageUrl);
     }
 
-    async loadImage() {
+    async loadImage(level = this.state.level) {
         const app = this.props.app;
         const version = app.state.imageVersion || 0;
+        this.loads += 1;
+        const mine = this.loads;
         this.setState({ version });
         let url = null;
         // Ask first, so a field without an image does not cost a 404.
         const info = await app.call('GET', '/field');
-        if (info && info.image) {
-            const blob = await app.call('GET', '/field/image');
+        const levels = (info && info.levels) || NO_LEVELS;
+        const shown = level < levelsInUse(levels) ? level : 0;
+        const has = shown === 0 ? info && info.image : (levels.levels[shown] || {}).image;
+        if (has) {
+            const blob = await app.call('GET', levelPath(shown, 'image'));
             if (blob) url = URL.createObjectURL(blob);
         }
+        if (mine !== this.loads) {
+            if (url) URL.revokeObjectURL(url); // a later load (another tab) won
+            return;
+        }
         if (this.state.imageUrl) URL.revokeObjectURL(this.state.imageUrl);
-        this.setState({ imageUrl: url, noImage: !url });
-        if (url) this.loadGeoref();
+        this.setState({ imageUrl: url, noImage: !url, levels, level: shown });
+        if (url) this.loadGeoref(shown);
         else this.setState({ georef: null, geoVersion: app.state.georefVersion || 0 });
     }
 
-    async loadGeoref() {
+    async loadGeoref(level = this.state.level) {
         const app = this.props.app;
         this.setState({ geoVersion: app.state.georefVersion || 0 });
-        const out = await app.call('GET', '/field/georef');
-        if (out) this.setState({ georef: out.georef });
+        const out = await app.call('GET', levelPath(level, 'georef'));
+        if (out && level === this.state.level) this.setState({ georef: out.georef, ownGeoref: out.own !== false });
+    }
+
+    selectLevel(level) {
+        if (level === this.state.level) return;
+        this.setState({ level });
+        this.loadImage(level);
     }
 
     async upload(e) {
@@ -68,12 +99,13 @@ export class FieldView extends Component {
             this.props.app.showToast(t('field.bad_type'));
             return;
         }
-        const out = await this.props.app.call('PUT', '/field/image', undefined, { type: file.type, data: file });
+        const out = await this.props.app.call('PUT', levelPath(this.state.level, 'image'), undefined,
+                                              { type: file.type, data: file });
         if (out) this.loadImage();
     }
 
     async removeImage() {
-        const out = await this.props.app.call('DELETE', '/field/image');
+        const out = await this.props.app.call('DELETE', levelPath(this.state.level, 'image'));
         if (out) this.loadImage();
     }
 
@@ -83,6 +115,12 @@ export class FieldView extends Component {
         if (drag && drag.id === node.node_id) return { x: drag.x, y: drag.y };
         if (p) return p;
         return { x: (index + 1) / (count + 1), y: 0.9 };
+    }
+
+    /** The level a box is shown on: its position's, else level 0. */
+    nodeLevel(node) {
+        const p = this.props.app.state.positions[node.node_id];
+        return shownLevel(this.state.levels, p ? p.level : 0);
     }
 
     point(e) {
@@ -103,14 +141,30 @@ export class FieldView extends Component {
         this.setState({ drag: { ...this.state.drag, ...this.point(e) } });
     }
 
+    async place(id, body) {
+        const { game } = this.props.app.state;
+        const out = await this.props.app.call('PUT', `/games/${game.id}/positions/${id}`, body);
+        if (out) {
+            this.props.app.setState((s) => ({
+                positions: { ...s.positions, [id]: { x: out.x, y: out.y, level: out.level } },
+            }));
+        }
+    }
+
     async up() {
         const drag = this.state.drag;
         if (!drag) return;
-        const { game } = this.props.app.state;
-        const out = await this.props.app.call('PUT', `/games/${game.id}/positions/${drag.id}`,
-                                              { x: drag.x, y: drag.y });
-        if (out) this.props.app.setState((s) => ({ positions: { ...s.positions, [drag.id]: { x: out.x, y: out.y } } }));
+        // On a level's plan the box goes to that level; with levels off it keeps the one it has (ML-3).
+        const body = { x: drag.x, y: drag.y };
+        if (levelsInUse(this.state.levels) > 1) body.level = this.state.level;
+        await this.place(drag.id, body);
         this.setState({ drag: null });
+    }
+
+    /** Moves a box to another level, at the same place on the plan. */
+    toLevel(node, index, count, level) {
+        const p = this.where(node, index, count);
+        this.place(node.node_id, { x: p.x, y: p.y, level });
     }
 
     canEdit() {
@@ -139,28 +193,64 @@ export class FieldView extends Component {
         </button>`;
     }
 
+    /** Each box's level, changeable by the GM (the keyboard's way to move a box between levels). */
+    renderNodeLevels(list) {
+        const { levels } = this.state;
+        const count = levelsInUse(levels);
+        if (count < 2 || list.length === 0) return null;
+        const edit = this.canEdit();
+        return html`<details class="node-levels" data-testid="node-levels">
+            <summary>${t('levels.boxes')}</summary>
+            <ul>${list.map((n, i) => {
+                const id = `node-level-${n.node_id}`;
+                const at = this.nodeLevel(n);
+                return html`<li><label for=${id}>${t('levels.box', { node: n.node_id })}</label>
+                    ${edit ? html`<select id=${id} data-testid=${id} value=${at}
+                        onChange=${(e) => this.toLevel(n, i, list.length, Number(e.target.value))}>
+                        ${Array.from({ length: count }, (_, lv) => html`<option value=${lv} selected=${lv === at}>${
+                            levelName(levels, lv)}</option>`)}
+                    </select>` : html`<span id=${id} data-testid=${id}>${levelName(levels, at)}</span>`}</li>`;
+            })}</ul>
+        </details>`;
+    }
+
     render(props, state) {
         const app = props.app;
         const { nodes, game, role } = app.state;
         const list = Object.values(nodes).sort((a, b) => a.node_id - b.node_id);
         const teams = (game && game.teams) || [];
+        const multi = levelsInUse(state.levels) > 1;
+        const here = list.filter((n) => this.nodeLevel(n) === state.level);
+        const name = levelName(state.levels, state.level);
         return html`<section class="card" aria-labelledby="field-h">
             <h2 id="field-h">${t('field.title')}</h2>
+            ${role === 'gm' && html`<${LevelSettings} app=${app} levels=${state.levels}
+                onChange=${() => this.loadImage()} />`}
+            <${LevelTabs} levels=${state.levels} current=${state.level} onSelect=${(lv) => this.selectLevel(lv)} />
+            <div id="field-level-panel" role=${multi ? 'tabpanel' : undefined}
+                aria-labelledby=${multi ? `level-tab-${state.level}` : undefined}>
             ${role === 'gm' && html`<div class="actions">
-                <label class="button">${t('field.upload')}
+                <label class="button">${multi ? t('levels.upload', { name }) : t('field.upload')}
                     <input type="file" class="sr-only" accept=${IMAGE_TYPES.join(',')} data-testid="field-upload"
                         onChange=${(e) => this.upload(e)} /></label>
-                ${state.imageUrl && html`<button type="button" onClick=${() => this.removeImage()}>${t('field.remove')}</button>`}
+                ${state.imageUrl && html`<button type="button" data-testid="field-remove"
+                    onClick=${() => this.removeImage()}>${multi ? t('levels.remove') : t('field.remove')}</button>`}
             </div>`}
-            <div class=${`field-area ${state.imageUrl ? 'with-image' : 'grid'}`} ref=${this.area} data-testid="field-area">
-                ${state.imageUrl && html`<img src=${state.imageUrl} alt=${t('field.image_alt')} draggable="false" />`}
+            <div class=${`field-area ${state.imageUrl ? 'with-image' : 'grid'}`} ref=${this.area} data-testid="field-area"
+                data-level=${state.level}>
+                ${state.imageUrl && html`<img src=${state.imageUrl} draggable="false"
+                    alt=${multi ? t('levels.image_alt', { name }) : t('field.image_alt')} />`}
                 ${state.imageUrl && georefPins(state.georef)}
-                ${list.map((n, i) => this.marker(n, i, list.length, teams))}
+                ${here.map((n) => this.marker(n, list.indexOf(n), list.length, teams))}
             </div>
-            <p class="muted small">${state.noImage ? t('field.no_image') : ''} ${role === 'gm' && game ? t('field.drag_hint') : ''}</p>
+            <p class="muted small">${state.noImage ? t(multi ? 'levels.no_image' : 'field.no_image', { name }) : ''}
+                ${' '}${role === 'gm' && game ? t('field.drag_hint') : ''}</p>
             ${list.length === 0 && html`<p class="muted">${t('nodes.none')}</p>`}
+            ${this.renderNodeLevels(list)}
+            </div>
         </section>
-        ${state.imageUrl && html`<${GeorefPanel} app=${app} georef=${state.georef}
-            onChange=${(georef) => this.setState({ georef })} />`}`;
+        ${state.imageUrl && html`<${GeorefPanel} app=${app} georef=${state.georef} level=${state.level}
+            own=${state.ownGeoref} levelName=${multi ? name : null} groundName=${levelName(state.levels, 0)}
+            onChange=${() => this.loadGeoref()} />`}`;
     }
 }

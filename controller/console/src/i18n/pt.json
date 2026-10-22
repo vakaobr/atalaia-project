@@ -248,6 +248,27 @@
     "atak_off": "Feed ATAK: desligado (controller.toml, [atak] enabled = false).",
     "atak_on": "Feed ATAK: ligado, {markers} marcadores no mapa, {sent} mensagens enviadas."
   },
+  "levels": {
+    "toggle": "Edifício com vários pisos",
+    "hint_off": "Marca se o campo é um edifício com vários pisos: cada piso tem a sua planta e cada caixa fica no piso onde está.",
+    "hint_on": "Cada piso tem a sua planta. Escolhe o piso nos separadores por cima da planta. Para uma cave, dá esse nome a um piso.",
+    "count": "Número de pisos",
+    "name": "Nome do piso {n}",
+    "save": "Guardar pisos",
+    "ground": "R/C",
+    "floor": "{n}.º andar",
+    "tabs": "Pisos",
+    "upload": "Carregar planta: {name}",
+    "remove": "Remover planta",
+    "image_alt": "Planta: {name}",
+    "no_image": "{name} ainda não tem planta: as caixas deste piso aparecem numa grelha.",
+    "boxes": "Piso de cada caixa",
+    "box": "Caixa {node}",
+    "confirm_off": "Desligar os pisos? Só a planta de {ground} fica em uso, como imagem do campo, e todas as caixas aparecem nela. As outras plantas, os nomes e o piso de cada caixa ficam guardados e voltam se ligares os pisos outra vez.",
+    "confirm_fewer": "Com menos pisos, as plantas de {names} são apagadas e as caixas desses pisos passam para {ground}. Continuar?",
+    "georef_title": "Posição no mapa (ATAK): {name}",
+    "georef_shared": "Este piso usa a posição no mapa de {ground}: as plantas estão desenhadas à mesma escala e com o mesmo enquadramento. Dá-lhe dois cantos só se a planta for diferente."
+  },
   "join": {
     "title": "Juntar caixas e controladores",
     "intro": "Gera os dados de entrada no jogo para uma caixa (cartão NFC ou consola série) ou para um controlador de reserva.",
@@ -577,6 +598,7 @@
       "bomb_site": "local da bomba"
     },
     "player_node": "uma pessoa com a função {role} no check-in",
+    "node_level": "piso {n}",
     "objectives": "Objetivos",
     "installed": "Cenários instalados",
     "none": "Ainda não há cenários instalados.",

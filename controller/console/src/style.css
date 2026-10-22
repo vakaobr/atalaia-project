@@ -725,6 +725,61 @@ tr.offline td {
     font-size: 0.9rem;
 }
 
+/* a multi-story field (field-levels.js): the GM's settings, a tab per level, each box's level */
+.levels-settings {
+    margin: 0.4rem 0 0.8rem;
+}
+
+.levels-names {
+    display: grid;
+    gap: 0.6rem;
+}
+
+@media (min-width: 40rem) {
+    .levels-names {
+        grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    }
+}
+
+.level-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin: 0.6rem 0 0.2rem;
+}
+
+.level-tabs button {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.level-tabs button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-fg);
+    font-weight: 600;
+}
+
+.node-levels ul {
+    list-style: none;
+    padding: 0;
+    margin: 0.4rem 0 0;
+    display: grid;
+    gap: 0.4rem;
+}
+
+.node-levels li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.node-levels select {
+    width: auto;
+    max-width: 100%;
+}
+
 /* the georeference's control points (georef-panel.js), under the boxes */
 .georef-pin {
     position: absolute;

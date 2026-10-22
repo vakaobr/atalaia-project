@@ -52,6 +52,12 @@ Schema 8 (phase 4, plan phase 19; P4R12) adds ``remote_commands``: every command
 through the site server (``[sync] remote_gm = true``), who sent it (the site server's account id and
 username), what it asked for and what came of it, whether it was carried out or refused. Rows older
 than ``REMOTE_LOG_DAYS`` are deleted when a new one is added.
+
+Schema 9 (the maintainer's request of 2026-10-22, decisions ML-1 to ML-12) adds field levels: a
+multi-story building with a floor plan per level. ``field_levels`` holds each level's plan (level 0
+is the field image of before: a schema 8 file's ``field_image`` row is moved there and that table
+dropped), the settings key ``field.levels`` whether levels are on, their number and names
+(field_levels.py), and ``positions.level`` the level a box is on (0 for every older row).
 """
 
 from __future__ import annotations
@@ -66,9 +72,10 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 REMOTE_LOG_DAYS = 365  # the remote GM's log on the controller (decision S19-9)
-FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes
+FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes, per level's plan
+FIELD_LEVELS_MAX = 10  # levels of a multi-story field (decision ML-1)
 EPOCH_KEYS = 8  # game keys whose TX epoch is kept (as the box's epoch store, radio_protocol.h)
 
 
@@ -145,8 +152,8 @@ CREATE TABLE IF NOT EXISTS scores (
     score   INTEGER NOT NULL,
     PRIMARY KEY (game_id, team)
 );
-CREATE TABLE IF NOT EXISTS field_image (
-    id           INTEGER PRIMARY KEY CHECK (id = 1),   -- one image per field
+CREATE TABLE IF NOT EXISTS field_levels (
+    level        INTEGER PRIMARY KEY CHECK (level BETWEEN 0 AND 9),  -- schema 9; 0: the field image
     content_type TEXT NOT NULL,
     data         BLOB NOT NULL,
     updated_at   REAL NOT NULL
@@ -154,8 +161,9 @@ CREATE TABLE IF NOT EXISTS field_image (
 CREATE TABLE IF NOT EXISTS positions (
     game_id INTEGER NOT NULL,
     node_id INTEGER NOT NULL,
-    x       REAL NOT NULL,                             -- 0..1 across the field image
-    y       REAL NOT NULL,                             -- 0..1 down the field image
+    x       REAL NOT NULL,                             -- 0..1 across the level's plan
+    y       REAL NOT NULL,                             -- 0..1 down the level's plan
+    level   INTEGER NOT NULL DEFAULT 0,                -- schema 9: the level it is on
     PRIMARY KEY (game_id, node_id)
 );
 CREATE TABLE IF NOT EXISTS token_keys (
@@ -381,10 +389,29 @@ class Store:
             for name, decl in CHECKIN_COLUMNS_V7:
                 if name not in have:
                     self._db.execute(f"ALTER TABLE checkins ADD COLUMN {name} {decl}")
+            self._upgrade_field_levels()
             self.set_setting("schema_version", str(SCHEMA_VERSION))
         if path != ":memory:":
             for name in (path, path + "-wal", path + "-shm"):
                 _private(name)  # tokens, token keys and, if enabled, game keys
+
+    def _upgrade_field_levels(self) -> None:
+        """Schema 9: positions get their level (0), and the one field image becomes level 0's plan."""
+        have = {r["name"] for r in self._db.execute("PRAGMA table_info(positions)").fetchall()}
+        if "level" not in have:
+            self._db.execute("ALTER TABLE positions ADD COLUMN level INTEGER NOT NULL DEFAULT 0")
+        old = self._db.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'field_image'")
+        if old.fetchone() is None:
+            return
+        self._db.execute("BEGIN IMMEDIATE")
+        try:
+            self._db.execute("INSERT OR IGNORE INTO field_levels (level, content_type, data, updated_at) "
+                             "SELECT 0, content_type, data, updated_at FROM field_image WHERE id = 1")
+            self._db.execute("DROP TABLE field_image")
+            self._db.execute("COMMIT")
+        except BaseException:
+            self._db.execute("ROLLBACK")
+            raise
 
     def close(self) -> None:
         with self._lock:
@@ -740,30 +767,50 @@ class Store:
 
     # --- field image and positions (GM console field view) ------------------
 
-    def set_field_image(self, content_type: str, data: bytes) -> None:
+    def set_field_image(self, content_type: str, data: bytes, level: int = 0) -> None:
+        """The field image (level 0) or a level's floor plan (schema 9)."""
         if len(data) > FIELD_IMAGE_MAX:
             raise ValueError(f"the field image is over {FIELD_IMAGE_MAX} bytes")
-        self._exec("INSERT INTO field_image (id, content_type, data, updated_at) VALUES (1, ?, ?, ?) "
-                   "ON CONFLICT(id) DO UPDATE SET content_type = excluded.content_type, "
+        if not 0 <= level < FIELD_LEVELS_MAX:
+            raise ValueError(f"level: 0 to {FIELD_LEVELS_MAX - 1}")
+        self._exec("INSERT INTO field_levels (level, content_type, data, updated_at) VALUES (?, ?, ?, ?) "
+                   "ON CONFLICT(level) DO UPDATE SET content_type = excluded.content_type, "
                    "data = excluded.data, updated_at = excluded.updated_at",
-                   (content_type, data, time.time()))
+                   (level, content_type, data, time.time()))
 
-    def field_image(self) -> Optional[tuple[str, bytes, float]]:
-        row = self._exec("SELECT content_type, data, updated_at FROM field_image WHERE id = 1").fetchone()
+    def field_image(self, level: int = 0) -> Optional[tuple[str, bytes, float]]:
+        row = self._exec("SELECT content_type, data, updated_at FROM field_levels WHERE level = ?",
+                         (level,)).fetchone()
         return (row["content_type"], bytes(row["data"]), row["updated_at"]) if row else None
 
-    def delete_field_image(self) -> bool:
-        return self._exec("DELETE FROM field_image WHERE id = 1").rowcount == 1
+    def field_images(self) -> dict[int, tuple[str, int, float]]:
+        """Every level's plan without its bytes: level -> (content type, size, updated_at)."""
+        rows = self._exec("SELECT level, content_type, length(data) AS size, updated_at FROM field_levels "
+                          "ORDER BY level").fetchall()
+        return {r["level"]: (r["content_type"], r["size"], r["updated_at"]) for r in rows}
 
-    def set_position(self, game_id: int, node_id: int, x: float, y: float) -> None:
-        self._exec("INSERT INTO positions (game_id, node_id, x, y) VALUES (?, ?, ?, ?) "
-                   "ON CONFLICT(game_id, node_id) DO UPDATE SET x = excluded.x, y = excluded.y",
-                   (game_id, node_id, x, y))
+    def delete_field_image(self, level: int = 0) -> bool:
+        return self._exec("DELETE FROM field_levels WHERE level = ?", (level,)).rowcount == 1
 
-    def positions(self, game_id: int) -> dict[int, dict[str, float]]:
-        rows = self._exec("SELECT node_id, x, y FROM positions WHERE game_id = ? ORDER BY node_id",
+    def set_position(self, game_id: int, node_id: int, x: float, y: float, level: Optional[int] = None) -> int:
+        """A box's place; ``level`` None keeps the level it is on (0 for a box not placed yet).
+        Returns its level."""
+        with self._lock:
+            self._exec("INSERT INTO positions (game_id, node_id, x, y, level) VALUES (?, ?, ?, ?, COALESCE(?, 0)) "
+                       "ON CONFLICT(game_id, node_id) DO UPDATE SET x = excluded.x, y = excluded.y, "
+                       "level = COALESCE(?, positions.level)", (game_id, node_id, x, y, level, level))
+            row = self._exec("SELECT level FROM positions WHERE game_id = ? AND node_id = ?",
+                             (game_id, node_id)).fetchone()
+        return int(row["level"])
+
+    def positions(self, game_id: int) -> dict[int, dict[str, Any]]:
+        rows = self._exec("SELECT node_id, x, y, level FROM positions WHERE game_id = ? ORDER BY node_id",
                           (game_id,)).fetchall()
-        return {r["node_id"]: {"x": r["x"], "y": r["y"]} for r in rows}
+        return {r["node_id"]: {"x": r["x"], "y": r["y"], "level": r["level"]} for r in rows}
+
+    def move_positions_to_level0(self, levels_from: int) -> int:
+        """Boxes on levels that no longer exist (``level >= levels_from``) go to level 0, in every game."""
+        return self._exec("UPDATE positions SET level = 0 WHERE level >= ?", (levels_from,)).rowcount
 
     # --- branding images and team presets (schema 4, decisions BR1-BR24) ------
 

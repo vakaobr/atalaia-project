@@ -255,7 +255,7 @@ class _Checker:
                 self.err(path, "bad_node", "a map: { role: objective }, { role: bomb_site } or "
                          "{ player: true, role: vip }")
                 continue
-            self.unknown_keys(spec, ("role", "player"), path)
+            self.unknown_keys(spec, ("role", "player", "level"), path)
             player = spec.get("player", False)
             role = spec.get("role")
             if not isinstance(player, bool):
@@ -269,6 +269,12 @@ class _Checker:
             elif role not in m.NODE_ROLES:
                 self.err(f"{path}.role", "bad_role", f"a box runs {m.OBJECTIVES_PACKAGE}: role "
                          f"{' or '.join(m.NODE_ROLES)} (a player: player: true)")
+                continue
+            level = spec.get("level")
+            if level is not None and (player or isinstance(level, bool) or not isinstance(level, int)
+                                      or not 0 <= level < m.LEVELS_MAX):
+                # The level of a multi-story field the box goes on (decision ML-8); a player has none.
+                self.err(f"{path}.level", "bad_level", f"a box's level of the field, 0 to {m.LEVELS_MAX - 1}")
                 continue
             good[name] = {"role": role, "player": player}
         return good

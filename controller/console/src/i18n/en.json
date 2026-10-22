@@ -248,6 +248,27 @@
     "atak_off": "ATAK feed: off (controller.toml, [atak] enabled = false).",
     "atak_on": "ATAK feed: on, {markers} markers on the map, {sent} messages sent."
   },
+  "levels": {
+    "toggle": "Multi-story building",
+    "hint_off": "Tick it if the field is a building with several floors: each floor has its own plan and each box sits on its floor.",
+    "hint_on": "Each level has its own floor plan. Choose the level with the tabs above the plan. For a basement, give a level that name.",
+    "count": "Number of levels",
+    "name": "Name of level {n}",
+    "save": "Save levels",
+    "ground": "Ground floor",
+    "floor": "Floor {n}",
+    "tabs": "Levels",
+    "upload": "Upload plan: {name}",
+    "remove": "Remove plan",
+    "image_alt": "Floor plan: {name}",
+    "no_image": "{name} has no plan yet: the boxes on this level are shown on a grid.",
+    "boxes": "Each box's level",
+    "box": "Box {node}",
+    "confirm_off": "Turn levels off? Only the plan of {ground} stays in use, as the field image, and every box shows on it. The other plans, the names and each box's level are kept and come back if you turn levels on again.",
+    "confirm_fewer": "With fewer levels, the plans of {names} are deleted and the boxes on those levels move to {ground}. Go on?",
+    "georef_title": "Map position (ATAK): {name}",
+    "georef_shared": "This level uses the map position of {ground}: the plans are drawn to the same scale and frame. Give it two corners only if its plan differs."
+  },
   "join": {
     "title": "Join boxes and controllers",
     "intro": "Make the join data for a box (NFC card or serial console) or for a standby controller.",
@@ -577,6 +598,7 @@
       "bomb_site": "bomb site"
     },
     "player_node": "a player whose check-in role is {role}",
+    "node_level": "level {n}",
     "objectives": "Objectives",
     "installed": "Installed scenarios",
     "none": "No scenarios installed yet.",

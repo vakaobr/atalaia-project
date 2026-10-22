@@ -9,6 +9,10 @@
 // corners it worked out, shown back here and as pins on the image. With the
 // API, 3-8 control points also work (a rotated image); the panel then shows
 // them and offers to replace them with two corners.
+//
+// On a multi-story field (field-levels.js) the panel is the shown level's: a level
+// without its own points shares level 0's (decision ML-6) and says so; the GM may
+// give it its own (PUT /api/v1/field/levels/{n}/georef).
 
 import { html, Component, t, ConfirmButton } from '../ui.js';
 
@@ -69,8 +73,22 @@ export class GeorefPanel extends Component {
         if (out) this.setState({ atak: out });
     }
 
+    componentDidUpdate(prev) {
+        if (prev.level !== this.props.level) this.setState({ edit: null, error: '', saved: false });
+    }
+
+    path() {
+        const level = this.props.level || 0;
+        return level === 0 ? '/field/georef' : `/field/levels/${level}/georef`;
+    }
+
+    /** This level's own points (null while it shares level 0's). */
+    own() {
+        return this.props.own === false ? null : this.props.georef;
+    }
+
     values() {
-        return this.state.edit || givenCorners(this.props.georef) || { top_left: '', bottom_right: '' };
+        return this.state.edit || givenCorners(this.own()) || { top_left: '', bottom_right: '' };
     }
 
     async save(e) {
@@ -85,7 +103,7 @@ export class GeorefPanel extends Component {
             }
             points.push({ ...GIVEN[name], ...p });
         }
-        const out = await this.props.app.call('PUT', '/field/georef', { points });
+        const out = await this.props.app.call('PUT', this.path(), { points });
         if (out) {
             this.setState({ edit: null, error: '', saved: true });
             this.props.onChange(out.georef);
@@ -94,7 +112,7 @@ export class GeorefPanel extends Component {
     }
 
     async remove() {
-        const out = await this.props.app.call('DELETE', '/field/georef');
+        const out = await this.props.app.call('DELETE', this.path());
         if (out) {
             this.setState({ edit: null, error: '', saved: false });
             this.props.onChange(null);
@@ -117,8 +135,10 @@ export class GeorefPanel extends Component {
         const gm = app.state.role === 'gm';
         const v = this.values();
         return html`<section class="card" aria-labelledby="georef-h" data-testid="georef">
-            <h2 id="georef-h">${t('georef.title')}</h2>
+            <h2 id="georef-h">${props.levelName ? t('levels.georef_title', { name: props.levelName }) : t('georef.title')}</h2>
             <p class="muted small">${t('georef.intro')}</p>
+            ${props.levelName && props.own === false && georef && html`<p class="muted small" data-testid="georef-shared">${
+                t('levels.georef_shared', { ground: props.groundName })}</p>`}
             ${georef ? html`<dl class="facts" data-testid="georef-corners">
                 ${CORNERS.map((c) => html`<dt>${t(`georef.${c}`)}</dt>
                     <dd data-testid=${`georef-${c}`}>${formatLatLon(georef.corners[c])}</dd>`)}
@@ -135,7 +155,7 @@ export class GeorefPanel extends Component {
                 ${state.error && html`<p class="error" role="alert" data-testid="georef-error">${state.error}</p>`}
                 <div class="actions">
                     <button type="submit" class="primary" data-testid="georef-save">${t('common.save')}</button>
-                    ${georef && html`<${ConfirmButton} label=${t('georef.remove')} question=${t('georef.confirm_remove')}
+                    ${this.own() && html`<${ConfirmButton} label=${t('georef.remove')} question=${t('georef.confirm_remove')}
                         testid="georef-remove" onConfirm=${() => this.remove()} />`}
                     ${state.saved && html`<span class="ok" role="status">${t('georef.saved')}</span>`}
                 </div>

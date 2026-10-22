@@ -29,6 +29,11 @@ points that do not fit one flat image (decision M9-3).
 Stored in the store's ``settings`` table (``field.georef``) as the GM's
 points; the map is fitted again when it is read. A new or removed field
 image deletes it (api.py), because its points belong to the old image.
+
+A multi-story field (field_levels.py) has a plan per level: level 0's points
+are ``field.georef`` as before, and another level may have its own
+(``field.georef.<level>``); a level without them shares level 0's (decision
+ML-6: the plans are drawn to the same frame).
 """
 
 from __future__ import annotations
@@ -252,8 +257,14 @@ class Georef:
                 "residual_m": round(self.residual_m, 2), "corners": corners}
 
 
-def load(store: Any) -> Optional[Georef]:
-    raw = store.get_setting(SETTING)
+def setting(level: int = 0) -> str:
+    """The settings key of a level's own control points (level 0: the field image's, as before)."""
+    return SETTING if level == 0 else f"{SETTING}.{level}"
+
+
+def load(store: Any, level: int = 0) -> Optional[Georef]:
+    """A level's own georeference (level 0: the field image's), or None."""
+    raw = store.get_setting(setting(level))
     if not raw:
         return None
     try:
@@ -262,11 +273,16 @@ def load(store: Any) -> Optional[Georef]:
         return None
 
 
-def save(store: Any, georef: Georef) -> None:
-    store.set_setting(SETTING, json.dumps([p.to_json() for p in georef.points], separators=(",", ":")))
+def for_level(store: Any, level: int) -> Optional[Georef]:
+    """What places a level's boxes on the map: its own points, else level 0's (decision ML-6)."""
+    return load(store, level) or (load(store, 0) if level else None)
 
 
-def clear(store: Any) -> bool:
-    had = bool(store.get_setting(SETTING))
-    store.delete_setting(SETTING)
+def save(store: Any, georef: Georef, level: int = 0) -> None:
+    store.set_setting(setting(level), json.dumps([p.to_json() for p in georef.points], separators=(",", ":")))
+
+
+def clear(store: Any, level: int = 0) -> bool:
+    had = bool(store.get_setting(setting(level)))
+    store.delete_setting(setting(level))
     return had

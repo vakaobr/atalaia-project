@@ -156,7 +156,7 @@ class CommandTests(RemoteCase):
                                        - (REMOTE_LOG_DAYS + 1) * 86400, "result": "done"})
         self.store.add_remote_command({"command_id": str(uuid.uuid4()), "result": "invalid"})
         self.assertEqual([e["result"] for e in self.store.remote_commands()], ["invalid"])
-        self.assertEqual(SCHEMA_VERSION, 8)
+        self.assertGreaterEqual(SCHEMA_VERSION, 8)  # the remote GM log came with schema 8
 
 
 class RemoteGmOffTests(RemoteCase):

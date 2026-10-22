@@ -245,12 +245,14 @@ class App extends Component {
             this.refreshGame();
             break;
         case 'position':
-            this.setState((s) => ({ positions: { ...s.positions, [msg.node_id]: { x: msg.x, y: msg.y } } }));
+            this.setState((s) => ({ positions: { ...s.positions,
+                [msg.node_id]: { x: msg.x, y: msg.y, level: msg.level || 0 } } }));
             break;
         case 'branding':
             this.setState({ branding: msg.branding });
             break;
         case 'field_image':
+        case 'field_levels':
             this.setState((s) => ({ imageVersion: (s.imageVersion || 0) + 1 }));
             break;
         case 'field_georef':

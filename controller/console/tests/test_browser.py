@@ -1337,6 +1337,117 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertIsNone(self.field.http.get("/api/v1/field/georef").json()["georef"])
         self.no_horizontal_scroll(page)
 
+    def test_field_levels_a_plan_per_level(self):
+        """The maintainer's request (ML-0): a multi-story building, a floor plan per level, a box on level 2,
+        levels turned off with a confirmation; in pt-PT, by keyboard too, and at phone width."""
+        game = self.field.create_game(start=True)
+        self.field.box_hello()
+        page = self.console()
+        page.get_by_test_id("tab-field").click()
+        marker = page.locator(f'[data-testid=field-area] .marker[data-node="{BOX}"]')
+        expect(marker).to_be_visible()
+        expect(page.get_by_test_id("level-tabs")).to_have_count(0)
+        expect(page.get_by_label("Edifício com vários pisos")).not_to_be_checked()  # the checkbox, by its label
+        page.get_by_test_id("levels-toggle").check()
+        expect(page.get_by_test_id("level-tab-0")).to_have_text("R/C")
+        expect(page.get_by_test_id("level-tab-1")).to_have_text("1.º andar")
+        page.get_by_test_id("levels-count").select_option("3")
+        expect(page.get_by_test_id("levels-name-2")).to_have_value("2.º andar")
+        page.get_by_test_id("levels-save").click()
+        expect(page.get_by_test_id("level-tab-2")).to_have_text("2.º andar")
+        levels = self.field.http.get("/api/v1/field/levels").json()
+        self.assertEqual((levels["enabled"], levels["names"]), (True, ["R/C", "1.º andar", "2.º andar"]))
+        # A plan per level, each uploaded on its tab.
+        for i, name in enumerate(("R/C", "1.º andar", "2.º andar")):
+            page.get_by_test_id(f"level-tab-{i}").click()
+            expect(page.get_by_test_id(f"level-tab-{i}")).to_have_attribute("aria-selected", "true")
+            expect(page.get_by_text(f"Carregar planta: {name}")).to_be_visible()
+            page.get_by_test_id("field-upload").set_input_files(str(ICON))
+            expect(page.locator("[data-testid=field-area] img")).to_have_attribute("alt", f"Planta: {name}")
+        view = self.field.http.get("/api/v1/field/levels").json()["levels"]
+        self.assertEqual([lv["image"] is not None for lv in view], [True, True, True])
+        # The box is on the ground floor: not on level 2's plan until the GM moves it there.
+        expect(marker).to_have_count(0)
+        page.locator("[data-testid=node-levels] summary").click()
+        page.get_by_test_id(f"node-level-{BOX}").select_option("2")
+        expect(marker).to_be_visible()
+        self.assertTrue(wait_for(lambda: self.field.http.get(
+            f"/api/v1/games/{game['id']}/positions").json().get(str(BOX), {}).get("level") == 2, 5))
+        # Dragged on level 2's plan, it stays on level 2.
+        marker.scroll_into_view_if_needed()
+        area = page.get_by_test_id("field-area").bounding_box()
+        box = marker.bounding_box()
+        page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+        page.mouse.down()
+        page.mouse.move(area["x"] + area["width"] * 0.3, area["y"] + area["height"] * 0.4, steps=8)
+        page.mouse.up()
+        self.assertTrue(wait_for(lambda: abs(self.field.http.get(f"/api/v1/games/{game['id']}/positions")
+                                             .json()[str(BOX)]["x"] - 0.3) < 0.03, 5))
+        self.assertEqual(self.field.http.get(f"/api/v1/games/{game['id']}/positions").json()[str(BOX)]["level"], 2)
+        # The tabs by keyboard: Home goes to the ground floor, where the box is not.
+        page.get_by_test_id("level-tab-2").focus()
+        page.keyboard.press("Home")
+        expect(page.get_by_test_id("level-tab-0")).to_have_attribute("aria-selected", "true")
+        expect(page.get_by_test_id("level-tab-0")).to_be_focused()
+        expect(marker).to_have_count(0)
+        page.keyboard.press("ArrowLeft")
+        expect(page.get_by_test_id("level-tab-2")).to_have_attribute("aria-selected", "true")
+        expect(marker).to_be_visible()
+        # A read-only page and a phone see the tabs and the box on its level, and no settings.
+        viewer = self.console(READ, width=390, height=844)
+        viewer.get_by_test_id("tab-field").click()
+        expect(viewer.get_by_test_id("levels-toggle")).to_have_count(0)
+        viewer.get_by_test_id("level-tab-2").click()
+        expect(viewer.locator(f'[data-testid=field-area] .marker[data-node="{BOX}"]')).to_be_visible()
+        self.no_horizontal_scroll(viewer)
+        # Turning levels off asks first and says what is kept (the box stays ticked meanwhile); "No" keeps them.
+        page.get_by_test_id("levels-toggle").click()
+        expect(page.get_by_test_id("levels-confirm")).to_contain_text("Só a planta de R/C fica em uso")
+        expect(page.get_by_test_id("levels-confirm")).to_contain_text("ficam guardados")
+        page.get_by_test_id("levels-confirm-no").click()
+        expect(page.get_by_test_id("levels-toggle")).to_be_checked()
+        self.assertTrue(self.field.http.get("/api/v1/field/levels").json()["enabled"])
+        page.get_by_test_id("levels-toggle").click()
+        page.get_by_test_id("levels-confirm-yes").click()
+        expect(page.get_by_test_id("level-tabs")).to_have_count(0)
+        expect(viewer.get_by_test_id("level-tabs")).to_have_count(0)  # through the live stream
+        expect(marker).to_be_visible()  # every box on the one field image
+        expect(page.get_by_text("Carregar imagem do campo")).to_be_visible()
+        levels = self.field.http.get("/api/v1/field/levels").json()
+        self.assertEqual((levels["enabled"], levels["count"]), (False, 3))
+        self.assertIsNotNone(levels["levels"][2]["image"])  # kept
+        self.no_horizontal_scroll(viewer)
+
+    def test_field_levels_in_english_and_fewer_levels(self):
+        """English defaults, and fewer levels asking before their plans are deleted."""
+        page = self.console()
+        page.get_by_test_id("lang").select_option("en")
+        page.get_by_test_id("tab-field").click()
+        page.get_by_test_id("levels-toggle").check()
+        expect(page.get_by_test_id("level-tab-0")).to_have_text("Ground floor")
+        expect(page.get_by_test_id("level-tab-1")).to_have_text("Floor 1")
+        page.get_by_test_id("level-tab-1").click()
+        page.get_by_test_id("field-upload").set_input_files(str(ICON))
+        expect(page.locator("[data-testid=field-area] img")).to_have_attribute("alt", "Floor plan: Floor 1")
+        page.get_by_test_id("levels-name-1").fill("Mezzanine")
+        page.get_by_test_id("levels-save").click()
+        expect(page.get_by_test_id("level-tab-1")).to_have_text("Mezzanine")
+        page.get_by_test_id("levels-count").select_option("3")
+        page.get_by_test_id("levels-save").click()
+        expect(page.get_by_test_id("level-tab-2")).to_be_visible()
+        page.get_by_test_id("level-tab-2").click()
+        page.get_by_test_id("field-upload").set_input_files(str(ICON))
+        expect(page.locator("[data-testid=field-area] img")).to_have_attribute("alt", "Floor plan: Floor 2")
+        page.get_by_test_id("levels-count").select_option("2")
+        page.get_by_test_id("levels-save").click()
+        expect(page.get_by_test_id("levels-confirm")).to_contain_text("the plans of Floor 2 are deleted")
+        page.get_by_test_id("levels-confirm-yes").click()
+        expect(page.get_by_test_id("level-tab-2")).to_have_count(0)
+        expect(page.get_by_test_id("level-tab-0")).to_have_attribute("aria-selected", "true")
+        levels = self.field.http.get("/api/v1/field/levels").json()
+        self.assertEqual((levels["count"], levels["names"]), (2, ["Ground floor", "Mezzanine"]))
+        self.assertIsNone(self.field.bundle.controller.store.field_image(2))
+
     def test_reconnects_after_the_stream_drops(self):
         self.field.create_game(start=True)
         page = self.console()

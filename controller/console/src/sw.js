@@ -28,6 +28,7 @@ const SHELL = [
     'components/box-language-settings.js',
     'components/branding-settings.js',
     'components/checkin-panel.js',
+    'components/field-levels.js',
     'components/field-view.js',
     'components/firmware-panel.js',
     'components/game-control.js',

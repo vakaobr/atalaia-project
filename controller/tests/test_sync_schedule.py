@@ -341,7 +341,7 @@ class StoreUpgradeTests(unittest.TestCase):
             store = Store(path)
             row = store.checkin(1, "p-abcdefgh2345")
             self.assertEqual((row["registration_id"], row["from_roster"], store.get_setting("schema_version")),
-                             (None, False, "8"))
+                             (None, False, "9"))
             store.close()
 
 

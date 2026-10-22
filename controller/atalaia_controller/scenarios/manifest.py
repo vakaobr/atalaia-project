@@ -37,6 +37,7 @@ DESCRIPTION_MAX = 2000
 VERSION_MAX = 32
 OBJECTIVES_MAX = 64
 NODES_MAX = 64
+LEVELS_MAX = 10  # a box's optional level on a multi-story field (field_levels.LEVELS_MAX, ML-8)
 POINTS_MAX = 100_000
 WINDOW_MAX_MIN = 7 * 24 * 60  # a week, in minutes
 MANIFEST_MAX_BYTES = 256 * 1024

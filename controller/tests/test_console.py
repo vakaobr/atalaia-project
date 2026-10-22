@@ -248,7 +248,7 @@ class ConsoleFilesTests(unittest.TestCase):
         read = {"Authorization": "Bearer read-secret"}
         self.assertEqual(self.client.get("/api/v1/whoami", headers=gm).json()["role"], "gm")
         self.assertEqual(self.client.get("/api/v1/whoami", headers=read).json()["role"], "read")
-        self.assertEqual(self.client.get("/api/v1/field", headers=read).json(), {"image": None})
+        self.assertIsNone(self.client.get("/api/v1/field", headers=read).json()["image"])
         png = (SRC / "icons" / "icon-192.png").read_bytes()
         r = self.client.put("/api/v1/field/image", headers={**gm, "Content-Type": "image/png"}, content=png)
         self.assertEqual(r.status_code, 200, r.text)
@@ -260,7 +260,7 @@ class ConsoleFilesTests(unittest.TestCase):
         self.assertEqual(self.client.put("/api/v1/field/image", headers={**gm, "Content-Type": "text/plain"},
                                          content=b"x").status_code, 415)
         self.assertTrue(self.client.delete("/api/v1/field/image", headers=gm).json()["deleted"])
-        self.assertEqual(self.client.get("/api/v1/field", headers=read).json(), {"image": None})
+        self.assertIsNone(self.client.get("/api/v1/field", headers=read).json()["image"])
 
 
 def _norm(base: Path, imp: str) -> str:

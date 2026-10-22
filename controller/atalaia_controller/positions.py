@@ -19,6 +19,12 @@ event ``visibility.granted`` (its envelope team sees ``see_team`` for
 when the time is up. Positions are deleted when the game ends, and are never
 sent on the radio or MQTT. A VIP's GPS reports also go to the game's field.lua
 as the input position.fix (decision P4R6, VIP / Payload), and to nothing else.
+
+On a multi-story field (field_levels.py) a report may say the player's level
+(``level``, 0-9; null: not known). A report without ``level`` keeps the one
+the player last gave in this game, so a phone that asks once ("which floor
+are you on?") need not send it every time; never given, the position has no
+level (decision ML-5).
 """
 
 from __future__ import annotations
@@ -30,6 +36,7 @@ import time
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from .engine import Conflict, ControllerError
+from .field_levels import LEVELS_MAX
 
 if TYPE_CHECKING:
     from .checkin import Viewer
@@ -54,7 +61,7 @@ def check_report(r: Any) -> dict[str, Any]:
     if not isinstance(r, dict):
         raise ControllerError("a position report is an object")
     allowed = {"lat", "lon", "accuracy_m", "altitude_m", "heading_deg", "speed_mps", "source", "beacon_id",
-               "t", "player_id", "team", "squad"}
+               "t", "player_id", "team", "squad", "level"}
     unknown = set(r) - allowed
     if unknown:
         raise ControllerError(f"position report: unknown fields {sorted(unknown)}")
@@ -76,6 +83,12 @@ def check_report(r: Any) -> dict[str, Any]:
                 or not all(0 <= int(x) <= 65535 for x in bid.split(":")):
             raise ControllerError("beacon_id: major:minor of the strongest iBeacon")
         out["beacon_id"] = bid
+    if "level" in r:
+        level = r["level"]
+        if level is not None and (isinstance(level, bool) or not isinstance(level, int)
+                                  or not 0 <= level < LEVELS_MAX):
+            raise ControllerError(f"level: 0 to {LEVELS_MAX - 1}, or null when not known")
+        out["level"] = level
     t = r.get("t", 0)
     if isinstance(t, bool) or not isinstance(t, int) or not 0 <= t <= 2**53:
         raise ControllerError("t: milliseconds, an integer")
@@ -155,6 +168,10 @@ class Positions:
                 or self.ctrl.game["id"] != game["id"]:
             raise Conflict("positions are kept only while the game runs")
         latest = max(checked, key=lambda r: r["t"])
+        if "level" not in latest:
+            latest = {**latest, **self._last_level(game["id"], viewer.player_id)}
+        if latest.get("level", 0) is None:
+            latest = {k: v for k, v in latest.items() if k != "level"}  # not known: no level
         pos = {"game_id": game["id"], "player_id": viewer.player_id, "team": viewer.team,
                "squad": viewer.squad, **latest, "received_at": self._wall()}
         self.ctrl.store.set_player_position(game["id"], viewer.player_id, pos, self._wall())
@@ -162,6 +179,11 @@ class Positions:
         if viewer.role == "vip":
             self._to_field(game, viewer, checked)
         return {"stored": len(checked), "interval_s": self.interval(game)}
+
+    def _last_level(self, game_id: int, player_id: str) -> dict[str, Any]:
+        """The level this player last gave in this game, as ``{"level": n}`` (or nothing)."""
+        before = self.ctrl.store.player_positions(game_id).get(player_id) or {}
+        return {"level": before["level"]} if isinstance(before.get("level"), int) else {}
 
     def _to_field(self, game: dict[str, Any], viewer: "Viewer", reports: list[dict[str, Any]]) -> None:
         """A VIP's GPS reports, oldest first, to the game's field.lua as position.fix (decision
