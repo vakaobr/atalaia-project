@@ -5,11 +5,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 5 -- Community: Status
 
-**Current phase:** Implementation (plan phases 1-6 built in software 2026-10-22: the visual mode editor complete, its link to the simulator, signed mode packages, the sandbox-escape battery, signed packages in the controller)
+**Current phase:** Implementation (plan phases 1-6 and 13a built in software 2026-10-22: the visual mode editor complete, its link to the simulator, signed mode packages, the sandbox-escape battery, signed packages in the controller, and the controller, console and protocol side of missing modes sent to boxes)
 **Phase status:** In progress
 **Risk level:** Medium
-**Last updated:** 2026-10-22 (plan phases 3-6 built, P5B-9 answered; plan phase 2 built, plan phase 13 planned from P5R-8; refreshed after phases 2-4 software; first written 2026-10-18)
-**Next step:** plan phase 13 (missing modes from the GM console; 13a the controller, console and protocol, 13b the box), or plan phase 7 (scenario blocks in the console)
+**Last updated:** 2026-10-22 (plan phase 13a built; plan phases 3-6 built, P5B-9 answered; plan phase 2 built, plan phase 13 planned from P5R-8; refreshed after phases 2-4 software; first written 2026-10-18)
+**Next step:** plan phase 13b (the box's side of missing modes, against the contract in `protocol/mode-packages.md`), then plan phase 7 (scenario blocks in the console)
 
 Phase 5 is the community layer: visual mode editor (Blockly), mode
 registry with signing and a verified badge, carrier PCB, translations,
@@ -81,6 +81,21 @@ section 16).
   between games. K10 amended for that path (ADR.md, "Note 2026-10-22: P5R-8").
   Design choices P5B-8 to P5B-17 (open; P5B-9, which keys a box trusts, is for
   the maintainer). Not built.
+- [x] **Plan phase 13a, missing modes from the GM console: the controller,
+  console and protocol (2026-10-22), in software:** join keys 16
+  (`fetch_modes`) and 17 (`forget_modes`) in the Python codec and the shared
+  vectors; the endpoints a box fetches a signed package from (no token, only a
+  part of the live game's mode, only while it is ready) and reports to (an HMAC
+  with the game key); what the controller offers boxes (`[modes] box_keys`, the
+  keys built into their firmware) and why not; the start guard waiting while
+  boxes fetch (`[modes] fetch_timeout_s`, *Stop waiting*); in the console,
+  *Send missing modes* under a box that answered *no mode*, its progress, and
+  the Boxes tab's *Modes fetched by boxes* with *Forget at its next invite*;
+  the wire contract for the box (check order, refusal codes, the report,
+  `node.modes_failed`, storage) in `protocol/mode-packages.md` with shared
+  vectors for 13b's C (`box_checks`, `reports`). 13 controller tests, 1 browser
+  test. Decisions P5D-1 to P5D-12 (open; P5D-3, P5D-6, P5D-11 for the
+  maintainer).
 
 ## Refresh 2026-10-22: what changed
 
@@ -180,12 +195,15 @@ section 16).
 
 ## Next steps
 
-1. Plan phase 13 (missing modes from the GM console), which needed 4, 5 and
-   6: 13a (join keys 16 and 17, `protocol/mode-packages.md`'s endpoints for
-   boxes, the start guard, the invite dialog's *Send missing modes*) and 13b
-   (`mode_fetch.c` with the box's C reader of the package vectors,
-   `CONFIG_ATALAIA_MODE_KEYS`, fetched slots on LittleFS) can run in parallel.
-   P5B-9 is answered: mode keys built into the box's firmware only.
+1. Plan phase 13b (in progress, in parallel with 13a, which is built):
+   `mode_fetch.c` with the box's C reader of the package vectors
+   (`box_checks`, `reports`), keys 16 and 17 in `core/src/join.c` (the
+   `mode_fetch` join vectors), `CONFIG_ATALAIA_MODE_KEYS`, fetched slots on
+   LittleFS, `node.modes_failed` (id 53, data `mode` key 38) in
+   `protocol/schema/events.yaml`, all as `protocol/mode-packages.md`,
+   "Fetching missing modes", says. Then the end-to-end test with the C host
+   box against the real controller. P5B-9 is answered: mode keys built into the
+   box's firmware only.
 2. Plan phase 7 (scenario blocks in the console); 8 and 9 (the registry
    template and community processes) now have the package tools and the
    battery to build on; 10 after P5R-10 (answered: German first).

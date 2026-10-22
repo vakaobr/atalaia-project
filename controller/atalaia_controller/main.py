@@ -42,6 +42,7 @@ from .mqtt import MqttBridge, maybe_bridge
 from .positions import Positions
 from .prop_link import PropLinks
 from .radio_modem import RadioModem
+from .mode_fetch import ModeFetch
 from .signed_modes import SignedModes
 from .store import Store
 from .remote_gm import RemoteGm
@@ -159,6 +160,7 @@ def build(cfg: Config, *, core: Optional[Core] = None, load_core_lib: bool = Tru
     FirmwareUpdates(controller, firmware_dir(cfg.db_path, cfg.firmware_dir), cfg.firmware_release_keys,
                     cfg.firmware_update_timeout_s, variants=cfg.firmware_variants)
     SignedModes(controller, cfg.modes_keys, cfg.modes_revoked, cfg.modes_index)
+    ModeFetch(controller, cfg.modes_box_keys, cfg.modes_fetch_timeout_s)
     Adoption(controller)
     mqtt = maybe_bridge(cfg, controller)
     hub = Hub()

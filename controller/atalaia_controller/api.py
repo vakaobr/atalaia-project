@@ -349,6 +349,46 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         controller._emit({"type": "modes"})
         return out
 
+    # --- missing modes sent to boxes (mode_fetch.py, protocol/mode-packages.md) -------------
+
+    def mode_fetch() -> Any:
+        if controller.mode_fetch is None:
+            raise HTTPException(503, "sending modes to boxes is not set up on this controller")
+        return controller.mode_fetch
+
+    @app.post("/api/v1/mode-packages/report")
+    async def mode_fetch_report(request: Request) -> dict[str, Any]:
+        """A box's report on a part it fetched: no token, the live game's key signs it (an HMAC)."""
+        from .mode_package import REPORT_MAX  # noqa: PLC0415
+
+        data, _ = await read_upload(request, REPORT_MAX, "report")
+        return mode_fetch().report(data, request.headers.get("x-atalaia-mac"))
+
+    @app.get("/api/v1/mode-packages/{mode_id}/release")
+    def mode_fetch_release(mode_id: str) -> Response:
+        """For the boxes, no token: a part's signed manifest and signature, which the box verifies with
+        the mode keys in its own firmware. Only a part of the live game's mode, only between games."""
+        return Response(mode_fetch().release_text(mode_id), media_type="text/plain; charset=utf-8",
+                        headers={"Cache-Control": "no-store"})
+
+    @app.get("/api/v1/mode-packages/{mode_id}/package")
+    def mode_fetch_package(mode_id: str) -> Response:
+        """For the boxes, no token: the part's archive, exactly as signed."""
+        return Response(mode_fetch().archive(mode_id), media_type="application/x-tar",
+                        headers={"Cache-Control": "no-store"})
+
+    @app.get("/api/v1/mode-fetch", dependencies=[Depends(require_gm)])
+    def mode_fetch_status() -> dict[str, Any]:
+        return mode_fetch().status()
+
+    @app.delete("/api/v1/mode-fetch", dependencies=[Depends(require_gm)])
+    def mode_fetch_cancel() -> dict[str, Any]:
+        return {"cancelled": mode_fetch().cancel()}
+
+    @app.put("/api/v1/mode-fetch/forget/{device_id}", dependencies=[Depends(require_gm)])
+    def mode_fetch_forget(device_id: str, body: Any = Body(None)) -> dict[str, Any]:
+        return mode_fetch().set_forget(device_id, body_map(body).get("forget"))
+
     # --- scenarios (plan phase 8, scenario_service.py) ----------------------------------
 
     @app.post("/api/v1/scenarios/check", dependencies=[Depends(require_console)])

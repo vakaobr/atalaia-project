@@ -19,6 +19,7 @@ import { ScenarioBuilder } from './components/scenario-builder.js';
 import { RadioSettings } from './components/radio-settings.js';
 import { BoxLanguageSettings } from './components/box-language-settings.js';
 import { FirmwarePanel } from './components/firmware-panel.js';
+import { FetchedModes } from './components/fetched-modes.js';
 import { ModePackages } from './components/mode-packages.js';
 import { CheckinPanel } from './components/checkin-panel.js';
 import { BrandingSettings, TeamPresets, FieldBrand, accentRef } from './components/branding-settings.js';
@@ -38,7 +39,7 @@ class App extends Component {
             nodes: {}, seen: {}, feed: [], alerts: [], modes: [], presets: [],
             positions: {}, scoreHistory: [], clockBase: null, toast: '', now: Date.now(),
             radio: null, chronoCounts: null, branding: null, teamPresets: [],
-            boxes: null, invites: [], invitePicker: false, mapFeatures: [],
+            boxes: null, invites: [], invitePicker: false, mapFeatures: [], modeFetch: null,
         };
         this.checkinPanel = null;
         this.stream = null;
@@ -136,6 +137,16 @@ class App extends Component {
         if (out) this.setState({ invites: out.invites });
     }
 
+    /** Missing modes sent to boxes (GET /mode-fetch): the offer per role, the fetches, what boxes keep. */
+    async loadModeFetch() {
+        if (this.state.role !== 'gm') return;
+        try {
+            this.setState({ modeFetch: await api(this.token, 'GET', '/mode-fetch') });
+        } catch (e) {
+            this.setState({ modeFetch: null }); // not set up on this controller
+        }
+    }
+
     async loadRadio() {
         const radio = await this.call('GET', '/radio');
         if (radio) this.setState({ radio });
@@ -222,6 +233,7 @@ class App extends Component {
             break;
         case 'modes':
             this.loadCatalogue(); // a scenario was installed (here or in another console)
+            if (this.state.modeFetch) this.loadModeFetch(); // what boxes can be sent may have changed
             break;
         case 'firmware':
             this.setState({ firmwareUpdates: msg.updates }); // firmware updates' progress (firmware-panel.js)
@@ -234,6 +246,10 @@ class App extends Component {
             break;
         case 'invites':
             if (this.state.game && msg.game === this.state.game.id) this.setState({ invites: msg.invites });
+            break;
+        case 'mode_fetch': // boxes fetching the game's missing modes (box-invites.js, fetched-modes.js)
+            this.setState((s) => ({ modeFetch: s.modeFetch ? { ...s.modeFetch, game: msg.game, fetches: msg.fetches,
+                                                                  boxes: msg.boxes } : s.modeFetch }));
             break;
         case 'radio_scan':
             this.setState((s) => ({ radio: s.radio ? { ...s.radio, scan: msg.scan } : s.radio }));
@@ -445,7 +461,7 @@ class App extends Component {
         case 'field':
             return html`<${FieldView} app=${this} />`;
         case 'nodes':
-            return html`<${NodeList} app=${this} /><${FirmwarePanel} app=${this} />`;
+            return html`<${NodeList} app=${this} /><${FirmwarePanel} app=${this} /><${FetchedModes} app=${this} />`;
         case 'join':
             return html`<${JoinPanel} app=${this} />`;
         case 'adopt':

@@ -732,6 +732,118 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(phone.get_by_test_id("mode-packages")).to_be_visible()
         self.no_horizontal_scroll(phone)
 
+    def test_send_missing_modes_from_the_invite_dialog(self):
+        """Phase 5 plan phase 13a (protocol/mode-packages.md, "Fetching missing modes"): a box that
+        lacks the game's signed mode answers "no mode"; next to it the dialog names the part and
+        offers "Send missing modes"; the box, invited again with join key 16, fetches the package
+        from the controller, checks it with the keys of its firmware, reports and says HELLO; the
+        game waits for it meanwhile. The Boxes tab lists what the box keeps and marks it to forget
+        them (join key 17). In pt-PT and English, and at phone width."""
+        from test_mode_fetch import BUILTIN, TAGGER  # noqa: PLC0415
+        from test_signed_modes import KEY, package, query  # noqa: PLC0415
+
+        from atalaia_controller import mode_package as mp  # noqa: PLC0415
+
+        self.field.close()
+        self.field = Field(cfg={"modes_keys": [KEY["public_key_b64"]], "modes_box_keys": [KEY["public_key_b64"]]})
+        archive, release = package()
+        r = self.field.http.post("/api/v1/mode-packages", params=query(release), content=archive,
+                                 headers={"Content-Type": "application/octet-stream"})
+        self.assertEqual(r.status_code, 201, r.text)
+        # A box that played a game of Domination, free again, without the club's mode.
+        device = bytes.fromhex("5a17c0de0b0e1234")
+        hexid = device.hex()
+        key = ff.field_key(JOIN_KEY)
+        first = self.field.create_game("Sábado", assignments={str(BOX): "zone"})
+        self.field.box_hello(device=device)
+        self.assertTrue(wait_for(lambda: self.field.bundle.controller.start_check()["ok"], 5))
+        self.assertEqual(self.field.http.post(f"/api/v1/games/{first['id']}/start").status_code, 200)
+        self.assertEqual(self.field.http.post(f"/api/v1/games/{first['id']}/end", json={}).status_code, 200)
+        box = lobby.IdleBox(JOIN_KEY, "Zona Norte", device_id=device, rng=random.Random(2), installed=set(BUILTIN))
+        box.last_game, box.last_role = first["id"], "zone"
+        self.field.host.hear(ff.encode(key, box._announce(), box.nonces.next()))
+        self.assertTrue(wait_for(lambda: hexid in self.field.bundle.controller.reinvite.inviter.boxes, 5))
+
+        def deliver_invite(now_ms: int) -> None:
+            """The invite's parts reach the box; its answer reaches the controller."""
+            parts: list[bytes] = []
+
+            def heard() -> bool:
+                for f in self.field.host.transmitted_all(0.2):
+                    if ff.is_frame(f) and ff.decode(key, f)["kind"] == "invite":
+                        parts.append(f)
+                return bool(parts) and len(parts) >= ff.decode(key, parts[0])["parts"]
+            self.assertTrue(wait_for(heard, 5))
+            for f in parts:
+                box.on_frame(f, now_ms)
+            for answer in box.tick(now_ms + 9_000):
+                self.field.host.hear(answer)
+
+        page = self.console()
+        page.get_by_test_id("game-name").fill("Domingo")
+        page.get_by_test_id("game-source").select_option(f"mode:{TAGGER}")
+        page.get_by_test_id("game-create").click()
+        expect(page.get_by_test_id("invite-dialog")).to_be_visible()
+        self.field.host.transmitted_all()  # what the modem sent so far (the DISCOVER, TIME)
+        page.get_by_test_id("invite-send").click()
+        deliver_invite(1000)
+        status = page.get_by_test_id(f"invite-status-{hexid}")
+        expect(status).to_have_text("recusou: o modo não está na caixa")
+        missing = page.get_by_test_id(f"invite-missing-{hexid}")
+        expect(missing).to_contain_text("Modos que faltam a esta caixa")
+        expect(page.get_by_test_id(f"invite-part-{hexid}-{TAGGER}")).to_have_text("Tagger 0.1.0: pode ser enviado")
+        page.get_by_test_id(f"invite-fetch-{hexid}").click()
+        deliver_invite(20_000)
+        self.assertEqual((box.phase, box.fetching), ("joined", [TAGGER]))
+        self.assertTrue(box.game["fetch_modes"])
+        expect(status).to_have_text("a obter os modos em falta por Wi-Fi")
+        expect(page.get_by_test_id("invite-fetch-wait")).to_contain_text("O jogo espera pelas caixas")
+        # Until it says HELLO, the game waits for it.
+        game = self.field.bundle.controller.game
+        self.assertEqual(self.field.http.post(f"/api/v1/games/{game['id']}/start", json={"force": True}).status_code,
+                         409)
+
+        # The box fetches (over HTTPS pinned to the field CA on a real box), checks, keeps, reports.
+        text = httpx.get(f"{self.field.base}/api/v1/mode-packages/{TAGGER}/release")
+        rel, _ = mp.box_check_release(text.content, TAGGER, [KEY["public_key_b64"]], "full", BUILTIN)
+        got = httpx.get(f"{self.field.base}/api/v1/mode-packages/{TAGGER}/package")
+        self.assertIn("node.lua", mp.box_check_archive(got.content, rel))
+        box.fetched_part(TAGGER, rel.version)
+        j = box.game
+        body = mp.report_body(j["game_id"], j["node_id"], TAGGER, rel.version, "installed", box.fetched)
+        r = httpx.post(f"{self.field.base}/api/v1/mode-packages/report", content=body,
+                       headers={"X-Atalaia-Mac": mp.report_mac(j["game_key"], body)})
+        self.assertEqual(r.json(), {"accepted": True})
+        expect(status).to_have_text("modos instalados, a juntar-se")
+        self.field.host.hear(node_packet(j["game_key"], j["game_id"], j["node_id"], 0, 1, "HELLO", hello_encode(
+            {"node_name": "Zona Norte", "platform": 1, "fw_version": "0.5.0", "core_version": "0.2.0", "tier": 0,
+             "capabilities": [0], "transports": 1, "epoch": 1, "device_id": device}), ack=True))
+        expect(status).to_have_text("juntou-se")
+        expect(page.get_by_test_id("invite-fetch-wait")).to_have_count(0)
+        expect(page.get_by_test_id("invite-ready")).to_be_visible()
+        page.get_by_test_id("invite-close").click()
+
+        # The Boxes tab: what the box keeps, and "forget them at its next invite".
+        page.get_by_test_id("lang").first.select_option("en")
+        page.get_by_test_id("tab-nodes").click()
+        kept = page.get_by_test_id(f"fetched-{hexid}")
+        expect(kept).to_contain_text(f"{TAGGER} 0.1.0")
+        expect(kept).to_contain_text(f"game {j['game_id']}, node {j['node_id']}")
+        expect(page.get_by_test_id("fetched-keys")).to_contain_text(KEY["key_id"])
+        page.get_by_test_id(f"fetched-forget-{hexid}").click()
+        expect(kept).to_contain_text("Forgets them at its next invite")
+        self.assertEqual(self.field.bundle.controller.mode_fetch.forget_marked(), [hexid])
+
+        # At phone width: the dialog and the Boxes tab do not scroll sideways.
+        phone = self.console(width=390, height=800)
+        phone.get_by_test_id("tab-nodes").click()
+        expect(phone.get_by_test_id("fetched-modes")).to_be_visible()
+        self.no_horizontal_scroll(phone)
+        phone.get_by_test_id("tab-game").click()
+        phone.get_by_test_id("game-invite").click()
+        expect(phone.get_by_test_id("invite-dialog")).to_be_visible()
+        self.no_horizontal_scroll(phone)
+
     def test_firmware_update_from_the_boxes_tab(self):
         """Firmware updates (protocol/firmware-update.md): the GM uploads a signed release in the
         Boxes tab and updates a box before the game starts; the CMD update goes on the air; the box's

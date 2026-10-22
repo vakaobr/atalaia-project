@@ -17,6 +17,10 @@ The previous game's boxes (to pre-select in the console) are the nodes of
 the most recent other game whose HELLO carried a device id, with their roles.
 Nothing here is stored: invites last as long as the controller runs.
 
+A box that answered *no mode* can be invited again with ``fetch_modes`` (join key 16): it
+then fetches the parts it lacks over HTTPS before its HELLO (mode_fetch.py, phase 5 plan phase
+13); a box the GM marked in the Boxes tab gets ``forget_modes`` (key 17) in its next invite.
+
 When a game ends, GAME_OVER says so to its boxes (decisions OT-7, OT-13): the
 game id and its key's tag, sealed under the field key, three times, on the
 game's channel. A controller that restarted without the game's key can still
@@ -142,7 +146,10 @@ class Reinvite:
             self.ctl._emit({"type": "boxes", "boxes": self.boxes()["boxes"]})
         if "invites" in pending and self.ctl.game is not None:
             gid = self.ctl.game["id"]
-            self.ctl._emit({"type": "invites", "game": gid, "invites": self.invites(gid)})
+            invites = self.invites(gid)
+            self.ctl._emit({"type": "invites", "game": gid, "invites": invites})
+            if self.ctl.mode_fetch is not None:
+                self.ctl.mode_fetch.on_invites(invites)  # a box fetching, or one that could not
 
     # --- what the console shows ----------------------------------------------------
 
@@ -206,7 +213,10 @@ class Reinvite:
             return {"sent": sent}
 
     def invite(self, game_id: int, specs: Any) -> dict[str, Any]:
-        """Invites boxes into the live game: [{"device_id", "role"?, "name"?}, ...]."""
+        """Invites boxes into the live game: [{"device_id", "role"?, "name"?, "fetch_modes"?}, ...].
+
+        ``fetch_modes``: the box fetches the parts it lacks (join key 16, mode_fetch.py); a box
+        marked to forget its fetched modes gets join key 17 as well."""
         from .engine import Conflict, ControllerError, Unavailable
         with self.ctl._lock:
             game = self.ctl.game
@@ -240,9 +250,27 @@ class Reinvite:
                 join_spec = {"kind": "node", "role": spec.get("role")}
                 if spec.get("name") is not None:
                     join_spec["name"] = spec["name"]
+                fetch = spec.get("fetch_modes", False)
+                if not isinstance(fetch, bool):
+                    raise ControllerError("fetch_modes: true or false")
+                mf = self.ctl.mode_fetch
+                if fetch:
+                    join_spec["fetch_modes"] = True
+                if mf is not None and hexid in mf.forget_marked():
+                    join_spec["forget_modes"] = True
                 # The same node id when the box is invited again into this game.
                 node_id = existing.node_id if existing is not None and existing.game_id == game_id else None
-                made = self.ctl.issue_join(join_spec, node_id=node_id, same_device=node_id is not None)
+                tier = self.inviter.boxes[hexid].tier
+                try:
+                    made = self.ctl.issue_join(join_spec, node_id=node_id, same_device=node_id is not None,
+                                               device=hexid, tier=tier)
+                except Conflict as exc:
+                    if not fetch:
+                        raise
+                    # This box cannot be sent the modes (a Reduced box, a part not offered...): said
+                    # for it alone, the other boxes are still invited.
+                    out.append({"device_id": hexid, "status": "not_sent", "detail": str(exc)})
+                    continue
                 payload = bytes.fromhex(made["payload_hex"])
                 try:
                     inv = self.inviter.invite(device, payload, game_id=game_id, node_id=made["node_id"],

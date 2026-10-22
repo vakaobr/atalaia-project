@@ -1,5 +1,5 @@
 {
-  "description": "Signed mode packages (protocol/mode-packages.md, decisions P5R-7, P5B-10, P5C-8 to P5C-13). Made by tools/mode_package_vectors.py; checked by controller/tests/test_mode_package.py (the shared Python of controller/atalaia_controller/mode_package.py) and, from phase 5 plan phase 13, by the Field Box. rfc8032: RFC 8032 section 7.1's TEST 1 and 2, copied from the RFC. signing_key is TEST 1's key and other_key TEST 2's: public test keys, never mode keys. archive: the canonical ustar archive of the files under its id (read back by Python's tarfile too). archives_invalid: archives every reader refuses, with the code. releases: manifests of that archive signed with signing_key, some changed after signing. verify: whole checks (archive, release, trusted keys, revoked ids) and their result. release_texts_invalid: texts a reader refuses. index and index_invalid: the registry index (registry/schema/index.schema.json); revoked: a revocation list.",
+  "description": "Signed mode packages (protocol/mode-packages.md, decisions P5R-7, P5B-10, P5C-8 to P5C-13). Made by tools/mode_package_vectors.py; checked by controller/tests/test_mode_package.py (the shared Python of controller/atalaia_controller/mode_package.py) and, from phase 5 plan phase 13, by the Field Box. rfc8032: RFC 8032 section 7.1's TEST 1 and 2, copied from the RFC. signing_key is TEST 1's key and other_key TEST 2's: public test keys, never mode keys. archive: the canonical ustar archive of the files under its id (read back by Python's tarfile too). archives_invalid: archives every reader refuses, with the code. releases: manifests of that archive signed with signing_key, some changed after signing. verify: whole checks (archive, release, trusted keys, revoked ids) and their result. release_texts_invalid: texts a reader refuses. index and index_invalid: the registry index (registry/schema/index.schema.json); revoked: a revocation list. Phase 5 plan phase 13 (a box fetching the modes it lacks, protocol/mode-packages.md, decisions P5B-10 to P5B-16, P5D-*): box_limits; box_checks: a Field Box's checks in its order (release_text, the part it asked for wanted_id, its mode keys, its tier, its built-in ids), then of the archive it downloaded (archive: 'archive', 'tampered', 'truncated' (the valid one less its last block) or archive_hex; null: refused before any download), with the result (ok, with the signer's key_id and the files kept, or the refusal's code); reports: a box's reports with their HMAC-SHA256 under game_key, and bodies to refuse.",
   "rfc8032": [
     {
       "name": "test_1",
@@ -799,6 +799,370 @@
         "key_id": "21fe31dfa154a261",
         "reason": "test key",
         "date": "2026-10-22"
+      }
+    ]
+  },
+  "box_limits": {
+    "max_package_bytes": 262144,
+    "max_fetched": 8,
+    "max_fetched_bytes": 524288
+  },
+  "box_checks": [
+    {
+      "name": "ok",
+      "release_text": "atalaia-mode-package-v1\nid=org.example.relay\nversion=1.2.0-rc.1\nkind=role\nmin_tier=full\nsize=4096\nsha256=92b13c9a5f42c796e2fbd900430bc286efa21d49e7ec1c44593aea538d74ae51\nsignature=u8Lu6YRCD8W+0rm4J62jVFk/7bNRsC1CrVXA+Ma9KiX5yA1pCPsgWa5jvYIXmzeJRTOXFb1q4ZZo9l71eYVBCQ==\n",
+      "wanted_id": "org.example.relay",
+      "keys": [
+        "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+      ],
+      "tier": "full",
+      "builtin": [],
+      "archive": "archive",
+      "result": "ok",
+      "key_id": "21fe31dfa154a261",
+      "kept": [
+        "assets/screens/relay.yaml",
+        "node.lua"
+      ],
+      "why": "a Full box, its own mode key, the signed archive"
+    },
+    {
+      "name": "ok_second_key",
+      "release_text": "atalaia-mode-package-v1\nid=org.example.relay\nversion=1.2.0-rc.1\nkind=role\nmin_tier=full\nsize=4096\nsha256=92b13c9a5f42c796e2fbd900430bc286efa21d49e7ec1c44593aea538d74ae51\nsignature=u8Lu6YRCD8W+0rm4J62jVFk/7bNRsC1CrVXA+Ma9KiX5yA1pCPsgWa5jvYIXmzeJRTOXFb1q4ZZo9l71eYVBCQ==\n",
+      "wanted_id": "org.example.relay",
+      "keys": [
+        "PUAXw+hDiVqStwqnTRt+vJyYLM8uxJaMwM1V8Sr0Zgw=",
+        "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+      ],
+      "tier": "full",
+      "builtin": [],
+      "archive": "archive",
+      "result": "ok",
+      "key_id": "21fe31dfa154a261",
+      "kept": [
+        "assets/screens/relay.yaml",
+        "node.lua"
+      ],
+      "why": "any of its mode keys will do"
+    },
+    {
+      "name": "no_key",
+      "release_text": "atalaia-mode-package-v1\nid=org.example.relay\nversion=1.2.0-rc.1\nkind=role\nmin_tier=full\nsize=4096\nsha256=92b13c9a5f42c796e2fbd900430bc286efa21d49e7ec1c44593aea538d74ae51\nsignature=u8Lu6YRCD8W+0rm4J62jVFk/7bNRsC1CrVXA+Ma9KiX5yA1pCPsgWa5jvYIXmzeJRTOXFb1q4ZZo9l71eYVBCQ==\n",
+      "wanted_id": "org.example.relay",
+      "keys": [],
+      "tier": "full",
+      "builtin": [],
+      "archive": null,
+      "result": "no_key",
+      "why": "no mode key is built into the box"
+    },
+    {
+      "name": "crlf",
+      "release_text": "atalaia-mode-package-v1\r\nid=org.example.relay\r\nversion=1.2.0-rc.1\r\nkind=role\r\nmin_tier=full\r\nsize=4096\r\nsha256=92b13c9a5f42c796e2fbd900430bc286efa21d49e7ec1c44593aea538d74ae51\r\nsignature=u8Lu6YRCD8W+0rm4J62jVFk/7bNRsC1CrVXA+Ma9KiX5yA1pCPsgWa5jvYIXmzeJRTOXFb1q4ZZo9l71eYVBCQ==\r\n",
+      "wanted_id": "org.example.relay",
+      "keys": [
+        "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+      ],
+      "tier": "full",
+      "builtin": [],
+      "archive": null,
+      "result": "bad_release",
+      "why": "exactly the manifest's lines"
+    },
+    {
+      "name": "other_id",
+      "release_text": "atalaia-mode-package-v1\nid=org.example.relay\nversion=1.2.0-rc.1\nkind=role\nmin_tier=full\nsize=4096\nsha256=92b13c9a5f42c796e2fbd900430bc286efa21d49e7ec1c44593aea538d74ae51\nsignature=u8Lu6YRCD8W+0rm4J62jVFk/7bNRsC1CrVXA+Ma9KiX5yA1pCPsgWa5jvYIXmzeJRTOXFb1q4ZZo9l71eYVBCQ==\n",
+      "wanted_id": "org.example.other",
+      "keys": [
+        "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+      ],
+      "tier": "full",
+      "builtin": [],
+      "archive": null,
+      "result": "bad_release",
+      "why": "not the part the box asked for"
+    },
+    {
+      "name": "untrusted_key",
+      "release_text": "atalaia-mode-package-v1\nid=org.example.relay\nversion=1.2.0-rc.1\nkind=role\nmin_tier=full\nsize=4096\nsha256=92b13c9a5f42c796e2fbd900430bc286efa21d49e7ec1c44593aea538d74ae51\nsignature=u8Lu6YRCD8W+0rm4J62jVFk/7bNRsC1CrVXA+Ma9KiX5yA1pCPsgWa5jvYIXmzeJRTOXFb1q4ZZo9l71eYVBCQ==\n",
+      "wanted_id": "org.example.relay",
+      "keys": [
+        "PUAXw+hDiVqStwqnTRt+vJyYLM8uxJaMwM1V8Sr0Zgw="
+      ],
+      "tier": "full",
+      "builtin": [],
+      "archive": null,
+      "result": "bad_signature",
+      "why": "none of its mode keys signed it"
+    },
+    {
+      "name": "changed_after_signing",
+      "release_text": "atalaia-mode-package-v1\nid=org.example.relay\nversion=1.2.0\nkind=role\nmin_tier=full\nsize=4096\nsha256=92b13c9a5f42c796e2fbd900430bc286efa21d49e7ec1c44593aea538d74ae51\nsignature=u8Lu6YRCD8W+0rm4J62jVFk/7bNRsC1CrVXA+Ma9KiX5yA1pCPsgWa5jvYIXmzeJRTOXFb1q4ZZo9l71eYVBCQ==\n",
+      "wanted_id": "org.example.relay",
+      "keys": [
+        "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+      ],
+      "tier": "full",
+      "builtin": [],
+      "archive": null,
+      "result": "bad_signature",
+      "why": "the version was changed after signing"
+    },
+    {
+      "name": "scenario",
+      "release_text": "atalaia-mode-package-v1\nid=org.example.relay\nversion=1.2.0-rc.1\nkind=scenario\nmin_tier=reduced\nsize=4096\nsha256=92b13c9a5f42c796e2fbd900430bc286efa21d49e7ec1c44593aea538d74ae51\nsignature=v9JzE0zZTkqWSZ7jI0zGRsDoNGfsLDmr+PINx04iRMBP0ExVNflWpPPzsM3raqari2Na08HVmxNQURuALcDSCg==\n",
+      "wanted_id": "org.example.relay",
+      "keys": [
+        "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+      ],
+      "tier": "full",
+      "builtin": [],
+      "archive": null,
+      "result": "kind",
+      "why": "a scenario never runs on a box"
+    },
+    {
+      "name": "full_on_reduced",
+      "release_text": "atalaia-mode-package-v1\nid=org.example.relay\nversion=1.2.0-rc.1\nkind=role\nmin_tier=full\nsize=4096\nsha256=92b13c9a5f42c796e2fbd900430bc286efa21d49e7ec1c44593aea538d74ae51\nsignature=u8Lu6YRCD8W+0rm4J62jVFk/7bNRsC1CrVXA+Ma9KiX5yA1pCPsgWa5jvYIXmzeJRTOXFb1q4ZZo9l71eYVBCQ==\n",
+      "wanted_id": "org.example.relay",
+      "keys": [
+        "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+      ],
+      "tier": "reduced",
+      "builtin": [],
+      "archive": null,
+      "result": "tier",
+      "why": "min_tier=full on a Reduced box"
+    },
+    {
+      "name": "reduced_on_reduced",
+      "release_text": "atalaia-mode-package-v1\nid=org.example.relay\nversion=1.2.0-rc.1\nkind=role\nmin_tier=reduced\nsize=4096\nsha256=92b13c9a5f42c796e2fbd900430bc286efa21d49e7ec1c44593aea538d74ae51\nsignature=KJv3vnvoZa5G/BpvcISH486linRqQZG/mLQvmNgc/GpvrSQlerMAb8Q9rBIKDo65tQBw+M8tpZh3upJrZfWjAQ==\n",
+      "wanted_id": "org.example.relay",
+      "keys": [
+        "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+      ],
+      "tier": "reduced",
+      "builtin": [],
+      "archive": "archive",
+      "result": "ok",
+      "key_id": "21fe31dfa154a261",
+      "kept": [
+        "assets/screens/relay.yaml",
+        "node.lua"
+      ],
+      "why": "min_tier=reduced on a Reduced box (the box never reads mode.yaml)"
+    },
+    {
+      "name": "builtin",
+      "release_text": "atalaia-mode-package-v1\nid=org.example.relay\nversion=1.2.0-rc.1\nkind=role\nmin_tier=full\nsize=4096\nsha256=92b13c9a5f42c796e2fbd900430bc286efa21d49e7ec1c44593aea538d74ae51\nsignature=u8Lu6YRCD8W+0rm4J62jVFk/7bNRsC1CrVXA+Ma9KiX5yA1pCPsgWa5jvYIXmzeJRTOXFb1q4ZZo9l71eYVBCQ==\n",
+      "wanted_id": "org.example.relay",
+      "keys": [
+        "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+      ],
+      "tier": "full",
+      "builtin": [
+        "org.example.relay",
+        "org.atalaia.domination"
+      ],
+      "archive": null,
+      "result": "builtin",
+      "why": "the firmware has this id: never replaced"
+    },
+    {
+      "name": "too_big",
+      "release_text": "atalaia-mode-package-v1\nid=org.example.relay\nversion=1.2.0-rc.1\nkind=role\nmin_tier=full\nsize=262656\nsha256=92b13c9a5f42c796e2fbd900430bc286efa21d49e7ec1c44593aea538d74ae51\nsignature=Xd5tyWzVRLM3Ve8sMchjVByVIk9i8BDbBdGko0aT3zH5nBRjEtF/EA3NsvwJQxnQf1hllxnL7QW7iS3aCw3nBQ==\n",
+      "wanted_id": "org.example.relay",
+      "keys": [
+        "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+      ],
+      "tier": "full",
+      "builtin": [],
+      "archive": null,
+      "result": "too_big",
+      "why": "over 256 KiB, refused before the download"
+    },
+    {
+      "name": "signature_before_tier",
+      "release_text": "atalaia-mode-package-v1\nid=org.example.relay\nversion=1.2.0-rc.1\nkind=role\nmin_tier=full\nsize=4096\nsha256=92b13c9a5f42c796e2fbd900430bc286efa21d49e7ec1c44593aea538d74ae51\nsignature=u8Lu6YRCD8W+0rm4J62jVFk/7bNRsC1CrVXA+Ma9KiX5yA1pCPsgWa5jvYIXmzeJRTOXFb1q4ZZo9l71eYVBCQ==\n",
+      "wanted_id": "org.example.relay",
+      "keys": [
+        "PUAXw+hDiVqStwqnTRt+vJyYLM8uxJaMwM1V8Sr0Zgw="
+      ],
+      "tier": "reduced",
+      "builtin": [],
+      "archive": null,
+      "result": "bad_signature",
+      "why": "the signature is checked first"
+    },
+    {
+      "name": "kind_before_builtin",
+      "release_text": "atalaia-mode-package-v1\nid=org.example.relay\nversion=1.2.0-rc.1\nkind=scenario\nmin_tier=reduced\nsize=4096\nsha256=92b13c9a5f42c796e2fbd900430bc286efa21d49e7ec1c44593aea538d74ae51\nsignature=v9JzE0zZTkqWSZ7jI0zGRsDoNGfsLDmr+PINx04iRMBP0ExVNflWpPPzsM3raqari2Na08HVmxNQURuALcDSCg==\n",
+      "wanted_id": "org.example.relay",
+      "keys": [
+        "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+      ],
+      "tier": "full",
+      "builtin": [
+        "org.example.relay"
+      ],
+      "archive": null,
+      "result": "kind",
+      "why": "the kind is checked before the built-in ids"
+    },
+    {
+      "name": "tampered",
+      "release_text": "atalaia-mode-package-v1\nid=org.example.relay\nversion=1.2.0-rc.1\nkind=role\nmin_tier=full\nsize=4096\nsha256=92b13c9a5f42c796e2fbd900430bc286efa21d49e7ec1c44593aea538d74ae51\nsignature=u8Lu6YRCD8W+0rm4J62jVFk/7bNRsC1CrVXA+Ma9KiX5yA1pCPsgWa5jvYIXmzeJRTOXFb1q4ZZo9l71eYVBCQ==\n",
+      "wanted_id": "org.example.relay",
+      "keys": [
+        "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+      ],
+      "tier": "full",
+      "builtin": [],
+      "archive": "tampered",
+      "result": "bad_hash",
+      "why": "one byte of the archive changed"
+    },
+    {
+      "name": "truncated",
+      "release_text": "atalaia-mode-package-v1\nid=org.example.relay\nversion=1.2.0-rc.1\nkind=role\nmin_tier=full\nsize=4096\nsha256=92b13c9a5f42c796e2fbd900430bc286efa21d49e7ec1c44593aea538d74ae51\nsignature=u8Lu6YRCD8W+0rm4J62jVFk/7bNRsC1CrVXA+Ma9KiX5yA1pCPsgWa5jvYIXmzeJRTOXFb1q4ZZo9l71eYVBCQ==\n",
+      "wanted_id": "org.example.relay",
+      "keys": [
+        "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+      ],
+      "tier": "full",
+      "builtin": [],
+      "archive": "truncated",
+      "result": "bad_hash",
+      "why": "fewer bytes than signed"
+    },
+    {
+      "name": "not_canonical",
+      "release_text": "atalaia-mode-package-v1\nid=org.example.relay\nversion=1.2.0-rc.1\nkind=role\nmin_tier=full\nsize=4096\nsha256=d1e88b858073c1803c9f0bff05406fd68826603100d381fe1be2d95a45dc5ccb\nsignature=Eq5ytT+CgoXs1IzT7f/d30yf5QLFnr+LA5aq7OPhepNaT11vOGbzTYYl3X3u6tPPsJwzguSYqJauE4aSDYTaBw==\n",
+      "wanted_id": "org.example.relay",
+      "keys": [
+        "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+      ],
+      "tier": "full",
+      "builtin": [],
+      "archive": null,
+      "archive_hex": "6f72672e6578616d706c652e72656c61792f2e2e2f6576696c2e6c756100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003030303036343400303030303030300030303030303030003030303030303030303736003030303030303030303030003031343432310020300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000075737461720030300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000030303030303030003030303030303000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000074656d706c6174653a2072656c61790a6c61796f75743a0a20202d20747970653a206c6162656c0a20202020746578743a202252656c617920e28692220a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006f72672e6578616d706c652e72656c61792f6d6f64652e79616d6c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000303030303634340030303030303030003030303030303000303030303030303034303000303030303030303030303000303134333433002030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007573746172003030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003030303030303000303030303030300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002320535044582d46696c65436f70797269676874546578743a2032303236204578616d706c6520436c75620a2320535044582d4c6963656e73652d4964656e7469666965723a204d49540a69643a206f72672e6578616d706c652e72656c61790a76657273696f6e3a20312e322e302d72632e310a6c6963656e73653a204d49540a6d696e5f746965723a2066756c6c0a6b696e643a20726f6c650a6e616d653a2052656c61790a6465736372697074696f6e3a204120626f782074686174207061737365732061206d657373616765206f6e2e0a726f6c65733a0a202072656c61793a207b2072657175697265733a205b7465616d5f696e7075745d207d0a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006f72672e6578616d706c652e72656c61792f6e6f64652e6c75610000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000303030303634340030303030303030003030303030303000303030303030303032343200303030303030303030303000303134313637002030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007573746172003030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003030303030303000303030303030300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002d2d20535044582d46696c65436f70797269676874546578743a2032303236204578616d706c6520436c75620a2d2d20535044582d4c6963656e73652d4964656e7469666965723a204d49540a6f6e28227465616d5f696e7075742e7072657373222c2066756e6374696f6e2865290a2020656d69742822782e6578616d706c652e72656c6179222c207b207465616d203d20652e7465616d207d290a656e64290a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "result": "bad_archive",
+      "why": "signed, but an archive no reader takes (a path out of its root)"
+    },
+    {
+      "name": "no_node_lua",
+      "release_text": "atalaia-mode-package-v1\nid=org.example.relay\nversion=1.2.0-rc.1\nkind=role\nmin_tier=full\nsize=2048\nsha256=c6309840635f5c41dbd8e2e16936838efaf3f3e83cbaa48f2d7d57b7493f7f65\nsignature=dqWCqjxIUWyZ4dvv/pKb91LM/O51eZiu4cp8x3Dp8BNuq1lnNH3xvNsHFK5wgC/uRIQH4rZxygWq9tGYD9tnDQ==\n",
+      "wanted_id": "org.example.relay",
+      "keys": [
+        "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+      ],
+      "tier": "full",
+      "builtin": [],
+      "archive": null,
+      "archive_hex": "6f72672e6578616d706c652e72656c61792f6d6f64652e79616d6c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000303030303634340030303030303030003030303030303000303030303030303034303000303030303030303030303000303134333433002030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007573746172003030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003030303030303000303030303030300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002320535044582d46696c65436f70797269676874546578743a2032303236204578616d706c6520436c75620a2320535044582d4c6963656e73652d4964656e7469666965723a204d49540a69643a206f72672e6578616d706c652e72656c61790a76657273696f6e3a20312e322e302d72632e310a6c6963656e73653a204d49540a6d696e5f746965723a2066756c6c0a6b696e643a20726f6c650a6e616d653a2052656c61790a6465736372697074696f6e3a204120626f782074686174207061737365732061206d657373616765206f6e2e0a726f6c65733a0a202072656c61793a207b2072657175697265733a205b7465616d5f696e7075745d207d0a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "result": "bad_archive",
+      "why": "signed, but nothing for a box to run"
+    }
+  ],
+  "reports": {
+    "game_key": "2b2c2d2e2f303132333435363738393a",
+    "valid": [
+      {
+        "game": 4242,
+        "node": 7,
+        "mode": "org.example.relay",
+        "version": "1.2.0-rc.1",
+        "result": "installed",
+        "kept": {
+          "org.example.relay": "1.2.0-rc.1",
+          "org.club.codes": "0.3.0"
+        },
+        "body": "atalaia-mode-report-v1\ngame=4242\nnode=7\nmode=org.example.relay\nversion=1.2.0-rc.1\nresult=installed\nkept=org.club.codes@0.3.0,org.example.relay@1.2.0-rc.1\n",
+        "mac": "e73114728311c1556ce0df3b351bdb99bff752527feba60b2ca6d2f8d3649255"
+      },
+      {
+        "game": 4242,
+        "node": 7,
+        "mode": "org.club.codes",
+        "version": null,
+        "result": "unreachable",
+        "kept": {},
+        "body": "atalaia-mode-report-v1\ngame=4242\nnode=7\nmode=org.club.codes\nversion=-\nresult=unreachable\nkept=-\n",
+        "mac": "6dc8c432ae0a3483d3721e6d9ddec6937c2b312994ba574e304356a917560708"
+      },
+      {
+        "game": 1,
+        "node": 65534,
+        "mode": "org.club.codes",
+        "version": "0.4.0",
+        "result": "bad_signature",
+        "kept": {
+          "org.club.codes": "0.3.0"
+        },
+        "body": "atalaia-mode-report-v1\ngame=1\nnode=65534\nmode=org.club.codes\nversion=0.4.0\nresult=bad_signature\nkept=org.club.codes@0.3.0\n",
+        "mac": "1357823cb8439805da213b91d89ff7ba6addc90d9f4e209918e70afe0f2b5f3b"
+      }
+    ],
+    "invalid": [
+      {
+        "name": "unknown_result",
+        "body": "atalaia-mode-report-v1\ngame=4242\nnode=7\nmode=org.example.relay\nversion=1.2.0-rc.1\nresult=great\nkept=org.club.codes@0.3.0,org.example.relay@1.2.0-rc.1\n",
+        "why": "a known result"
+      },
+      {
+        "name": "game_leading_zero",
+        "body": "atalaia-mode-report-v1\ngame=04242\nnode=7\nmode=org.example.relay\nversion=1.2.0-rc.1\nresult=installed\nkept=org.club.codes@0.3.0,org.example.relay@1.2.0-rc.1\n",
+        "why": "numbers have no leading zero"
+      },
+      {
+        "name": "node_zero",
+        "body": "atalaia-mode-report-v1\ngame=4242\nnode=0\nmode=org.example.relay\nversion=1.2.0-rc.1\nresult=installed\nkept=org.club.codes@0.3.0,org.example.relay@1.2.0-rc.1\n",
+        "why": "node 1-65534"
+      },
+      {
+        "name": "crlf",
+        "body": "atalaia-mode-report-v1\r\ngame=4242\r\nnode=7\r\nmode=org.example.relay\r\nversion=1.2.0-rc.1\r\nresult=installed\r\nkept=org.club.codes@0.3.0,org.example.relay@1.2.0-rc.1\r\n",
+        "why": "lines end with a line feed only"
+      },
+      {
+        "name": "extra_line",
+        "body": "atalaia-mode-report-v1\ngame=4242\nnode=7\nmode=org.example.relay\nversion=1.2.0-rc.1\nresult=installed\nkept=org.club.codes@0.3.0,org.example.relay@1.2.0-rc.1\nx=1\n",
+        "why": "nothing after kept"
+      },
+      {
+        "name": "bad_mode",
+        "body": "atalaia-mode-report-v1\ngame=4242\nnode=7\nmode=relay\nversion=1.2.0-rc.1\nresult=installed\nkept=org.club.codes@0.3.0,org.example.relay@1.2.0-rc.1\n",
+        "why": "a reverse-domain id"
+      },
+      {
+        "name": "bad_version",
+        "body": "atalaia-mode-report-v1\ngame=4242\nnode=7\nmode=org.example.relay\nversion=1.2\nresult=installed\nkept=org.club.codes@0.3.0,org.example.relay@1.2.0-rc.1\n",
+        "why": "MAJOR.MINOR.PATCH or -"
+      },
+      {
+        "name": "kept_unsorted",
+        "body": "atalaia-mode-report-v1\ngame=4242\nnode=7\nmode=org.example.relay\nversion=1.2.0-rc.1\nresult=installed\nkept=org.example.relay@1.2.0-rc.1,org.club.codes@0.3.0\n",
+        "why": "kept sorted by id"
+      },
+      {
+        "name": "kept_empty",
+        "body": "atalaia-mode-report-v1\ngame=4242\nnode=7\nmode=org.example.relay\nversion=1.2.0-rc.1\nresult=installed\nkept=\n",
+        "why": "- for none"
+      },
+      {
+        "name": "kept_twice",
+        "body": "atalaia-mode-report-v1\ngame=4242\nnode=7\nmode=org.example.relay\nversion=1.2.0-rc.1\nresult=installed\nkept=org.club.codes@0.3.0,org.club.codes@0.3.0\n",
+        "why": "an id once"
+      },
+      {
+        "name": "kept_nine",
+        "body": "atalaia-mode-report-v1\ngame=4242\nnode=7\nmode=org.example.relay\nversion=1.2.0-rc.1\nresult=installed\nkept=org.club.m0@1.0.0,org.club.m1@1.0.0,org.club.m2@1.0.0,org.club.m3@1.0.0,org.club.m4@1.0.0,org.club.m5@1.0.0,org.club.m6@1.0.0,org.club.m7@1.0.0,org.club.m8@1.0.0\n",
+        "why": "at most 8 kept"
+      },
+      {
+        "name": "empty",
+        "body": "",
+        "why": "not a report"
       }
     ]
   }

@@ -182,7 +182,7 @@ plus, depending on what the plan phase touches:
 | 4 | Mode packages and signing | archive format, `tools/mode_package.py` (pack, keygen, sign, verify), `registry/schema/index.schema.json`, shared vectors, licence check (AC-4, AC-5) | Software, now | -- | M | **Built 2026-10-22** |
 | 5 | Sandbox-escape battery | escape patterns as core C tests and through the simulator, in CI (AC-12) | Software, now | -- | S | **Built 2026-10-22** |
 | 6 | Signed packages in the controller | import from an index (signature, revocation, size, licence), the author and an "unverified" warning in the console | Software, now | 4 | M | **Built 2026-10-22** |
-| 13 | Missing modes from the GM console | P5R-8: the console's *Send missing modes* in the invite dialog; join key 16; a box fetches the signed packages it lacks over Wi-Fi HTTPS, checks them with its firmware's mode keys and the sandbox, keeps them on LittleFS (numbered 13 so the other numbers stay as P5R-1 has them; built here, after 6) | Software, now (box side host-tested); on real boxes: HW3 | 4, 5, 6 | L | Planned 2026-10-22 |
+| 13 | Missing modes from the GM console | P5R-8: the console's *Send missing modes* in the invite dialog; join key 16; a box fetches the signed packages it lacks over Wi-Fi HTTPS, checks them with its firmware's mode keys and the sandbox, keeps them on LittleFS (numbered 13 so the other numbers stay as P5R-1 has them; built here, after 6) | Software, now (box side host-tested); on real boxes: HW3 | 4, 5, 6 | L | 13a **built 2026-10-22** (P5D-1 to P5D-12); 13b in progress |
 | 7 | Scenario blocks in the console | a block view of the scenario builder writing the same YAML, en + pt, console browser tests | Software, now | 1 | M | |
 | 8 | Registry repository template | `index.json`, `keys/`, `revoked.json`, the registry CI workflow as files under `registry/template/` (AC-6 in this repository) | Software, now; publishing needs the maintainer | 4, 5 | S | |
 | 9 | Community processes | CONTRIBUTING.md "Submitting a community mode", review checklist, verified badge, RFC for the package format (AC-11) | Software, now | 4, 8 | S | |
@@ -198,8 +198,8 @@ Plan phases 4-6 and 7 can run in parallel worktrees with 2-3; 10-12 are
 independent of the rest; 13 needs 4, 5 and 6 (its 13a and 13b can then
 run in parallel). Sizes: L about a week of agent work.
 
-**Next (2026-10-22, plan phases 1-6 built): plan phase 13 (13a and 13b
-can run in parallel), or plan phase 7.**
+**Next (2026-10-22, plan phases 1-6 and 13a built): plan phase 13b (the
+box's side, in progress), then plan phase 7.**
 
 ---
 
@@ -526,6 +526,25 @@ key, the reduced tier); `box_host` runs a fetch from a fake controller;
 the controller's tests (offer, report, start guard, the console's
 browser tests); the simulator's join codec with keys 16 and 17. On real
 boxes: HW3.
+
+**13a built 2026-10-22** (decisions P5D-1 to P5D-12; the contract for 13b is
+`protocol/mode-packages.md`, "Fetching missing modes"). Differences from the
+plan above: a box that cannot fetch (no keys 13/14, no mode key, old firmware)
+answers *no mode* as today, and one whose fetch fails leaves the join (P5D-2,
+P5D-3); the reason list gained `not_offered`, `download`, `bad_archive` and
+`storage` (P5D-5); `node.modes_failed` is proposed as event id 53 with data
+`mode` (key 38), added to `events.yaml` by 13b (P5D-6); no contract case in
+`controller_api.json` and no Dart codec change, since the Android controller
+role serves no mode packages yet (P5D-1).
+
+| File | What |
+|------|------|
+| `simulator/atalaia_sim/join.py`, `protocol/vectors/join.json` (`mode_fetch`), `protocol/join.md` | Join keys 16 `fetch_modes` and 17 `forget_modes` |
+| `simulator/atalaia_sim/lobby.py` | The model of a free box: accepts a join with key 16 fetching, forgets with key 17, leaves the join when a fetch fails |
+| `controller/atalaia_controller/mode_package.py`, `tools/mode_package_vectors.py`, `protocol/vectors/mode_package.json` (`box_limits`, `box_checks`, `reports`) | The box's checks in order and its report, the reference for 13b's C |
+| `controller/atalaia_controller/mode_fetch.py`, `engine.py`, `reinvite.py`, `api.py`, `config.py` (`[modes] box_keys`, `fetch_timeout_s`), `main.py` | The offer, the endpoints boxes fetch from, the report, `node.modes_failed`, the start guard, keys 16 and 17 in invites and card joins |
+| `controller/console/src/components/box-invites.js`, `fetched-modes.js`, `app.js`, `sw.js`, `i18n/*.json` | *Send missing modes* in the invite dialog, the fetch's progress, *Stop waiting*; *Modes fetched by boxes* in the Boxes tab |
+| `controller/tests/test_mode_fetch.py`, `test_mode_package.py`, `simulator/tests/test_join.py`, `test_reinvite_sim.py`, `controller/console/tests/test_browser.py` | 13 + 2 + 3 + 2 tests and 1 browser test |
 
 ## Plan phase 7: Scenario blocks in the console
 

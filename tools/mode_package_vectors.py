@@ -184,6 +184,120 @@ def release_case(name, key, archive, valid, why, **change) -> dict:
             "release_text": release.text().decode(), "valid": valid, "why": why}
 
 
+def signed_text(key, mode_id: str, version: str, kind: str, tier: str, size: int, digest: str) -> str:
+    """A release text signed with key for exactly these fields."""
+    message = mp.manifest(mode_id, version, kind, tier, size, digest)
+    signature = base64.b64encode(key.sign(message)).decode()
+    return mp.Release(mode_id, version, kind, tier, size, digest, signature).text().decode()
+
+
+def box_checks(key, archive: bytes, tampered: bytes, releases: list[dict], invalid: list[dict]) -> list[dict]:
+    """A Field Box's checks of what it fetched (phase 5 plan phase 13, protocol/mode-packages.md,
+    "What a box checks"), each case's result made by mp.box_check_release then mp.box_check_archive."""
+    sk = key_forms(RFC8032[0])
+    ok_ = next(r for r in releases if r["name"] == "release")
+    keys, other = [sk["public_key_b64"]], [key_forms(RFC8032[1])["public_key_b64"]]
+    size, digest = ok_["size"], ok_["sha256"]
+    text = ok_["release_text"]
+    traversal = bytes.fromhex(next(a["hex"] for a in invalid if a["name"] == "traversal"))
+    no_script = mp.pack(MODE_ID, {"mode.yaml": FILES["mode.yaml"]})
+    cases = [
+        # name, release text, wanted id, keys, tier, built-in ids, archive (or None: refused before), why
+        ("ok", text, MODE_ID, keys, "full", [], "archive", "a Full box, its own mode key, the signed archive"),
+        ("ok_second_key", text, MODE_ID, other + keys, "full", [], "archive", "any of its mode keys will do"),
+        ("no_key", text, MODE_ID, [], "full", [], None, "no mode key is built into the box"),
+        ("crlf", text.replace("\n", "\r\n"), MODE_ID, keys, "full", [], None, "exactly the manifest's lines"),
+        ("other_id", text, "org.example.other", keys, "full", [], None, "not the part the box asked for"),
+        ("untrusted_key", text, MODE_ID, other, "full", [], None, "none of its mode keys signed it"),
+        ("changed_after_signing", next(r["release_text"] for r in releases if r["name"] == "other_version"),
+         MODE_ID, keys, "full", [], None, "the version was changed after signing"),
+        ("scenario", signed_text(key, MODE_ID, "1.2.0-rc.1", "scenario", "reduced", size, digest), MODE_ID, keys,
+         "full", [], None, "a scenario never runs on a box"),
+        ("full_on_reduced", text, MODE_ID, keys, "reduced", [], None, "min_tier=full on a Reduced box"),
+        ("reduced_on_reduced", signed_text(key, MODE_ID, "1.2.0-rc.1", "role", "reduced", size, digest), MODE_ID,
+         keys, "reduced", [], "archive", "min_tier=reduced on a Reduced box (the box never reads mode.yaml)"),
+        ("builtin", text, MODE_ID, keys, "full", [MODE_ID, "org.atalaia.domination"], None,
+         "the firmware has this id: never replaced"),
+        ("too_big", signed_text(key, MODE_ID, "1.2.0-rc.1", "role", "full", mp.BOX_MAX_PACKAGE_BYTES + 512, digest),
+         MODE_ID, keys, "full", [], None, "over 256 KiB, refused before the download"),
+        ("signature_before_tier", text, MODE_ID, other, "reduced", [], None, "the signature is checked first"),
+        ("kind_before_builtin", signed_text(key, MODE_ID, "1.2.0-rc.1", "scenario", "reduced", size, digest),
+         MODE_ID, keys, "full", [MODE_ID], None, "the kind is checked before the built-in ids"),
+        ("tampered", text, MODE_ID, keys, "full", [], "tampered", "one byte of the archive changed"),
+        ("truncated", text, MODE_ID, keys, "full", [], "truncated", "fewer bytes than signed"),
+        ("not_canonical", signed_text(key, MODE_ID, "1.2.0-rc.1", "role", "full", len(traversal),
+                                      mp.sha256(traversal)), MODE_ID, keys, "full", [], traversal,
+         "signed, but an archive no reader takes (a path out of its root)"),
+        ("no_node_lua", signed_text(key, MODE_ID, "1.2.0-rc.1", "role", "full", len(no_script),
+                                    mp.sha256(no_script)), MODE_ID, keys, "full", [], no_script,
+         "signed, but nothing for a box to run"),
+    ]
+    named = {"archive": archive, "tampered": tampered, "truncated": archive[:-512]}
+    out = []
+    for name, release_text, wanted, box_keys, tier, builtin, data, why in cases:
+        case: dict = {"name": name, "release_text": release_text, "wanted_id": wanted, "keys": box_keys,
+                      "tier": tier, "builtin": builtin}
+        try:
+            release, who = mp.box_check_release(release_text.encode(), wanted, box_keys, tier, builtin)
+            if data is None:
+                raise SystemExit(f"box check {name}: passed its release checks but has no archive")
+            raw = named[data] if isinstance(data, str) else data
+            case["archive"] = data if isinstance(data, str) else None
+            if not isinstance(data, str):
+                case["archive_hex"] = raw.hex()
+            kept = mp.box_check_archive(raw, release)
+            case.update(result="ok", key_id=who, kept=sorted(kept))
+        except mp.PackageError as exc:
+            if "archive" not in case:
+                case["archive"] = None
+            case["result"] = exc.code
+        case["why"] = why
+        out.append(case)
+    return out
+
+
+def reports() -> dict:
+    """A box's reports (protocol/mode-packages.md, "The report"), with their MACs under a game key."""
+    game_key = bytes(range(0x2b, 0x2b + 16))
+    valid = [
+        (4242, 7, MODE_ID, "1.2.0-rc.1", "installed", {MODE_ID: "1.2.0-rc.1", "org.club.codes": "0.3.0"}),
+        (4242, 7, "org.club.codes", None, "unreachable", {}),
+        (1, 65534, "org.club.codes", "0.4.0", "bad_signature", {"org.club.codes": "0.3.0"}),
+    ]
+    out = []
+    for game, node, mode_id, version, result, kept in valid:
+        body = mp.report_body(game, node, mode_id, version, result, kept)
+        out.append({"game": game, "node": node, "mode": mode_id, "version": version, "result": result,
+                    "kept": kept, "body": body.decode(), "mac": mp.report_mac(game_key, body)})
+    good = out[0]["body"]
+    KEPT = f"kept=org.club.codes@0.3.0,{MODE_ID}@1.2.0-rc.1"
+    assert KEPT in good
+    invalid = [
+        ("unknown_result", good.replace("result=installed", "result=great"), "a known result"),
+        ("game_leading_zero", good.replace("game=4242", "game=04242"), "numbers have no leading zero"),
+        ("node_zero", good.replace("node=7", "node=0"), "node 1-65534"),
+        ("crlf", good.replace("\n", "\r\n"), "lines end with a line feed only"),
+        ("extra_line", good + "x=1\n", "nothing after kept"),
+        ("bad_mode", good.replace("mode=org.example.relay", "mode=relay"), "a reverse-domain id"),
+        ("bad_version", good.replace("version=1.2.0-rc.1", "version=1.2"), "MAJOR.MINOR.PATCH or -"),
+        ("kept_unsorted", good.replace(KEPT, f"kept={MODE_ID}@1.2.0-rc.1,org.club.codes@0.3.0"),
+         "kept sorted by id"),
+        ("kept_empty", good.replace(KEPT, "kept="), "- for none"),
+        ("kept_twice", good.replace(KEPT, "kept=org.club.codes@0.3.0,org.club.codes@0.3.0"), "an id once"),
+        ("kept_nine", good.replace(KEPT, "kept=" + ",".join(f"org.club.m{i}@1.0.0" for i in range(9))),
+         "at most 8 kept"),
+        ("empty", "", "not a report"),
+    ]
+    for n, b, _ in invalid:
+        try:
+            mp.parse_report(b.encode())
+        except mp.PackageError:
+            continue
+        raise SystemExit(f"report {n}: parse_report takes it")
+    return {"game_key": game_key.hex(), "valid": out,
+            "invalid": [{"name": n, "body": b, "why": w} for n, b, w in invalid]}
+
+
 def build() -> dict:
     check_rfc()
     signing, other = RFC8032
@@ -294,7 +408,14 @@ def build() -> dict:
             "refuses, with the code. releases: manifests of that archive signed with signing_key, some changed "
             "after signing. verify: whole checks (archive, release, trusted keys, revoked ids) and their result. "
             "release_texts_invalid: texts a reader refuses. index and index_invalid: the registry index "
-            "(registry/schema/index.schema.json); revoked: a revocation list."),
+            "(registry/schema/index.schema.json); revoked: a revocation list. Phase 5 plan phase 13 (a box "
+            "fetching the modes it lacks, protocol/mode-packages.md, decisions P5B-10 to P5B-16, P5D-*): "
+            "box_limits; box_checks: a Field Box's checks in its order (release_text, the part it asked for "
+            "wanted_id, its mode keys, its tier, its built-in ids), then of the archive it downloaded (archive: "
+            "'archive', 'tampered', 'truncated' (the valid one less its last block) or archive_hex; null: refused "
+            "before any download), with the result (ok, with the signer's key_id and the files kept, or the "
+            "refusal's code); reports: a box's reports with their HMAC-SHA256 under game_key, and bodies to "
+            "refuse."),
         "rfc8032": RFC8032,
         "signing_key": sk,
         "other_key": key_forms(other),
@@ -307,6 +428,10 @@ def build() -> dict:
         "index": index_ok,
         "index_invalid": index_invalid,
         "revoked": revoked_ok,
+        "box_limits": {"max_package_bytes": mp.BOX_MAX_PACKAGE_BYTES, "max_fetched": mp.BOX_MAX_FETCHED,
+                       "max_fetched_bytes": mp.BOX_MAX_FETCHED_BYTES},
+        "box_checks": box_checks(key, archive, bytes(tampered), releases, invalid_archives(archive)),
+        "reports": reports(),
     }
 
 

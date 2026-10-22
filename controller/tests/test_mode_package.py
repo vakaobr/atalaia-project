@@ -116,6 +116,51 @@ class VectorTests(unittest.TestCase):
                         mp.verify(archive, release, case["keys"], case["revoked"], case["named_key"])
                     self.assertEqual(cm.exception.code, case["result"])
 
+    def test_what_a_box_checks(self):
+        """Phase 5 plan phase 13: a box's checks of a release and of the archive it downloaded,
+        in its order (the reference for firmware/esp32/main/mode_fetch.c)."""
+        valid = bytes.fromhex(VECTORS["archive"]["hex"])
+        archives = {"archive": valid, "tampered": bytes.fromhex(VECTORS["archive"]["tampered_hex"]),
+                    "truncated": valid[:-512]}
+        cases = VECTORS["box_checks"]
+        self.assertEqual({c["result"] for c in cases},
+                         {"ok", "no_key", "bad_release", "bad_signature", "kind", "tier", "builtin", "too_big",
+                          "bad_hash", "bad_archive"})
+        for case in cases:
+            with self.subTest(case=case["name"]):
+                def run():
+                    release, who = mp.box_check_release(case["release_text"].encode(), case["wanted_id"],
+                                                        case["keys"], case["tier"], case["builtin"])
+                    data = archives[case["archive"]] if case["archive"] else bytes.fromhex(case["archive_hex"])
+                    return who, mp.box_check_archive(data, release)
+                if case["result"] == "ok":
+                    who, kept = run()
+                    self.assertEqual((who, sorted(kept)), (case["key_id"], case["kept"]))
+                    self.assertEqual(kept["node.lua"], VECTORS["archive"]["files"]["node.lua"])
+                else:
+                    with self.assertRaises(mp.PackageError) as cm:
+                        run()
+                    self.assertEqual(cm.exception.code, case["result"])
+        limits = VECTORS["box_limits"]
+        self.assertEqual((limits["max_package_bytes"], limits["max_fetched"], limits["max_fetched_bytes"]),
+                         (256 * 1024, 8, 512 * 1024))
+
+    def test_a_boxs_reports(self):
+        key = bytes.fromhex(VECTORS["reports"]["game_key"])
+        for v in VECTORS["reports"]["valid"]:
+            with self.subTest(v["body"]):
+                body = mp.report_body(v["game"], v["node"], v["mode"], v["version"], v["result"], v["kept"])
+                self.assertEqual(body.decode(), v["body"])
+                self.assertEqual(mp.report_mac(key, body), v["mac"])
+                got = mp.parse_report(body)
+                self.assertEqual((got["game"], got["node"], got["mode"], got["version"], got["result"], got["kept"]),
+                                 (v["game"], v["node"], v["mode"], v["version"], v["result"], v["kept"]))
+        for v in VECTORS["reports"]["invalid"]:
+            with self.subTest(v["name"]), self.assertRaises(mp.PackageError):
+                mp.parse_report(v["body"].encode())
+        self.assertIn("installed", mp.BOX_RESULTS)
+        self.assertEqual(len(set(mp.BOX_RESULTS)), len(mp.BOX_RESULTS))
+
     def test_the_index_and_revocation_list(self):
         entries = mp.parse_index(VECTORS["index"])
         self.assertEqual(len(entries), 1)

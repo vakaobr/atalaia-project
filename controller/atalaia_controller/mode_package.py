@@ -507,3 +507,133 @@ def parse_revoked(value: Any) -> dict[str, str]:
             raise PackageError("bad_index", "a revoked key's date is YYYY-MM-DD")
         out[item["key_id"]] = reason
     return out
+
+
+# ---- what a box checks, and its report (phase 5 plan phase 13) -------------------------------
+#
+# A box that joins with key 16 (fetch_modes) fetches each part of its mode_id it lacks from its
+# controller (protocol/mode-packages.md, "Fetching missing modes"). These functions are the
+# reference for its checks (firmware/esp32/main/mode_fetch.c, plan phase 13b), in the box's order;
+# the shared vectors' box_checks and reports come from them, and the controller uses the same
+# rules to offer only what a box will take.
+
+BOX_MAX_PACKAGE_BYTES = 262_144   # a box takes an archive of at most 256 KiB (P5B-12)
+BOX_MAX_FETCHED = 8               # fetched packages a box keeps at most
+BOX_MAX_FETCHED_BYTES = 524_288   # and their archives' sizes together at most (512 KiB)
+SCREEN_FILE = re.compile(r"assets/screens/[A-Za-z0-9_.-]+\.yaml")
+REPORT_HEADER = "atalaia-mode-report-v1"
+REPORT_MAX = 1024
+# What a box reports for each part it fetched: installed, or why it stopped (in the order a box
+# meets them; protocol/mode-packages.md says what each means).
+BOX_RESULTS = ("installed", "no_wifi", "unreachable", "not_offered", "download", "no_key", "bad_release",
+               "bad_signature", "kind", "tier", "builtin", "too_big", "bad_hash", "bad_archive", "load",
+               "no_space", "storage", "cancelled")
+
+
+def box_check_release(text: bytes, wanted_id: str, keys: Iterable[str], tier: str,
+                      builtin: Iterable[str] = (), limit: int = BOX_MAX_PACKAGE_BYTES) -> tuple[Release, str]:
+    """A box's checks of a release text, before it downloads the archive; (release, key id) or
+    PackageError at the first failure, in this order: no mode key built in (``no_key``); the text
+    exactly the manifest's lines and a signature, for the id it asked for (``bad_release``); a
+    signature by one of its own mode keys (``bad_signature``); not a scenario (``kind``); its tier
+    (``tier``: a reduced box refuses ``min_tier=full``); not one of its built-in ids (``builtin``);
+    the size within its limit (``too_big``). ``tier`` is the box's: ``reduced`` or ``full``."""
+    if tier not in TIERS:
+        raise ValueError("tier: reduced or full")
+    keys = [k for k in keys if fr.public_key_bytes(k) is not None]
+    if not keys:
+        raise PackageError("no_key", "no mode key is built into this box")
+    try:
+        release = parse_release_text(text)
+    except PackageError as exc:
+        raise PackageError("bad_release", exc.detail) from None
+    if release.id != wanted_id:
+        raise PackageError("bad_release", f"the release is {release.id}'s, not {wanted_id}'s")
+    who = signer(keys, release)
+    if who is None:
+        raise PackageError("bad_signature", "none of the box's mode keys signed this manifest")
+    if release.kind not in BOX_KINDS:
+        raise PackageError("kind", f"a {release.kind} never runs on a box")
+    if tier == "reduced" and release.min_tier == "full":
+        raise PackageError("tier", "the package needs a Full box")
+    if release.id in set(builtin):
+        raise PackageError("builtin", "the box's firmware has a mode of this id: it is never replaced")
+    if release.size > limit:
+        raise PackageError("too_big", f"{release.size} bytes; a box takes at most {limit}")
+    return release, who
+
+
+def box_check_archive(archive: bytes, release: Release) -> dict[str, str]:
+    """A box's checks of the archive it downloaded for a release it checked: the signed size and
+    SHA-256 (``bad_hash``), the canonical form with the id as its root and a ``node.lua``
+    (``bad_archive``). The files a box keeps: ``node.lua`` and ``assets/screens/*.yaml``."""
+    if len(archive) != release.size or sha256(archive) != release.sha256:
+        raise PackageError("bad_hash", "the archive is not the one signed")
+    try:
+        _, files = unpack(archive, release.id, max(release.size, BLOCK))
+    except PackageError as exc:
+        raise PackageError("bad_archive", exc.detail) from None
+    if "node.lua" not in files:
+        raise PackageError("bad_archive", "the package has no node.lua")
+    return {name: text for name, text in files.items() if name == "node.lua" or SCREEN_FILE.fullmatch(name)}
+
+
+def report_body(game: int, node: int, mode_id: str, version: Optional[str], result: str,
+                kept: dict[str, str]) -> bytes:
+    """The text a box posts for each part it fetched (it signs it with the game key): the part,
+    the version it read (``-`` when it read none), the result, and every package it keeps now
+    (``id@version`` sorted by id, ``-`` for none)."""
+    kept_text = ",".join(f"{k}@{kept[k]}" for k in sorted(kept)) or "-"
+    return (f"{REPORT_HEADER}\ngame={game}\nnode={node}\nmode={mode_id}\nversion={version or '-'}\n"
+            f"result={result}\nkept={kept_text}\n").encode("ascii")
+
+
+def report_mac(game_key: bytes, body: bytes) -> str:
+    """HMAC-SHA256 of the report with the game key, lower-case hex (the X-Atalaia-Mac header)."""
+    return fr.report_mac(game_key, body)
+
+
+def parse_report(body: bytes) -> dict[str, Any]:
+    """A box's report (PackageError("bad_report") otherwise): exactly the lines of report_body."""
+    if len(body) > REPORT_MAX:
+        raise PackageError("bad_report", "too long")
+    try:
+        text = body.decode("ascii")
+    except UnicodeDecodeError:
+        raise PackageError("bad_report", "not ASCII") from None
+    lines = text.split("\n")
+    names = ("game", "node", "mode", "version", "result", "kept")
+    if len(lines) != len(names) + 2 or lines[0] != REPORT_HEADER or lines[-1] != "":
+        raise PackageError("bad_report", "not a report")
+    out: dict[str, Any] = {}
+    for name, line in zip(names, lines[1:-1]):
+        key, sep, value = line.partition("=")
+        if key != name or not sep:
+            raise PackageError("bad_report", f"line {name}")
+        out[name] = value
+    for name in ("game", "node"):
+        if not re.fullmatch(r"[1-9][0-9]{0,4}", out[name]) or int(out[name]) > 0xFFFE:
+            raise PackageError("bad_report", name)
+        out[name] = int(out[name])
+    if not MODE_ID.fullmatch(out["mode"]) or len(out["mode"]) > MODE_ID_MAX:
+        raise PackageError("bad_report", "mode")
+    if out["version"] == "-":
+        out["version"] = None
+    elif fr.version_key(out["version"]) is None:
+        raise PackageError("bad_report", "version")
+    if out["result"] not in BOX_RESULTS:
+        raise PackageError("bad_report", "result")
+    kept: dict[str, str] = {}
+    if out["kept"] != "-":
+        for item in out["kept"].split(","):
+            mode_id, sep, version = item.partition("@")
+            if (not sep or not MODE_ID.fullmatch(mode_id) or len(mode_id) > MODE_ID_MAX
+                    or fr.version_key(version) is None or mode_id in kept):
+                raise PackageError("bad_report", "kept")
+            kept[mode_id] = version
+        if len(kept) > BOX_MAX_FETCHED:
+            raise PackageError("bad_report", "kept")
+    out["kept"] = kept
+    if body != report_body(out["game"], out["node"], out["mode"], out["version"], out["result"], kept):
+        raise PackageError("bad_report", "not in its canonical form")
+    return out

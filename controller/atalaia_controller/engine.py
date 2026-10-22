@@ -292,8 +292,11 @@ class Controller:
         self.link_urls: list[str] = []          # its https addresses: join payload key 14
         # Why the live game may not start now (firmware updates still running), or None.
         self.start_guard: Optional[Callable[[], Optional[str]]] = None
+        # More of the same: boxes still fetching the game's modes (mode_fetch.py), and others.
+        self.start_guards: list[Callable[[], Optional[str]]] = []
         self.firmware: Any = None  # firmware_updates.FirmwareUpdates, set by main.build
         self.signed_modes: Any = None  # signed_modes.SignedModes, set by main.build
+        self.mode_fetch: Any = None  # mode_fetch.ModeFetch, set by main.build
         self.adoption: Any = None  # adoption.Adoption: field cards and USB adoption, set by main.build
         self._last_scan: Optional[dict[str, Any]] = None
         saved_scan = store.get_setting("radio.last_scan")
@@ -921,7 +924,8 @@ class Controller:
         return used
 
     def issue_join(self, spec: dict[str, Any], node_id: Optional[int] = None,
-                   same_device: bool = False) -> dict[str, Any]:
+                   same_device: bool = False, device: Optional[str] = None,
+                   tier: Optional[int] = None) -> dict[str, Any]:
         """A join payload for a box (kind "node") or a standby controller (kind "controller").
 
         The node id is the given one or the lowest free id; a box's role is
@@ -932,6 +936,10 @@ class Controller:
         issued again (decision BN-18): two devices on one (game key, node id) would use the same
         nonces. A replacement box gets a new node id. same_device: the box that has it, invited
         again (reinvite.py), whose epochs go on above its own.
+
+        ``fetch_modes`` (join key 16) asks the box to fetch the parts of its mode it lacks from
+        this controller, ``forget_modes`` (key 17) to forget those it fetched before (phase 5
+        plan phase 13, mode_fetch.py); device and tier: the invited box's, when known.
         """
         with self._lock:
             if self.game is None:
@@ -942,6 +950,13 @@ class Controller:
             kind = spec.get("kind", "node")
             if kind not in joinfmt.KINDS:
                 raise ControllerError(f"kind: one of {', '.join(sorted(joinfmt.KINDS))}")
+            fetch, forget = spec.get("fetch_modes", False), spec.get("forget_modes", False)
+            if not isinstance(fetch, bool) or not isinstance(forget, bool):
+                raise ControllerError("fetch_modes and forget_modes: true or false")
+            if (fetch or forget) and kind != "node":
+                raise ControllerError("fetch_modes and forget_modes are for boxes")
+            if (fetch or forget) and self.mode_fetch is None:
+                raise Unavailable("sending modes to boxes is not set up on this controller")
             # A scenario's box: the name the GM gives it (P4R8, M6-7), whose role is the scenario's.
             scenario_name = spec.get("name")
             if scenario_name is not None:
@@ -989,6 +1004,10 @@ class Controller:
             mode_id, params = self.game["mode_id"], self.game["params"]
             if kind == "node" and pkg is not None:
                 mode_id, params = pkg.mode.node_mode_id(role), pkg.mode.params_for(role, params or {})
+            if fetch:
+                why = self.mode_fetch.refusal(mode_id, tier)
+                if why:
+                    raise Conflict(why)
             join = {
                 "game_id": self.game["id"], "game_key": self._key, "node_id": node_id,
                 "controller_id": self.node_id,
@@ -998,6 +1017,7 @@ class Controller:
                 "game_seed": int(self.game["game_seed"]) & 0xFFFFFFFF,
                 "params": params or None, "kind": kind,
                 "lang": self.store.get_setting(f"box_lang:{self.game['id']}"),
+                "fetch_modes": fetch, "forget_modes": forget,
             }
             # Android props link over Wi-Fi with the field CA and the controller's addresses
             # (keys 13 and 14, RFC 0001 Amendment 4, proposed); boxes use them for firmware
@@ -1012,6 +1032,9 @@ class Controller:
                 except joinfmt.JoinError as exc:
                     if not link or exc.reason != "length":
                         raise
+                    if fetch:  # a box fetches over that link: without it the join is no use
+                        raise Conflict("this game's join with the field CA and the controller's addresses "
+                                       "is too long: the box could not fetch its modes") from None
                     link = {}
                     payload = joinfmt.encode(join, self.join_key)
             except joinfmt.JoinError as exc:
@@ -1033,6 +1056,9 @@ class Controller:
                 "ndef_tag_hex": joinfmt.to_ndef_tag(payload).hex(),
                 "wifi_link": bool(link),
             }
+            if fetch or forget:
+                out.update(fetch_modes=fetch, forget_modes=forget)
+                self.mode_fetch.track(self.game["id"], node_id, role, mode_id, device, fetch, forget)
             self._emit({"type": "join", "game": self.game["id"], "node_id": node_id, "kind": kind,
                         "role": role, "name": scenario_name})
             return out
@@ -1124,6 +1150,10 @@ class Controller:
             for node in self.fc.nodes.values():
                 if node.heard or node.hello:
                     out[node.node_id] = node.role
+        if self.mode_fetch is not None:
+            # A box still fetching the game's modes (or whose fetch failed) has not joined until
+            # its HELLO, even if a node.modes_failed of it was heard (mode_fetch.py).
+            out = {n: r for n, r in out.items() if not self.mode_fetch.holds(n)}
         return sorted(out.items())
 
     def _needed_roles(self) -> list[str]:
@@ -1185,9 +1215,10 @@ class Controller:
             assert self.game is not None
             if self.game["state"] != "ready":
                 raise Conflict(f"game {game_id} is {self.game['state']}; only a ready game starts")
-            reason = self.start_guard() if self.start_guard is not None else None
-            if reason:
-                raise Conflict(reason)
+            for guard in [self.start_guard, *self.start_guards]:
+                reason = guard() if guard is not None else None
+                if reason:
+                    raise Conflict(reason)
             check = self.start_check()
             if check["missing"] and not force:
                 raise StartBlocked("no box or prop has joined for: " + ", ".join(check["missing"])

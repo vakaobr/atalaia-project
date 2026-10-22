@@ -67,15 +67,32 @@ def announce_interval_ms(channel_hz: int, frame_len: int) -> int:
     return max(ANNOUNCE_MIN_MS, math.ceil(eu868.airtime_ms(frame_len) / (ANNOUNCE_SHARE * duty)))
 
 
+def missing_parts(j: dict, installed: Optional[set[str]]) -> list[str]:
+    """The parts of a join's mode_id a box with these modes lacks (None: it has every mode)."""
+    if installed is None:
+        return []
+    return [m for m in j["mode_id"].split("+") if m not in installed]
+
+
+def can_fetch(j: dict) -> bool:
+    """A join with key 16 and the controller's link (keys 13 and 14): the box may fetch the
+    signed packages it lacks (phase 5 plan phase 13, protocol/mode-packages.md)."""
+    return bool(j.get("fetch_modes") and j.get("ca_sha256") and j.get("urls"))
+
+
 def join_result(join_key: bytes, payload: bytes, installed: Optional[set[str]] = None) -> tuple[str, Optional[dict]]:
-    """What a box makes of a join payload: (result, join) with a field_frame result name."""
+    """What a box makes of a join payload: (result, join) with a field_frame result name.
+
+    A part the box lacks is ``no_mode``, unless the join asks it to fetch the missing modes
+    (key 16, with keys 13 and 14): then the box accepts the join *fetching* and says HELLO
+    only once it has them (protocol/mode-packages.md, "Fetching missing modes")."""
     try:
         j = joinfmt.decode(payload, join_key)
     except joinfmt.JoinError:
         return "refused", None
     if j["kind"] != "node":
         return "not_box", None
-    if installed is not None and any(m not in installed for m in j["mode_id"].split("+")):
+    if missing_parts(j, installed) and not can_fetch(j):
         return "no_mode", None
     return "accepted", j
 
@@ -93,6 +110,8 @@ class IdleBox:
         self.tier = tier
         self.channel_hz = channel_hz
         self.installed = installed
+        self.fetched: dict[str, str] = {}  # the packages fetched from a controller: id -> version
+        self.fetching: list[str] = []      # the parts the joined game's mode needs and the box lacks
         self.device_id = device_id or bytes(self.rng.getrandbits(8) for _ in range(ff.DEVICE_SIZE))
         # The box's nonces: its device id as sender, a boot count kept "in NVS" (RJ-15).
         self.nonces = ff.NonceSource(join_key, self.device_id)
@@ -126,6 +145,16 @@ class IdleBox:
         """A join payload from a card, a text or an invite (the same checks)."""
         if self.phase in ("joined", "playing") or self.standalone:
             return "busy"
+        try:
+            forget = joinfmt.decode(payload, self.join_key)["forget_modes"]
+        except joinfmt.JoinError:
+            forget = False
+        if forget and self.fetched:
+            # Key 17: every package fetched before goes, before the join's modes are looked at.
+            self.log.append(f"forgot the fetched modes {', '.join(sorted(self.fetched))}")
+            if self.installed is not None:
+                self.installed -= set(self.fetched)
+            self.fetched = {}
         result, j = join_result(self.join_key, payload, self.installed)
         if result == "accepted" and j is not None and j["game_id"] in self.ended:
             result = "ended"
@@ -133,6 +162,8 @@ class IdleBox:
             return result
         self.game = j
         self.phase = "joined"
+        # Key 16: a box that lacks parts fetches them now, and says HELLO only once it has them.
+        self.fetching = missing_parts(j, self.installed)
         self.channel_hz = j["channel_hz"]
         self.next_announce = None
         self.queue = [q for q in self.queue if q[1].get("answer")]
@@ -163,6 +194,23 @@ class IdleBox:
         self.ended = ([self.last_game] + [g for g in self.ended if g != self.last_game])[:ENDED_GAMES]
         self.next_announce = now_ms + self.rng.randint(*FIRST_ANNOUNCE_MS)
         self._drop_tokens(now_ms)  # free again: nothing sent before this counts
+
+    def fetched_part(self, mode_id: str, version: str) -> None:
+        """A part fetched and checked (the test's stand-in for main/mode_fetch.c's work): kept."""
+        self.fetched[mode_id] = version
+        if self.installed is not None:
+            self.installed.add(mode_id)
+        self.fetching = [m for m in self.fetching if m != mode_id]
+
+    def fetch_failed(self, now_ms: int = 0) -> None:
+        """A fetch that did not end with every part: the box leaves the join and is free again
+        (it said why in its report or in node.modes_failed); the game is not one it ended."""
+        if self.phase != "joined" or self.game is None:
+            return
+        self.log.append(f"left game {self.game['game_id']}: its modes could not be fetched")
+        self.phase, self.game, self.fetching = "idle", None, []
+        self.next_announce = now_ms + self.rng.randint(*FIRST_ANNOUNCE_MS)
+        self._drop_tokens(now_ms)
 
     def _drop_tokens(self, now_ms: int) -> None:
         self.token, self.prev_token = self._fresh(), None

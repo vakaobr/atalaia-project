@@ -937,5 +937,78 @@
       "role": "role package",
       "scenario": "scenario"
     }
+  },
+  "mode_fetch": {
+    "missing": "Modes this box lacks:",
+    "send": "Send missing modes",
+    "send_hint": "Invites the box again: it fetches the signed packages it lacks from this controller over the field Wi-Fi (HTTPS), checks them with the keys in its own firmware, and only then joins.",
+    "cannot": "Cannot be sent: {why}",
+    "why": {
+      "no_box_keys": "no box mode keys are set on this controller ([modes] box_keys)",
+      "no_https": "this controller does not serve HTTPS, and boxes fetch modes only over HTTPS",
+      "firmware": "every part is built in, so this box's firmware is older than the game: update it (Boxes tab)",
+      "tier": "a part needs a Full box",
+      "other": "upload the part as a package signed with a key built into the boxes' firmware (Presets tab)"
+    },
+    "parts": {
+      "offered": "can be sent",
+      "builtin": "built in",
+      "missing": "not on this controller: upload it",
+      "unsigned": "not signed: upload it as a signed package",
+      "revoked": "its key is revoked",
+      "untrusted": "its key is no longer trusted here",
+      "kind": "a box cannot run it",
+      "no_box_key": "not signed with a key built into the boxes",
+      "too_big": "too big for a box (over 256 KiB)"
+    },
+    "states": {
+      "sent": "sending the missing modes",
+      "fetching": "fetching its missing modes over Wi-Fi",
+      "installed": "modes installed, joining",
+      "done": "modes in place, joined",
+      "failed": "could not fetch the modes",
+      "timeout": "no news of its fetch",
+      "cancelled": "no longer waited for",
+      "forget": "forgetting its fetched modes"
+    },
+    "reasons": {
+      "no_mode": "its firmware cannot fetch modes (older, or no mode key built in): update its firmware",
+      "no_answer": "no answer",
+      "busy": "in another game",
+      "no_wifi": "no Wi-Fi: set the field's Wi-Fi on the box",
+      "unreachable": "it could not reach this controller over HTTPS",
+      "not_offered": "this controller no longer offers it",
+      "download": "the download broke off",
+      "no_key": "no mode key is built into the box",
+      "bad_release": "the signed release is not valid",
+      "bad_signature": "not signed with a key built into the box",
+      "kind": "a box does not run this kind",
+      "tier": "it needs a Full box",
+      "builtin": "the box has a built-in mode with that id",
+      "too_big": "too big for the box",
+      "bad_hash": "the package is not the one that was signed",
+      "bad_archive": "the package is malformed",
+      "load": "the script does not load on the box",
+      "no_space": "no room left on the box",
+      "storage": "the box could not store it",
+      "cancelled": "a game started"
+    },
+    "not_sent": "Not sent to {box}: {detail}",
+    "waiting": "The game waits for boxes fetching modes (at most {s} s).",
+    "stop": "Stop waiting",
+    "boxes_title": "Modes fetched by boxes",
+    "boxes_hint": "Boxes keep the signed modes they fetched for a game (at most 8, 512 KiB in all). A box marked here forgets them at its next invite; a factory reset forgets them too.",
+    "box_keys": "Mode keys built into the boxes ([modes] box_keys):",
+    "no_box_keys": "No box mode keys are set ([modes] box_keys): no mode can be sent to a box.",
+    "none": "No box has reported fetched modes yet.",
+    "box": "Box",
+    "kept": "Modes kept",
+    "kept_none": "none",
+    "reported": "Last report",
+    "reported_game": "game {game}, node {node}",
+    "forget": "Forget at its next invite",
+    "will_forget": "Forgets them at its next invite",
+    "undo": "Undo",
+    "unknown_box": "box on node {node}"
   }
 }

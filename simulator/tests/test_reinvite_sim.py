@@ -47,11 +47,14 @@ STRANGER = 901
 
 
 def join_payload(game_id: int, key: bytes, node_id: int, role: str = "zone", params=None,
-                 mode: str = "org.atalaia.domination") -> bytes:
+                 mode: str = "org.atalaia.domination", **extra) -> bytes:
     return joinfmt.encode({"game_id": game_id, "game_key": key, "node_id": node_id, "controller_id": CTRL,
                            "channel_hz": eu868.DEFAULT_CHANNEL_HZ, "max_hops": 2, "teams": ["red", "blue"],
-                           "mode_id": mode, "role": role, "game_seed": 7, "params": params, "kind": "node"},
-                          JOIN_KEY)
+                           "mode_id": mode, "role": role, "game_seed": 7, "params": params, "kind": "node",
+                           **extra}, JOIN_KEY)
+
+
+LINK = {"ca_sha256": bytes(range(32)), "urls": ["https://10.42.0.1:8443"]}
 
 
 @unittest.skipUnless(_has_crypto(), "cryptography library not available")
@@ -235,6 +238,58 @@ class ReinviteSimTests(unittest.TestCase):
         for frame in recorded:
             self.box.on_frame(frame, self.now)
         self.assertEqual(self.box.phase, "ended")
+
+    def test_a_box_lacking_a_mode_fetches_it_with_key_16(self):
+        """Phase 5 plan phase 13 (protocol/mode-packages.md): the same box, invited again with
+        fetch_modes (key 16) and the controller's link (keys 13, 14), accepts the join fetching
+        the parts it lacks; without the link it still answers no_mode. Key 17 forgets the fetched
+        ones first, so the next game's join makes it fetch again."""
+        self.play_first_game()
+        self.run_for(21_000)
+        self.box.installed = {"org.atalaia.domination"}
+        mode = "org.atalaia.domination+org.club.codes"
+        inv = self.inviter.invite(self.box.device_id, join_payload(2, self.key2, 9, mode=mode, fetch_modes=True),
+                                  game_id=2, node_id=9, role="zone", now_ms=self.now)
+        self.run_for(3_000)
+        self.assertEqual((inv.status, inv.detail), ("refused", "no_mode"))  # key 16 without 13 and 14
+        self.run_for(70_000)  # its next announcement, with a new token
+        inv = self.inviter.invite(self.box.device_id,
+                                  join_payload(2, self.key2, 9, mode=mode, fetch_modes=True, **LINK),
+                                  game_id=2, node_id=9, role="zone", now_ms=self.now)
+        self.run_for(3_000)
+        self.assertEqual(inv.status, "accepted")
+        self.assertEqual((self.box.phase, self.box.fetching), ("joined", ["org.club.codes"]))
+        self.box.fetched_part("org.club.codes", "1.0.0")
+        self.assertEqual(self.box.fetching, [])
+        self.box.start()
+        self.box.end(self.now)
+        self.run_for(70_000)
+        # Key 17: the fetched part goes, so a join that needs it fetches again; without key 16: no_mode.
+        inv = self.inviter.invite(self.box.device_id, join_payload(3, bytes([3] * 16), 4, mode=mode,
+                                                                   forget_modes=True),
+                                  game_id=3, node_id=4, role="zone", now_ms=self.now)
+        self.run_for(3_000)
+        self.assertEqual((inv.status, inv.detail), ("refused", "no_mode"))
+        self.assertEqual((self.box.fetched, self.box.installed), ({}, {"org.atalaia.domination"}))
+
+    def test_a_failed_fetch_leaves_the_box_free(self):
+        """A box whose fetch failed leaves the join, announces itself again and can be invited
+        once more into the same game."""
+        self.play_first_game()
+        self.run_for(21_000)
+        self.box.installed = {"org.atalaia.domination"}
+        mode = "org.atalaia.domination+org.club.codes"
+        payload = join_payload(2, self.key2, 9, mode=mode, fetch_modes=True, **LINK)
+        inv = self.inviter.invite(self.box.device_id, payload, game_id=2, node_id=9, role="zone", now_ms=self.now)
+        self.run_for(3_000)
+        self.assertEqual(inv.status, "accepted")
+        self.box.fetch_failed(self.now)
+        self.assertTrue(self.box.available)
+        self.assertNotIn(2, self.box.ended)
+        self.run_for(21_000)
+        inv = self.inviter.invite(self.box.device_id, payload, game_id=2, node_id=9, role="zone", now_ms=self.now)
+        self.run_for(3_000)
+        self.assertEqual(inv.status, "accepted")
 
     def test_alternating_replays_get_few_answers(self):
         """Two recorded invites played back in turn: one answer each in 10 s, and at most

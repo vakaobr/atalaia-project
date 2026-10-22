@@ -28,6 +28,8 @@ def fields(v: dict) -> dict:
     out["ca_sha256"] = bytes.fromhex(out["ca_sha256"]) if out.get("ca_sha256") else None
     out.setdefault("urls", None)
     out.setdefault("lang", None)
+    out.setdefault("fetch_modes", False)
+    out.setdefault("forget_modes", False)
     return out
 
 
@@ -125,6 +127,40 @@ class BoxLanguageTests(unittest.TestCase):
         for bad in ("", "PT", "p", "toolonglang", "1t", 5):
             with self.subTest(bad), self.assertRaises(join.JoinError):
                 join.encode({**fields(VECTORS["valid"][0]), "lang": bad}, KEY)
+
+
+class ModeFetchTests(unittest.TestCase):
+    """Optional keys 16 (fetch_modes) and 17 (forget_modes), phase 5 plan phase 13
+    (protocol/mode-packages.md): true when set, left out otherwise."""
+
+    def test_valid_round_trip(self) -> None:
+        section = VECTORS["mode_fetch"]
+        self.assertGreaterEqual(len(section["valid"]), 4)
+        for v in section["valid"]:
+            with self.subTest(v["name"]):
+                payload = bytes.fromhex(v["payload"])
+                self.assertEqual(join.decode(payload, KEY), fields(v))
+                self.assertEqual(join.encode(fields(v), KEY), payload)
+                self.assertEqual(join.to_text(payload), v["text"])
+                self.assertEqual(join.from_text(v["text"]), payload)
+
+    def test_invalid_fail_as_body(self) -> None:
+        self.assertGreaterEqual(len(VECTORS["mode_fetch"]["invalid"]), 6)
+        for v in VECTORS["mode_fetch"]["invalid"]:
+            with self.subTest(v["name"]), self.assertRaises(join.JoinError) as cm:
+                join.decode(bytes.fromhex(v["payload"]), KEY)
+            self.assertEqual(cm.exception.reason, "body", f"{v['name']}: {cm.exception}")
+
+    def test_absent_is_false_and_false_is_left_out(self) -> None:
+        base = fields(VECTORS["valid"][0])
+        got = join.decode(bytes.fromhex(VECTORS["valid"][0]["payload"]), KEY)
+        self.assertEqual((got["fetch_modes"], got["forget_modes"]), (False, False))
+        # False encodes as nothing at all: the same bytes as a join without the keys.
+        self.assertEqual(join.encode({**base, "fetch_modes": False, "forget_modes": False}, KEY),
+                         bytes.fromhex(VECTORS["valid"][0]["payload"]))
+        for bad in (1, 0, "true", None):
+            with self.subTest(bad), self.assertRaises(join.JoinError):
+                join.encode({**base, "fetch_modes": bad}, KEY)
 
 
 class InvalidVectorTests(unittest.TestCase):

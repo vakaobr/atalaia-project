@@ -641,5 +641,152 @@
         "why": "leave an optional key out instead of null"
       }
     ]
+  },
+  "mode_fetch": {
+    "description": "Optional keys 16 (fetch_modes) and 17 (forget_modes), phase 5 plan phase 13 (protocol/join.md; protocol/mode-packages.md, 'Fetching missing modes'): CBOR true (0xf5) when set, left out otherwise; false, a number, null or anything else refuses the payload (body). With key 16 a box fetches the signed packages its mode_id needs and lacks from the controller at the addresses of key 14, pinned to key 13 (fetch_modes_without_link is a valid payload, but such a box cannot fetch and answers no_mode); with key 17 it first forgets every package it fetched before. Made by hand from node_domination_zone's bytes (keys 13 and 14 from controller_link's prop_with_ca_and_urls, key 15 'pt'), tagged with Python's hmac module. The simulator's codec decodes and re-encodes the valid ones byte for byte and refuses the invalid ones (body); the core's (core/src/join.c) from plan phase 13b. Readers before them skip keys 16 and 17 like any key up to 31.",
+    "valid": [
+      {
+        "name": "fetch_modes_with_link",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 7,
+          "controller_id": 0,
+          "channel_hz": 869525000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "zone",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "node",
+          "ca_sha256": "adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+          "urls": [
+            "https://10.42.0.1:8443",
+            "https://atalaia.local:8443"
+          ],
+          "fetch_modes": true
+        },
+        "payload": "01ae0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000d5820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a0e827668747470733a2f2f31302e34322e302e313a38343433781a68747470733a2f2f6174616c6169612e6c6f63616c3a3834343310f5a893bba596d524096498d06547ddf5fe59ba601b59f36d62374afb5204287a26",
+        "text": "atalaia:join:Aa4BGRCSAlArfhUWKK7Spqv3FYgJz088AwcEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JZHpvbmUKGTA5DAANWCCtt5S9FDFtK4YhcaM8aLnKj7wk45gDBBO6lPLKpNZGOg6Cdmh0dHBzOi8vMTAuNDIuMC4xOjg0NDN4Gmh0dHBzOi8vYXRhbGFpYS5sb2NhbDo4NDQzEPWok7ulltUkCWSY0GVH3fX-WbpgG1nzbWI3SvtSBCh6Jg"
+      },
+      {
+        "name": "forget_modes",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 7,
+          "controller_id": 0,
+          "channel_hz": 869525000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "zone",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "node",
+          "forget_modes": true
+        },
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c0011f54d2cd8edd6f075d8d62d1b454a8537fe7857aef17d9ffd5f47572877af608685",
+        "text": "atalaia:join:AawBGRCSAlArfhUWKK7Spqv3FYgJz088AwcEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JZHpvbmUKGTA5DAAR9U0s2O3W8HXY1i0bRUqFN_54V67xfZ_9X0dXKHevYIaF"
+      },
+      {
+        "name": "fetch_and_forget_with_link_and_lang",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 7,
+          "controller_id": 0,
+          "channel_hz": 869525000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "zone",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "node",
+          "ca_sha256": "adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a",
+          "urls": [
+            "https://10.42.0.1:8443",
+            "https://atalaia.local:8443"
+          ],
+          "lang": "pt",
+          "fetch_modes": true,
+          "forget_modes": true
+        },
+        "payload": "01b00119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000d5820adb794bd14316d2b862171a33c68b9ca8fbc24e398030413ba94f2caa4d6463a0e827668747470733a2f2f31302e34322e302e313a38343433781a68747470733a2f2f6174616c6169612e6c6f63616c3a383434330f62707410f511f5962c0172b0dcb317fd064e3c4a31f5a84274a7300c67407e612e0797d5caed8e",
+        "text": "atalaia:join:AbABGRCSAlArfhUWKK7Spqv3FYgJz088AwcEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JZHpvbmUKGTA5DAANWCCtt5S9FDFtK4YhcaM8aLnKj7wk45gDBBO6lPLKpNZGOg6Cdmh0dHBzOi8vMTAuNDIuMC4xOjg0NDN4Gmh0dHBzOi8vYXRhbGFpYS5sb2NhbDo4NDQzD2JwdBD1EfWWLAFysNyzF_0GTjxKMfWoQnSnMAxnQH5hLgeX1crtjg"
+      },
+      {
+        "name": "fetch_modes_without_link",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 7,
+          "controller_id": 0,
+          "channel_hz": 869525000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "zone",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "node",
+          "fetch_modes": true
+        },
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c0010f5407ac33d08ccfbb11ad512e5a5dc1847384e5d25ec8a91cc5d3c78897f42e21a",
+        "text": "atalaia:join:AawBGRCSAlArfhUWKK7Spqv3FYgJz088AwcEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JZHpvbmUKGTA5DAAQ9UB6wz0IzPuxGtUS5aXcGEc4Tl0l7IqRzF08eIl_QuIa"
+      }
+    ],
+    "invalid": [
+      {
+        "name": "fetch_false",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c0010f4351374f8175bc93a4ac576a71fb5b09d7c35a147a31ad598caec5664f9e2688c",
+        "reason": "body",
+        "why": "true only: leave the key out instead of false"
+      },
+      {
+        "name": "fetch_uint",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c0010017a0c06b1256272514e49412a260a1b2df951c3e9228f3d2b8988f00b411ecd82",
+        "reason": "body",
+        "why": "a boolean, not a number"
+      },
+      {
+        "name": "fetch_null",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c0010f69dfe1e6c7b9b21bb9951e3d98d8ab5a5713f357ce689b68ba8514e6def4c72da",
+        "reason": "body",
+        "why": "leave an optional key out instead of null"
+      },
+      {
+        "name": "fetch_text",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c00106474727565e19797e9dcbbbe2651e79f62b36702d5b9b6b9ca4617904b4dab6a6c03a79083",
+        "reason": "body",
+        "why": "a boolean, not a text"
+      },
+      {
+        "name": "forget_false",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c0011f49698a378e03e5a391427bc950355f3cb6faf1e3ef91749dbacaea292759ebdd2",
+        "reason": "body",
+        "why": "true only: leave the key out instead of false"
+      },
+      {
+        "name": "forget_uint",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c001101c0bae6df40ca18f32c7285edcb04a5d8090fb002b449d56c774157341be90b99",
+        "reason": "body",
+        "why": "a boolean, not a number"
+      }
+    ]
   }
 }

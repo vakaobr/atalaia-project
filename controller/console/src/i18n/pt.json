@@ -937,5 +937,78 @@
       "role": "pacote de papel",
       "scenario": "cenário"
     }
+  },
+  "mode_fetch": {
+    "missing": "Modos que faltam a esta caixa:",
+    "send": "Enviar os modos em falta",
+    "send_hint": "Convida a caixa de novo: ela obtém deste controlador, pelo Wi-Fi do campo (HTTPS), os pacotes assinados que lhe faltam, verifica-os com as chaves do seu próprio firmware, e só depois se junta.",
+    "cannot": "Não se pode enviar: {why}",
+    "why": {
+      "no_box_keys": "este controlador não tem chaves de modos das caixas ([modes] box_keys)",
+      "no_https": "este controlador não serve HTTPS, e as caixas só obtêm modos por HTTPS",
+      "firmware": "todas as partes vêm de origem, por isso o firmware desta caixa é anterior ao jogo: atualize-o (separador Caixas)",
+      "tier": "uma das partes precisa de uma caixa Full",
+      "other": "carregue a parte como pacote assinado com uma chave incluída no firmware das caixas (separador Predefinições)"
+    },
+    "parts": {
+      "offered": "pode ser enviado",
+      "builtin": "de origem",
+      "missing": "não está neste controlador: carregue-o",
+      "unsigned": "sem assinatura: carregue-o como pacote assinado",
+      "revoked": "a chave foi revogada",
+      "untrusted": "a chave já não é de confiança aqui",
+      "kind": "uma caixa não o corre",
+      "no_box_key": "não está assinado com uma chave das caixas",
+      "too_big": "grande demais para uma caixa (mais de 256 KiB)"
+    },
+    "states": {
+      "sent": "a enviar os modos em falta",
+      "fetching": "a obter os modos em falta por Wi-Fi",
+      "installed": "modos instalados, a juntar-se",
+      "done": "modos prontos, juntou-se",
+      "failed": "não conseguiu obter os modos",
+      "timeout": "sem notícias da obtenção",
+      "cancelled": "já não se espera por ela",
+      "forget": "a esquecer os modos obtidos"
+    },
+    "reasons": {
+      "no_mode": "o firmware não obtém modos (é anterior, ou não tem chave de modos): atualize o firmware",
+      "no_answer": "não respondeu",
+      "busy": "noutro jogo",
+      "no_wifi": "sem Wi-Fi: configure o Wi-Fi do campo na caixa",
+      "unreachable": "não chegou a este controlador por HTTPS",
+      "not_offered": "este controlador já não o oferece",
+      "download": "a transferência foi interrompida",
+      "no_key": "a caixa não tem nenhuma chave de modos",
+      "bad_release": "a versão assinada não é válida",
+      "bad_signature": "não está assinado com uma chave da caixa",
+      "kind": "uma caixa não corre este tipo",
+      "tier": "precisa de uma caixa Full",
+      "builtin": "a caixa tem um modo de origem com esse id",
+      "too_big": "grande demais para a caixa",
+      "bad_hash": "o pacote não é o que foi assinado",
+      "bad_archive": "o pacote está mal formado",
+      "load": "o script não carrega na caixa",
+      "no_space": "não há espaço na caixa",
+      "storage": "a caixa não o conseguiu guardar",
+      "cancelled": "começou um jogo"
+    },
+    "not_sent": "Não enviado para {box}: {detail}",
+    "waiting": "O jogo espera pelas caixas que estão a obter modos (no máximo {s} s).",
+    "stop": "Deixar de esperar",
+    "boxes_title": "Modos obtidos pelas caixas",
+    "boxes_hint": "As caixas guardam os modos assinados que obtiveram para um jogo (no máximo 8, 512 KiB ao todo). Uma caixa marcada aqui esquece-os no próximo convite; uma reposição de fábrica também os esquece.",
+    "box_keys": "Chaves de modos incluídas nas caixas ([modes] box_keys):",
+    "no_box_keys": "Não há chaves de modos das caixas configuradas ([modes] box_keys): nenhum modo pode ser enviado a uma caixa.",
+    "none": "Nenhuma caixa indicou ainda modos obtidos.",
+    "box": "Caixa",
+    "kept": "Modos guardados",
+    "kept_none": "nenhum",
+    "reported": "Último relatório",
+    "reported_game": "jogo {game}, nó {node}",
+    "forget": "Esquecer no próximo convite",
+    "will_forget": "Esquece-os no próximo convite",
+    "undo": "Anular",
+    "unknown_box": "caixa no nó {node}"
   }
 }

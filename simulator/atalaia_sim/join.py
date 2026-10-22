@@ -13,15 +13,19 @@ field's 32-byte join key. A join is a dict:
      "role": "zone", "game_seed": 12345, "params": {...} or None,
      "kind": "node" or "controller",
      "ca_sha256": b"...32..." or None, "urls": ["https://10.42.0.1:8443"] or None,
-     "lang": "pt" or None}
+     "lang": "pt" or None, "fetch_modes": False, "forget_modes": False}
 
 ca_sha256 (key 13) and urls (key 14) are optional (RFC 0001 Amendment 4,
 proposed): the field CA's fingerprint and the controller's https addresses,
 for an Android prop that links to the controller over Wi-Fi
 (protocol/prop-link.md); boxes read them for firmware updates over Wi-Fi
 (protocol/firmware-update.md). lang (key 15, RFC 0001 Amendment 10, proposed) is
-the language of a box's screens ("pt", "en"...; None: English). Keys 16-31 are
-skipped.
+the language of a box's screens ("pt", "en"...; None: English). fetch_modes
+(key 16) and forget_modes (key 17), phase 5 plan phase 13 (protocol/mode-packages.md,
+"Fetching missing modes"): CBOR true when set, left out otherwise (false is refused):
+a box fetches the signed mode packages its mode_id needs and it lacks from the
+controller (keys 13 and 14 give it the address and the field CA), and forgets the
+packages it fetched before. Keys 18-31 are skipped.
 
 The codecs check protocol/vectors/join.json.
 """
@@ -54,10 +58,11 @@ NDEF_TYPE = b"application/vnd.atalaia.join"
 KEYS = {
     "game_id": 1, "game_key": 2, "node_id": 3, "controller_id": 4, "channel_hz": 5,
     "max_hops": 6, "teams": 7, "mode_id": 8, "role": 9, "game_seed": 10, "params": 11, "kind": 12,
-    "ca_sha256": 13, "urls": 14, "lang": 15,
+    "ca_sha256": 13, "urls": 14, "lang": 15, "fetch_modes": 16, "forget_modes": 17,
 }
 OPTIONAL = ("params", "ca_sha256", "urls", "lang")
-REQUIRED = set(KEYS) - set(OPTIONAL)
+FLAGS = ("fetch_modes", "forget_modes")  # CBOR true when set, left out otherwise
+REQUIRED = set(KEYS) - set(OPTIONAL) - set(FLAGS)
 URLS_MAX = 3
 URL_MAX = 64
 # The same rule as the check-in poster's urls (protocol/checkin.md): https://host[:port], no path.
@@ -167,6 +172,11 @@ def validate(j: dict[str, Any]) -> dict[str, Any]:
     if lang is not None and not (isinstance(lang, str) and LANG_RE.fullmatch(lang)):
         raise JoinError("body", f"lang: {lang!r} is not 2-8 of a-z, 0-9 and -, starting with two letters")
     out["lang"] = lang
+    for name in FLAGS:
+        flag = j.get(name, False)
+        if not isinstance(flag, bool):
+            raise JoinError("body", f"{name} must be true or false")
+        out[name] = flag
     kind = j["kind"]
     if kind not in KINDS:
         raise JoinError("body", f"kind must be one of {sorted(KINDS)}")
@@ -181,7 +191,7 @@ def encode(j: dict[str, Any], join_key: bytes) -> bytes:
     v = validate(j)
     body: dict[int, Any] = {}
     for name in KEYS:
-        if name in OPTIONAL and v[name] is None:
+        if (name in OPTIONAL and v[name] is None) or (name in FLAGS and not v[name]):
             continue
         body[KEYS[name]] = KINDS[v["kind"]] if name == "kind" else v[name]
     signed = bytes([VERSION]) + cbor.encode(body)
@@ -220,6 +230,8 @@ def decode(data: bytes, join_key: bytes) -> dict[str, Any]:
             v = _KIND_NAMES[v]
         if name in ("ca_sha256", "urls", "lang") and v is None:
             raise JoinError("body", f"{name} is null: leave an optional field out instead")
+        if name in FLAGS and v is not True:
+            raise JoinError("body", f"{name} is only ever true: leave it out instead")
         j[name] = v
     for name in ("game_key", "ca_sha256"):
         if name in j and not isinstance(j[name], bytes):

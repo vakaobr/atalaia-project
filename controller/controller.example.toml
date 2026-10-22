@@ -154,3 +154,7 @@ revoked = []                      # key ids (16 hex digits) that no longer count
                                   # revoked.json is added to them
 index = ""                        # a registry index: "https://..." or the path of an index.json
                                   # with its packages next to it (a field without internet)
+box_keys = []                     # the mode keys (and release keys) built into the boxes' firmware:
+                                  # only packages one of them signed are sent to a box that lacks a
+                                  # game's mode (the invite dialog's "Send missing modes"); empty: none
+fetch_timeout_s = 300.0           # the game waits this long at most for a box fetching its modes
