@@ -34,7 +34,8 @@ owner, and one for a VIP / Payload extraction zone:
 - the field's map features (map_features.py, decisions MF-11 to MF-13), placed by their level's
   georeference: a point as a spot marker, a circle as an ATAK drawn circle (``u-d-c-c``, its
   radius in the ``<shape><ellipse>``), a polygon as a closed drawn shape (``u-d-f``, its corners as
-  ``<link point>``, the first again at the end). Only those for everyone go to multicast; the staff
+  ``<link point>``, the first again at the end; the field boundary, MF-23, the same without a
+  fill). Only those for everyone go to multicast; the staff
   devices get them all (a team's and the organisers' too: the feed is not per team); the remote
   relay gets the points and circles for everyone, a circle as a spot marker with its radius as
   ``ce`` (the extraction zone's form), never a polygon (the relay's narrow form, sync_format.py).
@@ -112,9 +113,13 @@ FILL_ALPHA = 0x60            # a translucent fill, the plan's features over the 
 # What ATAK shows for a map feature (English, as the extraction zone's "Extraction") and its colour when
 # it has no team, as the console's (console/src/components/map-features.js FEATURE_COLOURS).
 FEATURE_NAMES = {"safe_zone": "Safe zone", "respawn": "Respawn", "hq": "HQ", "parking": "Parking",
-                 "first_aid": "First aid", "objective": "Objective", "other": "Feature"}
+                 "first_aid": "First aid", "objective": "Objective", "other": "Feature",
+                 "boundary": "Field boundary"}
 FEATURE_COLOURS = {"safe_zone": 0x14B8A6, "respawn": 0x6C757D, "hq": 0x6C757D, "parking": 0x546E7A,
-                   "first_aid": 0xE91E63, "objective": 0xF59E0B, "other": 0x94A3B8}
+                   "first_aid": 0xE91E63, "objective": 0xF59E0B, "other": 0x94A3B8, "boundary": 0x84CC16}
+# The field boundary (MF-23) is an outline: a closed shape whose fill is fully transparent, so the
+# field inside it stays readable on the map.
+BOUNDARY_FILL_ALPHA = 0x00
 
 # Team colours as the console shows them (console/src/ui.js TEAM_COLOURS and PALETTE), and the
 # ATAK team for each (ATAK's 14 team colours; decision M9-5). A team that is no colour gets the
@@ -270,11 +275,11 @@ def marker_detail(callsign: str, remarks: str, argb: int, battery: Optional[int]
     return out
 
 
-def shape_detail(callsign: str, remarks: str, argb: int) -> list[ET.Element]:
+def shape_detail(callsign: str, remarks: str, argb: int, fill_alpha: int = FILL_ALPHA) -> list[ET.Element]:
     """A drawn shape's style and names, in the order of takcot/examples "Drawing Shapes - *.cot"; its texts
     have tighter byte caps than a marker's, so a polygon's corners fit the datagram too."""
     return [_el("strokeColor", {"value": str(argb)}), _el("strokeWeight", {"value": STROKE_WEIGHT}),
-            _el("fillColor", {"value": str(argb_of(argb, FILL_ALPHA))}),
+            _el("fillColor", {"value": str(argb_of(argb, fill_alpha))}),
             _el("contact", {"callsign": xml_text(callsign, CALLSIGN_MAX, SHAPE_CALLSIGN_BYTES) or "?"}),
             _el("remarks", None, xml_text(remarks, REMARKS_MAX, SHAPE_REMARKS_BYTES)),
             _el("labels_on", {"value": "true"})]
@@ -313,7 +318,8 @@ def feature_xml(*, uid: str, feature: dict[str, Any], geo: georefmod.Georef, now
         for la, lo in [*corners, corners[0]]:
             detail.append(_el("link", {"point": f"{_deg(la)},{_deg(lo)}"}))
         cot_type = TYPE_POLYGON
-    detail += shape_detail(callsign, remarks, argb)
+    fill = BOUNDARY_FILL_ALPHA if feature.get("type") == mapmod.BOUNDARY else FILL_ALPHA
+    detail += shape_detail(callsign, remarks, argb, fill)
     data = event_xml(uid=uid, cot_type=cot_type, how=HOW_IMAGE, lat=lat, lon=lon, now=now, start=now, stale=stale,
                      detail=detail)
     return data, cot_type, lat, lon

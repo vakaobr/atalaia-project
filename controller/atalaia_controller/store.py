@@ -884,6 +884,46 @@ class Store:
     def delete_map_feature(self, feature_id: int) -> bool:
         return self._exec("DELETE FROM map_features WHERE id = ?", (feature_id,)).rowcount == 1
 
+    def set_field_from_map(self, level: int, content_type: str, data: bytes, georef_key: str, georef_value: str,
+                           boundary: dict[str, Any]) -> tuple[int, bool]:
+        """A level's plan, its own map position and its field boundary, loaded from a map (field_map.py,
+        MF-26), in one transaction: all three or nothing. The level's boundary is replaced if it has one
+        (MF-20). Returns (the boundary's id, whether it was new)."""
+        if len(data) > FIELD_IMAGE_MAX:
+            raise ValueError(f"the field image is over {FIELD_IMAGE_MAX} bytes")
+        if not 0 <= level < FIELD_LEVELS_MAX:
+            raise ValueError(f"level: 0 to {FIELD_LEVELS_MAX - 1}")
+        now = time.time()
+        text = json.dumps(boundary, separators=(",", ":"), ensure_ascii=False)
+        with self._lock:
+            self._db.execute("BEGIN IMMEDIATE")
+            try:
+                self._db.execute(
+                    "INSERT INTO field_levels (level, content_type, data, updated_at) VALUES (?, ?, ?, ?) "
+                    "ON CONFLICT(level) DO UPDATE SET content_type = excluded.content_type, "
+                    "data = excluded.data, updated_at = excluded.updated_at", (level, content_type, data, now))
+                self._db.execute("INSERT INTO settings (key, value) VALUES (?, ?) "
+                                 "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (georef_key, georef_value))
+                old = None
+                for r in self._db.execute("SELECT id, data_json FROM map_features WHERE level = ? ORDER BY id",
+                                          (level,)).fetchall():
+                    if json.loads(r["data_json"]).get("type") == "boundary":
+                        old = int(r["id"])
+                        break
+                if old is None:
+                    cur = self._db.execute("INSERT INTO map_features (level, data_json, created_at, updated_at) "
+                                           "VALUES (?, ?, ?, ?)", (level, text, now, now))
+                    fid, new = int(cur.lastrowid), True
+                else:
+                    self._db.execute("UPDATE map_features SET data_json = ?, updated_at = ? WHERE id = ?",
+                                     (text, now, old))
+                    fid, new = old, False
+                self._db.execute("COMMIT")
+            except BaseException:
+                self._db.execute("ROLLBACK")
+                raise
+        return fid, new
+
     def delete_map_features_from(self, levels_from: int) -> int:
         """The features of levels that no longer exist (``level >= levels_from``)."""
         return self._exec("DELETE FROM map_features WHERE level >= ?", (levels_from,)).rowcount

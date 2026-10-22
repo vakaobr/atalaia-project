@@ -1,0 +1,26 @@
+{
+  "version": 0.6,
+  "generator": "Atalaia browser tests (made-up data in the Overpass API's JSON form, not OpenStreetMap data)",
+  "osm3s": {"timestamp_osm_base": "2026-10-22T00:00:00Z"},
+  "elements": [
+    {"type": "way", "id": 1, "tags": {"highway": "track", "name": "Caminho da Mata"},
+     "geometry": [{"lat": 39.6018, "lon": -8.4038}, {"lat": 39.6000, "lon": -8.4005}, {"lat": 39.5982, "lon": -8.3982}]},
+    {"type": "way", "id": 2, "tags": {"highway": "path"},
+     "geometry": [{"lat": 39.6010, "lon": -8.4030}, {"lat": 39.5992, "lon": -8.4025}, {"lat": 39.5988, "lon": -8.3995}]},
+    {"type": "way", "id": 3, "tags": {"building": "yes", "name": "Armazém"},
+     "geometry": [{"lat": 39.6005, "lon": -8.4012}, {"lat": 39.6005, "lon": -8.4006}, {"lat": 39.6001, "lon": -8.4006},
+                  {"lat": 39.6001, "lon": -8.4012}, {"lat": 39.6005, "lon": -8.4012}]},
+    {"type": "way", "id": 4, "tags": {"natural": "wood"},
+     "geometry": [{"lat": 39.6014, "lon": -8.4000}, {"lat": 39.6014, "lon": -8.3988}, {"lat": 39.6006, "lon": -8.3988},
+                  {"lat": 39.6006, "lon": -8.4000}, {"lat": 39.6014, "lon": -8.4000}]},
+    {"type": "relation", "id": 5, "tags": {"type": "multipolygon", "natural": "water", "name": "Charca"},
+     "members": [{"type": "way", "ref": 50, "role": "outer",
+                  "geometry": [{"lat": 39.5992, "lon": -8.4032}, {"lat": 39.5992, "lon": -8.4022}, {"lat": 39.5986, "lon": -8.4022},
+                               {"lat": 39.5986, "lon": -8.4032}, {"lat": 39.5992, "lon": -8.4032}]}]},
+    {"type": "way", "id": 6, "tags": {"barrier": "fence"},
+     "geometry": [{"lat": 39.6016, "lon": -8.4034}, {"lat": 39.6013, "lon": -8.3986}]},
+    {"type": "way", "id": 7, "tags": {"waterway": "stream"},
+     "geometry": [{"lat": 39.5995, "lon": -8.4040}, {"lat": 39.5990, "lon": -8.4010}, {"lat": 39.5983, "lon": -8.3980}]},
+    {"type": "node", "id": 8, "lat": 39.5998, "lon": -8.3998, "tags": {"historic": "bunker", "name": "Bunker"}}
+  ]
+}

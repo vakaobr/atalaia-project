@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<!--
+SPDX-FileCopyrightText: 2026 The Atalaia contributors
+SPDX-License-Identifier: GPL-3.0-or-later
+
+Load the field from a map (decisions MF-19 to MF-30): the one page of the console
+that reaches the internet, while the GM sets the game up. The controller serves it
+with its own Content-Security-Policy (api.py FIELD_MAP_HEADERS): OpenStreetMap's
+tiles, the Overpass API and the DGT's orthophoto WMS, nothing else.
+-->
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#1f3a2b">
+  <title>Atalaia</title>
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="field-map.js"></script>
+</head>
+<body>
+  <div id="app"><noscript>Esta página precisa de JavaScript. · This page needs JavaScript.</noscript></div>
+</body>
+</html>

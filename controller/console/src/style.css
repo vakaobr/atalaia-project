@@ -920,6 +920,153 @@ tr.offline td {
     max-width: 100%;
 }
 
+/* the field boundary (MF-20): the plan dimmed outside it, its outline dashed and unfilled */
+.mf-outside {
+    fill: #000;
+    fill-opacity: 0.45;
+}
+
+.mf-shape.mf-boundary {
+    fill-opacity: 0;
+    stroke-width: 3;
+    stroke-dasharray: 8 4;
+}
+
+/* load the field from a map (field-map.js, MF-19 to MF-30) */
+.fm-map {
+    margin: 0.4rem 0;
+}
+
+.tm {
+    position: relative;
+    height: min(60vh, 32rem);
+    min-height: 16rem;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #e8e4dc;
+    touch-action: none;
+    user-select: none;
+    cursor: crosshair;
+}
+
+.tm:focus-visible {
+    outline: 3px solid var(--primary);
+    outline-offset: 2px;
+}
+
+.tm-tiles,
+.tm-outline {
+    position: absolute;
+    inset: 0;
+}
+
+.tm-outline {
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.tm-tile {
+    position: absolute;
+    width: 256px;
+    height: 256px;
+    max-width: none;
+    pointer-events: none;
+}
+
+.tm-shape {
+    fill: #84cc16;
+    fill-opacity: 0.2;
+    stroke: #3f6212;
+    stroke-width: 3;
+}
+
+.tm-corner {
+    fill: #fff;
+    stroke: #3f6212;
+    stroke-width: 3;
+}
+
+.tm-corner-n {
+    font: 700 14px system-ui, sans-serif;
+    fill: #1d231f;
+    paint-order: stroke;
+    stroke: #fff;
+    stroke-width: 3;
+}
+
+.tm-cross {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 1.4rem;
+    height: 1.4rem;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    background: linear-gradient(#1d231f, #1d231f) center / 2px 100% no-repeat,
+        linear-gradient(#1d231f, #1d231f) center / 100% 2px no-repeat;
+    opacity: 0.6;
+}
+
+.tm-credit {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    padding: 0.1rem 0.4rem;
+    background: rgba(255, 255, 255, 0.85);
+    font-size: 0.75rem;
+}
+
+.tm-credit a {
+    color: #1d231f;
+}
+
+.fm-corners {
+    margin: 0.3rem 0;
+    padding-left: 1.6rem;
+    overflow-wrap: anywhere;
+}
+
+.fm-ortho {
+    margin: 0.6rem 0 0;
+}
+
+.fm-preview {
+    position: relative;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.fm-preview img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.fm-preview svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.fm-outline {
+    fill: none;
+    stroke: #84cc16;
+    stroke-width: 3;
+    stroke-dasharray: 8 4;
+}
+
+.top a.fm-back {
+    background: transparent;
+    border-color: var(--accent-fg);
+    color: var(--accent-fg);
+    text-decoration: none;
+}
+
 /* ---- join ---- */
 
 .join-result {

@@ -47,6 +47,7 @@ which browsers cannot give headers, also takes ``?token=``.
     GET|PUT /api/v1/field/levels           a multi-story field: levels on or off, their number and names (PUT: GM)
     GET|PUT|DELETE /api/v1/field/levels/{n}/image   level n's floor plan (level 0: the field image)
     GET|PUT|DELETE /api/v1/field/levels/{n}/georef  level n's own control points (else level 0's)
+    POST /api/v1/field/levels/{n}/from-map GM: plan, map position and field boundary drawn from a map, at once
     GET  /api/v1/field/features            the map features this token may see (safe zones, respawns, HQs...)
     POST /api/v1/field/features            GM: mark one {"type", "shape", "x", "y" | "points", "radius_m"?, ...}
     PUT|DELETE /api/v1/field/features/{id} GM: change or delete one (map_features.py, decisions MF-*)
@@ -123,6 +124,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import hmac
+import json
 import math
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -136,6 +138,7 @@ from . import __version__
 from . import checkin as checkinmod
 from . import schedule as schedulemod
 from . import field_levels as levelsmod
+from . import field_map as fieldmapmod
 from . import georef as georefmod
 from . import map_features as mapmod
 from . import images, visibility
@@ -742,6 +745,28 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     def delete_level_georef_route(level: int) -> dict[str, Any]:
         return delete_level_georef(level)
 
+    @app.post("/api/v1/field/levels/{level}/from-map", dependencies=[Depends(require_gm)])
+    def field_from_map(level: int, body: Any = Body(None)) -> dict[str, Any]:
+        """The field loaded from a map (field_map.py, MF-19 to MF-30): the plan the GM's browser drew, its
+        map position from its edges and the field boundary, written together or not at all (MF-26)."""
+        level_or_404(level, write=True)
+        spec = fieldmapmod.check(body, levels_meta(), level)
+        boundary = spec["boundary"]
+        boundary.pop("level")
+        if mapmod.boundary_id(controller.store, level) is None \
+                and controller.store.count_map_features() >= mapmod.FEATURES_MAX:
+            raise HTTPException(409, f"the field has {mapmod.FEATURES_MAX} map features: delete one first")
+        geo = spec["georef"]
+        points = json.dumps([p.to_json() for p in geo.points], separators=(",", ":"))
+        fid, new = controller.store.set_field_from_map(level, spec["content_type"], spec["data"],
+                                                       georefmod.setting(level), points, boundary)
+        out = geo.to_api()
+        controller._emit({"type": "field_image", "level": level})
+        controller._emit({"type": "field_georef", "level": level, "georef": out})
+        controller._emit(FEATURES_CHANGED)
+        return {"level": level, "content_type": spec["content_type"], "bytes": len(spec["data"]), "georef": out,
+                "boundary": mapmod.view(feature_or_404(fid)), "boundary_new": new}
+
     # --- map features (map_features.py, decisions MF-0 to MF-16) ----------------
 
     def feature_or_404(feature_id: int) -> dict[str, Any]:
@@ -755,9 +780,14 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         """What this token may see (MF-3): staff everything, a player their team's too, else everyone's."""
         return {"features": mapmod.visible(controller.store, v)}
 
+    def one_boundary(data: dict[str, Any], except_id: Optional[int] = None) -> None:
+        if data["type"] == mapmod.BOUNDARY and mapmod.boundary_id(controller.store, data["level"], except_id):
+            raise HTTPException(409, "this level already has a field boundary: change that one")
+
     @app.post("/api/v1/field/features", status_code=201, dependencies=[Depends(require_gm)])
     def add_field_feature(body: Any = Body(None)) -> dict[str, Any]:
         data = mapmod.check(body, levels_meta())
+        one_boundary(data)
         if controller.store.count_map_features() >= mapmod.FEATURES_MAX:
             raise HTTPException(409, f"the field has {mapmod.FEATURES_MAX} map features: delete one first")
         level = data.pop("level")
@@ -769,6 +799,7 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     def put_field_feature(feature_id: int, body: Any = Body(None)) -> dict[str, Any]:
         feature_or_404(feature_id)
         data = mapmod.check(body, levels_meta())
+        one_boundary(data, feature_id)
         controller.store.put_map_feature(feature_id, data.pop("level"), data)
         controller._emit(FEATURES_CHANGED)
         return mapmod.view(feature_or_404(feature_id))
@@ -1217,7 +1248,8 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
         async def security_headers(request: Request, call_next):
             response = await call_next(request)
             if request.url.path.startswith("/console"):
-                for k, v in SECURITY_HEADERS.items():
+                headers = FIELD_MAP_HEADERS if request.url.path == FIELD_MAP_PAGE else SECURITY_HEADERS
+                for k, v in headers.items():
                     response.headers.setdefault(k, v)
             return response
 
@@ -1270,7 +1302,7 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
 
 
 # Same-origin only: no inline scripts or styles, nothing from other hosts
-# (OpenStreetMap tiles are not used in phase 2), images from blob: URLs.
+# (only the field-map page below reaches OpenStreetMap and the DGT), images from blob: URLs.
 SECURITY_HEADERS = {
     "Content-Security-Policy": ("default-src 'self'; script-src 'self'; style-src 'self'; "
                                 "img-src 'self' blob: data:; connect-src 'self'; "
@@ -1278,6 +1310,24 @@ SECURITY_HEADERS = {
                                 "base-uri 'none'; form-action 'none'"),
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
+}
+
+# The one page that may reach the internet: *Load the field from a map* (field_map.py, MF-27), run in the
+# GM's browser while setting the game up. Only it, and only these origins: OpenStreetMap's tiles as
+# images to find the field (img-src), the Overpass API for the area's OSM data and the DGT's orthophoto
+# WMS (connect-src, fetched so the canvas stays exportable: both send Access-Control-Allow-Origin: *).
+# Scripts stay same-origin; the rest of the console stays same-origin only.
+FIELD_MAP_PAGE = "/console/field-map.html"
+FIELD_MAP_ORIGINS = {"tiles": "https://tile.openstreetmap.org", "overpass": "https://overpass-api.de",
+                     "orthophoto": "https://ortos.dgterritorio.gov.pt"}
+FIELD_MAP_HEADERS = {
+    **SECURITY_HEADERS,
+    "Content-Security-Policy": ("default-src 'self'; script-src 'self'; style-src 'self'; "
+                                f"img-src 'self' blob: data: {FIELD_MAP_ORIGINS['tiles']}; "
+                                f"connect-src 'self' {FIELD_MAP_ORIGINS['overpass']} "
+                                f"{FIELD_MAP_ORIGINS['orthophoto']}; "
+                                "manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; "
+                                "base-uri 'none'; form-action 'none'"),
 }
 
 

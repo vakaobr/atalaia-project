@@ -79,6 +79,11 @@ JOIN_KEY = bytes(range(32))
 DOMINATION = "org.atalaia.domination"
 ICON = CONTROLLER / "console" / "src" / "icons" / "icon-512.png"
 BOX = 7
+# Load the field from a map (MF-19 to MF-30): the network is never reached; OSM's tiles, the Overpass API
+# and the DGT's WMS answer with these made-up fixtures.
+FIXTURES = HERE / "fixtures"
+CORS = {"Access-Control-Allow-Origin": "*"}
+OUTLINE = [(39.6015, -8.4030), (39.6012, -8.3990), (39.5990, -8.3985), (39.5984, -8.4010), (39.5995, -8.4035)]
 
 
 class Field:
@@ -177,8 +182,8 @@ class ConsoleBrowserTests(unittest.TestCase):
 
     # --- helpers --------------------------------------------------------------
 
-    def page(self, path: str = "/console/", width: int = 1280, height: int = 900):
-        ctx = self.browser.new_context(viewport={"width": width, "height": height}, device_scale_factor=2)
+    def page(self, path: str = "/console/", width: int = 1280, height: int = 900, **ctx_kw):
+        ctx = self.browser.new_context(viewport={"width": width, "height": height}, device_scale_factor=2, **ctx_kw)
         self.contexts.append(ctx)
         page = ctx.new_page()
         page.on("pageerror", lambda e: self.errors.append(f"pageerror: {e}"))
@@ -1829,6 +1834,201 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("mf-cancel").click()
         expect(page.get_by_test_id("mf-form")).to_have_count(0)
 
+    # --- the field loaded from a map (MF-18, built as MF-19 to MF-30) -------------------------
+
+    def map_routes(self, page, wms: str = "orthophoto.png", overpass: "list[int] | None" = None) -> dict:
+        """Answers the field-map page's three origins from fixtures; anything else outside the controller is
+        refused and recorded (no real network in the tests)."""
+        seen: dict = {"tiles": 0, "overpass": [], "wms": [], "other": []}
+        statuses = list(overpass or [200])
+        ctx = page.context
+
+        def other(route):
+            if route.request.url.startswith(self.field.base):
+                route.continue_()
+            else:
+                seen["other"].append(route.request.url)
+                route.abort()
+
+        def tiles(route):
+            seen["tiles"] += 1
+            route.fulfill(status=200, content_type="image/png", headers=CORS, body=(FIXTURES / "tile.png").read_bytes())
+
+        def overpass_api(route):
+            seen["overpass"].append(route.request.post_data or "")
+            status = statuses.pop(0) if len(statuses) > 1 else statuses[0]
+            if status != 200:
+                route.fulfill(status=status, content_type="text/plain", headers=CORS, body="busy")
+            else:
+                route.fulfill(status=200, content_type="application/json", headers=CORS,
+                              body=(FIXTURES / "overpass.json").read_text(encoding="utf-8"))
+
+        def orthophoto(route):
+            seen["wms"].append(route.request.url)
+            route.fulfill(status=200, content_type="image/png", headers=CORS, body=(FIXTURES / wms).read_bytes())
+
+        # Playwright runs the last matching route first: the catch-all is registered first.
+        ctx.route("**/*", other)
+        ctx.route("https://tile.openstreetmap.org/**", tiles)
+        ctx.route("https://overpass-api.de/api/interpreter", overpass_api)
+        ctx.route("https://ortos.dgterritorio.gov.pt/**", orthophoto)
+        return seen
+
+    def type_outline(self, page) -> None:
+        for lat, lon in OUTLINE:
+            page.get_by_test_id("fm-corner").fill(f"{lat}, {lon}")
+            page.get_by_test_id("fm-corner-add").click()
+
+    def check_loaded(self, level: int, wms_url: "str | None", label: str = "") -> dict:
+        """The controller's side after *Use as the field*: the plan, the map position from the image's edges
+        and the boundary as the outline in the image's coordinates."""
+        path = "/api/v1/field/georef" if level == 0 else f"/api/v1/field/levels/{level}/georef"
+        geo = self.field.http.get(path).json()["georef"]
+        self.assertEqual(geo["kind"], "corners")
+        (tl, br) = geo["points"]
+        self.assertEqual((tl["x"], tl["y"], br["x"], br["y"]), (0, 0, 1, 1))
+        north, west, south, east = tl["lat"], tl["lon"], br["lat"], br["lon"]
+        if wms_url is not None:
+            # The orthophoto was asked for exactly the image's edges (EPSG:4326: south, west, north, east).
+            q = dict(p.split("=", 1) for p in wms_url.split("?", 1)[1].split("&"))
+            self.assertEqual((q["CRS"], q["REQUEST"]), ("EPSG%3A4326", "GetMap"))
+            bbox = [float(v) for v in q["BBOX"].replace("%2C", ",").split(",")]
+            self.assertEqual(bbox, [south, west, north, east])
+        # The outline's box with its margin: the image covers every corner, a little more on each side.
+        self.assertLess(north, 39.6020)
+        self.assertGreater(north, max(lat for lat, _ in OUTLINE))
+        self.assertLess(west, min(lon for _, lon in OUTLINE))
+        boundary = [f for f in self.features() if f["type"] == "boundary"]
+        self.assertEqual(len(boundary), 1)
+        b = boundary[0]
+        self.assertEqual((b["level"], b["shape"], b["visibility"], b["label"], len(b["points"])),
+                         (level, "polygon", "everyone", label, len(OUTLINE)))
+        for p, (lat, lon) in zip(b["points"], OUTLINE):
+            self.assertAlmostEqual(p["x"], (lon - west) / (east - west), places=6)
+            self.assertAlmostEqual(p["y"], (north - lat) / (north - south), places=6)
+        return {"north": north, "south": south, "west": west, "east": east}
+
+    def test_field_from_a_map_in_portugal(self):
+        """The maintainer's idea (MF-18): find the field, trace its outline, draw the image over the DGT
+        orthophoto with OSM's data, and load it as the field image with its map position and boundary."""
+        self.field.http.put("/api/v1/field/image", headers={"Content-Type": "image/png"}, content=ICON.read_bytes())
+        page = self.console(service_workers="block")
+        seen = self.map_routes(page)
+        page.get_by_test_id("tab-field").click()
+        page.get_by_test_id("field-from-map").click()
+        expect(page.get_by_role("heading", name="Carregar o campo de um mapa")).to_be_attached()
+        expect(page.get_by_test_id("tm")).to_be_visible()
+        expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile(r"^https://tile\.openstreetmap\.org/6/"))
+        expect(page.locator(".tm-credit")).to_have_text("© OpenStreetMap contributors")
+        # Finding the field: a typed place.
+        page.get_by_test_id("fm-go").fill("39.6, -8.401")
+        page.get_by_test_id("fm-go-button").click()
+        expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile(r"/17/"))
+        self.assertGreater(seen["tiles"], 0)
+        # A press on the map marks a corner; undo takes it away.
+        page.get_by_test_id("tm").click(position={"x": 60, "y": 60})
+        expect(page.get_by_test_id("fm-count")).to_have_text("1 de no máximo 12 cantos (pelo menos 3).")
+        expect(page.locator(".tm-corner")).to_have_count(1)
+        page.get_by_test_id("fm-undo").click()
+        expect(page.get_by_test_id("fm-count")).to_contain_text("0 de no máximo")
+        # With the keyboard: the arrows move the map, the cross marks the corner at the map's centre.
+        page.get_by_test_id("tm").focus()
+        page.keyboard.press("ArrowRight")
+        page.get_by_test_id("fm-centre").click()
+        expect(page.get_by_test_id("fm-corners")).to_contain_text("39.600000, -8.40014")
+        page.get_by_test_id("fm-clear").click()
+        # A typed corner that is not "latitude, longitude" is refused; then the five corners.
+        page.get_by_test_id("fm-corner").fill("39.6")
+        page.get_by_test_id("fm-corner-add").click()
+        expect(page.get_by_test_id("fm-error")).to_contain_text("latitude, longitude")
+        self.type_outline(page)
+        expect(page.locator(".tm-shape")).to_have_count(1)
+        expect(page.get_by_test_id("fm-ortho")).to_be_checked()  # in Portugal: the orthophoto as the base
+        page.get_by_test_id("fm-label").fill("Campo da Mata")
+        page.get_by_test_id("fm-draw").click()
+        expect(page.get_by_test_id("fm-preview")).to_be_visible()
+        expect(page.get_by_test_id("fm-size")).to_contain_text("ortofotomapa da DGT com os caminhos")
+        expect(page.get_by_test_id("fm-replaces")).to_contain_text("O campo já tem imagem")
+        # One Overpass query for the area and one orthophoto, at the image's size; the image is drawn.
+        self.assertEqual(len(seen["overpass"]), 1)
+        self.assertIn("out geom", seen["overpass"][0].replace("+", " "))
+        self.assertEqual(len(seen["wms"]), 1)
+        q = dict(p.split("=", 1) for p in seen["wms"][0].split("?", 1)[1].split("&"))
+        size = page.get_by_test_id("fm-image").evaluate("(i) => [i.naturalWidth, i.naturalHeight]")
+        self.assertEqual(size, [int(q["WIDTH"]), int(q["HEIGHT"])])
+        self.assertGreater(size[0], 600)  # about half a metre per pixel over some 500 m
+        colours = page.get_by_test_id("fm-image").evaluate("""(i) => {
+            const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+            const g = c.getContext('2d'); g.drawImage(i, 0, 0, 64, 64);
+            const d = g.getImageData(0, 0, 64, 64).data; const s = new Set();
+            for (let k = 0; k < d.length; k += 4) s.add(`${d[k]},${d[k + 1]},${d[k + 2]}`);
+            return s.size; }""")
+        self.assertGreater(colours, 20)
+        page.get_by_test_id("fm-upload").click()
+        expect(page.get_by_test_id("fm-done")).to_be_visible()
+        info = self.field.http.get("/api/v1/field").json()["image"]
+        self.assertEqual(info["content_type"], "image/jpeg")
+        self.check_loaded(0, seen["wms"][0], label="Campo da Mata")
+        self.assertEqual(seen["other"], [])
+        self.no_horizontal_scroll(page)
+        # Back in the console: the field tab, the plan dimmed outside the boundary, one boundary per level.
+        page.get_by_test_id("fm-back-done").click()
+        expect(page.get_by_test_id("field-area").locator("img")).to_be_visible()
+        expect(page.get_by_test_id("mf-outside")).to_have_count(1)
+        expect(page.get_by_test_id("mf-list")).to_contain_text("Campo da Mata")
+        expect(page.get_by_test_id("mf-list")).to_contain_text("Limite do campo")
+        expect(page.locator("[data-testid=mf-new-type] option[value=boundary]")).to_be_disabled()
+        expect(page.get_by_test_id("georef-top_left")).to_be_visible()
+
+    def test_field_from_a_map_osm_only_in_english_on_a_phone(self):
+        """English at phone width, on a level of a building: the orthophoto has no picture (white) so the
+        image is drawn from OSM alone; a busy Overpass and an outline too big are said in words; offline,
+        the page says it needs internet; a read token cannot use it."""
+        self.field.http.put("/api/v1/field/levels", json={"enabled": True, "count": 2})
+        page = self.console(width=390, height=844, service_workers="block")
+        page.get_by_test_id("lang").select_option("en")
+        seen = self.map_routes(page, wms="orthophoto-white.png", overpass=[429, 200])
+        page.goto(self.field.base + "/console/field-map.html?level=1")
+        expect(page.get_by_role("heading", name="Load the field from a map")).to_be_attached()
+        expect(page.get_by_test_id("fm-level")).to_have_value("1")
+        # Too big: 5 km across.
+        for corner in ("39.60, -8.40", "39.60, -8.34", "39.58, -8.37"):
+            page.get_by_test_id("fm-corner").fill(corner)
+            page.get_by_test_id("fm-corner-add").click()
+        page.get_by_test_id("fm-draw").click()
+        expect(page.get_by_test_id("fm-error")).to_contain_text("The outline is too big")
+        self.assertEqual(seen["overpass"], [])
+        page.get_by_test_id("fm-clear").click()
+        self.type_outline(page)
+        # Overpass busy (429), then again.
+        page.get_by_test_id("fm-draw").click()
+        expect(page.get_by_test_id("fm-error")).to_have_text("OpenStreetMap's data service is busy: try again in a minute.")
+        self.errors = [e for e in self.errors if "429" not in e]
+        page.get_by_test_id("fm-draw").click()
+        expect(page.get_by_test_id("fm-preview")).to_be_visible()
+        expect(page.get_by_test_id("fm-notice")).to_contain_text("has no picture of this area")
+        expect(page.get_by_test_id("fm-size")).to_contain_text("Drawn from OpenStreetMap's data.")
+        expect(page.get_by_test_id("fm-replaces")).to_have_count(0)
+        self.no_horizontal_scroll(page)
+        page.get_by_test_id("fm-upload").click()
+        expect(page.get_by_test_id("fm-done")).to_contain_text("field boundary")
+        self.assertEqual(self.field.http.get("/api/v1/field").json()["levels"]["levels"][1]["image"]["content_type"],
+                         "image/png")
+        self.assertIsNone(self.field.http.get("/api/v1/field/georef").json()["georef"])  # level 0 untouched
+        self.check_loaded(1, None)
+        self.assertEqual(seen["other"], [])
+        # Offline, the page says so (the rest of the console needs no internet).
+        page.context.set_offline(True)
+        expect(page.get_by_test_id("fm-offline")).to_contain_text("needs internet")
+        page.context.set_offline(False)
+        # The read token's console cannot load a field.
+        viewer = self.console(READ, service_workers="block")
+        self.map_routes(viewer)
+        viewer.goto(self.field.base + "/console/field-map.html")
+        expect(viewer.get_by_test_id("fm-login")).to_be_visible()
+        viewer.goto(self.field.base + "/console/#field")
+        expect(viewer.get_by_test_id("field-from-map")).to_have_count(0)
+
     def test_reconnects_after_the_stream_drops(self):
         self.field.create_game(start=True)
         page = self.console()
@@ -1851,7 +2051,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v6').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v7').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js"):

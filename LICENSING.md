@@ -20,6 +20,10 @@ Full licence texts are in [`LICENSES/`](LICENSES/). The root [`LICENSE`](LICENSE
 
 Third-party components keep their own licences and must be compatible with GPL-3.0. The project page bundles the Barlow and Barlow Condensed fonts (OFL-1.1) in `site/fonts/`. The ESP32 firmware uses LVGL (MIT), downloaded at build time; its configuration file `firmware/esp32/lvgl_conf/lv_conf.h` is LVGL's MIT template. The firmware's screen tests vendor the stb image headers (MIT or Unlicense) in `firmware/esp32/test/third_party/stb/`. Planned dependencies include Lua 5.4 (MIT), ESP-IDF (Apache-2.0), RadioLib (MIT), LVGL (MIT) and Flutter (BSD-3-Clause). Vendored code goes in a `third_party/` folder with its original licence file.
 
+## Map data in a field's image
+
+A field image drawn by the console's *Load the field from a map* (decisions MF-19 to MF-30) is the field's own data, made in the GM's browser and kept on the field controller; it is not part of this repository. It is drawn from OpenStreetMap data (© OpenStreetMap contributors, ODbL) and, in mainland Portugal, the DGT's orthophoto (Ortofotomapas © DGT, CC BY 4.0), and carries both attributions in its corner. The browser tests use made-up fixtures, not OpenStreetMap or DGT data. No map library is vendored: the console's map viewer is the project's own code.
+
 ## Community game modes
 
 Game modes shared through the registry may use any licence from an approved list, shown on each package. Built-in modes in `modes/` are GPL-3.0-or-later.

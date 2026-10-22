@@ -5,7 +5,7 @@
 // a floor plan the GM uploads) with a marker per box, dragged into place by
 // the GM and kept by the controller (positions are fractions of the image).
 // Without an image the markers sit on a plain grid. Works fully offline:
-// no map tiles are fetched (OpenStreetMap is left for a later phase).
+// no map tiles are fetched here.
 // Below it, with an image, its place on the map for the ATAK feed
 // (georef-panel.js), with a pin on the image per control point.
 //
@@ -17,6 +17,9 @@
 // park, first aid and objectives on the shown level's plan, under the boxes, with their editor
 // below the plan. While the GM places one, a press on the plan places it (the boxes and pins
 // let the press through).
+//
+// *Load the field from a map* (field-map.js, decisions MF-19 to MF-30) is its own page, the only one
+// of the console allowed to reach the internet; it comes back here (#field) when done.
 
 import { html, Component, createRef, t, teamColour, OFFLINE_MS } from '../ui.js';
 import { linkBars } from './node-list.js';
@@ -303,6 +306,8 @@ export class FieldView extends Component {
                 <label class="button">${multi ? t('levels.upload', { name }) : t('field.upload')}
                     <input type="file" class="sr-only" accept=${IMAGE_TYPES.join(',')} data-testid="field-upload"
                         onChange=${(e) => this.upload(e)} /></label>
+                <a class="button" href=${`field-map.html?level=${state.level}`} data-testid="field-from-map">${
+                    t('fieldmap.open')}</a>
                 ${state.imageUrl && html`<button type="button" data-testid="field-remove"
                     onClick=${() => this.removeImage()}>${multi ? t('levels.remove') : t('field.remove')}</button>`}
             </div>`}

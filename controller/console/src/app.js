@@ -30,12 +30,18 @@ const FEED_MAX = 500;
 const ALERTS_MAX = 50;
 const HISTORY_MAX = 240;
 
+/** The tab to open with: the address's #tab (the field-map page comes back to #field), else the game. */
+function startTab() {
+    const tab = (window.location.hash || '').slice(1);
+    return TABS.includes(tab) ? tab : 'game';
+}
+
 class App extends Component {
     constructor() {
         super();
         this.state = {
             ready: false, lang: 'pt', token: savedToken(), role: null, loginError: '',
-            tab: 'game', connected: null, status: null, game: null, score: null,
+            tab: startTab(), connected: null, status: null, game: null, score: null,
             nodes: {}, seen: {}, feed: [], alerts: [], modes: [], presets: [],
             positions: {}, scoreHistory: [], clockBase: null, toast: '', now: Date.now(),
             radio: null, chronoCounts: null, branding: null, teamPresets: [],

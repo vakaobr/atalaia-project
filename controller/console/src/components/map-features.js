@@ -15,18 +15,23 @@
 // plan has a map position: georef-panel.js; else the radius is typed and the circle is drawn at
 // a nominal size, dashed), and an area corner by corner; the same can be done with the keyboard
 // by typing a place across and down the plan.
+//
+// The field boundary (decisions MF-19 to MF-30) is a type of its own: an area only, at most one per
+// level, no team, for everyone unless the GM says otherwise. The plan is dimmed outside it and its
+// outline drawn dashed. It is drawn here by hand, or loaded with the plan from a map (field-map.js).
 
 import { html, Component, t, teamColour, ConfirmButton } from '../ui.js';
 
-export const FEATURE_TYPES = ['safe_zone', 'respawn', 'hq', 'parking', 'first_aid', 'objective', 'other'];
+export const FEATURE_TYPES = ['safe_zone', 'respawn', 'hq', 'parking', 'first_aid', 'objective', 'other', 'boundary'];
+export const BOUNDARY = 'boundary';
 const TEAM_TYPES = ['respawn', 'hq'];
 export const SHAPES = ['point', 'circle', 'polygon'];
 const VISIBILITIES = ['everyone', 'team', 'organisers'];
 const DEFAULT_SHAPE = { safe_zone: 'circle', respawn: 'circle', hq: 'point', parking: 'polygon',
-                        first_aid: 'point', objective: 'point', other: 'point' };
+                        first_aid: 'point', objective: 'point', other: 'point', boundary: 'polygon' };
 // A feature's colour without a team (with one: the team's), as the ATAK feed's (atak.py FEATURE_COLOURS).
 export const FEATURE_COLOURS = { safe_zone: '#14b8a6', respawn: '#6c757d', hq: '#6c757d', parking: '#546e7a',
-                                 first_aid: '#e91e63', objective: '#f59e0b', other: '#94a3b8' };
+                                 first_aid: '#e91e63', objective: '#f59e0b', other: '#94a3b8', boundary: '#84cc16' };
 // The pins' icons, drawn in white on the colour (24 x 24).
 const ICONS = {
     safe_zone: 'M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3z',
@@ -36,6 +41,7 @@ const ICONS = {
     first_aid: 'M9 3h6v6h6v6h-6v6H9v-6H3V9h6V3z',
     objective: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 4a6 6 0 1 1 0 12 6 6 0 0 1 0-12zm0 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
     other: 'M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10z',
+    boundary: 'M3 3h6v2H5v4H3V3zm12 0h6v6h-2V5h-4V3zM3 15h2v4h4v2H3v-6zm16 0h2v6h-6v-2h4v-4z',
 };
 const NOMINAL_RADIUS = 0.04; // a circle's radius on a plan without a scale: 4 % of its width
 const POLYGON_MAX = 12;      // map_features.POLYGON_MAX
@@ -86,11 +92,16 @@ export function planScale(georef) {
 export function featureShapes(features, teams, scale) {
     const shapes = features.filter((f) => f.shape !== 'point' && (f.shape !== 'polygon' || (f.points || []).length >= 2));
     if (!shapes.length) return null;
+    // The field boundary: what is outside it dimmed (the whole plan less the area, even-odd), under the rest.
+    const outside = shapes.filter((f) => f.type === BOUNDARY && f.points.length >= 3).map((f) => html`<path
+        class="mf-outside" data-testid="mf-outside" fill-rule="evenodd"
+        d=${`M0 0H100V100H0Z M${f.points.map((p) => `${p.x * 100} ${p.y * 100}`).join(' L')}Z`} />`);
     return html`<svg class="mf-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"
         data-testid="mf-layer">
+        ${outside}
         ${shapes.map((f) => {
             const colour = featureColour(f, teams);
-            const cls = `mf-shape${f.draft ? ' draft' : ''}`;
+            const cls = `mf-shape${f.draft ? ' draft' : ''}${f.type === BOUNDARY ? ' mf-boundary' : ''}`;
             if (f.shape === 'circle') {
                 if (typeof f.x !== 'number') return null;
                 const rx = scale ? (f.radius_m / scale.w) * 100 : NOMINAL_RADIUS * 100;
@@ -139,7 +150,7 @@ export function FeatureLegend() {
 
 /** A new feature's form values for a type: its usual shape, and a team for a team's own type. */
 export function newDraft(type, level, teams) {
-    const team = TEAM_TYPES.includes(type) && teams.length ? teams[0] : null;
+    const team = TEAM_TYPES.includes(type) && teams.length ? teams[0] : null; // never the boundary's
     return { id: 'new', draft: true, level, type, label: '', shape: DEFAULT_SHAPE[type], x: null, y: null,
              radius_m: 25, points: [], team, visibility: team ? 'team' : 'everyone', note: '' };
 }
@@ -162,6 +173,11 @@ export class MapFeatures extends Component {
         // A type that is a team's own picks a team; the shape follows the type until the GM chose one or
         // placed something (an area chosen before the type stayed a circle: found on the bench, MF-17).
         const placed = d.x !== null || d.points.length;
+        if (type === BOUNDARY) {
+            // The field boundary is an area of no team (MF-20).
+            this.set({ type, shape: 'polygon', team: null, visibility: d.visibility === 'team' ? 'everyone' : d.visibility });
+            return;
+        }
         this.set({ type, shape: placed || d.shapeChosen ? d.shape : fresh.shape, team: d.team || fresh.team,
                    visibility: d.team || fresh.team ? 'team' : d.visibility === 'team' ? 'everyone' : d.visibility });
     }
@@ -225,6 +241,11 @@ export class MapFeatures extends Component {
                              y: f.y ?? null, radius_m: f.radius_m ?? 25, placing: false });
     }
 
+    /** Whether this level has a field boundary other than the one being edited (one per level, MF-20). */
+    hasBoundary(exceptId) {
+        return this.props.features.some((f) => f.level === this.props.level && f.type === BOUNDARY && f.id !== exceptId);
+    }
+
     renderList(here) {
         const { canEdit, teams } = this.props;
         if (!here.length) return html`<p class="muted small" data-testid="mf-none">${t('features.none')}</p>`;
@@ -274,19 +295,22 @@ export class MapFeatures extends Component {
     renderForm() {
         const { draft: d, teams, scale } = this.props;
         const teamChoices = [...new Set([...teams, ...(d.team ? [d.team] : [])])];
+        const isBoundary = d.type === BOUNDARY;
         return html`<form class="form mf-form" data-testid="mf-form" novalidate onSubmit=${(e) => this.save(e)}
             aria-labelledby="mf-form-h">
             <h3 id="mf-form-h">${t(d.id === 'new' ? 'features.add' : 'features.editing', { name: featureName(d) })}</h3>
             <div class="params">
                 <div class="field"><label for="mf-type">${t('features.type')}</label>
                     <select id="mf-type" data-testid="mf-type" value=${d.type} onChange=${(e) => this.setType(e.target.value)}>
-                        ${FEATURE_TYPES.map((k) => html`<option value=${k} selected=${k === d.type}>${t(`features.types.${k}`)}</option>`)}
+                        ${FEATURE_TYPES.map((k) => html`<option value=${k} selected=${k === d.type}
+                            disabled=${k === BOUNDARY && k !== d.type && this.hasBoundary(d.id)}>${t(`features.types.${k}`)}</option>`)}
                     </select></div>
                 <div class="field"><label for="mf-label">${t(d.type === 'other' ? 'features.label_other' : 'features.label')}</label>
                     <input id="mf-label" data-testid="mf-label" maxlength="48" autocomplete="off" value=${d.label}
                         onInput=${(e) => this.set({ label: e.target.value })} /></div>
                 <div class="field"><label for="mf-team">${t('features.team')}</label>
-                    <select id="mf-team" data-testid="mf-team" value=${d.team || ''} onChange=${(e) => this.setTeam(e.target.value)}>
+                    <select id="mf-team" data-testid="mf-team" value=${d.team || ''} disabled=${isBoundary}
+                        onChange=${(e) => this.setTeam(e.target.value)}>
                         <option value="" selected=${!d.team}>${t('features.no_team')}</option>
                         ${teamChoices.map((k) => html`<option value=${k} selected=${k === d.team}>${k}</option>`)}
                     </select></div>
@@ -301,8 +325,9 @@ export class MapFeatures extends Component {
             <fieldset class="mf-shapes">
                 <legend>${t('features.shape')}</legend>
                 ${SHAPES.map((k) => html`<label class="check"><input type="radio" name="mf-shape" value=${k}
-                    data-testid=${`mf-shape-${k}`} checked=${d.shape === k}
+                    data-testid=${`mf-shape-${k}`} checked=${d.shape === k} disabled=${isBoundary && k !== 'polygon'}
                     onChange=${() => this.setShape(k)} /> ${t(`features.shapes.${k}`)}</label>`)}
+                ${isBoundary && html`<p class="muted small">${t('features.boundary_hint')}</p>`}
             </fieldset>
             ${d.shape === 'circle' && html`<div class="field"><label for="mf-radius">${t('features.radius')}</label>
                 <input id="mf-radius" data-testid="mf-radius" type="number" min="1" max="2000" step="1"
@@ -335,7 +360,8 @@ export class MapFeatures extends Component {
             ${canEdit && !draft && html`<div class="actions">
                 <label for="mf-new-type" class="sr-only">${t('features.type')}</label>
                 <select id="mf-new-type" data-testid="mf-new-type" class="mf-new-type">
-                    ${FEATURE_TYPES.map((k) => html`<option value=${k}>${t(`features.types.${k}`)}</option>`)}
+                    ${FEATURE_TYPES.map((k) => html`<option value=${k} disabled=${k === BOUNDARY && this.hasBoundary(null)}>${
+                        t(`features.types.${k}`)}</option>`)}
                 </select>
                 <button type="button" class="primary" data-testid="mf-add" onClick=${(e) => {
                     const type = e.currentTarget.parentElement.querySelector('select').value;

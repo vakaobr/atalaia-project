@@ -25,7 +25,8 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from support import FakeModem, config
-from atalaia_controller.api import CONSOLE_DIR, SECURITY_HEADERS, Auth, create_app
+from atalaia_controller.api import (CONSOLE_DIR, FIELD_MAP_HEADERS, FIELD_MAP_ORIGINS, SECURITY_HEADERS, Auth,
+                                   create_app)
 from atalaia_controller.engine import Controller
 from atalaia_controller.firmware_release import REPORT_RESULTS
 from atalaia_controller.store import Store
@@ -109,6 +110,33 @@ class ConsoleFilesTests(unittest.TestCase):
         # No token needed for the static files; the API still needs one.
         self.assertEqual(self.client.get("/api/v1/nodes").status_code, 401)
 
+    def test_only_the_field_map_page_may_reach_the_internet(self):
+        """MF-27: the field-map page's CSP adds exactly OSM's tiles (images), the Overpass API and the DGT's
+        WMS (connections); every other page of the console stays same-origin only."""
+        r = self.client.get("/console/field-map.html")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.headers["content-security-policy"], FIELD_MAP_HEADERS["Content-Security-Policy"])
+        csp = dict(d.strip().split(" ", 1) for d in r.headers["content-security-policy"].split(";"))
+        self.assertEqual(csp["script-src"], "'self'")
+        self.assertEqual(csp["style-src"], "'self'")
+        self.assertEqual(csp["default-src"], "'self'")
+        self.assertEqual(csp["img-src"], "'self' blob: data: https://tile.openstreetmap.org")
+        self.assertEqual(csp["connect-src"], "'self' https://overpass-api.de https://ortos.dgterritorio.gov.pt")
+        self.assertNotIn("unsafe", r.headers["content-security-policy"])
+        for k in ("X-Content-Type-Options", "Referrer-Policy"):
+            self.assertEqual(r.headers[k], SECURITY_HEADERS[k])
+        for path in ("/console/", "/console/field-map.js", "/console/components/field-render.js",
+                     "/console/scoreboard.html"):
+            got = self.client.get(path).headers["content-security-policy"]
+            self.assertEqual(got, SECURITY_HEADERS["Content-Security-Policy"], path)
+            for origin in FIELD_MAP_ORIGINS.values():
+                self.assertNotIn(origin, got, path)
+        # The page and its scripts name only those origins.
+        code = "".join((SRC / rel).read_text(encoding="utf-8")
+                       for rel in ("field-map.js", "components/field-render.js", "components/tile-map.js"))
+        for url in set(re.findall(r"https://[a-z0-9.-]+", code)):
+            self.assertIn(url, [*FIELD_MAP_ORIGINS.values(), "https://www.openstreetmap.org"], url)
+
     def test_redirects(self):
         for path, target in (("/", "/console/"), ("/console", "/console/"),
                              ("/scoreboard", "/console/scoreboard.html")):
@@ -117,7 +145,7 @@ class ConsoleFilesTests(unittest.TestCase):
             self.assertEqual(r.headers["location"], target)
 
     def test_pages_have_no_inline_scripts_or_styles(self):
-        for page in ("index.html", "scoreboard.html"):
+        for page in ("index.html", "scoreboard.html", "field-map.html"):
             p = Refs()
             p.feed((SRC / page).read_text(encoding="utf-8"))
             self.assertEqual((p.inline_scripts, p.style_attrs), (0, 0), page)
@@ -130,7 +158,7 @@ class ConsoleFilesTests(unittest.TestCase):
     def test_every_referenced_file_exists_and_is_served(self):
         seen: set[str] = set()
         todo: list[str] = []
-        for page in ("index.html", "scoreboard.html"):
+        for page in ("index.html", "scoreboard.html", "field-map.html"):
             p = Refs()
             p.feed((SRC / page).read_text(encoding="utf-8"))
             todo += p.refs

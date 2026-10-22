@@ -3,7 +3,10 @@
 """Map features: what the GM marks on the field's plan besides the boxes (decisions MF-0 to MF-16).
 
 A safe zone, a team's respawn or headquarters (HQ), the car park, a first aid station, an
-objective, or anything else with a label. Each feature is on one level's plan (field_levels.py;
+objective, anything else with a label, or the field's boundary (``boundary``, decisions MF-19 to
+MF-30: the field's real outline, an area only, at most one per level, never a team's; the console
+dims what is outside it, ATAK shows it as a closed shape without a fill; loaded from a map by
+field_map.py or drawn by hand). Each feature is on one level's plan (field_levels.py;
 level 0 with levels off) and has one shape, in the plan's own coordinates (``x`` across and ``y``
 down, 0 to 1, as the boxes' positions):
 
@@ -37,7 +40,8 @@ from . import field_levels as levelsmod
 from . import visibility
 from .engine import ControllerError
 
-TYPES = ("safe_zone", "respawn", "hq", "parking", "first_aid", "objective", "other")
+TYPES = ("safe_zone", "respawn", "hq", "parking", "first_aid", "objective", "other", "boundary")
+BOUNDARY = "boundary"                  # the field's outline: a polygon, one per level, no team (MF-20)
 TEAM_TYPES = ("respawn", "hq")         # a team's own: for that team by default (MF-4)
 SHAPES = ("point", "circle", "polygon")
 VISIBILITIES = ("everyone", "team", "organisers")
@@ -141,6 +145,11 @@ def check(body: Any, meta: dict[str, Any]) -> dict[str, Any]:
             raise ControllerError("points: the area is empty (the points are on one line or at one place)")
         out["points"] = pts
     out["team"] = _team(body.get("team"))
+    if kind == BOUNDARY:
+        if shape != "polygon":
+            raise ControllerError("shape: the field boundary is an area (polygon)")
+        if out["team"] is not None:
+            raise ControllerError("team: the field boundary belongs to no team")
     vis = body.get("visibility")
     if vis is None:
         vis = default_visibility(out["team"])
@@ -151,6 +160,14 @@ def check(body: Any, meta: dict[str, Any]) -> dict[str, Any]:
     out["visibility"] = vis
     out["note"] = _text(body.get("note"), "note", NOTE_MAX)
     return out
+
+
+def boundary_id(store: Any, level: int, except_id: Optional[int] = None) -> Optional[int]:
+    """The id of the field boundary on this level (MF-20: at most one), other than ``except_id``."""
+    for row in store.map_features():
+        if row["level"] == level and row["data"].get("type") == BOUNDARY and row["id"] != except_id:
+            return int(row["id"])
+    return None
 
 
 def view(row: dict[str, Any]) -> dict[str, Any]:
