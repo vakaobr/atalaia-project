@@ -15,12 +15,12 @@ A join payload for a box (kind 0) carries two optional fields when the controlle
 
 ## The link
 
-`WS /api/v1/prop` (`wss://` with the pinned CA). JSON text frames.
+`WS /api/v1/prop` (`wss://` with the pinned CA). JSON text frames. The Pi controller serves it (`controller/atalaia_controller/prop_link.py`), and so does the Android controller (`app/lib/controller/controller_props.dart`, decision PE24's slice S4), checked by the same contract case (`vectors/controller_api.json`).
 
 1. The controller sends `{"type": "challenge", "nonce": "<32 random bytes, base64url>", "version": 1}`.
 2. The prop answers within 10 s with `{"type": "auth", "game_id": G, "node_id": N, "proof": "<base64url>"}`, where
    `proof = HMAC-SHA256(game key, "atalaia-prop-link-v1" 0x00 | nonce | G (2 bytes, big-endian) | N (2 bytes, big-endian))`.
-   The game key is the join payload's (16 bytes). The controller checks it in constant time and refuses (`{"type": "refused", "reason": "auth"}`, close code 4401) a wrong proof, a game that is not live here, a node id that is the controller's or not assigned to a role in the game (the join payload assigns it).
+   The game key is the join payload's (16 bytes). Known answers: [vectors/prop_link.json](vectors/prop_link.json). The controller checks it in constant time and refuses (`{"type": "refused", "reason": "auth"}`, close code 4401) a wrong proof, a game that is not live here, a node id that is the controller's or not assigned to a role in the game (the join payload assigns it).
 3. It sends `{"type": "welcome", "game_id", "node_id", "controller_id", "time": {<the current TIME fields>}}`.
 
 A newer link for the same node replaces the older one, which gets `{"type": "replaced"}` and close code 4409.

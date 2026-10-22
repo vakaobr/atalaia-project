@@ -16,9 +16,17 @@
 /// Slice S1 of PE24 (PLAN.md): one game at a time, created, started,
 /// paused, resumed and ended by the GM; field.lua with the field operations;
 /// box packets (decrypted) fed to [onPacket]; GM score adjustments and node
-/// commands. Not yet: keeping games across a restart (S3), the radio and the
-/// Wi-Fi props (S4), check-in and player tokens (S5), presets, mode uploads,
-/// scenarios, role packages, branding, channel scans, failover (S7).
+/// commands. Slice S3: an engine on a store that holds a live game (a
+/// [FileControllerStore] after a restart) takes the game up again as the Pi
+/// does (engine.py `_restore`): its clock, scores, nodes, health and
+/// field.lua; without its key (persist_game_key off) the game can only be
+/// ended (`key_lost`). Slice S4: the radio ([modem], an I/O pod through
+/// pod_modem.dart: CONFIGURE, the controller's packets with a TX epoch per
+/// game key, what it hears, TX_ACKs, peer epochs), join payloads sealed with
+/// the field join key ([issueJoin]) and the Android props on Wi-Fi
+/// (controller_props.dart, through [wifiForward]). Not yet: check-in and
+/// player tokens (S5), presets, mode uploads, scenarios, role packages,
+/// branding, the channel choice and scans, re-invites, failover (S7).
 library;
 
 import 'dart:convert';
@@ -30,7 +38,10 @@ import '../ffi/bindings.dart';
 import '../ffi/callbacks.dart';
 import '../ffi/core_node.dart';
 import '../modes/mode_catalog.dart';
+import '../protocol/join_payload.dart';
 import '../radio/rf_codec.dart';
+import '../security/ndef.dart';
+import 'controller_radio.dart';
 import 'controller_store.dart';
 import 'field_controller.dart';
 
@@ -96,6 +107,7 @@ class ControllerConfig {
     this.storageOk = true,
     this.healthNodeOfflineS = 120,
     this.healthBatteryLowPct = 20,
+    this.persistGameKey = true,
   });
 
   /// This controller's short id on the radio.
@@ -110,6 +122,10 @@ class ControllerConfig {
   final bool storageOk;
   final double healthNodeOfflineS;
   final int healthBatteryLowPct;
+
+  /// Keep the live game's key in the store, so that the game survives a
+  /// restart (ADR-P2-4; decision OT-7: on by default, as on the Pi).
+  final bool persistGameKey;
 
   /// ADR-P2-8's priority score, as the Pi computes it.
   int get priority {
@@ -126,6 +142,10 @@ const teamNameMax = 23;
 const squadsMax = 16;
 const modeIdMax = 63;
 const nodeCommands = ['set_owner', 'message', 'reset', 'reboot', 'mode'];
+
+/// How often a running game's clock is written to the store (the Pi's
+/// GAME_TIME_SAVE_MS): a crash loses at most this much of the game time.
+const gameTimeSaveMs = 5000;
 final _commandName = RegExp(r'^[a-z][a-z0-9_]{0,23}$');
 
 /// A mode's field.lua on the core, with field.* answered by the engine.
@@ -248,19 +268,33 @@ class ControllerEngine {
     ControllerStore? store,
     ModeCatalog? modes,
     this.core,
-    FieldTransport? transport,
+    this.modem,
+    this.transport,
     int Function()? clockMs,
     double Function()? wallSeconds,
     Random? random,
   }) : store = store ?? MemoryControllerStore(wallSeconds: wallSeconds),
        modes = modes ?? ModeCatalog.builtin(),
-       transport = transport ?? const NoRadio(),
        _wall =
            wallSeconds ?? (() => DateTime.now().microsecondsSinceEpoch / 1e6),
        _random = random ?? Random.secure() {
     final watch = Stopwatch()..start();
     _clock = clockMs ?? () => watch.elapsedMilliseconds;
     _t0 = _clock();
+    final m = modem;
+    if (m != null) {
+      m
+        ..onRx = _onRx
+        ..onTxAck = _onTxAck
+        ..onState = _onModemState
+        ..onError = (code, message) => _emit({
+          'type': 'system',
+          'kind': 'modem.error',
+          'code': code,
+          'message': message,
+        });
+    }
+    _restore();
   }
 
   final ControllerConfig config;
@@ -270,7 +304,18 @@ class ControllerEngine {
   /// The core: field.lua and the EVENT codec need it (null: modes with a
   /// field.lua are refused, box events are not decoded).
   final AtalaiaCore? core;
-  final FieldTransport transport;
+
+  /// The radio (slice S4): an I/O pod (pod_modem.dart), or a test's. Each
+  /// game gets a [RadioTransport] on it, with its own TX epoch.
+  final ControllerModem? modem;
+
+  /// A test's transport for every game's packets (tests of the radio
+  /// side): then neither the modem nor the Wi-Fi props are used. Null: a
+  /// [RadioTransport] per game, on the [modem] and the Wi-Fi props (only on
+  /// the props without a modem, as on a Pi without one).
+  final FieldTransport? transport;
+  RadioTransport? _radio;
+  final _txStatus = <String, int>{};
   final double Function() _wall;
   final Random _random;
   late final int Function() _clock;
@@ -283,18 +328,32 @@ class ControllerEngine {
   Map<String, Map<String, int>> _fieldScores = {};
   final _listeners = <void Function(Map<String, Object?>)>[];
 
+  /// The live game came back after a restart without its key: it can only
+  /// be ended (ADR-P2-4).
+  bool _keyLost = false;
+  int _lastTimeSave = 0;
+
   int nowMs() => _clock() - _t0;
 
   /// The live game's key (ADR-P2-2): for join payloads (slice S4); never on
-  /// the API.
+  /// the API. Empty with no live game, or when it was lost in a restart.
   Uint8List get gameKey => _key;
+
+  bool get keyLost => _keyLost;
 
   int get nodeId => (_game?['node_id'] as int?) ?? config.nodeId;
 
   /// The live game, or null.
   Map<String, Object?>? get liveGame => _game;
 
-  String get radioState => transport.state;
+  /// "up", "down", "connecting", or "none" without a radio.
+  String get radioState => modem?.state ?? transport?.state ?? 'none';
+
+  /// The channel new games use: the GM's choice, else the configured one
+  /// (engine.py `field_channel`).
+  int get fieldChannel =>
+      int.tryParse(store.getSetting('radio.channel_hz') ?? '') ??
+      config.channelHz;
 
   /// The wall clock, in seconds since 1970 (what the MQTT topics' `at` and
   /// `last_seen` give).
@@ -336,6 +395,7 @@ class ControllerEngine {
         out['start_check'] = startCheck();
       }
     }
+    if (live && _keyLost) out['key_lost'] = true;
     return out;
   }
 
@@ -468,6 +528,7 @@ class ControllerEngine {
         'team_info: team branding is not on the Android controller yet',
       );
     }
+    final boxLang = _boxLangFor(spec['console_lang']);
     final used = store.gameIds();
     final free = [
       for (var g = 1; g < 0xffff && g <= 4096 + used.length; g++)
@@ -491,13 +552,14 @@ class ControllerEngine {
       'term': 1,
       'created_at': _wall(),
       'node_id': config.nodeId,
-      'channel_hz': config.channelHz,
+      'channel_hz': fieldChannel,
       'max_hops': config.maxHops,
       'joined': false,
       'squads': squads,
       'team_info': <String, Object?>{},
     };
-    store.createGame(game);
+    store.createGame(game, key: config.persistGameKey ? key : null);
+    if (boxLang != null) store.setSetting('box_lang:$id', boxLang);
     _activate(store.game(id)!, key);
     final out = getGame(id);
     _emit({'type': 'game', 'game': out});
@@ -505,13 +567,31 @@ class ControllerEngine {
   }
 
   void _activate(Map<String, Object?> game, Uint8List key) {
+    final gameNode = (game['node_id'] as int?) ?? config.nodeId;
+    final hops = (game['max_hops'] as int?) ?? config.maxHops;
+    _radio = transport != null
+        ? null
+        : RadioTransport(
+            modem: modem,
+            store: store,
+            gameId: game['id']! as int,
+            nodeId: gameNode,
+            maxHops: hops,
+            channelHz: (game['channel_hz'] as int?) ?? fieldChannel,
+            key: key,
+            wifi: _toWifi,
+          );
+    // The key's tag (not secret) outlives the key, so a GAME_OVER can still
+    // name this game after a restart without the key (decision OT-13; sent
+    // by the re-invites, slice S7).
+    store.setSetting('key_tag:${game['id']}', epochTag(key));
     final fc =
         FieldController(
-            transport: transport,
+            transport: _radio ?? transport!,
             gameId: game['id']! as int,
             teams: (game['teams']! as List).cast<String>(),
-            nodeId: (game['node_id'] as int?) ?? config.nodeId,
-            maxHops: (game['max_hops'] as int?) ?? config.maxHops,
+            nodeId: gameNode,
+            maxHops: hops,
             term: (game['term'] as int?) ?? 1,
             decodeEvent: core == null ? null : _decodeEvent,
             wallSeconds: () => _wall().floor(),
@@ -543,15 +623,162 @@ class ControllerEngine {
     _field?.close();
     _field = null;
     _fieldScores = {};
+    modem?.clear(); // the modem forgets the key
+    _radio = null;
     _fc = null;
     _key = Uint8List(0);
     _game = null;
+    _keyLost = false;
   }
 
-  /// Ends the controller: the field script's node is freed.
+  /// Ends the controller (the app stops it, or a test's restart): the game
+  /// time is saved as the tick saves it and the field script's node is
+  /// freed. A new engine on the same store takes the live game up again.
   void close() {
+    _saveGameTime();
     _field?.close();
     _field = null;
+  }
+
+  /// After a restart: the live game in the store, taken up again as the Pi
+  /// does (engine.py `_restore`).
+  void _restore() {
+    final game = store.liveGame();
+    if (game == null) return;
+    final id = game['id']! as int;
+    final key = store.gameKey(id);
+    if (key == null) {
+      // ADR-P2-4: the key was never written (persist_game_key off).
+      _game = game;
+      _keyLost = true;
+      return;
+    }
+    _activate(game, key);
+    final fc = _fc!;
+    fc.restoreAdjustments(_adjustments(id));
+    for (final node in store.nodes(id)) {
+      // Each box's counters as last reported: merging by maximum goes on
+      // from them.
+      final nodeId = node['node_id']! as int;
+      final score = node['score'];
+      if (score is Map) {
+        fc.mergeCounters('node-$nodeId', {
+          for (final e in score.entries)
+            if (e.value is int) '${e.key}': e.value as int,
+        });
+      }
+      final known = fc.registerNode(
+        nodeId,
+        '${node['name'] ?? 'node-$nodeId'}',
+        '${node['role'] ?? ''}',
+      );
+      known.epoch = (node['epoch'] as int?) ?? 0;
+      final battery = node['battery_pct'];
+      if (battery is int) known.batteryPct = battery;
+    }
+    _restoreHealth(fc, id);
+    // The controller's own events go on from their stored seq (PE24-42).
+    var own = 0;
+    for (final e in store.events(id)) {
+      if (e['node'] == fc.nodeId && e['epoch'] == null) {
+        own = max(own, e['seq']! as int);
+      }
+    }
+    fc.restoreEventSeq(own);
+    final saved = int.tryParse(store.getSetting('game_time:$id') ?? '') ?? 0;
+    fc.restoreClock(
+      switch (game['state']) {
+        'running' => gameRunning,
+        'paused' => gamePaused,
+        _ => gameWaiting,
+      },
+      saved,
+      nowMs(),
+    );
+    // The field script's points from earlier runs, and the script again.
+    final runs = store.getSetting('field_scores:$id');
+    _fieldScores = {};
+    if (runs != null) {
+      (jsonDecode(runs) as Map).forEach((k, v) {
+        _fieldScores['$k'] = {
+          for (final e in (v as Map).entries)
+            if (e.value is int) '${e.key}': e.value as int,
+        };
+      });
+    }
+    _fieldScores.forEach(fc.mergeCounters);
+    if (fc.gameState == gameRunning || fc.gameState == gamePaused) {
+      try {
+        _startField();
+      } on ControllerError {
+        // As the Pi: the game goes on without its field script (logged by
+        // the shell, which sees no field_state from it).
+      }
+    }
+  }
+
+  /// After a restart: the health events' seq goes on from the stored ones,
+  /// each box's link is what its last link event said (one that was online
+  /// has node_offline_s from now to be heard again) and a battery.low
+  /// already logged is not repeated (engine.py `_restore_health`).
+  void _restoreHealth(FieldController fc, int gameId) {
+    final health = [
+      for (final t in healthEvents) ...store.events(gameId, type: t),
+    ];
+    fc.healthSeq = 0;
+    for (final e in health) {
+      if (e['epoch'] == null) {
+        fc.healthSeq = max(fc.healthSeq, e['seq']! as int);
+      }
+    }
+    final now = nowMs();
+    for (final node in fc.nodes.values) {
+      final mine = [
+        for (final e in health)
+          if (e['node'] == node.nodeId) e,
+      ];
+      Map<String, Object?>? last;
+      for (final e in mine) {
+        if (e['type'] == 'battery.low') continue;
+        if (last == null ||
+            (e['t']! as int) > (last['t']! as int) ||
+            (e['t'] == last['t'] &&
+                (e['seq']! as int) > (last['seq']! as int))) {
+          last = e;
+        }
+      }
+      if (last != null) {
+        node
+          ..link = (last['type']! as String).split('.')[1]
+          ..linkChangedMs = node.link == 'online' ? now : null;
+      }
+      node.batteryLow = mine.any((e) => e['type'] == 'battery.low');
+    }
+  }
+
+  /// The GM's adjustments per team, from the log (engine.py
+  /// `_adjustments`).
+  Map<String, int> _adjustments(int gameId) {
+    final out = <String, int>{};
+    for (final e in store.events(gameId, type: 'score.delta')) {
+      final team = e['team'];
+      final amount = (e['data'] as Map?)?['amount'];
+      if (e['node'] == nodeId && team is String && amount is int) {
+        out[team] = (out[team] ?? 0) + amount;
+      }
+    }
+    return out;
+  }
+
+  void _saveGameTime({bool force = false}) {
+    final fc = _fc;
+    final game = _game;
+    if (fc == null || game == null) return;
+    final now = nowMs();
+    if (force || now - _lastTimeSave >= gameTimeSaveMs) {
+      _lastTimeSave = now;
+      store.setSetting('game_time:${game['id']}', '${fc.gameTimeMs}');
+    }
   }
 
   // --- the lifecycle ------------------------------------------------------
@@ -562,7 +789,13 @@ class ControllerEngine {
     if (_game == null || _game!['id'] != id) {
       throw ControllerError.conflict('game $id is ${game['state']}, not live');
     }
-    return _fc!;
+    final fc = _fc;
+    if (_keyLost || fc == null) {
+      throw ControllerError.conflict(
+        "this game's key was lost when the controller restarted; end it",
+      );
+    }
+    return fc;
   }
 
   Map<String, Object?> _setState(
@@ -692,6 +925,7 @@ class ControllerEngine {
     _startField();
     final out = _setState(id, 'running', {'started_at': _wall()});
     _afterField();
+    _saveGameTime(force: true);
     return out;
   }
 
@@ -707,6 +941,7 @@ class ControllerEngine {
       ..pauseGame(nowMs: nowMs(), reason: reason.isEmpty ? null : reason)
       ..controllerEvent('game.pause', data, null, 'critical');
     _field?.input('game.pause', reason.isEmpty ? null : data);
+    _saveGameTime(force: true);
     return _setState(id, 'paused');
   }
 
@@ -722,20 +957,35 @@ class ControllerEngine {
     return _setState(id, 'running');
   }
 
+  /// Ends the live game; also one whose key was lost in a restart (its boxes
+  /// are not told: a GAME_OVER over the field radio needs the field join
+  /// key and the radio, slice S4, so `game_over_frame` is "no_join_key", as
+  /// on a Pi without a join key).
   Map<String, Object?> endGame(int id, [String reason = '', String? winner]) {
-    final fc = _live(id);
-    fc.endGame(nowMs: nowMs(), reason: reason.isEmpty ? null : reason);
-    final data = <String, Object?>{if (reason.isNotEmpty) 'reason': reason};
-    final win = fc.teams.contains(winner)
-        ? winner
-        : _winner(fc.totalScores, fc.teams);
-    if (win != null) data['winner'] = win;
-    fc.controllerEvent('game.end', data, null, 'critical');
-    _field?.input('game.end', reason.isEmpty ? null : {'reason': reason});
-    store.saveScores(id, fc.totalScores);
+    final game = store.game(id);
+    if (game == null) throw ControllerError.notFound('no game $id');
+    if (_game == null || _game!['id'] != id) {
+      throw ControllerError.conflict('game $id is ${game['state']}, not live');
+    }
+    if (!_keyLost) {
+      final fc = _live(id);
+      fc.endGame(nowMs: nowMs(), reason: reason.isEmpty ? null : reason);
+      final data = <String, Object?>{if (reason.isNotEmpty) 'reason': reason};
+      final win = fc.teams.contains(winner)
+          ? winner
+          : _winner(fc.totalScores, fc.teams);
+      if (win != null) data['winner'] = win;
+      fc.controllerEvent('game.end', data, null, 'critical');
+      _field?.input('game.end', reason.isEmpty ? null : {'reason': reason});
+      store.saveScores(id, fc.totalScores);
+      _saveGameTime(force: true);
+    }
+    store
+      ..forgetGameKey(id) // the key does not outlive the game
+      ..deleteSetting('key_tag:$id');
     _setState(id, 'ended', {'ended_at': _wall()});
     _deactivate();
-    return publicGame(store.game(id)!);
+    return {...publicGame(store.game(id)!), 'game_over_frame': 'no_join_key'};
   }
 
   // --- scores, log, nodes -------------------------------------------------
@@ -906,6 +1156,205 @@ class ControllerEngine {
     }
   }
 
+  // --- the boxes' language (join key 15) -----------------------------------
+
+  /// GET /api/v1/settings/box-language: the field setting ("auto": the
+  /// language of the console that creates the game) and the live game's.
+  Map<String, Object?> boxLanguage() {
+    final g = _game;
+    final live = g == null ? null : store.getSetting('box_lang:${g['id']}');
+    return {
+      'box_language': store.getSetting('box_language') ?? 'auto',
+      'choices': boxLanguages,
+      'game_box_language': live ?? (g == null ? null : 'en'),
+    };
+  }
+
+  Map<String, Object?> setBoxLanguage(Object? value) {
+    if (value is! String || !boxLanguages.contains(value)) {
+      throw ControllerError('box_language: one of ${boxLanguages.join(', ')}');
+    }
+    store.setSetting('box_language', value);
+    return boxLanguage();
+  }
+
+  String? _boxLangFor(Object? consoleLang) {
+    final setting = store.getSetting('box_language') ?? 'auto';
+    if (setting != 'auto') return setting;
+    if (consoleLang == null) return null;
+    if (consoleLang is! String ||
+        !boxLanguages.contains(consoleLang) ||
+        consoleLang == 'auto') {
+      throw ControllerError('console_lang: pt or en');
+    }
+    return consoleLang;
+  }
+
+  // --- joins (ADR-P2-12, protocol/join.md) ---------------------------------
+
+  /// The field join key (32 bytes; never on the API): join payloads are
+  /// sealed with it. Empty: no joins (503), as on a Pi without one.
+  Uint8List joinKey = Uint8List(0);
+
+  Set<int> _issuedIds() {
+    final saved = store.getSetting('issued_nodes:${_game!['id']}');
+    return saved == null
+        ? {}
+        : {for (final n in jsonDecode(saved) as List) n as int};
+  }
+
+  Set<int> _usedIds(FieldController fc) {
+    final g = _game!;
+    return {
+      nodeId,
+      config.nodeId,
+      broadcastNode,
+      for (final n in (g['assignments']! as Map).keys) int.parse('$n'),
+      ..._issuedIds(),
+      ...fc.nodes.keys,
+      if (g['controller_id'] is int) g['controller_id']! as int,
+    };
+  }
+
+  /// A join payload for a box (kind "node") or a standby controller (kind
+  /// "controller"), as the Pi's `issue_join`: the node id given or the
+  /// lowest free one, never one a join was issued for or a box was heard on
+  /// in this game (decision BN-18: two devices on one node id would reuse
+  /// each other's nonces). A box's role goes into the game's assignments.
+  /// The answer holds the game key (in the payload): the GM token only.
+  Map<String, Object?> issueJoin(
+    Map<String, Object?> spec, {
+    Object? nodeIdValue,
+    bool sameDevice = false,
+  }) {
+    final g = _game;
+    if (g == null) {
+      throw ControllerError.conflict('no live game: create a game first');
+    }
+    final id = g['id']! as int;
+    final fc = _live(id);
+    if (joinKey.isEmpty) {
+      throw ControllerError.unavailable('no join key configured');
+    }
+    final kind = spec['kind'] ?? 'node';
+    if (kind != 'node' && kind != 'controller') {
+      throw ControllerError('kind: controller, node');
+    }
+    if (spec['name'] != null) {
+      // Scenarios come with slice S7: no scenario node names here.
+      throw ControllerError(
+        "name: only a box of a scenario's game takes a scenario node's name",
+      );
+    }
+    final mode = _mode(g['mode_id']);
+    String role;
+    if (kind == 'node') {
+      final roles = [for (final r in mode?.main.roles ?? const []) r.name]
+        ..sort();
+      var asked = spec['role'];
+      if (asked == null && roles.length == 1) asked = roles.single;
+      if (asked is! String || !roles.contains(asked)) {
+        throw ControllerError('role: one of $roles');
+      }
+      role = asked;
+    } else {
+      role = 'controller';
+    }
+    nodeIdValue ??= spec['node_id'];
+    final int node;
+    if (nodeIdValue == null) {
+      final used = _usedIds(fc);
+      node = [
+        for (var i = 1; i < 0xffff; i++) i,
+      ].firstWhere((i) => !used.contains(i));
+    } else {
+      node = _int(nodeIdValue, 'node_id');
+    }
+    if (node < 1 || node > 0xfffe || node == nodeId) {
+      throw ControllerError("node id $node: 1-65534, not the controller's");
+    }
+    final assignments = Map<String, Object?>.of(
+      (g['assignments']! as Map).cast<String, Object?>(),
+    );
+    final assigned = assignments['$node'];
+    if (kind == 'controller' &&
+        (assigned != null || fc.nodes.containsKey(node))) {
+      throw ControllerError.conflict('node id $node is a box in this game');
+    }
+    final issued = _issuedIds();
+    final known = fc.nodes[node];
+    if (!sameDevice &&
+        (issued.contains(node) || (known != null && known.heard))) {
+      throw ControllerError.conflict(
+        'node id $node already has a box in this game: two boxes on one '
+        "node id would reuse each other's radio nonces. A replacement box "
+        'gets a new node id (Join).',
+      );
+    }
+    final params = (g['params'] as Map?)?.cast<String, Object?>() ?? {};
+    final join = JoinPayload(
+      gameId: id,
+      gameKey: _key,
+      nodeId: node,
+      controllerId: nodeId,
+      channelHz: (g['channel_hz'] as int?) ?? config.channelHz,
+      maxHops: (g['max_hops'] as int?) ?? config.maxHops,
+      teams: (g['teams']! as List).cast<String>(),
+      modeId: g['mode_id']! as String,
+      role: role,
+      gameSeed: (g['game_seed']! as int) & 0xffffffff,
+      params: params.isEmpty ? null : params,
+      kind: kind == 'node' ? JoinKind.node : JoinKind.controller,
+      lang: store.getSetting('box_lang:$id'),
+    );
+    final Uint8List payload;
+    try {
+      payload = encodeJoin(join, joinKey);
+    } on JoinException catch (e) {
+      throw ControllerError.conflict(
+        'this game does not fit in a join payload: ${e.message}',
+      );
+    }
+    if (!issued.contains(node)) {
+      store.setSetting(
+        'issued_nodes:$id',
+        jsonEncode((issued..add(node)).toList()..sort()),
+      );
+    }
+    if (kind == 'node' && assigned != role) {
+      assignments['$node'] = role;
+      g['assignments'] = assignments;
+      store.updateGame(id, {'assignments': assignments});
+      fc.registerNode(node, 'node-$node', role);
+    }
+    final out = <String, Object?>{
+      'game': id,
+      'node_id': node,
+      'kind': kind,
+      'role': role,
+      'name': null,
+      'controller_id': nodeId,
+      'channel_hz': join.channelHz,
+      'max_hops': join.maxHops,
+      'bytes': payload.length,
+      'text': joinToText(payload),
+      'payload_hex': _hexOf(payload),
+      'ndef_tag_hex': _hexOf(type2Memory(payload, joinNdefType)),
+      // Keys 13 and 14 (the field CA and the https addresses) come with
+      // HTTPS on the phone, slice S6: an Android prop asks for the address.
+      'wifi_link': false,
+    };
+    _emit({
+      'type': 'join',
+      'game': id,
+      'node_id': node,
+      'kind': kind,
+      'role': role,
+      'name': null,
+    });
+    return out;
+  }
+
   Map<String, Object?> status() {
     final fc = _fc;
     return {
@@ -918,10 +1367,16 @@ class ControllerEngine {
       'role': fc == null ? null : 'leader',
       'term': fc?.term,
       'live_game': _game?['id'],
-      'key_lost': false,
+      'key_lost': _keyLost,
       'radio': radioState,
-      'tx_status': <String, int>{},
-      'field_channel_hz': config.channelHz,
+      'modem': {
+        'ident': modem?.ident,
+        'status': modem?.status,
+        'reconnects': modem?.reconnects ?? 0,
+      },
+      'tx_epoch': _radio?.epoch,
+      'tx_status': Map.of(_txStatus),
+      'field_channel_hz': fieldChannel,
       'channel_confirmed': false,
       'sync': {'enabled': false},
     };
@@ -959,6 +1414,60 @@ class ControllerEngine {
         fc.durationMs > 0 &&
         fc.gameTimeMs >= fc.durationMs) {
       endGame(game['id']! as int, 'time');
+      return;
+    }
+    _saveGameTime();
+  }
+
+  // --- the radio ------------------------------------------------------------
+
+  /// Android props on Wi-Fi (prop links): set by their server; true when one
+  /// of them took the message.
+  bool Function(int type, Uint8List payload)? wifiForward;
+
+  bool _toWifi(int type, Uint8List payload) =>
+      wifiForward?.call(type, payload) ?? false;
+
+  /// A packet the radio heard and authenticated.
+  void _onRx(RadioRx rx) {
+    onPacket(
+      rx.header,
+      rx.payload,
+      epoch: rx.epoch,
+      rssi: rx.rssi,
+      snr: rx.snr,
+    );
+  }
+
+  void _onTxAck(int seq, String status) {
+    _txStatus[status] = (_txStatus[status] ?? 0) + 1;
+    if (status != 'ok') {
+      _emit({
+        'type': 'system',
+        'kind': 'tx.failed',
+        'seq': seq,
+        'status': status,
+      });
+    }
+  }
+
+  void _onModemState(String state) {
+    final m = modem;
+    if (m == null) return;
+    if (state == ModemState.up) {
+      _emit({'type': 'system', 'kind': 'radio.up'});
+      final fc = _fc;
+      if (fc == null) {
+        m.setChannel(fieldChannel); // no game: listen on the field's channel
+      } else {
+        final known = {
+          for (final n in fc.nodes.values)
+            if (n.epoch != 0) n.nodeId: n.epoch,
+        };
+        if (known.isNotEmpty) m.setPeerEpochs(known);
+      }
+    } else if (state == ModemState.down) {
+      _emit({'type': 'system', 'kind': 'radio.down'});
     }
   }
 
@@ -1098,6 +1607,12 @@ Map<String, Object?> logRecord(Map<String, Object?> record) => {
   ])
     k: record[k],
 };
+
+String _hexOf(List<int> b) =>
+    [for (final x in b) x.toRadixString(16).padLeft(2, '0')].join();
+
+/// The boxes' screen languages (join key 15): "auto" is the console's.
+const boxLanguages = ['auto', 'pt', 'en'];
 
 /// An integer from JSON, as Python's int() takes it (decision PE24-6).
 int _int(Object? value, String name) {

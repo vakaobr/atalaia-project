@@ -61,6 +61,7 @@ void main() {
       'player.respawn',
       'gm.message',
       'battery.low',
+      'settings.json', // the controller store's file (controller_store.dart)
     });
     expect(used.length, greaterThan(150));
     final missing = used.where((k) => !ptStrings.containsKey(k)).toList()

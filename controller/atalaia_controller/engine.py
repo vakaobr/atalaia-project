@@ -450,6 +450,11 @@ class Controller:
             if isinstance(node.get("battery_pct"), int):
                 known.battery_pct = node["battery_pct"]
         self._restore_health(fc, game["id"])
+        # The controller's own events go on from their stored seq: from 1 again, an event at the
+        # same game time and of the same type as an earlier one (a second GM adjustment before
+        # the start) would be dropped as a replay (decision PE24-42).
+        fc._event_seq = max((e["seq"] for e in self.store.events(game["id"])
+                             if e["node"] == fc.node_id and e["epoch"] is None), default=0)
         saved = self.store.get_setting(f"game_time:{game['id']}")
         fc.game_time_ms = int(saved) if saved else 0
         fc.game_state = {"running": GAME_RUNNING, "paused": GAME_PAUSED}.get(game["state"], 0)

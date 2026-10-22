@@ -48,6 +48,35 @@ final class AtalaiaEvent extends Struct {
   external Array<Uint8> type;
 }
 
+/// atalaia_event_def_t (atalaia/protocol.h): a standard event's definition.
+final class EventDef extends Struct {
+  external Pointer<Utf8> name;
+  @Uint8()
+  external int id;
+
+  /// atalaia_prio_t, the schema's default priority (a C enum: an `int`).
+  @Int()
+  external int prio;
+  external Pointer<Uint8> data;
+  @Uint8()
+  external int dataCount;
+}
+
+/// atalaia_data_field_def_t (atalaia/protocol.h): an event data field.
+final class DataFieldDef extends Struct {
+  external Pointer<Utf8> name;
+  @Uint8()
+  external int key;
+
+  /// atalaia_field_type_t: 0 string, 1 integer, 2 number, 3 boolean.
+  @Int()
+  external int type;
+
+  /// Allowed in every event.
+  @Bool()
+  external bool common;
+}
+
 /// void (*event)(void *user, const atalaia_event_t *ev, const char *data_json)
 typedef EventCallbackNative =
     Void Function(Pointer<Void>, Pointer<AtalaiaEvent>, Pointer<Utf8>);

@@ -8,7 +8,10 @@ The same cases run against the Android field controller (decision PE24,
 app/test/controller/api_contract_test.dart): this controller is the
 reference, so every case must pass here first. Each case gets a fresh
 controller with a recording modem and a clock that only moves on an
-``advance_ms`` step, which also runs the controller's tick once. Stream
+``advance_ms`` step, which also runs the controller's tick once; a
+``restart`` step stops the controller, closes its SQLite store and starts a
+new controller on the same file (slice S3), with the case's
+``persist_game_key`` (the default, true, unless the case says). Stream
 steps (``ws_*``, ``ws``) use the TestClient's WebSocket sessions, all on the
 one event loop of the entered TestClient; ``mqtt`` steps read what the MQTT
 bridge (mqtt.py) published to a recording client; the ``mqtt_acl`` checks
@@ -17,6 +20,7 @@ run against the Mosquitto ACL the Pi installs (controller/deploy/atalaia.acl).
 
 from __future__ import annotations
 
+import base64
 import contextlib
 import json
 import re
@@ -33,11 +37,15 @@ from starlette.websockets import WebSocketDisconnect
 from support import CORE, FakeModem, config
 from atalaia_controller.api import Auth, create_app
 from atalaia_controller.engine import Controller
+from atalaia_controller import prop_link
 from atalaia_controller.mqtt import MqttBridge
+from atalaia_controller.prop_link import PropLinks
 from atalaia_controller.store import Store
 from atalaia_controller.ws import Hub
-from atalaia_sim import codec
+from atalaia_sim import codec, packet
+from atalaia_sim import join as joinfmt
 from atalaia_sim.packet import hello_encode, state_encode
+from atalaia_sim.protocol import MESSAGE_TYPES
 
 ROOT = Path(__file__).resolve().parents[2]
 VECTORS = json.loads((ROOT / "protocol" / "vectors" / "controller_api.json").read_text(encoding="utf-8"))
@@ -119,28 +127,94 @@ class RecordingMqtt:
         return SimpleNamespace(rc=0)
 
 
+PRIOS = ("telemetry", "normal", "critical", "reserved")
+TYPE_NAMES = {v: k for k, v in MESSAGE_TYPES.items()}
+
+
+def _plain(value: Any) -> Any:
+    """Decoded payload values as JSON: bytes in hex."""
+    if isinstance(value, (bytes, bytearray)):
+        return bytes(value).hex()
+    if isinstance(value, dict):
+        return {str(k): _plain(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_plain(v) for v in value]
+    return value
+
+
+class RecordingModem(FakeModem):
+    """The FakeModem, with what the controller asked of the radio in one ordered list, as the
+    shared cases' 'tx' steps see it (packets with their header and payload by field name, and
+    the modem commands)."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.log: list[dict[str, Any]] = []
+
+    def configure(self, game_id, node_id, epoch, max_hops, channel_hz, key) -> None:
+        super().configure(game_id, node_id, epoch, max_hops, channel_hz, key)
+        self.log.append({"kind": "configure", "game_id": game_id, "node_id": node_id, "epoch": epoch,
+                         "max_hops": max_hops, "channel_hz": channel_hz})
+
+    def clear(self) -> None:
+        super().clear()
+        self.log.append({"kind": "clear"})
+
+    def set_channel(self, channel_hz: int) -> bool:
+        self.log.append({"kind": "channel", "channel_hz": channel_hz})
+        return super().set_channel(channel_hz)
+
+    def set_peer_epochs(self, epochs: dict[int, int]) -> None:
+        super().set_peer_epochs(epochs)
+        self.log.append({"kind": "peer_epochs", "epochs": {str(k): v for k, v in sorted(epochs.items())}})
+
+    def send_packet(self, header, payload: bytes) -> bool:
+        if not super().send_packet(header, payload):
+            return False
+        name = TYPE_NAMES.get(header.type, str(header.type))
+        fields = (_plain(packet._decode_payload(payload, packet._key_table(name)))
+                  if name in packet._PF else {})
+        self.log.append({"kind": name, "source": header.source, "seq": header.seq,
+                         "hop_limit": header.hop_limit, "prio": PRIOS[(header.version_flags >> 3) & 3],
+                         "ack": bool(header.version_flags & 4), "fields": fields})
+        return True
+
+
 class ContractCase(unittest.TestCase):
     def run_case(self, case: dict[str, Any]) -> None:
         with tempfile.TemporaryDirectory() as tmp, contextlib.ExitStack() as stack:
-            cfg = config(tmp, gm_token=VECTORS["tokens"]["gm"], read_token=VECTORS["tokens"]["read"])
-            store = Store(cfg.db_path)
-            stack.callback(store.close)
-            modem = FakeModem()
-            now = [0.0]
-            ctrl = Controller(cfg, store, modem=modem, core=CORE, clock=lambda: now[0])
-            stack.callback(ctrl.stop)
-            hub = Hub()
-            if "stream_max_queue" in case:
-                hub.max_queue = case["stream_max_queue"]
-            mqtt = RecordingMqtt()
-            MqttBridge(cfg, ctrl).client = mqtt  # type: ignore[assignment]
-            # Entered, so that every WebSocket session runs on one event loop with the hub.
-            client = stack.enter_context(TestClient(create_app(ctrl, hub, Auth(cfg.gm_token, cfg.read_token))))
-            env = SimpleNamespace(client=client, modem=modem, ctrl=ctrl, hub=hub, mqtt=mqtt, now=now,
-                                  saved={}, sockets={}, stack=stack, sentinel=0)
+            cfg = config(tmp, gm_token=VECTORS["tokens"]["gm"], read_token=VECTORS["tokens"]["read"],
+                         persist_game_key=case.get("persist_game_key", True))
+            env = SimpleNamespace(cfg=cfg, case=case, modem=RecordingModem(), mqtt=RecordingMqtt(), now=[0.0],
+                                  saved={}, stack=stack, sentinel=0)
+            self.boot(env)
             for i, step in enumerate(case["steps"]):
                 with self.subTest(step=i):
                     self.run_step(step, env)
+
+    @staticmethod
+    def boot(env: SimpleNamespace) -> None:
+        """A controller on the case's store (a new one after a 'restart' step), with its API, stream and
+        MQTT bridge; the clock, the radio and the recorded MQTT messages go on across restarts."""
+        now = env.now
+        env.store = Store(env.cfg.db_path)
+        env.ctrl = Controller(env.cfg, env.store, modem=env.modem, core=CORE, clock=lambda: now[0],
+                              join_key=bytes.fromhex(env.case.get("join_key", "")))
+        # The controller then the store, on a restart or at the end of the case.
+        env.stops = contextlib.ExitStack()
+        env.stops.callback(env.store.close)
+        env.stops.callback(env.ctrl.stop)
+        env.stack.callback(env.stops.close)
+        env.hub = Hub()
+        if "stream_max_queue" in env.case:
+            env.hub.max_queue = env.case["stream_max_queue"]
+        MqttBridge(env.cfg, env.ctrl).client = env.mqtt  # type: ignore[assignment]
+        PropLinks(env.ctrl)  # WS /api/v1/prop
+        # Entered, so that every WebSocket session runs on one event loop with the hub.
+        env.client = env.stack.enter_context(
+            TestClient(create_app(env.ctrl, env.hub, Auth(env.cfg.gm_token, env.cfg.read_token))))
+        env.sockets = {}
+        env.props = {}
 
     def check(self, pattern: Any, actual: Any, where: str, env: SimpleNamespace) -> None:
         why = mismatch(substitute(pattern, env.saved), actual)
@@ -164,6 +238,12 @@ class ContractCase(unittest.TestCase):
             got.append(m)
 
     def run_step(self, step: dict[str, Any], env: SimpleNamespace) -> None:
+        if "restart" in step:
+            # The Pi reboots: the old controller stops and its store closes; its stream
+            # connections are left behind (closed with the case).
+            env.stops.close()
+            self.boot(env)
+            return
         if "advance_ms" in step:
             env.now[0] += step["advance_ms"] / 1000
             env.ctrl.tick()
@@ -182,7 +262,16 @@ class ContractCase(unittest.TestCase):
                 payload = codec.encode_event(rx["event"])
             else:
                 raise ValueError(f"unknown rx type {kind}")
-            env.modem.rx(rx["source"], rx["seq"], kind, payload, game_id=game_id, epoch=rx.get("epoch", 0))
+            env.modem.rx(rx["source"], rx["seq"], kind, payload, game_id=game_id, epoch=rx.get("epoch", 0),
+                         ack=rx.get("ack", False))
+            return
+        if "radio_state" in step:
+            # The modem's link went down or came back.
+            env.modem.state = step["radio_state"]
+            env.modem.on_state(step["radio_state"])
+            return
+        if "tx_ack" in step:
+            env.modem.on_tx_ack(step["tx_ack"]["seq"], step["tx_ack"]["status"])
             return
         if "ws_connect" in step:
             self.ws_connect(step, env)
@@ -209,6 +298,46 @@ class ContractCase(unittest.TestCase):
                     ws.receive_json()
             self.assertEqual(ctx.exception.code, step["close"])
             return
+        if "prop_connect" in step:
+            self.prop_connect(step, env)
+            return
+        if "prop_send" in step:
+            env.props[step["prop_send"]].send_json(substitute(step["json"], env.saved))
+            return
+        if "prop" in step:
+            # Every message since the last look: a ping goes after them, its pong ends the list.
+            ws = env.props[step["prop"]]
+            ws.send_json({"type": "ping"})
+            got = []
+            while (m := ws.receive_json()) != {"type": "pong"}:
+                got.append(m)
+            self.check(step["messages"], got, f"prop {step['prop']}", env)
+            return
+        if "prop_closed" in step:
+            ws = env.props.pop(step["prop_closed"])
+            got = []
+            with self.assertRaises(WebSocketDisconnect) as ctx:
+                while True:
+                    got.append(ws.receive_json())
+            self.check(step["messages"], got, f"prop {step['prop_closed']}", env)
+            self.assertEqual(ctx.exception.code, step["close"])
+            return
+        if "join_decode" in step:
+            # A join payload's text, opened with the case's field join key.
+            text = substitute(step["join_decode"], env.saved)
+            j = joinfmt.decode(joinfmt.from_text(text), bytes.fromhex(env.case["join_key"]))
+            self.check(step["json"], _plain(j), "the join payload", env)
+            for name, path in step.get("save", {}).items():
+                env.saved[name] = dig(_plain(j), path)
+            return
+        if "tx" in step:
+            got = list(env.modem.log)
+            env.modem.log.clear()
+            kinds = step.get("kinds")
+            if kinds is not None:
+                got = [e for e in got if e["kind"] in kinds]
+            self.check(step["tx"], got, "the radio", env)
+            return
         if "mqtt" in step:
             got = list(env.mqtt.published)
             env.mqtt.published.clear()
@@ -231,6 +360,34 @@ class ContractCase(unittest.TestCase):
             self.check(step["json"], body, f"{req['method']} {req['path']}", env)
         for name, path in step.get("save", {}).items():
             env.saved[name] = dig(body, path)
+
+    def prop_connect(self, step: dict[str, Any], env: SimpleNamespace) -> None:
+        """An Android prop's link (protocol/prop-link.md): the challenge, the proof with the key given
+        (hex), then the welcome, or the refusal and the close code."""
+        def run(ws: Any) -> None:
+            challenge = ws.receive_json()
+            self.check({"type": "challenge", "version": 1, "nonce": "$any"}, challenge, "the challenge", env)
+            nonce = base64.urlsafe_b64decode(challenge["nonce"] + "=" * (-len(challenge["nonce"]) % 4))
+            key = bytes.fromhex(substitute(step["key"], env.saved))
+            gid = substitute(step.get("game_id", "${gid}"), env.saved)
+            node = step["node_id"]
+            proof = base64.urlsafe_b64encode(prop_link.proof(key, nonce, gid, node)).rstrip(b"=").decode()
+            ws.send_json({"type": "auth", "game_id": gid, "node_id": node, "proof": proof})
+
+        if "close" in step:
+            got = []
+            with self.assertRaises(WebSocketDisconnect) as ctx:
+                with env.client.websocket_connect("/api/v1/prop") as ws:
+                    run(ws)
+                    while True:
+                        got.append(ws.receive_json())
+            self.check(step["messages"], got, f"prop {step['prop_connect']}", env)
+            self.assertEqual(ctx.exception.code, step["close"])
+            return
+        ws = env.stack.enter_context(env.client.websocket_connect("/api/v1/prop"))
+        run(ws)
+        env.props[step["prop_connect"]] = ws
+        self.check(step["welcome"], ws.receive_json(), f"prop {step['prop_connect']}: welcome", env)
 
     def ws_connect(self, step: dict[str, Any], env: SimpleNamespace) -> None:
         token = step.get("token", "none")
@@ -283,6 +440,18 @@ def parse_acl(text: str) -> dict[str, list[tuple[str, str]]]:
 
 def acl_allows(rules: dict[str, list[tuple[str, str]]], user: str, topic: str, access: str) -> bool:
     return any(a in (access, "readwrite") and paho.topic_matches_sub(p, topic) for a, p in rules.get(user, []))
+
+
+class PropProofVectors(unittest.TestCase):
+    """The prop link's proof against protocol/vectors/prop_link.json (the app checks the same)."""
+
+    def test_vectors(self):
+        vectors = json.loads((ROOT / "protocol" / "vectors" / "prop_link.json").read_text(encoding="utf-8"))
+        for v in vectors["valid"]:
+            with self.subTest(v["name"]):
+                got = prop_link.proof(bytes.fromhex(v["game_key"]), bytes.fromhex(v["nonce"]), v["game_id"],
+                                      v["node_id"])
+                self.assertEqual(got.hex(), v["proof"])
 
 
 class MqttAclContract(unittest.TestCase):

@@ -1,0 +1,29 @@
+{
+  "description": "The Android prop link's proof (protocol/prop-link.md, step 2): HMAC-SHA256(game key, \"atalaia-prop-link-v1\" 0x00 | nonce | game id (2 bytes, big-endian) | node id (2 bytes, big-endian)). Computed with Python's standard hmac and hashlib modules. The Pi controller's tests (test_api_contract.py) and the app's (controller_props_test.dart) check these.",
+  "valid": [
+    {
+      "name": "counting",
+      "game_key": "000102030405060708090a0b0c0d0e0f",
+      "nonce": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "game_id": 1,
+      "node_id": 1,
+      "proof": "4e8516fc0f5cd138bea19ac4bf05a252e0c7624f494083833b1ae0d74ab3c52d"
+    },
+    {
+      "name": "all_ones",
+      "game_key": "ffffffffffffffffffffffffffffffff",
+      "nonce": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "game_id": 65534,
+      "node_id": 65534,
+      "proof": "76b40aab5bb6adbcb588b47778fb5e46f0a0738084f9d0f6275061093830d6c9"
+    },
+    {
+      "name": "fips197_key",
+      "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+      "nonce": "6465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f80818283",
+      "game_id": 4242,
+      "node_id": 7,
+      "proof": "d692378ba95259cf326baf65fc64bf63591f814a2bacb6a76931c81a402ceb49"
+    }
+  ]
+}

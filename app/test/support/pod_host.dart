@@ -34,6 +34,89 @@ String _program(String variable) {
 
 String podHostPath() => _program('ATALAIA_POD_HOST');
 String modemHostPath() => _program('ATALAIA_MODEM_HOST');
+String boxHostPath() => _program('ATALAIA_BOX_HOST');
+
+/// The host box (firmware/esp32/test/box_host): a Field Box's game and
+/// radio code (main/box_game.c, main/radio/field_link.c, the node runner and
+/// the core, with mbedtls AES-CCM), as controller/tests/support.py's BoxHost.
+/// It shares the hub's air; its NVS and flash are files in [stateDir], so
+/// [kill] then [boot] again is a battery pull.
+class HostBox {
+  HostBox._(this.hub, this.stateDir, this.joinKey, this.name, this.stateMs);
+
+  static Future<HostBox> start(
+    AirHub hub,
+    String stateDir,
+    List<int> joinKey, {
+    String name = 'box',
+    int stateMs = 500,
+  }) async {
+    final b = HostBox._(hub, stateDir, joinKey, name, stateMs);
+    await b.boot();
+    return b;
+  }
+
+  final AirHub hub;
+  final String stateDir;
+  final List<int> joinKey;
+  final String name;
+  final int stateMs;
+  Process? _process;
+  _Lines? _out;
+  var airPort = 0;
+
+  List<String> get lines => _out?.lines ?? const [];
+
+  /// Starts the program (again, after [kill]): it rejoins a stored game.
+  Future<void> boot() async {
+    final p = await Process.start(boxHostPath(), [
+      '--state-dir',
+      stateDir,
+      '--modes',
+      '../modes',
+      '--air-peer',
+      '${hub.port}',
+      '--join-key',
+      [for (final b in joinKey) b.toRadixString(16).padLeft(2, '0')].join(),
+      '--state-ms',
+      '$stateMs',
+      '--name',
+      name,
+    ]);
+    final out = _Lines(p);
+    final ready = await out.wait('READY ');
+    airPort = _ports(ready)['air']!;
+    hub.members.add(airPort);
+    _process = p;
+    _out = out;
+  }
+
+  void send(String line) => _process!.stdin.writeln(line);
+
+  /// Types the join text on the box's console.
+  void join(String text) => send('@join $text');
+
+  void hold(int button, int ms) => send('hold $button $ms');
+
+  bool logged(String needle) => lines.any((l) => l.contains(needle));
+
+  Future<Map<String, Object?>> status() async {
+    final from = lines.length;
+    send('status');
+    final line = await _out!.wait('STATUS ', from: from);
+    return (jsonDecode(line.substring(7)) as Map).cast<String, Object?>();
+  }
+
+  /// A battery pull: no goodbye.
+  Future<void> kill() async {
+    final p = _process;
+    if (p == null) return;
+    hub.members.remove(airPort);
+    p.kill();
+    await p.exitCode;
+    _process = null;
+  }
+}
 
 /// A host program's stdout lines, as they come.
 class _Lines {

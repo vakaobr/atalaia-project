@@ -22,11 +22,13 @@
 #
 # check and test need the core and the FFI stub built for this machine as
 # shared libraries, named by ATALAIA_CORE_LIB and ATALAIA_CORE_STUB_LIB, and
-# the host pod and host modem programs, named by ATALAIA_POD_HOST and
-# ATALAIA_MODEM_HOST (this image has no CMake; docker_app.py builds them in
-# the atalaia-dev image, CI on the runner): the bridge tests load the stub,
-# every mode's tests in modes/*/tests/ run on the real core through the Dart
-# bridge, and the pod and radio-link tests run the pod firmware's own code.
+# the host pod, host modem and host box programs, named by ATALAIA_POD_HOST,
+# ATALAIA_MODEM_HOST and ATALAIA_BOX_HOST (this image has no CMake;
+# docker_app.py builds them in the atalaia-dev image, CI on the runner): the
+# bridge tests load the stub, every mode's tests in modes/*/tests/ run on the
+# real core through the Dart bridge, the pod and radio-link tests run the pod
+# firmware's own code, and the phone controller's end-to-end tests the pod's
+# and the Field Box's (slice S4 of PE24).
 #
 # The repository is at $ATALAIA_SRC (default /src), mounted read-only except
 # for format, lock, gen and goldens: the work happens on a copy of app/,
@@ -55,14 +57,14 @@ rm -rf "$W/app/.dart_tool" "$W/app/build" "$W/app/android/.gradle" "$W/app/andro
 cd "$W/app"
 
 need_core_libs() {
-    for var in ATALAIA_CORE_LIB ATALAIA_CORE_STUB_LIB ATALAIA_POD_HOST ATALAIA_MODEM_HOST; do
+    for var in ATALAIA_CORE_LIB ATALAIA_CORE_STUB_LIB ATALAIA_POD_HOST ATALAIA_MODEM_HOST ATALAIA_BOX_HOST; do
         eval "path=\${$var:-}"
         if [ -z "$path" ] || [ ! -f "$path" ]; then
             echo "check.sh: $var must name the library or program built from core/ or" \
                 "firmware/esp32/test/ (now: '${path}')." >&2
             echo "  Build them with: cmake -S core -B build -DATALAIA_SHARED=ON -DATALAIA_STUB=ON" \
                 "-DATALAIA_MBEDTLS=OFF && cmake --build build, and cmake -S" \
-                "firmware/esp32/test/pod_host (and modem_host) (tools/docker_app.py does this)" >&2
+                "firmware/esp32/test/pod_host (and modem_host, box_host) (tools/docker_app.py does this)" >&2
             exit 2
         fi
         echo "$var=$path"

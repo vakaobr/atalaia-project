@@ -271,6 +271,21 @@ class AtalaiaBindings {
         )
       >('atalaia_event_decode', isLeaf: true);
 
+  /// The standard event's definition (atalaia/protocol.h), or null for a
+  /// custom event.
+  late final eventDef = library
+      .lookupFunction<
+        Pointer<EventDef> Function(Pointer<Utf8>),
+        Pointer<EventDef> Function(Pointer<Utf8>)
+      >('atalaia_event_def', isLeaf: true);
+
+  /// A data field's definition by name (not NUL-terminated: [len] bytes).
+  late final dataField = library
+      .lookupFunction<
+        Pointer<DataFieldDef> Function(Pointer<Utf8>, Size),
+        Pointer<DataFieldDef> Function(Pointer<Utf8>, int)
+      >('atalaia_data_field', isLeaf: true);
+
   /// Only in the FFI stub (core/tests/stub.c): the C structs' layout as JSON.
   late final stubLayout = library
       .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
@@ -548,6 +563,75 @@ class AtalaiaCore {
   /// An EVENT payload decoded by the core's codec (atalaia/codec.h), as the
   /// Android field controller reads a box's events: the event, or why the
   /// codec refused the payload.
+  /// The schema's default priority of a standard event (0 telemetry, 1
+  /// normal, 2 critical), or null for a custom event (normal, as the
+  /// simulator's codec takes it).
+  int? eventDefaultPrio(String type) {
+    final name = type.toNativeUtf8();
+    try {
+      final def = bindings.eventDef(name);
+      return def == nullptr ? null : def.ref.prio;
+    } finally {
+      calloc.free(name);
+    }
+  }
+
+  /// What is wrong with an event's type and data by the schema the core was
+  /// built from (protocol/schema/events.yaml), as the simulator's
+  /// `codec.schema_problems`: a standard event takes its own data fields and
+  /// the common ones, each of its type; a custom event (`x.<club>.<name>`)
+  /// anything. The core's encoder alone lets unknown fields through.
+  List<String> eventSchemaProblems(String type, Map<String, Object?> data) {
+    final name = type.toNativeUtf8();
+    try {
+      final def = bindings.eventDef(name);
+      if (def == nullptr) {
+        return _customEvent.hasMatch(type)
+            ? const []
+            : [
+                "'$type' is not a standard event; custom events are named "
+                    'x.<club>.<name>',
+              ];
+      }
+      final own = {for (var i = 0; i < def.ref.dataCount; i++) def.ref.data[i]};
+      final problems = <String>[];
+      data.forEach((k, v) {
+        final kn = k.toNativeUtf8();
+        try {
+          final f = bindings.dataField(kn, kn.length);
+          if (f == nullptr || !(f.ref.common || own.contains(f.ref.key))) {
+            problems.add("'$type' has no data field '$k'");
+            return;
+          }
+          final ok = switch (f.ref.type) {
+            0 => v is String,
+            1 => v is int,
+            2 => v is num,
+            3 => v is bool,
+            _ => false,
+          };
+          if (!ok) {
+            const names = ['string', 'integer', 'number', 'boolean'];
+            problems.add(
+              "'$type' data field '$k' must be a "
+              '${f.ref.type < names.length ? names[f.ref.type] : 'value'}, '
+              'got ${jsonEncode(v)}',
+            );
+          }
+        } finally {
+          calloc.free(kn);
+        }
+      });
+      return problems;
+    } finally {
+      calloc.free(name);
+    }
+  }
+
+  static final _customEvent = RegExp(
+    r'^x\.[a-z0-9][a-z0-9_-]*(\.[a-z0-9][a-z0-9_-]*)+$',
+  );
+
   DecodedEvent decodeEvent(List<int> payload) {
     const cap = 65536; // ATALAIA_CODEC_MAX_BYTES and the data JSON's NUL
     final src = _nativeBytes(payload);

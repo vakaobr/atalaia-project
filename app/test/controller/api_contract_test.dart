@@ -5,8 +5,10 @@
 // against the Android field controller (decision PE24): the engine on the
 // real core, served over HTTP on the loopback address, as the Pi controller
 // runs them in controller/tests/test_api_contract.py. Each case gets a
-// fresh controller, a radio that is up and a clock that only moves on an
-// advance_ms step, which also runs one tick. Stream steps connect real
+// fresh controller, a radio that is up (a RecordingModem: tx steps read what went to it, slice S4) and a clock that only moves on an
+// advance_ms step, which also runs one tick; its store is a
+// FileControllerStore in a temporary directory, and a restart step closes
+// the controller and opens a new one on it (slice S3). Stream steps connect real
 // WebSocket clients to WS /api/v1/stream on the loopback address; mqtt
 // steps read what the MQTT bridge (controller_mqtt.dart) published; the
 // mqtt_acl checks run against MqttAcl.field (mqtt_broker.dart).
@@ -20,15 +22,18 @@ import 'dart:typed_data';
 import 'package:atalaia_app/controller/controller_api.dart';
 import 'package:atalaia_app/controller/controller_engine.dart';
 import 'package:atalaia_app/controller/controller_mqtt.dart';
+import 'package:atalaia_app/controller/prop_link.dart' show propLinkProof;
+import 'package:atalaia_app/controller/controller_store.dart';
 import 'package:atalaia_app/controller/mqtt_broker.dart';
 import 'package:atalaia_app/core/node_types.dart';
 import 'package:atalaia_app/ffi/bindings.dart';
+import 'package:atalaia_app/protocol/join_payload.dart';
 import 'package:atalaia_app/radio/rf_codec.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/core_libs.dart';
 import '../support/event_schema.dart';
-import '../support/recording_radio.dart';
+import '../support/recording_modem.dart';
 import '../support/vectors.dart';
 
 final _var = RegExp(r'\$\{(\w+)\}');
@@ -101,6 +106,34 @@ String? mismatch(Object? pattern, Object? actual, [String where = r'$']) {
   }
   return null;
 }
+
+Uint8List _unhex(String s) => Uint8List.fromList([
+  for (var i = 0; i + 1 < s.length; i += 2)
+    int.parse(s.substring(i, i + 2), radix: 16),
+]);
+
+String _hex(List<int> b) =>
+    [for (final x in b) x.toRadixString(16).padLeft(2, '0')].join();
+
+/// A join payload by protocol/join.md's names, bytes in hex (as the Python
+/// runner shows the simulator's decoder's answer).
+Map<String, Object?> joinJson(JoinPayload j) => {
+  'game_id': j.gameId,
+  'game_key': _hex(j.gameKey),
+  'node_id': j.nodeId,
+  'controller_id': j.controllerId,
+  'channel_hz': j.channelHz,
+  'max_hops': j.maxHops,
+  'teams': j.teams,
+  'mode_id': j.modeId,
+  'role': j.role,
+  'game_seed': j.gameSeed,
+  'params': j.params,
+  'kind': j.kind.name,
+  'ca_sha256': j.caSha256 == null ? null : _hex(j.caSha256!),
+  'urls': j.urls,
+  'lang': j.lang,
+};
 
 Object? dig(Object? value, String path) {
   for (final part in path.split('.')) {
@@ -208,33 +241,63 @@ void main() {
   for (final c in cases(vectors, 'cases')) {
     test(c['name'] as String, () async {
       var now = 0;
-      final engine = ControllerEngine(
-        core: core,
-        transport: RecordingRadio(),
-        clockMs: () => now,
+      final dir = Directory.systemTemp.createTempSync('atalaia-contract-');
+      final config = ControllerConfig(
+        persistGameKey: (c['persist_game_key'] as bool?) ?? true,
       );
-      final api = ControllerApi(
-        engine,
-        gmToken: tokens['gm']!,
-        readToken: tokens['read']!,
-      );
-      if (c['stream_max_queue'] != null) {
-        api.hub.maxQueue = c['stream_max_queue'] as int;
-      }
+      final radio = RecordingModem();
+      final joinKey = _unhex((c['join_key'] as String?) ?? '');
       final published = <Map<String, Object?>>[];
-      ControllerMqtt(
-        engine,
-        (topic, payload, {qos = 0, retain = false}) => published.add({
-          'topic': topic,
-          'qos': qos,
-          'retain': retain,
-          'payload': jsonDecode(payload as String),
-        }),
-      );
-      final server = await api.serve();
+      late ControllerEngine engine;
+      late ControllerApi api;
+      late HttpServer server;
+      var sockets = <String, _Stream>{};
+      var props = <String, _Stream>{};
+      // Streams of the controllers before a restart, closed with the case.
+      final leftBehind = <_Stream>[];
+
+      // A controller on the case's store (a new one after a restart step),
+      // with its API, stream and MQTT bridge, as the Pi runner boots one.
+      Future<void> boot() async {
+        engine = ControllerEngine(
+          config: config,
+          store: FileControllerStore(dir),
+          core: core,
+          modem: radio,
+          clockMs: () => now,
+        )..joinKey = joinKey;
+        api = ControllerApi(
+          engine,
+          gmToken: tokens['gm']!,
+          readToken: tokens['read']!,
+        );
+        if (c['stream_max_queue'] != null) {
+          api.hub.maxQueue = c['stream_max_queue'] as int;
+        }
+        ControllerMqtt(
+          engine,
+          (topic, payload, {qos = 0, retain = false}) => published.add({
+            'topic': topic,
+            'qos': qos,
+            'retain': retain,
+            'payload': jsonDecode(payload as String),
+          }),
+        );
+        server = await api.serve();
+        sockets = {};
+        props = {};
+      }
+
+      Future<void> shutDown() async {
+        await api.props.close();
+        await api.hub.close();
+        await server.close(force: true);
+        engine.close();
+      }
+
+      await boot();
       final client = HttpClient();
       final saved = <String, Object?>{};
-      final sockets = <String, _Stream>{};
       var sentinel = 0;
 
       void check(Object? pattern, Object? actual, String where) {
@@ -281,10 +344,63 @@ void main() {
         check(step['hello'], await ws.next(), 'stream $name: hello');
       }
 
+      // An Android prop's link (protocol/prop-link.md): the challenge, the
+      // proof with the key given (hex), then the welcome, or the refusal and
+      // the close code.
+      Future<void> propConnect(Map<String, dynamic> step, int i) async {
+        final name = step['prop_connect'] as String;
+        final ws = _Stream(
+          await WebSocket.connect('ws://127.0.0.1:${server.port}/api/v1/prop'),
+        );
+        final challenge = await ws.next();
+        check(
+          {'type': 'challenge', 'version': 1, 'nonce': r'$any'},
+          challenge,
+          'step $i: the challenge',
+        );
+        final nonce = base64Url.decode(
+          base64Url.normalize(challenge!['nonce']! as String),
+        );
+        final key = _unhex(substitute(step['key'], saved)! as String);
+        final gid = substitute(step['game_id'] ?? r'${gid}', saved)! as int;
+        final node = step['node_id'] as int;
+        ws.socket.add(
+          jsonEncode({
+            'type': 'auth',
+            'game_id': gid,
+            'node_id': node,
+            'proof': base64Url
+                .encode(propLinkProof(key, nonce, gid, node))
+                .replaceAll('=', ''),
+          }),
+        );
+        if (step.containsKey('close')) {
+          final got = <Map<String, Object?>>[];
+          for (var m = await ws.next(); m != null; m = await ws.next()) {
+            got.add(m);
+          }
+          check(step['messages'], got, 'step $i: prop $name');
+          expect(ws.socket.closeCode, step['close'], reason: 'step $i');
+          return;
+        }
+        props[name] = ws;
+        check(step['welcome'], await ws.next(), 'step $i: prop $name: welcome');
+      }
+
       try {
         final steps = (c['steps'] as List).cast<Map<String, dynamic>>();
         for (var i = 0; i < steps.length; i++) {
           final step = steps[i];
+          if (step.containsKey('restart')) {
+            // The phone's controller stops and a new one opens the same
+            // store, as after the app was killed or the phone restarted.
+            leftBehind
+              ..addAll(sockets.values)
+              ..addAll(props.values);
+            await shutDown();
+            await boot();
+            continue;
+          }
           if (step.containsKey('advance_ms')) {
             now += step['advance_ms'] as int;
             engine.tick();
@@ -330,19 +446,89 @@ void main() {
               'STATE' => RfType.state,
               _ => RfType.event,
             };
-            engine.onPacket(
+            radio.rx(
               RfHeader.v1(
                 gameId: engine.liveGame!['id']! as int,
                 source: rx['source']! as int,
                 seq: rx['seq']! as int,
                 hopLimit: 2,
                 type: type,
+                ack: rx['ack'] == true,
               ),
               rxPayload(rx),
               epoch: (rx['epoch'] as int?) ?? 0,
-              rssi: -60,
-              snr: 5,
             );
+            continue;
+          }
+          if (step.containsKey('prop_connect')) {
+            await propConnect(step, i);
+            continue;
+          }
+          if (step.containsKey('prop_send')) {
+            props[step['prop_send'] as String]!.socket.add(
+              jsonEncode(substitute(step['json'], saved)),
+            );
+            continue;
+          }
+          if (step.containsKey('prop')) {
+            // Every message since the last look: a ping goes after them, its
+            // pong ends the list.
+            final name = step['prop'] as String;
+            final ws = props[name]!..socket.add(jsonEncode({'type': 'ping'}));
+            final got = <Map<String, Object?>>[];
+            while (true) {
+              final m = await ws.next();
+              if (m == null) fail('step $i: prop $name closed');
+              if (m.length == 1 && m['type'] == 'pong') break;
+              got.add(m);
+            }
+            check(step['messages'], got, 'step $i: prop $name');
+            continue;
+          }
+          if (step.containsKey('prop_closed')) {
+            final name = step['prop_closed'] as String;
+            final ws = props.remove(name)!;
+            final got = <Map<String, Object?>>[];
+            for (var m = await ws.next(); m != null; m = await ws.next()) {
+              got.add(m);
+            }
+            check(step['messages'], got, 'step $i: prop $name');
+            expect(ws.socket.closeCode, step['close'], reason: 'step $i');
+            continue;
+          }
+          if (step.containsKey('join_decode')) {
+            // A join payload's text, opened with the case's field join key.
+            final text = substitute(step['join_decode'], saved)! as String;
+            final j = joinJson(decodeJoin(joinFromText(text), joinKey));
+            check(step['json'], j, 'step $i: the join payload');
+            for (final e
+                in ((step['save'] as Map?) ?? const {})
+                    .cast<String, String>()
+                    .entries) {
+              saved[e.key] = dig(j, e.value);
+            }
+            continue;
+          }
+          if (step.containsKey('tx')) {
+            var got = List.of(radio.log);
+            radio.log.clear();
+            final kinds = (step['kinds'] as List?)?.cast<String>();
+            if (kinds != null) {
+              got = [
+                for (final e in got)
+                  if (kinds.contains(e['kind'])) e,
+              ];
+            }
+            check(step['tx'], got, 'step $i: the radio');
+            continue;
+          }
+          if (step.containsKey('radio_state')) {
+            radio.setState(step['radio_state'] as String);
+            continue;
+          }
+          if (step.containsKey('tx_ack')) {
+            final a = (step['tx_ack'] as Map).cast<String, Object?>();
+            radio.onTxAck?.call(a['seq']! as int, a['status']! as String);
             continue;
           }
           final req = (substitute(step['request'], saved)! as Map)
@@ -377,16 +563,33 @@ void main() {
           }
         }
       } finally {
-        for (final ws in sockets.values) {
+        for (final ws in [...leftBehind, ...sockets.values, ...props.values]) {
           await ws.socket.close();
         }
-        await api.hub.close();
         client.close(force: true);
-        await server.close(force: true);
-        engine.close();
+        await shutDown();
+        dir.deleteSync(recursive: true);
       }
     });
   }
+
+  test('the prop link proof (protocol/vectors/prop_link.json)', () {
+    final v = loadVectors('prop_link.json');
+    for (final c in cases(v, 'valid')) {
+      expect(
+        _hex(
+          propLinkProof(
+            _unhex(c['game_key'] as String),
+            _unhex(c['nonce'] as String),
+            c['game_id'] as int,
+            c['node_id'] as int,
+          ),
+        ),
+        c['proof'],
+        reason: c['name'] as String,
+      );
+    }
+  });
 
   test('the MQTT ACL (as controller/deploy/atalaia.acl on the Pi)', () {
     final acl = (vectors['mqtt_acl'] as Map).cast<String, Object?>();

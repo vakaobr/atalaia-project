@@ -322,6 +322,15 @@ class RestartTests(EngineCase):
         self.assertEqual((out["state"], out["game_over_frame"]), ("ended", "no_join_key"))
         self.create()
 
+    def test_own_event_seq_goes_on_after_a_restart(self):
+        """Decision PE24-42: a second adjustment at the same game time is not taken for a replay."""
+        gid = self.create()["id"]
+        self.ctrl.adjust_score(gid, "red", 5, "")
+        self.reopen()
+        self.assertEqual(self.ctrl.adjust_score(gid, "red", 3, "")["event"]["seq"], 2)
+        self.reopen()
+        self.assertEqual(self.ctrl.score(gid)["teams"]["red"], 8)
+
     def test_the_default_survives_a_restart(self):
         """Decision OT-7: persist_game_key is on by default; a restart mid-game carries on."""
         self.assertTrue(self.cfg.persist_game_key)

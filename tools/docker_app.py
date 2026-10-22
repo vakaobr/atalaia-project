@@ -24,9 +24,10 @@ running. Two images are used:
 - atalaia-dev (tools/dev/Dockerfile, built on first use like docker_sim.py)
   builds the core and the FFI stub as shared libraries for the Dart tests
   (cmake ... -DATALAIA_SHARED=ON -DATALAIA_STUB=ON -DATALAIA_MBEDTLS=OFF),
-  and the host pod and host modem (firmware/esp32/test/pod_host and
-  modem_host, mbedtls linked in statically), which the pod and radio-link
-  tests run. Both images are Ubuntu 24.04, so they run in the other one.
+  and the host pod, host modem and host box (firmware/esp32/test/pod_host,
+  modem_host and box_host, mbedtls linked in statically), which the pod and
+  radio-link tests and the phone controller's end-to-end tests run. Both
+  images are Ubuntu 24.04, so they run in the other one.
 - ghcr.io/cirruslabs/flutter:3.44.0, pinned by digest (about 2.3 GB on the
   first run), runs app/tool/check.sh. It has no CMake: the NDK 28.2.13676358
   and CMake 3.22.1 come from the Android SDK manager on first use (about
@@ -77,11 +78,11 @@ def fail(message: str) -> int:
 
 
 def build_core() -> int:
-    """The core, the FFI stub, the host pod and the host modem, in the atalaia-dev image."""
+    """The core, the FFI stub, the host pod, the host modem and the host box, in the atalaia-dev image."""
     if not docker_sim.ensure_image():
         return fail("building the atalaia-dev image failed")
-    print("docker_app: building the core, the FFI stub, the host pod and the host modem "
-          "(atalaia-dev)...", flush=True)
+    print("docker_app: building the core, the FFI stub, the host pod, the host modem and the "
+          "host box (atalaia-dev)...", flush=True)
     script = ("cmake -S /src/core -B /core-build -DCMAKE_BUILD_TYPE=Debug -DATALAIA_SHARED=ON "
               "-DATALAIA_STUB=ON -DATALAIA_MBEDTLS=OFF -DBUILD_TESTING=OFF > /tmp/build.log 2>&1 "
               "&& cmake --build /core-build >> /tmp/build.log 2>&1 "
@@ -89,6 +90,11 @@ def build_core() -> int:
               "cmake -S /src/firmware/esp32/test/$h -B /core-build/$h -DCMAKE_BUILD_TYPE=Debug "
               ">> /tmp/build.log 2>&1 && cmake --build /core-build/$h >> /tmp/build.log 2>&1 "
               "|| exit 1; done "
+              # The host box links the core with mbedtls: its static library, so that
+              # the program runs in the Flutter image too (which has no mbedtls).
+              "&& cmake -S /src/firmware/esp32/test/box_host -B /core-build/box_host "
+              "-DCMAKE_BUILD_TYPE=Debug -DMBEDCRYPTO_LIB=$(ls /usr/lib/*/libmbedcrypto.a | head -n 1) "
+              ">> /tmp/build.log 2>&1 && cmake --build /core-build/box_host >> /tmp/build.log 2>&1 "
               "|| { cat /tmp/build.log; exit 1; }")
     return subprocess.call(["docker", "run", "--rm", "-v", f"{REPO}:/src:ro", "-v",
                             f"{CORE_VOLUME}:/core-build", docker_sim.IMAGE, "sh", "-c", script])
@@ -104,7 +110,8 @@ def flutter(mode: str, args: list[str]) -> int:
                 "-e", "ATALAIA_CORE_LIB=/core-build/libatalaia_core.so",
                 "-e", "ATALAIA_CORE_STUB_LIB=/core-build/libatalaia_core_stub.so",
                 "-e", "ATALAIA_POD_HOST=/core-build/pod_host/pod_host",
-                "-e", "ATALAIA_MODEM_HOST=/core-build/modem_host/modem_host"]
+                "-e", "ATALAIA_MODEM_HOST=/core-build/modem_host/modem_host",
+                "-e", "ATALAIA_BOX_HOST=/core-build/box_host/box_host"]
     if mode in ("ndk", "apk"):
         cmd += ["-v", f"{NDK_VOLUME}:{SDK}/ndk", "-v", f"{CMAKE_VOLUME}:{SDK}/cmake"]
     if mode == "apk":

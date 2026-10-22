@@ -1,5 +1,5 @@
 {
-  "description": "Contract cases for the field controller's REST API v1 (controller/atalaia_controller/api.py; the Android controller, app/lib/controller/controller_api.dart, decision PE24). Each case starts a fresh controller (no games, node id 0, a radio that is up, a clock at 0) and runs its steps in order. A 'request' step sends method and path with the token named (gm, read, none: no Authorization header, bad: an unknown token) and the JSON body if given; the answer must have the status and, if given, a body matching 'json'. 'save' keeps values of the answer (dotted paths) under names; '${name}' in a path or as a whole string value stands for a saved value. An 'rx' step is a decrypted packet from a box as the radio gives it (HELLO, STATE: the payload's fields by name, counters by team id; EVENT: the event, encoded by the core's codec, prio from the schema when not given). An 'advance_ms' step moves the controller's clock on and runs its tick once. Stream steps (WS /api/v1/stream, added with slice S2 of PE24): 'ws_connect' opens a connection under a name with the token named ('via': 'query', the default, puts it in ?token=, 'header' in Authorization), and the first message must match 'hello', or, with 'close', the controller must close it with that code before any message; 'ws' takes every message that connection got since its last 'ws' step (the runner publishes a marker {'type': 'pong', 'sentinel': n} through the stream after them and drops the markers), and they must match 'messages' as a list, so nothing may come in between or be missing; 'ws_send' sends 'json' and the next message must match 'reply'; 'ws_flood' hands 'count' messages {'type': 'system', 'kind': 'test', 'i': i} to every open connection at once, before any is sent, and the controller must close the connection named with code 'close' (a client more than 'stream_max_queue' messages behind, a case setting: 256 when not given). An 'mqtt' step takes every message the controller published to its MQTT broker since the last 'mqtt' step, as {'topic', 'qos', 'retain', 'payload' (the JSON payload)}, and they must match the list given. 'mqtt_acl' lists who may read and write which topics. Matching: an object matches when every key given matches (other keys are free); '$absent' as a value means the key must not be there and '$any' that it must be there; a list matches element by element and must have the same length, except {'$contains': [...]}, where each pattern must match some element. The Python controller is the reference: these cases describe what it does (controller/tests/test_api_contract.py), and the Android controller must do the same (app/test/controller/api_contract_test.dart).",
+  "description": "Contract cases for the field controller's REST API v1 (controller/atalaia_controller/api.py; the Android controller, app/lib/controller/controller_api.dart, decision PE24). Each case starts a fresh controller (no games, node id 0, a radio that is up, a clock at 0) and runs its steps in order. A 'request' step sends method and path with the token named (gm, read, none: no Authorization header, bad: an unknown token) and the JSON body if given; the answer must have the status and, if given, a body matching 'json'. 'save' keeps values of the answer (dotted paths) under names; '${name}' in a path or as a whole string value stands for a saved value. An 'rx' step is a decrypted packet from a box as the radio gives it (HELLO, STATE: the payload's fields by name, counters by team id; EVENT: the event, encoded by the core's codec, prio from the schema when not given). An 'advance_ms' step moves the controller's clock on and runs its tick once. Stream steps (WS /api/v1/stream, added with slice S2 of PE24): 'ws_connect' opens a connection under a name with the token named ('via': 'query', the default, puts it in ?token=, 'header' in Authorization), and the first message must match 'hello', or, with 'close', the controller must close it with that code before any message; 'ws' takes every message that connection got since its last 'ws' step (the runner publishes a marker {'type': 'pong', 'sentinel': n} through the stream after them and drops the markers), and they must match 'messages' as a list, so nothing may come in between or be missing; 'ws_send' sends 'json' and the next message must match 'reply'; 'ws_flood' hands 'count' messages {'type': 'system', 'kind': 'test', 'i': i} to every open connection at once, before any is sent, and the controller must close the connection named with code 'close' (a client more than 'stream_max_queue' messages behind, a case setting: 256 when not given). An 'mqtt' step takes every message the controller published to its MQTT broker since the last 'mqtt' step, as {'topic', 'qos', 'retain', 'payload' (the JSON payload)}, and they must match the list given. 'mqtt_acl' lists who may read and write which topics. A 'restart' step (added with slice S3) stops the controller and starts a new one on the same store, as after a reboot or a crash: the clock goes on, the open stream connections end (a 'ws_connect' after it opens one to the new controller), the MQTT messages go on to the same list. A case may set 'persist_game_key' (true when not given: decision OT-7), the controller's setting for the whole case, before and after its restarts. Radio steps (added with slice S4): an 'rx' step may set 'ack': true (the packet asks for an ACK); 'tx' takes everything the controller asked of its radio since the last 'tx' step, in order, and it must match the list given ('kinds' keeps only those kinds): a packet is {'kind': its message type (HELLO, EVENT, ACK, STATE, CMD, TIME...), 'source', 'seq', 'hop_limit', 'prio' (telemetry, normal, critical), 'ack' (an ACK requested), 'fields': the payload by the field names of protocol/schema/messages.yaml, bytes in hex}; the modem's commands are {'kind': 'configure', 'game_id', 'node_id', 'epoch', 'max_hops', 'channel_hz'} (the key is never shown), {'kind': 'clear'}, {'kind': 'channel', 'channel_hz'} and {'kind': 'peer_epochs', 'epochs': {node id: epoch}}. 'radio_state' ('up' or 'down') is the modem's link going down or coming back; 'tx_ack' {'seq', 'status'} is the modem's TX_ACK. Joins (slice S4): a case may set 'join_key' (the field join key, hex; none when not given: joins are refused with 503); a 'join_decode' step opens the join text given (usually a saved one) with it and its fields (protocol/join.md's names, bytes in hex) must match 'json'; 'save' works as for a request. Android props on Wi-Fi (WS /api/v1/prop, protocol/prop-link.md; slice S4): 'prop_connect' opens a link under a name for 'node_id' with the game key 'key' (hex, usually a saved join_decode's) to the game 'game_id' (the saved ${gid} when not given): the runner answers the challenge with the proof, and the first message must match 'welcome', or, with 'close', the messages until the controller closes it must match 'messages' and the close code 'close'; 'prop_send' sends 'json' on a link; 'prop' takes every message the link got since its last look (the runner sends a ping after them and stops at its pong), which must match 'messages'; 'prop_closed' takes the messages until the controller closes the link, which must match 'messages', and its close code 'close'. Matching: an object matches when every key given matches (other keys are free); '$absent' as a value means the key must not be there and '$any' that it must be there; a list matches element by element and must have the same length, except {'$contains': [...]}, where each pattern must match some element. The Python controller is the reference: these cases describe what it does (controller/tests/test_api_contract.py), and the Android controller must do the same (app/test/controller/api_contract_test.dart).",
   "tokens": {"gm": "gm-secret", "read": "read-secret"},
   "cases": [
     {
@@ -338,6 +338,251 @@
           {"topic": "field/v1/${gid}/nodes/7/health", "qos": 1, "retain": true, "payload": {"node_id": 7, "battery_pct": null, "rssi": -60, "link": "online"}}
         ]},
         {"request": {"method": "GET", "path": "/api/v1/games/${gid}/log", "token": "gm"}, "status": 200, "json": {"$contains": [{"type": "hacking.solved", "data": {"code": "1234"}}]}}
+      ]
+    },
+    {
+      "name": "a restart keeps the live game: its clock, score, nodes and log",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sunday", "mode_id": "org.atalaia.domination", "assignments": {"4": "zone"}}}, "status": 201, "save": {"gid": "id"}},
+        {"rx": {"source": 4, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-4", "platform": 1, "fw_version": "0.3.0", "core_version": "0.2.0", "tier": 0, "capabilities": [1, 2], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm"}, "status": 200, "json": {"state": "running"}},
+        {"rx": {"source": 4, "seq": 1, "epoch": 1, "type": "STATE", "state": {"owner_team": 1, "phase": 1, "game_time_ms": 10, "counters": {"1": 7}, "epoch": 1}}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/score", "token": "gm", "body": {"team": "blue", "amount": 2, "reason": "bonus"}}, "status": 200},
+        {"advance_ms": 12000},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/pause", "token": "gm", "body": {"reason": "medic"}}, "status": 200, "json": {"state": "paused"}},
+        {"restart": true},
+        {"request": {"method": "GET", "path": "/api/v1/controller", "token": "read"}, "status": 200, "json": {"live_game": "${gid}", "key_lost": false, "role": "leader", "term": 1, "radio": "up"}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}", "token": "gm"}, "status": 200, "json": {"id": "${gid}", "state": "paused", "live": true, "game_time_ms": 12000, "key_lost": "$absent", "game_key": "$absent"}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/score", "token": "read"}, "status": 200, "json": {"teams": {"red": 7, "blue": 2}}},
+        {"request": {"method": "GET", "path": "/api/v1/nodes", "token": "read"}, "status": 200, "json": [{"node_id": 4, "name": "box-4", "role": "zone", "battery_pct": 90, "epoch": 1, "score": {"red": 7, "blue": 0}, "link": "online", "battery_low": false}]},
+        {"ws_connect": "g", "token": "gm", "hello": {"type": "hello", "game": {"id": "${gid}", "state": "paused", "live": true}, "score": {"game": "${gid}", "teams": {"red": 7, "blue": 2}}, "nodes": [{"node_id": 4, "name": "box-4"}], "status": {"live_game": "${gid}", "key_lost": false}}},
+        {"rx": {"source": 4, "seq": 2, "epoch": 1, "type": "STATE", "state": {"owner_team": 1, "phase": 1, "game_time_ms": 12000, "counters": {"1": 11}, "epoch": 1}}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/score", "token": "read"}, "status": 200, "json": {"teams": {"red": 11, "blue": 2}}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/resume", "token": "gm"}, "status": 200, "json": {"state": "running"}},
+        {"advance_ms": 1000},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}", "token": "read"}, "status": 200, "json": {"state": "running", "game_time_ms": 13000}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm", "body": {"reason": "done"}}, "status": 200, "json": {"state": "ended", "live": false}},
+        {"restart": true},
+        {"request": {"method": "GET", "path": "/api/v1/controller", "token": "read"}, "status": 200, "json": {"live_game": null, "key_lost": false, "role": null}},
+        {"request": {"method": "GET", "path": "/api/v1/games", "token": "read"}, "status": 200, "json": [{"id": "${gid}", "state": "ended", "live": false, "started_at": "$any", "ended_at": "$any"}]},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/score", "token": "read"}, "status": 200, "json": {"teams": {"red": 11, "blue": 2}}},
+        {"request": {"method": "GET", "path": "/api/v1/nodes?game=${gid}", "token": "read"}, "status": 200, "json": [{"node_id": 4, "name": "box-4", "role": "zone", "score": {"red": 11, "blue": 0}}]},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/log", "token": "read"}, "status": 200, "json": {"$contains": [{"node": 0, "type": "game.start", "t": 0}, {"node": 4, "type": "node.online"}, {"node": 0, "type": "score.delta", "team": "blue", "data": {"amount": 2, "reason": "bonus"}}, {"node": 0, "type": "game.pause", "t": 12000, "data": {"reason": "medic"}}, {"node": 0, "type": "game.resume", "t": 12000}, {"node": 0, "type": "game.end", "t": 13000, "data": {"reason": "done", "winner": "red"}}]}},
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Next", "mode_id": "org.atalaia.domination"}}, "status": 201, "json": {"state": "ready", "live": true}}
+      ]
+    },
+    {
+      "name": "the GM's score adjustments outlive two restarts",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sunday", "mode_id": "org.atalaia.domination"}}, "status": 201, "save": {"gid": "id"}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/score", "token": "gm", "body": {"team": "red", "amount": 5, "reason": "first"}}, "status": 200, "json": {"score": {"teams": {"red": 5, "blue": 0}}}},
+        {"restart": true},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/score", "token": "gm", "body": {"team": "red", "amount": 3, "reason": "second"}}, "status": 200, "json": {"score": {"teams": {"red": 8, "blue": 0}}}},
+        {"restart": true},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/score", "token": "read"}, "status": 200, "json": {"teams": {"red": 8, "blue": 0}}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/log", "token": "read"}, "status": 200, "json": [{"node": 0, "seq": 1, "t": 0, "type": "score.delta", "data": {"amount": 5, "reason": "first"}}, {"node": 0, "seq": 2, "t": 0, "type": "score.delta", "data": {"amount": 3, "reason": "second"}}]}
+      ]
+    },
+    {
+      "name": "field.lua runs again after a restart and its earlier points stay",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Hold", "mode_id": "org.atalaia.holdall", "assignments": {"4": "zone", "5": "zone"}}}, "status": 201, "save": {"gid": "id"}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm", "body": {"force": true}}, "status": 200, "json": {"state": "running"}},
+        {"rx": {"source": 4, "seq": 0, "epoch": 1, "type": "STATE", "state": {"owner_team": 1, "phase": 1, "game_time_ms": 0, "counters": {}, "epoch": 1}}},
+        {"rx": {"source": 5, "seq": 0, "epoch": 1, "type": "STATE", "state": {"owner_team": 1, "phase": 1, "game_time_ms": 0, "counters": {}, "epoch": 1}}},
+        {"advance_ms": 1000},
+        {"advance_ms": 10000},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/score", "token": "read"}, "status": 200, "json": {"teams": {"red": 1, "blue": 0}}},
+        {"restart": true},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}", "token": "gm"}, "status": 200, "json": {"state": "running", "game_time_ms": 11000}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/score", "token": "read"}, "status": 200, "json": {"teams": {"red": 1, "blue": 0}}},
+        {"rx": {"source": 4, "seq": 1, "epoch": 1, "type": "STATE", "state": {"owner_team": 1, "phase": 1, "game_time_ms": 11000, "counters": {}, "epoch": 1}}},
+        {"rx": {"source": 5, "seq": 1, "epoch": 1, "type": "STATE", "state": {"owner_team": 1, "phase": 1, "game_time_ms": 11000, "counters": {}, "epoch": 1}}},
+        {"advance_ms": 1000},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/log", "token": "gm"}, "status": 200, "json": {"$contains": [{"node": 0, "type": "holdall.scoring_start", "t": 1000, "data": {"team": "red"}}, {"node": 0, "type": "holdall.scoring_start", "t": 12000, "data": {"team": "red"}}]}},
+        {"advance_ms": 10000},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/score", "token": "read"}, "status": 200, "json": {"teams": {"red": 2, "blue": 0}}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm"}, "status": 200, "json": {"state": "ended"}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/score", "token": "read"}, "status": 200, "json": {"teams": {"red": 2, "blue": 0}}}
+      ]
+    },
+    {
+      "name": "without persist_game_key a restart loses the key and the game can only be ended",
+      "persist_game_key": false,
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sunday", "mode_id": "org.atalaia.domination"}}, "status": 201, "save": {"gid": "id"}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm", "body": {"force": true}}, "status": 200, "json": {"state": "running"}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/score", "token": "gm", "body": {"team": "red", "amount": 1}}, "status": 200},
+        {"restart": true},
+        {"request": {"method": "GET", "path": "/api/v1/controller", "token": "read"}, "status": 200, "json": {"live_game": "${gid}", "key_lost": true, "role": null, "term": null}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}", "token": "read"}, "status": 200, "json": {"state": "running", "live": true, "key_lost": true}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/score", "token": "read"}, "status": 200, "json": {"teams": {"red": 1, "blue": 0}}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/pause", "token": "gm"}, "status": 409},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/resume", "token": "gm"}, "status": 409},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/score", "token": "gm", "body": {"team": "red", "amount": 1}}, "status": 409},
+        {"request": {"method": "POST", "path": "/api/v1/nodes/4/cmd", "token": "gm", "body": {"cmd": "message", "params": {"text": "go"}}}, "status": 409},
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Next", "mode_id": "org.atalaia.domination"}}, "status": 409},
+        {"advance_ms": 1000},
+        {"ws_connect": "g", "token": "gm", "hello": {"type": "hello", "game": {"id": "${gid}", "state": "running", "key_lost": true}, "score": {"teams": {"red": 1, "blue": 0}}, "status": {"live_game": "${gid}", "key_lost": true}}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm"}, "status": 200, "json": {"id": "${gid}", "state": "ended", "live": false, "game_over_frame": "no_join_key"}},
+        {"ws": "g", "messages": [{"type": "game", "game": {"id": "${gid}", "state": "ended", "live": true, "key_lost": true}}]},
+        {"request": {"method": "GET", "path": "/api/v1/controller", "token": "read"}, "status": 200, "json": {"live_game": null, "key_lost": false}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/score", "token": "read"}, "status": 200, "json": {"teams": {"red": 1, "blue": 0}}},
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Next", "mode_id": "org.atalaia.domination"}}, "status": 201, "json": {"state": "ready"}, "save": {"gid2": "id"}},
+        {"restart": true},
+        {"request": {"method": "GET", "path": "/api/v1/controller", "token": "read"}, "status": 200, "json": {"live_game": "${gid2}", "key_lost": true}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid2}/start", "token": "gm", "body": {"force": true}}, "status": 409},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid2}/end", "token": "gm"}, "status": 200, "json": {"state": "ended"}}
+      ]
+    },
+    {
+      "name": "the radio: the game on the modem, the controller's packets and ACKs",
+      "steps": [
+        {"tx": []},
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sunday", "mode_id": "org.atalaia.domination", "assignments": {"4": "zone"}}}, "status": 201, "save": {"gid": "id"}},
+        {"tx": [{"kind": "configure", "game_id": "${gid}", "node_id": 0, "epoch": 1, "max_hops": 2, "channel_hz": 869525000}]},
+        {"request": {"method": "GET", "path": "/api/v1/controller", "token": "read"}, "status": 200, "json": {"radio": "up", "tx_epoch": 1, "tx_status": {}, "modem": {"ident": "$any", "status": "$any", "reconnects": 0}}},
+        {"rx": {"source": 4, "seq": 0, "epoch": 1, "ack": true, "type": "HELLO", "hello": {"node_name": "box-4", "platform": 1, "fw_version": "0.3.0", "core_version": "0.2.0", "tier": 0, "capabilities": [1, 2], "transports": 1, "battery_pct": 90, "epoch": 1}}},
+        {"rx": {"source": 4, "seq": 1, "epoch": 1, "ack": true, "type": "EVENT", "event": {"node": 4, "seq": 1, "t": 0, "type": "zone.captured", "team": 1}}},
+        {"rx": {"source": 4, "seq": 3, "epoch": 1, "ack": true, "type": "EVENT", "event": {"node": 4, "seq": 2, "t": 0, "type": "zone.neutralized"}}},
+        {"tx": [
+          {"kind": "ACK", "source": 0, "seq": 0, "hop_limit": 2, "prio": "normal", "ack": false, "fields": {"ack_node": 4, "ack_seq": 0}},
+          {"kind": "ACK", "source": 0, "seq": 1, "fields": {"ack_node": 4, "ack_seq": 1}},
+          {"kind": "ACK", "source": 0, "seq": 2, "fields": {"ack_node": 4, "ack_seq": 1, "ack_bitmap": "02"}}
+        ]},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm"}, "status": 200},
+        {"tx": [
+          {"kind": "CMD", "source": 0, "seq": 3, "prio": "critical", "ack": false, "fields": {"cmd": 0, "params": "$absent", "dest": "$absent"}},
+          {"kind": "TIME", "source": 0, "seq": 4, "prio": "critical", "fields": {"game_time_ms": 0, "game_state": 1, "duration_ms": 0, "term": 1, "wall_s": "$any"}}
+        ]},
+        {"request": {"method": "POST", "path": "/api/v1/nodes/4/cmd", "token": "gm", "body": {"cmd": "message", "params": {"text": "go"}}}, "status": 202, "json": {"seq": 5}},
+        {"tx": [{"kind": "CMD", "seq": 5, "fields": {"cmd": 5, "params": {"text": "go"}, "dest": 4}}]},
+        {"advance_ms": 29000},
+        {"tx": []},
+        {"advance_ms": 1000},
+        {"tx": [{"kind": "TIME", "seq": 6, "fields": {"game_time_ms": 30000, "game_state": 1}}]},
+        {"tx_ack": {"seq": 6, "status": "duty_cycle"}},
+        {"request": {"method": "GET", "path": "/api/v1/controller", "token": "read"}, "status": 200, "json": {"tx_status": {"duty_cycle": 1}}},
+        {"radio_state": "down"},
+        {"request": {"method": "POST", "path": "/api/v1/nodes/4/cmd", "token": "gm", "body": {"cmd": "message", "params": {"text": "go"}}}, "status": 503},
+        {"request": {"method": "GET", "path": "/api/v1/controller", "token": "read"}, "status": 200, "json": {"radio": "down"}},
+        {"radio_state": "up"},
+        {"tx": [{"kind": "peer_epochs", "epochs": {"4": 1}}]},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm"}, "status": 200},
+        {"tx": [
+          {"kind": "CMD", "fields": {"cmd": 3}},
+          {"kind": "TIME", "fields": {"game_state": 3}},
+          {"kind": "clear"}
+        ]},
+        {"radio_state": "down"},
+        {"radio_state": "up"},
+        {"tx": [{"kind": "channel", "channel_hz": 869525000}]},
+        {"request": {"method": "GET", "path": "/api/v1/controller", "token": "read"}, "status": 200, "json": {"tx_epoch": null}},
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Next", "mode_id": "org.atalaia.domination"}}, "status": 201, "save": {"gid2": "id"}},
+        {"tx": [{"kind": "configure", "game_id": "${gid2}", "epoch": 1}]}
+      ]
+    },
+    {
+      "name": "the radio after a restart: a new epoch under the same game key",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sunday", "mode_id": "org.atalaia.domination"}}, "status": 201, "save": {"gid": "id"}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm", "body": {"force": true}}, "status": 200},
+        {"tx": [{"kind": "configure", "game_id": "${gid}", "epoch": 1}], "kinds": ["configure"]},
+        {"restart": true},
+        {"tx": [{"kind": "configure", "game_id": "${gid}", "node_id": 0, "epoch": 2}]},
+        {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {}}, "status": 503},
+        {"request": {"method": "GET", "path": "/api/v1/controller", "token": "read"}, "status": 200, "json": {"tx_epoch": 2}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/pause", "token": "gm"}, "status": 200},
+        {"tx": [{"kind": "CMD", "seq": 0, "fields": {"cmd": 1}}, {"kind": "TIME", "seq": 1, "fields": {"game_state": 2}}]},
+        {"restart": true},
+        {"tx": [{"kind": "configure", "game_id": "${gid}", "epoch": 3}]},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm"}, "status": 200},
+        {"tx": [{"kind": "clear"}], "kinds": ["clear", "configure"]}
+      ]
+    },
+    {
+      "name": "joins: payloads sealed with the field join key, one node id per device",
+      "join_key": "6465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f80818283",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {}}, "status": 409},
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sunday", "mode_id": "org.atalaia.domination", "console_lang": "auto"}}, "status": 400},
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sunday", "mode_id": "org.atalaia.domination", "assignments": {"4": "zone"}, "console_lang": "pt"}}, "status": 201, "save": {"gid": "id"}},
+        {"request": {"method": "POST", "path": "/api/v1/join", "token": "read", "body": {}}, "status": 403},
+        {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {}}, "status": 200, "json": {"game": "${gid}", "node_id": 1, "kind": "node", "role": "zone", "controller_id": 0, "channel_hz": 869525000, "max_hops": 2, "wifi_link": false, "bytes": "$any", "text": "$any", "payload_hex": "$any", "ndef_tag_hex": "$any", "game_key": "$absent"}, "save": {"text1": "text"}},
+        {"join_decode": "${text1}", "json": {"game_id": "${gid}", "node_id": 1, "controller_id": 0, "kind": "node", "role": "zone", "mode_id": "org.atalaia.domination", "teams": ["red", "blue"], "channel_hz": 869525000, "max_hops": 2, "lang": "pt", "params": {"capture_hold_ms": 3000, "tick_s": 10, "points_per_tick": 1}, "ca_sha256": null, "urls": null, "game_key": "$any", "game_seed": "$any"}, "save": {"key1": "game_key"}},
+        {"request": {"method": "POST", "path": "/api/v1/nodes/4/join", "token": "gm", "body": {}}, "status": 200, "json": {"node_id": 4, "role": "zone"}},
+        {"request": {"method": "POST", "path": "/api/v1/nodes/4/join", "token": "gm", "body": {}}, "status": 409},
+        {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {"role": "bomb"}}, "status": 400},
+        {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {"kind": "box"}}, "status": 400},
+        {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {"name": "alpha"}}, "status": 400},
+        {"request": {"method": "POST", "path": "/api/v1/nodes/0/join", "token": "gm", "body": {}}, "status": 400},
+        {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {"kind": "controller"}}, "status": 200, "json": {"node_id": 2, "kind": "controller", "role": "controller"}, "save": {"text2": "text"}},
+        {"join_decode": "${text2}", "json": {"node_id": 2, "kind": "controller", "role": "controller"}},
+        {"request": {"method": "POST", "path": "/api/v1/nodes/4/join", "token": "gm", "body": {"kind": "controller"}}, "status": 409},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}", "token": "gm"}, "status": 200, "json": {"assignments": {"1": "zone", "4": "zone"}}},
+        {"rx": {"source": 5, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-5", "platform": 1, "fw_version": "0.3.0", "core_version": "0.2.0", "tier": 0, "capabilities": [1], "transports": 1, "epoch": 1}}},
+        {"request": {"method": "POST", "path": "/api/v1/nodes/5/join", "token": "gm", "body": {}}, "status": 409},
+        {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {"node_id": 6}}, "status": 200, "json": {"node_id": 6}},
+        {"restart": true},
+        {"request": {"method": "POST", "path": "/api/v1/nodes/1/join", "token": "gm", "body": {}}, "status": 409},
+        {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {}}, "status": 200, "json": {"node_id": 3}, "save": {"text3": "text"}},
+        {"join_decode": "${text3}", "json": {"node_id": 3, "game_key": "${key1}"}},
+        {"request": {"method": "GET", "path": "/api/v1/settings/box-language", "token": "read"}, "status": 200, "json": {"box_language": "auto", "choices": ["auto", "pt", "en"], "game_box_language": "pt"}},
+        {"request": {"method": "PUT", "path": "/api/v1/settings/box-language", "token": "gm", "body": {"box_language": "xx"}}, "status": 400},
+        {"request": {"method": "PUT", "path": "/api/v1/settings/box-language", "token": "read", "body": {"box_language": "en"}}, "status": 403},
+        {"request": {"method": "PUT", "path": "/api/v1/settings/box-language", "token": "gm", "body": {"box_language": "en"}}, "status": 200, "json": {"box_language": "en", "game_box_language": "pt"}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm"}, "status": 200},
+        {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {}}, "status": 409},
+        {"request": {"method": "GET", "path": "/api/v1/settings/box-language", "token": "read"}, "status": 200, "json": {"box_language": "en", "game_box_language": null}},
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Next", "mode_id": "org.atalaia.domination", "console_lang": "pt"}}, "status": 201, "save": {"gid2": "id"}},
+        {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {}}, "status": 200, "json": {"node_id": 1}, "save": {"text4": "text"}},
+        {"join_decode": "${text4}", "json": {"game_id": "${gid2}", "lang": "en"}}
+      ]
+    },
+    {
+      "name": "an Android prop on Wi-Fi: the proof, its packets, TIME and commands",
+      "join_key": "6465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f80818283",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sunday", "mode_id": "org.atalaia.domination", "assignments": {"4": "zone"}}}, "status": 201, "save": {"gid": "id"}},
+        {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {"node_id": 7}}, "status": 200, "save": {"text": "text"}},
+        {"join_decode": "${text}", "json": {"node_id": 7}, "save": {"key": "game_key"}},
+        {"prop_connect": "wrong", "node_id": 7, "key": "00000000000000000000000000000000", "close": 4401, "messages": [{"type": "refused", "reason": "auth"}]},
+        {"prop_connect": "unassigned", "node_id": 5, "key": "${key}", "close": 4401, "messages": [{"type": "refused", "reason": "auth"}]},
+        {"prop_connect": "controller", "node_id": 0, "key": "${key}", "close": 4401, "messages": [{"type": "refused", "reason": "auth"}]},
+        {"prop_connect": "p", "node_id": 7, "key": "${key}", "welcome": {"type": "welcome", "game_id": "${gid}", "node_id": 7, "controller_id": 0, "time": {"type": "time", "game_time_ms": 0, "game_state": 0, "state": "waiting", "duration_ms": 0, "term": 1}}},
+        {"prop_send": "p", "json": {"type": "hello", "node_name": "telemovel-7", "fw_version": "0.3.0", "core_version": "0.2.0", "tier": 0, "capabilities": [0, 2], "battery_pct": 81}},
+        {"prop_send": "p", "json": {"type": "state", "owner_team": 1, "phase": 1, "game_time_ms": 4000, "counters": {"1": 12}, "battery_pct": 80}},
+        {"prop_send": "p", "json": {"type": "event", "event": {"seq": 1, "t": 4000, "type": "zone.captured", "team": 1}}},
+        {"prop_send": "p", "json": {"type": "event", "event": {"seq": 1, "t": 4000, "type": "zone.captured", "team": 1}}},
+        {"prop_send": "p", "json": {"type": "event", "event": {"seq": 2, "t": 4100, "type": "zone.captured", "team": 1, "data": {"no_such_field": 1}}}},
+        {"prop_send": "p", "json": {"type": "teleport"}},
+        {"prop": "p", "messages": [
+          {"type": "ack", "seq": 1, "event_type": "zone.captured"},
+          {"type": "ack", "seq": 1, "event_type": "zone.captured"},
+          {"type": "error", "message": "$any", "seq": 2},
+          {"type": "error", "message": "$any"}
+        ]},
+        {"request": {"method": "GET", "path": "/api/v1/nodes", "token": "read"}, "status": 200, "json": {"$contains": [{"node_id": 7, "name": "telemovel-7", "role": "zone", "platform": 3, "battery_pct": 80, "owner": "red", "epoch": 0, "score": {"red": 12, "blue": 0}}]}},
+        {"request": {"method": "GET", "path": "/api/v1/games/${gid}/log", "token": "read"}, "status": 200, "json": [{"node": 7, "type": "node.online", "prio": "telemetry", "epoch": null}, {"node": 7, "seq": 1, "t": 4000, "type": "zone.captured", "team": "red", "epoch": 0}]},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm", "body": {"force": true}}, "status": 200},
+        {"prop": "p", "messages": [
+          {"type": "cmd", "cmd": "start", "opcode": 0, "params": {}, "dest": null},
+          {"type": "time", "state": "running", "game_state": 1, "game_time_ms": 0, "term": 1, "duration_ms": 0, "wall_s": "$any"}
+        ]},
+        {"request": {"method": "POST", "path": "/api/v1/nodes/7/cmd", "token": "gm", "body": {"cmd": "message", "params": {"text": "go"}}}, "status": 202},
+        {"request": {"method": "POST", "path": "/api/v1/nodes/4/cmd", "token": "gm", "body": {"cmd": "message", "params": {"text": "not you"}}}, "status": 202},
+        {"prop": "p", "messages": [{"type": "cmd", "cmd": "message", "opcode": 5, "params": {"text": "go"}, "dest": 7}]},
+        {"tx": [{"kind": "CMD", "fields": {"cmd": 0}}, {"kind": "CMD", "fields": {"cmd": 5, "dest": 7}}, {"kind": "CMD", "fields": {"cmd": 5, "dest": 4}}], "kinds": ["CMD"]},
+        {"prop_connect": "p2", "node_id": 7, "key": "${key}", "welcome": {"type": "welcome", "node_id": 7, "time": {"state": "running", "game_state": 1}}},
+        {"prop_closed": "p", "messages": [{"type": "replaced"}], "close": 4409},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm"}, "status": 200},
+        {"prop": "p2", "messages": [
+          {"type": "cmd", "cmd": "end", "opcode": 3, "dest": null},
+          {"type": "time", "state": "ended", "game_state": 3}
+        ]},
+        {"prop_send": "p2", "json": {"type": "event", "event": {"seq": 3, "t": 5000, "type": "zone.captured", "team": 2}}},
+        {"prop": "p2", "messages": [{"type": "error", "message": "$any", "seq": 3}]},
+        {"prop_connect": "late", "node_id": 7, "key": "${key}", "close": 4401, "messages": [{"type": "refused", "reason": "auth"}]}
       ]
     }
   ],

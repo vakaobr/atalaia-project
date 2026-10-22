@@ -5,9 +5,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 3 -- Android and Players: Status
 
-**Current phase:** Implementation: plan phases A-D and F done in software; plan phase E done in software except the Android controller role's shell (PE24: slices S1, the game engine and REST API, and S2, the live stream and MQTT, done 2026-10-22; S3-S7 to do); plan phase G (integration and field test) pending, it needs the hardware
+**Current phase:** Implementation: plan phases A-D and F done in software; plan phase E done in software except the Android controller role's shell (PE24: slices S1, the game engine and REST API, S2, the live stream and MQTT, S3, keeping games across a restart, and S4, the pod as its radio, joins and Wi-Fi props, done 2026-10-22; S5-S7 to do); plan phase G (integration and field test) pending, it needs the hardware
 **Risk level:** Medium
-**Last verified:** 2026-10-22 (PE24 slice S2)
+**Last verified:** 2026-10-22 (PE24 slice S4)
 
 ## Completed
 
@@ -186,7 +186,7 @@ tools/docker_app.py` (Dart, NDK, APK) and `app\tool\emulator_tests.ps1`
 | Prop on Wi-Fi (PD12) | `protocol/prop-link.md`, `controller/atalaia_controller/prop_link.py`, `app/lib/controller/prop_link.dart`, `prop_session.dart`; join keys 13 and 14 (RFC 0001 Amendment 4, proposed) | Done: HELLO, STATE, events with ACK and resend, commands and TIME, `node.tamper` |
 | Positions (ADR-P3-6) | `controller/atalaia_controller/positions.py`, `POST`/`GET /api/v1/positions`; `app/lib/position/position_reporter.dart`, `app/lib/platform/location.dart`, `LocationPlugin.kt`, the foreground service's location type | Done for GPS; BLE beacons not built |
 | Teams and squads (maintainer) | games' `squads` (0 = none), squad pickers and the squad-leader role only where a game has squads (PE25) | Done in the controller, the console and the app |
-| Android controller role (ADR-P3-12) | `app/lib/controller/mqtt_broker.dart`, `visibility_engine.dart`; since 2026-10-22 `field_controller.dart`, `controller_engine.dart`, `controller_store.dart`, `controller_api.dart`, `controller_stream.dart`, `controller_mqtt.dart` | **Partly**: the broker and the visibility engine are built and tested; slices S1 and S2 of PE24 (2026-10-22, below): the game engine with `field.lua` on the core, the REST API for games, scores, the log and nodes, the live stream and the MQTT topics with the Pi's ACL; slices S3-S7 to do |
+| Android controller role (ADR-P3-12) | `app/lib/controller/mqtt_broker.dart`, `visibility_engine.dart`; since 2026-10-22 `field_controller.dart`, `controller_engine.dart`, `controller_store.dart`, `controller_api.dart`, `controller_stream.dart`, `controller_mqtt.dart` | **Partly**: the broker and the visibility engine are built and tested; slices S1 and S2 of PE24 (2026-10-22, below): the game engine with `field.lua` on the core, the REST API for games, scores, the log and nodes, the live stream and the MQTT topics with the Pi's ACL; slice S3 (2026-10-22): games kept in files across a restart; slice S4 (2026-10-22): an I/O pod as its radio, joins, Android props on Wi-Fi; slices S5-S7 to do |
 
 Tests: controller 201 (60 new: check-in, chrono list with the shared
 vectors, poster vectors, positions, prop link, TLS); console browser tests
@@ -236,8 +236,43 @@ Tests: 6 new controller tests (the 5 cases and the ACL against
 cases and the ACL, 5 for the stream's routing and hello, 3 for logins, the
 ACL and the bridge on a real broker).
 
-Remaining slices (`PLAN.md`, "PE24 slices"): **S3** keeping games across a restart; **S4** the I/O pod as the
-controller's radio, the Wi-Fi props and joins; **S5** check-in, player
+### Slice S3: keeping games across a restart (2026-10-22)
+
+Decisions PE24-40 to PE24-44. Built and tested in software; the store's
+directory comes from the shell (S6).
+
+| Deliverable | Where | State |
+| --- | --- | --- |
+| The file store | `app/lib/controller/controller_store.dart` (`FileControllerStore`) | Done: games, the event log, scores, nodes and settings in JSON files under one directory; written through, whole files replaced by rename, the log appended and flushed; a last line cut short by a crash dropped; a newer layout refused (PE24-40) |
+| The restart | `app/lib/controller/controller_engine.dart` (`_restore`) | Done, as the Pi's `_restore`: the live game with its term and clock (saved every 5 s and at start, pause and end), each box's counters, the GM's adjustments, nodes, their link and battery.low, `field.lua`'s earlier points and a new run; the key kept only with `persist_game_key` (on by default), else `key_lost` and only End works (PE24-41, PE24-44) |
+| A fix in both controllers | `controller/atalaia_controller/engine.py`, `controller_engine.dart` | Done: the controller's own events go on from their stored seq after a restart; from 1 again, a second GM adjustment at the same game time was dropped as a replay and its points lost at the next restart (PE24-42) |
+| Shared contract cases | `protocol/vectors/controller_api.json` (new step `restart`, case setting `persist_game_key`) | Done: 4 new cases (17 in all: a live game across a restart, the GM's adjustments across two restarts, `field.lua` again with its earlier points, a game without its key), passing against both controllers (PE24-43) |
+
+Tests: 5 new controller tests (the 4 cases; the Pi unit test for PE24-42),
+13 new Dart tests (4 for the cases, 6 for the files, 3 for the node health,
+the key and the game time across restarts).
+
+### Slice S4: the pod as the radio, joins and Wi-Fi props (2026-10-22)
+
+Decisions PE24-45 to PE24-53. Built and tested in software, with the pod's
+and the Field Box's own C code on one machine; not on a real pod, box or
+phone. The API stays on the loopback address (PE24-7).
+
+| Deliverable | Where | State |
+| --- | --- | --- |
+| The radio | `app/lib/controller/controller_radio.dart`, `pod_modem.dart` | Done: the modem interface (the Pi's RadioModem), `RadioTransport` (the Pi's ModemTransport: the controller's packets with a TX epoch per game key, stored before use, a new one per run and when seq wraps; PE24-46), `PodModem` (an I/O pod's RADIO_* frames: IDENT, PING and STATUS, CONFIGURE and the peer epochs again on a new link, RX, TX_ACK, errors; PE24-45); `GET /api/v1/controller` has `modem`, `tx_epoch` and `tx_status`, and the radio's system messages reach the stream and MQTT (PE24-53) |
+| Joins | `controller_engine.dart` (`issueJoin`), `controller_api.dart` | Done: `POST /api/v1/join`, `POST /api/v1/nodes/{id}/join` and the boxes' language (`GET/PUT /api/v1/settings/box-language`, `console_lang`) as on the Pi, sealed with the field join key; no keys 13 and 14 until HTTPS (S6); scenario names and the standby's join are S7 (PE24-48) |
+| Android props on Wi-Fi | `app/lib/controller/controller_props.dart` | Done: `WS /api/v1/prop` as the Pi's prop_link.py, events checked against the schema with the core's tables (new bindings), TIME and commands forwarded; without a radio the props still get them (PE24-49, PE24-50) |
+| The field's channel | `controller_engine.dart` (`fieldChannel`) | New games use the stored field channel and an idle radio is tuned to it; the channel choice API moves to S7 with the scan (PE24-52) |
+| Shared contract cases | `protocol/vectors/controller_api.json`, `prop_link.json` | Done: radio, join and prop steps (PE24-47); 4 new cases (21 in all: the game on the modem with ACKs, CMD, TIME and TX failures; a new epoch after each restart; joins; an Android prop on Wi-Fi), passing against both controllers; the prop link's proof against 3 known answers on both sides |
+| End to end on one machine | `app/test/controller/pod_controller_test.dart`; the host box for the Dart tests (`tools/docker_app.py`, CI's `flutter-test`) | Done: the phone's engine with the host pod as its radio and host boxes on a UDP air: a box joins, plays, scores and ends; the phone restarts mid-game and goes on; Hold-All's `field.lua` scores two boxes (PE24-51) |
+
+Tests: 5 new controller tests (the 4 cases and the prop link's known
+answers; the Pi's code is unchanged in S4), 16 new Dart tests (5 for the
+cases and the proof, 3 end to end, 4 for the pod modem, 2 for the app's prop
+client against the phone, 2 for the TX epochs).
+
+Remaining slices (`PLAN.md`, "PE24 slices"): **S5** check-in, player
 tokens, positions and the chrono list; **S6** the controller's shell and
 screens (controller isolate, foreground service, the GM console on the
 phone, HTTPS, the field's Wi-Fi); **S7** after the field test: failover,
@@ -245,9 +280,10 @@ presets, mode uploads, scenarios, role packages, branding, the channel
 scan, re-invites, adoption, pairing, firmware updates, the site sync,
 ATAK, the remote GM. For the maintainer: PE24-2 (a phone as the only
 controller, not a standby), PE24-3 (not on plan phase G's gate) and PE24-8
-(the GM console's files in the app) are answered; open for the maintainer:
-PE24-11 (no `since` replay on the stream, as on the Pi) and PE24-12 (the
-phone's MQTT passwords are the API tokens).
+(the GM console's files in the app), PE24-11 (no `since` replay on the
+stream, as on the Pi) and PE24-12 (the phone's MQTT passwords are the API
+tokens) are answered; open for the maintainer: PE24-42 (the fix in the Pi
+controller), PE24-44 (the game key at rest on a phone) and PE24-52 (the channel choice moves to S7); for the coordinator: PE24-51 (the host box built for the Dart tests).
 
 ## Medic Kit (2026-10-19)
 
@@ -413,11 +449,11 @@ Phase G needs hardware.
 2. ~~Architecture~~ -- Complete
 3. ~~Planning~~ -- Complete
 4. Implementation -- plan phases A-F done in software (E without the
-   Android controller role's shell, PE24: its slices S1 and S2 done
+   Android controller role's shell, PE24: its slices S1 to S4 done
    2026-10-22), the Medic Kit and branding; next: plan phase G (the field
    test: the boards, the pods and real phones, with the Pi controller) and
-   the controller role's slices S3-S6 (S3 next: keeping games across a
-   restart)
+   the controller role's slices S5-S6 (S5 next: check-in, player tokens,
+   positions and the chrono list)
 
 ## How to resume with implementation
 

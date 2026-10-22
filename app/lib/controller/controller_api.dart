@@ -31,14 +31,19 @@
 ///     WS   /api/v1/stream                    live games, events, scores, nodes
 ///                                            (controller_stream.dart; the token
 ///                                            also as ?token=)
+///     POST /api/v1/join                      GM: a join payload (slice S4)
+///     POST /api/v1/nodes/{id}/join           GM: a join payload for that node id
+///     GET|PUT /api/v1/settings/box-language  the boxes' screen language
+///     WS   /api/v1/prop                      Android props on Wi-Fi
+///                                            (controller_props.dart, slice S4)
 ///
 /// The read token gets games without their gm_only parameters and events
 /// without their gm_only data (decision M5-1), as on the Pi.
 ///
 /// [serve] listens on the loopback address unless told otherwise: a phone
 /// controller is reachable from the field's network only when the shell
-/// opens it there (PE24-7). Check-in, player tokens, joins and the rest of
-/// the Pi's endpoints are later slices (PLAN.md, "PE24 slices").
+/// opens it there (PE24-7). Check-in, player tokens and the rest of the
+/// Pi's endpoints are later slices (PLAN.md, "PE24 slices").
 library;
 
 import 'dart:async';
@@ -49,6 +54,7 @@ import 'package:crypto/crypto.dart';
 
 import '../modes/builtin_modes.g.dart';
 import 'controller_engine.dart';
+import 'controller_props.dart';
 import 'controller_stream.dart';
 
 /// The app's version (pubspec.yaml), which /healthz and /whoami give.
@@ -135,15 +141,35 @@ class ControllerApi {
       _route('POST', r'/api/v1/nodes/([^/]+)/cmd', _gm(_nodeCmd)),
       _route('GET', r'/api/v1/games/([^/]+)/log', _read(_log)),
       _route('GET', r'/api/v1/controller', _read(_status)),
+      // Slice S4: joins and the boxes' language.
+      _route('POST', r'/api/v1/join', _gm(_join)),
+      _route('POST', r'/api/v1/nodes/([^/]+)/join', _gm(_joinNode)),
+      _route(
+        'GET',
+        r'/api/v1/settings/box-language',
+        _read((r, who) => ApiResponse(200, engine.boxLanguage())),
+      ),
+      _route(
+        'PUT',
+        r'/api/v1/settings/box-language',
+        _gm(
+          (r) =>
+              ApiResponse(200, engine.setBoxLanguage(r.body['box_language'])),
+        ),
+      ),
     ];
     hub = StreamHub(engine);
     engine.addListener(hub.publish);
+    props = PropLinks(engine);
   }
 
   final ControllerEngine engine;
 
   /// The live feed of WS /api/v1/stream.
   late final StreamHub hub;
+
+  /// Android props on Wi-Fi: WS /api/v1/prop (slice S4).
+  late final PropLinks props;
   final String gmToken;
   final String readToken;
   late final List<(String, RegExp, _Handler)> _routes;
@@ -249,6 +275,15 @@ class ControllerApi {
     if (req.uri.path == '/api/v1/stream' &&
         WebSocketTransformer.isUpgradeRequest(req)) {
       await _stream(req);
+      return;
+    }
+    if (req.uri.path == '/api/v1/prop' &&
+        WebSocketTransformer.isUpgradeRequest(req)) {
+      try {
+        await props.serve(await WebSocketTransformer.upgrade(req));
+      } on WebSocketException {
+        // The handshake failed: nothing to serve.
+      }
       return;
     }
     final res = req.response;
@@ -419,4 +454,10 @@ class ControllerApi {
 
   ApiResponse _status(_Request r, String who) =>
       ApiResponse(200, engine.status());
+
+  // A join holds the game key; every answer is sent with no-store (_write).
+  ApiResponse _join(_Request r) => ApiResponse(200, engine.issueJoin(r.body));
+
+  ApiResponse _joinNode(_Request r) =>
+      ApiResponse(200, engine.issueJoin(r.body, nodeIdValue: r.pathInt(1)));
 }
