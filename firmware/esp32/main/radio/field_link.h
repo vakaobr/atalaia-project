@@ -152,8 +152,10 @@ typedef struct {
 } field_link_t;
 
 /*
- * Set up the link for a verified join. Runs the boot epoch cycle (ADR-P2-2:
- * the epoch is incremented and persisted before the first packet), and
+ * Set up the link for a verified join. Runs the boot epoch cycle (ADR-P2-2,
+ * per game key since the RFC 0001 amendment of 2026-10-22: this key's epoch
+ * + 1, or 1 for a new key, persisted before the first packet; resuming: the
+ * stored game after a reboot, see atalaia_radio_proto_boot_epoch), and
  * queues HELLO. Unacknowledged events still in the log (a reboot) are
  * queued again. Returns false if the radio must not transmit (NVS failure:
  * proto.tx_blocked).
@@ -161,7 +163,7 @@ typedef struct {
 bool field_link_init(field_link_t *l, const atalaia_join_t *join,
                      const atalaia_crypto_ops_t *crypto, const atalaia_radio_nvs_ops_t *nvs,
                      event_log_t *log, const atalaia_hello_t *hello, const field_link_io_t *io,
-                     uint32_t now_ms);
+                     uint32_t now_ms, bool resuming);
 
 /* The game event the node just emitted (from the core's event callback). */
 void field_link_event(field_link_t *l, const atalaia_event_t *ev, const char *data_json);

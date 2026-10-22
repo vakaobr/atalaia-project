@@ -16,7 +16,7 @@ steps:
   - expect: { type: zone.neutralized, node: alpha, at: 25.5, data: { previous_team: red } }
   - expect: { type: zone.neutralized, node: bravo, at: 25.5, data: { previous_team: red } }
   - expect: { type: zone.neutralized, node: charlie, at: 25.5, data: { previous_team: blue } }
-  - expect_screen: { node: alpha, template: standby }
+  - expect_screen: { node: alpha, template: neutral }
   - expect_screen: { node: master, template: master_status, data: { team: blue, held: 0, of: 3, points: 2 } }
   - wait: 5                                          # blue's first tick at 30.5 s
   - expect_score: { team: blue, points: 2 }

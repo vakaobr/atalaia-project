@@ -50,6 +50,7 @@ which browsers cannot give headers, also takes ``?token=``.
     PUT|DELETE /api/v1/team-presets/{id}   GM
     GET  /api/v1/games/{id}/teams          a game's team colours, display names and crests (no token)
     PUT  /api/v1/games/{id}/teams/{team}   GM: {"display_name"?, "crest_id"?, "team_preset_id"?}
+    GET|PUT /api/v1/settings/box-language  the boxes' screen language: "auto" (the console's), "pt", "en"
     GET  /api/v1/radio                     the field's radio channel, its limits, candidates, last scan
     PUT  /api/v1/radio/channel             set it {"channel_hz", "source"} (no live game)
     POST /api/v1/radio/scan                find a quiet channel: noise scan with the modem {"dwell_s"?}
@@ -458,6 +459,16 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     @app.post("/api/v1/controller/join", status_code=201, dependencies=[Depends(require_gm)])
     def join_standby(body: Any = Body(None)) -> dict[str, Any]:
         return controller.join_as_standby(body_map(body).get("text"))
+
+    # --- the boxes' screen language (join key 15, RFC 0001 Amendment 10) ------
+
+    @app.get("/api/v1/settings/box-language", dependencies=[Depends(require_console)])
+    def box_language() -> dict[str, Any]:
+        return controller.box_language()
+
+    @app.put("/api/v1/settings/box-language", dependencies=[Depends(require_gm)])
+    def put_box_language(body: Any = Body(None)) -> dict[str, Any]:
+        return controller.set_box_language(body_map(body).get("box_language"))
 
     # --- the field's radio channel (channels.py, RFC 0001 Amendment 3) -------
 

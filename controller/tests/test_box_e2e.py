@@ -171,7 +171,8 @@ class FieldTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200, r.text)
         self.assertIn(r.json()["invites"][0]["status"], ("sending", "invited"))
         self.assertTrue(wait_for(lambda: box.status()["game_id"] == gid2, 8), box.lines[-8:])
-        screen = 'SCREEN status {"title":"Invited","mode":"' + str(gid2) + ': zone"}'
+        # Invited, then waiting for the start: never the running game's look (decision BN-12).
+        screen = 'SCREEN waiting {"game":' + str(gid2) + ',"role":"zone","invited":true}'
         self.assertTrue(box.logged(screen), box.lines[-8:])
 
         def invite_status():
@@ -236,6 +237,55 @@ class FieldTests(unittest.TestCase):
         self.assertTrue(wait_for(lambda: box.status()["phase"] == 0, 10), box.lines[-8:])
         self.assertFalse(box.status()["have_key"])
         self.assertFalse(os.path.exists(os.path.join(box.state_dir, "join")))
+
+    def play_and_end(self, box: BoxHost, epoch: int) -> None:
+        """One game with the box: it joins, each side hears the other (the controller registers the
+        HELLO, the box gets its ACK), it starts and ends, and the box is free again."""
+        gid = self.game()
+        nid = self.join(box)
+        self.assertTrue(wait_for(lambda: self.node(nid).get("fw_version") == "host", 5), box.lines[-5:])
+        self.assertTrue(wait_for(lambda: box.status()["acked"] >= 1, 5), box.lines[-5:])
+        self.assertEqual((box.status()["game_id"], box.status()["epoch"]), (gid, epoch))
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/end", headers=GM, json={}).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 0, 10), box.lines[-8:])
+
+    def test_a_box_in_many_games_in_a_row(self):
+        """Found on the bench (2026-10-22): the box kept one nonce epoch for its whole life and the
+        controller one for all its runs, while a receiver meets a source in a new game at epoch 0
+        and looks 16 above it. After 16 games the box was never heard again (the modem counted 863
+        authentication failures) and the box no longer heard the controller. The epoch is per game
+        key now (RFC 0001 amendment of 2026-10-22): every game starts at epoch 1 on both sides."""
+        box = self.box("alpha")
+        for _ in range(18):
+            self.play_and_end(box, 1)
+
+    def test_a_free_box_is_ready_from_boot_and_speaks_the_fields_language(self):
+        """Decision BN-6: an adopted box with no game shows "ready" from boot (it showed the admin
+        PIN's lock until its first game had ended). BN-14: the controller's box language reaches
+        the box in the join (key 15); the box keeps it after the game and across a reboot."""
+        box = self.box("alpha")
+        self.assertTrue(box.logged("SCREEN ready {}"), box.lines[-5:])
+        self.assertEqual(box.status()["lang"], "")
+        r = self.client.put("/api/v1/settings/box-language", headers=GM, json={"box_language": "pt"})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.play_and_end(box, 1)
+        self.assertEqual(box.status()["lang"], "pt")
+        box.kill()
+        box.start()
+        self.assertEqual(box.status()["lang"], "pt")
+        self.assertTrue(box.logged("SCREEN ready {}"))
+
+    def test_a_box_updated_from_the_old_epoch_store(self):
+        """A box that ran the firmware before the per-key epoch: its one epoch counter (120 here,
+        a box flashed a while ago) is not carried into a new game, which starts at epoch 1."""
+        state = os.path.join(self.tmp.name, "old")
+        os.makedirs(state)
+        with open(os.path.join(state, "epoch"), "wb") as f:
+            f.write((120).to_bytes(2, "big"))
+        box = self.box("old")
+        self.play_and_end(box, 1)
 
     def test_node_health_events(self):
         """The box's own battery.low from its gauge, and the controller's node.online and node.offline

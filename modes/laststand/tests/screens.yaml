@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A zone shows the defenders holding it from the start, the attackers after a capture, and neutral when the GM frees it (decision BN-11)
+nodes: { alpha: zone, bravo: zone }
+steps:
+  - expect_screen: { node: alpha, template: captured, data: { team: blue, since: 0 } }
+  - hold: { node: alpha, team: red, s: 3 }
+  - expect_screen: { node: alpha, template: captured, data: { team: red, since: 3 } }
+  - input: { node: alpha, type: cmd.set_owner, data: { team: none } }
+  - expect_screen: { node: alpha, template: neutral, data: { hold_s: 3 } }

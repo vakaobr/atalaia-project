@@ -71,6 +71,7 @@
 #include "adoption.h"
 #include "atalaia/version.h"
 #include "box_game.h"
+#include "box_text.h"
 #include "box_pair.h"
 #include "builtin_presets.h"
 #include "button_tracker.h"
@@ -143,7 +144,8 @@ static int erase_file(const char *name)
     return 0;
 }
 
-static int nvs_read_epoch(void *ctx, uint16_t *epoch)
+/* "epoch": the single u16 of the firmware before the per-key store (read only: migration). */
+static int nvs_read_legacy_epoch(void *ctx, uint16_t *epoch)
 {
     (void)ctx;
     uint8_t b[2];
@@ -152,11 +154,23 @@ static int nvs_read_epoch(void *ctx, uint16_t *epoch)
     return 0;
 }
 
-static int nvs_write_epoch(void *ctx, uint16_t epoch)
+/* "epochs": the per-key epoch store, written aside and renamed (atomic, as NVS's blob). */
+static int nvs_read_epochs(void *ctx, uint8_t *buf, size_t cap)
 {
     (void)ctx;
-    uint8_t b[2] = {(uint8_t)(epoch >> 8), (uint8_t)epoch};
-    return write_file("epoch", b, 2);
+    char p[300];
+    path_of(p, sizeof(p), "epochs");
+    FILE *f = fopen(p, "rb");
+    if (f == NULL) return -1;
+    size_t n = fread(buf, 1, cap, f);
+    fclose(f);
+    return (int)n;
+}
+
+static int nvs_write_epochs(void *ctx, const uint8_t *buf, size_t len)
+{
+    (void)ctx;
+    return write_file("epochs", buf, len);
 }
 
 static int nvs_read_key(void *ctx, uint8_t key[16])
@@ -178,8 +192,9 @@ static int nvs_erase_key(void *ctx)
 }
 
 static const atalaia_radio_nvs_ops_t nvs_ops = {
-    .read_epoch = nvs_read_epoch,
-    .write_epoch = nvs_write_epoch,
+    .read_legacy_epoch = nvs_read_legacy_epoch,
+    .read_epochs = nvs_read_epochs,
+    .write_epochs = nvs_write_epochs,
     .read_key = nvs_read_key,
     .write_key = nvs_write_key,
     .erase_key = nvs_erase_key,
@@ -245,6 +260,27 @@ static int store_save_ff_boot(void *ctx, uint32_t boot)
     uint8_t b[4] = {(uint8_t)(boot >> 24), (uint8_t)(boot >> 16), (uint8_t)(boot >> 8),
                     (uint8_t)boot};
     return write_file("ff_boot", b, 4);
+}
+
+/* The screens' language, the last game's (join key 15): the file "lang". */
+static int store_load_lang(void *ctx, char *code, size_t cap)
+{
+    (void)ctx;
+    if (cap == 0) return -1;
+    char p[300];
+    path_of(p, sizeof(p), "lang");
+    FILE *f = fopen(p, "rb");
+    if (f == NULL) return -1;
+    size_t n = fread(code, 1, cap - 1, f);
+    fclose(f);
+    code[n] = '\0';
+    return 0;
+}
+
+static int store_save_lang(void *ctx, const char *code)
+{
+    (void)ctx;
+    return write_file("lang", (const uint8_t *)code, strlen(code));
 }
 
 /* The platform's random bytes, as the box's seeded generator gives them (never a nonce). */
@@ -417,7 +453,7 @@ static void print_status(void)
         "\"term\":%lu,\"events_sent\":%lu,\"retries\":%lu,\"acked\":%lu,\"cmds\":%lu,"
         "\"times\":%lu,\"states\":%lu,\"rx_ok\":%lu,\"rx_rejected\":%lu,\"relayed\":%lu,"
         "\"have_key\":%s,\"device_id\":\"%s\",\"available\":%s,\"invites_accepted\":%lu,"
-        "\"invites_refused\":%lu,\"last_game\":%u}",
+        "\"invites_refused\":%lu,\"last_game\":%u,\"lang\":\"%s\"}",
         (int)game.phase, game.paused ? "true" : "false", game.join.game_id, game.join.node_id,
         game.link.proto.epoch, (unsigned long)runner.game_time_ms, game.owner_team, scores,
         (unsigned)field_link_pending(&game.link), game.link.leader, (unsigned long)game.link.term,
@@ -426,7 +462,8 @@ static void print_status(void)
         (unsigned long)st->rx_ok, (unsigned long)st->rx_rejected, (unsigned long)st->relayed,
         game.link.proto.has_key ? "true" : "false", device,
         box_lobby_available(&game) ? "true" : "false", (unsigned long)game.lobby.invites_accepted,
-        (unsigned long)game.lobby.invites_refused, game.lobby.last_game);
+        (unsigned long)game.lobby.invites_refused, game.lobby.last_game,
+        box_lang_given() ? box_lang_code(box_lang()) : "");
 }
 
 int main(int argc, char **argv)
@@ -564,6 +601,8 @@ int main(int argc, char **argv)
                              .save_device_id = store_save_device_id,
                              .load_ff_boot = store_load_ff_boot,
                              .save_ff_boot = store_save_ff_boot,
+                             .load_lang = store_load_lang,
+                             .save_lang = store_save_lang,
                              .ctx = NULL};
     box_shell_ops_t shell = {.screen = shell_screen,
                              .log = shell_log,
@@ -599,9 +638,8 @@ int main(int argc, char **argv)
     box_pair_init(&pairing, &pops, &adopt, &atalaia_crypto_mbedtls, name, 0, 869525000u);
 
     uint32_t last = mono_ms();
-    if (box_game_resume(&game, last)) {
-        out("LOG rejoined the stored game");
-    }
+    bool resumed = box_game_resume(&game, last);
+    if (resumed) out("LOG rejoined the stored game");
     button_tracker_t buttons;
     button_tracker_init(&buttons, game.teams, game.join.team_count);
     uint8_t pressed = 0;
@@ -611,6 +649,8 @@ int main(int argc, char **argv)
     socklen_t alen = sizeof(addr);
     getsockname(air_sock, (struct sockaddr *)&addr, &alen);
     out("READY air=%u", ntohs(addr.sin_port));
+    /* A free adopted box: ready from boot (decision BN-10), after READY (the first line). */
+    if (!resumed && adopt.adopted && game.lobby.ready && !pair) box_lobby_show_ready(&game);
     if (pair) box_pair_start(&pairing, last);
 
     serial_console_t console;

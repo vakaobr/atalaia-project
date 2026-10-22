@@ -108,9 +108,11 @@ and unencrypted NVS -- no firmware changes are needed.
 Before the box is built, a bare board with a button or two on its header
 can already run a game: `python tools/docker_fw.py bench` builds the Field
 Box firmware with keys from the USB serial console and no setup portal
-(firmware/esp32/README.md, Build). In a serial monitor type `1234#` (the
-admin PIN), then `1`, `#`, `#` for Bomb; the board's own OLED shows each
-step. Buttons must be soldered to the header (or to pins soldered there):
+(firmware/esp32/README.md, Build). An adopted board boots to **READY /
+next game** (decision BN-10): any key brings the game picker; an unadopted
+one shows its pairing code first (`*` gives the picker). In a serial monitor
+type a key, then `1234#` (the admin PIN), then `1`, `#`, `#` for Bomb; the
+board's own OLED shows each step. Buttons must be soldered to the header (or to pins soldered there):
 a Dupont pin pushed into a bare hole loses contact while it is held, and
 any release, even 0.1 s, starts a hold again (seen on the first V4.3 board,
 2026-10-20). The buttons go on **GPIO 4 (red) and GPIO 48 (blue)**: a
@@ -175,9 +177,11 @@ firmware no longer reads a button there.
 
 1. Check display initialisation in the log: `Display initialised
    (320x240)` and `LVGL 9.2.2 on 320x240`.
-2. Verify: the setup screen (first boot) or the admin PIN screen is
-   visible on the external TFT, in landscape, and looks like
-   `firmware/esp32/test/screens/wifi_setup.png` or `pin_entry.png`: the
+2. Verify: the setup screen (first boot), the admin PIN screen (not
+   adopted) or the Ready screen (adopted, no game) is visible on the
+   external TFT, in landscape, and looks like
+   `firmware/esp32/test/screens/wifi_setup.png`, `pin_entry.png` or
+   `ready_picker.png`: the
    same layout, the header bar at the top, amber and red where the
    reference has them. Mirrored or upside-down text means the MADCTL value
    in `hal_esp_display.c` needs a flip; red and blue swapped means its BGR
@@ -201,7 +205,7 @@ firmware no longer reads a button there.
    then `button 4 (P7) pressed`); it needs the keypad expander (step 5).
    With button 3 on GPIO 44 the log says `no console input on UART0`:
    expected, the USB console still takes input.
-2. Start a Bomb game (admin PIN, game 1, `#`, `#`). Press each team
+2. Start a Bomb game (a key from Ready, the admin PIN, game 1, `#`, `#`). Press each team
    button (GPIO 4, 48; GPIO 44 and P7 for teams 3 and 4). While red holds, the
    screen and the OLED show the arming bar filling.
 3. Hold the red button for 5 s: the log shows `game: event bomb.armed`
@@ -430,11 +434,13 @@ build) on COM3, **board 2** the USB modem on COM4, behind a controller running i
    "Nenhuma caixa se juntou para: zone" until the box's HELLO, then *Começar* without
    "mesmo assim": start, capture, end.
 6. **Free again.** After the end, board 1's log shows `game <id> ended`, an announcement within
-   2-20 s, and 30 s after the end the OLED shows **READY / next game**. `@lobby`: free, last game
+   2-20 s, and 30 s after the end the OLED shows **READY / Next game** (**PRONTA / Próximo jogo**
+   when the field's box language is Portuguese). `@lobby`: free, last game
    `<id>` (zone). The announcements then come about every 72 s (note the times: decision RJ-11).
 7. **The invite.** Create a second game: the dialog lists board 1 ticked as *último jogo*, role
    zone. *Convidar (1)*. Expected within a second or two: on COM3 `field: invite <n>: accepted`
-   and `joined game <id2> as node <n> ...`, the OLED **INVITED / <id2>: zone**; in the dialog
+   and `joined game <id2> as node <n> ... epoch 1` (a new game's epochs start at 1: RFC 0001
+   Amendment 9), the OLED **WAITING / Game <id2>** (**À ESPERA / Jogo <id2>**); in the dialog
    *convidada*, then *aceitou, a juntar-se*, then *juntou-se* (the box's HELLO). *Começar* starts
    the game with no confirmation about missing boxes. Note the RSSI shown, and the modem's
    `duty_ms` in the *Controlador* tab before and after.
@@ -444,9 +450,33 @@ build) on COM3, **board 2** the USB modem on COM4, behind a controller running i
    it no longer appears after the dialog's *Procurar caixas*, and an invite to it fails after
    three attempts (*falhou: no answer*); `@lobby` counts the controller's frames as ignored.
    Give it the field's key again.
-9. **Record** in `docs/review/decisions-to-review.md` (RJ-11, RJ-15): the announcement interval
+9. **Many games in a row (decision BN-7).** Play (or just create, invite, start and end) more
+   than 16 games with board 1 without reflashing: every game it is heard (the dialog reaches
+   *juntou-se*, the console shows its HELLO) and its log says `epoch 1` at each join; the modem's
+   `rx_auth_fail` (its OLED and IDENT counters) does not climb. Reboot board 1 in a game: it comes
+   back at epoch 2 and is heard.
+10. **Record** in `docs/review/decisions-to-review.md` (RJ-11, RJ-15): the announcement interval
    seen, the time from *Convidar* to *juntou-se*, the RSSI, and any refusal that should not have
    happened.
+
+### What the box's screens say through a game
+
+(Decisions BN-6 and BN-10 to BN-14; the reference images are in
+`firmware/esp32/test/screens/` and `screens/oled/`, `_pt` for Portuguese.)
+
+| On the screen | English / Português | Means |
+| --- | --- | --- |
+| `ready` | READY · Next game / PRONTA · Próximo jogo | Adopted, in no game: it can be invited. A key brings this box's own game picker (admin PIN). Shown from boot and 30 s after a game ends |
+| `waiting` | WAITING · Game N, The game hasn't started / À ESPERA · Jogo N, O jogo ainda não começou | Joined (by card, text or an invite: "Invited: zone") and waiting for the GM's Start. Nothing else is shown until then |
+| `playing` | GAME ON / JOGO EM CURSO | The game has started; the mode's own screen follows as soon as it draws one |
+| `neutral` | ZONE · NEUTRAL, Hold to capture / ZONA · NEUTRA, Mantém premido | A running zone that no team holds (Domination, Hold-All, Last Stand, Master and Satellites) |
+| `captured` | ZONE HELD · RED / ZONA OCUPADA · RED | A team holds the zone |
+| `standby` (Bomb) | READY · Hold to arm / PRONTA · Mantém premido para armar | The bomb is not armed yet; "standby" is never used for a zone |
+| `final_score` | GAME OVER / FIM DO JOGO | The game ended; Ready follows |
+
+The language is the game's (the console's *Língua das caixas* / *Box language*, by default the
+language of the console that created the game), kept for the box's screens between games and
+after a reboot; a join from an older controller gives English.
 
 ## Step 10c: Firmware update over the air (one board on the desk)
 

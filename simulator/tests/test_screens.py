@@ -33,7 +33,8 @@ class ScreenTemplateTests(unittest.TestCase):
                 self.assertEqual(check_screens(self.core, mode_dir), [])
         # Plan phase A: Domination and Bomb migrated; the phase 3 modes ship their own.
         self.assertEqual(found["bomb"], ["countdown", "defused", "exploded", "standby"])
-        self.assertEqual(found["domination"], ["captured", "final_score", "standby"])
+        # Its neutral screen was "standby", the Bomb's word, until decision BN-11.
+        self.assertEqual(found["domination"], ["captured", "final_score", "neutral"])
         self.assertEqual(found["kill_confirmed"], ["tags"])
         self.assertEqual(found["respawn"], ["respawn"])
         self.assertEqual(found["player_checkin"], ["checkin"])

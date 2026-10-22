@@ -215,6 +215,19 @@ bool atalaia_join_text_ok(const char *s, size_t max)
     return text_ok(s, max);
 }
 
+bool atalaia_join_lang_ok(const char *s)
+{
+    size_t n = 0;
+    while (n <= ATALAIA_JOIN_LANG_MAX && s[n] != '\0') n++;
+    if (n < 2 || n > ATALAIA_JOIN_LANG_MAX) return false;
+    for (size_t i = 0; i < n; i++) {
+        char c = s[i];
+        bool letter = c >= 'a' && c <= 'z';
+        if (i < 2 ? !letter : !(letter || (c >= '0' && c <= '9') || c == '-')) return false;
+    }
+    return true;
+}
+
 bool atalaia_join_valid(const atalaia_join_t *j)
 {
     if (j->game_id == 0 || j->game_id == 0xFFFF) return false;
@@ -232,6 +245,7 @@ bool atalaia_join_valid(const atalaia_join_t *j)
     if (!text_ok(j->mode_id, ATALAIA_JOIN_MODE_MAX)) return false;
     if (!text_ok(j->role, ATALAIA_JOIN_ROLE_MAX)) return false;
     if (j->kind > ATALAIA_JOIN_KIND_CONTROLLER) return false;
+    if (j->lang[0] && !atalaia_join_lang_ok(j->lang)) return false;
     if (j->url_count > ATALAIA_JOIN_URLS_MAX) return false;
     for (uint8_t u = 0; u < j->url_count; u++) {
         if (!atalaia_join_url_ok(j->urls[u])) return false;
@@ -320,7 +334,9 @@ size_t atalaia_join_encode(const atalaia_join_t *j, const uint8_t join_key[ATALA
     mc_init_writer(&w, buf + 1, cap - 1 - ATALAIA_JOIN_MAC_SIZE);
     bool params = j->params_json[0] != '\0';
 
-    mc_put_map(&w, 11u + (params ? 1u : 0u) + (j->has_ca ? 1u : 0u) + (j->url_count ? 1u : 0u));
+    bool lang = j->lang[0] != '\0';
+    mc_put_map(&w, 11u + (params ? 1u : 0u) + (j->has_ca ? 1u : 0u) + (j->url_count ? 1u : 0u) +
+                       (lang ? 1u : 0u));
     mc_put_uint(&w, ATALAIA_JOIN_K_GAME_ID);
     mc_put_uint(&w, j->game_id);
     mc_put_uint(&w, ATALAIA_JOIN_K_GAME_KEY);
@@ -363,6 +379,10 @@ size_t atalaia_join_encode(const atalaia_join_t *j, const uint8_t join_key[ATALA
         mc_put_uint(&w, ATALAIA_JOIN_K_URLS);
         mc_put_array(&w, j->url_count);
         for (uint8_t u = 0; u < j->url_count; u++) mc_put_text(&w, j->urls[u]);
+    }
+    if (lang) {
+        mc_put_uint(&w, ATALAIA_JOIN_K_LANG);
+        mc_put_text(&w, j->lang);
     }
     if (!w.ok) return 0;
 
@@ -421,8 +441,8 @@ static bool decode_body(const uint8_t *body, size_t len, atalaia_join_t *j)
     if (!mc_read_map(&r, &count)) return false;
     for (uint64_t i = 0; i < count && r.ok; i++) {
         uint64_t key, v;
-        /* Keys 13 and 14 are optional (RFC 0001 Amendment 4); 15-31 are reserved for
-         * optional fields (skipped); 32 and up are invalid. */
+        /* Keys 13 and 14 are optional (RFC 0001 Amendment 4), 15 too (Amendment 10); 16-31
+         * are reserved for optional fields (skipped); 32 and up are invalid. */
         if (!mc_read_uint(&r, &key) || key >= 32) return false;
         if (seen & JBIT(key)) return false; /* duplicate key */
         seen |= JBIT(key);
@@ -505,6 +525,12 @@ static bool decode_body(const uint8_t *body, size_t len, atalaia_join_t *j)
             j->url_count = (uint8_t)n;
             break;
         }
+        case ATALAIA_JOIN_K_LANG:
+            /* Too long fails the read; present, it must be a language ("" too is refused). */
+            if (!read_text(&r, j->lang, sizeof(j->lang)) || !atalaia_join_lang_ok(j->lang)) {
+                return false;
+            }
+            break;
         default:
             if (!mc_skip_value(&r)) return false;
             break;

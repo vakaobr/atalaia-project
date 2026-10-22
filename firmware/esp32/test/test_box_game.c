@@ -18,7 +18,10 @@
 
 #include "box_game.h"
 #include "builtin_presets.h"
+#include "box_text.h"
 #include "check.h"
+#include "epoch_store_fake.h"
+#include "oled_view.h"
 #include "hal/stub/hal_stub.h"
 #include "state_persist.h"
 
@@ -45,8 +48,9 @@ typedef struct {
     int join_len;
     uint8_t key[32];
     bool have_key;
-    uint16_t epoch;
-    bool have_epoch;
+    epoch_fake_t epochs;
+    char lang[9];
+    bool have_lang;
     uint8_t device_id[8];
     bool have_device_id;
     uint32_t ff_boot;
@@ -118,18 +122,18 @@ static int st_save_ff_boot(void *ctx, uint32_t boot)
     f->have_ff_boot = true;
     return 0;
 }
-static int nv_read_epoch(void *ctx, uint16_t *e)
+static int st_load_lang(void *ctx, char *code, size_t cap)
 {
     flash_t *f = (flash_t *)ctx;
-    if (!f->have_epoch) return -1;
-    *e = f->epoch;
+    if (!f->have_lang) return -1;
+    snprintf(code, cap, "%s", f->lang);
     return 0;
 }
-static int nv_write_epoch(void *ctx, uint16_t e)
+static int st_save_lang(void *ctx, const char *code)
 {
     flash_t *f = (flash_t *)ctx;
-    f->epoch = e;
-    f->have_epoch = true;
+    snprintf(f->lang, sizeof(f->lang), "%s", code);
+    f->have_lang = true;
     return 0;
 }
 static int nv_read_key(void *ctx, uint8_t k[16])
@@ -156,6 +160,7 @@ typedef struct {
     int count;
     char screen[32];
     char screen_data[256];
+    char history[512]; /* every shell screen's template, "a;b;" */
     uint32_t channel;
 } shell_t;
 
@@ -173,6 +178,8 @@ static void sh_screen(void *user, const char *t, const char *d)
 {
     shell_t *s = (shell_t *)user;
     snprintf(s->screen, sizeof(s->screen), "%s", t);
+    size_t used = strlen(s->history);
+    snprintf(s->history + used, sizeof(s->history) - used, "%s;", t);
     snprintf(s->screen_data, sizeof(s->screen_data), "%s", d);
 }
 static bool sh_channel(void *user, uint32_t hz)
@@ -229,8 +236,7 @@ static void fixture(bool keep_flash)
     node_runner_init(&runner, &hal, 0);
     memset(&shell, 0, sizeof(shell));
     if (!keep_flash) memset(&flash, 0, sizeof(flash));
-    nvs_ops = (atalaia_radio_nvs_ops_t){nv_read_epoch, nv_write_epoch, nv_read_key,
-                                        nv_write_key,  nv_erase_key,   &flash};
+    nvs_ops = EPOCH_FAKE_OPS(&flash.epochs, nv_read_key, nv_write_key, nv_erase_key);
     box_store_ops_t store = {.load_join = st_load_join,
                              .save_join = st_save_join,
                              .erase_join = st_erase_join,
@@ -240,6 +246,8 @@ static void fixture(bool keep_flash)
                              .save_device_id = st_save_device,
                              .load_ff_boot = st_load_ff_boot,
                              .save_ff_boot = st_save_ff_boot,
+                             .load_lang = st_load_lang,
+                             .save_lang = st_save_lang,
                              .ctx = &flash};
     box_shell_ops_t sh = {.screen = sh_screen,
                           .log = NULL,
@@ -447,7 +455,8 @@ static void test_join_play_end(void)
     CHECK(game.phase == BOX_JOINED && box_game_active(&game));
     CHECK(flash.join_len == (int)n && memcmp(flash.join, buf, n) == 0);
     CHECK(shell.channel == 869475000u);
-    CHECK(strcmp(shell.screen, "status") == 0 && strstr(shell.screen_data, "Joined game") != NULL);
+    CHECK(strcmp(shell.screen, "waiting") == 0 &&
+          strstr(shell.screen_data, "\"invited\":false") != NULL);
     atalaia_header_t h;
     uint8_t pl[PKT_CAP];
     size_t pn;
@@ -555,7 +564,7 @@ static void test_resume_after_reboot(void)
     CHECK(game.have_join_key);
     CHECK(box_game_resume(&game, 5));
     CHECK(game.phase == BOX_PLAYING && runner.running);
-    CHECK(game.link.proto.epoch == 2 && flash.epoch == 2);
+    CHECK(game.link.proto.epoch == 2 && epoch_fake_of(&flash.epochs, GAME_KEY) == 2);
     CHECK(runner.game_time_ms >= 2000 && runner.game_time_ms <= played);
     CHECK(runner.node_id == NODE);
     CHECK(events_named("node.rebooted") == 1);
@@ -1015,18 +1024,121 @@ static void cmd_now(uint8_t opcode)
     box_game_on_packet(&game, out, len, -55);
 }
 
-/* Joins game GAME_ID by card, starts it, ends it: the box is free again. */
+/* Joins game GAME_ID by card (another one once GAME_ID was played to its end: a box refuses a
+ * game it played to its end, BN-19), starts it, ends it: the box is free again. */
 static void play_and_end(uint32_t *now)
 {
+    static uint16_t next_id = GAME_ID + 0x100;
+    atalaia_join_t j;
+    make_join(&j);
+    if (box_lobby_played_to_the_end(&game, GAME_ID)) {
+        j.game_id = next_id++;
+        j.game_key[0] ^= (uint8_t)j.game_id;
+    }
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    CHECK(!box_lobby_available(&game));
+    cmd_now(FIELD_CMD_START);
+    run_ms(now, 100);
+    cmd_now(FIELD_CMD_END);
+    CHECK(game.phase == BOX_ENDED && box_lobby_available(&game));
+}
+
+/* What the box shows through a game (decisions BN-10, BN-12, BN-13): joined and waiting until the
+ * start, whatever time passes; the game on as soon as it starts (the mode's screen follows); the
+ * mode's final screen; then ready for the next game. Found on the bench: a joined box looked like
+ * a running game, and an invited box kept "Invited" over a running game. */
+static void test_screens_follow_the_game(void)
+{
+    lobby_fixture();
+    uint32_t now = 10;
+    shell.history[0] = 0;
     atalaia_join_t j;
     make_join(&j);
     uint8_t buf[ATALAIA_JOIN_MAX];
     CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
-    CHECK(!box_lobby_available(&game));
+    char want[96];
+    snprintf(want, sizeof(want), "{\"game\":%u,\"role\":\"zone\",\"invited\":false}", GAME_ID);
+    CHECK(strcmp(shell.screen, "waiting") == 0 && strcmp(shell.screen_data, want) == 0);
+    run_ms(&now, 20000);
+    CHECK(strcmp(shell.screen, "waiting") == 0); /* no "ready", no game screen before the start */
+    runner.queues.screen_count = 0;
     cmd(FIELD_CMD_START);
-    run_ms(now, 100);
+    snprintf(want, sizeof(want), "{\"game\":%u,\"role\":\"zone\"}", GAME_ID);
+    CHECK(strcmp(shell.screen, "playing") == 0 && strcmp(shell.screen_data, want) == 0);
+    const char *t = last_screen(NULL);
+    CHECK(t != NULL && strcmp(t, "neutral") == 0); /* Domination's own, never the Bomb's */
+    runner.queues.screen_count = 0;
     cmd(FIELD_CMD_END);
-    CHECK(game.phase == BOX_ENDED && box_lobby_available(&game));
+    t = last_screen(NULL);
+    CHECK(t != NULL && strcmp(t, "final_score") == 0);
+    run_ms(&now, BOX_READY_MS + 100);
+    CHECK(strcmp(shell.screen, "ready") == 0);
+    CHECK(strcmp(shell.history, "waiting;playing;ready;") == 0);
+}
+
+/* The game's language (join key 15) for the box's screens, kept between games and across a
+ * reboot; a join without one gives English back (decision BN-14). */
+static void test_screen_language(void)
+{
+    lobby_fixture();
+    CHECK(box_lang() == BOX_LANG_EN && !box_lang_given());
+    atalaia_join_t j;
+    make_join(&j);
+    snprintf(j.lang, sizeof(j.lang), "pt");
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    CHECK(box_lang() == BOX_LANG_PT && box_lang_given());
+    CHECK(flash.have_lang && strcmp(flash.lang, "pt") == 0);
+    /* Its screens are Portuguese: the waiting screen's words, on the TFT and the OLED. */
+    CHECK(strcmp(shell.screen, "waiting") == 0);
+    oled_text_t o;
+    CHECK(oled_text_for("", shell.screen, shell.screen_data, &o));
+    CHECK(strcmp(o.head, "\xc3\x80 ESPERA") == 0 && strcmp(o.big, "Jogo 3054") == 0);
+    CHECK(strcmp(box_text(TX_NOT_STARTED), "O jogo ainda n\xc3\xa3o come\xc3\xa7ou") == 0);
+    cmd(FIELD_CMD_START);
+    cmd(FIELD_CMD_END);
+    ack_all();
+    /* A reboot between games: still Portuguese. */
+    box_lang_set_code("");
+    fixture(true);
+    CHECK(box_lang() == BOX_LANG_PT && box_lang_given());
+    /* The next game gives no language (an older controller): English. */
+    make_join(&j);
+    j.game_id = GAME_ID + 1;
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    CHECK(box_lang() == BOX_LANG_EN && !box_lang_given());
+    CHECK(flash.have_lang && strcmp(flash.lang, "") == 0);
+    oled_text_for("", shell.screen, shell.screen_data, &o);
+    CHECK(strcmp(o.head, "WAITING") == 0);
+    state_persist_clear();
+}
+
+/* Review finding 2 (decision BN-19): an old game's card whose key the epoch store keeps only as
+ * retired (sixteen newer games since) is refused before anything changes; its epochs are no
+ * longer known, so starting it again could reuse a nonce. */
+static void test_old_card_refused(void)
+{
+    lobby_fixture();
+    static atalaia_radio_proto_t rp;
+    uint8_t key[16];
+    for (int k = 0; k <= ATALAIA_EPOCH_KEYS; k++) {
+        memcpy(key, GAME_KEY, 16);
+        if (k > 0) key[15] ^= (uint8_t)(0x80 | k);
+        atalaia_radio_proto_init(&rp, 1, 1, &atalaia_crypto_test_stub, &nvs_ops);
+        atalaia_radio_proto_set_key(&rp, key);
+        CHECK(atalaia_radio_proto_boot_epoch(&rp, false));
+    }
+    atalaia_join_t j;
+    make_join(&j);
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    int writes = flash.epochs.writes;
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_ENDED);
+    CHECK(game.phase == BOX_IDLE && flash.join_len == 0 && flash.epochs.writes == writes);
+    /* A newer game's card still joins. */
+    j.game_key[15] ^= (uint8_t)(0x80 | ATALAIA_EPOCH_KEYS);
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    state_persist_clear();
 }
 
 static void test_lobby_announce_and_invite(void)
@@ -1058,7 +1170,8 @@ static void test_lobby_announce_and_invite(void)
     mark = shell.count;
     CHECK(invite(ff_key, token, 0x0C01, 31, 4242, NULL, NULL) == 2);
     CHECK(game.phase == BOX_JOINED && game.join.game_id == 0x0C01 && game.join.node_id == 31);
-    CHECK(strstr(shell.screen_data, "\"Invited\",\"mode\":\"3073: zone\"") != NULL);
+    CHECK(strcmp(shell.screen, "waiting") == 0 &&
+          strcmp(shell.screen_data, "{\"game\":3073,\"role\":\"zone\",\"invited\":true}") == 0);
     CHECK(game.lobby.invites_accepted == 1 && memcmp(game.lobby.token, token, 8) != 0);
     run_ms(&now, BOX_INVITE_ANSWER_MAX_MS + 20);
     int frames = field_frames_since(mark, &m);
@@ -1136,13 +1249,19 @@ static void test_lobby_refusals(void)
     CHECK(memcmp(m.token, token, 8) != 0);
     memcpy(token, m.token, 8);
 
-    /* A card join meanwhile drops the tokens too: the controller's last one gets no answer. */
+    /* The ended game's card, tapped: refused too (BN-19), and nothing changes. */
     atalaia_join_t j;
     make_join(&j);
     uint8_t buf[ATALAIA_JOIN_MAX];
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_ENDED);
+    CHECK(game.phase != BOX_JOINED && memcmp(game.lobby.token, token, 8) == 0);
+    /* A card join of another game meanwhile drops the tokens too: the controller's last one gets
+     * no answer. */
+    j.game_id = 0x0C04;
+    j.game_key[0] ^= 0x04;
     CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
     CHECK(memcmp(game.lobby.token, token, 8) != 0);
-    cmd(FIELD_CMD_START);
+    cmd_now(FIELD_CMD_START);
     CHECK(game.phase == BOX_PLAYING);
     mark = shell.count;
     invite(ff_key, token, 0x0C03, 31, 6, NULL, NULL);
@@ -1154,13 +1273,13 @@ static void test_lobby_refusals(void)
     parts = invite(ff_key, token, 0x0C03, 31, 7, rec, rec_len);
     run_ms(&now, BOX_INVITE_ANSWER_MAX_MS + 20);
     CHECK(field_frames_since(mark, &m) == 1 && m.answer == 7 && m.result == ATALAIA_FF_BUSY);
-    CHECK(game.phase == BOX_PLAYING && game.join.game_id == GAME_ID);
+    CHECK(game.phase == BOX_PLAYING && game.join.game_id == 0x0C04);
     CHECK(memcmp(game.lobby.token, token, 8) != 0);
     /* The game ends; the busy invite played back cannot pull the box into game 0x0C03. */
-    cmd(FIELD_CMD_END);
+    cmd_now(FIELD_CMD_END);
     CHECK(game.phase == BOX_ENDED);
     for (int p = 0; p < parts; p++) box_game_on_packet(&game, rec[p], rec_len[p], -60);
-    CHECK(game.phase == BOX_ENDED && game.join.game_id == GAME_ID);
+    CHECK(game.phase == BOX_ENDED && game.join.game_id == 0x0C04);
     state_persist_clear();
 }
 
@@ -1268,10 +1387,9 @@ static void test_lobby_discover_and_ready_screen(void)
     play_and_end(&now);
     /* The final screen stays BOX_READY_MS, then "Ready" for the next game. */
     run_ms(&now, BOX_READY_MS - 200);
-    CHECK(strstr(shell.screen_data, "\"Ready\",\"mode\":\"next game\"") == NULL);
+    CHECK(strcmp(shell.screen, "ready") != 0);
     run_ms(&now, 300);
-    CHECK(strcmp(shell.screen, "status") == 0 &&
-          strstr(shell.screen_data, "\"Ready\",\"mode\":\"next game\"") != NULL);
+    CHECK(strcmp(shell.screen, "ready") == 0 && strcmp(shell.screen_data, "{}") == 0);
     /* DISCOVER: an answer within 3 s, but not twice within a quarter of the interval (no
      * announcement for a long time, and the next periodic one far away). */
     game.lobby.announced = false;
@@ -1414,4 +1532,7 @@ void run_box_game_tests(void)
     test_join_play_end();
     test_end_without_acks();
     test_resume_after_reboot();
+    test_screens_follow_the_game();
+    test_screen_language();
+    test_old_card_refused();
 }

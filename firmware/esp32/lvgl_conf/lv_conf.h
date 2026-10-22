@@ -502,14 +502,14 @@
 #define LV_FONT_MONTSERRAT_8  0
 #define LV_FONT_MONTSERRAT_10 0
 #define LV_FONT_MONTSERRAT_12 0
-#define LV_FONT_MONTSERRAT_14 1
+#define LV_FONT_MONTSERRAT_14 0 /*Atalaia: lv_font_atalaia_14 (main/fonts) instead*/
 #define LV_FONT_MONTSERRAT_16 0
 #define LV_FONT_MONTSERRAT_18 0
-#define LV_FONT_MONTSERRAT_20 1 /*Atalaia*/
+#define LV_FONT_MONTSERRAT_20 0 /*Atalaia: lv_font_atalaia_20 (main/fonts) instead*/
 #define LV_FONT_MONTSERRAT_22 0
 #define LV_FONT_MONTSERRAT_24 0
 #define LV_FONT_MONTSERRAT_26 0
-#define LV_FONT_MONTSERRAT_28 1 /*Atalaia*/
+#define LV_FONT_MONTSERRAT_28 0 /*Atalaia: lv_font_atalaia_28 (main/fonts) instead*/
 #define LV_FONT_MONTSERRAT_30 0
 #define LV_FONT_MONTSERRAT_32 0
 #define LV_FONT_MONTSERRAT_34 0
@@ -519,7 +519,7 @@
 #define LV_FONT_MONTSERRAT_42 0
 #define LV_FONT_MONTSERRAT_44 0
 #define LV_FONT_MONTSERRAT_46 0
-#define LV_FONT_MONTSERRAT_48 1 /*Atalaia*/
+#define LV_FONT_MONTSERRAT_48 0 /*Atalaia: lv_font_atalaia_48 (main/fonts) instead*/
 
 /*Demonstrate special features*/
 #define LV_FONT_MONTSERRAT_28_COMPRESSED 0  /*bpp = 3*/
@@ -534,10 +534,16 @@
 /*Optionally declare custom fonts here.
  *You can use these fonts as default font too and they will be available globally.
  *E.g. #define LV_FONT_CUSTOM_DECLARE   LV_FONT_DECLARE(my_font_1) LV_FONT_DECLARE(my_font_2)*/
-#define LV_FONT_CUSTOM_DECLARE
+/*Atalaia: LVGL's Montserrat with the letters of Portuguese (tools/gen_box_fonts.py, main/fonts/),
+ *linked by the firmware's main component and the host's LVGL library.*/
+#define LV_FONT_CUSTOM_DECLARE                                                                    \
+    LV_FONT_DECLARE(lv_font_atalaia_14)                                                            \
+    LV_FONT_DECLARE(lv_font_atalaia_20)                                                            \
+    LV_FONT_DECLARE(lv_font_atalaia_28)                                                            \
+    LV_FONT_DECLARE(lv_font_atalaia_48)
 
 /*Always set a default font*/
-#define LV_FONT_DEFAULT &lv_font_montserrat_14
+#define LV_FONT_DEFAULT &lv_font_atalaia_14
 
 /*Enable handling large font and/or fonts with a lot of characters.
  *The limit depends on the font size, font face and bpp.

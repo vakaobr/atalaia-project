@@ -3,14 +3,15 @@
 #
 # Seconds left until the bomb explodes, red for the last ten.
 # Data: left (seconds), team (with team codes: the arming team), defuse (0-1
-# while the defenders hold their button: the defuse bar fills).
+# while the defenders hold their button: the defuse bar fills);
+# lang (pt or en) from the box.
 template: countdown
 layout:
   - type: row
     style: { width: fill, height: 44, background: danger }
     children:
       - type: label
-        text: ARMED
+        text: "{lang == 'pt' && 'ARMADA' || 'ARMED'}"
         style: { font_size: 20, width: fill, align: center }
   - type: spacer
     height: fill
@@ -19,14 +20,14 @@ layout:
     text: "{left|clock}"
     style: { font_size: 48, color: "{left <= 10 && 'danger' || 'white'}" }
   - type: label
-    text: until detonation
+    text: "{lang == 'pt' && 'até à explosão' || 'until detonation'}"
     style: { font_size: 20, color: muted }
   - type: progress_bar
     id: fuse_bar
     value: "{left / params.fuse_s}"
     style: { width: 240, height: 10, color: "{team || 'danger'}" }
   - type: label
-    text: Defusing... keep holding
+    text: "{lang == 'pt' && 'A desarmar... não largues' || 'Defusing... keep holding'}"
     style:
       font_size: 14
       color: white
@@ -39,7 +40,7 @@ layout:
   - type: spacer
     height: fill
   - type: label
-    text: "Armed by {team|upper}"
+    text: "{lang == 'pt' && 'Armada por' || 'Armed by'} {team|upper}"
     style:
       font_size: 14
       color: team

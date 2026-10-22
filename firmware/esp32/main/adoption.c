@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "atalaia/join.h"
+#include "box_text.h"
 
 /* ---- the field card ------------------------------------------------------ */
 
@@ -224,26 +225,28 @@ adopt_result_t adoption_offer(adoption_t *a, const uint8_t key[ADOPTION_KEY_SIZE
 
 static void show_result(adoption_t *a, adopt_result_t r, uint32_t now_ms)
 {
+    /* In the box's language (box_text.h, decision BN-14). */
     static const struct {
         adopt_result_t r;
-        const char *title;
+        box_text_id_t title;
     } titles[] = {
-        {ADOPT_ADOPTED, "Adopted"},         {ADOPT_SAME, "Already adopted"},
-        {ADOPT_READOPTED, "Adopted"},       {ADOPT_BAD_PIN, "Wrong PIN"},
-        {ADOPT_LOCKED, "Adoption locked"},  {ADOPT_BUSY, "Game joined"},
-        {ADOPT_BAD_KEY, "Not adopted"},     {ADOPT_BAD_CARD, "Bad field card"},
-        {ADOPT_STORE_FAILED, "Not stored"}, {ADOPT_NEED_PIN, "Admin PIN needed"},
+        {ADOPT_ADOPTED, TX_ADOPTED},         {ADOPT_SAME, TX_ALREADY_ADOPTED},
+        {ADOPT_READOPTED, TX_ADOPTED},       {ADOPT_BAD_PIN, TX_WRONG_PIN},
+        {ADOPT_LOCKED, TX_ADOPTION_LOCKED},  {ADOPT_BUSY, TX_GAME_JOINED},
+        {ADOPT_BAD_KEY, TX_NOT_ADOPTED},     {ADOPT_BAD_CARD, TX_BAD_FIELD_CARD},
+        {ADOPT_STORE_FAILED, TX_NOT_STORED}, {ADOPT_NEED_PIN, TX_ADMIN_PIN_NEEDED},
     };
-    const char *title = "Adoption";
+    const char *title = box_text(TX_ADOPTION);
     for (size_t i = 0; i < sizeof(titles) / sizeof(titles[0]); i++) {
-        if (titles[i].r == r) title = titles[i].title;
+        if (titles[i].r == r) title = box_text(titles[i].title);
     }
     char data[200];
     if (a->adopted) {
         snprintf(data, sizeof(data), "{\"title\":\"%s\",\"field\":\"%s\",\"fingerprint\":\"%s\"}",
                  title, a->name[0] ? a->name : "-", a->fingerprint);
     } else {
-        snprintf(data, sizeof(data), "{\"title\":\"%s\",\"field\":\"none\"}", title);
+        snprintf(data, sizeof(data), "{\"title\":\"%s\",\"field\":\"%s\"}", title,
+                 box_text(TX_FIELD_NONE));
     }
     if (a->ops.screen) a->ops.screen(a->ops.ctx, "status", data);
     a->overlay = true;
@@ -253,8 +256,8 @@ static void show_result(adoption_t *a, adopt_result_t r, uint32_t now_ms)
 static void show_pin(adoption_t *a, bool error)
 {
     char data[96];
-    snprintf(data, sizeof(data), "{\"digits\":%u,\"error\":%s,\"prompt\":\"PIN to change field\"}",
-             (unsigned)a->typed_len, error ? "true" : "false");
+    snprintf(data, sizeof(data), "{\"digits\":%u,\"error\":%s,\"prompt\":\"%s\"}",
+             (unsigned)a->typed_len, error ? "true" : "false", box_text(TX_PIN_TO_CHANGE_FIELD));
     if (a->ops.screen) a->ops.screen(a->ops.ctx, "pin_entry", data);
 }
 

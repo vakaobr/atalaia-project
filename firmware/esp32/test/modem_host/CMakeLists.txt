@@ -40,6 +40,7 @@ add_executable(modem_host
     ${CORE_DIR}/src/msg_codec.c
     ${CORE_DIR}/src/version.c
     ${CORE_DIR}/src/duty_cycle.c
+    ${CORE_DIR}/src/join.c # atalaia_hmac_sha256: the epoch store tag (radio_protocol.c)
 )
 target_include_directories(modem_host PRIVATE
     ${CORE_DIR}/include ${CORE_DIR}/src ${MAIN_DIR} ${MBEDTLS_INCLUDE_DIR})

@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A box shows neutral, then the team that holds it, and neutral again when the GM frees it (decision BN-11)
+nodes: { alpha: zone, bravo: zone }
+steps:
+  - expect_screen: { node: alpha, template: neutral, data: { hold_s: 3 } }
+  - hold: { node: alpha, team: red, s: 3 }
+  - expect_screen: { node: alpha, template: captured, data: { team: red, since: 3 } }
+  - input: { node: alpha, type: cmd.set_owner, data: { team: none } }
+  - expect_screen: { node: alpha, template: neutral, data: { hold_s: 3 } }
+  - expect_screen: { node: bravo, template: neutral }

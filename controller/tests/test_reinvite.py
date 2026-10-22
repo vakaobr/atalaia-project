@@ -22,7 +22,7 @@ from fastapi.testclient import TestClient
 
 from support import CORE, FakeModem, config
 from atalaia_controller.api import Auth, create_app
-from atalaia_controller.engine import Controller, StartBlocked
+from atalaia_controller.engine import Conflict, Controller, StartBlocked
 from atalaia_controller.store import Store
 from atalaia_controller.ws import Hub
 from atalaia_sim import field_frame as ff
@@ -81,6 +81,42 @@ class Case(unittest.TestCase):
         if role is not None:
             self.ctrl.fc.register_node(node_id, f"node-{node_id}", role)
         self.modem.rx(node_id, seq, "HELLO", hello(f"box-{node_id}", device), game_id=self.ctrl.game["id"], epoch=1)
+
+
+class SharedNodeIdTests(Case):
+    """Review finding 1 (decision BN-18): two devices on one (game key, node id) use the same nonces.
+    The controller never issues a node id twice in a game, and says so loudly when two boxes still
+    say HELLO on one (one card tapped on two boxes)."""
+
+    def test_a_node_id_is_issued_once(self):
+        self.game()
+        self.assertEqual(self.ctrl.issue_join({"role": "zone"}, node_id=4)["node_id"], 4)
+        with self.assertRaises(Conflict) as cm:
+            self.ctrl.issue_join({"role": "zone"}, node_id=4)  # "replace the dead box on node 4"
+        self.assertIn("new node id", str(cm.exception))
+        # A box heard on a node id the GM pre-assigned: not issued again either.
+        self.heard(6, "zone", bytes(range(8)))
+        with self.assertRaises(Conflict):
+            self.ctrl.issue_join({"role": "zone"}, node_id=6)
+        # A replacement gets a new id; the same device invited again keeps its own (reinvite.py).
+        self.assertNotIn(self.ctrl.issue_join({"role": "zone"})["node_id"], (4, 6))
+        self.assertEqual(self.ctrl.issue_join({"role": "zone"}, node_id=4, same_device=True)["node_id"], 4)
+        r = self.client.post("/api/v1/nodes/4/join", headers=GM, json={"role": "zone"})
+        self.assertEqual(r.status_code, 409, r.text)
+
+    def test_two_boxes_on_one_node_id_are_flagged(self):
+        self.game()
+        self.ctrl.issue_join({"role": "zone"}, node_id=4)
+        self.heard(4, "zone", bytes(range(8)))
+        self.heard(4, "zone", bytes(range(8)), seq=1)  # the same box again: fine
+        self.assertFalse(any(m.get("kind") == "conflict" for m in self.messages))
+        self.heard(4, "zone", bytes(range(8, 16)), seq=2)  # the card tapped on a second box
+        alerts = [m for m in self.messages if m.get("kind") == "conflict"]
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]["node"]["node_id"], 4)
+        node = [n for n in self.client.get("/api/v1/nodes", headers=READ).json() if n["node_id"] == 4][0]
+        self.assertTrue(node["conflict"])
+        self.assertEqual(self.ctrl.conflicts[4], [bytes(range(8)).hex(), bytes(range(8, 16)).hex()])
 
 
 class StartGuardTests(Case):

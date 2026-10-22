@@ -143,7 +143,8 @@ class GameLifecycleTests(EngineCase):
             self.ctrl.resume_game(gid)
         game2 = self.create()
         self.assertNotEqual(game2["id"], gid)
-        self.assertEqual(self.modem.configured[-1][2], 2)  # a new nonce epoch
+        # A new game, a new key: its nonce epochs start at 1 (RFC 0001 amendment of 2026-10-22).
+        self.assertEqual(self.modem.configured[-1][2], 1)
 
     def test_auto_end_at_duration(self):
         gid = self.create(duration_ms=10_000)["id"]

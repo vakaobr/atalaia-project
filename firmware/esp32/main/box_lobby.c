@@ -248,6 +248,7 @@ static atalaia_ff_result_t result_of(box_join_result_t r)
     case BOX_JOIN_BUSY: return ATALAIA_FF_BUSY;
     case BOX_JOIN_STORAGE: return ATALAIA_FF_STORAGE;
     case BOX_JOIN_RADIO: return ATALAIA_FF_RADIO;
+    case BOX_JOIN_ENDED: return ATALAIA_FF_ENDED;
     default: return ATALAIA_FF_REFUSED;
     }
 }
@@ -259,7 +260,7 @@ static const char *result_name(atalaia_ff_result_t r)
     return r <= ATALAIA_FF_ENDED ? names[r] : "?";
 }
 
-static bool played_to_the_end(const box_game_t *g, uint16_t game_id)
+bool box_lobby_played_to_the_end(const box_game_t *g, uint16_t game_id)
 {
     for (size_t i = 0; i < BOX_ENDED_GAMES; i++) {
         if (g->lobby.ended[i] == game_id && game_id != 0) return true;
@@ -293,7 +294,7 @@ static void on_invite(box_game_t *g, const atalaia_ff_msg_t *m)
     /* A join for a game this box has already played to its end is stale, whoever sends it. */
     atalaia_ff_result_t result;
     if (atalaia_join_decode(payload, (size_t)n, g->join_key, &j) == ATALAIA_JOIN_OK &&
-        played_to_the_end(g, j.game_id)) {
+        box_lobby_played_to_the_end(g, j.game_id)) {
         result = ATALAIA_FF_ENDED;
     } else {
         result = result_of(box_game_join_invited(g, payload, (size_t)n));
@@ -371,10 +372,15 @@ void box_lobby_cancel_ready_screen(box_game_t *g)
 
 static void show_ready(box_game_t *g)
 {
-    char data[SCREEN_DATA_MAX];
-    /* Short enough for the on-board OLED's head line and big line too. */
-    snprintf(data, sizeof(data), "{\"title\":\"Ready\",\"mode\":\"next game\"}");
-    if (g->shell.screen != NULL) g->shell.screen(g->shell.user, "status", data);
+    /* "Ready / next game" in the box's language (screen_renderer.c, oled_view.c). */
+    const char *data = g->has_picker ? "{\"picker\":true}" : "{}";
+    if (g->shell.screen != NULL) g->shell.screen(g->shell.user, "ready", data);
+}
+
+void box_lobby_show_ready(box_game_t *g)
+{
+    g->lobby.ready_screen_due = false;
+    show_ready(g);
 }
 
 void box_lobby_tick(box_game_t *g, uint32_t now_ms)

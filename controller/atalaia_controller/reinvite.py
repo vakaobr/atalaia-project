@@ -201,7 +201,7 @@ class Reinvite:
                     join_spec["name"] = spec["name"]
                 # The same node id when the box is invited again into this game.
                 node_id = existing.node_id if existing is not None and existing.game_id == game_id else None
-                made = self.ctl.issue_join(join_spec, node_id=node_id)
+                made = self.ctl.issue_join(join_spec, node_id=node_id, same_device=node_id is not None)
                 payload = bytes.fromhex(made["payload_hex"])
                 try:
                     inv = self.inviter.invite(device, payload, game_id=game_id, node_id=made["node_id"],

@@ -7,6 +7,10 @@
  * (headless, 320x240 RGB565), writes the result to <build>/screens/ and
  * compares it pixel by pixel with firmware/esp32/test/screens/<name>.png.
  *
+ * A case whose name ends in "_pt" is drawn in Portuguese, as a box whose game's
+ * join carried "pt" (box_text.h, decision BN-14); the others as a box no game
+ * gave a language to (English, and the modes' templates in their default).
+ *
  * To accept new renders on purpose, run with ATALAIA_UPDATE_SCREENS=1:
  *   ATALAIA_UPDATE_SCREENS=1 ctest --test-dir <build> -R screens
  * (or `python tools/docker_fw.py test --update-screens`), then look at
@@ -21,6 +25,7 @@
 #include <sys/stat.h>
 
 #include "lvgl.h"
+#include "box_text.h"
 #include "png_io.h"
 #include "screen_renderer.h"
 #include "screen_template.h"
@@ -76,9 +81,36 @@ static const screen_case_t cases[] = {
      "{\"title\":\"Game on\",\"mode\":\"Domination\",\"timer_s\":600,\"battery\":85,"
      "\"version\":\"0.1.0\"}",
      NULL},
-    /* Between games (main/box_lobby.c): an invite taken, and ready for the next game. */
-    {"status_invited", "status", "{\"title\":\"Invited\",\"mode\":\"3073: zone\"}", NULL},
-    {"status_ready", "status", "{\"title\":\"Ready\",\"mode\":\"next game\"}", NULL},
+    /* A game's life on a box (decisions BN-10, BN-12, BN-13): joined or invited, waiting for the
+     * start; started (before the mode draws); ready for the next game (with the picker's hint on a
+     * box that has one). */
+    {"waiting", "waiting", "{\"game\":3073,\"role\":\"zone\",\"invited\":false}", NULL},
+    {"waiting_invited", "waiting", "{\"game\":3073,\"role\":\"zone\",\"invited\":true}", NULL},
+    {"playing", "playing", "{\"game\":3073,\"role\":\"zone\"}", NULL},
+    {"ready", "ready", "{}", NULL},
+    {"ready_picker", "ready", "{\"picker\":true}", NULL},
+    /* A zone nobody holds and a zone a team holds, for the modes without their own (BN-11). */
+    {"neutral", "neutral", "{\"hold_s\":3}", NULL},
+    {"captured", "captured", "{\"team\":\"red\",\"since\":95}", NULL},
+    /* The same in Portuguese (BN-14). */
+    {"waiting_invited_pt", "waiting", "{\"game\":3073,\"role\":\"zone\",\"invited\":true}", NULL},
+    {"playing_pt", "playing", "{\"game\":3073,\"role\":\"zone\"}", NULL},
+    {"ready_picker_pt", "ready", "{\"picker\":true}", NULL},
+    {"neutral_pt", "neutral", "{\"hold_s\":3}", NULL},
+    {"captured_pt", "captured", "{\"team\":\"red\",\"since\":95}", NULL},
+    {"standby_pt", "standby", "{\"arm\":\"red\"}", NULL},
+    {"countdown_pt", "countdown", "{\"left\":299,\"team\":\"red\"}", NULL},
+    {"defused_pt", "defused", "{\"team\":\"blue\"}", NULL},
+    {"final_score_pt", "final_score", "{\"owner\":\"red\"}", NULL},
+    {"paused_pt", "paused", "{}", NULL},
+    {"pin_entry_pt", "pin_entry", "{\"digits\":2,\"error\":true}", NULL},
+    {"preset_select_pt", "preset_select",
+     "{\"presets\":[\"Bomba\",\"Domínio\"],\"selected\":1,\"page\":1,\"pages\":2}", NULL},
+    {"timer_adjust_pt", "timer_adjust", "{\"timer_s\":0}", NULL},
+    {"start_confirm_pt", "start_confirm", "{\"label\":\"Bomba\",\"timer_s\":600}", NULL},
+    {"wifi_setup_pt", "wifi_setup", "{\"ssid\":\"atalaia-3F2A\"}", NULL},
+    {"status_adopted_pt", "status",
+     "{\"title\":\"Adotada\",\"field\":\"Campo da Atalaia\",\"fingerprint\":\"604A-0A95\"}", NULL},
     {"pin_entry", "pin_entry", "{\"digits\":2,\"error\":false}", NULL},
     {"pin_entry_wrong", "pin_entry", "{\"digits\":0,\"error\":true}", NULL},
     /* Adoption (adoption.c, protocol/adoption.md): adopted, and another field's card. */
@@ -113,13 +145,21 @@ static const screen_case_t cases[] = {
     /* Declarative templates (ADR-P3-4): Bomb and Domination migrated, the phase 3 modes. */
     {"yaml_bomb_standby", "standby", "{\"arm\":\"red\"}", BOMB},
     {"yaml_bomb_standby_arming", "standby", "{\"arm\":\"red\",\"progress\":0.6}", BOMB},
+    {"yaml_bomb_standby_pt", "standby", "{\"arm\":\"red\"}", BOMB},
+    {"yaml_bomb_countdown_defusing_pt", "countdown",
+     "{\"left\":231,\"defuse\":0.4,\"team\":\"red\"}", BOMB},
+    {"yaml_bomb_exploded_pt", "exploded", "{\"team\":\"red\"}", BOMB},
     {"yaml_bomb_countdown", "countdown", "{\"left\":299}", BOMB},
     {"yaml_bomb_countdown_defusing", "countdown", "{\"left\":231,\"defuse\":0.4}", BOMB},
     {"yaml_bomb_countdown_last_seconds", "countdown", "{\"left\":7,\"team\":\"red\"}", BOMB},
     {"yaml_bomb_defused", "defused", "{\"team\":\"blue\"}", BOMB},
     {"yaml_bomb_defused_yellow", "defused", "{\"team\":\"yellow\"}", BOMB},
     {"yaml_bomb_exploded", "exploded", "{\"team\":\"red\"}", BOMB},
-    {"yaml_domination_standby", "standby", "{}", DOM},
+    {"yaml_domination_neutral", "neutral", "{}", DOM},
+    {"yaml_domination_neutral_pt", "neutral", "{}", DOM},
+    {"yaml_domination_captured_pt", "captured", "{\"team\":\"red\",\"points\":12,\"since\":95}",
+     DOM},
+    {"yaml_domination_final_score_pt", "final_score", "{\"owner\":\"blue\",\"points\":40}", DOM},
     {"yaml_domination_captured", "captured", "{\"team\":\"red\",\"points\":12,\"since\":95}", DOM},
     {"yaml_domination_final_score", "final_score", "{\"owner\":\"blue\",\"points\":40}", DOM},
     {"yaml_domination_final_score_no_owner", "final_score", "{}", DOM},
@@ -156,7 +196,9 @@ static const screen_case_t cases[] = {
      MEDIC_EN},
     /* Master and Satellites: a free box, a satellite, and the master with the controller's status.
      */
-    {"yaml_master_satellites_standby", "standby", "{}", MASTER},
+    {"yaml_master_satellites_neutral", "neutral", "{}", MASTER},
+    {"yaml_master_satellites_status_pt", "master_status",
+     "{\"team\":\"red\",\"since\":95,\"held\":2,\"of\":3,\"points\":4}", MASTER},
     {"yaml_master_satellites_captured", "captured", "{\"team\":\"blue\",\"since\":95}", MASTER},
     {"yaml_master_satellites_status", "master_status",
      "{\"team\":\"red\",\"since\":95,\"held\":2,\"of\":3,\"points\":4}", MASTER},
@@ -167,6 +209,7 @@ static const screen_case_t cases[] = {
     {"yaml_target_windows_standby", "standby", "{\"hits\":0}", TARGET},
     {"yaml_target_windows_standby_hit", "standby", "{\"team\":\"blue\",\"hits\":3}", TARGET},
     {"yaml_target_windows_window", "window", "{\"team\":\"red\",\"left\":4}", TARGET},
+    {"yaml_target_windows_standby_hit_pt", "standby", "{\"team\":\"blue\",\"hits\":3}", TARGET},
     /* The Hacking Terminal: each puzzle, a lock, the solved screen with a code, in pt and en. */
     {"yaml_hack_code", "hack_code",
      "{\"team\":\"red\",\"typed\":\"8 5 _ _\",\"digits\":4,\"tries\":3,\"locked\":0,"
@@ -310,8 +353,15 @@ static void check_overlaps(const char *name)
     }
 }
 
+static bool portuguese(const char *name)
+{
+    size_t n = strlen(name);
+    return n > 3 && strcmp(name + n - 3, "_pt") == 0;
+}
+
 static void render(const screen_case_t *c)
 {
+    box_lang_set_code(portuguese(c->name) ? "pt" : "");
     if (c->mode) screen_render(SCREEN_MODE_MESSAGE, c->mode);
     if (!screen_render(c->template_name, c->data)) fail(c->name, "template not recognised");
     if (c->mode && !screen_template_widget_count()) fail(c->name, "not drawn from its template");

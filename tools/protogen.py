@@ -924,7 +924,7 @@ def gen_join_vectors(jv: dict[str, Any], byte_array: Any) -> list[str]:
               f"{f['channel_hz']}u, {f['max_hops']},",
               f"      {{{teams}}}, {len(f['teams'])},",
               f"      {c_string(f['mode_id'])}, {c_string(f['role'])}, {f['game_seed']}u, "
-              f"{c_string(params)}, {kinds[f['kind']]}, false, {{0}}, 0, {{\"\"}}}},",
+              f"{c_string(params)}, {kinds[f['kind']]}, false, {{0}}, 0, {{\"\"}}, \"\"}},",
               f"     join_vec_{i}, join_vec_{i}_len, {c_string(v['text'])}, "
               f"join_tag_{i}, join_tag_{i}_len}},"]
     L += ["};",
@@ -942,6 +942,43 @@ def gen_join_vectors(jv: dict[str, Any], byte_array: Any) -> list[str]:
     L += ["};",
           "#define HMAC_VECTOR_COUNT (sizeof(hmac_vectors) / sizeof(hmac_vectors[0]))", ""]
     L += gen_join_link_vectors(jv["controller_link"], byte_array, kinds)
+    L += gen_join_lang_vectors(jv["box_language"], byte_array, kinds)
+    return L
+
+
+def gen_join_lang_vectors(lv: dict[str, Any], byte_array: Any, kinds: dict[str, str]) -> list[str]:
+    """Key 15 (lang) of a join payload (RFC 0001 Amendment 10): the language of a box's screens."""
+    L = ["/* ---- join payloads with the box language (key 15) ---- */", "",
+         "typedef struct {", "    const char *name;", "    atalaia_join_t fields;", "    const uint8_t *payload;",
+         "    size_t payload_len;", "    const char *text;", "} join_lang_vector_t;", ""]
+    for i, v in enumerate(lv["valid"]):
+        L += byte_array(f"join_lang_{i}", v["payload"])
+    for i, v in enumerate(lv["invalid"]):
+        require(v["reason"] == "body", f"join.json box_language {v['name']}: only body errors here")
+        L += byte_array(f"join_lang_bad_{i}", v["payload"])
+    L += ["", "static const join_lang_vector_t join_lang_vectors[] = {"]
+    for i, v in enumerate(lv["valid"]):
+        f = v["fields"]
+        require(f.get("ca_sha256") is None and f.get("urls") is None and f["params"] is None,
+                f"join.json box_language {v['name']}: lang only")
+        key = ", ".join(f"0x{b:02x}" for b in bytes.fromhex(f["game_key"]))
+        teams = ", ".join("{" + c_string(t) + "}" for t in f["teams"])
+        L += [f"    {{{c_string(v['name'])},",
+              f"     {{.game_id = {f['game_id']}, .game_key = {{{key}}}, .node_id = {f['node_id']},",
+              f"      .controller_id = {f['controller_id']}, .channel_hz = {f['channel_hz']}u, "
+              f".max_hops = {f['max_hops']},",
+              f"      .teams = {{{teams}}}, .team_count = {len(f['teams'])},",
+              f"      .mode_id = {c_string(f['mode_id'])}, .role = {c_string(f['role'])}, "
+              f".game_seed = {f['game_seed']}u,",
+              f"      .kind = {kinds[f['kind']]}, .lang = {c_string(f['lang'])}}},",
+              f"     join_lang_{i}, join_lang_{i}_len, {c_string(v['text'])}}},"]
+    L += ["};", "#define JOIN_LANG_VECTOR_COUNT (sizeof(join_lang_vectors) / sizeof(join_lang_vectors[0]))", "",
+          "static const join_bad_vector_t join_lang_bad_vectors[] = {"]
+    for i, v in enumerate(lv["invalid"]):
+        L.append(f"    {{{c_string(v['name'])}, join_lang_bad_{i}, join_lang_bad_{i}_len, ATALAIA_JOIN_ERR_BODY, "
+                 f"{c_string(v['why'])}}},")
+    L += ["};", "#define JOIN_LANG_BAD_VECTOR_COUNT (sizeof(join_lang_bad_vectors) / sizeof(join_lang_bad_vectors[0]))",
+          ""]
     return L
 
 

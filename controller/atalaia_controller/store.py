@@ -56,6 +56,8 @@ than ``REMOTE_LOG_DAYS`` are deleted when a new one is added.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import os
 import sqlite3
@@ -67,6 +69,13 @@ from typing import Any, Optional
 SCHEMA_VERSION = 8
 REMOTE_LOG_DAYS = 365  # the remote GM's log on the controller (decision S19-9)
 FIELD_IMAGE_MAX = 4 * 1024 * 1024  # bytes
+EPOCH_KEYS = 8  # game keys whose TX epoch is kept (as the box's epoch store, radio_protocol.h)
+
+
+def epoch_tag(key: bytes) -> str:
+    """A game key's name in the epoch list: the first 8 bytes of HMAC-SHA256(key, "atalaia epoch
+    tag"), in hex (RFC 0001 amendment of 2026-10-22; protocol/vectors/epoch_tag.json)."""
+    return hmac.new(key, b"atalaia epoch tag", hashlib.sha256).digest()[:8].hex()
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings (
@@ -403,14 +412,30 @@ class Store:
     def delete_setting(self, key: str) -> None:
         self._exec("DELETE FROM settings WHERE key = ?", (key,))
 
-    def next_tx_epoch(self) -> int:
-        """The controller's epoch for this run: stored epoch + 1, written before any TX (ADR-P2-2)."""
+    def next_tx_epoch(self, key: bytes, resuming: bool = False) -> int:
+        """The controller's epoch for this run in the game with this key, written before any TX
+        (ADR-P2-2; per game key since RFC 0001's amendment of 2026-10-22).
+
+        The setting tx_epochs keeps [tag, epoch] for the last EPOCH_KEYS game keys, most recent
+        first; the tag is epoch_tag(key), never the key. A key with a record goes on at its epoch
+        + 1; a new key starts at 1, so a box new to the game (epochs 0..16) hears it. The one
+        tx_epoch of earlier versions is used only while tx_epochs does not exist, and only by a
+        game the controller resumes (resuming: its game); a new game starts at 1. One row write:
+        a crash leaves the old list or the new one."""
+        tag = epoch_tag(key)
         with self._lock:
-            current = int(self.get_setting("tx_epoch") or "0")
-            if current >= 0xFFFF:
-                raise RuntimeError("the controller's nonce epochs are exhausted; reset the store")
-            self.set_setting("tx_epoch", str(current + 1))
-            return current + 1
+            saved = self.get_setting("tx_epochs")
+            table: list[list[Any]] = json.loads(saved) if saved else []
+            current = next((int(e) for t, e in table if t == tag), None)
+            if saved is None and resuming and self.get_setting("tx_epoch"):
+                current = int(self.get_setting("tx_epoch") or "0")
+            if current is not None and current >= 0xFFFF:
+                raise RuntimeError("the controller's nonce epochs for this game are exhausted; "
+                                   "start a new game")
+            epoch = 1 if current is None else current + 1
+            table = [[tag, epoch]] + [r for r in table if r[0] != tag]
+            self.set_setting("tx_epochs", json.dumps(table[:EPOCH_KEYS]))
+            return epoch
 
     # --- modes --------------------------------------------------------------
 

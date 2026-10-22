@@ -14,6 +14,7 @@
 #include <unistd.h>
 
 #include "check.h"
+#include "epoch_store_fake.h"
 #include "radio/field_link.h"
 
 #define BOX      7
@@ -22,6 +23,7 @@
 #define PKT_CAP  (ATALAIA_RF_HEADER_SIZE + ATALAIA_RF_PAYLOAD_MAX + ATALAIA_RF_MIC_SIZE)
 
 static const uint8_t KEY[16] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+static const uint8_t *box_key = KEY; /* the game key box_up joins with */
 
 /* ---- Fakes ------------------------------------------------------------------------- */
 
@@ -44,25 +46,8 @@ static bool sink_tx(void *ctx, const uint8_t *p, size_t n)
     return true;
 }
 
-typedef struct {
-    uint16_t epoch;
-    bool present;
-} nvs_t;
+typedef epoch_fake_t nvs_t;
 
-static int nvs_read_epoch(void *ctx, uint16_t *e)
-{
-    nvs_t *n = (nvs_t *)ctx;
-    if (!n->present) return -1;
-    *e = n->epoch;
-    return 0;
-}
-static int nvs_write_epoch(void *ctx, uint16_t e)
-{
-    nvs_t *n = (nvs_t *)ctx;
-    n->epoch = e;
-    n->present = true;
-    return 0;
-}
 static int nvs_read_key(void *ctx, uint8_t k[16])
 {
     (void)ctx;
@@ -126,13 +111,14 @@ typedef struct {
     shell_t shell;
     atalaia_join_t join;
     atalaia_hello_t hello;
+    bool resuming; /* a reboot into the stored game */
 } box_t;
 
 static void box_join(atalaia_join_t *j)
 {
     memset(j, 0, sizeof(*j));
     j->game_id = GAME;
-    memcpy(j->game_key, KEY, 16);
+    memcpy(j->game_key, box_key, 16);
     j->node_id = BOX;
     j->controller_id = 0;
     j->channel_hz = 869525000u;
@@ -148,8 +134,7 @@ static void box_join(atalaia_join_t *j)
 static bool box_up(box_t *b, event_log_t *log, uint32_t now)
 {
     box_join(&b->join);
-    b->nvs_ops = (atalaia_radio_nvs_ops_t){nvs_read_epoch, nvs_write_epoch, nvs_read_key,
-                                           nvs_write_key,  nvs_erase_key,   &b->nvs};
+    b->nvs_ops = EPOCH_FAKE_OPS(&b->nvs, nvs_read_key, nvs_write_key, nvs_erase_key);
     memset(&b->hello, 0, sizeof(b->hello));
     snprintf(b->hello.node_name, sizeof(b->hello.node_name), "box-7");
     snprintf(b->hello.fw_version, sizeof(b->hello.fw_version), "test");
@@ -165,14 +150,14 @@ static bool box_up(box_t *b, event_log_t *log, uint32_t now)
                           .tx = sink_tx,
                           .tx_ctx = &b->sink};
     return field_link_init(&b->link, &b->join, &atalaia_crypto_test_stub, &b->nvs_ops, log,
-                           &b->hello, &io, now);
+                           &b->hello, &io, now, b->resuming);
 }
 
 /* Opens a packet the box sent. */
 static bool open_box(box_t *b, int i, atalaia_header_t *h, uint8_t *pl, size_t *n)
 {
-    return atalaia_packet_decrypt(b->sink.pkt[i], b->sink.len[i], b->link.proto.epoch, KEY, h, pl,
-                                  n, &atalaia_crypto_test_stub);
+    return atalaia_packet_decrypt(b->sink.pkt[i], b->sink.len[i], b->link.proto.epoch, box_key, h,
+                                  pl, n, &atalaia_crypto_test_stub);
 }
 
 static int count_type(box_t *b, int from, uint8_t type)
@@ -261,7 +246,7 @@ static void test_hello_event_retry_and_ack(void)
     static box_t b;
     memset(&b, 0, sizeof(b));
     CHECK(box_up(&b, NULL, 1000));
-    CHECK(b.nvs.epoch == 1); /* boot epoch stored before the first packet */
+    CHECK(epoch_fake_of(&b.nvs, KEY) == 1); /* boot epoch stored before the first packet */
 
     /* HELLO first, asking for an ACK, from our id, with max_hops and our epoch. */
     CHECK(b.sink.count == 1);
@@ -591,9 +576,10 @@ static void test_log_replay_after_reboot(void)
     static box_t b2;
     memset(&b2, 0, sizeof(b2));
     b2.nvs = kept;
+    b2.resuming = true;
     event_log_init(&log, dir);
     CHECK(box_up(&b2, &log, 20));
-    CHECK(b2.link.proto.epoch == 2 && b2.nvs.epoch == 2);
+    CHECK(b2.link.proto.epoch == 2 && epoch_fake_of(&b2.nvs, KEY) == 2);
     CHECK(field_link_pending(&b2.link) == 2);
     field_link_tick(&b2.link, 21);
     CHECK(count_type(&b2, 0, ATALAIA_MSG_EVENT) == 2);
@@ -649,6 +635,62 @@ static void test_refused_tx_still_acknowledged(void)
     CHECK(field_link_pending(&b.link) == 0);
 }
 
+/* A receiver new to the game (the modem, another box: epochs 0..16 from nothing) hears the box's
+ * packet i, and gives the epoch that authenticated it. */
+static bool fresh_receiver_hears(box_t *b, int i, const uint8_t key[16], uint8_t *type,
+                                 uint16_t *epoch)
+{
+    static atalaia_radio_proto_t rx;
+    atalaia_radio_proto_init(&rx, GAME, 99, &atalaia_crypto_test_stub, NULL);
+    atalaia_radio_proto_set_key(&rx, key);
+    radio_rx_msg_t m;
+    memset(&m, 0, sizeof(m));
+    memcpy(m.data, b->sink.pkt[i], b->sink.len[i]);
+    m.len = b->sink.len[i];
+    atalaia_header_t h;
+    uint8_t pl[PKT_CAP];
+    size_t n = 0;
+    if (!atalaia_radio_proto_on_recv_window(&rx, &m, 16, &h, pl, &n, epoch)) return false;
+    *type = h.type;
+    return true;
+}
+
+/* Found on the bench (2026-10-22): one epoch counter for the box's whole life left a box that
+ * had joined more than ~16 games unheard in every new one (the modem counted 863 failures).
+ * The epoch is per game key now (RFC 0001 amendment of 2026-10-22): 40 games in a row, each
+ * with a new key, start at epoch 1 and are heard by a fresh receiver; a reboot inside a game
+ * still raises the epoch. */
+static void test_many_games_heard_by_a_fresh_receiver(void)
+{
+    static box_t b;
+    static nvs_t kept;
+    memset(&kept, 0, sizeof(kept));
+    for (int game = 0; game < 40; game++) {
+        uint8_t key[16];
+        for (int i = 0; i < 16; i++) key[i] = (uint8_t)(0xA0 + game * 3 + i * 7);
+        box_key = key;
+        for (int boot = 1; boot <= 2; boot++) { /* the join, then a reboot in the same game */
+            memset(&b, 0, sizeof(b));
+            b.nvs = kept;
+            b.resuming = boot == 2;
+            CHECK(box_up(&b, NULL, 10));
+            kept = b.nvs;
+            CHECK(b.link.proto.epoch == boot);
+            atalaia_event_t ev;
+            make_event(&ev, 1, "zone.captured", 1, ATALAIA_PRIO_NORMAL);
+            field_link_event(&b.link, &ev, "{\"team\":\"red\"}");
+            CHECK(b.sink.count == 2);
+            uint8_t type = 0;
+            uint16_t epoch = 0;
+            CHECK(fresh_receiver_hears(&b, 0, key, &type, &epoch));
+            CHECK(type == ATALAIA_MSG_HELLO && epoch == boot);
+            CHECK(fresh_receiver_hears(&b, 1, key, &type, &epoch));
+            CHECK(type == ATALAIA_MSG_EVENT && epoch == boot);
+        }
+    }
+    box_key = KEY;
+}
+
 void run_field_link_tests(void)
 {
     test_hello_event_retry_and_ack();
@@ -661,4 +703,5 @@ void run_field_link_tests(void)
     test_state_contents_and_interval();
     test_log_replay_after_reboot();
     test_refused_tx_still_acknowledged();
+    test_many_games_heard_by_a_fresh_receiver();
 }

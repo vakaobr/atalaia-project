@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "box_text.h"
 #include "screen_json.h"
 #include "screen_types.h"
 
@@ -30,6 +31,11 @@ static void upper(char *s)
 static void set(char *dst, size_t sz, const char *src)
 {
     snprintf(dst, sz, "%s", src ? src : "");
+}
+
+static void set_text(char *dst, size_t sz, box_text_id_t id)
+{
+    set(dst, sz, box_text(id));
 }
 
 /* 299 -> "4:59", 3725 -> "1:02:05". */
@@ -107,11 +113,11 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
 
     /* ---- the shell's screens ---- */
     if (strcmp(t, "pin_entry") == 0) {
-        set(out->head, sizeof(out->head), "ADMIN PIN");
+        set_text(out->head, sizeof(out->head), TXO_ADMIN_PIN);
         screen_json_int(data, "digits", &v);
         dots(v, out->big, sizeof(out->big));
-        set(out->foot, sizeof(out->foot),
-            screen_json_true(data, "error") ? "Wrong PIN" : "# enter  * delete");
+        set_text(out->foot, sizeof(out->foot),
+                 screen_json_true(data, "error") ? TXO_WRONG_PIN : TXO_ENTER_DELETE);
         return true;
     }
     if (strcmp(t, "preset_select") == 0) {
@@ -121,36 +127,38 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
         screen_json_int(data, "selected", &selected);
         screen_json_int(data, "page", &page);
         screen_json_int(data, "pages", &pages);
-        set(out->head, sizeof(out->head), "GAMES");
+        set_text(out->head, sizeof(out->head), TXO_GAMES);
         if (pages > 1) snprintf(out->head_right, sizeof(out->head_right), "%ld/%ld", page, pages);
         if (selected >= 1 && selected <= count) {
             snprintf(out->big, sizeof(out->big), "%d %s", (int)selected, names[selected - 1]);
         } else {
-            set(out->big, sizeof(out->big), count ? "-" : "No games");
+            set(out->big, sizeof(out->big), count ? "-" : box_text(TXO_NO_GAMES));
         }
-        set(out->foot, sizeof(out->foot), pages > 1 ? "1-9  0 more  # ok" : "1-9 pick  # ok");
+        set_text(out->foot, sizeof(out->foot), pages > 1 ? TXO_PICK_PAGES : TXO_PICK);
         return true;
     }
     if (strcmp(t, "timer_adjust") == 0) {
-        set(out->head, sizeof(out->head), "GAME TIME");
+        set_text(out->head, sizeof(out->head), TXO_GAME_TIME);
         screen_json_int(data, "timer_s", &v);
         clock_text(v, out->big, sizeof(out->big));
-        set(out->foot, sizeof(out->foot), "2 +5  8 -5  # ok");
+        set_text(out->foot, sizeof(out->foot), TXO_TIMER_KEYS);
         return true;
     }
     if (strcmp(t, "start_confirm") == 0) {
-        set(out->head, sizeof(out->head), "START?");
+        set_text(out->head, sizeof(out->head), TXO_START_Q);
         if (screen_json_str(data, "label", s, sizeof(s)) && s[0]) {
             set(out->big, sizeof(out->big), s);
         }
         if (screen_json_int(data, "timer_s", &v)) {
             clock_text(v, out->head_right, sizeof(out->head_right));
         }
-        set(out->foot, sizeof(out->foot), "# start  * back");
+        set_text(out->foot, sizeof(out->foot), TXO_START_BACK);
         return true;
     }
     if (strcmp(t, "status") == 0) {
-        if (!screen_json_str(data, "title", s, sizeof(s)) || !s[0]) set(s, sizeof(s), "status");
+        if (!screen_json_str(data, "title", s, sizeof(s)) || !s[0]) {
+            set_text(s, sizeof(s), TX_STATUS_UP);
+        }
         upper(s);
         set(out->head, sizeof(out->head), s);
         if (screen_json_str(data, "code", s, sizeof(s)) && s[0]) {
@@ -159,7 +167,7 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
             if (screen_json_str(data, "id", id, sizeof(id)) && id[0]) {
                 snprintf(out->foot, sizeof(out->foot), "id %s  console", id);
             } else {
-                set(out->foot, sizeof(out->foot), "console: Adopt");
+                set_text(out->foot, sizeof(out->foot), TXO_CONSOLE_ADOPT);
             }
         } else if (screen_json_str(data, "pairing", s, sizeof(s)) && s[0]) {
             set(out->foot, sizeof(out->foot), s); /* pairing paused or locked */
@@ -175,32 +183,66 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
         return true;
     }
     if (strcmp(t, "wifi_setup") == 0) {
-        set(out->head, sizeof(out->head), "WI-FI SETUP");
+        set_text(out->head, sizeof(out->head), TXO_WIFI_SETUP);
         if (!screen_json_str(data, "ssid", s, sizeof(s)) || !s[0])
             set(s, sizeof(s), "atalaia-....");
         set(out->big, sizeof(out->big), s);
-        set(out->foot, sizeof(out->foot), "open 192.168.4.1");
+        set_text(out->foot, sizeof(out->foot), TXO_OPEN_PORTAL);
+        return true;
+    }
+    /* A free box, ready for the next game (BN-10); joined, not started yet (BN-12). */
+    if (strcmp(t, "ready") == 0) {
+        set_text(out->head, sizeof(out->head), TX_READY_UP);
+        set_text(out->big, sizeof(out->big), TX_NEXT_GAME);
+        if (screen_json_true(data, "picker"))
+            set_text(out->foot, sizeof(out->foot), TXO_KEY_PICKER);
+        return true;
+    }
+    if (strcmp(t, "waiting") == 0) {
+        set_text(out->head, sizeof(out->head), TX_WAITING_UP);
+        screen_json_int(data, "game", &v);
+        snprintf(out->big, sizeof(out->big), box_text(TX_GAME_N), (unsigned)v);
+        set_text(out->foot, sizeof(out->foot), TXO_NOT_STARTED);
         return true;
     }
 
     /* ---- mode screens: the mode in the header ---- */
     set(out->head, sizeof(out->head), mode);
     if (strcmp(t, "standby") == 0) {
-        set(out->big, sizeof(out->big), "STANDBY");
+        set_text(out->big, sizeof(out->big), TX_READY_UP);
         out->bar = share_pct(data, "progress");
         if (out->bar >= 0) {
-            set(out->foot, sizeof(out->foot), "ARMING");
+            set_text(out->foot, sizeof(out->foot), TXO_ARMING);
         } else if (screen_json_str(data, "arm", s, sizeof(s)) && s[0]) {
             upper(s);
-            snprintf(out->foot, sizeof(out->foot), "Hold %s to arm", s);
+            snprintf(out->foot, sizeof(out->foot), box_text(TXO_HOLD_TO_ARM), s);
         } else {
-            set(out->foot, sizeof(out->foot), "Waiting");
+            set_text(out->foot, sizeof(out->foot), TX_WAITING);
         }
         return true;
     }
+    /* A zone nobody holds, a zone a team holds (BN-11): never the Bomb's words. */
+    if (strcmp(t, "neutral") == 0) {
+        set_text(out->big, sizeof(out->big), TX_NEUTRAL_UP);
+        out->bar = share_pct(data, "progress");
+        set_text(out->foot, sizeof(out->foot), TXO_HOLD_TO_CAPTURE);
+        return true;
+    }
+    if (strcmp(t, "captured") == 0 && screen_json_str(data, "team", s, sizeof(s)) && s[0]) {
+        upper(s);
+        set(out->big, sizeof(out->big), s);
+        out->bar = share_pct(data, "progress");
+        set_text(out->foot, sizeof(out->foot), TX_ZONE_HELD_UP);
+        return true;
+    }
+    if (strcmp(t, "playing") == 0) {
+        set_text(out->big, sizeof(out->big), TX_GAME_ON_UP);
+        if (screen_json_str(data, "role", s, sizeof(s))) set(out->foot, sizeof(out->foot), s);
+        return true;
+    }
     if (strcmp(t, "paused") == 0) {
-        set(out->big, sizeof(out->big), "PAUSED");
-        set(out->foot, sizeof(out->foot), "Wait for the GM");
+        set_text(out->big, sizeof(out->big), TX_PAUSED_UP);
+        set_text(out->foot, sizeof(out->foot), TXO_WAIT_GM);
         return true;
     }
     if (strcmp(t, "code_entry") == 0) {
@@ -222,14 +264,14 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
     if (screen_json_int(data, "left", &v)) {
         clock_text(v, out->big, sizeof(out->big));
     } else if (strcmp(t, "final_score") == 0) {
-        set(out->big, sizeof(out->big), "GAME OVER");
+        set_text(out->big, sizeof(out->big), TX_GAME_OVER_UP);
     } else {
         set(out->big, sizeof(out->big), t);
         upper(out->big);
     }
     out->bar = share_pct(data, strcmp(t, "countdown") == 0 ? "defuse" : "progress");
     if (out->bar >= 0 && strcmp(t, "countdown") == 0) {
-        set(out->foot, sizeof(out->foot), "DEFUSE");
+        set_text(out->foot, sizeof(out->foot), TXO_DEFUSE);
         return true;
     }
     static const char *const team_keys[] = {"team", "owner", "winner", NULL};
@@ -238,7 +280,7 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
         upper(s);
         set(out->foot, sizeof(out->foot), s);
     } else if (strcmp(t, "countdown") == 0) {
-        set(out->foot, sizeof(out->foot), "until detonation");
+        set_text(out->foot, sizeof(out->foot), TX_UNTIL_DETONATION);
     } else {
         first_str(data, text_keys, out->foot, sizeof(out->foot));
     }
@@ -313,18 +355,18 @@ static void build(lv_obj_t *scr)
     lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, 0);
     lv_obj_align(bar, LV_ALIGN_TOP_LEFT, 0, 0);
 
-    head_right = text(bar, &lv_font_montserrat_14, lv_color_black());
+    head_right = text(bar, &lv_font_atalaia_14, lv_color_black());
     lv_label_set_long_mode(head_right, LV_LABEL_LONG_CLIP);
     lv_obj_align(head_right, LV_ALIGN_RIGHT_MID, -2, 0);
-    head = text(bar, &lv_font_montserrat_14, lv_color_black());
+    head = text(bar, &lv_font_atalaia_14, lv_color_black());
     lv_obj_align(head, LV_ALIGN_LEFT_MID, 2, 0);
 
-    big = text(scr, &lv_font_montserrat_28, lv_color_white());
+    big = text(scr, &lv_font_atalaia_28, lv_color_white());
     lv_obj_set_width(big, TEXT_MAX);
     lv_obj_set_style_text_align(big, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(big, LV_ALIGN_CENTER, 0, 0);
 
-    foot = text(scr, &lv_font_montserrat_14, lv_color_white());
+    foot = text(scr, &lv_font_atalaia_14, lv_color_white());
 
     /* A hold's progress: an outlined box filling from the left. */
     hold_box = lv_obj_create(scr);
@@ -354,14 +396,14 @@ void oled_view_draw(lv_obj_t *scr, const oled_text_t *t)
     if (!built) build(scr);
 
     lv_label_set_text(head_right, t->head_right);
-    int32_t right_w = t->head_right[0] ? width_of(t->head_right, &lv_font_montserrat_14) + 6 : 0;
+    int32_t right_w = t->head_right[0] ? width_of(t->head_right, &lv_font_atalaia_14) + 6 : 0;
     lv_obj_set_width(head, OLED_W - 4 - right_w);
     lv_label_set_text(head, t->head);
 
     /* The biggest font the middle line fits in. */
-    const lv_font_t *font = &lv_font_montserrat_28;
-    if (width_of(t->big, font) > TEXT_MAX) font = &lv_font_montserrat_20;
-    if (width_of(t->big, font) > TEXT_MAX) font = &lv_font_montserrat_14;
+    const lv_font_t *font = &lv_font_atalaia_28;
+    if (width_of(t->big, font) > TEXT_MAX) font = &lv_font_atalaia_20;
+    if (width_of(t->big, font) > TEXT_MAX) font = &lv_font_atalaia_14;
     lv_obj_set_style_text_font(big, font, 0);
     lv_obj_set_height(big, lv_font_get_line_height(font));
     lv_label_set_text(big, t->big);
@@ -406,11 +448,11 @@ void oled_view_splash(lv_obj_t *scr, const char *version, uint32_t now_ms, uint3
     lv_obj_set_style_image_recolor_opa(img, LV_OPA_COVER, 0);
     lv_obj_align(img, LV_ALIGN_LEFT_MID, 4, 0);
 
-    lv_obj_t *name = text(scr, &lv_font_montserrat_20, lv_color_white());
+    lv_obj_t *name = text(scr, &lv_font_atalaia_20, lv_color_white());
     lv_label_set_text(name, "ATALAIA");
     lv_obj_align(name, LV_ALIGN_LEFT_MID, OLED_LOGO_W + 10, -8);
 
-    lv_obj_t *ver = text(scr, &lv_font_montserrat_14, lv_color_white());
+    lv_obj_t *ver = text(scr, &lv_font_atalaia_14, lv_color_white());
     lv_label_set_text(ver, version ? version : "");
     lv_obj_align_to(ver, name, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 2);
 

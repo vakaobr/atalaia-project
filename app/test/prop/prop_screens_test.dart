@@ -89,7 +89,7 @@ void main() {
     // The mode draws its standby screen.
     runner.node.screen('standby', {'arm': 'red'});
     await tester.pump();
-    expect(find.text('Hold the button to arm'), findsOneWidget);
+    expect(find.text('Hold to arm'), findsOneWidget);
     expect(find.text('RED'), findsOneWidget);
 
     // Hold the red button for a second.

@@ -9,7 +9,7 @@
 -- how many satellites its holder has (the mode command "status"), so the
 -- master shows them; a box that was never told is a satellite, or a box
 -- picked from its own preset list, and shows only who holds it.
--- Screens (assets/screens/): standby, captured, master_status; final_score at
+-- Screens (assets/screens/): neutral, captured, master_status; final_score at
 -- the end (the Field Box's built-in screen).
 
 local s = state.node { owner = nil, since = 0 }
@@ -17,7 +17,7 @@ local master = nil -- the last status from the controller: { held, of, points }
 
 local function show()
   if s.owner == nil then
-    ui.screen("standby", {})
+    ui.screen("neutral", {})
   elseif master then
     ui.screen("master_status", {
       team = s.owner,

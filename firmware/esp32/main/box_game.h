@@ -52,6 +52,10 @@ typedef struct {
      * first frame of every run. NULL, or a failed save: the box sends no field frame. */
     int (*load_ff_boot)(void *ctx, uint32_t *boot); /* 0 = ok, -1 = none stored yet */
     int (*save_ff_boot)(void *ctx, uint32_t boot);  /* 0 = ok */
+    /* The box's screen language, the last game's (join key 15; box_text.h): "en", "pt". NULL: not
+     * kept (English after a reboot until the next game). */
+    int (*load_lang)(void *ctx, char *code, size_t cap); /* 0 = ok */
+    int (*save_lang)(void *ctx, const char *code);       /* 0 = ok */
     void *ctx;
 } box_store_ops_t;
 
@@ -89,6 +93,7 @@ typedef enum {
     BOX_JOIN_BUSY,       /* a game is being played */
     BOX_JOIN_STORAGE,    /* the payload could not be stored */
     BOX_JOIN_RADIO,      /* the radio may not transmit (epoch NVS failure) */
+    BOX_JOIN_ENDED,      /* a game this box played to its end, or an old game's key (BN-19) */
 } box_join_result_t;
 
 #define BOX_END_LINGER_MS 60000
@@ -182,6 +187,7 @@ typedef struct {
     bool battery_low;         /* battery.low sent for this crossing (until the level is back up) */
     uint32_t battery_next_ms; /* next gauge reading */
     box_lobby_t lobby;        /* between games: field frames (box_lobby.c) */
+    bool has_picker;          /* the shell has the game picker: "ready" says a key brings it */
 } box_game_t;
 
 void box_game_init(box_game_t *g, node_runner_t *runner, preset_t *preset_buf,
@@ -230,6 +236,9 @@ bool box_game_playing(const box_game_t *g);
  * (stored, or made now), the derived key, a token. False without a random source or key. */
 bool box_lobby_init(box_game_t *g);
 
+/* True if this box played game_id to its end (it keeps its last BOX_ENDED_GAMES). */
+bool box_lobby_played_to_the_end(const box_game_t *g, uint16_t game_id);
+
 /* True when the box may take an invite: no game joined, or its game over, and no game
  * picked on the box being played. */
 bool box_lobby_available(const box_game_t *g);
@@ -249,6 +258,10 @@ void box_lobby_joined(box_game_t *g);
 
 /* The shell drew something else (the preset picker): no ready screen over it. */
 void box_lobby_cancel_ready_screen(box_game_t *g);
+
+/* Shows "ready" now (a free adopted box at boot, decision BN-10): "Ready / next game", and with
+ * has_picker, that a key brings the game picker. */
+void box_lobby_show_ready(box_game_t *g);
 
 /* The device id as 16 hex digits (NUL-terminated), "" before box_lobby_init. */
 void box_lobby_device_hex(const box_game_t *g, char out[17]);

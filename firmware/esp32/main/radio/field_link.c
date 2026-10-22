@@ -265,7 +265,7 @@ void field_link_send_battery_low(field_link_t *l, uint8_t percent, uint32_t t_ms
 bool field_link_init(field_link_t *l, const atalaia_join_t *join,
                      const atalaia_crypto_ops_t *crypto, const atalaia_radio_nvs_ops_t *nvs,
                      event_log_t *log, const atalaia_hello_t *hello, const field_link_io_t *io,
-                     uint32_t now_ms)
+                     uint32_t now_ms, bool resuming)
 {
     memset(l, 0, sizeof(*l));
     l->join = *join;
@@ -284,7 +284,7 @@ bool field_link_init(field_link_t *l, const atalaia_join_t *join,
     l->proto.tx = io->tx;
     l->proto.tx_ctx = io->tx_ctx;
     atalaia_radio_proto_set_key(&l->proto, join->game_key);
-    if (!atalaia_radio_proto_boot_epoch(&l->proto)) {
+    if (!atalaia_radio_proto_boot_epoch(&l->proto, resuming)) {
         say(l, "radio halted: the nonce epoch could not be stored");
         return false;
     }

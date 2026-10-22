@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "box_text.h"
 #include "config_store.h"
 #include "esp_app_desc.h"
 #include "esp_event.h"
@@ -339,7 +340,7 @@ static void progress(void *ctx, uint32_t done, uint32_t total)
     last = pct;
     char text[48];
     snprintf(text, sizeof(text), "%s %u%%", s_job.version, pct);
-    show("Updating", text);
+    show(box_text(TX_UPDATING), text);
 }
 
 static const fw_io_t IO = {
@@ -360,19 +361,19 @@ static void update_task(void *arg)
 {
     (void)arg;
     ESP_LOGW(TAG, "update to %s (release %s) started", s_job.version, s_job.id);
-    show("Updating", s_job.version);
+    show(box_text(TX_UPDATING), s_job.version);
     fw_result_t r = fw_update_run(&s_job, &IO);
     memset(s_join.game_key, 0, sizeof(s_join.game_key));
     if (r == FW_INSTALLED) {
         ESP_LOGW(TAG, "%s installed (%lu bytes): rebooting into it", s_job.version,
                  (unsigned long)s_job.written);
-        show("Restarting", s_job.version);
+        show(box_text(TX_RESTARTING), s_job.version);
         vTaskDelay(pdMS_TO_TICKS(500));
         esp_restart();
     }
     ESP_LOGW(TAG, "update to %s failed: %s; the running image is unchanged", s_job.version,
              fw_result_name(r));
-    show("Update failed", fw_result_name(r));
+    show(box_text(TX_UPDATE_FAILED), fw_result_name(r));
     s_busy = false;
     vTaskDelete(NULL);
 }
@@ -419,7 +420,7 @@ void fw_update_esp_offer(const char *params_json)
     if (r == FW_INSTALLED) r = fw_update_precheck(&s_job);
     if (r != FW_INSTALLED) {
         ESP_LOGW(TAG, "update refused: %s", fw_result_name(r));
-        show("Update refused", fw_result_name(r));
+        show(box_text(TX_UPDATE_REFUSED), fw_result_name(r));
         memset(s_join.game_key, 0, sizeof(s_join.game_key));
         return;
     }

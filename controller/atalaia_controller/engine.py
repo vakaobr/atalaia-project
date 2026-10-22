@@ -70,6 +70,7 @@ log = logging.getLogger("atalaia.controller")
 
 TEAM_NAME_MAX = 23  # ATALAIA_TEAM_NAME_MAX - 1 in the core
 SQUADS_MAX = 16     # squads per team a game may define
+BOX_LANGUAGES = ("auto", "pt", "en")  # the boxes' screens (join key 15); auto: the console's
 TEAM_DISPLAY_MAX = 32  # characters of a team's display name (decision BR13)
 CREST_ID_RE = re.compile(r"[0-9a-f]{64}")
 GAME_TIME_SAVE_MS = 5_000
@@ -114,7 +115,7 @@ class ModemTransport:
 
     def __init__(self, modem: Optional[radio_modem.RadioModem], store: Store, game_id: int,
                  node_id: int, max_hops: int, channel_hz: int, key: bytes,
-                 wifi: Optional[Callable[[int, bytes], bool]] = None) -> None:
+                 wifi: Optional[Callable[[int, bytes], bool]] = None, resuming: bool = False) -> None:
         self.modem = modem
         # Android props linked over Wi-Fi get the TIME beacons and commands too (prop_link.py).
         self.wifi = wifi
@@ -124,7 +125,8 @@ class ModemTransport:
         self.max_hops = max_hops
         self.channel_hz = channel_hz
         self.key = key
-        self.epoch = store.next_tx_epoch()
+        # Per game key (RFC 0001 amendment of 2026-10-22): a new game starts at epoch 1.
+        self.epoch = store.next_tx_epoch(key, resuming)
         self._next = 0
         self.seq = 0  # last seq sent (FieldController.seq)
         self.refused = 0
@@ -142,7 +144,7 @@ class ModemTransport:
             self.refused += 1
             return self.seq if on_wifi else None
         if self._next > 0xFFFF:
-            self.epoch = self.store.next_tx_epoch()  # persisted before the first packet with it
+            self.epoch = self.store.next_tx_epoch(self.key)  # persisted before the first packet with it
             self._next = 0
             self.configure_modem()
         seq = self._next
@@ -270,6 +272,8 @@ class Controller:
         self.field: Optional[FieldScript] = None
         self._field_scores: dict[str, dict[str, int]] = {}  # field.lua points per run
         self.scenario_names: dict[int, str] = {}  # the live game's box names for its scenario (Join tab)
+        self._devices: dict[int, str] = {}  # the live game's device ids by node id (BN-18)
+        self.conflicts: dict[int, list[str]] = {}  # node ids two devices said HELLO on
         self._meta_cache: dict[str, tuple[int, Optional[scenarios.Meta]]] = {}
         self.key_lost = False
         self._key = b""
@@ -377,7 +381,8 @@ class Controller:
 
     # --- games: activation and restore ---------------------------------------
 
-    def _activate(self, game: dict[str, Any], key: bytes, term: int, lead: bool = True) -> None:
+    def _activate(self, game: dict[str, Any], key: bytes, term: int, lead: bool = True,
+                  resuming: bool = False) -> None:
         """Puts a game on the radio: transport, FieldController, election, hooks.
 
         lead=False for a game joined as a standby controller: it follows the
@@ -393,7 +398,7 @@ class Controller:
         else:
             election.follow(self.now_ms())
         self.transport = ModemTransport(self.modem, self.store, game["id"], node_id, max_hops,
-                                        channel, key, wifi=self._to_wifi)
+                                        channel, key, wifi=self._to_wifi, resuming=resuming)
         fc = FieldController(transport=self.transport, game_id=game["id"], teams=game["teams"],
                              node_id=node_id, election=election, max_hops=max_hops)
         fc.duration_ms = game["duration_ms"]
@@ -411,6 +416,9 @@ class Controller:
         self.game = game
         self._key = key
         self.scenario_names = scenarios.node_names(self, game["id"])
+        # Each box's device id as its HELLOs gave it, and the node ids two devices shared (BN-18).
+        self._devices: dict[int, str] = {}
+        self.conflicts: dict[int, list[str]] = {}
 
     def _restore(self) -> None:
         game = self.store.live_game()
@@ -425,7 +433,7 @@ class Controller:
             self.key_lost = True
             return
         # A joined standby restarts as a follower; the GM promotes it again if needed.
-        self._activate(game, key, game["term"], lead=not game.get("joined"))
+        self._activate(game, key, game["term"], lead=not game.get("joined"), resuming=True)
         assert self.fc is not None
         fc = self.fc
         fc.restore_adjustments(self._adjustments(game["id"]))
@@ -434,6 +442,8 @@ class Controller:
             fc.merge_scores(node["node_id"], node.get("score") or {})
             known = fc.register_node(node["node_id"], node["name"], node["role"])
             known.epoch = node.get("epoch") or 0
+            if node.get("device_id"):
+                self._devices[node["node_id"]] = node["device_id"]
             if isinstance(node.get("battery_pct"), int):
                 known.battery_pct = node["battery_pct"]
         self._restore_health(fc, game["id"])
@@ -637,6 +647,10 @@ class Controller:
                 team_info[team] = self._team_entry(team, entry, {})
             team_info = {k: v for k, v in team_info.items() if v}
 
+            # The language of the boxes' screens (join key 15, RFC 0001 Amendment 10): the field's
+            # setting, or with "auto" the language of the console the GM created the game in.
+            box_lang = self._box_lang_for(spec.get("console_lang"))
+
             used = self.store.game_ids()
             game_id = random.SystemRandom().choice([g for g in range(1, 0xFFFF) if g not in used][:4096])
             key = os.urandom(16)  # ADR-P2-2: a fresh AES-128 key per game
@@ -651,6 +665,8 @@ class Controller:
                 "team_info": team_info,
             }
             self.store.create_game(game, key if self.cfg.persist_game_key else None)
+            if box_lang is not None:
+                self.store.set_setting(f"box_lang:{game_id}", box_lang)
             self._activate(self.store.game(game_id) or game, key, 1)
             out = self.get_game(game_id)
             self._emit({"type": "game", "game": out})
@@ -744,6 +760,36 @@ class Controller:
         if not self.modem.can_measure:
             return "old_firmware"
         return None
+
+    # --- the boxes' language (join key 15, RFC 0001 Amendment 10) ----------------
+
+    def box_language(self) -> dict[str, Any]:
+        """The field setting (GET /api/v1/settings/box-language): "auto" (the default: the
+        language of the console that creates the game), "pt" or "en"; and the live game's."""
+        with self._lock:
+            live = self.store.get_setting(f"box_lang:{self.game['id']}") if self.game is not None else None
+            return {"box_language": self.store.get_setting("box_language") or "auto",
+                    "choices": list(BOX_LANGUAGES), "game_box_language": live or ("en" if self.game else None)}
+
+    def set_box_language(self, value: Any) -> dict[str, Any]:
+        """The GM's choice; games created from now on use it (a live game keeps its own)."""
+        if value not in BOX_LANGUAGES:
+            raise ControllerError(f"box_language: one of {', '.join(BOX_LANGUAGES)}")
+        with self._lock:
+            self.store.set_setting("box_language", value)
+        return self.box_language()
+
+    def _box_lang_for(self, console_lang: Any) -> Optional[str]:
+        """A new game's box language: the setting, or with "auto" the console's ("pt", "en");
+        None (English, the join without key 15) when neither says."""
+        setting = self.store.get_setting("box_language") or "auto"
+        if setting != "auto":
+            return setting
+        if console_lang is None:
+            return None
+        if console_lang not in BOX_LANGUAGES or console_lang == "auto":
+            raise ControllerError("console_lang: pt or en")
+        return console_lang
 
     def radio_settings(self) -> dict[str, Any]:
         """The field channel, its limits, the candidates and the last scan (GET /api/v1/radio)."""
@@ -848,22 +894,35 @@ class Controller:
 
     # --- join flow (ADR-P2-12, protocol/join.md) -------------------------------
 
+    def _issued_ids(self) -> set[int]:
+        """The node ids a join was issued for in the live game (kept across restarts)."""
+        assert self.game is not None
+        saved = self.store.get_setting(f"issued_nodes:{self.game['id']}")
+        return set(json.loads(saved)) if saved else set()
+
     def _used_ids(self) -> set[int]:
         assert self.game is not None
         used = {self.node_id, self.cfg.node_id, 0xFFFF}
         used.update(int(n) for n in self.game["assignments"])
+        used.update(self._issued_ids())  # a standby controller's id too (BN-18)
         if self.fc is not None:
             used.update(self.fc.nodes)
         if self.game.get("controller_id") is not None:
             used.add(int(self.game["controller_id"]))
         return used
 
-    def issue_join(self, spec: dict[str, Any], node_id: Optional[int] = None) -> dict[str, Any]:
+    def issue_join(self, spec: dict[str, Any], node_id: Optional[int] = None,
+                   same_device: bool = False) -> dict[str, Any]:
         """A join payload for a box (kind "node") or a standby controller (kind "controller").
 
         The node id is the given one or the lowest free id; a box's role is
         recorded in the game's assignments. The answer holds the game key (in
         the payload), so only the GM token may ask for it.
+
+        A node id a join was already issued for, or a box was heard on, in this game is never
+        issued again (decision BN-18): two devices on one (game key, node id) would use the same
+        nonces. A replacement box gets a new node id. same_device: the box that has it, invited
+        again (reinvite.py), whose epochs go on above its own.
         """
         with self._lock:
             if self.game is None:
@@ -908,6 +967,12 @@ class Controller:
             assigned = self.game["assignments"].get(str(node_id))
             if kind == "controller" and (assigned is not None or node_id in fc.nodes):
                 raise Conflict(f"node id {node_id} is a box in this game")
+            issued = self._issued_ids()
+            known = fc.nodes.get(node_id)
+            if not same_device and (node_id in issued or (known is not None and known.heard)):
+                raise Conflict(f"node id {node_id} already has a box in this game: two boxes on one "
+                               "node id would reuse each other's radio nonces. A replacement box "
+                               "gets a new node id (Join).")
             # A box's join names what it runs, with that part's parameters: for a role of a
             # role package (the Medic Kit's medic), the package alone; else the main mode and
             # its modifiers (modes/README.md, protocol/join.md). A standby controller gets
@@ -923,6 +988,7 @@ class Controller:
                 "teams": list(self.game["teams"]), "mode_id": mode_id, "role": role,
                 "game_seed": int(self.game["game_seed"]) & 0xFFFFFFFF,
                 "params": params or None, "kind": kind,
+                "lang": self.store.get_setting(f"box_lang:{self.game['id']}"),
             }
             # Android props link over Wi-Fi with the field CA and the controller's addresses
             # (keys 13 and 14, RFC 0001 Amendment 4, proposed); boxes use them for firmware
@@ -941,6 +1007,9 @@ class Controller:
                     payload = joinfmt.encode(join, self.join_key)
             except joinfmt.JoinError as exc:
                 raise Conflict(f"this game does not fit in a join payload: {exc}") from None
+            if node_id not in issued:
+                self.store.set_setting(f"issued_nodes:{self.game['id']}",
+                                       json.dumps(sorted(issued | {node_id})))
             if kind == "node" and assigned != role:
                 self.game["assignments"][str(node_id)] = role
                 self.store.update_game(self.game["id"], assignments=self.game["assignments"])
@@ -1008,6 +1077,8 @@ class Controller:
             }
             key = j["game_key"]
             self.store.create_game(game, key if self.cfg.persist_game_key else None)
+            if j.get("lang"):  # promoted, it issues joins in the same language
+                self.store.set_setting(f"box_lang:{j['game_id']}", j["lang"])
             self._activate(self.store.game(j["game_id"]) or game, key, 0, lead=False)
             out = self.get_game(j["game_id"])
             self._emit({"type": "game", "game": out})
@@ -1258,6 +1329,8 @@ class Controller:
             "score": {t: v.get(f"node-{node.node_id}", 0) for t, v in self.fc._scores.items()},
             # Health as the controller logged it (node.online/node.offline, battery.low).
             "link": node.link, "battery_low": node.battery_low,
+            # Two devices said HELLO on this node id (BN-18): one join used twice.
+            "conflict": node.node_id in self.conflicts,
         }
 
     def send_node_cmd(self, node_id: int, cmd: str, params: Optional[dict[str, Any]]) -> dict[str, Any]:
@@ -1500,6 +1573,18 @@ class Controller:
         info["seen_ms_ago"] = max(0, self.now_ms() - node.last_seen_ms) if node.heard else None
         self._emit({"type": "node", "game": self.game["id"], "kind": kind, "node": info})
         if kind == "hello":
+            device = info.get("device_id")
+            seen = self._devices.get(node.node_id)
+            if device and seen and device != seen and node.node_id not in self.conflicts:
+                # One join (a card, a text) used on two boxes, or a node id given twice: the two
+                # use the same nonces under the game key (BN-18). Said loudly; the GM re-joins one.
+                self.conflicts[node.node_id] = [seen, device]
+                log.warning("two boxes share node %d (devices %s and %s): one join was used twice; "
+                            "re-join one of them", node.node_id, seen, device)
+                info["conflict"] = True
+                self._emit({"type": "node", "game": self.game["id"], "kind": "conflict", "node": info})
+            if device:
+                self._devices[node.node_id] = device
             if self.reinvite is not None:
                 self.reinvite.on_hello(node.node_id, info.get("device_id"))
             if self.game.get("state") == "ready" and not self.game.get("joined"):

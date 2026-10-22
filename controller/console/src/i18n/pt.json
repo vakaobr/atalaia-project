@@ -212,7 +212,8 @@
       "proxy": "proxy"
     },
     "commands": "Comandos",
-    "command_sent": "enviado"
+    "command_sent": "enviado",
+    "conflict": "Duas caixas partilham o n.º {node}: a mesma entrada foi usada em duas caixas, que usam os mesmos nonces do rádio. Tira uma delas do jogo e junta-a de novo com outra entrada (Juntar)."
   },
   "field": {
     "title": "Campo",
@@ -778,5 +779,18 @@
     "start_now": "Começar agora",
     "pending_note": "Há {n} réplica(s) declarada(s) por cronografar.",
     "back": "Voltar"
+  },
+  "box_language": {
+    "title": "Língua das caixas",
+    "intro": "A língua dos ecrãs das caixas: Pronta, à espera do início, zona neutra, armada, fim do jogo. Um jogo mantém a língua com que foi criado, e todas as entradas (cartão, código QR, texto, convite por rádio) a levam. As caixas com firmware mais antigo ficam em inglês.",
+    "label": "Língua nas caixas",
+    "choices": {
+      "auto": "A língua desta consola quando o jogo é criado",
+      "pt": "Português",
+      "en": "Inglês"
+    },
+    "live": "As caixas do jogo em curso: {lang}",
+    "saved": "Guardado: os jogos criados a partir de agora usam-na.",
+    "read_only": "Só quem dirige o jogo a muda."
   }
 }

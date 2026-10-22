@@ -3,7 +3,7 @@
 name: The master's holder scores every tick, the master shows its holder, and satellites alone score nothing
 nodes: { master: master, alpha: satellite, bravo: satellite }
 steps:
-  - expect_screen: { node: master, template: standby }
+  - expect_screen: { node: master, template: neutral }
   - hold: { node: alpha, team: red, s: 3 }           # a satellite alone: no points
   - expect: { type: zone.captured, node: alpha, team: red, at: 3 }
   - expect_screen: { node: alpha, template: captured, data: { team: red, since: 3 } }

@@ -12,13 +12,16 @@ field's 32-byte join key. A join is a dict:
      "teams": ["red", "blue"], "mode_id": "org.atalaia.domination",
      "role": "zone", "game_seed": 12345, "params": {...} or None,
      "kind": "node" or "controller",
-     "ca_sha256": b"...32..." or None, "urls": ["https://10.42.0.1:8443"] or None}
+     "ca_sha256": b"...32..." or None, "urls": ["https://10.42.0.1:8443"] or None,
+     "lang": "pt" or None}
 
 ca_sha256 (key 13) and urls (key 14) are optional (RFC 0001 Amendment 4,
 proposed): the field CA's fingerprint and the controller's https addresses,
 for an Android prop that links to the controller over Wi-Fi
 (protocol/prop-link.md); boxes read them for firmware updates over Wi-Fi
-(protocol/firmware-update.md). Keys 15-31 are skipped.
+(protocol/firmware-update.md). lang (key 15, RFC 0001 Amendment 10, proposed) is
+the language of a box's screens ("pt", "en"...; None: English). Keys 16-31 are
+skipped.
 
 The codecs check protocol/vectors/join.json.
 """
@@ -51,15 +54,17 @@ NDEF_TYPE = b"application/vnd.atalaia.join"
 KEYS = {
     "game_id": 1, "game_key": 2, "node_id": 3, "controller_id": 4, "channel_hz": 5,
     "max_hops": 6, "teams": 7, "mode_id": 8, "role": 9, "game_seed": 10, "params": 11, "kind": 12,
-    "ca_sha256": 13, "urls": 14,
+    "ca_sha256": 13, "urls": 14, "lang": 15,
 }
-OPTIONAL = ("params", "ca_sha256", "urls")
+OPTIONAL = ("params", "ca_sha256", "urls", "lang")
 REQUIRED = set(KEYS) - set(OPTIONAL)
 URLS_MAX = 3
 URL_MAX = 64
 # The same rule as the check-in poster's urls (protocol/checkin.md): https://host[:port], no path.
 URL_RE = re.compile(r"https://(?:[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63})*|\[[0-9A-Fa-f:.]{2,45}\])"
                     r"(?::([1-9][0-9]{0,4}))?")
+# Key 15: 2-8 bytes of a-z, 0-9 and "-", the first two a-z ("pt", "en", "pt-br").
+LANG_RE = re.compile(r"[a-z]{2}[a-z0-9-]{0,6}")
 KINDS = {"node": 0, "controller": 1}
 _KIND_NAMES = {v: k for k, v in KINDS.items()}
 _NAMES = {v: k for k, v in KEYS.items()}
@@ -158,6 +163,10 @@ def validate(j: dict[str, Any]) -> dict[str, Any]:
                 raise JoinError("body", f"urls: {u!r} is not https://host[:port] of at most {URL_MAX} bytes")
         urls = list(urls)
     out["urls"] = urls
+    lang = j.get("lang")
+    if lang is not None and not (isinstance(lang, str) and LANG_RE.fullmatch(lang)):
+        raise JoinError("body", f"lang: {lang!r} is not 2-8 of a-z, 0-9 and -, starting with two letters")
+    out["lang"] = lang
     kind = j["kind"]
     if kind not in KINDS:
         raise JoinError("body", f"kind must be one of {sorted(KINDS)}")
@@ -209,7 +218,7 @@ def decode(data: bytes, join_key: bytes) -> dict[str, Any]:
             if not isinstance(v, int) or isinstance(v, bool) or v not in _KIND_NAMES:
                 raise JoinError("body", f"unknown join kind {v!r}")
             v = _KIND_NAMES[v]
-        if name in ("ca_sha256", "urls") and v is None:
+        if name in ("ca_sha256", "urls", "lang") and v is None:
             raise JoinError("body", f"{name} is null: leave an optional field out instead")
         j[name] = v
     for name in ("game_key", "ca_sha256"):
@@ -217,7 +226,7 @@ def decode(data: bytes, join_key: bytes) -> dict[str, Any]:
             raise JoinError("body", f"{name} must be a byte string")
     if "urls" in j and _has_bytes(j["urls"]):
         raise JoinError("body", "urls must be text")
-    for name in ("teams", "mode_id", "role"):
+    for name in ("teams", "mode_id", "role", "lang"):
         if name in j and _has_bytes(j[name]):
             raise JoinError("body", f"{name} must be text")
     if "params" in j and _has_bytes(j["params"]):

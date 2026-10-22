@@ -5,7 +5,7 @@
 // resume and end it (each confirmed in place), send a message to every
 // box, adjust a team's score. ControllerPanel: role, term, radio, promote.
 
-import { html, Component, createRef, t, clock, ConfirmButton, modeText, teamName } from '../ui.js';
+import { html, Component, createRef, t, lang, clock, ConfirmButton, modeText, teamName } from '../ui.js';
 import { FirstSetupNotice, mhz } from './radio-settings.js';
 import { TeamFields, TeamsEditor, teamInfoBody } from './branding-settings.js';
 import { BoxInvites, StartCheck } from './box-invites.js';
@@ -61,6 +61,8 @@ class CreateGame extends Component {
         const body = { name: this.state.name.trim(), teams, params: values,
                        duration_ms: Math.max(0, Math.round(parseFloat(this.state.minutes || '0') * 60000)),
                        squads: Math.max(0, Math.min(16, parseInt(this.state.squads || '0', 10) || 0)) };
+        // The boxes' screens take this console's language unless the field fixes one (Settings).
+        body.console_lang = lang();
         const info = teamInfoBody(this.state.teamInfo, teams);
         if (info) body.team_info = info;
         if (preset) {

@@ -251,6 +251,12 @@ class ConsoleBrowserTests(unittest.TestCase):
         with ctrl._lock:
             ctrl.fc.node_offline_ms, ctrl.fc.link_gap_ms = 120_000, 60_000
 
+        # One join used on two boxes (decision BN-18): HELLOs from two device ids on node 7.
+        expect(page.get_by_test_id(f"node-conflict-{BOX}")).to_have_count(0)
+        self.field.box_hello(device=bytes(range(8)))
+        self.field.box_hello(device=bytes(range(8, 16)))
+        expect(page.get_by_test_id(f"node-conflict-{BOX}")).to_contain_text(f"Duas caixas partilham o n.º {BOX}")
+
         # A GM score adjustment and a pause, through the page.
         page.get_by_test_id("tab-game").click()
         page.locator("[data-testid=adjust] select").select_option("blue")
@@ -1190,6 +1196,38 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("radio-channel")).to_have_text("869,525 MHz")  # the default stays
         r = self.field.http.post("/api/v1/radio/scan")
         self.assertEqual(r.status_code, 503)
+
+    def test_box_language_follows_the_console_or_the_setting(self):
+        """Join key 15 (RFC 0001 Amendment 10): with "auto" a game takes the language of the console it
+        was created in; the setting in Settings fixes one for the field's next games."""
+        page = self.console()  # European Portuguese by default
+        page.get_by_test_id("tab-settings").click()
+        expect(page.get_by_test_id("box-language-settings")).to_contain_text("Língua das caixas")
+        expect(page.get_by_test_id("box-language")).to_have_value("auto")
+        page.get_by_test_id("tab-game").click()
+        page.get_by_test_id("game-name").fill("Domingo")
+        page.get_by_test_id("game-source").select_option(f"mode:{DOMINATION}")
+        page.get_by_test_id("game-create").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("pronto")
+        page.get_by_test_id("tab-join").click()
+        page.get_by_test_id("join-generate").click()
+        j = join.decode(join.from_text(page.get_by_test_id("join-text").input_value()), JOIN_KEY)
+        self.assertEqual(j["lang"], "pt")
+        self.field.http.post(f"/api/v1/games/{self.field.bundle.controller.game['id']}/end", json={})
+        # Fixed to English in Settings: the next game's joins say so, whatever the console's language.
+        page.get_by_test_id("tab-settings").click()
+        page.get_by_test_id("box-language").select_option("en")
+        expect(page.get_by_test_id("box-language-settings")).to_contain_text("Guardado")
+        self.assertEqual(self.field.http.get("/api/v1/settings/box-language").json()["box_language"], "en")
+        page.get_by_test_id("tab-game").click()
+        page.get_by_test_id("game-name").fill("Segunda")
+        page.get_by_test_id("game-source").select_option(f"mode:{DOMINATION}")
+        page.get_by_test_id("game-create").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("pronto")
+        page.get_by_test_id("tab-join").click()
+        page.get_by_test_id("join-generate").click()
+        j = join.decode(join.from_text(page.get_by_test_id("join-text").input_value()), JOIN_KEY)
+        self.assertEqual(j["lang"], "en")
 
     def test_channel_settings_read_only(self):
         page = self.console(READ)

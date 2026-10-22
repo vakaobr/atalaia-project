@@ -27,6 +27,7 @@ def fields(v: dict) -> dict:
     out["game_key"] = bytes.fromhex(out["game_key"])
     out["ca_sha256"] = bytes.fromhex(out["ca_sha256"]) if out.get("ca_sha256") else None
     out.setdefault("urls", None)
+    out.setdefault("lang", None)
     return out
 
 
@@ -98,6 +99,32 @@ class ControllerLinkTests(unittest.TestCase):
             with self.subTest(v["name"]), self.assertRaises(join.JoinError) as cm:
                 join.decode(bytes.fromhex(v["payload"]), KEY)
             self.assertEqual(cm.exception.reason, "body", f"{v['name']}: {cm.exception}")
+
+
+class BoxLanguageTests(unittest.TestCase):
+    """Optional key 15 (RFC 0001 Amendment 10, proposed): the language of a box's screens."""
+
+    def test_valid_round_trip(self) -> None:
+        section = VECTORS["box_language"]
+        self.assertGreaterEqual(len(section["valid"]), 2)
+        for v in section["valid"]:
+            with self.subTest(v["name"]):
+                payload = bytes.fromhex(v["payload"])
+                self.assertEqual(join.decode(payload, KEY), fields(v))
+                self.assertEqual(join.encode(fields(v), KEY), payload)
+                self.assertEqual(join.to_text(payload), v["text"])
+
+    def test_invalid_fail_as_body(self) -> None:
+        for v in VECTORS["box_language"]["invalid"]:
+            with self.subTest(v["name"]), self.assertRaises(join.JoinError) as cm:
+                join.decode(bytes.fromhex(v["payload"]), KEY)
+            self.assertEqual(cm.exception.reason, "body", f"{v['name']}: {cm.exception}")
+
+    def test_absent_is_none_and_encode_checks(self) -> None:
+        self.assertIsNone(join.decode(bytes.fromhex(VECTORS["valid"][0]["payload"]), KEY)["lang"])
+        for bad in ("", "PT", "p", "toolonglang", "1t", 5):
+            with self.subTest(bad), self.assertRaises(join.JoinError):
+                join.encode({**fields(VECTORS["valid"][0]), "lang": bad}, KEY)
 
 
 class InvalidVectorTests(unittest.TestCase):

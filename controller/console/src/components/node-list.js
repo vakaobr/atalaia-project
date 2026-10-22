@@ -55,6 +55,8 @@ export class NodeList extends Component {
         const gm = role === 'gm' && status && status.role === 'leader' && game && game.live;
         return html`<section class="card" aria-labelledby="nodes-h">
             <h2 id="nodes-h">${t('nodes.title')}</h2>
+            ${list.filter((n) => n.conflict).map((n) => html`<p class="warn" role="alert"
+                data-testid=${`node-conflict-${n.node_id}`}>${t('nodes.conflict', { node: n.node_id })}</p>`)}
             ${list.length === 0 ? html`<p class="muted">${t('nodes.none')}</p>` : html`
             <div class="table-wrap"><table class="table" data-testid="node-list">
                 <thead><tr>

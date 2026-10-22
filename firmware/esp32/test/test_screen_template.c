@@ -53,7 +53,7 @@ static void test_mode_picks_templates(void)
 
     /* A main mode with a modifier: the main mode's templates, then the modifier's. */
     screen_render(SCREEN_MODE_MESSAGE, "org.atalaia.domination+org.atalaia.codes {}");
-    s = screen_template_find("standby");
+    s = screen_template_find("neutral");
     CHECK(s != NULL && strcmp(s->mode_id, "org.atalaia.domination") == 0);
     CHECK(screen_template_find("countdown") == NULL);
     screen_render(SCREEN_MODE_MESSAGE, "org.atalaia.codes+org.atalaia.bomb {}");
@@ -62,9 +62,9 @@ static void test_mode_picks_templates(void)
     /* A mode without templates, or none at all. */
     screen_render(SCREEN_MODE_MESSAGE, "org.atalaia.holdall {}");
     CHECK(screen_template_find("final_score") == NULL);
-    /* Master and Satellites has its own standby and captured, next to Domination's. */
+    /* Master and Satellites has its own neutral and captured, next to Domination's. */
     screen_render(SCREEN_MODE_MESSAGE, "org.atalaia.master_satellites {}");
-    s = screen_template_find("standby");
+    s = screen_template_find("neutral");
     CHECK(s != NULL && strcmp(s->mode_id, "org.atalaia.master_satellites") == 0);
     CHECK(screen_template_find("master_status") != NULL);
     CHECK(screen_template_find("final_score") == NULL); /* the Field Box's C screen */
@@ -127,7 +127,7 @@ static void test_fallback_to_c_screens(void)
     CHECK(screen_render("countdown", "{\"left\":299}"));
     CHECK(screen_template_widget("time_left") == NULL);
     /* A template name only a mode has: unknown without the mode. */
-    CHECK(!screen_render("captured", "{\"team\":\"red\"}"));
+    CHECK(!screen_render("hack_solved", "{\"team\":\"red\"}"));
     /* Bomb with Codes: code_entry stays C, countdown is the template. */
     screen_render(SCREEN_MODE_MESSAGE, "org.atalaia.bomb+org.atalaia.codes {\"fuse_s\":60}");
     CHECK(screen_render("code_entry", "{\"title\":\"CODE\",\"digits\":2}"));
@@ -139,7 +139,7 @@ static void test_fallback_to_c_screens(void)
     test_display_render();
     /* A new mode forgets what is shown: the same name is redrawn from its template. */
     screen_render(SCREEN_MODE_MESSAGE, "org.atalaia.domination {\"capture_hold_ms\":3000}");
-    CHECK(screen_render("standby", "{}"));
+    CHECK(screen_render("neutral", "{}"));
     test_display_render();
     screen_renderer_reset();
 }
@@ -153,13 +153,16 @@ static void fold_is(const char *in, const char *want)
     CHECK(strcmp(buf, want) == 0);
 }
 
-/* The Montserrat fonts are ASCII only: Portuguese texts lose their accents, not letters. */
+/* The fonts have ASCII and the letters of Portuguese (BN-14): those stay, other accents go. */
 static void test_text_fold(void)
 {
-    fold_is("L\xc3\xaa a tua etiqueta", "Le a tua etiqueta");
-    fold_is("Mant\xc3\xa9m premido para tratar", "Mantem premido para tratar");
-    fold_is("A\xc3\x87\xc3\x83O \xc3\xa7\xc3\xa3 \xc3\xbf", "ACAO ca y");
-    fold_is("1.\xc2\xba \xc2\xab x \xc2\xbb 20\xc2\xb0", "1.o \" x \" 20o");
+    fold_is("L\xc3\xaa a tua etiqueta", "L\xc3\xaa a tua etiqueta");
+    fold_is("Mant\xc3\xa9m premido para tratar", "Mant\xc3\xa9m premido para tratar");
+    fold_is("A\xc3\x87\xc3\x83O \xc3\xa7\xc3\xa3 \xc3\xbf",
+            "A\xc3\x87\xc3\x83O \xc3\xa7\xc3\xa3 y");
+    fold_is("\xc3\x91o\xc3\xb1o \xc3\xa8 \xc3\xbc", "Nono e u");
+    fold_is("1.\xc2\xba \xc2\xab x \xc2\xbb 20\xc2\xb0 \xc2\xb7 \xe2\x80\xa2",
+            "1.\xc2\xba \" x \" 20\xc2\xb0 \xc2\xb7 \xe2\x80\xa2");
     fold_is("a \xe2\x80\x94 b\xe2\x80\xa6 \xe2\x80\x9cq\xe2\x80\x9d \xe2\x80\x99",
             "a - b... \"q\" '");
     fold_is("ok \xef\x80\x8c", "ok \xef\x80\x8c");              /* LV_SYMBOL_OK stays */

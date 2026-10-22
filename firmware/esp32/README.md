@@ -609,12 +609,17 @@ Implemented in plan phase C:
   accounting, duty-cycle tracking.
 - **Radio task** -- FreeRTOS core 0 priority 3, TX/RX queues, DIO1 ISR.
 - **Radio protocol** -- `main/radio/radio_protocol.c`, packet encrypt/decrypt
-  with epoch persistence via NVS, per-source epoch trial on receive, nonce
-  safety invariant with `tx_blocked` on NVS failure or epoch exhaustion.
+  with epoch persistence via NVS, per game key (RFC 0001 Amendment 9,
+  proposed: the last 16 keys by an HMAC tag and 48 older ones retired, one
+  atomic blob; a new game starts at epoch 1, a retired key is refused),
+  per-source epoch trial on receive (HELLO and TIME searched 256 epochs up,
+  within a budget; a new source's epoch provisional), nonce safety invariant with `tx_blocked` on NVS
+  failure or epoch exhaustion.
 - **Event log** -- `main/radio/event_log.c`, flash-backed append-only log.
 - **Time sync** -- `main/radio/time_sync.c`, slew/step from TIME beacons.
-- **NVS key storage** -- `main/radio/radio_nvs_esp.c`, game key and epoch
-  in the "radio" NVS namespace. On production boards with an eFuse HMAC key
+- **NVS key storage** -- `main/radio/radio_nvs_esp.c`, game key and the
+  epochs ("epochs"; the single "epoch" of older firmware is only read, for a
+  game resumed after the update) in the "radio" NVS namespace. On production boards with an eFuse HMAC key
   burned, NVS encryption protects the key at rest; otherwise the box logs a
   warning at boot that the key is in plain NVS.
 
@@ -687,9 +692,17 @@ controller's game.
   sends neither. The controller logs `battery.low` from the STATE level too
   if the box's own does not arrive. In software and on the host box only:
   the bench board has no gauge fitted.
-- **After a reboot** -- the stored join brings the box back: a new epoch,
-  HELLO, the saved game state, `node.rebooted`, and the unacknowledged events
-  from the flash log.
+- **After a reboot** -- the stored join brings the box back: a new epoch
+  (that game's last + 1), HELLO, the saved game state, `node.rebooted`, and
+  the unacknowledged events from the flash log.
+- **Screens through a game** -- (decisions BN-6, BN-10 to BN-14) a free
+  adopted box shows "Ready / next game" from boot (a key brings the game
+  picker); joined or invited, "Waiting: the game hasn't started"; at the start
+  "Game on" until the mode draws (a zone: "Neutral: hold to capture" or the
+  team holding it, never the Bomb's "standby"); the mode's game over; then
+  "Ready" again. In the field's language, English or European Portuguese (join
+  key 15, kept between games; `main/box_text.c`, fonts with the Portuguese
+  letters in `main/fonts/`, `tools/gen_box_fonts.py`).
 - **Between games** -- `main/box_lobby.c` ([protocol/field-frames.md](../../protocol/field-frames.md),
   RFC 0001 Amendment 7, proposed). A box with a field join key has an 8-byte
   random **device id**, made once and kept in NVS (`device_id`), which its

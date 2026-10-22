@@ -22,7 +22,7 @@ static bool same_join(const atalaia_join_t *a, const atalaia_join_t *b)
         strcmp(a->role, b->role) != 0 || a->game_seed != b->game_seed ||
         strcmp(a->params_json, b->params_json) != 0 || a->kind != b->kind ||
         a->has_ca != b->has_ca || (a->has_ca && memcmp(a->ca_sha256, b->ca_sha256, 32) != 0) ||
-        a->url_count != b->url_count) {
+        a->url_count != b->url_count || strcmp(a->lang, b->lang) != 0) {
         return false;
     }
     for (uint8_t u = 0; u < a->url_count; u++) {
@@ -178,6 +178,48 @@ static void test_link_vectors(void)
     }
 }
 
+/* Key 15, the box language (RFC 0001 Amendment 10): read, kept and written back byte for
+ * byte; anything but 2-8 of a-z, 0-9 and '-' (the first two letters) refuses the payload. */
+static void test_lang_vectors(void)
+{
+    CHECK(JOIN_LANG_VECTOR_COUNT >= 2);
+    for (size_t i = 0; i < JOIN_LANG_VECTOR_COUNT; i++) {
+        const join_lang_vector_t *v = &join_lang_vectors[i];
+        int before = check_failures;
+        atalaia_join_t got;
+        CHECK(atalaia_join_decode(v->payload, v->payload_len, join_key, &got) == ATALAIA_JOIN_OK);
+        CHECK(same_join(&got, &v->fields) && strcmp(got.lang, v->fields.lang) == 0);
+        uint8_t buf[ATALAIA_JOIN_MAX];
+        size_t n = atalaia_join_encode(&v->fields, join_key, buf, sizeof(buf));
+        CHECK(n == v->payload_len && memcmp(buf, v->payload, n) == 0);
+        if (check_failures != before) fprintf(stderr, "  in join lang vector %s\n", v->name);
+    }
+    CHECK(JOIN_LANG_BAD_VECTOR_COUNT >= 8);
+    for (size_t i = 0; i < JOIN_LANG_BAD_VECTOR_COUNT; i++) {
+        const join_bad_vector_t *v = &join_lang_bad_vectors[i];
+        atalaia_join_t got;
+        if (atalaia_join_decode(v->payload, v->payload_len, join_key, &got) != v->result) {
+            fprintf(stderr, "FAIL join lang bad vector %s (%s)\n", v->name, v->why);
+            check_failures++;
+        }
+    }
+    /* No key 15: "" (English). */
+    atalaia_join_t got;
+    CHECK(atalaia_join_decode(join_vectors[0].payload, join_vectors[0].payload_len, join_key,
+                              &got) == ATALAIA_JOIN_OK &&
+          got.lang[0] == '\0');
+    CHECK(atalaia_join_lang_ok("pt") && atalaia_join_lang_ok("pt-br") &&
+          atalaia_join_lang_ok("abcdefgh"));
+    CHECK(!atalaia_join_lang_ok("") && !atalaia_join_lang_ok("p") &&
+          !atalaia_join_lang_ok("abcdefghi") && !atalaia_join_lang_ok("Pt") &&
+          !atalaia_join_lang_ok("-p") && !atalaia_join_lang_ok("p1"));
+    /* The encoder refuses a bad one. */
+    atalaia_join_t j = join_lang_vectors[0].fields;
+    snprintf(j.lang, sizeof(j.lang), "PT");
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    CHECK(atalaia_join_encode(&j, join_key, buf, sizeof(buf)) == 0);
+}
+
 static void test_url_rule(void)
 {
     CHECK(atalaia_join_url_ok("https://10.42.0.1:8443"));
@@ -259,6 +301,7 @@ void run_join_tests(void)
     test_invalid_vectors();
     test_optional_key_skipped();
     test_link_vectors();
+    test_lang_vectors();
     test_url_rule();
     test_text_and_tag_edges();
     test_encode_refuses_bad_fields();

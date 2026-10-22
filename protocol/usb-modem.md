@@ -32,7 +32,7 @@ The **epoch** at the end of RX is an addition to ADR-P2-4 (decision D2): it is t
 
 ## TX and TX_ACK
 
-The controller owns its own nonce counter (ADR-P2-2): it chooses `seq` and tells the modem its epoch with CONFIGURE, storing the epoch +1 in SQLite before the first packet of every run and again when `seq` wraps. The modem sets the encrypted bit, clears the reserved bit, clamps `hop_limit` to the configured maximum, encrypts with the game key and the controller's epoch, and queues the packet for the radio. As a safety net it refuses any packet whose `(epoch << 16) | seq` is not above the last one it sent. The TX_ACK comes when the radio has an outcome:
+The controller owns its own nonce counter (ADR-P2-2): it chooses `seq` and tells the modem its epoch with CONFIGURE, storing the epoch +1 in SQLite before the first packet of every run and again when `seq` wraps. The epoch is per game key (RFC 0001 Amendment 9, proposed): a new game starts at epoch 1, a restart in the same game goes on above its last one. The modem sets the encrypted bit, clears the reserved bit, clamps `hop_limit` to the configured maximum, encrypts with the game key and the controller's epoch, and queues the packet for the radio. As a safety net it refuses any packet whose `(epoch << 16) | seq` is not above the last one it sent. The TX_ACK comes when the radio has an outcome:
 
 | Status | Meaning |
 | --- | --- |
@@ -62,7 +62,7 @@ Between games, boxes and controllers exchange **field frames** ([field-frames.md
 
 The modem forwards a packet only if it belongs to the configured game, carries the encrypted bit, is not its own packet relayed back, authenticates, and has not been forwarded in the last 30 seconds (dedupe on source, epoch and seq: flood copies arrive several times). The modem never relays: the controller does not rebroadcast (ADR-P2-6).
 
-To authenticate, the modem tries the source's last known epoch and then up to `epoch_window` epochs above it (16 by default, `CONFIG_ATALAIA_MODEM_EPOCH_WINDOW`), or epochs 0 to `epoch_window` for a source it has not heard yet; never a lower epoch, so replays stay rejected. ADR-P2-2 tries only one epoch above, which never recovers a box that rebooted twice out of range (decision D4). The controller can also tell the modem a box's epoch with SET_PEER_EPOCH; it does so after every reconnect, from the epochs it has seen.
+To authenticate, the modem tries the source's last known epoch and then up to `epoch_window` epochs above it (16 by default, `CONFIG_ATALAIA_MODEM_EPOCH_WINDOW`), or epochs 0 to `epoch_window` for a source it has not heard yet; a HELLO or a TIME up to 256 above (RFC 0001 Amendment 9: a box back from a crash loop says HELLO first); never a lower epoch, so replays stay rejected. ADR-P2-2 tries only one epoch above, which never recovers a box that rebooted twice out of range (decision D4). The controller can also tell the modem a box's epoch with SET_PEER_EPOCH; it does so after every reconnect, from the epochs it has seen.
 
 ## Commands
 

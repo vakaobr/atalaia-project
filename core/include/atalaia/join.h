@@ -33,6 +33,7 @@
 #define ATALAIA_JOIN_URLS_MAX    3   /* key 14: the controller's https addresses */
 #define ATALAIA_JOIN_URL_MAX     64  /* bytes of one address, without the NUL */
 #define ATALAIA_JOIN_CA_SIZE     32  /* key 13: SHA-256 of the field CA's DER certificate */
+#define ATALAIA_JOIN_LANG_MAX    8   /* key 15: the box language, bytes without the NUL */
 #define ATALAIA_JOIN_TEXT_PREFIX "atalaia:join:"
 #define ATALAIA_JOIN_NDEF_TYPE   "application/vnd.atalaia.join"
 
@@ -52,6 +53,7 @@ enum {
     ATALAIA_JOIN_K_KIND = 12,
     ATALAIA_JOIN_K_CA_SHA256 = 13, /* optional (RFC 0001 Amendment 4) */
     ATALAIA_JOIN_K_URLS = 14,      /* optional (RFC 0001 Amendment 4) */
+    ATALAIA_JOIN_K_LANG = 15,      /* optional (RFC 0001 Amendment 10) */
 };
 
 typedef enum {
@@ -80,6 +82,9 @@ typedef struct {
     uint8_t ca_sha256[ATALAIA_JOIN_CA_SIZE];
     uint8_t url_count; /* 0-3 */
     char urls[ATALAIA_JOIN_URLS_MAX][ATALAIA_JOIN_URL_MAX + 1];
+    /* The language of the box's screens (key 15): "pt", "en", "pt-br"...; "" when the payload
+     * has none (English). A box that does not know the language uses English. */
+    char lang[ATALAIA_JOIN_LANG_MAX + 1];
 } atalaia_join_t;
 
 typedef enum {
@@ -110,6 +115,9 @@ size_t atalaia_join_encode(const atalaia_join_t *j, const uint8_t join_key[ATALA
 atalaia_join_result_t atalaia_join_decode(const uint8_t *buf, size_t len,
                                           const uint8_t join_key[ATALAIA_JOIN_KEY_SIZE],
                                           atalaia_join_t *out);
+
+/* True if s is a join's language (key 15): 2-8 bytes of a-z, 0-9 and '-', the first two a-z. */
+bool atalaia_join_lang_ok(const char *s);
 
 /* True if s is valid UTF-8 without NUL, 1..max bytes: the payload's rule for text fields
  * (also the field frames', atalaia/field_frame.h). */

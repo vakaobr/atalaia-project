@@ -105,9 +105,9 @@ Offset  Size  Field       Source
 `nonce_ctr` is a 32-bit monotonic counter composed of two halves:
 
 - **epoch** (uint16, high half): incremented and persisted to NVS at
-  boot and whenever `seq` wraps from 65535 to 0. If the NVS write
-  fails, the node halts the radio and emits `nonce.nvs_fail`
-  (critical). No per-packet NVS writes.
+  boot (per game key since Amendment 9: a new key starts at 1) and
+  whenever `seq` wraps from 65535 to 0. If the NVS write fails, the
+  node halts the radio and emits `nonce.nvs_fail` (critical). No per-packet NVS writes.
 - **seq** (uint16, low half): the header sequence number, incremented
   per packet.
 
@@ -124,6 +124,9 @@ epoch per source. On a new packet:
    that source.
 4. On both failures, drop the packet.
 5. Never accept a lower epoch.
+
+(Amendment 9: receivers search further above for HELLO and TIME, and a
+node's epochs are per game key.)
 
 HELLO and STATE messages also announce the epoch explicitly, allowing
 receivers to resync after a longer gap.
@@ -348,7 +351,8 @@ controller.
 The game key is stored in the ESP32-S3's encrypted NVS partition
 (eFuse HMAC-derived key). On reboot:
 
-1. Read game key and epoch from encrypted NVS.
+1. Read game key and epoch from encrypted NVS (the epoch of that key:
+   Amendment 9).
 2. Increment epoch; persist before first TX.
 3. Replay unacknowledged events from the flash-backed event log
    (`/log/game.bin` on LittleFS).
@@ -606,6 +610,39 @@ CMD opcode **9, `update`**: the controller offers a box a firmware release. Its 
 **Compatibility:** the version bits do not change. A box or a modem from before drops type 10 (game id 0 and not a field frame); a controller from before ignores what it hears in FIELD_RX that does not open as a field frame. Pairing needs both the box's and the modem's new firmware.
 
 **Reason:** the maintainer's decision (2026-10-21) to adopt boxes three ways: a field card, a USB cable and, for a box with a screen and nothing else at hand, its code over the radio, where an eavesdropper without the code learns nothing and an active attacker gets one guess per run.
+
+## Amendment 9 (2026-10-22, proposed): The nonce epoch is per game key
+
+**Status:** proposed after the bench boards (decisions BN-7 to BN-9); for review.
+
+**Supersedes:** in section 3, "**epoch** (uint16, high half): incremented and persisted to NVS at boot" and, in section 10, "Read game key and epoch from encrypted NVS. Increment epoch; persist before first TX", where the one epoch counter served every game the node ever played; and, in section 3's "Receiver epoch discovery", the one-epoch trial for the packets a node sends first after a start.
+
+**Change:**
+
+1. **A node keeps an epoch per game key.** At every start in a game (a join, a rejoin after a reboot, a seq wrap as before) the node takes that key's last epoch + 1; a key it has no epoch for starts at **1**. The epoch is persisted before the first packet that uses it, as before. Nonces stay unique: AES-CCM needs a nonce used once per key, every game has a fresh random 16-byte key (ADR-P2-2), and within one key the epoch still only grows.
+2. **The key is named by a tag, never stored for this.** The tag is the first 8 bytes of `HMAC-SHA256(game_key, "atalaia epoch tag")` (vectors: `protocol/vectors/epoch_tag.json`). The same key always gives the same tag; the tag tells nothing about the key (HMAC is a PRF keyed by it, and the label keeps it apart from any other use of the key). Two different keys share a tag with probability 2^-64; if they ever did, the second would go on above the first's epoch: never a reused nonce, at worst a node not heard in that game.
+3. **Storage.** The Field Box keeps the epochs of its last 16 game keys and the tags alone of the 48 before them (*retired*) in one NVS blob (`radio/epochs`: version 2, the two counts, a zero byte, 10-byte records of tag and big-endian epoch, the most recent first, then the retired 8-byte tags; version 1, of the first builds, had 8 records and no retired tags and is still read), written whole by one `nvs_set_blob` and commit. After a power cut the blob is the old one or the new one, never a mix, so a key's record never goes back and a new key never takes another key's epoch: a cut before the write leaves the old store and nothing was sent with the new epoch; a cut after it leaves an epoch that was never used. The controller does the same in its SQLite settings (`tx_epochs`, one row). An unreadable or malformed store stops the radio (`tx_blocked`), as an NVS read error did.
+4. **Migration.** Firmware from before kept one `u16` `epoch`. It is read only while no per-key store exists, and only for the stored game the box resumes at boot (the key it belonged to): that game goes on above it, so a box updated in the middle of a game keeps working. Any other game starts at 1 and the old value is never read again. The controller's single `tx_epoch` is used the same way, only for the game it restores after a restart.
+5. **Receivers search further for what a node sends first.** HELLO (and TIME, a controller's first packets after a restart) is tried up to 256 epochs above the source's last authenticated one (`ATALAIA_RESTART_EPOCH_WINDOW`), every other type up to the receiver's window (16 on the modem and the box; 1 in the original rule), and a lower epoch never. Once the HELLO authenticates, the source's epoch is known and the rest of its packets are heard. Replays stay refused: a recorded packet has an epoch at or below the one already seen. *(Review of 2026-10-22, decision BN-20:)* the normal window is always tried first, and the wide search runs at most once per source every 2 s and 20 times a minute in all (source and type are in the clear, so junk HELLOs could otherwise cost 257 decryptions each); a node's HELLO is resent every 3 s until acknowledged, so a genuine one is searched within a retry or two.
+6. **A retired key does not transmit** (review, decision BN-19). Its epochs are no longer known, so starting it again could reuse a nonce: the box refuses the join (card, QR code, text or invite, before anything changes), as it refuses a game it played to its end (it remembers its last four). A floor (the highest epoch of a forgotten key, every new key starting above it) was considered and not chosen: every new key's epochs are above the floor, so each forgotten key raises it, and it becomes a lifetime counter again, out of the receivers' reach after some 240 games.
+7. **One device per node id** (review, decision BN-18). Two devices on one (game key, node id) would use the same nonces with certainty. The controller never issues a join for a node id it already issued one for, or heard a box on, in the game (a replacement box gets a new node id), except to the same device invited again; and when two device ids (HELLO key 10) say HELLO on one node id it flags the node in the console ("two boxes share node N") so the GM takes one out and joins it again.
+8. **A receiver's first epoch for a source is provisional** (review, decision BN-21). A receiver that has not heard a source (or whose table dropped it) could take a recorded old HELLO at a low epoch and then drop the source's real packets more than 16 above it. Until a packet authenticates in the normal window, the source's packets of any type may get the (budgeted) wide search; a source the controller names (SET_PEER_EPOCH) is trusted.
+
+**Compatibility:** no wire change. A receiver from before meets a node in a new game at epoch 1, inside its window, so new nodes are heard by old receivers; the wider search for HELLO needs the new firmware on the receiver. An old node keeps its single counter and is still unheard after ~16 games until it is updated. The epoch of the first game after an update starts at 1, which is safe because that game's key is new to the node.
+
+**Reason:** found on the bench (2026-10-22): a box that had booted or joined more than ~16 times since it was flashed was never heard in a new game (the modem counted 863 authentication failures for a box at epoch ~127 in a fresh game, while the box believed it had joined), and the controller's own single counter made it unheard by the boxes after ~16 games in the same way. A box in a crash loop (35 reboots in one game) jumped past the window within one game (decision BN-5).
+
+**Left open:** a key older than 64 newer games is new to the box again, so its card tapped once more would start it at 1 (a game whose controller has long moved on). A card of a game played before the update, tapped after it, starts at 1 too: the old single counter cannot say which keys it covered (only the game resumed at the update takes it up). A box reflashed with its NVS erased forgets every key, so the same card tapped again reuses that game's nonces: re-join it with a new join. Two devices on one node id are flagged only when both send their device id (Field Boxes with a field join key do; an Android prop does not yet). The controller keeps its own epochs for its last 8 game keys only (it restores only its live game). A box that reboots more than 256 times in one game is still lost to that game.
+
+## Amendment 10 (2026-10-22, proposed): The box language in the join payload
+
+**Status:** proposed with the box screens in the field's language (the maintainer's request of 2026-10-22); for review.
+
+**Change:** the join payload ([protocol/join.md](../../protocol/join.md)) gains an optional key **15, `lang`**: text, 2-8 bytes of `a-z`, `0-9` and `-`, the first two `a-z` (`pt`, `en`, `pt-br`); anything else (upper case, empty, one letter, longer, a number, bytes, null) refuses the payload as a body error. Absent means English. A box draws its screens (Ready, waiting for the start, a neutral zone, armed, game over...) in that language and keeps it for its screens between games; a box that does not know the language uses English. The controller puts in the field's "box language" setting (`GET|PUT /api/v1/settings/box-language`: `auto`, `pt` or `en`), where `auto`, the default, is the language of the console the game was created in; a game keeps its language, and every join payload of the game carries it (card, QR code, text, a radio invite, a standby controller's). Readers now skip keys 16-31. Shared vectors: the `box_language` section of `protocol/vectors/join.json`, made by hand from an existing payload and tagged with Python's `hmac`.
+
+**Compatibility:** firmware, apps and controllers from before skip keys 15-31, so an old box takes a new payload and stays in English; a payload without key 15 is unchanged byte for byte. The payload grows by 4-10 bytes, inside the 448.
+
+**Reason:** every box screen was fixed English while the fields play in Portuguese too; the language is a property of the game (the people on that field), so it travels with the game's join, which reaches the box by every path at once.
 
 ## Open questions
 

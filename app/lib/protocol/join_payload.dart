@@ -79,6 +79,7 @@ final class JoinPayload {
     required this.kind,
     this.caSha256,
     this.urls,
+    this.lang,
   });
 
   final int gameId;
@@ -103,6 +104,10 @@ final class JoinPayload {
 
   /// Key 14: the controller's https base addresses (1-3), or null.
   final List<String>? urls;
+
+  /// Key 15: the language of the box screens ("pt", "en"...; RFC 0001
+  /// Amendment 10), or null: English.
+  final String? lang;
 
   /// The parts of [modeId]: the main mode, then its modifiers.
   List<String> get modeParts => modeId.split('+');
@@ -235,6 +240,12 @@ JoinPayload _validate(Map<String, Object?> j) {
           ),
     ];
   }
+  final lang = j['lang'];
+  if (lang != null && (lang is! String || !_lang.hasMatch(lang))) {
+    throw _body(
+      'lang: $lang is not 2-8 of a-z, 0-9 and -, starting with two letters',
+    );
+  }
   return JoinPayload(
     gameId: gameId,
     gameKey: key,
@@ -250,8 +261,12 @@ JoinPayload _validate(Map<String, Object?> j) {
     kind: kind,
     caSha256: ca as Uint8List?,
     urls: u,
+    lang: lang as String?,
   );
 }
+
+/// Key 15: 2-8 bytes of a-z, 0-9 and '-', the first two a-z.
+final _lang = RegExp(r'^[a-z]{2}[a-z0-9-]{0,6}$');
 
 /// An https base address: https://host[:port] (a DNS name or IPv4 address,
 /// or an IPv6 address in brackets), nothing after it, at most 64 bytes. The
@@ -273,6 +288,7 @@ const _keys = {
   1: 'game_id', 2: 'game_key', 3: 'node_id', 4: 'controller_id', //
   5: 'channel_hz', 6: 'max_hops', 7: 'teams', 8: 'mode_id', 9: 'role',
   10: 'game_seed', 11: 'params', 12: 'kind', 13: 'ca_sha256', 14: 'urls',
+  15: 'lang',
 };
 
 bool _hasBytes(Object? v) => switch (v) {
@@ -326,7 +342,8 @@ JoinPayload decodeJoin(List<int> data, List<int> joinKey) {
       if (v is! int || v < 0 || v > 1) throw _body('unknown join kind $v');
       v = JoinKind.values[v];
     }
-    if ((name == 'ca_sha256' || name == 'urls') && v == null) {
+    if ((name == 'ca_sha256' || name == 'urls' || name == 'lang') &&
+        v == null) {
       throw _body('$name is null: leave an optional field out instead');
     }
     j[name] = v;
@@ -336,7 +353,7 @@ JoinPayload decodeJoin(List<int> data, List<int> joinKey) {
       throw _body('$name must be a byte string');
     }
   }
-  for (final name in ['teams', 'mode_id', 'role', 'params', 'urls']) {
+  for (final name in ['teams', 'mode_id', 'role', 'params', 'urls', 'lang']) {
     if (_hasBytes(j[name])) throw _body('$name must be text');
   }
   return _validate(j);
@@ -363,6 +380,7 @@ Uint8List encodeJoin(JoinPayload j, List<int> joinKey) {
     'kind': j.kind,
     'ca_sha256': j.caSha256,
     'urls': j.urls,
+    'lang': j.lang,
   });
   final body = <int, Object?>{
     1: v.gameId,
@@ -379,6 +397,7 @@ Uint8List encodeJoin(JoinPayload j, List<int> joinKey) {
     12: v.kind.index,
     if (v.caSha256 != null) 13: v.caSha256,
     if (v.urls != null) 14: v.urls,
+    if (v.lang != null) 15: v.lang,
   };
   final signed = Uint8List.fromList([joinVersion, ...cborEncode(body)]);
   final out = Uint8List.fromList([

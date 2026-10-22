@@ -130,6 +130,89 @@ class IssueJoinTests(unittest.TestCase):
             self.assertEqual(ensure_join_key(cfg, Store(cfg.db_path)), bytes([0xAB]) * 32)
 
 
+class BoxLanguageTests(unittest.TestCase):
+    """The boxes' screen language (join key 15, RFC 0001 Amendment 10): the field setting
+    (GET|PUT /api/v1/settings/box-language), "auto" by default, which takes the language of the
+    console that creates the game; every join of the game carries it."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.a = Side(self.tmp.name, "a")
+
+    def tearDown(self):
+        self.a.close()
+        self.tmp.cleanup()
+
+    def game(self, **extra) -> int:
+        r = self.a.client.post("/api/v1/games", headers=GM, json={
+            "name": "Sunday", "mode_id": DOMINATION, "teams": ["red", "blue"], **extra})
+        self.assertEqual(r.status_code, 201, r.text)
+        return r.json()["id"]
+
+    def end(self, gid: int) -> None:
+        self.assertEqual(self.a.client.post(f"/api/v1/games/{gid}/end", headers=GM, json={}).status_code, 200)
+
+    def lang_of(self, **spec) -> str | None:
+        r = self.a.client.post("/api/v1/join", headers=GM, json={"role": "zone", **spec})
+        self.assertEqual(r.status_code, 200, r.text)
+        return join.decode(bytes.fromhex(r.json()["payload_hex"]), JOIN_KEY)["lang"]
+
+    def test_auto_takes_the_consoles_language(self):
+        c = self.a.client
+        self.assertEqual(c.get("/api/v1/settings/box-language", headers=READ).json(),
+                         {"box_language": "auto", "choices": ["auto", "pt", "en"], "game_box_language": None})
+        gid = self.game(console_lang="pt")
+        self.assertEqual(self.lang_of(), "pt")
+        self.assertEqual(c.get("/api/v1/settings/box-language", headers=READ).json()["game_box_language"], "pt")
+        # A standby controller's join carries it too.
+        r = c.post("/api/v1/join", headers=GM, json={"kind": "controller"})
+        self.assertEqual(join.decode(bytes.fromhex(r.json()["payload_hex"]), JOIN_KEY)["lang"], "pt")
+        self.end(gid)
+        gid = self.game(console_lang="en")
+        self.assertEqual(self.lang_of(), "en")
+        self.end(gid)
+        # Created through the API without a console: no key 15 (English).
+        self.game()
+        self.assertIsNone(self.lang_of())
+
+    def test_a_fixed_setting_wins_and_a_game_keeps_its_language(self):
+        c = self.a.client
+        self.assertEqual(c.put("/api/v1/settings/box-language", headers=READ,
+                               json={"box_language": "pt"}).status_code, 403)
+        self.assertEqual(c.put("/api/v1/settings/box-language", headers=GM,
+                               json={"box_language": "fr"}).status_code, 400)
+        r = c.put("/api/v1/settings/box-language", headers=GM, json={"box_language": "pt"})
+        self.assertEqual((r.status_code, r.json()["box_language"]), (200, "pt"))
+        gid = self.game(console_lang="en")
+        self.assertEqual(self.lang_of(), "pt")
+        # Changed during the game: the live game keeps its language; the next game takes the new one.
+        c.put("/api/v1/settings/box-language", headers=GM, json={"box_language": "en"})
+        self.assertEqual(self.lang_of(), "pt")
+        self.end(gid)
+        self.game(console_lang="pt")
+        self.assertEqual(self.lang_of(), "en")
+        # A console language the controller does not know is refused while "auto" decides.
+        c.put("/api/v1/settings/box-language", headers=GM, json={"box_language": "auto"})
+        self.end(self.a.ctrl.game["id"])
+        r = c.post("/api/v1/games", headers=GM, json={"name": "x", "mode_id": DOMINATION, "console_lang": "xx"})
+        self.assertEqual(r.status_code, 400)
+
+    def test_the_setting_survives_a_restart(self):
+        self.a.close()
+        self.a = Side(self.tmp.name, "keep", persist_game_key=True)
+        self.a.client.put("/api/v1/settings/box-language", headers=GM, json={"box_language": "en"})
+        self.assertEqual(self.a.store.get_setting("box_language"), "en")
+        gid = self.game(console_lang="pt")
+        self.a.ctrl.stop()
+        ctrl = Controller(self.a.cfg, self.a.store, modem=FakeModem(), core=CORE, join_key=JOIN_KEY)
+        try:
+            self.assertEqual(ctrl.game["id"], gid)
+            self.assertEqual(join.decode(bytes.fromhex(ctrl.issue_join({"role": "zone"})["payload_hex"]),
+                                         JOIN_KEY)["lang"], "en")
+        finally:
+            ctrl.stop()
+
+
 class StandbyApiTests(unittest.TestCase):
     """A standby joins from the text, follows TIME, and leaves when the game ends."""
 

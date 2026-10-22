@@ -47,6 +47,7 @@ void run_modem_framing_tests(void);
 void run_modem_tests(void);
 void run_field_link_tests(void);
 void run_box_game_tests(void);
+void run_box_text_tests(void);
 void run_serial_console_tests(void);
 void run_board_fem_tests(void);
 void run_screen_template_tests(void);

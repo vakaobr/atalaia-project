@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "box_text.h"
 #include "screen_types.h"
 #include "state_persist.h"
 
@@ -43,6 +44,7 @@ const char *box_join_result_name(box_join_result_t r)
     case BOX_JOIN_BUSY: return "a game is being played";
     case BOX_JOIN_STORAGE: return "could not store the join";
     case BOX_JOIN_RADIO: return "radio halted (epoch storage failed)";
+    case BOX_JOIN_ENDED: return "a game this box has played already";
     }
     return "?";
 }
@@ -123,6 +125,11 @@ static void prepare_runner(box_game_t *g)
 
 static void start_mode(box_game_t *g)
 {
+    /* The game is on, whatever the mode draws (some draw nothing until a capture): the joined
+     * screen never stays up in a running game (decision BN-13). */
+    char data[SCREEN_DATA_MAX];
+    snprintf(data, sizeof(data), "{\"game\":%u,\"role\":\"%.24s\"}", g->join.game_id, g->join.role);
+    show(g, "playing", data);
     prepare_runner(g);
     g->owner_team = ATALAIA_TEAM_NONE;
     if (!node_runner_start(g->runner, g->preset, g->teams, g->join.team_count)) {
@@ -254,6 +261,24 @@ void box_game_init(box_game_t *g, node_runner_t *runner, preset_t *preset_buf,
     g->lobby.first_min_ms = BOX_ANNOUNCE_FIRST_MIN_MS;
     g->lobby.first_max_ms = BOX_ANNOUNCE_FIRST_MAX_MS;
     g->lobby.interval_min_ms = BOX_ANNOUNCE_MIN_MS;
+    /* The screens' language until a game says otherwise: the last game's (BN-14). */
+    char code[ATALAIA_JOIN_LANG_MAX + 1] = "";
+    if (g->store.load_lang == NULL || g->store.load_lang(g->store.ctx, code, sizeof(code)) != 0) {
+        code[0] = 0;
+    }
+    box_lang_set_code(code);
+}
+
+/* The joined game's language (join key 15) for the screens, kept for between games. */
+static void take_language(box_game_t *g, const atalaia_join_t *j)
+{
+    if (box_lang_given() == (j->lang[0] != 0) && box_lang() == box_lang_from_code(j->lang)) {
+        return;
+    }
+    box_lang_set_code(j->lang);
+    if (g->store.save_lang != NULL && g->store.save_lang(g->store.ctx, j->lang) != 0) {
+        say(g, "screen language: not stored (the last one after a reboot)");
+    }
 }
 
 bool box_game_load_join_key(box_game_t *g)
@@ -378,18 +403,14 @@ static int find_preset(box_game_t *g, const char *mode_id)
     return first->index;
 }
 
+/* Joined (or invited), the game not started: its own screen, never a mode's or the
+ * running game's (decision BN-12). The game id, the role and how the box joined. */
 static void show_waiting(box_game_t *g)
 {
     char data[SCREEN_DATA_MAX];
-    if (g->lobby.invited) {
-        /* An invite over the radio says so, in words short enough for the OLED too. */
-        snprintf(data, sizeof(data), "{\"title\":\"Invited\",\"mode\":\"%u: %.24s\"}",
-                 g->join.game_id, g->join.role);
-    } else {
-        snprintf(data, sizeof(data), "{\"title\":\"Joined game %u\",\"mode\":\"%.24s, node %u\"}",
-                 g->join.game_id, g->join.role, g->join.node_id);
-    }
-    show(g, "status", data);
+    snprintf(data, sizeof(data), "{\"game\":%u,\"role\":\"%.24s\",\"invited\":%s}", g->join.game_id,
+             g->join.role, g->lobby.invited ? "true" : "false");
+    show(g, "waiting", data);
 }
 
 /* Takes a verified join: from a card or text (fresh), or from the store (reboot). */
@@ -413,6 +434,7 @@ static box_join_result_t apply(box_game_t *g, const atalaia_join_t *j, const uin
         if (g->log != NULL) event_log_clear(g->log);
     }
     g->join = *j;
+    take_language(g, j);
     g->preset_index = index;
     for (uint8_t t = 0; t < j->team_count; t++) g->teams[t] = g->join.teams[t];
     if (g->shell.set_channel != NULL && !g->shell.set_channel(g->shell.user, j->channel_hz)) {
@@ -436,7 +458,8 @@ static box_join_result_t apply(box_game_t *g, const atalaia_join_t *j, const uin
                           .tx = g->shell.radio_send != NULL ? link_tx : NULL,
                           .tx_ctx = g};
     g->now_ms = g->now_ms ? g->now_ms : 1;
-    if (!field_link_init(&g->link, j, g->crypto, g->nvs, g->log, &g->hello, &io, g->now_ms)) {
+    if (!field_link_init(&g->link, j, g->crypto, g->nvs, g->log, &g->hello, &io, g->now_ms,
+                         !fresh)) {
         return BOX_JOIN_RADIO;
     }
     if (g->state_interval_ms != 0) g->link.state_interval_ms = g->state_interval_ms;
@@ -511,6 +534,15 @@ static box_join_result_t join_payload(box_game_t *g, const uint8_t *payload, siz
     if (r != ATALAIA_JOIN_OK) {
         say(g, "join refused: %s", atalaia_join_result_name(r));
         return BOX_JOIN_REFUSED;
+    }
+    /* A card, a QR code or a text of a game this box has played to its end, or of an old game
+     * whose key the epoch store keeps only as retired: its nonces may not be used again
+     * (decision BN-19). Checked before anything of the box's state changes. */
+    if (box_lobby_played_to_the_end(g, j.game_id) ||
+        atalaia_radio_epoch_key_retired(g->nvs, j.game_key)) {
+        memset(&j, 0, sizeof(j));
+        say(g, "join refused: %s", box_join_result_name(BOX_JOIN_ENDED));
+        return BOX_JOIN_ENDED;
     }
     box_join_result_t out = apply(g, &j, payload, len, true);
     memset(&j, 0, sizeof(j));

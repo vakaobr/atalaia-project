@@ -212,7 +212,8 @@
       "proxy": "proxy"
     },
     "commands": "Commands",
-    "command_sent": "sent"
+    "command_sent": "sent",
+    "conflict": "Two boxes share node {node}: one join was used on two boxes, and they use the same radio nonces. Take one of them out of the game and join it again with a new join (Join)."
   },
   "field": {
     "title": "Field",
@@ -778,5 +779,18 @@
     "start_now": "Start now",
     "pending_note": "{n} declared replica(s) not chronographed yet.",
     "back": "Back"
+  },
+  "box_language": {
+    "title": "Box language",
+    "intro": "The language of the box screens: Ready, waiting for the start, neutral zone, armed, game over. A game keeps the language it was created with, and every join (card, QR code, text, radio invite) carries it. Boxes with older firmware stay in English.",
+    "label": "Language on the boxes",
+    "choices": {
+      "auto": "This console's language when the game is created",
+      "pt": "Portuguese",
+      "en": "English"
+    },
+    "live": "The live game's boxes: {lang}",
+    "saved": "Saved: games created from now on use it.",
+    "read_only": "Only the game master changes it."
   }
 }

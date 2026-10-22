@@ -314,7 +314,7 @@ void main() {
         await loop.input('game.start', {'preset': 'org.atalaia.domination'}),
         isTrue,
       );
-      expect(out.commands.last.args.first, 'standby');
+      expect(out.commands.last.args.first, 'neutral');
       expect(
         await loop.input('team_input.hold', {'team': 'blue', 'ms': 150}),
         isTrue,

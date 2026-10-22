@@ -35,7 +35,9 @@ const cases = [
   ('bomb_defused', 'bomb', 'defused', '{"team":"blue"}'),
   ('bomb_defused_yellow', 'bomb', 'defused', '{"team":"yellow"}'),
   ('bomb_exploded', 'bomb', 'exploded', '{"team":"red"}'),
-  ('domination_standby', 'domination', 'standby', '{}'),
+  ('domination_neutral', 'domination', 'neutral', '{}'),
+  // The box's language from the join (decision BN-14): the same template in Portuguese.
+  ('domination_neutral_pt', 'domination', 'neutral', '{"lang":"pt"}'),
   (
     'domination_captured',
     'domination',
@@ -108,7 +110,7 @@ const cases = [
   ),
   ('medic_empty', 'medic', 'medic_empty', '{}'),
   // Master and Satellites: a free box, a satellite, the master with its status.
-  ('master_satellites_standby', 'master_satellites', 'standby', '{}'),
+  ('master_satellites_neutral', 'master_satellites', 'neutral', '{}'),
   (
     'master_satellites_captured',
     'master_satellites',

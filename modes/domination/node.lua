@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 --
 -- Domination (draft): the last team to claim the box scores while it holds it.
--- Screens (assets/screens/): standby until the first capture, then captured
+-- Screens (assets/screens/): neutral until the first capture, then captured
 -- (the holding team, its points on this box and when it took it), and
 -- final_score when the game ends.
 
@@ -12,7 +12,7 @@ local function show()
   if s.owner then
     ui.screen("captured", { team = s.owner, points = score.get(s.owner), since = s.since })
   else
-    ui.screen("standby", {})
+    ui.screen("neutral", {})
   end
 end
 

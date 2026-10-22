@@ -17,6 +17,7 @@ import { AdoptPanel } from './components/adopt-panel.js';
 import { PresetBuilder } from './components/preset-builder.js';
 import { ScenarioBuilder } from './components/scenario-builder.js';
 import { RadioSettings } from './components/radio-settings.js';
+import { BoxLanguageSettings } from './components/box-language-settings.js';
 import { FirmwarePanel } from './components/firmware-panel.js';
 import { CheckinPanel } from './components/checkin-panel.js';
 import { BrandingSettings, TeamPresets, FieldBrand, accentRef } from './components/branding-settings.js';
@@ -445,7 +446,7 @@ class App extends Component {
         case 'controller':
             return html`<${ControllerPanel} app=${this} />`;
         case 'settings':
-            return html`<${RadioSettings} app=${this} /><${BrandingSettings} app=${this} /><${TeamPresets} app=${this} />`;
+            return html`<${RadioSettings} app=${this} /><${BoxLanguageSettings} app=${this} /><${BrandingSettings} app=${this} /><${TeamPresets} app=${this} />`;
         default:
             return null;
         }

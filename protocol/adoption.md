@@ -47,6 +47,7 @@ The rules are the box's own (`adoption_offer()` in `adoption.c`); the controller
 - **Development builds run with NVS encryption off**: the key is in plain flash, readable by anyone who dumps it over USB (the box logs `NVS encryption is off` at boot). That is acceptable on the bench only.
 - **Production Field Boxes need** (decision AD-12): NVS encryption with the HMAC-based scheme and an eFuse key ([BRING_UP.md step 0](../firmware/esp32/docs/BRING_UP.md#step-0-efuse-hmac-key-provisioning-production-only)); flash encryption (release mode), so the NVS and the image cannot be read from the flash chip; secure boot v2 with the release key, so a modified image cannot be flashed to print the key; the JTAG part of USB-Serial-JTAG disabled by eFuse (`DIS_USB_JTAG`), the serial part kept for USB adoption; and the admin PIN changed from 1234 at setup, else the PIN protects nothing. None of these is set in the repository's sdkconfig files yet; they are one-way eFuse operations for a release process.
 - The controller keeps the key in its store (`join_key` setting, or `[join] key`), never in the API, the logs or the adoption records.
+- The same namespace holds the radio's nonce epochs (`epochs`, RFC 0001 Amendment 9). Erasing it (a reflash with `erase_flash`, a factory reset) also forgets which games the box played: a join card of a game still running, tapped again on that box, would reuse its earlier nonces (decision BN-18). Join it again with a new join from the console instead.
 
 ## 3. What the box shows
 

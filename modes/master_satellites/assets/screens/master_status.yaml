@@ -3,14 +3,15 @@
 #
 # A team holds the master. Data: team, since (game time of the capture, in
 # seconds), held and of (the satellites the team holds, of all of them) and
-# points (the master's points per tick with that bonus), from the controller.
+# points (the master's points per tick with that bonus), from the controller;
+# lang (pt or en) from the box.
 template: master_status
 layout:
   - type: row
     style: { width: fill, height: 44, background: team }
     children:
       - type: label
-        text: MASTER HELD
+        text: "{lang == 'pt' && 'MASTER OCUPADO' || 'MASTER HELD'}"
         style: { font_size: 20, width: fill, align: center, color: contrast }
   - type: spacer
     height: fill
@@ -18,18 +19,18 @@ layout:
     text: "{team|upper}"
     style: { font_size: 48, color: team }
   - type: label
-    text: "{held} of {of} satellites"
+    text: "{held} {lang == 'pt' && 'de' || 'of'} {of} {lang == 'pt' && 'satélites' || 'satellites'}"
     style: { font_size: 20 }
   - type: label
-    text: "{points} points every {params.tick_s} s"
+    text: "{points} {lang == 'pt' && 'pontos a cada' || 'points every'} {params.tick_s} s"
     style: { font_size: 20, color: "{points > 0 && 'white' || 'danger'}" }
   - type: label
-    text: "held since {since|clock}"
+    text: "{lang == 'pt' && 'desde' || 'held since'} {since|clock}"
     style: { font_size: 14, color: muted }
   - type: spacer
     height: fill
   - type: label
-    text: Hold your button to take it over
+    text: "{lang == 'pt' && 'Mantém o botão premido para a tomar' || 'Hold your button to take it over'}"
     style:
       font_size: 14
       color: muted

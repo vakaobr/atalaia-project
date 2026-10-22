@@ -2,7 +2,8 @@
  * SPDX-FileCopyrightText: 2026 The Atalaia contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * ESP-IDF NVS backend for the radio protocol's key and epoch storage.
+ * ESP-IDF NVS backend for the radio protocol's key and epoch storage (the per-key epoch
+ * store "epochs"; the old single "epoch" is only read, for migration).
  */
 
 #ifdef ESP_PLATFORM
@@ -22,7 +23,8 @@ static nvs_handle_t nvs_h;
 
 /* ---- NVS ops -------------------------------------------------------------- */
 
-static int esp_nvs_read_epoch(void *ctx, uint16_t *epoch)
+/* The u16 "epoch" of the firmware before the per-key epoch store (read only, for migration). */
+static int esp_nvs_read_legacy_epoch(void *ctx, uint16_t *epoch)
 {
     (void)ctx;
     esp_err_t err = nvs_get_u16(nvs_h, "epoch", epoch);
@@ -34,17 +36,28 @@ static int esp_nvs_read_epoch(void *ctx, uint16_t *epoch)
     return 0;
 }
 
-static int esp_nvs_write_epoch(void *ctx, uint16_t epoch)
+/* The epoch store (radio_protocol.h): one blob, so one write replaces it whole. NVS writes the
+ * new blob's entries before it erases the old ones: after a power cut it reads one or the other. */
+static int esp_nvs_read_epochs(void *ctx, uint8_t *buf, size_t cap)
 {
     (void)ctx;
-    esp_err_t err = nvs_set_u16(nvs_h, "epoch", epoch);
+    size_t len = cap;
+    esp_err_t err = nvs_get_blob(nvs_h, "epochs", buf, &len);
+    if (err == ESP_ERR_NVS_NOT_FOUND) return -1;
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "nvs write epoch: %s", esp_err_to_name(err));
-        return -1;
+        ESP_LOGE(TAG, "nvs read epochs: %s", esp_err_to_name(err));
+        return -2;
     }
-    err = nvs_commit(nvs_h);
+    return (int)len;
+}
+
+static int esp_nvs_write_epochs(void *ctx, const uint8_t *buf, size_t len)
+{
+    (void)ctx;
+    esp_err_t err = nvs_set_blob(nvs_h, "epochs", buf, len);
+    if (err == ESP_OK) err = nvs_commit(nvs_h);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "nvs commit epoch: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "nvs write epochs: %s", esp_err_to_name(err));
         return -1;
     }
     return 0;
@@ -97,8 +110,9 @@ static int esp_nvs_erase_key(void *ctx)
 }
 
 static const atalaia_radio_nvs_ops_t esp_nvs_ops = {
-    .read_epoch = esp_nvs_read_epoch,
-    .write_epoch = esp_nvs_write_epoch,
+    .read_legacy_epoch = esp_nvs_read_legacy_epoch,
+    .read_epochs = esp_nvs_read_epochs,
+    .write_epochs = esp_nvs_write_epochs,
     .read_key = esp_nvs_read_key,
     .write_key = esp_nvs_write_key,
     .erase_key = esp_nvs_erase_key,
@@ -201,6 +215,28 @@ static int store_save_ff_boot(void *ctx, uint32_t boot)
     return 0;
 }
 
+/* The screens' language, the last game's (join key 15; box_text.h): "" when it gave none. */
+static int store_load_lang(void *ctx, char *code, size_t cap)
+{
+    (void)ctx;
+    size_t len = cap;
+    esp_err_t err = nvs_get_str(nvs_h, "lang", code, &len);
+    if (err != ESP_OK) return -1; /* none stored, or unreadable: English */
+    return 0;
+}
+
+static int store_save_lang(void *ctx, const char *code)
+{
+    (void)ctx;
+    esp_err_t err = nvs_set_str(nvs_h, "lang", code);
+    if (err == ESP_OK) err = nvs_commit(nvs_h);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "nvs write lang: %s", esp_err_to_name(err));
+        return -1;
+    }
+    return 0;
+}
+
 static const box_store_ops_t esp_box_store = {
     .load_join = store_load_join,
     .save_join = store_save_join,
@@ -211,6 +247,8 @@ static const box_store_ops_t esp_box_store = {
     .save_device_id = store_save_device_id,
     .load_ff_boot = store_load_ff_boot,
     .save_ff_boot = store_save_ff_boot,
+    .load_lang = store_load_lang,
+    .save_lang = store_save_lang,
     .ctx = NULL,
 };
 

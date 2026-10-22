@@ -371,7 +371,7 @@ static void test_every_builtin_and_master_satellites(void)
     button_tracker_t buttons;
     button_tracker_init(&buttons, teams, 2);
     const screen_update_t *su = last_screen(&runner);
-    CHECK(su && strcmp(su->template_name, "standby") == 0);
+    CHECK(su && strcmp(su->template_name, "neutral") == 0);
 
     runner.queues.screen_count = 0;
     hold(&runner, &buttons, 0x2, 3100); /* blue holds 3 s: captured, no score on the box */

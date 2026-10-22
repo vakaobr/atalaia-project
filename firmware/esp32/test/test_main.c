@@ -43,6 +43,7 @@ int main(void)
     run_modem_tests();
     run_field_link_tests();
     run_box_game_tests();
+    run_box_text_tests();
     run_serial_console_tests();
     run_board_fem_tests();
     run_screen_template_tests();

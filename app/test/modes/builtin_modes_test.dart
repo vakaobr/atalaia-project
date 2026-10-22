@@ -67,7 +67,7 @@ void main() {
     expect(ms.roles.map((r) => r.name), ['master', 'satellite']);
     expect(
       ms.screens.keys,
-      containsAll(['standby', 'captured', 'master_status']),
+      containsAll(['neutral', 'captured', 'master_status']),
     );
     final hack = catalog.byId('org.atalaia.hacking_terminal')!;
     expect(hack.needsController, isFalse);

@@ -2,22 +2,23 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # The bomb waits to be armed. Data: arm (the attacking team), progress (0-1
-# while the attackers hold their button; the bar fills, letting go empties it).
+# while the attackers hold their button; the bar fills, letting go empties it);
+# lang (pt or en) from the box. Its header says READY, not STANDBY (decision BN-11).
 template: standby
 layout:
   - type: row
     style: { width: fill, height: 44, background: panel }
     children:
       - type: label
-        text: STANDBY
+        text: "{lang == 'pt' && 'PRONTA' || 'READY'}"
         style: { font_size: 20, width: fill, align: center }
   - type: spacer
     height: fill
   - type: label
-    text: "{progress && 'Arming... keep holding' || 'Hold the button to arm'}"
+    text: "{lang == 'pt' && (progress && 'A armar... não largues' || 'Mantém premido para armar') || (progress && 'Arming... keep holding' || 'Hold to arm')}"
     style: { font_size: 20, color: "{progress && 'white' || 'muted'}", visible: "{arm}" }
   - type: label
-    text: Waiting
+    text: "{lang == 'pt' && 'À espera' || 'Waiting'}"
     style: { font_size: 20, color: muted, visible: "{!arm}" }
   - type: label
     text: "{arm|upper}"
@@ -28,7 +29,7 @@ layout:
   - type: spacer
     height: fill
   - type: label
-    text: The bomb is not armed
+    text: "{lang == 'pt' && 'A bomba não está armada' || 'The bomb is not armed'}"
     style:
       font_size: 14
       color: muted

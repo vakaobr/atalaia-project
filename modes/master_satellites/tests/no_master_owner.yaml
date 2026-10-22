@@ -8,7 +8,7 @@ steps:
   - wait: 120
   - expect_score: { team: red, points: 0 }
   - expect_score: { team: blue, points: 0 }
-  - expect_screen: { node: master, template: standby }
+  - expect_screen: { node: master, template: neutral }
   - expect_no: zone.neutralized
   - hold: { node: alpha, team: blue, s: 3 }          # satellites change hands freely
   - expect: { type: zone.captured, node: alpha, team: blue, data: { previous_team: red } }

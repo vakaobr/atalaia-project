@@ -2,33 +2,33 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # The game is over. Data: owner (the team holding the zone at the end),
-# points (its points on this box).
+# points (its points on this box); lang (pt or en) from the box.
 template: final_score
 layout:
   - type: row
     style: { width: fill, height: 44, background: panel }
     children:
       - type: label
-        text: GAME OVER
+        text: "{lang == 'pt' && 'FIM DO JOGO' || 'GAME OVER'}"
         style: { font_size: 20, width: fill, align: center }
   - type: spacer
     height: fill
   - type: label
-    text: The zone was held by
+    text: "{lang == 'pt' && 'A zona ficou com' || 'The zone was held by'}"
     style: { font_size: 20, color: muted, visible: "{owner}" }
   - type: label
     text: "{owner|upper}"
     style: { font_size: 48, color: "{owner}", visible: "{owner}" }
   - type: label
-    text: "{points} points on this box"
+    text: "{points} {lang == 'pt' && 'pontos nesta caixa' || 'points on this box'}"
     style: { font_size: 20, visible: "{owner}" }
   - type: label
-    text: No team held the zone
+    text: "{lang == 'pt' && 'Nenhuma equipa ficou com a zona' || 'No team held the zone'}"
     style: { font_size: 20, color: muted, visible: "{!owner}" }
   - type: spacer
     height: fill
   - type: label
-    text: Scores are final
+    text: "{lang == 'pt' && 'Pontuações finais' || 'Scores are final'}"
     style:
       font_size: 14
       color: muted

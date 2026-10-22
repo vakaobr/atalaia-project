@@ -25,6 +25,7 @@
 #include "adoption.h"
 #include "atalaia/join.h"
 #include "box_pair.h"
+#include "box_text.h"
 #include "atalaia/packet.h"
 #include "atalaia/version.h"
 #include "box_game.h"
@@ -622,6 +623,7 @@ static void box_start(const char *tier)
     box_game_init(&box, &runner, &game_preset, nvs ? atalaia_box_store_esp() : &no_store, &ops,
                   &atalaia_crypto_mbedtls, nvs, &game_log, &hello);
     box.state_interval_ms = (uint32_t)CONFIG_ATALAIA_STATE_INTERVAL_S * 1000u;
+    box.has_picker = true; /* "ready" says a key brings the game picker */
     /* battery.low below this level, only with a MAX17048 (box_battery() is -1 without one). */
     box.battery_low_pct = (uint8_t)CONFIG_ATALAIA_BATTERY_LOW_PCT;
     if (!atalaia_nvs_encrypted()) {
@@ -692,8 +694,8 @@ static void start_game(void)
     /* Shown until the mode draws its own screen. */
     char data[SCREEN_DATA_MAX];
     const char *label = game_preset.label[0] ? game_preset.label : game_preset.mode_id;
-    snprintf(data, sizeof(data), "{\"title\":\"Game on\",\"mode\":\"%.40s\",\"timer_s\":%u}", label,
-             (unsigned)game_preset.duration_s);
+    snprintf(data, sizeof(data), "{\"title\":\"%s\",\"mode\":\"%.40s\",\"timer_s\":%u}",
+             box_text(TX_GAME_ON_UP), label, (unsigned)game_preset.duration_s);
     send_screen("status", data);
 
     /* A new seed for rand() in every game picked on the box, as the controller gives every
@@ -1112,8 +1114,13 @@ void app_main(void)
             }
         }
 
-        if (!resumed) {
-            /* No valid saved state -- start the normal preset picker. */
+        if (!resumed && adopt.adopted && box.lobby.ready && !pair_at_boot) {
+            /* A free adopted box: "Ready / next game" from boot, as after a game; a key brings
+             * the picker (and its admin PIN) as there (decision BN-10). */
+            after_game = true;
+            box_lobby_show_ready(&box);
+        } else if (!resumed) {
+            /* Not adopted (pairing over the picker), or no radio: the preset picker. */
             start_picker();
         }
     }

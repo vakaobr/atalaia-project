@@ -153,7 +153,7 @@ void main() {
       node.input('game.start', {'preset': 'org.atalaia.domination'}),
       isTrue,
     );
-    expect(commands.last.args.first, 'standby');
+    expect(commands.last.args.first, 'neutral');
     for (var ms = 250; ms <= 3000; ms += 250) {
       node.advance(ms);
       node.input('team_input.hold', {'team': 'red', 'ms': ms});

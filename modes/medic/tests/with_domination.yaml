@@ -6,7 +6,7 @@ params: { capture_hold_ms: 3000, heal_hold_s: 5 }
 nodes: { zone: zone, kit: medic }
 steps:
   - expect_screen: { node: kit, template: medic_idle, data: { remaining: 5 } }
-  - expect_screen: { node: zone, template: standby }
+  - expect_screen: { node: zone, template: neutral }
   # Holding the kit's button captures nothing: Domination does not run there.
   - hold: { node: kit, team: red, s: 5 }
   - expect_no: zone.captured

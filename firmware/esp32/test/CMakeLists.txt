@@ -101,7 +101,9 @@ FetchContent_MakeAvailable(lvgl)
 # One lv_conf.h for the device and the host, so both render alike.
 set(LVGL_CONF_DIR "${CMAKE_CURRENT_LIST_DIR}/../lvgl_conf")
 file(GLOB_RECURSE LVGL_SOURCES CONFIGURE_DEPENDS "${lvgl_SOURCE_DIR}/src/*.c")
-add_library(atalaia_lvgl_host STATIC ${LVGL_SOURCES})
+# lv_conf.h's LV_FONT_CUSTOM_DECLARE: the box's fonts (main/fonts, tools/gen_box_fonts.py).
+file(GLOB ATALAIA_FONTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/../main/fonts/*.c")
+add_library(atalaia_lvgl_host STATIC ${LVGL_SOURCES} ${ATALAIA_FONTS})
 target_include_directories(atalaia_lvgl_host SYSTEM PUBLIC "${lvgl_SOURCE_DIR}" "${LVGL_CONF_DIR}")
 target_compile_definitions(atalaia_lvgl_host PUBLIC LV_CONF_INCLUDE_SIMPLE LV_KCONFIG_IGNORE)
 # Third-party code: built without the project's warning flags, like the vendored Lua.
@@ -113,6 +115,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/../main/builtin_screens.cmake)
 atalaia_builtin_screens("${MODES_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/builtin_screens.c")
 add_library(atalaia_screens_fw STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/screen_renderer.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../main/box_text.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/screen_json.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/screen_template.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/oled_view.c
@@ -210,6 +213,7 @@ set(TEST_SOURCES
     test_modem.c
     test_field_link.c
     test_box_game.c
+    test_box_text.c
     test_serial_console.c
     test_board_fem.c
     test_screen_template.c

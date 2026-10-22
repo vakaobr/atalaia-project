@@ -83,7 +83,7 @@ static void test_bomb_phases(void)
 {
     oled_text_t t = map("BOMB", "standby", "{\"arm\":\"red\"}");
     CHECK(strcmp(t.head, "BOMB") == 0);
-    CHECK(strcmp(t.big, "STANDBY") == 0);
+    CHECK(strcmp(t.big, "READY") == 0); /* the Bomb's "standby" (decision BN-11) */
     CHECK(strcmp(t.foot, "Hold RED to arm") == 0);
     t = map("BOMB", "countdown", "{\"left\":299}");
     CHECK(strcmp(t.big, "4:59") == 0);

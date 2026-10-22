@@ -505,5 +505,141 @@
         "why": "addresses are text"
       }
     ]
+  },
+  "box_language": {
+    "description": "Optional key 15 (lang): the language of a box's screens, RFC 0001 Amendment 10 (proposed); 2-8 bytes of a-z, 0-9 and '-', the first two a-z. Absent: English; a box that does not know the language uses English. Made by hand from node_domination_zone's bytes (map of 12, key 15 appended), tagged with Python's hmac module. The core's, the simulator's and the app's codecs decode and re-encode the valid ones byte for byte and refuse the invalid ones (body).",
+    "valid": [
+      {
+        "name": "lang_pt",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 7,
+          "controller_id": 0,
+          "channel_hz": 869525000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "zone",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "node",
+          "lang": "pt"
+        },
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000f62707476bcb1ba6e375a20908f57f710faac5769de25771c3356152ea7dbec771a2a1b",
+        "text": "atalaia:join:AawBGRCSAlArfhUWKK7Spqv3FYgJz088AwcEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JZHpvbmUKGTA5DAAPYnB0dryxum43WiCQj1f3EPqsV2neJXccM1YVLqfb7HcaKhs"
+      },
+      {
+        "name": "lang_en",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 7,
+          "controller_id": 0,
+          "channel_hz": 869525000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "zone",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "node",
+          "lang": "en"
+        },
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000f62656e4c0a87ddaadb071c7a30b4d82a4ce265ce8c7768b93accb47af759aa15c56cf7",
+        "text": "atalaia:join:AawBGRCSAlArfhUWKK7Spqv3FYgJz088AwcEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JZHpvbmUKGTA5DAAPYmVuTAqH3arbBxx6MLTYKkziZc6Md2i5Osy0evdZqhXFbPc"
+      },
+      {
+        "name": "lang_pt_br",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 7,
+          "controller_id": 0,
+          "channel_hz": 869525000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "zone",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "node",
+          "lang": "pt-br"
+        },
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000f6570742d6272d2075079f858b2d0194220af614cd6c72efec08b70b56d9bf779b464d7eedd1c",
+        "text": "atalaia:join:AawBGRCSAlArfhUWKK7Spqv3FYgJz088AwcEAAUaM9PmCAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JZHpvbmUKGTA5DAAPZXB0LWJy0gdQefhYstAZQiCvYUzWxy7-wItwtW2b93m0ZNfu3Rw"
+      }
+    ],
+    "invalid": [
+      {
+        "name": "lang_uppercase",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000f62505457edd2affa255ea50b2c9771a95e53e97fb432db11589cc0ada87cd3457c7917",
+        "reason": "body",
+        "why": "lower-case letters only"
+      },
+      {
+        "name": "lang_empty",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000f60617bf8d0e387c5dc0da0048697f2db16eaa70d240e8ce9be37a088bed0745faf",
+        "reason": "body",
+        "why": "2-8 bytes; leave the key out instead"
+      },
+      {
+        "name": "lang_one_letter",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000f6170c7fb6f95400998dcd6b125bba3f8e53d342ac0f36f37c0c950291b783683cfcd",
+        "reason": "body",
+        "why": "2-8 bytes"
+      },
+      {
+        "name": "lang_9_bytes",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000f6970742d6272617a696ce40b1df0e7f0c2c9c4784f8b7c75ab658bc68286b6631b781a7425d4b761c3c3",
+        "reason": "body",
+        "why": "2-8 bytes"
+      },
+      {
+        "name": "lang_too_long",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000f6b746f6f6c6f6e676c616e67a09135f295e0cb393ea5f1b14a8b10873b54baeb65ead1f8b77861ea99a44d6c",
+        "reason": "body",
+        "why": "2-8 bytes"
+      },
+      {
+        "name": "lang_digit_first",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000f623174d5302f91b63373f647b530151c3115e3f2510651e6a961d50d9f9f96f19c508b",
+        "reason": "body",
+        "why": "the first two are letters"
+      },
+      {
+        "name": "lang_underscore",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000f6570745f6272aa03f1021c1170c282a60776f4e3a3c091a5c0269985cc51d20cd0ba33e8f868",
+        "reason": "body",
+        "why": "a-z, 0-9 and - only"
+      },
+      {
+        "name": "lang_uint",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000f01acdd3f5f95c1c70cc70aa6a906fa0f40a59bc02ce9b92203571225c687a2abf9",
+        "reason": "body",
+        "why": "a text"
+      },
+      {
+        "name": "lang_bytes",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000f42707488d25ddcaac1e4b74cc52524661441d800fc9116ff3da0b42b5a5c66acdff754",
+        "reason": "body",
+        "why": "a text, not a byte string"
+      },
+      {
+        "name": "lang_null",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000ff6ade65bd45fcc33cccdb6e53cf4754a697a54e0d87877cb3f19ec7c3d99584c25",
+        "reason": "body",
+        "why": "leave an optional key out instead of null"
+      }
+    ]
   }
 }

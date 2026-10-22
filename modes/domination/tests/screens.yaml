@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: The screen shows standby, then the holding team with its points on the box, then the final score
+name: The screen shows neutral, then the holding team with its points on the box, then the final score
 steps:
-  - expect_screen: { template: standby }
+  - expect_screen: { template: neutral }
   - hold: { team: red, s: 3 }
   - expect_screen: { template: captured, data: { team: red, points: 0, since: 3 } }
   - wait: 7                       # the tick at 10 s

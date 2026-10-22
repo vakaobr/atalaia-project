@@ -7,15 +7,19 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import os
 import stat
 import sys
 import tempfile
 import time
 import unittest
+from pathlib import Path
 
 import support  # noqa: F401
-from atalaia_controller.store import Store
+from atalaia_controller.store import EPOCH_KEYS, Store, epoch_tag
 
 
 def event(**kw):
@@ -94,14 +98,54 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(self.store.scores(77), {"red": 7, "blue": 1})
 
     def test_tx_epoch_survives_a_restart(self):
-        self.assertEqual(self.store.next_tx_epoch(), 1)
-        self.assertEqual(self.store.next_tx_epoch(), 2)
+        key = bytes(range(16))
+        self.assertEqual(self.store.next_tx_epoch(key), 1)
+        self.assertEqual(self.store.next_tx_epoch(key, resuming=True), 2)
         self.store.close()
         self.store = Store(self.path)
-        self.assertEqual(self.store.next_tx_epoch(), 3)
-        self.store.set_setting("tx_epoch", "65535")
+        self.assertEqual(self.store.next_tx_epoch(key, resuming=True), 3)
+        self.store.set_setting("tx_epochs", json.dumps([[epoch_tag(key), 65535]]))
         with self.assertRaises(RuntimeError):
-            self.store.next_tx_epoch()
+            self.store.next_tx_epoch(key)
+
+    def test_tx_epoch_per_game_key(self):
+        """Found on the bench (2026-10-22): one epoch for every run made the controller unheard by
+        the boxes after 16 games (they look 16 above epoch 0 in a new game). Per key now."""
+        old = bytes(range(16))
+        for _ in range(40):
+            self.store.next_tx_epoch(old)
+        for game in range(40):
+            self.assertEqual(self.store.next_tx_epoch(bytes([game]) * 16), 1)
+        # Only the last EPOCH_KEYS keys are kept; the tags, never the keys.
+        table = json.loads(self.store.get_setting("tx_epochs"))
+        self.assertEqual(len(table), EPOCH_KEYS)
+        self.assertEqual(table[0], [epoch_tag(bytes([39]) * 16), 1])
+        self.assertNotIn(bytes([39] * 16).hex(), self.store.get_setting("tx_epochs"))
+        # A reboot in a game goes on from that game's epoch.
+        self.assertEqual(self.store.next_tx_epoch(bytes([38]) * 16, resuming=True), 2)
+
+    def test_tx_epoch_from_an_older_version(self):
+        """Before the per-key list, one tx_epoch: a resumed game goes on from it, a new one starts at 1."""
+        key = bytes(range(16))
+        self.store.set_setting("tx_epoch", "120")
+        self.assertEqual(self.store.next_tx_epoch(key, resuming=True), 121)
+        self.assertEqual(self.store.next_tx_epoch(bytes(16)), 1)
+        other = Store(os.path.join(os.path.dirname(self.path), "other.db"))
+        try:
+            other.set_setting("tx_epoch", "120")
+            self.assertEqual(other.next_tx_epoch(key), 1)
+            self.assertEqual(other.next_tx_epoch(key, resuming=True), 2)  # the list exists now
+        finally:
+            other.close()
+
+    def test_epoch_tag_vectors(self):
+        """protocol/vectors/epoch_tag.json, shared with the firmware's test_radio_protocol.c."""
+        path = Path(__file__).resolve().parents[2] / "protocol" / "vectors" / "epoch_tag.json"
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        for v in doc["valid"]:
+            key = bytes.fromhex(v["game_key"])
+            self.assertEqual(epoch_tag(key), v["tag"], v["name"])
+            self.assertEqual(hmac.new(key, doc["label"].encode(), hashlib.sha256).hexdigest()[:16], v["tag"])
 
     @unittest.skipIf(sys.platform == "win32", "POSIX file modes")
     def test_private_file(self):

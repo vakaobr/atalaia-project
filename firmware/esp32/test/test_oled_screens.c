@@ -10,6 +10,7 @@
  * with firmware/esp32/test/screens/oled/<name>.png.
  *
  * ATALAIA_UPDATE_SCREENS=1 rewrites the references, as for test_screens.c.
+ * A case whose name ends in "_pt" is drawn in Portuguese (box_text.h), as there.
  */
 #define _POSIX_C_SOURCE 200809L
 
@@ -19,6 +20,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "box_text.h"
 #include "lvgl.h"
 #include "modem/modem_screen.h"
 #include "oled_view.h"
@@ -35,6 +37,7 @@ typedef struct {
 } oled_case_t;
 
 #define BOMB  "org.atalaia.bomb {\"attackers\":\"red\",\"defenders\":\"blue\",\"fuse_s\":300}"
+#define DOM   "org.atalaia.domination {\"capture_hold_ms\":3000}"
 #define MEDIC "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"en\"}"
 
 /* "splash" is drawn by oled_view_splash(), not by a screen update. */
@@ -50,8 +53,26 @@ static const oled_case_t cases[] = {
     {"timer_adjust", NULL, "timer_adjust", "{\"timer_s\":600}"},
     {"start_confirm", NULL, "start_confirm", "{\"label\":\"Bomb\",\"timer_s\":600}"},
     {"status", NULL, "status", "{\"title\":\"Game on\",\"mode\":\"Bomb\",\"timer_s\":600}"},
-    {"status_invited", NULL, "status", "{\"title\":\"Invited\",\"mode\":\"3073: zone\"}"},
-    {"status_ready", NULL, "status", "{\"title\":\"Ready\",\"mode\":\"next game\"}"},
+    /* A game's life (decisions BN-10, BN-12, BN-13): invited or joined and waiting, started,
+     * a zone nobody holds and one a team holds (BN-11), over, and ready for the next game. */
+    {"waiting_invited", NULL, "waiting", "{\"game\":3073,\"role\":\"zone\",\"invited\":true}"},
+    {"playing", DOM, "playing", "{\"game\":3073,\"role\":\"zone\"}"},
+    {"neutral", DOM, "neutral", "{}"},
+    {"captured", DOM, "captured", "{\"team\":\"red\",\"points\":12,\"since\":95}"},
+    {"final_score", DOM, "final_score", "{\"owner\":\"red\",\"points\":12}"},
+    {"ready_picker", NULL, "ready", "{\"picker\":true}"},
+    {"waiting_invited_pt", NULL, "waiting", "{\"game\":3073,\"role\":\"zone\",\"invited\":true}"},
+    {"playing_pt", DOM, "playing", "{\"game\":3073,\"role\":\"zone\"}"},
+    {"neutral_pt", DOM, "neutral", "{}"},
+    {"captured_pt", DOM, "captured", "{\"team\":\"red\",\"points\":12,\"since\":95}"},
+    {"final_score_pt", DOM, "final_score", "{\"owner\":\"red\",\"points\":12}"},
+    {"ready_picker_pt", NULL, "ready", "{\"picker\":true}"},
+    {"standby_pt", BOMB, "standby", "{\"arm\":\"red\"}"},
+    {"countdown_defusing_pt", BOMB, "countdown", "{\"left\":231,\"defuse\":0.4}"},
+    {"pin_entry_wrong_pt", NULL, "pin_entry", "{\"digits\":0,\"error\":true}"},
+    {"preset_select_pt", NULL, "preset_select",
+     "{\"presets\":[\"Bomba\",\"Domínio\"],\"selected\":2,\"page\":1,\"pages\":2}"},
+    {"start_confirm_pt", NULL, "start_confirm", "{\"label\":\"Bomba\",\"timer_s\":600}"},
     {"status_pair_locked", NULL, "status",
      "{\"title\":\"Pair locked\",\"pairing\":\"restart the box\"}"},
     {"status_pair", NULL, "status",
@@ -162,6 +183,8 @@ static void capture(lv_obj_t *scr)
 /* Draws the case, then captures it. */
 static void render(const oled_case_t *c)
 {
+    size_t n = strlen(c->name);
+    box_lang_set_code(n > 3 && strcmp(c->name + n - 3, "_pt") == 0 ? "pt" : "");
     lv_obj_t *scr = lv_screen_active();
     fake_ms += 10000;
     if (!c->template_name) {

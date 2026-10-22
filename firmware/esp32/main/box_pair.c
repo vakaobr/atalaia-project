@@ -12,6 +12,7 @@
 
 #include "atalaia/duty_cycle.h"
 #include "atalaia/join.h"
+#include "box_text.h"
 #include "cpace.h"
 
 static void say(box_pair_t *p, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
@@ -61,8 +62,8 @@ static void show_code(box_pair_t *p, const char *title)
 {
     char data[160];
     snprintf(data, sizeof(data),
-             "{\"title\":\"%s\",\"code\":\"%.3s %.3s\",\"id\":\"%02x%02x\",\"field\":\"none\"}",
-             title, p->code, p->code + 3, p->pair_id[0], p->pair_id[1]);
+             "{\"title\":\"%s\",\"code\":\"%.3s %.3s\",\"id\":\"%02x%02x\",\"field\":\"%s\"}",
+             title, p->code, p->code + 3, p->pair_id[0], p->pair_id[1], box_text(TX_FIELD_NONE));
     if (p->ops.screen) p->ops.screen(p->ops.user, "status", data);
 }
 
@@ -140,7 +141,7 @@ bool box_pair_start(box_pair_t *p, uint32_t now_ms)
     p->failed_in_row = 0;
     p->show_until_ms = now_ms + BOX_PAIR_SHOW_MS;
     p->next_offer_ms = now_ms + rand_between(p, 1000, 3000);
-    show_code(p, "Pair this box");
+    show_code(p, box_text(TX_PAIR_THIS_BOX));
     say(p,
         "pairing: code %.3s %.3s on %lu Hz, for %u minutes (the console's Adopt tab, "
         "\"Pair by code\")",
@@ -186,7 +187,7 @@ static void run_failed(box_pair_t *p, const char *why)
         /* Said on the screen until a key, not only in the log (decision AD-25). */
         p->redraw = false;
         p->lock_notice = true;
-        show_notice(p, "Pair locked", "restart the box");
+        show_notice(p, box_text(TX_PAIR_LOCKED), box_text(TX_RESTART_THE_BOX));
         return;
     }
     new_code(p);
@@ -194,10 +195,10 @@ static void run_failed(box_pair_t *p, const char *why)
         p->waiting = true;
         p->wait_until_ms = p->now_ms + BOX_PAIR_WAIT_MS;
         p->failed_in_row = 0;
-        show_notice(p, "Pair paused", "for 1 minute");
+        show_notice(p, box_text(TX_PAIR_PAUSED), box_text(TX_FOR_ONE_MINUTE));
         say(p, "pairing: %u failed runs in a row, waiting a minute", BOX_PAIR_RUNS_BEFORE_WAIT);
     } else {
-        show_code(p, "Try again");
+        show_code(p, box_text(TX_TRY_AGAIN));
     }
     say(p, "pairing: new code %.3s %.3s", p->code, p->code + 3);
 }
@@ -370,7 +371,7 @@ bool box_pair_key(box_pair_t *p, char key, uint32_t now_ms)
         box_pair_stop(p, "cancelled on the keypad");
     } else if (key == '#' && !p->in_run && !p->waiting) {
         new_code(p);
-        show_code(p, "Pair this box");
+        show_code(p, box_text(TX_PAIR_THIS_BOX));
         say(p, "pairing: new code %.3s %.3s", p->code, p->code + 3);
     }
     return true;
@@ -388,7 +389,7 @@ bool box_pair_tick(box_pair_t *p, uint32_t now_ms)
     }
     if (p->active && p->waiting && (int32_t)(now_ms - p->wait_until_ms) >= 0) {
         p->waiting = false;
-        show_code(p, "Pair this box");
+        show_code(p, box_text(TX_PAIR_THIS_BOX));
     }
     if (p->active && !p->in_run && (int32_t)(now_ms - p->show_until_ms) >= 0) {
         box_pair_stop(p,

@@ -19,7 +19,7 @@ steps:
   - input: { node: master, type: cmd.set_owner, data: { team: none } }
   - expect: { type: zone.neutralized, node: master, data: { previous_team: blue } }
   - expect: { type: zone.neutralized, node: bravo, data: { previous_team: blue } }
-  - expect_screen: { node: master, template: standby }
+  - expect_screen: { node: master, template: neutral }
   - wait: 30
   - expect_score: { team: blue, points: 2 }
   - expect_score: { team: red, points: 3 }

@@ -9,7 +9,8 @@
  * (6 px and 4 px gaps) with their children centred. "fill" takes the room
  * left along the parent's direction (flex grow) and the whole parent across
  * it. Fonts: Montserrat 14, 20, 28 and 48 (font_size picks the nearest,
- * 20 by default), ASCII only, so texts are folded first (accents dropped,
+ * 20 by default) with ASCII and the letters of Portuguese (main/fonts,
+ * decision BN-14), so texts are folded first (other accents dropped,
  * screen_template_fold_text). A progress bar is a track with a filled part,
  * 200x12 by default. Colours not set: white text on the dark background,
  * accent bars.
@@ -76,6 +77,18 @@ const builtin_screen_t *screen_template_find(const char *name)
 static const char latin1_base[] =
     "AAAAAAACEEEEIIIIDNOOOOOxOUUUUYTsaaaaaaaceeeeiiiidnooooo/ouuuuyty";
 
+/* The letters the box's fonts have (tools/gen_box_fonts.py): kept as they are. */
+static bool in_fonts_c3(unsigned char d)
+{
+    static const unsigned char kept[] = {0x80, 0x81, 0x82, 0x83, 0x87, 0x89, 0x8A, 0x8D,
+                                         0x93, 0x94, 0x95, 0x9A, 0xA0, 0xA1, 0xA2, 0xA3,
+                                         0xA7, 0xA9, 0xAA, 0xAD, 0xB3, 0xB4, 0xB5, 0xBA};
+    for (size_t i = 0; i < sizeof(kept); i++) {
+        if (kept[i] == d) return true;
+    }
+    return false;
+}
+
 void screen_template_fold_text(char *s)
 {
     const unsigned char *in = (const unsigned char *)s;
@@ -85,16 +98,23 @@ void screen_template_fold_text(char *s)
         if (c < 0x80) {
             *out++ = (char)c;
             in++;
+        } else if (c == 0xC3 && in[1] >= 0x80 && in[1] <= 0xBF && in_fonts_c3(in[1])) {
+            *out++ = (char)in[0]; /* a letter of Portuguese: in the fonts */
+            *out++ = (char)in[1];
+            in += 2;
         } else if (c == 0xC3 && in[1] >= 0x80 && in[1] <= 0xBF) {
             *out++ = latin1_base[in[1] - 0x80];
             in += 2;
+        } else if (c == 0xC2 &&
+                   (in[1] == 0xAA || in[1] == 0xBA || in[1] == 0xB0 || in[1] == 0xB7)) {
+            /* ª and º (1.º), the degree sign, the middle dot: in the fonts. */
+            *out++ = (char)in[0];
+            *out++ = (char)in[1];
+            in += 2;
         } else if (c == 0xC2 && in[1] >= 0x80 && in[1] <= 0xBF) {
-            /* ª and º (1.º), the quotes « », the degree sign; the rest has no ASCII look-alike. */
+            /* The quotes « »; the rest has no ASCII look-alike. */
             unsigned char d = in[1];
-            *out++ = d == 0xAA                  ? 'a'
-                     : (d == 0xBA || d == 0xB0) ? 'o'
-                     : (d == 0xAB || d == 0xBB) ? '"'
-                                                : '?';
+            *out++ = (d == 0xAB || d == 0xBB) ? '"' : '?';
             in += 2;
         } else if (c == 0xEF && in[1] >= 0x80 && in[1] <= 0xA3 && in[2] >= 0x80 && in[2] <= 0xBF) {
             /* LVGL's symbols (U+F000-U+F8FF) are in the fonts: kept as they are. */
@@ -105,7 +125,11 @@ void screen_template_fold_text(char *s)
         } else if (c == 0xE2 && in[1] == 0x80 && in[2] >= 0x80 && in[2] <= 0xBF) {
             /* Dashes, quotes and the ellipsis of U+2010-U+203F. */
             unsigned char d = in[2];
-            if (d >= 0x90 && d <= 0x95) {
+            if (d == 0xA2) {
+                *out++ = (char)in[0]; /* the bullet: in the fonts */
+                *out++ = (char)in[1];
+                *out++ = (char)in[2];
+            } else if (d >= 0x90 && d <= 0x95) {
                 *out++ = '-';
             } else if (d >= 0x98 && d <= 0x9B) {
                 *out++ = '\'';
@@ -201,10 +225,10 @@ static const char *icon_symbol(const char *name)
 static const lv_font_t *font_for(int size)
 {
     if (size <= 0) size = 20;
-    if (size <= 16) return &lv_font_montserrat_14;
-    if (size <= 24) return &lv_font_montserrat_20;
-    if (size <= 38) return &lv_font_montserrat_28;
-    return &lv_font_montserrat_48;
+    if (size <= 16) return &lv_font_atalaia_14;
+    if (size <= 24) return &lv_font_atalaia_20;
+    if (size <= 38) return &lv_font_atalaia_28;
+    return &lv_font_atalaia_48;
 }
 
 /* Dark text on light backgrounds (yellow), white text on the rest. */

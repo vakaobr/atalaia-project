@@ -238,7 +238,7 @@ static void build(lv_obj_t *scr)
     static lv_image_dsc_t icon;
     lv_obj_t *img = image(bar, &icon, oled_icon_a8, OLED_ICON_W, OLED_ICON_H, lv_color_black());
     lv_obj_align(img, LV_ALIGN_LEFT_MID, 2, 0);
-    lv_obj_t *title = label(bar, &lv_font_montserrat_14, "MODEM MODE");
+    lv_obj_t *title = label(bar, &lv_font_atalaia_14, "MODEM MODE");
     lv_obj_set_style_text_color(title, lv_color_black(), 0);
     lv_obj_align(title, LV_ALIGN_LEFT_MID, OLED_ICON_W + 5, 0);
 
@@ -273,7 +273,7 @@ void modem_screen_splash(lv_obj_t *scr, const char *version)
     lv_obj_align(img, LV_ALIGN_LEFT_MID, 4, 0);
 
     const int32_t x = OLED_LOGO_W + 10;
-    lv_obj_t *name = label(scr, &lv_font_montserrat_20, "ATALAIA");
+    lv_obj_t *name = label(scr, &lv_font_atalaia_20, "ATALAIA");
     lv_obj_align(name, LV_ALIGN_TOP_LEFT, x, 8);
     lv_obj_t *mode = label(scr, &lv_font_unscii_8, "MODEM MODE");
     lv_obj_align_to(mode, name, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 4);

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # The bomb exploded: the whole screen in the winning team's colour.
-# Data: team (the arming team).
+# Data: team (the arming team); lang (pt or en) from the box.
 template: exploded
 style: { background: "{team || 'panel'}" }
 layout:
@@ -10,8 +10,11 @@ layout:
     icon: warning
     style: { font_size: 48, color: contrast }
   - type: label
-    text: EXPLODED
+    text: "{lang == 'pt' && 'EXPLODIU' || 'EXPLODED'}"
     style: { font_size: 48, color: contrast }
   - type: label
     text: "{team|upper} team wins"
-    style: { font_size: 28, color: contrast, visible: "{team}" }
+    style: { font_size: 28, color: contrast, visible: "{team && lang != 'pt'}" }
+  - type: label
+    text: "Vence a equipa {team|upper}"
+    style: { font_size: 28, color: contrast, visible: "{team && lang == 'pt'}" }
