@@ -50,6 +50,7 @@ int main(void)
     run_pod_tests();
     run_fw_update_tests();
     run_adoption_tests();
+    run_admin_pin_tests();
     run_box_pair_tests();
 
     if (check_failures == 0) {

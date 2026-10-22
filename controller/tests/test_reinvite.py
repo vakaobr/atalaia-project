@@ -407,5 +407,80 @@ class ReinviteTests(Case):
         self.assertGreater(listed["ignored"], 0)
 
 
-if __name__ == "__main__":
-    unittest.main()
+class GameOverTests(ReinviteTests):
+    """Decisions OT-7 and OT-13: when a game ends, GAME_OVER (its id and its key's tag) goes to its boxes
+    over the field radio, three times; a controller that restarted without the game's key ends the game
+    this way, and its box leaves it."""
+
+    def restart(self, **cfg) -> None:
+        self.client.close()
+        self.ctrl.stop()
+        for k, v in cfg.items():
+            setattr(self.cfg, k, v)
+        self.modem = FakeModem()
+        self.ctrl = Controller(self.cfg, self.store, modem=self.modem, core=CORE, clock=self.clock, join_key=JOIN_KEY)
+        self.client = TestClient(create_app(self.ctrl, Hub(), Auth(self.cfg.gm_token, self.cfg.read_token)))
+
+    def frames(self) -> list[dict]:
+        key = ff.field_key(JOIN_KEY)
+        return [ff.decode(key, f) for f in self.modem.fields]
+
+    def test_persisted_by_default(self):
+        self.assertTrue(config(self.tmp.name).persist_game_key)
+
+    def test_a_restart_without_the_key_still_ends_the_boxes_game(self):
+        self.cfg.persist_game_key = False
+        gid = self.game(assignments={"4": "zone"})
+        key = self.ctrl.game_key(gid)
+        self.assertEqual(self.box.join(bytes.fromhex(self.ctrl.issue_join({"role": "zone"}, node_id=4)["payload_hex"])),
+                         "accepted")
+        self.heard(4, device=self.box.device_id)
+        self.ctrl.start_game(gid)
+        self.box.start()
+        self.restart(persist_game_key=False)  # the Pi restarted, the key was not kept
+        self.assertTrue(self.ctrl.status()["key_lost"])
+        r = self.client.post(f"/api/v1/games/{gid}/end", headers=GM, json={})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual((r.json()["state"], r.json()["game_over_frame"]), ("ended", "sent"))
+        self.assertEqual(self.frames(), [{"kind": "game_over", "game_id": gid, "key_tag": ff.key_tag(key)}])
+        self.assertEqual(self.modem.channels, [])  # the game's channel is the field's: no retuning
+        while self.modem.fields:
+            self.box.on_frame(self.modem.fields.pop(0), self.ctrl.now_ms())
+        self.assertEqual(self.box.phase, "ended")
+        # Bounded: three in all, about 4 s apart; the box announces itself and is listed again.
+        sent = 1
+        for _ in range(int(25 / 0.05)):
+            self.clock.advance(0.05)
+            self.ctrl.tick()
+            sent += len(self.modem.fields)
+            self.modem.fields.clear()
+            for frame in self.box.tick(self.ctrl.now_ms()):
+                self.modem.on_field_rx(frame, -71, 6)
+        self.assertEqual(sent, lobby.GAME_OVER_REPEATS)
+        listed = self.client.get("/api/v1/boxes", headers=GM).json()["boxes"]
+        self.assertEqual([(b["name"], b["last_game"]) for b in listed], [("Zona Norte", gid)])
+        self.assertIsNone(self.store.get_setting(f"key_tag:{gid}"))
+
+    def test_after_every_end_and_on_the_games_channel(self):
+        gid = self.game(assignments={"4": "zone"})
+        key = self.ctrl.game_key(gid)
+        self.ctrl.start_game(gid, force=True)
+        # The field's channel is another by the time the game ends (chosen while it ran, as a
+        # standby's could be); the game's boxes still listen where it was made.
+        self.store.set_setting("radio.channel_hz", "868100000")
+        self.modem.channels.clear()
+        out = self.ctrl.end_game(gid)
+        self.assertEqual(out["game_over_frame"], "sent")
+        self.assertEqual(self.frames(), [{"kind": "game_over", "game_id": gid, "key_tag": ff.key_tag(key)}])
+        self.assertEqual(self.modem.channels, [869_525_000])  # its boxes listen on the game's channel
+        for _ in range(int(15 / 0.05)):
+            self.clock.advance(0.05)
+            self.ctrl.tick()
+        self.assertEqual(len(self.modem.fields), lobby.GAME_OVER_REPEATS)
+        self.assertEqual(self.modem.channels, [869_525_000, 868_100_000])  # then back on the field's
+
+    def test_no_radio_and_a_standby(self):
+        gid = self.game(assignments={"4": "zone"})
+        self.modem.state = "down"
+        self.assertEqual(self.ctrl.end_game(gid)["game_over_frame"], "no_radio")
+        self.assertEqual(self.modem.fields, [])

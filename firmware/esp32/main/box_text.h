@@ -135,6 +135,10 @@ typedef enum {
     TX_RESTARTING,
     TX_UPDATE_FAILED,
     TX_UPDATE_REFUSED,
+    TX_PIN_LOCKED,    /* the admin PIN's wait (decision AD-28) */
+    TX_TRY_IN_MIN,    /* "%lu": minutes */
+    TX_NO_ADMIN_PIN,  /* a Field Box with no admin PIN set (AD-29) */
+    TX_SET_ADMIN_PIN, /* how to set one */
     /* the on-board OLED (16 characters a line) */
     TXO_ADMIN_PIN,
     TXO_WRONG_PIN,
@@ -157,6 +161,10 @@ typedef enum {
     TXO_KEY_PICKER,
     TXO_NOT_STARTED,
     TXO_HOLD_TO_CAPTURE,
+    TXO_PIN_LOCKED,
+    TXO_AGAIN_IN_MIN, /* "%lu": minutes */
+    TXO_NO_PIN,
+    TXO_SET_PIN,
     TX_COUNT,
 } box_text_id_t;
 

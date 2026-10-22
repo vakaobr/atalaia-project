@@ -15,7 +15,7 @@ layout:
   - type: spacer
     height: fill
   - type: label
-    text: "{lang == 'pt' && 'NEUTRA' || 'NEUTRAL'}"
+    text: "{lang == 'pt' && 'LIVRE' || 'NEUTRAL'}"
     style: { font_size: 48 }
   - type: label
     text: "{lang == 'pt' && 'Mantém premido' || 'Hold to capture'}"

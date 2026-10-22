@@ -216,7 +216,7 @@ export class AdoptPanel extends Component {
                     <span class="muted small">${b.port}</span><br />
                     <span data-testid="adopt-box-state">${this.stateText(b)}</span>
                     ${b.busy && html` · <span class="notice">${t('adopt.busy')}</span>`}
-                    ${b.locked && html` · <span class="notice">${t('adopt.locked')}</span>`}
+                    ${b.locked && html` · <span class="notice">${t('adopt.locked', { min: b.locked_min || 1 })}</span>`}
                     ${b.relation !== 'this_field' && !b.busy && html` <button type="button" data-testid="adopt-box-adopt"
                         onClick=${() => this.setState({ confirm: b, pin: '', result: null })}>${t('adopt.adopt')}</button>`}
                 </li>`)}

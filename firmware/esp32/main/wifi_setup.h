@@ -32,6 +32,13 @@ void wifi_setup_stop(void);
 void wifi_setup_set_join_key_handler(bool (*handler)(const char *hex));
 
 /*
+ * Why the form's admin PIN is refused, or NULL: 4-8 digits, and not one too easy to guess
+ * (admin_pin_weak: 1234, 0000, a sequence, a repeated pair). A Field Box has no default
+ * PIN; this is where its first one is set (decision AD-29).
+ */
+const char *wifi_setup_pin_problem(const char *pin);
+
+/*
  * Parse a single field from a URL-encoded form body (e.g. "name=val&k2=v2").
  * URL-decodes %XX sequences and '+' (space). Copies at most out_sz-1 bytes
  * into out and NUL-terminates.

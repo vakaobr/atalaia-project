@@ -631,7 +631,23 @@ static void update_pin_entry(const char *data)
         set_bg(dot, filled ? COLOR_ACCENT : COLOR_BG);
         lv_obj_set_style_border_color(dot, lv_color_hex(filled ? COLOR_ACCENT : COLOR_MUTED), 0);
     }
-    show(slot[1 + PIN_DOTS], screen_json_true(data, "error"));
+    /* The wait after wrong PINs, or no PIN set (decisions AD-28, AD-29): said in place of the
+     * prompt and the error line. */
+    long wait_min = 0;
+    char line[64];
+    if (screen_json_true(data, "no_pin")) {
+        lv_label_set_text(slot[0], box_text(TX_NO_ADMIN_PIN));
+        lv_label_set_text(slot[1 + PIN_DOTS], box_text(TX_SET_ADMIN_PIN));
+        show(slot[1 + PIN_DOTS], true);
+    } else if (screen_json_int(data, "locked_min", &wait_min) && wait_min > 0) {
+        lv_label_set_text(slot[0], box_text(TX_PIN_LOCKED));
+        snprintf(line, sizeof(line), box_text(TX_TRY_IN_MIN), (unsigned long)wait_min);
+        lv_label_set_text(slot[1 + PIN_DOTS], line);
+        show(slot[1 + PIN_DOTS], true);
+    } else {
+        lv_label_set_text(slot[1 + PIN_DOTS], box_text(TX_WRONG_PIN_AGAIN));
+        show(slot[1 + PIN_DOTS], screen_json_true(data, "error"));
+    }
 }
 
 /* ---- code_entry: a mode's code typed on the keypad -------------------- */

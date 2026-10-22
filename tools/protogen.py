@@ -1419,7 +1419,8 @@ def gen_pair_vectors(pv: dict[str, Any]) -> str:
 
 
 FIELD_FRAME_VECTORS = REPO / "protocol" / "vectors" / "field_frame.json"
-FF_KINDS = {"announce": "ATALAIA_FF_ANNOUNCE", "discover": "ATALAIA_FF_DISCOVER", "invite": "ATALAIA_FF_INVITE"}
+FF_KINDS = {"announce": "ATALAIA_FF_ANNOUNCE", "discover": "ATALAIA_FF_DISCOVER", "invite": "ATALAIA_FF_INVITE",
+            "game_over": "ATALAIA_FF_GAME_OVER"}
 FF_RESULTS = ("accepted", "busy", "refused", "no_mode", "not_box", "storage", "radio", "ended")
 
 
@@ -1469,13 +1470,13 @@ def gen_field_frame_vectors(fv: dict[str, Any]) -> str:
         init = [f".kind = {FF_KINDS[f['kind']]}"]
         if f["kind"] == "announce":
             init.append(".battery_pct = " + str(f.get("battery_pct", 255)))
-        for key in ("device_id", "token"):
+        for key in ("device_id", "token", "key_tag"):
             if key in f:
                 init.append(f".{key} = {braces(f[key])}")
         for key in ("name", "last_role"):
             if key in f:
                 init.append(f".{key} = {c_string(f[key])}")
-        for key in ("tier", "last_game", "answer", "invite_id", "part", "parts"):
+        for key in ("tier", "last_game", "answer", "invite_id", "part", "parts", "game_id"):
             if key in f:
                 init.append(f".{key} = {f[key]}")
         if "result" in f:

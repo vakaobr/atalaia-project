@@ -12,6 +12,8 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "admin_pin.h"
+
 /* ------------------------------------------------------------------ */
 /* URL-encoded form parsing (platform-independent)                     */
 /* ------------------------------------------------------------------ */
@@ -63,6 +65,16 @@ bool parse_form_field(const char *body, const char *key, char *out, int out_sz)
         if (p) p++; /* advance past '&' */
     }
     return false;
+}
+
+const char *wifi_setup_pin_problem(const char *pin)
+{
+    const char *why = admin_pin_weak(pin);
+    if (why == NULL) return NULL;
+    if (strcmp(why, "length") == 0 || strcmp(why, "digits") == 0) return "PIN must be 4-8 digits";
+    /* No default admin PIN on a Field Box (decision AD-29): 1234 and the like are refused. */
+    return "Choose another admin PIN: 1234, 0000, a sequence or a repeated pair is too easy to "
+           "guess";
 }
 
 /* ------------------------------------------------------------------ */
@@ -118,15 +130,6 @@ static bool is_valid_region(const char *r)
     return false;
 }
 
-static bool is_digits_only(const char *s)
-{
-    if (!s || !*s) return false;
-    for (const char *p = s; *p; p++) {
-        if (*p < '0' || *p > '9') return false;
-    }
-    return true;
-}
-
 static int parse_int_clamped(const char *s, int lo, int hi, int fallback)
 {
     if (!s || !*s) return fallback;
@@ -174,9 +177,10 @@ static esp_err_t config_post_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    if (!parse_form_field(buf, "pin", pin, sizeof(pin)) || !is_digits_only(pin) ||
-        strlen(pin) < 4 || strlen(pin) > 8) {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "PIN must be 4-8 digits");
+    if (!parse_form_field(buf, "pin", pin, sizeof(pin))) pin[0] = '\0';
+    const char *pin_problem = wifi_setup_pin_problem(pin);
+    if (pin_problem != NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, pin_problem);
         return ESP_FAIL;
     }
 

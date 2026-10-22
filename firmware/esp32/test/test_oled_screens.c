@@ -46,6 +46,10 @@ static const oled_case_t cases[] = {
     {"pin_entry", NULL, "pin_entry", "{\"digits\":0,\"error\":false}"},
     {"pin_entry_typed", NULL, "pin_entry", "{\"digits\":3,\"error\":false}"},
     {"pin_entry_wrong", NULL, "pin_entry", "{\"digits\":0,\"error\":true}"},
+    {"pin_entry_locked", NULL, "pin_entry", "{\"digits\":0,\"error\":false,\"locked_min\":60}"},
+    {"pin_entry_locked_pt", NULL, "pin_entry", "{\"digits\":0,\"error\":false,\"locked_min\":60}"},
+    {"pin_entry_no_pin", NULL, "pin_entry", "{\"digits\":0,\"error\":false,\"no_pin\":true}"},
+    {"pin_entry_no_pin_pt", NULL, "pin_entry", "{\"digits\":0,\"error\":false,\"no_pin\":true}"},
     {"preset_select", NULL, "preset_select",
      "{\"presets\":[\"Bomb\",\"Domination\",\"Hold-All Domination\",\"Last Stand\",\"Codes\","
      "\"Kill Confirmed\",\"Respawn and Lives\",\"Player Check-in\",\"Medic Kit\"],"

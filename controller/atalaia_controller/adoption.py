@@ -229,6 +229,9 @@ class Adoption:
                 "fw": str(info.get("fw", "")), "state": info.get("state"), "field": field,
                 "field_name": str(info.get("field_name", "")), "relation": relation,
                 "busy": bool(info.get("busy")), "locked": bool(info.get("locked")),
+                # Older boxes say neither (decisions AD-28, AD-29): a wait of 1 min, a PIN set.
+                "locked_min": int(info.get("locked_min") or 1) if info.get("locked") else 0,
+                "pin_set": info.get("pin_set") is not False,
                 "usb_serial": usb_serial}
 
     def scan(self) -> dict[str, Any]:

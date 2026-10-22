@@ -149,6 +149,7 @@ const char *adopt_result_name(adopt_result_t r)
     case ADOPT_BAD_KEY: return "bad_key";
     case ADOPT_BAD_CARD: return "bad_card";
     case ADOPT_STORE_FAILED: return "store_failed";
+    case ADOPT_NO_PIN: return "no_pin";
     }
     return "?";
 }
@@ -157,7 +158,13 @@ void adoption_init(adoption_t *a, const adoption_ops_t *ops, const char *admin_p
 {
     memset(a, 0, sizeof(*a));
     if (ops != NULL) a->ops = *ops;
-    snprintf(a->admin_pin, sizeof(a->admin_pin), "%s", admin_pin ? admin_pin : "");
+    admin_pin_init(&a->own_pin, NULL, admin_pin);
+    a->pin = &a->own_pin;
+}
+
+void adoption_set_pin(adoption_t *a, admin_pin_t *pin)
+{
+    a->pin = pin != NULL ? pin : &a->own_pin;
 }
 
 static void set_name(char dst[ADOPTION_NAME_MAX + 1], const char *name)
@@ -181,18 +188,6 @@ static void say(adoption_t *a, const char *line)
     if (a->ops.log) a->ops.log(a->ops.ctx, line);
 }
 
-static bool pin_matches(const adoption_t *a, const char *pin)
-{
-    /* Over the whole buffer, so the time does not tell how many characters matched. */
-    char given[ADOPTION_PIN_MAX + 1] = {0};
-    char want[ADOPTION_PIN_MAX + 1] = {0};
-    size_t n = strlen(pin);
-    if (n == 0 || n > ADOPTION_PIN_MAX || a->admin_pin[0] == '\0') return false;
-    memcpy(given, pin, n);
-    memcpy(want, a->admin_pin, strlen(a->admin_pin));
-    return same_bytes((const uint8_t *)given, (const uint8_t *)want, sizeof(given));
-}
-
 adopt_result_t adoption_offer(adoption_t *a, const uint8_t key[ADOPTION_KEY_SIZE], const char *name,
                               const char *pin)
 {
@@ -204,16 +199,20 @@ adopt_result_t adoption_offer(adoption_t *a, const uint8_t key[ADOPTION_KEY_SIZE
         if (nm[0] == '\0' || strcmp(nm, a->name) == 0) return ADOPT_SAME;
         ok = ADOPT_SAME; /* the same field, renamed: store the new name */
     } else if (a->adopted) {
-        if (a->pin_failures >= ADOPTION_PIN_TRIES) return ADOPT_LOCKED;
+        /* The admin PIN (admin_pin.h): none set on a Field Box moves it nowhere; a wait
+         * refuses before anything is compared or counted. */
+        if (!admin_pin_is_set(a->pin)) return ADOPT_NO_PIN;
+        if (admin_pin_wait_ms(a->pin) > 0) return ADOPT_LOCKED;
         if (pin == NULL || pin[0] == '\0') return ADOPT_NEED_PIN;
-        if (!pin_matches(a, pin)) {
-            a->pin_failures++;
-            return a->pin_failures >= ADOPTION_PIN_TRIES ? ADOPT_LOCKED : ADOPT_BAD_PIN;
+        switch (admin_pin_check(a->pin, pin)) {
+        case ADMIN_PIN_OK: break;
+        case ADMIN_PIN_STORE_FAILED: return ADOPT_STORE_FAILED;
+        case ADMIN_PIN_NOT_SET: return ADOPT_NO_PIN;
+        default: return admin_pin_wait_ms(a->pin) > 0 ? ADOPT_LOCKED : ADOPT_BAD_PIN;
         }
         ok = ADOPT_READOPTED;
     }
     if (a->ops.store == NULL || !a->ops.store(a->ops.ctx, key, nm)) return ADOPT_STORE_FAILED;
-    a->pin_failures = 0;
     a->adopted = true;
     memcpy(a->key, key, ADOPTION_KEY_SIZE);
     set_name(a->name, nm);
@@ -236,6 +235,21 @@ static void show_result(adoption_t *a, adopt_result_t r, uint32_t now_ms)
         {ADOPT_BAD_KEY, TX_NOT_ADOPTED},     {ADOPT_BAD_CARD, TX_BAD_FIELD_CARD},
         {ADOPT_STORE_FAILED, TX_NOT_STORED}, {ADOPT_NEED_PIN, TX_ADMIN_PIN_NEEDED},
     };
+    if (r == ADOPT_LOCKED || r == ADOPT_NO_PIN) {
+        /* The PIN's own screen: how long it is locked for, or that none is set (AD-28, AD-29). */
+        char pin_data[96];
+        if (r == ADOPT_LOCKED) {
+            snprintf(pin_data, sizeof(pin_data),
+                     "{\"digits\":0,\"error\":false,\"locked_min\":%lu}",
+                     (unsigned long)admin_pin_wait_min(a->pin));
+        } else {
+            snprintf(pin_data, sizeof(pin_data), "{\"digits\":0,\"error\":false,\"no_pin\":true}");
+        }
+        if (a->ops.screen) a->ops.screen(a->ops.ctx, "pin_entry", pin_data);
+        a->overlay = true;
+        a->overlay_until_ms = now_ms + ADOPTION_SCREEN_MS;
+        return;
+    }
     const char *title = box_text(TX_ADOPTION);
     for (size_t i = 0; i < sizeof(titles) / sizeof(titles[0]); i++) {
         if (titles[i].r == r) title = box_text(titles[i].title);
@@ -449,9 +463,12 @@ bool adoption_command(adoption_t *a, const char *cmd, const adoption_identity_t 
         bool busy = a->ops.busy && a->ops.busy(a->ops.ctx);
         snprintf(reply, cap,
                  ADOPTION_REPLY_PREFIX "{\"v\":1,\"kind\":\"info\",\"name\":\"%s\",\"mac\":\"%s\","
-                                       "\"fw\":\"%s\",%s,\"busy\":%s,\"locked\":%s}",
+                                       "\"fw\":\"%s\",%s,\"busy\":%s,\"locked\":%s,"
+                                       "\"locked_min\":%lu,\"pin_set\":%s}",
                  name, mac, fw, state, busy ? "true" : "false",
-                 a->pin_failures >= ADOPTION_PIN_TRIES ? "true" : "false");
+                 admin_pin_wait_ms(a->pin) > 0 ? "true" : "false",
+                 (unsigned long)admin_pin_wait_min(a->pin),
+                 admin_pin_is_set(a->pin) ? "true" : "false");
         return true;
     }
     bool adopt = strncmp(cmd, "adopt ", 6) == 0;
@@ -495,12 +512,16 @@ bool adoption_command(adoption_t *a, const char *cmd, const adoption_identity_t 
     memset(key, 0, sizeof(key));
     memset(pin, 0, sizeof(pin));
     log_result(a, adopt ? "usb" : "joinkey", r);
-    if (adopt_result_ok(r) || r == ADOPT_LOCKED || r == ADOPT_BAD_PIN) show_result(a, r, now_ms);
+    if (adopt_result_ok(r) || r == ADOPT_LOCKED || r == ADOPT_BAD_PIN || r == ADOPT_NO_PIN) {
+        show_result(a, r, now_ms);
+    }
     if (joinkey) {
         snprintf(reply, cap, "join key: %s",
                  adopt_result_ok(r) ? "stored"
                  : r == ADOPT_NEED_PIN
                      ? "refused (adopted to another field: \"@adopt <key> <admin PIN>\")"
+                 : r == ADOPT_NO_PIN
+                     ? "refused (adopted to another field, and no admin PIN is set: \"@admin-pin\")"
                  : r == ADOPT_BAD_KEY ? "refused (64 hex digits)"
                  : r == ADOPT_BUSY    ? "refused while a game is joined"
                                       : adopt_result_name(r));

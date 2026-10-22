@@ -551,8 +551,11 @@ At boot the firmware stores a preset, with the defaults from its
 or erased box and every Wokwi run get all thirteen, in that order; a box
 updated to a firmware with more modes gets the new ones in free slots), and
 replaces the stored script of a built-in mode when the image has a
-different one (`main/builtin_presets.c`). The default admin PIN is 1234
-until the setup portal sets one. The keypad picker shows nine presets a
+different one (`main/builtin_presets.c`). A Field Box has no default admin
+PIN: the setup portal sets it and refuses 1234 and other easy ones; bench
+and Wokwi builds use 1234 when none is stored (`main/admin_pin.c`, decisions
+AD-28 to AD-31: wrong PINs counted in NVS, waits of 1, 2, 4 ... 60 minutes
+after five in a row, `@admin-pin` on the USB console). The keypad picker shows nine presets a
 page (keys 1-9 on every page); with more than nine, `0` turns to the next
 page, and the header shows the page (`CHOOSE A GAME 1/2`), so the tenth,
 Master and Satellites, is the first entry of the second page (decision
@@ -644,8 +647,9 @@ controller's game.
   portal's field follow the same rules. An unadopted box (none stored; a
   development key does not count) takes the first field; an adopted box takes
   the same field again and another field's key only with its admin PIN (on
-  the keypad after the card, or in `@adopt`; five wrong ones lock it until a
-  restart); nothing while a game is joined or played, and a field card tapped
+  the keypad after the card, or in `@adopt`; after five wrong ones in a row
+  each try waits 1, 2, 4 ... 60 minutes, counted in NVS across restarts; a
+  Field Box with no admin PIN set moves nowhere: `no_pin`); nothing while a game is joined or played, and a field card tapped
   during a game is ignored, never a player tag. The screen shows ADOPTED with
   the field's name and its key's fingerprint (`XXXX-XXXX`), or asks for the
   PIN. The key stays in the "radio" NVS namespace, the name in `field_name`;
@@ -698,7 +702,8 @@ controller's game.
 - **Screens through a game** -- (decisions BN-6, BN-10 to BN-14) a free
   adopted box shows "Ready / next game" from boot (a key brings the game
   picker); joined or invited, "Waiting: the game hasn't started"; at the start
-  "Game on" until the mode draws (a zone: "Neutral: hold to capture" or the
+  "Game on" until the mode draws (a zone: "Neutral: hold to capture", in
+  Portuguese "Livre: mantém premido", or the
   team holding it, never the Bomb's "standby"); the mode's game over; then
   "Ready" again. In the field's language, English or European Portuguese (join
   key 15, kept between games; `main/box_text.c`, fonts with the Portuguese
@@ -716,7 +721,12 @@ controller's game.
   and its current or previous token, in 1-3 parts, brings a join payload,
   which goes through the card's checks; a box in a game answers "busy", an
   old token gets no answer, a game it played to the end is refused. The box
-  answers how it went, and joins: "Invited / game: role" on its screen. 30 s
+  answers how it went, and joins: "Invited / game: role" on its screen. In a
+  game it takes a **GAME_OVER** (kind 4) for its game id and its game key's
+  tag, which a controller sends when a game ends, also one whose key it lost in
+  a restart: the box ends the game as on CMD end; another game's, or one for
+  its game id under another key (played back), changes nothing (decisions
+  OT-7, OT-13; no timeout ever ends a game on the box). 30 s
   after a game ends the final screen gives way to "Ready / next game". `@lobby`
   on the serial console prints the device id, whether the box is free, its
   channel and its invites. A field frame's nonce is the device id's pseudonym,

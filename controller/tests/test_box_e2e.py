@@ -215,6 +215,62 @@ class FieldTests(unittest.TestCase):
         self.assertEqual(self.client.post(f"/api/v1/games/{gid2}/start", headers=GM).status_code, 200)
         self.assertTrue(wait_for(lambda: box.status()["phase"] == 2 and box.status()["game_id"] == gid2, 5))
 
+    def restart_controller(self, **cfg) -> None:
+        """The Pi restarts: a new Controller on the same store, modem and field join key."""
+        self.client.close()
+        self.ctrl.stop()
+        for k, v in cfg.items():
+            setattr(self.cfg, k, v)
+        self.ctrl = Controller(self.cfg, self.store, modem=self.modem, core=CORE, join_key=JOIN_KEY)
+        self.client = TestClient(create_app(self.ctrl, Hub(), Auth(self.cfg.gm_token, self.cfg.read_token)))
+        self.ctrl.start()
+
+    def test_a_controller_restart_in_the_middle_of_a_game(self):
+        """Decision OT-7 (a): persist_game_key is on by default, so a controller that restarts in the
+        middle of a game takes it up again: the box is still heard (a capture after the restart is
+        logged), and the GM's end reaches it."""
+        gid = self.game()
+        box = self.box("alpha")
+        nid = self.join(box)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
+        box.hold(1, 1300)
+        self.assertTrue(wait_for(lambda: "zone.captured" in self.log_types(gid, nid), 6))
+        self.restart_controller()
+        self.assertFalse(self.client.get("/api/v1/controller", headers=GM).json()["key_lost"])
+        box.hold(2, 1300)
+        self.assertTrue(wait_for(lambda: self.log_types(gid, nid).count("zone.captured") == 2, 10), box.lines[-8:])
+        r = self.client.post(f"/api/v1/games/{gid}/end", headers=GM, json={})
+        self.assertEqual((r.status_code, r.json()["game_over_frame"]), (200, "sent"))
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 0, 10), box.lines[-8:])
+
+    def test_a_restart_without_the_key_ends_the_game_over_the_field_radio(self):
+        """Decision OT-7 (b), found on the bench: a controller that restarted without the game's key
+        (persist_game_key = false) could not end the game, and its box stayed in it until it was
+        erased. The GM's End now sends GAME_OVER (the game id and its key's tag, sealed under the
+        field key) through the C host modem: the C box leaves the game and announces itself free."""
+        self.cfg.persist_game_key = False
+        gid = self.game()
+        box = self.box("alpha", "--announce-ms", "400")
+        self.join(box)
+        self.assertEqual(self.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True}).status_code, 200)
+        self.assertTrue(wait_for(lambda: box.status()["phase"] == 2, 5))
+        self.restart_controller()
+        self.assertTrue(self.client.get("/api/v1/controller", headers=GM).json()["key_lost"])
+        self.assertFalse(box.status()["available"])
+        r = self.client.post(f"/api/v1/games/{gid}/end", headers=GM, json={})
+        self.assertEqual((r.status_code, r.json()["game_over_frame"]), (200, "sent"), r.text)
+        self.assertTrue(wait_for(lambda: box.logged(f"game {gid} is over (said by a field controller)"), 5),
+                        box.lines[-8:])
+        self.assertTrue(wait_for(lambda: box.status()["available"], 5))
+        device = box.status()["device_id"]
+
+        def listed():
+            return [b for b in self.client.get("/api/v1/boxes", headers=GM).json()["boxes"]
+                    if b["device_id"] == device]
+        self.assertTrue(wait_for(lambda: listed(), 8))
+        self.assertEqual(listed()[0]["last_game"], gid)
+
     def test_join_play_reboot_end(self):
         gid = self.game()
         box = self.box("alpha")

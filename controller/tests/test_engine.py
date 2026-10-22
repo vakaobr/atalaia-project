@@ -107,7 +107,7 @@ class GameLifecycleTests(EngineCase):
         self.assertEqual((gid, node, epoch, hops, channel), (game["id"], 0, 1, 2, 869_525_000))
         self.assertEqual(len(key), 16)
         self.assertEqual(self.ctrl.game_key(game["id"]), key)
-        self.assertIsNone(self.store.game_key(game["id"]))  # not on disk by default
+        self.assertEqual(self.store.game_key(game["id"]), key)  # kept on disk by default (OT-7)
         with self.assertRaises(Conflict):
             self.create()
 
@@ -307,16 +307,32 @@ class RestartTests(EngineCase):
         self.assertIsNone(self.store.game_key(gid))
 
     def test_lost_key_only_allows_ending(self):
+        self.reopen(persist_game_key=False)
         gid = self.create()["id"]
+        self.assertIsNone(self.store.game_key(gid))  # never on disk with persist_game_key = false
         self.ctrl.start_game(gid, force=True)
-        self.reopen()
+        self.reopen(persist_game_key=False)
         self.assertTrue(self.ctrl.status()["key_lost"])
         with self.assertRaises(Conflict):
             self.ctrl.pause_game(gid)
         with self.assertRaises(Conflict):
             self.create()
-        self.assertEqual(self.ctrl.end_game(gid)["state"], "ended")
+        out = self.ctrl.end_game(gid)
+        # No field join key here: no GAME_OVER either (test_reinvite.GameOverTests sends one).
+        self.assertEqual((out["state"], out["game_over_frame"]), ("ended", "no_join_key"))
         self.create()
+
+    def test_the_default_survives_a_restart(self):
+        """Decision OT-7: persist_game_key is on by default; a restart mid-game carries on."""
+        self.assertTrue(self.cfg.persist_game_key)
+        gid = self.create()["id"]
+        self.ctrl.start_game(gid, force=True)
+        self.reopen()
+        self.assertFalse(self.ctrl.status()["key_lost"])
+        self.assertEqual(self.ctrl.game["state"], "running")
+        self.ctrl.pause_game(gid)
+        self.assertEqual(self.ctrl.end_game(gid)["state"], "ended")
+        self.assertIsNone(self.store.game_key(gid))  # the key does not outlive the game
 
 
 FIELD_LUA = """

@@ -113,6 +113,12 @@ static const screen_case_t cases[] = {
      "{\"title\":\"Adotada\",\"field\":\"Campo da Atalaia\",\"fingerprint\":\"604A-0A95\"}", NULL},
     {"pin_entry", "pin_entry", "{\"digits\":2,\"error\":false}", NULL},
     {"pin_entry_wrong", "pin_entry", "{\"digits\":0,\"error\":true}", NULL},
+    /* The admin PIN after five wrong ones (a wait), and a Field Box with none set (AD-28, AD-29).
+     */
+    {"pin_entry_locked", "pin_entry", "{\"digits\":0,\"error\":false,\"locked_min\":8}", NULL},
+    {"pin_entry_locked_pt", "pin_entry", "{\"digits\":0,\"error\":false,\"locked_min\":8}", NULL},
+    {"pin_entry_no_pin", "pin_entry", "{\"digits\":0,\"error\":false,\"no_pin\":true}", NULL},
+    {"pin_entry_no_pin_pt", "pin_entry", "{\"digits\":0,\"error\":false,\"no_pin\":true}", NULL},
     /* Adoption (adoption.c, protocol/adoption.md): adopted, and another field's card. */
     {"status_adopted", "status",
      "{\"title\":\"Adopted\",\"field\":\"Campo da Atalaia\",\"fingerprint\":\"604A-0A95\"}", NULL},

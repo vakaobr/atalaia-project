@@ -150,6 +150,33 @@ class ReinviteSimTests(unittest.TestCase):
         self.assertIn(f"invite {self.inviter.invites[self.box.device_id.hex()].invite_id} refused: an old token",
                       self.box.log)
 
+    def test_game_over_frees_a_box_whose_controller_lost_the_key(self):
+        """Decision OT-13: a controller that restarted without the game's key still has the field
+        key; its GAME_OVER (the game id and the key's tag, three times, a few seconds apart) ends the
+        box's game, and the box announces itself again. Another game's, or the same id under
+        another key (an old one played back), changes nothing."""
+        self.assertEqual(self.box.join(join_payload(1, self.key1, 4)), "accepted")
+        self.box.start()
+        self.run_for(1_000)
+        self.inviter.game_over(1, ff.key_tag(self.key2), self.now)  # the id, but another game's key
+        self.inviter.game_over(7, ff.key_tag(self.key1), self.now)  # another game
+        self.run_for(13_000)
+        self.assertEqual(self.box.phase, "playing")
+        tunes: list = []
+        self.inviter.tune = lambda ch: tunes.append(ch) or True
+        start = len(self.sent)
+        go = self.inviter.game_over(1, ff.key_tag(self.key1), self.now, channel_hz=eu868.DEFAULT_CHANNEL_HZ)
+        self.run_for(500)
+        self.assertEqual(self.box.phase, "ended")
+        self.assertIn("game 1 is over (said by a field controller)", self.box.log)
+        self.run_for(12_000)
+        # Bounded: three frames, about 4 s apart; then the radio goes back.
+        self.assertEqual((go.sent, len(self.sent) - start), (lobby.GAME_OVER_REPEATS, 3))
+        self.assertEqual(tunes[-1], None)
+        self.assertEqual(self.inviter.games_over, [])
+        self.run_for(21_000)
+        self.assertEqual([(b.name, b.last_game) for b in self.inviter.available(self.now)], [("Zona Norte", 1)])
+
     def test_the_same_game_again_is_refused(self):
         """A box that played a game to its end does not join it again, even with a valid token."""
         self.play_first_game()

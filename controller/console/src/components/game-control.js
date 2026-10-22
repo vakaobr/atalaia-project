@@ -245,6 +245,11 @@ export class GameControl extends Component {
         return this.props.app.call('POST', `/games/${game.id}/${action}`, body).then((g) => {
             if (g) this.props.app.setGame(g);
             else if (action === 'start') this.props.app.refreshGame(); // what is missing now
+            // A game ended without its key: say whether its boxes heard GAME_OVER (decision OT-13).
+            if (g && action === 'end' && game.key_lost && g.game_over_frame) {
+                this.props.app.showToast(g.game_over_frame === 'sent' ? t('game.over_told')
+                    : t('game.over_not_told', { why: g.game_over_frame }));
+            }
             return !!g;
         });
     }
@@ -299,6 +304,7 @@ export class GameControl extends Component {
             </dl>
             <${GameSettings} app=${app} game=${game} review=${app.state.reviewSettings || 0} />
             ${game.joined && html`<p class="notice">${t('game.standby_notice')}</p>`}
+            ${game.key_lost && html`<p class="notice" data-testid="game-key-lost">${t('game.key_lost_notice')}</p>`}
             ${s === 'ready' && !game.joined && html`<${StartCheck} game=${game} />`}
             ${gm && html`<div class="actions" data-testid="game-actions">
                 ${s === 'ready' && this.renderStart(game, pending, leading)}
@@ -309,7 +315,8 @@ export class GameControl extends Component {
                 ${s === 'paused' && html`<${ConfirmButton} testid="game-resume" class="primary" label=${t('game.resume')}
                     question=${t('game.confirm_resume')} disabled=${!leading} onConfirm=${() => this.lifecycle('resume')} />`}
                 <${ConfirmButton} testid="game-end" class="danger" label=${game.joined && !leading ? t('game.leave') : t('game.end')}
-                    question=${t('game.confirm_end')} onConfirm=${() => this.lifecycle('end', {})} />
+                    question=${game.key_lost ? t('game.confirm_end_key_lost') : t('game.confirm_end')}
+                    onConfirm=${() => this.lifecycle('end', {})} />
             </div>`}
             ${gm && !leading && html`<p class="notice">${t('game.not_leader')}</p>`}
             ${gm && leading && html`<${Broadcast} app=${app} />`}

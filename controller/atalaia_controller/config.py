@@ -10,7 +10,7 @@
     power_source = 3            # 3 mains, 2 large battery, 1 small battery
     battery_pct = 100
     storage_ok = true
-    persist_game_key = false    # keep the game key in SQLite to survive a restart
+    persist_game_key = true     # keep the live game's key in SQLite: it survives a restart (OT-7)
 
     [radio]
     channel_hz = 869525000      # the field's channel until the GM chooses one in the console
@@ -175,7 +175,7 @@ class Config:
     power_source: int = 3
     battery_pct: int = 100
     storage_ok: bool = True
-    persist_game_key: bool = False
+    persist_game_key: bool = True  # decision OT-7 (2026-10-22): on by default
     tick_interval_s: float = 0.1
     # [radio]
     channel_hz: int = eu868.DEFAULT_CHANNEL_HZ

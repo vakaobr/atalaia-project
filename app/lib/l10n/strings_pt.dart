@@ -296,7 +296,7 @@ const Map<String, String> ptStrings = {
   'event.game.resume': 'O jogo recomeçou',
   'event.game.end': 'O jogo terminou',
   'event.zone.captured': 'A equipa {team} capturou {zone}',
-  'event.zone.neutralized': '{zone} ficou neutra',
+  'event.zone.neutralized': '{zone} ficou livre',
   'event.bomb.armed': 'Bomba armada pela equipa {team} ({fuse} s)',
   'event.bomb.defused': 'Bomba desarmada pela equipa {team}',
   'event.bomb.exploded': 'A bomba explodiu',

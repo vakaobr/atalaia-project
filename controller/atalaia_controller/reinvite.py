@@ -16,6 +16,11 @@ simulator's radio-model tests also run.
 The previous game's boxes (to pre-select in the console) are the nodes of
 the most recent other game whose HELLO carried a device id, with their roles.
 Nothing here is stored: invites last as long as the controller runs.
+
+When a game ends, GAME_OVER says so to its boxes (decisions OT-7, OT-13): the
+game id and its key's tag, sealed under the field key, three times, on the
+game's channel. A controller that restarted without the game's key can still
+end it this way; with the key, it follows the game's own CMD end.
 """
 
 from __future__ import annotations
@@ -35,12 +40,18 @@ log = logging.getLogger("atalaia.reinvite")
 DEVICE_HEX_LEN = 2 * ff.DEVICE_SIZE
 
 
+def ff_repeats() -> int:
+    return lobby.GAME_OVER_REPEATS
+
+
 class Reinvite:
     def __init__(self, controller: "Controller") -> None:
         self.ctl = controller
         self.inviter = lobby.Inviter(controller.join_key, self._send, nonces=self._nonces())
         self.inviter.on_change = self._changed
+        self.inviter.tune = self._tune
         self._pending_emit: set[str] = set()
+        self._tuned: Optional[int] = None  # the channel a GAME_OVER took the modem to
 
     def _nonces(self) -> ff.NonceSource:
         """This controller's field frame nonces (decisions RJ-7, RJ-15): a sender id fresh from
@@ -85,6 +96,36 @@ class Reinvite:
         if inv is not None:
             log.info("box %s joined game %d as node %d (%s)", inv.device_id.hex(), inv.game_id, node_id, inv.role)
         self._flush()
+
+    def game_over(self, game_id: int, key_tag: bytes, channel_hz: Optional[int]) -> bool:
+        """Tells the game's boxes it is over (GAME_OVER, decision OT-13); False without a radio."""
+        modem = self.ctl.modem
+        if modem is None or not modem.is_up or not getattr(modem, "has_field_frames", False):
+            log.warning("game %d: no GAME_OVER sent (the radio modem is %s)", game_id, self.ctl.radio_state)
+            return False
+        self.inviter.game_over(game_id, key_tag, self.ctl.now_ms(), channel_hz=channel_hz)
+        log.info("game %d: GAME_OVER to its boxes (%d times, on %s Hz)", game_id, ff_repeats(), channel_hz)
+        self.inviter.tick(self.ctl.now_ms())  # the first one at once
+        return True
+
+    def _tune(self, channel_hz: Optional[int]) -> bool:
+        """The modem on a GAME_OVER's channel (its game's) while no game is live, then back on the
+        field's; with a game live on another channel, that GAME_OVER is dropped."""
+        modem, field = self.ctl.modem, self.ctl.field_channel
+        if channel_hz is None:
+            if self._tuned is not None and self.ctl.fc is None and modem is not None and modem.is_up:
+                modem.set_channel(field)
+                self.ctl._modem_moved("a game over was told on its game's channel")
+            self._tuned = None
+            return True
+        if self.ctl.fc is not None:
+            transport = self.ctl.transport
+            return transport is not None and transport.channel_hz == channel_hz
+        if channel_hz != field and self._tuned != channel_hz and modem is not None:
+            modem.set_channel(channel_hz)
+            self.ctl._modem_moved("a game over is told on its game's channel")
+            self._tuned = channel_hz
+        return True
 
     def forget_game(self, game_id: int) -> None:
         """The game ended or was deleted: its invites go (no more retries into it)."""

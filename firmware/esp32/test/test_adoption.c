@@ -173,8 +173,9 @@ static void test_rules(void)
     CHECK(adoption_offer(&a, other, "Outro", "432") == ADOPT_BAD_PIN);
     CHECK(memcmp(a.key, mine, 32) == 0 && sh.stores == 2);
     CHECK(adoption_offer(&a, other, "Outro", "4321") == ADOPT_READOPTED);
-    CHECK(memcmp(a.key, other, 32) == 0 && strcmp(a.name, "Outro") == 0 && a.pin_failures == 0);
-    /* Five wrong PINs lock it until a restart, the right one included. */
+    CHECK(memcmp(a.key, other, 32) == 0 && strcmp(a.name, "Outro") == 0 && a.pin->failures == 0);
+    /* Five wrong PINs in a row start a wait, the right one refused during it (admin_pin.h: the
+     * waits and the count across a reboot are test_admin_pin.c's). */
     for (int i = 0; i < ADOPTION_PIN_TRIES - 1; i++) {
         CHECK(adoption_offer(&a, mine, "", "0000") == ADOPT_BAD_PIN);
     }
@@ -190,12 +191,12 @@ static void test_rules(void)
     CHECK(adoption_offer(&a, mine, "", NULL) == ADOPT_STORE_FAILED && !a.adopted);
     sh.store_fails = false;
     CHECK(adoption_offer(&a, mine, "a\"b", NULL) == ADOPT_BAD_KEY && !a.adopted);
-    /* A box restored from NVS is adopted; with no admin PIN set nothing moves it. */
+    /* A box restored from NVS is adopted; with no admin PIN set nothing moves it (AD-29). */
     adoption_init(&a, &OPS, "");
     adoption_restore(&a, mine, "Campo");
     CHECK(a.adopted && strcmp(a.fingerprint, "604A-0A95") == 0);
-    CHECK(adoption_offer(&a, other, "", "") == ADOPT_NEED_PIN);
-    CHECK(adoption_offer(&a, other, "", "1234") == ADOPT_BAD_PIN);
+    CHECK(adoption_offer(&a, other, "", "") == ADOPT_NO_PIN);
+    CHECK(adoption_offer(&a, other, "", "1234") == ADOPT_NO_PIN);
 }
 
 /* ---- a card tapped, the PIN on the keypad -------------------------------- */
@@ -285,10 +286,10 @@ static void test_commands(void)
     CHECK(!adoption_command(&a, "join atalaia:join:x", &id, 0, reply, sizeof(reply)));
     CHECK(!adoption_command(&a, "adoption", &id, 0, reply, sizeof(reply)));
     CHECK(adoption_command(&a, "adopt-info", &id, 0, reply, sizeof(reply)));
-    CHECK(strcmp(reply,
-                 "ATALAIA-ADOPT {\"v\":1,\"kind\":\"info\",\"name\":\"box \\\"7\\\"\","
-                 "\"mac\":\"24:58:7C:DA:11:F0\",\"fw\":\"0.4.0\",\"state\":\"unadopted\","
-                 "\"field\":\"\",\"field_name\":\"\",\"busy\":false,\"locked\":false}") == 0);
+    CHECK(strcmp(reply, "ATALAIA-ADOPT {\"v\":1,\"kind\":\"info\",\"name\":\"box \\\"7\\\"\","
+                        "\"mac\":\"24:58:7C:DA:11:F0\",\"fw\":\"0.4.0\",\"state\":\"unadopted\","
+                        "\"field\":\"\",\"field_name\":\"\",\"busy\":false,\"locked\":false,"
+                        "\"locked_min\":0,\"pin_set\":true}") == 0);
 
     snprintf(cmd, sizeof(cmd), "adopt %s - Campo da Atalaia", MINE_HEX);
     CHECK(adoption_command(&a, cmd, &id, 0, reply, sizeof(reply)));

@@ -148,6 +148,9 @@ typedef struct {
     uint32_t ready_screen_ms;
     bool invited; /* the current game came from an invite */
     uint32_t invites_accepted, invites_refused, frames_ignored;
+    /* GAME_OVER frames (decision OT-13): one that ended this box's game; ones for its game id
+     * under another key (an old game's, recorded and played back), refused. */
+    uint32_t games_over_heard, games_over_refused;
     /* The timings (box_game_init sets the BOX_ANNOUNCE_* values; the host box shortens them). */
     uint32_t first_min_ms, first_max_ms, interval_min_ms;
     uint32_t interval_fixed_ms; /* the host box's tests: this interval, not the computed one */
@@ -276,6 +279,10 @@ void box_lobby_device_hex(const box_game_t *g, char out[17]);
 
 /* Internal to box_game.c and box_lobby.c: take a join payload from an invite. */
 box_join_result_t box_game_join_invited(box_game_t *g, const uint8_t *payload, size_t len);
+
+/* Internal to box_game.c and box_lobby.c: the field said this box's game is over (a GAME_OVER
+ * field frame for its game id and key tag, decision OT-13): it ends exactly as on CMD end. */
+void box_game_end_by_field(box_game_t *g);
 
 /*
  * An NFC tag read while a game runs (joined or stand-alone): the node gets

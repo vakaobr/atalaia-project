@@ -162,6 +162,11 @@ static void end_game(box_game_t *g)
     box_lobby_game_over(g, g->now_ms);
 }
 
+void box_game_end_by_field(box_game_t *g)
+{
+    if (g->phase == BOX_PLAYING || g->phase == BOX_JOINED) end_game(g);
+}
+
 static void leave_game(box_game_t *g)
 {
     memset(g->link.proto.game_key, 0, sizeof(g->link.proto.game_key));

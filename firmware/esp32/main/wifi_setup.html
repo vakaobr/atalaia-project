@@ -44,8 +44,8 @@ button:active{background:#00a0cc}
 <option value="4">4</option>
 </select>
 
-<label for="pin">Admin PIN (4-6 digits)</label>
-<input type="password" id="pin" name="pin" required pattern="[0-9]{4,6}" minlength="4" maxlength="6" inputmode="numeric" placeholder="1234">
+<label for="pin">Admin PIN (4-8 digits; not 1234, 0000, a sequence or a repeated pair: there is no default)</label>
+<input type="password" id="pin" name="pin" required pattern="[0-9]{4,8}" minlength="4" maxlength="8" inputmode="numeric" autocomplete="new-password">
 
 <label for="brightness">Display Brightness</label>
 <input type="range" id="brightness" name="brightness" min="10" max="100" value="80">

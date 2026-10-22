@@ -165,6 +165,16 @@ size_t atalaia_ff_body_encode(const atalaia_ff_msg_t *m, uint8_t *buf, size_t ca
         mc_put_uint(&w, ATALAIA_FF_K_CHUNK);
         mc_put_bytes(&w, m->chunk, m->chunk_len);
         break;
+    case ATALAIA_FF_GAME_OVER:
+        if (m->game_id == 0 || m->game_id == 0xFFFF) return 0;
+        mc_put_map(&w, 3);
+        mc_put_uint(&w, ATALAIA_FF_K_KIND);
+        mc_put_uint(&w, m->kind);
+        mc_put_uint(&w, ATALAIA_FF_K_GAME);
+        mc_put_uint(&w, m->game_id);
+        mc_put_uint(&w, ATALAIA_FF_K_KEY_TAG);
+        mc_put_bytes(&w, m->key_tag, ATALAIA_FF_TAG_SIZE);
+        break;
     default: return 0;
     }
     return w.ok ? w.pos : 0;
@@ -204,7 +214,8 @@ static bool read_text_field(mc_reader_t *r, char *out, size_t cap)
     (BIT(ATALAIA_FF_K_KIND) | BIT(ATALAIA_FF_K_DEVICE) | BIT(ATALAIA_FF_K_TOKEN) |                 \
      BIT(ATALAIA_FF_K_INVITE) | BIT(ATALAIA_FF_K_PART) | BIT(ATALAIA_FF_K_PARTS) |                 \
      BIT(ATALAIA_FF_K_CHUNK))
-#define KNOWN_KEYS 0x7FEu /* keys 1-10: a key another kind uses is not "unknown" */
+#define GAME_OVER_KEYS (BIT(ATALAIA_FF_K_KIND) | BIT(ATALAIA_FF_K_GAME) | BIT(ATALAIA_FF_K_KEY_TAG))
+#define KNOWN_KEYS     0x7FEu /* keys 1-10: a key another kind uses is not "unknown" */
 
 bool atalaia_ff_body_decode(const uint8_t *buf, size_t len, atalaia_ff_msg_t *m)
 {
@@ -234,6 +245,10 @@ bool atalaia_ff_body_decode(const uint8_t *buf, size_t len, atalaia_ff_msg_t *m)
         allowed = INVITE_KEYS;
         required = INVITE_KEYS;
         break;
+    case ATALAIA_FF_GAME_OVER:
+        allowed = GAME_OVER_KEYS;
+        required = GAME_OVER_KEYS;
+        break;
     default: return false;
     }
     uint32_t seen = BIT(ATALAIA_FF_K_KIND);
@@ -248,7 +263,14 @@ bool atalaia_ff_body_decode(const uint8_t *buf, size_t len, atalaia_ff_msg_t *m)
             continue;
         }
         bool ok = true;
-        if (key == ATALAIA_FF_K_DEVICE) {
+        if (m->kind == ATALAIA_FF_GAME_OVER) {
+            if (key == ATALAIA_FF_K_GAME) {
+                ok = read_uint_max(&r, 0xFFFE, &v) && v != 0;
+                m->game_id = (uint16_t)v;
+            } else {
+                ok = read_fixed(&r, m->key_tag, ATALAIA_FF_TAG_SIZE);
+            }
+        } else if (key == ATALAIA_FF_K_DEVICE) {
             ok = read_fixed(&r, m->device_id, ATALAIA_FF_DEVICE_SIZE);
         } else if (key == ATALAIA_FF_K_TOKEN) {
             ok = read_fixed(&r, m->token, ATALAIA_FF_TOKEN_SIZE);

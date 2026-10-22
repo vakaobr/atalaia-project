@@ -115,7 +115,11 @@
       "last": "Só {have} × {role} juntas e {param} é {value}: a contagem pode correr logo desde o início."
     },
     "settings": "Definições do jogo",
-    "settings_hint": "Definidas ao criar o jogo; para as mudar, termine este jogo e crie outro."
+    "settings_hint": "Definidas ao criar o jogo; para as mudar, termine este jogo e crie outro.",
+    "key_lost_notice": "Este controlador reiniciou sem a chave do jogo (persist_game_key estava desligado): o jogo só pode ser terminado. Ao terminá-lo, as caixas são avisadas pelo rádio do campo, com a chave de entrada do campo, e saem do jogo.",
+    "confirm_end_key_lost": "Terminar o jogo e avisar as caixas pelo rádio do campo?",
+    "over_told": "As caixas do jogo foram avisadas pelo rádio do campo de que o jogo terminou.",
+    "over_not_told": "Não foi possível avisar as caixas pelo rádio ({why}): reinicie cada caixa ou junte-a ao próximo jogo com um cartão."
   },
   "controller": {
     "title": "Controlador de campo",
@@ -666,12 +670,12 @@
     "none": "Nenhuma caixa encontrada. Verifica o cabo (de dados, não só de carga) e se a caixa está ligada.",
     "silent": "{n} porta(s) não responderam",
     "busy": "tem um jogo: termina-o primeiro",
-    "locked": "demasiados PIN errados: reinicia a caixa",
+    "locked": "demasiados PIN errados: espera {min} min (reiniciar não encurta a espera)",
     "adopt": "Adotar",
     "confirm": "Adotar a caixa {name} ({mac}) para este campo?",
     "confirm_hint": "O controlador confirma que é ainda essa caixa antes de escrever a chave.",
     "pin": "PIN de administração da caixa",
-    "pin_hint": "Esta caixa pertence a outro campo (ou à chave antiga deste): é preciso o seu PIN de administração. Cinco PIN errados bloqueiam a adoção até a caixa reiniciar.",
+    "pin_hint": "Esta caixa pertence a outro campo (ou à chave antiga deste): é preciso o seu PIN de administração. Depois de cinco PIN errados seguidos, cada tentativa espera 1, 2, 4… até 60 minutos, também depois de reiniciar a caixa.",
     "state": {
       "none": "não adotada",
       "this_field": "adotada por este campo",
@@ -684,7 +688,8 @@
       "readopted": "A caixa {name} ({mac}) passou para este campo.",
       "need_pin": "A caixa {name} pertence a outro campo: escreve o seu PIN de administração.",
       "bad_pin": "PIN de administração errado para a caixa {name}.",
-      "locked": "Caixa {name}: demasiados PIN errados; reinicia-a antes de tentar de novo.",
+      "locked": "Caixa {name}: demasiados PIN errados; tenta de novo quando a caixa o disser (até 60 minutos).",
+      "no_pin": "A caixa {name} pertence a outro campo e não tem PIN de administração: define-o na consola USB da caixa (\"@admin-pin\").",
       "busy": "A caixa {name} tem um jogo: termina o jogo primeiro.",
       "bad_key": "A caixa {name} recusou a chave.",
       "bad_card": "Foi encostado um cartão de campo danificado.",
@@ -791,7 +796,7 @@
   },
   "box_language": {
     "title": "Língua das caixas",
-    "intro": "A língua dos ecrãs das caixas: Pronta, à espera do início, zona neutra, armada, fim do jogo. Um jogo mantém a língua com que foi criado, e todas as entradas (cartão, código QR, texto, convite por rádio) a levam. As caixas com firmware mais antigo ficam em inglês.",
+    "intro": "A língua dos ecrãs das caixas: Pronta, à espera do início, zona livre, armada, fim do jogo. Um jogo mantém a língua com que foi criado, e todas as entradas (cartão, código QR, texto, convite por rádio) a levam. As caixas com firmware mais antigo ficam em inglês.",
     "label": "Língua nas caixas",
     "choices": {
       "auto": "A língua desta consola quando o jogo é criado",

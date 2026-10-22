@@ -111,7 +111,7 @@ Box firmware with keys from the USB serial console and no setup portal
 (firmware/esp32/README.md, Build). An adopted board boots to **READY /
 next game** (decision BN-10): any key brings the game picker; an unadopted
 one shows its pairing code first (`*` gives the picker). In a serial monitor
-type a key, then `1234#` (the admin PIN), then `1`, `#`, `#` for Bomb; the
+type a key, then `1234#` (the bench build's admin PIN; a Field Box has none until its setup), then `1`, `#`, `#` for Bomb; the
 board's own OLED shows each step. Buttons must be soldered to the header (or to pins soldered there):
 a Dupont pin pushed into a bare hole loses contact while it is held, and
 any release, even 0.1 s, starts a hold again (seen on the first V4.3 board,
@@ -347,8 +347,10 @@ its USB-C port; the controller and its modem (board 2) as in step 10b.
    log shows `adoption (usb): adopted, field XXXX-XXXX`. Adopt again: *already adopted*.
 3. **Another field's box.** Give the board another key by hand (`@adopt <64 other hex
    digits> 1234`: the bench build's admin PIN), then adopt it from the console: it asks
-   for the admin PIN; `9999` gives *wrong PIN*, `1234` moves it back. Five wrong PINs lock
-   it until a reset.
+   for the admin PIN; `9999` gives *wrong PIN*, `1234` moves it back. Five wrong PINs in a
+   row start a wait of 1 minute (then 2, 4 ... 60): the screen shows *PIN locked · try
+   again in N min*, a reset starts the same wait again in full (the count is in NVS), and
+   the right PIN after the wait sets the count back (decision AD-28).
 4. **The field card** (once a PN532 is fitted, step 7): *Make the field card*, write the
    bytes to an NTAG215 from page 4, tap it on an unadopted board (ADOPTED, the fingerprint)
    and on a board of another field (the PIN screen: type `1234#` on the keypad or the
@@ -469,7 +471,7 @@ build) on COM3, **board 2** the USB modem on COM4, behind a controller running i
 | `ready` | READY · Next game / PRONTA · Próximo jogo | Adopted, in no game: it can be invited. A key brings this box's own game picker (admin PIN). Shown from boot and 30 s after a game ends |
 | `waiting` | WAITING · Game N, The game hasn't started / À ESPERA · Jogo N, O jogo ainda não começou | Joined (by card, text or an invite: "Invited: zone") and waiting for the GM's Start. Nothing else is shown until then |
 | `playing` | GAME ON / JOGO EM CURSO | The game has started; the mode's own screen follows as soon as it draws one |
-| `neutral` | ZONE · NEUTRAL, Hold to capture / ZONA · NEUTRA, Mantém premido | A running zone that no team holds (Domination, Hold-All, Last Stand, Master and Satellites) |
+| `neutral` | ZONE · NEUTRAL, Hold to capture / ZONA · LIVRE, Mantém premido | A running zone that no team holds (Domination, Hold-All, Last Stand, Master and Satellites) |
 | `captured` | ZONE HELD · RED / ZONA OCUPADA · RED | A team holds the zone |
 | `standby` (Bomb) | READY · Hold to arm / PRONTA · Mantém premido para armar | The bomb is not armed yet; "standby" is never used for a zone |
 | `final_score` | GAME OVER / FIM DO JOGO | The game ended; Ready follows |
@@ -600,11 +602,16 @@ is in [README.md](../README.md#the-modems-oled).
 ## Step 11: Wi-Fi Setup Portal
 
 1. Reset configuration: hold reset during boot or enter admin PIN
-   and select "Setup" from the admin menu.
+   and select "Setup" from the admin menu. (A Field Box build only: bench and Wokwi
+   builds skip the portal and use the admin PIN 1234, which they say in the log.)
 2. Connect to `atalaia-XXXX` AP from a phone (the 2.4 GHz antenna
    must be connected).
 3. Verify: captive portal page loads automatically.
-4. Fill in config and submit.
+4. Fill in config and submit. The admin PIN has no default (decision AD-29): 1234, 0000,
+   a sequence (9876, 7890) or a repeated pair (1212) is refused with *Choose another admin
+   PIN*; until a PIN is set the keypad picker shows *No admin PIN set* and adoption to
+   another field answers `no_pin`. A box set up before has none if its PIN was one of those:
+   type `@admin-pin <PIN>` on its USB console (`@admin-pin <PIN> <new PIN>` changes it).
 5. Verify: node reboots into normal mode.
 6. The page sets the node up, but there is no DNS redirect yet: if the
    phone does not open the page by itself, browse to

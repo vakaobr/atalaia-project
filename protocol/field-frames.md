@@ -5,9 +5,9 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Field frames: boxes between games
 
-A box whose game is over can be invited into the next game over the radio, without a card, a QR code or the serial console. This file specifies the **field frames** that make it possible, version 1: RFC 0001 Amendment 7 (proposed, 2026-10-21), decisions RJ-1 to RJ-15 in [`docs/review/decisions-to-review.md`](../docs/review/decisions-to-review.md).
+A box whose game is over can be invited into the next game over the radio, without a card, a QR code or the serial console. This file specifies the **field frames** that make it possible, version 1: RFC 0001 Amendment 7 (proposed, 2026-10-21) and its addendum of 2026-10-22 (GAME_OVER), decisions RJ-1 to RJ-15 and OT-7 to OT-16 in [`docs/review/decisions-to-review.md`](../docs/review/decisions-to-review.md).
 
-Implementations: [`core/src/field_frame.c`](../core/src/field_frame.c) (the codec, C: boxes and the host test programs) and [`simulator/atalaia_sim/field_frame.py`](../simulator/atalaia_sim/field_frame.py) (Python: the field controller and the simulator); the box's behaviour is [`firmware/esp32/main/box_lobby.c`](../firmware/esp32/main/box_lobby.c), the controller's [`controller/atalaia_controller/reinvite.py`](../controller/atalaia_controller/reinvite.py), both modelled in [`simulator/atalaia_sim/lobby.py`](../simulator/atalaia_sim/lobby.py). All check the shared vectors in [`vectors/field_frame.json`](vectors/field_frame.json): RFC 5869's HKDF-SHA256 cases, the field key, 7 valid bodies and frames, 10 frames and 30 bodies that must be refused, the invite parts of three join payloads. `tools/field_frame_vectors.py` writes the file (and `--check`s it), with the cryptography library's AES-CCM and HKDF.
+Implementations: [`core/src/field_frame.c`](../core/src/field_frame.c) (the codec, C: boxes and the host test programs) and [`simulator/atalaia_sim/field_frame.py`](../simulator/atalaia_sim/field_frame.py) (Python: the field controller and the simulator); the box's behaviour is [`firmware/esp32/main/box_lobby.c`](../firmware/esp32/main/box_lobby.c), the controller's [`controller/atalaia_controller/reinvite.py`](../controller/atalaia_controller/reinvite.py), both modelled in [`simulator/atalaia_sim/lobby.py`](../simulator/atalaia_sim/lobby.py). All check the shared vectors in [`vectors/field_frame.json`](vectors/field_frame.json): RFC 5869's HKDF-SHA256 cases, the field key, 9 valid bodies and frames, 10 frames and 37 bodies that must be refused, the invite parts of three join payloads. `tools/field_frame_vectors.py` writes the file (and `--check`s it), with the cryptography library's AES-CCM and HKDF.
 
 ## The idea
 
@@ -16,7 +16,9 @@ Implementations: [`core/src/field_frame.c`](../core/src/field_frame.c) (the code
 - The GM picks boxes for the next game; the controller makes each one's join payload exactly as for a card ([join.md](join.md)) and sends it in an **INVITE** addressed to the box's device id and carrying the token of its last announcement.
 - The box takes it only when it has no game (or its game is over), only with its current token, and puts the payload through every check a card goes through. It answers with an announcement saying how it went, changes its token, and joins: its HELLO in the new game (with its device id) closes the invite.
 
-Nothing about a game changes: the game itself still runs under its own key; field frames are only the way in.
+- When a game ends, the controller also says so in a **GAME_OVER** (the game id and its key's tag), so that a box still in it leaves: the only way when the controller restarted without the game's key (decision OT-7).
+
+Nothing about a game changes: the game itself still runs under its own key; field frames are the way in, and a way out for a controller that lost the game's key.
 
 ## On air
 
@@ -67,6 +69,13 @@ Integer keys, in this order, in the shortest form, optional fields left out. Key
 | 6 | `parts` | uint | 1-3 |
 | 7 | `chunk` | bytes | 1-153: this part of the join payload |
 
+**GAME_OVER** (kind 4, RFC 0001 Amendment 7's addendum of 2026-10-22), controller to the boxes of one game:
+
+| Key | Field | Type | Values |
+| --- | --- | --- | --- |
+| 4 | `game_id` | uint | 1-65534: the game that is over |
+| 5 | `key_tag` | bytes | 8: its game key's tag, `HMAC-SHA256(game key, "atalaia epoch tag")[:8]`, the epoch store's name for the key ([vectors/epoch_tag.json](vectors/epoch_tag.json)) |
+
 The join payload ([join.md](join.md): version, CBOR body, HMAC-SHA256 tag) is cut into chunks of 153 bytes, the last one shorter, and the parts concatenated in order give it back. Three parts hold the largest join payload (448 bytes); a typical box's join is 115-300 bytes, one or two parts (with the field CA and the controller's addresses for firmware updates, two). An INVITE's other fields take at most 34 bytes, so a part never exceeds the 187-byte body. A part of another invite, token or part count starts the reassembly over.
 
 ## The box
@@ -77,6 +86,7 @@ The join payload ([join.md](join.md): version, CBOR body, HMAC-SHA256 tag) is cu
 - **Announcements**, on the channel of its last game (the radio keeps listening there after a game; a new box listens on 869.525 MHz): the first one 2-20 s after its game ends or after it starts (spread so that a field's boxes do not all talk at once), then every `max(60 s, airtime / (2 % x duty cycle))` with ±10 % jitter, so they take at most 2 % of the sub-band's duty-cycle budget. A DISCOVER is answered after 0-3 s, unless the box announced within the last quarter of that interval.
 - **An invite**: for its device id, with its current or previous token, all parts there: refused "ended" if the join is for a game the box has played to its end (it remembers its last four), else taken through the card's path (the HMAC with the join key, a box's payload, the mode installed, stored in NVS, the channel, a new epoch, HELLO). A box whose game is over but not yet left (BOX_ENDED, waiting for the last ACKs) leaves it first. The answer goes 100-600 ms later, one per invite in 10 s.
 - **Screens**: "Invited · game: role" when it joins from an invite; 30 s after a game ends the final screen gives way to "Ready · next game" (not over the preset picker), on the TFT and the on-board OLED.
+- **GAME_OVER** (decision OT-13): a box in a game (joined, or playing) whose game id and game key's tag both match ends it exactly as on CMD end (the mode's game over, then announcing itself and "Ready", BN-10 to BN-13). Any other GAME_OVER changes nothing: another game's, or its game id under another key (`games_over_refused`, logged). It needs no time or counter: a game's end is a fact that stays true, so one played back later can only end that same game, which the box no longer joins (played to its end, BN-19), and a later game with the same id has another key, so another tag. A box never leaves a game on its own when the controller goes silent (the maintainer's choice: a box cannot tell a controller gone from one briefly out of reach, or a failover).
 
 ## The controller
 
@@ -84,6 +94,7 @@ The join payload ([join.md](join.md): version, CBOR body, HMAC-SHA256 tag) is cu
 - It keeps the free boxes it hears (name, device id, RSSI and SNR, when, last game and role, token) for 2 hours, and marks the previous game's boxes: the nodes of the most recent other game whose HELLO carried a device id, with their roles. It keeps, per device id, the highest (boot, count) of the box's nonces it has heard and refuses an announcement whose nonce is not the box's own pseudonym or is not newer (a replay cannot bring back a stale token or show a box in a game as free). It forgets a game's invites when the game ends, and a HELLO closes only the live game's.
 - A DISCOVER at most every 10 s. Invites one box at a time, paced by their time on air; an invite unanswered for 6 s is sent again with the box's latest token, three times in all, then it has failed ("no answer"). An answer sets it accepted or refused (with the box's reason); the box's HELLO in the game, joined.
 - Only into the live game, before it starts; only with the GM token (`POST /api/v1/games/{id}/invites`, [controller/README.md](../controller/README.md)).
+- **GAME_OVER** after every game it ran ends (besides the game's own CMD end), three times, 4 s apart, on the game's channel (the modem is tuned there and back to the field's channel when they differ and no game is live; with a game live on another channel it is dropped). It names the game by its key's tag, which the controller keeps beside the game (`key_tag:<game>`, not secret) and so still has after a restart without the key (`persist_game_key = false`, a lost key): the console's End on such a game sends it and says whether it went (`game_over_frame`: `sent`, `no_radio`, `no_join_key`, `no_tag` for a game made before the tag was kept). A standby controller never sends one (its game may still run on the primary).
 
 ## Duty cycle
 
@@ -96,6 +107,7 @@ Time on air at SF7/125 kHz (the LoRa formula, `eu868.airtime_ms`):
 | INVITE part | up to 217 | up to 343 ms |
 | a two-part invite (a 270-byte join) | 217 + 120 | 550 ms |
 | a three-part invite (448 bytes) | 3 x 217 | 1.03 s |
+| GAME_OVER | 47 | 92 ms (three: 0.28 s) |
 
 - A free box on 869.4-869.65 MHz (10 %, 360 s an hour) announces about every 72 s: 7.2 s an hour, 2 % of its budget; on a 1 % sub-band (36 s an hour) every 12 minutes; on 868.7-869.2 MHz (0.1 %) every 2 hours. DISCOVER answers can add at most three times as much.
 - The controller: twenty boxes invited with two parts each take about 11 s of air, 3 % of the controller's hourly budget on 869.4-869.65 MHz; on a 1 % sub-band, 30 % of it, so a field on a 1 % channel should invite in smaller groups. Every attempt counts; three attempts at most.
@@ -107,10 +119,11 @@ Time on air at SF7/125 kHz (the LoRa formula, `eu868.airtime_ms`):
 - Without the join key: frames do not open, a forged invite is not accepted, and recording frames gives nothing to replay (the token).
 - A box's announcements say, to whoever holds the join key, that it is free, its name, its last role and battery. The device id is not linkable to the hardware or its Wi-Fi MAC address.
 - A DISCOVER played back makes the free boxes answer, limited by the 2 % share above; it costs airtime, nothing else.
+- A GAME_OVER can only be made with the join key and the game key's tag (which the game key gives, so whoever reads the invites): someone with the join key can end a game's boxes, among the worse things that key already allows. Without it a GAME_OVER does not open; played back it only ends a game that is over (above).
 
 ## What is not covered
 
-- **Adopting a box over the radio** is not a field frame: its messages run before the box holds the join key, so they are a sibling message type 10 (`PAIR`, RFC 0001 Amendment 8) with this header's rules but in the clear, secured by CPace with the code the box shows ([adoption.md](adoption.md) section 7, decisions AD-15 to AD-27). The modem carries both types in FIELD_TX / FIELD_RX; its KEY message's nonce follows this file's rule, and both use `atalaia_hkdf_sha256` / `hkdf_sha256`. Kinds 4-7 of type 9 stay unused (decoders refuse them).
+- **Adopting a box over the radio** is not a field frame: its messages run before the box holds the join key, so they are a sibling message type 10 (`PAIR`, RFC 0001 Amendment 8) with this header's rules but in the clear, secured by CPace with the code the box shows ([adoption.md](adoption.md) section 7, decisions AD-15 to AD-27). The modem carries both types in FIELD_TX / FIELD_RX; its KEY message's nonce follows this file's rule, and both use `atalaia_hkdf_sha256` / `hkdf_sha256`. Kind 4 of type 9 is GAME_OVER (addendum of 2026-10-22); kinds 5-7 stay unused (decoders refuse them).
 - Android props link over Wi-Fi ([prop-link.md](prop-link.md)), not LoRa: they are not invited over the radio yet (they count for the start guard as soon as they are linked). The app's HELLO codec reads and writes key 10.
 - A box listens on its last game's channel: after the field's channel changes (RFC 0001 Amendment 3), its next game needs a card once.
 - Field frames are not relayed: a box out of the modem's direct range is not heard between games.

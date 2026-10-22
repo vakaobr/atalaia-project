@@ -118,6 +118,7 @@ else()
         "fw_update.c"
         "fw_update_esp.c"
         "fw_desc.c"
+        "admin_pin.c"
         "adoption.c"
         "cpace.c"
         "box_pair.c"

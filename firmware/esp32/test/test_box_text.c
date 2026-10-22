@@ -42,6 +42,8 @@ static void test_every_text(void)
     }
     CHECK(strcmp(box_text_in(BOX_LANG_PT, TX_WAITING_UP), "\xc3\x80 ESPERA") == 0);
     CHECK(strcmp(box_text_in(BOX_LANG_EN, TX_NEUTRAL_UP), "NEUTRAL") == 0);
+    /* The maintainer's word for a zone nobody holds (BN-14). */
+    CHECK(strcmp(box_text_in(BOX_LANG_PT, TX_NEUTRAL_UP), "LIVRE") == 0);
     CHECK(strcmp(box_text_in(BOX_LANG_COUNT, TX_NEUTRAL_UP), "NEUTRAL") == 0); /* English */
     CHECK(strcmp(box_text_in(BOX_LANG_PT, TX_COUNT), "") == 0);
 }

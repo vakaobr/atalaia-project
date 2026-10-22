@@ -13,7 +13,10 @@ invite recorded and played again later is refused.
 ``Inviter`` is the field controller's side (controller/atalaia_controller/
 reinvite.py wraps it): the free boxes it has heard, a DISCOVER, invites
 with their parts, retries and progress (invited, accepted, joined, refused,
-failed), paced by their time on air.
+failed), paced by their time on air, and GAME_OVER: "game N (its key's tag)
+is over", sent GAME_OVER_REPEATS times when a game ends (decision OT-13), so
+that a box still in it leaves, also when the controller no longer has the
+game's key (a restart without persist_game_key).
 
 The same timings as the firmware: an idle box announces 2-20 s after its
 game ends (spread, so a field's boxes do not all talk at once), then at an
@@ -53,6 +56,8 @@ BOX_FORGET_MS = 2 * 3_600_000
 GAP_MS = 50                  # between a controller's frames, on top of their time on air
 PART_GAP_MS = 150            # between an invite's parts: the box re-arms its receiver after
                              # each part, and back-to-back parts lost the second on the bench
+GAME_OVER_REPEATS = 3        # a GAME_OVER goes this many times (decision OT-15) ...
+GAME_OVER_GAP_MS = 4_000     # ... this far apart: 3 x 92 ms of air in all
 
 
 def announce_interval_ms(channel_hz: int, frame_len: int) -> int:
@@ -139,6 +144,16 @@ class IdleBox:
         if self.phase == "joined":
             self.phase = "playing"
 
+    def on_game_over(self, msg: dict[str, Any], now_ms: int) -> bool:
+        """GAME_OVER (decision OT-13): only the box's own game, by its id and its key's tag, ends."""
+        if self.phase not in ("joined", "playing") or self.game is None:
+            return False
+        if msg["game_id"] != self.game["game_id"] or msg["key_tag"] != ff.key_tag(self.game["game_key"]):
+            return False
+        self.log.append(f"game {msg['game_id']} is over (said by a field controller)")
+        self.end(now_ms)
+        return True
+
     def end(self, now_ms: int = 0) -> None:
         """The game ended (CMD end): the box is free again and soon announces itself."""
         if self.phase not in ("joined", "playing") or self.game is None:
@@ -175,6 +190,9 @@ class IdleBox:
             msg = ff.decode(self.key, raw)
         except (ff.FieldFrameError, ValueError):
             return  # another field's, a stranger's, or not a field frame at all
+        if msg["kind"] == "game_over":
+            self.on_game_over(msg, now_ms)
+            return
         if msg["kind"] == "discover":
             gap = self._interval() // 4
             if self.available and (self.last_announce is None or now_ms - self.last_announce >= gap):
@@ -292,6 +310,18 @@ class InviteError(ValueError):
     pass
 
 
+@dataclass
+class GameOver:
+    """A GAME_OVER on its way: the game id, its key's tag, the channel its boxes listen on."""
+
+    game_id: int
+    key_tag: bytes
+    channel_hz: Optional[int] = None
+    left: int = GAME_OVER_REPEATS
+    next_ms: int = 0
+    sent: int = 0
+
+
 class Inviter:
     """A field controller's side: the free boxes heard, DISCOVER, invites with retries.
 
@@ -316,6 +346,10 @@ class Inviter:
         self._nkey = ff.nonce_key(join_key)
         self._fresh: dict[str, tuple[int, int]] = {}  # device id -> highest (boot, ctr) heard
         self.on_change: Optional[Callable[[str], None]] = None  # "boxes" or "invites"
+        self.games_over: list[GameOver] = []
+        # Called with a GAME_OVER's channel before it is sent (False: drop it, the radio is busy
+        # elsewhere), and with None once none is left (the controller's radio goes back).
+        self.tune: Optional[Callable[[Optional[int]], bool]] = None
 
     def _changed(self, what: str) -> None:
         if self.on_change is not None:
@@ -404,6 +438,39 @@ class Inviter:
         self._changed("invites")
         return inv
 
+    def game_over(self, game_id: int, key_tag: bytes, now_ms: int,
+                  channel_hz: Optional[int] = None) -> GameOver:
+        """Says GAME_OVER_REPEATS times, GAME_OVER_GAP_MS apart, that game_id (its key's tag) is over."""
+        ff.validate({"kind": "game_over", "game_id": game_id, "key_tag": key_tag})
+        self.games_over = [g for g in self.games_over if g.game_id != game_id]
+        go = GameOver(game_id, bytes(key_tag), channel_hz, next_ms=now_ms)
+        self.games_over.append(go)
+        return go
+
+    def _tick_game_over(self, now_ms: int) -> bool:
+        """Sends the next GAME_OVER that is due; True if the radio was used."""
+        done = [g for g in self.games_over if g.left == 0 and now_ms >= g.next_ms]
+        if done:
+            self.games_over = [g for g in self.games_over if g not in done]
+            if not self.games_over and self.tune is not None:
+                self.tune(None)
+        due = [g for g in self.games_over if g.left > 0 and now_ms >= g.next_ms]
+        if not due or now_ms < self.busy_until:
+            return False
+        go = due[0]
+        if self.tune is not None and not self.tune(go.channel_hz):
+            self.games_over.remove(go)
+            return False
+        frame = ff.encode(self.key, {"kind": "game_over", "game_id": go.game_id, "key_tag": go.key_tag},
+                          self.nonces.next())
+        if self.send(frame) is not None:
+            go.sent += 1
+        go.left -= 1
+        airtime = int(eu868.airtime_ms(len(frame)))
+        self.busy_until = now_ms + airtime + GAP_MS
+        go.next_ms = now_ms + airtime + (GAME_OVER_GAP_MS if go.left else GAP_MS)
+        return True
+
     def forget_game(self, game_id: int) -> None:
         for hexid in [h for h, i in self.invites.items() if i.game_id == game_id]:
             del self.invites[hexid]
@@ -418,7 +485,7 @@ class Inviter:
                 changed = True
         if changed:
             self._changed("invites")
-        if now_ms < self.busy_until:
+        if self._tick_game_over(now_ms) or now_ms < self.busy_until:
             return
         due = [i for i in self.invites.values() if i.status in ("sending", "invited") and now_ms >= i.next_ms
                and i.attempts < INVITE_ATTEMPTS]

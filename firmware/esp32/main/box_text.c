@@ -68,7 +68,7 @@ static const char *const texts[TX_COUNT][BOX_LANG_COUNT] = {
     [TX_PAUSED_UP] = {"PAUSED", "EM PAUSA"},
     [TX_WAIT_GM] = {"Wait for the game master", "Aguarda a organização"},
     [TX_ZONE_UP] = {"ZONE", "ZONA"},
-    [TX_NEUTRAL_UP] = {"NEUTRAL", "NEUTRA"},
+    [TX_NEUTRAL_UP] = {"NEUTRAL", "LIVRE"},
     /* "Mantém premido para capturar" does not fit the screen's width: two lines. */
     [TX_HOLD_TO_CAPTURE] = {"Hold to capture", "Mantém premido"},
     [TX_HOLD_FOR_S] = {"Hold your button for %ld s", "%ld s para capturar a zona"},
@@ -144,6 +144,10 @@ static const char *const texts[TX_COUNT][BOX_LANG_COUNT] = {
     [TX_RESTARTING] = {"Restarting", "A reiniciar"},
     [TX_UPDATE_FAILED] = {"Update failed", "Falhou a atualização"},
     [TX_UPDATE_REFUSED] = {"Update refused", "Atualização recusada"},
+    [TX_PIN_LOCKED] = {"PIN locked", "PIN bloqueado"},
+    [TX_TRY_IN_MIN] = {"Try again in %lu min", "Tenta daqui a %lu min"},
+    [TX_NO_ADMIN_PIN] = {"No admin PIN set", "Sem PIN de administração"},
+    [TX_SET_ADMIN_PIN] = {"USB console: @admin-pin", "Consola USB: @admin-pin"},
     [TXO_ADMIN_PIN] = {"ADMIN PIN", "PIN ADMIN"},
     [TXO_WRONG_PIN] = {"Wrong PIN", "PIN errado"},
     [TXO_ENTER_DELETE] = {"# enter  * delete", "# ok  * apagar"},
@@ -165,6 +169,10 @@ static const char *const texts[TX_COUNT][BOX_LANG_COUNT] = {
     [TXO_KEY_PICKER] = {"key: game picker", "tecla: jogos"},
     [TXO_NOT_STARTED] = {"not started yet", "não começou"},
     [TXO_HOLD_TO_CAPTURE] = {"Hold to capture", "Premir: capturar"},
+    [TXO_PIN_LOCKED] = {"LOCKED", "BLOQUEADO"},
+    [TXO_AGAIN_IN_MIN] = {"again in %lu min", "daqui a %lu min"},
+    [TXO_NO_PIN] = {"NO PIN", "SEM PIN"},
+    [TXO_SET_PIN] = {"@admin-pin", "@admin-pin"},
 };
 
 const char *box_text_in(box_lang_t lang, box_text_id_t id)

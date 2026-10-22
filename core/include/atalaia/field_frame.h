@@ -4,11 +4,13 @@
  *
  * Field frames (protocol/field-frames.md, RFC 0001 Amendment 7): what travels
  * on a field's radio outside any game, between boxes that have no game and the
- * field controllers. Three kinds, in one message type (FIELD, 9):
+ * field controllers. Four kinds, in one message type (FIELD, 9):
  *
  *   ANNOUNCE  box -> controllers   "I am free": device id, a fresh token, name, last role
  *   DISCOVER  controller -> boxes  "who is free?": free boxes answer with an ANNOUNCE
  *   INVITE    controller -> a box  a join payload for the box's device id and token, in 1-3 parts
+ *   GAME_OVER controller -> boxes  "game N (its key's tag T) is over": a box in that game leaves it
+ *                                  (decision OT-13; for a controller that lost the game's key)
  *
  * On air:
  *
@@ -53,11 +55,13 @@
 #define ATALAIA_FF_SENDER_SIZE 8         /* a box's device id, a controller's sender id */
 #define ATALAIA_FF_BOOT_MAX    0xFFFFFFu /* the boot counter's 3 bytes */
 #define ATALAIA_FF_CTR_MAX     0xFFFFu   /* frames per boot count; then the boot count rises */
+#define ATALAIA_FF_TAG_SIZE    8         /* a game key's tag (GAME_OVER, see below) */
 
 typedef enum {
     ATALAIA_FF_ANNOUNCE = 1,
     ATALAIA_FF_DISCOVER = 2,
     ATALAIA_FF_INVITE = 3,
+    ATALAIA_FF_GAME_OVER = 4, /* RFC 0001 Amendment 7, addendum of 2026-10-22 */
 } atalaia_ff_kind_t;
 
 /* What a box answers to an invite (ANNOUNCE key 10). */
@@ -90,6 +94,9 @@ enum {
     ATALAIA_FF_K_PART = 5,
     ATALAIA_FF_K_PARTS = 6,
     ATALAIA_FF_K_CHUNK = 7,
+    /* GAME_OVER */
+    ATALAIA_FF_K_GAME = 4,
+    ATALAIA_FF_K_KEY_TAG = 5,
 };
 
 typedef struct {
@@ -111,6 +118,9 @@ typedef struct {
     uint8_t parts;      /* 1-3 */
     uint8_t chunk_len;  /* 1-ATALAIA_FF_CHUNK_MAX */
     uint8_t chunk[ATALAIA_FF_CHUNK_MAX];
+    /* GAME_OVER */
+    uint16_t game_id;                     /* 1-65534 */
+    uint8_t key_tag[ATALAIA_FF_TAG_SIZE]; /* the game key's tag (its epoch store's) */
 } atalaia_ff_msg_t;
 
 /* HKDF-SHA256 (RFC 5869): extract with salt (NULL or empty: 32 zero bytes), then

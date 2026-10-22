@@ -3,7 +3,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * On-device preset picker driven by the keypad. The GM enters the admin
- * PIN, picks a preset, adjusts the timer and starts the game.
+ * PIN, picks a preset, adjusts the timer and starts the game. With a check
+ * set (preset_ui_set_guard, as the box does) the PIN goes through
+ * admin_pin.h: its failure count, its waits, and no PIN set on a Field Box.
  */
 #ifndef ATALAIA_PRESET_UI_H
 #define ATALAIA_PRESET_UI_H
@@ -11,6 +13,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "admin_pin.h"
 #include "screen_types.h"
 
 #define PRESET_UI_PIN_MAX 8
@@ -35,8 +38,14 @@ typedef struct {
     int page; /* 0-based page of PRESET_UI_PAGE_SIZE entries on the list screen */
     uint32_t timer_duration_s;
     bool pin_accepted;
-    bool pin_error; /* the last PIN was wrong; cleared by the next key */
+    bool pin_error;      /* the last PIN was wrong; cleared by the next key */
+    admin_pin_t *guard;  /* NULL: admin_pin compared as it is (host tests) */
+    uint32_t locked_min; /* the last '#' met a wait of this many minutes (0: none) */
+    bool no_pin;         /* the last '#' met a box with no admin PIN set */
 } preset_ui_t;
+
+/* The box's admin PIN check (admin_pin.h), shared with adoption. */
+void preset_ui_set_guard(preset_ui_t *ui, admin_pin_t *guard);
 
 /*
  * Initialise the preset UI. admin_pin is the PIN the GM must enter.

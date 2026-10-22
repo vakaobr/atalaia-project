@@ -54,6 +54,7 @@ void run_screen_template_tests(void);
 void run_pod_tests(void);
 void run_fw_update_tests(void);
 void run_adoption_tests(void);
+void run_admin_pin_tests(void);
 void run_box_pair_tests(void);
 
 #endif /* ATALAIA_FW_TEST_CHECK_H */

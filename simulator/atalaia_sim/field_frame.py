@@ -5,7 +5,9 @@
 A box with no game announces itself (ANNOUNCE), a field controller asks who is
 free (DISCOVER) and invites a free box into its next game (INVITE: a join
 payload, protocol/join.md, in one to three parts, for the box's device id and
-the token of its last announcement). On air::
+the token of its last announcement), and says that a game is over (GAME_OVER:
+the game id and its key's tag, for a controller that lost the game's key;
+decision OT-13). On air::
 
     header (9: game_id 0, source 0, seq 0, hop_limit 0, type 9) | nonce (13) | body | MIC (8)
 
@@ -44,11 +46,12 @@ JOIN_MAX = 448
 LABEL = b"atalaia field frame v1"
 NONCE_LABEL = b"atalaia field nonce v1"
 SENDER_SIZE = 8
+TAG_SIZE = 8  # a game key's tag: HMAC-SHA256(game key, "atalaia epoch tag")[:8]
 BOOT_MAX = 0xFFFFFF
 CTR_MAX = 0xFFFF
 
-ANNOUNCE, DISCOVER, INVITE = 1, 2, 3
-KINDS = {"announce": ANNOUNCE, "discover": DISCOVER, "invite": INVITE}
+ANNOUNCE, DISCOVER, INVITE, GAME_OVER = 1, 2, 3, 4
+KINDS = {"announce": ANNOUNCE, "discover": DISCOVER, "invite": INVITE, "game_over": GAME_OVER}
 KIND_NAMES = {v: k for k, v in KINDS.items()}
 
 # What a box answers to an invite (ANNOUNCE key 10).
@@ -59,6 +62,7 @@ RESULT = {name: i for i, name in enumerate(RESULTS)}
 K_KIND, K_DEVICE, K_TOKEN = 1, 2, 3
 K_NAME, K_TIER, K_LAST_GAME, K_LAST_ROLE, K_BATTERY, K_ANSWER, K_RESULT = 4, 5, 6, 7, 8, 9, 10
 K_INVITE, K_PART, K_PARTS, K_CHUNK = 4, 5, 6, 7
+K_GAME, K_KEY_TAG = 4, 5
 KNOWN_KEYS = set(range(1, 11))  # a key another kind uses is not an "unknown" one
 
 _HEADER = Header(vf_make(1, 1, False, True), 0, 0, 0, 0, FIELD_TYPE)
@@ -69,6 +73,13 @@ class FieldFrameError(ValueError):
 
 
 # --- keys --------------------------------------------------------------------
+
+
+def key_tag(game_key: bytes) -> bytes:
+    """A game key's tag (8 bytes), as the boxes' epoch store names the key: it says nothing of the key."""
+    if len(game_key) != 16:
+        raise ValueError("a game key is 16 bytes")
+    return hmac.new(game_key, b"atalaia epoch tag", hashlib.sha256).digest()[:TAG_SIZE]
 
 
 def hkdf_sha256(ikm: bytes, length: int, salt: bytes = b"", info: bytes = b"") -> bytes:
@@ -181,6 +192,11 @@ def validate(msg: dict[str, Any]) -> dict[str, Any]:
                 raise FieldFrameError(f"answer: 1-65535 with a result of {RESULTS}")
     elif kind == "discover":
         pass
+    elif kind == "game_over":
+        if not _uint(msg.get("game_id"), 1, 0xFFFE):
+            raise FieldFrameError("game_id: 1-65534")
+        if not _fixed(msg.get("key_tag"), TAG_SIZE):
+            raise FieldFrameError("key_tag: 8 bytes")
     elif kind == "invite":
         if not _fixed(msg.get("device_id"), DEVICE_SIZE) or not _fixed(msg.get("token"), TOKEN_SIZE):
             raise FieldFrameError("device_id and token are 8 bytes each")
@@ -214,6 +230,8 @@ def body_encode(msg: dict[str, Any]) -> bytes:
         out.update({K_DEVICE: bytes(msg["device_id"]), K_TOKEN: bytes(msg["token"]),
                     K_INVITE: msg["invite_id"], K_PART: msg["part"], K_PARTS: msg["parts"],
                     K_CHUNK: bytes(msg["chunk"])})
+    elif kind == "game_over":
+        out.update({K_GAME: msg["game_id"], K_KEY_TAG: bytes(msg["key_tag"])})
     body = cbor.encode(out)
     if len(body) > BODY_MAX:
         raise FieldFrameError(f"body of {len(body)} bytes; at most {BODY_MAX}")
@@ -223,6 +241,7 @@ def body_encode(msg: dict[str, Any]) -> bytes:
 _ANNOUNCE_KEYS = {K_KIND, K_DEVICE, K_TOKEN, K_NAME, K_TIER, K_LAST_GAME, K_LAST_ROLE, K_BATTERY,
                   K_ANSWER, K_RESULT}
 _INVITE_KEYS = {K_KIND, K_DEVICE, K_TOKEN, K_INVITE, K_PART, K_PARTS, K_CHUNK}
+_GAME_OVER_KEYS = {K_KIND, K_GAME, K_KEY_TAG}
 
 
 def body_decode(data: bytes) -> dict[str, Any]:
@@ -238,7 +257,8 @@ def body_decode(data: bytes) -> dict[str, Any]:
     if list(raw)[0] != K_KIND or not _uint(raw[K_KIND], 0, 255):
         raise FieldFrameError("the kind comes first")
     kind = KIND_NAMES.get(raw[K_KIND])
-    allowed = {"announce": _ANNOUNCE_KEYS, "discover": {K_KIND}, "invite": _INVITE_KEYS}.get(kind or "")
+    allowed = {"announce": _ANNOUNCE_KEYS, "discover": {K_KIND}, "invite": _INVITE_KEYS,
+               "game_over": _GAME_OVER_KEYS}.get(kind or "")
     if allowed is None:
         raise FieldFrameError(f"unknown kind {raw[K_KIND]}")
     for k in raw:
@@ -265,6 +285,11 @@ def body_decode(data: bytes) -> dict[str, Any]:
         names = {K_DEVICE: "device_id", K_TOKEN: "token", K_INVITE: "invite_id", K_PART: "part",
                  K_PARTS: "parts", K_CHUNK: "chunk"}
         for key, name in names.items():
+            if key not in raw:
+                raise FieldFrameError(f"missing key {key}")
+            msg[name] = raw[key]
+    elif kind == "game_over":
+        for key, name in ((K_GAME, "game_id"), (K_KEY_TAG, "key_tag")):
             if key not in raw:
                 raise FieldFrameError(f"missing key {key}")
             msg[name] = raw[key]

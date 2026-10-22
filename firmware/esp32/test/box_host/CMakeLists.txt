@@ -49,6 +49,7 @@ add_executable(box_host
     ${MAIN_DIR}/hal/stub/hal_stub.c
     ${MAIN_DIR}/hal/stub/hal_radio_stub.c
     ${MAIN_DIR}/fw_update.c
+    ${MAIN_DIR}/admin_pin.c
     ${MAIN_DIR}/adoption.c
     ${MAIN_DIR}/cpace.c
     ${MAIN_DIR}/box_pair.c

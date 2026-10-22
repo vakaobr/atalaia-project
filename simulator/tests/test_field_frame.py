@@ -33,7 +33,7 @@ if os.environ.get("ATALAIA_REQUIRE_ALL") == "1" and not _has_crypto():
 
 def fields(v: dict) -> dict:
     out = dict(v["fields"])
-    for k in ("device_id", "token", "chunk"):
+    for k in ("device_id", "token", "chunk", "key_tag"):
         if k in out:
             out[k] = bytes.fromhex(out[k])
     return out
@@ -80,6 +80,19 @@ class BodyTests(unittest.TestCase):
             with self.subTest(change):
                 with self.assertRaises(ff.FieldFrameError):
                     ff.body_encode({**good, **change})
+        over = fields(VECTORS["valid"][7])
+        self.assertEqual(over["kind"], "game_over")
+        for change in ({"game_id": 0}, {"game_id": 65535}, {"key_tag": bytes(7)}):
+            with self.subTest(change):
+                with self.assertRaises(ff.FieldFrameError):
+                    ff.body_encode({**over, **change})
+
+    def test_key_tag_is_the_epoch_stores(self):
+        """GAME_OVER names its game by the key's tag, the one the boxes' epoch store keeps (BN-7)."""
+        tags = json.loads((Path(__file__).resolve().parents[2] / "protocol" / "vectors" / "epoch_tag.json")
+                          .read_text())["valid"]
+        for v in tags:
+            self.assertEqual(ff.key_tag(bytes.fromhex(v["game_key"])).hex(), v["tag"])
 
 
 @unittest.skipUnless(_has_crypto(), "cryptography library not available")

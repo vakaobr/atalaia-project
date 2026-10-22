@@ -139,6 +139,22 @@ static void test_validate_short_pin(void)
     /* Caller validates: fewer than 4 digits. */
 }
 
+/* The setup portal sets a Field Box's first admin PIN; there is no default, and 1234 and the
+ * other easy ones are refused with a clear message (decision AD-29). */
+static void test_portal_refuses_trivial_pins(void)
+{
+    CHECK(wifi_setup_pin_problem("4711") == NULL);
+    CHECK(wifi_setup_pin_problem("80162") == NULL);
+    CHECK(strcmp(wifi_setup_pin_problem("12"), "PIN must be 4-8 digits") == 0);
+    CHECK(strcmp(wifi_setup_pin_problem("12ab"), "PIN must be 4-8 digits") == 0);
+    CHECK(strcmp(wifi_setup_pin_problem(""), "PIN must be 4-8 digits") == 0);
+    static const char *const easy[] = {"1234", "0000", "1111", "4321", "123456", "1212"};
+    for (size_t i = 0; i < sizeof(easy) / sizeof(easy[0]); i++) {
+        const char *why = wifi_setup_pin_problem(easy[i]);
+        CHECK(why != NULL && strstr(why, "too easy to guess") != NULL);
+    }
+}
+
 /* ---- entry point ---- */
 
 void run_wifi_setup_tests(void)
@@ -154,4 +170,5 @@ void run_wifi_setup_tests(void)
     test_validate_bad_region();
     test_validate_non_digit_pin();
     test_validate_short_pin();
+    test_portal_refuses_trivial_pins();
 }

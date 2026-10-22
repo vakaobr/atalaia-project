@@ -1444,6 +1444,101 @@ static void test_lobby_replay_refused(void)
     state_persist_clear();
 }
 
+/* A GAME_OVER field frame for game gid under the tag of the game key `key` (decision OT-13). */
+static void game_over_frame(const uint8_t fkey[16], uint16_t gid, const uint8_t key[16],
+                            uint8_t *keep, size_t *keep_len)
+{
+    atalaia_ff_msg_t m;
+    memset(&m, 0, sizeof(m));
+    m.kind = ATALAIA_FF_GAME_OVER;
+    m.game_id = gid;
+    atalaia_radio_epoch_tag(key, m.key_tag);
+    to_box(fkey, &m, keep, keep_len);
+}
+
+/* OT-7, found on the bench: a controller that restarted without the game's key could not end
+ * its game, and the box stayed in it until it was erased. GAME_OVER, sealed under the field
+ * key, ends the box's own game (its id and its key's tag) exactly as CMD end does: the final
+ * screen, then announcing itself and "ready"; never another game, nor a game that reuses the id
+ * under another key (an old GAME_OVER played back). No timeout ends a game (the maintainer's
+ * choice): a silent controller changes nothing. */
+static void test_lobby_game_over(void)
+{
+    lobby_fixture();
+    uint32_t now = 10;
+    play_and_end(&now);
+    uint8_t token[8];
+    memcpy(token, game.lobby.token, 8);
+    uint8_t key20[16];
+    memcpy(key20, GAME_KEY, 16);
+    key20[0] ^= 0x20; /* invite(): game_key[0] ^= gid */
+    invite(ff_key, token, 0x0C20, 31, 90, NULL, NULL);
+    CHECK(game.phase == BOX_JOINED && game.join.game_id == 0x0C20);
+    cmd_now(FIELD_CMD_START);
+    CHECK(game.phase == BOX_PLAYING);
+    /* The controller falls silent (it restarted without the key): the game goes on. */
+    run_ms(&now, 5 * BOX_ANNOUNCE_MIN_MS);
+    CHECK(game.phase == BOX_PLAYING);
+
+    /* Another game's end, the right id under another game's key, another field's frame: no. */
+    game_over_frame(ff_key, 0x0C21, key20, NULL, NULL);
+    CHECK(game.phase == BOX_PLAYING && game.lobby.games_over_refused == 0);
+    game_over_frame(ff_key, 0x0C20, GAME_KEY, NULL, NULL);
+    CHECK(game.phase == BOX_PLAYING && game.lobby.games_over_refused == 1);
+    uint8_t other_key[16];
+    static const uint8_t other_join[32] = {7, 7, 7};
+    atalaia_ff_key(other_join, other_key);
+    uint32_t ignored = game.lobby.frames_ignored;
+    game_over_frame(other_key, 0x0C20, key20, NULL, NULL);
+    CHECK(game.phase == BOX_PLAYING && game.lobby.frames_ignored == ignored + 1);
+
+    /* Its own game's end: over as on CMD end, then free, announcing itself, "ready". */
+    static uint8_t rec[ATALAIA_FF_MAX];
+    size_t rec_len = 0;
+    runner.queues.screen_count = 0;
+    game_over_frame(ff_key, 0x0C20, key20, rec, &rec_len);
+    CHECK(game.phase == BOX_ENDED && game.lobby.games_over_heard == 1);
+    CHECK(box_lobby_available(&game) && box_lobby_played_to_the_end(&game, 0x0C20));
+    const char *t = last_screen(NULL);
+    CHECK(t != NULL && strcmp(t, "final_score") == 0); /* the mode's game over, as on CMD end */
+    int mark = shell.count;
+    run_ms(&now, BOX_ANNOUNCE_FIRST_MAX_MS + 100);
+    atalaia_ff_msg_t m;
+    CHECK(field_frames_since(mark, &m) >= 1 && m.kind == ATALAIA_FF_ANNOUNCE);
+    CHECK(m.last_game == 0x0C20 && strcmp(m.last_role, "zone") == 0);
+    run_ms(&now, BOX_READY_MS);
+    CHECK(strcmp(shell.screen, "ready") == 0);
+    run_ms(&now, BOX_END_LINGER_MS);
+    CHECK(game.phase == BOX_IDLE); /* no ACK will come: it leaves after the linger */
+    /* Played back now: nothing to end. */
+    box_game_on_packet(&game, rec, rec_len, -60);
+    CHECK(game.lobby.games_over_heard == 1 && game.phase == BOX_IDLE);
+
+    /* Four more games: 0x0C20 is no longer among the last four played to the end. */
+    play_and_end(&now);
+    play_and_end(&now);
+    play_and_end(&now);
+    play_and_end(&now);
+    CHECK(!box_lobby_played_to_the_end(&game, 0x0C20));
+    /* A new game 0x0C20 under another key, by card: the old GAME_OVER played back is refused.
+     * Its own ends it before its start too (the GM ended a game nobody had started). */
+    atalaia_join_t j;
+    make_join(&j);
+    j.game_id = 0x0C20;
+    j.game_key[0] ^= 0x77;
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    CHECK(game.phase == BOX_JOINED);
+    box_game_on_packet(&game, rec, rec_len, -60);
+    CHECK(game.phase == BOX_JOINED && game.lobby.games_over_refused == 2);
+    uint8_t key77[16];
+    memcpy(key77, GAME_KEY, 16);
+    key77[0] ^= 0x77;
+    game_over_frame(ff_key, 0x0C20, key77, NULL, NULL);
+    CHECK(game.phase == BOX_ENDED && game.lobby.games_over_heard == 2);
+    state_persist_clear();
+}
+
 static void test_lobby_discover_and_ready_screen(void)
 {
     lobby_fixture();
@@ -1586,6 +1681,7 @@ void run_box_game_tests(void)
     test_lobby_announce_and_invite();
     test_lobby_refusals();
     test_lobby_replay_refused();
+    test_lobby_game_over();
     test_lobby_discover_and_ready_screen();
     test_lobby_device_id();
     test_battery_low();

@@ -64,7 +64,7 @@ from .reinvite import Reinvite
 from .config import Config
 from .modem_framing import RxPacket
 from .modes import ModeRegistry, resolve_params
-from .store import Store
+from .store import Store, epoch_tag
 
 log = logging.getLogger("atalaia.controller")
 
@@ -415,6 +415,9 @@ class Controller:
         self.fc = fc
         self.game = game
         self._key = key
+        # The key's tag (not secret) outlives the key, so a GAME_OVER can still name this game
+        # after a restart without the key (decision OT-13).
+        self.store.set_setting(f"key_tag:{game['id']}", epoch_tag(key))
         self.scenario_names = scenarios.node_names(self, game["id"])
         # Each box's device id as its HELLOs gave it, and the node ids two devices shared (BN-18).
         self._devices: dict[int, str] = {}
@@ -1250,11 +1253,36 @@ class Controller:
             self.store.update_game(game_id, game_key=None)  # the key does not outlive the game
             if self.positions is not None:
                 self.positions.end_game(game_id)  # ADR-P3-6: positions last as long as the game
+            tag = epoch_tag(self._key) if self._key else self.store.get_setting(f"key_tag:{game_id}")
+            key_lost = self.key_lost
             out = self._set_state(game_id, "ended", ended_at=time.time())
             self._deactivate()
             if self.reinvite is not None:
                 self.reinvite.forget_game(game_id)  # no invite into a game that is over
-            return self.public_game(self.store.game(game_id) or out)
+            told = self._tell_game_over(game, tag, key_lost)
+            result = self.public_game(self.store.game(game_id) or out)
+            result["game_over_frame"] = told
+            return result
+
+    def _tell_game_over(self, game: dict[str, Any], tag: Optional[str], key_lost: bool) -> str:
+        """GAME_OVER to the game's boxes over the field radio (decisions OT-7, OT-13): "sent",
+        "no_tag" (a game this controller made before it kept key tags), "no_join_key" or
+        "no_radio". Always after a game this controller ran ends, besides its CMD end; the only
+        way to its boxes when the controller restarted without the game's key."""
+        self.store.delete_setting(f"key_tag:{game['id']}")
+        if game.get("joined"):
+            return "standby"  # a standby's game may still run on its primary: never ended from here
+        if tag is None:
+            told = "no_tag"
+        elif self.reinvite is None:
+            told = "no_join_key"
+        elif self.reinvite.game_over(game["id"], bytes.fromhex(tag), game.get("channel_hz") or self.cfg.channel_hz):
+            told = "sent"
+        else:
+            told = "no_radio"
+        if key_lost:
+            log.warning("game %d ended without its key: its boxes told over the field radio: %s", game["id"], told)
+        return told
 
     def _leave_standby(self, game_id: int, reason: str) -> dict[str, Any]:
         """A standby controller stops following a game (the GM left it, or it ended)."""
@@ -1262,6 +1290,7 @@ class Controller:
             self.store.save_scores(game_id, self.fc.total_scores)
             self._save_game_time(force=True)
         self.store.update_game(game_id, game_key=None)
+        self.store.delete_setting(f"key_tag:{game_id}")
         log.info("standby: left game %d (%s)", game_id, reason)
         out = self._set_state(game_id, "ended", ended_at=time.time())
         self._deactivate()

@@ -357,6 +357,23 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("game-state")).to_have_text("running")
         self.assertEqual(self.field.bundle.controller.game["state"], "running")
 
+    def test_ending_a_game_whose_key_was_lost(self):
+        """Decisions OT-7 and OT-13: a controller that restarted without the game's key says so on the
+        game card; its End asks to tell the boxes over the field radio, and does (GAME_OVER)."""
+        game = self.field.create_game("Domingo", start=True)
+        ctrl = self.field.bundle.controller
+        with ctrl._lock:  # as a restart with persist_game_key = false leaves it (engine._restore)
+            ctrl._deactivate()
+            ctrl.game, ctrl.key_lost = ctrl.store.game(game["id"]), True
+        page = self.console()
+        expect(page.get_by_test_id("game-key-lost")).to_contain_text("reiniciou sem a chave do jogo")
+        page.get_by_test_id("game-end").click()
+        expect(page.locator(".confirm-q")).to_have_text("Terminar o jogo e avisar as caixas pelo rádio do campo?")
+        page.get_by_test_id("game-end-yes").click()
+        expect(page.get_by_test_id("toast")).to_contain_text("As caixas do jogo foram avisadas pelo rádio do campo")
+        expect(page.get_by_test_id("game-ended")).to_be_visible()
+        self.assertEqual(ctrl.store.game(game["id"])["state"], "ended")
+
     def ready_game_with_the_dialog(self, lang: str = "en", **spec):
         """A Hold-All game (min_zones 2 by default) waiting for its zone box (node 7), and the
         console with the invite dialog open."""

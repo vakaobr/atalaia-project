@@ -26,10 +26,27 @@ void preset_ui_init(preset_ui_t *ui, const char *admin_pin, int preset_count)
     ui->timer_duration_s = 600; /* 10 minutes default */
 }
 
+void preset_ui_set_guard(preset_ui_t *ui, admin_pin_t *guard)
+{
+    ui->guard = guard;
+}
+
+/* The PIN typed: through the box's check when it has one (admin_pin.h). */
+static bool pin_ok(preset_ui_t *ui)
+{
+    if (ui->guard == NULL) return strcmp(ui->pin_buffer, ui->admin_pin) == 0;
+    admin_pin_result_t r = admin_pin_check(ui->guard, ui->pin_buffer);
+    ui->no_pin = r == ADMIN_PIN_NOT_SET;
+    ui->locked_min = admin_pin_wait_min(ui->guard);
+    return r == ADMIN_PIN_OK;
+}
+
 bool preset_ui_handle_key(preset_ui_t *ui, char key)
 {
     if (!ui) return false;
     ui->pin_error = false;
+    ui->locked_min = 0;
+    ui->no_pin = false;
 
     switch (ui->state) {
     case PRESET_UI_STATE_PIN_ENTRY:
@@ -42,7 +59,7 @@ bool preset_ui_handle_key(preset_ui_t *ui, char key)
         }
         if (key == '#') {
             /* Check PIN. */
-            if (strcmp(ui->pin_buffer, ui->admin_pin) == 0) {
+            if (pin_ok(ui)) {
                 ui->pin_accepted = true;
                 ui->state = PRESET_UI_STATE_PRESET_LIST;
             } else {
@@ -50,7 +67,7 @@ bool preset_ui_handle_key(preset_ui_t *ui, char key)
                 ui->pin_pos = 0;
                 ui->pin_buffer[0] = '\0';
                 ui->pin_accepted = false;
-                ui->pin_error = true;
+                ui->pin_error = ui->locked_min == 0 && !ui->no_pin;
             }
             return true;
         }
@@ -177,8 +194,15 @@ bool preset_ui_screen(const preset_ui_t *ui, const char *const *labels, int labe
     switch (ui->state) {
     case PRESET_UI_STATE_PIN_ENTRY:
         tmpl = "pin_entry";
-        snprintf(data, sz, "{\"digits\":%d,\"error\":%s}", ui->pin_pos,
-                 ui->pin_error ? "true" : "false");
+        if (ui->no_pin) {
+            snprintf(data, sz, "{\"digits\":%d,\"error\":false,\"no_pin\":true}", ui->pin_pos);
+        } else if (ui->locked_min > 0) {
+            snprintf(data, sz, "{\"digits\":%d,\"error\":false,\"locked_min\":%lu}", ui->pin_pos,
+                     (unsigned long)ui->locked_min);
+        } else {
+            snprintf(data, sz, "{\"digits\":%d,\"error\":%s}", ui->pin_pos,
+                     ui->pin_error ? "true" : "false");
+        }
         break;
 
     case PRESET_UI_STATE_PRESET_LIST: {

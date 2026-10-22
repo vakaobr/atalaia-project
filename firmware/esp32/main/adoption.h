@@ -16,9 +16,11 @@
  * An unadopted box takes the first field that offers itself. An adopted box
  * takes the same field again (the name may change) and another field's key
  * only with its admin PIN: typed on the keypad after the card, or given in
- * "@adopt"; five wrong PINs lock adoption until the box restarts. Nothing
- * is adopted while a field game is joined. "@joinkey <64 hex>" follows the
- * same rules without a PIN.
+ * "@adopt"; the PIN is checked by admin_pin.h, whose failure count survives
+ * a restart (after five wrong PINs in a row each try waits 1, 2, 4 ... 60
+ * minutes, decision AD-28), and a Field Box with no admin PIN set moves to
+ * no other field. Nothing is adopted while a field game is joined.
+ * "@joinkey <64 hex>" follows the same rules without a PIN.
  *
  * Replies on the console are one line, "ATALAIA-ADOPT {json}", which the
  * controller reads. Platform-free: the shell gives the storage, the screen
@@ -31,6 +33,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "admin_pin.h"
+
 #define ADOPTION_KEY_SIZE     32
 #define ADOPTION_NAME_MAX     48 /* bytes of UTF-8 */
 #define ADOPTION_CHECK_SIZE   8
@@ -38,10 +42,10 @@
 #define ADOPTION_CARD_MAX     (ADOPTION_CARD_MIN + ADOPTION_NAME_MAX)
 #define ADOPTION_NDEF_TYPE    "application/vnd.atalaia.field"
 #define ADOPTION_FP_SIZE      10 /* "XXXX-XXXX" and the NUL */
-#define ADOPTION_PIN_MAX      8
-#define ADOPTION_PIN_TRIES    5     /* wrong PINs before adoption locks until a restart */
-#define ADOPTION_PIN_WAIT_MS  60000 /* a card waits this long for its PIN */
-#define ADOPTION_SCREEN_MS    4000  /* a result stays on the screen this long */
+#define ADOPTION_PIN_MAX      ADMIN_PIN_MAX
+#define ADOPTION_PIN_TRIES    ADMIN_PIN_FREE_TRIES /* wrong PINs in a row before the waits */
+#define ADOPTION_PIN_WAIT_MS  60000                /* a card waits this long for its PIN */
+#define ADOPTION_SCREEN_MS    4000                 /* a result stays on the screen this long */
 #define ADOPTION_REPLY_PREFIX "ATALAIA-ADOPT "
 #define ADOPTION_REPLY_MAX    512
 
@@ -83,15 +87,16 @@ typedef enum {
     ADOPT_READOPTED,   /* moved from another field, with the admin PIN */
     ADOPT_NEED_PIN,    /* adopted to another field: the admin PIN is needed */
     ADOPT_BAD_PIN,
-    ADOPT_LOCKED,   /* too many wrong PINs since the box started */
+    ADOPT_LOCKED,   /* too many wrong PINs: a wait runs (admin_pin.h) */
     ADOPT_BUSY,     /* a field game is joined */
     ADOPT_BAD_KEY,  /* not 64 hex digits, or a name that is not allowed */
     ADOPT_BAD_CARD, /* a field card that does not decode */
     ADOPT_STORE_FAILED,
+    ADOPT_NO_PIN, /* adopted to another field, and no admin PIN is set on this box */
 } adopt_result_t;
 
 /* "adopted", "same", "readopted", "need_pin", "bad_pin", "locked", "busy",
- * "bad_key", "bad_card", "store_failed". */
+ * "bad_key", "bad_card", "store_failed", "no_pin". */
 const char *adopt_result_name(adopt_result_t r);
 static inline bool adopt_result_ok(adopt_result_t r)
 {
@@ -117,12 +122,12 @@ typedef struct {
 
 typedef struct {
     adoption_ops_t ops;
-    char admin_pin[ADOPTION_PIN_MAX + 1];
+    admin_pin_t *pin;    /* the admin PIN's check: the shell's (shared with the picker) */
+    admin_pin_t own_pin; /* adoption_init's, in RAM, until adoption_set_pin */
     bool adopted;
     uint8_t key[ADOPTION_KEY_SIZE];
     char name[ADOPTION_NAME_MAX + 1];
     char fingerprint[ADOPTION_FP_SIZE];
-    uint8_t pin_failures;
     /* Another field's card, waiting for the admin PIN on the keypad. */
     bool pending;
     adoption_card_t pending_card;
@@ -134,7 +139,10 @@ typedef struct {
     uint32_t overlay_until_ms;
 } adoption_t;
 
+/* admin_pin: checked in RAM only (host tests); a box gives its shared check with
+ * adoption_set_pin, whose count is in NVS. */
 void adoption_init(adoption_t *a, const adoption_ops_t *ops, const char *admin_pin);
+void adoption_set_pin(adoption_t *a, admin_pin_t *pin);
 /* At boot, the key and name stored in NVS (a development key is not given here). */
 void adoption_restore(adoption_t *a, const uint8_t key[ADOPTION_KEY_SIZE], const char *name);
 

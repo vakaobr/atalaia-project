@@ -13,8 +13,9 @@ failover_mode = "manual"          # "auto" only after field testing (ADR-P2-8)
 power_source = 3                  # 3 mains or USB, 2 large battery, 1 small battery
 battery_pct = 100
 storage_ok = true
-persist_game_key = false          # true: the game survives a controller restart, but
-                                  # the key is then on the Pi's disk (see README)
+persist_game_key = true           # the live game survives a controller restart; its key
+                                  # is on the Pi's disk until the game ends, next to the
+                                  # field join key, which is already there (see README)
 
 [radio]
 # The field's channel until the GM chooses one in the console (Settings), which

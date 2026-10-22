@@ -115,7 +115,11 @@
       "last": "Only {have} × {role} joined and {param} is {value}: the countdown can run from the start."
     },
     "settings": "Game settings",
-    "settings_hint": "Set when the game was created; to change them, end this game and create another one."
+    "settings_hint": "Set when the game was created; to change them, end this game and create another one.",
+    "key_lost_notice": "This controller restarted without the game's key (persist_game_key was off): the game can only be ended. Ending it tells its boxes over the field radio, sealed with the field join key, and they leave the game.",
+    "confirm_end_key_lost": "End the game and tell its boxes over the field radio?",
+    "over_told": "The game's boxes were told over the field radio that it is over.",
+    "over_not_told": "The boxes could not be told over the radio ({why}): restart each box, or join it to the next game with a card."
   },
   "controller": {
     "title": "Field controller",
@@ -666,12 +670,12 @@
     "none": "No box found. Check the cable (a data cable, not only power) and that the box is switched on.",
     "silent": "{n} port(s) did not answer",
     "busy": "a game is joined: end it first",
-    "locked": "too many wrong PINs: restart the box",
+    "locked": "too many wrong PINs: wait {min} min (a restart does not shorten it)",
     "adopt": "Adopt",
     "confirm": "Adopt box {name} ({mac}) for this field?",
     "confirm_hint": "The controller checks it is still that box before it writes the key.",
     "pin": "The box's admin PIN",
-    "pin_hint": "This box belongs to another field (or to this field's old key): its admin PIN is needed. Five wrong PINs lock adoption until the box restarts.",
+    "pin_hint": "This box belongs to another field (or to this field's old key): its admin PIN is needed. After five wrong PINs in a row each try waits 1, 2, 4… up to 60 minutes, also after the box restarts.",
     "state": {
       "none": "not adopted",
       "this_field": "adopted by this field",
@@ -684,7 +688,8 @@
       "readopted": "Box {name} ({mac}) moved to this field.",
       "need_pin": "Box {name} belongs to another field: type its admin PIN.",
       "bad_pin": "Wrong admin PIN for box {name}.",
-      "locked": "Box {name}: too many wrong PINs; restart it before trying again.",
+      "locked": "Box {name}: too many wrong PINs; try again when the box says so (up to 60 minutes).",
+      "no_pin": "Box {name} belongs to another field and has no admin PIN: set one on the box's USB console (\"@admin-pin\").",
       "busy": "Box {name} has a game joined: end the game first.",
       "bad_key": "Box {name} refused the key.",
       "bad_card": "A damaged field card was tapped.",

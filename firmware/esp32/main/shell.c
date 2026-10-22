@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "admin_pin.h"
 #include "adoption.h"
 #include "atalaia/join.h"
 #include "box_pair.h"
@@ -134,6 +135,8 @@ static uint8_t nfc_mem[888]; /* NTAG216 user memory */
 static uint8_t nfc_last_uid[10];
 static uint8_t nfc_last_uid_len;
 static uint32_t nfc_last_poll_ms;
+/* The admin PIN (admin_pin.h): one check for the picker and adoption, its failure count in NVS. */
+static admin_pin_t admin_guard;
 /* Adoption (adoption.h): the field card, "@adopt" over the USB cable, "@joinkey". */
 static adoption_t adopt;
 static char adopt_mac[18];
@@ -202,9 +205,11 @@ static void load_preset_list(void)
 
 static void start_picker(void)
 {
-    char admin_pin[9] = "1234";
-    config_store_get_str("admin_pin", admin_pin, sizeof(admin_pin));
-    preset_ui_init(&preset_ui, admin_pin, preset_count);
+    preset_ui_init(&preset_ui, NULL, preset_count);
+    preset_ui_set_guard(&preset_ui, &admin_guard);
+    /* A wait still running, or no PIN set: said at once (decisions AD-28, AD-29). */
+    preset_ui.locked_min = admin_pin_wait_min(&admin_guard);
+    preset_ui.no_pin = !admin_pin_is_set(&admin_guard);
     memset(&picker_screen, 0, sizeof(picker_screen));
     picker_active = true;
     show_picker();
@@ -261,6 +266,14 @@ static void serial_input_init(void)
 
 static void serial_command(const char *cmd)
 {
+    if (SERIAL_ADOPT_ON || SERIAL_JOIN_ON) {
+        /* "@admin-pin <new>" while none is set, "@admin-pin <PIN> <new>" (decision AD-30). */
+        static char pin_reply[160];
+        if (admin_pin_command(&admin_guard, cmd, pin_reply, sizeof(pin_reply))) {
+            ESP_LOGI(TAG, "%s", pin_reply);
+            return;
+        }
+    }
     bool adopt_cmd =
         SERIAL_ADOPT_ON && (strcmp(cmd, "adopt-info") == 0 || strncmp(cmd, "adopt ", 6) == 0);
     bool joinkey_cmd = SERIAL_JOIN_ON && strncmp(cmd, "joinkey ", 8) == 0;
@@ -515,6 +528,71 @@ static bool portal_join_key(const char *hex)
     return strcmp(reply, "join key: stored") == 0;
 }
 
+/* ---- the admin PIN (admin_pin.h, decisions AD-28 to AD-30) ---- */
+
+#if CONFIG_ATALAIA_SKIP_SETUP
+#define ADMIN_PIN_BENCH_BUILD true
+#else
+#define ADMIN_PIN_BENCH_BUILD false
+#endif
+
+static bool pin_load_failures(void *user, uint32_t *failures)
+{
+    (void)user;
+    *failures = config_store_get_u32("pin_fails", 0);
+    return true;
+}
+
+static bool pin_store_failures(void *user, uint32_t failures)
+{
+    (void)user;
+    config_store_set_u32("pin_fails", failures);
+    return config_store_get_u32("pin_fails", failures + 1u) == failures;
+}
+
+static bool pin_store(void *user, const char *pin)
+{
+    (void)user;
+    config_store_set_str("admin_pin", pin);
+    return true;
+}
+
+static uint32_t pin_now(void *user)
+{
+    (void)user;
+    return now_ms();
+}
+
+static void admin_guard_init(void)
+{
+    char stored[ADMIN_PIN_MAX + 2] = "";
+    bool have = config_store_get_str("admin_pin", stored, sizeof(stored)) && stored[0] != '\0';
+    char pin[ADMIN_PIN_MAX + 1];
+    admin_pin_effective(have ? stored : NULL, ADMIN_PIN_BENCH_BUILD, pin);
+    if (ADMIN_PIN_BENCH_BUILD && !have) {
+        ESP_LOGW(TAG, "admin PIN %s (a bench build, CONFIG_ATALAIA_SKIP_SETUP): never on a field",
+                 ADMIN_PIN_BENCH);
+    } else if (pin[0] == '\0') {
+        ESP_LOGW(TAG,
+                 "no admin PIN set%s: the game picker and adoption to another field are "
+                 "refused until one is (\"@admin-pin <PIN>\" on the USB console)",
+                 have ? " (the stored one is too easy to guess)" : "");
+    }
+    admin_pin_ops_t ops = {.load_failures = pin_load_failures,
+                           .store_failures = pin_store_failures,
+                           .store_pin = pin_store,
+                           .now_ms = pin_now,
+                           .ctx = NULL};
+    admin_pin_init(&admin_guard, &ops, pin);
+    memset(stored, 0, sizeof(stored));
+    memset(pin, 0, sizeof(pin));
+    if (admin_pin_wait_ms(&admin_guard) > 0) {
+        ESP_LOGW(TAG, "%lu wrong admin PINs in a row: the next try waits %lu min",
+                 (unsigned long)admin_guard.failures,
+                 (unsigned long)admin_pin_wait_min(&admin_guard));
+    }
+}
+
 /* ---- adoption's shell ops (adoption.h) ---- */
 
 static bool adopt_busy(void *user)
@@ -630,14 +708,14 @@ static void box_start(const char *tier)
         ESP_LOGW(TAG, "NVS encryption is off: the game key and the field join key are stored in "
                       "plain NVS (development only; BRING_UP.md step 0)");
     }
-    char admin_pin[9] = "1234";
-    config_store_get_str("admin_pin", admin_pin, sizeof(admin_pin));
+    admin_guard_init();
     adoption_ops_t aops = {.busy = adopt_busy,
                            .store = adopt_store,
                            .screen = box_screen,
                            .log = adopt_log,
                            .ctx = NULL};
-    adoption_init(&adopt, &aops, admin_pin);
+    adoption_init(&adopt, &aops, NULL);
+    adoption_set_pin(&adopt, &admin_guard);
     uint8_t mac[6];
     if (esp_efuse_mac_get_default(mac) == ESP_OK) {
         /* As the ESP32-S3's USB-Serial-JTAG gives it for its serial number. */

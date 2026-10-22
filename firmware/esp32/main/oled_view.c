@@ -118,6 +118,16 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
         dots(v, out->big, sizeof(out->big));
         set_text(out->foot, sizeof(out->foot),
                  screen_json_true(data, "error") ? TXO_WRONG_PIN : TXO_ENTER_DELETE);
+        /* The wait after wrong PINs, or no PIN set (decisions AD-28, AD-29). */
+        long wait_min = 0;
+        if (screen_json_true(data, "no_pin")) {
+            set_text(out->big, sizeof(out->big), TXO_NO_PIN);
+            set_text(out->foot, sizeof(out->foot), TXO_SET_PIN);
+        } else if (screen_json_int(data, "locked_min", &wait_min) && wait_min > 0) {
+            set_text(out->big, sizeof(out->big), TXO_PIN_LOCKED);
+            snprintf(out->foot, sizeof(out->foot), box_text(TXO_AGAIN_IN_MIN),
+                     (unsigned long)wait_min);
+        }
         return true;
     }
     if (strcmp(t, "preset_select") == 0) {

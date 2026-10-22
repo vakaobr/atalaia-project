@@ -15,6 +15,12 @@
  * end. It answers every invite it could read (accepted, busy, refused...) with
  * an ANNOUNCE carrying the invite's id and the result, and changes its token
  * when it accepts, so an old invite recorded and played again never works.
+ *
+ * In a game, it takes one kind: GAME_OVER for its own game id and its game key's
+ * tag (decision OT-13), which a controller sends when the GM ends a game, also one
+ * whose key it no longer has (a restart without persist_game_key): the box ends
+ * the game as on CMD end. A GAME_OVER for another game, or for its game id under
+ * another key (an old game's, played back), changes nothing.
  */
 #include <stdarg.h>
 #include <stdio.h>
@@ -314,6 +320,29 @@ static void on_invite(box_game_t *g, const atalaia_ff_msg_t *m)
     answer(g, m->invite_id, result);
 }
 
+/* "Game N (its key's tag T) is over" (decision OT-13): only the box's own game, named by its id
+ * and its key's tag, ends. A game's end is a fact that stays true, so the frame needs no time:
+ * played back later it can only end that same game again, which the box no longer joins
+ * (played to its end, BN-19); a new game with the same id has another key, so another tag. */
+static void on_game_over(box_game_t *g, const atalaia_ff_msg_t *m)
+{
+    box_lobby_t *l = &g->lobby;
+    if (g->phase != BOX_JOINED && g->phase != BOX_PLAYING) return; /* no game, or over already */
+    if (m->game_id != g->join.game_id) return;                     /* another game's */
+    uint8_t tag[ATALAIA_EPOCH_TAG_SIZE];
+    atalaia_radio_epoch_tag(g->join.game_key, tag);
+    bool same = memcmp(tag, m->key_tag, sizeof(tag)) == 0;
+    memset(tag, 0, sizeof(tag));
+    if (!same) {
+        l->games_over_refused++;
+        say(g, "game over for game %u refused: another game's key", m->game_id);
+        return;
+    }
+    l->games_over_heard++;
+    say(g, "game %u is over (said by a field controller)", m->game_id);
+    box_game_end_by_field(g);
+}
+
 bool box_lobby_on_packet(box_game_t *g, const uint8_t *pkt, size_t len)
 {
     if (!atalaia_ff_is_frame(pkt, len)) return false;
@@ -335,6 +364,7 @@ bool box_lobby_on_packet(box_game_t *g, const uint8_t *pkt, size_t len)
         break;
     }
     case ATALAIA_FF_INVITE: on_invite(g, &m); break;
+    case ATALAIA_FF_GAME_OVER: on_game_over(g, &m); break;
     default: break; /* other boxes' announcements */
     }
     memset(&m, 0, sizeof(m));
