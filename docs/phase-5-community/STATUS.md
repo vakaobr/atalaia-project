@@ -9,7 +9,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 **Phase status:** In progress
 **Risk level:** Medium
 **Last updated:** 2026-10-22 (plan phases 8 and 9 built; plan phase 7 built; plan phase 13b built; plan phase 13a built; plan phases 3-6 built, P5B-9 answered; plan phase 2 built, plan phase 13 planned from P5R-8; refreshed after phases 2-4 software; first written 2026-10-18)
-**Next step:** plan phase 10 (German), in progress; creating the registry repository waits for the maintainer; plan phase 13's test on real boxes is HW3
+**Next step:** the review of the German (P5H-5); creating the registry repository waits for the maintainer; plan phase 13's test on real boxes is HW3
 
 Phase 5 is the community layer: visual mode editor (Blockly), mode
 registry with signing and a verified badge, carrier PCB, translations,
@@ -147,6 +147,16 @@ section 16).
   format, the manifest and the index. AC-11 met. Decisions P5G-12 to P5G-14
   (open; P5G-2, P5G-3, P5G-8, P5G-9, P5G-12, P5G-13 and P5G-14 for the
   maintainer: governance, who holds the keys, moderation, licensing).
+- [x] **Plan phase 10, German (2026-10-22), in software:** German in the
+  project page (`/de/`), the GM console, the mode editor (with Blockly's own
+  German), the app and the Field Box's screens (join key 15 `de`; the fonts
+  gain Ä Ö Ü ä ö ü ß, +9.2 KB; older firmware shows English);
+  `tools/i18n_check.py` checks every part against English in `tools/check.sh`
+  (a missing German key shows English and is only a warning; the project page
+  must stay complete); `docs/translations/` (process, glossary, status).
+  Drafted by an AI model, **not yet reviewed by a native-speaking player**
+  (`docs/translations/status.yaml`). AC-7 met in software. Decisions P5H-1 to
+  P5H-11 (open; P5H-5, P5H-10 and P5H-11 for the maintainer).
 
 ## Refresh 2026-10-22: what changed
 
@@ -179,7 +189,7 @@ section 16).
 | 7 | Scenario blocks in the console | Software | **Built 2026-10-22** |
 | 8 | Registry repository template | Software; publishing needs the maintainer | **Built 2026-10-22** (the repository itself waits for the maintainer) |
 | 9 | Community processes | Software | **Built 2026-10-22** |
-| 10 | German | Software (after P5R-10) | |
+| 10 | German | Software (after P5R-10) | **Built 2026-10-22** (AI-drafted, review pending) |
 | 11 | Traditional Chinese (Taiwan) | Software | |
 | 12 | Build guides for other node types | Software | |
 | HW1 | Carrier PCB | Needs hardware | |
@@ -259,7 +269,8 @@ section 16).
    fetching from the bench controller; and the end-to-end test of the C host
    box (`box_host --mode-keys --mode-source`) against the real controller
    over HTTPS, which the host tests only model with files.
-2. Plan phase 10 (German first, P5R-10), in progress. Plan phase 7 is built;
+2. The review of the German by German-speaking players (P5H-5); mode names and
+   screens in German (P5H-7). Plan phase 7 is built;
    its P5F-2 (the CSP's two style hashes instead of `'unsafe-inline'`), P5F-4
    (refuse rather than rewrite; comments go once the blocks change the YAML)
    and P5F-5 (the block set, typed references) are for the maintainer. Plan

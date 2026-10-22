@@ -706,9 +706,9 @@ roadmap:
     short: >-
       Visual mode editor complete in software, tested live in the simulator; signed mode packages, a
       sandbox-escape battery in CI, the field controller installing signed modes, boxes getting the
-      signed modes they lack from the GM console, scenarios built from blocks in the console, and
-      the mode registry ready as a template, with its checks and the verified badge. Next: creating
-      the registry, translations.
+      signed modes they lack from the GM console, scenarios built from blocks in the console, the
+      mode registry ready as a template, with its checks and the verified badge, and German (a
+      draft, being reviewed). Next: creating the registry, more translations.
     text: >-
       Visual mode editor, mode registry, carrier PCB (a ready-made circuit board that makes builds
       easier), translations, build guides for other node types. Built in software: the visual mode
@@ -733,8 +733,12 @@ roadmap:
       checked automatically (its signature, that its source is what was signed, its licence, its
       tests in the simulator), and a mode the project has reviewed gets the verified badge, the
       project's own signature, which is what lets it reach the boxes. How to submit a mode, the
-      review checklist, keys and moderation are written down. Next: creating the registry from its
-      template; German and Traditional Chinese; the carrier PCB after the first built boxes.
+      review checklist, keys and moderation are written down. Atalaia is now in German too (this
+      page, the GM console, the mode editor, the app and the Field Box's screens), drafted by an AI
+      model and not yet reviewed by German-speaking players: if you play in German, help us review
+      it; translations into other languages start at docs/translations. Next: creating the registry
+      from its template; the review of the German; Traditional Chinese; the carrier PCB after the
+      first built boxes.
     gate: Ongoing after the first release.
 
 hub:

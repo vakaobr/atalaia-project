@@ -186,7 +186,7 @@ plus, depending on what the plan phase touches:
 | 7 | Scenario blocks in the console | a block view of the scenario builder writing the same YAML, en + pt, console browser tests | Software, now | 1 | M | **Built 2026-10-22** (P5F-1 to P5F-12) |
 | 8 | Registry repository template | `index.json`, `keys/`, `revoked.json`, the registry CI workflow as files under `registry/template/` (AC-6 in this repository) | Software, now; publishing needs the maintainer | 4, 5 | S | **Built 2026-10-22** (P5G-1 to P5G-11) |
 | 9 | Community processes | CONTRIBUTING.md "Submitting a community mode", review checklist, verified badge, RFC for the package format (AC-11) | Software, now | 4, 8 | S | **Built 2026-10-22** (P5G-12 to P5G-14) |
-| 10 | German | site, console, editor, app and box texts in German; `tools/i18n_check.py` across domains (AC-7) | Software, now (on a real box: with the boards) | -- | M | After the maintainer confirms P5R-10 |
+| 10 | German | site, console, editor, app and box texts in German; `tools/i18n_check.py` across domains (AC-7) | Software, now (on a real box: with the boards) | -- | M | **Built 2026-10-22** (P5H-1 to P5H-11; German drafted by an AI model, native review pending) |
 | 11 | Traditional Chinese (Taiwan) | the same, with CJK glyphs in the box's fonts and the app | Software, now; flash budget on the box to check | 10 | M | |
 | 12 | Build guides for other node types | satellite, I/O pod, target addon as text, rendered on the project page (AC-10 text) | Software, now | -- | S | |
 | HW1 | Carrier PCB | KiCad schematic and layout, ERC/DRC in CI (AC-9) | Needs hardware (3 perfboard boxes) | phase 1 | -- | |
@@ -198,8 +198,9 @@ Plan phases 4-6 and 7 can run in parallel worktrees with 2-3; 10-12 are
 independent of the rest; 13 needs 4, 5 and 6 (its 13a and 13b can then
 run in parallel). Sizes: L about a week of agent work.
 
-**Next (2026-10-22, plan phases 1-9 and 13 built in software): plan phase 10
-(German first, in progress); plan phase 13 on real boxes in HW3.**
+**Next (2026-10-22, plan phases 1-10 and 13 built in software): the review of the
+German by German-speaking players (P5H-5); the leftovers (the editor making packages,
+contract cases for the mode-package endpoints); plan phase 13 on real boxes in HW3.**
 
 ---
 
@@ -682,7 +683,7 @@ release.
 | AC-4 | The registry index format is defined and documented | 4 | **Met in software (2026-10-22)**: `registry/schema/index.schema.json`, `protocol/mode-packages.md` |
 | AC-5 | Mode packages are Ed25519-signed and verifiable | 4 | **Met in software (2026-10-22)**: `tools/mode_package.py`, the shared vectors |
 | AC-6 | Registry CI runs mode tests and checks licences | 8 | **Met in this repository's template (2026-10-22)**: `registry/template/.github/workflows/registry.yml` run on a sample submission by CI's `registry-template` job; in `atalaia-modes` once the maintainer creates it |
-| AC-7 | At least one language beyond en/pt on the site | 10 | Pending |
+| AC-7 | At least one language beyond en/pt on the site | 10 | **Met in software (2026-10-22)**: `/de/` built and checked by `build_site.py --check`; review pending (P5H-5) |
 | AC-8 | Built-in modes carry English and Portuguese texts | -- | **Met differently**: in `mode.yaml`'s `i18n:` (P4R22), every built-in mode |
 | AC-9 | The carrier PCB schematic passes KiCad ERC | HW1 | Pending (needs hardware) |
 | AC-10 | Build guides exist for the Field Box and the Satellite | 12, HW2 | Field Box done (`hardware/field-box/BUILD.md`); the rest pending |
