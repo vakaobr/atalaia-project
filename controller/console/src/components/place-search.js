@@ -52,9 +52,12 @@ export function placeOf(r) {
     return { name, lat, lon, bounds };
 }
 
-/** Nominatim with the policy's limits: one search at a time, one a second, the same question once. */
+/** Nominatim with the policy's limits: one search at a time, one a second, the same question once.
+ * The second is timed with the monotonic clock (performance.now), as setTimeout is: the wall clock
+ * (Date.now) can be stepped (a time sync, a virtual machine catching up, the user setting the time),
+ * and a step forward between two searches let the second go after 0.74 s (decision FL-2). */
 export class PlaceSearch {
-    constructor(fetcher = (...a) => fetch(...a), now = () => Date.now(), sleep = (ms) => new Promise((r) => setTimeout(r, ms))) {
+    constructor(fetcher = (...a) => fetch(...a), now = () => performance.now(), sleep = (ms) => new Promise((r) => setTimeout(r, ms))) {
         this.fetcher = fetcher;
         this.now = now;
         this.sleep = sleep;

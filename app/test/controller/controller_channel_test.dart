@@ -249,6 +249,44 @@ void main() {
       },
     );
 
+    test(
+      'a pod whose IDENT says measure: false: the scan refuses up front (PE24-105)',
+      () async {
+        // An older pod leaves the flag out and is taken to measure (above).
+        expect(modem.ident!.containsKey('measure'), isFalse);
+        link.ident(measure: true);
+        await settle();
+        expect(modem.canMeasure, isTrue);
+        link.ident(measure: false);
+        await settle();
+        expect(modem.isUp, isTrue);
+        expect(modem.hasRadioChip, isTrue);
+        expect(modem.canMeasure, isFalse);
+        final e = ControllerEngine(modem: modem);
+        final ch = ControllerChannel(e);
+        // The Pi's reason for a modem without `measure` (engine.py).
+        expect(ch.settings()['scan_unavailable'], 'old_firmware');
+        expect(
+          () => ch.startScan(null),
+          throwsA(
+            isA<ControllerError>()
+                .having((x) => x.status, 'status', 503)
+                .having(
+                  (x) => x.message,
+                  'message',
+                  scanUnavailableTexts['old_firmware'],
+                ),
+          ),
+        );
+        expect(ch.scan, isNull);
+        await settle();
+        expect([
+          for (final (op, _) in link.commands)
+            if (op == RadioOp.measure) op,
+        ], isEmpty);
+      },
+    );
+
     test('a pod without a radio chip cannot measure', () async {
       link.ident(radio: false);
       await settle();

@@ -306,6 +306,32 @@
      }
     ]
    }
+  },
+  {
+   "name": "An emoji written as a surrogate pair (\\ud83d\\ude00), as JSON may write it",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors \ud83d\ude00",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ],
+    "description": "\ud83d\udca3 and \u00e9"
+   }
   }
  ],
  "invalid": [
@@ -2157,6 +2183,198 @@
     {
      "path": "objectives[0].name",
      "code": "setup_too_large"
+    }
+   ]
+  },
+  {
+   "name": "An id that ends with a line feed (Python's re $ matched before it)",
+   "manifest": {
+    "id": "org.club.vectors\n",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "id",
+     "code": "bad_id"
+    }
+   ]
+  },
+  {
+   "name": "An objective id that ends with a line feed",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill\n",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].id",
+     "code": "bad_id"
+    }
+   ]
+  },
+  {
+   "name": "A code that ends with a line feed",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "enter_code",
+      "target": "a",
+      "params": {
+       "code": "1234\n"
+      }
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].params.code",
+     "code": "bad_param"
+    }
+   ]
+  },
+  {
+   "name": "Half of a surrogate pair in a name (an emoji cut in two)",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors \ud83d",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "name",
+     "code": "bad_unicode"
+    }
+   ]
+  },
+  {
+   "name": "A low surrogate before the high one",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill \ude00\ud83d",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "objectives[0].name",
+     "code": "bad_unicode"
+    }
+   ]
+  },
+  {
+   "name": "Half of a surrogate pair in a key",
+   "manifest": {
+    "id": "org.club.vectors",
+    "version": "1",
+    "name": "Vectors",
+    "teams": [
+     "red",
+     "blue"
+    ],
+    "nodes": {
+     "a": {
+      "role": "objective"
+     },
+     "\udc00": {
+      "role": "objective"
+     }
+    },
+    "objectives": [
+     {
+      "id": "hill",
+      "name": "Hill",
+      "type": "capture_and_hold",
+      "target": "a"
+     }
+    ]
+   },
+   "errors": [
+    {
+     "path": "nodes",
+     "code": "bad_unicode"
     }
    ]
   }

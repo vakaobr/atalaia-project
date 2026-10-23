@@ -2179,8 +2179,7 @@ class ConsoleBrowserTests(unittest.TestCase):
 
         def search(route):
             q ={k: v[0] for k, v in parse_qs(urlsplit(route.request.url).query).items()}
-            seen["search"].append({"q": q, "referer": route.request.headers.get("referer"),
-                                   "at": time.monotonic()})
+            seen["search"].append({"q": q, "referer": route.request.headers.get("referer")})
             status = (nominatim or {}).get(q.get("q", ""), 200)
             if status != 200:
                 route.fulfill(status=status, content_type="text/plain", headers=CORS, body="no")
@@ -2432,6 +2431,9 @@ class ConsoleBrowserTests(unittest.TestCase):
         to five results, chosen with the keyboard, fit the map to the place; at phone width."""
         page = self.console(width=390, height=844, service_workers="block")
         seen = self.map_routes(page, nominatim={"Campo Recusado": 429})
+        # The browser's monotonic clock at the moment the page hands each Nominatim request to fetch (FL-2):
+        # the route handler's time.monotonic() also counted how late Playwright got round to each request.
+        page.add_init_script(self.SENT_AT_STUB)
         page.goto(self.field.base + "/console/field-map.html")
         expect(page.get_by_test_id("tm")).to_be_visible()
         # "latitude, longitude" goes straight there, without a request.
@@ -2475,13 +2477,17 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("fm-go").fill("Mata Grande")
         page.get_by_test_id("fm-go-button").click()
         expect(page.get_by_test_id("fm-place")).to_have_count(3)
+        # A step of the wall clock does not shorten the second (FL-2): it is timed on the monotonic clock.
+        page.evaluate("window.__clockStep = 900")
         page.get_by_test_id("fm-go").fill("nowhere at all")
         page.get_by_test_id("fm-go-button").click()
         expect(page.get_by_test_id("fm-place-status")).to_have_text(
             "Nenhum sítio encontrado para «nowhere at all». Experimenta outro nome, ou escreve «latitude, longitude».")
         expect(page.get_by_test_id("fm-search-credit")).to_be_visible()
         self.assertEqual(len(seen["search"]), 3)
-        self.assertGreaterEqual(seen["search"][2]["at"] - seen["search"][1]["at"], 0.95)
+        sent = page.evaluate("window.__nominatimSentAt")
+        self.assertEqual(len(sent), 3)  # one fetch per request the route saw: nothing cached was sent
+        self.assertGreaterEqual(sent[2] - sent[1], 1000 - 5)  # ms; the policy's 1 s (a timer's rounding aside)
         # Refused (a block or too many requests) is said in words; an empty search sends nothing.
         page.get_by_test_id("fm-go").fill("Campo Recusado")
         page.get_by_test_id("fm-go-button").click()
@@ -2493,6 +2499,21 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertEqual(len(seen["search"]), 4)
         self.assertEqual((seen["other"], seen["overpass"], seen["wms"]), ([], [], []))
         self.no_horizontal_scroll(page)
+
+    # Records when the page hands each Nominatim request to fetch, on the browser's monotonic clock, and lets a
+    # test step the wall clock (Date.now) forward by window.__clockStep ms, as a time sync may.
+    SENT_AT_STUB = """(() => {
+        const real = window.fetch.bind(window);
+        const dateNow = Date.now.bind(Date);
+        window.__clockStep = 0;
+        Date.now = () => dateNow() + window.__clockStep;
+        window.__nominatimSentAt = [];
+        window.fetch = (input, init) => {
+            const url = typeof input === 'string' ? input : (input && input.url) || '';
+            if (url.startsWith('https://nominatim.openstreetmap.org/')) window.__nominatimSentAt.push(performance.now());
+            return real(input, init);
+        };
+    })();"""
 
     GEO_STUB = """(() => {
         const geo = navigator.geolocation;

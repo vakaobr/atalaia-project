@@ -27,10 +27,10 @@ LICENSE = "GPL-3.0-or-later"  # the runtime's (runtime.lua), copied into every p
 SPDX_TAG = "SPDX-" "License-Identifier:"
 
 RUNTIME = Path(__file__).with_name("runtime.lua")
-_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\Z")
 _KEYWORDS = frozenset("and break do else elseif end false for function goto if in local nil not or repeat "
                       "return then true until while".split())
-_SAFE_COMMENT = re.compile(r"^[a-z0-9_.+-]*$")
+_SAFE_COMMENT = re.compile(r"^[a-z0-9_.+-]*\Z")
 _SHORT = {"\\": "\\\\", '"': '\\"', "\n": "\\n", "\r": "\\r", "\t": "\\t"}
 LUA_INT_MAX = 2**63 - 1
 

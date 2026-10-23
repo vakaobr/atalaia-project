@@ -119,6 +119,58 @@ class VectorTests(unittest.TestCase):
         text = json.dumps(load((MANIFESTS / "foxhound.yaml").read_text(encoding="utf-8")))
         self.assertEqual(validate(load(text)), [])
 
+    def test_a_name_ends_where_it_seems(self):
+        """PE24-106: Python's re "$" also matches before a final line feed; the patterns end with \\Z,
+        so "hill\\n" is no id, and no name, role or code either."""
+        for path, m in [
+            ("id", manifest([{"id": "x", "name": "X", "type": "capture_and_hold", "target": "a"}],
+                            id="org.test.scenario\n")),
+            ("objectives[0].id", manifest([{"id": "hill\n", "name": "X", "type": "capture_and_hold", "target": "a"}])),
+            ("objectives[0].params.code", manifest([{"id": "x", "name": "X", "type": "enter_code", "target": "a",
+                                                     "params": {"code": "1234\n"}}])),
+            ("params.rounds\n", manifest([{"id": "x", "name": "X", "type": "capture_and_hold", "target": "a"}],
+                                         params={"rounds\n": {"type": "int", "default": 1}})),
+            ("nodes.p.player", manifest([{"id": "x", "name": "X", "type": "escort", "target": "p",
+                                          "params": {"destination": {"lat": 1, "lon": 1, "radius_m": 50}}}],
+                                        nodes={"p": {"player": "vip\n"}})),
+        ]:
+            with self.subTest(path):
+                self.assertIn(path, [p.path for p in errors(validate(m))])
+        with self.assertRaises(LuaError):
+            comment("a\n")
+        self.assertEqual(lua_value({"a\n": 1}), '{ ["a\\n"] = 1 }')
+
+    def test_characters_past_u_ffff_written_as_surrogate_pairs(self):
+        """PE24-107: JSON writes an emoji as two escapes (\\ud83d\\ude00) when it keeps to ASCII; PyYAML
+        reads them as two surrogates, which made the validator raise (a 500 from POST
+        /api/v1/scenarios/check). A pair is the character it encodes; half of one is a problem."""
+        base = manifest([{"id": "x", "name": "X \U0001f600", "type": "capture_and_hold", "target": "a"}],
+                        nodes={"a": {"role": "objective"}}, description="\U0001f600 \U0001f4a3")
+        text = json.dumps(base)  # ensure_ascii: the emoji as surrogate-pair escapes
+        self.assertIn("\\ud83d\\ude00", text)
+        m = load(text)
+        self.assertEqual(m, base)
+        self.assertEqual(validate(m), [])
+        self.assertIn(lua_string("X \U0001f600"), compile_scenario(m).field_lua)
+        # YAML's own escapes too, in a key as well; a key that a pair makes equal to another is twice.
+        self.assertEqual(load('a: "\\ud83d\\ude00"\n"\\ud83d\\ude00": "\\U0001F600"\n'),
+                         {"a": "\U0001f600", "\U0001f600": "\U0001f600"})
+        with self.assertRaisesRegex(ManifestError, "given twice"):
+            load('"\\ud83d\\ude00": 1\n"\U0001f600": 2\n')
+        # Half a pair, written as an escape, alone or in the wrong order: refused, said in words.
+        for half in ("\\ud83d", "\\ude00", "\\ude00\\ud83d", "x\\ud83d y", "\\U0000D83D"):
+            with self.subTest(half), self.assertRaisesRegex(ManifestError, "half of a surrogate pair"):
+                load(text.replace("\\ud83d\\ude00", half, 1))
+        # A lone surrogate in the text itself (a JSON body can carry one): the YAML reader refuses it.
+        with self.assertRaisesRegex(ManifestError, "not valid YAML"):
+            load(json.dumps(base, ensure_ascii=False).replace("\U0001f600", "\ud83d", 1))
+        # A map built in code: the validator says where, rather than raising.
+        for path, m in [("name", {**base, "name": "\ud83d"}),
+                        ("objectives[0].name", manifest([{"id": "x", "name": "\udc00", "type": "survive"}])),
+                        ("nodes", {**base, "nodes": {"\ud83d": {"role": "objective"}}})]:
+            with self.subTest(path):
+                self.assertEqual([(p.path, p.code) for p in validate(m)], [(path, "bad_unicode")])
+
 
 class LuaEscapingTests(unittest.TestCase):
     """No text from a manifest is ever Lua code: every one is a quoted literal (lua.py)."""

@@ -52,13 +52,13 @@ class LuaError implements Exception {
   String toString() => message;
 }
 
-final RegExp _name = RegExp(r'^[A-Za-z_][A-Za-z0-9_]*\n?$');
+final RegExp _name = RegExp(r'^[A-Za-z_][A-Za-z0-9_]*$');
 const Set<String> _keywords = {
   'and', 'break', 'do', 'else', 'elseif', 'end', 'false', 'for', 'function', //
   'goto', 'if', 'in', 'local', 'nil', 'not', 'or', 'repeat', 'return', 'then',
   'true', 'until', 'while',
 };
-final RegExp _safeComment = RegExp(r'^[a-z0-9_.+-]*\n?$');
+final RegExp _safeComment = RegExp(r'^[a-z0-9_.+-]*$');
 const Map<int, String> _short = {
   0x5C: r'\\',
   0x22: r'\"',

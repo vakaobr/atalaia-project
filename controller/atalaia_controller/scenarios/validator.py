@@ -54,6 +54,30 @@ def _is_number(v: Any) -> bool:
     return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
 
 
+def _surrogates(value: Any, path: str, out: list[Problem], seen: set[int]) -> None:
+    """Texts (and keys) with a surrogate code point: half of a UTF-16 pair, which no UTF-8 text holds
+    (decision PE24-107). A manifest read from JSON or YAML text has its pairs joined (manifest.load_text),
+    so only a lone half is left; a map built in code may still hold one."""
+    if isinstance(value, str):
+        if any(0xD800 <= ord(c) <= 0xDFFF for c in value):
+            out.append(Problem(path, "bad_unicode", "not valid Unicode: half of a surrogate pair (a character "
+                               "past U+FFFF needs both halves, \\ud83d\\ude00)", ERROR))
+        return
+    if not isinstance(value, (dict, list)) or id(value) in seen:
+        return
+    seen.add(id(value))
+    if isinstance(value, list):
+        for i, item in enumerate(value):
+            _surrogates(item, f"{path}[{i}]", out, seen)
+        return
+    for key, item in value.items():
+        if isinstance(key, str) and any(0xD800 <= ord(c) <= 0xDFFF for c in key):
+            out.append(Problem(path, "bad_unicode", "a key that is not valid Unicode: half of a surrogate pair",
+                               ERROR))
+            continue
+        _surrogates(item, f"{path}.{key}" if path else str(key), out, seen)
+
+
 def _has_controls(text: str) -> bool:
     """Control characters in a one-line text (a name): newlines, escapes, bidi overrides."""
     return any(unicodedata.category(c) in ("Cc", "Cf", "Zl", "Zp") for c in text)
@@ -96,6 +120,11 @@ class _Checker:
 
     def run(self) -> list[Problem]:
         mf = self.m
+        # Half a surrogate pair anywhere: said alone, since no text with one can be measured or
+        # written as UTF-8 (decision PE24-107).
+        _surrogates(mf, "", self.problems, set())
+        if self.problems:
+            return self.problems
         self.unknown_keys(mf, m.TOP_KEYS, "")
         self.check_id()
         version = mf.get("version")

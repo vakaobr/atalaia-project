@@ -17,12 +17,12 @@ from typing import Any, Optional
 import yaml
 
 # The names (P4R8). An objective id goes into every scenario event (data key 34), so it is short.
-OBJECTIVE_ID = re.compile(r"^[a-z][a-z0-9_]{0,23}$")
+OBJECTIVE_ID = re.compile(r"^[a-z][a-z0-9_]{0,23}\Z")
 # A mode id, as modes.py checks it on upload.
-SCENARIO_ID = re.compile(r"^[a-z0-9][a-z0-9_-]*(\.[a-z0-9][a-z0-9_-]*)+$")
-PARAM_NAME = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
-PLAYER_ROLE = re.compile(r"^[a-z][a-z0-9_]{0,23}$")
-CODE = re.compile(r"^[0-9]{1,8}$")  # the objectives package takes up to 8 digits, then #
+SCENARIO_ID = re.compile(r"^[a-z0-9][a-z0-9_-]*(\.[a-z0-9][a-z0-9_-]*)+\Z")
+PARAM_NAME = re.compile(r"^[a-z][a-z0-9_]{0,31}\Z")
+PLAYER_ROLE = re.compile(r"^[a-z][a-z0-9_]{0,23}\Z")
+CODE = re.compile(r"^[0-9]{1,8}\Z")  # the objectives package takes up to 8 digits, then #
 
 OBJECTIVES_PACKAGE = "org.atalaia.objectives"
 MODE_ID_MAX = 63  # a game's id in a join (protocol/join.md)
@@ -132,7 +132,8 @@ def load_text(text: str) -> dict[str, Any]:
     """The manifest in a YAML or JSON text. ManifestError when it is not one."""
     if not isinstance(text, str):
         raise ManifestError("a scenario manifest is text")
-    if len(text.encode("utf-8")) > MANIFEST_MAX_BYTES:
+    # "surrogatepass": a lone surrogate in the text itself is the YAML reader's to refuse, not a crash here.
+    if len(text.encode("utf-8", "surrogatepass")) > MANIFEST_MAX_BYTES:
         raise ManifestError(f"the manifest is larger than {MANIFEST_MAX_BYTES} bytes")
     try:
         data = yaml.load(text, Loader=_UniqueKeyLoader)  # noqa: S506 (a SafeLoader subclass)
@@ -140,7 +141,60 @@ def load_text(text: str) -> dict[str, Any]:
         raise ManifestError(f"not valid YAML: {exc}") from None
     if not isinstance(data, dict):
         raise ManifestError("a scenario manifest is a map (id, version, name, nodes, objectives, ...)")
+    _join_surrogates(data, set())
     return data
+
+
+_PAIR = re.compile("[\ud800-\udbff][\udc00-\udfff]")
+_SURROGATE = re.compile("[\ud800-\udfff]")
+
+
+def _joined(text: str) -> str:
+    """A text with each surrogate pair as the one character it encodes; ManifestError for a lone one.
+
+    PyYAML reads an escape per code unit, so "\\ud83d\\ude00" (as JSON writes an emoji with
+    ensure_ascii) comes back as two surrogates, which UTF-8 cannot hold (decision PE24-107)."""
+    if not _SURROGATE.search(text):
+        return text
+    text = _PAIR.sub(lambda p: chr(0x10000 + ((ord(p[0][0]) - 0xD800) << 10) + ord(p[0][1]) - 0xDC00), text)
+    lone = _SURROGATE.search(text)
+    if lone:
+        raise ManifestError(f"not valid YAML: \\u{ord(lone[0]):04x} is half of a surrogate pair; a character "
+                            "past U+FFFF is written as both halves (\\ud83d\\ude00), as \\U0001F600, or as it is")
+    return text
+
+
+def _join_surrogates(value: Any, seen: set[int]) -> None:
+    """Joins the surrogate pairs of every text in the manifest (keys too), in place (an alias is
+    one object, and may contain itself)."""
+    if not isinstance(value, (dict, list)) or id(value) in seen:
+        return
+    seen.add(id(value))
+    if isinstance(value, list):
+        for i, item in enumerate(value):
+            if isinstance(item, str):
+                value[i] = _joined(item)
+            else:
+                _join_surrogates(item, seen)
+        return
+    items = list(value.items())
+    if not any(isinstance(k, str) and _SURROGATE.search(k) for k, _ in items):
+        for k, v in items:
+            if isinstance(v, str):
+                value[k] = _joined(v)
+            else:
+                _join_surrogates(v, seen)
+        return
+    value.clear()
+    for k, v in items:
+        key = _joined(k) if isinstance(k, str) else k
+        if key in value:
+            raise ManifestError(f"not valid YAML: the key {key!r} is given twice")
+        if isinstance(v, str):
+            v = _joined(v)
+        else:
+            _join_surrogates(v, seen)
+        value[key] = v
 
 
 def text_ok(value: Any, max_bytes: int, required: bool = True) -> bool:

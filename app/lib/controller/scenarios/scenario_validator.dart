@@ -95,6 +95,72 @@ final RegExp _controls = RegExp(r'[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]', unicode: true);
 /// overrides.
 bool _hasControls(String text) => _controls.hasMatch(text);
 
+/// Whether a text holds half of a surrogate pair: a lone UTF-16 surrogate,
+/// which no UTF-8 text holds (decision PE24-107). A pair is the character it
+/// encodes, as in the Pi's texts once its loader has joined them.
+bool _loneSurrogate(String text) {
+  for (var i = 0; i < text.length; i++) {
+    final c = text.codeUnitAt(i);
+    if (c >= 0xD800 && c <= 0xDBFF) {
+      final next = i + 1 < text.length ? text.codeUnitAt(i + 1) : 0;
+      if (next < 0xDC00 || next > 0xDFFF) return true;
+      i++;
+    } else if (c >= 0xDC00 && c <= 0xDFFF) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/// validator.py `_surrogates`: every text and key with half a surrogate
+/// pair, where it is (a key: the map's path).
+void _surrogates(
+  Object? value,
+  String path,
+  List<Problem> out,
+  Set<Object> seen,
+) {
+  if (value is String) {
+    if (_loneSurrogate(value)) {
+      out.add(
+        Problem(
+          path,
+          'bad_unicode',
+          'not valid Unicode: half of a surrogate pair (a character past '
+              r'U+FFFF needs both halves, \ud83d\ude00)',
+        ),
+      );
+    }
+    return;
+  }
+  if ((value is! Map && value is! List) || !seen.add(value!)) return;
+  if (value is List) {
+    for (var i = 0; i < value.length; i++) {
+      _surrogates(value[i], '$path[$i]', out, seen);
+    }
+    return;
+  }
+  for (final e in (value as Map<Object?, Object?>).entries) {
+    final key = e.key;
+    if (key is String && _loneSurrogate(key)) {
+      out.add(
+        Problem(
+          path,
+          'bad_unicode',
+          'a key that is not valid Unicode: half of a surrogate pair',
+        ),
+      );
+      continue;
+    }
+    _surrogates(
+      e.value,
+      path.isNotEmpty ? '$path.${m.pyStr(key)}' : m.pyStr(key),
+      out,
+      seen,
+    );
+  }
+}
+
 Map<Object?, Object?> _asMap(Object? v) =>
     v is Map<Object?, Object?> ? v : const {};
 
@@ -164,6 +230,9 @@ class _Checker {
   // -- the manifest --
 
   List<Problem> run() {
+    // Half a surrogate pair anywhere: said alone, as on the Pi (PE24-107).
+    _surrogates(mf, '', problems, Set.identity());
+    if (problems.isNotEmpty) return problems;
     unknownKeys(mf, m.topKeys, '');
     checkId();
     var version = mf['version'];

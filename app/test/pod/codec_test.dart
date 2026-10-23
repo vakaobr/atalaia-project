@@ -4,7 +4,8 @@
 // The capability proxy codec (lib/pod/pod_codec.dart) against the shared
 // vectors that the C codec (core/tests/test_proxy.c, firmware's
 // test_proxy_codec.c) and the Python one check:
-// protocol/vectors/capability_proxy.yaml.
+// protocol/vectors/capability_proxy.yaml, its pod_relay section (field and
+// pair frames, IDENT's flags; decisions PE24-100 to PE24-104) included.
 
 import 'dart:convert';
 import 'dart:io';
@@ -40,7 +41,84 @@ PodIdent _ident(Map<String, Object?> f) => PodIdent(
       .toList(),
   batteryPct: f['battery_pct'] as int?,
   hasRadio: f['has_radio']! as bool,
+  fieldFrames: f['field_frames'] == true,
+  pairFrames: f['pair_frames'] == true,
+  measure: f['measure'] as bool?,
 );
+
+/// A radio frame's payload, made from a vector's fields.
+List<int> _radioPayload(int type, Map<String, Object?> f) => switch (type) {
+  FrameType.radioRx => radioRx(
+    hexDecode(f['header']! as String),
+    hexDecode(f['payload']! as String),
+    f['rssi']! as int,
+    f['snr']! as int,
+    f['epoch']! as int,
+  ),
+  FrameType.radioTx => radioTx(
+    hexDecode(f['header']! as String),
+    hexDecode(f['payload']! as String),
+  ),
+  FrameType.radioTxAck => radioTxAck(f['seq']! as int, f['status']! as int),
+  FrameType.radioCmd when f['opcode'] == RadioOp.configure => radioConfigure(
+    gameId: f['game_id']! as int,
+    nodeId: f['node_id']! as int,
+    epoch: f['epoch']! as int,
+    maxHops: f['max_hops']! as int,
+    channelHz: f['channel_hz']! as int,
+    key: hexDecode(f['key']! as String),
+  ),
+  FrameType.radioCmd when f['opcode'] == RadioOp.measure => radioMeasure(
+    f['channel_hz']! as int,
+    f['dwell_ms']! as int,
+    cad: f['flags'] == 1,
+  ),
+  FrameType.radioCmd => [f['opcode']! as int],
+  FrameType.radioStatus => utf8.encode(f['json']! as String),
+  FrameType.radioError => radioError(
+    f['code']! as int,
+    f['message']! as String,
+  ),
+  FrameType.radioNoise => RadioNoise(
+    channelHz: f['channel_hz']! as int,
+    dwellMs: f['dwell_ms']! as int,
+    samples: f['samples']! as int,
+    minDbm: f['min_dbm']! as int,
+    meanDbm: f['mean_dbm']! as int,
+    p50Dbm: f['p50_dbm']! as int,
+    p90Dbm: f['p90_dbm']! as int,
+    maxDbm: f['max_dbm']! as int,
+    cadTries: f['cad_tries']! as int,
+    cadDetected: f['cad_detected']! as int,
+  ).encode(),
+  FrameType.radioFieldTx => radioFieldTx(
+    f['id']! as int,
+    hexDecode(f['frame']! as String),
+  ),
+  FrameType.radioFieldRx => radioFieldRx(
+    hexDecode(f['frame']! as String),
+    f['rssi']! as int,
+    f['snr']! as int,
+  ),
+  FrameType.radioFieldAck => radioFieldAck(
+    f['id']! as int,
+    f['status']! as int,
+  ),
+  _ => throw StateError('type $type'),
+};
+
+void _refused(Map<String, Object?> c) {
+  final payload = hexDecode(c['payload']! as String);
+  final type = c['type']! as int;
+  expect(
+    () => switch (type) {
+      FrameType.ident => decodeIdent(payload),
+      FrameType.ack => decodeAck(payload),
+      _ => decodeMessage(payload),
+    },
+    throwsA(isA<ProxyException>()),
+  );
+}
 
 void main() {
   final v = _vectors();
@@ -107,57 +185,7 @@ void main() {
       test('${c['name']}', () {
         final f = c['fields']! as Map<String, Object?>;
         final type = c['type']! as int;
-        final payload = switch (type) {
-          FrameType.radioRx => radioRx(
-            hexDecode(f['header']! as String),
-            hexDecode(f['payload']! as String),
-            f['rssi']! as int,
-            f['snr']! as int,
-            f['epoch']! as int,
-          ),
-          FrameType.radioTx => radioTx(
-            hexDecode(f['header']! as String),
-            hexDecode(f['payload']! as String),
-          ),
-          FrameType.radioTxAck => radioTxAck(
-            f['seq']! as int,
-            f['status']! as int,
-          ),
-          FrameType.radioCmd when f['opcode'] == RadioOp.configure =>
-            radioConfigure(
-              gameId: f['game_id']! as int,
-              nodeId: f['node_id']! as int,
-              epoch: f['epoch']! as int,
-              maxHops: f['max_hops']! as int,
-              channelHz: f['channel_hz']! as int,
-              key: hexDecode(f['key']! as String),
-            ),
-          FrameType.radioCmd when f['opcode'] == RadioOp.measure =>
-            radioMeasure(
-              f['channel_hz']! as int,
-              f['dwell_ms']! as int,
-              cad: f['flags'] == 1,
-            ),
-          FrameType.radioCmd => [f['opcode']! as int],
-          FrameType.radioStatus => utf8.encode(f['json']! as String),
-          FrameType.radioError => radioError(
-            f['code']! as int,
-            f['message']! as String,
-          ),
-          FrameType.radioNoise => RadioNoise(
-            channelHz: f['channel_hz']! as int,
-            dwellMs: f['dwell_ms']! as int,
-            samples: f['samples']! as int,
-            minDbm: f['min_dbm']! as int,
-            meanDbm: f['mean_dbm']! as int,
-            p50Dbm: f['p50_dbm']! as int,
-            p90Dbm: f['p90_dbm']! as int,
-            maxDbm: f['max_dbm']! as int,
-            cadTries: f['cad_tries']! as int,
-            cadDetected: f['cad_detected']! as int,
-          ).encode(),
-          _ => throw StateError('type $type'),
-        };
+        final payload = _radioPayload(type, f);
         expect(hexEncode(payload), c['payload']);
         expect(hexEncode(encodeFrame(type, payload)), c['frame']);
       });
@@ -179,19 +207,69 @@ void main() {
 
   group('invalid payloads are refused', () {
     for (final c in _list(v, 'invalid')) {
-      test('${c['name']}: ${c['why']}', () {
-        final payload = hexDecode(c['payload']! as String);
-        final type = c['type']! as int;
-        expect(
-          () => switch (type) {
-            FrameType.ident => decodeIdent(payload),
-            FrameType.ack => decodeAck(payload),
-            _ => decodeMessage(payload),
-          },
-          throwsA(isA<ProxyException>()),
-        );
+      test('${c['name']}: ${c['why']}', () => _refused(c));
+    }
+  });
+
+  group('pod relay (PE24-100 to PE24-104)', () {
+    final r = v['pod_relay']! as Map<String, Object?>;
+    for (final c in _list(r, 'ident')) {
+      test('IDENT ${c['name']}', () {
+        final f = c['fields']! as Map<String, Object?>;
+        final payload = encodeIdent(_ident(f));
+        expect(hexEncode(payload), c['payload']);
+        expect(hexEncode(encodeFrame(FrameType.ident, payload)), c['frame']);
+        final back = decodeIdent(payload);
+        expect(back.fwVersion, f['fw_version']);
+        expect(back.capabilities, f['capabilities']);
+        expect(back.batteryPct, f['battery_pct']);
+        expect(back.hasRadio, f['has_radio']);
+        expect(back.fieldFrames, f['field_frames']);
+        expect(back.pairFrames, f['pair_frames']);
+        expect(back.measure, f['measure']);
+        // The modem's JSON IDENT words, which the controller reads.
+        expect(back.toJson()['measure'], f['measure']);
       });
     }
+    for (final c in _list(r, 'radio')) {
+      test('radio ${c['name']}', () {
+        final f = c['fields']! as Map<String, Object?>;
+        final type = c['type']! as int;
+        final payload = _radioPayload(type, f);
+        expect(hexEncode(payload), c['payload']);
+        expect(hexEncode(encodeFrame(type, payload)), c['frame']);
+        final frames = FrameDecoder().feed(hexDecode(c['frame']! as String));
+        expect(frames.single.type, type);
+        expect(hexEncode(frames.single.payload), c['payload']);
+      });
+    }
+    for (final c in _list(r, 'invalid')) {
+      test('refused ${c['name']}: ${c['why']}', () => _refused(c));
+    }
+
+    test('an older pod leaves the flags out: none of them, measure unsaid', () {
+      final old = _list(v, 'ident').first;
+      final back = decodeIdent(hexDecode(old['payload']! as String));
+      expect(
+        (back.fieldFrames, back.pairFrames, back.measure),
+        (false, false, null),
+      );
+      expect(back.toJson().containsKey('measure'), isFalse);
+    });
+
+    test('pair_frames counts only with field_frames', () {
+      final back = decodeIdent(
+        encodeIdent(
+          const PodIdent(
+            fwVersion: '0.3.0',
+            capabilities: [],
+            hasRadio: true,
+            pairFrames: true,
+          ),
+        ),
+      );
+      expect((back.fieldFrames, back.pairFrames), (false, false));
+    });
   });
 
   test('a stream with junk: the good frames, one CRC and one length error', () {

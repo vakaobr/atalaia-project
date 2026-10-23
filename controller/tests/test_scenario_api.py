@@ -11,6 +11,7 @@ missing scenario (M6-1).
 
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -139,6 +140,23 @@ class EndpointTests(Case):
         r = self.client.post("/api/v1/scenarios/check", headers=GM, json={"text": MANIFEST})
         self.assertEqual((r.status_code, r.json()["problems"][0]["code"]), (400, "bad_manifest"))
         self.assertEqual(self.client.post("/api/v1/scenarios/check", json={"manifest": MANIFEST}).status_code, 401)
+
+    def test_check_reads_surrogate_pairs_and_refuses_half_of_one(self):
+        """PE24-107: an emoji written as JSON's two escapes was a 500; now it is the emoji, and half of a
+        pair is a problem in words (bad_manifest), as is a lone surrogate in the request's own text."""
+        m = yaml.safe_load(MANIFEST)
+        m["name"] = "Ponte \U0001f309"
+        text = json.dumps(m)
+        self.assertIn("\\ud83c\\udf09", text)
+        r = self.client.post("/api/v1/scenarios/check", headers=GM, json={"manifest": text})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual((r.json()["ok"], r.json()["name"]), (True, "Ponte \U0001f309"))
+        for bad in (text.replace("\\ud83c\\udf09", "\\ud83c"),  # an escape
+                    json.dumps(m, ensure_ascii=False).replace("\U0001f309", "\udf09")):  # the text itself
+            r = self.client.post("/api/v1/scenarios/check", headers=GM, json={"manifest": bad})
+            self.assertEqual(r.status_code, 200, r.text)
+            out = r.json()
+            self.assertEqual((out["ok"], [p["code"] for p in out["problems"]]), (False, ["bad_manifest"]))
 
     def test_check_hands_back_the_manifest_for_the_block_view(self):
         """Phase 5 plan phase 7 (P5F-3): the manifest as the controller read it, when JSON holds it

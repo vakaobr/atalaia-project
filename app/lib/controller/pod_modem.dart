@@ -325,14 +325,16 @@ class PodModem extends ControllerModem {
 
   /// A pod with a radio chip measures: its firmware runs the modem's code,
   /// MEASURE included (protocol/capability-proxy.md, RADIO_NOISE; decision
-  /// PE24-77). The pod's IDENT has no `measure` flag as the modem's has, so
-  /// a pod whose firmware could not measure would answer `unknown_cmd`,
-  /// which fails the scan with that error.
+  /// PE24-77). Its IDENT says so with key 8 `measure` (PE24-101, read here
+  /// since PE24-105): false makes the scan refuse up front with
+  /// `old_firmware`, as the Pi does for a modem without `measure`; a pod
+  /// older than the flag leaves it out and is taken to measure (every pod
+  /// firmware so far does), as before.
   @override
   bool get hasRadioChip => _ident?['has_radio'] == true;
 
   @override
-  bool get canMeasure => hasRadioChip;
+  bool get canMeasure => hasRadioChip && _ident?['measure'] != false;
 
   /// MEASURE through the pod (RADIO_CMD opcode 8), answered by RADIO_NOISE
   /// or a RADIO_ERROR whose message starts with "MEASURE"; one at a time,
@@ -395,9 +397,7 @@ class PodModem extends ControllerModem {
     if (!isUp || pod.broken || !_fieldFrames) return null;
     _fieldId = (_fieldId + 1) & 0xffff;
     final id = _fieldId;
-    unawaited(
-      pod.sendRadio(FrameType.radioFieldTx, [id >> 8, id & 0xff, ...frame]),
-    );
+    unawaited(pod.sendRadio(FrameType.radioFieldTx, radioFieldTx(id, frame)));
     return id;
   }
 }

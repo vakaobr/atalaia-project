@@ -36,6 +36,11 @@
 ///   mode.yaml writes it once with an anchor;
 /// * keys equal in Python are one key, so a repeated one: yes and true, 1
 ///   and 1.0, yes and 1;
+/// * a character past U+FFFF written as two escapes, a surrogate pair
+///   ("😀", as JSON in ASCII writes an emoji), is that character
+///   in a double-quoted text (package:yaml refuses the escapes; the Pi's
+///   loader joins what PyYAML reads), and half of a pair is refused, on
+///   both (decision PE24-107);
 /// * a plain = or << as a value is refused (PyYAML has no constructor for
 ///   them), as is a character PyYAML's reader does not accept (C0 controls
 ///   but tab and line breaks, DEL, C1 controls but NEL, lone surrogates,
@@ -68,19 +73,20 @@ import 'dart:convert';
 import 'package:yaml/yaml.dart';
 
 // The names (P4R8). An objective id goes into every scenario event (data key
-// 34), so it is short. Python's re "$" also matches before a final newline,
-// so each pattern takes one, as the Pi's does ("hill\n" is an objective id).
-final RegExp objectiveIdPattern = RegExp(r'^[a-z][a-z0-9_]{0,23}\n?$');
+// 34), so it is short. Each ends where it seems: the Pi's patterns end with
+// \Z since PE24-106 (Python's "$" had also matched before a final newline,
+// so "hill\n" was an objective id); Dart's "$" never did.
+final RegExp objectiveIdPattern = RegExp(r'^[a-z][a-z0-9_]{0,23}$');
 
 /// A mode id, as modes.py checks it on upload.
 final RegExp scenarioIdPattern = RegExp(
-  r'^[a-z0-9][a-z0-9_-]*(\.[a-z0-9][a-z0-9_-]*)+\n?$',
+  r'^[a-z0-9][a-z0-9_-]*(\.[a-z0-9][a-z0-9_-]*)+$',
 );
-final RegExp paramNamePattern = RegExp(r'^[a-z][a-z0-9_]{0,31}\n?$');
-final RegExp playerRolePattern = RegExp(r'^[a-z][a-z0-9_]{0,23}\n?$');
+final RegExp paramNamePattern = RegExp(r'^[a-z][a-z0-9_]{0,31}$');
+final RegExp playerRolePattern = RegExp(r'^[a-z][a-z0-9_]{0,23}$');
 
 /// The objectives package takes up to 8 digits, then #.
-final RegExp codePattern = RegExp(r'^[0-9]{1,8}\n?$');
+final RegExp codePattern = RegExp(r'^[0-9]{1,8}$');
 
 const String objectivesPackage = 'org.atalaia.objectives';
 
@@ -533,14 +539,57 @@ Map<Object?, Object?> loadText(String text) {
       );
     }
   }
-  final YamlDocument document;
-  try {
-    document = loadYamlDocument(text);
-  } catch (e) {
-    // package:yaml can also fail with an Error (a RangeError on !!float 1).
-    throw ManifestError(
-      'not valid YAML: ${e is YamlException ? e.message : e}',
-    );
+  // A character past U+FFFF written as two escapes, a surrogate pair (as
+  // JSON writes one when it keeps to ASCII): PyYAML reads each half and the
+  // Pi's loader joins them; package:yaml refuses a surrogate escape, so the
+  // pair is written as the one \U escape it means first (decision PE24-107).
+  // Escapes are YAML's only in double-quoted texts: the quick way joins
+  // every pair and keeps the result when no other text held one; else each
+  // pair is joined where package:yaml stops at it.
+  final (joined, at) = _joinSurrogateEscapes(text);
+  if (at.isNotEmpty) {
+    try {
+      final (data, literal) = _read(joined, retry: false);
+      if (!at.any((j) => literal.any((s) => j.$1 < s.$2 && s.$1 < j.$2))) {
+        return data;
+      }
+    } on ManifestError {
+      // The text as it is says why.
+    }
+  }
+  return _read(text, retry: true).$1;
+}
+
+/// The manifest in [text], and where its texts that are not double-quoted
+/// are (offsets). With [retry], a surrogate pair's escape that package:yaml
+/// stops at is joined and the text read again.
+(Map<Object?, Object?>, List<(int, int)>) _read(
+  String text, {
+  required bool retry,
+}) {
+  YamlDocument? document;
+  while (document == null) {
+    try {
+      document = loadYamlDocument(text);
+    } on YamlException catch (e) {
+      final at = e.span?.start.offset;
+      if (at != null && _surrogateEscape.matchAsPrefix(text, at) != null) {
+        final pair = retry ? _pairAt(text, at) : null;
+        if (pair == null) {
+          throw ManifestError(
+            'not valid YAML: ${text.substring(at, at + (text[at + 1] == 'u' ? 6 : 10))} '
+            'is half of a surrogate pair; a character past U+FFFF is written '
+            r'as both halves (\ud83d\ude00), as \U0001F600, or as it is',
+          );
+        }
+        text = text.replaceRange(at, pair.$2, _bigEscape(pair.$1));
+        continue;
+      }
+      throw ManifestError('not valid YAML: ${e.message}');
+    } catch (e) {
+      // package:yaml can also fail with an Error (a RangeError on !!float 1).
+      throw ManifestError('not valid YAML: $e');
+    }
   }
   if (document.tagDirectives.isNotEmpty) {
     throw ManifestError('not valid YAML: %TAG directives are not accepted');
@@ -554,7 +603,61 @@ Map<Object?, Object?> loadText(String text) {
       '...)',
     );
   }
-  return data;
+  return (data, reader.literal);
+}
+
+// A YAML escape of a surrogate (\uD83D, \U0000D83D), of a high one, and a
+// low one after the escaped line breaks that a double-quoted text drops.
+final RegExp _surrogateEscape = RegExp(
+  r'\\(?:u[dD][89a-fA-F][0-9a-fA-F]{2}|U0000[dD][89a-fA-F][0-9a-fA-F]{2})',
+);
+final RegExp _highEscape = RegExp(
+  r'\\(?:u[dD][89abAB][0-9a-fA-F]{2}|U0000[dD][89abAB][0-9a-fA-F]{2})',
+);
+final RegExp _lowEscape = RegExp(
+  r'(?:\\(?:\r\n|\r|\n)[ \t]*)*'
+  r'\\(?:u[dD][c-fC-F][0-9a-fA-F]{2}|U0000[dD][c-fC-F][0-9a-fA-F]{2})',
+);
+
+/// The character of a surrogate pair whose high half's escape starts at
+/// [at], and where its low half's escape ends; null without a low half.
+(int, int)? _pairAt(String text, int at) {
+  final high = _highEscape.matchAsPrefix(text, at);
+  if (high == null) return null;
+  final low = _lowEscape.matchAsPrefix(text, high.end);
+  if (low == null) return null;
+  int half(String escape) =>
+      int.parse(escape.substring(escape.length - 4), radix: 16);
+  final code =
+      0x10000 + ((half(high[0]!) - 0xD800) << 10) + (half(low[0]!) - 0xDC00);
+  return (code, low.end);
+}
+
+String _bigEscape(int code) => '\\U${code.toRadixString(16).padLeft(8, '0')}';
+
+/// Every surrogate pair's escape (not after an escaped backslash) written as
+/// one \U escape, and where the new escapes are.
+(String, List<(int, int)>) _joinSurrogateEscapes(String text) {
+  if (!text.contains(r'\')) return (text, const []);
+  final out = StringBuffer();
+  final at = <(int, int)>[];
+  var done = 0;
+  for (final m in _highEscape.allMatches(text)) {
+    if (m.start < done) continue;
+    var slashes = 0;
+    for (var i = m.start - 1; i >= 0 && text.codeUnitAt(i) == 0x5C; i--) {
+      slashes++;
+    }
+    final pair = slashes.isEven ? _pairAt(text, m.start) : null;
+    if (pair == null) continue;
+    out.write(text.substring(done, m.start));
+    final start = out.length;
+    out.write(_bigEscape(pair.$1));
+    at.add((start, out.length));
+    done = pair.$2;
+  }
+  out.write(text.substring(done));
+  return (out.toString(), at);
 }
 
 // PyYAML's reader: what it accepts in a stream (reader.py, NON_PRINTABLE).
@@ -578,6 +681,10 @@ class _Reader {
 
   /// Where the quoted and block texts are (offsets), for [_checkTabs].
   final List<(int, int)> quoted = [];
+
+  /// Where the texts that are not double-quoted are (offsets): YAML reads no
+  /// escape in them ([loadText]).
+  final List<(int, int)> literal = [];
 
   Object? node(YamlNode node) {
     if (_done.containsKey(node)) return _done[node];
@@ -620,6 +727,9 @@ class _Reader {
     final scalar = node as YamlScalar;
     if (scalar.style != ScalarStyle.PLAIN) {
       quoted.add((scalar.span.start.offset, scalar.span.end.offset));
+    }
+    if (scalar.style != ScalarStyle.DOUBLE_QUOTED) {
+      literal.add((scalar.span.start.offset, scalar.span.end.offset));
     }
     final value = _scalar(scalar, props);
     if (value is _Marker) {

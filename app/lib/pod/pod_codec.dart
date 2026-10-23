@@ -40,8 +40,8 @@ abstract final class FrameType {
   static const radioNoise = 0x0b;
 
   /// The modem's FIELD_TX, FIELD_RX and FIELD_ACK plus 3 (field and pair
-  /// frames): proposed by decision PE24-91, not in the pod firmware yet. A
-  /// pod says it relays them in its IDENT ([PodIdent.fieldFrames]).
+  /// frames; decisions PE24-91 and PE24-100). A pod says it relays them in
+  /// its IDENT ([PodIdent.fieldFrames]).
   static const radioFieldTx = 0x0c;
   static const radioFieldRx = 0x0d;
   static const radioFieldAck = 0x0e;
@@ -242,6 +242,7 @@ final class PodIdent {
     this.batteryPct,
     this.fieldFrames = false,
     this.pairFrames = false,
+    this.measure,
   });
 
   final String fwVersion;
@@ -249,10 +250,14 @@ final class PodIdent {
   final int? batteryPct;
   final bool hasRadio;
 
-  /// The pod relays field frames (RADIO_FIELD_*; IDENT key 6, proposed by
-  /// decision PE24-91), and pair frames too (key 7). Absent: false.
+  /// The pod relays field frames (RADIO_FIELD_*; IDENT key 6, decisions
+  /// PE24-91 and PE24-101), and pair frames too (key 7). Absent: false.
   final bool fieldFrames;
   final bool pairFrames;
+
+  /// The pod answers RADIO_CMD MEASURE (IDENT key 8, PE24-101); null when
+  /// the pod leaves it out (an older pod: it measures if it has a radio).
+  final bool? measure;
 
   Map<String, Object?> toJson() => {
     'fw_version': fwVersion,
@@ -262,6 +267,7 @@ final class PodIdent {
     'protocol_version': proxyVersion,
     if (fieldFrames) 'field': true,
     if (pairFrames) 'pair': true,
+    'measure': ?measure,
   };
 }
 
@@ -278,18 +284,30 @@ Uint8List encodeIdent(PodIdent ident) {
     5: proxyVersion,
     if (ident.fieldFrames) 6: true,
     if (ident.pairFrames) 7: true,
+    8: ?ident.measure,
   };
   return _fit(cborEncode(body));
 }
 
 PodIdent decodeIdent(List<int> payload) {
-  final m = _decodeMap(payload, {1, 2, 4, 5}, {1, 2, 3, 4, 5, 6, 7});
+  final m = _decodeMap(payload, {1, 2, 4, 5}, {1, 2, 3, 4, 5, 6, 7, 8});
   final caps = m[2];
   if (caps is! List || caps.length > capabilitiesMax) {
     throw ProxyException('capabilities is a list of at most $capabilitiesMax');
   }
   if (m[4] is! bool) throw ProxyException('has_radio is true or false');
   if (m[5] != proxyVersion) throw ProxyException('protocol_version is 1');
+  // The optional bools (PE24-101): a value that is not a bool is refused, as
+  // the C and Python codecs do.
+  for (final (key, name) in const [
+    (6, 'field_frames'),
+    (7, 'pair_frames'),
+    (8, 'measure'),
+  ]) {
+    if (m.containsKey(key) && m[key] is! bool) {
+      throw ProxyException('$name is true or false');
+    }
+  }
   return PodIdent(
     fwVersion: _text('fw_version', m[1], _printable),
     capabilities: [for (final c in caps) _capability(c)],
@@ -297,6 +315,7 @@ PodIdent decodeIdent(List<int> payload) {
     hasRadio: m[4]! as bool,
     fieldFrames: m[6] == true,
     pairFrames: m[6] == true && m[7] == true,
+    measure: m[8] as bool?,
   );
 }
 
@@ -417,6 +436,22 @@ Uint8List radioConfigure({
     ...key,
   ]);
 }
+
+/// RADIO_FIELD_TX: the modem's FIELD_TX, an id and a whole field or pair
+/// frame, as it is (PE24-100).
+Uint8List radioFieldTx(int id, List<int> frame) =>
+    Uint8List.fromList([_uint('id', id, 0xffff) >> 8, id & 0xff, ...frame]);
+
+/// RADIO_FIELD_RX: the modem's FIELD_RX, the frame heard with its RSSI and SNR.
+Uint8List radioFieldRx(List<int> frame, int rssi, int snr) =>
+    Uint8List.fromList([...frame, rssi & 0xff, snr & 0xff]);
+
+/// RADIO_FIELD_ACK: the modem's FIELD_ACK, the id and a TX_ACK status (0-8).
+Uint8List radioFieldAck(int id, int status) => Uint8List.fromList([
+  _uint('id', id, 0xffff) >> 8,
+  id & 0xff,
+  _uint('status', status, 8),
+]);
 
 Uint8List radioError(int code, String message) =>
     Uint8List.fromList([_uint('code', code, 255), ...utf8.encode(message)]);

@@ -383,6 +383,29 @@ objectives:
     params: { code: "1234\\n" }
 """
 
+# Characters past U+FFFF as JSON writes them when it keeps to ASCII: two escapes, a surrogate pair,
+# which PyYAML reads as two code points and the loader joins (decision PE24-107).
+SURROGATE_PAIRS = json.dumps({
+    "id": "org.club.emoji", "version": "1", "name": "Ponte \U0001f309", "lang": "en",
+    "description": "\U0001f4a3 and \u00e9", "teams": ["red", "blue"], "nodes": {"a": {"role": "objective"}},
+    "objectives": [{"id": "hill", "name": "Hill \U0001f600", "type": "capture_and_hold", "target": "a"}],
+}, indent=2)
+assert "\\ud83c\\udf09" in SURROGATE_PAIRS
+
+# The same escapes where YAML does not read escapes (a plain and a single-quoted text) and where it
+# does, in one text: only the double-quoted ones are characters.
+SURROGATE_PAIRS_YAML = """\
+id: org.club.emoji-yaml
+version: '1'
+name: "Ponte \\ud83c\\udf09 \\U0000D83D\\U0000DE00 \\ud83d\\
+  \\ude00"
+description: plain \\ud83c\\udf09 text
+author: 'single \\ud83c\\udf09'
+nodes: { a: { role: objective } }
+objectives:
+  - { id: hill, name: "\\\\ud83d\\U0001F600", type: capture_and_hold, target: a }
+"""
+
 JSON_TEXT = json.dumps({
     "id": "org.club.json", "version": 1.0, "name": "JSON", "lang": "en", "teams": ["red", "blue"],
     "nodes": {"a": {"role": "objective"}, "b": {"role": "bomb_site"}},
@@ -435,6 +458,9 @@ INVALID = [
      "nodes:\n  a: &a { role: objective }\n  b: { <<: *a, role: bomb_site }\n"),
     ("Not a manifest: a list", "- id: org.club.list\n"),
     ("Not a manifest: a value '='", "id: =\n"),
+    ("Not a manifest: half of a surrogate pair, as an escape (PE24-107)",
+     SURROGATE_PAIRS.replace("\\ud83c\\udf09", "\\ud83c", 1)),
+    ("Not a manifest: a low surrogate before the high one", SURROGATE_PAIRS.replace("\\ud83c\\udf09", "\\udf09\\ud83c", 1)),
 ]
 
 LOADS = [
@@ -446,6 +472,14 @@ LOADS = [
     "1.2.3, ..5]",
     "a: [.inf, -.Inf, +.INF, .nan, .NaN, 1.0e+400, 0.1, 100.0, 1e16, 1.0e+16, 1234567890123456.0]",
     "a: [~, null, Null, NULL, nULL, '', \"\", None]",
+    "{\"a\": \"\\ud83d\\ude00\", \"\\ud83d\\udca3\": [\"x\\ud83d\\ude00y\", \"\\U0001F600\"]}",
+    "a: x\\ud83d\\ude00\nb: 'y\\ud83d\\ude00'\nc: \"\\\\\\\\ud83d\\\\ude00\"\nd: \"\\U0000d83d\\U0000DE00\"\n# \\ud83d\n",
+    "a: \"\\\\ud83d\\ude00\"\n",
+    "a: \"\\ud83d\\\n  \\ude00\"\n",
+    "a: \"\\ud83d\"\n",
+    "a: \"\\ude00\"\n",
+    "a: [\"\\ud83d\", \"\\ude00\"]\n",
+    "\"\\ud83d\\ude00\": 1\n\"\\U0001F600\": 2\n",
     "a: [2026-10-23, 2026-1-2, 2026-10-23 10:00:00, 2026-10-23T10:00:00Z, 2026-10-23t10:00:00.5+01:30, "
     "2026-1-2 3:04:05 -5, 2026-10-23T10:00:00.1234567]",
     "yes: 1\nno: 2\n3: 3\n1.5: 4\n~: 5\n2026-10-23: 6\n=: 8\n",
@@ -537,8 +571,12 @@ def build_vectors() -> dict[str, Any]:
         ("Long texts folded at mode.yaml's width", LONG_TEXTS),
         ("YAML 1.1 readings, merge keys and a shared effect", YAML11),
         ("Floats in field.lua and a version of 30 digits", FLOATS),
-        ("Ids that end with a newline (Python's re $)", TRAILING_NEWLINE),
+        ("Ids and a code that end with a newline: refused (Python's re $ took them before PE24-106)",
+         TRAILING_NEWLINE),
         ("A manifest in JSON", JSON_TEXT),
+        ("Emoji written as surrogate-pair escapes, as JSON with ensure_ascii writes them (PE24-107)",
+         SURROGATE_PAIRS),
+        ("Surrogate-pair escapes in double-quoted, plain and single-quoted YAML texts", SURROGATE_PAIRS_YAML),
     ]]
     cases += [compile_case(name, text) for name, text in INVALID]
     return {"description": DESCRIPTION, "compile": cases, "loads": [load_case(t) for t in LOADS]}

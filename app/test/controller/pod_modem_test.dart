@@ -39,19 +39,24 @@ class ScriptedPod implements PodTransport {
   void frame(int type, List<int> payload) =>
       _in.add(encodeFrame(type, payload));
 
-  void ident({bool radio = true, bool field = false, bool pair = false}) =>
-      frame(
-        FrameType.ident,
-        encodeIdent(
-          PodIdent(
-            fwVersion: 'test',
-            capabilities: const [],
-            hasRadio: radio,
-            fieldFrames: field,
-            pairFrames: pair,
-          ),
-        ),
-      );
+  void ident({
+    bool radio = true,
+    bool field = false,
+    bool pair = false,
+    bool? measure,
+  }) => frame(
+    FrameType.ident,
+    encodeIdent(
+      PodIdent(
+        fwVersion: 'test',
+        capabilities: const [],
+        hasRadio: radio,
+        fieldFrames: field,
+        pairFrames: pair,
+        measure: measure,
+      ),
+    ),
+  );
 
   /// The RADIO_CMD frames sent, as (opcode, rest).
   List<(int, List<int>)> get commands => [
