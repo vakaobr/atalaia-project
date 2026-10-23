@@ -18,6 +18,13 @@ persist_game_key = true           # the live game survives a controller restart;
                                   # field join key, which is already there (see README)
 
 [radio]
+# The field's radio region until the GM chooses one in the console (Settings):
+# "eu868" (Europe, 868 MHz) or "as923-tw" (Taiwan, 920-925 MHz, LoRa at 500 kHz,
+# 0.5 W at the antenna port; RFC 0001 Amendment 12). The USB modem and every box
+# must be built for the same region (Kconfig ATALAIA_RADIO_REGION); a box built for
+# another refuses the field's joins. Leave channel_hz out for the region's default
+# (869525000, or 921500000 in AS923-TW).
+region = "eu868"
 # The field's channel until the GM chooses one in the console (Settings), which
 # then wins. 869.525 MHz is the centre of 869.4-869.65 MHz, the only EU868
 # sub-band with 10% duty cycle and 500 mW ERP; elsewhere in 868-870 MHz the

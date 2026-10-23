@@ -2,7 +2,7 @@
  * SPDX-FileCopyrightText: 2026 The Atalaia contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * EU868 limits that follow the game channel. See radio_limits.h.
+ * The region's limits that follow the game channel. See radio_limits.h.
  */
 #include "radio_limits.h"
 
@@ -13,19 +13,27 @@
 void radio_limits_init(radio_limits_t *l, int fem_gain_db, int antenna_gain_dbi)
 {
     memset(l, 0, sizeof(*l));
-    atalaia_dc_init(&l->dc);
-    l->band = ATALAIA_BAND_COUNT;
     l->fem_gain_db = fem_gain_db;
     l->antenna_gain_dbi = antenna_gain_dbi;
+    radio_limits_set_region(l, RADIO_REGION);
+}
+
+bool radio_limits_set_region(radio_limits_t *l, atalaia_region_t region)
+{
+    if (atalaia_region_info(region) == NULL) return false;
+    l->region = region;
+    atalaia_dc_init_region(&l->dc, region);
+    l->band = ATALAIA_BAND_COUNT;
+    l->channel_hz = 0;
+    l->tx_power_dbm = 0;
+    return true;
 }
 
 bool radio_limits_power_for(const radio_limits_t *l, uint32_t channel_hz, int8_t *dbm)
 {
     const atalaia_band_info_t *info =
-        atalaia_band_info(atalaia_band_of_channel(channel_hz, ATALAIA_LORA_BW_HZ));
-    if (info == NULL) return false;
-    *dbm = atalaia_eu868_tx_power_dbm(info->erp_dbm, l->fem_gain_db, l->antenna_gain_dbi);
-    return true;
+        atalaia_region_band_info(l->region, atalaia_region_band_of_channel(l->region, channel_hz));
+    return atalaia_tx_power_for(info, l->fem_gain_db, l->antenna_gain_dbi, dbm);
 }
 
 bool radio_limits_set_channel(radio_limits_t *l, uint32_t channel_hz)
@@ -33,14 +41,14 @@ bool radio_limits_set_channel(radio_limits_t *l, uint32_t channel_hz)
     int8_t power;
     if (!radio_limits_power_for(l, channel_hz, &power)) return false;
     l->channel_hz = channel_hz;
-    l->band = atalaia_band_of_channel(channel_hz, ATALAIA_LORA_BW_HZ);
+    l->band = atalaia_region_band_of_channel(l->region, channel_hz);
     l->tx_power_dbm = power;
     return true;
 }
 
-uint32_t radio_limits_airtime_us(size_t packet_len)
+uint32_t radio_limits_airtime_us(const radio_limits_t *l, size_t packet_len)
 {
-    return atalaia_airtime_us(RADIO_LORA_SF, ATALAIA_LORA_BW_HZ, packet_len);
+    return atalaia_region_airtime_us(l->region, packet_len);
 }
 
 static uint32_t remaining_us(radio_limits_t *l, uint32_t now_ms)
@@ -63,11 +71,15 @@ uint32_t radio_limits_remaining_ms(radio_limits_t *l, uint32_t now_ms)
 
 bool radio_limits_can_send(radio_limits_t *l, size_t packet_len, uint32_t now_ms)
 {
-    return radio_limits_airtime_us(packet_len) <= remaining_us(l, now_ms);
+    uint32_t air_us = radio_limits_airtime_us(l, packet_len);
+    const atalaia_region_info_t *r = atalaia_region_info(l->region);
+    /* A region with a dwell rule: no single transmission longer than it. */
+    if (r != NULL && r->max_dwell_ms != 0 && air_us > r->max_dwell_ms * 1000u) return false;
+    return air_us <= remaining_us(l, now_ms);
 }
 
 void radio_limits_record(radio_limits_t *l, size_t packet_len, uint32_t now_ms)
 {
     if (l->band == ATALAIA_BAND_COUNT) return;
-    atalaia_dc_record(&l->dc, l->band, radio_limits_airtime_us(packet_len), now_ms);
+    atalaia_dc_record(&l->dc, l->band, radio_limits_airtime_us(l, packet_len), now_ms);
 }

@@ -56,7 +56,9 @@ ESP-IDF drivers live in `main/hal/esp/`; stubs for Linux testing in
 
 The SX1262 LoRa radio driver (`main/hal/esp/hal_esp_radio.c`) uses
 SPI3_HOST (GPIO 8-14: NSS, SCK, MOSI, MISO, RST, BUSY, DIO1).
-EU868 band, SF7/BW125, single shared game channel: the field's channel,
+In the region the image is built for (`ATALAIA_RADIO_REGION`, `main/radio/radio_region.h`;
+EU868 at SF7/BW125, or AS923-TW at SF9/BW500 with the SX1262's 500 kHz
+TX fix, RFC 0001 Amendment 12), single shared game channel: the field's channel,
 which a box gets in its join payload and the modem with CONFIGURE or
 SET_CHANNEL (`CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ` in Kconfig until
 then). The default, 869.525 MHz, is the centre of 869.4-869.65 MHz, the
@@ -423,7 +425,7 @@ Radio-specific Kconfig options (under "Atalaia Field Box Configuration > Radio")
 - `ATALAIA_VEXT_CTL_PIN` -- Vext, active low, driven low at boot (under "Board power")
 - `ATALAIA_RADIO_FEM_GAIN_DB` -- FEM gain for TX power calculation (default 14)
 - `ATALAIA_RADIO_ANTENNA_GAIN_DBI` -- antenna gain in dBi (default 2)
-- `ATALAIA_RADIO_REGION` -- regulatory region (EU868)
+- `ATALAIA_RADIO_REGION` -- the radio region the image is built for: EU868 (default) or AS923-TW (Taiwan, 920-925 MHz, SF9 at 500 kHz, 0.5 W at the antenna port; RFC 0001 Amendment 12). The firmware knows only that region: a join, a CONFIGURE or a MEASURE on another region's channel is refused. `python3 tools/docker_fw.py build|bench|modem|pod --region=as923-tw` builds a Taiwanese image (fit a 915-925 MHz antenna; not certified, decisions RF-AS923-3 and RF-AS923-13)
 - `ATALAIA_RADIO_DISABLE` -- skip radio init (kept for debugging; the Wokwi build runs with the radio enabled)
 
 Field game options (under "Field network games"):

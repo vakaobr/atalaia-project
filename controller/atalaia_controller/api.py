@@ -63,7 +63,8 @@ which browsers cannot give headers, also takes ``?token=``.
     GET  /api/v1/games/{id}/teams          a game's team colours, display names and crests (no token)
     PUT  /api/v1/games/{id}/teams/{team}   GM: {"display_name"?, "crest_id"?, "team_preset_id"?}
     GET|PUT /api/v1/settings/box-language  the boxes' screen language: "auto" (the console's), "pt", "en", "de", "zh-tw"
-    GET  /api/v1/radio                     the field's radio channel, its limits, candidates, last scan
+    GET  /api/v1/radio                     the field's radio region and channel, its limits, candidates, last scan
+    PUT  /api/v1/radio/region              set the region {"region": "eu868" or "as923-tw"} (no live game)
     PUT  /api/v1/radio/channel             set it {"channel_hz", "source"} (no live game)
     POST /api/v1/radio/scan                find a quiet channel: noise scan with the modem {"dwell_s"?}
     GET  /api/v1/radio/scan                the scan's progress and results
@@ -578,6 +579,11 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     def put_channel(body: Any = Body(None)) -> dict[str, Any]:
         spec = body_map(body)
         return controller.set_field_channel(spec.get("channel_hz"), spec.get("source", "manual"))
+
+    @app.put("/api/v1/radio/region", dependencies=[Depends(require_gm)])
+    def put_region(body: Any = Body(None)) -> dict[str, Any]:
+        # The field's radio region (radio_region.py, RFC 0001 Amendment 12): no live game, no scan.
+        return controller.set_field_region(body_map(body).get("region"))
 
     @app.post("/api/v1/radio/scan", status_code=202, dependencies=[Depends(require_gm)])
     def start_scan(body: Any = Body(None)) -> dict[str, Any]:

@@ -275,6 +275,19 @@ radio:
       do Meshtastic usa-o. Perto destas utilizações, a organização pode pôr o controlador a escutar
       todos os canais permitidos durante um minuto e escolher o mais calmo, tirar um à sorte ou
       escolher à mão. As caixas seguem depois os limites do canal escolhido.
+  region:
+    title: "Regiões de rádio: Europa e Taiwan"
+    lead: >-
+      Um campo está numa região de rádio, escolhida uma vez na consola da organização. Na Europa
+      (EU868) as caixas usam os canais acima. Em Taiwan (AS923, 920–925&nbsp;MHz), as regras da NCC
+      (LP0002) só dão potência total a um canal único, sem saltos de frequência, se tiver pelo menos
+      500&nbsp;kHz de largura; por isso, aí as caixas usam LoRa a 500&nbsp;kHz (SF9, com mais ou
+      menos o mesmo alcance que na Europa), no máximo 0,5&nbsp;W na antena e 921,5&nbsp;MHz por
+      omissão, longe dos canais que o LoRaWAN e o Meshtastic usam. Cada caixa, modem de rádio USB e
+      módulo de E/S é feito para uma região e recusa os canais das outras, por isso uma caixa nunca
+      emite fora da sua banda; as caixas ficam a saber a região do campo com cada jogo. A região de
+      Taiwan não está certificada: um produto vendido em Taiwan precisa da homologação da NCC e de
+      uma antena feita para 920&nbsp;MHz. Nada disto foi ainda testado no ar.
 
 modes:
   title: Modos de jogo

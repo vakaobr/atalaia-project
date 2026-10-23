@@ -56,6 +56,7 @@ import '../ffi/callbacks.dart';
 import '../ffi/core_node.dart';
 import '../modes/mode_catalog.dart';
 import '../protocol/join_payload.dart';
+import '../protocol/radio_region.dart';
 import '../radio/rf_codec.dart';
 import '../security/bytes.dart' show hexDecode;
 import '../security/ndef.dart';
@@ -131,6 +132,7 @@ class ControllerConfig {
   const ControllerConfig({
     this.nodeId = 0,
     this.channelHz = 869525000,
+    this.region = 'eu868',
     this.maxHops = 2,
     this.failoverMode = 'manual',
     this.powerSource = 1,
@@ -144,6 +146,10 @@ class ControllerConfig {
   /// This controller's short id on the radio.
   final int nodeId;
   final int channelHz;
+
+  /// The field's radio region until the GM picks one (`[radio] region`,
+  /// radio_region.dart): "eu868" or "as923-tw".
+  final String region;
   final int maxHops;
   final String failoverMode;
 
@@ -436,9 +442,21 @@ class ControllerEngine {
 
   /// The channel new games use: the GM's choice, else the configured one
   /// (engine.py `field_channel`).
-  int get fieldChannel =>
-      int.tryParse(store.getSetting('radio.channel_hz') ?? '') ??
-      config.channelHz;
+  int get fieldChannel {
+    final stored = int.tryParse(store.getSetting('radio.channel_hz') ?? '');
+    if (stored != null) return stored;
+    final region = fieldRegion;
+    return region.channelOk(config.channelHz)
+        ? config.channelHz
+        : region.defaultChannelHz;
+  }
+
+  /// The field's radio region (engine.py `field_region`, radio_region.py):
+  /// the GM's choice in the store, else the configured one.
+  Region get fieldRegion =>
+      regionsByCode[store.getSetting('radio.region')] ??
+      regionsByCode[config.region] ??
+      defaultRegion;
 
   /// The wall clock, in seconds since 1970 (what the MQTT topics' `at` and
   /// `last_seen` give).
@@ -1600,6 +1618,7 @@ class ControllerEngine {
       urls: link && linkUrls.isNotEmpty ? linkUrls.take(3).toList() : null,
       fetchModes: fetch,
       forgetModes: forget,
+      region: fieldRegion.code, // key 18: a box refuses another region's game
     );
     var join = joinWith(link: withLink);
     var linked = withLink;

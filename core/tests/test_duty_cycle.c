@@ -5,6 +5,7 @@
  * Tests for the duty-cycle tracker and airtime calculator.
  */
 #include <stdio.h>
+#include <string.h>
 
 #include "atalaia/duty_cycle.h"
 #include "check.h"
@@ -171,10 +172,11 @@ static void test_band_info(void)
     const atalaia_band_info_t *g2 = atalaia_band_info(ATALAIA_BAND_G2);
     CHECK(g2 != NULL);
     CHECK(g2->lo_hz == 869400000u && g2->hi_hz == 869650000u);
-    CHECK(g2->duty_ppm == 100000 && g2->erp_dbm == 27 && g2->erp_mw == 500);
+    CHECK(g2->duty_ppm == 100000 && g2->limit_dbm == 27 && g2->limit_mw == 500);
+    CHECK(g2->limit_ref == ATALAIA_LIMIT_ERP);
     CHECK(atalaia_band_info(ATALAIA_BAND_G)->duty_ppm == 10000);
     CHECK(atalaia_band_info(ATALAIA_BAND_G1)->duty_ppm == 1000);
-    CHECK(atalaia_band_info(ATALAIA_BAND_G3)->erp_mw == 25);
+    CHECK(atalaia_band_info(ATALAIA_BAND_G3)->limit_mw == 25);
     CHECK(atalaia_band_info(ATALAIA_BAND_COUNT) == NULL);
     /* The hourly budgets follow the duty-cycle limits. */
     atalaia_duty_cycle_t dc;
@@ -184,8 +186,64 @@ static void test_band_info(void)
     }
 }
 
+/* The regions' table (RFC 0001 Amendment 12). */
+static void test_regions(void)
+{
+    const atalaia_region_info_t *eu = atalaia_region_info(ATALAIA_REGION_EU868);
+    const atalaia_region_info_t *tw = atalaia_region_info(ATALAIA_REGION_AS923_TW);
+    CHECK(eu != NULL && tw != NULL && atalaia_region_info(ATALAIA_REGION_COUNT) == NULL);
+    CHECK(strcmp(eu->code, "eu868") == 0 && eu->sf == 7 && eu->bw_hz == 125000u);
+    CHECK(eu->default_channel_hz == 869525000u && eu->band_count == ATALAIA_BAND_COUNT);
+    CHECK(strcmp(tw->code, "as923-tw") == 0 && tw->sf == 9 && tw->bw_hz == 500000u);
+    CHECK(tw->default_channel_hz == 921500000u && tw->band_count == 1);
+    CHECK(atalaia_region_from_code("eu868") == ATALAIA_REGION_EU868);
+    CHECK(atalaia_region_from_code("as923-tw") == ATALAIA_REGION_AS923_TW);
+    CHECK(atalaia_region_from_code("us915") == ATALAIA_REGION_COUNT);
+    CHECK(atalaia_region_from_code(NULL) == ATALAIA_REGION_COUNT);
+    /* Every default channel is legal in its own region and in no other. */
+    for (int r = 0; r < ATALAIA_REGION_COUNT; r++) {
+        uint32_t hz = atalaia_region_info((atalaia_region_t)r)->default_channel_hz;
+        for (int o = 0; o < ATALAIA_REGION_COUNT; o++) {
+            CHECK(atalaia_region_channel_ok((atalaia_region_t)o, hz) == (o == r));
+        }
+    }
+    /* AS923-TW: the whole 500 kHz channel inside 920-925 MHz. */
+    CHECK(atalaia_region_band_of_channel(ATALAIA_REGION_AS923_TW, 920250000u) == ATALAIA_BAND_TW);
+    CHECK(atalaia_region_band_of_channel(ATALAIA_REGION_AS923_TW, 924750000u) == ATALAIA_BAND_TW);
+    CHECK(!atalaia_region_channel_ok(ATALAIA_REGION_AS923_TW, 920249999u));
+    CHECK(!atalaia_region_channel_ok(ATALAIA_REGION_AS923_TW, 924750001u));
+    CHECK(!atalaia_region_channel_ok(ATALAIA_REGION_AS923_TW, 920000000u));
+    CHECK(!atalaia_region_channel_ok(ATALAIA_REGION_AS923_TW, 915000000u));
+    CHECK(!atalaia_region_channel_ok(ATALAIA_REGION_COUNT, 921500000u));
+    /* EU868 through the region functions, as through the old ones. */
+    CHECK(atalaia_region_band_of_channel(ATALAIA_REGION_EU868, 869525000u) == ATALAIA_BAND_G2);
+    CHECK(!atalaia_region_channel_ok(ATALAIA_REGION_EU868, 869400000u));
+    /* Taiwan's limit: 0.5 W peak at the antenna port, antenna gain above 6 dBi counted. */
+    const atalaia_band_info_t *b =
+        atalaia_region_band_info(ATALAIA_REGION_AS923_TW, (atalaia_band_t)ATALAIA_BAND_TW);
+    CHECK(b != NULL && b->lo_hz == 920000000u && b->hi_hz == 925000000u);
+    CHECK(b->limit_dbm == 27 && b->limit_mw == 500 && b->limit_ref == ATALAIA_LIMIT_CONDUCTED);
+    CHECK(b->free_gain_dbi == 6 && b->duty_ppm == 100000u);
+    CHECK(atalaia_region_band_info(ATALAIA_REGION_AS923_TW, ATALAIA_BAND_G1) == NULL);
+    /* Budgets: one 10% slot for AS923-TW, nothing in the others. */
+    atalaia_duty_cycle_t dc;
+    atalaia_dc_init_region(&dc, ATALAIA_REGION_AS923_TW);
+    CHECK(dc.bands[ATALAIA_BAND_TW].budget_us == 360000000u);
+    CHECK(dc.bands[1].budget_us == 0 && !atalaia_dc_can_send(&dc, (atalaia_band_t)1, 1));
+    /* SF9 at 500 kHz: the same symbol time as SF7 at 125 kHz, so the same preamble, and fewer
+     * symbols for the payload. */
+    uint32_t eu_us = atalaia_region_airtime_us(ATALAIA_REGION_EU868, 53);
+    uint32_t tw_us = atalaia_region_airtime_us(ATALAIA_REGION_AS923_TW, 53);
+    CHECK(eu_us == atalaia_airtime_us(7, 125000u, 53) &&
+          tw_us == atalaia_airtime_us(9, 500000u, 53));
+    CHECK(tw_us < eu_us && tw_us > eu_us / 2);
+    CHECK(atalaia_region_airtime_us(ATALAIA_REGION_AS923_TW, 255) < 400000u);
+    CHECK(atalaia_region_airtime_us(ATALAIA_REGION_COUNT, 53) == 0);
+}
+
 void run_duty_cycle_tests(void)
 {
+    test_regions();
     test_channel_edges();
     test_band_info();
     test_init_budgets();

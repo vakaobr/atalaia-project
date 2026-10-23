@@ -296,6 +296,36 @@
           {"radio_state": "up"},
           {"request": {"method": "GET", "path": "/api/v1/radio", "token": "read"}, "status": 200, "json": {"scan_unavailable": null}}
         ]
+      },
+      {
+        "name": "the radio region: Taiwan's band (AS923-TW), its channels, a game's join with key 18 (RF-AS923)",
+        "join_key": "6465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f80818283",
+        "steps": [
+          {"request": {"method": "GET", "path": "/api/v1/radio", "token": "read"}, "status": 200, "json": {"region": {"code": "eu868", "sf": 7, "bw_khz": 125, "default_channel_hz": 869525000}, "region_source": "config", "regions": [{"code": "eu868", "lo_hz": 868000000, "hi_hz": 870000000}, {"code": "as923-tw", "sf": 9, "bw_khz": 500, "lo_hz": 920000000, "hi_hz": 925000000, "default_channel_hz": 921500000, "max_dwell_ms": 0, "sub_bands": [{"name": "tw", "lo_hz": 920000000, "hi_hz": 925000000, "duty_pct": 10, "limit_mw": 500, "limit_dbm": 27, "limit_ref": "conducted"}]}], "channel": {"channel_hz": 869525000, "region": "eu868", "limit_ref": "erp", "erp_mw": 500}}},
+          {"request": {"method": "PUT", "path": "/api/v1/radio/region", "token": "read", "body": {"region": "as923-tw"}}, "status": 403},
+          {"request": {"method": "PUT", "path": "/api/v1/radio/region", "token": "gm", "body": {"region": "us915"}}, "status": 400},
+          {"request": {"method": "PUT", "path": "/api/v1/radio/region", "token": "gm", "body": {"region": null}}, "status": 400},
+          {"request": {"method": "PUT", "path": "/api/v1/radio/region", "token": "gm", "body": {}}, "status": 400},
+          {"request": {"method": "PUT", "path": "/api/v1/radio/region", "token": "gm", "body": {"region": "as923-tw"}}, "status": 200, "json": {"region": {"code": "as923-tw"}, "region_source": "console", "channel": {"channel_hz": 921500000, "band": "tw", "duty_pct": 10, "limit_mw": 500, "limit_dbm": 27, "limit_ref": "conducted", "erp_mw": "$absent", "full_power": true, "usable": true, "region": "as923-tw", "bw_khz": 500, "sf": 9, "notes": ["default"]}, "source": "default", "confirmed": false, "recommended_hz": 921500000, "default": {"channel_hz": 921500000}, "candidates": [{"channel_hz": 920500000}, {"channel_hz": 921000000}, {"channel_hz": 921500000}, {"channel_hz": 922000000}, {"channel_hz": 922500000}, {"channel_hz": 923000000}, {"channel_hz": 923500000}, {"channel_hz": 924000000}, {"channel_hz": 924500000}], "scan": null}},
+          {"request": {"method": "GET", "path": "/api/v1/radio", "token": "read"}, "status": 200, "json": {"candidates": [{"channel_hz": 920500000, "notes": []}, {"channel_hz": 921000000}, {"channel_hz": 921500000, "notes": ["default"]}, {"channel_hz": 922000000}, {"channel_hz": 922500000}, {"channel_hz": 923000000, "notes": ["lorawan_default"]}, {"channel_hz": 923500000, "notes": ["lorawan_default"]}, {"channel_hz": 924000000, "notes": ["lorawan_default"]}, {"channel_hz": 924500000}]}},
+          {"request": {"method": "PUT", "path": "/api/v1/radio/channel", "token": "gm", "body": {"channel_hz": 869525000}}, "status": 400},
+          {"request": {"method": "PUT", "path": "/api/v1/radio/channel", "token": "gm", "body": {"channel_hz": 920249999}}, "status": 400},
+          {"request": {"method": "PUT", "path": "/api/v1/radio/channel", "token": "gm", "body": {"channel_hz": 922000000}}, "status": 200, "json": {"channel": {"channel_hz": 922000000, "notes": []}, "source": "manual", "confirmed": true}},
+          {"request": {"method": "POST", "path": "/api/v1/radio/random", "token": "gm"}, "status": 200, "json": {"suggestion": {"pool": 9, "pool_full_power": 9, "region": "as923-tw", "usable": true}}},
+          {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Taipei", "mode_id": "org.atalaia.domination"}}, "status": 201, "json": {"channel_hz": 922000000}, "save": {"gid": "id"}},
+          {"request": {"method": "PUT", "path": "/api/v1/radio/region", "token": "gm", "body": {"region": "eu868"}}, "status": 409},
+          {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {}}, "status": 200, "json": {"channel_hz": 922000000}, "save": {"text1": "text"}},
+          {"join_decode": "${text1}", "json": {"game_id": "${gid}", "channel_hz": 922000000, "region": "as923-tw", "kind": "node"}},
+          {"request": {"method": "POST", "path": "/api/v1/games/${gid}/end", "token": "gm"}, "status": 200},
+          {"tx": "$any"},
+          {"request": {"method": "PUT", "path": "/api/v1/radio/region", "token": "gm", "body": {"region": "as923-tw"}}, "status": 200, "json": {"channel": {"channel_hz": 922000000}, "confirmed": true}},
+          {"restart": true},
+          {"request": {"method": "GET", "path": "/api/v1/radio", "token": "read"}, "status": 200, "json": {"region": {"code": "as923-tw"}, "region_source": "console", "channel": {"channel_hz": 922000000}}},
+          {"request": {"method": "PUT", "path": "/api/v1/radio/region", "token": "gm", "body": {"region": "eu868"}}, "status": 200, "json": {"region": {"code": "eu868"}, "channel": {"channel_hz": 869525000, "region": "eu868"}, "source": "default", "confirmed": false, "recommended_hz": 869525000}},
+          {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Lisbon", "mode_id": "org.atalaia.domination"}}, "status": 201, "json": {"channel_hz": 869525000}},
+          {"request": {"method": "POST", "path": "/api/v1/join", "token": "gm", "body": {}}, "status": 200, "save": {"text2": "text"}},
+          {"join_decode": "${text2}", "json": {"channel_hz": 869525000, "region": "eu868"}}
+        ]
       }
     ]
   },

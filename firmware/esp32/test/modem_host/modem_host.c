@@ -15,8 +15,12 @@
  *   modem_host [--serial-port N] [--air-port N] [--air-peer N]
  *              [--epoch-window N] [--duty-budget-ms N] [--no-radio]
  *              [--noise-floor DBM] [--noise HZ:DBM[:CAD_PCT]]... [--measure-fail HZ]
+ *              [--region eu868|as923-tw]
  *
- * The duty-cycle budget and the TX power follow the channel's EU868
+ * --region plays a modem built for that radio region (Kconfig
+ * ATALAIA_RADIO_REGION; EU868 by default): it starts on the region's
+ * default channel, refuses channels of other regions and names its region
+ * in IDENT. The duty-cycle budget and the TX power follow the channel's
  * sub-band (radio/radio_limits.c, as on the ESP32); --duty-budget-ms caps
  * the budget lower for tests. MEASURE answers after the asked dwell, with
  * samples drawn around the channel's simulated level (--noise, else
@@ -228,11 +232,17 @@ int main(int argc, char **argv)
 {
     long serial_port = 0, air_port = 0, peer_port = 0, window = 16;
     bool radio = true;
+    atalaia_region_t region = RADIO_REGION;
     /* The ESP32 HAL's defaults: 14 dB FEM, 2 dBi antenna, the default channel. */
     radio_limits_init(&limits, 14, 2);
-    radio_limits_set_channel(&limits, 869525000u);
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--serial-port") == 0) {
+        if (strcmp(argv[i], "--region") == 0) {
+            region = atalaia_region_from_code(i + 1 < argc ? argv[++i] : NULL);
+            if (region == ATALAIA_REGION_COUNT) {
+                fprintf(stderr, "modem_host: --region eu868 or as923-tw\n");
+                return 2;
+            }
+        } else if (strcmp(argv[i], "--serial-port") == 0) {
             serial_port = arg_value(argc, argv, &i);
         } else if (strcmp(argv[i], "--air-port") == 0) {
             air_port = arg_value(argc, argv, &i);
@@ -269,6 +279,8 @@ int main(int argc, char **argv)
             return 2;
         }
     }
+    radio_limits_set_region(&limits, region);
+    radio_limits_set_channel(&limits, radio_region_default_channel_hz(region));
     signal(SIGPIPE, SIG_IGN);
 
     serial_listen = bind_socket(SOCK_STREAM, (uint16_t)serial_port);
@@ -296,6 +308,7 @@ int main(int argc, char **argv)
     };
     static modem_t modem;
     modem_init(&modem, &io, &atalaia_crypto_mbedtls, "host", radio, (uint16_t)window);
+    modem.region = region;
 
     printf("READY serial=%u air=%u\n", bound_port(serial_listen), bound_port(air_sock));
     fflush(stdout);

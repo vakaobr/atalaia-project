@@ -13,7 +13,8 @@ field's 32-byte join key. A join is a dict:
      "role": "zone", "game_seed": 12345, "params": {...} or None,
      "kind": "node" or "controller",
      "ca_sha256": b"...32..." or None, "urls": ["https://10.42.0.1:8443"] or None,
-     "lang": "pt" or None, "fetch_modes": False, "forget_modes": False}
+     "lang": "pt" or None, "fetch_modes": False, "forget_modes": False,
+     "region": "eu868" or "as923-tw"}
 
 ca_sha256 (key 13) and urls (key 14) are optional (RFC 0001 Amendment 4,
 proposed): the field CA's fingerprint and the controller's https addresses,
@@ -25,7 +26,10 @@ the language of a box's screens ("pt", "en"...; None: English). fetch_modes
 "Fetching missing modes"): CBOR true when set, left out otherwise (false is refused):
 a box fetches the signed mode packages its mode_id needs and it lacks from the
 controller (keys 13 and 14 give it the address and the field CA), and forgets the
-packages it fetched before. Keys 18-31 are skipped.
+packages it fetched before. region (key 18, RFC 0001 Amendment 12, proposed) is the
+field's radio region (regions.py): the key holds the region's number (1: AS923-TW)
+and is left out for EU868 (0 is refused, so a join has one encoding); the channel
+must fit in that region. Keys 19-31 are skipped.
 
 The codecs check protocol/vectors/join.json.
 """
@@ -39,7 +43,7 @@ import json
 import re
 from typing import Any, Optional
 
-from . import cbor, eu868
+from . import cbor, eu868, regions
 from .codec import CodecError, _check_value
 
 VERSION = 1
@@ -59,10 +63,11 @@ KEYS = {
     "game_id": 1, "game_key": 2, "node_id": 3, "controller_id": 4, "channel_hz": 5,
     "max_hops": 6, "teams": 7, "mode_id": 8, "role": 9, "game_seed": 10, "params": 11, "kind": 12,
     "ca_sha256": 13, "urls": 14, "lang": 15, "fetch_modes": 16, "forget_modes": 17,
+    "region": 18,
 }
 OPTIONAL = ("params", "ca_sha256", "urls", "lang")
 FLAGS = ("fetch_modes", "forget_modes")  # CBOR true when set, left out otherwise
-REQUIRED = set(KEYS) - set(OPTIONAL) - set(FLAGS)
+REQUIRED = set(KEYS) - set(OPTIONAL) - set(FLAGS) - {"region"}
 URLS_MAX = 3
 URL_MAX = 64
 # The same rule as the check-in poster's urls (protocol/checkin.md): https://host[:port], no path.
@@ -129,9 +134,13 @@ def validate(j: dict[str, Any]) -> dict[str, Any]:
     out["controller_id"] = _uint("controller_id", j["controller_id"], 0, 0xFFFE)
     if out["node_id"] == out["controller_id"]:
         raise JoinError("body", "node_id and controller_id must differ")
+    region = j.get("region", regions.EU868.code)
+    if region not in regions.BY_CODE:
+        raise JoinError("body", f"region: one of {', '.join(regions.BY_CODE)}")
+    out["region"] = region
     channel = _uint("channel_hz", j["channel_hz"], 0, 0xFFFFFFFF)
-    if not channel_ok(channel):
-        raise JoinError("body", "channel_hz: the 125 kHz channel must fit inside an EU868 sub-band")
+    if not regions.BY_CODE[region].channel_ok(channel):
+        raise JoinError("body", f"channel_hz: the whole channel must fit inside a sub-band of {region}")
     out["channel_hz"] = channel
     out["max_hops"] = _uint("max_hops", j["max_hops"], 1, 3)
     teams = j["teams"]
@@ -193,6 +202,10 @@ def encode(j: dict[str, Any], join_key: bytes) -> bytes:
     for name in KEYS:
         if (name in OPTIONAL and v[name] is None) or (name in FLAGS and not v[name]):
             continue
+        if name == "region":
+            if v[name] != regions.EU868.code:  # EU868 is the key's absence
+                body[KEYS[name]] = regions.BY_CODE[v[name]].number
+            continue
         body[KEYS[name]] = KINDS[v["kind"]] if name == "kind" else v[name]
     signed = bytes([VERSION]) + cbor.encode(body)
     out = signed + hmac.new(join_key, signed, hashlib.sha256).digest()
@@ -232,6 +245,10 @@ def decode(data: bytes, join_key: bytes) -> dict[str, Any]:
             raise JoinError("body", f"{name} is null: leave an optional field out instead")
         if name in FLAGS and v is not True:
             raise JoinError("body", f"{name} is only ever true: leave it out instead")
+        if name == "region":
+            if not isinstance(v, int) or isinstance(v, bool) or v not in regions.BY_NUMBER or v == 0:
+                raise JoinError("body", f"region {v!r}: a known region from 1 up (EU868 leaves the key out)")
+            v = regions.BY_NUMBER[v].code
         j[name] = v
     for name in ("game_key", "ca_sha256"):
         if name in j and not isinstance(j[name], bytes):

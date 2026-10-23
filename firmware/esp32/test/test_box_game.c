@@ -1212,6 +1212,39 @@ static void test_screen_language(void)
     state_persist_clear();
 }
 
+/* Join key 18 (RFC 0001 Amendment 12, RF-AS923-2): a box built for one region refuses an
+ * authentic join of another before anything changes, and takes its own region's. */
+static void test_other_region_refused(void)
+{
+    lobby_fixture();
+    CHECK(game.region == ATALAIA_REGION_EU868); /* host builds: EU868 */
+    CHECK(game.lobby.channel_hz == 869525000u); /* the region's default between games */
+    atalaia_join_t j;
+    make_join(&j);
+    j.region = ATALAIA_REGION_AS923_TW;
+    j.channel_hz = 921500000u;
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    int writes = flash.epochs.writes;
+    shell.channel = 0;
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_REGION);
+    CHECK(game.phase == BOX_IDLE && flash.join_len == 0 && flash.epochs.writes == writes);
+    CHECK(shell.channel == 0); /* never tuned to 921.5 MHz */
+    CHECK(strcmp(box_join_result_name(BOX_JOIN_REGION), "?") != 0);
+
+    /* The same box built for AS923-TW: the Taiwanese join is taken, a European one refused. */
+    lobby_fixture();
+    game.region = ATALAIA_REGION_AS923_TW;
+    make_join(&j);
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_REGION);
+    CHECK(game.phase == BOX_IDLE);
+    j.region = ATALAIA_REGION_AS923_TW;
+    j.channel_hz = 921500000u;
+    CHECK(box_game_join(&game, buf, encode(&j, JOIN_KEY, buf)) == BOX_JOIN_OK);
+    CHECK(game.phase == BOX_JOINED && shell.channel == 921500000u);
+    CHECK(game.lobby.channel_hz == 921500000u);
+    state_persist_clear();
+}
+
 /* Review finding 2 (decision BN-19): an old game's card whose key the epoch store keeps only as
  * retired (sixteen newer games since) is refused before anything changes; its epochs are no
  * longer known, so starting it again could reuse a nonce. */
@@ -1897,5 +1930,6 @@ void run_box_game_tests(void)
     test_screens_follow_the_game();
     test_screen_language();
     test_old_card_refused();
+    test_other_region_refused();
     test_fetch_modes();
 }

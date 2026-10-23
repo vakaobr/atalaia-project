@@ -504,6 +504,29 @@
     "band_range": "{lo}–{hi} MHz ({erc})",
     "allowed": "Limites",
     "limits": "{duty}% do tempo · {mw} mW ERP",
+    "limits_conducted": "{duty}% do tempo · {mw} mW à saída da antena",
+    "limits_eirp": "{duty}% do tempo · {mw} mW EIRP",
+    "region_title": "Região de rádio",
+    "region": "Região",
+    "region_band": "Banda",
+    "region_lora": "{lo}–{hi} MHz · LoRa SF{sf} a {bw} kHz",
+    "region_names": {
+      "eu868": "Europa (EU868, 868 MHz)",
+      "as923-tw": "Taiwan (AS923, 920–925 MHz)"
+    },
+    "region_sources": {
+      "config": "a configuração do controlador",
+      "console": "escolhida na consola"
+    },
+    "region_apply": "Mudar de região",
+    "region_hint": "Escolhe a região uma vez, a do país onde fica o campo. Só funcionam as regiões para que as caixas e o modem USB foram feitos: uma caixa feita para outra região recusa as adesões.",
+    "region_confirm": "Passar o campo para {region}? Todas as caixas e o modem USB têm de ser feitos para esta região (o firmware recusa as outras), e o canal volta ao da região por omissão até escolheres um.",
+    "region_mismatch": "O modem USB foi feito para {modem}, mas o campo está em {field}: o modem recusa os canais desta região, por isso nenhum jogo pode começar. Usa um modem feito para {field}, ou volta à região anterior.",
+    "why_tw_1": "Em Taiwan, estes aparelhos podem usar 920–925 MHz (NCC LP0002). Um emissor que não salta de canal em canal tem de ocupar pelo menos 500 kHz, por isso o canal do campo tem 500 kHz (LoRa SF9, mais ou menos o alcance do SF7 a 125 kHz noutras regiões), até 0,5 W à saída da antena ao ar livre.",
+    "why_tw_2": "O canal recomendado fica longe de 923,2 e 923,4 MHz, onde começam todos os aparelhos LoRaWAN de Taiwan, e do canal por omissão do Meshtastic (923,875 MHz).",
+    "why_tw_3": "As regras não impõem ciclo de trabalho; as caixas e o modem limitam-se a 10% do tempo, como o jogo foi pensado. O firmware ainda não está certificado para Taiwan: um produto vendido lá precisa da homologação da NCC.",
+    "default_hint_tw": "{channel} MHz: longe dos canais cheios do LoRaWAN e do Meshtastic (ver acima).",
+    "random_hint_tw": "Sorteia um dos canais candidatos de 500 kHz; todos permitem os 0,5 W.",
     "source": "Escolhido",
     "sources": {
       "default": "recomendado (por omissão)",
@@ -1021,7 +1044,7 @@
       "fingerprint": "tem outra chave que não a deste campo.",
       "box_refused": "a caixa recusou.",
       "duty_cycle": "o ciclo de trabalho do rádio está esgotado por agora.",
-      "channel_changed": "o rádio saiu de 869,525 MHz (o canal do campo, uma procura ou o modem a ligar de novo); procura caixas outra vez."
+      "channel_changed": "o rádio saiu do canal de emparelhamento (o da região: 869,525 MHz na Europa, 921,5 MHz em Taiwan) para o canal do campo, uma procura ou o modem a ligar de novo; procura caixas outra vez."
     },
     "code_id": "id {id}",
     "code_duplicate": "Mais do que uma caixa se oferece com este nome: escreve o código só na entrada cujo id é o que está no ecrã da caixa."

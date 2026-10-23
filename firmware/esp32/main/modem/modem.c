@@ -85,11 +85,12 @@ void modem_send_ident(modem_t *m)
     int n = snprintf(json, sizeof(json),
                      "{\"fw\":\"atalaia-modem\",\"fw_version\":\"%s\",\"core_version\":\"%s\","
                      "\"framing\":%d,\"radio\":\"%s\",\"payload_max\":%d,\"epoch_window\":%u,"
-                     "\"measure\":%s,\"field\":true,\"pair\":true}",
+                     "\"measure\":%s,\"field\":true,\"pair\":true,\"region\":\"%s\"}",
                      m->fw_version != NULL ? m->fw_version : "unknown", atalaia_version(),
                      MODEM_PROTOCOL_VERSION, m->radio_present ? "sx1262" : "none",
                      ATALAIA_RF_PAYLOAD_MAX, (unsigned)m->epoch_window,
-                     m->radio_present && m->io.measure_start != NULL ? "true" : "false");
+                     m->radio_present && m->io.measure_start != NULL ? "true" : "false",
+                     radio_region_code(m->region));
     if (n > 0 && (size_t)n < sizeof(json)) {
         send_frame(m, MODEM_FRAME_IDENT, (const uint8_t *)json, (size_t)n);
     }
@@ -109,9 +110,12 @@ static uint32_t be32(const uint8_t *p)
 
 static bool apply_channel(modem_t *m, uint32_t hz)
 {
-    /* The whole 125 kHz channel inside one EU868 sub-band (RFC 0001 Amendment 3). */
-    if (!atalaia_channel_ok(hz)) {
-        send_error(m, MODEM_ERR_BAD_PARAMS, "channel does not fit in an EU868 sub-band");
+    /* The whole channel inside one sub-band of the modem's region (RFC 0001 Amendments 3, 12). */
+    if (!atalaia_region_channel_ok(m->region, hz)) {
+        send_error(m, MODEM_ERR_BAD_PARAMS,
+                   m->region == ATALAIA_REGION_EU868
+                       ? "channel does not fit in an EU868 sub-band"
+                       : "channel does not fit in a sub-band of this modem's region");
         return false;
     }
     if (m->radio_present && m->io.set_channel != NULL && m->io.set_channel(m->io.ctx, hz) != 0) {
@@ -242,8 +246,11 @@ static void cmd_measure(modem_t *m, const uint8_t *p, size_t len)
         send_error(m, MODEM_ERR_BUSY, "MEASURE: a measurement is already running");
         return;
     }
-    if (!atalaia_channel_ok(hz)) {
-        send_error(m, MODEM_ERR_BAD_PARAMS, "MEASURE: channel does not fit in an EU868 sub-band");
+    if (!atalaia_region_channel_ok(m->region, hz)) {
+        send_error(m, MODEM_ERR_BAD_PARAMS,
+                   m->region == ATALAIA_REGION_EU868
+                       ? "MEASURE: channel does not fit in an EU868 sub-band"
+                       : "MEASURE: channel does not fit in a sub-band of this modem's region");
         return;
     }
     if (dwell < NOISE_DWELL_MIN_MS || dwell > NOISE_DWELL_MAX_MS) {
@@ -549,6 +556,7 @@ void modem_init(modem_t *m, const modem_io_t *io, const atalaia_crypto_ops_t *cr
     m->fw_version = fw_version;
     m->radio_present = radio_present;
     m->epoch_window = epoch_window == 0 ? 1 : epoch_window;
+    m->region = RADIO_REGION;
     modem_decoder_init(&m->dec);
     m->boot_ms = now(m);
 }

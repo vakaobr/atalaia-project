@@ -512,7 +512,7 @@ int main(int argc, char **argv)
     int nbuttons = POD_BUTTONS;
     cfg.keypad = cfg.nfc = cfg.leds = cfg.audio = cfg.tamper = true;
     radio_limits_init(&limits, 14, 2);
-    radio_limits_set_channel(&limits, 869525000u);
+    radio_limits_set_channel(&limits, radio_region_default_channel_hz(RADIO_REGION));
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--usb-port") == 0) {
             usb_port = arg_value(argc, argv, &i);

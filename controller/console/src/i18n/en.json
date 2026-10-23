@@ -504,6 +504,29 @@
     "band_range": "{lo}–{hi} MHz ({erc})",
     "allowed": "Limits",
     "limits": "{duty}% of the time · {mw} mW ERP",
+    "limits_conducted": "{duty}% of the time · {mw} mW at the antenna port",
+    "limits_eirp": "{duty}% of the time · {mw} mW EIRP",
+    "region_title": "Radio region",
+    "region": "Region",
+    "region_band": "Band",
+    "region_lora": "{lo}–{hi} MHz · LoRa SF{sf} at {bw} kHz",
+    "region_names": {
+      "eu868": "Europe (EU868, 868 MHz)",
+      "as923-tw": "Taiwan (AS923, 920–925 MHz)"
+    },
+    "region_sources": {
+      "config": "the controller's configuration",
+      "console": "chosen in the console"
+    },
+    "region_apply": "Change the region",
+    "region_hint": "Pick the region once, for the country the field is in. Only regions the boxes and the USB modem are built for work: a box built for another region refuses the joins.",
+    "region_confirm": "Move the field to {region}? Every box and the USB modem must be built for this region (their firmware refuses the others), and the channel goes back to the region's default until you choose one.",
+    "region_mismatch": "The USB modem is built for {modem}, but the field is in {field}: the modem refuses this region's channels, so no game can start. Use a modem built for {field}, or change the region back.",
+    "why_tw_1": "In Taiwan these devices may use 920–925 MHz (NCC LP0002). A transmitter that does not hop between channels must spread over at least 500 kHz, so the field's channel is 500 kHz wide (LoRa SF9, about the range of SF7 at 125 kHz elsewhere), at up to 0.5 W at the antenna port outdoors.",
+    "why_tw_2": "The recommended channel stays clear of 923.2 and 923.4 MHz, where every LoRaWAN device in Taiwan starts, and of Meshtastic's default (923.875 MHz).",
+    "why_tw_3": "The rules set no duty cycle; the boxes and the modem keep themselves to 10% of the time, as the game is designed for. The firmware is not certified for Taiwan yet: a product sold there needs NCC type approval.",
+    "default_hint_tw": "{channel} MHz: clear of LoRaWAN's and Meshtastic's busy channels (see above).",
+    "random_hint_tw": "Draws one of the candidate 500 kHz channels; every one allows the full 0.5 W.",
     "source": "Chosen",
     "sources": {
       "default": "recommended (default)",
@@ -1021,7 +1044,7 @@
       "fingerprint": "it holds another key than this field's.",
       "box_refused": "the box refused it.",
       "duty_cycle": "the radio's duty cycle is used up for now.",
-      "channel_changed": "the radio left 869.525 MHz (the field's channel, a scan or the modem reconnecting); look for boxes again."
+      "channel_changed": "the radio left the pairing channel (the region's default: 869.525 MHz in Europe, 921.5 MHz in Taiwan) for the field's channel, a scan or the modem reconnecting; look for boxes again."
     },
     "code_id": "id {id}",
     "code_duplicate": "More than one box offers itself under this name: type the code only into the entry whose id is the one on the box's screen."

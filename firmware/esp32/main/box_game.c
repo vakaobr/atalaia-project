@@ -48,6 +48,7 @@ const char *box_join_result_name(box_join_result_t r)
     case BOX_JOIN_STORAGE: return "could not store the join";
     case BOX_JOIN_RADIO: return "radio halted (epoch storage failed)";
     case BOX_JOIN_ENDED: return "a game this box has played already";
+    case BOX_JOIN_REGION: return "another radio region's game (this box is built for its own)";
     }
     return "?";
 }
@@ -272,6 +273,7 @@ void box_game_init(box_game_t *g, node_runner_t *runner, preset_t *preset_buf,
     g->log = log;
     g->hello = *hello;
     g->preset_index = -1;
+    g->region = RADIO_REGION;
     g->battery_low_pct = BOX_BATTERY_LOW_PCT;
     g->lobby.first_min_ms = BOX_ANNOUNCE_FIRST_MIN_MS;
     g->lobby.first_max_ms = BOX_ANNOUNCE_FIRST_MAX_MS;
@@ -438,6 +440,9 @@ static box_join_result_t apply(box_game_t *g, const atalaia_join_t *j, const uin
                                size_t len, bool fresh)
 {
     if (j->kind != ATALAIA_JOIN_KIND_NODE) return BOX_JOIN_CONTROLLER;
+    /* Join key 18: only the firmware's own region (its antenna, its limits); the decoder has
+     * checked that the channel belongs to the region the join names. */
+    if (j->region != (uint8_t)g->region) return BOX_JOIN_REGION;
     bool same = (g->phase == BOX_JOINED || g->phase == BOX_PLAYING) &&
                 j->game_id == g->join.game_id && j->node_id == g->join.node_id &&
                 memcmp(j->game_key, g->join.game_key, sizeof(j->game_key)) == 0;

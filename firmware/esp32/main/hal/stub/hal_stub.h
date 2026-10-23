@@ -5,6 +5,7 @@
 #define HAL_STUB_H
 
 #include "../hal.h"
+#include "../../radio/radio_region.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,6 +37,8 @@ extern bool hal_stub_radio_rx_pending;
 extern uint32_t hal_stub_radio_channel_hz;
 extern uint32_t hal_stub_radio_dc_remaining_ms;
 extern int hal_stub_radio_noise_dbm;
+/* The region the stub radio checks channels against (the build's, RADIO_REGION, after reset). */
+extern atalaia_region_t hal_stub_radio_region;
 extern int hal_stub_radio_measure_calls;
 
 void hal_stub_radio_reset(void);

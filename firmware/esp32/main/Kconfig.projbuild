@@ -482,23 +482,45 @@ menu "Atalaia Field Box Configuration"
         choice ATALAIA_RADIO_REGION
             prompt "Radio regulatory region"
             default ATALAIA_RADIO_REGION_EU868
+            help
+                The band this board may transmit in (RFC 0001 Amendment 12,
+                decisions RF-AS923-1 to RF-AS923-12). The firmware knows only
+                this region: a join payload, a modem CONFIGURE or MEASURE on
+                another region's channel is refused, so a board built and
+                labelled for one band never transmits in another. Fit the
+                antenna for the band (an 868 MHz whip is mistuned at 920 MHz).
+                Applies to the Field Box, the USB radio modem and the I/O pod.
 
             config ATALAIA_RADIO_REGION_EU868
-                bool "EU868 (Europe)"
+                bool "EU868 (Europe, 868-870 MHz, SF7 at 125 kHz)"
+
+            config ATALAIA_RADIO_REGION_AS923_TW
+                bool "AS923-TW (Taiwan, 920-925 MHz, SF9 at 500 kHz)"
+                help
+                    NCC LP0002 5.8.1: LoRa at 500 kHz ("digital modulation":
+                    a 6 dB bandwidth of at least 500 kHz), at most 0.5 W
+                    peak output at the antenna port outdoors, less the
+                    antenna gain above 6 dBi; the 10% airtime budget is this
+                    project's own. Not certified: a product sold in Taiwan
+                    needs NCC type approval (decision RF-AS923-3).
         endchoice
 
         config ATALAIA_RADIO_DEFAULT_CHANNEL_HZ
             int "Default game channel frequency (Hz)"
+            default 921500000 if ATALAIA_RADIO_REGION_AS923_TW
             default 869525000
             help
                 The channel the radio listens on until a game's join payload
                 (or the modem's CONFIGURE / SET_CHANNEL) sets the field's
-                channel. Default 869.525 MHz: the centre of 869.4-869.65 MHz,
-                the only EU868 sub-band with 10% duty cycle and 500 mW ERP
-                (RFC 0001 Amendment 3). The whole 125 kHz channel must fit in
-                one EU868 sub-band; the TX power and the duty-cycle budget
-                follow that sub-band (25 mW and 1% or 0.1% elsewhere). An
-                invalid value falls back to 869525000 with an error at boot.
+                channel; an unadopted box pairs on its region's default. EU868:
+                869.525 MHz, the centre of 869.4-869.65 MHz, the only EU868
+                sub-band with 10% duty cycle and 500 mW ERP (RFC 0001 Amendment
+                3); the whole 125 kHz channel must fit in one EU868 sub-band, and
+                the TX power and the duty-cycle budget follow that sub-band (25
+                mW and 1% or 0.1% elsewhere). AS923-TW: 921.5 MHz, clear of
+                LoRaWAN's 923.2/923.4 MHz; the whole 500 kHz channel must fit in
+                920-925 MHz. An invalid value falls back to the region's default
+                with an error at boot.
 
         config ATALAIA_RADIO_LOG_PACKETS
             bool "Log every packet sent and received (bring-up)"

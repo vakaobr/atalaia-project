@@ -4,12 +4,16 @@
  *
  * SX1262 LoRa radio driver for the Heltec WiFi LoRa 32 V4 (V4.3 with the
  * KCT8103L front-end module, or V4.2 with the GC1109: Kconfig "Board
- * revision"). EU868 band, SF7/BW125, single shared game channel (default
- * 869.525 MHz, g2 sub-band, 10% duty cycle, 500 mW ERP). The TX power and
- * the duty-cycle budget follow the sub-band of the channel in use
- * (radio/radio_limits.c, RFC 0001 Amendment 3): 25 mW ERP and 1% (or 0.1%)
- * outside 869.4-869.65 MHz. FEM gain (~14 dB) and antenna gain are
- * accounted for in the TX power setting (decision C2).
+ * revision"), single shared game channel, in the region the firmware is
+ * built for (Kconfig ATALAIA_RADIO_REGION, radio/radio_region.h, RFC 0001
+ * Amendment 12): EU868 at SF7/BW125 (default 869.525 MHz, g2 sub-band, 10%
+ * duty cycle, 500 mW ERP), or AS923-TW at SF9/BW500 (default 921.5 MHz,
+ * 920-925 MHz, 0.5 W at the antenna port). The TX power and the duty-cycle
+ * budget follow the sub-band of the channel in use (radio/radio_limits.c,
+ * RFC 0001 Amendment 3): in EU868, 25 mW ERP and 1% (or 0.1%) outside
+ * 869.4-869.65 MHz. FEM gain (~14 dB) and antenna gain are accounted for in
+ * the TX power setting (decision C2); a channel whose limit the SX1262
+ * cannot keep is refused.
  *
  * The FEM is powered (its LDO on GPIO 7, its chip enable on GPIO 2, and
  * the revision's mode pin) only after the SX1262 answers its probe;
@@ -90,14 +94,12 @@ static void fem_power_off(void)
 #define FEM_GAIN_DB      CONFIG_ATALAIA_RADIO_FEM_GAIN_DB
 #define ANTENNA_GAIN_DBI CONFIG_ATALAIA_RADIO_ANTENNA_GAIN_DBI
 
-/* Default game channel from Kconfig (869.525 MHz, g2 sub-band). */
+/* Default game channel from Kconfig (the region's default: 869.525 MHz or 921.5 MHz). */
 #ifndef CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ
 #define CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ 869525000
 #endif
 
-/* LoRa parameters: SF7, BW125, CR4/5. */
-#define LORA_SF       7
-#define LORA_BW_HZ    125000
+/* LoRa parameters: the region's SF and bandwidth (atalaia_region_info), CR4/5. */
 #define LORA_CR       1 /* 4/5 */
 #define LORA_PREAMBLE 8
 /* The SX126x private-network sync word (0x1424; LoRaWAN's public one is
@@ -108,7 +110,23 @@ static void fem_power_off(void)
 
 /* The conducted TX power comes from the channel's sub-band (radio_limits):
  * with FEM=14 dB and antenna=2 dBi, 13 dBm on 869.4-869.65 MHz (500 mW ERP)
- * and 0 dBm elsewhere (25 mW ERP). */
+ * and 0 dBm elsewhere (25 mW ERP); 13 dBm in AS923-TW (0.5 W at the port). */
+
+/* The SX1262's bandwidth codes (SetModulationParams). */
+static uint8_t sx_bw_code(uint32_t bw_hz)
+{
+    switch (bw_hz) {
+    case 250000: return 0x05;
+    case 500000: return 0x06;
+    default: return 0x04; /* 125 kHz */
+    }
+}
+
+/* The region's LoRa settings, from the core's table. */
+static const atalaia_region_info_t *region_info(void)
+{
+    return atalaia_region_info(RADIO_REGION);
+}
 
 /* SX1262 commands. */
 #define SX_CMD_SET_SLEEP            0x84
@@ -492,16 +510,27 @@ static int esp_radio_init(void)
     /* The default game channel; its sub-band sets the TX power and budget. */
     radio_limits_init(&limits, FEM_GAIN_DB, ANTENNA_GAIN_DBI);
     uint32_t channel = CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ;
+    const atalaia_region_info_t *region = region_info();
     if (!radio_limits_set_channel(&limits, channel)) {
-        ESP_LOGE(TAG, "default channel %lu Hz does not fit in an EU868 sub-band; using 869525000",
-                 (unsigned long)channel);
-        channel = 869525000u;
-        radio_limits_set_channel(&limits, channel);
+        ESP_LOGE(TAG, "default channel %lu Hz does not fit in a %s sub-band; using %lu",
+                 (unsigned long)channel, region->code, (unsigned long)region->default_channel_hz);
+        channel = region->default_channel_hz;
+        if (!radio_limits_set_channel(&limits, channel)) {
+            /* The gains (Kconfig) leave no legal power even on the default: never transmit. */
+            ESP_LOGE(TAG, "no legal TX power on %lu Hz with FEM %d dB and antenna %d dBi",
+                     (unsigned long)channel, FEM_GAIN_DB, ANTENNA_GAIN_DBI);
+            set_fault("radio: no legal TX power");
+            fem_power_off();
+            probe_cleanup(4);
+            return -1;
+        }
     }
     rc |= sx_set_frequency(channel);
 
-    /* Set modulation parameters: SF7, BW125, CR4/5, low-data-rate off. */
-    uint8_t mod_cmd[] = {SX_CMD_SET_MODULATION, LORA_SF, 0x04, LORA_CR, 0x00};
+    /* Set modulation parameters: the region's SF and bandwidth, CR4/5, low-data-rate off (the
+     * symbol is 1.024 ms in both regions, well under the 16 ms that needs it). */
+    uint8_t mod_cmd[] = {SX_CMD_SET_MODULATION, region->sf, sx_bw_code(region->bw_hz), LORA_CR,
+                         0x00};
     rc |= sx_cmd(mod_cmd, sizeof(mod_cmd), NULL, 0);
 
     /* Set PA config for SX1262 (+22 dBm capable PA). */
@@ -540,8 +569,9 @@ static int esp_radio_init(void)
         return -1;
     }
 
-    ESP_LOGI(TAG, "SX1262 initialised: EU868, SF%d, BW%dk, TX %d dBm, ch %lu Hz", LORA_SF,
-             LORA_BW_HZ / 1000, limits.tx_power_dbm, (unsigned long)limits.channel_hz);
+    ESP_LOGI(TAG, "SX1262 initialised: %s, SF%d, BW%luk, TX %d dBm, ch %lu Hz", region->code,
+             region->sf, (unsigned long)(region->bw_hz / 1000), limits.tx_power_dbm,
+             (unsigned long)limits.channel_hz);
     return 0;
 }
 
@@ -593,6 +623,14 @@ static int esp_radio_send(const uint8_t *data, size_t len)
         SX_CMD_SET_PACKET_PARAMS, 0x00, LORA_PREAMBLE, 0x00, (uint8_t)len, 0x01, 0x00};
     if (sx_cmd(pkt_cmd, sizeof(pkt_cmd), NULL, 0) != 0) return -1;
 
+    /* SX1261/2 datasheet section 15.1 (modulation quality with 500 kHz LoRa bandwidth): before
+     * each transmission, bit 2 of register 0x0889 is cleared at 500 kHz and set otherwise. */
+    uint8_t tx_mod;
+    if (sx_read_reg(0x0889, &tx_mod) != 0) return -1;
+    tx_mod =
+        region_info()->bw_hz == 500000u ? (uint8_t)(tx_mod & ~0x04u) : (uint8_t)(tx_mod | 0x04u);
+    if (sx_write_reg(0x0889, tx_mod) != 0) return -1;
+
     /* Write payload to buffer at offset 0. */
     uint8_t wr_cmd[2 + 255];
     wr_cmd[0] = SX_CMD_WRITE_BUFFER;
@@ -618,7 +656,7 @@ static int esp_radio_send(const uint8_t *data, size_t len)
         return -2;
     }
 
-    /* Record the time on air (LoRa formula, SF7/BW125) in the sub-band's budget. */
+    /* Record the time on air (LoRa formula, the region's SF and bandwidth) in the budget. */
     radio_limits_record(&limits, len, now_ms());
 
     /* Return to RX on the game channel after TX. */
@@ -685,8 +723,9 @@ static int esp_radio_set_channel(uint32_t freq_hz)
 {
     int8_t power;
     if (!radio_limits_power_for(&limits, freq_hz, &power)) {
-        ESP_LOGW(TAG, "channel %lu Hz: the 125 kHz channel does not fit in an EU868 sub-band",
-                 (unsigned long)freq_hz);
+        ESP_LOGW(TAG, "channel %lu Hz: the %lu kHz channel does not fit in a %s sub-band",
+                 (unsigned long)freq_hz, (unsigned long)(region_info()->bw_hz / 1000),
+                 region_info()->code);
         return -1;
     }
     /* Retune from standby, not mid-receive. Power first when it drops, so the
@@ -747,13 +786,21 @@ static uint32_t esp_radio_duty_cycle_remaining_ms(void)
 /* ---- Noise measurement (USB modem MEASURE) -------------------------------- */
 
 /* One channel-activity detection on the current frequency: true if a LoRa
- * preamble was seen. Two symbols, with the detection thresholds the SX126x
- * documentation gives for SF7 / 125 kHz. *ok is false on a radio error. */
+ * preamble was seen. Two symbols, with the detection peak Semtech's CAD
+ * application note (AN1200.48) gives for the spreading factor (22 at SF7, 23
+ * at SF9) and a minimum of 10. *ok is false on a radio error. */
 static bool sx_cad_once(bool *ok)
 {
     uint8_t stby[] = {SX_CMD_SET_STANDBY, 0x00};
-    uint8_t params[] = {
-        SX_CMD_SET_CAD_PARAMS, 0x01 /* 2 symbols */, 22, 10, 0x00 /* CAD only */, 0x00, 0x00, 0x00};
+    uint8_t det_peak = region_info()->sf >= 9 ? 23 : 22;
+    uint8_t params[] = {SX_CMD_SET_CAD_PARAMS,
+                        0x01 /* 2 symbols */,
+                        det_peak,
+                        10,
+                        0x00 /* CAD only */,
+                        0x00,
+                        0x00,
+                        0x00};
     uint8_t clr[] = {SX_CMD_CLR_IRQ_STATUS, 0xFF, 0xFF};
     uint8_t cad[] = {SX_CMD_SET_CAD};
     *ok = false;
@@ -776,7 +823,7 @@ static bool sx_cad_once(bool *ok)
 static int esp_radio_measure(uint32_t freq_hz, uint32_t dwell_ms, bool cad, noise_result_t *out)
 {
     static noise_acc_t acc; /* 520 bytes: kept off the radio task's stack */
-    if (!atalaia_channel_ok(freq_hz)) return -2;
+    if (!atalaia_region_channel_ok(RADIO_REGION, freq_hz)) return -2;
     if (dwell_ms < NOISE_DWELL_MIN_MS) dwell_ms = NOISE_DWELL_MIN_MS;
     if (dwell_ms > NOISE_DWELL_MAX_MS) dwell_ms = NOISE_DWELL_MAX_MS;
     noise_acc_init(&acc);

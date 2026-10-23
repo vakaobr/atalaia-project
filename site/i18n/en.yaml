@@ -269,6 +269,18 @@ radio:
       869.525&nbsp;MHz and Meshtastic's European default uses it, so near such users the GM can let
       the controller listen to every legal channel for a minute and pick the quietest, draw one at
       random, or choose by hand. The boxes then follow the chosen channel's own limits.
+  region:
+    title: "Radio regions: Europe and Taiwan"
+    lead: >-
+      A field is in one radio region, chosen once in the GM console. In Europe (EU868) the boxes use
+      the channels above. In Taiwan (AS923, 920–925&nbsp;MHz) the NCC's rules (LP0002) give a single
+      channel that does not hop full power only if it is at least 500&nbsp;kHz wide, so there the
+      boxes use LoRa at 500&nbsp;kHz (SF9, about the same range as in Europe), at most 0.5&nbsp;W at
+      the antenna, and 921.5&nbsp;MHz by default, away from the channels LoRaWAN and Meshtastic use.
+      Every box, USB radio modem and I/O pod is built for one region and refuses the other regions'
+      channels, so a box never transmits outside its band; the boxes learn the field's region with
+      each game. The Taiwanese region is not certified: a product sold in Taiwan needs the NCC's type
+      approval, and an antenna made for 920&nbsp;MHz. None of it has been tested on air yet.
 
 modes:
   title: Game modes

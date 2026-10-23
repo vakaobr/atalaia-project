@@ -3,10 +3,13 @@
 """The field's radio channel: the candidate list, the noise scan, the suggestion.
 
 The channel is a field setting (decisions CH1-CH8 in
-docs/review/decisions-to-review.md, RFC 0001 Amendment 3). The default,
-869.525 MHz, sits in the only EU868 sub-band that allows 10% duty cycle
-and 500 mW ERP; the GM can keep it, scan for a quieter one, draw one at
-random or pick one from the list.
+docs/review/decisions-to-review.md, RFC 0001 Amendment 3), in the field's
+radio region (atalaia_sim/regions.py, Amendment 12: EU868 or AS923-TW;
+every function here takes the region, EU868 when not given). The EU868
+default, 869.525 MHz, sits in the only EU868 sub-band that allows 10% duty
+cycle and 500 mW ERP; AS923-TW's, 921.5 MHz, keeps clear of LoRaWAN's and
+Meshtastic's defaults. The GM can keep it, scan for a quieter one, draw one
+at random or pick one from the list: only channels of the region.
 
 A scan asks the USB modem to measure each candidate (MEASURE, protocol/
 usb-modem.md) for an equal share of the dwell, and ranks the results:
@@ -26,7 +29,8 @@ import time
 from dataclasses import asdict
 from typing import Any, Callable, Optional
 
-from atalaia_sim import eu868
+from atalaia_sim import regions
+from atalaia_sim.regions import Region
 
 from . import modem_framing as mf
 
@@ -39,9 +43,9 @@ PER_CHANNEL_MIN_S = 0.01
 SOURCES = ("default", "scan", "random", "manual")
 
 
-def candidates() -> list[dict[str, Any]]:
-    """Every channel the GM can pick, with its sub-band's limits."""
-    return [eu868.describe(hz) for hz in eu868.CANDIDATES]
+def candidates(region: Region = regions.EU868) -> list[dict[str, Any]]:
+    """Every channel the GM can pick in the region, with its sub-band's limits."""
+    return [region.describe(hz) for hz in region.candidates]
 
 
 def rank_key(n: mf.Noise) -> tuple:
@@ -52,24 +56,25 @@ def is_quiet(n: mf.Noise, threshold_dbm: int) -> bool:
     return n.p90_dbm <= threshold_dbm and n.activity <= BUSY_ACTIVITY
 
 
-def suggest(results: list[mf.Noise], threshold_dbm: int) -> Optional[dict[str, Any]]:
+def suggest(results: list[mf.Noise], threshold_dbm: int,
+            region: Region = regions.EU868) -> Optional[dict[str, Any]]:
     """The channel to suggest after a scan, and why (decision CH3)."""
     if not results:
         return None
     ranked = sorted(results, key=rank_key)
-    full = [n for n in ranked if eu868.band_of(n.channel_hz).full_power]
+    full = [n for n in ranked if region.band_of(n.channel_hz).full_power]
     if full and is_quiet(full[0], threshold_dbm):
         return {"channel_hz": full[0].channel_hz, "reason": "quiet_full_power"}
     reason = "quietest" if is_quiet(ranked[0], threshold_dbm) else "quietest_but_noisy"
     return {"channel_hz": ranked[0].channel_hz, "reason": reason}
 
 
-def random_choice(rng: Optional[random.Random] = None) -> dict[str, Any]:
-    """A random legal channel with enough airtime for a game (decision CH5)."""
-    pool = eu868.scan_candidates()
+def random_choice(rng: Optional[random.Random] = None, region: Region = regions.EU868) -> dict[str, Any]:
+    """A random legal channel of the region with enough airtime for a game (decision CH5)."""
+    pool = region.scan_candidates()
     hz = (rng or random.SystemRandom()).choice(pool)
-    full = sum(1 for c in pool if eu868.band_of(c).full_power)
-    return {**eu868.describe(hz), "pool": len(pool), "pool_full_power": full}
+    full = sum(1 for c in pool if region.band_of(c).full_power)
+    return {**region.describe(hz), "pool": len(pool), "pool_full_power": full}
 
 
 def per_channel_dwell_s(total_s: float, count: int) -> float:
@@ -85,8 +90,9 @@ class Scan:
 
     def __init__(self, measure: Callable[[int, int], mf.Noise], total_s: float,
                  threshold_dbm: int, on_change: Callable[[dict[str, Any]], None],
-                 channels: Optional[list[int]] = None) -> None:
-        self.channels = list(channels or eu868.scan_candidates())
+                 channels: Optional[list[int]] = None, region: Region = regions.EU868) -> None:
+        self.region = region
+        self.channels = list(channels or region.scan_candidates())
         self.dwell_ms = int(round(per_channel_dwell_s(total_s, len(self.channels)) * 1000))
         self.threshold_dbm = threshold_dbm
         self._measure = measure
@@ -156,11 +162,13 @@ class Scan:
                 "total_s": round(self.dwell_ms * len(self.channels) / 1000, 1),
                 "threshold_dbm": self.threshold_dbm,
                 "started_at": self.started_at, "finished_at": self.finished_at,
-                "results": [result_row(n, self.threshold_dbm) for n in ranked],
-                "suggestion": suggest(results, self.threshold_dbm) if self.state == "done" else None,
+                "region": self.region.code,
+                "results": [result_row(n, self.threshold_dbm, self.region) for n in ranked],
+                "suggestion": (suggest(results, self.threshold_dbm, self.region)
+                               if self.state == "done" else None),
             }
 
 
-def result_row(n: mf.Noise, threshold_dbm: int) -> dict[str, Any]:
-    return {**eu868.describe(n.channel_hz), **asdict(n), "activity_pct": round(n.activity * 100, 1),
+def result_row(n: mf.Noise, threshold_dbm: int, region: Region = regions.EU868) -> dict[str, Any]:
+    return {**region.describe(n.channel_hz), **asdict(n), "activity_pct": round(n.activity * 100, 1),
             "quiet": is_quiet(n, threshold_dbm)}

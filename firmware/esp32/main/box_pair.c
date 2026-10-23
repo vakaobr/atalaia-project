@@ -14,6 +14,7 @@
 #include "atalaia/join.h"
 #include "box_text.h"
 #include "cpace.h"
+#include "radio/radio_region.h"
 
 static void say(box_pair_t *p, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 
@@ -96,7 +97,7 @@ void box_pair_init(box_pair_t *p, const box_pair_ops_t *ops, adoption_t *adopt,
     if (!atalaia_join_text_ok(p->name, ATALAIA_PF_NAME_MAX))
         snprintf(p->name, sizeof(p->name), "box");
     p->tier = tier <= 2 ? tier : 0;
-    p->channel_hz = channel_hz ? channel_hz : 869525000u;
+    p->channel_hz = channel_hz ? channel_hz : radio_region_default_channel_hz(RADIO_REGION);
 }
 
 bool box_pair_showing(const box_pair_t *p)
@@ -115,10 +116,10 @@ static uint32_t offer_interval(box_pair_t *p)
     m.tier = p->tier;
     uint8_t frame[ATALAIA_PF_MAX];
     size_t n = atalaia_pf_encode(&m, frame, sizeof(frame));
-    const atalaia_band_info_t *band =
-        atalaia_band_info(atalaia_band_of_channel(p->channel_hz, ATALAIA_LORA_BW_HZ));
+    const atalaia_band_info_t *band = atalaia_region_band_info(
+        RADIO_REGION, atalaia_region_band_of_channel(RADIO_REGION, p->channel_hz));
     uint32_t ppm = band != NULL ? band->duty_ppm : 10000u;
-    uint64_t air_us = atalaia_airtime_us(7, ATALAIA_LORA_BW_HZ, n ? n : 40);
+    uint64_t air_us = atalaia_region_airtime_us(RADIO_REGION, n ? n : 40);
     uint64_t ms = air_us * 100000u / ((uint64_t)BOX_PAIR_OFFER_SHARE_PCT * ppm);
     if (ms < BOX_PAIR_OFFER_MIN_MS) ms = BOX_PAIR_OFFER_MIN_MS;
     return ms > 0x7FFFFFFFu ? 0x7FFFFFFFu : (uint32_t)ms;

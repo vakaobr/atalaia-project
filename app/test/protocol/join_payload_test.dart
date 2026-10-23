@@ -32,6 +32,7 @@ JoinPayload _fields(Map<String, dynamic> f) => JoinPayload(
   caSha256: f['ca_sha256'] == null ? null : hexDecode(f['ca_sha256'] as String),
   urls: (f['urls'] as List?)?.cast<String>(),
   lang: f['lang'] as String?,
+  region: f['region'] as String? ?? 'eu868',
 );
 
 /// [text] with the last base64url character's lowest bit set: a padding bit
@@ -202,6 +203,85 @@ void main() {
         final j = decodeJoin(hexDecode(c['payload'] as String), key);
         expect((j.fetchModes, j.forgetModes), (false, false));
       }
+    });
+  });
+
+  group('region (key 18)', () {
+    final section = v['region'] as Map<String, dynamic>;
+    test('the section has its cases', () {
+      expect(cases(section, 'valid').length, greaterThanOrEqualTo(3));
+      expect(cases(section, 'invalid').length, greaterThanOrEqualTo(8));
+    });
+    for (final c in cases(section, 'valid')) {
+      test('${c['name']}', () {
+        final payload = hexDecode(c['payload'] as String);
+        final f = c['fields'] as Map<String, dynamic>;
+        final j = decodeJoin(payload, key);
+        expect(j.region, f['region']);
+        expect(j.channelHz, f['channel_hz']);
+        expect(j.lang, f['lang']);
+        expect(hexEncode(encodeJoin(j, key)), c['payload']);
+        expect(hexEncode(encodeJoin(_fields(f), key)), c['payload']);
+        expect(joinToText(payload), c['text']);
+      });
+    }
+    for (final c in cases(section, 'invalid')) {
+      test('${c['name']}: body', () {
+        expect(
+          () => decodeJoin(hexDecode(c['payload'] as String), key),
+          throwsA(
+            isA<JoinException>().having(
+              (e) => e.reason,
+              'reason',
+              JoinFailure.body,
+            ),
+          ),
+        );
+      });
+    }
+    test('absent: EU868, and EU868 encodes as the key left out', () {
+      for (final c in cases(v, 'valid')) {
+        final payload = hexDecode(c['payload'] as String);
+        final j = decodeJoin(payload, key);
+        expect(j.region, 'eu868');
+        expect(hexEncode(encodeJoin(j, key)), c['payload']);
+      }
+    });
+    test('the encoder checks the region and its channel', () {
+      final base = _fields(
+        cases(v, 'valid').first['fields'] as Map<String, dynamic>,
+      );
+      JoinPayload withRegion(String region, int hz) => JoinPayload(
+        gameId: base.gameId,
+        gameKey: base.gameKey,
+        nodeId: base.nodeId,
+        controllerId: base.controllerId,
+        channelHz: hz,
+        maxHops: base.maxHops,
+        teams: base.teams,
+        modeId: base.modeId,
+        role: base.role,
+        gameSeed: base.gameSeed,
+        params: base.params,
+        kind: base.kind,
+        region: region,
+      );
+      for (final bad in [
+        withRegion('us915', 915000000),
+        withRegion('as923-tw', 869525000),
+        withRegion('eu868', 921500000),
+      ]) {
+        expect(
+          () => encodeJoin(bad, key),
+          throwsA(isA<JoinException>()),
+          reason: '${bad.region} ${bad.channelHz}',
+        );
+      }
+      final tw = decodeJoin(
+        encodeJoin(withRegion('as923-tw', 921500000), key),
+        key,
+      );
+      expect((tw.region, tw.channelHz), ('as923-tw', 921500000));
     });
   });
 

@@ -42,7 +42,9 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("atalaia.adoption")
 
-PAIR_CHANNEL_HZ = eu868.DEFAULT_CHANNEL_HZ  # where an unadopted box listens (its Kconfig default)
+PAIR_CHANNEL_HZ = eu868.DEFAULT_CHANNEL_HZ  # where an unadopted EU868 box listens (its Kconfig default)
+# An unadopted box listens on its region's default channel (Kconfig ATALAIA_RADIO_DEFAULT_CHANNEL_HZ):
+# Pairing._pair_hz() is the field region's (RFC 0001 Amendment 12).
 OFFER_TTL_MS = 60_000  # a box not heard this long leaves the list (it offers every 15 s or more)
 STEP_MS = 10_000  # START -> REPLY, KEY -> DONE
 RESEND_MS = 3_000
@@ -243,17 +245,21 @@ class Pairing:
             self.retuned = False
             if was:
                 self.listen_until_ms = 0
-                log.info("pairing: no longer listening on %d Hz (%s)", PAIR_CHANNEL_HZ, why)
+                log.info("pairing: no longer listening on %d Hz (%s)", self._pair_hz(), why)
             run = self.run
             if run is not None and run.state in ("starting", "sealing") and \
-                    self.ctl.field_channel != PAIR_CHANNEL_HZ:
+                    self.ctl.field_channel != self._pair_hz():
                 self._fail(run, "channel_changed", self.ctl.now_ms())
+
+    def _pair_hz(self) -> int:
+        """Where an unadopted box of the field's region listens: the region's default channel."""
+        return self.ctl.field_region.default_channel_hz
 
     def _current_channel(self) -> int:
         game = self.ctl.game
         if game is not None and self.ctl._channel_lock_reason():
             return int(game.get("channel_hz") or self.ctl.field_channel)
-        return PAIR_CHANNEL_HZ if self.retuned else self.ctl.field_channel
+        return self._pair_hz() if self.retuned else self.ctl.field_channel
 
     def _tune_back(self) -> None:
         self.retuned = False
@@ -270,14 +276,14 @@ class Pairing:
             if not getattr(self.ctl.modem, "has_pair_frames", False):
                 raise Unavailable("the modem's firmware does not carry pair frames: update it")
             current = self._current_channel()
-            if current != PAIR_CHANNEL_HZ:
+            if current != self._pair_hz():
                 reason = self.ctl._channel_lock_reason()
                 if reason:
-                    raise Conflict(f"new boxes listen on {PAIR_CHANNEL_HZ} Hz and the radio is on {current} Hz "
+                    raise Conflict(f"new boxes listen on {self._pair_hz()} Hz and the radio is on {current} Hz "
                                    f"for the live game ({reason}): pair them before or after it")
-                self.ctl.modem.set_channel(PAIR_CHANNEL_HZ)
+                self.ctl.modem.set_channel(self._pair_hz())
                 self.retuned = True
-                log.info("pairing: the modem listens on %d Hz for unadopted boxes", PAIR_CHANNEL_HZ)
+                log.info("pairing: the modem listens on %d Hz for unadopted boxes", self._pair_hz())
             self.listen_until_ms = self.ctl.now_ms() + LISTEN_MS
             return self._status()
 
@@ -326,8 +332,8 @@ class Pairing:
             o["duplicate_name"] = names[o["name"]] > 1
         return {"offers": sorted(offers, key=lambda o: o["name"]),
                 "run": self.run.public() if self.run is not None else None,
-                "channel_hz": PAIR_CHANNEL_HZ, "radio_channel_hz": self._current_channel(),
-                "listening": self._current_channel() == PAIR_CHANNEL_HZ,
+                "channel_hz": self._pair_hz(), "radio_channel_hz": self._current_channel(),
+                "listening": self._current_channel() == self._pair_hz(),
                 "listen_ms_left": max(0, self.listen_until_ms - now) if self.retuned else None,
                 "radio": self._modem_ok(),
                 "pair_frames": self._modem_ok() and bool(getattr(self.ctl.modem, "has_pair_frames", False)),

@@ -20,6 +20,7 @@
  *            [--join-key HEX] [--state-ms N] [--name NAME]
  *            [--as-box VERSION] [--release-keys HEX] [--admin-pin PIN] [--mac MAC] [--pair]
  *            [--announce-ms N] [--no-wifi] [--mode-keys HEX] [--mode-source DIR]
+ *            [--region eu868|as923-tw]
  *
  * Without --join-key (and no key stored in DIR) the box is unadopted
  * (main/adoption.c, protocol/adoption.md); --admin-pin (1234) and --mac
@@ -29,6 +30,9 @@
  *
  * --announce-ms N: between games, announce N ms after a game ends and then every N ms
  * (instead of 2-20 s and the duty-cycle-based interval), so the tests need not wait.
+ * --region: a box built for that radio region (Kconfig ATALAIA_RADIO_REGION; EU868 by
+ * default): it pairs on the region's default channel, tunes only to the region's channels
+ * and refuses another region's joins (join key 18).
  * The box's device id is the file device_id in --state-dir (made at the first start).
  *
  * --as-box VERSION: HELLO says a Field Box (esp32s3, full tier) running VERSION, so
@@ -331,9 +335,18 @@ static void shell_log(void *user, const char *line)
     out("LOG %s", line);
 }
 
+/* The region this "firmware" is built for (--region). */
+static atalaia_region_t host_region = RADIO_REGION;
+
 static bool shell_set_channel(void *user, uint32_t hz)
 {
     (void)user;
+    /* As the SX1262 HAL: only a channel of the build's region. */
+    if (!atalaia_region_channel_ok(host_region, hz)) {
+        out("LOG channel %lu Hz refused (not a %s channel)", (unsigned long)hz,
+            radio_region_code(host_region));
+        return false;
+    }
     out("LOG channel %lu Hz", (unsigned long)hz);
     return true;
 }
@@ -647,7 +660,13 @@ int main(int argc, char **argv)
             pair = true;
             continue;
         }
-        if (strcmp(argv[i], "--admin-pin") == 0 && i + 1 < argc) {
+        if (strcmp(argv[i], "--region") == 0 && i + 1 < argc) {
+            host_region = atalaia_region_from_code(argv[++i]);
+            if (host_region == ATALAIA_REGION_COUNT) {
+                fprintf(stderr, "box_host: --region eu868 or as923-tw\n");
+                return 2;
+            }
+        } else if (strcmp(argv[i], "--admin-pin") == 0 && i + 1 < argc) {
             admin_pin = argv[++i];
         } else if (strcmp(argv[i], "--mac") == 0 && i + 1 < argc) {
             mac = argv[++i];
@@ -795,6 +814,7 @@ int main(int argc, char **argv)
                              .user = NULL};
     box_game_init(&game, &runner, &preset, &store, &shell, &atalaia_crypto_mbedtls, &nvs_ops,
                   &evlog, &hello);
+    game.region = host_region;
     if (announce_ms > 0) {
         game.lobby.first_min_ms = game.lobby.first_max_ms = (uint32_t)announce_ms;
         game.lobby.interval_fixed_ms = (uint32_t)announce_ms;
@@ -815,7 +835,8 @@ int main(int argc, char **argv)
     game.state_interval_ms = (uint32_t)state_ms;
     static box_pair_t pairing;
     box_pair_ops_t pops = {air_send, shell_random, shell_screen, shell_log, NULL};
-    box_pair_init(&pairing, &pops, &adopt, &atalaia_crypto_mbedtls, name, 0, 869525000u);
+    box_pair_init(&pairing, &pops, &adopt, &atalaia_crypto_mbedtls, name, 0,
+                  radio_region_default_channel_hz(host_region));
 
     uint32_t last = mono_ms();
     bool resumed = box_game_resume(&game, last);

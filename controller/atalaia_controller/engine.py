@@ -38,8 +38,8 @@ import time
 from collections import Counter
 from typing import Any, Callable, Optional
 
-from atalaia_sim import eu868
 from atalaia_sim import join as joinfmt
+from atalaia_sim import regions
 from atalaia_sim.core import Core, Emitted, FieldOps, Node
 from atalaia_sim.election import LEADER, Election, priority_score
 from atalaia_sim.field_controller import (
@@ -57,7 +57,7 @@ from atalaia_sim.field_controller import (
 from atalaia_sim.mode import COMMAND_NAME, SEPARATOR, ModeError
 from atalaia_sim.packet import Header, vf_make
 
-from . import channels, radio_modem, visibility
+from . import channels, radio_modem, radio_region, visibility
 from . import scenario_service as scenarios
 from .pairing import Pairing
 from .reinvite import Reinvite
@@ -305,12 +305,14 @@ class Controller:
                 self._last_scan = json.loads(saved_scan)
             except ValueError:
                 self._last_scan = None
+        region = self.field_region
         stored = self.store.get_setting("radio.channel_hz")
-        if stored is not None and (not stored.isdigit() or not eu868.channel_ok(int(stored))):
-            log.error("the stored field channel %r is not a legal EU868 game channel; using the "
-                      "configured %d Hz", stored, cfg.channel_hz)
+        if stored is not None and (not stored.isdigit() or not region.channel_ok(int(stored))):
+            fallback = cfg.channel_hz if region.channel_ok(cfg.channel_hz) else region.default_channel_hz
+            log.error("the stored field channel %r is not a legal %s game channel; using %d Hz",
+                      stored, region.code, fallback)
             self.store.set_setting("radio.channel_source", "default")
-            self.store.set_setting("radio.channel_hz", str(cfg.channel_hz))
+            self.store.set_setting("radio.channel_hz", str(fallback))
         elif stored is not None and int(stored) != cfg.channel_hz:
             log.info("field channel %s Hz (chosen in the console; radio.channel_hz = %d is the "
                      "default)", stored, cfg.channel_hz)
@@ -741,9 +743,18 @@ class Controller:
 
     @property
     def field_channel(self) -> int:
-        """The channel new games use: the GM's choice, else radio.channel_hz from the config."""
+        """The channel new games use: the GM's choice, else radio.channel_hz from the config
+        (else the region's default, when the config's channel is another region's)."""
         stored = self.store.get_setting("radio.channel_hz")
-        return int(stored) if stored is not None else self.cfg.channel_hz
+        if stored is not None:
+            return int(stored)
+        region = self.field_region
+        return self.cfg.channel_hz if region.channel_ok(self.cfg.channel_hz) else region.default_channel_hz
+
+    @property
+    def field_region(self) -> regions.Region:
+        """The field's radio region (radio_region.py): the GM's choice, else [radio] region."""
+        return radio_region.field_region(self.store, self.cfg)
 
     def _channel_lock_reason(self) -> Optional[str]:
         if self.game is not None:
@@ -804,18 +815,23 @@ class Controller:
         return console_lang
 
     def radio_settings(self) -> dict[str, Any]:
-        """The field channel, its limits, the candidates and the last scan (GET /api/v1/radio)."""
+        """The field's region and channel, its limits, the candidates and the last scan
+        (GET /api/v1/radio)."""
         with self._lock:
             hz = self.field_channel
+            region = self.field_region
             scan = self.scan.public() if self.scan is not None else self._last_scan
+            default_hz = self.cfg.channel_hz if region.channel_ok(self.cfg.channel_hz) else region.default_channel_hz
             return {
-                "channel": eu868.describe(hz),
+                "channel": region.describe(hz),
                 "source": self.store.get_setting("radio.channel_source") or "default",
                 "confirmed": self.store.get_setting("radio.channel_confirmed") == "1",
                 "set_at": float(self.store.get_setting("radio.channel_set_at") or 0) or None,
-                "default": eu868.describe(self.cfg.channel_hz),
-                "recommended_hz": eu868.DEFAULT_CHANNEL_HZ,
-                "candidates": channels.candidates(),
+                "default": region.describe(default_hz),
+                "recommended_hz": region.default_channel_hz,
+                "candidates": channels.candidates(region),
+                **radio_region.public(region, self.modem.ident if self.modem is not None else None,
+                                      "console" if radio_region.stored(self.store) else "config"),
                 "locked": self._channel_lock_reason(),
                 "scan_unavailable": self._scan_unavailable(),
                 "scan_dwell_s": self.cfg.scan_dwell_s,
@@ -831,10 +847,11 @@ class Controller:
             if reason:
                 raise Conflict(f"the channel cannot change now: {reason}")
             hz = _int(channel_hz, "channel_hz")
-            if not eu868.channel_ok(hz):
+            region = self.field_region
+            if not region.channel_ok(hz):
                 raise ControllerError(
-                    f"channel_hz {hz}: the 125 kHz channel (centre +-62.5 kHz) must fit inside "
-                    "one EU868 sub-band")
+                    f"channel_hz {hz}: the {region.bw_hz // 1000} kHz channel (centre +-"
+                    f"{region.bw_hz / 2000:g} kHz) must fit inside one {region.code} sub-band")
             if source not in channels.SOURCES:
                 raise ControllerError(f"source: one of {', '.join(channels.SOURCES)}")
             self.store.set_setting("radio.channel_hz", str(hz))
@@ -849,9 +866,40 @@ class Controller:
         self._emit({"type": "radio", "radio": out})
         return out
 
+    def set_field_region(self, code: Any) -> dict[str, Any]:
+        """The GM's choice of the field's radio region (PUT /api/v1/radio/region): only with no
+        game and no scan; the field moves to the region's default channel, to be confirmed, and
+        the last scan (the old region's channels) is forgotten."""
+        with self._lock:
+            reason = self._channel_lock_reason()
+            if reason:
+                raise Conflict(f"the region cannot change now: {reason}")
+            if not isinstance(code, str) or code not in regions.BY_CODE:
+                raise ControllerError(f"region: one of {', '.join(regions.BY_CODE)}")
+            region = regions.BY_CODE[code]
+            changed = region is not self.field_region
+            self.store.set_setting(radio_region.STORE_KEY, region.code)
+            if changed:
+                self.store.set_setting("radio.channel_hz", str(region.default_channel_hz))
+                self.store.set_setting("radio.channel_source", "default")
+                self.store.set_setting("radio.channel_confirmed", "0")
+                self.store.set_setting("radio.channel_set_at", str(time.time()))
+                self.store.set_setting("radio.last_scan", "")
+                self._last_scan = None
+                self.scan = None
+                if self.modem is not None and self.modem.is_up and region.code == radio_region.modem_region(
+                        self.modem.ident):
+                    self.modem.set_channel(region.default_channel_hz)
+                    self._modem_moved("the field's region changed")
+                log.info("field region set to %s (channel %d Hz, to be confirmed)", region.code,
+                         region.default_channel_hz)
+        out = self.radio_settings()
+        self._emit({"type": "radio", "radio": out})
+        return out
+
     def random_channel(self) -> dict[str, Any]:
         """A random legal channel as a suggestion; nothing changes until the GM accepts it."""
-        return channels.random_choice()
+        return channels.random_choice(region=self.field_region)
 
     def start_scan(self, dwell_s: Any = None) -> dict[str, Any]:
         """Starts the noise scan of the candidates ("find a quiet channel")."""
@@ -871,7 +919,8 @@ class Controller:
             assert self.modem is not None
             modem = self.modem
             self.scan = channels.Scan(lambda hz, ms: modem.measure(hz, ms), total,
-                                      self.cfg.quiet_threshold_dbm, self._on_scan)
+                                      self.cfg.quiet_threshold_dbm, self._on_scan,
+                                      region=self.field_region)
             self._modem_moved("a channel scan started")
             self.scan.start()
             return self.scan.public()
@@ -1018,6 +1067,7 @@ class Controller:
                 "params": params or None, "kind": kind,
                 "lang": self.store.get_setting(f"box_lang:{self.game['id']}"),
                 "fetch_modes": fetch, "forget_modes": forget,
+                "region": self.field_region.code,  # key 18: the box refuses another region's game
             }
             # Android props link over Wi-Fi with the field CA and the controller's addresses
             # (keys 13 and 14, RFC 0001 Amendment 4, proposed); boxes use them for firmware
@@ -1085,6 +1135,9 @@ class Controller:
                 raise ControllerError(f"join payload refused ({exc.reason}): {exc}") from None
             if j["kind"] != "controller":
                 raise ControllerError("this join payload is for a box, not a standby controller")
+            if j["region"] != self.field_region.code:
+                raise Conflict(f"this game is in the {j['region']} radio region and this controller's field "
+                               f"in {self.field_region.code}; change the region in the radio settings first")
             try:
                 pkg = self.modes.get(j["mode_id"])
             except ModeError as exc:

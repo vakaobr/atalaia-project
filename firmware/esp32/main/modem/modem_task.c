@@ -234,9 +234,10 @@ bool modem_task_start(const hal_t *hal)
     modem_init(&modem, &io, &atalaia_crypto_mbedtls, app->version, hal->radio != NULL,
                CONFIG_ATALAIA_MODEM_EPOCH_WINDOW);
     /* The radio's boot channel (hal_esp_radio.c), shown until the controller sets one. */
-    idle_channel_hz = atalaia_channel_ok(CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ)
-                          ? CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ
-                          : 869525000u;
+    idle_channel_hz =
+        atalaia_region_channel_ok(RADIO_REGION, CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ)
+            ? CONFIG_ATALAIA_RADIO_DEFAULT_CHANNEL_HZ
+            : radio_region_default_channel_hz(RADIO_REGION);
     publish_screen_state();
     ESP_LOGI(TAG, "modem ready on %s (radio %s, epoch window %d)",
              MODEM_LINK_UART ? "UART0" : "USB-Serial-JTAG", hal->radio != NULL ? "on" : "absent",

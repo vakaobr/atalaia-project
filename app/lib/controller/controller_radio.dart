@@ -133,6 +133,16 @@ abstract class ControllerModem {
   /// in its IDENT (`"measure": true`).
   bool get canMeasure => hasRadioChip && ident?['measure'] == true;
 
+  /// The radio region the radio's firmware is built for (IDENT `region`,
+  /// RFC 0001 Amendment 12): a radio from before regions says nothing and is
+  /// an EU868 build (radio_region.py `modem_region`); null without an IDENT.
+  String? get radioRegion {
+    final id = ident;
+    if (id == null) return null;
+    final r = id['region'] ?? 'eu868';
+    return r is String ? r : null;
+  }
+
   /// Measures the noise on a channel for [dwellMs] (MEASURE, answered by a
   /// NOISE frame, [RadioNoise] of pod_codec.dart; radio_modem.py `measure`). Throws [MeasureException] when
   /// the radio refuses or cannot finish it.

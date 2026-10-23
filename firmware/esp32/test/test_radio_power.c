@@ -76,8 +76,33 @@ static void test_clamp_high(void)
 
 /* ---- Runner --------------------------------------------------------------- */
 
+/* atalaia_tx_power_for: every kind of limit, and false when -9 dBm is still too much. */
+static void test_power_for_each_kind_of_limit(void)
+{
+    int8_t p = 99;
+    const atalaia_band_info_t *g2 = atalaia_band_info(ATALAIA_BAND_G2);
+    CHECK(atalaia_tx_power_for(g2, 14, 2, &p) && p == 13); /* as atalaia_eu868_tx_power_dbm */
+    const atalaia_band_info_t *tw =
+        atalaia_region_band_info(ATALAIA_REGION_AS923_TW, (atalaia_band_t)ATALAIA_BAND_TW);
+    CHECK(atalaia_tx_power_for(tw, 14, 2, &p) && p == 13);
+    CHECK(atalaia_tx_power_for(tw, 14, 6, &p) && p == 13);
+    CHECK(atalaia_tx_power_for(tw, 14, 8, &p) && p == 11);
+    CHECK(atalaia_tx_power_for(tw, 0, 0, &p) && p == 22); /* the SX1262's top */
+    atalaia_band_info_t eirp = *tw;
+    eirp.limit_ref = ATALAIA_LIMIT_EIRP;
+    CHECK(atalaia_tx_power_for(&eirp, 14, 2, &p) && p == 11);
+    /* g with a 30 dB FEM: -15 dBm needed, below the chip's -9: refused, p untouched. */
+    p = 99;
+    CHECK(!atalaia_tx_power_for(atalaia_band_info(ATALAIA_BAND_G), 30, 2, &p) && p == 99);
+    CHECK(!atalaia_tx_power_for(NULL, 14, 2, &p));
+    atalaia_band_info_t odd = *tw;
+    odd.limit_ref = 7;
+    CHECK(!atalaia_tx_power_for(&odd, 14, 2, &p));
+}
+
 void run_radio_power_tests(void)
 {
+    test_power_for_each_kind_of_limit();
     test_g_band_default();
     test_g2_band_default();
     test_no_fem();

@@ -20,7 +20,10 @@
 /// (`fetch_modes`) and 17 (`forget_modes`), CBOR true when set and left out
 /// otherwise, ask a box to fetch the parts of its mode it lacks from the
 /// controller, or to forget those it fetched before (protocol/mode-packages.md;
-/// the phone controller sends them from slice S7b of PE24).
+/// the phone controller sends them from slice S7b of PE24). Key 18 is the
+/// field's radio region (RFC 0001 Amendment 12, radio_region.dart): its
+/// number, left out for EU868 (0 written is refused, so a join has one
+/// encoding); the channel must fit in that region.
 library;
 
 import 'dart:convert';
@@ -30,6 +33,7 @@ import 'package:crypto/crypto.dart';
 
 import '../security/bytes.dart';
 import 'cbor.dart';
+import 'radio_region.dart';
 
 const int joinVersion = 1;
 const int joinMaxLength = 448;
@@ -55,17 +59,7 @@ enum JoinKind { node, controller }
 
 /// EU868 sub-bands (RFC 0001 Amendment 1 and 3): a channel's whole 125 kHz
 /// must fit inside one.
-const _subBands = [
-  (868000000, 868600000),
-  (868700000, 869200000),
-  (869400000, 869650000),
-  (869700000, 870000000),
-];
-
-bool channelOk(int hz) {
-  const half = 125000 ~/ 2;
-  return _subBands.any((b) => b.$1 <= hz - half && hz + half <= b.$2);
-}
+bool channelOk(int hz) => eu868.channelOk(hz);
 
 final class JoinPayload {
   JoinPayload({
@@ -86,6 +80,7 @@ final class JoinPayload {
     this.lang,
     this.fetchModes = false,
     this.forgetModes = false,
+    this.region = 'eu868',
   });
 
   final int gameId;
@@ -120,6 +115,10 @@ final class JoinPayload {
 
   /// Key 17: forget every package fetched before (true when set).
   final bool forgetModes;
+
+  /// Key 18: the field's radio region's code ("eu868", "as923-tw"); a box
+  /// built for another region refuses the join.
+  final String region;
 
   /// The parts of [modeId]: the main mode, then its modifiers.
   List<String> get modeParts => modeId.split('+');
@@ -197,10 +196,16 @@ JoinPayload _validate(Map<String, Object?> j) {
   if (nodeId == controllerId) {
     throw _body('node_id and controller_id must differ');
   }
+  final regionCode = j['region'] ?? defaultRegion.code;
+  final region = regionCode is String ? regionsByCode[regionCode] : null;
+  if (region == null) {
+    throw _body('region: one of ${regionsByCode.keys.join(', ')}');
+  }
   final channel = _uint('channel_hz', j['channel_hz'], 0, 0xffffffff);
-  if (!channelOk(channel)) {
+  if (!region.channelOk(channel)) {
     throw _body(
-      'channel_hz: the 125 kHz channel must fit inside an EU868 sub-band',
+      'channel_hz: the whole channel must fit inside a sub-band of '
+      '${region.code}',
     );
   }
   final maxHops = _uint('max_hops', j['max_hops'], 1, 3);
@@ -282,6 +287,7 @@ JoinPayload _validate(Map<String, Object?> j) {
     lang: lang as String?,
     fetchModes: j['fetch_modes'] == true,
     forgetModes: j['forget_modes'] == true,
+    region: region.code,
   );
 }
 
@@ -308,7 +314,7 @@ const _keys = {
   1: 'game_id', 2: 'game_key', 3: 'node_id', 4: 'controller_id', //
   5: 'channel_hz', 6: 'max_hops', 7: 'teams', 8: 'mode_id', 9: 'role',
   10: 'game_seed', 11: 'params', 12: 'kind', 13: 'ca_sha256', 14: 'urls',
-  15: 'lang', 16: 'fetch_modes', 17: 'forget_modes',
+  15: 'lang', 16: 'fetch_modes', 17: 'forget_modes', 18: 'region',
 };
 
 bool _hasBytes(Object? v) => switch (v) {
@@ -369,6 +375,15 @@ JoinPayload decodeJoin(List<int> data, List<int> joinKey) {
     if ((name == 'fetch_modes' || name == 'forget_modes') && v != true) {
       throw _body('$name: CBOR true when set, else left out');
     }
+    if (name == 'region') {
+      final r = v is int && v != 0 ? regionsByNumber[v] : null;
+      if (r == null) {
+        throw _body(
+          'region $v: a known region from 1 up (EU868 leaves the key out)',
+        );
+      }
+      v = r.code;
+    }
     j[name] = v;
   }
   for (final name in ['game_key', 'ca_sha256']) {
@@ -406,6 +421,7 @@ Uint8List encodeJoin(JoinPayload j, List<int> joinKey) {
     'lang': j.lang,
     'fetch_modes': j.fetchModes,
     'forget_modes': j.forgetModes,
+    'region': j.region,
   });
   final body = <int, Object?>{
     1: v.gameId,
@@ -425,6 +441,7 @@ Uint8List encodeJoin(JoinPayload j, List<int> joinKey) {
     if (v.lang != null) 15: v.lang,
     if (v.fetchModes) 16: true,
     if (v.forgetModes) 17: true,
+    if (v.region != eu868.code) 18: regionsByCode[v.region]!.number,
   };
   final signed = Uint8List.fromList([joinVersion, ...cborEncode(body)]);
   final out = Uint8List.fromList([

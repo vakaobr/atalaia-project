@@ -176,6 +176,12 @@ bool atalaia_join_channel_ok(uint32_t hz)
     return atalaia_channel_ok(hz);
 }
 
+bool atalaia_join_region_channel_ok(uint8_t region, uint32_t hz)
+{
+    /* The whole channel, at the region's bandwidth, inside one of its sub-bands. */
+    return region < ATALAIA_REGION_COUNT && atalaia_region_channel_ok((atalaia_region_t)region, hz);
+}
+
 /* Valid UTF-8 with no NUL, 1..max bytes. */
 static bool text_ok(const char *s, size_t max)
 {
@@ -233,7 +239,7 @@ bool atalaia_join_valid(const atalaia_join_t *j)
     if (j->game_id == 0 || j->game_id == 0xFFFF) return false;
     if (j->node_id == 0xFFFF || j->controller_id == 0xFFFF) return false;
     if (j->node_id == j->controller_id) return false;
-    if (!atalaia_join_channel_ok(j->channel_hz)) return false;
+    if (!atalaia_join_region_channel_ok(j->region, j->channel_hz)) return false;
     if (j->max_hops < 1 || j->max_hops > 3) return false;
     if (j->team_count < 1 || j->team_count > ATALAIA_JOIN_TEAMS_MAX) return false;
     for (uint8_t t = 0; t < j->team_count; t++) {
@@ -338,7 +344,8 @@ size_t atalaia_join_encode(const atalaia_join_t *j, const uint8_t join_key[ATALA
 
     bool lang = j->lang[0] != '\0';
     mc_put_map(&w, 11u + (params ? 1u : 0u) + (j->has_ca ? 1u : 0u) + (j->url_count ? 1u : 0u) +
-                       (lang ? 1u : 0u) + (j->fetch_modes ? 1u : 0u) + (j->forget_modes ? 1u : 0u));
+                       (lang ? 1u : 0u) + (j->fetch_modes ? 1u : 0u) + (j->forget_modes ? 1u : 0u) +
+                       (j->region != 0 ? 1u : 0u));
     mc_put_uint(&w, ATALAIA_JOIN_K_GAME_ID);
     mc_put_uint(&w, j->game_id);
     mc_put_uint(&w, ATALAIA_JOIN_K_GAME_KEY);
@@ -394,6 +401,11 @@ size_t atalaia_join_encode(const atalaia_join_t *j, const uint8_t join_key[ATALA
     if (j->forget_modes) {
         mc_put_uint(&w, ATALAIA_JOIN_K_FORGET_MODES);
         mc_put_head(&w, CBOR_MAJOR_SIMPLE, JOIN_CBOR_TRUE);
+    }
+    /* Key 18 only for a region other than EU868 (0 is refused, so a join has one encoding). */
+    if (j->region != 0) {
+        mc_put_uint(&w, ATALAIA_JOIN_K_REGION);
+        mc_put_uint(&w, j->region);
     }
     if (!w.ok) return 0;
 
@@ -453,8 +465,8 @@ static bool decode_body(const uint8_t *body, size_t len, atalaia_join_t *j)
     for (uint64_t i = 0; i < count && r.ok; i++) {
         uint64_t key, v;
         /* Keys 13 and 14 are optional (RFC 0001 Amendment 4), 15 too (Amendment 10), 16 and 17
-         * too (plan phase 13); 18-31 are reserved for optional fields (skipped); 32 and up are
-         * invalid. */
+         * too (plan phase 13), 18 too (Amendment 12); 19-31 are reserved for optional fields
+         * (skipped); 32 and up are invalid. */
         if (!mc_read_uint(&r, &key) || key >= 32) return false;
         if (seen & JBIT(key)) return false; /* duplicate key */
         seen |= JBIT(key);
@@ -555,6 +567,11 @@ static bool decode_body(const uint8_t *body, size_t len, atalaia_join_t *j)
             }
             break;
         }
+        case ATALAIA_JOIN_K_REGION:
+            /* 1 and up, a region this codec knows: EU868 is the key's absence. */
+            if (!read_uint_max(&r, ATALAIA_REGION_COUNT - 1, &v) || v == 0) return false;
+            j->region = (uint8_t)v;
+            break;
         default:
             if (!mc_skip_value(&r)) return false;
             break;

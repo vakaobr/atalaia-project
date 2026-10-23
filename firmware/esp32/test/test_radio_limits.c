@@ -2,9 +2,10 @@
  * SPDX-FileCopyrightText: 2026 The Atalaia contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * The EU868 limits that follow the game channel (radio_limits.c: duty-cycle
- * budget and TX power from the channel's sub-band, RFC 0001 Amendment 3)
- * and the noise measurement summary (noise_stats.c, the modem's MEASURE).
+ * The limits that follow the game channel (radio_limits.c: duty-cycle
+ * budget and TX power from the channel's sub-band, RFC 0001 Amendment 3), in
+ * EU868 and AS923-TW (Amendment 12), and the noise measurement summary
+ * (noise_stats.c, the modem's MEASURE).
  */
 #include <string.h>
 
@@ -20,8 +21,55 @@
 
 static void test_airtime(void)
 {
-    CHECK(radio_limits_airtime_us(PKT) == PKT_US);
-    CHECK(radio_limits_airtime_us(217) > radio_limits_airtime_us(PKT));
+    radio_limits_t l;
+    radio_limits_init(&l, 14, 2);
+    CHECK(l.region == ATALAIA_REGION_EU868); /* host builds: EU868 */
+    CHECK(radio_limits_airtime_us(&l, PKT) == PKT_US);
+    CHECK(radio_limits_airtime_us(&l, 217) > radio_limits_airtime_us(&l, PKT));
+}
+
+/* AS923-TW (NCC LP0002 5.8.1): SF9/BW500, 920-925 MHz, 0.5 W at the antenna port, 10%. */
+static void test_taiwan(void)
+{
+    radio_limits_t l;
+    radio_limits_init(&l, 14, 2);
+    CHECK(radio_limits_set_region(&l, ATALAIA_REGION_AS923_TW));
+    CHECK(l.band == ATALAIA_BAND_COUNT && !radio_limits_can_send(&l, PKT, 1000));
+    /* 47 bytes at SF9/500 kHz: 12.25 + 8 + 11 x 5 = 75.25 symbols of 1.024 ms (77.056 ms). */
+    CHECK(radio_limits_airtime_us(&l, PKT) == 1225u * 1024u / 100u + 63u * 1024u);
+    CHECK(radio_limits_airtime_us(&l, PKT) < PKT_US);
+    /* 27 dBm at the port - 14 dB FEM = 13 dBm; the 2 dBi antenna is under the 6 dBi allowed. */
+    CHECK(radio_limits_set_channel(&l, 921500000u));
+    CHECK(l.band == (atalaia_band_t)ATALAIA_BAND_TW && l.tx_power_dbm == 13);
+    CHECK(radio_limits_remaining_ms(&l, 1000) == 360000u);
+    CHECK(radio_limits_can_send(&l, PKT, 1000));
+    /* Edges at 500 kHz; EU868 channels are not this region's. */
+    CHECK(radio_limits_set_channel(&l, 920250000u) && radio_limits_set_channel(&l, 924750000u));
+    CHECK(!radio_limits_set_channel(&l, 920249999u));
+    CHECK(!radio_limits_set_channel(&l, 924750001u));
+    CHECK(!radio_limits_set_channel(&l, 869525000u));
+    CHECK(l.channel_hz == 924750000u);
+    /* An antenna of 9 dBi: 3 dB above the 6 allowed come off the power. */
+    radio_limits_t big;
+    radio_limits_init(&big, 14, 9);
+    CHECK(radio_limits_set_region(&big, ATALAIA_REGION_AS923_TW));
+    CHECK(radio_limits_set_channel(&big, 921500000u) && big.tx_power_dbm == 10);
+    /* Unknown region: nothing changes. */
+    CHECK(!radio_limits_set_region(&l, ATALAIA_REGION_COUNT) &&
+          l.region == ATALAIA_REGION_AS923_TW);
+    /* Back to EU868: the Taiwanese channel is refused, the European one taken. */
+    CHECK(radio_limits_set_region(&l, ATALAIA_REGION_EU868));
+    CHECK(!radio_limits_set_channel(&l, 921500000u) && radio_limits_set_channel(&l, 869525000u));
+}
+
+/* A channel whose limit the SX1262 cannot keep even at -9 dBm is refused (fail closed). */
+static void test_no_legal_power(void)
+{
+    radio_limits_t l;
+    radio_limits_init(&l, 30, 2); /* 14 + 2.15 - 2 - 30 = -15.85 dBm needed on g */
+    CHECK(!radio_limits_set_channel(&l, 868100000u));
+    CHECK(l.band == ATALAIA_BAND_COUNT && !radio_limits_can_send(&l, PKT, 1000));
+    CHECK(radio_limits_set_channel(&l, 869525000u) && l.tx_power_dbm == -2); /* g2 still fits */
 }
 
 static void test_no_channel_no_tx(void)
@@ -202,6 +250,8 @@ static void test_noise_encode(void)
 void run_radio_limits_tests(void)
 {
     test_airtime();
+    test_taiwan();
+    test_no_legal_power();
     test_no_channel_no_tx();
     test_budget_and_power_follow_the_channel();
     test_budget_is_per_sub_band();

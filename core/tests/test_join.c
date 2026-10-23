@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "atalaia/duty_cycle.h"
 #include "atalaia/join.h"
 #include "check.h"
 #include "packet_vectors.h"
@@ -258,6 +259,49 @@ static void test_fetch_vectors(void)
           !got.fetch_modes && !got.forget_modes);
 }
 
+/* Key 18 (RFC 0001 Amendment 12): the field's region, EU868 left out. */
+static void test_region_vectors(void)
+{
+    CHECK(JOIN_REGION_VECTOR_COUNT >= 3);
+    for (size_t i = 0; i < JOIN_REGION_VECTOR_COUNT; i++) {
+        const join_region_vector_t *v = &join_region_vectors[i];
+        int before = check_failures;
+        atalaia_join_t got;
+        CHECK(atalaia_join_decode(v->payload, v->payload_len, join_key, &got) == ATALAIA_JOIN_OK);
+        CHECK(same_join(&got, &v->fields) && strcmp(got.lang, v->fields.lang) == 0);
+        CHECK(got.region == v->fields.region && got.region == ATALAIA_REGION_AS923_TW);
+        uint8_t buf[ATALAIA_JOIN_MAX];
+        size_t n = atalaia_join_encode(&v->fields, join_key, buf, sizeof(buf));
+        CHECK(n == v->payload_len && memcmp(buf, v->payload, n) == 0);
+        char text[ATALAIA_JOIN_MAX * 2];
+        CHECK(atalaia_join_to_text(v->payload, v->payload_len, text, sizeof(text)) > 0 &&
+              strcmp(text, v->text) == 0);
+        if (check_failures != before) fprintf(stderr, "  in join region vector %s\n", v->name);
+    }
+    CHECK(JOIN_REGION_BAD_VECTOR_COUNT >= 8);
+    for (size_t i = 0; i < JOIN_REGION_BAD_VECTOR_COUNT; i++) {
+        const join_bad_vector_t *v = &join_region_bad_vectors[i];
+        atalaia_join_t got;
+        if (atalaia_join_decode(v->payload, v->payload_len, join_key, &got) != v->result) {
+            fprintf(stderr, "FAIL join region bad vector %s (%s)\n", v->name, v->why);
+            check_failures++;
+        }
+    }
+    /* No key 18: EU868. A region the codec does not know is not encoded. */
+    atalaia_join_t got;
+    CHECK(atalaia_join_decode(join_vectors[0].payload, join_vectors[0].payload_len, join_key,
+                              &got) == ATALAIA_JOIN_OK &&
+          got.region == ATALAIA_REGION_EU868);
+    atalaia_join_t bad = join_region_vectors[0].fields;
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    bad.region = ATALAIA_REGION_COUNT;
+    CHECK(atalaia_join_encode(&bad, join_key, buf, sizeof(buf)) == 0);
+    bad.region = ATALAIA_REGION_EU868; /* 921.5 MHz is not an EU868 channel */
+    CHECK(atalaia_join_encode(&bad, join_key, buf, sizeof(buf)) == 0);
+    CHECK(atalaia_join_region_channel_ok(ATALAIA_REGION_AS923_TW, 921500000u));
+    CHECK(!atalaia_join_region_channel_ok(ATALAIA_REGION_COUNT, 921500000u));
+}
+
 static void test_url_rule(void)
 {
     CHECK(atalaia_join_url_ok("https://10.42.0.1:8443"));
@@ -341,6 +385,7 @@ void run_join_tests(void)
     test_link_vectors();
     test_lang_vectors();
     test_fetch_vectors();
+    test_region_vectors();
     test_url_rule();
     test_text_and_tag_edges();
     test_encode_refuses_bad_fields();

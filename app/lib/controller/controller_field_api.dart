@@ -20,6 +20,7 @@ part of 'controller_api.dart';
 //     GET  /api/v1/games/{id}/positions      the boxes' places on the plan {x, y, level}
 //     PUT  /api/v1/games/{id}/positions/{node}  GM: place a box
 //     GET  /api/v1/radio                     the field's channel, candidates, last scan
+//     PUT  /api/v1/radio/region              GM: the field's radio region {"region"}
 //     PUT  /api/v1/radio/channel             GM: set it {"channel_hz", "source"}
 //     POST|GET|DELETE /api/v1/radio/scan     GM: find a quiet channel / its state / cancel
 //     POST /api/v1/radio/random              GM: a random legal channel, as a suggestion
@@ -196,6 +197,12 @@ extension on ControllerApi {
         );
       }),
     ),
+    // The field's radio region (radio_region.py, RFC 0001 Amendment 12).
+    ControllerApi._route(
+      'PUT',
+      r'/api/v1/radio/region',
+      _gm((r) => ApiResponse(200, _channel.setRegion(r.body['region']))),
+    ),
     ControllerApi._route(
       'POST',
       r'/api/v1/radio/scan',
@@ -214,7 +221,11 @@ extension on ControllerApi {
     ControllerApi._route(
       'POST',
       r'/api/v1/radio/random',
-      _gm((r) => ApiResponse(200, {'suggestion': randomChannel()})),
+      _gm(
+        (r) => ApiResponse(200, {
+          'suggestion': randomChannel(null, _channel.engine.fieldRegion),
+        }),
+      ),
     ),
   ];
 }

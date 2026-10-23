@@ -1,12 +1,15 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Settings: the field's radio channel (RFC 0001 Amendment 3). The GM keeps
-// the recommended 869.525 MHz, scans for a quiet channel with the USB
-// modem, draws one at random or picks one from the list; the controller
-// keeps the choice, tunes the modem and puts it in every join payload.
-// Only while no game is live. Also FirstSetupNotice, shown on the game tab
-// until the channel has been chosen once.
+// Settings: the field's radio region and channel (RFC 0001 Amendments 3 and
+// 11). The region (EU868, or AS923 as Taiwan uses it) is picked once, after a
+// confirmation: the boxes and the USB modem must be built for it, and the
+// channel goes back to the region's default. The GM keeps the recommended
+// channel, scans for a quiet one with the USB modem, draws one at random or
+// picks one from the list; the controller keeps the choice, tunes the modem
+// and puts the channel and the region in every join payload. Only while no
+// game is live. Also FirstSetupNotice, shown on the game tab until the
+// channel has been chosen once.
 
 import { html, Component, t, decimal } from '../ui.js';
 
@@ -19,9 +22,26 @@ function pct(value) {
     return decimal(value);
 }
 
-/** "10% of the time · 500 mW ERP" for a channel description from the API. */
+/** "10% of the time · 500 mW ERP" for a channel description from the API: the power limit
+ * with what it is measured as (ERP in EU868, at the antenna port in AS923-TW, or EIRP). An
+ * older controller gives only erp_mw. */
 export function limits(ch) {
-    return t('radio.limits', { duty: pct(ch.duty_pct), mw: ch.erp_mw });
+    const ref = ch.limit_ref || 'erp';
+    const mw = ch.limit_mw !== undefined ? ch.limit_mw : ch.erp_mw;
+    const key = ref === 'conducted' ? 'radio.limits_conducted' : ref === 'eirp' ? 'radio.limits_eirp' : 'radio.limits';
+    return t(key, { duty: pct(ch.duty_pct), mw });
+}
+
+/** A region's name in the console's language ("eu868", "as923-tw"), else the API's. */
+export function regionName(code, region) {
+    const key = `radio.region_names.${code}`;
+    const name = t(key);
+    return name !== key ? name : (region && region.name) || code;
+}
+
+/** Whether the field is in Taiwan's region: some explanations differ (EU868 is the default). */
+function taiwan(radio) {
+    return !!radio.region && radio.region.code === 'as923-tw';
 }
 
 function bandRange(ch) {
@@ -48,7 +68,49 @@ export class FirstSetupNotice extends Component {
 export class RadioSettings extends Component {
     constructor() {
         super();
-        this.state = { manual: '', random: null };
+        this.state = { manual: '', random: null, region: '' };
+    }
+
+    async changeRegion(code) {
+        const app = this.props.app;
+        const name = regionName(code, (app.state.radio.regions || []).find((r) => r.code === code));
+        if (!window.confirm(t('radio.region_confirm', { region: name }))) return;
+        const out = await app.call('PUT', '/radio/region', { region: code });
+        if (out) {
+            app.setState({ radio: out });
+            this.setState({ manual: '', random: null, region: '' });
+            app.refreshStatus();
+        }
+    }
+
+    renderRegion(radio, gm, disabled) {
+        const region = radio.region;
+        if (!region) return null; // a controller from before regions: EU868
+        const value = this.state.region || region.code;
+        return html`<section aria-labelledby="radio-region-h" data-testid="radio-region-section">
+            <h3 id="radio-region-h">${t('radio.region_title')}</h3>
+            <dl class="facts">
+                <dt>${t('radio.region')}</dt>
+                <dd><strong data-testid="radio-region">${regionName(region.code, region)}</strong></dd>
+                <dt>${t('radio.region_band')}</dt>
+                <dd data-testid="radio-region-lora">${t('radio.region_lora', { lo: mhz(region.lo_hz), hi: mhz(region.hi_hz),
+                                                                              sf: region.sf, bw: region.bw_khz })}</dd>
+                <dt>${t('radio.source')}</dt>
+                <dd data-testid="radio-region-source">${t(`radio.region_sources.${radio.region_source || 'config'}`)}</dd>
+            </dl>
+            ${radio.region_mismatch && html`<p class="warning" data-testid="radio-region-mismatch">${t('radio.region_mismatch', {
+                modem: regionName(radio.modem_region), field: regionName(region.code, region) })}</p>`}
+            ${gm && (radio.regions || []).length > 1 && html`<div class="form inline">
+                <label for="radio-region-select">${t('radio.region')}</label>
+                <select id="radio-region-select" data-testid="radio-region-select" value=${value} disabled=${disabled}
+                    onChange=${(e) => this.setState({ region: e.target.value })}>
+                    ${radio.regions.map((r) => html`<option value=${r.code}>${regionName(r.code, r)}</option>`)}
+                </select>
+                <button type="button" data-testid="radio-region-apply" disabled=${disabled || value === region.code}
+                    onClick=${() => this.changeRegion(value)}>${t('radio.region_apply')}</button>
+            </div>
+            <p class="muted small">${t('radio.region_hint')}</p>`}
+        </section>`;
     }
 
     componentDidMount() {
@@ -153,7 +215,7 @@ export class RadioSettings extends Component {
         const r = this.state.random;
         return html`<section aria-labelledby="radio-random-h">
             <h3 id="radio-random-h">${t('radio.random_title')}</h3>
-            <p class="muted small">${t('radio.random_hint')}</p>
+            <p class="muted small">${t(taiwan(radio) ? 'radio.random_hint_tw' : 'radio.random_hint')}</p>
             <div class="actions">
                 <button type="button" data-testid="radio-random" disabled=${disabled}
                     onClick=${() => this.random()}>${t('radio.random')}</button>
@@ -210,16 +272,17 @@ export class RadioSettings extends Component {
             ${this.renderCurrent(radio)}
             <details class="why" data-testid="radio-why">
                 <summary>${t('radio.why_title', { channel: mhz(radio.recommended_hz) })}</summary>
-                <p>${t('radio.why_1')}</p>
-                <p>${t('radio.why_2')}</p>
-                <p>${t('radio.why_3')}</p>
+                ${taiwan(radio) ? html`<p>${t('radio.why_tw_1')}</p><p>${t('radio.why_tw_2')}</p><p>${t('radio.why_tw_3')}</p>`
+                    : html`<p>${t('radio.why_1')}</p><p>${t('radio.why_2')}</p><p>${t('radio.why_3')}</p>`}
             </details>
+            ${this.renderRegion(radio, gm, disabled)}
             ${radio.locked && html`<p class="notice" data-testid="radio-locked">${live ? t('radio.locked_game')
                 : scanning ? t('radio.locked_scan') : radio.locked}</p>`}
             ${gm ? html`
                 <section aria-labelledby="radio-default-h">
                     <h3 id="radio-default-h">${t('radio.default_title')}</h3>
-                    <p class="muted small">${t('radio.default_hint', { channel: mhz(radio.recommended_hz) })}</p>
+                    <p class="muted small">${t(taiwan(radio) ? 'radio.default_hint_tw' : 'radio.default_hint',
+                                               { channel: mhz(radio.recommended_hz) })}</p>
                     <div class="actions"><button type="button" class="primary" data-testid="radio-keep-default"
                         disabled=${disabled} onClick=${() => this.apply(radio.recommended_hz, 'default')}>${
                         t('radio.keep_default', { channel: mhz(radio.recommended_hz) })}</button></div>

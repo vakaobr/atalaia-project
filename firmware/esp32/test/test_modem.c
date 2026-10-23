@@ -241,6 +241,7 @@ static void test_ident_and_ping(void)
     CHECK(strstr(json, "\"fw_version\":\"test-1.0\"") != NULL);
     CHECK(strstr(json, "\"radio\":\"sx1262\"") != NULL);
     CHECK(strstr(json, "\"epoch_window\":16") != NULL);
+    CHECK(strstr(json, "\"region\":\"eu868\"") != NULL); /* the build's region (RF-AS923-2) */
 
     uint8_t ping[5] = {MODEM_CMD_PING};
     put32(ping + 1, 4242);
@@ -902,9 +903,50 @@ static void test_pair_frames(void)
     CHECK(last_of(MODEM_FRAME_FIELD_RX) >= 0 && last_of(MODEM_FRAME_RX) < 0);
 }
 
+/* A modem built for AS923-TW (RFC 0001 Amendment 12): its region in IDENT, only 920-925 MHz
+ * channels at 500 kHz for CONFIGURE, SET_CHANNEL and MEASURE. */
+static void test_taiwan_modem(void)
+{
+    setup(true, 16);
+    modem.region = ATALAIA_REGION_AS923_TW;
+    modem_send_ident(&modem);
+    char json[MODEM_FRAME_PAYLOAD_MAX + 1];
+    memcpy(json, io_state.payload[0], io_state.len[0]);
+    json[io_state.len[0]] = '\0';
+    CHECK(strstr(json, "\"region\":\"as923-tw\"") != NULL);
+
+    clear_out();
+    configure(0x1234, 0, 1, 2, 869525000, KEY); /* an EU868 channel: not this modem's */
+    CHECK(last_error_code() == MODEM_ERR_BAD_PARAMS && !modem.configured);
+    clear_out();
+    configure(0x1234, 0, 1, 2, 920249999u, KEY); /* the 500 kHz channel starts below 920 MHz */
+    CHECK(last_error_code() == MODEM_ERR_BAD_PARAMS && !modem.configured);
+    clear_out();
+    measure_cmd(868300000u, 100, 0);
+    CHECK(last_error_code() == MODEM_ERR_BAD_PARAMS && io_state.measures == 0);
+    clear_out();
+    measure_cmd(922000000u, 100, MODEM_MEASURE_CAD);
+    CHECK(io_state.measures == 1 && io_state.measure_hz == 922000000u);
+    noise_result_t r = {.channel_hz = 922000000u, .dwell_ms = 100, .samples = 100};
+    modem_on_measure_result(&modem, 0, &r);
+    clear_out();
+    configure(0x1234, 0, 1, 2, 921500000u, KEY);
+    CHECK(status_has("\"configured\":true") && io_state.channel == 921500000u);
+    clear_out();
+    uint8_t ch[5] = {MODEM_CMD_SET_CHANNEL};
+    put32(ch + 1, 924750000u);
+    host_send(MODEM_FRAME_CMD, ch, sizeof(ch));
+    CHECK(status_has("\"channel_hz\":924750000"));
+    clear_out();
+    put32(ch + 1, 868100000u);
+    host_send(MODEM_FRAME_CMD, ch, sizeof(ch));
+    CHECK(last_error_code() == MODEM_ERR_BAD_PARAMS && modem.channel_hz == 924750000u);
+}
+
 void run_modem_tests(void)
 {
     test_ident_and_ping();
+    test_taiwan_modem();
     test_configure_validation();
     test_tx_encrypts_and_acks();
     test_tx_nonce_guard();

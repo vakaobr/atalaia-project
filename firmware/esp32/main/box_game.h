@@ -37,6 +37,7 @@
 #include "node_runner.h"
 #include "preset_store.h"
 #include "radio/field_link.h"
+#include "radio/radio_region.h"
 
 /* Where the join lives across reboots: encrypted NVS on the ESP32 (ADR-P2-12). */
 typedef struct {
@@ -99,6 +100,7 @@ typedef enum {
     BOX_JOIN_STORAGE,    /* the payload could not be stored */
     BOX_JOIN_RADIO,      /* the radio may not transmit (epoch NVS failure) */
     BOX_JOIN_ENDED,      /* a game this box played to its end, or an old game's key (BN-19) */
+    BOX_JOIN_REGION,     /* another radio region's game (join key 18): not this firmware's band */
 } box_join_result_t;
 
 #define BOX_END_LINGER_MS 60000
@@ -181,6 +183,9 @@ typedef struct {
 
     uint8_t join_key[ATALAIA_JOIN_KEY_SIZE];
     bool have_join_key;
+    /* The radio region the firmware is built for (RADIO_REGION after init; host tests may set
+     * another): a join of another region is refused before anything changes (RF-AS923-2). */
+    atalaia_region_t region;
     box_phase_t phase;
     atalaia_join_t join;
     const char *teams[ATALAIA_JOIN_TEAMS_MAX];

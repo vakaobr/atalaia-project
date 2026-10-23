@@ -16,7 +16,7 @@ A receiver skips bytes until a `0xA5`, reads the length, and accepts the frame o
 
 | Type | Direction | Payload |
 | --- | --- | --- |
-| `0x01` IDENT | modem → controller | JSON: `fw`, `fw_version`, `core_version`, `framing`, `radio` (`"sx1262"` or `"none"`), `payload_max`, `epoch_window`, `measure` (true when the modem can answer MEASURE: it has a radio and its firmware knows the command), `field` (true: the firmware carries field frames), `pair` (true: and pair frames, type 10) |
+| `0x01` IDENT | modem → controller | JSON: `fw`, `fw_version`, `core_version`, `framing`, `radio` (`"sx1262"` or `"none"`), `payload_max`, `epoch_window`, `measure` (true when the modem can answer MEASURE: it has a radio and its firmware knows the command), `field` (true: the firmware carries field frames), `pair` (true: and pair frames, type 10), `region` (`"eu868"` or `"as923-tw"`: the radio region the firmware is built for, RFC 0001 Amendment 12; a modem without the key is an EU868 build) |
 | `0x02` RX | modem → controller | header (9) + plaintext payload + rssi (int8) + snr (int8) + epoch (uint16 BE) |
 | `0x03` TX | controller → modem | header (9) + plaintext payload (up to 200) |
 | `0x04` TX_ACK | modem → controller | seq (uint16 BE) + status (1) |
@@ -46,7 +46,7 @@ The controller owns its own nonce counter (ADR-P2-2): it chooses `seq` and tells
 | 7 no_radio | no radio chip answered at boot |
 | 8 busy | (FIELD_ACK only) a MEASURE is running |
 
-`duty_cycle` follows the channel in use: the budget is the duty cycle of the channel's EU868 sub-band (10% of a sliding hour on 869.4-869.65 MHz, 1% on 868.0-868.6 and 869.7-870.0 MHz, 0.1% on 868.7-869.2 MHz), counted per sub-band, and a packet is refused when its LoRa time on air (SF7, 125 kHz) does not fit in what is left. The TX power follows the sub-band too: 500 mW ERP on 869.4-869.65 MHz, 25 mW elsewhere, less the front-end module's and the antenna's gains (RFC 0001 Amendment 3, decision C2).
+`duty_cycle` follows the channel in use: the budget is the duty cycle of the channel's sub-band in the modem's region (EU868: 10% of a sliding hour on 869.4-869.65 MHz, 1% on 868.0-868.6 and 869.7-870.0 MHz, 0.1% on 868.7-869.2 MHz; AS923-TW: this project's 10% on 920-925 MHz), counted per sub-band, and a packet is refused when its LoRa time on air (SF7 at 125 kHz in EU868, SF9 at 500 kHz in AS923-TW) does not fit in what is left. The TX power follows the sub-band too: 500 mW ERP on 869.4-869.65 MHz, 25 mW elsewhere, 0.5 W at the antenna port in AS923-TW, less the front-end module's and the antenna's gains (RFC 0001 Amendments 3 and 12, decision C2).
 
 0-2 are ADR-P2-4's; 3-7 are additions (decision D3); 8 came with the field frames (decision RJ-10).
 
@@ -82,7 +82,7 @@ Every command except PING, IDENT and MEASURE is answered by a STATUS frame when 
 
 Field frames go and come in their own frame types (FIELD_TX, FIELD_RX, FIELD_ACK, above), not as commands.
 
-A **channel** (CONFIGURE, SET_CHANNEL, MEASURE) is accepted only when the whole 125 kHz LoRa channel fits inside one EU868 sub-band: centre - 62.5 kHz and centre + 62.5 kHz both within 868.0-868.6, 868.7-869.2, 869.4-869.65 or 869.7-870.0 MHz (RFC 0001 Amendment 3). 869.40 MHz, for example, is refused: its channel starts at 869.3375 MHz. Anything else is ERROR `bad_params`.
+A **channel** (CONFIGURE, SET_CHANNEL, MEASURE) is accepted only when the whole LoRa channel fits inside one sub-band of the region the modem is built for (IDENT `region`, RFC 0001 Amendment 12). EU868: the 125 kHz channel, centre - 62.5 kHz and centre + 62.5 kHz both within 868.0-868.6, 868.7-869.2, 869.4-869.65 or 869.7-870.0 MHz (Amendment 3); 869.40 MHz, for example, is refused: its channel starts at 869.3375 MHz. AS923-TW: the 500 kHz channel inside 920-925 MHz, centres 920.25-924.75 MHz. Anything else, another region's channels included, is ERROR `bad_params`.
 
 The game key lives only in the modem's RAM. A modem that reboots has forgotten it; the controller notices (missed pings or a closed port), reconnects, asks for IDENT and sends CONFIGURE again.
 
@@ -95,13 +95,13 @@ STATUS is a JSON object with `cmd`, `configured`, `radio`, `game_id`, `channel_h
 | 3 unknown_cmd | unknown CMD opcode |
 | 4 not_configured | needs CONFIGURE first |
 | 5 radio | the radio refused a setting |
-| 6 bad_params | a parameter out of range (a channel that does not fit in an EU868 sub-band, max_hops above 3, a MEASURE dwell outside 10-10000 ms) |
+| 6 bad_params | a parameter out of range (a channel that does not fit in a sub-band of the modem's region, max_hops above 3, a MEASURE dwell outside 10-10000 ms) |
 | 7 busy | MEASURE while a game is configured or another MEASURE runs; CONFIGURE or SET_CHANNEL while a MEASURE runs |
 | 8 no_radio | MEASURE on a modem without a radio chip (for example the Wokwi emulator) |
 
 ## MEASURE and NOISE
 
-The field controller's "find a quiet channel" (controller/README.md) asks the modem to listen to each candidate channel in turn. MEASURE tunes the radio to `channel_hz` and keeps it receiving for `dwell_ms`, reading the SX1262's instantaneous RSSI (GetRssiInst) about once a millisecond; with flag bit 0 it also runs a channel-activity detection (CAD: two LoRa symbols at SF7, 125 kHz) every 100 ms, which detects LoRa preambles even below the noise. Nothing is transmitted, so measuring uses no duty cycle. Then the radio goes back to its channel and the modem answers with one NOISE frame:
+The field controller's "find a quiet channel" (controller/README.md) asks the modem to listen to each candidate channel in turn. MEASURE tunes the radio to `channel_hz` and keeps it receiving for `dwell_ms`, reading the SX1262's instantaneous RSSI (GetRssiInst) about once a millisecond; with flag bit 0 it also runs a channel-activity detection (CAD: two LoRa symbols at the region's SF and bandwidth: SF7 at 125 kHz, SF9 at 500 kHz) every 100 ms, which detects LoRa preambles even below the noise. Nothing is transmitted, so measuring uses no duty cycle. Then the radio goes back to its channel and the modem answers with one NOISE frame:
 
 | Offset | Size | Field |
 | --- | --- | --- |

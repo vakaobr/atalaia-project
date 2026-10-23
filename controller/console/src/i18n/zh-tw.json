@@ -504,6 +504,29 @@
     "band_range": "{lo}–{hi} MHz（{erc}）",
     "allowed": "限制",
     "limits": "{duty}% 的時間 · {mw} mW ERP",
+    "limits_conducted": "{duty}% 的時間 · 天線端 {mw} mW",
+    "limits_eirp": "{duty}% 的時間 · {mw} mW EIRP",
+    "region_title": "無線電區域",
+    "region": "區域",
+    "region_band": "頻段",
+    "region_lora": "{lo}–{hi} MHz · LoRa SF{sf}，{bw} kHz",
+    "region_names": {
+      "eu868": "歐洲（EU868，868 MHz）",
+      "as923-tw": "台灣（AS923，920–925 MHz）"
+    },
+    "region_sources": {
+      "config": "控制器的設定檔",
+      "console": "在主控台中選擇"
+    },
+    "region_apply": "變更區域",
+    "region_hint": "依場地所在的國家選擇一次區域。只有盒子和 USB 數據機所支援的區域才能使用：為其他區域製作的盒子會拒絕加入。",
+    "region_confirm": "要將場地改為{region}嗎？所有盒子和 USB 數據機都必須是為此區域製作的（韌體會拒絕其他區域），而頻道會回到該區域的預設值，直到你選擇一個。",
+    "region_mismatch": "USB 數據機是為{modem}製作的，但場地在{field}：數據機會拒絕此區域的頻道，因此無法開始任何遊戲。請改用為{field}製作的數據機，或將區域改回。",
+    "why_tw_1": "在台灣，這類裝置可使用 920–925 MHz（NCC LP0002）。不跳頻的發射機必須占用至少 500 kHz，因此場地頻道寬 500 kHz（LoRa SF9，距離約等於其他地區 125 kHz 的 SF7），戶外天線端最高 0.5 W。",
+    "why_tw_2": "建議的頻道避開 923.2 與 923.4 MHz（台灣所有 LoRaWAN 裝置的起始頻道），以及 Meshtastic 的預設頻道（923.875 MHz）。",
+    "why_tw_3": "法規沒有規定工作週期；盒子和數據機會自行限制在 10% 的時間，符合遊戲的設計。韌體尚未取得台灣認證：在當地販售的產品需要 NCC 型式認證。",
+    "default_hint_tw": "{channel} MHz：避開 LoRaWAN 與 Meshtastic 的繁忙頻道（見上方）。",
+    "random_hint_tw": "從 500 kHz 的候選頻道中抽一個；每個都允許完整的 0.5 W。",
     "source": "選擇方式",
     "sources": {
       "default": "建議（預設）",
@@ -1021,7 +1044,7 @@
       "fingerprint": "它持有的不是這個場地的金鑰。",
       "box_refused": "盒子拒絕了。",
       "duty_cycle": "無線電的 Duty Cycle 暫時用完了。",
-      "channel_changed": "無線電離開了 869.525 MHz（場地頻道、掃描或數據機重新連線）；請重新搜尋盒子。"
+      "channel_changed": "無線電離開了配對頻道（該地區的預設頻道：歐洲為 869.525 MHz，台灣為 921.5 MHz），改到場地頻道、掃描或數據機重新連線；請重新搜尋盒子。"
     },
     "code_id": "ID {id}",
     "code_duplicate": "有不只一個盒子用這個名稱提出配對：只在 ID 與盒子螢幕上相同的那一項輸入代碼。"

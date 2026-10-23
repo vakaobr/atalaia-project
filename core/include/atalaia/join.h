@@ -56,6 +56,7 @@ enum {
     ATALAIA_JOIN_K_LANG = 15,         /* optional (RFC 0001 Amendment 10) */
     ATALAIA_JOIN_K_FETCH_MODES = 16,  /* optional, true only (phase 5 plan phase 13) */
     ATALAIA_JOIN_K_FORGET_MODES = 17, /* optional, true only (phase 5 plan phase 13) */
+    ATALAIA_JOIN_K_REGION = 18,       /* optional, 1 and up only (RFC 0001 Amendment 12) */
 };
 
 typedef enum {
@@ -68,7 +69,7 @@ typedef struct {
     uint8_t game_key[ATALAIA_JOIN_GAME_KEY];
     uint16_t node_id;       /* this device's short id in the game, 0-65534 */
     uint16_t controller_id; /* the controller that issued it, 0-65534 */
-    uint32_t channel_hz;    /* the shared game channel, inside an EU868 sub-band */
+    uint32_t channel_hz;    /* the shared game channel, inside a sub-band of the region */
     uint8_t max_hops;       /* relay clamp, 1-3 (ADR-P2-6) */
     char teams[ATALAIA_JOIN_TEAMS_MAX][ATALAIA_JOIN_TEAM_MAX + 1];
     uint8_t team_count; /* 1-8 */
@@ -92,6 +93,11 @@ typedef struct {
      * forget_modes: it first forgets every package it fetched. Written only when true. */
     bool fetch_modes;
     bool forget_modes;
+    /* Key 18 (RFC 0001 Amendment 12): the field's radio region, an atalaia_region_t. Written
+     * only when not EU868 (0), so EU868 joins keep their bytes; a payload that writes 0, or a
+     * region this codec does not know, is refused. The channel must fit in this region. A box
+     * whose firmware is built for another region refuses the join (box_game.c). */
+    uint8_t region;
 } atalaia_join_t;
 
 typedef enum {
@@ -116,8 +122,10 @@ size_t atalaia_join_encode(const atalaia_join_t *j, const uint8_t join_key[ATALA
 /*
  * Checks the tag (in constant time) and then the body. Fills *out only
  * when the result is ATALAIA_JOIN_OK. Keys 13 (ca_sha256), 14 (urls), 15 (lang),
- * 16 (fetch_modes) and 17 (forget_modes) are read; unknown body keys 18-31 are skipped, so a newer
- * controller may add optional fields; keys from 32 up are refused.
+ * 16 (fetch_modes), 17 (forget_modes) and 18 (region) are read; unknown body keys 19-31 are
+ * skipped, so a newer controller may add optional fields; keys from 32 up are refused. (A
+ * decoder older than key 18 skips it and checks the channel against EU868, so it refuses
+ * another region's join too.)
  */
 atalaia_join_result_t atalaia_join_decode(const uint8_t *buf, size_t len,
                                           const uint8_t join_key[ATALAIA_JOIN_KEY_SIZE],
@@ -193,5 +201,8 @@ void atalaia_sha256_final(atalaia_sha256_t *s, uint8_t out[32]);
 
 /* True if the channel lies inside an EU868 sub-band (g, g1, g2, g3). */
 bool atalaia_join_channel_ok(uint32_t channel_hz);
+
+/* True if the channel lies inside a sub-band of the region (an atalaia_region_t). */
+bool atalaia_join_region_channel_ok(uint8_t region, uint32_t channel_hz);
 
 #endif /* ATALAIA_JOIN_H */

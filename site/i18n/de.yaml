@@ -284,6 +284,20 @@ radio:
       ihn, also kann die Spielleitung in deren Nähe den Controller eine Minute lang jeden erlaubten
       Kanal abhören und den ruhigsten wählen lassen, einen zufällig ziehen oder von Hand wählen. Die
       Boxen halten sich dann an die Grenzen des gewählten Kanals.
+  region:
+    title: "Funkregionen: Europa und Taiwan"
+    lead: >-
+      Ein Feld liegt in einer Funkregion, die die Spielleitung einmal in der Konsole wählt. In Europa
+      (EU868) nutzen die Boxen die Kanäle oben. In Taiwan (AS923, 920–925&nbsp;MHz) geben die Regeln
+      der NCC (LP0002) einem einzelnen Kanal ohne Frequenzsprünge die volle Leistung nur, wenn er
+      mindestens 500&nbsp;kHz breit ist; dort nutzen die Boxen deshalb LoRa mit 500&nbsp;kHz (SF9,
+      etwa dieselbe Reichweite wie in Europa), höchstens 0,5&nbsp;W an der Antenne und standardmäßig
+      921,5&nbsp;MHz, abseits der Kanäle von LoRaWAN und Meshtastic. Jede Box, jedes USB-Funkmodem
+      und jedes I/O-Pod ist für eine Region gebaut und lehnt die Kanäle der anderen ab, also sendet
+      eine Box nie außerhalb ihres Bands; die Boxen erfahren die Region des Felds mit jedem Spiel.
+      Die taiwanische Region ist nicht zertifiziert: Ein in Taiwan verkauftes Produkt braucht die
+      Typzulassung der NCC und eine Antenne für 920&nbsp;MHz. Nichts davon wurde bisher in der Luft
+      getestet.
 
 modes:
   title: Spielmodi

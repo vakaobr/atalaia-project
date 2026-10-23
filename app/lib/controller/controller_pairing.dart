@@ -39,6 +39,8 @@ import '../security/cpace.dart';
 import 'controller_engine.dart';
 
 /// Where an unadopted box listens (its Kconfig default).
+/// Where an unadopted EU868 box listens (its Kconfig default); a box of
+/// another region listens on that region's default: [_pairHz].
 const pairChannelHz = 869525000;
 const offerTtlMs = 60000;
 const pairStepMs = 10000;
@@ -103,6 +105,11 @@ class ControllerPairing {
   }
 
   final ControllerEngine engine;
+
+  /// Where an unadopted box of the field's region listens: the region's
+  /// default channel (pairing.py `_pair_hz`, RFC 0001 Amendment 12).
+  int get _pairHz => engine.fieldRegion.defaultChannelHz;
+
   final Random _random;
   final offers = <String, Map<String, Object?>>{};
   _Run? _run;
@@ -301,7 +308,7 @@ class ControllerPairing {
     _retuned = false;
     if (was) _listenUntilMs = 0;
     final run = _run;
-    if (run != null && run.active && engine.fieldChannel != pairChannelHz) {
+    if (run != null && run.active && engine.fieldChannel != _pairHz) {
       _fail(run, 'channel_changed', engine.nowMs());
     }
   }
@@ -311,7 +318,7 @@ class ControllerPairing {
     if (g != null && engine.channelLockReason() != null) {
       return (g['channel_hz'] as int?) ?? engine.fieldChannel;
     }
-    return _retuned ? pairChannelHz : engine.fieldChannel;
+    return _retuned ? _pairHz : engine.fieldChannel;
   }
 
   void _tuneBack() {
@@ -335,16 +342,16 @@ class ControllerPairing {
       );
     }
     final current = _currentChannel();
-    if (current != pairChannelHz) {
+    if (current != _pairHz) {
       final reason = engine.channelLockReason();
       if (reason != null) {
         throw ControllerError.conflict(
-          'new boxes listen on $pairChannelHz Hz and the radio is on '
+          'new boxes listen on $_pairHz Hz and the radio is on '
           '$current Hz for the live game ($reason): pair them before or '
           'after it',
         );
       }
-      m.setChannel(pairChannelHz);
+      m.setChannel(_pairHz);
       _retuned = true;
     }
     _listenUntilMs = engine.nowMs() + pairListenMs;
@@ -434,9 +441,9 @@ class ControllerPairing {
     return {
       'offers': list,
       'run': _run?.public(),
-      'channel_hz': pairChannelHz,
+      'channel_hz': _pairHz,
       'radio_channel_hz': current,
-      'listening': current == pairChannelHz,
+      'listening': current == _pairHz,
       'listen_ms_left': _retuned ? max(0, _listenUntilMs - now) : null,
       'radio': _modemOk(),
       'pair_frames': _modemOk() && (m?.hasPairFrames ?? false),

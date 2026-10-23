@@ -7,10 +7,13 @@ random loss, jitter, flood relay, deduplication, network partitions,
 and per-node duty-cycle tracking.
 
 The duty-cycle budget and the maximum power follow the game channel's
-EU868 sub-band (eu868.py, RFC 0001 Amendment 3), as on the boxes and the
-USB modem: 10% and 500 mW ERP on 869.4-869.65 MHz, 1% (0.1% on
-868.7-869.2 MHz) and 25 mW elsewhere. Time on air uses the LoRa formula
-for SF7/BW125. A node whose budget is spent does not transmit.
+sub-band in the field's region (regions.py, RFC 0001 Amendments 3 and 12),
+as on the boxes and the USB modem: in EU868, 10% and 500 mW ERP on
+869.4-869.65 MHz, 1% (0.1% on 868.7-869.2 MHz) and 25 mW elsewhere; in
+AS923-TW, 0.5 W at the antenna port and this project's 10%. Time on air
+uses the LoRa formula at the region's SF and bandwidth (SF7/125 kHz,
+SF9/500 kHz). A node whose budget is spent does not transmit, nor one
+whose packet is longer than the region's dwell rule allows.
 """
 
 from __future__ import annotations
@@ -31,7 +34,7 @@ from .packet import (
     vf_make,
     vf_enc,
 )
-from . import eu868
+from . import regions
 from .protocol import MESSAGE_TYPES
 
 # Delivery jitter range in ms.
@@ -54,9 +57,14 @@ class RadioConfig:
     game_id: int = 1             # game identifier for packet headers
     game_key: bytes = b"\x00" * KEY_SIZE  # AES-128 key (test default)
     epoch: int = 0               # current encryption epoch
-    channel_hz: int = eu868.DEFAULT_CHANNEL_HZ  # single shared game channel (g2 sub-band)
+    channel_hz: Optional[int] = None  # single shared game channel (None: the region's default)
     fem_gain_db: int = 14        # Heltec V4.3 front-end module (decision C2)
     antenna_gain_dbi: int = 2
+    region: str = "eu868"        # the field's radio region (regions.py)
+
+    def __post_init__(self) -> None:
+        if self.channel_hz is None:
+            self.channel_hz = regions.get(self.region).default_channel_hz
 
 
 # --- pending packet -----------------------------------------------------------
@@ -139,10 +147,17 @@ class RadioModel:
         rng: Optional[random.Random] = None,
     ) -> None:
         self.config = config or RadioConfig()
-        self.band = eu868.band_of(self.config.channel_hz)
-        if self.band is None:
-            raise ValueError(f"channel {self.config.channel_hz} Hz: the 125 kHz channel must fit "
-                             "inside an EU868 sub-band")
+        self.region = regions.get(self.config.region)
+        band = self.region.band_of(self.config.channel_hz)
+        if band is None:
+            raise ValueError(f"channel {self.config.channel_hz} Hz: the {self.region.bw_hz // 1000} kHz "
+                             f"channel must fit inside a {self.region.code} sub-band")
+        self.band: regions.SubBand = band
+        power = regions.legal_tx_power_dbm(band, self.config.fem_gain_db, self.config.antenna_gain_dbi)
+        if power is None:
+            raise ValueError(f"channel {self.config.channel_hz} Hz: even the radio's lowest power would "
+                             "exceed the limit with these gains")
+        self._tx_power_dbm = power
         self.rng = rng or random.Random(42)
         self.nodes: dict[int, RadioNode] = {}
         self.pending: list[PendingPacket] = []
@@ -217,8 +232,8 @@ class RadioModel:
     # --- airtime and limits ---------------------------------------------------
 
     def _estimate_airtime(self, packet_len: int) -> float:
-        """On-air time in ms of a whole packet (LoRa formula, SF7/BW125)."""
-        return eu868.airtime_ms(packet_len)
+        """On-air time in ms of a whole packet (LoRa formula, the region's SF and bandwidth)."""
+        return self.region.airtime_ms(packet_len)
 
     @property
     def duty_budget_ms_per_hour(self) -> float:
@@ -227,14 +242,13 @@ class RadioModel:
 
     @property
     def max_erp_dbm(self) -> int:
-        """The sub-band's ERP limit: 27 dBm (500 mW) on g2, 14 dBm (25 mW) elsewhere."""
-        return self.band.erp_dbm
+        """The sub-band's power limit: 27 dBm (500 mW) on g2 and in AS923-TW, 14 dBm (25 mW) elsewhere."""
+        return self.band.limit_dbm
 
     @property
     def tx_power_dbm(self) -> int:
         """The SX1262 conducted power the boxes use on this channel (radio_power.h)."""
-        return eu868.tx_power_dbm(self.band.erp_dbm, self.config.fem_gain_db,
-                                  self.config.antenna_gain_dbi)
+        return self._tx_power_dbm
 
     def _spend(self, node_id: int, packet_len: int, now_ms: int) -> bool:
         """Records a transmission in the node's budget; False (and nothing sent) if it does not fit."""
@@ -242,7 +256,8 @@ class RadioModel:
         if node_obj is None:
             return True
         airtime = self._estimate_airtime(packet_len)
-        if not node_obj.duty.can_send(airtime, now_ms):
+        dwell = self.region.max_dwell_ms
+        if (dwell and airtime > dwell) or not node_obj.duty.can_send(airtime, now_ms):
             node_obj.duty_refused += 1
             return False
         node_obj.duty.record(airtime, now_ms)

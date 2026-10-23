@@ -13,9 +13,14 @@
     persist_game_key = true     # keep the live game's key in SQLite: it survives a restart (OT-7)
 
     [radio]
+    region = "eu868"            # the field's radio region until the GM chooses one in the
+                                # console: "eu868" (868 MHz) or "as923-tw" (Taiwan, 920-925 MHz)
+                                # (RFC 0001 Amendment 12); the boxes and the modem must be
+                                # built for it
     channel_hz = 869525000      # the field's channel until the GM chooses one in the console
-                                # (RFC 0001 Amendments 1 and 3); the 125 kHz channel must fit
-                                # inside one EU868 sub-band
+                                # (RFC 0001 Amendments 1 and 3); the whole channel must fit
+                                # inside one of the region's sub-bands; left out: the region's
+                                # default (869525000, or 921500000 in AS923-TW)
     max_hops = 2
     scan_dwell_s = 60.0         # "find a quiet channel": total listening time, split across
                                 # the candidates (at most 10 s each)
@@ -153,14 +158,14 @@ from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
-from atalaia_sim import eu868
+from atalaia_sim import eu868, regions
 
 from . import REPO_ROOT
 
 SECTIONS = {
     "controller": ("node_id", "db_path", "modes_dirs", "failover_mode", "power_source",
                    "battery_pct", "storage_ok", "persist_game_key", "tick_interval_s"),
-    "radio": ("channel_hz", "max_hops", "scan_dwell_s", "quiet_threshold_dbm"),
+    "radio": ("region", "channel_hz", "max_hops", "scan_dwell_s", "quiet_threshold_dbm"),
     "health": ("node_offline_s", "battery_low_pct"),
     "modem": ("port", "baudrate", "ping_interval_s"),
     "api": ("host", "port", "gm_token", "read_token", "tls_port", "tls_dir", "tls_names"),
@@ -196,6 +201,7 @@ class Config:
     persist_game_key: bool = True  # decision OT-7 (2026-10-22): on by default
     tick_interval_s: float = 0.1
     # [radio]
+    region: str = regions.DEFAULT.code
     channel_hz: int = eu868.DEFAULT_CHANNEL_HZ
     max_hops: int = 2
     scan_dwell_s: float = 60.0
@@ -282,13 +288,21 @@ class Config:
             raise ConfigError("controller.failover_mode must be 'manual' or 'auto'")
         if not 1 <= self.max_hops <= 3:
             raise ConfigError("radio.max_hops must be 1-3 (ADR-P2-6)")
-        if not eu868.channel_ok(self.channel_hz):
+        if self.region not in regions.BY_CODE:
+            raise ConfigError(f"radio.region = {self.region!r}: one of {', '.join(regions.BY_CODE)}")
+        region = regions.get(self.region)
+        if region is regions.EU868 and not eu868.channel_ok(self.channel_hz):
             # The whole 125 kHz channel, not just its centre (RFC 0001 Amendment 3):
             # 869.40 MHz is inside 869.4-869.65 MHz but its channel starts at 869.3375.
             raise ConfigError(
                 f"radio.channel_hz = {self.channel_hz}: the 125 kHz channel (centre +-62.5 kHz) "
                 "must fit inside one EU868 sub-band (868.0-868.6, 868.7-869.2, 869.4-869.65 or "
                 "869.7-870.0 MHz); the default is 869525000")
+        if not region.channel_ok(self.channel_hz):
+            raise ConfigError(
+                f"radio.channel_hz = {self.channel_hz}: the {region.bw_hz // 1000} kHz channel must fit "
+                f"inside {region.lo_hz / 1e6:g}-{region.hi_hz / 1e6:g} MHz ({region.code}); "
+                f"the default is {region.default_channel_hz}")
         if not 1.0 <= self.scan_dwell_s <= 600.0:
             raise ConfigError("radio.scan_dwell_s must be 1-600 seconds")
         if not -128 <= self.quiet_threshold_dbm <= 0:
@@ -468,6 +482,7 @@ def _coerce(name: str, value: Any, default: Any) -> Any:
 def load_config(path: Optional[str] = None, env: Mapping[str, str] = os.environ) -> Config:
     cfg = Config()
     defaults = {f.name: getattr(cfg, f.name) for f in fields(cfg)}
+    given: set[str] = set()
     if path:
         try:
             data = tomllib.loads(Path(path).read_text(encoding="utf-8"))
@@ -481,6 +496,7 @@ def load_config(path: Optional[str] = None, env: Mapping[str, str] = os.environ)
                     raise ConfigError(f"{path}: unknown setting {section}.{key}")
                 attr = _attr(section, key)
                 setattr(cfg, attr, _coerce(f"{section}.{key}", value, defaults[attr]))
+                given.add(attr)
     for section, keys in SECTIONS.items():
         for key in keys:
             name = f"ATALAIA_{section.upper()}_{key.upper()}"
@@ -490,5 +506,9 @@ def load_config(path: Optional[str] = None, env: Mapping[str, str] = os.environ)
                 if attr in COMMA_LISTS:
                     value = [v.strip() for v in value.split(",") if v.strip()]
                 setattr(cfg, attr, _coerce(name, value, defaults[attr]))
+                given.add(attr)
+    # A region without a channel: the region's default channel (RFC 0001 Amendment 12).
+    if "channel_hz" not in given and cfg.region in regions.BY_CODE:
+        cfg.channel_hz = regions.get(cfg.region).default_channel_hz
     cfg.validate()
     return cfg

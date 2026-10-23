@@ -1729,6 +1729,104 @@ class ConsoleBrowserTests(unittest.TestCase):
         r = self.field.http.post("/api/v1/radio/scan")
         self.assertEqual(r.status_code, 503)
 
+    # --- the field's radio region (RFC 0001 Amendment 12, RF-AS923) ----------------
+
+    def test_region_changed_to_taiwan_after_a_confirmation(self):
+        """The region shown with its band and LoRa settings; changing it asks first (No keeps it); Yes
+        moves the field to Taiwan's default channel, unconfirmed, with its limits at the antenna port,
+        its nine 500 kHz channels and its own explanation; this modem is an EU868 build: a warning."""
+        page = self.console()
+        page.get_by_test_id("lang").first.select_option("en")
+        page.get_by_test_id("tab-settings").click()
+        expect(page.get_by_test_id("radio-region")).to_have_text("Europe (EU868, 868 MHz)")
+        expect(page.get_by_test_id("radio-region-lora")).to_have_text("868.000–870.000 MHz · LoRa SF7 at 125 kHz")
+        expect(page.get_by_test_id("radio-region-source")).to_have_text("the controller's configuration")
+        expect(page.get_by_test_id("radio-region-mismatch")).to_have_count(0)
+        expect(page.get_by_test_id("radio-region-apply")).to_be_disabled()  # the same region
+        page.get_by_test_id("radio-region-select").select_option("as923-tw")
+        asked: list[str] = []
+
+        def answer(dialog, yes: bool) -> None:
+            asked.append(dialog.message)
+            dialog.accept() if yes else dialog.dismiss()
+
+        page.once("dialog", lambda d: answer(d, False))
+        page.get_by_test_id("radio-region-apply").click()
+        self.assertTrue(wait_for(lambda: len(asked) == 1, 5))
+        self.assertIn("Taiwan (AS923, 920–925 MHz)", asked[0])
+        self.assertIn("must be built for this region", asked[0])
+        self.assertEqual(self.field.http.get("/api/v1/radio").json()["region"]["code"], "eu868")
+        page.once("dialog", lambda d: answer(d, True))
+        page.get_by_test_id("radio-region-apply").click()
+        expect(page.get_by_test_id("radio-region")).to_have_text("Taiwan (AS923, 920–925 MHz)")
+        expect(page.get_by_test_id("radio-region-lora")).to_have_text("920.000–925.000 MHz · LoRa SF9 at 500 kHz")
+        expect(page.get_by_test_id("radio-region-source")).to_have_text("chosen in the console")
+        expect(page.get_by_test_id("radio-channel")).to_have_text("921.500 MHz")
+        expect(page.get_by_test_id("radio-limits")).to_have_text("10% of the time · 500 mW at the antenna port")
+        expect(page.get_by_test_id("radio-source")).to_contain_text("not chosen yet")
+        expect(page.get_by_test_id("radio-low-power")).to_have_count(0)
+        expect(page.get_by_test_id("radio-region-mismatch")).to_contain_text(
+            "The USB modem is built for Europe (EU868, 868 MHz), but the field is in Taiwan (AS923, 920–925 MHz)")
+        expect(page.locator("[data-testid=radio-manual] option")).to_have_count(9)
+        expect(page.locator('[data-testid=radio-manual] option[value="923000000"]')).to_contain_text(
+            "LoRaWAN default, often busy")
+        why = page.get_by_test_id("radio-why")
+        why.locator("summary").click()
+        expect(why).to_contain_text("NCC LP0002")
+        expect(why).not_to_contain_text("869.4–869.65 MHz")
+        settings = self.field.http.get("/api/v1/radio").json()
+        self.assertEqual((settings["region"]["code"], settings["channel"]["channel_hz"], settings["confirmed"],
+                          settings["region_mismatch"]), ("as923-tw", 921_500_000, False, True))
+        # The first-setup reminder asks for the Taiwanese channel; back in the game tab it names it.
+        page.get_by_test_id("tab-game").click()
+        expect(page.get_by_test_id("radio-first-setup")).to_contain_text("921.500 MHz")
+        # Back to Europe, from the stream of another change (the API), with no reload.
+        page.get_by_test_id("tab-settings").click()
+        self.assertEqual(self.field.http.put("/api/v1/radio/region", json={"region": "eu868"}).status_code, 200)
+        expect(page.get_by_test_id("radio-region")).to_have_text("Europe (EU868, 868 MHz)")
+        expect(page.get_by_test_id("radio-channel")).to_have_text("869.525 MHz")
+        expect(page.get_by_test_id("radio-region-mismatch")).to_have_count(0)
+
+    def test_a_taiwanese_field(self):
+        """A controller configured for AS923-TW with a modem built for it: no warning, a noise scan over
+        the nine 500 kHz channels whose suggestion is taken, a game and its join on that channel with
+        the region (join key 18), the region locked while the game lives; in Traditional Chinese too."""
+        self.field.close()
+        self.field = Field("--region", "as923-tw", "--noise", "922000000:-112", "--noise-floor", "-100",
+                           cfg={"region": "as923-tw", "channel_hz": 921_500_000})
+        page = self.console()
+        page.get_by_test_id("lang").first.select_option("en")
+        page.get_by_test_id("tab-settings").click()
+        expect(page.get_by_test_id("radio-region")).to_have_text("Taiwan (AS923, 920–925 MHz)")
+        expect(page.get_by_test_id("radio-region-mismatch")).to_have_count(0)
+        self.assertEqual(self.field.http.get("/api/v1/radio").json()["modem_region"], "as923-tw")
+        page.get_by_test_id("radio-scan").click()
+        expect(page.get_by_test_id("radio-suggestion")).to_contain_text(
+            "Suggested: 922.000 MHz, the quietest full-power channel (10% of the time · 500 mW at the antenna port)",
+            timeout=15000)
+        rows = page.locator("[data-testid=radio-results] tbody tr")
+        expect(rows).to_have_count(9)
+        expect(rows.first).to_have_attribute("data-channel", "922000000")
+        page.get_by_test_id("radio-accept-suggestion").click()
+        expect(page.get_by_test_id("radio-channel")).to_have_text("922.000 MHz")
+        self.assertTrue(wait_for(lambda: (self.field.bundle.modem.status or {}).get("channel_hz")
+                                 == 922_000_000, 8))
+        page.get_by_test_id("radio-random").click()
+        expect(page.get_by_test_id("radio-random-result")).to_contain_text("9 of 9 candidate channels give 500 mW.")
+        game = self.field.create_game()
+        self.assertEqual(game["channel_hz"], 922_000_000)
+        expect(page.get_by_test_id("radio-locked")).to_be_visible()
+        expect(page.get_by_test_id("radio-region-select")).to_be_disabled()
+        self.assertEqual(self.field.http.put("/api/v1/radio/region", json={"region": "eu868"}).status_code, 409)
+        page.get_by_test_id("tab-join").click()
+        page.get_by_test_id("join-generate").click()
+        j = join.decode(join.from_text(page.get_by_test_id("join-text").input_value()), JOIN_KEY)
+        self.assertEqual((j["region"], j["channel_hz"]), ("as923-tw", 922_000_000))
+        page.get_by_test_id("lang").first.select_option("zh-tw")
+        page.get_by_test_id("tab-settings").click()
+        expect(page.get_by_test_id("radio-region")).to_have_text("台灣（AS923，920–925 MHz）")
+        expect(page.get_by_test_id("radio-limits")).to_have_text("10% 的時間 · 天線端 500 mW")
+
     def test_box_language_follows_the_console_or_the_setting(self):
         """Join key 15 (RFC 0001 Amendment 10): with "auto" a game takes the language of the console it
         was created in; the setting in Settings fixes one for the field's next games."""

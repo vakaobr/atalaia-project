@@ -120,7 +120,7 @@ static void test_validate_bad_region(void)
     char out[64];
     CHECK(parse_form_field("region=INVALID", "region", out, sizeof(out)));
     CHECK(strcmp(out, "INVALID") == 0);
-    /* Caller validates: INVALID is not EU868/US915/etc. */
+    /* Caller validates: INVALID is not the build region (EU868 or AS923-TW) */
 }
 
 static void test_validate_non_digit_pin(void)

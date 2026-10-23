@@ -36,100 +36,41 @@ import 'dart:convert';
 import 'dart:math';
 
 import '../pod/pod_codec.dart' show RadioNoise;
+import '../protocol/radio_region.dart';
 import 'controller_engine.dart';
 
+export '../protocol/radio_region.dart' show Region, SubBand;
+
 // --- EU868 game channels (simulator/atalaia_sim/eu868.py) -----------------
+//
+// The regions' table is radio_region.dart (RFC 0001 Amendment 12); these
+// keep the EU868 names. Everything the field does goes through its region
+// ([ControllerEngine.fieldRegion]).
 
 const loraBwHz = 125000;
 const defaultChannelHz = 869525000;
 
-/// An EU868 sub-band and its limits (ERC/REC 70-03 Annex 1).
-final class SubBand {
-  const SubBand(
-    this.name,
-    this.erc,
-    this.loHz,
-    this.hiHz,
-    this.duty,
-    this.erpDbm,
-    this.erpMw,
-  );
-  final String name;
-  final String erc;
-  final int loHz;
-  final int hiHz;
-  final double duty;
-  final int erpDbm;
-  final int erpMw;
-  double get dutyPct => duty * 100;
-  bool get fullPower => erpMw >= 500;
-}
-
-const subBands = [
-  SubBand('g', 'h1.5', 868000000, 868600000, 0.01, 14, 25),
-  SubBand('g1', 'h1.6', 868700000, 869200000, 0.001, 14, 25),
-  SubBand('g2', 'h1.7', 869400000, 869650000, 0.10, 27, 500),
-  SubBand('g3', 'h1.9', 869700000, 870000000, 0.01, 14, 25),
-];
-
 /// LoRaWAN's three default channels: often busy.
-const lorawanDefaults = {868100000, 868300000, 868500000};
+Set<int> get lorawanDefaults => eu868.busyHz;
 
-/// The channels a GM can pick from (decision CH1).
-const channelCandidates = [
-  868100000, 868200000, 868300000, 868400000, 868500000, // g, 1 %, 25 mW
-  868800000, 868950000, 869100000, // g1, 0.1 %, 25 mW
-  869475000, 869525000, 869575000, // g2, 10 %, 500 mW
-  869775000, 869850000, 869925000, // g3, 1 %, 25 mW
-];
+/// The channels a GM can pick from in EU868 (decision CH1).
+List<int> get channelCandidates => eu868.candidates;
 
-/// The sub-band that holds the whole 125 kHz channel, or null.
-SubBand? bandOf(int centreHz) {
-  final lo = centreHz - loraBwHz ~/ 2, hi = centreHz + loraBwHz ~/ 2;
-  for (final b in subBands) {
-    if (b.loHz <= lo && hi <= b.hiHz) return b;
-  }
-  return null;
-}
+/// The EU868 sub-band that holds the whole 125 kHz channel, or null.
+SubBand? bandOf(int centreHz) => eu868.bandOf(centreHz);
 
-bool channelOk(int centreHz) => bandOf(centreHz) != null;
+bool channelOk(int centreHz) => eu868.channelOk(centreHz);
 
 /// Legal and with enough airtime for a game: not in the 0.1 % sub-band.
-bool usableForGames(int centreHz) {
-  final b = bandOf(centreHz);
-  return b != null && b.duty >= 0.01;
-}
+bool usableForGames(int centreHz) => eu868.usableForGames(centreHz);
 
 /// The candidates a scan measures and a random pick draws from.
-List<int> scanCandidates() => [
-  for (final hz in channelCandidates)
-    if (usableForGames(hz)) hz,
-];
+List<int> scanCandidates([Region region = eu868]) => region.scanCandidates();
 
-/// A channel and its limits, for the API and the console (eu868.describe).
-Map<String, Object?> describeChannel(int centreHz) {
-  final b = bandOf(centreHz);
-  if (b == null) {
-    throw ArgumentError('$centreHz Hz is not a legal EU868 game channel');
-  }
-  return {
-    'channel_hz': centreHz,
-    'band': b.name,
-    'erc_band': b.erc,
-    'band_lo_hz': b.loHz,
-    'band_hi_hz': b.hiHz,
-    'duty_pct': roundTo(b.dutyPct, 3),
-    'erp_mw': b.erpMw,
-    'erp_dbm': b.erpDbm,
-    'full_power': b.fullPower,
-    'usable': usableForGames(centreHz),
-    'notes': [
-      if (centreHz == defaultChannelHz) 'default',
-      if (lorawanDefaults.contains(centreHz)) 'lorawan_default',
-      if (b.duty < 0.01) 'low_airtime',
-    ],
-  };
-}
+/// A channel and its limits, for the API and the console (regions.py
+/// `describe`).
+Map<String, Object?> describeChannel(int centreHz, [Region region = eu868]) =>
+    region.describe(centreHz);
 
 /// Python's round(x, digits) for the values the API gives (correctly
 /// rounded decimal, as `toStringAsFixed`).
@@ -189,12 +130,16 @@ bool isQuiet(RadioNoise n, int thresholdDbm) =>
     n.p90Dbm <= thresholdDbm && n.activity <= busyActivity;
 
 /// The channel to suggest after a scan, and why (decision CH3).
-Map<String, Object?>? suggestChannel(List<RadioNoise> results, int threshold) {
+Map<String, Object?>? suggestChannel(
+  List<RadioNoise> results,
+  int threshold, [
+  Region region = eu868,
+]) {
   if (results.isEmpty) return null;
   final ranked = List.of(results)..sort(_compareNoise);
   final full = [
     for (final n in ranked)
-      if (bandOf(n.channelHz)?.fullPower ?? false) n,
+      if (region.bandOf(n.channelHz)?.fullPower ?? false) n,
   ];
   if (full.isNotEmpty && isQuiet(full.first, threshold)) {
     return {'channel_hz': full.first.channelHz, 'reason': 'quiet_full_power'};
@@ -207,22 +152,27 @@ Map<String, Object?>? suggestChannel(List<RadioNoise> results, int threshold) {
   };
 }
 
-/// A random legal channel with enough airtime for a game (decision CH5).
-Map<String, Object?> randomChannel([Random? random]) {
-  final pool = scanCandidates();
+/// A random legal channel of the region with enough airtime for a game
+/// (decision CH5).
+Map<String, Object?> randomChannel([Random? random, Region region = eu868]) {
+  final pool = region.scanCandidates();
   final hz = pool[(random ?? Random.secure()).nextInt(pool.length)];
   return {
-    ...describeChannel(hz),
+    ...region.describe(hz),
     'pool': pool.length,
-    'pool_full_power': pool.where((c) => bandOf(c)!.fullPower).length,
+    'pool_full_power': pool.where((c) => region.bandOf(c)!.fullPower).length,
   };
 }
 
 double perChannelDwellS(double totalS, int count) =>
     max(perChannelMinS, min(perChannelMaxS, totalS / max(1, count)));
 
-Map<String, Object?> resultRow(RadioNoise n, int threshold) => {
-  ...describeChannel(n.channelHz),
+Map<String, Object?> resultRow(
+  RadioNoise n,
+  int threshold, [
+  Region region = eu868,
+]) => {
+  ...region.describe(n.channelHz),
   ...n.toJson(),
   'activity_pct': roundTo(n.activity * 100, 1),
   'quiet': isQuiet(n, threshold),
@@ -239,7 +189,8 @@ class ChannelScan {
     this._onChange, {
     List<int>? channels,
     double Function()? wall,
-  }) : channels = channels ?? scanCandidates(),
+    this.region = eu868,
+  }) : channels = channels ?? region.scanCandidates(),
        _wall = wall ?? (() => DateTime.now().microsecondsSinceEpoch / 1e6) {
     dwellMs = roundHalfEven(
       perChannelDwellS(totalS, this.channels.length) * 1000,
@@ -252,6 +203,9 @@ class ChannelScan {
   final double Function() _wall;
   final List<int> channels;
   final int thresholdDbm;
+
+  /// The field's region: its channels' limits in the results.
+  final Region region;
   late final int dwellMs;
   late final double startedAt;
   double? finishedAt;
@@ -321,9 +275,10 @@ class ChannelScan {
       'threshold_dbm': thresholdDbm,
       'started_at': startedAt,
       'finished_at': finishedAt,
-      'results': [for (final n in ranked) resultRow(n, thresholdDbm)],
+      'region': region.code,
+      'results': [for (final n in ranked) resultRow(n, thresholdDbm, region)],
       'suggestion': state == 'done'
-          ? suggestChannel(results, thresholdDbm)
+          ? suggestChannel(results, thresholdDbm, region)
           : null,
     };
   }
@@ -360,12 +315,16 @@ class ControllerChannel {
     }
     final stored = store.getSetting('radio.channel_hz');
     final hz = stored == null ? null : int.tryParse(stored);
+    final region = engine.fieldRegion;
     if (stored != null &&
-        (hz == null || !RegExp(r'^\d+$').hasMatch(stored) || !channelOk(hz))) {
-      // A stored channel that is not a legal one: the configured default.
+        (hz == null ||
+            !RegExp(r'^\d+$').hasMatch(stored) ||
+            !region.channelOk(hz))) {
+      // A stored channel that is not a legal one: the configured default
+      // (the region's, when the configured one is another region's).
       store
         ..setSetting('radio.channel_source', 'default')
-        ..setSetting('radio.channel_hz', '${engine.config.channelHz}');
+        ..setSetting('radio.channel_hz', '${_defaultHz(region)}');
     }
   }
 
@@ -402,19 +361,37 @@ class ControllerChannel {
       if (engine.store.getSetting(k) != null) k: engine.store.getSetting(k)!,
   };
 
+  /// The configured channel, or the region's default when it is another
+  /// region's (engine.py `radio_settings`' default).
+  int _defaultHz(Region region) => region.channelOk(engine.config.channelHz)
+      ? engine.config.channelHz
+      : region.defaultChannelHz;
+
   /// GET /api/v1/radio.
   Map<String, Object?> settings() {
     final s = _settings;
     final setAt = double.tryParse(s['radio.channel_set_at'] ?? '') ?? 0;
     final game = engine.liveGame;
+    final region = engine.fieldRegion;
+    final modemRegion = engine.modem?.radioRegion;
     return {
-      'channel': describeChannel(engine.fieldChannel),
+      'channel': region.describe(engine.fieldChannel),
       'source': s['radio.channel_source'] ?? 'default',
       'confirmed': s['radio.channel_confirmed'] == '1',
       'set_at': setAt == 0 ? null : setAt,
-      'default': describeChannel(engine.config.channelHz),
-      'recommended_hz': defaultChannelHz,
-      'candidates': [for (final hz in channelCandidates) describeChannel(hz)],
+      'default': region.describe(_defaultHz(region)),
+      'recommended_hz': region.defaultChannelHz,
+      'candidates': [for (final hz in region.candidates) region.describe(hz)],
+      // The region (radio_region.py `public`, RFC 0001 Amendment 12).
+      'region': region.public(),
+      'region_source':
+          engine.store.getSetting('radio.region') != null &&
+              regionsByCode.containsKey(engine.store.getSetting('radio.region'))
+          ? 'console'
+          : 'config',
+      'regions': [for (final r in regions) r.public()],
+      'modem_region': modemRegion,
+      'region_mismatch': modemRegion != null && modemRegion != region.code,
       'locked': _lockReason(),
       'scan_unavailable': _scanUnavailable(),
       'scan_dwell_s': scanDwellS,
@@ -432,10 +409,11 @@ class ControllerChannel {
       throw ControllerError.conflict('the channel cannot change now: $reason');
     }
     final hz = _int(channelHz, 'channel_hz');
-    if (!channelOk(hz)) {
+    final region = engine.fieldRegion;
+    if (!region.channelOk(hz)) {
       throw ControllerError(
-        'channel_hz $hz: the 125 kHz channel (centre +-62.5 kHz) must fit '
-        'inside one EU868 sub-band',
+        'channel_hz $hz: the ${region.bwHz ~/ 1000} kHz channel must fit '
+        'inside one ${region.code} sub-band',
       );
     }
     if (!channelSources.contains(source)) {
@@ -450,6 +428,42 @@ class ControllerChannel {
     if (m != null && m.isUp) {
       m.setChannel(hz);
       engine.modemMoved("the field's channel changed");
+    }
+    final out = settings();
+    engine.emit({'type': 'radio', 'radio': out});
+    return out;
+  }
+
+  /// PUT /api/v1/radio/region: the GM's choice of the field's radio region
+  /// (engine.py `set_field_region`): only with no live game and no scan; the
+  /// field moves to the region's default channel, to be confirmed, and the
+  /// last scan (the old region's channels) is forgotten. The radio is tuned
+  /// only when its firmware is built for the new region.
+  Map<String, Object?> setRegion(Object? code) {
+    final reason = _lockReason();
+    if (reason != null) {
+      throw ControllerError.conflict('the region cannot change now: $reason');
+    }
+    final region = code is String ? regionsByCode[code] : null;
+    if (region == null) {
+      throw ControllerError('region: one of ${regionsByCode.keys.join(', ')}');
+    }
+    final changed = region.code != engine.fieldRegion.code;
+    engine.store.setSetting('radio.region', region.code);
+    if (changed) {
+      engine.store
+        ..setSetting('radio.channel_hz', '${region.defaultChannelHz}')
+        ..setSetting('radio.channel_source', 'default')
+        ..setSetting('radio.channel_confirmed', '0')
+        ..setSetting('radio.channel_set_at', '${engine.wallSeconds()}')
+        ..setSetting('radio.last_scan', '');
+      _lastScan = null;
+      scan = null;
+      final m = engine.modem;
+      if (m != null && m.isUp && m.radioRegion == region.code) {
+        m.setChannel(region.defaultChannelHz);
+        engine.modemMoved("the field's region changed");
+      }
     }
     final out = settings();
     engine.emit({'type': 'radio', 'radio': out});
@@ -478,6 +492,7 @@ class ControllerChannel {
       quietThresholdDbm,
       _onScan,
       wall: engine.wallSeconds,
+      region: engine.fieldRegion,
     );
     engine.modemMoved('a channel scan started');
     s.start();

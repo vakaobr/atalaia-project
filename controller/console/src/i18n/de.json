@@ -504,6 +504,29 @@
     "band_range": "{lo}–{hi} MHz ({erc})",
     "allowed": "Grenzen",
     "limits": "{duty}% der Zeit · {mw} mW ERP",
+    "limits_conducted": "{duty}% der Zeit · {mw} mW am Antennenanschluss",
+    "limits_eirp": "{duty}% der Zeit · {mw} mW EIRP",
+    "region_title": "Funkregion",
+    "region": "Region",
+    "region_band": "Band",
+    "region_lora": "{lo}–{hi} MHz · LoRa SF{sf} mit {bw} kHz",
+    "region_names": {
+      "eu868": "Europa (EU868, 868 MHz)",
+      "as923-tw": "Taiwan (AS923, 920–925 MHz)"
+    },
+    "region_sources": {
+      "config": "die Konfiguration des Controllers",
+      "console": "in der Konsole gewählt"
+    },
+    "region_apply": "Region ändern",
+    "region_hint": "Wähle die Region einmal, für das Land, in dem das Feld liegt. Es funktionieren nur Regionen, für die die Boxen und das USB-Modem gebaut sind: Eine Box für eine andere Region lehnt die Beitritte ab.",
+    "region_confirm": "Das Feld auf {region} umstellen? Alle Boxen und das USB-Modem müssen für diese Region gebaut sein (ihre Firmware lehnt andere ab), und der Kanal geht auf den Standard der Region zurück, bis du einen wählst.",
+    "region_mismatch": "Das USB-Modem ist für {modem} gebaut, das Feld liegt aber in {field}: Das Modem lehnt die Kanäle dieser Region ab, also kann kein Spiel starten. Nimm ein Modem für {field} oder stelle die Region zurück.",
+    "why_tw_1": "In Taiwan dürfen solche Geräte 920–925 MHz nutzen (NCC LP0002). Ein Sender, der nicht zwischen Kanälen springt, muss mindestens 500 kHz belegen, daher ist der Kanal des Felds 500 kHz breit (LoRa SF9, etwa die Reichweite von SF7 mit 125 kHz anderswo), mit bis zu 0,5 W am Antennenanschluss im Freien.",
+    "why_tw_2": "Der empfohlene Kanal hält Abstand zu 923,2 und 923,4 MHz, auf denen jedes LoRaWAN-Gerät in Taiwan startet, und zum Standard von Meshtastic (923,875 MHz).",
+    "why_tw_3": "Die Regeln schreiben keinen Duty Cycle vor; die Boxen und das Modem begrenzen sich auf 10% der Zeit, wofür das Spiel ausgelegt ist. Die Firmware ist für Taiwan noch nicht zertifiziert: Ein dort verkauftes Produkt braucht eine Zulassung der NCC.",
+    "default_hint_tw": "{channel} MHz: abseits der belegten Kanäle von LoRaWAN und Meshtastic (siehe oben).",
+    "random_hint_tw": "Lost einen der 500-kHz-Kandidaten aus; jeder erlaubt die vollen 0,5 W.",
     "source": "Gewählt",
     "sources": {
       "default": "empfohlen (Standard)",
@@ -1021,7 +1044,7 @@
       "fingerprint": "Sie hat einen anderen Schlüssel als den dieses Felds.",
       "box_refused": "Die Box hat abgelehnt.",
       "duty_cycle": "Der Duty Cycle des Funks ist vorerst aufgebraucht.",
-      "channel_changed": "Der Funk hat 869,525 MHz verlassen (der Kanal des Felds, ein Scan oder das Modem verbindet neu); such erneut nach Boxen."
+      "channel_changed": "Der Funk hat den Kopplungskanal verlassen (den der Region: 869,525 MHz in Europa, 921,5 MHz in Taiwan), für den Kanal des Felds, einen Scan oder weil das Modem neu verbindet; such erneut nach Boxen."
     },
     "code_id": "ID {id}",
     "code_duplicate": "Mehr als eine Box bietet sich unter diesem Namen an: Gib den Code nur in den Eintrag ein, dessen ID auf dem Bildschirm der Box steht."

@@ -38,6 +38,14 @@ a shallow clone, which cannot count, the core's version and the commit: 0.3.0-de
                                                only: tools/mode_package.py pubkey prints them.
 All three apply to that build folder only, and are reset when left out.
 
+`build`, `bench`, `modem`, `pod` and `wokwi` also take:
+    --region=eu868 | --region=as923-tw         the radio region the image is built for
+                                               (Kconfig ATALAIA_RADIO_REGION, RFC 0001
+                                               Amendment 12): EU868 (868 MHz) by default, or
+                                               AS923 as Taiwan uses it (920-925 MHz). The
+                                               firmware refuses every other region's channel.
+                                               Applies to that build folder; EU868 when left out.
+
 Works from any folder and any shell (cmd, PowerShell, bash). Docker must be
 running. `build`, `wokwi`, `modem`, `pod` and `bench` use the espressif/idf:v5.3.2 image, the same as
 CI's esp32-build job, and write into firmware/esp32/ so that flashing tools
@@ -249,6 +257,23 @@ def field_box_options(build_dir: str) -> tuple[str, ...]:
     return (f"{build_dir}/sdkconfig.release_keys",)
 
 
+REGIONS = {"eu868": "CONFIG_ATALAIA_RADIO_REGION_EU868", "as923-tw": "CONFIG_ATALAIA_RADIO_REGION_AS923_TW"}
+
+
+def region_options(build_dir: str) -> tuple[str, ...]:
+    """The radio region (--region, EU868 when not given): a defaults file in the build folder,
+    rewritten only when it changes, so that a change rebuilds the sdkconfig."""
+    region = FW_OPTIONS.get("region", "eu868")
+    region_file = FW / build_dir / "sdkconfig.region"
+    text = ("# Written by tools/docker_fw.py (--region): the radio region of this build.\n"
+            + "".join(f"{key}=y\n" if code == region else f"# {key} is not set\n"
+                      for code, key in REGIONS.items()))
+    region_file.parent.mkdir(parents=True, exist_ok=True)
+    if not region_file.exists() or region_file.read_text() != text:
+        region_file.write_text(text)
+    return (f"{build_dir}/sdkconfig.region",)
+
+
 def variant(build_dir: str, defaults: tuple[str, ...]) -> int:
     """Builds a variant (defaults applied on top of sdkconfig.defaults) into build_dir, with the
     firmware's version (a CMake cache value, set on every build so that it never sticks)."""
@@ -258,7 +283,8 @@ def variant(build_dir: str, defaults: tuple[str, ...]) -> int:
                     f"{FW_VERSION_LEN} characters; give one with --fw-version=")
     print(f"docker_fw: firmware version {version}", flush=True)
     cmake_args = [f"-D ATALAIA_FW_VERSION={version}"]
-    defaults = defaults + field_box_options(build_dir)
+    defaults = defaults + field_box_options(build_dir) + region_options(build_dir)
+    print(f"docker_fw: radio region {FW_OPTIONS.get('region', 'eu868')}", flush=True)
     # The variant's sdkconfig lives in its build folder. Regenerate it when
     # the defaults change, so edits to them always take effect.
     sdkconfig = FW / build_dir / "sdkconfig"
@@ -368,8 +394,8 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 0 if argv else 1
     command, options = argv[0], argv[1:]
-    box = ["--fw-version=", "--release-keys=", "--mode-keys="]
-    known = {"build": box, "wokwi": box, "modem": [], "pod": [], "bench": box,
+    box = ["--fw-version=", "--release-keys=", "--mode-keys=", "--region="]
+    known = {"build": box, "wokwi": box, "modem": ["--region="], "pod": ["--region="], "bench": box,
              "test": ["--update-screens"], "clean": [], "version": []}
     if command not in known:
         return fail(f"unknown command {command!r}; run with --help")
@@ -387,6 +413,11 @@ def main(argv: list[str]) -> int:
             if keys is None:
                 return fail("--release-keys: 1-4 Ed25519 public keys, 64 hex digits or 44 base64 characters each")
             FW_OPTIONS["release_keys"] = keys
+        elif name == "--region=":
+            value = option.split("=", 1)[1]
+            if value not in REGIONS:
+                return fail(f"--region: one of {', '.join(REGIONS)}")
+            FW_OPTIONS["region"] = value
         elif name == "--mode-keys=":
             keys = release_keys_hex(option.split("=", 1)[1])
             if keys is None:

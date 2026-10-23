@@ -35,7 +35,7 @@ import random
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
-from . import eu868
+from . import eu868, regions
 from . import field_frame as ff
 from . import join as joinfmt
 
@@ -60,11 +60,11 @@ GAME_OVER_REPEATS = 3        # a GAME_OVER goes this many times (decision OT-15)
 GAME_OVER_GAP_MS = 4_000     # ... this far apart: 3 x 92 ms of air in all
 
 
-def announce_interval_ms(channel_hz: int, frame_len: int) -> int:
+def announce_interval_ms(channel_hz: int, frame_len: int, region: regions.Region = regions.EU868) -> int:
     """How often a free box announces: ANNOUNCE_SHARE of its sub-band's budget, at least a minute apart."""
-    band = eu868.band_of(channel_hz)
+    band = region.band_of(channel_hz)
     duty = band.duty if band is not None else 0.01
-    return max(ANNOUNCE_MIN_MS, math.ceil(eu868.airtime_ms(frame_len) / (ANNOUNCE_SHARE * duty)))
+    return max(ANNOUNCE_MIN_MS, math.ceil(region.airtime_ms(frame_len) / (ANNOUNCE_SHARE * duty)))
 
 
 def missing_parts(j: dict, installed: Optional[set[str]]) -> list[str]:
@@ -101,8 +101,13 @@ class IdleBox:
     """A box's side of the field frames (the simulator's model of box_lobby.c)."""
 
     def __init__(self, join_key: bytes, name: str = "field-box", *, rng: Optional[random.Random] = None,
-                 device_id: Optional[bytes] = None, tier: int = 0, channel_hz: int = eu868.DEFAULT_CHANNEL_HZ,
-                 installed: Optional[set[str]] = None, now_ms: int = 0) -> None:
+                 device_id: Optional[bytes] = None, tier: int = 0, channel_hz: Optional[int] = None,
+                 installed: Optional[set[str]] = None, now_ms: int = 0, region: str = "eu868") -> None:
+        # The region the box's firmware is built for (Kconfig ATALAIA_RADIO_REGION): it listens
+        # on that region's default channel and refuses another region's joins (box_game.c).
+        self.region = regions.get(region)
+        if channel_hz is None:
+            channel_hz = self.region.default_channel_hz
         self.rng = rng or random.Random()
         self.join_key = join_key
         self.key = ff.field_key(join_key)
@@ -156,6 +161,9 @@ class IdleBox:
                 self.installed -= set(self.fetched)
             self.fetched = {}
         result, j = join_result(self.join_key, payload, self.installed)
+        if result == "accepted" and j is not None and j["region"] != self.region.code:
+            result = "refused"  # another region's join: this radio may not use its channel
+            self.log.append(f"join refused: region {j['region']}, the box is built for {self.region.code}")
         if result == "accepted" and j is not None and j["game_id"] in self.ended:
             result = "ended"
         if result != "accepted" or j is None:
@@ -230,7 +238,8 @@ class IdleBox:
         return msg
 
     def _interval(self) -> int:
-        return announce_interval_ms(self.channel_hz, len(ff.encode(self.key, self._announce(), bytes(ff.NONCE_SIZE))))
+        return announce_interval_ms(self.channel_hz, len(ff.encode(self.key, self._announce(), bytes(ff.NONCE_SIZE))),
+                                    self.region)
 
     def on_frame(self, raw: bytes, now_ms: int) -> None:
         """A frame heard on the radio (anything: it is ignored unless it is ours to read)."""

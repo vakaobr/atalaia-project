@@ -30,6 +30,7 @@ def fields(v: dict) -> dict:
     out.setdefault("lang", None)
     out.setdefault("fetch_modes", False)
     out.setdefault("forget_modes", False)
+    out.setdefault("region", "eu868")
     return out
 
 
@@ -161,6 +162,41 @@ class ModeFetchTests(unittest.TestCase):
         for bad in (1, 0, "true", None):
             with self.subTest(bad), self.assertRaises(join.JoinError):
                 join.encode({**base, "fetch_modes": bad}, KEY)
+
+
+class RegionTests(unittest.TestCase):
+    """Optional key 18 (region), RFC 0001 Amendment 12: the region's number, left out for EU868."""
+
+    def test_valid_round_trip(self) -> None:
+        section = VECTORS["region"]
+        self.assertGreaterEqual(len(section["valid"]), 3)
+        for v in section["valid"]:
+            with self.subTest(v["name"]):
+                payload = bytes.fromhex(v["payload"])
+                self.assertEqual(join.decode(payload, KEY), fields(v))
+                self.assertEqual(join.encode(fields(v), KEY), payload)
+                self.assertEqual(join.to_text(payload), v["text"])
+
+    def test_invalid_fail_as_body(self) -> None:
+        self.assertGreaterEqual(len(VECTORS["region"]["invalid"]), 8)
+        for v in VECTORS["region"]["invalid"]:
+            with self.subTest(v["name"]), self.assertRaises(join.JoinError) as cm:
+                join.decode(bytes.fromhex(v["payload"]), KEY)
+            self.assertEqual(cm.exception.reason, "body", f"{v['name']}: {cm.exception}")
+
+    def test_eu868_is_the_key_left_out(self) -> None:
+        base = fields(VECTORS["valid"][0])
+        payload = bytes.fromhex(VECTORS["valid"][0]["payload"])
+        self.assertEqual(join.decode(payload, KEY)["region"], "eu868")
+        self.assertEqual(join.encode({**base, "region": "eu868"}, KEY), payload)
+        for bad in ("us915", "EU868", 0, 1, None):
+            with self.subTest(bad), self.assertRaises(join.JoinError):
+                join.encode({**base, "region": bad}, KEY)
+        # The channel must fit in the region the join names.
+        with self.assertRaises(join.JoinError):
+            join.encode({**base, "region": "as923-tw"}, KEY)
+        with self.assertRaises(join.JoinError):
+            join.encode({**base, "channel_hz": 921_500_000}, KEY)
 
 
 class InvalidVectorTests(unittest.TestCase):

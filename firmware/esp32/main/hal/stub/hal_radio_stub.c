@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "atalaia/duty_cycle.h"
+#include "hal_stub.h"
 
 /* ---- Test-assertion state ------------------------------------------------ */
 
@@ -35,6 +36,7 @@ uint32_t hal_stub_radio_dc_remaining_ms = 360000;
 
 /* The noise the stub "hears" when asked to measure, and measure() calls. */
 int hal_stub_radio_noise_dbm = -118;
+atalaia_region_t hal_stub_radio_region = RADIO_REGION;
 int hal_stub_radio_measure_calls;
 
 void hal_stub_radio_reset(void)
@@ -49,6 +51,7 @@ void hal_stub_radio_reset(void)
     hal_stub_radio_mode = HAL_RADIO_MODE_SLEEP;
     hal_stub_radio_dc_remaining_ms = 360000;
     hal_stub_radio_noise_dbm = -118;
+    hal_stub_radio_region = RADIO_REGION;
     hal_stub_radio_measure_calls = 0;
 }
 
@@ -88,8 +91,8 @@ static size_t stub_radio_recv(uint8_t *buf, size_t max_len, int8_t *rssi)
 
 static int stub_radio_set_channel(uint32_t freq_hz)
 {
-    /* The same rule as the SX1262 HAL: the 125 kHz channel inside one sub-band. */
-    if (!atalaia_channel_ok(freq_hz)) return -1;
+    /* The same rule as the SX1262 HAL: the channel inside one of the region's sub-bands. */
+    if (!atalaia_region_channel_ok(hal_stub_radio_region, freq_hz)) return -1;
     hal_stub_radio_channel_hz = freq_hz;
     return 0;
 }
@@ -113,7 +116,7 @@ static uint32_t stub_radio_duty_cycle_remaining_ms(void)
 static int stub_radio_measure(uint32_t freq_hz, uint32_t dwell_ms, bool cad, noise_result_t *out)
 {
     hal_stub_radio_measure_calls++;
-    if (!atalaia_channel_ok(freq_hz)) return -2;
+    if (!atalaia_region_channel_ok(hal_stub_radio_region, freq_hz)) return -2;
     /* One reading per millisecond around the configured level, one CAD per 100 ms. */
     noise_acc_t acc;
     noise_acc_init(&acc);

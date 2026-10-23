@@ -119,15 +119,18 @@ static esp_err_t root_get_handler(httpd_req_t *req)
 
 /* Validation helpers. */
 
-static const char *const known_regions[] = {"EU868", "US915", "AU915", "AS923",
-                                            "KR920", "IN865", "RU864", NULL};
+/* The setup page's region is the firmware's own (Kconfig ATALAIA_RADIO_REGION, RF-AS923-11):
+ * the radio uses only its build's region, so the page may not offer another. Before regions it
+ * listed US915, AU915 and others that the radio never used. */
+#if defined(CONFIG_ATALAIA_RADIO_REGION_AS923_TW)
+#define SETUP_REGION "AS923-TW"
+#else
+#define SETUP_REGION "EU868"
+#endif
 
 static bool is_valid_region(const char *r)
 {
-    for (int i = 0; known_regions[i]; i++) {
-        if (strcmp(r, known_regions[i]) == 0) return true;
-    }
-    return false;
+    return strcmp(r, SETUP_REGION) == 0;
 }
 
 static int parse_int_clamped(const char *s, int lo, int hi, int fallback)
@@ -162,7 +165,7 @@ static esp_err_t config_post_handler(httpd_req_t *req)
     buf[ret] = '\0';
 
     /* Parse fields. */
-    char name[33], region[8], pin[9], bri_s[4], vol_s[4];
+    char name[33], region[10], pin[9], bri_s[4], vol_s[4];
 
     if (!parse_form_field(buf, "name", name, sizeof(name)) || name[0] == '\0') {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Name is required (1-32 chars)");
@@ -170,10 +173,11 @@ static esp_err_t config_post_handler(httpd_req_t *req)
     }
 
     if (!parse_form_field(buf, "region", region, sizeof(region))) {
-        snprintf(region, sizeof(region), "EU868");
+        snprintf(region, sizeof(region), "%s", SETUP_REGION);
     }
     if (!is_valid_region(region)) {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid radio region");
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                            "This box is built for the " SETUP_REGION " radio region only");
         return ESP_FAIL;
     }
 

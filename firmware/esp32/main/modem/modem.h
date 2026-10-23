@@ -29,6 +29,7 @@
 #include "modem_framing.h"
 #include "radio/noise_stats.h"
 #include "radio/radio_protocol.h"
+#include "radio/radio_region.h"
 
 #define MODEM_DEDUPE_SIZE      64
 #define MODEM_DEDUPE_EXPIRY_MS 30000
@@ -84,6 +85,9 @@ typedef struct {
     const char *fw_version;
     bool radio_present;
     uint16_t epoch_window;
+    /* The region of the firmware's build (RADIO_REGION; the host modem's --region): every
+     * channel it is given must be one of its; IDENT names it. */
+    atalaia_region_t region;
 
     modem_decoder_t dec;
     atalaia_radio_proto_t rx; /* game key, per-source epochs (receive side) */

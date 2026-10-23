@@ -788,5 +788,130 @@
         "why": "a boolean, not a number"
       }
     ]
+  },
+  "region": {
+    "description": "Optional key 18 (region), RFC 0001 Amendment 12 (proposed; decisions RF-AS923-1 to RF-AS923-12): the field's radio region by its number (1: AS923-TW, Taiwan 920-925 MHz, SF9 at 500 kHz), left out for EU868 (0 written is refused, so a join has one encoding); the channel must fit in that region's sub-bands at its bandwidth (centre +- 250 kHz inside 920-925 MHz for AS923-TW). An unknown region, or a name instead of the number, refuses the payload (body). A box built for another region refuses an authentic join of this region (Kconfig ATALAIA_RADIO_REGION); a reader older than key 18 skips it and checks the channel against EU868, so it refuses it too. Valid ones made with the simulator's codec from node_domination_zone's fields (the fields give region by its name); invalid ones by hand, tagged with Python's hmac module. The simulator's, the core's (core/src/join.c) and the app's codecs decode and re-encode the valid ones byte for byte and refuse the invalid ones (body).",
+    "valid": [
+      {
+        "name": "taiwan_node",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 7,
+          "controller_id": 0,
+          "channel_hz": 921500000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "zone",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "node",
+          "region": "as923-tw"
+        },
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a36ecf960060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c00120195c1fed3d36772d5f2c68e359a3f8d0e44ac678d0b57e10ece0e167ce401c569",
+        "text": "atalaia:join:AawBGRCSAlArfhUWKK7Spqv3FYgJz088AwcEAAUaNuz5YAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JZHpvbmUKGTA5DAASAZXB_tPTZ3LV8saONZo_jQ5ErGeNC1fhDs4OFnzkAcVp"
+      },
+      {
+        "name": "taiwan_lowest_channel",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 7,
+          "controller_id": 0,
+          "channel_hz": 920250000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "zone",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "node",
+          "lang": "zh-tw",
+          "region": "as923-tw"
+        },
+        "payload": "01ad0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a36d9e690060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c000f657a682d74771201fb7768c8de2602bdba7438b02e16b0b2ff1dd47f8cf0a6df5eb5e813ce7a945d",
+        "text": "atalaia:join:Aa0BGRCSAlArfhUWKK7Spqv3FYgJz088AwcEAAUaNtnmkAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JZHpvbmUKGTA5DAAPZXpoLXR3EgH7d2jI3iYCvbp0OLAuFrCy_x3Uf4zwpt9etegTznqUXQ"
+      },
+      {
+        "name": "taiwan_highest_channel_standby",
+        "fields": {
+          "game_id": 4242,
+          "game_key": "2b7e151628aed2a6abf7158809cf4f3c",
+          "node_id": 3,
+          "controller_id": 1,
+          "channel_hz": 924750000,
+          "max_hops": 2,
+          "teams": [
+            "red",
+            "blue"
+          ],
+          "mode_id": "org.atalaia.domination",
+          "role": "standby",
+          "game_seed": 12345,
+          "params": null,
+          "kind": "controller",
+          "region": "as923-tw"
+        },
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03030401051a371e90b0060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09677374616e6462790a1930390c0112013b36fc1f179b566b1ed5cfe77a196ec623c6a71e2c345dc464b836e995a71d3d",
+        "text": "atalaia:join:AawBGRCSAlArfhUWKK7Spqv3FYgJz088AwMEAQUaNx6QsAYCB4JjcmVkZGJsdWUIdm9yZy5hdGFsYWlhLmRvbWluYXRpb24JZ3N0YW5kYnkKGTA5DAESATs2_B8Xm1ZrHtXP53oZbsYjxqceLDRdxGS4NumVpx09"
+      }
+    ],
+    "invalid": [
+      {
+        "name": "region_zero_written",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c001200f71bdb898c280802541a650b5f95f55865dd1b5858f64294706c8737ed592e2b",
+        "reason": "body",
+        "why": "key 18 = 0: EU868 is the key's absence, so a join has one encoding"
+      },
+      {
+        "name": "region_unknown",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a36ecf960060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c0012026d11fbcf1dbdc5acfb296829a622dd044ee2647374516ee02853668e6c1d49fa",
+        "reason": "body",
+        "why": "key 18 = 2: no such region; a box never guesses its limits"
+      },
+      {
+        "name": "region_text",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a36ecf960060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c00126861733932332d747752b8ce24d626e9f35b7899d8bbcd08dcd86f52ee3e4caa22e51a3f7b61681412",
+        "reason": "body",
+        "why": "key 18 is the region's number, not its name"
+      },
+      {
+        "name": "region_true",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a36ecf960060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c0012f5e4ba29a3d3076745e320fa23ee831ec421c7fcf08ce4106ac868bc20e6b2c370",
+        "reason": "body",
+        "why": "key 18 = true: not a number"
+      },
+      {
+        "name": "taiwan_with_eu868_channel",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a33d3e608060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c001201db6c9260109ec65f59bbdf23a3be39e0f246d9da6983cd58844b0c18dbf29b53",
+        "reason": "body",
+        "why": "region AS923-TW with 869.525 MHz: outside 920-925 MHz"
+      },
+      {
+        "name": "taiwan_channel_without_region",
+        "payload": "01ab0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a36ecf960060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c00a69b18b57eea13a392754922ac2ce595a66937895cf8b3a1500f7b6320e44ae0",
+        "reason": "body",
+        "why": "921.5 MHz without key 18 (EU868): outside every EU868 sub-band, as a reader older than key 18 sees it"
+      },
+      {
+        "name": "taiwan_channel_spills_low",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a36d9e68f060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c001201e006deb545e9e8a78715301ac24a3d209d4103cc30211a96cb6a7eae90e84de3",
+        "reason": "body",
+        "why": "the 500 kHz channel starts below 920 MHz"
+      },
+      {
+        "name": "taiwan_channel_spills_high",
+        "payload": "01ac0119109202502b7e151628aed2a6abf7158809cf4f3c03070400051a371e90b1060207826372656464626c756508766f72672e6174616c6169612e646f6d696e6174696f6e09647a6f6e650a1930390c00120191ec4918d006a079c765b26c78d5e9abe39b9f74c787da0a61ad932c9face49a",
+        "reason": "body",
+        "why": "the 500 kHz channel ends above 925 MHz"
+      }
+    ]
   }
 }

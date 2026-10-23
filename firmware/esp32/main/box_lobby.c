@@ -90,7 +90,7 @@ bool box_lobby_init(box_game_t *g)
     l->boot_ok = false; /* a new key, or a new run: the next frame raises the boot count */
     new_token(g, false);
     atalaia_ff_reasm_reset(&l->reasm);
-    if (l->channel_hz == 0) l->channel_hz = 869525000u; /* the radio's default channel */
+    if (l->channel_hz == 0) l->channel_hz = radio_region_default_channel_hz(g->region);
     l->ready = true;
     /* The first announcement, 2-20 s from the next tick (announce_ms 0: not chosen yet). */
     l->announce_due = true;
@@ -191,10 +191,10 @@ static uint32_t announce_interval(box_game_t *g)
     uint8_t body[ATALAIA_FF_BODY_MAX];
     size_t n = atalaia_ff_body_encode(&m, body, sizeof(body));
     size_t frame = ATALAIA_RF_HEADER_SIZE + ATALAIA_FF_NONCE_SIZE + n + ATALAIA_RF_MIC_SIZE;
-    const atalaia_band_info_t *band =
-        atalaia_band_info(atalaia_band_of_channel(g->lobby.channel_hz, ATALAIA_LORA_BW_HZ));
+    const atalaia_band_info_t *band = atalaia_region_band_info(
+        g->region, atalaia_region_band_of_channel(g->region, g->lobby.channel_hz));
     uint32_t ppm = band != NULL ? band->duty_ppm : 10000u;
-    uint64_t air_us = atalaia_airtime_us(7, ATALAIA_LORA_BW_HZ, frame);
+    uint64_t air_us = atalaia_region_airtime_us(g->region, frame);
     /* air_ms * 1e6 / (share * ppm), with share in percent: air_us * 1e5 / (share * ppm). */
     uint64_t ms = air_us * 100000u / ((uint64_t)BOX_ANNOUNCE_SHARE_PCT * ppm);
     if (ms < g->lobby.interval_min_ms) ms = g->lobby.interval_min_ms;

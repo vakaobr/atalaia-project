@@ -22,7 +22,10 @@
 #ifndef ATALAIA_RADIO_POWER_H
 #define ATALAIA_RADIO_POWER_H
 
+#include <stdbool.h>
 #include <stdint.h>
+
+#include "atalaia/duty_cycle.h"
 
 /* EU868 ERP limits per sub-band (dBm). */
 #define ATALAIA_EU868_G_ERP_LIMIT_DBM  14 /* 25 mW, 1% DC  */
@@ -49,6 +52,45 @@ static inline int8_t atalaia_eu868_tx_power_dbm(int erp_limit_dbm, int fem_gain_
     if (conducted < -9) conducted = -9;
     if (conducted > 22) conducted = 22;
     return (int8_t)conducted;
+}
+
+/*
+ * The SX1262 conducted power for a sub-band of any region (RFC 0001
+ * Amendment 12), by what its limit is measured as:
+ *   ERP:       limit + 2.15 - antenna - FEM (as above)
+ *   EIRP:      limit - antenna - FEM
+ *   CONDUCTED: limit - FEM - max(0, antenna - free_gain_dbi): NCC LP0002
+ *              5.8.1.2 limits the peak output at the antenna port and
+ *              lowers it by the antenna gain above 6 dBi.
+ * Capped at +22 dBm. Returns false, writing nothing, when even the SX1262's
+ * lowest setting (-9 dBm) would exceed the limit with these gains: such a
+ * channel may not be used (the old clamp to -9 dBm would have transmitted
+ * over the limit).
+ */
+static inline bool atalaia_tx_power_for(const atalaia_band_info_t *band, int fem_gain_db,
+                                        int antenna_gain_dbi, int8_t *dbm)
+{
+    if (band == NULL) return false;
+    int x100;
+    switch (band->limit_ref) {
+    case ATALAIA_LIMIT_ERP:
+        x100 = band->limit_dbm * 100 + 215 - fem_gain_db * 100 - antenna_gain_dbi * 100;
+        break;
+    case ATALAIA_LIMIT_EIRP:
+        x100 = band->limit_dbm * 100 - fem_gain_db * 100 - antenna_gain_dbi * 100;
+        break;
+    case ATALAIA_LIMIT_CONDUCTED: {
+        int over = antenna_gain_dbi - (int)band->free_gain_dbi;
+        x100 = band->limit_dbm * 100 - fem_gain_db * 100 - (over > 0 ? over : 0) * 100;
+        break;
+    }
+    default: return false;
+    }
+    int conducted = x100 / 100; /* truncation toward zero, as the Python side */
+    if (conducted < -9) return false;
+    if (conducted > 22) conducted = 22;
+    *dbm = (int8_t)conducted;
+    return true;
 }
 
 #endif /* ATALAIA_RADIO_POWER_H */

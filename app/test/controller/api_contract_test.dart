@@ -170,6 +170,7 @@ Map<String, Object?> joinJson(JoinPayload j) => {
   'lang': j.lang,
   'fetch_modes': j.fetchModes,
   'forget_modes': j.forgetModes,
+  'region': j.region,
 };
 
 /// A decoded frame's fields as the cases see them: bytes in hex.

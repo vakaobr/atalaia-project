@@ -2,38 +2,61 @@
  * SPDX-FileCopyrightText: 2026 The Atalaia contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * EU868 duty-cycle tracker and LoRa airtime calculator.
+ * Duty-cycle tracker, LoRa airtime calculator and the regions' table.
  */
 #include <string.h>
 
 #include "atalaia/duty_cycle.h"
 
-/* EU868 budgets in microseconds per hour. */
-static const uint32_t band_budgets[ATALAIA_BAND_COUNT] = {
-    36000000u,  /* G:  1%   of 3600s  */
-    3600000u,   /* G1: 0.1% of 3600s  */
-    360000000u, /* G2: 10%  of 3600s  */
-    36000000u   /* G3: 1%   of 3600s  */
+/* EU868: ERC/REC 70-03 Annex 1 (edition of February 2025): h1.5, h1.6, h1.7,
+ * h1.9, limits in ERP. In the same order as atalaia_band_t. The hourly budget
+ * of a band is duty_ppm x 3600 us. */
+static const atalaia_band_info_t eu868_bands[ATALAIA_BAND_COUNT] = {
+    {868000000u, 868600000u, 10000, 14, 25, ATALAIA_LIMIT_ERP, 0},   /* g:  1%,   25 mW  */
+    {868700000u, 869200000u, 1000, 14, 25, ATALAIA_LIMIT_ERP, 0},    /* g1: 0.1%, 25 mW  */
+    {869400000u, 869650000u, 100000, 27, 500, ATALAIA_LIMIT_ERP, 0}, /* g2: 10%,  500 mW */
+    {869700000u, 870000000u, 10000, 14, 25, ATALAIA_LIMIT_ERP, 0},   /* g3: 1%,   25 mW  */
 };
 
-/* ERC/REC 70-03 Annex 1 (edition of February 2025): h1.5, h1.6, h1.7, h1.9.
- * In the same order as atalaia_band_t; band_budgets above follows duty_ppm. */
-static const atalaia_band_info_t band_table[ATALAIA_BAND_COUNT] = {
-    {868000000u, 868600000u, 10000, 14, 25},   /* g:  1%,   25 mW  */
-    {868700000u, 869200000u, 1000, 14, 25},    /* g1: 0.1%, 25 mW  */
-    {869400000u, 869650000u, 100000, 27, 500}, /* g2: 10%,  500 mW */
-    {869700000u, 870000000u, 10000, 14, 25},   /* g3: 1%,   25 mW  */
+/* Taiwan: NCC LP0002 (edition of 2020-07-01) 5.8.1, "other IoT devices",
+ * 920-925 MHz, digital modulation (6 dB bandwidth at least 500 kHz, at most
+ * 8 dBm in any 3 kHz): at most 0.5 W peak output outdoors (1 W indoors or in
+ * a closed site with controlled access, not used), less the antenna gain
+ * above 6 dBi. LP0002 sets no duty cycle; 10% is this project's own budget,
+ * the airtime the game was designed for (decision RF-AS923-4). */
+static const atalaia_band_info_t as923_tw_bands[1] = {
+    {920000000u, 925000000u, 100000, 27, 500, ATALAIA_LIMIT_CONDUCTED, 6}, /* 0.5 W */
 };
 
-const atalaia_band_info_t *atalaia_band_info(atalaia_band_t band)
+/* The regions (RFC 0001 Amendment 12). AS923-TW uses SF9 at 500 kHz: the
+ * 500 kHz LP0002 asks of a non-hopping device, and with SF9 the same symbol
+ * time (1.024 ms) and nearly the same sensitivity as SF7 at 125 kHz. Its
+ * default channel, 921.5 MHz, keeps clear of LoRaWAN's 923.2 and 923.4 MHz
+ * and Meshtastic's TW default (923.875 MHz) (decision RF-AS923-5). */
+static const atalaia_region_info_t region_table[ATALAIA_REGION_COUNT] = {
+    {"eu868", 7, 125000u, 869525000u, 0, ATALAIA_BAND_COUNT, eu868_bands},
+    {"as923-tw", 9, 500000u, 921500000u, 0, 1, as923_tw_bands},
+};
+
+const atalaia_region_info_t *atalaia_region_info(atalaia_region_t region)
 {
-    if ((int)band < 0 || (int)band >= ATALAIA_BAND_COUNT) {
+    if ((int)region < 0 || (int)region >= ATALAIA_REGION_COUNT) {
         return NULL;
     }
-    return &band_table[band];
+    return &region_table[region];
 }
 
-atalaia_band_t atalaia_band_of_channel(uint32_t centre_hz, uint32_t bw_hz)
+atalaia_region_t atalaia_region_from_code(const char *code)
+{
+    if (code == NULL) return ATALAIA_REGION_COUNT;
+    for (int r = 0; r < ATALAIA_REGION_COUNT; r++) {
+        if (strcmp(code, region_table[r].code) == 0) return (atalaia_region_t)r;
+    }
+    return ATALAIA_REGION_COUNT;
+}
+
+static atalaia_band_t band_in(const atalaia_band_info_t *bands, int count, uint32_t centre_hz,
+                              uint32_t bw_hz)
 {
     uint64_t half = bw_hz / 2u;
     if ((uint64_t)centre_hz < half) {
@@ -41,12 +64,48 @@ atalaia_band_t atalaia_band_of_channel(uint32_t centre_hz, uint32_t bw_hz)
     }
     uint64_t lo = (uint64_t)centre_hz - half;
     uint64_t hi = (uint64_t)centre_hz + half;
-    for (int b = 0; b < ATALAIA_BAND_COUNT; b++) {
-        if (lo >= band_table[b].lo_hz && hi <= band_table[b].hi_hz) {
+    for (int b = 0; b < count; b++) {
+        if (lo >= bands[b].lo_hz && hi <= bands[b].hi_hz) {
             return (atalaia_band_t)b;
         }
     }
     return ATALAIA_BAND_COUNT;
+}
+
+atalaia_band_t atalaia_region_band_of_channel(atalaia_region_t region, uint32_t centre_hz)
+{
+    const atalaia_region_info_t *r = atalaia_region_info(region);
+    if (r == NULL) return ATALAIA_BAND_COUNT;
+    return band_in(r->bands, r->band_count, centre_hz, r->bw_hz);
+}
+
+bool atalaia_region_channel_ok(atalaia_region_t region, uint32_t centre_hz)
+{
+    return atalaia_region_band_of_channel(region, centre_hz) != ATALAIA_BAND_COUNT;
+}
+
+const atalaia_band_info_t *atalaia_region_band_info(atalaia_region_t region, atalaia_band_t band)
+{
+    const atalaia_region_info_t *r = atalaia_region_info(region);
+    if (r == NULL || (int)band < 0 || (int)band >= r->band_count) return NULL;
+    return &r->bands[band];
+}
+
+uint32_t atalaia_region_airtime_us(atalaia_region_t region, size_t packet_bytes)
+{
+    const atalaia_region_info_t *r = atalaia_region_info(region);
+    if (r == NULL) return 0;
+    return atalaia_airtime_us(r->sf, r->bw_hz, packet_bytes);
+}
+
+const atalaia_band_info_t *atalaia_band_info(atalaia_band_t band)
+{
+    return atalaia_region_band_info(ATALAIA_REGION_EU868, band);
+}
+
+atalaia_band_t atalaia_band_of_channel(uint32_t centre_hz, uint32_t bw_hz)
+{
+    return band_in(eu868_bands, ATALAIA_BAND_COUNT, centre_hz, bw_hz);
 }
 
 bool atalaia_channel_ok(uint32_t centre_hz)
@@ -54,12 +113,18 @@ bool atalaia_channel_ok(uint32_t centre_hz)
     return atalaia_band_of_channel(centre_hz, ATALAIA_LORA_BW_HZ) != ATALAIA_BAND_COUNT;
 }
 
-void atalaia_dc_init(atalaia_duty_cycle_t *dc)
+void atalaia_dc_init_region(atalaia_duty_cycle_t *dc, atalaia_region_t region)
 {
     memset(dc, 0, sizeof(*dc));
     for (int b = 0; b < ATALAIA_BAND_COUNT; b++) {
-        dc->bands[b].budget_us = band_budgets[b];
+        const atalaia_band_info_t *info = atalaia_region_band_info(region, (atalaia_band_t)b);
+        dc->bands[b].budget_us = info != NULL ? info->duty_ppm * 3600u : 0u;
     }
+}
+
+void atalaia_dc_init(atalaia_duty_cycle_t *dc)
+{
+    atalaia_dc_init_region(dc, ATALAIA_REGION_EU868);
 }
 
 void atalaia_dc_tick(atalaia_duty_cycle_t *dc, uint32_t now_ms)
