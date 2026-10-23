@@ -13,7 +13,7 @@
 #define ATALAIA_VERSION_MAJOR      0
 #define ATALAIA_VERSION_MINOR      3
 #define ATALAIA_VERSION_PATCH      0
-#define ATALAIA_VERSION_PRERELEASE "dev"
+#define ATALAIA_VERSION_PRERELEASE ""
 
 /* ATALAIA_PROTOCOL_VERSION, the Skirmesh-RF version this core speaks. */
 #include "atalaia/protocol.h"

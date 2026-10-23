@@ -17,7 +17,17 @@ int check_failures = 0;
 
 static void test_version(void)
 {
-    CHECK(strcmp(atalaia_version(), "0.3.0-dev") == 0);
+    /* The version follows version.h (decision FV-1): MAJOR.MINOR.PATCH, with "-" and the
+     * pre-release when there is one ("0.3.0-dev" between releases, "0.3.0" on a release). */
+    char want[48];
+    if (ATALAIA_VERSION_PRERELEASE[0] != '\0') {
+        snprintf(want, sizeof(want), "%d.%d.%d-%s", ATALAIA_VERSION_MAJOR, ATALAIA_VERSION_MINOR,
+                 ATALAIA_VERSION_PATCH, ATALAIA_VERSION_PRERELEASE);
+    } else {
+        snprintf(want, sizeof(want), "%d.%d.%d", ATALAIA_VERSION_MAJOR, ATALAIA_VERSION_MINOR,
+                 ATALAIA_VERSION_PATCH);
+    }
+    CHECK(strcmp(atalaia_version(), want) == 0);
     CHECK(ATALAIA_PROTOCOL_VERSION == 1);
 }
 

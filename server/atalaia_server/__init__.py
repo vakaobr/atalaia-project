@@ -17,7 +17,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-__version__ = "0.1.0"
+__version__ = "0.3.0"
 
 try:
     import atalaia_controller  # noqa: F401

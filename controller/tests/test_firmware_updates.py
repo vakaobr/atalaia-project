@@ -535,7 +535,8 @@ class BuildVersionTests(unittest.TestCase):
         self.fw = docker_fw()
 
     def test_core_version(self) -> None:
-        self.assertEqual(self.fw.core_version(), "0.3.0-dev")  # core/include/atalaia/version.h
+        # core/include/atalaia/version.h: "0.3.0-dev" between releases, "0.3.0" on a release commit.
+        self.assertRegex(self.fw.core_version(), r"^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$")
         header = ('#define ATALAIA_VERSION_MAJOR 1\n#define ATALAIA_VERSION_MINOR 20\n'
                   '#define ATALAIA_VERSION_PATCH 3\n#define ATALAIA_VERSION_PRERELEASE "%s"\n')
         self.assertEqual(self.fw.core_version(header % "rc.1"), "1.20.3-rc.1")

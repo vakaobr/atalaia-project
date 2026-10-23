@@ -12,7 +12,7 @@ description: >-
   and draws its YAML screens, the player and GM views, the marshal's chrono
   check-in, player tags and join cards.
 publish_to: none
-version: 0.2.0
+version: 0.3.0
 
 environment:
   sdk: ^3.12.0
