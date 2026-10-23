@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+id: org.atalaia.money_factory
+version: 0.1.0
+license: GPL-3.0-or-later
+min_tier: reduced
+kind: mode
+name: Money Factory
+description: >-
+  Teams capture factory boxes, which make money while they hold them. Players collect it by scanning
+  their signed NFC tag at their team's factory, carry it across the field and bank it by scanning their
+  tag at a bank box: money banked is points. The controller keeps what each player carries, so the
+  money can be collected at one box and banked at another. A player healed at a medic kit loses what
+  they carry, and a team that banks the target wins.
+roles:
+  factory: { requires: [nfc, team_input], optional: [team_display, display, audio] }
+  bank:    { requires: [nfc], optional: [display, audio] }
+params:
+  production:      { type: int, min: 1, max: 1000, default: 1, label: "Money a factory makes each tick" }
+  tick_s:          { type: int, min: 1, max: 600, default: 10, label: "Seconds per tick of a factory" }
+  capacity:        { type: int, min: 1, max: 10000, default: 50, label: "Most money a factory holds" }
+  carry_max:       { type: int, min: 0, max: 10000, default: 20, label: "Most money a player carries (0: no limit)" }
+  capture:         { type: bool, default: true, label: "Teams capture the factories: a factory makes money only while held, and only its team collects (off: always, and anyone)" }
+  capture_hold_ms: { type: int, min: 0, max: 60000, default: 3000, label: "Hold time to capture a factory (ms)" }
+  target:          { type: int, min: 0, max: 100000, default: 0, label: "Money a team banks to win the game (0: no end)" }
+  drop_on_heal:    { type: bool, default: true, label: "A player healed at a medic kit loses the money they carry" }
+i18n:
+  pt:
+    name: Fábrica de Dinheiro
+    description: >-
+      As equipas capturam caixas-fábrica, que fazem dinheiro enquanto as tiverem. Quem joga recolhe-o
+      lendo a sua etiqueta NFC assinada na fábrica da sua equipa, leva-o pelo campo e deposita-o lendo a
+      etiqueta numa caixa-banco: o dinheiro depositado são pontos. O controlador guarda o que cada pessoa
+      leva, por isso o dinheiro pode ser recolhido numa caixa e depositado noutra. Quem recebe tratamento
+      num kit de ligaduras perde o que leva, e a equipa que depositar o objetivo ganha.
+    params:
+      production: Dinheiro que uma fábrica faz por intervalo
+      tick_s: Segundos por intervalo de uma fábrica
+      capacity: Máximo de dinheiro numa fábrica
+      carry_max: "Máximo de dinheiro que cada pessoa leva (0: sem limite)"
+      capture: "As equipas capturam as fábricas: uma fábrica só faz dinheiro enquanto tiver equipa, e só essa equipa recolhe (desligado: sempre, e qualquer pessoa)"
+      capture_hold_ms: Tempo a premir para capturar uma fábrica (ms)
+      target: "Dinheiro que uma equipa deposita para ganhar o jogo (0: sem fim)"
+      drop_on_heal: Quem recebe tratamento num kit de ligaduras perde o dinheiro que leva

@@ -145,3 +145,4 @@ The Chinese names are what Taiwan's players would call these games, for an `i18n
 | VIP / Payload | VIP / Carga | VIP / Payload | VIP / 護送 |
 | Hacking Terminal | Hackeia o terminal | Hacking-Terminal | 駭客終端 |
 | Objectives | Objetivos | Ziele | 任務目標 |
+| Money Factory | Fábrica de Dinheiro | Money Factory | 印鈔廠 *(check)* |

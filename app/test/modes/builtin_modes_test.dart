@@ -94,6 +94,28 @@ void main() {
       vip.screens.keys,
       containsAll(['checkpoint_free', 'checkpoint_held', 'payload']),
     );
+    // Money Factory: factories and banks with NFC; an Android prop with NFC
+    // can be either (a bank needs no team buttons).
+    final money = catalog.byId('org.atalaia.money_factory')!;
+    expect(money.needsController, isTrue);
+    expect(money.name('pt'), 'Fábrica de Dinheiro');
+    expect(money.name('en'), 'Money Factory');
+    expect(money.roles.map((r) => r.name), ['factory', 'bank']);
+    expect(money.role('factory')!.requires, ['nfc', 'team_input']);
+    expect(money.role('bank')!.requires, ['nfc']);
+    expect(money.role('bank')!.uses('team_input'), isFalse);
+    expect(
+      money.screens.keys,
+      containsAll([
+        'neutral',
+        'captured',
+        'factory',
+        'collected',
+        'bank',
+        'deposited',
+        'refused',
+      ]),
+    );
     expect(catalog.byId('org.atalaia.respawn')!.needsController, isFalse);
   });
 

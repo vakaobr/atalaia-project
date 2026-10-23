@@ -318,6 +318,7 @@ static const char *const builtin_folders[][2] = {
     {"hacking_terminal", "org.atalaia.hacking_terminal"},
     {"vip_payload", "org.atalaia.vip_payload"},
     {"objectives", "org.atalaia.objectives"},
+    {"money_factory", "org.atalaia.money_factory"},
 };
 enum { BUILTIN_N = sizeof(builtin_folders) / sizeof(builtin_folders[0]) };
 
@@ -573,6 +574,82 @@ static void test_objectives_from_the_picker(void)
     node_runner_stop(&runner);
 }
 
+/* Money Factory, the fourteenth slot (second page, fifth entry): a box is a factory until the
+ * controller's field.lua tells it it is a bank (decision MF-A3). On its own it captures and
+ * makes money, but refuses tags (no game key: no_game). Every one of its templates renders. */
+static void test_money_factory_from_the_picker(void)
+{
+    preset_summary_t list[PRESET_MAX_SLOTS];
+    seed_every_builtin(list);
+    CHECK(strcmp(list[13].mode_id, "org.atalaia.money_factory") == 0);
+    CHECK(strcmp(list[13].label, "Money Factory") == 0);
+
+    preset_ui_t ui;
+    preset_ui_init(&ui, "1234", BUILTIN_N);
+    for (const char *k = "1234#05###"; *k; k++) preset_ui_handle_key(&ui, *k);
+    CHECK(preset_ui_get_state(&ui) == PRESET_UI_STATE_GAME_STARTED);
+    CHECK(preset_ui_selected_preset(&ui) == 14);
+
+    static preset_t p;
+    CHECK(preset_store_load(list[preset_ui_selected_preset(&ui) - 1].index, &p));
+    CHECK(strcmp(p.mode_id, "org.atalaia.money_factory") == 0);
+    CHECK(strstr(p.params_json, "\"carry_max\":20") != NULL);
+
+    hal_t hal;
+    hal_stub_init(&hal);
+    static node_runner_t runner;
+    node_runner_init(&runner, &hal, 0);
+    const char *teams[] = {"red", "blue"};
+    CHECK(node_runner_start(&runner, &p, teams, 2));
+    CHECK(strcmp(runner.queues.screens[0].template_name, SCREEN_MODE_MESSAGE) == 0);
+    CHECK(screen_render(SCREEN_MODE_MESSAGE, runner.queues.screens[0].data_json));
+    button_tracker_t buttons;
+    button_tracker_init(&buttons, teams, 2);
+    const screen_update_t *su = last_screen(&runner);
+    CHECK(su && strcmp(su->template_name, "neutral") == 0);
+    if (su) CHECK(screen_render(su->template_name, su->data_json));
+
+    hold(&runner, &buttons, 0x1, 3100); /* red holds 3 s: captured */
+    CHECK(strcmp(runner.last_event_type, "zone.captured") == 0);
+    for (int i = 0; i < 1000; i++) node_runner_tick(&runner, 10); /* a tick: 1 in the factory */
+    su = last_screen(&runner);
+    CHECK(su && strcmp(su->template_name, "captured") == 0);
+    CHECK(su && strstr(su->data_json, "\"team\":\"red\"") != NULL);
+    CHECK(su && strstr(su->data_json, "\"stock\":1") != NULL);
+    if (su) CHECK(screen_render(su->template_name, su->data_json));
+
+    /* A game picked on the box has no game key: the box refuses every tag. */
+    node_runner_input(&runner, "nfc.tag",
+                      "{\"uid\":\"04a1b2c3d4e5f6\",\"valid\":false,"
+                      "\"reason\":\"no_game\"}");
+    su = last_screen(&runner);
+    CHECK(su && strcmp(su->template_name, "refused") == 0);
+    CHECK(su && strstr(su->data_json, "\"reason\":\"no_game\"") != NULL);
+    if (su) CHECK(screen_render(su->template_name, su->data_json));
+
+    /* The other templates, with the data the script gives them. */
+    CHECK(screen_render("collected", "{\"player\":\"r1\",\"team\":\"red\",\"amount\":5,"
+                                     "\"carrying\":12,\"stock\":0}"));
+    CHECK(screen_render("factory", "{\"stock\":7}"));
+    CHECK(screen_render("deposited", "{\"player\":\"b1\",\"team\":\"blue\",\"amount\":12,"
+                                     "\"total\":30}"));
+    CHECK(screen_render("refused", "{\"reason\":\"full\",\"player\":\"b1\",\"team\":\"blue\","
+                                   "\"carrying\":20}"));
+
+    /* Told it is a bank, it shows the bank and ignores the buttons. */
+    node_runner_input(&runner, "cmd.mode", "{\"name\":\"bank\"}");
+    for (int i = 0; i < 500; i++) node_runner_tick(&runner, 10);
+    su = last_screen(&runner);
+    CHECK(su && strcmp(su->template_name, "bank") == 0);
+    if (su) CHECK(screen_render(su->template_name, su->data_json));
+    runner.event_count = 0;
+    hold(&runner, &buttons, 0x2, 3100);
+    CHECK(runner.event_count == 0);
+    const atalaia_score_t *score = atalaia_node_score(runner.node);
+    CHECK(score && score->gained[1] == 0 && score->gained[2] == 0);
+    node_runner_stop(&runner);
+}
+
 void run_builtin_presets_tests(void)
 {
     test_seed_empty_store();
@@ -586,4 +663,5 @@ void run_builtin_presets_tests(void)
     test_hacking_terminal_from_the_picker();
     test_vip_payload_checkpoint_from_the_picker();
     test_objectives_from_the_picker();
+    test_money_factory_from_the_picker();
 }

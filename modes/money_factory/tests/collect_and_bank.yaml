@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A team captures the factory, it makes money, a player collects it and banks it at another box for points
+params: { production: 5, tick_s: 10 }
+nodes: { plant: factory, vault: bank }
+steps:
+  - expect_screen: { node: plant, template: neutral, data: { stock: 0 } }
+  - expect_screen: { node: vault, template: bank, data: { total: 0, counts: "" } }
+  # A neutral factory makes nothing.
+  - wait: 10
+  - expect_screen: { node: plant, template: neutral, data: { stock: 0 } }
+  - hold: { node: plant, team: red, s: 3 }           # 10 -> 13 s
+  - expect: { type: zone.captured, node: plant, team: red, at: 13 }
+  - expect_screen: { node: plant, template: captured, data: { team: red, since: 13, stock: 0 } }
+  - wait: 7                                          # the tick at 20 s
+  - expect_screen: { node: plant, template: captured, data: { team: red, stock: 5 } }
+  - scan: { node: plant, player: r1, team: red }
+  - expect: { type: money.collected, node: plant, team: red, at: 20, data: { player: r1, amount: 5 } }
+  - expect_screen: { node: plant, template: collected, data: { player: r1, team: red, amount: 5, carrying: 5, stock: 0 } }
+  # Collecting scores nothing; banking does, at the bank.
+  - expect_score: { team: red, points: 0 }
+  - wait: 30
+  - scan: { node: vault, player: r1, team: red }
+  - expect: { type: money.deposited, node: vault, team: red, at: 50, data: { player: r1, amount: 5 } }
+  - expect_screen: { node: vault, template: deposited, data: { player: r1, team: red, amount: 5, total: 5 } }
+  - expect_score: { team: red, points: 5 }
+  - expect_score: { team: red, node: vault, points: 5 }
+  # Banked once: nothing left to bank.
+  - scan: { node: vault, player: r1, team: red }
+  - expect_screen: { node: vault, template: refused, data: { reason: nothing, player: r1 } }
+  - expect_no: money.deposited
+  - wait: 4
+  - expect_screen: { node: vault, template: bank, data: { total: 5, counts: RED 5 } }
+  - expect_score: { team: red, points: 5 }
+  - end: time
+  - expect_screen: { node: plant, template: final_score, data: { owner: red } }
+  - expect_no: script.error

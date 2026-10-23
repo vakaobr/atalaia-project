@@ -741,6 +741,7 @@ int main(int argc, char **argv)
         {"hacking_terminal", "org.atalaia.hacking_terminal"},
         {"vip_payload", "org.atalaia.vip_payload"},
         {"objectives", "org.atalaia.objectives"},
+        {"money_factory", "org.atalaia.money_factory"},
     };
     enum { BUILTIN_COUNT = sizeof(builtin_modes) / sizeof(builtin_modes[0]) };
     builtin_source_t sources[BUILTIN_COUNT];

@@ -380,6 +380,16 @@ modes:
       Feld-Controller und dem Handy; nur „extrahiert“ geht hinaus. In Software geschrieben und
       getestet, noch nicht mit echtem GPS gespielt.
     meta: Checkpoint-Boxen, ein Handy mit GPS oder das Handy des VIP · braucht den Feld-Controller
+  money_factory:
+    title: Money Factory
+    text: >-
+      Teams nehmen Fabrik-Boxen ein, die Geld machen, solange sie sie halten. Wer spielt, sammelt es
+      mit dem eigenen Tag an der Fabrik des eigenen Teams ein, trägt es über das Feld und zahlt es an
+      einer Bank-Box ein, wo es Punkte bringt; der Feld-Controller merkt sich, was jede Person trägt,
+      so kann das Geld an einer Box eingesammelt und an einer anderen eingezahlt werden. Wer an einem
+      Medic-Kit geheilt wird, verliert das getragene Geld, und das erste Team, das das Ziel einzahlt,
+      kann gewinnen. In Software geschrieben und getestet, noch nicht auf echten Boxen gespielt.
+    meta: Fabrik- und Bank-Boxen oder Handys mit NFC · Tags der Spielenden · braucht den Feld-Controller
   codes:
     title: Codes (Modifikator)
     text: >-
@@ -610,7 +620,10 @@ roadmap:
       <strong>In Software fertig</strong> (Planphasen A bis F): Kill Confirmed, Respawn und Leben und
       Check-in, die signierte NFC-Tags der Spielenden lesen, und das Medic-Kit (wer getroffen wurde,
       scannt den eigenen Tag und hält einen Knopf, um geheilt zu werden, mit einer begrenzten Zahl an
-      Heilungen); Modus-Bildschirme in YAML beschrieben, von Field Box und App gleich gezeichnet;
+      Heilungen),
+      und Money Factory (Fabriken machen Geld, solange ein Team sie hält; wer spielt, sammelt es mit
+      dem eigenen Tag ein und zahlt es an einer anderen Box ein, und der Controller merkt sich, was
+      jede Person trägt); Modus-Bildschirme in YAML beschrieben, von Field Box und App gleich gezeichnet;
       <a href="{{ page.to.glossary }}#glossar-chrono">Chrono beim Check-in</a> (Energie, Limits pro
       Klasse, Stichproben, Messwerte von Marshal signiert). Die App nutzt denselben Spielkern wie die
       Boxen, auf Portugiesisch und Englisch: Ein Android-Handy arbeitet als Box (jeder Modus, mit den
@@ -642,9 +655,9 @@ roadmap:
       beim Verlassen des Felds auch dort funktioniert) und der Funkkanal mit der Suche nach einem
       ruhigen Kanal über den I/O-Pod; nach dem Feldtest: der Wechsel zwischen einem Handy und einem
       Pi und der Rest dessen, was der Pi kann) und die iOS-Version (nicht gebaut: sie braucht einen
-      Mac); der Modus Money Factory ist zurückgestellt. Planphase G, der Feldtest mit echten Handys
-      und Pods, wartet auf die Hardware: Bisher lief die App nur auf Android-Emulatoren und die
-      Pod-Firmware nur als eigener Code auf einem Computer.
+      Mac). Planphase G, der Feldtest mit echten Handys und Pods, wartet auf die Hardware: Bisher
+      lief die App nur auf Android-Emulatoren und die Pod-Firmware nur als eigener Code auf einem
+      Computer.
     gate: "Gate: Ein Spiel mischt ESP32- und Android-Props ohne Probleme."
   p4:
     title: Site-Server und erweitertes Spiel

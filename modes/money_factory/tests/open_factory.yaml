@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Without capture a factory always makes money, anyone collects, and team buttons and the GM's override do nothing
+params: { capture: false, production: 3, tick_s: 10, carry_max: 0 }
+nodes: { plant: factory, vault: bank }
+steps:
+  - expect_screen: { node: plant, template: factory, data: { stock: 0 } }
+  - hold: { node: plant, team: red, s: 5 }
+  - input: { node: plant, type: cmd.set_owner, data: { team: blue } }
+  - expect_no: zone.captured
+  - wait: 15                                         # ticks at 10 and 20
+  - expect_screen: { node: plant, template: factory, data: { stock: 6 } }
+  - scan: { node: plant, player: r1, team: red }
+  - expect: { type: money.collected, data: { player: r1, amount: 6 } }
+  - wait: 10                                         # the tick at 30 s
+  - scan: { node: plant, player: b1, team: blue }
+  - expect: { type: money.collected, team: blue, data: { player: b1, amount: 3 } }
+  - scan: { node: vault, player: b1, team: blue }
+  - scan: { node: vault, player: r1, team: red }
+  - expect_score: { team: red, points: 6 }
+  - expect_score: { team: blue, points: 3 }
+  - wait: 4
+  - expect_screen: { node: vault, template: bank, data: { total: 9, counts: BLUE 3  RED 6 } }
+  - expect_no: script.error

@@ -222,6 +222,33 @@ const cases = [
     'obj_bomb',
     '{"label":"Local A","phase":"armed","team":"red","left":42,"fuse_s":60}',
   ),
+  // Money Factory: a factory held, a collection on a phone (in Portuguese),
+  // a bank and a refusal (the reason's text is in the template).
+  (
+    'money_factory_captured',
+    'money_factory',
+    'captured',
+    '{"team":"red","since":95,"stock":35}',
+  ),
+  (
+    'money_factory_collected_pt',
+    'money_factory',
+    'collected',
+    '{"player":"r1","team":"red","amount":15,"carrying":20,"stock":20,'
+        '"lang":"pt"}',
+  ),
+  (
+    'money_factory_bank',
+    'money_factory',
+    'bank',
+    '{"total":45,"counts":"RED 30  BLUE 15"}',
+  ),
+  (
+    'money_factory_refused_pt',
+    'money_factory',
+    'refused',
+    '{"reason":"not_yours","player":"b1","team":"blue","lang":"pt"}',
+  ),
   (
     'code_entry',
     null,

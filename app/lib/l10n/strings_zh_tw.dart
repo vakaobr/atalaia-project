@@ -297,6 +297,8 @@ const Map<String, String> zhTwStrings = {
   'event.hacking.solved': '{team}駭入了終端',
   'event.hacking.solved.no_team': '有終端被駭入',
   'event.vip.extracted': '{team}抵達了撤離區',
+  'event.money.collected': '{player} 收取了 {amount} 元',
+  'event.money.deposited': '{player} 為{team}存入了 {amount} 元',
   'event.scenario.started': '劇本已開始',
   'event.scenario.objective.completed': '{team}完成了一個任務目標',
   'event.scenario.objective.completed.no_team': '一個任務目標已完成',

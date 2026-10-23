@@ -178,6 +178,8 @@
       "hacking_solved_code": "{team} 破解了駭客終端（{puzzle}），取得密碼 {code}",
       "vip_extracted": "{team} 的護送目標抵達撤離區",
       "vip_extracted_vip": "{team} 撤離了他們的 VIP（{player}）",
+      "money_collected": "{player}（{team}）收取了 {amount} 元",
+      "money_deposited": "{player}（{team}）存入了 {amount} 元：{amount} 分",
       "scenario_started": "劇本 {scenario} 開始",
       "scenario_objective_completed": "{team} 完成任務目標 {objective}",
       "scenario_objective_completed_hidden": "{team} 完成一個任務目標",

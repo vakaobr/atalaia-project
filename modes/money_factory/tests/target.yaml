@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: The first team to bank the target, at every bank, wins the game
+params: { production: 10, tick_s: 10, target: 25, carry_max: 0, capture_hold_ms: 1000 }
+nodes: { plant: factory, east: bank, west: bank }
+steps:
+  - hold: { node: plant, team: red, s: 1 }
+  - wait: 9                                          # 10 in the factory
+  - scan: { node: plant, player: r1, team: red }
+  - scan: { node: east, player: r1, team: red }
+  - expect: { type: money.deposited, node: east, data: { amount: 10 } }
+  - wait: 10
+  - scan: { node: plant, player: r2, team: red }
+  - scan: { node: west, player: r2, team: red }
+  - expect: { type: money.deposited, node: west, data: { amount: 10 } }
+  - expect_status: running                           # 20 of 25
+  - wait: 10
+  - scan: { node: plant, player: r1, team: red }
+  - scan: { node: west, player: r1, team: red }
+  - expect: { type: money.deposited, node: west, at: 30, data: { amount: 10 } }
+  - expect: { type: game.end, node: controller, data: { winner: red } }
+  - expect_status: ended
+  - expect_score: { team: red, points: 30 }
+  - expect_no: script.error

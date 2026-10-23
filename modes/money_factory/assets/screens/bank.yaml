@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# A bank. Data: total (money banked here), counts (per team, as text); lang
+# (pt or en) from the box.
+template: bank
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: panel }
+    children:
+      - type: label
+        text: "{lang == 'pt' && 'BANCO' || 'BANK'}"
+        style: { font_size: 20, width: fill, align: center }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{total}"
+    style: { font_size: 48 }
+  - type: label
+    text: "{lang == 'pt' && 'depositado neste banco' || 'banked here'}"
+    style: { font_size: 20, color: muted }
+  - type: label
+    text: "{counts}"
+    style: { font_size: 20, visible: "{counts}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{lang == 'pt' && 'Lê a tua etiqueta para depositar' || 'Scan your tag to bank your money'}"
+    style:
+      font_size: 14
+      color: muted
+      padding: { bottom: 10 }

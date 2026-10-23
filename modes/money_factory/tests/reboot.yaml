@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A bank that rebooted is told again that it is a bank and what every player carries
+params: { production: 5, tick_s: 10, capture_hold_ms: 1000 }
+nodes: { plant: factory, vault: bank }
+steps:
+  - hold: { node: plant, team: red, s: 1 }
+  - wait: 9
+  - scan: { node: plant, player: r1, team: red }
+  - expect: { type: money.collected, data: { player: r1, amount: 5 } }
+  - reboot: vault
+  - expect: { type: node.rebooted, node: vault }
+  - expect_screen: { node: vault, template: bank, data: { total: 0 } }
+  - scan: { node: vault, player: r1, team: red }
+  - expect: { type: money.deposited, node: vault, data: { player: r1, amount: 5 } }
+  - expect_score: { team: red, points: 5 }
+  - expect_no: script.error

@@ -358,6 +358,16 @@ modes:
       way score while a team holds them. Positions stay on the field controller and the phone; only
       "extracted" goes out. Written and tested in software, not yet played with real GPS.
     meta: Checkpoint boxes, a phone with GPS or the VIP's phone · needs the field controller
+  money_factory:
+    title: Money Factory
+    text: >-
+      Teams capture factory boxes, which make money while they hold them. Players collect it by
+      scanning their tag at their team's factory, carry it across the field and bank it at a bank
+      box for points; the field controller keeps what each player carries, so the money can be
+      collected at one box and banked at another. A player healed at a medic kit loses what they
+      carry, and the first team to bank the target can win. Written and tested in software, not yet
+      played on real boxes.
+    meta: Factory and bank boxes or phones with NFC · player tags · needs the field controller
   codes:
     title: Codes (modifier)
     text: >-
@@ -367,7 +377,7 @@ modes:
   yours:
     title: Your mode
     text: >-
-      Money Factory, capture the flag, your club's own… Modes are short
+      Capture the flag, your club's own… Modes are short
       scripts. Propose one with the game mode idea template.
     link: Share a game mode idea
 
@@ -579,7 +589,9 @@ roadmap:
     done: >-
       <strong>Done in software</strong> (plan phases A to F): Kill Confirmed, Respawn and Lives and
       Player Check-in, which read players' signed NFC tags, and the Medic Kit (a hit player scans
-      their tag and holds a button to be healed, with a limited number of heals); mode screens
+      their tag and holds a button to be healed, with a limited number of heals),
+      and Money Factory (factories make money while a team holds them; players collect it with
+      their tag and bank it at another box, the controller keeping what each one carries); mode screens
       described in YAML, drawn alike by the Field Box and the app;
       <a href="{{ page.to.glossary }}#glossary-chrono">chrono check-in</a> (energy, limits per class, spot checks,
       readings signed by the marshal). The app runs the same game core as the boxes, in Portuguese
@@ -609,9 +621,9 @@ roadmap:
       field boundary and the field loaded from a map, so players' out-of-bounds warning works there
       too) and the radio channel, with the search for a quiet channel through the I/O pod; to come
       after the field test: failover between a phone and a Pi and the rest of the Pi's features) and
-      the iOS version (not built: it needs a Mac); the Money Factory mode is deferred. Plan phase G,
-      the field test with real phones and pods, waits for the hardware: so far the app has run only
-      on Android emulators, and the pod firmware only as its own code on a computer.
+      the iOS version (not built: it needs a Mac). Plan phase G, the field test with real phones and
+      pods, waits for the hardware: so far the app has run only on Android emulators, and the pod
+      firmware only as its own code on a computer.
     gate: "Gate: one game mixes ESP32 and Android props without issues."
   p4:
     title: Site server and advanced play

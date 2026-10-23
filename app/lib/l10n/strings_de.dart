@@ -338,6 +338,8 @@ const Map<String, String> deStrings = {
   'event.hacking.solved': 'Team {team} hat ein Terminal gehackt',
   'event.hacking.solved.no_team': 'Ein Terminal wurde gehackt',
   'event.vip.extracted': 'Team {team} hat die Extraktionszone erreicht',
+  'event.money.collected': '{player} hat {amount} Geld eingesammelt',
+  'event.money.deposited': '{player} hat {amount} für Team {team} eingezahlt',
   'event.scenario.started': 'Das Szenario hat begonnen',
   'event.scenario.objective.completed': 'Team {team} hat ein Ziel erfüllt',
   'event.scenario.objective.completed.no_team': 'Ein Ziel wurde erfüllt',

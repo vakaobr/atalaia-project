@@ -321,6 +321,8 @@ const Map<String, String> enStrings = {
   'event.hacking.solved': '{team} hacked a terminal',
   'event.hacking.solved.no_team': 'A terminal was hacked',
   'event.vip.extracted': '{team} reached the extraction zone',
+  'event.money.collected': '{player} collected {amount} money',
+  'event.money.deposited': '{player} banked {amount} for {team}',
   'event.scenario.started': 'The scenario has started',
   'event.scenario.objective.completed': '{team} completed an objective',
   'event.scenario.objective.completed.no_team': 'An objective was completed',

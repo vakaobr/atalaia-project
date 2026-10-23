@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# A player collected money at a factory. Data: player, team, amount (taken
+# now), carrying (all they carry now), stock (left in the factory); lang (pt
+# or en) from the box.
+template: collected
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: team }
+    children:
+      - type: label
+        text: "{lang == 'pt' && 'RECOLHIDO' || 'COLLECTED'}"
+        style: { font_size: 20, width: fill, align: center, color: contrast }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "+{amount}"
+    style: { font_size: 48, color: team }
+  - type: label
+    text: "{player}"
+    style: { font_size: 20 }
+  - type: label
+    text: "{lang == 'pt' && 'Levas' || 'You carry'} {carrying}"
+    style: { font_size: 20, color: accent }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{lang == 'pt' && 'Leva-o a um banco' || 'Take it to a bank'}"
+    style:
+      font_size: 14
+      color: muted
+      padding: { bottom: 10 }

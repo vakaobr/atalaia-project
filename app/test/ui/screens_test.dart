@@ -186,6 +186,29 @@ void main() {
     expect(eventText(en, empty), 'A medic kit is empty');
   });
 
+  test("Money Factory's events in words, in both languages", () {
+    const collected = FeedEvent(
+      'money.collected',
+      'red',
+      {'player': 'r1', 'amount': 12},
+      60000,
+      9,
+    );
+    const banked = FeedEvent(
+      'money.deposited',
+      'red',
+      {'player': 'r1', 'amount': 12},
+      90000,
+      10,
+    );
+    const pt = Strings(AppLanguage.pt);
+    const en = Strings(AppLanguage.en);
+    expect(eventText(pt, collected), 'r1 recolheu 12 de dinheiro');
+    expect(eventText(en, collected), 'r1 collected 12 money');
+    expect(eventText(pt, banked), 'r1 depositou 12 para a equipa vermelha');
+    expect(eventText(en, banked), 'r1 banked 12 for red');
+  });
+
   test("the Hacking Terminal's event in words, with and without a team", () {
     const solved = FeedEvent(
       'hacking.solved',

@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Scans are refused with the reason on the screen, and nothing is collected or banked
+params: { production: 5, tick_s: 10 }
+nodes: { plant: factory, vault: bank }
+steps:
+  # Nobody holds the factory: capture it first.
+  - scan: { node: plant, player: r1, team: red }
+  - expect_screen: { node: plant, template: refused, data: { reason: neutral, player: r1, team: red } }
+  - hold: { node: plant, team: blue, s: 3 }
+  - scan: { node: plant, player: b1, team: blue }
+  - expect_screen: { node: plant, template: refused, data: { reason: empty } }
+  - wait: 7                                          # the tick at 10 s
+  # Another team's factory.
+  - scan: { node: plant, player: r1, team: red }
+  - expect_screen: { node: plant, template: refused, data: { reason: not_yours, player: r1 } }
+  # Tags the box does not take.
+  - scan: { node: plant, player: b1, team: blue, forged: true }
+  - expect_screen: { node: plant, template: refused, data: { reason: forged, player: null } }
+  - scan: { node: plant, player: b1, team: blue, game: 99 }
+  - expect_screen: { node: plant, template: refused, data: { reason: game } }
+  - scan: { node: plant, player: b1 }
+  - expect_screen: { node: plant, template: refused, data: { reason: no_team, player: b1 } }
+  - scan: { node: plant, uid: "04c0ffee" }
+  - expect_screen: { node: plant, template: refused, data: { reason: not_tag } }
+  - scan: { node: vault, player: b1, team: blue, forged: true }
+  - expect_screen: { node: vault, template: refused, data: { reason: forged } }
+  # Nothing to bank.
+  - scan: { node: vault, player: r1, team: red }
+  - expect_screen: { node: vault, template: refused, data: { reason: nothing, player: r1, carrying: 0 } }
+  - expect_no: money.collected
+  - expect_no: money.deposited
+  # The result goes, the main screen comes back.
+  - wait: 4
+  - expect_screen: { node: plant, template: captured, data: { team: blue, stock: 5 } }
+  - expect_screen: { node: vault, template: bank }
+  - expect_score: { team: red, points: 0 }
+  - expect_score: { team: blue, points: 0 }
+  - expect_no: script.error

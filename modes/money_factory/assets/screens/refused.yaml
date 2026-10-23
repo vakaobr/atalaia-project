@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# A scan refused, and why. Data: reason, and for a player tag player, team and
+# carrying; lang (pt or en) from the box.
+template: refused
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: danger }
+    children:
+      - type: label
+        text: "{lang == 'pt' && 'RECUSADO' || 'REFUSED'}"
+        style: { font_size: 20, width: fill, align: center, color: contrast }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{lang == 'pt' && 'Etiqueta falsificada' || 'Forged tag'}"
+    style: { font_size: 20, width: 300, visible: "{reason == 'forged'}" }
+  - type: label
+    text: "{lang == 'pt' && 'Etiqueta de outro jogo' || 'Tag from another game'}"
+    style: { font_size: 20, width: 300, visible: "{reason == 'game'}" }
+  - type: label
+    text: "{lang == 'pt' && 'Não é uma etiqueta do jogo' || 'Not a game tag'}"
+    style: { font_size: 20, width: 300, visible: "{reason == 'not_tag'}" }
+  - type: label
+    text: "{lang == 'pt' && 'Esta caixa não está num jogo' || 'This box is not in a game'}"
+    style: { font_size: 20, width: 300, visible: "{reason == 'no_game'}" }
+  - type: label
+    text: "{lang == 'pt' && 'Equipa desconhecida' || 'Unknown team'}"
+    style: { font_size: 20, width: 300, visible: "{reason == 'no_team'}" }
+  - type: label
+    text: "{lang == 'pt' && 'Captura primeiro a fábrica' || 'Capture the factory first'}"
+    style: { font_size: 20, width: 300, visible: "{reason == 'neutral'}" }
+  - type: label
+    text: "{lang == 'pt' && 'A fábrica é de outra equipa' || 'Another team holds the factory'}"
+    style: { font_size: 20, width: 300, visible: "{reason == 'not_yours'}" }
+  - type: label
+    text: "{lang == 'pt' && 'A fábrica ainda não tem dinheiro' || 'No money in the factory yet'}"
+    style: { font_size: 20, width: 300, visible: "{reason == 'empty'}" }
+  - type: label
+    text: "{lang == 'pt' && 'Já levas o máximo: vai a um banco' || 'You carry all you can: go to a bank'}"
+    style: { font_size: 20, width: 300, visible: "{reason == 'full'}" }
+  - type: label
+    text: "{lang == 'pt' && 'Não levas dinheiro' || 'You carry no money'}"
+    style: { font_size: 20, width: 300, visible: "{reason == 'nothing'}" }
+  - type: label
+    text: "{player}"
+    style:
+      font_size: 14
+      color: muted
+      visible: "{player}"
+      padding: { top: 6 }
+  - type: spacer
+    height: fill

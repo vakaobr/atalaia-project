@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# A factory without capture (params.capture off): it always makes money and
+# anyone collects. Data: stock (the money in it); lang (pt or en) from the box.
+template: factory
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: panel }
+    children:
+      - type: label
+        text: "{lang == 'pt' && 'FÁBRICA' || 'FACTORY'}"
+        style: { font_size: 20, width: fill, align: center }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{stock}"
+    style: { font_size: 48, color: accent }
+  - type: label
+    text: "{lang == 'pt' && 'de' || 'of'} {params.capacity}"
+    style: { font_size: 20, color: muted }
+  - type: progress_bar
+    value: "{stock / params.capacity}"
+    style: { width: 220, height: 10, color: accent }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{lang == 'pt' && 'Lê a tua etiqueta para recolher' || 'Scan your tag to collect'}"
+    style:
+      font_size: 14
+      color: muted
+      padding: { bottom: 10 }

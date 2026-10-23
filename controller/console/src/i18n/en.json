@@ -178,6 +178,8 @@
       "hacking_solved_code": "{team} solved a hacking terminal ({puzzle}) and got the code {code}",
       "vip_extracted": "{team}'s payload reached the extraction zone",
       "vip_extracted_vip": "{team} extracted its VIP ({player})",
+      "money_collected": "{player} ({team}) collected {amount} money",
+      "money_deposited": "{player} ({team}) banked {amount}: {amount} points",
       "scenario_started": "The scenario {scenario} started",
       "scenario_objective_completed": "{team} completed the objective {objective}",
       "scenario_objective_completed_hidden": "{team} completed an objective",

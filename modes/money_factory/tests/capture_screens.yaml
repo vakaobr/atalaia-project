@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Holding a button fills a bar, another team takes the factory with its money, and the GM can free or give it
+params: { production: 5, tick_s: 10, capture_hold_ms: 4000 }
+nodes: { plant: factory, vault: bank }
+steps:
+  - hold: { node: plant, team: red, s: 2 }           # let go at 2 of 4 s
+  - expect_screen: { node: plant, template: neutral, data: { taker: null, progress: null } }
+  - expect_no: zone.captured
+  - hold: { node: plant, team: red, s: 4 }           # 2 -> 6 s
+  - expect: { type: zone.captured, team: red, at: 6 }
+  - expect_screen: { node: plant, template: captured, data: { team: red, since: 6, taker: null } }
+  - wait: 4                                          # the tick at 10 s
+  # Blue takes it over: the money in it stays.
+  - hold: { node: plant, team: blue, s: 4 }          # 10 -> 14 s
+  - expect: { type: zone.captured, team: blue, at: 14, data: { previous_team: red } }
+  - expect_screen: { node: plant, template: captured, data: { team: blue, since: 14, stock: 5 } }
+  # The GM frees it, then gives it to red.
+  - input: { node: plant, type: cmd.set_owner, data: { team: none } }
+  - expect: { type: zone.neutralized, data: { previous_team: blue } }
+  - expect_screen: { node: plant, template: neutral, data: { stock: 5 } }
+  - wait: 6                                          # a free factory makes nothing at 20 s
+  - expect_screen: { node: plant, template: neutral, data: { stock: 5 } }
+  - input: { node: plant, type: cmd.set_owner, data: { team: red } }
+  - expect: { type: zone.captured, team: red, at: 20 }
+  # A bank ignores team buttons and the override.
+  - hold: { node: vault, team: blue, s: 5 }
+  - input: { node: vault, type: cmd.set_owner, data: { team: blue } }
+  - expect_no: zone.captured
+  - expect_screen: { node: vault, template: bank }
+  - expect_no: script.error

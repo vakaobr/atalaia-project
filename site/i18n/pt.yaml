@@ -370,6 +370,16 @@ modes:
       dão pontos enquanto uma equipa os tiver. As posições ficam no controlador de campo e no
       telemóvel; só sai o «extraído». Escrito e testado em software, ainda não jogado com GPS a sério.
     meta: Caixas de ponto de controlo, um telemóvel com GPS ou o telemóvel do VIP · precisa do controlador de campo
+  money_factory:
+    title: Fábrica de Dinheiro
+    text: >-
+      As equipas capturam caixas-fábrica, que fazem dinheiro enquanto as tiverem. Quem joga
+      recolhe-o lendo a sua etiqueta na fábrica da sua equipa, leva-o pelo campo e deposita-o numa
+      caixa-banco, onde vale pontos; o controlador de campo guarda o que cada pessoa leva, por isso
+      o dinheiro pode ser recolhido numa caixa e depositado noutra. Quem recebe tratamento num kit
+      de ligaduras perde o que leva, e a primeira equipa a depositar o objetivo pode ganhar. Escrito
+      e testado em software, ainda não jogado em caixas a sério.
+    meta: Caixas ou telemóveis com NFC como fábricas e bancos · etiquetas de quem joga · precisa do controlador de campo
   codes:
     title: Códigos (modificador)
     text: >-
@@ -379,7 +389,7 @@ modes:
   yours:
     title: O teu modo
     text: >-
-      Money Factory, capturar a bandeira, o modo do teu clube… Os
+      Capturar a bandeira, o modo do teu clube… Os
       modos são pequenos scripts. Propõe o teu com o modelo de ideia de modo de jogo.
     link: Partilha uma ideia de modo de jogo
 
@@ -598,7 +608,10 @@ roadmap:
       <strong>Feito em software</strong> (fases A a F do plano): a Baixa Confirmada, as Reentradas
       e Vidas e o Registo de Presença, que leem as etiquetas NFC assinadas de quem joga, e as
       Ligaduras (a pessoa atingida lê a sua etiqueta e mantém um botão premido para receber o
-      tratamento, com um número limitado de tratamentos); ecrãs dos modos descritos em YAML,
+      tratamento, com um número limitado de tratamentos),
+      e a Fábrica de Dinheiro (as fábricas fazem dinheiro enquanto uma equipa as tiver; quem joga
+      recolhe-o com a sua etiqueta e deposita-o noutra caixa, e o controlador guarda o que cada
+      pessoa leva); ecrãs dos modos descritos em YAML,
       desenhados da mesma maneira pela Field Box e pela app; a
       <a href="{{ page.to.glossary }}#glossario-cronografagem">cronografagem</a> à entrada (energia, limites por
       classe, verificações durante o jogo, medições assinadas pelo marshal). A app corre o mesmo
@@ -631,10 +644,9 @@ roadmap:
       do campo e o campo carregado de um mapa, por isso o aviso de saída do limite também funciona
       aí) e o canal de rádio, com a procura de um canal sossegado através do módulo de E/S; depois
       do teste no campo: a passagem entre um telemóvel e um Pi e o resto do que o Pi faz) e a versão
-      iOS (por fazer: precisa de um Mac); o modo Money Factory ficou para depois. A fase G do plano,
-      o teste no campo com telemóveis e módulos a sério, espera pelo hardware: até agora a app só
-      correu em emuladores Android, e o firmware do módulo só como o seu próprio código num
-      computador.
+      iOS (por fazer: precisa de um Mac). A fase G do plano, o teste no campo com telemóveis e
+      módulos a sério, espera pelo hardware: até agora a app só correu em emuladores Android, e o
+      firmware do módulo só como o seu próprio código num computador.
     gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."
   p4:
     title: Servidor do clube e jogo avançado

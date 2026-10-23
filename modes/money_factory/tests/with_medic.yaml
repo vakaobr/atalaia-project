@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: With the Medic Kit in the game, a player healed at a kit loses the money they carry
+modifiers: [medic]
+params: { production: 5, tick_s: 10, heal_hold_s: 2, capture_hold_ms: 1000 }
+nodes: { plant: factory, vault: bank, kit: medic }
+steps:
+  - hold: { node: plant, team: red, s: 1 }
+  - wait: 19                                         # ticks at 10 and 20: 10 in the factory
+  - scan: { node: plant, player: r1, team: red }
+  - expect: { type: money.collected, data: { player: r1, amount: 10 } }
+  # r1 is hit and healed: the money is lost.
+  - scan: { node: kit, player: r1, team: red }
+  - hold: { node: kit, team: red, s: 2 }
+  - expect: { type: medic.heal, node: kit, data: { player: r1 } }
+  - scan: { node: vault, player: r1, team: red }
+  - expect_screen: { node: vault, template: refused, data: { reason: nothing, player: r1 } }
+  - expect_no: money.deposited
+  - expect_score: { team: red, points: 0 }
+  - expect_no: script.error

@@ -53,6 +53,11 @@ static const struct {
      * controller tells the box what it is for ("setup"), so a box needs it to join; picked on
      * its own, a box waits for a scenario. */
     {"Objectives", "org.atalaia.objectives", "{}"},
+    /* A factory (a bank is told so by the controller's field.lua); tags need a controller's
+     * game key, so on its own a box only captures (decision MF-A8). */
+    {"Money Factory", "org.atalaia.money_factory",
+     "{\"production\":1,\"tick_s\":10,\"capacity\":50,\"carry_max\":20,\"capture\":true,"
+     "\"capture_hold_ms\":3000,\"target\":0,\"drop_on_heal\":true}"},
 };
 
 bool builtin_presets_has(const char *mode_id)

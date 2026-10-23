@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: With drop_on_heal off, a healed player keeps their money
+modifiers: [medic]
+params: { production: 5, tick_s: 10, heal_hold_s: 2, capture_hold_ms: 1000, drop_on_heal: false }
+nodes: { plant: factory, vault: bank, kit: medic }
+steps:
+  - hold: { node: plant, team: blue, s: 1 }
+  - wait: 9
+  - scan: { node: plant, player: b1, team: blue }
+  - scan: { node: kit, player: b1, team: blue }
+  - hold: { node: kit, team: blue, s: 2 }
+  - expect: { type: medic.heal, data: { player: b1 } }
+  - scan: { node: vault, player: b1, team: blue }
+  - expect: { type: money.deposited, data: { player: b1, amount: 5 } }
+  - expect_score: { team: blue, points: 5 }
+  - expect_no: script.error

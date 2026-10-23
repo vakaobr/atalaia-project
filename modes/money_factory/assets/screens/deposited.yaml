@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# A player banked their money. Data: player, team, amount (points for the
+# team), total (the team's money banked here); lang (pt or en) from the box.
+template: deposited
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: team }
+    children:
+      - type: label
+        text: "{lang == 'pt' && 'DEPOSITADO' || 'BANKED'}"
+        style: { font_size: 20, width: fill, align: center, color: contrast }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "+{amount}"
+    style: { font_size: 48, color: team }
+  - type: label
+    text: "{player}"
+    style: { font_size: 20 }
+  - type: label
+    text: "{team|upper}: {total} {lang == 'pt' && 'neste banco' || 'banked here'}"
+    style: { font_size: 20, color: muted }
+  - type: spacer
+    height: fill

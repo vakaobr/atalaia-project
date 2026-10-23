@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: A player carries at most carry_max, at every factory, until they bank it; a factory holds at most its capacity
+params: { production: 4, tick_s: 5, capacity: 10, carry_max: 6, capture_hold_ms: 1000 }
+nodes: { north: factory, south: factory, vault: bank }
+steps:
+  - hold: { node: north, team: blue, s: 1 }
+  - hold: { node: south, team: blue, s: 1 }          # 2 s
+  - wait: 18                                         # ticks at 5, 10, 15, 20: 16, held to 10
+  - expect_screen: { node: north, template: captured, data: { stock: 10 } }
+  - scan: { node: north, player: b1, team: blue }
+  - expect: { type: money.collected, node: north, data: { player: b1, amount: 6 } }
+  - expect_screen: { node: north, template: collected, data: { amount: 6, carrying: 6, stock: 4 } }
+  # The south factory was told what b1 carries: full there too.
+  - scan: { node: south, player: b1, team: blue }
+  - expect_screen: { node: south, template: refused, data: { reason: full, player: b1, carrying: 6 } }
+  - expect_no: money.collected
+  # Another player takes what is left at north, less than their room.
+  - scan: { node: north, player: b2, team: blue }
+  - expect: { type: money.collected, node: north, data: { player: b2, amount: 4 } }
+  - scan: { node: north, player: b3, team: blue }
+  - expect_screen: { node: north, template: refused, data: { reason: empty } }
+  # b1 banks 6 and may collect again.
+  - scan: { node: vault, player: b1, team: blue }
+  - expect: { type: money.deposited, data: { player: b1, amount: 6 } }
+  - scan: { node: south, player: b1, team: blue }
+  - expect: { type: money.collected, node: south, data: { player: b1, amount: 6 } }
+  - expect_screen: { node: south, template: collected, data: { carrying: 6, stock: 4 } }
+  - expect_score: { team: blue, points: 6 }
+  - expect_no: script.error

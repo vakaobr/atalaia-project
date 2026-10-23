@@ -46,6 +46,10 @@ SPDX-License-Identifier: CC-BY-SA-4.0
   the Field Box's HAL as capabilities, the radio passthrough, node.tamper),
   the host pod, and the phone's radio link through a pod next to its Wi-Fi
   link; nothing run on a board or a phone (see below)
+- [x] Money Factory (2026-10-23, the maintainer's go-ahead): the mode decision
+  A1 deferred, with the state shared between boxes (what each player
+  carries) in the controller's `field.lua`; in the simulator, the
+  controller, the GM console, the Field Box and the app (see below)
 
 ## Plan phase A (2026-10-18)
 
@@ -53,7 +57,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 | --- | --- | --- |
 | Events 25-27, 33-41 and data keys 29-30 | `protocol/schema/events.yaml` (C, Python and JSON Schema regenerated; three new event vectors) | Done |
 | Kill Confirmed, Respawn and Lives, Player Check-in | `modes/kill_confirmed/`, `modes/respawn/`, `modes/player_checkin/` (manifests with `i18n.pt`, scripts, 7 tests, YAML screens); built into the Field Box as presets 6-8 | Done |
-| Money Factory | events only (33, 34) | Mode deferred: decision A1 |
+| Money Factory | events only (33, 34) | Mode deferred: decision A1; built on 2026-10-23 (below) |
 | Player tags (ADR-P3-9) | `protocol/nfc-tag.md`, `core/src/tag.c`, `simulator/atalaia_sim/tag.py`, `protocol/vectors/tag.json`; the Field Box reads tags during games (`box_game_tag`, `@tag` on the console) | Done; tag writing from the console is a follow-up |
 | Capability proxy protocol v1 (ADR-P3-2) | `protocol/capability-proxy.md`, `protocol/vectors/capability_proxy.yaml`, `core/src/proxy.c`, `firmware/esp32/test/test_proxy_codec.c`, `simulator/atalaia_sim/capability_proxy.py` | Done (C and Python); the Dart codec is plan phase D, the pod firmware plan phase F |
 | Declarative screen templates (ADR-P3-4) | `core/src/screen_template.c` (parser, checks, expressions), `firmware/esp32/main/screen_template.c` (LVGL renderer, C fallback), templates for Bomb, Domination and the three new modes, 16 new reference images | Done on the Field Box; the Flutter renderer is plan phase D |
@@ -435,6 +439,38 @@ command, the event texts, 6 golden images), and on an Android 16 emulator
 
 Not run: real NFC tags on a phone or on the Field Box's PN532, real radios,
 Wokwi (decision R7). A kit's own charges do not survive its reboot (MK15).
+
+## Money Factory (2026-10-23)
+
+"Fábrica de Dinheiro" in Portuguese: teams capture factory boxes, which make
+money while held; players collect it with their tag and bank it at a bank box
+for points. Decision A1 deferred it because the money is collected at one box
+and banked at another; the controller's `field.lua` now keeps what each player
+carries. Decisions MF-A1 to MF-A12 in `docs/review/decisions-to-review.md`
+(MF-A2, MF-A3, MF-A5 and MF-A6 for the maintainer).
+
+| Deliverable | Where | State |
+| --- | --- | --- |
+| The mode | `modes/money_factory/`: `mode.yaml` (roles `factory`, requiring `nfc` and `team_input`, and `bank`, requiring `nfc`; `production` 1, `tick_s` 10, `capacity` 50, `carry_max` 20, `capture` on, `capture_hold_ms` 3000, `target` 0, `drop_on_heal` on; i18n pt), `node.lua` (capture, production, collecting, banking, every refusal with its reason), `field.lua` (the banks told what they are, each player's wallet told to the boxes, a heal at a medic kit empties it, the target), seven YAML screens in Portuguese and English | Done; 10 event-sequence tests run in the simulator and, through the core, in Dart |
+| Events | `money.collected` (33) and `money.deposited` (34), unchanged since plan phase A | Done |
+| GM console | the mode from the controller's catalogue; `feed.events.money_*` in four languages | Done; a browser test |
+| Field Box | the fourteenth built-in preset, "Money Factory" (`builtin_presets.c`, `CMakeLists.txt`, `shell.c`, the host box); its seven screens built in; the image 18,400 bytes larger | Done; host tests, 8 reference images, the ESP-IDF Field Box build with 0 warnings |
+| Android prop and app | no prop code: the catalogue reads the manifest (`builtin_modes.g.dart` regenerated); `event.money.*` in four languages | Done; catalogue, event text and 4 golden tests |
+| Project page | a card on the modes page, the roadmap's phase 3, in pt, en, de and zh-tw | Done |
+
+Tests: simulator (`test_money_factory.py`, 7: the manifest, the banks told
+and reminded, wallets to banks and factories, an older word ignored, a bank
+out of reach, the longest player id in a CMD, the capture bar), the 10 YAML
+tests in Python and in Dart, the controller through the real engine and core
+(`controller/tests/test_money_factory.py`, 2: the joins, the wallets over CMD,
+the field state and the target ending the game), the Field Box's host tests
+(`test_builtin_presets.c`: the preset from the picker, a tag refused without
+a game, a bank; 8 reference images), the GM console in Chromium (the form,
+a factory's join, both events in words in pt and en), Dart (the catalogue, the
+event texts, 4 golden images).
+
+Not run: real NFC tags on a phone or on the Field Box's PN532, real radios,
+Wokwi (decision R7).
 
 ## Branding (2026-10-19)
 

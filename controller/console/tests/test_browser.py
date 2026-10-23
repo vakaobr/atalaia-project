@@ -1169,6 +1169,42 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(extracted.nth(0)).to_contain_text("blue's payload reached the extraction zone")
         expect(extracted.nth(1)).to_contain_text("red extracted its VIP (p-k7m2q4x9z3ab)")
 
+    def test_money_factory_game_and_its_events(self):
+        """A Money Factory game from the form (its parameters in Portuguese); a factory's join;
+        money collected and banked read as words in the feed, in both languages."""
+        page = self.console()
+        page.get_by_test_id("game-name").fill("Fábrica")
+        page.get_by_test_id("game-source").select_option("mode:org.atalaia.money_factory")
+        expect(page.locator('label[for="game-carry_max"]')).to_contain_text("Máximo de dinheiro que cada pessoa leva")
+        page.locator("#game-target").fill("100")
+        page.get_by_test_id("game-create").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("pronto")
+        game = self.field.bundle.controller.game
+        self.assertEqual((game["mode_id"], game["params"]["target"], game["params"]["carry_max"]),
+                         ("org.atalaia.money_factory", 100, 20))
+
+        page.get_by_test_id("tab-join").click()
+        page.locator("#j-node").fill(str(BOX))
+        page.get_by_test_id("join-generate").click()
+        j = join.decode(join.from_text(page.get_by_test_id("join-text").input_value()), JOIN_KEY)
+        self.assertEqual((j["mode_id"], j["role"]), ("org.atalaia.money_factory", "factory"))
+
+        self.field.http.post(f"/api/v1/games/{game['id']}/start", json={"force": True})
+        self.field.host.transmitted_all(0.3)
+        self.field.box_hello()
+        for seq, type_ in ((1, "money.collected"), (2, "money.deposited")):
+            self.field.box("EVENT", codec.encode_event({"node": BOX, "seq": seq, "t": 9000 * seq, "type": type_,
+                                                        "team": 1, "data": {"player": "r1", "amount": 12}}),
+                           ack=True)
+        page.get_by_test_id("tab-feed").click()
+        collected = page.locator('[data-testid=feed] [data-type="money.collected"]')
+        deposited = page.locator('[data-testid=feed] [data-type="money.deposited"]')
+        expect(collected).to_contain_text("r1 (red) recolheu 12 de dinheiro")
+        expect(deposited).to_contain_text("r1 (red) depositou 12: 12 pontos")
+        page.get_by_test_id("lang").first.select_option("en")
+        expect(collected).to_contain_text("r1 (red) collected 12 money")
+        expect(deposited).to_contain_text("r1 (red) banked 12: 12 points")
+
     def test_a_scenario_over_the_objectives_package(self):
         """A scenario package (kind: scenario, the hand-written example of plan phase 6) uploaded,
         then a game of it from the form with the objectives package ticked; a box's join names the

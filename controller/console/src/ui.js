@@ -123,7 +123,7 @@ export function eventWords(e) {
         if (!d.objective) key += '_hidden';
     }
     const s = t(key, { team, player: d.player || '', remaining: d.remaining,
-                       used: d.player_heals_used, puzzle, code: d.code || '',
+                       used: d.player_heals_used, amount: d.amount, puzzle, code: d.code || '',
                        objective: d.objective || '', scenario: d.scenario || '', reason });
     return s === key ? '' : s;
 }

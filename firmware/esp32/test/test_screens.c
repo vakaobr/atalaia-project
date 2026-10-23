@@ -61,6 +61,7 @@ typedef struct {
 #define VIP      "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"pt\"}"
 #define VIP_EN   "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"en\"}"
 #define OBJ      "org.atalaia.objectives {}"
+#define MONEY    "org.atalaia.money_factory {\"capacity\":50,\"capture_hold_ms\":3000}"
 
 /* Data as the modes (modes/bomb, modes/domination, modes/codes) and the shell send it. */
 static const screen_case_t cases[] = {
@@ -354,6 +355,20 @@ static const screen_case_t cases[] = {
      "{\"phase\":\"armed\",\"team\":\"red\",\"left\":42,\"fuse_s\":60,\"lang\":\"en\"}", OBJ},
     {"yaml_obj_bomb_exploded", "obj_bomb",
      "{\"phase\":\"exploded\",\"team\":\"red\",\"left\":0,\"fuse_s\":60}", OBJ},
+    /* Money Factory: a factory (free, being taken, held, without capture), a collection, a
+     * bank, a deposit and a refusal; the box's language picks Portuguese or English. */
+    {"yaml_money_neutral_pt", "neutral", "{\"stock\":0}", MONEY},
+    {"yaml_money_neutral_taking", "neutral", "{\"stock\":5,\"taker\":\"blue\",\"progress\":0.4}",
+     MONEY},
+    {"yaml_money_captured_pt", "captured", "{\"team\":\"red\",\"since\":95,\"stock\":35}", MONEY},
+    {"yaml_money_factory", "factory", "{\"stock\":12}", MONEY},
+    {"yaml_money_collected_pt", "collected",
+     "{\"player\":\"r1\",\"team\":\"red\",\"amount\":15,\"carrying\":20,\"stock\":20}", MONEY},
+    {"yaml_money_bank_pt", "bank", "{\"total\":45,\"counts\":\"RED 30  BLUE 15\"}", MONEY},
+    {"yaml_money_deposited", "deposited",
+     "{\"player\":\"b1\",\"team\":\"blue\",\"amount\":12,\"total\":27}", MONEY},
+    {"yaml_money_refused_pt", "refused",
+     "{\"reason\":\"full\",\"player\":\"r1\",\"team\":\"red\",\"carrying\":20}", MONEY},
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))
 

@@ -212,7 +212,7 @@ Python with unit tests that also run inside `tools/check.sh`.
 - Carrier PCB, community hub directory, mode registry browser, more
   languages (phase 5).
 - The Android controller role's shell (phase 3 PE24) and iOS (phase 3).
-- Money Factory (phase 3 decision A1).
+- Money Factory (phase 3 decision A1; built on 2026-10-23 as a phase 3 mode, decisions MF-A1 to MF-A12).
 
 ---
 

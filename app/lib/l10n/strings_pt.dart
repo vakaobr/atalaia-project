@@ -327,6 +327,8 @@ const Map<String, String> ptStrings = {
   'event.hacking.solved': 'A equipa {team} hackeou um terminal',
   'event.hacking.solved.no_team': 'Um terminal foi hackeado',
   'event.vip.extracted': 'A equipa {team} chegou à zona de extração',
+  'event.money.collected': '{player} recolheu {amount} de dinheiro',
+  'event.money.deposited': '{player} depositou {amount} para a equipa {team}',
   'event.scenario.started': 'O cenário começou',
   'event.scenario.objective.completed': 'A equipa {team} cumpriu um objetivo',
   'event.scenario.objective.completed.no_team': 'Um objetivo foi cumprido',
