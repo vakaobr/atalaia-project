@@ -6,7 +6,8 @@ SPDX-License-Identifier: GPL-3.0-or-later
 Load the field from a map (decisions MF-19 to MF-30): the one page of the console
 that reaches the internet, while the GM sets the game up. The controller serves it
 with its own Content-Security-Policy (api.py FIELD_MAP_HEADERS): OpenStreetMap's
-tiles, the Overpass API, the DGT's orthophoto WMS and OpenStreetMap's Nominatim
+tiles, the Overpass API, the open orthophotos' WMS and WMTS (ortho-sources.js,
+MF-65 to MF-80) and OpenStreetMap's Nominatim
 place search (MF-44), nothing else; and the one console page allowed the GM's
 location (Permissions-Policy, MF-43), which never leaves the browser.
 -->

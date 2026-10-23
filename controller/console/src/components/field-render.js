@@ -6,8 +6,9 @@
 // - the area: the outline's bounding box and a margin (10 %, at least 20 m), at most AREA_MAX_M on a side;
 // - where an open orthophoto covers the area (the GM may untick it), that orthophoto as the base, from its
 //   open WMS (ortho-sources.js: the DGT's in mainland Portugal, IGN España's PNOA, IGN France's, PDOK's in
-//   the Netherlands; EPSG:4326, so the picture is already in the image's frame), fetched with fetch() so
-//   the canvas can still be exported (each WMS sends Access-Control-Allow-Origin: *); a white picture
+//   the Netherlands, and since MF-73 those of Belgium, Luxembourg, Switzerland, Germany, Poland and
+//   Czechia; EPSG:4326, so the picture is already in the image's frame), fetched with fetch() so the canvas
+//   can still be exported (each WMS sends Access-Control-Allow-Origin, * or the page's origin); a white picture
 //   (outside its coverage) is dropped and OpenStreetMap drawn alone;
 // - OpenStreetMap's data for the area from the Overpass API, one query with a size cap (MF-50 to MF-53:
 //   when the main instance is busy, retried with exponential backoff and jitter, and asked of one other

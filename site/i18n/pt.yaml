@@ -725,7 +725,9 @@ roadmap:
       pelo nome de um sítio, desenha o limite real do campo no OpenStreetMap e o navegador desenha a
       imagem do campo com os dados do OpenStreetMap, sobre a fotografia aérea aberta do país
       (o ortofotomapa da DGT em Portugal continental, o PNOA do IGN em Espanha, as ortofotos do IGN
-      em França e as do PDOK nos Países Baixos), com a sua posição no mapa e o limite do campo,
+      em França, também no ultramar, e as do PDOK nos Países Baixos, e as dos serviços públicos da
+      Bélgica, do Luxemburgo, da Suíça e do Liechtenstein, de onze estados alemães, da Polónia e da
+      Chéquia), com a sua posição no mapa e o limite do campo,
       ficando escurecido o que está fora; a página tenta outra vez quando o serviço de dados do
       OpenStreetMap está ocupado e mostra essa fotografia aérea enquanto o GM desenha o limite; o telemóvel de quem joga avisa
       com uma faixa e vibração quando sai do limite, com o seu próprio GPS, sem enviar nada; as

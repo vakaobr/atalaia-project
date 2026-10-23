@@ -1315,7 +1315,7 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
 
 
 # Same-origin only: no inline scripts or styles, nothing from other hosts
-# (only the field-map page below reaches OpenStreetMap and the DGT), images from blob: URLs; no location.
+# (only the field-map page below reaches OpenStreetMap and the open orthophotos), images from blob: URLs; no location.
 # The one exception: the two stylesheets Blockly 13.3.0 writes for the scenario blocks (its own
 # and its renderer's), allowed by their SHA-256 only (console/src/lib/README.md, decision P5F-2).
 BLOCKLY_STYLES = ("'sha256-m3jRF8xS4qsN1MRZbjUZslcyoZPGURDGaSwFOJRSdE4=' "
@@ -1338,22 +1338,33 @@ SECURITY_HEADERS = {
 # OpenStreetMap's Nominatim to find a place by its name (connect-src, MF-44). When the main Overpass
 # instance is busy, one other public instance from the OSM wiki's list (MF-51). The open orthophotos
 # (console/src/components/ortho-sources.js: the DGT's, MF-25 and MF-54; IGN España's, IGN France's and
-# PDOK's, MF-65 to MF-72), each origin both as images, the map's *Ortofoto* tiles (img-src), and as a
-# connection, the one picture fetched for the drawn image so the canvas stays exportable (connect-src;
-# each sends Access-Control-Allow-Origin: *). It alone may ask for the GM's location
-# (geolocation=(self), MF-43), which only moves its map and is sent nowhere.
+# PDOK's, MF-65 to MF-72; Belgium's regions', Luxembourg's, Switzerland's, eleven German Länder's,
+# Poland's and Czechia's, MF-73 to MF-80): each WMS origin both as images, the map's *Ortofoto* tiles
+# (img-src), and as a connection, the one picture fetched for the drawn image so the canvas stays
+# exportable (connect-src; each sends Access-Control-Allow-Origin, * or the page's own origin); a WMTS on
+# an origin of its own only as images (FIELD_MAP_ORTHO_TILES, MF-79). It alone may ask for the GM's
+# location (geolocation=(self), MF-43), which only moves its map and is sent nowhere.
 # Scripts stay same-origin; the rest of the console stays same-origin only.
 FIELD_MAP_PAGE = "/console/field-map.html"
-FIELD_MAP_ORTHOPHOTOS = ("https://ortos.dgterritorio.gov.pt", "https://www.ign.es", "https://data.geopf.fr",
-                         "https://service.pdok.nl")
+FIELD_MAP_ORTHOPHOTOS = (
+    "https://ortos.dgterritorio.gov.pt", "https://www.ign.es", "https://data.geopf.fr", "https://service.pdok.nl",
+    "https://wms.ngi.be", "https://geo.api.vlaanderen.be", "https://geoservices.wallonie.be",
+    "https://wms.geoportail.lu", "https://wms.geo.admin.ch", "https://gdi.berlin.de", "https://isk.geobasis-bb.de",
+    "https://geoservices.bayern.de", "https://geodienste.bremen.de", "https://www.gds-srv.hessen.de",
+    "https://www.geodaten-mv.de", "https://www.wms.nrw.de", "https://geo4.service24.rlp.de",
+    "https://geoportal.saarland.de", "https://geodienste.sachsen.de", "https://www.geoproxy.geoportal-th.de",
+    "https://mapy.geoportal.gov.pl", "https://ags.cuzk.gov.cz")
+FIELD_MAP_ORTHO_TILES = ("https://wmts1.geoportail.lu", "https://wmts.geo.admin.ch", "https://www.wmts.nrw.de")
 FIELD_MAP_ORIGINS = {"tiles": "https://tile.openstreetmap.org", "overpass": "https://overpass-api.de",
                      "search": "https://nominatim.openstreetmap.org", "overpass_2": "https://overpass.private.coffee",
-                     **{f"orthophoto_{i}": origin for i, origin in enumerate(FIELD_MAP_ORTHOPHOTOS)}}
+                     **{f"orthophoto_{i}": origin for i, origin in enumerate(FIELD_MAP_ORTHOPHOTOS)},
+                     **{f"ortho_tiles_{i}": origin for i, origin in enumerate(FIELD_MAP_ORTHO_TILES)}}
 _ORTHOPHOTOS = " ".join(FIELD_MAP_ORTHOPHOTOS)
+_ORTHO_TILES = " ".join(FIELD_MAP_ORTHO_TILES)
 FIELD_MAP_HEADERS = {
     **SECURITY_HEADERS,
     "Content-Security-Policy": ("default-src 'self'; script-src 'self'; style-src 'self'; "
-                                f"img-src 'self' blob: data: {FIELD_MAP_ORIGINS['tiles']} {_ORTHOPHOTOS}; "
+                                f"img-src 'self' blob: data: {FIELD_MAP_ORIGINS['tiles']} {_ORTHOPHOTOS} {_ORTHO_TILES}; "
                                 f"connect-src 'self' {FIELD_MAP_ORIGINS['overpass']} "
                                 f"{FIELD_MAP_ORIGINS['overpass_2']} {_ORTHOPHOTOS} {FIELD_MAP_ORIGINS['search']}; "
                                 "manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; "

@@ -86,9 +86,18 @@ BOX = 7
 FIXTURES = HERE / "fixtures"
 CORS = {"Access-Control-Allow-Origin": "*"}
 OUTLINE = [(39.6015, -8.4030), (39.6012, -8.3990), (39.5990, -8.3985), (39.5984, -8.4010), (39.5995, -8.4035)]
-# The open orthophotos' origins (api.py FIELD_MAP_ORTHOPHOTOS; MF-65 to MF-72), every one answered by a fixture.
-ORTHO_ORIGINS = ("https://ortos.dgterritorio.gov.pt", "https://www.ign.es", "https://data.geopf.fr",
-                 "https://service.pdok.nl")
+# The open orthophotos' origins (api.py FIELD_MAP_ORTHOPHOTOS, its WMS, and FIELD_MAP_ORTHO_TILES, WMTS on
+# origins of their own; MF-65 to MF-80), every one answered by a fixture.
+ORTHO_WMS_ORIGINS = (
+    "https://ortos.dgterritorio.gov.pt", "https://www.ign.es", "https://data.geopf.fr", "https://service.pdok.nl",
+    "https://wms.ngi.be", "https://geo.api.vlaanderen.be", "https://geoservices.wallonie.be",
+    "https://wms.geoportail.lu", "https://wms.geo.admin.ch", "https://gdi.berlin.de", "https://isk.geobasis-bb.de",
+    "https://geoservices.bayern.de", "https://geodienste.bremen.de", "https://www.gds-srv.hessen.de",
+    "https://www.geodaten-mv.de", "https://www.wms.nrw.de", "https://geo4.service24.rlp.de",
+    "https://geoportal.saarland.de", "https://geodienste.sachsen.de", "https://www.geoproxy.geoportal-th.de",
+    "https://mapy.geoportal.gov.pl", "https://ags.cuzk.gov.cz")
+ORTHO_TILE_ORIGINS = ("https://wmts1.geoportail.lu", "https://wmts.geo.admin.ch", "https://www.wmts.nrw.de")
+ORTHO_ORIGINS = ORTHO_WMS_ORIGINS + ORTHO_TILE_ORIGINS
 
 
 class Field:
@@ -2925,13 +2934,15 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.reload()
         expect(page.get_by_test_id("fm-layer-ortho")).to_be_checked()
         expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile(r"^https://ortos\."))
-        # Outside every orthophoto's coverage (Berlin): only the map, and why.
-        page.get_by_test_id("fm-go").fill("52.52, 13.405")
+        # Outside every orthophoto's coverage (Vienna): only the map, and why.
+        page.get_by_test_id("fm-go").fill("48.2082, 16.3738")
         page.get_by_test_id("fm-go-button").click()
         expect(page.get_by_test_id("fm-layers")).to_have_count(0)
         expect(page.get_by_test_id("fm-layer-none")).to_have_text(
             "Aqui só há o mapa do OpenStreetMap: só há fotografia aérea aberta de alta resolução que se possa usar "
-            "em Portugal continental, Espanha, França continental e Córsega e nos Países Baixos.")
+            "em Portugal continental, Espanha, França (com a Córsega e os territórios ultramarinos), nos Países "
+            "Baixos, na Bélgica, no Luxemburgo, na Suíça e no Liechtenstein, na Polónia, na Chéquia e na Alemanha "
+            "menos Baden-Württemberg, Baixa Saxónia, Hamburgo, Saxónia-Anhalt e Schleswig-Holstein.")
         expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile(r"^https://tile\.openstreetmap\.org/"))
         for origin in ORTHO_ORIGINS:
             expect(page.locator(f".tm-tile[src^='{origin}']")).to_have_count(0)
@@ -2978,15 +2989,39 @@ class ConsoleBrowserTests(unittest.TestCase):
     def test_field_map_orthophoto_chosen_by_country(self):
         """MF-66, MF-67: the orthophoto is the one of the country the point is in (the map's centre), or of
         the outline's centroid; by a border, both, the centroid's country first; none outside every
-        coverage (the sea, the Azores, Belgium, Germany, the UK, Switzerland)."""
+        coverage (the sea, the Azores, Madeira, the UK, Austria, Italy, Denmark, Andorra, and the German Länder
+        left out by MF-80). MF-73 to MF-78: Belgium by region (Brussels before Flemish Brabant around it),
+        Germany by Land (Berlin before Brandenburg around it), Switzerland with Liechtenstein, France's overseas
+        departments and collectivities."""
         page, _ = self.field_map()
         points = {
             "dgt": [(38.7223, -9.1393), (38.881, -7.163), (37.0194, -7.9304)],
             "ign-es": [(38.878, -6.970), (40.4168, -3.7038), (39.5696, 2.6502), (28.1235, -15.4363)],
-            "ign-fr": [(48.8566, 2.3522), (41.9192, 8.7386), (49.1193, 6.1757)],
+            "ign-fr": [(48.8566, 2.3522), (41.9192, 8.7386), (49.1193, 6.1757), (16.2411, -61.5331),
+                       (14.6161, -61.0588), (4.9224, -52.3135), (-20.8823, 55.4504), (-12.7806, 45.2279),
+                       (46.7811, -56.1764), (18.0708, -63.0501), (17.8962, -62.8498)],
             "pdok": [(52.3676, 4.9041), (53.0548, 4.7977), (50.8514, 5.6910)],
-            "": [(52.52, 13.405), (50.8503, 4.3517), (51.5072, -0.1276), (46.2044, 6.1432), (37.7412, -25.6756),
-                 (39.5, -11.5)],
+            "ngi": [(50.8467, 4.3525), (50.8503, 4.3517)],
+            "vlaanderen": [(51.05, 3.72), (51.2194, 4.4025), (50.9307, 5.3378)],
+            "spw": [(50.4669, 4.8675), (50.6326, 5.5797), (50.4542, 3.9567)],
+            "act": [(49.6116, 6.1319), (49.9, 6.0)],
+            "swisstopo": [(46.948, 7.447), (46.2044, 6.1432), (47.3769, 8.5417), (46.0037, 8.9511), (47.141, 9.521)],
+            "de-be": [(52.52, 13.405), (52.477, 13.411)],
+            "de-bb": [(52.3906, 13.0645), (52.607, 12.861)],
+            "de-by": [(48.1351, 11.582), (49.4521, 11.0767)],
+            "de-hb": [(53.0793, 8.8017), (53.5396, 8.5809)],
+            "de-he": [(50.1109, 8.6821), (51.3127, 9.4797)],
+            "de-mv": [(54.0924, 12.0991), (53.792, 12.17)],
+            "de-nw": [(50.9375, 6.9603), (51.572, 8.111)],
+            "de-rp": [(50.3569, 7.589), (49.752, 8.112)],
+            "de-sl": [(49.35, 7.18), (49.472, 7.172)],
+            "de-sn": [(51.0504, 13.7373), (51.3397, 12.3731)],
+            "de-th": [(50.9848, 11.0299), (50.955, 11.105)],
+            "gugik": [(52.2297, 21.0122), (50.0647, 19.945), (54.352, 18.6466)],
+            "cuzk": [(50.0875, 14.4213), (49.1951, 16.6068)],
+            "": [(51.5072, -0.1276), (37.7412, -25.6756), (32.65, -16.9083), (39.5, -11.5), (48.2082, 16.3738),
+                 (47.2692, 11.4041), (41.9028, 12.4964), (55.6761, 12.5683), (42.5063, 1.5218), (48.7758, 9.1829),
+                 (52.3759, 9.732), (53.5511, 9.9937), (52.1205, 11.6276), (54.3233, 10.1228)],
         }
         for want, pts in points.items():
             got = page.evaluate(self.SOURCES_JS, [[{"lat": a, "lon": b}] for a, b in pts])
@@ -3075,11 +3110,156 @@ class ConsoleBrowserTests(unittest.TestCase):
             "Credits on the image: Luchtfoto © Beeldmateriaal.nl / PDOK (CC BY 4.0) · © OpenStreetMap contributors")
         self.assertEqual(seen["other"], [])
 
+    # MF-73 to MF-78: each new source, at a point inside it: its name, its tiles at zoom 17 (WMTS, or its WMS per
+    # tile), the map's credit, its WMS for the drawn image and the image's credit.
+    YEAR = time.localtime().tm_year
+    NEW_SOURCES = (
+        ("ign-fr", (-20.8823, 55.4504), "IGN France", "https://data.geopf.fr/wmts?",
+         "Orthophotos © IGN (Licence Ouverte 2.0)", "Orthophotos © IGN (Licence Ouverte 2.0)",
+         "https://data.geopf.fr/wms-r?"),
+        ("ngi", (50.8467, 4.3525), "NGI-IGN", "https://wms.ngi.be/inspire/ortho/service?",
+         "© NGI-IGN 2023, CC BY 4.0", "© NGI-IGN 2023, CC BY 4.0", "https://wms.ngi.be/inspire/ortho/service?"),
+        ("vlaanderen", (51.05, 3.72), "Digitaal Vlaanderen", "https://geo.api.vlaanderen.be/OMWRGBMRVL/wmts?",
+         "Bron: Luchtopnamen Digitaal Vlaanderen", "Bron: Luchtopnamen Digitaal Vlaanderen",
+         "https://geo.api.vlaanderen.be/omwrgbmrvl/wms?"),
+        ("spw", (50.4669, 4.8675), "SPW Wallonie",
+         "https://geoservices.wallonie.be/arcgis/services/IMAGERIE/ORTHO_LAST/MapServer/WMSServer?",
+         "Source : Service public de Wallonie (SPW) – Orthophotos (CC BY 4.0)",
+         "Source : Service public de Wallonie (SPW) – Orthophotos (CC BY 4.0)",
+         "https://geoservices.wallonie.be/arcgis/services/IMAGERIE/ORTHO_LAST/MapServer/WMSServer?"),
+        ("act", (49.6116, 6.1319), "geoportail.lu",
+         "https://wmts1.geoportail.lu/opendata/wmts/ortho_latest/GLOBAL_WEBMERCATOR_4_V3/17/",
+         "Orthophoto © ACT Luxembourg (CC0)", "Orthophoto © ACT Luxembourg (CC0)",
+         "https://wms.geoportail.lu/opendata/service?"),
+        ("swisstopo", (47.141, 9.521), "swisstopo",
+         "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/17/",
+         "© swisstopo", "© swisstopo", "https://wms.geo.admin.ch/?"),
+        ("de-be", (52.477, 13.411), "Geoportal Berlin", "https://gdi.berlin.de/services/wms/truedop_2025_sommer?",
+         "Geoportal Berlin / TrueDOP 2025 (dl-de/zero-2-0)", "Geoportal Berlin / TrueDOP 2025 (dl-de/zero-2-0)",
+         "https://gdi.berlin.de/services/wms/truedop_2025_sommer?"),
+        ("de-bb", (52.607, 12.861), "LGB Brandenburg", "https://isk.geobasis-bb.de/mapproxy/dop20c/service/wms?",
+         "© GeoBasis-DE/LGB, dl-de/by-2-0", "© GeoBasis-DE/LGB, dl-de/by-2-0 (Daten geändert)",
+         "https://isk.geobasis-bb.de/mapproxy/dop20c/service/wms?"),
+        ("de-by", (48.1351, 11.582), "LDBV Bayern", "https://geoservices.bayern.de/od/wms/dop/v1/dop20?",
+         "Bayerische Vermessungsverwaltung – www.geodaten.bayern.de (CC BY 4.0)",
+         "Bayerische Vermessungsverwaltung – www.geodaten.bayern.de (CC BY 4.0, Daten geändert)",
+         "https://geoservices.bayern.de/od/wms/dop/v1/dop20?"),
+        ("de-hb", (53.5396, 8.5809), "GeoInformation Bremen", "https://geodienste.bremen.de/wms_dop_lb?",
+         "© Landesamt GeoInformation Bremen (CC BY 4.0)", "© Landesamt GeoInformation Bremen (CC BY 4.0)",
+         "https://geodienste.bremen.de/wms_dop_lb?"),
+        ("de-he", (50.1109, 8.6821), "HVBG Hessen",
+         "https://www.gds-srv.hessen.de/cgi-bin/lika-services/ogc-free-images.ows?",
+         "Geobasisdaten © Hessische Verwaltung für Bodenmanagement und Geoinformation",
+         "Geobasisdaten © Hessische Verwaltung für Bodenmanagement und Geoinformation (Daten geändert)",
+         "https://www.gds-srv.hessen.de/cgi-bin/lika-services/ogc-free-images.ows?"),
+        ("de-mv", (54.0924, 12.0991), "LAiV M-V", "https://www.geodaten-mv.de/dienste/adv_dop?",
+         f"© GeoBasis-DE/M-V {YEAR} (CC BY 4.0)", f"© GeoBasis-DE/M-V {YEAR} (CC BY 4.0)",
+         "https://www.geodaten-mv.de/dienste/adv_dop?"),
+        ("de-nw", (50.9375, 6.9603), "Geobasis NRW",
+         "https://www.wmts.nrw.de/geobasis/wmts_nw_dop/tiles/nw_dop/EPSG_3857_16/12/",
+         "Luftbild: Geobasis NRW (dl-de/zero-2-0)", "Luftbild: Geobasis NRW (dl-de/zero-2-0)",
+         "https://www.wms.nrw.de/geobasis/wms_nw_dop?"),
+        ("de-rp", (50.3569, 7.589), "LVermGeo RLP", "https://geo4.service24.rlp.de/wms/rp_dop20.fcgi?",
+         f"©GeoBasis-DE / LVermGeoRP ({YEAR}), dl-de/by-2-0, www.lvermgeo.rlp.de",
+         f"©GeoBasis-DE / LVermGeoRP ({YEAR}), dl-de/by-2-0, www.lvermgeo.rlp.de [Daten bearbeitet]",
+         "https://geo4.service24.rlp.de/wms/rp_dop20.fcgi?"),
+        ("de-sl", (49.35, 7.18), "LVGL Saarland", "https://geoportal.saarland.de/freewms/dop2025?",
+         "© GeoBasis DE/LVGL-SL 2025, dl-de/by-2-0", "© GeoBasis DE/LVGL-SL 2025, dl-de/by-2-0 (Daten geändert)",
+         "https://geoportal.saarland.de/freewms/dop2025?"),
+        ("de-sn", (51.0504, 13.7373), "GeoSN Sachsen", "https://geodienste.sachsen.de/wms_geosn_dop-rgb/guest?",
+         "Quelle: GeoSN, dl-de/by-2-0", "Quelle: GeoSN, dl-de/by-2-0 (Daten geändert)",
+         "https://geodienste.sachsen.de/wms_geosn_dop-rgb/guest?"),
+        ("de-th", (50.9848, 11.0299), "GDI-Th", "https://www.geoproxy.geoportal-th.de/geoproxy/services/DOP?",
+         "© GDI-Th (CC BY 4.0)", "© GDI-Th (CC BY 4.0)", "https://www.geoproxy.geoportal-th.de/geoproxy/services/DOP?"),
+        ("gugik", (52.2297, 21.0122), "GUGiK",
+         "https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMTS/StandardResolution?",
+         "Ortofotomapa: GUGiK (geoportal.gov.pl)", "Ortofotomapa: GUGiK (geoportal.gov.pl)",
+         "https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMS/HighResolution?"),
+        ("cuzk", (50.0875, 14.4213), "ČÚZK", "https://ags.cuzk.gov.cz/arcgis1/rest/services/ORTOFOTO_WM/MapServer/tile/17/",
+         f"Ortofoto: ČÚZK, {YEAR} (CC BY 4.0)", f"Ortofoto: ČÚZK, {YEAR} (CC BY 4.0)",
+         "https://ags.cuzk.gov.cz/arcgis1/services/ORTOFOTO/MapServer/WMSServer?"),
+    )
+
+    def test_field_map_new_orthophotos(self):
+        """MF-73 to MF-78, in English: in each new country, region or Land its own orthophoto is offered by name,
+        its tiles come from its WMTS (or its WMS per tile) with its credit in the map's corner, and the drawn
+        image is one GetMap of its WMS in EPSG:4326 with its credit burned in and said under the preview. The
+        table's WMS, layers and size limits are the ones checked by hand (MF-73)."""
+        page, seen = self.field_map(lang="en")
+        table = page.evaluate("() => import('./components/ortho-sources.js').then((m) => m.ORTHO_SOURCES.map("
+                              "(s) => [s.id, s.wms, s.layer, s.maxSide]))")
+        self.assertEqual(table[4:], [
+            ["ngi", "https://wms.ngi.be/inspire/ortho/service", "orthoimage_coverage", 4000],
+            ["vlaanderen", "https://geo.api.vlaanderen.be/omwrgbmrvl/wms", "Ortho", 2048],
+            ["spw", "https://geoservices.wallonie.be/arcgis/services/IMAGERIE/ORTHO_LAST/MapServer/WMSServer", "0",
+             4096],
+            ["act", "https://wms.geoportail.lu/opendata/service", "ortho_latest", 4096],
+            ["swisstopo", "https://wms.geo.admin.ch/", "ch.swisstopo.swissimage", 2048],
+            ["de-be", "https://gdi.berlin.de/services/wms/truedop_2025_sommer", "truedop_2025_sommer_rgb", 4096],
+            ["de-bb", "https://isk.geobasis-bb.de/mapproxy/dop20c/service/wms", "bebb_dop20c", 4096],
+            ["de-by", "https://geoservices.bayern.de/od/wms/dop/v1/dop20", "by_dop20c", 4096],
+            ["de-hb", "https://geodienste.bremen.de/wms_dop_lb", "dop10_2025_HB,dop10_2025_BHV", 4096],
+            ["de-he", "https://www.gds-srv.hessen.de/cgi-bin/lika-services/ogc-free-images.ows", "he_dop_rgb", 3000],
+            ["de-mv", "https://www.geodaten-mv.de/dienste/adv_dop", "mv_dop", 4096],
+            ["de-nw", "https://www.wms.nrw.de/geobasis/wms_nw_dop", "nw_dop_rgb", 4096],
+            ["de-rp", "https://geo4.service24.rlp.de/wms/rp_dop20.fcgi", "rp_dop20", 4096],
+            ["de-sl", "https://geoportal.saarland.de/freewms/dop2025", "sl_dop20_rgb", 4096],
+            ["de-sn", "https://geodienste.sachsen.de/wms_geosn_dop-rgb/guest", "sn_dop_020", 4096],
+            ["de-th", "https://www.geoproxy.geoportal-th.de/geoproxy/services/DOP", "th_dop", 4096],
+            ["gugik", "https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMS/HighResolution", "Raster", 4096],
+            ["cuzk", "https://ags.cuzk.gov.cz/arcgis1/services/ORTOFOTO/MapServer/WMSServer", "0", 4096],
+        ])
+        for sid, (lat, lon), name, tiles, credit, image_credit, wms in self.NEW_SOURCES:
+            with self.subTest(sid):
+                page.get_by_test_id("fm-go").fill(f"{lat}, {lon}")
+                page.get_by_test_id("fm-go-button").click()
+                self.check_tiles(page, seen, tiles, f"Orthophoto ({name})", credit)
+                self.trace(page, self.outline_at(lat, lon))
+                expect(page.locator("label.fm-ortho")).to_have_text(f"Orthophoto ({name}) as the base")
+                asked = len(seen["wms"])
+                page.get_by_test_id("fm-draw").click()
+                expect(page.get_by_test_id("fm-preview")).to_be_visible()
+                self.assertEqual(len(seen["wms"]), asked + 1)
+                self.assertTrue(seen["wms"][-1].startswith(wms), seen["wms"][-1])
+                q = {k: v[0] for k, v in parse_qs(urlsplit(seen["wms"][-1]).query, keep_blank_values=True).items()}
+                self.assertEqual((q["CRS"], q["REQUEST"], q["FORMAT"]), ("EPSG:4326", "GetMap", "image/jpeg"))
+                expect(page.get_by_test_id("fm-image-credit")).to_have_text(
+                    f"Credits on the image: {image_credit} · © OpenStreetMap contributors")
+                page.get_by_test_id("fm-clear").click()
+        # The WMTS whose levels are not the zooms: NRW's "00" is zoom 5, Poland's are "EPSG:3857:<zoom>", and
+        # Flanders' are PNG; ČÚZK's (zooms 6 to 18) and NRW's (5 to 21) fall back to their WMS outside them.
+        urls = page.evaluate("() => import('./components/ortho-sources.js').then((m) => Object.fromEntries("
+                             "m.ORTHO_SOURCES.filter((s) => s.tile).map((s) => [s.id, [s.tile(17, 1, 2), "
+                             "s.tile(4, 1, 2), s.tile(19, 1, 2)]])))")
+        self.assertEqual(urls["de-nw"][0], "https://www.wmts.nrw.de/geobasis/wmts_nw_dop/tiles/nw_dop/EPSG_3857_16/12/1/2")
+        self.assertTrue(urls["de-nw"][1].startswith("https://www.wms.nrw.de/geobasis/wms_nw_dop?"), urls["de-nw"])
+        self.assertTrue(urls["cuzk"][2].startswith("https://ags.cuzk.gov.cz/arcgis1/services/ORTOFOTO/"), urls["cuzk"])
+        self.assertIn("TILEMATRIX=EPSG%3A3857%3A17&TILEROW=2&TILECOL=1", urls["gugik"][0])
+        self.assertIn("FORMAT=image%2Fpng", urls["vlaanderen"][0])
+        self.assertEqual(seen["other"], [])
+
+    def test_field_map_orthophoto_policy_matches_the_sources(self):
+        """MF-79: the page's Content-Security-Policy names exactly the origins its sources use: every WMS as
+        images and connections, a WMTS on an origin of its own as images only."""
+        page, _ = self.field_map()
+        csp = self.field.http.get("/console/field-map.html").headers["content-security-policy"]
+        policy = dict(d.strip().split(" ", 1) for d in csp.split(";"))
+        img = set(policy["img-src"].split()) - {"'self'", "blob:", "data:", "https://tile.openstreetmap.org"}
+        connect = set(policy["connect-src"].split()) - {"'self'", "https://overpass-api.de",
+                                                        "https://overpass.private.coffee",
+                                                        "https://nominatim.openstreetmap.org"}
+        got = page.evaluate("() => import('./components/ortho-sources.js').then((m) => [m.sourceOrigins(), "
+                            "m.imageOrigins()])")
+        self.assertEqual(set(got[0]), img)
+        self.assertEqual(set(got[1]), connect)
+        self.assertEqual(connect, set(ORTHO_WMS_ORIGINS))
+        self.assertEqual(img - connect, set(ORTHO_TILE_ORIGINS))
+
     def test_field_map_orthophoto_at_a_border_and_outside(self):
         """MF-67: by the border between Elvas and Badajoz the centroid's country (Portugal) is asked first; a
         white picture (no photo there) asks the other country's once, and both white leave OpenStreetMap
-        alone, said in words. Outside every coverage (Berlin) there is no orthophoto to tick and none is
-        asked."""
+        alone, said in words; so in Berlin (inside Brandenburg's outer ring, MF-76) Berlin's then Brandenburg's.
+        Outside every coverage (Vienna) there is no orthophoto to tick and none is asked."""
         page, seen = self.field_map(wms="orthophoto-white.png")
         page.get_by_test_id("fm-go").fill("38.88, -7.075")
         page.get_by_test_id("fm-go-button").click()
@@ -3091,19 +3271,30 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("fm-notice")).to_have_text(
             "A ortofoto (DGT) não tem imagem desta área: a imagem é desenhada só com o OpenStreetMap.")
         expect(page.get_by_test_id("fm-image-credit")).to_have_text("Créditos na imagem: © OpenStreetMap contributors")
-        # Berlin: no orthophoto, no switch, nothing asked.
+        # Berlin: Berlin's TrueDOP first, then Brandenburg's (its mosaic takes in Berlin), both white here.
         page.get_by_test_id("fm-clear").click()
         page.get_by_test_id("fm-go").fill("52.52, 13.405")
         page.get_by_test_id("fm-go-button").click()
+        self.trace(page, self.outline_at(52.52, 13.405))
+        expect(page.locator("label.fm-ortho")).to_have_text("Ortofoto (Geoportal Berlin) como base")
+        page.get_by_test_id("fm-draw").click()
+        expect(page.get_by_test_id("fm-preview")).to_be_visible()
+        self.assertEqual([urlsplit(u).hostname for u in seen["wms"][2:]], ["gdi.berlin.de", "isk.geobasis-bb.de"])
+        expect(page.get_by_test_id("fm-notice")).to_have_text(
+            "A ortofoto (Geoportal Berlin) não tem imagem desta área: a imagem é desenhada só com o OpenStreetMap.")
+        # Vienna: no orthophoto, no switch, nothing asked.
+        page.get_by_test_id("fm-clear").click()
+        page.get_by_test_id("fm-go").fill("48.2082, 16.3738")
+        page.get_by_test_id("fm-go-button").click()
         expect(page.get_by_test_id("fm-layers")).to_have_count(0)
         expect(page.get_by_test_id("fm-layer-none")).to_be_visible()
-        self.trace(page, self.outline_at(52.52, 13.405))
+        self.trace(page, self.outline_at(48.2082, 16.3738))
         expect(page.get_by_test_id("fm-ortho")).to_have_count(0)
         page.get_by_test_id("fm-draw").click()
         expect(page.get_by_test_id("fm-preview")).to_be_visible()
         expect(page.get_by_test_id("fm-notice")).to_have_count(0)
         expect(page.get_by_test_id("fm-size")).to_contain_text("Desenhada a partir dos dados do OpenStreetMap.")
-        self.assertEqual(len(seen["wms"]), 2)
+        self.assertEqual(len(seen["wms"]), 4)
         self.assertEqual(seen["wms_tiles"], [])
         self.assertEqual(seen["other"], [])
 
