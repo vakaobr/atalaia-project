@@ -871,4 +871,19 @@ const Map<String, String> enStrings = {
   'ctl.notif_starting': 'Starting…',
   'ctl.notif_idle': 'No live game',
   'ctl.notif_game': '{name}: {state}',
+  // The phone controller's [modes] settings (slice S7b of PE24).
+  'ctl_modes.title': 'Mode packages',
+  'ctl_modes.tile': 'Mode packages (field controller)',
+  'ctl_modes.tile_hint': '{keys} trusted keys, {box} box keys',
+  'ctl_modes.intro':
+      'The keys this phone\'s field controller trusts for signed mode packages, the keys built into the boxes\' firmware (the controller offers the boxes only packages they take), revoked keys and the registry\'s index: a Pi\'s [modes] settings. They apply when the controller next starts.',
+  'ctl_modes.keys': 'Trusted mode keys (one per line, base64)',
+  'ctl_modes.box_keys': 'The boxes\' mode keys (one per line, base64)',
+  'ctl_modes.revoked': 'Revoked key ids (one per line, 16 hex digits)',
+  'ctl_modes.index':
+      'The registry\'s index (an https:// address or a file; optional)',
+  'ctl_modes.bad_key': 'Line {line}: not a mode key (base64 of 32 bytes).',
+  'ctl_modes.bad_id': 'Line {line}: not a key id (16 hex digits).',
+  'ctl_modes.bad_index': 'The index is an https:// address or a file.',
+  'ctl_modes.saved': 'Saved: they apply when the controller next starts.',
 };

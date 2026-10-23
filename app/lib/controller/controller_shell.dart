@@ -23,6 +23,7 @@ import '../pod/pod_client.dart';
 import 'console_assets.dart';
 import 'controller_host.dart';
 import 'controller_isolate.dart';
+import 'controller_signed_modes.dart';
 
 /// What the controller takes from the app's assets.
 final class ControllerAssets {
@@ -74,6 +75,7 @@ final class ControllerStart {
     this.pod,
     this.podName,
     this.firmwareKeys = const [],
+    this.modes = const ModesConfig(),
   });
 
   final Uint8List joinKey;
@@ -88,12 +90,16 @@ final class ControllerStart {
   final PodTransport? pod;
   final String? podName;
 
+  /// The `[modes]` settings (slice S7b): the app's.
+  final ModesConfig modes;
+
   ControllerStart withoutPod() => ControllerStart(
     joinKey: joinKey,
     open: open,
     fieldId: fieldId,
     limitTemplate: limitTemplate,
     firmwareKeys: firmwareKeys,
+    modes: modes,
   );
 
   ControllerStart withFirmwareKeys(List<String> keys) => ControllerStart(
@@ -104,6 +110,7 @@ final class ControllerStart {
     pod: pod,
     podName: podName,
     firmwareKeys: keys,
+    modes: modes,
   );
 
   ControllerStart withOpen(bool open) => ControllerStart(
@@ -114,6 +121,7 @@ final class ControllerStart {
     pod: pod,
     podName: podName,
     firmwareKeys: firmwareKeys,
+    modes: modes,
   );
 }
 
@@ -189,6 +197,7 @@ class ControllerShell extends ChangeNotifier {
         pod: how.pod != null,
         fieldId: how.fieldId,
         firmwareKeys: how.firmwareKeys,
+        modes: how.modes,
       );
       final run = _run = await _launch(boot, pod: how.pod);
       _sub = run.changes.listen((_) => _changed());

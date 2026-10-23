@@ -25,7 +25,6 @@ request and ``ws_connect`` steps may give a player token (``bearer``), and
 (``raw``: an uploaded image), answers that are not JSON (``content_type``,
 ``body_base64``) and the noise scan's steps (``noise``, ``hold_measure``,
 ``scan_wait``) on the recording modem.
-``ws_closed`` reads a connection to its end.
 
 Slice S7c (boxes over the radio, adoption and firmware updates on the phone
 controller): adoption (adoption.py, USB off as on the phone) and firmware updates
@@ -40,6 +39,12 @@ frames the controller sent since the last look, decoded (``save`` keeps values),
 unadopted box's side of a pairing run with a code (its REPLY to the last START, its
 DONE to the last KEY). A request may send raw bytes (``body_hex``, ``body_text``)
 and headers, and sign the body with ``mac_key`` (X-Atalaia-Mac, a box's report).
+
+Slice S7b (presets, mode packages, scenarios and branding): the vectors'
+``fixtures``' values are saved in every case; a case's ``mode_keys``,
+``mode_revoked`` and ``box_keys`` set up signed mode packages and the modes sent to
+boxes; a raw body may name its ``content_type``, and an answer's ``headers`` are
+matched.
 """
 
 from __future__ import annotations
@@ -68,6 +73,8 @@ from atalaia_controller.api import Auth, create_app
 from atalaia_controller.checkin import Checkin
 from atalaia_controller.engine import Controller
 from atalaia_controller.firmware_updates import FirmwareUpdates
+from atalaia_controller.mode_fetch import ModeFetch
+from atalaia_controller.signed_modes import SignedModes
 from atalaia_controller.positions import Positions
 from atalaia_controller import prop_link
 from atalaia_controller.mqtt import MqttBridge
@@ -226,8 +233,8 @@ class ContractCase(unittest.TestCase):
                          persist_game_key=case.get("persist_game_key", True), adopt_usb=False,
                          firmware_release_keys=case.get("firmware_keys", []))
             env = SimpleNamespace(cfg=cfg, case=case, modem=RecordingModem(), mqtt=RecordingMqtt(), now=[0.0],
-                                  saved={}, stack=stack, sentinel=0, tmp=tmp, field_seen=0, senders={},
-                                  last_field=None, pair=None)
+                                  saved=dict(VECTORS.get("fixtures", {}).get("values", {})), stack=stack,
+                                  sentinel=0, tmp=tmp, field_seen=0, senders={}, last_field=None, pair=None)
             self.boot(env)
             for i, step in enumerate(case["steps"]):
                 with self.subTest(step=i):
@@ -259,6 +266,9 @@ class ContractCase(unittest.TestCase):
         # Slice S7c: adoption (no USB, as on a phone) and firmware updates, as main.build sets them up.
         Adoption(env.ctrl, lister=lambda: [])
         FirmwareUpdates(env.ctrl, Path(env.tmp) / "firmware", env.cfg.firmware_release_keys, clock=wall)
+        # Slice S7b: signed mode packages and the modes sent to boxes, as main.build sets them up.
+        SignedModes(env.ctrl, env.case.get("mode_keys", []), env.case.get("mode_revoked", []), "")
+        ModeFetch(env.ctrl, env.case.get("box_keys", []), clock=wall)
         if env.case.get("https"):
             env.ctrl.ca_sha256 = bytes(range(32))
             env.ctrl.link_urls = ["https://192.0.2.10:8443"]
@@ -450,29 +460,35 @@ class ContractCase(unittest.TestCase):
             raw += bytes(max(0, req["raw"].get("size", 0) - len(raw)))
             kwargs["content"] = raw
             headers["Content-Type"] = req["raw"]["content_type"]
-        # Slice S7c: raw bytes (hex or text), signed with 'mac_key' as a box signs its report.
+        # Slices S7c and S7b: raw bytes (hex or text) with their type, signed with 'mac_key' as a box
+        # signs its report.
         raw_body = bytes.fromhex(req["body_hex"]) if "body_hex" in req else \
             req["body_text"].encode("utf-8") if "body_text" in req else None
         if raw_body is not None:
             kwargs["content"] = raw_body
-            headers["Content-Type"] = "application/octet-stream"
+            headers["Content-Type"] = req.get("content_type", "application/octet-stream")
             if "mac_key" in req:
                 headers["X-Atalaia-Mac"] = hmac.new(bytes.fromhex(req["mac_key"]), raw_body,
                                                     hashlib.sha256).hexdigest()
         headers.update(req.get("headers", {}))
         r = env.client.request(req["method"], req["path"], **kwargs)
         self.assertEqual(r.status_code, step["status"], f"{req['method']} {req['path']}: {r.text[:500]}")
+        where = f"{req['method']} {req['path']}"
+        if "headers" in step:
+            # Slice S7b: the answer's headers, by lower-case name.
+            got = {k.lower(): v for k, v in r.headers.items()}
+            self.check({k.lower(): v for k, v in step["headers"].items()}, got, where + ": headers", env)
         ctype = r.headers.get("content-type", "").split(";")[0].strip()
         if "content_type" in step:
-            self.assertEqual(ctype, step["content_type"], f"{req['method']} {req['path']}")
+            self.assertEqual(ctype, step["content_type"], where)
         if "body_base64" in step:
-            self.assertEqual(r.content, base64.b64decode(step["body_base64"]), f"{req['method']} {req['path']}")
+            self.assertEqual(r.content, base64.b64decode(step["body_base64"]), where)
         if "text" in step:
             # A plain answer (a release text): its text, exactly.
             self.assertEqual(r.text, substitute(step["text"], env.saved))
             return
         if "bytes_sha256" in step:
-            self.assertEqual(hashlib.sha256(r.content).hexdigest(), step["bytes_sha256"])
+            self.assertEqual(hashlib.sha256(r.content).hexdigest(), substitute(step["bytes_sha256"], env.saved))
             return
         body = r.json() if ctype == "application/json" else None
         if "json" in step:

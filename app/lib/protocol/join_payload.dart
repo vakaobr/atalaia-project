@@ -16,7 +16,11 @@
 /// parameters and seed. Optional keys 13 (the field CA's fingerprint) and 14
 /// (the controller's https addresses) let it link to the controller over
 /// Wi-Fi (protocol/prop-link.md, RFC 0001 Amendment 4, proposed); boxes use
-/// them only for firmware updates (protocol/firmware-update.md).
+/// them only for firmware updates (protocol/firmware-update.md). Keys 16
+/// (`fetch_modes`) and 17 (`forget_modes`), CBOR true when set and left out
+/// otherwise, ask a box to fetch the parts of its mode it lacks from the
+/// controller, or to forget those it fetched before (protocol/mode-packages.md;
+/// the phone controller sends them from slice S7b of PE24).
 library;
 
 import 'dart:convert';
@@ -80,6 +84,8 @@ final class JoinPayload {
     this.caSha256,
     this.urls,
     this.lang,
+    this.fetchModes = false,
+    this.forgetModes = false,
   });
 
   final int gameId;
@@ -108,6 +114,12 @@ final class JoinPayload {
   /// Key 15: the language of the box screens ("pt", "en"...; RFC 0001
   /// Amendment 10), or null: English.
   final String? lang;
+
+  /// Key 16: fetch the parts of [modeId] the box lacks (true when set).
+  final bool fetchModes;
+
+  /// Key 17: forget every package fetched before (true when set).
+  final bool forgetModes;
 
   /// The parts of [modeId]: the main mode, then its modifiers.
   List<String> get modeParts => modeId.split('+');
@@ -240,6 +252,12 @@ JoinPayload _validate(Map<String, Object?> j) {
           ),
     ];
   }
+  for (final flag in ['fetch_modes', 'forget_modes']) {
+    final f = j[flag];
+    if (f != null && f != false && f != true) {
+      throw _body('$flag: true when set, else left out');
+    }
+  }
   final lang = j['lang'];
   if (lang != null && (lang is! String || !_lang.hasMatch(lang))) {
     throw _body(
@@ -262,6 +280,8 @@ JoinPayload _validate(Map<String, Object?> j) {
     caSha256: ca as Uint8List?,
     urls: u,
     lang: lang as String?,
+    fetchModes: j['fetch_modes'] == true,
+    forgetModes: j['forget_modes'] == true,
   );
 }
 
@@ -288,7 +308,7 @@ const _keys = {
   1: 'game_id', 2: 'game_key', 3: 'node_id', 4: 'controller_id', //
   5: 'channel_hz', 6: 'max_hops', 7: 'teams', 8: 'mode_id', 9: 'role',
   10: 'game_seed', 11: 'params', 12: 'kind', 13: 'ca_sha256', 14: 'urls',
-  15: 'lang',
+  15: 'lang', 16: 'fetch_modes', 17: 'forget_modes',
 };
 
 bool _hasBytes(Object? v) => switch (v) {
@@ -346,6 +366,9 @@ JoinPayload decodeJoin(List<int> data, List<int> joinKey) {
         v == null) {
       throw _body('$name is null: leave an optional field out instead');
     }
+    if ((name == 'fetch_modes' || name == 'forget_modes') && v != true) {
+      throw _body('$name: CBOR true when set, else left out');
+    }
     j[name] = v;
   }
   for (final name in ['game_key', 'ca_sha256']) {
@@ -381,6 +404,8 @@ Uint8List encodeJoin(JoinPayload j, List<int> joinKey) {
     'ca_sha256': j.caSha256,
     'urls': j.urls,
     'lang': j.lang,
+    'fetch_modes': j.fetchModes,
+    'forget_modes': j.forgetModes,
   });
   final body = <int, Object?>{
     1: v.gameId,
@@ -398,6 +423,8 @@ Uint8List encodeJoin(JoinPayload j, List<int> joinKey) {
     if (v.caSha256 != null) 13: v.caSha256,
     if (v.urls != null) 14: v.urls,
     if (v.lang != null) 15: v.lang,
+    if (v.fetchModes) 16: true,
+    if (v.forgetModes) 17: true,
   };
   final signed = Uint8List.fromList([joinVersion, ...cborEncode(body)]);
   final out = Uint8List.fromList([

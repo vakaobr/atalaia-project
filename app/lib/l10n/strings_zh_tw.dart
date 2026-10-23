@@ -755,4 +755,18 @@ const Map<String, String> zhTwStrings = {
   'ctl.notif_starting': '啟動中…',
   'ctl.notif_idle': '沒有進行中的遊戲',
   'ctl.notif_game': '{name}：{state}',
+  // The phone controller's [modes] settings (slice S7b of PE24).
+  'ctl_modes.title': '模式包',
+  'ctl_modes.tile': '模式包（場地控制器）',
+  'ctl_modes.tile_hint': '{keys} 把信任金鑰，{box} 把盒子金鑰',
+  'ctl_modes.intro':
+      '這支手機的場地控制器信任的模式包簽署金鑰、盒子韌體內建的金鑰（控制器只提供盒子會接受的模式包）、已撤回的金鑰，和登錄目錄的網址：等同 Pi 的 [modes] 設定。控制器下次啟動時生效。',
+  'ctl_modes.keys': '信任的模式金鑰（每行一把，base64）',
+  'ctl_modes.box_keys': '盒子的模式金鑰（每行一把，base64）',
+  'ctl_modes.revoked': '已撤回的金鑰 ID（每行一個，16 位十六進位數字）',
+  'ctl_modes.index': '登錄目錄（https:// 網址或檔案；選填）',
+  'ctl_modes.bad_key': '行 {line}：不是模式金鑰（32 位元組的 base64）。',
+  'ctl_modes.bad_id': '行 {line}：不是金鑰 ID（16 位十六進位數字）。',
+  'ctl_modes.bad_index': '目錄必須是 https:// 網址或檔案。',
+  'ctl_modes.saved': '已儲存：控制器下次啟動時生效。',
 };

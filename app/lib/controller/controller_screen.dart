@@ -30,6 +30,7 @@ import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'controller_boxes_screen.dart';
 import 'controller_shell.dart';
+import 'controller_signed_modes.dart';
 
 class ControllerScreen extends StatefulWidget {
   const ControllerScreen({super.key});
@@ -95,6 +96,7 @@ class _ControllerScreenState extends State<ControllerScreen> {
         open: _open,
         fieldId: app.settings.fieldId,
         limitTemplate: app.settings.limitTemplate,
+        modes: ModesConfig.fromJson(app.settings.controllerModes),
         pod: _pod,
         podName: _podName,
         firmwareKeys: app.settings.firmwareKeys,

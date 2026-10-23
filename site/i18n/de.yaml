@@ -665,7 +665,7 @@ roadmap:
       Spiel, das Spielende, das den Boxen auch nach einem Neustart des Handys ohne den
       Spielschlüssel gemeldet wird, neue Boxen, aufgenommen über den Code, den sie zeigen, oder mit
       einer Feldkarte, die das Handy per NFC schreibt, und Firmware-Updates zwischen Spielen (mit
-      dem USB-Funkmodem des Pi am Handy: der I/O-Pod reicht diese Nachrichten noch nicht weiter);
+      dem USB-Funkmodem des Pi am Handy: der I/O-Pod reicht diese Nachrichten noch nicht weiter); und Presets, hochgeladene Modi und signierte Moduspakete, die an Boxen geschickt werden, denen sie fehlen, auf dem Handy kompilierte Szenarien, Rollenpakete in einem Spiel sowie Teamnamen und Wappen;
       nach dem Feldtest: der Wechsel zwischen einem Handy und einem
       Pi und der Rest dessen, was der Pi kann) und die iOS-Version (nicht gebaut: sie braucht einen
       Mac). Planphase G, der Feldtest mit echten Handys und Pods, wartet auf die Hardware: Bisher

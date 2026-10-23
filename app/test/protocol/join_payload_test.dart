@@ -170,6 +170,41 @@ void main() {
     });
   });
 
+  group('mode fetch (keys 16 and 17)', () {
+    final section = v['mode_fetch'] as Map<String, dynamic>;
+    for (final c in cases(section, 'valid')) {
+      test('${c['name']}', () {
+        final payload = hexDecode(c['payload'] as String);
+        final f = c['fields'] as Map<String, dynamic>;
+        final j = decodeJoin(payload, key);
+        expect(j.fetchModes, f['fetch_modes'] ?? false);
+        expect(j.forgetModes, f['forget_modes'] ?? false);
+        expect(hexEncode(encodeJoin(j, key)), c['payload']);
+        expect(joinToText(payload), c['text']);
+      });
+    }
+    for (final c in cases(section, 'invalid')) {
+      test('${c['name']}: body', () {
+        expect(
+          () => decodeJoin(hexDecode(c['payload'] as String), key),
+          throwsA(
+            isA<JoinException>().having(
+              (e) => e.reason,
+              'reason',
+              JoinFailure.body,
+            ),
+          ),
+        );
+      });
+    }
+    test('absent: neither', () {
+      for (final c in cases(v, 'valid')) {
+        final j = decodeJoin(hexDecode(c['payload'] as String), key);
+        expect((j.fetchModes, j.forgetModes), (false, false));
+      }
+    });
+  });
+
   group('box language (key 15)', () {
     final section = v['box_language'] as Map<String, dynamic>;
     for (final c in cases(section, 'valid')) {

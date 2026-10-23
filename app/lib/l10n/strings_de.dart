@@ -915,4 +915,23 @@ const Map<String, String> deStrings = {
   'ctl.notif_starting': 'Startet…',
   'ctl.notif_idle': 'Kein laufendes Spiel',
   'ctl.notif_game': '{name}: {state}',
+  // The phone controller's [modes] settings (slice S7b of PE24).
+  'ctl_modes.title': 'Moduspakete',
+  'ctl_modes.tile': 'Moduspakete (Feld-Controller)',
+  'ctl_modes.tile_hint':
+      '{keys} vertrauenswürdige Schlüssel, {box} Box-Schlüssel',
+  'ctl_modes.intro':
+      'Die Schlüssel, denen der Feld-Controller dieses Handys bei signierten Moduspaketen vertraut, die Schlüssel in der Firmware der Boxen (der Controller bietet den Boxen nur Pakete an, die sie annehmen), widerrufene Schlüssel und der Index des Registers: der Abschnitt [modes] eines Pi. Sie gelten ab dem nächsten Start des Controllers.',
+  'ctl_modes.keys':
+      'Vertrauenswürdige Modusschlüssel (einer pro Zeile, Base64)',
+  'ctl_modes.box_keys': 'Modusschlüssel der Boxen (einer pro Zeile, Base64)',
+  'ctl_modes.revoked':
+      'IDs widerrufener Schlüssel (eine pro Zeile, 16 Hexziffern)',
+  'ctl_modes.index':
+      'Index des Registers (eine https://-Adresse oder eine Datei; optional)',
+  'ctl_modes.bad_key':
+      'Zeile {line}: kein Modusschlüssel (Base64 von 32 Bytes).',
+  'ctl_modes.bad_id': 'Zeile {line}: keine Schlüssel-ID (16 Hexziffern).',
+  'ctl_modes.bad_index': 'Der Index ist eine https://-Adresse oder eine Datei.',
+  'ctl_modes.saved': 'Gespeichert: gilt ab dem nächsten Start des Controllers.',
 };

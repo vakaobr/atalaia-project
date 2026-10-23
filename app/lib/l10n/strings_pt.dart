@@ -888,4 +888,23 @@ const Map<String, String> ptStrings = {
   'ctl.notif_starting': 'A arrancar…',
   'ctl.notif_idle': 'Sem jogo em curso',
   'ctl.notif_game': '{name}: {state}',
+  // The phone controller's [modes] settings (slice S7b of PE24).
+  'ctl_modes.title': 'Pacotes de modos',
+  'ctl_modes.tile': 'Pacotes de modos (controlador de campo)',
+  'ctl_modes.tile_hint': '{keys} chaves de confiança, {box} chaves das caixas',
+  'ctl_modes.intro':
+      'As chaves em que o controlador de campo deste telemóvel confia para pacotes de modos assinados, as chaves gravadas no firmware das caixas (o controlador só lhes oferece pacotes que aceitam), as chaves revogadas e o índice do registo: a secção [modes] de um Pi. Aplicam-se quando o controlador voltar a arrancar.',
+  'ctl_modes.keys': 'Chaves de modos de confiança (uma por linha, base64)',
+  'ctl_modes.box_keys': 'Chaves de modos das caixas (uma por linha, base64)',
+  'ctl_modes.revoked':
+      'Ids de chaves revogadas (um por linha, 16 dígitos hexadecimais)',
+  'ctl_modes.index':
+      'Índice do registo (um endereço https:// ou um ficheiro; opcional)',
+  'ctl_modes.bad_key':
+      'Linha {line}: não é uma chave de modos (base64 de 32 bytes).',
+  'ctl_modes.bad_id':
+      'Linha {line}: não é um id de chave (16 dígitos hexadecimais).',
+  'ctl_modes.bad_index': 'O índice é um endereço https:// ou um ficheiro.',
+  'ctl_modes.saved':
+      'Guardado: aplica-se quando o controlador voltar a arrancar.',
 };

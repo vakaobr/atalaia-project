@@ -5,9 +5,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 3 -- Android and Players: Status
 
-**Current phase:** Implementation: plan phases A-D and F done in software; plan phase E done in software, with the Android controller role in slices (PE24: S1, the game engine and REST API, S2, the live stream and MQTT, S3, keeping games across a restart, S4, the pod as its radio, joins and Wi-Fi props, S5, check-in, player tokens, positions and the chrono list, and S6, the shell and its screen, done 2026-10-22, in software; S7a, the field plan and the radio channel, and S7c, boxes over the radio (re-invites, GAME_OVER, adoption, pairing, firmware updates), pulled forward and done 2026-10-23, in software; the rest of S7 after the field test); plan phase G (integration and field test) pending, it needs the hardware
+**Current phase:** Implementation: plan phases A-D and F done in software; plan phase E done in software, with the Android controller role in slices (PE24: S1, the game engine and REST API, S2, the live stream and MQTT, S3, keeping games across a restart, S4, the pod as its radio, joins and Wi-Fi props, S5, check-in, player tokens, positions and the chrono list, and S6, the shell and its screen, done 2026-10-22, in software; S7a, the field plan and the radio channel, S7b, presets, mode packages, scenarios, role packages and branding, and S7c, boxes over the radio (re-invites, GAME_OVER, adoption, pairing, firmware updates), pulled forward and done 2026-10-23, in software; the rest of S7 after the field test); plan phase G (integration and field test) pending, it needs the hardware
 **Risk level:** Medium
-**Last verified:** 2026-10-23 (PE24 slices S7a and S7c)
+**Last verified:** 2026-10-23 (PE24 slices S7a, S7b and S7c)
 
 ## Completed
 
@@ -444,6 +444,42 @@ Pi), PE24-64 (the engine kept past the activity, the service's type) and
 PE24-67 (the field CA on the phone, the pointycastle dependency) and PE24-70
 (`features` in `whoami`, an API addition); for the
 coordinator: PE24-61 (the console copied in at build time, CI's step).
+
+### Slice S7b: presets, mode packages, scenarios and branding (2026-10-23)
+
+Part of slice S7 pulled forward before the field test (the maintainer,
+2026-10-23); decisions PE24-80 to PE24-89. Built and tested in software, on
+one machine, against the real core; not on a phone. Built beside S7a (the
+field plan, map features, the channel) and S7c (re-invites, adoption and
+pairing, firmware updates) and rebased on them.
+
+| Deliverable | Where | State |
+| --- | --- | --- |
+| Presets, mode uploads, role packages in a game | `app/lib/controller/controller_modes.dart`, `controller_engine.dart`, `controller_api_s7b.dart` | Done, as the Pi's `modes.py` and the simulator's `compose`: `GET|POST /api/v1/presets` (the read token without gm_only parameters; a game from a preset), `GET|POST /api/v1/modes` (uploads checked and loaded in the core, kept in the store), a game of a main mode with modifiers and role packages, or a scenario's; each box's join names only what it runs, with its parameters (PE24-80) |
+| Signed mode packages | `mode_package.dart`, `controller_signed_modes.dart`, `controller_modes_screen.dart` | Done: the Dart port of `mode_package.py` (every group of `mode_package.json`), upload, the registry index (https or a file) with its revocations, trust shown per package; the `[modes]` settings in the app's *Definições* (PE24-81, PE24-82) |
+| Modes sent to boxes | `controller_mode_fetch.dart`; join keys 16 and 17 in `app/lib/protocol/join_payload.dart` | Done, as `mode_fetch.py` with 4d0c23d's HELLO rule: the offer, the release and package without a token between games, the reports' HMAC, `hello_seen` and `report_lost`, `node.modes_failed`, the start guard, stopping the wait, boxes marked to forget; S7c's radio invites carry keys 16 and 17 and show a box fetching (PE24-83) |
+| Scenarios | `app/lib/controller/scenarios/`, `controller_scenarios.dart` | Done: the validator and compiler ported to Dart (the same problems for `scenario.json`, the same field.lua and mode.yaml byte for byte for the new `scenario_compile.json`), `POST /api/v1/scenarios/check`, `GET|POST /api/v1/scenarios`, `GET /api/v1/scenarios/{id}`, a scenario's game with the boxes the GM names, the staff's and the players' views, objective events by visibility (PE24-84) |
+| Team branding | `controller_branding.dart`, `controller_images.dart` | Done: the field's name, accent, logo and wallpaper, crests, saved teams, a game's team names and crests, `branding` in the stream's hello; images checked and stripped as the Pi's `images.py`, byte for byte (PE24-85) |
+| Shared contract cases | `protocol/vectors/controller_api.json` (`fixtures`, `mode_keys`, `mode_revoked`, `box_keys`, a raw body's `content_type`, the answer's `headers`) | Done: 11 new cases (56 in all), passing on both controllers (PE24-86) |
+| What the console shows | `controller_api.dart` `controllerFeatures` | Done: `presets`, `branding`, `scenarios`, `mode_packages` added, so their tabs and panels show on a phone (PE24-89) |
+
+Tests: 11 new shared contract cases (both controllers); new Dart tests:
+16 in `mode_package_test.dart` (every vector group), 123 in
+`controller_images_test.dart` (the Pi's image tests, 112 cases its checker
+made, a bomb, cut zlib streams, 2,100 damaged files), 33 in
+`scenarios_test.dart` (`scenario.json`, `scenario_compile.json`, the
+runtime's copy), 11 in `controller_modes_test.dart` (composition, uploads
+and presets across a restart, an index on the phone with its revocations,
+keys 16 and 17, a crest's clean-up, the settings), 6 in
+`controller_modes_screen_test.dart` (the settings' screen, the controller
+started with them, 320 px and the accessibility guidelines in four
+languages), 11 in `join_payload_test.dart` (join.json's `mode_fetch`);
+the settings' golden images drawn again (the new tile). Python: the
+contract runner's new step kinds and `test_scenario_compile_vectors.py`.
+The Pi's controller code is unchanged.
+
+Remaining of **S7** after the field test: failover (a phone as a Pi's
+standby, the standby's scenario), the site sync, ATAK, the remote GM.
 
 ## Medic Kit (2026-10-19)
 

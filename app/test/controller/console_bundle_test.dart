@@ -204,13 +204,19 @@ void main() {
           reason: '$area: $method $path',
         );
       }
-      // The console's other calls in the areas left out.
+      // The console's other calls in the areas served since slice S7b.
       for (final (method, path) in [
         ('GET', '/api/v1/team-presets'),
         ('POST', '/api/v1/crests'),
         ('PUT', '/api/v1/games/1/teams/red'),
         ('GET', '/api/v1/mode-packages'),
         ('POST', '/api/v1/modes'),
+        ('POST', '/api/v1/scenarios/check'),
+      ]) {
+        expect(await routed(method, path), isTrue, reason: '$method $path');
+      }
+      // The console's other calls in the areas left out.
+      for (final (method, path) in [
         ('POST', '/api/v1/controller/join'),
         ('POST', '/api/v1/schedule/1/game'),
       ]) {

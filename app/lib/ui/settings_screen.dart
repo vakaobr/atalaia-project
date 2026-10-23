@@ -10,6 +10,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app.dart';
+import '../controller/controller_modes_screen.dart';
+import '../controller/controller_signed_modes.dart';
 import '../l10n/strings.dart';
 import '../platform/platform_check.dart';
 import '../prop/battery_guide.dart';
@@ -92,6 +94,27 @@ class SettingsScreen extends StatelessWidget {
             ),
             onTap: () => _editPin(context),
           ),
+          if (controllerRoleAvailable)
+            ListTile(
+              key: const Key('controller-modes'),
+              leading: const Icon(Icons.verified),
+              title: Text(s.t('ctl_modes.tile')),
+              subtitle: Text(
+                s.t('ctl_modes.tile_hint', {
+                  'keys':
+                      '${ModesConfig.fromJson(st.controllerModes).keys.length}',
+                  'box':
+                      '${ModesConfig.fromJson(st.controllerModes).boxKeys.length}',
+                }),
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => const ControllerModesScreen(),
+                ),
+              ),
+            ),
           if (propRoleAvailable) ...[
             SwitchListTile(
               key: const Key('kiosk'),

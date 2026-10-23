@@ -19,6 +19,10 @@
 ///     address (decision PE24-62);
 ///   - the MQTT broker with the Pi's users and ACL, on the loopback address,
 ///     or every address once opened (PE24-13);
+///   - slice S7b: the mode packages, presets, scenarios and branding
+///     (controller_modes.dart, controller_scenarios.dart,
+///     controller_branding.dart), signed packages with the app's `[modes]`
+///     settings ([ControllerBoot.modes]) and the modes sent to boxes;
 ///   - the tick every 100 ms, and every [ControllerBoot.addressCheck] a look
 ///     at the phone's addresses: a new one (another network, the hotspot's
 ///     address) makes a new server certificate for it, the HTTPS listener
@@ -48,15 +52,19 @@ import 'console_files.dart';
 import 'controller_adoption.dart';
 import 'controller_api.dart';
 import 'controller_boxes.dart';
+import 'controller_branding.dart';
 import 'controller_channel.dart';
 import 'controller_checkin.dart';
 import 'controller_engine.dart';
 import 'controller_field.dart';
 import 'controller_firmware.dart';
+import 'controller_mode_fetch.dart';
 import 'controller_pairing.dart';
 import 'controller_radio.dart';
 import 'controller_mqtt.dart';
 import 'controller_positions.dart';
+import 'controller_scenarios.dart';
+import 'controller_signed_modes.dart';
 import 'controller_store.dart';
 import 'field_tls.dart';
 import 'mqtt_broker.dart';
@@ -84,6 +92,7 @@ final class ControllerBoot {
     this.addresses,
     this.addressCheck = const Duration(seconds: 10),
     this.firmwareKeys = const [],
+    this.modes = const ModesConfig(),
   });
 
   /// The controller's folder in the app's private storage.
@@ -131,6 +140,10 @@ final class ControllerBoot {
   /// The firmware release keys' public halves (standard base64, at most 8;
   /// the Pi's `[firmware] release_keys`): none, no release is accepted.
   final List<String> firmwareKeys;
+
+  /// The Pi's `[modes]` settings: trusted mode keys, revoked key ids, the
+  /// registry index, the boxes' mode keys (slice S7b, decision PE24-82).
+  final ModesConfig modes;
 }
 
 /// The controller's own secrets, kept in `shell.json` beside its store.
@@ -325,6 +338,15 @@ class ControllerHost {
       ControllerBoxes(engine);
       ControllerPairing(engine);
     }
+    // Slice S7b: scenarios, branding, signed packages, modes sent to boxes.
+    ControllerScenarios(engine);
+    ControllerBranding(engine, fieldId: boot.fieldId);
+    engine.signedModes = ControllerSignedModes(engine.modes, boot.modes);
+    ControllerModeFetch(
+      engine,
+      boot.modes.boxKeys,
+      timeoutS: boot.modes.fetchTimeoutS,
+    );
     api = ControllerApi(
       engine,
       gmToken: secrets.gmToken,

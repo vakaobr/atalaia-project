@@ -152,11 +152,11 @@ class StreamHub {
     if (out['type'] == 'event' &&
         ev is Map<String, Object?> &&
         !v.isStaffOf(out['game'] as int?)) {
-      out['event'] = publicEvent(ev);
+      out['event'] = engine.eventFor(v, out['game'], ev);
     } else if (out['type'] == 'game' &&
         game is Map<String, Object?> &&
         !v.isStaffOf(game['id'] as int?)) {
-      out['game'] = engine.playersGame(game);
+      out['game'] = engine.playersGame(game, v);
     }
     return out;
   }
@@ -186,9 +186,11 @@ class StreamHub {
         for (final e in all.skip(max(0, all.length - helloEvents)))
           {for (final k in _helloEventKeys) k: e[k]},
       ];
-      if (!staff) events = [for (final e in events) publicEvent(e)];
+      if (!staff) {
+        events = [for (final e in events) engine.eventFor(viewer, gameId, e)];
+      }
       game = engine.getGame(gameId);
-      if (!staff) game = engine.playersGame(game);
+      if (!staff) game = engine.playersGame(game, viewer);
     }
     final out = <String, Object?>{
       'type': 'hello',
@@ -197,6 +199,9 @@ class StreamHub {
       'nodes': gameId == null ? const <Object?>[] : engine.nodes(gameId),
       'events': events,
     };
+    // Public: the field's name, images and accent (slice S7b).
+    final branding = engine.branding;
+    if (branding != null) out['branding'] = branding.view();
     if (viewer.kind != 'player') return out..['status'] = status;
     out['status'] = {'live_game': gameId};
     final me = engine.checkin?.me(viewer, forHello: true);

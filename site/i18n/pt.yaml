@@ -656,7 +656,7 @@ roadmap:
       depois de o telemóvel reiniciar sem a chave do jogo, a adoção de caixas novas pelo código que
       mostram ou pelo cartão de campo que o telemóvel escreve por NFC, e as atualizações de firmware
       entre jogos (com o modem de rádio USB do Pi ligado ao telemóvel: o módulo de E/S ainda não
-      passa estas mensagens); depois do teste no campo: a passagem entre um telemóvel e um Pi e o resto do que o Pi faz) e a versão
+      passa estas mensagens); e as predefinições, os modos carregados e os pacotes de modos assinados, enviados às caixas que não os têm, os cenários compilados no telemóvel, os pacotes de papéis num jogo e os nomes e emblemas das equipas; depois do teste no campo: a passagem entre um telemóvel e um Pi e o resto do que o Pi faz) e a versão
       iOS (por fazer: precisa de um Mac). A fase G do plano, o teste no campo com telemóveis e
       módulos a sério, espera pelo hardware: até agora a app só correu em emuladores Android, e o
       firmware do módulo só como o seu próprio código num computador.

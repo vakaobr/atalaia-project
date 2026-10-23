@@ -74,6 +74,10 @@ final class AppSettings {
   /// halves, standard base64 of 32 bytes, at most 8.
   List<String> firmwareKeys = [];
 
+  /// The phone controller's `[modes]` settings (ModesConfig's JSON: keys,
+  /// box_keys, revoked, index; slice S7b of PE24).
+  Map<String, Object?> controllerModes = {};
+
   List<int>? get joinKey {
     final h = joinKeyHex;
     if (h == null || !isJoinKeyHex(h)) return null;
@@ -124,6 +128,7 @@ final class AppSettings {
     'notice_seen': noticeSeen,
     'share_position': sharePosition,
     'firmware_keys': firmwareKeys,
+    'controller_modes': controllerModes,
   };
 
   static AppSettings fromJson(Map<String, Object?> j) {
@@ -155,7 +160,9 @@ final class AppSettings {
       ..firmwareKeys = [
         for (final k in (j['firmware_keys'] as List?) ?? const [])
           if (k is String) k,
-      ];
+      ]
+      ..controllerModes =
+          (j['controller_modes'] as Map?)?.cast<String, Object?>() ?? {};
   }
 }
 

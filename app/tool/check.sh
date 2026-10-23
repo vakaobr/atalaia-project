@@ -58,6 +58,11 @@ cp -r "$SRC/app" "$SRC/core" "$SRC/modes" "$SRC/protocol" "$W/"
 mkdir -p "$W/controller/console"
 cp -r "$SRC/controller/console/src" "$W/controller/console/"
 cp -r "$SRC/controller/templates" "$W/controller/"
+# The phone controller's slice S7b tests read the Pi's branding images, its
+# example scenarios and the scenario runtime (checked to be the app's copy).
+mkdir -p "$W/controller/tests" "$W/controller/atalaia_controller/scenarios"
+cp -r "$SRC/controller/tests/fixtures" "$SRC/controller/tests/scenarios" "$W/controller/tests/"
+cp "$SRC/controller/atalaia_controller/scenarios/runtime.lua" "$W/controller/atalaia_controller/scenarios/"
 rm -rf "$W/app/.dart_tool" "$W/app/build" "$W/app/android/.gradle" "$W/app/android/app/.cxx" \
     "$W/core/build"
 cd "$W/app"

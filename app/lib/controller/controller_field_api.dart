@@ -31,8 +31,12 @@ part of 'controller_api.dart';
 /// The largest request body the phone reads: a plan (4 MB) or the field
 /// from a map (its image in base64, about 5.6 MB) on the field's paths,
 /// 1 MB elsewhere (decision PE24-76); a firmware image up to a Field Box's
-/// OTA slot, 2 MiB (slice S7c, `POST /api/v1/firmware`).
-int _bodyLimit(String path) => path.startsWith('/api/v1/field/')
+/// OTA slot, 2 MiB (slice S7c, `POST /api/v1/firmware`); the field's logo
+/// and wallpaper, 4 MiB, the wallpaper's limit (slice S7b; a crest and a
+/// signed mode package fit in 1 MB).
+int _bodyLimit(String path) => path.startsWith('/api/v1/field/branding/')
+    ? 4 << 20
+    : path.startsWith('/api/v1/field/')
     ? 6 << 20
     : path == '/api/v1/firmware'
     ? slotSize

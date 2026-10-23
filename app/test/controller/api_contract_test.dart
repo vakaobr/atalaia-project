@@ -27,7 +27,11 @@
 // key, as the Pi runner does; field_rx, pair_rx, field_tx, field_ack,
 // pair_box and pair_box_done steps play the boxes' side of the field and
 // pair frames, and requests may send raw bytes signed with a key (a box's
-// firmware report).
+// firmware report). Slice S7b: the vectors' fixtures' values are saved in
+// every case; a case's mode_keys, mode_revoked and box_keys set up signed
+// mode packages and the modes sent to boxes (scenarios and branding are on
+// every controller); raw bodies may name their 'content_type' and answers'
+// 'headers' are matched.
 
 import 'dart:async';
 import 'dart:collection';
@@ -38,6 +42,10 @@ import 'dart:typed_data';
 import 'package:atalaia_app/controller/controller_adoption.dart';
 import 'package:atalaia_app/controller/controller_api.dart';
 import 'package:atalaia_app/controller/controller_boxes.dart';
+import 'package:atalaia_app/controller/controller_branding.dart';
+import 'package:atalaia_app/controller/controller_mode_fetch.dart';
+import 'package:atalaia_app/controller/controller_scenarios.dart';
+import 'package:atalaia_app/controller/controller_signed_modes.dart';
 import 'package:atalaia_app/controller/controller_checkin.dart';
 import 'package:atalaia_app/controller/controller_engine.dart';
 import 'package:atalaia_app/controller/controller_field.dart';
@@ -160,6 +168,8 @@ Map<String, Object?> joinJson(JoinPayload j) => {
   'ca_sha256': j.caSha256 == null ? null : _hex(j.caSha256!),
   'urls': j.urls,
   'lang': j.lang,
+  'fetch_modes': j.fetchModes,
+  'forget_modes': j.forgetModes,
 };
 
 /// A decoded frame's fields as the cases see them: bytes in hex.
@@ -350,6 +360,20 @@ void main() {
           ControllerBoxes(engine);
           ControllerPairing(engine);
         }
+        // Slice S7b, as the host sets them up.
+        ControllerScenarios(engine);
+        ControllerBranding(engine);
+        engine.signedModes = ControllerSignedModes(
+          engine.modes,
+          ModesConfig(
+            keys: [...?(c['mode_keys'] as List?)?.cast<String>()],
+            revoked: [...?(c['mode_revoked'] as List?)?.cast<String>()],
+          ),
+          wallSeconds: () => wallStart + now / 1000,
+        );
+        ControllerModeFetch(engine, [
+          ...?(c['box_keys'] as List?)?.cast<String>(),
+        ], clock: () => wallStart + now / 1000);
         if (c['https'] == true) {
           engine
             ..caSha256 = Uint8List.fromList(List.generate(32, (i) => i))
@@ -386,7 +410,10 @@ void main() {
 
       await boot();
       final client = HttpClient();
-      final saved = <String, Object?>{};
+      final saved = <String, Object?>{
+        ...?((vectors['fixtures'] as Map?)?['values'] as Map?)
+            ?.cast<String, Object?>(),
+      };
       var sentinel = 0;
 
       void check(Object? pattern, Object? actual, String where) {
@@ -842,14 +869,18 @@ void main() {
             request.add(data);
             if (size > data.length) request.add(Uint8List(size - data.length));
           }
-          // Slice S7c: raw bytes (hex or text), signed with 'mac_key'.
+          // Slices S7c and S7b: raw bytes (hex or text) with their type,
+          // signed with 'mac_key'.
           final rawBody = req.containsKey('body_hex')
               ? _unhex(req['body_hex']! as String)
               : req.containsKey('body_text')
               ? Uint8List.fromList(utf8.encode(req['body_text']! as String))
               : null;
           if (rawBody != null) {
-            request.headers.contentType = ContentType.binary;
+            request.headers.set(
+              'Content-Type',
+              (req['content_type'] as String?) ?? 'application/octet-stream',
+            );
             if (req.containsKey('mac_key')) {
               request.headers.set(
                 'X-Atalaia-Mac',
@@ -859,7 +890,6 @@ void main() {
                 ).convert(rawBody).toString(),
               );
             }
-            request.add(rawBody);
           }
           for (final e
               in ((req['headers'] as Map?) ?? const {})
@@ -867,6 +897,7 @@ void main() {
                   .entries) {
             request.headers.set(e.key, e.value);
           }
+          if (rawBody != null) request.add(rawBody);
           final response = await request.close();
           final bytes = await response.fold<BytesBuilder>(
             BytesBuilder(),
@@ -881,6 +912,19 @@ void main() {
             reason:
                 '$where: ${text.length > 500 ? text.substring(0, 500) : text}',
           );
+          if (step.containsKey('headers')) {
+            // Slice S7b: the answer's headers, by lower-case name.
+            final got = <String, Object?>{};
+            response.headers.forEach((k, v) => got[k] = v.join(','));
+            check(
+              {
+                for (final e in (step['headers'] as Map).entries)
+                  '${e.key}'.toLowerCase(): e.value,
+              },
+              got,
+              '$where: headers',
+            );
+          }
           final ctype = response.headers.contentType?.mimeType ?? '';
           if (step.containsKey('content_type')) {
             expect(ctype, step['content_type'], reason: where);
@@ -899,7 +943,7 @@ void main() {
           if (step.containsKey('bytes_sha256')) {
             expect(
               sha256.convert(data).toString(),
-              step['bytes_sha256'],
+              substitute(step['bytes_sha256'], saved),
               reason: where,
             );
             continue;

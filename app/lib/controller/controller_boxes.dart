@@ -590,8 +590,19 @@ class ControllerBoxes {
     final g = engine.liveGame;
     if (pending.contains('invites') && g != null) {
       final gid = g['id']! as int;
-      engine.emit({'type': 'invites', 'game': gid, 'invites': invites(gid)});
+      final list = invites(gid);
+      engine.emit({'type': 'invites', 'game': gid, 'invites': list});
+      // A box fetching its modes, or one that could not (slice S7b).
+      engine.modeFetch?.onInvites(list);
     }
+  }
+
+  /// A box's mode fetch changed whether its HELLO joined it
+  /// (controller_mode_fetch.dart): the consoles are told.
+  void refreshInvites() {
+    _pending.add('invites');
+    _pending.add('boxes');
+    _flush();
   }
 
   // --- what the console shows -------------------------------------------------
@@ -620,13 +631,17 @@ class ControllerBoxes {
     return null;
   }
 
-  /// Device id -> node id of the boxes the live game has heard.
+  /// Device id -> node id of the boxes the live game has heard: not a box
+  /// whose mode fetch has not ended in its HELLO (it said HELLO only to tell
+  /// that its fetch failed; the GM may invite it again, P5D-17).
   Map<String, int> _inLiveGame() {
     final g = engine.liveGame;
     if (g == null) return {};
+    final mf = engine.modeFetch;
     return {
       for (final n in engine.nodes(g['id']! as int))
-        if (n['device_id'] is String)
+        if (n['device_id'] is String &&
+            (mf == null || !mf.holds(n['node_id']! as int)))
           n['device_id']! as String: n['node_id']! as int,
     };
   }
@@ -662,10 +677,15 @@ class ControllerBoxes {
     };
   }
 
+  /// The live game's invites as the console shows them: not *joined* while
+  /// a box's mode fetch has not ended in its HELLO (slice S7b).
   List<Map<String, Object?>> invites(int gameId) => [
     for (final i in inviter.invites.values)
-      if (i.gameId == gameId) i.public(),
+      if (i.gameId == gameId) _view(i.public()),
   ];
+
+  Map<String, Object?> _view(Map<String, Object?> inv) =>
+      engine.modeFetch?.inviteView(inv) ?? inv;
 
   // --- what the GM does -------------------------------------------------------
 
@@ -739,22 +759,37 @@ class ControllerBoxes {
       if (spec['name'] != null) joinSpec['name'] = spec['name'];
       final fetch = spec['fetch_modes'] ?? false;
       if (fetch is! bool) throw ControllerError('fetch_modes: true or false');
-      if (fetch) {
-        // Sending modes to boxes (join key 16) is a phone controller's
-        // later work: as a Pi without mode fetching (engine.py issue_join).
-        throw ControllerError.unavailable(
-          'sending modes to boxes is not set up on this controller',
-        );
+      // Join key 16: the box fetches the parts it lacks; key 17 for a box
+      // the GM marked to forget its fetched modes (slice S7b).
+      final mf = engine.modeFetch;
+      if (fetch) joinSpec['fetch_modes'] = true;
+      if (mf != null && mf.forgetMarked().contains(hexid)) {
+        joinSpec['forget_modes'] = true;
       }
       // The same node id when the box is invited again into this game.
       final nodeId = existing != null && existing.gameId == gameId
           ? existing.nodeId
           : null;
-      final made = engine.issueJoin(
-        joinSpec,
-        nodeIdValue: nodeId,
-        sameDevice: nodeId != null,
-      );
+      final Map<String, Object?> made;
+      try {
+        made = engine.issueJoin(
+          joinSpec,
+          nodeIdValue: nodeId,
+          sameDevice: nodeId != null,
+          device: hexid,
+          tier: inviter.boxes[hexid]?.tier,
+        );
+      } on ControllerError catch (e) {
+        if (!fetch || e.status != 409) rethrow;
+        // This box cannot be sent the modes (a Reduced box, a part not
+        // offered...): said for it alone, the others are still invited.
+        out.add({
+          'device_id': hexid,
+          'status': 'not_sent',
+          'detail': e.message,
+        });
+        continue;
+      }
       final payload = hexDecode(made['payload_hex']! as String);
       try {
         final inv = inviter.invite(
@@ -776,7 +811,7 @@ class ControllerBoxes {
     ); // the first one goes at once; the others as the air allows
     _flush();
     return {
-      'invites': [for (final o in out) o is BoxInvite ? o.public() : o],
+      'invites': [for (final o in out) o is BoxInvite ? _view(o.public()) : o],
     };
   }
 }

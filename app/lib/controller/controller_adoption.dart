@@ -45,13 +45,14 @@ class ControllerAdoption {
     return key;
   }
 
-  /// The field's name for a card: the check-in poster's (the Pi's branding
-  /// `field_name`, decision BR4), made fit for a card.
+  /// The field's name for a card: the branding's `field_name` (the check-in
+  /// poster's, decision BR4; controller_branding.dart, slice S7b), made fit
+  /// for a card.
   String fieldName() {
     final svc = engine.checkin;
-    final name = svc == null
-        ? 'Atalaia'
-        : '${svc.posterFields()['field_name']}';
+    final name =
+        engine.branding?.fieldName() ??
+        (svc == null ? 'Atalaia' : '${svc.posterFields()['field_name']}');
     return cleanFieldName(name);
   }
 

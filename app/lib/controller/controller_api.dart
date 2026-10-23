@@ -39,6 +39,9 @@
 ///     WS   /api/v1/prop                      Android props on Wi-Fi
 ///                                            (controller_props.dart, slice S4)
 ///
+/// Slice S7b (controller_api_s7b.dart): presets, mode uploads and signed
+/// mode packages, the modes sent to boxes, scenarios and team branding.
+///
 /// Field check-in, player tokens, the chrono list and positions (slice S5;
 /// controller_checkin.dart, controller_positions.dart):
 ///
@@ -92,19 +95,28 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
-import '../modes/builtin_modes.g.dart';
+import '../modes/mode_catalog.dart';
+import 'controller_branding.dart';
 import 'controller_channel.dart';
 import 'controller_checkin.dart';
 import 'controller_engine.dart';
 import 'controller_field.dart';
+import 'controller_images.dart';
+import 'controller_mode_fetch.dart';
+import 'controller_modes.dart';
 import 'controller_positions.dart';
 import 'controller_props.dart';
+import 'controller_scenarios.dart';
+import 'controller_signed_modes.dart';
 import 'controller_stream.dart';
 import 'console_files.dart';
 import 'controller_adoption.dart' show ControllerAdoption;
 import 'controller_boxes.dart' show ControllerBoxes;
 import 'controller_firmware.dart' show ControllerFirmware, reportMax, slotSize;
 import 'controller_pairing.dart' show ControllerPairing;
+import 'mode_package.dart';
+
+part 'controller_api_s7b.dart';
 
 part 'controller_boxes_api.dart';
 
@@ -115,12 +127,13 @@ const controllerApiVersion = '0.2.0';
 
 /// The GM console's areas this controller serves, in /whoami's `features`
 /// (decision PE24-70): the console hides the tabs and panels of the rest.
-/// The Pi's api.py `FEATURES` has every area; this one leaves out presets
-/// and team presets, branding, ATAK, scenarios, the schedule, mode
-/// packages and failover (PLAN.md, "PE24 slices"). An area served later is
+/// The Pi's api.py `FEATURES` has every area; this one leaves out ATAK, the
+/// schedule and failover (PLAN.md, "PE24 slices"). An area served later is
 /// added here: slice S7a added the radio channel and the field plan
-/// (controller_field_api.dart), slice S7c boxes (free boxes, discover,
-/// invites), adoption and firmware (controller_boxes_api.dart).
+/// (controller_field_api.dart), slice S7b presets (and saved teams),
+/// branding, scenarios and mode packages (controller_api_s7b.dart,
+/// PE24-89), slice S7c boxes (free boxes, discover, invites), adoption and
+/// firmware (controller_boxes_api.dart).
 const controllerFeatures = [
   'checkin',
   'join',
@@ -131,6 +144,10 @@ const controllerFeatures = [
   'boxes',
   'adoption',
   'firmware',
+  'presets',
+  'branding',
+  'scenarios',
+  'mode_packages',
 ];
 
 /// An answer: its status code, JSON body and extra headers.
@@ -198,7 +215,8 @@ final class _Request {
   final String client;
 
   /// The body's bytes and its Content-Type (an uploaded image, slice S7a;
-  /// a firmware image or a box's report, slice S7c).
+  /// a firmware image or a box's report, slice S7c; a mode package, a
+  /// crest or a branding image, slice S7b).
   final Uint8List bytes;
   final String? contentType;
 
@@ -260,7 +278,6 @@ class ControllerApi {
       _route('GET', r'/healthz', _healthz),
       _route('GET', r'/api/v1/whoami', _viewer(_whoami)),
       _route('GET', r'/api/v1/nodes', _viewer(_nodes)),
-      _route('GET', r'/api/v1/modes', _read(_modes)),
       _route('GET', r'/api/v1/games', _viewer(_games)),
       _route('POST', r'/api/v1/games', _gm(_createGame)),
       _route('GET', r'/api/v1/games/([^/]+)', _viewer(_game)),
@@ -295,6 +312,7 @@ class ControllerApi {
       ..._checkinRoutes(),
       ..._fieldRoutes(),
       ..._boxesRoutes(),
+      ...s7bRoutes(),
     ];
     // Slice S7a: the field plan and the radio channel, on every controller
     // (the shell gives the field plan its folder first; else in memory).
@@ -435,6 +453,7 @@ class ControllerApi {
     String client = 'local',
     Uint8List? bytes,
     String? contentType,
+    Map<String, String> headers = const {},
   }) {
     final out = _dispatch(
       method,
@@ -444,6 +463,7 @@ class ControllerApi {
       client,
       bytes,
       contentType,
+      headers,
     );
     if (out is ApiResponse) return out;
     throw StateError('$method ${uri.path} answers asynchronously');
@@ -541,6 +561,9 @@ class ControllerApi {
       'detail': e.message,
       ...e.extra,
     }),
+    // Slice S7b: a mode package or a scenario refused (api.py's handlers).
+    ModeException() => ApiResponse(400, {'detail': e.message}),
+    ScenarioRefused() => ApiResponse(400, e.toJson()),
     _ => throw e,
   };
 
@@ -693,29 +716,8 @@ class ControllerApi {
   ApiResponse _nodes(_Request r, ApiViewer v) =>
       ApiResponse(200, engine.nodes(r.queryInt('game')));
 
-  ApiResponse _modes(_Request r, String who) => ApiResponse(200, [
-    for (final m in engine.modes.modes)
-      {
-        'id': m.id,
-        'kind': m.kind,
-        'name': m.name('en'),
-        'version': m.version,
-        'description': m.description('en'),
-        'min_tier': m.manifest['min_tier'],
-        'roles': m.manifest['roles'] ?? const {},
-        'params': m.manifest['params'] ?? const {},
-        'commands': m.manifest['commands'] ?? const {},
-        'i18n': m.manifest['i18n'] ?? const {},
-        'parts': [m.id],
-        'field_script': m.fieldScript != null,
-        'builtin': true,
-        'files': (builtinModeFiles[m.folder]?.keys.toList() ?? <String>[])
-          ..sort(),
-      },
-  ]);
-
   Map<String, Object?> _view(Map<String, Object?> game, ApiViewer v) =>
-      v.isStaffOf(game['id'] as int?) ? game : engine.playersGame(game);
+      v.isStaffOf(game['id'] as int?) ? game : engine.playersGame(game, v);
 
   ApiResponse _games(_Request r, ApiViewer v) =>
       ApiResponse(200, [for (final g in engine.listGames()) _view(g, v)]);
@@ -790,7 +792,7 @@ class ControllerApi {
     final out = engine.log(id, sinceMs: r.queryInt('since_ms'));
     return ApiResponse(
       200,
-      v.isStaffOf(id) ? out : [for (final e in out) publicEvent(e)],
+      v.isStaffOf(id) ? out : [for (final e in out) engine.eventFor(v, id, e)],
     );
   }
 

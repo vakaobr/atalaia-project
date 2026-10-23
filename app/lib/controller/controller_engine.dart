@@ -30,11 +30,14 @@
 /// engine's hooks the Pi's engine has for them: the controller's own events
 /// ([logControllerEvent]), a VIP's position for field.lua
 /// ([fieldPosition]), the retention purge and the grants' expiry on [tick],
-/// positions deleted when a game ends. Not yet: presets, mode uploads,
-/// scenarios, role packages, branding, failover (S7). Slice S7c: the hooks
-/// of the boxes over the radio ([boxes], [pairing], [adoption],
-/// [firmware]): field and pair frames routed to them, GAME_OVER when a game
-/// ends, [startGuards], [sendUpdate]. Slice S6: the shell runs the engine on the
+/// positions deleted when a game ends. Slice S7b: presets, mode uploads and
+/// signed packages ([modes], controller_modes.dart; [signedModes]), the
+/// modes sent to boxes ([modeFetch]), scenarios ([scenarios]), role
+/// packages in a game and team branding ([branding]). Not yet: failover
+/// (S7, later). Slice S7c: the hooks of the boxes over the radio ([boxes],
+/// [pairing], [adoption], [firmware]): field and pair frames routed to
+/// them, GAME_OVER when a game ends, [startGuards], [sendUpdate]. Slice S6:
+/// the shell runs the engine on the
 /// controller's own isolate (controller_host.dart) and gives it the field
 /// CA and the phone's addresses for join keys 13 and 14 ([caSha256],
 /// [linkUrls]).
@@ -58,13 +61,18 @@ import '../security/bytes.dart' show hexDecode;
 import '../security/ndef.dart';
 import 'controller_adoption.dart';
 import 'controller_boxes.dart';
+import 'controller_branding.dart';
 import 'controller_channel.dart';
 import 'controller_checkin.dart';
 import 'controller_field.dart';
 import 'controller_firmware.dart';
+import 'controller_mode_fetch.dart';
+import 'controller_modes.dart';
 import 'controller_pairing.dart';
 import 'controller_positions.dart';
 import 'controller_radio.dart';
+import 'controller_scenarios.dart';
+import 'controller_signed_modes.dart';
 import 'controller_store.dart';
 import 'field_controller.dart';
 
@@ -297,10 +305,15 @@ class ControllerEngine {
     double Function()? wallSeconds,
     Random? random,
   }) : store = store ?? MemoryControllerStore(wallSeconds: wallSeconds),
-       modes = modes ?? ModeCatalog.builtin(),
        _wall =
            wallSeconds ?? (() => DateTime.now().microsecondsSinceEpoch / 1e6),
        _random = random ?? Random.secure() {
+    this.modes = ControllerModes(
+      this.store,
+      core: core,
+      catalog: modes,
+      wallSeconds: _wall,
+    );
     final watch = Stopwatch()..start();
     _clock = clockMs ?? () => watch.elapsedMilliseconds;
     _t0 = _clock();
@@ -325,7 +338,22 @@ class ControllerEngine {
 
   final ControllerConfig config;
   final ControllerStore store;
-  final ModeCatalog modes;
+
+  /// The built-in and uploaded packages and the presets (slice S7b).
+  late final ControllerModes modes;
+
+  /// Signed mode packages (slice S7b): set by [ControllerSignedModes]'s
+  /// user (the host); null: 503, as on a Pi without them.
+  ControllerSignedModes? signedModes;
+
+  /// The modes sent to boxes (slice S7b): set by [ControllerModeFetch].
+  ControllerModeFetch? modeFetch;
+
+  /// Scenarios (slice S7b): set by [ControllerScenarios].
+  ControllerScenarios? scenarios;
+
+  /// Field and team branding (slice S7b): set by [ControllerBranding].
+  ControllerBranding? branding;
 
   /// The core: field.lua and the EVENT codec need it (null: modes with a
   /// field.lua are refused, box events are not decoded).
@@ -379,8 +407,9 @@ class ControllerEngine {
   ControllerAdoption? adoption;
   ControllerFirmware? firmware;
 
-  /// Why the live game may not start now (firmware updates on their way;
-  /// engine.py `start_guards`), or null: checked by [startGame] before the
+  /// Why the live game may not start now (firmware updates on their way,
+  /// slice S7c; boxes still fetching its modes, slice S7b; engine.py
+  /// `start_guards`), or null: checked by [startGame] before the
   /// start check, never overridden by `force`.
   final startGuards = <String? Function()>[];
 
@@ -469,52 +498,85 @@ class ControllerEngine {
 
   // --- games: what the API shows ------------------------------------------
 
-  GameMode? _mode(Object? modeId) {
-    if (modeId is! String) return null;
-    try {
-      return modes.compose(modeId);
-    } on ModeException {
-      return null;
-    }
-  }
+  /// The game's mode, composed with its other parts (controller_modes.dart),
+  /// or null.
+  ControllerMode? _mode(Object? modeId) => modes.modeOf(modeId);
+
+  /// The scenario a game's id leads with, or null.
+  ScenarioMeta? scenarioMeta(Object? modeId) => scenarios?.meta(modeId);
 
   Map<String, Object?> publicGame(Map<String, Object?> game) {
     final out = Map<String, Object?>.of(game);
     final live = _game != null && _game!['id'] == game['id'];
     out['live'] = live;
+    final meta = scenarioMeta(game['mode_id']);
+    final svc = scenarios;
+    if (meta != null && svc != null) {
+      // The staff's view: every objective, and the boxes the GM named.
+      out['scenario'] = meta.staffView();
+      final names = svc.nodeNames(game['id']! as int);
+      final ids = names.keys.toList()..sort();
+      out['scenario_nodes'] = {for (final k in ids) '$k': names[k]};
+    }
     final fc = _fc;
     if (live && fc != null) {
       out['game_time_ms'] = fc.gameTimeMs;
       out['term'] = fc.term;
-      if (game['state'] == 'ready' && game['joined'] != true) {
-        out['start_check'] = startCheck();
-      }
     }
     if (live && _keyLost) out['key_lost'] = true;
+    if (live &&
+        fc != null &&
+        game['state'] == 'ready' &&
+        game['joined'] != true) {
+      out['start_check'] = startCheck();
+    }
     return out;
   }
 
   /// A game as players and the read token see it: without its gm_only
-  /// parameters (decision M5-1).
-  Map<String, Object?> playersGame(Map<String, Object?> game) {
+  /// parameters (decision M5-1), and of its scenario only the objectives
+  /// [viewer] may know (P4R24; engine.py `players_game`).
+  Map<String, Object?> playersGame(
+    Map<String, Object?> game, [
+    ApiViewer? viewer,
+  ]) {
     final mode = _mode(game['mode_id']);
     final params = game['params'];
-    final hidden = <String>{
-      if (mode != null)
-        for (final part in mode.parts)
-          for (final e
-              in ((part.manifest['params'] as Map?) ?? const {}).entries)
-            if ((e.value as Map?)?['gm_only'] == true) '${e.key}',
-    };
-    return {
+    final out = <String, Object?>{
       ...game,
       'params': mode == null || params is! Map
           ? <String, Object?>{}
-          : {
-              for (final e in params.entries)
-                if (!hidden.contains(e.key)) '${e.key}': e.value,
-            },
+          : mode.publicParams(params.cast<String, Object?>()),
     }..remove('scenario_nodes');
+    final meta = scenarioMeta(game['mode_id']);
+    final svc = scenarios;
+    if (meta != null && svc != null) {
+      out['scenario'] = meta.playerView(
+        viewer,
+        game,
+        svc.revealed(game['id']! as int),
+      );
+    }
+    return out;
+  }
+
+  /// An event as [viewer] may see it: gm_only data for staff, and a
+  /// scenario objective's event for the players it is for (engine.py
+  /// `event_for`).
+  Map<String, Object?> eventFor(
+    ApiViewer viewer,
+    Object? gameId,
+    Map<String, Object?> ev,
+  ) {
+    if (viewer.isStaffOf(gameId is int ? gameId : null)) return ev;
+    if (!objectiveEvents.contains(ev['type']) || gameId is! int) {
+      return publicEvent(ev);
+    }
+    final game = _game != null && _game!['id'] == gameId
+        ? _game
+        : store.game(gameId);
+    final meta = game == null ? null : scenarioMeta(game['mode_id']);
+    return scenarioEvent(viewer, ev, game, meta?.objectives);
   }
 
   List<Map<String, Object?>> listGames() => [
@@ -544,24 +606,32 @@ class ControllerEngine {
     if (name is! String || name.isEmpty || name.length > 64) {
       throw ControllerError('name: 1 to 64 characters');
     }
+    Map<String, Object?>? preset;
     if (spec['preset_id'] != null) {
-      // Presets come with slice S7 (PLAN.md, "PE24 slices").
-      throw ControllerError.notFound('no preset ${spec['preset_id']}');
+      preset = modes.preset(_int(spec['preset_id'], 'preset_id'));
+      if (preset == null) {
+        throw ControllerError.notFound('no preset ${spec['preset_id']}');
+      }
     }
-    var modeId = spec['mode_id'];
-    final modifiers = spec['modifiers'] ?? const <Object?>[];
+    var modeId = _truthy(spec['mode_id'])
+        ? spec['mode_id']
+        : preset?['mode_id'];
+    final modifiers = _truthy(spec['modifiers'])
+        ? spec['modifiers']
+        : const <Object?>[];
     if (modifiers is! List || modifiers.any((m) => m is! String)) {
       throw ControllerError('modifiers: a list of modifier ids');
     }
     if (modifiers.isNotEmpty && modeId is String) {
-      modeId = [modeId, ...modifiers].join('+');
+      modeId = [modeId, ...modifiers].join(modeSeparator);
     }
-    if (modeId is! String) throw ControllerError('unknown mode $modeId');
-    final GameMode mode;
+    final ControllerMode mode;
     try {
-      mode = modes.compose(modeId);
+      final pkg = modes.get(modeId);
+      if (pkg == null) throw ControllerError('unknown mode $modeId');
+      mode = pkg.mode;
     } on ModeException catch (e) {
-      throw ControllerError('unknown mode $modeId ($e)');
+      throw ControllerError('$e');
     }
     if (utf8.encode(mode.id).length > modeIdMax) {
       throw ControllerError(
@@ -582,11 +652,17 @@ class ControllerEngine {
       );
     }
     final teams = teamsSpec.cast<String>();
-    final overrides = spec['params'] ?? const <String, Object?>{};
-    if (overrides is! Map) throw ControllerError('params must be a map');
+    final overrides = <String, Object?>{
+      ...?(preset?['params'] as Map?)?.cast<String, Object?>(),
+    };
+    if (spec['params'] != null) {
+      final given = spec['params'];
+      if (given is! Map) throw ControllerError('params must be a map');
+      overrides.addAll(given.cast<String, Object?>());
+    }
     final Map<String, Object?> params;
     try {
-      params = mode.resolveParams(overrides.cast<String, Object?>(), teams);
+      params = mode.resolveParams(overrides, teams);
     } on ModeException catch (e) {
       throw ControllerError('$e');
     }
@@ -598,7 +674,7 @@ class ControllerEngine {
     if (assignments is! Map) {
       throw ControllerError('assignments: a map of node id to role');
     }
-    final roles = {for (final r in mode.main.roles) r.name};
+    final roles = mode.roles.keys.toSet();
     final clean = <String, String>{};
     assignments.forEach((nodeId, role) {
       final nid = _int(nodeId, 'assignments node id');
@@ -621,11 +697,15 @@ class ControllerEngine {
     if (squads < 0 || squads > squadsMax) {
       throw ControllerError('squads: 0 (none) to $squadsMax per team');
     }
-    final teamInfo = spec['team_info'];
-    if (teamInfo != null && (teamInfo is! Map || teamInfo.isNotEmpty)) {
-      // Team branding comes with slice S7 (PLAN.md, "PE24 slices").
+    // Team branding (decisions BR12-BR15): display names and crests next to
+    // the colours, which stay the team names the boxes and the radio know.
+    final b = branding;
+    final teamInfo = b != null
+        ? b.teamInfoFor(spec['team_info'], teams)
+        : <String, Object?>{};
+    if (b == null && _truthy(spec['team_info'])) {
       throw ControllerError(
-        'team_info: team branding is not on the Android controller yet',
+        'team_info: team branding is not set up on this controller',
       );
     }
     final boxLang = _boxLangFor(spec['console_lang']);
@@ -642,7 +722,7 @@ class ControllerEngine {
       'id': id,
       'name': name,
       'mode_id': mode.id,
-      'preset_id': null,
+      'preset_id': preset?['id'],
       'teams': teams,
       'params': params,
       'assignments': clean,
@@ -656,7 +736,7 @@ class ControllerEngine {
       'max_hops': config.maxHops,
       'joined': false,
       'squads': squads,
-      'team_info': <String, Object?>{},
+      'team_info': teamInfo,
     };
     store.createGame(game, key: config.persistGameKey ? key : null);
     if (boxLang != null) store.setSetting('box_lang:$id', boxLang);
@@ -918,17 +998,29 @@ class ControllerEngine {
     for (final node in _fc?.nodes.values ?? const <FieldNode>[]) {
       if (node.heard || node.hello != null) out[node.nodeId] = node.role;
     }
+    // A box still fetching the game's modes (or whose fetch failed) has not
+    // joined until its HELLO (controller_mode_fetch.dart).
+    final fetch = modeFetch;
+    if (fetch != null) out.removeWhere((n, _) => fetch.holds(n));
     final ids = out.keys.toList()..sort();
     return [for (final id in ids) (id, out[id]!)];
   }
 
+  /// The roles that must each have a joined node before the game starts: a
+  /// scenario's boxes' roles, else every role of the game's mode and role
+  /// packages unless its manifest says `needed: false` (engine.py
+  /// `_needed_roles`).
   List<String> _neededRoles() {
+    final meta = scenarioMeta(_game!['mode_id']);
+    if (meta != null) {
+      final boxes = meta.boxNodes().values.toSet().toList()..sort();
+      if (boxes.isNotEmpty) return boxes;
+    }
     final mode = _mode(_game!['mode_id']);
     if (mode == null) return [];
-    final specs = (mode.main.manifest['roles'] as Map?) ?? const {};
     return [
-      for (final r in mode.main.roles)
-        if ((specs[r.name] as Map?)?['needed'] != false) r.name,
+      for (final e in mode.roles.entries)
+        if (!(e.value is Map && (e.value! as Map)['needed'] == false)) e.key,
     ]..sort();
   }
 
@@ -1018,11 +1110,13 @@ class ControllerEngine {
         'missing': missing,
       });
     }
+    final presetId = _game!['preset_id'];
+    final preset = presetId is int ? modes.preset(presetId) : null;
     fc
       ..startGame(durationMs: _game!['duration_ms']! as int, nowMs: nowMs())
       ..controllerEvent(
         'game.start',
-        {'preset': _game!['mode_id']},
+        {'preset': preset?['name'] ?? _game!['mode_id']},
         null,
         'critical',
       );
@@ -1264,11 +1358,7 @@ class ControllerEngine {
     int nodeId,
     Map<String, Object?> params,
   ) {
-    final mode = _mode(_game!['mode_id']);
-    final commands = <String, Object?>{
-      for (final part in mode?.parts ?? const <ModeManifest>[])
-        ...?(part.manifest['commands'] as Map?)?.cast<String, Object?>(),
-    };
+    final commands = _mode(_game!['mode_id'])?.commands ?? const {};
     final name = params['name'];
     if (name is! String || !commands.containsKey(name)) {
       final known = (commands.keys.toList()..sort()).join(', ');
@@ -1290,6 +1380,12 @@ class ControllerEngine {
         'node $nodeId is a ${node.role}',
       );
     }
+  }
+
+  /// A game's team display names and crests changed (controller_branding.dart).
+  void updateTeamInfo(int gameId, Map<String, Object?> info) {
+    store.updateGame(gameId, {'team_info': info});
+    if (_game != null && _game!['id'] == gameId) _game!['team_info'] = info;
   }
 
   // --- the boxes' language (join key 15) -----------------------------------
@@ -1369,6 +1465,8 @@ class ControllerEngine {
     Map<String, Object?> spec, {
     Object? nodeIdValue,
     bool sameDevice = false,
+    String? device,
+    int? tier,
   }) {
     final g = _game;
     if (g == null) {
@@ -1383,16 +1481,48 @@ class ControllerEngine {
     if (kind != 'node' && kind != 'controller') {
       throw ControllerError('kind: controller, node');
     }
-    if (spec['name'] != null) {
-      // Scenarios come with slice S7: no scenario node names here.
-      throw ControllerError(
-        "name: only a box of a scenario's game takes a scenario node's name",
+    final fetch = spec['fetch_modes'] ?? false;
+    final forget = spec['forget_modes'] ?? false;
+    if (fetch is! bool || forget is! bool) {
+      throw ControllerError('fetch_modes and forget_modes: true or false');
+    }
+    if ((fetch || forget) && kind != 'node') {
+      throw ControllerError('fetch_modes and forget_modes are for boxes');
+    }
+    final fetcher = modeFetch;
+    if ((fetch || forget) && fetcher == null) {
+      throw ControllerError.unavailable(
+        'sending modes to boxes is not set up on this controller',
       );
+    }
+    // A scenario's box: the name the GM gives it (P4R8, M6-7), whose role is
+    // the scenario's.
+    final scenarioName = spec['name'];
+    if (scenarioName != null) {
+      final meta = scenarioMeta(g['mode_id']);
+      final boxes = meta?.boxNodes() ?? const <String, String>{};
+      if (kind != 'node' || meta == null) {
+        throw ControllerError(
+          "name: only a box of a scenario's game takes a scenario node's name",
+        );
+      }
+      if (scenarioName is! String || !boxes.containsKey(scenarioName)) {
+        throw ControllerError(
+          "name: one of the scenario's boxes ${boxes.keys.toList()..sort()}",
+        );
+      }
+      if (spec['role'] != null && spec['role'] != boxes[scenarioName]) {
+        throw ControllerError(
+          '$scenarioName is a ${boxes[scenarioName]} in the scenario, not a '
+          '${spec['role']}',
+        );
+      }
+      spec = {...spec, 'role': boxes[scenarioName]};
     }
     final mode = _mode(g['mode_id']);
     String role;
     if (kind == 'node') {
-      final roles = [for (final r in mode?.main.roles ?? const []) r.name]
+      final roles = mode?.roles.keys.toList() ?? <String>[]
         ..sort();
       var asked = spec['role'];
       if (asked == null && roles.length == 1) asked = roles.single;
@@ -1434,7 +1564,19 @@ class ControllerEngine {
         'gets a new node id (Join).',
       );
     }
-    final params = (g['params'] as Map?)?.cast<String, Object?>() ?? {};
+    // A box's join names what it runs, with that part's parameters: for a
+    // role of a role package, the package alone; else the main mode and its
+    // modifiers. A standby controller gets the whole game.
+    var modeId = g['mode_id']! as String;
+    var params = (g['params'] as Map?)?.cast<String, Object?>() ?? {};
+    if (kind == 'node' && mode != null) {
+      modeId = mode.nodeModeId(role);
+      params = mode.paramsFor(role, params);
+    }
+    if (fetch) {
+      final why = fetcher!.refusal(modeId, tier);
+      if (why != null) throw ControllerError.conflict(why);
+    }
     // Android props link over Wi-Fi with the field CA and the phone's
     // addresses (keys 13 and 14, RFC 0001 Amendment 4, proposed), as the
     // Pi's issue_join: a payload too long with them is made without them.
@@ -1448,7 +1590,7 @@ class ControllerEngine {
       channelHz: (g['channel_hz'] as int?) ?? config.channelHz,
       maxHops: (g['max_hops'] as int?) ?? config.maxHops,
       teams: (g['teams']! as List).cast<String>(),
-      modeId: g['mode_id']! as String,
+      modeId: modeId,
       role: role,
       gameSeed: (g['game_seed']! as int) & 0xffffffff,
       params: params.isEmpty ? null : params,
@@ -1456,6 +1598,8 @@ class ControllerEngine {
       lang: store.getSetting('box_lang:$id'),
       caSha256: link ? ca : null,
       urls: link && linkUrls.isNotEmpty ? linkUrls.take(3).toList() : null,
+      fetchModes: fetch,
+      forgetModes: forget,
     );
     var join = joinWith(link: withLink);
     var linked = withLink;
@@ -1465,6 +1609,13 @@ class ControllerEngine {
         payload = encodeJoin(join, joinKey);
       } on JoinException catch (e) {
         if (!withLink || e.reason != JoinFailure.length) rethrow;
+        if (fetch) {
+          // A box fetches over that link: without it the join is no use.
+          throw ControllerError.conflict(
+            "this game's join with the field CA and the controller's "
+            'addresses is too long: the box could not fetch its modes',
+          );
+        }
         join = joinWith(link: false);
         linked = false;
         payload = encodeJoin(join, joinKey);
@@ -1486,12 +1637,13 @@ class ControllerEngine {
       store.updateGame(id, {'assignments': assignments});
       fc.registerNode(node, 'node-$node', role);
     }
+    if (scenarioName is String) scenarios?.nameNode(id, node, scenarioName);
     final out = <String, Object?>{
       'game': id,
       'node_id': node,
       'kind': kind,
       'role': role,
-      'name': null,
+      'name': scenarioName,
       'controller_id': nodeId,
       'channel_hz': join.channelHz,
       'max_hops': join.maxHops,
@@ -1500,14 +1652,25 @@ class ControllerEngine {
       'payload_hex': _hexOf(payload),
       'ndef_tag_hex': _hexOf(type2Memory(payload, joinNdefType)),
       'wifi_link': linked,
+      if (fetch || forget) ...{'fetch_modes': fetch, 'forget_modes': forget},
     };
+    // Also a plain join: it ends a fetch made for that node before (P5D-18).
+    fetcher?.track(
+      id,
+      node,
+      role,
+      modeId,
+      device,
+      fetch: fetch,
+      forget: forget,
+    );
     _emit({
       'type': 'join',
       'game': id,
       'node_id': node,
       'kind': kind,
       'role': role,
-      'name': null,
+      'name': scenarioName,
     });
     return out;
   }
@@ -1562,6 +1725,7 @@ class ControllerEngine {
     // or without a game.
     boxes?.tick(nowMs());
     pairing?.tick(nowMs());
+    branding?.purge(); // crests nothing refers to, at most every 10 minutes
     final fc = _fc;
     if (fc == null) return;
     fc.tick(nowMs());
@@ -1712,6 +1876,14 @@ class ControllerEngine {
     final id = game['id']! as int;
     if (!store.insertEvent(id, record)) return;
     _emit({'type': 'event', 'game': id, 'event': logRecord(record)});
+    if (record['type'] == objectiveRevealed) {
+      // A hidden objective's names reach its players with the game (P4R24).
+      final meta = scenarioMeta(game['mode_id']);
+      final o = meta?.objectives[(record['data'] as Map?)?['objective']];
+      if (o != null && o['visibility'] == 'hidden') {
+        _emit({'type': 'game', 'game': publicGame(game)});
+      }
+    }
     positions?.onEvent(id, record);
     final field = _field;
     if (field != null &&
@@ -1861,3 +2033,12 @@ int _int(Object? value, String name) {
   }
   throw ControllerError('$name must be an integer');
 }
+
+/// Python's truth of a JSON value (None, False, 0, "", [] and {} are false).
+bool _truthy(Object? v) => switch (v) {
+  null || false || 0 || '' => false,
+  final double d => d != 0,
+  final List<Object?> l => l.isNotEmpty,
+  final Map<Object?, Object?> m => m.isNotEmpty,
+  _ => true,
+};
