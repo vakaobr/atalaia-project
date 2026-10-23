@@ -30,6 +30,15 @@
 ///     POST /api/v1/nodes/{id}/cmd            GM: a command to one node (65535: all)
 ///     GET  /api/v1/games/{id}/log            the merged event log (?since_ms=)
 ///     GET  /api/v1/controller                the controller's state
+///     POST /api/v1/controller/promote        GM: manual failover, stand for election
+///     POST /api/v1/controller/join           GM: take a game as standby {"text"}
+///                                            (slice S7, controller_failover.dart)
+///     GET  /api/v1/schedule                  the site server's schedule as last pulled
+///     POST /api/v1/schedule/{id}/game        GM: a game made from a scheduled game
+///     GET  /api/v1/remote-gm                 GM: the remote GM's state and log
+///     GET  /api/v1/atak                      the ATAK feed's settings and counters
+///                                            (slice S7: controller_schedule.dart,
+///                                            controller_remote_gm.dart, controller_atak.dart)
 ///     WS   /api/v1/stream                    live games, events, scores, nodes
 ///                                            (controller_stream.dart; the token
 ///                                            also as ?token=)
@@ -127,13 +136,15 @@ const controllerApiVersion = '0.2.0';
 
 /// The GM console's areas this controller serves, in /whoami's `features`
 /// (decision PE24-70): the console hides the tabs and panels of the rest.
-/// The Pi's api.py `FEATURES` has every area; this one leaves out ATAK, the
-/// schedule and failover (PLAN.md, "PE24 slices"). An area served later is
+/// The Pi's api.py `FEATURES` has every area; this one serves them all
+/// since slice S7 (PLAN.md, "PE24 slices"). An area served later was
 /// added here: slice S7a added the radio channel and the field plan
 /// (controller_field_api.dart), slice S7b presets (and saved teams),
 /// branding, scenarios and mode packages (controller_api_s7b.dart,
 /// PE24-89), slice S7c boxes (free boxes, discover, invites), adoption and
-/// firmware (controller_boxes_api.dart).
+/// firmware (controller_boxes_api.dart), slice S7 failover (the promote
+/// and standby join above; PE24-118), the schedule (the site sync's,
+/// controller_schedule.dart) and ATAK (controller_atak.dart).
 const controllerFeatures = [
   'checkin',
   'join',
@@ -148,6 +159,9 @@ const controllerFeatures = [
   'branding',
   'scenarios',
   'mode_packages',
+  'failover',
+  'schedule',
+  'atak',
 ];
 
 /// An answer: its status code, JSON body and extra headers.
@@ -293,6 +307,17 @@ class ControllerApi {
       _route('GET', r'/api/v1/controller', _read(_status)),
       // Slice S6: the field CA (no token), as the Pi's api.py `field_ca`.
       _route('GET', r'/api/v1/controller/ca', _fieldCa),
+      // Slice S7: failover (controller_failover.dart), as the Pi's api.py.
+      _route(
+        'POST',
+        r'/api/v1/controller/promote',
+        _gm((r) => ApiResponse(200, engine.promote())),
+      ),
+      _route(
+        'POST',
+        r'/api/v1/controller/join',
+        _gm((r) => ApiResponse(201, engine.joinAsStandby(r.body['text']))),
+      ),
       // Slice S4: joins and the boxes' language.
       _route('POST', r'/api/v1/join', _gm(_join)),
       _route('POST', r'/api/v1/nodes/([^/]+)/join', _gm(_joinNode)),
@@ -313,6 +338,64 @@ class ControllerApi {
       ..._fieldRoutes(),
       ..._boxesRoutes(),
       ...s7bRoutes(),
+      // Slice S7: the site server's schedule (controller_schedule.dart).
+      _route(
+        'GET',
+        r'/api/v1/schedule',
+        _read(
+          (r, who) => ApiResponse(
+            200,
+            engine.schedule?.view() ??
+                {'enabled': false, 'pulled_at': null, 'games': <Object?>[]},
+            const {'Cache-Control': 'no-store'},
+          ),
+        ),
+      ),
+      // Slice S7: the remote GM's log (GM) and the ATAK feed's status.
+      _route(
+        'GET',
+        r'/api/v1/remote-gm',
+        _gm((r) {
+          final limit = (r.queryInt('limit') ?? 200).clamp(1, 1000);
+          final view = engine.remoteGmView;
+          if (view != null) return ApiResponse(200, view(limit));
+          final log = [
+            for (final e
+                in (engine.store.document('remote_commands') as List?) ??
+                    const [])
+              e,
+          ].reversed.take(limit).toList();
+          return ApiResponse(200, {
+            'enabled': false,
+            'stream': null,
+            'log': log,
+          });
+        }),
+      ),
+      _route(
+        'GET',
+        r'/api/v1/atak',
+        _read(
+          (r, who) =>
+              ApiResponse(200, engine.atakStatus?.call() ?? {'enabled': false}),
+        ),
+      ),
+      _route(
+        'POST',
+        r'/api/v1/schedule/([^/]+)/game',
+        _gm((r) {
+          final s = engine.schedule;
+          if (s == null) {
+            throw ControllerError.notFound(
+              'no such scheduled game in the last schedule pulled',
+            );
+          }
+          return ApiResponse(
+            201,
+            s.createGame(r.pathText(1), r.json ?? <String, Object?>{}),
+          );
+        }),
+      ),
     ];
     // Slice S7a: the field plan and the radio channel, on every controller
     // (the shell gives the field plan its folder first; else in memory).

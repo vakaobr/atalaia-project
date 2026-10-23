@@ -366,6 +366,8 @@ jobs:
         run: python tools/field_frame_vectors.py --check
       - name: Pairing vectors are up to date
         run: python tools/pairing_vectors.py --check
+      - name: The ATAK emitter's known answers are up to date
+        run: python tools/atak_xml_vectors.py --check
       - name: The mode package vectors are up to date
         run: python tools/mode_package_vectors.py --check
       - name: The scenario compiler's Unicode table is up to date

@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 /// Skirmesh-RF's plaintext side (protocol/schema/messages.yaml, RFC 0001):
-/// the 9-byte packet header and the HELLO, STATE, ACK, CMD and TIME
+/// the 9-byte packet header and the HELLO, STATE, ACK, CMD, TIME and CLAIM
 /// payloads, as CBOR maps with the schema's integer keys in key order, in
 /// the shortest form. What an Android prop sends and hears on the field's
 /// radio through an I/O pod (lib/radio/pod_radio_link.dart); the pod
 /// encrypts and decrypts (the USB modem's code). The EVENT payload is the
 /// core's own codec, through dart:ffi. The shared vectors
-/// (protocol/vectors/{header,hello,state,ack,cmd,time}.json) are checked by
+/// (protocol/vectors/{header,hello,state,ack,cmd,time,claim}.json) are checked by
 /// test/radio/rf_codec_test.dart, as by the C and Python codecs.
 library;
 
@@ -455,4 +455,69 @@ final class RfTime {
     5: _checked('term', term, 0xffffffff),
     if (txTimeUs != null) 6: _checked('tx_time_us', txTimeUs!, 0xffff),
   });
+}
+
+// ---- CLAIM --------------------------------------------------------------------------------
+
+/// CLAIM (message type 8): a candidate stands for the controller role with
+/// a term (ADR-P2-8; the phone's failover, PE24 slice S7,
+/// controller_failover.dart).
+final class RfClaim {
+  const RfClaim({
+    required this.term,
+    required this.priority,
+    required this.nodeId,
+    this.lastAckSeq,
+  });
+
+  factory RfClaim.decode(List<int> payload) {
+    final m = _map(payload);
+    _only(m, 4);
+    Map<int, int>? lastAck;
+    if (m.containsKey(4)) {
+      final acks = m[4];
+      if (acks is! Map) throw RfException('last_ack_seq is a map');
+      lastAck = {};
+      for (final e in acks.entries) {
+        final k = e.key, v = e.value;
+        if (k is! int || k < 0 || k > 0xffff) {
+          throw RfException('last_ack_seq: node ids 0-65535');
+        }
+        if (v is! int || v < 0 || v > 0xffff) {
+          throw RfException('last_ack_seq: seqs 0-65535');
+        }
+        lastAck[k] = v;
+      }
+    }
+    return RfClaim(
+      term: _uint(m, 1, 'term', 0xffffffff),
+      priority: _uint(m, 2, 'priority', 0xffff),
+      nodeId: _uint(m, 3, 'node_id', 0xffff),
+      lastAckSeq: lastAck,
+    );
+  }
+
+  final int term, priority, nodeId;
+
+  /// Per node, the highest contiguous seq this candidate heard (in the
+  /// order given; the Python codec keeps its dict's order).
+  final Map<int, int>? lastAckSeq;
+
+  Uint8List encode() {
+    final acks = lastAckSeq;
+    return cborEncode(<int, Object?>{
+      1: _checked('term', term, 0xffffffff),
+      2: _checked('priority', priority, 0xffff),
+      3: _checked('node_id', nodeId, 0xffff),
+      if (acks != null && acks.isNotEmpty)
+        4: <int, int>{
+          for (final e in acks.entries)
+            _checked('last_ack_seq node', e.key, 0xffff): _checked(
+              'last_ack_seq seq',
+              e.value,
+              0xffff,
+            ),
+        },
+    });
+  }
 }

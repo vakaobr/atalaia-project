@@ -76,6 +76,9 @@ final class ControllerStart {
     this.podName,
     this.firmwareKeys = const [],
     this.modes = const ModesConfig(),
+    this.failoverMode = 'manual',
+    this.sync,
+    this.atak,
   });
 
   final Uint8List joinKey;
@@ -93,36 +96,35 @@ final class ControllerStart {
   /// The `[modes]` settings (slice S7b): the app's.
   final ModesConfig modes;
 
-  ControllerStart withoutPod() => ControllerStart(
+  /// Slice S7: failover, the site server and ATAK (the app's settings).
+  final String failoverMode;
+  final Map<String, Object?>? sync;
+  final Map<String, Object?>? atak;
+
+  ControllerStart _with({
+    bool? open,
+    List<String>? firmwareKeys,
+    bool keepPod = true,
+  }) => ControllerStart(
     joinKey: joinKey,
-    open: open,
+    open: open ?? this.open,
     fieldId: fieldId,
     limitTemplate: limitTemplate,
-    firmwareKeys: firmwareKeys,
+    pod: keepPod ? pod : null,
+    podName: keepPod ? podName : null,
+    firmwareKeys: firmwareKeys ?? this.firmwareKeys,
     modes: modes,
+    failoverMode: failoverMode,
+    sync: sync,
+    atak: atak,
   );
 
-  ControllerStart withFirmwareKeys(List<String> keys) => ControllerStart(
-    joinKey: joinKey,
-    open: open,
-    fieldId: fieldId,
-    limitTemplate: limitTemplate,
-    pod: pod,
-    podName: podName,
-    firmwareKeys: keys,
-    modes: modes,
-  );
+  ControllerStart withoutPod() => _with(keepPod: false);
 
-  ControllerStart withOpen(bool open) => ControllerStart(
-    joinKey: joinKey,
-    open: open,
-    fieldId: fieldId,
-    limitTemplate: limitTemplate,
-    pod: pod,
-    podName: podName,
-    firmwareKeys: firmwareKeys,
-    modes: modes,
-  );
+  ControllerStart withFirmwareKeys(List<String> keys) =>
+      _with(firmwareKeys: keys);
+
+  ControllerStart withOpen(bool open) => _with(open: open);
 }
 
 enum ControllerPhase { stopped, starting, running, stopping }
@@ -198,6 +200,9 @@ class ControllerShell extends ChangeNotifier {
         fieldId: how.fieldId,
         firmwareKeys: how.firmwareKeys,
         modes: how.modes,
+        failoverMode: how.failoverMode,
+        sync: how.sync,
+        atak: how.atak,
       );
       final run = _run = await _launch(boot, pod: how.pod);
       _sub = run.changes.listen((_) => _changed());

@@ -23,8 +23,13 @@
 /// hex digits of its id), listed in the `images` document (decision
 /// PE24-85). A logo or wallpaper that is replaced is deleted at once when
 /// nothing else uses it; a crest nothing refers to is deleted a day after its
-/// upload (purge, from the engine's tick). A phone has no site server sync:
-/// the branding is always the GM's own (`[sync] branding = "site"` is a Pi's).
+/// upload (purge, from the engine's tick).
+///
+/// Slice S7 (the site sync, controller_sync.dart): with the sync's branding
+/// set to "site" ([siteManaged]) the field's branding and the site's saved
+/// teams come from the site server ([applySite], branding.py
+/// `apply_site`), and the console cannot change them (409), as on a Pi
+/// with `[sync] branding = "site"`.
 library;
 
 import 'dart:convert';
@@ -138,6 +143,12 @@ class ControllerBranding {
   final rate = RateLimit(240);
   double _lastPurge = 0;
 
+  /// The field's branding and saved teams are the site server's (the
+  /// sync's branding is "site"; branding.py `from_site`).
+  bool siteManaged = false;
+  var _applying = false;
+
+  static const _sitePresets = 'branding.site_presets';
   static const _setting = 'branding.field';
   static const _nameSetting = 'branding.field_name';
   static const _imagesDoc = 'images';
@@ -265,8 +276,18 @@ class ControllerBranding {
     return v;
   }
 
+  void _localOnly() {
+    if (siteManaged) {
+      throw ControllerError.conflict(
+        "the field's branding comes from the site server (the sync's "
+        'branding is "site"): change it there',
+      );
+    }
+  }
+
   /// PUT /api/v1/field/branding {"field_name"?, "accent"?}.
   Map<String, Object?> setField(Map<String, Object?> spec) {
+    _localOnly();
     final unknown =
         spec.keys.where((k) => k != 'field_name' && k != 'accent').toList()
           ..sort();
@@ -315,6 +336,7 @@ class ControllerBranding {
     Uint8List data,
     String contentType,
   ) {
+    _localOnly();
     final checked = _check(data, contentType, brandingSlots[slot]!);
     final id = sha256.convert(checked.data).toString();
     _putImage(id, slot, checked);
@@ -327,6 +349,7 @@ class ControllerBranding {
   }
 
   Map<String, Object?> deleteImage(String slot) {
+    _localOnly();
     final saved = _saved();
     final old = saved.remove(slot);
     _save(saved);
@@ -475,6 +498,7 @@ class ControllerBranding {
       if (current == null) {
         throw ControllerError.notFound('no team preset $presetId');
       }
+      _notSitePreset(presetId);
     }
     final (name, colour, crestId) = _presetSpec(spec, current);
     final doc = _presetDoc();
@@ -521,6 +545,7 @@ class ControllerBranding {
     if (current == null) {
       throw ControllerError.notFound('no team preset $presetId');
     }
+    _notSitePreset(presetId);
     final doc = _presetDoc();
     doc['items'] = [
       for (final p in _presetRows())
@@ -539,9 +564,189 @@ class ControllerBranding {
         : null,
   };
 
-  List<Map<String, Object?>> teamPresets() => [
-    for (final p in teamPresetRows()) presetView(p),
-  ];
+  List<Map<String, Object?>> teamPresets() {
+    final site = siteManaged ? sitePresets().values.toSet() : <int>{};
+    return [
+      for (final p in teamPresetRows())
+        {...presetView(p), if (site.contains(p['id'])) 'source': 'site'},
+    ];
+  }
+
+  void _notSitePreset(int presetId) {
+    if (!_applying && siteManaged && sitePresets().values.contains(presetId)) {
+      throw ControllerError.conflict(
+        "this team preset comes from the site server's saved teams: change "
+        'it there',
+      );
+    }
+  }
+
+  // --- from the site server (slice S7; branding.py, plan phase 18) ----------
+
+  /// {site team id: team preset id}.
+  Map<String, int> sitePresets() {
+    try {
+      final v = jsonDecode(engine.store.getSetting(_sitePresets) ?? '{}');
+      if (v is! Map) return {};
+      return {
+        for (final e in v.entries)
+          if (e.key is String && e.value is int)
+            e.key as String: e.value as int,
+      };
+    } on FormatException {
+      return {};
+    }
+  }
+
+  /// Keeps an image fetched from the site server (checked by the sync with
+  /// [checkImage], its bytes unchanged).
+  void storeSiteImage(String sha, String kind, CheckedImage img) =>
+      _putImage(sha, kind, img);
+
+  /// Makes the field's branding and the site's team presets match the site
+  /// server's answer (checked by `checkField`; its images already stored,
+  /// except those in [unavailable], which keep what was there). A preset
+  /// made here with a site team's name becomes that team's (branding.py
+  /// `apply_site`). Returns the counts of what changed.
+  Map<String, int> applySite(
+    Map<String, Object?> answer, {
+    Set<String> unavailable = const {},
+  }) {
+    final out = {
+      'field': 0,
+      'added': 0,
+      'updated': 0,
+      'removed': 0,
+      'conflicts': 0,
+    };
+    final field = (answer['field']! as Map).cast<String, Object?>();
+    final saved = _saved();
+    final before = jsonEncode(saved);
+    final replaced = <String>[], dropped = <String>[];
+    for (final slot in brandingSlots.keys) {
+      final ref = field[slot] as Map?;
+      final want = ref?['sha256'] as String?;
+      if (want != null &&
+          (unavailable.contains(want) ||
+              image(want, withData: false) == null)) {
+        continue; // not fetched yet: the next cycle tries again
+      }
+      if (saved[slot] != want) {
+        final old = saved[slot];
+        if (old is String && old.isNotEmpty) replaced.add(old);
+        if (want == null) {
+          saved.remove(slot);
+        } else {
+          saved[slot] = want;
+        }
+      }
+    }
+    if (field['accent'] == null) {
+      saved.remove('accent');
+    } else {
+      saved['accent'] = field['accent'];
+    }
+    if (jsonEncode(saved) != before) {
+      _save(saved);
+      out['field'] = out['field']! + 1;
+    }
+    final name = field['field_name'];
+    if (name is String && name != fieldName()) {
+      try {
+        final svc = engine.checkin;
+        if (svc != null) {
+          svc.setPoster({'field_name': name});
+        } else {
+          engine.store.setSetting(_nameSetting, name);
+        }
+        out['field'] = out['field']! + 1;
+      } on ControllerError {
+        // As the Pi (logged there): the site's field name is not used.
+      }
+    }
+    _applying = true;
+    try {
+      _applySiteTeams(
+        (answer['teams']! as List).cast<Map<String, Object?>>(),
+        unavailable,
+        dropped,
+        out,
+      );
+    } finally {
+      _applying = false;
+    }
+    replaced.forEach(_dropIfUnused);
+    for (final id in dropped) {
+      _dropIfUnused(id, grace: true);
+    }
+    if (out['field']! + out['added']! + out['updated']! + out['removed']! > 0) {
+      _changed();
+    }
+    return out;
+  }
+
+  void _applySiteTeams(
+    List<Map<String, Object?>> teams,
+    Set<String> unavailable,
+    List<String> dropped,
+    Map<String, int> out,
+  ) {
+    final mapping = sitePresets();
+    final byName = {for (final p in _presetRows()) p['name']: p};
+    final kept = <String, int>{};
+    for (final team in teams) {
+      final teamId = team['team_id']! as String;
+      var crest = (team['crest'] as Map?)?['sha256'] as String?;
+      var current = mapping.containsKey(teamId)
+          ? teamPreset(mapping[teamId]!)
+          : null;
+      current ??= byName[team['name']];
+      if (crest != null &&
+          (unavailable.contains(crest) ||
+              image(crest, withData: false) == null)) {
+        crest = current?['crest_id'] as String?;
+      }
+      if (current != null &&
+          current['name'] == team['name'] &&
+          current['colour'] == team['colour'] &&
+          current['crest_id'] == crest) {
+        kept[teamId] = current['id']! as int;
+        continue;
+      }
+      final Map<String, Object?> row;
+      try {
+        row = saveTeamPreset({
+          'name': team['name'],
+          'colour': team['colour'],
+          'crest_id': crest,
+        }, current?['id'] as int?);
+      } on ControllerError {
+        out['conflicts'] = out['conflicts']! + 1; // another preset has the name
+        if (current != null) kept[teamId] = current['id']! as int;
+        continue;
+      }
+      kept[teamId] = row['id']! as int;
+      if (current == null) {
+        out['added'] = out['added']! + 1;
+      } else {
+        out['updated'] = out['updated']! + 1;
+      }
+    }
+    for (final e in mapping.entries) {
+      if (kept.containsKey(e.key) || kept.values.contains(e.value)) continue;
+      if (teamPreset(e.value) != null) {
+        deleteTeamPreset(e.value);
+        out['removed'] = out['removed']! + 1;
+      }
+    }
+    if (jsonEncode(kept) != jsonEncode(mapping)) {
+      final keys = kept.keys.toList()..sort();
+      engine.store.setSetting(
+        _sitePresets,
+        jsonEncode({for (final k in keys) k: kept[k]}),
+      );
+    }
+  }
 
   /// GET /api/v1/games/{id}/teams: each team's colour, display name and
   /// crest (no token).

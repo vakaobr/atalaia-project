@@ -38,6 +38,14 @@
 /// key), field cards and firmware updates (releases in the controller's
 /// folder, [ControllerBoot.firmwareKeys]) are set up as the Pi's main.py
 /// sets them up.
+///
+/// Slice S7 (decisions PE24-118 onward): failover with the app's
+/// `failover_mode` ([ControllerBoot.failoverMode]), the schedule always (the
+/// console's area), and with the app's site server settings
+/// ([ControllerBoot.sync]) the site sync (controller_sync.dart), the remote
+/// GM's stream when it or the ATAK relay is on (controller_remote_gm.dart),
+/// and with [ControllerBoot.atak] the CoT feed for ATAK
+/// (controller_atak.dart), as the Pi's main.py builds them.
 library;
 
 import 'dart:async';
@@ -51,11 +59,13 @@ import '../pod/pod_client.dart';
 import 'console_files.dart';
 import 'controller_adoption.dart';
 import 'controller_api.dart';
+import 'controller_atak.dart';
 import 'controller_boxes.dart';
 import 'controller_branding.dart';
 import 'controller_channel.dart';
 import 'controller_checkin.dart';
 import 'controller_engine.dart';
+import 'controller_failover.dart';
 import 'controller_field.dart';
 import 'controller_firmware.dart';
 import 'controller_mode_fetch.dart';
@@ -63,9 +73,12 @@ import 'controller_pairing.dart';
 import 'controller_radio.dart';
 import 'controller_mqtt.dart';
 import 'controller_positions.dart';
+import 'controller_remote_gm.dart';
 import 'controller_scenarios.dart';
+import 'controller_schedule.dart';
 import 'controller_signed_modes.dart';
 import 'controller_store.dart';
+import 'controller_sync.dart';
 import 'field_tls.dart';
 import 'mqtt_broker.dart';
 import 'pod_modem.dart';
@@ -93,6 +106,9 @@ final class ControllerBoot {
     this.addressCheck = const Duration(seconds: 10),
     this.firmwareKeys = const [],
     this.modes = const ModesConfig(),
+    this.failoverMode = 'manual',
+    this.sync,
+    this.atak,
   });
 
   /// The controller's folder in the app's private storage.
@@ -144,6 +160,15 @@ final class ControllerBoot {
   /// The Pi's `[modes]` settings: trusted mode keys, revoked key ids, the
   /// registry index, the boxes' mode keys (slice S7b, decision PE24-82).
   final ModesConfig modes;
+
+  /// `manual` or `auto` (ADR-P2-8; slice S7's failover).
+  final String failoverMode;
+
+  /// The site server's settings ([SyncConfig.toJson]); null: no sync.
+  final Map<String, Object?>? sync;
+
+  /// The `[atak]` section ([AtakConfig.fromSection]'s keys); null: off.
+  final Map<String, Object?>? atak;
 }
 
 /// The controller's own secrets, kept in `shell.json` beside its store.
@@ -246,6 +271,13 @@ class ControllerHost {
   late final ControllerEngine engine;
   late final ControllerCheckin checkin;
   late final ControllerApi api;
+
+  /// Slice S7: the site sync, the remote GM's stream and the ATAK feed
+  /// (null: off), and why a setting left one off.
+  ControllerSync? sync;
+  RemoteGm? remote;
+  AtakEmitter? atak;
+  String? syncProblem, atakProblem;
   late final MqttBroker broker;
   late final ControllerMqtt bridge;
   late final HttpServer http;
@@ -305,7 +337,12 @@ class ControllerHost {
     }
     engine = ControllerEngine(
       // A phone on its battery (ADR-P2-8: power source 1).
-      config: const ControllerConfig(powerSource: 1),
+      config: ControllerConfig(
+        powerSource: 1,
+        failoverMode: failoverModes.contains(boot.failoverMode)
+            ? boot.failoverMode
+            : 'manual',
+      ),
       store: FileControllerStore(Directory('${dir.path}/store')),
       core: core,
       modem: modem,
@@ -352,6 +389,7 @@ class ControllerHost {
       gmToken: secrets.gmToken,
       readToken: secrets.readToken,
     );
+    _startSiteAndAtak();
     api
       ..console = ConsoleFiles(boot.console)
       ..caPem = tls.caPem
@@ -380,6 +418,50 @@ class ControllerHost {
     );
     _watcher = Timer.periodic(boot.addressCheck, (_) => unawaited(check()));
     _running = true;
+  }
+
+  /// Slice S7: the schedule, the site sync, the remote GM and ATAK, as the
+  /// Pi's main.py `build` (a setting that does not pass its check leaves
+  /// that part off and says why in [status]).
+  void _startSiteAndAtak() {
+    ControllerSchedule(engine);
+    final cfg = SyncConfig.fromJson(boot.sync);
+    if (boot.sync != null) {
+      syncProblem = cfg == null ? 'the settings are damaged' : cfg.problem();
+    }
+    ControllerSync? s;
+    if (cfg != null && syncProblem == null) {
+      s = sync = ControllerSync(engine, cfg, schedule: engine.schedule)
+        ..start();
+    }
+    AtakConfig? a;
+    final section = boot.atak;
+    if (section != null) {
+      try {
+        a = AtakConfig.fromSection(section)
+          ..checkConfig(syncEnabled: s != null);
+      } on AtakConfigError catch (e) {
+        atakProblem = e.message;
+      }
+    }
+    RemoteGm? r;
+    if (s != null && cfg != null && (cfg.remoteGm || a?.remote == true)) {
+      r = remote = RemoteGm(
+        engine,
+        s,
+        remoteGm: cfg.remoteGm,
+        atakRemote: a?.remote == true,
+      )..start();
+    }
+    if (a != null && a.enabled) {
+      final emitter = atak = AtakEmitter(engine, a, fieldId: boot.fieldId);
+      engine.atakStatus = emitter.status;
+      if (r != null) {
+        emitter.remoteSink = (events) => r!.pushCot(events);
+        r.onRelay = (on) => emitter.remoteReady = on;
+      }
+      emitter.start();
+    }
   }
 
   Future<void> _bindHttps(int port) async {
@@ -477,6 +559,11 @@ class ControllerHost {
       'mqtt_clients': broker.clientCount,
       'props': api.props.count,
       'console': !api.console.isEmpty,
+      'sync': sync != null,
+      'sync_problem': syncProblem,
+      'remote_gm': remote?.remoteGm ?? false,
+      'atak': atak != null,
+      'atak_problem': atakProblem,
     };
   }
 
@@ -487,6 +574,9 @@ class ControllerHost {
     _ticker?.cancel();
     _watcher?.cancel();
     engine.removeListener(_onMessage);
+    await atak?.stop();
+    await remote?.stop();
+    await sync?.stop();
     await api.props.close();
     await api.hub.close();
     await http.close(force: true);

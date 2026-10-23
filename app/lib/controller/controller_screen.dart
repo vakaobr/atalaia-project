@@ -100,6 +100,9 @@ class _ControllerScreenState extends State<ControllerScreen> {
         pod: _pod,
         podName: _podName,
         firmwareKeys: app.settings.firmwareKeys,
+        failoverMode: app.settings.failoverMode,
+        sync: app.settings.controllerSync,
+        atak: app.settings.controllerAtak,
       ),
       strings,
     );

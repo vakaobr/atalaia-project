@@ -620,8 +620,7 @@ roadmap:
     title: Android e jogadores
     short: >-
       Dispositivos Android, módulo de E/S, app para quem joga e os modos que precisam dos
-      telemóveis, com a Fábrica de Dinheiro: feito em software, menos o iOS e as últimas partes do
-      telemóvel como controlador de campo; o teste no campo espera por telemóveis e módulos a sério.
+      telemóveis, com a Fábrica de Dinheiro: feito em software, menos o iOS; o teste no campo espera por telemóveis e módulos a sério.
     text: >-
       Dispositivos Android, o <a href="{{ page.to.glossary }}#glossario-dispositivo-android">módulo de E/S</a>, a app
       para quem joga, para os marshals e para a organização, e os modos que precisam dos telemóveis
@@ -652,8 +651,7 @@ roadmap:
       seu próprio controlador pode mostrar o logótipo, a imagem de fundo e a cor na app, no
       marcador e no cartaz, e dar nomes e emblemas às equipas.
     todo: >-
-      <strong>Ainda falta.</strong> Em software: o telemóvel como controlador de campo, feito por
-      partes (já feitos: o broker MQTT, o filtro de posições e o motor de jogo, com o field.lua no
+      <strong>Ainda falta.</strong> O telemóvel como controlador de campo, feito por partes, está pronto em software e espera por um telemóvel a sério (feitos: o broker MQTT, o filtro de posições e o motor de jogo, com o field.lua no
       núcleo partilhado, a API REST, o stream em direto e os tópicos MQTT, os jogos guardados quando
       o telemóvel reinicia, os códigos para as caixas entrarem no jogo, o módulo de E/S como rádio,
       os dispositivos Android pela rede Wi-Fi e o check-in no campo, com o token de cada pessoa, a
@@ -669,8 +667,7 @@ roadmap:
       depois de o telemóvel reiniciar sem a chave do jogo, a adoção de caixas novas pelo código que
       mostram ou pelo cartão de campo que o telemóvel escreve por NFC, e as atualizações de firmware
       entre jogos (com o modem de rádio USB do Pi ligado ao telemóvel: o módulo de E/S ainda não
-      passa estas mensagens); e as predefinições, os modos carregados e os pacotes de modos assinados, enviados às caixas que não os têm, os cenários compilados no telemóvel, os pacotes de papéis num jogo e os nomes e emblemas das equipas; depois do teste no campo: a passagem entre um telemóvel e um Pi e o resto do que o Pi faz) e a versão
-      iOS (o projeto está no repositório e o CI constrói-o num Mac, mas ainda não correu num iPhone; o prop e o telemóvel como controlador do campo ficam só em Android). A fase G do plano, o teste no campo com telemóveis e
+      passa estas mensagens); e as predefinições, os modos carregados e os pacotes de modos assinados, enviados às caixas que não os têm, os cenários compilados no telemóvel, os pacotes de papéis num jogo e os nomes e emblemas das equipas; e o resto do que o Pi faz, também trazido para antes do teste no campo: a substituição, para que um telemóvel e um Pi possam ser o controlador de reserva um do outro, a sincronização com o servidor do site (jogos, registos e pontuações enviados quando há internet; listas de inscritos, imagem do campo e biblioteca de cenários recebidas de lá), o GM remoto e o feed para o ATAK); e a versão iOS (o projeto está no repositório e o CI constrói-o num Mac, mas ainda não correu num iPhone; o prop e o telemóvel como controlador do campo ficam só em Android). A fase G do plano, o teste no campo com telemóveis e
       módulos a sério, espera pelo hardware: até agora a app só correu em emuladores Android, e o
       firmware do módulo só como o seu próprio código num computador.
     gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."

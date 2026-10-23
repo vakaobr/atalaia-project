@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 
 import '../app.dart';
 import '../controller/controller_modes_screen.dart';
+import '../controller/controller_site_screen.dart';
 import '../controller/controller_signed_modes.dart';
 import '../l10n/strings.dart';
 import '../platform/platform_check.dart';
@@ -112,6 +113,36 @@ class SettingsScreen extends StatelessWidget {
                 context,
                 MaterialPageRoute<void>(
                   builder: (_) => const ControllerModesScreen(),
+                ),
+              ),
+            ),
+          if (controllerRoleAvailable)
+            ListTile(
+              key: const Key('controller-site'),
+              leading: const Icon(Icons.cloud_sync),
+              title: Text(s.t('ctl_site.tile')),
+              subtitle: Text(
+                s.t('ctl_site.tile_hint', {
+                  'mode': s.t(
+                    st.failoverMode == 'auto'
+                        ? 'ctl_site.auto'
+                        : 'ctl_site.manual',
+                  ),
+                  'sync': s.t(
+                    st.controllerSync == null ? 'ctl_site.off' : 'ctl_site.on',
+                  ),
+                  'atak': s.t(
+                    st.controllerAtak?['enabled'] == true
+                        ? 'ctl_site.on'
+                        : 'ctl_site.off',
+                  ),
+                }),
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => const ControllerSiteScreen(),
                 ),
               ),
             ),

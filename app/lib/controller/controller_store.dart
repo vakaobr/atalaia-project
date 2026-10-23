@@ -46,6 +46,10 @@ abstract interface class ControllerStore {
 
   /// The game's events in game-time order (then node, then seq).
   List<Map<String, Object?>> events(int gameId, {int? sinceMs, String? type});
+
+  /// The game's events in the order they were written (the site sync's
+  /// cursor, slice S7: an event's id is its place here, from 1).
+  List<Map<String, Object?>> eventLog(int gameId);
   void saveScores(int gameId, Map<String, int> totals);
   Map<String, int> scores(int gameId);
   void upsertNode(int gameId, Map<String, Object?> info);
@@ -189,6 +193,11 @@ class MemoryControllerStore implements ControllerStore {
     });
     return out;
   }
+
+  @override
+  List<Map<String, Object?>> eventLog(int gameId) => [
+    for (final e in _events[gameId] ?? const <Map<String, Object?>>[]) _copy(e),
+  ];
 
   @override
   void saveScores(int gameId, Map<String, int> totals) =>

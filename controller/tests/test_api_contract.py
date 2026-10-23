@@ -26,6 +26,11 @@ request and ``ws_connect`` steps may give a player token (``bearer``), and
 ``body_base64``) and the noise scan's steps (``noise``, ``hold_measure``,
 ``scan_wait``) on the recording modem.
 
+Slice S7 (failover, the vectors' ``s7`` block): a case may set ``failover_mode``
+(manual when not given); ``rx`` steps may be another controller's TIME or CLAIM (their
+fields by name); ``join_encode`` seals a join payload with the case's join key and saves
+its text (a standby's join, made by the controller that leads).
+
 Slice S7c (boxes over the radio, adoption and firmware updates on the phone
 controller): adoption (adoption.py, USB off as on the phone) and firmware updates
 (firmware_updates.py, the case's ``firmware_keys``, releases in the case's folder,
@@ -231,6 +236,7 @@ class ContractCase(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, contextlib.ExitStack() as stack:
             cfg = config(tmp, gm_token=VECTORS["tokens"]["gm"], read_token=VECTORS["tokens"]["read"],
                          persist_game_key=case.get("persist_game_key", True), adopt_usb=False,
+                         failover_mode=case.get("failover_mode", "manual"),
                          firmware_release_keys=case.get("firmware_keys", []))
             env = SimpleNamespace(cfg=cfg, case=case, modem=RecordingModem(), mqtt=RecordingMqtt(), now=[0.0],
                                   saved=dict(VECTORS.get("fixtures", {}).get("values", {})), stack=stack,
@@ -325,6 +331,14 @@ class ContractCase(unittest.TestCase):
                 payload = state_encode(state)
             elif kind == "EVENT":
                 payload = codec.encode_event(rx["event"])
+            elif kind == "TIME":
+                # Slice S7 (failover): another controller's beacon, its fields by name.
+                payload = packet.time_encode(rx["time"])
+            elif kind == "CLAIM":
+                claim = dict(rx["claim"])
+                if "last_ack_seq" in claim:
+                    claim["last_ack_seq"] = {int(k): v for k, v in claim["last_ack_seq"].items()}
+                payload = packet.claim_encode(claim)
             else:
                 raise ValueError(f"unknown rx type {kind}")
             env.modem.rx(rx["source"], rx["seq"], kind, payload, game_id=game_id, epoch=rx.get("epoch", 0),
@@ -399,6 +413,14 @@ class ContractCase(unittest.TestCase):
                     got.append(ws.receive_json())
             self.check(step["messages"], got, f"prop {step['prop_closed']}", env)
             self.assertEqual(ctx.exception.code, step["close"])
+            return
+        if "join_encode" in step:
+            # Slice S7 (failover): a join payload sealed with the case's field join key, as
+            # another controller makes one (a standby's, kind "controller"); its text is saved.
+            fields = dict(substitute(step["join_encode"], env.saved))
+            fields["game_key"] = bytes.fromhex(fields["game_key"])
+            text = joinfmt.to_text(joinfmt.encode(fields, bytes.fromhex(env.case["join_key"])))
+            env.saved[step["save"]] = text
             return
         if "join_decode" in step:
             # A join payload's text, opened with the case's field join key.
@@ -633,8 +655,8 @@ def _make(case: dict[str, Any]):
     return test
 
 
-# The cases, then slice S7a's block (the field plan and the radio channel).
-for _n, _case in enumerate(VECTORS["cases"] + VECTORS["field_and_radio"]["cases"]):
+# The cases, then slice S7a's block (the field plan and the radio channel), then slice S7's (failover, ...).
+for _n, _case in enumerate(VECTORS["cases"] + VECTORS["field_and_radio"]["cases"] + VECTORS["s7"]["cases"]):
     setattr(ContractCase, f"test_{_n:02d}_" + re.sub(r"\W+", "_", _case["name"]).strip("_").lower(),
             _make(_case))
 

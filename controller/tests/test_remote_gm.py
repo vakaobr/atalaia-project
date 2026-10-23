@@ -201,6 +201,10 @@ class LiveTests(RemoteCase):
         events = self.remote.live()["events"]
         self.assertEqual(len(events), sync_format.MAX_LIVE_EVENTS)
         self.assertEqual(events[-1]["seq"], 80)
+        # Box 4 said HELLO with capabilities [0]: it is in the view, its capabilities as texts (PE24-121).
+        nodes = self.remote.live()["nodes"]
+        self.assertEqual([n["node_id"] for n in nodes], [4])
+        self.assertEqual(nodes[0]["info"]["capabilities"], ["0"])
 
 
 class FakeStream:

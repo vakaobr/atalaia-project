@@ -632,8 +632,7 @@ roadmap:
     title: Android und Spielende
     short: >-
       Android-Props, der I/O-Pod, die Spieler-App und die Modi, die Handys brauchen, Money Factory
-      eingeschlossen: in Software fertig, außer iOS und den letzten Teilen des Handys als
-      Feld-Controller; der Feldtest wartet auf echte Handys und Pods.
+      eingeschlossen: in Software fertig, außer iOS; der Feldtest wartet auf echte Handys und Pods.
     text: >-
       Android-Props, der <a href="{{ page.to.glossary }}#glossar-android-prop">I/O-Pod</a>, die App
       für Spielende, Marshals und die Spielleitung und die Modi, die Handys und Tags der Spielenden
@@ -663,8 +662,7 @@ roadmap:
       oder Club mit eigenem Controller kann sein Logo, Hintergrundbild und seine Farbe in der App, auf
       der Anzeigetafel und auf dem Aushang zeigen und seinen Teams Namen und Wappen geben.
     todo: >-
-      <strong>Noch offen.</strong> In Software: das Handy als Feld-Controller, in Scheiben gebaut
-      (fertig: sein MQTT-Broker, Positionsfilter und Spiel-Engine, mit field.lua auf dem gemeinsamen
+      <strong>Noch offen.</strong> Das Handy als Feld-Controller, in Scheiben gebaut, ist in Software fertig und wartet auf ein echtes Handy (fertig: sein MQTT-Broker, Positionsfilter und Spiel-Engine, mit field.lua auf dem gemeinsamen
       Kern, die REST-API, der Live-Stream und die MQTT-Topics, Spiele über einen Neustart hinweg,
       Beitritts-Payloads, ein I/O-Pod als sein Funk, Android-Props in seinem WLAN und der Check-in
       am Feld mit Spieler-Tokens, der Liste „Repliken zum Chronen“ und den Positionen der
@@ -680,8 +678,7 @@ roadmap:
       Spielschlüssel gemeldet wird, neue Boxen, aufgenommen über den Code, den sie zeigen, oder mit
       einer Feldkarte, die das Handy per NFC schreibt, und Firmware-Updates zwischen Spielen (mit
       dem USB-Funkmodem des Pi am Handy: der I/O-Pod reicht diese Nachrichten noch nicht weiter); und Presets, hochgeladene Modi und signierte Moduspakete, die an Boxen geschickt werden, denen sie fehlen, auf dem Handy kompilierte Szenarien, Rollenpakete in einem Spiel sowie Teamnamen und Wappen;
-      nach dem Feldtest: der Wechsel zwischen einem Handy und einem
-      Pi und der Rest dessen, was der Pi kann) und die iOS-Version (ihr Projekt liegt im Repository und die CI baut es auf einem Mac, aber es lief noch nicht auf einem iPhone; der Prop und das Handy als Feld-Controller bleiben nur Android). Planphase G, der Feldtest mit echten Handys und Pods, wartet auf die Hardware: Bisher
+      und, ebenfalls vorgezogen, der Rest dessen, was der Pi kann: die Ausfallübernahme, sodass ein Handy und ein Pi einander als Bereitschafts-Controller dienen, der Abgleich mit dem Site-Server (Spiele, Protokolle und Punkte gehen hin, sobald Internet da ist; Anmeldelisten, Branding und die Szenariobibliothek kommen von dort), die Remote-Spielleitung und der ATAK-Feed); und die iOS-Version (ihr Projekt liegt im Repository und die CI baut es auf einem Mac, aber es lief noch nicht auf einem iPhone; der Prop und das Handy als Feld-Controller bleiben nur Android). Planphase G, der Feldtest mit echten Handys und Pods, wartet auf die Hardware: Bisher
       lief die App nur auf Android-Emulatoren und die Pod-Firmware nur als eigener Code auf einem
       Computer.
     gate: "Gate: Ein Spiel mischt ESP32- und Android-Props ohne Probleme."

@@ -214,20 +214,68 @@ void main() {
     expect(low.single['data'], {'percent': 15});
   });
 
-  test('TIME and CLAIM from another controller are noted, not followed', () {
+  test('a higher term from another controller: this one steps down and '
+      'mirrors its clock (slice S7)', () {
+    final roles = <(String, int)>[];
+    fc.onRole = (role, term) => roles.add((role, term));
+    fc.startGame(nowMs: 0);
     fc.onPacket(
       header(2, 0, RfType.time),
       const RfTime(
         gameTimeMs: 5,
-        gameState: 1,
-        durationMs: 0,
+        gameState: 2,
+        durationMs: 9000,
         wallS: 0,
         term: 9,
       ).encode(),
     );
-    expect(fc.term, 1);
-    expect(fc.problems.single['type'], 'time');
+    expect(fc.term, 9);
+    expect(fc.isController, isFalse);
+    expect(fc.election.leader, 2);
+    expect((fc.gameState, fc.gameTimeMs, fc.durationMs), (gamePaused, 5, 9000));
+    expect(roles, [('follower', 9)]);
     expect(fc.nodes.containsKey(2), isFalse);
+    expect(
+      () => fc.pauseGame(nowMs: 10),
+      throwsA(isA<FieldControllerException>()),
+    );
+    // A follower neither beacons nor acknowledges.
+    radio.sent.clear();
+    fc.tick(100000);
+    fc.onPacket(header(4, 1, RfType.state, ack: true), state(1, {1: 3}));
+    expect(radio.sent, isEmpty);
+  });
+
+  test('promoted: a CLAIM with the ACKs heard, then the role and a TIME '
+      'with the new term', () {
+    fc.onPacket(header(4, 0, RfType.state), state(1, {1: 3}));
+    fc.onPacket(
+      header(2, 0, RfType.time),
+      const RfTime(
+        gameTimeMs: 0,
+        gameState: 1,
+        durationMs: 0,
+        wallS: 0,
+        term: 4,
+      ).encode(),
+    );
+    radio.sent.clear();
+    fc.promote(1000);
+    final claim = RfClaim.decode(radio.sent.single.$2);
+    expect((claim.term, claim.nodeId), (5, 0));
+    expect(claim.lastAckSeq, {4: 0});
+    expect(fc.election.role, 'candidate');
+    fc.tick(5999);
+    expect(fc.isController, isFalse);
+    fc.tick(6000);
+    expect(fc.isController, isTrue);
+    expect(beacons().single.term, 5);
+    expect(fc.electionLog.map((e) => e['type']), [
+      'role',
+      'claim_sent',
+      'role',
+      'role',
+    ]);
   });
 
   test('an event the codec refuses is kept as a problem, not logged', () {

@@ -31,7 +31,10 @@
 // every case; a case's mode_keys, mode_revoked and box_keys set up signed
 // mode packages and the modes sent to boxes (scenarios and branding are on
 // every controller); raw bodies may name their 'content_type' and answers'
-// 'headers' are matched.
+// 'headers' are matched. Slice S7 (the vectors' s7 block): a case's
+// failover_mode, rx steps of another controller's TIME and CLAIM, and
+// join_encode, which seals a join payload with the case's join key (a
+// standby's join, as the leading controller makes it).
 
 import 'dart:async';
 import 'dart:collection';
@@ -280,6 +283,26 @@ void main() {
           },
           epoch: s['epoch']! as int,
         ).encode();
+      case 'TIME':
+        // Slice S7: another controller's beacon.
+        final t = (rx['time']! as Map).cast<String, Object?>();
+        return RfTime(
+          gameTimeMs: t['game_time_ms']! as int,
+          gameState: t['game_state']! as int,
+          durationMs: t['duration_ms']! as int,
+          wallS: t['wall_s']! as int,
+          term: t['term']! as int,
+        ).encode();
+      case 'CLAIM':
+        final c = (rx['claim']! as Map).cast<String, Object?>();
+        return RfClaim(
+          term: c['term']! as int,
+          priority: c['priority']! as int,
+          nodeId: c['node_id']! as int,
+          lastAckSeq: (c['last_ack_seq'] as Map?)?.map(
+            (k, v) => MapEntry(int.parse('$k'), v as int),
+          ),
+        ).encode();
       case 'EVENT':
         final ev = (rx['event']! as Map).cast<String, Object?>();
         final type = ev['type']! as String;
@@ -307,12 +330,14 @@ void main() {
       (vectors['field_and_radio'] as Map).cast<String, dynamic>(),
       'cases',
     ),
+    ...cases((vectors['s7'] as Map).cast<String, dynamic>(), 'cases'),
   ]) {
     test(c['name'] as String, () async {
       var now = 0;
       final dir = Directory.systemTemp.createTempSync('atalaia-contract-');
       final config = ControllerConfig(
         persistGameKey: (c['persist_game_key'] as bool?) ?? true,
+        failoverMode: (c['failover_mode'] as String?) ?? 'manual',
       );
       final radio = RecordingModem();
       final joinKey = _unhex((c['join_key'] as String?) ?? '');
@@ -598,6 +623,8 @@ void main() {
             final type = switch (rx['type']) {
               'HELLO' => RfType.hello,
               'STATE' => RfType.state,
+              'TIME' => RfType.time,
+              'CLAIM' => RfType.claim,
               _ => RfType.event,
             };
             radio.rx(
@@ -648,6 +675,32 @@ void main() {
             }
             check(step['messages'], got, 'step $i: prop $name');
             expect(ws.socket.closeCode, step['close'], reason: 'step $i');
+            continue;
+          }
+          if (step.containsKey('join_encode')) {
+            // Slice S7: a join payload sealed with the case's join key, as
+            // another controller makes one; its text is saved.
+            final f = (substitute(step['join_encode'], saved)! as Map)
+                .cast<String, Object?>();
+            final join = JoinPayload(
+              gameId: f['game_id']! as int,
+              gameKey: _unhex(f['game_key']! as String),
+              nodeId: f['node_id']! as int,
+              controllerId: f['controller_id']! as int,
+              channelHz: f['channel_hz']! as int,
+              maxHops: f['max_hops']! as int,
+              teams: (f['teams']! as List).cast<String>(),
+              modeId: f['mode_id']! as String,
+              role: f['role']! as String,
+              gameSeed: f['game_seed']! as int,
+              params: (f['params'] as Map?)?.cast<String, Object?>(),
+              kind: JoinKind.values.byName(f['kind']! as String),
+              lang: f['lang'] as String?,
+              region: (f['region'] as String?) ?? 'eu868',
+            );
+            saved[step['save'] as String] = joinToText(
+              encodeJoin(join, joinKey),
+            );
             continue;
           }
           if (step.containsKey('join_decode')) {

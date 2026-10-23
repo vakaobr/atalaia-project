@@ -3,7 +3,7 @@
 
 // The Skirmesh-RF header and message codecs in Dart (lib/radio/rf_codec.dart)
 // against the shared vectors the C codecs (core/tests/) and the Python ones
-// (simulator/tests/) check: protocol/vectors/{header,hello,state,ack,cmd,time}.json.
+// (simulator/tests/) check: protocol/vectors/{header,hello,state,ack,cmd,time,claim}.json.
 
 import 'package:atalaia_app/radio/rf_codec.dart';
 import 'package:atalaia_app/security/bytes.dart';
@@ -232,6 +232,39 @@ void main() {
       test('refuses ${c['name']}', () {
         expect(
           () => RfTime.decode(hexDecode(c['cbor'] as String)),
+          throwsA(isA<RfException>()),
+        );
+      });
+    }
+  });
+
+  group('CLAIM', () {
+    final v = loadVectors('claim.json');
+    for (final c in cases(v, 'valid')) {
+      test('${c['name']}', () {
+        final f = (c['fields'] as Map).cast<String, Object?>();
+        final acks = (f['last_ack_seq'] as Map?)?.map(
+          (k, v) => MapEntry(int.parse('$k'), v as int),
+        );
+        final claim = RfClaim(
+          term: f['term']! as int,
+          priority: f['priority']! as int,
+          nodeId: f['node_id']! as int,
+          lastAckSeq: acks,
+        );
+        expect(hexEncode(claim.encode()), c['cbor']);
+        final back = RfClaim.decode(hexDecode(c['cbor'] as String));
+        expect(
+          (back.term, back.priority, back.nodeId),
+          (claim.term, claim.priority, claim.nodeId),
+        );
+        expect(back.lastAckSeq, acks);
+      });
+    }
+    for (final c in cases(v, 'invalid')) {
+      test('refuses ${c['name']}', () {
+        expect(
+          () => RfClaim.decode(hexDecode(c['cbor'] as String)),
           throwsA(isA<RfException>()),
         );
       });

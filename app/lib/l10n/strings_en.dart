@@ -886,4 +886,41 @@ const Map<String, String> enStrings = {
   'ctl_modes.bad_id': 'Line {line}: not a key id (16 hex digits).',
   'ctl_modes.bad_index': 'The index is an https:// address or a file.',
   'ctl_modes.saved': 'Saved: they apply when the controller next starts.',
+  // The phone controller's slice S7 settings (PE24-118 onward).
+  'ctl_site.tile': 'Site server, failover and ATAK (field controller)',
+  'ctl_site.tile_hint': 'Failover {mode}; site server {sync}; ATAK {atak}',
+  'ctl_site.on': 'on',
+  'ctl_site.off': 'off',
+  'ctl_site.title': 'Site server, failover and ATAK',
+  'ctl_site.intro':
+      'This phone\'s field controller as a Pi\'s controller.toml has it: its failover, the field\'s site server (the games, logs and scores go there when the internet is there; rosters, branding and the scenario library come from it) and the ATAK feed. They apply when the controller next starts.',
+  'ctl_site.failover': 'Failover',
+  'ctl_site.failover_auto': 'Automatic failover',
+  'ctl_site.manual': 'Manual',
+  'ctl_site.auto': 'Automatic',
+  'ctl_site.failover_hint':
+      'Manual: the GM promotes a standby controller. Automatic: a standby takes over after three missed beacons (30 s). A phone on battery yields to a Pi on mains when both stand.',
+  'ctl_site.sync': 'Site server',
+  'ctl_site.sync_hint': 'Offline first: a game never waits for the network.',
+  'ctl_site.url': 'Address (https://…)',
+  'ctl_site.key': 'The field\'s API key (from the site server)',
+  'ctl_site.key_set': 'API key {fp}… (type a new one to replace it)',
+  'ctl_site.branding':
+      'The field\'s branding and saved teams from the site server',
+  'ctl_site.library':
+      'The field\'s scenarios and game presets from the site server',
+  'ctl_site.remote_gm': 'Remote GM',
+  'ctl_site.remote_gm_hint':
+      'The field\'s GMs on the site server may start, pause and end the live game. Off by default.',
+  'ctl_site.atak': 'ATAK feed (Cursor on Target)',
+  'ctl_site.atak_hint':
+      'The boxes and zones on ATAK maps, over the field\'s Wi-Fi.',
+  'ctl_site.multicast': 'Multicast address (239.2.3.1:6969)',
+  'ctl_site.staff': 'Staff ATAK devices (host:port, comma between)',
+  'ctl_site.players':
+      'Player positions to the staff devices (never to multicast)',
+  'ctl_site.remote': 'Remote ATAK through the site server',
+  'ctl_site.remote_players': 'Player positions through the site server too',
+  'ctl_site.bad_sync': 'Site server: {why}',
+  'ctl_site.bad_atak': 'ATAK: {why}',
 };

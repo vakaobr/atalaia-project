@@ -222,6 +222,21 @@ class CursorTests(SyncCase):
         self.assertEqual(self.site.totals(game), {"red": 70, "blue": 0})
         self.assertEqual(self.site.games[game]["state"], "ended")
 
+    def test_a_box_that_said_hello_is_sent_with_its_capabilities(self) -> None:
+        """Decision PE24-121: a HELLO's capabilities are integer ids; they go as their texts (the format's),
+        else the node was left out of the sync (found by the Android controller's port)."""
+        gid = self.play(end=False)
+        fc = self.ctrl.fc
+        fc.nodes[3].hello = {"node_name": "alpha", "platform": 0, "fw_version": "1.2.0", "core_version": "0.3.0",
+                             "tier": 0, "capabilities": [1, 4], "transports": 1}
+        self.ctrl._on_node(fc.nodes[3], "hello")
+        self.assertTrue(self.client().run_once())
+        nodes = [b for p, _, b in self.site.requests if p.endswith("/nodes")][-1]["nodes"]
+        self.assertEqual([n["node_id"] for n in nodes], [3])
+        self.assertEqual(nodes[0]["info"]["capabilities"], ["1", "4"])
+        self.assertEqual(nodes[0]["info"]["platform"], "0")
+        self.assertEqual(self.store.sync_state(gid, self.seed(gid))["last_error"], None)
+
     def test_a_restart_sends_nothing_again(self) -> None:
         self.play()
         self.assertTrue(self.client().run_once())

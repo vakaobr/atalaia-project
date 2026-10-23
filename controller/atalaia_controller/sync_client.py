@@ -985,8 +985,13 @@ class SyncClient:
 
         out = []
         for node in self.store.nodes(game["id"]):
+            info = {k: node[k] for k in NODE_INFO if k in node}
+            if isinstance(info.get("capabilities"), list):
+                # A HELLO's capabilities are integer ids, the format's texts: as their decimal text, or
+                # every box that said HELLO was left out (decision PE24-121).
+                info["capabilities"] = [str(c) for c in info["capabilities"]]
             entry = {"node_id": node["node_id"], "name": node["name"], "role": node["role"],
-                     "last_seen": node["last_seen"], "info": {k: node[k] for k in NODE_INFO if k in node}}
+                     "last_seen": node["last_seen"], "info": info}
             try:
                 check_nodes({**self._envelope(game), "nodes": [entry]})
             except SyncFormatError as exc:

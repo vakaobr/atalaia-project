@@ -402,6 +402,9 @@ class Controller:
         if lead:
             election.lead(term, self.now_ms())
         else:
+            # A joined standby restarted: the term it knew, so a claim after the restart is higher than
+            # the leader's and the boxes follow it (decision PE24-119; a new join's term is 0).
+            election.term = max(election.term, int(term or 0))
             election.follow(self.now_ms())
         self.transport = ModemTransport(self.modem, self.store, game["id"], node_id, max_hops,
                                         channel, key, wifi=self._to_wifi, resuming=resuming)

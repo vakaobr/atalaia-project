@@ -934,4 +934,42 @@ const Map<String, String> deStrings = {
   'ctl_modes.bad_id': 'Zeile {line}: keine Schlüssel-ID (16 Hexziffern).',
   'ctl_modes.bad_index': 'Der Index ist eine https://-Adresse oder eine Datei.',
   'ctl_modes.saved': 'Gespeichert: gilt ab dem nächsten Start des Controllers.',
+  // The phone controller's slice S7 settings (PE24-118 onward).
+  'ctl_site.tile': 'Site-Server, Ausfallübernahme und ATAK (Feld-Controller)',
+  'ctl_site.tile_hint':
+      'Ausfallübernahme {mode}; Site-Server {sync}; ATAK {atak}',
+  'ctl_site.on': 'an',
+  'ctl_site.off': 'aus',
+  'ctl_site.title': 'Site-Server, Ausfallübernahme und ATAK',
+  'ctl_site.intro':
+      'Der Feld-Controller dieses Handys so, wie ihn die controller.toml eines Pi festlegt: seine Ausfallübernahme, der Site-Server des Felds (Spiele, Protokolle und Punkte gehen dorthin, sobald Internet da ist; Anmeldelisten, Branding und die Szenariobibliothek kommen von dort) und der ATAK-Feed. Gilt ab dem nächsten Start des Controllers.',
+  'ctl_site.failover': 'Ausfallübernahme',
+  'ctl_site.failover_auto': 'Automatische Ausfallübernahme',
+  'ctl_site.manual': 'Manuell',
+  'ctl_site.auto': 'Automatisch',
+  'ctl_site.failover_hint':
+      'Manuell: Die Spielleitung befördert einen Bereitschafts-Controller. Automatisch: Ein Bereitschafts-Controller übernimmt nach drei verpassten Signalen (30 s). Ein Handy im Akkubetrieb gibt einem Pi am Netz den Vortritt, wenn beide kandidieren.',
+  'ctl_site.sync': 'Site-Server',
+  'ctl_site.sync_hint': 'Offline zuerst: Ein Spiel wartet nie auf das Netz.',
+  'ctl_site.url': 'Adresse (https://…)',
+  'ctl_site.key': 'API-Schlüssel des Felds (vom Site-Server)',
+  'ctl_site.key_set':
+      'API-Schlüssel {fp}… (einen neuen eingeben, um ihn zu ersetzen)',
+  'ctl_site.branding':
+      'Branding und gespeicherte Teams des Felds vom Site-Server',
+  'ctl_site.library': 'Szenarien und Spielvorlagen des Felds vom Site-Server',
+  'ctl_site.remote_gm': 'Remote-Spielleitung',
+  'ctl_site.remote_gm_hint':
+      'Die Spielleitung des Felds auf dem Site-Server darf das laufende Spiel starten, pausieren und beenden. Standardmäßig aus.',
+  'ctl_site.atak': 'ATAK-Feed (Cursor on Target)',
+  'ctl_site.atak_hint':
+      'Die Boxen und Zonen auf ATAK-Karten, über das WLAN des Felds.',
+  'ctl_site.multicast': 'Multicast-Adresse (239.2.3.1:6969)',
+  'ctl_site.staff': 'ATAK-Geräte der Orga (Host:Port, durch Kommas getrennt)',
+  'ctl_site.players':
+      'Spielerpositionen an die Geräte der Orga (nie per Multicast)',
+  'ctl_site.remote': 'Remote-ATAK über den Site-Server',
+  'ctl_site.remote_players': 'Auch Spielerpositionen über den Site-Server',
+  'ctl_site.bad_sync': 'Site-Server: {why}',
+  'ctl_site.bad_atak': 'ATAK: {why}',
 };

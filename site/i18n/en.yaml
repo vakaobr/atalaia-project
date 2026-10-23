@@ -602,7 +602,7 @@ roadmap:
     title: Android and players
     short: >-
       Android props, the I/O pod, the player app and the modes that need phones, Money Factory
-      included: done in software, except iOS and the last parts of the phone as field controller;
+      included: done in software, except iOS;
       the field test waits for real phones and pods.
     text: >-
       Android props, the <a href="{{ page.to.glossary }}#glossary-android-prop">I/O pod</a>, the app for players,
@@ -630,8 +630,7 @@ roadmap:
       and colour in the app, on the scoreboard and on the poster, and give its teams names and
       crests.
     todo: >-
-      <strong>Still to come.</strong> In software: the phone as the field controller, built in
-      slices (done: its MQTT broker, position filter and game engine, with field.lua on the shared
+      <strong>Still to come.</strong> The phone as the field controller, built in slices, is done in software and waits for a real phone (done: its MQTT broker, position filter and game engine, with field.lua on the shared
       core, the REST API, the live stream and the MQTT topics, games kept across a restart, join
       payloads, an I/O pod as its radio, Android props on its Wi-Fi, field check-in with player
       tokens, the "replicas to chrono" list and players' positions, checked by the same contract
@@ -644,9 +643,7 @@ roadmap:
       boxes over the radio: sealed invites into the next game, the end of a game told to its boxes
       even after the phone restarted without the game's key, new boxes adopted by the code they show
       or by a field card the phone writes by NFC, and firmware updates between games (with the Pi's
-      USB radio modem plugged into the phone: the I/O pod does not pass these messages yet); and presets, mode uploads and signed mode packages, sent to the boxes that lack them, scenarios compiled on the phone, role packages in a game and team names and crests; to come
-      after the field test: failover between a phone and a Pi and the rest of the Pi's features) and
-      the iOS version (its project is in the repository and CI builds it on a Mac, but it has not run on an iPhone yet; the prop and the phone as field controller stay Android only). Plan phase G, the field test with real phones and
+      USB radio modem plugged into the phone: the I/O pod does not pass these messages yet); and presets, mode uploads and signed mode packages, sent to the boxes that lack them, scenarios compiled on the phone, role packages in a game and team names and crests; and the rest of the Pi's features, pulled forward too: failover, so that a phone and a Pi can each be the other's standby, the site server sync (games, logs and scores sent when the internet is there; rosters, branding and the scenario library from it), the remote GM and the ATAK feed); and the iOS version (its project is in the repository and CI builds it on a Mac, but it has not run on an iPhone yet; the prop and the phone as field controller stay Android only). Plan phase G, the field test with real phones and
       pods, waits for the hardware: so far the app has run only on Android emulators, and the pod
       firmware only as its own code on a computer.
     gate: "Gate: one game mixes ESP32 and Android props without issues."

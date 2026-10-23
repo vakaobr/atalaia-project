@@ -13,14 +13,19 @@
 /// decrypted ([onPacket]); what it sends goes to a [FieldTransport] (the I/O
 /// pod's radio and the Wi-Fi props, slice S4 of PE24).
 ///
-/// Not here yet (PE24 slice S7): the CLAIM election and TIME from another
-/// controller. This controller is always in charge, term 1 unless told.
+/// The CLAIM election (ADR-P2-8; PE24 slice S7, controller_failover.dart):
+/// TIME and CLAIM from another controller go to the [Election]; a standby
+/// mirrors the leader's game clock from its TIME beacons, so a takeover
+/// continues it; only the leader sends TIME, commands and ACKs and logs
+/// node health. Without an election given, this controller leads from the
+/// start with [term] (a lone controller, as the Python one).
 library;
 
 import 'dart:convert';
 import 'dart:typed_data';
 
 import '../core/node_types.dart';
+import 'controller_failover.dart';
 import '../radio/rf_codec.dart';
 
 /// TIME key 2.
@@ -54,8 +59,9 @@ const cmdParamsMax = 127;
 /// Flood copies of a packet are dropped for this long (ADR-P2-6).
 const packetDedupeMs = 60000;
 
-/// TIME every 30 s (spec section 11; 10 s with automatic failover).
-const beaconIntervalMs = 30000;
+/// TIME every 30 s (spec section 11; 10 s with automatic failover:
+/// [beaconIntervalFor]).
+const beaconIntervalMs = beaconIntervalManualMs;
 
 /// Node health (decisions FU1-1 to FU1-3).
 const healthEvents = ['node.online', 'node.offline', 'battery.low'];
@@ -153,6 +159,15 @@ class AckTracker {
   /// Highest contiguous seq from 0, or -1.
   int contiguous(int node, int epoch) => _contig[(node, epoch)] ?? -1;
 
+  /// The latest epoch heard from [node], or null.
+  int? latestEpoch(int node) {
+    int? out;
+    for (final (n, e) in _contig.keys) {
+      if (n == node && (out == null || e > out)) out = e;
+    }
+    return out;
+  }
+
   RfAck ack(int node, int epoch) {
     final contig = contiguous(node, epoch);
     final bits = Uint8List(32);
@@ -182,13 +197,18 @@ class FieldController {
     required List<String> teams,
     this.nodeId = 0,
     this.maxHops = 2,
-    this.term = 1,
+    int term = 1,
+    Election? election,
+    int? beaconInterval,
     this.decodeEvent,
     int Function()? wallSeconds,
   }) : teams = List.unmodifiable(teams),
+       election = election ?? (Election(nodeId, 0)..lead(term, 0)),
        _wall =
            wallSeconds ??
            (() => DateTime.now().millisecondsSinceEpoch ~/ 1000) {
+    this.beaconInterval = beaconInterval ?? this.election.beaconInterval;
+    _roleSeen = this.election.role;
     for (final t in teams) {
       _scores[t] = {};
     }
@@ -199,7 +219,17 @@ class FieldController {
   final List<String> teams;
   final int nodeId;
   final int maxHops;
-  int term;
+
+  /// The controller election (controller_failover.dart).
+  final Election election;
+
+  /// TIME every [beaconInterval] ms while leading (10 s with automatic
+  /// failover, else 30 s).
+  late final int beaconInterval;
+  late String _roleSeen;
+
+  /// The term: the highest seen, ours when leading.
+  int get term => election.term;
   final EventDecoder? decodeEvent;
   final int Function() _wall;
 
@@ -234,8 +264,24 @@ class FieldController {
   void Function(FieldNode node, String kind)? onNode;
   void Function(Map<String, int> totals)? onScores;
 
-  /// Always true until the election is ported (PE24 slice S7).
-  bool get isController => true;
+  /// The role changed ([electionLeader], [electionCandidate],
+  /// [electionFollower]) with the term.
+  void Function(String role, int term)? onRole;
+
+  /// The election's own log: CLAIMs sent and heard, role changes (the
+  /// Python FieldController's `event_log` entries for them).
+  final List<Map<String, Object?>> electionLog = [];
+
+  /// True while this controller leads the game.
+  bool get isController => election.isLeader;
+
+  void _requireController() {
+    if (!election.isLeader) {
+      throw FieldControllerException(
+        'node $nodeId is not the controller (role ${election.role})',
+      );
+    }
+  }
 
   FieldNode registerNode(int id, String name, String role) {
     final node = nodes[id];
@@ -271,6 +317,7 @@ class FieldController {
   // --- the game -------------------------------------------------------------
 
   void startGame({int durationMs = 0, required int nowMs}) {
+    _requireController();
     gameState = gameRunning;
     this.durationMs = durationMs;
     gameTimeMs = 0;
@@ -282,6 +329,7 @@ class FieldController {
   }
 
   void pauseGame({required int nowMs, String? reason}) {
+    _requireController();
     _advanceTime(nowMs);
     gameState = gamePaused;
     _sendCmd(cmdOpcodes['pause']!, reason == null ? null : {'reason': reason});
@@ -289,6 +337,7 @@ class FieldController {
   }
 
   void resumeGame({required int nowMs}) {
+    _requireController();
     _advanceTime(nowMs);
     gameState = gameRunning;
     _sendCmd(cmdOpcodes['resume']!);
@@ -296,6 +345,7 @@ class FieldController {
   }
 
   void endGame({required int nowMs, String? reason}) {
+    _requireController();
     _advanceTime(nowMs);
     gameState = gameEnded;
     _sendCmd(cmdOpcodes['end']!, reason == null ? null : {'reason': reason});
@@ -316,7 +366,7 @@ class FieldController {
         gameState: gameState,
         durationMs: durationMs & 0xffffffff,
         wallS: _wall() & 0xffffffff,
-        term: term & 0xffffffff,
+        term: election.term & 0xffffffff,
       ).encode(),
       RfPrio.critical,
     );
@@ -326,6 +376,7 @@ class FieldController {
   /// null when nothing sent it. Throws [FieldControllerException] for an
   /// unknown command or parameters that do not fit a CMD.
   int? sendCmd(String cmd, Map<String, Object?>? params, {int? dest}) {
+    _requireController();
     final opcode = cmdOpcodes[cmd];
     if (opcode == null) {
       throw FieldControllerException('unknown command $cmd');
@@ -356,8 +407,10 @@ class FieldController {
   /// CMD update (opcode 9, RFC 0001 Amendment 6) to [dest]: the GM's alone
   /// (controller_firmware.dart), never a mode's field.lua, so not in
   /// [cmdOpcodes].
-  int? sendUpdateCmd(Map<String, Object?> params, {required int dest}) =>
-      _sendCmd(cmdUpdate, params, dest);
+  int? sendUpdateCmd(Map<String, Object?> params, {required int dest}) {
+    _requireController();
+    return _sendCmd(cmdUpdate, params, dest);
+  }
 
   // --- receiving ------------------------------------------------------------
 
@@ -372,13 +425,12 @@ class FieldController {
     final key = (header.source, epoch, header.seq);
     if (_packetsSeen.containsKey(key)) return; // a flood copy
     _packetsSeen[key] = _now;
-    if (header.type == RfType.time || header.type == RfType.claim) {
-      // Another controller (PE24 slice S7): noted, not followed.
-      problems.add({
-        't_ms': _now,
-        'type': header.type == RfType.time ? 'time' : 'claim',
-        'source': header.source,
-      });
+    if (header.type == RfType.time) {
+      _onTime(header.source, payload);
+      return;
+    }
+    if (header.type == RfType.claim) {
+      _onClaim(header.source, payload);
       return;
     }
     acks.record(header.source, epoch, header.seq);
@@ -398,10 +450,102 @@ class FieldController {
       case RfType.event:
         _onEvent(node, header, payload, epoch);
     }
-    if (header.ackRequested) {
+    if (header.ackRequested && election.isLeader) {
       _send(RfType.ack, acks.ack(header.source, epoch).encode(), RfPrio.normal);
     }
     _checkHealth(node, _now);
+  }
+
+  // --- the election (controller_failover.dart) ----------------------------
+
+  void _sendClaim(Claim claim, int nowMs) {
+    final lastAck = <int, int>{};
+    for (final id in nodes.keys) {
+      final epoch = acks.latestEpoch(id);
+      if (epoch != null && acks.contiguous(id, epoch) >= 0) {
+        lastAck[id] = acks.contiguous(id, epoch);
+      }
+    }
+    electionLog.add({
+      't_ms': nowMs,
+      'type': 'claim_sent',
+      'term': claim.term,
+      'priority': claim.priority,
+    });
+    _send(
+      RfType.claim,
+      RfClaim(
+        term: claim.term,
+        priority: claim.priority,
+        nodeId: claim.nodeId,
+        lastAckSeq: lastAck.isEmpty ? null : lastAck,
+      ).encode(),
+      RfPrio.critical,
+    );
+  }
+
+  /// Manual failover: stand for election now (the GM's "promote"). Throws
+  /// [ElectionException] for a node that cannot lead.
+  void promote(int nowMs) {
+    if (nowMs > _now) _now = nowMs;
+    _sendClaim(election.promote(nowMs), nowMs);
+    _checkRole(nowMs);
+  }
+
+  /// TIME from another controller: followed when its term is current; on
+  /// standby the game clock mirrors it, so a takeover continues it.
+  void _onTime(int source, Uint8List payload) {
+    final RfTime beacon;
+    try {
+      beacon = RfTime.decode(payload);
+    } on Object {
+      return;
+    }
+    if (!election.onTime(beacon.term, source, _now)) return;
+    gameState = beacon.gameState;
+    gameTimeMs = beacon.gameTimeMs;
+    _lastTick = _now;
+    durationMs = beacon.durationMs;
+    _checkRole(_now);
+  }
+
+  /// CLAIM from a candidate.
+  void _onClaim(int source, Uint8List payload) {
+    final RfClaim claim;
+    try {
+      claim = RfClaim.decode(payload);
+    } on Object {
+      return;
+    }
+    electionLog.add({
+      't_ms': _now,
+      'type': 'claim',
+      'source': source,
+      'term': claim.term,
+      'priority': claim.priority,
+      'node_id': claim.nodeId,
+    });
+    election.onClaim(claim.term, claim.priority, claim.nodeId, _now);
+    _checkRole(_now);
+  }
+
+  void _checkRole(int nowMs) {
+    final role = election.role;
+    if (role == _roleSeen) return;
+    _roleSeen = role;
+    electionLog.add({
+      't_ms': nowMs,
+      'type': 'role',
+      'role': role,
+      'term': election.term,
+    });
+    if (role == electionLeader) {
+      // Took over: announce the new term at once (nodes follow the highest
+      // term).
+      _lastTick = nowMs;
+      sendTimeBeacon(nowMs);
+    }
+    onRole?.call(role, election.term);
   }
 
   void _onState(FieldNode node, Uint8List payload) {
@@ -481,11 +625,16 @@ class FieldController {
 
   // --- tick -----------------------------------------------------------------
 
-  /// Moves to [nowMs]: the game clock, due TIME beacons, node health.
+  /// Moves to [nowMs]: the game clock, the election, due TIME beacons (the
+  /// leader's), node health.
   void tick(int nowMs) {
     _advanceTime(nowMs);
-    if ((gameState == gameRunning || gameState == gamePaused) &&
-        nowMs - lastBeaconMs >= beaconIntervalMs) {
+    final claim = election.tick(nowMs);
+    if (claim != null) _sendClaim(claim, nowMs);
+    _checkRole(nowMs);
+    if (election.isLeader &&
+        (gameState == gameRunning || gameState == gamePaused) &&
+        nowMs - lastBeaconMs >= beaconInterval) {
       sendTimeBeacon(nowMs);
     }
     for (final node in nodes.values.toList()) {
@@ -573,7 +722,7 @@ class FieldController {
   }
 
   void _checkHealth(FieldNode node, int nowMs) {
-    if (gameState == gameEnded) return;
+    if (!election.isLeader || gameState == gameEnded) return;
     final since = node.heard
         ? node.lastSeenMs
         : node.link == 'online'

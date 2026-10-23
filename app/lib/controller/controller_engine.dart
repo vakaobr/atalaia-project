@@ -33,8 +33,7 @@
 /// positions deleted when a game ends. Slice S7b: presets, mode uploads and
 /// signed packages ([modes], controller_modes.dart; [signedModes]), the
 /// modes sent to boxes ([modeFetch]), scenarios ([scenarios]), role
-/// packages in a game and team branding ([branding]). Not yet: failover
-/// (S7, later). Slice S7c: the hooks of the boxes over the radio ([boxes],
+/// packages in a game and team branding ([branding]). Slice S7c: the hooks of the boxes over the radio ([boxes],
 /// [pairing], [adoption], [firmware]): field and pair frames routed to
 /// them, GAME_OVER when a game ends, [startGuards], [sendUpdate]. Slice S6:
 /// the shell runs the engine on the
@@ -44,6 +43,13 @@
 ///
 /// Slice S7a (PE24-74): the field plan ([field], controller_field.dart) and
 /// the channel choice and noise scan ([channel], controller_channel.dart).
+///
+/// Slice S7 (PE24-118 onward): failover (controller_failover.dart): the
+/// CLAIM election on every game ([promote]; `failover_mode` manual or
+/// auto), a game joined as a standby controller from a join payload of
+/// kind "controller" ([joinAsStandby]), the standby following the leader's
+/// TIME beacons and taking over its field.lua when it wins, so a phone and
+/// a Pi can be each other's standby (PE24-2).
 library;
 
 import 'dart:convert';
@@ -64,6 +70,7 @@ import 'controller_adoption.dart';
 import 'controller_boxes.dart';
 import 'controller_branding.dart';
 import 'controller_channel.dart';
+import 'controller_failover.dart';
 import 'controller_checkin.dart';
 import 'controller_field.dart';
 import 'controller_firmware.dart';
@@ -73,6 +80,7 @@ import 'controller_pairing.dart';
 import 'controller_positions.dart';
 import 'controller_radio.dart';
 import 'controller_scenarios.dart';
+import 'controller_schedule.dart';
 import 'controller_signed_modes.dart';
 import 'controller_store.dart';
 import 'field_controller.dart';
@@ -164,15 +172,8 @@ class ControllerConfig {
   /// restart (ADR-P2-4; decision OT-7: on by default, as on the Pi).
   final bool persistGameKey;
 
-  /// ADR-P2-8's priority score, as the Pi computes it.
-  int get priority {
-    final score =
-        powerSource.clamp(0, 3) * 4096 +
-        batteryPct.clamp(0, 100) * 32 +
-        (storageOk ? 512 : 0) +
-        100 * 2;
-    return min(score, 0xffff);
-  }
+  /// ADR-P2-8's priority score, as the Pi computes it (a link of 100).
+  int get priority => priorityScore(powerSource, batteryPct, storageOk, 100);
 }
 
 const teamNameMax = 23;
@@ -413,6 +414,19 @@ class ControllerEngine {
   ControllerAdoption? adoption;
   ControllerFirmware? firmware;
 
+  /// Slice S7: the schedule pulled from the site server
+  /// (controller_schedule.dart), the site sync (controller_sync.dart) and
+  /// its status for `GET /api/v1/controller`, and the remote GM
+  /// (controller_remote_gm.dart); each set by its constructor.
+  ControllerSchedule? schedule;
+  Map<String, Object?> Function()? syncStatus;
+
+  /// `GET /api/v1/remote-gm`'s view (set by controller_remote_gm.dart) and
+  /// `GET /api/v1/atak`'s status (set by the host with
+  /// controller_atak.dart's emitter); null: off.
+  Map<String, Object?> Function(int limit)? remoteGmView;
+  Map<String, Object?> Function()? atakStatus;
+
   /// Why the live game may not start now (firmware updates on their way,
   /// slice S7c; boxes still fetching its modes, slice S7b; engine.py
   /// `start_guards`), or null: checked by [startGame] before the
@@ -431,6 +445,11 @@ class ControllerEngine {
   Uint8List get gameKey => _key;
 
   bool get keyLost => _keyLost;
+
+  /// Whether this controller is in charge of the live game: it leads the
+  /// election and has the game's key (slice S7: the remote GM's
+  /// `in_charge`, the ATAK feed).
+  bool get inCharge => _fc?.isController == true && !_keyLost;
 
   int get nodeId => (_game?['node_id'] as int?) ?? config.nodeId;
 
@@ -504,6 +523,7 @@ class ControllerEngine {
         field == null ||
         game == null ||
         game['id'] != gameId ||
+        !fc.isController ||
         fc.gameState != gameRunning) {
       return false;
     }
@@ -764,8 +784,26 @@ class ControllerEngine {
     return out;
   }
 
-  void _activate(Map<String, Object?> game, Uint8List key) {
+  /// Puts a game on the radio (engine.py `_activate`): [lead] false for a
+  /// game joined as a standby controller, which follows the TIME beacons
+  /// until it is promoted (ADR-P2-8; PE24 slice S7).
+  void _activate(Map<String, Object?> game, Uint8List key, {bool lead = true}) {
     final gameNode = (game['node_id'] as int?) ?? config.nodeId;
+    final election = Election(
+      gameNode,
+      config.priority,
+      mode: config.failoverMode,
+    );
+    if (lead) {
+      election.lead((game['term'] as int?) ?? 1, nowMs());
+    } else {
+      // A joined standby restarted: the term it knew, so a claim after the
+      // restart is higher than the leader's and the boxes follow it
+      // (decision PE24-119; a new join's term is 0).
+      election
+        ..term = max(election.term, (game['term'] as int?) ?? 0)
+        ..follow(nowMs());
+    }
     final hops = (game['max_hops'] as int?) ?? config.maxHops;
     _radio = transport != null
         ? null
@@ -790,7 +828,7 @@ class ControllerEngine {
             teams: (game['teams']! as List).cast<String>(),
             nodeId: gameNode,
             maxHops: hops,
-            term: (game['term'] as int?) ?? 1,
+            election: election,
             decodeEvent: core == null ? null : _decodeEvent,
             wallSeconds: () => _wall().floor(),
           )
@@ -804,7 +842,8 @@ class ControllerEngine {
     fc
       ..onEvent = _onEvent
       ..onNode = _onNode
-      ..onScores = _onScores;
+      ..onScores = _onScores
+      ..onRole = _onRole;
     _fc = fc;
     _game = game;
     _key = key;
@@ -851,7 +890,9 @@ class ControllerEngine {
       _keyLost = true;
       return;
     }
-    _activate(game, key);
+    // A joined standby restarts as a follower; the GM promotes it again if
+    // needed.
+    _activate(game, key, lead: game['joined'] != true);
     final fc = _fc!;
     fc.restoreAdjustments(_adjustments(id));
     for (final node in store.nodes(id)) {
@@ -905,7 +946,8 @@ class ControllerEngine {
       });
     }
     _fieldScores.forEach(fc.mergeCounters);
-    if (fc.gameState == gameRunning || fc.gameState == gamePaused) {
+    if (fc.isController &&
+        (fc.gameState == gameRunning || fc.gameState == gamePaused)) {
       try {
         _startField();
       } on ControllerError {
@@ -991,6 +1033,11 @@ class ControllerEngine {
     if (_keyLost || fc == null) {
       throw ControllerError.conflict(
         "this game's key was lost when the controller restarted; end it",
+      );
+    }
+    if (!fc.isController) {
+      throw ControllerError.conflict(
+        'this controller is on standby (term ${fc.term}); promote it first',
       );
     }
     return fc;
@@ -1183,6 +1230,10 @@ class ControllerEngine {
     if (game == null) throw ControllerError.notFound('no game $id');
     if (_game == null || _game!['id'] != id) {
       throw ControllerError.conflict('game $id is ${game['state']}, not live');
+    }
+    final standby = _fc;
+    if (standby != null && !standby.isController && _game!['joined'] == true) {
+      return _leaveStandby(id, reason.isEmpty ? 'left' : reason);
     }
     if (!_keyLost) {
       final fc = _live(id);
@@ -1701,9 +1752,9 @@ class ControllerEngine {
       'host': 'android',
       'failover_mode': config.failoverMode,
       'joined': _game?['joined'] == true,
-      'leader': fc?.nodeId,
+      'leader': fc?.election.leader,
       'priority': config.priority,
-      'role': fc == null ? null : 'leader',
+      'role': fc?.election.role,
       'term': fc?.term,
       'live_game': _game?['id'],
       'key_lost': _keyLost,
@@ -1717,8 +1768,203 @@ class ControllerEngine {
       'tx_status': Map.of(_txStatus),
       'field_channel_hz': fieldChannel,
       'channel_confirmed': store.getSetting('radio.channel_confirmed') == '1',
-      'sync': {'enabled': false},
+      'sync': syncStatus?.call() ?? {'enabled': false},
     };
+  }
+
+  // --- failover (PE24 slice S7, controller_failover.dart) -----------------
+
+  /// Manual failover (ADR-P2-8; engine.py `promote`): stand for election on
+  /// the live game; the CLAIM goes out now, and with no better claim heard
+  /// this controller leads 5 s later.
+  Map<String, Object?> promote() {
+    final fc = _fc;
+    if (fc == null) throw ControllerError.conflict('no live game');
+    if (fc.isController) {
+      throw ControllerError.conflict(
+        'already the controller (term ${fc.term})',
+      );
+    }
+    try {
+      fc.promote(nowMs());
+    } on ElectionException catch (e) {
+      throw ControllerError.conflict(e.message);
+    }
+    return status();
+  }
+
+  /// Takes a game as a standby controller from a join text of kind
+  /// "controller" (engine.py `join_as_standby`): the game is stored and put
+  /// on the radio with the payload's key, node id and channel, and this
+  /// controller follows the TIME beacons until the GM promotes it (or, with
+  /// `failover_mode = auto`, until the leader falls silent). Answers with
+  /// the game.
+  Map<String, Object?> joinAsStandby(Object? text) {
+    if (_game != null) {
+      throw ControllerError.conflict(
+        'game ${_game!['id']} is still live here; end it first',
+      );
+    }
+    if (joinKey.isEmpty) {
+      throw ControllerError.unavailable('no join key configured');
+    }
+    if (text is! String) {
+      throw ControllerError('text: the join text (atalaia:join:...)');
+    }
+    final JoinPayload j;
+    try {
+      j = decodeJoin(joinFromText(text), joinKey);
+    } on JoinException catch (e) {
+      throw ControllerError(
+        'join payload refused (${e.reason.name}): ${e.message}',
+      );
+    }
+    if (j.kind != JoinKind.controller) {
+      throw ControllerError(
+        'this join payload is for a box, not a standby controller',
+      );
+    }
+    // The standby keeps to its field's radio region (RF-AS923, as the Pi).
+    if (j.region != fieldRegion.code) {
+      throw ControllerError.conflict(
+        'this game is in the ${j.region} radio region and this '
+        "controller's field in ${fieldRegion.code}; change the region in "
+        'the radio settings first',
+      );
+    }
+    final ModePackage? pkg;
+    try {
+      pkg = modes.get(j.modeId);
+    } on ModeException catch (e) {
+      throw ControllerError.conflict('mode ${j.modeId}: $e');
+    }
+    if (pkg == null) {
+      // A scenario is an upload: the standby needs it too (decisions M6-1,
+      // M8-3).
+      final have = {for (final p in modes.all()) p.mode.id};
+      final missing = [
+        for (final m in j.modeId.split(modeSeparator))
+          if (!have.contains(m)) m,
+      ];
+      throw ControllerError.conflict(
+        'mode ${j.modeId} is not installed on this controller (missing: '
+        '${missing.join(', ')}); install a scenario here first, with the '
+        "same manifest (the leading controller's GET /api/v1/scenarios/{id} "
+        'gives it)',
+      );
+    }
+    if (pkg.mode.fieldScript != null && core == null) {
+      throw ControllerError.unavailable(
+        'this mode has a field.lua and the core library is not loaded',
+      );
+    }
+    final existing = store.game(j.gameId);
+    if (existing != null) {
+      throw ControllerError.conflict(
+        'this controller already has a game ${j.gameId} '
+        '(${existing['state']})',
+      );
+    }
+    final Map<String, Object?> params;
+    try {
+      params = pkg.mode.resolveParams(j.params ?? const {}, j.teams);
+    } on ModeException catch (e) {
+      throw ControllerError('$e');
+    }
+    final game = <String, Object?>{
+      'id': j.gameId,
+      'name': 'Game ${j.gameId} (standby)',
+      'mode_id': pkg.mode.id,
+      'preset_id': null,
+      'teams': j.teams,
+      'params': params,
+      'assignments': <String, Object?>{},
+      'duration_ms': 0,
+      'game_seed': j.gameSeed,
+      'state': 'ready',
+      'term': 0,
+      'created_at': _wall(),
+      'node_id': j.nodeId,
+      'channel_hz': j.channelHz,
+      'max_hops': j.maxHops,
+      'joined': true,
+      'controller_id': j.controllerId,
+      'squads': 0,
+      'team_info': <String, Object?>{},
+    };
+    store.createGame(game, key: config.persistGameKey ? j.gameKey : null);
+    // Promoted, it issues joins in the same language.
+    final lang = j.lang;
+    if (lang != null) store.setSetting('box_lang:${j.gameId}', lang);
+    _activate(store.game(j.gameId) ?? game, j.gameKey, lead: false);
+    final out = getGame(j.gameId);
+    _emit({'type': 'game', 'game': out});
+    return out;
+  }
+
+  /// A standby controller stops following a game (the GM left it, or it
+  /// ended; engine.py `_leave_standby`).
+  Map<String, Object?> _leaveStandby(int id, String reason) {
+    final fc = _fc;
+    if (fc != null) {
+      store.saveScores(id, fc.totalScores);
+      _saveGameTime(force: true);
+    }
+    store
+      ..forgetGameKey(id)
+      ..deleteSetting('key_tag:$id');
+    final out = _setState(id, 'ended', {'ended_at': _wall()});
+    _deactivate();
+    return publicGame(store.game(id) ?? out);
+  }
+
+  /// On standby: the stored game follows the leader's TIME beacons
+  /// (engine.py `_follow_state`).
+  void _followState(FieldController fc) {
+    final game = _game!;
+    final id = game['id']! as int;
+    final state = switch (fc.gameState) {
+      gameRunning => 'running',
+      gamePaused => 'paused',
+      gameEnded => 'ended',
+      _ => 'ready',
+    };
+    if (fc.durationMs != game['duration_ms']) {
+      game['duration_ms'] = fc.durationMs;
+      store.updateGame(id, {'duration_ms': fc.durationMs});
+    }
+    if (state == game['state']) return;
+    if (state == 'ended') {
+      _leaveStandby(id, 'the game ended');
+      return;
+    }
+    final times = <String, Object?>{};
+    if (state == 'running' && game['started_at'] == null) {
+      times['started_at'] = _wall();
+      game['started_at'] = times['started_at'];
+    }
+    _setState(id, state, times);
+  }
+
+  /// The election's role changed (engine.py `_on_role`): the term is kept
+  /// with the game, the consoles are told, and a takeover runs the game's
+  /// field.lua here from now on (a new run; the old controller's runs'
+  /// points are not known here, decision K5).
+  void _onRole(String role, int term) {
+    final game = _game;
+    if (game != null) store.updateGame(game['id']! as int, {'term': term});
+    _emit({'type': 'system', 'kind': 'role', 'role': role, 'term': term});
+    final fc = _fc;
+    if (role == electionLeader &&
+        game != null &&
+        fc != null &&
+        (fc.gameState == gameRunning || fc.gameState == gamePaused)) {
+      try {
+        _startField();
+      } on ControllerError {
+        // As the Pi (logged there): the game goes on without its field.lua.
+      }
+    }
   }
 
   // --- packets and the tick -----------------------------------------------
@@ -1756,11 +2002,16 @@ class ControllerEngine {
     }
     final game = _game;
     if (game != null &&
+        fc.isController &&
         fc.gameState == gameRunning &&
         fc.durationMs > 0 &&
         fc.gameTimeMs >= fc.durationMs) {
       endGame(game['id']! as int, 'time');
       return;
+    }
+    if (game != null && !fc.isController) {
+      _followState(fc);
+      if (_game == null) return;
     }
     _saveGameTime();
   }
@@ -1992,7 +2243,8 @@ class ControllerEngine {
       store.setSetting('field_scores:${game['id']}', jsonEncode(_fieldScores));
     }
     final end = field.pendingEnd;
-    if (!mayEnd || end == null) return false;
+    final fc = _fc;
+    if (!mayEnd || end == null || fc == null || !fc.isController) return false;
     field.pendingEnd = null;
     final winner = end['winner'];
     endGame(

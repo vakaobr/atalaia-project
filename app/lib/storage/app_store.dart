@@ -78,6 +78,19 @@ final class AppSettings {
   /// box_keys, revoked, index; slice S7b of PE24).
   Map<String, Object?> controllerModes = {};
 
+  /// The phone controller's failover (slice S7 of PE24, ADR-P2-8): manual
+  /// (the GM promotes a standby) or auto.
+  String failoverMode = 'manual';
+
+  /// The phone controller's site server (SyncConfig's JSON: the address,
+  /// the field's API key, branding, library, remote GM), or null: no sync.
+  /// The key is kept here as the join key is (decisions PD6, PE24-125).
+  Map<String, Object?>? controllerSync;
+
+  /// The phone controller's `[atak]` section (AtakConfig.fromSection's
+  /// keys), or null: off.
+  Map<String, Object?>? controllerAtak;
+
   List<int>? get joinKey {
     final h = joinKeyHex;
     if (h == null || !isJoinKeyHex(h)) return null;
@@ -129,6 +142,9 @@ final class AppSettings {
     'share_position': sharePosition,
     'firmware_keys': firmwareKeys,
     'controller_modes': controllerModes,
+    'failover_mode': failoverMode,
+    'controller_sync': controllerSync,
+    'controller_atak': controllerAtak,
   };
 
   static AppSettings fromJson(Map<String, Object?> j) {
@@ -162,7 +178,11 @@ final class AppSettings {
           if (k is String) k,
       ]
       ..controllerModes =
-          (j['controller_modes'] as Map?)?.cast<String, Object?>() ?? {};
+          (j['controller_modes'] as Map?)?.cast<String, Object?>() ?? {}
+      ..failoverMode = str('failover_mode') == 'auto' ? 'auto' : 'manual'
+      ..controllerSync = (j['controller_sync'] as Map?)?.cast<String, Object?>()
+      ..controllerAtak = (j['controller_atak'] as Map?)
+          ?.cast<String, Object?>();
   }
 }
 

@@ -28,11 +28,11 @@
 /// once.
 ///
 /// The records are kept in one document of the controller's store
-/// ("checkin", decision PE24-56), written whole after every change. Not here
-/// yet (slice S7): rosters of registered players from a site server (a
-/// registration id and ticket sent at check-in are kept with the walk-in, as
-/// on a Pi without a roster), the outcomes sent back to it, and the history
-/// of a marshal's earlier keys for the site sync.
+/// ("checkin", decision PE24-56), written whole after every change. Slice
+/// S7 (the site sync, controller_sync.dart): rosters of
+/// registered players from a site server ([applyRoster]), the outcomes
+/// sent back to it ([outcomes]), a marshal's earlier keys
+/// ([marshalKeyHistory]) and what the chrono registry's sync reads.
 library;
 
 import 'dart:convert';
@@ -370,6 +370,11 @@ class ControllerCheckin {
   var _replicas = <String, Map<String, Object?>>{};
   var _tokenKeys = <String, String>{};
 
+  /// A marshal's earlier keys with the time each was replaced (the Pi's
+  /// `marshal_key_history`, schema 6): what they signed still verifies on
+  /// the site server (slice S7's sync).
+  var _marshalHistory = <Map<String, Object?>>[];
+
   double _wall() => engine.wallSeconds();
 
   // --- the document ---------------------------------------------------------
@@ -405,6 +410,7 @@ class ControllerCheckin {
     _readings = _listOf(doc['readings']);
     _marshals = _mapOf(doc['marshals']);
     _replicas = _mapOf(doc['replicas']);
+    _marshalHistory = _listOf(doc['marshal_history']);
     _tokenKeys = {
       if (doc['token_keys'] is Map)
         for (final e in (doc['token_keys'] as Map).entries)
@@ -421,6 +427,7 @@ class ControllerCheckin {
     'marshals': _marshals,
     'replicas': _replicas,
     'token_keys': _tokenKeys,
+    'marshal_history': _marshalHistory,
   });
 
   // --- the store's queries (store.py) ---------------------------------------
@@ -1987,6 +1994,17 @@ class ControllerCheckin {
     final now = _wall();
     // The same key registered again keeps the time it was first registered.
     final same = existing != null && existing['public_key'] == b64;
+    if (existing != null && !same) {
+      // The old key goes to the history (store.py `put_marshal`).
+      _marshalHistory.add({
+        'marshal_id': mid,
+        'name': existing['name'],
+        'public_key': existing['public_key'],
+        'player_id': existing['player_id'],
+        'registered_at': existing['registered_at'],
+        'replaced_at': now,
+      });
+    }
     _marshals[mid] = {
       'marshal_id': mid,
       'name': name,
@@ -2403,6 +2421,251 @@ class ControllerCheckin {
     return {'player_id': pid, 'erased': true, 'readings_deleted': readings};
   }
 
+  // --- the site sync (slice S7, controller_sync.dart) -----------------------
+
+  /// The field identity [pid] as the sync's claims need it: its secret's
+  /// SHA-256 (hex), null for one made for a hand check-in; null when this
+  /// controller never saw the id (store.py `field_player`).
+  ({String? secretSha256})? fieldPlayer(String pid) {
+    final p = _fieldPlayers[pid];
+    if (p == null) return null;
+    return (secretSha256: p['secret_sha256'] as String?);
+  }
+
+  /// Every earlier key of every marshal, oldest first (store.py
+  /// `marshal_key_history`, schema 6).
+  List<Map<String, Object?>> marshalKeyHistory() {
+    final out = [for (final h in _marshalHistory) Map.of(h)]
+      ..sort((a, b) {
+        final c = (a['replaced_at']! as num).compareTo(
+          b['replaced_at']! as num,
+        );
+        return c != 0
+            ? c
+            : (a['marshal_id']! as String).compareTo(
+                b['marshal_id']! as String,
+              );
+      });
+    return out;
+  }
+
+  /// The replica registry, by when each was registered (store.py
+  /// `replicas`).
+  List<Map<String, Object?>> replicaRegistry() {
+    final out = [for (final r in _replicas.values) Map.of(r)]
+      ..sort((a, b) {
+        final ra = '${a['registered_at'] ?? ''}',
+            rb = '${b['registered_at'] ?? ''}';
+        final c = ra.compareTo(rb);
+        return c != 0
+            ? c
+            : (a['replica_id']! as String).compareTo(
+                b['replica_id']! as String,
+              );
+      });
+    return out;
+  }
+
+  /// The stored readings in the order they arrived, with their record's
+  /// text (store.py `readings_unsynced` without the sync's marks).
+  List<Map<String, Object?>> storedReadings() => [
+    for (final r in _readings)
+      {
+        'reading_id': r['reading_id'],
+        // The phone keeps the signed record as JSON data; its text is that
+        // data written again (the site server verifies the fields and the
+        // signature, not the text's spacing).
+        'record_json': r['record'] is String
+            ? r['record']
+            : jsonEncode(r['record']),
+        'series_id': r['series_id'],
+        'outcome': r['outcome'],
+        'received_at': r['received_at'],
+        'game_id': r['game_id'],
+      },
+  ];
+
+  /// A roster pulled from the site server (checked by
+  /// controller_sync_format.dart's `checkRoster`) becomes this game's
+  /// expected check-ins until the game starts (ADR-P4-11; checkin.py
+  /// `apply_roster`): new registrations are added with their declarations
+  /// `pending`, an expected one takes the roster's latest data, a cancelled
+  /// one that has not arrived goes, and anyone already at the field stays as
+  /// the controller has them. A declaration this field's check-in would
+  /// refuse is dropped and counted.
+  Map<String, Object?> applyRoster(int gameId, Map<String, Object?> roster) {
+    final out = <String, Object?>{
+      'added': 0,
+      'updated': 0,
+      'removed': 0,
+      'kept': 0,
+      'conflicts': 0,
+      'dropped_declarations': 0,
+      'frozen': false,
+    };
+    void inc(String k) => out[k] = (out[k]! as int) + 1;
+    final game = engine.store.game(gameId);
+    if (game == null || game['state'] != 'ready') {
+      out['frozen'] = true; // started (or gone): the controller's list rules
+      return out;
+    }
+    final st = settings();
+    final now = _wall();
+    final listed = <Object?>{};
+    final teams = (game['teams']! as List).cast<String>();
+    for (final reg
+        in (roster['registrations']! as List).cast<Map<String, Object?>>()) {
+      final pid = reg['player_id']! as String;
+      final rid = reg['registration_id']! as String;
+      listed.add(rid);
+      final byReg = _byRegistration(gameId, rid);
+      final row = _row(gameId, pid);
+      if ((byReg != null && byReg['player_id'] != pid) ||
+          (row != null &&
+              row['registration_id'] != null &&
+              row['registration_id'] != rid)) {
+        inc('conflicts');
+        continue;
+      }
+      final String name;
+      try {
+        name = _text('display_name', reg['display_name'], _nameMax)!;
+      } on ControllerError {
+        inc('conflicts');
+        continue;
+      }
+      final fed = st['federation'] != 'off' ? reg['federation_number'] : null;
+      final pref = teams.contains(reg['team_preference'])
+          ? reg['team_preference']
+          : null;
+      final decls = _rosterDeclarations(
+        gameId,
+        pid,
+        (reg['replicas']! as List).cast<Object?>(),
+        st,
+        out,
+      );
+      final fields = <String, Object?>{
+        'display_name': name,
+        'federation_number': fed,
+        'team_preference': pref,
+        'registration_id': rid,
+        'ticket_sha256': reg['ticket_sha256'],
+        'from_roster': true,
+      };
+      if (row == null) {
+        _addCheckin(gameId, pid, {'status': 'expected', ...fields}, now);
+        _replaceDeclarations(game, pid, decls, staff: true, now: now);
+        inc('added');
+      } else if (row['status'] == 'expected') {
+        _update(gameId, pid, {...fields, 'updated_at': now});
+        _replaceDeclarations(game, pid, decls, staff: true, now: now);
+        inc('updated');
+      } else {
+        if (row['registration_id'] == null) {
+          // A walk-in who turns out to be registered.
+          _update(gameId, pid, {
+            'registration_id': rid,
+            'from_roster': true,
+            'ticket_sha256': reg['ticket_sha256'],
+            'updated_at': now,
+          });
+        }
+        inc('kept');
+      }
+    }
+    for (final row in _rows(gameId)) {
+      if (row['status'] == 'expected' &&
+          !listed.contains(row['registration_id'])) {
+        final pid = row['player_id'];
+        _declarations.removeWhere(
+          (_, d) => d['game_id'] == gameId && d['player_id'] == pid,
+        );
+        _checkins.remove(row);
+        inc('removed');
+      }
+    }
+    if (['added', 'updated', 'removed'].any((k) => out[k] != 0)) {
+      _save();
+      engine.emit({
+        'type': 'roster',
+        'game': gameId,
+        'counts': Map.of(out),
+        '_staff': true,
+      });
+    }
+    return out;
+  }
+
+  List<Map<String, Object?>> _rosterDeclarations(
+    int gameId,
+    String pid,
+    List<Object?> items,
+    Map<String, Object?> st,
+    Map<String, Object?> out,
+  ) {
+    final decls = <Map<String, Object?>>[];
+    void drop() =>
+        out['dropped_declarations'] = (out['dropped_declarations']! as int) + 1;
+    for (final item in items) {
+      final Map<String, Object?> d;
+      try {
+        d = validateDeclaration(item);
+      } on ControllerError {
+        drop();
+        continue;
+      }
+      final other = _declarations[d['declaration_id']];
+      if (!limits.classes.containsKey(d['class']) ||
+          decls.length >= (st['max_replicas']! as int) ||
+          (other != null &&
+              (other['game_id'] != gameId || other['player_id'] != pid))) {
+        drop();
+        continue;
+      }
+      decls.add(d);
+    }
+    return decls;
+  }
+
+  /// What goes back to the site server after the game (checkin.py
+  /// `outcomes`): per registration its outcome and its declarations' final
+  /// states, and the walk-ins as a count. No names, no federation numbers.
+  Map<String, Object?> outcomes(int gameId) {
+    const arrivedStates = ['pending', 'checked_in', 'left'];
+    final regs = <Map<String, Object?>>[];
+    var walkins = 0;
+    for (final r in _rows(gameId)) {
+      final arrived =
+          arrivedStates.contains(r['status']) ||
+          (r['status'] == 'removed' && r['checked_in_at'] != null);
+      final rid = r['registration_id'];
+      if (rid == null || rid == '') {
+        if (arrived) walkins++;
+        continue;
+      }
+      final fromRoster = r['from_roster'] == true;
+      final ticket = r['ticket_sha256'];
+      if (!fromRoster && (ticket == null || ticket == '')) continue;
+      final pid = r['player_id']! as String;
+      regs.add({
+        'registration_id': rid,
+        'player_id': pid,
+        'outcome': arrived ? 'checked_in' : 'no_show',
+        'declarations': [
+          for (final d in _decls(gameId, pid).take(20))
+            {
+              'declaration_id': d['declaration_id'],
+              'state': d['state'],
+              'reading_id': d['reading_id'],
+            },
+        ],
+        if (!fromRoster) 'ticket_sha256': ticket,
+      });
+    }
+    return {'registrations': regs, 'walkins': walkins};
+  }
+
   // --- retention ------------------------------------------------------------------
 
   /// Erases what the retention rules say has been kept long enough (at most
@@ -2447,11 +2710,16 @@ class ControllerCheckin {
         isUtc: true,
       ),
     );
+    final keysBefore = _marshalHistory.length;
+    _marshalHistory.removeWhere(
+      (h) => (h['replaced_at']! as num) < now - _chronoRetentionDays * 86400,
+    );
     final out = {
       'checkins': erased,
       'declarations': declarations,
       'identities': idle.length,
       'readings': _deleteReadings(before: cutoff),
+      'marshal_keys': keysBefore - _marshalHistory.length,
     };
     if (out.values.any((v) => v > 0)) _save();
     return out;

@@ -215,13 +215,12 @@ void main() {
       ]) {
         expect(await routed(method, path), isTrue, reason: '$method $path');
       }
-      // The console's other calls in the areas left out.
-      for (final (method, path) in [
-        ('POST', '/api/v1/controller/join'),
-        ('POST', '/api/v1/schedule/1/game'),
-      ]) {
-        expect(await routed(method, path), isFalse, reason: '$method $path');
-      }
+      // The other calls of the areas slice S7 added: a standby's join
+      // (failover) and a game made from the schedule. Every area is served
+      // since slice S7, as on the Pi.
+      expect(await routed('POST', '/api/v1/controller/join'), isTrue);
+      expect(await routed('POST', '/api/v1/schedule/1/game'), isTrue);
+      expect(controllerFeatures.toSet(), areas.keys.toSet());
       // The console's other calls in the areas slice S7a added (field, radio).
       for (final (method, path) in [
         ('GET', '/api/v1/field'),

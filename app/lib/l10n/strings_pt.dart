@@ -907,4 +907,45 @@ const Map<String, String> ptStrings = {
   'ctl_modes.bad_index': 'O índice é um endereço https:// ou um ficheiro.',
   'ctl_modes.saved':
       'Guardado: aplica-se quando o controlador voltar a arrancar.',
+  // The phone controller's slice S7 settings (PE24-118 onward).
+  'ctl_site.tile':
+      'Servidor do site, substituição e ATAK (controlador de campo)',
+  'ctl_site.tile_hint':
+      'Substituição {mode}; servidor do site {sync}; ATAK {atak}',
+  'ctl_site.on': 'ligado',
+  'ctl_site.off': 'desligado',
+  'ctl_site.title': 'Servidor do site, substituição e ATAK',
+  'ctl_site.intro':
+      'O controlador de campo deste telemóvel como o controller.toml de um Pi o define: a substituição, o servidor do site do campo (os jogos, os registos e as pontuações vão para lá quando há internet; listas de inscritos, imagem do campo e biblioteca de cenários vêm de lá) e o feed para o ATAK. Aplica-se quando o controlador voltar a arrancar.',
+  'ctl_site.failover': 'Substituição',
+  'ctl_site.failover_auto': 'Substituição automática',
+  'ctl_site.manual': 'Manual',
+  'ctl_site.auto': 'Automático',
+  'ctl_site.failover_hint':
+      'Manual: o GM promove um controlador de reserva. Automático: um controlador de reserva assume depois de três sinais em falta (30 s). Um telemóvel a bateria cede a um Pi ligado à corrente quando ambos se candidatam.',
+  'ctl_site.sync': 'Servidor do site',
+  'ctl_site.sync_hint': 'Primeiro offline: um jogo nunca espera pela rede.',
+  'ctl_site.url': 'Endereço (https://…)',
+  'ctl_site.key': 'Chave de API do campo (do servidor do site)',
+  'ctl_site.key_set': 'Chave de API {fp}… (escreve outra para a substituir)',
+  'ctl_site.branding':
+      'Imagem do campo e equipas guardadas do servidor do site',
+  'ctl_site.library':
+      'Cenários e predefinições de jogo do campo do servidor do site',
+  'ctl_site.remote_gm': 'GM remoto',
+  'ctl_site.remote_gm_hint':
+      'Os GM do campo no servidor do site podem iniciar, pausar e terminar o jogo em curso. Desligado por omissão.',
+  'ctl_site.atak': 'Feed ATAK (Cursor on Target)',
+  'ctl_site.atak_hint':
+      'As caixas e as zonas nos mapas do ATAK, pelo Wi-Fi do campo.',
+  'ctl_site.multicast': 'Endereço multicast (239.2.3.1:6969)',
+  'ctl_site.staff':
+      'Dispositivos ATAK da organização (anfitrião:porta, separados por vírgulas)',
+  'ctl_site.players':
+      'Posições dos jogadores para os dispositivos da organização (nunca para multicast)',
+  'ctl_site.remote': 'ATAK remoto através do servidor do site',
+  'ctl_site.remote_players':
+      'Também as posições dos jogadores através do servidor do site',
+  'ctl_site.bad_sync': 'Servidor do site: {why}',
+  'ctl_site.bad_atak': 'ATAK: {why}',
 };

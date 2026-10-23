@@ -355,9 +355,11 @@ class RemoteGm:
             if seen is None:
                 ago = node.get("seen_ms_ago")
                 seen = now - ago / 1000 if isinstance(ago, (int, float)) else now
+            info = {k: node[k] for k in NODE_INFO if node.get(k) is not None}
+            if isinstance(info.get("capabilities"), list):  # integer ids as texts (decision PE24-121)
+                info["capabilities"] = [str(c) for c in info["capabilities"]]
             entry = {"node_id": node["node_id"], "name": node.get("name") or f"node-{node['node_id']}",
-                     "role": node.get("role") or "-", "last_seen": seen,
-                     "info": {k: node[k] for k in NODE_INFO if node.get(k) is not None}}
+                     "role": node.get("role") or "-", "last_seen": seen, "info": info}
             try:
                 check_nodes({**env, "nodes": [entry]})
             except SyncFormatError:
