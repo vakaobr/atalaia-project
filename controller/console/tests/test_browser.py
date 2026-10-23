@@ -1490,11 +1490,12 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertIsNone(bad.evaluate("localStorage.getItem('atalaia.token')"))
         self.forget_refusal("/api/v1/whoami")
 
-    PHONE_FEATURES = ["checkin", "join", "box_language", "positions"]  # app/lib/controller/controller_api.dart
+    # app/lib/controller/controller_api.dart (slice S7a added the radio and the field plan)
+    PHONE_FEATURES = ["checkin", "join", "box_language", "positions", "radio", "field"]
     # The console's calls in the areas a phone controller does not serve yet.
-    PHONE_HIDDEN = re.compile(r"/api/v1/(presets|team-presets|crests|field\b|radio|boxes|adopt|firmware|atak"
+    PHONE_HIDDEN = re.compile(r"/api/v1/(presets|team-presets|crests|field/branding|boxes|adopt|firmware|atak"
                               r"|scenarios|schedule|mode-packages|mode-fetch|controller/promote|controller/join"
-                              r"|remote-gm|games/\d+/(positions|invites|teams))")
+                              r"|remote-gm|games/\d+/(invites|teams))")
 
     def phone_controller(self, page, requests: list) -> None:
         """whoami answers with the Android controller's features; every request is noted."""
@@ -1513,41 +1514,46 @@ class ConsoleBrowserTests(unittest.TestCase):
                          setup=lambda p: self.phone_controller(p, requests))
         expect(page.get_by_test_id("tab-game")).to_have_text("Jogo")
         expect(page.get_by_test_id("game-state")).to_be_visible()
-        for tab in ("field", "adopt", "presets", "scenarios"):
+        for tab in ("adopt", "presets", "scenarios"):
             expect(page.get_by_test_id(f"tab-{tab}")).to_have_count(0)
+        expect(page.get_by_test_id("tab-field")).to_be_visible()  # slice S7a
         expect(page.get_by_test_id("game-actions")).to_be_visible()
         expect(page.get_by_test_id("game-invite")).to_have_count(0)  # boxes
         expect(page.get_by_test_id("teams-editor")).to_have_count(0)  # branding
-        for tab in ("game", "checkin", "nodes", "join", "feed", "controller", "settings"):
+        for tab in ("game", "checkin", "nodes", "join", "feed", "field", "controller", "settings"):
             page.get_by_test_id(f"tab-{tab}").click()
             page.wait_for_timeout(200)
             self.no_horizontal_scroll(page)
         expect(page.get_by_role("heading", name="Língua das caixas")).to_be_visible()
-        expect(page.get_by_test_id("radio-current")).to_have_count(0)
+        expect(page.get_by_test_id("radio-current")).to_be_visible()  # slice S7a
         expect(page.get_by_test_id("branding-settings")).to_have_count(0)
         expect(page.get_by_test_id("team-presets")).to_have_count(0)
         page.get_by_test_id("tab-controller").click()
         missing = page.get_by_test_id("controller-missing")
         expect(missing).to_contain_text("Este controlador ainda não serve estas partes da consola")
-        expect(missing).to_contain_text("o canal de rádio")
-        expect(missing).to_contain_text("o mapa do campo")
+        expect(missing).to_contain_text("adotar caixas")
+        expect(missing).not_to_contain_text("o canal de rádio")
+        expect(missing).not_to_contain_text("o mapa do campo")
         expect(missing).not_to_contain_text("check-in")
         expect(page.get_by_test_id("promote")).to_have_count(0)
-        # No live game: the creation form without team names and crests, no standby join, no radio reminder.
+        # No live game: the creation form without team names and crests, no standby join; the radio
+        # reminder since slice S7a.
         self.field.http.post(f"/api/v1/games/{game['id']}/end", json={})
         page.get_by_test_id("tab-game").click()
         expect(page.get_by_test_id("game-ended")).to_be_visible()
         expect(page.get_by_test_id("game-team-branding")).to_have_count(0)
-        expect(page.get_by_test_id("radio-first-setup")).to_have_count(0)
+        expect(page.get_by_test_id("radio-first-setup")).to_be_visible()
         page.get_by_test_id("tab-join").click()
         expect(page.get_by_test_id("standby-form")).to_have_count(0)
         page.wait_for_timeout(300)
         self.assertTrue(any("/api/v1/whoami" in u for u in requests))
         self.assertEqual([u for u in requests if self.PHONE_HIDDEN.search(u)], [])
-        # A #field address opens the game instead of a tab that is not there.
+        # An #adopt address opens the game instead of a tab that is not there; #field opens the field.
+        adopt = self.page(f"/console/#adopt&token={GM}", setup=lambda p: self.phone_controller(p, []))
+        expect(adopt.get_by_test_id("tab-game")).to_have_attribute("aria-current", "page")
+        expect(adopt.get_by_test_id("tab-adopt")).to_have_count(0)
         field = self.page(f"/console/#field&token={GM}", setup=lambda p: self.phone_controller(p, []))
-        expect(field.get_by_test_id("tab-game")).to_have_attribute("aria-current", "page")
-        expect(field.get_by_test_id("tab-field")).to_have_count(0)
+        expect(field.get_by_test_id("tab-field")).to_have_attribute("aria-current", "page")
 
     def test_csv_and_printing_notice_in_androids_web_view(self):
         self.field.create_game()

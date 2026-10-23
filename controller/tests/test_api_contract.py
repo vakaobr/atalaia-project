@@ -20,7 +20,11 @@ Field check-in and player positions (slice S5) are set up on every controller
 as main.py sets them up, with HTTPS off (no field CA), the wall clock at the
 vectors' ``wall_start`` moving with the clock and the field's day in UTC;
 request and ``ws_connect`` steps may give a player token (``bearer``), and
-``ws_closed`` reads a connection to its end.
+``ws_closed`` reads a connection to its end. The field plan and the radio channel
+(slice S7a, the vectors' ``field_and_radio`` block) add requests with a raw body
+(``raw``: an uploaded image), answers that are not JSON (``content_type``,
+``body_base64``) and the noise scan's steps (``noise``, ``hold_measure``,
+``scan_wait``) on the recording modem.
 """
 
 from __future__ import annotations
@@ -31,6 +35,7 @@ import datetime
 import json
 import re
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -175,6 +180,11 @@ class RecordingModem(FakeModem):
     def set_peer_epochs(self, epochs: dict[int, int]) -> None:
         super().set_peer_epochs(epochs)
         self.log.append({"kind": "peer_epochs", "epochs": {str(k): v for k, v in sorted(epochs.items())}})
+
+    def measure(self, channel_hz: int, dwell_ms: int, cad: bool = True, timeout=None):
+        # Slice S7a: the noise scan's MEASUREs, answered from self.noise (FakeModem).
+        self.log.append({"kind": "measure", "channel_hz": channel_hz, "dwell_ms": dwell_ms})
+        return super().measure(channel_hz, dwell_ms, cad, timeout)
 
     def send_packet(self, header, payload: bytes) -> bool:
         if not super().send_packet(header, payload):
@@ -364,6 +374,25 @@ class ContractCase(unittest.TestCase):
                 got = [e for e in got if e["kind"] in kinds]
             self.check(step["tx"], got, "the radio", env)
             return
+        if "noise" in step:
+            # Slice S7a: what the radio measures on each channel: [p90 dBm, CAD detections of 10].
+            for hz, (p90, hits) in step["noise"].items():
+                env.modem.noise[int(hz)] = (p90, hits)
+            return
+        if "hold_measure" in step:
+            # Measurements wait (the scan stays running) until a 'scan_wait' step.
+            env.modem.measure_gate = threading.Event()
+            return
+        if "scan_wait" in step:
+            # Lets held measurements go and waits until the scan has ended.
+            gate = env.modem.measure_gate
+            env.modem.measure_gate = None
+            if gate is not None:
+                gate.set()
+            if env.ctrl.scan is not None:
+                env.ctrl.scan.join(10)
+                self.assertFalse(env.ctrl.scan.running, "the scan did not end")
+            return
         if "mqtt" in step:
             got = list(env.mqtt.published)
             env.mqtt.published.clear()
@@ -381,9 +410,20 @@ class ContractCase(unittest.TestCase):
         kwargs: dict[str, Any] = {"headers": headers}
         if "body" in req:
             kwargs["json"] = req["body"]
+        if "raw" in req:
+            # Slice S7a: a raw body (an uploaded image), zero bytes added up to 'size' if given.
+            raw = base64.b64decode(req["raw"].get("base64", ""))
+            raw += bytes(max(0, req["raw"].get("size", 0) - len(raw)))
+            kwargs["content"] = raw
+            headers["Content-Type"] = req["raw"]["content_type"]
         r = env.client.request(req["method"], req["path"], **kwargs)
-        self.assertEqual(r.status_code, step["status"], f"{req['method']} {req['path']}: {r.text}")
-        body = r.json()
+        self.assertEqual(r.status_code, step["status"], f"{req['method']} {req['path']}: {r.text[:500]}")
+        ctype = r.headers.get("content-type", "").split(";")[0].strip()
+        if "content_type" in step:
+            self.assertEqual(ctype, step["content_type"], f"{req['method']} {req['path']}")
+        if "body_base64" in step:
+            self.assertEqual(r.content, base64.b64decode(step["body_base64"]), f"{req['method']} {req['path']}")
+        body = r.json() if ctype == "application/json" else None
         if "json" in step:
             self.check(step["json"], body, f"{req['method']} {req['path']}", env)
         for name, path in step.get("save", {}).items():
@@ -446,7 +486,8 @@ def _make(case: dict[str, Any]):
     return test
 
 
-for _n, _case in enumerate(VECTORS["cases"]):
+# The cases, then slice S7a's block (the field plan and the radio channel).
+for _n, _case in enumerate(VECTORS["cases"] + VECTORS["field_and_radio"]["cases"]):
     setattr(ContractCase, f"test_{_n:02d}_" + re.sub(r"\W+", "_", _case["name"]).strip("_").lower(),
             _make(_case))
 

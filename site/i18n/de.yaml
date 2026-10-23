@@ -636,12 +636,15 @@ roadmap:
       Spielenden, geprüft mit denselben Vertragsfällen wie der Pi-Controller und ausgeführt mit dem
       Code von Pod und Field Box auf einem Computer, und sein Bildschirm: die Rolle auf dem
       Startbildschirm der App, läuft bei ausgeschaltetem Bildschirm weiter, die GM-Konsole aus der
-      App, HTTPS mit einer auf dem Handy erzeugten Feld-CA und das WLAN des Felds; nach dem
-      Feldtest: der Wechsel zwischen einem Handy und einem Pi und der Rest dessen, was der Pi kann)
-      und die iOS-Version (nicht gebaut: sie braucht einen Mac); der Modus Money Factory ist
-      zurückgestellt. Planphase G, der Feldtest mit echten Handys und Pods, wartet auf die Hardware:
-      Bisher lief die App nur auf Android-Emulatoren und die Pod-Firmware nur als eigener Code auf
-      einem Computer.
+      App, HTTPS mit einer auf dem Handy erzeugten Feld-CA und das WLAN des Felds; und, vor den
+      Feldtest vorgezogen, der Feldplan (ein Plan pro Ebene, seine Lage auf der Karte,
+      Kartenelemente mit der Feldgrenze und das aus einer Karte geladene Feld, sodass die Warnung
+      beim Verlassen des Felds auch dort funktioniert) und der Funkkanal mit der Suche nach einem
+      ruhigen Kanal über den I/O-Pod; nach dem Feldtest: der Wechsel zwischen einem Handy und einem
+      Pi und der Rest dessen, was der Pi kann) und die iOS-Version (nicht gebaut: sie braucht einen
+      Mac); der Modus Money Factory ist zurückgestellt. Planphase G, der Feldtest mit echten Handys
+      und Pods, wartet auf die Hardware: Bisher lief die App nur auf Android-Emulatoren und die
+      Pod-Firmware nur als eigener Code auf einem Computer.
     gate: "Gate: Ein Spiel mischt ESP32- und Android-Props ohne Probleme."
   p4:
     title: Site-Server und erweitertes Spiel

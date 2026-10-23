@@ -138,6 +138,13 @@ class StreamHub {
         'positions': pos.visible(v, msg['game'] as int?),
       };
     }
+    if (msg['_map_features'] == true) {
+      // Each connection gets the features its token may see, whole (MF-10;
+      // slice S7a): never another team's or the staff's.
+      final field = engine.field;
+      if (field == null) return null;
+      return {'type': 'map_features', 'features': field.visibleFeatures(v)};
+    }
     if (v.kind == 'player' && !playerTypes.contains(msg['type'])) return null;
     final out = publicMessage(msg);
     final ev = out['event'];

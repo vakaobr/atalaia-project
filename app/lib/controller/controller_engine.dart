@@ -31,11 +31,13 @@
 /// ([logControllerEvent]), a VIP's position for field.lua
 /// ([fieldPosition]), the retention purge and the grants' expiry on [tick],
 /// positions deleted when a game ends. Not yet: presets, mode uploads,
-/// scenarios, role packages, branding, the channel choice and scans,
-/// re-invites, failover (S7). Slice S6: the shell runs the engine on the
+/// scenarios, role packages, branding, re-invites, failover (S7). Slice S6: the shell runs the engine on the
 /// controller's own isolate (controller_host.dart) and gives it the field
 /// CA and the phone's addresses for join keys 13 and 14 ([caSha256],
 /// [linkUrls]).
+///
+/// Slice S7a (PE24-74): the field plan ([field], controller_field.dart) and
+/// the channel choice and noise scan ([channel], controller_channel.dart).
 library;
 
 import 'dart:convert';
@@ -50,7 +52,9 @@ import '../modes/mode_catalog.dart';
 import '../protocol/join_payload.dart';
 import '../radio/rf_codec.dart';
 import '../security/ndef.dart';
+import 'controller_channel.dart';
 import 'controller_checkin.dart';
+import 'controller_field.dart';
 import 'controller_positions.dart';
 import 'controller_radio.dart';
 import 'controller_store.dart';
@@ -346,6 +350,14 @@ class ControllerEngine {
   /// constructor.
   ControllerPositions? positions;
 
+  /// The field's channel and its noise scan (slice S7a): set by
+  /// [ControllerChannel]'s constructor.
+  ControllerChannel? channel;
+
+  /// The field plan: images, levels, map positions, map features and the
+  /// boxes' places (slice S7a): set by [ControllerField]'s constructor.
+  ControllerField? field;
+
   /// The live game came back after a restart without its key: it can only
   /// be ended (ADR-P2-4).
   bool _keyLost = false;
@@ -495,6 +507,11 @@ class ControllerEngine {
     if (_game != null) {
       throw ControllerError.conflict(
         'game ${_game!['id']} is still live; end it first',
+      );
+    }
+    if (channel?.scanRunning ?? false) {
+      throw ControllerError.conflict(
+        'a channel scan is running; wait for it or cancel it first',
       );
     }
     final name = spec['name'] ?? '';
@@ -1456,7 +1473,7 @@ class ControllerEngine {
       'tx_epoch': _radio?.epoch,
       'tx_status': Map.of(_txStatus),
       'field_channel_hz': fieldChannel,
-      'channel_confirmed': false,
+      'channel_confirmed': store.getSetting('radio.channel_confirmed') == '1',
       'sync': {'enabled': false},
     };
   }
@@ -1539,7 +1556,9 @@ class ControllerEngine {
       _emit({'type': 'system', 'kind': 'radio.up'});
       final fc = _fc;
       if (fc == null) {
-        m.setChannel(fieldChannel); // no game: listen on the field's channel
+        // No game: listen on the field's channel (not during a scan, which
+        // tunes the radio itself).
+        if (!(channel?.scanRunning ?? false)) m.setChannel(fieldChannel);
       } else {
         final known = {
           for (final n in fc.nodes.values)

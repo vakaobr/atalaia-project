@@ -626,11 +626,15 @@ roadmap:
       casos de contrato que o controlador no Pi e postos a jogar com o próprio código do módulo e da
       Field Box num computador, e o seu ecrã: o controlador de campo no ecrã inicial da app, a
       correr com o ecrã apagado, a consola da organização servida pela app, HTTPS com uma CA do
-      campo feita no telemóvel e a rede Wi-Fi do campo; depois do teste no campo: a passagem entre
-      um telemóvel e um Pi e o resto do que o Pi faz) e a versão iOS (por fazer: precisa de um Mac);
-      o modo Money Factory ficou para depois. A fase G do plano, o teste no campo com telemóveis e
-      módulos a sério, espera pelo hardware: até agora a app só correu em emuladores Android, e o
-      firmware do módulo só como o seu próprio código num computador.
+      campo feita no telemóvel e a rede Wi-Fi do campo; e, trazidos para antes do teste no campo, o
+      mapa do campo (uma planta por piso, a sua posição no mapa, os elementos do mapa com o limite
+      do campo e o campo carregado de um mapa, por isso o aviso de saída do limite também funciona
+      aí) e o canal de rádio, com a procura de um canal sossegado através do módulo de E/S; depois
+      do teste no campo: a passagem entre um telemóvel e um Pi e o resto do que o Pi faz) e a versão
+      iOS (por fazer: precisa de um Mac); o modo Money Factory ficou para depois. A fase G do plano,
+      o teste no campo com telemóveis e módulos a sério, espera pelo hardware: até agora a app só
+      correu em emuladores Android, e o firmware do módulo só como o seu próprio código num
+      computador.
     gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."
   p4:
     title: Servidor do clube e jogo avançado

@@ -89,12 +89,16 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 
 import '../modes/builtin_modes.g.dart';
+import 'controller_channel.dart';
 import 'controller_checkin.dart';
 import 'controller_engine.dart';
+import 'controller_field.dart';
 import 'controller_positions.dart';
 import 'controller_props.dart';
 import 'controller_stream.dart';
 import 'console_files.dart';
+
+part 'controller_field_api.dart';
 
 /// The app's version (pubspec.yaml), which /healthz and /whoami give.
 const controllerApiVersion = '0.2.0';
@@ -102,11 +106,18 @@ const controllerApiVersion = '0.2.0';
 /// The GM console's areas this controller serves, in /whoami's `features`
 /// (decision PE24-70): the console hides the tabs and panels of the rest.
 /// The Pi's api.py `FEATURES` has every area; this one leaves out presets
-/// and team presets, branding, the radio panel, boxes and invites,
-/// adoption, firmware, ATAK, the field (image, levels, map features, the
-/// boxes' places), scenarios, the schedule, mode packages and failover
-/// (PLAN.md, "PE24 slices"). An area served later is added here.
-const controllerFeatures = ['checkin', 'join', 'box_language', 'positions'];
+/// and team presets, branding, boxes and invites, adoption, firmware,
+/// ATAK, scenarios, the schedule, mode packages and failover (PLAN.md,
+/// "PE24 slices"). An area served later is added here: slice S7a added
+/// the radio channel and the field plan (controller_field_api.dart).
+const controllerFeatures = [
+  'checkin',
+  'join',
+  'box_language',
+  'positions',
+  'radio',
+  'field',
+];
 
 /// An answer: its status code, JSON body and extra headers.
 final class ApiResponse {
@@ -157,8 +168,10 @@ final class _Request {
     this.match,
     this.token,
     this.bodyText,
-    this.client,
-  );
+    this.client, [
+    Uint8List? bytes,
+    this.contentType,
+  ]) : bytes = bytes ?? Uint8List.fromList(utf8.encode(bodyText));
 
   final String method;
   final Uri uri;
@@ -168,6 +181,10 @@ final class _Request {
 
   /// The caller's address (the check-in's rate limit).
   final String client;
+
+  /// The body's bytes and its Content-Type (an uploaded image, slice S7a).
+  final Uint8List bytes;
+  final String? contentType;
 
   String pathText(int group) => Uri.decodeComponent(match.group(group)!);
 
@@ -257,7 +274,12 @@ class ControllerApi {
         ),
       ),
       ..._checkinRoutes(),
+      ..._fieldRoutes(),
     ];
+    // Slice S7a: the field plan and the radio channel, on every controller
+    // (the shell gives the field plan its folder first; else in memory).
+    if (engine.field == null) ControllerField(engine);
+    if (engine.channel == null) ControllerChannel(engine);
     hub = StreamHub(engine);
     engine.addListener(hub.publish);
     props = PropLinks(engine);
@@ -391,8 +413,18 @@ class ControllerApi {
     String? authorization,
     String body = '',
     String client = 'local',
+    Uint8List? bytes,
+    String? contentType,
   }) {
-    final out = _dispatch(method, uri, authorization, body, client);
+    final out = _dispatch(
+      method,
+      uri,
+      authorization,
+      body,
+      client,
+      bytes,
+      contentType,
+    );
     if (out is ApiResponse) return out;
     throw StateError('$method ${uri.path} answers asynchronously');
   }
@@ -404,15 +436,20 @@ class ControllerApi {
     String? authorization,
     String body = '',
     String client = 'local',
-  }) async => _dispatch(method, uri, authorization, body, client);
+    Uint8List? bytes,
+    String? contentType,
+  }) async =>
+      _dispatch(method, uri, authorization, body, client, bytes, contentType);
 
   FutureOr<ApiResponse> _dispatch(
     String method,
     Uri uri,
     String? authorization,
     String body,
-    String client,
-  ) {
+    String client, [
+    Uint8List? bytes,
+    String? contentType,
+  ]) {
     if (method == 'GET' || method == 'HEAD') {
       final file = _consoleAnswer(uri.path);
       if (file != null) return file;
@@ -428,7 +465,16 @@ class ControllerApi {
       if (match == null) continue;
       pathMatched = true;
       if (m != method) continue;
-      final request = _Request(method, uri, match, token, body, client);
+      final request = _Request(
+        method,
+        uri,
+        match,
+        token,
+        body,
+        client,
+        bytes,
+        contentType,
+      );
       try {
         final out = handler(request);
         if (out is ApiResponse) return out;
@@ -498,19 +544,23 @@ class ControllerApi {
     }
     final res = req.response;
     try {
-      final chunks = <int>[];
+      final chunks = BytesBuilder(copy: false);
+      final limit = _bodyLimit(req.uri.path);
       await for (final c in req) {
-        chunks.addAll(c);
-        if (chunks.length > 1 << 20) {
+        chunks.add(c);
+        if (chunks.length > limit) {
           throw _HttpError(413, 'the request body is too large');
         }
       }
+      final bytes = chunks.takeBytes();
       final answer = await handleAsync(
         req.method,
         req.uri,
         authorization: req.headers.value(HttpHeaders.authorizationHeader),
-        body: utf8.decode(chunks, allowMalformed: true),
+        body: utf8.decode(bytes, allowMalformed: true),
         client: req.connectionInfo?.remoteAddress.address ?? '?',
+        bytes: bytes,
+        contentType: req.headers.value(HttpHeaders.contentTypeHeader),
       );
       _write(res, answer, head: req.method == 'HEAD');
     } on _HttpError catch (e) {

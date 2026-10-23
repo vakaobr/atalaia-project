@@ -16,7 +16,12 @@
 // as the Pi runner sets them up: the portugal limit template, HTTPS off,
 // the wall clock at the vectors' wall_start moving with the clock, the
 // field's day in UTC; request and ws_connect steps may give a player token
-// ('bearer'), and ws_closed reads a connection to its end.
+// ('bearer'), and ws_closed reads a connection to its end. The field plan and
+// the radio channel (slice S7a, the vectors' field_and_radio block) add
+// requests with a raw body ('raw': an uploaded image), answers that are not
+// JSON ('content_type', 'body_base64') and the noise scan's steps ('noise',
+// 'hold_measure', 'scan_wait') on the recording modem; every controller has
+// its field plan's files in the case's folder, so a restart keeps them.
 
 import 'dart:async';
 import 'dart:collection';
@@ -27,6 +32,7 @@ import 'dart:typed_data';
 import 'package:atalaia_app/controller/controller_api.dart';
 import 'package:atalaia_app/controller/controller_checkin.dart';
 import 'package:atalaia_app/controller/controller_engine.dart';
+import 'package:atalaia_app/controller/controller_field.dart';
 import 'package:atalaia_app/controller/controller_positions.dart';
 import 'package:atalaia_app/controller/controller_mqtt.dart';
 import 'package:atalaia_app/controller/prop_link.dart' show propLinkProof;
@@ -249,7 +255,14 @@ void main() {
     throw ArgumentError('unknown rx type ${rx['type']}');
   }
 
-  for (final c in cases(vectors, 'cases')) {
+  // The cases, then slice S7a's block (the field plan and the radio channel).
+  for (final c in [
+    ...cases(vectors, 'cases'),
+    ...cases(
+      (vectors['field_and_radio'] as Map).cast<String, dynamic>(),
+      'cases',
+    ),
+  ]) {
     test(c['name'] as String, () async {
       var now = 0;
       final dir = Directory.systemTemp.createTempSync('atalaia-contract-');
@@ -288,6 +301,7 @@ void main() {
           ),
         );
         ControllerPositions(engine);
+        ControllerField(engine, dir: Directory('${dir.path}/field'));
         api = ControllerApi(
           engine,
           gmToken: tokens['gm']!,
@@ -471,6 +485,27 @@ void main() {
             expect(ws.socket.closeCode, step['close'], reason: 'step $i');
             continue;
           }
+          if (step.containsKey('noise')) {
+            // Slice S7a: what the radio measures on each channel.
+            (step['noise'] as Map).forEach((hz, v) {
+              final l = (v as List).cast<int>();
+              radio.noise[int.parse('$hz')] = (l[0], l[1]);
+            });
+            continue;
+          }
+          if (step.containsKey('hold_measure')) {
+            radio.held = Completer<void>();
+            continue;
+          }
+          if (step.containsKey('scan_wait')) {
+            radio.held?.complete();
+            radio.held = null;
+            final scan = engine.channel?.scan;
+            if (scan != null) {
+              await scan.done.timeout(const Duration(seconds: 10));
+            }
+            continue;
+          }
           if (step.containsKey('mqtt')) {
             final got = List.of(published);
             published.clear();
@@ -589,11 +624,42 @@ void main() {
             request.headers.contentType = ContentType.json;
             request.write(jsonEncode(req['body']));
           }
+          if (req.containsKey('raw')) {
+            // Slice S7a: a raw body, zero bytes added up to 'size' if given.
+            final raw = (req['raw']! as Map).cast<String, Object?>();
+            final data = base64.decode((raw['base64'] as String?) ?? '');
+            final size = (raw['size'] as int?) ?? 0;
+            request.headers.set('Content-Type', raw['content_type']! as String);
+            request.contentLength = data.length > size ? data.length : size;
+            request.add(data);
+            if (size > data.length) request.add(Uint8List(size - data.length));
+          }
           final response = await request.close();
-          final text = await utf8.decodeStream(response);
+          final bytes = await response.fold<BytesBuilder>(
+            BytesBuilder(),
+            (b, chunk) => b..add(chunk),
+          );
+          final data = bytes.takeBytes();
+          final text = utf8.decode(data, allowMalformed: true);
           final where = 'step $i: $method $path';
-          expect(response.statusCode, step['status'], reason: '$where: $text');
-          final body = jsonDecode(text);
+          expect(
+            response.statusCode,
+            step['status'],
+            reason:
+                '$where: ${text.length > 500 ? text.substring(0, 500) : text}',
+          );
+          final ctype = response.headers.contentType?.mimeType ?? '';
+          if (step.containsKey('content_type')) {
+            expect(ctype, step['content_type'], reason: where);
+          }
+          if (step.containsKey('body_base64')) {
+            expect(
+              data,
+              base64.decode(step['body_base64'] as String),
+              reason: where,
+            );
+          }
+          final body = ctype == 'application/json' ? jsonDecode(text) : null;
           if (step.containsKey('json')) check(step['json'], body, where);
           for (final e
               in ((step['save'] as Map?) ?? const {})

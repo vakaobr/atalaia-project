@@ -20,6 +20,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
+import '../pod/pod_codec.dart' show RadioNoise;
 import '../radio/rf_codec.dart';
 import 'controller_store.dart';
 import 'field_controller.dart';
@@ -102,6 +103,34 @@ abstract class ControllerModem {
   void Function(int seq, String status)? onTxAck;
   void Function(String state)? onState;
   void Function(String code, String message)? onError;
+
+  // --- the noise scan (slice S7a, controller_channel.dart) -----------------
+
+  /// Whether the radio has a radio chip (radio_modem.py's IDENT
+  /// `"radio": "sx1262"`; an I/O pod says `has_radio`).
+  bool get hasRadioChip => ident?['radio'] == 'sx1262';
+
+  /// Whether the radio can measure noise (MEASURE): the Pi's modem says so
+  /// in its IDENT (`"measure": true`).
+  bool get canMeasure => hasRadioChip && ident?['measure'] == true;
+
+  /// Measures the noise on a channel for [dwellMs] (MEASURE, answered by a
+  /// NOISE frame, [RadioNoise] of pod_codec.dart; radio_modem.py `measure`). Throws [MeasureException] when
+  /// the radio refuses or cannot finish it.
+  Future<RadioNoise> measure(int channelHz, int dwellMs, {bool cad = true}) =>
+      Future.error(
+        MeasureException('unknown_cmd', 'this radio cannot measure'),
+      );
+}
+
+/// A MEASURE the radio refused or could not finish (radio_modem.py
+/// `MeasureError`: the modem's error name, "timeout" or "link").
+class MeasureException implements Exception {
+  MeasureException(this.code, this.message);
+  final String code;
+  final String message;
+  @override
+  String toString() => message;
 }
 
 /// The epoch store's name for a game key (RFC 0001 amendment of 2026-10-22,

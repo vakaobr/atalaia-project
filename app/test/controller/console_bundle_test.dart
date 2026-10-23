@@ -209,17 +209,27 @@ void main() {
         ('GET', '/api/v1/team-presets'),
         ('POST', '/api/v1/crests'),
         ('PUT', '/api/v1/games/1/teams/red'),
-        ('GET', '/api/v1/field'),
-        ('GET', '/api/v1/games/1/positions'),
         ('GET', '/api/v1/games/1/invites'),
         ('POST', '/api/v1/boxes/discover'),
         ('GET', '/api/v1/mode-packages'),
         ('POST', '/api/v1/modes'),
-        ('POST', '/api/v1/radio/scan'),
         ('POST', '/api/v1/controller/join'),
         ('POST', '/api/v1/schedule/1/game'),
       ]) {
         expect(await routed(method, path), isFalse, reason: '$method $path');
+      }
+      // The console's other calls in the areas slice S7a added (field, radio).
+      for (final (method, path) in [
+        ('GET', '/api/v1/field'),
+        ('GET', '/api/v1/games/1/positions'),
+        ('PUT', '/api/v1/games/1/positions/2'),
+        ('PUT', '/api/v1/field/levels'),
+        ('POST', '/api/v1/field/levels/0/from-map'),
+        ('POST', '/api/v1/radio/scan'),
+        ('DELETE', '/api/v1/radio/scan'),
+        ('POST', '/api/v1/radio/random'),
+      ]) {
+        expect(await routed(method, path), isTrue, reason: '$method $path');
       }
     });
 

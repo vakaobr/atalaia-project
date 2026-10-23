@@ -604,11 +604,14 @@ roadmap:
       tokens, the "replicas to chrono" list and players' positions, checked by the same contract
       cases as the Pi controller and run with the pod's and the Field Box's own code on a computer,
       and its screen: the role on the app's home screen, kept running with the screen off, the GM
-      console served from the app, HTTPS with a field CA made on the phone and the field's Wi-Fi; to
-      come after the field test: failover between a phone and a Pi and the rest of the Pi's
-      features) and the iOS version (not built: it needs a Mac); the Money Factory mode is deferred.
-      Plan phase G, the field test with real phones and pods, waits for the hardware: so far the app
-      has run only on Android emulators, and the pod firmware only as its own code on a computer.
+      console served from the app, HTTPS with a field CA made on the phone and the field's Wi-Fi;
+      and, pulled forward, the field plan (a plan per level, its map position, map features with the
+      field boundary and the field loaded from a map, so players' out-of-bounds warning works there
+      too) and the radio channel, with the search for a quiet channel through the I/O pod; to come
+      after the field test: failover between a phone and a Pi and the rest of the Pi's features) and
+      the iOS version (not built: it needs a Mac); the Money Factory mode is deferred. Plan phase G,
+      the field test with real phones and pods, waits for the hardware: so far the app has run only
+      on Android emulators, and the pod firmware only as its own code on a computer.
     gate: "Gate: one game mixes ESP32 and Android props without issues."
   p4:
     title: Site server and advanced play

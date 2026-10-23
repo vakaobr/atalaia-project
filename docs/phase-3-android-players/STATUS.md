@@ -5,9 +5,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 3 -- Android and Players: Status
 
-**Current phase:** Implementation: plan phases A-D and F done in software; plan phase E done in software, with the Android controller role in slices (PE24: S1, the game engine and REST API, S2, the live stream and MQTT, S3, keeping games across a restart, S4, the pod as its radio, joins and Wi-Fi props, S5, check-in, player tokens, positions and the chrono list, and S6, the shell and its screen, done 2026-10-22, in software; S7 after the field test); plan phase G (integration and field test) pending, it needs the hardware
+**Current phase:** Implementation: plan phases A-D and F done in software; plan phase E done in software, with the Android controller role in slices (PE24: S1, the game engine and REST API, S2, the live stream and MQTT, S3, keeping games across a restart, S4, the pod as its radio, joins and Wi-Fi props, S5, check-in, player tokens, positions and the chrono list, and S6, the shell and its screen, done 2026-10-22, in software; S7a, the field plan and the radio channel, pulled forward and done 2026-10-23, in software; the rest of S7 after the field test); plan phase G (integration and field test) pending, it needs the hardware
 **Risk level:** Medium
-**Last verified:** 2026-10-22 (PE24 slice S6)
+**Last verified:** 2026-10-23 (PE24 slice S7a)
 
 ## Completed
 
@@ -186,7 +186,7 @@ tools/docker_app.py` (Dart, NDK, APK) and `app\tool\emulator_tests.ps1`
 | Prop on Wi-Fi (PD12) | `protocol/prop-link.md`, `controller/atalaia_controller/prop_link.py`, `app/lib/controller/prop_link.dart`, `prop_session.dart`; join keys 13 and 14 (RFC 0001 Amendment 4, proposed) | Done: HELLO, STATE, events with ACK and resend, commands and TIME, `node.tamper` |
 | Positions (ADR-P3-6) | `controller/atalaia_controller/positions.py`, `POST`/`GET /api/v1/positions`; `app/lib/position/position_reporter.dart`, `app/lib/platform/location.dart`, `LocationPlugin.kt`, the foreground service's location type | Done for GPS; BLE beacons not built. Since 2026-10-22 the out-of-bounds warning on the player's phone (`app/lib/position/field_bounds.dart`, decisions MF-31 to MF-40): the phone's own fixes against the field boundary, with a margin, the fix's accuracy and a dwell; a banner, vibration and the notification; nothing sent |
 | Teams and squads (maintainer) | games' `squads` (0 = none), squad pickers and the squad-leader role only where a game has squads (PE25) | Done in the controller, the console and the app |
-| Android controller role (ADR-P3-12) | `app/lib/controller/mqtt_broker.dart`, `visibility_engine.dart`; since 2026-10-22 `field_controller.dart`, `controller_engine.dart`, `controller_store.dart`, `controller_api.dart`, `controller_stream.dart`, `controller_mqtt.dart` | **Partly**: the broker and the visibility engine are built and tested; slices S1 and S2 of PE24 (2026-10-22, below): the game engine with `field.lua` on the core, the REST API for games, scores, the log and nodes, the live stream and the MQTT topics with the Pi's ACL; slice S3 (2026-10-22): games kept in files across a restart; slice S4 (2026-10-22): an I/O pod as its radio, joins, Android props on Wi-Fi; slice S5 (2026-10-22, `controller_checkin.dart`, `controller_positions.dart`): field check-in, player tokens, the chrono list and positions; slice S6 (2026-10-22, `controller_screen.dart`, `controller_shell.dart`, `controller_isolate.dart`, `controller_host.dart`, `field_tls.dart`): the role on the home screen, its own isolate under the foreground service, the GM console from the APK, HTTPS with a field CA made on the phone, the field's Wi-Fi; not yet on a phone; slice S7 after the field test |
+| Android controller role (ADR-P3-12) | `app/lib/controller/mqtt_broker.dart`, `visibility_engine.dart`; since 2026-10-22 `field_controller.dart`, `controller_engine.dart`, `controller_store.dart`, `controller_api.dart`, `controller_stream.dart`, `controller_mqtt.dart` | **Partly**: the broker and the visibility engine are built and tested; slices S1 and S2 of PE24 (2026-10-22, below): the game engine with `field.lua` on the core, the REST API for games, scores, the log and nodes, the live stream and the MQTT topics with the Pi's ACL; slice S3 (2026-10-22): games kept in files across a restart; slice S4 (2026-10-22): an I/O pod as its radio, joins, Android props on Wi-Fi; slice S5 (2026-10-22, `controller_checkin.dart`, `controller_positions.dart`): field check-in, player tokens, the chrono list and positions; slice S6 (2026-10-22, `controller_screen.dart`, `controller_shell.dart`, `controller_isolate.dart`, `controller_host.dart`, `field_tls.dart`): the role on the home screen, its own isolate under the foreground service, the GM console from the APK, HTTPS with a field CA made on the phone, the field's Wi-Fi; slice S7a (2026-10-23, `controller_field.dart`, `controller_field_api.dart`, `controller_channel.dart`): the field plan and the radio channel with its scan; not yet on a phone; the rest of S7 after the field test |
 
 Tests: controller 201 (60 new: check-in, chrono list with the shared
 vectors, poster vectors, positions, prop link, TLS); console browser tests
@@ -353,8 +353,39 @@ area's endpoint served), 1 Dart test (`console_bundle_test.dart`: the phone's
 list, its areas served, the rest unknown to its router), the app's console
 test changed for the fragment.
 
+### Slice S7a: the field plan and the radio channel (2026-10-23)
+
+Pulled forward from S7 before the field test (the maintainer's approval
+of 2026-10-23). Decisions PE24-74 to PE24-79. Built and tested in
+software: against the Pi controller by shared cases, with the pod
+firmware's own code for the scan, not on a phone or a pod.
+
+| Deliverable | Where | State |
+| --- | --- | --- |
+| The field plan | `app/lib/controller/controller_field.dart`, `controller_field_api.dart` | Done, as the Pi's `field_levels.py`, `georef.py`, `map_features.py`, `field_map.py` and api.py: a plan per level (PNG, JPEG, WebP, 4 MB), the levels (ML-0 to ML-12), each plan's map position (GR-1: two corners or 3-8 points, the same arithmetic and refusals), map features (MF-0 to MF-49, the boundary, visibility for every token on REST and the stream), the field from a map (MF-26, all or nothing), the boxes' places, and the stream's `field_image`, `field_georef`, `field_levels`, `map_features` and `position` (PE24-74) |
+| Keeping it | `controller_field.dart` (`ControllerField.dir`), `controller_host.dart` | Done: one store document and each plan as a file in the controller's folder, a new plan the plan only once the document names it; leftovers removed at the start (PE24-75) |
+| Plans as request bodies | `controller_api.dart` (`_Request.bytes`, `contentType`; 6 MB on the field's paths) | Done (PE24-76) |
+| The channel choice and the scan | `app/lib/controller/controller_channel.dart`, `controller_radio.dart` (`measure`), `pod_modem.dart` | Done, as the Pi's `channels.py` and engine.py: the field channel's settings, the choice, a random suggestion, the noise scan through the I/O pod (MEASURE and RADIO_NOISE) with the Pi's ranking and suggestion, cancelling it, the last scan kept; no game created during a scan (PE24-74); the pod's IDENT has no `measure` flag (PE24-77, for the pod firmware) |
+| The console on a phone | `controller_api.dart` (`controllerFeatures`: `radio`, `field`); `controller/console/tests/test_browser.py` | Done: the *Campo* tab, the radio panel and its first-setup reminder show on a phone controller; the out-of-bounds warning works on a phone-controlled field (PE24-78) |
+| Shared contract cases | `protocol/vectors/controller_api.json` (`field_and_radio`) | Done: `raw`, `content_type`, `body_base64`, `noise`, `hold_measure`, `scan_wait`; 6 new cases (35 in all), passing against both controllers (PE24-76) |
+
+Tests: 6 shared cases (on both controllers); 21 new Dart tests: 10 in
+`controller_field_test.dart` (the map position against numbers the Pi's
+georef.py printed and its refusals, a plan as a file replaced and kept
+across a restart, a crash's leftovers removed, the field from a map all
+or nothing when the write fails, plans in memory, at most 200 features,
+who sees which feature, a whole 4 MB plan over HTTP), 10 in
+`controller_channel_test.dart` (the ranking and the suggestion, the
+candidates and the dwell, no pod, a failed measurement, a stored channel
+that is not legal, the pod's MEASURE against a scripted link, a whole scan
+through the host pod), 1 in `field_bounds_phone_test.dart` (a player
+warned out of bounds on a phone controller); `console_bundle_test.dart`
+and the console's browser test of a phone controller changed for the new
+areas. The Pi's code is unchanged; its contract runner gained the new
+steps.
+
 Remaining: **S7** after the field test: failover, presets, mode uploads,
-scenarios, role packages, branding, the channel scan, re-invites, adoption,
+scenarios, role packages, branding, re-invites, adoption,
 pairing, firmware updates, the site sync, ATAK, the remote GM, each added to
 `controllerFeatures` as it is ported.
 For the maintainer: PE24-2 (a phone as the only controller, not a standby),

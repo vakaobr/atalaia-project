@@ -39,8 +39,10 @@ import '../ffi/bindings.dart';
 import '../pod/pod_client.dart';
 import 'console_files.dart';
 import 'controller_api.dart';
+import 'controller_channel.dart';
 import 'controller_checkin.dart';
 import 'controller_engine.dart';
+import 'controller_field.dart';
 import 'controller_mqtt.dart';
 import 'controller_positions.dart';
 import 'controller_store.dart';
@@ -277,6 +279,10 @@ class ControllerHost {
       caSha256: tls.caSha256,
     );
     ControllerPositions(engine);
+    // Slice S7a: the field plan's images as files in the controller's
+    // folder (decision PE24-75), and the radio channel.
+    ControllerField(engine, dir: Directory('${dir.path}/field'));
+    ControllerChannel(engine);
     api = ControllerApi(
       engine,
       gmToken: secrets.gmToken,

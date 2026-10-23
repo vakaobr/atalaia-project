@@ -64,6 +64,7 @@ class PodModem extends ControllerModem {
   final _peers = <int, int>{};
   StreamSubscription<PodEvent>? _sub;
   Timer? _pinger;
+  _Measure? _measuring;
   var _token = 0;
   int? _pendingPing;
   var _missed = 0;
@@ -91,6 +92,7 @@ class PodModem extends ControllerModem {
   Future<void> close() async {
     _closed = true;
     _pinger?.cancel();
+    _measureFailed('link', 'the pod link was closed');
     await _sub?.cancel();
     if (_config != null && !pod.broken) {
       await pod.sendRadio(FrameType.radioCmd, [RadioOp.clear]);
@@ -150,6 +152,7 @@ class PodModem extends ControllerModem {
         _ping();
       case PodLinkBroken():
         _setState(ModemState.down);
+        _measureFailed('link', 'the pod link broke');
       case PodRadioFrame(:final type, :final payload):
         _onRadio(type, payload);
       case PodCapabilityEvent():
@@ -197,12 +200,30 @@ class PodModem extends ControllerModem {
           _missed = 0;
           _setState(ModemState.up);
         }
+      case FrameType.radioNoise:
+        final m = _measuring;
+        if (m == null) return;
+        try {
+          final noise = RadioNoise.decode(p);
+          if (noise.channelHz != m.channelHz) {
+            _measureFailed('bad_frame', 'the pod answered for another channel');
+            return;
+          }
+          _measuring = null;
+          m.timer.cancel();
+          m.done.complete(noise);
+        } on ProxyException catch (e) {
+          _measureFailed('bad_frame', e.message);
+        }
       case FrameType.radioError:
         if (p.isEmpty) return;
-        onError?.call(
-          modemErrorNames[p[0]] ?? 'error_${p[0]}',
-          utf8.decode(p.sublist(1), allowMalformed: true),
-        );
+        final message = utf8.decode(p.sublist(1), allowMalformed: true);
+        if (_measuring != null && message.startsWith('MEASURE')) {
+          // The answer to a MEASURE (protocol/usb-modem.md): not an alert.
+          _measureFailed(modemErrorNames[p[0]] ?? 'error_${p[0]}', message);
+          return;
+        }
+        onError?.call(modemErrorNames[p[0]] ?? 'error_${p[0]}', message);
     }
   }
 
@@ -270,6 +291,64 @@ class PodModem extends ControllerModem {
     return true;
   }
 
+  /// A pod with a radio chip measures: its firmware runs the modem's code,
+  /// MEASURE included (protocol/capability-proxy.md, RADIO_NOISE; decision
+  /// PE24-77). The pod's IDENT has no `measure` flag as the modem's has, so
+  /// a pod whose firmware could not measure would answer `unknown_cmd`,
+  /// which fails the scan with that error.
+  @override
+  bool get hasRadioChip => _ident?['has_radio'] == true;
+
+  @override
+  bool get canMeasure => hasRadioChip;
+
+  /// MEASURE through the pod (RADIO_CMD opcode 8), answered by RADIO_NOISE
+  /// or a RADIO_ERROR whose message starts with "MEASURE"; one at a time,
+  /// given up after the dwell plus 3 s (radio_modem.py `measure`).
+  @override
+  Future<RadioNoise> measure(int channelHz, int dwellMs, {bool cad = true}) {
+    if (_measuring != null) {
+      return Future.error(
+        MeasureException('busy', 'a measurement is already running'),
+      );
+    }
+    if (dwellMs < 10 || dwellMs > 10000) {
+      return Future.error(
+        MeasureException('bad_params', 'dwell of $dwellMs ms; 10-10000'),
+      );
+    }
+    if (!isUp || pod.broken) {
+      return Future.error(MeasureException('link', 'the pod radio is $state'));
+    }
+    final m = _Measure(channelHz);
+    _measuring = m;
+    m.timer = Timer(Duration(milliseconds: dwellMs + 3000), () {
+      _measureFailed(
+        'timeout',
+        'no answer to MEASURE within ${(dwellMs / 1000 + 3).toStringAsFixed(1)} s',
+      );
+    });
+    _send([
+      RadioOp.measure,
+      channelHz >> 24 & 0xff,
+      channelHz >> 16 & 0xff,
+      channelHz >> 8 & 0xff,
+      channelHz & 0xff,
+      dwellMs >> 8 & 0xff,
+      dwellMs & 0xff,
+      cad ? 1 : 0,
+    ]);
+    return m.done.future;
+  }
+
+  void _measureFailed(String code, String message) {
+    final m = _measuring;
+    if (m == null) return;
+    _measuring = null;
+    m.timer.cancel();
+    m.done.completeError(MeasureException(code, message));
+  }
+
   @override
   bool sendPacket(RfHeader header, Uint8List payload) {
     if (!isUp || pod.broken) return false;
@@ -278,4 +357,12 @@ class PodModem extends ControllerModem {
     );
     return true;
   }
+}
+
+/// A MEASURE waiting for its answer.
+final class _Measure {
+  _Measure(this.channelHz);
+  final int channelHz;
+  final done = Completer<RadioNoise>();
+  late Timer timer;
 }

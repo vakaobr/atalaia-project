@@ -7,13 +7,16 @@
 /// runner wraps its FakeModem the same way): packets with their header and
 /// their payload by the field names of protocol/schema/messages.yaml (bytes
 /// in hex), and the modem's commands (configure without the key, clear,
-/// channel, peer_epochs).
+/// channel, peer_epochs, and measure: slice S7a's noise scan, which it
+/// answers from [noise] as the Pi's FakeModem does, held while [held]).
 library;
 
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:atalaia_app/controller/controller_radio.dart';
+import 'package:atalaia_app/pod/pod_codec.dart' show RadioNoise;
 import 'package:atalaia_app/protocol/cbor.dart';
 import 'package:atalaia_app/radio/rf_codec.dart';
 import 'package:yaml/yaml.dart';
@@ -146,6 +149,41 @@ class RecordingModem extends ControllerModem {
       'fields': schema.decode(type, payload),
     });
     return true;
+  }
+
+  /// The noise per channel: (90th percentile in dBm, CAD detections of 10);
+  /// -118 dBm and none when not given (the Pi's FakeModem).
+  final noise = <int, (int, int)>{};
+
+  /// While set, measurements wait until it completes (the Pi's
+  /// FakeModem.measure_gate).
+  Completer<void>? held;
+
+  @override
+  bool get canMeasure => true;
+
+  @override
+  Future<RadioNoise> measure(
+    int channelHz,
+    int dwellMs, {
+    bool cad = true,
+  }) async {
+    log.add({'kind': 'measure', 'channel_hz': channelHz, 'dwell_ms': dwellMs});
+    final gate = held;
+    if (gate != null) await gate.future;
+    final (p90, hits) = noise[channelHz] ?? (-118, 0);
+    return RadioNoise(
+      channelHz: channelHz,
+      dwellMs: dwellMs,
+      samples: dwellMs,
+      minDbm: p90 - 6,
+      meanDbm: p90 - 3,
+      p50Dbm: p90 - 4,
+      p90Dbm: p90,
+      maxDbm: p90 + 9,
+      cadTries: 10,
+      cadDetected: hits,
+    );
   }
 
   /// A packet the radio heard, as its RX frame reaches the controller.
