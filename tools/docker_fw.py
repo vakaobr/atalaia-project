@@ -21,7 +21,11 @@
                                                (CONFIG_ATALAIA_OTA_RELEASE_KEYS; default: none, and
                                                the box refuses every update). Public keys only:
                                                tools/firmware_release.py keygen prints them.
-Both apply to that build folder only, and are reset when left out.
+    --mode-keys=<hex or base64>[,...]          the mode public keys a box accepts fetched mode
+                                               packages from (CONFIG_ATALAIA_MODE_KEYS; default:
+                                               none, and the box fetches no modes). Public keys
+                                               only: tools/mode_package.py pubkey prints them.
+All three apply to that build folder only, and are reset when left out.
 
 Works from any folder and any shell (cmd, PowerShell, bash). Docker must be
 running. `build`, `wokwi`, `modem`, `pod` and `bench` use the espressif/idf:v5.3.2 image, the same as
@@ -102,7 +106,7 @@ def build() -> int:
     return code
 
 
-# Field Box options (main sets them): the firmware's version and its release keys.
+# Field Box options (main sets them): the firmware's version, its release keys and its mode keys.
 FW_OPTIONS: dict[str, str] = {}
 FIELD_BOX_BUILDS = ("build", WOKWI_BUILD, BENCH_BUILD)
 
@@ -126,12 +130,14 @@ def release_keys_hex(text: str) -> str | None:
 
 def field_box_options(build_dir: str) -> tuple[list[str], tuple[str, ...]]:
     """The Field Box's version (a CMake cache value, set on every build so that it never sticks)
-    and its release keys (a defaults file in the build folder, rewritten only when it changes)."""
+    and its release and mode keys (a defaults file in the build folder, rewritten only when it
+    changes)."""
     if build_dir not in FIELD_BOX_BUILDS:
         return [], ()
     keys_file = FW / build_dir / "sdkconfig.release_keys"
     text = ("# Written by tools/docker_fw.py (--release-keys): public keys only.\n"
-            f'CONFIG_ATALAIA_OTA_RELEASE_KEYS="{FW_OPTIONS.get("release_keys", "")}"\n')
+            f'CONFIG_ATALAIA_OTA_RELEASE_KEYS="{FW_OPTIONS.get("release_keys", "")}"\n'
+            f'CONFIG_ATALAIA_MODE_KEYS="{FW_OPTIONS.get("mode_keys", "")}"\n')
     keys_file.parent.mkdir(parents=True, exist_ok=True)
     if not keys_file.exists() or keys_file.read_text() != text:
         keys_file.write_text(text)
@@ -249,7 +255,7 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 0 if argv else 1
     command, options = argv[0], argv[1:]
-    box = ["--fw-version=", "--release-keys="]
+    box = ["--fw-version=", "--release-keys=", "--mode-keys="]
     known = {"build": box, "wokwi": box, "modem": [], "pod": [], "bench": box,
              "test": ["--update-screens"], "clean": []}
     if command not in known:
@@ -269,6 +275,11 @@ def main(argv: list[str]) -> int:
             if keys is None:
                 return fail("--release-keys: 1-4 Ed25519 public keys, 64 hex digits or 44 base64 characters each")
             FW_OPTIONS["release_keys"] = keys
+        elif name == "--mode-keys=":
+            keys = release_keys_hex(option.split("=", 1)[1])
+            if keys is None:
+                return fail("--mode-keys: 1-4 Ed25519 public keys, 64 hex digits or 44 base64 characters each")
+            FW_OPTIONS["mode_keys"] = keys
     if command == "clean":
         return clean()
     try:
