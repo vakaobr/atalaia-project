@@ -6,7 +6,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 # Phase 5 -- Community: Status
 
 **Current phase:** Implementation (plan phases 1-13 built in software 2026-10-22: the visual mode editor complete, its link to the simulator, signed mode packages, the sandbox-escape battery, signed packages in the controller, scenario blocks in the GM console, missing modes sent to boxes (controller and box), the registry repository's template and the community processes, German, Traditional Chinese (Taiwan), the build guides for the other node types)
-**Phase status:** In progress
+**Phase status:** Software done (every software plan phase built; the gate waits for hardware and real deployments)
 **Risk level:** Medium
 **Last updated:** 2026-10-22 (plan phase 11 built, P5K-1 to P5K-12; plan phase 12 built; the editor makes the package itself, P5I-1 to P5I-6; plan phases 8 and 9 built; plan phase 7 built; plan phase 13b built; plan phase 13a built; plan phases 3-6 built, P5B-9 answered; plan phase 2 built, plan phase 13 planned from P5R-8; refreshed after phases 2-4 software; first written 2026-10-18)
 **Next step:** the review of the German and the Traditional Chinese by native-speaking players (P5H-5, P5K-11), and the maintainer's P5K-3, P5K-4, P5K-5, P5K-7 and P5K-12 (box flash and fonts, OLED readability, typed Chinese names, the app's font, the radio band on the Chinese page); P5I-1 and P5I-3 (the editor's package: made in the page, signed offline) for the maintainer; creating the registry repository waits for the maintainer; plan phase 13's test on real boxes is HW3; every software plan phase is built; the build guides wait for their first builds and photos (HW2) and the maintainer's P5J decisions

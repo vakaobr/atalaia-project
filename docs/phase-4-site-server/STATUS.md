@@ -6,7 +6,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 # Phase 4 -- Site Server and Advanced Play: Status
 
 **Current phase:** Implementation (plan phases 1 to 22 built in software, 2026-10-21; sync over 4G: HW1; a real ATAK device: HW3; a real deployment with a real domain, and a real hosted deployment: HW1)
-**Phase status:** In progress
+**Phase status:** Software done (every software plan phase built; the gate waits for hardware and real deployments)
 **Risk level:** High
 **Last verified:** 2026-10-21 (follow-up: the remote ATAK relay; full clean check, the site server's tests, migrations, deploy, deploy-hosted and browser tests)
 **Next step:** the hardware phases HW1-HW4 (the boards); hosted mode waits for the legal review (P4-6) before going live

@@ -77,7 +77,10 @@ header:
   language: Sprache
 
 hero:
-  status: Pre-Alpha · Software der Phasen 1 und 2 fertig, zwei Boards und der Feld-Controller arbeiten auf dem Labortisch zusammen, Phase 3 in Software fast fertig, Phase 4 in Software gebaut, Phase 5 begonnen (der visuelle Modus-Editor, mit Live-Test im Simulator) · noch nicht feldtauglich
+  status: >-
+    Pre-Alpha · Software der Phasen 1 und 2 fertig, echte Boards spielen auf dem Labortisch ganze
+    Spiele mit dem Feld-Controller, Phase 3 in Software fast fertig, Phasen 4 und 5 in Software
+    gebaut · noch nicht feldtauglich
   title: Die offene Plattform für <span class="nowrap">Force-on-Force</span>
   lead: >-
     Atalaia ist eine offene Plattform für die elektronischen Props von Airsoft, Paintball und
@@ -534,11 +537,12 @@ try:
     text: >-
       Die <a href="{{ page.to.glossary }}#glossar-firmware">Firmware</a> der Field Box, des
       USB-Funkmodems und des I/O-Pods ist geschrieben, und alle drei laufen in Tests auf einem
-      Computer. Die der Field Box lief auf einem echten Heltec V4.3 auf dem Labortisch: Sie startet,
-      schaltet den Funk ein, liest zwei Knöpfe und spielt Bombe, wobei der kleine Bildschirm des Boards
-      das Spiel zeigt; die von Modem und Pod liefen noch auf keinem Board. Um ein nacktes Board ohne Box
-      zu testen, gibt es eine Labor-Version der Firmware (Tasten über das USB-Kabel). Um eine Box zu
-      bauen und zu flashen, folge dem
+      Computer. Die der Field Box und des Modems laufen auf echten Heltec V4.3 auf dem Labortisch:
+      Eine Box tritt über Funk den Spielen des Feld-Controllers bei, mit einem zweiten Board als
+      Modem, spielt sie bis zum Ende und bekommt Firmware-Updates per Funk, wobei der kleine
+      Bildschirm des Boards das Spiel zeigt; die des Pods lief noch auf keinem Board. Um ein nacktes
+      Board ohne Box zu testen, gibt es eine Labor-Version der Firmware (Tasten über das USB-Kabel).
+      Um eine Box zu bauen und zu flashen, folge dem
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">Bauhandbuch</a>;
       die
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/firmware/esp32/README.md">Anleitung
@@ -555,9 +559,11 @@ roadmap:
   title: Roadmap
   intro: >-
     Sechs Phasen, jede mit einem echten Feldtest als Abschluss, ihrem Gate. Die Software ist der
-    Hardware vorausgeeilt: Die Phasen 1 und 2 sind in Software fertig, das erste Board spielt schon
-    Bombe auf dem Labortisch, und die Gates warten auf gebaute Boxen; Phase 3 ist in Software fast
-    fertig, und Phase 4 hat begonnen.
+    Hardware vorausgeeilt: Die Phasen 1 und 2 sind in Software fertig, echte Boards spielen auf dem
+    Labortisch schon ganze Spiele mit dem Feld-Controller, und die Gates warten auf gebaute Boxen
+    und Feldtests; Phase 3 ist in Software fertig, außer iOS und den letzten Teilen des Handys als
+    Feld-Controller, und alle Software-Schritte der Phasen 4 und 5 sind gebaut und warten auf
+    Hardware, einen echten Server und das Repository der Registry.
   # The main page shows each phase's title and short line, then this link to the roadmap page.
   more: Die ganze Roadmap, mit dem Inhalt jeder Phase und ihrem Gate →
   # Status tags, from docs/phase-*/STATUS.md: done (gate met), software done (gate waits for
@@ -577,8 +583,9 @@ roadmap:
   p1:
     title: Eine Box
     short: >-
-      Firmware der Field Box und ein Bauhandbuch; das erste Board spielt Bombe auf dem Labortisch und
-      wartet auf die erste gebaute Box.
+      Firmware der Field Box und ein Bauhandbuch; auf dem Labortisch spielt ein echtes Board ganze
+      Spiele, sein kleiner Bildschirm zeigt Haltebalken, Punkte und Haltezeit in vier Sprachen, und
+      es wartet auf die erste gebaute Box.
     text: >-
       Bau der Field Box, ESP32-Firmware, Presets auf dem Gerät und ein Bauhandbuch mit Schaltplan.
     gate: >-
@@ -591,8 +598,9 @@ roadmap:
     title: Feldnetzwerk
     short: >-
       Skirmesh-RF über LoRa, Feld-Controller, API, GM-Konsole und ein Modus-Paket, in Software
-      getestet; auf dem Labortisch tauschen zwei Boards Funkpakete aus, und eine Box hat über ihr
-      USB-Modem ein Spiel mit dem Feld-Controller gespielt.
+      getestet; auf dem Labortisch spielen echte Boards ganze Spiele mit dem Feld-Controller über
+      Funk (Einladungen, Eroberungen, Koppeln per Code, Updates per Funk, ein fehlender Modus
+      nachgeladen) und warten auf 5 gebaute Boxen auf einem Feld.
     text: >-
       Skirmesh-RF über LoRa, Feld-Controller, API, GM-Konsole und ein Modus-Paket, jetzt in Software
       geschrieben und getestet: Hold-All Domination (Punkte nur, solange man alle Boxen hält), Last
@@ -609,9 +617,9 @@ roadmap:
   p3:
     title: Android und Spielende
     short: >-
-      Android-Props, der I/O-Pod, die Spieler-App und die Modi, die Handys brauchen: in Software
-      fertig, außer dem Handy als Feld-Controller und iOS; der Feldtest wartet auf echte Handys und
-      Pods.
+      Android-Props, der I/O-Pod, die Spieler-App und die Modi, die Handys brauchen, Money Factory
+      eingeschlossen: in Software fertig, außer iOS und den letzten Teilen des Handys als
+      Feld-Controller; der Feldtest wartet auf echte Handys und Pods.
     text: >-
       Android-Props, der <a href="{{ page.to.glossary }}#glossar-android-prop">I/O-Pod</a>, die App
       für Spielende, Marshals und die Spielleitung und die Modi, die Handys und Tags der Spielenden
@@ -667,7 +675,20 @@ roadmap:
   p4:
     title: Site-Server und erweitertes Spiel
     short: >-
-      Site-Server, Spielplanung und Anmeldung, eigene Szenarien, erweiterte Modi, ATAK. Begonnen: Erweiterte Modi (Master und Satelliten, das Hacking-Terminal, VIP / Payload und die Logik von Zielfenster), eigene Szenarien (ihre Laufzeit, ihr Compiler, der Editor in der Konsole und die Ziele in der App), Geo-Funktionen im Kern, der ATAK-Feed (auf dem Feld und, über den Site-Server, für Staff außerhalb), und die Konten des Site-Servers, Rechte an persönlichen Daten, Controller-Sync, Chrono-Register, Spielplanung mit öffentlichen Feldseiten, Feeds und Anmeldung, Club-Profile mit Branding-Sync, Spielverlauf und die Szenario-Bibliothek, Gerätezustand, ein Firmware-Katalog, Firmware-Updates per Funk für die Field Box, Boxen ins Feld aufnehmen (NFC-Feldkarte, USB-Kabel oder der Code, den die Box zeigt), Boxen per Funk ins nächste Spiel einladen und ein Start, der wartet, bis jede Rolle eine Box hat, die Remote-Spielleitung, Webseiten für das Staff und das Deployment (HTTPS, verschlüsselte Backups, Wiederherstellung), der Hosted-Modus für viele Felder auf einem Server, mit seinem Deployment, sind in Software gebaut.
+      Site-Server, Spielplanung und Anmeldung, eigene Szenarien, erweiterte Modi, ATAK. Alle
+      Software-Schritte sind gebaut: erweiterte Modi (Master und Satelliten, das Hacking-Terminal,
+      VIP / Payload und die Logik von Zielfenster), eigene Szenarien (ihre Laufzeit, ihr Compiler,
+      der Editor in der Konsole und die Ziele in der App), Geo-Funktionen im Kern, der ATAK-Feed
+      (auf dem Feld und, über den Site-Server, für Staff außerhalb), und die Konten des
+      Site-Servers, Rechte an persönlichen Daten, Controller-Sync, Chrono-Register, Spielplanung mit
+      öffentlichen Feldseiten, Feeds und Anmeldung, Club-Profile mit Branding-Sync, Spielverlauf und
+      die Szenario-Bibliothek, Gerätezustand, ein Firmware-Katalog, Firmware-Updates per Funk für
+      die Field Box, Boxen ins Feld aufnehmen (NFC-Feldkarte, USB-Kabel oder der Code, den die Box
+      zeigt), Boxen per Funk ins nächste Spiel einladen und ein Start, der wartet, bis jede Rolle
+      eine Box hat, die Remote-Spielleitung, Webseiten für das Staff und das Deployment (HTTPS,
+      verschlüsselte Backups, Wiederherstellung), der Hosted-Modus für viele Felder auf einem
+      Server, mit seinem Deployment. Es fehlen: ein echter Server mit Domain, eine rechtliche
+      Prüfung, bevor der Hosted-Modus live geht, und die Tests auf Hardware.
     text: >-
       Site-Server (Konten, Spielverlauf, das Chrono-Register, Spielplanung, Anmeldung und
       Veröffentlichung), eigene Szenarien, erweiterte Modi (Master- und Satellitenzonen, VIP-Eskorte,
@@ -780,13 +801,15 @@ roadmap:
   p5:
     title: Community
     short: >-
-      Visueller Modus-Editor in Software komplett, live im Simulator getestet; signierte
-      Modus-Pakete, vom Editor selbst erstellt, eine Sandbox-Ausbruch-Testreihe in der CI, der
-      Feld-Controller installiert signierte Modi, Boxen bekommen die signierten Modi, die ihnen
+      Alle Software-Schritte sind gebaut: der visuelle Modus-Editor, live im Simulator getestet;
+      signierte Modus-Pakete, vom Editor selbst erstellt, eine Sandbox-Ausbruch-Testreihe in der CI,
+      der Feld-Controller installiert signierte Modi, Boxen bekommen die signierten Modi, die ihnen
       fehlen, von der GM-Konsole, Szenarien aus Blöcken in der Konsole, die Modus-Registry als
-      Vorlage bereit, mit ihren Prüfungen und dem Verifiziert-Siegel, und Deutsch und
-      traditionelles Chinesisch (Entwürfe, werden noch geprüft); <a href="{{ page.to.build }}">Bauanleitungen</a> für Satellit, I/O-Pod und
-      Ziel-Addon, als Text. Als Nächstes: die Registry anlegen, weitere Übersetzungen.
+      Vorlage bereit, mit ihren Prüfungen und dem Verifiziert-Siegel, Deutsch und traditionelles
+      Chinesisch (KI-Entwürfe, noch nicht von Muttersprachigen geprüft) und
+      <a href="{{ page.to.build }}">Bauanleitungen</a> für Satellit, I/O-Pod und Ziel-Addon, als
+      Text. Es fehlen: das Anlegen des Registry-Repositorys und die Hardware: die Träger-Platine,
+      Fotos echter Builds, Community-Inhalte von einem Feld.
     text: >-
       Visueller Modus-Editor, Modus-Registry, Träger-Platine (eine fertige Leiterplatte, die den Bau
       erleichtert), Übersetzungen, Bauanleitungen für weitere Gerätetypen. In Software gebaut: der
