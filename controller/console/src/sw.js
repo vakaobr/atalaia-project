@@ -44,6 +44,7 @@ const SHELL = [
     'components/map-features.js',
     'components/mode-packages.js',
     'components/node-list.js',
+    'components/place-search.js',
     'components/preset-builder.js',
     'components/radio-settings.js',
     'components/scenario-builder.js',

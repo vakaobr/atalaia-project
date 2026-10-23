@@ -123,8 +123,9 @@ class ConsoleFilesTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/v1/nodes").status_code, 401)
 
     def test_only_the_field_map_page_may_reach_the_internet(self):
-        """MF-27: the field-map page's CSP adds exactly OSM's tiles (images), the Overpass API and the DGT's
-        WMS (connections); every other page of the console stays same-origin only."""
+        """MF-27, MF-45: the field-map page's CSP adds exactly OSM's tiles (images), the Overpass API, the
+        DGT's WMS and Nominatim (connections); every other page of the console stays same-origin only.
+        MF-43: only that page may ask for the GM's location."""
         r = self.client.get("/console/field-map.html")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.headers["content-security-policy"], FIELD_MAP_HEADERS["Content-Security-Policy"])
@@ -133,19 +134,25 @@ class ConsoleFilesTests(unittest.TestCase):
         self.assertEqual(csp["style-src"], "'self'")
         self.assertEqual(csp["default-src"], "'self'")
         self.assertEqual(csp["img-src"], "'self' blob: data: https://tile.openstreetmap.org")
-        self.assertEqual(csp["connect-src"], "'self' https://overpass-api.de https://ortos.dgterritorio.gov.pt")
+        self.assertEqual(csp["connect-src"], "'self' https://overpass-api.de https://ortos.dgterritorio.gov.pt "
+                                             "https://nominatim.openstreetmap.org")
         self.assertNotIn("unsafe", r.headers["content-security-policy"])
         for k in ("X-Content-Type-Options", "Referrer-Policy"):
             self.assertEqual(r.headers[k], SECURITY_HEADERS[k])
-        for path in ("/console/", "/console/field-map.js", "/console/components/field-render.js",
-                     "/console/scoreboard.html"):
-            got = self.client.get(path).headers["content-security-policy"]
-            self.assertEqual(got, SECURITY_HEADERS["Content-Security-Policy"], path)
+        # The GM's location: this page only (the default allowlist is already 'self'; said explicitly).
+        self.assertEqual(r.headers["permissions-policy"], "geolocation=(self)")
+        for path in ("/console/", "/console/index.html", "/console/field-map.js",
+                     "/console/components/field-render.js", "/console/components/place-search.js",
+                     "/console/scoreboard.html", "/console/poster.html"):
+            got = self.client.get(path)
+            self.assertEqual(got.headers["content-security-policy"], SECURITY_HEADERS["Content-Security-Policy"], path)
             for origin in FIELD_MAP_ORIGINS.values():
-                self.assertNotIn(origin, got, path)
+                self.assertNotIn(origin, got.headers["content-security-policy"], path)
+            self.assertEqual(got.headers["permissions-policy"], "geolocation=()", path)
         # The page and its scripts name only those origins.
         code = "".join((SRC / rel).read_text(encoding="utf-8")
-                       for rel in ("field-map.js", "components/field-render.js", "components/tile-map.js"))
+                       for rel in ("field-map.js", "components/field-render.js", "components/tile-map.js",
+                                   "components/place-search.js"))
         for url in set(re.findall(r"https://[a-z0-9.-]+", code)):
             self.assertIn(url, [*FIELD_MAP_ORIGINS.values(), "https://www.openstreetmap.org"], url)
 

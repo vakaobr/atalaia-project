@@ -1,0 +1,39 @@
+[
+  {
+    "place_id": 1,
+    "licence": "Made-up test data in Nominatim's jsonv2 form (not OpenStreetMap data)",
+    "lat": "39.6000000",
+    "lon": "-8.4010000",
+    "category": "leisure",
+    "type": "pitch",
+    "name": "Campo da Mata",
+    "display_name": "Campo da Mata, Vale Fictício, Portugal",
+    "boundingbox": ["39.5980000", "39.6020000", "-8.4040000", "-8.3980000"]
+  },
+  {
+    "place_id": 2,
+    "licence": "Made-up test data in Nominatim's jsonv2 form (not OpenStreetMap data)",
+    "lat": "41.1500000",
+    "lon": "-8.6100000",
+    "category": "place",
+    "type": "village",
+    "name": "Mata de Baixo",
+    "display_name": "Mata de Baixo, Concelho Inventado, Distrito de Teste, Portugal, um nome muito comprido para ver se a lista continua dentro do ecrã de um telemóvel sem deslizar para o lado"
+  },
+  {
+    "place_id": 3,
+    "licence": "Made-up test data in Nominatim's jsonv2 form (not OpenStreetMap data)",
+    "lat": "not a number",
+    "lon": "-8.0",
+    "display_name": "Without a position: left out"
+  },
+  {
+    "place_id": 4,
+    "licence": "Made-up test data in Nominatim's jsonv2 form (not OpenStreetMap data)",
+    "lat": "40.2000000",
+    "lon": "-8.4000000",
+    "name": "Mata Grande",
+    "display_name": "Mata Grande, Portugal",
+    "boundingbox": ["40.1000000", "40.3000000", "-8.5000000", "-8.3000000"]
+  }
+]

@@ -1309,7 +1309,7 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
 
 
 # Same-origin only: no inline scripts or styles, nothing from other hosts
-# (only the field-map page below reaches OpenStreetMap and the DGT), images from blob: URLs.
+# (only the field-map page below reaches OpenStreetMap and the DGT), images from blob: URLs; no location.
 # The one exception: the two stylesheets Blockly 13.3.0 writes for the scenario blocks (its own
 # and its renderer's), allowed by their SHA-256 only (console/src/lib/README.md, decision P5F-2).
 BLOCKLY_STYLES = ("'sha256-m3jRF8xS4qsN1MRZbjUZslcyoZPGURDGaSwFOJRSdE4=' "
@@ -1322,24 +1322,29 @@ SECURITY_HEADERS = {
                                 "base-uri 'none'; form-action 'none'"),
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
+    # No console page may ask the browser for the device's location, except the field-map page (MF-43).
+    "Permissions-Policy": "geolocation=()",
 }
 
 # The one page that may reach the internet: *Load the field from a map* (field_map.py, MF-27), run in the
 # GM's browser while setting the game up. Only it, and only these origins: OpenStreetMap's tiles as
 # images to find the field (img-src), the Overpass API for the area's OSM data and the DGT's orthophoto
-# WMS (connect-src, fetched so the canvas stays exportable: both send Access-Control-Allow-Origin: *).
+# WMS (connect-src, fetched so the canvas stays exportable: both send Access-Control-Allow-Origin: *),
+# and OpenStreetMap's Nominatim to find a place by its name (connect-src, MF-44). It alone may ask for
+# the GM's location (geolocation=(self), MF-43), which only moves its map and is sent nowhere.
 # Scripts stay same-origin; the rest of the console stays same-origin only.
 FIELD_MAP_PAGE = "/console/field-map.html"
 FIELD_MAP_ORIGINS = {"tiles": "https://tile.openstreetmap.org", "overpass": "https://overpass-api.de",
-                     "orthophoto": "https://ortos.dgterritorio.gov.pt"}
+                     "orthophoto": "https://ortos.dgterritorio.gov.pt", "search": "https://nominatim.openstreetmap.org"}
 FIELD_MAP_HEADERS = {
     **SECURITY_HEADERS,
     "Content-Security-Policy": ("default-src 'self'; script-src 'self'; style-src 'self'; "
                                 f"img-src 'self' blob: data: {FIELD_MAP_ORIGINS['tiles']}; "
                                 f"connect-src 'self' {FIELD_MAP_ORIGINS['overpass']} "
-                                f"{FIELD_MAP_ORIGINS['orthophoto']}; "
+                                f"{FIELD_MAP_ORIGINS['orthophoto']} {FIELD_MAP_ORIGINS['search']}; "
                                 "manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; "
                                 "base-uri 'none'; form-action 'none'"),
+    "Permissions-Policy": "geolocation=(self)",
 }
 
 

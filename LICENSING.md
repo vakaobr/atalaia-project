@@ -22,7 +22,7 @@ Third-party components keep their own licences and must be compatible with GPL-3
 
 ## Map data in a field's image
 
-A field image drawn by the console's *Load the field from a map* (decisions MF-19 to MF-30) is the field's own data, made in the GM's browser and kept on the field controller; it is not part of this repository. It is drawn from OpenStreetMap data (© OpenStreetMap contributors, ODbL) and, in mainland Portugal, the DGT's orthophoto (Ortofotomapas © DGT, CC BY 4.0), and carries both attributions in its corner. The browser tests use made-up fixtures, not OpenStreetMap or DGT data. No map library is vendored: the console's map viewer is the project's own code.
+A field image drawn by the console's *Load the field from a map* (decisions MF-19 to MF-30) is the field's own data, made in the GM's browser and kept on the field controller; it is not part of this repository. It is drawn from OpenStreetMap data (© OpenStreetMap contributors, ODbL) and, in mainland Portugal, the DGT's orthophoto (Ortofotomapas © DGT, CC BY 4.0), and carries both attributions in its corner. A place the GM searches for by name on that page is found with OpenStreetMap's Nominatim (decisions MF-44 to MF-46): the results are OpenStreetMap data (© OpenStreetMap contributors, ODbL), shown with that attribution and only used to move the map; they are kept in the page's memory while it is open (so the same question is not asked twice) and never saved by the page or sent to the controller. The browser tests use made-up fixtures, not OpenStreetMap, Nominatim or DGT data. No map library is vendored: the console's map viewer is the project's own code.
 
 ## Community game modes
 

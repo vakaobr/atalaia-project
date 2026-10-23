@@ -6,8 +6,10 @@
 // keeps; the only page of the console that reaches the internet (its own Content-Security-Policy,
 // api.py FIELD_MAP_HEADERS), and only while the GM sets the game up:
 //
-// 1. find the field on an interactive OpenStreetMap map (tile-map.js), or go to a typed
-//    "latitude, longitude" (or the level's current map position);
+// 1. find the field on an interactive OpenStreetMap map (tile-map.js): the level's current map
+//    position, else the GM's own location when the browser already allows it (MF-41, MF-42), a typed
+//    "latitude, longitude", *Use my location*, or a place's name searched with OpenStreetMap's
+//    Nominatim (MF-44 to MF-46; place-search.js);
 // 2. trace the field's outline corner by corner: a press on the map, the map's centre (the cross,
 //    with the keyboard) or a typed "latitude, longitude"; undo and start again; 3 to 12 corners;
 // 3. *Draw the field image*: this browser fetches the area's OpenStreetMap data (Overpass) and, in
@@ -17,15 +19,17 @@
 //
 // The controller needs no internet for any of it; the rest of the console works offline as before.
 
-import { html, render, Component, createRef, t, loadLanguage, api, savedToken } from './ui.js';
+import { html, render, Component, createRef, t, loadLanguage, lang, api, savedToken } from './ui.js';
 import { TileMap } from './components/tile-map.js';
 import { areaFor, frameFor, inPortugal, fetchOsm, fetchOrthophoto, drawField, encode, base64, MapError }
     from './components/field-render.js';
 import { parseLatLon, formatLatLon } from './components/georef-panel.js';
 import { levelName, levelsInUse } from './components/field-levels.js';
+import { PlaceSearch, SearchError, locate, locationGranted } from './components/place-search.js';
 
 const CORNERS_MAX = 12; // map_features.POLYGON_MAX
 const FIELD_ZOOM = 17;
+const LOCATE_ZOOM = 17; // where a field is recognisable (clamped to the tile server's highest)
 
 /** The map's element: Preact leaves it alone after the first render (TileMap owns what is inside). */
 class MapHost extends Component {
@@ -49,10 +53,13 @@ class FieldMap extends Component {
         this.state = {
             ready: false, role: null, error: '', notice: '', levels: null, level, info: null, outline: [],
             corner: '', go: '', label: '', ortho: null, busy: '', result: null, done: null,
-            online: navigator.onLine !== false,
+            online: navigator.onLine !== false, finding: '', places: null, placeStatus: '',
         };
         this.mapEl = createRef();
         this.map = null;
+        this.search = new PlaceSearch();
+        this.views = 0; // the map's moves: an automatic location does not override the GM's own
+        this.searchSeq = 0;
         this.onLine = () => this.setState({ online: navigator.onLine !== false });
     }
 
@@ -89,6 +96,7 @@ class FieldMap extends Component {
         this.map = new TileMap(this.mapEl.current, {
             label: t('fieldmap.map_label'), attribution: '© OpenStreetMap contributors',
             onPress: (p) => this.addCorner(p),
+            onView: () => { this.views += 1; },
         });
         // Start where the level's plan already is on the map, if it is.
         try {
@@ -98,9 +106,37 @@ class FieldMap extends Component {
                 const c = geo.corners;
                 this.map.view({ lat: (c.top_left.lat + c.bottom_right.lat) / 2, lon: (c.top_left.lon + c.bottom_right.lon) / 2 },
                     FIELD_ZOOM);
+                return;
             }
         } catch (e) {
-            /* no map position: the default view (Portugal) */
+            /* no map position: the GM's location if already allowed, else the default view (Portugal) */
+        }
+        // MF-42: without a map position, the GM's own location, but only if the browser already allows it
+        // (no permission prompt the GM did not ask for).
+        if (await locationGranted()) this.useLocation(true);
+    }
+
+    /** MF-41: one fix from the browser; the map moves there. The position stays in this browser. */
+    async useLocation(auto = false) {
+        if (this.state.finding) return;
+        const views = this.views;
+        // On open (auto) the page stays usable meanwhile: nothing is disabled and nothing is said yet.
+        if (!auto) this.setState({ finding: 'locate', error: '', placeStatus: t('fieldmap.locating') });
+        const done = auto ? {} : { finding: '' };
+        try {
+            const p = await locate();
+            // On open, whatever the GM did meanwhile wins (moved the map, searched).
+            if (!this.map || (auto && (this.views !== views || this.state.finding || this.state.places))) {
+                if (!auto) this.setState({ ...done, placeStatus: '' });
+                return;
+            }
+            this.map.view(p, Math.min(LOCATE_ZOOM, this.map.maxZoom));
+            this.setState({ ...done, places: null, placeStatus: t('fieldmap.located', {
+                m: Math.max(1, Math.round(p.accuracy || 0)) }) });
+        } catch (e) {
+            if (auto && (this.views !== views || this.state.finding || this.state.places)) return;
+            const code = e instanceof SearchError ? e.code : 'unavailable';
+            this.setState({ ...done, placeStatus: '', error: t(`fieldmap.locate_errors.${code}`) });
         }
     }
 
@@ -134,15 +170,58 @@ class FieldMap extends Component {
         this.addCorner(p);
     }
 
-    goTo(e) {
+    /** The search box: "latitude, longitude" goes straight there (no request); anything else is a place's
+     * name for Nominatim, only now that the GM pressed Search (MF-44). */
+    async goTo(e) {
         e.preventDefault();
-        const p = parseLatLon(this.state.go);
-        if (!p) {
-            this.setState({ error: t('fieldmap.bad_latlon') });
+        if (this.state.finding) return;
+        const text = this.state.go.trim();
+        const p = parseLatLon(text);
+        if (p) {
+            this.setState({ error: '', places: null, placeStatus: '' });
+            this.map.view(p, FIELD_ZOOM);
             return;
         }
-        this.setState({ error: '' });
-        this.map.view(p, FIELD_ZOOM);
+        if (!text) {
+            this.setState({ error: t('fieldmap.place_errors.empty') });
+            return;
+        }
+        const seq = ++this.searchSeq;
+        this.setState({ finding: 'search', error: '', places: null, placeStatus: t('fieldmap.searching') });
+        try {
+            const places = await this.search.search(text, lang());
+            if (seq !== this.searchSeq) return;
+            this.setState({ finding: '', places, placeStatus: places.length
+                ? t('fieldmap.found', { n: places.length }) : t('fieldmap.not_found', { q: text }) });
+        } catch (err) {
+            if (seq !== this.searchSeq) return;
+            const code = err instanceof SearchError ? err.code : 'failed';
+            this.setState({ finding: '', placeStatus: '',
+                            error: t(`fieldmap.place_errors.${code}`, { detail: err.message }) });
+        }
+    }
+
+    choosePlace(place) {
+        if (place.bounds) {
+            this.map.fit(place.bounds, FIELD_ZOOM);
+        } else {
+            this.map.view(place, FIELD_ZOOM);
+        }
+        this.setState({ places: null, error: '', placeStatus: t('fieldmap.showing', { name: place.name }) });
+        // Keyboard users carry on on the map (the list they chose from is gone).
+        const box = this.mapEl.current && this.mapEl.current.querySelector('.tm');
+        if (box) box.focus();
+    }
+
+    renderPlaces() {
+        const s = this.state;
+        return html`${s.placeStatus && html`<p class="small" role="status" data-testid="fm-place-status">${s.placeStatus}</p>`}
+            ${s.places && s.places.length > 0 && html`<ul class="fm-places" aria-label=${t('fieldmap.results')}
+                data-testid="fm-places">
+                ${s.places.map((p) => html`<li><button type="button" class="fm-place" data-testid="fm-place"
+                    onClick=${() => this.choosePlace(p)}>${p.name}</button></li>`)}</ul>`}
+            ${s.places && html`<p class="muted small" data-testid="fm-search-credit">${t('fieldmap.search_credit')}${' '}
+                <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a></p>`}`;
     }
 
     useOrtho() {
@@ -308,12 +387,18 @@ class FieldMap extends Component {
                 <p>${t('fieldmap.intro')}</p>
                 <p class="muted small">${t('fieldmap.sources')}</p>
                 ${!s.online && html`<p class="warning" role="alert" data-testid="fm-offline">${t('fieldmap.offline')}</p>`}
-                ${s.done ? null : html`<form class="form inline" novalidate onSubmit=${(e) => this.goTo(e)}>
+                ${s.done ? null : html`<form class="form inline fm-find" novalidate role="search"
+                    onSubmit=${(e) => this.goTo(e)}>
                     <label for="fm-go">${t('fieldmap.go')}</label>
-                    <input id="fm-go" data-testid="fm-go" inputmode="decimal" autocomplete="off" placeholder="39.600000, -8.400000"
+                    <input id="fm-go" data-testid="fm-go" type="search" autocomplete="off" enterkeyhint="search"
+                        placeholder=${t('fieldmap.go_placeholder')} aria-describedby="fm-search-note"
                         value=${s.go} onInput=${(e) => this.setState({ go: e.target.value })} />
-                    <button type="submit" data-testid="fm-go-button">${t('fieldmap.go_button')}</button>
-                </form>`}
+                    <button type="submit" data-testid="fm-go-button" disabled=${Boolean(s.finding)}>${t('fieldmap.go_button')}</button>
+                    <button type="button" data-testid="fm-locate" disabled=${Boolean(s.finding)}
+                        onClick=${() => this.useLocation()}>${t('fieldmap.locate')}</button>
+                </form>
+                <p class="muted small" id="fm-search-note">${t('fieldmap.search_note')}</p>
+                ${this.renderPlaces()}`}
                 <p class="muted small" id="fm-map-help">${t('fieldmap.map_help')}</p>
                 <${MapHost} hostRef=${this.mapEl} />
                 <div class="actions">

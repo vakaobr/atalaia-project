@@ -5,7 +5,8 @@
 // (Web Mercator, 256 px), viewed interactively only, as OSM's tile usage policy allows: the
 // tiles of the current view and nothing else (no prefetching, no offline copy), the browser's
 // own cache, the attribution always visible, and the page's origin as the Referer the policy
-// asks for (the console otherwise sends none). Hand-written rather than a vendored library
+// asks for (the console otherwise sends none). fit() shows a place found by name (MF-44).
+// Hand-written rather than a vendored library
 // (MF-21): panning by dragging or with the arrow keys, zooming with the wheel, + and - or the
 // buttons, a press without a drag reports where it was (the GM's next corner), and an SVG
 // layer draws the outline being traced. Nothing here is drawn into the field image: that is
@@ -117,6 +118,25 @@ export class TileMap {
         this.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(zoom)));
         this.draw();
         if (this.opts.onView) this.opts.onView({ ...this.centre, zoom: this.zoom });
+    }
+
+    /** Centres the map on a box ({south, north, west, east}) at the closest zoom that shows all of it,
+     * at most maxZoom (a place found by name, MF-44). */
+    fit(b, maxZoom = ZOOM_MAX) {
+        const { w, h } = this.size();
+        let z = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(maxZoom)));
+        for (; z > ZOOM_MIN; z -= 1) {
+            const a = project(b.north, b.west, z);
+            const c = project(b.south, b.east, z);
+            if (c.x - a.x <= w && c.y - a.y <= h) break;
+        }
+        const a = project(b.north, b.west, z);
+        const c = project(b.south, b.east, z);
+        this.view(unproject((a.x + c.x) / 2, (a.y + c.y) / 2, z), z);
+    }
+
+    get maxZoom() {
+        return ZOOM_MAX;
     }
 
     zoomBy(step, px, py) {

@@ -1041,6 +1041,22 @@ tr.offline td {
     margin: 0.6rem 0 0;
 }
 
+/* finding the field: a place's name or the GM's location (MF-41 to MF-48) */
+.fm-places {
+    display: grid;
+    gap: 0.3rem;
+    margin: 0.3rem 0;
+    padding: 0;
+    list-style: none;
+}
+
+.fm-place {
+    width: 100%;
+    text-align: start;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
 .fm-preview {
     position: relative;
     border: 1px solid var(--line);

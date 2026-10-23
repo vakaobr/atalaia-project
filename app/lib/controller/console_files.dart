@@ -26,6 +26,7 @@ const consoleSecurityHeaders = {
       "base-uri 'none'; form-action 'none'",
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
+  'Permissions-Policy': 'geolocation=()',
 };
 
 const _types = {

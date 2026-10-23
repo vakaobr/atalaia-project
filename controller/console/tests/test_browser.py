@@ -27,8 +27,10 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 HERE = Path(__file__).resolve().parent
 CONTROLLER = HERE.parents[1]
@@ -2090,12 +2092,27 @@ class ConsoleBrowserTests(unittest.TestCase):
 
     # --- the field loaded from a map (MF-18, built as MF-19 to MF-30) -------------------------
 
-    def map_routes(self, page, wms: str = "orthophoto.png", overpass: "list[int] | None" = None) -> dict:
-        """Answers the field-map page's three origins from fixtures; anything else outside the controller is
-        refused and recorded (no real network in the tests)."""
-        seen: dict = {"tiles": 0, "overpass": [], "wms": [], "other": []}
+    def map_routes(self, page, wms: str = "orthophoto.png", overpass: "list[int] | None" = None,
+                   nominatim: "dict[str, int] | None" = None) -> dict:
+        """Answers the field-map page's four origins from fixtures; anything else outside the controller is
+        refused and recorded (no real network in the tests). Nominatim answers fixtures/nominatim.json, an
+        empty list for a q containing "nowhere", or the status nominatim maps a q to."""
+        seen: dict = {"tiles": 0, "overpass": [], "wms": [], "search": [], "other": []}
         statuses = list(overpass or [200])
         ctx = page.context
+
+        def search(route):
+            q ={k: v[0] for k, v in parse_qs(urlsplit(route.request.url).query).items()}
+            seen["search"].append({"q": q, "referer": route.request.headers.get("referer"),
+                                   "at": time.monotonic()})
+            status = (nominatim or {}).get(q.get("q", ""), 200)
+            if status != 200:
+                route.fulfill(status=status, content_type="text/plain", headers=CORS, body="no")
+            elif "nowhere" in q.get("q", ""):
+                route.fulfill(status=200, content_type="application/json", headers=CORS, body="[]")
+            else:
+                route.fulfill(status=200, content_type="application/json", headers=CORS,
+                              body=(FIXTURES / "nominatim.json").read_text(encoding="utf-8"))
 
         def other(route):
             if route.request.url.startswith(self.field.base):
@@ -2126,6 +2143,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         ctx.route("https://tile.openstreetmap.org/**", tiles)
         ctx.route("https://overpass-api.de/api/interpreter", overpass_api)
         ctx.route("https://ortos.dgterritorio.gov.pt/**", orthophoto)
+        ctx.route("https://nominatim.openstreetmap.org/**", search)
         return seen
 
     def type_outline(self, page) -> None:
@@ -2282,6 +2300,157 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(viewer.get_by_test_id("fm-login")).to_be_visible()
         viewer.goto(self.field.base + "/console/#field")
         expect(viewer.get_by_test_id("field-from-map")).to_have_count(0)
+
+    def test_field_map_finds_a_place_by_name(self):
+        """MF-44 to MF-46, as the maintainer asked (2026-10-23): a place's name goes to Nominatim (mocked)
+        only when the GM presses Search, never per keystroke, at most once a second, the same question once,
+        with the page's origin as the Referer and the page's language; typed coordinates send nothing; up
+        to five results, chosen with the keyboard, fit the map to the place; at phone width."""
+        page = self.console(width=390, height=844, service_workers="block")
+        seen = self.map_routes(page, nominatim={"Campo Recusado": 429})
+        page.goto(self.field.base + "/console/field-map.html")
+        expect(page.get_by_test_id("tm")).to_be_visible()
+        # "latitude, longitude" goes straight there, without a request.
+        page.get_by_test_id("fm-go").fill("39.6, -8.401")
+        page.get_by_test_id("fm-go-button").click()
+        expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile(r"/17/"))
+        # Typing is not searching: nothing is sent until Search (no search as you type).
+        page.get_by_test_id("fm-go").fill("")
+        page.get_by_test_id("fm-go").press_sequentially("Campo da Mata", delay=30)
+        page.wait_for_timeout(400)
+        self.assertEqual(seen["search"], [])
+        page.get_by_test_id("fm-go").press("Enter")
+        expect(page.get_by_test_id("fm-place")).to_have_count(3)  # the result without a position is left out
+        expect(page.get_by_test_id("fm-place-status")).to_have_text(
+            "Sítios encontrados: 3. Escolhe um para levar o mapa até lá.")
+        expect(page.get_by_test_id("fm-search-credit")).to_contain_text("Nominatim")
+        expect(page.get_by_test_id("fm-search-credit").locator("a")).to_have_attribute(
+            "href", "https://www.openstreetmap.org/copyright")
+        self.assertEqual(len(seen["search"]), 1)
+        self.assertEqual(seen["search"][0]["q"], {"format": "jsonv2", "q": "Campo da Mata", "limit": "5",
+                                                  "accept-language": "pt-PT,pt",
+                                                  "email": "falecom@andersonleite.me"})
+        self.assertEqual(seen["search"][0]["referer"], self.field.base + "/")  # the origin only
+        self.no_horizontal_scroll(page)  # a long name wraps
+        # With the keyboard: the result is a button; the map fits the place's box, and takes the focus.
+        page.get_by_test_id("fm-place").first.focus()
+        page.keyboard.press("Enter")
+        expect(page.get_by_test_id("fm-places")).to_have_count(0)
+        expect(page.get_by_test_id("fm-place-status")).to_have_text("No mapa: Campo da Mata, Vale Fictício, Portugal")
+        expect(page.get_by_test_id("tm")).to_be_focused()
+        expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile(r"/16/"))  # 560 m across
+        page.get_by_test_id("fm-centre").click()
+        expect(page.get_by_test_id("fm-corners")).to_contain_text("39.600000, -8.401000")
+        page.get_by_test_id("fm-clear").click()
+        # The same question again: answered from the page's memory, not sent again.
+        page.get_by_test_id("fm-go").fill("campo  da mata")
+        page.get_by_test_id("fm-go-button").click()
+        expect(page.get_by_test_id("fm-place")).to_have_count(3)
+        self.assertEqual(len(seen["search"]), 1)
+        # At most one request a second: a second search right after the first waits.
+        page.get_by_test_id("fm-go").fill("Mata Grande")
+        page.get_by_test_id("fm-go-button").click()
+        expect(page.get_by_test_id("fm-place")).to_have_count(3)
+        page.get_by_test_id("fm-go").fill("nowhere at all")
+        page.get_by_test_id("fm-go-button").click()
+        expect(page.get_by_test_id("fm-place-status")).to_have_text(
+            "Nenhum sítio encontrado para «nowhere at all». Experimenta outro nome, ou escreve «latitude, longitude».")
+        expect(page.get_by_test_id("fm-search-credit")).to_be_visible()
+        self.assertEqual(len(seen["search"]), 3)
+        self.assertGreaterEqual(seen["search"][2]["at"] - seen["search"][1]["at"], 0.95)
+        # Refused (a block or too many requests) is said in words; an empty search sends nothing.
+        page.get_by_test_id("fm-go").fill("Campo Recusado")
+        page.get_by_test_id("fm-go-button").click()
+        expect(page.get_by_test_id("fm-error")).to_contain_text("recusou ou está ocupada (HTTP 429)")
+        self.errors = [e for e in self.errors if "429" not in e]
+        page.get_by_test_id("fm-go").fill("  ")
+        page.get_by_test_id("fm-go-button").click()
+        expect(page.get_by_test_id("fm-error")).to_have_text("Escreve o nome de um sítio, ou «latitude, longitude».")
+        self.assertEqual(len(seen["search"]), 4)
+        self.assertEqual((seen["other"], seen["overpass"], seen["wms"]), ([], [], []))
+        self.no_horizontal_scroll(page)
+
+    GEO_STUB = """(() => {
+        const geo = navigator.geolocation;
+        const real = geo.getCurrentPosition.bind(geo);
+        geo.getCurrentPosition = (ok, err, o) => (window.__geoFail
+            ? setTimeout(() => err({ code: window.__geoFail, message: 'test' }), 10) : real(ok, err, o));
+        Object.defineProperty(window, 'isSecureContext', { configurable: true, get: () => !window.__insecure });
+    })();"""
+
+    def test_field_map_uses_the_gms_location(self):
+        """MF-41 to MF-43, MF-47: already allowed, the page opens at the GM's location (a level's map position
+        wins); *Use my location* asks again; only this page may ask; the position is sent nowhere."""
+        here = {"latitude": 38.7071, "longitude": -9.1355, "accuracy": 25}
+        page = self.console(service_workers="block", permissions=["geolocation"], geolocation=here)
+        allows = "(document.permissionsPolicy || document.featurePolicy).allowsFeature('geolocation')"
+        self.assertFalse(page.evaluate(allows))  # the console itself may not ask (geolocation=())
+        seen = self.map_routes(page)
+        sent: list[str] = []
+        page.on("request", lambda r: sent.append(f"{r.url} {r.post_data or ''}"))
+        page.goto(self.field.base + "/console/field-map.html")
+        self.assertTrue(page.evaluate(allows))
+        expect(page.get_by_test_id("fm-place-status")).to_have_text(
+            "O mapa está na tua localização (precisão de cerca de 25 m).")
+        expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile(r"/17/"))
+        page.get_by_test_id("fm-centre").click()
+        expect(page.get_by_test_id("fm-corners")).to_contain_text("38.707100, -9.135500")
+        page.get_by_test_id("fm-clear").click()
+        # The button: elsewhere first, then a new fix.
+        page.get_by_test_id("fm-go").fill("39.6, -8.401")
+        page.get_by_test_id("fm-go-button").click()
+        page.context.set_geolocation({"latitude": 39.5, "longitude": -8.2, "accuracy": 8})
+        page.get_by_test_id("fm-locate").click()
+        expect(page.get_by_test_id("fm-place-status")).to_have_text(
+            "O mapa está na tua localização (precisão de cerca de 8 m).")
+        page.get_by_test_id("fm-centre").click()
+        expect(page.get_by_test_id("fm-corners")).to_contain_text("39.500000, -8.200000")
+        page.get_by_test_id("fm-clear").click()
+        # The positions went nowhere: not to the controller, not to any other origin.
+        self.assertGreater(len(sent), 5)
+        for s in sent:
+            for coord in ("38.707", "9.135", "39.5", "-8.2"):
+                self.assertNotIn(coord, s)
+        self.assertEqual((seen["search"], seen["other"]), ([], []))
+        # A level with a map position opens there, not at the GM's location.
+        self.field.http.put("/api/v1/field/image", headers={"Content-Type": "image/png"}, content=ICON.read_bytes())
+        r = self.field.http.put("/api/v1/field/georef", json={"points": [
+            {"x": 0, "y": 0, "lat": 38.7240, "lon": -9.1420}, {"x": 1, "y": 1, "lat": 38.7200, "lon": -9.1360}]})
+        self.assertEqual(r.status_code, 200, r.text)
+        page.reload()
+        expect(page.get_by_test_id("tm")).to_be_visible()
+        page.wait_for_timeout(500)
+        expect(page.get_by_test_id("fm-place-status")).to_have_count(0)
+        page.get_by_test_id("fm-centre").click()
+        expect(page.get_by_test_id("fm-corners")).to_contain_text("38.722000, -9.139000")
+
+    def test_field_map_location_errors_in_english(self):
+        """MF-41: without permission nothing is asked on open; a denial, a timeout, no position and a page
+        that is not a secure context are said in words."""
+        page = self.console(service_workers="block")
+        page.get_by_test_id("lang").select_option("en")
+        page.context.add_init_script(self.GEO_STUB)
+        seen = self.map_routes(page)
+        page.goto(self.field.base + "/console/field-map.html")
+        expect(page.get_by_test_id("tm")).to_be_visible()
+        page.wait_for_timeout(500)
+        expect(page.get_by_test_id("fm-place-status")).to_have_count(0)  # not allowed yet: no prompt on open
+        expect(page.get_by_test_id("fm-error")).to_have_count(0)
+        page.get_by_test_id("fm-locate").click()
+        expect(page.get_by_test_id("fm-error")).to_have_text(
+            "This page is not allowed your location. You can allow it in the browser's settings for this address, "
+            "or search for the place by name.")
+        page.evaluate("window.__geoFail = 3")
+        page.get_by_test_id("fm-locate").click()
+        expect(page.get_by_test_id("fm-error")).to_contain_text("took too long")
+        page.evaluate("window.__geoFail = 2")
+        page.get_by_test_id("fm-locate").click()
+        expect(page.get_by_test_id("fm-error")).to_contain_text("could not tell where it is")
+        page.evaluate("window.__insecure = true")
+        page.get_by_test_id("fm-locate").click()
+        expect(page.get_by_test_id("fm-error")).to_contain_text("only to secure pages")
+        expect(page.get_by_test_id("fm-error")).to_contain_text("127.0.0.1")
+        self.assertEqual((seen["search"], seen["other"]), ([], []))
 
     def test_reconnects_after_the_stream_drops(self):
         self.field.create_game(start=True)

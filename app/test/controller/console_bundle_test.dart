@@ -120,6 +120,7 @@ void main() {
       );
       expect(index.headers['X-Content-Type-Options'], 'nosniff');
       expect(index.headers['Referrer-Policy'], 'no-referrer');
+      expect(index.headers['Permissions-Policy'], 'geolocation=()');
       expect(
         get('/console/app.js').contentType,
         'text/javascript; charset=utf-8',
