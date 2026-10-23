@@ -862,6 +862,38 @@ const Map<String, String> deStrings = {
       'Zeig ihn nicht den Spielenden.',
   'ctl.code_gm': 'GM-Code',
   'ctl.code_read': 'Lese-Code (Anzeigetafel)',
+  // Slice S7c: the field card written by this phone's NFC.
+  'ctl.card': 'Feldkarte',
+  'ctl.card_hint':
+      'Neue Boxen kommen mit der Feldkarte in dieses Feld: Schreib sie auf '
+      'eine NTAG215- oder NTAG216-Karte und halte sie einmal an jede neue '
+      'Box. Boxen mit Display lassen sich auch über den Code koppeln, den '
+      'sie zeigen (Reiter „Aufnehmen“ der Konsole).',
+  'ctl.card_write': 'Feldkarte schreiben',
+  'ctl.card_warn_title': 'Das Hauptgeheimnis des Felds',
+  'ctl.card_warn':
+      'Diese Karte enthält den Beitrittsschlüssel des Felds: Wer sie hat, '
+      'kann Beitrittskarten für die Boxen dieses Felds erstellen und die '
+      'Schlüssel späterer Spiele lesen, die per Funk gesendet werden. Schließ '
+      'sie weg; geht sie verloren oder wird kopiert, braucht das Feld einen '
+      'neuen Schlüssel.',
+  'ctl.card_write_go': 'Karte schreiben',
+  'ctl.card_done': 'Feldkarte geschrieben (Feld {fingerprint}).',
+  'ctl.card_failed':
+      'Die Feldkarte konnte nicht erstellt werden: versuch es noch einmal.',
+  'ctl.firmware': 'Firmware-Updates',
+  'ctl.fw_keys': 'Firmware-Release-Schlüssel',
+  'ctl.fw_keys_none':
+      'Keine: Dieser Controller nimmt kein Firmware-Release für die Boxen an.',
+  'ctl.fw_keys_set':
+      '{n} Schlüssel: Releases, die sie signieren, werden angenommen.',
+  'ctl.fw_keys_hint':
+      'Die öffentlichen Hälften der Release-Schlüssel (Base64, je 44 '
+      'Zeichen), einer pro Zeile, wie in [firmware] release_keys des Pi. '
+      'Die Boxen prüfen jedes Release noch einmal mit den Schlüsseln in '
+      'ihrer eigenen Firmware. Ein laufender Controller startet dafür neu.',
+  'ctl.fw_keys_bad':
+      'Jeder Schlüssel hat 44 Base64-Zeichen (32 Bytes); höchstens 8.',
   'ctl.code_hidden': 'Verborgen',
   'ctl.show_codes': 'Codes zeigen',
   'ctl.hide_codes': 'Codes verbergen',

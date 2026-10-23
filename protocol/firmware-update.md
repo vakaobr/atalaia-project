@@ -6,7 +6,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 How a Field Box gets a new firmware image from its field controller over the field's Wi-Fi, and why it can trust it. Design: decisions FU3-1 onwards in `docs/review/decisions-to-review.md`; the radio side is RFC 0001 Amendment 6 (CMD opcode 9). In software and in host tests; the over-the-air path has not yet run on a real board (`firmware/esp32/docs/BRING_UP.md`, "Firmware update over the air").
 
-Code: the box's checks and update job `firmware/esp32/main/fw_update.c` (platform-free, host-tested with fakes) and its ESP-IDF side `fw_update_esp.c`; the shared Python `controller/atalaia_controller/firmware_release.py` (the site server's catalogue, the controller and `tools/firmware_release.py` use it); the controller's service `firmware_updates.py`; the vectors `protocol/vectors/firmware.json`.
+Code: the box's checks and update job `firmware/esp32/main/fw_update.c` (platform-free, host-tested with fakes) and its ESP-IDF side `fw_update_esp.c`; the shared Python `controller/atalaia_controller/firmware_release.py` (the site server's catalogue, the controller and `tools/firmware_release.py` use it); the controller's service `firmware_updates.py`; the Android field controller's `app/lib/protocol/firmware_release.dart` and `app/lib/controller/controller_firmware.dart` (slice S7c of PE24: the same API, the release keys set on the controller's screen, the boxes fetching over the phone's HTTPS with its field CA); the vectors `protocol/vectors/firmware.json`.
 
 ## Trust
 

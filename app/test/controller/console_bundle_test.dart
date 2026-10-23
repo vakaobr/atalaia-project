@@ -209,8 +209,6 @@ void main() {
         ('GET', '/api/v1/team-presets'),
         ('POST', '/api/v1/crests'),
         ('PUT', '/api/v1/games/1/teams/red'),
-        ('GET', '/api/v1/games/1/invites'),
-        ('POST', '/api/v1/boxes/discover'),
         ('GET', '/api/v1/mode-packages'),
         ('POST', '/api/v1/modes'),
         ('POST', '/api/v1/controller/join'),

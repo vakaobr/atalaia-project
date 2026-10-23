@@ -653,7 +653,12 @@ roadmap:
       Feldtest vorgezogen, der Feldplan (ein Plan pro Ebene, seine Lage auf der Karte,
       Kartenelemente mit der Feldgrenze und das aus einer Karte geladene Feld, sodass die Warnung
       beim Verlassen des Felds auch dort funktioniert) und der Funkkanal mit der Suche nach einem
-      ruhigen Kanal über den I/O-Pod; nach dem Feldtest: der Wechsel zwischen einem Handy und einem
+      ruhigen Kanal über den I/O-Pod, und die Boxen über Funk: versiegelte Einladungen ins nächste
+      Spiel, das Spielende, das den Boxen auch nach einem Neustart des Handys ohne den
+      Spielschlüssel gemeldet wird, neue Boxen, aufgenommen über den Code, den sie zeigen, oder mit
+      einer Feldkarte, die das Handy per NFC schreibt, und Firmware-Updates zwischen Spielen (mit
+      dem USB-Funkmodem des Pi am Handy: der I/O-Pod reicht diese Nachrichten noch nicht weiter);
+      nach dem Feldtest: der Wechsel zwischen einem Handy und einem
       Pi und der Rest dessen, was der Pi kann) und die iOS-Version (nicht gebaut: sie braucht einen
       Mac). Planphase G, der Feldtest mit echten Handys und Pods, wartet auf die Hardware: Bisher
       lief die App nur auf Android-Emulatoren und die Pod-Firmware nur als eigener Code auf einem

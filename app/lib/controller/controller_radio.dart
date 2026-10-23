@@ -104,6 +104,25 @@ abstract class ControllerModem {
   void Function(String state)? onState;
   void Function(String code, String message)? onError;
 
+  // --- field and pair frames (slice S7c; protocol/usb-modem.md FIELD_*) ---
+
+  /// The radio carries field frames (re-invites, GAME_OVER; the modem's
+  /// IDENT `"field": true`). A radio that does not: none of them.
+  bool get hasFieldFrames => false;
+
+  /// And pair frames, type 10 (adopting a box by its code; `"pair": true`).
+  bool get hasPairFrames => false;
+
+  /// Queues a whole field or pair frame, sealed (or, a pair frame, in the
+  /// clear) by the controller, with or without a game: the id its FIELD_ACK
+  /// will carry ([onFieldAck]), or null when it was not taken.
+  int? sendField(Uint8List frame) => null;
+
+  /// A field or pair frame heard, as it is, with its RSSI and SNR.
+  void Function(Uint8List frame, int rssi, int snr)? onFieldRx;
+
+  /// The outcome of a [sendField] (ok, duty_cycle, invalid...).
+  void Function(int id, String status)? onFieldAck;
   // --- the noise scan (slice S7a, controller_channel.dart) -----------------
 
   /// Whether the radio has a radio chip (radio_modem.py's IDENT

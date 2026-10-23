@@ -18,6 +18,13 @@
 ///   - RADIO_RX to [onRx] (header, plaintext, RSSI, SNR, the sender's epoch),
 ///     RADIO_TX_ACK to [onTxAck], RADIO_ERROR to [onError].
 ///
+/// Field and pair frames (re-invites, GAME_OVER, pairing by code; slice
+/// S7c) go as RADIO_FIELD_TX and come as RADIO_FIELD_RX / RADIO_FIELD_ACK
+/// (the modem's FIELD_* plus 3), only with a pod whose IDENT says it relays
+/// them: the pod firmware does not yet (decision PE24-91), so with today's
+/// pods [hasFieldFrames] is false and the controller says so, as a Pi does
+/// with an old modem.
+///
 /// A pod with no radio chip is never up. Checked against the pod
 /// firmware's own code (the host pod) and the Field Box's (the host box)
 /// over a shared UDP air in test/controller/pod_controller_test.dart; not
@@ -69,6 +76,9 @@ class PodModem extends ControllerModem {
   int? _pendingPing;
   var _missed = 0;
   var _closed = false;
+  var _fieldFrames = false;
+  var _pairFrames = false;
+  var _fieldId = 0;
 
   @override
   String get state => _state;
@@ -81,6 +91,12 @@ class PodModem extends ControllerModem {
 
   @override
   int get reconnects => _reconnects;
+
+  @override
+  bool get hasFieldFrames => _fieldFrames;
+
+  @override
+  bool get hasPairFrames => _pairFrames;
 
   /// Starts on a pod client that is not started yet: its IDENT comes first.
   Future<void> start() async {
@@ -143,6 +159,8 @@ class PodModem extends ControllerModem {
       case PodIdentified(:final ident):
         if (_ident != null) _reconnects++;
         _ident = ident.toJson()..remove('capabilities');
+        _fieldFrames = ident.fieldFrames;
+        _pairFrames = ident.pairFrames;
         if (!ident.hasRadio) {
           _setState(ModemState.down);
           return;
@@ -215,6 +233,20 @@ class PodModem extends ControllerModem {
         } on ProxyException catch (e) {
           _measureFailed('bad_frame', e.message);
         }
+      case FrameType.radioFieldRx:
+        if (p.length < 3) return;
+        final n = p.length;
+        onFieldRx?.call(
+          Uint8List.fromList(p.sublist(0, n - 2)),
+          p[n - 2] >= 128 ? p[n - 2] - 256 : p[n - 2],
+          p[n - 1] >= 128 ? p[n - 1] - 256 : p[n - 1],
+        );
+      case FrameType.radioFieldAck:
+        if (p.length != 3) return;
+        onFieldAck?.call(
+          p[0] << 8 | p[1],
+          txStatusNames[p[2]] ?? 'status_${p[2]}',
+        );
       case FrameType.radioError:
         if (p.isEmpty) return;
         final message = utf8.decode(p.sublist(1), allowMalformed: true);
@@ -356,6 +388,17 @@ class PodModem extends ControllerModem {
       pod.sendRadio(FrameType.radioTx, radioTx(header.encode(), payload)),
     );
     return true;
+  }
+
+  @override
+  int? sendField(Uint8List frame) {
+    if (!isUp || pod.broken || !_fieldFrames) return null;
+    _fieldId = (_fieldId + 1) & 0xffff;
+    final id = _fieldId;
+    unawaited(
+      pod.sendRadio(FrameType.radioFieldTx, [id >> 8, id & 0xff, ...frame]),
+    );
+    return id;
   }
 }
 

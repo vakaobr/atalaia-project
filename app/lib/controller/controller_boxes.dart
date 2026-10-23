@@ -1,0 +1,782 @@
+// SPDX-FileCopyrightText: 2026 The Atalaia contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+/// Re-inviting boxes into the next game over the radio, and GAME_OVER
+/// (protocol/field-frames.md; decisions RJ-1 to RJ-15, OT-13 to OT-16), on
+/// the Android field controller (slice S7c of PE24, decision PE24-90): the
+/// Pi controller's controller/atalaia_controller/reinvite.py and the
+/// controller's side of simulator/atalaia_sim/lobby.py (`Inviter`), in Dart.
+///
+/// A box whose game is over announces itself in field frames sealed with a
+/// key derived from the field join key; the radio (an I/O pod that relays
+/// them, or a USB radio modem: decisions PE24-91, PE24-92) hands them over
+/// as they are. The controller keeps the free boxes it has heard for two
+/// hours (with the box's newest nonce, so a replayed announcement is
+/// refused), sends a DISCOVER when the GM opens the console's box picker
+/// (at most every 10 s), and invites the boxes the GM picks into the live
+/// game before it starts: for each, a join payload made exactly as for a
+/// card ([ControllerEngine.issueJoin]), cut into one to three INVITE parts
+/// for the box's device id and the token of its last announcement, paced by
+/// their time on air, sent again after 6 s unanswered, three times at most.
+/// The box's answer sets it accepted or refused, its HELLO in the game
+/// joined. Nothing here is stored: invites last as long as the controller
+/// runs.
+///
+/// When a game ends, GAME_OVER (its id and its key's tag) goes three times,
+/// 4 s apart, on the game's channel (the radio tuned there and back to the
+/// field's channel while no game is live), so its boxes leave it also when
+/// the controller restarted without the game's key.
+///
+/// The controller's nonces (decision RJ-15): a sender id drawn from
+/// Random.secure at every start and never stored, boot 1 and the frame
+/// count, then boot 2 after 65,536 frames, within the run.
+library;
+
+import 'dart:math';
+import 'dart:typed_data';
+
+import '../protocol/field_frame.dart';
+import '../security/bytes.dart';
+import 'controller_engine.dart';
+
+const announceMinMs = 60000;
+const inviteRetryMs = 6000;
+const inviteAttempts = 3;
+const discoverMinMs = 10000;
+const boxForgetMs = 2 * 3600000;
+const _gapMs = 50; // between the controller's frames, on top of their air
+const _partGapMs = 150; // between an invite's parts (the box re-arms)
+const gameOverRepeats = 3;
+const gameOverGapMs = 4000;
+
+/// LoRa time on air at SF7/125 kHz (explicit header, CRC, CR 4/5, an
+/// 8-symbol preamble): eu868.py `airtime_ms`, core/src/duty_cycle.c.
+double airtimeMs(int packetBytes, {int sf = 7, int bwHz = 125000}) {
+  final tSymUs = (1 << sf) * 1000000 ~/ bwHz;
+  final tPreambleUs = 1225 * tSymUs ~/ 100;
+  final de = sf >= 11 ? 1 : 0;
+  final num = 8 * packetBytes - 4 * sf + 28 + 16;
+  final den = 4 * (sf - 2 * de);
+  final symbols = num <= 0 ? 8 : 8 + (num + den - 1) ~/ den * 5;
+  return (tPreambleUs + symbols * tSymUs) / 1000.0;
+}
+
+/// A free box as its last announcement told it.
+class BoxSeen {
+  BoxSeen({
+    required this.deviceId,
+    required this.name,
+    required this.tier,
+    required this.token,
+    required this.seenMs,
+    this.lastGame,
+    this.lastRole,
+    this.batteryPct,
+    this.rssi,
+    this.snr,
+  });
+
+  final Uint8List deviceId;
+  final String name;
+  final int tier;
+  final Uint8List token;
+  final int seenMs;
+  final int? lastGame;
+  final String? lastRole;
+  final int? batteryPct;
+  final int? rssi;
+  final int? snr;
+
+  Map<String, Object?> public(int nowMs) => {
+    'device_id': hexEncode(deviceId),
+    'name': name,
+    'tier': tier,
+    'last_game': lastGame,
+    'last_role': lastRole,
+    'battery_pct': batteryPct,
+    'rssi': rssi,
+    'snr': snr,
+    'seen_s_ago': max(0, (nowMs - seenMs) ~/ 1000),
+  };
+}
+
+/// An invite on its way: sending, invited, accepted, joined, refused, failed.
+class BoxInvite {
+  BoxInvite({
+    required this.deviceId,
+    required this.inviteId,
+    required this.gameId,
+    required this.nodeId,
+    required this.role,
+    required this.payload,
+    required this.nextMs,
+    this.name,
+  });
+
+  final Uint8List deviceId;
+  final int inviteId;
+  final int gameId;
+  final int nodeId;
+  final String role;
+  final Uint8List payload;
+  final String? name;
+  String status = 'sending';
+  String? detail;
+  int attempts = 0;
+  int nextMs;
+  final tx = <int>{};
+  final pending = <Uint8List>[];
+
+  int get parts => splitJoin(payload).length;
+
+  Map<String, Object?> public() => {
+    'device_id': hexEncode(deviceId),
+    'game': gameId,
+    'node_id': nodeId,
+    'role': role,
+    'name': name,
+    'status': status,
+    'detail': detail,
+    'attempts': attempts,
+    'parts': parts,
+    'bytes': payload.length,
+  };
+}
+
+class _GameOver {
+  _GameOver(this.gameId, this.keyTag, this.channelHz, this.nextMs);
+  final int gameId;
+  final Uint8List keyTag;
+  final int? channelHz;
+  int left = gameOverRepeats;
+  int nextMs;
+  int sent = 0;
+}
+
+/// The controller's side of the field frames (lobby.py `Inviter`). [send]
+/// puts a frame on air and returns an id for its outcome
+/// ([onTxResult]), or null when the radio refused it at once.
+class FieldInviter {
+  FieldInviter(
+    List<int> joinKey,
+    this.send, {
+    Random? random,
+    FieldNonceSource? nonces,
+  }) : key = fieldKey(joinKey),
+       _nkey = fieldNonceKey(joinKey),
+       _random = random ?? Random.secure(),
+       nonces =
+           nonces ??
+           FieldNonceSource(
+             joinKey,
+             List.generate(ffSenderSize, (_) => Random.secure().nextInt(256)),
+           );
+
+  final Uint8List key;
+  final Uint8List _nkey;
+  final FieldNonceSource nonces;
+  final int? Function(Uint8List frame) send;
+  final Random _random;
+  final boxes = <String, BoxSeen>{};
+  final invites = <String, BoxInvite>{};
+  var busyUntil = 0;
+  int? lastDiscover;
+
+  /// Frames that did not open (another field's, strangers'), and
+  /// announcements older than one heard from that box (replays).
+  var ignored = 0;
+  var stale = 0;
+  final _fresh = <String, (int, int)>{};
+  final _gamesOver = <_GameOver>[];
+
+  /// "boxes" or "invites" changed.
+  void Function(String what)? onChange;
+
+  /// A GAME_OVER's channel before it is sent (false: drop it, the radio is
+  /// busy elsewhere), and null once none is left (the radio goes back).
+  bool Function(int? channelHz)? tune;
+
+  void _changed(String what) => onChange?.call(what);
+
+  // --- hearing ----------------------------------------------------------------
+
+  Map<String, Object?>? onFrame(
+    Uint8List raw,
+    int nowMs, {
+    int? rssi,
+    int? snr,
+  }) {
+    final Map<String, Object?> msg;
+    try {
+      msg = decodeFieldFrame(key, raw);
+    } on FieldFrameException {
+      ignored++;
+      return null;
+    }
+    if (msg['kind'] != 'announce') return msg;
+    final device = msg['device_id']! as Uint8List;
+    final hexid = hexEncode(device);
+    // Fresh only: a box's nonces carry its pseudonym and a rising
+    // (boot, ctr) (decision RJ-15).
+    final nonce = raw.sublist(rfHeaderSize, rfHeaderSize + ffNonceSize);
+    final seq = (
+      nonce[8] << 16 | nonce[9] << 8 | nonce[10],
+      nonce[11] << 8 | nonce[12],
+    );
+    final pseudonym = fieldNonce(_nkey, device, 0, 0).sublist(0, 8);
+    final last = _fresh[hexid] ?? (0, -1);
+    final newer = seq.$1 > last.$1 || (seq.$1 == last.$1 && seq.$2 > last.$2);
+    if (!constantTimeEquals(nonce.sublist(0, 8), pseudonym) || !newer) {
+      stale++;
+      return null;
+    }
+    _fresh[hexid] = seq;
+    boxes[hexid] = BoxSeen(
+      deviceId: device,
+      name: msg['name']! as String,
+      tier: msg['tier']! as int,
+      token: msg['token']! as Uint8List,
+      seenMs: nowMs,
+      lastGame: msg['last_game'] as int?,
+      lastRole: msg['last_role'] as String?,
+      batteryPct: msg['battery_pct'] as int?,
+      rssi: rssi,
+      snr: snr,
+    );
+    final inv = invites[hexid];
+    if (inv != null &&
+        msg['answer'] == inv.inviteId &&
+        (inv.status == 'sending' || inv.status == 'invited')) {
+      if (msg['result'] == 'accepted') {
+        inv
+          ..status = 'accepted'
+          ..detail = null;
+      } else {
+        inv
+          ..status = 'refused'
+          ..detail = msg['result'] as String?;
+      }
+      _changed('invites');
+    }
+    _changed('boxes');
+    return msg;
+  }
+
+  /// A HELLO in the game ([gameId]: the live game's; only its invites).
+  BoxInvite? onHello(int nodeId, Uint8List? deviceId, {int? gameId}) {
+    for (final inv in invites.values) {
+      if (gameId != null && inv.gameId != gameId) continue;
+      if (inv.nodeId == nodeId &&
+          (deviceId == null || constantTimeEquals(deviceId, inv.deviceId)) &&
+          const [
+            'sending',
+            'invited',
+            'accepted',
+            'failed',
+          ].contains(inv.status)) {
+        inv
+          ..status = 'joined'
+          ..detail = null;
+        boxes.remove(hexEncode(inv.deviceId)); // in a game now
+        _changed('invites');
+        _changed('boxes');
+        return inv;
+      }
+    }
+    return null;
+  }
+
+  void onTxResult(int txId, String status) {
+    for (final inv in invites.values) {
+      if (inv.tx.remove(txId) &&
+          status != 'ok' &&
+          (inv.status == 'sending' || inv.status == 'invited')) {
+        inv.detail = 'radio: $status';
+        _changed('invites');
+      }
+    }
+  }
+
+  // --- sending ----------------------------------------------------------------
+
+  List<BoxSeen> available(int nowMs) {
+    boxes.removeWhere((_, b) => nowMs - b.seenMs > boxForgetMs);
+    final out = boxes.values.toList()
+      ..sort((a, b) {
+        final c = a.name.compareTo(b.name);
+        return c != 0
+            ? c
+            : hexEncode(a.deviceId).compareTo(hexEncode(b.deviceId));
+      });
+    return out;
+  }
+
+  bool discover(int nowMs) {
+    final last = lastDiscover;
+    if (last != null && nowMs - last < discoverMinMs) return false;
+    final frame = encodeFieldFrame(key, {'kind': 'discover'}, nonces.next());
+    lastDiscover = nowMs;
+    busyUntil =
+        max(busyUntil, nowMs) + airtimeMs(frame.length).toInt() + _gapMs;
+    return send(frame) != null;
+  }
+
+  BoxInvite invite(
+    Uint8List deviceId,
+    Uint8List payload, {
+    required int gameId,
+    required int nodeId,
+    required String role,
+    required int nowMs,
+    String? name,
+  }) {
+    final hexid = hexEncode(deviceId);
+    if (!boxes.containsKey(hexid)) {
+      throw InviteException('box $hexid has not announced itself');
+    }
+    if (payload.isEmpty || payload.length > ffJoinMax) {
+      throw InviteException(
+        'a join payload of ${payload.length} bytes does not fit in '
+        '$ffPartsMax parts',
+      );
+    }
+    final inv = BoxInvite(
+      deviceId: deviceId,
+      inviteId: 1 + _random.nextInt(0xffff),
+      gameId: gameId,
+      nodeId: nodeId,
+      role: role,
+      payload: payload,
+      nextMs: nowMs,
+      name: name,
+    );
+    invites[hexid] = inv;
+    _changed('invites');
+    return inv;
+  }
+
+  /// Says [gameOverRepeats] times, [gameOverGapMs] apart, that [gameId]
+  /// (its key's [keyTag]) is over.
+  void gameOver(int gameId, Uint8List keyTag, int nowMs, {int? channelHz}) {
+    validateFieldMessage({
+      'kind': 'game_over',
+      'game_id': gameId,
+      'key_tag': keyTag,
+    });
+    _gamesOver
+      ..removeWhere((g) => g.gameId == gameId)
+      ..add(_GameOver(gameId, keyTag, channelHz, nowMs));
+  }
+
+  bool _tickGameOver(int nowMs) {
+    final done = [
+      for (final g in _gamesOver)
+        if (g.left == 0 && nowMs >= g.nextMs) g,
+    ];
+    if (done.isNotEmpty) {
+      _gamesOver.removeWhere(done.contains);
+      if (_gamesOver.isEmpty) tune?.call(null);
+    }
+    final due = [
+      for (final g in _gamesOver)
+        if (g.left > 0 && nowMs >= g.nextMs) g,
+    ];
+    if (due.isEmpty || nowMs < busyUntil) return false;
+    final go = due.first;
+    final t = tune;
+    if (t != null && !t(go.channelHz)) {
+      _gamesOver.remove(go);
+      return false;
+    }
+    final frame = encodeFieldFrame(key, {
+      'kind': 'game_over',
+      'game_id': go.gameId,
+      'key_tag': go.keyTag,
+    }, nonces.next());
+    if (send(frame) != null) go.sent++;
+    go.left--;
+    final air = airtimeMs(frame.length).toInt();
+    busyUntil = nowMs + air + _gapMs;
+    go.nextMs = nowMs + air + (go.left > 0 ? gameOverGapMs : _gapMs);
+    return true;
+  }
+
+  void forgetGame(int gameId) {
+    invites.removeWhere((_, i) => i.gameId == gameId);
+    _changed('invites');
+  }
+
+  /// Sends the next frame that is due (one at a time, paced by time on air).
+  void tick(int nowMs) {
+    var changed = false;
+    for (final inv in invites.values) {
+      if (inv.status == 'invited' &&
+          nowMs >= inv.nextMs &&
+          inv.attempts >= inviteAttempts) {
+        inv
+          ..status = 'failed'
+          ..detail = inv.detail ?? 'no answer';
+        changed = true;
+      }
+    }
+    if (changed) _changed('invites');
+    if (_tickGameOver(nowMs) || nowMs < busyUntil) return;
+    final due = [
+      for (final i in invites.values)
+        if ((i.status == 'sending' || i.status == 'invited') &&
+            nowMs >= i.nextMs &&
+            i.attempts < inviteAttempts)
+          i,
+    ];
+    if (due.isEmpty) return;
+    due.sort((a, b) {
+      final c = a.nextMs.compareTo(b.nextMs);
+      return c != 0 ? c : a.inviteId.compareTo(b.inviteId);
+    });
+    final inv = due.first;
+    final box = boxes[hexEncode(inv.deviceId)];
+    if (box == null) {
+      inv
+        ..status = 'failed'
+        ..detail = 'the box is no longer announcing itself';
+      _changed('invites');
+      return;
+    }
+    if (inv.pending.isEmpty) {
+      // A new attempt: all its parts, one per tick.
+      inv.pending.addAll(
+        inviteFrames(
+          key,
+          nonces,
+          inv.deviceId,
+          box.token,
+          inv.inviteId,
+          inv.payload,
+        ),
+      );
+      inv.detail = null;
+    }
+    final frame = inv.pending.removeAt(0);
+    final txId = send(frame);
+    if (txId != null) {
+      inv.tx.add(txId);
+    } else {
+      inv.detail = 'radio: not sent';
+    }
+    final air = airtimeMs(frame.length).toInt();
+    if (inv.status != 'invited') {
+      inv.status = 'invited';
+      _changed('invites');
+    }
+    if (inv.pending.isNotEmpty) {
+      busyUntil = nowMs + air + _partGapMs;
+      inv.nextMs = busyUntil;
+      return;
+    }
+    inv.attempts++;
+    busyUntil = nowMs + air + _gapMs;
+    inv.nextMs = nowMs + air + inviteRetryMs;
+    _changed('invites');
+  }
+}
+
+class InviteException implements Exception {
+  InviteException(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
+
+/// The phone controller's free boxes, invites and GAME_OVER (reinvite.py
+/// `Reinvite`), on the engine's radio. Made only with a field join key.
+class ControllerBoxes {
+  ControllerBoxes(this.engine, {Random? random}) {
+    if (engine.joinKey.length != 32) {
+      throw ArgumentError('the boxes need the field join key');
+    }
+    inviter = FieldInviter(engine.joinKey, _send, random: random)
+      ..onChange = _pending.add
+      ..tune = _tune;
+    engine.boxes = this;
+  }
+
+  final ControllerEngine engine;
+  late final FieldInviter inviter;
+  final _pending = <String>{};
+  int? _tuned; // the channel a GAME_OVER took the radio to
+
+  int? _send(Uint8List frame) {
+    final m = engine.modem;
+    if (m == null || !m.isUp) return null;
+    return m.sendField(frame);
+  }
+
+  // --- the radio ------------------------------------------------------------
+
+  void onFieldRx(Uint8List frame, int rssi, int snr) {
+    inviter.onFrame(frame, engine.nowMs(), rssi: rssi, snr: snr);
+    _flush();
+  }
+
+  void onFieldAck(int id, String status) {
+    inviter.onTxResult(id, status);
+    _flush();
+  }
+
+  void tick(int nowMs) {
+    inviter.tick(nowMs);
+    _flush();
+  }
+
+  /// A HELLO in the live game: an invite for that node is done.
+  void onHello(int nodeId, String? deviceHex) {
+    final g = engine.liveGame;
+    inviter.onHello(
+      nodeId,
+      deviceHex == null ? null : hexDecode(deviceHex),
+      gameId: g?['id'] as int?,
+    );
+    _flush();
+  }
+
+  /// Tells the game's boxes it is over (GAME_OVER, decision OT-13); false
+  /// without a radio that carries field frames.
+  bool gameOver(int gameId, Uint8List keyTag, int? channelHz) {
+    final m = engine.modem;
+    if (m == null || !m.isUp || !m.hasFieldFrames) return false;
+    inviter
+      ..gameOver(gameId, keyTag, engine.nowMs(), channelHz: channelHz)
+      ..tick(engine.nowMs()); // the first one at once
+    _flush();
+    return true;
+  }
+
+  bool _tune(int? channelHz) {
+    final m = engine.modem;
+    final field = engine.fieldChannel;
+    if (channelHz == null) {
+      if (_tuned != null && engine.liveGame == null && m != null && m.isUp) {
+        m.setChannel(field);
+        engine.modemMoved('a game over was told on its game\'s channel');
+      }
+      _tuned = null;
+      return true;
+    }
+    final g = engine.liveGame;
+    if (g != null) {
+      return ((g['channel_hz'] as int?) ?? field) == channelHz;
+    }
+    if (channelHz != field && _tuned != channelHz && m != null) {
+      m.setChannel(channelHz);
+      engine.modemMoved('a game over is told on its game\'s channel');
+      _tuned = channelHz;
+    }
+    return true;
+  }
+
+  /// The game ended: its invites go (no more retries into it).
+  void forgetGame(int gameId) {
+    inviter.forgetGame(gameId);
+    _flush();
+  }
+
+  /// Tells the consoles what changed.
+  void _flush() {
+    final pending = Set.of(_pending);
+    _pending.clear();
+    if (pending.contains('boxes')) {
+      engine.emit({'type': 'boxes', 'boxes': boxes()['boxes']});
+    }
+    final g = engine.liveGame;
+    if (pending.contains('invites') && g != null) {
+      final gid = g['id']! as int;
+      engine.emit({'type': 'invites', 'game': gid, 'invites': invites(gid)});
+    }
+  }
+
+  // --- what the console shows -------------------------------------------------
+
+  /// The most recent game other than the live one with boxes that said
+  /// their device id.
+  Map<String, Object?>? previousGame() {
+    final live = engine.liveGame?['id'];
+    final games = engine.store.games();
+    for (final game in games.reversed) {
+      if (game['id'] == live) continue;
+      final roles = <String, String>{
+        for (final n in engine.store.nodes(game['id']! as int))
+          if (n['device_id'] is String)
+            n['device_id']! as String: '${n['role']}',
+      };
+      if (roles.isNotEmpty) {
+        return {
+          'id': game['id'],
+          'name': game['name'],
+          'mode_id': game['mode_id'],
+          'boxes': roles,
+        };
+      }
+    }
+    return null;
+  }
+
+  /// Device id -> node id of the boxes the live game has heard.
+  Map<String, int> _inLiveGame() {
+    final g = engine.liveGame;
+    if (g == null) return {};
+    return {
+      for (final n in engine.nodes(g['id']! as int))
+        if (n['device_id'] is String)
+          n['device_id']! as String: n['node_id']! as int,
+    };
+  }
+
+  Map<String, Object?> boxes() {
+    final now = engine.nowMs();
+    final prev = previousGame();
+    final prevBoxes = (prev?['boxes'] as Map<String, String>?) ?? const {};
+    final live = _inLiveGame();
+    final out = <Map<String, Object?>>[];
+    for (final box in inviter.available(now)) {
+      final entry = box.public(now);
+      final hexid = entry['device_id']! as String;
+      entry['previous'] = prevBoxes.containsKey(hexid);
+      entry['previous_role'] = prevBoxes[hexid] ?? entry['last_role'];
+      entry['node_id'] = live[hexid];
+      entry['invite'] = inviter.invites[hexid]?.public();
+      out.add(entry);
+    }
+    final m = engine.modem;
+    return {
+      'boxes': out,
+      'previous_game': prev == null
+          ? null
+          : {
+              for (final e in prev.entries)
+                if (e.key != 'boxes') e.key: e.value,
+            },
+      'radio': m != null && m.isUp,
+      'field_frames': m != null && m.hasFieldFrames,
+      'ignored': inviter.ignored,
+      'stale': inviter.stale,
+    };
+  }
+
+  List<Map<String, Object?>> invites(int gameId) => [
+    for (final i in inviter.invites.values)
+      if (i.gameId == gameId) i.public(),
+  ];
+
+  // --- what the GM does -------------------------------------------------------
+
+  Map<String, Object?> discover() {
+    final m = engine.modem;
+    if (m == null || !m.isUp) {
+      throw ControllerError.unavailable(
+        'the radio modem is ${engine.radioState}: no DISCOVER sent',
+      );
+    }
+    final sent = inviter.discover(engine.nowMs());
+    return {'sent': sent};
+  }
+
+  /// Invites boxes into the live game: [{"device_id", "role"?, "name"?,
+  /// "fetch_modes"?}, ...] (reinvite.py `invite`).
+  Map<String, Object?> invite(int gameId, Object? specs) {
+    final game = engine.liveGame;
+    if (game == null || game['id'] != gameId) {
+      throw ControllerError.conflict('game $gameId is not the live game');
+    }
+    if (game['state'] != 'ready') {
+      throw ControllerError.conflict(
+        "game $gameId is ${game['state']}: boxes are invited before it starts",
+      );
+    }
+    final m = engine.modem;
+    if (m == null || !m.isUp) {
+      throw ControllerError.unavailable(
+        'the radio modem is ${engine.radioState}: no invite can be sent',
+      );
+    }
+    if (specs is! List || specs.isEmpty || specs.length > 64) {
+      throw ControllerError('boxes: a list of 1-64 {device_id, role?, name?}');
+    }
+    final now = engine.nowMs();
+    // Invites and refusals, in order; an invite's view once the first went.
+    final out = <Object>[];
+    for (final spec in specs) {
+      final deviceHex = spec is Map ? spec['device_id'] : null;
+      if (spec is! Map || deviceHex is! String || deviceHex.length != 16) {
+        throw ControllerError(
+          'each box: {device_id: 16 hex digits, role?, name?}',
+        );
+      }
+      final hexid = deviceHex.toLowerCase();
+      final Uint8List device;
+      try {
+        device = hexDecode(hexid);
+      } on FormatException {
+        throw ControllerError('device_id "$hexid": 16 hex digits');
+      }
+      if (!inviter.boxes.containsKey(hexid)) {
+        out.add({
+          'device_id': hexid,
+          'status': 'failed',
+          'detail': 'not announcing itself',
+        });
+        continue;
+      }
+      if (_inLiveGame().containsKey(hexid)) {
+        out.add({
+          'device_id': hexid,
+          'status': 'joined',
+          'detail': 'already in this game',
+        });
+        continue;
+      }
+      final existing = inviter.invites[hexid];
+      final joinSpec = <String, Object?>{'kind': 'node', 'role': spec['role']};
+      if (spec['name'] != null) joinSpec['name'] = spec['name'];
+      final fetch = spec['fetch_modes'] ?? false;
+      if (fetch is! bool) throw ControllerError('fetch_modes: true or false');
+      if (fetch) {
+        // Sending modes to boxes (join key 16) is a phone controller's
+        // later work: as a Pi without mode fetching (engine.py issue_join).
+        throw ControllerError.unavailable(
+          'sending modes to boxes is not set up on this controller',
+        );
+      }
+      // The same node id when the box is invited again into this game.
+      final nodeId = existing != null && existing.gameId == gameId
+          ? existing.nodeId
+          : null;
+      final made = engine.issueJoin(
+        joinSpec,
+        nodeIdValue: nodeId,
+        sameDevice: nodeId != null,
+      );
+      final payload = hexDecode(made['payload_hex']! as String);
+      try {
+        final inv = inviter.invite(
+          device,
+          payload,
+          gameId: gameId,
+          nodeId: made['node_id']! as int,
+          role: made['role']! as String,
+          nowMs: now,
+          name: made['name'] as String?,
+        );
+        out.add(inv);
+      } on InviteException catch (e) {
+        out.add({'device_id': hexid, 'status': 'too_big', 'detail': e.message});
+      }
+    }
+    inviter.tick(
+      now,
+    ); // the first one goes at once; the others as the air allows
+    _flush();
+    return {
+      'invites': [for (final o in out) o is BoxInvite ? o.public() : o],
+    };
+  }
+}

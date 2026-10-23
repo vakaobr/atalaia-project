@@ -719,6 +719,27 @@ const Map<String, String> zhTwStrings = {
   'ctl.codes_hint': '控制台會要求其中一個。主辦的存取碼可以操控遊戲：不要給玩家看。',
   'ctl.code_gm': '主辦存取碼',
   'ctl.code_read': '唯讀存取碼（記分板）',
+  // Slice S7c: the field card written by this phone's NFC.
+  'ctl.card': '場地卡',
+  'ctl.card_hint':
+      '新盒子用場地卡加入這個場地：把它寫到 NTAG215 或 NTAG216 卡上，再靠在每個新盒子上一次。'
+      '有螢幕的盒子也可以在主控台用它顯示的代碼加入。',
+  'ctl.card_write': '寫入場地卡',
+  'ctl.card_warn_title': '場地的主密鑰',
+  'ctl.card_warn':
+      '這張卡帶有場地加入金鑰：持有它的人可以為這個場地的盒子製作加入卡，'
+      '並讀取之後透過無線電傳送的遊戲金鑰。請鎖好保管；如果卡片失去或被複製，場地需要換新的金鑰。',
+  'ctl.card_write_go': '寫入卡片',
+  'ctl.card_done': '場地卡已寫入（場地 {fingerprint}）。',
+  'ctl.card_failed': '無法製作場地卡：請再試一次。',
+  'ctl.firmware': '韌體更新',
+  'ctl.fw_keys': '韌體版本金鑰',
+  'ctl.fw_keys_none': '沒有：這個控制器不接受任何盒子的韌體版本。',
+  'ctl.fw_keys_set': '{n} 把金鑰：接受它們簽署的版本。',
+  'ctl.fw_keys_hint':
+      '版本金鑰的公開部分（base64，每把 44 個字元），一行一把，同 Pi 的 [firmware] release_keys。'
+      '盒子會再用自己韌體裡的金鑰檢查每個版本。執行中的控制器會重新啟動來使用它們。',
+  'ctl.fw_keys_bad': '每把金鑰是 44 個 base64 字元（32 位元組）；最多 8 把。',
   'ctl.code_hidden': '已隱藏',
   'ctl.show_codes': '顯示存取碼',
   'ctl.hide_codes': '隱藏存取碼',

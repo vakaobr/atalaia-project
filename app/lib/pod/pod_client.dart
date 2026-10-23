@@ -162,7 +162,9 @@ class PodClient {
           FrameType.radioTxAck ||
           FrameType.radioStatus ||
           FrameType.radioError ||
-          FrameType.radioNoise:
+          FrameType.radioNoise ||
+          FrameType.radioFieldRx ||
+          FrameType.radioFieldAck:
         _events.add(PodRadioFrame(f.type, f.payload));
       default:
         break; // other types are ignored: a later version may add frames

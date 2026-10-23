@@ -619,7 +619,11 @@ roadmap:
       console served from the app, HTTPS with a field CA made on the phone and the field's Wi-Fi;
       and, pulled forward, the field plan (a plan per level, its map position, map features with the
       field boundary and the field loaded from a map, so players' out-of-bounds warning works there
-      too) and the radio channel, with the search for a quiet channel through the I/O pod; to come
+      too) and the radio channel, with the search for a quiet channel through the I/O pod, and the
+      boxes over the radio: sealed invites into the next game, the end of a game told to its boxes
+      even after the phone restarted without the game's key, new boxes adopted by the code they show
+      or by a field card the phone writes by NFC, and firmware updates between games (with the Pi's
+      USB radio modem plugged into the phone: the I/O pod does not pass these messages yet); to come
       after the field test: failover between a phone and a Pi and the rest of the Pi's features) and
       the iOS version (not built: it needs a Mac). Plan phase G, the field test with real phones and
       pods, waits for the hardware: so far the app has run only on Android emulators, and the pod

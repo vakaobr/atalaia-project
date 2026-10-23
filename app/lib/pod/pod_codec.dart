@@ -38,6 +38,13 @@ abstract final class FrameType {
 
   /// The modem's NOISE, the answer to MEASURE (decision PF2).
   static const radioNoise = 0x0b;
+
+  /// The modem's FIELD_TX, FIELD_RX and FIELD_ACK plus 3 (field and pair
+  /// frames): proposed by decision PE24-91, not in the pod firmware yet. A
+  /// pod says it relays them in its IDENT ([PodIdent.fieldFrames]).
+  static const radioFieldTx = 0x0c;
+  static const radioFieldRx = 0x0d;
+  static const radioFieldAck = 0x0e;
 }
 
 /// The modem's CMD opcodes (protocol/usb-modem.md), carried by RADIO_CMD.
@@ -233,6 +240,8 @@ final class PodIdent {
     required this.capabilities,
     required this.hasRadio,
     this.batteryPct,
+    this.fieldFrames = false,
+    this.pairFrames = false,
   });
 
   final String fwVersion;
@@ -240,12 +249,19 @@ final class PodIdent {
   final int? batteryPct;
   final bool hasRadio;
 
+  /// The pod relays field frames (RADIO_FIELD_*; IDENT key 6, proposed by
+  /// decision PE24-91), and pair frames too (key 7). Absent: false.
+  final bool fieldFrames;
+  final bool pairFrames;
+
   Map<String, Object?> toJson() => {
     'fw_version': fwVersion,
     'capabilities': capabilities,
     'battery_pct': ?batteryPct,
     'has_radio': hasRadio,
     'protocol_version': proxyVersion,
+    if (fieldFrames) 'field': true,
+    if (pairFrames) 'pair': true,
   };
 }
 
@@ -260,12 +276,14 @@ Uint8List encodeIdent(PodIdent ident) {
       3: _uint('battery_pct', ident.batteryPct, 100),
     4: ident.hasRadio,
     5: proxyVersion,
+    if (ident.fieldFrames) 6: true,
+    if (ident.pairFrames) 7: true,
   };
   return _fit(cborEncode(body));
 }
 
 PodIdent decodeIdent(List<int> payload) {
-  final m = _decodeMap(payload, {1, 2, 4, 5}, {1, 2, 3, 4, 5});
+  final m = _decodeMap(payload, {1, 2, 4, 5}, {1, 2, 3, 4, 5, 6, 7});
   final caps = m[2];
   if (caps is! List || caps.length > capabilitiesMax) {
     throw ProxyException('capabilities is a list of at most $capabilitiesMax');
@@ -277,6 +295,8 @@ PodIdent decodeIdent(List<int> payload) {
     capabilities: [for (final c in caps) _capability(c)],
     batteryPct: m.containsKey(3) ? _uint('battery_pct', m[3], 100) : null,
     hasRadio: m[4]! as bool,
+    fieldFrames: m[6] == true,
+    pairFrames: m[6] == true && m[7] == true,
   );
 }
 

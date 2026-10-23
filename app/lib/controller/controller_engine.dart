@@ -31,7 +31,10 @@
 /// ([logControllerEvent]), a VIP's position for field.lua
 /// ([fieldPosition]), the retention purge and the grants' expiry on [tick],
 /// positions deleted when a game ends. Not yet: presets, mode uploads,
-/// scenarios, role packages, branding, re-invites, failover (S7). Slice S6: the shell runs the engine on the
+/// scenarios, role packages, branding, failover (S7). Slice S7c: the hooks
+/// of the boxes over the radio ([boxes], [pairing], [adoption],
+/// [firmware]): field and pair frames routed to them, GAME_OVER when a game
+/// ends, [startGuards], [sendUpdate]. Slice S6: the shell runs the engine on the
 /// controller's own isolate (controller_host.dart) and gives it the field
 /// CA and the phone's addresses for join keys 13 and 14 ([caSha256],
 /// [linkUrls]).
@@ -51,10 +54,15 @@ import '../ffi/core_node.dart';
 import '../modes/mode_catalog.dart';
 import '../protocol/join_payload.dart';
 import '../radio/rf_codec.dart';
+import '../security/bytes.dart' show hexDecode;
 import '../security/ndef.dart';
+import 'controller_adoption.dart';
+import 'controller_boxes.dart';
 import 'controller_channel.dart';
 import 'controller_checkin.dart';
 import 'controller_field.dart';
+import 'controller_firmware.dart';
+import 'controller_pairing.dart';
 import 'controller_positions.dart';
 import 'controller_radio.dart';
 import 'controller_store.dart';
@@ -302,6 +310,9 @@ class ControllerEngine {
         ..onRx = _onRx
         ..onTxAck = _onTxAck
         ..onState = _onModemState
+        // Field and pair frames (slice S7c): pairing's, else the invites'.
+        ..onFieldRx = _onFieldRx
+        ..onFieldAck = _onFieldAck
         ..onError = (code, message) => _emit({
           'type': 'system',
           'kind': 'modem.error',
@@ -357,6 +368,21 @@ class ControllerEngine {
   /// The field plan: images, levels, map positions, map features and the
   /// boxes' places (slice S7a): set by [ControllerField]'s constructor.
   ControllerField? field;
+
+  /// Slice S7c (controller_boxes.dart, controller_pairing.dart,
+  /// controller_adoption.dart, controller_firmware.dart): the free boxes
+  /// and invites over the radio, GAME_OVER, pairing by code, field cards
+  /// and firmware updates; each set by its constructor (the first two only
+  /// with a field join key, as the Pi's reinvite and pairing).
+  ControllerBoxes? boxes;
+  ControllerPairing? pairing;
+  ControllerAdoption? adoption;
+  ControllerFirmware? firmware;
+
+  /// Why the live game may not start now (firmware updates on their way;
+  /// engine.py `start_guards`), or null: checked by [startGame] before the
+  /// start check, never overridden by `force`.
+  final startGuards = <String? Function()>[];
 
   /// The live game came back after a restart without its key: it can only
   /// be ended (ADR-P2-4).
@@ -970,6 +996,10 @@ class ControllerEngine {
         'game $id is ${_game!['state']}; only a ready game starts',
       );
     }
+    for (final guard in startGuards) {
+      final reason = guard();
+      if (reason != null) throw ControllerError.conflict(reason);
+    }
     final check = startCheck();
     final missing = (check['missing']! as List).cast<String>();
     if (missing.isNotEmpty && !force) {
@@ -1031,10 +1061,11 @@ class ControllerEngine {
     return _setState(id, 'running');
   }
 
-  /// Ends the live game; also one whose key was lost in a restart (its boxes
-  /// are not told: a GAME_OVER over the field radio needs the field join
-  /// key and the radio, slice S4, so `game_over_frame` is "no_join_key", as
-  /// on a Pi without a join key).
+  /// Ends the live game; also one whose key was lost in a restart. Its
+  /// boxes are told over the field radio too (GAME_OVER, decisions OT-7 and
+  /// OT-13; slice S7c), by its key's tag, so also after a restart without
+  /// the key: `game_over_frame` says whether it went (engine.py
+  /// `_tell_game_over`).
   Map<String, Object?> endGame(int id, [String reason = '', String? winner]) {
     final game = store.game(id);
     if (game == null) throw ControllerError.notFound('no game $id');
@@ -1054,13 +1085,43 @@ class ControllerEngine {
       store.saveScores(id, fc.totalScores);
       _saveGameTime(force: true);
     }
-    store
-      ..forgetGameKey(id) // the key does not outlive the game
-      ..deleteSetting('key_tag:$id');
+    final tag = _key.isNotEmpty
+        ? epochTag(_key)
+        : store.getSetting('key_tag:$id');
+    store.forgetGameKey(id); // the key does not outlive the game
     positions?.endGame(id); // ADR-P3-6: positions last as long as the game
     _setState(id, 'ended', {'ended_at': _wall()});
     _deactivate();
-    return {...publicGame(store.game(id)!), 'game_over_frame': 'no_join_key'};
+    boxes?.forgetGame(id); // no invite into a game that is over
+    final told = _tellGameOver(game, tag);
+    return {...publicGame(store.game(id)!), 'game_over_frame': told};
+  }
+
+  /// GAME_OVER to the game's boxes over the field radio (engine.py
+  /// `_tell_game_over`): "sent", "no_tag" (no key tag kept), "no_join_key"
+  /// or "no_radio" (no radio, or one that carries no field frames).
+  String _tellGameOver(Map<String, Object?> game, String? tag) {
+    final id = game['id']! as int;
+    store.deleteSetting('key_tag:$id');
+    if (game['joined'] == true) return 'standby';
+    final b = boxes;
+    final String told;
+    if (tag == null) {
+      told = 'no_tag';
+    } else if (b == null) {
+      told = 'no_join_key';
+    } else if (b.gameOver(
+      id,
+      hexDecode(tag),
+      (game['channel_hz'] as int?) ?? config.channelHz,
+    )) {
+      told = 'sent';
+    } else {
+      told = 'no_radio';
+    }
+    // A game ended without its key reaches its boxes only this way (the
+    // Pi logs it; the result is in the answer, nothing more on the stream).
+    return told;
   }
 
   // --- scores, log, nodes -------------------------------------------------
@@ -1497,6 +1558,10 @@ class ControllerEngine {
   /// field.lua's timers, the game's time limit.
   void tick() {
     checkin?.purge(); // retention (ADR-P3-13), at most every 10 minutes
+    // Slice S7c: invites and their retries, GAME_OVERs, pairing runs, with
+    // or without a game.
+    boxes?.tick(nowMs());
+    pairing?.tick(nowMs());
     final fc = _fc;
     if (fc == null) return;
     fc.tick(nowMs());
@@ -1557,8 +1622,11 @@ class ControllerEngine {
       final fc = _fc;
       if (fc == null) {
         // No game: listen on the field's channel (not during a scan, which
-        // tunes the radio itself).
-        if (!(channel?.scanRunning ?? false)) m.setChannel(fieldChannel);
+        // tunes the radio itself); pairing no longer listens on its own.
+        if (!(channel?.scanRunning ?? false)) {
+          m.setChannel(fieldChannel);
+          modemMoved('the modem came back');
+        }
       } else {
         final known = {
           for (final n in fc.nodes.values)
@@ -1569,6 +1637,71 @@ class ControllerEngine {
     } else if (state == ModemState.down) {
       _emit({'type': 'system', 'kind': 'radio.down'});
     }
+  }
+
+  /// The modem was tuned to the field's channel (engine.py `_modem_moved`):
+  /// pairing no longer listens on its own channel (slice S7c).
+  void modemMoved(String why) => pairing?.channelMoved(why);
+
+  /// Why the radio's channel may not move now (engine.py
+  /// `_channel_lock_reason`): a live game, or a running noise scan (slice
+  /// S7a's [channel]).
+  String? channelLockReason() {
+    final g = _game;
+    if (g != null) {
+      return "game ${g['id']} is live (${g['state']}); end it first";
+    }
+    if (channel?.scanRunning ?? false) return 'a channel scan is running';
+    return null;
+  }
+
+  void _onFieldRx(Uint8List frame, int rssi, int snr) {
+    final p = pairing;
+    if (p != null && p.isOurs(frame)) {
+      p.onFrame(frame, rssi, snr);
+    } else {
+      boxes?.onFieldRx(frame, rssi, snr);
+    }
+  }
+
+  void _onFieldAck(int id, String status) {
+    final p = pairing;
+    if (p != null && p.ownsTx(id)) {
+      p.onAck(id, status);
+    } else {
+      boxes?.onFieldAck(id, status);
+    }
+  }
+
+  /// CMD update (RFC 0001 Amendment 6) to one box, only while the live game
+  /// has not started (engine.py `send_update`; controller_firmware.dart
+  /// checks the release and the box first): the packet's seq.
+  int sendUpdate(int nodeId, Map<String, Object?> params) {
+    final g = _game;
+    if (g == null) {
+      throw ControllerError.conflict(
+        'no live game: the boxes to update must be joined to one',
+      );
+    }
+    final fc = _live(g['id']! as int);
+    if (g['state'] != 'ready') {
+      throw ControllerError.conflict(
+        "game ${g['id']} is ${g['state']}: firmware updates only before a "
+        'game starts, never during one',
+      );
+    }
+    final int? seq;
+    try {
+      seq = fc.sendUpdateCmd(params, dest: nodeId);
+    } on FieldControllerException catch (e) {
+      throw ControllerError(e.message);
+    }
+    if (seq == null) {
+      throw ControllerError.unavailable(
+        'the radio modem is $radioState; command not sent',
+      );
+    }
+    return seq;
   }
 
   // --- FieldController hooks ----------------------------------------------
@@ -1604,6 +1737,9 @@ class ControllerEngine {
     store.upsertNode(game['id']! as int, info);
     info['seen_ms_ago'] = node.heard ? max(0, nowMs() - node.lastSeenMs) : null;
     _emit({'type': 'node', 'game': game['id'], 'kind': kind, 'node': info});
+    if (kind == 'hello') {
+      boxes?.onHello(node.nodeId, info['device_id'] as String?);
+    }
     if (kind == 'hello' && game['state'] == 'ready' && game['joined'] != true) {
       _emit({'type': 'game', 'game': publicGame(game)});
     }

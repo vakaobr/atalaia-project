@@ -69,6 +69,11 @@ final class AppSettings {
   /// remembered only as the last answer.
   bool sharePosition = false;
 
+  /// The firmware release keys a phone controller trusts (slice S7c,
+  /// decision PE24-96; the Pi's `[firmware] release_keys`): the public
+  /// halves, standard base64 of 32 bytes, at most 8.
+  List<String> firmwareKeys = [];
+
   List<int>? get joinKey {
     final h = joinKeyHex;
     if (h == null || !isJoinKeyHex(h)) return null;
@@ -118,6 +123,7 @@ final class AppSettings {
     'display_name': displayName,
     'notice_seen': noticeSeen,
     'share_position': sharePosition,
+    'firmware_keys': firmwareKeys,
   };
 
   static AppSettings fromJson(Map<String, Object?> j) {
@@ -145,7 +151,11 @@ final class AppSettings {
         for (final e in ((j['notice_seen'] as Map?) ?? const {}).entries)
           if (e.value is int) '${e.key}': e.value as int,
       }
-      ..sharePosition = j['share_position'] == true;
+      ..sharePosition = j['share_position'] == true
+      ..firmwareKeys = [
+        for (final k in (j['firmware_keys'] as List?) ?? const [])
+          if (k is String) k,
+      ];
   }
 }
 

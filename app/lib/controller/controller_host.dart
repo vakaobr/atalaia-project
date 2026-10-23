@@ -27,6 +27,13 @@
 /// Changing the radio or the Wi-Fi opening restarts the controller (the
 /// shell stops this host and starts a new one on the same folder): the live
 /// game is taken up again as after a restart (slice S3).
+///
+/// Slice S7c: the radio link is an I/O pod or a USB radio modem, whichever
+/// answers (serial_modem.dart `probeRadioLink`, decision PE24-92); the free
+/// boxes and invites, GAME_OVER and pairing by code (with the field join
+/// key), field cards and firmware updates (releases in the controller's
+/// folder, [ControllerBoot.firmwareKeys]) are set up as the Pi's main.py
+/// sets them up.
 library;
 
 import 'dart:async';
@@ -38,17 +45,23 @@ import 'dart:typed_data';
 import '../ffi/bindings.dart';
 import '../pod/pod_client.dart';
 import 'console_files.dart';
+import 'controller_adoption.dart';
 import 'controller_api.dart';
+import 'controller_boxes.dart';
 import 'controller_channel.dart';
 import 'controller_checkin.dart';
 import 'controller_engine.dart';
 import 'controller_field.dart';
+import 'controller_firmware.dart';
+import 'controller_pairing.dart';
+import 'controller_radio.dart';
 import 'controller_mqtt.dart';
 import 'controller_positions.dart';
 import 'controller_store.dart';
 import 'field_tls.dart';
 import 'mqtt_broker.dart';
 import 'pod_modem.dart';
+import 'serial_modem.dart';
 
 /// Everything a phone controller needs to start; sendable to its isolate.
 final class ControllerBoot {
@@ -70,6 +83,7 @@ final class ControllerBoot {
     this.openAddress = '0.0.0.0',
     this.addresses,
     this.addressCheck = const Duration(seconds: 10),
+    this.firmwareKeys = const [],
   });
 
   /// The controller's folder in the app's private storage.
@@ -113,6 +127,10 @@ final class ControllerBoot {
   /// Fixed addresses instead of the phone's interfaces (tests).
   final List<String>? addresses;
   final Duration addressCheck;
+
+  /// The firmware release keys' public halves (standard base64, at most 8;
+  /// the Pi's `[firmware] release_keys`): none, no release is accepted.
+  final List<String> firmwareKeys;
 }
 
 /// The controller's own secrets, kept in `shell.json` beside its store.
@@ -220,7 +238,14 @@ class ControllerHost {
   late final HttpServer http;
   HttpServer? https;
   PodClient? _podClient;
-  PodModem? modem;
+  PodModem? _podModem;
+  SerialModem? _serialModem;
+
+  /// The radio: an I/O pod, or a USB radio modem ([radioKind]).
+  ControllerModem? modem;
+
+  /// "pod", "modem", or null without a radio link.
+  String? radioKind;
   Timer? _ticker;
   Timer? _watcher;
   var _addresses = <String>[];
@@ -257,8 +282,13 @@ class ControllerHost {
     );
     final pod = podTransport;
     if (boot.pod && pod != null) {
-      _podClient = PodClient(pod);
-      modem = PodModem(_podClient!);
+      radioKind = await probeRadioLink(pod);
+      if (radioKind == 'modem') {
+        modem = _serialModem = SerialModem(pod);
+      } else {
+        _podClient = PodClient(pod);
+        modem = _podModem = PodModem(_podClient!);
+      }
     }
     engine = ControllerEngine(
       // A phone on its battery (ADR-P2-8: power source 1).
@@ -283,6 +313,18 @@ class ControllerHost {
     // folder (decision PE24-75), and the radio channel.
     ControllerField(engine, dir: Directory('${dir.path}/field'));
     ControllerChannel(engine);
+    // Slice S7c, as the Pi's main.py: adoption and firmware updates always;
+    // the boxes over the radio and pairing with the field join key.
+    ControllerAdoption(engine);
+    ControllerFirmware(
+      engine,
+      firmwareDir(dir.path),
+      keys: validReleaseKeys(boot.firmwareKeys),
+    );
+    if (boot.joinKey.length == 32) {
+      ControllerBoxes(engine);
+      ControllerPairing(engine);
+    }
     api = ControllerApi(
       engine,
       gmToken: secrets.gmToken,
@@ -308,7 +350,8 @@ class ControllerHost {
     if (boot.open) await _bindHttps(boot.httpsPort);
     _applyLinks();
     engine.addListener(_onMessage);
-    await modem?.start();
+    await _podModem?.start();
+    await _serialModem?.start();
     _ticker = Timer.periodic(
       const Duration(milliseconds: 100),
       (_) => engine.tick(),
@@ -405,6 +448,8 @@ class ControllerHost {
       'read_token': secrets.readToken,
       'radio': engine.radioState,
       'pod': boot.pod,
+      'radio_kind': radioKind,
+      'field_frames': modem?.hasFieldFrames ?? false,
       'game': game,
       'stream_clients': api.hub.clientCount,
       'mqtt_clients': broker.clientCount,
@@ -425,7 +470,8 @@ class ControllerHost {
     await http.close(force: true);
     await https?.close(force: true);
     await broker.stop();
-    await modem?.close();
+    await _podModem?.close();
+    await _serialModem?.close();
     await _podClient?.close();
     engine.close();
   }

@@ -79,6 +79,10 @@
 /// opens it there, over HTTPS ([serveRequest] on the shell's own servers;
 /// PE24-7, PE24-62). The rest of the Pi's endpoints are later slices
 /// (PLAN.md, "PE24 slices").
+///
+/// Slice S7c (controller_boxes_api.dart): the free boxes and invites over
+/// the radio, adoption (field cards, pairing by code) and firmware updates,
+/// with the Pi's paths, tokens and answers.
 library;
 
 import 'dart:async';
@@ -97,6 +101,12 @@ import 'controller_positions.dart';
 import 'controller_props.dart';
 import 'controller_stream.dart';
 import 'console_files.dart';
+import 'controller_adoption.dart' show ControllerAdoption;
+import 'controller_boxes.dart' show ControllerBoxes;
+import 'controller_firmware.dart' show ControllerFirmware, reportMax, slotSize;
+import 'controller_pairing.dart' show ControllerPairing;
+
+part 'controller_boxes_api.dart';
 
 part 'controller_field_api.dart';
 
@@ -106,10 +116,11 @@ const controllerApiVersion = '0.2.0';
 /// The GM console's areas this controller serves, in /whoami's `features`
 /// (decision PE24-70): the console hides the tabs and panels of the rest.
 /// The Pi's api.py `FEATURES` has every area; this one leaves out presets
-/// and team presets, branding, boxes and invites, adoption, firmware,
-/// ATAK, scenarios, the schedule, mode packages and failover (PLAN.md,
-/// "PE24 slices"). An area served later is added here: slice S7a added
-/// the radio channel and the field plan (controller_field_api.dart).
+/// and team presets, branding, ATAK, scenarios, the schedule, mode
+/// packages and failover (PLAN.md, "PE24 slices"). An area served later is
+/// added here: slice S7a added the radio channel and the field plan
+/// (controller_field_api.dart), slice S7c boxes (free boxes, discover,
+/// invites), adoption and firmware (controller_boxes_api.dart).
 const controllerFeatures = [
   'checkin',
   'join',
@@ -117,6 +128,9 @@ const controllerFeatures = [
   'positions',
   'radio',
   'field',
+  'boxes',
+  'adoption',
+  'firmware',
 ];
 
 /// An answer: its status code, JSON body and extra headers.
@@ -171,6 +185,7 @@ final class _Request {
     this.client, [
     Uint8List? bytes,
     this.contentType,
+    this.headers = const {},
   ]) : bytes = bytes ?? Uint8List.fromList(utf8.encode(bodyText));
 
   final String method;
@@ -182,9 +197,13 @@ final class _Request {
   /// The caller's address (the check-in's rate limit).
   final String client;
 
-  /// The body's bytes and its Content-Type (an uploaded image, slice S7a).
+  /// The body's bytes and its Content-Type (an uploaded image, slice S7a;
+  /// a firmware image or a box's report, slice S7c).
   final Uint8List bytes;
   final String? contentType;
+
+  /// The request's headers, names in lower case (slice S7c).
+  final Map<String, String> headers;
 
   String pathText(int group) => Uri.decodeComponent(match.group(group)!);
 
@@ -275,6 +294,7 @@ class ControllerApi {
       ),
       ..._checkinRoutes(),
       ..._fieldRoutes(),
+      ..._boxesRoutes(),
     ];
     // Slice S7a: the field plan and the radio channel, on every controller
     // (the shell gives the field plan its folder first; else in memory).
@@ -438,8 +458,17 @@ class ControllerApi {
     String client = 'local',
     Uint8List? bytes,
     String? contentType,
-  }) async =>
-      _dispatch(method, uri, authorization, body, client, bytes, contentType);
+    Map<String, String> headers = const {},
+  }) async => _dispatch(
+    method,
+    uri,
+    authorization,
+    body,
+    client,
+    bytes,
+    contentType,
+    headers,
+  );
 
   FutureOr<ApiResponse> _dispatch(
     String method,
@@ -449,6 +478,7 @@ class ControllerApi {
     String client, [
     Uint8List? bytes,
     String? contentType,
+    Map<String, String> headers = const {},
   ]) {
     if (method == 'GET' || method == 'HEAD') {
       final file = _consoleAnswer(uri.path);
@@ -474,6 +504,7 @@ class ControllerApi {
         client,
         bytes,
         contentType,
+        headers,
       );
       try {
         final out = handler(request);
@@ -553,6 +584,10 @@ class ControllerApi {
         }
       }
       final bytes = chunks.takeBytes();
+      final headers = <String, String>{};
+      req.headers.forEach((name, values) {
+        if (values.isNotEmpty) headers[name.toLowerCase()] = values.first;
+      });
       final answer = await handleAsync(
         req.method,
         req.uri,
@@ -561,6 +596,7 @@ class ControllerApi {
         client: req.connectionInfo?.remoteAddress.address ?? '?',
         bytes: bytes,
         contentType: req.headers.value(HttpHeaders.contentTypeHeader),
+        headers: headers,
       );
       _write(res, answer, head: req.method == 'HEAD');
     } on _HttpError catch (e) {

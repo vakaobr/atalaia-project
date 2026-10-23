@@ -318,7 +318,7 @@ void main() {
           lessThan(640),
         );
         await guidelines();
-        // Down the whole screen, nothing overflows, every part meets them.
+        // Down the whole screen, nothing overflows.
         for (var i = 0; i < 12; i++) {
           await tester.drag(
             find.byType(Scrollable).first,
@@ -326,8 +326,14 @@ void main() {
           );
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
-          await guidelines();
         }
+        // Every part meets them, all of it on one tall screen: a text that a
+        // scroll leaves half under the app bar would be read on the bar's
+        // colours by the contrast check (slice S7c made the list longer).
+        tester.view.physicalSize = const Size(320, 4000);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await guidelines();
         await h.services.controller.stop();
         handle.dispose();
       },

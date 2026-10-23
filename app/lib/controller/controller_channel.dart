@@ -380,14 +380,9 @@ class ControllerChannel {
 
   bool get scanRunning => scan?.running ?? false;
 
-  String? _lockReason() {
-    final g = engine.liveGame;
-    if (g != null) {
-      return 'game ${g['id']} is live (${g['state']}); end it first';
-    }
-    if (scanRunning) return 'a channel scan is running';
-    return null;
-  }
+  /// The engine's (engine.py `_channel_lock_reason`): a live game or a
+  /// running scan; pairing asks the same (slice S7c).
+  String? _lockReason() => engine.channelLockReason();
 
   String? _scanUnavailable() {
     final m = engine.modem;
@@ -452,7 +447,10 @@ class ControllerChannel {
       ..setSetting('radio.channel_confirmed', '1')
       ..setSetting('radio.channel_set_at', '${engine.wallSeconds()}');
     final m = engine.modem;
-    if (m != null && m.isUp) m.setChannel(hz);
+    if (m != null && m.isUp) {
+      m.setChannel(hz);
+      engine.modemMoved("the field's channel changed");
+    }
     final out = settings();
     engine.emit({'type': 'radio', 'radio': out});
     return out;
@@ -481,6 +479,7 @@ class ControllerChannel {
       _onScan,
       wall: engine.wallSeconds,
     );
+    engine.modemMoved('a channel scan started');
     s.start();
     return s.public();
   }
@@ -505,6 +504,7 @@ class ControllerChannel {
       final m = engine.modem;
       if (m != null && m.isUp) {
         m.setChannel(engine.fieldChannel); // back on the field's channel
+        engine.modemMoved('a channel scan ended');
       }
     }
     engine.emit({'type': 'radio_scan', 'scan': state});

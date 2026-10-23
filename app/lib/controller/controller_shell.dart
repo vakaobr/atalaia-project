@@ -73,12 +73,16 @@ final class ControllerStart {
     this.limitTemplate = 'portugal',
     this.pod,
     this.podName,
+    this.firmwareKeys = const [],
   });
 
   final Uint8List joinKey;
   final bool open;
   final String fieldId;
   final String limitTemplate;
+
+  /// The firmware release keys (the app's settings; slice S7c).
+  final List<String> firmwareKeys;
 
   /// The I/O pod's link, opened already (null: no radio).
   final PodTransport? pod;
@@ -89,6 +93,17 @@ final class ControllerStart {
     open: open,
     fieldId: fieldId,
     limitTemplate: limitTemplate,
+    firmwareKeys: firmwareKeys,
+  );
+
+  ControllerStart withFirmwareKeys(List<String> keys) => ControllerStart(
+    joinKey: joinKey,
+    open: open,
+    fieldId: fieldId,
+    limitTemplate: limitTemplate,
+    pod: pod,
+    podName: podName,
+    firmwareKeys: keys,
   );
 
   ControllerStart withOpen(bool open) => ControllerStart(
@@ -98,6 +113,7 @@ final class ControllerStart {
     limitTemplate: limitTemplate,
     pod: pod,
     podName: podName,
+    firmwareKeys: firmwareKeys,
   );
 }
 
@@ -172,6 +188,7 @@ class ControllerShell extends ChangeNotifier {
         open: how.open,
         pod: how.pod != null,
         fieldId: how.fieldId,
+        firmwareKeys: how.firmwareKeys,
       );
       final run = _run = await _launch(boot, pod: how.pod);
       _sub = run.changes.listen((_) => _changed());

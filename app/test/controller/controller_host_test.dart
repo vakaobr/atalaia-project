@@ -361,4 +361,27 @@ void main() {
     await link.close();
     expect(await waitFor(() => h.status()['radio'] == 'down'), isTrue);
   });
+
+  test(
+    'a USB radio modem as the radio, through the relay (slice S7c)',
+    () async {
+      final hub = await AirHub.start();
+      addTearDown(hub.close);
+      final modem = await HostModem.start(airPeer: hub.port);
+      addTearDown(modem.stop);
+      hub.members.add(modem.airPort);
+      final link = await SocketPodTransport.modem(modem);
+      late RelayPodTransport relay;
+      relay = RelayPodTransport('relay', (b) => unawaited(link.send(b)));
+      link.incoming.listen(relay.receive, onDone: () => relay.linkClosed());
+      final h = await start(boot(pod: true), pod: relay);
+      expect(await waitFor(() => h.status()['radio'] == 'up'), isTrue);
+      expect(h.status()['radio_kind'], 'modem');
+      expect(h.status()['field_frames'], isTrue);
+      expect(h.engine.boxes, isNotNull);
+      expect(h.engine.pairing, isNotNull);
+      expect(h.engine.adoption, isNotNull);
+      expect(h.engine.firmware, isNotNull);
+    },
+  );
 }

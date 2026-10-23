@@ -39,12 +39,19 @@ class ScriptedPod implements PodTransport {
   void frame(int type, List<int> payload) =>
       _in.add(encodeFrame(type, payload));
 
-  void ident({bool radio = true}) => frame(
-    FrameType.ident,
-    encodeIdent(
-      PodIdent(fwVersion: 'test', capabilities: const [], hasRadio: radio),
-    ),
-  );
+  void ident({bool radio = true, bool field = false, bool pair = false}) =>
+      frame(
+        FrameType.ident,
+        encodeIdent(
+          PodIdent(
+            fwVersion: 'test',
+            capabilities: const [],
+            hasRadio: radio,
+            fieldFrames: field,
+            pairFrames: pair,
+          ),
+        ),
+      );
 
   /// The RADIO_CMD frames sent, as (opcode, rest).
   List<(int, List<int>)> get commands => [
@@ -200,4 +207,50 @@ void main() {
     final tx = link.sent.lastWhere((f) => f.type == FrameType.radioTx);
     expect(tx.payload, [...h.encode(), 1, 2, 3]);
   });
+
+  // Slice S7c, decision PE24-91: the field and pair frames a pod would
+  // relay as RADIO_FIELD_TX, RADIO_FIELD_RX and RADIO_FIELD_ACK (the
+  // modem's FIELD_* plus 3), only when its IDENT says so; today's pod
+  // firmware does not, and then nothing goes.
+  test(
+    'field frames only with a pod whose IDENT says it relays them',
+    () async {
+      link.ident();
+      await settle();
+      link.pong();
+      await settle();
+      expect(modem.isUp, isTrue);
+      expect([modem.hasFieldFrames, modem.hasPairFrames], [false, false]);
+      expect(modem.sendField(Uint8List(40)), isNull);
+      expect(link.sent.where((f) => f.type == FrameType.radioFieldTx), isEmpty);
+
+      link.ident(field: true, pair: true);
+      await settle();
+      link.pong();
+      await settle();
+      expect([modem.hasFieldFrames, modem.hasPairFrames], [true, true]);
+      expect(modem.ident, containsPair('field', true));
+      final heard = <(List<int>, int, int)>[];
+      final acks = <(int, String)>[];
+      modem
+        ..onFieldRx = ((f, rssi, snr) => heard.add((f, rssi, snr)))
+        ..onFieldAck = ((id, st) => acks.add((id, st)));
+      final frame = Uint8List.fromList(List.generate(40, (i) => i));
+      expect(modem.sendField(frame), 1);
+      expect(modem.sendField(frame), 2);
+      await settle();
+      final tx = link.sent
+          .where((f) => f.type == FrameType.radioFieldTx)
+          .toList();
+      expect(tx.first.payload, [0, 1, ...frame]);
+      expect(tx.last.payload.sublist(0, 2), [0, 2]);
+      link
+        ..frame(FrameType.radioFieldRx, [...frame, 0xc0, 0xfb])
+        ..frame(FrameType.radioFieldAck, [0, 2, 1]);
+      await settle();
+      expect(heard.single.$1, frame);
+      expect([heard.single.$2, heard.single.$3], [-64, -5]);
+      expect(acks, [(2, 'duty_cycle')]);
+    },
+  );
 }

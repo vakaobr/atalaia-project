@@ -42,16 +42,26 @@ String boxHostPath() => _program('ATALAIA_BOX_HOST');
 /// It shares the hub's air; its NVS and flash are files in [stateDir], so
 /// [kill] then [boot] again is a battery pull.
 class HostBox {
-  HostBox._(this.hub, this.stateDir, this.joinKey, this.name, this.stateMs);
+  HostBox._(
+    this.hub,
+    this.stateDir,
+    this.joinKey,
+    this.name,
+    this.stateMs,
+    this.args,
+  );
 
+  /// [joinKey] empty: an unadopted box (no `--join-key`); [args]: more of
+  /// box_host's options (`--announce-ms`, `--pair`, `--as-box`...).
   static Future<HostBox> start(
     AirHub hub,
     String stateDir,
     List<int> joinKey, {
     String name = 'box',
     int stateMs = 500,
+    List<String> args = const [],
   }) async {
-    final b = HostBox._(hub, stateDir, joinKey, name, stateMs);
+    final b = HostBox._(hub, stateDir, joinKey, name, stateMs, args);
     await b.boot();
     return b;
   }
@@ -61,6 +71,7 @@ class HostBox {
   final List<int> joinKey;
   final String name;
   final int stateMs;
+  final List<String> args;
   Process? _process;
   _Lines? _out;
   var airPort = 0;
@@ -76,12 +87,15 @@ class HostBox {
       '../modes',
       '--air-peer',
       '${hub.port}',
-      '--join-key',
-      [for (final b in joinKey) b.toRadixString(16).padLeft(2, '0')].join(),
+      if (joinKey.isNotEmpty) ...[
+        '--join-key',
+        [for (final b in joinKey) b.toRadixString(16).padLeft(2, '0')].join(),
+      ],
       '--state-ms',
       '$stateMs',
       '--name',
       name,
+      ...args,
     ]);
     final out = _Lines(p);
     final ready = await out.wait('READY ');
@@ -246,6 +260,13 @@ class SocketPodTransport implements PodTransport {
   static Future<SocketPodTransport> usb(HostPod pod) async =>
       SocketPodTransport._(
         await Socket.connect(InternetAddress.loopbackIPv4, pod.usbPort),
+      );
+
+  /// The host modem's serial link, as the phone's USB-OTG link to a USB
+  /// radio modem would carry it (serial_modem.dart; slice S7c).
+  static Future<SocketPodTransport> modem(HostModem modem) async =>
+      SocketPodTransport._(
+        await Socket.connect(InternetAddress.loopbackIPv4, modem.serialPort),
       );
 
   final Socket _socket;

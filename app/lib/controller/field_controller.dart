@@ -43,6 +43,9 @@ const cmdOpcodes = {
   'mode': 8,
 };
 
+/// CMD update's opcode (firmware updates, slice S7c).
+const cmdUpdate = 9;
+
 const broadcastNode = 0xffff;
 
 /// A box's C decoder turns CMD params into JSON in a 128-byte buffer.
@@ -349,6 +352,12 @@ class FieldController {
       RfPrio.critical,
     );
   }
+
+  /// CMD update (opcode 9, RFC 0001 Amendment 6) to [dest]: the GM's alone
+  /// (controller_firmware.dart), never a mode's field.lua, so not in
+  /// [cmdOpcodes].
+  int? sendUpdateCmd(Map<String, Object?> params, {required int dest}) =>
+      _sendCmd(cmdUpdate, params, dest);
 
   // --- receiving ------------------------------------------------------------
 

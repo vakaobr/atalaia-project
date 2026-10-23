@@ -151,6 +151,26 @@ class RecordingModem extends ControllerModem {
     return true;
   }
 
+  // --- field and pair frames (slice S7c), as the Pi's FakeModem: kept
+  // apart from [log], so the shared cases' `tx` steps see only packets and
+  // commands; `field_tx` steps read [fields].
+
+  /// The field and pair frames sent (FIELD_TX), in order.
+  final fields = <Uint8List>[];
+
+  @override
+  bool get hasFieldFrames => true;
+
+  @override
+  bool get hasPairFrames => true;
+
+  @override
+  int? sendField(Uint8List frame) {
+    if (!isUp) return null;
+    fields.add(frame);
+    return fields.length;
+  }
+
   /// The noise per channel: (90th percentile in dBm, CAD detections of 10);
   /// -118 dBm and none when not given (the Pi's FakeModem).
   final noise = <int, (int, int)>{};

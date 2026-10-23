@@ -22,6 +22,12 @@
 // JSON ('content_type', 'body_base64') and the noise scan's steps ('noise',
 // 'hold_measure', 'scan_wait') on the recording modem; every controller has
 // its field plan's files in the case's folder, so a restart keeps them.
+// Slice S7c: field cards and firmware updates are set up on every
+// controller, the boxes over the radio and pairing with the case's join
+// key, as the Pi runner does; field_rx, pair_rx, field_tx, field_ack,
+// pair_box and pair_box_done steps play the boxes' side of the field and
+// pair frames, and requests may send raw bytes signed with a key (a box's
+// firmware report).
 
 import 'dart:async';
 import 'dart:collection';
@@ -29,10 +35,14 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:atalaia_app/controller/controller_adoption.dart';
 import 'package:atalaia_app/controller/controller_api.dart';
+import 'package:atalaia_app/controller/controller_boxes.dart';
 import 'package:atalaia_app/controller/controller_checkin.dart';
 import 'package:atalaia_app/controller/controller_engine.dart';
 import 'package:atalaia_app/controller/controller_field.dart';
+import 'package:atalaia_app/controller/controller_firmware.dart';
+import 'package:atalaia_app/controller/controller_pairing.dart';
 import 'package:atalaia_app/controller/controller_positions.dart';
 import 'package:atalaia_app/controller/controller_mqtt.dart';
 import 'package:atalaia_app/controller/prop_link.dart' show propLinkProof;
@@ -40,8 +50,12 @@ import 'package:atalaia_app/controller/controller_store.dart';
 import 'package:atalaia_app/controller/mqtt_broker.dart';
 import 'package:atalaia_app/core/node_types.dart';
 import 'package:atalaia_app/ffi/bindings.dart';
+import 'package:atalaia_app/protocol/field_frame.dart';
 import 'package:atalaia_app/protocol/join_payload.dart';
+import 'package:atalaia_app/protocol/pair_frame.dart';
 import 'package:atalaia_app/radio/rf_codec.dart';
+import 'package:atalaia_app/security/cpace.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/core_libs.dart';
@@ -148,6 +162,23 @@ Map<String, Object?> joinJson(JoinPayload j) => {
   'lang': j.lang,
 };
 
+/// A decoded frame's fields as the cases see them: bytes in hex.
+Map<String, Object?> plainMessage(Map<String, Object?> m) => {
+  for (final e in m.entries)
+    e.key: e.value is List<int> ? _hex(e.value! as List<int>) : e.value,
+};
+
+/// A frame the controller sent, decoded with the case's join key.
+Map<String, Object?> fieldJson(Uint8List frame, Uint8List joinKey) {
+  if (isPairFrame(frame)) {
+    return {'type': 'pair', ...plainMessage(decodePairFrame(frame))};
+  }
+  return {
+    'type': 'field',
+    ...plainMessage(decodeFieldFrame(fieldKey(joinKey), frame)),
+  };
+}
+
 Object? dig(Object? value, String path) {
   for (final part in path.split('.')) {
     value = value is List ? value[int.parse(part)] : (value! as Map)[part];
@@ -222,6 +253,9 @@ void main() {
           transports: h['transports']! as int,
           batteryPct: h['battery_pct'] as int?,
           epoch: h['epoch']! as int,
+          deviceId: h['device_id'] == null
+              ? null
+              : _unhex(h['device_id']! as String),
         ).encode();
       case 'STATE':
         final s = (rx['state']! as Map).cast<String, Object?>();
@@ -271,6 +305,13 @@ void main() {
       );
       final radio = RecordingModem();
       final joinKey = _unhex((c['join_key'] as String?) ?? '');
+      final firmwareKeys = ((c['firmware_keys'] as List?) ?? const [])
+          .cast<String>();
+      // Slice S7c: the boxes' side of the field and pair frames.
+      var fieldSeen = 0;
+      Uint8List? lastField;
+      final senders = <String, FieldNonceSource>{};
+      PairKeys? pairKeys;
       final published = <Map<String, Object?>>[];
       late ControllerEngine engine;
       late ControllerApi api;
@@ -302,6 +343,18 @@ void main() {
         );
         ControllerPositions(engine);
         ControllerField(engine, dir: Directory('${dir.path}/field'));
+        // Slice S7c, as the Pi runner sets them up.
+        ControllerAdoption(engine);
+        ControllerFirmware(engine, '${dir.path}/firmware', keys: firmwareKeys);
+        if (joinKey.length == 32) {
+          ControllerBoxes(engine);
+          ControllerPairing(engine);
+        }
+        if (c['https'] == true) {
+          engine
+            ..caSha256 = Uint8List.fromList(List.generate(32, (i) => i))
+            ..linkUrls = ['https://192.0.2.10:8443'];
+        }
         api = ControllerApi(
           engine,
           gmToken: tokens['gm']!,
@@ -595,6 +648,161 @@ void main() {
             check(step['tx'], got, 'step $i: the radio');
             continue;
           }
+          if (step.containsKey('field_rx')) {
+            final spec = (substitute(step['field_rx'], saved)! as Map)
+                .cast<String, Object?>();
+            final Uint8List frame;
+            if (spec['replay'] == true) {
+              frame = lastField!;
+            } else {
+              final msg = {
+                for (final e in spec.entries)
+                  e.key:
+                      const [
+                        'device_id',
+                        'token',
+                        'key_tag',
+                        'chunk',
+                      ].contains(e.key)
+                      ? _unhex(e.value! as String)
+                      : e.value,
+              };
+              final sender = (msg['device_id'] as Uint8List?) ?? Uint8List(8);
+              final nonces = senders.putIfAbsent(
+                _hex(sender),
+                () => FieldNonceSource(joinKey, sender),
+              );
+              frame = encodeFieldFrame(fieldKey(joinKey), msg, nonces.next());
+            }
+            lastField = frame;
+            radio.onFieldRx?.call(frame, -61, 7);
+            continue;
+          }
+          if (step.containsKey('pair_rx')) {
+            final spec = (substitute(step['pair_rx'], saved)! as Map)
+                .cast<String, Object?>();
+            final msg = {
+              for (final e in spec.entries)
+                e.key:
+                    const [
+                      'pair_id',
+                      'sid',
+                      'point',
+                      'tag',
+                      'fingerprint',
+                    ].contains(e.key)
+                    ? _unhex(e.value! as String)
+                    : e.value,
+            };
+            radio.onFieldRx?.call(encodePairFrame(msg), -62, 6);
+            continue;
+          }
+          if (step.containsKey('field_ack')) {
+            final a = (step['field_ack'] as Map).cast<String, Object?>();
+            radio.onFieldAck?.call(a['id']! as int, a['status']! as String);
+            continue;
+          }
+          if (step.containsKey('field_tx')) {
+            var got = [
+              for (final f in radio.fields.skip(fieldSeen))
+                fieldJson(f, joinKey),
+            ];
+            fieldSeen = radio.fields.length;
+            final kinds = (step['kinds'] as List?)?.cast<String>();
+            if (kinds != null) {
+              got = [
+                for (final g in got)
+                  if (kinds.contains(g['kind'])) g,
+              ];
+            }
+            check(step['field_tx'], got, 'step $i: the field frames');
+            for (final e
+                in ((step['save'] as Map?) ?? const {})
+                    .cast<String, String>()
+                    .entries) {
+              saved[e.key] = dig(got, e.value);
+            }
+            continue;
+          }
+          if (step.containsKey('pair_box') ||
+              step.containsKey('pair_box_done')) {
+            Map<String, Object?> last(String kind) {
+              for (final f in radio.fields.reversed) {
+                if (!isPairFrame(f)) continue;
+                final m = decodePairFrame(f);
+                if (m['kind'] == kind) return m;
+              }
+              fail('step $i: the controller sent no ${kind.toUpperCase()}');
+            }
+
+            if (step.containsKey('pair_box')) {
+              // An unadopted box answers the last START with its own code.
+              final spec = (step['pair_box'] as Map).cast<String, Object?>();
+              final start = last('start');
+              final pid = start['pair_id']! as Uint8List;
+              final sid = start['sid']! as Uint8List;
+              final ya = start['point']! as Uint8List;
+              final ybSecret = _unhex((spec['yb'] as String?) ?? '6b' * 32);
+              final yb = x25519(
+                ybSecret,
+                pairGenerator(spec['code']! as String, pid, sid),
+              );
+              final k = x25519Verified(ybSecret, ya);
+              final keys = PairKeys(pairIsk(sid, k, ya, yb), sid);
+              pairKeys = keys;
+              radio.onFieldRx?.call(
+                encodePairFrame({
+                  'kind': 'reply',
+                  'pair_id': pid,
+                  'sid': sid,
+                  'point': yb,
+                  'tag': keys.tagReply,
+                }),
+                -62,
+                6,
+              );
+            } else {
+              // The box checks KEY, opens the key and answers DONE.
+              final spec = (step['pair_box_done'] as Map)
+                  .cast<String, Object?>();
+              final keys = pairKeys!;
+              final key = last('key');
+              expect(
+                _hex(key['tag']! as Uint8List),
+                _hex(keys.tagKey),
+                reason: "step $i: KEY's confirmation",
+              );
+              final (join, name) = openPairKey(
+                keys,
+                key['nonce']! as Uint8List,
+                key['pair_id']! as Uint8List,
+                key['sid']! as Uint8List,
+                key['sealed']! as Uint8List,
+              );
+              check(
+                spec['opened'] ?? const <String, Object?>{},
+                {'join_key': _hex(join), 'field_name': name},
+                'step $i: the sealed key',
+              );
+              final result = (spec['result'] as String?) ?? 'adopted';
+              final fp = spec['fingerprint'] != null
+                  ? _unhex(spec['fingerprint']! as String)
+                  : fieldFingerprintBytes(join);
+              radio.onFieldRx?.call(
+                encodePairFrame({
+                  'kind': 'done',
+                  'pair_id': key['pair_id'],
+                  'sid': key['sid'],
+                  'result': result,
+                  'fingerprint': fp,
+                  'tag': keys.tagDone(result, fp),
+                }),
+                -62,
+                6,
+              );
+            }
+            continue;
+          }
           if (step.containsKey('radio_state')) {
             radio.setState(step['radio_state'] as String);
             continue;
@@ -634,6 +842,31 @@ void main() {
             request.add(data);
             if (size > data.length) request.add(Uint8List(size - data.length));
           }
+          // Slice S7c: raw bytes (hex or text), signed with 'mac_key'.
+          final rawBody = req.containsKey('body_hex')
+              ? _unhex(req['body_hex']! as String)
+              : req.containsKey('body_text')
+              ? Uint8List.fromList(utf8.encode(req['body_text']! as String))
+              : null;
+          if (rawBody != null) {
+            request.headers.contentType = ContentType.binary;
+            if (req.containsKey('mac_key')) {
+              request.headers.set(
+                'X-Atalaia-Mac',
+                Hmac(
+                  sha256,
+                  _unhex(req['mac_key']! as String),
+                ).convert(rawBody).toString(),
+              );
+            }
+            request.add(rawBody);
+          }
+          for (final e
+              in ((req['headers'] as Map?) ?? const {})
+                  .cast<String, String>()
+                  .entries) {
+            request.headers.set(e.key, e.value);
+          }
           final response = await request.close();
           final bytes = await response.fold<BytesBuilder>(
             BytesBuilder(),
@@ -658,6 +891,18 @@ void main() {
               base64.decode(step['body_base64'] as String),
               reason: where,
             );
+          }
+          if (step.containsKey('text')) {
+            expect(text, substitute(step['text'], saved), reason: where);
+            continue;
+          }
+          if (step.containsKey('bytes_sha256')) {
+            expect(
+              sha256.convert(data).toString(),
+              step['bytes_sha256'],
+              reason: where,
+            );
+            continue;
           }
           final body = ctype == 'application/json' ? jsonDecode(text) : null;
           if (step.containsKey('json')) check(step['json'], body, where);

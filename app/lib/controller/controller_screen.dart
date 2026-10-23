@@ -28,6 +28,7 @@ import '../security/bytes.dart';
 import '../ui/qr_painter.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import 'controller_boxes_screen.dart';
 import 'controller_shell.dart';
 
 class ControllerScreen extends StatefulWidget {
@@ -96,6 +97,7 @@ class _ControllerScreenState extends State<ControllerScreen> {
         limitTemplate: app.settings.limitTemplate,
         pod: _pod,
         podName: _podName,
+        firmwareKeys: app.settings.firmwareKeys,
       ),
       strings,
     );
@@ -115,6 +117,14 @@ class _ControllerScreenState extends State<ControllerScreen> {
         _pod = null;
         _podName = null;
       });
+    }
+  }
+
+  /// New release keys: a running controller restarts to take them.
+  Future<void> _firmwareKeysChanged(List<String> keys) async {
+    final last = _shell.lastStart;
+    if (_shell.running && last != null) {
+      await _shell.restart(last.withFirmwareKeys(keys));
     }
   }
 
@@ -240,6 +250,19 @@ class _ControllerScreenState extends State<ControllerScreen> {
             ],
             SectionTitle(s.t('ctl.console')),
             ..._console(context, s),
+            // Slice S7c: the field card, written by this phone's NFC, and
+            // the firmware release keys.
+            if (_shell.running && _shell.status?.httpPort != null) ...[
+              SectionTitle(s.t('ctl.card')),
+              FieldCardTile(
+                makeCard: () => requestFieldCard(
+                  _shell.status!.httpPort!,
+                  _shell.status!.gmToken,
+                ),
+              ),
+            ],
+            SectionTitle(s.t('ctl.firmware')),
+            FirmwareKeysTile(onChanged: _firmwareKeysChanged),
           ],
         ),
       ),

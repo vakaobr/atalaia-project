@@ -5,9 +5,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Phase 3 -- Android and Players: Status
 
-**Current phase:** Implementation: plan phases A-D and F done in software; plan phase E done in software, with the Android controller role in slices (PE24: S1, the game engine and REST API, S2, the live stream and MQTT, S3, keeping games across a restart, S4, the pod as its radio, joins and Wi-Fi props, S5, check-in, player tokens, positions and the chrono list, and S6, the shell and its screen, done 2026-10-22, in software; S7a, the field plan and the radio channel, pulled forward and done 2026-10-23, in software; the rest of S7 after the field test); plan phase G (integration and field test) pending, it needs the hardware
+**Current phase:** Implementation: plan phases A-D and F done in software; plan phase E done in software, with the Android controller role in slices (PE24: S1, the game engine and REST API, S2, the live stream and MQTT, S3, keeping games across a restart, S4, the pod as its radio, joins and Wi-Fi props, S5, check-in, player tokens, positions and the chrono list, and S6, the shell and its screen, done 2026-10-22, in software; S7a, the field plan and the radio channel, and S7c, boxes over the radio (re-invites, GAME_OVER, adoption, pairing, firmware updates), pulled forward and done 2026-10-23, in software; the rest of S7 after the field test); plan phase G (integration and field test) pending, it needs the hardware
 **Risk level:** Medium
-**Last verified:** 2026-10-23 (PE24 slice S7a)
+**Last verified:** 2026-10-23 (PE24 slices S7a and S7c)
 
 ## Completed
 
@@ -190,7 +190,7 @@ tools/docker_app.py` (Dart, NDK, APK) and `app\tool\emulator_tests.ps1`
 | Prop on Wi-Fi (PD12) | `protocol/prop-link.md`, `controller/atalaia_controller/prop_link.py`, `app/lib/controller/prop_link.dart`, `prop_session.dart`; join keys 13 and 14 (RFC 0001 Amendment 4, proposed) | Done: HELLO, STATE, events with ACK and resend, commands and TIME, `node.tamper` |
 | Positions (ADR-P3-6) | `controller/atalaia_controller/positions.py`, `POST`/`GET /api/v1/positions`; `app/lib/position/position_reporter.dart`, `app/lib/platform/location.dart`, `LocationPlugin.kt`, the foreground service's location type | Done for GPS; BLE beacons not built. Since 2026-10-22 the out-of-bounds warning on the player's phone (`app/lib/position/field_bounds.dart`, decisions MF-31 to MF-40): the phone's own fixes against the field boundary, with a margin, the fix's accuracy and a dwell; a banner, vibration and the notification; nothing sent |
 | Teams and squads (maintainer) | games' `squads` (0 = none), squad pickers and the squad-leader role only where a game has squads (PE25) | Done in the controller, the console and the app |
-| Android controller role (ADR-P3-12) | `app/lib/controller/mqtt_broker.dart`, `visibility_engine.dart`; since 2026-10-22 `field_controller.dart`, `controller_engine.dart`, `controller_store.dart`, `controller_api.dart`, `controller_stream.dart`, `controller_mqtt.dart` | **Partly**: the broker and the visibility engine are built and tested; slices S1 and S2 of PE24 (2026-10-22, below): the game engine with `field.lua` on the core, the REST API for games, scores, the log and nodes, the live stream and the MQTT topics with the Pi's ACL; slice S3 (2026-10-22): games kept in files across a restart; slice S4 (2026-10-22): an I/O pod as its radio, joins, Android props on Wi-Fi; slice S5 (2026-10-22, `controller_checkin.dart`, `controller_positions.dart`): field check-in, player tokens, the chrono list and positions; slice S6 (2026-10-22, `controller_screen.dart`, `controller_shell.dart`, `controller_isolate.dart`, `controller_host.dart`, `field_tls.dart`): the role on the home screen, its own isolate under the foreground service, the GM console from the APK, HTTPS with a field CA made on the phone, the field's Wi-Fi; slice S7a (2026-10-23, `controller_field.dart`, `controller_field_api.dart`, `controller_channel.dart`): the field plan and the radio channel with its scan; not yet on a phone; the rest of S7 after the field test |
+| Android controller role (ADR-P3-12) | `app/lib/controller/mqtt_broker.dart`, `visibility_engine.dart`; since 2026-10-22 `field_controller.dart`, `controller_engine.dart`, `controller_store.dart`, `controller_api.dart`, `controller_stream.dart`, `controller_mqtt.dart` | **Partly**: the broker and the visibility engine are built and tested; slices S1 and S2 of PE24 (2026-10-22, below): the game engine with `field.lua` on the core, the REST API for games, scores, the log and nodes, the live stream and the MQTT topics with the Pi's ACL; slice S3 (2026-10-22): games kept in files across a restart; slice S4 (2026-10-22): an I/O pod as its radio, joins, Android props on Wi-Fi; slice S5 (2026-10-22, `controller_checkin.dart`, `controller_positions.dart`): field check-in, player tokens, the chrono list and positions; slice S6 (2026-10-22, `controller_screen.dart`, `controller_shell.dart`, `controller_isolate.dart`, `controller_host.dart`, `field_tls.dart`): the role on the home screen, its own isolate under the foreground service, the GM console from the APK, HTTPS with a field CA made on the phone, the field's Wi-Fi; slice S7a (2026-10-23, `controller_field.dart`, `controller_field_api.dart`, `controller_channel.dart`): the field plan and the radio channel with its scan; slice S7c (2026-10-23, `controller_boxes.dart`, `controller_pairing.dart`, `controller_adoption.dart`, `controller_firmware.dart`, `serial_modem.dart`): boxes over the radio, GAME_OVER, adoption by field card and pairing code, firmware updates; not yet on a phone; the rest of S7 after the field test |
 
 Tests: controller 201 (60 new: check-in, chrono list with the shared
 vectors, poster vectors, positions, prop link, TLS); console browser tests
@@ -388,10 +388,51 @@ and the console's browser test of a phone controller changed for the new
 areas. The Pi's code is unchanged; its contract runner gained the new
 steps.
 
+
+### Slice S7c: boxes over the radio (2026-10-23)
+
+Pulled forward from S7 before the field test with the maintainer's approval
+(2026-10-23). Decisions PE24-90 to PE24-99. Built and tested in software on
+one machine: the phone controller against the Pi's own USB radio modem and
+Field Boxes running their firmware's own code (the host modem and host boxes
+on a UDP air), and against the host pod; not on a phone, a modem or a pod.
+
+| Deliverable | Where | State |
+| --- | --- | --- |
+| Free boxes, DISCOVER, sealed radio invites, answers | `app/lib/controller/controller_boxes.dart` (`FieldInviter`, `ControllerBoxes`), `controller_boxes_api.dart`; `lib/protocol/field_frame.dart`, `lib/security/aes_ccm.dart` | Done, as `reinvite.py` and lobby.py's `Inviter`: the boxes heard for two hours with each box's newest nonce (a replay refused), a DISCOVER at most every 10 s, invites into the live game before it starts with the join payload made as for a card, cut into one to three parts paced by their time on air (150 ms between parts, BN-2), sent again after 6 s, three times at most; the box's answer (accepted, refused with its reason) and its HELLO (joined); the previous game's boxes; `GET /api/v1/boxes`, `POST /api/v1/boxes/discover`, `GET/POST /api/v1/games/{id}/invites` (PE24-90) |
+| GAME_OVER | `controller_engine.dart` (`endGame`), `controller_boxes.dart` | Done: three times 4 s apart after every game the phone ran ends, by its key's tag (kept beside the game), also after a restart without the key; the radio tuned to the game's channel and back; `game_over_frame` `sent`, `no_radio`, `no_join_key`, `no_tag` |
+| The start guard | `controller_engine.dart` (`startGuards`), `controller_firmware.dart` | Done: the start check (missing roles, *Start anyway* with `force`) as since S1; an update on its way to a box blocks the start, `force` or not, until it ends or the GM cancels |
+| Adoption: the field card | `controller_adoption.dart`, `controller_boxes_screen.dart` (`FieldCardTile`), `controller_screen.dart`; `lib/protocol/field_card.dart` | Done: `GET /api/v1/adopt`, `POST /api/v1/adopt/card` (never cached) and the records as the Pi's; the screen's *Cartão de campo* writes the card with the phone's NFC after the master-secret warning (PE24-93); USB adoption not offered (`usb: false`, 503, PE24-95) |
+| Adoption: pairing by code | `controller_pairing.dart`; `lib/protocol/pair_frame.dart`, `lib/security/cpace.dart` | Done, as `pairing.py`: offers, one run at a time, CPace (X25519 on `BigInt`, Elligator 2, SHA-512), the join key and the field's name sealed in KEY, DONE checked with the fingerprint; the pairing channel for five minutes (`GET /api/v1/adopt/pair`, `POST .../listen`, `POST .../pair`; PE24-94) |
+| Firmware updates | `controller_firmware.dart`, `controller_boxes_api.dart`, `controller_boxes_screen.dart` (`FirmwareKeysTile`), `app_store.dart`; `lib/protocol/firmware_release.dart` | Done, as `firmware_updates.py`: signed releases checked with the release keys set on the controller's screen (the app's settings) and kept in the controller's folder, CMD update over the radio only before a game starts, the release and image served without a token over the phone's HTTPS (the S6 field CA), the box's report, HELLO, `node.update_failed`, the timeout, cancel (PE24-96) |
+| The radio | `controller_radio.dart` (field frames on `ControllerModem`), `serial_modem.dart`, `pod_modem.dart`, `controller_host.dart` | Done: the Pi's USB radio modem as the phone's radio (field and pair frames), told from a pod by its answer (PE24-92); the pod's side ready for RADIO_FIELD_* once its firmware relays them (PE24-91, a firmware follow-up) |
+| What the console sees | `controller_api.dart` (`controllerFeatures`) | Done: `boxes`, `adoption` and `firmware` added to `whoami` (PE24-97) |
+
+Tests: 10 new shared contract cases (45 in all; passing on both
+controllers) with the new field and pair frame steps (PE24-98); 18 codec
+tests (`test/protocol/field_frame_test.dart`: field frames, pair frames and
+CPace, field cards, firmware releases against the shared vectors); 6
+end-to-end tests (`boxes_e2e_test.dart`: a box that played a game invited
+into the next one, GAME_OVER ending a key-lost game on the box, an
+unadopted box paired by its code after a wrong one, a firmware offer
+reaching the box and its own checks passing, a failed update coming back
+over LoRa, the host pod saying it relays no field frames); 1 in
+`pod_modem_test.dart`, 1 in `controller_host_test.dart` (a USB radio modem
+through the relay), 7 in `boxes_screen_test.dart` (the field card in every
+language at 320 px, a failed write, the release keys); the screen's
+accessibility test now checks the whole screen on one tall view (a scroll
+left a strip of a button under the app bar, which the contrast check read).
+The Pi's contract runner sets up adoption and firmware updates as
+`main.build` does; the Pi's code is otherwise unchanged.
+
 Remaining: **S7** after the field test: failover, presets, mode uploads,
-scenarios, role packages, branding, re-invites, adoption,
-pairing, firmware updates, the site sync, ATAK, the remote GM, each added to
-`controllerFeatures` as it is ported.
+scenarios, role packages, branding, the site sync, ATAK,
+the remote GM, each added to `controllerFeatures` as it is ported; the pod
+firmware's relay of field frames (PE24-91).
+For the maintainer (S7c): PE24-91 (the pod's relay, a protocol and
+firmware follow-up), PE24-92 (a USB radio modem on the phone), PE24-93 (the
+field card written by the phone's NFC) and PE24-96 (firmware updates from a
+phone, the release keys in the app).
 For the maintainer: PE24-2 (a phone as the only controller, not a standby),
 PE24-3 (not on plan phase G's gate), PE24-8 (the GM console's files in the
 app), PE24-11, PE24-12, PE24-42, PE24-44, PE24-52 and PE24-60 (players'
@@ -600,8 +641,9 @@ Phase G needs hardware.
 2. ~~Architecture~~ -- Complete
 3. ~~Planning~~ -- Complete
 4. Implementation -- plan phases A-F done in software (E with the
-   Android controller role's slices S1 to S6, PE24, done 2026-10-22; its
-   slice S7 comes after the field test), the Medic Kit and branding; next: plan phase G (the field
+   Android controller role's slices S1 to S6, PE24, done 2026-10-22, and
+   S7c, boxes over the radio, done 2026-10-23; the rest of slice S7 comes
+   after the field test), the Medic Kit and branding; next: plan phase G (the field
    test: the boards, the pods and real phones, with the Pi controller), with
    the phone controller's bench test (a phone, a pod, a box and a prop;
    PE24-3, PE24-69), then slice S7 as fields ask

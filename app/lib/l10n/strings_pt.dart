@@ -837,6 +837,36 @@ const Map<String, String> ptStrings = {
       'mostres a quem joga.',
   'ctl.code_gm': 'Código da organização',
   'ctl.code_read': 'Código só de leitura (marcador)',
+  // Slice S7c: the field card written by this phone's NFC.
+  'ctl.card': 'Cartão de campo',
+  'ctl.card_hint':
+      'As caixas novas entram neste campo com o cartão de campo: escreve-o '
+      'num cartão NTAG215 ou NTAG216 e encosta-o uma vez a cada caixa nova. '
+      'As caixas com ecrã também podem ser emparelhadas pelo código que '
+      'mostram (separador Adotar da consola).',
+  'ctl.card_write': 'Escrever o cartão de campo',
+  'ctl.card_warn_title': 'O segredo-mestre do campo',
+  'ctl.card_warn':
+      'Este cartão leva a chave de entrada do campo: quem o tiver pode '
+      'fazer cartões de entrada para as caixas deste campo e ler as chaves '
+      'dos jogos seguintes enviadas por rádio. Guarda-o fechado à chave; se '
+      'se perder ou for copiado, o campo precisa de uma chave nova.',
+  'ctl.card_write_go': 'Escrever o cartão',
+  'ctl.card_done': 'Cartão de campo escrito (campo {fingerprint}).',
+  'ctl.card_failed': 'Não foi possível fazer o cartão de campo: tenta de novo.',
+  'ctl.firmware': 'Atualizações de firmware',
+  'ctl.fw_keys': 'Chaves das versões de firmware',
+  'ctl.fw_keys_none':
+      'Nenhuma: este controlador não aceita versões de firmware para as '
+      'caixas.',
+  'ctl.fw_keys_set': '{n} chave(s): aceita as versões que assinam.',
+  'ctl.fw_keys_hint':
+      'As metades públicas das chaves de versão (base64, 44 caracteres '
+      'cada), uma por linha, como em [firmware] release_keys do Pi. As '
+      'caixas voltam a verificar cada versão com as chaves do seu próprio '
+      'firmware. Um controlador ligado reinicia para as usar.',
+  'ctl.fw_keys_bad':
+      'Cada chave tem 44 caracteres base64 (32 bytes); no máximo 8.',
   'ctl.code_hidden': 'Escondido',
   'ctl.show_codes': 'Mostrar os códigos',
   'ctl.hide_codes': 'Esconder os códigos',

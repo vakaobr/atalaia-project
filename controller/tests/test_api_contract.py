@@ -25,6 +25,21 @@ request and ``ws_connect`` steps may give a player token (``bearer``), and
 (``raw``: an uploaded image), answers that are not JSON (``content_type``,
 ``body_base64``) and the noise scan's steps (``noise``, ``hold_measure``,
 ``scan_wait``) on the recording modem.
+``ws_closed`` reads a connection to its end.
+
+Slice S7c (boxes over the radio, adoption and firmware updates on the phone
+controller): adoption (adoption.py, USB off as on the phone) and firmware updates
+(firmware_updates.py, the case's ``firmware_keys``, releases in the case's folder,
+the wall clock) are set up on every controller; a case may set ``https`` (the
+controller serves HTTPS: a field CA and an address for join keys 13 and 14). Field
+steps: ``field_rx`` is a field frame a box sends (its fields, sealed with the case's
+join key, the nonce from that device's own counter; ``replay`` sends the previous
+one again), ``pair_rx`` a pair frame (in the clear), ``field_tx`` the field and pair
+frames the controller sent since the last look, decoded (``save`` keeps values),
+``field_ack`` the radio's FIELD_ACK, ``pair_box`` and ``pair_box_done`` play an
+unadopted box's side of a pairing run with a code (its REPLY to the last START, its
+DONE to the last KEY). A request may send raw bytes (``body_hex``, ``body_text``)
+and headers, and sign the body with ``mac_key`` (X-Atalaia-Mac, a box's report).
 """
 
 from __future__ import annotations
@@ -32,6 +47,8 @@ from __future__ import annotations
 import base64
 import contextlib
 import datetime
+import hashlib
+import hmac
 import json
 import re
 import tempfile
@@ -46,17 +63,21 @@ from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from support import CORE, FakeModem, config
+from atalaia_controller.adoption import Adoption
 from atalaia_controller.api import Auth, create_app
 from atalaia_controller.checkin import Checkin
 from atalaia_controller.engine import Controller
+from atalaia_controller.firmware_updates import FirmwareUpdates
 from atalaia_controller.positions import Positions
 from atalaia_controller import prop_link
 from atalaia_controller.mqtt import MqttBridge
 from atalaia_controller.prop_link import PropLinks
 from atalaia_controller.store import Store
 from atalaia_controller.ws import Hub
-from atalaia_sim import codec, packet
+from atalaia_sim import codec, cpace, packet
+from atalaia_sim import field_frame as ff
 from atalaia_sim import join as joinfmt
+from atalaia_sim import pair_frame as pf
 from atalaia_sim.packet import hello_encode, state_encode
 from atalaia_sim.protocol import MESSAGE_TYPES
 
@@ -202,9 +223,11 @@ class ContractCase(unittest.TestCase):
     def run_case(self, case: dict[str, Any]) -> None:
         with tempfile.TemporaryDirectory() as tmp, contextlib.ExitStack() as stack:
             cfg = config(tmp, gm_token=VECTORS["tokens"]["gm"], read_token=VECTORS["tokens"]["read"],
-                         persist_game_key=case.get("persist_game_key", True))
+                         persist_game_key=case.get("persist_game_key", True), adopt_usb=False,
+                         firmware_release_keys=case.get("firmware_keys", []))
             env = SimpleNamespace(cfg=cfg, case=case, modem=RecordingModem(), mqtt=RecordingMqtt(), now=[0.0],
-                                  saved={}, stack=stack, sentinel=0)
+                                  saved={}, stack=stack, sentinel=0, tmp=tmp, field_seen=0, senders={},
+                                  last_field=None, pair=None)
             self.boot(env)
             for i, step in enumerate(case["steps"]):
                 with self.subTest(step=i):
@@ -233,6 +256,12 @@ class ContractCase(unittest.TestCase):
         svc._wall = wall
         svc._tz = datetime.timezone.utc
         Positions(env.ctrl, wall=wall)
+        # Slice S7c: adoption (no USB, as on a phone) and firmware updates, as main.build sets them up.
+        Adoption(env.ctrl, lister=lambda: [])
+        FirmwareUpdates(env.ctrl, Path(env.tmp) / "firmware", env.cfg.firmware_release_keys, clock=wall)
+        if env.case.get("https"):
+            env.ctrl.ca_sha256 = bytes(range(32))
+            env.ctrl.link_urls = ["https://192.0.2.10:8443"]
         # Entered, so that every WebSocket session runs on one event loop with the hub.
         env.client = env.stack.enter_context(
             TestClient(create_app(env.ctrl, env.hub, Auth(env.cfg.gm_token, env.cfg.read_token))))
@@ -276,7 +305,10 @@ class ContractCase(unittest.TestCase):
             game_id = env.ctrl.game["id"]
             kind = rx["type"]
             if kind == "HELLO":
-                payload = hello_encode(rx["hello"])
+                hello = dict(rx["hello"])
+                if "device_id" in hello:
+                    hello["device_id"] = bytes.fromhex(substitute(hello["device_id"], env.saved))
+                payload = hello_encode(hello)
             elif kind == "STATE":
                 state = dict(rx["state"])
                 state["counters"] = {int(k): v for k, v in state["counters"].items()}
@@ -366,6 +398,8 @@ class ContractCase(unittest.TestCase):
             for name, path in step.get("save", {}).items():
                 env.saved[name] = dig(_plain(j), path)
             return
+        if self.field_step(step, env):
+            return
         if "tx" in step:
             got = list(env.modem.log)
             env.modem.log.clear()
@@ -416,6 +450,16 @@ class ContractCase(unittest.TestCase):
             raw += bytes(max(0, req["raw"].get("size", 0) - len(raw)))
             kwargs["content"] = raw
             headers["Content-Type"] = req["raw"]["content_type"]
+        # Slice S7c: raw bytes (hex or text), signed with 'mac_key' as a box signs its report.
+        raw_body = bytes.fromhex(req["body_hex"]) if "body_hex" in req else \
+            req["body_text"].encode("utf-8") if "body_text" in req else None
+        if raw_body is not None:
+            kwargs["content"] = raw_body
+            headers["Content-Type"] = "application/octet-stream"
+            if "mac_key" in req:
+                headers["X-Atalaia-Mac"] = hmac.new(bytes.fromhex(req["mac_key"]), raw_body,
+                                                    hashlib.sha256).hexdigest()
+        headers.update(req.get("headers", {}))
         r = env.client.request(req["method"], req["path"], **kwargs)
         self.assertEqual(r.status_code, step["status"], f"{req['method']} {req['path']}: {r.text[:500]}")
         ctype = r.headers.get("content-type", "").split(";")[0].strip()
@@ -423,11 +467,98 @@ class ContractCase(unittest.TestCase):
             self.assertEqual(ctype, step["content_type"], f"{req['method']} {req['path']}")
         if "body_base64" in step:
             self.assertEqual(r.content, base64.b64decode(step["body_base64"]), f"{req['method']} {req['path']}")
+        if "text" in step:
+            # A plain answer (a release text): its text, exactly.
+            self.assertEqual(r.text, substitute(step["text"], env.saved))
+            return
+        if "bytes_sha256" in step:
+            self.assertEqual(hashlib.sha256(r.content).hexdigest(), step["bytes_sha256"])
+            return
         body = r.json() if ctype == "application/json" else None
         if "json" in step:
             self.check(step["json"], body, f"{req['method']} {req['path']}", env)
         for name, path in step.get("save", {}).items():
             env.saved[name] = dig(body, path)
+
+    def field_step(self, step: dict[str, Any], env: SimpleNamespace) -> bool:
+        """The field and pair frame steps (slice S7c); False for any other step."""
+        join_key = bytes.fromhex(env.case.get("join_key", "00" * 32))
+        if "field_rx" in step:
+            spec = substitute(step["field_rx"], env.saved)
+            if spec.get("replay"):
+                frame = env.last_field
+            else:
+                msg = {k: bytes.fromhex(v) if k in ("device_id", "token", "key_tag", "chunk") else v
+                       for k, v in spec.items()}
+                sender = msg.get("device_id", bytes(8))
+                if sender.hex() not in env.senders:
+                    env.senders[sender.hex()] = ff.NonceSource(join_key, sender)
+                frame = ff.encode(ff.field_key(join_key), msg, env.senders[sender.hex()].next())
+            env.last_field = frame
+            env.modem.on_field_rx(frame, -61, 7)
+            return True
+        if "pair_rx" in step:
+            spec = substitute(step["pair_rx"], env.saved)
+            msg = {k: bytes.fromhex(v) if k in ("pair_id", "sid", "point", "tag", "fingerprint") else v
+                   for k, v in spec.items()}
+            env.modem.on_field_rx(pf.encode(msg), -62, 6)
+            return True
+        if "field_ack" in step:
+            env.modem.on_field_ack(step["field_ack"]["id"], step["field_ack"]["status"])
+            return True
+        if "field_tx" in step:
+            got = [self.field_json(f, join_key) for f in env.modem.fields[env.field_seen:]]
+            env.field_seen = len(env.modem.fields)
+            kinds = step.get("kinds")
+            if kinds is not None:
+                got = [g for g in got if g["kind"] in kinds]
+            self.check(step["field_tx"], got, "the field frames", env)
+            for name, path in step.get("save", {}).items():
+                env.saved[name] = dig(got, path)
+            return True
+        if "pair_box" in step:
+            # An unadopted box answers the last START with its own code.
+            spec = step["pair_box"]
+            start = self.last_pair(env, "start")
+            yb_secret = bytes.fromhex(spec.get("yb", "6b" * 32))
+            g = pf.generator(spec["code"], start["pair_id"], start["sid"])
+            yb = cpace.scalar_mult(yb_secret, g)
+            k = cpace.scalar_mult_vfy(yb_secret, start["point"])
+            keys = pf.keys(pf.isk(start["sid"], k, start["point"], yb), start["sid"])
+            env.pair = (start, keys)
+            env.modem.on_field_rx(pf.encode({"kind": "reply", "pair_id": start["pair_id"], "sid": start["sid"],
+                                             "point": yb, "tag": pf.tag_reply(keys)}), -62, 6)
+            return True
+        if "pair_box_done" in step:
+            # The box checks KEY, opens the join key and answers DONE with its result.
+            spec = step["pair_box_done"]
+            start, keys = env.pair
+            key = self.last_pair(env, "key")
+            self.assertEqual(key["tag"], pf.tag_key(keys), "KEY's confirmation")
+            join, name = pf.open_key(keys, key["nonce"], key["pair_id"], key["sid"], key["sealed"])
+            self.check(spec.get("opened", {}), {"join_key": join.hex(), "field_name": name}, "the sealed key", env)
+            result = spec.get("result", "adopted")
+            fp = bytes.fromhex(spec["fingerprint"]) if "fingerprint" in spec else pf.fingerprint_bytes(join)
+            env.modem.on_field_rx(pf.encode({"kind": "done", "pair_id": key["pair_id"], "sid": key["sid"],
+                                             "result": result, "fingerprint": fp,
+                                             "tag": pf.tag_done(keys, result, fp)}), -62, 6)
+            return True
+        return False
+
+    @staticmethod
+    def field_json(frame: bytes, join_key: bytes) -> dict[str, Any]:
+        """A frame the controller sent, as the cases see it: its kind and fields, bytes in hex."""
+        if pf.is_frame(frame):
+            return {"type": "pair", **_plain(pf.decode(frame))}
+        return {"type": "field", **_plain(ff.decode(ff.field_key(join_key), frame))}
+
+    def last_pair(self, env: SimpleNamespace, kind: str) -> dict[str, Any]:
+        for frame in reversed(env.modem.fields):
+            if pf.is_frame(frame):
+                msg = pf.decode(frame)
+                if msg["kind"] == kind:
+                    return msg
+        self.fail(f"the controller sent no {kind.upper()}")
 
     def prop_connect(self, step: dict[str, Any], env: SimpleNamespace) -> None:
         """An Android prop's link (protocol/prop-link.md): the challenge, the proof with the key given

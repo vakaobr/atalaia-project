@@ -823,6 +823,34 @@ const Map<String, String> enStrings = {
       'do not show it to players.',
   'ctl.code_gm': "Game master's code",
   'ctl.code_read': 'Read-only code (scoreboard)',
+  // Slice S7c: the field card written by this phone's NFC.
+  'ctl.card': 'Field card',
+  'ctl.card_hint':
+      'New boxes join this field with the field card: write it on an '
+      'NTAG215 or NTAG216 card and tap it once on each new box. Boxes with '
+      "a screen can also be paired by the code they show (the console's "
+      'Adopt tab).',
+  'ctl.card_write': 'Write the field card',
+  'ctl.card_warn_title': "The field's master secret",
+  'ctl.card_warn':
+      'This card holds the field join key: whoever has it can make join '
+      "cards for this field's boxes and read later games' keys sent over "
+      'the radio. Keep it locked away; if it is lost or copied, the field '
+      'needs a new key.',
+  'ctl.card_write_go': 'Write the card',
+  'ctl.card_done': 'Field card written (field {fingerprint}).',
+  'ctl.card_failed': 'The field card could not be made: try again.',
+  'ctl.firmware': 'Firmware updates',
+  'ctl.fw_keys': 'Firmware release keys',
+  'ctl.fw_keys_none':
+      'None: this controller takes no firmware release for the boxes.',
+  'ctl.fw_keys_set': '{n} key(s): releases they sign are taken.',
+  'ctl.fw_keys_hint':
+      "The release keys' public halves (base64, 44 characters each), one "
+      "per line, as in the Pi's [firmware] release_keys. The boxes check "
+      'every release again with the keys in their own firmware. A running '
+      'controller restarts to take them.',
+  'ctl.fw_keys_bad': 'Each key is 44 base64 characters (32 bytes); at most 8.',
   'ctl.code_hidden': 'Hidden',
   'ctl.show_codes': 'Show the codes',
   'ctl.hide_codes': 'Hide the codes',
