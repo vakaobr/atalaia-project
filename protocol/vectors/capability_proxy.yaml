@@ -175,3 +175,50 @@ stream:
     - { type: 4, payload: "0007" }
   crc_errors: 1
   length_errors: 1
+
+
+# Field and pair frames through the pod (decisions PE24-100 to PE24-103): the modem's FIELD_TX,
+# FIELD_RX and FIELD_ACK plus 3 (0x0C-0x0E), payloads unchanged, and IDENT's optional bools
+# (keys 6 field_frames, 7 pair_frames, 8 measure). A section of their own, so that a codec
+# written before them still passes the sections above; the C and Python codecs check both.
+# The field frame is field_frame.json's announce_minimal, the pair frame pairing.json's offer.
+pod_relay:
+  ident:
+    - name: pod_relays
+      fields: {"fw_version": "0.3.0", "capabilities": [{"id": "btn.1", "type": "button"}], "battery_pct": 87, "has_radio": true, "protocol_version": 1, "field_frames": true, "pair_frames": true, "measure": true}
+      payload: "a80165302e332e300281a26269646562746e2e31647479706566627574746f6e03185704f5050106f507f508f5"
+      frame: "a501002da80165302e332e300281a26269646562746e2e31647479706566627574746f6e03185704f5050106f507f508f5ce21"
+    - name: pod_without_radio
+      fields: {"fw_version": "0.3.0", "capabilities": [], "has_radio": false, "protocol_version": 1, "field_frames": true, "pair_frames": true, "measure": false}
+      payload: "a70165302e332e30028004f4050106f507f508f4"
+      frame: "a5010014a70165302e332e30028004f4050106f507f508f4d95a"
+  radio:
+    - name: field_tx
+      type: 12
+      fields: {"id": 513, "frame": "2a0000000000000009310453d449a7f0b00000010000acc8ba543cf30fabae3ae1f2e31f90fb1b296ad5715ed8a9cceabb8d33a6c4b1e22b918932e38c5361f3b305"}
+      payload: "02012a0000000000000009310453d449a7f0b00000010000acc8ba543cf30fabae3ae1f2e31f90fb1b296ad5715ed8a9cceabb8d33a6c4b1e22b918932e38c5361f3b305"
+      frame: "a50c004402012a0000000000000009310453d449a7f0b00000010000acc8ba543cf30fabae3ae1f2e31f90fb1b296ad5715ed8a9cceabb8d33a6c4b1e22b918932e38c5361f3b3054aa8"
+    - name: field_rx
+      type: 13
+      fields: {"frame": "2a0000000000000009310453d449a7f0b00000010000acc8ba543cf30fabae3ae1f2e31f90fb1b296ad5715ed8a9cceabb8d33a6c4b1e22b918932e38c5361f3b305", "rssi": -87, "snr": 6}
+      payload: "2a0000000000000009310453d449a7f0b00000010000acc8ba543cf30fabae3ae1f2e31f90fb1b296ad5715ed8a9cceabb8d33a6c4b1e22b918932e38c5361f3b305a906"
+      frame: "a50d00442a0000000000000009310453d449a7f0b00000010000acc8ba543cf30fabae3ae1f2e31f90fb1b296ad5715ed8a9cceabb8d33a6c4b1e22b918932e38c5361f3b305a906c315"
+    - name: field_ack
+      type: 14
+      fields: {"id": 513, "status": 1}
+      payload: "020101"
+      frame: "a50e0003020101581f"
+    - name: pair_tx
+      type: 12
+      fields: {"id": 2, "frame": "28000000000000000aa401010248b0c5b0c5a1a2a3a4036b706f7274612d6e6f7274650400"}
+      payload: "000228000000000000000aa401010248b0c5b0c5a1a2a3a4036b706f7274612d6e6f7274650400"
+      frame: "a50c0027000228000000000000000aa401010248b0c5b0c5a1a2a3a4036b706f7274612d6e6f7274650400707b"
+    - name: pair_rx
+      type: 13
+      fields: {"frame": "28000000000000000aa401010248b0c5b0c5a1a2a3a4036b706f7274612d6e6f7274650400", "rssi": -101, "snr": -3}
+      payload: "28000000000000000aa401010248b0c5b0c5a1a2a3a4036b706f7274612d6e6f72746504009bfd"
+      frame: "a50d002728000000000000000aa401010248b0c5b0c5a1a2a3a4036b706f7274612d6e6f72746504009bfdf83f"
+  invalid:
+    - { name: field_frames_not_bool, type: 1, payload: "a50165302e332e30028004f505010663796573", why: "field_frames is a bool" }
+    - { name: pair_frames_null, type: 1, payload: "a50165302e332e30028004f5050107f6", why: "pair_frames is a bool" }
+    - { name: measure_not_bool, type: 1, payload: "a50165302e332e30028004f505010801", why: "measure is a bool" }

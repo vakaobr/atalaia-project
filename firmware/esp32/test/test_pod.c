@@ -412,6 +412,9 @@ static void test_ident(void)
                                      &id));
     CHECK(strcmp(id.fw_version, "0.3.0") == 0 && id.has_radio && id.protocol_version == 1);
     CHECK(id.has_battery && id.battery_pct == 87);
+    /* Keys 6-8 (PE24-101): it measures, and relays field and pair frames. */
+    CHECK(id.measure == ATALAIA_PROXY_YES && id.field_frames == ATALAIA_PROXY_YES &&
+          id.pair_frames == ATALAIA_PROXY_YES);
     CHECK(strcmp(id.caps_json,
                  "[{\"id\":\"btn.1\",\"type\":\"button\"},{\"id\":\"btn.2\",\"type\":\"button\"},"
                  "{\"id\":\"btn.3\",\"type\":\"button\"},{\"id\":\"btn.4\",\"type\":\"button\"},"
@@ -421,33 +424,40 @@ static void test_ident(void)
                  "{\"id\":\"case\",\"type\":\"tamper\"}]") == 0);
     CHECK(compact_idents == 0);
 
-    /* Everything fitted and the longest fw_version still fit in 256 bytes. */
+    /* Everything fitted, the flags and the longest fw_version still fit in 256 bytes
+     * (237: PF6, PE24-101). */
     fw = "0.3.0-123-g0123456-dirt"; /* 23 bytes */
     phone_send_vector(POD_LINK_USB, "cmd_ident");
-    CHECK(phone[POD_LINK_USB].frames == 2 && phone[POD_LINK_USB].len[1] <= 256 - 24);
+    CHECK(phone[POD_LINK_USB].frames == 2 && phone[POD_LINK_USB].len[1] <= 256 - 18);
     CHECK(atalaia_proxy_ident_decode(phone[POD_LINK_USB].payload[1], phone[POD_LINK_USB].len[1],
                                      &id) &&
           strlen(id.fw_version) == 23 && compact_idents == 0);
 
-    /* Colours on the buttons: in IDENT while they fit, left out when they do not. */
+    /* Colours on the buttons: in IDENT while they fit, left out when they do not (the
+     * flags stay: they are not optional to the phone). */
     pod_caps_config_t coloured = full_config();
     coloured.team[0] = "red";
     coloured.team[1] = "blue";
     coloured.team[2] = "green";
-    coloured.team[3] = "yellow";
     setup_with(&coloured, true);
     phone_send_vector(POD_LINK_USB, "cmd_ident");
     CHECK(atalaia_proxy_ident_decode(phone[POD_LINK_USB].payload[0], phone[POD_LINK_USB].len[0],
                                      &id));
-    CHECK(strstr(id.caps_json, "{\"id\":\"btn.4\",\"type\":\"button\",\"team\":\"yellow\"}") !=
+    CHECK(strstr(id.caps_json, "{\"id\":\"btn.3\",\"type\":\"button\",\"team\":\"green\"}") !=
               NULL &&
           compact_idents == 0);
+    coloured.team[3] = "yellow"; /* four colours and the flags: 261 bytes */
+    setup_with(&coloured, true);
+    phone_send_vector(POD_LINK_USB, "cmd_ident");
     fw = "0.3.0-123-g0123456-dirt";
     phone_send_vector(POD_LINK_USB, "cmd_ident");
-    CHECK(phone[POD_LINK_USB].frames == 2 && compact_idents == 1);
-    CHECK(atalaia_proxy_ident_decode(phone[POD_LINK_USB].payload[1], phone[POD_LINK_USB].len[1],
-                                     &id));
-    CHECK(strstr(id.caps_json, "team") == NULL && strstr(id.caps_json, "\"case\"") != NULL);
+    CHECK(phone[POD_LINK_USB].frames == 2 && compact_idents == 2);
+    for (int k = 0; k < 2; k++) {
+        CHECK(atalaia_proxy_ident_decode(phone[POD_LINK_USB].payload[k], phone[POD_LINK_USB].len[k],
+                                         &id));
+        CHECK(strstr(id.caps_json, "team") == NULL && strstr(id.caps_json, "\"case\"") != NULL);
+        CHECK(id.field_frames == ATALAIA_PROXY_YES && id.pair_frames == ATALAIA_PROXY_YES);
+    }
 
     /* A pod without a radio and with two buttons says so. */
     pod_caps_config_t cfg;
@@ -461,6 +471,9 @@ static void test_ident(void)
     CHECK(atalaia_proxy_ident_decode(phone[POD_LINK_BLE].payload[0], phone[POD_LINK_BLE].len[0],
                                      &id));
     CHECK(!id.has_radio);
+    /* No radio: nothing to measure with; the relay is the firmware's (FIELD_TX gets no_radio). */
+    CHECK(id.measure == ATALAIA_PROXY_NO && id.field_frames == ATALAIA_PROXY_YES &&
+          id.pair_frames == ATALAIA_PROXY_YES);
     CHECK(strcmp(id.caps_json, "[{\"id\":\"btn.1\",\"type\":\"button\"},"
                                "{\"id\":\"btn.3\",\"type\":\"button\",\"team\":\"blue\"}]") == 0);
 
@@ -533,10 +546,12 @@ static void test_cmd(void)
     uint32_t ignored = pod.count.ignored;
     phone_send_vector(POD_LINK_USB, "button_hold"); /* an EVT */
     phone_send_vector(POD_LINK_USB, "rx");          /* a RADIO_RX */
+    phone_send_vector(POD_LINK_USB, "field_rx");    /* a RADIO_FIELD_RX */
+    phone_send_vector(POD_LINK_USB, "field_ack");   /* a RADIO_FIELD_ACK */
     uint8_t x = 1;
-    phone_send(POD_LINK_USB, 0x0C, &x, 1);
+    phone_send(POD_LINK_USB, 0x0F, &x, 1);
     phone_send(POD_LINK_USB, 0x7F, NULL, 0);
-    CHECK(phone[POD_LINK_USB].frames == before && pod.count.ignored == ignored + 4);
+    CHECK(phone[POD_LINK_USB].frames == before && pod.count.ignored == ignored + 6);
 }
 
 /* ---- EVT ------------------------------------------------------------------------------- */
@@ -779,6 +794,122 @@ static void test_radio(void)
     CHECK(st[0] == 57 && (int8_t)st[1] == -70 && st[2] == 0x07);
 }
 
+/* ---- Field and pair frames (PE24-100) ------------------------------------------------- */
+
+/* The last frame of a type on a link is a vector's payload. */
+static bool last_is(pod_link_t link, uint8_t type, const char *vector)
+{
+    int i = find_type(link, type);
+    const proxy_frame_vector_t *v = frame_vector(vector);
+    return i >= 0 && v != NULL && v->type == type && phone[link].len[i] == v->payload_len &&
+           memcmp(phone[link].payload[i], v->payload, v->payload_len) == 0;
+}
+
+static void test_field_relay(void)
+{
+    const proxy_frame_vector_t *ftx = frame_vector("field_tx");
+    const proxy_frame_vector_t *ptx = frame_vector("pair_tx");
+    CHECK(ftx != NULL && ptx != NULL);
+    if (ftx == NULL || ptx == NULL) return;
+
+    /* No game configured (a sealed re-invite, a pairing by code): the phone's first frame is
+     * its IDENT, then a field frame goes on air as it is, hop_limit 0, tagged with its id. */
+    setup();
+    phone_send_vector(POD_LINK_USB, "cmd_ident");
+    phone_send_vector(POD_LINK_USB, "field_tx");
+    CHECK(!pod.radio.configured && radio_sends == 1 && radio_tag == (MODEM_FIELD_TAG | 513));
+    CHECK(radio_pkt_len == ftx->payload_len - 2 &&
+          memcmp(radio_pkt, ftx->payload + 2, radio_pkt_len) == 0);
+    CHECK(pod.radio.count.field_tx == 1 && pod.count.ignored == 0);
+    /* Its outcome, the duty cycle's refusal here, comes back as RADIO_FIELD_ACK. */
+    pod_on_tx_result(&pod, radio_tag, MODEM_TX_DUTY_CYCLE);
+    CHECK(last_is(POD_LINK_USB, ATALAIA_PROXY_RADIO_FIELD_ACK, "field_ack"));
+    pod_on_tx_result(&pod, radio_tag, MODEM_TX_OK);
+    int i = find_type(POD_LINK_USB, ATALAIA_PROXY_RADIO_FIELD_ACK);
+    CHECK(i >= 0 && phone[POD_LINK_USB].payload[i][2] == MODEM_TX_OK);
+
+    /* A field frame heard: RADIO_FIELD_RX to the phone, as it is, with RSSI and SNR. */
+    pod_on_air_rx(&pod, ftx->payload + 2, ftx->payload_len - 2, -87, 6);
+    CHECK(last_is(POD_LINK_USB, ATALAIA_PROXY_RADIO_FIELD_RX, "field_rx"));
+    CHECK(pod.radio.count.field_rx == 1 && phone[POD_LINK_BLE].frames == 0);
+
+    /* Pair frames (type 10, in the clear) ride the same frames. */
+    phone_send_vector(POD_LINK_USB, "pair_tx");
+    CHECK(radio_sends == 2 && radio_tag == (MODEM_FIELD_TAG | 2) &&
+          radio_pkt_len == ptx->payload_len - 2 &&
+          memcmp(radio_pkt, ptx->payload + 2, radio_pkt_len) == 0);
+    pod_on_air_rx(&pod, ptx->payload + 2, ptx->payload_len - 2, -101, -3);
+    CHECK(last_is(POD_LINK_USB, ATALAIA_PROXY_RADIO_FIELD_RX, "pair_rx"));
+
+    /* Not the shape of a field or pair frame (a game packet): invalid, not sent. */
+    uint8_t bad[2 + 40];
+    memset(bad, 0, sizeof(bad));
+    put16(bad, 77);
+    bad[2] = 0x22; /* version 1, encrypted */
+    put16(bad + 3, 4242);
+    bad[10] = 2; /* a game message's type */
+    phone_send(POD_LINK_USB, ATALAIA_PROXY_RADIO_FIELD_TX, bad, sizeof(bad));
+    i = find_type(POD_LINK_USB, ATALAIA_PROXY_RADIO_FIELD_ACK);
+    CHECK(radio_sends == 2 && i >= 0 && phone[POD_LINK_USB].payload[i][1] == 77 &&
+          phone[POD_LINK_USB].payload[i][2] == MODEM_TX_INVALID);
+    /* Shorter than its id: the modem's ERROR. */
+    phone_send(POD_LINK_USB, ATALAIA_PROXY_RADIO_FIELD_TX, bad, 1);
+    i = find_type(POD_LINK_USB, ATALAIA_PROXY_RADIO_ERROR);
+    CHECK(i >= 0 && phone[POD_LINK_USB].payload[i][0] == MODEM_ERR_BAD_FRAME);
+
+    /* While a measurement runs the radio is busy. */
+    uint8_t measure[8] = {MODEM_CMD_MEASURE, 0x33, 0xd3, 0xe6, 0x08, 0x13, 0x88, 1};
+    phone_send(POD_LINK_USB, ATALAIA_PROXY_RADIO_CMD, measure, sizeof(measure));
+    CHECK(measures == 1);
+    phone_send_vector(POD_LINK_USB, "field_tx");
+    i = find_type(POD_LINK_USB, ATALAIA_PROXY_RADIO_FIELD_ACK);
+    CHECK(radio_sends == 2 && i >= 0 && phone[POD_LINK_USB].payload[i][2] == MODEM_TX_BUSY);
+
+    /* With a game configured: field frames still go and come (GAME_OVER, a re-invite during a
+     * game), the heard ones to the link that runs the radio. */
+    setup();
+    phone_send_vector(POD_LINK_BLE, "cmd_ident");
+    phone_send_vector(POD_LINK_USB, "cmd_configure");
+    CHECK(pod.radio_owner == POD_LINK_USB);
+    phone_send_vector(POD_LINK_USB, "field_tx");
+    CHECK(radio_sends == 1);
+    pod_on_air_rx(&pod, ftx->payload + 2, ftx->payload_len - 2, -87, 6);
+    CHECK(last_is(POD_LINK_USB, ATALAIA_PROXY_RADIO_FIELD_RX, "field_rx"));
+    CHECK(find_type(POD_LINK_BLE, ATALAIA_PROXY_RADIO_FIELD_RX) < 0);
+
+    /* A phone on Bluetooth only, before any game: what is heard goes to it. */
+    setup();
+    phone_send_vector(POD_LINK_BLE, "cmd_ident");
+    pod_on_air_rx(&pod, ptx->payload + 2, ptx->payload_len - 2, -101, -3);
+    CHECK(last_is(POD_LINK_BLE, ATALAIA_PROXY_RADIO_FIELD_RX, "pair_rx"));
+    CHECK(phone[POD_LINK_USB].frames == 0);
+
+    /* No phone yet: heard, counted, sent nowhere. */
+    setup();
+    pod_on_air_rx(&pod, ftx->payload + 2, ftx->payload_len - 2, -87, 6);
+    CHECK(phone[POD_LINK_USB].frames == 0 && phone[POD_LINK_BLE].frames == 0);
+
+    /* No radio chip: RADIO_FIELD_ACK no_radio. */
+    pod_caps_config_t cfg = full_config();
+    setup_with(&cfg, false);
+    phone_send_vector(POD_LINK_USB, "cmd_ident");
+    phone_send_vector(POD_LINK_USB, "field_tx");
+    i = find_type(POD_LINK_USB, ATALAIA_PROXY_RADIO_FIELD_ACK);
+    CHECK(radio_sends == 0 && i >= 0 && phone[POD_LINK_USB].payload[i][2] == MODEM_TX_NO_RADIO);
+
+    /* A largest field frame (217 bytes) fits a frame both ways, over Bluetooth too. */
+    setup();
+    phone_send_vector(POD_LINK_BLE, "cmd_ident");
+    uint8_t big[2 + MODEM_FIELD_MAX];
+    memcpy(big, ftx->payload, ftx->payload_len);
+    memset(big + ftx->payload_len, 0x5a, sizeof(big) - ftx->payload_len);
+    phone_send(POD_LINK_BLE, ATALAIA_PROXY_RADIO_FIELD_TX, big, sizeof(big));
+    CHECK(radio_sends == 1 && radio_pkt_len == MODEM_FIELD_MAX);
+    pod_on_air_rx(&pod, big + 2, MODEM_FIELD_MAX, -60, 9);
+    i = find_type(POD_LINK_BLE, ATALAIA_PROXY_RADIO_FIELD_RX);
+    CHECK(i >= 0 && phone[POD_LINK_BLE].len[i] == MODEM_FIELD_MAX + 2);
+}
+
 /* ---- Capabilities ---------------------------------------------------------------------- */
 
 static void test_caps_inputs(void)
@@ -957,6 +1088,7 @@ void run_pod_tests(void)
     test_cmd();
     test_evt();
     test_radio();
+    test_field_relay();
     test_caps_inputs();
     test_caps_commands();
     test_json();

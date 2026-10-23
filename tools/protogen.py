@@ -1116,15 +1116,23 @@ def gen_proxy_vectors(pv: dict[str, Any]) -> str:
           "typedef struct {", "    const char *name;", "    uint8_t type;", "    const uint8_t *payload;",
           "    size_t payload_len;", "    const char *why;", "} proxy_bad_vector_t;", ""]
 
+    def opt(f: dict[str, Any], name: str) -> str:
+        v = f.get(name)
+        require(v is None or isinstance(v, bool), f"capability_proxy.yaml: {name} is a bool")
+        return "ATALAIA_PROXY_UNSAID" if v is None else "ATALAIA_PROXY_YES" if v else "ATALAIA_PROXY_NO"
+
+    # pod_relay (PE24-100): its own section in the YAML, the same tables here.
+    relay = pv.get("pod_relay", {})
     idents, msgs, frames, bads = [], [], [], []
-    for i, v in enumerate(pv["ident"]):
+    for i, v in enumerate(pv["ident"] + relay.get("ident", [])):
         f = v["fields"]
         L += arr(f"pi_{i}", v["payload"]) + arr(f"pi_{i}_frame", v["frame"])
         battery = f.get("battery_pct")
         idents.append(
             f"    {{{c_string(v['name'])}, {{{c_string(f['fw_version'])}, "
             f"{c_string(compact(f['capabilities']))}, {'true' if battery is not None else 'false'}, "
-            f"{battery or 0}, {'true' if f['has_radio'] else 'false'}, {f['protocol_version']}}}, "
+            f"{battery or 0}, {'true' if f['has_radio'] else 'false'}, {f['protocol_version']}, "
+            f"{opt(f, 'field_frames')}, {opt(f, 'pair_frames')}, {opt(f, 'measure')}}}, "
             f"pi_{i}, pi_{i}_len, pi_{i}_frame, pi_{i}_frame_len}},")
         frames.append(f"    {{{c_string(v['name'])}, 0x01, pi_{i}, pi_{i}_len, pi_{i}_frame, pi_{i}_frame_len}},")
     k = 0
@@ -1145,11 +1153,11 @@ def gen_proxy_vectors(pv: dict[str, Any]) -> str:
         L += arr(f"pa_{i}", v["payload"]) + arr(f"pa_{i}_frame", v["frame"])
         acks.append(f"    {{{c_string(v['name'])}, {int(v['seq'])}}},")
         frames.append(f"    {{{c_string(v['name'])}, 0x04, pa_{i}, pa_{i}_len, pa_{i}_frame, pa_{i}_frame_len}},")
-    for i, v in enumerate(pv["radio"]):
+    for i, v in enumerate(pv["radio"] + relay.get("radio", [])):
         L += arr(f"pr_{i}", v["payload"]) + arr(f"pr_{i}_frame", v["frame"])
         frames.append(f"    {{{c_string(v['name'])}, {int(v['type'])}, pr_{i}, pr_{i}_len, pr_{i}_frame, "
                       f"pr_{i}_frame_len}},")
-    for i, v in enumerate(pv["invalid"]):
+    for i, v in enumerate(pv["invalid"] + relay.get("invalid", [])):
         L += arr(f"pb_{i}", v["payload"])
         bads.append(f"    {{{c_string(v['name'])}, {int(v['type'])}, pb_{i}, pb_{i}_len, "
                     f"{c_string(v['why'])}}},")

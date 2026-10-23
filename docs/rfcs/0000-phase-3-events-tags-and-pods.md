@@ -44,6 +44,8 @@ New data fields: `see_team` (key 29, string) and `tolerance_pct` (key 30, number
 
 Added with the pod firmware (plan phase F, 2026-10-19): the modem's NOISE as RADIO_NOISE (`0x0B`, the answer to MEASURE, which the modem gained with RFC 0001 Amendment 3; decision PF2), and a capability type `tamper` (events `opened`, `closed`) for a pod's enclosure switch, which the phone reports as `node.tamper` with `reason: pod_opened` (decision PF8). The standard capability types of the design specification (section 7) gain `tamper`.
 
+Added for the phone as field controller (2026-10-23, decisions PE24-100 to PE24-103): the modem's FIELD_TX, FIELD_RX and FIELD_ACK as RADIO_FIELD_TX, RADIO_FIELD_RX and RADIO_FIELD_ACK (`0x0C`-`0x0E`, plus 3 as the other radio frames), which carry field frames (type 9) and pair frames (type 10) as they are, and three optional IDENT bools, keys 6 `field_frames`, 7 `pair_frames` and 8 `measure`, within version 1 (readers skipped keys 6-23; an older pod leaves them out, so the phone knows what it can ask).
+
 ## Compatibility
 
 Older nodes pass unknown event ids through as raw CBOR (ADR-P3-8); the JSON Schema of the game log gains the new events. The tag and the proxy are new formats with version bytes or fields of their own. The capability proxy skips unknown keys 6-23, so a later pod can add optional fields.

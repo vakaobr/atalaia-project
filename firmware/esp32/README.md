@@ -362,7 +362,11 @@ encrypts them with the game key, keeps the duty cycle and the TX power of
 the channel's EU868 sub-band (`radio/radio_limits.c`), refuses a channel
 that does not fit in one sub-band, dedupes and decrypts what it hears
 (RADIO_RX), and measures noise when asked (MEASURE, answered by RADIO_NOISE
-`0x0B`, decision PF2). The game key lives in RAM only and is forgotten
+`0x0B`, decision PF2). Field and pair frames, sealed by the phone, go and
+come as they are (RADIO_FIELD_TX, RX and ACK, `0x0C`-`0x0E`, with or without
+a game; decision PE24-100), so a phone with only a pod can re-invite boxes,
+end a game with GAME_OVER and adopt a box by its code; IDENT says so (keys
+6 `field_frames`, 7 `pair_frames`, 8 `measure`, PE24-101). The game key lives in RAM only and is forgotten
 when the link that configured the radio goes (decision PF5). The board
 revision (V4.3 KCT8103L by default, V4.2 GC1109) and Vext are the Field
 Box's settings; the GNSS connector is not used (E21).
@@ -378,7 +382,8 @@ lists the checks that need the board and a phone. Code:
 
 - `main/pod/pod.c` -- the proxy: IDENT (its `fw_version`, at most 23 bytes, is the image's
   version with the build metadata shortened when it does not fit: `pod_fw_version`, FV-5),
-  EVT with ACKs and resends, CMD acted on once, the radio passthrough, Pod Status (plain C);
+  EVT with ACKs and resends, CMD acted on once, the radio passthrough (field and pair frames
+  too), Pod Status (plain C);
 - `main/pod/pod_caps.c` -- the capabilities on the HAL ops (plain C);
 - `main/pod/pod_ble.c` -- the GATT service's logic, UUIDs and advertising
   data (plain C); `pod_ble_nimble.c` puts it on NimBLE;

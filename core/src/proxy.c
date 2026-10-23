@@ -12,14 +12,17 @@
 #include "atalaia/codec.h"
 #include "cbor_int.h"
 
-#define KEY_UNKNOWN_FIRST 6
+#define KEY_FIELD_FRAMES  6
+#define KEY_PAIR_FRAMES   7
+#define KEY_MEASURE       8
+#define KEY_UNKNOWN_FIRST 6 /* IDENT knows 6-8 now; EVT and CMD none */
 #define KEY_UNKNOWN_LAST  23
 #define CBOR_FALSE        20
 #define CBOR_TRUE         21
 
 uint8_t atalaia_proxy_modem_type(uint8_t proxy_type)
 {
-    return proxy_type >= ATALAIA_PROXY_RADIO_RX && proxy_type <= ATALAIA_PROXY_RADIO_NOISE
+    return proxy_type >= ATALAIA_PROXY_RADIO_RX && proxy_type <= ATALAIA_PROXY_RADIO_FIELD_ACK
                ? (uint8_t)(proxy_type - 3)
                : 0;
 }
@@ -51,6 +54,19 @@ static bool printable_ok(const char *s)
 static void put_bool(mc_writer_t *w, bool v)
 {
     mc_put_head(w, CBOR_MAJOR_SIMPLE, v ? CBOR_TRUE : CBOR_FALSE);
+}
+
+static bool opt_ok(atalaia_proxy_opt_t v)
+{
+    return v == ATALAIA_PROXY_UNSAID || v == ATALAIA_PROXY_NO || v == ATALAIA_PROXY_YES;
+}
+
+/* An optional bool, written only when said. */
+static void put_opt(mc_writer_t *w, uint64_t key, atalaia_proxy_opt_t v)
+{
+    if (v == ATALAIA_PROXY_UNSAID) return;
+    mc_put_uint(w, key);
+    put_bool(w, v == ATALAIA_PROXY_YES);
 }
 
 static bool read_bool(mc_reader_t *r, bool *out)
@@ -168,7 +184,8 @@ static int put_caps(const char *json, mc_writer_t *w)
 size_t atalaia_proxy_ident_encode(const atalaia_proxy_ident_t *in, uint8_t *buf, size_t cap)
 {
     if (!in || !buf || !printable_ok(in->fw_version) || in->protocol_version != 1 ||
-        (in->has_battery && in->battery_pct > 100)) {
+        (in->has_battery && in->battery_pct > 100) || !opt_ok(in->measure) ||
+        !opt_ok(in->field_frames) || !opt_ok(in->pair_frames)) {
         return 0;
     }
     int caps = put_caps(in->caps_json, NULL);
@@ -176,7 +193,10 @@ size_t atalaia_proxy_ident_encode(const atalaia_proxy_ident_t *in, uint8_t *buf,
     if (cap > ATALAIA_PROXY_PAYLOAD_MAX) cap = ATALAIA_PROXY_PAYLOAD_MAX;
     mc_writer_t w;
     mc_init_writer(&w, buf, cap);
-    mc_put_map(&w, in->has_battery ? 5 : 4);
+    unsigned fields = 4u + (in->has_battery ? 1u : 0u) + (in->measure != ATALAIA_PROXY_UNSAID) +
+                      (in->field_frames != ATALAIA_PROXY_UNSAID) +
+                      (in->pair_frames != ATALAIA_PROXY_UNSAID);
+    mc_put_map(&w, fields);
     mc_put_uint(&w, 1);
     mc_put_text(&w, in->fw_version);
     mc_put_uint(&w, 2);
@@ -190,7 +210,18 @@ size_t atalaia_proxy_ident_encode(const atalaia_proxy_ident_t *in, uint8_t *buf,
     put_bool(&w, in->has_radio);
     mc_put_uint(&w, 5);
     mc_put_uint(&w, ATALAIA_PROXY_VERSION);
+    put_opt(&w, KEY_FIELD_FRAMES, in->field_frames);
+    put_opt(&w, KEY_PAIR_FRAMES, in->pair_frames);
+    put_opt(&w, KEY_MEASURE, in->measure);
     return w.ok ? w.pos : 0;
+}
+
+static bool read_opt(mc_reader_t *r, atalaia_proxy_opt_t *out)
+{
+    bool v;
+    if (!read_bool(r, &v)) return false;
+    *out = v ? ATALAIA_PROXY_YES : ATALAIA_PROXY_NO;
+    return true;
 }
 
 static bool ident_decode(const uint8_t *buf, size_t len, atalaia_proxy_ident_t *t)
@@ -253,6 +284,15 @@ static bool ident_decode(const uint8_t *buf, size_t len, atalaia_proxy_ident_t *
             t->protocol_version = (uint8_t)v;
             break;
         }
+        case KEY_FIELD_FRAMES:
+            if (!read_opt(&r, &t->field_frames)) return false;
+            continue;
+        case KEY_PAIR_FRAMES:
+            if (!read_opt(&r, &t->pair_frames)) return false;
+            continue;
+        case KEY_MEASURE:
+            if (!read_opt(&r, &t->measure)) return false;
+            continue;
         default:
             if (key < KEY_UNKNOWN_FIRST || key > KEY_UNKNOWN_LAST || !mc_skip_value(&r)) {
                 return false;

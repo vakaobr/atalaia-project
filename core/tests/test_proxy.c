@@ -18,7 +18,9 @@ static bool same_ident(const atalaia_proxy_ident_t *a, const atalaia_proxy_ident
 {
     return strcmp(a->fw_version, b->fw_version) == 0 && strcmp(a->caps_json, b->caps_json) == 0 &&
            a->has_battery == b->has_battery && a->battery_pct == b->battery_pct &&
-           a->has_radio == b->has_radio && a->protocol_version == b->protocol_version;
+           a->has_radio == b->has_radio && a->protocol_version == b->protocol_version &&
+           a->measure == b->measure && a->field_frames == b->field_frames &&
+           a->pair_frames == b->pair_frames;
 }
 
 static bool same_msg(const atalaia_proxy_msg_t *a, const atalaia_proxy_msg_t *b)
@@ -121,6 +123,9 @@ static void test_skipped_keys(void)
     atalaia_proxy_ident_t ident;
     CHECK(atalaia_proxy_ident_decode(proxy_skipped_ident, proxy_skipped_ident_len, &ident));
     CHECK(strcmp(ident.fw_version, "0.3.0") == 0 && strcmp(ident.caps_json, "[]") == 0);
+    /* Keys 6-8 left out: an older pod, which says nothing of them (PE24-101). */
+    CHECK(ident.measure == ATALAIA_PROXY_UNSAID && ident.field_frames == ATALAIA_PROXY_UNSAID &&
+          ident.pair_frames == ATALAIA_PROXY_UNSAID);
     atalaia_proxy_msg_t msg;
     CHECK(atalaia_proxy_msg_decode(proxy_skipped_evt, proxy_skipped_evt_len, &msg));
     CHECK(same_msg(&msg, &proxy_msg_vectors[0].fields));
@@ -165,7 +170,21 @@ static void test_encode_refuses(void)
     CHECK(atalaia_proxy_modem_type(ATALAIA_PROXY_RADIO_RX) == 0x02);
     CHECK(atalaia_proxy_modem_type(ATALAIA_PROXY_RADIO_ERROR) == 0x07);
     CHECK(atalaia_proxy_modem_type(ATALAIA_PROXY_RADIO_NOISE) == 0x08);
-    CHECK(atalaia_proxy_modem_type(0x0C) == 0);
+    CHECK(atalaia_proxy_modem_type(ATALAIA_PROXY_RADIO_FIELD_TX) == 0x09);
+    CHECK(atalaia_proxy_modem_type(ATALAIA_PROXY_RADIO_FIELD_RX) == 0x0A);
+    CHECK(atalaia_proxy_modem_type(ATALAIA_PROXY_RADIO_FIELD_ACK) == 0x0B);
+    CHECK(atalaia_proxy_modem_type(0x0F) == 0);
+
+    /* IDENT's optional bools: only the three values. */
+    id = proxy_ident_vectors[0].fields;
+    id.measure = (atalaia_proxy_opt_t)3;
+    CHECK(atalaia_proxy_ident_encode(&id, buf, sizeof(buf)) == 0);
+    id.measure = ATALAIA_PROXY_NO;
+    id.pair_frames = ATALAIA_PROXY_YES;
+    n = atalaia_proxy_ident_encode(&id, buf, sizeof(buf));
+    atalaia_proxy_ident_t back;
+    CHECK(n > 0 && atalaia_proxy_ident_decode(buf, n, &back) && back.measure == ATALAIA_PROXY_NO &&
+          back.field_frames == ATALAIA_PROXY_UNSAID && back.pair_frames == ATALAIA_PROXY_YES);
     CHECK(atalaia_proxy_modem_type(ATALAIA_PROXY_ACK) == 0);
     CHECK(atalaia_proxy_ack_encode(1, buf, 1) == 0);
 }

@@ -66,6 +66,12 @@ void pod_send_ident(pod_t *p, pod_link_t link)
         if (p->io.ident != NULL) p->io.ident(p->io.ctx, &id, compact != 0);
         id.has_radio = p->radio.radio_present;
         id.protocol_version = ATALAIA_PROXY_VERSION;
+        /* As the modem's JSON IDENT: measure with a radio and a measuring build; field and
+         * pair frames always relayed (without a radio, FIELD_TX is answered no_radio). */
+        id.measure = p->radio.radio_present && p->radio.io.measure_start != NULL ? ATALAIA_PROXY_YES
+                                                                                 : ATALAIA_PROXY_NO;
+        id.field_frames = ATALAIA_PROXY_YES;
+        id.pair_frames = ATALAIA_PROXY_YES;
         n = atalaia_proxy_ident_encode(&id, buf, sizeof(buf));
     }
     if (n == 0) {
@@ -84,9 +90,11 @@ static void radio_out(void *ctx, uint8_t type, const uint8_t *payload, size_t le
 {
     pod_t *p = (pod_t *)ctx;
     if (p->muted || type == MODEM_FRAME_IDENT) return; /* RADIO_CMD IDENT gets the pod's IDENT */
-    if (type < MODEM_FRAME_RX || type > MODEM_FRAME_NOISE) return;
-    /* A reply goes back where its frame came from; a received packet, a TX
-     * outcome or a measurement to the link that runs the radio. */
+    /* RX to FIELD_ACK: field and pair frames go as they are, sealed by their ends (PE24-100). */
+    if (type < MODEM_FRAME_RX || type > MODEM_FRAME_FIELD_ACK) return;
+    /* A reply goes back where its frame came from; a received packet or field frame, a TX
+     * outcome or a measurement to the link that runs the radio, else to the link of the
+     * phone's last radio frame (its RADIO_CMD IDENT at least). */
     int link = p->replying;
     if (!valid_link(link)) {
         link = valid_link(p->radio_owner) ? p->radio_owner : p->radio_link;
@@ -188,7 +196,8 @@ static void on_frame(void *ctx, uint8_t type, const uint8_t *pl, size_t len)
     case ATALAIA_PROXY_CMD: handle_cmd(p, link, pl, len); break;
     case ATALAIA_PROXY_ACK: handle_ack(p, pl, len); break;
     case ATALAIA_PROXY_RADIO_TX:
-    case ATALAIA_PROXY_RADIO_CMD: handle_radio(p, link, type, pl, len); break;
+    case ATALAIA_PROXY_RADIO_CMD:
+    case ATALAIA_PROXY_RADIO_FIELD_TX: handle_radio(p, link, type, pl, len); break;
     default:
         /* IDENT, EVT and the radio's answers go the other way; unknown types
          * may come from a later version: counted, not answered. */

@@ -39,10 +39,22 @@ typedef enum {
     ATALAIA_PROXY_RADIO_STATUS = 0x09, /* the modem's STATUS */
     ATALAIA_PROXY_RADIO_ERROR = 0x0A,  /* the modem's ERROR */
     ATALAIA_PROXY_RADIO_NOISE = 0x0B,  /* the modem's NOISE, the answer to MEASURE (decision PF2) */
+    /* Field and pair frames, sealed or secured by their two ends; the pod relays their bytes
+     * (protocol/field-frames.md, adoption.md; decision PE24-100). */
+    ATALAIA_PROXY_RADIO_FIELD_TX = 0x0C,  /* the modem's FIELD_TX: id (u16) + a whole frame */
+    ATALAIA_PROXY_RADIO_FIELD_RX = 0x0D,  /* the modem's FIELD_RX: a frame heard + rssi + snr */
+    ATALAIA_PROXY_RADIO_FIELD_ACK = 0x0E, /* the modem's FIELD_ACK: id (u16) + status */
 } atalaia_proxy_type_t;
 
 /* The modem frame type a radio frame carries (proxy type - 3), or 0. */
 uint8_t atalaia_proxy_modem_type(uint8_t proxy_type);
+
+/* An optional bool of IDENT (keys 6-8): left out (an older pod), false or true. */
+typedef enum {
+    ATALAIA_PROXY_UNSAID = 0,
+    ATALAIA_PROXY_NO = 1,
+    ATALAIA_PROXY_YES = 2,
+} atalaia_proxy_opt_t;
 
 typedef struct {
     char fw_version[ATALAIA_PROXY_TEXT_MAX + 1];
@@ -51,7 +63,10 @@ typedef struct {
     bool has_battery;
     uint8_t battery_pct; /* 0-100, when has_battery */
     bool has_radio;
-    uint8_t protocol_version; /* 1 */
+    uint8_t protocol_version;         /* 1 */
+    atalaia_proxy_opt_t field_frames; /* key 6: relays RADIO_FIELD_TX/RX/ACK (PE24-101) */
+    atalaia_proxy_opt_t pair_frames;  /* key 7: and pair frames (type 10) in them */
+    atalaia_proxy_opt_t measure;      /* key 8: answers RADIO_CMD MEASURE */
 } atalaia_proxy_ident_t;
 
 /* EVT (name = event, data) or CMD (name = method, args). */

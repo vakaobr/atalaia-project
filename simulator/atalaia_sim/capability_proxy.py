@@ -9,7 +9,8 @@ radio frames carry the modem's payloads. The C codec (core/src/proxy.c and
 the modem framing) and this one check protocol/vectors/capability_proxy.yaml.
 
     ident: {"fw_version": "0.3.0", "capabilities": [{"id": "btn.red", "type": "button"}],
-            "battery_pct": 87 (optional), "has_radio": True, "protocol_version": 1}
+            "battery_pct": 87 (optional), "has_radio": True, "protocol_version": 1,
+            "field_frames": True, "pair_frames": True, "measure": True (optional bools)}
     evt:   {"cap_id": "btn.red", "event": "hold", "data": {"ms": 5000}, "seq": 7}
     cmd:   {"cap_id": "ring", "method": "fill", "args": {"team": "red"}, "seq": 1}
 """
@@ -30,9 +31,13 @@ IDENT, EVT, CMD, ACK = 0x01, 0x02, 0x03, 0x04
 RADIO_RX, RADIO_TX, RADIO_TX_ACK, RADIO_CMD, RADIO_STATUS, RADIO_ERROR = 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A
 # The modem's NOISE (the answer to MEASURE), 0x08 + 3: decision PF2.
 RADIO_NOISE = 0x0B
+# The modem's FIELD_TX, FIELD_RX and FIELD_ACK (field and pair frames), 0x09-0x0B + 3: PE24-100.
+RADIO_FIELD_TX, RADIO_FIELD_RX, RADIO_FIELD_ACK = 0x0C, 0x0D, 0x0E
 TYPE_NAMES = {IDENT: "IDENT", EVT: "EVT", CMD: "CMD", ACK: "ACK", RADIO_RX: "RADIO_RX",
               RADIO_TX: "RADIO_TX", RADIO_TX_ACK: "RADIO_TX_ACK", RADIO_CMD: "RADIO_CMD",
-              RADIO_STATUS: "RADIO_STATUS", RADIO_ERROR: "RADIO_ERROR", RADIO_NOISE: "RADIO_NOISE"}
+              RADIO_STATUS: "RADIO_STATUS", RADIO_ERROR: "RADIO_ERROR", RADIO_NOISE: "RADIO_NOISE",
+              RADIO_FIELD_TX: "RADIO_FIELD_TX", RADIO_FIELD_RX: "RADIO_FIELD_RX",
+              RADIO_FIELD_ACK: "RADIO_FIELD_ACK"}
 
 # The modem's CMD opcodes (protocol/usb-modem.md), carried by RADIO_CMD.
 OP_PING, OP_CONFIGURE, OP_SET_CHANNEL, OP_STATUS, OP_SET_PEER_EPOCH, OP_CLEAR, OP_IDENT, OP_MEASURE = range(1, 9)
@@ -40,6 +45,8 @@ OP_PING, OP_CONFIGURE, OP_SET_CHANNEL, OP_STATUS, OP_SET_PEER_EPOCH, OP_CLEAR, O
 CAPS_MAX = 16
 TEXT_MAX = 23
 UNKNOWN_KEYS = range(6, 24)  # skipped: a later version's optional fields
+# IDENT's optional bools (PE24-101): what the pod's firmware can do.
+IDENT_FLAGS = {6: "field_frames", 7: "pair_frames", 8: "measure"}
 _NAME = re.compile(r"^[a-z0-9._-]{1,23}$")
 _PRINTABLE = re.compile(r"^[\x20-\x7e]{1,23}$")
 
@@ -185,11 +192,16 @@ def encode_ident(ident: dict[str, Any]) -> bytes:
     if ident.get("protocol_version", VERSION) != VERSION:
         raise ProxyError("protocol_version is 1")
     body[5] = VERSION
+    for key, name in IDENT_FLAGS.items():
+        if ident.get(name) is not None:
+            if not isinstance(ident[name], bool):
+                raise ProxyError(f"{name} is true or false")
+            body[key] = ident[name]
     return _fit(cbor.encode(body))
 
 
 def decode_ident(payload: bytes) -> dict[str, Any]:
-    m = _decode_map(payload, {1, 2, 4, 5}, {1, 2, 3, 4, 5})
+    m = _decode_map(payload, {1, 2, 4, 5}, {1, 2, 3, 4, 5, *IDENT_FLAGS})
     caps = m[2]
     if not isinstance(caps, list) or len(caps) > CAPS_MAX:
         raise ProxyError(f"capabilities is a list of at most {CAPS_MAX}")
@@ -203,6 +215,11 @@ def decode_ident(payload: bytes) -> dict[str, Any]:
         out["battery_pct"] = _uint("battery_pct", m[3], 100)
     out["has_radio"] = m[4]
     out["protocol_version"] = VERSION
+    for key, name in IDENT_FLAGS.items():
+        if key in m:
+            if not isinstance(m[key], bool):
+                raise ProxyError(f"{name} is true or false")
+            out[name] = m[key]
     return out
 
 
@@ -291,6 +308,21 @@ def radio_noise(r: dict[str, int]) -> bytes:
     return struct.pack(">IHHbbbbbHH", r["channel_hz"], r["dwell_ms"], r["samples"], r["min_dbm"],
                        r["mean_dbm"], r["p50_dbm"], r["p90_dbm"], r["max_dbm"], r["cad_tries"],
                        r["cad_detected"])
+
+
+def radio_field_tx(frame_id: int, frame: bytes) -> bytes:
+    """RADIO_FIELD_TX: the modem's FIELD_TX, an id and a whole field or pair frame, as it is."""
+    return _uint("id", frame_id, 0xFFFF).to_bytes(2, "big") + frame
+
+
+def radio_field_rx(frame: bytes, rssi: int, snr: int) -> bytes:
+    """RADIO_FIELD_RX: the modem's FIELD_RX, the frame heard with its RSSI and SNR."""
+    return frame + rssi.to_bytes(1, "big", signed=True) + snr.to_bytes(1, "big", signed=True)
+
+
+def radio_field_ack(frame_id: int, status: int) -> bytes:
+    """RADIO_FIELD_ACK: the modem's FIELD_ACK, the id and a TX_ACK status (0-8)."""
+    return _uint("id", frame_id, 0xFFFF).to_bytes(2, "big") + bytes([_uint("status", status, 8)])
 
 
 def describe(frame_type: int) -> Optional[str]:

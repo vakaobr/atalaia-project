@@ -57,6 +57,7 @@ Between games, boxes and controllers exchange **field frames** ([field-frames.md
 - **FIELD_TX**: the controller's id for it (its FIELD_ACK names it) and the whole frame, sealed by the controller. The modem checks only the shape (version 1, encrypted, game 0, type 9, 31-217 bytes), forces `hop_limit` to 0 (outside the MIC, so it still holds) and queues it on its current channel, the duty cycle counting as for any packet. FIELD_ACK: `ok`, `duty_cycle`, `timeout`, `invalid` (not a field frame's shape), `queue_full`, `no_radio`, or `busy` while a MEASURE runs. It never touches the game's nonce counter.
 - **FIELD_RX**: every packet heard with that shape, before any game check, with its RSSI and SNR. No dedupe and no relay: field frames are not flooded.
 - **Pair frames** ([adoption.md](adoption.md) section 7, RFC 0001 Amendment 8): message type 10 with game id 0, *not* encrypted (their security is CPace's, between a controller and an unadopted box), 10-209 bytes, go and come the same way, in FIELD_TX and FIELD_RX, with the same `hop_limit` 0 and duty-cycle rules; the shape check takes either type. IDENT says `"pair": true` when the firmware carries them.
+- **Through an I/O pod** (decision PE24-100): the pod runs this code and puts FIELD_TX, FIELD_RX and FIELD_ACK on its links as RADIO_FIELD_TX, RADIO_FIELD_RX and RADIO_FIELD_ACK (`0x0C`-`0x0E`, these types plus 3); its CBOR IDENT says `field_frames` and `pair_frames` ([capability-proxy.md](capability-proxy.md)).
 
 ## RX
 

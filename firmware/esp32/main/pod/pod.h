@@ -18,7 +18,9 @@
  *          IDENT starts the list again, since the phone numbers from 0);
  *   RADIO_ the USB radio modem's own logic (main/modem/modem.c) with the
  *          frame types shifted by 3: AES-CCM, dedupe, the epoch window, the
- *          duty cycle and the channel rules are the modem's.
+ *          duty cycle and the channel rules are the modem's. Field and pair
+ *          frames (RADIO_FIELD_TX/RX/ACK, 0x0C-0x0E) are relayed as the modem
+ *          carries them: sealed by the phone, never opened here (PE24-100).
  *
  * The game key lives in RAM only, as on the modem, and is forgotten (CLEAR)
  * when the link that configured the radio goes away (decision PF5): a phone
@@ -56,9 +58,9 @@ typedef struct {
     /* A valid CMD, acted on once. Returns false if the pod has no such
      * capability or method (the CMD was acknowledged all the same). */
     bool (*command)(void *ctx, const atalaia_proxy_msg_t *cmd);
-    /* The IDENT's fw_version, caps_json and battery; the pod fills has_radio
-     * and protocol_version. compact: the first try did not fit in 256
-     * bytes; leave out what is optional (the buttons' colours). */
+    /* The IDENT's fw_version, caps_json and battery; the pod fills has_radio,
+     * protocol_version, measure, field_frames and pair_frames. compact: the first try did not fit
+     * in 256 bytes; leave out what is optional (the buttons' colours). */
     void (*ident)(void *ctx, atalaia_proxy_ident_t *out, bool compact);
     /* A link became active (may be NULL): the capabilities may report their
      * state again (an open case). */

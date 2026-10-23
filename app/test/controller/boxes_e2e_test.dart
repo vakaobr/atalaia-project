@@ -423,7 +423,7 @@ void main() {
   });
 
   test(
-    'an I/O pod that does not relay field frames: the controller says so',
+    'an I/O pod relays field and pair frames (PE24-100): the controller uses it as its radio',
     () async {
       final pod = await HostPod.start(airPeer: hub.port);
       addTearDown(pod.stop);
@@ -446,15 +446,14 @@ void main() {
       ControllerPairing(e);
       await (m as PodModem).start();
       expect(await waitFor(() => m.isUp), isTrue);
-      expect(m.hasFieldFrames, isFalse);
-      expect(m.sendField(Uint8List(40)), isNull);
-      expect(e.boxes!.boxes()['field_frames'], isFalse);
-      expect(
-        () => e.pairing!.listen(),
-        throwsA(isA<ControllerError>().having((x) => x.status, 'status', 503)),
-      );
+      // Since PE24-100 the pod's IDENT says field_frames and pair_frames and
+      // it relays them as the USB modem does.
+      expect(m.hasFieldFrames, isTrue);
+      expect(m.hasPairFrames, isTrue);
+      expect(e.boxes!.boxes()['field_frames'], isTrue);
+      e.pairing!.listen();
       final gid = game(e);
-      expect(e.endGame(gid)['game_over_frame'], 'no_radio');
+      expect(e.endGame(gid)['game_over_frame'], 'sent');
       e.close();
     },
   );

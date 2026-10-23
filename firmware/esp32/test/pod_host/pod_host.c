@@ -17,7 +17,9 @@
  *     connected, paired (an encrypted link) and turned notifications on;
  *   - the "air" is UDP on 127.0.0.1, as for the host modem: every datagram
  *     received on the air port is a packet heard on the radio, every packet
- *     sent goes to the air peer port;
+ *     sent goes to the air peer port (field and pair frames too: the phone's
+ *     RADIO_FIELD_TX goes on air as it is, and what is heard comes back as
+ *     RADIO_FIELD_RX, so a test can use the pod where it used the modem);
  *   - the hardware is lines on stdin, and what the pod does with its outputs
  *     is lines on stdout.
  *
@@ -399,7 +401,8 @@ static void print_status(void)
 {
     out("STATUS {\"usb\":%s,\"ble\":%s,\"radio_configured\":%s,\"radio_owner\":%d,\"pending\":%u,"
         "\"evt_sent\":%lu,\"evt_acked\":%lu,\"evt_lost\":%lu,\"cmds\":%lu,\"cmd_repeats\":%lu,"
-        "\"cmd_unknown\":%lu,\"bad_payloads\":%lu,\"ignored\":%lu,\"links_broken\":%lu}",
+        "\"cmd_unknown\":%lu,\"bad_payloads\":%lu,\"ignored\":%lu,\"links_broken\":%lu,"
+        "\"field_tx\":%lu,\"field_rx\":%lu}",
         pod_link_active(&pod, POD_LINK_USB) ? "true" : "false",
         pod_link_active(&pod, POD_LINK_BLE) ? "true" : "false",
         pod.radio.configured ? "true" : "false", pod.radio_owner, (unsigned)pod_pending(&pod),
@@ -407,7 +410,8 @@ static void print_status(void)
         (unsigned long)pod.count.evt_lost, (unsigned long)pod.count.cmds,
         (unsigned long)pod.count.cmd_repeats, (unsigned long)pod.count.cmd_unknown,
         (unsigned long)pod.count.bad_payloads, (unsigned long)pod.count.ignored,
-        (unsigned long)pod.count.links_broken);
+        (unsigned long)pod.count.links_broken, (unsigned long)pod.radio.count.field_tx,
+        (unsigned long)pod.radio.count.field_rx);
 }
 
 /* Returns false on "quit". */

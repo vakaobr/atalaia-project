@@ -15,6 +15,7 @@ from atalaia_sim import capability_proxy as cp
 VECTORS = yaml.safe_load((Path(__file__).resolve().parents[2] / "protocol" / "vectors" /
                           "capability_proxy.yaml").read_text(encoding="utf-8"))
 KINDS = {"evt": cp.EVT, "cmd": cp.CMD}
+RELAY = VECTORS["pod_relay"]  # field and pair frames through the pod, IDENT keys 6-8 (PE24-100)
 
 
 class FramingTests(unittest.TestCase):
@@ -27,7 +28,9 @@ class FramingTests(unittest.TestCase):
         rows += [(KINDS[k], v) for k in ("evt", "cmd") for v in VECTORS[k]]
         rows += [(cp.ACK, v) for v in VECTORS["ack"]]
         rows += [(v["type"], v) for v in VECTORS["radio"]]
-        self.assertGreaterEqual(len(rows), 20)
+        rows += [(cp.IDENT, v) for v in RELAY["ident"]]
+        rows += [(v["type"], v) for v in RELAY["radio"]]
+        self.assertGreaterEqual(len(rows), 27)
         for frame_type, v in rows:
             with self.subTest(v["name"]):
                 payload, frame = bytes.fromhex(v["payload"]), bytes.fromhex(v["frame"])
@@ -54,7 +57,7 @@ class FramingTests(unittest.TestCase):
 
 class PayloadTests(unittest.TestCase):
     def test_ident(self) -> None:
-        for v in VECTORS["ident"]:
+        for v in VECTORS["ident"] + RELAY["ident"]:
             with self.subTest(v["name"]):
                 payload = bytes.fromhex(v["payload"])
                 self.assertEqual(cp.encode_ident(v["fields"]), payload)
@@ -103,9 +106,29 @@ class PayloadTests(unittest.TestCase):
             self.assertIn(v["type"], range(cp.RADIO_RX, cp.RADIO_NOISE + 1))
         self.assertEqual(cp.describe(cp.RADIO_NOISE), "RADIO_NOISE")
 
+    def test_relay_payloads(self) -> None:
+        """RADIO_FIELD_TX/RX/ACK: the modem's FIELD_TX/RX/ACK (0x09-0x0B) plus 3, as they are."""
+        for v in RELAY["radio"]:
+            with self.subTest(v["name"]):
+                f = v["fields"]
+                self.assertIn(v["type"], range(cp.RADIO_FIELD_TX, cp.RADIO_FIELD_ACK + 1))
+                if v["type"] == cp.RADIO_FIELD_TX:
+                    got = cp.radio_field_tx(f["id"], bytes.fromhex(f["frame"]))
+                elif v["type"] == cp.RADIO_FIELD_RX:
+                    got = cp.radio_field_rx(bytes.fromhex(f["frame"]), f["rssi"], f["snr"])
+                else:
+                    got = cp.radio_field_ack(f["id"], f["status"])
+                self.assertEqual(got.hex(), v["payload"])
+        self.assertEqual(cp.describe(cp.RADIO_FIELD_ACK), "RADIO_FIELD_ACK")
+        # An older pod's IDENT says nothing of the flags; this one says each.
+        self.assertNotIn("measure", cp.decode_ident(bytes.fromhex(VECTORS["ident"][0]["payload"])))
+        flags = cp.decode_ident(bytes.fromhex(RELAY["ident"][1]["payload"]))
+        self.assertEqual((flags["measure"], flags["field_frames"], flags["pair_frames"]),
+                         (False, True, True))
+
     def test_invalid(self) -> None:
         self.assertGreaterEqual(len(VECTORS["invalid"]), 20)
-        for v in VECTORS["invalid"]:
+        for v in VECTORS["invalid"] + RELAY["invalid"]:
             with self.subTest(v["name"]):
                 payload = bytes.fromhex(v["payload"])
                 with self.assertRaises(cp.ProxyError):
@@ -133,7 +156,8 @@ class PayloadTests(unittest.TestCase):
         ident = VECTORS["ident"][0]["fields"]
         for bad in ({**ident, "battery_pct": 101}, {**ident, "capabilities": [{"id": "x"}]},
                     {**ident, "protocol_version": 2}, {**ident, "has_radio": 1},
-                    {**ident, "capabilities": [{"id": "b", "type": "t"}] * 17}):
+                    {**ident, "capabilities": [{"id": "b", "type": "t"}] * 17},
+                    {**ident, "measure": 1}, {**ident, "pair_frames": "yes"}):
             with self.subTest(bad):
                 with self.assertRaises(cp.ProxyError):
                     cp.encode_ident(bad)
