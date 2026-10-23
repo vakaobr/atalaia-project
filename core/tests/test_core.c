@@ -17,7 +17,7 @@ int check_failures = 0;
 
 static void test_version(void)
 {
-    CHECK(strcmp(atalaia_version(), "0.2.0") == 0);
+    CHECK(strcmp(atalaia_version(), "0.3.0-dev") == 0);
     CHECK(ATALAIA_PROTOCOL_VERSION == 1);
 }
 

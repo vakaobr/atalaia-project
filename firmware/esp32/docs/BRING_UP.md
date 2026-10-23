@@ -139,7 +139,9 @@ firmware no longer reads a button there.
    The log goes to UART0 and to this USB port; what you type on the USB
    port (`@join`, `@joinkey`, `@adopt-info`) reaches the box
    (`CONFIG_ATALAIA_CONSOLE_USB_INPUT`).
-3. Verify: boot log shows firmware version, PSRAM detection (2 MB on
+3. Verify: boot log shows the firmware version with its commit (`Atalaia firmware
+   v0.3.0-dev.412+g8560d54 (core v0.3.0-dev)`, the commit you built; `.dirty` if the tree
+   had changes; what `python3 tools/docker_fw.py version` printed), PSRAM detection (2 MB on
    V4.3), tier selection (should be "full").
 4. Verify: no crash loops (watchdog resets).
 5. Verify: one line per part. A part that is not connected logs a warning
@@ -503,12 +505,14 @@ section 11 (`%FLASH%`, `COM5`).
 
    Note its `public key (hex)` (HEX below) and `(base64)` (B64).
 2. **Image A (installed by USB) and image B (the update)**, both bench builds trusting that
-   key; B has a higher version. Each build replaces `build-bench/`, so copy each out:
+   key; B has a higher version. A is a development build (its version carries the commit,
+   `0.3.0-dev.N+g<commit>`); B gets an exact one above every dev build of 0.3.0 (FV-4). Each
+   build replaces `build-bench/`, so copy each out:
 
    ```sh
    python3 tools/docker_fw.py bench --release-keys=HEX
    cp -r firmware/esp32/build-bench /mnt/c/atalaia-bench-A
-   python3 tools/docker_fw.py bench --release-keys=HEX --fw-version=0.2.1-bench.1
+   python3 tools/docker_fw.py bench --release-keys=HEX --fw-version=0.3.1-bench.1
    mkdir -p ~/atalaia-bench/B && cp firmware/esp32/build-bench/atalaia_esp32.bin ~/atalaia-bench/B/
    python3 tools/firmware_release.py sign ~/atalaia-bench/B/atalaia_esp32.bin --key ~/atalaia-bench/bench.pem
    ```
@@ -524,8 +528,8 @@ section 11 (`%FLASH%`, `COM5`).
    %FLASH% -m serial.tools.miniterm COM5 115200
    ```
 
-   The log shows `Atalaia firmware v0.2.0` and `fw_update: 1 release key(s); version 0.2.0,
-   variant box-bench, board heltec_v4_3`.
+   The log shows `Atalaia firmware v0.3.0-dev.N+g<commit>` and `fw_update: 1 release key(s);
+   version 0.3.0-dev.N+g<commit>, variant box-bench, board heltec_v4_3`.
 4. **The controller, without a radio, serving HTTPS on the PC's network address** (find it
    with `ipconfig`: 192.168.1.50 below). A `bench.toml`:
 
@@ -557,24 +561,24 @@ section 11 (`%FLASH%`, `COM5`).
 
    The log shows `join key: stored`, `field: joined game ...` and `field Wi-Fi: stored`.
 6. **Upload B** in the console's *Boxes* tab (*Firmware updates*: the `.bin` and its
-   `.release.json`). It is listed as `0.2.1-bench.1`, `heltec_v4_3`, signed by the bench key.
-7. **Update:** on the serial console `@update 0.2.1-bench.1 <release id>`. Expected: the OLED
-   shows `UPDATING` and the percentage, the log `update to 0.2.1-bench.1 ... started`, then
-   `installed (... bytes): rebooting into it`; after the reboot `firmware 0.2.1-bench.1 confirmed
-   after its self-test` and `Atalaia firmware v0.2.1-bench.1`. The controller's log shows the
+   `.release.json`). It is listed as `0.3.1-bench.1`, `heltec_v4_3`, signed by the bench key.
+7. **Update:** on the serial console `@update 0.3.1-bench.1 <release id>`. Expected: the OLED
+   shows `UPDATING` and the percentage, the log `update to 0.3.1-bench.1 ... started`, then
+   `installed (... bytes): rebooting into it`; after the reboot `firmware 0.3.1-bench.1 confirmed
+   after its self-test` and `Atalaia firmware v0.3.1-bench.1`. The controller's log shows the
    box's report (started from the console, the update was not one the controller sent: it logs
    it and keeps no record). Note the download time and the heap left (`mem_monitor`).
 8. **What must be refused** (each leaves the box on the version it runs):
-   - `@update 0.2.1-bench.1 <release id>` again: `update refused: not_newer`.
+   - `@update 0.3.1-bench.1 <release id>` again: `update refused: not_newer`.
    - Another throw-away key K2 (step 1), its B64 added to `release_keys` (the controller
-     trusts it, the box does not): build `--fw-version=0.2.2-bench.1` with `--release-keys=HEX`,
-     sign it with K2, upload, `@update`: `update to 0.2.2-bench.1 failed: bad_signature`.
+     trusts it, the box does not): build `--fw-version=0.3.2-bench.1` with `--release-keys=HEX`,
+     sign it with K2, upload, `@update`: `update to 0.3.2-bench.1 failed: bad_signature`.
    - The same image signed with the bench key, and the USB cable pulled while the OLED shows
-     about 50 %: after power-up the box still runs 0.2.1-bench.1.
-   - **Rollback:** build `--fw-version=0.2.3-bench.1` **without** `--release-keys`, sign it with
-     the bench key, upload, `@update 0.2.3-bench.1 <id>`: it installs and reboots, its self-test
+     about 50 %: after power-up the box still runs 0.3.1-bench.1.
+   - **Rollback:** build `--fw-version=0.3.3-bench.1` **without** `--release-keys`, sign it with
+     the bench key, upload, `@update 0.3.3-bench.1 <id>`: it installs and reboots, its self-test
      fails (`core FAILED`: an image without a release key could never be updated again), and
-     the box comes back on 0.2.1-bench.1 (`rolling back`, then the old version's boot log).
+     the box comes back on 0.3.1-bench.1 (`rolling back`, then the old version's boot log).
 9. **Afterwards:** delete `~/atalaia-bench` (the keys with it) and flash a normal build.
 
 ## Step 10d: The USB radio modem's screen

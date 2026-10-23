@@ -14,9 +14,18 @@
                                                accept new screen renders as the references
     python tools/docker_fw.py clean            delete the firmware build folders
 
+    python tools/docker_fw.py version          the version a build here would carry (no Docker)
+
+Every image's version (esp_app_desc_t, HELLO's fw_version, a firmware update's check) is
+the core's (core/include/atalaia/version.h, 0.3.0-dev while 0.3.0 is developed) with the
+commit it was built from, worked out here from the checkout: 0.3.0-dev.412+g8560d54 (commits
+since the last release tag v<X.Y.Z>, or since the first commit; the commit's first 7 hex
+digits), with ".dirty" when tracked files have uncommitted changes. A copy with no commit
+(a tarball, a fresh `git init`) or no git gets the core's version alone (decisions FV-1 to FV-4).
+
 `build`, `bench` and `wokwi` (the Field Box) also take:
-    --fw-version=0.2.1-bench.1                 the firmware's version instead of the core's
-                                               (a release candidate, or a bench test of an update)
+    --fw-version=0.3.0-rc.1                    the exact version instead (a release or a release
+                                               candidate, or a bench test of an update)
     --release-keys=<hex or base64>[,...]       the release public keys a box accepts updates from
                                                (CONFIG_ATALAIA_OTA_RELEASE_KEYS; default: none, and
                                                the box refuses every update). Public keys only:
@@ -43,10 +52,14 @@ import re
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 REPO = Path(__file__).resolve().parents[1]
 FW = REPO / "firmware" / "esp32"
+VERSION_H = REPO / "core" / "include" / "atalaia" / "version.h"
+FW_VERSION_LEN = 31  # esp_app_desc_t's version (32 bytes with its NUL)
 IDF_IMAGE = "espressif/idf:v5.3.2"
 DEV_IMAGE = "atalaia-dev"
 DEV_LABEL = "org.atalaia.dockerfile"
@@ -66,6 +79,87 @@ BENCH_DEFAULTS = ("sdkconfig.defaults", "sdkconfig.bench")
 def fail(message: str) -> int:
     print(f"docker_fw: {message}", file=sys.stderr)
     return 1
+
+
+# ---- the firmware's version (decisions FV-1 to FV-4) ------------------------------------
+
+_IDS = r"[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*"
+FW_VERSION = re.compile(rf"\d{{1,4}}\.\d{{1,4}}\.\d{{1,4}}(?:-({_IDS}))?(?:\+({_IDS}))?")
+
+
+def valid_fw_version(version: str) -> bool:
+    """MAJOR.MINOR.PATCH[-pre-release][+build] as the box takes it (fw_update.c's fw_version_valid:
+    1-20 characters each for the pre-release and the build metadata) and at most 31 characters."""
+    m = FW_VERSION.fullmatch(version)
+    return (m is not None and len(version) <= FW_VERSION_LEN
+            and all(part is None or len(part) <= 20 for part in m.groups()))
+
+
+def core_version(text: Optional[str] = None) -> str:
+    """The core's version from version.h: MAJOR.MINOR.PATCH, and -PRERELEASE when it has one."""
+    text = VERSION_H.read_text(encoding="utf-8") if text is None else text
+    numbers = [re.search(rf"#define ATALAIA_VERSION_{name} +(\d+)", text)
+               for name in ("MAJOR", "MINOR", "PATCH")]
+    if not all(numbers):
+        raise ValueError("version.h: ATALAIA_VERSION_MAJOR, _MINOR and _PATCH")
+    out = ".".join(m.group(1) for m in numbers if m)
+    pre = re.search(r'#define ATALAIA_VERSION_PRERELEASE +"([0-9A-Za-z.]*)"', text)
+    return f"{out}-{pre.group(1)}" if pre and pre.group(1) else out
+
+
+@dataclass(frozen=True)
+class Checkout:
+    """What the checkout says about the commit being built."""
+
+    commit: str  # the first 7 hex digits of HEAD
+    count: int  # commits since the last release tag (or since the first commit)
+    tag: Optional[str]  # that release tag (v0.2.0), or None
+    dirty: bool  # tracked files differ from HEAD
+
+
+def _git(*args: str) -> Optional[str]:
+    try:
+        out = subprocess.run(["git", "-C", str(REPO), *args], capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return out.stdout.strip() if out.returncode == 0 else None
+
+
+def checkout() -> Optional[Checkout]:
+    """HEAD's commit, the commits since the last release tag (v<digits>..., no pre-release: an
+    rc tag never resets the count), and whether tracked files changed; None without git or
+    without a commit (a tarball, the verify script's fresh `git init`)."""
+    head = _git("rev-parse", "--verify", "--quiet", "HEAD^{commit}")
+    if not head or not re.fullmatch(r"[0-9a-f]{40,64}", head):
+        return None
+    tag = _git("describe", "--tags", "--abbrev=0", "--match", "v[0-9]*", "--exclude", "v*-*", "HEAD")
+    count = _git("rev-list", "--count", f"{tag}..HEAD" if tag else "HEAD")
+    if count is None or not count.isdigit():
+        return None
+    status = _git("status", "--porcelain", "--untracked-files=no")
+    return Checkout(commit=head[:7], count=int(count), tag=tag or None, dirty=bool(status))
+
+
+def build_version(core: str, co: Optional[Checkout]) -> str:
+    """The version a development build carries. While the core's version is a pre-release
+    (0.3.0-dev), <core>.<count>+g<commit>[.dirty]: dev.N compares as a number, so a later commit
+    is newer, every dev build is older than the release and newer than 0.2.0, and the build
+    metadata (the commit) is ignored in the order. A release's version (0.3.0) is kept as it is
+    on its tag with no change; any other commit gets <core>+<count>.g<commit>[.dirty], equal to
+    the release in the order (FV-3). No checkout: the core's version."""
+    if co is None:
+        return core
+    meta = f"g{co.commit}" + (".dirty" if co.dirty else "")
+    if "-" in core:
+        return f"{core}.{co.count}+{meta}"
+    if co.tag == f"v{core}" and co.count == 0 and not co.dirty:
+        return core
+    return f"{core}+{co.count}.{meta}"
+
+
+def firmware_version() -> str:
+    """--fw-version when given, else this checkout's build version."""
+    return FW_OPTIONS.get("fw_version") or build_version(core_version(), checkout())
 
 
 def docker(*args: str, quiet: bool = False) -> int:
@@ -128,12 +222,11 @@ def release_keys_hex(text: str) -> str | None:
     return " ".join(out) if len(out) <= 4 else None
 
 
-def field_box_options(build_dir: str) -> tuple[list[str], tuple[str, ...]]:
-    """The Field Box's version (a CMake cache value, set on every build so that it never sticks)
-    and its release and mode keys (a defaults file in the build folder, rewritten only when it
-    changes)."""
+def field_box_options(build_dir: str) -> tuple[str, ...]:
+    """The Field Box's release and mode keys (a defaults file in the build folder, rewritten only
+    when it changes)."""
     if build_dir not in FIELD_BOX_BUILDS:
-        return [], ()
+        return ()
     keys_file = FW / build_dir / "sdkconfig.release_keys"
     text = ("# Written by tools/docker_fw.py (--release-keys): public keys only.\n"
             f'CONFIG_ATALAIA_OTA_RELEASE_KEYS="{FW_OPTIONS.get("release_keys", "")}"\n'
@@ -141,14 +234,19 @@ def field_box_options(build_dir: str) -> tuple[list[str], tuple[str, ...]]:
     keys_file.parent.mkdir(parents=True, exist_ok=True)
     if not keys_file.exists() or keys_file.read_text() != text:
         keys_file.write_text(text)
-    version = FW_OPTIONS.get("fw_version", "")
-    return [f"-D ATALAIA_FW_VERSION={version}"], (f"{build_dir}/sdkconfig.release_keys",)
+    return (f"{build_dir}/sdkconfig.release_keys",)
 
 
 def variant(build_dir: str, defaults: tuple[str, ...]) -> int:
-    """Builds a variant (defaults applied on top of sdkconfig.defaults) into build_dir."""
-    cmake_args, extra_defaults = field_box_options(build_dir)
-    defaults = defaults + extra_defaults
+    """Builds a variant (defaults applied on top of sdkconfig.defaults) into build_dir, with the
+    firmware's version (a CMake cache value, set on every build so that it never sticks)."""
+    version = firmware_version()
+    if not valid_fw_version(version):
+        return fail(f"the version {version!r} is not MAJOR.MINOR.PATCH[-pre-release][+build] of at most "
+                    f"{FW_VERSION_LEN} characters; give one with --fw-version=")
+    print(f"docker_fw: firmware version {version}", flush=True)
+    cmake_args = [f"-D ATALAIA_FW_VERSION={version}"]
+    defaults = defaults + field_box_options(build_dir)
     # The variant's sdkconfig lives in its build folder. Regenerate it when
     # the defaults change, so edits to them always take effect.
     sdkconfig = FW / build_dir / "sdkconfig"
@@ -161,7 +259,10 @@ def variant(build_dir: str, defaults: tuple[str, ...]) -> int:
         f"idf.py -B {build_dir} -D SDKCONFIG={build_dir}/sdkconfig "
         f"-D 'SDKCONFIG_DEFAULTS={';'.join(defaults)}' {' '.join(cmake_args)} build"
     )
-    return run_idf(script)
+    code = run_idf(script)
+    if code == 0:
+        print(f"\nVersion: {version} (firmware/esp32/{build_dir}/, HELLO's fw_version)")
+    return code
 
 
 def wokwi() -> int:
@@ -257,7 +358,7 @@ def main(argv: list[str]) -> int:
     command, options = argv[0], argv[1:]
     box = ["--fw-version=", "--release-keys=", "--mode-keys="]
     known = {"build": box, "wokwi": box, "modem": [], "pod": [], "bench": box,
-             "test": ["--update-screens"], "clean": []}
+             "test": ["--update-screens"], "clean": [], "version": []}
     if command not in known:
         return fail(f"unknown command {command!r}; run with --help")
     for option in options:
@@ -266,9 +367,8 @@ def main(argv: list[str]) -> int:
             return fail(f"unknown option {option!r} for {command}")
         if name == "--fw-version=":
             value = option.split("=", 1)[1]
-            if not re.fullmatch(r"\d{1,4}\.\d{1,4}\.\d{1,4}(-[0-9A-Za-z][0-9A-Za-z.]{0,19})?", value) \
-                    or len(value) > 31:
-                return fail("--fw-version: MAJOR.MINOR.PATCH[-pre-release], at most 31 characters")
+            if not valid_fw_version(value):
+                return fail("--fw-version: MAJOR.MINOR.PATCH[-pre-release][+build], at most 31 characters")
             FW_OPTIONS["fw_version"] = value
         elif name == "--release-keys=":
             keys = release_keys_hex(option.split("=", 1)[1])
@@ -282,6 +382,9 @@ def main(argv: list[str]) -> int:
             FW_OPTIONS["mode_keys"] = keys
     if command == "clean":
         return clean()
+    if command == "version":
+        print(firmware_version())
+        return 0
     try:
         if docker("info", quiet=True) != 0:
             return fail("Docker is not running; start Docker Desktop and try again")

@@ -116,6 +116,14 @@ typedef struct {
 } pod_t;
 
 /*
+ * IDENT's fw_version (1-23 printable bytes) from the image's version (up to 31): the version
+ * itself when it fits; else without the trailing identifiers of its build metadata, one by
+ * one (0.3.0-dev.412+g8560d54.dirty -> 0.3.0-dev.412+g8560d54), then without the metadata;
+ * else cut (decision FV-5). "unknown" for an empty one.
+ */
+void pod_fw_version(const char *image_version, char out[ATALAIA_PROXY_TEXT_MAX + 1]);
+
+/*
  * Prepares the pod. radio_io is the modem's I/O (its serial_write and
  * frame_out are replaced); radio_present says whether the SX1262 answered
  * at boot. Sends nothing.

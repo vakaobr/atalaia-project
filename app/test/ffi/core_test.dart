@@ -28,12 +28,18 @@ void main() {
 
   setUpAll(() => core = AtalaiaCore.open(coreLibraryPath()));
 
-  test('the version is the one core/CMakeLists.txt declares', () {
+  test('the version is the one core/CMakeLists.txt and version.h declare', () {
     final cmake = File('../core/CMakeLists.txt').readAsStringSync();
-    final declared = RegExp(
+    final number = RegExp(
       r'project\(atalaia_core VERSION (\S+)',
     ).firstMatch(cmake)!.group(1);
-    expect(core.version, declared);
+    // A development core adds version.h's pre-release ("0.3.0-dev", FV-1).
+    final pre = RegExp(r'#define ATALAIA_VERSION_PRERELEASE "([^"]*)"')
+        .firstMatch(
+          File('../core/include/atalaia/version.h').readAsStringSync(),
+        )!
+        .group(1)!;
+    expect(core.version, pre.isEmpty ? number : '$number-$pre');
   });
 
   group('event vectors (protocol/vectors/events.yaml) through the C codec', () {

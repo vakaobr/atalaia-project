@@ -25,7 +25,7 @@ Boxes already in the field learn a new key only from a firmware release that car
 
 ## Signing a release
 
-1. Build the release from a clean checkout of the tagged commit: `python3 tools/docker_fw.py build` (the version is the core's, `core/include/atalaia/version.h`, or `--fw-version=` for a release candidate).
+1. Build the release from a clean checkout of the tagged commit: `python3 tools/docker_fw.py build`, or `--fw-version=` for a release candidate. The release commit empties `ATALAIA_VERSION_PRERELEASE` in `core/include/atalaia/version.h` (`0.3.0-dev` becomes `0.3.0`) and is tagged `v0.3.0` (only with the maintainer's go-ahead); built there, clean, the image says exactly `0.3.0` (`docker_fw.py version` prints what a build would carry). Anywhere else a build carries its commit (`0.3.0-dev.412+g8560d54`, `0.3.0+3.gabcdef0` after the tag, `.dirty` with changes; decisions FV-1 to FV-4): sign those only with a bench key. The commit after the release sets the next version with `dev` again (`0.3.1`/`0.4.0`, `"dev"`), so that its builds sort above the release.
 2. Copy `firmware/esp32/build/atalaia_esp32.bin` to the signing machine and sign it:
 
    ```sh

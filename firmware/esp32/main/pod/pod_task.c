@@ -303,10 +303,9 @@ void pod_task_start(const hal_t *hal, const pod_caps_config_t *cfg)
 {
     hw = hal;
     const esp_app_desc_t *app = esp_app_get_description();
-    /* IDENT's fw_version is 1-23 printable bytes: the image's version, cut. */
-    size_t n = strnlen(app->version, ATALAIA_PROXY_TEXT_MAX);
-    memcpy(fw_version, n > 0 ? app->version : "unknown", n > 0 ? n : 7);
-    fw_version[n > 0 ? n : 7] = '\0';
+    /* IDENT's fw_version is 1-23 printable bytes: the image's version, its build metadata
+     * shortened if need be (the boot log has all of it). */
+    pod_fw_version(app->version, fw_version);
 
     usb_serial_jtag_driver_config_t usb = {
         .tx_buffer_size = USB_BUF_SIZE,

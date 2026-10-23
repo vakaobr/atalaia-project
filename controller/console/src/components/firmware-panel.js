@@ -13,11 +13,15 @@ import { html, Component, t } from '../ui.js';
 
 const ACTIVE = ['sent', 'installed'];
 
-/** -1, 0 or 1, as Semantic Versioning orders a and b (firmware_release.py's version_key). */
+/** -1, 0 or 1, as Semantic Versioning orders firmware versions a and b (firmware_release.py's
+ *  firmware_version_key): build metadata (a development build's commit, +g8560d54) is ignored. */
 export function compareVersions(a, b) {
+    const ids = '[0-9A-Za-z]+(?:\\.[0-9A-Za-z]+)*';
+    const re = new RegExp(`^(\\d{1,4})\\.(\\d{1,4})\\.(\\d{1,4})(?:-(${ids}))?(?:\\+(${ids}))?$`);
     const split = (v) => {
-        const m = /^(\d{1,4})\.(\d{1,4})\.(\d{1,4})(?:-([0-9A-Za-z][0-9A-Za-z.]{0,19}))?$/.exec(v || '');
-        return m ? [[+m[1], +m[2], +m[3]], m[4] ? m[4].split('.') : null] : null;
+        const m = re.exec(v || '');
+        if (!m || v.length > 35 || (m[4] && m[4].length > 20) || (m[5] && m[5].length > 20)) return null;
+        return [[+m[1], +m[2], +m[3]], m[4] ? m[4].split('.') : null];
     };
     const x = split(a);
     const y = split(b);

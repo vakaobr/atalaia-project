@@ -1,5 +1,5 @@
 {
-  "description": "Firmware releases and updates over the air (protocol/firmware-update.md, decisions FU3-*). Checked by the shared Python (controller/atalaia_controller/firmware_release.py: the site server's catalogue, the controller, tools/firmware_release.py) and the Field Box's C side (firmware/esp32/main/fw_update.c with Monocypher; firmware/esp32/test/firmware_vectors.h, made by tools/protogen.py). rfc8032: the five Ed25519 test vectors of RFC 8032 section 7.1, copied from the RFC. signing_key is TEST 1's key and other_key TEST 2's: public test keys, never release keys. releases: manifests signed with signing_key (Ed25519 is deterministic: any RFC 8032 implementation makes the same signatures), each with the release text a box fetches; valid ones verify with signing_key alone, invalid ones fail for their reason. release_texts_invalid: texts a box must refuse before any signature check. versions: semver_order is Semantic Versioning 2.0.0's own example; the rest pin this project's rule (firmware.py's VERSION). images: the first 324 bytes of an image (ESP-IDF image and segment headers, esp_app_desc_t, the Atalaia descriptor). reports: a box's report and its HMAC-SHA256 with the game key.",
+  "description": "Firmware releases and updates over the air (protocol/firmware-update.md, decisions FU3-*). Checked by the shared Python (controller/atalaia_controller/firmware_release.py: the site server's catalogue, the controller, tools/firmware_release.py) and the Field Box's C side (firmware/esp32/main/fw_update.c with Monocypher; firmware/esp32/test/firmware_vectors.h, made by tools/protogen.py). rfc8032: the five Ed25519 test vectors of RFC 8032 section 7.1, copied from the RFC. signing_key is TEST 1's key and other_key TEST 2's: public test keys, never release keys. releases: manifests signed with signing_key (Ed25519 is deterministic: any RFC 8032 implementation makes the same signatures), each with the release text a box fetches; valid ones verify with signing_key alone, invalid ones fail for their reason. release_texts_invalid: texts a box must refuse before any signature check. versions: semver_order is Semantic Versioning 2.0.0's own example; the rest pin this project's rule (firmware_release.py's version_key): build_metadata are firmware versions with build metadata (a development build's commit, decision FV-2), valid for a firmware and refused for a mode package; equal includes versions that differ only in it. images: the first 324 bytes of an image (ESP-IDF image and segment headers, esp_app_desc_t, the Atalaia descriptor). reports: a box's report and its HMAC-SHA256 with the game key.",
   "rfc8032": [
     {
       "name": "test_1",
@@ -71,6 +71,18 @@
       "valid": true,
       "why": "a pre-release verifies like any other",
       "release_text": "atalaia-firmware-release-v1\nplatform=esp32s3\nversion=0.3.0-rc.1\nsize=1048576\nsha256=1ac9be62646879b004f63d8096a929d72d97d41bb99436508a90e4ab353a61c7\nsignature=0RiwhWJ95fn9zEKOZHyvK2c5aX2i63AZkQLfLTXDTFSAjE9c8IR8cG3AK9YUECoLn541F8xtsIBkpaAf0IJEBQ==\n"
+    },
+    {
+      "name": "dev_build",
+      "platform": "esp32s3",
+      "version": "0.3.0-dev.412+g8560d54",
+      "size": 1048576,
+      "sha256": "c0ffee8560d548560d548560d548560d548560d548560d548560d548560d54aa",
+      "signature": "9BTWBjOd5GXZsIpH2q/H+RuR1B6Iz1OEYbkUfO7Ip7csFuz1V0uN2Mt4piuPYKs4HXo5FzcqI0Qq7n3VCYDJBg==",
+      "manifest": "atalaia-firmware-release-v1\nplatform=esp32s3\nversion=0.3.0-dev.412+g8560d54\nsize=1048576\nsha256=c0ffee8560d548560d548560d548560d548560d548560d548560d548560d54aa\n",
+      "valid": true,
+      "why": "a development build's version carries its commit as build metadata (FV-2): signed like any other",
+      "release_text": "atalaia-firmware-release-v1\nplatform=esp32s3\nversion=0.3.0-dev.412+g8560d54\nsize=1048576\nsha256=c0ffee8560d548560d548560d548560d548560d548560d548560d548560d54aa\nsignature=9BTWBjOd5GXZsIpH2q/H+RuR1B6Iz1OEYbkUfO7Ip7csFuz1V0uN2Mt4piuPYKs4HXo5FzcqI0Qq7n3VCYDJBg==\n"
     },
     {
       "name": "other_platform",
@@ -233,11 +245,6 @@
       "why": "MAJOR.MINOR.PATCH"
     },
     {
-      "name": "build_metadata",
-      "text": "atalaia-firmware-release-v1\nplatform=esp32s3\nversion=0.3.0+b1\nsize=1572864\nsha256=267f9618b46a4380e216ca546a15c6897f4ecec907592223459f83780807f858\nsignature=1hjc3Vt+v1cgLUOQ9bm/DounjWZCB+rXA98GpFYGSHZituPmAUmWSqJsyddtpZ6dP7vuQO9PBURlDofIhtUuDA==\n",
-      "why": "no build metadata"
-    },
-    {
       "name": "size_leading_zero",
       "text": "atalaia-firmware-release-v1\nplatform=esp32s3\nversion=0.3.0\nsize=01572864\nsha256=267f9618b46a4380e216ca546a15c6897f4ecec907592223459f83780807f858\nsignature=1hjc3Vt+v1cgLUOQ9bm/DounjWZCB+rXA98GpFYGSHZituPmAUmWSqJsyddtpZ6dP7vuQO9PBURlDofIhtUuDA==\n",
       "why": "the size in its canonical decimal form"
@@ -320,6 +327,12 @@
       "0.2.0",
       "0.2.1-bench.1",
       "0.2.1",
+      "0.3.0-dev",
+      "0.3.0-dev.1+g0000001",
+      "0.3.0-dev.9+gfedcba9.dirty",
+      "0.3.0-dev.10+g1234567",
+      "0.3.0-dev.412+g8560d54",
+      "0.3.0-dev.1234+g1234567",
       "0.3.0-rc.2",
       "0.3.0-rc.10",
       "0.3.0",
@@ -338,6 +351,22 @@
       [
         "0.0.1-00000000000000000002",
         "0.0.1-2"
+      ],
+      [
+        "0.3.0-dev.412+g8560d54",
+        "0.3.0-dev.412"
+      ],
+      [
+        "0.3.0-dev.412+g8560d54",
+        "0.3.0-dev.412+gabcdef0.dirty"
+      ],
+      [
+        "1.0.0+build",
+        "1.0.0"
+      ],
+      [
+        "1.0.0-rc.1+b.2",
+        "1.0.0-rc.1+b.10"
       ]
     ],
     "valid": [
@@ -349,6 +378,17 @@
       "1.2.3-0",
       "1.2.3-rc.1"
     ],
+    "build_metadata": [
+      "1.0.0+build",
+      "1.0.0+0",
+      "1.0.0+001.a",
+      "0.3.0-dev+gabcdef0",
+      "0.3.0-dev.412+g8560d54",
+      "0.3.0-dev.412+g8560d54.dirty",
+      "0.3.0-dev.12345+g1234567.dirty",
+      "1.2.3-rc.1+12345678901234567890",
+      "1234.1234.1234-12345+gabcdef0.dirty"
+    ],
     "invalid": [
       "",
       "1",
@@ -356,7 +396,17 @@
       "1.0.0.0",
       "v1.0.0",
       "1.0.0-",
-      "1.0.0+build",
+      "1.0.0+",
+      "1.0.0-+build",
+      "1.0.0+a..b",
+      "1.0.0+.a",
+      "1.0.0+a.",
+      "1.0.0+a+b",
+      "1.0.0+a-b",
+      "1.0.0+a_b",
+      "1.0.0+123456789012345678901",
+      "1234.1234.1234-123456+gabcdef0.dirty",
+      "1.0.0+build ",
       "12345.0.0",
       "1.0.0-rc..1",
       "1.0.0-rc.",

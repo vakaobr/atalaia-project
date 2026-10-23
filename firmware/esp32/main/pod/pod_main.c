@@ -16,6 +16,7 @@
 #include <string.h>
 
 #include "atalaia/version.h"
+#include "esp_app_desc.h"
 #include "esp_log.h"
 #include "hal/hal.h"
 #include "hal/esp/hal_esp.h"
@@ -44,7 +45,8 @@ void app_main(void)
 {
     static hal_t hal;
     memset(&hal, 0, sizeof(hal));
-    ESP_LOGI(TAG, "Atalaia I/O pod, core %s", atalaia_version());
+    ESP_LOGI(TAG, "Atalaia I/O pod %s, core %s", esp_app_get_description()->version,
+             atalaia_version());
 
     /* NVS: NimBLE keeps its bonds there, the PHY its calibration. */
     esp_err_t err = nvs_flash_init();

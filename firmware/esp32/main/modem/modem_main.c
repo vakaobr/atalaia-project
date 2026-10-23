@@ -31,7 +31,8 @@ void app_main(void)
     memset(&hal, 0, sizeof(hal));
     hal.radio = &hal_esp_radio_ops;
 
-    ESP_LOGI(TAG, "Atalaia USB radio modem, core %s", atalaia_version());
+    ESP_LOGI(TAG, "Atalaia USB radio modem %s, core %s", esp_app_get_description()->version,
+             atalaia_version());
     hal_esp_board_power_on();
     if (hal.radio->init() != 0) {
         ESP_LOGW(TAG, "radio: not available (no SX1262); TX frames get status no_radio");

@@ -89,7 +89,7 @@ class FirmwareUpdates:
                 continue
             if isinstance(entry, dict) and (self.dir / f"{entry.get('sha256')}.bin").is_file():
                 out.append(entry)
-        out.sort(key=lambda e: (e["platform"], fr.version_key(e["version"]) or ()), reverse=True)
+        out.sort(key=lambda e: (e["platform"], fr.firmware_version_key(e["version"]) or ()), reverse=True)
         return out
 
     def _signer(self, e: dict[str, Any]) -> Optional[str]:
@@ -120,8 +120,9 @@ class FirmwareUpdates:
             raise Conflict("no release key is configured ([firmware] release_keys): no release is accepted")
         if platform not in BOX_PLATFORMS:
             raise ControllerError(f"platform: one of {', '.join(BOX_PLATFORMS)} (a Field Box's)")
-        if not isinstance(version, str) or fr.version_key(version) is None or len(version) > 31:
-            raise ControllerError("version: MAJOR.MINOR.PATCH with an optional -pre-release, at most 31 characters")
+        if not isinstance(version, str) or fr.firmware_version_key(version) is None or len(version) > 31:
+            raise ControllerError("version: MAJOR.MINOR.PATCH with an optional -pre-release and +build, "
+                                  "at most 31 characters")
         if fr.signature_bytes(signature) is None:
             raise ControllerError("signature: 64 bytes in standard base64 (88 characters)")
         if not 1 <= len(image) <= SLOT_SIZE:
@@ -223,7 +224,7 @@ class FirmwareUpdates:
             return "wrong_platform"
         if node.get("tier") not in BOX_TIERS:
             return "wrong_tier"
-        if fr.version_key(str(node["fw_version"])) is None:
+        if fr.firmware_version_key(str(node["fw_version"])) is None:
             return "unknown_version"
         if fr.compare_versions(release["version"], str(node["fw_version"])) <= 0:
             return "not_newer"

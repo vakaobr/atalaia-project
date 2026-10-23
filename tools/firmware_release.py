@@ -149,8 +149,8 @@ def cmd_sign(args: argparse.Namespace) -> int:
     image = image_path.read_bytes()
     info = describe(image)
     version = args.version or info.version
-    if fr.version_key(version) is None:
-        return fail(f"version {version!r}: MAJOR.MINOR.PATCH with an optional -pre-release")
+    if fr.firmware_version_key(version) is None:
+        return fail(f"version {version!r}: MAJOR.MINOR.PATCH with an optional -pre-release and +build")
     if info.version != version or info.project != fr.PROJECT_NAME:
         return fail(f"the image says {info.project} {info.version}, not {fr.PROJECT_NAME} {version}")
     if args.platform not in fr.PLATFORM_NAMES:

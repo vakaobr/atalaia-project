@@ -379,6 +379,26 @@ void pod_status_bytes(const pod_t *p, int battery_pct, bool usb_host, uint8_t ou
 
 /* ---- Init -------------------------------------------------------------------------- */
 
+void pod_fw_version(const char *image_version, char out[ATALAIA_PROXY_TEXT_MAX + 1])
+{
+    const char *v = image_version != NULL && image_version[0] != '\0' ? image_version : "unknown";
+    size_t n = strlen(v);
+    const char *plus = strchr(v, '+');
+    if (n > ATALAIA_PROXY_TEXT_MAX && plus != NULL) {
+        /* Drop the build metadata's last identifier until it fits, then the '+' itself. */
+        while (n > ATALAIA_PROXY_TEXT_MAX && n > (size_t)(plus - v)) {
+            const char *dot = NULL;
+            for (const char *c = plus + 1; c < v + n; c++) {
+                if (*c == '.') dot = c;
+            }
+            n = dot != NULL ? (size_t)(dot - v) : (size_t)(plus - v);
+        }
+    }
+    if (n > ATALAIA_PROXY_TEXT_MAX) n = ATALAIA_PROXY_TEXT_MAX;
+    memcpy(out, v, n);
+    out[n] = '\0';
+}
+
 void pod_init(pod_t *p, const pod_io_t *io, const modem_io_t *radio_io,
               const atalaia_crypto_ops_t *crypto, const char *fw_version, bool radio_present,
               uint16_t epoch_window)

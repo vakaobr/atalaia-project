@@ -23,7 +23,9 @@ the manifest followed by ``signature=<base64 of the 64 bytes>`` and a line feed.
 Platforms are HELLO's (``protocol/schema/messages.yaml``): ``esp32`` (0),
 ``esp32s3`` (1), ``linux`` (2), ``android`` (3). Versions are
 ``MAJOR.MINOR.PATCH`` with an optional pre-release (``-rc.1``), ordered as
-Semantic Versioning 2.0.0 section 11 orders them.
+Semantic Versioning 2.0.0 section 11 orders them. A firmware's version may also
+carry build metadata (``+g8560d54``: a development build's commit, decision
+FV-2), kept in the text and ignored in the order; a mode package's may not.
 
 No web stack here: the site server imports this module with FastAPI blocked
 (``server/tests/test_shared_imports.py``).
@@ -46,8 +48,9 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 MANIFEST_HEADER = "atalaia-firmware-release-v1"
 PLATFORMS = {0: "esp32", 1: "esp32s3", 2: "linux", 3: "android"}  # HELLO's platform byte
 PLATFORM_NAMES = tuple(PLATFORMS.values())
-VERSION = re.compile(r"(\d{1,4})\.(\d{1,4})\.(\d{1,4})(?:-([0-9A-Za-z][0-9A-Za-z.]{0,19}))?")
-VERSION_MAX = 35  # bytes: 4.4.4 digits, a hyphen and 20 characters of pre-release
+VERSION = re.compile(r"(\d{1,4})\.(\d{1,4})\.(\d{1,4})(?:-([0-9A-Za-z][0-9A-Za-z.]{0,19}))?"
+                     r"(?:\+([0-9A-Za-z][0-9A-Za-z.]{0,19}))?")
+VERSION_MAX = 35  # bytes, the whole text: 4.4.4 digits, a hyphen and 20 characters of pre-release
 SHA256 = re.compile(r"[0-9a-f]{64}")
 KEY_LEN = 32
 SIGNATURE_LEN = 64
@@ -113,23 +116,33 @@ def public_key_bytes(value: Any) -> Optional[bytes]:
     return raw if len(raw) == KEY_LEN else None
 
 
-def version_key(version: str) -> Optional[tuple[Any, ...]]:
+def version_key(version: str, build: bool = False) -> Optional[tuple[Any, ...]]:
     """A sortable key, or None for a version of another form. As Semantic Versioning 2.0.0 section 11 orders
     them: a pre-release sorts before its release, its identifiers compared one by one, numbers as numbers and
-    before words (``1.0.0-rc.2`` < ``1.0.0-rc.10`` < ``1.0.0``)."""
+    before words (``1.0.0-rc.2`` < ``1.0.0-rc.10`` < ``1.0.0``). With ``build`` (a firmware's version), build
+    metadata (``+g8560d54``) is allowed and ignored: ``0.3.0-dev.7+gaaaaaaa`` and ``0.3.0-dev.7`` have the same
+    key; without it (a mode package's version) such a version is refused."""
     m = VERSION.fullmatch(version or "") if isinstance(version, str) else None
-    if m is None:
+    if m is None or len(version) > VERSION_MAX:
         return None
-    pre = m.group(4)
+    pre, meta = m.group(4), m.group(5)
+    if meta is not None and (not build or "" in meta.split(".")):
+        return None
     if pre is not None and "" in pre.split("."):
         return None
     ids = tuple((0, int(p)) if p.isdigit() else (1, p) for p in pre.split(".")) if pre else ()
     return int(m.group(1)), int(m.group(2)), int(m.group(3)), 0 if pre else 1, ids
 
 
+def firmware_version_key(version: str) -> Optional[tuple[Any, ...]]:
+    """version_key for a firmware's version: build metadata allowed and ignored (decision FV-2)."""
+    return version_key(version, build=True)
+
+
 def compare_versions(a: str, b: str) -> int:
-    """-1, 0 or 1 as a sorts before, with or after b; ValueError for a version of another form."""
-    ka, kb = version_key(a), version_key(b)
+    """-1, 0 or 1 as firmware version a sorts before, with or after b (build metadata ignored); ValueError for
+    a version of another form."""
+    ka, kb = firmware_version_key(a), firmware_version_key(b)
     if ka is None or kb is None:
         raise ValueError("not a firmware version")
     return (ka > kb) - (ka < kb)
@@ -259,7 +272,7 @@ def parse_report(body: bytes) -> dict[str, Any]:
         raise ReleaseError("bad_report", "release")
     if out["result"] not in REPORT_RESULTS:
         raise ReleaseError("bad_report", "result")
-    if version_key(out["version"]) is None:
+    if firmware_version_key(out["version"]) is None:
         raise ReleaseError("bad_report", "version")
     if body != report_body(out["game"], out["node"], out["release"], out["result"], out["version"]):
         raise ReleaseError("bad_report", "not in its canonical form")

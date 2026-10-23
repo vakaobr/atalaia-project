@@ -1315,6 +1315,7 @@ def gen_firmware_vectors(fv: dict[str, Any]) -> str:
     L += strs("fw_vec_version_order", ver["order"])
     L += strs("fw_vec_version_equal", [x for pair in ver["equal"] for x in pair])
     L += strs("fw_vec_version_valid", ver["valid"])
+    L += strs("fw_vec_version_build_metadata", ver["build_metadata"])
     L += strs("fw_vec_version_invalid", ver["invalid"])
 
     L += ["typedef struct {", "    const char *name;", "    const uint8_t *head;", "    size_t head_len;",

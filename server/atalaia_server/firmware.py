@@ -42,6 +42,7 @@ from atalaia_controller.firmware_release import (  # noqa: F401  (the catalogue'
     signature_bytes,
     signer,
     verify_signature,
+    firmware_version_key,
     version_key,
 )
 
@@ -61,7 +62,7 @@ def check_entry(entry: dict[str, Any]) -> dict[str, Any]:
     """An entry's fields in form (not its signature): platform, version, size, sha256, signature."""
     if entry.get("platform") not in PLATFORM_NAMES:
         raise FirmwareError("bad_platform", "platform")
-    if not isinstance(entry.get("version"), str) or version_key(entry["version"]) is None:
+    if not isinstance(entry.get("version"), str) or firmware_version_key(entry["version"]) is None:
         raise FirmwareError("bad_version", "version")
     size = entry.get("size")
     if not isinstance(size, int) or isinstance(size, bool) or not 1 <= size <= MAX_SIZE:

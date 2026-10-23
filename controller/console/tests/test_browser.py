@@ -925,7 +925,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         ctrl.ca_sha256 = bytes(range(32))  # as with [api] tls_port: the joins carry the field CA
         ctrl.link_urls = ["https://10.42.0.1:8443"]
         game = self.field.create_game()
-        self.field.box_hello("0.3.0")
+        self.field.box_hello("0.3.0-dev.412+g8560d54.dirty")  # a development build (FV-2)
         image = box_image("0.4.0")
         files = Path(self.field.tmp.name)
         (files / "atalaia_esp32.bin").write_bytes(image)
@@ -945,6 +945,26 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("firmware-releases")).to_contain_text("heltec_v4_3")
         update = page.get_by_test_id(f"firmware-update-{BOX}")
         expect(update).to_have_text("Atualizar para 0.4.0")
+        expect(page.get_by_test_id("firmware-boxes")).to_contain_text("0.3.0-dev.412+g8560d54.dirty")
+        # The page orders versions as the controller and the box do (protocol/vectors/firmware.json).
+        versions = json.loads((CONTROLLER.parent / "protocol" / "vectors" / "firmware.json").read_text())["versions"]
+        wrong = page.evaluate("""async (v) => {
+            const { compareVersions } = await import('./components/firmware-panel.js');
+            const wrong = [];
+            for (const name of ['semver_order', 'semver_core_order', 'order']) {
+                const l = v[name];
+                for (let i = 0; i + 1 < l.length; i++) {
+                    if (compareVersions(l[i], l[i + 1]) !== -1 || compareVersions(l[i + 1], l[i]) !== 1) {
+                        wrong.push([l[i], l[i + 1]]);
+                    }
+                }
+            }
+            for (const [a, b] of v.equal) if (compareVersions(a, b) !== 0) wrong.push([a, b]);
+            for (const x of v.valid.concat(v.build_metadata)) if (compareVersions(x, x) !== 0) wrong.push([x]);
+            for (const x of v.invalid) if (compareVersions(x, '1.0.0') !== null) wrong.push([x]);
+            return wrong;
+        }""", versions)
+        self.assertEqual(wrong, [])
 
         key = ctrl.game_key(game["id"])
         epoch = ctrl.transport.epoch

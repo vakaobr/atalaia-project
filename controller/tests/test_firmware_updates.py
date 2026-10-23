@@ -78,15 +78,22 @@ class VectorTests(unittest.TestCase):
         v = VECTORS["versions"]
         for name in ("semver_order", "semver_core_order", "order"):
             items = v[name]
-            self.assertEqual(sorted(reversed(items), key=fr.version_key), items, name)
+            self.assertEqual(sorted(reversed(items), key=fr.firmware_version_key), items, name)
             for a, b in zip(items, items[1:]):
                 self.assertEqual((fr.compare_versions(a, b), fr.compare_versions(b, a)), (-1, 1), (a, b))
         for a, b in v["equal"]:
             self.assertEqual(fr.compare_versions(a, b), 0)
         for good in v["valid"]:
             self.assertIsNotNone(fr.version_key(good), good)
+            self.assertEqual(fr.firmware_version_key(good), fr.version_key(good), good)
+        # Build metadata (decision FV-2): a firmware's version takes it, a mode package's does not.
+        for meta in v["build_metadata"]:
+            self.assertIsNotNone(fr.firmware_version_key(meta), meta)
+            self.assertIsNone(fr.version_key(meta), meta)
+            self.assertEqual(fr.firmware_version_key(meta), fr.version_key(meta.split("+")[0]), meta)
         for bad in v["invalid"]:
             self.assertIsNone(fr.version_key(bad), bad)
+            self.assertIsNone(fr.firmware_version_key(bad), bad)
         with self.assertRaises(ValueError):
             fr.compare_versions("1.0", "1.0.0")
 
@@ -376,6 +383,36 @@ class UpdateTests(FirmwareCase):
         self.assertEqual(self.client.post("/api/v1/firmware/0123456789abcdef/install", json={"nodes": "all"},
                                           headers=GM).status_code, 404)
 
+    def test_development_builds(self) -> None:
+        """Decisions FV-1 to FV-4: a development build's version carries its commit as build metadata,
+        which the order ignores; dev.N compares as a number, and every dev build is below the release."""
+        game = self.new_game()
+        dev = "0.3.0-dev.413+gabcdef0"
+        image = box_image(dev, salt=1)
+        r = self.upload(image, dev)
+        self.assertEqual(r.status_code, 201, r.text)
+        rel = r.json()
+        self.hello(game, 4, "0.3.0-dev.412+g8560d54.dirty")   # an older dev build
+        self.hello(game, 5, "0.3.0-dev.413+g1111111")         # the same count, another commit
+        self.hello(game, 6, "0.3.0-dev.413+gabcdef0.dirty")   # the same commit, changed
+        self.hello(game, 7, "0.3.0")                           # the release: dev builds are older
+        self.hello(game, 8, "0.2.0")
+        r = self.client.post(f"/api/v1/firmware/{rel['id']}/install", json={"nodes": "all"}, headers=GM)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual({x["node_id"]: x["result"] for x in r.json()["results"]},
+                         {4: "sent", 5: "not_newer", 6: "not_newer", 7: "not_newer", 8: "sent"})
+        self.assertIn({"cmd": 9, "params": {"id": rel["id"], "version": dev}, "dest": 4}, self.update_cmds())
+        # The release 0.3.0 is newer than every dev build of it.
+        r = self.client.post(f"/api/v1/firmware/{self.rel['id']}/install", json={"nodes": [5, 6]}, headers=GM)
+        self.assertEqual({x["node_id"]: x["result"] for x in r.json()["results"]}, {5: "sent", 6: "sent"})
+        # The box reports and says hello with the exact version, build metadata included.
+        self.assertEqual(self.report(game, 4, rel["id"], "installed", dev).json(), {"accepted": True})
+        self.hello(game, 4, dev, seq=1)
+        self.assertEqual(next(u for u in self.fw.updates() if u["node_id"] == 4)["state"], "done")
+        # The newest release first in the list, whatever the metadata.
+        versions = [x["version"] for x in self.client.get("/api/v1/firmware", headers=GM).json()["releases"]]
+        self.assertEqual(versions, ["0.3.0", dev])
+
     def test_refused_without_a_live_ready_game_or_https(self) -> None:
         r = self.client.post(f"/api/v1/firmware/{self.rel['id']}/install", json={"nodes": "all"}, headers=GM)
         self.assertEqual(r.status_code, 409)
@@ -477,6 +514,105 @@ class UpdateTests(FirmwareCase):
                                                {"node_id": 5, "result": "unknown"},  # joined, never heard
                                                {"node_id": 6, "result": "unknown"}])
         self.assertEqual(self.fw.updates(), [])
+
+
+def docker_fw():
+    """tools/docker_fw.py as a module (it needs no Docker to work out a version)."""
+    import importlib.util  # noqa: PLC0415
+    import sys  # noqa: PLC0415
+
+    spec = importlib.util.spec_from_file_location("docker_fw", REPO / "tools" / "docker_fw.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module  # its dataclass looks itself up there
+    spec.loader.exec_module(module)
+    return module
+
+
+class BuildVersionTests(unittest.TestCase):
+    """The version a firmware build carries (tools/docker_fw.py, decisions FV-1 to FV-4)."""
+
+    def setUp(self) -> None:
+        self.fw = docker_fw()
+
+    def test_core_version(self) -> None:
+        self.assertEqual(self.fw.core_version(), "0.3.0-dev")  # core/include/atalaia/version.h
+        header = ('#define ATALAIA_VERSION_MAJOR 1\n#define ATALAIA_VERSION_MINOR 20\n'
+                  '#define ATALAIA_VERSION_PATCH 3\n#define ATALAIA_VERSION_PRERELEASE "%s"\n')
+        self.assertEqual(self.fw.core_version(header % "rc.1"), "1.20.3-rc.1")
+        self.assertEqual(self.fw.core_version(header % ""), "1.20.3")  # a release
+        with self.assertRaises(ValueError):
+            self.fw.core_version("#define ATALAIA_VERSION_MAJOR 1\n")
+
+    def test_build_version(self) -> None:
+        co = self.fw.Checkout
+        cases = [
+            ("0.3.0-dev", co("8560d54", 412, None, False), "0.3.0-dev.412+g8560d54"),
+            ("0.3.0-dev", co("8560d54", 412, None, True), "0.3.0-dev.412+g8560d54.dirty"),
+            ("0.3.0-dev", co("0000001", 1, "v0.2.0", False), "0.3.0-dev.1+g0000001"),
+            ("0.3.0-dev", None, "0.3.0-dev"),                                        # no history
+            ("0.3.0", co("1234567", 0, "v0.3.0", False), "0.3.0"),                  # the release
+            ("0.3.0", co("1234567", 0, "v0.3.0", True), "0.3.0+0.g1234567.dirty"),
+            ("0.3.0", co("abcdef0", 5, "v0.3.0", False), "0.3.0+5.gabcdef0"),       # after it, not bumped
+            ("0.3.0", None, "0.3.0"),
+        ]
+        for core, checkout, want in cases:
+            with self.subTest(core=core, checkout=checkout):
+                got = self.fw.build_version(core, checkout)
+                self.assertEqual(got, want)
+                self.assertTrue(self.fw.valid_fw_version(got))
+                self.assertIsNotNone(fr.firmware_version_key(got))
+        # Every dev build of 0.3.0 is above 0.2.0 and below 0.3.0, later commits above earlier ones,
+        # and the commit itself never counts.
+        builds = [self.fw.build_version("0.3.0-dev", co(f"{n:07x}", n, "v0.2.0", n % 2 == 1)) for n in
+                  (1, 2, 9, 10, 99, 100, 412, 99999)]
+        ordered = ["0.2.0", "0.3.0-dev", *builds, "0.3.0-rc.1", "0.3.0"]
+        for a, b in zip(ordered, ordered[1:]):
+            self.assertEqual(fr.compare_versions(a, b), -1, (a, b))
+        self.assertEqual(fr.compare_versions("0.3.0-dev.412+g8560d54", "0.3.0-dev.412+gabcdef0.dirty"), 0)
+        self.assertLessEqual(max(len(b) for b in builds), 31)
+
+    def test_valid_fw_version(self) -> None:
+        v = VECTORS["versions"]
+        for good in v["valid"] + v["build_metadata"]:
+            if len(good) <= 31:
+                self.assertTrue(self.fw.valid_fw_version(good), good)
+        for bad in v["invalid"] + ["1.2.3-rc.1+" + "a" * 21, "1234.1234.1234-12345+gabcdef0.dirty"]:
+            self.assertFalse(self.fw.valid_fw_version(bad), bad)  # the last: 35 > esp_app_desc_t's 31
+
+    @unittest.skipUnless(__import__("shutil").which("git"), "no git here (the dev image has none)")
+    def test_checkout(self) -> None:
+        """A real repository: no commit, commits, a release tag, an rc tag (no reset), changes."""
+        import subprocess  # noqa: PLC0415
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            self.fw.REPO = repo
+
+            def run(*args: str) -> None:
+                subprocess.run(["git", "-C", tmp, "-c", "user.name=t", "-c", "user.email=t@example.org",
+                                "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", *args],
+                               check=True, capture_output=True)
+
+            run("init", "-q")
+            (repo / "a.txt").write_text("1")
+            run("add", "-A")
+            self.assertIsNone(self.fw.checkout())  # as the verify script's fresh `git init`
+            run("commit", "-q", "-m", "one")
+            first = self.fw.checkout()
+            self.assertEqual((first.count, first.tag, first.dirty, len(first.commit)), (1, None, False, 7))
+            run("tag", "v0.2.0")
+            for n in range(3):
+                (repo / "a.txt").write_text(str(n + 2))
+                run("commit", "-q", "-am", f"c{n}")
+            run("tag", "v0.3.0-rc.1")  # a pre-release tag: the count goes on from v0.2.0
+            got = self.fw.checkout()
+            self.assertEqual((got.count, got.tag, got.dirty), (3, "v0.2.0", False))
+            (repo / "untracked.txt").write_text("x")
+            self.assertFalse(self.fw.checkout().dirty)
+            (repo / "a.txt").write_text("changed")
+            self.assertTrue(self.fw.checkout().dirty)
+            self.assertEqual(self.fw.build_version("0.3.0-dev", self.fw.checkout()),
+                             f"0.3.0-dev.3+g{got.commit}.dirty")
 
 
 class ToolTests(unittest.TestCase):

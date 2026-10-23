@@ -124,8 +124,21 @@ python tools/docker_fw.py test                    host tests and screen referenc
 python tools/docker_fw.py test --update-screens   accept changed screens as the new references
 ```
 
-`build`, `bench` and `wokwi` also take `--fw-version=0.2.1-rc.1` (the firmware's version,
-`PROJECT_VER`, instead of the core's; HELLO reports it and a firmware update compares it)
+Every image carries the commit it was built from in its version (`PROJECT_VER`, which the
+boot log, HELLO's `fw_version`, the modem's and the pod's IDENT and the console show, and a
+firmware update compares; decisions FV-1 to FV-6): the core's version
+(`core/include/atalaia/version.h`, `0.3.0-dev` while 0.3.0 is developed), the commits since
+the last release tag `vX.Y.Z` (or since the first commit) and the commit's first 7 hex
+digits, `0.3.0-dev.412+g8560d54`, with `.dirty` when tracked files have uncommitted changes.
+`docker_fw.py` works it out on the host (the build runs in Docker) and prints it;
+`python tools/docker_fw.py version` prints it without building. A copy with no commit (a
+tarball, a fresh `git init`) or a plain `idf.py build` gets the core's version alone
+(`0.3.0-dev`). Every development build of 0.3.0 is newer than 0.2.0 and older than 0.3.0;
+`dev.N` compares as a number, and the `+...` build metadata never counts, so a box refuses an
+update to another commit with the same count (`not_newer`).
+
+`build`, `bench` and `wokwi` also take `--fw-version=0.3.0-rc.1` (the exact version instead,
+for a release candidate or a bench test of an update; `+build` allowed, at most 31 characters)
 and `--release-keys=<hex or base64>[,...]` (the release public keys the box accepts
 updates from, `CONFIG_ATALAIA_OTA_RELEASE_KEYS`); both apply to that build folder only and
 are reset when left out. See [Firmware updates](#firmware-updates-over-the-air).
@@ -246,7 +259,8 @@ for boards with a USB-UART bridge.
 
 The board's own OLED tells a GM whether the modem works, without a laptop
 (`main/modem/modem_screen.c`, task `main/modem/modem_display.c`). At boot,
-for 2 s, the splash: the tower, "ATALAIA", "MODEM MODE" and the version.
+for 2 s, the splash: the tower, "ATALAIA", "MODEM MODE" and the version (as much of it
+as the line holds: the boot log and the IDENT have all of it, FV-6).
 Then the status screen, under a header bar with a small tower and
 "MODEM MODE":
 
@@ -362,8 +376,9 @@ python tools/docker_fw.py pod      -> firmware/esp32/build-pod/atalaia_esp32.bin
 the Field Box (docs/BRING_UP.md, "The I/O pod"); the pod section there
 lists the checks that need the board and a phone. Code:
 
-- `main/pod/pod.c` -- the proxy: IDENT, EVT with ACKs and resends, CMD
-  acted on once, the radio passthrough, Pod Status (plain C);
+- `main/pod/pod.c` -- the proxy: IDENT (its `fw_version`, at most 23 bytes, is the image's
+  version with the build metadata shortened when it does not fit: `pod_fw_version`, FV-5),
+  EVT with ACKs and resends, CMD acted on once, the radio passthrough, Pod Status (plain C);
 - `main/pod/pod_caps.c` -- the capabilities on the HAL ops (plain C);
 - `main/pod/pod_ble.c` -- the GATT service's logic, UUIDs and advertising
   data (plain C); `pod_ble_nimble.c` puts it on NimBLE;
@@ -505,6 +520,11 @@ step 10c).
   the image's first bytes (`esp_app_desc_t` and the Atalaia descriptor of `main/fw_desc.c`:
   version, project, variant, board) before it opens the slot, and the size and SHA-256 of
   everything written before it sets the boot partition. Anything else aborts the slot's write.
+- **Versions** compare as Semantic Versioning orders them, build metadata ignored (FV-2, FV-4):
+  `0.2.0` < `0.3.0-dev` < `0.3.0-dev.9+g...` < `0.3.0-dev.10+g...` < `0.3.0-rc.1` < `0.3.0`;
+  two builds of the same commit count are equal, so neither updates the other (flash by USB).
+  A development build can be signed with a bench key and installed like a release
+  (BRING_UP.md step 10c); its release text and image say the version with its `+g...`.
 - **The ESP32 side** (`main/fw_update_esp.c`): the Wi-Fi station (`wifi_ssid`/`wifi_pass` in
   NVS: the setup portal's "Field Wi-Fi" fields, or `@wifi <ssid> <password>`), `esp_http_client`
   over HTTPS trusting only the field CA whose SHA-256 is key 13 of the box's join, `esp_ota_*`

@@ -108,7 +108,7 @@ bool mp_release_parse(const char *text, size_t len, mp_release_t *out)
     if (!take_line(&p, end, "version", &v, &n) || n > FW_VERSION_MAX) return false;
     memcpy(out->version, v, n);
     out->version[n] = '\0';
-    if (!fw_version_valid(out->version)) return false;
+    if (!fw_version_valid_plain(out->version)) return false;
 
     int k;
     if (!take_line(&p, end, "kind", &v, &n) || (k = name_index(KIND_NAMES, 4, v, n)) < 0) {

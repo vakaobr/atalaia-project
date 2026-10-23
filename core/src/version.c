@@ -6,9 +6,13 @@
 
 #define ATALAIA_STR2(x) #x
 #define ATALAIA_STR(x)  ATALAIA_STR2(x)
+#define NUMBERS                                                                                    \
+    ATALAIA_STR(ATALAIA_VERSION_MAJOR)                                                             \
+    "." ATALAIA_STR(ATALAIA_VERSION_MINOR) "." ATALAIA_STR(ATALAIA_VERSION_PATCH)
+#define WITH_PRERELEASE NUMBERS "-" ATALAIA_VERSION_PRERELEASE
 
 const char *atalaia_version(void)
 {
-    return ATALAIA_STR(ATALAIA_VERSION_MAJOR) "." ATALAIA_STR(
-        ATALAIA_VERSION_MINOR) "." ATALAIA_STR(ATALAIA_VERSION_PATCH);
+    /* Two literals: nothing is made at run time. */
+    return sizeof(ATALAIA_VERSION_PRERELEASE) > 1 ? WITH_PRERELEASE : NUMBERS;
 }

@@ -60,7 +60,22 @@ static bool core_number(const char **p, char end, unsigned *out)
 typedef struct {
     unsigned major, minor, patch;
     const char *pre; /* NULL: a release */
+    size_t pre_len;
+    bool build; /* "+build" metadata: kept in the text, ignored in the order (FV-2) */
 } version_t;
+
+/* A pre-release or build metadata: 1-20 of [0-9A-Za-z.], no empty identifier. */
+static bool identifiers(const char *p, size_t n)
+{
+    if (n < 1 || n > 20 || p[n - 1] == '.') return false;
+    char prev = '.'; /* so that a leading '.' is an empty identifier */
+    for (size_t i = 0; i < n; i++) {
+        if (!is_alnum(p[i]) && p[i] != '.') return false;
+        if (p[i] == '.' && prev == '.') return false;
+        prev = p[i];
+    }
+    return true;
+}
 
 static bool version_split(const char *v, version_t *out)
 {
@@ -72,26 +87,38 @@ static bool version_split(const char *v, version_t *out)
     p++;
     const char *q = p;
     while (is_digit(*q)) q++;
-    if (!core_number(&p, *q == '-' ? '-' : '\0', &out->patch)) return false;
+    if (!core_number(&p, *q == '-' || *q == '+' ? *q : '\0', &out->patch)) return false;
     out->pre = NULL;
-    if (*p == '\0') return true;
-    p++; /* '-' */
-    out->pre = p;
-    size_t n = strlen(p);
-    if (n < 1 || n > 20 || !is_alnum(p[0])) return false;
-    char prev = '\0';
-    for (size_t i = 0; i < n; i++) {
-        if (!is_alnum(p[i]) && p[i] != '.') return false;
-        if (p[i] == '.' && prev == '.') return false; /* an empty identifier */
-        prev = p[i];
+    out->pre_len = 0;
+    out->build = false;
+    if (*p == '-') {
+        p++;
+        size_t n = strcspn(p, "+");
+        if (!identifiers(p, n)) return false;
+        out->pre = p;
+        out->pre_len = n;
+        p += n;
     }
-    return p[n - 1] != '.';
+    if (*p == '+') {
+        p++;
+        size_t n = strlen(p);
+        if (!identifiers(p, n)) return false;
+        out->build = true;
+        p += n;
+    }
+    return *p == '\0';
 }
 
 bool fw_version_valid(const char *v)
 {
     version_t parts;
     return version_split(v, &parts);
+}
+
+bool fw_version_valid_plain(const char *v)
+{
+    version_t parts;
+    return version_split(v, &parts) && !parts.build;
 }
 
 /* Two numeric identifiers by value, however many digits (leading zeros ignored). */
@@ -129,9 +156,14 @@ int fw_version_compare(const char *a, const char *b)
         if (x.pre == y.pre) return 0;
         return x.pre == NULL ? 1 : -1; /* a pre-release sorts before its release */
     }
+    /* Identifier by identifier, within the pre-release only: the build metadata after it
+     * never counts (Semantic Versioning 2.0.0 section 10). */
     const char *p = x.pre, *q = y.pre;
+    const char *pe = x.pre + x.pre_len, *qe = y.pre + y.pre_len;
     for (;;) {
-        size_t np = strcspn(p, "."), nq = strcspn(q, ".");
+        size_t np = 0, nq = 0;
+        while (p + np < pe && p[np] != '.') np++;
+        while (q + nq < qe && q[nq] != '.') nq++;
         bool dp = all_digits(p, np), dq = all_digits(q, nq);
         int c;
         if (dp && dq) {
@@ -146,9 +178,9 @@ int fw_version_compare(const char *a, const char *b)
         if (c != 0) return c;
         p += np;
         q += nq;
-        if (*p == '\0' || *q == '\0') {
-            if (*p == *q) return 0;
-            return *p == '\0' ? -1 : 1; /* fewer identifiers sort first */
+        if (p == pe || q == qe) {
+            if (p == pe && q == qe) return 0;
+            return p == pe ? -1 : 1; /* fewer identifiers sort first */
         }
         p++;
         q++;

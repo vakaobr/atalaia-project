@@ -116,13 +116,24 @@ static void test_versions(void)
         CHECK(fw_version_compare(fw_vec_version_equal[i], fw_vec_version_equal[i + 1]) == 0);
     }
     for (size_t i = 0; i < FW_VEC_VERSION_VALID_COUNT; i++) {
-        if (!fw_version_valid(fw_vec_version_valid[i])) {
+        if (!fw_version_valid(fw_vec_version_valid[i]) ||
+            !fw_version_valid_plain(fw_vec_version_valid[i])) {
             fprintf(stderr, "FAIL version %s refused\n", fw_vec_version_valid[i]);
             check_failures++;
         }
     }
+    /* Build metadata (FV-2): a firmware's version takes it, a mode package's does not. */
+    for (size_t i = 0; i < FW_VEC_VERSION_BUILD_METADATA_COUNT; i++) {
+        if (!fw_version_valid(fw_vec_version_build_metadata[i]) ||
+            fw_version_valid_plain(fw_vec_version_build_metadata[i])) {
+            fprintf(stderr, "FAIL version %s with build metadata\n",
+                    fw_vec_version_build_metadata[i]);
+            check_failures++;
+        }
+    }
     for (size_t i = 0; i < FW_VEC_VERSION_INVALID_COUNT; i++) {
-        if (fw_version_valid(fw_vec_version_invalid[i])) {
+        if (fw_version_valid(fw_vec_version_invalid[i]) ||
+            fw_version_valid_plain(fw_vec_version_invalid[i])) {
             fprintf(stderr, "FAIL version \"%s\" accepted\n", fw_vec_version_invalid[i]);
             check_failures++;
         }
@@ -209,6 +220,9 @@ static void test_keys_and_offers(void)
     CHECK(fw_offer_parse("{\"id\":\"0123456789abcdef\",\"version\":\"0.3.0\"}", id, version));
     CHECK(strcmp(id, "0123456789abcdef") == 0 && strcmp(version, "0.3.0") == 0);
     CHECK(fw_offer_parse("{\"version\":\"0.3.0-rc.1\",\"id\":\"0123456789abcdef\"}", id, version));
+    CHECK(fw_offer_parse(
+        "{\"id\":\"0123456789abcdef\",\"version\":\"0.3.0-dev.412+g8560d54.dirty\"}", id, version));
+    CHECK(strcmp(version, "0.3.0-dev.412+g8560d54.dirty") == 0);
     CHECK(!fw_offer_parse("{\"id\":\"0123456789abcde\",\"version\":\"0.3.0\"}", id, version));
     CHECK(!fw_offer_parse("{\"id\":\"0123456789abcdef0\",\"version\":\"0.3.0\"}", id, version));
     CHECK(!fw_offer_parse("{\"id\":\"0123456789ABCDEF\",\"version\":\"0.3.0\"}", id, version));
@@ -534,6 +548,45 @@ static void test_job_prechecks(void)
     CHECK(fw_update_run(&job, &IO) == FW_BAD_OFFER);
 }
 
+/* Development builds (decisions FV-1 to FV-4): their versions carry the commit as build
+ * metadata, which the order ignores; dev.N numbers compare as numbers. */
+static fw_result_t offer(fw_job_t *job, const char *version, const char *running)
+{
+    setup(job);
+    make_image(version, "box", "heltec_v4_3");
+    make_release("esp32s3", version, IMG_SIZE, job->id);
+    snprintf(job->version, sizeof(job->version), "%s", version);
+    job->running_version = running;
+    return fw_update_run(job, &IO);
+}
+
+static void test_job_dev_builds(void)
+{
+    fw_job_t job;
+    /* Newer: a later dev build, the release after its dev builds, a dev build over 0.2.0. */
+    CHECK(offer(&job, "0.3.0-dev.10+g1234567", "0.3.0-dev.9+gfedcba9") == FW_INSTALLED);
+    CHECK(strstr(F.report, "result=installed\nversion=0.3.0-dev.10+g1234567\n") != NULL);
+    CHECK(offer(&job, "0.3.0", "0.3.0-dev.412+g8560d54.dirty") == FW_INSTALLED);
+    CHECK(offer(&job, "0.3.0-dev.1+g0000001", "0.2.0") == FW_INSTALLED);
+    CHECK(offer(&job, "0.3.0-dev.1+g0000001", "0.3.0-dev") == FW_INSTALLED);
+    /* Not newer: the same count with another commit or a dirty tree, an older count, the
+     * release itself or a later release, all before any network. */
+    CHECK(offer(&job, "0.3.0-dev.412+gabcdef0", "0.3.0-dev.412+g8560d54") == FW_NOT_NEWER);
+    CHECK(F.net_ups == 0);
+    CHECK(offer(&job, "0.3.0-dev.412+g8560d54", "0.3.0-dev.412+g8560d54.dirty") == FW_NOT_NEWER);
+    CHECK(offer(&job, "0.3.0-dev.9+gfedcba9", "0.3.0-dev.10+g1234567") == FW_NOT_NEWER);
+    CHECK(offer(&job, "0.3.0-dev.1234+g1234567", "0.3.0") == FW_NOT_NEWER);
+    CHECK(offer(&job, "0.3.0-dev.1234+g1234567", "0.3.1-bench.1") == FW_NOT_NEWER);
+    CHECK(F.net_ups == 0);
+    /* The image must say the release's version exactly, build metadata included. */
+    setup(&job);
+    make_image("0.3.0-dev.11+g1234567", "box", "heltec_v4_3");
+    make_release("esp32s3", "0.3.0-dev.11+gabcdef0", IMG_SIZE, job.id);
+    snprintf(job.version, sizeof(job.version), "0.3.0-dev.11+gabcdef0");
+    job.running_version = "0.3.0-dev.10+g1234567";
+    CHECK(fw_update_run(&job, &IO) == FW_BAD_IMAGE && untouched());
+}
+
 static void test_job_refusals(void)
 {
     fw_job_t job;
@@ -680,6 +733,7 @@ void run_fw_update_tests(void)
     test_keys_and_offers();
     test_job_installs();
     test_job_prechecks();
+    test_job_dev_builds();
     test_job_refusals();
     test_job_image_checks();
     test_job_interrupted();

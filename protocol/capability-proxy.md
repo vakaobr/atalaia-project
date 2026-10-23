@@ -38,7 +38,7 @@ CBOR maps with small integer keys, written in key order and in the shortest form
 
 | Key | Field | Type | |
 | --- | --- | --- | --- |
-| 1 | `fw_version` | text, 1-23 printable ASCII bytes | required |
+| 1 | `fw_version` | text, 1-23 printable ASCII bytes (the pod: its image's version, the build metadata shortened to fit, decision FV-5) | required |
 | 2 | `capabilities` | array (0-16) of capability descriptors | required |
 | 3 | `battery_pct` | uint, 0-100 | left out when unknown |
 | 4 | `has_radio` | bool | required |

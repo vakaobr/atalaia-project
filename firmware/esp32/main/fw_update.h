@@ -39,7 +39,7 @@
 
 #define FW_MANIFEST_HEADER  "atalaia-firmware-release-v1"
 #define FW_PLATFORM_MAX     15  /* "esp32s3" */
-#define FW_VERSION_MAX      35  /* 4.4.4 digits, '-' and 20 characters */
+#define FW_VERSION_MAX      35  /* the whole text, +build included (4.4.4 digits, '-' and 20) */
 #define FW_RELEASE_ID_LEN   16  /* hex digits: the start of the image's SHA-256 */
 #define FW_KEYS_MAX         4   /* release keys a firmware carries (rotation) */
 #define FW_RELEASE_TEXT_MAX 512 /* bytes of a release text (about 250 in practice) */
@@ -88,11 +88,16 @@ const char *fw_result_name(fw_result_t r);
 
 /* ---- versions ----------------------------------------------------------------------- */
 
-/* MAJOR.MINOR.PATCH (1-4 digits each) with an optional pre-release (-[0-9A-Za-z][0-9A-Za-z.]{0,19},
- * no empty identifier), as firmware_release.py's VERSION. */
+/* A firmware's version: MAJOR.MINOR.PATCH (1-4 digits each) with an optional pre-release
+ * (-[0-9A-Za-z][0-9A-Za-z.]{0,19}, no empty identifier) and optional build metadata (+ and the
+ * same, e.g. a development build's commit: 0.3.0-dev.412+g8560d54), at most FW_VERSION_MAX
+ * characters, as firmware_release.py's version_key(build=True) (decision FV-2). */
 bool fw_version_valid(const char *v);
-/* <0, 0, >0 as a sorts before, with or after b (Semantic Versioning 2.0.0 section 11); both
- * must be valid. */
+/* The same without build metadata: a mode package's version (mode_package.c). */
+bool fw_version_valid_plain(const char *v);
+/* <0, 0, >0 as a sorts before, with or after b (Semantic Versioning 2.0.0 section 11: build
+ * metadata ignored, so 0.3.0-dev.7+gaaaaaaa and 0.3.0-dev.7+gbbbbbbb are equal); both must
+ * be valid. */
 int fw_version_compare(const char *a, const char *b);
 
 /* ---- release texts and signatures ----------------------------------------------------- */

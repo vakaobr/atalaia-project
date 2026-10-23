@@ -367,6 +367,37 @@ static void ack(pod_link_t link, uint16_t seq)
 
 /* ---- IDENT ----------------------------------------------------------------------------- */
 
+/* IDENT's fw_version from the image's version (FV-5): 23 bytes at most. */
+static void test_fw_version(void)
+{
+    static const char *const cases[][2] = {
+        {"0.3.0-dev.412+g8560d54", "0.3.0-dev.412+g8560d54"},       /* 22: as it is */
+        {"0.3.0-dev.412+g8560d54.dirty", "0.3.0-dev.412+g8560d54"}, /* 28: no ".dirty" */
+        {"0.3.0-dev.1234+g1234567.dirty", "0.3.0-dev.1234+g1234567"},
+        {"0.3.0-dev.12345+g1234567.dirty", "0.3.0-dev.12345"}, /* the hash too */
+        {"0.3.0-dev.12345+g1234567", "0.3.0-dev.12345"},
+        {"1.2.3-12345678901234567890", "1.2.3-12345678901234567"}, /* no metadata: cut */
+        {"1.2.3-1234567890123456789+gabcdef0", "1.2.3-12345678901234567"},
+        {"0.3.0", "0.3.0"},
+        {"0.3.0+b", "0.3.0+b"},
+        {"", "unknown"},
+    };
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        char out[ATALAIA_PROXY_TEXT_MAX + 1];
+        memset(out, 'x', sizeof(out));
+        pod_fw_version(cases[i][0], out);
+        if (strcmp(out, cases[i][1]) != 0) {
+            fprintf(stderr, "FAIL pod_fw_version(%s) = %s, not %s\n", cases[i][0], out,
+                    cases[i][1]);
+            check_failures++;
+        }
+        check_count++;
+    }
+    char out[ATALAIA_PROXY_TEXT_MAX + 1];
+    pod_fw_version(NULL, out);
+    CHECK(strcmp(out, "unknown") == 0);
+}
+
 static void test_ident(void)
 {
     setup();
@@ -921,6 +952,7 @@ static void test_json(void)
 
 void run_pod_tests(void)
 {
+    test_fw_version();
     test_ident();
     test_cmd();
     test_evt();

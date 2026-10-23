@@ -27,7 +27,7 @@ sha256=<64 lower-case hex digits: the SHA-256 of the whole image file>
 ```
 
 - `platform`: HELLO's names (`esp32`, `esp32s3`, `linux`, `android`); a Field Box is `esp32s3`.
-- `version`: `MAJOR.MINOR.PATCH` (1-4 digits each) with an optional pre-release (`-` then 1-20 of `0-9A-Za-z.`, no empty identifier), ordered as Semantic Versioning 2.0.0 section 11 orders versions; a Field Box's version is at most 31 characters (`esp_app_desc_t`).
+- `version`: `MAJOR.MINOR.PATCH` (1-4 digits each) with an optional pre-release (`-` then 1-20 of `0-9A-Za-z.`, no empty identifier) and optional build metadata (`+` then the same), at most 35 characters, ordered as Semantic Versioning 2.0.0 section 11 orders versions: the build metadata is ignored (section 10), so `0.3.0-dev.7+gaaaaaaa` and `0.3.0-dev.7+gbbbbbbb` are equal and neither is newer. A Field Box's version is at most 31 characters (`esp_app_desc_t`). Build metadata is new (decision FV-2): a box, controller or site server from before it refuses such a version (`bad_release`, or the upload); a mode package's version never takes it.
 - `size`: decimal, no leading zero, 1 to 4294967295.
 
 The signature is the Ed25519 signature of those bytes, in standard base64 with its padding (88 characters). The **release id** is the first 16 hex digits of `sha256`.
@@ -52,7 +52,7 @@ An ESP-IDF application image (`atalaia_esp32.bin`). Its first 324 bytes, which a
 | 32 | 256 | `esp_app_desc_t`: magic `0xABCD5432` (little-endian), version at 48 (32 bytes, NUL-terminated), project name at 80 (`atalaia_esp32`) |
 | 288 | 36 | the Atalaia descriptor (`main/fw_desc.c`): `ATFW`, format `1`, 3 reserved bytes, variant (12 bytes: `box`, `box-bench`, `box-dev`), board (16 bytes: `heltec_v4_3`, `heltec_v4_2`), NUL-terminated and zero-filled |
 
-The version in `esp_app_desc_t` is the firmware's version (`PROJECT_VER`: the core's version, or `ATALAIA_FW_VERSION` given to the build), which HELLO reports as `fw_version`.
+The version in `esp_app_desc_t` is the firmware's version (`PROJECT_VER`: `ATALAIA_FW_VERSION` given to the build, or the core's version), which HELLO reports as `fw_version`. `tools/docker_fw.py` gives every build the commit it was built from (decisions FV-1 to FV-4): the core's version (`core/include/atalaia/version.h`, `0.3.0-dev` while 0.3.0 is developed), `.` and the commits since the last release tag `vX.Y.Z` (or since the first commit), `+g` and the commit's first 7 hex digits, and `.dirty` when tracked files had uncommitted changes: `0.3.0-dev.412+g8560d54`. So every development build of 0.3.0 sorts above `0.2.0` and below `0.3.0`, and a later commit above an earlier one. A release is built from its tag with `ATALAIA_VERSION_PRERELEASE` empty (`0.3.0`), or with `--fw-version=`; a copy with no commit history gets the core's version (`0.3.0-dev`, below every counted build).
 
 ## The offer
 
@@ -69,7 +69,7 @@ The live game cannot start while an update is on its way (`sent` or `installed`,
 On CMD update (or `@update <version> <id>` on its serial console, which runs the same checks), a box refuses at once, showing why:
 
 - `busy`: a game is being played (running or paused);
-- `bad_offer`, `no_key` (no release key built in), `no_link` (the join has no field CA or no address), `not_newer` (the offered version is not above its own: **anti-rollback by version**), `battery` (below `CONFIG_ATALAIA_OTA_MIN_BATTERY_PCT`, with a gauge fitted).
+- `bad_offer`, `no_key` (no release key built in), `no_link` (the join has no field CA or no address), `not_newer` (the offered version is not above its own: **anti-rollback by version**; another build with the same version but other build metadata is not above it either), `battery` (below `CONFIG_ATALAIA_OTA_MIN_BATTERY_PCT`, with a gauge fitted).
 
 Then, on its own task, while the radio and the joined game carry on:
 
