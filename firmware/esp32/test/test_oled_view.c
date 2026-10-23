@@ -185,6 +185,74 @@ static void test_zone_screens(void)
     CHECK(strcmp(t.foot, "Hold to capture") == 0);
 }
 
+/* The box's own hold bar on a zone's screens, for modes that send no progress (BN-26):
+ * Domination's neutral and captured carry no bar of their own. */
+static void test_box_hold_bar(void)
+{
+    CHECK(oled_mode_hold_ms("org.atalaia.domination {\"capture_hold_ms\":3000,\"tick_s\":10}") ==
+          3000);
+    CHECK(oled_mode_hold_ms("org.example.hill {\"hold_ms\":5000}") == 5000);
+    CHECK(oled_mode_hold_ms("org.atalaia.bomb {\"arm_hold_ms\":5000}") == 0);
+    CHECK(oled_mode_hold_ms("org.atalaia.codes") == 0);
+    CHECK(oled_mode_hold_ms(NULL) == 0);
+
+    oled_hold_t blue = {"blue", 1600}; /* 1.6 s of 3 s: the 1.5 s step, half the bar */
+    oled_text_t t = map("DOMINATION", "neutral", "{}");
+    CHECK(t.bar == -1);
+    CHECK(oled_text_hold(&t, &blue, 1, 3000));
+    CHECK(t.bar == 50);
+    CHECK(strcmp(t.foot, "BLUE") == 0);
+    CHECK(strcmp(t.big, "NEUTRAL") == 0);
+
+    t = map("DOMINATION", "captured", "{\"team\":\"red\",\"points\":12,\"since\":95}");
+    CHECK(oled_text_hold(&t, &blue, 1, 3000));
+    CHECK(t.bar == 50);
+    CHECK(strcmp(t.foot, "BLUE") == 0);
+    CHECK(strcmp(t.head_right, "12 pts") == 0); /* the points stay in the header */
+    CHECK(!oled_text_held(&t, 230));            /* the held time waits for the bar to go */
+    CHECK(strcmp(t.foot, "BLUE") == 0);
+
+    /* The team that holds the zone: no bar (Domination ignores its holds). */
+    oled_hold_t red = {"red", 2000};
+    t = map("DOMINATION", "captured", "{\"team\":\"red\",\"since\":95}");
+    CHECK(!oled_text_hold(&t, &red, 1, 3000));
+    CHECK(t.bar == -1);
+    CHECK(oled_text_held(&t, 230));
+    CHECK(strcmp(t.foot, "held for 2:15") == 0);
+    /* Several buttons down: the one held longest that is not the owner's. */
+    oled_hold_t several[3] = {{"red", 2900}, {"green", 250}, {"blue", 750}};
+    t = map("DOMINATION", "captured", "{\"team\":\"red\"}");
+    CHECK(oled_text_hold(&t, several, 3, 3000));
+    CHECK(t.bar == 25);
+    CHECK(strcmp(t.foot, "BLUE") == 0);
+    /* Just pressed: an empty bar; past the hold time: full. */
+    oled_hold_t now = {"blue", 120};
+    t = map("DOMINATION", "neutral", "{}");
+    CHECK(oled_text_hold(&t, &now, 1, 3000));
+    CHECK(t.bar == 0);
+    now.ms = 4000;
+    t = map("DOMINATION", "neutral", "{}");
+    CHECK(oled_text_hold(&t, &now, 1, 3000));
+    CHECK(t.bar == 100);
+
+    /* The mode's own bar wins (King of the Hill); no hold time, no buttons, another screen:
+     * nothing. */
+    t = map("HILL", "neutral", "{\"taker\":\"red\",\"progress\":0.3}");
+    CHECK(!oled_text_hold(&t, &blue, 1, 3000));
+    CHECK(t.bar == 30);
+    CHECK(strcmp(t.foot, "RED") == 0);
+    t = map("DOMINATION", "neutral", "{}");
+    CHECK(!oled_text_hold(&t, &blue, 1, 0));
+    CHECK(!oled_text_hold(&t, &blue, 0, 3000));
+    CHECK(t.bar == -1);
+    CHECK(strcmp(t.foot, "Hold to capture") == 0);
+    t = map("DOMINATION", "playing", "{\"role\":\"zone\"}");
+    CHECK(!oled_text_hold(&t, &blue, 1, 3000));
+    t = map("BOMB", "standby", "{\"arm\":\"red\"}");
+    CHECK(!oled_text_hold(&t, &blue, 1, 3000));
+    CHECK(t.bar == -1);
+}
+
 static void test_pack(void)
 {
     static uint16_t frame[HAL_OLED_WIDTH * HAL_OLED_HEIGHT];
@@ -211,5 +279,6 @@ void run_oled_view_tests(void)
     test_bomb_phases();
     test_other_screens();
     test_zone_screens();
+    test_box_hold_bar();
     test_pack();
 }

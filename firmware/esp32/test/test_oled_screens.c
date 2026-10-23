@@ -31,6 +31,8 @@
 
 #define W HAL_OLED_WIDTH
 #define H HAL_OLED_HEIGHT
+/* The hold bar's inside (oled_view.c: 48 pixels less its border and padding). */
+#define HOLD_INNER_W 42
 
 typedef struct {
     const char *name; /* PNG file name without .png */
@@ -69,6 +71,11 @@ static const oled_case_t cases[] = {
     /* Another team holding its button: the bar, and that team below. */
     {"captured_taking", DOM, "captured",
      "{\"team\":\"red\",\"points\":12,\"since\":95,\"taker\":\"blue\",\"progress\":0.4}"},
+    /* Domination sends no progress: the box's own bar from its held button (BN-26). A case
+     * whose name ends in "_holding" is drawn while blue has held its button 1.5 s of the 3 s
+     * capture hold. */
+    {"neutral_holding", DOM, "neutral", "{}"},
+    {"captured_holding", DOM, "captured", "{\"team\":\"red\",\"points\":12,\"since\":95}"},
     {"final_score", DOM, "final_score", "{\"owner\":\"red\",\"points\":12}"},
     {"ready_picker", NULL, "ready", "{\"picker\":true}"},
     {"waiting_invited_pt", NULL, "waiting", "{\"game\":3073,\"role\":\"zone\",\"invited\":true}"},
@@ -196,6 +203,25 @@ static uint32_t game_clock(void)
 {
     return fake_game_ms;
 }
+/* The box's team buttons (oled_view_set_hold_reader): none held unless a case says so. */
+static oled_hold_t fake_holds[OLED_HOLDS_MAX];
+static int fake_hold_count;
+
+static int hold_reader(oled_hold_t *holds, int max)
+{
+    int n = fake_hold_count < max ? fake_hold_count : max;
+    memcpy(holds, fake_holds, (size_t)n * sizeof(*holds));
+    return n;
+}
+
+static void hold_button(const char *team, uint32_t ms)
+{
+    fake_hold_count = team ? 1 : 0;
+    if (team) {
+        snprintf(fake_holds[0].team, sizeof(fake_holds[0].team), "%s", team);
+        fake_holds[0].ms = ms;
+    }
+}
 static int failures;
 static uint8_t rendered[W * H * 3];
 
@@ -256,6 +282,11 @@ static void render(const oled_case_t *c)
     } else {
         if (c->mode) oled_view_handle(scr, "@mode", c->mode, fake_ms);
         oled_view_handle(scr, c->template_name, c->data, fake_ms);
+        if (n > 8 && strcmp(c->name + n - 8, "_holding") == 0) {
+            hold_button("blue", 1500);
+            oled_view_poll(scr, fake_ms);
+            hold_button(NULL, 0);
+        }
     }
     capture(scr);
 }
@@ -378,6 +409,68 @@ static void check_held_tick(void)
     }
 }
 
+/* A Domination box while a team holds its button (BN-26): the mode sends no progress, so the
+ * bar comes from the box's own button, on neutral and captured, and goes when it is let go. */
+static bool hold_bar_shows(lv_obj_t *scr, int32_t *fill_w)
+{
+    /* The header bar, the big line, the footer, the hold bar. */
+    lv_obj_t *box = lv_obj_get_child(scr, 3);
+    lv_obj_update_layout(scr);
+    if (fill_w) *fill_w = lv_obj_get_width(lv_obj_get_child(box, 0));
+    return !lv_obj_has_flag(box, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void check_button_hold(void)
+{
+    box_lang_set_code("");
+    lv_obj_t *scr = lv_screen_active();
+    int32_t fill = -1;
+    fake_game_ms = 230000;
+    oled_view_handle(scr, "@mode", DOM, 1);
+    oled_view_handle(scr, "captured", "{\"team\":\"red\",\"points\":3,\"since\":95}", 1);
+    if (hold_bar_shows(scr, NULL)) fail("captured", "a bar with no button held");
+    /* Blue presses: an empty bar and BLUE at once; then it fills with the hold. */
+    hold_button("blue", 0);
+    oled_view_poll(scr, 2);
+    if (!hold_bar_shows(scr, &fill) || fill != 0) fail("captured", "no bar when blue presses");
+    if (strcmp(foot_text(scr), "BLUE") != 0) fail("captured", "the taker is not shown");
+    hold_button("blue", 1500);
+    fake_game_ms += 1000; /* the game's clock goes on: the bar keeps the footer */
+    oled_view_poll(scr, 3);
+    if (!hold_bar_shows(scr, &fill) || fill != (HOLD_INNER_W * 50) / 100)
+        fail("captured", "the bar does not fill while blue holds");
+    if (strcmp(foot_text(scr), "BLUE") != 0) fail("captured", "the held time over the bar");
+    /* Let go: the bar goes, the held time comes back (on the clock that went on). */
+    hold_button(NULL, 0);
+    oled_view_poll(scr, 4);
+    if (hold_bar_shows(scr, NULL)) fail("captured", "the bar stays after the button is let go");
+    if (strcmp(foot_text(scr), "held for 2:16") != 0)
+        fail("captured", "the held time does not come back");
+    /* The owner's own button: nothing (Domination ignores it). */
+    hold_button("red", 2000);
+    oled_view_poll(scr, 5);
+    if (hold_bar_shows(scr, NULL)) fail("captured", "a bar for the team that holds the zone");
+    /* Neutral: the same bar, and back to "Hold to capture". */
+    hold_button(NULL, 0);
+    oled_view_handle(scr, "neutral", "{}", 6);
+    hold_button("blue", 750);
+    oled_view_poll(scr, 7);
+    if (!hold_bar_shows(scr, &fill) || fill != (HOLD_INNER_W * 25) / 100)
+        fail("neutral", "no bar while blue holds");
+    if (strcmp(foot_text(scr), "BLUE") != 0) fail("neutral", "the taker is not shown");
+    hold_button(NULL, 0);
+    oled_view_poll(scr, 8);
+    if (hold_bar_shows(scr, NULL) || strcmp(foot_text(scr), box_text(TXO_HOLD_TO_CAPTURE)) != 0)
+        fail("neutral", "the bar stays after the button is let go");
+    /* Not on another screen. */
+    oled_view_handle(scr, "playing", "{\"role\":\"zone\"}", 9);
+    hold_button("blue", 750);
+    oled_view_poll(scr, 10);
+    if (hold_bar_shows(scr, NULL)) fail("playing", "a hold bar over another screen");
+    hold_button(NULL, 0);
+    fake_game_ms = 230000;
+}
+
 /* The splash holds later screens until its time is over. */
 static void check_splash_hold(void)
 {
@@ -413,6 +506,7 @@ int main(void)
                            LV_DISPLAY_RENDER_MODE_FULL);
     lv_display_set_flush_cb(display, flush_cb);
     oled_view_set_game_clock(game_clock);
+    oled_view_set_hold_reader(hold_reader);
 
     for (int i = 0; i < CASE_COUNT; i++) {
         render(&cases[i]);
@@ -421,6 +515,7 @@ int main(void)
         compare_with_reference(cases[i].name);
     }
     check_held_tick(); /* on the OLED view's own objects, before the modem's screens replace them */
+    check_button_hold();
     for (int i = 0; i < MODEM_CASE_COUNT; i++) {
         render_modem(&modem_cases[i]);
         compare_with_reference(modem_cases[i].name);

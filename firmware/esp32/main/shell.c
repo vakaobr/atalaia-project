@@ -992,6 +992,24 @@ static uint32_t game_clock_ms(void)
     return *(volatile const uint32_t *)&runner.game_time_ms;
 }
 
+/* The team buttons held down now, for the OLED's hold bar on a zone's screens (BN-26): read
+ * from the LVGL task while the game task updates them (whole words; a name read as it is
+ * replaced shows for one frame at most). */
+static int held_buttons(oled_hold_t *holds, int max)
+{
+    if (!*(volatile const bool *)&runner.running) return 0;
+    int n = 0;
+    int count = *(volatile const int *)&btn_tracker.team_count;
+    for (int i = 0; i < count && i < BUTTON_TRACKER_MAX && n < max; i++) {
+        const char *team = *(const char *volatile const *)&btn_tracker.team_names[i];
+        if (!*(volatile const bool *)&btn_tracker.pressed[i] || !team) continue;
+        snprintf(holds[n].team, sizeof(holds[n].team), "%s", team);
+        holds[n].ms = *(volatile const uint32_t *)&btn_tracker.held_ms[i];
+        n++;
+    }
+    return n;
+}
+
 /*
  * lvgl_task -- core 1, priority 4, 5 ms.
  * Owns LVGL: brings up the display, renders queued screens, runs LVGL timers.
@@ -1007,6 +1025,7 @@ static void task_lvgl(void *arg)
         snprintf(version, sizeof(version), "v%.20s", esp_app_get_description()->version);
         oled_view_splash(oled_scr, version, now_ms(), CONFIG_ATALAIA_OLED_SPLASH_MS);
         oled_view_set_game_clock(game_clock_ms);
+        oled_view_set_hold_reader(held_buttons);
     }
 
     for (;;) {
