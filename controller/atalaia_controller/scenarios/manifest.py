@@ -139,6 +139,10 @@ def load_text(text: str) -> dict[str, Any]:
         data = yaml.load(text, Loader=_UniqueKeyLoader)  # noqa: S506 (a SafeLoader subclass)
     except yaml.YAMLError as exc:
         raise ManifestError(f"not valid YAML: {exc}") from None
+    except ValueError as exc:
+        # A date or timestamp YAML recognises but the calendar has not (2026-13-45): PyYAML raises a
+        # plain ValueError, which was a 500 from POST /api/v1/scenarios/check (decision PE24-108).
+        raise ManifestError(f"not valid YAML: a date that does not exist ({exc})") from None
     if not isinstance(data, dict):
         raise ManifestError("a scenario manifest is a map (id, version, name, nodes, objectives, ...)")
     _join_surrogates(data, set())

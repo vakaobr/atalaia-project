@@ -158,6 +158,17 @@ class EndpointTests(Case):
             out = r.json()
             self.assertEqual((out["ok"], [p["code"] for p in out["problems"]]), (False, ["bad_manifest"]))
 
+    def test_check_refuses_a_date_that_does_not_exist(self):
+        """PE24-108: a date YAML recognises but the calendar has not made PyYAML raise a ValueError,
+        a 500; now it is a problem in words (bad_manifest)."""
+        for text in (MANIFEST.replace("version: 1", "version: 2026-13-45"),
+                     MANIFEST.replace("version: 1", "version: 2026-02-30 25:61:00")):
+            r = self.client.post("/api/v1/scenarios/check", headers=GM, json={"manifest": text})
+            self.assertEqual(r.status_code, 200, r.text)
+            out = r.json()
+            self.assertEqual((out["ok"], [p["code"] for p in out["problems"]]), (False, ["bad_manifest"]))
+            self.assertIn("date that does not exist", out["problems"][0]["message"])
+
     def test_check_hands_back_the_manifest_for_the_block_view(self):
         """Phase 5 plan phase 7 (P5F-3): the manifest as the controller read it, when JSON holds it
         unchanged (the console's block view is made from it); else None."""
