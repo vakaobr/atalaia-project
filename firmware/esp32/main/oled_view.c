@@ -356,6 +356,78 @@ bool oled_text_hold(oled_text_t *t, const oled_hold_t *holds, int n, uint32_t ho
     return true;
 }
 
+/* "g" and at least 4 hex digits: the commit of FV-3's build metadata ("gabc1234"). */
+static bool commit_id(const char *s, size_t n)
+{
+    if (n < 5 || s[0] != 'g') return false;
+    for (size_t i = 1; i < n; i++) {
+        if (!isxdigit((unsigned char)s[i])) return false;
+    }
+    return true;
+}
+
+static bool digits_id(const char *s, size_t n)
+{
+    if (n == 0) return false;
+    for (size_t i = 0; i < n; i++) {
+        if (!isdigit((unsigned char)s[i])) return false;
+    }
+    return true;
+}
+
+void oled_version_lines(const char *version, char *line1, size_t n1, char *line2, size_t n2)
+{
+    if (n1) line1[0] = '\0';
+    if (n2) line2[0] = '\0';
+    if (!version || !version[0]) return;
+    const char *plus = strchr(version, '+');
+    int core_len = plus ? (int)(plus - version) : (int)strlen(version);
+    if (!plus) {
+        if (n1) snprintf(line1, n1, "v%.*s", core_len, version);
+        return;
+    }
+    /* The build metadata's identifiers: [<count>.]g<hash>[.dirty] (FV-3), else as it is. */
+    const char *meta = plus + 1;
+    const char *id[4];
+    size_t len[4];
+    int ids = 0; /* 4: four or more, never a commit's */
+    for (const char *p = meta; ids < 4;) {
+        const char *dot = strchr(p, '.');
+        id[ids] = p;
+        len[ids] = dot ? (size_t)(dot - p) : strlen(p);
+        ids++;
+        if (!dot) break;
+        p = dot + 1;
+    }
+    int at = 0;
+    const char *count = NULL;
+    size_t count_len = 0;
+    if (ids >= 1 && ids <= 3 && digits_id(id[0], len[0])) {
+        count = id[0];
+        count_len = len[0];
+        at = 1;
+    }
+    bool ours = ids <= 3 && at < ids && commit_id(id[at], len[at]);
+    bool dirty = false;
+    if (ours && at + 1 < ids) {
+        dirty = len[at + 1] == 5 && strncmp(id[at + 1], "dirty", 5) == 0;
+        ours = dirty && at + 2 == ids;
+    }
+    if (!ours) {
+        if (n1) snprintf(line1, n1, "v%.*s", core_len, version);
+        if (n2) snprintf(line2, n2, "%s", meta);
+        return;
+    }
+    if (n1) {
+        if (count) {
+            snprintf(line1, n1, "v%.*s+%.*s", core_len, version, (int)count_len, count);
+        } else {
+            snprintf(line1, n1, "v%.*s", core_len, version);
+        }
+    }
+    if (n2) snprintf(line2, n2, "%.*s%s", (int)len[at] - 1, id[at] + 1, dirty ? "*" : "");
+}
+
 void oled_pack(const uint16_t *rgb565, uint8_t fb[HAL_OLED_FB_SIZE])
 {
     memset(fb, 0, HAL_OLED_FB_SIZE);
@@ -533,18 +605,39 @@ void oled_view_splash(lv_obj_t *scr, const char *version, uint32_t now_ms, uint3
     lv_image_set_src(img, &logo);
     lv_obj_set_style_image_recolor(img, lv_color_white(), 0);
     lv_obj_set_style_image_recolor_opa(img, LV_OPA_COVER, 0);
-    lv_obj_align(img, LV_ALIGN_LEFT_MID, 4, 0);
+    lv_obj_align(img, LV_ALIGN_LEFT_MID, OLED_SPLASH_LOGO_X, 0);
 
+    /* The version in two lines (FV-8): a release's one line; a development build's commit on a
+     * second, the lines moved up to make room. Past the tower, 92 pixels: "v0.4.0-dev.12" and
+     * "0.4.0-dev.123" fit; a longer one ends in "...". */
+    char line1[40], line2[24];
+    oled_version_lines(version, line1, sizeof(line1), line2, sizeof(line2));
+    const int32_t x = OLED_SPLASH_TEXT_X;
     lv_obj_t *name = text(scr, &lv_font_atalaia_20, lv_color_white());
     lv_label_set_text(name, "ATALAIA");
-    lv_obj_align(name, LV_ALIGN_LEFT_MID, OLED_LOGO_W + 10, -8);
+    lv_obj_align(name, LV_ALIGN_LEFT_MID, x, line2[0] ? -16 : -8);
 
     lv_obj_t *ver = text(scr, &lv_font_atalaia_14, lv_color_white());
-    lv_label_set_text(ver, version ? version : "");
+    lv_obj_set_width(ver, OLED_W - x);
+    lv_label_set_text(ver, oled_version_fit(line1, &lv_font_atalaia_14, OLED_W - x));
     lv_obj_align_to(ver, name, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 2);
+    if (line2[0]) {
+        lv_obj_t *commit = text(scr, &lv_font_atalaia_14, lv_color_white());
+        lv_obj_set_width(commit, OLED_W - x);
+        lv_label_set_text(commit, line2);
+        lv_obj_align_to(commit, ver, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 0);
+    }
 
     splash_on = true;
     splash_until = now_ms + hold_ms;
+}
+
+const char *oled_version_fit(const char *line1, const lv_font_t *font, int32_t max_w)
+{
+    if (!line1) return "";
+    if (line1[0] != 'v') return line1;
+    int32_t w = lv_text_get_width(line1, (uint32_t)strlen(line1), font, 0);
+    return w <= max_w ? line1 : line1 + 1;
 }
 
 void oled_view_set_game_clock(uint32_t (*game_ms)(void))

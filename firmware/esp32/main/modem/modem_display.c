@@ -13,7 +13,6 @@
 #include "modem_display.h"
 
 #include <stdbool.h>
-#include <stdio.h>
 #include <string.h>
 
 #include "esp_heap_caps.h"
@@ -88,9 +87,7 @@ static void display_loop(void *arg)
     lv_obj_t *scr = lv_display_get_screen_active(disp);
 
     if (CONFIG_ATALAIA_OLED_SPLASH_MS > 0) {
-        char version[24];
-        snprintf(version, sizeof(version), "v%.20s", fw_version ? fw_version : "");
-        modem_screen_splash(scr, version);
+        modem_screen_splash(scr, fw_version); /* the whole version, shown short (FV-8) */
         lv_refr_now(disp);
         vTaskDelay(pdMS_TO_TICKS(CONFIG_ATALAIA_OLED_SPLASH_MS));
     }

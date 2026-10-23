@@ -269,8 +269,47 @@ static void test_pack(void)
     CHECK(fb[7 * HAL_OLED_WIDTH + 127] == 0x80);
 }
 
+/* The splashes' version (FV-8): the version without its commit, then the commit. */
+static void version_is(const char *version, const char *want1, const char *want2)
+{
+    char l1[40], l2[24];
+    memset(l1, 'x', sizeof(l1));
+    memset(l2, 'x', sizeof(l2));
+    oled_version_lines(version, l1, sizeof(l1), l2, sizeof(l2));
+    CHECK(strcmp(l1, want1) == 0);
+    CHECK(strcmp(l2, want2) == 0);
+}
+
+static void test_version_lines(void)
+{
+    version_is("0.3.0", "v0.3.0", "");                               /* a release */
+    version_is("0.4.0-dev", "v0.4.0-dev", "");                       /* a plain idf.py build */
+    version_is("0.4.0-rc.1", "v0.4.0-rc.1", "");                     /* --fw-version= */
+    version_is("0.4.0-dev.12+gabc1234", "v0.4.0-dev.12", "abc1234"); /* FV-3 */
+    version_is("0.4.0-dev.12+gabc1234.dirty", "v0.4.0-dev.12", "abc1234*"); /* changes */
+    version_is("0.3.0+5.g8560d54", "v0.3.0+5", "8560d54");                  /* past a release */
+    version_is("0.3.0+5.g8560d54.dirty", "v0.3.0+5", "8560d54*");
+    /* Other build metadata as it is. */
+    version_is("0.3.0+bench", "v0.3.0", "bench");
+    version_is("0.3.0+gxyz1234", "v0.3.0", "gxyz1234"); /* not hex */
+    version_is("0.3.0+gab1", "v0.3.0", "gab1");         /* too short for a commit */
+    version_is("0.3.0+gabc1234.clean", "v0.3.0", "gabc1234.clean");
+    version_is("0.3.0+1.2.gabc1234", "v0.3.0", "1.2.gabc1234");
+    version_is("0.3.0+5", "v0.3.0", "5");
+    version_is("0.3.0+a.b.c.d.e", "v0.3.0", "a.b.c.d.e");
+    version_is("", "", "");
+    version_is(NULL, "", "");
+    /* Cut to the buffers, always terminated. */
+    char l1[6], l2[4];
+    oled_version_lines("0.4.0-dev.12+gabc1234.dirty", l1, sizeof(l1), l2, sizeof(l2));
+    CHECK(strcmp(l1, "v0.4.") == 0);
+    CHECK(strcmp(l2, "abc") == 0);
+    oled_version_lines("0.4.0-dev.12+gabc1234", NULL, 0, NULL, 0); /* no buffers: nothing */
+}
+
 void run_oled_view_tests(void)
 {
+    test_version_lines();
     test_mode_title();
     test_mode_message_changes_nothing();
     test_pin_entry();

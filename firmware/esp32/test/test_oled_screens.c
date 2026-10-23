@@ -45,9 +45,12 @@ typedef struct {
 #define DOM   "org.atalaia.domination {\"capture_hold_ms\":3000}"
 #define MEDIC "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"en\"}"
 
-/* "splash" is drawn by oled_view_splash(), not by a screen update. */
+/* The splashes are drawn by oled_view_splash(), not by a screen update; data is the firmware's
+ * version (FV-8): a release, a development build, one with a three-digit count and changes. */
 static const oled_case_t cases[] = {
-    {"splash", NULL, NULL, NULL},
+    {"splash", NULL, NULL, "0.2.0"},
+    {"splash_dev", NULL, NULL, "0.4.0-dev.12+gabc1234"},
+    {"splash_dev_dirty", NULL, NULL, "0.4.0-dev.164+g8560d54.dirty"},
     {"pin_entry", NULL, "pin_entry", "{\"digits\":0,\"error\":false}"},
     {"pin_entry_typed", NULL, "pin_entry", "{\"digits\":3,\"error\":false}"},
     {"pin_entry_wrong", NULL, "pin_entry", "{\"digits\":0,\"error\":true}"},
@@ -149,18 +152,23 @@ static const oled_case_t cases[] = {
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))
 
-/* The USB radio modem's screens: "modem_splash" is modem_screen_splash(). */
+/* The USB radio modem's screens: the modem_splash* cases are modem_screen_splash(). */
 typedef struct {
     const char *name;
+    const char *version; /* the splashes': the firmware's version; NULL a status screen */
     modem_screen_state_t state;
 } modem_case_t;
 
 #define MODEM_COUNTS .tx = 1234, .tx_fail = 3, .rx = 56789, .rx_auth_fail = 1
 static const modem_case_t modem_cases[] = {
-    {"modem_splash", {0}},
+    {"modem_splash", "0.2.0", {0}},
+    {"modem_splash_dev", "0.4.0-dev.12+gabc1234", {0}},
+    {"modem_splash_dev_dirty", "0.4.0-dev.164+g8560d54.dirty", {0}},
     {"modem_waiting",
+     NULL,
      {.link = MODEM_LINK_WAITING, .channel_hz = 869525000u, .radio_ok = true, .duty_ms = 360000}},
     {"modem_game",
+     NULL,
      {.link = MODEM_LINK_UP,
       .configured = true,
       .game_id = 4660,
@@ -169,6 +177,7 @@ static const modem_case_t modem_cases[] = {
       .radio_ok = true,
       .duty_ms = 341200}},
     {"modem_link_down",
+     NULL,
      {.link = MODEM_LINK_DOWN,
       .configured = true,
       .game_id = 4660,
@@ -177,6 +186,7 @@ static const modem_case_t modem_cases[] = {
       .radio_ok = true,
       .duty_ms = 341200}},
     {"modem_no_duty",
+     NULL,
      {.link = MODEM_LINK_UP,
       .configured = true,
       .game_id = 4660,
@@ -185,6 +195,7 @@ static const modem_case_t modem_cases[] = {
       .radio_ok = true,
       .duty_ms = 0}},
     {"modem_radio_fault",
+     NULL,
      {.link = MODEM_LINK_UP,
       .channel_hz = 869525000u,
       .radio_ok = false,
@@ -278,7 +289,7 @@ static void render(const oled_case_t *c)
     lv_obj_t *scr = lv_screen_active();
     fake_ms += 10000;
     if (!c->template_name) {
-        oled_view_splash(scr, "v0.2.0", fake_ms, 0);
+        oled_view_splash(scr, c->data, fake_ms, 0);
     } else {
         if (c->mode) oled_view_handle(scr, "@mode", c->mode, fake_ms);
         oled_view_handle(scr, c->template_name, c->data, fake_ms);
@@ -294,8 +305,8 @@ static void render(const oled_case_t *c)
 static void render_modem(const modem_case_t *c)
 {
     lv_obj_t *scr = lv_screen_active();
-    if (strcmp(c->name, "modem_splash") == 0) {
-        modem_screen_splash(scr, "v0.2.0");
+    if (c->version) {
+        modem_screen_splash(scr, c->version);
     } else {
         modem_screen_text_t t;
         modem_screen_text(&c->state, &t);
@@ -471,11 +482,49 @@ static void check_button_hold(void)
     fake_game_ms = 230000;
 }
 
+/* Every line of a splash shows whole (FV-8): no label's text is wider than the label, and no
+ * label leaves the screen. */
+static void check_labels_fit(const char *name)
+{
+    lv_obj_t *scr = lv_screen_active();
+    lv_obj_update_layout(scr);
+    for (uint32_t i = 0; i < lv_obj_get_child_count(scr); i++) {
+        lv_obj_t *l = lv_obj_get_child(scr, (int32_t)i);
+        if (!lv_obj_check_type(l, &lv_label_class)) continue;
+        const char *s = lv_label_get_text(l);
+        const lv_font_t *font = lv_obj_get_style_text_font(l, LV_PART_MAIN);
+        int32_t tw = lv_text_get_width(s, (uint32_t)strlen(s), font, 0);
+        lv_area_t a;
+        lv_obj_get_coords(l, &a);
+        if (tw > lv_area_get_width(&a)) fail(name, "a line of the splash is clipped");
+        if (a.x1 < 0 || a.y1 < 0 || a.x1 + tw > W || a.y1 + lv_font_get_line_height(font) > H)
+            fail(name, "a line of the splash leaves the screen");
+    }
+}
+
+/* A development build's version line fits the splash whole up to a count of 199 (FV-8): with
+ * its "v" while that fits (every count up to 39, most up to 99), else without it. Past that
+ * some end in "...", the commit's line still whole. */
+static void check_version_widths(void)
+{
+    extern const lv_font_t lv_font_atalaia_14;
+    const int32_t max_w = W - OLED_SPLASH_TEXT_X;
+    for (int n = 0; n <= 199; n++) {
+        char version[40], l1[40], l2[24];
+        snprintf(version, sizeof(version), "0.4.0-dev.%d+gabc1234.dirty", n);
+        oled_version_lines(version, l1, sizeof(l1), l2, sizeof(l2));
+        const char *shown = oled_version_fit(l1, &lv_font_atalaia_14, max_w);
+        if (lv_text_get_width(shown, (uint32_t)strlen(shown), &lv_font_atalaia_14, 0) > max_w)
+            fail("splash", "a development build's version up to dev.199 does not fit");
+        if (n <= 39 && shown != l1) fail("splash", "a count up to 39 lost its v");
+    }
+}
+
 /* The splash holds later screens until its time is over. */
 static void check_splash_hold(void)
 {
     lv_obj_t *scr = lv_screen_active();
-    oled_view_splash(scr, "v0.2.0", 1000, 2000);
+    oled_view_splash(scr, "0.2.0", 1000, 2000);
     oled_view_handle(scr, "pin_entry", "{\"digits\":0}", 1500);
     lv_obj_t *first = lv_obj_get_child(scr, 0);
     if (!first || !lv_obj_check_type(first, &lv_image_class))
@@ -512,15 +561,18 @@ int main(void)
         render(&cases[i]);
         char msg[200] = "";
         if (font_check_labels(lv_screen_active(), msg, sizeof(msg)) > 0) fail(cases[i].name, msg);
+        if (!cases[i].template_name) check_labels_fit(cases[i].name);
         compare_with_reference(cases[i].name);
     }
     check_held_tick(); /* on the OLED view's own objects, before the modem's screens replace them */
     check_button_hold();
     for (int i = 0; i < MODEM_CASE_COUNT; i++) {
         render_modem(&modem_cases[i]);
+        if (modem_cases[i].version) check_labels_fit(modem_cases[i].name);
         compare_with_reference(modem_cases[i].name);
     }
     check_splash_hold();
+    check_version_widths();
     if (!update_mode()) check_no_stale_references();
 
     if (failures) {

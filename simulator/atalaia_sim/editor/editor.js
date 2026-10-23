@@ -560,8 +560,17 @@ async function main() {
     const mayReplace = () => isEmpty() || window.confirm(ui('replace'));
 
     // ---- toolbar ----
+    // Only what was chosen last is loaded: an example chosen before it whose file comes later is
+    // dropped (FL-3). body[data-example] names the example once it is loaded and shown (empty
+    // while one is on its way, or after New / Open), the end state the browser tests wait for.
+    let choosing = 0;
+    const loadChosen = (p, name = '') => {
+        choosing++;
+        load(p);
+        document.body.dataset.example = name;
+    };
     document.getElementById('new').addEventListener('click', () => {
-        if (mayReplace()) load({ format: FORMAT, version: 1, mode: defaultInfo() });
+        if (mayReplace()) loadChosen({ format: FORMAT, version: 1, mode: defaultInfo() });
     });
     document.getElementById('save').addEventListener('click', () => {
         download(`${info.id || 'mode'}.blocks.json`, JSON.stringify(project(), null, 2) + '\n', 'application/json');
@@ -571,7 +580,7 @@ async function main() {
         e.target.value = '';
         if (!file || !mayReplace()) return;
         try {
-            load(JSON.parse(await file.text()));
+            loadChosen(JSON.parse(await file.text()));
         } catch (err) {
             window.alert(ui('bad_file'));
         }
@@ -580,7 +589,11 @@ async function main() {
     example.addEventListener('change', async () => {
         const name = example.value;
         example.value = '';
-        if (name && mayReplace()) load(await fetchJson(`examples/${name}.json`));
+        if (!name || !mayReplace()) return;
+        const mine = ++choosing;
+        document.body.dataset.example = '';
+        const p = await fetchJson(`examples/${name}.json`);
+        if (mine === choosing) loadChosen(p, name);
     });
     document.getElementById('download').addEventListener('click', () => {
         download(FILE_NAMES[activeFile] || activeFile.split('/').pop(), files[activeFile], 'text/plain');

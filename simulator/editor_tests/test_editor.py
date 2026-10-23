@@ -173,6 +173,12 @@ class EditorTests(unittest.TestCase):
         expect(page.locator("body")).to_have_attribute("data-ready", "true")
         return page
 
+    def choose_example(self, page, name):
+        """Chooses an example and waits until the editor has loaded and shown it (FL-3): the
+        code shown before it (another example's) must not be taken for it."""
+        page.select_option("#example", name)
+        expect(page.locator("body")).to_have_attribute("data-example", name)
+
     def tearDown(self):
         self.assertEqual(getattr(self, "errors", []), [])
         self.assertEqual(getattr(self, "outside", []), [])
@@ -574,7 +580,7 @@ class EditorTests(unittest.TestCase):
 
     def test_the_test_button_starts_a_box_per_role(self):
         page = self.open("en")
-        page.select_option("#example", "master_satellites")
+        self.choose_example(page, "master_satellites")
         expect(page.locator("#code")).to_contain_text("local function capture(team, squad)")
         page.fill("#test-boxes", "3")
         page.click("#test")
@@ -629,7 +635,7 @@ class EditorTests(unittest.TestCase):
         expect(page.locator("#ws-node .blocklyToolboxFlyout")).to_contain_text("否則")
         expect(page.locator("#lang")).to_have_value("zh-tw")
         expect(page.locator("#make-package")).to_have_text("製作套件")
-        page.select_option("#example", "domination")
+        self.choose_example(page, "domination")
         expect(page.locator("#ws-node .blocklyBlockCanvas", has_text="遊戲開始")).to_have_count(1)
         clipped = page.evaluate("""() => {
             const out = [];
@@ -655,7 +661,7 @@ class EditorTests(unittest.TestCase):
 
     def test_an_example_through_the_page(self):
         page = self.open("en")
-        page.select_option("#example", "holdall")
+        self.choose_example(page, "holdall")
         expect(page.locator("#code")).to_contain_text('on("team_input.hold", function(e)')
         expect(page.locator("#no-problems")).to_be_visible()
         page.click("#tab-field")
@@ -677,7 +683,7 @@ class EditorTests(unittest.TestCase):
 
     def test_save_open_and_the_draft(self):
         page = self.open("en")
-        page.select_option("#example", "domination")
+        self.choose_example(page, "domination")
         expect(page.locator("#code")).to_contain_text("local function show()")
         with page.expect_download() as info:
             page.click("#save")
@@ -715,12 +721,13 @@ class EditorTests(unittest.TestCase):
         maps to the block that wrote it."""
         page = self.open("en")
         for name in ("domination", "holdall", "master_satellites"):
-            page.select_option("#example", name)
+            self.choose_example(page, name)
             expect(page.locator("#code")).to_contain_text("local function")
             for kind in ("node", "field") if name != "domination" else ("node",):
                 with self.subTest(example=name, script=kind):
-                    lines = page.evaluate("k => window.atalaiaEditor.lineBlocks(k)", kind)
-                    code = page.evaluate("k => window.atalaiaEditor.files()[k + '_lua']", kind)
+                    # The map and the script it maps, taken together (one generation).
+                    lines, code = page.evaluate(
+                        "k => [window.atalaiaEditor.lineBlocks(k), window.atalaiaEditor.files()[k + '_lua']]", kind)
                     self.assertIsNotNone(lines)
                     self.assertEqual(len(lines), len(code.split("\n")))
                     types = page.evaluate("([k, ids]) => ids.map((id) => id && window.atalaiaEditor.blockType(k, id))",
@@ -732,9 +739,35 @@ class EditorTests(unittest.TestCase):
                         if line.strip().startswith("score.add("):
                             self.assertEqual(types[number], "atalaia_score_add", line)
 
+    def test_an_example_chosen_before_another_does_not_replace_it(self):
+        """Choosing an example, then another before the first one's file came: the editor shows
+        the one chosen last, and the first one's file, when it comes, is dropped (FL-3)."""
+        page = self.open("en")
+        held = []
+        page.route("**/examples/holdall.json", lambda route: held.append(route))
+        # Counts the example files read (on <html>, as the page's CSP has no eval for
+        # wait_for_function), so the test knows when the late one has been handled.
+        page.evaluate("""() => {
+            const json = Response.prototype.json;
+            let read = 0;
+            Response.prototype.json = function () {
+                return json.call(this).then((v) => { document.documentElement.dataset.jsonRead = ++read; return v; });
+            };
+        }""")
+        page.select_option("#example", "holdall")
+        expect(page.locator("body")).to_have_attribute("data-example", "")
+        self.choose_example(page, "domination")
+        expect(page.locator("html")).to_have_attribute("data-json-read", "1")
+        self.assertEqual(len(held), 1)
+        held[0].continue_()
+        expect(page.locator("html")).to_have_attribute("data-json-read", "2")
+        expect(page.locator("body")).to_have_attribute("data-example", "domination")
+        self.assertEqual(page.evaluate("() => window.atalaiaEditor.project().mode.id"), "org.atalaia.domination")
+        expect(page.locator("#code")).to_contain_text("local function show()")
+
     def test_the_test_button_plays_the_mode_in_the_simulator(self):
         page = self.open("en")
-        page.select_option("#example", "holdall")
+        self.choose_example(page, "holdall")
         expect(page.locator("#code")).to_contain_text("local function capture(team, squad)")
         page.fill("#test-boxes", "2")
         page.click("#test")
@@ -902,7 +935,7 @@ class EditorTests(unittest.TestCase):
         page = self.open("en")
         for name in ("domination", "holdall", "master_satellites"):
             with self.subTest(example=name):
-                page.select_option("#example", name)
+                self.choose_example(page, name)
                 expect(page.locator("#no-problems")).to_be_visible()
                 file_name, archive = self.make_package(page)
                 gen = page.evaluate("() => window.atalaiaEditor.files()")
@@ -946,7 +979,7 @@ class EditorTests(unittest.TestCase):
 
     def test_the_package_is_refused_with_problems_and_goes_when_the_files_change(self):
         page = self.open("en")
-        page.select_option("#example", "domination")
+        self.choose_example(page, "domination")
         expect(page.locator("#no-problems")).to_be_visible()
         message = page.locator("#package-message")
         page.click("#tab-mode")
@@ -971,7 +1004,7 @@ class EditorTests(unittest.TestCase):
         expect(page.locator("#package-panel")).to_be_hidden()
         # The panel speaks the page's language.
         page = self.open("pt")
-        page.select_option("#example", "domination")
+        self.choose_example(page, "domination")
         expect(page.locator("#make-package")).to_have_text("Criar o pacote")
         self.make_package(page)
         expect(page.locator("#package-message")).to_contain_text("descarregado")

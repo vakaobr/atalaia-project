@@ -180,6 +180,7 @@ void modem_screen_text(const modem_screen_state_t *s, modem_screen_text_t *out)
 
 #include "hal_oled.h"
 #include "oled_logo.h"
+#include "oled_view.h"
 
 #define OLED_W HAL_OLED_WIDTH
 #define BAR_H  16
@@ -270,15 +271,28 @@ void modem_screen_splash(lv_obj_t *scr, const char *version)
 
     static lv_image_dsc_t logo;
     lv_obj_t *img = image(scr, &logo, oled_logo_a8, OLED_LOGO_W, OLED_LOGO_H, lv_color_white());
-    lv_obj_align(img, LV_ALIGN_LEFT_MID, 4, 0);
+    lv_obj_align(img, LV_ALIGN_LEFT_MID, OLED_SPLASH_LOGO_X, 0);
 
-    const int32_t x = OLED_LOGO_W + 10;
+    /* The version as on the box's splash (FV-8): Montserrat 14, as unscii 8 holds only 11
+     * characters here; a development build's commit on a line of its own, the lines moved up. */
+    char line1[40], line2[24];
+    oled_version_lines(version, line1, sizeof(line1), line2, sizeof(line2));
+    const int32_t x = OLED_SPLASH_TEXT_X;
+    const int32_t w = HAL_OLED_WIDTH - x;
     lv_obj_t *name = label(scr, &lv_font_atalaia_20, "ATALAIA");
-    lv_obj_align(name, LV_ALIGN_TOP_LEFT, x, 8);
+    lv_obj_align(name, LV_ALIGN_TOP_LEFT, x, line2[0] ? 1 : 6);
     lv_obj_t *mode = label(scr, &lv_font_unscii_8, "MODEM MODE");
-    lv_obj_align_to(mode, name, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 4);
-    lv_obj_t *ver = label(scr, &lv_font_unscii_8, version ? version : "");
-    lv_obj_align_to(ver, mode, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 6);
+    lv_obj_align_to(mode, name, LV_ALIGN_OUT_BOTTOM_LEFT, 0, line2[0] ? 2 : 4);
+    lv_obj_t *ver =
+        label(scr, &lv_font_atalaia_14, oled_version_fit(line1, &lv_font_atalaia_14, w));
+    lv_label_set_long_mode(ver, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(ver, w);
+    lv_obj_align_to(ver, mode, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 2);
+    if (line2[0]) {
+        lv_obj_t *commit = label(scr, &lv_font_unscii_8, line2);
+        lv_obj_set_width(commit, w);
+        lv_obj_align_to(commit, ver, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 1);
+    }
 }
 
 #endif /* ATALAIA_SCREEN_LVGL */

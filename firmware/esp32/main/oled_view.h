@@ -79,16 +79,37 @@ bool oled_text_held(oled_text_t *t, long game_s);
  */
 bool oled_text_hold(oled_text_t *t, const oled_hold_t *holds, int n, uint32_t hold_ms);
 
+/*
+ * The firmware's version as the splashes (box and modem) show it, in two lines that fit the
+ * OLED (decision FV-8): line1 the version without its commit, line2 the commit.
+ * "0.4.0-dev.12+gabc1234" -> "v0.4.0-dev.12" and "abc1234"; ".dirty" (a tree with changes)
+ * -> "abc1234*"; a release tree past its tag, "0.3.0+5.gabc1234" -> "v0.3.0+5" and
+ * "abc1234"; a release, "0.3.0" -> "v0.3.0" and ""; other build metadata (a bench's
+ * --fw-version=0.3.0+bench) goes on line2 as it is. NULL or "" gives two empty lines. Both
+ * are cut to their buffers, always terminated.
+ */
+void oled_version_lines(const char *version, char *line1, size_t n1, char *line2, size_t n2);
+
 /* Packs a 128x64 RGB565 frame into SSD1306 pages: a pixel is lit when its
  * brightness is at least half. */
 void oled_pack(const uint16_t *rgb565, uint8_t fb[HAL_OLED_FB_SIZE]);
 
 #if ATALAIA_SCREEN_LVGL
 #include "lvgl.h"
+#include "oled_logo.h"
 
-/* Shows the boot splash (tower, name, version) on scr. Screens that
- * arrive within hold_ms wait until oled_view_poll() passes that time. */
+/* Shows the boot splash (tower, name, version) on scr: version is the firmware's whole version
+ * (esp_app_desc_t), shown as oled_version_lines() splits it. Screens that arrive within
+ * hold_ms wait until oled_view_poll() passes that time. */
 void oled_view_splash(lv_obj_t *scr, const char *version, uint32_t now_ms, uint32_t hold_ms);
+
+/* The splashes' layout (box and modem): the tower 2 pixels from the left, the text 4 past it. */
+#define OLED_SPLASH_LOGO_X 2
+#define OLED_SPLASH_TEXT_X (OLED_SPLASH_LOGO_X + OLED_LOGO_W + 4)
+
+/* line1 of oled_version_lines() as it fits max_w pixels in font: as it is, else without its
+ * leading "v" (the splash's label ends what still does not fit in "..."). */
+const char *oled_version_fit(const char *line1, const lv_font_t *font, int32_t max_w);
 
 /* Takes a screen update (every message the TFT gets, "@mode" included). */
 void oled_view_handle(lv_obj_t *scr, const char *template_name, const char *data_json,

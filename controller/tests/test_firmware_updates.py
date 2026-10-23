@@ -555,6 +555,11 @@ class BuildVersionTests(unittest.TestCase):
             ("0.3.0", co("1234567", 0, "v0.3.0", True), "0.3.0+0.g1234567.dirty"),
             ("0.3.0", co("abcdef0", 5, "v0.3.0", False), "0.3.0+5.gabcdef0"),       # after it, not bumped
             ("0.3.0", None, "0.3.0"),
+            # A shallow clone (FV-9): the commit, no count.
+            ("0.3.0-dev", co("8560d54", None, None, False), "0.3.0-dev+g8560d54"),
+            ("0.3.0-dev", co("8560d54", None, None, True), "0.3.0-dev+g8560d54.dirty"),
+            ("0.3.0", co("abcdef0", None, None, False), "0.3.0+gabcdef0"),
+            ("0.3.0", co("1234567", 0, "v0.3.0", False), "0.3.0"),                  # shallow, on its tag
         ]
         for core, checkout, want in cases:
             with self.subTest(core=core, checkout=checkout):
@@ -614,6 +619,26 @@ class BuildVersionTests(unittest.TestCase):
             self.assertTrue(self.fw.checkout().dirty)
             self.assertEqual(self.fw.build_version("0.3.0-dev", self.fw.checkout()),
                              f"0.3.0-dev.3+g{got.commit}.dirty")
+            run("checkout", "-q", "--", "a.txt")
+
+            # Clones of it (FV-9): a whole one counts as the repository does; a shallow one (CI's
+            # actions/checkout without fetch-depth: 0) has the commit and no count, except on a
+            # release tag.
+            def clone(name: str, *args: str) -> Path:
+                run("clone", "-q", *args, f"file://{tmp}", str(repo / name))
+                self.fw.REPO = repo / name
+                return repo / name
+
+            clone("full")
+            self.assertEqual(self.fw.checkout(), got)
+            clone("shallow", "--depth", "1")
+            self.assertEqual(self.fw.checkout(), self.fw.Checkout(got.commit, None, None, False))
+            self.assertEqual(self.fw.build_version("0.3.0-dev", self.fw.checkout()), f"0.3.0-dev+g{got.commit}")
+            self.fw.REPO = repo
+            run("tag", "v0.3.0")
+            clone("shallow-release", "--depth", "1", "--branch", "v0.3.0")
+            self.assertEqual(self.fw.checkout(), self.fw.Checkout(got.commit, 0, "v0.3.0", False))
+            self.assertEqual(self.fw.build_version("0.3.0", self.fw.checkout()), "0.3.0")
 
 
 class ToolTests(unittest.TestCase):

@@ -1022,9 +1022,9 @@ static void task_lvgl(void *arg)
     display_port_init(hal.display);
     lv_obj_t *oled_scr = display_port_oled_init(hal.oled);
     if (oled_scr) {
-        char version[24];
-        snprintf(version, sizeof(version), "v%.20s", esp_app_get_description()->version);
-        oled_view_splash(oled_scr, version, now_ms(), CONFIG_ATALAIA_OLED_SPLASH_MS);
+        /* The whole version; the splash shows its short form (FV-8). */
+        oled_view_splash(oled_scr, esp_app_get_description()->version, now_ms(),
+                         CONFIG_ATALAIA_OLED_SPLASH_MS);
         oled_view_set_game_clock(game_clock_ms);
         oled_view_set_hold_reader(held_buttons);
     }

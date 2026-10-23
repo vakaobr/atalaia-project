@@ -21,7 +21,9 @@ the core's (core/include/atalaia/version.h, 0.3.0-dev while 0.3.0 is developed) 
 commit it was built from, worked out here from the checkout: 0.3.0-dev.412+g8560d54 (commits
 since the last release tag v<X.Y.Z>, or since the first commit; the commit's first 7 hex
 digits), with ".dirty" when tracked files have uncommitted changes. A copy with no commit
-(a tarball, a fresh `git init`) or no git gets the core's version alone (decisions FV-1 to FV-4).
+(a tarball, a fresh `git init`) or no git gets the core's version alone (decisions FV-1 to FV-4);
+a shallow clone, which cannot count, the core's version and the commit: 0.3.0-dev+g8560d54
+(FV-9; CI checks out the whole history, so its images carry the count too).
 
 `build`, `bench` and `wokwi` (the Field Box) also take:
     --fw-version=0.3.0-rc.1                    the exact version instead (a release or a release
@@ -112,7 +114,7 @@ class Checkout:
     """What the checkout says about the commit being built."""
 
     commit: str  # the first 7 hex digits of HEAD
-    count: int  # commits since the last release tag (or since the first commit)
+    count: Optional[int]  # commits since the last release tag (or the first commit); None: shallow
     tag: Optional[str]  # that release tag (v0.2.0), or None
     dirty: bool  # tracked files differ from HEAD
 
@@ -128,15 +130,21 @@ def _git(*args: str) -> Optional[str]:
 def checkout() -> Optional[Checkout]:
     """HEAD's commit, the commits since the last release tag (v<digits>..., no pre-release: an
     rc tag never resets the count), and whether tracked files changed; None without git or
-    without a commit (a tarball, the verify script's fresh `git init`)."""
+    without a commit (a tarball, the verify script's fresh `git init`). A shallow clone (CI's
+    actions/checkout without fetch-depth: 0) lacks the history to count: count None, unless HEAD
+    is itself a release tag (count 0) (FV-9)."""
     head = _git("rev-parse", "--verify", "--quiet", "HEAD^{commit}")
     if not head or not re.fullmatch(r"[0-9a-f]{40,64}", head):
         return None
-    tag = _git("describe", "--tags", "--abbrev=0", "--match", "v[0-9]*", "--exclude", "v*-*", "HEAD")
+    release = ("--tags", "--match", "v[0-9]*", "--exclude", "v*-*", "HEAD")
+    status = _git("status", "--porcelain", "--untracked-files=no")
+    if _git("rev-parse", "--is-shallow-repository") == "true":
+        tag = _git("describe", "--exact-match", *release)
+        return Checkout(commit=head[:7], count=0 if tag else None, tag=tag or None, dirty=bool(status))
+    tag = _git("describe", "--abbrev=0", *release)
     count = _git("rev-list", "--count", f"{tag}..HEAD" if tag else "HEAD")
     if count is None or not count.isdigit():
         return None
-    status = _git("status", "--porcelain", "--untracked-files=no")
     return Checkout(commit=head[:7], count=int(count), tag=tag or None, dirty=bool(status))
 
 
@@ -146,10 +154,14 @@ def build_version(core: str, co: Optional[Checkout]) -> str:
     is newer, every dev build is older than the release and newer than 0.2.0, and the build
     metadata (the commit) is ignored in the order. A release's version (0.3.0) is kept as it is
     on its tag with no change; any other commit gets <core>+<count>.g<commit>[.dirty], equal to
-    the release in the order (FV-3). No checkout: the core's version."""
+    the release in the order (FV-3). No checkout: the core's version. A shallow clone, whose count
+    is unknown: <core>+g<commit>[.dirty], the commit without a count that would be wrong, equal to
+    the core's version in the order (FV-9)."""
     if co is None:
         return core
     meta = f"g{co.commit}" + (".dirty" if co.dirty else "")
+    if co.count is None:
+        return f"{core}+{meta}"
     if "-" in core:
         return f"{core}.{co.count}+{meta}"
     if co.tag == f"v{core}" and co.count == 0 and not co.dirty:

@@ -133,7 +133,10 @@ digits, `0.3.0-dev.412+g8560d54`, with `.dirty` when tracked files have uncommit
 `docker_fw.py` works it out on the host (the build runs in Docker) and prints it;
 `python tools/docker_fw.py version` prints it without building. A copy with no commit (a
 tarball, a fresh `git init`) or a plain `idf.py build` gets the core's version alone
-(`0.3.0-dev`). Every development build of 0.3.0 is newer than 0.2.0 and older than 0.3.0;
+(`0.3.0-dev`); a shallow clone, which cannot count, the core's version and the commit
+(`0.3.0-dev+g8560d54`). CI's firmware jobs check out the whole history and pass
+`docker_fw.py version` to `idf.py -D ATALAIA_FW_VERSION=...`, so their images carry the
+count and the commit too (FV-9). Every development build of 0.3.0 is newer than 0.2.0 and older than 0.3.0;
 `dev.N` compares as a number, and the `+...` build metadata never counts, so a box refuses an
 update to another commit with the same count (`not_newer`).
 
@@ -219,7 +222,9 @@ pixel on flush (`oled_pack`); only the 128-byte pages that changed go over
 the 100 kHz bus, so a countdown tick costs one or two pages and a full frame
 about 100 ms. At boot it shows a splash for 2 s (the tower from
 `site/favicon.svg`, drawn by `tools/oled_logo.py` into `main/oled_logo.c`,
-with the name and the version; the same file has the USB radio modem's
+with the name and the version, short: `v0.4.0-dev.12` and the commit, `abc1234`, on
+the next line, `*` after it for uncommitted changes, a release alone, `v0.3.0`; FV-8;
+the same file has the USB radio modem's
 small header tower). Kconfig: `ATALAIA_OLED_STATUS` (on by
 default), `ATALAIA_OLED_ADDR`, `ATALAIA_OLED_RST_PIN`, `ATALAIA_OLED_FLIP`
 and `ATALAIA_OLED_SPLASH_MS`. Without an OLED at the address the box logs a
@@ -259,8 +264,8 @@ for boards with a USB-UART bridge.
 
 The board's own OLED tells a GM whether the modem works, without a laptop
 (`main/modem/modem_screen.c`, task `main/modem/modem_display.c`). At boot,
-for 2 s, the splash: the tower, "ATALAIA", "MODEM MODE" and the version (as much of it
-as the line holds: the boot log and the IDENT have all of it, FV-6).
+for 2 s, the splash: the tower, "ATALAIA", "MODEM MODE" and the version, short as on the
+box (the version, then its commit; FV-8: the boot log and the IDENT have all of it).
 Then the status screen, under a header bar with a small tower and
 "MODEM MODE":
 
