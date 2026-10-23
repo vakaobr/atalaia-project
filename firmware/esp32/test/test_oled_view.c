@@ -144,6 +144,47 @@ static void test_other_screens(void)
     CHECK(strcmp(t.foot, "Waiting") == 0);
 }
 
+/* A zone (BN-11): the captured screen's points and held time (BN-23), and the taker. */
+static void test_zone_screens(void)
+{
+    oled_text_t t = map("DOMINATION", "captured", "{\"team\":\"red\",\"points\":12,\"since\":95}");
+    CHECK(strcmp(t.big, "RED") == 0);
+    CHECK(strcmp(t.head, "DOMINATION") == 0);
+    CHECK(strcmp(t.head_right, "12 pts") == 0);
+    CHECK(t.since == 95);
+    CHECK(t.bar == -1);
+    CHECK(strcmp(t.foot, "ZONE HELD") == 0); /* until the game's clock gives the held time */
+    CHECK(oled_text_held(&t, 230));
+    CHECK(strcmp(t.foot, "held for 2:15") == 0);
+    CHECK(!oled_text_held(&t, 230)); /* unchanged */
+    CHECK(oled_text_held(&t, 90));   /* a clock behind the capture: 0:00, never negative */
+    CHECK(strcmp(t.foot, "held for 0:00") == 0);
+    /* Without points or a capture time (another mode's captured screen): as before. */
+    t = map("HILL", "captured", "{\"team\":\"blue\"}");
+    CHECK(t.head_right[0] == '\0');
+    CHECK(t.since == -1);
+    CHECK(!oled_text_held(&t, 230));
+    CHECK(strcmp(t.foot, "ZONE HELD") == 0);
+    /* Another team holding its button: the bar and the taker; the held time waits. */
+    t = map("HILL", "captured",
+            "{\"team\":\"red\",\"points\":1,\"since\":5,\"taker\":\"blue\","
+            "\"progress\":0.25}");
+    CHECK(t.bar == 25);
+    CHECK(strcmp(t.foot, "BLUE") == 0);
+    CHECK(!oled_text_held(&t, 230));
+    CHECK(strcmp(t.foot, "BLUE") == 0);
+    t = map("HILL", "captured", "{\"team\":\"red\",\"progress\":0.25}");
+    CHECK(strcmp(t.foot, "ZONE HELD") == 0);
+    t = map("HILL", "neutral", "{\"taker\":\"red\",\"progress\":0.5}");
+    CHECK(strcmp(t.big, "NEUTRAL") == 0);
+    CHECK(strcmp(t.foot, "RED") == 0);
+    t = map("HILL", "neutral", "{}");
+    CHECK(strcmp(t.foot, "Hold to capture") == 0);
+    CHECK(t.bar == -1);
+    t = map("HILL", "neutral", "{\"taker\":\"red\"}"); /* no bar: no taker either */
+    CHECK(strcmp(t.foot, "Hold to capture") == 0);
+}
+
 static void test_pack(void)
 {
     static uint16_t frame[HAL_OLED_WIDTH * HAL_OLED_HEIGHT];
@@ -169,5 +210,6 @@ void run_oled_view_tests(void)
     test_timer_and_start();
     test_bomb_phases();
     test_other_screens();
+    test_zone_screens();
     test_pack();
 }

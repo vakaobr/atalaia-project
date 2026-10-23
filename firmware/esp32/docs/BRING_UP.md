@@ -472,7 +472,7 @@ build) on COM3, **board 2** the USB modem on COM4, behind a controller running i
 | `waiting` | WAITING · Game N, The game hasn't started / À ESPERA · Jogo N, O jogo ainda não começou | Joined (by card, text or an invite: "Invited: zone") and waiting for the GM's Start. Nothing else is shown until then |
 | `playing` | GAME ON / JOGO EM CURSO | The game has started; the mode's own screen follows as soon as it draws one |
 | `neutral` | ZONE · NEUTRAL, Hold to capture / ZONA · LIVRE, Mantém premido | A running zone that no team holds (Domination, Hold-All, Last Stand, Master and Satellites) |
-| `captured` | ZONE HELD · RED / ZONA OCUPADA · RED | A team holds the zone |
+| `captured` | ZONE HELD · RED / ZONA OCUPADA · RED; the OLED: RED big, the team's points on this box in the header (12 pts), how long it has held the zone below (held for 2:15 / ocupada 2:15, ticking each second; the taking team while another holds its button, BN-23) | A team holds the zone |
 | `standby` (Bomb) | READY · Hold to arm / PRONTA · Mantém premido para armar | The bomb is not armed yet; "standby" is never used for a zone |
 | `final_score` | GAME OVER / FIM DO JOGO | The game ended; Ready follows |
 

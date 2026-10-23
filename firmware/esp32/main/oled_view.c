@@ -104,6 +104,7 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
 {
     memset(out, 0, sizeof(*out));
     out->bar = -1;
+    out->since = -1;
     if (!t || strcmp(t, "@mode") == 0) return false;
     if (!data) data = "{}";
     const char *mode = mode_title && mode_title[0] ? mode_title : "ATALAIA";
@@ -231,18 +232,33 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
         }
         return true;
     }
-    /* A zone nobody holds, a zone a team holds (BN-11): never the Bomb's words. */
+    /* A zone nobody holds, a zone a team holds (BN-11): never the Bomb's words. While a team
+     * holds its button to take it: the bar, and that team ("taker") below (BN-25). */
     if (strcmp(t, "neutral") == 0) {
         set_text(out->big, sizeof(out->big), TX_NEUTRAL_UP);
         out->bar = share_pct(data, "progress");
         set_text(out->foot, sizeof(out->foot), TXO_HOLD_TO_CAPTURE);
+        if (out->bar >= 0 && screen_json_str(data, "taker", s, sizeof(s)) && s[0]) {
+            upper(s);
+            set(out->foot, sizeof(out->foot), s);
+        }
         return true;
     }
+    /* The team, its points on this box at the right of the header, and how long it has held
+     * the zone below (oled_text_held, from the game's clock) when the mode gives them. */
     if (strcmp(t, "captured") == 0 && screen_json_str(data, "team", s, sizeof(s)) && s[0]) {
         upper(s);
         set(out->big, sizeof(out->big), s);
         out->bar = share_pct(data, "progress");
         set_text(out->foot, sizeof(out->foot), TX_ZONE_HELD_UP);
+        if (screen_json_int(data, "points", &v)) {
+            snprintf(out->head_right, sizeof(out->head_right), box_text(TXO_POINTS), v);
+        }
+        if (screen_json_int(data, "since", &v) && v >= 0) out->since = v;
+        if (out->bar >= 0 && screen_json_str(data, "taker", s, sizeof(s)) && s[0]) {
+            upper(s);
+            set(out->foot, sizeof(out->foot), s);
+        }
         return true;
     }
     if (strcmp(t, "playing") == 0) {
@@ -297,6 +313,17 @@ bool oled_text_for(const char *mode_title, const char *t, const char *data, oled
     return true;
 }
 
+bool oled_text_held(oled_text_t *t, long game_s)
+{
+    if (t->since < 0 || t->bar >= 0) return false;
+    char clock[16], foot[sizeof(t->foot)];
+    clock_text(game_s - t->since, clock, sizeof(clock));
+    snprintf(foot, sizeof(foot), box_text(TXO_HELD_FOR), clock);
+    if (strcmp(foot, t->foot) == 0) return false;
+    set(t->foot, sizeof(t->foot), foot);
+    return true;
+}
+
 void oled_pack(const uint16_t *rgb565, uint8_t fb[HAL_OLED_FB_SIZE])
 {
     memset(fb, 0, HAL_OLED_FB_SIZE);
@@ -333,6 +360,10 @@ static char pending_data[SCREEN_DATA_MAX];
 static bool pending;
 static uint32_t splash_until;
 static bool splash_on;
+/* What the OLED shows, for the held time's tick; the game's clock. */
+static oled_text_t drawn = {.bar = -1, .since = -1};
+static uint32_t (*game_clock)(void);
+static long drawn_s = -1;
 
 /* One line of text: too long ends in "...", never wraps. */
 static lv_obj_t *text(lv_obj_t *parent, const lv_font_t *font, lv_color_t colour)
@@ -353,6 +384,7 @@ static void clean(lv_obj_t *scr)
     lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
     built = false;
+    drawn.since = -1;
 }
 
 static void build(lv_obj_t *scr)
@@ -470,10 +502,33 @@ void oled_view_splash(lv_obj_t *scr, const char *version, uint32_t now_ms, uint3
     splash_until = now_ms + hold_ms;
 }
 
+void oled_view_set_game_clock(uint32_t (*game_ms)(void))
+{
+    game_clock = game_ms;
+}
+
 static void show(lv_obj_t *scr, const char *t, const char *data)
 {
     oled_text_t txt;
-    if (oled_text_for(mode_title, t, data, &txt)) oled_view_draw(scr, &txt);
+    if (!oled_text_for(mode_title, t, data, &txt)) return;
+    drawn = txt;
+    drawn_s = -1;
+    if (game_clock && drawn.since >= 0) {
+        drawn_s = (long)(game_clock() / 1000u);
+        oled_text_held(&drawn, drawn_s);
+    }
+    oled_view_draw(scr, &drawn);
+}
+
+/* Once a second of game time: the footer only, one or two of the panel's pages (as a
+ * countdown's tick); the TFT is not touched. */
+static void tick_held(void)
+{
+    if (!game_clock || drawn.since < 0 || !built) return;
+    long s = (long)(game_clock() / 1000u);
+    if (s == drawn_s) return;
+    drawn_s = s;
+    if (oled_text_held(&drawn, s)) lv_label_set_text(foot, drawn.foot);
 }
 
 void oled_view_handle(lv_obj_t *scr, const char *t, const char *data, uint32_t now_ms)
@@ -496,7 +551,11 @@ void oled_view_handle(lv_obj_t *scr, const char *t, const char *data, uint32_t n
 
 void oled_view_poll(lv_obj_t *scr, uint32_t now_ms)
 {
-    if (!splash_on || (int32_t)(now_ms - splash_until) < 0) return;
+    if (!splash_on) {
+        tick_held();
+        return;
+    }
+    if ((int32_t)(now_ms - splash_until) < 0) return;
     splash_on = false;
     if (pending) {
         pending = false;

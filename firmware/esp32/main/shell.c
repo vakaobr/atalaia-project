@@ -985,6 +985,13 @@ static uint32_t now_ms(void)
     return (uint32_t)(esp_timer_get_time() / 1000);
 }
 
+/* The running game's time for the OLED's held-time tick: one 32-bit word the game task
+ * writes whole (node_runner_tick), read here from the LVGL task. */
+static uint32_t game_clock_ms(void)
+{
+    return *(volatile const uint32_t *)&runner.game_time_ms;
+}
+
 /*
  * lvgl_task -- core 1, priority 4, 5 ms.
  * Owns LVGL: brings up the display, renders queued screens, runs LVGL timers.
@@ -999,6 +1006,7 @@ static void task_lvgl(void *arg)
         char version[24];
         snprintf(version, sizeof(version), "v%.20s", esp_app_get_description()->version);
         oled_view_splash(oled_scr, version, now_ms(), CONFIG_ATALAIA_OLED_SPLASH_MS);
+        oled_view_set_game_clock(game_clock_ms);
     }
 
     for (;;) {

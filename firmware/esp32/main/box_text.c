@@ -248,6 +248,9 @@ static const char *const texts[TX_COUNT][BOX_LANG_COUNT] = {
     [TXO_AGAIN_IN_MIN] = {"again in %lu min", "daqui a %lu min", "Warte %lu min", "%lu 分鐘後再試"},
     [TXO_NO_PIN] = {"NO PIN", "SEM PIN", "KEINE PIN", "無 PIN 碼"},
     [TXO_SET_PIN] = {"@admin-pin", "@admin-pin", "@admin-pin", "@admin-pin"},
+    [TXO_POINTS] = {"%ld pts", "%ld pts", "%ld Pkt.", "%ld 分"},
+    /* A duration, not the game time of the capture (the TFT's TX_HELD_SINCE). */
+    [TXO_HELD_FOR] = {"held for %s", "ocupada %s", "gehalten %s", "已佔領 %s"},
 };
 
 const char *box_text_in(box_lang_t lang, box_text_id_t id)

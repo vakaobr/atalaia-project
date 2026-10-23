@@ -8,7 +8,9 @@
  * for staff. Every screen update the TFT gets is mapped to three lines: a
  * header bar (mode or menu), one big value (countdown, phase, choice) and
  * a footer (team, hint or message), with a progress bar beside it while
- * a team holds its button (data "progress", or Bomb's "defuse").
+ * a team holds its button (data "progress", or Bomb's "defuse"). The
+ * captured screen also shows the team's points in the header and, from the
+ * game's clock, how long it has held the zone in the footer.
  *
  * oled_text_for() is the mapping, plain C for the host tests; the LVGL part
  * (ATALAIA_SCREEN_LVGL) draws it on a second LVGL display, packed to one
@@ -29,6 +31,7 @@ typedef struct {
     char big[48];        /* the big middle line */
     char foot[48];       /* the footer line */
     int bar;             /* 0-100: a hold's progress bar beside the footer; -1 none */
+    long since;          /* captured: the game time (s) the team took the zone; -1 none */
 } oled_text_t;
 
 /* The header for a mode, from the "@mode" screen message's data,
@@ -42,6 +45,13 @@ void oled_mode_title(const char *mode_msg, char *out, size_t out_sz);
  */
 bool oled_text_for(const char *mode_title, const char *template_name, const char *data_json,
                    oled_text_t *out);
+
+/*
+ * The captured screen's footer from the game time (game_s, seconds): how long
+ * the team has held the zone ("held for 2:15"), when t has a capture time and
+ * no hold bar. Returns true when the footer changed.
+ */
+bool oled_text_held(oled_text_t *t, long game_s);
 
 /* Packs a 128x64 RGB565 frame into SSD1306 pages: a pixel is lit when its
  * brightness is at least half. */
@@ -58,8 +68,15 @@ void oled_view_splash(lv_obj_t *scr, const char *version, uint32_t now_ms, uint3
 void oled_view_handle(lv_obj_t *scr, const char *template_name, const char *data_json,
                       uint32_t now_ms);
 
-/* Shows the latest screen once the splash time is over. */
+/* Shows the latest screen once the splash time is over; ticks the captured
+ * screen's held time. */
 void oled_view_poll(lv_obj_t *scr, uint32_t now_ms);
+
+/* The game's clock, in milliseconds of game time (read from the display
+ * task; NULL: none). While a captured screen with a capture time shows, the
+ * footer counts how long the team has held the zone, redrawn once a second
+ * by oled_view_poll(). */
+void oled_view_set_game_clock(uint32_t (*game_ms)(void));
 
 /* Draws t on scr (the three-line layout; builds it on first use). */
 void oled_view_draw(lv_obj_t *scr, const oled_text_t *t);

@@ -175,6 +175,8 @@ typedef enum {
     TXO_AGAIN_IN_MIN, /* "%lu": minutes */
     TXO_NO_PIN,
     TXO_SET_PIN,
+    TXO_POINTS,   /* "%ld": a team's points on this box (the captured screen's header) */
+    TXO_HELD_FOR, /* %s: how long the team has held the zone (game time since its capture) */
     TX_COUNT,
 } box_text_id_t;
 

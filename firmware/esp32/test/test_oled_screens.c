@@ -66,6 +66,9 @@ static const oled_case_t cases[] = {
     {"playing", DOM, "playing", "{\"game\":3073,\"role\":\"zone\"}"},
     {"neutral", DOM, "neutral", "{}"},
     {"captured", DOM, "captured", "{\"team\":\"red\",\"points\":12,\"since\":95}"},
+    /* Another team holding its button: the bar, and that team below. */
+    {"captured_taking", DOM, "captured",
+     "{\"team\":\"red\",\"points\":12,\"since\":95,\"taker\":\"blue\",\"progress\":0.4}"},
     {"final_score", DOM, "final_score", "{\"owner\":\"red\",\"points\":12}"},
     {"ready_picker", NULL, "ready", "{\"picker\":true}"},
     {"waiting_invited_pt", NULL, "waiting", "{\"game\":3073,\"role\":\"zone\",\"invited\":true}"},
@@ -185,6 +188,14 @@ static const modem_case_t modem_cases[] = {
 _Alignas(64) static uint8_t framebuffer[W * H * 2];
 static lv_display_t *display;
 static uint32_t fake_ms;
+/* The game's clock (oled_view_set_game_clock): 3:50 into the game, so a zone taken at 1:35
+ * ("since":95) has been held for 2:15. */
+static uint32_t fake_game_ms = 230000;
+
+static uint32_t game_clock(void)
+{
+    return fake_game_ms;
+}
 static int failures;
 static uint8_t rendered[W * H * 3];
 
@@ -317,6 +328,56 @@ static void check_no_stale_references(void)
     closedir(dir);
 }
 
+/* The captured screen's held time follows the game's clock, once a second. */
+static const char *foot_text(lv_obj_t *scr)
+{
+    return lv_label_get_text(
+        lv_obj_get_child(scr, 2)); /* the header bar, the big line, the footer */
+}
+
+static void check_held_tick(void)
+{
+    box_lang_set_code("");
+    lv_obj_t *scr = lv_screen_active();
+    fake_game_ms = 230000;
+    oled_view_handle(scr, "captured", "{\"team\":\"red\",\"points\":3,\"since\":95}", 1);
+    if (strcmp(foot_text(scr), "held for 2:15") != 0)
+        fail("captured", "the held time is not drawn");
+    fake_game_ms = 230999;
+    oled_view_poll(scr, 2);
+    if (strcmp(foot_text(scr), "held for 2:15") != 0)
+        fail("captured", "the held time changed within its second");
+    fake_game_ms = 231000;
+    oled_view_poll(scr, 3);
+    if (strcmp(foot_text(scr), "held for 2:16") != 0)
+        fail("captured", "the held time does not tick");
+    fake_game_ms = 3600000 + 95000 + 5000;
+    oled_view_poll(scr, 4);
+    if (strcmp(foot_text(scr), "held for 1:00:05") != 0) fail("captured", "an hour's hold");
+    /* While another team takes it, the taker stays; no tick. */
+    oled_view_handle(scr, "captured",
+                     "{\"team\":\"red\",\"since\":95,\"taker\":\"blue\",\"progress\":0.5}", 5);
+    fake_game_ms += 1000;
+    oled_view_poll(scr, 6);
+    if (strcmp(foot_text(scr), "BLUE") != 0)
+        fail("captured", "the taker gave way to the held time");
+    /* Another screen: nothing ticks over it. */
+    oled_view_handle(scr, "paused", "{}", 7);
+    fake_game_ms += 1000;
+    oled_view_poll(scr, 8);
+    if (strcmp(foot_text(scr), box_text(TXO_WAIT_GM)) != 0)
+        fail("paused", "the held time ticked over another screen");
+    fake_game_ms = 230000;
+    /* The longest held time, 9:59:59, fits the footer in every language (no "..."). */
+    extern const lv_font_t lv_font_atalaia_14;
+    for (int lang = 0; lang < BOX_LANG_COUNT; lang++) {
+        char line[64];
+        snprintf(line, sizeof(line), box_text_in((box_lang_t)lang, TXO_HELD_FOR), "9:59:59");
+        int32_t w = lv_text_get_width(line, (uint32_t)strlen(line), &lv_font_atalaia_14, 0);
+        if (w > W - 4) fail("captured", "the held time does not fit the footer");
+    }
+}
+
 /* The splash holds later screens until its time is over. */
 static void check_splash_hold(void)
 {
@@ -351,6 +412,7 @@ int main(void)
     lv_display_set_buffers(display, framebuffer, NULL, sizeof(framebuffer),
                            LV_DISPLAY_RENDER_MODE_FULL);
     lv_display_set_flush_cb(display, flush_cb);
+    oled_view_set_game_clock(game_clock);
 
     for (int i = 0; i < CASE_COUNT; i++) {
         render(&cases[i]);
@@ -358,6 +420,7 @@ int main(void)
         if (font_check_labels(lv_screen_active(), msg, sizeof(msg)) > 0) fail(cases[i].name, msg);
         compare_with_reference(cases[i].name);
     }
+    check_held_tick(); /* on the OLED view's own objects, before the modem's screens replace them */
     for (int i = 0; i < MODEM_CASE_COUNT; i++) {
         render_modem(&modem_cases[i]);
         compare_with_reference(modem_cases[i].name);
