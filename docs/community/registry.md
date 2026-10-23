@@ -126,7 +126,8 @@ python3 tools/registry_check.py site ../atalaia-modes /tmp/registry-site
 ```
 
 This repository's own CI runs the template's checks on a sample submission
-(`registry/examples/org.example.hill/`, throwaway keys made at run time):
+(`registry/examples/org.example.hill/`, King of the Hill with its own screens,
+the mode to copy when starting one; throwaway keys made at run time):
 `python3 -m unittest discover -s registry/tests`, CI job `registry-template`
 (decision P5G-11).
 

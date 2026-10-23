@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: MIT
+#
+# The game is over. Data from node.lua: owner (the team on the hill at the
+# end, absent when none) and points (its points on this box); lang from the box.
+template: final_score
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: panel }
+    children:
+      - type: label
+        text: "{lang == 'pt' && 'FIM DO JOGO' || 'GAME OVER'}"
+        style: { font_size: 20, width: fill, align: center }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{lang == 'pt' && 'A colina ficou com' || 'The hill was held by'}"
+    style: { font_size: 20, color: muted, visible: "{owner}" }
+  # A colour can be an expression: here the owner's team colour.
+  - type: label
+    text: "{owner|upper}"
+    style: { font_size: 48, color: "{owner}", visible: "{owner}" }
+  - type: label
+    text: "{points} {lang == 'pt' && 'pontos nesta caixa' || 'points on this box'}"
+    style: { font_size: 20, visible: "{owner}" }
+  - type: label
+    text: "{lang == 'pt' && 'Ninguém tomou a colina' || 'No team took the hill'}"
+    style: { font_size: 20, color: muted, visible: "{!owner}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{lang == 'pt' && 'Pontuações finais' || 'Scores are final'}"
+    style:
+      font_size: 14
+      color: muted
+      padding: { bottom: 10 }

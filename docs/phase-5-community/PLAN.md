@@ -628,7 +628,7 @@ Field Boxes have built in; a fourth job publishes to GitHub Pages.
 |------|------|
 | `registry/template/` | `index.json` (empty, `schema_version: 1`), `keys/README.md`, `keys/revoked.json`, `modes/README.md`, `README.md`, `CONTRIBUTING.md`, `REUSE.toml`, `.github/workflows/registry.yml` (`registry-lint`, `registry-test`, `sandbox-escape`, `publish`, with this repository's tools at `ATALAIA_REF`), `.github/CODEOWNERS`, the pull request template and the *Flag a mode* and *Revoke a key* issue templates |
 | `tools/registry_check.py` | `lint` (with `--base`), `test`, `key`, `add`, `badge` (`--remove`), `site` |
-| `registry/examples/org.example.hill/` | A sample community submission (MIT) with two tests |
+| `registry/examples/org.example.hill/` | A sample community submission (MIT) with two tests (since 2026-10-23 its own screens and a third test) |
 | `registry/tests/test_registry_template.py` | 18 tests: the workflow's shape; the sample listed and verified with throwaway keys, every `check-` step of the workflow run as written, the published package verified as a controller does; the refusals |
 | `tools/check.sh`, `.github/workflows/ci.yml` (job `registry-template`) | The test in this repository's checks |
 

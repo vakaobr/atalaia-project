@@ -63,7 +63,10 @@ How the registry works, its review checklist, keys and moderation:
    then `http://localhost:8000/editor/`; *Test in the simulator* plays it, and
    *Make the package* downloads its unsigned archive and the commands that sign
    it, for a field controller of your own; the registry packs from the source),
-   or by hand as [`modes/README.md`](modes/README.md) describes. Pick its id
+   or by hand as [`modes/README.md`](modes/README.md) describes; the sample
+   [`registry/examples/org.example.hill/`](registry/examples/org.example.hill/)
+   (King of the Hill: a script, its own screens in Portuguese and English, the
+   LED ring and a sound, tests) is a small one to copy. Pick its id
    (`org.yourclub.name`; `org.atalaia.` is the project's own) and a licence
    from the approved seven (`GPL-3.0-or-later`, `LGPL-3.0-or-later`, `MIT`,
    `Apache-2.0`, `BSD-2-Clause`, `BSD-3-Clause`, `CC0-1.0`); every file starts

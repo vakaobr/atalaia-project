@@ -126,7 +126,7 @@ class Workspace:
     def project_key(self) -> None:
         assert quiet(["key", self.root, "--public", self.project, "--owner", "vakaobr", "--project"]) == 0
 
-    def badge(self, version: str = "1.0.0", key: Path | None = None) -> int:
+    def badge(self, version: str = "1.1.0", key: Path | None = None) -> int:
         return quiet(["badge", self.root, SAMPLE_ID, version, "--key", key or self.project_pem])
 
     def errors(self, base: Path | None = None) -> list[str]:
@@ -219,14 +219,14 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual((entry["id"], entry["name"], entry["author"]), (SAMPLE_ID, "King of the Hill", "Example Club"))
         listed = entry["versions"][0]
         self.assertEqual((listed["url"], listed["verified"], listed["license"], listed["key_id"]),
-                         ("packages/org.example.hill-1.0.0.tar", False, "MIT", rc.fr.key_id(ws.author)))
+                         ("packages/org.example.hill-1.1.0.tar", False, "MIT", rc.fr.key_id(ws.author)))
         self.assertEqual(ws.errors(ws.dir / "base"), [])
 
         ws.project_key()
         self.assertEqual(ws.badge(), 0)
         verified = ws.index()["modes"][0]["versions"][0]
         self.assertEqual((verified["verified"], verified["key_id"]), (True, rc.fr.key_id(ws.project)))
-        self.assertTrue((ws.root / "packages" / "org.example.hill-1.0.0.tar.verified.json").is_file())
+        self.assertTrue((ws.root / "packages" / "org.example.hill-1.1.0.tar.verified.json").is_file())
         self.assertEqual(ws.errors(ws.dir / "base"), [])
 
         copy_licences(ws.root, ["CC0-1.0", "CC-BY-SA-4.0", "GPL-3.0-or-later", "MIT"])
@@ -240,20 +240,20 @@ class TemplateTests(unittest.TestCase):
         keys = json.loads((site / "keys.json").read_text())
         self.assertEqual([k["public_key"] for k in keys["project"]], [ws.project])
         self.assertEqual([k["public_key"] for k in keys["authors"]], [ws.author])
-        self.assertIn("verified 1.0.0", (site / "badges" / f"{SAMPLE_ID}.svg").read_text())
+        self.assertIn("verified 1.1.0", (site / "badges" / f"{SAMPLE_ID}.svg").read_text())
         # A field controller that trusts only the project's key takes the published package.
-        archive = site / "packages" / "org.example.hill-1.0.0.tar"
+        archive = site / "packages" / "org.example.hill-1.1.0.tar"
         for release, key in ((".verified.json", ws.project), (".release.json", ws.author)):
             out = subprocess.run([sys.executable, str(REPO / "tools" / "mode_package.py"), "verify", str(archive),
                                   str(archive) + release, "--keys", key, "--revoked", str(site / "revoked.json")],
                                  capture_output=True, text=True, check=False)
             self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
         # Taking the badge away lists the author's signature again.
-        self.assertEqual(quiet(["badge", ws.root, SAMPLE_ID, "1.0.0", "--remove"]), 0)
+        self.assertEqual(quiet(["badge", ws.root, SAMPLE_ID, "1.1.0", "--remove"]), 0)
         self.assertEqual(ws.index()["modes"][0]["versions"][0]["key_id"], rc.fr.key_id(ws.author))
         self.assertEqual(ws.errors(), [])
         self.assertEqual(quiet(["site", ws.root, site]), 0)
-        self.assertIn("not reviewed 1.0.0", (site / "badges" / f"{SAMPLE_ID}.svg").read_text())
+        self.assertIn("not reviewed 1.1.0", (site / "badges" / f"{SAMPLE_ID}.svg").read_text())
 
     def test_the_mode_tests_run_and_a_failing_one_fails(self):
         lib = core_lib()
@@ -292,7 +292,7 @@ class RefusalTests(unittest.TestCase):
 
     def test_a_tampered_archive(self):
         ws = self.listed()
-        archive = ws.root / "packages" / "org.example.hill-1.0.0.tar"
+        archive = ws.root / "packages" / "org.example.hill-1.1.0.tar"
         data = bytearray(archive.read_bytes())
         data[data.index(b"score.add")] ^= 0x20
         archive.write_bytes(bytes(data))
@@ -302,19 +302,19 @@ class RefusalTests(unittest.TestCase):
         ws = self.listed()
         node = ws.root / "modes" / SAMPLE_ID / "node.lua"
         node.write_text(node.read_text() + "-- changed after signing\n")
-        self.assertRefused(ws, "does not pack to packages/org.example.hill-1.0.0.tar")
+        self.assertRefused(ws, "does not pack to packages/org.example.hill-1.1.0.tar")
 
     def test_verified_without_the_projects_signature(self):
         ws = self.listed()
         index = ws.index()
         index["modes"][0]["versions"][0]["verified"] = True
         (ws.root / "index.json").write_text(json.dumps(index))
-        self.assertRefused(ws, "verified needs packages/org.example.hill-1.0.0.tar.verified.json")
+        self.assertRefused(ws, "verified needs packages/org.example.hill-1.1.0.tar.verified.json")
         # The badge with an author's key is refused by the tool, and by lint if made by hand.
         self.assertNotEqual(ws.badge(key=ws.author_pem), 0)
-        self.assertFalse((ws.root / "packages" / "org.example.hill-1.0.0.tar.verified.json").exists())
-        shutil.copyfile(ws.root / "packages" / "org.example.hill-1.0.0.tar.release.json",
-                        ws.root / "packages" / "org.example.hill-1.0.0.tar.verified.json")
+        self.assertFalse((ws.root / "packages" / "org.example.hill-1.1.0.tar.verified.json").exists())
+        shutil.copyfile(ws.root / "packages" / "org.example.hill-1.1.0.tar.release.json",
+                        ws.root / "packages" / "org.example.hill-1.1.0.tar.verified.json")
         self.assertRefused(ws, "the project's signature")
 
     def test_a_badge_left_behind_and_an_index_signature_that_is_not_the_authors(self):
@@ -323,7 +323,7 @@ class RefusalTests(unittest.TestCase):
         index = ws.index()
         index["modes"][0]["versions"][0]["verified"] = False
         (ws.root / "index.json").write_text(json.dumps(index))
-        self.assertRefused(ws, "not verified, but packages/org.example.hill-1.0.0.tar.verified.json is there")
+        self.assertRefused(ws, "not verified, but packages/org.example.hill-1.1.0.tar.verified.json is there")
         self.assertRefused(ws, "lists the author's signature and key id")
 
     def test_revoked_keys(self):
@@ -348,15 +348,15 @@ class RefusalTests(unittest.TestCase):
     def test_the_checklists_automated_items(self):
         # REUSE-IgnoreStart (SPDX text the checks look for, not this file's licence)
         cases = [
-            ("1.0.1", lambda f: (f / "node.lua").write_text((f / "node.lua").read_text().replace(
+            ("1.1.1", lambda f: (f / "node.lua").write_text((f / "node.lua").read_text().replace(
                 "local previous", 'local f = io.open("/etc/passwd")\n  local previous')), "uses 'io'"),
-            ("1.0.2", lambda f: (f / "node.lua").write_text((f / "node.lua").read_text().replace(
+            ("1.1.2", lambda f: (f / "node.lua").write_text((f / "node.lua").read_text().replace(
                 "-- SPDX-License-Identifier: MIT", "-- SPDX-License-Identifier: GPL-3.0-or-later")),
              "node.lua says GPL-3.0-or-later, mode.yaml says MIT"),
-            ("1.0.3", lambda f: (f / "mode.yaml").write_text((f / "mode.yaml").read_text() + "  de:\n    name: X\n"),
+            ("1.1.3", lambda f: (f / "mode.yaml").write_text((f / "mode.yaml").read_text() + "  de:\n    name: X\n"),
              "i18n.de lacks description"),
-            ("1.0.4", lambda f: (f / "assets" / "screens").mkdir(parents=True) or (
-                f / "assets" / "screens" / "big.yaml").write_text(
+            # The sample has screens already: one more, too big.
+            ("1.1.4", lambda f: (f / "assets" / "screens" / "big.yaml").write_text(
                 "# SPDX-FileCopyrightText: 2026 The Atalaia contributors\n# SPDX-License-Identifier: MIT\n"
                 + "# padding\n" * 60000), "(checklist item 9)"),
         ]
@@ -391,7 +391,7 @@ class RefusalTests(unittest.TestCase):
         ws = self.listed()
         other_pem, other = new_key(ws.keys, "other")
         self.assertEqual(quiet(["key", ws.root, "--public", other, "--owner", "someone-else"]), 0)
-        set_version(ws.root / "modes" / SAMPLE_ID, "1.1.0")
+        set_version(ws.root / "modes" / SAMPLE_ID, "1.2.0")
         self.assertEqual(quiet(["add", ws.root, SAMPLE_ID, "--key", other_pem]), 0)
         self.assertRefused(ws, "versions signed by keys of different owners: example-club, someone-else")
 
@@ -405,7 +405,7 @@ class RefusalTests(unittest.TestCase):
         self.assertNotEqual(quiet(["add", ws.root, SAMPLE_ID, "--key", ws.author_pem]), 0)
         # ... and lint against the base refuses it made by hand.
         for name in ("", ".release.json", ".license"):
-            (ws.root / "packages" / f"org.example.hill-1.0.0.tar{name}").unlink()
+            (ws.root / "packages" / f"org.example.hill-1.1.0.tar{name}").unlink()
         index = ws.index()
         index["modes"] = []
         (ws.root / "index.json").write_text(json.dumps(index))
@@ -415,14 +415,14 @@ class RefusalTests(unittest.TestCase):
         # A new version is fine; a version taken down is only reported.
         shutil.rmtree(ws.root)
         shutil.copytree(base, ws.root)
-        self.new_version(ws, "1.0.1", lambda f: None)
+        self.new_version(ws, "1.1.1", lambda f: None)
         report = rc.lint(ws.root, base)
         self.assertEqual(report.errors, [])
         index = ws.index()
-        index["modes"][0]["versions"] = [v for v in index["modes"][0]["versions"] if v["version"] != "1.0.0"]
+        index["modes"][0]["versions"] = [v for v in index["modes"][0]["versions"] if v["version"] != "1.1.0"]
         (ws.root / "index.json").write_text(json.dumps(index))
         for name in ("", ".release.json", ".license"):
-            (ws.root / "packages" / f"org.example.hill-1.0.0.tar{name}").unlink()
+            (ws.root / "packages" / f"org.example.hill-1.1.0.tar{name}").unlink()
         report = rc.lint(ws.root, base)
         self.assertEqual(report.errors, [])
         self.assertTrue(any("removed from the index" in w for w in report.warnings), report.warnings)

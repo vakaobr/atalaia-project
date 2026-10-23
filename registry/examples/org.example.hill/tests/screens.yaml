@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: MIT
+name: The screen shows the free hill, a team taking it, the owner with its points, then the final score
+steps:
+  - expect_screen: { template: neutral, data: { taker: null } }
+  # Half way through a hold (input sends one event, as the box does every 250 ms).
+  - input: { type: team_input.hold, data: { team: blue, ms: 2500 } }
+  - expect_screen: { template: neutral, data: { taker: blue, progress: 0.5 } }
+  - input: { type: team_input.release, data: { team: blue, ms: 2500 } }
+  - expect_screen: { template: neutral, data: { taker: null, progress: null } }
+  - hold: { team: red, s: 5 }
+  - expect_screen: { template: captured, data: { team: red, points: 0, since: 5, taker: null } }
+  - wait: 25                      # the tick at 30 s
+  - expect_screen: { template: captured, data: { team: red, points: 1, since: 5 } }
+  - input: { type: team_input.hold, data: { team: blue, ms: 1000 } }
+  - expect_screen: { template: captured, data: { team: red, taker: blue, progress: 0.2 } }
+  - hold: { team: blue, s: 5 }
+  - expect_screen: { template: captured, data: { team: blue, points: 0, since: 35, taker: null } }
+  - end: time
+  - expect_screen: { template: final_score, data: { owner: blue, points: 0 } }

@@ -2,18 +2,25 @@
 # SPDX-License-Identifier: MIT
 #
 # A sample community submission for the registry's template and its CI test
-# (registry/tests/test_registry_template.py); not a built-in mode.
+# (registry/tests/test_registry_template.py); not a built-in mode. Copy it to
+# start your own: mode.yaml (this file), node.lua (the box's script),
+# assets/screens/*.yaml (what the box's screen shows) and tests/*.yaml (run
+# them with `python3 -m atalaia_sim test <folder>`).
 id: org.example.hill
-version: 1.0.0
+version: 1.1.0
 license: MIT
 min_tier: reduced
 name: King of the Hill
 description: Hold the box to take the hill; the team on the hill scores every tick.
 roles:
-  hill: { requires: [team_input], optional: [team_display, audio] }
+  # The box must have team buttons; a team colour display (the LED ring), a
+  # speaker and a screen are used when the box has them.
+  hill: { requires: [team_input], optional: [team_display, audio, display] }
 params:
   hold_ms: { type: int, min: 0, max: 60000, default: 5000, label: "Hold time to take the hill (ms)" }
   tick_s:  { type: int, min: 1, max: 600,   default: 30,   label: "Seconds per point" }
+# The GM console's texts in Portuguese (English is the text above). Every
+# language lists the same keys. The screens carry their own languages.
 i18n:
   pt:
     name: Rei da Colina
