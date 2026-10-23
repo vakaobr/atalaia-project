@@ -1330,17 +1330,22 @@ SECURITY_HEADERS = {
 # GM's browser while setting the game up. Only it, and only these origins: OpenStreetMap's tiles as
 # images to find the field (img-src), the Overpass API for the area's OSM data and the DGT's orthophoto
 # WMS (connect-src, fetched so the canvas stays exportable: both send Access-Control-Allow-Origin: *),
-# and OpenStreetMap's Nominatim to find a place by its name (connect-src, MF-44). It alone may ask for
+# and OpenStreetMap's Nominatim to find a place by its name (connect-src, MF-44). When the main Overpass
+# instance is busy, one other public instance from the OSM wiki's list (MF-51); the DGT's WMS also as
+# images, the map's *Ortofoto* layer (img-src, MF-54). It alone may ask for
 # the GM's location (geolocation=(self), MF-43), which only moves its map and is sent nowhere.
 # Scripts stay same-origin; the rest of the console stays same-origin only.
 FIELD_MAP_PAGE = "/console/field-map.html"
 FIELD_MAP_ORIGINS = {"tiles": "https://tile.openstreetmap.org", "overpass": "https://overpass-api.de",
-                     "orthophoto": "https://ortos.dgterritorio.gov.pt", "search": "https://nominatim.openstreetmap.org"}
+                     "orthophoto": "https://ortos.dgterritorio.gov.pt", "search": "https://nominatim.openstreetmap.org",
+                     "overpass_2": "https://overpass.private.coffee"}
 FIELD_MAP_HEADERS = {
     **SECURITY_HEADERS,
     "Content-Security-Policy": ("default-src 'self'; script-src 'self'; style-src 'self'; "
-                                f"img-src 'self' blob: data: {FIELD_MAP_ORIGINS['tiles']}; "
+                                f"img-src 'self' blob: data: {FIELD_MAP_ORIGINS['tiles']} "
+                                f"{FIELD_MAP_ORIGINS['orthophoto']}; "
                                 f"connect-src 'self' {FIELD_MAP_ORIGINS['overpass']} "
+                                f"{FIELD_MAP_ORIGINS['overpass_2']} "
                                 f"{FIELD_MAP_ORIGINS['orthophoto']} {FIELD_MAP_ORIGINS['search']}; "
                                 "manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; "
                                 "base-uri 'none'; form-action 'none'"),

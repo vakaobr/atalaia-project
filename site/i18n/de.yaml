@@ -722,21 +722,23 @@ roadmap:
       es von ihrem Standort aus oder über einen Ortsnamen, zeichnet den echten Umriss des Felds auf
       OpenStreetMap nach, und der Browser zeichnet das Feldbild aus den Daten von OpenStreetMap,
       über dem DGT-Orthofoto in Portugal, mit seiner Kartenposition und dem Umriss als Feldgrenze,
-      das Außen abgedunkelt; die Handys der Spielenden warnen mit einem Banner und einer Vibration,
-      wenn sie die Feldgrenze verlassen, mit ihrem eigenen GPS, ohne etwas zu senden; Positionen der
-      Spielenden gehen nie an alle, nur an Geräte des Staffs, wenn das Feld es einschaltet; Staff
-      außerhalb des Felds bekommt dasselbe über den Site-Server, über eine verschlüsselte Verbindung
-      mit einem Zertifikat pro Gerät, das das Feld ausstellt und sofort widerrufen kann, Positionen
-      nur für Spielleitung oder Marshal; noch nicht mit einem echten ATAK-Handy probiert).
-      Site-Server: sein Grundgerüst (Datenbank, Migrationen, Health-Check, in einem eigenen
-      Container), Konten (Passwörter, Zwei-Faktor-Codes Pflicht für Orga und Marshals, Sitzungen und
-      Rollen pro Feld) und Rechte an persönlichen Daten (Auskunft, Export, Berichtigung, Löschung,
-      Einwilligungsnachweise, eine tägliche Löschung nach Aufbewahrungsfrist), und der
-      Controller-Sync (Feld-Controller schicken ihre Spiele, Logs und Punkte an den Site-Server,
-      offline zuerst und sicher wiederholbar; noch nicht über eine echte 4G-Verbindung), und das
-      Chrono-Register (signierte Messwerte geprüft und signiert aufbewahrt, nur öffentliche
-      Schlüssel, Austausch zwischen Feldern mit Einwilligung; noch nicht mit einem echten
-      Chronografen), und die Spielplanung mit einer öffentlichen Seite pro Feld und offenen
+      das Außen abgedunkelt; die Seite versucht es erneut, wenn der Datendienst von OpenStreetMap
+      ausgelastet ist, und zeigt auf dem portugiesischen Festland das DGT-Orthofoto, während die
+      Spielleitung den Umriss zeichnet; die Handys der Spielenden warnen mit einem Banner und einer
+      Vibration, wenn sie die Feldgrenze verlassen, mit ihrem eigenen GPS, ohne etwas zu senden;
+      Positionen der Spielenden gehen nie an alle, nur an Geräte des Staffs, wenn das Feld es
+      einschaltet; Staff außerhalb des Felds bekommt dasselbe über den Site-Server, über eine
+      verschlüsselte Verbindung mit einem Zertifikat pro Gerät, das das Feld ausstellt und sofort
+      widerrufen kann, Positionen nur für Spielleitung oder Marshal; noch nicht mit einem echten
+      ATAK-Handy probiert). Site-Server: sein Grundgerüst (Datenbank, Migrationen, Health-Check, in
+      einem eigenen Container), Konten (Passwörter, Zwei-Faktor-Codes Pflicht für Orga und Marshals,
+      Sitzungen und Rollen pro Feld) und Rechte an persönlichen Daten (Auskunft, Export,
+      Berichtigung, Löschung, Einwilligungsnachweise, eine tägliche Löschung nach
+      Aufbewahrungsfrist), und der Controller-Sync (Feld-Controller schicken ihre Spiele, Logs und
+      Punkte an den Site-Server, offline zuerst und sicher wiederholbar; noch nicht über eine echte
+      4G-Verbindung), und das Chrono-Register (signierte Messwerte geprüft und signiert aufbewahrt,
+      nur öffentliche Schlüssel, Austausch zwischen Feldern mit Einwilligung; noch nicht mit einem
+      echten Chronografen), und die Spielplanung mit einer öffentlichen Seite pro Feld und offenen
       iCalendar- und JSON-Feeds seiner Spiele (ohne persönliche Daten), und die Anmeldung zu diesen
       Spielen mit vorab angegebenen Repliken und einem Check-in-Ticket: Der Feld-Controller holt die
       Liste und meldet, wer gekommen ist; Anmeldung aus der App und Import einer Anmeldeliste (CSV

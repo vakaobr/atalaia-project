@@ -24,7 +24,7 @@
 import { html, Component, createRef, t, teamColour, OFFLINE_MS } from '../ui.js';
 import { linkBars } from './node-list.js';
 import { GeorefPanel, georefPins } from './georef-panel.js';
-import { LevelSettings, LevelTabs, levelName, levelsInUse, shownLevel } from './field-levels.js';
+import { LevelSettings, LevelTabs, levelName, levelsInUse, shownLevel, takeLoaded } from './field-levels.js';
 import { MapFeatures, featurePins, featureShapes, planScale } from './map-features.js';
 
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
@@ -43,8 +43,11 @@ export class FieldView extends Component {
         super();
         this.state = {
             imageUrl: null, version: -1, geoVersion: -1, georef: null, ownGeoref: true, drag: null,
-            noImage: false, levels: NO_LEVELS, level: 0, draft: null,
+            noImage: false, levels: NO_LEVELS, level: 0, draft: null, loadedNote: false,
         };
+        // MF-63: back from *Load the field from a map* after saving: that level, and a note saying so.
+        this.loaded = takeLoaded();
+        if (this.loaded !== null) this.state.level = this.loaded;
         this.radiusDrag = false;
         this.area = createRef();
         this.loads = 0;
@@ -52,6 +55,8 @@ export class FieldView extends Component {
 
     componentDidMount() {
         this.loadImage();
+        // The note goes into a status region already on the page, so screen readers announce it.
+        if (this.loaded !== null) this.noteTimer = setTimeout(() => this.setState({ loadedNote: true }), 150);
     }
 
     componentDidUpdate() {
@@ -61,6 +66,7 @@ export class FieldView extends Component {
     }
 
     componentWillUnmount() {
+        clearTimeout(this.noteTimer);
         if (this.state.imageUrl) URL.revokeObjectURL(this.state.imageUrl);
     }
 
@@ -297,6 +303,9 @@ export class FieldView extends Component {
         const placing = state.draft && state.draft.placing;
         return html`<section class="card" aria-labelledby="field-h">
             <h2 id="field-h">${t('field.title')}</h2>
+            ${this.loaded !== null && html`<p class=${state.loadedNote ? 'notice' : ''} role="status"
+                data-testid="field-loaded">${state.loadedNote ? (multi ? t('fieldmap.loaded_level', { name })
+                    : t('fieldmap.loaded')) : ''}</p>`}
             ${role === 'gm' && html`<${LevelSettings} app=${app} levels=${state.levels}
                 onChange=${() => this.loadImage()} />`}
             <${LevelTabs} levels=${state.levels} current=${state.level} onSelect=${(lv) => this.selectLevel(lv)} />

@@ -711,17 +711,19 @@ roadmap:
       ATAK; o campo também pode ser carregado de um mapa: o GM encontra-o a partir de onde está ou
       pelo nome de um sítio, desenha o limite real do campo no OpenStreetMap e o navegador desenha a
       imagem do campo com os dados do OpenStreetMap, sobre o ortofotomapa da DGT em Portugal, com a
-      sua posição no mapa e o limite do campo, ficando escurecido o que está fora; o telemóvel de
-      quem joga avisa com uma faixa e vibração quando sai do limite, com o seu próprio GPS, sem
-      enviar nada; as posições de quem joga nunca vão para toda a gente, só para dispositivos da
-      organização quando o campo o liga; quem organiza, longe do campo, recebe o mesmo através do
-      servidor do clube, por uma ligação cifrada com um certificado por dispositivo que o campo
-      emite e pode revogar de imediato, e as posições só chegam aos certificados de GM ou marshal;
-      ainda não experimentado num telemóvel com ATAK real). Servidor do clube: o esqueleto (base de
-      dados, migrações, verificação de estado, no seu próprio contentor), as contas (palavras-passe,
-      códigos de dois fatores obrigatórios para quem organiza e para marshals, sessões e funções por
-      campo) e os direitos sobre os dados pessoais (acesso, exportação, correção, apagamento,
-      registo de consentimentos, limpeza diária por prazo de conservação) e a sincronização com os
+      sua posição no mapa e o limite do campo, ficando escurecido o que está fora; a página tenta
+      outra vez quando o serviço de dados do OpenStreetMap está ocupado e, em Portugal continental,
+      mostra o ortofotomapa da DGT enquanto o GM desenha o limite; o telemóvel de quem joga avisa
+      com uma faixa e vibração quando sai do limite, com o seu próprio GPS, sem enviar nada; as
+      posições de quem joga nunca vão para toda a gente, só para dispositivos da organização quando
+      o campo o liga; quem organiza, longe do campo, recebe o mesmo através do servidor do clube,
+      por uma ligação cifrada com um certificado por dispositivo que o campo emite e pode revogar de
+      imediato, e as posições só chegam aos certificados de GM ou marshal; ainda não experimentado
+      num telemóvel com ATAK real). Servidor do clube: o esqueleto (base de dados, migrações,
+      verificação de estado, no seu próprio contentor), as contas (palavras-passe, códigos de dois
+      fatores obrigatórios para quem organiza e para marshals, sessões e funções por campo) e os
+      direitos sobre os dados pessoais (acesso, exportação, correção, apagamento, registo de
+      consentimentos, limpeza diária por prazo de conservação) e a sincronização com os
       controladores de campo (enviam os jogos, os registos e as pontuações ao servidor do clube,
       funcionam sem rede e podem repetir o envio sem duplicar nada; ainda não numa ligação 4G real)
       e o registo de cronógrafo (leituras assinadas verificadas e guardadas tal como assinadas, só

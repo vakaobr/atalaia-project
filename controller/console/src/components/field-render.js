@@ -8,8 +8,9 @@
 //   (OrtoSat 2023, 30 cm; EPSG:4326, so the picture is already in the image's frame), fetched with
 //   fetch() so the canvas can still be exported (the WMS sends Access-Control-Allow-Origin: *);
 //   a white picture (outside its coverage, e.g. in Spain) is dropped and OpenStreetMap drawn alone;
-// - OpenStreetMap's data for the area from the Overpass API, one query with a size cap, drawn on a
-//   canvas: woods, scrub, grass, farmland, water, bare ground, buildings, fences, walls and hedges,
+// - OpenStreetMap's data for the area from the Overpass API, one query with a size cap (MF-50 to MF-53:
+//   when the main instance is busy, retried with exponential backoff and jitter, and asked of one other
+//   public instance, within about a minute, cancellable), drawn on a canvas: woods, scrub, grass, farmland, water, bare ground, buildings, fences, walls and hedges,
 //   streams, roads, tracks and paths, and names; over the orthophoto only the lines, the buildings'
 //   outlines and the names, so the photo stays readable;
 // - the attribution burned into the bottom-right corner ("© OpenStreetMap contributors" and, with the
@@ -21,6 +22,12 @@
 // area's middle latitude (off by under 0.05 % at its top and bottom edges for an area of 4 km).
 
 export const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
+// MF-50, MF-51: the public Overpass instances asked, in this order, when the one before is busy or
+// unreachable (from the OSM wiki's list of public instances with no key and no stated limit for this use;
+// VK's instance in Russia was left out until the maintainer chooses, MF-51).
+export const OVERPASS_URLS = [OVERPASS_URL, 'https://overpass.private.coffee/api/interpreter'];
+// MF-50: how hard the page tries before saying the service is busy.
+export const RETRY = { tries: 6, budgetMs: 60000, baseMs: 2000, capMs: 16000, refusedMs: 30000, requestMs: 35000 };
 export const WMS_URL = 'https://ortos.dgterritorio.gov.pt/wms/ortosat2023';
 export const WMS_LAYER = 'ortoSat2023-CorVerdadeira';
 // The orthophoto's coverage as its WMS capabilities give it (mainland Portugal, a little of Spain too).
@@ -96,28 +103,133 @@ export function overpassQuery(b) {
         + 'relation[landuse];way[leisure];way[waterway];way[barrier];node[name];);out geom;';
 }
 
-/** OSM data for the area from the Overpass API (one POST). */
-export async function fetchOsm(b, fetcher = fetch) {
-    let r;
-    try {
-        r = await fetcher(OVERPASS_URL, { method: 'POST', body: new URLSearchParams({ data: overpassQuery(b) }),
-                                          referrerPolicy: 'no-referrer' });
-    } catch (e) {
-        throw new MapError('offline');
+/** An Overpass answer that says "busy, ask again later" (or no answer at all): worth retrying. */
+class Busy extends Error {
+    constructor(code, detail, wait = 0) {
+        super(detail || code);
+        this.code = code; // 'busy', or 'unreachable' (no answer the page can read)
+        this.wait = wait; // at least this long before asking that instance again (a refusal: 429)
     }
-    if (r.status === 429 || r.status === 502 || r.status === 503 || r.status === 504) throw new MapError('busy');
-    if (!r.ok) throw new MapError('osm_failed', `HTTP ${r.status}`);
+}
+
+/** The host of an instance's URL, as the page names it ("overpass-api.de"). */
+export function overpassHost(url) {
+    return new URL(url).host;
+}
+
+/** A pause of ms that says how many seconds are left, once a second (tick(s)); a cancel ends it. */
+function pause(ms, signal, tick) {
+    return new Promise((resolve, reject) => {
+        const end = Date.now() + ms;
+        let timer = null;
+        const abort = () => {
+            clearTimeout(timer);
+            reject(new MapError('cancelled'));
+        };
+        const step = () => {
+            const left = end - Date.now();
+            if (left <= 0) {
+                if (signal) signal.removeEventListener('abort', abort);
+                resolve();
+                return;
+            }
+            tick(Math.ceil(left / 1000));
+            timer = setTimeout(step, Math.min(left, ((left - 1) % 1000) + 1));
+        };
+        if (signal) {
+            if (signal.aborted) {
+                reject(new MapError('cancelled'));
+                return;
+            }
+            signal.addEventListener('abort', abort, { once: true });
+        }
+        step();
+    });
+}
+
+/** One question to one instance: the elements, or Busy (retry), or MapError (stop). */
+async function askOverpass(url, query, fetcher, signal) {
+    // Each request has its own time limit (the query's own is 25 s), and the GM's cancel ends it too.
+    const ctl = new AbortController();
+    const cancel = () => ctl.abort();
+    if (signal) signal.addEventListener('abort', cancel, { once: true });
+    const timer = setTimeout(() => ctl.abort(), RETRY.requestMs);
+    let r;
     let data;
     try {
-        data = await r.json();
-    } catch (e) {
-        throw new MapError('osm_failed', 'not JSON');
+        try {
+            r = await fetcher(url, { method: 'POST', body: new URLSearchParams({ data: query }),
+                                     referrerPolicy: 'no-referrer', signal: ctl.signal });
+        } catch (e) {
+            if (signal && signal.aborted) throw new MapError('cancelled');
+            if (navigator.onLine === false) throw new MapError('offline');
+            // MF-52: no answer the page may read: the server is down, the request timed out, or an error
+            // answer without Access-Control-Allow-Origin (the browser then reports a network error, not
+            // the 502): busy or unreachable, and worth asking again.
+            throw new Busy('unreachable', e && e.name === 'AbortError' ? 'timeout' : 'network');
+        }
+        if ([429, 502, 503, 504].includes(r.status)) {
+            const after = Number(r.headers.get('retry-after'));
+            throw new Busy('busy', `HTTP ${r.status}`,
+                           Math.max(r.status === 429 ? RETRY.refusedMs : 0, after > 0 ? after * 1000 : 0));
+        }
+        if (!r.ok) throw new MapError('osm_failed', `HTTP ${r.status}`);
+        try {
+            data = await r.json();
+        } catch (e) {
+            if (signal && signal.aborted) throw new MapError('cancelled');
+            if (e && e.name === 'AbortError') throw new Busy('unreachable', 'timeout');
+            throw new MapError('osm_failed', 'not JSON');
+        }
+    } finally {
+        clearTimeout(timer);
+        if (signal) signal.removeEventListener('abort', cancel);
     }
     const remark = String(data.remark || '');
     if (/maxsize|out of memory/i.test(remark)) throw new MapError('too_much');
-    if (/timed out|timeout/i.test(remark)) throw new MapError('busy');
+    // "runtime error: Query timed out ...", "... rate_limited", "... too busy": the server's load, not the area.
+    if (/timed out|timeout|rate_limited|too busy|capacity/i.test(remark)) throw new Busy('busy', remark);
     if (!Array.isArray(data.elements)) throw new MapError('osm_failed', remark);
     return data.elements;
+}
+
+/** OSM data for the area from the Overpass API: {elements, url} (the instance that answered).
+ *
+ * MF-50 to MF-52: one POST to the main instance; when it is busy (429, 502, 503, 504, a busy or timeout
+ * remark) or does not answer, the page asks again, each instance at most every so often: after a busy
+ * answer an instance rests a backoff that doubles with each try (RETRY.baseMs, up to RETRY.capMs), with
+ * jitter (a random half of it, so many pages do not come back together), at least 30 s after a 429 (the
+ * main instance's own rule) or its Retry-After; meanwhile the next instance in OVERPASS_URLS that is
+ * free is asked. At most RETRY.tries requests and RETRY.budgetMs in all; opts.onWait({seconds, host})
+ * says each second of a wait, opts.onTry({host, n}) each request; opts.signal cancels. */
+export async function fetchOsm(b, opts = {}) {
+    const { fetcher = fetch, signal = null, onWait = () => {}, onTry = () => {}, urls = OVERPASS_URLS,
+            random = Math.random } = typeof opts === 'function' ? { fetcher: opts } : opts;
+    const query = overpassQuery(b);
+    const start = Date.now();
+    const free = urls.map(() => 0); // when each instance may be asked again
+    let last = null;
+    let busy = false; // an instance answered "busy" (else none could be reached)
+    for (let n = 0; n < RETRY.tries; n += 1) {
+        let i = 0;
+        for (let k = 1; k < urls.length; k += 1) if (free[k] < free[i]) i = k; // the soonest free, in order
+        const wait = Math.max(0, free[i] - Date.now());
+        if (n > 0 && Date.now() + wait - start > RETRY.budgetMs) break;
+        const host = overpassHost(urls[i]);
+        if (wait > 0) await pause(wait, signal, (seconds) => onWait({ seconds, host }));
+        if (signal && signal.aborted) throw new MapError('cancelled');
+        onTry({ host, n });
+        try {
+            return { elements: await askOverpass(urls[i], query, fetcher, signal), url: urls[i] };
+        } catch (e) {
+            if (!(e instanceof Busy)) throw e;
+            last = e;
+            busy = busy || e.code === 'busy';
+            const backoff = Math.min(RETRY.capMs, RETRY.baseMs * 2 ** n);
+            free[i] = Date.now() + Math.max(e.wait, backoff / 2 + random() * (backoff / 2));
+        }
+    }
+    throw new MapError(busy ? 'busy' : 'unreachable', last ? last.message : '');
 }
 
 /** The DGT orthophoto for the area at the image's size, as an ImageBitmap, or null where it has no
@@ -137,6 +249,20 @@ export async function fetchOrthophoto(b, frame, fetcher = fetch) {
     }
     const bitmap = await createImageBitmap(await r.blob());
     return mostlyWhite(bitmap) ? null : bitmap;
+}
+
+/** MF-54: one 256-pixel tile (z/x/y, Web Mercator, as OpenStreetMap's) of the DGT orthophoto for the
+ * map's *Ortofoto* layer: a WMS GetMap of exactly that tile's box in EPSG:3857 (which the WMS offers), so
+ * it lies on the map like any tile; JPEG, the same URL for the same tile (the browser's cache). */
+export function orthoTileUrl(z, x, y) {
+    const half = 20037508.342789244; // half the Web Mercator world, in metres
+    const side = (2 * half) / 2 ** z;
+    const r = (v) => (Math.round(v * 100) / 100).toFixed(2);
+    const box = [-half + x * side, half - (y + 1) * side, -half + (x + 1) * side, half - y * side].map(r);
+    const q = new URLSearchParams({ SERVICE: 'WMS', VERSION: '1.3.0', REQUEST: 'GetMap', LAYERS: WMS_LAYER,
+                                    STYLES: '', CRS: 'EPSG:3857', BBOX: box.join(','), WIDTH: '256', HEIGHT: '256',
+                                    FORMAT: 'image/jpeg' });
+    return `${WMS_URL}?${q}`;
 }
 
 function mostlyWhite(bitmap) {

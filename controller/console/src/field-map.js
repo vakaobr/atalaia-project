@@ -6,30 +6,92 @@
 // keeps; the only page of the console that reaches the internet (its own Content-Security-Policy,
 // api.py FIELD_MAP_HEADERS), and only while the GM sets the game up:
 //
-// 1. find the field on an interactive OpenStreetMap map (tile-map.js): the level's current map
+// 1. find the field on an interactive OpenStreetMap map (tile-map.js), or, in mainland Portugal, over
+//    the DGT orthophoto (the *Mapa* / *Ortofoto* switch, MF-54 to MF-57): the level's current map
 //    position, else the GM's own location when the browser already allows it (MF-41, MF-42), a typed
 //    "latitude, longitude", *Use my location*, or a place's name searched with OpenStreetMap's
 //    Nominatim (MF-44 to MF-46; place-search.js);
 // 2. trace the field's outline corner by corner: a press on the map, the map's centre (the cross,
 //    with the keyboard) or a typed "latitude, longitude"; undo and start again; 3 to 12 corners;
-// 3. *Draw the field image*: this browser fetches the area's OpenStreetMap data (Overpass) and, in
-//    Portugal, the DGT orthophoto, once, and draws the image (field-render.js), shown with the outline;
+// 3. *Draw the field image*: this browser fetches the area's OpenStreetMap data (Overpass; when busy,
+//    retried and asked of other public instances, MF-50 to MF-53) and, in Portugal, the DGT orthophoto,
+//    once, and draws the image (field-render.js), shown with the outline;
+//    MF-59: the preview then scrolls into view with the focus on its heading; MF-60: leaving the page
+//    with a drawn image not yet used asks first;
 // 4. *Use as the field*: one request to the controller (POST /api/v1/field/levels/{n}/from-map) sets
 //    the level's plan, its map position (from the image's edges) and its field boundary together.
 //
 // The controller needs no internet for any of it; the rest of the console works offline as before.
 
 import { html, render, Component, createRef, t, loadLanguage, lang, api, savedToken } from './ui.js';
-import { TileMap } from './components/tile-map.js';
-import { areaFor, frameFor, inPortugal, fetchOsm, fetchOrthophoto, drawField, encode, base64, MapError }
-    from './components/field-render.js';
+import { TileMap, OSM_SOURCE } from './components/tile-map.js';
+import { areaFor, frameFor, inPortugal, fetchOsm, fetchOrthophoto, drawField, encode, base64, MapError, OVERPASS_URL,
+         overpassHost, orthoTileUrl, ATTRIBUTION_DGT, RETRY } from './components/field-render.js';
 import { parseLatLon, formatLatLon } from './components/georef-panel.js';
-import { levelName, levelsInUse } from './components/field-levels.js';
+import { levelName, levelsInUse, LOADED_KEY } from './components/field-levels.js';
 import { PlaceSearch, SearchError, locate, locationGranted } from './components/place-search.js';
 
 const CORNERS_MAX = 12; // map_features.POLYGON_MAX
 const FIELD_ZOOM = 17;
 const LOCATE_ZOOM = 17; // where a field is recognisable (clamped to the tile server's highest)
+// MF-54: the DGT orthophoto as the map's tiles (WMS GetMap per tile, EPSG:3857), mainland Portugal only.
+const ORTHO_SOURCE = { id: 'ortho', url: orthoTileUrl, credit: ATTRIBUTION_DGT, referrer: 'no-referrer' };
+const LAYER_KEY = 'atalaia.fieldmap.layer'; // MF-56: the GM's choice, in this browser only
+
+function savedLayer() {
+    try {
+        return window.localStorage.getItem(LAYER_KEY) === 'ortho' ? 'ortho' : 'map';
+    } catch (e) {
+        return 'map';
+    }
+}
+
+function saveLayer(layer) {
+    try {
+        window.localStorage.setItem(LAYER_KEY, layer);
+    } catch (e) {
+        /* private mode: the choice is just not remembered */
+    }
+}
+
+// MF-61: the outline's corners (only they, not the image) kept across a reload of the page, per level,
+// for this tab only (sessionStorage): a page stuck waiting can be reloaded without tracing again.
+const OUTLINE_KEY = 'atalaia.fieldmap.outline.';
+
+function savedOutline(level) {
+    try {
+        const v = JSON.parse(window.sessionStorage.getItem(OUTLINE_KEY + level) || '[]');
+        if (!Array.isArray(v) || v.length > CORNERS_MAX) return [];
+        return v.every((p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lon) && Math.abs(p.lat) <= 90
+            && Math.abs(p.lon) <= 180) ? v.map((p) => ({ lat: p.lat, lon: p.lon })) : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveOutline(level, outline) {
+    try {
+        if (outline.length) window.sessionStorage.setItem(OUTLINE_KEY + level, JSON.stringify(outline));
+        else window.sessionStorage.removeItem(OUTLINE_KEY + level);
+    } catch (e) {
+        /* storage blocked: a reload just starts again */
+    }
+}
+
+/** MF-63: tells the console's Field tab, once, that the field was loaded on this level. */
+function markLoaded(level) {
+    try {
+        window.sessionStorage.setItem(LOADED_KEY, JSON.stringify({ level }));
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+/** Whether the orthophoto covers this point of the map (its coverage box, as for drawing). */
+function orthoCovers(p) {
+    return inPortugal({ south: p.lat, north: p.lat, west: p.lon, east: p.lon });
+}
 
 /** The map's element: Preact leaves it alone after the first render (TileMap owns what is inside). */
 class MapHost extends Component {
@@ -54,13 +116,22 @@ class FieldMap extends Component {
             ready: false, role: null, error: '', notice: '', levels: null, level, info: null, outline: [],
             corner: '', go: '', label: '', ortho: null, busy: '', result: null, done: null,
             online: navigator.onLine !== false, finding: '', places: null, placeStatus: '',
+            layer: savedLayer(), orthoHere: true, wait: null, osmTry: null,
         };
+        this.osmAbort = null;
         this.mapEl = createRef();
         this.map = null;
         this.search = new PlaceSearch();
         this.views = 0; // the map's moves: an automatic location does not override the GM's own
         this.searchSeq = 0;
         this.onLine = () => this.setState({ online: navigator.onLine !== false });
+        // MF-60: closing the tab or reloading with a drawn image not yet used asks first (the browser's own
+        // words: browsers no longer show a page's text there).
+        this.onLeave = (e) => {
+            if (!this.unsaved() || this.leaving) return;
+            e.preventDefault();
+            e.returnValue = '';
+        };
     }
 
     async componentDidMount() {
@@ -68,6 +139,7 @@ class FieldMap extends Component {
         document.title = `Atalaia · ${t('fieldmap.title')}`;
         window.addEventListener('online', this.onLine);
         window.addEventListener('offline', this.onLine);
+        window.addEventListener('beforeunload', this.onLeave);
         const token = savedToken();
         let role = null;
         try {
@@ -88,16 +160,33 @@ class FieldMap extends Component {
     componentWillUnmount() {
         window.removeEventListener('online', this.onLine);
         window.removeEventListener('offline', this.onLine);
+        window.removeEventListener('beforeunload', this.onLeave);
+        if (this.osmAbort) this.osmAbort.abort();
         if (this.map) this.map.destroy();
         if (this.state.result) URL.revokeObjectURL(this.state.result.url);
     }
 
     async startMap(token, level) {
         this.map = new TileMap(this.mapEl.current, {
-            label: t('fieldmap.map_label'), attribution: '© OpenStreetMap contributors',
+            label: t('fieldmap.map_label'), source: OSM_SOURCE,
             onPress: (p) => this.addCorner(p),
-            onView: () => { this.views += 1; },
+            onView: (v) => {
+                this.views += 1;
+                this.showLayer(this.state.layer, orthoCovers(v));
+            },
         });
+        this.showLayer(this.state.layer, orthoCovers(this.map.centre));
+        // MF-61: an outline traced before a reload comes back, and the map shows it.
+        const kept = savedOutline(level);
+        if (kept.length) {
+            this.setOutline(kept);
+            const lats = kept.map((p) => p.lat);
+            const lons = kept.map((p) => p.lon);
+            this.map.fit({ south: Math.min(...lats), north: Math.max(...lats), west: Math.min(...lons),
+                           east: Math.max(...lons) }, FIELD_ZOOM);
+            this.setState({ placeStatus: t('fieldmap.restored', { n: kept.length }) });
+            return;
+        }
         // Start where the level's plan already is on the map, if it is.
         try {
             const path = level === 0 ? '/field/georef' : `/field/levels/${level}/georef`;
@@ -140,7 +229,35 @@ class FieldMap extends Component {
         }
     }
 
+    /** MF-54, MF-55: the map's tiles: the orthophoto when chosen and the view is in its coverage, else
+     * OpenStreetMap's (outside it the switch is hidden and the choice kept for when the map comes back). */
+    showLayer(layer, orthoHere) {
+        if (this.map) this.map.setSource(layer === 'ortho' && orthoHere ? ORTHO_SOURCE : OSM_SOURCE);
+        if (layer !== this.state.layer || orthoHere !== this.state.orthoHere) this.setState({ layer, orthoHere });
+    }
+
+    chooseLayer(layer) {
+        saveLayer(layer);
+        this.showLayer(layer, this.state.orthoHere);
+    }
+
+    renderLayers() {
+        const s = this.state;
+        if (!s.orthoHere) {
+            return html`<p class="muted small fm-layer-note" data-testid="fm-layer-none">${t('fieldmap.layer_none')}</p>`;
+        }
+        const option = (value, label) => html`<label class="fm-layer">
+            <input type="radio" name="fm-layer" value=${value} data-testid=${`fm-layer-${value}`}
+                checked=${s.layer === value} onChange=${() => this.chooseLayer(value)} />
+            <span>${label}</span></label>`;
+        return html`<div class="fm-layers" role="radiogroup" aria-labelledby="fm-layers-h" data-testid="fm-layers">
+            <span id="fm-layers-h" class="small">${t('fieldmap.layer')}</span>
+            ${option('map', t('fieldmap.layer_map'))}${option('ortho', t('fieldmap.layer_ortho'))}
+        </div>`;
+    }
+
     setOutline(outline) {
+        saveOutline(this.state.level, outline);
         this.setState({ outline, error: '', result: this.dropResult() });
         if (this.map) this.map.setOutline(outline);
     }
@@ -249,27 +366,91 @@ class FieldMap extends Component {
             const bounds = areaFor(outline);
             const frame = frameFor(bounds);
             const ortho = this.useOrtho();
-            this.setState({ busy: 'osm' });
-            const elements = await fetchOsm(bounds);
+            this.setState({ busy: 'osm', wait: null, osmTry: null });
+            this.osmAbort = new AbortController();
+            let osm;
+            try {
+                osm = await fetchOsm(bounds, {
+                    signal: this.osmAbort.signal,
+                    onWait: (wait) => this.setState({ wait }),
+                    onTry: (osmTry) => this.setState({ wait: null, osmTry }),
+                });
+            } finally {
+                this.osmAbort = null;
+            }
+            const { elements } = osm;
             let photo = null;
-            let notice = '';
+            let notice = osm.url === OVERPASS_URL ? '' : t('fieldmap.osm_from', { host: overpassHost(osm.url) });
             if (ortho) {
                 this.setState({ busy: 'ortho' });
                 try {
                     photo = await fetchOrthophoto(bounds, frame);
-                    if (!photo) notice = t('fieldmap.no_ortho');
+                    if (!photo) notice = `${notice} ${t('fieldmap.no_ortho')}`.trim();
                 } catch (e) {
-                    notice = t('fieldmap.ortho_failed', { detail: this.mapError(e) });
+                    notice = `${notice} ${t('fieldmap.ortho_failed', { detail: this.mapError(e) })}`.trim();
                 }
             }
             this.setState({ busy: 'draw' });
             const canvas = drawField(elements, bounds, frame, photo);
             const out = await encode(canvas, Boolean(photo));
             this.setState({ busy: '', notice, result: { ...out, url: URL.createObjectURL(out.blob), bounds,
-                                                         photo: Boolean(photo), mpp: frame.mpp * (frame.width / out.width) } });
+                                                         photo: Boolean(photo), mpp: frame.mpp * (frame.width / out.width) } },
+                          () => this.showPreview());
         } catch (e) {
-            this.setState({ busy: '', error: this.mapError(e) });
+            if (e instanceof MapError && e.code === 'cancelled') {
+                this.setState({ busy: '', wait: null, notice: t('fieldmap.cancelled') });
+            } else {
+                this.setState({ busy: '', wait: null, error: this.mapError(e) });
+            }
         }
+    }
+
+    changeLevel(level) {
+        saveOutline(this.state.level, []);
+        saveOutline(level, this.state.outline);
+        this.setState({ level });
+    }
+
+    /** MF-59: the drawn image is easy to miss below the fold: bring it into view and put the keyboard (and
+     * a screen reader) on its heading, from where *Use as the field* is the next button. */
+    showPreview() {
+        this.showHeading('fm-preview-h');
+    }
+
+    /** Scrolls a section (by its heading's id) into view and focuses the heading. */
+    showHeading(id) {
+        const h = document.getElementById(id);
+        if (!h) return;
+        const smooth = !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        h.closest('section').scrollIntoView({ block: 'start', behavior: smooth ? 'smooth' : 'auto' });
+        h.focus({ preventScroll: true });
+    }
+
+    /** A drawn image that was not used yet (MF-60). */
+    unsaved() {
+        return Boolean(this.state.result) && !this.state.done;
+    }
+
+    /** MF-60: the back link asks before leaving a drawn image behind. */
+    leave(e) {
+        if (!this.unsaved()) return;
+        if (window.confirm(t('fieldmap.leave_confirm'))) {
+            this.leaving = true; // no second question from beforeunload
+        } else {
+            e.preventDefault();
+        }
+    }
+
+    /** What the page is doing, for the status line beside *Draw* (MF-53: a wait says how long). */
+    busyText() {
+        const s = this.state;
+        if (s.busy !== 'osm') return t(`fieldmap.busy.${s.busy}`);
+        if (s.wait) return t('fieldmap.busy.osm_retry', { s: s.wait.seconds, host: s.wait.host });
+        // MF-62: from the second try on, which try and where, and that the page is waiting for its answer.
+        if (s.osmTry && s.osmTry.n > 0) {
+            return t('fieldmap.busy.osm_from', { host: s.osmTry.host, n: s.osmTry.n + 1, max: RETRY.tries });
+        }
+        return t('fieldmap.busy.osm');
     }
 
     async upload() {
@@ -279,8 +460,16 @@ class FieldMap extends Component {
             const body = { content_type: result.type, image: await base64(result.blob), bounds: result.bounds, outline,
                            label: label.trim() };
             const done = await api(savedToken(), 'POST', `/field/levels/${level}/from-map`, body);
-            this.setState({ busy: '', done });
+            saveOutline(level, []);
+            this.setState({ busy: '', done }, () => this.showHeading('fm-done-h'));
             if (this.map) this.map.setOutline([]);
+            // MF-63: back to the console's Field tab at once, on the level just loaded, which says it was saved
+            // (a one-time note for that tab, field-view.js); this page's *Field loaded* stays only if the note
+            // cannot be kept (storage blocked), with its link back.
+            if (markLoaded(level)) {
+                this.leaving = true;
+                window.location.assign('./#field');
+            }
         } catch (e) {
             this.setState({ busy: '', error: e.message });
         }
@@ -297,8 +486,20 @@ class FieldMap extends Component {
         const b = r.bounds;
         const pts = this.state.outline.map((p) => `${(((p.lon - b.west) / (b.east - b.west)) * 100).toFixed(3)},${
             (((b.north - p.lat) / (b.north - b.south)) * 100).toFixed(3)}`).join(' ');
-        return html`<section class="card" aria-labelledby="fm-preview-h" data-testid="fm-preview">
-            <h2 id="fm-preview-h">${t('fieldmap.preview')}</h2>
+        return html`<section class="card fm-wide" aria-labelledby="fm-preview-h" data-testid="fm-preview">
+            <h2 id="fm-preview-h" tabindex="-1">${t('fieldmap.preview')}</h2>
+            <p class="small" data-testid="fm-preview-next">${t('fieldmap.preview_next')}</p>
+            ${this.hasPlan() && html`<p class="warning small" data-testid="fm-replaces">${
+                levelsInUse(this.state.levels) > 1
+                    ? t('fieldmap.replaces_level', { name: levelName(this.state.levels, this.state.level) })
+                    : t('fieldmap.replaces')}</p>`}
+            <div class="actions">
+                <button type="button" class="primary fm-use" data-testid="fm-upload" disabled=${Boolean(this.state.busy)}
+                    onClick=${() => this.upload()}>${t('fieldmap.use')}</button>
+                <button type="button" data-testid="fm-redraw" disabled=${Boolean(this.state.busy)}
+                    onClick=${() => this.setState({ result: this.dropResult() })}>${t('fieldmap.change')}</button>
+                ${this.state.busy === 'upload' && html`<span class="muted small" role="status">${t('fieldmap.busy.upload')}</span>`}
+            </div>
             <div class="fm-preview">
                 <img src=${r.url} alt=${t('fieldmap.preview_alt')} data-testid="fm-image" />
                 <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
@@ -307,22 +508,12 @@ class FieldMap extends Component {
             <p class="muted small" data-testid="fm-size">${t('fieldmap.size', {
                 width: r.width, height: r.height, mpp: r.mpp.toFixed(2), kb: Math.round(r.blob.size / 1024) })}
                 ${' '}${t(r.photo ? 'fieldmap.source_both' : 'fieldmap.source_osm')}</p>
-            ${this.hasPlan() && html`<p class="warning small" data-testid="fm-replaces">${
-                levelsInUse(this.state.levels) > 1
-                    ? t('fieldmap.replaces_level', { name: levelName(this.state.levels, this.state.level) })
-                    : t('fieldmap.replaces')}</p>`}
-            <div class="actions">
-                <button type="button" class="primary" data-testid="fm-upload" disabled=${Boolean(this.state.busy)}
-                    onClick=${() => this.upload()}>${t('fieldmap.use')}</button>
-                <button type="button" data-testid="fm-redraw" disabled=${Boolean(this.state.busy)}
-                    onClick=${() => this.setState({ result: this.dropResult() })}>${t('fieldmap.change')}</button>
-            </div>
         </section>`;
     }
 
     renderDone() {
         return html`<section class="card" aria-labelledby="fm-done-h" data-testid="fm-done">
-            <h2 id="fm-done-h">${t('fieldmap.done_title')}</h2>
+            <h2 id="fm-done-h" tabindex="-1">${t('fieldmap.done_title')}</h2>
             <p role="status">${t('fieldmap.done')}</p>
             <div class="actions"><a class="button primary" href="./#field" data-testid="fm-back-done">${t('fieldmap.back')}</a></div>
         </section>`;
@@ -354,7 +545,7 @@ class FieldMap extends Component {
             <div class="params">
                 ${multi && html`<div class="field"><label for="fm-level">${t('fieldmap.level')}</label>
                     <select id="fm-level" data-testid="fm-level" value=${s.level}
-                        onChange=${(e) => this.setState({ level: Number(e.target.value) })}>
+                        onChange=${(e) => this.changeLevel(Number(e.target.value))}>
                         ${Array.from({ length: levelsInUse(s.levels) }, (_, lv) => html`<option value=${lv}
                             selected=${lv === s.level}>${levelName(s.levels, lv)}</option>`)}
                     </select></div>`}
@@ -368,21 +559,42 @@ class FieldMap extends Component {
             <div class="actions">
                 <button type="button" class="primary" data-testid="fm-draw" disabled=${Boolean(s.busy) || n < 3}
                     onClick=${() => this.drawImage()}>${t('fieldmap.draw')}</button>
-                ${s.busy && html`<span class="muted small" role="status" data-testid="fm-busy">${t(`fieldmap.busy.${s.busy}`)}</span>`}
+                ${s.busy === 'osm' && html`<button type="button" data-testid="fm-cancel"
+                    onClick=${() => this.osmAbort && this.osmAbort.abort()}>${t('fieldmap.cancel')}</button>`}
+                ${s.busy && html`<span class="muted small" role="status" data-testid="fm-busy">${this.busyText()}</span>`}
+                ${!s.busy && s.result && html`<button type="button" data-testid="fm-show-preview"
+                    onClick=${() => this.showPreview()}>${t('fieldmap.show_preview')}</button>`}
             </div>
         </section>`;
+    }
+
+    /** MF-59: at the top of the page, kept in view while scrolling: what is being done while busy (said
+     * aloud by the status beside *Draw*, so hidden from screen readers here), then that the image is
+     * ready and not yet used, with the way to it. */
+    renderBanner() {
+        const s = this.state;
+        if (s.done || !(s.busy || s.result)) return null;
+        if (s.busy) {
+            return html`<div class="fm-banner" aria-hidden="true" data-testid="fm-banner">
+                <span>${this.busyText()}</span></div>`;
+        }
+        return html`<div class="fm-banner fm-banner-ready" data-testid="fm-banner">
+            <span>${t('fieldmap.ready')}</span>
+            <button type="button" class="primary" data-testid="fm-banner-show"
+                onClick=${() => this.showPreview()}>${t('fieldmap.show_preview')}</button></div>`;
     }
 
     render(props, s) {
         if (!s.ready) return html`<main class="content"><p class="muted">…</p></main>`;
         const header = html`<header class="top"><div class="brand"><strong>${t('fieldmap.title')}</strong></div>
-            <div class="top-right"><a class="button fm-back" href="./#field" data-testid="fm-back">${t('fieldmap.back')}</a></div>
+            <div class="top-right"><a class="button fm-back" href="./#field" data-testid="fm-back" onClick=${(e) => this.leave(e)}>${t('fieldmap.back')}</a></div>
         </header>`;
         if (s.role !== 'gm') {
             return html`${header}<main class="content"><p class="error" data-testid="fm-login">${t('fieldmap.login')}</p></main>`;
         }
         return html`${header}<main class="content fm">
-            <section class="card" aria-labelledby="fm-h">
+            ${this.renderBanner()}
+            <section class="card fm-find-card" aria-labelledby="fm-h">
                 <h1 id="fm-h" class="sr-only">${t('fieldmap.title')}</h1>
                 <p>${t('fieldmap.intro')}</p>
                 <p class="muted small">${t('fieldmap.sources')}</p>
@@ -401,16 +613,20 @@ class FieldMap extends Component {
                 ${this.renderPlaces()}`}
                 <p class="muted small" id="fm-map-help">${t('fieldmap.map_help')}</p>
                 <${MapHost} hostRef=${this.mapEl} />
-                <div class="actions">
+                <div class="actions fm-map-actions">
                     <button type="button" data-testid="fm-zoom-in" aria-label=${t('fieldmap.zoom_in')}
                         onClick=${() => this.map.zoomBy(1)}>+</button>
                     <button type="button" data-testid="fm-zoom-out" aria-label=${t('fieldmap.zoom_out')}
                         onClick=${() => this.map.zoomBy(-1)}>−</button>
+                    ${this.renderLayers()}
                 </div>
             </section>
-            ${s.error && html`<p class="error" role="alert" data-testid="fm-error">${s.error}</p>`}
-            ${s.notice && html`<p class="notice" role="status" data-testid="fm-notice">${s.notice}</p>`}
-            ${s.done ? this.renderDone() : html`${this.renderOutline()}${s.result && this.renderPreview()}`}
+            <div class="fm-side">
+                ${s.error && html`<p class="error" role="alert" data-testid="fm-error">${s.error}</p>`}
+                ${s.notice && html`<p class="notice" role="status" data-testid="fm-notice">${s.notice}</p>`}
+                ${s.done ? this.renderDone() : this.renderOutline()}
+            </div>
+            ${!s.done && s.result && this.renderPreview()}
         </main>`;
     }
 }

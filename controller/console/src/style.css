@@ -946,6 +946,130 @@ tr.offline td {
     margin: 0.4rem 0;
 }
 
+/* The page's layout (MF-58): one column on a phone or a narrow window; from 64rem the map takes the
+ * width on the left and the outline sits beside it, the preview across both, centred up to 100rem. */
+.content.fm {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.fm-side {
+    display: grid;
+    gap: 1rem;
+    align-content: start;
+    min-width: 0;
+}
+
+.fm-side > p {
+    margin: 0;
+}
+
+@media (min-width: 64rem) {
+    .content.fm {
+        max-width: 100rem;
+        grid-template-columns: minmax(0, 1fr) minmax(20rem, 28rem);
+        align-items: start;
+    }
+
+    .fm-find-card {
+        grid-column: 1;
+    }
+
+    .fm-side {
+        grid-column: 2;
+    }
+
+    .fm-wide,
+    .fm-banner {
+        grid-column: 1 / -1;
+    }
+
+    .fm .tm {
+        height: min(68vh, 44rem);
+    }
+
+    /* the outline's forms, in the narrower column: the label above, the field and its button below */
+    .fm-side .form.inline {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .fm-side .form.inline label {
+        grid-column: 1 / -1;
+    }
+
+    .fm-side .params {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* busy, or the image drawn and not yet used: kept at the top of the window (MF-59) */
+.fm-banner {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    background: var(--info-bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.fm-wide,
+.fm-side > .card {
+    scroll-margin-top: 5rem; /* below the banner */
+}
+
+.fm h2[tabindex="-1"]:focus {
+    outline: none; /* focused by the page (MF-59), not by the GM: the scroll shows where */
+}
+
+.fm-banner-ready {
+    border-left: 4px solid var(--primary);
+    font-weight: 600;
+}
+
+/* the map's layer switch: Mapa / Ortofoto (MF-54) */
+.fm-layers {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin-inline-start: auto;
+}
+
+.fm-layer {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.fm-layer:has(input:checked) {
+    border-color: var(--primary);
+    font-weight: 600;
+}
+
+.fm-layer input {
+    margin: 0;
+}
+
+.fm-layer:focus-within {
+    outline: 3px solid var(--primary);
+    outline-offset: 2px;
+}
+
+.fm-layer-note {
+    margin: 0 0 0 auto;
+}
+
 .tm {
     position: relative;
     height: min(60vh, 32rem);
@@ -1057,8 +1181,12 @@ tr.offline td {
     overflow-wrap: anywhere;
 }
 
+/* The preview: as wide as the card, at most 70 % of the window's height (MF-59: the image never pushes
+ * the actions out of sight; they come before it); the box hugs the image so the outline lies on it. */
 .fm-preview {
     position: relative;
+    width: fit-content;
+    max-width: 100%;
     border: 1px solid var(--line);
     border-radius: 6px;
     overflow: hidden;
@@ -1066,8 +1194,15 @@ tr.offline td {
 
 .fm-preview img {
     display: block;
-    width: 100%;
+    max-width: 100%;
+    max-height: 70vh;
+    width: auto;
     height: auto;
+}
+
+button.fm-use {
+    font-size: 1.05rem;
+    padding-inline: 1.2rem;
 }
 
 .fm-preview svg {

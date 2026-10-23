@@ -11,8 +11,19 @@
 // buttons, a press without a drag reports where it was (the GM's next corner), and an SVG
 // layer draws the outline being traced. Nothing here is drawn into the field image: that is
 // drawn from OpenStreetMap data (field-render.js).
+// MF-54: the tiles come from a source ({id, url(z, x, y), credit, href, referrer}): OpenStreetMap's by
+// default, or another the page sets (the DGT orthophoto, field-map.js); its credit is always shown.
+// Tiles that leave the view are kept, detached, for a while (SPARE_MAX), so panning back shows them
+// again without asking the server; nothing outside the view is ever requested.
 
 export const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+/** OpenStreetMap's standard tiles, with the Referer its tile policy asks for (MF-21). */
+export const OSM_SOURCE = {
+    id: 'osm', url: (z, x, y) => TILE_URL.replace('{z}', z).replace('{x}', x).replace('{y}', y),
+    credit: '© OpenStreetMap contributors', href: 'https://www.openstreetmap.org/copyright',
+    referrer: 'strict-origin-when-cross-origin',
+};
+const SPARE_MAX = 256; // tiles kept out of view (a few screens' worth)
 const TILE = 256;
 const ZOOM_MIN = 2;
 const ZOOM_MAX = 19; // tile.openstreetmap.org's highest zoom
@@ -43,13 +54,15 @@ function el(tag, cls) {
 }
 
 export class TileMap {
-    /** root: an empty element; opts: {label, attribution, onPress(latlon), onView({lat, lon, zoom})}. */
+    /** root: an empty element; opts: {label, source, onPress(latlon), onView({lat, lon, zoom})}. */
     constructor(root, opts) {
         this.root = root;
         this.opts = opts;
         this.centre = { lat: 39.6, lon: -8.0 };
         this.zoom = 6;
         this.tiles = new Map();
+        this.spare = new Map(); // tiles out of view, oldest first
+        this.source = opts.source || OSM_SOURCE;
         this.outline = [];
         this.box = el('div', 'tm');
         this.box.tabIndex = 0;
@@ -63,14 +76,10 @@ export class TileMap {
         this.svg.setAttribute('data-testid', 'tm-outline');
         const cross = el('span', 'tm-cross');
         cross.setAttribute('aria-hidden', 'true');
-        const credit = el('div', 'tm-credit');
-        const link = el('a');
-        link.href = 'https://www.openstreetmap.org/copyright';
-        link.target = '_blank';
-        link.rel = 'noopener';
-        link.textContent = opts.attribution;
-        credit.append(link);
-        this.box.append(this.layer, this.svg, cross, credit);
+        this.credit = el('div', 'tm-credit');
+        this.credit.setAttribute('data-testid', 'tm-credit');
+        this.showCredit();
+        this.box.append(this.layer, this.svg, cross, this.credit);
         root.append(this.box);
         this.press = null;
         this.box.addEventListener('pointerdown', (e) => this.down(e));
@@ -82,6 +91,36 @@ export class TileMap {
         this.resize = () => this.draw();
         window.addEventListener('resize', this.resize);
         this.draw();
+    }
+
+    showCredit() {
+        const s = this.source;
+        const text = el(s.href ? 'a' : 'span');
+        if (s.href) {
+            text.href = s.href;
+            text.target = '_blank';
+            text.rel = 'noopener';
+        }
+        text.textContent = s.credit;
+        this.credit.replaceChildren(text);
+    }
+
+    /** Shows the tiles of another source (MF-54), with its credit. */
+    setSource(source) {
+        if (source.id === this.source.id) return;
+        for (const [key, img] of this.tiles) this.keep(key, img);
+        this.tiles.clear();
+        this.source = source;
+        this.layer.dataset.source = source.id;
+        this.showCredit();
+        this.draw();
+    }
+
+    keep(key, img) {
+        img.remove();
+        this.spare.delete(key);
+        this.spare.set(key, img);
+        while (this.spare.size > SPARE_MAX) this.spare.delete(this.spare.keys().next().value);
     }
 
     destroy() {
@@ -225,16 +264,22 @@ export class TileMap {
         for (let ty = y0; ty <= y1; ty += 1) {
             for (let tx = Math.floor(o.x / TILE); tx <= Math.floor((o.x + w) / TILE); tx += 1) {
                 const wx = ((tx % n) + n) % n;
-                const key = `${z}/${wx}/${ty}/${tx}`;
+                const key = `${this.source.id}/${z}/${wx}/${ty}/${tx}`;
                 want.add(key);
                 let img = this.tiles.get(key);
+                if (!img) {
+                    img = this.spare.get(key);
+                    this.spare.delete(key);
+                }
                 if (!img) {
                     img = el('img', 'tm-tile');
                     img.alt = '';
                     img.draggable = false;
                     img.decoding = 'async';
-                    img.referrerPolicy = 'strict-origin-when-cross-origin'; // the Referer OSM's policy asks for
-                    img.src = TILE_URL.replace('{z}', z).replace('{x}', wx).replace('{y}', ty);
+                    img.referrerPolicy = this.source.referrer || 'no-referrer';
+                    img.src = this.source.url(z, wx, ty);
+                }
+                if (!this.tiles.has(key)) {
                     this.tiles.set(key, img);
                     this.layer.append(img);
                 }
@@ -244,8 +289,8 @@ export class TileMap {
         }
         for (const [key, img] of this.tiles) {
             if (!want.has(key)) {
-                img.remove();
                 this.tiles.delete(key);
+                this.keep(key, img);
             }
         }
         this.drawOutline();

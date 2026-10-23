@@ -204,6 +204,10 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("tab-game")).to_be_visible()
         return page
 
+    def drop_errors(self, *needles: str) -> None:
+        """Forgets the console's reports of failures a test caused on purpose (a busy server, no answer)."""
+        self.errors = [e for e in self.errors if not any(n in e for n in needles)]
+
     def no_horizontal_scroll(self, page) -> None:
         width = page.evaluate("[document.documentElement.scrollWidth, window.innerWidth]")
         self.assertLessEqual(width[0], width[1], "the page scrolls sideways")
@@ -2154,13 +2158,23 @@ class ConsoleBrowserTests(unittest.TestCase):
 
     # --- the field loaded from a map (MF-18, built as MF-19 to MF-30) -------------------------
 
-    def map_routes(self, page, wms: str = "orthophoto.png", overpass: "list[int] | None" = None,
-                   nominatim: "dict[str, int] | None" = None) -> dict:
-        """Answers the field-map page's four origins from fixtures; anything else outside the controller is
+    OVERPASS_2 = "https://overpass.private.coffee/api/interpreter"
+
+    def map_routes(self, page, wms: str = "orthophoto.png", overpass: "list | None" = None,
+                   nominatim: "dict[str, int] | None" = None, fallbacks: "dict[str, list] | None" = None) -> dict:
+        """Answers the field-map page's origins from fixtures; anything else outside the controller is
         refused and recorded (no real network in the tests). Nominatim answers fixtures/nominatim.json, an
-        empty list for a q containing "nowhere", or the status nominatim maps a q to."""
-        seen: dict = {"tiles": 0, "overpass": [], "wms": [], "search": [], "other": []}
-        statuses = list(overpass or [200])
+        empty list for a q containing "nowhere", or the status nominatim maps a q to. Each Overpass instance
+        answers its list in turn (the last one again and again): a status (with CORS), "nocors" (a 502 without
+        Access-Control-Allow-Origin, as a busy proxy may send), "abort" (no answer) or "hang" (never
+        answers); the main instance answers `overpass` (default 200), the other one `fallbacks` by URL
+        (default "abort"). seen["hosts"] lists the instances asked, in order; seen["wms"] the orthophoto
+        for the image (EPSG:4326), seen["wms_tiles"] the map's *Ortofoto* tiles (EPSG:3857)."""
+        seen: dict = {"tiles": 0, "overpass": [], "hosts": [], "wms": [], "wms_tiles": [], "search": [],
+                      "other": []}
+        answers = {self.OVERPASS_2: ["abort"], **(fallbacks or {}),
+                   "https://overpass-api.de/api/interpreter": list(overpass or [200])}
+        answers = {url: list(v) for url, v in answers.items()}
         ctx = page.context
 
         def search(route):
@@ -2188,22 +2202,36 @@ class ConsoleBrowserTests(unittest.TestCase):
             route.fulfill(status=200, content_type="image/png", headers=CORS, body=(FIXTURES / "tile.png").read_bytes())
 
         def overpass_api(route):
-            seen["overpass"].append(route.request.post_data or "")
-            status = statuses.pop(0) if len(statuses) > 1 else statuses[0]
-            if status != 200:
+            url = route.request.url
+            seen["hosts"].append(urlsplit(url).hostname)
+            if url == "https://overpass-api.de/api/interpreter":
+                seen["overpass"].append(route.request.post_data or "")
+            todo = answers[url]
+            status = todo.pop(0) if len(todo) > 1 else todo[0]
+            if status == "hang":
+                return  # never answered: the page's own time limit ends it
+            if status == "abort":
+                route.abort("connectionrefused")
+            elif status == "nocors":
+                route.fulfill(status=502, content_type="text/plain", body="This Overpass API server is currently "
+                              "at capacity. Retry your request using exponential backoff.")
+            elif status != 200:
                 route.fulfill(status=status, content_type="text/plain", headers=CORS, body="busy")
             else:
                 route.fulfill(status=200, content_type="application/json", headers=CORS,
                               body=(FIXTURES / "overpass.json").read_text(encoding="utf-8"))
 
         def orthophoto(route):
-            seen["wms"].append(route.request.url)
-            route.fulfill(status=200, content_type="image/png", headers=CORS, body=(FIXTURES / wms).read_bytes())
+            tile = "EPSG%3A3857" in route.request.url
+            seen["wms_tiles" if tile else "wms"].append(route.request.url)
+            body = (FIXTURES / ("orthophoto.png" if tile else wms)).read_bytes()
+            route.fulfill(status=200, content_type="image/png", headers=CORS, body=body)
 
         # Playwright runs the last matching route first: the catch-all is registered first.
         ctx.route("**/*", other)
         ctx.route("https://tile.openstreetmap.org/**", tiles)
         ctx.route("https://overpass-api.de/api/interpreter", overpass_api)
+        ctx.route(self.OVERPASS_2, overpass_api)
         ctx.route("https://ortos.dgterritorio.gov.pt/**", orthophoto)
         ctx.route("https://nominatim.openstreetmap.org/**", search)
         return seen
@@ -2281,6 +2309,13 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("fm-label").fill("Campo da Mata")
         page.get_by_test_id("fm-draw").click()
         expect(page.get_by_test_id("fm-preview")).to_be_visible()
+        # MF-59: the preview comes into view with the focus on its heading; *Use as the field* is right under it,
+        # and the banner at the top says the image is not saved yet.
+        expect(page.locator("#fm-preview-h")).to_be_focused()
+        expect(page.locator("#fm-preview-h")).to_be_in_viewport()
+        expect(page.get_by_test_id("fm-upload")).to_be_in_viewport()
+        expect(page.get_by_test_id("fm-banner")).to_contain_text("ainda não está guardada")
+        expect(page.get_by_test_id("fm-preview-next")).to_contain_text("até lá, nada fica guardado")
         expect(page.get_by_test_id("fm-size")).to_contain_text("ortofotomapa da DGT com os caminhos")
         expect(page.get_by_test_id("fm-replaces")).to_contain_text("O campo já tem imagem")
         # One Overpass query for the area and one orthophoto, at the image's size; the image is drawn.
@@ -2298,15 +2333,33 @@ class ConsoleBrowserTests(unittest.TestCase):
             for (let k = 0; k < d.length; k += 4) s.add(`${d[k]},${d[k + 1]},${d[k + 2]}`);
             return s.size; }""")
         self.assertGreater(colours, 20)
+        # MF-60: leaving with the image not used asks first; "Cancel" stays.
+        asked: list[str] = []
+
+        def answer(d, accept: bool) -> None:
+            asked.append(d.message)
+            d.accept() if accept else d.dismiss()
+
+        page.once("dialog", lambda d: answer(d, False))
+        page.get_by_test_id("fm-back").click()
+        expect(page.get_by_test_id("fm-preview")).to_be_visible()
+        self.assertEqual(asked, ["A imagem do campo desenhada ainda não foi guardada. Sair na mesma e perdê-la?"])
+        self.no_horizontal_scroll(page)
+        # MF-63: saved, the page goes back to the console's Field tab, which says so (a status, read aloud).
         page.get_by_test_id("fm-upload").click()
-        expect(page.get_by_test_id("fm-done")).to_be_visible()
+        expect(page).to_have_url(re.compile(r"/console/#field$"))
+        expect(page.get_by_test_id("field-loaded")).to_have_text(
+            "Campo carregado do mapa: a imagem, a sua posição no mapa (ATAK) e o limite do campo estão guardados.")
+        expect(page.get_by_test_id("field-loaded")).to_have_attribute("role", "status")
+        self.assertEqual(len(asked), 1)  # no question once saved
+        self.assertIsNone(page.evaluate("sessionStorage.getItem('atalaia.fieldmap.loaded')"))  # said once
         info = self.field.http.get("/api/v1/field").json()["image"]
         self.assertEqual(info["content_type"], "image/jpeg")
         self.check_loaded(0, seen["wms"][0], label="Campo da Mata")
         self.assertEqual(seen["other"], [])
-        self.no_horizontal_scroll(page)
+        self.assertEqual(seen["hosts"], ["overpass-api.de"])
+        self.assertEqual(seen["wms_tiles"], [])  # the map stayed on *Mapa*
         # Back in the console: the field tab, the plan dimmed outside the boundary, one boundary per level.
-        page.get_by_test_id("fm-back-done").click()
         expect(page.get_by_test_id("field-area").locator("img")).to_be_visible()
         expect(page.get_by_test_id("mf-outside")).to_have_count(1)
         expect(page.get_by_test_id("mf-list")).to_contain_text("Campo da Mata")
@@ -2321,7 +2374,8 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.field.http.put("/api/v1/field/levels", json={"enabled": True, "count": 2})
         page = self.console(width=390, height=844, service_workers="block")
         page.get_by_test_id("lang").select_option("en")
-        seen = self.map_routes(page, wms="orthophoto-white.png", overpass=[429, 200])
+        seen = self.map_routes(page, wms="orthophoto-white.png", overpass=[429],
+                               fallbacks={self.OVERPASS_2: [200]})
         page.goto(self.field.base + "/console/field-map.html?level=1")
         expect(page.get_by_role("heading", name="Load the field from a map")).to_be_attached()
         expect(page.get_by_test_id("fm-level")).to_have_value("1")
@@ -2334,24 +2388,32 @@ class ConsoleBrowserTests(unittest.TestCase):
         self.assertEqual(seen["overpass"], [])
         page.get_by_test_id("fm-clear").click()
         self.type_outline(page)
-        # Overpass busy (429), then again.
-        page.get_by_test_id("fm-draw").click()
-        expect(page.get_by_test_id("fm-error")).to_have_text("OpenStreetMap's data service is busy: try again in a minute.")
-        self.errors = [e for e in self.errors if "429" not in e]
+        # The main Overpass instance refuses (429): the second instance is asked at once, and the page says so.
         page.get_by_test_id("fm-draw").click()
         expect(page.get_by_test_id("fm-preview")).to_be_visible()
+        expect(page.locator("#fm-preview-h")).to_be_focused()
+        expect(page.locator("#fm-preview-h")).to_be_in_viewport()
+        self.assertEqual(seen["hosts"], ["overpass-api.de", "overpass.private.coffee"])
+        self.drop_errors("429")
+        expect(page.get_by_test_id("fm-notice")).to_contain_text(
+            "OpenStreetMap's data came from overpass.private.coffee (the main server was busy); this server's data may be a few months old.")
         expect(page.get_by_test_id("fm-notice")).to_contain_text("has no picture of this area")
         expect(page.get_by_test_id("fm-size")).to_contain_text("Drawn from OpenStreetMap's data.")
         expect(page.get_by_test_id("fm-replaces")).to_have_count(0)
         self.no_horizontal_scroll(page)
         page.get_by_test_id("fm-upload").click()
-        expect(page.get_by_test_id("fm-done")).to_contain_text("field boundary")
+        # Back on the console's Field tab, on the level just loaded (MF-63).
+        expect(page.get_by_test_id("field-loaded")).to_contain_text("loaded from the map: the plan")
+        expect(page.get_by_test_id("field-area")).to_have_attribute("data-level", "1")
+        self.no_horizontal_scroll(page)
         self.assertEqual(self.field.http.get("/api/v1/field").json()["levels"]["levels"][1]["image"]["content_type"],
                          "image/png")
         self.assertIsNone(self.field.http.get("/api/v1/field/georef").json()["georef"])  # level 0 untouched
         self.check_loaded(1, None)
         self.assertEqual(seen["other"], [])
         # Offline, the page says so (the rest of the console needs no internet).
+        page.goto(self.field.base + "/console/field-map.html?level=1")
+        expect(page.get_by_test_id("tm")).to_be_visible()
         page.context.set_offline(True)
         expect(page.get_by_test_id("fm-offline")).to_contain_text("needs internet")
         page.context.set_offline(False)
@@ -2513,6 +2575,248 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("fm-error")).to_contain_text("only to secure pages")
         expect(page.get_by_test_id("fm-error")).to_contain_text("127.0.0.1")
         self.assertEqual((seen["search"], seen["other"]), ([], []))
+
+    # --- the field map in real use (2026-10-23): layout, a busy Overpass, the orthophoto layer (MF-50..MF-63)
+
+    RETRY_JS = "(o) => import('./components/field-render.js').then((m) => { Object.assign(m.RETRY, o); })"
+
+    def field_map(self, width: int = 1280, height: int = 900, lang: str = "", **routes):
+        """The field-map page for the GM, its outside origins answered by map_routes(**routes)."""
+        page = self.console(width=width, height=height, service_workers="block")
+        if lang:
+            page.get_by_test_id("lang").select_option(lang)
+        seen = self.map_routes(page, **routes)
+        page.goto(self.field.base + "/console/field-map.html")
+        expect(page.get_by_test_id("tm")).to_be_visible()
+        return page, seen
+
+    def test_field_map_overpass_busy_retries_and_other_instances(self):
+        """MF-50 to MF-52, after the maintainer met "This Overpass API server is currently at capacity" (502):
+        the page waits with backoff and jitter, says it is retrying and when, asks the other public instances
+        meanwhile, takes a 502 without CORS (a network error to the page) as busy too, and after the tries
+        says the service is busy, in words."""
+        page, seen = self.field_map(overpass=[502, 200])
+        self.type_outline(page)
+        page.get_by_test_id("fm-ortho").uncheck()  # OpenStreetMap alone: only Overpass is asked
+        page.get_by_test_id("fm-draw").click()
+        # The main instance said 502; the other did not answer; the main one is asked again after its
+        # backoff, and the status line (and the banner at the top) count the seconds down.
+        expect(page.get_by_test_id("fm-busy")).to_contain_text(
+            re.compile(r"está ocupado: nova tentativa em \d+ s \(overpass-api\.de\)"))
+        expect(page.get_by_test_id("fm-banner")).to_contain_text("nova tentativa em")
+        expect(page.get_by_test_id("fm-cancel")).to_be_visible()
+        expect(page.get_by_test_id("fm-preview")).to_be_visible(timeout=15000)
+        self.assertEqual(seen["hosts"], ["overpass-api.de", "overpass.private.coffee", "overpass-api.de"])
+        expect(page.get_by_test_id("fm-notice")).to_have_count(0)  # the main instance answered in the end
+        # A 502 without Access-Control-Allow-Origin is a network error to the page: busy or unreachable, so
+        # the next instance is asked, and the page says where the data came from.
+        page.get_by_test_id("fm-redraw").click()
+        seen = self.map_routes(page, overpass=["nocors"], fallbacks={self.OVERPASS_2: [200]})
+        page.get_by_test_id("fm-draw").click()
+        expect(page.get_by_test_id("fm-preview")).to_be_visible()
+        self.assertEqual(seen["hosts"], ["overpass-api.de", "overpass.private.coffee"])
+        expect(page.get_by_test_id("fm-notice")).to_have_text(
+            "Os dados do OpenStreetMap vieram de overpass.private.coffee (o servidor principal estava ocupado); "
+            "os deste servidor podem estar uns meses atrasados.")
+        # Every instance busy (a 429 rests that instance 30 s): after the tries, within the time allowed (made
+        # short here), the page says so; nothing is left running.
+        page.get_by_test_id("fm-redraw").click()
+        page.evaluate(self.RETRY_JS, {"baseMs": 200, "capMs": 400, "budgetMs": 2500})
+        seen = self.map_routes(page, overpass=[503], fallbacks={self.OVERPASS_2: [429]})
+        page.get_by_test_id("fm-draw").click()
+        expect(page.get_by_test_id("fm-error")).to_contain_text(
+            "Os servidores de dados do OpenStreetMap estão ocupados (HTTP 50", timeout=10000)
+        expect(page.get_by_test_id("fm-busy")).to_have_count(0)
+        expect(page.get_by_test_id("fm-banner")).to_have_count(0)
+        expect(page.get_by_test_id("fm-draw")).to_be_enabled()
+        self.assertLessEqual(len(seen["hosts"]), 6)
+        self.assertEqual(seen["hosts"][:3], ["overpass-api.de", "overpass.private.coffee", "overpass-api.de"])
+        self.assertEqual(seen["hosts"].count("overpass.private.coffee"), 1)  # refused (429): not asked again so soon
+        self.assertNotIn("maps.mail.ru", seen["hosts"])
+        self.assertEqual(seen["other"], [])
+        self.drop_errors("502", "503", "504", "429", "ERR_CONNECTION_REFUSED", "CORS", "Failed to fetch")
+
+    def test_field_map_overpass_timeout_and_cancel(self):
+        """The maintainer's page waited for ever on a stalled Overpass request: each request now has its own
+        time limit (a little over the query's 25 s; made short here), after which the next instance is asked;
+        the status line says which try and that it waits; *Cancel* ends a wait at once. In English."""
+        page, seen = self.field_map(lang="en", width=390, height=844, overpass=["hang"],
+                                    fallbacks={self.OVERPASS_2: ["hang", 200]})
+        page.evaluate(self.RETRY_JS, {"requestMs": 1500})
+        self.type_outline(page)
+        page.get_by_test_id("fm-ortho").uncheck()
+        page.get_by_test_id("fm-draw").click()
+        expect(page.get_by_test_id("fm-busy")).to_have_text("Fetching OpenStreetMap's data for the area…")
+        expect(page.get_by_test_id("fm-busy")).to_have_text(
+            "Fetching OpenStreetMap's data from overpass.private.coffee (try 2 of at most 6), waiting for the "
+            "answer…", timeout=5000)
+        expect(page.get_by_test_id("fm-preview")).to_be_visible(timeout=20000)
+        self.assertEqual(seen["hosts"][:2], ["overpass-api.de", "overpass.private.coffee"])
+        self.assertEqual(seen["hosts"][-1], "overpass.private.coffee")
+        expect(page.get_by_test_id("fm-notice")).to_contain_text("came from overpass.private.coffee")
+        self.no_horizontal_scroll(page)
+        # Cancel: every instance silent; the GM stops waiting.
+        page.get_by_test_id("fm-redraw").click()
+        page.evaluate(self.RETRY_JS, {"requestMs": 35000})
+        seen = self.map_routes(page, overpass=["hang"], fallbacks={self.OVERPASS_2: ["hang"]})
+        page.get_by_test_id("fm-draw").click()
+        expect(page.get_by_test_id("fm-busy")).to_be_visible()
+        expect(page.get_by_test_id("fm-banner")).to_have_attribute("aria-hidden", "true")  # said once, beside Draw
+        page.get_by_test_id("fm-cancel").click()
+        expect(page.get_by_test_id("fm-notice")).to_have_text(
+            "Cancelled: nothing more is asked of OpenStreetMap. You can draw again whenever you like.")
+        expect(page.get_by_test_id("fm-busy")).to_have_count(0)
+        expect(page.get_by_test_id("fm-cancel")).to_have_count(0)
+        expect(page.get_by_test_id("fm-draw")).to_be_enabled()
+        expect(page.get_by_test_id("fm-error")).to_have_count(0)
+        page.wait_for_timeout(500)
+        self.assertEqual(seen["hosts"], ["overpass-api.de"])  # nothing asked after the cancel
+        self.drop_errors("ERR_ABORTED", "ERR_FAILED", "ERR_CONNECTION_REFUSED", "Failed to fetch", "aborted")
+
+    def test_field_map_outline_kept_across_a_reload(self):
+        """MF-61: a page stuck waiting can be reloaded without tracing the outline again: the corners (only
+        they) are kept for this tab, per level; MF-60: a reload with a drawn image not used asks first, and
+        nothing is asked when no image is drawn."""
+        page, seen = self.field_map()
+        dialogs: list[str] = []
+
+        def on_dialog(d) -> None:
+            dialogs.append(d.type)
+            d.accept()
+
+        page.on("dialog", on_dialog)
+        for lat, lon in OUTLINE[:2]:
+            page.get_by_test_id("fm-corner").fill(f"{lat}, {lon}")
+            page.get_by_test_id("fm-corner-add").click()
+        page.reload()
+        expect(page.get_by_test_id("fm-count")).to_have_text("2 de no máximo 12 cantos (pelo menos 3).")
+        expect(page.get_by_test_id("fm-place-status")).to_have_text(
+            "O limite que estavas a desenhar voltou (2 cantos): podes continuar.")
+        expect(page.locator(".tm-corner")).to_have_count(2)
+        expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile(r"/1[6-7]/"))  # shown on the map
+        self.assertEqual(dialogs, [])  # nothing drawn: no question
+        page.get_by_test_id("fm-clear").click()
+        self.type_outline(page)
+        page.get_by_test_id("fm-draw").click()
+        expect(page.get_by_test_id("fm-preview")).to_be_visible()
+        page.reload()
+        expect(page.get_by_test_id("fm-count")).to_contain_text("5 de no máximo")
+        self.assertEqual(dialogs, ["beforeunload"])
+        expect(page.get_by_test_id("fm-preview")).to_have_count(0)  # the image is not kept, only the corners
+        expect(page.get_by_test_id("fm-corners")).to_contain_text("39.601500, -8.403000")
+        # Kept for this tab only, and only the corners.
+        kept = json.loads(page.evaluate("sessionStorage.getItem('atalaia.fieldmap.outline.0')"))
+        self.assertEqual(kept, [{"lat": lat, "lon": lon} for lat, lon in OUTLINE])
+        self.assertIsNone(page.evaluate("localStorage.getItem('atalaia.fieldmap.outline.0')"))
+        # Start again empties it.
+        page.get_by_test_id("fm-clear").click()
+        self.assertIsNone(page.evaluate("sessionStorage.getItem('atalaia.fieldmap.outline.0')"))
+        self.assertEqual(seen["other"], [])
+
+    def test_field_map_layout_at_every_width(self):
+        """The maintainer's desktop (about 1850 px wide) left the page's left part empty: one centred column on
+        a phone, the map with the outline beside it from 64rem, centred and up to 100rem wide; no sideways
+        scroll at 320, 390, 768, 1280 and 1850 px. Screenshots go to ATALAIA_SCREENSHOTS when set."""
+        page, _ = self.field_map(width=1850)
+        self.type_outline(page)
+        page.get_by_test_id("fm-draw").click()
+        expect(page.get_by_test_id("fm-preview")).to_be_visible()
+        shots = os.environ.get("ATALAIA_SCREENSHOTS")
+        for width in (320, 390, 768, 1280, 1850):
+            page.set_viewport_size({"width": width, "height": 900})
+            page.evaluate("window.dispatchEvent(new Event('resize'))")
+            page.wait_for_timeout(150)
+            self.no_horizontal_scroll(page)
+            # All in one go, in page coordinates (a scroll between two measures would move them).
+            main, card, side, preview = page.evaluate("""() => ['main', '.fm-find-card', '.fm-side',
+                '[data-testid=fm-preview]'].map((s) => { const r = document.querySelector(s).getBoundingClientRect();
+                return { x: r.x + scrollX, y: r.y + scrollY, width: r.width, height: r.height }; })""")
+            left, right = main["x"], width - main["x"] - main["width"]
+            self.assertAlmostEqual(left, right, delta=2, msg=f"{width} px: the page is centred")
+            self.assertGreaterEqual(card["width"], min(width, 1600) * 0.55, f"{width} px: the map gets the width")
+            if width >= 1024:  # 64rem: the outline beside the map, the preview across both
+                self.assertGreaterEqual(side["x"], card["x"] + card["width"], f"{width} px")
+                self.assertLess(abs(side["y"] - card["y"]), 2, f"{width} px")
+                self.assertGreaterEqual(preview["width"], card["width"] + side["width"], f"{width} px")
+            else:
+                self.assertGreaterEqual(side["y"], card["y"] + card["height"], f"{width} px")
+                self.assertAlmostEqual(side["width"], card["width"], delta=1, msg=f"{width} px")
+            if width == 1850:
+                self.assertGreaterEqual(main["width"], 1550)  # no empty half
+                self.assertLessEqual(left, 130)
+            self.assertLessEqual(page.get_by_test_id("fm-image").bounding_box()["height"], 900 * 0.7 + 1)
+            png = page.screenshot(full_page=True)
+            self.assertGreater(len(png), 1000)
+            if shots:
+                Path(shots).mkdir(parents=True, exist_ok=True)
+                (Path(shots) / f"field-map-{width}.png").write_bytes(png)
+
+    def test_field_map_orthophoto_layer(self):
+        """MF-54 to MF-57: in mainland Portugal the map can show the DGT orthophoto (WMS GetMap per 256-pixel
+        tile in EPSG:3857, only the tiles in view, each once), with its credit while shown; the choice is
+        remembered in this browser; outside its coverage only the map is offered, and why is said."""
+        page, seen = self.field_map()
+        page.get_by_test_id("fm-go").fill("39.6, -8.401")
+        page.get_by_test_id("fm-go-button").click()
+        expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile(r"^https://tile\.openstreetmap\.org/17/"))
+        expect(page.get_by_test_id("fm-layer-map")).to_be_checked()  # the default stays *Mapa*
+        self.assertEqual(seen["wms_tiles"], [])
+        page.get_by_text("Ortofoto", exact=True).click()
+        expect(page.get_by_test_id("fm-layer-ortho")).to_be_checked()
+        expect(page.locator(".tm-tile").first).to_have_attribute(
+            "src", re.compile(r"^https://ortos\.dgterritorio\.gov\.pt/wms/ortosat2023\?"))
+        expect(page.get_by_test_id("tm-credit")).to_have_text("Ortofotomapas © DGT (CC BY 4.0)")
+        page.wait_for_function("[...document.querySelectorAll('.tm-tile')].every((i) => i.complete)")
+        tiles = page.locator(".tm-tile").evaluate_all("(l) => l.map((i) => i.src)")
+        # Only the tiles in view, each asked once, each a GetMap of exactly one zoom-17 tile.
+        self.assertEqual(sorted(seen["wms_tiles"]), sorted(tiles))
+        side = 2 * 20037508.342789244 / 2 ** 17
+        for url in seen["wms_tiles"]:
+            q = {k: v[0] for k, v in parse_qs(urlsplit(url).query, keep_blank_values=True).items()}
+            self.assertEqual({k: v for k, v in q.items() if k != "BBOX"}, {
+                "SERVICE": "WMS", "VERSION": "1.3.0", "REQUEST": "GetMap", "LAYERS": "ortoSat2023-CorVerdadeira",
+                "STYLES": "", "CRS": "EPSG:3857", "WIDTH": "256", "HEIGHT": "256", "FORMAT": "image/jpeg"})
+            x0, y0, x1, y1 = (float(v) for v in q["BBOX"].split(","))
+            self.assertAlmostEqual(x1 - x0, side, delta=0.02)
+            self.assertAlmostEqual(y1 - y0, side, delta=0.02)
+            frac = ((x0 + 20037508.342789244) / side) % 1
+            self.assertLess(min(frac, 1 - frac), 1e-4)  # on the tile grid
+        # Panning away and back asks only for the new tiles: the ones seen are kept.
+        asked = len(seen["wms_tiles"])
+        page.get_by_test_id("tm").focus()
+        page.keyboard.press("ArrowRight")
+        page.keyboard.press("ArrowLeft")
+        page.wait_for_function("[...document.querySelectorAll('.tm-tile')].every((i) => i.complete)")
+        self.assertLessEqual(len(seen["wms_tiles"]) - asked, 8)  # one column of new tiles at most
+        self.assertEqual(len(set(seen["wms_tiles"])), len(seen["wms_tiles"]))
+        # A corner pressed on the orthophoto is a corner as on the map.
+        page.get_by_test_id("fm-centre").click()
+        expect(page.get_by_test_id("fm-corners")).to_contain_text("39.600000, -8.401000")
+        # Remembered in this browser.
+        page.get_by_test_id("fm-clear").click()
+        page.reload()
+        expect(page.get_by_test_id("fm-layer-ortho")).to_be_checked()
+        expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile(r"^https://ortos\."))
+        # Outside its coverage (Paris): only the map, and why.
+        page.get_by_test_id("fm-go").fill("48.8566, 2.3522")
+        page.get_by_test_id("fm-go-button").click()
+        expect(page.get_by_test_id("fm-layers")).to_have_count(0)
+        expect(page.get_by_test_id("fm-layer-none")).to_have_text(
+            "Fora de Portugal continental só há o mapa do OpenStreetMap: não há fotografia aérea aberta de alta "
+            "resolução que se possa usar aqui.")
+        expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile(r"^https://tile\.openstreetmap\.org/"))
+        expect(page.locator(".tm-tile[src^='https://ortos']")).to_have_count(0)
+        expect(page.get_by_test_id("tm-credit")).to_have_text("© OpenStreetMap contributors")
+        # Back in Portugal, the orthophoto again (the choice was kept).
+        page.get_by_test_id("fm-go").fill("38.6296, -9.1505")
+        page.get_by_test_id("fm-go-button").click()
+        expect(page.get_by_test_id("fm-layer-ortho")).to_be_checked()
+        expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile(r"^https://ortos\."))
+        # Back to *Mapa*.
+        page.get_by_test_id("fm-layer-map").check()
+        expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile(r"^https://tile\.openstreetmap"))
+        self.assertEqual(page.evaluate("localStorage.getItem('atalaia.fieldmap.layer')"), "map")
+        self.assertEqual((seen["other"], seen["overpass"], seen["wms"]), ([], [], []))
 
     def test_reconnects_after_the_stream_drops(self):
         self.field.create_game(start=True)

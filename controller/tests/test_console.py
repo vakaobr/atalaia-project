@@ -125,7 +125,9 @@ class ConsoleFilesTests(unittest.TestCase):
     def test_only_the_field_map_page_may_reach_the_internet(self):
         """MF-27, MF-45: the field-map page's CSP adds exactly OSM's tiles (images), the Overpass API, the
         DGT's WMS and Nominatim (connections); every other page of the console stays same-origin only.
-        MF-43: only that page may ask for the GM's location."""
+        MF-51: one more public Overpass instance (VK's left out, pending the maintainer); MF-54: the DGT's
+        WMS also as images (the map's *Ortofoto* layer). MF-43: only that page may ask for the GM's
+        location."""
         r = self.client.get("/console/field-map.html")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.headers["content-security-policy"], FIELD_MAP_HEADERS["Content-Security-Policy"])
@@ -133,9 +135,11 @@ class ConsoleFilesTests(unittest.TestCase):
         self.assertEqual(csp["script-src"], "'self'")
         self.assertEqual(csp["style-src"], "'self'")
         self.assertEqual(csp["default-src"], "'self'")
-        self.assertEqual(csp["img-src"], "'self' blob: data: https://tile.openstreetmap.org")
-        self.assertEqual(csp["connect-src"], "'self' https://overpass-api.de https://ortos.dgterritorio.gov.pt "
-                                             "https://nominatim.openstreetmap.org")
+        self.assertEqual(csp["img-src"], "'self' blob: data: https://tile.openstreetmap.org "
+                                         "https://ortos.dgterritorio.gov.pt")
+        self.assertEqual(csp["connect-src"], "'self' https://overpass-api.de https://overpass.private.coffee "
+                                             "https://ortos.dgterritorio.gov.pt https://nominatim.openstreetmap.org")
+        self.assertNotIn("mail.ru", r.headers["content-security-policy"])  # MF-51: not without the maintainer
         self.assertNotIn("unsafe", r.headers["content-security-policy"])
         for k in ("X-Content-Type-Options", "Referrer-Policy"):
             self.assertEqual(r.headers[k], SECURITY_HEADERS[k])
@@ -152,7 +156,7 @@ class ConsoleFilesTests(unittest.TestCase):
         # The page and its scripts name only those origins.
         code = "".join((SRC / rel).read_text(encoding="utf-8")
                        for rel in ("field-map.js", "components/field-render.js", "components/tile-map.js",
-                                   "components/place-search.js"))
+                                   "components/place-search.js", "components/field-levels.js"))
         for url in set(re.findall(r"https://[a-z0-9.-]+", code)):
             self.assertIn(url, [*FIELD_MAP_ORIGINS.values(), "https://www.openstreetmap.org"], url)
 

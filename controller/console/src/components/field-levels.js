@@ -12,6 +12,19 @@ import { html, Component, t } from '../ui.js';
 
 export const LEVELS_MIN = 2;
 export const LEVELS_MAX = 10;
+// MF-63: the field-map page's one-time note to the Field tab (sessionStorage): {level} just loaded.
+export const LOADED_KEY = 'atalaia.fieldmap.loaded';
+
+/** The field-map page's note, read once (and removed): the level it loaded, or null. */
+export function takeLoaded() {
+    try {
+        const v = JSON.parse(window.sessionStorage.getItem(LOADED_KEY) || 'null');
+        window.sessionStorage.removeItem(LOADED_KEY);
+        return v && Number.isInteger(v.level) && v.level >= 0 ? v.level : null;
+    } catch (e) {
+        return null;
+    }
+}
 
 /** A level's default name in the console's language: the ground floor, then floors 1, 2, ... */
 export function defaultLevelName(level) {
