@@ -193,6 +193,14 @@ void main() {
       await settle();
       link.pong();
       await settle();
+      // Under load the link can still be connecting after the two settles:
+      // wait for it to be up (the PINGs and the PONG above), at most 5 s.
+      final deadline = DateTime.now().add(const Duration(seconds: 5));
+      while (!modem.isUp && DateTime.now().isBefore(deadline)) {
+        link.pong();
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      expect(modem.isUp, isTrue);
     });
 
     tearDown(() async => modem.close());

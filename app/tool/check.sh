@@ -58,11 +58,10 @@ cp -r "$SRC/app" "$SRC/core" "$SRC/modes" "$SRC/protocol" "$W/"
 mkdir -p "$W/controller/console"
 cp -r "$SRC/controller/console/src" "$W/controller/console/"
 cp -r "$SRC/controller/templates" "$W/controller/"
-# The phone controller's slice S7b tests read the Pi's branding images, its
-# example scenarios and the scenario runtime (checked to be the app's copy).
-mkdir -p "$W/controller/tests" "$W/controller/atalaia_controller/scenarios"
+# The phone controller's slice S7b tests read the Pi's branding images and its
+# example scenarios (the scenario compiler itself is the core's, core/scenario/).
+mkdir -p "$W/controller/tests"
 cp -r "$SRC/controller/tests/fixtures" "$SRC/controller/tests/scenarios" "$W/controller/tests/"
-cp "$SRC/controller/atalaia_controller/scenarios/runtime.lua" "$W/controller/atalaia_controller/scenarios/"
 rm -rf "$W/app/.dart_tool" "$W/app/build" "$W/app/android/.gradle" "$W/app/android/app/.cxx" \
     "$W/core/build"
 cd "$W/app"
@@ -113,7 +112,8 @@ check_android_lib() {
         || { echo "check.sh: $lib is not built for $abi" >&2; exit 1; }
     for sym in atalaia_version atalaia_node_create atalaia_node_destroy atalaia_node_load \
         atalaia_node_set_teams atalaia_node_set_params atalaia_node_input atalaia_node_advance \
-        atalaia_node_status atalaia_node_mem_used atalaia_tag_event_json atalaia_tpl_parse; do
+        atalaia_node_status atalaia_node_mem_used atalaia_tag_event_json atalaia_tpl_parse \
+        atalaia_scenario_check atalaia_scenario_compile atalaia_scenario_free; do
         "$tools/llvm-nm" -D --defined-only "$lib" | grep -q " T $sym\$" \
             || { echo "check.sh: $lib does not export $sym" >&2; exit 1; }
     done

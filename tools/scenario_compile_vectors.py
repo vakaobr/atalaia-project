@@ -6,8 +6,8 @@
     python3 tools/scenario_compile_vectors.py           write the file
     python3 tools/scenario_compile_vectors.py --check   fail if it is stale
 
-The Pi's scenario compiler (controller/atalaia_controller/scenarios, plain Python and PyYAML)
-compiles a set of manifests: the valid ones of protocol/vectors/scenario.json, the examples in
+The scenario compiler (core/scenario/, in the C core since decision PE24-109; the Pi reads the
+manifest's text with PyYAML, controller/atalaia_controller/scenarios) compiles a set of manifests: the valid ones of protocol/vectors/scenario.json, the examples in
 controller/tests/scenarios and the cases below, which use every objective type, parameter and
 effect, translations, scenario parameters, YAML 1.1's readings (yes, 0815, 1:30, merge keys),
 anchors, and names and descriptions with quotes, Unicode and control characters. For each one
@@ -16,13 +16,13 @@ package's field.lua and mode.yaml in full and mode.yaml read back as data. A sec
 ``loads``, holds YAML texts with what the manifest loader reads from them (typed, so that a date,
 a float and an integer stay apart) or that it refuses them.
 
-The Android field controller's Dart port (app/lib/controller/scenarios) must give the same
+The Android field controller, which reads the text with its own PyYAML-compatible reader
+(app/lib/controller/scenarios/scenario_manifest.dart) and calls the same core, must give the same
 problems and byte-identical files: app/test/controller/scenarios_test.dart reads this file, and
 controller/tests/test_scenario_compile_vectors.py runs ``--check`` so that a change to the
-compiler without new vectors fails the Pi's tests too.
-
-The tool also writes app/lib/controller/scenarios/scenario_runtime.g.dart, the scenario runtime
-(runtime.lua) as a Dart string, which ``--check`` checks as well. Needs PyYAML.
+compiler without new vectors fails the Pi's tests too. These files were first written by the Pi's
+Python compiler; the core's gives every one of them byte for byte. Needs PyYAML and the core
+library (ATALAIA_CORE_LIB, or a build folder of the repository).
 """
 
 from __future__ import annotations
@@ -39,20 +39,18 @@ sys.path.insert(0, str(REPO / "controller"))
 
 import yaml  # noqa: E402
 
-from atalaia_controller.scenarios import ManifestError, load, validate  # noqa: E402
-from atalaia_controller.scenarios.lua import RUNTIME  # noqa: E402
-from atalaia_controller.scenarios.package import build  # noqa: E402
-from atalaia_controller.scenarios.validator import errors  # noqa: E402
+from atalaia_controller.scenarios import ManifestError, load  # noqa: E402
+from atalaia_controller.scenarios.package import compile_package  # noqa: E402
 
 OUT = REPO / "protocol" / "vectors" / "scenario_compile.json"
-DART_RUNTIME = REPO / "app" / "lib" / "controller" / "scenarios" / "scenario_runtime.g.dart"
 SHARED = REPO / "protocol" / "vectors" / "scenario.json"
 EXAMPLES = REPO / "controller" / "tests" / "scenarios"
 
 DESCRIPTION = (
     "Golden outputs of the scenario compiler (ADR-P4-6 as amended, decisions P4R7, P4R8, P4R9), "
-    "written by tools/scenario_compile_vectors.py with the Pi's Python compiler "
-    "(controller/atalaia_controller/scenarios) and PyYAML. 'compile' lists manifests: the valid ones "
+    "written by tools/scenario_compile_vectors.py with the scenario compiler of the C core "
+    "(core/scenario/, decision PE24-109; first with the Pi's Python one, whose outputs these are byte "
+    "for byte) and the Pi's PyYAML reader (controller/atalaia_controller/scenarios). 'compile' lists manifests: the valid ones "
     "of protocol/vectors/scenario.json (as JSON text), controller/tests/scenarios/*.yaml and cases "
     "written in the tool. Each has its name and manifest_text; 'manifest_error' true when the "
     "loader refuses the text (then nothing else); otherwise 'problems', every problem validate() "
@@ -64,7 +62,7 @@ DESCRIPTION = (
     "decimal text}, {\"float\": Python's repr}, {\"bool\": b}, {\"null\": null}, {\"timestamp\": "
     "Python's str of the date or datetime}, {\"list\": [values]} and {\"map\": [[key, value], ...]} "
     "in the map's order. Read by app/test/controller/scenarios_test.dart (the Android field "
-    "controller's Dart port) and checked for staleness by "
+    "controller's reader and its calls into the core) and checked for staleness by "
     "controller/tests/test_scenario_compile_vectors.py."
 )
 
@@ -542,10 +540,9 @@ def compile_case(name: str, text: str) -> dict[str, Any]:
     except ManifestError:
         case["manifest_error"] = True
         return case
-    problems = validate(manifest)
+    problems, package = compile_package(manifest)
     case["problems"] = [{"path": p.path, "code": p.code, "level": p.level} for p in problems]
-    if not errors(problems):
-        package = build(manifest)
+    if package is not None:
         case["field_lua"] = package.field_lua
         case["mode_yaml"] = package.mode_yaml
         case["mode_yaml_data"] = yaml.safe_load(package.mode_yaml)
@@ -582,43 +579,11 @@ def build_vectors() -> dict[str, Any]:
     return {"description": DESCRIPTION, "compile": cases, "loads": [load_case(t) for t in LOADS]}
 
 
-def dart_runtime() -> str:
-    """runtime.lua as a Dart string constant, one adjacent literal per line (as dart format keeps it)."""
-    text = RUNTIME.read_text(encoding="utf-8")
-    lines = text.split("\n")
-    parts = [line + "\n" for line in lines[:-1]] + ([lines[-1]] if lines[-1] else [])
-
-    def literal(s: str) -> str:
-        s = s.replace("\\", "\\\\").replace("'", "\\'").replace("$", "\\$").replace("\n", "\\n")
-        return f"'{s}'"
-
-    body = "\n".join(f"    {literal(p)}" for p in parts)
-    # REUSE-IgnoreStart (the generated file's header, not this file's licence)
-    return ("// SPDX-FileCopyrightText: 2026 The Atalaia contributors\n"
-            "// SPDX-License-Identifier: GPL-3.0-or-later\n"
-            "\n"
-            "/// The scenario runtime, controller/atalaia_controller/scenarios/runtime.lua,\n"
-            "/// as a Dart string: the code after the SCENARIO table in every compiled\n"
-            "/// scenario's field.lua (scenario_lua.dart).\n"
-            "///\n"
-            "/// Generated from that file by tools/scenario_compile_vectors.py: do not\n"
-            "/// edit it by hand. scenarios_test.dart checks that it is the same text.\n"
-            "library;\n"
-            "\n"
-            "/// runtime.lua's text, its header included (its SPDX lines are the runtime's,\n"
-            "/// not this file's: REUSE skips them).\n"
-            "// REUSE-IgnoreStart\n"
-            "const String scenarioRuntimeLua =\n"
-            f"{body};\n"
-            "// REUSE-IgnoreEnd\n")
-    # REUSE-IgnoreEnd
-
-
 def outputs() -> dict[Path, str]:
     # The manifests and packages carry SPDX lines; written "SPDX\u002d" (the same JSON string), so
     # that REUSE does not read them as this file's licence (the protocol's, from REUSE.toml).
     vectors = json.dumps(build_vectors(), indent=1, ensure_ascii=False).replace("SPDX-", "SPDX\\u002d")
-    return {OUT: vectors + "\n", DART_RUNTIME: dart_runtime()}
+    return {OUT: vectors + "\n"}
 
 
 def check() -> list[str]:

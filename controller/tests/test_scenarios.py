@@ -1,10 +1,12 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """The scenario compiler and validator (atalaia_controller.scenarios, ADR-P4-6 as amended, plan
-phase 7): the shared vectors (protocol/vectors/scenario.json), every objective type compiled and
-run in the simulator over org.atalaia.objectives, Foxhound recompiled from a manifest and played
-by the objectives package's own YAML tests, Lua escaping of hostile texts, the core's load check
-and the command line. Every simulated run fails on a Simulation.problems entry (run_test).
+phase 7; since decision PE24-109 the core's, core/scenario/, with Python reading the text): the
+shared vectors (protocol/vectors/scenario.json), every objective type compiled and run in the
+simulator over org.atalaia.objectives, Foxhound recompiled from a manifest and played by the
+objectives package's own YAML tests, Lua escaping of hostile texts, the core's load check, the
+manifest's data tree (aliases, dates, depth) and the command line. Every simulated run fails on a
+Simulation.problems entry (run_test).
 
     cd controller && python -m unittest discover -s tests
 """
@@ -13,6 +15,7 @@ from __future__ import annotations
 
 import contextlib
 import copy
+import datetime
 import io
 import json
 import os
@@ -28,10 +31,9 @@ import yaml
 
 from support import CORE
 from atalaia_controller.modes import ModeRegistry
-from atalaia_controller.scenarios import (ManifestError, ScenarioError, check_package, compile_scenario, load,
-                                          validate)
-from atalaia_controller.scenarios import cli
-from atalaia_controller.scenarios.lua import LuaError, comment, lua_string, lua_value
+from atalaia_controller.scenarios import (CoreUnavailable, LuaError, ManifestError, ScenarioError, check_package,
+                                          compile_scenario, load, lua_literal, validate)
+from atalaia_controller.scenarios import cli, compiler
 from atalaia_controller.scenarios.validator import errors
 from atalaia_controller.store import Store
 from atalaia_sim.core import Node
@@ -44,6 +46,16 @@ MANIFESTS = HERE / "scenarios"
 OBJECTIVES_DIR = REPO / "modes" / "objectives"
 VECTORS = json.loads((REPO / "protocol" / "vectors" / "scenario.json").read_text(encoding="utf-8"))
 HOSTILE = 'Pon"te]] os.exit(1) --[[ \\'
+
+
+def lua_value(value: Any) -> str:
+    """A value as field.lua writes it (core/scenario/luagen.lua)."""
+    return lua_literal(value)
+
+
+def lua_string(text: str) -> str:
+    assert isinstance(text, str)
+    return lua_literal(text)
 
 
 def manifest(objectives: list[dict[str, Any]], nodes: dict[str, Any] | None = None, **top: Any) -> dict[str, Any]:
@@ -136,8 +148,6 @@ class VectorTests(unittest.TestCase):
         ]:
             with self.subTest(path):
                 self.assertIn(path, [p.path for p in errors(validate(m))])
-        with self.assertRaises(LuaError):
-            comment("a\n")
         self.assertEqual(lua_value({"a\n": 1}), '{ ["a\\n"] = 1 }')
 
     def test_characters_past_u_ffff_written_as_surrogate_pairs(self):
@@ -173,7 +183,7 @@ class VectorTests(unittest.TestCase):
 
 
 class LuaEscapingTests(unittest.TestCase):
-    """No text from a manifest is ever Lua code: every one is a quoted literal (lua.py)."""
+    """No text from a manifest is ever Lua code: every one is a quoted literal (core/scenario/luagen.lua)."""
 
     def test_literals(self):
         self.assertEqual(lua_string('a"b\\c\nd\re\tf'), '"a\\"b\\\\c\\nd\\re\\tf"')
@@ -184,11 +194,9 @@ class LuaEscapingTests(unittest.TestCase):
         self.assertEqual(lua_value({"end": 1, "a b": True, "x": None, "n": [1, 2.5]}),
                          '{ ["end"] = 1, ["a b"] = true, n = { 1, 2.5 } }')
         self.assertEqual(lua_value(38.0), "38.0")
-        for bad in (float("nan"), float("inf"), 2**64, object()):
+        for bad in (float("nan"), float("inf"), 2**64, -2**63, object(), {1: 2}):
             with self.subTest(bad), self.assertRaises(LuaError):
                 lua_value(bad)
-        with self.assertRaises(LuaError):
-            comment("a\nos.exit()")
 
     @unittest.skipIf(CORE is None, "the shared core library is not built")
     def test_round_trip_through_the_core(self):
@@ -542,6 +550,98 @@ class SharedLibraryTests(unittest.TestCase):
         r = subprocess.run([sys.executable, "-c", script], cwd=HERE.parent, capture_output=True, text=True,
                            timeout=60)
         self.assertEqual(r.returncode, 0, r.stderr)
+
+
+class DataTreeTests(unittest.TestCase):
+    """What Python hands the core (decision PE24-109): the manifest's data tree, typed as the 'loads'
+    vectors write it, with a YAML alias as {"alias": n}; and what the core makes of values only PyYAML
+    builds."""
+
+    def test_the_tree_is_the_loads_vectors_typed_form(self):
+        golden = json.loads((REPO / "protocol" / "vectors" / "scenario_compile.json").read_text(encoding="utf-8"))
+
+        def expand(v: Any, shared: list[Any]) -> Any:
+            # {"alias": n} as the value it names, as the vectors write it.
+            (kind, body), = v.items()
+            if kind == "alias":
+                return shared[body]
+            if kind == "list":
+                out: dict[str, Any] = {"list": []}
+                shared.append(out)
+                out["list"] = [expand(x, shared) for x in body]
+                return out
+            if kind == "map":
+                out = {"map": []}
+                shared.append(out)
+                out["map"] = [[expand(k, shared), expand(x, shared)] for k, x in body]
+                return out
+            return v
+
+        cases = [c for c in golden["loads"] if not c.get("error")]
+        self.assertGreater(len(cases), 15)
+        for case in cases:
+            with self.subTest(case["text"]):
+                tree = json.loads(compiler.encode(load(case["text"])).decode("utf-8"))
+                self.assertEqual(expand(tree, []), case["data"])
+
+    def test_a_map_two_objectives_share_is_written_once(self):
+        """As PyYAML writes one object it meets twice: &id001, then *id001 (mode.yaml)."""
+        points = {"param": "points"}
+        m = manifest([{"id": "one", "name": "One", "type": "capture_and_hold", "target": "a",
+                       "effect": {"points": points}},
+                      {"id": "two", "name": "Two", "type": "capture_and_hold", "target": "b",
+                       "effect": {"points": points}}],
+                     params={"points": {"type": "int", "default": 3}})
+        tree = json.loads(compiler.encode(m))
+        self.assertIn('{"alias":', json.dumps(tree, separators=(",", ":")))
+        written = compile_scenario(m).mode_yaml
+        self.assertIn("points: &id001\n", written)
+        self.assertIn("points: *id001\n", written)
+        self.assertEqual(yaml.safe_load(written)["scenario"]["objectives"][1]["points"], {"param": "points"})
+
+    def test_values_only_pyyaml_builds_are_problems_not_crashes(self):
+        base = load((MANIFESTS / "foxhound.yaml").read_text(encoding="utf-8"))
+        loop: list[Any] = []
+        loop.append(loop)
+        for key, value, path, code in [
+            ("teams", loop, "teams", "bad_teams"),
+            ("description", {"a": loop}, "description", "bad_text"),
+            ("version", datetime.date(2026, 10, 23), "version", "bad_text"),
+            ("version", {1, 2}, "version", "bad_text"),
+            ("version", b"bytes", "version", "bad_text"),
+            # A language JSON cannot write: Python's json.dumps raised in the size check (a 500).
+            ("lang", [datetime.datetime(2026, 1, 2, 3, 4, 5)], "lang", "bad_lang"),
+        ]:
+            with self.subTest(key=key, value=repr(value)):
+                m = copy.copy(base)
+                m[key] = value
+                self.assertIn((path, code), [(p.path, p.code) for p in errors(validate(m))])
+        m = copy.deepcopy(base)
+        m["objectives"][0]["target"] = datetime.datetime(2026, 10, 23, 10, 0, tzinfo=datetime.timezone(
+            datetime.timedelta(hours=-5)))
+        message = [p.message for p in validate(m) if p.path == "objectives[0].target"][0]
+        self.assertEqual(message, repr(m["objectives"][0]["target"]) + " is not in the nodes map")
+
+    def test_a_manifest_nested_too_deep_is_refused_in_words(self):
+        deep: Any = "x"
+        for _ in range(150):
+            deep = [deep]
+        m = manifest([{"id": "x", "name": "X", "type": "capture_and_hold", "target": "a"}], extra=deep)
+        self.assertEqual([(p.path, p.code, p.message) for p in validate(m)],
+                         [("", "bad_manifest", "the manifest is nested more than 100 levels deep")])
+
+    def test_a_core_without_the_compiler(self):
+        stub = os.environ.get("ATALAIA_CORE_STUB_LIB")
+        if not stub or not Path(stub).exists():
+            self.skipTest("the FFI stub is not built")
+        import ctypes  # noqa: PLC0415
+
+        from atalaia_sim.core import Core  # noqa: PLC0415
+
+        core = Core.__new__(Core)  # the stub has node.h only: no screen templates, tags or scenarios
+        core.lib = ctypes.CDLL(stub)
+        with self.assertRaises(CoreUnavailable):
+            validate({}, core=core)
 
 
 class CommandLineTests(unittest.TestCase):

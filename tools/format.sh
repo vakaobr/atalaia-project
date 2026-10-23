@@ -2,8 +2,8 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Formats the core's C code (clang-format, .clang-format) and the game modes'
-# Lua (StyLua, stylua.toml). With --check, changes nothing and fails if a
+# Formats the core's C code (clang-format, .clang-format), the game modes' and the scenario
+# compiler's Lua (StyLua, stylua.toml; .styluaignore skips a generated file). With --check, changes nothing and fails if a
 # file needs formatting, as CI does. Run from the repository root; the dev
 # container (tools/dev/Dockerfile) has both tools. Vendored code (Lua, stb,
 # Monocypher, LVGL's lv_conf.h) is left alone, and generated files opt out with
@@ -39,10 +39,10 @@ c_files=$(find $c_dirs -name '*.[ch]' \
 if [ "$check" -eq 1 ]; then
     # shellcheck disable=SC2086
     clang-format --dry-run --Werror $c_files
-    stylua --check modes
+    stylua --check modes core/scenario
     echo "format.sh: C and Lua are formatted"
 else
     # shellcheck disable=SC2086
     clang-format -i $c_files
-    stylua modes
+    stylua modes core/scenario
 fi

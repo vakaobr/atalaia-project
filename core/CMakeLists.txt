@@ -13,6 +13,10 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(ATALAIA_SHARED "Also build the core as a shared library (used by the simulator and the app)" OFF)
 option(ATALAIA_STUB "Also build libatalaia_core_stub, the FFI stub the app's Dart tests load" OFF)
 option(ATALAIA_MBEDTLS "Use mbedtls for real AES-128-CCM when it is installed" ON)
+# The scenario validator and compiler (decision PE24-109): Lua sources in core/scenario/, embedded.
+# The Pi's and the phone's controllers use it; the Field Box does not compile scenarios, and its
+# firmware (firmware/esp32/components/atalaia_core) lists the core's sources without it.
+option(ATALAIA_SCENARIO "Build the scenario compiler (core/scenario) into the core" ON)
 
 # ---- Lua 5.4 (vendored, MIT) -----------------------------------------------
 # Only the libraries the sandbox opens are compiled: no io, os, package,
@@ -79,6 +83,26 @@ set(ATALAIA_CORE_SOURCES
 if(ATALAIA_HAVE_MBEDTLS)
     list(APPEND ATALAIA_CORE_SOURCES src/crypto_mbedtls.c)
 endif()
+if(ATALAIA_SCENARIO)
+    # The Lua sources become a C file in the build folder whenever one changes.
+    set(ATALAIA_SCENARIO_LUA
+        scenario/unicode.lua scenario/py.lua scenario/tree.lua scenario/manifest.lua
+        scenario/protocol.lua scenario/luagen.lua scenario/yaml.lua scenario/package.lua
+        scenario/validator.lua scenario/main.lua scenario/runtime.lua)
+    list(TRANSFORM ATALAIA_SCENARIO_LUA PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/)
+    string(REPLACE ";" "|" ATALAIA_SCENARIO_ARG "${ATALAIA_SCENARIO_LUA}")
+    set(ATALAIA_SCENARIO_C ${CMAKE_CURRENT_BINARY_DIR}/scenario_sources.c)
+    add_custom_command(
+        OUTPUT ${ATALAIA_SCENARIO_C}
+        COMMAND ${CMAKE_COMMAND} -DOUT=${ATALAIA_SCENARIO_C} -DSOURCES=${ATALAIA_SCENARIO_ARG}
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed_scenario.cmake
+        DEPENDS ${ATALAIA_SCENARIO_LUA} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed_scenario.cmake
+        COMMENT "Embedding the scenario compiler's Lua sources"
+        VERBATIM)
+    # One target writes it, so that the static and the shared core never write it at once.
+    add_custom_target(atalaia_scenario_embed DEPENDS ${ATALAIA_SCENARIO_C})
+    list(APPEND ATALAIA_CORE_SOURCES src/scenario.c ${ATALAIA_SCENARIO_C})
+endif()
 # geo.c must give the same bits everywhere (decision M3-1): no fused
 # multiply-add (clang contracts a * b + c by default, and arm64 has FMA).
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
@@ -87,6 +111,9 @@ endif()
 
 function(atalaia_core_target name type)
     add_library(${name} ${type} ${ATALAIA_CORE_SOURCES})
+    if(ATALAIA_SCENARIO)
+        add_dependencies(${name} atalaia_scenario_embed)
+    endif()
     target_include_directories(${name} PUBLIC include PRIVATE src)
     target_link_libraries(${name} PRIVATE atalaia_lua)
     if(MATH_LIBRARY)
@@ -148,4 +175,15 @@ if(BUILD_TESTING)
         target_compile_options(test_sandbox_escape PRIVATE -Wall -Wextra -Wpedantic -Werror)
     endif()
     add_test(NAME sandbox_escape COMMAND test_sandbox_escape)
+
+    # The scenario compiler's entry points, limits and malformed or mutated data trees.
+    if(ATALAIA_SCENARIO)
+        add_executable(test_scenario tests/test_scenario.c)
+        target_include_directories(test_scenario PRIVATE src)
+        target_link_libraries(test_scenario PRIVATE atalaia_core)
+        if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+            target_compile_options(test_scenario PRIVATE -Wall -Wextra -Wpedantic -Werror)
+        endif()
+        add_test(NAME scenario COMMAND test_scenario)
+    endif()
 endif()

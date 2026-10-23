@@ -16,10 +16,11 @@
 ///     GET  /api/v1/scenarios         the installed scenarios
 ///     GET  /api/v1/scenarios/{id}    GM: the manifest and the package
 ///
-/// The validator and the compiler are the Pi's, ported to Dart
-/// (scenarios/, decision PE24-84): the same problems for the shared
-/// vectors (protocol/vectors/scenario.json) and the same package, byte for
-/// byte (protocol/vectors/scenario_compile.json). The manifest is kept next
+/// The validator and the compiler are the C core's (core/scenario/,
+/// decision PE24-109), which the Pi calls too; the phone reads the
+/// manifest's text itself (scenarios/scenario_manifest.dart): the same
+/// problems for the shared vectors (protocol/vectors/scenario.json) and the
+/// same package, byte for byte (protocol/vectors/scenario_compile.json). The manifest is kept next
 /// to its package (setting `scenario.manifest:<id>`, M8-2); the names the
 /// GM gives the boxes in the Join tab (P4R8, M6-7) are kept per game
 /// (`scenario.nodes:<game id>`).
@@ -392,18 +393,24 @@ class ControllerScenarios {
         'manifest': null,
       };
     }
-    final problems = validate(manifest);
-    if (errors(problems).isEmpty) {
-      try {
-        final package = compileScenario(manifest);
-        final core = engine.core;
-        if (core != null) checkScripts(core, parseModePackage(package.files));
-      } on ModeException catch (e) {
-        problems.add(Problem('', 'lua_does_not_load', e.message));
+    final core = engine.core;
+    var problems = <Problem>[];
+    if (core != null) {
+      // One call into the core: the problems and, without errors, the package.
+      final (found, package) = compilePackage(manifest, core);
+      problems = [...found];
+      if (package != null) {
+        try {
+          checkScripts(core, parseModePackage(package.files));
+        } on ModeException catch (e) {
+          problems.add(Problem('', 'lua_does_not_load', e.message));
+        }
       }
     }
+    // Without the core nothing is checked: not ok, and checked_in_core says
+    // why (as on the Pi).
     final out = <String, Object?>{
-      'ok': errors(problems).isEmpty,
+      'ok': core != null && errors(problems).isEmpty,
       'problems': [for (final p in problems) p.toJson()],
       ..._summary(manifest),
     };
@@ -430,9 +437,16 @@ class ControllerScenarios {
     } on ManifestError catch (e) {
       throw ScenarioRefused([Problem('', 'bad_manifest', e.message)]);
     }
-    final problems = validate(manifest);
-    if (errors(problems).isNotEmpty) throw ScenarioRefused(problems);
-    final package = compileScenario(manifest);
+    final core = engine.core;
+    if (core == null) {
+      throw ControllerError.unavailable(
+        'the core library is not loaded, so scenarios cannot be checked or '
+        'compiled',
+      );
+    }
+    final (problems, compiled) = compilePackage(manifest, core);
+    if (compiled == null) throw ScenarioRefused(problems);
+    final package = compiled;
     final existing = _modes.package(package.id);
     if (existing != null && existing.kind != 'scenario') {
       throw ControllerError.conflict(

@@ -22,6 +22,8 @@ python3 tools/protogen.py --check
 python3 tools/field_frame_vectors.py --check
 python3 tools/pairing_vectors.py --check
 python3 tools/mode_package_vectors.py --check
+# The scenario compiler's Unicode classes (core/scenario/unicode.lua, decision PE24-109).
+python3 tools/scenario_unicode.py --check
 python3 tools/build_site.py --check
 # Every translation against English; a language still being translated only warns (P5H-2).
 python3 tools/i18n_check.py

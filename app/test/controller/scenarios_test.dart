@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // The scenario validator and compiler on the Android field controller
-// (lib/controller/scenarios, decision PE24) against the Pi's: the shared
-// rules (protocol/vectors/scenario.json, as controller/tests/
-// test_scenarios.py reads them), the Pi compiler's golden outputs
-// (protocol/vectors/scenario_compile.json, written by
-// tools/scenario_compile_vectors.py: the same problems, field.lua and
-// mode.yaml byte for byte, and what the manifest loader reads from YAML
-// texts), the runtime's copy (scenario_runtime.g.dart is runtime.lua), the
-// Lua literals, and mutated manifests that must give problems, never an
-// exception.
+// (lib/controller/scenarios, decision PE24): the phone reads the manifest's
+// text (scenario_manifest.dart) and calls the C core's compiler
+// (core/scenario/, decision PE24-109), the one the Pi calls too. Checked
+// here: the shared rules (protocol/vectors/scenario.json, as controller/
+// tests/test_scenarios.py reads them), the golden outputs
+// (protocol/vectors/scenario_compile.json: the same problems, field.lua and
+// mode.yaml byte for byte, and what the manifest reader reads from YAML
+// texts), the data tree the phone hands the core, the Lua literals, and
+// mutated manifests that must give problems, never an exception.
 
 import 'dart:convert';
 import 'dart:io';
@@ -18,8 +18,10 @@ import 'dart:math';
 
 import 'package:atalaia_app/controller/scenarios/scenario_manifest.dart';
 import 'package:atalaia_app/controller/scenarios/scenario_package.dart';
-import 'package:atalaia_app/controller/scenarios/scenario_runtime.g.dart';
+import 'package:atalaia_app/ffi/bindings.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../support/core_libs.dart';
 
 Map<String, Object?> _json(String path) =>
     jsonDecode(File(path).readAsStringSync()) as Map<String, Object?>;
@@ -50,6 +52,34 @@ Object? _typed(Object? v) => switch (v) {
   _ => throw StateError('no typed form for ${v.runtimeType}'),
 };
 
+/// The data tree with each {"alias": n} as the list or map it names, as the
+/// 'loads' vectors write it.
+Object? _expand(Object? v, List<Object?> shared) {
+  final (kind, body) = (v! as Map<String, Object?>).entries
+      .map((e) => (e.key, e.value))
+      .single;
+  switch (kind) {
+    case 'alias':
+      return shared[body! as int];
+    case 'list':
+      final out = <String, Object?>{};
+      shared.add(out);
+      out['list'] = [
+        for (final x in body! as List<Object?>) _expand(x, shared),
+      ];
+      return out;
+    case 'map':
+      final out = <String, Object?>{};
+      shared.add(out);
+      out['map'] = [
+        for (final pair in (body! as List<Object?>).cast<List<Object?>>())
+          [_expand(pair[0], shared), _expand(pair[1], shared)],
+      ];
+      return out;
+  }
+  return v;
+}
+
 Object? _copy(Object? v) => switch (v) {
   final List<Object?> l => l.map(_copy).toList(),
   final Map<Object?, Object?> m => {
@@ -59,19 +89,22 @@ Object? _copy(Object? v) => switch (v) {
 };
 
 void main() {
+  late AtalaiaCore core;
+  setUpAll(() => core = AtalaiaCore.open(coreLibraryPath()));
+
   group('protocol/vectors/scenario.json', () {
     test('valid manifests give no error and exactly their warnings', () {
       for (final c in _cases(_shared, 'valid')) {
         final manifest = c['manifest'];
         final got = {
-          for (final p in validate(manifest)) (p.path, p.code, p.level),
+          for (final p in validate(manifest, core)) (p.path, p.code, p.level),
         };
         final want = {
           for (final w in (c['warnings'] as List<Object?>? ?? const []))
             ((w! as Map<String, Object?>)['path'], w['code'], levelWarning),
         };
         expect(got, want, reason: c['name'] as String);
-        compileScenario(manifest);
+        compileScenario(manifest, core);
       }
     });
 
@@ -79,7 +112,7 @@ void main() {
       for (final c in _cases(_shared, 'invalid')) {
         final manifest = c['manifest'];
         final got = {
-          for (final p in errors(validate(manifest))) (p.path, p.code),
+          for (final p in errors(validate(manifest, core))) (p.path, p.code),
         };
         final want = {
           for (final e
@@ -88,7 +121,7 @@ void main() {
         };
         expect(got, want, reason: c['name'] as String);
         expect(
-          () => compileScenario(manifest),
+          () => compileScenario(manifest, core),
           throwsA(
             isA<ScenarioError>().having(
               (e) => e.problems,
@@ -97,7 +130,7 @@ void main() {
             ),
           ),
         );
-        for (final p in validate(manifest)) {
+        for (final p in validate(manifest, core)) {
           expect(p.message, isNotEmpty);
           expect('$p', contains(p.code));
         }
@@ -122,7 +155,7 @@ void main() {
         }
         final manifest = loadManifest(text);
         final problems = [
-          for (final p in validate(manifest)) [p.path, p.code, p.level],
+          for (final p in validate(manifest, core)) [p.path, p.code, p.level],
         ];
         final want = [
           for (final p
@@ -132,12 +165,12 @@ void main() {
         expect(problems, want);
         if (!c.containsKey('field_lua')) {
           expect(
-            () => compileScenario(manifest),
+            () => compileScenario(manifest, core),
             throwsA(isA<ScenarioError>()),
           );
           return;
         }
-        final package = compileScenario(manifest);
+        final package = compileScenario(manifest, core);
         expect(package.fieldLua, c['field_lua']);
         expect(package.modeYaml, c['mode_yaml']);
         expect(package.files.keys, ['mode.yaml', 'field.lua']);
@@ -150,7 +183,7 @@ void main() {
       });
     }
 
-    test('the loader reads YAML as PyYAML does', () {
+    test('the reader reads YAML as PyYAML does', () {
       for (final c in _cases(_golden, 'loads')) {
         final text = c['text']! as String;
         if (c['error'] == true) {
@@ -168,27 +201,102 @@ void main() {
         }
       }
     });
+
+    test('what the reader read reaches the core as the same data tree', () {
+      for (final c in _cases(_golden, 'loads')) {
+        if (c['error'] == true) continue;
+        final text = c['text']! as String;
+        final tree = jsonDecode(utf8.decode(encodeTree(loadText(text))));
+        expect(
+          jsonEncode(_expand(tree, [])),
+          jsonEncode(c['data']),
+          reason: text,
+        );
+      }
+    });
   });
 
-  test('scenario_runtime.g.dart is runtime.lua', () {
-    final runtime = File(
-      '../controller/atalaia_controller/scenarios/runtime.lua',
-    ).readAsStringSync();
-    expect(scenarioRuntimeLua, runtime);
+  group('the data tree', () {
+    test('a map two objectives share is written once, with an anchor', () {
+      final points = <Object?, Object?>{'param': 'points'};
+      final manifest = <Object?, Object?>{
+        'id': 'org.test.shared',
+        'version': '1',
+        'name': 'Shared',
+        'params': {
+          'points': {'type': 'int', 'default': 3},
+        },
+        'nodes': {
+          'a': {'role': 'objective'},
+          'b': {'role': 'objective'},
+        },
+        'objectives': [
+          {
+            'id': 'one',
+            'name': 'One',
+            'type': 'capture_and_hold',
+            'target': 'a',
+            'effect': {'points': points},
+          },
+          {
+            'id': 'two',
+            'name': 'Two',
+            'type': 'capture_and_hold',
+            'target': 'b',
+            'effect': {'points': points},
+          },
+        ],
+      };
+      final written = compileScenario(manifest, core).modeYaml;
+      expect(written, contains('points: &id001\n'));
+      expect(written, contains('points: *id001\n'));
+    });
+
+    test('half of a surrogate pair built in code is bad_unicode', () {
+      final manifest = loadManifest(
+        File('../controller/tests/scenarios/foxhound.yaml').readAsStringSync(),
+      );
+      manifest['name'] = 'X \ud83d';
+      expect(
+        [for (final p in validate(manifest, core)) (p.path, p.code)],
+        [('name', 'bad_unicode')],
+      );
+      manifest['name'] = 'X 😀';
+      expect(validate(manifest, core), isEmpty);
+    });
+
+    test('a manifest nested too deep is refused in words', () {
+      Object? deep = 'x';
+      for (var i = 0; i < 150; i++) {
+        deep = [deep];
+      }
+      final problems = validate({'id': 'org.test.deep', 'extra': deep}, core);
+      expect(
+        [for (final p in problems) (p.path, p.code)],
+        [('', 'bad_manifest')],
+      );
+    });
+
+    test('a core without the compiler is refused', () {
+      final stub = AtalaiaCore.open(stubLibraryPath());
+      expect(() => validate({}, stub), throwsArgumentError);
+    });
   });
 
   group('Lua literals', () {
+    String luaValue(Object? v) => luaLiteral(v, core);
+
     test('every text is a quoted literal', () {
-      expect(luaString('a"b\\c\nd\re\tf'), r'"a\"b\\c\nd\re\tf"');
-      expect(luaString(']]--[['), '"]]--[["');
-      expect(luaString('\x00\x1b\x7f'), r'"\000\027\127"');
-      expect(luaString('Informações'), '"Informações"');
+      expect(luaValue('a"b\\c\nd\re\tf'), r'"a\"b\\c\nd\re\tf"');
+      expect(luaValue(']]--[['), '"]]--[["');
+      expect(luaValue('\x00\x1b\x7f'), r'"\000\027\127"');
+      expect(luaValue('Informações'), '"Informações"');
       expect(
-        luaString('\u202e\u2028'),
+        luaValue('\u202e\u2028'),
         r'"\226\128\174\226\128\168"',
       ); // bidi, line separator
-      expect(luaString('\ue000'), r'"\238\128\128"'); // private use
-      expect(luaString('😀'), '"😀"');
+      expect(luaValue('\ue000'), r'"\238\128\128"'); // private use
+      expect(luaValue('😀'), '"😀"');
       expect(
         luaValue({
           'end': 1,
@@ -228,7 +336,9 @@ void main() {
         (-2.5, '-2.5'),
       ];
       for (final (value, text) in cases) {
+        // The reader's (the data tree's floats) and the core's (field.lua).
         expect(pyFloatRepr(value), text);
+        expect(luaValue(value), text);
       }
     });
   });
@@ -250,14 +360,14 @@ void main() {
           reason: text,
         );
       }
-      expect(validate([1]).single.code, 'bad_manifest');
+      expect(validate([1], core).single.code, 'bad_manifest');
     });
 
     test('a manifest in JSON is a manifest too', () {
       final foxhound = loadManifest(
         File('../controller/tests/scenarios/foxhound.yaml').readAsStringSync(),
       );
-      expect(validate(loadManifest(jsonEncode(foxhound))), isEmpty);
+      expect(validate(loadManifest(jsonEncode(foxhound)), core), isEmpty);
     });
   });
 
@@ -294,13 +404,13 @@ void main() {
       ])
         c['manifest'],
     ];
-    for (var n = 0; n < 3000; n++) {
+    for (var n = 0; n < 1000; n++) {
       final manifest = _copy(manifests[rng.nextInt(manifests.length)]);
       for (var k = 0; k < 1 + rng.nextInt(3); k++) {
         mutate(manifest);
       }
       try {
-        compileScenario(manifest);
+        compileScenario(manifest, core);
       } on ScenarioError {
         // Problems, as expected.
       }

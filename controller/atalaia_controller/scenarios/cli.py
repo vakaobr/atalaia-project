@@ -2,17 +2,18 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """python3 -m atalaia_controller.scenarios validate|check|compile scenario.yaml
 
-    validate  the manifest's problems only (no core needed)
+    validate  the manifest's problems only
     check     validate, compile, and load the generated field.lua in the core, as the controller
               does when the package is installed (P4R9)
     compile   check, then write the package (mode.yaml and field.lua) into -o DIR, or print
               the generated field.lua without -o
 
-Problems are printed one a line, "file: path: level: message (code)", or as JSON with --json.
-Exit status: 0 without errors (warnings are printed), 1 with errors, 2 when the file cannot be
-read or is not a manifest, or the core library is missing (check and compile load the Lua in it
-unless --no-core). Also
-``python3 -m atalaia_controller scenario ...``.
+The validator and the compiler are the core's (core/scenario/, decision PE24-109), so every
+command needs the core library (ATALAIA_CORE_LIB, or a build folder of the repository);
+--no-core only skips loading the generated field.lua in it. Problems are printed one a line,
+"file: path: level: message (code)", or as JSON with --json. Exit status: 0 without errors
+(warnings are printed), 1 with errors, 2 when the file cannot be read or is not a manifest, or
+the core library is missing. Also ``python3 -m atalaia_controller scenario ...``.
 """
 
 from __future__ import annotations
@@ -25,8 +26,8 @@ from typing import Any, Optional
 
 from atalaia_sim.mode import ModeError
 
-from . import ManifestError, Problem, check_package, errors, load, validate
-from .package import build
+from . import CoreUnavailable, ManifestError, Problem, check_package, errors, load
+from .package import compile_package
 
 
 def _core() -> Any:
@@ -43,7 +44,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("manifest", help="the scenario manifest (YAML or JSON)")
     parser.add_argument("-o", "--output", help="compile: the folder to write the package into")
     parser.add_argument("--json", action="store_true", help="print the problems (and the files) as JSON")
-    parser.add_argument("--no-core", action="store_true", help="check, compile: do not load the Lua in the core")
+    parser.add_argument("--no-core", action="store_true",
+                        help="check, compile: do not load the generated Lua in the core")
     args = parser.parse_args(argv)
 
     path = Path(args.manifest)
@@ -56,25 +58,24 @@ def main(argv: Optional[list[str]] = None) -> int:
         else:
             print(f"{path}: error: {exc}", file=sys.stderr)
         return 2
-    problems = validate(manifest)
+    try:
+        core = _core()
+        problems, package = compile_package(manifest, core)
+    except (CoreUnavailable, OSError) as exc:  # LibraryNotFound is an OSError
+        print(f"scenario: the core library is needed: it holds the validator and the compiler "
+              f"({str(exc).splitlines()[0]})", file=sys.stderr)
+        return 2
     bad = bool(errors(problems))
     result: dict[str, Any] = {"ok": not bad, "problems": [p.to_dict() for p in problems]}
-    package = None
-    if not bad and args.command != "validate":
-        package = build(manifest)
-        if not args.no_core:
-            try:
-                core = _core()
-            except Exception as exc:  # noqa: BLE001 (LibraryNotFound, OSError)
-                print(f"scenario: the core library is needed to load the generated field.lua "
-                      f"({str(exc).splitlines()[0]}); --no-core skips that check", file=sys.stderr)
-                return 2
-            try:
-                check_package(core, package)
-            except ModeError as exc:
-                problems.append(Problem("", "lua_does_not_load", str(exc)))
-                result = {"ok": False, "problems": [p.to_dict() for p in problems]}
-                bad = True
+    if args.command == "validate":
+        package = None
+    if package is not None and not args.no_core:
+        try:
+            check_package(core, package)
+        except ModeError as exc:
+            problems.append(Problem("", "lua_does_not_load", str(exc)))
+            result = {"ok": False, "problems": [p.to_dict() for p in problems]}
+            bad = True
     if args.json:
         if package is not None and not bad:
             result["files"] = package.files

@@ -12,7 +12,8 @@ The GM console's scenario builder sends a manifest (YAML or JSON text) to
     GET  /api/v1/scenarios/{id}    GM: the manifest and the generated package (field.lua holds the
                                    codes and destinations, so not for the read token)
 
-The scenario compiler (``atalaia_controller.scenarios``) stays plain Python, shared with the site
+The scenario compiler (``atalaia_controller.scenarios``: the manifest read by PyYAML, the rules and
+the package by the core's compiler, core/scenario/, decision PE24-109) is shared with the site
 server; this module is the controller's use of it. The manifest is kept next to its package
 (setting ``scenario.manifest:<id>``; decision M8-2), so the GM can read it back, edit it, and install
 the same scenario on a standby controller (decision M6-1: a standby needs the package too).
@@ -35,7 +36,8 @@ import yaml
 from atalaia_sim.mode import SEPARATOR, ModeError
 
 from . import visibility
-from .scenarios import ManifestError, Problem, check_package, compile_scenario, load, validate
+from .scenarios import ManifestError, Problem, check_package, load
+from .scenarios.package import compile_package
 from .scenarios.validator import errors
 
 if TYPE_CHECKING:
@@ -158,15 +160,18 @@ def check(ctrl: "Controller", text: str) -> dict[str, Any]:
     except ManifestError as exc:
         return {"ok": False, "problems": [Problem("", "bad_manifest", str(exc)).to_dict()], "id": None,
                 "name": None, "nodes": [], "objectives": [], "installed": None, "manifest": None}
-    problems = validate(manifest)
-    if not errors(problems):
-        try:
-            package = compile_scenario(manifest)
-            if ctrl.core is not None:
+    problems: list[Problem] = []
+    if ctrl.core is not None:
+        # The validator and the compiler are the core's (decision PE24-109): one call gives both.
+        problems, package = compile_package(manifest, ctrl.core)
+        if package is not None:
+            try:
                 check_package(ctrl.core, package)
-        except ModeError as exc:
-            problems.append(Problem("", "lua_does_not_load", str(exc)))
-    out = {"ok": not errors(problems), "problems": [p.to_dict() for p in problems], **_summary(manifest)}
+            except ModeError as exc:
+                problems.append(Problem("", "lua_does_not_load", str(exc)))
+    # Without the core nothing is checked: not ok, and checked_in_core says why (as the site server).
+    out = {"ok": ctrl.core is not None and not errors(problems), "problems": [p.to_dict() for p in problems],
+           **_summary(manifest)}
     # The manifest as read, for the console's block view (phase 5 plan phase 7, decision P5F-3):
     # only when JSON carries it unchanged, else None (the block view then says it cannot show it).
     out["manifest"] = manifest if _json_exact(manifest) else None
@@ -204,17 +209,19 @@ def _uses(game: Optional[dict[str, Any]], scenario_id: str) -> bool:
 def install(ctrl: "Controller", text: str) -> dict[str, Any]:
     """Compiles a manifest and installs its package (modes.install: the core's load check). The
     manifest is kept next to it. Refused: errors in the manifest; Conflict (engine): the id is
-    another kind of package, or the live game runs this scenario."""
-    from .engine import Conflict  # noqa: PLC0415 (engine imports this module)
+    another kind of package, or the live game runs this scenario; Unavailable: no core library
+    (it holds the validator and the compiler, decision PE24-109)."""
+    from .engine import Conflict, Unavailable  # noqa: PLC0415 (engine imports this module)
 
     try:
         manifest = load(text)
     except ManifestError as exc:
         raise Refused([Problem("", "bad_manifest", str(exc))]) from None
-    problems = validate(manifest)
-    if errors(problems):
+    if ctrl.core is None:
+        raise Unavailable("the core library is not loaded, so scenarios cannot be checked or compiled")
+    problems, package = compile_package(manifest, ctrl.core)
+    if package is None:
         raise Refused(problems)
-    package = compile_scenario(manifest)
     existing = _package(ctrl, package.id)
     if existing is not None and existing.kind != "scenario":
         raise Conflict(f"{package.id} is installed as a {existing.kind}, not a scenario; give the scenario "

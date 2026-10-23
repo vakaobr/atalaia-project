@@ -2,9 +2,10 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 --
 -- The scenario runtime: the code of every compiled scenario's field.lua,
--- after the SCENARIO table that the compiler writes (lua.py). It is GPL, as
--- the game modes are, because it is copied into every scenario package; the
--- compiler that copies it is AGPL. Everything above "@runtime" stays here.
+-- after the SCENARIO table that the compiler writes (luagen.lua). It is GPL,
+-- as the game modes are, because it is copied into every scenario package;
+-- the core embeds it with the compiler (decision PE24-109). Everything above
+-- "@runtime" stays here.
 --
 -- The data (one entry of SCENARIO.objectives):
 --   id, type      the objective's id (data key 34) and type

@@ -190,6 +190,27 @@ class Core:
     def version(self) -> str:
         return self.lib.atalaia_version().decode()
 
+    def scenario(self, op: str, tree: bytes) -> dict[str, Any]:
+        """The scenario compiler's answer (atalaia/scenario.h) for a manifest's data tree (JSON,
+        atalaia_controller.scenarios.compiler.encode): op is check, compile or literal. Looked up
+        on first use, so a core built without ATALAIA_SCENARIO (or the FFI stub) still loads;
+        AttributeError then."""
+        fn = getattr(self.lib, f"atalaia_scenario_{op}")
+        if fn.restype is not ctypes.c_void_p:
+            fn.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t)]
+            fn.restype = ctypes.c_void_p
+            self.lib.atalaia_scenario_free.argtypes = [ctypes.c_void_p]
+            self.lib.atalaia_scenario_free.restype = None
+        n = ctypes.c_size_t(0)
+        ptr = fn(tree, len(tree), ctypes.byref(n))
+        if not ptr:
+            raise MemoryError("atalaia_scenario: no memory for the answer")
+        try:
+            text = ctypes.string_at(ptr, n.value)
+        finally:
+            self.lib.atalaia_scenario_free(ptr)
+        return json.loads(text.decode("utf-8"))
+
     def check_screen(self, source: bytes) -> Optional[str]:
         """Parses a screen template with the core's parser (the one the Field Box uses);
         returns why it is refused, or None."""

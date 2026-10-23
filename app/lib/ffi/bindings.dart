@@ -286,6 +286,28 @@ class AtalaiaBindings {
         Pointer<DataFieldDef> Function(Pointer<Utf8>, int)
       >('atalaia_data_field', isLeaf: true);
 
+  /// The scenario compiler (atalaia/scenario.h, decision PE24-109): a
+  /// manifest's data tree in, an answer's JSON out (malloc'd, freed with
+  /// [scenarioFree]). Not leaf calls: a compile can take tens of
+  /// milliseconds, and the VM may collect garbage meanwhile.
+  late final scenarioCheck = _scenario('atalaia_scenario_check');
+  late final scenarioCompile = _scenario('atalaia_scenario_compile');
+  late final scenarioLiteral = _scenario('atalaia_scenario_literal');
+
+  late final scenarioFree = library
+      .lookupFunction<
+        Void Function(Pointer<Utf8>),
+        void Function(Pointer<Utf8>)
+      >('atalaia_scenario_free', isLeaf: true);
+
+  Pointer<Utf8> Function(Pointer<Uint8>, int, Pointer<Size>) _scenario(
+    String name,
+  ) =>
+      library.lookupFunction<
+        Pointer<Utf8> Function(Pointer<Uint8>, Size, Pointer<Size>),
+        Pointer<Utf8> Function(Pointer<Uint8>, int, Pointer<Size>)
+      >(name);
+
   /// Only in the FFI stub (core/tests/stub.c): the C structs' layout as JSON.
   late final stubLayout = library
       .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
@@ -333,6 +355,37 @@ class AtalaiaCore {
 
   /// The core's version, e.g. "0.2.0" ("stub" for the FFI stub).
   String get version => bindings.version().toDartString();
+
+  /// The scenario compiler's answer (atalaia/scenario.h) for a manifest's
+  /// data tree ([tree], JSON in UTF-8; scenario_package.dart writes it):
+  /// [op] is check, compile or literal. An ArgumentError when this library
+  /// has no scenario compiler (the FFI stub).
+  Map<String, Object?> scenario(String op, List<int> tree) {
+    final fn = switch (op) {
+      'check' => bindings.scenarioCheck,
+      'compile' => bindings.scenarioCompile,
+      'literal' => bindings.scenarioLiteral,
+      _ => throw ArgumentError.value(op, 'op'),
+    };
+    final src = _nativeBytes(tree);
+    final len = calloc<Size>();
+    try {
+      final answer = fn(src, tree.length, len);
+      if (answer == nullptr) {
+        throw StateError('atalaia_scenario_$op: no memory for the answer');
+      }
+      try {
+        final text = utf8.decode(answer.cast<Uint8>().asTypedList(len.value));
+        return jsonDecode(text) as Map<String, Object?>;
+      } finally {
+        bindings.scenarioFree(answer);
+      }
+    } finally {
+      calloc
+        ..free(src)
+        ..free(len);
+    }
+  }
 
   /// Parses a screen template with the core's parser, the one the Field Box
   /// renders with; returns why it is refused, or null.

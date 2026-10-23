@@ -3,10 +3,10 @@
 """The field's scenario library and game presets (ADR-P4-6 as amended, P4R7, P4R9; plan phase 20).
 
 A scenario is checked here as the controller checks it: the shared compiler's validator
-(``atalaia_controller.scenarios``, plain Python, P4R16), then the compiled ``field.lua`` loaded in the C
-core (``check_package``, the controller's own ``modes.check_scripts``). The image builds the core in a build
-stage (``ATALAIA_CORE_LIB``); without it a manifest can be checked by the validator alone but not saved
-(``core_unavailable``), as the controller refuses an install without its core. Every save of a manifest is a
+(``atalaia_controller.scenarios``, P4R16, whose rules are the C core's since decision PE24-109), then the
+compiled ``field.lua`` loaded in the core (``check_package``, the controller's own ``modes.check_scripts``).
+The image builds the core in a build stage (``ATALAIA_CORE_LIB``); without it a manifest is read but
+neither checked nor saved (``core_unavailable``), as the controller refuses an install without its core. Every save of a manifest is a
 new revision, kept as it was typed; the current revision of each scenario that is not archived, and the
 field's presets, are what ``GET /api/v1/sync/presets`` gives the field's controllers, the primary and every
 standby (decision S20-1). The controller compiles and checks the manifest again when it installs it, and
@@ -23,7 +23,8 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from atalaia_controller import sync_format
-from atalaia_controller.scenarios import ManifestError, Problem, check_package, compile_scenario, load, validate
+from atalaia_controller.scenarios import ManifestError, Problem, check_package, compile_scenario, load
+from atalaia_controller.scenarios.package import compile_package
 from atalaia_controller.scenarios.validator import errors
 from atalaia_sim.mode import ModeError
 from sqlalchemy import delete, func, select
@@ -93,12 +94,14 @@ def check(holder: CoreHolder, text: str) -> Checked:
         manifest = load(text)
     except ManifestError as exc:
         return Checked(None, [Problem("", "bad_manifest", str(exc))], False)
-    problems = validate(manifest)
     core = holder.get()
-    if errors(problems) or core is None:
-        return Checked(manifest, problems, False)
+    if core is None:
+        # The validator and the compiler are the core's (decision PE24-109): nothing is checked.
+        return Checked(manifest, [], False)
+    problems, package = compile_package(manifest, core)
+    if package is None:
+        return Checked(manifest, problems, True)
     try:
-        package = compile_scenario(manifest)
         with holder.lock:
             check_package(core, package)
     except ModeError as exc:
@@ -216,7 +219,8 @@ async def revisions(db: AsyncSession, scenario: FieldScenario) -> list[dict[str,
 
 def package_files(text: str) -> Optional[dict[str, str]]:
     """The package a manifest compiles to (mode.yaml, field.lua), for staff to read; None if it no longer
-    compiles (a compiler of a newer server may refuse what an older one saved)."""
+    compiles (a compiler of a newer server may refuse what an older one saved) or the core library, which
+    holds the compiler, is missing."""
     try:
         return dict(compile_scenario(load(text)).files)
     except Exception:  # noqa: BLE001  (any refusal: the manifest is still shown)

@@ -1,12 +1,13 @@
 // SPDX-FileCopyrightText: 2026 The Atalaia contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-/// The scenario manifest (ADR-P4-6 as amended) on the Android field
-/// controller (decision PE24): reading it, its names (decision P4R8) and the
-/// objective types. A port of the Pi controller's
-/// controller/atalaia_controller/scenarios/manifest.py, with the few Python
-/// semantics the validator, the Lua writer and mode.yaml rely on ([pyStr],
-/// [pyTruthy], [pyGet], [pyFloatRepr]).
+/// Reading a scenario manifest (ADR-P4-6 as amended) on the Android field
+/// controller (decision PE24): the one part of the scenario compiler that
+/// stays in Dart. The rules, the Lua writer and mode.yaml are the C core's
+/// (core/scenario/, decision PE24-109), which scenario_package.dart calls
+/// with what this reads, as the Pi's
+/// controller/atalaia_controller/scenarios/manifest.py does. [pyStr],
+/// [pyRepr] and [pyFloatRepr] print a read value as Python does.
 ///
 /// A manifest is YAML (or JSON, which is YAML too). Reading it never runs
 /// code and refuses a key given twice in one map. The Pi reads it with
@@ -72,176 +73,9 @@ import 'dart:convert';
 
 import 'package:yaml/yaml.dart';
 
-// The names (P4R8). An objective id goes into every scenario event (data key
-// 34), so it is short. Each ends where it seems: the Pi's patterns end with
-// \Z since PE24-106 (Python's "$" had also matched before a final newline,
-// so "hill\n" was an objective id); Dart's "$" never did.
-final RegExp objectiveIdPattern = RegExp(r'^[a-z][a-z0-9_]{0,23}$');
-
-/// A mode id, as modes.py checks it on upload.
-final RegExp scenarioIdPattern = RegExp(
-  r'^[a-z0-9][a-z0-9_-]*(\.[a-z0-9][a-z0-9_-]*)+$',
-);
-final RegExp paramNamePattern = RegExp(r'^[a-z][a-z0-9_]{0,31}$');
-final RegExp playerRolePattern = RegExp(r'^[a-z][a-z0-9_]{0,23}$');
-
-/// The objectives package takes up to 8 digits, then #.
-final RegExp codePattern = RegExp(r'^[0-9]{1,8}$');
-
-const String objectivesPackage = 'org.atalaia.objectives';
-
-/// A game's id in a join (protocol/join.md).
-const int modeIdMax = 63;
-
-/// The scenario leads the game's id and the objectives package follows
-/// (decision M6-1).
-const int scenarioIdMax = modeIdMax - 1 - objectivesPackage.length;
-
-/// The core's ATALAIA_TEAM_NAME_MAX - 1.
-const int teamNameMax = 23;
-const int teamsMax = 8;
-const int squadsMax = 16;
-
-/// A box's name in its HELLO (protocol/schema/messages.yaml).
-const int nodeNameMax = 24;
-
-/// Bytes: a scenario's or an objective's name.
-const int nameMax = 64;
-const int descriptionMax = 2000;
-const int versionMax = 32;
-const int objectivesMax = 64;
-const int nodesMax = 64;
-
-/// A box's optional level on a multi-story field (ML-8).
-const int levelsMax = 10;
-const int pointsMax = 100000;
-
-/// A week, in minutes.
-const int windowMaxMin = 7 * 24 * 60;
+/// A manifest's text is at most this many bytes (UTF-8).
 const int manifestMaxBytes = 256 * 1024;
 
-/// The objectives package's screens (modes/objectives/node.lua).
-const List<String> langs = ['pt', 'en'];
-
-/// Texts are in English, with i18n.pt (P4R8).
-const List<String> translations = ['pt'];
-
-/// org.atalaia.objectives' roles.
-const List<String> nodeRoles = ['objective', 'bomb_site'];
-const List<String> visibilities = ['public', 'team', 'squad', 'hidden'];
-
-/// ATALAIA_GEO_POLYGON_MAX (core/include/atalaia/geo.h).
-const int polygonMax = 32;
-
-/// A phone's GPS is rarely better than this.
-const int radiusWarnM = 10;
-
-/// One parameter of an objective type: its type and range, and whether it
-/// is required.
-class Param {
-  const Param(this.kind, {this.required = false, this.lo = 0, this.hi = 0});
-
-  /// int, bool, code or destination.
-  final String kind;
-  final bool required;
-  final int lo;
-  final int hi;
-}
-
-/// An objective type (ADR-P4-6's table): what it targets, its parameters,
-/// and what it needs.
-class ObjectiveType {
-  const ObjectiveType(
-    this.target,
-    this.params, {
-    this.needsTeam = false,
-    this.needsEnd = false,
-  });
-
-  /// "objective" or "bomb_site" (a box's role), "player", or null.
-  final String? target;
-  final Map<String, Param> params;
-
-  /// An assignee team is required.
-  final bool needsTeam;
-
-  /// A time window's end is required (it is judged then).
-  final bool needsEnd;
-}
-
-const Param _hold = Param('int', lo: 0, hi: 600000);
-
-/// The objective types, in the manifest's documented order.
-const Map<String, ObjectiveType> objectiveTypes = {
-  // Hold the target: completed when the team has held it for duration_s.
-  'capture_and_hold': ObjectiveType('objective', {
-    'hold_ms': _hold,
-    'duration_s': Param('int', lo: 0, hi: 86400),
-  }),
-  // Type the code on the target's keypad.
-  'enter_code': ObjectiveType('objective', {
-    'code': Param('code', required: true),
-  }),
-  // Scan tag_count tags at the target (with any, any cards).
-  'scan_tags': ObjectiveType('objective', {
-    'tag_count': Param('int', required: true, lo: 1, hi: 100),
-    'any': Param('bool'),
-  }),
-  // A player with the target's role reaches the destination.
-  'escort': ObjectiveType('player', {
-    'destination': Param('destination', required: true),
-    'max_acc_m': Param('int', lo: 1, hi: 1000),
-  }),
-  // Arm the bomb at the target and let it explode; a defuse fails it.
-  'destroy': ObjectiveType('bomb_site', {
-    'hold_ms': _hold,
-    'defuse_ms': _hold,
-    'fuse_s': Param('int', lo: 10, hi: 3600),
-  }),
-  // Keep the target for duration_s from when the objective opens.
-  'defend': ObjectiveType('objective', {
-    'duration_s': Param('int', required: true, lo: 1, hi: 86400),
-    'hold_ms': _hold,
-  }, needsTeam: true),
-  // Keep at least minimum_lives of Respawn's lives until the window's end.
-  'survive': ObjectiveType(
-    null,
-    {'minimum_lives': Param('int', required: true, lo: 0, hi: 1000)},
-    needsTeam: true,
-    needsEnd: true,
-  ),
-};
-
-const List<String> topKeys = [
-  'id',
-  'version',
-  'name',
-  'description',
-  'author',
-  'lang',
-  'teams',
-  'squads',
-  'params',
-  'i18n',
-  'nodes',
-  'objectives',
-];
-const List<String> objectiveKeys = [
-  'id',
-  'type',
-  'name',
-  'description',
-  'i18n',
-  'target',
-  'assignee',
-  'params',
-  'visibility',
-  'depends_on',
-  'time_window',
-  'effect',
-];
-
-/// The text is not a manifest at all (not YAML, not a map, too large).
 class ManifestError implements Exception {
   ManifestError(this.message);
 
@@ -333,8 +167,8 @@ String pyStr(Object? value) => switch (value) {
   _ => value.toString(),
 };
 
-/// Python's repr() of a value, for messages (close to Python's; messages
-/// are free text).
+/// Python's repr() of a value, for the reader's messages (close to Python's;
+/// messages are free text).
 String pyRepr(Object? value) {
   if (value is! String) return pyStr(value);
   final quote = value.contains("'") && !value.contains('"') ? '"' : "'";
@@ -389,65 +223,6 @@ String pyFloatRepr(double value) {
   return '$sign${digits.substring(0, point)}.${digits.substring(point)}';
 }
 
-/// Python's truth of a value: None, False, 0, "" and empty lists and maps
-/// are false.
-bool pyTruthy(Object? value) => switch (value) {
-  null => false,
-  final bool b => b,
-  final int i => i != 0,
-  final double d => d != 0,
-  final BigInt b => b != BigInt.zero,
-  final String s => s.isNotEmpty,
-  final List<Object?> l => l.isNotEmpty,
-  final Map<Object?, Object?> m => m.isNotEmpty,
-  _ => true,
-};
-
-/// Python's dict.get(key, default): the default only when the key is
-/// absent (a key given as null is null).
-Object? pyGet(Object? map, Object? key, [Object? fallback]) {
-  if (map is! Map<Object?, Object?>) return fallback;
-  return map.containsKey(key) ? map[key] : fallback;
-}
-
-/// Whether a value is a Python int (an int or a BigInt, never a bool).
-bool pyIsInt(Object? value) => value is int || value is BigInt;
-
-/// Python's == between two manifest values: numbers by value (True == 1 ==
-/// 1.0), texts and the rest as Dart compares them.
-bool pyEq(Object? a, Object? b) {
-  final ka = _numKey(a), kb = _numKey(b);
-  if (ka != null || kb != null) return ka != null && kb != null && ka == kb;
-  if (a is List<Object?> && b is List<Object?>) {
-    if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (!pyEq(a[i], b[i])) return false;
-    }
-    return true;
-  }
-  if (a is Map<Object?, Object?> && b is Map<Object?, Object?>) {
-    if (a.length != b.length) return false;
-    for (final key in a.keys) {
-      if (!pyHasKey(b, key) || !pyEq(a[key], pyLookup(b, key))) return false;
-    }
-    return true;
-  }
-  return a == b;
-}
-
-/// Python's `key in map`, with Python's equality of keys.
-bool pyHasKey(Map<Object?, Object?> map, Object? key) =>
-    map.containsKey(key) || map.keys.any((k) => pyEq(k, key));
-
-/// Python's map[key], with Python's equality of keys.
-Object? pyLookup(Map<Object?, Object?> map, Object? key) {
-  if (map.containsKey(key)) return map[key];
-  for (final entry in map.entries) {
-    if (pyEq(entry.key, key)) return entry.value;
-  }
-  return null;
-}
-
 /// A number as one exact value (bool, int, BigInt, an integral double), or
 /// the double itself; null for anything else.
 Object? _numKey(Object? v) {
@@ -463,59 +238,6 @@ Object? _numKey(Object? v) {
 
 /// The UTF-8 length of a text, as Python's len(text.encode()).
 int utf8Length(String text) => utf8.encode(text).length;
-
-/// The length of a text in code points, as Python's len(text).
-int pyLen(String text) => text.runes.length;
-
-// Python's str.isspace() characters (str.strip() removes them).
-bool _pySpace(int c) =>
-    (c >= 0x09 && c <= 0x0D) ||
-    (c >= 0x1C && c <= 0x20) ||
-    c == 0x85 ||
-    c == 0xA0 ||
-    c == 0x1680 ||
-    (c >= 0x2000 && c <= 0x200A) ||
-    c == 0x2028 ||
-    c == 0x2029 ||
-    c == 0x202F ||
-    c == 0x205F ||
-    c == 0x3000;
-
-/// Whether Python's text.strip() is empty.
-bool pyBlank(String text) => text.runes.every(_pySpace);
-
-/// A text in the language: `i18n.<lang>.<key>`, else the English one.
-String? translated(
-  Map<Object?, Object?> entry,
-  Object? lang, [
-  String key = 'name',
-]) {
-  if (lang != 'en') {
-    final i18n = entry['i18n'];
-    if (i18n is Map<Object?, Object?>) {
-      final strings = pyLookup(i18n, lang);
-      if (pyHasKey(i18n, lang) && strings is Map<Object?, Object?>) {
-        final value = strings[key];
-        if (value is String && value.isNotEmpty) return value;
-      }
-    }
-  }
-  final value = entry[key];
-  return value is String ? value : null;
-}
-
-/// An objective's visibility when the manifest gives none.
-String defaultVisibility(Map<Object?, Object?> objective) {
-  final raw = objective['assignee'];
-  final assignee = pyTruthy(raw) ? raw : const <Object?, Object?>{};
-  if (assignee is Map<Object?, Object?> && assignee['squad'] != null) {
-    return 'squad';
-  }
-  if (assignee is Map<Object?, Object?> && assignee['team'] != null) {
-    return 'team';
-  }
-  return 'public';
-}
 
 // -- Reading the text --
 
