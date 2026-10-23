@@ -40,4 +40,6 @@ leads to this same page in the other languages.
         <a href="{{ page.href.zh_tw }}" hreflang="zh-Hant-TW" lang="zh-Hant-TW"{{ page.current.zh_tw }}>中文<span class="sr-only"> · 繁體中文（台灣）</span></a>
       </nav>
     </div>
+    {# Only an AI-drafted language fills it in (P5H-11, P5K-12); empty, it is hidden. #}
+    <p class="translation-notice" role="note">{{ header.translation_notice }}</p>
   </header>

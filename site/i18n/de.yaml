@@ -63,6 +63,7 @@ meta:
     ATALAIA“.
 
 header:
+  translation_notice: "Diese Seite wurde von einem KI-Modell übersetzt und noch nicht geprüft. Spielst du auf Deutsch? Hilf uns beim Prüfen: docs/translations im GitHub-Repository."
   skip: Zum Inhalt springen
   home: Atalaia-Startseite
   sections: Bereiche

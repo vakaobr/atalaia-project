@@ -61,6 +61,7 @@ meta:
     aberto ATALAIA».
 
 header:
+  translation_notice: ""
   skip: Saltar para o conteúdo
   home: Atalaia, página inicial
   sections: Secções

@@ -558,3 +558,17 @@ html:has(.viewer[open]) { overflow: hidden; }
 /* Where a photo of the first build will go (plan phase HW2): dashed, like the planned parts of the diagrams. */
 .photo { margin: 24px 0 0; padding: 18px 16px; border: 2px dashed var(--muted); border-radius: var(--radius); color: var(--muted); font-size: 0.95rem; }
 .photo figcaption { max-width: 70ch; }
+
+/* The AI-drafted translations ask for reviewers (P5H-11, P5K-12). */
+.translation-notice {
+  margin: 0;
+  padding: 0.5rem 1rem;
+  text-align: center;
+  font-size: 0.9rem;
+  background: var(--notice-bg, #fff4d6);
+  color: var(--notice-fg, #4a3a00);
+}
+.translation-notice:empty { display: none; }
+@media (prefers-color-scheme: dark) {
+  .translation-notice { background: var(--notice-bg-dark, #3a3000); color: var(--notice-fg-dark, #ffe9a8); }
+}

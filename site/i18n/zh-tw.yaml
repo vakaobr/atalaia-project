@@ -60,6 +60,7 @@ meta:
     上方寫著英文「Open-source project ATALAIA」。
 
 header:
+  translation_notice: 本頁由 AI 模型翻譯，尚未經過審閱。你用中文玩生存遊戲嗎？歡迎協助審閱：請見 GitHub 儲存庫的 docs/translations。
   skip: 跳到內容
   home: Atalaia 首頁
   sections: 章節

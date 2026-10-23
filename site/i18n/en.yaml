@@ -58,6 +58,7 @@ meta:
     a forested valley, under the words "Open-source project ATALAIA".
 
 header:
+  translation_notice: ""
   skip: Skip to content
   home: Atalaia home
   sections: Sections
