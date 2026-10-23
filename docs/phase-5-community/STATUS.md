@@ -95,7 +95,10 @@ section 16).
   `node.modes_failed`, storage) in `protocol/mode-packages.md` with shared
   vectors for 13b's C (`box_checks`, `reports`). 13 controller tests, 1 browser
   test. Decisions P5D-1 to P5D-12 (open; P5D-3, P5D-6, P5D-11 for the
-  maintainer).
+  maintainer). Bench fix (2026-10-23): a HELLO ends a fetch only with the
+  reports that the box keeps every part; the HELLO a box says before
+  `node.modes_failed` (P5E-8) no longer counts as success (P5D-14 to P5D-18,
+  P5D-14 for the maintainer; 9 more controller tests, 1 more browser test).
 - [x] **Plan phase 7, scenario blocks in the GM console (2026-10-22), in
   software:** the *Scenarios* tab's editor has a *Blocks* view beside its
   YAML: 30 blocks (the scenario, its texts, teams, parameters, boxes and

@@ -22,7 +22,9 @@
 // controller can send (signed with a key built into the boxes' firmware) or what to do, and
 // "Send missing modes": the box is invited again with join key 16, fetches what it lacks over
 // the field Wi-Fi (HTTPS) and then joins; its progress shows in the row, and the game waits for
-// it (the GM may stop waiting).
+// it (the GM may stop waiting). A HELLO without the reports that the box keeps every part does not
+// join it (P5D-14): the row says so until its failure comes over the radio, the report, or the
+// timeout.
 
 import { html, Component, createRef, t, api } from '../ui.js';
 import { gameRoles } from './preset-builder.js';
@@ -174,7 +176,7 @@ export class BoxInvites extends Component {
     }
 
     fetchStatus(f) {
-        const s = t(`mode_fetch.states.${f.state}`);
+        const s = t(`mode_fetch.states.${f.state === 'fetching' && f.hello_seen ? 'hello_seen' : f.state}`);
         if (!f.reason) return s;
         const r = t(`mode_fetch.reasons.${f.reason}`);
         return `${s}: ${r === `mode_fetch.reasons.${f.reason}` ? f.reason : r}`;

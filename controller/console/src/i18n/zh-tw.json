@@ -1119,6 +1119,7 @@
     "states": {
       "sent": "正在傳送缺少的模式",
       "fetching": "正在透過 Wi-Fi 取得缺少的模式",
+      "hello_seen": "已送出 HELLO，但沒有回報模式：等待盒子的消息",
       "installed": "模式已安裝，加入中",
       "done": "模式就緒，已加入",
       "failed": "無法取得模式",
@@ -1146,7 +1147,8 @@
       "load": "腳本無法在盒子上載入",
       "no_space": "盒子沒有剩餘空間",
       "storage": "盒子無法儲存",
-      "cancelled": "遊戲已開始"
+      "cancelled": "遊戲已開始",
+      "report_lost": "已送出 HELLO，但沒有收到它已有全部部分的回報"
     },
     "not_sent": "沒有傳送給 {box}：{detail}",
     "waiting": "遊戲正在等待取得模式的盒子（最多 {s} 秒）。",

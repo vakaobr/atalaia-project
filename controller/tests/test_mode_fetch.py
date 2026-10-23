@@ -56,10 +56,13 @@ URLS = ["https://10.42.0.1:8443"]
 
 class FetchingBox:
     """A Field Box fetching the parts it lacks (the test double of main/mode_fetch.c): over the
-    controller's API, with the checks of mode_package.box_check_*, then its sandbox."""
+    controller's API, with the checks of mode_package.box_check_*, then its sandbox; a failure it
+    cannot report over HTTPS goes over the radio as the firmware does it (HELLO, node.modes_failed,
+    then it leaves the join: decision P5E-8)."""
 
     def __init__(self, case: "Case", box: lobby.IdleBox, keys: list[str], tier: str = "full") -> None:
         self.case, self.box, self.keys, self.tier = case, box, keys, tier
+        self.joined = box.game  # the join it fetches for (kept after it leaves it)
         self.reports: list[dict[str, Any]] = []
 
     def report(self, part: str, version: Optional[str], result: str) -> None:
@@ -94,19 +97,57 @@ class FetchingBox:
         self.box.fetched_part(part, release.version)
         return release.version, "installed"
 
-    def run(self, seq: int = 0) -> list[str]:
-        """Every part it lacks, in order, stopping at the first failure; HELLO when all are in."""
-        results = []
-        for part in list(self.box.fetching):
-            version, result = self.fetch_one(part)
-            self.report(part, version, result)
-            results.append(result)
-            if result != "installed":
-                self.box.fetch_failed()
-                return results
-        j = self.box.game
+    def hello(self, seq: int = 0) -> None:
+        """Its HELLO in the joined game, over the radio."""
+        j = self.joined
         self.case.modem.rx(j["node_id"], seq, "HELLO", hello(self.box.name, self.box.device_id),
                            game_id=j["game_id"], epoch=1)
+
+    def modes_failed(self, part: str, reason: str, seq: int = 1) -> None:
+        """node.modes_failed in the joined game (id 53, critical: sent for an ack), over the radio."""
+        from atalaia_sim import codec  # noqa: PLC0415
+        j = self.joined
+        event = {"node": j["node_id"], "seq": 0, "t": 0, "type": "node.modes_failed",
+                 "data": {"mode": part, "reason": reason}}
+        self.case.modem.rx(j["node_id"], seq, "EVENT", codec.encode_event(event), game_id=j["game_id"], epoch=1,
+                           ack=True)
+
+    def fail_over_radio(self, part: str, reason: str, seq: int = 0) -> None:
+        """A failure it could not report over HTTPS (decision P5E-8, main/box_game.c's
+        fetch_failed_over_lora): HELLO first (the event needs the game's link), then
+        node.modes_failed, then it leaves the join and is free again."""
+        self.hello(seq)
+        self.modes_failed(part, reason, seq + 1)
+        self.box.fetch_failed(self.case.ctrl.now_ms())
+
+    def run(self, seq: int = 0, *, reachable: bool = True, lost: tuple[str, ...] = (),
+            radio: bool = True) -> list[str]:
+        """Every part it lacks, in order, stopping at the first failure; HELLO when all are in.
+
+        ``reachable``: False, no address answers (``unreachable``): nothing reported over HTTPS,
+        said over the radio. ``lost``: parts whose report gets no answer (the controller never
+        has it): a failure is then said over the radio, an installed part is not (the box goes on).
+        ``radio``: False, the failure's HELLO and event never reach the controller either."""
+        results = []
+        for part in list(self.box.fetching):
+            if not reachable:
+                results.append("unreachable")
+                if radio:
+                    self.fail_over_radio(part, "unreachable", seq)
+                else:
+                    self.box.fetch_failed(self.case.ctrl.now_ms())
+                return results
+            version, result = self.fetch_one(part)
+            if part not in lost:
+                self.report(part, version, result)
+            results.append(result)
+            if result != "installed":
+                if part in lost and radio:
+                    self.fail_over_radio(part, result, seq)
+                else:
+                    self.box.fetch_failed(self.case.ctrl.now_ms())
+                return results
+        self.hello(seq)
         return results
 
 
@@ -382,6 +423,199 @@ class FetchTests(Case):
         # An event for a node that was not fetching changes nothing.
         self.ctrl._emit({"type": "event", "game": gid, "event": {**event, "node": 99}})
         self.assertEqual(len(self.status()["fetches"]), 1)
+
+    def test_hello_then_node_modes_failed_the_bench_sequence(self):
+        """Found on the bench (2026-10-23): a box that cannot reach the controller over HTTPS says
+        HELLO in the game, then node.modes_failed (unreachable) over the radio, then leaves the join
+        (P5E-8). The HELLO without a report does not end the fetch (P5D-14): the event is taken,
+        the invite says the fetch failed, the node is not joined, the start guard stops waiting,
+        and the box, free again, can be invited again into the same game."""
+        box = self.free_box({"org.atalaia.domination"})
+        gid = self.game()
+        inv = self.invite(gid, box, fetch_modes=True)
+        self.pump(box, 2)
+        node = inv["node_id"]
+        fb = FetchingBox(self, box, [KEY["public_key_b64"]])
+        # 10:07:21, its HELLO: no report says it keeps the part, so the fetch is still on its way.
+        fb.hello(0)
+        fetch = self.fetch_of(node)
+        self.assertEqual((fetch["state"], fetch["hello_seen"], fetch["reason"], fetch["installed"]),
+                         ("fetching", True, None, []))
+        self.assertEqual(self.invite_status(gid)["status"], "accepted")
+        self.assertIn("fetching", self.fetch.busy() or "")
+        self.assertEqual(self.ctrl.start_check()["missing"], ["zone"])  # heard, but not joined
+        # 10:07:49, node.modes_failed over the radio, and the box leaves the join.
+        self.clock.advance(28)
+        self.messages.clear()
+        fb.modes_failed(TAGGER, "unreachable", 1)
+        box.fetch_failed(self.ctrl.now_ms())
+        fetch = self.fetch_of(node)
+        self.assertEqual((fetch["state"], fetch["reason"], fetch["mode"], fetch["installed"]),
+                         ("failed", "unreachable", TAGGER, []))
+        shown = self.invite_status(gid)
+        self.assertEqual((shown["status"], shown["detail"]), ("failed", "mode fetch failed: unreachable"))
+        self.assertIsNone(self.fetch.busy())
+        self.assertEqual(self.ctrl.start_check()["missing"], ["zone"])
+        # The consoles were told: the invite, and the start check.
+        self.assertTrue(any(m["type"] == "invites" and m["invites"][0]["status"] == "failed" for m in self.messages))
+        self.assertTrue(any(m["type"] == "game" for m in self.messages))
+        # Free again, it announces itself: not in this game, so the GM may send the modes again.
+        self.pump(box, 70)
+        [b] = [b for b in self.client.get("/api/v1/boxes", headers=GM).json()["boxes"]
+               if b["device_id"] == box.device_id.hex()]
+        self.assertEqual((b["node_id"], b["invite"]["status"]), (None, "failed"))
+        again = self.invite(gid, box, fetch_modes=True)
+        self.assertEqual((again["status"], again["node_id"]), ("invited", node))
+        self.pump(box, 2)
+        fetch = self.fetch_of(node)
+        self.assertEqual((fetch["state"], fetch["hello_seen"]), ("fetching", False))
+        # This time the controller answers: the report, the HELLO, joined (the success path).
+        self.assertEqual(FetchingBox(self, box, [KEY["public_key_b64"]]).run(seq=10), ["installed"])
+        fetch = self.fetch_of(node)
+        self.assertEqual((fetch["state"], fetch["installed"]), ("done", [TAGGER]))
+        self.assertEqual(self.invite_status(gid)["status"], "joined")
+        self.assertTrue(self.ctrl.start_check()["ok"])
+
+    def test_unreachable_with_nothing_over_the_radio_either(self):
+        """Neither HTTPS nor its HELLO reached the controller: the timeout, as before."""
+        box = self.free_box({"org.atalaia.domination"})
+        gid = self.game()
+        inv = self.invite(gid, box, fetch_modes=True)
+        self.pump(box, 2)
+        self.assertEqual(FetchingBox(self, box, [KEY["public_key_b64"]]).run(reachable=False, radio=False),
+                         ["unreachable"])
+        self.assertIsNotNone(self.fetch.busy())
+        self.clock.advance(301)
+        fetch = self.fetch_of(inv["node_id"])
+        self.assertEqual((fetch["state"], fetch["reason"]), ("timeout", None))
+        self.assertIsNone(self.fetch.busy())
+
+    def test_whole_fallback_from_the_box_model(self):
+        """The same with FetchingBox's own fallback (reachable=False): HELLO, event, free."""
+        box = self.free_box({"org.atalaia.domination"})
+        gid = self.game()
+        inv = self.invite(gid, box, fetch_modes=True)
+        self.pump(box, 2)
+        self.assertEqual(FetchingBox(self, box, [KEY["public_key_b64"]]).run(reachable=False), ["unreachable"])
+        fetch = self.fetch_of(inv["node_id"])
+        self.assertEqual((fetch["state"], fetch["reason"]), ("failed", "unreachable"))
+        self.assertTrue(box.available)
+        self.assertEqual(self.invite_status(gid)["status"], "failed")
+        self.assertEqual(self.ctrl.start_check()["missing"], ["zone"])
+
+    def test_a_failure_whose_report_was_lost(self):
+        """A refusal reported over HTTPS without an answer is said over the radio after a HELLO."""
+        box = self.free_box({"org.atalaia.domination"})
+        gid = self.game()
+        inv = self.invite(gid, box, fetch_modes=True)
+        self.pump(box, 2)
+        fb = FetchingBox(self, box, [OTHER["public_key_b64"]])
+        self.assertEqual(fb.run(lost=(TAGGER,)), ["bad_signature"])
+        self.assertEqual(fb.reports, [])
+        fetch = self.fetch_of(inv["node_id"])
+        self.assertEqual((fetch["state"], fetch["reason"]), ("failed", "bad_signature"))
+        self.assertEqual(self.invite_status(gid)["status"], "failed")
+
+    def test_an_installed_report_lost_then_late_or_never(self):
+        """Every part in, but its report got no answer: the box goes on and says HELLO (nothing
+        over the radio). The controller waits: the report coming late ends the fetch; never, the
+        timeout says report_lost and the node is not counted as joined (P5D-16)."""
+        box = self.free_box({"org.atalaia.domination"})
+        gid = self.game()
+        inv = self.invite(gid, box, fetch_modes=True)
+        self.pump(box, 2)
+        node = inv["node_id"]
+        fb = FetchingBox(self, box, [KEY["public_key_b64"]])
+        self.assertEqual(fb.run(lost=(TAGGER,)), ["installed"])
+        fetch = self.fetch_of(node)
+        self.assertEqual((fetch["state"], fetch["hello_seen"]), ("fetching", True))
+        self.assertIsNotNone(self.fetch.busy())
+        # Late: the controller had processed the POST after all (the box gave up on its answer).
+        fb.report(TAGGER, "0.1.0", "installed")
+        self.assertEqual(fb.reports[-1]["answer"], {"accepted": True})
+        self.assertEqual(self.fetch_of(node)["state"], "done")
+        self.assertEqual(self.invite_status(gid)["status"], "joined")
+        self.assertTrue(self.ctrl.start_check()["ok"])
+        # Never: the next game's box, the same story without the late report.
+        self.client.post(f"/api/v1/games/{gid}/end", headers=GM, json={})
+        box.end(self.ctrl.now_ms())
+        self.pump(box, 21)
+        self.store.set_setting("mode_fetch.boxes", "{}")  # what it kept is not known here
+        box.fetched.clear()
+        box.installed.discard(TAGGER)
+        nxt = self.game()
+        inv = self.invite(nxt, box, fetch_modes=True)
+        self.pump(box, 2)
+        self.assertEqual(FetchingBox(self, box, [KEY["public_key_b64"]]).run(lost=(TAGGER,)), ["installed"])
+        self.clock.advance(301)
+        fetch = self.fetch_of(inv["node_id"])
+        self.assertEqual((fetch["state"], fetch["reason"], fetch["hello_seen"]), ("timeout", "report_lost", True))
+        self.assertIsNone(self.fetch.busy())
+        self.assertEqual(self.invite_status(nxt)["status"], "failed")
+        self.assertEqual(self.ctrl.start_check()["missing"], ["zone"])
+
+    def test_a_box_that_keeps_every_part_already(self):
+        """Key 16 to a box that lacks nothing now (it kept the part from an earlier fetch): it says
+        HELLO at once, with no report; what it keeps, from its last report, ends the fetch."""
+        box = self.free_box({"org.atalaia.domination"})
+        gid = self.game()
+        self.invite(gid, box, fetch_modes=True)
+        self.pump(box, 2)
+        FetchingBox(self, box, [KEY["public_key_b64"]]).run()
+        self.client.post(f"/api/v1/games/{gid}/end", headers=GM, json={})
+        box.end(self.ctrl.now_ms())
+        self.pump(box, 21)
+        nxt = self.game()
+        inv = self.invite(nxt, box, fetch_modes=True)
+        self.pump(box, 2)
+        self.assertEqual(box.fetching, [])  # nothing missing: the join goes on as today
+        FetchingBox(self, box, [KEY["public_key_b64"]]).hello(0)
+        self.assertEqual(self.fetch_of(inv["node_id"])["state"], "done")
+        self.assertTrue(self.ctrl.start_check()["ok"])
+
+    def test_node_modes_failed_after_a_fetch_that_ended_in_its_hello(self):
+        """Every part reported installed, HELLO (done), yet the composed game does not load on the
+        box: node.modes_failed (load) over the radio (P5E-10) fails the fetch even after done."""
+        box = self.free_box({"org.atalaia.domination"})
+        gid = self.game()
+        inv = self.invite(gid, box, fetch_modes=True)
+        self.pump(box, 2)
+        fb = FetchingBox(self, box, [KEY["public_key_b64"]])
+        self.assertEqual(fb.run(), ["installed"])
+        self.assertEqual(self.fetch_of(inv["node_id"])["state"], "done")
+        self.assertTrue(self.ctrl.start_check()["ok"])
+        fb.modes_failed(TAGGER, "load", 1)
+        box.fetch_failed(self.ctrl.now_ms())
+        fetch = self.fetch_of(inv["node_id"])
+        self.assertEqual((fetch["state"], fetch["reason"]), ("failed", "load"))
+        self.assertEqual(self.invite_status(gid)["status"], "failed")
+        self.assertEqual(self.ctrl.start_check()["missing"], ["zone"])
+        # A second event changes nothing (the first reason stays); a HELLO again neither.
+        fb.modes_failed(TAGGER, "storage", 2)
+        self.assertEqual(self.fetch_of(inv["node_id"])["reason"], "load")
+
+    def test_a_plain_join_ends_a_failed_fetch(self):
+        """The GM invites the box again without key 16: the failed fetch no longer holds its node
+        (its next HELLO joins it, as for any invite)."""
+        box = self.free_box({"org.atalaia.domination"})
+        gid = self.game()
+        inv = self.invite(gid, box, fetch_modes=True)
+        self.pump(box, 2)
+        FetchingBox(self, box, [KEY["public_key_b64"]]).run(reachable=False)
+        self.assertTrue(self.fetch.holds(inv["node_id"]))
+        self.pump(box, 70)
+        again = self.invite(gid, box)
+        self.assertEqual((again["status"], again["node_id"]), ("invited", inv["node_id"]))
+        self.assertFalse(self.fetch.holds(inv["node_id"]))
+        self.assertEqual(self.status()["fetches"], [])
+
+    def test_covered_by_reports(self):
+        """Two parts offered: a HELLO with a report for one only does not end the fetch."""
+        a = {"installed": ["org.club.a"], "kept": {"org.club.a": "1.0.0"}, "parts": ["org.club.a", "org.club.b"]}
+        self.assertFalse(self.fetch._covered(a))
+        self.assertTrue(self.fetch._covered(a, {"org.club.b": "0.9.0"}))
+        self.assertTrue(self.fetch._covered({**a, "kept": {"org.club.a": "1.0.0", "org.club.b": "1.0.0"}}))
+        self.assertTrue(self.fetch._covered({"installed": [], "kept": None, "parts": []}))
 
     def test_reports_are_checked(self):
         box = self.free_box({"org.atalaia.domination"})

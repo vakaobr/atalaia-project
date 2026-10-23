@@ -1119,6 +1119,7 @@
     "states": {
       "sent": "sende die fehlenden Modi",
       "fetching": "holt ihre fehlenden Modi per WLAN",
+      "hello_seen": "hat HELLO gesagt, ohne ihre Modi zu melden: wartet auf Rückmeldung",
       "installed": "Modi installiert, tritt bei",
       "done": "Modi vorhanden, beigetreten",
       "failed": "konnte die Modi nicht holen",
@@ -1146,7 +1147,8 @@
       "load": "das Skript lädt nicht auf der Box",
       "no_space": "kein Platz mehr auf der Box",
       "storage": "die Box konnte es nicht speichern",
-      "cancelled": "ein Spiel hat begonnen"
+      "cancelled": "ein Spiel hat begonnen",
+      "report_lost": "hat HELLO gesagt, aber keine Meldung kam, dass sie alle Teile hat"
     },
     "not_sent": "Nicht an {box} gesendet: {detail}",
     "waiting": "Das Spiel wartet auf Boxen, die Modi holen (höchstens {s} s).",

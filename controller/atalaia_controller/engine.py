@@ -1058,6 +1058,8 @@ class Controller:
             }
             if fetch or forget:
                 out.update(fetch_modes=fetch, forget_modes=forget)
+            if self.mode_fetch is not None:
+                # Also a plain join: it ends a fetch made for that node before (P5D-18).
                 self.mode_fetch.track(self.game["id"], node_id, role, mode_id, device, fetch, forget)
             self._emit({"type": "join", "game": self.game["id"], "node_id": node_id, "kind": kind,
                         "role": role, "name": scenario_name})

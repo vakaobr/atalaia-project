@@ -1119,6 +1119,7 @@
     "states": {
       "sent": "sending the missing modes",
       "fetching": "fetching its missing modes over Wi-Fi",
+      "hello_seen": "said HELLO without reporting its modes: waiting for its news",
       "installed": "modes installed, joining",
       "done": "modes in place, joined",
       "failed": "could not fetch the modes",
@@ -1146,7 +1147,8 @@
       "load": "the script does not load on the box",
       "no_space": "no room left on the box",
       "storage": "the box could not store it",
-      "cancelled": "a game started"
+      "cancelled": "a game started",
+      "report_lost": "it said HELLO, but no report that it keeps every part came"
     },
     "not_sent": "Not sent to {box}: {detail}",
     "waiting": "The game waits for boxes fetching modes (at most {s} s).",

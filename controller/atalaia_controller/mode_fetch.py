@@ -12,6 +12,13 @@ take), loads it in its sandbox, keeps it, reports, and only then says HELLO. Nev
 only between games: the packages are served only while the live game is ready, and the start
 guard waits while fetches are on their way (``[modes] fetch_timeout_s``; the GM may stop waiting).
 
+A HELLO ends a fetch only when the controller holds HTTPS reports that the box keeps every part it
+was offered (decisions P5D-14 to P5D-18): a box whose fetch failed where it could not report over
+HTTPS says HELLO too, to send ``node.modes_failed`` in the game, and then leaves the join. A HELLO
+without those reports leaves the fetch on its way (``hello_seen``) until that event, the missing
+report, or the timeout (reason ``report_lost``); ``node.modes_failed`` is taken even after a fetch
+ended in its HELLO (every part in, yet the composed game does not load on the box).
+
 Served without a token, for the boxes: ``GET /api/v1/mode-packages/{id}/release`` (the signed
 manifest and signature, exactly as signed) and ``.../package`` (the archive, exactly as signed),
 only for a part of the live game's mode the controller offers; ``POST /api/v1/mode-packages/report``
@@ -44,6 +51,7 @@ log = logging.getLogger("atalaia.mode_fetch")
 ACTIVE = ("sent", "fetching", "installed")  # a fetch on its way: the start guard waits
 MODES_FAILED = "node.modes_failed"  # a box's failure said over LoRa (protocol/mode-packages.md)
 REASON = re.compile(r"[a-z][a-z_]{0,23}")
+REPORT_LOST = "report_lost"  # a HELLO, then neither the missing reports nor node.modes_failed
 BOXES_KEPT = 64  # boxes whose fetched modes the store remembers
 DEVICE = re.compile(r"[0-9a-f]{16}")
 # The states of one of a game's parts, for the offer (what the console shows): a box can be sent
@@ -185,13 +193,21 @@ class ModeFetch:
               fetch: bool, forget: bool) -> None:
         """A join with key 16 (or 17) was made for this node (Controller.issue_join)."""
         if not fetch and not forget:
+            # A plain join for this node: a fetch made for it before (a failed one) is over.
+            with self._lock:
+                dropped = self.attempts.pop(node_id, None) is not None
+            if dropped:
+                self._emit()
             return
+        # The parts the box is offered: its HELLO ends the fetch once reports say it keeps them all.
+        parts = [p["id"] for p in self.offer(mode_id)["parts"] if p["state"] == "offered"] if fetch else []
         with self._lock:
             now = self.clock()
             self.attempts[node_id] = {
                 "node_id": node_id, "game": game_id, "device_id": device, "role": role, "mode_id": mode_id,
                 "fetch": fetch, "forget": forget, "state": "sent" if fetch else "forget", "reason": None,
-                "mode": None, "installed": [], "sent_at": now, "updated_at": now}
+                "mode": None, "installed": [], "parts": parts, "kept": None, "hello_seen": False,
+                "sent_at": now, "updated_at": now}
         log.info("game %d: a join for node %d (%s) %s", game_id, node_id, mode_id,
                  "fetches its missing modes" if fetch else "forgets its fetched modes")
         self._emit()
@@ -204,7 +220,23 @@ class ModeFetch:
         now = self.clock()
         for a in self.attempts.values():
             if a["state"] in ACTIVE and now - a["updated_at"] > self.timeout_s:
-                a.update(state="timeout", updated_at=now)
+                # After its HELLO: it said neither that it keeps every part nor why not (P5D-16).
+                a.update(state="timeout", reason=REPORT_LOST if a.get("hello_seen") else None, updated_at=now)
+
+    def _covered(self, a: dict[str, Any], stored: Optional[dict[str, str]] = None) -> bool:
+        """Whether HTTPS reports say the box keeps every part it was offered: installed in this
+        fetch, or in the ``kept`` of its last report (this fetch's, or ``stored``, from before: a box
+        that lacked nothing when the join came fetches nothing and reports nothing)."""
+        have = set(a["installed"]) | set(a.get("kept") or {}) | set(stored or {})
+        return set(a.get("parts") or ()) <= have
+
+    def _stored_kept(self, device: Optional[str]) -> Optional[dict[str, str]]:
+        """What a box keeps, from its last report (the store's ``mode_fetch.boxes``)."""
+        if device is None:
+            return None
+        box = self._load("mode_fetch.boxes", {}).get(device)
+        kept = box.get("kept") if isinstance(box, dict) else None
+        return kept if isinstance(kept, dict) else None
 
     def fetches(self) -> list[dict[str, Any]]:
         """The live game's fetches (and forgets), by node id."""
@@ -226,10 +258,28 @@ class ModeFetch:
 
     def holds(self, node_id: int) -> bool:
         """A node of the live game whose fetch has not ended in its HELLO: not joined yet, even if
-        the controller heard it (a node.modes_failed it sent before leaving the join)."""
+        the controller heard it (its HELLO without the reports, its node.modes_failed, before it
+        left the join)."""
         with self._lock:
             a = self.attempts.get(node_id)
             return a is not None and a["game"] == self._live() and a["fetch"] and a["state"] != "done"
+
+    def invite_view(self, inv: dict[str, Any]) -> dict[str, Any]:
+        """An invite as the GM sees it (reinvite.py): its box's HELLO made it *joined*, but a box
+        whose fetch has not ended in that HELLO has not joined: *accepted* while the controller
+        waits for its news, *failed* once the fetch failed, timed out or was no longer waited for
+        (P5D-17)."""
+        if inv.get("status") != "joined":
+            return inv
+        with self._lock:
+            a = self.attempts.get(inv.get("node_id"))
+            if a is None or a["game"] != inv.get("game") or not a["fetch"] or a["state"] == "done" or \
+                    (a["device_id"] is not None and a["device_id"] != inv.get("device_id")):
+                return inv
+            state, reason = a["state"], a["reason"]
+        if state in ACTIVE:
+            return {**inv, "status": "accepted", "detail": None}
+        return {**inv, "status": "failed", "detail": f"mode fetch {state}" + (f": {reason}" if reason else "")}
 
     def cancel(self) -> list[int]:
         """The GM stops waiting for the fetches on their way (the start guard lets the game start)."""
@@ -284,12 +334,18 @@ class ModeFetch:
             now = self.clock()
             accepted = a is not None and a["game"] == r["game"] and a["fetch"] and \
                 a["state"] in ACTIVE + ("timeout",)
+            joined = False
             if accepted:
                 assert a is not None
+                a["kept"] = dict(r["kept"])
                 if r["result"] == "installed":
                     if r["mode"] not in a["installed"]:
                         a["installed"].append(r["mode"])
                     a.update(state="installed", reason=None, mode=r["mode"], updated_at=now)
+                    if a["hello_seen"] and self._covered(a):
+                        # The report its HELLO waited for, late (the box got no answer in time).
+                        a.update(state="done", updated_at=now)
+                        joined = True
                 else:
                     a.update(state="failed", reason=r["result"], mode=r["mode"], updated_at=now)
             device = a["device_id"] if a is not None else None
@@ -299,29 +355,39 @@ class ModeFetch:
         log.warning("box %d: mode %s %s%s", r["node"], r["mode"], r["result"],
                     "" if accepted else " (not a fetch this controller is waiting for)")
         self._emit()
+        if joined:
+            log.info("box %d: its modes are in place (the report came after its HELLO)", r["node"])
+            self._joined_changed()
         return {"accepted": accepted}
 
     def on_failed_over_radio(self, ev: dict[str, Any]) -> None:
         """node.modes_failed: a box says over LoRa (sealed with the game key) that its fetch failed
-        where it could not report over HTTPS (no Wi-Fi, the controller unreachable)."""
+        where it could not report over HTTPS (no Wi-Fi, the controller unreachable). It comes after
+        the box's HELLO (the event needs the game's link, P5E-8), so it is taken while the fetch
+        waits after that HELLO, after a timeout or the GM's *stop waiting*, and even after a fetch
+        that ended in its HELLO (every part reported installed, yet the composed game does not load
+        on the box: ``load``, P5E-10). A fetch that failed already keeps its first reason (P5D-15)."""
         data = ev.get("data") or {}
         node_id, mode_id, reason = ev.get("node"), data.get("mode"), data.get("reason")
         if not isinstance(node_id, int) or not isinstance(reason, str) or not REASON.fullmatch(reason):
             return
         with self._lock:
             a = self.attempts.get(node_id)
-            if a is None or a["game"] != self._live() or not a["fetch"] or \
-                    a["state"] not in ACTIVE + ("timeout",):
+            if a is None or a["game"] != self._live() or not a["fetch"] or a["state"] == "failed":
                 log.warning("box %d said over the radio that fetching %s failed (%s): not a fetch it was sent",
                             node_id, mode_id, reason)
                 return
+            heard = a["hello_seen"] or a["state"] == "done"  # its HELLO made the invite "joined"
             a.update(state="failed", reason=reason, mode=mode_id if isinstance(mode_id, str) else None,
                      updated_at=self.clock())
         log.warning("box %d: fetching %s failed: %s (said over the radio)", node_id, mode_id, reason)
         self._emit()
+        if heard:
+            self._joined_changed()
 
     def on_message(self, msg: dict[str, Any]) -> None:
-        """A HELLO ends a fetch (the box has every part now) and a forget; node.modes_failed fails it."""
+        """A HELLO ends a forget, and a fetch whose HTTPS reports say the box keeps every part it
+        was offered (P5D-14); node.modes_failed fails a fetch."""
         if msg.get("type") == "event" and isinstance(msg.get("event"), dict) and \
                 msg["event"].get("type") == MODES_FAILED:
             self.on_failed_over_radio(msg["event"])
@@ -331,16 +397,45 @@ class ModeFetch:
         node = msg["node"]
         if node.get("node_id") is None:
             return
+        node_id = int(node["node_id"])
         with self._lock:
-            a = self.attempts.get(int(node["node_id"]))
-            if a is None or a["game"] != msg.get("game") or a["state"] == "done":
-                return
-            a.update(state="done", reason=None, updated_at=self.clock())
-            forgot = a["device_id"] if a["forget"] else None
+            a = self.attempts.get(node_id)
+            # What it kept before this join; not with key 17, which made it forget all of that.
+            device = a["device_id"] if a is not None and not a["forget"] else None
+        stored = self._stored_kept(device)
+        with self._lock:
+            a = self.attempts.get(node_id)
+            if a is None or a["game"] != msg.get("game") or a["state"] in ("done", "failed") or \
+                    (a["fetch"] and a["hello_seen"]):
+                return  # a failed fetch stays failed (that box is leaving the join); a HELLO again
+            forgot = a["device_id"] if a["forget"] else None  # key 17 is read first, whatever follows
+            done = not a["fetch"] or self._covered(a, stored)
+            if done:
+                a.update(state="done", reason=None, updated_at=self.clock())
+            else:
+                # A HELLO without a report for every part: the HELLO a box says to tell over the
+                # radio that its fetch failed (P5E-8), or one whose last report was lost.
+                a.update(hello_seen=True, updated_at=self.clock(),
+                         state="fetching" if a["state"] in ACTIVE else a["state"])
+            missing = sorted(set(a["parts"]) - set(a["installed"]) - set(a["kept"] or {}) - set(stored or {}))
         if forgot:
             self.set_forget(forgot, False)
-        log.info("box %s said HELLO: its modes are in place", node["node_id"])
+        if done:
+            log.info("box %s said HELLO: its modes are in place", node_id)
+        else:
+            log.warning("box %s said HELLO without a report that it keeps %s: not joined until that report, "
+                        "its node.modes_failed or the timeout", node_id, ", ".join(missing))
         self._emit()
+
+    def _joined_changed(self) -> None:
+        """A box shown as joined by its HELLO has not joined after all, or the other way round:
+        the invites and the start check change (the console's dialog and Start)."""
+        c = self.controller
+        with c._lock:
+            if c.reinvite is not None:
+                c.reinvite.refresh_invites()
+            if c.game is not None and c.game.get("state") == "ready":
+                c._emit({"type": "game", "game": c.public_game(c.game)})
 
     # ---- what boxes keep, and forgetting ----------------------------------------------------
 

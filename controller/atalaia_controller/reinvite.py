@@ -166,15 +166,31 @@ class Reinvite:
         return None
 
     def _in_live_game(self) -> dict[str, int]:
-        """Device id -> node id of the boxes the live game has heard."""
+        """Device id -> node id of the boxes the live game has heard: not a box whose mode fetch
+        has not ended in its HELLO (it said HELLO only to tell that its fetch failed, and left the
+        join: the GM may invite it again, decision P5D-17)."""
         fc = self.ctl.fc
+        mf = self.ctl.mode_fetch
         out: dict[str, int] = {}
         if fc is not None:
             for node in fc.nodes.values():
                 dev = node.hello.get("device_id")
-                if isinstance(dev, (bytes, bytearray)) and len(dev) == ff.DEVICE_SIZE:
+                if isinstance(dev, (bytes, bytearray)) and len(dev) == ff.DEVICE_SIZE and \
+                        (mf is None or not mf.holds(node.node_id)):
                     out[bytes(dev).hex()] = node.node_id
         return out
+
+    def _view(self, inv: lobby.Invite) -> dict[str, Any]:
+        """An invite as the console shows it: not *joined* while its box's mode fetch has not
+        ended in its HELLO (mode_fetch.ModeFetch.invite_view)."""
+        mf = self.ctl.mode_fetch
+        return mf.invite_view(inv.public()) if mf is not None else inv.public()
+
+    def refresh_invites(self) -> None:
+        """A box's fetch changed whether its HELLO joined it (mode_fetch.py): the consoles are told."""
+        self._changed("invites")
+        self._changed("boxes")
+        self._flush()
 
     def boxes(self) -> dict[str, Any]:
         with self.ctl._lock:
@@ -190,7 +206,7 @@ class Reinvite:
                 entry["previous_role"] = prev_boxes.get(hexid) or entry.get("last_role")
                 entry["node_id"] = live.get(hexid)
                 inv = self.inviter.invites.get(hexid)
-                entry["invite"] = inv.public() if inv is not None else None
+                entry["invite"] = self._view(inv) if inv is not None else None
                 out.append(entry)
             radio = self.ctl.modem
             return {"boxes": out, "previous_game": {k: v for k, v in prev.items() if k != "boxes"} if prev else None,
@@ -199,7 +215,7 @@ class Reinvite:
                     "ignored": self.inviter.ignored, "stale": self.inviter.stale}
 
     def invites(self, game_id: int) -> list[dict[str, Any]]:
-        return [i.public() for i in self.inviter.invites.values() if i.game_id == game_id]
+        return [self._view(i) for i in self.inviter.invites.values() if i.game_id == game_id]
 
     # --- what the GM does ------------------------------------------------------------
 

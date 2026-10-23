@@ -1119,6 +1119,7 @@
     "states": {
       "sent": "a enviar os modos em falta",
       "fetching": "a obter os modos em falta por Wi-Fi",
+      "hello_seen": "disse HELLO sem relatório dos modos: à espera de notícias da caixa",
       "installed": "modos instalados, a juntar-se",
       "done": "modos prontos, juntou-se",
       "failed": "não conseguiu obter os modos",
@@ -1146,7 +1147,8 @@
       "load": "o script não carrega na caixa",
       "no_space": "não há espaço na caixa",
       "storage": "a caixa não o conseguiu guardar",
-      "cancelled": "começou um jogo"
+      "cancelled": "começou um jogo",
+      "report_lost": "disse HELLO, mas não chegou o relatório de que tem todas as partes"
     },
     "not_sent": "Não enviado para {box}: {detail}",
     "waiting": "O jogo espera pelas caixas que estão a obter modos (no máximo {s} s).",
