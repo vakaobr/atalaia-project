@@ -265,7 +265,7 @@ Use the legal LoRa band for the region: EU868 in Portugal and the rest of Europe
 
 ### Addon bus
 
-Addons plug into a waterproof 5-pin M12 connector: GND, 5 V, SDA, SCL and an interrupt line. Each addon carries its own small MCU that answers an "identify" request with a capability descriptor, so the host needs no driver changes. I2C is reliable to about 1–2 m; longer runs or remote targets use a Satellite or thin node over LoRa or BLE instead.
+Addons plug into a waterproof 5-pin M12 connector carrying 3.3 V only: the board's 3.3 V (at most 25 mA for the addon), GND, SDA and SCL of the box's 3.3 V I2C bus; the fifth pin is not connected. There is no 5 V on the port and no interrupt line: the box polls the addon every 20 ms, and an addon that needs more power (its own lights) brings its own cell (corrected 2026-10-23, decisions P5J-15 to P5J-21; `hardware/target-addon/BUILD.md`). Each addon carries its own small MCU that answers an "identify" request with a capability descriptor, so the host needs no driver changes. I2C is reliable to about 1–2 m; longer runs or remote targets use a Satellite or thin node over LoRa or BLE instead.
 
 ### Enclosure and power guidance
 

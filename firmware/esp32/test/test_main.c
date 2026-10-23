@@ -54,6 +54,7 @@ int main(void)
     run_adoption_tests();
     run_admin_pin_tests();
     run_box_pair_tests();
+    run_target_addon_tests();
 
     if (check_failures == 0) {
         printf("firmware: all %d checks passed\n", check_count);

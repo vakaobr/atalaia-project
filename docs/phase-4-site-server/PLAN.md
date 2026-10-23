@@ -1693,7 +1693,10 @@ behind carrier-grade NAT needs no inbound port.
 The target addon's MCU firmware (RP2040 or ATtiny) and its link to the
 Field Box's addon port, the `hit` capability in the Field Box's HAL,
 piezo threshold and debounce tuned on steel and polycarbonate plates;
-then Target Windows becomes a built-in preset.
+then Target Windows becomes a built-in preset. Since 2026-10-23 the port is
+3.3 V only and polled, with no interrupt line, and the Field Box firmware has
+a polling driver for it (a stub, not called yet; decisions P5J-15 to P5J-21,
+`hardware/target-addon/BUILD.md`).
 
 ## HW3: Phones in the field
 

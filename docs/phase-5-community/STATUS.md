@@ -341,7 +341,11 @@ section 16).
    firmware change), P5J-7 (no separate siren on the pod), P5J-8 (a phone
    charging the pod's cell), P5J-9 (the target addon's open questions: the bus
    voltage, and no free GPIO on a Field Box for its interrupt line) and P5J-11
-   (the page's address and words).
+   (the page's address and words). P5J-9 was answered on 2026-10-23 ("fix in
+   3.3 V"): built as P5J-15 to P5J-21 (open): the port is 3.3 V only, polled
+   every 20 ms with no interrupt line and no pin change, with a polling driver
+   (a stub with host tests, not called yet) in the firmware; the addon itself
+   is still not buildable (its processor, firmware, address and sensor: HW2).
 
 ## Verification of plan phase 12 (2026-10-22)
 

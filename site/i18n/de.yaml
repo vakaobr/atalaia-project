@@ -1052,24 +1052,32 @@ build:
   target:
     title: Ziel-Addon
     status: >-
-      Noch nicht baubar: Das Ziel-Addon gibt es nur als Entwurf. Schließ nach dieser Seite keine
-      Zielplatte an eine Box an.
+      Noch nicht baubar: Die Seite der Box ist entschieden, das Addon selbst noch nicht. Schließ nach
+      dieser Seite keine Zielplatte an eine Box an.
     what: >-
-      Eine Platte, auf die geschossen wird, mit einem Sensor, der jeden Treffer spürt, und einem
-      Leuchtring. Sie wird an eine Box gesteckt und macht daraus ein punktendes Ziel für
+      Eine Platte, auf die geschossen wird, mit einem Sensor, der jeden Treffer spürt. Sie wird an
+      eine Box gesteckt und macht daraus ein punktendes Ziel für
       <a href="{{ page.to.modes }}#target-windows">Zielfenster</a>, dessen Regeln geschrieben und im
-      Simulator getestet sind.
+      Simulator getestet sind; das Fenster zeigt der Leuchtring der Box selbst.
     decided_title: Was entschieden ist
     decided:
       parts: >-
-        Eine Platte aus Stahl oder Polycarbonat, ein Piezo-Sensor, ein eigener kleiner Prozessor
-        (Klasse RP2040 oder ATtiny), der Treffer erkennt, und ein LED-Ring. Etwa
+        Eine Platte aus Stahl oder Polycarbonat, ein Piezo-Sensor und ein eigener kleiner Prozessor
+        (Klasse RP2040 oder ATtiny), der Treffer erkennt. Etwa
         <span class="nowrap">20–30&nbsp;€</span> an Teilen (die Schätzung des Projekts).
       port: >-
-        Es wird an einen wasserdichten 5-poligen M12-Stecker an der Box angeschlossen: Masse,
-        5&nbsp;V, die beiden I2C-Leitungen und eine Interrupt-Leitung, für Kabel bis etwa
-        1–2&nbsp;m. Sein Prozessor sagt der Box, was es ist, also braucht die Box keinen neuen Treiber
-        pro Addon.
+        Es wird an einen wasserdichten 5-poligen M12-Stecker an der Box angeschlossen, der nur
+        3,3&nbsp;V führt: die 3,3&nbsp;V des Boards, Masse und die beiden I2C-Leitungen; keine
+        5&nbsp;V, und der fünfte Pin bleibt frei. Kabel bis 2&nbsp;m. Sein Prozessor sagt der Box, was
+        es ist, also braucht die Box keinen neuen Treiber pro Addon.
+      power: >-
+        Es darf der Box höchstens 25&nbsp;mA entnehmen, über eine rückstellbare Sicherung: genug für
+        Prozessor und Sensor, nicht für Licht. Zielfenster lässt den LED-Ring der Box selbst
+        leuchten; ein Addon mit eigenem Licht braucht einen eigenen Akku.
+      polling: >-
+        Keine Interrupt-Leitung: Die Box liest das Addon alle 20&nbsp;ms über I2C, etwa 3&nbsp;% des
+        Busses, so erreicht ein Treffer das Spiel nach höchstens etwa 21&nbsp;ms. Kein Pin der Box
+        ändert sich. Die Firmware der Box kann das schon, getestet, und wartet auf das Addon.
       capability: >-
         Die Skripte der Modi erhalten jeden Treffer mit seiner Stärke (0 bis 255) und können das Ziel
         scharf machen und entschärfen. Dasselbe ist für den I/O-Pod eines Handys festgelegt.
@@ -1077,22 +1085,17 @@ build:
         Zielfenster lässt das Ziel ein paar Sekunden in der Farbe eines zufälligen Teams leuchten;
         ein Treffer, der in diesem Fenster stark genug ist, punktet für dieses Team.
       next: >-
-        Danach kommen die eigene Firmware des Addons, der Treiber der Box für seinen Anschluss und der
-        Sensor, abgestimmt auf echten Platten aus Stahl und Polycarbonat; dann wird Zielfenster ein
-        Modus, den eine Box anbietet.
+        Danach kommen die eigene Firmware des Addons, die Box, die ihren Anschluss damit ausliest, und
+        der Sensor, abgestimmt auf echten Platten aus Stahl und Polycarbonat; dann wird Zielfenster
+        ein Modus, den eine Box anbietet.
     open:
-      mcu: Der Prozessor (RP2040 oder ATtiny) und seine Firmware.
+      mcu: Der Prozessor (RP2040 oder ATtiny, innerhalb der 25&nbsp;mA) und seine Firmware.
       protocol: >-
-        Wie Box und Addon über I2C sprechen: die Adresse, wie das Addon sagt, was es ist, wie ein
-        Treffer gemeldet wird, wie es scharf gemacht wird.
-      connector: Die Pinbelegung des M12-Steckers und das Kabel.
-      voltage: >-
-        Die Spannung auf den I2C-Leitungen: Der Bus der Box hat 3,3&nbsp;V, der Stecker führt aber auch
-        5&nbsp;V; den Bus auf 5&nbsp;V zu ziehen, könnte das Board beschädigen.
-      interrupt: >-
-        Der Pin der Interrupt-Leitung: Eine Field Box nutzt schon alle acht freien Pins ihres Boards,
-        für ihn bleibt keiner übrig.
-      ring: Ob das Fenster auf dem eigenen LED-Ring des Addons oder auf dem der Box erscheint.
+        Die I2C-Adresse des Addons und wie es sagt, was es ist; wie ein Treffer gemeldet wird, gibt es
+        als Entwurf, der mit dem ersten Addon endgültig wird.
+      checks: >-
+        Die Prüfungen beim ersten Bau: die Pull-up-Widerstände des Busses mit 2&nbsp;m Kabel, die
+        Sicherung und der Schutz des Steckers gegen statische Entladung und Wasser.
       sensor: Die Sensorschaltung und ihre Befestigung, und die Platte, ihr Ständer und ihr Winkel.
     safety_title: Sicherheit, sobald es etwas zu bauen gibt
     safety:
@@ -1108,7 +1111,7 @@ build:
         und halte die Elektronik hinter der Platte oder in einem eigenen Gehäuse.
       limits: >-
         <strong>Die Energiegrenzen des Felds</strong> gelten beim Schießen auf Ziele wie auf Menschen.
-    photo: das fertige Ziel, Platte, Sensor und LED-Ring, und der Anschluss an einer Box.
+    photo: das fertige Ziel, Platte und Sensor, und der Anschluss an einer Box.
     full: >-
       Was entschieden ist, mit den Dokumenten hinter jeder Entscheidung (auf Englisch):
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/target-addon/BUILD.md">Anleitung

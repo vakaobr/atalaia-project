@@ -749,7 +749,7 @@ begins only after the following gates are met:
 | I2S routing | Labelled connector for the MAX98357A (BCLK, LRCLK, DOUT) |
 | GPIO breakout | Labelled screw terminals or JST for team buttons (GPIO 4, 5, 33, 34) |
 | WS2812B level shifter | 3.3V-to-5V level shifter for the LED data line (GPIO 48) |
-| M12 addon bus | GND, 5V, SDA, SCL, INT (design-spec.md section 6) |
+| M12 addon bus | 3V3 (through a resettable fuse), SDA, GND, SCL; pin 5 not connected; no 5V, no INT (design-spec.md section 6 as corrected 2026-10-23; decisions P5J-15 to P5J-21) |
 | Power management | USB-C PD input pads, BMS connector, power switch pads |
 | Mounting holes | 4x M3, matching the reference enclosure standoffs |
 
@@ -801,6 +801,13 @@ Box build manual with wiring diagrams (`hardware/field-box/BUILD.md`) and the
 pin map with GNSS exist, and the first Heltec V4.3 boards run on the bench;
 no perfboard box is finished, so none of the three gates is met (plan phase
 HW1).
+
+**Note 2026-10-23:** the M12 addon bus is 3.3 V only (the maintainer's answer
+to P5J-9, built as P5J-15 to P5J-21): the board's 3V3 through a resettable
+fuse, GND, SDA and SCL on A-coded pins 1-4 (`hardware/target-addon/BUILD.md`,
+section 2), pin 5 not connected; no 5 V, and no interrupt line, so the carrier
+PCB needs no GPIO for it. The table above is corrected; its other GPIO numbers
+predate the pin map of 2026-10-21 (`Kconfig.projbuild` is the source).
 
 ---
 

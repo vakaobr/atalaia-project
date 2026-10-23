@@ -986,23 +986,32 @@ build:
   target:
     title: Target addon
     status: >-
-      Not buildable yet: the target addon is designed only. Do not wire a plate to a box from this
-      page.
+      Not buildable yet: the box's side of the port is decided, the addon itself is not. Do not wire
+      a plate to a box from this page.
     what: >-
-      A plate that players shoot at, with a sensor that feels each hit and a ring of lights. It
-      plugs into a box and turns it into a scoring target for
+      A plate that players shoot at, with a sensor that feels each hit. It plugs into a box and turns
+      it into a scoring target for
       <a href="{{ page.to.modes }}#target-windows">Target Windows</a>, whose rules are built and
-      tested in the simulator.
+      tested in the simulator; the box's own ring of lights shows the window.
     decided_title: What is decided
     decided:
       parts: >-
-        A steel or polycarbonate plate, a piezo sensor, a small processor of its own (RP2040 or
-        ATtiny class) to detect hits, and an LED ring. About <span class="nowrap">€20–30</span> in
-        parts (the design's estimate).
+        A steel or polycarbonate plate, a piezo sensor and a small processor of its own (RP2040 or
+        ATtiny class) to detect hits. About <span class="nowrap">€20–30</span> in parts (the
+        design's estimate).
       port: >-
-        It plugs into a waterproof 5-pin M12 connector on the box: ground, 5&nbsp;V, the two I2C lines
-        and an interrupt line, for cables of up to about 1–2&nbsp;m. Its processor tells the box what
-        it is, so the box needs no new driver per addon.
+        It plugs into a waterproof 5-pin M12 connector on the box that carries 3.3&nbsp;V only: the
+        board's 3.3&nbsp;V, ground and the two I2C lines; no 5&nbsp;V, and the fifth pin stays free.
+        Cables of up to 2&nbsp;m. Its processor tells the box what it is, so the box needs no new
+        driver per addon.
+      power: >-
+        It may take at most 25&nbsp;mA from the box, through a resettable fuse: enough for its
+        processor and sensor, not for lights. Target Windows lights the box's own LED ring; an addon
+        with lights of its own needs a battery of its own.
+      polling: >-
+        No interrupt line: the box reads the addon over I2C every 20&nbsp;ms, about 3&nbsp;% of the
+        bus, so a hit reaches the game within about 21&nbsp;ms. No pin of the box changes. The box's
+        firmware already has this reading, tested, waiting for the addon.
       capability: >-
         Game scripts see each hit with its strength (0 to 255), and can arm and disarm the target.
         The same is defined for a phone's I/O pod.
@@ -1010,21 +1019,17 @@ build:
         Target Windows lights the target in a random team's colour for a few seconds; a hit strong
         enough in that window scores for that team.
       next: >-
-        Then come the addon's own firmware, the box's driver for its port, and the sensor tuned on
-        real steel and polycarbonate plates; Target Windows then becomes a mode a box offers.
+        Then come the addon's own firmware, the box putting its reading of the port to use, and the
+        sensor tuned on real steel and polycarbonate plates; Target Windows then becomes a mode a box
+        offers.
     open:
-      mcu: The processor (RP2040 or ATtiny) and its firmware.
+      mcu: The processor (RP2040 or ATtiny, within the 25&nbsp;mA) and its firmware.
       protocol: >-
-        How the box and the addon talk over I2C: the address, how the addon says what it is, how a
-        hit is reported, how it is armed.
-      connector: The M12 connector's pin order and the cable.
-      voltage: >-
-        The voltage on the I2C lines: the box's bus is 3.3&nbsp;V while the connector also carries
-        5&nbsp;V; pulling the bus up to 5&nbsp;V could damage the board.
-      interrupt: >-
-        The interrupt line's pin: a Field Box already uses all eight of its board's free pins, so it
-        has none left for it.
-      ring: Whether the window is shown on the addon's own LED ring or on the box's.
+        The addon's I2C address and how it says what it is; how a hit is reported has a draft, final
+        with the first addon.
+      checks: >-
+        The checks of the first build: the bus's pull-up resistors with 2&nbsp;m of cable, the fuse,
+        and protecting the connector from static and water.
       sensor: The sensor circuit and its mounting, and the plate, its stand and its angle.
     safety_title: Safety, once there is something to build
     safety:
@@ -1039,7 +1044,7 @@ build:
         connector, and keep the electronics behind the plate or in their own enclosure.
       limits: >-
         <strong>The field's power limits</strong> apply to shooting at targets as at players.
-    photo: the finished target, plate, sensor and LED ring, and the port on a box.
+    photo: the finished target, plate and sensor, and the port on a box.
     full: >-
       What is decided, with the documents behind each decision:
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/target-addon/BUILD.md">target

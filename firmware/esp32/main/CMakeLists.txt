@@ -126,6 +126,7 @@ else()
         "adoption.c"
         "cpace.c"
         "box_pair.c"
+        "target_addon.c"
     )
     set(ATALAIA_EMBED EMBED_FILES "wifi_setup.html")
 endif()

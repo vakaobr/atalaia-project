@@ -706,6 +706,19 @@ decided and what is not, with no wiring: it is not buildable yet, and a Field
 Box has no free GPIO for its interrupt line (P5J-9). No guide has been followed
 on real hardware; photos are HW2.
 
+**Follow-up 2026-10-23** (the maintainer's answer to P5J-9, "fix in 3.3 V";
+decisions P5J-15 to P5J-21, open): the M12 port carries 3.3 V only (the
+board's 3V3 through a resettable fuse, at most 25 mA for the addon; SDA, GND,
+SCL on A-coded pins 2, 3, 4, 3.3 V on 1, pin 5 not connected), *Target
+Windows* lights the box's own ring, and there is no interrupt line: the box
+polls the addon every 20 ms (about 3 % of the 100 kHz bus; a hit reaches the
+script within about 21 ms). No pin changes. A polling driver with a draft
+report format (`firmware/esp32/main/target_addon.c`, host tests in
+`test_target_addon.c`) is in the firmware, not called yet; the design
+specification, ADR-P5-6's table, the guide and the build page in four
+languages say 3.3 V. The addon stays not buildable: its processor, firmware,
+I2C address, "identify" answer, sensor and plate are open (HW2).
+
 | File | What |
 |------|------|
 | `hardware/satellite/BUILD.md`, `hardware/io-pod/BUILD.md`, `hardware/target-addon/BUILD.md` | The guides, in the Field Box manual's manner, with `<!-- PHOTO: ... -->` placeholders (P5J-10) |

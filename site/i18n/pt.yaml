@@ -1038,23 +1038,32 @@ build:
   target:
     title: Módulo de alvo
     status: >-
-      Ainda não se pode montar: o módulo de alvo só existe no papel. Não ligues uma placa de alvo a
-      uma caixa a partir desta página.
+      Ainda não se pode montar: o lado da caixa já está decidido, o módulo em si ainda não. Não
+      ligues uma placa de alvo a uma caixa a partir desta página.
     what: >-
-      Uma placa onde se dispara, com um sensor que sente cada impacto e um anel de luz. Liga-se a
-      uma caixa e transforma-a num alvo que pontua, para as
+      Uma placa onde se dispara, com um sensor que sente cada impacto. Liga-se a uma caixa e
+      transforma-a num alvo que pontua, para as
       <a href="{{ page.to.modes }}#target-windows">Janelas de Alvo</a>, cujas regras já estão
-      escritas e testadas no simulador.
+      escritas e testadas no simulador; a janela aparece no anel de luz da própria caixa.
     decided_title: O que está decidido
     decided:
       parts: >-
-        Uma placa de aço ou de policarbonato, um sensor piezoelétrico, um pequeno processador
-        próprio (da classe RP2040 ou ATtiny) para detetar os impactos, e um anel de LED. Cerca de
+        Uma placa de aço ou de policarbonato, um sensor piezoelétrico e um pequeno processador
+        próprio (da classe RP2040 ou ATtiny) para detetar os impactos. Cerca de
         <span class="nowrap">20–30&nbsp;€</span> em peças (a estimativa do projeto).
       port: >-
-        Liga-se a um conector M12 estanque de 5 pinos na caixa: massa, 5&nbsp;V, as duas linhas I2C
-        e uma linha de interrupção, para cabos até cerca de 1–2&nbsp;m. O seu processador diz à caixa
-        o que é, por isso a caixa não precisa de um controlador novo para cada acessório.
+        Liga-se a um conector M12 estanque de 5 pinos na caixa que só leva 3,3&nbsp;V: os 3,3&nbsp;V
+        da placa, a massa e as duas linhas I2C; nada de 5&nbsp;V, e o quinto pino fica livre. Cabos
+        até 2&nbsp;m. O seu processador diz à caixa o que é, por isso a caixa não precisa de um
+        controlador novo para cada acessório.
+      power: >-
+        Pode tirar no máximo 25&nbsp;mA da caixa, através de um fusível rearmável: chega para o
+        processador e o sensor, não para luzes. As Janelas de Alvo acendem o anel de LED da própria
+        caixa; um módulo com luzes próprias precisa da sua própria bateria.
+      polling: >-
+        Sem linha de interrupção: a caixa lê o módulo por I2C a cada 20&nbsp;ms, cerca de 3&nbsp;%
+        do barramento, e um impacto chega ao jogo em cerca de 21&nbsp;ms no máximo. Nenhum pino da
+        caixa muda. O firmware da caixa já tem esta leitura, testada, à espera do módulo.
       capability: >-
         Os scripts dos modos recebem cada impacto com a sua força (de 0 a 255) e podem armar e
         desarmar o alvo. O mesmo está definido para o módulo de E/S de um telemóvel.
@@ -1062,22 +1071,18 @@ build:
         As Janelas de Alvo acendem o alvo na cor de uma equipa ao acaso durante alguns segundos; um
         impacto forte o suficiente nessa janela pontua para essa equipa.
       next: >-
-        Seguem-se o firmware do próprio módulo, o controlador da caixa para a sua porta e o sensor
-        afinado em placas reais de aço e de policarbonato; depois, as Janelas de Alvo passam a ser
-        um modo que a caixa oferece.
+        Seguem-se o firmware do próprio módulo, a caixa a usar a leitura da porta e o sensor afinado
+        em placas reais de aço e de policarbonato; depois, as Janelas de Alvo passam a ser um modo
+        que a caixa oferece.
     open:
-      mcu: O processador (RP2040 ou ATtiny) e o seu firmware.
+      mcu: O processador (RP2040 ou ATtiny, dentro dos 25&nbsp;mA) e o seu firmware.
       protocol: >-
-        Como a caixa e o módulo falam por I2C: o endereço, como o módulo diz o que é, como comunica
-        um impacto, como é armado.
-      connector: A ordem dos pinos do conector M12 e o cabo.
-      voltage: >-
-        A tensão nas linhas I2C: o barramento da caixa é de 3,3&nbsp;V, mas o conector também leva
-        5&nbsp;V; puxar o barramento para 5&nbsp;V pode estragar a placa.
-      interrupt: >-
-        O pino da linha de interrupção: uma Field Box já usa os oito pinos livres da sua placa, por
-        isso não lhe sobra nenhum.
-      ring: Se a janela aparece no anel de LED do próprio módulo ou no da caixa.
+        O endereço I2C do módulo e como diz o que é; a forma de comunicar um impacto tem um
+        rascunho, que fica definitivo com o primeiro módulo.
+      checks: >-
+        As verificações da primeira montagem: as resistências de pull-up do barramento com
+        2&nbsp;m de cabo, o fusível, e a proteção do conector contra a eletricidade estática e a
+        água.
       sensor: O circuito do sensor e a sua fixação, e a placa, o suporte e o ângulo.
     safety_title: A segurança, quando houver alguma coisa para montar
     safety:
@@ -1093,7 +1098,7 @@ build:
       limits: >-
         <strong>Os limites de potência do campo</strong> valem para disparar contra alvos como contra
         quem joga.
-    photo: o alvo acabado, a placa, o sensor e o anel de LED, e a porta numa caixa.
+    photo: o alvo acabado, a placa e o sensor, e a porta numa caixa.
     full: >-
       O que está decidido, com os documentos por trás de cada decisão (em inglês):
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/target-addon/BUILD.md">guia

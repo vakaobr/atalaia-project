@@ -118,6 +118,9 @@ process.
 | target addon | módulo de alvo | Ziel-Addon | 標靶擴充模組 | *(check)*; zh-tw: *(check)* |
 | enclosure switch (tamper) | interruptor da caixa | Gehäuseschalter | 外殼開關 | the alert: "violação" / "Manipulationsalarm" *(check)*; zh-tw: 警報：「防拆警報」 |
 | Li-ion cell | célula (de iões de lítio) | Zelle, Akku | 鋰電池芯、電芯 | "pilha" is a disposable battery |
+| resettable fuse (PTC) | fusível rearmável | rückstellbare Sicherung | 可自恢復保險絲 | the target addon's port (P5J-16) *(check)* |
+| pull-up resistor | resistência de pull-up | Pull-up-Widerstand | 上拉電阻 | I2C; "pull-up" stays English in pt and de |
+| interrupt line | linha de interrupção | Interrupt-Leitung | 中斷線 | |
 
 ## Mode names
 

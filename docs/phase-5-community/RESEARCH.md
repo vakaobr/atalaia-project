@@ -320,7 +320,7 @@ perfboard. The carrier PCB:
 - Provides header sockets for the Heltec V4.3 board
 - Routes I2C, SPI, I2S and GPIO to labelled connectors for each module
 - Includes the level shifter for the WS2812B data line (3.3V to 5V)
-- Adds the M12 addon bus connector (GND, 5V, SDA, SCL, INT)
+- Adds the M12 addon bus connector (3.3 V, GND, SDA, SCL; no 5 V and no INT since 2026-10-23, decisions P5J-15 to P5J-21)
 - Adds battery management connectors (USB-C PD in, BMS connector, power switch)
 - Fits inside the reference IP65 enclosure (~200x150x100 mm)
 
