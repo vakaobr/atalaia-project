@@ -3,7 +3,7 @@
 
 cmake_minimum_required(VERSION 3.16)
 # The numbers of core/include/atalaia/version.h (CMake keeps no pre-release).
-project(atalaia_core VERSION 0.3.0 LANGUAGES C)
+project(atalaia_core VERSION 0.4.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
