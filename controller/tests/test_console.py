@@ -25,8 +25,8 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from support import FakeModem, config
-from atalaia_controller.api import (CONSOLE_DIR, FEATURES, FIELD_MAP_HEADERS, FIELD_MAP_ORIGINS, SECURITY_HEADERS,
-                                   Auth, create_app)
+from atalaia_controller.api import (CONSOLE_DIR, FEATURES, FIELD_MAP_HEADERS, FIELD_MAP_ORIGINS, FIELD_MAP_ORTHOPHOTOS,
+                                    SECURITY_HEADERS, Auth, create_app)
 from atalaia_controller.engine import BOX_LANGUAGES, Controller
 from atalaia_controller.firmware_release import REPORT_RESULTS
 from atalaia_controller.store import Store
@@ -135,10 +135,12 @@ class ConsoleFilesTests(unittest.TestCase):
         self.assertEqual(csp["script-src"], "'self'")
         self.assertEqual(csp["style-src"], "'self'")
         self.assertEqual(csp["default-src"], "'self'")
-        self.assertEqual(csp["img-src"], "'self' blob: data: https://tile.openstreetmap.org "
-                                         "https://ortos.dgterritorio.gov.pt")
+        # MF-65 to MF-72: the open orthophotos (the DGT's, IGN España's, IGN France's, PDOK's), each origin as
+        # images (the map's tiles) and as a connection (the drawn image's one picture), nothing else.
+        ortho = "https://ortos.dgterritorio.gov.pt https://www.ign.es https://data.geopf.fr https://service.pdok.nl"
+        self.assertEqual(csp["img-src"], f"'self' blob: data: https://tile.openstreetmap.org {ortho}")
         self.assertEqual(csp["connect-src"], "'self' https://overpass-api.de https://overpass.private.coffee "
-                                             "https://ortos.dgterritorio.gov.pt https://nominatim.openstreetmap.org")
+                                             f"{ortho} https://nominatim.openstreetmap.org")
         self.assertNotIn("mail.ru", r.headers["content-security-policy"])  # MF-51: not without the maintainer
         self.assertNotIn("unsafe", r.headers["content-security-policy"])
         for k in ("X-Content-Type-Options", "Referrer-Policy"):
@@ -153,12 +155,21 @@ class ConsoleFilesTests(unittest.TestCase):
             for origin in FIELD_MAP_ORIGINS.values():
                 self.assertNotIn(origin, got.headers["content-security-policy"], path)
             self.assertEqual(got.headers["permissions-policy"], "geolocation=()", path)
-        # The page and its scripts name only those origins.
+        # The page and its scripts name only those origins (and the credits' links, never fetched).
         code = "".join((SRC / rel).read_text(encoding="utf-8")
                        for rel in ("field-map.js", "components/field-render.js", "components/tile-map.js",
-                                   "components/place-search.js", "components/field-levels.js"))
+                                   "components/place-search.js", "components/field-levels.js",
+                                   "components/ortho-sources.js", "components/ortho-coverage.js"))
+        links = ["https://www.openstreetmap.org", "https://www.dgterritorio.gov.pt", "https://www.scne.es",
+                 "https://cartes.gouv.fr", "https://www.beeldmateriaal.nl"]
         for url in set(re.findall(r"https://[a-z0-9.-]+", code)):
-            self.assertIn(url, [*FIELD_MAP_ORIGINS.values(), "https://www.openstreetmap.org"], url)
+            self.assertIn(url, [*FIELD_MAP_ORIGINS.values(), *links], url)
+        # Each orthophoto's WMS (its image and its tiles) is on an origin the policy names, and every
+        # orthophoto origin of the policy is used.
+        sources = (SRC / "components/ortho-sources.js").read_text(encoding="utf-8")
+        used = {re.match(r"https://[a-z0-9.-]+", u).group(0)
+                for u in re.findall(r"(?:wms: |wmtsTile\(|=> `)'?(https://[^'`]+)", sources)}
+        self.assertEqual(used, set(FIELD_MAP_ORTHOPHOTOS))
 
     def test_redirects(self):
         for path, target in (("/", "/console/"), ("/console", "/console/"),

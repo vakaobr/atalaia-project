@@ -6,16 +6,18 @@
 // keeps; the only page of the console that reaches the internet (its own Content-Security-Policy,
 // api.py FIELD_MAP_HEADERS), and only while the GM sets the game up:
 //
-// 1. find the field on an interactive OpenStreetMap map (tile-map.js), or, in mainland Portugal, over
-//    the DGT orthophoto (the *Mapa* / *Ortofoto* switch, MF-54 to MF-57): the level's current map
+// 1. find the field on an interactive OpenStreetMap map (tile-map.js), or over an open orthophoto where
+//    there is one (the *Mapa* / *Ortofoto* switch, MF-54 to MF-57: the DGT's in mainland Portugal, and
+//    since MF-65 IGN España's, IGN France's and PDOK's, ortho-sources.js): the level's current map
 //    position, else the GM's own location when the browser already allows it (MF-41, MF-42), a typed
 //    "latitude, longitude", *Use my location*, or a place's name searched with OpenStreetMap's
 //    Nominatim (MF-44 to MF-46; place-search.js);
 // 2. trace the field's outline corner by corner: a press on the map, the map's centre (the cross,
 //    with the keyboard) or a typed "latitude, longitude"; undo and start again; 3 to 12 corners;
 // 3. *Draw the field image*: this browser fetches the area's OpenStreetMap data (Overpass; when busy,
-//    retried and asked of other public instances, MF-50 to MF-53) and, in Portugal, the DGT orthophoto,
-//    once, and draws the image (field-render.js), shown with the outline;
+//    retried and asked of other public instances, MF-50 to MF-53) and, where there is one, the
+//    orthophoto of the country the outline is in (MF-67), once, and draws the image (field-render.js),
+//    shown with the outline;
 //    MF-59: the preview then scrolls into view with the focus on its heading; MF-60: leaving the page
 //    with a drawn image not yet used asks first;
 // 4. *Use as the field*: one request to the controller (POST /api/v1/field/levels/{n}/from-map) sets
@@ -25,8 +27,9 @@
 
 import { html, render, Component, createRef, t, loadLanguage, lang, api, savedToken } from './ui.js';
 import { TileMap, OSM_SOURCE } from './components/tile-map.js';
-import { areaFor, frameFor, inPortugal, fetchOsm, fetchOrthophoto, drawField, encode, base64, MapError, OVERPASS_URL,
-         overpassHost, orthoTileUrl, ATTRIBUTION_DGT, RETRY } from './components/field-render.js';
+import { areaFor, frameFor, fetchOsm, fetchOrthophoto, drawField, encode, base64, MapError, OVERPASS_URL,
+         overpassHost, attribution, RETRY } from './components/field-render.js';
+import { sourceAt, sourcesFor, tileSource } from './components/ortho-sources.js';
 import { parseLatLon, formatLatLon } from './components/georef-panel.js';
 import { levelName, levelsInUse, LOADED_KEY } from './components/field-levels.js';
 import { PlaceSearch, SearchError, locate, locationGranted } from './components/place-search.js';
@@ -34,8 +37,6 @@ import { PlaceSearch, SearchError, locate, locationGranted } from './components/
 const CORNERS_MAX = 12; // map_features.POLYGON_MAX
 const FIELD_ZOOM = 17;
 const LOCATE_ZOOM = 17; // where a field is recognisable (clamped to the tile server's highest)
-// MF-54: the DGT orthophoto as the map's tiles (WMS GetMap per tile, EPSG:3857), mainland Portugal only.
-const ORTHO_SOURCE = { id: 'ortho', url: orthoTileUrl, credit: ATTRIBUTION_DGT, referrer: 'no-referrer' };
 const LAYER_KEY = 'atalaia.fieldmap.layer'; // MF-56: the GM's choice, in this browser only
 
 function savedLayer() {
@@ -88,11 +89,6 @@ function markLoaded(level) {
     }
 }
 
-/** Whether the orthophoto covers this point of the map (its coverage box, as for drawing). */
-function orthoCovers(p) {
-    return inPortugal({ south: p.lat, north: p.lat, west: p.lon, east: p.lon });
-}
-
 /** The map's element: Preact leaves it alone after the first render (TileMap owns what is inside). */
 class MapHost extends Component {
     shouldComponentUpdate() {
@@ -116,7 +112,7 @@ class FieldMap extends Component {
             ready: false, role: null, error: '', notice: '', levels: null, level, info: null, outline: [],
             corner: '', go: '', label: '', ortho: null, busy: '', result: null, done: null,
             online: navigator.onLine !== false, finding: '', places: null, placeStatus: '',
-            layer: savedLayer(), orthoHere: true, wait: null, osmTry: null,
+            layer: savedLayer(), orthoHere: null, wait: null, osmTry: null, orthoName: '',
         };
         this.osmAbort = null;
         this.mapEl = createRef();
@@ -172,10 +168,10 @@ class FieldMap extends Component {
             onPress: (p) => this.addCorner(p),
             onView: (v) => {
                 this.views += 1;
-                this.showLayer(this.state.layer, orthoCovers(v));
+                this.showLayer(this.state.layer, sourceAt(v));
             },
         });
-        this.showLayer(this.state.layer, orthoCovers(this.map.centre));
+        this.showLayer(this.state.layer, sourceAt(this.map.centre));
         // MF-61: an outline traced before a reload comes back, and the map shows it.
         const kept = savedOutline(level);
         if (kept.length) {
@@ -229,10 +225,11 @@ class FieldMap extends Component {
         }
     }
 
-    /** MF-54, MF-55: the map's tiles: the orthophoto when chosen and the view is in its coverage, else
-     * OpenStreetMap's (outside it the switch is hidden and the choice kept for when the map comes back). */
+    /** MF-54, MF-55, MF-65: the map's tiles: the orthophoto of the map's centre (orthoHere, a row of
+     * ortho-sources.js, or null) when chosen, else OpenStreetMap's (outside every coverage the switch is
+     * hidden and the choice kept for when the map comes back). */
     showLayer(layer, orthoHere) {
-        if (this.map) this.map.setSource(layer === 'ortho' && orthoHere ? ORTHO_SOURCE : OSM_SOURCE);
+        if (this.map) this.map.setSource(layer === 'ortho' && orthoHere ? tileSource(orthoHere) : OSM_SOURCE);
         if (layer !== this.state.layer || orthoHere !== this.state.orthoHere) this.setState({ layer, orthoHere });
     }
 
@@ -252,7 +249,8 @@ class FieldMap extends Component {
             <span>${label}</span></label>`;
         return html`<div class="fm-layers" role="radiogroup" aria-labelledby="fm-layers-h" data-testid="fm-layers">
             <span id="fm-layers-h" class="small">${t('fieldmap.layer')}</span>
-            ${option('map', t('fieldmap.layer_map'))}${option('ortho', t('fieldmap.layer_ortho'))}
+            ${option('map', t('fieldmap.layer_map'))}
+            ${option('ortho', t('fieldmap.layer_ortho', { name: s.orthoHere.name }))}
         </div>`;
     }
 
@@ -341,13 +339,14 @@ class FieldMap extends Component {
                 <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a></p>`}`;
     }
 
+    /** MF-67: the orthophotos for the outline, best first (its centroid's country; empty when none). */
+    orthoSources() {
+        return sourcesFor(this.state.outline);
+    }
+
     useOrtho() {
-        if (this.state.ortho !== null) return this.state.ortho;
-        try {
-            return this.state.outline.length >= 3 && inPortugal(areaFor(this.state.outline));
-        } catch (e) {
-            return false;
-        }
+        if (!this.orthoSources().length) return false;
+        return this.state.ortho !== null ? this.state.ortho : true;
     }
 
     mapError(e) {
@@ -365,7 +364,9 @@ class FieldMap extends Component {
         try {
             const bounds = areaFor(outline);
             const frame = frameFor(bounds);
-            const ortho = this.useOrtho();
+            // MF-67: the outline's country's orthophoto; a white answer (no picture there: the coverage is
+            // simplified) asks the next one near, if any, once.
+            const sources = this.useOrtho() ? this.orthoSources().slice(0, 2) : [];
             this.setState({ busy: 'osm', wait: null, osmTry: null });
             this.osmAbort = new AbortController();
             let osm;
@@ -380,21 +381,32 @@ class FieldMap extends Component {
             }
             const { elements } = osm;
             let photo = null;
+            let used = null;
             let notice = osm.url === OVERPASS_URL ? '' : t('fieldmap.osm_from', { host: overpassHost(osm.url) });
-            if (ortho) {
-                this.setState({ busy: 'ortho' });
+            let failed = '';
+            for (const source of sources) {
+                this.setState({ busy: 'ortho', orthoName: source.name });
                 try {
-                    photo = await fetchOrthophoto(bounds, frame);
-                    if (!photo) notice = `${notice} ${t('fieldmap.no_ortho')}`.trim();
+                    photo = await fetchOrthophoto(bounds, frame, source);
                 } catch (e) {
-                    notice = `${notice} ${t('fieldmap.ortho_failed', { detail: this.mapError(e) })}`.trim();
+                    failed = t('fieldmap.ortho_failed', { name: source.name, detail: this.mapError(e) });
+                    break;
+                }
+                if (photo) {
+                    used = source;
+                    break;
                 }
             }
+            if (sources.length && !photo) {
+                notice = `${notice} ${failed || t('fieldmap.no_ortho', { name: sources[0].name })}`.trim();
+            }
             this.setState({ busy: 'draw' });
-            const canvas = drawField(elements, bounds, frame, photo);
+            const credit = used ? used.imageCredit : '';
+            const canvas = drawField(elements, bounds, frame, photo, credit);
             const out = await encode(canvas, Boolean(photo));
             this.setState({ busy: '', notice, result: { ...out, url: URL.createObjectURL(out.blob), bounds,
-                                                         photo: Boolean(photo), mpp: frame.mpp * (frame.width / out.width) } },
+                                                         photo: used ? used.name : '', credit: attribution(credit),
+                                                         mpp: frame.mpp * (frame.width / out.width) } },
                           () => this.showPreview());
         } catch (e) {
             if (e instanceof MapError && e.code === 'cancelled') {
@@ -444,7 +456,7 @@ class FieldMap extends Component {
     /** What the page is doing, for the status line beside *Draw* (MF-53: a wait says how long). */
     busyText() {
         const s = this.state;
-        if (s.busy !== 'osm') return t(`fieldmap.busy.${s.busy}`);
+        if (s.busy !== 'osm') return t(`fieldmap.busy.${s.busy}`, { name: s.orthoName });
         if (s.wait) return t('fieldmap.busy.osm_retry', { s: s.wait.seconds, host: s.wait.host });
         // MF-62: from the second try on, which try and where, and that the page is waiting for its answer.
         if (s.osmTry && s.osmTry.n > 0) {
@@ -507,7 +519,8 @@ class FieldMap extends Component {
             </div>
             <p class="muted small" data-testid="fm-size">${t('fieldmap.size', {
                 width: r.width, height: r.height, mpp: r.mpp.toFixed(2), kb: Math.round(r.blob.size / 1024) })}
-                ${' '}${t(r.photo ? 'fieldmap.source_both' : 'fieldmap.source_osm')}</p>
+                ${' '}${t(r.photo ? 'fieldmap.source_both' : 'fieldmap.source_osm', { name: r.photo })}</p>
+            <p class="muted small" data-testid="fm-image-credit">${t('fieldmap.image_credit', { credit: r.credit })}</p>
         </section>`;
     }
 
@@ -523,6 +536,7 @@ class FieldMap extends Component {
         const s = this.state;
         const n = s.outline.length;
         const multi = s.levels && levelsInUse(s.levels) > 1;
+        const ortho = this.orthoSources();
         return html`<section class="card" aria-labelledby="fm-outline-h">
             <h2 id="fm-outline-h">${t('fieldmap.outline')}</h2>
             <p class="small" role="status" data-testid="fm-count">${t('fieldmap.corners', { n, max: CORNERS_MAX })}</p>
@@ -553,9 +567,9 @@ class FieldMap extends Component {
                     <input id="fm-label" data-testid="fm-label" maxlength="48" autocomplete="off" value=${s.label}
                         onInput=${(e) => this.setState({ label: e.target.value })} /></div>
             </div>
-            <label class="check fm-ortho"><input type="checkbox" data-testid="fm-ortho" checked=${this.useOrtho()}
-                onChange=${(e) => this.setState({ ortho: e.target.checked, result: this.dropResult() })} />
-                ${t('fieldmap.ortho')}</label>
+            ${ortho.length > 0 && html`<label class="check fm-ortho"><input type="checkbox" data-testid="fm-ortho"
+                checked=${this.useOrtho()} onChange=${(e) => this.setState({ ortho: e.target.checked, result: this.dropResult() })} />
+                ${t('fieldmap.ortho', { name: ortho[0].name })}</label>`}
             <div class="actions">
                 <button type="button" class="primary" data-testid="fm-draw" disabled=${Boolean(s.busy) || n < 3}
                     onClick=${() => this.drawImage()}>${t('fieldmap.draw')}</button>

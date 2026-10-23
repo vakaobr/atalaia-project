@@ -682,10 +682,11 @@ roadmap:
       plan, as a pin, a circle or an area, each shown to everyone, to one team or only to the
       organisers, in the console and on ATAK; the field can also be loaded from a map: the GM finds
       it from where they stand or by a place's name, traces the field's real outline on
-      OpenStreetMap and the browser draws the field image from OpenStreetMap's data, over the DGT
-      orthophoto in Portugal, with its map position and the outline as the field boundary, the
-      outside dimmed; the page retries when OpenStreetMap's data service is busy and, in mainland
-      Portugal, shows the DGT orthophoto while the GM traces the outline; players' phones warn them
+      OpenStreetMap and the browser draws the field image from OpenStreetMap's data, over the
+      country's open aerial imagery (the DGT orthophoto in mainland Portugal, IGN's PNOA in Spain,
+      IGN's orthophotos in France and PDOK's in the Netherlands), with its map position and the
+      outline as the field boundary, the outside dimmed; the page retries when OpenStreetMap's data
+      service is busy and shows that imagery while the GM traces the outline; players' phones warn them
       with a banner and a vibration when they leave the boundary, from their own GPS, sending
       nothing; player positions never go to everyone, only to staff devices when the field turns it
       on; staff away from the field get the same through the site server, over an encrypted

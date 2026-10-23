@@ -86,6 +86,9 @@ BOX = 7
 FIXTURES = HERE / "fixtures"
 CORS = {"Access-Control-Allow-Origin": "*"}
 OUTLINE = [(39.6015, -8.4030), (39.6012, -8.3990), (39.5990, -8.3985), (39.5984, -8.4010), (39.5995, -8.4035)]
+# The open orthophotos' origins (api.py FIELD_MAP_ORTHOPHOTOS; MF-65 to MF-72), every one answered by a fixture.
+ORTHO_ORIGINS = ("https://ortos.dgterritorio.gov.pt", "https://www.ign.es", "https://data.geopf.fr",
+                 "https://service.pdok.nl")
 
 
 class Field:
@@ -2169,7 +2172,8 @@ class ConsoleBrowserTests(unittest.TestCase):
         Access-Control-Allow-Origin, as a busy proxy may send), "abort" (no answer) or "hang" (never
         answers); the main instance answers `overpass` (default 200), the other one `fallbacks` by URL
         (default "abort"). seen["hosts"] lists the instances asked, in order; seen["wms"] the orthophoto
-        for the image (EPSG:4326), seen["wms_tiles"] the map's *Ortofoto* tiles (EPSG:3857)."""
+        for the image (a GetMap in EPSG:4326, any of the four orthophotos' origins: they all answer `wms`),
+        seen["wms_tiles"] the map's *Ortofoto* tiles (any other request to those origins)."""
         seen: dict = {"tiles": 0, "overpass": [], "hosts": [], "wms": [], "wms_tiles": [], "search": [],
                       "other": []}
         answers = {self.OVERPASS_2: ["abort"], **(fallbacks or {}),
@@ -2221,8 +2225,9 @@ class ConsoleBrowserTests(unittest.TestCase):
                               body=(FIXTURES / "overpass.json").read_text(encoding="utf-8"))
 
         def orthophoto(route):
-            tile = "EPSG%3A3857" in route.request.url
-            seen["wms_tiles" if tile else "wms"].append(route.request.url)
+            url = route.request.url
+            tile = not ("REQUEST=GetMap" in url and "EPSG%3A4326" in url)
+            seen["wms_tiles" if tile else "wms"].append(url)
             body = (FIXTURES / ("orthophoto.png" if tile else wms)).read_bytes()
             route.fulfill(status=200, content_type="image/png", headers=CORS, body=body)
 
@@ -2231,7 +2236,8 @@ class ConsoleBrowserTests(unittest.TestCase):
         ctx.route("https://tile.openstreetmap.org/**", tiles)
         ctx.route("https://overpass-api.de/api/interpreter", overpass_api)
         ctx.route(self.OVERPASS_2, overpass_api)
-        ctx.route("https://ortos.dgterritorio.gov.pt/**", orthophoto)
+        for origin in ORTHO_ORIGINS:
+            ctx.route(f"{origin}/**", orthophoto)
         ctx.route("https://nominatim.openstreetmap.org/**", search)
         return seen
 
@@ -2315,7 +2321,9 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.get_by_test_id("fm-upload")).to_be_in_viewport()
         expect(page.get_by_test_id("fm-banner")).to_contain_text("ainda não está guardada")
         expect(page.get_by_test_id("fm-preview-next")).to_contain_text("até lá, nada fica guardado")
-        expect(page.get_by_test_id("fm-size")).to_contain_text("ortofotomapa da DGT com os caminhos")
+        expect(page.get_by_test_id("fm-size")).to_contain_text("A ortofoto (DGT) com os caminhos")
+        expect(page.get_by_test_id("fm-image-credit")).to_have_text(
+            "Créditos na imagem: Ortofotomapas © DGT (CC BY 4.0) · © OpenStreetMap contributors")
         expect(page.get_by_test_id("fm-replaces")).to_contain_text("O campo já tem imagem")
         # One Overpass query for the area and one orthophoto, at the image's size; the image is drawn.
         self.assertEqual(len(seen["overpass"]), 1)
@@ -2398,6 +2406,7 @@ class ConsoleBrowserTests(unittest.TestCase):
             "OpenStreetMap's data came from overpass.private.coffee (the main server was busy); this server's data may be a few months old.")
         expect(page.get_by_test_id("fm-notice")).to_contain_text("has no picture of this area")
         expect(page.get_by_test_id("fm-size")).to_contain_text("Drawn from OpenStreetMap's data.")
+        expect(page.get_by_test_id("fm-image-credit")).to_have_text("Credits on the image: © OpenStreetMap contributors")
         expect(page.get_by_test_id("fm-replaces")).to_have_count(0)
         self.no_horizontal_scroll(page)
         page.get_by_test_id("fm-upload").click()
@@ -2782,7 +2791,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile(r"^https://tile\.openstreetmap\.org/17/"))
         expect(page.get_by_test_id("fm-layer-map")).to_be_checked()  # the default stays *Mapa*
         self.assertEqual(seen["wms_tiles"], [])
-        page.get_by_text("Ortofoto", exact=True).click()
+        page.get_by_text("Ortofoto (DGT)", exact=True).click()
         expect(page.get_by_test_id("fm-layer-ortho")).to_be_checked()
         expect(page.locator(".tm-tile").first).to_have_attribute(
             "src", re.compile(r"^https://ortos\.dgterritorio\.gov\.pt/wms/ortosat2023\?"))
@@ -2818,15 +2827,16 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.reload()
         expect(page.get_by_test_id("fm-layer-ortho")).to_be_checked()
         expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile(r"^https://ortos\."))
-        # Outside its coverage (Paris): only the map, and why.
-        page.get_by_test_id("fm-go").fill("48.8566, 2.3522")
+        # Outside every orthophoto's coverage (Berlin): only the map, and why.
+        page.get_by_test_id("fm-go").fill("52.52, 13.405")
         page.get_by_test_id("fm-go-button").click()
         expect(page.get_by_test_id("fm-layers")).to_have_count(0)
         expect(page.get_by_test_id("fm-layer-none")).to_have_text(
-            "Fora de Portugal continental só há o mapa do OpenStreetMap: não há fotografia aérea aberta de alta "
-            "resolução que se possa usar aqui.")
+            "Aqui só há o mapa do OpenStreetMap: só há fotografia aérea aberta de alta resolução que se possa usar "
+            "em Portugal continental, Espanha, França continental e Córsega e nos Países Baixos.")
         expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile(r"^https://tile\.openstreetmap\.org/"))
-        expect(page.locator(".tm-tile[src^='https://ortos']")).to_have_count(0)
+        for origin in ORTHO_ORIGINS:
+            expect(page.locator(f".tm-tile[src^='{origin}']")).to_have_count(0)
         expect(page.get_by_test_id("tm-credit")).to_have_text("© OpenStreetMap contributors")
         # Back in Portugal, the orthophoto again (the choice was kept).
         page.get_by_test_id("fm-go").fill("38.6296, -9.1505")
@@ -2838,6 +2848,166 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile(r"^https://tile\.openstreetmap"))
         self.assertEqual(page.evaluate("localStorage.getItem('atalaia.fieldmap.layer')"), "map")
         self.assertEqual((seen["other"], seen["overpass"], seen["wms"]), ([], [], []))
+
+    # --- open orthophotos outside Portugal (MF-65 to MF-72) ---
+
+    SOURCES_JS = ("(pts) => import('./components/ortho-sources.js').then((m) => pts.map((p) => (p.length > 2"
+                  " ? m.sourcesFor(p) : m.sourcesAt(p[0])).map((s) => s.id)))")
+
+    @staticmethod
+    def outline_at(lat: float, lon: float, scale: float = 1.0) -> list:
+        """OUTLINE moved to (lat, lon) (its first corner's neighbourhood), optionally scaled."""
+        return [(round(lat + (a - 39.6) * scale, 6), round(lon + (b + 8.4) * scale, 6)) for a, b in OUTLINE]
+
+    def trace(self, page, corners: list) -> None:
+        for lat, lon in corners:
+            page.get_by_test_id("fm-corner").fill(f"{lat}, {lon}")
+            page.get_by_test_id("fm-corner-add").click()
+
+    def check_tiles(self, page, seen: dict, prefix: str, name: str, credit: str) -> None:
+        """The *Ortofoto* layer in a country: its name on the switch, its tiles, its credit in the corner."""
+        expect(page.get_by_test_id("fm-layers")).to_contain_text(name)
+        page.get_by_test_id("fm-layer-ortho").check()
+        expect(page.locator(".tm-tile").first).to_have_attribute("src", re.compile("^" + re.escape(prefix)))
+        expect(page.get_by_test_id("tm-credit")).to_have_text(credit)
+        page.wait_for_function("[...document.querySelectorAll('.tm-tile')].every((i) => i.complete)")
+        tiles = page.locator(".tm-tile").evaluate_all("(l) => l.map((i) => i.src)")
+        self.assertTrue(all(t.startswith(prefix) for t in tiles), tiles)
+        # Only the tiles in view, each asked once.
+        asked = [u for u in seen["wms_tiles"] if u.startswith(prefix)]
+        self.assertEqual(sorted(asked), sorted(tiles))
+
+    def test_field_map_orthophoto_chosen_by_country(self):
+        """MF-66, MF-67: the orthophoto is the one of the country the point is in (the map's centre), or of
+        the outline's centroid; by a border, both, the centroid's country first; none outside every
+        coverage (the sea, the Azores, Belgium, Germany, the UK, Switzerland)."""
+        page, _ = self.field_map()
+        points = {
+            "dgt": [(38.7223, -9.1393), (38.881, -7.163), (37.0194, -7.9304)],
+            "ign-es": [(38.878, -6.970), (40.4168, -3.7038), (39.5696, 2.6502), (28.1235, -15.4363)],
+            "ign-fr": [(48.8566, 2.3522), (41.9192, 8.7386), (49.1193, 6.1757)],
+            "pdok": [(52.3676, 4.9041), (53.0548, 4.7977), (50.8514, 5.6910)],
+            "": [(52.52, 13.405), (50.8503, 4.3517), (51.5072, -0.1276), (46.2044, 6.1432), (37.7412, -25.6756),
+                 (39.5, -11.5)],
+        }
+        for want, pts in points.items():
+            got = page.evaluate(self.SOURCES_JS, [[{"lat": a, "lon": b}] for a, b in pts])
+            self.assertEqual([g[:1] for g in got], [[want] if want else []] * len(pts), want)
+        # Two outlines across the border between Elvas and Badajoz: each has corners in both countries, and the
+        # centroid decides; the other country comes second (asked when the first has no picture there).
+        west = [{"lat": a, "lon": b} for a, b in ((38.885, -7.095), (38.885, -7.055), (38.875, -7.055),
+                                                   (38.875, -7.095))]
+        east = [{"lat": a, "lon": b} for a, b in ((38.885, -7.065), (38.885, -7.025), (38.875, -7.025),
+                                                   (38.875, -7.065))]
+        self.assertEqual(page.evaluate(self.SOURCES_JS, [west, east]), [["dgt", "ign-es"], ["ign-es", "dgt"]])
+
+    def test_field_map_in_spain(self):
+        """MF-68: in Spain the layer is IGN España's PNOA (its WMTS, Web Mercator tiles) with its credit, and
+        the drawn image is over PNOA (one WMS GetMap in EPSG:4326 at the image's size) with IGN's wording for
+        a derived work burned in."""
+        page, seen = self.field_map()
+        page.get_by_test_id("fm-go").fill("40.4168, -3.7038")
+        page.get_by_test_id("fm-go-button").click()
+        expect(page.get_by_test_id("fm-layer-map")).to_be_checked()
+        expect(page.get_by_text("Ortofoto (IGN España)", exact=True)).to_be_visible()
+        self.check_tiles(page, seen, "https://www.ign.es/wmts/pnoa-ma?", "Ortofoto (IGN España)",
+                         "PNOA CC-BY 4.0 scne.es")
+        q = {k: v[0] for k, v in parse_qs(urlsplit(seen["wms_tiles"][0]).query, keep_blank_values=True).items()}
+        self.assertEqual({k: v for k, v in q.items() if k not in ("TILEROW", "TILECOL")}, {
+            "SERVICE": "WMTS", "REQUEST": "GetTile", "VERSION": "1.0.0", "LAYER": "OI.OrthoimageCoverage",
+            "STYLE": "default", "TILEMATRIXSET": "GoogleMapsCompatible", "TILEMATRIX": "17", "FORMAT": "image/jpeg"})
+        self.trace(page, self.outline_at(40.4168, -3.7038))
+        expect(page.get_by_test_id("fm-ortho")).to_be_checked()
+        expect(page.locator("label.fm-ortho")).to_have_text("Ortofoto (IGN España) como base")
+        page.get_by_test_id("fm-draw").click()
+        expect(page.get_by_test_id("fm-preview")).to_be_visible()
+        self.assertEqual(len(seen["wms"]), 1)
+        self.assertTrue(seen["wms"][0].startswith("https://www.ign.es/wms-inspire/pnoa-ma?"), seen["wms"])
+        q = {k: v[0] for k, v in parse_qs(urlsplit(seen["wms"][0]).query, keep_blank_values=True).items()}
+        self.assertEqual((q["LAYERS"], q["CRS"], q["REQUEST"], q["FORMAT"]),
+                         ("OI.OrthoimageCoverage", "EPSG:4326", "GetMap", "image/jpeg"))
+        size = page.get_by_test_id("fm-image").evaluate("(i) => [i.naturalWidth, i.naturalHeight]")
+        self.assertEqual(size, [int(q["WIDTH"]), int(q["HEIGHT"])])
+        expect(page.get_by_test_id("fm-size")).to_contain_text("A ortofoto (IGN España) com os caminhos")
+        expect(page.get_by_test_id("fm-image-credit")).to_have_text(
+            "Créditos na imagem: Obra derivada de PNOA CC-BY 4.0 scne.es · © OpenStreetMap contributors")
+        self.assertEqual(seen["other"], [])
+
+    def test_field_map_in_france_and_the_netherlands(self):
+        """MF-69, MF-70, in English: IGN France's orthophotos (Géoplateforme WMTS tiles, its WMS-R for the
+        image) and PDOK's (WMTS tiles; its WMS draws at most 2500 pixels on a side, so a large area's picture
+        is asked smaller, in proportion, and stretched to the image), each with its credit."""
+        page, seen = self.field_map(lang="en")
+        page.get_by_test_id("fm-go").fill("48.8566, 2.3522")
+        page.get_by_test_id("fm-go-button").click()
+        self.check_tiles(page, seen, "https://data.geopf.fr/wmts?", "Orthophoto (IGN France)",
+                         "Orthophotos © IGN (Licence Ouverte 2.0)")
+        q = {k: v[0] for k, v in parse_qs(urlsplit(seen["wms_tiles"][0]).query).items()}
+        self.assertEqual((q["LAYER"], q["TILEMATRIXSET"], q["STYLE"], q["TILEMATRIX"]),
+                         ("ORTHOIMAGERY.ORTHOPHOTOS", "PM_0_19", "normal", "17"))
+        self.trace(page, self.outline_at(48.8566, 2.3522))
+        expect(page.locator("label.fm-ortho")).to_have_text("Orthophoto (IGN France) as the base")
+        page.get_by_test_id("fm-draw").click()
+        expect(page.get_by_test_id("fm-preview")).to_be_visible()
+        self.assertEqual(len(seen["wms"]), 1)
+        self.assertTrue(seen["wms"][0].startswith("https://data.geopf.fr/wms-r?"), seen["wms"])
+        self.assertIn("LAYERS=ORTHOIMAGERY.ORTHOPHOTOS", seen["wms"][0])
+        expect(page.get_by_test_id("fm-image-credit")).to_have_text(
+            "Credits on the image: Orthophotos © IGN (Licence Ouverte 2.0) · © OpenStreetMap contributors")
+        # The Netherlands, a field about 3 km across: the image is 4096 pixels wide, PDOK's picture 2500.
+        page.get_by_test_id("fm-clear").click()
+        page.get_by_test_id("fm-go").fill("52.3676, 4.9041")
+        page.get_by_test_id("fm-go-button").click()
+        self.check_tiles(page, seen, "https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0/Actueel_ortho25/EPSG:3857/17/",
+                         "Orthophoto (PDOK)", "Luchtfoto © Beeldmateriaal.nl / PDOK (CC BY 4.0)")
+        self.trace(page, [(52.36, 4.88), (52.36, 4.92), (52.385, 4.92), (52.385, 4.88)])
+        page.get_by_test_id("fm-draw").click()
+        expect(page.get_by_test_id("fm-preview")).to_be_visible()
+        self.assertEqual(len(seen["wms"]), 2)
+        self.assertTrue(seen["wms"][1].startswith("https://service.pdok.nl/hwh/luchtfotorgb/wms/v1_0?"), seen["wms"])
+        q = {k: v[0] for k, v in parse_qs(urlsplit(seen["wms"][1]).query).items()}
+        self.assertEqual((q["LAYERS"], q["CRS"]), ("Actueel_ortho25", "EPSG:4326"))
+        w, h = int(q["WIDTH"]), int(q["HEIGHT"])
+        size = page.get_by_test_id("fm-image").evaluate("(i) => [i.naturalWidth, i.naturalHeight]")
+        self.assertEqual(max(w, h), 2500)
+        self.assertGreater(max(size), 2500)
+        self.assertAlmostEqual(w / h, size[0] / size[1], delta=0.01)
+        expect(page.get_by_test_id("fm-size")).to_contain_text("The orthophoto (PDOK) with OpenStreetMap's")
+        expect(page.get_by_test_id("fm-image-credit")).to_have_text(
+            "Credits on the image: Luchtfoto © Beeldmateriaal.nl / PDOK (CC BY 4.0) · © OpenStreetMap contributors")
+        self.assertEqual(seen["other"], [])
+
+    def test_field_map_orthophoto_at_a_border_and_outside(self):
+        """MF-67: by the border between Elvas and Badajoz the centroid's country (Portugal) is asked first; a
+        white picture (no photo there) asks the other country's once, and both white leave OpenStreetMap
+        alone, said in words. Outside every coverage (Berlin) there is no orthophoto to tick and none is
+        asked."""
+        page, seen = self.field_map(wms="orthophoto-white.png")
+        page.get_by_test_id("fm-go").fill("38.88, -7.075")
+        page.get_by_test_id("fm-go-button").click()
+        self.trace(page, [(38.885, -7.095), (38.885, -7.055), (38.875, -7.055), (38.875, -7.095)])
+        expect(page.locator("label.fm-ortho")).to_have_text("Ortofoto (DGT) como base")
+        page.get_by_test_id("fm-draw").click()
+        expect(page.get_by_test_id("fm-preview")).to_be_visible()
+        self.assertEqual([urlsplit(u).hostname for u in seen["wms"]], ["ortos.dgterritorio.gov.pt", "www.ign.es"])
+        expect(page.get_by_test_id("fm-notice")).to_have_text(
+            "A ortofoto (DGT) não tem imagem desta área: a imagem é desenhada só com o OpenStreetMap.")
+        expect(page.get_by_test_id("fm-image-credit")).to_have_text("Créditos na imagem: © OpenStreetMap contributors")
+        # Berlin: no orthophoto, no switch, nothing asked.
+        page.get_by_test_id("fm-clear").click()
+        page.get_by_test_id("fm-go").fill("52.52, 13.405")
+        page.get_by_test_id("fm-go-button").click()
+        expect(page.get_by_test_id("fm-layers")).to_have_count(0)
+        expect(page.get_by_test_id("fm-layer-none")).to_be_visible()
+        self.trace(page, self.outline_at(52.52, 13.405))
+        expect(page.get_by_test_id("fm-ortho")).to_have_count(0)
+        page.get_by_test_id("fm-draw").click()
+        expect(page.get_by_test_id("fm-preview")).to_be_visible()
+        expect(page.get_by_test_id("fm-notice")).to_have_count(0)
+        expect(page.get_by_test_id("fm-size")).to_contain_text("Desenhada a partir dos dados do OpenStreetMap.")
+        self.assertEqual(len(seen["wms"]), 2)
+        self.assertEqual(seen["wms_tiles"], [])
+        self.assertEqual(seen["other"], [])
 
     def test_reconnects_after_the_stream_drops(self):
         self.field.create_game(start=True)

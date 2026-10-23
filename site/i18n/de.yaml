@@ -721,10 +721,11 @@ roadmap:
       Konsole und auf ATAK; das Feld lässt sich auch aus einer Karte laden: Die Spielleitung findet
       es von ihrem Standort aus oder über einen Ortsnamen, zeichnet den echten Umriss des Felds auf
       OpenStreetMap nach, und der Browser zeichnet das Feldbild aus den Daten von OpenStreetMap,
-      über dem DGT-Orthofoto in Portugal, mit seiner Kartenposition und dem Umriss als Feldgrenze,
-      das Außen abgedunkelt; die Seite versucht es erneut, wenn der Datendienst von OpenStreetMap
-      ausgelastet ist, und zeigt auf dem portugiesischen Festland das DGT-Orthofoto, während die
-      Spielleitung den Umriss zeichnet; die Handys der Spielenden warnen mit einem Banner und einer
+      über den offenen Luftbildern des Landes (dem DGT-Orthofoto auf dem portugiesischen Festland,
+      dem PNOA des IGN in Spanien, den Orthofotos des IGN in Frankreich und denen von PDOK in den
+      Niederlanden), mit seiner Kartenposition und dem Umriss als Feldgrenze, das Außen
+      abgedunkelt; die Seite versucht es erneut, wenn der Datendienst von OpenStreetMap ausgelastet
+      ist, und zeigt diese Luftbilder, während die Spielleitung den Umriss zeichnet; die Handys der Spielenden warnen mit einem Banner und einer
       Vibration, wenn sie die Feldgrenze verlassen, mit ihrem eigenen GPS, ohne etwas zu senden;
       Positionen der Spielenden gehen nie an alle, nur an Geräte des Staffs, wenn das Feld es
       einschaltet; Staff außerhalb des Felds bekommt dasselbe über den Site-Server, über eine

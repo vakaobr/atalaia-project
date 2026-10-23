@@ -4,22 +4,25 @@
 // Draws the field image in the GM's browser (decisions MF-22 to MF-25), once, while the game is set up:
 //
 // - the area: the outline's bounding box and a margin (10 %, at least 20 m), at most AREA_MAX_M on a side;
-// - in Portugal (or when the GM ticks it), the DGT's orthophoto as the base, from its open WMS
-//   (OrtoSat 2023, 30 cm; EPSG:4326, so the picture is already in the image's frame), fetched with
-//   fetch() so the canvas can still be exported (the WMS sends Access-Control-Allow-Origin: *);
-//   a white picture (outside its coverage, e.g. in Spain) is dropped and OpenStreetMap drawn alone;
+// - where an open orthophoto covers the area (the GM may untick it), that orthophoto as the base, from its
+//   open WMS (ortho-sources.js: the DGT's in mainland Portugal, IGN España's PNOA, IGN France's, PDOK's in
+//   the Netherlands; EPSG:4326, so the picture is already in the image's frame), fetched with fetch() so
+//   the canvas can still be exported (each WMS sends Access-Control-Allow-Origin: *); a white picture
+//   (outside its coverage) is dropped and OpenStreetMap drawn alone;
 // - OpenStreetMap's data for the area from the Overpass API, one query with a size cap (MF-50 to MF-53:
 //   when the main instance is busy, retried with exponential backoff and jitter, and asked of one other
 //   public instance, within about a minute, cancellable), drawn on a canvas: woods, scrub, grass, farmland, water, bare ground, buildings, fences, walls and hedges,
 //   streams, roads, tracks and paths, and names; over the orthophoto only the lines, the buildings'
 //   outlines and the names, so the photo stays readable;
-// - the attribution burned into the bottom-right corner ("© OpenStreetMap contributors" and, with the
-//   orthophoto, "Ortofotomapas © DGT (CC BY 4.0)").
+// - the attribution burned into the bottom-right corner ("© OpenStreetMap contributors" and, with an
+//   orthophoto, its own credit, e.g. "Ortofotomapas © DGT (CC BY 4.0)").
 //
 // The frame is north-up with latitude linear down the image and longitude linear across it (an
 // equirectangular frame over the area): exactly the controller's two-corner map position (georef.py),
 // so the map position set from the image's edges is exact; the pixels are square on the ground at the
 // area's middle latitude (off by under 0.05 % at its top and bottom edges for an area of 4 km).
+
+import { imageUrl } from './ortho-sources.js';
 
 export const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 // MF-50, MF-51: the public Overpass instances asked, in this order, when the one before is busy or
@@ -28,14 +31,9 @@ export const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 export const OVERPASS_URLS = [OVERPASS_URL, 'https://overpass.private.coffee/api/interpreter'];
 // MF-50: how hard the page tries before saying the service is busy.
 export const RETRY = { tries: 6, budgetMs: 60000, baseMs: 2000, capMs: 16000, refusedMs: 30000, requestMs: 35000 };
-export const WMS_URL = 'https://ortos.dgterritorio.gov.pt/wms/ortosat2023';
-export const WMS_LAYER = 'ortoSat2023-CorVerdadeira';
-// The orthophoto's coverage as its WMS capabilities give it (mainland Portugal, a little of Spain too).
-export const PT_BOUNDS = { south: 36.7643, north: 42.2796, west: -10.1934, east: -5.70954 };
 export const ATTRIBUTION_OSM = '© OpenStreetMap contributors';
-export const ATTRIBUTION_DGT = 'Ortofotomapas © DGT (CC BY 4.0)';
 export const AREA_MAX_M = 4000;           // the outline's box, on its longer side
-export const SIDE_MAX_PX = 4096;          // the image's longer side (also the WMS's MaxWidth/MaxHeight)
+export const SIDE_MAX_PX = 4096;          // the image's longer side (an orthophoto asked at most its maxSide)
 export const METRES_PER_PX = 0.5;         // the finest the image is drawn at
 export const IMAGE_MAX = 4 * 1024 * 1024; // the controller's field image limit (store.FIELD_IMAGE_MAX)
 const OVERPASS_MAX_BYTES = 32 * 1024 * 1024;
@@ -87,12 +85,6 @@ export function frameFor(b) {
     const h = (b.north - b.south) * k.ns;
     const mpp = Math.max(METRES_PER_PX, Math.max(w, h) / SIDE_MAX_PX);
     return { width: Math.max(1, Math.round(w / mpp)), height: Math.max(1, Math.round(h / mpp)), mpp };
-}
-
-/** Whether the area is inside the orthophoto's coverage box (the GM may still untick it). */
-export function inPortugal(b) {
-    return b.south >= PT_BOUNDS.south && b.north <= PT_BOUNDS.north && b.west >= PT_BOUNDS.west
-        && b.east <= PT_BOUNDS.east;
 }
 
 /** The Overpass QL query: one request for everything drawn, capped in time and size. */
@@ -232,15 +224,16 @@ export async function fetchOsm(b, opts = {}) {
     throw new MapError(busy ? 'busy' : 'unreachable', last ? last.message : '');
 }
 
-/** The DGT orthophoto for the area at the image's size, as an ImageBitmap, or null where it has no
- * picture (all white: outside its coverage). */
-export async function fetchOrthophoto(b, frame, fetcher = fetch) {
-    const q = new URLSearchParams({ SERVICE: 'WMS', VERSION: '1.3.0', REQUEST: 'GetMap', LAYERS: WMS_LAYER,
-                                    STYLES: '', CRS: 'EPSG:4326', BBOX: `${b.south},${b.west},${b.north},${b.east}`,
-                                    WIDTH: String(frame.width), HEIGHT: String(frame.height), FORMAT: 'image/jpeg' });
+/** An orthophoto (a row of ortho-sources.js) for the area, as an ImageBitmap, or null where it has no
+ * picture (all white: outside its coverage). Asked at the image's size, or smaller in proportion when that
+ * is more than the WMS draws (its maxSide, MF-70); the canvas then stretches it to the image. */
+export async function fetchOrthophoto(b, frame, source, fetcher = fetch) {
+    const k = Math.min(1, source.maxSide / Math.max(frame.width, frame.height));
+    const width = Math.max(1, Math.round(frame.width * k));
+    const height = Math.max(1, Math.round(frame.height * k));
     let r;
     try {
-        r = await fetcher(`${WMS_URL}?${q}`, { referrerPolicy: 'no-referrer' });
+        r = await fetcher(imageUrl(source, b, width, height), { referrerPolicy: 'no-referrer' });
     } catch (e) {
         throw new MapError('offline');
     }
@@ -249,20 +242,6 @@ export async function fetchOrthophoto(b, frame, fetcher = fetch) {
     }
     const bitmap = await createImageBitmap(await r.blob());
     return mostlyWhite(bitmap) ? null : bitmap;
-}
-
-/** MF-54: one 256-pixel tile (z/x/y, Web Mercator, as OpenStreetMap's) of the DGT orthophoto for the
- * map's *Ortofoto* layer: a WMS GetMap of exactly that tile's box in EPSG:3857 (which the WMS offers), so
- * it lies on the map like any tile; JPEG, the same URL for the same tile (the browser's cache). */
-export function orthoTileUrl(z, x, y) {
-    const half = 20037508.342789244; // half the Web Mercator world, in metres
-    const side = (2 * half) / 2 ** z;
-    const r = (v) => (Math.round(v * 100) / 100).toFixed(2);
-    const box = [-half + x * side, half - (y + 1) * side, -half + (x + 1) * side, half - y * side].map(r);
-    const q = new URLSearchParams({ SERVICE: 'WMS', VERSION: '1.3.0', REQUEST: 'GetMap', LAYERS: WMS_LAYER,
-                                    STYLES: '', CRS: 'EPSG:3857', BBOX: box.join(','), WIDTH: '256', HEIGHT: '256',
-                                    FORMAT: 'image/jpeg' });
-    return `${WMS_URL}?${q}`;
 }
 
 function mostlyWhite(bitmap) {
@@ -350,8 +329,8 @@ function closed(g) {
     return g.length >= 4 && g[0].lat === g[g.length - 1].lat && g[0].lon === g[g.length - 1].lon;
 }
 
-/** Draws the field image on a canvas: {canvas, orthophoto: whether it is the base}. */
-export function drawField(elements, b, frame, photo) {
+/** Draws the field image on a canvas, over photo (an orthophoto, or null) with its credit. */
+export function drawField(elements, b, frame, photo, credit = '') {
     const canvas = document.createElement('canvas');
     canvas.width = frame.width;
     canvas.height = frame.height;
@@ -428,7 +407,7 @@ export function drawField(elements, b, frame, photo) {
     }
     g.setLineDash([]);
     drawNames(g, elements, px, frame, photo);
-    drawAttribution(g, frame, photo);
+    drawAttribution(g, frame, attribution(photo ? credit : ''));
     return canvas;
 }
 
@@ -484,8 +463,12 @@ function drawNames(g, elements, px, frame, photo) {
     }
 }
 
-function drawAttribution(g, frame, photo) {
-    const text = photo ? `${ATTRIBUTION_DGT} · ${ATTRIBUTION_OSM}` : ATTRIBUTION_OSM;
+/** The credit burned into the image: the orthophoto's (when it is the base) and OpenStreetMap's. */
+export function attribution(credit) {
+    return credit ? `${credit} · ${ATTRIBUTION_OSM}` : ATTRIBUTION_OSM;
+}
+
+function drawAttribution(g, frame, text) {
     const size = Math.max(14, Math.round(Math.min(frame.width, frame.height) / 60));
     g.font = `${size}px system-ui, sans-serif`;
     g.textAlign = 'right';

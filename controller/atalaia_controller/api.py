@@ -1328,25 +1328,28 @@ SECURITY_HEADERS = {
 
 # The one page that may reach the internet: *Load the field from a map* (field_map.py, MF-27), run in the
 # GM's browser while setting the game up. Only it, and only these origins: OpenStreetMap's tiles as
-# images to find the field (img-src), the Overpass API for the area's OSM data and the DGT's orthophoto
-# WMS (connect-src, fetched so the canvas stays exportable: both send Access-Control-Allow-Origin: *),
-# and OpenStreetMap's Nominatim to find a place by its name (connect-src, MF-44). When the main Overpass
-# instance is busy, one other public instance from the OSM wiki's list (MF-51); the DGT's WMS also as
-# images, the map's *Ortofoto* layer (img-src, MF-54). It alone may ask for
-# the GM's location (geolocation=(self), MF-43), which only moves its map and is sent nowhere.
+# images to find the field (img-src), the Overpass API for the area's OSM data (connect-src), and
+# OpenStreetMap's Nominatim to find a place by its name (connect-src, MF-44). When the main Overpass
+# instance is busy, one other public instance from the OSM wiki's list (MF-51). The open orthophotos
+# (console/src/components/ortho-sources.js: the DGT's, MF-25 and MF-54; IGN España's, IGN France's and
+# PDOK's, MF-65 to MF-72), each origin both as images, the map's *Ortofoto* tiles (img-src), and as a
+# connection, the one picture fetched for the drawn image so the canvas stays exportable (connect-src;
+# each sends Access-Control-Allow-Origin: *). It alone may ask for the GM's location
+# (geolocation=(self), MF-43), which only moves its map and is sent nowhere.
 # Scripts stay same-origin; the rest of the console stays same-origin only.
 FIELD_MAP_PAGE = "/console/field-map.html"
+FIELD_MAP_ORTHOPHOTOS = ("https://ortos.dgterritorio.gov.pt", "https://www.ign.es", "https://data.geopf.fr",
+                         "https://service.pdok.nl")
 FIELD_MAP_ORIGINS = {"tiles": "https://tile.openstreetmap.org", "overpass": "https://overpass-api.de",
-                     "orthophoto": "https://ortos.dgterritorio.gov.pt", "search": "https://nominatim.openstreetmap.org",
-                     "overpass_2": "https://overpass.private.coffee"}
+                     "search": "https://nominatim.openstreetmap.org", "overpass_2": "https://overpass.private.coffee",
+                     **{f"orthophoto_{i}": origin for i, origin in enumerate(FIELD_MAP_ORTHOPHOTOS)}}
+_ORTHOPHOTOS = " ".join(FIELD_MAP_ORTHOPHOTOS)
 FIELD_MAP_HEADERS = {
     **SECURITY_HEADERS,
     "Content-Security-Policy": ("default-src 'self'; script-src 'self'; style-src 'self'; "
-                                f"img-src 'self' blob: data: {FIELD_MAP_ORIGINS['tiles']} "
-                                f"{FIELD_MAP_ORIGINS['orthophoto']}; "
+                                f"img-src 'self' blob: data: {FIELD_MAP_ORIGINS['tiles']} {_ORTHOPHOTOS}; "
                                 f"connect-src 'self' {FIELD_MAP_ORIGINS['overpass']} "
-                                f"{FIELD_MAP_ORIGINS['overpass_2']} "
-                                f"{FIELD_MAP_ORIGINS['orthophoto']} {FIELD_MAP_ORIGINS['search']}; "
+                                f"{FIELD_MAP_ORIGINS['overpass_2']} {_ORTHOPHOTOS} {FIELD_MAP_ORIGINS['search']}; "
                                 "manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; "
                                 "base-uri 'none'; form-action 'none'"),
     "Permissions-Policy": "geolocation=(self)",
