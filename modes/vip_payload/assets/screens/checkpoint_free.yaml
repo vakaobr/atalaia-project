@@ -2,45 +2,28 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Nobody holds the checkpoint. No data; the hold time comes from the game's
-# parameters. Texts in params.lang (pt or en).
+# parameters. Texts in params.lang (pt, the default, en, de or zh-tw).
 template: checkpoint_free
 layout:
   - type: row
     style: { width: fill, height: 44, background: panel }
     children:
       - type: label
-        text: PONTO DE CONTROLO
-        style: { font_size: 20, width: fill, align: center, visible: "{params.lang != 'en'}" }
-      - type: label
-        text: CHECKPOINT
-        style: { font_size: 20, width: fill, align: center, visible: "{params.lang == 'en'}" }
+        text: "{params.lang == 'en' && 'CHECKPOINT' || params.lang == 'de' && 'CHECKPOINT' || params.lang == 'zh-tw' && '檢查點' || 'PONTO DE CONTROLO'}"
+        style: { font_size: 20, width: fill, align: center }
   - type: spacer
     height: fill
   - type: label
-    text: MANTÉM PREMIDO
-    style: { font_size: 28, color: accent, visible: "{params.lang != 'en'}" }
+    text: "{params.lang == 'en' && 'HOLD TO CAPTURE' || params.lang == 'de' && 'GEDRÜCKT HALTEN' || params.lang == 'zh-tw' && '按住以佔領' || 'MANTÉM PREMIDO'}"
+    style: { font_size: 28, color: accent }
   - type: label
-    text: HOLD TO CAPTURE
-    style: { font_size: 28, color: accent, visible: "{params.lang == 'en'}" }
-  - type: label
-    text: "o botão {params.capture_hold_ms / 1000} s para capturar"
-    style: { font_size: 20, color: muted, visible: "{params.lang != 'en'}" }
-  - type: label
-    text: "Hold your button for {params.capture_hold_ms / 1000} s"
-    style: { font_size: 20, color: muted, visible: "{params.lang == 'en'}" }
+    text: "{params.lang == 'en' && 'Hold your button for' || params.lang == 'de' && 'Halte deinen Knopf' || params.lang == 'zh-tw' && '按住按鈕' || 'o botão'} {params.capture_hold_ms / 1000} {params.lang == 'en' && 's' || params.lang == 'de' && 's lang' || params.lang == 'zh-tw' && '秒' || 's para capturar'}"
+    style: { font_size: 20, color: muted }
   - type: spacer
     height: fill
   - type: label
-    text: Ninguém tem este ponto
+    text: "{params.lang == 'en' && 'Nobody holds this checkpoint' || params.lang == 'de' && 'Kein Team hält diesen Checkpoint' || params.lang == 'zh-tw' && '目前沒有隊伍佔領此檢查點' || 'Ninguém tem este ponto'}"
     style:
       font_size: 14
       color: muted
-      visible: "{params.lang != 'en'}"
-      padding: { bottom: 10 }
-  - type: label
-    text: Nobody holds this checkpoint
-    style:
-      font_size: 14
-      color: muted
-      visible: "{params.lang == 'en'}"
       padding: { bottom: 10 }

@@ -3,22 +3,22 @@
 #
 # The bomb waits to be armed. Data: arm (the attacking team), progress (0-1
 # while the attackers hold their button; the bar fills, letting go empties it);
-# lang (pt or en) from the box. Its header says READY, not STANDBY (decision BN-11).
+# lang (pt, en, de or zh-tw) from the box. Its header says READY, not STANDBY (decision BN-11).
 template: standby
 layout:
   - type: row
     style: { width: fill, height: 44, background: panel }
     children:
       - type: label
-        text: "{lang == 'pt' && 'PRONTA' || 'READY'}"
+        text: "{lang == 'pt' && 'PRONTA' || lang == 'de' && 'BEREIT' || lang == 'zh-tw' && '就緒' || 'READY'}"
         style: { font_size: 20, width: fill, align: center }
   - type: spacer
     height: fill
   - type: label
-    text: "{lang == 'pt' && (progress && 'A armar... não largues' || 'Mantém premido para armar') || (progress && 'Arming... keep holding' || 'Hold to arm')}"
+    text: "{lang == 'pt' && (progress && 'A armar... não largues' || 'Mantém premido para armar') || lang == 'de' && (progress && 'Schärfen... nicht loslassen' || 'Halten zum Schärfen') || lang == 'zh-tw' && (progress && '啟動中，別放手' || '按住以啟動') || (progress && 'Arming... keep holding' || 'Hold to arm')}"
     style: { font_size: 20, color: "{progress && 'white' || 'muted'}", visible: "{arm}" }
   - type: label
-    text: "{lang == 'pt' && 'À espera' || 'Waiting'}"
+    text: "{lang == 'pt' && 'À espera' || lang == 'de' && 'Wartet' || lang == 'zh-tw' && '等待中' || 'Waiting'}"
     style: { font_size: 20, color: muted, visible: "{!arm}" }
   - type: label
     text: "{arm|upper}"
@@ -29,7 +29,7 @@ layout:
   - type: spacer
     height: fill
   - type: label
-    text: "{lang == 'pt' && 'A bomba não está armada' || 'The bomb is not armed'}"
+    text: "{lang == 'pt' && 'A bomba não está armada' || lang == 'de' && 'Die Bombe ist nicht scharf' || lang == 'zh-tw' && '炸彈尚未啟動' || 'The bomb is not armed'}"
     style:
       font_size: 14
       color: muted

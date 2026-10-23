@@ -5,20 +5,17 @@
 # team holding a captured terminal), wires (the wires' numbers, "-" for the
 # ones cut), cut and of (wires cut, of all of them), locked (seconds left of a
 # lock, 0 when open), note (yours when the holder's team types). Texts in
-# params.lang (pt or en).
+# params.lang (pt, the default, en, de or zh-tw).
 template: hack_wires
 layout:
   - type: row
     style: { width: fill, height: 44, background: "{team || owner || 'panel'}" }
     children:
       - type: label
-        text: CORTA OS FIOS
-        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang != 'en'}" }
-      - type: label
-        text: CUT THE WIRES
-        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang == 'en'}" }
+        text: "{params.lang == 'en' && 'CUT THE WIRES' || params.lang == 'de' && 'KAPPE DIE DRÄHTE' || params.lang == 'zh-tw' && '剪斷電線' || 'CORTA OS FIOS'}"
+        style: { font_size: 20, width: fill, align: center, color: contrast }
   - type: label
-    text: "Terminal: {owner|upper}"
+    text: "{params.lang == 'zh-tw' && '終端：' || 'Terminal: '}{owner|upper}"
     style:
       font_size: 14
       color: "{owner}"
@@ -33,58 +30,31 @@ layout:
     value: "{cut / of}"
     style: { width: 260, height: 12, color: "{team || 'accent'}" }
   - type: label
-    text: "{cut} de {of} cortados"
+    text: "{cut} {params.lang == 'en' && 'of' || params.lang == 'de' && 'von' || params.lang == 'zh-tw' && '/' || 'de'} {of} {params.lang == 'en' && 'cut' || params.lang == 'de' && 'gekappt' || params.lang == 'zh-tw' && '條已剪' || 'cortados'}"
     style:
       font_size: 20
-      visible: "{!locked && params.lang != 'en'}"
+      visible: "{!locked}"
       padding: { top: 6 }
   - type: label
-    text: "{cut} of {of} cut"
-    style:
-      font_size: 20
-      visible: "{!locked && params.lang == 'en'}"
-      padding: { top: 6 }
-  - type: label
-    text: "FIO ERRADO: BLOQUEADO {locked} s"
+    text: "{params.lang == 'en' && 'WRONG WIRE: LOCKED' || params.lang == 'de' && 'FALSCH: GESPERRT' || params.lang == 'zh-tw' && '剪錯了：鎖定' || 'FIO ERRADO: BLOQUEADO'} {locked} {params.lang == 'zh-tw' && '秒' || 's'}"
     style:
       font_size: 20
       color: danger
-      visible: "{locked && params.lang != 'en'}"
-      padding: { top: 6 }
-  - type: label
-    text: "WRONG WIRE: LOCKED {locked} s"
-    style:
-      font_size: 20
-      color: danger
-      visible: "{locked && params.lang == 'en'}"
+      visible: "{locked}"
       padding: { top: 6 }
   - type: spacer
     height: fill
   - type: label
-    text: O terminal já é da tua equipa
+    text: "{params.lang == 'en' && 'Your team holds this terminal' || params.lang == 'de' && 'Dein Team hält dieses Terminal' || params.lang == 'zh-tw' && '你的隊伍已佔領這個終端' || 'O terminal já é da tua equipa'}"
     style:
       font_size: 14
       color: muted
-      visible: "{note == 'yours' && params.lang != 'en'}"
+      visible: "{note == 'yours'}"
       padding: { bottom: 10 }
   - type: label
-    text: Your team holds this terminal
+    text: "{params.lang == 'en' && 'Press the number of the wire to cut' || params.lang == 'de' && 'Drück die Nummer des Drahts' || params.lang == 'zh-tw' && '按下要剪的電線號碼' || 'Carrega no número do fio a cortar'}"
     style:
       font_size: 14
       color: muted
-      visible: "{note == 'yours' && params.lang == 'en'}"
-      padding: { bottom: 10 }
-  - type: label
-    text: Carrega no número do fio a cortar
-    style:
-      font_size: 14
-      color: muted
-      visible: "{!note && params.lang != 'en'}"
-      padding: { bottom: 10 }
-  - type: label
-    text: Press the number of the wire to cut
-    style:
-      font_size: 14
-      color: muted
-      visible: "{!note && params.lang == 'en'}"
+      visible: "{!note}"
       padding: { bottom: 10 }

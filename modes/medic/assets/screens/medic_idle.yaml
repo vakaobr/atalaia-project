@@ -3,18 +3,15 @@
 #
 # The kit waits for a player's tag. Data: remaining (heals left), team (the
 # team the kit serves, if one). The texts follow the game's params.lang
-# (pt, the default, or en).
+# (pt, the default, en, de or zh-tw).
 template: medic_idle
 layout:
   - type: row
     style: { width: fill, height: 44, background: "{team || 'panel'}" }
     children:
       - type: label
-        text: LIGADURAS
-        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang != 'en'}" }
-      - type: label
-        text: MEDIC KIT
-        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang == 'en'}" }
+        text: "{params.lang == 'en' && 'MEDIC KIT' || params.lang == 'de' && 'MEDIC-KIT' || params.lang == 'zh-tw' && '醫護包' || 'LIGADURAS'}"
+        style: { font_size: 20, width: fill, align: center, color: contrast }
   - type: spacer
     height: fill
   - type: label
@@ -22,35 +19,33 @@ layout:
     style: { font_size: 48, color: "{remaining <= 1 && 'orange' || 'white'}" }
   - type: label
     text: "Restam {remaining} ligaduras"
-    style: { font_size: 20, color: muted, visible: "{params.lang != 'en' && remaining != 1}" }
+    style: { font_size: 20, color: muted, visible: "{params.lang != 'en' && params.lang != 'de' && params.lang != 'zh-tw' && remaining != 1}" }
   - type: label
     text: Resta 1 ligadura
-    style: { font_size: 20, color: muted, visible: "{params.lang != 'en' && remaining == 1}" }
+    style: { font_size: 20, color: muted, visible: "{params.lang != 'en' && params.lang != 'de' && params.lang != 'zh-tw' && remaining == 1}" }
   - type: label
     text: "{remaining} heals left"
     style: { font_size: 20, color: muted, visible: "{params.lang == 'en' && remaining != 1}" }
   - type: label
     text: 1 heal left
     style: { font_size: 20, color: muted, visible: "{params.lang == 'en' && remaining == 1}" }
+  - type: label
+    text: "Noch {remaining} Verbände"
+    style: { font_size: 20, color: muted, visible: "{params.lang == 'de' && remaining != 1}" }
+  - type: label
+    text: Noch 1 Verband
+    style: { font_size: 20, color: muted, visible: "{params.lang == 'de' && remaining == 1}" }
+  - type: label
+    text: "還剩 {remaining} 次"
+    style: { font_size: 20, color: muted, visible: "{params.lang == 'zh-tw'}" }
   - type: spacer
     height: fill
   - type: label
-    text: Lê a tua etiqueta
-    style: { font_size: 28, color: accent, visible: "{params.lang != 'en'}" }
+    text: "{params.lang == 'en' && 'Scan your tag' || params.lang == 'de' && 'Scanne deinen Tag' || params.lang == 'zh-tw' && '感應你的標籤' || 'Lê a tua etiqueta'}"
+    style: { font_size: 28, color: accent }
   - type: label
-    text: Scan your tag
-    style: { font_size: 28, color: accent, visible: "{params.lang == 'en'}" }
-  - type: label
-    text: e mantém premido o botão
+    text: "{params.lang == 'en' && 'then hold the button' || params.lang == 'de' && 'und halte den Knopf' || params.lang == 'zh-tw' && '再按住按鈕' || 'e mantém premido o botão'}"
     style:
       font_size: 14
       color: muted
-      visible: "{params.lang != 'en'}"
-      padding: { bottom: 10 }
-  - type: label
-    text: then hold the button
-    style:
-      font_size: 14
-      color: muted
-      visible: "{params.lang == 'en'}"
       padding: { bottom: 10 }

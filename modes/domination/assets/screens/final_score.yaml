@@ -2,33 +2,33 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # The game is over. Data: owner (the team holding the zone at the end),
-# points (its points on this box); lang (pt or en) from the box.
+# points (its points on this box); lang (pt, en, de or zh-tw) from the box.
 template: final_score
 layout:
   - type: row
     style: { width: fill, height: 44, background: panel }
     children:
       - type: label
-        text: "{lang == 'pt' && 'FIM DO JOGO' || 'GAME OVER'}"
+        text: "{lang == 'pt' && 'FIM DO JOGO' || lang == 'de' && 'SPIEL VORBEI' || lang == 'zh-tw' && '遊戲結束' || 'GAME OVER'}"
         style: { font_size: 20, width: fill, align: center }
   - type: spacer
     height: fill
   - type: label
-    text: "{lang == 'pt' && 'A zona ficou com' || 'The zone was held by'}"
+    text: "{lang == 'pt' && 'A zona ficou com' || lang == 'de' && 'Zone gehalten von' || lang == 'zh-tw' && '據點最後由此隊佔領' || 'The zone was held by'}"
     style: { font_size: 20, color: muted, visible: "{owner}" }
   - type: label
     text: "{owner|upper}"
     style: { font_size: 48, color: "{owner}", visible: "{owner}" }
   - type: label
-    text: "{points} {lang == 'pt' && 'pontos nesta caixa' || 'points on this box'}"
+    text: "{points} {lang == 'pt' && 'pontos nesta caixa' || lang == 'de' && 'Punkte auf dieser Box' || lang == 'zh-tw' && '分（這個盒子）' || 'points on this box'}"
     style: { font_size: 20, visible: "{owner}" }
   - type: label
-    text: "{lang == 'pt' && 'Nenhuma equipa ficou com a zona' || 'No team held the zone'}"
+    text: "{lang == 'pt' && 'Nenhuma equipa ficou com a zona' || lang == 'de' && 'Kein Team hielt die Zone' || lang == 'zh-tw' && '沒有隊伍佔領據點' || 'No team held the zone'}"
     style: { font_size: 20, color: muted, visible: "{!owner}" }
   - type: spacer
     height: fill
   - type: label
-    text: "{lang == 'pt' && 'Pontuações finais' || 'Scores are final'}"
+    text: "{lang == 'pt' && 'Pontuações finais' || lang == 'de' && 'Endstand' || lang == 'zh-tw' && '最終分數' || 'Scores are final'}"
     style:
       font_size: 14
       color: muted

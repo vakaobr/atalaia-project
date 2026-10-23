@@ -122,13 +122,21 @@ process.
 | resettable fuse (PTC) | fusível rearmável | rückstellbare Sicherung | 可自恢復保險絲 | the target addon's port (P5J-16) *(check)* |
 | pull-up resistor | resistência de pull-up | Pull-up-Widerstand | 上拉電阻 | I2C; "pull-up" stays English in pt and de |
 | interrupt line | linha de interrupção | Interrupt-Leitung | 中斷線 | |
+| heal (at a medic kit) | tratamento | Behandlung | 治療、次 | the kit's charges: *Verbände* ("Noch 4 Verbände"); zh-tw: 「還剩 4 次」 (P5H-12) |
+| puzzle (Hacking Terminal) | enigma | Rätsel | 謎題 | zh-tw: a code guess as Taiwan's 1A2B game writes it (「2A2B」) *(check)* |
+| wire (to cut) | fio | Draht (kappen) | 電線（剪斷） | *(check)* |
+| factory / bank (Money Factory) | fábrica / banco | Fabrik / Bank | 印鈔廠 / 銀行 | collect / bank: *abholen* / *einzahlen*; zh-tw: 領錢 / 存入 |
+| payload | carga | Payload | 護送目標 | |
+| extraction zone | zona de extração | Extraktionszone, Extraktion | 撤離區 | |
+| checkpoint (VIP) | ponto de controlo | Checkpoint | 檢查點 | |
+| session (signed in) | sessão | Sitzung | 工作階段 | the site server's staff pages *(check)* |
 
 ## Mode names
 
 German players use most English mode names as they are; the German name is what the GM
-console and the app show when a mode's `mode.yaml` gets an `i18n.de` block (P5H-7: not yet).
-The Chinese names are what Taiwan's players would call these games, for an `i18n.zh-tw` block
-(P5K-1: not yet either).
+console and the app show from the mode's `mode.yaml` (`i18n.de`, P5H-12). The Chinese names are
+what Taiwan's players would call these games (`i18n.zh-tw`, P5K-13). Both drafted by an AI model,
+not yet reviewed.
 
 | English | Portuguese (pt-PT) | German (de) | Traditional Chinese (zh-tw) |
 |---|---|---|---|

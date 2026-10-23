@@ -481,7 +481,8 @@ screens:
     caption: Chrono check-in, the reading signed by the marshal.
   medic_intro: >-
     The Medic Kit draws its screens from the same YAML files on a Field Box and on an Android prop,
-    in Portuguese unless the GM sets it to English. Here they are as the app draws them:
+    in Portuguese unless the GM sets English, German or Chinese. Here they are as the app draws
+    them:
   medic_idle:
     alt: >-
       Medic Kit screen: "LIGADURAS" (Medic Kit) header, a large 4, "Restam 4 ligaduras" (4 heals
@@ -802,7 +803,7 @@ roadmap:
       project's own signature, which is what lets it reach the boxes. How to submit a mode, the
       review checklist, keys and moderation are written down. Atalaia is now in German and in
       Traditional Chinese as written in Taiwan too (this page, the GM console, the mode editor, the
-      app and the Field Box's screens), both drafted by an AI model and not yet reviewed by players
+      app, the Field Box's screens, the built-in modes and the site server's pages), both drafted by an AI model and not yet reviewed by players
       who speak them: if you play in German or in Chinese, help us review them; translations into
       other languages start at docs/translations. Next: creating the registry from its template; the
       review of the German and the Chinese; the carrier PCB after the first built boxes.

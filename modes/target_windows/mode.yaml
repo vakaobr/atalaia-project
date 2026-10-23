@@ -28,3 +28,24 @@ i18n:
       hit_points: Pontos por um tiro na janela
       min_strength: Impacto mais fraco que conta (0-255)
       multi_hit: Todos os tiros numa janela pontuam (senão, o primeiro fecha-a)
+  de:
+    name: Zielfenster
+    description: >-
+      Eine Zielscheibe leuchtet für ein paar Sekunden in der Farbe eines zufälligen Teams; ein Treffer,
+      solange sie leuchtet, punktet für dieses Team. Braucht das Ziel-Addon (ein Treffersensor und ein
+      LED-Ring).
+    params:
+      interval_s: Sekunden, die die Scheibe zwischen den Fenstern dunkel bleibt
+      window_s: Sekunden, die ein Fenster offen bleibt
+      hit_points: Punkte für einen Treffer im Fenster
+      min_strength: Schwächster Treffer, der zählt (0-255)
+      multi_hit: Jeder Treffer in einem Fenster punktet (sonst schließt der erste es)
+  zh-tw:
+    name: 標靶時窗
+    description: 標靶會隨機亮起某一隊的顏色幾秒鐘；亮著時命中就為該隊得分。需要標靶擴充模組（命中感測器與 LED 燈環）。
+    params:
+      interval_s: 兩個時窗之間標靶熄滅的秒數
+      window_s: 每個時窗開啟的秒數
+      hit_points: 時窗內命中的分數
+      min_strength: 計算命中的最小力道（0-255）
+      multi_hit: 時窗內每次命中都得分（否則第一次命中就關閉時窗）

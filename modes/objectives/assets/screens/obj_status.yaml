@@ -4,7 +4,7 @@
 # A node with nothing to do. Data: state (wait: no setup from the scenario yet;
 # off: a hidden or inactive objective; done: completed; failed), team (done: the team
 # that completed it, if one), label (the objective's name, from the setup),
-# lang (pt, the default, or en).
+# lang (pt, the default, en, de or zh-tw).
 template: obj_status
 style: { background: "{state == 'done' && team || 'background'}" }
 layout:
@@ -12,56 +12,34 @@ layout:
     style: { width: fill, height: 44, background: panel }
     children:
       - type: label
-        text: "{label || 'OBJETIVO'}"
-        style: { font_size: 20, width: fill, align: center, visible: "{lang != 'en'}" }
-      - type: label
-        text: "{label || 'OBJECTIVE'}"
-        style: { font_size: 20, width: fill, align: center, visible: "{lang == 'en'}" }
+        text: "{label || lang == 'en' && 'OBJECTIVE' || lang == 'de' && 'ZIEL' || lang == 'zh-tw' && '任務目標' || 'OBJETIVO'}"
+        style: { font_size: 20, width: fill, align: center }
   - type: spacer
     height: fill
   - type: label
-    text: À espera do cenário
-    style: { font_size: 28, visible: "{state == 'wait' && lang != 'en'}" }
+    text: "{lang == 'en' && 'Waiting for the scenario' || lang == 'de' && 'Warte aufs Szenario' || lang == 'zh-tw' && '等待劇本' || 'À espera do cenário'}"
+    style: { font_size: 28, visible: "{state == 'wait'}" }
   - type: label
-    text: Waiting for the scenario
-    style: { font_size: 28, visible: "{state == 'wait' && lang == 'en'}" }
-  - type: label
-    text: Objetivo inativo
-    style: { font_size: 28, color: muted, visible: "{state == 'off' && lang != 'en'}" }
-  - type: label
-    text: Objective inactive
-    style: { font_size: 28, color: muted, visible: "{state == 'off' && lang == 'en'}" }
+    text: "{lang == 'en' && 'Objective inactive' || lang == 'de' && 'Ziel inaktiv' || lang == 'zh-tw' && '目標未啟用' || 'Objetivo inativo'}"
+    style: { font_size: 28, color: muted, visible: "{state == 'off'}" }
   - type: icon
     icon: ok
     style: { font_size: 48, color: "{team && 'contrast' || 'accent'}", visible: "{state == 'done'}" }
   - type: label
-    text: CUMPRIDO
-    style: { font_size: 28, color: "{team && 'contrast' || 'white'}", visible: "{state == 'done' && lang != 'en'}" }
+    text: "{lang == 'en' && 'COMPLETE' || lang == 'de' && 'ERFÜLLT' || lang == 'zh-tw' && '已完成' || 'CUMPRIDO'}"
+    style: { font_size: 28, color: "{team && 'contrast' || 'white'}", visible: "{state == 'done'}" }
   - type: label
-    text: COMPLETE
-    style: { font_size: 28, color: "{team && 'contrast' || 'white'}", visible: "{state == 'done' && lang == 'en'}" }
-  - type: label
-    text: FALHADO
-    style: { font_size: 28, color: danger, visible: "{state == 'failed' && lang != 'en'}" }
-  - type: label
-    text: FAILED
-    style: { font_size: 28, color: danger, visible: "{state == 'failed' && lang == 'en'}" }
+    text: "{lang == 'en' && 'FAILED' || lang == 'de' && 'GESCHEITERT' || lang == 'zh-tw' && '失敗' || 'FALHADO'}"
+    style: { font_size: 28, color: danger, visible: "{state == 'failed'}" }
   - type: label
     text: "{team|upper}"
     style: { font_size: 20, color: contrast, visible: "{state == 'done' && team}" }
   - type: spacer
     height: fill
   - type: label
-    text: Configurado pelo controlador de campo
+    text: "{lang == 'en' && 'Set up by the field controller' || lang == 'de' && 'Eingerichtet vom Feld-Controller' || lang == 'zh-tw' && '由場地控制器設定' || 'Configurado pelo controlador de campo'}"
     style:
       font_size: 14
       color: muted
-      visible: "{state == 'wait' && lang != 'en'}"
-      padding: { bottom: 10 }
-  - type: label
-    text: Set up by the field controller
-    style:
-      font_size: 14
-      color: muted
-      visible: "{state == 'wait' && lang == 'en'}"
+      visible: "{state == 'wait'}"
       padding: { bottom: 10 }

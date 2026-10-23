@@ -22,6 +22,7 @@
 #include <string.h>
 
 #include "atalaia/screen_template.h"
+#include "box_fonts_cjk.h"
 #include "screen_types.h"
 
 #define MODE_ID_MAX 64
@@ -102,12 +103,44 @@ static bool in_fonts_c3(unsigned char d)
     return false;
 }
 
-void screen_template_fold_text(char *s)
+static bool in_table(const uint16_t *t, size_t n, uint32_t cp)
+{
+    size_t lo = 0, hi = n;
+    while (lo < hi) {
+        size_t mid = lo + (hi - lo) / 2;
+        if (t[mid] == cp) return true;
+        if (t[mid] < cp) {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+    return false;
+}
+
+#define TABLE(t) t, sizeof(t) / sizeof(t[0])
+
+/* A Chinese letter or full-width sign the label's font has (box_fonts_cjk.h, P5H-12); the 48 px
+ * font falls back on the 28 px one, as LVGL draws it. */
+static bool cjk_in_font(uint32_t cp, int font_size)
+{
+    if (font_size <= 0) font_size = 20; /* font_for's default */
+    if (font_size <= 16) return in_table(TABLE(box_fonts_cjk_14), cp);
+    if (font_size <= 24) return in_table(TABLE(box_fonts_cjk_20), cp);
+    if (font_size <= 38) return in_table(TABLE(box_fonts_cjk_28), cp);
+    return in_table(TABLE(box_fonts_cjk_48), cp) || in_table(TABLE(box_fonts_cjk_28), cp);
+}
+
+void screen_template_fold_text(char *s, int font_size)
 {
     const unsigned char *in = (const unsigned char *)s;
     char *out = s;
     while (*in) {
         unsigned char c = in[0];
+        uint32_t cp3 = 0; /* a three-byte sequence's code point, 0 for any other */
+        if (c >= 0xE0 && c <= 0xEF && (in[1] & 0xC0) == 0x80 && (in[2] & 0xC0) == 0x80) {
+            cp3 = ((uint32_t)(c & 0x0F) << 12) | ((uint32_t)(in[1] & 0x3F) << 6) | (in[2] & 0x3F);
+        }
         if (c < 0x80) {
             *out++ = (char)c;
             in++;
@@ -152,6 +185,18 @@ void screen_template_fold_text(char *s)
                 *out++ = '.';
                 *out++ = '.';
                 *out++ = '.';
+            } else {
+                *out++ = '?';
+            }
+            in += 3;
+        } else if (cp3 && ((cp3 >= 0x2E80 && cp3 <= 0x9FFF) || (cp3 >= 0xF900 && cp3 <= 0xFAFF) ||
+                           (cp3 >= 0xFF00 && cp3 <= 0xFFEF))) {
+            /* Chinese: kept when the label's font has it (the built-in templates' texts and
+             * the box's own), else '?', as a GM's name in letters no font carries (P5K-5). */
+            if (cjk_in_font(cp3, font_size)) {
+                *out++ = (char)in[0];
+                *out++ = (char)in[1];
+                *out++ = (char)in[2];
             } else {
                 *out++ = '?';
             }
@@ -468,7 +513,7 @@ void screen_template_update(const char *data_json)
             }
             if (w->type == ATALAIA_TPL_LABEL) {
                 atalaia_tpl_text(atalaia_tpl_str(&tpl, w->content), &sc, text, sizeof(text));
-                screen_template_fold_text(text);
+                screen_template_fold_text(text, w->font_size);
                 if (strcmp(lv_label_get_text(o), text) != 0) {
                     lv_label_set_text(o, text);
                     dirty = true;
@@ -500,7 +545,7 @@ void screen_template_update(const char *data_json)
                 lv_qrcode_update(o, text, (uint32_t)strlen(text));
 #else
                 lv_obj_set_style_text_color(o, lv_color_hex(fg == NOT_SET ? COLOR_TEXT : fg), 0);
-                screen_template_fold_text(text);
+                screen_template_fold_text(text, w->font_size ? w->font_size : 14);
                 lv_label_set_text(o, text);
 #endif
                 qr_hash[i] = h;

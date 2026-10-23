@@ -416,6 +416,34 @@ class EditorTests(unittest.TestCase):
         self.assertIn('id = (node_ids("master"))[1]\n', out["field_lua"])
         self.assertIn('local count, id, owner,', out["field_lua"])  # n is the loops' own
 
+    def test_german_and_chinese_texts_in_the_manifest(self):
+        """The mode's name, description and the labels of parameters and commands in pt, de and
+        zh-tw (P5H-18); a project saved before German and Chinese still loads, with none."""
+        page = self.open()
+        declare = B("atalaia_command_declare", {"NAME": "refill", "ROLES": "medic", "LABEL": "Refill the kit",
+                                                "LABEL_DE": "Kit auffüllen", "LABEL_ZH_TW": "補充醫護包"}, x=500)
+        handler = B("atalaia_on_command", {"NAME": "refill"}, {"DO": B("atalaia_log", inputs={"TEXT": ev("name")})})
+        param = B("atalaia_param_declare", {"NAME": "tick_s", "TYPE": "int", "DEFAULT": "10", "MIN": "1",
+                                            "MAX": "600", "LABEL": "Seconds", "LABEL_PT": "Segundos",
+                                            "LABEL_DE": "Sekunden", "LABEL_ZH_TW": "秒數"}, x=900)
+        proj = project(node=[declare, handler, param], roles=[{"name": "medic", "inputs": None, "needed": True}],
+                       name_pt="Kit", description_de="Ein Kit", name_zh_tw="醫護包", description_zh_tw="一個包")
+        out = self.generate(page, proj)
+        self.assertEqual(out["problems"], [])
+        i18n = yaml.safe_load(out["mode_yaml"])["i18n"]
+        self.assertEqual(list(i18n), ["pt", "de", "zh-tw"])
+        self.assertEqual(i18n["pt"], {"name": "Kit", "params": {"tick_s": "Segundos"}})
+        self.assertEqual(i18n["de"], {"description": "Ein Kit", "params": {"tick_s": "Sekunden"},
+                                      "commands": {"refill": "Kit auffüllen"}})
+        self.assertEqual(i18n["zh-tw"], {"name": "醫護包", "description": "一個包", "params": {"tick_s": "秒數"},
+                                         "commands": {"refill": "補充醫護包"}})
+        # An older project: no German or Chinese fields anywhere, so no such blocks of i18n.
+        old = project(node=[B("atalaia_param_declare", {"NAME": "tick_s", "TYPE": "int", "DEFAULT": "10",
+                                                        "MIN": "1", "MAX": "600", "LABEL": "S"}, x=0)],
+                      name_pt="Kit")
+        i18n = yaml.safe_load(self.generate(page, old)["mode_yaml"])["i18n"]
+        self.assertEqual(list(i18n), ["pt"])
+
     # ---- plan phase 3: geo, GM commands, roles, kinds, screens ----
 
     def test_geo_blocks(self):

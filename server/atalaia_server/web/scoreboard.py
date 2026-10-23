@@ -10,8 +10,8 @@ Only for a field whose admin turned it on (``PUT /api/v1/fields/{id}/history/set
 404 like a page that never existed. A live game's scores are the field's ``spectator_delay_s`` behind (60 s by
 default), so a scoreboard on a phone gives no live intelligence; nothing else of the game is shown: no
 events, no players, no parameters, no nodes (decision S20-5). Rendered like the field pages (``string.Template``,
-every value escaped, no JavaScript: the page reloads itself with ``<meta http-equiv="refresh">``), pt-PT or
-English.
+every value escaped, no JavaScript: the page reloads itself with ``<meta http-equiv="refresh">``), in the field
+pages' languages.
 """
 
 from __future__ import annotations
@@ -51,6 +51,20 @@ STRINGS = {
            "delayed": "Scores {delay} s behind. Refreshes every {refresh} s.",
            "refresh": "Refreshes every {refresh} s.",
            "footer": "The field's public scoreboard, made by the Atalaia site server. It shows no players."},
+    # German and Traditional Chinese (Taiwan): AI drafts (2026-10-23), not yet reviewed (see i18n.py).
+    "de": {"title": "Anzeigetafel: {field}", "none": "Gerade läuft kein Spiel.", "team": "Team", "score": "Punkte",
+           "state_ready": "in Vorbereitung", "state_running": "läuft", "state_paused": "pausiert",
+           "state_ended": "beendet", "winner": "gewinnt", "draw": "unentschieden",
+           "delayed": "Punkte {delay} s verzögert. Aktualisiert sich alle {refresh} s.",
+           "refresh": "Aktualisiert sich alle {refresh} s.",
+           "footer": "Die öffentliche Anzeigetafel des Spielfelds, erstellt vom Atalaia-Site-Server. Sie zeigt "
+                     "keine Spielenden."},
+    "zh-tw": {"title": "記分板：{field}", "none": "目前沒有進行中的遊戲。", "team": "隊伍", "score": "分數",
+              "state_ready": "準備中", "state_running": "進行中", "state_paused": "已暫停",
+              "state_ended": "已結束", "winner": "獲勝", "draw": "平手",
+              "delayed": "分數延遲 {delay} 秒。每 {refresh} 秒更新一次。",
+              "refresh": "每 {refresh} 秒更新一次。",
+              "footer": "場地的公開記分板，由 Atalaia 場地伺服器產生。不會顯示玩家。"},
 }
 assert set(STRINGS) == set(i18n.LANGUAGES)
 
@@ -111,7 +125,7 @@ async def scoreboard_page(slug: str, request: Request, db: AsyncSession = Depend
     else:
         status = t[f"state_{game['state']}"]
         if game["state"] == "ended" and game["winner"] is None:
-            status += f" ({t['draw']})"
+            status += i18n.paren(t["draw"], page.lang)
         body = (f'<h2>{esc(game["name"])}</h2>\n<p class="when"><code>{esc(game["mode_id"])}</code> · '
                 f"{esc(status)}</p>\n" + _table(t, game))
         note = (t["delayed"].format(delay=state["delay_s"], refresh=REFRESH_S) if state["delay_s"]

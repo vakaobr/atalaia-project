@@ -22,7 +22,7 @@ params:
   max_heals_per_player: { type: int, min: 0, max: 100, default: 2, label: "Heals per player in the game, at every kit (0: no limit)" }
   cooldown_s:           { type: int, min: 0, max: 3600, default: 0, label: "Seconds a player waits between two heals (0: no wait)" }
   team:                 { type: team, optional: true, label: "Team the kit serves (empty: every team)" }
-  lang:                 { type: string, default: pt, max: 2, label: "Language of the kit's screen: pt or en" }
+  lang:                 { type: string, default: pt, max: 5, label: "Language of the kit's screen: pt, en, de or zh-tw" }
 commands:
   refill: { roles: [medic], label: "Refill the kit" }
 i18n:
@@ -41,6 +41,36 @@ i18n:
       max_heals_per_player: "Tratamentos por pessoa no jogo, em todos os kits (0: sem limite)"
       cooldown_s: "Segundos de espera entre dois tratamentos da mesma pessoa (0: sem espera)"
       team: "Equipa que o kit serve (vazio: todas)"
-      lang: "Língua do ecrã do kit: pt ou en"
+      lang: "Língua do ecrã do kit: pt, en, de ou zh-tw"
     commands:
       refill: Repor as ligaduras
+  de:
+    name: Medic-Kit
+    description: >-
+      Ein Medic-Kit neben jedem Spiel. Wer getroffen wurde, scannt den eigenen signierten NFC-Tag und hält
+      einen Knopf so lange, wie die Orga es festlegt, um behandelt zu werden; zu frühes Loslassen bricht ab.
+      Das Kit hat eine Zahl von Behandlungen und zeigt, wie viele übrig sind; jede Person kann pro Spiel an
+      allen Kits nur begrenzt oft behandelt werden, und die Spielleitung und die Spielenden sehen jede
+      Behandlung. Gefälschte Tags, Tags aus einem anderen Spiel und Spielende eines Teams, dem das Kit nicht
+      dient, werden abgelehnt, und der Bildschirm sagt, warum.
+    params:
+      heal_hold_s: Sekunden, die man zum Behandeln den Knopf hält
+      charges: Behandlungen im Kit
+      max_heals_per_player: "Behandlungen pro Person im Spiel, an allen Kits (0: kein Limit)"
+      cooldown_s: "Sekunden Wartezeit zwischen zwei Behandlungen (0: keine)"
+      team: "Team, dem das Kit dient (leer: alle Teams)"
+      lang: "Sprache des Kit-Bildschirms: pt, en, de oder zh-tw"
+    commands:
+      refill: Kit auffüllen
+  zh-tw:
+    name: 醫護包
+    description: 可搭配任何遊戲的醫護包。中彈的玩家感應自己已簽署的 NFC 標籤，再按住按鈕到主辦設定的時間，即可接受治療；太早放開就會取消。醫護包有固定的治療次數並顯示剩餘次數；每位玩家每場遊戲在所有醫護包合計的治療次數有限，主辦與玩家都看得到每一次治療。偽造的標籤、其他遊戲的標籤，以及醫護包不服務的隊伍的玩家都會被拒絕，畫面會說明原因。
+    params:
+      heal_hold_s: 接受治療需按住按鈕的秒數
+      charges: 醫護包的治療次數
+      max_heals_per_player: 每位玩家每場遊戲的治療次數，所有醫護包合計（0：不限）
+      cooldown_s: 兩次治療之間需等待的秒數（0：不用等）
+      team: 醫護包服務的隊伍（空白：所有隊伍）
+      lang: 醫護包畫面的語言：pt、en、de 或 zh-tw
+    commands:
+      refill: 補充醫護包

@@ -30,3 +30,23 @@ i18n:
       penalty_points: Pontos que perde a equipa de quem foi abatido
       turn_in_s: Segundos para ler etiquetas depois de carregar no botão da equipa
       retag_after_s: Segundos até a etiqueta da mesma pessoa voltar a contar
+  de:
+    name: Kill Confirmed
+    description: >-
+      Die Spielenden tragen signierte NFC-Tags. Ein Team drückt seinen Knopf an der Station und scannt die
+      gesammelten Tags: der Tag eines Gegners bestätigt den Kill (Punkte für das Team, ein Abzug für das Team
+      des Tags), der Tag eines Teammitglieds verweigert ihn. Gefälschte Tags und Tags aus einem anderen Spiel
+      werden abgelehnt.
+    params:
+      confirm_points: Punkte für einen bestätigten Kill
+      penalty_points: Punkte, die das Team der getroffenen Person verliert
+      turn_in_s: Sekunden zum Scannen der Tags nach dem Teamknopf
+      retag_after_s: Sekunden, bis der Tag derselben Person wieder zählt
+  zh-tw:
+    name: 擊殺確認
+    description: 玩家身上帶著已簽署的 NFC 標籤。隊伍在站點按下自己的按鈕，再感應收集到的標籤：敵人的標籤確認擊殺（該隊得分，標籤所屬的隊伍扣分），隊友的標籤則否決擊殺。偽造的標籤與其他遊戲的標籤會被拒絕。
+    params:
+      confirm_points: 確認擊殺的分數
+      penalty_points: 被擊殺玩家的隊伍扣除的分數
+      turn_in_s: 按下隊伍按鈕後感應標籤的秒數
+      retag_after_s: 同一位玩家的標籤再次計算前的秒數

@@ -3,33 +3,33 @@
 #
 # The target is dark between windows. Data: team (the team of the last
 # scoring hit, if any) and hits (scoring hits on this target so far);
-# lang (pt or en) from the box.
+# lang (pt, en, de or zh-tw) from the box.
 template: standby
 layout:
   - type: row
     style: { width: fill, height: 44, background: panel }
     children:
       - type: label
-        text: "{lang == 'pt' && 'ALVO' || 'TARGET'}"
+        text: "{lang == 'pt' && 'ALVO' || lang == 'de' && 'ZIELSCHEIBE' || lang == 'zh-tw' && '標靶' || 'TARGET'}"
         style: { font_size: 20, width: fill, align: center }
   - type: spacer
     height: fill
   - type: label
-    text: "{lang == 'pt' && 'À ESPERA' || 'STAND BY'}"
+    text: "{lang == 'pt' && 'À ESPERA' || lang == 'de' && 'WARTEN' || lang == 'zh-tw' && '待命' || 'STAND BY'}"
     style: { font_size: 28, color: accent }
   - type: label
-    text: "{lang == 'pt' && 'Espera pela tua cor' || 'Wait for your colour'}"
+    text: "{lang == 'pt' && 'Espera pela tua cor' || lang == 'de' && 'Warte auf deine Farbe' || lang == 'zh-tw' && '等你的顏色亮起' || 'Wait for your colour'}"
     style: { font_size: 20, color: muted }
   - type: label
-    text: "{lang == 'pt' && 'Último acerto' || 'Last hit'}: {team|upper}"
+    text: "{lang == 'pt' && 'Último acerto' || lang == 'de' && 'Letzter Treffer' || lang == 'zh-tw' && '上次命中' || 'Last hit'}{lang == 'zh-tw' && '：' || ': '}{team|upper}"
     style: { font_size: 20, color: team, visible: "{team}" }
   - type: label
-    text: "{hits} {lang == 'pt' && 'acertos que contam' || 'scoring hits'}"
+    text: "{hits} {lang == 'pt' && 'acertos que contam' || lang == 'de' && 'Treffer mit Punkten' || lang == 'zh-tw' && '次有效命中' || 'scoring hits'}"
     style: { font_size: 14, color: muted, visible: "{hits > 0}" }
   - type: spacer
     height: fill
   - type: label
-    text: "{lang == 'pt' && 'Acerta no alvo enquanto mostra a tua cor' || 'Hit the target while it shows your colour'}"
+    text: "{lang == 'pt' && 'Acerta no alvo enquanto mostra a tua cor' || lang == 'de' && 'Triff, solange sie deine Farbe zeigt' || lang == 'zh-tw' && '標靶亮你的顏色時射擊' || 'Hit the target while it shows your colour'}"
     style:
       font_size: 14
       color: muted

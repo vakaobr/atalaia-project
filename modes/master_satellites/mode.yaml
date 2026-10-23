@@ -31,3 +31,24 @@ i18n:
       points_per_tick: Pontos por intervalo só pela mestre
       satellite_bonus_pct: Bónus por satélite, em % dos pontos da mestre (arredondado para baixo)
       min_satellites: Satélites de que a equipa da mestre precisa antes de a mestre pontuar
+  de:
+    name: Master und Satelliten
+    description: >-
+      Teams nehmen eine Master-Box und ihre Satelliten ein wie bei Domination. Nur der Master punktet, und die
+      Satelliten, die sein Team auch hält, erhöhen seine Punkte; wechselt der Master den Besitz, werden alle
+      Satelliten wieder frei.
+    params:
+      capture_hold_ms: Haltezeit zum Einnehmen (ms)
+      tick_s: Sekunden pro Wertungsintervall, solange ein Team den Master hält
+      points_per_tick: Punkte pro Intervall für den Master allein
+      satellite_bonus_pct: Bonus pro gehaltenem Satelliten, in % der Master-Punkte (abgerundet)
+      min_satellites: Satelliten, die das Team des Masters braucht, bevor der Master punktet
+  zh-tw:
+    name: 主站與衛星
+    description: 各隊像佔點模式一樣佔領主站盒子與它的衛星。只有主站會得分，佔有主站的隊伍同時佔有的衛星會提高主站的分數；主站易手時，所有衛星都回到中立。
+    params:
+      capture_hold_ms: 佔領需按住的時間（毫秒）
+      tick_s: 一隊佔有主站時的計分間隔（秒）
+      points_per_tick: 主站本身每次計分的分數
+      satellite_bonus_pct: 每個佔有的衛星的加成，主站分數的 %（無條件捨去）
+      min_satellites: 主站開始計分前，佔有主站的隊伍需要的衛星數

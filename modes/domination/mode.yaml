@@ -20,3 +20,17 @@ i18n:
       capture_hold_ms: Tempo a premir para capturar (ms)
       tick_s: Segundos por intervalo de pontuação
       points_per_tick: Pontos por intervalo
+  de:
+    name: Domination
+    description: Das letzte Team, das die Box einnimmt, punktet, solange es sie hält.
+    params:
+      capture_hold_ms: Haltezeit zum Einnehmen (ms)
+      tick_s: Sekunden pro Wertungsintervall
+      points_per_tick: Punkte pro Intervall
+  zh-tw:
+    name: 佔點
+    description: 最後佔領盒子的隊伍，在佔有期間持續得分。
+    params:
+      capture_hold_ms: 佔領需按住的時間（毫秒）
+      tick_s: 每次計分間隔（秒）
+      points_per_tick: 每次計分的分數

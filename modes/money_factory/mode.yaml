@@ -42,3 +42,33 @@ i18n:
       capture_hold_ms: Tempo a premir para capturar uma fábrica (ms)
       target: "Dinheiro que uma equipa deposita para ganhar o jogo (0: sem fim)"
       drop_on_heal: Quem recebe tratamento num kit de ligaduras perde o dinheiro que leva
+  de:
+    name: Money Factory
+    description: >-
+      Teams nehmen Fabrik-Boxen ein, die Geld machen, solange sie gehalten werden. Die Spielenden holen es ab,
+      indem sie ihren signierten NFC-Tag an der Fabrik ihres Teams scannen, tragen es über das Feld und zahlen
+      es ein, indem sie ihren Tag an einer Bank-Box scannen: eingezahltes Geld sind Punkte. Der Controller
+      merkt sich, was jede Person trägt, so kann das Geld an einer Box abgeholt und an einer anderen
+      eingezahlt werden. Wer an einem Medic-Kit behandelt wird, verliert das getragene Geld, und ein Team, das
+      das Ziel einzahlt, gewinnt.
+    params:
+      production: Geld, das eine Fabrik pro Intervall macht
+      tick_s: Sekunden pro Intervall einer Fabrik
+      capacity: Meistes Geld, das eine Fabrik fasst
+      carry_max: "Meistes Geld, das eine Person trägt (0: kein Limit)"
+      capture: "Teams nehmen die Fabriken ein: eine Fabrik macht nur Geld, solange sie gehalten wird, und nur ihr Team holt ab (aus: immer, und alle)"
+      capture_hold_ms: Haltezeit zum Einnehmen einer Fabrik (ms)
+      target: "Geld, das ein Team zum Sieg einzahlt (0: kein Ende)"
+      drop_on_heal: Wer an einem Medic-Kit behandelt wird, verliert das getragene Geld
+  zh-tw:
+    name: 印鈔廠
+    description: 各隊佔領印鈔廠盒子，佔有期間印鈔廠會產生金錢。玩家在自己隊伍的印鈔廠感應已簽署的 NFC 標籤領錢，帶著穿越場地，再到銀行盒子感應標籤存入：存入的錢就是分數。場地控制器會記住每位玩家身上的錢，所以可以在一個盒子領錢、到另一個盒子存入。在醫護包接受治療的玩家會失去身上的錢，存到目標金額的隊伍獲勝。
+    params:
+      production: 印鈔廠每次間隔產生的金錢
+      tick_s: 印鈔廠的間隔秒數
+      capacity: 印鈔廠最多可存的金錢
+      carry_max: 每位玩家最多可帶的金錢（0：不限）
+      capture: 各隊要佔領印鈔廠：只有被佔有時才會產生金錢，也只有該隊能領錢（關閉：一直產生，誰都能領）
+      capture_hold_ms: 佔領印鈔廠需按住的時間（毫秒）
+      target: 隊伍存到這個金額即獲勝（0：不結束）
+      drop_on_heal: 在醫護包接受治療的玩家會失去身上的錢

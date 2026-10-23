@@ -12,7 +12,7 @@ layout:
     style: { width: fill, height: 44, background: team }
     children:
       - type: label
-        text: "{lang == 'pt' && 'REI DA COLINA' || 'KING OF THE HILL'}"
+        text: "{lang == 'pt' && 'REI DA COLINA' || lang == 'de' && 'KING OF THE HILL' || lang == 'zh-tw' && '山頭爭奪戰' || 'KING OF THE HILL'}"
         style: { font_size: 20, width: fill, align: center, color: contrast }
   - type: spacer
     height: fill
@@ -20,14 +20,14 @@ layout:
     text: "{team|upper}"
     style: { font_size: 48, color: team }
   - type: label
-    text: "{points} {lang == 'pt' && 'pontos nesta caixa' || 'points on this box'}"
+    text: "{points} {lang == 'pt' && 'pontos nesta caixa' || lang == 'de' && 'Punkte auf dieser Box' || lang == 'zh-tw' && '分（這個盒子）' || 'points on this box'}"
     style: { font_size: 20 }
   # |clock shows seconds as M:SS.
   - type: label
-    text: "{lang == 'pt' && 'desde' || 'held since'} {since|clock}"
+    text: "{lang == 'pt' && 'desde' || lang == 'de' && 'seit' || lang == 'zh-tw' && '佔領於' || 'held since'} {since|clock}"
     style: { font_size: 14, color: muted, visible: "{!taker}" }
   - type: label
-    text: "{lang == 'pt' && 'A tomar:' || 'Taking:'} {taker|upper}"
+    text: "{lang == 'pt' && 'A tomar:' || lang == 'de' && 'Übernahme:' || lang == 'zh-tw' && '奪取中' || 'Taking:'} {taker|upper}"
     style: { font_size: 14, color: "{taker}", visible: "{taker}" }
   - type: progress_bar
     value: "{progress}"
@@ -35,7 +35,7 @@ layout:
   - type: spacer
     height: fill
   - type: label
-    text: "{lang == 'pt' && 'Mantém o botão premido para a tomar' || 'Hold your button to take it'}"
+    text: "{lang == 'pt' && 'Mantém o botão premido para a tomar' || lang == 'de' && 'Halte den Knopf zum Übernehmen' || lang == 'zh-tw' && '按住你的按鈕即可奪取' || 'Hold your button to take it'}"
     style:
       font_size: 14
       color: muted

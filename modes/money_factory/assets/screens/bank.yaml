@@ -9,7 +9,7 @@ layout:
     style: { width: fill, height: 44, background: panel }
     children:
       - type: label
-        text: "{lang == 'pt' && 'BANCO' || 'BANK'}"
+        text: "{lang == 'pt' && 'BANCO' || lang == 'de' && 'BANK' || lang == 'zh-tw' && '銀行' || 'BANK'}"
         style: { font_size: 20, width: fill, align: center }
   - type: spacer
     height: fill
@@ -17,7 +17,7 @@ layout:
     text: "{total}"
     style: { font_size: 48 }
   - type: label
-    text: "{lang == 'pt' && 'depositado neste banco' || 'banked here'}"
+    text: "{lang == 'pt' && 'depositado neste banco' || lang == 'de' && 'hier eingezahlt' || lang == 'zh-tw' && '存在這間銀行' || 'banked here'}"
     style: { font_size: 20, color: muted }
   - type: label
     text: "{counts}"
@@ -25,7 +25,7 @@ layout:
   - type: spacer
     height: fill
   - type: label
-    text: "{lang == 'pt' && 'Lê a tua etiqueta para depositar' || 'Scan your tag to bank your money'}"
+    text: "{lang == 'pt' && 'Lê a tua etiqueta para depositar' || lang == 'de' && 'Scanne deinen Tag zum Einzahlen' || lang == 'zh-tw' && '感應你的標籤來存錢' || 'Scan your tag to bank your money'}"
     style:
       font_size: 14
       color: muted

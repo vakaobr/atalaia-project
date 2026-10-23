@@ -73,7 +73,7 @@ export function lang() {
 }
 
 /** A mode's name or description in the current language (mode.yaml "i18n"), else the manifest's
- * (English: modes have no German yet, decision P5H-7). */
+ * (English for a language the manifest lacks; the built-in modes have pt, de and zh-tw, P5H-12). */
 export function modeText(mode, key) {
     const tr = mode && mode.i18n && mode.i18n[current];
     return (tr && typeof tr[key] === 'string' && tr[key]) || (mode && mode[key]) || '';

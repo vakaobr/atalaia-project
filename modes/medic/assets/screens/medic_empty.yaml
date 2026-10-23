@@ -2,42 +2,29 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # The kit has no heals left until the organisers refill it. Data: team (the
-# team the kit serves, if one). Texts in params.lang (pt or en).
+# team the kit serves, if one). Texts in params.lang (pt, the default, en, de or
+# zh-tw).
 template: medic_empty
 layout:
   - type: row
     style: { width: fill, height: 44, background: "{team || 'panel'}" }
     children:
       - type: label
-        text: LIGADURAS
-        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang != 'en'}" }
-      - type: label
-        text: MEDIC KIT
-        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang == 'en'}" }
+        text: "{params.lang == 'en' && 'MEDIC KIT' || params.lang == 'de' && 'MEDIC-KIT' || params.lang == 'zh-tw' && '醫護包' || 'LIGADURAS'}"
+        style: { font_size: 20, width: fill, align: center, color: contrast }
   - type: spacer
     height: fill
   - type: label
     text: "0"
     style: { font_size: 48, color: danger }
   - type: label
-    text: Sem ligaduras
-    style: { font_size: 28, color: danger, visible: "{params.lang != 'en'}" }
-  - type: label
-    text: The kit is empty
-    style: { font_size: 28, color: danger, visible: "{params.lang == 'en'}" }
+    text: "{params.lang == 'en' && 'The kit is empty' || params.lang == 'de' && 'Das Kit ist leer' || params.lang == 'zh-tw' && '醫護包已用完' || 'Sem ligaduras'}"
+    style: { font_size: 28, color: danger }
   - type: spacer
     height: fill
   - type: label
-    text: A organização pode repor o kit
+    text: "{params.lang == 'en' && 'The organisers can refill it' || params.lang == 'de' && 'Die Orga kann es auffüllen' || params.lang == 'zh-tw' && '主辦可以補充醫護包' || 'A organização pode repor o kit'}"
     style:
       font_size: 14
       color: muted
-      visible: "{params.lang != 'en'}"
-      padding: { bottom: 10 }
-  - type: label
-    text: The organisers can refill it
-    style:
-      font_size: 14
-      color: muted
-      visible: "{params.lang == 'en'}"
       padding: { bottom: 10 }

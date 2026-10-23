@@ -18,7 +18,7 @@ Each domain keeps the format it was built with (decision P5R-11):
     app       app/lib/l10n/strings_<lang>.dart              the Flutter app ("-" as "_")
     box       firmware/esp32/main/box_text.c                the Field Box's screens (one column a language)
     server    server/atalaia_server/web/i18n.py, staff_i18n.py   the site server's pages
-    modes     modes/*/mode.yaml (i18n.<lang>)               the built-in modes' names, read only for the table
+    modes     modes/*/mode.yaml (i18n.<lang>)               the built-in modes' names, descriptions, labels
 
 The languages and their state are in docs/translations/status.yaml. For each domain a language
 has, the check fails when it has a key English lacks, a placeholder English does not have (or
@@ -221,15 +221,27 @@ def read_server(root: Path) -> Domain:
 
 
 def read_modes(root: Path) -> Domain:
+    """The built-in modes' manifests: name, description, every parameter's label (a parameter
+    without one, such as Bomb's teams, is named by its name in English) and every command's, as
+    <mode>.<key> (P5H-12)."""
     tables: dict[str, dict[str, str]] = {}
+    where: dict[str, str] = {}
     for path in sorted((root / "modes").glob("*/mode.yaml")):
         manifest = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         mode = path.parent.name
-        tables.setdefault(BASE, {})[mode] = str(manifest.get("name", ""))
+        en = tables.setdefault(BASE, {})
+        en[f"{mode}.name"] = str(manifest.get("name", ""))
+        en[f"{mode}.description"] = " ".join(str(manifest.get("description", "")).split())
+        for section in ("params", "commands"):
+            for name, spec in (manifest.get(section) or {}).items():
+                label = spec.get("label") if isinstance(spec, dict) else None
+                en[f"{mode}.{section}.{name}"] = str(label or name)
         for lang, texts in (manifest.get("i18n") or {}).items():
-            if isinstance(texts, dict) and texts.get("name"):
-                tables.setdefault(lang, {})[mode] = str(texts["name"])
-    return Domain("modes", BRACES, tables, {}, read_only=True)
+            where[lang] = "modes/*/mode.yaml"
+            table = tables.setdefault(lang, {})
+            for key, text in flatten(texts if isinstance(texts, dict) else {}).items():
+                table[f"{mode}.{key}"] = " ".join(text.split())
+    return Domain("modes", BRACES, tables, where)
 
 
 def rel(path: Path, root: Path = REPO) -> str:

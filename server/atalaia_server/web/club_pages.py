@@ -9,7 +9,7 @@
 
 Only a club with ``public_page`` on that no server administrator hid has them; anything else is a 404,
 the same as a club that never existed (decision S18-8). Rendered like the field pages (``field_pages``:
-``string.Template`` with every value escaped, pt-PT or English, ETags, no script); no member is ever named.
+``string.Template`` with every value escaped, in their languages, ETags, no script); no member is ever named.
 A report keeps no address; the reports per address are limited (5 an hour, ``Limits.reports``).
 """
 

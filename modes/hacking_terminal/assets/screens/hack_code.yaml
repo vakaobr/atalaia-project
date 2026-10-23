@@ -5,22 +5,19 @@
 # team holding a captured terminal), typed (the digits typed, "_" for the
 # rest), digits, tries, g1-g3 / r1-r3 / c1-c3 (the last guesses, newest
 # first: the guess, digits in the right place, digits in the code but
-# elsewhere), locked (seconds left of a lock, 0 when open, shown at the
-# bottom instead of the note), note (the line at the bottom: enter, short
-# for a guess too short, yours when its holder types). Texts in params.lang (pt or en).
+# elsewhere; zh-tw: 1A2B), locked (seconds left of a lock, 0 when open, shown
+# at the bottom instead of the note), note (enter, short for a guess too
+# short, yours when its holder types). Texts in params.lang (pt, en, de, zh-tw).
 template: hack_code
 layout:
   - type: row
     style: { width: fill, height: 44, background: "{team || owner || 'panel'}" }
     children:
       - type: label
-        text: DECIFRA O CÓDIGO
-        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang != 'en'}" }
-      - type: label
-        text: CRACK THE CODE
-        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang == 'en'}" }
+        text: "{params.lang == 'en' && 'CRACK THE CODE' || params.lang == 'de' && 'KNACK DEN CODE' || params.lang == 'zh-tw' && '破解代碼' || 'DECIFRA O CÓDIGO'}"
+        style: { font_size: 20, width: fill, align: center, color: contrast }
   - type: label
-    text: "Terminal: {owner|upper}"
+    text: "{params.lang == 'zh-tw' && '終端：' || 'Terminal: '}{owner|upper}"
     style:
       font_size: 14
       color: "{owner}"
@@ -32,78 +29,41 @@ layout:
     text: "{typed}"
     style: { font_size: 48, color: "{locked && 'muted' || 'accent'}" }
   - type: label
-    text: "{g1}: {r1} no sítio, {c1} fora"
-    style: { font_size: 20, visible: "{g1 && params.lang != 'en'}" }
+    text: "{g1}: {r1}{params.lang == 'en' && ' right, ' || params.lang == 'de' && ' richtig, ' || params.lang == 'zh-tw' && 'A' || ' no sítio, '}{c1}{params.lang == 'en' && ' wrong place' || params.lang == 'de' && ' falsch' || params.lang == 'zh-tw' && 'B' || ' fora'}"
+    style: { font_size: 20, visible: "{g1}" }
   - type: label
-    text: "{g1}: {r1} right, {c1} wrong place"
-    style: { font_size: 20, visible: "{g1 && params.lang == 'en'}" }
+    text: "{g2}: {r2}{params.lang == 'en' && ' right, ' || params.lang == 'de' && ' richtig, ' || params.lang == 'zh-tw' && 'A' || ' no sítio, '}{c2}{params.lang == 'en' && ' wrong place' || params.lang == 'de' && ' falsch' || params.lang == 'zh-tw' && 'B' || ' fora'}"
+    style: { font_size: 14, color: muted, visible: "{g2}" }
   - type: label
-    text: "{g2}: {r2} no sítio, {c2} fora"
-    style: { font_size: 14, color: muted, visible: "{g2 && params.lang != 'en'}" }
-  - type: label
-    text: "{g2}: {r2} right, {c2} wrong place"
-    style: { font_size: 14, color: muted, visible: "{g2 && params.lang == 'en'}" }
-  - type: label
-    text: "{g3}: {r3} no sítio, {c3} fora"
-    style: { font_size: 14, color: muted, visible: "{g3 && params.lang != 'en'}" }
-  - type: label
-    text: "{g3}: {r3} right, {c3} wrong place"
-    style: { font_size: 14, color: muted, visible: "{g3 && params.lang == 'en'}" }
+    text: "{g3}: {r3}{params.lang == 'en' && ' right, ' || params.lang == 'de' && ' richtig, ' || params.lang == 'zh-tw' && 'A' || ' no sítio, '}{c3}{params.lang == 'en' && ' wrong place' || params.lang == 'de' && ' falsch' || params.lang == 'zh-tw' && 'B' || ' fora'}"
+    style: { font_size: 14, color: muted, visible: "{g3}" }
   - type: spacer
     height: fill
   - type: label
-    text: "Marca {digits} algarismos e #"
+    text: "{params.lang == 'en' && 'Type' || params.lang == 'de' && 'Tippe' || params.lang == 'zh-tw' && '輸入' || 'Marca'} {digits} {params.lang == 'en' && 'digits, then #' || params.lang == 'de' && 'Ziffern, dann #' || params.lang == 'zh-tw' && '位數字再按 #' || 'algarismos e #'}"
     style:
       font_size: 14
       color: muted
-      visible: "{!locked && note == 'enter' && params.lang != 'en'}"
+      visible: "{!locked && note == 'enter'}"
       padding: { bottom: 10 }
   - type: label
-    text: "Type {digits} digits, then #"
+    text: "{params.lang == 'en' && 'The code has' || params.lang == 'de' && 'Der Code hat' || params.lang == 'zh-tw' && '代碼有' || 'O código tem'} {digits} {params.lang == 'en' && 'digits' || params.lang == 'de' && 'Ziffern' || params.lang == 'zh-tw' && '位數' || 'algarismos'}"
     style:
       font_size: 14
       color: muted
-      visible: "{!locked && note == 'enter' && params.lang == 'en'}"
+      visible: "{!locked && note == 'short'}"
       padding: { bottom: 10 }
   - type: label
-    text: "O código tem {digits} algarismos"
+    text: "{params.lang == 'en' && 'Your team holds this terminal' || params.lang == 'de' && 'Dein Team hält dieses Terminal' || params.lang == 'zh-tw' && '你的隊伍已佔領這個終端' || 'O terminal já é da tua equipa'}"
     style:
       font_size: 14
       color: muted
-      visible: "{!locked && note == 'short' && params.lang != 'en'}"
+      visible: "{!locked && note == 'yours'}"
       padding: { bottom: 10 }
   - type: label
-    text: "The code has {digits} digits"
-    style:
-      font_size: 14
-      color: muted
-      visible: "{!locked && note == 'short' && params.lang == 'en'}"
-      padding: { bottom: 10 }
-  - type: label
-    text: "O terminal já é da tua equipa"
-    style:
-      font_size: 14
-      color: muted
-      visible: "{!locked && note == 'yours' && params.lang != 'en'}"
-      padding: { bottom: 10 }
-  - type: label
-    text: "Your team holds this terminal"
-    style:
-      font_size: 14
-      color: muted
-      visible: "{!locked && note == 'yours' && params.lang == 'en'}"
-      padding: { bottom: 10 }
-  - type: label
-    text: "BLOQUEADO {locked} s"
+    text: "{params.lang == 'en' && 'LOCKED' || params.lang == 'de' && 'GESPERRT' || params.lang == 'zh-tw' && '鎖定' || 'BLOQUEADO'} {locked} {params.lang == 'zh-tw' && '秒' || 's'}"
     style:
       font_size: 20
       color: danger
-      visible: "{locked && params.lang != 'en'}"
-      padding: { bottom: 8 }
-  - type: label
-    text: "LOCKED {locked} s"
-    style:
-      font_size: 20
-      color: danger
-      visible: "{locked && params.lang == 'en'}"
+      visible: "{locked}"
       padding: { bottom: 8 }

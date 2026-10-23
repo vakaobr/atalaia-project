@@ -27,25 +27,30 @@ languages:
     # Texts added in English and Portuguese after the draft (the GM console's scenario blocks and
     # hidden areas, the app's phone controller and out-of-bounds warning) drafted the same way.
     gaps_filled: 2026-10-22
+    # The built-in modes (mode.yaml i18n.de, their screen templates, the Medic Kit's refusals, the
+    # registry's sample) and the site server's pages, drafted the same way (P5H-7, P5H-8, P5H-12).
+    modes_and_server: 2026-10-23
     review: >-
-      drafted by an AI model (Claude) on 2026-10-22, not yet reviewed by a native-speaking player.
-      Review it with docs/translations/glossary.md, then set status to complete and name the
-      reviewer here.
+      drafted by an AI model (Claude) on 2026-10-22 and 2026-10-23, not yet reviewed by a
+      native-speaking player. Review it with docs/translations/glossary.md, then set status to
+      complete and name the reviewer here.
     reviewed_by: null
-    # Where German exists. Mode manifests (mode.yaml i18n) and the site server's pages have none
-    # yet (decisions P5H-7, P5H-8).
-    domains: [site, console, editor, app, box]
+    # Where German exists: modes is the built-in modes' manifests (their screen templates are
+    # checked by the mode tests and the reference images *_de.png), server the site server's pages.
+    domains: [site, console, editor, app, box, modes, server]
   zh-tw:
     name: 繁體中文（台灣）
     status: draft
     drafted: 2026-10-22
+    # The built-in modes and the site server's pages, as German's (P5H-12, P5K-13).
+    modes_and_server: 2026-10-23
     review: >-
-      Traditional Chinese as written in Taiwan, drafted by an AI model (Claude) on 2026-10-22, not
-      yet reviewed by a native-speaking player. Review it with docs/translations/glossary.md (the
-      zh-tw column), in the running console, app and editor and in the box's reference images
+      Traditional Chinese as written in Taiwan, drafted by an AI model (Claude) on 2026-10-22 and
+      2026-10-23, not yet reviewed by a native-speaking player. Review it with
+      docs/translations/glossary.md (the zh-tw column), in the running console, app, editor and
+      site server pages and in the box's reference images
       (firmware/esp32/test/screens/*_zh-tw.png), then set status to complete and name the
       reviewer here.
     reviewed_by: null
-    # Where Traditional Chinese exists. Mode manifests (mode.yaml i18n) and the site server's
-    # pages have none yet (decisions P5H-7, P5H-8, P5K-1).
-    domains: [site, console, editor, app, box]
+    # Where Traditional Chinese exists (modes and server as German's).
+    domains: [site, console, editor, app, box, modes, server]

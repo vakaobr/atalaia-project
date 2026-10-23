@@ -1,10 +1,17 @@
 # SPDX-FileCopyrightText: 2026 The Atalaia contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""The field pages' texts in pt-PT and English, the language choice and dates in the field's zone.
+"""The field pages' texts in pt-PT, English, German and Traditional Chinese (Taiwan), the language choice
+and dates in the field's zone.
 
 Portuguese is pt-PT, inclusive and impersonal (the project's rule: "marshal" with one L,
 "squad" untranslated, team = "equipa"); dates are written out by hand (no locale database in
 the image), lower-case months and weekdays as pt-PT writes them.
+
+German (``de``) and Traditional Chinese as written in Taiwan (``zh-tw``; the pages say ``zh-Hant-TW``)
+were drafted by an AI model (Claude) on 2026-10-23 and are not yet reviewed by a native-speaking player
+(``docs/translations/status.yaml``); their words are those of ``docs/translations/glossary.md``. German
+says "du" and names people neutrally (Spielende, Orga, Spielleitung); zh-tw says 你, writes full-width
+punctuation after Han and a half-width space between Han and Latin letters or digits.
 """
 
 from __future__ import annotations
@@ -13,7 +20,7 @@ from datetime import datetime
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-LANGUAGES = ("pt", "en")
+LANGUAGES = ("pt", "en", "de", "zh-tw")
 DEFAULT = "pt"
 
 STRINGS: dict[str, dict[str, str]] = {
@@ -155,30 +162,196 @@ STRINGS: dict[str, dict[str, str]] = {
         "report_too_many": "Too many reports from this address. Try again later.",
         "back_club": "Back to {club}",
     },
+    "de": {
+        "upcoming": "Nächste Spiele",
+        "no_games": "Noch keine Spiele geplant.",
+        "cancelled": "Abgesagt",
+        "cancelled_notice": "Dieses Spiel wurde abgesagt.",
+        "reason": "Grund",
+        "when": "Wann",
+        "where": "Wo",
+        "mode": "Modus",
+        "mode_later": "wird noch bekannt gegeben",
+        "teams": "Teams",
+        "places": "Plätze",
+        "places_open": "unbegrenzt",
+        "registration": "Anmeldung",
+        "reg_not_yet": "öffnet am {opens}",
+        "reg_open": "offen bis {closes}",
+        "reg_closed": "geschlossen",
+        "federation": "Verbandsnummer",
+        "fed_required": "erforderlich",
+        "fed_optional": "optional",
+        "local_time": "Ortszeit, {zone}",
+        "calendar": "Kalender",
+        "feeds_text": "Die Spiele dieses Spielfelds für Kalender und andere Websites:",
+        "feed_ics": "iCalendar (.ics)",
+        "feed_json": "Daten (JSON)",
+        "add_to_calendar": "Zum Kalender hinzufügen (.ics)",
+        "back": "Alle Spiele auf {field}",
+        "not_found_title": "Seite nicht gefunden",
+        "not_found": "Diese Seite gibt es nicht, oder sie ist nicht öffentlich.",
+        "language": "Sprache",
+        "footer": "Die öffentliche Seite des Spielfelds, erstellt vom Atalaia-Server. Sie zeigt nie, wer sich "
+                  "angemeldet hat.",
+        "past": "Schon vorbei.",
+        "full": "ausgebucht",
+        "register": "Anmelden",
+        "register_title": "Anmeldung: {game}",
+        "back_game": "Zurück zu {game}",
+        "reg_intro": "Du meldest dich mit einem Konto auf dieser Website an, in der Atalaia-App.",
+        "reg_step_account": "Leg ein Konto auf dieser Website an (oder nimm das, das du schon hast).",
+        "reg_step_app": "Öffne dieses Spiel in der Atalaia-App mit dem Button unten (oder füge die Adresse dieser "
+                        "Seite unter Spielen › Online-Anmeldung ein), logge dich mit deinem Konto ein und melde dich "
+                        "für das Spiel an, mit den Repliken, die du nutzen wirst, falls das Spiel danach fragt.",
+        "reg_open_app": "In der Atalaia-App öffnen",
+        "reg_address": "Die Adresse dieser Seite, zum Einfügen in der App:",
+        "reg_step_ticket": "Die App speichert das Check-in-Ticket und nutzt es am Spieltag auf dem Spielfeld. Ohne "
+                           "die App druckst du das Ticket aus und zeigst es einem Marshal.",
+        "reg_data": "Das Spielfeld bekommt den Namen, den du für das Spiel wählst, deinen Team-Wunsch, deine "
+                    "Verbandsnummer (falls das Spiel danach fragt) und die angegebenen Repliken, und löscht sie "
+                    "30 Tage nach dem Spiel.",
+        "reg_unavailable": "Die Anmeldung für dieses Spiel ist nicht offen, oder es sind keine Plätze mehr frei.",
+        # Club pages (plan phase 18)
+        "club_footer": "Die öffentliche Seite des Clubs, erstellt vom Atalaia-Server.",
+        "club_logo": "Logo von {club}",
+        "club_crest": "Wappen von {club}",
+        "report": "Diese Seite melden",
+        "report_title": "Melden: {club}",
+        "report_intro": "Wenn diese Seite Bilder oder Namen ohne Erlaubnis verwendet, beleidigend ist oder sich als "
+                        "eine andere Person oder ein anderer Club ausgibt, sag der Administration dieses Servers "
+                        "Bescheid: Sie kann die Seite ausblenden.",
+        "report_reason": "Grund",
+        "reason_rights": "Bilder oder Namen ohne Erlaubnis verwendet",
+        "reason_offensive": "Beleidigender Inhalt",
+        "reason_impersonation": "Gibt sich als andere Person oder anderer Club aus",
+        "reason_other": "Anderer Grund",
+        "report_text": "Details (optional, bis zu 1000 Zeichen)",
+        "report_send": "Meldung senden",
+        "report_privacy": "Die Adresse der meldenden Person wird nicht gespeichert.",
+        "report_done": "Die Meldung ging an die Administration des Servers. Danke für den Hinweis.",
+        "report_invalid": "Die Meldung wurde nicht angenommen: Wähle einen Grund und schreib bis zu 1000 Zeichen.",
+        "report_too_many": "Zu viele Meldungen von dieser Adresse. Versuch es später noch einmal.",
+        "back_club": "Zurück zu {club}",
+    },
+    "zh-tw": {
+        "upcoming": "近期遊戲",
+        "no_games": "目前還沒有排定的遊戲。",
+        "cancelled": "已取消",
+        "cancelled_notice": "這場遊戲已取消。",
+        "reason": "原因",
+        "when": "時間",
+        "where": "地點",
+        "mode": "模式",
+        "mode_later": "待公布",
+        "teams": "隊伍",
+        "places": "名額",
+        "places_open": "不限",
+        "registration": "報名",
+        "reg_not_yet": "{opens} 開放",
+        "reg_open": "開放至 {closes}",
+        "reg_closed": "已截止",
+        "federation": "協會會員編號",
+        "fed_required": "必填",
+        "fed_optional": "選填",
+        "local_time": "當地時間，{zone}",
+        "calendar": "行事曆",
+        "feeds_text": "這個場地的遊戲，提供給行事曆和其他網站：",
+        "feed_ics": "iCalendar（.ics）",
+        "feed_json": "資料（JSON）",
+        "add_to_calendar": "加入行事曆（.ics）",
+        "back": "{field} 的所有遊戲",
+        "not_found_title": "找不到頁面",
+        "not_found": "這個頁面不存在，或沒有公開。",
+        "language": "語言",
+        "footer": "場地的公開頁面，由 Atalaia 伺服器產生。不會顯示有誰報名。",
+        "past": "已結束。",
+        "full": "額滿",
+        "register": "報名",
+        "register_title": "報名：{game}",
+        "back_game": "回到 {game}",
+        "reg_intro": "報名要用這個網站的帳號，在 Atalaia App 中完成。",
+        "reg_step_account": "在這個網站建立帳號（或用你已經有的帳號登入）。",
+        "reg_step_app": "在 Atalaia App 中，用下方的按鈕開啟這場遊戲（或把這個頁面的網址貼到「玩家 › 線上報名」），"
+                        "用你的帳號登入並報名；如果這場遊戲有要求，也要登記你會使用的槍。",
+        "reg_open_app": "在 Atalaia App 中開啟",
+        "reg_address": "這個頁面的網址，用來貼到 App 中：",
+        "reg_step_ticket": "App 會保存報到票券，當天在場地使用。沒有 App 的話，可以把票券印出來給裁判看。",
+        "reg_data": "場地會收到你為這場遊戲取的名字、你想加入的隊伍、你的協會會員編號（如果遊戲有要求）以及你登記的槍，"
+                    "並在遊戲結束 30 天後刪除。",
+        "reg_unavailable": "這場遊戲目前沒有開放報名，或已經額滿。",
+        # Club pages (plan phase 18)
+        "club_footer": "社團的公開頁面，由 Atalaia 伺服器產生。",
+        "club_logo": "{club} 的標誌",
+        "club_crest": "{club} 的隊徽",
+        "report": "檢舉這個頁面",
+        "report_title": "檢舉：{club}",
+        "report_intro": "如果這個頁面未經授權使用圖片或名稱、內容冒犯他人，或冒充其他人或社團，請通知這台伺服器的管理員，"
+                        "管理員可以把它隱藏。",
+        "report_reason": "原因",
+        "reason_rights": "未經授權使用圖片或名稱",
+        "reason_offensive": "冒犯性內容",
+        "reason_impersonation": "冒充其他人或社團",
+        "reason_other": "其他原因",
+        "report_text": "詳細說明（選填，最多 1000 個字元）",
+        "report_send": "送出檢舉",
+        "report_privacy": "不會保存檢舉者的位址。",
+        "report_done": "檢舉已送給伺服器的管理員。謝謝你告訴我們。",
+        "report_invalid": "檢舉未被接受：請選擇一個原因，並寫最多 1000 個字元。",
+        "report_too_many": "這個位址的檢舉次數太多，請稍後再試。",
+        "back_club": "回到 {club}",
+    },
 }
-LANGUAGE_NAMES = {"pt": "Português", "en": "English"}
+LANGUAGE_NAMES = {"pt": "Português", "en": "English", "de": "Deutsch", "zh-tw": "繁體中文（台灣）"}
+# Each language's BCP 47 tag, for <html lang>, the switcher's lang and hreflang and Content-Language; the
+# ``?lang=`` value stays the project's code (zh-tw), as everywhere else in Atalaia.
+TAGS = {"pt": "pt", "en": "en", "de": "de", "zh-tw": "zh-Hant-TW"}
 
 _WEEKDAYS = {
     "pt": ("segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo"),
     "en": ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"),
+    "de": ("Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"),
+    "zh-tw": ("星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"),
 }
 _MONTHS = {
     "pt": ("janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro",
            "novembro", "dezembro"),
     "en": ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
            "November", "December"),
+    "de": ("Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober",
+           "November", "Dezember"),
+    "zh-tw": tuple(f"{n} 月" for n in range(1, 13)),
 }
+# Chinese tags that mean Traditional characters: the script subtag Hant, or, with no script subtag, a
+# region that writes them (Taiwan, Hong Kong, Macau). Plain zh, zh-CN, zh-SG and any Hans tag are Simplified,
+# which none of these pages is in.
+_TRADITIONAL_REGIONS = {"tw", "hk", "mo"}
+
+
+def _language(tag: str) -> Optional[str]:
+    """The page language an ``Accept-Language`` tag asks for (case-insensitive), or None."""
+    subtags = tag.strip().lower().split("-")
+    if subtags[0] == "zh":
+        rest = subtags[1:]
+        if "hant" in rest:
+            return "zh-tw"
+        if "hans" in rest:
+            return None
+        return "zh-tw" if any(s in _TRADITIONAL_REGIONS for s in rest) else None
+    return subtags[0] if subtags[0] in LANGUAGES else None
 
 
 def choose(query: Optional[str], accept_language: Optional[str]) -> tuple[str, bool]:
-    """The page's language and whether it was asked for explicitly (``?lang=``): ``?lang=pt|en``,
-    else the best of ``Accept-Language`` (RFC 9110 section 12.5.4, by q-value then order), else pt."""
+    """The page's language and whether it was asked for explicitly (``?lang=``): ``?lang=pt|en|de|zh-tw``,
+    else the best of ``Accept-Language`` (RFC 9110 section 12.5.4, by q-value then order), else pt.
+    ``de`` and ``de-*`` are German; ``zh-TW``, ``zh-Hant(-*)``, ``zh-HK`` and ``zh-MO`` are zh-tw, while
+    Simplified Chinese (``zh``, ``zh-CN``, ``zh-Hans(-*)``, ``zh-SG``) is skipped like any other language."""
     if query in LANGUAGES:
         return query, True
     best: tuple[float, int, str] = (0.0, 0, DEFAULT)
     for index, item in enumerate((accept_language or "").split(",")):
         tag, _, params = item.strip().partition(";")
-        primary = tag.strip().lower().split("-")[0]
+        language = _language(tag)
         q = 1.0
         for param in params.split(";"):
             key, _, value = param.strip().partition("=")
@@ -187,17 +360,22 @@ def choose(query: Optional[str], accept_language: Optional[str]) -> tuple[str, b
                     q = float(value)
                 except ValueError:
                     q = 0.0
-        if primary in LANGUAGES and q > 0 and (q, -index) > (best[0], best[1]):
-            best = (q, -index, primary)
+        if language is not None and q > 0 and (q, -index) > (best[0], best[1]):
+            best = (q, -index, language)
     return best[2], False
 
 
 def date(value: datetime, zone: str, lang: str) -> str:
-    """``sábado, 8 de novembro de 2026`` / ``Saturday 8 November 2026``, in the field's zone."""
+    """``sábado, 8 de novembro de 2026`` / ``Saturday 8 November 2026`` / ``Samstag, 8. November 2026`` /
+    ``2026 年 11 月 8 日（星期六）``, in the field's zone."""
     local = value.astimezone(ZoneInfo(zone))
     weekday, month = _WEEKDAYS[lang][local.weekday()], _MONTHS[lang][local.month - 1]
     if lang == "pt":
         return f"{weekday}, {local.day} de {month} de {local.year}"
+    if lang == "de":
+        return f"{weekday}, {local.day}. {month} {local.year}"
+    if lang == "zh-tw":
+        return f"{local.year} 年 {month} {local.day} 日（{weekday}）"
     return f"{weekday} {local.day} {month} {local.year}"
 
 
@@ -206,13 +384,26 @@ def time(value: datetime, zone: str) -> str:
 
 
 def moment(value: datetime, zone: str, lang: str) -> str:
-    """A date and a time: ``sábado, 8 de novembro de 2026, 09:00``."""
-    return f"{date(value, zone, lang)}, {time(value, zone)}"
+    """A date and a time: ``sábado, 8 de novembro de 2026, 09:00``; ``2026 年 11 月 8 日（星期六）09:00``
+    (no comma after the full-width bracket)."""
+    sep = "" if lang == "zh-tw" else ", "
+    return f"{date(value, zone, lang)}{sep}{time(value, zone)}"
 
 
 def span(starts: datetime, ends: datetime, zone: str, lang: str) -> str:
     """When a game is: one date with two times, or two moments when it ends on another day."""
     tz = ZoneInfo(zone)
     if starts.astimezone(tz).date() == ends.astimezone(tz).date():
-        return f"{date(starts, zone, lang)}, {time(starts, zone)}–{time(ends, zone)}"
-    return f"{moment(starts, zone, lang)} – {moment(ends, zone, lang)}"
+        return f"{moment(starts, zone, lang)}–{time(ends, zone)}"
+    to = " 至 " if lang == "zh-tw" else " – "
+    return f"{moment(starts, zone, lang)}{to}{moment(ends, zone, lang)}"
+
+
+def paren(text: str, lang: str) -> str:
+    """A remark after a word: `` (text)``, or ``（text）`` in Chinese (full-width, no space before it)."""
+    return f"（{text}）" if lang == "zh-tw" else f" ({text})"
+
+
+def join(items: list[str], lang: str) -> str:
+    """A list: ``a, b``, or ``a、b`` in Chinese."""
+    return ("、" if lang == "zh-tw" else ", ").join(items)

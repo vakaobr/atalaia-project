@@ -4,14 +4,14 @@
 # A team holds the master. Data: team, since (game time of the capture, in
 # seconds), held and of (the satellites the team holds, of all of them) and
 # points (the master's points per tick with that bonus), from the controller;
-# lang (pt or en) from the box.
+# lang (pt, en, de or zh-tw) from the box.
 template: master_status
 layout:
   - type: row
     style: { width: fill, height: 44, background: team }
     children:
       - type: label
-        text: "{lang == 'pt' && 'MASTER OCUPADO' || 'MASTER HELD'}"
+        text: "{lang == 'pt' && 'MASTER OCUPADO' || lang == 'de' && 'MASTER BESETZT' || lang == 'zh-tw' && '主站已佔領' || 'MASTER HELD'}"
         style: { font_size: 20, width: fill, align: center, color: contrast }
   - type: spacer
     height: fill
@@ -19,18 +19,18 @@ layout:
     text: "{team|upper}"
     style: { font_size: 48, color: team }
   - type: label
-    text: "{held} {lang == 'pt' && 'de' || 'of'} {of} {lang == 'pt' && 'satélites' || 'satellites'}"
+    text: "{held} {lang == 'pt' && 'de' || lang == 'de' && 'von' || lang == 'zh-tw' && '/' || 'of'} {of} {lang == 'pt' && 'satélites' || lang == 'de' && 'Satelliten' || lang == 'zh-tw' && '個衛星' || 'satellites'}"
     style: { font_size: 20 }
   - type: label
-    text: "{points} {lang == 'pt' && 'pontos a cada' || 'points every'} {params.tick_s} s"
+    text: "{points} {lang == 'pt' && 'pontos a cada' || lang == 'de' && 'Punkte alle' || lang == 'zh-tw' && '分，每' || 'points every'} {params.tick_s} s"
     style: { font_size: 20, color: "{points > 0 && 'white' || 'danger'}" }
   - type: label
-    text: "{lang == 'pt' && 'desde' || 'held since'} {since|clock}"
+    text: "{lang == 'pt' && 'desde' || lang == 'de' && 'seit' || lang == 'zh-tw' && '佔領於' || 'held since'} {since|clock}"
     style: { font_size: 14, color: muted }
   - type: spacer
     height: fill
   - type: label
-    text: "{lang == 'pt' && 'Mantém o botão premido para a tomar' || 'Hold your button to take it over'}"
+    text: "{lang == 'pt' && 'Mantém o botão premido para a tomar' || lang == 'de' && 'Halte den Knopf zum Übernehmen' || lang == 'zh-tw' && '按住你的按鈕即可奪取' || 'Hold your button to take it over'}"
     style:
       font_size: 14
       color: muted

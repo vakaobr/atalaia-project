@@ -217,6 +217,32 @@ void main() {
     expect(s.screenData['error'], isTrue);
   });
 
+  test("a joined game's language reaches the templates as lang, unless the "
+      'mode gives one (P5H-12)', () async {
+    final join = JoinPayload(
+      gameId: 4243,
+      gameKey: Uint8List(16),
+      nodeId: 4,
+      controllerId: 0,
+      channelHz: 869525000,
+      maxHops: 2,
+      teams: const ['red', 'blue'],
+      modeId: 'org.atalaia.bomb',
+      role: 'bomb',
+      gameSeed: 1,
+      params: null,
+      kind: JoinKind.node,
+      lang: 'de',
+    );
+    final s = session('org.atalaia.bomb', 'bomb', join: join);
+    addTearDown(s.close);
+    await s.open();
+    await s.start();
+    await s.advance(0);
+    expect(s.screenName, 'standby');
+    expect(s.screenData, {'lang': 'de', 'arm': 'red'});
+  });
+
   test('Medic Kit: a signed tag, then holding a button heals; letting go '
       'early cancels; a forged tag is refused', () async {
     final key = Uint8List.fromList(List.generate(16, (i) => 200 - i));

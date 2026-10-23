@@ -27,3 +27,14 @@ i18n:
       de uma equipa, um código a marcar no teclado, etiquetas de jogador a ler, ou um local de
       bomba a armar e a desarmar. Informa o que acontece e nunca pontua: o cenário decide quando um
       objetivo é cumprido ou falhado, e volta a configurar o nó depois de um reinício.
+  de:
+    name: Ziele
+    description: >-
+      Die Boxen und Props eines eigenen Szenarios. Jede wartet darauf, dass das Szenario auf dem
+      Feld-Controller ihr sagt, wofür sie da ist: ein Punkt zum Einnehmen per Teamknopf, ein Code zum Tippen
+      am Tastenfeld, Tags der Spielenden zum Scannen oder ein Bombenplatz zum Schärfen und Entschärfen. Sie
+      meldet, was passiert, und punktet nie: das Szenario entscheidet, wann ein Ziel erfüllt oder gescheitert
+      ist, und richtet den Knoten nach einem Neustart wieder ein.
+  zh-tw:
+    name: 任務目標
+    description: 自訂劇本中的盒子與道具。每一個都等待場地控制器上的劇本告訴它用途：按住隊伍按鈕佔領的點、在按鍵輸入的代碼、要感應的玩家標籤，或是要啟動與拆除的炸彈點。它只回報發生的事，從不計分：由劇本決定任務目標何時完成或失敗，並在重新啟動後再次設定節點。

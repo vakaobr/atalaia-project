@@ -20,7 +20,7 @@ params:
   reveal_code: { type: string, optional: true, max: 16, gm_only: true, label: "Code shown and sent when it is solved (empty: none)" }
   capture:     { type: bool, default: false, label: "Solving captures the terminal; another team can hack it back" }
   team:        { type: team, optional: true, label: "Team credited when nobody pressed a team button first (empty: none)" }
-  lang:        { type: string, default: pt, max: 2, label: "Language of the terminal's screen: pt or en" }
+  lang:        { type: string, default: pt, max: 5, label: "Language of the terminal's screen: pt, en, de or zh-tw" }
 commands:
   reset: { roles: [terminal], label: "New puzzle" }
 i18n:
@@ -39,6 +39,39 @@ i18n:
       reveal_code: "Código mostrado e enviado quando é resolvido (vazio: nenhum)"
       capture: Resolver captura o terminal; outra equipa pode voltar a hackeá-lo
       team: "Equipa creditada quando ninguém premiu primeiro um botão de equipa (vazio: nenhuma)"
-      lang: "Língua do ecrã do terminal: pt ou en"
+      lang: "Língua do ecrã do terminal: pt, en, de ou zh-tw"
     commands:
       reset: Novo enigma
+  de:
+    name: Hacking-Terminal
+    description: >-
+      Ein Terminal mit einem Rätsel am Tastenfeld: einen Code anhand der Ziffern an der richtigen und an der
+      falschen Stelle knacken, die Drähte in der richtigen Reihenfolge kappen oder eine Folge wiederholen.
+      Eine falsche Antwort sperrt es eine Weile. Wer es löst, kann einen Code aufdecken, Punkte holen und das
+      Terminal für das eigene Team einnehmen; das Rätsel kommt aus dem Seed des Spiels, eine Wiederholung
+      sieht also dasselbe.
+    params:
+      puzzle: "Rätsel: code (Code), wires (Drähte) oder sequence (Folge)"
+      digits: "Länge: Ziffern des Codes, Drähte, Tasten der Folge"
+      lockout_s: "Sekunden, die das Terminal nach einer falschen Antwort sperrt (0: keine Sperre)"
+      points: Punkte für das Team, das es löst
+      reveal_code: "Code, der beim Lösen gezeigt und gesendet wird (leer: keiner)"
+      capture: Lösen nimmt das Terminal ein; ein anderes Team kann es zurückhacken
+      team: "Team, das zählt, wenn niemand zuerst einen Teamknopf gedrückt hat (leer: keins)"
+      lang: "Sprache des Terminal-Bildschirms: pt, en, de oder zh-tw"
+    commands:
+      reset: Neues Rätsel
+  zh-tw:
+    name: 駭客終端
+    description: 按鍵上有謎題的終端：依「位置對」與「數字對但位置錯」的提示破解代碼（像 1A2B）、依正確順序剪斷電線，或照順序按回一組按鍵。答錯會鎖定一段時間。解開後可揭露一個代碼、得分，並為解開的隊伍佔領終端；謎題來自遊戲的種子，所以重播時會是同一題。
+    params:
+      puzzle: 謎題：code（代碼）、wires（電線）或 sequence（順序）
+      digits: 長度：代碼的位數、電線數、順序的按鍵數
+      lockout_s: 答錯後終端鎖定的秒數（0：不鎖定）
+      points: 解開的隊伍得到的分數
+      reveal_code: 解開時顯示並送出的代碼（空白：無）
+      capture: 解開即佔領終端；別隊可以再駭回去
+      team: 沒有人先按隊伍按鈕時計分的隊伍（空白：無）
+      lang: 終端畫面的語言：pt、en、de 或 zh-tw
+    commands:
+      reset: 新謎題

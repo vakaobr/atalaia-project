@@ -8,14 +8,11 @@
 template: medic_refused
 layout:
   - type: row
-    style: { width: fill, height: 44, background: danger }
+    style: { width: fill, height: 44, background: "danger" }
     children:
       - type: label
-        text: RECUSADO
-        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang != 'en'}" }
-      - type: label
-        text: REFUSED
-        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang == 'en'}" }
+        text: "{params.lang == 'en' && 'REFUSED' || params.lang == 'de' && 'ABGELEHNT' || params.lang == 'zh-tw' && '已拒絕' || 'RECUSADO'}"
+        style: { font_size: 20, width: fill, align: center, color: contrast }
   - type: spacer
     height: fill
   - type: icon

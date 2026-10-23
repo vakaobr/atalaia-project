@@ -29,3 +29,21 @@ i18n:
       lives: "Vidas: reentradas por equipa, ou por pessoa com vidas individuais"
       per_player: Contar as vidas por pessoa (precisa de etiquetas NFC) em vez de por equipa
       respawn_cooldown_s: Segundos de espera entre reentradas de cada pessoa
+  de:
+    name: Respawn und Leben
+    description: >-
+      Ein Respawn-Punkt zählt Leben. Die Spielenden scannen ihren signierten NFC-Tag (oder drücken den Knopf
+      ihres Teams), um ins Spiel zurückzukehren; jeder Respawn kostet ihr Team ein Leben, bei Leben pro Person
+      die Person selbst, und zwischen zwei Respawns gilt eine Wartezeit. Hat ein Team keine Leben mehr, wird
+      der nächste Respawn abgelehnt und das Team scheidet aus.
+    params:
+      lives: "Leben: Respawns pro Team, oder pro Person bei Leben pro Person"
+      per_player: Leben pro Person zählen (braucht NFC-Tags) statt pro Team
+      respawn_cooldown_s: Sekunden Wartezeit zwischen zwei Respawns einer Person
+  zh-tw:
+    name: 復活與命數
+    description: 復活點會計算命數。玩家感應自己已簽署的 NFC 標籤（或按自己隊伍的按鈕）回到遊戲；每次復活扣該隊一條命，命數按玩家計算時則扣玩家自己的，兩次復活之間需要等待。隊伍沒有命數時，下一次復活會被拒絕，該隊淘汰。
+    params:
+      lives: 命數：每隊的復活次數，或命數按玩家計算時每位玩家的次數
+      per_player: 按玩家計算命數（需要 NFC 標籤），而不是按隊伍
+      respawn_cooldown_s: 每位玩家兩次復活之間的等待秒數

@@ -12,7 +12,11 @@
   "license": "GPL-3.0-or-later",
   "min_tier": "reduced",
   "author": "The Atalaia contributors",
-  "year": "2026"
+  "year": "2026",
+  "name_de": "Domination",
+  "description_de": "Das letzte Team, das die Box einnimmt, punktet, solange es sie hält.",
+  "name_zh_tw": "佔點",
+  "description_zh_tw": "最後佔領盒子的隊伍，在佔有期間持續得分。"
  },
  "node": {
   "blocks": {
@@ -75,7 +79,9 @@
       "MIN": "0",
       "MAX": "60000",
       "LABEL": "Hold time to capture (ms)",
-      "LABEL_PT": "Tempo a premir para capturar (ms)"
+      "LABEL_PT": "Tempo a premir para capturar (ms)",
+      "LABEL_DE": "Haltezeit zum Einnehmen (ms)",
+      "LABEL_ZH_TW": "佔領需按住的時間（毫秒）"
      }
     },
     {
@@ -90,7 +96,9 @@
       "MIN": "1",
       "MAX": "600",
       "LABEL": "Seconds per scoring tick",
-      "LABEL_PT": "Segundos por intervalo de pontuação"
+      "LABEL_PT": "Segundos por intervalo de pontuação",
+      "LABEL_DE": "Sekunden pro Wertungsintervall",
+      "LABEL_ZH_TW": "每次計分間隔（秒）"
      }
     },
     {
@@ -105,7 +113,9 @@
       "MIN": "1",
       "MAX": "1000",
       "LABEL": "Points per tick",
-      "LABEL_PT": "Pontos por intervalo"
+      "LABEL_PT": "Pontos por intervalo",
+      "LABEL_DE": "Punkte pro Intervall",
+      "LABEL_ZH_TW": "每次計分的分數"
      }
     },
     {

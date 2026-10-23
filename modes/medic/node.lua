@@ -52,6 +52,32 @@ local reasons = {
     cancelled = "Let go too early: scan again",
     scan_first = "Scan your tag first",
   },
+  -- German and Traditional Chinese (Taiwan): drafted by an AI model, not yet reviewed
+  -- (docs/translations/status.yaml).
+  de = {
+    mac = "Gefälschter Tag",
+    game = "Tag aus einem anderen Spiel",
+    no_game = "Dieses Kit ist in keinem Spiel",
+    team = "Unbekanntes Team",
+    not_tag = "Kein Tag dieses Spiels",
+    wrong_team = "Dieses Kit gehört einem anderen Team",
+    limit = "Du hast alle Behandlungen gehabt",
+    cooldown = "Warte %d s",
+    cancelled = "Zu früh losgelassen: nochmal scannen",
+    scan_first = "Scanne zuerst deinen Tag",
+  },
+  ["zh-tw"] = {
+    mac = "偽造的標籤",
+    game = "其他遊戲的標籤",
+    no_game = "這個醫護包不在遊戲中",
+    team = "未知隊伍",
+    not_tag = "不是這場遊戲的標籤",
+    wrong_team = "這是別隊的醫護包",
+    limit = "你的治療次數已用完",
+    cooldown = "請等 %d 秒",
+    cancelled = "太早放開了：請再感應一次",
+    scan_first = "請先感應你的標籤",
+  },
 }
 local texts = reasons[params.lang] or reasons.pt
 

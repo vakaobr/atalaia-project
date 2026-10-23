@@ -495,8 +495,8 @@ screens:
     caption: Cronografagem à entrada, com a medição assinada pelo marshal.
   medic_intro: >-
     As Ligaduras desenham os seus ecrãs a partir dos mesmos ficheiros YAML numa Field Box e num
-    dispositivo Android, em português, a não ser que a organização escolha o inglês. Aqui, tal como
-    a app os desenha:
+    dispositivo Android, em português, a não ser que a organização escolha o inglês, o alemão ou o
+    chinês. Aqui, tal como a app os desenha:
   medic_idle:
     alt: >-
       Ecrã das Ligaduras: cabeçalho «LIGADURAS», um 4 em grande, «Restam 4 ligaduras» e, a amarelo,
@@ -841,7 +841,8 @@ roadmap:
       selo de verificado, a assinatura do próprio projeto, que é o que o deixa chegar às caixas.
       Como submeter um modo, a lista de revisão, as chaves e a moderação estão escritos. O Atalaia
       já está também em alemão e em chinês tradicional, como se escreve em Taiwan (esta página, a
-      consola de GM, o editor de modos, a app e os ecrãs da Field Box), em rascunhos feitos com um
+      consola de GM, o editor de modos, a app, os ecrãs da Field Box, os modos incluídos e as
+      páginas do servidor do site), em rascunhos feitos com um
       modelo de IA e ainda não revistos por quem joga nessas línguas: se jogas em alemão ou em
       chinês, ajuda-nos a revê-los; as traduções para outras línguas começam em docs/translations
       (em inglês). A seguir: criar o registo a partir do modelo; a revisão do alemão e do chinês; a

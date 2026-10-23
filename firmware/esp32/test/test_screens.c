@@ -54,12 +54,18 @@ typedef struct {
 #define CHECKIN  "org.atalaia.player_checkin {\"points\":1}"
 #define MEDIC    "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"pt\"}"
 #define MEDIC_EN "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"en\"}"
+#define MEDIC_DE "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"de\"}"
+#define MEDIC_ZH "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"zh-tw\"}"
 #define MASTER   "org.atalaia.master_satellites {\"capture_hold_ms\":3000,\"tick_s\":10}"
 #define TARGET   "org.atalaia.target_windows {\"interval_s\":20,\"window_s\":5}"
 #define HACK     "org.atalaia.hacking_terminal {\"digits\":4,\"lockout_s\":10,\"lang\":\"pt\"}"
 #define HACK_EN  "org.atalaia.hacking_terminal {\"digits\":4,\"lockout_s\":10,\"lang\":\"en\"}"
+#define HACK_DE  "org.atalaia.hacking_terminal {\"digits\":4,\"lockout_s\":10,\"lang\":\"de\"}"
+#define HACK_ZH  "org.atalaia.hacking_terminal {\"digits\":4,\"lockout_s\":10,\"lang\":\"zh-tw\"}"
 #define VIP      "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"pt\"}"
 #define VIP_EN   "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"en\"}"
+#define VIP_DE   "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"de\"}"
+#define VIP_ZH   "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"zh-tw\"}"
 #define OBJ      "org.atalaia.objectives {}"
 #define MONEY    "org.atalaia.money_factory {\"capacity\":50,\"capture_hold_ms\":3000}"
 
@@ -116,7 +122,7 @@ static const screen_case_t cases[] = {
     {"wifi_setup_pt", "wifi_setup", "{\"ssid\":\"atalaia-3F2A\"}", NULL},
     {"status_adopted_pt", "status",
      "{\"title\":\"Adotada\",\"field\":\"Campo da Atalaia\",\"fingerprint\":\"604A-0A95\"}", NULL},
-    /* The same in German (P5H-4); the modes' templates have no German and show English. */
+    /* The same in German (P5H-4); the modes' templates in German too (P5H-12). */
     {"waiting_invited_de", "waiting", "{\"game\":3073,\"role\":\"zone\",\"invited\":true}", NULL},
     {"playing_de", "playing", "{\"game\":3073,\"role\":\"zone\"}", NULL},
     {"ready_picker_de", "ready", "{\"picker\":true}", NULL},
@@ -144,8 +150,8 @@ static const screen_case_t cases[] = {
     {"pin_entry_locked_de", "pin_entry", "{\"digits\":0,\"error\":false,\"locked_min\":8}", NULL},
     {"pin_entry_no_pin_de", "pin_entry", "{\"digits\":0,\"error\":false,\"no_pin\":true}", NULL},
     {"yaml_domination_neutral_de", "neutral", "{}", DOM},
-    /* The same in Traditional Chinese (P5K-2). Mode and preset names stay English, as the
-     * modes have no Chinese (P5H-7); so do the modes' templates (yaml_domination_neutral_zh-tw). */
+    /* The same in Traditional Chinese (P5K-2). The box's preset names stay English
+     * (builtin_presets.c); the modes' templates are Chinese too (P5H-12). */
     {"waiting_invited_zh-tw", "waiting", "{\"game\":3073,\"role\":\"zone\",\"invited\":true}",
      NULL},
     {"playing_zh-tw", "playing", "{\"game\":3073,\"role\":\"zone\"}", NULL},
@@ -368,6 +374,63 @@ static const screen_case_t cases[] = {
     {"yaml_money_deposited", "deposited",
      "{\"player\":\"b1\",\"team\":\"blue\",\"amount\":12,\"total\":27}", MONEY},
     {"yaml_money_refused_pt", "refused",
+     "{\"reason\":\"full\",\"player\":\"r1\",\"team\":\"red\",\"carrying\":20}", MONEY},
+    /* The built-in modes' own texts in German and Traditional Chinese (P5H-12): a German or a
+     * Chinese box draws them; the modes with a language parameter take it from params.lang. */
+    {"yaml_domination_captured_de", "captured", "{\"team\":\"red\",\"points\":12,\"since\":95}",
+     DOM},
+    {"yaml_domination_final_score_de", "final_score", "{\"owner\":\"blue\",\"points\":40}", DOM},
+    {"yaml_bomb_standby_arming_de", "standby", "{\"arm\":\"red\",\"progress\":0.6}", BOMB},
+    {"yaml_bomb_countdown_defusing_de", "countdown", "{\"left\":231,\"defuse\":0.4}", BOMB},
+    {"yaml_master_satellites_status_de", "master_status",
+     "{\"team\":\"red\",\"since\":95,\"held\":2,\"of\":3,\"points\":4}", MASTER},
+    {"yaml_target_windows_standby_hit_de", "standby", "{\"team\":\"blue\",\"hits\":3}", TARGET},
+    {"yaml_hack_code_de", "hack_code",
+     "{\"team\":\"red\",\"typed\":\"8 5 _ _\",\"digits\":4,\"tries\":3,\"locked\":0,"
+     "\"note\":\"enter\",\"g1\":\"8571\",\"r1\":2,\"c1\":2,\"g2\":\"5678\","
+     "\"r2\":0,\"c2\":2,\"g3\":\"1234\",\"r3\":0,\"c3\":1}",
+     HACK_DE},
+    {"yaml_bomb_defused_de", "defused", "{\"team\":\"blue\"}", BOMB},
+    {"yaml_hack_sequence_locked_de", "hack_sequence",
+     "{\"phase\":\"idle\",\"step\":0,\"of\":4,\"locked\":20}", HACK_DE},
+    {"yaml_hack_wires_locked_de", "hack_wires",
+     "{\"wires\":\"1 2 3 4\",\"cut\":0,\"of\":4,\"locked\":20}", HACK_DE},
+    {"yaml_medic_idle_de", "medic_idle", "{\"remaining\":4}", MEDIC_DE},
+    {"yaml_vip_payload_weak_de", "payload", "{\"team\":\"red\",\"state\":\"weak\",\"metres\":40}",
+     VIP_DE},
+    {"yaml_obj_capture_de", "obj_capture",
+     "{\"label\":\"Brücke\",\"only\":\"red\",\"hold_ms\":3000}", OBJ},
+    {"yaml_money_neutral_taking_de", "neutral", "{\"stock\":5,\"taker\":\"blue\",\"progress\":0.4}",
+     MONEY},
+    {"yaml_money_refused_de", "refused",
+     "{\"reason\":\"full\",\"player\":\"r1\",\"team\":\"red\",\"carrying\":20}", MONEY},
+    {"yaml_domination_captured_zh-tw", "captured", "{\"team\":\"red\",\"points\":12,\"since\":95}",
+     DOM},
+    {"yaml_domination_final_score_zh-tw", "final_score", "{\"owner\":\"blue\",\"points\":40}", DOM},
+    {"yaml_bomb_countdown_defusing_zh-tw", "countdown", "{\"left\":231,\"defuse\":0.4}", BOMB},
+    {"yaml_bomb_exploded_zh-tw", "exploded", "{\"team\":\"red\"}", BOMB},
+    {"yaml_master_satellites_status_zh-tw", "master_status",
+     "{\"team\":\"red\",\"since\":95,\"held\":2,\"of\":3,\"points\":4}", MASTER},
+    {"yaml_target_windows_standby_hit_zh-tw", "standby", "{\"team\":\"blue\",\"hits\":3}", TARGET},
+    {"yaml_hack_code_zh-tw", "hack_code",
+     "{\"team\":\"red\",\"typed\":\"8 5 _ _\",\"digits\":4,\"tries\":3,\"locked\":0,"
+     "\"note\":\"enter\",\"g1\":\"8571\",\"r1\":2,\"c1\":2,\"g2\":\"5678\","
+     "\"r2\":0,\"c2\":2,\"g3\":\"1234\",\"r3\":0,\"c3\":1}",
+     HACK_ZH},
+    {"yaml_hack_sequence_input_zh-tw", "hack_sequence",
+     "{\"team\":\"yellow\",\"owner\":\"red\",\"phase\":\"input\",\"step\":2,\"of\":5,"
+     "\"locked\":0}",
+     HACK_ZH},
+    {"yaml_medic_healed_zh-tw", "medic_healed",
+     "{\"player\":\"b1\",\"team\":\"blue\",\"remaining\":3,\"used\":1,\"max\":2}", MEDIC_ZH},
+    {"yaml_vip_checkpoint_free_zh-tw", "checkpoint_free", "{}", VIP_ZH},
+    {"yaml_obj_tags_zh-tw", "obj_tags",
+     "{\"team\":\"blue\",\"have\":1,\"count\":2,\"note\":\"wrong_team\"}", OBJ},
+    {"yaml_obj_bomb_armed_zh-tw", "obj_bomb",
+     "{\"phase\":\"armed\",\"team\":\"red\",\"left\":42,\"fuse_s\":60}", OBJ},
+    {"yaml_money_captured_zh-tw", "captured", "{\"team\":\"red\",\"since\":95,\"stock\":35}",
+     MONEY},
+    {"yaml_money_refused_zh-tw", "refused",
      "{\"reason\":\"full\",\"player\":\"r1\",\"team\":\"red\",\"carrying\":20}", MONEY},
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))

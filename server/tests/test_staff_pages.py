@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """The field staff's pages on PostgreSQL 16 (Phase 4 follow-up, decisions FU2-1 to FU2-12).
 
-Each page in pt-PT and English, its headers (no-store, noindex, the unchanged content security policy), that
+Each page in pt-PT, English, German and Traditional Chinese (Taiwan), its headers (no-store, noindex, the unchanged content security policy), that
 it loads only same-origin scripts and runs no inline one, that it holds no data (the API, with its role
 rules, gives the data), the pages' texts against what the scripts ask for, what the scripts may not do
 (parse HTML, load from elsewhere), the static files' caching, and the per-address limit. In a real browser,
@@ -21,7 +21,7 @@ from pathlib import Path
 from atalaia_server import sync
 from atalaia_server.ratelimit import Limits, RequestLimit
 from atalaia_server.security_headers import HEADERS
-from atalaia_server.web import staff_pages
+from atalaia_server.web import i18n, staff_pages
 from atalaia_server.web.staff_i18n import STRINGS
 
 from .base import AppTestCase
@@ -74,19 +74,25 @@ def parse(text: str) -> Scripts:
 
 
 class StaffPageTests(AppTestCase):
-    async def test_every_page_in_both_languages(self) -> None:
+    async def test_every_page_in_every_language(self) -> None:
         csp = dict(HEADERS)["content-security-policy"]
         for name, path in PAGES.items():
-            for lang, html_lang in (("pt", "pt-PT"), ("en", "en")):
+            for lang, html_lang, header in (("pt", "pt-PT", "pt"), ("en", "en", "en"), ("de", "de", "de"),
+                                            ("zh-tw", "zh-Hant-TW", "zh-Hant-TW")):
                 with self.subTest(page=name, lang=lang):
                     r = await self.client.get(path, params={"lang": lang})
                     self.assertEqual(r.status_code, 200, r.text)
                     self.assertEqual(r.headers["content-type"], "text/html; charset=utf-8")
                     self.assertEqual(r.headers["cache-control"], "no-store")
                     self.assertEqual(r.headers["x-robots-tag"], "noindex")
-                    self.assertEqual(r.headers["content-language"], lang)
+                    self.assertEqual(r.headers["content-language"], header)
                     self.assertEqual(r.headers["content-security-policy"], csp)  # the policy as it was
                     self.assertIn(f'<html lang="{html_lang}">', r.text)
+                    self.assertIn(f'data-lang="{lang}"', r.text)
+                    for other in i18n.LANGUAGES:  # the switcher names all four
+                        tag = i18n.TAGS[other]
+                        self.assertIn(f'<span lang="{tag}" aria-current="true">' if other == lang
+                                      else f'<a lang="{tag}" hreflang="{tag}" href="{path}?lang={other}">', r.text)
                     self.assertIn("<noscript>", r.text)
                     self.assertNotIn("$", re.sub(r'<script type="application/json".*?</script>', "", r.text,
                                                  flags=re.S))  # every placeholder filled
@@ -109,6 +115,14 @@ class StaffPageTests(AppTestCase):
         self.assertIn(STRINGS["en"]["login_title"], r.text)
         r = await self.client.get("/staff/login")
         self.assertIn(STRINGS["pt"]["login_title"], r.text)
+        for header, lang, html_lang in (("de-DE,de;q=0.9", "de", "de"), ("zh-Hant-TW", "zh-tw", "zh-Hant-TW"),
+                                        ("zh-HK, en;q=0.5", "zh-tw", "zh-Hant-TW"), ("zh-CN, en;q=0.5", "en", "en"),
+                                        ("zh-Hans", "pt", "pt-PT")):
+            with self.subTest(header=header):
+                r = await self.client.get("/staff/login", headers={"Accept-Language": header})
+                self.assertIn(f'<html lang="{html_lang}">', r.text)
+                self.assertIn(f'data-lang="{lang}"', r.text)
+                self.assertIn(f"<title>{STRINGS[lang]['login_title']} · {STRINGS[lang]['site']}</title>", r.text)
         head = await self.client.head("/staff/login")
         self.assertEqual((head.status_code, head.content), (200, b""))
         r = await self.client.get("/staff", params={"lang": "en"})
@@ -216,14 +230,16 @@ class StaffScriptTests(AppTestCase):
                 for target in re.findall(r"from '([^']+)'", text):
                     self.assertTrue(target.startswith("./") and (STATIC / target[2:]).is_file(), target)
 
-    async def test_every_text_a_script_asks_for_exists_in_both_languages(self) -> None:
-        self.assertEqual(set(STRINGS["pt"]), set(STRINGS["en"]))
+    async def test_every_text_a_script_asks_for_exists_in_every_language(self) -> None:
+        self.assertEqual(tuple(STRINGS), i18n.LANGUAGES)
+        for lang, strings in STRINGS.items():
+            self.assertEqual(set(strings), set(STRINGS["en"]), lang)
         asked: set[str] = set()
         for text in self.sources().values():
             asked |= set(re.findall(r"\bt\('([a-z0-9_]+)'", text))
         missing = sorted(k for k in asked if k not in STRINGS["en"])
         self.assertEqual(missing, [])
-        for lang, strings in STRINGS.items():  # the same {names} in both languages
+        for lang, strings in STRINGS.items():  # the same {names} in every language
             for key, value in strings.items():
                 self.assertEqual(set(re.findall(r"\{(\w+)\}", value)),
                                  set(re.findall(r"\{(\w+)\}", STRINGS["en"][key])), (lang, key))
@@ -239,6 +255,16 @@ class StaffScriptTests(AppTestCase):
         staff = self.sources()["staff.js"]
         self.assertIn("'X-Atalaia-Refresh': '1'", staff)
         self.assertIn("Authorization: `Bearer ${s.token}`", staff)
+
+    async def test_german_and_chinese_follow_the_glossary(self) -> None:
+        de = " ".join(STRINGS["de"].values())
+        for word in ("Ihnen", "Ihre ", "Spieler ", "Spieler:in", "Spieler*in", "SpielerInnen", "Schiedsrichter"):
+            self.assertNotIn(word, de)  # "du"; neutral forms; "Marshal" as the glossary has it
+        for key, zh in STRINGS["zh-tw"].items():
+            for letter in ("您", "妳", "他們", "她", "这", "个", "设", "场", "报", "们", "录", "证", "码"):
+                self.assertNotIn(letter, zh, key)  # 你 only, no gendered pronoun, no Simplified letter
+            self.assertNotRegex(zh, r"[一-鿿][A-Za-z0-9]|[A-Za-z0-9][一-鿿]", key)  # a space
+            self.assertNotRegex(zh, r"[一-鿿][,.:;!?()]", key)  # full-width punctuation after Han
 
     async def test_portuguese_is_inclusive(self) -> None:
         text = " ".join(STRINGS["pt"].values()).lower()

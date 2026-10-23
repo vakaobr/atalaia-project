@@ -22,13 +22,15 @@ They are subsets of Noto Sans TC 2.004 from
 | `NotoSansTC-Regular.otf` | `5bab0cb3c1cf89dde07c4a95a4054b195afbcfe784d69d75c340780712237537` |
 | `NotoSansTC-Bold.otf` | `55420b259eb119bf5f2a0aadba10cf9d736c12d64ab93e78546d69ef5f43558b` |
 
-Each subset has the characters of `lib/l10n/strings_zh_tw.dart`. When a Chinese text gains a
-character they lack, `test/l10n/cjk_font_test.dart` names it; make them again from `app/` with
+Each subset has the characters of `lib/l10n/strings_zh_tw.dart` and of the built-in modes'
+files, `lib/modes/builtin_modes.g.dart` (their zh-tw names, labels and screens, which the prop
+and setup goldens show; decision P5H-12). When a Chinese text gains a character they lack, `test/l10n/cjk_font_test.dart` names it; make them again from `app/` with
 fontTools 4.55 (`pip install fonttools==4.55.3`):
 
 ```sh
+cat lib/l10n/strings_zh_tw.dart lib/modes/builtin_modes.g.dart > /tmp/zh-tw-chars.txt
 for w in Regular Bold; do
-  pyftsubset NotoSansTC-$w.otf --text-file=lib/l10n/strings_zh_tw.dart \
+  pyftsubset NotoSansTC-$w.otf --text-file=/tmp/zh-tw-chars.txt \
     --layout-features='*' --no-hinting --desubroutinize \
     --output-file=test/fonts/NotoSansTC-$w-subset.otf
 done

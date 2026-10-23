@@ -29,3 +29,16 @@ i18n:
       equipa que tinha a caixa.
     params:
       codes: "Códigos: dígitos:tipo[:pontos][:equipa], separados por vírgulas; o tipo é points, hint ou unlock (ex.: 4711:points:50,0815:hint,2222:unlock:red)"
+  de:
+    name: Codes
+    description: >-
+      Codes am Tastenfeld geben Punkte, Hinweise oder Freischaltungen, neben jedem Hauptmodus auf derselben
+      Box. Jeder Code gilt einmal pro Spiel. Die Spielleitung sieht jeden benutzten Code, das Team, für das er
+      zählte, und das Team, das die Box hielt.
+    params:
+      codes: "Codes: Ziffern:Art[:Punkte][:Team], durch Kommas getrennt; Art ist points, hint oder unlock (z. B. 4711:points:50,0815:hint,2222:unlock:red)"
+  zh-tw:
+    name: 密碼
+    description: 在按鍵輸入代碼可得到分數、提示或解鎖，可與同一個盒子上的任何主要模式並用。每個代碼每場遊戲只能用一次。主辦會看到每個用過的代碼、計分的隊伍，以及當時佔有盒子的隊伍。
+    params:
+      codes: "代碼：數字:種類[:分數][:隊伍]，以逗號分隔；種類為 points、hint 或 unlock（例如 4711:points:50,0815:hint,2222:unlock:red）"

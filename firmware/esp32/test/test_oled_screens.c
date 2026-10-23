@@ -41,9 +41,12 @@ typedef struct {
     const char *data;
 } oled_case_t;
 
-#define BOMB  "org.atalaia.bomb {\"attackers\":\"red\",\"defenders\":\"blue\",\"fuse_s\":300}"
-#define DOM   "org.atalaia.domination {\"capture_hold_ms\":3000}"
-#define MEDIC "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"en\"}"
+#define BOMB     "org.atalaia.bomb {\"attackers\":\"red\",\"defenders\":\"blue\",\"fuse_s\":300}"
+#define DOM      "org.atalaia.domination {\"capture_hold_ms\":3000}"
+#define MEDIC    "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"en\"}"
+#define MEDIC_DE "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"de\"}"
+#define MEDIC_ZH "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"zh-tw\"}"
+#define MONEY    "org.atalaia.money_factory {\"capacity\":50,\"capture_hold_ms\":3000}"
 
 /* The splashes are drawn by oled_view_splash(), not by a screen update; data is the firmware's
  * version (FV-8): a release, a development build, one with a three-digit count and changes. */
@@ -110,7 +113,7 @@ static const oled_case_t cases[] = {
      "{\"presets\":[\"Bombe\",\"Domination\"],\"selected\":2,\"page\":1,\"pages\":2}"},
     {"timer_adjust_de", NULL, "timer_adjust", "{\"timer_s\":600}"},
     {"start_confirm_de", NULL, "start_confirm", "{\"label\":\"Bombe\",\"timer_s\":600}"},
-    /* Traditional Chinese (P5K-2): mode and preset names stay English (P5H-7). */
+    /* Traditional Chinese (P5K-2): the box's preset names stay English (builtin_presets.c). */
     {"pin_entry_zh-tw", NULL, "pin_entry", "{\"digits\":2,\"error\":false}"},
     {"pin_entry_locked_zh-tw", NULL, "pin_entry",
      "{\"digits\":0,\"error\":false,\"locked_min\":60}"},
@@ -148,6 +151,15 @@ static const oled_case_t cases[] = {
      "{\"title\":\"DEFUSE\",\"digits\":2,\"left\":61,\"message\":\"Enter your team code\"}"},
     {"mode_template", MEDIC, "medic_refused",
      "{\"reason\":\"limit\",\"message\":\"Limit reached\",\"player\":\"r2\",\"team\":\"red\"}"},
+    /* The modes' own screens on a German or Chinese box (P5H-12): the mode's words are the
+     * TFT's; the OLED shows a countdown, a team or the script's message (the Medic Kit's
+     * refusals are in the fonts, gen_box_fonts.py). */
+    {"mode_template_de", MEDIC_DE, "medic_refused",
+     "{\"reason\":\"limit\",\"message\":\"Du hast alle Behandlungen gehabt\"}"},
+    {"mode_template_zh-tw", MEDIC_ZH, "medic_refused",
+     "{\"reason\":\"limit\",\"message\":\"你的治療次數已用完\"}"},
+    {"money_captured_de", MONEY, "captured", "{\"team\":\"red\",\"since\":95,\"stock\":35}"},
+    {"money_captured_zh-tw", MONEY, "captured", "{\"team\":\"red\",\"since\":95,\"stock\":35}"},
     {"wifi_setup", NULL, "wifi_setup", "{\"ssid\":\"atalaia-7c4f\"}"},
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))

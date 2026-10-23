@@ -19,8 +19,9 @@
                                                        revoking one, the devices connected now, the log
     GET /static/staff/<file>                           the pages' scripts and style sheet
 
-How they work (FU2-1, FU2-2): each page is rendered here, in pt-PT or English like the field pages
-(``?lang=``, else ``Accept-Language``), with every text escaped, and holds **no data**: its script
+How they work (FU2-1, FU2-2): each page is rendered here, in the field pages' languages (pt-PT, English,
+German, Traditional Chinese for Taiwan) and chosen as they are (``?lang=``, else ``Accept-Language``),
+with every text escaped, and holds **no data**: its script
 (``static/staff/``, same-origin modules, which the content security policy's ``script-src 'self'``
 already allows: no inline script, nothing from elsewhere) asks the API for it, with the access token in
 ``Authorization: Bearer`` as the app does. So every page has exactly its API's role rules (the field's
@@ -51,7 +52,7 @@ from fastapi.responses import RedirectResponse, Response
 from ..history_models import DEFAULT_RETENTION_DAYS, MAX_DELAY_S, MIN_RETENTION_DAYS
 from ..services import devices
 from . import i18n
-from .field_pages import GET_HEAD, HERE, HTML_TYPE, STARTED, answer, esc
+from .field_pages import GET_HEAD, HERE, HTML_TYPE, STARTED, answer, esc, switcher
 from .staff_i18n import STRINGS
 
 router = APIRouter(include_in_schema=False)
@@ -64,7 +65,7 @@ STATIC_NAME = re.compile(r"[a-z][a-z0-9_]*\.(js|css)")
 STATIC_TYPES = {"js": "text/javascript; charset=utf-8", "css": "text/css; charset=utf-8"}
 REMOTE_POLL_S = 5
 DEVICE_DAYS = (7, 30, 90, 365, devices.MAX_DEVICE_DAYS)
-HTML_LANG = {"pt": "pt-PT", "en": "en"}
+HTML_LANG = {**i18n.TAGS, "pt": "pt-PT"}
 assert set(STRINGS) == set(i18n.LANGUAGES)
 
 
@@ -98,14 +99,7 @@ class StaffPage:
         return f"{path}?lang={self.lang}" if self.explicit else path
 
     def languages(self) -> str:
-        out = []
-        for lang in i18n.LANGUAGES:
-            name = esc(i18n.LANGUAGE_NAMES[lang])
-            if lang == self.lang:
-                out.append(f'<span lang="{lang}" aria-current="true">{name}</span>')
-            else:
-                out.append(f'<a lang="{lang}" hreflang="{lang}" href="{esc(self.path)}?lang={lang}">{name}</a>')
-        return " ".join(out)
+        return switcher(self.lang, self.path)
 
     def sections(self, field: Optional[uuid.UUID], current: str) -> str:
         """The navigation: every field, and on a field's pages that field's sections (the script hides those
@@ -139,7 +133,8 @@ class StaffPage:
             language_label=esc(i18n.STRINGS[self.lang]["language"]), languages=self.languages(),
             content=content, strings=strings_block(self.t))
         return answer(request, body, HTML_TYPE, datetime.now(timezone.utc), NO_STORE, status_code=status_code,
-                      extra={"Content-Language": self.lang, "Vary": "Accept-Language", "X-Robots-Tag": "noindex"})
+                      extra={"Content-Language": i18n.TAGS[self.lang], "Vary": "Accept-Language",
+                             "X-Robots-Tag": "noindex"})
 
     def not_found(self, request: Request) -> Response:
         content = f'<h1>{esc(self.t["err_not_found"])}</h1>\n'

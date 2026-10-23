@@ -169,6 +169,14 @@ class PublicPageTests(ClubCase):
         self.assertIn('href="/c/lobos-do-pinhal/report?lang=en"', r.text)
         self.assertNotIn("rita", r.text)  # no member is ever named
         self.assertNotIn("<script", r.text)
+        for lang, html_lang, report, crest_alt in (("de", "de", "Diese Seite melden", "Wappen von "),
+                                                   ("zh-tw", "zh-Hant-TW", "檢舉這個頁面", " 的隊徽")):
+            with self.subTest(lang=lang):
+                page = await self.client.get("/c/lobos-do-pinhal/", params={"lang": lang})
+                self.assertIn(f'<html lang="{html_lang}">', page.text)
+                self.assertIn(f'href="/c/lobos-do-pinhal/report?lang={lang}">{report}</a>', page.text)
+                self.assertIn(crest_alt, page.text)
+                self.assertIn('href="/c/lobos-do-pinhal/?lang=pt">Português</a>', page.text)
         crest = await self.client.get("/c/lobos-do-pinhal/crest")
         self.assertEqual((crest.status_code, crest.headers["content-type"]), (200, "image/png"))
         self.assertEqual(crest.headers["x-content-type-options"], "nosniff")

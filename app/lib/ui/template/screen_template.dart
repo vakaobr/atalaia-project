@@ -23,7 +23,7 @@ import 'expression.dart';
 const int templateSourceMax = 4096; // bytes of YAML
 const int templateWidgetsMax = 32;
 const int _yamlNodesMax = 192;
-const int _poolMax = 1536;
+const int _poolMax = 3072; // ATALAIA_TPL_POOL_MAX (P5H-12)
 const int templateNameMax = 31;
 const int templateDepthMax = 4; // rows and columns inside each other
 const int _nestMax = 20;

@@ -21,7 +21,7 @@ params:
   checkpoint_points: { type: int, min: 0, max: 1000, default: 1, label: "Points per tick for the team holding a checkpoint (0: none)" }
   tick_s:            { type: int, min: 1, max: 600, default: 10, label: "Seconds per scoring tick of a checkpoint" }
   capture_hold_ms:   { type: int, min: 0, max: 60000, default: 3000, label: "Hold time to capture a checkpoint (ms)" }
-  lang:              { type: string, default: pt, max: 2, label: "Language of the screens: pt or en" }
+  lang:              { type: string, default: pt, max: 5, label: "Language of the screens: pt, en, de or zh-tw" }
 i18n:
   pt:
     name: VIP / Carga
@@ -39,4 +39,34 @@ i18n:
       checkpoint_points: "Pontos por intervalo para a equipa que tem um ponto de controlo (0: nenhum)"
       tick_s: Segundos por intervalo de um ponto de controlo
       capture_hold_ms: Tempo a premir para capturar um ponto de controlo (ms)
-      lang: "Língua dos ecrãs: pt ou en"
+      lang: "Língua dos ecrãs: pt, en, de ou zh-tw"
+  de:
+    name: VIP / Payload
+    description: >-
+      Ein Team eskortiert seinen VIP, eine Person, die ihre Position teilt, oder ein Payload, ein Handy mit
+      GPS, zu einer Extraktionszone; die anderen Teams versuchen, es zu verhindern. Das Erreichen der Zone
+      bringt Punkte und kann das Spiel beenden. Checkpoint-Boxen unterwegs werden eingenommen wie bei
+      Domination und punkten, solange ein Team sie hält.
+    params:
+      vip_team: Team, das den VIP und das Payload eskortiert
+      extraction: "Mitte der Extraktionszone, Breite,Länge in Grad, z. B. 38.722345,-9.139312 (leer: keine Extraktion)"
+      radius_m: Radius der Extraktionszone (m)
+      vip_points: Punkte für das eskortierende Team bei der Extraktion
+      end_on_extract: Die Extraktion beendet das Spiel, gewonnen vom eskortierenden Team
+      checkpoint_points: "Punkte pro Intervall für das Team, das einen Checkpoint hält (0: keine)"
+      tick_s: Sekunden pro Wertungsintervall eines Checkpoints
+      capture_hold_ms: Haltezeit zum Einnehmen eines Checkpoints (ms)
+      lang: "Sprache der Bildschirme: pt, en, de oder zh-tw"
+  zh-tw:
+    name: VIP / 護送
+    description: 一隊護送自己的 VIP（分享位置的玩家）或護送目標（有 GPS 的手機）到撤離區；其他隊伍設法阻止。抵達撤離區可得分，也可以結束遊戲。沿途的檢查點盒子像佔點模式一樣佔領，佔有期間持續得分。
+    params:
+      vip_team: 護送 VIP 與護送目標的隊伍
+      extraction: 撤離區中心，緯度,經度（度），例如 38.722345,-9.139312（空白：不撤離）
+      radius_m: 撤離區半徑（公尺）
+      vip_points: 撤離時護送隊伍得到的分數
+      end_on_extract: 撤離即結束遊戲，由護送隊伍獲勝
+      checkpoint_points: 佔有檢查點的隊伍每次計分的分數（0：無）
+      tick_s: 檢查點的計分間隔（秒）
+      capture_hold_ms: 佔領檢查點需按住的時間（毫秒）
+      lang: 畫面的語言：pt、en、de 或 zh-tw

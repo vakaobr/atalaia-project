@@ -251,6 +251,8 @@ function definitions(t) {
             ],
             message2: t('param_label'), args2: [{ type: 'field_input', name: 'LABEL', text: 'Seconds per tick' }],
             message3: t('param_label_pt'), args3: [{ type: 'field_input', name: 'LABEL_PT', text: '' }],
+            message4: t('param_label_de'), args4: [{ type: 'field_input', name: 'LABEL_DE', text: '' }],
+            message5: t('param_label_zh_tw'), args5: [{ type: 'field_input', name: 'LABEL_ZH_TW', text: '' }],
             colour: HUE.settings, tooltip: t('param_declare_tip'),
         },
 
@@ -311,6 +313,8 @@ function definitions(t) {
             args0: [nameField('NAME', 'refill', commandName), nameField('ROLES', 'zone', roleList)],
             message1: t('param_label'), args1: [{ type: 'field_input', name: 'LABEL', text: 'Refill' }],
             message2: t('param_label_pt'), args2: [{ type: 'field_input', name: 'LABEL_PT', text: '' }],
+            message3: t('param_label_de'), args3: [{ type: 'field_input', name: 'LABEL_DE', text: '' }],
+            message4: t('param_label_zh_tw'), args4: [{ type: 'field_input', name: 'LABEL_ZH_TW', text: '' }],
             colour: HUE.commands, tooltip: t('command_declare_tip'),
         },
         {

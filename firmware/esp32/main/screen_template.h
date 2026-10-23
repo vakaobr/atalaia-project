@@ -58,11 +58,13 @@ void screen_template_reset(void);
  * place before it is drawn: those letters, ª º ° · and the bullet stay
  * ("Lê a tua etiqueta"), other accented Latin letters lose the accent
  * ("Ñ" -> "N"), dashes, quotes and the ellipsis become their ASCII forms,
- * LVGL's own symbols stay, and anything else becomes '?'. The text never
- * gets longer.
+ * LVGL's own symbols stay, Chinese letters stay when the font a label of
+ * font_size is drawn with has them (box_fonts_cjk.h: the box's own and the
+ * built-in templates' texts, decision P5H-12; 0 is the default size, 20),
+ * and anything else becomes '?'. The text never gets longer.
  * Phones draw the same templates with every character (app/lib/ui/template/).
  */
-void screen_template_fold_text(char *s);
+void screen_template_fold_text(char *s, int font_size);
 
 #if ATALAIA_SCREEN_LVGL
 #include "lvgl.h"

@@ -644,7 +644,13 @@ class PropSession extends ChangeNotifier {
           ? (args[1]! as Map).cast<String, Object?>()
           : const <String, Object?>{};
       screenName = name;
-      screenData = data;
+      // The game's language as "lang" (join key 15), unless the mode gives
+      // one, as a Field Box does: the built-in templates show their pt, de
+      // or zh-tw texts for it, English otherwise (decision P5H-12).
+      final lang = setup.join?.lang;
+      screenData = lang != null && !data.containsKey('lang')
+          ? {'lang': lang, ...data}
+          : data;
       template = _template(name);
       unawaited(screenManager.activity());
       return;

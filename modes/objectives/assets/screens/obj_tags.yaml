@@ -7,18 +7,15 @@
 # no team has pressed its button yet; wrong_team: a team that may not scan
 # here; again: a tag already counted, or the team already has them all), any
 # (any card counts, not only players' tags), label (the objective's name),
-# lang (pt, the default, or en).
+# lang (pt, the default, en, de or zh-tw).
 template: obj_tags
 layout:
   - type: row
     style: { width: fill, height: 44, background: "{team || 'panel'}" }
     children:
       - type: label
-        text: "{label || 'ETIQUETAS'}"
-        style: { font_size: 20, width: fill, align: center, color: "{team && 'contrast' || 'white'}", visible: "{lang != 'en'}" }
-      - type: label
-        text: "{label || 'TAGS'}"
-        style: { font_size: 20, width: fill, align: center, color: "{team && 'contrast' || 'white'}", visible: "{lang == 'en'}" }
+        text: "{label || lang == 'en' && 'TAGS' || lang == 'de' && 'TAGS' || lang == 'zh-tw' && '標籤' || 'ETIQUETAS'}"
+        style: { font_size: 20, width: fill, align: center, color: "{team && 'contrast' || 'white'}" }
   - type: spacer
     height: fill
   - type: label
@@ -30,86 +27,44 @@ layout:
   - type: spacer
     height: fill
   - type: label
-    text: Não é uma etiqueta do jogo
+    text: "{lang == 'en' && 'Not a game tag' || lang == 'de' && 'Kein Tag dieses Spiels' || lang == 'zh-tw' && '不是這場遊戲的標籤' || 'Não é uma etiqueta do jogo'}"
     style:
       font_size: 20
       color: danger
-      visible: "{note == 'not_tag' && lang != 'en'}"
+      visible: "{note == 'not_tag'}"
       padding: { bottom: 8 }
   - type: label
-    text: Not a game tag
+    text: "{lang == 'en' && 'Another team’s objective' || lang == 'de' && 'Ziel eines anderen Teams' || lang == 'zh-tw' && '這是別隊的目標' || 'Objetivo de outra equipa'}"
     style:
       font_size: 20
       color: danger
-      visible: "{note == 'not_tag' && lang == 'en'}"
+      visible: "{note == 'wrong_team'}"
       padding: { bottom: 8 }
   - type: label
-    text: Objetivo de outra equipa
+    text: "{lang == 'en' && 'Press your team’s button' || lang == 'de' && 'Drück deinen Teamknopf' || lang == 'zh-tw' && '先按你隊伍的按鈕' || 'Carrega no botão da equipa'}"
     style:
       font_size: 20
       color: danger
-      visible: "{note == 'wrong_team' && lang != 'en'}"
+      visible: "{note == 'team_first'}"
       padding: { bottom: 8 }
   - type: label
-    text: Another team's objective
-    style:
-      font_size: 20
-      color: danger
-      visible: "{note == 'wrong_team' && lang == 'en'}"
-      padding: { bottom: 8 }
-  - type: label
-    text: Carrega no botão da equipa
-    style:
-      font_size: 20
-      color: danger
-      visible: "{note == 'team_first' && lang != 'en'}"
-      padding: { bottom: 8 }
-  - type: label
-    text: Press your team's button
-    style:
-      font_size: 20
-      color: danger
-      visible: "{note == 'team_first' && lang == 'en'}"
-      padding: { bottom: 8 }
-  - type: label
-    text: Esta etiqueta já conta
+    text: "{lang == 'en' && 'This tag already counts' || lang == 'de' && 'Dieser Tag zählt schon' || lang == 'zh-tw' && '這個標籤已計算過' || 'Esta etiqueta já conta'}"
     style:
       font_size: 20
       color: muted
-      visible: "{note == 'again' && lang != 'en'}"
+      visible: "{note == 'again'}"
       padding: { bottom: 8 }
   - type: label
-    text: This tag already counts
-    style:
-      font_size: 20
-      color: muted
-      visible: "{note == 'again' && lang == 'en'}"
-      padding: { bottom: 8 }
-  - type: label
-    text: Cada pessoa lê a sua etiqueta
+    text: "{lang == 'en' && 'Each player scans their own tag' || lang == 'de' && 'Alle scannen ihren eigenen Tag' || lang == 'zh-tw' && '每位玩家感應自己的標籤' || 'Cada pessoa lê a sua etiqueta'}"
     style:
       font_size: 14
       color: muted
-      visible: "{!note && !any && lang != 'en'}"
+      visible: "{!note && !any}"
       padding: { bottom: 10 }
   - type: label
-    text: Each player scans their own tag
+    text: "{lang == 'en' && 'Scan the cards you found' || lang == 'de' && 'Scanne die Karten, die du gefunden hast' || lang == 'zh-tw' && '感應你找到的卡片' || 'Lê os cartões que encontraste'}"
     style:
       font_size: 14
       color: muted
-      visible: "{!note && !any && lang == 'en'}"
-      padding: { bottom: 10 }
-  - type: label
-    text: Lê os cartões que encontraste
-    style:
-      font_size: 14
-      color: muted
-      visible: "{!note && any && lang != 'en'}"
-      padding: { bottom: 10 }
-  - type: label
-    text: Scan the cards you found
-    style:
-      font_size: 14
-      color: muted
-      visible: "{!note && any && lang == 'en'}"
+      visible: "{!note && any}"
       padding: { bottom: 10 }

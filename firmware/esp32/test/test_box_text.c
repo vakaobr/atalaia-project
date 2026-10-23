@@ -33,15 +33,6 @@ static size_t columns(const char *s)
     return n;
 }
 
-static bool has_wide(const char *s)
-{
-    size_t i = 0;
-    for (uint32_t cp; (cp = font_check_next(s, &i)) != 0;) {
-        if (wide(cp)) return true;
-    }
-    return false;
-}
-
 /* The texts the TFT draws at 48 px (tools/gen_box_fonts.py's AT_48). */
 static bool at_48(int id)
 {
@@ -63,12 +54,12 @@ static void test_every_text(void)
             CHECK(font_check_text(&lv_font_atalaia_20, s, &missing));
             CHECK(font_check_text(&lv_font_atalaia_28, s, &missing));
             if (at_48(id)) CHECK(font_check_text(&lv_font_atalaia_48, s, &missing));
-            /* Latin texts: folding (the templates' filter) changes nothing either. Chinese ones
-             * are drawn by the box's own screens only, never through a template. */
-            if (!has_wide(s)) {
+            /* Folding (the templates' filter) changes nothing either, Chinese included: the
+             * fonts' tables have every letter at 14, 20 and 28 px (box_fonts_cjk.h, P5H-12). */
+            for (int px = 14; px <= 28; px += px == 14 ? 6 : 8) {
                 char folded[128];
                 snprintf(folded, sizeof(folded), "%s", s);
-                screen_template_fold_text(folded);
+                screen_template_fold_text(folded, px);
                 CHECK(strcmp(folded, s) == 0);
             }
             /* The OLED's lines: 16 columns, a Han letter two (a few English ones of before

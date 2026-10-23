@@ -10,7 +10,7 @@ layout:
     style: { width: fill, height: 44, background: team }
     children:
       - type: label
-        text: "{lang == 'pt' && 'RECOLHIDO' || 'COLLECTED'}"
+        text: "{lang == 'pt' && 'RECOLHIDO' || lang == 'de' && 'ABGEHOLT' || lang == 'zh-tw' && '已領取' || 'COLLECTED'}"
         style: { font_size: 20, width: fill, align: center, color: contrast }
   - type: spacer
     height: fill
@@ -21,12 +21,12 @@ layout:
     text: "{player}"
     style: { font_size: 20 }
   - type: label
-    text: "{lang == 'pt' && 'Levas' || 'You carry'} {carrying}"
+    text: "{lang == 'pt' && 'Levas' || lang == 'de' && 'Du trägst' || lang == 'zh-tw' && '你帶著' || 'You carry'} {carrying}"
     style: { font_size: 20, color: accent }
   - type: spacer
     height: fill
   - type: label
-    text: "{lang == 'pt' && 'Leva-o a um banco' || 'Take it to a bank'}"
+    text: "{lang == 'pt' && 'Leva-o a um banco' || lang == 'de' && 'Bring es zu einer Bank' || lang == 'zh-tw' && '把錢帶到銀行' || 'Take it to a bank'}"
     style:
       font_size: 14
       color: muted

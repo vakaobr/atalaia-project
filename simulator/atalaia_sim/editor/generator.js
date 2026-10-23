@@ -516,6 +516,22 @@ function commandBlocks(ws) {
  * reacts to are required, unless the role lists its own; outputs it uses are optional). Returns
  * { code, problems }.
  */
+/**
+ * The mode's translations the Mode tab and the declaration blocks carry (mode.yaml `i18n`): the
+ * language code and the suffix of its fields (`name_pt`, `LABEL_PT`; `name_zh_tw`, `LABEL_ZH_TW`
+ * for `zh-tw`). A project saved before German and Chinese has no such fields: they read as empty.
+ */
+export const TRANSLATIONS = [['pt', 'pt'], ['de', 'de'], ['zh-tw', 'zh_tw']];
+
+function translatedLabels(block) {
+    const out = {};
+    for (const [lang, suffix] of TRANSLATIONS) {
+        const field = `LABEL_${suffix.toUpperCase()}`;
+        out[lang] = block.getField(field) ? String(block.getFieldValue(field) || '').trim() : '';
+    }
+    return out;
+}
+
 export function generateManifest(info, nodeWs, fieldWs, scripts) {
     const problems = [];
     if (!/^[a-z0-9][a-z0-9_-]*(\.[a-z0-9][a-z0-9_-]*)+$/.test(info.id || '')) problems.push({ key: 'problem_bad_id', block: null });
@@ -532,7 +548,7 @@ export function generateManifest(info, nodeWs, fieldWs, scripts) {
             seen.add(name);
             const spec = paramSpec(block);
             if (!spec) problems.push({ key: 'problem_param_default', block: block.id, name });
-            else params.push([name, spec, String(block.getFieldValue('LABEL_PT') || '').trim()]);
+            else params.push([name, spec, translatedLabels(block)]);
         }
     }
     for (const script of scripts) {
@@ -597,7 +613,7 @@ export function generateManifest(info, nodeWs, fieldWs, scripts) {
         }
         if (!handlers.has(name)) problems.push({ key: 'problem_command_unhandled', block: block.id, name });
         commands.push([name, forRoles, String(block.getFieldValue('LABEL') || '').trim() || name,
-            String(block.getFieldValue('LABEL_PT') || '').trim()]);
+            translatedLabels(block)]);
     }
 
     // (REUSE-IgnoreStart)
@@ -627,19 +643,23 @@ export function generateManifest(info, nodeWs, fieldWs, scripts) {
             lines.push(`  ${name}: { roles: [${forRoles.join(', ')}], label: ${yamlValue(label)} }`);
         }
     }
-    const labelsPt = params.filter(([, , pt]) => pt);
-    const commandsPt = commands.filter(([, , , pt]) => pt);
-    if (info.name_pt || info.description_pt || labelsPt.length || commandsPt.length) {
-        lines.push('i18n:', '  pt:');
-        if (info.name_pt) lines.push(`    name: ${yamlValue(info.name_pt)}`);
-        if (info.description_pt) lines.push(`    description: ${yamlValue(info.description_pt)}`);
-        if (labelsPt.length) {
+    for (const [lang, suffix] of TRANSLATIONS) {
+        const labels = params.filter(([, , tr]) => tr[lang]);
+        const commandLabels = commands.filter(([, , , tr]) => tr[lang]);
+        const name = info[`name_${suffix}`];
+        const description = info[`description_${suffix}`];
+        if (!(name || description || labels.length || commandLabels.length)) continue;
+        if (!lines.includes('i18n:')) lines.push('i18n:');
+        lines.push(`  ${lang}:`);
+        if (name) lines.push(`    name: ${yamlValue(name)}`);
+        if (description) lines.push(`    description: ${yamlValue(description)}`);
+        if (labels.length) {
             lines.push('    params:');
-            for (const [name, , pt] of labelsPt) lines.push(`      ${name}: ${yamlValue(pt)}`);
+            for (const [pname, , tr] of labels) lines.push(`      ${pname}: ${yamlValue(tr[lang])}`);
         }
-        if (commandsPt.length) {
+        if (commandLabels.length) {
             lines.push('    commands:');
-            for (const [name, , , pt] of commandsPt) lines.push(`      ${name}: ${yamlValue(pt)}`);
+            for (const [cname, , , tr] of commandLabels) lines.push(`      ${cname}: ${yamlValue(tr[lang])}`);
         }
     }
     return { code: lines.join('\n') + '\n', problems };
@@ -649,7 +669,8 @@ export function generateManifest(info, nodeWs, fieldWs, scripts) {
 export function defaultInfo() {
     return {
         id: 'org.club.my-mode', version: '0.1.0', name: 'My mode', description: '', name_pt: '',
-        description_pt: '', kind: 'mode', roles: [{ name: 'zone', inputs: null, needed: true }],
+        description_pt: '', name_de: '', description_de: '', name_zh_tw: '',
+        description_zh_tw: '', kind: 'mode', roles: [{ name: 'zone', inputs: null, needed: true }],
         license: 'GPL-3.0-or-later', min_tier: 'reduced', author: 'The Atalaia contributors',
         year: String(new Date().getFullYear()),
     };

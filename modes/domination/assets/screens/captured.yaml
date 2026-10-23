@@ -2,14 +2,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # A team holds the zone. Data: team, points (the team's on this box),
-# since (game time of the capture, in seconds); lang (pt or en) from the box.
+# since (game time of the capture, in seconds); lang (pt, en, de or zh-tw) from the box.
 template: captured
 layout:
   - type: row
     style: { width: fill, height: 44, background: team }
     children:
       - type: label
-        text: "{lang == 'pt' && 'ZONA OCUPADA' || 'ZONE HELD'}"
+        text: "{lang == 'pt' && 'ZONA OCUPADA' || lang == 'de' && 'ZONE BESETZT' || lang == 'zh-tw' && '據點已佔領' || 'ZONE HELD'}"
         style: { font_size: 20, width: fill, align: center, color: contrast }
   - type: spacer
     height: fill
@@ -17,15 +17,15 @@ layout:
     text: "{team|upper}"
     style: { font_size: 48, color: team }
   - type: label
-    text: "{points} {lang == 'pt' && 'pontos nesta caixa' || 'points on this box'}"
+    text: "{points} {lang == 'pt' && 'pontos nesta caixa' || lang == 'de' && 'Punkte auf dieser Box' || lang == 'zh-tw' && '分（這個盒子）' || 'points on this box'}"
     style: { font_size: 20 }
   - type: label
-    text: "{lang == 'pt' && 'desde' || 'held since'} {since|clock}"
+    text: "{lang == 'pt' && 'desde' || lang == 'de' && 'seit' || lang == 'zh-tw' && '佔領於' || 'held since'} {since|clock}"
     style: { font_size: 20, color: muted }
   - type: spacer
     height: fill
   - type: label
-    text: "{lang == 'pt' && 'Mantém o botão premido para a tomar' || 'Hold your button to take it over'}"
+    text: "{lang == 'pt' && 'Mantém o botão premido para a tomar' || lang == 'de' && 'Halte den Knopf zum Übernehmen' || lang == 'zh-tw' && '按住你的按鈕即可奪取' || 'Hold your button to take it over'}"
     style:
       font_size: 14
       color: muted

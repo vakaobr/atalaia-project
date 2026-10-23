@@ -509,8 +509,8 @@ screens:
     caption: Chrono beim Check-in, der Messwert von Marshal signiert.
   medic_intro: >-
     Das Medic-Kit zeichnet seine Bildschirme aus denselben YAML-Dateien auf einer Field Box und auf
-    einem Android-Prop, auf Portugiesisch, außer die Spielleitung stellt Englisch ein. So zeichnet die
-    App sie:
+    einem Android-Prop, auf Portugiesisch, außer die Spielleitung stellt Englisch, Deutsch oder
+    Chinesisch ein. So zeichnet die App sie:
   medic_idle:
     alt: >-
       Bildschirm des Medic-Kits: Kopfzeile „LIGADURAS“ (Verbände), eine große 4, „Restam 4 ligaduras“
@@ -859,7 +859,8 @@ roadmap:
       zu den Boxen lässt. Wie man einen Modus einreicht, die Prüfliste, Schlüssel und Moderation
       sind aufgeschrieben. Atalaia gibt es jetzt auch auf Deutsch und in traditionellem
       Chinesisch, wie es in Taiwan geschrieben wird (diese Seite, die GM-Konsole, der Modus-Editor,
-      die App und die Bildschirme der Field Box), beides von einem KI-Modell entworfen und noch
+      die App, die Bildschirme der Field Box, die eingebauten Modi und die Seiten des Site-Servers),
+      beides von einem KI-Modell entworfen und noch
       nicht von Spielenden geprüft, die diese Sprachen sprechen: Wenn du auf Deutsch oder
       Chinesisch spielst, hilf uns beim Prüfen. Als Nächstes: die Registry aus ihrer Vorlage
       anlegen; die Prüfung des Deutschen und des Chinesischen; die Träger-Platine nach den ersten

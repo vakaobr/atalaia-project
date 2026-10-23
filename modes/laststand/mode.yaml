@@ -31,3 +31,29 @@ i18n:
       min_zones: Zonas em jogo antes de a contagem poder correr
       reset: A contagem recomeça do início após uma reconquista (senão continua de onde parou)
       end_game: Terminar o jogo quando os defensores caem
+  de:
+    name: Last Stand
+    description: >-
+      Die Verteidigenden beginnen mit allen Zonen. Sobald sie nur noch ihre letzte Zone haben, läuft ein
+      Countdown zur Niederlage, bis sie eine andere zurückerobern.
+    params:
+      capture_hold_ms: Haltezeit zum Einnehmen (ms)
+      attackers: Angreifende (gewinnen, wenn die Verteidigenden fallen)
+      defenders: Verteidigende (beginnen mit allen Zonen)
+      countdown_s: Countdown zur Niederlage (s)
+      last_zones: Der Countdown läuft, solange die Verteidigenden so viele Zonen oder weniger halten
+      min_zones: Zonen im Spiel, bevor der Countdown laufen kann
+      reset: Der Countdown beginnt nach einer Rückeroberung von vorn (sonst läuft er weiter, wo er stand)
+      end_game: Das Spiel endet, wenn die Verteidigenden fallen
+  zh-tw:
+    name: 最後一人
+    description: 防守方一開始佔有所有據點。防守方只剩最後一個據點時，失敗倒數開始，直到防守方奪回另一個據點為止。
+    params:
+      capture_hold_ms: 佔領需按住的時間（毫秒）
+      attackers: 進攻方（防守方失守時獲勝）
+      defenders: 防守方（一開始佔有所有據點）
+      countdown_s: 失敗倒數（秒）
+      last_zones: 防守方佔有的據點不超過這個數目時開始倒數
+      min_zones: 倒數開始前需要在場的據點數
+      reset: 奪回據點後倒數重新開始（否則從停下的地方繼續）
+      end_game: 防守方失守時結束遊戲

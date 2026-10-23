@@ -35,19 +35,26 @@ export function has(key) {
     return Object.prototype.hasOwnProperty.call(STRINGS, key);
 }
 
-const LOCALE = page.lang === 'pt' ? 'pt-PT' : 'en-GB';
+const LOCALES = { pt: 'pt-PT', en: 'en-GB', de: 'de-DE', 'zh-tw': 'zh-Hant-TW' };
+const LOCALE = LOCALES[page.lang] || 'en-GB';
+const CHINESE = page.lang === 'zh-tw';
 
-/** A date and time, in the field's time zone when it is known. */
+/** A date and time, in the field's time zone when it is known. Times are 24-hour (HH:MM) in every
+ * language (zh-TW defaults to 12-hour); where a Chinese format writes 年/月/日, a half-width space goes
+ * between them and the digits, as the project writes them (ICU's medium zh-TW date is 2026/11/8). */
 export function when(iso, zone) {
     if (!iso) return t('none');
     const date = new Date(iso);
     if (Number.isNaN(date.getTime())) return String(iso);
-    const options = { dateStyle: 'medium', timeStyle: 'short' };
+    const options = CHINESE ? { dateStyle: 'medium', timeStyle: 'short', hourCycle: 'h23' }
+        : { dateStyle: 'medium', timeStyle: 'short' };
+    let text;
     try {
-        return new Intl.DateTimeFormat(LOCALE, zone ? { ...options, timeZone: zone } : options).format(date);
+        text = new Intl.DateTimeFormat(LOCALE, zone ? { ...options, timeZone: zone } : options).format(date);
     } catch (e) {
-        return new Intl.DateTimeFormat(LOCALE, options).format(date);
+        text = new Intl.DateTimeFormat(LOCALE, options).format(date);
     }
+    return CHINESE ? text.replace(/(\d)([年月日])/g, '$1 $2').replace(/([年月])(\d)/g, '$1 $2') : text;
 }
 
 /** A game time in milliseconds as m:ss or h:mm:ss. */

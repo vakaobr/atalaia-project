@@ -17,8 +17,9 @@ Only a field with ``public_page`` on has them; any other slug, a draft, or a gam
 field is a 404, the same as a page that never existed. Rendered on the server from
 ``templates/`` (``string.Template``, every value escaped), no JavaScript, nothing loaded from
 elsewhere, so the security headers' content security policy holds as it is (the JSON-LD block
-is data, which the policy does not run). pt-PT or English: ``?lang=pt|en``, else
-``Accept-Language``, else pt. No registrant's name or count: only the places left.
+is data, which the policy does not run). pt-PT, English, German or Traditional Chinese (Taiwan;
+the last two AI drafts, see ``i18n.py``): ``?lang=pt|en|de|zh-tw``, else ``Accept-Language``,
+else pt. No registrant's name or count: only the places left.
 
 Every answer has an ``ETag`` (SHA-256 of the body) and ``Last-Modified``, and a matching
 ``If-None-Match`` (or, without it, ``If-Modified-Since``) gets 304, so calendars can poll
@@ -139,6 +140,18 @@ def no_feed() -> Response:
     return Response(status_code=404, headers={"Cache-Control": "no-store"})
 
 
+def switcher(current: str, path: str) -> str:
+    """The language switcher: every language named in itself, with its BCP 47 tag; links to this path."""
+    out = []
+    for lang in i18n.LANGUAGES:
+        name, tag = esc(i18n.LANGUAGE_NAMES[lang]), i18n.TAGS[lang]
+        if lang == current:
+            out.append(f'<span lang="{tag}" aria-current="true">{name}</span>')
+        else:
+            out.append(f'<a lang="{tag}" hreflang="{tag}" href="{esc(path)}?lang={lang}">{name}</a>')
+    return " ".join(out)
+
+
 class Page:
     """One rendering: the language and how links keep it."""
 
@@ -152,22 +165,16 @@ class Page:
         return f"{path}?lang={self.lang}" if self.explicit else path
 
     def languages(self) -> str:
-        out = []
-        for lang in i18n.LANGUAGES:
-            name = esc(i18n.LANGUAGE_NAMES[lang])
-            if lang == self.lang:
-                out.append(f'<span lang="{lang}" aria-current="true">{name}</span>')
-            else:
-                out.append(f'<a lang="{lang}" hreflang="{lang}" href="{esc(self.path)}?lang={lang}">{name}</a>')
-        return " ".join(out)
+        return switcher(self.lang, self.path)
 
     def render(self, request: Request, title: str, content: str, modified: datetime, head: str = "",
                status_code: int = 200, footer: Optional[str] = None) -> Response:
+        tag = i18n.TAGS[self.lang]
         body = TEMPLATES["page"].substitute(
-            lang=self.lang, title=esc(title), head=head, language_label=esc(self.t["language"]),
+            lang=tag, title=esc(title), head=head, language_label=esc(self.t["language"]),
             languages=self.languages(), content=content, footer=esc(footer or self.t["footer"]))
         return answer(request, body, HTML_TYPE, modified, CACHE_PAGE, status_code=status_code,
-                      extra={"Content-Language": self.lang, "Vary": "Accept-Language"})
+                      extra={"Content-Language": tag, "Vary": "Accept-Language"})
 
     def not_found(self, request: Request) -> Response:
         content = TEMPLATES["not_found"].substitute(heading=esc(self.t["not_found_title"]),
@@ -186,17 +193,24 @@ def _game_line(page: Page, game: ScheduledGame, field: Field) -> str:
             f"{badge}</li>\n")
 
 
+def _small_paren(text: str, lang: str) -> str:
+    """`` <small>(text)</small>``, or ``<small>（text）</small>`` in Chinese."""
+    if lang == "zh-tw":
+        return f"<small>（{esc(text)}）</small>"
+    return f" <small>({esc(text)})</small>"
+
+
 def _details(page: Page, game: ScheduledGame, field: Field, now: datetime, registered: int) -> str:
     t, zone = page.t, field.timezone
     rows: list[tuple[str, str]] = [
-        (t["when"], esc(i18n.span(game.starts_at, game.ends_at, zone, page.lang)) + " <small>("
-         + esc(t["local_time"].format(zone=zone)) + ")</small>")]
+        (t["when"], esc(i18n.span(game.starts_at, game.ends_at, zone, page.lang))
+         + _small_paren(t["local_time"].format(zone=zone), page.lang))]
     place = svc.location(game, field)
     if place:
         rows.append((t["where"], esc(place)))
     rows.append((t["mode"], f"<code>{esc(game.mode_id)}</code>" if game.mode_id else esc(t["mode_later"])))
     if game.teams:
-        rows.append((t["teams"], esc(", ".join(game.teams))))
+        rows.append((t["teams"], esc(i18n.join(game.teams, page.lang))))
     left = svc.places_left(game, registered)
     rows.append((t["places"], (esc(left) if left else esc(t["full"])) if left is not None else esc(t["places_open"])))
     state = svc.registration_state(game, now)
@@ -210,7 +224,9 @@ def _details(page: Page, game: ScheduledGame, field: Field, now: datetime, regis
     elif state == "closed":
         rows.append((t["registration"], esc(t["reg_closed"])))
     if game.federation != "off":
-        label = t["federation"] + (f" ({field.federation_label})" if field.federation_label else "")
+        label = t["federation"]
+        if field.federation_label:
+            label += i18n.paren(field.federation_label, page.lang)
         rows.append((label, esc(t["fed_required" if game.federation == "required" else "fed_optional"])))
     return "".join(f"<dt>{esc(k)}</dt><dd>{v}</dd>\n" for k, v in rows)
 
@@ -349,7 +365,9 @@ async def game_page(slug: str, name: str, request: Request, db: AsyncSession = D
         return answer(request, body, ical.MEDIA_TYPE, modified, CACHE_FEED, _feed_headers())
     notice = ""
     if game.status == "cancelled":
-        reason = (f" {esc(page.t['reason'])}: {esc(game.cancelled_reason)}" if game.cancelled_reason else "")
+        space, colon = ("", "：") if page.lang == "zh-tw" else (" ", ": ")
+        reason = (f"{space}{esc(page.t['reason'])}{colon}{esc(game.cancelled_reason)}" if game.cancelled_reason
+                  else "")
         notice = f'<p class="notice">{esc(page.t["cancelled_notice"])}{reason}</p>\n'
     elif game.ends_at <= now:
         notice = f'<p class="notice">{esc(page.t["past"])}</p>\n'

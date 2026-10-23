@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # The bomb was defused: the whole screen in the winning team's colour.
-# Data: team (the defusing team); lang (pt or en) from the box.
+# Data: team (the defusing team); lang (pt, en, de or zh-tw) from the box.
 template: defused
 style: { background: "{team || 'panel'}" }
 layout:
@@ -10,11 +10,21 @@ layout:
     icon: ok
     style: { font_size: 48, color: contrast }
   - type: label
-    text: "{lang == 'pt' && 'DESARMADA' || 'DEFUSED'}"
-    style: { font_size: 48, color: contrast }
+    text: "{lang == 'pt' && 'DESARMADA' || lang == 'zh-tw' && '已拆除' || 'DEFUSED'}"
+    style: { font_size: 48, color: contrast, visible: "{lang != 'de'}" }
+  # German's word is wider than the screen at 48 px: 28, as the box's own screen fits it.
+  - type: label
+    text: ENTSCHÄRFT
+    style: { font_size: 28, color: contrast, visible: "{lang == 'de'}" }
   - type: label
     text: "{team|upper} team wins"
-    style: { font_size: 28, color: contrast, visible: "{team && lang != 'pt'}" }
+    style: { font_size: 28, color: contrast, visible: "{team && lang != 'pt' && lang != 'de' && lang != 'zh-tw'}" }
   - type: label
     text: "Vence a equipa {team|upper}"
     style: { font_size: 28, color: contrast, visible: "{team && lang == 'pt'}" }
+  - type: label
+    text: "Team {team|upper} gewinnt"
+    style: { font_size: 28, color: contrast, visible: "{team && lang == 'de'}" }
+  - type: label
+    text: "{team|upper} 隊獲勝"
+    style: { font_size: 28, color: contrast, visible: "{team && lang == 'zh-tw'}" }

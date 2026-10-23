@@ -243,5 +243,53 @@ class FirmwareBuiltinTests(unittest.TestCase):
                 self.assertEqual([e for e in sim.events if e.type == "script.error"], [])
 
 
+class TemplateLanguageTests(unittest.TestCase):
+    """The built-in modes' screens in every language of the boxes (decision P5H-12): a template
+    that picks its texts by language (lang from the box, or the mode's params.lang) has German
+    and Traditional Chinese wherever it has Portuguese, and the manifests every language."""
+
+    LANGS = ("pt", "de", "zh-tw")
+
+    def test_every_language_template_has_german_and_chinese(self):
+        for path in sorted(MODES.glob("*/assets/screens/*.yaml")):
+            text = "\n".join(line for line in path.read_text(encoding="utf-8").splitlines()
+                             if not line.lstrip().startswith("#"))
+            if "lang" not in text:
+                continue  # English only (Kill Confirmed, Respawn, Player Check-in)
+            with self.subTest(path.relative_to(MODES).as_posix()):
+                de = len(re.findall(r"lang == 'de'", text))
+                zh = len(re.findall(r"lang == 'zh-tw'", text))
+                self.assertGreater(de, 0)
+                self.assertGreater(zh, 0)
+
+    def test_every_manifest_has_every_language(self):
+        for path in sorted(MODES.glob("*/mode.yaml")):
+            mode = load_mode(path.parent)
+            with self.subTest(mode.id):
+                self.assertEqual(sorted(mode.i18n), sorted(self.LANGS))
+                for lang in self.LANGS:
+                    self.assertEqual(set(mode.i18n[lang].get("params", {})), set(mode.params))
+                    self.assertEqual(set(mode.i18n[lang].get("commands", {})), set(mode.commands or {}))
+
+    @unittest.skipIf(CORE is None, "needs the shared core library")
+    def test_a_box_language_picks_the_texts(self):
+        neutral = (MODES / "domination" / "assets" / "screens" / "neutral.yaml").read_text(
+            encoding="utf-8")
+        header = re.search(r'text: "(\{lang == .*\})"', neutral).group(1)
+        hold = re.search(r'text: "(\{params.capture_hold_ms / 1000\} s zum .*)"', neutral).group(1)
+        for lang, want in (("pt", "ZONA"), ("en", "ZONE"), ("de", "ZONE"), ("zh-tw", "據點"),
+                           ("fr", "ZONE"), (None, "ZONE")):
+            data = {} if lang is None else {"lang": lang}
+            self.assertEqual(CORE.screen_text(header, data, {}), want, lang)
+        self.assertEqual(CORE.screen_text(hold, {}, {"capture_hold_ms": 3000}),
+                         "3 s zum Einnehmen der Zone")
+        seq = (MODES / "hacking_terminal" / "assets" / "screens" / "hack_sequence.yaml").read_text(
+            encoding="utf-8")
+        turn = re.search(r"""text: "(\{params.lang == 'en' && 'YOUR TURN'.*\})\"""", seq).group(1)
+        for lang, want in (("pt", "A TUA VEZ"), ("en", "YOUR TURN"), ("de", "DU BIST DRAN"),
+                           ("zh-tw", "換你了")):
+            self.assertEqual(CORE.screen_text(turn, {}, {"lang": lang}), want, lang)
+
+
 if __name__ == "__main__":
     unittest.main()

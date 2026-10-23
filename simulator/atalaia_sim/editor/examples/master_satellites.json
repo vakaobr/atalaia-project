@@ -24,7 +24,11 @@
   "license": "GPL-3.0-or-later",
   "min_tier": "reduced",
   "author": "The Atalaia contributors",
-  "year": "2026"
+  "year": "2026",
+  "name_de": "Master und Satelliten",
+  "description_de": "Teams nehmen eine Master-Box und ihre Satelliten ein wie bei Domination. Nur der Master punktet, und die Satelliten, die sein Team auch hält, erhöhen seine Punkte; wechselt der Master den Besitz, werden alle Satelliten wieder frei.",
+  "name_zh_tw": "主站與衛星",
+  "description_zh_tw": "各隊像佔點模式一樣佔領主站盒子與它的衛星。只有主站會得分，佔有主站的隊伍同時佔有的衛星會提高主站的分數；主站易手時，所有衛星都回到中立。"
  },
  "node": {
   "blocks": {
@@ -95,7 +99,9 @@
       "MIN": "0",
       "MAX": "60000",
       "LABEL": "Hold time to capture (ms)",
-      "LABEL_PT": "Tempo a premir para capturar (ms)"
+      "LABEL_PT": "Tempo a premir para capturar (ms)",
+      "LABEL_DE": "Haltezeit zum Einnehmen (ms)",
+      "LABEL_ZH_TW": "佔領需按住的時間（毫秒）"
      }
     },
     {
@@ -1512,7 +1518,9 @@
       "MIN": "1",
       "MAX": "600",
       "LABEL": "Seconds per scoring tick while a team holds the master",
-      "LABEL_PT": "Segundos por intervalo enquanto uma equipa tem a mestre"
+      "LABEL_PT": "Segundos por intervalo enquanto uma equipa tem a mestre",
+      "LABEL_DE": "Sekunden pro Wertungsintervall, solange ein Team den Master hält",
+      "LABEL_ZH_TW": "一隊佔有主站時的計分間隔（秒）"
      }
     },
     {
@@ -1527,7 +1535,9 @@
       "MIN": "1",
       "MAX": "1000",
       "LABEL": "Points per tick for the master alone",
-      "LABEL_PT": "Pontos por intervalo só pela mestre"
+      "LABEL_PT": "Pontos por intervalo só pela mestre",
+      "LABEL_DE": "Punkte pro Intervall für den Master allein",
+      "LABEL_ZH_TW": "主站本身每次計分的分數"
      }
     },
     {
@@ -1542,7 +1552,9 @@
       "MIN": "0",
       "MAX": "1000",
       "LABEL": "Bonus per satellite held, in % of the master's points (rounded down)",
-      "LABEL_PT": "Bónus por satélite, em % dos pontos da mestre (arredondado para baixo)"
+      "LABEL_PT": "Bónus por satélite, em % dos pontos da mestre (arredondado para baixo)",
+      "LABEL_DE": "Bonus pro gehaltenem Satelliten, in % der Master-Punkte (abgerundet)",
+      "LABEL_ZH_TW": "每個佔有的衛星的加成，主站分數的 %（無條件捨去）"
      }
     },
     {
@@ -1557,7 +1569,9 @@
       "MIN": "0",
       "MAX": "63",
       "LABEL": "Satellites the master's holder needs before the master scores",
-      "LABEL_PT": "Satélites de que a equipa da mestre precisa antes de a mestre pontuar"
+      "LABEL_PT": "Satélites de que a equipa da mestre precisa antes de a mestre pontuar",
+      "LABEL_DE": "Satelliten, die das Team des Masters braucht, bevor der Master punktet",
+      "LABEL_ZH_TW": "主站開始計分前，佔有主站的隊伍需要的衛星數"
      }
     },
     {
@@ -3106,8 +3120,8 @@
   ]
  },
  "screens": {
-  "captured": "# SPDX-FileCopyrightText: 2026 The Atalaia contributors\n# SPDX-License-Identifier: GPL-3.0-or-later\n#\n# A team holds a satellite (or a box with no controller). Data: team, since\n# (game time of the capture, in seconds). Boxes do not score: the master does;\n# lang (pt or en) from the box.\ntemplate: captured\nlayout:\n  - type: row\n    style: { width: fill, height: 44, background: team }\n    children:\n      - type: label\n        text: \"{lang == 'pt' && 'ZONA OCUPADA' || 'ZONE HELD'}\"\n        style: { font_size: 20, width: fill, align: center, color: contrast }\n  - type: spacer\n    height: fill\n  - type: label\n    text: \"{team|upper}\"\n    style: { font_size: 48, color: team }\n  - type: label\n    text: \"{lang == 'pt' && 'desde' || 'held since'} {since|clock}\"\n    style: { font_size: 20, color: muted }\n  - type: spacer\n    height: fill\n  - type: label\n    text: \"{lang == 'pt' && 'Mantém o botão premido para a tomar' || 'Hold your button to take it over'}\"\n    style:\n      font_size: 14\n      color: muted\n      padding: { bottom: 10 }\n",
-  "master_status": "# SPDX-FileCopyrightText: 2026 The Atalaia contributors\n# SPDX-License-Identifier: GPL-3.0-or-later\n#\n# A team holds the master. Data: team, since (game time of the capture, in\n# seconds), held and of (the satellites the team holds, of all of them) and\n# points (the master's points per tick with that bonus), from the controller;\n# lang (pt or en) from the box.\ntemplate: master_status\nlayout:\n  - type: row\n    style: { width: fill, height: 44, background: team }\n    children:\n      - type: label\n        text: \"{lang == 'pt' && 'MASTER OCUPADO' || 'MASTER HELD'}\"\n        style: { font_size: 20, width: fill, align: center, color: contrast }\n  - type: spacer\n    height: fill\n  - type: label\n    text: \"{team|upper}\"\n    style: { font_size: 48, color: team }\n  - type: label\n    text: \"{held} {lang == 'pt' && 'de' || 'of'} {of} {lang == 'pt' && 'satélites' || 'satellites'}\"\n    style: { font_size: 20 }\n  - type: label\n    text: \"{points} {lang == 'pt' && 'pontos a cada' || 'points every'} {params.tick_s} s\"\n    style: { font_size: 20, color: \"{points > 0 && 'white' || 'danger'}\" }\n  - type: label\n    text: \"{lang == 'pt' && 'desde' || 'held since'} {since|clock}\"\n    style: { font_size: 14, color: muted }\n  - type: spacer\n    height: fill\n  - type: label\n    text: \"{lang == 'pt' && 'Mantém o botão premido para a tomar' || 'Hold your button to take it over'}\"\n    style:\n      font_size: 14\n      color: muted\n      padding: { bottom: 10 }\n",
-  "neutral": "# SPDX-FileCopyrightText: 2026 The Atalaia contributors\n# SPDX-License-Identifier: GPL-3.0-or-later\n#\n# Nobody holds the box (a master or a satellite) in a running game (decision\n# BN-11). No data of the mode's; the hold time comes from the game's\n# parameters, lang (pt or en) from the box.\ntemplate: neutral\nlayout:\n  - type: row\n    style: { width: fill, height: 44, background: panel }\n    children:\n      - type: label\n        text: \"{lang == 'pt' && 'ZONA' || 'ZONE'}\"\n        style: { font_size: 20, width: fill, align: center }\n  - type: spacer\n    height: fill\n  - type: label\n    text: \"{lang == 'pt' && 'LIVRE' || 'NEUTRAL'}\"\n    style: { font_size: 48 }\n  - type: label\n    text: \"{lang == 'pt' && 'Mantém premido' || 'Hold to capture'}\"\n    style: { font_size: 20, color: accent }\n  - type: label\n    text: \"Hold your button for {params.capture_hold_ms / 1000} s\"\n    style: { font_size: 14, color: muted, visible: \"{lang != 'pt'}\" }\n  - type: label\n    text: \"{params.capture_hold_ms / 1000} s para capturar a zona\"\n    style: { font_size: 14, color: muted, visible: \"{lang == 'pt'}\" }\n  - type: spacer\n    height: fill\n  - type: label\n    text: \"{lang == 'pt' && 'Nenhuma equipa tem esta zona' || 'Nobody holds this zone'}\"\n    style:\n      font_size: 14\n      color: muted\n      padding: { bottom: 10 }\n"
+  "captured": "# SPDX-FileCopyrightText: 2026 The Atalaia contributors\n# SPDX-License-Identifier: GPL-3.0-or-later\n#\n# A team holds a satellite (or a box with no controller). Data: team, since\n# (game time of the capture, in seconds). Boxes do not score: the master does;\n# lang (pt, en, de or zh-tw) from the box.\ntemplate: captured\nlayout:\n  - type: row\n    style: { width: fill, height: 44, background: team }\n    children:\n      - type: label\n        text: \"{lang == 'pt' && 'ZONA OCUPADA' || lang == 'de' && 'ZONE BESETZT' || lang == 'zh-tw' && '據點已佔領' || 'ZONE HELD'}\"\n        style: { font_size: 20, width: fill, align: center, color: contrast }\n  - type: spacer\n    height: fill\n  - type: label\n    text: \"{team|upper}\"\n    style: { font_size: 48, color: team }\n  - type: label\n    text: \"{lang == 'pt' && 'desde' || lang == 'de' && 'seit' || lang == 'zh-tw' && '佔領於' || 'held since'} {since|clock}\"\n    style: { font_size: 20, color: muted }\n  - type: spacer\n    height: fill\n  - type: label\n    text: \"{lang == 'pt' && 'Mantém o botão premido para a tomar' || lang == 'de' && 'Halte den Knopf zum Übernehmen' || lang == 'zh-tw' && '按住你的按鈕即可奪取' || 'Hold your button to take it over'}\"\n    style:\n      font_size: 14\n      color: muted\n      padding: { bottom: 10 }\n",
+  "master_status": "# SPDX-FileCopyrightText: 2026 The Atalaia contributors\n# SPDX-License-Identifier: GPL-3.0-or-later\n#\n# A team holds the master. Data: team, since (game time of the capture, in\n# seconds), held and of (the satellites the team holds, of all of them) and\n# points (the master's points per tick with that bonus), from the controller;\n# lang (pt, en, de or zh-tw) from the box.\ntemplate: master_status\nlayout:\n  - type: row\n    style: { width: fill, height: 44, background: team }\n    children:\n      - type: label\n        text: \"{lang == 'pt' && 'MASTER OCUPADO' || lang == 'de' && 'MASTER BESETZT' || lang == 'zh-tw' && '主站已佔領' || 'MASTER HELD'}\"\n        style: { font_size: 20, width: fill, align: center, color: contrast }\n  - type: spacer\n    height: fill\n  - type: label\n    text: \"{team|upper}\"\n    style: { font_size: 48, color: team }\n  - type: label\n    text: \"{held} {lang == 'pt' && 'de' || lang == 'de' && 'von' || lang == 'zh-tw' && '/' || 'of'} {of} {lang == 'pt' && 'satélites' || lang == 'de' && 'Satelliten' || lang == 'zh-tw' && '個衛星' || 'satellites'}\"\n    style: { font_size: 20 }\n  - type: label\n    text: \"{points} {lang == 'pt' && 'pontos a cada' || lang == 'de' && 'Punkte alle' || lang == 'zh-tw' && '分，每' || 'points every'} {params.tick_s} s\"\n    style: { font_size: 20, color: \"{points > 0 && 'white' || 'danger'}\" }\n  - type: label\n    text: \"{lang == 'pt' && 'desde' || lang == 'de' && 'seit' || lang == 'zh-tw' && '佔領於' || 'held since'} {since|clock}\"\n    style: { font_size: 14, color: muted }\n  - type: spacer\n    height: fill\n  - type: label\n    text: \"{lang == 'pt' && 'Mantém o botão premido para a tomar' || lang == 'de' && 'Halte den Knopf zum Übernehmen' || lang == 'zh-tw' && '按住你的按鈕即可奪取' || 'Hold your button to take it over'}\"\n    style:\n      font_size: 14\n      color: muted\n      padding: { bottom: 10 }\n",
+  "neutral": "# SPDX-FileCopyrightText: 2026 The Atalaia contributors\n# SPDX-License-Identifier: GPL-3.0-or-later\n#\n# Nobody holds the box (a master or a satellite) in a running game (decision\n# BN-11). No data of the mode's; the hold time comes from the game's\n# parameters, lang (pt, en, de or zh-tw) from the box.\ntemplate: neutral\nlayout:\n  - type: row\n    style: { width: fill, height: 44, background: panel }\n    children:\n      - type: label\n        text: \"{lang == 'pt' && 'ZONA' || lang == 'de' && 'ZONE' || lang == 'zh-tw' && '據點' || 'ZONE'}\"\n        style: { font_size: 20, width: fill, align: center }\n  - type: spacer\n    height: fill\n  - type: label\n    text: \"{lang == 'pt' && 'LIVRE' || lang == 'de' && 'FREI' || lang == 'zh-tw' && '中立' || 'NEUTRAL'}\"\n    style: { font_size: 48 }\n  - type: label\n    text: \"{lang == 'pt' && 'Mantém premido' || lang == 'de' && 'Gedrückt halten' || lang == 'zh-tw' && '按住按鈕' || 'Hold to capture'}\"\n    style: { font_size: 20, color: accent }\n  - type: label\n    text: \"Hold your button for {params.capture_hold_ms / 1000} s\"\n    style: { font_size: 14, color: muted, visible: \"{lang != 'pt' && lang != 'de' && lang != 'zh-tw'}\" }\n  - type: label\n    text: \"{params.capture_hold_ms / 1000} s para capturar a zona\"\n    style: { font_size: 14, color: muted, visible: \"{lang == 'pt'}\" }\n  - type: label\n    text: \"{params.capture_hold_ms / 1000} s zum Einnehmen der Zone\"\n    style: { font_size: 14, color: muted, visible: \"{lang == 'de'}\" }\n  - type: label\n    text: \"按住 {params.capture_hold_ms / 1000} 秒即可佔領據點\"\n    style: { font_size: 14, color: muted, visible: \"{lang == 'zh-tw'}\" }\n  - type: spacer\n    height: fill\n  - type: label\n    text: \"{lang == 'pt' && 'Nenhuma equipa tem esta zona' || lang == 'de' && 'Kein Team hält diese Zone' || lang == 'zh-tw' && '目前沒有隊伍佔領此據點' || 'Nobody holds this zone'}\"\n    style:\n      font_size: 14\n      color: muted\n      padding: { bottom: 10 }\n"
  }
 }

@@ -107,6 +107,34 @@ class FieldPageTests(PagesCase):
         self.assertRegex(r.text, r'href="/f/campo-tejo/games/[0-9a-f-]{36}\?lang=en"')  # the choice is kept
         self.assertIn('<a lang="pt" hreflang="pt" href="/f/campo-tejo/?lang=pt">Português</a>', r.text)
 
+    async def test_german_and_chinese(self) -> None:
+        await self.game(start=datetime(2030, 11, 9, 9, 0, tzinfo=UTC))
+        switcher = ('<a lang="pt" hreflang="pt" href="/f/campo-tejo/?lang=pt">Português</a> '
+                    '<a lang="en" hreflang="en" href="/f/campo-tejo/?lang=en">English</a> ')
+        for kwargs in ({"params": {"lang": "de"}}, {"headers": {"Accept-Language": "de-AT,de;q=0.9,en;q=0.5"}}):
+            with self.subTest(**{k: str(v) for k, v in kwargs.items()}):
+                r = await self.client.get("/f/campo-tejo/", **kwargs)
+                self.assertEqual(r.headers["content-language"], "de")
+                self.assertIn('<html lang="de">', r.text)
+                self.assertIn("Nächste Spiele", r.text)
+                self.assertIn("Samstag, 9. November 2030, 09:00–13:00", r.text)
+                self.assertIn(switcher + '<span lang="de" aria-current="true">Deutsch</span> <a lang="zh-Hant-TW" '
+                              'hreflang="zh-Hant-TW" href="/f/campo-tejo/?lang=zh-tw">繁體中文（台灣）</a>', r.text)
+        for kwargs in ({"params": {"lang": "zh-tw"}}, {"headers": {"Accept-Language": "zh-TW"}},
+                       {"headers": {"Accept-Language": "zh-Hant-HK, en;q=0.5"}}):
+            with self.subTest(**{k: str(v) for k, v in kwargs.items()}):
+                r = await self.client.get("/f/campo-tejo/", **kwargs)
+                self.assertEqual(r.headers["content-language"], "zh-Hant-TW")
+                self.assertIn('<html lang="zh-Hant-TW">', r.text)
+                self.assertIn("近期遊戲", r.text)
+                self.assertIn("2030 年 11 月 9 日（星期六）09:00–13:00", r.text)
+                self.assertIn(switcher + '<a lang="de" hreflang="de" href="/f/campo-tejo/?lang=de">Deutsch</a> '
+                              '<span lang="zh-Hant-TW" aria-current="true">繁體中文（台灣）</span>', r.text)
+        r = await self.client.get("/f/campo-tejo/", params={"lang": "zh-tw"})
+        self.assertRegex(r.text, r'href="/f/campo-tejo/games/[0-9a-f-]{36}\?lang=zh-tw"')  # the choice is kept
+        r = await self.client.get("/f/campo-tejo/", headers={"Accept-Language": "zh-CN, zh;q=0.9"})  # Simplified
+        self.assertIn('<html lang="pt">', r.text)
+
     async def test_no_games(self) -> None:
         r = await self.client.get("/f/campo-tejo/")
         self.assertIn("Ainda não há jogos marcados.", r.text)
@@ -198,6 +226,28 @@ class GamePageTests(PagesCase):
             "url": f"{PUBLIC}/f/campo-tejo/games/{game.id}",
             "organizer": {"@type": "Organization", "name": "Campo Tejo", "url": f"{PUBLIC}/f/campo-tejo/"},
             "description": "Jogo de domínio.\n\nTraz água.", "maximumAttendeeCapacity": 60})
+
+    async def test_the_game_page_in_german_and_chinese(self) -> None:
+        game = await self.game(start=datetime(2030, 11, 9, 9, 0, tzinfo=UTC), teams=["red", "blue"],
+                               federation="required", registration_opens_at=datetime(2030, 11, 1, 9, 0, tzinfo=UTC))
+        de = (await self.client.get(f"/f/campo-tejo/games/{game.id}", params={"lang": "de"})).text
+        self.assertIn("<dt>Wann</dt><dd>Samstag, 9. November 2030, 09:00–13:00 <small>(Ortszeit, "
+                      "Europe/Lisbon)</small></dd>", de)
+        self.assertIn("<dt>Teams</dt><dd>red, blue</dd>", de)
+        self.assertIn("<dt>Anmeldung</dt><dd>öffnet am Freitag, 1. November 2030, 09:00</dd>", de)
+        self.assertIn("<dt>Verbandsnummer (FPA)</dt><dd>erforderlich</dd>", de)
+        zh = (await self.client.get(f"/f/campo-tejo/games/{game.id}", params={"lang": "zh-tw"})).text
+        self.assertIn("<dt>時間</dt><dd>2030 年 11 月 9 日（星期六）09:00–13:00<small>（當地時間，"
+                      "Europe/Lisbon）</small></dd>", zh)
+        self.assertIn("<dt>隊伍</dt><dd>red、blue</dd>", zh)
+        self.assertIn("<dt>報名</dt><dd>2030 年 11 月 1 日（星期五）09:00 開放</dd>", zh)
+        self.assertIn("<dt>協會會員編號（FPA）</dt><dd>必填</dd>", zh)
+        cancelled = await self.game(status="cancelled", cancelled_reason="Chuva forte")
+        zh = (await self.client.get(f"/f/campo-tejo/games/{cancelled.id}", params={"lang": "zh-tw"})).text
+        self.assertIn("這場遊戲已取消。原因：Chuva forte", zh)
+        two_days = await self.game(start=datetime(2030, 11, 9, 9, 0, tzinfo=UTC), hours=33)
+        zh = (await self.client.get(f"/f/campo-tejo/games/{two_days.id}", params={"lang": "zh-tw"})).text
+        self.assertIn("2030 年 11 月 9 日（星期六）09:00 至 2030 年 11 月 10 日（星期日）18:00", zh)
 
     async def test_cancelled_and_past(self) -> None:
         cancelled = await self.game(status="cancelled", cancelled_reason="Chuva forte")
@@ -432,17 +482,64 @@ class LanguageTests(unittest.TestCase):
         self.assertEqual(i18n.choose("fr", "en-US"), ("en", False))
         self.assertEqual(i18n.choose(None, "fr-FR, en;q=0.8, pt;q=0.9"), ("pt", False))
         self.assertEqual(i18n.choose(None, "en;q=0, pt-BR;q=0.1"), ("pt", False))
-        self.assertEqual(i18n.choose(None, "de, fr"), ("pt", False))
+        self.assertEqual(i18n.choose(None, "fr, it"), ("pt", False))
         self.assertEqual(i18n.choose(None, "EN-gb;q=bad, en"), ("en", False))
+
+    def test_choose_german_and_chinese(self) -> None:
+        self.assertEqual(i18n.choose("de", "en"), ("de", True))
+        self.assertEqual(i18n.choose("zh-tw", None), ("zh-tw", True))
+        self.assertEqual(i18n.choose("zh-TW", "en"), ("en", False))  # ?lang= takes the code exactly
+        for header in ("de", "de-DE", "DE-at", "de-CH;q=0.8, en;q=0.5", "fr, de;q=0.9, en;q=0.8"):
+            with self.subTest(header=header):
+                self.assertEqual(i18n.choose(None, header), ("de", False))
+        for header in ("zh-TW", "zh-tw", "zh-Hant", "ZH-HANT", "zh-Hant-TW", "zh-Hant-HK", "zh-HK", "zh-MO",
+                       "zh-CN;q=0.5, zh-TW;q=0.9", "zh, zh-TW;q=0.8, en;q=0.7"):
+            with self.subTest(header=header):
+                self.assertEqual(i18n.choose(None, header), ("zh-tw", False))
+        # Simplified Chinese is not zh-tw: the next preference, or pt.
+        for header, lang in (("zh", "pt"), ("zh-CN", "pt"), ("zh-Hans", "pt"), ("zh-Hans-CN", "pt"),
+                             ("zh-SG", "pt"), ("zh-Hans-TW", "pt"), ("zh-CN, en;q=0.5", "en"),
+                             ("zh-CN,zh;q=0.9,de;q=0.8", "de"), ("zh-TW;q=0", "pt")):
+            with self.subTest(header=header):
+                self.assertEqual(i18n.choose(None, header), (lang, False))
 
     def test_dates(self) -> None:
         t = datetime(2026, 3, 29, 1, 30, tzinfo=UTC)  # Lisbon moves to summer time at 01:00 UTC that day
         self.assertEqual(i18n.moment(t, "Europe/Lisbon", "pt"), "domingo, 29 de março de 2026, 02:30")
         self.assertEqual(i18n.moment(t, "Europe/Lisbon", "en"), "Sunday 29 March 2026, 02:30")
         self.assertEqual(i18n.moment(t, "Atlantic/Azores", "pt"), "domingo, 29 de março de 2026, 01:30")
+        self.assertEqual(i18n.moment(t, "Europe/Lisbon", "de"), "Sonntag, 29. März 2026, 02:30")
+        self.assertEqual(i18n.moment(t, "Europe/Lisbon", "zh-tw"), "2026 年 3 月 29 日（星期日）02:30")
+        saturday = datetime(2026, 11, 8, 9, 0, tzinfo=UTC)
+        self.assertEqual(i18n.date(saturday, "Europe/Lisbon", "de"), "Sonntag, 8. November 2026")
+        self.assertEqual(i18n.date(saturday - timedelta(days=1), "Europe/Lisbon", "de"),
+                         "Samstag, 7. November 2026")
+        self.assertEqual(i18n.date(saturday - timedelta(days=1), "Asia/Taipei", "zh-tw"),
+                         "2026 年 11 月 7 日（星期六）")
+        end = saturday + timedelta(hours=4)
+        self.assertEqual(i18n.span(saturday, end, "Asia/Taipei", "zh-tw"), "2026 年 11 月 8 日（星期日）17:00–21:00")
+        self.assertEqual(i18n.span(saturday, end + timedelta(days=1), "Europe/Berlin", "de"),
+                         "Sonntag, 8. November 2026, 10:00 – Montag, 9. November 2026, 14:00")
 
-    def test_both_languages_have_every_text(self) -> None:
-        self.assertEqual(set(i18n.STRINGS["pt"]), set(i18n.STRINGS["en"]))
+    def test_every_language_has_every_text(self) -> None:
+        self.assertEqual(i18n.LANGUAGES, ("pt", "en", "de", "zh-tw"))
+        self.assertEqual(set(i18n.LANGUAGE_NAMES), set(i18n.LANGUAGES))
+        self.assertEqual(set(i18n.TAGS), set(i18n.LANGUAGES))
+        for lang, strings in i18n.STRINGS.items():
+            self.assertEqual(set(strings), set(i18n.STRINGS["en"]), lang)
+            for key, text in strings.items():  # the same {names}
+                self.assertEqual(set(re.findall(r"\{(\w+)\}", text)),
+                                 set(re.findall(r"\{(\w+)\}", i18n.STRINGS["en"][key])), (lang, key))
+
+    def test_german_and_chinese_follow_the_glossary(self) -> None:
+        de = " ".join(i18n.STRINGS["de"].values())
+        for word in ("Ihnen", "Ihre ", "Spieler ", "Spieler:in", "Spieler*in", "SpielerInnen"):  # "du"; neutral
+            self.assertNotIn(word, de)
+        for key, zh in i18n.STRINGS["zh-tw"].items():
+            for letter in ("您", "妳", "他們", "她", "这", "个", "设", "场", "报", "们"):  # formal, gendered, Simplified
+                self.assertNotIn(letter, zh, key)
+            self.assertNotRegex(zh, r"[一-鿿][A-Za-z0-9]|[A-Za-z0-9][一-鿿]", key)  # a space
+            self.assertNotRegex(zh, r"[一-鿿][,.:;!?()]", key)  # full-width punctuation after Han
 
 
 if __name__ == "__main__":

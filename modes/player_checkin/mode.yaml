@@ -25,3 +25,19 @@ i18n:
     params:
       points: Pontos para a equipa por cada registo
       repeat_after_s: "Segundos até a mesma pessoa voltar a contar (0: uma vez por jogo)"
+  de:
+    name: Check-in
+    description: >-
+      Die Spielenden checken an einem Checkpoint ein, indem sie ihren signierten NFC-Tag scannen. Die Box
+      zählt die Spielenden jedes Teams und gibt ihrem Team für jeden Check-in Punkte. Eine Person zählt einmal
+      oder nach einer festgelegten Zeit erneut. Gefälschte Tags und Tags aus einem anderen Spiel werden
+      abgelehnt.
+    params:
+      points: Punkte für das Team pro Check-in
+      repeat_after_s: "Sekunden, bis dieselbe Person wieder zählt (0: einmal pro Spiel)"
+  zh-tw:
+    name: 玩家報到
+    description: 玩家在報到點感應自己已簽署的 NFC 標籤報到。盒子會計算每隊的玩家人數，每次報到都為該隊加分。每位玩家只算一次，或在設定的時間後再算一次。偽造的標籤與其他遊戲的標籤會被拒絕。
+    params:
+      points: 每次報到為該隊加的分數
+      repeat_after_s: 同一位玩家再次計算前的秒數（0：每場一次）

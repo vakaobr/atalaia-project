@@ -4,7 +4,7 @@
 # A code to type on the keypad. Data: team (the team credited, if known),
 # digits (how many digits are typed: the code itself is never shown), note
 # (wrong: the last code was wrong; ok: the right code was typed), label (the
-# objective's name), lang (pt, the default, or en).
+# objective's name), lang (pt, the default, en, de or zh-tw).
 template: obj_code
 style: { background: "{note == 'ok' && team || 'background'}" }
 layout:
@@ -12,58 +12,35 @@ layout:
     style: { width: fill, height: 44, background: "{team || 'panel'}" }
     children:
       - type: label
-        text: "{label || 'CÓDIGO'}"
-        style: { font_size: 20, width: fill, align: center, color: "{team && 'contrast' || 'white'}", visible: "{lang != 'en'}" }
-      - type: label
-        text: "{label || 'CODE'}"
-        style: { font_size: 20, width: fill, align: center, color: "{team && 'contrast' || 'white'}", visible: "{lang == 'en'}" }
+        text: "{label || lang == 'en' && 'CODE' || lang == 'de' && 'CODE' || lang == 'zh-tw' && '代碼' || 'CÓDIGO'}"
+        style: { font_size: 20, width: fill, align: center, color: "{team && 'contrast' || 'white'}" }
   - type: spacer
     height: fill
   - type: label
     text: "{digits}"
     style: { font_size: 48, color: accent, visible: "{note != 'ok'}" }
   - type: label
-    text: algarismos marcados
-    style: { font_size: 20, color: muted, visible: "{note != 'ok' && lang != 'en'}" }
-  - type: label
-    text: digits typed
-    style: { font_size: 20, color: muted, visible: "{note != 'ok' && lang == 'en'}" }
+    text: "{lang == 'en' && 'digits typed' || lang == 'de' && 'Ziffern getippt' || lang == 'zh-tw' && '已輸入的位數' || 'algarismos marcados'}"
+    style: { font_size: 20, color: muted, visible: "{note != 'ok'}" }
   - type: icon
     icon: ok
     style: { font_size: 48, color: "{team && 'contrast' || 'accent'}", visible: "{note == 'ok'}" }
   - type: label
-    text: CÓDIGO ACEITE
-    style: { font_size: 28, color: "{team && 'contrast' || 'white'}", visible: "{note == 'ok' && lang != 'en'}" }
-  - type: label
-    text: CODE ACCEPTED
-    style: { font_size: 28, color: "{team && 'contrast' || 'white'}", visible: "{note == 'ok' && lang == 'en'}" }
+    text: "{lang == 'en' && 'CODE ACCEPTED' || lang == 'de' && 'CODE RICHTIG' || lang == 'zh-tw' && '代碼正確' || 'CÓDIGO ACEITE'}"
+    style: { font_size: 28, color: "{team && 'contrast' || 'white'}", visible: "{note == 'ok'}" }
   - type: spacer
     height: fill
   - type: label
-    text: Código errado
+    text: "{lang == 'en' && 'Wrong code' || lang == 'de' && 'Falscher Code' || lang == 'zh-tw' && '代碼錯誤' || 'Código errado'}"
     style:
       font_size: 20
       color: danger
-      visible: "{note == 'wrong' && lang != 'en'}"
+      visible: "{note == 'wrong'}"
       padding: { bottom: 8 }
   - type: label
-    text: Wrong code
-    style:
-      font_size: 20
-      color: danger
-      visible: "{note == 'wrong' && lang == 'en'}"
-      padding: { bottom: 8 }
-  - type: label
-    text: "Marca o código e #  (* apaga)"
+    text: "{lang == 'en' && 'Type the code, then #  (* clears)' || lang == 'de' && 'Code tippen, dann #  (* löscht)' || lang == 'zh-tw' && '輸入代碼後按 #（* 清除）' || 'Marca o código e #  (* apaga)'}"
     style:
       font_size: 14
       color: muted
-      visible: "{!note && lang != 'en'}"
-      padding: { bottom: 10 }
-  - type: label
-    text: "Type the code, then #  (* clears)"
-    style:
-      font_size: 14
-      color: muted
-      visible: "{!note && lang == 'en'}"
+      visible: "{!note}"
       padding: { bottom: 10 }

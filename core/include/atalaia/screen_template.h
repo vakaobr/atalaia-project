@@ -50,8 +50,8 @@
 
 #define ATALAIA_TPL_SOURCE_MAX  4096 /* bytes of YAML */
 #define ATALAIA_TPL_WIDGETS_MAX 32
-#define ATALAIA_TPL_YAML_MAX    192 /* YAML nodes while parsing */
-#define ATALAIA_TPL_POOL_MAX    1536
+#define ATALAIA_TPL_YAML_MAX    192  /* YAML nodes while parsing */
+#define ATALAIA_TPL_POOL_MAX    3072 /* the texts, every language's (P5H-12) */
 #define ATALAIA_TPL_NAME_MAX    31
 #define ATALAIA_TPL_DEPTH_MAX   4   /* rows and columns inside each other */
 #define ATALAIA_TPL_TEXT_MAX    160 /* a widget's text after interpolation, NUL included */

@@ -3,57 +3,41 @@
 #
 # A point to capture. Data: team (the team holding it, if one), only (the only
 # team that may capture it, if one), hold_ms (how long to hold), label (the
-# objective's name), lang (pt, the default, or en).
+# objective's name), lang (pt, the default, en, de or zh-tw).
 template: obj_capture
 layout:
   - type: row
     style: { width: fill, height: 44, background: "{team || 'panel'}" }
     children:
       - type: label
-        text: "{label || 'CAPTURAR'}"
-        style: { font_size: 20, width: fill, align: center, color: "{team && 'contrast' || 'white'}", visible: "{lang != 'en'}" }
-      - type: label
-        text: "{label || 'CAPTURE'}"
-        style: { font_size: 20, width: fill, align: center, color: "{team && 'contrast' || 'white'}", visible: "{lang == 'en'}" }
+        text: "{label || lang == 'en' && 'CAPTURE' || lang == 'de' && 'EINNEHMEN' || lang == 'zh-tw' && '佔領' || 'CAPTURAR'}"
+        style: { font_size: 20, width: fill, align: center, color: "{team && 'contrast' || 'white'}" }
   - type: spacer
     height: fill
   - type: label
     text: "{team|upper}"
     style: { font_size: 48, color: team, visible: "{team}" }
   - type: label
-    text: tem este ponto
-    style: { font_size: 20, color: muted, visible: "{team && lang != 'en'}" }
+    text: "{lang == 'en' && 'holds this point' || lang == 'de' && 'hält diesen Punkt' || lang == 'zh-tw' && '佔領了這個點' || 'tem este ponto'}"
+    style: { font_size: 20, color: muted, visible: "{team}" }
   - type: label
-    text: holds this point
-    style: { font_size: 20, color: muted, visible: "{team && lang == 'en'}" }
-  - type: label
-    text: MANTÉM PREMIDO
-    style: { font_size: 28, color: accent, visible: "{!team && lang != 'en'}" }
-  - type: label
-    text: HOLD TO CAPTURE
-    style: { font_size: 28, color: accent, visible: "{!team && lang == 'en'}" }
+    text: "{lang == 'en' && 'HOLD TO CAPTURE' || lang == 'de' && 'GEDRÜCKT HALTEN' || lang == 'zh-tw' && '按住以佔領' || 'MANTÉM PREMIDO'}"
+    style: { font_size: 28, color: accent, visible: "{!team}" }
   - type: spacer
     height: fill
   - type: label
-    text: "Mantém premido {hold_ms / 1000} s para capturar"
+    text: "{lang == 'en' && 'Hold your button' || lang == 'de' && 'Halte deinen Knopf' || lang == 'zh-tw' && '按住按鈕' || 'Mantém premido'} {hold_ms / 1000} {lang == 'en' && 's to capture' || lang == 'de' && 's zum Einnehmen' || lang == 'zh-tw' && '秒即可佔領' || 's para capturar'}"
     style:
       font_size: 14
       color: muted
-      visible: "{!only && lang != 'en'}"
-      padding: { bottom: 10 }
-  - type: label
-    text: "Hold your button {hold_ms / 1000} s to capture"
-    style:
-      font_size: 14
-      color: muted
-      visible: "{!only && lang == 'en'}"
+      visible: "{!only}"
       padding: { bottom: 10 }
   - type: label
     text: "Só a equipa {only} captura: {hold_ms / 1000} s"
     style:
       font_size: 14
       color: muted
-      visible: "{only && lang != 'en'}"
+      visible: "{only && lang != 'en' && lang != 'de' && lang != 'zh-tw'}"
       padding: { bottom: 10 }
   - type: label
     text: "Only {only} captures: {hold_ms / 1000} s"
@@ -61,4 +45,18 @@ layout:
       font_size: 14
       color: muted
       visible: "{only && lang == 'en'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: "Nur Team {only} nimmt ein: {hold_ms / 1000} s"
+    style:
+      font_size: 14
+      color: muted
+      visible: "{only && lang == 'de'}"
+      padding: { bottom: 10 }
+  - type: label
+    text: "只有 {only} 隊能佔領：{hold_ms / 1000} 秒"
+    style:
+      font_size: 14
+      color: muted
+      visible: "{only && lang == 'zh-tw'}"
       padding: { bottom: 10 }

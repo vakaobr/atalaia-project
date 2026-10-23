@@ -144,13 +144,20 @@ static void test_fallback_to_c_screens(void)
     screen_renderer_reset();
 }
 
-static void fold_is(const char *in, const char *want)
+static void fold_at(const char *in, int font_size, const char *want)
 {
     char buf[64];
     snprintf(buf, sizeof(buf), "%s", in);
-    screen_template_fold_text(buf);
-    if (strcmp(buf, want) != 0) fprintf(stderr, "FAIL fold \"%s\": \"%s\"\n", in, buf);
+    screen_template_fold_text(buf, font_size);
+    if (strcmp(buf, want) != 0) {
+        fprintf(stderr, "FAIL fold \"%s\" at %d: \"%s\"\n", in, font_size, buf);
+    }
     CHECK(strcmp(buf, want) == 0);
+}
+
+static void fold_is(const char *in, const char *want)
+{
+    fold_at(in, 0, want);
 }
 
 /* The fonts have ASCII and the letters of Portuguese (BN-14) and German (P5H-4): those stay,
@@ -173,10 +180,17 @@ static void test_text_fold(void)
     fold_is("\xe2\x82\xac 5 \xf0\x9f\x98\x80 \xc3", "? 5 ? ?"); /* euro, emoji, a cut sequence */
     fold_is("\x80x\xc2", "?x?");
     fold_is("", "");
-    /* Han letters in a template's data (a Chinese team or objective name) are a "?" each: the
-     * fonts carry only the letters of the box's own Chinese texts, which never pass through a
-     * template (P5K-3), so a name would be half drawn, half empty boxes. 紅隊 */
-    fold_is("A \xe7\xb4\x85\xe9\x9a\x8a", "A ??");
+    /* Chinese: a letter stays when the label's font has it (the box's own texts and the built-in
+     * templates', box_fonts_cjk.h, P5H-12), else it is a '?' (P5K-5), as in a GM's team name:
+     * 紅隊, of which the fonts have 隊 only (TX_TEAM_WINS). The full-width comma stays. */
+    fold_is("A \xe7\xb4\x85\xe9\x9a\x8a", "A ?\xe9\x9a\x8a");
+    fold_at("\xe7\xb4\x85\xe9\x9a\x8a\xef\xbc\x8c", 14, "?\xe9\x9a\x8a\xef\xbc\x8c");
+    /* 中立 at 48 px (TX_NEUTRAL_UP); 隊 is not in the 48 px font, but in the 28 px one it falls
+     * back on. 鈔 (印鈔廠) is in the templates at 14 and 20 px only. */
+    fold_at("\xe4\xb8\xad\xe7\xab\x8b", 48, "\xe4\xb8\xad\xe7\xab\x8b");
+    fold_at("\xe9\x9a\x8a", 48, "\xe9\x9a\x8a");
+    fold_at("\xe9\x88\x94", 20, "\xe9\x88\x94");
+    fold_at("\xe9\x88\x94", 48, "?");
 }
 
 /* The Medic Kit's Portuguese screens on the box: folded, and the language follows params.lang. */

@@ -5,7 +5,8 @@
 # state (searching: no fix yet; weak: the fix is less precise than the zone,
 # metres is its accuracy; no_zone: the game has no extraction zone; moving:
 # metres is the distance to the zone's edge; extracted), metres. Texts in
-# params.lang (pt or en). Nothing here says where the zone or the phone is.
+# params.lang (pt, the default, en, de or zh-tw). Nothing here says where the
+# zone or the phone is.
 template: payload
 style: { background: "{state == 'extracted' && team || 'background'}" }
 layout:
@@ -13,11 +14,8 @@ layout:
     style: { width: fill, height: 44, background: team }
     children:
       - type: label
-        text: CARGA
-        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang != 'en'}" }
-      - type: label
-        text: PAYLOAD
-        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang == 'en'}" }
+        text: "{params.lang == 'en' && 'PAYLOAD' || params.lang == 'de' && 'PAYLOAD' || params.lang == 'zh-tw' && '護送目標' || 'CARGA'}"
+        style: { font_size: 20, width: fill, align: center, color: contrast }
   - type: spacer
     height: fill
   - type: icon
@@ -27,51 +25,32 @@ layout:
     text: "{metres} m"
     style: { font_size: 48, color: accent, visible: "{state == 'moving'}" }
   - type: label
-    text: até à zona de extração
-    style: { font_size: 20, color: muted, visible: "{state == 'moving' && params.lang != 'en'}" }
+    text: "{params.lang == 'en' && 'to the extraction zone' || params.lang == 'de' && 'bis zur Extraktionszone' || params.lang == 'zh-tw' && '距離撤離區' || 'até à zona de extração'}"
+    style: { font_size: 20, color: muted, visible: "{state == 'moving'}" }
   - type: label
-    text: to the extraction zone
-    style: { font_size: 20, color: muted, visible: "{state == 'moving' && params.lang == 'en'}" }
+    text: "{params.lang == 'en' && 'Looking for GPS' || params.lang == 'de' && 'Suche GPS' || params.lang == 'zh-tw' && '搜尋 GPS 中' || 'À procura de GPS'}"
+    style: { font_size: 28, visible: "{state == 'searching'}" }
   - type: label
-    text: À procura de GPS
-    style: { font_size: 28, visible: "{state == 'searching' && params.lang != 'en'}" }
+    text: "{params.lang == 'en' && 'Weak GPS' || params.lang == 'de' && 'GPS schwach' || params.lang == 'zh-tw' && 'GPS 訊號弱' || 'GPS fraco'} ({metres} m)"
+    style: { font_size: 28, color: orange, visible: "{state == 'weak'}" }
   - type: label
-    text: Looking for GPS
-    style: { font_size: 28, visible: "{state == 'searching' && params.lang == 'en'}" }
-  - type: label
-    text: "GPS fraco ({metres} m)"
-    style: { font_size: 28, color: orange, visible: "{state == 'weak' && params.lang != 'en'}" }
-  - type: label
-    text: "Weak GPS ({metres} m)"
-    style: { font_size: 28, color: orange, visible: "{state == 'weak' && params.lang == 'en'}" }
-  - type: label
-    text: Sem zona de extração
-    style: { font_size: 28, color: muted, visible: "{state == 'no_zone' && params.lang != 'en'}" }
-  - type: label
-    text: No extraction zone
-    style: { font_size: 28, color: muted, visible: "{state == 'no_zone' && params.lang == 'en'}" }
+    text: "{params.lang == 'en' && 'No extraction zone' || params.lang == 'de' && 'Keine Extraktion' || params.lang == 'zh-tw' && '沒有撤離區' || 'Sem zona de extração'}"
+    style: { font_size: 28, color: muted, visible: "{state == 'no_zone'}" }
   - type: icon
     icon: ok
     style: { font_size: 48, color: contrast, visible: "{state == 'extracted'}" }
   - type: label
-    text: EXTRAÇÃO CONCLUÍDA
+    text: "{params.lang == 'de' && 'EXTRAHIERT' || params.lang == 'zh-tw' && '撤離成功' || 'EXTRAÇÃO CONCLUÍDA'}"
     style: { font_size: 20, color: contrast, visible: "{state == 'extracted' && params.lang != 'en'}" }
   - type: label
-    text: EXTRACTED
+    text: "EXTRACTED"
     style: { font_size: 28, color: contrast, visible: "{state == 'extracted' && params.lang == 'en'}" }
   - type: spacer
     height: fill
   - type: label
-    text: Leva-me à zona de extração
+    text: "{params.lang == 'en' && 'Take me to the extraction zone' || params.lang == 'de' && 'Bring mich zur Extraktionszone' || params.lang == 'zh-tw' && '把我帶到撤離區' || 'Leva-me à zona de extração'}"
     style:
       font_size: 14
       color: muted
-      visible: "{state != 'extracted' && params.lang != 'en'}"
-      padding: { bottom: 10 }
-  - type: label
-    text: Take me to the extraction zone
-    style:
-      font_size: 14
-      color: muted
-      visible: "{state != 'extracted' && params.lang == 'en'}"
+      visible: "{state != 'extracted'}"
       padding: { bottom: 10 }

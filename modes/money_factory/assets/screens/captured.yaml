@@ -4,14 +4,14 @@
 # A team holds the factory (decision BN-11's name, so a box's OLED shows the
 # team and how long it has held it). Data: team, since (game time of the
 # capture, in seconds), stock (the money in it), taker and progress (0-1)
-# while another team holds its input; lang (pt or en) from the box.
+# while another team holds its input; lang (pt, en, de or zh-tw) from the box.
 template: captured
 layout:
   - type: row
     style: { width: fill, height: 44, background: team }
     children:
       - type: label
-        text: "{lang == 'pt' && 'FÁBRICA OCUPADA' || 'FACTORY HELD'}"
+        text: "{lang == 'pt' && 'FÁBRICA OCUPADA' || lang == 'de' && 'FABRIK BESETZT' || lang == 'zh-tw' && '印鈔廠已佔領' || 'FACTORY HELD'}"
         style: { font_size: 20, width: fill, align: center, color: contrast }
   - type: spacer
     height: fill
@@ -25,7 +25,7 @@ layout:
     value: "{stock / params.capacity}"
     style: { width: 220, height: 10, color: team, visible: "{!taker}" }
   - type: label
-    text: "{lang == 'pt' && 'A tomar:' || 'Taking:'} {taker|upper}"
+    text: "{lang == 'pt' && 'A tomar:' || lang == 'de' && 'Übernahme:' || lang == 'zh-tw' && '奪取中' || 'Taking:'} {taker|upper}"
     style: { font_size: 20, color: "{taker}", visible: "{taker}" }
   - type: progress_bar
     value: "{progress}"
@@ -33,7 +33,7 @@ layout:
   - type: spacer
     height: fill
   - type: label
-    text: "{lang == 'pt' && 'Lê a tua etiqueta para recolher' || 'Scan your tag to collect'}"
+    text: "{lang == 'pt' && 'Lê a tua etiqueta para recolher' || lang == 'de' && 'Scanne deinen Tag zum Abholen' || lang == 'zh-tw' && '感應你的標籤來領錢' || 'Scan your tag to collect'}"
     style:
       font_size: 14
       color: muted

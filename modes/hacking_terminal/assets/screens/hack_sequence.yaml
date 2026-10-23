@@ -6,20 +6,18 @@
 # show: the sequence is shown; input: the player types it back), key (the key
 # shown), step (the key shown, or the keys typed back so far), of (the
 # sequence's length), locked (seconds left of a lock, 0 when open), note
-# (yours when the holder's team types). Texts in params.lang (pt or en).
+# (yours when the holder's team types). Texts in params.lang (pt, the default,
+# en, de or zh-tw).
 template: hack_sequence
 layout:
   - type: row
     style: { width: fill, height: 44, background: "{team || owner || 'panel'}" }
     children:
       - type: label
-        text: REPETE A SEQUÊNCIA
-        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang != 'en'}" }
-      - type: label
-        text: REPEAT THE SEQUENCE
-        style: { font_size: 20, width: fill, align: center, color: contrast, visible: "{params.lang == 'en'}" }
+        text: "{params.lang == 'en' && 'REPEAT THE SEQUENCE' || params.lang == 'de' && 'WIEDERHOLE DIE FOLGE' || params.lang == 'zh-tw' && '照順序按回去' || 'REPETE A SEQUÊNCIA'}"
+        style: { font_size: 20, width: fill, align: center, color: contrast }
   - type: label
-    text: "Terminal: {owner|upper}"
+    text: "{params.lang == 'zh-tw' && '終端：' || 'Terminal: '}{owner|upper}"
     style:
       font_size: 14
       color: "{owner}"
@@ -36,80 +34,44 @@ layout:
     style: { font_size: 20, color: muted, visible: "{phase == 'show'}" }
   # Typing it back.
   - type: label
-    text: A TUA VEZ
-    style: { font_size: 28, color: accent, visible: "{phase == 'input' && params.lang != 'en'}" }
-  - type: label
-    text: YOUR TURN
-    style: { font_size: 28, color: accent, visible: "{phase == 'input' && params.lang == 'en'}" }
+    text: "{params.lang == 'en' && 'YOUR TURN' || params.lang == 'de' && 'DU BIST DRAN' || params.lang == 'zh-tw' && '換你了' || 'A TUA VEZ'}"
+    style: { font_size: 28, color: accent, visible: "{phase == 'input'}" }
   - type: progress_bar
     value: "{step / of}"
     style: { width: 260, height: 12, color: "{team || 'accent'}", visible: "{phase == 'input'}" }
   - type: label
-    text: "{step} de {of}"
+    text: "{step} {params.lang == 'en' && 'of' || params.lang == 'de' && 'von' || params.lang == 'zh-tw' && '/' || 'de'} {of}"
     style:
       font_size: 20
-      visible: "{phase == 'input' && params.lang != 'en'}"
-      padding: { top: 6 }
-  - type: label
-    text: "{step} of {of}"
-    style:
-      font_size: 20
-      visible: "{phase == 'input' && params.lang == 'en'}"
+      visible: "{phase == 'input'}"
       padding: { top: 6 }
   # Waiting, or locked.
   - type: label
-    text: "{of} TECLAS"
-    style: { font_size: 28, visible: "{phase == 'idle' && !locked && params.lang != 'en'}" }
+    text: "{of} {params.lang == 'en' && 'KEYS' || params.lang == 'de' && 'TASTEN' || params.lang == 'zh-tw' && '個按鍵' || 'TECLAS'}"
+    style: { font_size: 28, visible: "{phase == 'idle' && !locked}" }
   - type: label
-    text: "{of} KEYS"
-    style: { font_size: 28, visible: "{phase == 'idle' && !locked && params.lang == 'en'}" }
-  - type: label
-    text: "TECLA ERRADA: BLOQUEADO {locked} s"
-    style: { font_size: 20, color: danger, visible: "{locked && params.lang != 'en'}" }
-  - type: label
-    text: "WRONG KEY: LOCKED {locked} s"
-    style: { font_size: 20, color: danger, visible: "{locked && params.lang == 'en'}" }
+    text: "{params.lang == 'en' && 'WRONG KEY: LOCKED' || params.lang == 'de' && 'FALSCH: GESPERRT' || params.lang == 'zh-tw' && '按錯了：鎖定' || 'TECLA ERRADA: BLOQUEADO'} {locked} {params.lang == 'zh-tw' && '秒' || 's'}"
+    style: { font_size: 20, color: danger, visible: "{locked}" }
   - type: spacer
     height: fill
   - type: label
-    text: O terminal já é da tua equipa
+    text: "{params.lang == 'en' && 'Your team holds this terminal' || params.lang == 'de' && 'Dein Team hält dieses Terminal' || params.lang == 'zh-tw' && '你的隊伍已佔領這個終端' || 'O terminal já é da tua equipa'}"
     style:
       font_size: 14
       color: muted
-      visible: "{note == 'yours' && params.lang != 'en'}"
+      visible: "{note == 'yours'}"
       padding: { bottom: 10 }
   - type: label
-    text: Your team holds this terminal
+    text: "{params.lang == 'en' && 'Press a key to see the sequence' || params.lang == 'de' && 'Drück eine Taste für die Folge' || params.lang == 'zh-tw' && '按任一鍵看順序' || 'Carrega numa tecla para ver a sequência'}"
     style:
       font_size: 14
       color: muted
-      visible: "{note == 'yours' && params.lang == 'en'}"
+      visible: "{!note && phase == 'idle' && !locked}"
       padding: { bottom: 10 }
   - type: label
-    text: Carrega numa tecla para ver a sequência
+    text: "{params.lang == 'en' && 'Remember the keys' || params.lang == 'de' && 'Merk dir die Tasten' || params.lang == 'zh-tw' && '記住這些按鍵' || 'Memoriza as teclas'}"
     style:
       font_size: 14
       color: muted
-      visible: "{!note && phase == 'idle' && !locked && params.lang != 'en'}"
-      padding: { bottom: 10 }
-  - type: label
-    text: Press a key to see the sequence
-    style:
-      font_size: 14
-      color: muted
-      visible: "{!note && phase == 'idle' && !locked && params.lang == 'en'}"
-      padding: { bottom: 10 }
-  - type: label
-    text: Memoriza as teclas
-    style:
-      font_size: 14
-      color: muted
-      visible: "{phase == 'show' && params.lang != 'en'}"
-      padding: { bottom: 10 }
-  - type: label
-    text: Remember the keys
-    style:
-      font_size: 14
-      color: muted
-      visible: "{phase == 'show' && params.lang == 'en'}"
+      visible: "{phase == 'show'}"
       padding: { bottom: 10 }

@@ -31,3 +31,30 @@ i18n:
       reset_after_defuse: Voltar à espera depois de desarmada
       auto_arm_after_s: Armar automaticamente ao fim de (s)
       team_codes: "Códigos de equipa, ex.: red=1234,blue=5678: o teclado arma (o código de uma equipa) e desarma (o código de outra equipa) em vez dos botões"
+  de:
+    name: Bombe / Rush
+    description: >-
+      Die Angreifenden machen die Bombe scharf und verteidigen sie; die Verteidigenden müssen sie entschärfen,
+      bevor sie explodiert. Mit Team-Codes macht jedes Team mit seinem eigenen Code am Tastenfeld scharf und
+      entschärft.
+    params:
+      attackers: Angreifende
+      defenders: Verteidigende
+      fuse_s: Zünder (s)
+      arm_hold_ms: Haltezeit zum Schärfen (ms)
+      defuse_hold_ms: Haltezeit zum Entschärfen (ms)
+      reset_after_defuse: Nach dem Entschärfen wieder bereit
+      auto_arm_after_s: Automatisch scharf nach (s)
+      team_codes: "Team-Codes, z. B. red=1234,blue=5678: das Tastenfeld macht scharf (der Code eines Teams) und entschärft (der Code eines anderen Teams) statt der Knöpfe"
+  zh-tw:
+    name: 炸彈 / Rush
+    description: 進攻方啟動炸彈並守住它；防守方必須在爆炸前拆除。使用隊伍代碼時，各隊用自己的代碼在按鍵上啟動與拆除。
+    params:
+      attackers: 進攻方
+      defenders: 防守方
+      fuse_s: 引信（秒）
+      arm_hold_ms: 啟動需按住的時間（毫秒）
+      defuse_hold_ms: 拆除需按住的時間（毫秒）
+      reset_after_defuse: 拆除後回到待命
+      auto_arm_after_s: 自動啟動的時間（秒）
+      team_codes: 隊伍代碼，例如 red=1234,blue=5678：改用按鍵啟動（某一隊的代碼）與拆除（另一隊的代碼），不用按鈕

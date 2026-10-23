@@ -19,7 +19,8 @@ roles:
 params:
   hold_ms: { type: int, min: 0, max: 60000, default: 5000, label: "Hold time to take the hill (ms)" }
   tick_s:  { type: int, min: 1, max: 600,   default: 30,   label: "Seconds per point" }
-# The GM console's texts in Portuguese (English is the text above). Every
+# The GM console's texts in Portuguese, German and Traditional Chinese (Taiwan)
+# (English is the text above; de and zh-tw drafted by an AI model). Every
 # language lists the same keys. The screens carry their own languages.
 i18n:
   pt:
@@ -28,3 +29,15 @@ i18n:
     params:
       hold_ms: Tempo a premir para tomar a colina (ms)
       tick_s: Segundos por ponto
+  de:
+    name: King of the Hill
+    description: Halte die Box, um den Hügel einzunehmen; das Team auf dem Hügel punktet in jedem Intervall.
+    params:
+      hold_ms: Haltezeit zum Einnehmen des Hügels (ms)
+      tick_s: Sekunden pro Punkt
+  zh-tw:
+    name: 山頭爭奪戰
+    description: 按住盒子即可佔領山頭；佔有山頭的隊伍每次間隔得分。
+    params:
+      hold_ms: 佔領山頭需按住的時間（毫秒）
+      tick_s: 每得 1 分的秒數

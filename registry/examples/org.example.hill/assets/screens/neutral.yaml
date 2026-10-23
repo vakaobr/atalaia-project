@@ -3,37 +3,38 @@
 #
 # Nobody owns the hill yet. Data from node.lua: taker and progress (0-1)
 # while a team holds its button. The box adds lang, the game's language
-# ('pt', 'en', 'de' or 'zh-tw'): each text below picks Portuguese with
-# {lang == 'pt' && '...' || '...'} and shows English otherwise.
+# ('pt', 'en', 'de' or 'zh-tw'): each text below picks its language with
+# {lang == 'pt' && '...' || lang == 'de' && '...' || lang == 'zh-tw' && '...' || '...'}
+# and shows English, the last, for any other.
 template: neutral
 layout:
   - type: row
     style: { width: fill, height: 44, background: panel }
     children:
       - type: label
-        text: "{lang == 'pt' && 'REI DA COLINA' || 'KING OF THE HILL'}"
+        text: "{lang == 'pt' && 'REI DA COLINA' || lang == 'de' && 'KING OF THE HILL' || lang == 'zh-tw' && '山頭爭奪戰' || 'KING OF THE HILL'}"
         style: { font_size: 20, width: fill, align: center }
   - type: spacer
     height: fill
   - type: label
-    text: "{lang == 'pt' && 'LIVRE' || 'FREE'}"
+    text: "{lang == 'pt' && 'LIVRE' || lang == 'de' && 'FREI' || lang == 'zh-tw' && '中立' || 'FREE'}"
     style: { font_size: 48 }
   # While a team holds: its name in its colour and a bar that fills.
   # `visible` hides a widget while its expression is empty or false.
   - type: label
-    text: "{lang == 'pt' && 'A tomar:' || 'Taking:'} {taker|upper}"
+    text: "{lang == 'pt' && 'A tomar:' || lang == 'de' && 'Übernahme:' || lang == 'zh-tw' && '奪取中' || 'Taking:'} {taker|upper}"
     style: { font_size: 20, color: "{taker}", visible: "{taker}" }
   - type: progress_bar
     value: "{progress}"
     style: { width: 220, height: 12, color: "{taker}", visible: "{taker}" }
   # params.* reads the game's settings (mode.yaml's params).
   - type: label
-    text: "{lang == 'pt' && 'Mantém premido durante' || 'Hold your button for'} {params.hold_ms / 1000} s"
+    text: "{lang == 'pt' && 'Mantém premido durante' || lang == 'de' && 'Halte deinen Knopf für' || lang == 'zh-tw' && '按住按鈕' || 'Hold your button for'} {params.hold_ms / 1000} {lang == 'zh-tw' && '秒' || 's'}"
     style: { font_size: 20, color: accent, visible: "{!taker}" }
   - type: spacer
     height: fill
   - type: label
-    text: "{lang == 'pt' && 'Nenhuma equipa tem a colina' || 'No team holds the hill'}"
+    text: "{lang == 'pt' && 'Nenhuma equipa tem a colina' || lang == 'de' && 'Kein Team hält den Hügel' || lang == 'zh-tw' && '目前沒有隊伍佔領山頭' || 'No team holds the hill'}"
     style:
       font_size: 14
       color: muted

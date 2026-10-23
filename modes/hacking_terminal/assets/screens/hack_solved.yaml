@@ -4,7 +4,7 @@
 # The puzzle is solved. Data: team (the team that solved it, if known), code
 # (the code it reveals, if the game set one), capture (true when the terminal
 # is now that team's and another team can hack it back). Texts in
-# params.lang (pt or en).
+# params.lang (pt, the default, en, de or zh-tw).
 template: hack_solved
 style: { background: "{team || 'panel'}" }
 layout:
@@ -12,34 +12,21 @@ layout:
     icon: ok
     style: { font_size: 48, color: contrast }
   - type: label
-    text: ACESSO CONCEDIDO
-    style: { font_size: 28, color: contrast, visible: "{params.lang != 'en'}" }
-  - type: label
-    text: ACCESS GRANTED
-    style: { font_size: 28, color: contrast, visible: "{params.lang == 'en'}" }
+    text: "{params.lang == 'en' && 'ACCESS GRANTED' || params.lang == 'de' && 'ZUGRIFF ERTEILT' || params.lang == 'zh-tw' && '存取成功' || 'ACESSO CONCEDIDO'}"
+    style: { font_size: 28, color: contrast }
   - type: label
     text: "{team|upper}"
     style: { font_size: 20, color: contrast, visible: "{team}" }
   - type: label
-    text: Código
+    text: "{params.lang == 'en' && 'Code' || params.lang == 'de' && 'Code' || params.lang == 'zh-tw' && '代碼' || 'Código'}"
     style:
       font_size: 14
       color: contrast
-      visible: "{code && params.lang != 'en'}"
-      padding: { top: 8 }
-  - type: label
-    text: Code
-    style:
-      font_size: 14
-      color: contrast
-      visible: "{code && params.lang == 'en'}"
+      visible: "{code}"
       padding: { top: 8 }
   - type: label
     text: "{code}"
     style: { font_size: 48, color: contrast, visible: "{code}" }
   - type: label
-    text: Outra equipa pode voltar a hackeá-lo
-    style: { font_size: 14, color: contrast, visible: "{capture && params.lang != 'en'}", padding: 6 }
-  - type: label
-    text: Another team can hack it back
-    style: { font_size: 14, color: contrast, visible: "{capture && params.lang == 'en'}", padding: 6 }
+    text: "{params.lang == 'en' && 'Another team can hack it back' || params.lang == 'de' && 'Ein anderes Team kann es zurückhacken' || params.lang == 'zh-tw' && '別隊可以再駭回去' || 'Outra equipa pode voltar a hackeá-lo'}"
+    style: { font_size: 14, color: contrast, visible: "{capture}", padding: 6 }

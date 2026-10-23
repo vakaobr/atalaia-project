@@ -3,7 +3,8 @@
 #
 # A heal is done. Data: player, team (the player's), remaining (heals left
 # in the kit), used (the player's heals in this game), max (heals a player
-# may have; 0: no limit). Texts in params.lang (pt or en).
+# may have; 0: no limit). Texts in params.lang (pt, the default, en, de or
+# zh-tw).
 template: medic_healed
 style: { background: "{team || 'panel'}" }
 layout:
@@ -11,29 +12,32 @@ layout:
     icon: plus
     style: { font_size: 48, color: contrast }
   - type: label
-    text: DE VOLTA AO JOGO
-    style: { font_size: 28, color: contrast, visible: "{params.lang != 'en'}" }
-  - type: label
-    text: BACK IN THE GAME
-    style: { font_size: 28, color: contrast, visible: "{params.lang == 'en'}" }
+    text: "{params.lang == 'en' && 'BACK IN THE GAME' || params.lang == 'de' && 'ZURÜCK IM SPIEL' || params.lang == 'zh-tw' && '回到遊戲' || 'DE VOLTA AO JOGO'}"
+    style: { font_size: 28, color: contrast }
   - type: label
     text: "{player}"
     style: { font_size: 20, color: contrast }
   - type: label
-    text: "Tratamento {used} de {max}"
-    style: { font_size: 20, color: contrast, visible: "{params.lang != 'en' && max > 0}" }
-  - type: label
-    text: "Heal {used} of {max}"
-    style: { font_size: 20, color: contrast, visible: "{params.lang == 'en' && max > 0}" }
+    text: "{params.lang == 'en' && 'Heal' || params.lang == 'de' && 'Behandlung' || params.lang == 'zh-tw' && '第' || 'Tratamento'} {used} {params.lang == 'en' && 'of' || params.lang == 'de' && 'von' || params.lang == 'zh-tw' && '次，共' || 'de'} {max}{params.lang == 'zh-tw' && ' 次' || ''}"
+    style: { font_size: 20, color: contrast, visible: "{max > 0}" }
   - type: label
     text: "Restam {remaining} ligaduras"
-    style: { font_size: 14, color: contrast, visible: "{params.lang != 'en' && remaining != 1}", padding: 6 }
+    style: { font_size: 14, color: contrast, visible: "{params.lang != 'en' && params.lang != 'de' && params.lang != 'zh-tw' && remaining != 1}", padding: 6 }
   - type: label
     text: Resta 1 ligadura
-    style: { font_size: 14, color: contrast, visible: "{params.lang != 'en' && remaining == 1}", padding: 6 }
+    style: { font_size: 14, color: contrast, visible: "{params.lang != 'en' && params.lang != 'de' && params.lang != 'zh-tw' && remaining == 1}", padding: 6 }
   - type: label
     text: "{remaining} heals left in the kit"
     style: { font_size: 14, color: contrast, visible: "{params.lang == 'en' && remaining != 1}", padding: 6 }
   - type: label
     text: 1 heal left in the kit
     style: { font_size: 14, color: contrast, visible: "{params.lang == 'en' && remaining == 1}", padding: 6 }
+  - type: label
+    text: "Noch {remaining} Verbände im Kit"
+    style: { font_size: 14, color: contrast, visible: "{params.lang == 'de' && remaining != 1}", padding: 6 }
+  - type: label
+    text: Noch 1 Verband im Kit
+    style: { font_size: 14, color: contrast, visible: "{params.lang == 'de' && remaining == 1}", padding: 6 }
+  - type: label
+    text: "醫護包還剩 {remaining} 次"
+    style: { font_size: 14, color: contrast, visible: "{params.lang == 'zh-tw'}", padding: 6 }

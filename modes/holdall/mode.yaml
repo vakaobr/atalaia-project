@@ -23,3 +23,21 @@ i18n:
       tick_s: Segundos por ponto enquanto uma equipa tem todas as caixas
       points_per_tick: Pontos por intervalo
       min_zones: Caixas em jogo antes de alguém poder pontuar
+  de:
+    name: Hold-All Domination
+    description: >-
+      Teams nehmen Boxen ein wie bei Domination, aber ein Team punktet nur, solange es alle Boxen gleichzeitig
+      hält.
+    params:
+      capture_hold_ms: Haltezeit zum Einnehmen (ms)
+      tick_s: Sekunden pro Wertungsintervall, solange ein Team alle Boxen hält
+      points_per_tick: Punkte pro Intervall
+      min_zones: Boxen im Spiel, bevor jemand punkten kann
+  zh-tw:
+    name: 全佔點
+    description: 各隊像佔點模式一樣佔領盒子，但只有同時佔有所有盒子的隊伍才會得分。
+    params:
+      capture_hold_ms: 佔領需按住的時間（毫秒）
+      tick_s: 一隊佔有所有盒子時的計分間隔（秒）
+      points_per_tick: 每次計分的分數
+      min_zones: 開始計分前需要在場的盒子數

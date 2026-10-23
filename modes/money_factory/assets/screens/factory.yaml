@@ -2,14 +2,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # A factory without capture (params.capture off): it always makes money and
-# anyone collects. Data: stock (the money in it); lang (pt or en) from the box.
+# anyone collects. Data: stock (the money in it); lang (pt, en, de or zh-tw) from the box.
 template: factory
 layout:
   - type: row
     style: { width: fill, height: 44, background: panel }
     children:
       - type: label
-        text: "{lang == 'pt' && 'FÁBRICA' || 'FACTORY'}"
+        text: "{lang == 'pt' && 'FÁBRICA' || lang == 'de' && 'FABRIK' || lang == 'zh-tw' && '印鈔廠' || 'FACTORY'}"
         style: { font_size: 20, width: fill, align: center }
   - type: spacer
     height: fill
@@ -17,7 +17,7 @@ layout:
     text: "{stock}"
     style: { font_size: 48, color: accent }
   - type: label
-    text: "{lang == 'pt' && 'de' || 'of'} {params.capacity}"
+    text: "{lang == 'pt' && 'de' || lang == 'de' && 'von' || lang == 'zh-tw' && '/' || 'of'} {params.capacity}"
     style: { font_size: 20, color: muted }
   - type: progress_bar
     value: "{stock / params.capacity}"
@@ -25,7 +25,7 @@ layout:
   - type: spacer
     height: fill
   - type: label
-    text: "{lang == 'pt' && 'Lê a tua etiqueta para recolher' || 'Scan your tag to collect'}"
+    text: "{lang == 'pt' && 'Lê a tua etiqueta para recolher' || lang == 'de' && 'Scanne deinen Tag zum Abholen' || lang == 'zh-tw' && '感應你的標籤來領錢' || 'Scan your tag to collect'}"
     style:
       font_size: 14
       color: muted

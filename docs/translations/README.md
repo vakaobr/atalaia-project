@@ -6,8 +6,9 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 # Translating Atalaia
 
 Atalaia is written in English first and ships in European Portuguese, with German (plan
-phase 10 of phase 5, decisions P5H-1 to P5H-11) and Traditional Chinese as written in Taiwan
-(`zh-tw`, plan phase 11, decisions P5K-1 to P5K-12) being reviewed; both are in
+phase 10 of phase 5, decisions P5H-1 to P5H-11; the built-in modes and the site server's pages,
+P5H-12 to P5H-16) and Traditional Chinese as written in Taiwan (`zh-tw`, plan phase 11, decisions
+P5K-1 to P5K-12; the same parts, P5K-13 to P5K-15) being reviewed; both are in
 [`docs/review/decisions-to-review.md`](../review/decisions-to-review.md). Translations are
 welcome for any language people play in; you do not need to write code.
 
@@ -29,8 +30,9 @@ English's in every language.
 | Mode editor | [`simulator/atalaia_sim/editor/i18n/en.json`](../../simulator/atalaia_sim/editor/i18n/en.json) | JSON (`ui`, `blocks`), `%1` inputs and `{name}` | A block's text is a sentence with its inputs; their order may change. Blockly's own texts come from its `msg/<lang>.js` (vendored, checksummed) |
 | App | [`app/lib/l10n/strings_en.dart`](../../app/lib/l10n/strings_en.dart) | Dart map, `{name}` placeholders | Long texts are split over adjacent literals |
 | Field Box screens | [`firmware/esp32/main/box_text.c`](../../firmware/esp32/main/box_text.c) | one C table, one column a language, `%s`/`%u`/`%ld` | The OLED's lines (`TXO_*`) have 16 columns, a Han letter taking two; the screens are checked by reference images. Letters outside the box's fonts need new glyphs: Latin ones in `LATIN` of `tools/gen_box_fonts.py`; Chinese ones are taken from the table itself, so after changing a Chinese text make the fonts again (`python3 tools/gen_box_fonts.py --check`, in CI, names a missing or unused letter; P5K-3) |
-| Modes | `modes/<mode>/mode.yaml` | `i18n.<lang>:` name, description, parameter labels, commands | No German or Chinese yet (P5H-7, P5K-1) |
-| Site server pages | `server/atalaia_server/web/i18n.py`, `staff_i18n.py` | Python dicts | Portuguese and English only (P5H-8) |
+| Modes | `modes/<mode>/mode.yaml` | `i18n.<lang>:` name, description, parameter labels, commands | Every language the same keys as English (`tools/i18n_check.py`'s `modes`) |
+| Mode screens | `modes/<mode>/assets/screens/*.yaml` | template expressions: `{lang == 'pt' && '...' \|\| lang == 'de' && '...' \|\| lang == 'zh-tw' && '...' \|\| '...'}`, English last | A text whose words change order around a value is a label per language (`visible: "{lang == 'de'}"`); the Medic Kit, Hacking Terminal and VIP compare `params.lang` instead. Chinese letters are added to the box's fonts by `tools/gen_box_fonts.py` from these files, at each label's size (P5H-12); check the reference images (`yaml_*_de.png`, `yaml_*_zh-tw.png`). The Medic Kit's refusals are in its `node.lua` |
+| Site server pages | `server/atalaia_server/web/i18n.py`, `staff_i18n.py`, `scoreboard.py` | Python dicts, `{name}` placeholders | Dates are written by hand per language (`date()` in `i18n.py`); the staff pages' script formats dates with the browser (`static/staff/staff.js`) |
 
 A language's code is the same everywhere (`status.yaml`, the console's `LANGS`, the join's key
 15): `de`, and `zh-tw` for Traditional Chinese (Taiwan). Files carry it as they can: `zh-tw.json`,
@@ -48,7 +50,8 @@ A language's code is the same everywhere (`status.yaml`, the console's `LANGS`, 
   move it in the sentence.
 - Keep texts short where the English is short: buttons, tabs, the box's screens.
 - Decimal separators, quotation marks and dates as your language writes them.
-- Chinese, Japanese or Korean: the box's fonts carry only the letters its texts use, the OLED
+- Chinese, Japanese or Korean: the box's fonts carry only the letters its texts (and the built-in
+  modes' screens) use, the OLED
   draws them at 14 px on one bit per pixel (prefer common letters with few strokes in its
   `TXO_*` lines), and lines break between letters, never before a closing or after an opening
   full-width sign (P5K-6).

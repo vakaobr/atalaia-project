@@ -3,7 +3,8 @@
 
 // The golden tests draw Traditional Chinese with a subset of Noto Sans TC
 // (test/fonts/), since a widget test has no system fonts. A character the
-// zh-tw texts use and the subset lacks would be drawn as a box in the
+// zh-tw texts use (the app's own and the built-in modes': names, labels
+// and screens) and the subset lacks would be drawn as a box in the
 // goldens: this test names it instead (make the subset again, as
 // test/fonts/README.md says). On phones Android's own CJK font draws them.
 
@@ -11,6 +12,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:atalaia_app/l10n/strings_zh_tw.dart';
+import 'package:atalaia_app/modes/builtin_modes.g.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fonts.dart';
@@ -69,4 +71,21 @@ void main() {
     };
     expect(missing, isEmpty, reason: 'make test/fonts/ again');
   });
+
+  test(
+    "the test font has every character of the built-in modes' zh-tw texts",
+    () {
+      // Every Han letter or full-width sign in the modes' files is Chinese
+      // text for a zh-tw box or console (decision P5H-12).
+      final have = cmapCodePoints(File(cjkRegular).readAsBytesSync());
+      final missing = <String>{
+        for (final entry in builtinModeFiles.entries)
+          for (final file in entry.value.entries)
+            for (final c in file.value.runes)
+              if (c > 0x2000 && !have.contains(c))
+                '${String.fromCharCode(c)} (${entry.key}/${file.key})',
+      };
+      expect(missing, isEmpty, reason: 'make test/fonts/ again');
+    },
+  );
 }

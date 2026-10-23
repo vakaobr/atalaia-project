@@ -3,33 +3,39 @@
 #
 # Nobody holds the zone yet (a running game: decision BN-11; the box's own
 # "waiting" screen is before the start). No data of the mode's; the hold time
-# comes from the game's parameters, lang (pt or en) from the box (box_text.h).
+# comes from the game's parameters, lang (pt, en, de or zh-tw) from the box (box_text.h).
 template: neutral
 layout:
   - type: row
     style: { width: fill, height: 44, background: panel }
     children:
       - type: label
-        text: "{lang == 'pt' && 'ZONA' || 'ZONE'}"
+        text: "{lang == 'pt' && 'ZONA' || lang == 'de' && 'ZONE' || lang == 'zh-tw' && '據點' || 'ZONE'}"
         style: { font_size: 20, width: fill, align: center }
   - type: spacer
     height: fill
   - type: label
-    text: "{lang == 'pt' && 'LIVRE' || 'NEUTRAL'}"
+    text: "{lang == 'pt' && 'LIVRE' || lang == 'de' && 'FREI' || lang == 'zh-tw' && '中立' || 'NEUTRAL'}"
     style: { font_size: 48 }
   - type: label
-    text: "{lang == 'pt' && 'Mantém premido' || 'Hold to capture'}"
+    text: "{lang == 'pt' && 'Mantém premido' || lang == 'de' && 'Gedrückt halten' || lang == 'zh-tw' && '按住按鈕' || 'Hold to capture'}"
     style: { font_size: 20, color: accent }
   - type: label
     text: "Hold your button for {params.capture_hold_ms / 1000} s"
-    style: { font_size: 14, color: muted, visible: "{lang != 'pt'}" }
+    style: { font_size: 14, color: muted, visible: "{lang != 'pt' && lang != 'de' && lang != 'zh-tw'}" }
   - type: label
     text: "{params.capture_hold_ms / 1000} s para capturar a zona"
     style: { font_size: 14, color: muted, visible: "{lang == 'pt'}" }
+  - type: label
+    text: "{params.capture_hold_ms / 1000} s zum Einnehmen der Zone"
+    style: { font_size: 14, color: muted, visible: "{lang == 'de'}" }
+  - type: label
+    text: "按住 {params.capture_hold_ms / 1000} 秒即可佔領據點"
+    style: { font_size: 14, color: muted, visible: "{lang == 'zh-tw'}" }
   - type: spacer
     height: fill
   - type: label
-    text: "{lang == 'pt' && 'Nenhuma equipa tem esta zona' || 'Nobody holds this zone'}"
+    text: "{lang == 'pt' && 'Nenhuma equipa tem esta zona' || lang == 'de' && 'Kein Team hält diese Zone' || lang == 'zh-tw' && '目前沒有隊伍佔領此據點' || 'Nobody holds this zone'}"
     style:
       font_size: 14
       color: muted

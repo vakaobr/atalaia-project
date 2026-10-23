@@ -12,7 +12,7 @@
 #include "atalaia/screen_template.h"
 #include "check.h"
 
-static atalaia_tpl_t tpl; /* 6 KB: not on the stack */
+static atalaia_tpl_t tpl; /* 7.5 KB: not on the stack */
 static char err[160];
 
 static bool parse(const char *src)

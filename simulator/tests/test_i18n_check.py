@@ -169,15 +169,25 @@ class BoxFontCheckTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
         for name in ("firmware/esp32/main/box_text.c", "firmware/esp32/main/box_text.h",
-                     "firmware/esp32/main/fonts"):
+                     "firmware/esp32/main/fonts", "firmware/esp32/main/box_fonts_cjk.h"):
             src, dst = REPO / name, self.root / name
             dst.parent.mkdir(parents=True, exist_ok=True)
             if src.is_dir():
                 shutil.copytree(src, dst)
             else:
                 shutil.copy(src, dst)
+        # The built-in modes' templates and scripts (P5H-12).
+        for src in [*REPO.glob("modes/*/assets/screens/*.yaml"), *REPO.glob("modes/*/node.lua")]:
+            dst = self.root / src.relative_to(REPO)
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(src, dst)
         self.box = self.root / "firmware/esp32/main/box_text.c"
         self.text = self.box.read_text(encoding="utf-8")
+
+    def replace_in_templates(self, old: str, new: str) -> None:
+        for path in self.root.glob("modes/*/assets/screens/*.yaml"):
+            text = path.read_text(encoding="utf-8")
+            path.write_text(text.replace(old, new), encoding="utf-8")
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -202,12 +212,26 @@ class BoxFontCheckTests(unittest.TestCase):
         self.assertIn("lv_font_atalaia_48.c: lacks 閒", err)  # TX_NEUTRAL_UP is drawn at 48 px
 
     def test_a_letter_no_text_uses_any_more_fails(self):
-        # 爆 is only in TX_EXPLODED_UP (48 px) and TX_UNTIL_DETONATION: the fonts carry it for nothing.
-        text = self.text.replace('"已爆炸"', '"爆炸了"').replace('"後引爆"', '"後炸"')
-        self.box.write_text(text.replace('"爆炸了"', '"炸了"'), encoding="utf-8")
+        # 爆 is only in TX_EXPLODED_UP (48 px), TX_UNTIL_DETONATION and Bomb's and the objectives'
+        # templates: without them the fonts carry it for nothing.
+        text = self.text.replace('"已爆炸"', '"炸了"').replace('"後引爆"', '"後炸"')
+        self.box.write_text(text, encoding="utf-8")
+        self.replace_in_templates("已爆炸", "炸了")
+        self.replace_in_templates("後引爆", "後炸")
         code, _, err = self.check()
         self.assertEqual(code, 1)
-        self.assertIn("has 爆 U+7206, which no box text uses", err)
+        self.assertIn("has 爆 U+7206, which no box text or built-in template uses", err)
+
+    def test_a_template_letter_the_fonts_lack_fails_at_its_size(self):
+        # Domination's captured header is 20 px: 閒 would be needed there only (P5H-12).
+        self.replace_in_templates("'據點已佔領'", "'閒置'")
+        code, _, err = self.check()
+        self.assertEqual(code, 1)
+        self.assertIn("lv_font_atalaia_20.c: lacks 閒 U+9592, which a box text or a built-in "
+                      "template uses at 20 px", err)
+        self.assertNotIn("lv_font_atalaia_14.c: lacks 閒", err)
+        self.assertNotIn("lv_font_atalaia_48.c: lacks 閒", err)
+        self.assertIn("box_fonts_cjk.h is not the fonts' Chinese letters", err)
 
     def test_a_letter_in_no_font_at_all_fails(self):
         # Polish l with stroke is neither in LATIN nor Chinese.

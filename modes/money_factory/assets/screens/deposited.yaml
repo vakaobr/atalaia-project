@@ -2,14 +2,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # A player banked their money. Data: player, team, amount (points for the
-# team), total (the team's money banked here); lang (pt or en) from the box.
+# team), total (the team's money banked here); lang (pt, en, de or zh-tw) from the box.
 template: deposited
 layout:
   - type: row
     style: { width: fill, height: 44, background: team }
     children:
       - type: label
-        text: "{lang == 'pt' && 'DEPOSITADO' || 'BANKED'}"
+        text: "{lang == 'pt' && 'DEPOSITADO' || lang == 'de' && 'EINGEZAHLT' || lang == 'zh-tw' && '已存入' || 'BANKED'}"
         style: { font_size: 20, width: fill, align: center, color: contrast }
   - type: spacer
     height: fill
@@ -20,7 +20,7 @@ layout:
     text: "{player}"
     style: { font_size: 20 }
   - type: label
-    text: "{team|upper}: {total} {lang == 'pt' && 'neste banco' || 'banked here'}"
+    text: "{team|upper}: {total} {lang == 'pt' && 'neste banco' || lang == 'de' && 'hier eingezahlt' || lang == 'zh-tw' && '存在這間銀行' || 'banked here'}"
     style: { font_size: 20, color: muted }
   - type: spacer
     height: fill
