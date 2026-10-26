@@ -1506,6 +1506,37 @@
       ]
     },
     {
+      "name": "S7c firmware: a radio that refuses the offer fails the update at once, a late refusal is not its own",
+      "https": true,
+      "firmware_keys": ["11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="],
+      "join_key": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "steps": [
+        {"request": {"method": "POST", "path": "/api/v1/firmware?platform=esp32s3&version=0.3.0&signature=xnCbrlT17yuv5LLB5y%2BJBiOFOoG%2BMvUW18YB5CKeoPDFysOimzSygPFpelv7t2HBAo8eePny1%2BdzhjCvVPRWDw%3D%3D", "token": "gm", "body_hex": "e9040000000000000000000000000000000000000000000000000000000000003254cdab000000000000000000000000302e332e300000000000000000000000000000000000000000000000000000006174616c6169615f65737033320000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004154465701000000626f7800000000000000000068656c7465635f76345f330000000000000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b"}, "status": 201, "json": {"id": "c71c328620d52e62", "platform": "esp32s3", "version": "0.3.0", "size": 400, "sha256": "c71c328620d52e6238057aad8d5893aaa45b199e9fe087b7de507348657fb4e8", "variant": "box", "board": "heltec_v4_3", "key_id": "21fe31dfa154a261", "verified": true, "uploaded_at": "$any"}},
+        {"request": {"method": "POST", "path": "/api/v1/games", "token": "gm", "body": {"name": "Sunday", "mode_id": "org.atalaia.domination", "assignments": {"4": "zone"}}}, "status": 201, "save": {"gid": "id"}},
+        {"rx": {"source": 4, "seq": 0, "epoch": 1, "type": "HELLO", "hello": {"node_name": "box-4", "platform": 1, "fw_version": "0.2.0", "core_version": "0.2.0", "tier": 0, "capabilities": [1], "transports": 1, "epoch": 1}}},
+        {"tx": "$any"},
+        {"request": {"method": "POST", "path": "/api/v1/firmware/c71c328620d52e62/install", "token": "gm", "body": {"nodes": [4]}}, "status": 200, "json": {"results": [{"node_id": 4, "result": "sent"}]}},
+        {"tx": [{"kind": "CMD", "seq": 0, "fields": {"cmd": 9, "params": {"id": "c71c328620d52e62", "version": "0.3.0"}, "dest": 4}}], "kinds": ["CMD"]},
+        {"tx_ack": {"seq": 0, "status": "ok"}},
+        {"tx_ack": {"seq": 1, "status": "duty_cycle"}},
+        {"request": {"method": "GET", "path": "/api/v1/firmware", "token": "gm"}, "status": 200, "json": {"updates": [{"node_id": 4, "release": "c71c328620d52e62", "state": "sent", "reason": null}]}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm", "body": {"force": true}}, "status": 409},
+        {"tx_ack": {"seq": 0, "status": "duty_cycle"}},
+        {"request": {"method": "GET", "path": "/api/v1/firmware", "token": "gm"}, "status": 200, "json": {"updates": [{"node_id": 4, "release": "c71c328620d52e62", "state": "failed", "reason": "radio_duty_cycle"}]}},
+        {"request": {"method": "POST", "path": "/api/v1/firmware/c71c328620d52e62/install", "token": "gm", "body": {"nodes": "all"}}, "status": 200, "json": {"results": [{"node_id": 4, "result": "sent"}]}},
+        {"tx": [{"kind": "CMD", "seq": 1, "fields": {"cmd": 9, "params": {"id": "c71c328620d52e62", "version": "0.3.0"}, "dest": 4}}], "kinds": ["CMD"]},
+        {"tx_ack": {"seq": 1, "status": "queue_full"}},
+        {"request": {"method": "GET", "path": "/api/v1/firmware", "token": "gm"}, "status": 200, "json": {"updates": [{"node_id": 4, "release": "c71c328620d52e62", "state": "failed", "reason": "radio_queue_full"}]}},
+        {"request": {"method": "POST", "path": "/api/v1/firmware/c71c328620d52e62/install", "token": "gm", "body": {"nodes": [4]}}, "status": 200, "json": {"results": [{"node_id": 4, "result": "sent"}]}},
+        {"tx": [{"kind": "CMD", "seq": 2, "fields": {"cmd": 9, "params": {"id": "c71c328620d52e62", "version": "0.3.0"}, "dest": 4}}], "kinds": ["CMD"]},
+        {"advance_ms": 31000},
+        {"tx_ack": {"seq": 2, "status": "timeout"}},
+        {"request": {"method": "GET", "path": "/api/v1/firmware", "token": "gm"}, "status": 200, "json": {"updates": [{"node_id": 4, "release": "c71c328620d52e62", "state": "sent", "reason": null}]}},
+        {"request": {"method": "DELETE", "path": "/api/v1/firmware/updates", "token": "gm"}, "status": 200, "json": {"cancelled": [4]}},
+        {"request": {"method": "POST", "path": "/api/v1/games/${gid}/start", "token": "gm"}, "status": 200, "json": {"state": "running"}}
+      ]
+    },
+    {
       "name": "S7c firmware: no release key and no HTTPS, a failure said over the radio, the GM stops waiting",
       "firmware_keys": [],
       "steps": [

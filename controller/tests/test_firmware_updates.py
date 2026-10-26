@@ -505,6 +505,54 @@ class UpdateTests(FirmwareCase):
         self.assertEqual({u["node_id"]: (u["state"], u["reason"]) for u in self.fw.updates()}[5], ("failed", "busy"))
         self.assertIsNone(self.fw.busy())
 
+    def test_the_radio_refusing_the_offer(self) -> None:
+        """The radio's TX_ACK for the offer's packet (duty cycle, queue...): the update fails at once with a
+        reason, the game is not held, nothing is resent (decision PE24-133; the phone does the same)."""
+        game = self.new_game()
+        for n in (4, 5, 6):
+            self.hello(game, n, "0.2.0")
+        for status, reason in (("duty_cycle", "radio_duty_cycle"), ("queue_full", "radio_queue_full"),
+                               ("timeout", "radio_failed")):
+            self.client.post(f"/api/v1/firmware/{self.rel['id']}/install", json={"nodes": [4]}, headers=GM)
+            seq = self.fw.attempts[4]["seq"]
+            sent = len(self.update_cmds())
+            self.messages.clear()
+            # An ok for the packet, and the refusal of another packet, change nothing.
+            self.modem.on_tx_ack(seq, "ok")
+            self.modem.on_tx_ack((seq + 1) & 0xFFFF, status)
+            self.assertEqual(self.fw.updates()[0]["state"], "sent", status)
+            self.modem.on_tx_ack(seq, status)
+            a = self.fw.updates()[0]
+            self.assertEqual((a["state"], a["reason"]), ("failed", reason))
+            self.assertTrue(any(m.get("type") == "firmware" and m["updates"][0]["state"] == "failed"
+                                for m in self.messages), "the stream says so")
+            self.assertTrue(any(m.get("kind") == "tx.failed" for m in self.messages))  # the system event stays
+            self.assertIsNone(self.fw.busy())  # the game is not held
+            self.assertEqual(len(self.update_cmds()), sent)  # nothing resent
+        # The game can start, and a failed update is not touched again by a later refusal.
+        self.modem.on_tx_ack(seq, "duty_cycle")
+        self.assertEqual(self.fw.updates()[0]["reason"], "radio_failed")
+
+    def test_a_refusal_only_for_a_fresh_offer_still_sent(self) -> None:
+        game = self.new_game()
+        for n in (4, 5):
+            self.hello(game, n, "0.2.0")
+        self.client.post(f"/api/v1/firmware/{self.rel['id']}/install", json={"nodes": "all"}, headers=GM)
+        seq4, seq5 = self.fw.attempts[4]["seq"], self.fw.attempts[5]["seq"]
+        self.assertNotEqual(seq4, seq5)
+        # The seq is 16 bits and wraps: an offer older than the window is not the refused packet.
+        self.clock.t += 31
+        self.modem.on_tx_ack(seq4, "duty_cycle")
+        self.assertEqual({u["node_id"]: u["state"] for u in self.fw.updates()}, {4: "sent", 5: "sent"})
+        # Within the window, only the box whose packet it is.
+        self.clock.t -= 10
+        self.modem.on_tx_ack(seq5, "duty_cycle")
+        self.assertEqual({u["node_id"]: u["state"] for u in self.fw.updates()}, {4: "sent", 5: "failed"})
+        # A box that already installed is not failed by a late refusal.
+        self.assertEqual(self.report(game, 4, self.rel["id"], "installed", "0.3.0").json(), {"accepted": True})
+        self.modem.on_tx_ack(seq4, "duty_cycle")
+        self.assertEqual(self.fw.updates()[0]["state"], "installed")
+
     def test_radio_down(self) -> None:
         game = self.new_game()
         self.hello(game, 4, "0.2.0")

@@ -53,6 +53,8 @@ VARIANTS = ("box",)  # the Field Box's images ([firmware] variants: "box-bench" 
 REPORT_MAX = 512
 ACTIVE = ("sent", "installed")  # an update on its way
 UPDATE_FAILED = "node.update_failed"  # a box's failure said over LoRa (protocol/schema/events.yaml, id 52)
+OFFER_WINDOW_S = 30  # a radio's refusal (TX_ACK) this soon after the CMD update is taken as the offer's
+REFUSAL_REASON = {"duty_cycle": "radio_duty_cycle", "queue_full": "radio_queue_full"}  # any other: radio_failed
 REASON = re.compile(r"[a-z][a-z_]{0,23}")  # a result code: no_wifi, unreachable, busy...
 
 
@@ -329,9 +331,32 @@ class FirmwareUpdates:
         log.warning("box %d: firmware update to %s failed: %s (said over the radio)", node_id, a["version"], reason)
         self._emit()
 
+    def on_offer_refused(self, seq: Any, status: Any) -> None:
+        """The radio refused an offer after taking it (its TX_ACK: the duty cycle's budget spent, a full
+        queue, a transmission that never ended): the box never heard it, so the update fails now with that
+        reason instead of waiting out ``timeout_s`` as ``sent`` (decision PE24-133, as the phone does). The
+        packet's seq is 16 bits and wraps, so only an offer sent a moment ago is taken for the packet.
+        Nothing is resent: the GM offers again."""
+        if not isinstance(seq, int) or isinstance(seq, bool) or not isinstance(status, str):
+            return
+        with self._lock:
+            now = self.clock()
+            for a in self.attempts.values():
+                if a["state"] == "sent" and a["seq"] == seq and now - a["sent_at"] < OFFER_WINDOW_S:
+                    a.update(state="failed", reason=REFUSAL_REASON.get(status, "radio_failed"), updated_at=now)
+                    break
+            else:
+                return
+        log.warning("box %d: firmware update to %s failed: the radio refused the offer (%s)", a["node_id"],
+                    a["version"], status)
+        self._emit()
+
     def on_message(self, msg: dict[str, Any]) -> None:
         """A box's HELLO shows what it runs: the update's version (done) or, once it said installed,
         the old one (the new image did not confirm itself). A box's node.update_failed: failed."""
+        if msg.get("type") == "system" and msg.get("kind") == "tx.failed":
+            self.on_offer_refused(msg.get("seq"), msg.get("status"))
+            return
         if msg.get("type") == "event" and isinstance(msg.get("event"), dict) and \
                 msg["event"].get("type") == UPDATE_FAILED:
             self.on_failed_over_radio(msg["event"])
