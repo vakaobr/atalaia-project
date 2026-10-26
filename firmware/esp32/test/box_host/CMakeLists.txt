@@ -25,6 +25,9 @@ endif()
 
 # The core as the device builds it (mbedtls found above, so AES-CCM is real).
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+# The core's own default is off on macOS (Homebrew's mbedtls is not 2.28); this
+# program needs the real AES-CCM, so it asks (Linux's default is already ON).
+set(ATALAIA_MBEDTLS ON CACHE BOOL "" FORCE)
 add_subdirectory(${CORE_DIR} core)
 
 add_executable(box_host
@@ -67,5 +70,10 @@ target_link_libraries(box_host PRIVATE box_host_monocypher)
 target_include_directories(box_host PRIVATE ${MAIN_DIR} ${MAIN_DIR}/radio ${CORE_DIR}/src)
 target_link_libraries(box_host PRIVATE atalaia_core)
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(box_host PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    target_compile_options(box_host PRIVATE -Wall -Wextra -Wpedantic)
+    # Not an error on macOS: Apple's Clang is not a compiler CI builds with
+    # (as the core's ATALAIA_WERROR). Linux is unchanged.
+    if(NOT APPLE)
+        target_compile_options(box_host PRIVATE -Werror)
+    endif()
 endif()

@@ -84,13 +84,18 @@ Uint8List boxImage(String version, {int size = 4096}) {
 }
 
 void main() {
+  if (skipFileWithoutHosts(['ATALAIA_MODEM_HOST', 'ATALAIA_BOX_HOST'])) return;
   late AtalaiaCore core;
   setUpAll(() => core = AtalaiaCore.open(coreLibraryPath()));
 
   late Directory tmp;
   late AirHub hub;
   late HostModem host;
-  late List<HostBox> boxes;
+  // Set when setUp has made them all: a setUp that fails (a host program that
+  // does not start) must not make tearDown fail with a LateInitializationError
+  // on top of the real failure.
+  var up = false;
+  final boxes = <HostBox>[];
   ControllerEngine? engine;
   SerialModem? modem;
   SocketPodTransport? link;
@@ -150,10 +155,12 @@ void main() {
 
   setUp(() async {
     tmp = Directory.systemTemp.createTempSync('atalaia-boxes-e2e-');
+    up = false;
+    boxes.clear();
     hub = await AirHub.start();
     host = await HostModem.start(airPeer: hub.port);
     hub.members.add(host.airPort);
-    boxes = [];
+    up = true;
     persistGameKey = true;
   });
 
@@ -162,8 +169,10 @@ void main() {
     for (final b in boxes) {
       await b.kill();
     }
-    await host.stop();
-    hub.close();
+    if (up) {
+      await host.stop();
+      hub.close();
+    }
     tmp.deleteSync(recursive: true);
   });
 

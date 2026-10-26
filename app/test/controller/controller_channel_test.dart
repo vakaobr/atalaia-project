@@ -308,6 +308,7 @@ void main() {
 
   test(
     'a whole scan through the host pod (the pod firmware measuring)',
+    skip: hostSkip(['ATALAIA_POD_HOST']),
     () async {
       final hub = await AirHub.start();
       final pod = await HostPod.start(airPeer: hub.port);

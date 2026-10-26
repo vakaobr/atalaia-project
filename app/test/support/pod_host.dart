@@ -5,7 +5,9 @@
 /// programs the Dart tests drive (firmware/esp32/test/pod_host and
 /// modem_host, built by tools/docker_app.py and CI's flutter-test job;
 /// `$ATALAIA_POD_HOST` and `$ATALAIA_MODEM_HOST` name them). A missing
-/// program fails the tests that need it: nothing is skipped.
+/// program fails the tests that need it, except on a machine that has said it
+/// cannot have them (see [hostSkip]): a broken setup is never skipped on the
+/// Linux runs.
 ///
 /// The pod's USB link is a TCP socket carrying the raw frames; its
 /// Bluetooth link a socket where every message is a 2-byte length and one
@@ -20,6 +22,7 @@ import 'dart:typed_data';
 
 import 'package:atalaia_app/pod/pod_client.dart';
 import 'package:atalaia_app/pod/pod_codec.dart';
+import 'package:flutter_test/flutter_test.dart' show test;
 
 /// How long a test waits for a host program (the pod, the modem) to do what
 /// it was asked: a program that is working answers in milliseconds, but one
@@ -43,6 +46,40 @@ Future<void> eventually(
     }
     await Future<void>.delayed(const Duration(milliseconds: 10));
   }
+}
+
+bool _missing(String variable) {
+  final env = Platform.environment[variable];
+  return env == null || env.isEmpty || !File(env).existsSync();
+}
+
+/// Why the tests that need the host programs named by [variables] (their
+/// environment variables, `ATALAIA_POD_HOST`...) are skipped here, or null:
+/// run them. They are skipped only when one program is missing AND either
+/// `ATALAIA_ALLOW_MISSING_HOSTS=1` is set, or the machine is not Linux and
+/// that variable is unset (a Mac or a Windows PC that has not built them:
+/// firmware/esp32/test/*_host, app/README.md, "Tests on a Mac").
+/// `ATALAIA_ALLOW_MISSING_HOSTS=0` never skips; app/tool/check.sh sets it, so
+/// `python tools/docker_app.py` and CI's flutter-test fail on a missing
+/// program, as does any Linux run without the opt-in.
+String? hostSkip(Iterable<String> variables) {
+  final missing = variables.where(_missing).toList();
+  if (missing.isEmpty) return null;
+  final allow = Platform.environment['ATALAIA_ALLOW_MISSING_HOSTS'];
+  if (allow == '0') return null;
+  if (allow != '1' && Platform.isLinux) return null;
+  return '${missing.map((v) => '\$$v').join(', ')} not set to a built host '
+      'program (firmware/esp32/test/*_host; app/README.md, "Tests on a Mac")';
+}
+
+/// For a file whose every test needs the host programs [variables]: when they
+/// are to be skipped ([hostSkip]), registers one skipped test saying why and
+/// returns true, and `main` returns; else false. Call it first in `main`.
+bool skipFileWithoutHosts(Iterable<String> variables) {
+  final reason = hostSkip(variables);
+  if (reason == null) return false;
+  test('needs the firmware host programs', () {}, skip: reason);
+  return true;
 }
 
 String _program(String variable) {

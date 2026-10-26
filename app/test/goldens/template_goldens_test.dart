@@ -8,6 +8,9 @@
 // references in layout and colour, not pixel for pixel (Roboto here,
 // Montserrat on the box; Material icons here, LVGL symbols there).
 
+@Tags(['golden'])
+library;
+
 import 'dart:convert';
 
 import 'package:atalaia_app/modes/mode_catalog.dart';

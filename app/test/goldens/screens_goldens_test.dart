@@ -7,6 +7,9 @@
 // phase 4 plan phase 8), the marshal's chrono with a
 // PASS, and the settings. Drawn with Roboto, as on Android.
 
+@Tags(['golden'])
+library;
+
 import 'dart:io';
 
 import 'package:atalaia_app/chrono/chrono_ui.dart';

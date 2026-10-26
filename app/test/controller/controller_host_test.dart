@@ -343,27 +343,32 @@ void main() {
     expect(gm.length, greaterThan(20));
   });
 
-  test('an I/O pod as the radio, through the relay', () async {
-    final hub = await AirHub.start();
-    addTearDown(hub.close);
-    final pod = await HostPod.start(airPeer: hub.port);
-    addTearDown(pod.stop);
-    hub.members.add(pod.airPort);
-    final link = await SocketPodTransport.usb(pod);
-    // The relay as the controller's isolate has it: the UI isolate's link
-    // on the other side.
-    late RelayPodTransport relay;
-    relay = RelayPodTransport('relay', (b) => unawaited(link.send(b)));
-    link.incoming.listen(relay.receive, onDone: () => relay.linkClosed());
-    final h = await start(boot(pod: true), pod: relay);
-    expect(await waitFor(() => h.status()['radio'] == 'up'), isTrue);
-    expect(h.status()['pod'], isTrue);
-    await link.close();
-    expect(await waitFor(() => h.status()['radio'] == 'down'), isTrue);
-  });
+  test(
+    'an I/O pod as the radio, through the relay',
+    skip: hostSkip(['ATALAIA_POD_HOST']),
+    () async {
+      final hub = await AirHub.start();
+      addTearDown(hub.close);
+      final pod = await HostPod.start(airPeer: hub.port);
+      addTearDown(pod.stop);
+      hub.members.add(pod.airPort);
+      final link = await SocketPodTransport.usb(pod);
+      // The relay as the controller's isolate has it: the UI isolate's link
+      // on the other side.
+      late RelayPodTransport relay;
+      relay = RelayPodTransport('relay', (b) => unawaited(link.send(b)));
+      link.incoming.listen(relay.receive, onDone: () => relay.linkClosed());
+      final h = await start(boot(pod: true), pod: relay);
+      expect(await waitFor(() => h.status()['radio'] == 'up'), isTrue);
+      expect(h.status()['pod'], isTrue);
+      await link.close();
+      expect(await waitFor(() => h.status()['radio'] == 'down'), isTrue);
+    },
+  );
 
   test(
     'a USB radio modem as the radio, through the relay (slice S7c)',
+    skip: hostSkip(['ATALAIA_MODEM_HOST']),
     () async {
       final hub = await AirHub.start();
       addTearDown(hub.close);

@@ -212,6 +212,7 @@ List<String> _tail(List<String> lines) =>
     lines.length > 12 ? lines.sublist(lines.length - 12) : lines;
 
 void main() {
+  if (skipFileWithoutHosts(['ATALAIA_POD_HOST', 'ATALAIA_MODEM_HOST'])) return;
   setUpAll(() => core = AtalaiaCore.open(coreLibraryPath()));
 
   setUp(() async {

@@ -81,6 +81,9 @@ need_core_libs() {
         fi
         echo "$var=$path"
     done
+    # A missing host program fails the tests that need it here (Docker and CI): the Dart
+    # tests skip them only on a machine that opted in, e.g. a Mac (test/support/pod_host.dart).
+    export ATALAIA_ALLOW_MISSING_HOSTS=0
 }
 
 # The NDK and CMake from the Android SDK manager, at the pinned versions

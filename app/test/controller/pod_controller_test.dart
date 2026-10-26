@@ -42,13 +42,16 @@ Future<bool> waitFor(
 }
 
 void main() {
+  if (skipFileWithoutHosts(['ATALAIA_POD_HOST', 'ATALAIA_BOX_HOST'])) return;
   late AtalaiaCore core;
   setUpAll(() => core = AtalaiaCore.open(coreLibraryPath()));
 
   late Directory tmp;
   late AirHub hub;
   late HostPod pod;
-  late List<HostBox> boxes;
+  final boxes = <HostBox>[];
+  // Set when setUp has made the hub and the pod (see boxes_e2e_test.dart).
+  var up = false;
   ControllerEngine? engine;
   PodClient? client;
   Timer? ticker;
@@ -93,10 +96,12 @@ void main() {
 
   setUp(() async {
     tmp = Directory.systemTemp.createTempSync('atalaia-pod-ctrl-');
+    up = false;
+    boxes.clear();
     hub = await AirHub.start();
     pod = await HostPod.start(airPeer: hub.port);
     hub.members.add(pod.airPort);
-    boxes = [];
+    up = true;
   });
 
   tearDown(() async {
@@ -104,8 +109,10 @@ void main() {
     for (final b in boxes) {
       await b.kill();
     }
-    await pod.stop();
-    hub.close();
+    if (up) {
+      await pod.stop();
+      hub.close();
+    }
     tmp.deleteSync(recursive: true);
   });
 

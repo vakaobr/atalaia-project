@@ -5,6 +5,9 @@
 // Portuguese and English on a 360x780 phone: the login at a site, the
 // field's games, the registration form with replicas, the kept ticket.
 
+@Tags(['golden'])
+library;
+
 import 'package:atalaia_app/checkin/my_replicas.dart';
 import 'package:atalaia_app/l10n/strings.dart';
 import 'package:atalaia_app/site/site_api.dart';

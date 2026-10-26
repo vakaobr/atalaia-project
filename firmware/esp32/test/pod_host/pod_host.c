@@ -71,6 +71,11 @@
 #include "radio/noise_stats.h"
 #include "radio/radio_limits.h"
 
+/* macOS has no MSG_NOSIGNAL; SIGPIPE is ignored in main() either way. */
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
+
 static void out(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 
 static void out(const char *fmt, ...)

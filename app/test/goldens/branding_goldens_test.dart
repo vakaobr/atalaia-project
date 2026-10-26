@@ -10,6 +10,9 @@
 // buttons). The default look without branding is the other golden files,
 // which this feature must leave unchanged.
 
+@Tags(['golden'])
+library;
+
 import 'dart:typed_data';
 
 import 'package:atalaia_app/core/node_types.dart';

@@ -57,5 +57,10 @@ target_include_directories(pod_host PRIVATE
 target_compile_definitions(pod_host PRIVATE ATALAIA_HAVE_MBEDTLS)
 target_link_libraries(pod_host PRIVATE ${MBEDCRYPTO_LIB})
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(pod_host PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    target_compile_options(pod_host PRIVATE -Wall -Wextra -Wpedantic)
+    # Not an error on macOS: Apple's Clang is not a compiler CI builds with
+    # (as the core's ATALAIA_WERROR). Linux is unchanged.
+    if(NOT APPLE)
+        target_compile_options(pod_host PRIVATE -Werror)
+    endif()
 endif()

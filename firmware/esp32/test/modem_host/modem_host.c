@@ -50,6 +50,11 @@
 #include "radio/noise_stats.h"
 #include "radio/radio_limits.h"
 
+/* macOS has no MSG_NOSIGNAL; SIGPIPE is ignored in main() either way. */
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
+
 #define PENDING_MAX 32
 
 static int serial_listen = -1;

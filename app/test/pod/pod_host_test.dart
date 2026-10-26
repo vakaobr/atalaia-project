@@ -41,6 +41,7 @@ Future<ProxyMessage> next(PodClient c, {String? capId, String? name}) async {
 }
 
 void main() {
+  if (skipFileWithoutHosts(['ATALAIA_POD_HOST'])) return;
   late HostPod pod;
 
   setUp(() async => pod = await HostPod.start());

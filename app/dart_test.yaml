@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# `golden`: the tests in test/goldens/, which compare pixels with the images
+# drawn on Linux in ghcr.io/cirruslabs/flutter:3.44.0 (tools/docker_app.py
+# goldens). Another platform renders the fonts differently, so a Mac runs
+# `flutter test --exclude-tags golden`. Nothing excludes them by default:
+# `flutter test`, tools/docker_app.py and CI's flutter-test run them.
+tags:
+  golden:

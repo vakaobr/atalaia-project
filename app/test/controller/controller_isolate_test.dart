@@ -80,21 +80,25 @@ void main() {
     },
   );
 
-  test('an I/O pod linked on the UI isolate is its radio', () async {
-    final hub = await AirHub.start();
-    addTearDown(hub.close);
-    final pod = await HostPod.start(airPeer: hub.port);
-    addTearDown(pod.stop);
-    hub.members.add(pod.airPort);
-    final link = await SocketPodTransport.usb(pod);
-    final run = await ControllerIsolate.spawn(boot(pod: true), pod: link);
-    addTearDown(run.stop);
-    expect(run.status.pod, isTrue);
-    final up = await run.changes
-        .firstWhere((s) => s.radio == 'up')
-        .timeout(const Duration(seconds: 8));
-    expect(up.radio, 'up');
-  });
+  test(
+    'an I/O pod linked on the UI isolate is its radio',
+    skip: hostSkip(['ATALAIA_POD_HOST']),
+    () async {
+      final hub = await AirHub.start();
+      addTearDown(hub.close);
+      final pod = await HostPod.start(airPeer: hub.port);
+      addTearDown(pod.stop);
+      hub.members.add(pod.airPort);
+      final link = await SocketPodTransport.usb(pod);
+      final run = await ControllerIsolate.spawn(boot(pod: true), pod: link);
+      addTearDown(run.stop);
+      expect(run.status.pod, isTrue);
+      final up = await run.changes
+          .firstWhere((s) => s.radio == 'up')
+          .timeout(const Duration(seconds: 8));
+      expect(up.radio, 'up');
+    },
+  );
 
   test('a start that cannot work says why', () async {
     await expectLater(

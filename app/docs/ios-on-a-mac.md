@@ -435,8 +435,31 @@ is built and installed like `flutter run`, with the same bundle id), or with a
 simulator's id from `flutter devices`:
 
 ```sh
-flutter test integration_test/ios_checklist_test.dart -d <udid> --reporter expanded
+flutter test integration_test/ios_checklist_test.dart -d <udid> --reporter expanded --no-uninstall
 ```
+
+**Use `--no-uninstall` on an iPhone.** `flutter test` uninstalls the app when a
+run ends (`--uninstall` is on by default), so every run would be a fresh install
+that has lost what the phone remembers per app: the Local Network permission
+(its prompt then appears in the middle of the test, where nobody answers it, and
+the feed never opens) and the Location permission, and possibly the developer
+trust. So: install and open the app once (`flutter run`, or one run of the test),
+allow **Local Network** and **Location** by hand (the prompts, or Settings >
+Atalaia), and from then on run the tests with `--no-uninstall`, which keeps the
+installed app and its permissions. If iOS asks again to trust the developer
+(Settings > General > VPN & Device Management), trust it again, as in step 9.
+
+**The app left on the iPhone afterwards is the debug test build.** On iOS 14 and
+later a debug build started without a debugger shows the splash and exits. For
+normal use, reinstall the release build: `flutter build ios --release` then
+`xcrun devicectl device install app --device <udid> build/ios/iphoneos/Runner.app`
+(or `flutter run --release -d <udid>`).
+
+**Location needs a field check-in first.** The position-sharing switch appears
+only after a field check-in (Participante > Check-in with the poster), not after
+a read-token join, and Settings > Atalaia > Location exists only once the app
+has asked for it. So checklist item 8 needs that check-in first, and "allow
+Location once by hand" above means after it.
 
 To follow a real field controller as well, give its address and its tokens (the
 controller's *read* token and, for the marshal list, the GM token; the real
@@ -446,13 +469,15 @@ values never go in a file that is committed or in a shared note):
 flutter test integration_test/ios_checklist_test.dart -d <udid> --reporter expanded \
   --dart-define=ATALAIA_TEST_CONTROLLER=http://192.168.1.183:8080 \
   --dart-define=ATALAIA_TEST_READ_TOKEN=<read token> \
-  --dart-define=ATALAIA_TEST_GM_TOKEN=<GM token>
+  --dart-define=ATALAIA_TEST_GM_TOKEN=<GM token> \
+  --no-uninstall
 ```
 
 `--dart-define=ATALAIA_TEST_GAME=<game id>` picks the game the test player
 checks in to when the controller lists several (the first one is used
 otherwise). The first time the app talks to the controller, iOS shows the Local
-Network prompt on the phone: answer **Allow** (the player test waits 30 s for
+Network prompt on the phone (see `--no-uninstall` above: allow it once by hand,
+before the test, so that it does not appear mid-run): answer **Allow** (the player test waits 30 s for
 the feed, so there is time; after a "Don't Allow" it fails with the feed never
 opening, and Settings > Atalaia > Local Network is where to turn it on). Keep
 the phone unlocked, as for `flutter run`; tests run as a debug build, which is

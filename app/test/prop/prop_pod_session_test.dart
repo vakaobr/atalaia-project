@@ -53,6 +53,7 @@ Future<void> until(bool Function() ok, {int ms = 5000}) async {
 }
 
 void main() {
+  if (skipFileWithoutHosts(['ATALAIA_POD_HOST', 'ATALAIA_MODEM_HOST'])) return;
   late AtalaiaCore core;
   late AirHub hub;
   late HostModem modem;
