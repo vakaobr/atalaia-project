@@ -105,6 +105,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 
 import '../modes/mode_catalog.dart';
+import '../version.dart';
 import 'controller_branding.dart';
 import 'controller_channel.dart';
 import 'controller_checkin.dart';
@@ -131,8 +132,8 @@ part 'controller_boxes_api.dart';
 
 part 'controller_field_api.dart';
 
-/// The app's version (pubspec.yaml), which /healthz and /whoami give.
-const controllerApiVersion = '0.2.0';
+/// The app's version (lib/version.dart), which /healthz and /whoami give.
+const controllerApiVersion = appVersion;
 
 /// The GM console's areas this controller serves, in /whoami's `features`
 /// (decision PE24-70): the console hides the tabs and panels of the rest.

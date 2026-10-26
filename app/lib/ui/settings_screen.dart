@@ -17,10 +17,8 @@ import '../l10n/strings.dart';
 import '../platform/platform_check.dart';
 import '../prop/battery_guide.dart';
 import '../storage/app_store.dart';
+import '../version.dart';
 import 'widgets.dart';
-
-/// The app's version (pubspec.yaml).
-const appVersion = '0.2.0';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});

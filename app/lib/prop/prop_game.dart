@@ -32,6 +32,7 @@ import '../radio/pod_radio_link.dart';
 import '../ui/template/template_view.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import '../version.dart';
 import 'capability_mapper.dart';
 import 'game_timer.dart';
 import 'prop_session.dart';
@@ -136,7 +137,7 @@ class _PropGameScreenState extends State<PropGameScreen> {
       urls: urls,
       hello: {
         'node_name': 'phone-${j.nodeId}',
-        'fw_version': 'app-0.3.0',
+        'fw_version': 'app-$appVersion',
         'core_version': services.runner.coreVersion ?? '',
         'tier': 0,
         'capabilities': const <int>[],
@@ -163,7 +164,7 @@ class _PropGameScreenState extends State<PropGameScreen> {
       encodeEvent: encode,
       hello: {
         'node_name': 'phone-${j.nodeId}',
-        'fw_version': 'app-0.3.0',
+        'fw_version': 'app-$appVersion',
         'core_version': services.runner.coreVersion ?? '',
         'tier': 0,
         'capabilities': const <int>[],

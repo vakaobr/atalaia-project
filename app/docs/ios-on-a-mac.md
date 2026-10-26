@@ -9,8 +9,10 @@ A step-by-step guide for the first tests (decisions iOS-1 to iOS-12 in
 [docs/review/decisions-to-review.md](../../docs/review/decisions-to-review.md)).
 The project in [`ios/`](../ios/) was generated and edited on Linux with the
 pinned Flutter; it was first built on a Mac on 2026-10-26 (Xcode 27.1, macOS
-27.0, Apple silicon: `flutter build ios --release --no-codesign`), and CI's
-`ios-build` job compiles it on a Mac runner. It has not run on an iPhone yet. If a step differs on your machine, the
+27.0, Apple silicon: `flutter build ios --release --no-codesign`) and the same
+day installed and opened on an iPhone 15 Pro Max (iOS 27.2 beta, Xcode 27.2,
+free Personal Team), where checks 1 to 4 below passed; CI's `ios-build` job
+compiles it on a Mac runner. If a step differs on your machine, the
 troubleshooting list at the end is where to look first, and please write down
 what you found.
 
@@ -178,14 +180,37 @@ day 6 before a field test.
 ## Troubleshooting
 
 - **"Untrusted Developer" / the app closes at once**: trust the certificate
-  (above). Also check Developer Mode is on.
+  (above). Also check Developer Mode is on. On the first `flutter run` this is
+  expected: the app is installed but iOS refuses to open it ("invalid code
+  signature, inadequate entitlements or its profile has not been explicitly
+  trusted by the user"), and `flutter run` only says "Could not run
+  build/ios/iphoneos/Runner.app ... Error running application". Trust the
+  certificate (Settings > General > VPN & Device Management) and open the app,
+  or run again.
+- **No Developer Mode switch on the iPhone**: it appears only after Xcode has
+  tried to run something on the phone once: pick the iPhone as the run
+  destination in Xcode's toolbar and press Run (Xcode 27 has no Window >
+  Devices and Simulators any more).
 - **"Failed to register bundle identifier"**, "No profiles for ... were found":
   the bundle id belongs to another team; add a suffix (step 7).
 - **"Communication with Apple failed" / "no devices"**: Xcode > Settings >
   Accounts > Download Manual Profiles; reconnect the cable; unlock the phone.
-- **"Failed to prepare device for development"** or the phone's iOS is newer
-  than Xcode knows: update Xcode (App Store); Xcode > Window > Devices and
-  Simulators shows what is missing.
+- **"Failed to prepare device for development"**, "connected (no DDI)", or
+  the phone's iOS is newer than Xcode knows: update Xcode (App Store; a beta iOS
+  may need the matching Xcode beta: iOS 27.2 needed Xcode 27.2), then select the
+  iPhone as the run destination and press Run once.
+- **`flutter build ios --simulator` fails with "Binary ... Flutter.framework/Flutter
+  does not contain architectures "arm64 x86_64""** (Xcode 27.2, Flutter
+  3.44.0): Flutter's tooling runs `lipo <binary> -verify_arch arm64 x86_64`,
+  which Xcode 27.2's `lipo` refuses ("-verify_arch requires exactly one input
+  file") although the framework has both. Not the app's fault; builds for an
+  iPhone are not affected. Use `flutter run -d <simulator id>`, which builds
+  only the Mac's own architecture.
+- **`git status` shows `ios/Runner.xcodeproj/project.pbxproj` and
+  `Runner.xcscheme` changed** after the first build: Xcode 27 upgrades the
+  project's format ("Updating project for Xcode compatibility") and writes your
+  team (`DEVELOPMENT_TEAM`). Do not commit your team; `git checkout -- ios/`
+  before pulling.
 - **`errSecInternalComponent` or "CodeSign failed"** from the terminal: unlock
   the login keychain (`security unlock-keychain ~/Library/Keychains/login.keychain-db`)
   or build once from Xcode and Allow.
