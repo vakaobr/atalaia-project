@@ -78,6 +78,11 @@ typedef struct {
      * mode_fetch.h): the shell fetches them for join (on its own task on the ESP32) and then
      * calls box_game_fetch_done on the game's task. NULL: the box answers "no mode" as before. */
     void (*fetch_modes)(void *user, const atalaia_join_t *join);
+    /* The field test's radio report (radio/radio_stats.h, decision SL-18): the duty-cycle budget
+     * left (ms), and one JSON line for the serial log under the tag RADIO_STATS_TAG. Read-only,
+     * both may be NULL (no line is made without radio_stats). */
+    uint32_t (*duty_remaining_ms)(void *user);
+    void (*radio_stats)(void *user, const char *json_line);
     void *user;
 } box_shell_ops_t;
 
@@ -199,6 +204,8 @@ typedef struct {
     uint8_t battery_low_pct;  /* battery.low below this level; 0 = never */
     bool battery_low;         /* battery.low sent for this crossing (until the level is back up) */
     uint32_t battery_next_ms; /* next gauge reading */
+    bool stats_on;            /* the radio report's clock runs (a game is on this box) */
+    uint32_t stats_last_ms;   /* when the last report line was made */
     box_lobby_t lobby;        /* between games: field frames (box_lobby.c) */
     bool has_picker;          /* the shell has the game picker: "ready" says a key brings it */
     /* Fetching mode packages (BOX_FETCHING, mode_fetch.h): the join payload taken, joined once

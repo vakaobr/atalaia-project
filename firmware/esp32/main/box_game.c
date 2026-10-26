@@ -15,6 +15,7 @@
 #include "mode_store.h"
 #include "screen_json.h"
 #include "screen_types.h"
+#include "radio/radio_stats.h"
 #include "state_persist.h"
 
 static void say(box_game_t *g, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
@@ -28,6 +29,36 @@ static void say(box_game_t *g, const char *fmt, ...)
     vsnprintf(line, sizeof(line), fmt, ap);
     va_end(ap);
     g->shell.log(g->shell.user, line);
+}
+
+/* The radio report line (radio_stats.h): read-only, a stack buffer, nothing sent. */
+static void radio_report(box_game_t *g, bool final)
+{
+    if (g->shell.radio_stats == NULL) return;
+    const field_link_stats_t *s = &g->link.stats;
+    radio_stats_box_t r = {.sent = s->events_sent,
+                           .retries = s->retries,
+                           .acked = s->acked,
+                           .expired = s->expired,
+                           .relayed = s->relayed,
+                           .relay_skipped = s->relay_skipped,
+                           .relay_cancelled = s->relay_cancelled,
+                           .relay_no_slot = s->relay_no_slot,
+                           .dup = s->rx_duplicates,
+                           .tx_refused = s->tx_refused,
+                           .rx = s->rx_ok,
+                           .rx_rejected = s->rx_rejected,
+                           .states = s->states_sent,
+                           .hellos = s->hellos_sent,
+                           .neighbours = atalaia_relay_neighbours(&g->link.relay, g->now_ms)};
+    uint32_t duty = g->shell.duty_remaining_ms != NULL ? g->shell.duty_remaining_ms(g->shell.user)
+                                                       : RADIO_STATS_DUTY_UNKNOWN;
+    char line[RADIO_STATS_LINE_MAX];
+    if (radio_stats_box_line(line, sizeof(line), g->now_ms / 1000u, g->join.game_id,
+                             g->join.node_id, &r, duty, final) > 0) {
+        g->shell.radio_stats(g->shell.user, line);
+    }
+    g->stats_last_ms = g->now_ms;
 }
 
 static void show(box_game_t *g, const char *tmpl, const char *json)
@@ -173,6 +204,8 @@ static void end_game(box_game_t *g)
     state_persist_clear();
     field_link_state_now(&g->link);
     say(g, "game %u ended", g->join.game_id);
+    if (g->stats_on) radio_report(g, true);
+    g->stats_on = false;
     /* Free for the next game: announce soon, "ready for the next game" later (box_lobby.c). */
     box_lobby_game_over(g, g->now_ms);
 }
@@ -804,6 +837,14 @@ void box_game_tick(box_game_t *g, uint32_t raw_delta_ms, uint32_t now_ms)
         node_runner_tick(g->runner, field_link_adjust_delta(&g->link, raw_delta_ms));
     }
     field_link_tick(&g->link, now_ms);
+    if (g->phase != BOX_ENDED) {
+        if (!g->stats_on) {
+            g->stats_on = true;
+            g->stats_last_ms = now_ms;
+        } else if (now_ms - g->stats_last_ms >= RADIO_STATS_PERIOD_MS) {
+            radio_report(g, false);
+        }
+    }
     check_battery(g, now_ms);
     if (g->phase == BOX_ENDED &&
         (field_link_pending(&g->link) == 0 || now_ms - g->ended_ms >= BOX_END_LINGER_MS)) {

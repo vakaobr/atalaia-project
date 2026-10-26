@@ -161,6 +161,7 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/radio/field_link.c
     ${SHELL_DIR}/radio/radio_limits.c
     ${SHELL_DIR}/radio/noise_stats.c
+    ${SHELL_DIR}/radio/radio_stats.c
     ${SHELL_DIR}/box_game.c
     ${SHELL_DIR}/box_lobby.c
     ${SHELL_DIR}/serial_console.c
@@ -214,6 +215,7 @@ set(TEST_SOURCES
     test_radio_protocol.c
     test_radio_power.c
     test_radio_limits.c
+    test_radio_stats.c
     test_modem_framing.c
     test_modem.c
     test_field_link.c

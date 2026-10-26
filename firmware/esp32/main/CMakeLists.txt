@@ -28,6 +28,7 @@ if(CONFIG_ATALAIA_MODEM_MODE)
         "radio/radio_protocol.c"
         "radio/radio_limits.c"
         "radio/noise_stats.c"
+        "radio/radio_stats.c"
     )
     set(ATALAIA_EMBED)
 elseif(CONFIG_ATALAIA_POD_MODE)
@@ -59,6 +60,7 @@ elseif(CONFIG_ATALAIA_POD_MODE)
         "radio/radio_protocol.c"
         "radio/radio_limits.c"
         "radio/noise_stats.c"
+        "radio/radio_stats.c"
     )
     if(CONFIG_ATALAIA_POD_BLE)
         list(APPEND ATALAIA_SRCS "pod/pod_ble_nimble.c")
@@ -111,6 +113,7 @@ else()
         "radio/radio_nvs_esp.c"
         "radio/radio_limits.c"
         "radio/noise_stats.c"
+        "radio/radio_stats.c"
         "radio/field_link.c"
         "box_game.c"
         "box_lobby.c"

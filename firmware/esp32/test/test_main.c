@@ -39,6 +39,7 @@ int main(void)
     run_radio_protocol_tests();
     run_radio_power_tests();
     run_radio_limits_tests();
+    run_radio_stats_tests();
     run_modem_framing_tests();
     run_modem_tests();
     run_field_link_tests();

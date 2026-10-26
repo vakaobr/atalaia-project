@@ -28,6 +28,7 @@
 #include "freertos/task.h"
 #include "atalaia/duty_cycle.h"
 #include "modem.h"
+#include "radio/radio_stats.h"
 #include "radio/radio_task.h"
 #include "sdkconfig.h"
 
@@ -177,6 +178,29 @@ static modem_tx_status_t map_status(radio_tx_status_t status)
     }
 }
 
+/* The radio report (radio/radio_stats.h, decision SL-18), once a minute while a game is
+ * configured. It goes to the log console (UART0 only: the USB link carries frames, never logs;
+ * protocol/usb-modem.md STATUS carries the same counters for the controller). Read-only. */
+static void log_radio_stats(uint32_t t_ms)
+{
+    if (!modem.configured) return;
+    const modem_counters_t *c = &modem.count;
+    radio_stats_modem_t s = {.rx_ok = c->rx_ok,
+                             .rx_dropped = c->rx_dropped,
+                             .rx_auth_fail = c->rx_auth_fail,
+                             .rx_dupes = c->rx_dupes,
+                             .tx_ok = c->tx_ok,
+                             .tx_fail = c->tx_fail,
+                             .field_rx = c->field_rx,
+                             .field_tx = c->field_tx};
+    char line[RADIO_STATS_LINE_MAX];
+    if (radio_stats_modem_line(line, sizeof(line), t_ms / 1000u, modem.game_id, modem.node_id, &s,
+                               modem.radio_present ? radio_task_duty_remaining_ms()
+                                                   : RADIO_STATS_DUTY_UNKNOWN) > 0) {
+        ESP_LOGI(RADIO_STATS_TAG, "%s", line);
+    }
+}
+
 static void modem_loop(void *arg)
 {
     (void)arg;
@@ -187,9 +211,14 @@ static void modem_loop(void *arg)
 
     uint8_t buf[256];
     uint32_t last_publish = io_now_ms(NULL);
+    uint32_t last_stats = last_publish;
     for (;;) {
         esp_task_wdt_reset();
         uint32_t t = io_now_ms(NULL);
+        if (t - last_stats >= RADIO_STATS_PERIOD_MS) {
+            last_stats = t;
+            log_radio_stats(t);
+        }
         if (t - last_publish >= SCREEN_PUBLISH_MS) {
             publish_screen_state();
             last_publish = t;

@@ -258,7 +258,8 @@ FIELD_ACK: it never holds the field join key), and
 keeps the game key in RAM only; it has no
 Lua, game screens or presets (~480 KB image, ~190 KB of it LVGL and the
 fonts for its own OLED). The log console stays on UART0
-only, so it never mixes with the frames, and the task watchdog reboots a
+only, so it never mixes with the frames (the modem's `radio_stats` line, once a minute while a game
+is configured, `"role":"modem"` with its rx/tx counters and duty budget, is on it too: decision SL-18), and the task watchdog reboots a
 hung modem. `CONFIG_ATALAIA_MODEM_LINK_UART0` switches the link to UART0
 for boards with a USB-UART bridge.
 
@@ -776,6 +777,18 @@ controller's game.
 - **After a reboot** -- the stored join brings the box back: a new epoch
   (that game's last + 1), HELLO, the saved game state, `node.rebooted`, and
   the unacknowledged events from the flash log.
+- **The radio report** -- (decision SL-18) while a game is on the box, once a minute and once
+  more when it ends, one JSON line on the serial port (USB-C, 115200 baud) under the log tag
+  `radio_stats`: `I (123456) radio_stats: {"t_s":120,"game":4243,"node":7,"sent":9,"retries":31,
+  "acked":2,"expired":1,"relayed":140,"relay_skipped":12,"relay_cancelled":3,"relay_no_slot":4,
+  "dup":77,"tx_refused":5,"duty_remaining_ms":359900,"neighbours":4,"rx":..,"rx_rejected":..,
+  "states":..,"hellos":..,"final":0}` (one line; counters cumulative since the join; `final` 1 on the
+  game's last line; `duty_remaining_ms` -1 if unknown). `main/radio/radio_stats.[ch]` makes it from
+  `field_link_stats_t` and `radio_task_duty_remaining_ms()` in a 512-byte stack buffer, called from
+  `box_game_tick` and `end_game`: it reads, it never changes what the radio does
+  (`test/test_radio_stats.c` pins the format, `test/test_box_game.c` the timing).
+  `tools/bench_radio_log.py` reads the lines; the runbook is
+  [docs/runbooks/radio-field-test.md](../../docs/runbooks/radio-field-test.md).
 - **Screens through a game** -- (decisions BN-6, BN-10 to BN-14) a free
   adopted box shows "Ready / next game" from boot (a key brings the game
   picker); joined or invited, "Waiting: the game hasn't started"; at the start

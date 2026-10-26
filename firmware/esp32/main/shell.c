@@ -47,6 +47,7 @@
 #include "screen_template.h"
 #include "state_persist.h"
 #include "radio/event_log.h"
+#include "radio/radio_stats.h"
 #include "radio/radio_task.h"
 #include "serial_console.h"
 #include "wifi_setup.h"
@@ -459,6 +460,19 @@ static void box_log(void *user, const char *line)
     ESP_LOGI(TAG, "field: %s", line);
 }
 
+/* The radio report (radio/radio_stats.h, decision SL-18): one JSON line a minute, read-only. */
+static uint32_t box_duty_remaining(void *user)
+{
+    (void)user;
+    return radio_task_duty_remaining_ms();
+}
+
+static void box_radio_stats(void *user, const char *line)
+{
+    (void)user;
+    ESP_LOGI(RADIO_STATS_TAG, "%s", line);
+}
+
 static void box_reboot(void *user)
 {
     (void)user;
@@ -734,6 +748,8 @@ static void box_start(const char *tier)
                            /* A join may fetch missing modes only with a mode key built in. */
                            .fetch_modes = mode_fetch_esp_key_count() > 0 ? box_fetch_modes : NULL,
                            .random = box_random,
+                           .duty_remaining_ms = box_duty_remaining,
+                           .radio_stats = box_radio_stats,
                            .user = NULL};
     box_game_init(&box, &runner, &game_preset, nvs ? atalaia_box_store_esp() : &no_store, &ops,
                   &atalaia_crypto_mbedtls, nvs, &game_log, &hello);

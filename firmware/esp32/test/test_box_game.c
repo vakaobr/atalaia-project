@@ -22,6 +22,7 @@
 #include "check.h"
 #include "epoch_store_fake.h"
 #include "oled_view.h"
+#include "radio/radio_stats.h"
 #include "hal/stub/hal_stub.h"
 #include "mode_fetch.h"
 #include "mode_store.h"
@@ -164,7 +165,21 @@ typedef struct {
     char screen_data[256];
     char history[512]; /* every shell screen's template, "a;b;" */
     uint32_t channel;
+    char stats[8][RADIO_STATS_LINE_MAX]; /* the radio report's lines (decision SL-18) */
+    int stats_count;
 } shell_t;
+
+static uint32_t sh_duty(void *user)
+{
+    (void)user;
+    return 123456u;
+}
+static void sh_stats(void *user, const char *line)
+{
+    shell_t *s = (shell_t *)user;
+    if (s->stats_count < 8) snprintf(s->stats[s->stats_count], RADIO_STATS_LINE_MAX, "%s", line);
+    s->stats_count++;
+}
 
 static bool sh_send(void *user, const uint8_t *p, size_t n)
 {
@@ -257,6 +272,8 @@ static void fixture(bool keep_flash)
                           .set_channel = sh_channel,
                           .battery_pct = NULL,
                           .radio_send = sh_send,
+                          .duty_remaining_ms = sh_duty,
+                          .radio_stats = sh_stats,
                           .user = &shell};
     atalaia_hello_t hello;
     memset(&hello, 0, sizeof(hello));
@@ -1143,6 +1160,38 @@ static void test_screens_follow_the_game(void)
     CHECK(strcmp(shell.history, "waiting;playing;ready;") == 0);
 }
 
+/* The radio report (decision SL-18): one line a minute while a game is on the box and one when
+ * it ends, each a JSON object on one line; nothing else is sent because of it. */
+static void test_radio_report(void)
+{
+    fixture(false);
+    CHECK(box_game_set_join_key_hex(&game, JOIN_KEY_HEX));
+    atalaia_join_t j;
+    make_join(&j);
+    uint8_t buf[ATALAIA_JOIN_MAX];
+    size_t n = encode(&j, JOIN_KEY, buf);
+    CHECK(box_game_join(&game, buf, n) == BOX_JOIN_OK);
+    uint32_t now = 100;
+    run_ms(&now, 100);
+    cmd(FIELD_CMD_START);
+    CHECK(shell.stats_count == 0);
+    run_ms(&now, 59000);
+    CHECK(shell.stats_count == 0); /* not yet a minute */
+    run_ms(&now, 2000);
+    CHECK(shell.stats_count == 1);
+    CHECK(strstr(shell.stats[0], "\"game\":3054,\"node\":12,") != NULL);
+    CHECK(strstr(shell.stats[0], "\"duty_remaining_ms\":123456,") != NULL);
+    CHECK(strstr(shell.stats[0], "\"final\":0}") != NULL);
+    CHECK(strchr(shell.stats[0], '\n') == NULL);
+    run_ms(&now, 60000);
+    CHECK(shell.stats_count == 2);
+    cmd_now(FIELD_CMD_END);
+    CHECK(game.phase == BOX_ENDED);
+    CHECK(shell.stats_count == 3 && strstr(shell.stats[2], "\"final\":1}") != NULL);
+    run_ms(&now, 200000); /* the box leaves the game: no more lines */
+    CHECK(shell.stats_count == 3);
+}
+
 /* The game's language (join key 15) for the box's screens, kept between games and across a
  * reboot; a join without one gives English back (decision BN-14). */
 static void test_screen_language(void)
@@ -1925,6 +1974,7 @@ void run_box_game_tests(void)
     test_join_refusals();
     test_join_with_a_modifier();
     test_join_play_end();
+    test_radio_report();
     test_end_without_acks();
     test_resume_after_reboot();
     test_screens_follow_the_game();

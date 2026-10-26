@@ -43,6 +43,7 @@ void run_radio_stub_tests(void);
 void run_radio_protocol_tests(void);
 void run_radio_power_tests(void);
 void run_radio_limits_tests(void);
+void run_radio_stats_tests(void);
 void run_modem_framing_tests(void);
 void run_modem_tests(void);
 void run_field_link_tests(void);
