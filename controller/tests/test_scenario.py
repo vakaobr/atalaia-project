@@ -174,8 +174,9 @@ class ScenarioControllerTests(unittest.TestCase):
         self.assertEqual(setups[4], {"name": "setup", "kind": "done", "team": "red", "label": "Ponte"})
         self.assertEqual(setups[6], {"name": "setup", "kind": "code", "code": "4711", "team": "red",
                                      "label": "Cofre"})
-        # The vault's code went to its box only: never in the log or the stream.
-        self.assertFalse(any("4711" in str(e) for e in self.ctrl.log(self.gid)))
+        # The vault's code went to its box only: never in the log or the stream. Only what an entry carries
+        # is searched: its received_at once read ...47.11... (about one run in twelve) and failed this test.
+        self.assertFalse(any("4711" in repr((e["type"], e["team"], e["data"])) for e in self.ctrl.log(self.gid)))
 
         # Box 7 reboots: the scenario sets it up again.
         self.modem.sent.clear()
