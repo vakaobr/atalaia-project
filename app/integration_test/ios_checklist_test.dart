@@ -457,7 +457,11 @@ void main() {
       'field controller', (tester) async {
     await tester.pumpWidget(deviceApp());
     await waitFor(tester, find.byKey(const Key('role-player')));
+    // The list builds only what is on screen, and a small phone shows the
+    // first roles only: scroll to each.
+    await reveal(tester, find.byKey(const Key('role-marshal')));
     expect(find.byKey(const Key('role-marshal')), findsOneWidget);
+    await reveal(tester, find.byKey(const Key('role-gm')));
     expect(find.byKey(const Key('role-gm')), findsOneWidget);
     final note = find.textContaining('só o Android');
     if (isIOS) {

@@ -50,7 +50,9 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(deviceApp());
-    await waitFor(tester, find.byKey(const Key('role-controller')));
+    await waitFor(tester, find.byKey(const Key('role-player')));
+    // The last role is below the fold of a small screen (the list builds
+    // only what is shown): tapVisible scrolls to it.
     await tapVisible(tester, find.byKey(const Key('role-controller')));
     await waitFor(tester, find.byKey(const Key('ctl-start')));
     await tapVisible(tester, find.byKey(const Key('ctl-start')));

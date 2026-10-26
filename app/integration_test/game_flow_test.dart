@@ -62,7 +62,7 @@ void main() {
     await tester.tap(find.byKey(const Key('prop-start')));
     await waitFor(tester, inDialog('Começar'));
     await tester.tap(inDialog('Começar'));
-    await waitFor(tester, find.text('Hold the button to arm'));
+    await waitFor(tester, find.text('Hold to arm'));
 
     final hold = await tester.startGesture(
       tester.getCenter(find.byKey(const Key('team-button-red'))),

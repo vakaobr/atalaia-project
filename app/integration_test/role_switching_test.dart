@@ -35,7 +35,12 @@ void main() {
     await tester.pumpAndSettle();
 
     await tapVisible(tester, find.byKey(const Key('role-marshal')));
-    await waitFor(tester, find.byKey(const Key('marshal-chrono')));
+    // The marshal's tools open only once the field controller has confirmed
+    // this phone as a marshal on the GM's list (MR-1 to MR-14): a fresh
+    // phone has no check-in, so the screen says to check in first and offers
+    // none of the tools.
+    await waitFor(tester, find.byKey(const Key('queue-go-checkin')));
+    expect(find.byKey(const Key('marshal-chrono')), findsNothing);
     await tester.pumpAndSettle();
     await goBack(tester);
     await tester.pumpAndSettle();

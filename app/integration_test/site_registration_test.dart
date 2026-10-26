@@ -59,6 +59,9 @@ void main() {
     // pages (and both back buttons) are on screen.
     await tester.pumpAndSettle();
     await goBack(tester);
-    await waitFor(tester, find.text('Tens inscrição neste jogo.'));
+    // The registered note is part of the game page's list, below the fold
+    // of a small screen: scroll to it.
+    await reveal(tester, find.text('Tens inscrição neste jogo.'));
+    expect(find.text('Tens inscrição neste jogo.'), findsOneWidget);
   });
 }
