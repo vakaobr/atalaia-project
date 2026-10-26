@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# A box a team completed: locked, its buttons do nothing. Data: team (the
+# team that completed it), step (its place in the order), of (all the boxes)
+# and done (boxes completed so far); lang (pt, en, de or zh-tw) from the box.
+template: completed
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: team }
+    children:
+      - type: label
+        text: "{lang == 'pt' && 'CAIXA COMPLETA' || lang == 'de' && 'BOX ABGESCHLOSSEN' || lang == 'zh-tw' && '盒子已完成' || 'BOX COMPLETED'} {step}/{of}"
+        style: { font_size: 20, width: fill, align: center, color: contrast }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{team|upper}"
+    style: { font_size: 48, color: team }
+  - type: label
+    text: "{lang == 'zh-tw' && '已完成 ' || ''}{done} {lang == 'pt' && 'de' || lang == 'de' && 'von' || lang == 'zh-tw' && '/' || 'of'} {of} {lang == 'pt' && 'caixas completas' || lang == 'de' && 'Boxen abgeschlossen' || lang == 'zh-tw' && '個盒子' || 'boxes completed'}"
+    style: { font_size: 20 }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{lang == 'pt' && 'Bloqueada: já não pode ser capturada' || lang == 'de' && 'Gesperrt: nicht mehr einnehmbar' || lang == 'zh-tw' && '已鎖定，無法再佔領' || 'Locked: it cannot be captured again'}"
+    style:
+      font_size: 14
+      color: muted
+      padding: { bottom: 10 }

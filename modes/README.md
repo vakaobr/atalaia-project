@@ -29,6 +29,7 @@ The GM console builds its settings form from `params` in `mode.yaml`, so GMs nev
 | [Hacking Terminal](hacking_terminal/) (Hackeia o terminal) | main mode | boxes and Android props with a keypad | Phase 4 plan phase 4, in software (not yet on a phone in the field: HW3); 13 tests, plus controller, host-box, Field Box preset, browser and Dart tests |
 | [VIP / Payload](vip_payload/) (VIP / Carga) | main mode | checkpoint boxes and Android props, a payload prop with GPS (Android), the VIP's phone through the controller (`field.lua`) | Phase 4 plan phase 5, in software (not yet with real GPS in the field: HW3); 8 tests, plus simulator, controller, host-box, Field Box preset, browser and Dart tests |
 | [Money Factory](money_factory/) (Fábrica de Dinheiro) | main mode | factory and bank boxes and Android props with NFC + controller (`field.lua`) | Phase 3, built after the maintainer's go-ahead of 2026-10-23 (decision A1's blocker solved by the controller, MF-A1 to MF-A12), in software (not yet on radio hardware); 10 tests, plus simulator, controller, host-box, Field Box preset, browser and Dart tests |
+| [Progressive Domination](progressive_domination/) (Domínio Progressivo) | main mode | boxes + controller (`field.lua`) | Maintainer's request of 2026-10-26, in software (not yet on radio hardware); 8 tests, plus simulator, controller, firmware and Dart tests |
 | [Objectives](objectives/) (Objetivos) | role package for custom scenarios | boxes and Android props, set up by a scenario's `field.lua` on the controller | Phase 4 plan phase 6, in software (not yet on radio hardware); 9 tests, 7 of them with a hand-written example scenario, plus simulator, controller, host-box, Field Box preset, browser and Dart tests; the scenario compiler (plan phase 7, in software) writes scenario packages from a YAML manifest and plays the same tests with its own Foxhound |
 
 The script API is described in the "Game runtime and scripting" section of the [design specification](../docs/design-spec.md), and implemented in [`core/src/script_api.c`](../core/src/script_api.c).
@@ -357,3 +358,18 @@ The simulator's mode tests check every template with the core's own parser (the 
 ## On the Field Box
 
 Every mode in this folder is built into the Field Box firmware (`firmware/esp32/main/CMakeLists.txt`) as a preset (the Medic Kit too, so a box can be joined as a kit, and the objectives package, so a box can play its part in any scenario), and a box adds the presets of built-in modes it does not have yet at boot; the scripts are data, so a mode needs no firmware code of its own. Its screen templates are built in the same way. A preset holds up to 16 KB of script (a main mode with its modifiers, composed). The largest combination, Bomb with Codes, takes about 50 KB of a Reduced-tier box's 64 KB Lua heap when loaded; Full-tier boxes have 256 KB.
+
+## Progressive Domination (2026-10-26)
+
+Decisions PD-MODE-1 to PD-MODE-20 in `docs/review/decisions-to-review.md`. Needs the controller.
+
+- **The boxes:** any number of boxes with the role `zone`, all running the same `node.lua`. Only the **active** box can be captured (by holding a team button for `capture_hold_ms`, as in Domination); a box that is not active (`inactive`: buttons ignored, LED off) or is completed (`completed`: locked, in the team's colour) ignores its buttons and the GM's owner override.
+- **The order:** fixed at the start by `field.lua`: the box names in `order` (comma-separated) first, then the other boxes by box id, or shuffled with the game's seeded `rand()` when `random_order`.
+- **Announcing:** `field.lua` activates the first box at the start and logs `progressive.activated` (`zone` the box's name, `step` its place); the console's feed and plan, the player app and its feed show it in four languages. The box plays the `alarm` clip, its LED is white while nobody holds it, and its screen says ACTIVE BOX n/N (FINAL BOX for the last).
+- **Points:** each full minute a team holds the active box pays `params.points_per_min` to it (the first one minute after the capture). After `complete_min` minutes held the box is completed for that team (`progressive.completed`, plus `complete_bonus`), locked, and the next box is announced.
+- **Recapture:** a team taking the box before it completes starts its own count from zero; what the first team earned stays. The GM freeing the box stops the count.
+- **The end:** after the last box the team with the most points wins (a tie ends the game without a winner); a team reaching `target_score` wins at once; the game's own duration also ends it.
+- **Screens:** `inactive`, `neutral` (the active box, nobody holds it), `captured` (holder, minutes held of the minutes needed, points those minutes paid), `completed`; `final_score` is the Field Box's built-in one.
+- **The word to the boxes:** the mode command `pd` (`phase` wait, active or done; `step`, `of`, `done`, `team`; `n` grows with each change, so an older word is ignored), said again every 10 s and to a box that rebooted.
+
+It is the fifteenth built-in preset, on the second page of the box's keypad picker (`0` turns the page, then `6`); picked on its own a box only waits for a controller.

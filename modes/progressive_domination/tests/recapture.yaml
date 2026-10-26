@@ -1,0 +1,23 @@
+
+name: Another team taking the box before it completes starts its own count; the first team keeps its points
+params: { complete_min: 3, points_per_min: 10, capture_hold_ms: 2000 }
+nodes: { alpha: zone, bravo: zone }
+steps:
+  - hold: { node: alpha, team: red, s: 2 }           # captured at 2 s
+  - wait: 120                                        # 122 s: two minutes paid (at 62 and 122)
+  - expect_score: { team: red, points: 20 }
+  - hold: { node: alpha, team: blue, s: 2 }          # blue captures at 124 s
+  - expect: { type: zone.captured, node: alpha, team: blue, at: 124, data: { previous_team: red } }
+  - expect_screen: { node: alpha, template: captured, data: { team: blue, since: 124, held_min: 0, points: 0 } }
+  - wait: 59
+  - expect_score: { team: blue, points: 0 }
+  - wait: 1                                          # 184 s: blue's first minute
+  - expect_score: { team: blue, points: 10 }
+  - expect_score: { team: red, points: 20 }
+  - expect_no: progressive.completed
+  - wait: 120                                        # 304 s: blue's third minute completes it
+  - expect_score: { team: blue, points: 30 }
+  - expect_score: { team: red, points: 20 }
+  - expect: { type: progressive.completed, node: controller, team: blue, at: 304, data: { zone: alpha, step: 1 } }
+  - expect: { type: progressive.activated, node: controller, at: 304, data: { zone: bravo, step: 2 } }
+  - expect_no: script.error

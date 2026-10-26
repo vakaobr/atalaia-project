@@ -82,7 +82,9 @@
             "medic.heal",
             "medic.empty",
             "node.update_failed",
-            "node.modes_failed"
+            "node.modes_failed",
+            "progressive.activated",
+            "progressive.completed"
           ]
         },
         {
@@ -1633,6 +1635,68 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "progressive.activated"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "zone": {
+                "$ref": "#/$defs/data/zone"
+              },
+              "step": {
+                "$ref": "#/$defs/data/step"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "progressive.completed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "team": {
+                "$ref": "#/$defs/data/team"
+              },
+              "squad": {
+                "$ref": "#/$defs/data/squad"
+              },
+              "zone": {
+                "$ref": "#/$defs/data/zone"
+              },
+              "step": {
+                "$ref": "#/$defs/data/step"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
     }
   ],
   "$defs": {
@@ -1788,6 +1852,10 @@
       "mode": {
         "type": "string",
         "description": "mode package id: one part of a game's mode id"
+      },
+      "step": {
+        "type": "integer",
+        "description": "a box's place in a sequence of boxes, from 1 (Progressive Domination)"
       }
     }
   }

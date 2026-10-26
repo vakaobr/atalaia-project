@@ -268,6 +268,8 @@ const Map<String, String> enStrings = {
   'player.node': 'Box {n}',
   'player.held_by': 'Held by {team}',
   'player.held_by_none': 'Held by nobody',
+  'player.active_box': 'Active box: {zone}',
+  'player.active_box_tag': 'ACTIVE',
   'player.scenario': 'Scenario objectives',
   'player.objective_waiting': 'Starts with the game',
   'player.objective_active': 'In progress',
@@ -329,6 +331,9 @@ const Map<String, String> enStrings = {
   'event.vip.extracted': '{team} reached the extraction zone',
   'event.money.collected': '{player} collected {amount} money',
   'event.money.deposited': '{player} banked {amount} for {team}',
+  'event.progressive.activated':
+      'Box {zone} is active now (number {step}): the only one that can be captured',
+  'event.progressive.completed': '{team} completed box {zone} (number {step})',
   'event.scenario.started': 'The scenario has started',
   'event.scenario.objective.completed': '{team} completed an objective',
   'event.scenario.objective.completed.no_team': 'An objective was completed',

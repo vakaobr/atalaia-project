@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# A team holds the active box. Data: team, since (game time of its capture, in
+# seconds), step and of (its place in the order, and all the boxes), final (the
+# last box), held_min (full minutes held), need_min (minutes that complete it),
+# points (what those minutes paid), share (0-1 of the time that completes it),
+# taker and progress (0-1) while another team holds its input to take it over;
+# lang (pt, en, de or zh-tw) from the box.
+template: captured
+layout:
+  - type: row
+    style: { width: fill, height: 44, background: team }
+    children:
+      - type: label
+        text: "{final && (lang == 'pt' && 'ÚLTIMA CAIXA' || lang == 'de' && 'LETZTE BOX' || lang == 'zh-tw' && '最後一個盒子' || 'FINAL BOX') || (lang == 'pt' && 'CAIXA ATIVA' || lang == 'de' && 'AKTIVE BOX' || lang == 'zh-tw' && '啟用中' || 'ACTIVE BOX')} {step}/{of}"
+        style: { font_size: 20, width: fill, align: center, color: contrast }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{team|upper}"
+    style: { font_size: 48, color: team }
+  - type: label
+    text: "{held_min} / {need_min} {lang == 'zh-tw' && '分鐘' || 'min'}  ·  {points} {lang == 'pt' && 'pontos' || lang == 'de' && 'Punkte' || lang == 'zh-tw' && '分' || 'points'}"
+    style: { font_size: 20 }
+  - type: progress_bar
+    value: "{share}"
+    style: { width: 220, height: 12, color: team }
+  - type: label
+    text: "{lang == 'pt' && 'desde' || lang == 'de' && 'seit' || lang == 'zh-tw' && '佔領於' || 'held since'} {since|clock}"
+    style: { font_size: 14, color: muted, visible: "{!taker}" }
+  - type: label
+    text: "{lang == 'pt' && 'A tomar:' || lang == 'de' && 'Übernahme:' || lang == 'zh-tw' && '奪取中' || 'Taking:'} {taker|upper}"
+    style: { font_size: 14, color: "{taker}", visible: "{taker}" }
+  - type: spacer
+    height: fill
+  - type: label
+    text: "{lang == 'pt' && 'Completa ao fim de ' || lang == 'de' && 'Abgeschlossen nach ' || lang == 'zh-tw' && '滿 ' || 'Completes after '}{need_min} {lang == 'zh-tw' && '分鐘即完成' || 'min'}"
+    style:
+      font_size: 14
+      color: muted
+      padding: { bottom: 10 }

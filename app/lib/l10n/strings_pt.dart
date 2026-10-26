@@ -276,6 +276,8 @@ const Map<String, String> ptStrings = {
   'player.node': 'Caixa {n}',
   'player.held_by': 'Da equipa {team}',
   'player.held_by_none': 'De ninguém',
+  'player.active_box': 'Caixa ativa: {zone}',
+  'player.active_box_tag': 'ATIVA',
   'player.scenario': 'Objetivos do cenário',
   'player.objective_waiting': 'Começa com o jogo',
   'player.objective_active': 'Em curso',
@@ -335,6 +337,10 @@ const Map<String, String> ptStrings = {
   'event.vip.extracted': 'A equipa {team} chegou à zona de extração',
   'event.money.collected': '{player} recolheu {amount} de dinheiro',
   'event.money.deposited': '{player} depositou {amount} para a equipa {team}',
+  'event.progressive.activated':
+      'A caixa {zone} está ativa (n.º {step}): é a única que pode ser capturada',
+  'event.progressive.completed':
+      'A equipa {team} completou a caixa {zone} (n.º {step})',
   'event.scenario.started': 'O cenário começou',
   'event.scenario.objective.completed': 'A equipa {team} cumpriu um objetivo',
   'event.scenario.objective.completed.no_team': 'Um objetivo foi cumprido',

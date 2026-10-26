@@ -73,6 +73,7 @@ data_fields:
   puzzle:        { key: 36, type: string,  doc: "hacking terminal puzzle: code, wires or sequence" }
   release:       { key: 37, type: string,  doc: "firmware release id: the first 16 hex digits of the image's SHA-256" }
   mode:          { key: 38, type: string,  doc: "mode package id: one part of a game's mode id" }
+  step:          { key: 39, type: integer, doc: "a box's place in a sequence of boxes, from 1 (Progressive Domination)" }
 
 # id: CBOR value of the type field (1-23 take one byte). prio: the default
 # priority. data: the fields this event may carry besides the common ones.
@@ -144,3 +145,7 @@ events:
   # Wi-Fi, the controller unreachable, refused before any network): mode is the part, reason the
   # fetch's result code (protocol/mode-packages.md, phase 5 plan phase 13, decisions P5B-16, P5E-8).
   node.modes_failed:          { id: 53, prio: critical,  data: [mode, reason] }
+  # Progressive Domination (decisions PD-MODE-1 to PD-MODE-20), from the mode's field.lua on the
+  # controller: zone is the box's name, step its place in the order (1 to the number of boxes).
+  progressive.activated:      { id: 54, prio: critical,  data: [zone, step] }  # the box that is now the only one capturable; no team
+  progressive.completed:      { id: 55, prio: critical,  data: [zone, step] }  # team: the team that held it long enough

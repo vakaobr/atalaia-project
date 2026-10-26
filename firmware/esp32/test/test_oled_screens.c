@@ -47,6 +47,7 @@ typedef struct {
 #define MEDIC_DE "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"de\"}"
 #define MEDIC_ZH "org.atalaia.medic {\"heal_hold_s\":10,\"charges\":5,\"lang\":\"zh-tw\"}"
 #define MONEY    "org.atalaia.money_factory {\"capacity\":50,\"capture_hold_ms\":3000}"
+#define PROG     "org.atalaia.progressive_domination {\"capture_hold_ms\":3000,\"complete_min\":10}"
 
 /* The splashes are drawn by oled_view_splash(), not by a screen update; data is the firmware's
  * version (FV-8): a release, a development build, one with a three-digit count and changes. */
@@ -160,6 +161,13 @@ static const oled_case_t cases[] = {
      "{\"reason\":\"limit\",\"message\":\"你的治療次數已用完\"}"},
     {"money_captured_de", MONEY, "captured", "{\"team\":\"red\",\"since\":95,\"stock\":35}"},
     {"money_captured_zh-tw", MONEY, "captured", "{\"team\":\"red\",\"since\":95,\"stock\":35}"},
+    /* Progressive Domination: the OLED has no template of its own for a box that waits or is
+     * completed (its screen's name, and the team); the active box is a free or held zone. */
+    {"prog_inactive", PROG, "inactive", "{\"done\":1,\"of\":4}"},
+    {"prog_neutral", PROG, "neutral", "{\"step\":2,\"of\":4,\"final\":false}"},
+    {"prog_captured", PROG, "captured",
+     "{\"team\":\"red\",\"since\":95,\"step\":2,\"of\":4,\"held_min\":1,\"points\":6}"},
+    {"prog_completed", PROG, "completed", "{\"team\":\"blue\",\"step\":1,\"of\":4,\"done\":1}"},
     {"wifi_setup", NULL, "wifi_setup", "{\"ssid\":\"atalaia-7c4f\"}"},
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))

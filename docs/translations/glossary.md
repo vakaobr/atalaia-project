@@ -125,6 +125,7 @@ process.
 | heal (at a medic kit) | tratamento | Behandlung | 治療、次 | the kit's charges: *Verbände* ("Noch 4 Verbände"); zh-tw: 「還剩 4 次」 (P5H-12) |
 | puzzle (Hacking Terminal) | enigma | Rätsel | 謎題 | zh-tw: a code guess as Taiwan's 1A2B game writes it (「2A2B」) *(check)* |
 | wire (to cut) | fio | Draht (kappen) | 電線（剪斷） | *(check)* |
+| active box / completed box (Progressive Domination) | caixa ativa / caixa completa | aktive Box / abgeschlossene Box | 啟用中的盒子 / 已完成的盒子 | locked: *bloqueada* / *gesperrt* / 已鎖定 *(check)* |
 | factory / bank (Money Factory) | fábrica / banco | Fabrik / Bank | 印鈔廠 / 銀行 | collect / bank: *abholen* / *einzahlen*; zh-tw: 領錢 / 存入 |
 | payload | carga | Payload | 護送目標 | |
 | extraction zone | zona de extração | Extraktionszone, Extraktion | 撤離區 | |
@@ -155,3 +156,4 @@ not yet reviewed.
 | Hacking Terminal | Hackeia o terminal | Hacking-Terminal | 駭客終端 |
 | Objectives | Objetivos | Ziele | 任務目標 |
 | Money Factory | Fábrica de Dinheiro | Money Factory | 印鈔廠 *(check)* |
+| Progressive Domination | Domínio Progressivo | Progressive Domination | 漸進佔點 *(check)* |

@@ -1,0 +1,38 @@
+
+name: One box at a time, points for each full minute, the box completes after the hold time and the next one is announced
+params: { complete_min: 2, points_per_min: 5, capture_hold_ms: 3000 }
+nodes: { alpha: zone, bravo: zone, charlie: zone }
+steps:
+  # The first box in the order is announced to both teams; the others wait.
+  - expect: { type: progressive.activated, node: controller, at: 0, data: { zone: alpha, step: 1 } }
+  - expect_screen: { node: alpha, template: neutral, data: { step: 1, of: 3, final: false } }
+  - expect_screen: { node: bravo, template: inactive, data: { done: 0, of: 3 } }
+  - expect_screen: { node: charlie, template: inactive, data: { done: 0, of: 3 } }
+  # An inactive box ignores its buttons.
+  - hold: { node: bravo, team: blue, s: 5 }          # 0 -> 5 s
+  - expect_no: zone.captured
+  - expect_screen: { node: bravo, template: inactive }
+  # Red takes the active box.
+  - hold: { node: alpha, team: red, s: 3 }           # 5 -> 8 s
+  - expect: { type: zone.captured, node: alpha, team: red, at: 8 }
+  - expect_screen: { node: alpha, template: captured, data: { team: red, since: 8, held_min: 0, need_min: 2, points: 0 } }
+  - wait: 59                                         # 67 s: not a full minute yet
+  - expect_score: { team: red, points: 0 }
+  - wait: 1                                          # 68 s: the first minute is paid
+  - expect_score: { team: red, points: 5 }
+  - wait: 59
+  - expect_score: { team: red, points: 5 }
+  - wait: 1                                          # 128 s: the second minute, and the box is completed
+  - expect_score: { team: red, points: 10 }
+  - expect: { type: progressive.completed, node: controller, team: red, at: 128, data: { zone: alpha, step: 1 } }
+  - expect: { type: progressive.activated, node: controller, at: 128, data: { zone: bravo, step: 2 } }
+  - wait: 1
+  - expect_screen: { node: alpha, template: completed, data: { team: red, step: 1, of: 3, done: 1 } }
+  - expect_screen: { node: bravo, template: neutral, data: { step: 2, of: 3, final: false } }
+  - expect_screen: { node: charlie, template: inactive, data: { done: 1, of: 3 } }
+  # The completed box is locked: nobody takes it, nor does the GM's override.
+  - hold: { node: alpha, team: blue, s: 5 }
+  - input: { node: alpha, type: cmd.set_owner, data: { team: blue } }
+  - expect_no: { type: zone.captured, node: alpha }
+  - expect_score: { team: blue, points: 0 }
+  - expect_no: script.error

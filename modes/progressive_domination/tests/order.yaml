@@ -1,0 +1,17 @@
+
+name: The GM's list of box names sets the order, the boxes it does not name follow by box id
+params: { complete_min: 1, points_per_min: 1, capture_hold_ms: 1000, order: "charlie, alpha" }
+nodes: { alpha: zone, bravo: zone, charlie: zone }
+steps:
+  - expect: { type: progressive.activated, data: { zone: charlie, step: 1 } }
+  - expect_screen: { node: charlie, template: neutral, data: { step: 1, of: 3 } }
+  - hold: { node: charlie, team: red, s: 1 }
+  - wait: 60
+  - expect: { type: progressive.activated, data: { zone: alpha, step: 2 } }
+  - hold: { node: alpha, team: blue, s: 1 }
+  - wait: 60
+  - expect: { type: progressive.activated, data: { zone: bravo, step: 3 } }
+  - expect_screen: { node: bravo, template: neutral, data: { step: 3, of: 3, final: true } }
+  - expect_screen: { node: charlie, template: completed, data: { team: red } }
+  - expect_screen: { node: alpha, template: completed, data: { team: blue } }
+  - expect_no: script.error

@@ -210,6 +210,50 @@ void main() {
     expect(eventText(en, banked), 'r1 banked 12 for red');
   });
 
+  test("Progressive Domination's events in words, in the four languages", () {
+    const activated = FeedEvent(
+      'progressive.activated',
+      null,
+      {'zone': 'Moinho', 'step': 2},
+      60000,
+      0,
+    );
+    const completed = FeedEvent(
+      'progressive.completed',
+      'red',
+      {'zone': 'Moinho', 'step': 2},
+      90000,
+      0,
+    );
+    const pt = Strings(AppLanguage.pt);
+    const en = Strings(AppLanguage.en);
+    const de = Strings(AppLanguage.de);
+    const zh = Strings(AppLanguage.zhTw);
+    expect(
+      eventText(pt, activated),
+      'A caixa Moinho está ativa (n.º 2): é a única que pode ser capturada',
+    );
+    expect(
+      eventText(en, activated),
+      'Box Moinho is active now (number 2): the only one that can be captured',
+    );
+    expect(
+      eventText(de, activated),
+      'Box Moinho ist jetzt aktiv (Nr. 2): nur sie kann eingenommen werden',
+    );
+    expect(eventText(zh, activated), '盒子「Moinho」現已啟用（第 2 個）：只有它能被佔領');
+    expect(
+      eventText(pt, completed),
+      'A equipa vermelha completou a caixa Moinho (n.º 2)',
+    );
+    expect(eventText(en, completed), 'red completed box Moinho (number 2)');
+    expect(
+      eventText(de, completed),
+      'Team Rot hat Box Moinho abgeschlossen (Nr. 2)',
+    );
+    expect(eventText(zh, completed), '紅隊完成了盒子「Moinho」（第 2 個）');
+  });
+
   test("the Hacking Terminal's event in words, with and without a team", () {
     const solved = FeedEvent(
       'hacking.solved',

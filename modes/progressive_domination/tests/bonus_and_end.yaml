@@ -1,0 +1,19 @@
+
+name: Every box completed ends the game, won by the team with the most points, bonus for completing included
+params: { complete_min: 1, points_per_min: 3, complete_bonus: 5, capture_hold_ms: 1000 }
+nodes: { alpha: zone, bravo: zone }
+steps:
+  - hold: { node: alpha, team: red, s: 1 }           # 1 s
+  - wait: 60                                         # 61 s: 3 for the minute, 5 for the box
+  - expect_score: { team: red, points: 8 }
+  - expect: { type: progressive.completed, team: red, data: { zone: alpha, step: 1 } }
+  - wait: 1
+  - expect_screen: { node: bravo, template: neutral, data: { step: 2, of: 2, final: true } }
+  - hold: { node: bravo, team: blue, s: 1 }          # 63 s
+  - wait: 60                                         # 123 s: blue 8 too, a tie
+  - expect: { type: progressive.completed, team: blue, data: { zone: bravo, step: 2 } }
+  - expect: { type: game.end, node: controller, data: { reason: all_completed } }
+  - expect_status: ended
+  - expect_score: { team: red, points: 8 }
+  - expect_score: { team: blue, points: 8 }
+  - expect_no: script.error

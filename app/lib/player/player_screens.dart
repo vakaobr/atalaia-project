@@ -684,11 +684,25 @@ class PlayerView extends StatelessWidget {
             ),
           if (feed.objectives.isNotEmpty)
             _ScenarioObjectives(feed: feed, teams: teams),
+          if (feed.activeBox != null)
+            Card(
+              key: const Key('player-active-box'),
+              child: ListTile(
+                leading: const Icon(Icons.flag),
+                title: Text(s.t('player.active_box', {'zone': feed.activeBox})),
+              ),
+            ),
           if (feed.nodes.isNotEmpty) ...[
             SectionTitle(s.t('player.objectives')),
             for (final n in feed.nodes.values)
               ListTile(
                 dense: true,
+                trailing: n['name'] != null && n['name'] == feed.activeBox
+                    ? Text(
+                        s.t('player.active_box_tag'),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      )
+                    : null,
                 leading: teams.crest('${n['owner']}') == null
                     ? TeamDot(n['owner'] as String?)
                     : TeamCrest(
@@ -1072,6 +1086,7 @@ String eventText(
     'reason': str('reason') ?? '',
     'remaining': d['remaining'] ?? '',
     'objective': objective ?? '',
+    'step': d['step'] ?? '',
   };
   return s.tOr(key, e.type, args);
 }

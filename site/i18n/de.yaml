@@ -407,6 +407,17 @@ modes:
       Medic-Kit geheilt wird, verliert das getragene Geld, und das erste Team, das das Ziel einzahlt,
       kann gewinnen. In Software geschrieben und getestet, noch nicht auf echten Boxen gespielt.
     meta: Fabrik- und Bank-Boxen oder Handys mit NFC · Tags der Spielenden · braucht den Feld-Controller
+  progressive_domination:
+    title: Progressive Domination
+    text: >-
+      Mehrere Boxen, aber nur eine kann gleichzeitig eingenommen werden, und beide Teams erfahren,
+      welche. Das Team, das die aktive Box hält, punktet für jede volle Minute; hat es sie lange
+      genug gehalten, ist die Box für dieses Team abgeschlossen und gesperrt, und die nächste Box der
+      Reihenfolge wird beiden Teams gemeldet. Die Reihenfolge ist die Liste der Spielleitung, die
+      Box-Nummern oder zufällig; das Spiel endet mit der letzten abgeschlossenen Box oder wenn ein
+      Team die Zielpunktzahl erreicht. In Software geschrieben und getestet, noch nicht auf echten
+      Boxen gespielt.
+    meta: Boxen mit Team-Knöpfen · braucht den Feld-Controller
   codes:
     title: Codes (Modifikator)
     text: >-

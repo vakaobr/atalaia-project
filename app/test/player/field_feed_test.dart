@@ -474,4 +474,48 @@ void main() {
       expect(feed.objectives, isEmpty);
     });
   });
+
+  group("Progressive Domination's active box (PD-MODE-15)", () {
+    Map<String, Object?> event(String type, String zone, int step, int t) => {
+      'type': 'event',
+      'game': 7,
+      'event': {
+        'node': 0,
+        't': t,
+        'type': type,
+        'data': {'zone': zone, 'step': step},
+      },
+    };
+
+    test('the newest activation, until that box is completed', () {
+      final feed = FieldFeed(FieldLink.parse('10.0.0.1', 'c')!)
+        ..onMessage(hello);
+      addTearDown(feed.dispose);
+      expect(feed.activeBox, isNull);
+      feed.onMessage(event('progressive.activated', 'Moinho', 1, 1000));
+      expect(feed.activeBox, 'Moinho');
+      // A completion is followed at once by the next box's activation.
+      feed
+        ..onMessage(event('progressive.completed', 'Moinho', 1, 70000))
+        ..onMessage(event('progressive.activated', 'Ponte', 2, 70000));
+      expect(feed.activeBox, 'Ponte');
+      // The last box completed: nothing is active.
+      feed.onMessage(event('progressive.completed', 'Ponte', 2, 140000));
+      expect(feed.activeBox, isNull);
+    });
+
+    test('a snapshot taken mid-game says which box is active', () {
+      final feed = FieldFeed(FieldLink.parse('10.0.0.1', 'c')!)
+        ..onMessage({
+          ...hello,
+          'events': [
+            event('progressive.activated', 'Moinho', 1, 1000)['event'],
+            event('progressive.completed', 'Moinho', 1, 70000)['event'],
+            event('progressive.activated', 'Ponte', 2, 70000)['event'],
+          ],
+        });
+      addTearDown(feed.dispose);
+      expect(feed.activeBox, 'Ponte');
+    });
+  });
 }

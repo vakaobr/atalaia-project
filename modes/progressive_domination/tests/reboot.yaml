@@ -1,0 +1,15 @@
+
+name: A box that reboots is told its phase again
+params: { complete_min: 1, points_per_min: 1, capture_hold_ms: 1000 }
+nodes: { alpha: zone, bravo: zone, charlie: zone }
+steps:
+  - hold: { node: alpha, team: red, s: 1 }
+  - wait: 61
+  - expect_screen: { node: alpha, template: completed, data: { team: red, done: 1 } }
+  - reboot: { node: alpha }
+  - expect_screen: { node: alpha, template: completed, data: { team: red, done: 1 } }
+  - reboot: { node: bravo }
+  - expect_screen: { node: bravo, template: neutral, data: { step: 2, of: 3 } }
+  - reboot: { node: charlie }
+  - expect_screen: { node: charlie, template: inactive, data: { done: 1, of: 3 } }
+  - expect_no: script.error

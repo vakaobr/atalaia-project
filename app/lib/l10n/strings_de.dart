@@ -283,6 +283,8 @@ const Map<String, String> deStrings = {
   'player.node': 'Box {n}',
   'player.held_by': 'Gehalten von Team {team}',
   'player.held_by_none': 'Von niemandem gehalten',
+  'player.active_box': 'Aktive Box: {zone}',
+  'player.active_box_tag': 'AKTIV',
   'player.scenario': 'Szenario-Ziele',
   'player.objective_waiting': 'Beginnt mit dem Spiel',
   'player.objective_active': 'Läuft',
@@ -346,6 +348,10 @@ const Map<String, String> deStrings = {
   'event.vip.extracted': 'Team {team} hat die Extraktionszone erreicht',
   'event.money.collected': '{player} hat {amount} Geld eingesammelt',
   'event.money.deposited': '{player} hat {amount} für Team {team} eingezahlt',
+  'event.progressive.activated':
+      'Box {zone} ist jetzt aktiv (Nr. {step}): nur sie kann eingenommen werden',
+  'event.progressive.completed':
+      'Team {team} hat Box {zone} abgeschlossen (Nr. {step})',
   'event.scenario.started': 'Das Szenario hat begonnen',
   'event.scenario.objective.completed': 'Team {team} hat ein Ziel erfüllt',
   'event.scenario.objective.completed.no_team': 'Ein Ziel wurde erfüllt',

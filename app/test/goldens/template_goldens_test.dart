@@ -249,6 +249,27 @@ const cases = [
     'refused',
     '{"reason":"not_yours","player":"b1","team":"blue","lang":"pt"}',
   ),
+  // Progressive Domination: the box waiting, the active box held with its bar,
+  // and a completed box.
+  (
+    'progressive_domination_inactive_pt',
+    'progressive_domination',
+    'inactive',
+    '{"done":1,"of":4,"lang":"pt"}',
+  ),
+  (
+    'progressive_domination_captured',
+    'progressive_domination',
+    'captured',
+    '{"team":"red","since":95,"step":2,"of":4,"final":false,"held_min":4,'
+        '"need_min":10,"points":24,"share":0.4}',
+  ),
+  (
+    'progressive_domination_completed_de',
+    'progressive_domination',
+    'completed',
+    '{"team":"blue","step":1,"of":4,"done":1,"lang":"de"}',
+  ),
   (
     'code_entry',
     null,

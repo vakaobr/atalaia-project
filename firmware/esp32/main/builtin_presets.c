@@ -58,6 +58,11 @@ static const struct {
     {"Money Factory", "org.atalaia.money_factory",
      "{\"production\":1,\"tick_s\":10,\"capacity\":50,\"carry_max\":20,\"capture\":true,"
      "\"capture_hold_ms\":3000,\"target\":0,\"drop_on_heal\":true}"},
+    /* Any box of the game; the controller's field.lua picks the active one, pays the minutes held
+     * and ends the game, so on its own a box waits (decision PD-MODE-13). */
+    {"Progressive Domination", "org.atalaia.progressive_domination",
+     "{\"capture_hold_ms\":3000,\"complete_min\":10,\"points_per_min\":6,\"complete_bonus\":0,"
+     "\"random_order\":false,\"order\":\"\",\"target_score\":0}"},
 };
 
 bool builtin_presets_has(const char *mode_id)

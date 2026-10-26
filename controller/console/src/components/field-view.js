@@ -271,15 +271,27 @@ export class FieldView extends Component {
         return role === 'gm' && game;
     }
 
+    /** The box Progressive Domination has active now (decision PD-MODE-15): the feed's newest
+     * progressive.activated, unless that box was completed since; its name, else null. */
+    activeBox() {
+        for (const e of this.props.app.state.feed || []) {
+            if (e.type === 'progressive.completed') return null;
+            if (e.type === 'progressive.activated') return (e.data && e.data.zone) || null;
+        }
+        return null;
+    }
+
     marker(node, i, count, teams, grid) {
         const { seen, now } = this.props.app.state;
         const p = this.where(node, i, count);
         const offline = seen[node.node_id] !== undefined && now - seen[node.node_id] > OFFLINE_MS;
+        const active = node.name !== undefined && node.name === this.activeBox();
         // MF-90: with a grid, the box's cell too ("Box 7, owner: red, grid C4").
         const cell = gridCell(grid, p.x, p.y);
-        const label = t('field.marker', { node: node.node_id, owner: node.owner || t('nodes.no_owner') })
+        const label = t(active ? 'field.marker_active' : 'field.marker',
+                        { node: node.node_id, owner: node.owner || t('nodes.no_owner') })
             + (cell ? `, ${t('grid.cell', { cell })}` : '');
-        return html`<button type="button" class=${`marker ${offline ? 'offline' : ''}`} aria-label=${label}
+        return html`<button type="button" class=${`marker ${offline ? 'offline' : ''} ${active ? 'active' : ''}`} aria-label=${label}
             data-node=${node.node_id} title=${label}
             ref=${(el) => {
                 if (!el) return;

@@ -1,0 +1,63 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+id: org.atalaia.progressive_domination
+version: 0.1.0
+license: GPL-3.0-or-later
+min_tier: reduced
+kind: mode
+name: Progressive Domination
+description: >-
+  Several boxes, but only one can be captured at a time. Both teams are told which box is active; the
+  team holding it scores for each minute, and once a team has held it long enough the box is completed
+  for that team and locked, and the next box in the order is announced to both teams.
+roles:
+  zone: { requires: [team_input], optional: [team_display, audio, display] }
+params:
+  capture_hold_ms: { type: int, min: 0, max: 60000, default: 3000, label: "Hold time to capture (ms)" }
+  complete_min:    { type: int, min: 1, max: 240,   default: 10,   label: "Minutes a team holds the active box to complete it" }
+  points_per_min:  { type: int, min: 0, max: 1000,  default: 6,    label: "Points per full minute a team holds the active box" }
+  complete_bonus:  { type: int, min: 0, max: 10000, default: 0,    label: "Points for completing a box" }
+  random_order:    { type: bool, default: false, label: "Random order of the boxes (off: by box id)" }
+  order:           { type: string, max: 100, default: "", label: "Boxes in the order of play, by name, comma-separated (the others follow)" }
+  target_score:    { type: int, min: 0, max: 100000, default: 0, label: "Points that win the game at once (0: play every box)" }
+i18n:
+  pt:
+    name: Domínio Progressivo
+    description: >-
+      Várias caixas, mas só uma pode ser capturada de cada vez. As duas equipas sabem qual é a caixa ativa;
+      a equipa que a tem pontua por cada minuto e, quando a tiver mantido o tempo necessário, a caixa fica
+      completa para essa equipa e bloqueada, e a caixa seguinte da ordem é anunciada às duas equipas.
+    params:
+      capture_hold_ms: Tempo a premir para capturar (ms)
+      complete_min: Minutos que uma equipa mantém a caixa ativa para a completar
+      points_per_min: Pontos por cada minuto completo que uma equipa mantém a caixa ativa
+      complete_bonus: Pontos por completar uma caixa
+      random_order: "Ordem aleatória das caixas (desligado: pelo número da caixa)"
+      order: "Caixas pela ordem de jogo, por nome e separadas por vírgulas (as outras seguem-se)"
+      target_score: "Pontos que ganham o jogo de imediato (0: jogar todas as caixas)"
+  de:
+    name: Progressive Domination
+    description: >-
+      Mehrere Boxen, aber nur eine kann gleichzeitig eingenommen werden. Beide Teams erfahren, welche Box aktiv
+      ist; das Team, das sie hält, punktet für jede Minute, und hat es sie lange genug gehalten, ist die Box
+      für dieses Team abgeschlossen und gesperrt, und die nächste Box der Reihenfolge wird beiden Teams
+      gemeldet.
+    params:
+      capture_hold_ms: Haltezeit zum Einnehmen (ms)
+      complete_min: Minuten, die ein Team die aktive Box halten muss, um sie abzuschließen
+      points_per_min: Punkte für jede volle Minute, die ein Team die aktive Box hält
+      complete_bonus: Punkte für das Abschließen einer Box
+      random_order: "Zufällige Reihenfolge der Boxen (aus: nach Box-Nummer)"
+      order: "Boxen in Spielreihenfolge, nach Namen und durch Kommas getrennt (die übrigen folgen)"
+      target_score: "Punkte, die das Spiel sofort gewinnen (0: alle Boxen spielen)"
+  zh-tw:
+    name: 漸進佔點
+    description: 場上有好幾個盒子，但同一時間只能佔領其中一個。兩隊都會收到目前啟用的是哪個盒子；佔有它的隊伍每分鐘得分，佔有夠久之後，這個盒子就算該隊完成並鎖定，下一個盒子則會通知兩隊。
+    params:
+      capture_hold_ms: 佔領需按住的時間（毫秒）
+      complete_min: 隊伍要佔有啟用中的盒子幾分鐘才算完成
+      points_per_min: 隊伍佔有啟用中的盒子，每滿一分鐘的得分
+      complete_bonus: 完成一個盒子的得分
+      random_order: 盒子的順序隨機（關閉：依盒子編號）
+      order: 盒子的遊玩順序，用名稱、以逗號分隔（其餘接在後面）
+      target_score: 達到這個分數就立刻獲勝（0：玩完所有盒子）

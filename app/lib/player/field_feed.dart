@@ -459,6 +459,20 @@ class FieldFeed extends ChangeNotifier {
     }
   }
 
+  /// The box Progressive Domination has active now (decision PD-MODE-15): the
+  /// name in the newest `progressive.activated`, unless a box was completed
+  /// since (the next one's activation follows it at once); else null.
+  String? get activeBox {
+    for (final e in events) {
+      if (e.type == 'progressive.completed') return null;
+      if (e.type == 'progressive.activated') {
+        final zone = e.data['zone'];
+        return zone is String ? zone : null;
+      }
+    }
+    return null;
+  }
+
   /// The game's scenario as this connection may see it (its name and
   /// objectives), or null.
   Map<String, Object?>? get scenario {

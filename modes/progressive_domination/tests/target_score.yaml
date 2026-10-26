@@ -1,0 +1,15 @@
+
+name: A team that reaches the target score wins at once, before the box completes
+params: { complete_min: 10, points_per_min: 6, target_score: 12, capture_hold_ms: 1000 }
+nodes: { alpha: zone, bravo: zone }
+steps:
+  - hold: { node: alpha, team: blue, s: 1 }
+  - wait: 60
+  - expect_score: { team: blue, points: 6 }
+  - expect_status: running
+  - wait: 60
+  - expect_score: { team: blue, points: 12 }
+  - expect: { type: game.end, node: controller, data: { winner: blue } }
+  - expect_status: ended
+  - expect_no: progressive.completed
+  - expect_no: script.error

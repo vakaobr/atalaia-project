@@ -1,0 +1,20 @@
+
+name: The GM can give the active box to a team or free it; freeing it stops the count
+params: { complete_min: 2, points_per_min: 4, capture_hold_ms: 2000 }
+nodes: { alpha: zone, bravo: zone }
+steps:
+  - wait: 5
+  - input: { node: bravo, type: cmd.set_owner, data: { team: red } }   # an inactive box ignores the GM too
+  - expect_no: zone.captured
+  - input: { node: alpha, type: cmd.set_owner, data: { team: red } }   # 5 s
+  - expect: { type: zone.captured, node: alpha, team: red, at: 5 }
+  - wait: 30
+  - input: { node: alpha, type: cmd.set_owner, data: { team: none } }  # 35 s: freed, 30 s of the minute lost
+  - expect: { type: zone.neutralized, node: alpha, data: { previous_team: red } }
+  - expect_screen: { node: alpha, template: neutral, data: { step: 1 } }
+  - wait: 100
+  - expect_score: { team: red, points: 0 }
+  - input: { node: alpha, type: cmd.set_owner, data: { team: blue } } # 135 s
+  - wait: 60
+  - expect_score: { team: blue, points: 4 }
+  - expect_no: script.error

@@ -116,6 +116,24 @@ void main() {
         'refused',
       ]),
     );
+    // Progressive Domination: any box of the game is a zone; the controller
+    // picks the active one (a game with it needs a controller).
+    final pd = catalog.byId('org.atalaia.progressive_domination')!;
+    expect(pd.needsController, isTrue);
+    expect(pd.name('pt'), 'Domínio Progressivo');
+    expect(pd.name('en'), 'Progressive Domination');
+    expect(pd.name('de'), 'Progressive Domination');
+    expect(pd.name('zh-tw'), '漸進佔點');
+    expect(pd.roles.map((r) => r.name), ['zone']);
+    expect(pd.role('zone')!.requires, ['team_input']);
+    expect(
+      pd.screens.keys,
+      containsAll(['inactive', 'neutral', 'captured', 'completed']),
+    );
+    expect(
+      pd.params.firstWhere((p) => p.name == 'complete_min').label('pt'),
+      'Minutos que uma equipa mantém a caixa ativa para a completar',
+    );
     expect(catalog.byId('org.atalaia.respawn')!.needsController, isFalse);
   });
 

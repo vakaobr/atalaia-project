@@ -116,6 +116,7 @@ DATA_FIELDS = {
     'puzzle': DataField(36, 'string', False),
     'release': DataField(37, 'string', False),
     'mode': DataField(38, 'string', False),
+    'step': DataField(39, 'integer', False),
 }
 
 EVENTS = {
@@ -170,6 +171,8 @@ EVENTS = {
     'medic.empty': EventDef(51, 'normal', ()),
     'node.update_failed': EventDef(52, 'critical', ('release', 'reason', 'fw')),
     'node.modes_failed': EventDef(53, 'critical', ('mode', 'reason')),
+    'progressive.activated': EventDef(54, 'critical', ('zone', 'step')),
+    'progressive.completed': EventDef(55, 'critical', ('zone', 'step')),
 }
 
 PAYLOAD_FIELDS = {

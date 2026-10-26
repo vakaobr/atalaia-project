@@ -1,0 +1,15 @@
+
+name: A team that completes every box with the most points wins
+params: { complete_min: 1, points_per_min: 3, capture_hold_ms: 1000 }
+nodes: { alpha: zone, bravo: zone }
+steps:
+  - hold: { node: alpha, team: red, s: 1 }
+  - wait: 60
+  - hold: { node: bravo, team: red, s: 1 }
+  - wait: 60
+  - expect: { type: progressive.completed, team: red, data: { zone: bravo, step: 2 } }
+  - expect: { type: game.end, node: controller, data: { winner: red } }
+  - expect_status: ended
+  - expect_score: { team: red, points: 6 }
+  - expect_score: { team: blue, points: 0 }
+  - expect_no: script.error

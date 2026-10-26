@@ -68,6 +68,7 @@ typedef struct {
 #define VIP_ZH   "org.atalaia.vip_payload {\"capture_hold_ms\":3000,\"lang\":\"zh-tw\"}"
 #define OBJ      "org.atalaia.objectives {}"
 #define MONEY    "org.atalaia.money_factory {\"capacity\":50,\"capture_hold_ms\":3000}"
+#define PROG     "org.atalaia.progressive_domination {\"capture_hold_ms\":3000,\"complete_min\":10}"
 
 /* Data as the modes (modes/bomb, modes/domination, modes/codes) and the shell send it. */
 static const screen_case_t cases[] = {
@@ -432,6 +433,41 @@ static const screen_case_t cases[] = {
      MONEY},
     {"yaml_money_refused_zh-tw", "refused",
      "{\"reason\":\"full\",\"player\":\"r1\",\"team\":\"red\",\"carrying\":20}", MONEY},
+    /* Progressive Domination: a box waiting, the active box free, being taken, held, held in
+     * the last place while another team takes it, and completed; every language once or more. */
+    {"yaml_prog_inactive", "inactive", "{\"done\":1,\"of\":4}", PROG},
+    {"yaml_prog_inactive_pt", "inactive", "{\"done\":1,\"of\":4}", PROG},
+    {"yaml_prog_inactive_no_word_de", "inactive", "{}", PROG},
+    {"yaml_prog_inactive_zh-tw", "inactive", "{\"done\":1,\"of\":4}", PROG},
+    {"yaml_prog_neutral", "neutral", "{\"step\":2,\"of\":4,\"final\":false}", PROG},
+    {"yaml_prog_neutral_taking_pt", "neutral",
+     "{\"step\":2,\"of\":4,\"final\":false,\"taker\":\"blue\",\"progress\":0.4}", PROG},
+    {"yaml_prog_neutral_final_de", "neutral", "{\"step\":4,\"of\":4,\"final\":true}", PROG},
+    {"yaml_prog_neutral_zh-tw", "neutral", "{\"step\":2,\"of\":4,\"final\":false}", PROG},
+    {"yaml_prog_captured", "captured",
+     "{\"team\":\"red\",\"since\":95,\"step\":2,\"of\":4,\"final\":false,\"held_min\":4,"
+     "\"need_min\":10,\"points\":24,\"share\":0.4}",
+     PROG},
+    {"yaml_prog_captured_pt", "captured",
+     "{\"team\":\"red\",\"since\":95,\"step\":2,\"of\":4,\"final\":false,\"held_min\":4,"
+     "\"need_min\":10,\"points\":24,\"share\":0.4}",
+     PROG},
+    {"yaml_prog_captured_final_taking_de", "captured",
+     "{\"team\":\"blue\",\"since\":95,\"step\":4,\"of\":4,\"final\":true,\"held_min\":9,"
+     "\"need_min\":10,\"points\":54,\"share\":0.9,\"taker\":\"red\",\"progress\":0.6}",
+     PROG},
+    {"yaml_prog_captured_zh-tw", "captured",
+     "{\"team\":\"red\",\"since\":95,\"step\":2,\"of\":4,\"final\":false,\"held_min\":4,"
+     "\"need_min\":10,\"points\":24,\"share\":0.4}",
+     PROG},
+    {"yaml_prog_completed", "completed", "{\"team\":\"blue\",\"step\":1,\"of\":4,\"done\":1}",
+     PROG},
+    {"yaml_prog_completed_pt", "completed", "{\"team\":\"blue\",\"step\":1,\"of\":4,\"done\":1}",
+     PROG},
+    {"yaml_prog_completed_de", "completed", "{\"team\":\"blue\",\"step\":1,\"of\":4,\"done\":1}",
+     PROG},
+    {"yaml_prog_completed_zh-tw", "completed", "{\"team\":\"blue\",\"step\":1,\"of\":4,\"done\":1}",
+     PROG},
 };
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))
 

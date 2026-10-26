@@ -124,7 +124,8 @@ export function eventWords(e) {
     }
     const s = t(key, { team, player: d.player || '', remaining: d.remaining,
                        used: d.player_heals_used, amount: d.amount, puzzle, code: d.code || '',
-                       objective: d.objective || '', scenario: d.scenario || '', reason });
+                       objective: d.objective || '', scenario: d.scenario || '', reason,
+                       zone: d.zone || '', step: d.step });
     return s === key ? '' : s;
 }
 

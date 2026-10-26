@@ -730,6 +730,12 @@ tr.offline td {
     border-style: dashed;
 }
 
+/* Progressive Domination's active box (field-view.js): a ring, not a colour, so it works with every team colour */
+.marker.active {
+    outline: 3px solid #ffc107;
+    outline-offset: 3px;
+}
+
 .marker-id {
     font-weight: 700;
     font-size: 0.9rem;

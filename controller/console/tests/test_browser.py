@@ -1221,6 +1221,33 @@ class ConsoleBrowserTests(unittest.TestCase):
         expect(collected).to_contain_text("r1 (red) collected 12 money")
         expect(deposited).to_contain_text("r1 (red) banked 12: 12 points")
 
+    def test_progressive_domination_game_and_its_events(self):
+        """A Progressive Domination game from the form (its parameters in Portuguese); the
+        activation and the completion of a box read as words in the feed, in both languages."""
+        page = self.console()
+        page.get_by_test_id("game-name").fill("Progressivo")
+        page.get_by_test_id("game-source").select_option("mode:org.atalaia.progressive_domination")
+        expect(page.locator('label[for="game-complete_min"]')).to_contain_text("Minutos que uma equipa mantém")
+        page.locator("#game-complete_min").fill("5")
+        page.get_by_test_id("game-create").click()
+        expect(page.get_by_test_id("game-state")).to_have_text("pronto")
+        game = self.field.bundle.controller.game
+        self.assertEqual((game["mode_id"], game["params"]["complete_min"], game["params"]["points_per_min"]),
+                         ("org.atalaia.progressive_domination", 5, 6))
+        self.field.http.post(f"/api/v1/games/{game['id']}/start", json={"force": True})
+        self.field.host.transmitted_all(0.3)
+        fc = self.field.bundle.controller.fc
+        fc.controller_event("progressive.activated", {"zone": "Moinho", "step": 2}, team=None, prio="critical")
+        fc.controller_event("progressive.completed", {"zone": "Moinho", "step": 2}, team="red", prio="critical")
+        page.get_by_test_id("tab-feed").click()
+        activated = page.locator('[data-testid=feed] [data-type="progressive.activated"]')
+        completed = page.locator('[data-testid=feed] [data-type="progressive.completed"]')
+        expect(activated).to_contain_text("A caixa Moinho está ativa (n.º 2)")
+        expect(completed).to_contain_text("red completou a caixa Moinho (n.º 2)")
+        page.get_by_test_id("lang").first.select_option("en")
+        expect(activated).to_contain_text("Box Moinho is active now (number 2)")
+        expect(completed).to_contain_text("red completed box Moinho (number 2)")
+
     def test_a_scenario_over_the_objectives_package(self):
         """A scenario package (kind: scenario, the hand-written example of plan phase 6) uploaded,
         then a game of it from the form with the objectives package ticked; a box's join names the

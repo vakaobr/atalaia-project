@@ -53,6 +53,8 @@ static const uint8_t data_hacking_solved[] = {36, 10};
 static const uint8_t data_medic_heal[] = {14, 32, 33};
 static const uint8_t data_node_update_failed[] = {37, 3, 21};
 static const uint8_t data_node_modes_failed[] = {38, 3};
+static const uint8_t data_progressive_activated[] = {5, 39};
+static const uint8_t data_progressive_completed[] = {5, 39};
 
 const atalaia_event_def_t atalaia_event_defs[] = {
     {"game.start", ATALAIA_EV_GAME_START, ATALAIA_PRIO_CRITICAL, data_game_start, 1},
@@ -106,6 +108,8 @@ const atalaia_event_def_t atalaia_event_defs[] = {
     {"medic.empty", ATALAIA_EV_MEDIC_EMPTY, ATALAIA_PRIO_NORMAL, NULL, 0},
     {"node.update_failed", ATALAIA_EV_NODE_UPDATE_FAILED, ATALAIA_PRIO_CRITICAL, data_node_update_failed, 3},
     {"node.modes_failed", ATALAIA_EV_NODE_MODES_FAILED, ATALAIA_PRIO_CRITICAL, data_node_modes_failed, 2},
+    {"progressive.activated", ATALAIA_EV_PROGRESSIVE_ACTIVATED, ATALAIA_PRIO_CRITICAL, data_progressive_activated, 2},
+    {"progressive.completed", ATALAIA_EV_PROGRESSIVE_COMPLETED, ATALAIA_PRIO_CRITICAL, data_progressive_completed, 2},
 };
 const size_t atalaia_event_def_count =
     sizeof(atalaia_event_defs) / sizeof(atalaia_event_defs[0]);
@@ -149,6 +153,7 @@ const atalaia_data_field_def_t atalaia_data_field_defs[] = {
     {"puzzle", ATALAIA_DATA_PUZZLE, ATALAIA_FIELD_STRING, false},
     {"release", ATALAIA_DATA_RELEASE, ATALAIA_FIELD_STRING, false},
     {"mode", ATALAIA_DATA_MODE, ATALAIA_FIELD_STRING, false},
+    {"step", ATALAIA_DATA_STEP, ATALAIA_FIELD_INTEGER, false},
 };
 const size_t atalaia_data_field_def_count =
     sizeof(atalaia_data_field_defs) / sizeof(atalaia_data_field_defs[0]);

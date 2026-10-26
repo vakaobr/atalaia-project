@@ -383,6 +383,16 @@ modes:
       carry, and the first team to bank the target can win. Written and tested in software, not yet
       played on real boxes.
     meta: Factory and bank boxes or phones with NFC · player tags · needs the field controller
+  progressive_domination:
+    title: Progressive Domination
+    text: >-
+      Several boxes, but only one can be captured at a time, and both teams are told which. The
+      team that holds the active box scores for every full minute; once a team has held it long
+      enough, the box is completed for that team and locked, and the next box in the order is
+      announced to both teams. The order is the GM's list, the box numbers or random; the game ends
+      when the last box is completed, or when a team reaches a target score. Written and tested in
+      software, not yet played on real boxes.
+    meta: Boxes with team buttons · needs the field controller
   codes:
     title: Codes (modifier)
     text: >-
