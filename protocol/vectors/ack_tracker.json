@@ -1,0 +1,18 @@
+{
+  "description": "The controller's ACK base and bitmap for the seqs received from one box (one node, one epoch). Both controllers (simulator/atalaia_sim/field_controller.py AckTracker, used by the Pi; app/lib/controller/field_controller.dart AckTracker, the phone) must give exactly this ack_seq (65535 = 0xFFFF = nothing contiguous yet) and ack_bitmap (hex, bit n = ack_seq + 1 + n, trailing zero bytes dropped; null = no bitmap). 'received' lists inclusive [first, last] seq ranges in arrival order. Rule (decision SL-8): every seq more than 128 below the highest received counts as received, so a packet lost for good cannot stall the base.",
+  "window": 128,
+  "cases": [
+    {"name": "in_order", "received": [[0, 4]], "ack_seq": 4, "ack_bitmap": null},
+    {"name": "gap_inside_window", "received": [[0, 5], [7, 7]], "ack_seq": 5, "ack_bitmap": "02"},
+    {"name": "seq_zero_missing", "received": [[1, 1]], "ack_seq": 65535, "ack_bitmap": "02"},
+    {"name": "gap_exactly_128_below_is_kept", "received": [[0, 5], [7, 134]], "ack_seq": 5, "ack_bitmap": "feffffffffffffffffffffffffffffff01"},
+    {"name": "gap_129_below_is_given_up", "received": [[0, 5], [7, 135]], "ack_seq": 135, "ack_bitmap": null},
+    {"name": "permanent_gap_then_261", "received": [[0, 5], [7, 261]], "ack_seq": 261, "ack_bitmap": null},
+    {"name": "permanent_gap_then_1000_packets", "received": [[0, 5], [7, 1000]], "ack_seq": 1000, "ack_bitmap": null},
+    {"name": "seq_zero_lost_for_good", "received": [[1, 200]], "ack_seq": 200, "ack_bitmap": null},
+    {"name": "late_straggler_changes_nothing", "received": [[0, 5], [7, 261], [6, 6]], "ack_seq": 261, "ack_bitmap": null},
+    {"name": "gap_given_up_while_receiving", "received": [[0, 5], [7, 100], [101, 200]], "ack_seq": 200, "ack_bitmap": null},
+    {"name": "jump_ahead_keeps_newest_in_bitmap", "received": [[0, 2], [500, 500]], "ack_seq": 371, "ack_bitmap": "0000000000000000000000000000000001"},
+    {"name": "two_gaps_both_given_up", "received": [[0, 9], [11, 11], [13, 200]], "ack_seq": 200, "ack_bitmap": null}
+  ]
+}

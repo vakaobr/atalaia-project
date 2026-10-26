@@ -141,7 +141,17 @@ class FieldNode {
 }
 
 /// Which seqs arrived from each (node, epoch), as ACK payloads.
+///
+/// A packet lost for good would hold the base back for ever and 256 packets
+/// later the box's newest seq would be outside the bitmap (decision SL-8),
+/// so every seq more than [gapWindow] below the highest received counts as
+/// received. Same rule as AckTracker in simulator/atalaia_sim/
+/// field_controller.py; protocol/vectors/ack_tracker.json pins both.
 class AckTracker {
+  /// The box's outbox holds 32 entries resent every 3 s at most, so one
+  /// still waiting is never this old; 128 is half the bitmap.
+  static const gapWindow = 128;
+
   final _contig = <(int, int), int>{};
   final _above = <(int, int), Set<int>>{};
 
@@ -150,6 +160,11 @@ class AckTracker {
     var contig = _contig[key] ?? -1;
     if (seq <= contig) return;
     final above = _above.putIfAbsent(key, () => <int>{})..add(seq);
+    final floor = above.reduce((a, b) => a > b ? a : b) - gapWindow - 1;
+    if (floor > contig) {
+      contig = floor;
+      above.removeWhere((x) => x <= contig);
+    }
     while (above.remove(contig + 1)) {
       contig += 1;
     }

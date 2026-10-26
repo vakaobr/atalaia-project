@@ -122,11 +122,12 @@ class AckWindowTests(unittest.TestCase):
             tracker.record(5, 0, seq)
         return tracker.ack_payload(5, 0)
 
-    def test_the_shipped_tracker_cannot_acknowledge_past_a_hole(self):
+    def test_the_shipped_tracker_acknowledges_past_a_hole(self):
+        # Before SL-8 was built (2026-10-26) the shipped tracker stayed at the hole (ack_seq 5) and could not
+        # cover 299, 256 numbers past it; now it skips a hole older than 128 as the study's model does.
         payload = self._fed(AckTracker())
-        self.assertEqual(payload["ack_seq"], 5)  # stuck at the hole
-        self.assertTrue(_covers(payload, 200))
-        self.assertFalse(_covers(payload, 299))  # 256 numbers past the hole: out of the bitmap's reach
+        self.assertTrue(all(_covers(payload, s) for s in (200, 290, 299)))
+        self.assertEqual(payload, self._fed(GapSkippingAckTracker(128)))
 
     def test_skipping_a_hole_keeps_the_newest_packets_covered(self):
         payload = self._fed(GapSkippingAckTracker(128))

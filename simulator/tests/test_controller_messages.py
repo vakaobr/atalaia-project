@@ -117,10 +117,57 @@ class AckTrackerTests(unittest.TestCase):
         self.assertEqual(a.ack_payload(3, 2)["ack_seq"], 0)
         self.assertEqual(a.latest_epoch(3), 2)
 
-    def test_bitmap_stops_at_256(self):
+    def test_bitmap_covers_the_newest_seq_after_a_jump(self):
+        # A jump to 300 used to leave it outside the 256-bit bitmap; now the
+        # base moves to 171 (SL-8) and seq 300 is bit 128 of the bitmap.
         a = AckTracker()
         a.record(1, 0, 300)
-        self.assertNotIn("ack_bitmap", a.ack_payload(1, 0))
+        msg = a.ack_payload(1, 0)
+        self.assertEqual(msg["ack_seq"], 171)
+        self.assertEqual(msg["ack_bitmap"], bytes(16) + b"\x01")
+
+    def test_a_packet_lost_for_good_does_not_stall_the_acks(self):
+        # SL-8: seq 6 never arrives; 256 packets later the box's newest seq
+        # used to fall outside the bitmap and no ACK could name it again.
+        a = AckTracker()
+        for seq in range(6):
+            a.record(7, 1, seq)
+        for seq in range(7, 1200):
+            a.record(7, 1, seq)
+            msg = a.ack_payload(7, 1)
+            self.assertGreaterEqual(msg["ack_seq"], seq - AckTracker.GAP_WINDOW - 1)
+            # The newest seq is named: in the base or in the bitmap.
+            if msg["ack_seq"] < seq:
+                n = seq - msg["ack_seq"] - 1
+                self.assertTrue(msg["ack_bitmap"][n // 8] >> (n % 8) & 1)
+        self.assertEqual(a.ack_payload(7, 1), {"ack_node": 7, "ack_seq": 1199})
+
+    def test_the_tracker_forgets_what_it_gave_up_on(self):
+        a = AckTracker()
+        a.record(7, 1, 0)
+        for seq in range(2, 2000):
+            a.record(7, 1, seq)
+        self.assertLessEqual(len(a._above[(7, 1)]), AckTracker.GAP_WINDOW + 1)
+
+    def test_shared_vectors(self):
+        # protocol/vectors/ack_tracker.json: the phone's tracker passes the
+        # same cases byte for byte.
+        path = os.path.join(os.path.dirname(__file__), "..", "..", "protocol", "vectors",
+                            "ack_tracker.json")
+        with open(path) as f:
+            vectors = json.load(f)
+        self.assertEqual(vectors["window"], AckTracker.GAP_WINDOW)
+        for case in vectors["cases"]:
+            with self.subTest(case["name"]):
+                a = AckTracker()
+                for first, last in case["received"]:
+                    for seq in range(first, last + 1):
+                        a.record(5, 2, seq)
+                msg = a.ack_payload(5, 2)
+                self.assertEqual(msg["ack_seq"], case["ack_seq"])
+                bitmap = case["ack_bitmap"]
+                self.assertEqual(msg.get("ack_bitmap"),
+                                 None if bitmap is None else bytes.fromhex(bitmap))
 
 
 class EventHandlingTests(unittest.TestCase):

@@ -188,7 +188,21 @@ class AckTracker:
     with every seq below it also received (0xFFFF when seq 0 is missing:
     "nothing contiguous yet"); ``ack_bitmap`` bit n says whether
     ``ack_seq + 1 + n`` arrived, for the next 256 seqs.
+
+    A packet lost for good (a STATE is never sent again, an event's resend
+    takes a new seq) would hold ``ack_seq`` back for ever, and 256 packets
+    later the box's newest seq would be outside the bitmap and unACKable
+    (decision SL-8). So every seq more than ``GAP_WINDOW`` below the highest
+    one received counts as received. The Dart port (AckTracker in
+    app/lib/controller/field_controller.dart) does the same;
+    protocol/vectors/ack_tracker.json pins both.
     """
+
+    #: A seq this far below the highest received is given up on. The box's
+    #: outbox holds 32 entries resent every 3 s at most, so one still
+    #: waiting is never this old; and 128 is half the bitmap, so the highest
+    #: seq always stays inside it.
+    GAP_WINDOW = 128
 
     def __init__(self) -> None:
         self._contig: dict[tuple[int, int], int] = {}
@@ -201,6 +215,11 @@ class AckTracker:
             return
         above = self._above.setdefault(key, set())
         above.add(seq)
+        floor = max(above) - self.GAP_WINDOW - 1
+        if floor > contig:
+            contig = floor
+            above = {x for x in above if x > contig}
+            self._above[key] = above
         while contig + 1 in above:
             contig += 1
             above.discard(contig)
