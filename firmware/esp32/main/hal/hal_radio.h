@@ -12,6 +12,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "atalaia/duty_cycle.h"
 #include "radio/noise_stats.h"
 
 typedef enum {
@@ -43,6 +44,20 @@ typedef struct {
     uint32_t cad_us;   /* the whole CAD, standby to its result; 0 when none was run */
     uint32_t rearm_us; /* putting the radio back in receive; 0 when none was needed */
 } hal_radio_busy_t;
+
+/*
+ * A bench profile (set_profile): another modulation and CAD setting for a test, on a channel
+ * inside one sub-band of EU868, under that sub-band's limits. Bench images only use it
+ * (docs/runbooks/lbt-bench-gate.md: the AS923-TW modulation on 868.3 MHz).
+ */
+typedef struct {
+    uint8_t sf;
+    uint32_t bw_hz;
+    uint32_t freq_hz;
+    atalaia_cad_params_t cad;
+    uint8_t eu868_band;  /* atalaia_band_t: the sub-band whose limits apply */
+    int8_t tx_power_dbm; /* conducted; the HAL refuses one above the sub-band's legal power */
+} hal_radio_profile_t;
 
 typedef struct {
     /*
@@ -116,6 +131,12 @@ typedef struct {
      * about 10 ms rather than 60. May be NULL (the wait stays what it is).
      */
     void (*set_recv_wait_ms)(uint32_t ms);
+
+    /*
+     * Bench profile (see hal_radio_profile_t): sets it (0, or -1 refused: nothing changed), or,
+     * with NULL, puts the build's region back. The radio is left in standby. May be NULL.
+     */
+    int (*set_profile)(const hal_radio_profile_t *profile);
 
     void (*deinit)(void);
 } hal_radio_ops_t;

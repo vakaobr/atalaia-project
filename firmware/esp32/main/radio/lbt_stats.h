@@ -114,10 +114,16 @@ typedef struct {
     lbt_cmd_kind_t kind;
     uint32_t frames;
     uint32_t gap_min_us, gap_max_us; /* probe: the gap between two probes' starts */
+    /* "proxy=as923": the AS923-TW modulation on 868.3 MHz (lbt_profile.h). The options below
+     * mean something only with it: peak= / min= (-1: the region table's), power= (dBm
+     * conducted, INT8_MIN: the proxy's default). */
+    bool proxy;
+    int det_peak, det_min, power_dbm;
 } lbt_cmd_t;
 
-/* Parses what follows "@lbt ". False (and kind BAD) if it is not one of the four commands or a
- * number is out of range. */
+/* Parses what follows "@lbt ": "tx|probe [numbers] [proxy=as923 [peak=N] [min=N] [power=dBm]]",
+ * "stop", "status". False (and kind BAD) if it is not one of them or a number is out of range
+ * (with the proxy, tx frames are capped by its duty budget, lbt_profile_frames_max). */
 bool lbt_parse_cmd(const char *args, lbt_cmd_t *out);
 
 /* ---- the bench frame and the random numbers ---- */

@@ -35,6 +35,8 @@ typedef struct {
     int8_t tx_power_dbm; /* SX1262 conducted power for this sub-band */
     int fem_gain_db;
     int antenna_gain_dbi;
+    uint8_t sf_override; /* 0: the region's SF and bandwidth (a bench profile sets both) */
+    uint32_t bw_override_hz;
     uint32_t budget_cap_us; /* 0 = none; a lower budget than the band's (host tests) */
 } radio_limits_t;
 
@@ -44,6 +46,14 @@ void radio_limits_init(radio_limits_t *l, int fem_gain_db, int antenna_gain_dbi)
 /* Another region (host tests and the host modem's --region): its budgets, no channel yet.
  * False, changing nothing, for an unknown region. */
 bool radio_limits_set_region(radio_limits_t *l, atalaia_region_t region);
+
+/*
+ * A bench profile's modulation on an EU868 sub-band's limits (the AS923-TW modulation on
+ * 868.3 MHz): time on air and the channel's fit follow this SF and bandwidth, the budget and the
+ * power the sub-band. False, changing nothing, outside EU868. The channel must be set again.
+ */
+bool radio_limits_set_modulation(radio_limits_t *l, uint8_t sf, uint32_t bw_hz);
+void radio_limits_clear_modulation(radio_limits_t *l); /* the region's again; channel unset */
 
 /*
  * Moves to a channel. Returns false, changing nothing, if the channel (at the

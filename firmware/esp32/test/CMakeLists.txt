@@ -166,6 +166,7 @@ set(SHELL_SOURCES
     ${SHELL_DIR}/radio/radio_stats.c
     ${SHELL_DIR}/radio/channel_busy.c
     ${SHELL_DIR}/radio/lbt_stats.c
+    ${SHELL_DIR}/radio/lbt_profile.c
     ${SHELL_DIR}/box_game.c
     ${SHELL_DIR}/box_lobby.c
     ${SHELL_DIR}/serial_console.c

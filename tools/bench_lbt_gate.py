@@ -13,6 +13,12 @@
                                                            command on the board's console, saves what
                                                            it prints until the test ends, then reports
 
+The AS923-TW proxy ("@lbt probe 100 proxy=as923"): AS923-TW's modulation (SF9/500 kHz) and CAD
+settings run on 868.3 MHz, inside EU868 sub-band g, because a bench in Europe may not transmit on
+921.5 MHz. The report then names the profile, the CAD settings under test (detPeak / detMin and
+whether they are bench-proven) and the duty limit, and the tool REFUSES (exit 66) a proxy log whose
+channel is not inside 868.0-868.6 MHz or touches 920-925 MHz.
+
 The log is what a board flashed with the bench image (docker_fw.py bench) prints after
 "@lbt probe" (docs/runbooks/lbt-bench-gate.md): lines "LBT,..." among whatever else the console
 says. This script does not trust the firmware's own summary: it rebuilds every received frame's
@@ -189,6 +195,17 @@ def classify(log: Log, sym_us: int) -> Result:
     return r
 
 
+PROXY_PROFILE = "as923-eu868"
+PROXY_BAND = (868_000_000, 868_600_000)  # EU868 sub-band g
+AS923_BAND = (920_000_000, 925_000_000)
+
+
+def proxy_channel_ok(freq: int, bw: int) -> bool:
+    """The whole channel inside sub-band g and nowhere near AS923 (firmware: lbt_profile_channel_ok)."""
+    lo, hi = freq - bw // 2, freq + bw // 2
+    return PROXY_BAND[0] <= lo and hi <= PROXY_BAND[1] and not (hi >= AS923_BAND[0] and lo <= AS923_BAND[1])
+
+
 def pct(a: int, b: int) -> float:
     return 100.0 * a / b if b else 0.0
 
@@ -210,10 +227,28 @@ def report(log: Log, gate: float, cad_assumed_us: int, out=sys.stdout) -> int:
 
     sf = int(log.cfg.get("sf", "7"))
     bw = int(log.cfg.get("bw", "125000"))
+    freq = int(log.cfg.get("freq", "0"))
     sym_us = int(log.cfg.get("sym_us", str((1 << sf) * 1_000_000 // bw)))
+    profile = log.cfg.get("profile", "")
+    proxy = profile == PROXY_PROFILE
+    if proxy and not proxy_channel_ok(freq, bw):
+        p(f"REFUSED: the log says profile {profile} on {freq / 1e6:.3f} MHz / {bw // 1000} kHz wide: the "
+          f"proxy's channel must lie inside {PROXY_BAND[0] / 1e6:.1f}-{PROXY_BAND[1] / 1e6:.1f} MHz "
+          f"(EU868 sub-band g) and clear of {AS923_BAND[0] / 1e6:.0f}-{AS923_BAND[1] / 1e6:.0f} MHz. "
+          "Do not transmit on it; flash the bench image from this checkout.")
+        return 66
     r = classify(log, sym_us)
-    p(f"Listen-before-talk bench gate (SL-25): region {log.cfg.get('region', '?')}, "
-      f"{int(log.cfg.get('freq', '0')) / 1e6:.3f} MHz, SF{sf} / {bw // 1000} kHz, symbol {sym_us} us")
+    p(f"Listen-before-talk bench gate (SL-25): "
+      f"{'profile ' + profile + ', ' if profile else ''}region {log.cfg.get('region', '?')}"
+      f"{', modulation of ' + log.cfg['mod'] if 'mod' in log.cfg else ''}, "
+      f"{freq / 1e6:.3f} MHz, SF{sf} / {bw // 1000} kHz, symbol {sym_us} us")
+    if "det_peak" in log.cfg:
+        proven = log.cfg.get("peak_proven", "0") == "1"
+        duty = int(log.cfg.get("duty_ppm", "0")) / 10000
+        p(f"CAD under test: {log.cfg.get('cad_sym', '?')} symbols, detPeak {log.cfg['det_peak']} "
+          f"({'proven on a board' if proven else 'UNPROVEN: this run tests it'}), detMin {log.cfg.get('det_min', '?')}; "
+          f"duty limit {duty:g} % of the hour, {log.cfg.get('limit_dbm', '?')} dBm, "
+          f"TX power {log.cfg.get('tx_dbm', '?')} dBm conducted")
     p(f"Log: {len(log.probes)} probes, {len(log.frames)} frames received"
       f"{', ended: ' + log.end.get('reason', '?') if log.end else ', no end line (cut short?)'}")
     if not log.probes:
@@ -320,29 +355,42 @@ def report(log: Log, gate: float, cad_assumed_us: int, out=sys.stdout) -> int:
         p(f"INCONCLUSIVE: need at least {MIN_FRAMES} frames and {MIN_PER_DECILE} probes in every tenth "
           f"(have {r.frames} frames); the rate so far is {pct(total_hit, total_n):.1f} %, worst tenth {worst:.1f} %.")
         return 2
+    peak = log.cfg.get("det_peak")
     if ok:
         p(f"PASS: {pct(total_hit, total_n):.1f} % of the probes inside frames found the channel busy, "
-          f"every tenth of the frame above {gate:g} % (worst {worst:.1f} %): the busy test covers the whole frame.")
+          f"every tenth of the frame above {gate:g} % (worst {worst:.1f} %): the busy test covers the whole frame"
+          + (f", with detPeak {peak} at SF{sf} / {bw // 1000} kHz." if proxy and peak else "."))
         return 0
     p(f"FAIL: {pct(total_hit, total_n):.1f} % of the probes inside frames found the channel busy, worst "
       f"tenth {worst:.1f} % (gate {gate:g} %): the busy test does not cover the whole frame; "
       "SL-25's answer becomes \"don't\".")
+    if proxy:
+        p(f"detPeak {peak} did not hold at SF{sf} / {bw // 1000} kHz. Sweep it (the same run on both boards, "
+          f"one value at a time): \"@lbt probe 100 proxy=as923 peak=N\" and \"@lbt tx 100 proxy=as923 peak=N\"; "
+          "the tx side ignores peak=, so give it on the prober. See docs/runbooks/lbt-bench-gate.md.")
     return 1
 
 
 # ---- the self-test: a made-up log, built the way the firmware's would be -------------------------
 
 
-def synthetic(blind_after_us: int | None, frames: int = 40, seed: int = 7, wrap: bool = False) -> list[str]:
+PROXY_CFG = ("LBT,cfg,role=probe,profile=as923-eu868,region=eu868,mod=as923-tw,freq={freq},sf=9,bw=500000,"
+             "sym_us=1024,cad_sym=2,det_peak=23,det_min=10,peak_proven=0,duty_ppm=10000,limit_dbm=14,tx_dbm=-9")
+
+
+def synthetic(blind_after_us: int | None, frames: int = 40, seed: int = 7, wrap: bool = False,
+              proxy_freq: int | None = None) -> list[str]:
     """A prober log of `frames` frames of 92.416 ms. A probe finds the channel busy inside a frame
     if its position is before blind_after_us (a CAD that sees only the preamble: 12544) or always
     (None). Probes every 2-5 ms; lost frames none; the clock may start just before its wrap."""
     import random
 
     rng = random.Random(seed)
-    air, sym = 92416, 1024
+    air, sym = (82176 if proxy_freq else 92416), 1024
     t = (WRAP - 3_000_000) if wrap else 1_000_000
-    lines = [f"LBT,cfg,role=probe,region=eu868,freq=869525000,sf=7,bw=125000,sym_us={sym}",
+    cfg = PROXY_CFG.format(freq=proxy_freq) if proxy_freq else \
+        f"LBT,cfg,role=probe,region=eu868,freq=869525000,sf=7,bw=125000,sym_us={sym}"
+    lines = [cfg,
              "LBT,start,role=probe,frames=%d,gap_us=2000-5000" % frames,
              "I (1234) lbt: some other log line"]
     seq = 0
@@ -403,6 +451,27 @@ def selftest() -> int:
         check(code == 1 and "FAIL" in buf.getvalue(), f"preamble-only fails (wrap={wrap})")
         r = classify(log, 1024)
         check(pct(sum(r.in_hit), sum(r.in_n)) < 20 and r.in_hit[9] == 0, "the payload tenths are blind")
+    # The AS923-TW proxy on 868.3 MHz: the report names the profile, the CAD under test, the duty limit.
+    log = parse(synthetic(None, proxy_freq=868_300_000))
+    buf = io.StringIO()
+    code = report(log, 90.0, 4000, buf)
+    text = buf.getvalue()
+    check(code == 0 and "PASS" in text and "detPeak 23 at SF9 / 500 kHz" in text, "the proxy passes and says detPeak")
+    check("profile as923-eu868" in text and "868.300 MHz, SF9 / 500 kHz" in text, "the proxy's profile and channel are reported")
+    check("UNPROVEN" in text and "duty limit 1 % of the hour" in text and "TX power -9 dBm" in text,
+          "the proxy's CAD status and duty limit are reported")
+    log = parse(synthetic(12544, proxy_freq=868_300_000))
+    buf = io.StringIO()
+    check(report(log, 90.0, 4000, buf) == 1 and "peak=N" in buf.getvalue(), "a failing proxy points at the detPeak sweep")
+    # The proxy is refused outside sub-band g, and on any AS923 frequency.
+    for bad in (921_500_000, 868_600_000, 868_249_999, 868_350_001, 869_525_000, 920_000_000):
+        buf = io.StringIO()
+        check(report(parse(synthetic(None, proxy_freq=bad)), 90.0, 4000, buf) == 66 and "REFUSED" in buf.getvalue(),
+              f"the proxy on {bad} Hz is refused")
+    check(proxy_channel_ok(868_300_000, 500_000) and proxy_channel_ok(868_250_000, 500_000)
+          and proxy_channel_ok(868_350_000, 500_000), "the proxy's channel edges")
+    # A log of the build's own profile without the new fields (older firmware) still reads.
+    check(report(parse(synthetic(None)), 90.0, 4000, io.StringIO()) == 0, "an older log still reports")
     # Too little data.
     log = parse(synthetic(None, frames=5))
     buf = io.StringIO()

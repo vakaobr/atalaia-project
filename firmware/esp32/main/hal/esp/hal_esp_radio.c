@@ -32,6 +32,7 @@
 #include "../../radio/channel_busy.h"
 #include "../../radio/noise_stats.h"
 #include "../../radio/radio_limits.h"
+#include "../../radio/radio_power.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -128,6 +129,23 @@ static uint8_t sx_bw_code(uint32_t bw_hz)
 static const atalaia_region_info_t *region_info(void)
 {
     return atalaia_region_info(RADIO_REGION);
+}
+
+/* The modulation and CAD settings in use: the region's, unless a bench profile (set_profile) has
+ * replaced them for a test (the "@lbt ... proxy=as923" run, docs/runbooks/lbt-bench-gate.md). */
+static uint8_t cur_sf;
+static uint32_t cur_bw_hz;
+static atalaia_cad_params_t cur_cad;
+static bool profile_active;
+static int8_t profile_power_dbm; /* the conducted power the profile asked for (<= the legal one) */
+static uint32_t profile_saved_channel_hz;
+
+static void modulation_from_region(void)
+{
+    const atalaia_region_info_t *r = region_info();
+    cur_sf = r->sf;
+    cur_bw_hz = r->bw_hz;
+    cur_cad = r->cad;
 }
 
 /* SX1262 commands. */
@@ -542,8 +560,9 @@ static int esp_radio_init(void)
 
     /* Set modulation parameters: the region's SF and bandwidth, CR4/5, low-data-rate off (the
      * symbol is 1.024 ms in both regions, well under the 16 ms that needs it). */
-    uint8_t mod_cmd[] = {SX_CMD_SET_MODULATION, region->sf, sx_bw_code(region->bw_hz), LORA_CR,
-                         0x00};
+    modulation_from_region();
+    profile_active = false;
+    uint8_t mod_cmd[] = {SX_CMD_SET_MODULATION, cur_sf, sx_bw_code(cur_bw_hz), LORA_CR, 0x00};
     rc |= sx_cmd(mod_cmd, sizeof(mod_cmd), NULL, 0);
 
     /* Set PA config for SX1262 (+22 dBm capable PA). */
@@ -641,8 +660,7 @@ static int esp_radio_send(const uint8_t *data, size_t len)
      * each transmission, bit 2 of register 0x0889 is cleared at 500 kHz and set otherwise. */
     uint8_t tx_mod;
     if (sx_read_reg(0x0889, &tx_mod) != 0) return -1;
-    tx_mod =
-        region_info()->bw_hz == 500000u ? (uint8_t)(tx_mod & ~0x04u) : (uint8_t)(tx_mod | 0x04u);
+    tx_mod = cur_bw_hz == 500000u ? (uint8_t)(tx_mod & ~0x04u) : (uint8_t)(tx_mod | 0x04u);
     if (sx_write_reg(0x0889, tx_mod) != 0) return -1;
 
     /* Write payload to buffer at offset 0. */
@@ -749,8 +767,7 @@ static int esp_radio_set_channel(uint32_t freq_hz)
     int8_t power;
     if (!radio_limits_power_for(&limits, freq_hz, &power)) {
         ESP_LOGW(TAG, "channel %lu Hz: the %lu kHz channel does not fit in a %s sub-band",
-                 (unsigned long)freq_hz, (unsigned long)(region_info()->bw_hz / 1000),
-                 region_info()->code);
+                 (unsigned long)freq_hz, (unsigned long)(cur_bw_hz / 1000), region_info()->code);
         return -1;
     }
     /* Retune from standby, not mid-receive. Power first when it drops, so the
@@ -759,6 +776,7 @@ static int esp_radio_set_channel(uint32_t freq_hz)
     uint8_t stby[] = {SX_CMD_SET_STANDBY, 0x00};
     rx_armed = false;
     if (sx_cmd(stby, sizeof(stby), NULL, 0) != 0) return -1;
+    if (profile_active && power > profile_power_dbm) power = profile_power_dbm; /* bench profile */
     if (power <= limits.tx_power_dbm) {
         if (sx_set_tx_power(power) != 0 || sx_set_frequency(freq_hz) != 0) return -1;
     } else {
@@ -821,7 +839,7 @@ static bool sx_cad_once(bool *ok)
 {
     uint8_t stby[] = {SX_CMD_SET_STANDBY, 0x00};
     /* The region's CAD settings (core duty_cycle.c, RFC 0001 Amendment 14). */
-    const atalaia_cad_params_t *cp = &region_info()->cad;
+    const atalaia_cad_params_t *cp = &cur_cad;
     uint8_t sym = cp->symbols >= 16  ? 0x04
                   : cp->symbols >= 8 ? 0x03
                   : cp->symbols >= 4 ? 0x02
@@ -895,7 +913,7 @@ static int esp_radio_measure(uint32_t freq_hz, uint32_t dwell_ms, bool cad, nois
  * a receiver flag is believed (channel_busy.h). */
 static uint32_t max_frame_us(void)
 {
-    return atalaia_region_airtime_us(RADIO_REGION, 255) / 4 * 5;
+    return atalaia_airtime_us(cur_sf, cur_bw_hz, 255) / 4 * 5;
 }
 
 /*
@@ -958,6 +976,78 @@ static int esp_radio_channel_busy(hal_radio_busy_t *info)
     return seen ? 1 : 0;
 }
 
+/*
+ * A bench profile: another SF/bandwidth/CAD for a test, on a channel inside one of EU868's
+ * sub-bands, under that sub-band's limits (duty budget, power). Only in an EU868 image. The
+ * channel (at the profile's bandwidth) must fit inside the sub-band the profile names, so that a
+ * wider channel than the sub-band has room for is refused, and the power is the sub-band's
+ * legal one at most. NULL puts the build's region back (modulation, CAD, channel, limits).
+ * The sub-band's airtime already spent stays spent. Call from the radio task, not mid-send.
+ */
+static int esp_radio_set_profile(const hal_radio_profile_t *p)
+{
+    uint8_t stby[] = {SX_CMD_SET_STANDBY, 0x00};
+    rx_armed = false;
+    if (p == NULL) {
+        if (!profile_active) return 0;
+        modulation_from_region();
+        radio_limits_clear_modulation(&limits);
+        profile_active = false;
+        uint8_t mod_cmd[] = {SX_CMD_SET_MODULATION, cur_sf, sx_bw_code(cur_bw_hz), LORA_CR, 0x00};
+        if (sx_cmd(stby, sizeof(stby), NULL, 0) != 0 ||
+            sx_cmd(mod_cmd, sizeof(mod_cmd), NULL, 0) != 0) {
+            return -1;
+        }
+        if (!radio_limits_set_channel(&limits, profile_saved_channel_hz)) return -1;
+        if (sx_set_tx_power(limits.tx_power_dbm) != 0 ||
+            sx_set_frequency(profile_saved_channel_hz) != 0) {
+            return -1;
+        }
+        ESP_LOGI(TAG, "bench profile off: %s, SF%u, BW%luk, ch %lu Hz", region_info()->code,
+                 (unsigned)cur_sf, (unsigned long)(cur_bw_hz / 1000),
+                 (unsigned long)profile_saved_channel_hz);
+        return 0;
+    }
+    if (RADIO_REGION != ATALAIA_REGION_EU868 || p->eu868_band >= ATALAIA_BAND_COUNT ||
+        atalaia_band_of_channel(p->freq_hz, p->bw_hz) != (atalaia_band_t)p->eu868_band) {
+        ESP_LOGW(TAG, "bench profile refused: %lu Hz at %lu kHz is not inside EU868 sub-band %d",
+                 (unsigned long)p->freq_hz, (unsigned long)(p->bw_hz / 1000), (int)p->eu868_band);
+        return -1;
+    }
+    int8_t legal;
+    if (!atalaia_tx_power_for(atalaia_band_info((atalaia_band_t)p->eu868_band), FEM_GAIN_DB,
+                              ANTENNA_GAIN_DBI, &legal) ||
+        p->tx_power_dbm > legal) {
+        ESP_LOGW(TAG, "bench profile refused: %d dBm conducted is over the sub-band's limit",
+                 (int)p->tx_power_dbm);
+        return -1;
+    }
+    if (!profile_active) profile_saved_channel_hz = limits.channel_hz;
+    if (!radio_limits_set_modulation(&limits, p->sf, p->bw_hz) ||
+        !radio_limits_set_channel(&limits, p->freq_hz)) {
+        radio_limits_clear_modulation(&limits);
+        return -1;
+    }
+    cur_sf = p->sf;
+    cur_bw_hz = p->bw_hz;
+    cur_cad = p->cad;
+    profile_power_dbm = p->tx_power_dbm;
+    profile_active = true;
+    uint8_t mod_cmd[] = {SX_CMD_SET_MODULATION, cur_sf, sx_bw_code(cur_bw_hz), LORA_CR, 0x00};
+    if (sx_cmd(stby, sizeof(stby), NULL, 0) != 0 ||
+        sx_cmd(mod_cmd, sizeof(mod_cmd), NULL, 0) != 0 || sx_set_tx_power(profile_power_dbm) != 0 ||
+        sx_set_frequency(p->freq_hz) != 0) {
+        return -1;
+    }
+    ESP_LOGI(TAG,
+             "bench profile on: SF%u, BW%luk, ch %lu Hz, TX %d dBm conducted (limit %d), "
+             "budget %lu ms left this hour",
+             (unsigned)cur_sf, (unsigned long)(cur_bw_hz / 1000), (unsigned long)p->freq_hz,
+             (int)profile_power_dbm, (int)legal,
+             (unsigned long)radio_limits_remaining_ms(&limits, now_ms()));
+    return 0;
+}
+
 static int64_t esp_radio_last_rx_done_us(void)
 {
     return rx_done_us;
@@ -993,6 +1083,7 @@ const hal_radio_ops_t hal_esp_radio_ops = {
     .channel_busy = esp_radio_channel_busy,
     .last_rx_done_us = esp_radio_last_rx_done_us,
     .set_recv_wait_ms = esp_radio_set_recv_wait_ms,
+    .set_profile = esp_radio_set_profile,
     .deinit = esp_radio_deinit,
 };
 

@@ -29,10 +29,35 @@ bool radio_limits_set_region(radio_limits_t *l, atalaia_region_t region)
     return true;
 }
 
+static atalaia_band_t band_of(const radio_limits_t *l, uint32_t channel_hz)
+{
+    if (l->bw_override_hz != 0) return atalaia_band_of_channel(channel_hz, l->bw_override_hz);
+    return atalaia_region_band_of_channel(l->region, channel_hz);
+}
+
+bool radio_limits_set_modulation(radio_limits_t *l, uint8_t sf, uint32_t bw_hz)
+{
+    if (l->region != ATALAIA_REGION_EU868 || sf < 5 || sf > 12 || bw_hz == 0) return false;
+    l->sf_override = sf;
+    l->bw_override_hz = bw_hz;
+    l->band = ATALAIA_BAND_COUNT;
+    l->channel_hz = 0;
+    l->tx_power_dbm = 0;
+    return true;
+}
+
+void radio_limits_clear_modulation(radio_limits_t *l)
+{
+    l->sf_override = 0;
+    l->bw_override_hz = 0;
+    l->band = ATALAIA_BAND_COUNT;
+    l->channel_hz = 0;
+    l->tx_power_dbm = 0;
+}
+
 bool radio_limits_power_for(const radio_limits_t *l, uint32_t channel_hz, int8_t *dbm)
 {
-    const atalaia_band_info_t *info =
-        atalaia_region_band_info(l->region, atalaia_region_band_of_channel(l->region, channel_hz));
+    const atalaia_band_info_t *info = atalaia_region_band_info(l->region, band_of(l, channel_hz));
     return atalaia_tx_power_for(info, l->fem_gain_db, l->antenna_gain_dbi, dbm);
 }
 
@@ -41,13 +66,16 @@ bool radio_limits_set_channel(radio_limits_t *l, uint32_t channel_hz)
     int8_t power;
     if (!radio_limits_power_for(l, channel_hz, &power)) return false;
     l->channel_hz = channel_hz;
-    l->band = atalaia_region_band_of_channel(l->region, channel_hz);
+    l->band = band_of(l, channel_hz);
     l->tx_power_dbm = power;
     return true;
 }
 
 uint32_t radio_limits_airtime_us(const radio_limits_t *l, size_t packet_len)
 {
+    if (l->bw_override_hz != 0) {
+        return atalaia_airtime_us(l->sf_override, l->bw_override_hz, packet_len);
+    }
     return atalaia_region_airtime_us(l->region, packet_len);
 }
 

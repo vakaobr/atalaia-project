@@ -5,7 +5,9 @@
  * The bench test of listen-before-talk's gate (decision SL-25, step 1;
  * docs/runbooks/lbt-bench-gate.md). Bench images only (Kconfig ATALAIA_LBT_BENCH, set in
  * sdkconfig.bench); the commands are typed on the serial console: "@lbt tx", "@lbt probe",
- * "@lbt stop", "@lbt status". Nothing runs until one is typed.
+ * "@lbt stop", "@lbt status". Nothing runs until one is typed. "proxy=as923" runs the AS923-TW
+ * modulation (SF9/500 kHz, its CAD settings) on 868.3 MHz under EU868 sub-band g's limits
+ * (lbt_profile.h), and puts the build's radio settings back when the run ends.
  *
  * The test runs inside the radio task, in place of its loop (radio_task_bench_start): the task
  * owns the SPI bus and the game sends and receives nothing meanwhile. Its log lines ("LBT,...")
@@ -31,25 +33,26 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
+#include "lbt_profile.h"
 #include "lbt_stats.h"
 #include "radio_region.h"
 #include "radio_task.h"
 
 static const char *TAG = "lbt";
 
-/* The transmitter stops when the sub-band's budget left falls under this share of the 10 % hour
- * (360 000 ms): at most 30 % of it, about 3 % of an hour's airtime, is spent, across runs. */
-#define TX_MIN_REMAINING_MS 252000u
-#define IDLE_END_US         (60LL * 1000000)
+/* The transmitter stops when the sub-band's budget left falls under 70 % of it
+ * (lbt_profile_guard_ms): at most 30 % of the sub-band's hour is spent, across runs. */
+#define IDLE_END_US (60LL * 1000000)
 
 typedef struct {
-    char s[112];
+    char s[224]; /* the cfg line is the longest */
 } line_t;
 
 static QueueHandle_t line_q;
 static volatile uint32_t lines_dropped;
 static lbt_cmd_t active;
-static lbt_stats_t stats; /* the prober's; 5 KB of waiting probes */
+static lbt_profile_t prof; /* the radio settings of the run: the build's or the proxy's */
+static lbt_stats_t stats;  /* the prober's; 5 KB of waiting probes */
 
 /* ---- the log: a queue and a task that prints ------------------------------------------- */
 
@@ -68,7 +71,7 @@ static void printer_task(void *arg)
 static bool log_start(void)
 {
     if (line_q != NULL) return true;
-    line_q = xQueueCreate(192, sizeof(line_t));
+    line_q = xQueueCreate(160, sizeof(line_t));
     if (line_q == NULL) return false;
     if (xTaskCreatePinnedToCore(printer_task, "lbt_log", 3072, NULL, 1, NULL, 1) != pdPASS) {
         vQueueDelete(line_q);
@@ -93,17 +96,49 @@ static uint32_t now_us32(void)
     return (uint32_t)esp_timer_get_time();
 }
 
-static uint32_t symbol_us(const atalaia_region_info_t *r)
+static uint32_t symbol_us(const lbt_profile_t *p)
 {
-    return (uint32_t)(((uint64_t)1 << r->sf) * 1000000u / r->bw_hz);
+    return (uint32_t)(((uint64_t)1 << p->sf) * 1000000u / p->bw_hz);
 }
 
+/* The run's radio settings, all of them: profile, channel, modulation, the CAD settings under test
+ * and the duty limit (bench_lbt_gate.py reports them). */
 static void emit_cfg(const char *role)
 {
-    const atalaia_region_info_t *r = atalaia_region_info(RADIO_REGION);
-    emit("LBT,cfg,role=%s,region=%s,freq=%lu,sf=%u,bw=%lu,sym_us=%lu", role, r->code,
-         (unsigned long)radio_region_default_channel_hz(RADIO_REGION), (unsigned)r->sf,
-         (unsigned long)r->bw_hz, (unsigned long)symbol_us(r));
+    char tx[8];
+    if (prof.proxy) {
+        snprintf(tx, sizeof(tx), "%d", (int)prof.tx_power_dbm);
+    } else {
+        snprintf(tx, sizeof(tx), "hal");
+    }
+    emit("LBT,cfg,role=%s,profile=%s,region=%s,mod=%s,freq=%lu,sf=%u,bw=%lu,sym_us=%lu,cad_sym=%u,"
+         "det_peak=%u,det_min=%u,peak_proven=%u,duty_ppm=%lu,limit_dbm=%d,tx_dbm=%s",
+         role, prof.name, radio_region_code(RADIO_REGION), prof.mod_from,
+         (unsigned long)prof.freq_hz, (unsigned)prof.sf, (unsigned long)prof.bw_hz,
+         (unsigned long)symbol_us(&prof), (unsigned)prof.cad.symbols, (unsigned)prof.cad.det_peak,
+         (unsigned)prof.cad.det_min, (unsigned)prof.cad.det_peak_bench_proven,
+         (unsigned long)prof.duty_ppm, (int)prof.limit_dbm, tx);
+}
+
+/* A proxy run puts the radio on its profile before anything else and the build's settings back
+ * after (the game's radio is the test's meanwhile). The channel is asserted inside the sub-band
+ * and clear of every AS923 frequency before the radio is touched. */
+static bool profile_enter(const hal_radio_ops_t *radio, const char *role)
+{
+    if (!prof.proxy) return true;
+    hal_radio_profile_t hp;
+    lbt_profile_to_hal(&prof, &hp);
+    if (!lbt_profile_channel_ok(&prof) || radio->set_profile == NULL ||
+        radio->set_profile(&hp) != 0) {
+        emit("LBT,end,role=%s,reason=profile", role);
+        return false;
+    }
+    return true;
+}
+
+static void profile_leave(const hal_radio_ops_t *radio)
+{
+    if (prof.proxy && radio->set_profile != NULL) (void)radio->set_profile(NULL);
 }
 
 /* ---- the prober ----------------------------------------------------------------------------- */
@@ -140,8 +175,7 @@ static void emit_summary(const lbt_stats_t *s)
 static void handle_frame(const hal_radio_ops_t *radio, lbt_stats_t *s, const uint8_t *buf,
                          size_t len, int8_t rssi, bool *have_seq, uint32_t *last_seq)
 {
-    const atalaia_region_info_t *r = atalaia_region_info(RADIO_REGION);
-    uint32_t airtime = atalaia_region_airtime_us(RADIO_REGION, len);
+    uint32_t airtime = lbt_profile_airtime_us(&prof, len);
     uint32_t end = (uint32_t)(radio->last_rx_done_us != NULL ? radio->last_rx_done_us() : 0);
     uint32_t seq = 0, lost = 0;
     bool ours = lbt_frame_parse(buf, len, &seq);
@@ -150,20 +184,20 @@ static void handle_frame(const hal_radio_ops_t *radio, lbt_stats_t *s, const uin
         if (!*have_seq || seq > *last_seq) *last_seq = seq;
         *have_seq = true;
     }
-    lbt_stats_frame(s, end, airtime, symbol_us(r), lost);
+    lbt_stats_frame(s, end, airtime, symbol_us(&prof), lost);
     emit("LBT,r,%lu,%lu,%u,%ld,%lu,%d,%lu", (unsigned long)s->frames, (unsigned long)end,
          (unsigned)len, ours ? (long)seq : -1L, (unsigned long)airtime, (int)rssi,
          (unsigned long)lost);
     if (s->frames % LBT_SUMMARY_EVERY == 0) emit_summary(s);
 }
 
-static void prober(const hal_radio_ops_t *radio)
+static void prober_body(const hal_radio_ops_t *radio)
 {
     uint32_t rng = esp_random() | 1u;
     lbt_stats_init(&stats);
     lines_dropped = 0;
-    if (radio->set_channel(radio_region_default_channel_hz(RADIO_REGION)) != 0 ||
-        radio->set_mode(HAL_RADIO_MODE_RX) != 0 || radio->channel_busy == NULL) {
+    if (radio->set_channel(prof.freq_hz) != 0 || radio->set_mode(HAL_RADIO_MODE_RX) != 0 ||
+        radio->channel_busy == NULL) {
         emit("LBT,end,role=probe,reason=radio");
         return;
     }
@@ -219,6 +253,13 @@ static void prober(const hal_radio_ops_t *radio)
     emit("LBT,end,role=probe,reason=%s,frames=%lu", reason, (unsigned long)stats.frames);
 }
 
+static void prober(const hal_radio_ops_t *radio)
+{
+    if (!profile_enter(radio, "probe")) return;
+    prober_body(radio);
+    profile_leave(radio);
+}
+
 /* ---- the transmitter ---------------------------------------------------------------------- */
 
 /* The transmitter's totals. run_duty_pm: this run's airtime over its elapsed time, per mille;
@@ -227,27 +268,28 @@ static void prober(const hal_radio_ops_t *radio)
 static void emit_tsum(uint32_t sent, uint32_t failed, uint64_t air_us, int64_t elapsed_us,
                       uint32_t left_ms)
 {
-    uint32_t used_ms = left_ms > 360000u ? 0 : 360000u - left_ms;
+    uint32_t budget_ms = lbt_profile_budget_ms(&prof);
+    uint32_t used_ms = left_ms > budget_ms ? 0 : budget_ms - left_ms;
     emit("LBT,tsum,sent=%lu,failed=%lu,air_ms=%lu,elapsed_ms=%lu,run_duty_pm=%lu,left_ms=%lu,"
          "hour_used_pm=%lu",
          (unsigned long)sent, (unsigned long)failed, (unsigned long)(air_us / 1000),
          (unsigned long)(elapsed_us / 1000),
          (unsigned long)(elapsed_us > 0 ? air_us * 1000 / (uint64_t)elapsed_us : 0),
-         (unsigned long)left_ms, (unsigned long)(used_ms / 3600));
+         (unsigned long)left_ms, (unsigned long)(used_ms * 1000u / budget_ms));
 }
 
-static void transmitter(const hal_radio_ops_t *radio)
+static void transmitter_body(const hal_radio_ops_t *radio)
 {
     uint32_t rng = esp_random() | 1u;
-    if (radio->set_channel(radio_region_default_channel_hz(RADIO_REGION)) != 0 ||
-        radio->set_mode(HAL_RADIO_MODE_RX) != 0) {
+    if (radio->set_channel(prof.freq_hz) != 0 || radio->set_mode(HAL_RADIO_MODE_RX) != 0) {
         emit("LBT,end,role=tx,reason=radio");
         return;
     }
     emit_cfg("tx");
     uint32_t rem0 = radio->duty_cycle_remaining_ms();
     emit("LBT,start,role=tx,frames=%lu,budget_left_ms=%lu,min_left_ms=%lu",
-         (unsigned long)active.frames, (unsigned long)rem0, (unsigned long)TX_MIN_REMAINING_MS);
+         (unsigned long)active.frames, (unsigned long)rem0,
+         (unsigned long)lbt_profile_guard_ms(&prof));
 
     int64_t t0 = esp_timer_get_time();
     uint64_t air_us = 0;
@@ -259,7 +301,7 @@ static void transmitter(const hal_radio_ops_t *radio)
             break;
         }
         uint32_t rem = radio->duty_cycle_remaining_ms();
-        if (rem < TX_MIN_REMAINING_MS) {
+        if (rem < lbt_profile_guard_ms(&prof)) {
             reason = "duty_guard";
             break;
         }
@@ -267,7 +309,7 @@ static void transmitter(const hal_radio_ops_t *radio)
         uint8_t buf[LBT_STATE_LEN_MAX];
         lbt_frame_build(buf, len, sent, &rng);
         int rc = radio->send(buf, len);
-        uint32_t air = atalaia_region_airtime_us(RADIO_REGION, len);
+        uint32_t air = lbt_profile_airtime_us(&prof, len);
         if (rc != 0) {
             failed++;
             emit("LBT,txfail,seq=%lu,rc=%d", (unsigned long)sent, rc);
@@ -297,7 +339,20 @@ static void transmitter(const hal_radio_ops_t *radio)
     emit("LBT,end,role=tx,reason=%s,sent=%lu", reason, (unsigned long)sent);
 }
 
+static void transmitter(const hal_radio_ops_t *radio)
+{
+    if (!profile_enter(radio, "tx")) return;
+    transmitter_body(radio);
+    profile_leave(radio);
+}
+
 /* ---- the console command ---------------------------------------------------------------- */
+
+static uint32_t proxy_frames_max(void)
+{
+    lbt_profile_t p;
+    return lbt_profile_as923_eu868(&p, -1, -1, INT8_MIN) ? lbt_profile_frames_max(&p) : 0;
+}
 
 void lbt_bench_command(const char *args)
 {
@@ -305,15 +360,17 @@ void lbt_bench_command(const char *args)
     if (!lbt_parse_cmd(args, &cmd) || cmd.kind == LBT_CMD_BAD) {
         ESP_LOGW(TAG,
                  "usage: @lbt tx [frames<=%d] | @lbt probe [frames [gap_min_us gap_max_us]] | "
-                 "@lbt stop | @lbt status",
-                 LBT_TX_FRAMES_MAX);
+                 "@lbt stop | @lbt status; add proxy=as923 [peak=N] [min=N] [power=dBm] for the "
+                 "AS923-TW modulation on 868.3 MHz (tx frames <= %lu)",
+                 LBT_TX_FRAMES_MAX, (unsigned long)proxy_frames_max());
         return;
     }
     if (cmd.kind == LBT_CMD_STATUS) {
-        ESP_LOGI(TAG, "%s (region %s, channel %lu Hz)",
+        ESP_LOGI(TAG, "%s (region %s, channel %lu Hz; proxy=as923 runs SF9/500 kHz on %lu Hz)",
                  radio_task_bench_running() ? "a test is running" : "idle",
                  radio_region_code(RADIO_REGION),
-                 (unsigned long)radio_region_default_channel_hz(RADIO_REGION));
+                 (unsigned long)radio_region_default_channel_hz(RADIO_REGION),
+                 (unsigned long)LBT_PROXY_FREQ_HZ);
         return;
     }
     if (cmd.kind == LBT_CMD_STOP) {
@@ -324,6 +381,14 @@ void lbt_bench_command(const char *args)
     if (!log_start()) {
         ESP_LOGW(TAG, "no memory for the log");
         return;
+    }
+    if (cmd.proxy) {
+        if (!lbt_profile_as923_eu868(&prof, cmd.det_peak, cmd.det_min, cmd.power_dbm)) {
+            ESP_LOGW(TAG, "proxy refused: a value is out of range or the channel is not legal");
+            return;
+        }
+    } else {
+        lbt_profile_build(&prof, RADIO_REGION);
     }
     active = cmd;
     bool ok = radio_task_bench_start(cmd.kind == LBT_CMD_TX ? transmitter : prober);

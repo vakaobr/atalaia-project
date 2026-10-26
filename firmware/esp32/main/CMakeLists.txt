@@ -121,6 +121,7 @@ else()
         "radio/radio_stats.c"
         "radio/channel_busy.c"
         "radio/lbt_stats.c"
+        "radio/lbt_profile.c"
         "radio/field_link.c"
         "box_game.c"
         "box_lobby.c"
