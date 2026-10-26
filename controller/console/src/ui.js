@@ -256,7 +256,14 @@ export async function api(token, method, path, body, raw) {
  * WS /api/v1/stream with automatic reconnection (1 s, doubling to 15 s).
  * onMessage gets every JSON message (the first one of each connection is
  * the "hello" snapshot); onState gets 'open', 'closed' or 'denied'.
+ * A connection that goes silent without closing (a phone that slept, a Wi-Fi
+ * that dropped it, a proxy that timed out) is never told by the browser: the
+ * stream pings every PING_MS and, when nothing at all has come for DEAD_MS,
+ * drops it and connects again, for a fresh "hello" (decision CL-2).
  */
+export const PING_MS = 8000;
+export const DEAD_MS = 20000;
+
 export class Stream {
     constructor(token, onMessage, onState) {
         this.token = token;
@@ -266,7 +273,31 @@ export class Stream {
         this.stopped = false;
         this.ws = null;
         this.timer = null;
+        this.beat = null;
+        this.lastRx = Date.now();
+        this.wake = () => {
+            // A tab brought back to the front or a network that came back: a stale connection is replaced now.
+            if (document.visibilityState !== 'hidden' && Date.now() - this.lastRx > PING_MS) this.check();
+        };
+        document.addEventListener('visibilitychange', this.wake);
+        window.addEventListener('online', this.wake);
         this.connect();
+    }
+
+    /** Pings the server; a connection silent for DEAD_MS is dropped and opened again. */
+    check() {
+        const ws = this.ws;
+        if (this.stopped || !ws) return;
+        if (Date.now() - this.lastRx > DEAD_MS) {
+            ws.onclose = null;
+            try { ws.close(); } catch (e) { /* already gone */ }
+            this.ws = null;
+            this.onState('closed');
+            this.delay = 1000;
+            this.connect();
+        } else if (ws.readyState === WebSocket.OPEN) {
+            try { ws.send(JSON.stringify({ type: 'ping' })); } catch (e) { /* onclose follows */ }
+        }
     }
 
     connect() {
@@ -275,11 +306,16 @@ export class Stream {
         const url = `${proto}://${location.host}/api/v1/stream?token=${encodeURIComponent(this.token)}`;
         const ws = new WebSocket(url);
         this.ws = ws;
+        this.lastRx = Date.now();
+        clearInterval(this.beat);
+        this.beat = setInterval(() => this.check(), PING_MS);
         ws.onopen = () => {
             this.delay = 1000;
+            this.lastRx = Date.now();
             this.onState('open');
         };
         ws.onmessage = (e) => {
+            this.lastRx = Date.now();
             let msg;
             try {
                 msg = JSON.parse(e.data);
@@ -291,6 +327,7 @@ export class Stream {
         ws.onclose = (e) => {
             if (this.ws !== ws) return;
             this.ws = null;
+            clearInterval(this.beat);
             if (this.stopped) return;
             if (e.code === 4401) {
                 this.onState('denied');
@@ -308,6 +345,9 @@ export class Stream {
     close() {
         this.stopped = true;
         clearTimeout(this.timer);
+        clearInterval(this.beat);
+        document.removeEventListener('visibilitychange', this.wake);
+        window.removeEventListener('online', this.wake);
         if (this.ws) this.ws.close();
         this.ws = null;
     }

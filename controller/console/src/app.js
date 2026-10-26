@@ -399,6 +399,17 @@ class App extends Component {
     async refreshStatus() {
         const status = await this.call('GET', '/controller');
         if (status) this.setState({ status });
+        return status;
+    }
+
+    /** The safety net under the stream (decision CL-2): a live game this page was never told of (a stream
+     * that went quiet, a message lost) is fetched and handled as the stream's own "game" message. */
+    async syncLiveGame(status) {
+        const id = status && status.live_game;
+        const g = this.state.game;
+        if (!id || (g && g.id === id)) return;
+        const game = await this.call('GET', `/games/${id}`);
+        if (game && game.live && (!this.state.game || this.state.game.id !== id)) this.onMessage({ type: 'game', game });
     }
 
     async refreshGame() {
@@ -410,7 +421,7 @@ class App extends Component {
 
     refresh() {
         if (!this.state.role || !this.state.connected) return;
-        this.refreshStatus();
+        this.refreshStatus().then((status) => this.syncLiveGame(status));
         if (this.state.game && this.state.game.live) this.refreshGame();
     }
 

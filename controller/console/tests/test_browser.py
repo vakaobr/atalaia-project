@@ -1494,6 +1494,77 @@ class ConsoleBrowserTests(unittest.TestCase):
         page.get_by_test_id("tab-game").click()
         expect(page.get_by_test_id("score-red")).to_have_text("12")
 
+    def test_games_made_and_run_in_another_session_show_live(self):
+        """A game the API (the bench, another GM's console) creates, starts, pauses, resumes and ends shows
+        in every open console at once, without a reload: the GM's and a read token's, on the Game tab and
+        with a second game after the first has ended (found on the bench, 2026-10-26)."""
+        gm = self.console()
+        ro = self.console(READ)
+        for page in (gm, ro):
+            expect(page.get_by_test_id("game-state")).to_have_count(0)
+            page.evaluate("window.__sameDocument = 7")
+        http = self.field.http
+        first = self.field.create_game("Sessão B")
+        for page in (gm, ro):
+            expect(page.get_by_test_id("game-state")).to_have_text("pronto")
+            expect(page.locator("main")).to_contain_text("Sessão B")
+        self.assertEqual(http.post(f"/api/v1/games/{first['id']}/start", json={"force": True}).status_code, 200)
+        for page in (gm, ro):
+            expect(page.get_by_test_id("game-state")).to_have_text("a decorrer")
+        for action, text in (("pause", "em pausa"), ("resume", "a decorrer")):
+            self.assertEqual(http.post(f"/api/v1/games/{first['id']}/{action}", json={}).status_code, 200)
+            for page in (gm, ro):
+                expect(page.get_by_test_id("game-state")).to_have_text(text)
+        self.assertEqual(http.post(f"/api/v1/games/{first['id']}/end", json={}).status_code, 200)
+        for page in (gm, ro):
+            expect(page.get_by_test_id("game-ended")).to_contain_text("Sessão B")
+        second = self.field.create_game("Sessão C", start=True)
+        for page in (gm, ro):
+            expect(page.locator("main")).to_contain_text("Sessão C")
+            expect(page.get_by_test_id("game-state")).to_have_text("a decorrer")
+            self.assertEqual(page.evaluate("window.__sameDocument"), 7, "the page reloaded")
+        self.assertNotEqual(first["id"], second["id"])
+
+    def test_a_console_whose_stream_went_quiet_still_finds_the_live_game(self):
+        """Decision CL-2: a stream that is open but gets nothing (a half-open connection) must not leave the
+        console with no game for good: the 10 s refresh asks the controller which game is live."""
+        page = self.console()
+        hub = self.field.bundle.hub
+        self.assertTrue(wait_for(lambda: hub.client_count == 1, 5))
+        for queue in list(hub._clients):
+            hub.unsubscribe(queue)  # still connected, never sent anything again
+        self.field.create_game("Sessão D", start=True)
+        expect(page.get_by_test_id("game-state")).to_have_text("a decorrer", timeout=15_000)
+        expect(page.locator("main")).to_contain_text("Sessão D")
+
+    def test_a_silent_stream_is_dropped_and_opened_again(self):
+        """Decision CL-2: pings go out, and a connection that answers nothing for 20 s is replaced (the first
+        connection's server messages are held back here, as a dead Wi-Fi would)."""
+        opened = []
+        muted = []
+
+        def route(ws):
+            server = ws.connect_to_server()
+            opened.append(ws)
+            mine = len(opened)
+            ws.on_message(lambda m: server.send(m))
+            server.on_message(lambda m: None if (mine == 1 and muted) else ws.send(m))
+
+        page = self.page(setup=lambda p: p.route_web_socket("**/api/v1/stream**", route))
+        page.get_by_test_id("token").fill(GM)
+        page.get_by_test_id("login").click()
+        expect(page.get_by_test_id("tab-game")).to_be_visible()
+        page.wait_for_timeout(1500)  # the hello has come (Playwright's sync API runs the handlers while it waits)
+        self.assertEqual(len(opened), 1)
+        muted.append(True)
+        for _ in range(160):
+            if len(opened) == 2:
+                break
+            page.wait_for_timeout(250)
+        self.assertEqual(len(opened), 2, "the silent stream was never replaced")
+        self.field.create_game("Sessão E", start=True)
+        expect(page.get_by_test_id("game-state")).to_have_text("a decorrer", timeout=15_000)
+
     def test_scoreboard_page_follows_the_score(self):
         game = self.field.create_game(name="Final", start=True)
         page = self.page(f"/scoreboard#token={READ}&lang=en")
