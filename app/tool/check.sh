@@ -58,6 +58,9 @@ cp -r "$SRC/app" "$SRC/core" "$SRC/modes" "$SRC/protocol" "$W/"
 mkdir -p "$W/controller/console"
 cp -r "$SRC/controller/console/src" "$W/controller/console/"
 cp -r "$SRC/controller/templates" "$W/controller/"
+# console_bundle_test.dart compares the field-map page's origins with the Pi's api.py (MF-64).
+mkdir -p "$W/controller/atalaia_controller"
+cp "$SRC/controller/atalaia_controller/api.py" "$W/controller/atalaia_controller/"
 # The phone controller's slice S7b tests read the Pi's branding images and its
 # example scenarios (the scenario compiler itself is the core's, core/scenario/).
 mkdir -p "$W/controller/tests"

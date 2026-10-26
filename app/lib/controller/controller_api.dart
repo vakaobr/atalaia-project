@@ -635,7 +635,7 @@ class ControllerApi {
     final a = console.answer(path);
     if (a == null) return null;
     final headers = {
-      if (path.startsWith('/console')) ...consoleSecurityHeaders,
+      if (path.startsWith('/console')) ...consoleHeadersFor(path),
       if (a.location != null) 'Location': a.location!,
     };
     return switch (a.status) {

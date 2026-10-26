@@ -29,6 +29,54 @@ const consoleSecurityHeaders = {
   'Permissions-Policy': 'geolocation=()',
 };
 
+/// The one page that may reach the internet (api.py's FIELD_MAP_PAGE,
+/// decision MF-27): *Load the field from a map*, run in the GM's browser.
+const fieldMapPage = '/console/field-map.html';
+
+/// The origins of the field-map page's policy, the Pi's FIELD_MAP_* in api.py:
+/// OSM's tiles (images), Overpass and its second instance and Nominatim
+/// (connections), each open orthophoto's WMS (images and connections) and the
+/// WMTS origins of their own (images only).
+const _fieldMapOrthophotos =
+    'https://ortos.dgterritorio.gov.pt https://www.ign.es '
+    'https://data.geopf.fr https://service.pdok.nl '
+    'https://wms.ngi.be https://geo.api.vlaanderen.be '
+    'https://geoservices.wallonie.be https://wms.geoportail.lu '
+    'https://wms.geo.admin.ch https://gdi.berlin.de '
+    'https://isk.geobasis-bb.de https://geoservices.bayern.de '
+    'https://geodienste.bremen.de https://www.gds-srv.hessen.de '
+    'https://www.geodaten-mv.de https://www.wms.nrw.de '
+    'https://geo4.service24.rlp.de https://geoportal.saarland.de '
+    'https://geodienste.sachsen.de https://www.geoproxy.geoportal-th.de '
+    'https://mapy.geoportal.gov.pl https://ags.cuzk.gov.cz';
+const _fieldMapOrthoTiles =
+    'https://wmts1.geoportail.lu https://wmts.geo.admin.ch '
+    'https://www.wmts.nrw.de';
+
+/// The Pi's FIELD_MAP_HEADERS (api.py, MF-27, MF-43, MF-64): the strict
+/// headers with the page's own policy and `geolocation=(self)`. Scripts stay
+/// same-origin. Keep in step with api.py: controller/tests/test_console.py
+/// pins the same origins.
+const fieldMapSecurityHeaders = {
+  'Content-Security-Policy':
+      "default-src 'self'; script-src 'self'; style-src 'self'; "
+      "img-src 'self' blob: data: https://tile.openstreetmap.org "
+      '$_fieldMapOrthophotos $_fieldMapOrthoTiles; '
+      "connect-src 'self' https://overpass-api.de "
+      'https://overpass.private.coffee $_fieldMapOrthophotos '
+      'https://nominatim.openstreetmap.org; '
+      "manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; "
+      "base-uri 'none'; form-action 'none'",
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'Permissions-Policy': 'geolocation=(self)',
+};
+
+/// The headers of a /console answer for [path]: the field-map page's own, the
+/// strict ones for every other page and file.
+Map<String, String> consoleHeadersFor(String path) =>
+    path == fieldMapPage ? fieldMapSecurityHeaders : consoleSecurityHeaders;
+
 const _types = {
   'html': 'text/html; charset=utf-8',
   'js': 'text/javascript; charset=utf-8',
