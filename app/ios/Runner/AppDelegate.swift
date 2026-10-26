@@ -2,12 +2,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // iOS side of the app's platform channels (lib/platform/channels.dart).
-// Only the "device" channel is answered here, and only what the app needs to
-// run: the private folder for the settings (filesDir), the maker, the screen
-// kept on and a buzz. Every other method, and every other channel (QR, NFC,
-// location, kiosk, foreground service, the field's Wi-Fi, the I/O pod, app
-// links), is left out on purpose: Flutter then raises MissingPluginException,
-// which the Dart side reads as "not available" (decision iOS-3).
+// The "device" channel is answered here: the private folder for the settings
+// (filesDir), the maker, the screen kept on, a buzz, and the location
+// permission (requestPermission, handed to LocationPlugin). Three features
+// have a Swift file each, registered below (decisions iOS-13 to iOS-15):
+// the QR scanner (QrScanPlugin.swift), `atalaia://` links (LinkPlugin.swift)
+// and the position for a player who shares it (LocationPlugin.swift). Every
+// other method, and every other channel (NFC, kiosk, foreground service, the
+// field's Wi-Fi, the I/O pod), is left out on purpose: Flutter then raises
+// MissingPluginException, which the Dart side reads as "not available"
+// (decision iOS-3).
 
 import AudioToolbox
 import Flutter
@@ -28,6 +32,11 @@ import UIKit
       let channel = FlutterMethodChannel(
         name: "org.atalaia.app/device", binaryMessenger: registrar.messenger())
       channel.setMethodCallHandler(AppDelegate.handleDevice)
+      QrScanPlugin.register(messenger: registrar.messenger())
+      LocationPlugin.register(messenger: registrar.messenger())
+    }
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "AtalaiaLinks") {
+      LinkPlugin.register(registrar: registrar)
     }
   }
 
@@ -46,6 +55,16 @@ import UIKit
       let pattern = (args?["pattern"] as? [NSNumber])?.map { $0.intValue } ?? [0, 200]
       vibrate(pattern)
       result(nil)
+    case "requestPermission":
+      // Android's permission names; only the location has an iOS twin (the
+      // camera is asked by the scanner itself). Others: "not available".
+      let args = call.arguments as? [String: Any]
+      let name = (args?["name"] as? String) ?? ""
+      if LocationPlugin.handles(permission: name) {
+        LocationPlugin.requestPermission { granted in result(granted) }
+      } else {
+        result(FlutterMethodNotImplemented)
+      }
     default:
       result(FlutterMethodNotImplemented)
     }

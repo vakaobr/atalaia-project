@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 /// Links that open the app (decision S16-13): the Android activity's
-/// `atalaia://register?...` intents, through LinkPlugin.kt. The app checks
+/// `atalaia://register?...` intents, through LinkPlugin.kt, and on iOS the
+/// URL scheme's scene events, through LinkPlugin.swift (decision iOS-14). The app checks
 /// every link itself (lib/site/site_link.dart) before acting on it.
 library;
 

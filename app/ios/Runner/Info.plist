@@ -19,6 +19,19 @@
 		<string>de</string>
 		<string>zh-Hant</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>CFBundleURLName</key>
+			<string>org.atalaia.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>atalaia</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -31,6 +44,8 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>FlutterDeepLinkingEnabled</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NFCReaderUsageDescription</key>
@@ -44,6 +59,11 @@
 	<string>Atalaia uses the camera only to scan the QR codes of join cards and field posters.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Atalaia talks to the field controller on the field's Wi-Fi network: the game's feed, the GM console and check-in.</string>
+	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
+	<dict>
+		<key>AtalaiaPositions</key>
+		<string>Atalaia asks for your precise location once, so the organisers see where you are on the field; it is used only while you share your position in a game.</string>
+	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Atalaia uses your location only while you are in a game and have chosen to share your position with the organisers.</string>
 	<key>UIApplicationSceneManifest</key>

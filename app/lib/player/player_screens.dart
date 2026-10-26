@@ -45,6 +45,7 @@ import '../checkin/checkin_client.dart';
 import '../checkin/checkin_screen.dart';
 import '../l10n/strings.dart';
 import '../platform/location.dart';
+import '../platform/platform_check.dart';
 import '../position/field_bounds.dart';
 import '../position/position_reporter.dart';
 import '../prop/game_timer.dart';
@@ -470,7 +471,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
     if (!await services.device.requestPermission('ACCESS_FINE_LOCATION') ||
         !await location.granted()) {
-      if (mounted) setState(() => _shareError = s.t('player.location_denied'));
+      if (mounted) {
+        setState(
+          () => _shareError = s.t(
+            isIOS ? 'player.location_denied_ios' : 'player.location_denied',
+          ),
+        );
+      }
       return;
     }
     final http = _http ??= services.fieldHttp(field);
@@ -860,6 +867,15 @@ class _SharePosition extends StatelessWidget {
                   ),
           ),
         ),
+        if (isIOS)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              s.t('player.share_ios_note'),
+              key: const Key('player-share-ios-note'),
+              style: TextStyle(color: Theme.of(context).hintColor),
+            ),
+          ),
         if (running && bounds)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),

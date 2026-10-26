@@ -17,6 +17,9 @@
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		A7A100C0A7A100C0A7A100C0 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = A7A100B0A7A100B0A7A100B0 /* InfoPlist.strings */; };
+		A7A100D1A7A100D1A7A100D1 /* QrScanPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7A100C1A7A100C1A7A100C1 /* QrScanPlugin.swift */; };
+		A7A100D2A7A100D2A7A100D2 /* LinkPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7A100C2A7A100C2A7A100C2 /* LinkPlugin.swift */; };
+		A7A100D3A7A100D3A7A100D3 /* LocationPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7A100C3A7A100C3A7A100C3 /* LocationPlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -64,6 +67,9 @@
 		A7A100A2A7A100A2A7A100A2 /* pt-PT */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = pt-PT; path = pt-PT.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		A7A100A3A7A100A3A7A100A3 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		A7A100A4A7A100A4A7A100A4 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = zh-Hant; path = zh-Hant.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		A7A100C1A7A100C1A7A100C1 /* QrScanPlugin.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = QrScanPlugin.swift; sourceTree = "<group>"; };
+		A7A100C2A7A100C2A7A100C2 /* LinkPlugin.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LinkPlugin.swift; sourceTree = "<group>"; };
+		A7A100C3A7A100C3A7A100C3 /* LocationPlugin.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LocationPlugin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -129,6 +135,9 @@
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */,
+				A7A100C3A7A100C3A7A100C3 /* LocationPlugin.swift */,
+				A7A100C2A7A100C2A7A100C2 /* LinkPlugin.swift */,
+				A7A100C1A7A100C1A7A100C1 /* QrScanPlugin.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 			);
 			path = Runner;
@@ -294,6 +303,9 @@
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
+				A7A100D3A7A100D3A7A100D3 /* LocationPlugin.swift in Sources */,
+				A7A100D2A7A100D2A7A100D2 /* LinkPlugin.swift in Sources */,
+				A7A100D1A7A100D1A7A100D1 /* QrScanPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

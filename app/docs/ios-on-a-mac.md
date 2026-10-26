@@ -5,7 +5,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # The app on an iPhone, from a Mac
 
-A step-by-step guide for the first tests (decisions iOS-1 to iOS-12 in
+A step-by-step guide for the first tests (decisions iOS-1 to iOS-16 in
 [docs/review/decisions-to-review.md](../../docs/review/decisions-to-review.md)).
 The project in [`ios/`](../ios/) was generated and edited on Linux with the
 pinned Flutter; it was first built on a Mac on 2026-10-26 (Xcode 27.1, macOS
@@ -132,13 +132,14 @@ Always open the `.xcworkspace` after that.
 | Install on your own iPhone from Xcode or `flutter run` | yes | yes |
 | How long the install lasts | **7 days**, then it will not open until reinstalled | one year (development profile); TestFlight builds 90 days |
 | Apps and App IDs | few: about 3 apps per phone and 10 new App IDs a week | no practical limit |
-| Everything this guide tests: network, QR (when written), player feed, positions, languages, the GM web view | yes | yes |
+| Everything this guide tests: network, QR scanning, `atalaia://` links, player feed, positions (on the screen), languages, the GM web view | yes | yes |
 | **NFC tag reading** (the capability and its `com.apple.developer.nfc.readersession.formats` entitlement) | **no**: Xcode refuses the capability for a Personal Team and signing fails | yes |
 | Push notifications, iCloud, Associated Domains, background modes needing a capability | no | yes |
 | TestFlight, installing on other people's phones, the App Store | no | yes |
 
 So: **a free account runs everything the app does on iOS today** (it has no
-NFC code for iOS yet, so no entitlement is declared and signing works). The
+NFC code for iOS yet, so no entitlement is declared and signing works; the QR
+scanner, the `atalaia://` links and the position need no entitlement either). The
 day the NFC side is written, NFC testing needs the paid program; the same goes
 for giving the app to players through TestFlight. This is a decision for the
 maintainer (iOS-10).
@@ -263,15 +264,16 @@ At a field controller (a Pi's or an Android phone's, on its Wi-Fi):
 5. Join the field's Wi-Fi; iOS will say "no internet": stay connected. The
    **Local Network** prompt appears: Allow.
 6. Join a game by typing the **join text** or the controller's address and read
-   code. Scanning a QR code is **not available on iOS yet** (the camera
-   scanner is written for Android only): the app should offer the typed way
-   without a crash, and it should say so, not hang.
+   code, **or by scanning a QR code** (join card, field poster): see "QR
+   scanning" below. On the simulator, which has no camera, the app says so and
+   offers the typed way.
 7. **Player feed**: time, points, objectives, eliminations, the GM's messages,
    over the controller's HTTP or HTTPS (the WebSocket stays up with the
    screen on; note what happens after 30 s with the screen locked, and after
    switching to another app and back).
-8. **Positions** (the player sharing their position) are Android-only for now:
-   the setting should be missing or disabled, not crash.
+8. **Positions**: the player's *Share my position* switch, while the app is
+   on the screen: see "Position sharing" below. It stops when the app leaves
+   the screen, and the screen says so (the note under the switch).
 9. **Marshal**: the chrono check-in screens; limit templates in your language;
    the signed record stays on the phone.
 10. **GM**: type the console's address (`http://192.168.4.1:8080/console/`): the
@@ -298,8 +300,99 @@ Needs a paid account, or is not written yet, so expect it **not** to work:
 
 12. NFC reading and writing of players' tags and join cards (no Swift side, no
     entitlement); the field card written by NFC.
-13. The `atalaia://register?...` link from a site server's page (the iOS side of
-    links is not written; open the app and type or scan instead).
+
+### QR scanning (decision iOS-13)
+
+The scanner is the app's own full-screen camera view (AVFoundation), the same
+contract as Android's: the camera picture, the hint under it, a cancel button;
+the first QR code read ends it and fills the join text.
+
+- **Simulator** (no camera): the player's join screen and the marshal's replica
+  registry (its QR tag) answer "There is no camera to read the code." (`join.no_camera`);
+  the typed text still works. Nothing crashes, nothing hangs.
+- **Phone**, first use: iOS asks "Atalaia would like to access the camera"
+  (the text from `Info.plist`, in the phone's language). **Allow**: the camera
+  opens full screen. **Don't Allow**: the scanner closes at once with nothing
+  scanned (as Android's); to change it, Settings > Atalaia > Camera.
+- Point it at a join card or a field's QR code (the check-in poster): the scanner closes and the app joins as
+  if the text had been typed. A QR code that is not an Atalaia one is read and
+  refused by the app ("This is not a valid join code"), not by the scanner.
+- Cancel button: the scanner closes, nothing is scanned. Turn the phone to
+  landscape while scanning: the picture stays upright and the bar stays at
+  the bottom. Switch to another app and back while scanning: the picture
+  resumes.
+- Where it is used: the player's join and the marshal's replica registry QR
+  tag (the Android prop's join screen has the same button; props are Android only).
+
+### `atalaia://` links (decision iOS-14)
+
+A site server's register page has an *Open in the app* button with an
+`atalaia://register?site=...&field=...&game=...` link. The app's registration
+screen opens with the site and the field to confirm.
+
+On the **simulator** (booted; the app installed):
+
+```sh
+# the app is closed (cold start): the link starts it
+xcrun simctl terminate booted org.atalaia.app
+xcrun simctl openurl booted 'atalaia://register?site=https%3A%2F%2Fcampo.example.pt&field=campo-de-teste'
+
+# the app is open (while running): the registration screen opens over the current one
+xcrun simctl openurl booted 'atalaia://register?site=https%3A%2F%2Fcampo.example.pt&field=campo-de-teste&game=00000000-0000-4000-8000-000000000001'
+
+# not ours, or not a valid site: nothing opens, nothing crashes
+xcrun simctl openurl booted 'atalaia://register?site=http%3A%2F%2Fevil.example&field=x'
+xcrun simctl openurl booted 'atalaia://elsewhere'
+```
+
+(`site` is the site server's origin, percent-encoded: an `https://` one, or
+`http://` for localhost; the app checks it, `lib/site/site_link.dart`.) The
+first time, Simulator or iOS may ask "Open in Atalaia?": **Open**.
+
+On the **phone**: open the same link from Notes or Messages (a tapped
+`atalaia://register?...` link), or from Safari with the site server's register
+page. Cold start (app swiped away) and while running must both open the
+registration screen. If nothing happens, check `Info.plist` has
+`CFBundleURLTypes` with `atalaia` and the app was reinstalled after that.
+
+### Position sharing (decision iOS-15), when in use only
+
+On the player's screen, the *Share my position* switch (a field that took the
+phone's check-in): under it, a note says that on iPhone the position is shared
+only while Atalaia is on the screen.
+
+- **First use**: turn the switch on: iOS asks "Allow Atalaia to use your
+  location?" with **Allow While Using App** and **Allow Once**; there is no
+  "Always" on offer (no background mode). If the phone gave only the
+  *approximate* location (the *Precise Location* switch off in the prompt or
+  in Settings), iOS then asks once for a temporary precise location with the
+  app's text: **Allow** for a field test.
+- **Refused**: the switch stays off and the screen says how to allow it
+  (Settings > Atalaia > Location > While Using the App, and Location Services
+  on). *Allow Once* asks again the next time the app is opened.
+- **Sending**: with the controller up, *sent* counts up about every 10 s
+  (the controller's interval); the GM console sees the player. The positions
+  carry the phone's accuracy (metres), altitude, heading and speed when the
+  phone knows them.
+- **Leaving the screen**: switch to another app or lock the phone: the
+  reports stop (iOS suspends the app); come back: they go on by themselves.
+  The status bar's blue location indicator is shown while it runs on the
+  screen. Nothing is sent from the background; that is by design (iOS-5).
+
+On the **simulator**: Features > Location > *Custom Location...* (a latitude
+and a longitude), *City Run*, *Freeway Drive*, or from a terminal:
+
+```sh
+xcrun simctl location booted set 38.7223,-9.1393          # one place
+xcrun simctl location booted start --speed=2 --interval=1 38.7223,-9.1393 38.7230,-9.1385   # a walk (stop it with `set` or `clear`)
+xcrun simctl location booted clear
+xcrun simctl privacy booted reset location org.atalaia.app    # ask for the permission again
+xcrun simctl privacy booted grant location org.atalaia.app    # skip the prompt (`revoke` to test a refusal)
+```
+
+The simulator's location prompt and the temporary-precision prompt appear as
+on a phone. Check the fix goes on while you change the simulated place, and
+the controller's console follows.
 
 ## Integration tests on the iPhone
 
@@ -391,11 +484,12 @@ everything under "Needs a paid account".
   without Apple's MFi programme); and it starts the field's Wi-Fi (a local-only
   hotspot) from code, which iOS does not allow. An iPhone is a player, a marshal
   or a GM, joining a field controller that runs on a Pi, a PC or an Android phone.
-- **QR scanning, NFC, position sharing, app links**: the app's own Kotlin plugins
-  have no Swift twin yet; the Dart side answers "not available"
+- **NFC**: the app's Kotlin plugin has no Swift twin yet, and CoreNFC needs a
+  paid account's entitlement (iOS-10); the Dart side answers "not available"
   (`MissingPluginException` is read as unavailable) and falls back to typing.
-  Camera, NFC and location texts are already in the Info.plist, so adding
-  the Swift side later does not change the permissions' wording.
+  (The QR scanner, the `atalaia://` links and the position now have their
+  Swift sides: iOS-13 to iOS-15. The tones, the screen brightness and the
+  permission requests other than the location stay unanswered.)
 - **The GM console over HTTPS with the field's own CA**: the app pins that CA in
   its own HTTP client (`dart:io`, which iOS's App Transport Security does not
   govern), but the web view (WKWebView) knows nothing of the pin. The app's
@@ -408,4 +502,5 @@ everything under "Needs a paid account".
   so the app asks for no Bluetooth permission. **mDNS**: the app does not use it
   (the controller's address comes from the join), so no Bonjour entry.
 - **Background**: no background modes. A position or a feed is live only while the
-  app is on the screen.
+  app is on the screen: the position stops when the app leaves it and goes on
+  when it comes back, and the player screen says so (iOS-15).

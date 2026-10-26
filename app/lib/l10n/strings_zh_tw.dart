@@ -538,6 +538,10 @@ const Map<String, String> zhTwStrings = {
   'player.share_stopped': '已停止分享：遊戲結束或報到有變更。',
   'player.no_location': '這支手機沒有定位功能。',
   'player.location_denied': '沒有定位權限。',
+  'player.location_denied_ios':
+      '沒有定位權限。請到「設定 > Atalaia > 位置」選「使用 App 期間」，並確認定位服務已開啟。',
+  'player.share_ios_note':
+      '在 iPhone 上，只有 Atalaia 開在畫面上時才會分享你的位置：改用其他 App 或鎖定手機時會暫停，回來後繼續。',
   'player.sharing_title': 'Atalaia：正在分享你的位置',
   'player.sharing_text': '遊戲進行中',
   // The out-of-bounds warning (decisions MF-31 to MF-40)

@@ -160,7 +160,7 @@ class NfcWriteException implements Exception {
 }
 
 /// The camera QR scanner (CameraX and ZXing on Android: no Google Play
-/// services, decision PD5).
+/// services, decision PD5; AVFoundation on iOS, decision iOS-13).
 abstract interface class QrScanner {
   Future<bool> get available;
 

@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 /// The platform-channel side of services.dart: each class talks to one
-/// Kotlin plugin (android/app/src/main/kotlin/org/atalaia/app/). A missing
-/// plugin (iOS, the web, a widget test) means "not available", never a crash.
+/// Kotlin plugin (android/app/src/main/kotlin/org/atalaia/app/) and, for the
+/// device, QR, links and location channels, to its Swift twin on iOS
+/// (ios/Runner/, decisions iOS-3, iOS-13 to iOS-15). A missing plugin (the
+/// web, a widget test, NFC and the rest on iOS) means "not available", never
+/// a crash.
 library;
 
 import 'dart:async';
@@ -200,6 +203,8 @@ class ChannelNfcService implements NfcService {
   Future<void> cancelWrite() => _call<void>(_ch, 'cancelWrite', null);
 }
 
+/// QrScanPlugin.kt on Android, QrScanPlugin.swift on iOS. "scan" answers the
+/// text of the first code, or null for a cancel, a refused camera or no camera.
 class ChannelQrScanner implements QrScanner {
   static const _ch = MethodChannel('$_prefix/qr');
 

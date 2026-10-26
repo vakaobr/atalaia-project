@@ -602,6 +602,10 @@ const Map<String, String> enStrings = {
       'Sharing stopped: the game ended or the check-in changed.',
   'player.no_location': 'This phone has no location.',
   'player.location_denied': 'No permission for the location.',
+  'player.location_denied_ios':
+      'No permission for the location. Allow it in Settings > Atalaia > Location (While Using the App), and check that Location Services is on.',
+  'player.share_ios_note':
+      'On iPhone your position is shared only while Atalaia is open on the screen: it pauses when you switch to another app or lock the phone, and goes on when you come back.',
   'player.sharing_title': 'Atalaia: sharing your position',
   'player.sharing_text': 'During the game',
   // The out-of-bounds warning (decisions MF-31 to MF-40)

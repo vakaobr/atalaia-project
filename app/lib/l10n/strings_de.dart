@@ -624,6 +624,10 @@ const Map<String, String> deStrings = {
       'Teilen beendet: Das Spiel ist vorbei oder der Check-in hat sich geändert.',
   'player.no_location': 'Dieses Handy hat keinen Standort.',
   'player.location_denied': 'Keine Berechtigung für den Standort.',
+  'player.location_denied_ios':
+      'Keine Berechtigung für den Standort. Erlaube ihn unter Einstellungen > Atalaia > Standort (Beim Verwenden der App) und prüfe, ob die Ortungsdienste an sind.',
+  'player.share_ios_note':
+      'Auf dem iPhone wird deine Position nur geteilt, solange Atalaia auf dem Bildschirm offen ist: Sie pausiert, wenn du die App wechselst oder das Handy sperrst, und läuft weiter, wenn du zurückkommst.',
   'player.sharing_title': 'Atalaia: Deine Position wird geteilt',
   'player.sharing_text': 'Während des Spiels',
   // The out-of-bounds warning (decisions MF-31 to MF-40)

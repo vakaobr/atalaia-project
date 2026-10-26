@@ -611,6 +611,10 @@ const Map<String, String> ptStrings = {
       'A partilha parou: o jogo terminou ou o check-in mudou.',
   'player.no_location': 'Este telemóvel não tem localização.',
   'player.location_denied': 'Sem autorização para a localização.',
+  'player.location_denied_ios':
+      'Sem autorização para a localização. Permite-a em Definições > Atalaia > Localização (Ao Usar a Aplicação) e confirma que os Serviços de Localização estão ligados.',
+  'player.share_ios_note':
+      'No iPhone a posição só é partilhada enquanto o Atalaia está aberto no ecrã: pára se mudares de aplicação ou bloqueares o telemóvel, e continua quando voltas.',
   'player.sharing_title': 'Atalaia: a partilhar a posição',
   'player.sharing_text': 'Durante o jogo',
   // O aviso de fora do campo (decisões MF-31 a MF-40)

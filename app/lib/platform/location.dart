@@ -3,7 +3,9 @@
 
 /// The phone's position (ADR-P3-6): Android's own LocationManager through
 /// the app's Kotlin plugin (LocationPlugin.kt; no Google Play services,
-/// decision PD5). Used only while a player chooses to share their position
+/// decision PD5); on iOS CoreLocation, when in use only, through
+/// LocationPlugin.swift (decision iOS-15): fixes come only while the app is
+/// on the screen, and the player screen says so. Used only while a player chooses to share their position
 /// in a running game; nothing is kept on the phone.
 library;
 
@@ -86,7 +88,7 @@ class ChannelLocationService implements LocationService {
     try {
       return await _ch.invokeMethod<bool>(method) ?? false;
     } on MissingPluginException {
-      return false; // iOS and tests: not available
+      return false; // tests, or a phone without the plugin: not available
     } on PlatformException {
       return false;
     }
