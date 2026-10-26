@@ -38,6 +38,7 @@ which keeps English's ASCII folders (Han letters in an address are percent-encod
 | `sitemap.xml` | Every page in every language, each with its translations (`hreflang`). Generated |
 | `style.css`, `favicon.svg` | Shared by every page |
 | `img/` | The badge and illustrations (see [Images](#images)) |
+| `img/wiring/` | The Field Box's two wiring drawings, copied from `hardware/field-box/wiring/` by `tools/build_site.py` (see [The build guides page](#the-build-guides-page)). Generated |
 | `img/diagrams/` | The two radio diagrams in each language and layout. Generated (see [Diagrams](#diagrams)) |
 | `fonts/` | Barlow and Barlow Condensed (latin subset, WOFF2), self-hosted so the page loads nothing from other sites; SIL OFL 1.1, see [LICENSES/OFL-1.1.txt](../LICENSES/OFL-1.1.txt) |
 | `style.css` | The look: slate, sand and signal orange taken from the badge, with the hero's hills and tower drawn in inline SVG (the subpages' heads reuse the hills) |
@@ -185,6 +186,17 @@ in `hardware/satellite/BUILD.md` and in `hardware/io-pod/BUILD.md` together. The
 `figure.photo` boxes mark where the first builds' photos go (plan phase HW2); never a mock-up or
 generated picture. Portuguese words: guia de montagem, caixa satélite, módulo de E/S, módulo de
 alvo; German: Bauanleitung, Satellit, I/O-Pod, Ziel-Addon.
+
+The Field Box's section has a pin table of the same kind and its two WireViz wiring drawings
+(2026-10-26, the maintainer's request). The SVGs have one source, `hardware/field-box/wiring/*.svg`
+(rendered by `python tools/docker_hw.py render`): `tools/build_site.py` copies them to
+`img/wiring/` (`WIRING` there), adding a font stack with fallbacks and a "do not edit" note, and
+`--check` fails when a copy is stale. **They are not translated**: WireViz bakes the labels into the
+SVG, and they are pin names, GPIO numbers, wire colours and part numbers, which wiring keeps in
+one language; the captions, the alt text and the note saying so are translated. Each is shown scaled
+to the column inside a link to the SVG itself, so a tap opens it at full size to zoom and pan (the
+page never scrolls sideways), on a white sheet in the dark theme too (a black wire must stay
+black). The Satellite and the I/O pod point at the Field Box's drawings, as their BUILD.md files do.
 
 ### Diagrams
 

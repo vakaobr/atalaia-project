@@ -41,6 +41,14 @@ precedence = "override"
 SPDX-FileCopyrightText = "1994-2026 Lua.org, PUC-Rio"
 SPDX-License-Identifier = "MIT"
 
+# The project page's copies of the Field Box's wiring drawings (tools/build_site.py WIRING) keep the
+# hardware folder's licence.
+[[annotations]]
+path = "site/img/wiring/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2026 The Atalaia contributors"
+SPDX-License-Identifier = "CERN-OHL-S-2.0"
+
 # Barlow fonts for the project page keep their own licence (SIL OFL 1.1).
 [[annotations]]
 path = "site/fonts/**"

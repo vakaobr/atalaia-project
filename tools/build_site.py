@@ -20,6 +20,8 @@ templates site/src/diagrams/<name>.svg, the script writes, each marked
     site/zh-tw/<folder>/index.html  each page in Traditional Chinese (Taiwan), with
                                   English slugs (decision P5K)
     site/img/diagrams/<name>-<layout>-<code>.svg   each diagram, per layout and language
+    site/img/wiring/<name>.svg    the Field Box's WireViz wiring drawings, copied from
+                                  hardware/field-box/wiring/ (one source of truth; see WIRING)
     site/sitemap.xml              every page in every language, with its translations
 
 In a template, {{ key }} inserts the text of a key as HTML, {{ key|text }}
@@ -55,6 +57,12 @@ not fit, measuring it with the widest of the common fallback fonts
 image cannot use the page's fonts. The font size and weight come from the
 font-size and font-weight attributes of the text or its parents.
 
+The wiring drawings (WIRING below) are not translated: WireViz bakes its labels, which are pin
+names, GPIO numbers and signal names, into the SVG, and those are the same in every language, so
+each page only translates the caption and the alt text. The copy gets a font stack with
+fallbacks (the source names DejaVu Sans, which most phones lack) and a "do not edit" note; a
+template reads a copy's size from {{ page.wiring.<name>.width }} and .height.
+
 Every key a page or a diagram uses must be in that language's file, and every
 key in a language file must be used. Every template and partial must be used.
 The two languages' versions of a page must link to the same external
@@ -87,6 +95,17 @@ SRC = SITE / "src"
 PARTIALS = SRC / "partials"
 DIAGRAMS = SRC / "diagrams"
 DIAGRAM_OUT = SITE / "img" / "diagrams"
+WIRING_OUT = SITE / "img" / "wiring"
+# The Field Box's wiring drawings (WireViz output, hardware/field-box/wiring/*.svg, rendered by
+# tools/docker_hw.py): published name -> source. The build page shows them; the copies are
+# written by this script and checked by --check, so they cannot drift from the hardware folder.
+WIRING = {
+    "field-box-signals": REPO / "hardware" / "field-box" / "wiring" / "field-box-wiring.svg",
+    "field-box-power": REPO / "hardware" / "field-box" / "wiring" / "field-box-power.svg",
+}
+WIRING_FONT = re.compile(r'font-family="DejaVu Sans"')
+WIRING_FONT_STACK = 'font-family="DejaVu Sans, Verdana, Bitstream Vera Sans, Arial, sans-serif"'
+WIRING_SIZE = re.compile(r'<svg\b[^>]*\bviewBox="0(?:\.0+)? 0(?:\.0+)? ([\d.]+) ([\d.]+)"')
 I18N = SITE / "i18n"
 SITEMAP = SITE / "sitemap.xml"
 # What .github/workflows/pages.yml leaves out of the published site: links must not lead there.
@@ -345,15 +364,38 @@ def load_texts(lang: Language) -> dict[str, str]:
     return texts
 
 
+def wiring_copies() -> dict[Path, tuple[str, int, int]]:
+    """Each wiring drawing's site file -> its text, width and height (the viewBox, in points)."""
+    copies = {}
+    for name, source in WIRING.items():
+        if not source.is_file():
+            raise SiteError(f"{rel(source)} is missing: the build page shows it (WIRING in tools/build_site.py)")
+        text = source.read_text(encoding="utf-8").replace("\r\n", "\n")
+        size = WIRING_SIZE.search(text)
+        if not size or WIRING_FONT.search(text) is None:
+            raise SiteError(f"{rel(source)} is not the WireViz SVG the build page expects "
+                            f"(a viewBox and font-family=\"DejaVu Sans\"); see WIRING in tools/build_site.py")
+        note = (f"<!-- Copied from {rel(source)} by tools/build_site.py; do not edit: "
+                f"change the WireViz source and run tools/docker_hw.py render -->\n")
+        text = WIRING_FONT.sub(WIRING_FONT_STACK, text).replace("<svg", note + "<svg", 1)
+        copies[WIRING_OUT / f"{name}.svg"] = (text, round(float(size.group(1))), round(float(size.group(2))))
+    return copies
+
+
 def language_values(lang: Language) -> dict[str, str]:
     """The page.* values that depend only on the language: all that a diagram may use."""
-    return {
+    values = {
         "page.lang": lang.html_lang,
         "page.code": lang.code,  # the language's short code, as in file names (lora-wide-en.svg)
         "page.screenshots": lang.screenshots_code,  # the app screenshots' language (app-roles-en.png)
         "page.og_locale": lang.og_locale,
         "page.og_locale_alternate": ",".join(o.og_locale for o in LANGUAGES if o != lang),
     }
+    for path, (_, width, height) in wiring_copies().items():
+        name = path.stem.replace("-", "_")  # page.wiring.field_box_signals.width: a placeholder takes no hyphen
+        values[f"page.wiring.{name}.width"] = str(width)
+        values[f"page.wiring.{name}.height"] = str(height)
+    return values
 
 
 def meta_keys(page: Page, used: set[str], texts: dict[str, str]) -> set[str]:
@@ -862,7 +904,9 @@ def build() -> dict[Path, str]:
             rendered[out.relative_to(SITE).as_posix()] = (parser, folder(page, lang), where)
             external[page.name, lang] = parser.external
             pages[out] = text
-    check_addresses(rendered, {out.relative_to(SITE).as_posix() for lang in LANGUAGES for out, _, _ in variants[lang]})
+    wiring = wiring_copies()
+    check_addresses(rendered, {out.relative_to(SITE).as_posix() for lang in LANGUAGES for out, _, _ in variants[lang]}
+                    | {path.relative_to(SITE).as_posix() for path in wiring})
 
     first = LANGUAGES[0]
     for page in PAGES:
@@ -879,11 +923,17 @@ def build() -> dict[Path, str]:
         file_name = rel(I18N / f"{lang.code}.yaml")
         for out, source, variant in variants[lang]:
             pages[out] = render_diagram(variant, source, all_texts[lang], lang, out, file_name)
+    for path, (text, _, _) in wiring.items():
+        pages[path] = text
     pages[SITEMAP] = sitemap()
 
     strays = sorted(path for path in DIAGRAM_OUT.glob("*.svg") if path not in pages) if DIAGRAM_OUT.is_dir() else []
     if strays:
         raise SiteError("no diagram template makes these files; delete them, or restore their template:"
+                        + "".join(f"\n  {rel(path)}" for path in strays))
+    strays = sorted(path for path in WIRING_OUT.glob("*") if path not in pages) if WIRING_OUT.is_dir() else []
+    if strays:
+        raise SiteError("nothing in WIRING (tools/build_site.py) makes these files; delete them, or restore it:"
                         + "".join(f"\n  {rel(path)}" for path in strays))
     strays = sorted(path for path in SITE.rglob("*.html")
                     if path not in pages and path.relative_to(SITE).parts[0] not in UNPUBLISHED)

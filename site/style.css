@@ -614,6 +614,16 @@ html:has(.viewer[open]) { overflow: hidden; }
 .pins th, .pins td { padding: 6px 14px 6px 0; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
 .pins th { font-size: 0.85rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
 .pins td + td { font-family: var(--mono); font-size: 0.95rem; white-space: nowrap; }
+/* The Field Box's wiring drawings (WireViz SVGs, tools/build_site.py WIRING): very wide, so the page shows
+   one scaled to the column, as an overview, and a tap opens the SVG itself at full size, to zoom and pan
+   (the page never scrolls sideways). The sheet stays white in the dark theme: the wire colours are the
+   real ones (a black wire must stay black), and the drawing's own background is white anyway. */
+.wiring { margin: 18px 0 0; }
+.wiring .zoom { padding: 8px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); }
+.wiring .zoom:hover { border-color: var(--signal); }
+.wiring img { display: block; width: 100%; height: auto; }
+.wiring figcaption { margin-top: 6px; max-width: 75ch; color: var(--muted); font-size: 0.95rem; }
+.wiring figcaption a { white-space: nowrap; }
 /* Where a photo of the first build will go (plan phase HW2): dashed, like the planned parts of the diagrams. */
 .photo { margin: 24px 0 0; padding: 18px 16px; border: 2px dashed var(--muted); border-radius: var(--radius); color: var(--muted); font-size: 0.95rem; }
 .photo figcaption { max-width: 70ch; }

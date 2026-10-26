@@ -7,6 +7,8 @@ the target addon, shortened from hardware/<node>/BUILD.md, which stay the full
 guides (in English), and a pointer to the Field Box's build manual. Built into
 site/montagem/, site/en/build-guides/ and site/de/bauen/.
 
+The Field Box's wiring drawings (the two SVGs of hardware/field-box/wiring/) are copied into site/img/wiring/
+by tools/build_site.py (WIRING there), with --check; their labels stay in English (see site/README.md).
 The pin tables are the same in every language, so their GPIO numbers live here,
 not in the language files: each GPIO cell names its Kconfig symbol in
 data-kconfig, and tools/check_wiring.py (in tools/check.sh) fails if a number
@@ -58,6 +60,45 @@ phase HW2); never a mock-up or generated photo. See site/README.md.
         <section id="field-box" aria-labelledby="field-box-title">
           <h2 id="field-box-title">{{ build.field_box.title }}</h2>
           <p>{{ build.field_box.text }}</p>
+
+          <h3>{{ build.pins }}</h3>
+          <p>{{ build.pins_intro }}</p>
+          <div class="table">
+            <table class="pins">
+              <thead><tr><th scope="col">{{ build.pin_what }}</th><th scope="col">{{ build.pin_gpio }}</th></tr></thead>
+              <tbody>
+                <tr><td>{{ build.pin.btn1 }}</td><td data-kconfig="ATALAIA_BTN1_PIN">4</td></tr>
+                <tr><td>{{ build.pin.btn2 }}</td><td data-kconfig="ATALAIA_BTN2_PIN">48</td></tr>
+                <tr><td>{{ build.pin.btn3 }}</td><td data-kconfig="ATALAIA_BTN3_PIN">44</td></tr>
+                <tr><td>{{ build.pin.btn4 }}</td><td data-kconfig="ATALAIA_KP_P7_BUTTON">PCF8574 P7</td></tr>
+                <tr><td>{{ build.pin.keypad }}</td><td>PCF8574 P0&ndash;P6</td></tr>
+                <tr><td>{{ build.pin.led }}</td><td data-kconfig="ATALAIA_LED_PIN">35</td></tr>
+                <tr><td>{{ build.pin.disp_mosi }}</td><td data-kconfig="ATALAIA_DISP_MOSI_PIN">33</td></tr>
+                <tr><td>{{ build.pin.disp_clk }}</td><td data-kconfig="ATALAIA_DISP_CLK_PIN">47</td></tr>
+                <tr><td>{{ build.pin.disp_cs }}</td><td data-kconfig="ATALAIA_DISP_CS_PIN">1</td></tr>
+                <tr><td>{{ build.pin.disp_dc }}</td><td data-kconfig="ATALAIA_DISP_DC_PIN">3</td></tr>
+                <tr><td>{{ build.pin.disp_rst }}</td><td>3V3</td></tr>
+                <tr><td>{{ build.pin.sda_bus }}</td><td data-kconfig="ATALAIA_NFC_SDA_PIN">17</td></tr>
+                <tr><td>{{ build.pin.scl }}</td><td data-kconfig="ATALAIA_NFC_SCL_PIN">18</td></tr>
+                <tr><td>{{ build.pin.bclk }}</td><td data-kconfig="ATALAIA_AUDIO_BCLK_PIN">6</td></tr>
+                <tr><td>{{ build.pin.lrclk }}</td><td data-kconfig="ATALAIA_AUDIO_LRCLK_PIN">15</td></tr>
+                <tr><td>{{ build.pin.dout }}</td><td data-kconfig="ATALAIA_AUDIO_DOUT_PIN">16</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>{{ build.field_box.pins_shared }}</p>
+
+          <h3 id="field-box-wiring">{{ build.field_box.wiring.title }}</h3>
+          <p>{{ build.field_box.wiring.intro }}</p>
+          <figure class="wiring">
+            <a class="zoom" href="{{ page.root }}img/wiring/field-box-signals.svg"><img src="{{ page.root }}img/wiring/field-box-signals.svg" width="{{ page.wiring.field_box_signals.width }}" height="{{ page.wiring.field_box_signals.height }}" loading="lazy" decoding="async" alt="{{ build.field_box.wiring.signals.alt|text }}"></a>
+            <figcaption>{{ build.field_box.wiring.signals.caption }} <a href="{{ page.root }}img/wiring/field-box-signals.svg">{{ build.field_box.wiring.open }}</a></figcaption>
+          </figure>
+          <figure class="wiring">
+            <a class="zoom" href="{{ page.root }}img/wiring/field-box-power.svg"><img src="{{ page.root }}img/wiring/field-box-power.svg" width="{{ page.wiring.field_box_power.width }}" height="{{ page.wiring.field_box_power.height }}" loading="lazy" decoding="async" alt="{{ build.field_box.wiring.power.alt|text }}"></a>
+            <figcaption>{{ build.field_box.wiring.power.caption }} <a href="{{ page.root }}img/wiring/field-box-power.svg">{{ build.field_box.wiring.open }}</a></figcaption>
+          </figure>
+          <p class="more">{{ build.field_box.wiring.hint }}</p>
         </section>
 
         <section id="satellite" aria-labelledby="satellite-title">
@@ -96,6 +137,7 @@ phase HW2); never a mock-up or generated photo. See site/README.md.
             </table>
           </div>
           <p>{{ build.satellite.free_pins }}</p>
+          <p>{{ build.satellite.diagram_ref }}</p>
 
           <h3>{{ build.steps }}</h3>
           <ol class="ways">
@@ -157,6 +199,7 @@ phase HW2); never a mock-up or generated photo. See site/README.md.
             </table>
           </div>
           <p>{{ build.pod.free_pins }}</p>
+          <p>{{ build.pod.diagram_ref }}</p>
 
           <h3>{{ build.steps }}</h3>
           <ol class="ways">

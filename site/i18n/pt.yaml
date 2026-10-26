@@ -1062,7 +1062,7 @@ build:
   title: Guias de montagem
   intro: >-
     Os dispositivos da Atalaia montam-se com peças à venda em qualquer loja de eletrónica, à volta
-    de uma placa ESP32, sem placa de circuito feita de propósito. Aqui estão os guias da caixa
+    de uma placa ESP32, sem placa de circuito feita de propósito. Aqui estão os pinos e os esquemas de ligações da Field Box e os guias da caixa
     satélite, do módulo de E/S e do módulo de alvo, em resumo; os guias completos, com todas as
     verificações e as tabelas de problemas e soluções, estão no repositório (em inglês).
   status: >-
@@ -1099,6 +1099,18 @@ build:
     tamper: Interruptor da caixa, para GND
     log: >-
       Saída do registo (UART0 TX): só para o RX de um adaptador USB-série de 3,3&nbsp;V, na bancada
+    disp_mosi: >-
+      MOSI do ecrã (SPI)
+    disp_clk: >-
+      Relógio do ecrã (SCK)
+    disp_cs: >-
+      Seleção do ecrã (CS; o pino de tensão da bateria da placa, usado como saída)
+    disp_dc: >-
+      Dados/comando do ecrã (DC)
+    disp_rst: >-
+      RESET e retroiluminação do ecrã: os dois ao pino 3V3, sem GPIO
+    keypad: >-
+      Teclado, através do expansor PCF8574 (endereço 0x20)
   safety:
     title: Primeiro, a segurança
     intro: Estas regras valem para todas as montagens desta página, tal como para a Field Box.
@@ -1144,6 +1156,27 @@ build:
       de montagem</a> (em inglês) tem as peças, os esquemas de ligações, a alimentação e a segurança
       das baterias, a primeira gravação do firmware e a resolução de problemas; os guias abaixo
       remetem para ele em todos os passos que partilham.
+    pins_shared: >-
+      Os GPIO 1, 35 e 44 são pinos da placa que a Field Box partilha de propósito, cada um para este único uso: o 1 é a entrada de tensão da bateria da placa (o medidor lê a bateria por I2C), o 35 o seu LED branco (que pisca de leve com o anel) e o 44 a linha de receção da UART0 (a consola USB não é afetada).
+    wiring:
+      title: >-
+        Esquemas de ligações
+      intro: >-
+        Dois esquemas, gerados a partir dos ficheiros WireViz do repositório: os sinais com a alimentação lógica de 3,3 V, e a bateria, o interruptor e a linha de 5 V. Os pinos da placa têm só o número do GPIO: procura cada um pelo número impresso junto ao pino do conector. Os nomes (pinos, fios, peças) ficam em inglês em todas as línguas, como no repositório; se o texto e um esquema discordarem, vale o esquema.
+      open: >-
+        Abrir o esquema em tamanho real (SVG)
+      hint: >-
+        O esquema é muito largo: toca ou clica nele para o abrir em tamanho real, onde podes ampliar e deslocar. Também no tema escuro está sobre uma folha branca, para as cores dos fios continuarem verdadeiras.
+      signals:
+        alt: >-
+          Esquema de ligações 1 de 2, sinais e alimentação de 3,3 V: os pinos GPIO da placa principal passam pela placa de interligação até ao ecrã, aos botões de equipa, ao teclado e ao seu expansor PCF8574, ao leitor NFC, ao medidor de bateria, ao amplificador e ao altifalante, ao anel de LED e às antenas.
+        caption: >-
+          Esquema 1 de 2: sinais e alimentação lógica de 3,3 V.
+      power:
+        alt: >-
+          Esquema de ligações 2 de 2, bateria e alimentação de 5 V: a célula, o fusível, o interruptor geral, o díodo contra polaridade invertida e os empalmes alimentam a entrada de bateria da placa principal e, através do conversor elevador, a linha de 5 V do anel de LED, do amplificador e da placa de interligação.
+        caption: >-
+          Esquema 2 de 2: bateria, interruptor geral e linha de 5 V.
   satellite:
     title: Caixa satélite
     what: >-
@@ -1187,6 +1220,8 @@ build:
     free_pins: >-
       O firmware continua a comandar os pinos do ecrã da Field Box (GPIO 1, 3, 33 e 47): deixa-os
       sem ligação.
+    diagram_ref: >-
+      A ligação da caixa satélite é um subconjunto da da Field Box: segue os <a href="#field-box-wiring">esquemas de ligações da Field Box</a> e deixa de fora as peças que esta montagem não tem (o ecrã a cores, o teclado e o leitor NFC). Um esquema próprio ainda não existe.
     steps:
       revision: >-
         Lê o chip ao lado do conector da antena LoRa da placa: KCT8103L é uma V4.3 (a do firmware
@@ -1264,6 +1299,8 @@ build:
         Só na bancada: um adaptador USB-série de 3,3&nbsp;V para ler o registo do módulo.
     free_pins: >-
       O módulo não usa os outros pinos do ecrã da Field Box (GPIO 1, 3 e 33): deixa-os sem ligação.
+    diagram_ref: >-
+      A ligação do módulo é a da Field Box sem o ecrã: segue os <a href="#field-box-wiring">esquemas de ligações da Field Box</a> e deixa de fora o ecrã e os seus fios. Um esquema próprio ainda não existe.
     steps:
       like_box: >-
         Monta-o como uma Field Box sem o ecrã: revisão da placa, antenas, caixa, alimentação, placa

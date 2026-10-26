@@ -1026,7 +1026,7 @@ build:
   title: Build guides
   intro: >-
     Atalaia's props are built from off-the-shelf parts around one ESP32 board, with no custom
-    circuit board. This page has the guides for the Satellite, the I/O pod and the target addon,
+    circuit board. This page has the Field Box's pins and wiring diagrams and the guides for the Satellite, the I/O pod and the target addon,
     shortened; the full guides, with every check and the troubleshooting tables, are in the
     repository.
   status: >-
@@ -1061,6 +1061,18 @@ build:
     tamper: Enclosure switch, to GND
     log: >-
       Log output (UART0 TX): only a 3.3&nbsp;V USB-serial adapter's RX, on the bench
+    disp_mosi: >-
+      Screen MOSI (SPI)
+    disp_clk: >-
+      Screen clock (SCK)
+    disp_cs: >-
+      Screen chip select (CS; the board's battery-voltage pin, used as an output)
+    disp_dc: >-
+      Screen data/command (DC)
+    disp_rst: >-
+      Screen RESET and backlight: both to the 3V3 pin, no GPIO
+    keypad: >-
+      Keypad, through the PCF8574 expander (address 0x20)
   safety:
     title: Safety first
     intro: These rules hold for every build on this page, as for the Field Box.
@@ -1101,6 +1113,27 @@ build:
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/hardware/field-box/BUILD.md">build
       manual</a> has the parts, the wiring diagrams, power and battery safety, the first flash and
       troubleshooting; the guides below refer to it for every step they share.
+    pins_shared: >-
+      GPIO 1, 35 and 44 are board pins that the Field Box shares on purpose, each for this one use only: 1 is the board's battery-voltage input (the gauge reads the battery over I2C instead), 35 its white LED (it flickers faintly with the ring) and 44 UART0's receive line (the USB console is unaffected).
+    wiring:
+      title: >-
+        Wiring diagrams
+      intro: >-
+        Two drawings, generated from the repository's WireViz files: the signals with the 3.3 V logic power, and the battery, switch and 5 V rail. The board's pins are named by GPIO number only: find each one by the number printed next to its header pin. The labels (pins, wires, parts) stay in English in every language, as in the repository; if the text and a drawing disagree, the drawing wins.
+      open: >-
+        Open the full-size drawing (SVG)
+      hint: >-
+        The drawing is very wide: tap or click it to open it at full size, where you can zoom and pan. It sits on a white sheet in the dark theme too, so the wire colours stay true.
+      signals:
+        alt: >-
+          Wiring diagram 1 of 2, signals and 3.3 V power: the main board's GPIO pins go through the interconnect board to the screen, the team buttons, the keypad and its PCF8574 expander, the NFC reader, the battery gauge, the amplifier and speaker, the LED ring and the antennas.
+        caption: >-
+          Diagram 1 of 2: signals and 3.3 V logic power.
+      power:
+        alt: >-
+          Wiring diagram 2 of 2, battery and 5 V power: the cell, fuse, main switch, reverse-polarity diode and splices feed the main board's battery socket and, through the boost converter, the 5 V rail of the LED ring, the amplifier and the interconnect board.
+        caption: >-
+          Diagram 2 of 2: battery, main switch and 5 V rail.
   satellite:
     title: Satellite
     what: >-
@@ -1142,6 +1175,8 @@ build:
     free_pins: >-
       The firmware still drives the Field Box's screen pins (GPIO 1, 3, 33 and 47): leave them
       unconnected.
+    diagram_ref: >-
+      Its wiring is a subset of the Field Box's: follow the <a href="#field-box-wiring">Field Box's wiring diagrams</a> and leave out the parts this build does not have (the colour screen, the keypad and the NFC reader). A drawing of its own does not exist yet.
     steps:
       revision: >-
         Read the chip next to the board's LoRa antenna connector: KCT8103L is a V4.3 (the firmware's
@@ -1216,6 +1251,8 @@ build:
     free_pins: >-
       The pod does not use the Field Box's other screen pins (GPIO 1, 3 and 33): leave them
       unconnected.
+    diagram_ref: >-
+      The pod's wiring is the Field Box's without the screen: follow the <a href="#field-box-wiring">Field Box's wiring diagrams</a> and leave out the screen and its wires. A drawing of its own does not exist yet.
     steps:
       like_box: >-
         Build it as a Field Box without the screen: board revision, antennas, enclosure, power path,
