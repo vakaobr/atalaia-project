@@ -500,6 +500,15 @@ const Map<String, String> enStrings = {
   'checkin.bad_poster':
       'This check-in poster cannot be read. Ask the organisers for another.',
   'checkin.not_poster': 'This is not an Atalaia check-in poster.',
+  // Why the field controller did not answer (check-R5)
+  'diag.title': 'Details',
+  'diag.timeout': 'no answer in time',
+  'diag.refused': 'connection refused',
+  'diag.unreachable': 'no route to the address',
+  'diag.tls': 'certificate not accepted',
+  'diag.http': 'HTTP {status}',
+  'diag.other': 'connection error',
+  'diag.line': '{kind} · {url} · {time}',
   'checkin.unreachable':
       'The field\'s controller does not answer. Are you on the field\'s Wi-Fi?',
   'checkin.join_wifi':

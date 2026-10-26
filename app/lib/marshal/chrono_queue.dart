@@ -29,6 +29,7 @@ import '../l10n/strings.dart';
 import '../ui/code_kind.dart';
 import '../ui/widgets.dart';
 import 'marshal_records.dart';
+import '../checkin/failure_details.dart';
 
 /// The marshal's records for a screen that has none of its own.
 Future<MarshalRecords> marshalRecordsFor(BuildContext context) async {
@@ -321,6 +322,7 @@ class _ChronoQueueScreenState extends State<ChronoQueueScreen> {
                 kind: NoticeKind.warning,
                 key: const Key('queue-error'),
               ),
+            if (_error != null) FailureDetails(routeKey: widget.field.fieldId),
             if (_list != null)
               Text(
                 s.t('queue.counts', {

@@ -14,6 +14,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'branding/field_branding.dart';
 import 'checkin/checkin_client.dart';
+import 'checkin/field_route.dart';
 import 'checkin/field_trust.dart';
 import 'checkin/my_replicas.dart';
 import 'controller/controller_isolate.dart';
@@ -76,6 +77,7 @@ class AppServices {
     ControllerLauncher? controllerLauncher,
     ControllerAssetsLoader? controllerAssets,
     String? controllerDir,
+    FieldRoutes? routes,
   }) : modes = modes ?? ModeCatalog.builtin(),
        controller = ControllerShell(
          device: device,
@@ -86,11 +88,15 @@ class AppServices {
        ),
        brandingSource = brandingSource ?? ioBrandingSource,
        branding = BrandingCache(store),
-       fieldHttp = fieldHttp ?? IoFieldHttp.new,
-       trust = FieldTrust(store, fetch: caFetch),
+       routes = routes ?? FieldRoutes(),
        checkins = CheckinStore(store),
        sites = SiteSessions(store, siteHttp ?? IoSiteHttp.new),
-       tickets = TicketStore(store);
+       tickets = TicketStore(store) {
+    this.fieldHttp = fieldHttp ?? ((f) => IoFieldHttp(f, routes: this.routes));
+    trust = FieldTrust(store, fetch: caFetch, routes: this.routes);
+    // The winning address of a field is kept in its pinned record (check-R3).
+    this.routes.persist = trust.remember;
+  }
 
   /// The phone's own plugins, the core from the APK.
   factory AppServices.platform(AppStore store, DeviceServices device) =>
@@ -125,8 +131,13 @@ class AppServices {
   /// Field check-in (ADR-P3-13): the field controller's API over its pinned
   /// CA (tests give a fake controller), the pinned fields, the player's
   /// replicas and check-ins.
-  final FieldHttp Function(PinnedField field) fieldHttp;
-  final FieldTrust trust;
+  late final FieldHttp Function(PinnedField field) fieldHttp;
+  late final FieldTrust trust;
+
+  /// Which of a field's addresses answered, and the last failures (check-R1
+  /// to check-R5): the requests, the feed and the "does not answer" screens
+  /// share it.
+  final FieldRoutes routes;
   final CheckinStore checkins;
 
   /// The phone's location, for position reports (null: not available).

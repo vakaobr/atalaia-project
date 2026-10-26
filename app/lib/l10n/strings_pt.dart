@@ -512,6 +512,15 @@ const Map<String, String> ptStrings = {
   'checkin.bad_poster':
       'Este cartaz de check-in não se consegue ler. Pede outro à organização.',
   'checkin.not_poster': 'Isto não é um cartaz de check-in do Atalaia.',
+  // Why the field controller did not answer (check-R5)
+  'diag.title': 'Detalhes',
+  'diag.timeout': 'sem resposta a tempo',
+  'diag.refused': 'ligação recusada',
+  'diag.unreachable': 'sem caminho até ao endereço',
+  'diag.tls': 'certificado não aceite',
+  'diag.http': 'HTTP {status}',
+  'diag.other': 'erro de ligação',
+  'diag.line': '{kind} · {url} · {time}',
   'checkin.unreachable':
       'O controlador do campo não responde. Estás ligado à rede Wi-Fi do campo?',
   'checkin.join_wifi':

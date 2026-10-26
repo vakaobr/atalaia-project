@@ -43,6 +43,7 @@ import '../branding/branded.dart';
 import '../branding/field_branding.dart';
 import '../checkin/checkin_client.dart';
 import '../checkin/checkin_screen.dart';
+import '../checkin/failure_details.dart';
 import '../l10n/strings.dart';
 import '../platform/location.dart';
 import '../platform/platform_check.dart';
@@ -452,6 +453,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               ? null
               : services.feedConnect,
           onAssignment: widget.onAssignment,
+          routes: services.routes,
         );
     if (widget.feed == null) unawaited(feed.start());
     unawaited(_loadBranding());
@@ -631,6 +633,8 @@ class PlayerView extends StatelessWidget {
           ),
           FeedState.open => const SizedBox.shrink(),
         },
+        if (feed.state == FeedState.closed)
+          FailureDetails(routeKey: feed.routeKey, routes: feed.routes),
         if (g == null && feed.state == FeedState.open)
           Notice(s.t('player.no_game')),
         if (g != null) ...[

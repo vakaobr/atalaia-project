@@ -30,6 +30,7 @@ import '../ui/code_kind.dart';
 import '../ui/widgets.dart';
 import 'checkin_client.dart';
 import 'declare_replicas_screen.dart';
+import 'failure_details.dart';
 import 'field_identity.dart';
 import 'field_trust.dart';
 import 'my_replicas.dart';
@@ -313,6 +314,8 @@ class _CheckinScreenState extends State<CheckinScreen> {
               kind: NoticeKind.error,
               key: const Key('checkin-error'),
             ),
+          if (_error != null)
+            FailureDetails(routeKey: _field?.fieldId ?? _poster?.fieldId),
           ...switch (_step) {
             _Step.scan => _scanStep(s),
             _Step.connecting || _Step.sending => [
@@ -748,6 +751,7 @@ class _CheckinStatusScreenState extends State<CheckinStatusScreen> {
               key: const Key('checkin-left'),
             ),
           if (_error != null) Notice(_error!, kind: NoticeKind.warning),
+          if (_error != null) FailureDetails(routeKey: widget.field.fieldId),
           if (!_left) ...[
             Notice(
               s.t('checkin.status.${c.status}'),
@@ -810,7 +814,13 @@ class _CheckinStatusScreenState extends State<CheckinStatusScreen> {
                 MaterialPageRoute<void>(
                   builder: (_) => PlayerScreen(
                     link: FieldLink(
-                      Uri.parse(widget.field.urls.first),
+                      Uri.parse(
+                        context.services.routes.winner(
+                              widget.field.fieldId,
+                              widget.field.lastUrl,
+                            ) ??
+                            widget.field.urls.first,
+                      ),
                       c.token,
                       field: widget.field,
                     ),

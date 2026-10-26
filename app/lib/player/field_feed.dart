@@ -27,6 +27,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../checkin/field_route.dart';
 import '../checkin/field_trust.dart';
 
 /// A field controller's address and access code.
@@ -42,8 +43,11 @@ final class FieldLink {
 
   FieldLink withToken(String t) => FieldLink(base, t, field: field);
 
-  Uri get stream => base.replace(
-    scheme: base.scheme == 'https' ? 'wss' : 'ws',
+  Uri get stream => streamAt(base);
+
+  /// The stream at another of the field's addresses ([FieldFeed] races them).
+  Uri streamAt(Uri at) => at.replace(
+    scheme: at.scheme == 'https' ? 'wss' : 'ws',
     path: '/api/v1/stream',
     queryParameters: {'token': token},
   );
@@ -182,7 +186,9 @@ class FieldFeed extends ChangeNotifier {
     FeedConnect? connect,
     DateTime Function()? now,
     this.onAssignment,
-  }) : _connect =
+    FieldRoutes? routes,
+  }) : routes = routes ?? FieldRoutes(),
+       _connect =
            connect ??
            (link.field == null
                ? ioConnect
@@ -191,6 +197,33 @@ class FieldFeed extends ChangeNotifier {
 
   FieldLink link;
   final FeedConnect _connect;
+
+  /// The field's addresses raced on every connection, reconnects included:
+  /// the one that answered first is tried first, a dead one never holds the
+  /// feed (decisions check-R1, check-R4).
+  final FieldRoutes routes;
+
+  /// What [routes] keys this feed's failures by: the field, or the address
+  /// of a plain scoreboard link.
+  String get routeKey => link.field?.fieldId ?? 'link:${link.base}';
+
+  /// The addresses to race: the pinned field's, else the link's own.
+  List<String> get _urls {
+    final f = link.field;
+    return f != null && f.urls.isNotEmpty ? f.urls : [link.base.toString()];
+  }
+
+  Future<FeedSocket> _connectBest() async {
+    final urls = _urls;
+    final (_, socket) = await routes.choose<FeedSocket>(
+      routeKey,
+      urls,
+      (u, cancel) => _connect(link.streamAt(Uri.parse(u))),
+      seed: link.field?.lastUrl,
+      dispose: (s) => unawaited(s.close()),
+    );
+    return socket;
+  }
 
   /// Asked for a new token when the controller closes the stream with 4409
   /// (the GM changed this player's team, squad or role); null keeps the old.
@@ -275,7 +308,7 @@ class FieldFeed extends ChangeNotifier {
     state = FeedState.connecting;
     notifyListeners();
     try {
-      final s = await _connect(link.stream);
+      final s = await _connectBest();
       if (_stopped) {
         await s.close();
         return;

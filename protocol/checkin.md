@@ -25,7 +25,7 @@ atalaia:checkin:<base64url without padding of: version (1 byte) | body (CBOR map
 | --- | --- | --- | --- | --- |
 | 1 | `field_id` | text | yes | the field's id, as in chrono records: 1-64 of `A-Za-z0-9._:-` |
 | 2 | `field_name` | text | yes | 1-48 characters (not bytes), no control characters, no spaces at the ends |
-| 3 | `urls` | array of text | yes | 1-3 different base addresses of the controller's API, tried in order: `https://host[:port]`, a DNS name, an IPv4 address or an IPv6 address in brackets, nothing after it, at most 64 bytes each |
+| 3 | `urls` | array of text | yes | 1-3 different base addresses of the controller's API, raced by the app (the first at once, the next after about 250 ms or when the one before fails; the first that completes TLS with the field CA wins), best first: `https://host[:port]`, a DNS name, an IPv4 address or an IPv6 address in brackets, nothing after it, at most 64 bytes each |
 | 4 | `ca_sha256` | bytes | yes | 32 bytes: SHA-256 of the field CA's DER certificate (the join payload's key 13 holds the same value) |
 | 5 | `wifi_ssid` | text | no | 1-32 bytes of UTF-8 without NUL: the field network's name, shown as "join this Wi-Fi" |
 | 6 | `game_id` | uint | no | 1-65534: this game only (a pinned poster) |

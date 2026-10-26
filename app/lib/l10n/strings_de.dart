@@ -524,6 +524,15 @@ const Map<String, String> deStrings = {
   'checkin.bad_poster':
       'Dieses Check-in-Plakat ist nicht lesbar. Frag die Orga nach einem anderen.',
   'checkin.not_poster': 'Das ist kein Check-in-Plakat von Atalaia.',
+  // Why the field controller did not answer (check-R5)
+  'diag.title': 'Details',
+  'diag.timeout': 'keine Antwort rechtzeitig',
+  'diag.refused': 'Verbindung abgelehnt',
+  'diag.unreachable': 'keine Route zur Adresse',
+  'diag.tls': 'Zertifikat nicht akzeptiert',
+  'diag.http': 'HTTP {status}',
+  'diag.other': 'Verbindungsfehler',
+  'diag.line': '{kind} · {url} · {time}',
   'checkin.unreachable':
       'Der Controller des Felds antwortet nicht. Bist du im WLAN des Felds?',
   'checkin.join_wifi':

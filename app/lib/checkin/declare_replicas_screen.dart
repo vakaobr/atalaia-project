@@ -20,6 +20,7 @@ import '../ui/widgets.dart';
 import 'checkin_client.dart';
 import 'checkin_screen.dart';
 import 'my_replicas.dart';
+import 'failure_details.dart';
 
 class DeclareReplicasScreen extends StatefulWidget {
   const DeclareReplicasScreen({
@@ -126,6 +127,7 @@ class _DeclareReplicasScreenState extends State<DeclareReplicasScreen> {
             Text(s.t('declare.intro', {'max': _max})),
             const SizedBox(height: 8),
             if (_error != null) Notice(_error!, kind: NoticeKind.error),
+            if (_error != null) FailureDetails(routeKey: c.fieldId),
             if (_saved)
               Notice(
                 s.t('declare.saved'),

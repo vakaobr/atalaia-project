@@ -26,6 +26,7 @@ import 'package:crypto/crypto.dart';
 import '../protocol/checkin_poster.dart';
 import '../security/bytes.dart';
 import '../storage/app_store.dart';
+import 'field_route.dart';
 
 /// Fetches the PEM text at [url] (the CA endpoint), however its TLS looks.
 typedef CaFetcher = Future<String> Function(Uri url);
@@ -54,6 +55,7 @@ final class PinnedField {
     required this.caSha256,
     required this.urls,
     this.wifiSsid,
+    this.lastUrl,
   });
 
   final String fieldId;
@@ -62,6 +64,19 @@ final class PinnedField {
   final Uint8List caSha256;
   final List<String> urls;
   final String? wifiSsid;
+
+  /// The address that answered last (decision check-R3): tried first.
+  final String? lastUrl;
+
+  PinnedField withLastUrl(String? url) => PinnedField(
+    fieldId: fieldId,
+    fieldName: fieldName,
+    caPem: caPem,
+    caSha256: caSha256,
+    urls: urls,
+    wifiSsid: wifiSsid,
+    lastUrl: url,
+  );
 
   String get caShort => shortFingerprint(caSha256);
 
@@ -72,6 +87,7 @@ final class PinnedField {
     'ca_sha256': hexEncode(caSha256),
     'urls': urls,
     'wifi_ssid': wifiSsid,
+    if (lastUrl != null) 'last_url': lastUrl,
   };
 
   static PinnedField? fromJson(Map<String, Object?> j) {
@@ -83,17 +99,22 @@ final class PinnedField {
         caSha256: hexDecode(j['ca_sha256']! as String),
         urls: (j['urls']! as List).cast<String>(),
         wifiSsid: j['wifi_ssid'] as String?,
+        lastUrl: j['last_url'] as String?,
       );
     } on Object {
       return null;
     }
   }
 
+  /// The TLS context that trusts this field's CA and nothing else: the one
+  /// every connection to the field uses, the race's probes included.
+  SecurityContext securityContext() =>
+      SecurityContext(withTrustedRoots: false)
+        ..setTrustedCertificatesBytes(utf8.encode(caPem));
+
   /// An HTTP client that trusts this field's CA and nothing else.
   HttpClient client() {
-    final ctx = SecurityContext(withTrustedRoots: false)
-      ..setTrustedCertificatesBytes(utf8.encode(caPem));
-    return HttpClient(context: ctx)
+    return HttpClient(context: securityContext())
       ..connectionTimeout = const Duration(seconds: 8)
       ..idleTimeout = const Duration(seconds: 15);
   }
@@ -122,9 +143,10 @@ Future<String> ioFetchCa(Uri url) async {
     final req = await client.getUrl(url);
     final res = await req.close().timeout(const Duration(seconds: 10));
     if (res.statusCode != 200) {
-      throw TrustException(
-        TrustFailure.unreachable,
+      throw RouteError(
+        FailKind.http,
         '${url.host}: HTTP ${res.statusCode}',
+        status: res.statusCode,
       );
     }
     final bytes = <int>[];
@@ -141,9 +163,14 @@ Future<String> ioFetchCa(Uri url) async {
 }
 
 class FieldTrust {
-  FieldTrust(this.store, {CaFetcher? fetch}) : _fetch = fetch ?? ioFetchCa;
+  FieldTrust(this.store, {CaFetcher? fetch, FieldRoutes? routes})
+    : _fetch = fetch ?? ioFetchCa,
+      routes = routes ?? FieldRoutes();
 
   final AppStore store;
+
+  /// The addresses' winners and failures (the CA fetch races them too).
+  final FieldRoutes routes;
   final CaFetcher _fetch;
   static const _list = 'trusted_fields';
 
@@ -178,84 +205,101 @@ class FieldTrust {
         caSha256: old.caSha256,
         urls: poster.urls,
         wifiSsid: poster.wifiSsid,
+        lastUrl: poster.urls.contains(old.lastUrl) ? old.lastUrl : null,
       );
       await _save(updated);
       return updated;
     }
-    Object? lastError;
-    for (final u in poster.urls) {
-      final String pem;
-      try {
-        pem = await _fetch(Uri.parse('$u/api/v1/controller/ca'));
-      } on Object catch (e) {
-        lastError = e;
-        continue;
-      }
-      final der = pemToDer(pem);
-      if (der == null) {
-        throw TrustException(
-          TrustFailure.notACertificate,
-          'the controller did not send a certificate',
-        );
-      }
-      final got = Uint8List.fromList(sha256.convert(der).bytes);
-      if (!constantTimeEquals(got, poster.caSha256)) {
-        throw TrustException(
-          TrustFailure.mismatch,
-          "the controller's certificate is not the one on the poster",
-          knownShort: poster.caShort,
-          newShort: shortFingerprint(got),
-        );
-      }
-      final f = PinnedField(
-        fieldId: poster.fieldId,
-        fieldName: poster.fieldName,
-        caPem: pem,
-        caSha256: got,
-        urls: poster.urls,
-        wifiSsid: poster.wifiSsid,
-      );
-      await _save(f);
-      return f;
-    }
-    throw TrustException(
-      TrustFailure.unreachable,
-      'no address of the poster answered ($lastError)',
+    final (pem, got) = await _fetchCa(
+      poster.fieldId,
+      poster.urls,
+      poster.caSha256,
+      'the poster',
     );
+    final f = PinnedField(
+      fieldId: poster.fieldId,
+      fieldName: poster.fieldName,
+      caPem: pem,
+      caSha256: got,
+      urls: poster.urls,
+      wifiSsid: poster.wifiSsid,
+      lastUrl: routes.winner(poster.fieldId),
+    );
+    await _save(f);
+    return f;
+  }
+
+  /// The CA from the first of [urls] that answers with the certificate whose
+  /// fingerprint is [expected] (a race, check-R1): an address held by another
+  /// device (another certificate) counts as a failed one and the race goes
+  /// on; when none matches, the certificate that did not is what is reported.
+  Future<(String, Uint8List)> _fetchCa(
+    String key,
+    List<String> urls,
+    Uint8List expected,
+    String what,
+  ) async {
+    TrustException? definite;
+    try {
+      final (_, r) = await routes.choose<(String, Uint8List)>(key, urls, (
+        u,
+        cancel,
+      ) async {
+        final pem = await _fetch(Uri.parse('$u/api/v1/controller/ca'));
+        final der = pemToDer(pem);
+        if (der == null) {
+          definite ??= TrustException(
+            TrustFailure.notACertificate,
+            'the controller did not send a certificate',
+          );
+          throw RouteError(FailKind.tls, 'not a certificate');
+        }
+        final got = Uint8List.fromList(sha256.convert(der).bytes);
+        if (!constantTimeEquals(got, expected)) {
+          definite ??= TrustException(
+            TrustFailure.mismatch,
+            "the controller's certificate is not the one on $what",
+            knownShort: shortFingerprint(expected),
+            newShort: shortFingerprint(got),
+          );
+          throw RouteError(FailKind.tls, 'another certificate');
+        }
+        return (pem, got);
+      });
+      return r;
+    } on RaceFailed catch (e) {
+      throw definite ??
+          TrustException(
+            TrustFailure.unreachable,
+            'no address of $what answered (${e.failures.map((f) => '${f.kind.name} ${f.url}').join(', ')})',
+          );
+    }
   }
 
   /// A prop's trust for one game (ADR-P3-9): the CA from [urls] checked
   /// against the join payload's fingerprint; not kept after the game.
   Future<PinnedField> forGame(List<String> urls, Uint8List caSha256) async {
-    Object? lastError;
-    for (final u in urls) {
-      final String pem;
-      try {
-        pem = await _fetch(Uri.parse('$u/api/v1/controller/ca'));
-      } on Object catch (e) {
-        lastError = e;
-        continue;
-      }
-      final der = pemToDer(pem);
-      if (der == null ||
-          !constantTimeEquals(sha256.convert(der).bytes, caSha256)) {
-        throw TrustException(
-          TrustFailure.mismatch,
-          "the controller's certificate is not the one in the join payload",
-        );
-      }
-      return PinnedField(
-        fieldId: 'game',
-        fieldName: '',
-        caPem: pem,
-        caSha256: caSha256,
-        urls: urls,
-      );
-    }
-    throw TrustException(
-      TrustFailure.unreachable,
-      'no address of the join payload answered ($lastError)',
+    final (pem, got) = await _fetchCa(
+      'game',
+      urls,
+      caSha256,
+      'the join payload',
     );
+    return PinnedField(
+      fieldId: 'game',
+      fieldName: '',
+      caPem: pem,
+      caSha256: got,
+      urls: urls,
+    );
+  }
+
+  /// Keeps [url] as the address that answered for [fieldId] (a field not
+  /// pinned, or a game's prop, has none to keep).
+  Future<void> remember(String fieldId, String url) async {
+    final f = await known(fieldId);
+    if (f == null || f.lastUrl == url || !f.urls.contains(url)) return;
+    await _save(f.withLastUrl(url));
   }
 
   Future<void> _save(PinnedField f) async {

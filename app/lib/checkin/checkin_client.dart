@@ -15,6 +15,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'field_route.dart';
 import 'field_trust.dart';
 
 /// One answer: its status and JSON body.
@@ -44,13 +45,61 @@ abstract interface class FieldHttp {
   });
 }
 
-/// [FieldHttp] over dart:io: the field's addresses in order, its CA only.
+/// Opens a TLS connection to [url] with the field's CA alone, and closes it:
+/// the race's probe (a "does this address answer, and is it the field's
+/// controller"). The same security context as every request, so an address
+/// held by another device fails here exactly as it would later.
+typedef FieldProbe =
+    Future<void> Function(PinnedField field, Uri url, RaceCancel cancel);
+
+Future<void> ioProbe(PinnedField field, Uri url, RaceCancel cancel) async {
+  final task = await SecureSocket.startConnect(
+    url.host,
+    url.hasPort ? url.port : 443,
+    context: field.securityContext(),
+  );
+  cancel.onCancel(task.cancel);
+  final socket = await task.socket;
+  socket.destroy();
+}
+
+/// [FieldHttp] over dart:io: the field's addresses raced (check-R1), the one
+/// that answered first remembered and tried first, its CA only.
 class IoFieldHttp implements FieldHttp {
-  IoFieldHttp(this.field) : _client = field.client();
+  IoFieldHttp(this.field, {FieldRoutes? routes, FieldProbe? probe})
+    : routes = routes ?? FieldRoutes(),
+      _probe = probe ?? ioProbe,
+      _client = field.client();
 
   final PinnedField field;
+  final FieldRoutes routes;
+  final FieldProbe _probe;
   final HttpClient _client;
-  int _working = 0;
+
+  Future<FieldResponse> _request(
+    String url,
+    String method,
+    String path,
+    Object? body,
+    String? token,
+  ) async {
+    final req = await _client.openUrl(method, Uri.parse('$url/api/v1$path'));
+    req.headers.set('Accept', 'application/json');
+    if (token != null) req.headers.set('Authorization', 'Bearer $token');
+    if (body != null) {
+      req.headers.contentType = ContentType.json;
+      req.add(utf8.encode(jsonEncode(body)));
+    }
+    final res = await req.close().timeout(const Duration(seconds: 15));
+    final text = await utf8.decodeStream(res);
+    Object? json;
+    try {
+      json = text.isEmpty ? null : jsonDecode(text);
+    } on FormatException {
+      json = null;
+    }
+    return FieldResponse(res.statusCode, json);
+  }
 
   @override
   Future<FieldResponse> send(
@@ -59,36 +108,70 @@ class IoFieldHttp implements FieldHttp {
     Object? body,
     String? token,
   }) async {
-    Object? last;
-    final urls = field.urls;
-    for (var i = 0; i < urls.length; i++) {
-      final at = (_working + i) % urls.length;
+    final key = field.fieldId;
+    // The address that answered last goes first, on its own: no probe.
+    final known = routes.winner(key, field.lastUrl);
+    String? failed;
+    if (known != null && field.urls.contains(known)) {
       try {
-        final req = await _client.openUrl(
-          method,
-          Uri.parse('${urls[at]}/api/v1$path'),
+        return _answered(
+          key,
+          known,
+          await _request(known, method, path, body, token),
         );
-        req.headers.set('Accept', 'application/json');
-        if (token != null) req.headers.set('Authorization', 'Bearer $token');
-        if (body != null) {
-          req.headers.contentType = ContentType.json;
-          req.add(utf8.encode(jsonEncode(body)));
-        }
-        final res = await req.close().timeout(const Duration(seconds: 15));
-        final text = await utf8.decodeStream(res);
-        _working = at;
-        Object? json;
-        try {
-          json = text.isEmpty ? null : jsonDecode(text);
-        } on FormatException {
-          json = null;
-        }
-        return FieldResponse(res.statusCode, json);
       } on Object catch (e) {
-        last = e; // the next address
+        routes.noteFailure(key, routes.failure(known, e));
+        failed = known;
       }
     }
-    throw CheckinException(0, 'the field controller is out of reach ($last)');
+    // First use, or it failed: race the addresses, the failed one last.
+    String url;
+    try {
+      final r = await routes.choose<void>(
+        key,
+        field.urls,
+        (u, cancel) => _probe(field, Uri.parse(u), cancel),
+        seed: field.lastUrl,
+        avoid: failed,
+      );
+      url = r.$1;
+    } on RaceFailed catch (e) {
+      throw CheckinException(
+        0,
+        'the field controller is out of reach '
+        '(${e.failures.map((f) => '${f.kind.name} ${f.url}').join(', ')})',
+      );
+    }
+    try {
+      return _answered(
+        key,
+        url,
+        await _request(url, method, path, body, token),
+      );
+    } on Object catch (e) {
+      final f = routes.failure(url, e);
+      routes.noteFailure(key, f);
+      throw CheckinException(
+        0,
+        'the field controller is out of reach (${f.kind.name} $url)',
+      );
+    }
+  }
+
+  /// The address answered: it is the winner; a status of 400 or more is kept
+  /// as the last failure (kind http).
+  FieldResponse _answered(String key, String url, FieldResponse r) {
+    routes.succeeded(key, url);
+    if (r.status >= 400) {
+      routes.noteFailure(
+        key,
+        routes.failure(
+          url,
+          RouteError(FailKind.http, 'HTTP ${r.status}', status: r.status),
+        ),
+      );
+    }
+    return r;
   }
 
   void close() => _client.close(force: true);

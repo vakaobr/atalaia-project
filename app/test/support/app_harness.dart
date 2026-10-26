@@ -22,6 +22,7 @@ import 'package:atalaia_app/platform/location.dart';
 import 'package:atalaia_app/player/field_feed.dart';
 import 'package:atalaia_app/pod/pod_client.dart';
 import 'package:atalaia_app/site/site_client.dart';
+import 'package:atalaia_app/checkin/field_route.dart';
 import 'package:atalaia_app/storage/app_store.dart';
 import 'package:flutter/material.dart';
 
@@ -42,6 +43,7 @@ class Harness {
     this.location,
     this.controllerLauncher,
     this.controllerAssets,
+    this.routes,
   }) : qr = qr ?? FakeQr();
 
   /// The phone's location (none: not available).
@@ -50,6 +52,9 @@ class Harness {
   /// The phone controller's isolate (slice S6); none: a [FakeControllerRun].
   final ControllerLauncher? controllerLauncher;
   final ControllerAssetsLoader? controllerAssets;
+
+  /// The addresses' winners and failures (none: the app's own).
+  final FieldRoutes? routes;
   final wifi = FakeFieldWifi();
   final controllerRuns = <FakeControllerRun>[];
   final controllerBoots = <ControllerBoot>[];
@@ -88,6 +93,7 @@ class Harness {
     consoleView: (context, url) =>
         Center(child: Text('console $url', key: const Key('console-view'))),
     fieldHttp: fieldHttp,
+    routes: routes,
     caFetch: caFetch ?? _noCa,
     linkConnect: linkConnect,
     brandingSource: brandingSource ?? (_, _) => const _NoBranding(),
@@ -165,6 +171,7 @@ Harness harness({
   AppLinks? links,
   LocationService? location,
   ControllerLauncher? controllerLauncher,
+  FieldRoutes? routes,
 }) => Harness(
   settings: (settings ?? AppSettings())..language = language,
   runner: runner ?? FakeNodeRunner(),
@@ -178,4 +185,5 @@ Harness harness({
   links: links,
   location: location,
   controllerLauncher: controllerLauncher,
+  routes: routes,
 );
