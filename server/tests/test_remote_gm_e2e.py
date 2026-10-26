@@ -129,7 +129,15 @@ class RemoteGmEndToEndTests(unittest.TestCase):
             return links[0]["live"]["state"] if links and links[0]["live"] else None
 
         self.assertTrue(wait(lambda: live_state() == "ready"), self.api("GET", path, token=token))
-        for command, params, state in (("start", {}, "running"), ("pause", {"reason": "medic"}, "paused"),
+        # No box has joined for the zone: the start guard (RJ-1) refuses, naming the role (decision RG-1).
+        status, out = self.api("POST", f"{path}/commands", {"game": game, "command": "start"}, token=token)
+        self.assertEqual((status, out["detail"], out["code"], out["missing"]),
+                         (409, "refused_by_controller", "conflict", ["zone"]), out)
+        self.assertIn("zone", out["message"])
+        self.assertEqual(store.game(gid)["state"], "ready")
+        # The page then asks "Start anyway?" and sends it again with force.
+        for command, params, state in (("start", {"force": True}, "running"),
+                                       ("pause", {"reason": "medic"}, "paused"),
                                        ("resume", {}, "running"), ("end", {"reason": "time"}, "ended")):
             with self.subTest(command):
                 status, out = self.api("POST", f"{path}/commands", {"game": game, "command": command,
@@ -145,12 +153,18 @@ class RemoteGmEndToEndTests(unittest.TestCase):
         # Both sides logged every command.
         log = store.remote_commands()
         self.assertEqual([(e["command"], e["result"], e["username"]) for e in reversed(log)],
-                         [("start", "done", "gm-norte"), ("pause", "done", "gm-norte"), ("resume", "done", "gm-norte"),
+                         [("start", "conflict", "gm-norte"), ("start", "done", "gm-norte"),
+                          ("pause", "done", "gm-norte"), ("resume", "done", "gm-norte"),
                           ("end", "done", "gm-norte"), ("start", "not_live", "gm-norte")])
+        self.assertEqual((log[4]["params"], log[5]["params"]), ({"force": True}, {}))  # the forced start says so
+        forced = self.db.fetch("SELECT details->'params'->>'force' FROM audit_log WHERE action = 'remote_gm_command' "
+                               "AND details->>'command' = 'start' AND details->>'result' = 'done'")
+        self.assertEqual([tuple(r) for r in forced], [("true",)])  # and so does the audit log
         rows = self.db.fetch("SELECT action, details->>'command', details->>'result' FROM audit_log "
                              "WHERE action LIKE 'remote_gm%' ORDER BY id")
         self.assertEqual([tuple(r) for r in rows],
-                         [("remote_gm_command", "start", "done"), ("remote_gm_command", "pause", "done"),
+                         [("remote_gm_command", "start", "conflict"), ("remote_gm_command", "start", "done"),
+                          ("remote_gm_command", "pause", "done"),
                           ("remote_gm_command", "resume", "done"), ("remote_gm_command", "end", "done"),
                           ("remote_gm_command", "start", "not_live"), ("remote_gm_denied", None, None)])
         self.assertEqual([e["data"] for e in store.events(gid) if e["type"] == "game.pause"], [{"reason": "medic"}])

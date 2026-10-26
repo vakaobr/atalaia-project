@@ -1052,6 +1052,8 @@ const _messageMax = 100;
 const _reasonMax = 64;
 const _usernameMax = 64;
 const _detailMax = 200;
+const missingMax = 16; // roles named in a refused start's `missing` (RG-1)
+const roleMax = 32;
 const maxLiveEvents = 50;
 const _maxModeCommands = 32;
 final commandNameRe = _full(r'[a-z][a-z0-9_]{0,23}');
@@ -1166,7 +1168,10 @@ Json checkCommandParams(
   if (!remoteCommands.contains(command)) _fail('not_allowed', 'command');
   final params = _obj(raw, path);
   switch (command) {
-    case 'start' || 'resume':
+    case 'start':
+      _keys(params, path, const [], ['force']);
+      if (params.containsKey('force')) _bool(params['force'], '$path.force');
+    case 'resume':
       _keys(params, path, const []);
     case 'pause' || 'end':
       _keys(params, path, const [], ['reason']);
@@ -1209,7 +1214,7 @@ Json checkResult(Object? raw) {
   _envelope(
     {
       for (final e in body.entries)
-        if (e.key != 'detail') e.key: e.value,
+        if (e.key != 'detail' && e.key != 'missing') e.key: e.value,
     },
     ['id', 'code'],
     game: false,
@@ -1218,6 +1223,13 @@ Json checkResult(Object? raw) {
   _uuid(body['id'], 'id');
   if (!resultCodes.contains(body['code'])) _fail('bad_value', 'code');
   _text(body['detail'], 'detail', _detailMax, nullable: true);
+  if (body.containsKey('missing')) {
+    if (body['code'] != 'conflict') _fail('bad_value', 'missing');
+    final missing = _list(body['missing'], 'missing', missingMax, 1);
+    for (var i = 0; i < missing.length; i++) {
+      _text(missing[i], 'missing[$i]', roleMax);
+    }
+  }
   return body;
 }
 

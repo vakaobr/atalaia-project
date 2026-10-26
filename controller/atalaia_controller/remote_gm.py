@@ -16,13 +16,17 @@ socket carries, as protocol/sync.md describes:
 - ``command`` from the site server, for a user it authenticated with the ``gm``
   role on this field (in a TOTP session). Only ``start``, ``pause``, ``resume``,
   ``end``, ``message`` (a GM message to every node) and ``mode`` (one of the
-  game's declared mode commands) exist; the controller checks each with the
+  game's declared mode commands) exist; ``start`` takes an optional ``force``
+  (the console's "Start anyway", decision RG-1); the controller checks each with the
   shared ``sync_format.check_command``, refuses one for another game than its
   live one, one sent more than 60 s ago (by the site server's clock), one it
   already had (by its id), and any command when ``remote_gm`` is off, and carries
   out the rest through the engine exactly as the console's GM token would
   (a standby controller refuses, a paused game does not pause again).
-- ``command.result`` back: ``done`` or why not.
+- ``command.result`` back: ``done`` or why not. A ``start`` refused because roles
+  of the game have no joined node comes back as ``conflict`` with those roles in
+  ``missing``, so the site server's page can ask "Start anyway?" and send it
+  again with ``force`` (decision RG-1; the guard itself is RJ-1).
 
 The same stream carries the remote ATAK relay (Phase 4 follow-up, decisions
 FU5-*): with ``[atak] remote = true`` the controller opens it even with
@@ -56,8 +60,8 @@ from typing import Any, Callable, Optional
 from urllib.parse import urlsplit, urlunsplit
 
 from . import __version__
-from .engine import Conflict, ControllerError, NotFound, Unavailable
-from .sync_format import (MAX_COT_EVENTS, MAX_LIVE_EVENTS, NODE_INFO, STALE_S, SYNC_VERSION, SyncFormatError,
+from .engine import Conflict, ControllerError, NotFound, StartBlocked, Unavailable
+from .sync_format import (MAX_COT_EVENTS, MAX_LIVE_EVENTS, MISSING_MAX, NODE_INFO, ROLE_MAX, STALE_S, SYNC_VERSION, SyncFormatError,
                           check_command, check_event, check_live, check_nodes)
 from .ws_client import WebSocket, WsError
 
@@ -278,27 +282,38 @@ class RemoteGm:
                  "game_id": cmd["game"]["game_id"], "game_seed": cmd["game"]["game_seed"]}
         if not self.cfg.sync_remote_gm:
             code, detail = "remote_gm_off", "[sync] remote_gm is off on this controller"
+            missing = None
         elif abs(received - cmd["sent_at"]) > STALE_S:
             code, detail = "stale", f"sent {received - cmd['sent_at']:.0f} s ago by the site server's clock"
+            missing = None
         else:
-            code, detail = self._carry_out(cmd)
+            code, detail, missing = self._carry_out(cmd)
         row = self.store.add_remote_command({**entry, "result": code, "detail": detail})
         log.warning("remote GM %s (%s): %s %s on game %d: %s%s", cmd["user"]["username"], cmd["user"]["id"],
                     cmd["command"], json.dumps(cmd["params"], ensure_ascii=False), cmd["game"]["game_id"], code,
                     f" ({detail})" if detail and code != "done" else "")
-        return {"id": cmd["id"], "code": row["result"], "detail": row["detail"]}
+        out = {"id": cmd["id"], "code": row["result"], "detail": row["detail"]}
+        if missing:
+            out["missing"] = missing
+        return out
 
-    def _carry_out(self, cmd: dict[str, Any]) -> tuple[str, Optional[str]]:
+    def _carry_out(self, cmd: dict[str, Any]) -> tuple[str, Optional[str], Optional[list[str]]]:
+        """``(code, detail, missing)``: ``missing`` names the roles without a joined node when a start was
+        refused for that (the console's ``start_check``), else None."""
         ctrl = self.controller
         gid, seed = cmd["game"]["game_id"], cmd["game"]["game_seed"]
         game = ctrl.game
         if game is None or int(game["id"]) != gid or int(game["game_seed"]) != seed:
-            return "not_live", f"game {gid} (seed {seed}) is not this controller's live game"
+            return "not_live", f"game {gid} (seed {seed}) is not this controller's live game", None
         params = cmd["params"]
+        forced: list[str] = []
         try:
             what = cmd["command"]
             if what == "start":
-                out = ctrl.start_game(gid)
+                force = params.get("force") is True
+                if force:
+                    forced = list(ctrl.start_check()["missing"])
+                out = ctrl.start_game(gid, force=force)
             elif what == "pause":
                 out = ctrl.pause_game(gid, params.get("reason", ""))
             elif what == "resume":
@@ -307,22 +322,27 @@ class RemoteGm:
                 out = ctrl.end_game(gid, params.get("reason", ""))
             elif what == "message":
                 sent = ctrl.send_node_cmd(BROADCAST, "message", {"text": params["text"]})
-                return "done", f"sent to every node (seq {sent['seq']})"
+                return "done", f"sent to every node (seq {sent['seq']})", None
             else:
                 sent = ctrl.send_node_cmd(params["node"], "mode", {"name": params["name"]})
-                return "done", f"sent to node {sent['node']} (seq {sent['seq']})"
+                return "done", f"sent to node {sent['node']} (seq {sent['seq']})", None
         except NotFound as exc:
-            return "not_found", str(exc)[:200]
+            return "not_found", str(exc)[:200], None
+        except StartBlocked as exc:
+            missing = [str(r)[:ROLE_MAX] for r in exc.check.get("missing", [])][:MISSING_MAX]
+            return "conflict", str(exc)[:200], missing or None
         except Conflict as exc:
-            return "conflict", str(exc)[:200]
+            return "conflict", str(exc)[:200], None
         except Unavailable as exc:
-            return "unavailable", str(exc)[:200]
+            return "unavailable", str(exc)[:200], None
         except ControllerError as exc:
-            return "invalid", str(exc)[:200]
+            return "invalid", str(exc)[:200], None
         except Exception:  # noqa: BLE001
             log.exception("remote GM: %s failed", cmd["command"])
-            return "failed", "the controller could not carry it out (see its log)"
-        return "done", f"game {gid} is {out.get('state')}"
+            return "failed", "the controller could not carry it out (see its log)", None
+        if forced:  # the console's "Start anyway", by a remote GM: also in this command's log entry
+            return "done", f"game {gid} is {out.get('state')}, started anyway without nodes for: {', '.join(forced)}"[:200], None
+        return "done", f"game {gid} is {out.get('state')}", None
 
     # --- the live view ---------------------------------------------------------------------
 

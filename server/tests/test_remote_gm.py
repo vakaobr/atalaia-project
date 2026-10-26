@@ -117,13 +117,15 @@ class RemoteCase(AppTestCase):
         return await self.client.post(self.url("/commands", field), json=body, headers=headers or self.gm)
 
     async def answered(self, stream: Stream, body: dict[str, Any], code: str = "done",
-                       detail: Optional[str] = "game 4242 is running", ctrl: dict[str, str] = CONTROLLER) -> Any:
-        """Posts a command, answers it on the controller's socket, returns (the HTTP answer, the command sent)."""
+                       detail: Optional[str] = "game 4242 is running", ctrl: dict[str, str] = CONTROLLER,
+                       **result: Any) -> Any:
+        """Posts a command, answers it on the controller's socket (``result``: more fields of the result, such
+        as ``missing``), returns (the HTTP answer, the command sent)."""
         post = asyncio.create_task(self.post(body))
         cmd = await stream.receive()
         self.assertEqual(cmd["type"], "command")
         await stream.send({"type": "command.result", "sync_version": 1, "controller": ctrl, "id": cmd["id"],
-                           "code": code, **({"detail": detail} if detail else {})})
+                           "code": code, **({"detail": detail} if detail else {}), **result})
         return await post, cmd
 
     async def audit(self) -> list[Any]:
@@ -227,6 +229,31 @@ class CommandTests(RemoteCase):
         await stream.receive()  # the command it never answered
         rows = await self.audit()
         self.assertEqual([json.loads(r["details"])["result"] for r in rows], ["conflict", "controller_timeout"])
+
+    async def test_a_start_refused_for_missing_roles_names_them_and_a_forced_start_goes(self) -> None:
+        """Decision RG-1: the roles come back in ``missing`` (HTTP answer and audit log); ``force`` is passed on
+        as the console's "Start anyway" and is in the audit log."""
+        stream = await self.controller()
+        refusal = "no box or prop has joined for: zone; join them, or start anyway (force)"
+        r, cmd = await self.answered(stream, {"game": GAME, "command": "start"}, code="conflict", detail=refusal,
+                                     missing=["zone"])
+        self.assertEqual(r.status_code, 409, r.text)
+        self.assertEqual((r.json()["detail"], r.json()["code"], r.json()["missing"]),
+                         ("refused_by_controller", "conflict", ["zone"]))
+        self.assertEqual(cmd["params"], {})
+        r, cmd = await self.answered(stream, {"game": GAME, "command": "start", "params": {"force": True}})
+        self.assertEqual((r.status_code, r.json()["code"]), (200, "done"))
+        self.assertNotIn("missing", r.json())
+        self.assertEqual(cmd["params"], {"force": True})
+        sync_format.check_command({k: v for k, v in cmd.items() if k != "type"})
+        first, second = [json.loads(row["details"]) for row in await self.audit()]
+        self.assertEqual((first["result"], first["missing"], first["params"]), ("conflict", ["zone"], {}))
+        self.assertEqual((second["result"], second["params"], "missing" in second), ("done", {"force": True}, False))
+        # force is a boolean, and only a start has it
+        r = await self.post({"game": GAME, "command": "start", "params": {"force": "yes"}})
+        self.assertEqual((r.status_code, r.json()["error"]), (400, "not_a_boolean"))
+        r = await self.post({"game": GAME, "command": "resume", "params": {"force": True}})
+        self.assertEqual((r.status_code, r.json()["error"]), (400, "unknown_field"))
 
     async def test_offline_and_a_revoked_key(self) -> None:
         r = await self.post({"game": GAME, "command": "start"})

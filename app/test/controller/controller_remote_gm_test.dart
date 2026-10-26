@@ -241,13 +241,46 @@ void main() {
       expect(pause.single['data'], {'reason': 'medic'});
     });
 
-    test('a start without a box for a role is refused (no Start anyway)', () {
+    test('a start without a box for a role is refused, roles named (RG-1)', () {
       final r = remote();
       final g = game(joined: false);
       final out = r.handleCommand(command(g, 'start'));
       expect(out['code'], 'conflict');
       expect(out['detail'], contains('zone'));
+      expect(out['missing'], ['zone']);
       expect(state(g), 'ready');
+      // force: false is the same as none
+      final again = r.handleCommand(command(g, 'start', {'force': false}));
+      expect(again['code'], 'conflict');
+      expect(again['missing'], ['zone']);
+      expect(state(g), 'ready');
+    });
+
+    test('a start with force starts anyway, and the log says so (RG-1)', () {
+      final r = remote();
+      final g = game(joined: false);
+      final out = r.handleCommand(command(g, 'start', {'force': true}));
+      expect(out['code'], 'done', reason: '$out');
+      expect(out.containsKey('missing'), isFalse);
+      expect(out['detail'], contains('started anyway without nodes for: zone'));
+      expect(state(g), 'running');
+      final log = r.remoteCommands();
+      expect(log.first['params'], {'force': true});
+      expect(
+        engine
+            .log(g['id']! as int)
+            .where((e) => e['type'] == 'game.start')
+            .length,
+        1,
+      );
+    });
+
+    test('force on a game with all its boxes is no different (RG-1)', () {
+      final r = remote();
+      final g = game();
+      final out = r.handleCommand(command(g, 'start', {'force': true}));
+      expect(out['detail'], 'game ${g['id']} is running');
+      expect(state(g), 'running');
     });
 
     test('a message and a mode command go on the radio', () {

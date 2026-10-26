@@ -100,12 +100,36 @@ class CommandTests(RemoteCase):
         self.assertEqual(pause[0]["data"], {"reason": "medic"})
 
     def test_a_start_without_a_box_for_a_role_is_refused(self) -> None:
-        """The remote GM has no "Start anyway": the start guard holds (decision RJ-4)."""
+        """Without force the start guard holds (RJ-1) and the roles come back in ``missing`` (RG-1)."""
         game = self.game(joined=False)
         out = self.remote.handle_command(command(game, "start"))
         self.assertEqual(out["code"], "conflict")
         self.assertIn("zone", out["detail"])
+        self.assertEqual(out["missing"], ["zone"])
         self.assertEqual(self.state(game), "ready")
+        again = self.remote.handle_command(command(game, "start", {"force": False}))
+        self.assertEqual((again["code"], again["missing"]), ("conflict", ["zone"]))
+        self.assertEqual(self.state(game), "ready")
+        self.assertEqual([e["result"] for e in self.store.remote_commands()], ["conflict", "conflict"])
+
+    def test_a_forced_start_starts_anyway_and_is_logged(self) -> None:
+        """``{"force": true}`` is the console's "Start anyway" (RG-1): logged here with force, told to the consoles."""
+        game = self.game(joined=False)
+        messages: list[dict[str, Any]] = []
+        self.ctrl.add_listener(messages.append)
+        out = self.remote.handle_command(command(game, "start", {"force": True}))
+        self.assertEqual(out["code"], "done", out)
+        self.assertNotIn("missing", out)
+        self.assertIn("started anyway without nodes for: zone", out["detail"])
+        self.assertEqual(self.state(game), "running")
+        entry = self.store.remote_commands()[0]
+        self.assertEqual((entry["command"], entry["params"], entry["result"]), ("start", {"force": True}, "done"))
+        self.assertEqual([m["missing"] for m in messages if m.get("kind") == "start.forced"], [["zone"]])
+
+    def test_force_with_every_box_joined_changes_nothing(self) -> None:
+        game = self.game()
+        out = self.remote.handle_command(command(game, "start", {"force": True}))
+        self.assertEqual((out["code"], out["detail"]), ("done", f"game {game['id']} is running"))
 
     @unittest.skipIf(CORE is None, "the shared core library is not built")
     def test_a_message_and_a_mode_command_go_on_the_radio(self) -> None:

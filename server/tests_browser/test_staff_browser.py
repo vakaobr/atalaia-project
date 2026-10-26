@@ -126,6 +126,7 @@ class BrowserCase(AppTestCase):
         # The test's certificate is accepted, for the test's browser only.
         self.browser = await self.playwright.chromium.launch(args=["--ignore-certificate-errors"])
         self.problems: list[str] = []
+        self.dialogs: list[str] = []  # what each confirm() said (every one is accepted)
         self.pages: list[Page] = []
 
     async def asyncTearDown(self) -> None:
@@ -151,7 +152,12 @@ class BrowserCase(AppTestCase):
 
         page.on("console", console)
         page.on("pageerror", lambda exc: self.problems.append(f"{page.url}: {exc}"))
-        page.on("dialog", lambda dialog: asyncio.ensure_future(dialog.accept()))
+
+        def on_dialog(dialog: Any) -> None:
+            self.dialogs.append(dialog.message)
+            asyncio.ensure_future(dialog.accept())
+
+        page.on("dialog", on_dialog)
         self.pages.append(page)
         return page
 
@@ -441,11 +447,12 @@ class RemoteGmTests(BrowserCase):
         await asyncio.sleep(0.05)
         return stream
 
-    async def answer(self, stream: Stream, code: str = "done", detail: Optional[str] = None) -> dict[str, Any]:
+    async def answer(self, stream: Stream, code: str = "done", detail: Optional[str] = None,
+                     **result: Any) -> dict[str, Any]:
         cmd = await stream.receive(timeout=15)
         self.assertEqual(cmd["type"], "command")
         await stream.send({"type": "command.result", "sync_version": 1, "controller": CTRL, "id": cmd["id"],
-                           "code": code, **({"detail": detail} if detail else {})})
+                           "code": code, **({"detail": detail} if detail else {}), **result})
         return cmd
 
     async def test_live_view_commands_and_log(self) -> None:
@@ -490,6 +497,40 @@ class RemoteGmTests(BrowserCase):
         await expect(page.locator("#remote-log tbody tr")).to_have_count(4)
         await expect(page.locator("#remote-log tbody tr").first).to_contain_text("conflict")
         await self.check_page(page)
+
+    async def test_a_start_refused_for_missing_roles_asks_start_anyway(self) -> None:
+        """Decision RG-1: the controller refuses the start naming the roles; the page asks (the console's
+        "Start anyway?", with the roles) and sends the same start again with force."""
+        stream = await self.controller(LIVE)
+        name, secret = await self.staff("gm")
+        page = await self.new_page()
+        await self.login(page, name, secret, self.field_path("/remote-gm"))
+        card = page.locator("article.controller")
+        await expect(card.get_by_role("button", name="Começar")).to_be_enabled()
+        await card.get_by_role("button", name="Começar").click()
+        refusal = "no box or prop has joined for: zone; join them, or start anyway (force)"
+        cmd = await self.answer(stream, code="conflict", detail=refusal, missing=["zone"])
+        self.assertEqual(cmd["params"], {})
+        cmd = await self.answer(stream)  # the page asked, and sent it again
+        self.assertEqual((cmd["command"], cmd["params"]), ("start", {"force": True}))
+        self.assertEqual(self.dialogs, ["Falta uma caixa (ou um telemóvel ligado) para: zone. Começar mesmo assim?"])
+        await expect(page.locator("#command-result")).to_have_text("Feito: Começar.")
+        await page.click("#log-refresh")
+        await expect(page.locator("#remote-log tbody tr")).to_have_count(2)
+        await expect(page.locator("#remote-log tbody tr").first).to_contain_text("force")
+        await self.check_page(page)
+
+    async def test_a_refusal_without_roles_is_only_shown(self) -> None:
+        stream = await self.controller(LIVE)
+        name, secret = await self.staff("gm")
+        page = await self.new_page(lang="en-GB")
+        await self.login(page, name, secret, self.field_path("/remote-gm"))
+        await page.locator("article.controller").get_by_role("button", name="Start").click()
+        await self.answer(stream, code="conflict", detail="the game is on standby")
+        await expect(page.locator("#command-result")).to_have_text(
+            "The controller refused: conflict: the game is on standby.")
+        self.assertEqual(self.dialogs, [])
+        self.assertEqual(stream.pending(), 0)  # no second start
 
     async def test_a_field_admin_sees_the_log_but_not_the_live_view(self) -> None:
         await self.controller(LIVE)

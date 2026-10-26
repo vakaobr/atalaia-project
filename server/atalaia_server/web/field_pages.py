@@ -21,7 +21,8 @@ is data, which the policy does not run). pt-PT, English, German or Traditional C
 the last two AI drafts, see ``i18n.py``): ``?lang=pt|en|de|zh-tw``, else ``Accept-Language``,
 else pt. No registrant's name or count: only the places left.
 
-Every answer has an ``ETag`` (SHA-256 of the body) and ``Last-Modified``, and a matching
+Every answer has an ``ETag`` (SHA-256 of the body) and ``Last-Modified`` (a 404 page has no ``Last-Modified``: a
+page that is not there was never modified, as the feeds' 404 has none), and a matching
 ``If-None-Match`` (or, without it, ``If-Modified-Since``) gets 304, so calendars can poll
 cheaply. ``HEAD`` is answered like ``GET`` without the body (the same headers, the GET's
 ``Content-Length``), as calendar clients use it (decision S16-10). The feeds send ``Access-Control-Allow-Origin: *`` (read-only, no cookies). Links use
@@ -122,12 +123,15 @@ def _not_modified(request: Request, etag: str, modified: datetime) -> bool:
     return False
 
 
-def answer(request: Request, body: str, media_type: str, modified: datetime, cache: str,
+def answer(request: Request, body: str, media_type: str, modified: Optional[datetime], cache: str,
            extra: Optional[dict[str, str]] = None, status_code: int = 200) -> Response:
+    """``modified`` is None for a page that is not there (a 404): it has no modification time, and the current
+    time would make a HEAD and a GET a second apart differ."""
     data = body.encode("utf-8")
     etag = '"' + hashlib.sha256(data).hexdigest()[:32] + '"'
-    headers = {"ETag": etag, "Last-Modified": _http_date(modified), "Cache-Control": cache, **(extra or {})}
-    if status_code == 200 and _not_modified(request, etag, modified):
+    headers = {"ETag": etag, **({"Last-Modified": _http_date(modified)} if modified is not None else {}),
+               "Cache-Control": cache, **(extra or {})}
+    if status_code == 200 and modified is not None and _not_modified(request, etag, modified):
         return Response(status_code=304, headers=headers)
     if request.method == "HEAD":  # the GET's headers, its length, no body (RFC 9110 section 9.3.2)
         return Response(media_type=media_type, status_code=status_code,
@@ -166,7 +170,7 @@ class Page:
     def languages(self) -> str:
         return switcher(self.lang, self.path)
 
-    def render(self, request: Request, title: str, content: str, modified: datetime, head: str = "",
+    def render(self, request: Request, title: str, content: str, modified: Optional[datetime], head: str = "",
                status_code: int = 200, footer: Optional[str] = None) -> Response:
         tag = i18n.TAGS[self.lang]
         body = TEMPLATES["page"].substitute(
@@ -183,8 +187,7 @@ class Page:
     def not_found(self, request: Request) -> Response:
         content = TEMPLATES["not_found"].substitute(heading=esc(self.t["not_found_title"]),
                                                     text=esc(self.t["not_found"]))
-        response = self.render(request, self.t["not_found_title"], content, datetime.now(timezone.utc),
-                               status_code=404)
+        response = self.render(request, self.t["not_found_title"], content, None, status_code=404)
         response.headers["Cache-Control"] = "no-store"
         return response
 

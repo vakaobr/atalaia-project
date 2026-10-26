@@ -817,6 +817,8 @@ MESSAGE_MAX = 100           # characters of a GM message (the console's limit; t
 REASON_MAX = 64             # characters of a pause or end reason (the controller's API)
 USERNAME_MAX = 64           # the site server's usernames
 DETAIL_MAX = 200            # characters of a command result's detail
+MISSING_MAX = 16            # roles named in a refused start's ``missing``
+ROLE_MAX = 32               # characters of a role's name there (as a live view's node role)
 MAX_LIVE_EVENTS = 50        # the live view's latest events
 MAX_MODE_COMMANDS = 32
 COMMAND_NAME = re.compile(r"[a-z][a-z0-9_]{0,23}")  # a mode command's name (atalaia_sim.mode)
@@ -883,13 +885,18 @@ def check_live(body: Any) -> dict[str, Any]:
 
 
 def check_command_params(command: Any, params: Any, path: str = "params") -> dict[str, Any]:
-    """A remote command's parameters: none for start and resume, an optional reason for pause and end, the
+    """A remote command's parameters: an optional ``force`` (boolean, as the console's Start anyway) for start,
+    none for resume, an optional reason for pause and end, the
     text of a GM message, the name (and optionally the node: 65535 = every node) of a mode command the
     game's manifests declare (the controller checks that last part against its game)."""
     if command not in REMOTE_COMMANDS:
         _fail("not_allowed", "command")
     params = _obj(params, path)
-    if command in ("start", "resume"):
+    if command == "start":
+        _keys(params, path, (), ("force",))
+        if "force" in params:
+            _bool(params["force"], f"{path}.force")
+    elif command == "resume":
         _keys(params, path, ())
     elif command in ("pause", "end"):
         _keys(params, path, (), ("reason",))
@@ -931,14 +938,21 @@ def check_command(body: Any) -> dict[str, Any]:
 
 
 def check_result(body: Any) -> dict[str, Any]:
-    """The controller's answer to a command: ``done`` or why not (``RESULT_CODES``), with a short detail."""
+    """The controller's answer to a command: ``done`` or why not (``RESULT_CODES``), with a short detail and,
+    for a ``start`` refused because roles of the game have no joined node (``conflict``), those roles in
+    ``missing`` (RG-1: so the site server's page can offer "Start anyway")."""
     body = _obj(body, "")
-    _envelope({k: v for k, v in body.items() if k != "detail"}, ("id", "code"), game=False)
+    _envelope({k: v for k, v in body.items() if k not in ("detail", "missing")}, ("id", "code"), game=False)
     body.setdefault("detail", None)
     _uuid(body["id"], "id")
     if body["code"] not in RESULT_CODES:
         _fail("bad_value", "code")
     _text(body["detail"], "detail", DETAIL_MAX, null=True)
+    if "missing" in body:
+        if body["code"] != "conflict":
+            _fail("bad_value", "missing")
+        for i, role in enumerate(_list(body["missing"], "missing", MISSING_MAX, 1)):
+            _text(role, f"missing[{i}]", ROLE_MAX)
     return body
 
 

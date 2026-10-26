@@ -19,8 +19,11 @@
 ///   shared format, refused for another game, one sent more than 60 s ago
 ///   by the site server's clock, one already had (by its id) and any while
 ///   `remote_gm` is off, else carried out through the engine as the
-///   console's GM token would (no *Start anyway*);
-/// - `command.result` back; `cot` for the ATAK relay once the site
+///   console's GM token would; `start` takes an optional `force` (the
+///   console's *Start anyway*, decision RG-1);
+/// - `command.result` back (a start refused for roles with no joined node is
+///   `conflict` with those roles in `missing`, so the site server's page can
+///   ask *Start anyway?* and send it again with `force`); `cot` for the ATAK relay once the site
 ///   server's `hello.ack` says `atak_relay: true` (controller_atak.dart's
 ///   events, at most 100 a message, 500 waiting).
 ///
@@ -460,6 +463,7 @@ class RemoteGm {
     };
     final String code;
     final String? detail;
+    List<String>? missing;
     final sentAt = cmd['sent_at']! as num;
     if (!remoteGm) {
       (code, detail) = ('remote_gm_off', 'remote GM is off on this controller');
@@ -469,15 +473,22 @@ class RemoteGm {
         'sent ${(received - sentAt).round()} s ago by the site server\'s clock',
       );
     } else {
-      (code, detail) = _carryOut(cmd);
+      (code, detail, missing) = _carryOut(cmd);
     }
     final row = addRemoteCommand({...entry, 'result': code, 'detail': detail});
-    return {'id': id, 'code': row['result'], 'detail': row['detail']};
+    return {
+      'id': id,
+      'code': row['result'],
+      'detail': row['detail'],
+      if (missing != null && missing.isNotEmpty) 'missing': missing,
+    };
   }
 
   static String _cap(String s) => s.length > 200 ? s.substring(0, 200) : s;
 
-  (String, String?) _carryOut(Map<String, Object?> cmd) {
+  /// `(code, detail, missing)`: `missing` names the roles without a joined
+  /// node when a start was refused for that (the console's `start_check`).
+  (String, String?, List<String>?) _carryOut(Map<String, Object?> cmd) {
     final g = cmd['game']! as Map;
     final gid = g['game_id']! as int, seed = g['game_seed']! as int;
     final live = engine.liveGame;
@@ -485,14 +496,20 @@ class RemoteGm {
       return (
         'not_live',
         "game $gid (seed $seed) is not this controller's live game",
+        null,
       );
     }
     final params = (cmd['params']! as Map).cast<String, Object?>();
+    var forced = <String>[];
     try {
       final Map<String, Object?> out;
       switch (cmd['command']) {
         case 'start':
-          out = engine.startGame(gid);
+          final force = params['force'] == true;
+          if (force) {
+            forced = (engine.startCheck()['missing']! as List).cast<String>();
+          }
+          out = engine.startGame(gid, force: force);
         case 'pause':
           out = engine.pauseGame(gid, '${params['reason'] ?? ''}');
         case 'resume':
@@ -503,14 +520,29 @@ class RemoteGm {
           final sent = engine.sendNodeCmd(_broadcast, 'message', {
             'text': params['text'],
           });
-          return ('done', 'sent to every node (seq ${sent['seq']})');
+          return ('done', 'sent to every node (seq ${sent['seq']})', null);
         default:
           final sent = engine.sendNodeCmd(params['node'], 'mode', {
             'name': params['name'],
           });
-          return ('done', 'sent to node ${sent['node']} (seq ${sent['seq']})');
+          return (
+            'done',
+            'sent to node ${sent['node']} (seq ${sent['seq']})',
+            null,
+          );
       }
-      return ('done', 'game $gid is ${out['state']}');
+      if (forced.isNotEmpty) {
+        // The console's "Start anyway", by a remote GM: also in the log.
+        return (
+          'done',
+          _cap(
+            'game $gid is ${out['state']}, started anyway without nodes '
+            'for: ${forced.join(', ')}',
+          ),
+          null,
+        );
+      }
+      return ('done', 'game $gid is ${out['state']}', null);
     } on ControllerError catch (e) {
       final code = switch (e.status) {
         404 => 'not_found',
@@ -518,9 +550,16 @@ class RemoteGm {
         503 => 'unavailable',
         _ => 'invalid',
       };
-      return (code, _cap(e.message));
+      final check = e.extra['start_check'];
+      final missing = code == 'conflict' && check is Map
+          ? [
+              for (final r in (check['missing'] as List? ?? const []))
+                '$r'.length > roleMax ? '$r'.substring(0, roleMax) : '$r',
+            ].take(missingMax).toList()
+          : null;
+      return (code, _cap(e.message), missing);
     } on Object {
-      return ('failed', 'the controller could not carry it out');
+      return ('failed', 'the controller could not carry it out', null);
     }
   }
 

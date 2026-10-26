@@ -65,7 +65,7 @@ class VectorTests(unittest.TestCase):
     def test_stream(self) -> None:
         """The remote GM's messages on the stream (plan phase 19): the controller's and the site server's."""
         stream = VECTORS["stream"]
-        self.assertEqual((len(stream["valid"]), len(stream["invalid"])), (15, 43))
+        self.assertEqual((len(stream["valid"]), len(stream["invalid"])), (18, 48))
         self.assertEqual({v["kind"] for v in stream["valid"]}, set(fmt.STREAM))
         for vector in stream["valid"]:
             with self.subTest(vector=vector["name"]):

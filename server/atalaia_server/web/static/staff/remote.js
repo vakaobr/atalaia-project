@@ -39,18 +39,31 @@ async function send(entry, command, params) {
     busy = true;
     update(entry);
     result(t('sending'), '');
+    let startAnyway = false;
     try {
         await api('POST', fieldApi('/remote-gm/commands'),
             { game: live.game, command, params, controller_id: entry.data.controller_id });
         result(t('result_done', { command: t(`cmd_${command}`) }), 'ok');
     } catch (err) {
         if (err.status === 409 && err.body.detail === 'refused_by_controller') {
-            result(t('result_refused', { code: err.body.code, detail: err.body.message ? `: ${err.body.message}` : '' }), 'error');
+            // A start refused because roles have no joined box or prop (decision RG-1): the console's
+            // "Start anyway?", then the same start again with force.
+            const missing = err.body.missing;
+            if (command === 'start' && !params.force && err.body.code === 'conflict' && Array.isArray(missing) && missing.length) {
+                startAnyway = window.confirm(t('confirm_start_anyway', { roles: missing.join(', ') }));
+            }
+            if (!startAnyway) {
+                result(t('result_refused', { code: err.body.code, detail: err.body.message ? `: ${err.body.message}` : '' }), 'error');
+            }
         } else {
             result(errorText(err, ['gm']), 'error');
         }
     } finally {
         busy = false;
+    }
+    if (startAnyway) {
+        await send(entry, 'start', { ...params, force: true });
+        return;
     }
     await poll();
     await loadLog();

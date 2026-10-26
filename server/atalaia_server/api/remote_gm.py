@@ -121,16 +121,21 @@ async def remote_command(field_id: uuid.UUID, request: Request, principal: Princ
         return JSONResponse({"detail": exc.detail}, status_code=exc.status, headers=NO_STORE)
     await db.commit()  # nothing held open while the controller answers
     answer: Optional[dict[str, Any]] = None
+    missing: Optional[list[str]] = None
     try:
         answer = await hub.command(link, command)
-        code, message = answer["code"], answer["detail"]
+        code, message, missing = answer["code"], answer["detail"], answer.get("missing")
     except RemoteProblem as exc:  # the controller went away or did not answer in time
         code, message, problem = exc.detail, None, exc
+    # A forced start has ``params.force`` in ``what`` (the audit log shows it); a start refused for roles with
+    # no joined node names them (``missing``, decision RG-1) so the page can offer "Start anyway".
     record(db, "remote_gm_command", request, user_id=principal.user.id, resource="field", resource_id=field_id,
            details={"id": command["id"], "controller_id": link.controller_id, **what, "result": code,
-                    **({"message": message} if message else {})})
+                    **({"message": message} if message else {}), **({"missing": missing} if missing else {})})
     await db.commit()
     out = {"id": command["id"], "controller_id": link.controller_id, "code": code, "message": message}
+    if missing:
+        out["missing"] = missing
     if answer is None:
         return JSONResponse({**out, "detail": problem.detail}, status_code=problem.status, headers=NO_STORE)
     if code != "done":

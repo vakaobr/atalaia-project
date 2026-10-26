@@ -394,6 +394,9 @@ class HeadTests(PagesCase):
                 self.assertNotEqual(head.status_code, 405)
                 self.assertEqual(head.content, b"")
                 self.assertEqual(int(head.headers.get("content-length", "0")), len(got.content))
+                if got.status_code == 404:  # never modified: no Last-Modified to differ by a second (flake fix)
+                    self.assertNotIn("last-modified", got.headers)
+                    self.assertNotIn("last-modified", head.headers)
                 for name in ("etag", "last-modified", "cache-control", "content-type", "access-control-allow-origin",
                              "content-language"):
                     self.assertEqual(head.headers.get(name), got.headers.get(name), name)

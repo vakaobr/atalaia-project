@@ -11927,6 +11927,63 @@
       "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<event version=\"2.0\" uid=\"atalaia.campo.node.4\" type=\"b-m-p-s-m\" time=\"2026-10-21T10:00:00.000Z\" start=\"2026-10-21T10:00:00.000Z\" stale=\"2026-10-21T09:59:59.000Z\" how=\"h-e\"><point lat=\"38.7215000\" lon=\"-9.1390000\" hae=\"9999999.0\" ce=\"9999999.0\" le=\"9999999.0\" /><detail></detail></event>"
      ]
     }
+   },
+   {
+    "name": "command_start_force",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "start",
+     "params": {
+      "force": true
+     },
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    }
+   },
+   {
+    "name": "command_start_not_forced",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "start",
+     "params": {
+      "force": false
+     },
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    }
+   },
+   {
+    "name": "result_start_needs_roles",
+    "kind": "command.result",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "code": "conflict",
+     "detail": "no box or prop has joined for: zone; join them, or start anyway (force)",
+     "missing": [
+      "zone"
+     ]
+    }
    }
   ],
   "invalid": [
@@ -13721,6 +13778,103 @@
     },
     "error": "unknown_field",
     "path": "events[0]"
+   },
+   {
+    "name": "command_start_force_text",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "start",
+     "params": {
+      "force": "yes"
+     },
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    },
+    "error": "not_a_boolean",
+    "path": "params.force"
+   },
+   {
+    "name": "command_resume_with_force",
+    "kind": "command",
+    "body": {
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "game": {
+      "game_id": 4242,
+      "game_seed": 3735928559
+     },
+     "command": "resume",
+     "params": {
+      "force": true
+     },
+     "user": {
+      "id": "0192f3a4-0000-7000-8000-0000000000aa",
+      "username": "gm-norte"
+     },
+     "sent_at": 1792000500.25
+    },
+    "error": "unknown_field",
+    "path": "params.force"
+   },
+   {
+    "name": "result_missing_on_done",
+    "kind": "command.result",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "code": "done",
+     "detail": "game 4242 is paused",
+     "missing": [
+      "zone"
+     ]
+    },
+    "error": "bad_value",
+    "path": "missing"
+   },
+   {
+    "name": "result_missing_empty",
+    "kind": "command.result",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "code": "conflict",
+     "missing": []
+    },
+    "error": "bad_batch_size",
+    "path": "missing"
+   },
+   {
+    "name": "result_missing_not_a_text",
+    "kind": "command.result",
+    "body": {
+     "sync_version": 1,
+     "controller": {
+      "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+      "version": "0.1.0"
+     },
+     "id": "0192f3a4-0000-7000-8000-00000000c001",
+     "code": "conflict",
+     "missing": [
+      7
+     ]
+    },
+    "error": "not_a_text",
+    "path": "missing[0]"
    }
   ]
  }
