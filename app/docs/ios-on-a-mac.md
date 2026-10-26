@@ -239,14 +239,6 @@ day 6 before a field test.
   "Atalaia would like to find and connect to devices on your local network".
   Answer **Allow**. If you said no: Settings > Atalaia > Local Network.
 
-## Integration tests on the iPhone
-
-Run with `flutter test integration_test/<file> -d <iPhone id>`. State on
-2026-10-26: `integration_test/site_registration_test.dart` passes on iOS (1/1);
-`integration_test/check_in_test.dart` failed there on its fixed 10-year server
-certificate (see Troubleshooting) and now makes a 365-day one at run time; it
-has not yet been run again on an iPhone.
-
 ## What to try on the iPhone
 
 Write each result down (works, does not, what the screen said), with the iOS
@@ -308,6 +300,80 @@ Needs a paid account, or is not written yet, so expect it **not** to work:
     entitlement); the field card written by NFC.
 13. The `atalaia://register?...` link from a site server's page (the iOS side of
     links is not written; open the app and type or scan instead).
+
+## Integration tests on the iPhone
+
+The other on-device tests run the same way (`flutter test integration_test/<file>
+-d <iPhone or simulator id>`). State on 2026-10-26:
+`integration_test/site_registration_test.dart` passes on the iPhone (1/1) and in
+the simulator; `integration_test/check_in_test.dart` failed on the iPhone on its
+fixed 10-year server certificate (see Troubleshooting), now makes a 365-day one at
+run time and passes in the simulator (2/2). `controller_test.dart`,
+`game_flow_test.dart`, `medic_kit_test.dart` and `role_switching_test.dart` are
+Android only (the phone as field controller, props on the game core).
+
+`integration_test/ios_checklist_test.dart` does by itself what can be checked
+without a human in items 1 to 3 and 5 to 11 of the checklist above. It runs on
+the iPhone, in the iOS simulator and (the parts that need no iOS) on an Android
+emulator, where CI runs it with the other files of `integration_test/`. It uses
+no golden images: layout overflows are caught as the framework reports them
+(`FlutterError.onError`) and the texts are looked for in the app's own language
+tables, with Settings' titles also written out literally.
+
+From `app/`, with the iPhone plugged in and signed as in steps 7 to 9 (the test
+is built and installed like `flutter run`, with the same bundle id), or with a
+simulator's id from `flutter devices`:
+
+```sh
+flutter test integration_test/ios_checklist_test.dart -d <udid> --reporter expanded
+```
+
+To follow a real field controller as well, give its address and its tokens (the
+controller's *read* token and, for the marshal list, the GM token; the real
+values never go in a file that is committed or in a shared note):
+
+```sh
+flutter test integration_test/ios_checklist_test.dart -d <udid> --reporter expanded \
+  --dart-define=ATALAIA_TEST_CONTROLLER=http://192.168.1.183:8080 \
+  --dart-define=ATALAIA_TEST_READ_TOKEN=<read token> \
+  --dart-define=ATALAIA_TEST_GM_TOKEN=<GM token>
+```
+
+`--dart-define=ATALAIA_TEST_GAME=<game id>` picks the game the test player
+checks in to when the controller lists several (the first one is used
+otherwise). The first time the app talks to the controller, iOS shows the Local
+Network prompt on the phone: answer **Allow** (the player test waits 30 s for
+the feed, so there is time; after a "Don't Allow" it fails with the feed never
+opening, and Settings > Atalaia > Local Network is where to turn it on). Keep
+the phone unlocked, as for `flutter run`; tests run as a debug build, which is
+fine while Flutter is attached.
+
+| Checklist | Test | What it checks |
+| --- | --- | --- |
+| 1 | the app starts in Portuguese | a fresh start shows Portuguese (the app's default, not the phone's language): the "O que vais fazer neste telemóvel?" title and the role cards |
+| 1 | each language ... no overflow | Settings switches pt, en, de, zh-tw and back; each is shown by Settings' title and the texts of Home, Player, Marshal and GM, on a 320 x 568 pt screen (the small iPhone; if the device ignores the size the check still runs at its own): no `RenderFlex overflowed` error, no other framework error. The look of the Chinese glyphs (no square boxes) stays a human check |
+| 2 | the roles | player, marshal and GM, no prop and no field controller, and the "só o Android ..." note; on Android both are offered and the note is absent |
+| 3 | the settings are written ... and survive a restart | the device channel gives a private folder; in a folder of the run's own inside it (`itest-settings-<time>/`, removed afterwards: the installed app's own `settings.json` is never touched) the language, the vibration switch and the join key are changed through the screens and the file is read back; the widget tree is dropped, the settings are loaded from the same folder as `main()` does and the app shows English, the switch off and the key's end |
+| 3 | About shows the version | `Atalaia <appVersion>` from `lib/version.dart` in Settings > About (`test/version_test.dart` ties that to `pubspec.yaml`); on iOS also "no game core" |
+| 5, 7 | a player joins the controller ... | needs `ATALAIA_TEST_CONTROLLER` and `ATALAIA_TEST_READ_TOKEN`. Through the screens: the address and code typed, *Connect*; the game's name and a row for each team within 30 s; then, for a running game, one more message of the feed (a box's score, node or event) within 20 s, with the clock on screen (the boxes report every 15 s, SL-*). A game that is not running only has the first part (the test says so in its output) |
+| 6 | scanning a QR code ... | the scanner is not available (`ChannelQrScanner`), *Scan* answers "there is no camera to read the code" and the address and *Connect* stay; no exception. Skipped on Android |
+| 8 | sharing the position is refused cleanly | a check-in's player view of a running game (a stand-in feed) shows the switch; turning it on says "this phone has no location", the switch stays off, no exception. Skipped on Android |
+| 9 | a player who is not on the GM's marshal list is refused | needs `ATALAIA_TEST_CONTROLLER`. Checks a new test player in at the controller (through the app's own client, display name `itest-ios`, and out again with `DELETE /checkin/me`) and opens the Marshal role: the "not on the marshal list" notice, no tools, nothing kept |
+| 9 | a player the GM lists is accepted ... | needs `ATALAIA_TEST_CONTROLLER` and `ATALAIA_TEST_GM_TOKEN`. The same kind of test player is added to the marshal list with the GM API (`POST /api/v1/marshals`) and the Marshal role opens its tools (the app asks for a new token, takes the id the list gave and registers its key); the player is taken off the list (`DELETE /api/v1/marshals/<id>`) and the next opening says the marshal was removed. Off the list again, and out of the game, however the test ends |
+| 10 | the GM screen opens an address in the web view | the GM role opens `127.0.0.1:<port>` of a small server the test starts on the phone, and the real web view loads its page (the title is read from the web view, and the server saw `GET /console/`); with `ATALAIA_TEST_CONTROLLER` also the controller's own console, which needs no login to load. Skipped on Android and where there is no device web view |
+| 11 | the phone buzzes ... | the player view follows a stand-in stream on the loopback address (the real dart:io WebSocket) and a fake device service records the vibrations: none for the snapshot's events, then game start, a GM message, a box of the player's team captured and one taken, and game end each play their own pattern from `field_buzz.dart`; a box taken from nobody plays nothing, and with "Vibrate on game events" off nothing buzzes. How the taps feel, and the Ring/Silent and System Haptics settings, stay a human check |
+
+A test that needs a define it was not given is shown as skipped, with the
+define's name in its output. The tests that need no controller use only the
+phone's own loopback address, and nothing writes in the installed app's own
+settings. The same file also runs as a plain widget test on a computer (the app
+then plays an iPhone and the web view checks are skipped), which is how it is
+kept compiling and passing without a phone.
+
+Left to a person: item 4 (icon, launch screen, names), item 5's Wi-Fi without
+internet, item 7's lock screen and app switching, the feel of the buzz patterns
+and the Chinese glyphs in item 1, a console over HTTPS (item 10), and
+everything under "Needs a paid account".
 
 ## What does not work on iOS, and why
 
