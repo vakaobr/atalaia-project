@@ -125,7 +125,9 @@ export function eventWords(e) {
     const s = t(key, { team, player: d.player || '', remaining: d.remaining,
                        used: d.player_heals_used, amount: d.amount, puzzle, code: d.code || '',
                        objective: d.objective || '', scenario: d.scenario || '', reason,
-                       zone: d.zone || '', step: d.step });
+                       zone: d.zone || (e.node === undefined ? '' : `${t('nodes.node')} ${e.node}`), step: d.step,
+                       lives: d.lives_left === undefined ? '' : d.lives_left, fuse: d.fuse_s === undefined ? '' : d.fuse_s,
+                       text: d.text || '' });
     return s === key ? '' : s;
 }
 

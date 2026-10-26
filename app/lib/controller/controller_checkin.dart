@@ -274,6 +274,39 @@ bool _truthy(Object? v) => switch (v) {
   _ => true,
 };
 
+/// How the poster now differs from the one last printed (checkin.py
+/// `poster_change`, shared cases `poster_change` in protocol/vectors/checkin.json):
+/// null when nothing was printed, there is no poster to compare or nothing
+/// changed; else `added`, `removed`, `ca_changed` and `still_works`.
+Map<String, Object?>? posterChange(
+  Map<String, Object?>? printed,
+  List<String> urls,
+  String? caHex,
+) {
+  if (printed == null || urls.isEmpty || caHex == null) return null;
+  final old = [
+    for (final u in (printed['urls'] as List?) ?? const [])
+      if (u is String) u,
+  ];
+  final added = [
+    for (final u in urls)
+      if (!old.contains(u)) u,
+  ];
+  final removed = [
+    for (final u in old)
+      if (!urls.contains(u)) u,
+  ];
+  final was = printed['ca_sha256'];
+  final caChanged = was is String && was.isNotEmpty && was != caHex;
+  if (added.isEmpty && removed.isEmpty && !caChanged) return null;
+  return {
+    'added': added,
+    'removed': removed,
+    'ca_changed': caChanged,
+    'still_works': !caChanged && old.any(urls.contains),
+  };
+}
+
 String _hex(List<int> b) =>
     [for (final x in b) x.toRadixString(16).padLeft(2, '0')].join();
 
@@ -798,7 +831,41 @@ class ControllerCheckin {
         out['problem'] = e.message;
       }
     }
+    final printed = printedPoster();
+    out['printed'] = printed;
+    out['changed'] = posterChange(printed, [
+      for (final u in p['urls']! as List) '$u',
+    ], out['ca_sha256'] as String?);
     return out;
+  }
+
+  /// The poster the GM last printed: `urls`, `ca_sha256` (hex) and `at`
+  /// (seconds), or null (checkin.py `printed_poster`).
+  Map<String, Object?>? printedPoster() {
+    final raw = engine.store.getSetting('checkin.poster_printed');
+    if (raw == null) return null;
+    try {
+      final m = jsonDecode(raw);
+      return m is Map && m['urls'] is List ? m.cast<String, Object?>() : null;
+    } on FormatException {
+      return null;
+    }
+  }
+
+  /// The GM printed (or showed) the poster as it is now: later changes are
+  /// measured from here (checkin.py `mark_poster_printed`).
+  Map<String, Object?> markPosterPrinted() {
+    final p = posterFields();
+    final ca = p['ca_sha256'] as Uint8List?;
+    final urls = p['urls']! as List;
+    if (ca == null || urls.isEmpty) {
+      throw ControllerError('there is no poster to print yet');
+    }
+    engine.store.setSetting(
+      'checkin.poster_printed',
+      jsonEncode({'urls': urls, 'ca_sha256': _hex(ca), 'at': _wall()}),
+    );
+    return poster();
   }
 
   Map<String, Object?> setPoster(Map<String, Object?> spec) {

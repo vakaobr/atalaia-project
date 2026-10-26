@@ -10,6 +10,7 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:atalaia_app/controller/controller_checkin.dart';
 import 'package:atalaia_app/controller/controller_engine.dart';
@@ -24,6 +25,28 @@ List<String> _strings(Object? v) => (v! as List).cast<String>();
 void main() {
   final all = loadVectors('checkin.json')['poster_addresses'] as Map;
   final vectorCases = (all['cases'] as List).cast<Map<String, dynamic>>();
+
+  final change = loadVectors('checkin.json')['poster_change'] as Map;
+  final changeCases = (change['cases'] as List).cast<Map<String, dynamic>>();
+
+  group('shared cases of "the poster changed" (check-R8)', () {
+    test('are all here', () {
+      expect(changeCases.length, greaterThanOrEqualTo(8));
+    });
+    for (final c in changeCases) {
+      test('${c['name']}', () {
+        final i = c['input'] as Map<String, dynamic>;
+        expect(
+          posterChange(
+            i['printed'] as Map<String, Object?>?,
+            _strings(i['urls']),
+            i['ca_sha256'] as String?,
+          ),
+          c['expected'],
+        );
+      });
+    }
+  });
 
   test('the shared cases are all here', () {
     expect(vectorCases.length, greaterThanOrEqualTo(10));
@@ -169,6 +192,23 @@ void main() {
       });
       expect(again['urls'], ['https://10.42.0.1:8443']);
       expect(saved().containsKey('urls'), isFalse);
+    });
+
+    test('the poster changed since it was printed: said, and quiet after', () {
+      svc.caSha256 = Uint8List.fromList(List.filled(32, 7));
+      svc.useAddresses(now());
+      var p = svc.poster();
+      expect([p['printed'], p['changed']], [null, null]);
+      p = svc.markPosterPrinted();
+      expect((p['printed']! as Map)['urls'], ['https://10.42.0.1:8443']);
+      expect(p['changed'], isNull);
+      svc.defaultUrls = now(['192.168.43.1']).plan().defaultUrls;
+      svc.useAddresses(now(['192.168.43.1']));
+      final c = svc.poster()['changed']! as Map;
+      expect(c['removed'], ['https://10.42.0.1:8443']);
+      expect(c['added'], ['https://192.168.43.1:8443']);
+      expect(c['still_works'], isFalse);
+      expect(svc.markPosterPrinted()['changed'], isNull);
     });
 
     test('without addresses (tests) the lists are used as given', () {

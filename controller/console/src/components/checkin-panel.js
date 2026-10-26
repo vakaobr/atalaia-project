@@ -44,6 +44,24 @@ function StateBadge({ state, refusedToday }) {
         refusedToday ? ` · ${t('checkin.refused_today')}` : ''}</span>`;
 }
 
+/** What the poster's change since it was last printed means, in words (GET /checkin/poster's "changed";
+ * decision check-R8): the certificate changed or no printed address is left (printed posters fail), or
+ * some are (they still work). */
+export function posterChangedText(change) {
+    const gone = (change.removed || []).join(', ');
+    const now = (change.added || []).join(', ');
+    if (change.ca_changed) return t('poster_changed.ca');
+    if (!change.still_works) return t('poster_changed.gone', { now });
+    return t('poster_changed.partly', { gone, now });
+}
+
+function PosterChanged({ change }) {
+    return html`<div class="notice" data-testid="poster-changed" role="status">
+        <strong>${t('poster_changed.title')}</strong> ${posterChangedText(change)}
+        ${' '}<a href="poster.html" target="_blank" rel="noopener" data-testid="poster-changed-print">${t('poster_changed.print')}</a>
+    </div>`;
+}
+
 export class CheckinPanel extends Component {
     constructor() {
         super();
@@ -52,6 +70,8 @@ export class CheckinPanel extends Component {
 
     componentDidMount() {
         this.load();
+        this.onFocus = () => this.reloadPoster();
+        window.addEventListener('focus', this.onFocus);
         // A marshal's app registers its key without telling the stream: the list asks now and then.
         // Not while the GM edits a row of the list: drawing it again from the controller's answer would put
         // back the old name under the cursor, and the edit would be lost (found by the browser test, 2026-10-26).
@@ -138,6 +158,14 @@ export class CheckinPanel extends Component {
     componentWillUnmount() {
         clearTimeout(this.chronoTimer);
         clearInterval(this.marshalTimer);
+        window.removeEventListener('focus', this.onFocus);
+    }
+
+    /** Back from the poster page (another tab), where it was printed: ask whether it changed again. */
+    async reloadPoster() {
+        if (this.props.app.state.role !== 'gm') return;
+        const poster = await this.props.app.call('GET', '/checkin/poster');
+        if (poster) this.setState({ poster });
     }
 
     async setOpen(open) {
@@ -544,6 +572,7 @@ export class CheckinPanel extends Component {
             <h2 id="cp-h">${t('checkin.poster')}</h2>
             <p class="muted">${t('checkin.poster_intro')}</p>
             ${p.problem && html`<p class="warning" data-testid="poster-problem">${posterProblem(p)}</p>`}
+            ${p.changed && html`<${PosterChanged} change=${p.changed} />`}
             ${p.ca_short && html`<p>${t('checkin.ca')}: <code data-testid="poster-ca">${p.ca_short}</code></p>`}
             <form class="form" data-testid="poster-form" onSubmit=${(e) => this.savePoster(e)}>
                 <div class="field"><label for="cp-urls">${t('checkin.poster_urls')}</label>

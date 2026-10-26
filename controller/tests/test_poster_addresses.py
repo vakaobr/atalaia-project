@@ -23,6 +23,7 @@ from cryptography import x509
 
 from atalaia_controller import tls
 from atalaia_controller.addresses import FieldAddresses, url_host
+from atalaia_controller.checkin import poster_change
 from atalaia_controller.main import build
 
 VECTORS = json.loads((Path(__file__).resolve().parents[2] / "protocol" / "vectors" / "checkin.json")
@@ -52,6 +53,19 @@ class SharedCases(unittest.TestCase):
                 self.assertEqual(sorted(plan.san), want["san"])
                 # check-R9: the certificate covers every host on the poster.
                 self.assertLessEqual({url_host(u) for u in plan.poster}, set(plan.san))
+
+
+class SharedChangeCases(unittest.TestCase):
+    """The shared cases of "poster_change": when the console says "the poster changed" (check-R8)."""
+
+    def test_vectors(self) -> None:
+        cases = json.loads((Path(__file__).resolve().parents[2] / "protocol" / "vectors" / "checkin.json")
+                           .read_text(encoding="utf-8"))["poster_change"]["cases"]
+        self.assertGreaterEqual(len(cases), 8)
+        for c in cases:
+            with self.subTest(c["name"]):
+                i = c["input"]
+                self.assertEqual(poster_change(i["printed"], i["urls"], i["ca_sha256"]), c["expected"])
 
 
 class PlanTests(unittest.TestCase):
@@ -165,6 +179,28 @@ class ControllerTests(unittest.TestCase):
     def test_container_keeps_configured_addresses(self) -> None:
         b = self.open(addresses(tls_names=["192.168.1.50"], container=True), tls_names=["192.168.1.50"])
         self.assertEqual(b.controller.checkin.poster()["urls"], ["https://192.168.1.50:8443"])
+
+    def test_the_console_is_told_when_the_poster_changed_since_it_was_printed(self) -> None:
+        b = self.open(addresses(tls_names=["10.42.0.1"]), tls_names=["10.42.0.1"])
+        svc = b.controller.checkin
+        p = svc.poster()
+        self.assertEqual((p["printed"], p["changed"]), (None, None))     # nothing printed: nothing to compare
+        before = svc.mark_poster_printed()
+        self.assertEqual(before["printed"]["urls"], p["urls"])
+        self.assertIsNone(before["changed"])
+        b.controller.stop()
+        b.store.close()
+        self.bundles.clear()
+        # The next start finds another address (a DHCP lease moved): the poster, and its QR code, changed.
+        ips = ["192.168.43.1"]
+        b = self.open(addresses(tls_names=ips, found=ips, interfaces=ips), tls_names=ips)
+        out = b.controller.checkin.poster()
+        self.assertEqual(out["printed"]["urls"], p["urls"])
+        self.assertEqual(out["changed"]["removed"], p["urls"])
+        self.assertIn("https://192.168.43.1:8443", out["changed"]["added"])
+        self.assertFalse(out["changed"]["still_works"])
+        self.assertFalse(out["changed"]["ca_changed"])
+        self.assertIsNone(b.controller.checkin.mark_poster_printed()["changed"])   # printed again: quiet
 
 
 if __name__ == "__main__":

@@ -244,7 +244,7 @@ players write. Keep these choices consistent when you edit it:
 | props | dispositivos (de jogo); caixas for the boxes. "Props" appears only in the introduction and in the glossary term |
 | GM, organisers | organização; GM console is "consola da organização" |
 | field | campo |
-| site server | servidor do clube |
+| site server | servidor do site |
 | field controller | controlador de campo |
 | chrono, chrono check-in | cronografagem, cronografagem à entrada |
 | milsim, CQB, respawn, makers, copyleft, squad | unchanged ("esquadra" is a police station) |

@@ -22,9 +22,11 @@ import { BoxLanguageSettings } from './components/box-language-settings.js';
 import { FirmwarePanel } from './components/firmware-panel.js';
 import { FetchedModes } from './components/fetched-modes.js';
 import { ModePackages } from './components/mode-packages.js';
-import { CheckinPanel } from './components/checkin-panel.js';
+import { CheckinPanel, posterChangedText } from './components/checkin-panel.js';
 import { BrandingSettings, TeamPresets, FieldBrand, accentRef } from './components/branding-settings.js';
 import { discover } from './components/box-invites.js';
+import { RemoteGmLog } from './components/remote-gm-log.js';
+import { ScoreboardShare } from './components/scoreboard-share.js';
 import { PosterPrompt, PosterPromptSetting, posterPromptWanted } from './components/poster-prompt.js';
 
 const TABS = ['game', 'checkin', 'field', 'nodes', 'join', 'adopt', 'presets', 'scenarios', 'feed', 'controller', 'settings'];
@@ -111,10 +113,23 @@ class App extends Component {
             this.setState({ token, role: who.role, loginError: '', features: this.features });
             this.startStream();
             this.loadCatalogue();
+            this.checkPosterChanged(who.role);
             if (this.serves('branding')) this.loadBranding();
         } catch (e) {
             this.setState({ role: null, loginError: e.status === 401 ? t('login.bad') : e.message });
             this.loadBranding(); // for the login page
+        }
+    }
+
+    /** The poster's addresses (hence its QR code) are worked out again at every start: when they differ from
+     * the poster last printed, an alert says so and suggests printing it again (decision check-R8). */
+    async checkPosterChanged(role) {
+        if (role !== 'gm' || !this.serves('checkin')) return;
+        try {
+            const poster = await api(this.token, 'GET', '/checkin/poster');
+            if (poster.changed) this.alert('warn', t('poster_changed.alert', { what: posterChangedText(poster.changed) }));
+        } catch (e) {
+            /* an alert is not worth an error */
         }
     }
 
@@ -524,7 +539,7 @@ class App extends Component {
     renderTab(tab) {
         switch (tab) {
         case 'game':
-            return html`<${GameControl} app=${this} /><${ScorePanel} app=${this} />`;
+            return html`<${GameControl} app=${this} /><${ScorePanel} app=${this} /><${ScoreboardShare} app=${this} />`;
         case 'checkin':
             return html`<${CheckinPanel} app=${this} ref=${(c) => { this.checkinPanel = c; }} />`;
         case 'field':
@@ -544,7 +559,7 @@ class App extends Component {
         case 'feed':
             return html`<${LiveFeed} app=${this} />`;
         case 'controller':
-            return html`<${ControllerPanel} app=${this} />`;
+            return html`<${ControllerPanel} app=${this} />${this.state.role === 'gm' && html`<${RemoteGmLog} app=${this} />`}`;
         case 'settings':
             return html`${this.serves('radio') && html`<${RadioSettings} app=${this} />`}<${BoxLanguageSettings} app=${this} />${
                 this.state.role === 'gm' && this.serves('checkin') && html`<${PosterPromptSetting} />`}${

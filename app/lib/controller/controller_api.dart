@@ -71,6 +71,8 @@
 ///     PATCH|DELETE /api/v1/marshals/{id}     GM: rename or rebind / take a marshal off the list (revokes)
 ///     GET|PUT /api/v1/checkin/settings       GM: confirm, federation, limits
 ///     GET|PUT /api/v1/checkin/poster         GM: the check-in poster's text and fields
+///     POST /api/v1/checkin/poster/printed    GM: the poster as it is now was printed
+///     GET  /api/v1/scoreboard-link           GM: the scoreboard's links with the read code
 ///     GET|DELETE /api/v1/players/{player}/chrono  the GM or the player: their readings
 ///     DELETE /api/v1/players/{player}        GM: erase a player (?chrono=1: readings too)
 ///     GET|POST /api/v1/positions             positions the caller may see / report (player token)
@@ -1091,6 +1093,26 @@ class ControllerApi {
       'PUT',
       r'/api/v1/checkin/poster',
       _gm((r) => ApiResponse(200, _svc().setPoster(r.body))),
+    ),
+    _route(
+      'POST',
+      r'/api/v1/checkin/poster/printed',
+      _gm((r) => ApiResponse(200, _svc().markPosterPrinted())),
+    ),
+    // The console's "share with players" QR code (decision PD13). This
+    // controller's network-facing server is HTTPS, so its links are the
+    // poster's https addresses (the Pi's are http on its API port).
+    _route(
+      'GET',
+      r'/api/v1/scoreboard-link',
+      _gm(
+        (r) => ApiResponse(200, {
+          'links': [
+            for (final u in (_svc().posterFields()['urls']! as List))
+              '$u/scoreboard#token=$readToken',
+          ],
+        }, _noStore),
+      ),
     ),
     _route(
       'GET',

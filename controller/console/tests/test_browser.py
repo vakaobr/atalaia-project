@@ -1652,7 +1652,7 @@ class ConsoleBrowserTests(unittest.TestCase):
     # The console's calls in the areas a phone controller does not serve yet.
     PHONE_HIDDEN = re.compile(r"/api/v1/(presets|team-presets|crests|field/branding|boxes|adopt|firmware|atak"
                               r"|scenarios|schedule|mode-packages|mode-fetch|controller/promote|controller/join"
-                              r"|remote-gm|games/\d+/(invites|teams))")
+                              r"|games/\d+/(invites|teams))")   # remote-gm is served: S7 slice, the Controller tab's log
 
     def phone_controller(self, page, requests: list) -> None:
         """whoami answers with the Android controller's features; every request is noted."""
@@ -3575,7 +3575,7 @@ class ConsoleBrowserTests(unittest.TestCase):
         page = self.console()
         scope = page.evaluate("navigator.serviceWorker.ready.then((r) => r.scope)")
         self.assertTrue(scope.endswith("/console/"), scope)
-        cached = page.evaluate("caches.open('atalaia-console-v7').then((c) => c.keys())"
+        cached = page.evaluate("caches.open('atalaia-console-v8').then((c) => c.keys())"
                                ".then((k) => k.map((r) => new URL(r.url).pathname))")
         for path in ("/console/app.js", "/console/lib/preact.module.js", "/console/i18n/en.json",
                      "/console/components/georef-panel.js"):
@@ -4010,6 +4010,222 @@ class ConsoleBrowserTests(unittest.TestCase):
         poster.emulate_media(media="print")
         expect(poster.get_by_test_id("poster-print")).to_be_hidden()
 
+    # --- the remote GM's log (decision S19-11) -------------------------------------------
+
+    def add_remote_command(self, **entry) -> None:
+        store = self.field.bundle.store
+        store.add_remote_command({"received_at": time.time(), **entry})
+
+    def test_remote_gm_log_panel_in_the_controller_tab(self):
+        """S19-11: the Controller tab lists what the remote GM sent, from GET /api/v1/remote-gm, in the
+        console's language; the GM token only."""
+        game = self.field.create_game()
+        self.add_remote_command(command_id="00000000-0000-4000-8000-000000000001", user_id="u1", username="ana",
+                                command="pause", params={"reason": "chuva"}, game_id=game["id"], game_seed=1,
+                                result="done", detail=None)
+        self.add_remote_command(command_id="00000000-0000-4000-8000-000000000002", user_id="u1", username="ana",
+                                command="message", params={"text": "Fim em 5 min"}, game_id=game["id"], game_seed=1,
+                                result="not_live", detail="game 9 (seed 1) is not this controller's live game")
+        page = self.console()
+        page.get_by_test_id("tab-controller").click()
+        expect(page.get_by_test_id("remote-gm")).to_be_visible()
+        expect(page.get_by_test_id("remote-gm-off")).to_contain_text("GM remoto está desligado")  # [sync] remote_gm off
+        rows = page.get_by_test_id("remote-gm-row")
+        expect(rows).to_have_count(2)
+        newest = rows.nth(0)                                      # the latest command first
+        expect(newest).to_contain_text("ana")
+        expect(newest).to_contain_text("mensagem para todas as caixas")
+        expect(newest).to_contain_text("Fim em 5 min")
+        expect(newest).to_contain_text("recusado: não é o jogo em curso")
+        expect(rows.nth(1)).to_contain_text("pausa")
+        expect(rows.nth(1)).to_contain_text("chuva")
+        expect(rows.nth(1)).to_contain_text("cumprido")
+        # Another language; a command that arrives later shows without leaving the tab (it asks every 10 s,
+        # and "Refresh" asks now).
+        page.get_by_test_id("lang").select_option("en")
+        expect(page.get_by_test_id("remote-gm-off")).to_contain_text("The remote GM is off")
+        self.add_remote_command(command_id="00000000-0000-4000-8000-000000000003", user_id="u2", username="rui",
+                                command="end", params={}, game_id=game["id"], game_seed=1, result="done", detail=None)
+        page.get_by_test_id("remote-gm-refresh").click()
+        expect(rows).to_have_count(3)
+        expect(rows.nth(0)).to_contain_text("rui")
+        expect(rows.nth(0)).to_contain_text("done")
+        expect(rows.nth(1)).to_contain_text("refused: not the live game")
+        self.no_horizontal_scroll(page)
+        # The read token never sees it (the API refuses it too).
+        read = self.console(READ)
+        read.get_by_test_id("tab-controller").click()
+        expect(read.get_by_test_id("controller-status")).to_be_visible()
+        expect(read.get_by_test_id("remote-gm")).to_have_count(0)
+        refused = httpx.get(self.field.base + "/api/v1/remote-gm", headers={"Authorization": f"Bearer {READ}"})
+        self.assertEqual(refused.status_code, 403)
+
+    # --- "the poster changed" (decision check-R8) ---------------------------------------
+
+    def test_console_says_the_poster_changed_and_suggests_printing_it_again(self):
+        """The poster's addresses are worked out again at every start: when they differ from the poster last
+        printed, the console says so (an alert and a notice in the Check-in tab); printing it again quiets it."""
+        poster = self.field.http.get("/api/v1/checkin/poster").json()
+        self.assertEqual((poster["printed"], poster["changed"]), (None, None))   # never printed: nothing to compare
+        page = self.console()
+        page.get_by_test_id("tab-checkin").click()
+        expect(page.get_by_test_id("poster-ca")).to_be_visible()
+        expect(page.get_by_test_id("poster-changed")).to_have_count(0)
+        # The poster that was printed had another address (a DHCP lease that moved).
+        self.field.bundle.store.set_setting("checkin.poster_printed", json.dumps(
+            {"urls": ["https://10.42.0.7:8443"], "ca_sha256": poster["ca_sha256"], "at": 1.0}))
+        page = self.console()          # a new start of the console: the alert
+        page.get_by_test_id("tab-checkin").click()
+        notice = page.get_by_test_id("poster-changed")
+        expect(notice).to_be_visible()
+        expect(notice).to_contain_text("O cartaz mudou.")
+        expect(notice).to_contain_text("https://10.42.0.1:8443")
+        expect(notice).to_contain_text("já não chega a ele")
+        page.get_by_test_id("tab-feed").click()
+        expect(page.get_by_test_id("alerts")).to_contain_text("O cartaz de check-in mudou: imprime-o de novo.")
+        # Printing it (the poster page's button) keeps these addresses as the printed ones.
+        sheet = page.context.new_page()
+        sheet.on("pageerror", lambda e: self.errors.append(f"pageerror: {e}"))
+        sheet.goto(self.field.base + "/console/poster.html")
+        expect(sheet.get_by_test_id("poster-qr")).to_be_visible()
+        sheet.evaluate("window.print = () => {}")                    # headless: no print dialog
+        sheet.get_by_test_id("poster-print").click()
+        self.assertTrue(wait_for(lambda: self.field.http.get("/api/v1/checkin/poster").json()["changed"] is None, 5))
+        printed = self.field.http.get("/api/v1/checkin/poster").json()["printed"]
+        self.assertEqual(printed["urls"], poster["urls"])
+        self.assertEqual(printed["ca_sha256"], poster["ca_sha256"])
+        # Back in the console, the notice goes (the tab asks again when its window is focused).
+        page.get_by_test_id("tab-checkin").click()
+        page.evaluate("window.dispatchEvent(new Event('focus'))")
+        expect(page.get_by_test_id("poster-changed")).to_have_count(0)
+        # The same console in English; a changed certificate says printed posters no longer work.
+        self.field.bundle.store.set_setting("checkin.poster_printed", json.dumps(
+            {"urls": poster["urls"], "ca_sha256": "ab" * 32, "at": 1.0}))
+        page.get_by_test_id("lang").select_option("en")
+        page.evaluate("window.dispatchEvent(new Event('focus'))")
+        expect(page.get_by_test_id("poster-changed")).to_contain_text("printed posters no longer work")
+        # Not for the read token (it has no poster).
+        self.assertEqual(httpx.post(self.field.base + "/api/v1/checkin/poster/printed",
+                                    headers={"Authorization": f"Bearer {READ}"}).status_code, 403)
+
+    # --- "Print the poster?" can be paused (WCAG 2.2.1, decision check-R15) -------------------
+
+    def test_poster_prompt_countdown_can_be_paused_and_waits_for_the_pointer_and_focus(self):
+        page = self.console(poster_prompt=True)
+        self.create_game_in_console(page, "Domingo")
+        dialog = page.get_by_test_id("poster-prompt")
+        expect(dialog).to_be_visible()
+        countdown = page.get_by_test_id("poster-prompt-countdown")
+        pause = page.get_by_test_id("poster-prompt-pause")
+        expect(pause).to_have_attribute("aria-pressed", "false")
+        expect(pause).to_contain_text("Pausar a contagem")
+        # The pointer over the dialog holds the countdown; leaving it lets it run again.
+        dialog.hover()
+        held = countdown.text_content()
+        page.wait_for_timeout(2500)
+        self.assertEqual(countdown.text_content(), held, "the countdown ran under the pointer")
+        page.mouse.move(2, 2)
+        expect(countdown).not_to_have_text(held, timeout=4000)
+        # The button stops it until it is pressed again: the dialog then stays.
+        pause.click()
+        expect(pause).to_have_attribute("aria-pressed", "true")
+        expect(countdown).to_contain_text("Em pausa")
+        expect(page.get_by_test_id("poster-prompt-live")).to_contain_text("Contagem em pausa")
+        page.mouse.move(2, 2)
+        page.wait_for_timeout(12000)                      # longer than the ten seconds
+        expect(dialog).to_be_visible()
+        expect(countdown).to_contain_text("Em pausa")
+        pause.click()
+        expect(pause).to_have_attribute("aria-pressed", "false")
+        expect(page.get_by_test_id("poster-prompt-live")).to_contain_text("Contagem retomada")
+        page.mouse.move(2, 2)                             # the pointer left over the button would hold it
+        # Running again, with the seconds that were left: it closes itself (the default is kept).
+        expect(dialog).to_be_hidden(timeout=12000)
+
+    def test_poster_prompt_waits_while_a_control_has_keyboard_focus(self):
+        page = self.console(poster_prompt=True)
+        self.create_game_in_console(page, "Domingo")
+        dialog = page.get_by_test_id("poster-prompt")
+        expect(dialog).to_be_visible()
+        page.mouse.move(2, 2)
+        page.keyboard.press("Tab")                        # onto the first control, inside the dialog
+        self.assertTrue(page.evaluate("document.querySelector('[data-testid=poster-prompt]').contains(document.activeElement)"
+                                      " && document.activeElement !== document.querySelector('[data-testid=poster-prompt]')"))
+        page.wait_for_timeout(13000)
+        expect(dialog).to_be_visible()                    # held while the control has focus
+        page.keyboard.press("Escape")
+        expect(dialog).to_be_hidden(timeout=1500)
+
+    # --- "share with players": the scoreboard's QR code (decision PD13) -------------------
+
+    def test_scoreboard_qr_code_is_the_scoreboard_address_the_app_follows(self):
+        if not ZBARIMG:
+            self.skipTest("zbarimg is not installed")
+        self.field.create_game()
+        page = self.console()
+        box = page.get_by_test_id("scoreboard-share")
+        expect(box).to_be_visible()
+        expect(page.get_by_test_id("scoreboard-qr")).to_have_count(0)             # the code is asked for, not shown
+        page.get_by_test_id("scoreboard-show").click()
+        expect(page.get_by_test_id("scoreboard-qr")).to_be_visible()
+        # The address the app takes (FieldLink.parse): http://host:port/scoreboard#token=<read code>, the host one
+        # the poster lists (this field's is configured), the port the controller's API.
+        want = f"http://10.42.0.1:{self.field.port}/scoreboard#token={READ}"
+        expect(page.get_by_test_id("scoreboard-link")).to_have_text(want)
+        with tempfile.TemporaryDirectory() as tmp:
+            shot = os.path.join(tmp, "scoreboard.png")
+            page.get_by_test_id("scoreboard-qr").screenshot(path=shot)
+            out = read_qr(shot)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(out.stdout, want)
+        parts = urlsplit(out.stdout)
+        self.assertEqual((parts.scheme, parts.hostname, parts.port, parts.path), ("http", "10.42.0.1", self.field.port, "/scoreboard"))
+        self.assertEqual(parse_qs(parts.fragment), {"token": [READ]})
+        expect(page.get_by_test_id("scoreboard-warning")).to_contain_text("quem o tiver pode acompanhar")
+        # The same address opens the scoreboard page (here at this machine's own address) with the read code.
+        board = self.page(f"/scoreboard#token={READ}")
+        expect(board.get_by_test_id("board-state")).to_be_visible()
+        page.get_by_test_id("scoreboard-hide").click()
+        expect(page.get_by_test_id("scoreboard-qr")).to_have_count(0)
+        # The GM token only: the read token gets neither the panel nor the address.
+        read = self.console(READ)
+        expect(read.get_by_test_id("scoreboard-share")).to_have_count(0)
+        self.assertEqual(httpx.get(self.field.base + "/api/v1/scoreboard-link",
+                                   headers={"Authorization": f"Bearer {READ}"}).status_code, 403)
+        link = self.field.http.get("/api/v1/scoreboard-link")
+        self.assertEqual(link.json(), {"links": [want]})
+        self.assertEqual(link.headers["cache-control"], "no-store")
+
+    # --- the log's words for every event (E) -----------------------------------------------
+
+    def test_the_log_has_words_for_every_event_the_built_in_modes_emit(self):
+        emitted = set()
+        for lua in (CONTROLLER.parent / "modes").glob("*/*.lua"):
+            emitted |= set(re.findall(r"""(?:emit|event)[a-z_]*\(\s*["']([a-z_]+\.[a-z_.]+)["']""",
+                                      lua.read_text(encoding="utf-8")))
+        core = {"game.start", "game.pause", "game.resume", "game.end", "score.delta", "gm.message", "team.eliminated"}
+        types = sorted(emitted | core)
+        self.assertGreaterEqual(len(types), 25, types)
+        page = self.page()
+        for lang in ("pt", "en", "de", "zh-tw"):
+            words = page.evaluate("""async ([lang, types]) => {
+                const m = await import('/console/ui.js');
+                await m.loadLanguage(lang);
+                return types.map((type) => [type, m.eventWords({ type, team: 'red', node: 3, data: {} })]);
+            }""", [lang, types])
+            for typ, text in words:
+                self.assertNotEqual(text, "", f"{lang}: no words for {typ}")
+                self.assertNotIn("feed.events", text)
+        # Placeholders are filled from the event's data.
+        one = page.evaluate("""async () => {
+            const m = await import('/console/ui.js');
+            await m.loadLanguage('en');
+            return [m.eventWords({ type: 'zone.captured', team: 'red', node: 3, data: { zone: 'Alpha' } }),
+                    m.eventWords({ type: 'player.respawn', node: 3, data: { player: 'P1', lives_left: 2 } }),
+                    m.eventWords({ type: 'bomb.armed', team: 'blue', node: 4, data: { fuse_s: 30 } })];
+        }""")
+        self.assertEqual(one, ["red captured Alpha", "P1 is back in (2 lives)", "Bomb armed by blue (30 s)"])
+
     # --- field and team branding (decisions BR1-BR24) -------------------------------
 
     def loaded(self, locator) -> None:
@@ -4167,6 +4383,43 @@ class ConsoleBrowserTests(unittest.TestCase):
 
 
 BRANDING = CONTROLLER / "tests" / "fixtures" / "branding"
+
+
+class ConsoleTextsTests(unittest.TestCase):
+    """The console's texts (no browser): nothing internal for the GM to read, and the Portuguese as the app
+    and the site write it (tu, no gendered or formal forms, the glossary's words)."""
+
+    I18N = CONTROLLER / "console" / "src" / "i18n"
+
+    @staticmethod
+    def walk(node, path=""):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                yield from ConsoleTextsTests.walk(v, f"{path}.{k}" if path else k)
+        else:
+            yield path, node
+
+    def texts(self, lang: str):
+        return list(self.walk(json.loads((self.I18N / f"{lang}.json").read_text(encoding="utf-8"))))
+
+    def test_no_internal_ids_in_any_language(self):
+        internal = re.compile(r"\bADR-|\b(?:check|PE24|PD|MF|BR|CL|FL|GM|RJ|SQ|MR|OT|S19|FU\d?)-\d+|\bP[0-9][A-Z]-?\d+")
+        for lang in ("en", "pt", "de", "zh-tw"):
+            for key, text in self.texts(lang):
+                self.assertIsNone(internal.search(text), f"{lang} {key}: {text}")
+
+    def test_portuguese_is_tu_and_the_glossary_words(self):
+        formal = re.compile(r"\b(?:Convide|comece|[Tt]ermine|[Cc]rie|[Jj]unte|[Rr]einicie|[Aa]tualize|[Cc]arregue|[Ee]scolha|"
+                            r"[Mm]arque|[Cc]onfigure|[Ii]mprima|[Pp]ode fechar|[Vv]oc[eê]s?|[Ii]ntroduza|[Cc]lique|[Dd]igite)\b")
+        for key, text in self.texts("pt"):
+            self.assertIsNone(formal.search(text), f"pt {key}: {text}")
+            self.assertNotIn("jogadores", text.lower(), f"pt {key}: gendered plural")
+            self.assertNotIn("servidor do clube", text.lower(), f"pt {key}: the glossary says servidor do site")
+        pt = dict(self.texts("pt"))
+        self.assertNotIn("red, blue", pt["game.teams_hint"])
+        self.assertIn("«PRONTA»", pt["invites.empty"])                     # the pt box shows PRONTA
+        self.assertIn("código de acesso", pt["poster.login"])              # as the login says
+        self.assertIn("código de acesso", pt["fieldmap.login"])
 
 
 if __name__ == "__main__":

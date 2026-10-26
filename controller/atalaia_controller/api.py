@@ -152,6 +152,7 @@ from . import map_features as mapmod
 from . import images, visibility
 from . import scenario_service as scenarios
 from .branding import SLOTS, Branding, etag
+from .addresses import url_host
 from .checkin import Viewer
 from .engine import Controller, ControllerError, StartBlocked
 from .modes import resolve_params
@@ -1248,6 +1249,25 @@ def create_app(controller: Controller, hub: Hub, auth: Auth,
     @app.put("/api/v1/checkin/poster", dependencies=[Depends(require_gm)])
     def checkin_poster_put(body: Any = Body(None)) -> dict[str, Any]:
         return need_checkin().set_poster(body_map(body))
+
+    @app.post("/api/v1/checkin/poster/printed", dependencies=[Depends(require_gm)])
+    def checkin_poster_printed() -> dict[str, Any]:
+        return need_checkin().mark_poster_printed()
+
+    @app.get("/api/v1/scoreboard-link", dependencies=[Depends(require_gm)])
+    def scoreboard_link() -> JSONResponse:
+        """The scoreboard's address with the read token, for the console's "share with players" QR code
+        (decision PD13): http://<host>:<port>/scoreboard#token=<read token> for each address the poster
+        lists (the app's Player > Follow a game takes it). Secret: never cached."""
+        hosts: list[str] = []
+        svc = need_checkin()
+        for u in svc.poster_fields()["urls"]:
+            host = url_host(u)
+            if host and host not in hosts:
+                hosts.append(host)
+        links = [f"http://{'[' + h + ']' if ':' in h else h}:{controller.cfg.api_port}/scoreboard#token={auth.read_token}"
+                 for h in hosts]
+        return JSONResponse({"links": links}, headers=NO_STORE)
 
     def own_or_gm(v: Viewer, player_id: str) -> None:
         if not (v.is_gm_token or (v.kind == "player" and v.player_id == player_id)):

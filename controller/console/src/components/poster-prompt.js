@@ -13,6 +13,11 @@
 // opens keeps the focus there: the dialog then shows without a backdrop (aria-modal false) and
 // Esc still closes it. The countdown is a visible number (hidden from screen readers) and a
 // polite live region that says "closes in N seconds" when it opens and halfway.
+//
+// WCAG 2.2.1 (check-R15): the ten seconds stay the default, and the dialog still closes itself, but the
+// countdown can be stopped: it waits while the pointer is over the dialog or while keyboard focus is on
+// one of its controls, and the "Pause the countdown" button stops it until it is pressed again (the
+// dialog then stays until it is closed). A pause keeps the seconds that were left.
 
 import { html, Component, createRef, t } from '../ui.js';
 
@@ -45,6 +50,16 @@ export function isTyping(el) {
     return el.tagName === 'INPUT' && !TYPING_TYPES.has((el.type || 'text').toLowerCase());
 }
 
+/** Whether an element has focus the way a keyboard gives it (a click on a button does not count: its
+ * pointer is what holds the countdown, and a button that keeps focus after a click must not hold it). */
+function focusVisible(el) {
+    try {
+        return el.matches(':focus-visible');
+    } catch (e) {
+        return true; // an older browser: any focus on a control holds the countdown
+    }
+}
+
 /** The page's content, as a place for focus to go back to when the element that had it is gone. */
 function pageContent() {
     const main = document.querySelector('main.content');
@@ -56,7 +71,7 @@ export class PosterPrompt extends Component {
     // props: app, game ({id, name}), typing (the GM was typing in a field), onClose()
     constructor(props) {
         super(props);
-        this.state = { left: PROMPT_SECONDS, never: false, announce: '' };
+        this.state = { left: PROMPT_SECONDS, never: false, announce: '', paused: false, held: false };
         this.box = createRef();
         this.onKeyDown = (e) => this.keyDown(e);
     }
@@ -68,7 +83,10 @@ export class PosterPrompt extends Component {
         this.opener = active && active !== document.body ? active : null;
         if (this.modal && this.box.current) this.box.current.focus();
         this.setState({ announce: t('poster_prompt.announce', { n: PROMPT_SECONDS }) });
-        this.deadline = Date.now() + PROMPT_SECONDS * 1000;
+        this.remaining = PROMPT_SECONDS * 1000;
+        this.last = Date.now();
+        this.hover = false;
+        this.focused = false;
         this.timer = setInterval(() => this.tick(), 250);
         document.addEventListener('keydown', this.onKeyDown, true);
     }
@@ -83,13 +101,29 @@ export class PosterPrompt extends Component {
         document.removeEventListener('keydown', this.onKeyDown, true);
     }
 
+    /** Whether the countdown is stopped: by the button, the pointer over the dialog, or focus on a control. */
+    stopped() {
+        return this.state.paused || this.hover || this.focused;
+    }
+
     tick() {
-        const left = Math.max(0, Math.ceil((this.deadline - Date.now()) / 1000));
-        if (left !== this.state.left) {
+        const now = Date.now();
+        if (!this.stopped()) this.remaining = Math.max(0, this.remaining - (now - this.last));
+        this.last = now;
+        const left = Math.ceil(this.remaining / 1000);
+        const held = this.stopped();
+        if (left !== this.state.left || held !== this.state.held) {
             const half = Math.floor(PROMPT_SECONDS / 2);
-            this.setState({ left, announce: left === half ? t('poster_prompt.announce', { n: left }) : this.state.announce });
+            this.setState({ left, held, announce: left !== this.state.left && left === half && !held
+                ? t('poster_prompt.announce', { n: left }) : this.state.announce });
         }
         if (left <= 0) this.close(true);
+    }
+
+    togglePause() {
+        const paused = !this.state.paused;
+        this.setState({ paused, announce: t(paused ? 'poster_prompt.announce_paused' : 'poster_prompt.announce_resumed',
+                                            { n: Math.ceil(this.remaining / 1000) }) });
     }
 
     keyDown(e) {
@@ -137,17 +171,22 @@ export class PosterPrompt extends Component {
             onClick=${(e) => this.modal && e.target === e.currentTarget && this.close(true)}>
             <div class="modal card poster-prompt" role="dialog" aria-modal=${this.modal ? 'true' : 'false'}
                 aria-labelledby="pp-h" aria-describedby="pp-body" tabindex="-1" ref=${this.box}
+                onMouseEnter=${() => { this.hover = true; }} onMouseLeave=${() => { this.hover = false; }}
+                onFocusIn=${(e) => { this.focused = e.target !== this.box.current && focusVisible(e.target); }}
+                onFocusOut=${() => { this.focused = false; }}
                 data-testid="poster-prompt" data-modal=${this.modal ? 'true' : 'false'}>
                 <h2 id="pp-h">${t('poster_prompt.title')}</h2>
                 <p id="pp-body" data-testid="poster-prompt-body">${t('poster_prompt.body', { game: game.name })}</p>
                 <p class="muted small" aria-hidden="true" data-testid="poster-prompt-countdown">${
-                    t('poster_prompt.countdown', { n: state.left })}</p>
+                    state.paused ? t('poster_prompt.paused') : t('poster_prompt.countdown', { n: state.left })}</p>
                 <div class=${sr} role="status" aria-live="polite" data-testid="poster-prompt-live">${state.announce}</div>
                 <div class="field"><label><input type="checkbox" data-testid="poster-prompt-never" checked=${state.never}
                     onChange=${(e) => this.setState({ never: e.target.checked })} /> ${t('poster_prompt.never')}</label></div>
                 <div class="actions">
                     <a class="button primary" href="poster.html" target="_blank" rel="noopener"
                         data-testid="poster-prompt-open" onClick=${() => setTimeout(() => this.close(false), 0)}>${t('poster_prompt.open')}</a>
+                    <button type="button" data-testid="poster-prompt-pause" aria-pressed=${state.paused ? 'true' : 'false'}
+                        onClick=${() => this.togglePause()}>${t(state.paused ? 'poster_prompt.resume' : 'poster_prompt.pause')}</button>
                     <button type="button" data-testid="poster-prompt-close" onClick=${() => this.close(true)}>${
                         t('poster_prompt.close')}</button>
                 </div>

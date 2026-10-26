@@ -103,7 +103,16 @@ async function main() {
     tools.append(el('p', { class: 'muted' }, t('poster.intro')));
     const row = el('div', { class: 'tool-row' });
     const print = el('button', { type: 'button', class: 'primary', 'data-testid': 'poster-print' }, t('poster.print'));
-    print.addEventListener('click', () => window.print());
+    // Printed (the button or the browser's own Print): the controller keeps this poster's addresses, so the
+    // console can say "the poster changed" when they change later (decision check-R8).
+    let marked = false;
+    const markPrinted = () => {
+        if (marked) return;
+        marked = true;
+        api(token, 'POST', '/checkin/poster/printed').catch(() => { marked = false; });
+    };
+    window.addEventListener('afterprint', markPrinted);
+    print.addEventListener('click', () => { window.print(); markPrinted(); });
     row.append(print);
     if (ssid) {
         const label = el('label', { for: 'wifi-pass' }, t('poster.wifi_password'));

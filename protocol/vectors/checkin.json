@@ -1229,5 +1229,181 @@
         }
       }
     ]
+  },
+  "poster_change": {
+    "description": "Whether the poster now differs from the one last printed (decision check-R8: the console says \"the poster changed\" and suggests printing it again). input: printed (the urls and CA, as hex, of the poster the GM last printed, or null), urls (the poster's now), ca_sha256 (the field CA's now, hex; null when HTTPS is off). expected: null (nothing to say: nothing printed yet, no poster now, or the same addresses in any order and the same CA) or {added, removed, ca_changed, still_works}: still_works is true when the CA is the same and at least one printed address is still listed, so the printed poster still reaches the controller. controller/atalaia_controller/checkin.py (poster_change) and app/lib/controller/controller_checkin.dart (posterChange) both pass it.",
+    "cases": [
+      {
+        "name": "nothing printed yet",
+        "input": {
+          "printed": null,
+          "urls": [
+            "https://10.0.0.1:8443"
+          ],
+          "ca_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "expected": null
+      },
+      {
+        "name": "the same",
+        "input": {
+          "printed": {
+            "urls": [
+              "https://10.0.0.1:8443",
+              "https://myhost:8443"
+            ],
+            "ca_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "urls": [
+            "https://10.0.0.1:8443",
+            "https://myhost:8443"
+          ],
+          "ca_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "expected": null
+      },
+      {
+        "name": "the same in another order",
+        "input": {
+          "printed": {
+            "urls": [
+              "https://10.0.0.1:8443",
+              "https://myhost:8443"
+            ],
+            "ca_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "urls": [
+            "https://myhost:8443",
+            "https://10.0.0.1:8443"
+          ],
+          "ca_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "expected": null
+      },
+      {
+        "name": "an address added",
+        "input": {
+          "printed": {
+            "urls": [
+              "https://10.0.0.1:8443"
+            ],
+            "ca_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "urls": [
+            "https://10.0.0.1:8443",
+            "https://myhost:8443"
+          ],
+          "ca_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "expected": {
+          "added": [
+            "https://myhost:8443"
+          ],
+          "removed": [],
+          "ca_changed": false,
+          "still_works": true
+        }
+      },
+      {
+        "name": "an address gone, another still there",
+        "input": {
+          "printed": {
+            "urls": [
+              "https://10.0.0.1:8443",
+              "https://myhost:8443"
+            ],
+            "ca_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "urls": [
+            "https://myhost:8443"
+          ],
+          "ca_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "expected": {
+          "added": [],
+          "removed": [
+            "https://10.0.0.1:8443"
+          ],
+          "ca_changed": false,
+          "still_works": true
+        }
+      },
+      {
+        "name": "every printed address gone",
+        "input": {
+          "printed": {
+            "urls": [
+              "https://10.0.0.1:8443"
+            ],
+            "ca_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "urls": [
+            "https://10.0.0.9:8443"
+          ],
+          "ca_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "expected": {
+          "added": [
+            "https://10.0.0.9:8443"
+          ],
+          "removed": [
+            "https://10.0.0.1:8443"
+          ],
+          "ca_changed": false,
+          "still_works": false
+        }
+      },
+      {
+        "name": "the CA changed",
+        "input": {
+          "printed": {
+            "urls": [
+              "https://10.0.0.1:8443"
+            ],
+            "ca_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "urls": [
+            "https://10.0.0.1:8443"
+          ],
+          "ca_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "expected": {
+          "added": [],
+          "removed": [],
+          "ca_changed": true,
+          "still_works": false
+        }
+      },
+      {
+        "name": "no poster now (no address)",
+        "input": {
+          "printed": {
+            "urls": [
+              "https://10.0.0.1:8443"
+            ],
+            "ca_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "urls": [],
+          "ca_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "expected": null
+      },
+      {
+        "name": "no poster now (HTTPS off)",
+        "input": {
+          "printed": {
+            "urls": [
+              "https://10.0.0.1:8443"
+            ],
+            "ca_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "urls": [
+            "https://10.0.0.1:8443"
+          ],
+          "ca_sha256": null
+        },
+        "expected": null
+      }
+    ]
   }
 }

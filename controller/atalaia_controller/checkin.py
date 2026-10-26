@@ -279,6 +279,28 @@ class RateLimit:
             return True
 
 
+# --- what changed since the poster was last printed (decision check-R8) ---------
+
+
+def poster_change(printed: Optional[dict[str, Any]], urls: list[str],
+                  ca_hex: Optional[str]) -> Optional[dict[str, Any]]:
+    """How the poster now differs from the one last printed: None when nothing was printed yet, there is no
+    poster to compare, or its addresses and CA are the same (in any order). Otherwise ``added`` and
+    ``removed`` addresses, ``ca_changed`` and ``still_works``: whether a printed poster still reaches the
+    controller (the CA is the same and at least one of its addresses is still listed). The same on the
+    phone controller (controller_checkin.dart); shared cases ``poster_change`` in protocol/vectors/checkin.json."""
+    if not printed or not urls or not ca_hex:
+        return None
+    old_urls = [u for u in printed.get("urls") or [] if isinstance(u, str)]
+    added = [u for u in urls if u not in old_urls]
+    removed = [u for u in old_urls if u not in urls]
+    ca_changed = bool(printed.get("ca_sha256")) and printed.get("ca_sha256") != ca_hex
+    if not added and not removed and not ca_changed:
+        return None
+    return {"added": added, "removed": removed, "ca_changed": ca_changed,
+            "still_works": not ca_changed and any(u in urls for u in old_urls)}
+
+
 # --- the service -------------------------------------------------------------
 
 
@@ -400,7 +422,27 @@ class Checkin:
                 out["text"] = None
                 out["problem_code"] = "too_long" if exc.reason == "length" else "invalid"
                 out["problem"] = str(exc)
+        printed = self.printed_poster()
+        out["printed"] = printed
+        out["changed"] = poster_change(printed, p["urls"], out["ca_sha256"])
         return out
+
+    def printed_poster(self) -> Optional[dict[str, Any]]:
+        """The poster the GM last printed: ``urls``, ``ca_sha256`` (hex) and ``at`` (seconds), or None."""
+        try:
+            doc = json.loads(self.store.get_setting("checkin.poster_printed") or "null")
+        except ValueError:
+            return None
+        return doc if isinstance(doc, dict) and isinstance(doc.get("urls"), list) else None
+
+    def mark_poster_printed(self) -> dict[str, Any]:
+        """The GM printed (or showed) the poster as it is now: later changes are measured from here."""
+        p = self.poster_fields()
+        if p["ca_sha256"] is None or not p["urls"]:
+            raise ControllerError("there is no poster to print yet")
+        self.store.set_setting("checkin.poster_printed", json.dumps(
+            {"urls": list(p["urls"]), "ca_sha256": p["ca_sha256"].hex(), "at": self._wall()}))
+        return self.poster()
 
     def set_poster(self, spec: dict[str, Any]) -> dict[str, Any]:
         unknown = set(spec) - {"urls", "wifi_ssid", "game_id", "field_name"}

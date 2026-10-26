@@ -189,9 +189,9 @@ how:
     pequeno computador na base que corre o jogo e guarda a pontuação. Os telemóveis ligam-se a ele
     por Wi-Fi, e os marcadores, as transmissões em direto e as apps de mapas, como o
     <a href="{{ page.to.glossary }}#glossario-atak">ATAK</a>, pela sua API. Um
-    <a href="{{ page.to.glossary }}#glossario-servidor-do-clube">servidor do clube</a>, opcional e na internet, guarda as
+    <a href="{{ page.to.glossary }}#glossario-servidor-do-site">servidor do site</a>, opcional e na internet, guarda as
     contas e o histórico. O controlador, a sua API e a consola da organização já estão feitos e
-    testados num computador, ainda não no campo; do servidor do clube só existem, por agora, o
+    testados num computador, ainda não no campo; do servidor do site só existem, por agora, o
     esqueleto e as contas (entrada com códigos de dois fatores e funções por campo; ainda sem dados
     de jogos).
   core: >-
@@ -201,10 +201,10 @@ how:
     maneira numa caixa, num telemóvel ou num Raspberry Pi.
   diagram:
     title: >-
-      Um servidor do clube, opcional, liga-se pela internet ao controlador de campo. As apps da
+      Um servidor do site, opcional, liga-se pela internet ao controlador de campo. As apps da
       organização e dos jogadores chegam ao controlador por Wi-Fi, os marcadores e outras
       ferramentas por MQTT e REST, e os dispositivos pela rede mesh LoRa Skirmesh-RF.
-    server: Servidor do clube (opcional)
+    server: Servidor do site (opcional)
     server_sub: contas · histórico · app de jogador
     apps: Apps da organização
     apps_sub: e dos jogadores · Wi-Fi
@@ -220,7 +220,7 @@ how:
     thin_sub: tipo Arduino
   list:
     server: >-
-      <strong>Servidor do clube</strong> (opcional): contas, histórico e a app de jogador, pela
+      <strong>Servidor do site</strong> (opcional): contas, histórico e a app de jogador, pela
       internet.
     controller: >-
       <strong>Controlador de campo</strong> num Raspberry Pi ou Android: as apps da organização e
@@ -842,7 +842,7 @@ roadmap:
           que não os têm; os cenários compilados no telemóvel; os pacotes de papéis num jogo; os
           nomes e emblemas das equipas."
         - "O resto do que o Pi faz: a substituição (um telemóvel e um Pi podem ser o controlador de
-          reserva um do outro), a sincronização com o servidor do clube (jogos, registos e
+          reserva um do outro), a sincronização com o servidor do site (jogos, registos e
           pontuações enviados quando há internet; listas de inscritos, imagem do campo e biblioteca
           de cenários recebidas de lá), o GM remoto e o feed para o ATAK."
     g_ios:
@@ -862,9 +862,9 @@ roadmap:
         controlador do campo ficam só em Android."
     gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."
   p4:
-    title: Servidor do clube e jogo avançado
+    title: Servidor do site e jogo avançado
     short: >-
-      Servidor do clube, marcação de jogos e inscrições, cenários personalizados, modos avançados,
+      Servidor do site, marcação de jogos e inscrições, cenários personalizados, modos avançados,
       ATAK. Todos os passos de software estão feitos; faltam um servidor a sério, uma revisão
       jurídica e os testes em hardware.
     done:
@@ -873,8 +873,8 @@ roadmap:
       - "<strong>Cenários personalizados</strong>: o motor no controlador de campo, um compilador de
         cenários em YAML, um editor na consola da organização e os objetivos na app."
       - "<strong>O feed ATAK</strong>: as caixas e as zonas em mapas ATAK, no campo e, através do
-        servidor do clube, para a organização longe dele."
-      - "<strong>O servidor do clube</strong>: contas com códigos de dois fatores, direitos sobre os
+        servidor do site, para a organização longe dele."
+      - "<strong>O servidor do site</strong>: contas com códigos de dois fatores, direitos sobre os
         dados pessoais, sincronização, registo de cronógrafo, histórico dos jogos e biblioteca de
         cenários."
       - "<strong>Marcação de jogos e inscrições</strong>, com páginas públicas por campo, feeds de
@@ -926,12 +926,12 @@ roadmap:
           próprio GPS, sem enviar nada."
         - "As posições de quem joga nunca vão para toda a gente, só para dispositivos da organização
           quando o campo o liga. Quem organiza, longe do campo, recebe o mesmo através do servidor do
-          clube, por uma ligação cifrada com um certificado por dispositivo que o campo emite e pode
+          site, por uma ligação cifrada com um certificado por dispositivo que o campo emite e pode
           revogar de imediato; as posições só chegam aos certificados de GM ou marshal."
         - "Campos com vários pisos na consola: uma planta por piso e cada caixa no seu piso."
         - "Ainda não experimentado num telemóvel com ATAK real, nem num campo real."
     g_server:
-      title: Servidor do clube, contas e dados
+      title: Servidor do site, contas e dados
       items:
         - "O esqueleto: base de dados, migrações e verificação de estado, no seu próprio contentor."
         - "As contas: palavras-passe, códigos de dois fatores obrigatórios para quem organiza e para
@@ -1676,8 +1676,8 @@ glossary:
       correr um jogo sem ele. Já está feito (fase&nbsp;2) e testado num computador, ainda não num
       campo; pô-lo a correr num aparelho Android ainda está por fazer.
   server:
-    id: glossario-servidor-do-clube
-    term: Servidor do clube
+    id: glossario-servidor-do-site
+    term: Servidor do site
     text: >-
       Um computador opcional, no campo ou alugado na internet, que guarda o que dura para lá de um
       jogo: contas de jogadores, histórico, o registo de cronografagem e os serviços por trás da app
@@ -1697,7 +1697,7 @@ glossary:
       A regra que mantém a Atalaia aberta: usá-la tal como está não te obriga a nada, mas quem
       passar a outros uma versão alterada tem de partilhar o código-fonte com a mesma licença. A
       GPL, para o núcleo, o firmware, a app e os modos, aplica-se quando dás ou vendes cópias; a
-      AGPL, para o controlador de campo e o servidor do clube, aplica-se também quando pões uma
+      AGPL, para o controlador de campo e o servidor do site, aplica-se também quando pões uma
       versão alterada a funcionar para outras pessoas através de uma rede. O hardware (CERN-OHL-S)
       e a documentação (CC BY-SA) seguem a mesma ideia.
 
@@ -1750,7 +1750,7 @@ safety:
 footer:
   licences: >-
     A Atalaia é software livre: GPL-3.0-or-later para o núcleo, o firmware, a app e os modos;
-    AGPL-3.0-or-later para o controlador de campo e o servidor do clube; CERN-OHL-S-2.0 para o
+    AGPL-3.0-or-later para o controlador de campo e o servidor do site; CERN-OHL-S-2.0 para o
     hardware; CC BY-SA 4.0 para a documentação e esta página.
   licensing: Licenças
   manuals: Manuais para quem joga, a organização, os marshals e quem opera as caixas

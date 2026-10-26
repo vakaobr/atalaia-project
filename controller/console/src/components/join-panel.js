@@ -16,7 +16,7 @@ import qrcode from '../lib/qrcode.module.js';
 import { gameRoles } from './preset-builder.js';
 
 /** The QR code of text as SVG modules (error correction L, byte mode, 4-module quiet zone). */
-export function QrCode({ text, label }) {
+export function QrCode({ text, label, testid = 'join-qr' }) {
     const qr = qrcode(0, 'L');
     qr.addData(text, 'Byte');
     qr.make();
@@ -29,7 +29,7 @@ export function QrCode({ text, label }) {
         }
     }
     const size = n + 2 * q;
-    return html`<svg class="qr" data-testid="join-qr" viewBox=${`0 0 ${size} ${size}`} role="img"
+    return html`<svg class="qr" data-testid=${testid} viewBox=${`0 0 ${size} ${size}`} role="img"
         aria-label=${label} shape-rendering="crispEdges">
         <rect width=${size} height=${size} fill="#fff" />
         <path d=${d} fill="#000" />

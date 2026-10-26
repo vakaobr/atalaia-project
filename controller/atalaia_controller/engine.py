@@ -630,7 +630,12 @@ class Controller:
         if live and self.key_lost:
             out["key_lost"] = True
         if live and game.get("state") == "ready" and self.fc is not None and not game.get("joined"):
-            out["start_check"] = self.start_check()
+            try:
+                out["start_check"] = self.start_check()
+            except Conflict:
+                # The game ended between the check of "live" above and here (another thread): it is no
+                # longer live, so it has no start check; a GET of it must not fail with 409.
+                out["live"] = False
         return out
 
     def players_game(self, game: dict[str, Any], viewer: Any = None) -> dict[str, Any]:
