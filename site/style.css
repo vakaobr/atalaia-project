@@ -293,6 +293,29 @@ nav a:hover { color: var(--on-slate); }
 .card .meta { font-size: 0.92rem; color: var(--text); font-weight: 600; }
 .card.dashed { border: 1.5px dashed var(--line); background: transparent; }
 
+/* The modes page's animated pictures (tools/gen_mode_gifs.py): 360 x 444, the Field Box's two
+   screens as a game goes on; cards are wide enough to show them at their own size. */
+.cards.with-gifs { grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); }
+.gifs-intro { color: var(--muted); max-width: 70ch; margin: 0 0 24px; }
+.modegif { margin: 16px 0 0; }
+.modegif img { display: block; width: 100%; max-width: 360px; height: auto; margin: 0 auto; }
+.modegif figcaption { max-width: 360px; margin: 8px auto 0; font-size: 0.88rem; color: var(--muted); }
+.modegif-button {
+  display: block;
+  min-height: 44px;
+  margin: 8px auto 0;
+  padding: 0 16px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: 600 0.88rem/1 var(--body);
+  cursor: pointer;
+}
+@media (max-width: 480px) { .cards.with-gifs .card { padding: 16px 12px; } }
+.modegif-button:hover { border-color: var(--signal); }
+.modegif-button:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
 /* ---- diagram ---- */
 
 .diagram { margin: 0; }

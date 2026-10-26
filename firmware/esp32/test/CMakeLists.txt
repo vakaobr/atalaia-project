@@ -293,6 +293,16 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(oled_screen_test PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
 
+# Frames for the project page's animated game-mode pictures (tools/gen_mode_gifs.py): a script
+# of screen updates drawn on the TFT and the OLED through the same code as the two tests above.
+# Not a test; built with the rest so that CI's firmware-test job can run the generator's check.
+add_executable(mode_gif_frames mode_gif_frames.c test_display.c)
+target_include_directories(mode_gif_frames PRIVATE ${SHELL_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(mode_gif_frames PRIVATE atalaia_screens_fw)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(mode_gif_frames PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
 # ---- Capability proxy frames (protocol/capability-proxy.md) ------------------
 # The shared vectors through the modem framing the I/O pod reuses.
 add_executable(proxy_codec_test test_proxy_codec.c ${SHELL_DIR}/modem/modem_framing.c)

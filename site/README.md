@@ -70,6 +70,7 @@ the rest of this folder (see [REUSE.toml](../REUSE.toml)); the top-level README 
 | `field-isometric-960/1600` (`.jpg`, `.webp`) | Isometric stone tower ringed by GAME PROP cases | "How it fits together" on the English, German and Chinese main pages |
 | `og-pt.jpg`, `og-en.jpg` | 1200 × 630 social previews (`og:image`) | Link previews of every page in that language; the German and Chinese pages use `og-en.jpg` (`og_image` in `LANGUAGES`) until one is drawn with their text |
 | `screens/` | Screenshots (see [Screenshots](#screenshots)) | "What it looks like" on the main page; some in the top-level README |
+| `modes/` | The modes page's animated pictures, 52 GIFs and 52 stills (see [Game-mode animations](#game-mode-animations)) | The cards of the modes page; one in the top-level README |
 
 Each main page loads only its own hero image (WebP, with JPEG for older browsers, at 960 or 1600
 pixels wide as the screen needs) and lazy-loads everything below it.
@@ -93,6 +94,28 @@ close button or a click outside the image, with the focus back on the screenshot
 JavaScript, or in a browser without `<dialog>`, the link opens the image itself. The viewer
 needs each `<img>` to keep its `width` and `height`, and the link the class `zoom`. In the
 script, never write two braces together: the build reads them as a placeholder.
+
+### Game-mode animations
+
+`img/modes/<mode>-<language>.gif` (360 × 444, with `-still.gif`, one frame, beside it) are made by
+`python3 tools/gen_mode_gifs.py`, never by hand: the Field Box's firmware code (the screen renderer
+with the modes' templates, and the OLED view, in a host program,
+`firmware/esp32/test/mode_gif_frames.c`) draws the screens of a scripted game on the TFT and the
+OLED, and the script frames them in the box's body and writes the GIFs. `tools/mode_gifs.yaml`
+holds the scripts (what each mode's script sends, step by step, and how long each step stays).
+`python3 tools/gen_mode_gifs.py --check` (CI's firmware-test job runs it) fails if a file is not
+what the code draws now. Adding a mode takes four steps: an entry in `tools/mode_gifs.yaml`
+(its header explains the keys), `python3 tools/gen_mode_gifs.py --only <id>`, a `<figure
+class="modegif">` in the mode's card in `src/modes.html` (copy a neighbour's) and its `alt` and
+`caption` under `gifs.<id>` in the four language files.
+
+A card's picture is a `<picture>` whose `<source>` for `prefers-reduced-motion: reduce` is the still
+frame, with `loading="lazy"` and the alt text and caption of `gifs.<id>`; a small inline script at
+the end of `src/modes.html` adds a pause button under each (play, for someone who asked for less
+motion; clicking it swaps the image for the animated GIF). Every mode has a picture in each of the
+four languages (the box's templates are in all four; the messages a mode's script writes, such as
+"Kill confirmed: b1", stay English); a `languages: [en]` entry in the script would make one `-en`
+picture that the four pages share. Decisions GIF-1 to GIF-12 in `docs/review/decisions-to-review.md`.
 
 ## Translating the pages
 

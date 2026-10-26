@@ -24,16 +24,31 @@ here. See site/README.md and the comment at the top of index.html.
 
     <div class="content band">
       <div class="wrap">
-        <div class="cards">
+        <p class="gifs-intro">{{ gifs.intro }}</p>
+        <div class="cards with-gifs" data-play="{{ gifs.play|text }}" data-pause="{{ gifs.pause|text }}">
           <article class="card" id="domination">
             <h2>{{ modes.domination.title }}</h2>
             <p>{{ modes.domination.text }}</p>
             <p class="meta">{{ modes.domination.meta }}</p>
+            <figure class="modegif" data-still="{{ page.root }}img/modes/domination-{{ page.code }}-still.gif" data-anim="{{ page.root }}img/modes/domination-{{ page.code }}.gif">
+              <picture>
+                <source media="(prefers-reduced-motion: reduce)" srcset="{{ page.root }}img/modes/domination-{{ page.code }}-still.gif">
+                <img src="{{ page.root }}img/modes/domination-{{ page.code }}.gif" width="360" height="444" loading="lazy" decoding="async" alt="{{ gifs.domination.alt|text }}">
+              </picture>
+              <figcaption>{{ gifs.domination.caption }}</figcaption>
+            </figure>
           </article>
           <article class="card" id="bomb">
             <h2>{{ modes.bomb.title }}</h2>
             <p>{{ modes.bomb.text }}</p>
             <p class="meta">{{ modes.bomb.meta }}</p>
+            <figure class="modegif" data-still="{{ page.root }}img/modes/bomb-{{ page.code }}-still.gif" data-anim="{{ page.root }}img/modes/bomb-{{ page.code }}.gif">
+              <picture>
+                <source media="(prefers-reduced-motion: reduce)" srcset="{{ page.root }}img/modes/bomb-{{ page.code }}-still.gif">
+                <img src="{{ page.root }}img/modes/bomb-{{ page.code }}.gif" width="360" height="444" loading="lazy" decoding="async" alt="{{ gifs.bomb.alt|text }}">
+              </picture>
+              <figcaption>{{ gifs.bomb.caption }}</figcaption>
+            </figure>
           </article>
           <article class="card" id="holdall">
             <h2>{{ modes.holdall.title }}</h2>
@@ -49,56 +64,133 @@ here. See site/README.md and the comment at the top of index.html.
             <h2>{{ modes.kill_confirmed.title }}</h2>
             <p>{{ modes.kill_confirmed.text }}</p>
             <p class="meta">{{ modes.kill_confirmed.meta }}</p>
+            <figure class="modegif" data-still="{{ page.root }}img/modes/kill_confirmed-{{ page.code }}-still.gif" data-anim="{{ page.root }}img/modes/kill_confirmed-{{ page.code }}.gif">
+              <picture>
+                <source media="(prefers-reduced-motion: reduce)" srcset="{{ page.root }}img/modes/kill_confirmed-{{ page.code }}-still.gif">
+                <img src="{{ page.root }}img/modes/kill_confirmed-{{ page.code }}.gif" width="360" height="444" loading="lazy" decoding="async" alt="{{ gifs.kill_confirmed.alt|text }}">
+              </picture>
+              <figcaption>{{ gifs.kill_confirmed.caption }}</figcaption>
+            </figure>
           </article>
           <article class="card" id="respawn">
             <h2>{{ modes.respawn.title }}</h2>
             <p>{{ modes.respawn.text }}</p>
             <p class="meta">{{ modes.respawn.meta }}</p>
+            <figure class="modegif" data-still="{{ page.root }}img/modes/respawn-{{ page.code }}-still.gif" data-anim="{{ page.root }}img/modes/respawn-{{ page.code }}.gif">
+              <picture>
+                <source media="(prefers-reduced-motion: reduce)" srcset="{{ page.root }}img/modes/respawn-{{ page.code }}-still.gif">
+                <img src="{{ page.root }}img/modes/respawn-{{ page.code }}.gif" width="360" height="444" loading="lazy" decoding="async" alt="{{ gifs.respawn.alt|text }}">
+              </picture>
+              <figcaption>{{ gifs.respawn.caption }}</figcaption>
+            </figure>
           </article>
           <article class="card" id="player-checkin">
             <h2>{{ modes.player_checkin.title }}</h2>
             <p>{{ modes.player_checkin.text }}</p>
             <p class="meta">{{ modes.player_checkin.meta }}</p>
+            <figure class="modegif" data-still="{{ page.root }}img/modes/player_checkin-{{ page.code }}-still.gif" data-anim="{{ page.root }}img/modes/player_checkin-{{ page.code }}.gif">
+              <picture>
+                <source media="(prefers-reduced-motion: reduce)" srcset="{{ page.root }}img/modes/player_checkin-{{ page.code }}-still.gif">
+                <img src="{{ page.root }}img/modes/player_checkin-{{ page.code }}.gif" width="360" height="444" loading="lazy" decoding="async" alt="{{ gifs.player_checkin.alt|text }}">
+              </picture>
+              <figcaption>{{ gifs.player_checkin.caption }}</figcaption>
+            </figure>
           </article>
           <article class="card" id="medic">
             <h2>{{ modes.medic.title }}</h2>
             <p>{{ modes.medic.text }}</p>
             <p class="meta">{{ modes.medic.meta }}</p>
+            <figure class="modegif" data-still="{{ page.root }}img/modes/medic-{{ page.code }}-still.gif" data-anim="{{ page.root }}img/modes/medic-{{ page.code }}.gif">
+              <picture>
+                <source media="(prefers-reduced-motion: reduce)" srcset="{{ page.root }}img/modes/medic-{{ page.code }}-still.gif">
+                <img src="{{ page.root }}img/modes/medic-{{ page.code }}.gif" width="360" height="444" loading="lazy" decoding="async" alt="{{ gifs.medic.alt|text }}">
+              </picture>
+              <figcaption>{{ gifs.medic.caption }}</figcaption>
+            </figure>
           </article>
           <article class="card" id="master-satellites">
             <h2>{{ modes.master_satellites.title }}</h2>
             <p>{{ modes.master_satellites.text }}</p>
             <p class="meta">{{ modes.master_satellites.meta }}</p>
+            <figure class="modegif" data-still="{{ page.root }}img/modes/master_satellites-{{ page.code }}-still.gif" data-anim="{{ page.root }}img/modes/master_satellites-{{ page.code }}.gif">
+              <picture>
+                <source media="(prefers-reduced-motion: reduce)" srcset="{{ page.root }}img/modes/master_satellites-{{ page.code }}-still.gif">
+                <img src="{{ page.root }}img/modes/master_satellites-{{ page.code }}.gif" width="360" height="444" loading="lazy" decoding="async" alt="{{ gifs.master_satellites.alt|text }}">
+              </picture>
+              <figcaption>{{ gifs.master_satellites.caption }}</figcaption>
+            </figure>
           </article>
           <article class="card" id="target-windows">
             <h2>{{ modes.target_windows.title }}</h2>
             <p>{{ modes.target_windows.text }}</p>
             <p class="meta">{{ modes.target_windows.meta }}</p>
+            <figure class="modegif" data-still="{{ page.root }}img/modes/target_windows-{{ page.code }}-still.gif" data-anim="{{ page.root }}img/modes/target_windows-{{ page.code }}.gif">
+              <picture>
+                <source media="(prefers-reduced-motion: reduce)" srcset="{{ page.root }}img/modes/target_windows-{{ page.code }}-still.gif">
+                <img src="{{ page.root }}img/modes/target_windows-{{ page.code }}.gif" width="360" height="444" loading="lazy" decoding="async" alt="{{ gifs.target_windows.alt|text }}">
+              </picture>
+              <figcaption>{{ gifs.target_windows.caption }}</figcaption>
+            </figure>
           </article>
           <article class="card" id="hacking-terminal">
             <h2>{{ modes.hacking_terminal.title }}</h2>
             <p>{{ modes.hacking_terminal.text }}</p>
             <p class="meta">{{ modes.hacking_terminal.meta }}</p>
+            <figure class="modegif" data-still="{{ page.root }}img/modes/hacking_terminal-{{ page.code }}-still.gif" data-anim="{{ page.root }}img/modes/hacking_terminal-{{ page.code }}.gif">
+              <picture>
+                <source media="(prefers-reduced-motion: reduce)" srcset="{{ page.root }}img/modes/hacking_terminal-{{ page.code }}-still.gif">
+                <img src="{{ page.root }}img/modes/hacking_terminal-{{ page.code }}.gif" width="360" height="444" loading="lazy" decoding="async" alt="{{ gifs.hacking_terminal.alt|text }}">
+              </picture>
+              <figcaption>{{ gifs.hacking_terminal.caption }}</figcaption>
+            </figure>
           </article>
           <article class="card" id="vip-payload">
             <h2>{{ modes.vip_payload.title }}</h2>
             <p>{{ modes.vip_payload.text }}</p>
             <p class="meta">{{ modes.vip_payload.meta }}</p>
+            <figure class="modegif" data-still="{{ page.root }}img/modes/vip_payload-{{ page.code }}-still.gif" data-anim="{{ page.root }}img/modes/vip_payload-{{ page.code }}.gif">
+              <picture>
+                <source media="(prefers-reduced-motion: reduce)" srcset="{{ page.root }}img/modes/vip_payload-{{ page.code }}-still.gif">
+                <img src="{{ page.root }}img/modes/vip_payload-{{ page.code }}.gif" width="360" height="444" loading="lazy" decoding="async" alt="{{ gifs.vip_payload.alt|text }}">
+              </picture>
+              <figcaption>{{ gifs.vip_payload.caption }}</figcaption>
+            </figure>
           </article>
           <article class="card" id="money-factory">
             <h2>{{ modes.money_factory.title }}</h2>
             <p>{{ modes.money_factory.text }}</p>
             <p class="meta">{{ modes.money_factory.meta }}</p>
+            <figure class="modegif" data-still="{{ page.root }}img/modes/money_factory-{{ page.code }}-still.gif" data-anim="{{ page.root }}img/modes/money_factory-{{ page.code }}.gif">
+              <picture>
+                <source media="(prefers-reduced-motion: reduce)" srcset="{{ page.root }}img/modes/money_factory-{{ page.code }}-still.gif">
+                <img src="{{ page.root }}img/modes/money_factory-{{ page.code }}.gif" width="360" height="444" loading="lazy" decoding="async" alt="{{ gifs.money_factory.alt|text }}">
+              </picture>
+              <figcaption>{{ gifs.money_factory.caption }}</figcaption>
+            </figure>
           </article>
           <article class="card" id="progressive-domination">
             <h2>{{ modes.progressive_domination.title }}</h2>
             <p>{{ modes.progressive_domination.text }}</p>
             <p class="meta">{{ modes.progressive_domination.meta }}</p>
+            <figure class="modegif" data-still="{{ page.root }}img/modes/progressive_domination-{{ page.code }}-still.gif" data-anim="{{ page.root }}img/modes/progressive_domination-{{ page.code }}.gif">
+              <picture>
+                <source media="(prefers-reduced-motion: reduce)" srcset="{{ page.root }}img/modes/progressive_domination-{{ page.code }}-still.gif">
+                <img src="{{ page.root }}img/modes/progressive_domination-{{ page.code }}.gif" width="360" height="444" loading="lazy" decoding="async" alt="{{ gifs.progressive_domination.alt|text }}">
+              </picture>
+              <figcaption>{{ gifs.progressive_domination.caption }}</figcaption>
+            </figure>
           </article>
           <article class="card" id="codes">
             <h2>{{ modes.codes.title }}</h2>
             <p>{{ modes.codes.text }}</p>
             <p class="meta">{{ modes.codes.meta }}</p>
+            <figure class="modegif" data-still="{{ page.root }}img/modes/codes-{{ page.code }}-still.gif" data-anim="{{ page.root }}img/modes/codes-{{ page.code }}.gif">
+              <picture>
+                <source media="(prefers-reduced-motion: reduce)" srcset="{{ page.root }}img/modes/codes-{{ page.code }}-still.gif">
+                <img src="{{ page.root }}img/modes/codes-{{ page.code }}.gif" width="360" height="444" loading="lazy" decoding="async" alt="{{ gifs.codes.alt|text }}">
+              </picture>
+              <figcaption>{{ gifs.codes.caption }}</figcaption>
+            </figure>
           </article>
           <article class="card dashed" id="yours">
             <h2>{{ modes.yours.title }}</h2>
@@ -112,5 +204,41 @@ here. See site/README.md and the comment at the top of index.html.
   </main>
 
 {% include footer %}
+
+  {# The animations (decisions GIF-6, GIF-7). With "prefers-reduced-motion" the <picture> shows
+     the still picture and nothing moves; this script, the page's only one (inline, loading
+     nothing), adds a button under each picture that pauses it or, for someone who asked for
+     less motion, plays it. Without the script the animation plays, or the still shows.
+     Keep "{" and "}" in the script apart: two together are a placeholder. #}
+  <script>
+    (function () {
+      "use strict";
+      var cards = document.querySelector(".with-gifs");
+      if (!cards || !window.matchMedia) return;
+      var playLabel = cards.getAttribute("data-play");
+      var pauseLabel = cards.getAttribute("data-pause");
+      var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      var figures = cards.querySelectorAll("figure.modegif");
+      Array.prototype.forEach.call(figures, function (figure) {
+        var image = figure.querySelector("img");
+        var button = document.createElement("button");
+        var playing = !reduced;
+        button.type = "button";
+        button.className = "modegif-button";
+        function update() {
+          button.textContent = playing ? pauseLabel : playLabel;
+        }
+        button.addEventListener("click", function () {
+          var source = figure.querySelector("source");
+          if (source) source.parentNode.removeChild(source);
+          playing = !playing;
+          image.src = playing ? figure.getAttribute("data-anim") : figure.getAttribute("data-still");
+          update();
+        });
+        update();
+        figure.appendChild(button);
+      });
+    })();
+  </script>
 </body>
 </html>

@@ -419,6 +419,124 @@ modes:
       modos são pequenos scripts. Propõe o teu com o modelo de ideia de modo de jogo.
     link: Partilha uma ideia de modo de jogo
 
+# The animated pictures of the modes page (tools/gen_mode_gifs.py, tools/mode_gifs.yaml):
+# each picture's alt text (what happens in it, in order) and the caption under it.
+gifs:
+  intro: >-
+    Cada animação abaixo é desenhada pelo código do próprio firmware da caixa de campo, não é
+    uma maquete: o ecrã grande em cima e o pequeno OLED em baixo, à medida que um jogo do modo
+    avança. O botão por baixo de uma imagem pára-a.
+  play: Reproduzir animação
+  pause: Pausar animação
+  domination:
+    alt: >-
+      Animação de uma caixa de campo a jogar Domínio. O ecrã mostra a zona livre; a equipa
+      vermelha prime o botão, a barra do ecrã pequeno enche e a zona fica vermelha, com os
+      pontos a subir. Depois a equipa azul prime o botão e rouba a zona, e o jogo acaba com a
+      pontuação final.
+    caption: >-
+      Domínio numa caixa de campo: uma equipa mantém o botão premido para capturar a zona, os
+      pontos sobem enquanto a tiver e a outra equipa pode roubá-la.
+  bomb:
+    alt: >-
+      Animação de uma caixa de campo a jogar Bomba. O ecrã mostra a bomba pronta; a equipa
+      vermelha prime o botão para a armar, a contagem começa em 4:59, a equipa azul prime o
+      botão para a desarmar, a barra enche e o ecrã fica azul a indicar que a bomba foi
+      desarmada.
+    caption: >-
+      Bomba / Rush: armar a manter um botão premido, a contagem a correr e os defensores a
+      desarmar a tempo.
+  master_satellites:
+    alt: >-
+      Animação de Mestre e Satélites: uma caixa satélite passa de livre a vermelha quando a
+      equipa vermelha prime o botão; depois a caixa mestre mostra quantos satélites a equipa
+      vermelha tem (1, 2 e 3 de 3) e os pontos por intervalo, e por fim o ecrã de fim de jogo.
+    caption: >-
+      Mestre e Satélites: os satélites capturam-se como as zonas do Domínio; a caixa mestre
+      conta quantos uma equipa tem e paga mais pontos por cada um.
+  hacking_terminal:
+    alt: >-
+      Animação do terminal de hacking: o puzzle do código com tentativas e pistas (no sítio
+      certo e fora do sítio), o puzzle dos fios com fios a serem cortados, o puzzle da sequência
+      (uma tecla mostrada e depois "a tua vez") e o ecrã de acesso concedido com o código.
+    caption: >-
+      Hackeia o terminal: um terminal pode ter um puzzle de código, de fios ou de sequência; a
+      equipa que o resolve fica com o terminal e pode revelar um código.
+  medic:
+    alt: >-
+      Animação do kit de ligaduras: o kit mostra 4 tratamentos por dar; um jogador ferido prime
+      o botão e a barra da contagem enche; o kit mostra o tratamento feito com 3 por dar; um
+      jogador que já usou todos os tratamentos é recusado.
+    caption: >-
+      Ligaduras: um jogador ferido mantém o botão premido durante o tempo de tratamento; o kit
+      conta as cargas e o limite de cada jogador.
+  vip_payload:
+    alt: >-
+      Animação de VIP / Carga: uma caixa de ponto de controlo que ninguém tem, a equipa azul a
+      premir o botão e a ficar com ela, e depois o ecrã da carga com os metros até à zona de
+      extração a diminuir, um aviso de GPS fraco e a extração concluída.
+    caption: >-
+      VIP / Carga: os pontos de controlo capturam-se pelo caminho e o ecrã da carga (o de um
+      telemóvel) mostra a distância até à extração.
+  money_factory:
+    alt: >-
+      Animação da Fábrica de Dinheiro: uma fábrica livre, a equipa vermelha a premir o botão
+      enquanto a barra de captura enche, a fábrica da equipa vermelha com o stock a subir de 5
+      para 35 de 50, um jogador a recolher 15 e uma caixa-banco a mostrar um depósito de 15 e os
+      totais por equipa.
+    caption: >-
+      Fábrica de Dinheiro: uma fábrica capturada enche-se de dinheiro, os jogadores recolhem-no
+      com a etiqueta e depositam-no numa caixa-banco.
+  progressive_domination:
+    alt: >-
+      Animação de Domínio Progressivo: uma caixa à espera da sua vez (1 de 4 caixas completas);
+      a caixa passa a ser a ativa e a equipa azul prime o botão até a capturar; os pontos e os
+      minutos de posse da equipa azul sobem enquanto a barra enche; a caixa fica completa para a
+      equipa azul e bloqueada; depois a caixa seguinte, que esperava, passa a ser a ativa.
+    caption: >-
+      Domínio Progressivo: só uma caixa pode ser capturada de cada vez; a equipa que a mantém
+      tempo suficiente completa-a e anuncia-se a caixa seguinte da ordem.
+  target_windows:
+    alt: >-
+      Animação de Janelas de Alvo: um alvo à espera da cor de uma equipa, uma janela a abrir
+      para a equipa vermelha com contagem de 5 segundos, o alvo a mostrar o acerto da equipa
+      vermelha, depois uma janela para a equipa azul e o número de acertos a subir para 2.
+    caption: >-
+      Janelas de Alvo: um alvo abre uma janela curta para a cor de uma equipa; os acertos dentro
+      da janela pontuam.
+  codes:
+    alt: >-
+      Animação do modificador Códigos com a Bomba: o ecrã pede o código da equipa, quatro
+      dígitos aparecem como pontos, a contagem corre e escreve-se um código de desarme antes de
+      o ecrã mostrar a bomba desarmada.
+    caption: >-
+      Códigos: a Bomba com códigos de equipa escritos em vez de botões premidos: a caixa com
+      teclado pede um código para armar e outro para desarmar. As mensagens que o script do modo
+      escreve ficam em inglês.
+  kill_confirmed:
+    alt: >-
+      Animação de Baixa Confirmada: a estação espera etiquetas; a etiqueta de um jogador da
+      equipa vermelha é aceite, uma janela de 14 segundos conta decrescente e aparece a mensagem
+      "Kill confirmed: b1"; depois uma etiqueta falsificada é recusada.
+    caption: >-
+      Baixa Confirmada: ler a etiqueta assinada de um adversário confirma a baixa; uma etiqueta
+      falsificada é recusada. As mensagens que o script do modo escreve ficam em inglês.
+  respawn:
+    alt: >-
+      Animação de Reentradas e Vidas: um ponto de reentrada recebe jogadores de volta ao jogo
+      enquanto as vidas da equipa passam de 19 para 18 e 17, e por fim mostra a vermelho que a
+      equipa ficou sem vidas.
+    caption: >-
+      Reentradas e Vidas: cada regresso ao jogo custa uma vida à equipa; a zero, a equipa fica
+      fora. As mensagens que o script do modo escreve ficam em inglês.
+  player_checkin:
+    alt: >-
+      Animação de Registo de Presença: cada etiqueta lida no ponto de registo acrescenta um
+      jogador; o total passa de 1 para 3 e para 5, com a contagem por equipa.
+    caption: >-
+      Registo de Presença: os jogadores registam-se à partida e a caixa conta os jogadores de
+      cada equipa. As mensagens que o script do modo escreve ficam em inglês.
+
 screens:
   title: O que se vê
   intro: >-

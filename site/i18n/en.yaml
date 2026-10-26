@@ -406,6 +406,121 @@ modes:
       scripts. Propose one with the game mode idea template.
     link: Share a game mode idea
 
+# The animated pictures of the modes page (tools/gen_mode_gifs.py, tools/mode_gifs.yaml):
+# each picture's alt text (what happens in it, in order) and the caption under it.
+gifs:
+  intro: >-
+    Every animation below is drawn by the Field Box's own firmware code, not mocked up: the big
+    screen above, the small OLED below, as a game of the mode goes on. The button under a
+    picture pauses it.
+  play: Play animation
+  pause: Pause animation
+  domination:
+    alt: >-
+      Animation of a Field Box playing Domination. The screen shows a neutral zone; red holds
+      its button, the small screen's bar fills, and the zone turns red with its points counting
+      up. Then blue holds its button and takes the zone over, and the game ends with the final
+      score.
+    caption: >-
+      Domination on a Field Box: a team holds its button to claim the zone, the points climb
+      while it keeps it, and the other team can take it over.
+  bomb:
+    alt: >-
+      Animation of a Field Box playing Bomb. The screen shows the bomb ready; red holds its
+      button to arm it, the countdown starts at 4:59, blue holds its button to defuse, the bar
+      fills, and the screen turns blue to show the bomb is defused.
+    caption: >-
+      Bomb / Rush: arming by holding a button, the fuse counting down, the defenders defusing in
+      time.
+  master_satellites:
+    alt: >-
+      Animation of Master and Satellites: a satellite box turns from neutral to red when red
+      holds its button; then the master box shows how many satellites red holds (1, 2, then 3 of
+      3) and the points per tick, and finally the game-over screen.
+    caption: >-
+      Master and Satellites: satellites are claimed like Domination zones; the master box counts
+      how many a team holds and pays more points for each.
+  hacking_terminal:
+    alt: >-
+      Animation of the Hacking Terminal: the code puzzle with guesses and hints (right and wrong
+      place), the wires puzzle with wires being cut, the sequence puzzle (a key shown, then
+      "your turn") and the access-granted screen with the code.
+    caption: >-
+      Hacking Terminal: a terminal can hold a code, wires or sequence puzzle; the team that
+      solves it takes the terminal and may read out a code.
+  medic:
+    alt: >-
+      Animation of the Medic Kit: the kit shows 4 heals left; a wounded player holds the button
+      and the countdown bar fills; the kit shows the heal done with 3 left; a player who has
+      used every heal is refused.
+    caption: >-
+      Medic Kit: a wounded player holds the button for the heal time; the kit counts its charges
+      and each player's limit.
+  vip_payload:
+    alt: >-
+      Animation of VIP / Payload: a checkpoint box nobody holds, blue holding its button and
+      taking it, then the payload's screen with the metres to the extraction zone shrinking, a
+      weak-GPS warning and the extraction completed.
+    caption: >-
+      VIP / Payload: checkpoints are claimed along the way, and the payload's screen (a phone's)
+      shows the distance to extraction.
+  money_factory:
+    alt: >-
+      Animation of Money Factory: a free factory, red holding its button while the capture bar
+      fills, the factory held by red with its stock rising from 5 to 35 of 50, a player
+      collecting 15, and a bank box showing a deposit of 15 and the totals per team.
+    caption: >-
+      Money Factory: a held factory fills with money, players collect it with their tag and
+      deposit it at a bank box.
+  progressive_domination:
+    alt: >-
+      Animation of Progressive Domination: a box waiting for its turn (1 of 4 boxes completed);
+      the box becomes the active one and blue holds its button until it takes it; blue's points
+      and minutes held climb while the share bar fills; the box is completed for blue and
+      locked; then the next box, which was waiting, becomes the active one.
+    caption: >-
+      Progressive Domination: only one box can be captured at a time; the team that holds it
+      long enough completes it, and the next box in the order is announced.
+  target_windows:
+    alt: >-
+      Animation of Target Windows: a target waiting for a team's colour, a window opening for
+      red with a 5-second countdown, the target showing red's hit, then a window for blue and
+      the hit count rising to 2.
+    caption: >-
+      Target Windows: a target opens a short window for one team's colour; hits inside the
+      window score.
+  codes:
+    alt: >-
+      Animation of the Codes modifier with Bomb: the screen asks for the team code, four digits
+      are typed as dots, the countdown runs, and a defuse code is typed before the screen shows
+      the bomb defused.
+    caption: >-
+      Codes: Bomb with typed team codes instead of held buttons: the keypad box asks for a code
+      to arm and one to defuse. The messages the mode's script writes stay in English.
+  kill_confirmed:
+    alt: >-
+      Animation of Kill Confirmed: the station waits for tags; a red player's tag is accepted, a
+      14-second window counts down and the message "Kill confirmed: b1" shows; then a forged tag
+      is refused.
+    caption: >-
+      Kill Confirmed: scanning an enemy's signed tag confirms the kill; a forged tag is refused.
+      The messages the mode's script writes stay in English.
+  respawn:
+    alt: >-
+      Animation of Respawn and Lives: a respawn point welcomes players back into the game as the
+      team's lives go from 19 to 18 and 17, and finally shows in red that the team has no lives
+      left.
+    caption: >-
+      Respawn and Lives: each return to the game costs the team a life; at zero the team is out.
+      The messages the mode's script writes stay in English.
+  player_checkin:
+    alt: >-
+      Animation of Player Check-in: each tag scanned at the check-in point adds a player; the
+      total goes from 1 to 3 to 5, with the count per team.
+    caption: >-
+      Player Check-in: players check in at the start and the box counts each team's players. The
+      messages the mode's script writes stay in English.
+
 screens:
   title: What it looks like
   intro: >-

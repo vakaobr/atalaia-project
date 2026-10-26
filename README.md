@@ -45,6 +45,10 @@ The eight captures below show the real Field Box firmware (ESP32, LVGL 9.2, 320Ã
 </tr>
 </table>
 
+A mode's screens change as its game goes on. The animation below is drawn by the firmware's own screen code, the big screen and the small OLED: in Domination a zone nobody holds, red claiming it by holding its button, its points counting up, blue taking it over, and the final score. [The modes page](https://atalaia-project.link/en/modes/) has one for thirteen modes, in Portuguese, English, German and Traditional Chinese (`python3 tools/gen_mode_gifs.py` makes them).
+
+<p align="center"><img src="site/img/modes/domination-en.gif" width="360" height="444" alt="Animation of a Field Box playing Domination: the screen shows a neutral zone, red holds its button and the small screen's bar fills, the zone turns red with its points counting up, then blue takes the zone over and the game ends with the final score"></p>
+
 The Android app (phase 3, in Portuguese here) draws the same mode screens from the same YAML files. These are its test images, not photos of a phone: nothing has run on a real phone yet.
 
 <table>

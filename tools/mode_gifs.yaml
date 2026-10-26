@@ -1,0 +1,214 @@
+# SPDX-FileCopyrightText: 2026 The Atalaia contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The scripts of the project page's animated game-mode pictures (tools/gen_mode_gifs.py; decisions
+# GIF-1 to GIF-12 in docs/review/decisions-to-review.md). Each entry is one picture: the screens a
+# Field Box shows as a game of that mode goes on, drawn by the firmware's own code on the TFT and
+# the OLED (firmware/esp32/test/mode_gif_frames.c). The data of each step is what the mode's
+# script sends (modes/<mode>/node.lua: ui.screen(template, data)), as the screen reference tests
+# (firmware/esp32/test/test_screens.c) use it.
+#
+# To add a mode: add an entry here (the id is the file name: site/img/modes/<id>-<lang>.gif), run
+#   python3 tools/gen_mode_gifs.py            (Docker, or --frames-exe), then
+# put the picture on the page (site/src/modes.html, and its alt text and caption in the four
+# site/i18n/*.yaml files under gifs.<id>), then python3 tools/build_site.py.
+#
+# An entry:
+#   mode:        the "@mode" message's mode id (a main mode, "+" and a modifier)
+#   params:      the mode's parameters, as the game sends them
+#   lang_param:  true for a mode that takes its language as a parameter (Medic Kit, Hacking
+#                Terminal, VIP / Payload): the picture's language is put in params.lang
+#   languages:   "all", the default (a picture each in pt, en, de and zh-tw: the box takes the
+#                language of the game), or [en] for a mode whose screens are English in every
+#                language: one picture, shared by the four pages (none today, GIF-2)
+#   poster:      the step whose last frame is the still picture (prefers-reduced-motion)
+#   steps:       the screens in order; each has
+#     screen, data     the TFT's template and its data (a value may be {pt:, en:, de:, zh-tw:}
+#                      for a text the mode's script writes in the game's language)
+#     oled             {screen, data} when the OLED gets something else (default: the same)
+#     s                seconds the step stays on (default 2; a tween's last frame)
+#     game_s           the game's clock in seconds, from which the OLED counts "held for"
+#     hold             {team, ms}: that team's button held for ms (the OLED's hold bar)
+#     tween            {n, frame_s, set: {key: [from, to]}, game_s: [from, to],
+#                       hold_ms: [from, to], hold_team}: n frames between the values
+#                      (integers stay integers: write 0.0 and 1.0 for a fraction), frame_s seconds each
+frame_s: 0.15
+scripts:
+  domination:
+    mode: org.atalaia.domination
+    params: {capture_hold_ms: 3000, tick_s: 10}
+    poster: 3
+    steps:
+      - {screen: neutral, data: {}, game_s: 12, s: 2.2}
+      - {screen: neutral, data: {}, game_s: 12, tween: {n: 9, frame_s: 0.25, hold_team: red, hold_ms: [0, 3000]}, s: 0.2}
+      - {screen: captured, data: {team: red, points: 0, since: 15}, game_s: 15, s: 1.3}
+      - {screen: captured, data: {team: red, points: 12, since: 15}, game_s: 135, s: 1.6,
+         tween: {n: 7, frame_s: 0.35, set: {points: [0, 12]}, game_s: [15, 135]}}
+      - {screen: captured, data: {team: red, points: 12, since: 15}, game_s: 140, s: 0.2,
+         tween: {n: 9, frame_s: 0.25, hold_team: blue, hold_ms: [0, 3000]}}
+      - {screen: captured, data: {team: blue, points: 8, since: 143}, game_s: 143, s: 1.3}
+      - {screen: captured, data: {team: blue, points: 20, since: 143}, game_s: 263, s: 1.5,
+         tween: {n: 7, frame_s: 0.35, set: {points: [8, 20]}, game_s: [143, 263]}}
+      - {screen: final_score, data: {owner: blue, points: 20}, game_s: 600, s: 3.2}
+
+  bomb:
+    mode: org.atalaia.bomb
+    params: {attackers: red, defenders: blue, fuse_s: 300}
+    poster: 3
+    steps:
+      - {screen: standby, data: {arm: red}, s: 2.2}
+      - {screen: standby, data: {arm: red}, s: 0.2,
+         tween: {n: 9, frame_s: 0.22, set: {progress: [0.0, 1.0]}}}
+      - {screen: countdown, data: {left: 299, team: red}, s: 1.8}
+      - {screen: countdown, data: {left: 41, team: red}, s: 1.2}
+      - {screen: countdown, data: {left: 34, team: red, defuse: 1}, s: 0.3,
+         tween: {n: 9, frame_s: 0.3, set: {left: [41, 34], defuse: [0.0, 1.0]}}}
+      - {screen: defused, data: {team: blue}, s: 3.2}
+
+  master_satellites:
+    mode: org.atalaia.master_satellites
+    params: {capture_hold_ms: 3000, tick_s: 10}
+    poster: 4
+    steps:
+      - {screen: neutral, data: {}, game_s: 20, s: 2.0}
+      - {screen: neutral, data: {}, game_s: 20, tween: {n: 9, frame_s: 0.25, hold_team: red, hold_ms: [0, 3000]}, s: 0.2}
+      - {screen: captured, data: {team: red, since: 24}, game_s: 24, s: 1.2}
+      - {screen: master_status, data: {team: red, since: 24, held: 1, of: 3, points: 0}, game_s: 60, s: 2.0}
+      - {screen: master_status, data: {team: red, since: 24, held: 2, of: 3, points: 3}, game_s: 100, s: 2.0}
+      - {screen: master_status, data: {team: red, since: 24, held: 3, of: 3, points: 9}, game_s: 160, s: 2.2}
+      - {screen: final_score, data: {owner: red}, game_s: 600, s: 3.0}
+
+  hacking_terminal:
+    mode: org.atalaia.hacking_terminal
+    params: {digits: 4, lockout_s: 10}
+    lang_param: true
+    poster: 2
+    steps:
+      - {screen: hack_code, data: {typed: "_ _ _ _", digits: 4, tries: 3, locked: 0, note: enter}, s: 1.8}
+      - {screen: hack_code, data: {team: red, typed: "8 5 _ _", digits: 4, tries: 3, locked: 0, note: enter,
+                                   g1: "8571", r1: 1, c1: 1}, s: 1.8}
+      - {screen: hack_code, data: {team: red, typed: "_ _ _ _", digits: 4, tries: 2, locked: 0, note: enter,
+                                   g1: "8571", r1: 1, c1: 1, g2: "4217", r2: 2, c2: 2}, s: 1.8}
+      - {screen: hack_wires, data: {team: blue, wires: "1 2 3 4 5", cut: 0, of: 5, locked: 0}, s: 1.6}
+      - {screen: hack_wires, data: {team: blue, wires: "- 2 3 4 5", cut: 1, of: 5, locked: 0}, s: 1.2}
+      - {screen: hack_wires, data: {team: blue, wires: "- 2 - 4 5", cut: 2, of: 5, locked: 0}, s: 1.2}
+      - {screen: hack_sequence, data: {phase: show, key: 6, step: 1, of: 4, locked: 0}, s: 1.0}
+      - {screen: hack_sequence, data: {phase: show, key: 2, step: 2, of: 4, locked: 0}, s: 1.0}
+      - {screen: hack_sequence, data: {team: yellow, owner: red, phase: input, step: 2, of: 4, locked: 0}, s: 1.8}
+      - {screen: hack_solved, data: {team: yellow, code: "4711", capture: true}, s: 3.0}
+
+  medic:
+    mode: org.atalaia.medic
+    params: {heal_hold_s: 10, charges: 5}
+    lang_param: true
+    poster: 2
+    steps:
+      - {screen: medic_idle, data: {remaining: 4}, s: 2.0}
+      - {screen: medic_hold, data: {player: b1, team: blue, progress: 1, left: 0, remaining: 4}, s: 0.2,
+         tween: {n: 10, frame_s: 0.22, set: {progress: [0.0, 1.0], left: [10, 0]}}}
+      - {screen: medic_healed, data: {player: b1, team: blue, remaining: 3, used: 1, max: 2}, s: 2.4}
+      - {screen: medic_refused, data: {reason: limit, player: r2, team: red, remaining: 3,
+                                       message: {pt: "Chegaste ao limite de tratamentos", en: "You have had all your heals",
+                                                 de: "Du hast alle Behandlungen gehabt", zh-tw: "你的治療次數已用完"}}, s: 2.8}
+
+  vip_payload:
+    mode: org.atalaia.vip_payload
+    params: {capture_hold_ms: 3000}
+    lang_param: true
+    poster: 2
+    steps:
+      - {screen: checkpoint_free, data: {}, game_s: 30, s: 1.8}
+      - {screen: checkpoint_free, data: {}, game_s: 30, tween: {n: 9, frame_s: 0.25, hold_team: blue, hold_ms: [0, 3000]}, s: 0.2}
+      - {screen: checkpoint_held, data: {team: blue, since: 33}, game_s: 33, s: 2.0}
+      - {screen: payload, data: {team: red, state: moving, metres: 100}, s: 0.4,
+         tween: {n: 9, frame_s: 0.25, set: {metres: [100, 60]}}}
+      - {screen: payload, data: {team: red, state: weak, metres: 40}, s: 2.2}
+      - {screen: payload, data: {team: red, state: extracted, metres: 0}, s: 3.0}
+
+  money_factory:
+    mode: org.atalaia.money_factory
+    params: {capacity: 50, capture_hold_ms: 3000}
+    poster: 3
+    steps:
+      - {screen: neutral, data: {stock: 0}, game_s: 30, s: 1.8}
+      - {screen: neutral, data: {stock: 5, taker: red, progress: 1}, game_s: 30, s: 0.2,
+         tween: {n: 9, frame_s: 0.22, set: {progress: [0.0, 1.0]}}}
+      - {screen: captured, data: {team: red, since: 34, stock: 5}, game_s: 34, s: 1.0}
+      - {screen: captured, data: {team: red, since: 34, stock: 35}, game_s: 94, s: 1.6,
+         tween: {n: 7, frame_s: 0.3, set: {stock: [5, 35]}, game_s: [34, 94]}}
+      - {screen: collected, data: {player: r1, team: red, amount: 15, carrying: 15, stock: 20}, game_s: 100, s: 2.2}
+      - {screen: bank, data: {total: 15, counts: "RED 15  BLUE 0"}, game_s: 130, s: 1.8}
+      - {screen: deposited, data: {player: r1, team: red, amount: 15, total: 15}, game_s: 131, s: 2.4}
+      - {screen: bank, data: {total: 45, counts: "RED 30  BLUE 15"}, game_s: 400, s: 2.6}
+
+  progressive_domination:
+    mode: org.atalaia.progressive_domination
+    params: {capture_hold_ms: 3000, complete_min: 10}
+    poster: 4
+    steps:
+      - {screen: inactive, data: {done: 1, of: 4}, game_s: 120, s: 2.2}
+      - {screen: neutral, data: {step: 2, of: 4, final: false}, game_s: 125, s: 1.6}
+      - {screen: neutral, data: {step: 2, of: 4, final: false, taker: blue, progress: 1.0}, game_s: 125, s: 0.2,
+         tween: {n: 9, frame_s: 0.25, set: {progress: [0.0, 1.0]}, hold_team: blue, hold_ms: [0, 3000]}}
+      - {screen: captured, data: {team: blue, since: 130, step: 2, of: 4, final: false, held_min: 0, need_min: 10,
+                                  points: 0, share: 0.0}, game_s: 130, s: 1.3}
+      - {screen: captured, data: {team: blue, since: 130, step: 2, of: 4, final: false, need_min: 10}, s: 1.6,
+         tween: {n: 8, frame_s: 0.35, set: {held_min: [0, 9], points: [0, 54], share: [0.0, 0.9]}, game_s: [130, 670]}}
+      - {screen: completed, data: {team: blue, step: 2, of: 4, done: 2}, game_s: 730, s: 2.6}
+      - {screen: inactive, data: {done: 2, of: 4}, game_s: 735, s: 1.6}
+      - {screen: neutral, data: {step: 3, of: 4, final: false}, game_s: 736, s: 3.0}
+
+  target_windows:
+    mode: org.atalaia.target_windows
+    params: {interval_s: 20, window_s: 5}
+    poster: 1
+    steps:
+      - {screen: standby, data: {hits: 0}, s: 2.0}
+      - {screen: window, data: {team: red, left: 0}, s: 0.3,
+         tween: {n: 5, frame_s: 0.5, set: {left: [5, 1]}}}
+      - {screen: standby, data: {team: red, hits: 1}, s: 2.0}
+      - {screen: window, data: {team: blue, left: 0}, s: 0.3,
+         tween: {n: 5, frame_s: 0.5, set: {left: [5, 1]}}}
+      - {screen: standby, data: {team: blue, hits: 2}, s: 2.4}
+
+  codes:
+    mode: org.atalaia.bomb+org.atalaia.codes
+    params: {attackers: red, defenders: blue, fuse_s: 300}
+    poster: 1
+    steps:
+      - {screen: code_entry, data: {title: ARM, digits: 0, message: Enter your team code}, s: 1.4}
+      - {screen: code_entry, data: {title: ARM, digits: 4, message: Enter your team code}, s: 0.2,
+         tween: {n: 5, frame_s: 0.4, set: {digits: [0, 4]}}}
+      - {screen: countdown, data: {left: 299, team: red}, s: 1.8}
+      - {screen: code_entry, data: {title: DEFUSE, digits: 3, left: 154}, s: 0.2,
+         tween: {n: 4, frame_s: 0.4, set: {digits: [0, 3]}}}
+      - {screen: defused, data: {team: blue}, s: 2.6}
+
+  kill_confirmed:
+    mode: org.atalaia.kill_confirmed
+    params: {turn_in_s: 20}
+    poster: 1
+    steps:
+      - {screen: tags, data: {error: false}, s: 2.0}
+      - {screen: tags, data: {team: red, left: 14, message: "Kill confirmed: b1", error: false}, s: 0.2,
+         tween: {n: 7, frame_s: 0.4, set: {left: [20, 14]}}}
+      - {screen: tags, data: {message: Forged tag, error: true}, s: 2.4}
+
+  respawn:
+    mode: org.atalaia.respawn
+    params: {lives: 20, per_player: false}
+    poster: 1
+    steps:
+      - {screen: respawn, data: {team: blue, player: b3, lives: 19, message: Back in the game, error: false}, s: 1.6}
+      - {screen: respawn, data: {team: blue, player: b1, lives: 18, message: Back in the game, error: false}, s: 1.6}
+      - {screen: respawn, data: {team: blue, player: b3, lives: 17, message: Back in the game, error: false}, s: 1.6}
+      - {screen: respawn, data: {team: red, player: r1, lives: 0, message: "No lives left: team out", error: true}, s: 2.8}
+
+  player_checkin:
+    mode: org.atalaia.player_checkin
+    params: {points: 1}
+    poster: 2
+    steps:
+      - {screen: checkin, data: {total: 1, counts: "RED 1", team: red, message: "Checked in: r1", error: false}, s: 1.6}
+      - {screen: checkin, data: {total: 3, counts: "RED 2  BLUE 1", team: blue, message: "Checked in: b1", error: false}, s: 1.6}
+      - {screen: checkin, data: {total: 5, counts: "RED 3  BLUE 2", team: red, message: "Checked in: r2", error: false}, s: 2.4}

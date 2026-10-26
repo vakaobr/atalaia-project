@@ -432,6 +432,127 @@ modes:
       einen mit der Vorlage für Spielmodus-Ideen vor.
     link: Eine Spielmodus-Idee teilen
 
+# The animated pictures of the modes page (tools/gen_mode_gifs.py, tools/mode_gifs.yaml):
+# each picture's alt text (what happens in it, in order) and the caption under it.
+gifs:
+  intro: >-
+    Jede Animation unten zeichnet der Firmware-Code der Field Box selbst, keine Attrappe: der
+    große Bildschirm oben, das kleine OLED darunter, während ein Spiel des Modus läuft. Die
+    Taste unter einem Bild hält es an.
+  play: Animation abspielen
+  pause: Animation anhalten
+  domination:
+    alt: >-
+      Animation einer Field Box beim Spielen von Domination. Der Bildschirm zeigt eine neutrale
+      Zone; Rot hält seinen Knopf, der Balken auf dem kleinen Display füllt sich und die Zone
+      wird rot, die Punkte zählen hoch. Dann hält Blau seinen Knopf und übernimmt die Zone, und
+      das Spiel endet mit dem Endstand.
+    caption: >-
+      Domination auf einer Field Box: Ein Team hält seinen Knopf, um die Zone einzunehmen, die
+      Punkte steigen, solange es sie hält, und das andere Team kann sie übernehmen.
+  bomb:
+    alt: >-
+      Animation einer Field Box beim Spielen von Bombe. Der Bildschirm zeigt die bereite Bombe;
+      Rot hält seinen Knopf und macht sie scharf, der Countdown startet bei 4:59, Blau hält
+      seinen Knopf zum Entschärfen, der Balken füllt sich und der Bildschirm wird blau und
+      zeigt, dass die Bombe entschärft ist.
+    caption: >-
+      Bombe / Rush: Scharf machen durch Gedrückthalten eines Knopfs, die Zündzeit läuft ab, die
+      Verteidigenden entschärfen rechtzeitig.
+  master_satellites:
+    alt: >-
+      Animation von Master und Satelliten: Eine Satelliten-Box wird von neutral zu rot, wenn Rot
+      den Knopf hält; danach zeigt die Master-Box, wie viele Satelliten Rot hält (1, 2, dann 3
+      von 3) und die Punkte pro Takt, und zum Schluss den Bildschirm für das Spielende.
+    caption: >-
+      Master und Satelliten: Satelliten werden wie Domination-Zonen eingenommen; die Master-Box
+      zählt, wie viele ein Team hält, und zahlt für jeden mehr Punkte.
+  hacking_terminal:
+    alt: >-
+      Animation des Hacking-Terminals: das Code-Rätsel mit Versuchen und Hinweisen (richtige und
+      falsche Stelle), das Kabel-Rätsel, bei dem Drähte gekappt werden, das Folgen-Rätsel (eine
+      Taste wird gezeigt, dann "Du bist dran") und der Bildschirm "Zugriff erteilt" mit dem
+      Code.
+    caption: >-
+      Hacking-Terminal: Ein Terminal kann ein Code-, Draht- oder Folgen-Rätsel haben; das Team,
+      das es löst, übernimmt das Terminal und kann einen Code ablesen.
+  medic:
+    alt: >-
+      Animation des Medic-Kits: Das Kit zeigt 4 Behandlungen übrig; eine verletzte Person hält
+      den Knopf und der Balken füllt sich; das Kit zeigt die Behandlung als erledigt mit 3
+      übrig; wer alle Behandlungen verbraucht hat, wird abgelehnt.
+    caption: >-
+      Medic-Kit: Eine verletzte Person hält den Knopf für die Behandlungszeit; das Kit zählt
+      seine Ladungen und das Limit jeder Person.
+  vip_payload:
+    alt: >-
+      Animation von VIP / Payload: eine Checkpoint-Box, die niemand hält; Blau hält seinen Knopf
+      und übernimmt sie; dann der Payload-Bildschirm, auf dem die Meter bis zur Extraktionszone
+      schrumpfen, eine Warnung wegen schwachem GPS und die abgeschlossene Extraktion.
+    caption: >-
+      VIP / Payload: Checkpoints werden unterwegs eingenommen, und der Payload-Bildschirm (der
+      eines Handys) zeigt die Entfernung bis zur Extraktion.
+  money_factory:
+    alt: >-
+      Animation der Money Factory: eine freie Fabrik, Rot hält seinen Knopf und der Balken füllt
+      sich, die Fabrik gehört Rot und ihr Vorrat steigt von 5 auf 35 von 50, eine Person sammelt
+      15 ein, und eine Bank-Box zeigt eine Einzahlung von 15 und die Summen je Team.
+    caption: >-
+      Money Factory: Eine gehaltene Fabrik füllt sich mit Geld, Spielende sammeln es mit ihrem
+      Tag ein und zahlen es an einer Bank-Box ein.
+  progressive_domination:
+    alt: >-
+      Animation von Progressive Domination: Eine Box wartet auf ihren Einsatz (1 von 4 Boxen
+      abgeschlossen); die Box wird zur aktiven, und Blau hält seinen Knopf, bis es sie einnimmt;
+      die Punkte und die gehaltenen Minuten von Blau steigen, während der Anteilsbalken sich
+      füllt; die Box ist für Blau abgeschlossen und gesperrt; dann wird die nächste, wartende
+      Box zur aktiven.
+    caption: >-
+      Progressive Domination: Nur eine Box kann gleichzeitig eingenommen werden; das Team, das
+      sie lange genug hält, schließt sie ab, und die nächste Box der Reihenfolge wird
+      angekündigt.
+  target_windows:
+    alt: >-
+      Animation der Zielfenster: eine Zielscheibe wartet auf die Farbe eines Teams, ein Fenster
+      öffnet sich für Rot mit einem Countdown von 5 Sekunden, die Zielscheibe zeigt den Treffer
+      von Rot, dann ein Fenster für Blau und die Trefferzahl steigt auf 2.
+    caption: >-
+      Zielfenster: Eine Zielscheibe öffnet ein kurzes Fenster für die Farbe eines Teams; Treffer
+      im Fenster punkten.
+  codes:
+    alt: >-
+      Animation des Modifikators Codes mit Bombe: Der Bildschirm verlangt den Teamcode, vier
+      Ziffern erscheinen als Punkte, der Countdown läuft, und ein Entschärf-Code wird
+      eingegeben, bevor der Bildschirm die entschärfte Bombe zeigt.
+    caption: >-
+      Codes: Bombe mit eingetippten Teamcodes statt gedrückter Knöpfe: Die Box mit Tastenfeld
+      verlangt einen Code zum Scharfmachen und einen zum Entschärfen. Die Meldungen, die das
+      Skript des Modus schreibt, bleiben englisch.
+  kill_confirmed:
+    alt: >-
+      Animation von Kill Confirmed: Die Station wartet auf Tags; der Tag einer Person aus dem
+      roten Team wird angenommen, ein Fenster von 14 Sekunden läuft herunter und die Meldung
+      "Kill confirmed: b1" erscheint; danach wird ein gefälschter Tag abgelehnt.
+    caption: >-
+      Kill Confirmed: Das Scannen des signierten Tags eines Gegners bestätigt den Abschuss; ein
+      gefälschter Tag wird abgelehnt. Die Meldungen, die das Skript des Modus schreibt, bleiben
+      englisch.
+  respawn:
+    alt: >-
+      Animation von Respawn und Leben: Ein Respawn-Punkt holt Spielende zurück ins Spiel,
+      während die Leben des Teams von 19 auf 18 und 17 sinken, und zeigt zuletzt in Rot, dass
+      das Team keine Leben mehr hat.
+    caption: >-
+      Respawn und Leben: Jede Rückkehr ins Spiel kostet das Team ein Leben; bei null scheidet
+      das Team aus. Die Meldungen, die das Skript des Modus schreibt, bleiben englisch.
+  player_checkin:
+    alt: >-
+      Animation von Check-in: Jeder am Check-in-Punkt gescannte Tag fügt eine Person hinzu; die
+      Summe steigt von 1 auf 3 und 5, mit der Zahl je Team.
+    caption: >-
+      Check-in: Spielende checken zum Start ein, und die Box zählt die Spielenden jedes Teams.
+      Die Meldungen, die das Skript des Modus schreibt, bleiben englisch.
+
 screens:
   title: So sieht es aus
   intro: >-

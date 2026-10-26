@@ -631,6 +631,10 @@ jobs:
             -DCMAKE_BUILD_TYPE=Debug
           cmake --build /tmp/fw-test
           ctest --test-dir /tmp/fw-test --output-on-failure
+      - name: The modes page's animations are what the screens draw
+        run: |
+          python3 -m pip install pyyaml
+          python3 tools/gen_mode_gifs.py --check --frames-exe /tmp/fw-test/mode_gif_frames
 
   dco:
     name: Check DCO sign-off
