@@ -749,7 +749,7 @@ the field's game presets beside it. Every controller of the field pulls them
 (`GET /api/v1/sync/presets`, then `GET /api/v1/sync/scenarios/{id}` for a
 manifest that changed) with `[sync] library = true` (the default) and
 installs them through the console's own install, checking again; so a
-standby has the scenario a join names (M8-3). The person's game history (the
+standby has the scenario a join names (M8-3). What the site later archives (a scenario) or deletes (a preset) is removed again on the next pull, with no wire change (S20-9, 2026-10-26; kept while a game that is not ended or a scheduled game uses it). The person's game history (the
 games their player ids appear in, with those events) is in access and export;
 erasure removes the link as before. ADR-P4-8's per-field history retention:
 `retention_days` (30-730, 730 by default). Migration `0011_history` (after

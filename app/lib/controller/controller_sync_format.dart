@@ -27,6 +27,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 
 import 'controller_images.dart' show ImageLimits, imageTypes;
+import 'controller_modes.dart' show compareCodePoints;
 
 const syncVersion = 1;
 const maxEvents = 500;
@@ -1671,6 +1672,37 @@ Json checkScenario(Object? raw) {
     _fail('sha256_mismatch', 'sha256');
   }
   return body;
+}
+
+/// What the site's library no longer lists (decision S20-8; the Pi's
+/// `sync_format.library_removals`): [state] is what the controller installed
+/// from the site (scenario id to SHA-256, preset name to digest), [answer] a
+/// checked `presets` answer, which is the field's whole library, so what the
+/// state names and the answer does not was archived or deleted on the site.
+/// Candidates only, each list sorted: the controller keeps what a game that
+/// is not ended or a scheduled game uses, and what the GM replaced.
+Map<String, List<String>> libraryRemovals(
+  Map<String, Map<String, String>> state,
+  Json answer,
+) {
+  final ids = {
+    for (final s in (answer['scenarios']! as List).cast<Json>())
+      s['scenario_id']! as String,
+  };
+  final names = {
+    for (final p in (answer['presets']! as List).cast<Json>())
+      p['name']! as String,
+  };
+  return {
+    'scenarios': [
+      for (final id in (state['scenarios'] ?? const {}).keys)
+        if (!ids.contains(id)) id,
+    ]..sort(compareCodePoints),
+    'presets': [
+      for (final n in (state['presets'] ?? const {}).keys)
+        if (!names.contains(n)) n,
+    ]..sort(compareCodePoints),
+  };
 }
 
 /// The bodies the controller pushes, by kind.

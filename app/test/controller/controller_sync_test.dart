@@ -1064,6 +1064,147 @@ void main() {
     });
   });
 
+  group('the library: what the site archives or deletes', () {
+    Map<String, Object?> listing(
+      String sha, {
+      bool scenario = true,
+      bool preset = true,
+    }) => {
+      'sync_version': 1,
+      'scenarios': [
+        if (scenario)
+          {
+            'scenario_id': 'org.club.vectors',
+            'revision': 1,
+            'version': '1.0.0',
+            'name': 'Vectors',
+            'sha256': sha,
+          },
+      ],
+      'presets': [
+        if (preset)
+          {
+            'preset_id': '9e000000-0000-4000-8000-000000000001',
+            'name': 'Domingo curto',
+            'mode_id': domination,
+            'params': <String, Object?>{},
+          },
+      ],
+    };
+
+    final sha = sha256.convert(utf8.encode(manifest)).toString();
+    void serve({bool scenario = true, bool preset = true}) {
+      site.gets['/api/v1/sync/presets'] = listing(
+        sha,
+        scenario: scenario,
+        preset: preset,
+      );
+      site.gets['/api/v1/sync/scenarios/org.club.vectors'] = {
+        'sync_version': 1,
+        'scenario_id': 'org.club.vectors',
+        'revision': 1,
+        'sha256': sha,
+        'manifest': manifest,
+      };
+    }
+
+    test('both go on the next sync, and come back when restored', () async {
+      serve();
+      final c = client(library: true);
+      engine.modes.savePreset('Do GM', domination, <String, Object?>{});
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      expect(engine.modes.package('org.club.vectors'), isNotNull);
+      serve(scenario: false, preset: false);
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      expect(engine.modes.package('org.club.vectors'), isNull);
+      expect(
+        engine.store.getSetting('${scenarioManifestKey}org.club.vectors'),
+        isNull,
+      );
+      expect(engine.modes.presets().map((p) => p['name']), ['Do GM']);
+      final lib = c.status()['library']! as Map;
+      expect((lib['scenarios_removed'], lib['presets_removed']), (1, 1));
+      serve();
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      expect(engine.modes.package('org.club.vectors'), isNotNull);
+    });
+
+    test(
+      'a game that is not ended, or a scheduled game, keeps its scenario',
+      () async {
+        serve();
+        final c = client(library: true);
+        expect(await c.runOnce(), isTrue, reason: c.lastError);
+        final gid =
+            engine.createGame({
+                  'name': 'Vectors',
+                  'mode_id': 'org.club.vectors+org.atalaia.objectives',
+                  'teams': ['red', 'blue'],
+                })['id']!
+                as int;
+        serve(scenario: false);
+        expect(await c.runOnce(), isTrue, reason: c.lastError);
+        expect(engine.modes.package('org.club.vectors'), isNotNull);
+        engine.endGame(gid);
+        expect(await c.runOnce(), isTrue, reason: c.lastError);
+        expect(engine.modes.package('org.club.vectors'), isNull);
+      },
+    );
+
+    test('a scheduled game that names the scenario keeps it', () async {
+      serve();
+      final c = client(library: true);
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      site.gets['/api/v1/sync/schedule'] = {
+        'sync_version': 1,
+        'games': [
+          {
+            'scheduled_game_id': scheduledId,
+            'title': 'Domingo',
+            'starts_at': t0 + 3600,
+            'ends_at': t0 + 3600 + 7200,
+            'status': 'published',
+            'teams': ['red', 'blue'],
+            'federation': 'off',
+            'predeclare_replicas': false,
+            'registered': 0,
+            'mode_id': 'org.club.vectors+org.atalaia.objectives',
+          },
+        ],
+      };
+      site.gets['/api/v1/sync/claims'] = {
+        'sync_version': 1,
+        'claims': <Object?>[],
+      };
+      serve(scenario: false);
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      expect(engine.modes.package('org.club.vectors'), isNotNull);
+      site.gets['/api/v1/sync/schedule'] = {
+        'sync_version': 1,
+        'games': <Object?>[],
+      };
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      expect(engine.modes.package('org.club.vectors'), isNull);
+    });
+
+    test('a scenario the GM replaced is not removed', () async {
+      serve();
+      final c = client(library: true);
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      engine.scenarios!.install(
+        manifest.replaceFirst('"version": "1"', '"version": "7"'),
+      );
+      serve(scenario: false);
+      expect(await c.runOnce(), isTrue, reason: c.lastError);
+      expect(engine.modes.package('org.club.vectors'), isNotNull);
+      expect((c.status()['library']! as Map)['from_site'], {
+        'scenarios': <String>[],
+        'refused': <String>[],
+        'presets': ['Domingo curto'],
+      });
+    });
+  });
+
   test('nothing private is ever sent', () async {
     final gid = play(end: false);
     api.handle(

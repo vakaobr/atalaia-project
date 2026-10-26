@@ -536,6 +536,24 @@ class ControllerScenarios {
     };
   }
 
+  /// Removes an installed scenario and its kept manifest (the site archived
+  /// it: decision S20-8). Throws a conflict while the game that is not ended
+  /// runs it; false when no scenario of that id is installed.
+  bool uninstall(String scenarioId) {
+    final pkg = _modes.package(scenarioId);
+    if (pkg == null || pkg.kind != 'scenario') return false;
+    final live = engine.liveGame;
+    if (_uses(live, scenarioId)) {
+      throw ControllerError.conflict(
+        'game ${live!['id']} runs this scenario; end it before you remove '
+        'the scenario',
+      );
+    }
+    final removed = _modes.remove(scenarioId);
+    engine.store.deleteSetting('$scenarioManifestKey$scenarioId');
+    return removed;
+  }
+
   Map<String, Object?> describe(ModePackage pkg, {required bool hasManifest}) {
     final m = ScenarioMeta.parse(pkg.files['mode.yaml'] ?? '');
     final out = <String, Object?>{

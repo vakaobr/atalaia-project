@@ -26,7 +26,8 @@
 /// (the schedule, each linked game's roster until it starts, the claims'
 /// verdicts, the outcomes after the game), with branding "site" the
 /// field's branding and saved teams with their images, with the library on
-/// the field's scenarios and game presets. Every 30 s while a game runs and
+/// the field's scenarios and game presets (a scenario the site archives and a
+/// preset it deletes are removed again, decision S20-8). Every 30 s while a game runs and
 /// every 5 min between games; a failure doubles the wait up to 5 min; a
 /// `Retry-After` is respected; a game's start, pause or end wakes it.
 ///
@@ -399,6 +400,8 @@ class ControllerSync {
   double? libraryPulledAt;
   String? libraryError;
   int scenariosInstalled = 0;
+  int scenariosRemoved = 0;
+  int presetsRemoved = 0;
 
   /// The remote GM's status (controller_remote_gm.dart), when it runs.
   Map<String, Object?> Function()? remoteStatus;
@@ -1247,6 +1250,7 @@ class ControllerSync {
           }
         }
       }
+      _removeGone(answer, state);
     } finally {
       engine.store.setSetting(_librarySetting, _canonical(state));
     }
@@ -1255,6 +1259,52 @@ class ControllerSync {
         ? null
         : (text.length > 500 ? text.substring(0, 500) : text);
     libraryPulledAt = _wall();
+  }
+
+  /// Removes what the site no longer lists (decision S20-8): the scenarios
+  /// and presets this controller installed from it. A scenario stays (and is
+  /// asked again next cycle) while a game that is not ended runs it or a
+  /// scheduled game names it; one the GM replaced with another manifest is
+  /// theirs, so only the site's claim on it is dropped.
+  void _removeGone(
+    Map<String, Object?> answer,
+    Map<String, Map<String, String>> state,
+  ) {
+    final gone = libraryRemovals(state, answer);
+    final listed = {
+      for (final s
+          in (answer['scenarios']! as List).cast<Map<String, Object?>>())
+        s['scenario_id'],
+    };
+    state['refused']!.removeWhere((sid, _) => !listed.contains(sid));
+    final scheduled = <String>{
+      for (final g in schedule?.schedule() ?? const <Map<String, Object?>>[])
+        ...'${g['mode_id'] ?? ''}'.split(modeSeparator),
+    };
+    for (final sid in gone['scenarios']!) {
+      final kept = engine.store.getSetting('$scenarioManifestKey$sid');
+      if (kept == null ||
+          sha256.convert(utf8.encode(kept)).toString() !=
+              state['scenarios']![sid]) {
+        state['scenarios']!.remove(sid); // the GM's own manifest now
+        continue;
+      }
+      if (scheduled.contains(sid)) continue;
+      try {
+        engine.scenarios!.uninstall(sid);
+      } on ControllerError catch (e) {
+        if (e.status == 409) continue; // a game runs it: next cycle
+        rethrow;
+      }
+      state['scenarios']!.remove(sid);
+      scenariosRemoved++;
+      engine.emit({'type': 'modes'});
+    }
+    for (final name in gone['presets']!) {
+      engine.modes.deletePreset(name);
+      state['presets']!.remove(name);
+      presetsRemoved++;
+    }
   }
 
   Future<String?> _installScenario(
@@ -1488,6 +1538,8 @@ class ControllerSync {
         'pulled_at': libraryPulledAt,
         'error': libraryError,
         'scenarios_installed': scenariosInstalled,
+        'scenarios_removed': scenariosRemoved,
+        'presets_removed': presetsRemoved,
         'from_site': {
           for (final e in lib.entries) e.key: e.value.keys.toList()..sort(),
         },

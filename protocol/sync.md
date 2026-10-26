@@ -265,7 +265,19 @@ ADR-P4-6 as amended (P4R7, P4R9). The field's staff keep scenarios (manifests, e
 
 One scenario's current revision: `200 {"sync_version": 1, "scenario_id", "revision", "sha256", "manifest"}`, `manifest` being the text as it was saved (YAML or JSON, at most 256 KiB) whose UTF-8 bytes must hash to `sha256` (`sha256_mismatch` otherwise). An archived scenario or another field's is `404 {"detail": "scenario_not_found"}`.
 
-The controller fetches a scenario only when the SHA-256 differs from the one it last installed from the site (kept in its setting `sync.site_library`), compiles the manifest and loads its `field.lua` in its core again (`scenario_service.install`, the GM console's install), and stays the authority: a manifest it refuses is not fetched again until the site changes it, and one the live game runs waits until the game ends. A preset is saved by its name once its mode is installed on the controller and its parameters fit that mode (a site preset replaces a GM preset with the same name). Scenarios and presets the site no longer lists stay on the controller. `sync` in the controller's `GET /api/v1/controller` has `library`: whether it is on and supported, the last pull, what came from the site and the last problems.
+The controller fetches a scenario only when the SHA-256 differs from the one it last installed from the site (kept in its setting `sync.site_library`), compiles the manifest and loads its `field.lua` in its core again (`scenario_service.install`, the GM console's install), and stays the authority: a manifest it refuses is not fetched again until the site changes it, and one the live game runs waits until the game ends. A preset is saved by its name once its mode is installed on the controller and its parameters fit that mode (a site preset replaces a GM preset with the same name). What the site no longer lists is removed (below). `sync` in the controller's `GET /api/v1/controller` has `library`: whether it is on and supported, the last pull, what came from the site and the last problems.
+
+### Removing what the site archived or deleted (decision S20-9, built from S20-8)
+
+No wire change, no `sync_version` bump, no tombstones and no new field: a `presets` answer is the field's **whole** live library (a scenario's archive and a preset's deletion take it out of the answer; one with more than 200 of either is no valid answer, never a part of one), so an old controller keeps working as it did and a new one reads the absence. Against an older site server the rule is the same, since that server also lists only what is live.
+
+A controller keeps in `sync.site_library` what it installed from the site (`scenarios`: id to SHA-256, `presets`: name to digest) and removes, in the cycle after the answer, each scenario and preset it names that the answer does not (`sync_format.library_removals`, shared vectors in `library_removal` of `vectors/sync.json`: state and answer give the sorted ids and names). Only what came from the site is ever a candidate: a preset or scenario the GM made is never touched. The controller then **keeps**, and asks again next cycle:
+
+- a scenario the game that is not ended runs (`created`, `running` or `paused`): it goes in the cycle after the game ends;
+- a scenario a scheduled game of the last schedule pulled names in its `mode_id` (the GM can still make a game from it): it goes once that scheduled game has left the schedule (started, ended or cancelled);
+- and drops only the site's claim on a scenario whose kept manifest is no longer the one it installed from the site (the GM installed their own under that id): it stays as the GM's.
+
+A removed scenario loses its package and its kept manifest; a preset made from it that the site still lists stays, waiting for the mode as before. A scenario saved again on the site (restored) is installed again, being absent from the state. A refused manifest the site archived is forgotten. The controller's `sync.library` status counts `scenarios_removed` and `presets_removed`. Games already played keep their history; a built-in mode is never removed.
 
 ## WS /api/v1/sync/stream
 

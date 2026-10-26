@@ -41,6 +41,7 @@ class FakeLibrary:
 
     def __init__(self) -> None:
         self.manifests: dict[str, tuple[int, str]] = {}  # scenario id -> (revision, text)
+        self.schedule: list[dict[str, Any]] = []
         self.presets: list[dict[str, Any]] = []
         self.gets: list[str] = []
         self.missing = False
@@ -75,7 +76,7 @@ class FakeLibrary:
             return {"sync_version": 1, "scenario_id": sid, "revision": rev,
                     "sha256": self.sha(text) if not self.corrupt else "0" * 64, "manifest": text}
         if path.startswith("/api/v1/sync/schedule"):
-            return {"sync_version": 1, "games": []}
+            return {"sync_version": 1, "games": copy.deepcopy(self.schedule)}
         return {"sync_version": 1, "claims": []}
 
     def post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
@@ -198,6 +199,65 @@ class LibraryTests(unittest.TestCase):
         self.assertEqual(node.client.post(f"/api/v1/games/{gid}/end", headers=GM).status_code, 200)
         node.cycle()
         self.assertEqual(node.scenarios(), {SCENARIO: "2"})
+
+    def test_what_the_site_archives_or_deletes_is_removed_next_cycle(self) -> None:
+        """S20-8: a scenario archived and a preset deleted on the site go; the GM's own stay."""
+        node = Node(self, self.site)
+        node.client.post("/api/v1/presets", headers=GM, json={"name": "Do GM", "mode_id": DOMINATION, "params": {}})
+        node.cycle()
+        self.assertEqual((set(node.scenarios()), set(node.presets())),
+                         ({SCENARIO}, {"Domingo: dois objetivos", "Domínio rápido", "Do GM"}))
+        del self.site.manifests[SCENARIO]  # archived: the answer no longer lists it
+        del self.site.presets[0]
+        status = node.cycle()
+        self.assertEqual((node.scenarios(), set(node.presets())), ({}, {"Domínio rápido", "Do GM"}))
+        self.assertEqual((status["scenarios_removed"], status["presets_removed"], status["from_site"]["scenarios"],
+                          status["from_site"]["presets"]), (1, 1, [], ["Domínio rápido"]))
+        self.assertEqual(node.client.get(f"/api/v1/scenarios/{SCENARIO}", headers=GM).status_code, 404)
+        # Saved again on the site (restored): it comes back.
+        self.site.put(MANIFEST)
+        node.cycle()
+        self.assertEqual(node.scenarios(), {SCENARIO: "1"})
+
+    def test_a_game_that_is_not_ended_keeps_its_archived_scenario(self) -> None:
+        node = Node(self, self.site)
+        node.cycle()
+        r = node.client.post("/api/v1/games", headers=GM, json={
+            "name": "Two", "mode_id": SCENARIO, "modifiers": [OBJECTIVES], "teams": ["red", "blue"], "squads": 2})
+        gid = r.json()["id"]
+        del self.site.manifests[SCENARIO]
+        status = node.cycle()
+        self.assertEqual((node.scenarios(), status["scenarios_removed"]), ({SCENARIO: "1"}, 0))
+        self.assertEqual(status["from_site"]["scenarios"], [SCENARIO])  # asked again next cycle
+        node.client.post(f"/api/v1/games/{gid}/start", headers=GM, json={"force": True})
+        self.assertEqual(node.client.post(f"/api/v1/games/{gid}/end", headers=GM).status_code, 200)
+        status = node.cycle()
+        self.assertEqual((node.scenarios(), status["scenarios_removed"]), ({}, 1))
+
+    def test_a_scheduled_game_keeps_its_archived_scenario(self) -> None:
+        self.site.schedule = [{"scheduled_game_id": "0192f3a4-0000-7000-8000-00000000aaaa", "title": "Domingo",
+                               "starts_at": 1_800_003_600, "ends_at": 1_800_018_000, "status": "published",
+                               "mode_id": f"{SCENARIO}+{OBJECTIVES}", "teams": ["red", "blue"], "federation": "off",
+                               "predeclare_replicas": False, "registered": 0}]
+        node = Node(self, self.site)
+        node.cycle()
+        del self.site.manifests[SCENARIO]
+        node.cycle()
+        self.assertEqual(node.scenarios(), {SCENARIO: "1"})
+        self.site.schedule = []  # the scheduled game is over or gone
+        node.cycle()
+        self.assertEqual(node.scenarios(), {})
+
+    def test_a_scenario_the_gm_replaced_is_not_removed(self) -> None:
+        node = Node(self, self.site)
+        node.cycle()
+        r = node.client.post("/api/v1/scenarios", headers=GM, json={"manifest": MANIFEST.replace("version: 1",
+                                                                                                 "version: 7")})
+        self.assertEqual(r.status_code, 201, r.text)
+        del self.site.manifests[SCENARIO]
+        status = node.cycle()
+        self.assertEqual((node.scenarios(), status["scenarios_removed"], status["from_site"]["scenarios"]),
+                         ({SCENARIO: "7"}, 0, []))
 
     def test_presets_need_their_mode_and_fitting_parameters(self) -> None:
         self.site.preset("Sem modo", "org.club.unknown")

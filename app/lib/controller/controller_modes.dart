@@ -928,6 +928,19 @@ class ControllerModes {
     return pkg;
   }
 
+  /// Removes an uploaded package; false when it is not installed. A built-in
+  /// one is refused (modes.py `ModeRegistry.remove`).
+  bool remove(String id) {
+    if (_builtin.containsKey(id)) {
+      throw ModeException('$id is a built-in mode and stays');
+    }
+    final uploads = _uploads();
+    if (uploads.remove(id) == null) return false;
+    store.putDocument(_doc, uploads);
+    generation++;
+    return true;
+  }
+
   /// A signed package's archive, exactly as signed (null for an unsigned or
   /// unknown one).
   Uint8List? archive(String modeId) {
@@ -956,6 +969,21 @@ class ControllerModes {
       if (p['id'] == id) return p;
     }
     return null;
+  }
+
+  /// Deletes the preset called [name]; false when there is none.
+  bool deletePreset(String name) {
+    final doc = _presetDoc();
+    final items = [
+      for (final p in (doc['items'] as List?) ?? const [])
+        (p as Map).cast<String, Object?>(),
+    ];
+    final before = items.length;
+    items.removeWhere((p) => p['name'] == name);
+    if (items.length == before) return false;
+    doc['items'] = items;
+    store.putDocument(_presetsDoc, doc);
+    return true;
   }
 
   /// Saves a preset under [name], replacing one of that name (keeping its

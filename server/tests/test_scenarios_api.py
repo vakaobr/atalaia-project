@@ -306,6 +306,26 @@ class LibraryEndToEndTests(unittest.TestCase):
             self.assertEqual([s["version"] for s in scenario_service.listing(ctrl)], ["2"])
             self.assertEqual(client.status()["library"]["scenarios_installed"], 2)
 
+    def test_a_scenario_archived_and_a_preset_deleted_on_the_site_go_from_the_controllers(self) -> None:
+        """Decision S20-8: the site's answer no longer lists them, so the next sync removes them."""
+        self.store_scenario(MANIFEST)
+        self.db.fetch("INSERT INTO field_presets (field_id, name, mode_id, params) VALUES ($1, 'Domingo', $2, '{}'), "
+                      "($1, 'Domínio rápido', 'org.atalaia.domination', '{}')", self.field, f"{SCENARIO}+{OBJECTIVES}")
+        ctrl, client = self.controller("primary")
+        self.assertTrue(client.run_once(), client.last_error)
+        ctrl.store.save_preset("Do GM", "org.atalaia.domination", {})
+        self.db.fetch("UPDATE field_scenarios SET archived_at = now() WHERE field_id = $1", self.field)
+        self.db.fetch("DELETE FROM field_presets WHERE name = 'Domingo'")
+        self.assertTrue(client.run_once(), client.last_error)
+        self.assertEqual(scenario_service.listing(ctrl), [])
+        self.assertEqual(sorted(p["name"] for p in ctrl.store.presets()), ["Do GM", "Domínio rápido"])
+        library_status = client.status()["library"]
+        self.assertEqual((library_status["scenarios_removed"], library_status["presets_removed"]), (1, 1))
+        # Restored on the site (saved again): the controller installs it again.
+        self.db.fetch("UPDATE field_scenarios SET archived_at = NULL WHERE field_id = $1", self.field)
+        self.assertTrue(client.run_once(), client.last_error)
+        self.assertEqual([s["id"] for s in scenario_service.listing(ctrl)], [SCENARIO])
+
 
 if __name__ == "__main__":
     unittest.main()

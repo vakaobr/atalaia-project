@@ -1182,6 +1182,19 @@ def check_scenario(body: Any) -> dict[str, Any]:
     return body
 
 
+def library_removals(state: dict[str, Any], answer: dict[str, Any]) -> dict[str, list[str]]:
+    """What the site's library no longer lists (decision S20-8). ``state`` is what the controller installed from
+    the site (``{"scenarios": {id: sha256}, "presets": {name: digest}}``), ``answer`` a checked ``presets`` answer.
+    A ``presets`` answer is the field's whole library (a check fails past 200, never a part), so a scenario
+    archived or a preset deleted on the site is one the state names and the answer does not: ``{"scenarios":
+    [ids], "presets": [names]}``, each sorted. Only candidates: the controller keeps what a game uses and what
+    the GM replaced (protocol/sync.md)."""
+    ids = {s["scenario_id"] for s in answer["scenarios"]}
+    names = {p["name"] for p in answer["presets"]}
+    return {"scenarios": sorted(i for i in state.get("scenarios") or {} if i not in ids),
+            "presets": sorted(n for n in state.get("presets") or {} if n not in names)}
+
+
 CHECKS = {"games": check_game, "events": check_events, "scores": check_scores, "nodes": check_nodes,
           "marshals": check_marshals, "replicas": check_replicas, "chrono": check_chrono,
           "checkins": check_checkins, "claims": check_claims}

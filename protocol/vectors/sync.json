@@ -1,5 +1,5 @@
 {
- "description": "Controller sync bodies (protocol/sync.md). Every valid body passes its kind's check (games, events, scores, nodes, marshals, replicas, chrono, checkins, claims); nodes_unknown_info_dropped keeps only the info keys listed under info. Every invalid body fails with the error code and path given (the first problem found, in the order of protocol/sync.md's tables). merge: the snapshots merged in order by maximum per (source, team) give counters, and the totals are the counters' sum per team plus the deltas (GM adjustments, score.delta), worked out by hand from protocol/sync.md's rule (decision P4R10). The chrono bodies use the marshal test key and records of chrono_record.json: chrono_readings verifies on the site server once marshals_with_a_rotated_key is stored (its second key is that test key, valid from 1792000000). answers (plan phases 16, 18 and 20): the answers of the GET endpoints the controller pulls (schedule, roster, claims, field: the branding and saved teams, images by SHA-256, presets: the scenario library by id, revision and SHA-256 and the game presets, and scenario: one manifest whose UTF-8 bytes hash to its sha256), each valid one passing sync_format.ANSWERS[kind] and each invalid one failing with its error and path; the site server's own answers are checked with the same functions in its tests. stream (plan phase 19): the remote GM's messages on WS /api/v1/sync/stream (hello, live and command.result from the controller, command from the site server), each valid one passing sync_format.STREAM[kind] and each invalid one failing with its error and path; format vectors made for this repository from protocol/sync.md (there is no external source to copy them from).",
+ "description": "Controller sync bodies (protocol/sync.md). Every valid body passes its kind's check (games, events, scores, nodes, marshals, replicas, chrono, checkins, claims); nodes_unknown_info_dropped keeps only the info keys listed under info. Every invalid body fails with the error code and path given (the first problem found, in the order of protocol/sync.md's tables). merge: the snapshots merged in order by maximum per (source, team) give counters, and the totals are the counters' sum per team plus the deltas (GM adjustments, score.delta), worked out by hand from protocol/sync.md's rule (decision P4R10). The chrono bodies use the marshal test key and records of chrono_record.json: chrono_readings verifies on the site server once marshals_with_a_rotated_key is stored (its second key is that test key, valid from 1792000000). answers (plan phases 16, 18 and 20): the answers of the GET endpoints the controller pulls (schedule, roster, claims, field: the branding and saved teams, images by SHA-256, presets: the scenario library by id, revision and SHA-256 and the game presets, and scenario: one manifest whose UTF-8 bytes hash to its sha256), each valid one passing sync_format.ANSWERS[kind] and each invalid one failing with its error and path; the site server's own answers are checked with the same functions in its tests. stream (plan phase 19): the remote GM's messages on WS /api/v1/sync/stream (hello, live and command.result from the controller, command from the site server), each valid one passing sync_format.STREAM[kind] and each invalid one failing with its error and path; format vectors made for this repository from protocol/sync.md (there is no external source to copy them from). library_removal (decision S20-8): what a controller installed from the site (state: scenario id to SHA-256, preset name to digest) and a checked presets answer give the scenarios and presets to remove, sorted (sync_format.library_removals); the controller then keeps any a game that is not ended or a scheduled game uses, and any scenario the GM replaced.",
  "valid": [
   {
    "name": "game_minimal",
@@ -13877,5 +13877,158 @@
     "path": "missing[0]"
    }
   ]
- }
+ },
+ "library_removal": [
+  {
+   "name": "everything installed is still listed: nothing to remove",
+   "state": {
+    "scenarios": {
+     "org.club.foxhound": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "presets": {
+     "Rapid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+   },
+   "answer": {
+    "sync_version": 1,
+    "scenarios": [
+     {
+      "scenario_id": "org.club.foxhound",
+      "revision": 1,
+      "version": "1",
+      "name": "org.club.foxhound",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     }
+    ],
+    "presets": [
+     {
+      "preset_id": "0192f3a4-0000-7000-8000-000000000001",
+      "name": "Rapid",
+      "mode_id": "org.atalaia.domination",
+      "params": {}
+     }
+    ]
+   },
+   "removals": {
+    "scenarios": [],
+    "presets": []
+   }
+  },
+  {
+   "name": "a scenario the site archived is a candidate; a changed revision is not",
+   "state": {
+    "scenarios": {
+     "org.club.foxhound": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "pt.campo-norte.night_raid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "presets": {}
+   },
+   "answer": {
+    "sync_version": 1,
+    "scenarios": [
+     {
+      "scenario_id": "pt.campo-norte.night_raid",
+      "revision": 1,
+      "version": "1",
+      "name": "pt.campo-norte.night_raid",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+     }
+    ],
+    "presets": []
+   },
+   "removals": {
+    "scenarios": [
+     "org.club.foxhound"
+    ],
+    "presets": []
+   }
+  },
+  {
+   "name": "a preset the site deleted is a candidate, by its name",
+   "state": {
+    "scenarios": {},
+    "presets": {
+     "Rapid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "Slow": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+   },
+   "answer": {
+    "sync_version": 1,
+    "scenarios": [],
+    "presets": [
+     {
+      "preset_id": "0192f3a4-0000-7000-8000-000000000002",
+      "name": "Slow",
+      "mode_id": "org.atalaia.domination",
+      "params": {}
+     }
+    ]
+   },
+   "removals": {
+    "scenarios": [],
+    "presets": [
+     "Rapid"
+    ]
+   }
+  },
+  {
+   "name": "an empty library removes everything the controller got from the site, sorted",
+   "state": {
+    "scenarios": {
+     "pt.campo-norte.night_raid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "org.club.foxhound": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "presets": {
+     "b": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "a": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+   },
+   "answer": {
+    "sync_version": 1,
+    "scenarios": [],
+    "presets": []
+   },
+   "removals": {
+    "scenarios": [
+     "org.club.foxhound",
+     "pt.campo-norte.night_raid"
+    ],
+    "presets": [
+     "a",
+     "b"
+    ]
+   }
+  },
+  {
+   "name": "what the controller did not get from the site is never a candidate",
+   "state": {
+    "scenarios": {},
+    "presets": {}
+   },
+   "answer": {
+    "sync_version": 1,
+    "scenarios": [
+     {
+      "scenario_id": "org.club.foxhound",
+      "revision": 1,
+      "version": "1",
+      "name": "org.club.foxhound",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     }
+    ],
+    "presets": [
+     {
+      "preset_id": "0192f3a4-0000-7000-8000-000000000003",
+      "name": "Rapid",
+      "mode_id": "org.atalaia.domination",
+      "params": {}
+     }
+    ]
+   },
+   "removals": {
+    "scenarios": [],
+    "presets": []
+   }
+  }
+ ]
 }

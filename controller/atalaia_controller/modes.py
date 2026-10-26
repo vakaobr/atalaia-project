@@ -212,6 +212,15 @@ class ModeRegistry:
             files["field.lua"] = mode.field_script
         return ModePackage(mode, files, builtin=all(p.builtin for p in parts))
 
+    def remove(self, mode_id: str) -> bool:
+        """Removes an uploaded package; False when it is not installed. A built-in one is refused."""
+        if mode_id in self._builtin:
+            raise ModeError(f"{mode_id} is a built-in mode and stays")
+        removed = self.store.delete_mode(mode_id)
+        if removed:
+            self.generation += 1
+        return removed
+
     def install(self, files: dict[str, str], signed: Optional[dict[str, Any]] = None,
                 archive: Optional[bytes] = None) -> ModePackage:
         """Checks and keeps a package; ``signed`` and ``archive`` when signed_modes.py verified it

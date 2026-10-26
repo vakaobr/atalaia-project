@@ -244,6 +244,21 @@ def install(ctrl: "Controller", text: str) -> dict[str, Any]:
             "replaced": existing is not None}
 
 
+def uninstall(ctrl: "Controller", scenario_id: str) -> bool:
+    """Removes an installed scenario and its kept manifest (the site archived it: decision S20-8). Conflict
+    (engine) while the game that is not ended runs it; False when no scenario of that id is installed."""
+    from .engine import Conflict  # noqa: PLC0415 (engine imports this module)
+
+    pkg = _package(ctrl, scenario_id)
+    if pkg is None or pkg.kind != "scenario":
+        return False
+    if _uses(ctrl.game, scenario_id):
+        raise Conflict(f"game {ctrl.game['id']} runs this scenario; end it before you remove the scenario")
+    removed = ctrl.modes.remove(scenario_id)
+    ctrl.store.delete_setting(MANIFEST_KEY + scenario_id)
+    return removed
+
+
 def describe(pkg: "ModePackage", has_manifest: bool) -> dict[str, Any]:
     meta = Meta.parse(pkg.files.get("mode.yaml", ""))
     out: dict[str, Any] = {"id": pkg.id, "version": pkg.mode.version, "name": pkg.mode.name,

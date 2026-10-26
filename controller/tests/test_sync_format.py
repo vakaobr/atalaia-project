@@ -122,6 +122,14 @@ class VectorTests(unittest.TestCase):
         self.assertEqual(fmt.check_command(body)["params"], {"reason": ""})
         self.assertEqual(set(fmt.REMOTE_COMMANDS), {"start", "pause", "resume", "end", "message", "mode"})
 
+    def test_library_removal(self) -> None:
+        """Decision S20-8: what a controller got from the site and the site no longer lists."""
+        self.assertEqual(len(VECTORS["library_removal"]), 5)
+        for case in VECTORS["library_removal"]:
+            with self.subTest(case=case["name"]):
+                answer = fmt.check_presets(copy.deepcopy(case["answer"]))
+                self.assertEqual(fmt.library_removals(case["state"], answer), case["removals"])
+
     def test_merge(self) -> None:
         for case in VECTORS["merge"]:
             with self.subTest(case=case["name"]):

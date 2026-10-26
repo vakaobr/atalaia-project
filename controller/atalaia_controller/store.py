@@ -515,6 +515,10 @@ class Store:
                     json.dumps(signed) if signed is not None else None,
                     package if signed is not None else None))
 
+    def delete_mode(self, mode_id: str) -> bool:
+        """Removes an uploaded package (the scenario the site archived: S20-8); False when there was none."""
+        return self._exec("DELETE FROM modes WHERE id = ?", (mode_id,)).rowcount > 0
+
     def modes(self) -> list[dict[str, Any]]:
         rows = self._exec("SELECT id, version, files_json, signed_json FROM modes ORDER BY id").fetchall()
         return [{"id": r["id"], "version": r["version"], "files": json.loads(r["files_json"]),
@@ -547,6 +551,10 @@ class Store:
 
     def presets(self) -> list[dict[str, Any]]:
         return [self._preset(r) for r in self._exec("SELECT * FROM presets ORDER BY name").fetchall()]
+
+    def delete_preset(self, name: str) -> bool:
+        with self._lock:
+            return self._exec("DELETE FROM presets WHERE name = ?", (name,)).rowcount > 0
 
     def preset(self, preset_id: int) -> Optional[dict[str, Any]]:
         row = self._exec("SELECT * FROM presets WHERE id = ?", (preset_id,)).fetchone()

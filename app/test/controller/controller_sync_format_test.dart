@@ -111,6 +111,22 @@ void main() {
     expect(checkCommand(named('command_end'))['params'], {'reason': ''});
   });
 
+  test('what the site no longer lists is the Pi\'s (decision S20-8)', () {
+    final cases = list(v['library_removal']);
+    expect(cases.length, 5);
+    for (final c in cases) {
+      final answer = checkPresets(_copy(c['answer']));
+      final state = {
+        for (final e in (c['state']! as Map).entries)
+          e.key as String: (e.value! as Map).cast<String, String>(),
+      };
+      final want = (c['removals']! as Map).cast<String, Object?>();
+      expect(libraryRemovals(state, answer), {
+        for (final e in want.entries) e.key: (e.value! as List).cast<String>(),
+      }, reason: '${c['name']}');
+    }
+  });
+
   test('the merges, and the phone\'s FieldController reaches the same '
       'totals (P4R10)', () {
     for (final c in list(v['merge'])) {

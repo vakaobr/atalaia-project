@@ -76,7 +76,11 @@ field's key does this, a standby too, so a standby has the scenario a join
 names (decision M8-3). A refused manifest is not fetched again until the site
 changes it; one the live game runs waits for the game to end. Presets are
 saved by name once their mode is installed here and their parameters fit it.
-Scenarios and presets the site no longer lists stay on the controller.
+A scenario the site archived and a preset it deleted are removed on the next
+pull (decision S20-8; the answer is the field's whole library, so what it no
+longer lists is gone): only what this controller installed from the site, and
+a scenario neither a game that is not ended runs, nor a scheduled game names,
+nor the GM replaced with a manifest of their own, which stay.
 
 **Never sent:** positions (P4R25), check-in names and federation numbers,
 tokens, the game, join and token keys, private keys. The bodies carry the fields listed in
@@ -115,7 +119,7 @@ from . import __version__, images
 from .modes import resolve_params
 from .sync_format import (ANSWERS, MAX_EVENTS, MAX_MARSHALS, MAX_READINGS, MAX_REPLICAS, MAX_ROSTER, SYNC_VERSION,
                           SyncFormatError, check_checkins, check_claims, check_event, check_marshal, check_nodes,
-                          check_reading, check_replica)
+                          check_reading, check_replica, library_removals)
 
 log = logging.getLogger("atalaia.sync")
 
@@ -313,6 +317,8 @@ class SyncClient:
         self.library_pulled_at: Optional[float] = None
         self.library_error: Optional[str] = None
         self.scenarios_installed = 0
+        self.scenarios_removed = 0
+        self.presets_removed = 0
 
     # --- identity ---------------------------------------------------------------------
 
@@ -872,10 +878,49 @@ class SyncClient:
                         problems.append(f"preset {preset['name']}: {problem}")
                     else:
                         state["presets"][preset["name"]] = sha
+            self._remove_gone(answer, state)
         finally:
             self.store.set_setting(LIBRARY_SETTING, json.dumps(state, sort_keys=True))
         self.library_error = "; ".join(problems)[:500] or None
         self.library_pulled_at = self._wall()
+
+    def _remove_gone(self, answer: dict[str, Any], state: dict[str, dict[str, str]]) -> None:
+        """Removes what the site no longer lists (decision S20-8): the scenarios and presets this controller
+        installed from it. A scenario stays (and is tried again next cycle) while a game that is not ended runs it
+        or a scheduled game names it; one the GM replaced with another manifest is theirs, so only the site's claim
+        on it is dropped."""
+        from . import scenario_service  # noqa: PLC0415 (it imports the engine's modules)
+        from .engine import Conflict  # noqa: PLC0415
+
+        gone = library_removals(state, answer)
+        listed = {s["scenario_id"] for s in answer["scenarios"]}
+        for sid in [s for s in state["refused"] if s not in listed]:
+            del state["refused"][sid]  # refused, then archived: nothing to fetch any more
+        ctrl = self.controller
+        scheduled = {part for g in self.store.schedule() for part in str(g.get("mode_id") or "").split("+")}
+        for sid in gone["scenarios"]:
+            kept = self.store.get_setting(scenario_service.MANIFEST_KEY + sid)
+            if kept is None or hashlib.sha256(kept.encode("utf-8")).hexdigest() != state["scenarios"][sid]:
+                del state["scenarios"][sid]  # the GM's own manifest now (or the package is gone already)
+                continue
+            if sid in scheduled:
+                log.info("scenario %s archived on the site server: kept, a scheduled game names it", sid)
+                continue
+            try:
+                with ctrl._lock:
+                    scenario_service.uninstall(ctrl, sid)
+            except Conflict as exc:
+                log.info("scenario %s archived on the site server: kept, %s", sid, exc)
+                continue
+            del state["scenarios"][sid]
+            self.scenarios_removed += 1
+            ctrl._emit({"type": "modes"})
+            log.info("scenario %s removed: archived on the site server", sid)
+        for name in gone["presets"]:
+            self.store.delete_preset(name)
+            del state["presets"][name]
+            self.presets_removed += 1
+            log.info("preset %s removed: deleted on the site server", name)
 
     def _install_scenario(self, sid: str, sha: str, state: dict[str, dict[str, str]]) -> Optional[str]:
         """Fetches one manifest and installs it (compiled and loaded in the core here); a problem, or None."""
@@ -1024,4 +1069,5 @@ class SyncClient:
                 "library": {"enabled": bool(getattr(self.cfg, "sync_library", True)),
                             "supported": self.library_supported, "pulled_at": self.library_pulled_at,
                             "error": self.library_error, "scenarios_installed": self.scenarios_installed,
+                            "scenarios_removed": self.scenarios_removed, "presets_removed": self.presets_removed,
                             "from_site": {k: sorted(v) for k, v in self._library_state().items()}}}
