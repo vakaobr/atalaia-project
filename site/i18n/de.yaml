@@ -768,8 +768,12 @@ roadmap:
         auf dem Labortisch spielen echte Boards ganze Spiele mit dem Controller über Funk:
         Einladungen, Eroberungen, Koppeln per Code, Updates per Funk, ein fehlender Modus
         nachgeladen."
+      - "Die Boxen hören vor dem Senden: Eine Box prüft, ob der Kanal frei ist, bevor sie sendet,
+        damit weniger Nachrichten kollidieren. Im Simulator empfängt ein Feld mit 20 Boxen 89 % der
+        Updates statt 65 %."
     next:
       - Die Funk-Boards und 5 gebaute Boxen für den Feldtest.
+      - Ein Feldtest mit 20 Boxen, mit und ohne Hören vor dem Senden.
     gate: >-
       Gate: 5 Boxen auf einem <a href="{{ page.to.glossary }}#glossar-cqb">CQB</a>-Gelände und einem
       Outdoor-Feld, keine verlorene Einnahme. <strong>Offen.</strong>

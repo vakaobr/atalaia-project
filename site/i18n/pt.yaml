@@ -750,8 +750,12 @@ roadmap:
       - "Tudo testado no simulador, no emulador e num computador, incluindo jogos completos; na
         bancada, placas a sério jogam jogos inteiros com o controlador pelo rádio: convites,
         capturas, emparelhamento por código, atualizações pelo ar, um modo em falta descarregado."
+      - "As caixas escutam antes de falar: cada caixa verifica se o canal está livre antes de
+        transmitir, e há menos mensagens a colidir. No simulador, um campo de 20 caixas recebe 89 %
+        das atualizações em vez de 65 %."
     next:
       - As placas de rádio e 5 caixas montadas para o teste no campo.
+      - Um teste no campo com 20 caixas, com e sem escuta antes de falar.
     gate: >-
       Prova: 5 caixas num espaço de <a href="{{ page.to.glossary }}#glossario-cqb">CQB</a> e num campo
       exterior, sem uma única captura perdida. <strong>Em aberto.</strong>

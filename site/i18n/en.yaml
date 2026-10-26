@@ -731,8 +731,11 @@ roadmap:
       - "All of it tested in the simulator, the emulator and on a computer, whole games included; on
         the bench, real boards play whole games with the controller over the radio: invites,
         captures, pairing by code, updates over the air, a missing mode fetched."
+      - "Boxes listen before they talk: a box checks the channel is free before it sends, so fewer
+        messages collide. In the simulator, a 20-box field hears 89 % of updates instead of 65 %."
     next:
       - The radio boards, and 5 built boxes for the field test.
+      - A 20-box field test with listen-before-talk on and off.
     gate: >-
       Gate: 5 boxes on a <a href="{{ page.to.glossary }}#glossary-cqb">CQB</a> site and an outdoor
       field, zero lost captures. <strong>Open.</strong>
