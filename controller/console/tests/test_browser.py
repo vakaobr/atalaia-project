@@ -3596,6 +3596,10 @@ class ConsoleBrowserTests(unittest.TestCase):
         # The list has been drawn again from the controller's answer (it would put back a name typed before).
         expect(row2.get_by_test_id("marshal-player")).to_have_value(other["player_id"])
         row2.get_by_test_id("marshal-name").fill("Gaivota (entrada)")
+        # A slow GM: the list's refresh (every 5 s) comes while the name is being typed, and must not put
+        # the old name back under the cursor.
+        page.wait_for_timeout(6000)
+        expect(row2.get_by_test_id("marshal-name")).to_have_value("Gaivota (entrada)")
         row2.get_by_test_id("marshal-name").press("Tab")
         self.assertTrue(wait_for(lambda: self.field.bundle.store.roster_entry("M-02")["name"] == "Gaivota (entrada)", 5))
         # Removing asks first, and revokes at once: the key stops, the role goes.

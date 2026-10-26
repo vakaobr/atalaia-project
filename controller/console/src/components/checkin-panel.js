@@ -53,8 +53,11 @@ export class CheckinPanel extends Component {
     componentDidMount() {
         this.load();
         // A marshal's app registers its key without telling the stream: the list asks now and then.
+        // Not while the GM edits a row of the list: drawing it again from the controller's answer would put
+        // back the old name under the cursor, and the edit would be lost (found by the browser test, 2026-10-26).
         this.marshalTimer = setInterval(() => {
-            if (this.props.app.state.role === 'gm' && this.state.marshals) this.loadMarshals();
+            const editing = document.activeElement && document.activeElement.closest('[data-testid="marshals-table"]');
+            if (this.props.app.state.role === 'gm' && this.state.marshals && !editing) this.loadMarshals();
         }, 5000);
     }
 
@@ -180,6 +183,14 @@ export class CheckinPanel extends Component {
     async patchMarshal(id, body) {
         const m = await this.props.app.call('PATCH', `/marshals/${encodeURIComponent(id)}`, body);
         if (m) await this.loadMarshals();
+    }
+
+    // The name typed in a row, when the field is left: saved if it changed, then the controller's again.
+    async saveMarshalName(m, typed) {
+        const name = typed.trim();
+        if (name && name !== m.name) await this.patchMarshal(m.marshal_id, { name });
+        const { [m.marshal_id]: _, ...rest } = this.state.nameEdits || {};
+        this.setState({ nameEdits: rest });
     }
 
     async removeMarshal(m) {
@@ -425,6 +436,9 @@ export class CheckinPanel extends Component {
             return row && row.display_name ? row.display_name : pid;
         };
         const taken = new Set(marshals.map((m) => m.player_id).filter(Boolean));
+        // A name being typed stays the GM's until it is saved: every new drawing of the panel (the stream, the
+        // list's refresh) would otherwise put the controller's name back under the cursor.
+        const edits = this.state.nameEdits || {};
         const add = this.state.addMarshal || { player: '', name: '', id: '' };
         const setAdd = (k, v) => this.setState({ addMarshal: { ...add, [k]: v } });
         return html`<section class="card" aria-labelledby="cm-h" data-testid="marshals">
@@ -436,9 +450,10 @@ export class CheckinPanel extends Component {
                     <th>${t('checkin.marshals.player')}</th><th>${t('checkin.marshals.key')}</th><th></th></tr></thead>
                 <tbody>${marshals.map((m) => html`<tr data-testid=${`marshal-row-${m.marshal_id}`}>
                     <td><strong data-testid="marshal-id">${m.marshal_id}</strong></td>
-                    <td><input aria-label=${t('checkin.marshals.name')} data-testid="marshal-name" maxlength="64" value=${m.name}
-                        onChange=${(e) => e.target.value.trim() && e.target.value.trim() !== m.name
-                            && this.patchMarshal(m.marshal_id, { name: e.target.value.trim() })} /></td>
+                    <td><input aria-label=${t('checkin.marshals.name')} data-testid="marshal-name" maxlength="64"
+                        value=${edits[m.marshal_id] !== undefined ? edits[m.marshal_id] : m.name}
+                        onInput=${(e) => this.setState({ nameEdits: { ...edits, [m.marshal_id]: e.target.value } })}
+                        onChange=${(e) => this.saveMarshalName(m, e.target.value)} /></td>
                     <td><select aria-label=${t('checkin.marshals.player')} data-testid="marshal-player" value=${m.player_id || ''}
                         onChange=${(e) => this.patchMarshal(m.marshal_id, { player_id: e.target.value || null })}>
                         <option value="">${t('checkin.marshals.no_player')}</option>
