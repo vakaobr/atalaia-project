@@ -968,6 +968,7 @@
     "send_again": "Erneut senden",
     "send_again_hint": "Die Box hat noch nicht geantwortet: Sende das Update jetzt erneut (eine Box, die schon aktualisiert, ignoriert es)",
     "cancel": "Nicht mehr auf die laufenden Updates warten",
+    "radio_problem": "Es ging kein Angebot raus: {detail}",
     "states": {
       "sent": "{version}: gesendet, warte auf die Box",
       "installed": "{version}: installiert, startet neu",
@@ -996,7 +997,10 @@
       "flash": "Schreiben in den Flash fehlgeschlagen",
       "battery": "Akku zu schwach",
       "cancelled": "ein Spiel hat begonnen",
-      "self_test": "die neue Firmware hat ihren Selbsttest nicht bestanden"
+      "self_test": "die neue Firmware hat ihren Selbsttest nicht bestanden",
+      "radio_duty_cycle": "das Sendezeitbudget des Funks war aufgebraucht: In ein paar Minuten noch einmal senden",
+      "radio_queue_full": "die Warteschlange des Funks war voll: Noch einmal senden",
+      "radio_failed": "der Funk hat das Angebot nicht gesendet"
     },
     "results": {
       "sent": "Update gesendet",

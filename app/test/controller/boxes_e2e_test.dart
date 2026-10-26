@@ -10,9 +10,10 @@
 // a game announces itself and is invited into the next one with no card; a
 // game ended after the phone restarted without its key still ends on the
 // box (GAME_OVER); an unadopted box is paired by its code; a firmware
-// update's CMD reaches a box and its own offer checks pass. With an I/O pod
-// (the host pod), whose firmware does not relay field frames yet (decision
-// PE24-91), the controller says so instead.
+// update's CMD reaches a box and its own offer checks pass, through the USB
+// modem and through an I/O pod alike. With an I/O pod (the host pod, which
+// relays field and pair frames since PE24-100) the controller uses it as its
+// radio for them too.
 
 import 'dart:async';
 import 'dart:convert';
@@ -97,7 +98,9 @@ void main() {
   var up = false;
   final boxes = <HostBox>[];
   ControllerEngine? engine;
-  SerialModem? modem;
+  ControllerModem? modem;
+  Future<void> Function()? closeRadio;
+  final pods = <HostPod>[];
   SocketPodTransport? link;
   Timer? ticker;
   var persistGameKey = true;
@@ -105,13 +108,38 @@ void main() {
   /// The phone's controller on the host modem: a new engine on the store
   /// (a restart is the app's process going and coming back), with the
   /// boxes, pairing, field cards and firmware updates.
-  Future<ControllerEngine> phone({List<String> firmwareKeys = const []}) async {
-    link = await SocketPodTransport.modem(host);
-    expect(await probeRadioLink(link!), 'modem');
-    final m = modem = SerialModem(
-      link!,
-      pingInterval: const Duration(milliseconds: 200),
-    );
+  Future<ControllerEngine> phone({
+    List<String> firmwareKeys = const [],
+    bool viaPod = false,
+  }) async {
+    final ControllerModem m;
+    final Future<void> Function() begin;
+    if (viaPod) {
+      // The I/O pod as the phone's radio (the host pod, on the same air).
+      final pod = await HostPod.start(airPeer: hub.port);
+      pods.add(pod);
+      hub.members.add(pod.airPort);
+      link = await SocketPodTransport.usb(pod);
+      expect(await probeRadioLink(link!), 'pod');
+      final pm = PodModem(
+        PodClient(link!),
+        pingInterval: const Duration(milliseconds: 200),
+      );
+      m = pm;
+      begin = pm.start;
+      closeRadio = pm.close;
+    } else {
+      link = await SocketPodTransport.modem(host);
+      expect(await probeRadioLink(link!), 'modem');
+      final sm = SerialModem(
+        link!,
+        pingInterval: const Duration(milliseconds: 200),
+      );
+      m = sm;
+      begin = sm.start;
+      closeRadio = sm.close;
+    }
+    modem = m;
     final e = engine = ControllerEngine(
       config: ControllerConfig(persistGameKey: persistGameKey),
       store: FileControllerStore(Directory('${tmp.path}/controller')),
@@ -122,8 +150,8 @@ void main() {
     ControllerFirmware(e, '${tmp.path}/firmware', keys: firmwareKeys);
     ControllerBoxes(e);
     ControllerPairing(e);
-    await m.start();
-    expect(await waitFor(() => m.isUp), isTrue, reason: 'the modem');
+    await begin();
+    expect(await waitFor(() => m.isUp), isTrue, reason: 'the radio');
     expect(m.hasFieldFrames && m.hasPairFrames, isTrue);
     ticker = Timer.periodic(const Duration(milliseconds: 50), (_) => e.tick());
     return e;
@@ -131,7 +159,8 @@ void main() {
 
   Future<void> crash() async {
     ticker?.cancel();
-    await modem?.close();
+    await closeRadio?.call();
+    closeRadio = null;
     await link?.close();
     engine?.close();
     engine = null;
@@ -157,6 +186,7 @@ void main() {
     tmp = Directory.systemTemp.createTempSync('atalaia-boxes-e2e-');
     up = false;
     boxes.clear();
+    pods.clear();
     hub = await AirHub.start();
     host = await HostModem.start(airPeer: hub.port);
     hub.members.add(host.airPort);
@@ -168,6 +198,9 @@ void main() {
     await crash();
     for (final b in boxes) {
       await b.kill();
+    }
+    for (final p in pods) {
+      await p.stop();
     }
     if (up) {
       await host.stop();
@@ -414,55 +447,69 @@ void main() {
     timeout: const Timeout(Duration(minutes: 3)),
   );
 
-  test("a firmware update's offer reaches the box over the radio", () async {
-    final v = loadVectors('firmware.json');
-    final signing = (v['signing_key'] as Map).cast<String, String>();
-    final e = await phone(firmwareKeys: [signing['public_key_b64']!]);
-    e
-      ..caSha256 = Uint8List.fromList(List.generate(32, (i) => i))
-      ..linkUrls = ['https://10.42.0.1:8443', 'https://atalaia.local:8443'];
-    final image = boxImage('0.3.0');
-    final key = await MarshalKey.fromSeed(hexDecode(signing['seed']!));
-    final sig = base64.encode(
-      await ed25519Sign(
-        key,
-        releaseManifest(
-          'esp32s3',
-          '0.3.0',
-          image.length,
-          sha256.convert(image).toString(),
+  // The offer is CMD update (opcode 9), an ordinary sealed packet: the USB
+  // modem and the I/O pod carry it alike (decision PE24-130).
+  for (final viaPod in [false, true]) {
+    test("a firmware update's offer reaches the box over the radio "
+        '(${viaPod ? 'an I/O pod' : 'the USB modem'})', () async {
+      final v = loadVectors('firmware.json');
+      final signing = (v['signing_key'] as Map).cast<String, String>();
+      final e = await phone(
+        firmwareKeys: [signing['public_key_b64']!],
+        viaPod: viaPod,
+      );
+      e
+        ..caSha256 = Uint8List.fromList(List.generate(32, (i) => i))
+        ..linkUrls = ['https://10.42.0.1:8443', 'https://atalaia.local:8443'];
+      final image = boxImage('0.3.0');
+      final key = await MarshalKey.fromSeed(hexDecode(signing['seed']!));
+      final sig = base64.encode(
+        await ed25519Sign(
+          key,
+          releaseManifest(
+            'esp32s3',
+            '0.3.0',
+            image.length,
+            sha256.convert(image).toString(),
+          ),
         ),
-      ),
-    );
-    final rel = await e.firmware!.add(image, 'esp32s3', '0.3.0', sig);
-    final gid = game(e);
-    final b = await box(
-      'alpha',
-      args: ['--as-box', '0.2.0', '--release-keys', signing['public_key']!],
-    );
-    final nid = await join(e, b);
-    expect(await waitFor(() => node(e, nid)['fw_version'] == '0.2.0'), isTrue);
-    final r = await e.firmware!.install(rel['id']! as String, [nid]);
-    expect(r['results'], [
-      {'node_id': nid, 'result': 'sent'},
-    ]);
-    final offer = jsonEncode({'id': rel['id'], 'version': '0.3.0'});
-    expect(
-      await waitFor(
-        () => b.logged('UPDATE $offer link=yes/2 precheck=installed'),
-      ),
-      isTrue,
-      reason: '${b.lines.reversed.take(5)}',
-    );
-    // Not while the update is on its way; cancelled, the game starts.
-    expect(
-      () => e.startGame(gid, force: true),
-      throwsA(isA<ControllerError>().having((x) => x.status, 'status', 409)),
-    );
-    expect(e.firmware!.cancel(), [nid]);
-    e.startGame(gid, force: true);
-    expect(await waitFor(() async => (await b.status())['phase'] == 2), isTrue);
-  });
+      );
+      final rel = await e.firmware!.add(image, 'esp32s3', '0.3.0', sig);
+      final gid = game(e);
+      final b = await box(
+        'alpha',
+        args: ['--as-box', '0.2.0', '--release-keys', signing['public_key']!],
+      );
+      final nid = await join(e, b);
+      expect(
+        await waitFor(() => node(e, nid)['fw_version'] == '0.2.0'),
+        isTrue,
+      );
+      final r = await e.firmware!.install(rel['id']! as String, [nid]);
+      expect(r['results'], [
+        {'node_id': nid, 'result': 'sent'},
+      ]);
+      final offer = jsonEncode({'id': rel['id'], 'version': '0.3.0'});
+      expect(
+        await waitFor(
+          () => b.logged('UPDATE $offer link=yes/2 precheck=installed'),
+        ),
+        isTrue,
+        reason: '${b.lines.reversed.take(5)}',
+      );
+      // Not while the update is on its way; cancelled, the game starts.
+      expect(
+        () => e.startGame(gid, force: true),
+        throwsA(isA<ControllerError>().having((x) => x.status, 'status', 409)),
+      );
+      expect(e.firmware!.cancel(), [nid]);
+      e.startGame(gid, force: true);
+      expect(
+        await waitFor(() async => (await b.status())['phase'] == 2),
+        isTrue,
+      );
+    });
+  }
 
   test(
     'an I/O pod relays field and pair frames (PE24-100): the controller uses it as its radio',

@@ -968,6 +968,7 @@
     "send_again": "再次傳送",
     "send_again_hint": "盒子還沒有回應：現在再傳送一次更新（正在更新的盒子會忽略它）",
     "cancel": "不再等待傳送中的更新",
+    "radio_problem": "沒有送出任何更新提議：{detail}",
     "states": {
       "sent": "{version}：已傳送，等待盒子",
       "installed": "{version}：已安裝，重新啟動中",
@@ -996,7 +997,10 @@
       "flash": "寫入快閃記憶體失敗",
       "battery": "電量太低",
       "cancelled": "遊戲已開始",
-      "self_test": "新韌體自我測試失敗"
+      "self_test": "新韌體自我測試失敗",
+      "radio_duty_cycle": "無線電的發射時間額度已用完：幾分鐘後再傳送一次",
+      "radio_queue_full": "無線電的佇列已滿：再傳送一次",
+      "radio_failed": "無線電沒有送出更新提議"
     },
     "results": {
       "sent": "已傳送更新",

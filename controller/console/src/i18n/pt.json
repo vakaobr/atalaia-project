@@ -968,6 +968,7 @@
     "send_again": "Enviar de novo",
     "send_again_hint": "A caixa ainda não respondeu: enviar a atualização de novo já (uma caixa que já está a atualizar ignora-a)",
     "cancel": "Deixar de esperar pelas atualizações em curso",
+    "radio_problem": "Nenhuma oferta saiu: {detail}",
     "states": {
       "sent": "{version}: enviada, à espera da caixa",
       "installed": "{version}: instalada, a reiniciar",
@@ -996,7 +997,10 @@
       "flash": "a escrita na memória falhou",
       "battery": "bateria demasiado fraca",
       "cancelled": "começou um jogo",
-      "self_test": "o novo firmware falhou o autoteste"
+      "self_test": "o novo firmware falhou o autoteste",
+      "radio_duty_cycle": "o tempo de emissão do rádio esgotou-se: envia outra vez dentro de uns minutos",
+      "radio_queue_full": "a fila do rádio estava cheia: envia outra vez",
+      "radio_failed": "o rádio não enviou a oferta"
     },
     "results": {
       "sent": "atualização enviada",

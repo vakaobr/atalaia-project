@@ -43,6 +43,10 @@ const slotSize = 0x200000;
 const boxPlatforms = ['esp32', 'esp32s3'];
 const boxTiers = [0, 1];
 const reportMax = 512;
+
+/// How long after its CMD update a radio's refusal (TX_ACK) of that packet
+/// is taken as the offer's: the radio answers within its transmit timeout.
+const offerWindowS = 30;
 const _active = ['sent', 'installed'];
 final _reason = RegExp(r'^[a-z][a-z_]{0,23}$');
 
@@ -406,6 +410,7 @@ class ControllerFirmware {
       'version': e['version'],
     };
     final results = <Map<String, Object?>>[];
+    String? radioProblem;
     for (final nodeId in targets) {
       final node = known[nodeId];
       var why = node == null
@@ -430,6 +435,7 @@ class ControllerFirmware {
         } on ControllerError catch (err) {
           if (err.status != 503) rethrow;
           why = 'radio';
+          radioProblem = err.message;
         }
       }
       results.add({'node_id': nodeId, 'result': why ?? 'sent'});
@@ -437,12 +443,19 @@ class ControllerFirmware {
     if (nodes != 'all' &&
         targets.length == 1 &&
         results.first['result'] != 'sent') {
+      final why = results.first['result'];
       throw ControllerError.conflict(
-        'box ${targets.first}: ${results.first['result']}',
+        'box ${targets.first}: $why'
+        '${why == 'radio' && radioProblem != null ? ' ($radioProblem)' : ''}',
       );
     }
     _emit();
-    return {'release': await _public(e), 'results': results};
+    return {
+      'release': await _public(e),
+      'results': results,
+      // Why no offer went out when a box's result is "radio" (PE24-130).
+      'radio_problem': ?radioProblem,
+    };
   }
 
   /// A box's report on its update, authenticated with the live game's key.
@@ -484,6 +497,10 @@ class ControllerFirmware {
   /// A box's HELLO shows what it runs; its node.update_failed says why an
   /// update failed where it could not report over HTTPS (decision OT-8).
   void onMessage(Map<String, Object?> msg) {
+    if (msg['type'] == 'system' && msg['kind'] == 'tx.failed') {
+      _offerRefused(msg['seq'], msg['status']);
+      return;
+    }
     final ev = msg['event'];
     if (msg['type'] == 'event' &&
         ev is Map &&
@@ -518,6 +535,33 @@ class ControllerFirmware {
     }
   }
 
+  /// The radio refused an offer after taking it (its TX_ACK: the duty
+  /// cycle's budget spent, a full queue, a transmission that never ended):
+  /// the box never heard it, so the update fails now with that reason
+  /// instead of waiting out [timeoutS] as `sent` (decision PE24-130). The
+  /// packet's seq is 16 bits and wraps, so only an offer sent a moment ago
+  /// is taken for the packet.
+  void _offerRefused(Object? seq, Object? status) {
+    if (seq is! int || status is! String) return;
+    final now = _now();
+    for (final a in attempts.values) {
+      if (a['state'] == 'sent' &&
+          a['seq'] == seq &&
+          now - (a['sent_at']! as num) < offerWindowS) {
+        a
+          ..['state'] = 'failed'
+          ..['reason'] = switch (status) {
+            'duty_cycle' => 'radio_duty_cycle',
+            'queue_full' => 'radio_queue_full',
+            _ => 'radio_failed',
+          }
+          ..['updated_at'] = now;
+        _emit();
+        return;
+      }
+    }
+  }
+
   void _failedOverRadio(Map<String, Object?> ev) {
     final data = (ev['data'] as Map?) ?? const {};
     final nodeId = ev['node'];
@@ -542,6 +586,12 @@ class ControllerFirmware {
   Future<Map<String, Object?>> status() async => {
     'keys': [for (final k in keys) releaseKeyId(k)],
     'https': engine.caSha256 != null && engine.linkUrls.isNotEmpty,
+    // What carries the offers, and why it cannot now (PE24-130).
+    'radio': {
+      'kind': engine.radioKind,
+      'state': engine.radioState,
+      'problem': engine.radioProblem(),
+    },
     'slot_size': slotSize,
     'max_releases': maxReleases,
     'releases': await releases(),

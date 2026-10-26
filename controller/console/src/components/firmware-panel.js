@@ -43,7 +43,7 @@ export function compareVersions(a, b) {
 export class FirmwarePanel extends Component {
     constructor() {
         super();
-        this.state = { fw: null, busy: false, results: null };
+        this.state = { fw: null, busy: false, results: null, radioProblem: null };
         this.image = null;
         this.release = null;
     }
@@ -88,7 +88,7 @@ export class FirmwarePanel extends Component {
 
     async install(release, nodes) {
         const out = await this.props.app.call('POST', `/firmware/${release.id}/install`, { nodes });
-        if (out) this.setState({ results: out.results });
+        if (out) this.setState({ results: out.results, radioProblem: out.radio_problem || null });
         this.load();
     }
 
@@ -196,6 +196,8 @@ export class FirmwarePanel extends Component {
             ${this.renderBoxes(fw, canUpdate)}
             ${state.results && html`<ul class="small" data-testid="firmware-results">${state.results.map((r) =>
                 html`<li>${t('nodes.node')} ${r.node_id}: ${t(`firmware.results.${r.result}`)}</li>`)}</ul>`}
+            ${state.radioProblem && html`<p class="small warn" data-testid="firmware-radio-problem">
+                ${t('firmware.radio_problem', { detail: state.radioProblem })}</p>`}
             ${active && html`<p><button type="button" class="link" data-testid="firmware-cancel"
                 onClick=${() => this.cancel()}>${t('firmware.cancel')}</button></p>`}
         </section>`;

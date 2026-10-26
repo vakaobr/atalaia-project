@@ -6,10 +6,10 @@
 /// (protocol/usb-modem.md, firmware/esp32/main/modem/), spoken to as the
 /// Pi's controller/atalaia_controller/radio_modem.py does, over any byte
 /// link (a USB-OTG CDC ACM link through the app's USB plugin, or a test's
-/// socket to the host modem). Unlike an I/O pod (pod_modem.dart, whose
-/// firmware does not relay them yet, decision PE24-91) it carries field
-/// and pair frames (FIELD_TX, FIELD_RX, FIELD_ACK): re-invites, GAME_OVER
-/// and pairing by code.
+/// socket to the host modem). Like an I/O pod whose firmware relays them
+/// (pod_modem.dart, decisions PE24-100 and PE24-101; an older pod does not)
+/// it carries field and pair frames (FIELD_TX, FIELD_RX, FIELD_ACK):
+/// re-invites, GAME_OVER and pairing by code.
 ///
 ///   - IDENT at once (a JSON answer: `field`, `pair`, `radio`...), then a
 ///     PING whose STATUS brings the radio up; the game's CONFIGURE and the

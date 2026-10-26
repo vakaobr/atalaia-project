@@ -825,7 +825,8 @@ roadmap:
         - "As caixas pelo rádio: convites selados para o jogo seguinte; o fim do jogo dito às caixas
           mesmo depois de o telemóvel reiniciar sem a chave do jogo; a adoção de caixas novas pelo
           código que mostram ou pelo cartão de campo que o telemóvel escreve por NFC; as
-          atualizações de firmware entre jogos (com o modem de rádio USB do Pi ligado ao telemóvel)."
+          atualizações de firmware entre jogos, pelo módulo de E/S ou pelo modem de rádio USB do Pi,
+          e o telemóvel diz porquê quando o rádio não as consegue levar."
         - "As predefinições, os modos carregados e os pacotes de modos assinados, enviados às caixas
           que não os têm; os cenários compilados no telemóvel; os pacotes de papéis num jogo; os
           nomes e emblemas das equipas."
@@ -846,8 +847,6 @@ roadmap:
         Até agora a app correu em emuladores Android e num iPhone ligado ao controlador da bancada,
         e o firmware do módulo só como o seu próprio código num computador."
       - O telemóvel como controlador de campo espera por um telemóvel a sério.
-      - "O firmware do módulo de E/S ainda não passa as mensagens de rádio das atualizações de
-        firmware das caixas: para essas, o modem de rádio USB do Pi liga-se ao telemóvel."
       - "No iOS, o NFC pede uma conta Apple paga; o dispositivo Android e o telemóvel como
         controlador do campo ficam só em Android."
     gate: "Prova: um jogo mistura dispositivos ESP32 e Android sem problemas."

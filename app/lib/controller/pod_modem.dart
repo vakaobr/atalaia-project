@@ -21,9 +21,13 @@
 /// Field and pair frames (re-invites, GAME_OVER, pairing by code; slice
 /// S7c) go as RADIO_FIELD_TX and come as RADIO_FIELD_RX / RADIO_FIELD_ACK
 /// (the modem's FIELD_* plus 3), only with a pod whose IDENT says it relays
-/// them: the pod firmware does not yet (decision PE24-91), so with today's
-/// pods [hasFieldFrames] is false and the controller says so, as a Pi does
-/// with an old modem.
+/// them (keys 6 and 7, PE24-100 and PE24-101); with an older pod
+/// [hasFieldFrames] is false and the controller says so, as a Pi does with
+/// an old modem. A firmware update's offer (CMD update) and the boxes'
+/// answers (HELLO, node.update_failed) are ordinary game packets, RADIO_TX
+/// and RADIO_RX, which every pod relays: no IDENT key tells of them
+/// (decision PE24-130); [cannotCarry] says why a pod cannot, a pod with no
+/// radio chip or a radio that is down.
 ///
 /// A pod with no radio chip is never up. Checked against the pod
 /// firmware's own code (the host pod) and the Field Box's (the host box)
@@ -79,6 +83,9 @@ class PodModem extends ControllerModem {
   var _fieldFrames = false;
   var _pairFrames = false;
   var _fieldId = 0;
+
+  @override
+  String get kind => 'pod';
 
   @override
   String get state => _state;

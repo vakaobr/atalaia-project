@@ -968,6 +968,7 @@
     "send_again": "Send again",
     "send_again_hint": "The box has not answered yet: send the update again now (a box already updating ignores it)",
     "cancel": "Stop waiting for the updates on their way",
+    "radio_problem": "No offer went out: {detail}",
     "states": {
       "sent": "{version}: sent, waiting for the box",
       "installed": "{version}: installed, restarting",
@@ -996,7 +997,10 @@
       "flash": "writing the flash failed",
       "battery": "battery too low",
       "cancelled": "a game started",
-      "self_test": "the new firmware failed its self-test"
+      "self_test": "the new firmware failed its self-test",
+      "radio_duty_cycle": "the radio's airtime budget was spent: send it again in a few minutes",
+      "radio_queue_full": "the radio's queue was full: send it again",
+      "radio_failed": "the radio did not send the offer"
     },
     "results": {
       "sent": "update sent",

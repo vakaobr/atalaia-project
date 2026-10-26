@@ -129,6 +129,26 @@ abstract class ControllerModem {
   /// `"radio": "sx1262"`; an I/O pod says `has_radio`).
   bool get hasRadioChip => ident?['radio'] == 'sx1262';
 
+  /// What carries the packets: "pod" (an I/O pod, pod_modem.dart) or
+  /// "modem" (a USB radio modem, serial_modem.dart, or a test's).
+  String get kind => 'modem';
+
+  /// Why this radio cannot carry a game packet now, in words for the GM, or
+  /// null when it can (decision PE24-130). Both radios carry the same
+  /// packets (a firmware update's CMD among them): what differs is only the
+  /// thing that fails, a pod with no radio chip or a link that is down.
+  String? get cannotCarry {
+    final what = kind == 'pod' ? "the I/O pod's radio" : 'the USB radio modem';
+    if (ident != null && !hasRadioChip) {
+      return kind == 'pod'
+          ? 'the I/O pod has no radio chip: use a pod with a radio, or a '
+                'USB radio modem'
+          : 'the USB radio modem reports no radio chip';
+    }
+    if (!isUp) return '$what is $state';
+    return null;
+  }
+
   /// Whether the radio can measure noise (MEASURE): the Pi's modem says so
   /// in its IDENT (`"measure": true`).
   bool get canMeasure => hasRadioChip && ident?['measure'] == true;

@@ -14,7 +14,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "atalaia/codec.h"
 #include "atalaia/join.h"
+#include "atalaia/msg_codec.h"
 #include "atalaia/packet.h"
 #include "atalaia/tag.h"
 #include "check.h"
@@ -910,6 +912,113 @@ static void test_field_relay(void)
     CHECK(i >= 0 && phone[POD_LINK_BLE].len[i] == MODEM_FIELD_MAX + 2);
 }
 
+/* ---- A box's firmware update through the pod (PE24-130) --------------------------------- */
+
+/*
+ * The update needs no frame of its own: the offer is CMD update (opcode 9, RFC 0001 Amendment
+ * 6), an ordinary game packet the phone sends as RADIO_TX; the box's answers are a HELLO with
+ * its version and, for a failure its HTTPS report cannot carry, the event node.update_failed,
+ * ordinary game packets that come back as RADIO_RX. The image and the report go over the
+ * field's Wi-Fi, past the pod. So the pod needs no capability bit for it (the proxy's IDENT
+ * keys 6-8 tell of frame types an older pod ignores; every pod relays these).
+ */
+static void test_update_relay(void)
+{
+    static const uint8_t game_key[16] = {0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6,
+                                         0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c};
+    setup();
+    phone_send_vector(POD_LINK_USB, "cmd_configure"); /* game 4242, node 0, key above */
+    CHECK(pod.radio.configured && pod.radio_owner == POD_LINK_USB);
+
+    /* The offer to box 7, as the controller makes it: critical, sealed by the pod. */
+    atalaia_cmd_msg_t cmd;
+    memset(&cmd, 0, sizeof(cmd));
+    cmd.cmd = 9;
+    cmd.dest = 7;
+    snprintf(cmd.params_json, sizeof(cmd.params_json),
+             "{\"id\":\"0123456789abcdef\",\"version\":\"0.3.0\"}");
+    uint8_t body[128];
+    size_t body_len = atalaia_cmd_encode(&cmd, body, sizeof(body));
+    CHECK(body_len > 0);
+    uint8_t tx[9 + 128];
+    atalaia_header_t th = {
+        ATALAIA_VF_MAKE(1, ATALAIA_PRIO_CRITICAL, 0, 0), 4242, 0, 21, 2, ATALAIA_MSG_CMD};
+    atalaia_header_encode(&th, tx);
+    memcpy(tx + 9, body, body_len);
+    phone_send(POD_LINK_USB, ATALAIA_PROXY_RADIO_TX, tx, 9 + body_len);
+    CHECK(radio_sends == 1 && radio_tag == 22 && pod.count.ignored == 0);
+
+    /* What went on air is a sealed game packet that a box with the game's key opens. */
+    atalaia_header_t ah;
+    uint8_t plain[ATALAIA_RF_PAYLOAD_MAX];
+    size_t plain_len = 0;
+    CHECK(atalaia_packet_decrypt(radio_pkt, radio_pkt_len, pod.radio.tx_epoch, game_key, &ah, plain,
+                                 &plain_len, &atalaia_crypto_test_stub));
+    CHECK(ah.type == ATALAIA_MSG_CMD && ah.seq == 21 && ah.source == 0 && ah.game_id == 4242 &&
+          ATALAIA_VF_PRIO(ah.version_flags) == ATALAIA_PRIO_CRITICAL &&
+          ATALAIA_VF_ENC(ah.version_flags));
+    atalaia_cmd_msg_t got;
+    CHECK(atalaia_cmd_decode(plain, plain_len, &got) && got.cmd == 9 && got.dest == 7 &&
+          strstr(got.params_json, "0123456789abcdef") != NULL &&
+          strstr(got.params_json, "0.3.0") != NULL);
+
+    /* The duty cycle is the radio task's, as for every packet: a refusal comes back as
+     * RADIO_TX_ACK duty_cycle (for the phone to say so), the airtime's success as ok. */
+    pod_on_tx_result(&pod, radio_tag, MODEM_TX_DUTY_CYCLE);
+    int i = find_type(POD_LINK_USB, ATALAIA_PROXY_RADIO_TX_ACK);
+    CHECK(i >= 0 && phone[POD_LINK_USB].len[i] == 3 && phone[POD_LINK_USB].payload[i][1] == 21 &&
+          phone[POD_LINK_USB].payload[i][2] == MODEM_TX_DUTY_CYCLE);
+    pod_on_tx_result(&pod, radio_tag, MODEM_TX_OK);
+    i = find_type(POD_LINK_USB, ATALAIA_PROXY_RADIO_TX_ACK);
+    CHECK(i >= 0 && phone[POD_LINK_USB].payload[i][1] == 21 &&
+          phone[POD_LINK_USB].payload[i][2] == MODEM_TX_OK);
+
+    /* The box's node.update_failed (id 52: release, reason, fw), sealed with the game key,
+     * comes back as RADIO_RX with its plaintext: the pod never reads it. */
+    atalaia_event_t ev;
+    CHECK(atalaia_event_init(&ev, 7, 3, 0, "node.update_failed", ATALAIA_TEAM_NONE,
+                             ATALAIA_SQUAD_NONE, ATALAIA_PRIO_CRITICAL));
+    uint8_t evb[160];
+    size_t evb_len = atalaia_event_encode(
+        &ev, "{\"release\":\"0123456789abcdef\",\"reason\":\"no_wifi\",\"fw\":\"0.2.0\"}", evb,
+        sizeof(evb), NULL);
+    CHECK(evb_len > 0);
+    atalaia_header_t bh = {
+        ATALAIA_VF_MAKE(1, ATALAIA_PRIO_CRITICAL, 0, 1), 4242, 7, 3, 2, ATALAIA_MSG_EVENT};
+    uint8_t pkt[ATALAIA_RF_HEADER_SIZE + ATALAIA_RF_PAYLOAD_MAX + ATALAIA_RF_MIC_SIZE];
+    size_t pkt_len = atalaia_packet_encrypt(&bh, 2, game_key, evb, evb_len, pkt, sizeof(pkt),
+                                            &atalaia_crypto_test_stub);
+    CHECK(pkt_len > 0);
+    pod_on_air_rx(&pod, pkt, pkt_len, -92, 4);
+    i = find_type(POD_LINK_USB, ATALAIA_PROXY_RADIO_RX);
+    CHECK(i >= 0 && phone[POD_LINK_USB].len[i] == 9 + evb_len + 4);
+    if (i >= 0 && phone[POD_LINK_USB].len[i] == 9 + evb_len + 4) {
+        const uint8_t *p = phone[POD_LINK_USB].payload[i];
+        CHECK(memcmp(p + 9, evb, evb_len) == 0 && (int8_t)p[9 + evb_len] == -92);
+        atalaia_event_t back;
+        char data[160];
+        CHECK(atalaia_event_decode(p + 9, evb_len, &back, data, sizeof(data), NULL) &&
+              strcmp(back.type, "node.update_failed") == 0 && strstr(data, "no_wifi") != NULL);
+    }
+
+    /* A pod without a radio chip refuses the offer, saying so (the phone then says why). */
+    pod_caps_config_t cfg = full_config();
+    setup_with(&cfg, false);
+    phone_send_vector(POD_LINK_USB, "cmd_ident");
+    phone_send(POD_LINK_USB, ATALAIA_PROXY_RADIO_TX, tx, 9 + body_len);
+    i = find_type(POD_LINK_USB, ATALAIA_PROXY_RADIO_TX_ACK);
+    CHECK(radio_sends == 0 && i >= 0 && phone[POD_LINK_USB].payload[i][2] == MODEM_TX_NO_RADIO);
+
+    /* No game configured (the phone's CONFIGURE is lost with a link): not configured, not
+     * sent, and never an unsealed packet on air. */
+    setup();
+    phone_send_vector(POD_LINK_USB, "cmd_ident");
+    phone_send(POD_LINK_USB, ATALAIA_PROXY_RADIO_TX, tx, 9 + body_len);
+    i = find_type(POD_LINK_USB, ATALAIA_PROXY_RADIO_TX_ACK);
+    CHECK(radio_sends == 0 && i >= 0 &&
+          phone[POD_LINK_USB].payload[i][2] == MODEM_TX_NOT_CONFIGURED);
+}
+
 /* ---- Capabilities ---------------------------------------------------------------------- */
 
 static void test_caps_inputs(void)
@@ -1089,6 +1198,7 @@ void run_pod_tests(void)
     test_evt();
     test_radio();
     test_field_relay();
+    test_update_relay();
     test_caps_inputs();
     test_caps_commands();
     test_json();

@@ -64,6 +64,8 @@ The GM uploads the image and its `.release.json` in the console (*Boxes* tab), o
 
 The live game cannot start while an update is on its way (`sent` or `installed`, until `[firmware] update_timeout_s`, 600 s); the GM can stop waiting (`DELETE /api/v1/firmware/updates`), or send the update again at once to a box it names (`{"nodes": [7]}`) while its update is still `sent` (decision OT-9: a box already updating ignores the second offer; `"all"` skips such boxes, and an `installed` box is never sent another). A box stops a download as soon as a game starts. A mode's `field.lua` can never send `update`.
 
+**The radio that carries the offer** is whatever the controller has: the Pi's USB radio modem, or, on the Android field controller, an I/O pod or a USB radio modem plugged into the phone (decision PE24-130). The offer is an ordinary game packet (RADIO_TX through a pod, [capability-proxy.md](capability-proxy.md)) under the radio's duty-cycle budget; a controller never reports an offer `sent` that its radio could not send: with no radio, a pod with no radio chip or a radio that is down, the answer is `radio` for that box (409 `box N: radio (why)` for one box, `radio_problem` in the answer for `"all"`), and a phone whose radio takes the offer and then refuses it (its TX_ACK: `duty_cycle`, `queue_full`, or another status) marks the update `failed` with the reason `radio_duty_cycle`, `radio_queue_full` or `radio_failed` at once, instead of `sent` until the timeout. The Pi's controller does not yet follow a refused offer's TX_ACK.
+
 ## The box
 
 On CMD update (or `@update <version> <id>` on its serial console, which runs the same checks), a box refuses at once, showing why:

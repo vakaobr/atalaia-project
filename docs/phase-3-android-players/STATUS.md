@@ -405,7 +405,7 @@ on a UDP air), and against the host pod; not on a phone, a modem or a pod.
 | Adoption: the field card | `controller_adoption.dart`, `controller_boxes_screen.dart` (`FieldCardTile`), `controller_screen.dart`; `lib/protocol/field_card.dart` | Done: `GET /api/v1/adopt`, `POST /api/v1/adopt/card` (never cached) and the records as the Pi's; the screen's *Cartão de campo* writes the card with the phone's NFC after the master-secret warning (PE24-93); USB adoption not offered (`usb: false`, 503, PE24-95) |
 | Adoption: pairing by code | `controller_pairing.dart`; `lib/protocol/pair_frame.dart`, `lib/security/cpace.dart` | Done, as `pairing.py`: offers, one run at a time, CPace (X25519 on `BigInt`, Elligator 2, SHA-512), the join key and the field's name sealed in KEY, DONE checked with the fingerprint; the pairing channel for five minutes (`GET /api/v1/adopt/pair`, `POST .../listen`, `POST .../pair`; PE24-94) |
 | Firmware updates | `controller_firmware.dart`, `controller_boxes_api.dart`, `controller_boxes_screen.dart` (`FirmwareKeysTile`), `app_store.dart`; `lib/protocol/firmware_release.dart` | Done, as `firmware_updates.py`: signed releases checked with the release keys set on the controller's screen (the app's settings) and kept in the controller's folder, CMD update over the radio only before a game starts, the release and image served without a token over the phone's HTTPS (the S6 field CA), the box's report, HELLO, `node.update_failed`, the timeout, cancel (PE24-96) |
-| The radio | `controller_radio.dart` (field frames on `ControllerModem`), `serial_modem.dart`, `pod_modem.dart`, `controller_host.dart` | Done: the Pi's USB radio modem as the phone's radio (field and pair frames), told from a pod by its answer (PE24-92); the pod's side ready for RADIO_FIELD_* once its firmware relays them (PE24-91, a firmware follow-up) |
+| The radio | `controller_radio.dart` (field frames on `ControllerModem`), `serial_modem.dart`, `pod_modem.dart`, `controller_host.dart` | Done: the Pi's USB radio modem as the phone's radio (field and pair frames), told from a pod by its answer (PE24-92); the pod's side ready for RADIO_FIELD_* (the firmware relays them since PE24-100 to PE24-105); firmware updates through the pod or the modem (PE24-130, 2026-10-26: no new frame, the radio's refusals said in words and a refused offer fails the update) |
 | What the console sees | `controller_api.dart` (`controllerFeatures`) | Done: `boxes`, `adoption` and `firmware` added to `whoami` (PE24-97) |
 
 Tests: 10 new shared contract cases (45 in all; passing on both
@@ -427,6 +427,13 @@ The Pi's contract runner sets up adoption and firmware updates as
 
 Remaining (dated note, 2026-10-23): the rest of S7 is built too (below);
 the pod firmware's relay of field frames was built as PE24-100 to PE24-104.
+Dated note, 2026-10-26: the roadmap's last pod gap, "the pod does not relay a
+box's firmware update", was a stale statement: the offer (CMD update) and the
+box's HELLO and `node.update_failed` are ordinary game packets that every pod
+relays (RADIO_TX, RADIO_RX), and the image and report go over Wi-Fi. Decisions
+PE24-130 to PE24-135: no new frame or IDENT key; a host test and an end-to-end
+test through the host pod; the phone says why a radio cannot carry an offer
+and fails an update at once when the radio refuses it (duty cycle, full queue).
 For the maintainer (S7c): PE24-91 (the pod's relay, a protocol and
 firmware follow-up), PE24-92 (a USB radio modem on the phone), PE24-93 (the
 field card written by the phone's NFC) and PE24-96 (firmware updates from a

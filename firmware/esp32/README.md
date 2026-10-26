@@ -373,7 +373,10 @@ that does not fit in one sub-band, dedupes and decrypts what it hears
 come as they are (RADIO_FIELD_TX, RX and ACK, `0x0C`-`0x0E`, with or without
 a game; decision PE24-100), so a phone with only a pod can re-invite boxes,
 end a game with GAME_OVER and adopt a box by its code; IDENT says so (keys
-6 `field_frames`, 7 `pair_frames`, 8 `measure`, PE24-101). The game key lives in RAM only and is forgotten
+6 `field_frames`, 7 `pair_frames`, 8 `measure`, PE24-101). A box's firmware update needs nothing more: its offer is CMD update, an
+ordinary game packet sent as RADIO_TX (so under the same duty-cycle budget and region rules), and the box's HELLO and
+`node.update_failed` come back as RADIO_RX; the image and the report go over Wi-Fi (decision PE24-130, `test_update_relay`).
+The game key lives in RAM only and is forgotten
 when the link that configured the radio goes (decision PF5). The board
 revision (V4.3 KCT8103L by default, V4.2 GC1109) and Vext are the Field
 Box's settings; the GNSS connector is not used (E21).
@@ -398,7 +401,7 @@ lists the checks that need the board and a phone. Code:
   enclosure switch, and the boot.
 
 Tests: `test/test_pod.c` (the proxy and the capabilities, against the
-shared vectors), `test/test_ble_gatt_stub.c` (`ctest -R ble_gatt_stub`: the
+shared vectors; a box's update offer through the pod, opened with the game key, its duty-cycle refusal, the box's `node.update_failed` coming back), `test/test_ble_gatt_stub.c` (`ctest -R ble_gatt_stub`: the
 GATT service with the Bluetooth stack stubbed), `test/test_proxy_codec.c`
 (the frames). `test/pod_host/` builds the pod's code with real AES-CCM into
 a Linux program (USB and Bluetooth links as TCP sockets, the radio as UDP,

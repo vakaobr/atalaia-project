@@ -801,7 +801,8 @@ roadmap:
         - "The boxes over the radio: sealed invites into the next game; the end of a game told to
           its boxes even after the phone restarted without the game's key; new boxes adopted by the
           code they show or by a field card the phone writes by NFC; firmware updates between
-          games (with the Pi's USB radio modem plugged into the phone)."
+          games, through the I/O pod or the Pi's USB radio modem, and the phone says why when its
+          radio cannot carry them."
         - "Presets, mode uploads and signed mode packages sent to the boxes that lack them,
           scenarios compiled on the phone, role packages in a game, team names and crests."
         - "What the Pi controller does, too: failover (a phone and a Pi can each be the other's
@@ -820,8 +821,6 @@ roadmap:
         app has run on Android emulators and on an iPhone against the bench's controller, and the
         pod firmware only as its own code on a computer."
       - The phone as the field controller waits for a real phone.
-      - "The I/O pod's firmware does not relay the radio messages for boxes' firmware updates yet:
-        for those, the Pi's USB radio modem goes into the phone."
       - "On iOS, NFC needs a paid Apple account; the prop and the phone as the field controller stay
         Android only."
     gate: "Gate: one game mixes ESP32 and Android props without issues."

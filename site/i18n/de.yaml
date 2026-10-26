@@ -846,7 +846,8 @@ roadmap:
         - "Die Boxen über Funk: versiegelte Einladungen ins nächste Spiel; das Spielende, den Boxen
           mitgeteilt, auch wenn das Handy ohne den Spielschlüssel neu gestartet wurde; neue Boxen,
           aufgenommen über den Code, den sie zeigen, oder über eine Feldkarte, die das Handy per NFC
-          schreibt; Firmware-Updates zwischen den Spielen (mit dem USB-Funkmodem des Pi am Handy)."
+          schreibt; Firmware-Updates zwischen den Spielen, über den I/O-Pod oder das USB-Funkmodem
+          des Pi, und das Handy sagt, warum, wenn sein Funk sie nicht tragen kann."
         - "Presets, Modus-Uploads und signierte Modus-Pakete, an Boxen geschickt, denen sie fehlen;
           auf dem Handy kompilierte Szenarien; Rollenpakete in einem Spiel; Teamnamen und Wappen."
         - "Auch alles Übrige, was der Pi kann: Failover (ein Handy und ein Pi können gegenseitig ihre
@@ -867,8 +868,6 @@ roadmap:
         die App auf Android-Emulatoren und auf einem iPhone gegen den Controller auf dem
         Labortisch, und die Pod-Firmware nur als ihr eigener Code auf einem Computer."
       - Das Handy als Feld-Controller wartet auf ein echtes Handy.
-      - "Die Firmware des I/O-Pods leitet die Funknachrichten für die Firmware-Updates der Boxen noch
-        nicht weiter: Dafür kommt das USB-Funkmodem des Pi ans Handy."
       - "Unter iOS braucht NFC ein kostenpflichtiges Apple-Konto; der Prop und das Handy als
         Feld-Controller bleiben nur für Android."
     gate: "Gate: Ein Spiel mischt ESP32- und Android-Props ohne Probleme."

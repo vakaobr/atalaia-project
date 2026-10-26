@@ -2188,10 +2188,31 @@ class ControllerEngine {
     }
     if (seq == null) {
       throw ControllerError.unavailable(
-        'the radio modem is $radioState; command not sent',
+        '${radioProblem() ?? 'the radio is $radioState'}; command not sent',
       );
     }
     return seq;
+  }
+
+  /// "pod", "modem", or "none" without a radio (a test's transport is a
+  /// "modem").
+  String get radioKind => modem?.kind ?? (transport != null ? 'modem' : 'none');
+
+  /// Why the radio cannot carry a packet now, in words (a pod with no radio
+  /// chip, a link that is down, no radio linked at all), or null when it can
+  /// (decision PE24-130): what the GM reads when an update's offer cannot go.
+  String? radioProblem() {
+    final m = modem;
+    if (m == null) {
+      if (transport == null) {
+        return 'no radio is linked: plug an I/O pod with a radio, or a USB '
+            'radio modem, into the phone';
+      }
+      return transport!.state == ModemState.up
+          ? null
+          : 'the radio is ${transport!.state}';
+    }
+    return m.cannotCarry;
   }
 
   // --- FieldController hooks ----------------------------------------------
