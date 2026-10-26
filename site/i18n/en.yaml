@@ -666,6 +666,13 @@ try:
       on the Android emulator, as the
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/app/README.md#install-it-on-an-android-phone-from-windows">app
       guide</a> explains. It has run on emulators, not yet on a real phone.
+  manuals:
+    title: Playing and running it
+    text: >-
+      Manuals for the people who use Atalaia, not for developers: for
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/README.md">players, organisers, marshals and box operators</a>, in English
+      and Portuguese, with a one-page quick start. They say what the software shows today and mark
+      what has not been tried on a field.
 
 roadmap:
   title: Roadmap
@@ -1672,6 +1679,7 @@ footer:
     AGPL-3.0-or-later for the field controller and site server; CERN-OHL-S-2.0 for hardware;
     CC BY-SA 4.0 for documentation and this page.
   licensing: Licensing
+  manuals: Manuals for players, organisers, marshals and box operators
   independent: >-
     Independent and community-run; not affiliated with any commercial prop maker. This page sets no
     cookies and loads nothing from other sites.

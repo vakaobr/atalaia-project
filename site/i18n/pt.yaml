@@ -683,6 +683,13 @@ try:
       ou mais recente, ou no emulador Android, como explica o
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/app/README.md#install-it-on-an-android-phone-from-windows">guia
       da app</a> (em inglês). Já correu em emuladores, mas ainda não num telemóvel a sério.
+  manuals:
+    title: Jogar e organizar
+    text: >-
+      Manuais para quem usa a Atalaia, não para quem programa: para
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/README.md">quem joga, a organização, os marshals e quem opera as caixas</a>,
+      em português e em inglês, com um início rápido de uma página. Dizem o que o software mostra
+      hoje e marcam o que ainda não foi experimentado num campo.
 
 roadmap:
   # "Roadmap" stays in English in Portuguese too, as it is known in Portugal (never "Roteiro").
@@ -1746,6 +1753,7 @@ footer:
     AGPL-3.0-or-later para o controlador de campo e o servidor do clube; CERN-OHL-S-2.0 para o
     hardware; CC BY-SA 4.0 para a documentação e esta página.
   licensing: Licenças
+  manuals: Manuais para quem joga, a organização, os marshals e quem opera as caixas
   independent: >-
     Projeto independente e feito pela comunidade, sem ligação a nenhum fabricante comercial de
     dispositivos de jogo. Esta página não usa cookies nem carrega nada de outros sites.

@@ -13,6 +13,8 @@
 
 **The open force-on-force platform.** Project page: [Português](https://atalaia-project.link/) · [English](https://atalaia-project.link/en/)
 
+**Manuals** for the people who use it (players, game masters, marshals, box operators): [English](docs/manuals/en/quick-start.md) · [Português](docs/manuals/pt/quick-start.md) · [all manuals](docs/manuals/README.md)
+
 ![Illustration: at dusk, a stone watchtower on a hilltop carries a radio box whose signals reach glowing orange GAME PROP boxes spread across a forested valley, while a group of players walks past them. Painted text reads "Open-source project ATALAIA".](site/img/watchtower-night-1600.jpg)
 
 Atalaia is an open, local-first platform for airsoft, paintball and milsim game props. Build a domination box from a €20 microcontroller, turn an old Android phone into a hacking terminal, run a 20-box weekend milsim on a LoRa mesh, and write your own game modes as small scripts. No cloud required, no vendor lock-in.
@@ -130,7 +132,7 @@ The diagrams are built in English and Portuguese, for wide and narrow screens, f
 | [`simulator/`](simulator/) | Desktop simulator with virtual nodes and a web view; the mode editor (blocks to Lua) at `/editor/` | GPL-3.0-or-later |
 | [`examples/scoreboard/`](examples/scoreboard/) | MQTT subscriber scoreboard example | GPL-3.0-or-later |
 | [`hardware/`](hardware/) | Reference builds: wiring, bills of materials, enclosures; the Field Box build manual ([hardware/field-box/BUILD.md](hardware/field-box/BUILD.md)) and the build guides of the Satellite, the I/O pod and the target addon | CERN-OHL-S-2.0 |
-| [`docs/`](docs/) | Design spec, RFCs, phase folders, guides | CC-BY-SA-4.0 |
+| [`docs/`](docs/) | Design spec, RFCs, phase folders, guides, [user manuals](docs/manuals/README.md) | CC-BY-SA-4.0 |
 | [`site/`](site/) | The project page in Portuguese, English, German and Traditional Chinese, published to [GitHub Pages](https://atalaia-project.link/) | CC-BY-SA-4.0 |
 | [`tools/`](tools/) | Developer scripts: `check.sh`, `docker_fw.py`, `docker_console.py`, `docker_editor.py`, `docker_server.py`, `docker_sim.py`, `build_site.py`, `docker_hw.py` | GPL-3.0-or-later |
 

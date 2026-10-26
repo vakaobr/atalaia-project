@@ -5,6 +5,21 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Documentation
 
+## User manuals
+
+For the people who use Atalaia on a field, not for developers: players, game
+masters and organisers, marshals, and Field Box operators, in English and
+Portuguese, with a one-page quick start. Start at
+[`manuals/README.md`](manuals/README.md).
+
+| Manual | English | Português |
+| --- | --- | --- |
+| Quick start | [`manuals/en/quick-start.md`](manuals/en/quick-start.md) | [`manuals/pt/quick-start.md`](manuals/pt/quick-start.md) |
+| Players | [`manuals/en/player.md`](manuals/en/player.md) | [`manuals/pt/player.md`](manuals/pt/player.md) |
+| Game masters and organisers | [`manuals/en/game-master.md`](manuals/en/game-master.md) | [`manuals/pt/game-master.md`](manuals/pt/game-master.md) |
+| Marshals | [`manuals/en/marshal.md`](manuals/en/marshal.md) | [`manuals/pt/marshal.md`](manuals/pt/marshal.md) |
+| Field Box operators | [`manuals/en/field-box.md`](manuals/en/field-box.md) | [`manuals/pt/field-box.md`](manuals/pt/field-box.md) |
+
 ## Design specification
 
 The full design specification is in [`design-spec.md`](design-spec.md):
@@ -60,8 +75,8 @@ Each implementation phase has its own folder with `RESEARCH.md`, `ADR.md`,
 | [`phase-1-single-box/`](phase-1-single-box/) | 1 · Single box | Software complete; hardware gate pending |
 | [`phase-2-field-network/`](phase-2-field-network/) | 2 · Field network | Software complete (A–E); mode pack in progress; hardware gate (F) pending |
 | [`phase-3-android-players/`](phase-3-android-players/) | 3 · Android and players | Software of plan phases A-F done (E without the Android controller shell); field test (G) pending |
-| [`phase-4-site-server/`](phase-4-site-server/) | 4 · Site server and advanced play | Planning complete; implementation pending |
-| [`phase-5-community/`](phase-5-community/) | 5 · Community | Planning; ongoing after release |
+| [`phase-4-site-server/`](phase-4-site-server/) | 4 · Site server and advanced play | Software done; no real server or hardware yet |
+| [`phase-5-community/`](phase-5-community/) | 5 · Community | Software done; the mode registry is live; its signing key and the hardware are left |
 
 ## Hardware build guides
 

@@ -702,6 +702,14 @@ try:
       neuer oder im Android-Emulator, wie die
       <a href="https://github.com/vakaobr/atalaia-project/blob/main/app/README.md#install-it-on-an-android-phone-from-windows">Anleitung
       zur App</a> (auf Englisch) erklärt. Sie lief auf Emulatoren, noch nicht auf einem echten Handy.
+  manuals:
+    title: Spielen und ausrichten
+    text: >-
+      Handbücher für alle, die Atalaia benutzen, nicht für Entwickelnde: für
+      <a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/manuals/README.md">Spielende, Orga, Marshals und Box-Betreuende</a>, auf Englisch und
+      Portugiesisch, mit einer Kurzanleitung auf einer Seite. Sie beschreiben, was die Software
+      heute zeigt, und markieren, was noch nicht auf einem Feld erprobt wurde. Auf Deutsch gibt es
+      sie noch nicht.
 
 roadmap:
   title: Roadmap
@@ -1761,6 +1769,7 @@ footer:
     für den Feld-Controller und den Site-Server; CERN-OHL-S-2.0 für Hardware; CC BY-SA 4.0 für die
     Dokumentation und diese Seite.
   licensing: Lizenzen
+  manuals: Handbücher für Spielende, Orga, Marshals und Box-Betreuende (auf Englisch und Portugiesisch)
   independent: >-
     Unabhängig und von der Community getragen; mit keinem kommerziellen Prop-Hersteller verbunden.
     Diese Seite setzt keine Cookies und lädt nichts von anderen Seiten.
