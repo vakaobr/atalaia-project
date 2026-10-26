@@ -962,3 +962,18 @@ Medians of three seeds, 90 minutes, 10/20/30 boxes, three layouts, both regions,
 | CQB (walls) | 30 | A_backoff_core | 1.9 | 2.0 | 100.0 | 100.0 | 1.2 | 4.2 | 64.4 | 0.0 | - | - | 855.0 | - |
 | CQB (walls) | 30 | A_backoff_core_lbt | 2.1 | 2.3 | 100.0 | 100.0 | 1.2 | 3.3 | 76.3 | 0.0 | 1338.9 | 8.9 | 931.0 | 1.0 |
 
+## 12. Bench results (2026-10-26)
+
+Two Heltec V4.3 boards on the maintainer's bench, EU868 869.525 MHz SF7/125 kHz.
+
+**SL-18, one box in a Domination game** (firmware 0.4.0-dev.56+g585cbc6, the built relay rules and the radio_stats line, 19 minutes, `tools/bench_radio_log.py`): no events (nobody pressed the box's button), the box's HELLO acknowledged after one resend; 40 frames relayed (about 2 a minute, the controller's frames), 1 skipped, none cancelled or without a slot; no duplicates heard; no refusals by the duty-cycle budget; the budget went from 359.0 s to 349.4 s, 0.84 % airtime (SL-4's arithmetic: 0.68 % per box). The line and the tool work on hardware; the retry and ACK figures wait for a field test with captures and more boxes.
+
+**SL-25, the listen-before-talk gate** (`@lbt`, `tools/bench_lbt_gate.py`, `docs/runbooks/lbt-bench-gate.md`): board 2 sent 300 frames of 48-56 bytes (77-108 ms on air) every 300-700 ms; board 1 probed `hal_radio_channel_busy()`.
+
+| run | probe gap | frames received | probes in frames | busy | false busy between frames | CAD time |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 2-5 ms | 0 of 300 | 0 | - | (16 % busy: the transmitter's frames, seen by CAD) | 8.85 ms average |
+| 2 | 20-60 ms | 222 of 300 (74 %) | 589 | 589 (100 %, every tenth 100 %) | 61 of 1994 (3.1 %) | 8.02 ms average (p95 8.92) |
+
+Run 1 probed faster than a CAD takes, so the receiver never heard a whole frame: inconclusive by design. In run 2 the busy test found every frame from its start to its end; the receiver's flags did it (preamble detected 148, header valid 441, CAD 0), which is what SL-25 said it would take. A CAD takes about twice what SL-25 assumed (8 ms, not 4): its energy is 1.4-4.8 % of the TX energy, still small. The 26 % of frames the prober missed is the test's own continuous probing (the radio is deaf during a CAD); in use a box checks once before its own transmission. **Gate: PASS.**
+
