@@ -717,286 +717,376 @@ roadmap:
   done: Fertig
   software: Software fertig
   current: In Arbeit
+  # The parts of each phase on the roadmap page. Each phase: short (one line, also on the main
+  # page), done (bullets), next (bullets), gate; a phase with a long done list also has groups
+  # (g_*: title and items) that fold into a <details> under the first few bullets.
+  part_done: Was fertig ist
+  part_next: Als Nächstes, und worauf es wartet
+  part_more: Alles übrige, was fertig ist, nach Thema
+  status_link: Der ausführliche Stand dieser Phase im Repository →
   p0:
     title: Grundlagen
     short: >-
       Gemeinsamer Kern, Lua-Sandbox, Skirmesh-RF-Codec und Browser-Simulator. Gate erreicht.
-    text: >-
-      Gemeinsamer Kern, <a href="{{ page.to.glossary }}#glossar-lua">Lua-Sandbox</a>,
-      <a href="{{ page.to.glossary }}#glossar-skirmesh-rf">Skirmesh-RF-Codec</a>, Browser-Simulator.
+    done:
+      - Gemeinsamer Kern, die Spiellogik, die jede Plattform ausführt.
+      - <a href="{{ page.to.glossary }}#glossar-lua">Lua-Sandbox</a>, in der die Skripte der Spielmodi laufen.
+      - <a href="{{ page.to.glossary }}#glossar-skirmesh-rf">Skirmesh-RF-Codec</a>, das Format der Funknachrichten.
+      - Browser-Simulator, der Domination und Bombe spielt.
     gate: >-
       Gate: Der Simulator spielt Domination und Bombe aus Lua-Skripten. <strong>Erreicht.</strong>
   p1:
     title: Eine Box
     short: >-
       Firmware der Field Box und ein Bauhandbuch; auf dem Labortisch spielt ein echtes Board ganze
-      Spiele, sein kleiner Bildschirm zeigt Haltebalken, Punkte und Haltezeit in vier Sprachen, und
-      es wartet auf die erste gebaute Box.
-    text: >-
-      Bau der Field Box, ESP32-Firmware, Presets auf dem Gerät und ein Bauhandbuch mit Schaltplan.
+      Spiele. Es wartet auf die erste gebaute Box.
+    done:
+      - ESP32-Firmware der Field Box mit Presets auf dem Gerät, lauffähig in einem Emulator.
+      - Der kleine Bildschirm der Box zeigt Haltebalken, Punkte und Haltezeit, in vier Sprachen.
+      - Ein Bauhandbuch mit Schaltplänen.
+      - "Das erste Board (Heltec V4.3, 20. Oktober 2026) auf dem Labortisch: Es startet, schaltet den
+        Funk ein, liest seine Knöpfe und spielt ganze Spiele, Bombe eingeschlossen (scharf machen,
+        entschärfen, ablaufende Zeit), auf seinem kleinen Bildschirm."
+    next:
+      - Eine gebaute Box, die ein zweistündiges Club-Spiel ohne Neustart durchhält.
     gate: >-
-      Gate: Eine Box läuft ein zweistündiges Club-Spiel ohne Neustart. Die Firmware und ihre
-      Bildschirme sind fertig und laufen in einem Emulator, und das Bauhandbuch mit seinen Schaltplänen
-      ist geschrieben. Das erste Board (Heltec V4.3, 20. Oktober 2026) startet, schaltet den Funk ein,
-      liest seine Knöpfe und spielt Bombe (scharf machen, entschärfen, ablaufende Zeit) auf seinem
-      kleinen Bildschirm; das Gate bleibt offen, bis eine gebaute Box die 2 Stunden durchhält.
+      Gate: Eine Box läuft ein zweistündiges Club-Spiel ohne Neustart. <strong>Offen</strong>, bis
+      eine gebaute Box das schafft.
   p2:
     title: Feldnetzwerk
     short: >-
       Skirmesh-RF über LoRa, Feld-Controller, API, GM-Konsole und ein Modus-Paket, in Software
-      getestet; auf dem Labortisch spielen echte Boards ganze Spiele mit dem Feld-Controller über
-      Funk (Einladungen, Eroberungen, Koppeln per Code, Updates per Funk, ein fehlender Modus
-      nachgeladen) und warten auf 5 gebaute Boxen auf einem Feld.
-    text: >-
-      Skirmesh-RF über LoRa, Feld-Controller, API, GM-Konsole und ein Modus-Paket, jetzt in Software
-      geschrieben und getestet: Hold-All Domination (Punkte nur, solange man alle Boxen hält), Last
-      Stand (ein Countdown bis zur Niederlage, solange man nur eine von dreien hält), Codes pro Team
-      zum Scharfmachen bei Bombe und der Codes-Modifikator (Codes am Tastenfeld, die Punkte, Hinweise
-      oder Freischaltungen bringen, wobei die Spielleitung erfährt, wer sie benutzt hat).
+      getestet; auf dem Labortisch spielen echte Boards ganze Spiele mit dem Controller über Funk.
+      Es warten 5 gebaute Boxen auf einem Feld.
+    done:
+      - Das verschlüsselte Funkprotokoll Skirmesh-RF und das USB-Funkmodem.
+      - Der Feld-Controller mit seiner API.
+      - Die Konsole der Orga, mit Anzeigetafel.
+      - Der Beitritt zu einem Spiel per NFC-Karte oder QR-Code.
+      - Die Firmware der Boxen im Gespräch mit dem Controller.
+      - "Ein Modus-Paket: Hold-All Domination (Punkte nur, solange man alle Boxen hält), Last Stand
+        (ein Countdown bis zur Niederlage, solange man nur eine von dreien hält), Codes pro Team
+        zum Scharfmachen bei Bombe und der Codes-Modifikator (Codes am Tastenfeld, die Punkte,
+        Hinweise oder Freischaltungen bringen, wobei die Spielleitung erfährt, wer sie benutzt hat)."
+      - "Alles im Simulator, im Emulator und auf einem Computer getestet, ganze Spiele inklusive;
+        auf dem Labortisch spielen echte Boards ganze Spiele mit dem Controller über Funk:
+        Einladungen, Eroberungen, Koppeln per Code, Updates per Funk, ein fehlender Modus
+        nachgeladen."
+    next:
+      - Die Funk-Boards und 5 gebaute Boxen für den Feldtest.
     gate: >-
       Gate: 5 Boxen auf einem <a href="{{ page.to.glossary }}#glossar-cqb">CQB</a>-Gelände und einem
-      Outdoor-Feld, keine verlorene Einnahme. Das verschlüsselte Funkprotokoll, der Feld-Controller mit
-      seiner API, das USB-Funkmodem, die Konsole der Orga mit Anzeigetafel, der Beitritt zu einem
-      Spiel per NFC-Karte oder QR-Code und die Firmware der Boxen im Gespräch mit dem Controller sind
-      gebaut und im Simulator, im Emulator und auf einem Computer getestet, ganze Spiele inklusive. Das
-      Gate braucht die Funk-Boards.
+      Outdoor-Feld, keine verlorene Einnahme. <strong>Offen.</strong>
   p3:
     title: Android und Spielende
     short: >-
-      Android-Props, der I/O-Pod, die Spieler-App und die Modi, die Handys brauchen, Money Factory
-      eingeschlossen: in Software fertig, iOS eingeschlossen (auf einem iPhone geprüft); der Feldtest wartet auf echte Handys und Pods.
-    text: >-
-      Android-Props, der <a href="{{ page.to.glossary }}#glossar-android-prop">I/O-Pod</a>, die App
-      für Spielende, Marshals und die Spielleitung und die Modi, die Handys und Tags der Spielenden
-      brauchen.
-    done: >-
-      <strong>In Software fertig</strong> (Planphasen A bis F): Kill Confirmed, Respawn und Leben und
-      Check-in, die signierte NFC-Tags der Spielenden lesen, und das Medic-Kit (wer getroffen wurde,
-      scannt den eigenen Tag und hält einen Knopf, um geheilt zu werden, mit einer begrenzten Zahl an
-      Heilungen),
-      und Money Factory (Fabriken machen Geld, solange ein Team sie hält; wer spielt, sammelt es mit
-      dem eigenen Tag ein und zahlt es an einer anderen Box ein, und der Controller merkt sich, was
-      jede Person trägt); Modus-Bildschirme in YAML beschrieben, von Field Box und App gleich gezeichnet;
-      <a href="{{ page.to.glossary }}#glossar-chrono">Chrono beim Check-in</a> (Energie, Limits pro
-      Klasse, Stichproben, Messwerte von Marshal signiert). Die App nutzt denselben Spielkern wie die
-      Boxen, auf Portugiesisch und Englisch: Ein Android-Handy arbeitet als Box (jeder Modus, mit den
-      eigenen Bildschirmen des Modus, großen Team-Knöpfen, Tastenfeld und NFC-Tags) und tritt einem
-      Spiel per QR-Code, NFC-Karte oder Text bei; Spielende verfolgen das Spiel; Marshals haben den
-      Chrono, das Replik-Register und die Tags der Spielenden; die Spielleitung öffnet die Konsole.
-      Spielende checken am Feld ein, indem sie einen gedruckten Aushang scannen (kein Konto, kein
-      Internet), geben an, welche Repliken sie nutzen, und sehen, ob sie den Chrono bestanden haben;
-      Marshals arbeiten diese Liste „Repliken zum Chronen“ ab, und ihre signierten Messwerte markieren
-      jede Replik als bestanden oder abgelehnt. Spielende können während eines Spiels ihre Position
-      teilen, und der Controller entscheidet, wer sie sieht. Ein Android-Prop nimmt am Spiel des
-      Controllers über das WLAN des Felds teil, oder über seinen Funk mit einem I/O-Pod, dessen
-      Firmware dem Handy per USB oder Bluetooth die Team-Knöpfe, das Tastenfeld, die Lichter, die
-      Sirene, den NFC-Leser, den Gehäuseschalter und den LoRa-Funk eines Heltec-Boards leiht. Ein Feld
-      oder Club mit eigenem Controller kann sein Logo, Hintergrundbild und seine Farbe in der App, auf
-      der Anzeigetafel und auf dem Aushang zeigen und seinen Teams Namen und Wappen geben.
-    todo: >-
-      <strong>Noch offen.</strong> Das Handy als Feld-Controller, in Scheiben gebaut, ist in Software fertig und wartet auf ein echtes Handy (fertig: sein MQTT-Broker, Positionsfilter und Spiel-Engine, mit field.lua auf dem gemeinsamen
-      Kern, die REST-API, der Live-Stream und die MQTT-Topics, Spiele über einen Neustart hinweg,
-      Beitritts-Payloads, ein I/O-Pod als sein Funk, Android-Props in seinem WLAN und der Check-in
-      am Feld mit Spieler-Tokens, der Liste „Repliken zum Chronen“ und den Positionen der
-      Spielenden, geprüft mit denselben Vertragsfällen wie der Pi-Controller und ausgeführt mit dem
-      Code von Pod und Field Box auf einem Computer, und sein Bildschirm: die Rolle auf dem
-      Startbildschirm der App, läuft bei ausgeschaltetem Bildschirm weiter, die GM-Konsole aus der
-      App, HTTPS mit einer auf dem Handy erzeugten Feld-CA und das WLAN des Felds; und, vor den
-      Feldtest vorgezogen, der Feldplan (ein Plan pro Ebene, seine Lage auf der Karte,
-      Kartenelemente mit der Feldgrenze und das aus einer Karte geladene Feld, sodass die Warnung
-      beim Verlassen des Felds auch dort funktioniert) und der Funkkanal mit der Suche nach einem
-      ruhigen Kanal über den I/O-Pod, und die Boxen über Funk: versiegelte Einladungen ins nächste
-      Spiel, das Spielende, das den Boxen auch nach einem Neustart des Handys ohne den
-      Spielschlüssel gemeldet wird, neue Boxen, aufgenommen über den Code, den sie zeigen, oder mit
-      einer Feldkarte, die das Handy per NFC schreibt, und Firmware-Updates zwischen Spielen (mit
-      dem USB-Funkmodem des Pi am Handy: der I/O-Pod reicht diese Nachrichten noch nicht weiter); und Presets, hochgeladene Modi und signierte Moduspakete, die an Boxen geschickt werden, denen sie fehlen, auf dem Handy kompilierte Szenarien, Rollenpakete in einem Spiel sowie Teamnamen und Wappen;
-      und, ebenfalls vorgezogen, der Rest dessen, was der Pi kann: die Ausfallübernahme, sodass ein Handy und ein Pi einander als Bereitschafts-Controller dienen, der Abgleich mit dem Site-Server (Spiele, Protokolle und Punkte gehen hin, sobald Internet da ist; Anmeldelisten, Branding und die Szenariobibliothek kommen von dort), die Remote-Spielleitung und der ATAK-Feed); und die iOS-Version (ihr Projekt liegt im Repository, die CI baut es auf einem Mac, und es lief schon auf einem iPhone; am 2026-10-26 hat sie ihre Checkliste auf einem iPhone bestanden (12 automatische Prüfungen und von Hand: QR-Scannen mit der Kamera, Check-in mit dem Plakat des Felds über HTTPS, Teilen der Position, solange die App auf dem Bildschirm ist, die Warnung außerhalb des Felds und ihre Vibration, die atalaia://-Links); NFC braucht ein bezahltes Apple-Konto; der Prop und das Handy als Feld-Controller bleiben nur Android). Planphase G, der Feldtest mit echten Handys und Pods, wartet auf die Hardware: Bisher
-      lief die App auf Android-Emulatoren und auf einem iPhone am Controller des Prüfstands, und die Pod-Firmware nur als eigener Code auf einem
-      Computer.
+      Android-Props, der I/O-Pod, die Spieler-App und die Modi, die Handys brauchen: in Software
+      fertig, iOS eingeschlossen (auf einem iPhone geprüft). Der Feldtest wartet auf echte Handys
+      und Pods.
+    done:
+      - "<strong>Die App</strong> für Spielende, Marshals und die Spielleitung, auf Portugiesisch
+        und Englisch, für Android und iOS (die iOS-Version hat ihre Checkliste auf einem iPhone
+        bestanden)."
+      - Ein Android-Handy arbeitet als Box, mit jedem Modus und den eigenen Bildschirmen des Modus,
+        und tritt einem Spiel per QR-Code, NFC-Karte oder Text bei.
+      - "<strong>Das Handy als Feld-Controller</strong>, in Software fertig und wartend auf ein
+        echtes Handy: Es führt das Spiel und die Dienste des Felds allein aus."
+      - >-
+        <strong>Der <a href="{{ page.to.glossary }}#glossar-android-prop">I/O-Pod</a></strong>:
+        Firmware, die einem Handy die Knöpfe, das Tastenfeld, die Lichter, die Sirene, den
+        NFC-Leser und den LoRa-Funk eines Heltec-Boards leiht.
+      - "<strong>Modi mit Handys und Tags</strong>: Kill Confirmed, Respawn und Leben, Check-in,
+        das Medic-Kit und Money Factory."
+    g_modes:
+      title: Modi und Bildschirme
+      items:
+        - Kill Confirmed, Respawn und Leben und Check-in lesen signierte NFC-Tags der Spielenden.
+        - "Das Medic-Kit: Wer getroffen wurde, scannt den eigenen Tag und hält einen Knopf, um
+          geheilt zu werden, mit einer begrenzten Zahl an Heilungen."
+        - "Money Factory: Fabriken machen Geld, solange ein Team sie hält; wer spielt, sammelt es
+          mit dem eigenen Tag ein und zahlt es an einer anderen Box ein, und der Controller merkt
+          sich, was jede Person trägt."
+        - Modus-Bildschirme in YAML beschrieben, von Field Box und App gleich gezeichnet.
+    g_players:
+      title: Spielende und Marshals
+      items:
+        - "Spielende checken am Feld ein, indem sie einen gedruckten Aushang scannen (kein Konto,
+          kein Internet), geben an, welche Repliken sie nutzen, und sehen, ob sie den Chrono
+          bestanden haben."
+        - >-
+          <a href="{{ page.to.glossary }}#glossar-chrono">Chrono beim Check-in</a>: Energie, Limits
+          pro Klasse, Stichproben, Messwerte von Marshal signiert. Marshals arbeiten die Liste
+          „Repliken zum Chronen“ ab, und ihre signierten Messwerte markieren jede Replik als
+          bestanden oder abgelehnt; sie haben auch das Replik-Register und die Tags der Spielenden.
+        - Spielende können während eines Spiels ihre Position teilen, und der Controller entscheidet, wer sie sieht.
+        - "Ein Feld oder Club mit eigenem Controller kann sein Logo, Hintergrundbild und seine Farbe
+          in der App, auf der Anzeigetafel und auf dem Aushang zeigen und seinen Teams Namen und
+          Wappen geben."
+    g_props:
+      title: Android-Props und I/O-Pod
+      items:
+        - "Ein Android-Prop nimmt am Spiel des Controllers über das WLAN des Felds teil, oder über
+          seinen Funk mit einem I/O-Pod."
+        - "Die Firmware des Pods leiht dem Handy per USB oder Bluetooth die Team-Knöpfe, das
+          Tastenfeld, die Lichter, die Sirene, den NFC-Leser, den Gehäuseschalter und den LoRa-Funk
+          eines Heltec-Boards."
+    g_controller:
+      title: Das Handy als Feld-Controller
+      items:
+        - "Die Spiel-Engine, mit field.lua eines Modus auf dem gemeinsamen Kern, einem MQTT-Broker
+          und einem Positionsfilter; die REST-API, der Live-Stream und die MQTT-Topics; Spiele über
+          einen Neustart hinweg; Beitritts-Payloads."
+        - "Android-Props in seinem WLAN, ein I/O-Pod als sein Funk, der Check-in am Feld mit
+          Spieler-Tokens, die Liste „Repliken zum Chronen“ und die Positionen der Spielenden.
+          Geprüft mit denselben Vertragsfällen wie der Pi-Controller und ausgeführt mit dem Code
+          von Pod und Field Box auf einem Computer."
+        - "Sein Bildschirm: die Rolle auf dem Startbildschirm der App, auch bei ausgeschaltetem
+          Bildschirm weiterlaufend, die GM-Konsole aus der App ausgeliefert und HTTPS mit einer
+          Feld-CA, die auf dem Handy erzeugt wird."
+        - "Der Feldplan (ein Plan pro Ebene, seine Kartenposition, Kartenobjekte mit der Feldgrenze,
+          das aus einer Karte geladene Feld, sodass die Warnung beim Verlassen der Grenze dort auch
+          funktioniert) und der Funkkanal, mit der Suche nach einem ruhigen Kanal über den
+          I/O-Pod."
+        - "Die Boxen über Funk: versiegelte Einladungen ins nächste Spiel; das Spielende, den Boxen
+          mitgeteilt, auch wenn das Handy ohne den Spielschlüssel neu gestartet wurde; neue Boxen,
+          aufgenommen über den Code, den sie zeigen, oder über eine Feldkarte, die das Handy per NFC
+          schreibt; Firmware-Updates zwischen den Spielen (mit dem USB-Funkmodem des Pi am Handy)."
+        - "Presets, Modus-Uploads und signierte Modus-Pakete, an Boxen geschickt, denen sie fehlen;
+          auf dem Handy kompilierte Szenarien; Rollenpakete in einem Spiel; Teamnamen und Wappen."
+        - "Auch alles Übrige, was der Pi kann: Failover (ein Handy und ein Pi können gegenseitig ihre
+          Reserve sein), der Sync mit dem Site-Server (Spiele, Logs und Punkte gehen raus, wenn
+          Internet da ist; Anmeldelisten, Branding und Szenario-Bibliothek kommen von dort), die
+          Remote-Spielleitung und der ATAK-Feed."
+    g_ios:
+      title: iOS
+      items:
+        - "Das Projekt liegt im Repository, die CI baut es auf einem Mac, und es lief schon auf
+          einem iPhone."
+        - "Am 26.10.2026 bestand seine Checkliste auf dem Gerät auf einem iPhone: 12 automatische
+          Prüfungen und, von Hand, QR-Scannen mit der Kamera, Check-in mit dem Aushang des Felds
+          über HTTPS, Positionsfreigabe bei sichtbarer App, die Warnung beim Verlassen der Grenze
+          mit ihrer Vibration und atalaia://-Links."
+    next:
+      - "Der Feldtest mit echten Handys und Pods (Planphase G) wartet auf die Hardware. Bisher lief
+        die App auf Android-Emulatoren und auf einem iPhone gegen den Controller auf dem
+        Labortisch, und die Pod-Firmware nur als ihr eigener Code auf einem Computer."
+      - Das Handy als Feld-Controller wartet auf ein echtes Handy.
+      - "Die Firmware des I/O-Pods leitet die Funknachrichten für die Firmware-Updates der Boxen noch
+        nicht weiter: Dafür kommt das USB-Funkmodem des Pi ans Handy."
+      - "Unter iOS braucht NFC ein kostenpflichtiges Apple-Konto; der Prop und das Handy als
+        Feld-Controller bleiben nur für Android."
     gate: "Gate: Ein Spiel mischt ESP32- und Android-Props ohne Probleme."
   p4:
     title: Site-Server und erweitertes Spiel
     short: >-
       Site-Server, Spielplanung und Anmeldung, eigene Szenarien, erweiterte Modi, ATAK. Alle
-      Software-Schritte sind gebaut: erweiterte Modi (Master und Satelliten, das Hacking-Terminal,
-      VIP / Payload und die Logik von Zielfenster), eigene Szenarien (ihre Laufzeit, ihr Compiler,
-      der Editor in der Konsole und die Ziele in der App), Geo-Funktionen im Kern, der ATAK-Feed
-      (auf dem Feld und, über den Site-Server, für Staff außerhalb), und die Konten des
-      Site-Servers, Rechte an persönlichen Daten, Controller-Sync, Chrono-Register, Spielplanung mit
-      öffentlichen Feldseiten, Feeds und Anmeldung, Club-Profile mit Branding-Sync, Spielverlauf und
-      die Szenario-Bibliothek, Gerätezustand, ein Firmware-Katalog, Firmware-Updates per Funk für
-      die Field Box, Boxen ins Feld aufnehmen (NFC-Feldkarte, USB-Kabel oder der Code, den die Box
-      zeigt), Boxen per Funk ins nächste Spiel einladen und ein Start, der wartet, bis jede Rolle
-      eine Box hat, die Remote-Spielleitung, Webseiten für das Staff und das Deployment (HTTPS,
-      verschlüsselte Backups, Wiederherstellung), der Hosted-Modus für viele Felder auf einem
-      Server, mit seinem Deployment. Es fehlen: ein echter Server mit Domain, eine rechtliche
-      Prüfung, bevor der Hosted-Modus live geht, und die Tests auf Hardware.
-    text: >-
-      Site-Server (Konten, Spielverlauf, das Chrono-Register, Spielplanung, Anmeldung und
-      Veröffentlichung), eigene Szenarien, erweiterte Modi (Master- und Satellitenzonen, VIP-Eskorte,
-      Hacking-Terminals und mehr) und <a href="{{ page.to.glossary }}#glossar-atak">ATAK</a>. Recherche,
-      Architektur und Umsetzungsplan sind geschrieben, und der Plan wird in kleinen Schritten gebaut.
-    done: >-
-      In Software fertig und auf einem Computer getestet, noch nicht auf echten Boxen oder einem
-      echten Server. Modi: Master und Satelliten (Satelliten, die zusammen mit dem Master gehalten
-      werden, erhöhen seine Punkte; wechselt der Master den Besitz, werden sie frei), das
-      Hacking-Terminal (ein Rätsel am Tastenfeld, das einen Code aufdeckt oder das Terminal
-      einnimmt), VIP / Payload (ein Team eskortiert seinen VIP oder ein Handy mit GPS in eine
-      Extraktionszone; Checkpoint-Boxen punkten, solange sie gehalten werden; Positionen bleiben auf
-      dem Feld-Controller und dem Handy), die Laufzeit eigener Szenarien (ein Szenario läuft auf dem
-      Feld-Controller und sagt den Boxen des eingebauten Ziel-Pakets, was sie sein sollen: ein Punkt
-      zum Einnehmen, ein Code, Tags oder Karten zum Scannen, ein Bombenplatz; sie melden, das
-      Szenario zählt die Punkte), der Szenario-Compiler (ein YAML-Szenario mit sieben Zieltypen, mit
-      Abhängigkeiten, Aufdeckungen und Zeitfenstern, geprüft mit jedem Problem verortet und erklärt
-      und auf der Kommandozeile zu einem solchen Szenario kompiliert), Szenarien in der GM-Konsole
-      und der App (der Szenario-Editor der Konsole listet jedes Problem schon beim Tippen und
-      installiert das Szenario; die Boxen bekommen die Namen des Szenarios beim Beitritt; Spielende
-      sehen in der App die Ziele, die für sie bestimmt sind, mit ihren Namen und ihrem Stand, ein
-      verdecktes erst, wenn es aufgedeckt ist; jedes Squad kann seine eigene Kette haben, immer
-      ein Ziel auf einmal, das nächste wird aufgedeckt, wenn es erfüllt ist, gesagt dem ganzen
-      Squad oder nur dem Squad-Lead), die Regeln von Zielfenster (ein Treffer, während die
-      Zielscheibe die Farbe eines Teams zeigt, punktet für dieses Team; das Ziel-Addon ist noch
-      nicht gebaut), Geo-Funktionen im Kern (Entfernungen und Zonen für jedes Skript, auf jeder
-      Plattform gleich) und der ATAK-Feed (die Boxen und Zonen auf ATAK-Karten über das WLAN des
-      Felds, in der Farbe ihres Teams, platziert, indem man zwei Ecken des Feldbilds ihrer
-      Kartenposition zuordnet; die Spielleitung markiert auch sichere Zonen, den Respawn und die
-      Basis jedes Teams, den Parkplatz, die Erste Hilfe und Ziele auf dem Plan des Felds, als Punkt,
-      Kreis oder Fläche, jeweils sichtbar für alle, für ein Team oder nur für die Orga, in der
-      Konsole und auf ATAK; das Feld lässt sich auch aus einer Karte laden: Die Spielleitung findet
-      es von ihrem Standort aus oder über einen Ortsnamen, zeichnet den echten Umriss des Felds auf
-      OpenStreetMap nach, und der Browser zeichnet das Feldbild aus den Daten von OpenStreetMap,
-      über den offenen Luftbildern des Landes (dem DGT-Orthofoto auf dem portugiesischen Festland,
-      dem PNOA des IGN in Spanien, den Orthofotos des IGN in Frankreich, auch in Übersee, denen von
-      PDOK in den Niederlanden und denen der öffentlichen Dienste Belgiens, Luxemburgs, der Schweiz
-      und Liechtensteins, von elf deutschen Ländern, Polens und Tschechiens), mit seiner Kartenposition und dem Umriss als Feldgrenze, das Außen
-      abgedunkelt; die Seite versucht es erneut, wenn der Datendienst von OpenStreetMap ausgelastet
-      ist, und zeigt diese Luftbilder, während die Spielleitung den Umriss zeichnet; die Handys der Spielenden warnen mit einem Banner und einer
-      Vibration, wenn sie die Feldgrenze verlassen, mit ihrem eigenen GPS, ohne etwas zu senden;
-      Positionen der Spielenden gehen nie an alle, nur an Geräte des Staffs, wenn das Feld es
-      einschaltet; Staff außerhalb des Felds bekommt dasselbe über den Site-Server, über eine
-      verschlüsselte Verbindung mit einem Zertifikat pro Gerät, das das Feld ausstellt und sofort
-      widerrufen kann, Positionen nur für Spielleitung oder Marshal; noch nicht mit einem echten
-      ATAK-Handy probiert). Site-Server: sein Grundgerüst (Datenbank, Migrationen, Health-Check, in
-      einem eigenen Container), Konten (Passwörter, Zwei-Faktor-Codes Pflicht für Orga und Marshals,
-      Sitzungen und Rollen pro Feld) und Rechte an persönlichen Daten (Auskunft, Export,
-      Berichtigung, Löschung, Einwilligungsnachweise, eine tägliche Löschung nach
-      Aufbewahrungsfrist), und der Controller-Sync (Feld-Controller schicken ihre Spiele, Logs und
-      Punkte an den Site-Server, offline zuerst und sicher wiederholbar; noch nicht über eine echte
-      4G-Verbindung), und das Chrono-Register (signierte Messwerte geprüft und signiert aufbewahrt,
-      nur öffentliche Schlüssel, Austausch zwischen Feldern mit Einwilligung; noch nicht mit einem
-      echten Chronografen), und die Spielplanung mit einer öffentlichen Seite pro Feld und offenen
-      iCalendar- und JSON-Feeds seiner Spiele (ohne persönliche Daten), und die Anmeldung zu diesen
-      Spielen mit vorab angegebenen Repliken und einem Check-in-Ticket: Der Feld-Controller holt die
-      Liste und meldet, wer gekommen ist; Anmeldung aus der App und Import einer Anmeldeliste (CSV
-      oder JSON), exportiert von einer anderen Plattform; und Club-Profile (Name, Farbe, Logo und
-      Wappen, Mitglieder, eine öffentliche Seite, standardmäßig aus, mit Melde-Knopf und Moderation)
-      mit dem Branding des Felds und gespeicherten Teams, die mit seinen Controllern synchronisiert
-      werden, sodass das Wappen eines Clubs jedes Feld erreicht, das sein Team gespeichert hat; und
-      der Gerätezustand (Akku, Verbindung und Firmware jeder Box aus dem, was die Controller
-      schicken; der Feld-Controller meldet jetzt eine Box, die verstummt oder zurückkommt, und einen
-      schwachen Akku, den eine Box mit Akkuanzeige auch selbst meldet; noch nicht auf echten
-      Boards), ein Firmware-Katalog, der nur Releases listet, die mit einem vertrauenswürdigen
-      Schlüssel signiert sind, und Firmware-Updates per Funk für die Field Box: Die Spielleitung
-      lädt ein signiertes Release auf den Feld-Controller und aktualisiert die Boxen zwischen den
-      Spielen, nie währenddessen; jede Box lädt es über das WLAN des Felds herunter, prüft die
-      Signatur mit Schlüsseln, die in ihre eigene Firmware eingebaut sind, installiert es in ihren
-      Reserve-Slot und geht zur alten Firmware zurück, wenn die neue nicht startet (in Software,
-      noch nicht auf einem echten Board), Boxen ins Feld aufnehmen mit einer NFC-Feldkarte, dem
-      USB-Kabel des Controllers oder dem 6-stelligen Code, den die Box zeigt, per Funk gekoppelt (in
-      Software, noch nicht auf einem echten Board), Boxen, deren Spiel vorbei ist, melden sich per
-      Funk, sodass die Spielleitung sie von der Konsole aus ins nächste Spiel einlädt, ohne Karte
-      oder QR-Code (der Beitritt reist verschlüsselt unter einem Schlüssel, der aus dem
-      Beitrittsschlüssel des Felds abgeleitet ist), und ein Spiel, das erst startet, wenn jede Rolle
-      eine Box hat, außer die Spielleitung wählt „Trotzdem starten“ (getestet auf zwei Labor-Boards
-      mit dem Feld-Controller), Boxen, die in jedem neuen Spiel gehört werden (der Nonce-Zähler des
-      Funks gilt jetzt pro Spiel, ein Fehler, der auf dem Labortisch gefunden wurde), und
-      Bildschirme der Box, die dem Spiel folgen (Bereit, Warten, Frei) in der Sprache des Felds,
-      Englisch oder Portugiesisch (getestet auf zwei Labor-Boards), ein Controller, der mitten im
-      Spiel neu startet, nimmt es wieder auf, einer, der den Schlüssel des Spiels verloren hat, sagt
-      seinen Boxen trotzdem per Funk, dass das Spiel vorbei ist, und falsche Admin-PINs müssen immer
-      länger warten, gezählt über Neustarts hinweg, ohne Standard-PIN auf einer echten Box (in
-      Software, noch nicht auf den Labor-Boards), und Felder mit mehreren Etagen in der Konsole: ein
-      Grundriss pro Ebene und jede Box auf ihrer Ebene (in Software, noch nicht auf einem Feld
-      probiert), und die Remote-Spielleitung: Wer in der Orga die Rolle GM hat und mit einem
-      Zwei-Faktor-Code angemeldet ist, sieht das laufende Spiel und startet, pausiert, setzt fort
-      oder beendet es, oder schickt eine Nachricht oder einen Modus-Befehl, über eine Verbindung,
-      die der Feld-Controller selbst öffnet, nur wenn das Feld es einschaltet, mit jedem Befehl auf
-      beiden Seiten geloggt; und der Spielverlauf (Punkteverlauf und Event-Log jedes Spiels;
-      Spielende und Zuschauende sehen ein laufendes Spiel eine Minute verzögert, ohne Geheimnisse
-      oder Spieler-IDs), eine öffentliche Anzeigetafel pro Feld (standardmäßig aus) und die
-      Szenario-Bibliothek des Felds mit ihren Spiel-Presets, geprüft wie der Feld-Controller sie
-      prüft und von jedem Controller des Felds installiert, auch einem in Bereitschaft; und
-      Webseiten für das Staff des Felds (Anmeldung mit dem Zwei-Faktor-Code; der Spielverlauf mit
-      Punkteverlauf und Event-Log jedes Spiels, die Szenario-Bibliothek mit jedem Problem vor dem
-      Speichern, Revisionen und Presets, der Gerätezustand und die Live-Ansicht und Befehle der
-      Remote-Spielleitung), auf Portugiesisch und Englisch und auf dem Handy, getestet in einem
-      Headless-Browser, noch nicht auf einem echten Server; und das Deployment: HTTPS über Caddy mit
-      automatischem Zertifikat, ein Setup-Skript, das jedes Geheimnis erzeugt, verschlüsselte
-      tägliche Backups und eine Wiederherstellung in eine frische Datenbank, getestet in Docker auf
-      einem Computer, noch nicht auf einem echten Server mit echter Domain; und der Hosted-Modus:
-      ein Server für viele Felder, jedes in einem eigenen Datenbankschema unter einer eigenen
-      Adresse, mit Row-Level-Security darunter, sodass kein Feld je die Daten eines anderen sieht,
-      und den Befehlen des Betriebs, um die Daten eines Felds zu exportieren oder zu löschen,
-      getestet gegen PostgreSQL in Docker, und sein Deployment: ein Setup-Skript, das die
-      Datenbankrollen des Hubs anlegt, jedes Feld unter seiner eigenen Adresse mit einem Zertifikat,
-      das nur der Name eines aktiven Felds bekommen kann, und verschlüsselte Backups,
-      wiederhergestellt mit jedem Feld getrennt wie zuvor, getestet in Docker auf einem Computer,
-      noch nicht auf einem echten gehosteten Server mit echter Domain und nicht angeboten, bevor
-      eine Anwältin oder ein Anwalt die Vorlagen geprüft hat.
+      Software-Schritte sind gebaut; es fehlen ein echter Server, eine rechtliche Prüfung und die
+      Tests auf Hardware.
+    done:
+      - "<strong>Erweiterte Modi</strong>: Master und Satelliten, das Hacking-Terminal,
+        VIP / Payload und die Logik von Zielfenster."
+      - "<strong>Eigene Szenarien</strong>: ihre Laufzeit auf dem Feld-Controller, ein Compiler für
+        YAML-Szenarien, ein Editor in der GM-Konsole und die Ziele in der App."
+      - "<strong>Der ATAK-Feed</strong>: Boxen und Zonen auf ATAK-Karten, auf dem Feld und, über den
+        Site-Server, für Staff außerhalb."
+      - "<strong>Der Site-Server</strong>: Konten mit Zwei-Faktor-Codes, Rechte an persönlichen
+        Daten, Controller-Sync, Chrono-Register, Spielverlauf und Szenario-Bibliothek."
+      - "<strong>Spielplanung und Anmeldung</strong>, mit öffentlichen Feldseiten, Kalender-Feeds
+        und Club-Profilen."
+      - "<strong>Hosted-Modus</strong>: viele Felder auf einem Server, jedes vom anderen getrennt,
+        mit seinem Deployment."
+    g_modes:
+      title: Modi
+      items:
+        - "Master und Satelliten: Satelliten, die man mit dem Master hält, erhöhen seine Punkte;
+          wechselt der Master den Besitzer, werden sie frei."
+        - "Das Hacking-Terminal: ein Rätsel am Tastenfeld, das einen Code verrät oder das Terminal
+          erobert."
+        - "VIP / Payload: Ein Team eskortiert seinen VIP oder ein Handy mit GPS zu einer
+          Extraktionszone; Checkpoint-Boxen punkten, solange sie gehalten werden; Positionen bleiben
+          auf dem Feld-Controller und dem Handy."
+        - "Die Regeln von Zielfenster: Ein Treffer, während das Ziel die Farbe eines Teams zeigt,
+          punktet für dieses Team. Das Ziel-Addon ist noch nicht gebaut."
+        - "Geo-Funktionen im Kern: Entfernungen und Zonen für jedes Skript, auf jeder Plattform
+          identisch."
+    g_scenarios:
+      title: Eigene Szenarien
+      items:
+        - "Die Laufzeit: Ein Szenario läuft auf dem Feld-Controller und sagt den Boxen des
+          eingebauten Ziele-Pakets, was sie sind (ein Punkt zum Erobern, ein Code, Tags oder Karten
+          zum Scannen, ein Bombenplatz); sie melden, das Szenario punktet."
+        - "Der Compiler: ein YAML-Szenario mit sieben Zieltypen, mit Abhängigkeiten, Enthüllungen
+          und Zeitfenstern, geprüft mit jedem Problem verortet und erklärt, und von der
+          Kommandozeile kompiliert."
+        - "In der GM-Konsole: ein Editor, der jedes Problem auflistet, während die Orga tippt, und
+          das Szenario installiert; die Boxen bekommen die Namen des Szenarios beim Beitritt."
+        - "In der App: Spielende sehen die Ziele, die für sie gedacht sind, mit Namen und Stand, ein
+          verstecktes erst nach der Enthüllung; jeder Squad kann seine eigene Kette haben, ein Ziel
+          nach dem anderen, dem ganzen Squad oder nur dem Squad-Lead gesagt."
+    g_atak:
+      title: ATAK und die Feldkarte
+      items:
+        - "Der ATAK-Feed: Boxen und Zonen auf ATAK-Karten über das Feld-WLAN, in den Farben ihrer
+          Besitzer, platziert, indem man zwei Ecken des Feldbilds ihre Kartenposition gibt."
+        - "Die Spielleitung markiert Sicherheitszonen, Respawn und HQ jedes Teams, den Parkplatz,
+          Erste Hilfe und Ziele auf dem Plan des Felds, als Pin, Kreis oder Fläche, jedes für alle,
+          für ein Team oder nur für die Orga sichtbar, in der Konsole und auf ATAK."
+        - "Das Feld lässt sich aus einer Karte laden: Die Spielleitung findet es von ihrem Standort
+          oder über einen Ortsnamen und zeichnet seinen Umriss auf OpenStreetMap, und der Browser
+          zeichnet das Feldbild aus den Daten von OpenStreetMap über den offenen Luftbildern des
+          Landes (das portugiesische Festland, Spanien, Frankreich samt Übersee, die Niederlande,
+          Belgien, Luxemburg, die Schweiz, Liechtenstein, elf deutsche Länder, Polen und
+          Tschechien). Der Umriss wird zur Feldgrenze, das Außen abgedunkelt."
+        - "Die Handys der Spielenden warnen mit einem Banner und einer Vibration, wenn sie die Grenze
+          verlassen, mit ihrem eigenen GPS, ohne etwas zu senden."
+        - "Spielerpositionen gehen nie an alle, nur an Staff-Geräte, wenn das Feld es einschaltet.
+          Staff außerhalb des Felds bekommt dasselbe über den Site-Server, über eine verschlüsselte
+          Verbindung mit einem Zertifikat pro Gerät, das das Feld ausstellt und sofort widerrufen
+          kann; Positionen gehen nur an Zertifikate von Spielleitung oder Marshals."
+        - "Mehrstöckige Felder in der Konsole: ein Grundriss pro Ebene und jede Box auf ihrer Ebene."
+        - "Noch nicht mit einem echten ATAK-Handy ausprobiert, auch nicht auf einem echten Feld."
+    g_server:
+      title: Site-Server, Konten und Daten
+      items:
+        - "Sein Gerüst: Datenbank, Migrationen und ein Health-Check, in einem eigenen Container."
+        - "Konten: Passwörter, Zwei-Faktor-Codes Pflicht für Orga und Marshals, Sitzungen und Rollen
+          pro Feld."
+        - "Rechte an persönlichen Daten: Auskunft, Export, Berichtigung, Löschung, Einwilligungsnachweise und eine tägliche Löschung nach Aufbewahrungsfrist."
+        - "Controller-Sync: Feld-Controller schieben ihre Spiele, Logs und Punkte, offline zuerst und
+          gefahrlos wiederholbar. Noch nicht über eine echte 4G-Verbindung."
+        - "Das Chrono-Register: signierte Messwerte geprüft und so gespeichert, wie sie signiert
+          wurden, nur öffentliche Schlüssel, Austausch zwischen Feldern mit Einwilligung. Noch nicht
+          mit einem echten Chronographen."
+    g_games:
+      title: Spiele, Clubs und Staff-Seiten
+      items:
+        - "Spielplanung, mit einer öffentlichen Seite pro Feld und offenen iCalendar- und
+          JSON-Feeds seiner Spiele (ohne persönliche Daten)."
+        - "Die Anmeldung zu diesen Spielen, mit vorab angegebenen Repliken und einem Check-in-Ticket:
+          Der Feld-Controller holt die Liste und meldet, wer gekommen ist. Anmeldung aus der App;
+          Import einer Anmeldeliste (CSV oder JSON), die von einer anderen Plattform exportiert
+          wurde."
+        - "Club-Profile: Name, Farbe, Logo und Wappen, Mitglieder, eine öffentliche Seite, standardmäßig
+          aus, mit Melde-Knopf und Moderation. Branding und gespeicherte Teams eines Felds werden
+          mit seinen Controllern synchronisiert, sodass das Wappen eines Clubs jedes Feld erreicht,
+          das sein Team gespeichert hat."
+        - "Spielverlauf: Punkteverlauf und Ereignislog jedes Spiels; Spielende und Zuschauende sehen
+          ein laufendes Spiel eine Minute verzögert, ohne Geheimnisse oder Spieler-IDs. Eine
+          öffentliche Anzeigetafel pro Feld (standardmäßig aus)."
+        - "Die Szenario-Bibliothek des Felds mit ihren Spiel-Presets, so geprüft, wie der
+          Feld-Controller sie prüft, und von jedem Controller des Felds installiert, einer
+          Reserve eingeschlossen."
+        - "Webseiten für das Staff des Felds, auf Portugiesisch und Englisch und auf dem Handy:
+          Anmeldung mit dem Zwei-Faktor-Code, Spielverlauf, Szenario-Bibliothek (jedes Problem vor
+          dem Speichern gezeigt, Revisionen und Presets), Gerätezustand sowie Live-Ansicht und
+          Befehle der Remote-Spielleitung. Im Headless-Browser getestet, noch nicht auf einem
+          echten Server."
+    g_boxes:
+      title: Boxen und das Feld
+      items:
+        - "Gerätezustand: Akku, Verbindung und Firmware jeder Box aus dem, was die Controller senden;
+          der Feld-Controller meldet eine Box, die verstummt oder zurückkommt, und einen niedrigen
+          Akkustand, den eine Box mit Akku-Anzeige auch selbst meldet. Noch nicht auf echten
+          Boards."
+        - "Ein Firmware-Katalog, der nur mit einem vertrauenswürdigen Schlüssel signierte Releases
+          auflistet, und Firmware-Updates per Funk für die Field Box: Die Spielleitung lädt ein
+          signiertes Release in den Feld-Controller hoch und aktualisiert die Boxen zwischen den
+          Spielen, nie während eines; jede Box lädt es über das Feld-WLAN, prüft die Signatur mit
+          Schlüsseln, die in ihre Firmware eingebaut sind, installiert es in ihrem freien Slot und
+          kehrt zur alten Firmware zurück, wenn die neue nicht startet. In Software, noch nicht auf
+          einem echten Board."
+        - "Boxen ins Feld aufnehmen mit einer NFC-Feldkarte, dem USB-Kabel des Controllers oder dem
+          6-stelligen Code, den die Box zeigt, gekoppelt über Funk. In Software, noch nicht auf
+          einem echten Board."
+        - "Boxen per Funk ins nächste Spiel einladen, ohne Karte oder QR-Code (der Beitritt reist
+          verschlüsselt unter einem aus dem Feld-Beitrittsschlüssel abgeleiteten Schlüssel), und ein
+          Start, der wartet, bis jede Rolle eine Box hat, außer die Spielleitung wählt „Trotzdem
+          starten“. Auf zwei Labortisch-Boards mit dem Feld-Controller getestet."
+        - "Boxen, die in jedem neuen Spiel gehört werden (der Nonce-Zähler des Funks ist jetzt pro
+          Spiel, eine Korrektur vom Labortisch), und Box-Bildschirme, die dem Spiel folgen (Bereit,
+          Warten, Neutral), in der Sprache des Felds, Englisch oder Portugiesisch. Auf zwei
+          Labortisch-Boards getestet."
+        - "Ein mitten im Spiel neu gestarteter Controller nimmt das Spiel wieder auf; einer, der den
+          Spielschlüssel verloren hat, sagt seinen Boxen über das Feld-Funknetz trotzdem, dass das
+          Spiel vorbei ist; falsche Admin-PINs warten immer länger, über Neustarts hinweg gezählt,
+          ohne Standard-PIN auf einer echten Box. In Software, noch nicht auf den Labortisch-Boards."
+        - "Die Remote-Spielleitung: Eine Orga mit der GM-Rolle, per Zwei-Faktor-Code angemeldet, sieht
+          das laufende Spiel und startet, pausiert, setzt fort oder beendet es, oder schickt eine
+          Nachricht oder einen Modus-Befehl, über eine Verbindung, die der Feld-Controller selbst
+          öffnet, nur wenn das Feld es einschaltet, jeder Befehl auf beiden Seiten protokolliert."
+    g_deploy:
+      title: Deployment und Hosted-Modus
+      items:
+        - "Das Deployment: HTTPS über Caddy mit automatischem Zertifikat, ein Setup-Skript, das alle
+          Geheimnisse erzeugt, verschlüsselte tägliche Backups und eine Wiederherstellung in eine
+          frische Datenbank. In Docker auf einem Computer getestet, nicht auf einem echten Server
+          mit echter Domain."
+        - "Hosted-Modus: ein Server für viele Felder, jedes in einem eigenen Datenbankschema unter
+          eigener Adresse, mit Row-Level-Security darunter, sodass kein Feld je die Daten eines
+          anderen sieht, und die Befehle der Betreiber, um die Daten eines Felds zu exportieren oder
+          zu löschen. Gegen PostgreSQL in Docker getestet."
+        - "Sein Deployment: ein Setup-Skript, das die Datenbankrollen des Hubs anlegt, jedes Feld
+          unter eigener Adresse mit einem Zertifikat, das nur der Name eines aktiven Felds bekommen
+          kann, und verschlüsselte Backups, wiederhergestellt mit jedem Feld getrennt von den
+          anderen. In Docker getestet, nicht auf einem echten Hosted-Server mit echter Domain."
+    next:
+      - Ein echter Server mit Domain.
+      - Eine rechtliche Prüfung der Vorlagen, bevor der Hosted-Modus live geht. Vorher wird er nicht angeboten.
+      - "Die Tests auf Hardware: echte Boards, ein echtes ATAK-Handy, eine echte 4G-Verbindung, ein
+        echter Chronograph."
+      - Das Ziel-Addon, auf das die Regeln von Zielfenster warten.
     gate: >-
-      Gate: Ein <a href="{{ page.to.glossary }}#glossar-milsim">Milsim</a>-Wochenende läuft von Anfang
-      bis Ende mit Atalaia.
+      Gate: Ein Wochenend-<a href="{{ page.to.glossary }}#glossar-milsim">Milsim</a> läuft von Anfang
+      bis Ende auf Atalaia.
   p5:
     title: Community
     short: >-
-      Alle Software-Schritte sind gebaut: der visuelle Modus-Editor, live im Simulator getestet;
-      signierte Modus-Pakete, vom Editor selbst erstellt, eine Sandbox-Ausbruch-Testreihe in der CI,
-      der Feld-Controller installiert signierte Modi, Boxen bekommen die signierten Modi, die ihnen
-      fehlen, von der GM-Konsole, Szenarien aus Blöcken in der Konsole, die Modus-Registry als
-      Vorlage bereit, mit ihren Prüfungen und dem Verifiziert-Siegel, Deutsch und traditionelles
-      Chinesisch (KI-Entwürfe, noch nicht von Muttersprachigen geprüft) und
-      <a href="{{ page.to.build }}">Bauanleitungen</a> für Satellit, I/O-Pod und Ziel-Addon, als
-      Text. Es fehlen: das Anlegen des Registry-Repositorys und die Hardware: die Träger-Platine,
-      Fotos echter Builds, Community-Inhalte von einem Feld.
-    text: >-
-      Visueller Modus-Editor, Modus-Registry, Träger-Platine (eine fertige Leiterplatte, die den Bau
-      erleichtert), Übersetzungen, Bauanleitungen für weitere Gerätetypen. In Software gebaut: der
-      visuelle Modus-Editor, eine Seite des Simulators, auf der ein Modus aus Blöcken
-      zusammengesetzt wird (was passiert, wenn ein Team den Knopf hält, Timer, Punkte, Bildschirme
-      und Töne, die Einstellungen, die die Spielleitung ändern kann, und die Logik des
-      Feld-Controllers über mehrere Boxen); er schreibt die Lua-Skripte und das Manifest des Modus
-      während du arbeitest, auf Portugiesisch und Englisch, und läuft offline. Er hat auch Blöcke
-      für Zonen auf der Karte, GM-Befehle, mehrere Rollen und die eigenen Bildschirme des Modus;
-      drei Beispiele bestehen dieselben Tests wie die handgeschriebenen Modi, und ein Knopf probiert
-      den Modus sofort im Simulator aus. Modi reisen als signierte Pakete (ein Archiv, signiert wie
-      ein Firmware-Release); der Feld-Controller installiert sie nur mit seinen eigenen
-      vertrauenswürdigen Schlüsseln, zeigt, wer jedes signiert hat und ob das Projekt es geprüft
-      hat. Der Editor erstellt auch selbst das Paket des Modus, genau das Archiv, das das
-      Pack-Werkzeug erstellt, und zeigt, was der Modus-Schlüssel signieren wird, und den Befehl
-      dazu; signiert wird weiterhin offline auf dem eigenen Computer. Eine Reihe von
-      Ausbruchsversuchen läuft bei jeder Änderung und hat zwei Wege geschlossen, auf denen ein
-      Skript sein Zeitlimit überziehen konnte. In der GM-Konsole wird einer Box, der der Modus eines
-      Spiels fehlt, dieser angeboten: <em>Fehlende Modi senden</em> lädt sie erneut ein, und sie
-      holt das signierte Paket über das WLAN des Felds vom Feld-Controller, nur zwischen den
-      Spielen, während das Spiel auf sie wartet; die Box prüft es mit Schlüsseln, die in ihre
-      Firmware eingebaut sind, und behält es (auf einem Computer getestet, noch nicht auf einer
-      echten Box). Szenarien lassen sich jetzt auch in der GM-Konsole aus Blöcken bauen: die Boxen,
-      die Ziele und wer sie sieht, wann sie sich öffnen, was sie erfüllt und was sie bringen, mit
-      Maus, Touch oder Tastatur, auf Portugiesisch und Englisch, sogar auf dem Handy; der
-      Feld-Controller prüft und installiert sie genau so, als wären sie von Hand geschrieben. Die
-      Registry, in der Autorinnen und Autoren ihre Modi teilen, ist als Vorlage bereit: Ein
-      Pull-Request mit einem signierten Modus wird automatisch geprüft (seine Signatur, dass sein
-      Quelltext das Signierte ist, seine Lizenz, seine Tests im Simulator), und ein vom Projekt
-      geprüfter Modus bekommt das Verifiziert-Siegel, die eigene Signatur des Projekts, die ihn erst
-      zu den Boxen lässt. Wie man einen Modus einreicht, die Prüfliste, Schlüssel und Moderation
-      sind aufgeschrieben. Atalaia gibt es jetzt auch auf Deutsch und in traditionellem
-      Chinesisch, wie es in Taiwan geschrieben wird (diese Seite, die GM-Konsole, der Modus-Editor,
-      die App, die Bildschirme der Field Box, die eingebauten Modi und die Seiten des Site-Servers),
-      beides von einem KI-Modell entworfen und noch
-      nicht von Spielenden geprüft, die diese Sprachen sprechen: Wenn du auf Deutsch oder
-      Chinesisch spielst, hilf uns beim Prüfen. Als Nächstes: die Registry aus ihrer Vorlage
-      anlegen; die Prüfung des Deutschen und des Chinesischen; die Träger-Platine nach den ersten
-      gebauten Boxen.
+      Visueller Modus-Editor, signierte Modus-Pakete, die Modus-Registry als Vorlage, Deutsch und
+      traditionelles Chinesisch, Bauanleitungen. Alle Software-Schritte sind gebaut.
+    done:
+      - "<strong>Der visuelle Modus-Editor</strong>: eine Seite des Simulators, auf der ein Modus
+        aus Blöcken zusammengesetzt wird (was passiert, wenn ein Team den Knopf hält, Timer, Punkte,
+        Bildschirme und Töne, Zonen auf der Karte, GM-Befehle, mehrere Rollen, die Einstellungen,
+        die die Spielleitung ändern kann, und die Logik des Feld-Controllers über mehrere Boxen).
+        Er schreibt die Lua-Skripte und das Manifest des Modus während du arbeitest, auf
+        Portugiesisch und Englisch, läuft offline, und ein Knopf probiert den Modus sofort im
+        Simulator aus. Seine drei Beispiele bestehen dieselben Tests wie die handgeschriebenen
+        Modi."
+      - "<strong>Signierte Modus-Pakete</strong>: ein Archiv, signiert wie ein Firmware-Release. Der
+        Editor erstellt das Paket des Modus selbst und zeigt, was der Modus-Schlüssel signieren
+        wird, und den Befehl dazu; signiert wird weiterhin offline auf dem eigenen Computer."
+      - "Der Feld-Controller installiert signierte Modi nur mit seinen eigenen vertrauenswürdigen
+        Schlüsseln und zeigt, wer jeden signiert hat und ob das Projekt ihn geprüft hat."
+      - "Eine Reihe von Sandbox-Ausbruchsversuchen läuft bei jeder Änderung; sie hat zwei Wege
+        geschlossen, auf denen ein Skript sein Zeitlimit überziehen konnte."
+      - "<em>Fehlende Modi senden</em> in der GM-Konsole: Eine Box, der der Modus eines Spiels fehlt,
+        holt das signierte Paket über das Feld-WLAN vom Feld-Controller, nur zwischen den Spielen,
+        während das Spiel auf sie wartet; sie prüft es mit Schlüsseln, die in ihre Firmware
+        eingebaut sind, und behält es. Auf einem Computer getestet, nicht auf einer echten Box."
+      - "Szenarien aus Blöcken in der GM-Konsole: die Boxen, die Ziele und wer sie sieht, wann sie
+        sich öffnen, was sie erfüllt und was sie bringen, mit Maus, Touch oder Tastatur, sogar auf
+        dem Handy. Der Feld-Controller prüft und installiert sie, als wären sie von Hand
+        geschrieben."
+      - "<strong>Die Modus-Registry</strong>, als Vorlage bereit: Ein Pull-Request mit einem
+        signierten Modus wird automatisch geprüft (seine Signatur, dass sein Quelltext das
+        Signierte ist, seine Lizenz, seine Tests im Simulator), und ein vom Projekt geprüfter Modus
+        bekommt das Verifiziert-Siegel, die eigene Signatur des Projekts, die ihn erst zu den Boxen
+        lässt. Wie man einen Modus einreicht, die Prüfliste, Schlüssel und Moderation sind
+        aufgeschrieben."
+      - "<strong>Deutsch und traditionelles Chinesisch</strong> (wie in Taiwan geschrieben) auf
+        dieser Seite, in der GM-Konsole, im Modus-Editor, in der App, auf den Bildschirmen der Field
+        Box, in den eingebauten Modi und auf den Seiten des Site-Servers: KI-Entwürfe, noch nicht
+        von Spielenden geprüft, die diese Sprachen sprechen."
+      - >-
+        <a href="{{ page.to.build }}">Bauanleitungen</a> für Satellit, I/O-Pod und Ziel-Addon, als
+        Text. Noch keine Box wurde danach gebaut.
+    next:
+      - Das Registry-Repository aus seiner Vorlage anlegen (Aufgabe der Projektbetreuung).
+      - "Die Prüfung des Deutschen und des Chinesischen: Wenn du auf Deutsch oder Chinesisch
+        spielst, hilf uns beim Prüfen. Übersetzungen in andere Sprachen beginnen in
+        docs/translations (auf Englisch)."
+      - "Die Hardware: die Träger-Platine (eine fertige Leiterplatte, die den Bau erleichtert) nach
+        den ersten gebauten Boxen, Fotos echter Builds, Community-Inhalte von einem Feld."
     gate: Fortlaufend nach dem ersten Release.
 
 build:

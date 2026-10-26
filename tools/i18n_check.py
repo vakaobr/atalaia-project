@@ -77,6 +77,10 @@ def flatten(data: object, prefix: str = "") -> dict[str, str]:
     if isinstance(data, dict):
         for k, v in data.items():
             out.update(flatten(v, f"{prefix}{k}."))
+    elif isinstance(data, list) and all(isinstance(v, str) for v in data):
+        # A list of texts (the project page's bullets): name.0, name.1... as in tools/build_site.py.
+        for number, item in enumerate(data):
+            out[f"{prefix}{number}"] = item
     else:
         out[prefix[:-1]] = data if isinstance(data, str) else json.dumps(data)
     return out

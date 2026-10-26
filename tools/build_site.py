@@ -36,7 +36,10 @@ site/src/partials/<name>.html (the head, header and footer every page shares).
 Lines between {% if lang en %} and {% endif %}, each tag on a line of its own,
 appear only on the pages of the languages listed (for a picture with English
 text in it, say). Nested keys in the YAML files are joined with dots
-(why.local.title).
+(why.local.title). A YAML list of texts becomes the keys name.0, name.1...;
+{{ name|list }} makes a <li>...</li> line of each item, to go inside a <ul>, and
+every language must have as many items in a list as the first (the roadmap's
+bullets).
 
 A diagram template is an SVG file with the same placeholders, apart from plain
 {{ key }}: its text is always escaped. Lines between {% if layout wide %} and
@@ -172,10 +175,10 @@ IF_LANG = re.compile(r"^[ \t]*\{%\s*if\s+lang\s+([a-z -]+?)\s*%\}[ \t]*\n(.*?)^[
 # {% if layout wide %} ... {% endif %}, in diagram templates only; blocks do not nest.
 IF_LAYOUT = re.compile(r"^[ \t]*\{%\s*if\s+layout\s+([a-z ]+?)\s*%\}[ \t]*\n(.*?)^[ \t]*\{%\s*endif\s*%\}[ \t]*\n",
                        re.S | re.M)
-PLACEHOLDER = re.compile(r"\{\{\s*([A-Za-z0-9_.]+)\s*(?:\|\s*(text|wrap)\s*)?\}\}")
+PLACEHOLDER = re.compile(r"\{\{\s*([A-Za-z0-9_.]+)\s*(?:\|\s*(text|wrap|list)\s*)?\}\}")
 # A <text> element whose only content is a placeholder: its text is measured.
 TEXT_PLACEHOLDER = re.compile(
-    r"(<text\b[^>]*?)\s*>\s*\{\{\s*([A-Za-z0-9_.]+)\s*(?:\|\s*(text|wrap)\s*)?\}\}\s*</text>")
+    r"(<text\b[^>]*?)\s*>\s*\{\{\s*([A-Za-z0-9_.]+)\s*(?:\|\s*(text|wrap|list)\s*)?\}\}\s*</text>")
 SCHEME = re.compile(r"[a-z][a-z0-9+.-]*:", re.I)
 SVG_NS = "http://www.w3.org/2000/svg"
 DATA_ATTRIBUTES = ("data-key", "data-filter", "data-width", "data-lines", "data-leading")
@@ -272,10 +275,43 @@ def flatten(data: Any, prefix: str, path: Path) -> dict[str, str]:
             flat.update(flatten(value, name, path))
         elif isinstance(value, str):
             flat[name] = value.strip()
+        elif isinstance(value, list):
+            # A list of texts becomes name.0, name.1... ({{ name|list }} makes its <li> items).
+            for number, item in enumerate(value):
+                if not isinstance(item, str):
+                    raise SiteError(f"{rel(path)}: {name} must be a list of texts, "
+                                    f"item {number + 1} is {type(item).__name__}")
+                flat[f"{name}.{number}"] = item.strip()
+            if not value:
+                raise SiteError(f"{rel(path)}: {name} is an empty list")
         else:
-            raise SiteError(f"{rel(path)}: {name} must be text, not {type(value).__name__}")
+            raise SiteError(f"{rel(path)}: {name} must be text or a list of texts, not {type(value).__name__}")
     return flat
 
+
+def list_keys(texts: dict[str, str], name: str) -> list[str]:
+    """The keys name.0, name.1... of a list in the language files, in order (none if it is no list)."""
+    keys = []
+    while f"{name}.{len(keys)}" in texts:
+        keys.append(f"{name}.{len(keys)}")
+    return keys
+
+
+def list_lengths(texts: dict[str, str]) -> dict[str, int]:
+    """Every list's name and its number of items, from the keys name.0, name.1..."""
+    names = {key.rsplit(".", 1)[0] for key in texts if re.fullmatch(r".+\.\d+", key)}
+    return {name: len(list_keys(texts, name)) for name in names}
+
+
+def template_keys(template: str, texts: dict[str, str]) -> set[str]:
+    """The language-file keys a template uses (a {{ list|list }} uses all of the list's items)."""
+    keys: set[str] = set()
+    for match in PLACEHOLDER.finditer(template):
+        name = match.group(1)
+        if name.startswith("page."):
+            continue
+        keys |= set(list_keys(texts, name)) or {name} if match.group(2) == "list" else {name}
+    return keys
 
 # A space YAML folding left between Han letters, or beside full-width punctuation, (a line of the
 # file broken between two of them), which a browser would show: Chinese has no spaces between
@@ -494,6 +530,9 @@ def render(template: str, texts: dict[str, str], values: dict[str, str], source:
             return values[key]
         if escape == "wrap":
             raise SiteError(f"{rel(source)}: {{{{ {key}|wrap }}}} works only in a diagram")
+        if escape == "list":
+            items = list_keys(texts, key)
+            return "\n".join(f"<li>{fill(texts[item], values, item, file_name)}</li>" for item in items)
         value = fill(texts[key], values, key, file_name)  # every key is known to exist: see build()
         return html.escape(value, quote=True) if escape else value
 
@@ -642,7 +681,7 @@ def render_diagram(template: str, source: Path, texts: dict[str, str], lang: Lan
 
     def mark(match: re.Match[str]) -> str:
         attributes, key, how = match.group(1), match.group(2), match.group(3)
-        if key.startswith("page.") or not how:
+        if key.startswith("page.") or how not in ("text", "wrap"):
             return match.group(0)  # filled in, or refused, below
         value = html.escape(fill(texts[key], values, key, file_name), quote=True)  # every key exists: see build()
         return f'{attributes} data-key="{key}" data-filter="{how}">{value}</text>'
@@ -772,7 +811,7 @@ def build() -> dict[Path, str]:
                                 f"lines of its own, or an {{% include %}} is not on a line of its own")
             page_templates[page.name, lang] = page_template
             names = {m.group(1) for m in PLACEHOLDER.finditer(page_template)}
-            keys = {name for name in names if not name.startswith("page.")} | meta_keys(page, names, texts)
+            keys = template_keys(page_template, texts) | meta_keys(page, names, texts)
             for key in keys - texts.keys():
                 missing.setdefault(key, []).append(rel(path))
             used |= keys
@@ -784,7 +823,7 @@ def build() -> dict[Path, str]:
                     raise SiteError(f"{rel(source)}: an {{% if %}} block is not closed, nested, "
                                     f"or not on lines of its own")
                 variants[lang].append((diagram_path(source, layout, lang), source, variant))
-                keys = {m.group(1) for m in PLACEHOLDER.finditer(variant) if not m.group(1).startswith("page.")}
+                keys = template_keys(variant, texts)
                 for key in keys - texts.keys():
                     missing.setdefault(key, []).append(rel(source))
                 used |= keys
@@ -794,6 +833,15 @@ def build() -> dict[Path, str]:
                             f"{'every page' if len(where) == len(PAGES) else ', '.join(where)})")
         for key in sorted(texts.keys() - used):
             problems.append(f"{file_name}: {key} is not used by {users}")
+    # Every language's lists must be as long as the first's: a bullet missing in one language would
+    # otherwise go unnoticed (the keys it has are all used).
+    first_lengths = list_lengths(all_texts[LANGUAGES[0]])
+    for lang in LANGUAGES[1:]:
+        lengths = list_lengths(all_texts[lang])
+        for name in sorted(first_lengths.keys() | lengths.keys()):
+            if first_lengths.get(name) != lengths.get(name):
+                problems.append(f"{rel(I18N / f'{lang.code}.yaml')}: the list {name} has "
+                                f"{lengths.get(name, 0)} items, {LANGUAGES[0].code} has {first_lengths.get(name, 0)}")
     if problems:
         raise SiteError("\n".join(problems))
 

@@ -395,6 +395,42 @@ pre {
 }
 .phases p { margin: 6px 0 0; color: var(--muted); }
 .phases .gate { font-size: 0.95rem; color: var(--text); }
+/* A phase on the roadmap page: a summary line, then short parts (what is done, what is next) as bullets; a long done
+   list folds into a <details> that works without JavaScript. */
+.phases .summary { color: var(--text); font-size: 1.05rem; }
+.phases h3 {
+  margin: 18px 0 0;
+  font-family: var(--body);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.phases h4 { margin: 16px 0 0; font-family: var(--display); font-size: 1.1rem; font-weight: 600; line-height: 1.2; }
+.phases .bullets { margin: 6px 0 0; padding-left: 1.2em; }
+.phases .bullets li { position: static; margin: 0 0 6px; padding: 0; color: var(--muted); }
+.phases .bullets li::before, .phases .bullets li::after { content: none; display: none; }
+.phases .bullets li strong { color: var(--text); }
+.phases .more {
+  margin: 12px 0 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.phases .more > summary {
+  padding: 10px 14px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+}
+.phases .more > summary:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.phases .more[open] > summary { border-bottom: 1px solid var(--line); }
+.phases .more > h4, .phases .more > .bullets { margin-left: 14px; margin-right: 14px; }
+.phases .more > h4:first-of-type { margin-top: 12px; }
+.phases .more > .bullets:last-child { margin-bottom: 12px; }
+.phases .more > .bullets { padding-left: 1.2em; }
+.phases .status-link { font-size: 0.95rem; }
 .tag {
   display: inline-block;
   margin-bottom: 4px;

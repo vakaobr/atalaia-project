@@ -2,7 +2,8 @@
 SPDX-FileCopyrightText: 2026 The Atalaia contributors
 SPDX-License-Identifier: CC-BY-SA-4.0
 
-The roadmap page: the six phases in full, with their gates. Built into
+The roadmap page: the six phases, each short and scannable: a one-line summary,
+what is done as bullets (a long list folds into a <details>), what is next, the gate. Built into
 site/roadmap/ in both languages ("Roadmap" stays in English in Portuguese too);
 the main page has a one-line-per-phase version that links here. Keep the
 phases' status tags (done, software, current with class "now", designed)
@@ -27,12 +28,145 @@ docs/phase-*/STATUS.md. See site/README.md.
     <div class="content band">
       <div class="wrap">
         <ol class="phases">
-          <li id="phase-0"><span class="tag">{{ roadmap.done }}</span><h2>0 · {{ roadmap.p0.title }}</h2><p>{{ roadmap.p0.text }}</p><p class="gate">{{ roadmap.p0.gate }}</p></li>
-          <li id="phase-1"><span class="tag">{{ roadmap.software }}</span><h2>1 · {{ roadmap.p1.title }}</h2><p>{{ roadmap.p1.text }}</p><p class="gate">{{ roadmap.p1.gate }}</p></li>
-          <li id="phase-2"><span class="tag">{{ roadmap.software }}</span><h2>2 · {{ roadmap.p2.title }}</h2><p>{{ roadmap.p2.text }}</p><p class="gate">{{ roadmap.p2.gate }}</p></li>
-          <li id="phase-3" class="now"><span class="tag">{{ roadmap.current }}</span><h2>3 · {{ roadmap.p3.title }}</h2><p>{{ roadmap.p3.text }}</p><p>{{ roadmap.p3.done }}</p><p>{{ roadmap.p3.todo }}</p><p class="gate">{{ roadmap.p3.gate }}</p></li>
-          <li id="phase-4"><span class="tag">{{ roadmap.software }}</span><h2>4 · {{ roadmap.p4.title }}</h2><p>{{ roadmap.p4.text }}</p><p>{{ roadmap.p4.done }}</p><p class="gate">{{ roadmap.p4.gate }}</p></li>
-          <li id="phase-5"><span class="tag">{{ roadmap.software }}</span><h2>5 · {{ roadmap.p5.title }}</h2><p>{{ roadmap.p5.text }}</p><p class="gate">{{ roadmap.p5.gate }}</p></li>
+          <li id="phase-0">
+            <span class="tag">{{ roadmap.done }}</span>
+            <h2>0 · {{ roadmap.p0.title }}</h2>
+            <p class="summary">{{ roadmap.p0.short }}</p>
+            <h3>{{ roadmap.part_done }}</h3>
+            <ul class="bullets">
+{{ roadmap.p0.done|list }}
+            </ul>
+            <p class="gate">{{ roadmap.p0.gate }}</p>
+          </li>
+          <li id="phase-1">
+            <span class="tag">{{ roadmap.software }}</span>
+            <h2>1 · {{ roadmap.p1.title }}</h2>
+            <p class="summary">{{ roadmap.p1.short }}</p>
+            <h3>{{ roadmap.part_done }}</h3>
+            <ul class="bullets">
+{{ roadmap.p1.done|list }}
+            </ul>
+            <h3>{{ roadmap.part_next }}</h3>
+            <ul class="bullets">
+{{ roadmap.p1.next|list }}
+            </ul>
+            <p class="gate">{{ roadmap.p1.gate }}</p>
+            <p class="status-link"><a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/phase-1-single-box/STATUS.md">{{ roadmap.status_link }}</a></p>
+          </li>
+          <li id="phase-2">
+            <span class="tag">{{ roadmap.software }}</span>
+            <h2>2 · {{ roadmap.p2.title }}</h2>
+            <p class="summary">{{ roadmap.p2.short }}</p>
+            <h3>{{ roadmap.part_done }}</h3>
+            <ul class="bullets">
+{{ roadmap.p2.done|list }}
+            </ul>
+            <h3>{{ roadmap.part_next }}</h3>
+            <ul class="bullets">
+{{ roadmap.p2.next|list }}
+            </ul>
+            <p class="gate">{{ roadmap.p2.gate }}</p>
+            <p class="status-link"><a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/phase-2-field-network/STATUS.md">{{ roadmap.status_link }}</a></p>
+          </li>
+          <li id="phase-3" class="now">
+            <span class="tag">{{ roadmap.current }}</span>
+            <h2>3 · {{ roadmap.p3.title }}</h2>
+            <p class="summary">{{ roadmap.p3.short }}</p>
+            <h3>{{ roadmap.part_done }}</h3>
+            <ul class="bullets">
+{{ roadmap.p3.done|list }}
+            </ul>
+            <details class="more">
+              <summary>{{ roadmap.part_more }}</summary>
+              <h4>{{ roadmap.p3.g_modes.title }}</h4>
+              <ul class="bullets">
+{{ roadmap.p3.g_modes.items|list }}
+              </ul>
+              <h4>{{ roadmap.p3.g_players.title }}</h4>
+              <ul class="bullets">
+{{ roadmap.p3.g_players.items|list }}
+              </ul>
+              <h4>{{ roadmap.p3.g_props.title }}</h4>
+              <ul class="bullets">
+{{ roadmap.p3.g_props.items|list }}
+              </ul>
+              <h4>{{ roadmap.p3.g_controller.title }}</h4>
+              <ul class="bullets">
+{{ roadmap.p3.g_controller.items|list }}
+              </ul>
+              <h4>{{ roadmap.p3.g_ios.title }}</h4>
+              <ul class="bullets">
+{{ roadmap.p3.g_ios.items|list }}
+              </ul>
+            </details>
+            <h3>{{ roadmap.part_next }}</h3>
+            <ul class="bullets">
+{{ roadmap.p3.next|list }}
+            </ul>
+            <p class="gate">{{ roadmap.p3.gate }}</p>
+            <p class="status-link"><a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/phase-3-android-players/STATUS.md">{{ roadmap.status_link }}</a></p>
+          </li>
+          <li id="phase-4">
+            <span class="tag">{{ roadmap.software }}</span>
+            <h2>4 · {{ roadmap.p4.title }}</h2>
+            <p class="summary">{{ roadmap.p4.short }}</p>
+            <h3>{{ roadmap.part_done }}</h3>
+            <ul class="bullets">
+{{ roadmap.p4.done|list }}
+            </ul>
+            <details class="more">
+              <summary>{{ roadmap.part_more }}</summary>
+              <h4>{{ roadmap.p4.g_modes.title }}</h4>
+              <ul class="bullets">
+{{ roadmap.p4.g_modes.items|list }}
+              </ul>
+              <h4>{{ roadmap.p4.g_scenarios.title }}</h4>
+              <ul class="bullets">
+{{ roadmap.p4.g_scenarios.items|list }}
+              </ul>
+              <h4>{{ roadmap.p4.g_atak.title }}</h4>
+              <ul class="bullets">
+{{ roadmap.p4.g_atak.items|list }}
+              </ul>
+              <h4>{{ roadmap.p4.g_server.title }}</h4>
+              <ul class="bullets">
+{{ roadmap.p4.g_server.items|list }}
+              </ul>
+              <h4>{{ roadmap.p4.g_games.title }}</h4>
+              <ul class="bullets">
+{{ roadmap.p4.g_games.items|list }}
+              </ul>
+              <h4>{{ roadmap.p4.g_boxes.title }}</h4>
+              <ul class="bullets">
+{{ roadmap.p4.g_boxes.items|list }}
+              </ul>
+              <h4>{{ roadmap.p4.g_deploy.title }}</h4>
+              <ul class="bullets">
+{{ roadmap.p4.g_deploy.items|list }}
+              </ul>
+            </details>
+            <h3>{{ roadmap.part_next }}</h3>
+            <ul class="bullets">
+{{ roadmap.p4.next|list }}
+            </ul>
+            <p class="gate">{{ roadmap.p4.gate }}</p>
+            <p class="status-link"><a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/phase-4-site-server/STATUS.md">{{ roadmap.status_link }}</a></p>
+          </li>
+          <li id="phase-5">
+            <span class="tag">{{ roadmap.software }}</span>
+            <h2>5 · {{ roadmap.p5.title }}</h2>
+            <p class="summary">{{ roadmap.p5.short }}</p>
+            <h3>{{ roadmap.part_done }}</h3>
+            <ul class="bullets">
+{{ roadmap.p5.done|list }}
+            </ul>
+            <h3>{{ roadmap.part_next }}</h3>
+            <ul class="bullets">
+{{ roadmap.p5.next|list }}
+            </ul>
+            <p class="gate">{{ roadmap.p5.gate }}</p>
+            <p class="status-link"><a href="https://github.com/vakaobr/atalaia-project/blob/main/docs/phase-5-community/STATUS.md">{{ roadmap.status_link }}</a></p>
+          </li>
         </ol>
       </div>
     </div>
