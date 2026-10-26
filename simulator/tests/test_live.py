@@ -285,7 +285,7 @@ class LiveInputTests(unittest.TestCase):
 
     def test_a_node_offers_what_its_role_uses(self):
         none = {"nfc": False, "keypad": False, "hit": False, "set_owner": False, "commands": []}
-        self.assertEqual(self.inputs("domination", "zone"), none)
+        self.assertEqual(self.inputs("domination", "zone"), {**none, "set_owner": True})
         self.assertEqual(self.inputs("holdall", "zone"), {**none, "set_owner": True})
         self.assertEqual(self.inputs("target_windows", "target"), {**none, "hit": True})
         self.assertEqual(self.inputs("kill_confirmed", "station"), {**none, "nfc": True})

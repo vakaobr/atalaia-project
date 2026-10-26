@@ -19,20 +19,18 @@ end
 on("game.start", show)
 
 local function capture(team, squad)
-  local previous = s.owner
+  emit("zone.captured", { team = team, squad = squad, previous_team = s.owner })
   s.owner = team
   s.since = math.floor(game.time())
   cap("team_display"):show(team)
   audio.play("captured")
-  emit("zone.captured", { team = team, squad = squad, previous_team = previous })
   show()
 end
 
 on("team_input.hold", function(e)
-  if e.team == s.owner or e.ms < params.capture_hold_ms then
-    return
+  if e.team ~= s.owner and e.ms >= params.capture_hold_ms then
+    capture(e.team, e.squad)
   end
-  capture(e.team, e.squad)
 end)
 
 -- The GM's owner override from the console (decision E7): a team, or none to
