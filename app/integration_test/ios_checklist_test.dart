@@ -37,6 +37,7 @@ import 'package:atalaia_app/checkin/my_replicas.dart';
 import 'package:atalaia_app/controller/field_tls.dart';
 import 'package:atalaia_app/l10n/strings.dart';
 import 'package:atalaia_app/platform/channels.dart';
+import 'package:atalaia_app/platform/location.dart';
 import 'package:atalaia_app/platform/platform_check.dart';
 import 'package:atalaia_app/player/field_buzz.dart';
 import 'package:atalaia_app/player/field_feed.dart';
@@ -633,19 +634,25 @@ void main() {
     timeout: const Timeout(Duration(minutes: 3)),
   );
 
-  // --- 6: QR is unavailable ----------------------------------------------------
+  // --- 6: QR ---------------------------------------------------------------------
 
   itest(
-    '6. scanning a QR code is offered as unavailable, typing stays, no crash',
+    '6. with no camera (the simulator), scanning is offered as unavailable, '
+    'typing stays, no crash',
     (tester) async {
       if (_skipped(_androidHasIt)) {
+        return;
+      }
+      if (await ChannelQrScanner().available) {
+        // A phone with a camera (iOS-13): the scanner itself is a person's
+        // check (point it at a join card or the field's poster).
+        markTestSkipped('this phone has a camera: scan a real code by hand');
         return;
       }
       await tester.pumpWidget(deviceApp());
       await waitFor(tester, find.byKey(const Key('role-player')));
       await tapVisible(tester, find.byKey(const Key('role-player')));
       await waitFor(tester, find.byKey(const Key('player-scan')));
-      expect(await ChannelQrScanner().available, isFalse);
       await tapVisible(tester, find.byKey(const Key('player-scan')));
       await tester.pumpAndSettle();
       expect(
@@ -662,12 +669,17 @@ void main() {
 
   // --- 8: position sharing ------------------------------------------------------
 
-  itest('8. sharing the position is refused cleanly, not a crash', (
-    tester,
-  ) async {
+  itest('8. sharing the position: the switch, the iOS note, and sharing '
+      'when the phone already allows it', (tester) async {
     if (_skipped(_androidHasIt)) {
       return;
     }
+    // iOS-16: positions while the app is in front. A test cannot answer the
+    // system's permission prompt, so sharing is only turned on when the phone
+    // already allows it (`xcrun simctl privacy booted grant location
+    // org.atalaia.app` in the simulator); otherwise refused cleanly.
+    final location = ChannelLocationService();
+    final allowed = await location.available() && await location.granted();
     final feed =
         FieldFeed(
             FieldLink.parse('127.0.0.1:1', 'x')!,
@@ -707,17 +719,26 @@ void main() {
     await tester.pumpAndSettle();
     final share = find.byKey(const Key('player-share-position'));
     await reveal(tester, share);
+    expect(
+      find.byKey(const Key('player-share-ios-note')),
+      findsOneWidget,
+      reason: 'iOS says it shares only while the app is in front',
+    );
+    if (!allowed) {
+      markTestSkipped(
+        'location not allowed for the app yet: the prompt is a person\'s '
+        'check (or grant it with simctl and run again)',
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      return;
+    }
     await tester.tap(share);
     await tester.pumpAndSettle();
     expect(
-      find.text(_s(AppLanguage.pt).t('player.no_location')),
-      findsOneWidget,
-      reason: 'no location here: the app says so',
-    );
-    expect(
       tester.widget<SwitchListTile>(share).value,
-      isFalse,
-      reason: 'sharing did not start',
+      isTrue,
+      reason: 'sharing started',
     );
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
